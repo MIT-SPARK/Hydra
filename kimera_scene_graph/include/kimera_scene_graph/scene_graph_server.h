@@ -19,6 +19,7 @@
 
 #include "kimera_scene_graph/common.h"
 #include "kimera_scene_graph/scene_node.h"
+#include "kimera_scene_graph/dynamic_scene_node.h"
 #include "kimera_scene_graph/object_finder.h"
 #include "kimera_scene_graph/room_finder.h"
 

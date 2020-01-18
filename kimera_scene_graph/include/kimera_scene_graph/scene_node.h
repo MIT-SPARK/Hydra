@@ -5,7 +5,6 @@
 #include <vector>
 
 #include <glog/logging.h>
-
 #include <ros/ros.h>
 #include <visualization_msgs/Marker.h>
 
@@ -19,11 +18,13 @@ typedef std::unordered_map<NodeId, ros::Publisher> NodePclPublishers;
 
 // Forward declare what a SceneNode is.
 class SceneNode;
+
 typedef std::unordered_map<NodeId, SceneNode*> NodeParents;
 typedef std::unordered_map<NodeId, SceneNode*> NodeSiblings;
 typedef std::unordered_map<NodeId, SceneNode*> NodeChildren;
 
 typedef uint8_t InstanceId;
+
 
 struct NodeAttributes {
   Timestamp timestamp_;
@@ -50,6 +51,7 @@ struct SceneNode {
 typedef std::unordered_map<NodeId, SceneNode> NodeIdMap;
 typedef std::pair<NodeId, NodeId> Edge;
 typedef std::vector<Edge> EdgeList;
+
 class SceneGraph {
  public:
   SceneGraph(const ros::NodeHandle& nh,
@@ -274,5 +276,4 @@ class SceneGraphVisualizer {
     }
   }
 };
-
 }  // namespace kimera

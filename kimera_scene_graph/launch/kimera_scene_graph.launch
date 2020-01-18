@@ -11,8 +11,8 @@
 
   <!-- Send colored pointcloud with scene_graph to kimera_scene_graph for 3D segmentation -->
   <!-- launch-prefix=gdb -ex run args" -->
-  <node name="kimera_scene_graph_eval_node" pkg="kimera_scene_graph"
-    type="scene_graph_eval" output="screen"
+  <node name="kimera_scene_graph_node" pkg="kimera_scene_graph"
+    type="kimera_scene_graph_node" output="screen"
     args="-alsologtostderr -colorlogtostderr" clear_params="true">
     <!-- Scene Graph params -->
     <!-- Object Finder Type: 0: region growing, 1: euclidean clustering -->
@@ -30,7 +30,14 @@
     <param name="esdf_min_distance_m"                value="0.2"/>
     <param name="verbose"                            value="true"/>
     <param name="max_attempts_to_generate_viewpoint" value="20"/>
-    <param name="world_frame"                        value="map"/>
+    <param name="world_frame"                        value="world"/>
+    <param name="human_topic"                        value="/human_meshes"/>
+    <param name="filter_by_centroid"                 value="true"/>
+    <param name="filter_by_mesh"                     value="false"/>
+    <param name="feasible_dyn_rate"                  value="3.0"/>
+    <param name="feasible_mesh_rate"                 value="1.5"/>
+    <param name="node_association_time_cap"          value="2.0"/>
+    <param name="min_node_association_dist"          value="0.1"/>
 
     <!-- Params -->
     <param name="max_ray_length_m"          value="10.0" />

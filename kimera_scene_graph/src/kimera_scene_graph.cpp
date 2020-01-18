@@ -20,6 +20,9 @@ int main(int argc, char** argv) {
   // (instead of the SimulationSceneGraphServer).
   // kimera::SceneGraphServer node(nh, nh_private);
 
+  // TODO(Arjun): check how to properly integrate this with SceneGraphServer.
+  kimera::DynamicSceneGraph dynamic_graph(nh, nh_private);
+
   ros::spin();
 
   return EXIT_SUCCESS;
