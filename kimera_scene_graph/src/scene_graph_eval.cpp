@@ -14,7 +14,7 @@ class SceneGraphSimulationServerImpl : public SceneGraphSimulationServer {
                                  const ros::NodeHandle& nh_private)
       : SceneGraphSimulationServer(nh, nh_private) {}
 
-  void prepareWorld() {
+  void prepareWorld() override {
     CHECK(world_);
     world_->addObject(make_unique<vxb::Sphere>(
         vxb::Point(0.0, 0.0, 2.0), 2.0, vxb::Color::Red()));
@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
   kimera::SceneGraphSimulationServerImpl sim_eval(nh, nh_private);
 
   LOG(INFO) << "Starting sim evaluation.";
-  sim_eval.run();
+  //sim_eval.run();
   LOG(INFO) << "Finished sim evaluation.";
   LOG(INFO) << "Starting scene graph construction.";
   sim_eval.sceneGraphReconstruction();

@@ -15,13 +15,14 @@
     type="scene_graph_eval" output="screen"
     args="-alsologtostderr -colorlogtostderr" clear_params="true">
     <!-- Scene Graph params -->
+
     <!-- Object Finder Type: 0: region growing, 1: euclidean clustering -->
     <param name="object_finder_type"                 value="1"/>
 
     <!-- Simulator params -->
     <param name="visualize"                          value="true"/>
-    <param name="tsdf_voxel_size"                    value="0.1"/>
-    <param name="tsdf_voxels_per_side"               value="16"/>
+    <param name="tsdf_voxel_size"                    value="0.05"/>
+    <param name="tsdf_voxels_per_side"               value="32"/>
     <param name="incremental"                        value="false"/>
     <param name="add_robot_pose"                     value="false"/>
     <param name="generate_mesh"                      value="true"/>
@@ -35,7 +36,7 @@
     <!-- Params -->
     <param name="max_ray_length_m"          value="10.0" />
     <param name="min_time_between_msgs_sec" value="0.2" />
-    <param name="voxel_carving_enabled"     value="false" />
+    <param name="voxel_carving_enabled"     value="true" />
     <param name="color_mode"                value="lambert_color"/>
     <param name="use_const_weight"          value="false" />
 
@@ -52,12 +53,22 @@
     <param name="semantic_measurement_probability" value="0.8" />
     <!-- The only dynamic label we have right now are humans, with label 20 -->
     <rosparam param="dynamic_semantic_labels">[20]</rosparam>
+    <!-- Stuff are: walls (19), ceiling and floor (3) -->
+    <rosparam param="stuff_labels">[19, 3]</rosparam>
+    <rosparam param="walls_labels">[19, 12]</rosparam>
+    <rosparam param="floor_labels">[3, 1]</rosparam>
+
+    <param name="load_map" value="$(find kimera_semantics_ros)/tsdf_results/all_tesse.vxblx"/>
 
     <!-- Is this needed? -->
     <param name="slice_level" value="1.0" />
 
     <param name="semantic_label_2_color_csv_filepath"
+    value="$(find kimera_semantics_ros)/cfg/tesse_multiscene_office1_segmentation_mapping.csv"/>
+  <!--
+    <param name="semantic_label_2_color_csv_filepath"
     value="$(find kimera_semantics_ros)/cfg/simulation.csv"/>
+-->
 
     <param name="publish_pointclouds"     value="true"/>
     <param name="update_mesh_every_n_sec" value="0.1" />

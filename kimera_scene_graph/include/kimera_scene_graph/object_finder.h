@@ -15,6 +15,7 @@
 
 // Euclidean pcl
 #include <pcl/ModelCoefficients.h>
+#include <pcl/common/centroid.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/voxel_grid.h>
@@ -22,19 +23,12 @@
 #include <pcl/sample_consensus/model_types.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/segmentation/sac_segmentation.h>
-#include <pcl/common/centroid.h>
 
 #include <kimera_semantics/common.h>
 
 #include "kimera_scene_graph/common.h"
 
 namespace kimera {
-
-typedef pcl::CentroidPoint<Point> Centroid;
-// TODO(Toni): create a structure to hold both Centroids and ObjectPointClouds
-// associated to the centroids in the same object...
-typedef std::vector<Centroid> Centroids;
-typedef std::vector<ColoredPointCloud::Ptr> ObjectPointClouds;
 
 /** TODO(Marcus): this class finds centroids of objects and fills the scene
  * graph layer corresponding to Objects and perhaps Cameras...
@@ -89,10 +83,12 @@ struct EuclideanClusterEstimatorParams {
 template <class T>
 class ObjectFinder {
  public:
+  typedef pcl::PointCloud<T> PointCloudT;
+  typedef std::vector<typename PointCloudT::Ptr> ObjectPointClouds;
+
   ObjectFinder(const std::string& world_frame,
                const ObjectFinderType& object_finder_type)
-    : world_frame_(world_frame),
-      object_finder_type_(object_finder_type) {
+      : world_frame_(world_frame), object_finder_type_(object_finder_type) {
     setupRegionGrowingClusterEstimator();
     setupEuclideanClusterEstimator();
   }
@@ -106,7 +102,7 @@ class ObjectFinder {
    * @return colored pointcloud for cluster visualization...
    */
   ColoredPointCloud::Ptr findObjects(
-      const typename pcl::PointCloud<T>::Ptr& pointcloud,
+      const typename PointCloudT::Ptr& pointcloud,
       Centroids* centroids,
       ObjectPointClouds* object_pcls) {
     CHECK_NOTNULL(centroids);
@@ -132,25 +128,28 @@ class ObjectFinder {
       }
       default: { LOG(FATAL) << "Unknown object finder type..."; }
     }
+    return nullptr;
   }
 
   void updateClusterEstimator(const ObjectFinderType& object_finder_type) {
     object_finder_type_ = object_finder_type;
   }
 
-  void updateRegionGrowingParams(const RegionGrowingClusterEstimatorParams& new_params) {
+  void updateRegionGrowingParams(
+      const RegionGrowingClusterEstimatorParams& new_params) {
     region_growing_estimator_params_ = new_params;
     setupRegionGrowingClusterEstimator();
   }
 
-  void updateEuclideanClusterParams(const EuclideanClusterEstimatorParams& new_params) {
+  void updateEuclideanClusterParams(
+      const EuclideanClusterEstimatorParams& new_params) {
     euclidean_cluster_estimator_params_ = new_params;
     setupEuclideanClusterEstimator();
   }
 
  private:
-  typename pcl::PointCloud<T>::Ptr regionGrowingClusterEstimator(
-      const typename pcl::PointCloud<T>::Ptr& cloud,
+  ColoredPointCloud::Ptr regionGrowingClusterEstimator(
+      const typename PointCloudT::Ptr& cloud,
       Centroids* centroids,
       ObjectPointClouds* object_pcls) {
     typename pcl::search::Search<T>::Ptr tree(new pcl::search::KdTree<T>);
@@ -158,7 +157,7 @@ class ObjectFinder {
     pcl::NormalEstimation<T, pcl::Normal> normal_estimator;
     normal_estimator.setSearchMethod(tree);
     normal_estimator.setKSearch(
-          region_growing_estimator_params_.normal_estimator_neighbour_size_);
+        region_growing_estimator_params_.normal_estimator_neighbour_size_);
 
     normal_estimator.setInputCloud(cloud);
     normal_estimator.compute(*normals);
@@ -185,8 +184,8 @@ class ObjectFinder {
     return region_growing_cluster_estimator_.getColoredCloud();
   }
 
-  typename ColoredPointCloud::Ptr euclideanClusterEstimator(
-      const typename pcl::PointCloud<T>::Ptr& cloud,
+  ColoredPointCloud::Ptr euclideanClusterEstimator(
+      const typename PointCloudT::Ptr& cloud,
       Centroids* centroids,
       ObjectPointClouds* object_pcls) {
     CHECK_NOTNULL(centroids);
@@ -211,8 +210,7 @@ class ObjectFinder {
   ColoredPointCloud::Ptr getColoredCloud(
       const typename pcl::PointCloud<T>::Ptr& input,
       const std::vector<pcl::PointIndices>& clusters) {
-    ColoredPointCloud::Ptr colored_cloud(
-        new ColoredPointCloud);
+    ColoredPointCloud::Ptr colored_cloud(new ColoredPointCloud);
 
     if (!clusters.empty()) {
       srand(static_cast<unsigned int>(time(nullptr)));
@@ -276,13 +274,12 @@ class ObjectFinder {
     object_pcls->resize(cluster_indices.size());
     for (size_t k = 0; k < cluster_indices.size(); ++k) {
       Centroid& centroid = centroids->at(k);
-      ColoredPointCloud::Ptr pcl =
-          boost::make_shared<ColoredPointCloud>();
+      typename PointCloudT::Ptr pcl = boost::make_shared<PointCloudT>();
       const auto& indices = cluster_indices.at(k).indices;
       pcl->resize(indices.size());
       for (size_t i = 0; i < indices.size(); ++i) {
         // For centroid of cluster k, add all points belonging to it.
-        const ColorPoint& color_point = cloud->at(indices.at(i));
+        const T& color_point = cloud->at(indices.at(i));
         centroid.add(Point(color_point.x, color_point.y, color_point.z));
         pcl->at(i) = color_point;
       }
@@ -291,18 +288,25 @@ class ObjectFinder {
   }
 
   void setupRegionGrowingClusterEstimator() {
-    region_growing_cluster_estimator_.setMinClusterSize(region_growing_estimator_params_.min_cluster_size_);
-    region_growing_cluster_estimator_.setMaxClusterSize(region_growing_estimator_params_.max_cluster_size_);
-    region_growing_cluster_estimator_.setNumberOfNeighbours(region_growing_estimator_params_.number_of_neighbours_);
-    region_growing_cluster_estimator_.setSmoothnessThreshold(region_growing_estimator_params_.smoothness_threshold_);
-    region_growing_cluster_estimator_.setCurvatureThreshold(region_growing_estimator_params_.curvature_threshold_);
+    region_growing_cluster_estimator_.setMinClusterSize(
+        region_growing_estimator_params_.min_cluster_size_);
+    region_growing_cluster_estimator_.setMaxClusterSize(
+        region_growing_estimator_params_.max_cluster_size_);
+    region_growing_cluster_estimator_.setNumberOfNeighbours(
+        region_growing_estimator_params_.number_of_neighbours_);
+    region_growing_cluster_estimator_.setSmoothnessThreshold(
+        region_growing_estimator_params_.smoothness_threshold_);
+    region_growing_cluster_estimator_.setCurvatureThreshold(
+        region_growing_estimator_params_.curvature_threshold_);
   }
 
   void setupEuclideanClusterEstimator() {
     euclidean_cluster_estimator_.setClusterTolerance(
-          euclidean_cluster_estimator_params_.cluster_tolerance_);
-    euclidean_cluster_estimator_.setMinClusterSize(euclidean_cluster_estimator_params_.min_cluster_size_);
-    euclidean_cluster_estimator_.setMaxClusterSize(euclidean_cluster_estimator_params_.max_cluster_size_);
+        euclidean_cluster_estimator_params_.cluster_tolerance_);
+    euclidean_cluster_estimator_.setMinClusterSize(
+        euclidean_cluster_estimator_params_.min_cluster_size_);
+    euclidean_cluster_estimator_.setMaxClusterSize(
+        euclidean_cluster_estimator_params_.max_cluster_size_);
   }
 
  private:
@@ -316,4 +320,4 @@ class ObjectFinder {
   pcl::EuclideanClusterExtraction<T> euclidean_cluster_estimator_;
 };
 
-}
+}  // namespace kimera
