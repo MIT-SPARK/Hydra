@@ -29,4 +29,6 @@
   <depend>voxblox_ros</depend>
   <depend>voxblox_msgs</depend>
   <depend>voxblox_rviz_plugin</depend>
+  <depend>voxblox_skeleton</depend>
+  <depend>rviz_visual_tools</depend>
 </package>

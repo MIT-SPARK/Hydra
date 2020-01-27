@@ -8,21 +8,77 @@ namespace kimera {
 
 void RoomFinder::findRooms(const vxb::Mesh& mesh, Centroids* room_centroids) {}
 
+/**
+ * @brief RoomFinder::findRooms
+ * Uses Semantic ESDF to find the rooms
+ * @param cloud
+ * @param room_centroids
+ * @param room_pcls
+ * @return
+ */
 IntensityPointCloud::Ptr RoomFinder::findRooms(
-    const ColoredPointCloud::Ptr& cloud,
+    const IntensityPointCloud::Ptr& cloud,
     Centroids* room_centroids,
-    std::vector<IntensityPointCloud::Ptr>* room_pcls) {
+    std::vector<ColorPointCloud::Ptr>* room_pcls) {
+  LOG(INFO) << "Start Room finding using ESDF";
+  // Downsample pcl
+  IntensityPointCloud::Ptr downsampled_pcl(new IntensityPointCloud());
+  downsampled_pcl = downsamplePcl<IntensityPoint>(cloud, 0.05f);
+
+  // Pass through values below the given esdf truncation
+  // We use -1.0 instead of 0.0 bcs we also want to filter out 0.
+  downsampled_pcl = passThroughFilter1D<IntensityPoint>(
+      downsampled_pcl, "intensity", -1.0, kEsdfTruncation, true);
+
+  // Region growing clustering
+  ObjectFinder<IntensityPoint> object_finder(world_frame_,
+                                             ObjectFinderType::kEuclidean);
+  EuclideanClusterEstimatorParams params;
+  params.min_cluster_size_ = 300;
+  object_finder.updateEuclideanClusterParams(params);
+  std::vector<IntensityPointCloud::Ptr> room_pcls_noncolored;
+  ObjectFinder<IntensityPoint>::BoundingBoxes bounding_boxes;
+  ColorPointCloud::Ptr pcl = object_finder.findObjects(
+      downsampled_pcl, room_centroids, &room_pcls_noncolored, &bounding_boxes);
+  // Generate colored point cloud out of the noncolored rooms pcl.
+  // Repaint room_pcls to uniform color for better visualization of edges.
+  room_pcls->resize(room_pcls_noncolored.size());
+  static constexpr int32_t rgb =
+      (static_cast<uint32_t>(0u) << 16 |
+       static_cast<uint32_t>(255u) << 8 |
+       static_cast<uint32_t>(0u));
+  for (size_t i = 0u; i < room_pcls_noncolored.size(); ++i) {
+    auto& pcl_ptr = room_pcls->at(i);
+    pcl_ptr.reset(new ColorPointCloud);
+    pcl::copyPointCloud(*room_pcls_noncolored.at(i), *pcl_ptr);
+    for (auto& point : pcl_ptr->points) point.rgb = rgb;
+  }
+
+  pcl->header.frame_id = world_frame_;
+  for (auto& it : pcl->points) {
+    // Move all points to level 5
+    it.z = 10;
+  }
+  pcl_pub_.publish(*pcl);
+  LOG(INFO) << "Finished Room finding using ESDF";
+  return downsampled_pcl;
+}
+
+IntensityPointCloud::Ptr RoomFinder::findRooms(
+    const ColorPointCloud::Ptr& cloud,
+    Centroids* room_centroids,
+    std::vector<ColorPointCloud::Ptr>* room_pcls) {
   CHECK_NOTNULL(room_centroids);
   CHECK_NOTNULL(room_pcls);
 
   // Project pointcloud onto plane
-  ColoredPointCloud::Ptr projected_pcl(new ColoredPointCloud());
+  ColorPointCloud::Ptr projected_pcl(new ColorPointCloud());
   projectPointcloudToPlane(cloud, &(*projected_pcl));
 
-  ColoredPointCloud::Ptr downsampled_pcl(new ColoredPointCloud());
+  ColorPointCloud::Ptr downsampled_pcl(new ColorPointCloud());
   downsampled_pcl = downsamplePcl<ColorPoint>(projected_pcl, 0.05f);
 
-  ColoredPointCloud::Ptr final_cloud(new ColoredPointCloud());
+  ColorPointCloud::Ptr final_cloud(new ColorPointCloud());
   pcl::RadiusOutlierRemoval<ColorPoint> outrem;
   outrem.setRadiusSearch(of_params_.radius_search);
   outrem.setMinNeighborsInRadius(of_params_.min_neighbors_in_radius);
@@ -46,19 +102,34 @@ IntensityPointCloud::Ptr RoomFinder::findRooms(
       organized_cloud, "intensity", 0.5, 1.5);
 
   // Downsample the cloud like crazy...
-  organized_cloud = downsamplePcl<IntensityPoint>(organized_cloud, 0.10f);
+  organized_cloud = downsamplePcl<IntensityPoint>(organized_cloud, 0.20f);
 
-  ObjectFinder<IntensityPoint> object_finder("world_frame",
+  ObjectFinder<IntensityPoint> object_finder(world_frame_,
                                              ObjectFinderType::kEuclidean);
   EuclideanClusterEstimatorParams params;
-  params.min_cluster_size_ = 400;
+  params.min_cluster_size_ = 200;
   object_finder.updateEuclideanClusterParams(params);
-  ColoredPointCloud::Ptr pcl =
-      object_finder.findObjects(organized_cloud, room_centroids, room_pcls);
+  std::vector<IntensityPointCloud::Ptr> room_pcls_noncolored;
+  ObjectFinder<IntensityPoint>::BoundingBoxes bounding_boxes;
+  ColorPointCloud::Ptr pcl = object_finder.findObjects(
+      organized_cloud, room_centroids, &room_pcls_noncolored, &bounding_boxes);
+  // Generate colored point cloud out of the noncolored rooms pcl.
+  // Repaint room_pcls to uniform color for better visualization of edges.
+  room_pcls->resize(room_pcls_noncolored.size());
+  static constexpr int32_t rgb =
+      (static_cast<uint32_t>(0u) << 16 | static_cast<uint32_t>(255u) << 8 |
+       static_cast<uint32_t>(0u));
+  for (size_t i = 0u; i < room_pcls_noncolored.size(); ++i) {
+    auto& pcl_ptr = room_pcls->at(i);
+    pcl_ptr.reset(new ColorPointCloud);
+    pcl::copyPointCloud(*room_pcls_noncolored.at(i), *pcl_ptr);
+    for (auto& point : pcl_ptr->points) point.rgb = rgb;
+  }
+
   pcl->header.frame_id = world_frame_;
   for (auto& it : pcl->points) {
     // Move all points to level 5
-    it.z = 5;
+    it.z = 10;
   }
   pcl_pub_.publish(*pcl);
 
@@ -225,7 +296,7 @@ void RoomFinder::superVoxelize(const PointCloudT::Ptr& cloud,
   }
 }
 
-void RoomFinder::multiPlaneSegmenter(const ColoredPointCloud::Ptr& cloud,
+void RoomFinder::multiPlaneSegmenter(const ColorPointCloud::Ptr& cloud,
                                      PlanarRegions* planar_regions) {
   CHECK_NOTNULL(planar_regions);
 
@@ -295,8 +366,8 @@ bool RoomFinder::fastTriangulation(const PointCloud::Ptr& cloud,
   return (0);
 }
 
-void RoomFinder::projectPointcloudToPlane(const ColoredPointCloud::Ptr& cloud,
-                                          ColoredPointCloud* cloud_projected) {
+void RoomFinder::projectPointcloudToPlane(const ColorPointCloud::Ptr& cloud,
+                                          ColorPointCloud* cloud_projected) {
   CHECK_NOTNULL(cloud_projected);
   // Create a set of planar coefficients with X=Y=0,Z=1
   pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients());

@@ -13,3 +13,4 @@ float32 max_optimized_error
 float32 raw_count
 float32 no_outlier_count
 float32 pruned_count
+float32 pruned_no_static

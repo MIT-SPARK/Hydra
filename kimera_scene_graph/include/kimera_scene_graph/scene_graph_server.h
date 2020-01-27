@@ -9,16 +9,21 @@
 
 #include <voxblox/core/layer.h>
 #include <voxblox_ros/mesh_vis.h>
+#include <voxblox_skeleton/skeleton.h>
 
 #include <dynamic_reconfigure/server.h>
 #include <kimera_scene_graph/kimera_scene_graphConfig.h>
 #include <std_srvs/Empty.h>
 #include <std_srvs/EmptyRequest.h>
 #include <std_srvs/EmptyResponse.h>
+#include <std_srvs/SetBool.h>
+
 
 #include <kimera_semantics_ros/semantic_simulation_server.h>
 
+#include "kimera_scene_graph/building_finder.h"
 #include "kimera_scene_graph/common.h"
+#include "kimera_scene_graph/wall_finder.h"
 #include "kimera_scene_graph/object_finder.h"
 #include "kimera_scene_graph/room_finder.h"
 #include "kimera_scene_graph/scene_node.h"
@@ -26,7 +31,7 @@
 
 namespace kimera {
 
-typedef ColoredPointCloud SemanticPointCloud;
+typedef ColorPointCloud SemanticPointCloud;
 typedef std::unordered_map<SemanticLabel, SemanticPointCloud::Ptr>
     SemanticPointCloudMap;
 typedef std::unordered_map<SemanticLabel, vxb::Mesh::Ptr> SemanticMeshMap;
@@ -39,37 +44,60 @@ class SceneGraphSimulationServer : public SemanticSimulationServer {
   SceneGraphSimulationServer(const ros::NodeHandle& nh,
                              const ros::NodeHandle& nh_private);
 
-  bool sceneGraphReconstructionServiceCall(std_srvs::Empty::Request& request,
-                                           std_srvs::Empty::Response& response);
+  bool sceneGraphReconstructionServiceCall(
+      std_srvs::SetBool::Request& request,
+      std_srvs::SetBool::Response& response);
 
-  void sceneGraphReconstruction();
+  void sceneGraphReconstruction(const bool& only_rooms);
 
   void getSemanticPointcloudsFromMesh(
       const vxb::MeshLayer::ConstPtr& mesh_layer,
       const vxb::ColorMode& color_mode,
       SemanticPointCloudMap* semantic_pointclouds);
 
-  void getSemanticMeshesFromMesh(
-      const vxb::MeshLayer::ConstPtr& mesh_layer,
-      const vxb::ColorMode& color_mode,
-      SemanticMeshMap* semantic_pointclouds);
+  void getSemanticMeshesFromMesh(const vxb::MeshLayer::ConstPtr& mesh_layer,
+                                 const vxb::ColorMode& color_mode,
+                                 SemanticMeshMap* semantic_pointclouds);
 
   void getPointcloudFromMesh(const vxb::MeshLayer::ConstPtr& mesh_layer,
                              vxb::ColorMode color_mode,
-                             ColoredPointCloud::Ptr pointcloud);
+                             ColorPointCloud::Ptr pointcloud);
 
- private:
+ protected:
   void rqtReconfigureCallback(RqtSceneGraphConfig& config, uint32_t level);
+  void reconstructMeshOutOfTsdf(vxb::MeshLayer::Ptr mesh_layer);
+  void reconstructEsdfOutOfTsdf(const bool& save_to_file);
 
- private:
+  void publishSemanticMesh(const SemanticLabel& semantic_label,
+                           const vxb::Mesh& semantic_mesh);
+  void extractThings(const SemanticLabel& semantic_label,
+                     const SemanticPointCloud::Ptr& semantic_pcl);
+  void extractThings();
+
+  void publishSkeletonToObjectLinks(const ColorPointCloud::Ptr& graph_pcl);
+
+ protected:
   ros::Publisher color_clustered_pcl_pub_;
   ros::Publisher room_centroids_pub_;
+  ros::Publisher room_layout_pub_;
   ros::Publisher mesh_pub_;
   ros::Publisher polygon_mesh_pub_;
+  ros::Publisher sparse_graph_pub_;
+  ros::Publisher segmented_sparse_graph_pub_;
+  ros::Publisher esdf_truncated_pub_;
+
+  // TODO(Toni): This guy should be in the scene graph visualization itself
+  ros::Publisher edges_obj_skeleton_pub_;
+
+  // Rebuild esdf and save to file
+  bool build_esdf_batch_ = false;
 
   // To publish msgs to different topics according to semantic label.
-  SemanticRosPublishers<SemanticLabel, ColoredPointCloud> semantic_pcl_pubs_;
-  SemanticRosPublishers<SemanticLabel, visualization_msgs::Marker> semantic_mesh_pubs_;
+  SemanticRosPublishers<SemanticLabel, ColorPointCloud> semantic_pcl_pubs_;
+  SemanticRosPublishers<SemanticLabel, visualization_msgs::Marker>
+      semantic_mesh_pubs_;
+  SemanticRosPublishers<SemanticLabel, visualization_msgs::Marker>
+      semantic_mesh_2_pubs_;
 
   // Dynamically change params for scene graph reconstruction
   dynamic_reconfigure::Server<RqtSceneGraphConfig> rqt_server_;
@@ -79,11 +107,11 @@ class SceneGraphSimulationServer : public SemanticSimulationServer {
   ros::ServiceServer reconstruct_scene_graph_srv_;
   ros::ServiceServer load_map_srv_;
 
-  // Object finder
+  // Finders
+  std::unique_ptr<WallFinder<ColorPoint>> wall_finder_;
   std::unique_ptr<ObjectFinder<ColorPoint>> object_finder_;
-
-  // Room finder
   std::unique_ptr<RoomFinder> room_finder_;
+  std::unique_ptr<BuildingFinder> building_finder_;
 
   // Labels of interesting things
   std::vector<int> stuff_labels_;
@@ -92,7 +120,12 @@ class SceneGraphSimulationServer : public SemanticSimulationServer {
 
   // KimeraX
   SceneGraph scene_graph_;
-  DynamicSceneGraph dynamic_scene_graph_;
+
+  // TODO(Toni): remove
+  float skeleton_z_level_;
+
+  // Skeleton graph
+  vxb::SparseSkeletonGraph sparse_skeleton_graph_;
 };
 
 }  // namespace kimera

@@ -44,7 +44,6 @@
 // FOR SUPERVOXELS
 #include <pcl/console/parse.h>
 #include <pcl/io/pcd_io.h>
-#include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/segmentation/supervoxel_clustering.h>
 #include <pcl/visualization/pcl_visualizer.h>
@@ -106,21 +105,60 @@ struct OutlierFilterParams {
   float min_neighbors_in_radius = 12;
 };
 
+template <class T>
+typename pcl::PointCloud<T>::Ptr passThroughFilter1D(
+    const typename pcl::PointCloud<T>::Ptr& input,
+    const std::string& dimension,
+    const float& min,
+    const float& max,
+    const bool& negative_limits = false) {
+  typename pcl::PointCloud<T>::Ptr cloud_filtered(new pcl::PointCloud<T>);
+  // Create the filtering object
+  pcl::PassThrough<T> pass;
+  pass.setInputCloud(input);
+  pass.setFilterFieldName(dimension);
+  pass.setFilterLimits(min, max);
+  pass.setFilterLimitsNegative(negative_limits);
+  pass.filter(*cloud_filtered);
+  return cloud_filtered;
+}
+
 class RoomFinder {
  private:
  public:
   RoomFinder(const ros::NodeHandle& nh_private, const std::string& world_frame)
       : pcl_pub_(), nh_private_(nh_private), world_frame_(world_frame) {
-    pcl_pub_ =
-        nh_private_.advertise<ColoredPointCloud>("room_clusters", 1, true);
+    pcl_pub_ = nh_private_.advertise<ColorPointCloud>("room_clusters", 1, true);
   };
   ~RoomFinder() = default;
 
   void findRooms(const vxb::Mesh& mesh, Centroids* room_centroids);
+
+  /**
+   * @brief findRooms
+   * Uses Semantic ESDF
+   * @param cloud
+   * @param room_centroids
+   * @param room_pcls
+   * @return
+   */
   IntensityPointCloud::Ptr findRooms(
-      const ColoredPointCloud::Ptr& cloud,
+      const IntensityPointCloud::Ptr& cloud,
       Centroids* room_centroids,
-      std::vector<IntensityPointCloud::Ptr>* room_pcls);
+      std::vector<ColorPointCloud::Ptr>* room_pcls);
+
+  /**
+   * @brief findRooms
+   * Uses dilation/erosion
+   * @param cloud
+   * @param room_centroids
+   * @param room_pcls
+   * @return
+   */
+  IntensityPointCloud::Ptr findRooms(
+      const ColorPointCloud::Ptr& cloud,
+      Centroids* room_centroids,
+      std::vector<ColorPointCloud::Ptr>* room_pcls);
 
   inline void updateMarchingCubesParams(const MarchingCubesParams& mc_params) {
     mc_params_ = mc_params;
@@ -138,8 +176,8 @@ class RoomFinder {
 
   bool fastTriangulation(const PointCloud::Ptr& cloud, pcl::PolygonMesh* mesh);
 
-  static void projectPointcloudToPlane(const ColoredPointCloud::Ptr& cloud,
-                                       ColoredPointCloud* cloud_projected);
+  static void projectPointcloudToPlane(const ColorPointCloud::Ptr& cloud,
+                                       ColorPointCloud* cloud_projected);
 
   // Types
   using PointT = pcl::PointXYZRGB;
@@ -154,25 +192,8 @@ class RoomFinder {
 
   void superVoxelize(const PointCloudT::Ptr& cloud,
                      PlanarRegions* planar_regions);
-  void multiPlaneSegmenter(const ColoredPointCloud::Ptr& cloud,
+  void multiPlaneSegmenter(const ColorPointCloud::Ptr& cloud,
                            PlanarRegions* planar_regions);
-
-  template <class T>
-  typename pcl::PointCloud<T>::Ptr passThroughFilter1D(
-      const typename pcl::PointCloud<T>::Ptr& input,
-      const std::string& dimension,
-      const float& min,
-      const float& max) {
-    typename pcl::PointCloud<T>::Ptr cloud_filtered(new pcl::PointCloud<T>);
-    // Create the filtering object
-    pcl::PassThrough<T> pass;
-    pass.setInputCloud(input);
-    pass.setFilterFieldName(dimension);
-    pass.setFilterLimits(min, max);
-    // pass.setFilterLimitsNegative (true);
-    pass.filter(*cloud_filtered);
-    return cloud_filtered;
-  }
 
   /* --------------------------------------------------------------------------
    */

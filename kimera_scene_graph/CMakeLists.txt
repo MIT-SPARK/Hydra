@@ -8,16 +8,20 @@ catkin_simple()
 find_package(OpenCV REQUIRED)
 
 cs_add_library(${PROJECT_NAME}
+  include/kimera_scene_graph/common.h
   src/object_finder.cpp
   src/room_finder.cpp
+  src/wall_finder.cpp
+  src/building_finder.cpp
   src/scene_graph_server.cpp
+  src/scene_node.cpp
   src/semantic_ros_publishers.cpp
   src/min_cut_solvers/stoer_wagner_min_cut.cpp
   src/min_cut_solvers/stoer_wagner_min_cut_wrapper.cpp
 )
 
 target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBRARIES} ${PCL_LIBRARIES} gtsam tbb)
-target_include_directories(${PROJECT_NAME} PUBLIC ${OpenCV_INCLUDE_DIRS})
+target_include_directories(${PROJECT_NAME} PUBLIC ${OpenCV_INCLUDE_DIRS} ${CATKIN_INCLUDE_DIRS})
 
 cs_add_executable(kimera_scene_graph_node
   src/kimera_scene_graph.cpp

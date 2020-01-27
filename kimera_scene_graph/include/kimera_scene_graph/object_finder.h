@@ -24,6 +24,9 @@
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/segmentation/sac_segmentation.h>
 
+// Bounding Box
+#include <pcl/features/moment_of_inertia_estimation.h>
+
 #include <kimera_semantics/common.h>
 
 #include "kimera_scene_graph/common.h"
@@ -39,9 +42,9 @@ enum class ObjectFinderType { kRegionGrowing = 0, kEuclidean = 1 };
 struct RegionGrowingClusterEstimatorParams {
   size_t normal_estimator_neighbour_size_ = 50;
 
-  size_t min_cluster_size_ = 50;
-  size_t max_cluster_size_ = 1000000;
-  size_t number_of_neighbours_ = 30;
+  size_t min_cluster_size_ = 250;
+  size_t max_cluster_size_ = 10000000;
+  size_t number_of_neighbours_ = 20;
 
   double smoothness_threshold_ = 3.0 / 180.0 * M_PI;
   double curvature_threshold_ = 1.0;
@@ -49,7 +52,7 @@ struct RegionGrowingClusterEstimatorParams {
   inline std::string print() const {
     std::stringstream ss;
     // clang-format off
-    ss << "================== Region Growing Cluster Config ====================\n";
+    ss << "\n================== Region Growing Cluster Config ====================\n";
     ss << " - normal_estimator_neighbour_size:  " << normal_estimator_neighbour_size_ << '\n';
     ss << " - min_cluster_size:                 " << min_cluster_size_ << '\n';
     ss << " - max_cluster_size:                 " << max_cluster_size_ << '\n';
@@ -70,7 +73,7 @@ struct EuclideanClusterEstimatorParams {
   inline std::string print() const {
     std::stringstream ss;
     // clang-format off
-    ss << "================== Euclidean Cluster Config ====================\n";
+    ss << "\n================== Euclidean Cluster Config ====================\n";
     ss << " - min_cluster_size:                 " << min_cluster_size_ << '\n';
     ss << " - max_cluster_size:                 " << max_cluster_size_ << '\n';
     ss << " - cluster_tolerance:                " << cluster_tolerance_ << '\n';
@@ -85,6 +88,7 @@ class ObjectFinder {
  public:
   typedef pcl::PointCloud<T> PointCloudT;
   typedef std::vector<typename PointCloudT::Ptr> ObjectPointClouds;
+  typedef std::vector<BoundingBox<T>> BoundingBoxes;
 
   ObjectFinder(const std::string& world_frame,
                const ObjectFinderType& object_finder_type)
@@ -101,34 +105,96 @@ class ObjectFinder {
    * @param pointcloud
    * @return colored pointcloud for cluster visualization...
    */
-  ColoredPointCloud::Ptr findObjects(
-      const typename PointCloudT::Ptr& pointcloud,
-      Centroids* centroids,
-      ObjectPointClouds* object_pcls) {
+  ColorPointCloud::Ptr findObjects(const typename PointCloudT::Ptr& pointcloud,
+                                   Centroids* centroids,
+                                   ObjectPointClouds* object_pcls,
+                                   BoundingBoxes* bounding_boxes) {
     CHECK_NOTNULL(centroids);
     CHECK_NOTNULL(object_pcls);
+    CHECK_NOTNULL(bounding_boxes);
+    ColorPointCloud::Ptr clustered_colored_pcl = nullptr;
     switch (object_finder_type_) {
       case ObjectFinderType::kRegionGrowing: {
         LOG(INFO) << "Region Growing object finder.";
-        auto clustered_colored_pointcloud =
+        clustered_colored_pcl =
             regionGrowingClusterEstimator(pointcloud, centroids, object_pcls);
-        CHECK(clustered_colored_pointcloud);
-        clustered_colored_pointcloud->header.frame_id = world_frame_;
-        return clustered_colored_pointcloud;
         break;
       }
       case ObjectFinderType::kEuclidean: {
         LOG(INFO) << "Euclidean object finder.";
-        auto euclidean_cluster_pcl =
+        clustered_colored_pcl =
             euclideanClusterEstimator(pointcloud, centroids, object_pcls);
-        CHECK(euclidean_cluster_pcl);
-        euclidean_cluster_pcl->header.frame_id = world_frame_;
-        return euclidean_cluster_pcl;
         break;
       }
       default: { LOG(FATAL) << "Unknown object finder type..."; }
     }
-    return nullptr;
+    CHECK(clustered_colored_pcl);
+
+    // Find BB
+    bounding_boxes->resize(object_pcls->size());
+    for (size_t i = 0; i < object_pcls->size(); ++i) {
+      bounding_boxes->at(i) =
+          findBoundingBox(object_pcls->at(i), BoundingBoxType::kAABB);
+    }
+
+    clustered_colored_pcl->header.frame_id = world_frame_;
+    return clustered_colored_pcl;
+  }
+
+  BoundingBox<T> findBoundingBox(const typename PointCloudT::Ptr& cloud,
+                                 const BoundingBoxType& bb_type) {
+    CHECK(cloud);
+    pcl::MomentOfInertiaEstimation<T> feature_extractor;
+    feature_extractor.setInputCloud(cloud);
+    feature_extractor.compute();
+
+    BoundingBox<T> bb;
+    bb.type_ = bb_type;
+
+    std::vector<float> moment_of_inertia;
+    std::vector<float> eccentricity;
+    Eigen::Matrix3f rotational_matrix_OBB;
+    float major_value, middle_value, minor_value;
+    Eigen::Vector3f major_vector, middle_vector, minor_vector;
+    Eigen::Vector3f mass_center;
+
+    feature_extractor.getMomentOfInertia(moment_of_inertia);
+    feature_extractor.getEccentricity(eccentricity);
+
+    switch (bb_type) {
+      case BoundingBoxType::kOBB: {
+        T min_point_OBB;
+        T max_point_OBB;
+        T position_OBB;
+        feature_extractor.getOBB(
+            min_point_OBB, max_point_OBB, position_OBB, rotational_matrix_OBB);
+        bb.max_ = max_point_OBB;
+        bb.min_ = min_point_OBB;
+        bb.position_ = position_OBB;
+        bb.orientation_matrix = rotational_matrix_OBB;
+        break;
+      }
+      case BoundingBoxType::kAABB: {
+        T min_point_AABB;
+        T max_point_AABB;
+        feature_extractor.getAABB(min_point_AABB, max_point_AABB);
+        bb.max_ = max_point_AABB;
+        bb.min_ = min_point_AABB;
+        break;
+      }
+      default: {
+        LOG(FATAL) << "Unknown bounding box type.";
+        break;
+      }
+    }
+
+    // Do we want these? Perhaps to display a frame of reference? Perhaps
+    // for ICP?
+    // feature_extractor.getEigenValues(major_value, middle_value, minor_value);
+    // feature_extractor.getEigenVectors(
+    //    major_vector, middle_vector, minor_vector);
+    // feature_extractor.getMassCenter(mass_center);
+    return bb;
   }
 
   void updateClusterEstimator(const ObjectFinderType& object_finder_type) {
@@ -148,7 +214,7 @@ class ObjectFinder {
   }
 
  private:
-  ColoredPointCloud::Ptr regionGrowingClusterEstimator(
+  ColorPointCloud::Ptr regionGrowingClusterEstimator(
       const typename PointCloudT::Ptr& cloud,
       Centroids* centroids,
       ObjectPointClouds* object_pcls) {
@@ -184,7 +250,7 @@ class ObjectFinder {
     return region_growing_cluster_estimator_.getColoredCloud();
   }
 
-  ColoredPointCloud::Ptr euclideanClusterEstimator(
+  ColorPointCloud::Ptr euclideanClusterEstimator(
       const typename PointCloudT::Ptr& cloud,
       Centroids* centroids,
       ObjectPointClouds* object_pcls) {
@@ -207,10 +273,10 @@ class ObjectFinder {
     return getColoredCloud(cloud, cluster_indices);
   }
 
-  ColoredPointCloud::Ptr getColoredCloud(
+  ColorPointCloud::Ptr getColoredCloud(
       const typename pcl::PointCloud<T>::Ptr& input,
       const std::vector<pcl::PointIndices>& clusters) {
-    ColoredPointCloud::Ptr colored_cloud(new ColoredPointCloud);
+    ColorPointCloud::Ptr colored_cloud(new ColorPointCloud);
 
     if (!clusters.empty()) {
       srand(static_cast<unsigned int>(time(nullptr)));

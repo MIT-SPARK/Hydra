@@ -5,30 +5,34 @@
 #include <vector>
 
 #include <glog/logging.h>
+
+#include <interactive_markers/interactive_marker_server.h>
+#include <interactive_markers/menu_handler.h>
 #include <ros/ros.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
+#include <rviz_visual_tools/rviz_visual_tools.h>
+
 #include <kimera_semantics/color.h>
 #include <kimera_semantics/common.h>
+
+#include <pcl_ros/point_cloud.h>
 
 #include "kimera_scene_graph/common.h"
 #include "kimera_scene_graph/semantic_ros_publishers.h"
 
 namespace kimera {
 
-typedef ColoredPointCloud NodePcl;
+namespace rvt = rviz_visual_tools;
+
+typedef ColorPointCloud NodePcl;
 
 // Forward declare what a SceneNode is.
 class SceneNode;
-
 typedef std::unordered_map<NodeId, SceneNode*> NodeParents;
 typedef std::unordered_map<NodeId, SceneNode*> NodeSiblings;
 typedef std::unordered_map<NodeId, SceneNode*> NodeChildren;
-
-typedef uint8_t InstanceId;
-typedef Eigen::Vector3i NodeColor;
-
 
 struct NodeAttributes {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -40,6 +44,22 @@ struct NodeAttributes {
   InstanceId instance_id_;
   // 3D points associated to this Node.
   NodePcl::Ptr pcl_;
+  BoundingBox<ColorPoint> bounding_box_;
+
+  std::string print() const {
+    std::stringstream ss;
+    // clang-format off
+    ss << "Attributes: \n"
+        << "Timestamp : " << timestamp_ << '\n'
+        << "Position : " << position_ << '\n'
+        << "Orientation : " << orientation_ << '\n'
+        << "Color : " << color_ << '\n'
+        << "Semantic Label: " << std::to_string(semantic_label_) << '\n'
+        << "Instance Id: " << std::to_string(instance_id_) << '\n'
+        << "Pcl size: " << pcl_ ? std::to_string(pcl_->size()) : "no pcl attached...";
+    // clang-format on
+    return ss.str();
+  }
 };
 
 struct NodeFamily {
@@ -54,33 +74,21 @@ struct SceneNode {
   NodeId id_;
   NodeAttributes attributes_;
   NodeFamily family_;
+
+  std::string print() const {
+    std::stringstream ss;
+    ss << "Node " << id_ << ":\n" << attributes_.print();
+    return ss.str();
+  }
 };
 
 typedef std::unordered_map<NodeId, SceneNode> NodeIdMap;
 typedef std::pair<NodeId, NodeId> Edge;
 typedef std::vector<Edge> EdgeList;
-
 class SceneGraph {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  SceneGraph(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private)
-      : nh_(nh),
-        nh_private_(nh_private),
-        semantic_instance_centroid_pub_(),
-        text_markers_pub_(),
-        node_pcl_publishers_("centroid", nh_private),
-        edge_pub_() {
-    // Params
-    nh_private_.param("world_frame", world_frame_, world_frame_);
-
-    // Publishers
-    semantic_instance_centroid_pub_ = nh_private_.advertise<ColoredPointCloud>(
-        "semantic_instance_centroid", 1, true);
-    text_markers_pub_ = nh_private_.advertise<visualization_msgs::MarkerArray>(
-        "instance_ids", 1, true);
-    edge_pub_ = nh_private_.advertise<visualization_msgs::MarkerArray>(
-        "edges", 1, true);
-  }
+  SceneGraph(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private);
   virtual ~SceneGraph() = default;
 
  public:
@@ -91,14 +99,21 @@ class SceneGraph {
    * @param semantic_instance: retrieved semantic instance.
    * @return False if the id could not be found, true otherwise.
    */
-  bool getSceneNodeById(const NodeId& id, SceneNode* scene_node) const {
-    CHECK_NOTNULL(scene_node);
-    const auto& it = database_.find(id);
-    if (it == database_.end()) {
-      return false;
-    } else {
-      *scene_node = it->second;
-      return true;
+  bool getSceneNodeById(const NodeId& id, SceneNode* scene_node) const;
+
+  /**
+   * @brief getAllSceneNodes returns a vector of pointers to the internals of the
+   * database that scene graph saves. Everything is returned as const& so the
+   * user cannot recklessly modify the database...
+   * @param scene_nodes
+   */
+  inline void getAllSceneNodes(std::vector<const SceneNode*>* scene_nodes) {
+    CHECK_NOTNULL(scene_nodes);
+    scene_nodes->resize(database_.size());
+    size_t i = 0;
+    for (const auto& kv : database_) {
+      scene_nodes->at(i) = &kv.second;
+      ++i;
     }
   }
 
@@ -120,34 +135,19 @@ class SceneGraph {
    * semantic instance has been added to the database, false
    * otherwise.
    */
-  inline bool addSemanticInstanceSafely(const SceneNode& scene_node) {
-    const auto& it = database_.find(scene_node.id_);
-    if (it == database_.end()) {
-      return false;
-    } else {
-      it->second = scene_node;
-      return true;
-    }
-  }
+  bool addSemanticInstanceSafely(const SceneNode& scene_node);
 
   /**
    * @brief addEdge Adds an edge to the graph
    * @param id_1 id of the first node
    * @param id_2 id of the second node
    */
-  inline void addEdge(const NodeId& id_1, const NodeId& id_2) {
-    Edge edge;
-    edge.first = id_1;
-    edge.second = id_2;
-    edges_.push_back(edge);
-  }
+  void addEdge(const NodeId& id_1, const NodeId& id_2);
 
   inline EdgeList getEdges() const { return edges_; }
 
-  // TODO(Toni): delete pls
-  // inline NodeIdMap getFullDatabase() {
-  //   return database_;
-  // }
+  void getSemanticLayer(const SemanticLabel& label,
+                        NodeIdMap* semantic_layer) const;
 
   inline void clear() {
     database_.clear();
@@ -159,162 +159,77 @@ class SceneGraph {
 
   inline void updateEdgeAlpha(const float& alpha) { edge_alpha_ = alpha; }
 
- private:
-  virtual void visualizeImpl() {
-    ColoredPointCloud centroid_pointcloud;
-    visualization_msgs::MarkerArray line_assoc_markers;
-    visualization_msgs::MarkerArray text_markers;
-    for (const auto& it : database_) {
-      LOG(INFO) << "Publish centroid for SceneNode with id: " << it.first;
-      // TODO(Toni): Color the centroids with Semantic label and add instance
-      // id! Publish centroids
-      const NodeId& node_id = it.second.id_;
-      const SemanticLabel& node_label = it.second.attributes_.semantic_label_;
-      const InstanceId& node_instance_id = it.second.attributes_.instance_id_;
-      NodePosition object_position = it.second.attributes_.position_;
-      const NodeColor& node_color = it.second.attributes_.color_;
+  // Getters
+  inline float getLayerStepZ() const { return layer_step_z_; }
 
-      // Shift centroid in z, for scene-graph visualization
-      object_position.z += getSemanticZLevel(node_label);
+  // TODO(Toni): should be private!
+  visualization_msgs::Marker getLineFromPointToPoint(
+      const NodePosition& p1,
+      const NodePosition& p2,
+      const NodeColor& color,
+      const float& edge_scale,
+      const std::string& marker_namespace) const;
 
-      ColorPoint colored_centroid;
-      colored_centroid.x = object_position.x;
-      colored_centroid.y = object_position.y;
-      colored_centroid.z = object_position.z;
-      colored_centroid.r = node_color.x();
-      colored_centroid.g = node_color.y();
-      colored_centroid.b = node_color.z();
-      centroid_pointcloud.push_back(colored_centroid);
+ protected:
+  virtual void visualizeImpl() const;
+  void displayCentroids() const;
+  void displayEdges() const;
 
-      // Publish text on top of each centroid
-      text_markers.markers.push_back(getTextMarker(
-          "centroid_ids", "Id: " + std::to_string(node_instance_id)));
+  // Getters of visualization properties depending on the semantic label.
+  std::string getSemanticLabelString(const SemanticLabel& semantic_label) const;
+  float getSemanticZLevel(const SemanticLabel& semantic_label) const;
+  float getSemanticPclEdgeScale(const SemanticLabel& semantic_label) const;
+  float getSemanticPclEdgeAlpha(const SemanticLabel& semantic_label) const;
+  float getSemanticCentroidScale(const SemanticLabel& semantic_label) const;
+  float getSemanticCentroidAlpha(const SemanticLabel& semantic_label) const;
+  size_t getSemanticDropoutRatio(const SemanticLabel& node_label) const;
 
-      // Publish edges from centroid to its associated pointcloud
-      if (it.second.attributes_.pcl_) {
-        NodePcl object_pcl = *it.second.attributes_.pcl_;
-        static constexpr float kPclShift = -5.0;
-        for (auto& it : object_pcl.points)
-          it.z = getSemanticZLevel(node_label) + kPclShift;
-        const auto& marker =
-            getLinesFromPointToPointCloud(object_position, object_pcl);
-        line_assoc_markers.markers.push_back(marker);
-      }
-    }
-    // Publish centroids positions
-    centroid_pointcloud.header.frame_id = world_frame_;
-    semantic_instance_centroid_pub_.publish(centroid_pointcloud);
-    text_markers_pub_.publish(text_markers);
-    edge_pub_.publish(line_assoc_markers);
-  }
+  // Visualization marker generators
+  visualization_msgs::Marker getCentroidMarker(
+      const SceneNode& scene_node) const;
 
-  float getSemanticZLevel(const SemanticLabel& semantic_label) {
-    // Display each layer 0.5 meters apart.
-    static constexpr float kStepZ = 0.5;
-    switch (semantic_label) {
-      case kRoomSemanticLabel:
-        return 20 * kStepZ;
-      default:
-        return 0.0;
-    }
-  }
+  bool getBoundingBoxMarker(const SceneNode& scene_node,
+                            visualization_msgs::Marker* marker) const;
 
-  visualization_msgs::Marker getTextMarker(const std::string& marker_namespace,
-                                           const std::string& marker_text) {
-    visualization_msgs::Marker marker;
-    marker.header.frame_id = world_frame_;
-    marker.header.stamp = ros::Time::now();
-    marker.ns = marker_namespace;
-    static int marker_id = 0;
-    marker.id = ++marker_id;
-    marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
-    marker.action = visualization_msgs::Marker::ADD;
-
-    marker.pose.position.x = 0.0;
-    marker.pose.position.y = 1.0;
-    marker.pose.position.z = 1.0;
-    marker.pose.orientation.x = 0.0;
-    marker.pose.orientation.y = 0.0;
-    marker.pose.orientation.z = 0.0;
-    marker.pose.orientation.w = 1.0;
-
-    marker.text = marker_text;
-
-    marker.scale.z = 0.1;
-
-    marker.color.r = 0.0f;
-    marker.color.g = 1.0f;
-    marker.color.b = 0.0f;
-    marker.color.a = 1.0;
-
-    return marker;
-  }
+  visualization_msgs::Marker getTextMarker(const SceneNode& scene_node) const;
+  visualization_msgs::Marker getTextMarker(
+      const NodePosition& node_position,
+      const std::string& marker_namespace,
+      const std::string& marker_text) const;
 
   visualization_msgs::Marker getLinesFromPointToPointCloud(
       const NodePosition& position,
-      const NodePcl& pcl) {
-    visualization_msgs::Marker marker;
-    marker.header.frame_id = world_frame_;
-    marker.header.stamp = ros::Time();
+      const NodeColor& color,
+      const NodePcl& pcl,
+      const std::string& marker_namespace,
+      const float& edge_scale,
+      const float& edge_alpha,
+      const size_t& dropout_lines = 1u) const;
 
-    marker.type = visualization_msgs::Marker::LINE_LIST;
-    marker.action = visualization_msgs::Marker::ADD;
-    static int marker_id = 1u;
-    marker.id = ++marker_id;
-    marker.ns = "node_edges";
+  bool getNodeCentroidToPclLineMarker(const SceneNode& node,
+                                      visualization_msgs::Marker* marker) const;
 
-    marker.scale.x = 0.01;
+  // Interactive marker generators
+  visualization_msgs::InteractiveMarkerControl& makeBoxControl(
+      visualization_msgs::InteractiveMarker& msg);
 
-    marker.color.a = edge_alpha_;
-    marker.color.r = 0.0;
-    marker.color.g = 0.0;
-    marker.color.b = 0.0;
+  visualization_msgs::Marker makeBox(
+      visualization_msgs::InteractiveMarker& msg);
 
-    marker.pose.position.x = 0.0;
-    marker.pose.position.y = 0.0;
-    marker.pose.position.z = 0.0;
-    marker.pose.orientation.x = 0.0;
-    marker.pose.orientation.y = 0.0;
-    marker.pose.orientation.z = 0.0;
-    marker.pose.orientation.w = 1.0;
+  // Convenience functions
+  ColorPoint getColorPointFromNode(const SceneNode& node) const;
 
-    geometry_msgs::Point center_point;
-    center_point.x = position.x;
-    center_point.y = position.y;
-    center_point.z = position.z;
-
-    const size_t& n_lines = pcl.size();
-    marker.points.resize(2u * n_lines);
-    marker.colors.resize(2u * n_lines);
-    for (size_t i = 0u; i < n_lines; ++i) {
-      const NodePcl::PointType& point = pcl.at(i);
-      geometry_msgs::Point vtx;
-      vtx.x = point.x;
-      vtx.y = point.y;
-      vtx.z = point.z;
-
-      std_msgs::ColorRGBA color;
-      color.r = point.r;
-      color.g = point.g;
-      color.b = point.b;
-      color.a = edge_alpha_;
-
-      marker.colors[2u * i] = color;
-      marker.colors[(2u * i) + 1u] = color;
-
-      marker.points[2u * i] = center_point;
-      marker.points[(2u * i) + 1u] = vtx;
-    }
-
-    // REMOVE
-    marker.text = "Does this work?";
-    LOG(WARNING) << "Using edge alpha: " << edge_alpha_;
-
-    return marker;
-  }
+  void getDefaultMsgPose(geometry_msgs::Pose* pose) const;
+  void getDefaultMsgHeader(std_msgs::Header* header) const;
 
  protected:
+  /// Contains the scene nodes and its attributes
   NodeIdMap database_;
+
+  // TODO(Toni): store all edges, including skeleton ones here, but tag edge
+  // by their type.
+  /// List of edges between scene nodes (these edges are currently only for the
+  /// intra-class dependencies, the inter-class is done with pcls)
   EdgeList edges_;
 
   // ROS related things
@@ -322,12 +237,24 @@ class SceneGraph {
   ros::NodeHandle nh_private_;
   std::string world_frame_;
   ros::Publisher semantic_instance_centroid_pub_;
+  ros::Publisher bounding_box_pub_;
   SemanticRosPublishers<NodeId, NodePcl> node_pcl_publishers_;
-  ros::Publisher edge_pub_;
+  ros::Publisher edges_centroid_pcl_pub_;
+  ros::Publisher edges_node_node_pub_;
   ros::Publisher text_markers_pub_;
 
+  // Create an interactive marker server on the topic namespace simple_marker
+  interactive_markers::InteractiveMarkerServer server;
+
   // Visualization params.
-  float edge_alpha_ = 0.4;
+  float edge_alpha_ = 0.1;
+  float edge_scale_ = 0.01;
+
+  // Step in Z axis for the different layers of the scene graph
+  float layer_step_z_ = 15;
+
+  // For visualizing cuboid wireframes in rviz
+  rvt::RvizVisualToolsPtr visual_tools_;
 };
 
 class SceneGraphVisualizer {
@@ -352,4 +279,5 @@ class SceneGraphVisualizer {
     }
   }
 };
+
 }  // namespace kimera

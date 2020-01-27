@@ -63,6 +63,7 @@ class DynamicSceneGraph : public SceneGraph {
         agent_centroids_("agent_centroids", nh_private),
         agent_graph_edges_("agent_graph_edges", nh_private),
         mesh_pub_(),
+        edges_pub_(),
         serialize_graph_srv_(),
         deserialize_graph_srv_(),
         optimized_centroid_check_srv_(),
@@ -100,12 +101,13 @@ class DynamicSceneGraph : public SceneGraph {
         nh_private_.param("human_height", human_height_, human_height_);
         nh_private_.param("draw_skeleton_edges", draw_skeleton_edges_, draw_skeleton_edges_);
         nh_private_.param("edge_thickness", edge_thickness_, edge_thickness_);
+        nh_private_.param("merge_close", merge_close_, merge_close_);
 
         // Publishers
         mesh_pub_ = nh_private_.advertise<graph_cmr_ros::SMPLList>("human_meshes", 1, true);
-        semantic_instance_centroid_pub_ = nh_private_.advertise<ColoredPointCloud>(
+        semantic_instance_centroid_pub_ = nh_private_.advertise<ColorPointCloud>(
             "all_human_centroids", 1, true);
-        edge_pub_ = nh_private_.advertise<visualization_msgs::Marker>(
+        edges_pub_ = nh_private_.advertise<visualization_msgs::Marker>(
             "all_graph_edges", 1, true);
         
         // Service
@@ -162,6 +164,7 @@ class DynamicSceneGraph : public SceneGraph {
         float max_error = 0;
         float max_error_pruned = 0;
         size_t count = 0;
+        size_t total_count = 0;
         for (size_t i = 0 ; i < graph_priors_.size() ; i++){
             if (counts_[i] < prune_threshold_) 
                 continue;
@@ -199,7 +202,7 @@ class DynamicSceneGraph : public SceneGraph {
             }
             // total_error += counts_[i] * error / result.size();
             // total_error_pruned += counts_[i] * error_pruned / result.size();
-            // count += counts_[i];
+            total_count += counts_[i];
         }
         //LOG(INFO) << "Average Optimized Error: " << total_error / count;
         res.optimized_error = total_error / count;
@@ -208,7 +211,8 @@ class DynamicSceneGraph : public SceneGraph {
         res.pruned_variance = calcVariance(total_error_pruned, total_pruned_squared_error, count);
         res.max_optimized_error = max_error;
         res.max_pruned_error = max_error_pruned;
-        res.pruned_count = count;
+        res.pruned_count = total_count;
+        res.pruned_no_static = count;
     }
 
     float calcVariance(float err, float err_sq, int sample_size){
@@ -230,13 +234,13 @@ class DynamicSceneGraph : public SceneGraph {
                     mesh_pub_.publish(*smpls);
                     continue;
                 }
-                else if(topic.compare(edge_pub_.getTopic()) == 0){
+                else if(topic.compare(edges_pub_.getTopic()) == 0){
                     visualization_msgs::Marker::ConstPtr marker = m.instantiate<visualization_msgs::Marker>();
-                    edge_pub_.publish(*marker);
+                    edges_pub_.publish(*marker);
                     continue;
                 }
                 else if(topic.compare(semantic_instance_centroid_pub_.getTopic()) == 0){
-                    ColoredPointCloud::ConstPtr pt_cloud = m.instantiate<ColoredPointCloud>();
+                    ColorPointCloud::ConstPtr pt_cloud = m.instantiate<ColorPointCloud>();
                     semantic_instance_centroid_pub_.publish(*pt_cloud);
                     continue;
                 }
@@ -245,7 +249,7 @@ class DynamicSceneGraph : public SceneGraph {
                 AgentId id = std::stol(topic.substr(chop_idx + 1, topic.size()));
                 std::string smpl_msg_name = "human_smpl_msg_" + std::to_string(id);
                 if(topic.compare(agent_centroids_.getTopic(id)) == 0){
-                    ColoredPointCloud::ConstPtr pt_cloud = m.instantiate<ColoredPointCloud>();
+                    ColorPointCloud::ConstPtr pt_cloud = m.instantiate<ColorPointCloud>();
                     agent_centroids_.publish(id, *pt_cloud);
                 }
                 else if(topic.compare(agent_graph_edges_.getTopic(id)) == 0){
@@ -253,7 +257,7 @@ class DynamicSceneGraph : public SceneGraph {
                     agent_graph_edges_.publish(id, *marker);
                 }
                 else if(topic.compare(skeleton_points_pubs_.getTopic(id)) == 0){
-                    ColoredPointCloud::ConstPtr pt_cloud = m.instantiate<ColoredPointCloud>();
+                    ColorPointCloud::ConstPtr pt_cloud = m.instantiate<ColorPointCloud>();
                     skeleton_points_pubs_.publish(id, *pt_cloud);
                 }
                 else if(topic.compare(skeleton_edge_pubs_.getTopic(id)) == 0){
@@ -363,8 +367,8 @@ class DynamicSceneGraph : public SceneGraph {
                 if (dist > max_no_outlier_error_){
                     max_no_outlier_error_ = dist;
                 }
+                addSceneNode(human_node, gt_human);
             }
-            addSceneNode(human_node, gt_human);
         }
         visualizePoseGraphs();
         visualizeJoints();
@@ -399,7 +403,7 @@ class DynamicSceneGraph : public SceneGraph {
     }
 
     inline void colorPclFromJoints(DynamicSceneNode& scene_node){
-        ColoredPointCloud node_pcl;
+        ColorPointCloud node_pcl;
         scene_node.attributes_.pcl_ = node_pcl.makeShared();
         for (size_t idx = 0 ; idx < NUM_JOINTS; idx++){
             ColorPoint colorpoint(human_color_[0] * 255, human_color_[1] * 255, human_color_[2] * 255);
@@ -491,7 +495,7 @@ class DynamicSceneGraph : public SceneGraph {
     inline bool checkCloseness(const DynamicSceneNode& scene_node, const DynamicSceneNode& last_node) {
         Eigen::Vector3f diff = scene_node.attributes_.position_.getArray3fMap() - last_node.attributes_.position_.getArray3fMap();
         double distance = diff.norm();
-        return distance > min_node_dist_; // Fail if the node is too close
+        return !merge_close_ || distance > min_node_dist_; // Fail if the node is too close
     }
 
     inline bool checkMeshFeasibility(const DynamicSceneNode& scene_node, const DynamicSceneNode& last_node) {
@@ -614,7 +618,7 @@ class DynamicSceneGraph : public SceneGraph {
 
     void visualizePoseGraphs(bool serialize=false){
         AgentId id = 0;
-        ColoredPointCloud all_person_pointcloud;
+        ColorPointCloud all_person_pointcloud;
         visualization_msgs::Marker all_edges;
         setupEdgeMarker(all_edges, edge_color_);
         for ( size_t i = 0 ; i < graph_priors_.size() ; i++){
@@ -623,7 +627,7 @@ class DynamicSceneGraph : public SceneGraph {
             auto values = graph_priors_[i];
             visualization_msgs::Marker marker;
             setupEdgeMarker(marker, edge_color_);
-            ColoredPointCloud centroid_pointcloud;
+            ColorPointCloud centroid_pointcloud;
             ColorPoint last_centroid;
             int iter_count = 0;
             for(auto key_value_pair : values){
@@ -665,10 +669,10 @@ class DynamicSceneGraph : public SceneGraph {
         }
         all_person_pointcloud.header.frame_id = world_frame_;
         if (serialize){
-            bag_.write(edge_pub_.getTopic(), ros::Time::now(), all_edges);
+            bag_.write(edges_pub_.getTopic(), ros::Time::now(), all_edges);
             bag_.write(semantic_instance_centroid_pub_.getTopic(), ros::Time::now(), all_person_pointcloud);
         }
-        edge_pub_.publish(all_edges);
+        edges_pub_.publish(all_edges);
         semantic_instance_centroid_pub_.publish(all_person_pointcloud);
     }
 
@@ -689,6 +693,7 @@ class DynamicSceneGraph : public SceneGraph {
     int outlier_rejection_threshold_ = 100;
     bool single_sequence_smpl_mode_ = false;
     bool draw_skeleton_edges_ = false;
+    bool merge_close_ = true;
     const std::vector<int> joint_parents_ =  {1, 2, 8, 9, 3, 4, 7, 8, 12, 12, 9, 10, 14, -1, 13, -1, -1, 15, 16};
 
     std::vector<DynamicNodePoseGraph> pose_graphs_;
@@ -709,14 +714,15 @@ class DynamicSceneGraph : public SceneGraph {
     // ROS Subscriber
     ros::Subscriber human_sub_;
     ros::Publisher mesh_pub_;
+    ros::Publisher edges_pub_;
 
     ros::ServiceServer serialize_graph_srv_;
     ros::ServiceServer deserialize_graph_srv_;
     ros::ServiceServer optimized_centroid_check_srv_;
-    SemanticRosPublishers<AgentId, ColoredPointCloud> skeleton_points_pubs_;
+    SemanticRosPublishers<AgentId, ColorPointCloud> skeleton_points_pubs_;
     SemanticRosPublishers<AgentId, visualization_msgs::Marker> skeleton_edge_pubs_;
 
-    SemanticRosPublishers<AgentId, ColoredPointCloud> agent_centroids_;
+    SemanticRosPublishers<AgentId, ColorPointCloud> agent_centroids_;
     SemanticRosPublishers<AgentId, visualization_msgs::Marker> agent_graph_edges_;
 
     tf::TransformListener listener_;
