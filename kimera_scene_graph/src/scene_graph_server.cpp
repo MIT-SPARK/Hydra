@@ -22,6 +22,7 @@ SceneGraphSimulationServer::SceneGraphSimulationServer(
       room_finder_(nullptr),
       object_finder_(nullptr),
       scene_graph_(nh, nh_private),
+      dynamic_scene_graph_(nh, nh_private),
       reconstruct_scene_graph_srv_(),
       load_map_srv_() {
   // TODO(Toni): put all of this in scene graph reconstructor config!
@@ -237,6 +238,12 @@ void SceneGraphSimulationServer::sceneGraphReconstruction() {
 
   LOG(INFO) << "Visualize Scene Graph";
   scene_graph_.visualize();
+
+  LOG(INFO) << "Visualize Human Pose Graphs";
+  dynamic_scene_graph_.visualizePoseGraphs();
+
+  LOG(INFO) << "Visualize Human Joints";
+  dynamic_scene_graph_.visualizeJoints();
 }
 
 void SceneGraphSimulationServer::getSemanticPointcloudsFromMesh(

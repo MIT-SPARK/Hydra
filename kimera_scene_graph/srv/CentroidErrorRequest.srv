@@ -1,0 +1,15 @@
+---
+float32 raw_error
+float32 no_outlier_error
+float32 pruned_error
+float32 optimized_error
+float32 raw_variance
+float32 no_outlier_variance
+float32 pruned_variance
+float32 optimized_variance
+float32 max_no_outlier_error
+float32 max_pruned_error
+float32 max_optimized_error
+float32 raw_count
+float32 no_outlier_count
+float32 pruned_count

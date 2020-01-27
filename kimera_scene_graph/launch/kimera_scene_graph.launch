@@ -10,8 +10,9 @@
   <arg name="sensor_frame" default="left_cam"/>
 
   <!-- Send colored pointcloud with scene_graph to kimera_scene_graph for 3D segmentation -->
-  <!-- launch-prefix=gdb -ex run args" -->
-  <node name="kimera_scene_graph_node" pkg="kimera_scene_graph"
+  <!-- launch-prefix="gdb -ex run args" -->
+  <!-- launch-prefix="valgrind" -->
+  <node   name="kimera_scene_graph_node" pkg="kimera_scene_graph"
     type="kimera_scene_graph_node" output="screen"
     args="-alsologtostderr -colorlogtostderr" clear_params="true">
     <!-- Scene Graph params -->
@@ -32,12 +33,26 @@
     <param name="max_attempts_to_generate_viewpoint" value="20"/>
     <param name="world_frame"                        value="world"/>
     <param name="human_topic"                        value="/human_meshes"/>
-    <param name="filter_by_centroid"                 value="true"/>
-    <param name="filter_by_mesh"                     value="false"/>
+    <param name="filter_by_centroid"                 value="false"/>
+    <param name="filter_by_mesh"                     value="true"/>
     <param name="feasible_dyn_rate"                  value="3.0"/>
-    <param name="feasible_mesh_rate"                 value="1.5"/>
+    <param name="feasible_mesh_rate"                 value="3.0"/>
     <param name="node_association_time_cap"          value="2.0"/>
-    <param name="min_node_association_dist"          value="0.1"/>
+    <param name="min_node_association_dist"          value="0.2"/>
+    <param name="prune_threshold"                    value="10"/>
+    <param name="outlier_rejection_threshold"        value="1000"/>
+    <param name="human_color"                        value="[0.0, 1.0, 0.0]"/>
+    <param name="human_height"                       value="2.2"/>
+    <param name="centroid_color"                     value="[0.0, 0.0, 1.0]"/>
+    <param name="edge_thickness"                     value="0.02"/>
+    <param name="serialization_dir"                  value="/home/argupta/serialized_graph"/>
+    <param name="deserialization_file"               value="/home/argupta/serialized_graph/video_human/1"/>
+
+    <!-- Caution: Setting this to "true" will show the full smpl for each timestep for
+                  one human at the expense of showing the final smpl for each human -->
+    <param name="single_sequence_smpl_mode"                     value="false"/>
+    <param name="draw_skeleton_edges"                           value="false"/>
+
 
     <!-- Params -->
     <param name="max_ray_length_m"          value="10.0" />
@@ -69,5 +84,15 @@
     <param name="publish_pointclouds"     value="true"/>
     <param name="update_mesh_every_n_sec" value="0.1" />
     <param name="mesh_filename"           value="$(find kimera_semantics_ros)/mesh_results/$(anon tesse).ply" />
+
+  </node>
+
+  <node name="kimera_scene_graph_vis" pkg="graph_cmr_ros" type="vis_graph_script" output="screen" args="">
+    <param name="visualizer_type"        value="point_cloud"/>
+    <param name="human_topic"            value="kimera_scene_graph_node/human_meshes"/>
+    <param name="vis_topic"              value="kimera_scene_graph/human_meshes_vis"/>
+    <param name="use_time_color"         value="true"/>
+    <param name="use_time_transparency"  value="false"/>
+    <param name="publish_as_series"      value="true"/>
   </node>
 </launch>

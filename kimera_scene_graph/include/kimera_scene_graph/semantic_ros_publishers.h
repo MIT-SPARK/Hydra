@@ -44,6 +44,24 @@ class SemanticRosPublishers {
     // Publish semantic pointcloud
     pubs_.at(semantic_label).publish(msg);
   }
+  
+  /**
+   * Derive the topic name from the label.
+   */
+  std::string getTopic(const LabelType& semantic_label){
+    const auto& pub_it = pubs_.find(semantic_label);
+    if (pub_it == pubs_.end()) {
+      pubs_[semantic_label] =
+          nh_private_.advertise<MsgType>(
+              topic_name_ + "_semantic_label_" + std::to_string(semantic_label),
+              1, true);
+    }
+    return pubs_.at(semantic_label).getTopic();
+  }
+
+  std::string get_prefix(){
+    return topic_name_;
+  }
 
  private:
   /// Prepended string to the ROS topic that is to be advertised.

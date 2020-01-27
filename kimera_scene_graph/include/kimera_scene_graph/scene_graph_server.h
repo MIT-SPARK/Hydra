@@ -92,6 +92,7 @@ class SceneGraphSimulationServer : public SemanticSimulationServer {
 
   // KimeraX
   SceneGraph scene_graph_;
+  DynamicSceneGraph dynamic_scene_graph_;
 };
 
 }  // namespace kimera
