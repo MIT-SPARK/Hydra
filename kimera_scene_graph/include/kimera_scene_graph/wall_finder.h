@@ -39,8 +39,8 @@ class WallFinder : protected ObjectFinder<T> {
    * @return colored pointcloud for cluster visualization...
    */
   ColorPointCloud::Ptr findWalls(const typename PointCloudT::Ptr& pointcloud,
-                                   Centroids* centroids,
-                                   ObjectPointClouds* object_pcls) {
+                                 Centroids* centroids,
+                                 ObjectPointClouds* object_pcls) {
     CHECK_NOTNULL(centroids);
     CHECK_NOTNULL(object_pcls);
     return this->findObjects(pointcloud, centroids, object_pcls);

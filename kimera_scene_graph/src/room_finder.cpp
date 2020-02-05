@@ -44,8 +44,7 @@ IntensityPointCloud::Ptr RoomFinder::findRooms(
   // Repaint room_pcls to uniform color for better visualization of edges.
   room_pcls->resize(room_pcls_noncolored.size());
   static constexpr int32_t rgb =
-      (static_cast<uint32_t>(0u) << 16 |
-       static_cast<uint32_t>(255u) << 8 |
+      (static_cast<uint32_t>(0u) << 16 | static_cast<uint32_t>(255u) << 8 |
        static_cast<uint32_t>(0u));
   for (size_t i = 0u; i < room_pcls_noncolored.size(); ++i) {
     auto& pcl_ptr = room_pcls->at(i);
@@ -236,8 +235,8 @@ void RoomFinder::superVoxelize(const PointCloudT::Ptr& cloud,
 
   pcl::SupervoxelClustering<PointT> super(voxel_resolution, seed_resolution);
   // Our cloud is not organized...
-  bool disable_transform = true;
-  if (disable_transform) super.setUseSingleCameraTransform(false);
+  // bool disable_transform = true;
+  // if (disable_transform) super.setUseSingleCameraTransform(false);
 
   super.setInputCloud(cloud);
   super.setColorImportance(color_importance);

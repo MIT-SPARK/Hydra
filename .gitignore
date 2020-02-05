@@ -1,2 +1,5 @@
+*.swp
+*.idea
 **/mesh_results/*
 **/tsdf_results/*
+*.ccls*

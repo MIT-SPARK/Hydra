@@ -1,13 +1,13 @@
 #pragma once
 
-#include <unordered_map>
 #include <string>
+#include <unordered_map>
 
 #include <ros/ros.h>
 
 namespace kimera {
 
-template<class LabelType, class MsgType>
+template <class LabelType, class MsgType>
 class SemanticRosPublishers {
   typedef std::unordered_map<LabelType, ros::Publisher> SemanticRosPubs;
 
@@ -21,9 +21,7 @@ class SemanticRosPublishers {
    */
   SemanticRosPublishers(const std::string& topic_name,
                         const ros::NodeHandle& nh_private)
-      : topic_name_(topic_name),
-        nh_private_(nh_private),
-        pubs_() {}
+      : topic_name_(topic_name), nh_private_(nh_private), pubs_() {}
   virtual ~SemanticRosPublishers() = default;
 
   /** publish Publishes a given ROS msg for a given semantic_label under the
@@ -31,37 +29,34 @@ class SemanticRosPublishers {
    * If the given semantic_label has not been published before, a new ROS topic
    * is advertised with the name given by topic_name_.
    */
-  void publish(const LabelType& semantic_label,
-               const MsgType& msg) {
+  void publish(const LabelType& semantic_label, const MsgType& msg) {
     // Publish centroids for each semantic label
     const auto& pub_it = pubs_.find(semantic_label);
     if (pub_it == pubs_.end()) {
-      pubs_[semantic_label] =
-          nh_private_.advertise<MsgType>(
-              topic_name_ + "_semantic_label_" + std::to_string(semantic_label),
-              1, true);
+      pubs_[semantic_label] = nh_private_.advertise<MsgType>(
+          topic_name_ + "_semantic_label_" + std::to_string(semantic_label),
+          1,
+          true);
     }
     // Publish semantic pointcloud
     pubs_.at(semantic_label).publish(msg);
   }
-  
+
   /**
    * Derive the topic name from the label.
    */
-  std::string getTopic(const LabelType& semantic_label){
+  std::string getTopic(const LabelType& semantic_label) {
     const auto& pub_it = pubs_.find(semantic_label);
     if (pub_it == pubs_.end()) {
-      pubs_[semantic_label] =
-          nh_private_.advertise<MsgType>(
-              topic_name_ + "_semantic_label_" + std::to_string(semantic_label),
-              1, true);
+      pubs_[semantic_label] = nh_private_.advertise<MsgType>(
+          topic_name_ + "_semantic_label_" + std::to_string(semantic_label),
+          1,
+          true);
     }
     return pubs_.at(semantic_label).getTopic();
   }
 
-  std::string get_prefix(){
-    return topic_name_;
-  }
+  std::string get_prefix() { return topic_name_; }
 
  private:
   /// Prepended string to the ROS topic that is to be advertised.
@@ -71,4 +66,3 @@ class SemanticRosPublishers {
   SemanticRosPubs pubs_;
 };
 }
-

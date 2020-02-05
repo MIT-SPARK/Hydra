@@ -1,0 +1,640 @@
+Panels:
+  - Class: rviz/Displays
+    Help Height: 0
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Global Options1
+        - /SemanticMesh1/Namespaces1
+        - /Centroids1/Namespaces1
+        - /InstanceIds1/Namespaces1
+        - /EdgesObjectMesh1/Namespaces1
+        - /EdgesObjectSkeleton1/Namespaces1
+        - /EdgesNodeToNode1/Namespaces1
+        - /EdgesCentroidToPcl1/Namespaces1
+        - /SparseGraph1/Namespaces1
+        - /BoundingBoxes1/Namespaces1
+        - /Walls1/Namespaces1
+        - /Local Path1/Namespaces1
+        - /Global Path1/Namespaces1
+        - /Reference Trajectory1/Namespaces1
+      Splitter Ratio: 0.524911046
+    Tree Height: 1281
+  - Class: rviz/Selection
+    Name: Selection
+  - Class: rviz/Tool Properties
+    Expanded:
+      - /2D Pose Estimate1
+      - /2D Nav Goal1
+      - /Publish Point1
+    Name: Tool Properties
+    Splitter Ratio: 0.588679016
+  - Class: rviz/Views
+    Expanded:
+      - /Current View1
+    Name: Views
+    Splitter Ratio: 0.5
+  - Class: rviz/Time
+    Experimental: false
+    Name: Time
+    SyncMode: 0
+    SyncSource: ""
+  - Class: mav_planning_rviz/PlanningPanel
+    Name: PlanningPanel
+    namespace: firefly
+    odometry_topic: ground_truth/odometry
+    planner_name: voxblox_skeleton_planner
+Toolbars:
+  toolButtonStyle: 0
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 0.5
+      Cell Size: 1
+      Class: rviz/Grid
+      Color: 160; 160; 164
+      Enabled: false
+      Line Style:
+        Line Width: 0.0299999993
+        Value: Lines
+      Name: Grid
+      Normal Cell Count: 0
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Plane: XY
+      Plane Cell Count: 200
+      Reference Frame: <Fixed Frame>
+      Value: false
+    - Class: rviz/TF
+      Enabled: true
+      Frame Timeout: 15
+      Frames:
+        All Enabled: true
+        firefly/base_link:
+          Value: true
+        firefly/base_link_inertia:
+          Value: true
+        firefly/current_reference:
+          Value: true
+        firefly/odometry_sensor1:
+          Value: true
+        firefly/rotor_0:
+          Value: true
+        firefly/rotor_1:
+          Value: true
+        firefly/rotor_2:
+          Value: true
+        firefly/rotor_3:
+          Value: true
+        firefly/rotor_4:
+          Value: true
+        firefly/rotor_5:
+          Value: true
+        firefly/vi_sensor/base_link:
+          Value: true
+        firefly/vi_sensor/camera_depth_link:
+          Value: true
+        firefly/vi_sensor/camera_depth_optical_center_link:
+          Value: true
+        firefly/vi_sensor/camera_left_link:
+          Value: true
+        firefly/vi_sensor/camera_left_optical_link:
+          Value: true
+        firefly/vi_sensor/camera_right_link:
+          Value: true
+        firefly/vi_sensor/vi_sensor_link:
+          Value: true
+        map:
+          Value: true
+        odom:
+          Value: true
+        rviz_ortho:
+          Value: true
+        world:
+          Value: true
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: false
+      Tree:
+        world:
+          firefly/base_link:
+            firefly/base_link_inertia:
+              {}
+            firefly/rotor_0:
+              {}
+            firefly/rotor_1:
+              {}
+            firefly/rotor_2:
+              {}
+            firefly/rotor_3:
+              {}
+            firefly/rotor_4:
+              {}
+            firefly/rotor_5:
+              {}
+            firefly/vi_sensor/vi_sensor_link:
+              firefly/vi_sensor/camera_depth_link:
+                firefly/vi_sensor/camera_depth_optical_center_link:
+                  {}
+              firefly/vi_sensor/camera_left_link:
+                firefly/vi_sensor/camera_left_optical_link:
+                  {}
+              firefly/vi_sensor/camera_right_link:
+                {}
+          firefly/odometry_sensor1:
+            {}
+          firefly/vi_sensor/base_link:
+            {}
+          odom:
+            firefly/current_reference:
+              {}
+      Update Interval: 0
+      Value: true
+    - Class: rviz/Axes
+      Enabled: false
+      Length: 10
+      Name: Axes
+      Radius: 0.5
+      Reference Frame: <Fixed Frame>
+      Value: false
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /firefly/mav_local_planner/occupied_nodes
+      Name: SemanticMesh
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
+    - Class: voxblox_rviz_plugin/VoxbloxMesh
+      Enabled: true
+      Name: SemanticMesh
+      Topic: /firefly/voxblox_skeleton_planner/mesh
+      Unreliable: false
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /kimera_scene_graph_eval_node/semantic_instance_centroid
+      Name: Centroids
+      Namespaces:
+        B: true
+        R: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /kimera_scene_graph_eval_node/instance_ids
+      Name: InstanceIds
+      Namespaces:
+        B: true
+        R: true
+      Queue Size: 100
+      Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz/Path
+      Color: 25; 255; 0
+      Enabled: true
+      Head Diameter: 0.300000012
+      Head Length: 0.200000003
+      Length: 0.5
+      Line Style: Lines
+      Line Width: 0.100000001
+      Name: Camera Pose-Graph
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 85; 255
+      Pose Style: Axes
+      Radius: 0.100000001
+      Shaft Diameter: 0.100000001
+      Shaft Length: 0.300000012
+      Topic: /kimera_scene_graph_eval_node/view_path_pub
+      Unreliable: true
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: RGB8
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: Camera Poses
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.300000012
+      Style: Spheres
+      Topic: /kimera_scene_graph_eval_node/view_ptcloud_pub
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /kimera_scene_graph_eval_node/edges_centroid_pcl
+      Name: EdgesObjectMesh
+      Namespaces:
+        B: true
+        R: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /kimera_scene_graph_eval_node/obj_skeleton_edges
+      Name: EdgesObjectSkeleton
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /kimera_scene_graph_eval_node/edges_node_node
+      Name: EdgesNodeToNode
+      Namespaces:
+        intra_layer_edges: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /kimera_scene_graph_eval_node/edges_centroid_pcl
+      Name: EdgesCentroidToPcl
+      Namespaces:
+        B: true
+        R: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: false
+      Marker Topic: /kimera_scene_graph_eval_node/sparse_graph
+      Name: SparseGraph
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: false
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /kimera_scene_graph_eval_node/segmented_sparse_graph
+      Name: SegmentedSparseGraph
+      Namespaces:
+        non_transition_edges: true
+        transition_edges: true
+        vertices: true
+      Queue Size: 100
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Decay Time: 0
+      Enabled: false
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 0.300000012
+      Min Color: 0; 0; 0
+      Min Intensity: -0.199980259
+      Name: TruncatedESDF
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.0500000007
+      Style: Flat Squares
+      Topic: /kimera_scene_graph_eval_node/esdf_truncated
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: false
+    - Class: rviz/MarkerArray
+      Enabled: false
+      Marker Topic: /kimera_scene_graph_eval_node/bounding_boxes
+      Name: BoundingBoxes
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: false
+    - Class: rviz/MarkerArray
+      Enabled: false
+      Marker Topic: /kimera_scene_graph_eval_node/bounding_boxes_wireframe
+      Name: BoundingBoxesWireframe
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: false
+    - Alpha: 0.800000012
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 3.22500014
+        Min Value: 3.22500014
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Decay Time: 0
+      Enabled: false
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 2
+      Min Color: 0; 0; 0
+      Min Intensity: -0.199980259
+      Name: ESDF
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.0500000007
+      Style: Squares
+      Topic: /kimera_scene_graph_eval_node/esdf_test
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: false
+    - Alpha: 0.800000012
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Decay Time: 0
+      Enabled: false
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 0.200000003
+      Min Color: 0; 0; 0
+      Min Intensity: -0.198864937
+      Name: TSDF
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.100000001
+      Style: Points
+      Topic: /kimera_scene_graph_eval_node/tsdf_test
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: false
+    - Alpha: 0.300000012
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: RGB8
+      Decay Time: 0
+      Enabled: false
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 2
+      Min Color: 0; 0; 0
+      Min Intensity: -0.199980259
+      Name: RoomClusters
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.0500000007
+      Style: Points
+      Topic: /kimera_scene_graph_eval_node/room_clusters
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: false
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /kimera_scene_graph_eval_node/mesh_2_semantic_label_5
+      Name: Chairs
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 0
+        Min Value: 0
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: RGB8
+      Decay Time: 0
+      Enabled: false
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 2
+      Min Color: 0; 0; 0
+      Min Intensity: 0.300000042
+      Name: RoomLayout
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.0500000007
+      Style: Boxes
+      Topic: /kimera_scene_graph_eval_node/room_layout
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: false
+      Value: false
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /kimera_scene_graph_eval_node/mesh_2_semantic_label_18
+      Name: Bins
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /kimera_scene_graph_eval_node/mesh_2_semantic_label_7
+      Name: Sofas
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /kimera_scene_graph_eval_node/mesh_semantic_label_2
+      Name: Shelves
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /kimera_scene_graph_eval_node/mesh_semantic_label_19
+      Name: Walls
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
+    - Class: rviz/InteractiveMarkers
+      Enable Transparency: true
+      Enabled: true
+      Name: Planner Markers
+      Show Axes: false
+      Show Descriptions: true
+      Show Visual Aids: true
+      Update Topic: /planning_markers/update
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /firefly/mav_local_planner/local_path
+      Name: Local Path
+      Namespaces:
+        local_path: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /firefly/voxblox_skeleton_planner/path
+      Name: Global Path
+      Namespaces:
+        astar_diag: false
+        graph_plan: false
+        loco_plan: false
+        short_astar_plan: true
+        short_plan: false
+      Queue Size: 100
+      Value: true
+    - Alpha: 1
+      Arrow Length: 0.300000012
+      Axes Length: 0.300000012
+      Axes Radius: 0.00999999978
+      Class: rviz/PoseArray
+      Color: 255; 25; 0
+      Enabled: false
+      Head Length: 0.0700000003
+      Head Radius: 0.0299999993
+      Name: Waypoint List
+      Shaft Length: 0.230000004
+      Shaft Radius: 0.00999999978
+      Shape: Arrow (Flat)
+      Topic: /firefly/waypoint_list
+      Unreliable: false
+      Value: false
+    - Alpha: 1
+      Axes Length: 1
+      Axes Radius: 0.100000001
+      Class: rviz/Pose
+      Color: 255; 25; 0
+      Enabled: false
+      Head Length: 0.300000012
+      Head Radius: 0.100000001
+      Name: Waypoint
+      Shaft Length: 1
+      Shaft Radius: 0.0500000007
+      Shape: Arrow
+      Topic: /firefly/waypoint
+      Unreliable: false
+      Value: false
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /firefly/reference_trajectory
+      Name: Reference Trajectory
+      Namespaces:
+        "": true
+      Queue Size: 100
+      Value: true
+  Enabled: true
+  Global Options:
+    Background Color: 255; 255; 255
+    Default Light: true
+    Fixed Frame: odom
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz/Interact
+      Hide Inactive Objects: true
+    - Class: rviz/MoveCamera
+    - Class: rviz/Select
+    - Class: rviz/FocusCamera
+    - Class: rviz/Measure
+    - Class: rviz/SetInitialPose
+      Topic: /initialpose
+    - Class: rviz/SetGoal
+      Topic: /move_base_simple/goal
+    - Class: rviz/PublishPoint
+      Single click: true
+      Topic: /clicked_point
+    - Class: rviz_visual_tools/KeyTool
+  Value: true
+  Views:
+    Current:
+      Class: rviz/XYOrbit
+      Distance: 71.8124084
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.0599999987
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
+      Focal Point:
+        X: 34.4485779
+        Y: 29.3860283
+        Z: -2.01052826e-05
+      Focal Shape Fixed Size: false
+      Focal Shape Size: 0.0500000007
+      Invert Z Axis: false
+      Name: Current View
+      Near Clip Distance: 0.00999999978
+      Pitch: 0.859796405
+      Target Frame: map
+      Value: XYOrbit (rviz)
+      Yaw: 5.96840715
+    Saved: ~
+Window Geometry:
+  Displays:
+    collapsed: false
+  Height: 2130
+  Hide Left Dock: false
+  Hide Right Dock: true
+  PlanningPanel:
+    collapsed: false
+  QMainWindow State: 000000ff00000000fd00000004000000000000020600000800fc020000000bfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006600fffffffb0000001e0054006f006f006c002000500072006f00700065007200740069006500730200000780000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000002e0000054e000000e300fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d00610067006500000002da000002160000000000000000fb0000000a0049006d0061006700650000000500000002a30000000000000000fb0000001a0050006c0061006e006e0069006e006700500061006e0065006c0100000583000002ab0000019100ffffff000000010000025700000800fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000002e00000800000000c000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e1000001970000000300000ebd00000039fc0100000002fb0000000800540069006d0065000000000000000ebd000003d500fffffffb0000000800540069006d0065010000000000000450000000000000000000000ca90000080000000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Selection:
+    collapsed: false
+  Time:
+    collapsed: false
+  Tool Properties:
+    collapsed: false
+  Views:
+    collapsed: true
+  Width: 3766
+  X: 1994
+  Y: 30

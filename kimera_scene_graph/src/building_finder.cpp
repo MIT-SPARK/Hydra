@@ -2,6 +2,4 @@
 
 #include <string>
 
-namespace kimera {
-
-}
+namespace kimera {}

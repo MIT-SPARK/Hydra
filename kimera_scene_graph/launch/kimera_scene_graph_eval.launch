@@ -27,12 +27,12 @@
     <param name="incremental"                        value="false"/>
     <param name="add_robot_pose"                     value="false"/>
     <param name="generate_mesh"                      value="true"/>
-    <param name="num_viewpoints"                     value="10"/>
+    <param name="num_viewpoints"                     value="50"/>
     <param name="truncation_distance"                value="0.4"/>
     <param name="esdf_min_distance_m"                value="0.2"/>
     <param name="verbose"                            value="true"/>
     <param name="max_attempts_to_generate_viewpoint" value="20"/>
-    <param name="world_frame"                        value="map"/>
+    <param name="world_frame"                        value="odom"/>
 
     <!-- Params -->
     <param name="max_ray_length_m"          value="10.0" />
@@ -59,8 +59,8 @@
     <rosparam param="walls_labels">[19, 12]</rosparam>
     <rosparam param="floor_labels">[3, 1, 4]</rosparam>
 
-    <param name="load_tsdf_map" value="$(find kimera_scene_graph)/vxblx_files/all_tesse_tsdf.vxblx"/>
-    <param name="load_esdf_map" value="$(find kimera_scene_graph)/vxblx_files/all_tesse_esdf.vxblx"/>
+    <param name="load_tsdf_map"     value="$(find kimera_scene_graph)/vxblx_files/all_tesse_tsdf.vxblx"/>
+    <param name="load_esdf_map"     value="$(find kimera_scene_graph)/vxblx_files/all_tesse_esdf.vxblx"/>
     <param name="load_sparse_graph" value="$(find kimera_scene_graph)/vxblx_files/all_tesse_sparse_graph_2.vxblx"/>
 
     <!-- Whether to rebuild the esdf layer from scratch -->

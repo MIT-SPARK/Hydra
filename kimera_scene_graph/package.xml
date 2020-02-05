@@ -19,12 +19,19 @@
   <depend>minkindr_conversions</depend>
   <depend>pcl_conversions</depend>
   <depend>pcl_ros</depend>
+  <depend>message_generation</depend>
+  <depend>message_runtime</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>actionlib</depend>
+  <depend>actionlib_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>tf</depend>
   <depend>graph_cmr_ros</depend>
 
   <depend>kimera_semantics</depend>
   <depend>kimera_semantics_ros</depend>
+  <depend>object_db</depend>
   <depend>voxblox</depend>
   <depend>voxblox_ros</depend>
   <depend>voxblox_msgs</depend>

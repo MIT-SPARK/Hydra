@@ -47,10 +47,10 @@ int main(int argc, char** argv) {
 
   kimera::SceneGraphSimulationServerImpl sim_eval(nh, nh_private);
 
-  //sim_eval.run();
-  //LOG(INFO) << "Starting scene graph construction.";
+  // sim_eval.run();
+  // LOG(INFO) << "Starting scene graph construction.";
   // sim_eval.sceneGraphReconstruction();
-  //LOG(INFO) << "Finishing scene graph construction.";
+  // LOG(INFO) << "Finishing scene graph construction.";
   ros::spin();
   return 0;
 }

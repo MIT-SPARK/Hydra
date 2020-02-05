@@ -1,0 +1,5 @@
+name,red,green,blue,alpha,id
+Cube,255,0,127,255,0
+Sphere,255,0,0,255,1
+Plane,0,255,0,255,2
+Plane,255,20,127,255,3

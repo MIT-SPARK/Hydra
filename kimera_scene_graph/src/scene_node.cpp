@@ -177,7 +177,7 @@ bool SceneGraph::getNodeCentroidToPclLineMarker(
         z_shift = z_semantic_level - 0.3 * layer_step_z_;
         break;
       default:
-        z_shift = z_semantic_level - layer_step_z_; 
+        z_shift = z_semantic_level - layer_step_z_;
     }
 
     for (auto& point : shifted_node_pcl.points) {
@@ -254,7 +254,7 @@ float SceneGraph::getSemanticZLevel(const SemanticLabel& semantic_label) const {
     case kBuildingSemanticLabel:
       return 3.0 * layer_step_z_;
     default:
-      return layer_step_z_; // * 0.5
+      return layer_step_z_;  // * 0.5
   }
 }
 

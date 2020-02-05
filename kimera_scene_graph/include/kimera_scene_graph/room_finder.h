@@ -19,12 +19,9 @@
 // Outlier Removal
 #include <pcl/filters/approximate_voxel_grid.h>
 #include <pcl/filters/conditional_removal.h>
-#include <pcl/filters/morphological_filter.h>
 #include <pcl/filters/radius_outlier_removal.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/point_types.h>
-
-#include <pcl/2d/morphology.h>
 
 // for subscribers
 #include <pcl_ros/point_cloud.h>

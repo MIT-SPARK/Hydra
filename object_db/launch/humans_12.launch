@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="ISO-8859-15"?>
+<launch>
+  <env name="OMP_NUM_THREADS" value="12"/>
+  <node name="object_db_node" pkg="object_db"
+    type="server_node" output="screen">
+
+    <!-- Launch file for running on office2 scene with office1 seg-->
+    <!-- TEASER++ params -->
+    <param name="barc2"                              value="1"/>
+    <param name="noise_bound"                        value="0.1"/>
+    <param name="estimate_scaling"                   value="false"/>
+    <param name="rotation_algorithm"                 value="GNC_TLS"/>
+    <param name="rotation_gnc_factor"                value="1.4"/>
+    <param name="rotation_max_iterations"            value="100"/>
+    <param name="rotation_cost_threshold"            value="0.000001"/>
+    <param name="max_cique_find_exact"               value="true"/>
+
+    <!-- Object matcher params -->
+    <param name="matcher_num_threads"                 value="12"/>
+    <param name="matcher_radius"                      value="0.15"/>
+    <param name="matcher_nms_threshold"               value="0.0001"/>
+    <param name="matcher_use_nms"                     value="true"/>
+    <param name="matcher_use_refine"                  value="true"/>
+
+    <!-- Object Database Params -->
+    <param name="object_db_path"                     value="$(find object_db)/data/sofa_db_1seat/" />
+
+    <!-- GT Data Params -->
+    <param name="gt_csv_path"    value="$(find object_db)/data/gt_data.csv" />
+    <param name="semantic_label_csv_path"  value="$(find object_db)/data/label_id_mapping.csv"/>
+
+  </node>
+</launch>

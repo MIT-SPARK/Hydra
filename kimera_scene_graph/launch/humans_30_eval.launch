@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="ISO-8859-15"?>
+<launch>
+  <arg name="voxel_size"     default="0.05"/>
+  <param name="use_sim_time" value="false" />
+
+  <!-- Change sensor frame to:
+   - VIO's estimated base_link: `left_cam_base_link`
+   - Or, if you want to use simulator's ground-truth: `left_cam`
+  -->
+  <arg name="sensor_frame" default="left_cam"/>
+
+  <!-- Send colored pointcloud with scene_graph to kimera_scene_graph for 3D segmentation -->
+  <node name="kimera_scene_graph_eval_node" pkg="kimera_scene_graph"
+    type="scene_graph_eval" output="screen"
+    args="-alsologtostderr -colorlogtostderr" clear_params="true">
+    <!-- Scene Graph params -->
+
+    <!-- Object Finder Type: 0: region growing, 1: euclidean clustering -->
+    <param name="object_finder_type"                 value="1"/>
+
+    <!-- Simulator params -->
+    <param name="visualize"                          value="true"/>
+    <param name="tsdf_voxel_size"                    value="0.03"/>
+    <param name="tsdf_voxels_per_side"               value="16"/>
+    <param name="incremental"                        value="false"/>
+    <param name="add_robot_pose"                     value="false"/>
+    <param name="generate_mesh"                      value="true"/>
+    <param name="num_viewpoints"                     value="50"/>
+    <param name="truncation_distance"                value="0.4"/>
+    <param name="esdf_min_distance_m"                value="0.2"/>
+    <param name="verbose"                            value="true"/>
+    <param name="max_attempts_to_generate_viewpoint" value="20"/>
+    <param name="world_frame"                        value="map"/>
+
+    <!-- Params -->
+    <param name="max_ray_length_m"          value="10.0" />
+    <param name="min_time_between_msgs_sec" value="0.2" />
+    <param name="voxel_carving_enabled"     value="true" />
+    <param name="color_mode"                value="lambert_color"/>
+    <param name="use_const_weight"          value="false" />
+
+    <param name="sensor_frame"              value="$(arg sensor_frame)"/>
+    <param name="use_tf_transforms"         value="true" />
+
+    <param name="enable_icp"                value="false" />
+    <param name="icp_iterations"            value="10" />
+
+    <!-- "fast" or "merged" -->
+    <param name="semantic_tsdf_integrator_type"    value="fast" />
+    <!-- "color", "semantic" or "semantic_probability" -->
+    <param name="semantic_color_mode"              value="semantic"/>
+    <param name="semantic_measurement_probability" value="0.8" />
+    <!-- The only dynamic label we have right now are humans, with label 20 -->
+    <rosparam param="dynamic_semantic_labels">[20]</rosparam>
+    <!-- Stuff are: walls (19), ceiling and floor (3) -->
+    <rosparam param="stuff_labels">[19, 3]</rosparam>
+    <rosparam param="walls_labels">[19, 12]</rosparam>
+    <rosparam param="floor_labels">[3, 1, 4]</rosparam>
+
+    <param name="load_map" value="$(find kimera_semantics_ros)/tsdf_results/humans/humans_30.vxblx"/>
+    <!--param name="load_map" value="$(find kimera_semantics_ros)/tsdf_results/sofas/sofas_2.vxblx"/-->
+
+    <!-- Is this needed? -->
+    <param name="slice_level" value="1.0" />
+
+    <param name="semantic_label_2_color_csv_filepath"
+    value="$(find kimera_semantics_ros)/cfg/rss_segmentation_mapping.csv"/>
+  <!--
+    <param name="semantic_label_2_color_csv_filepath"
+    value="$(find kimera_semantics_ros)/cfg/simulation.csv"/>
+-->
+
+    <param name="publish_pointclouds"     value="true"/>
+    <param name="update_mesh_every_n_sec" value="0.1" />
+    <param name="mesh_filename"           value="$(find kimera_semantics_ros)/mesh_results/$(anon tesse).ply" />
+  </node>
+</launch>

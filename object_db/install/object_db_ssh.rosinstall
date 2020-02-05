@@ -1,0 +1,3 @@
+- git:
+    local-name: TEASER-plusplus 
+    uri: git@github.com:MIT-SPARK/TEASER-plusplus.git
