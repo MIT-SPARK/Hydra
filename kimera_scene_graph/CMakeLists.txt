@@ -15,6 +15,8 @@ cs_add_library(${PROJECT_NAME}
   src/building_finder.cpp
   src/scene_graph_server.cpp
   src/scene_node.cpp
+  src/dynamic_scene_node.cpp
+  src/dynamic_scene_node_evaluator.cpp
   src/semantic_ros_publishers.cpp
   src/min_cut_solvers/stoer_wagner_min_cut.cpp
   src/min_cut_solvers/stoer_wagner_min_cut_wrapper.cpp
@@ -42,6 +44,8 @@ target_link_libraries(min_cut ${PROJECT_NAME} ${PCL_LIBRARIES})
 catkin_add_gtest(test_scene_node tests/test_scene_node.cpp)
 target_link_libraries(test_scene_node ${PROJECT_NAME}) 
 
+catkin_add_gtest(test_scene_node_evaluator tests/test_scene_node_evaluator.cpp)
+target_link_libraries(test_scene_node_evaluator ${PROJECT_NAME}) 
 cs_install()
 
 cs_export()

@@ -22,8 +22,8 @@ TEST_F(DynamicSceneNodeTest, testCentroidCheck)
     kimera::DynamicSceneGraph d_graph(nh, nh_private);
     // Check far apart fails.
     kimera::DynamicSceneNode node1, node2;
-    node1.attributes_.position_ = NodePosition(0, 0, 0);
-    node2.attributes_.position_ = NodePosition(5, 5, 5);
+    node1.attributes_.position_ = kimera::NodePosition(0, 0, 0);
+    node2.attributes_.position_ = kimera::NodePosition(5, 5, 5);
 
     // pcl headers are in microseconds
     unsigned long inv_micro = pow(10, 6);
@@ -37,13 +37,13 @@ TEST_F(DynamicSceneNodeTest, testCentroidCheck)
     EXPECT_TRUE(d_graph.checkDynamicFeasibility(node2, node1));
 
     // Check very edge passes.
-    node1.attributes_.position_ = NodePosition(5, 5, 0);
+    node1.attributes_.position_ = kimera::NodePosition(5, 5, 0);
     node1.attributes_.timestamp_ = 0;
-    node2.attributes_.timestamp_ = 5 * inv_micro / d_graph.FEASIBLE_DYN_RATE_ + 1000;
+    node2.attributes_.timestamp_ = 5 * inv_micro / d_graph.feasible_dyn_rate_ + 1000;
     EXPECT_TRUE(d_graph.checkDynamicFeasibility(node2, node1));
 
     // Check that same point passes.
-    node1.attributes_.position_ = NodePosition(5, 5, 5);
+    node1.attributes_.position_ = kimera::NodePosition(5, 5, 5);
     EXPECT_TRUE(d_graph.checkDynamicFeasibility(node2, node1));
 }
 
@@ -99,7 +99,7 @@ TEST_F(DynamicSceneNodeTest, testCheckMeshFeasibility)
 /*
 * Check that the SMPLList msg is deserialized properly.
 */
-TEST_F(DynamicSceneNodeTest, testDeserialization)
+TEST_F(DynamicSceneNodeTest, testSceneNodeFromSMPL)
 {
     kimera::DynamicSceneGraph d_graph(nh, nh_private);
 
@@ -110,20 +110,26 @@ TEST_F(DynamicSceneNodeTest, testDeserialization)
     graph_cmr_ros::SMPL smpl;
     smpl.header.stamp = ros::Time();
     smpl.centroid = {1, 2, 3};
+    smpl.orientation = {0, 0, 0, 1};
     smpl.joints = test_joints;
 
     kimera::DynamicSceneNode test_node;
     d_graph.dynamicSceneNodeFromSMPL(smpl, test_node);
-    // TODO (argupta) decide how to best test this.
+    auto& center = test_node.pose_.translation();
+    EXPECT_EQ(smpl.centroid[0], center[0]);
+    EXPECT_EQ(smpl.centroid[1], center[1]);
+    EXPECT_EQ(smpl.centroid[2], center[2]);
 }
 
 /*
 * Check that if we send one human, we get the correct number of graphs and connectivity.
 */
-TEST_F(DynamicSceneNodeTest, testGraphConnectionSingleStill)
+TEST_F(DynamicSceneNodeTest, testGraphConnection)
 {
     kimera::DynamicSceneGraph d_graph(nh, nh_private);
-    // Simulate messages for 1 human -> pass to callback (obey dynamic feasibility check)
+    d_graph.feasible_dyn_rate_ = 2.0;
+    d_graph.feasible_mesh_rate_ = 1.5;
+    d_graph.time_cap_ = 10.0;
 
     boost::shared_ptr<graph_cmr_ros::SMPLList> msg(new graph_cmr_ros::SMPLList);
     std::vector<double> test_joints;
@@ -134,6 +140,7 @@ TEST_F(DynamicSceneNodeTest, testGraphConnectionSingleStill)
     float base_time = 0.1;
     smpl.header.stamp = ros::Time(base_time);
     smpl.centroid = {1, 1, 1};
+    smpl.orientation = {0, 0, 0, 1};
     smpl.joints = test_joints;
     
     msg->human_meshes.push_back(smpl);
@@ -150,7 +157,7 @@ TEST_F(DynamicSceneNodeTest, testGraphConnectionSingleStill)
 
         // Ensure that there are the right number of nodes in the graph.
         EXPECT_EQ(d_graph.last_poses_.size(), 1u) << "STILL -- too many last poses -- iter: " << i;
-        EXPECT_EQ(d_graph.last_poses_[0].second, 0) << "STILL -- too many poses in chain -- iter: " << i;
+        EXPECT_EQ(d_graph.counts_[0], i + 1) << "STILL -- too many poses in chain -- iter: " << i;
 
         // Increment time to ensure that the checks pass.
         base_time += 2.0;
@@ -173,7 +180,7 @@ TEST_F(DynamicSceneNodeTest, testGraphConnectionSingleStill)
 
         // Ensure that there are the right number of nodes in the graph.
         EXPECT_EQ(d_graph.last_poses_.size(), 1) << "MOVING -- too many last poses -- iter: " << i;
-        EXPECT_EQ(d_graph.last_poses_[0].second, 1 + i) << "MOVING -- incorrect poses in chain -- iter: " << i;
+        EXPECT_EQ(d_graph.counts_[0], 3 + i) << "MOVING -- incorrect poses in chain -- iter: " << i;
     }
 
     // Add a drastic jump to ensure that a new graph is added.
@@ -194,8 +201,8 @@ TEST_F(DynamicSceneNodeTest, testGraphConnectionSingleStill)
         // Ensure that there are the right number of nodes in the graph.
         EXPECT_EQ(d_graph.last_poses_.size(), 2 + i) << "MULTI -- too many last poses -- iter: " << i;
         for (size_t j = 0; j <= i; j++){
-            if (j == 0) EXPECT_EQ(d_graph.last_poses_[j].second, 2) << "multi -- incorrect poses in chain -- iter: " << i;
-            else EXPECT_EQ(d_graph.last_poses_[j].second, 0) << "multi -- incorrect poses in chain -- iter: " << i;
+            if (j == 0) EXPECT_EQ(d_graph.counts_[j], 4) << "multi -- incorrect poses in chain -- iter: " << i;
+            else EXPECT_EQ(d_graph.counts_[j], 1) << "multi -- incorrect poses in chain -- iter: " << i;
         }
     }
 }

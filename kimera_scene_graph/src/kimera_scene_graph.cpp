@@ -5,6 +5,8 @@
  */
 
 #include "kimera_scene_graph/scene_graph_server.h"
+#include "kimera_scene_graph/dynamic_scene_node_evaluator.h"
+
 
 int main(int argc, char** argv) {
   ros::init(argc, argv, "kimera_scene_graph");
@@ -20,8 +22,7 @@ int main(int argc, char** argv) {
   // (instead of the SimulationSceneGraphServer).
   // kimera::SceneGraphServer node(nh, nh_private);
 
-  // TODO(Arjun): check how to properly integrate this with SceneGraphServer.
-  kimera::DynamicSceneGraph dynamic_graph(nh, nh_private);
+  DynamicSceneGraphEvaluator dynamic_graph_evaluator(nh, nh_private);
 
   ros::spin();
 

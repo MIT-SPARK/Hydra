@@ -32,6 +32,7 @@ SceneGraphSimulationServer::SceneGraphSimulationServer(
       wall_finder_(nullptr),
       building_finder_(nullptr),
       scene_graph_(nh, nh_private),
+      dynamic_scene_graph_(nh, nh_private),
       reconstruct_scene_graph_srv_(),
       load_map_srv_() {
   // TODO(Toni): remove
@@ -716,6 +717,11 @@ void SceneGraphSimulationServer::sceneGraphReconstruction(
   LOG(INFO) << "Visualize Scene Graph";
   scene_graph_.visualize();
 
+  LOG(INFO) << "Visualizing Human Pose Graphs";
+  dynamic_scene_graph_.visualizePoseGraphs();
+
+  LOG(INFO) << "Visualizing Human Skeletons";
+  dynamic_scene_graph_.visualizeJoints();
 }
 
 void SceneGraphSimulationServer::publishSkeletonToObjectLinks(

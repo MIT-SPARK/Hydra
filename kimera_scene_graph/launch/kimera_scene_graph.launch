@@ -31,7 +31,7 @@
     <param name="esdf_min_distance_m"                value="0.2"/>
     <param name="verbose"                            value="true"/>
     <param name="max_attempts_to_generate_viewpoint" value="20"/>
-    <param name="world_frame"                        value="map"/>
+    <param name="world_frame"                        value="world"/>
     <param name="human_topic"                        value="/human_meshes"/>
     <param name="filter_by_centroid"                 value="true"/>
     <param name="filter_by_mesh"                     value="false"/>
@@ -47,6 +47,7 @@
     <param name="centroid_color"                     value="[0.0, 0.0, 1.0]"/>
     <param name="edge_thickness"                     value="0.02"/>
     <param name="serialization_dir"                  value="/home/argupta/serialized_graph"/>
+    <param name="num_humans"                         value="5"/>
     <param name="deserialization_file"               value="/home/argupta/serialized_graph/scene_graph_higher_sparse/27"/>
 
     <!-- Caution: Setting this to "true" will show the full smpl for each timestep for
@@ -89,7 +90,7 @@
   </node>
 
   <node name="kimera_scene_graph_vis" pkg="graph_cmr_ros" type="vis_graph_script" output="screen" args="">
-    <param name="visualizer_type"        value="mesh"/>
+    <param name="visualizer_type"        value="point_cloud"/>
     <param name="human_topic"            value="kimera_scene_graph_node/human_meshes"/>
     <param name="vis_topic"              value="kimera_scene_graph/human_meshes_vis"/>
     <param name="use_time_color"         value="false"/>

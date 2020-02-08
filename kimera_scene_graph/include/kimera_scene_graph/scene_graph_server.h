@@ -121,6 +121,9 @@ class SceneGraphSimulationServer : public SemanticSimulationServer {
   // KimeraX
   SceneGraph scene_graph_;
 
+  // KimeraX Dynamic
+  DynamicSceneGraph dynamic_scene_graph_;
+
   // TODO(Toni): remove
   float skeleton_z_level_;
 
