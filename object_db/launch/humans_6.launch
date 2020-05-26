@@ -28,5 +28,6 @@
     <!-- GT Data Params -->
     <param name="gt_csv_path"    value="$(find object_db)/data/gt_data.csv" />
     <param name="semantic_label_csv_path"  value="$(find object_db)/data/label_id_mapping.csv"/>
+
   </node>
 </launch>

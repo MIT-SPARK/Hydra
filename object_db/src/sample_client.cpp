@@ -1,12 +1,10 @@
-#include <Eigen/Core>
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/client/terminal_state.h>
 #include <ros/ros.h>
 
 #include <object_db/ObjectRegistrationAction.h>
 
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
   ros::init(argc, argv, "teaser_sample_client");
 
   ROS_INFO("Starting client.");
@@ -18,7 +16,7 @@ int main(int argc, char** argv)
 
   ROS_INFO("Waiting for action server to start.");
   // wait for the action server to start
-  ac.waitForServer(); // will wait for infinite time
+  ac.waitForServer();  // will wait for infinite time
 
   ROS_INFO("TEASER++ server started.");
 

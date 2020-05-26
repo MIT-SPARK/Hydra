@@ -61,5 +61,4 @@ struct BoundingBox {
   Eigen::Matrix3f orientation_matrix;
 };
 
-
 }  // namespace kimera

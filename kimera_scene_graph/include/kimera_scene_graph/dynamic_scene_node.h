@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -29,6 +30,8 @@
 #include <gtsam/nonlinear/Values.h>
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/slam/PriorFactor.h>
+
+#include <voxblox_msgs/FilePath.h>
 
 #include "kimera_scene_graph/CentroidErrorRequest.h"
 #include "kimera_scene_graph/scene_node.h"
@@ -69,11 +72,18 @@ class DynamicSceneGraph : public SceneGraph {
    * @param response: The empty response.
    * @return True always.
    */
-  bool deserializeServiceCall(std_srvs::Empty::Request& request,
-                              std_srvs::Empty::Response& response) {
-    LOG(INFO) << "DynamicSceneNode: Deserialization Requested";
-    deserializeAndPublish();
-    return true;
+
+  bool deserializeServiceCall(
+      voxblox_msgs::FilePath::Request& request,
+      voxblox_msgs::FilePath::Response& /*response*/) {  // NOLINT
+    LOG(INFO) << "DynamicSceneNode: Deserialization Requested...";
+    if (!deserializeAndPublish(request.file_path)) {
+      LOG(ERROR) << "Failed to load map!";
+      return false;
+    } else {
+      LOG(INFO) << "Successful deserialization request.";
+      return true;
+    }
   }
 
   /**
@@ -214,14 +224,14 @@ class DynamicSceneGraph : public SceneGraph {
    * deserialization_file
    *  and publishes them.
    */
-  bool deserializeAndPublish();
+  bool deserializeAndPublish(const std::string& deserialization_file);
 
   /**
    * @brief serialize the messages to a bag file in the serialization_dir_ named
    * based on the number
    *  of pose graphs.
    */
-  inline void serialize() {
+  bool serialize() {
     if (makedirs(serialization_dir_)) {
       // Put in the number of humans as the file name so we know how many
       // topics.
@@ -231,6 +241,10 @@ class DynamicSceneGraph : public SceneGraph {
       visualizeJoints(true);
       visualizePoseGraphs(true);
       bag_.close();
+      return true;
+    } else {
+      LOG(ERROR) << "Serialization for dynamic scene nodes failed!";
+      return false;
     }
   }
 
@@ -242,13 +256,14 @@ class DynamicSceneGraph : public SceneGraph {
    * @return true if the directory exists or was successfully made, false
    * otherwise.
    */
-  bool makedirs(std::string& filepath, bool create_dirs = true) {
+  bool makedirs(const std::string& filepath, bool create_dirs = true) {
     // Ensure that the directory exists
     boost::filesystem::path dir(filepath);
     if (!(boost::filesystem::exists(dir))) {
       LOG(WARNING) << "Serialization Directory: " << filepath
-                   << " Doesn't Exist \n Creating Directory ...";
+                   << " Doesn't Exist...";
       if (create_dirs) {
+        LOG(WARNING) << "Creating Directory: " << filepath;
         if (boost::filesystem::create_directory(dir)) {
           LOG(WARNING) << "...Successfully Created !";
           return true;
@@ -319,7 +334,6 @@ class DynamicSceneGraph : public SceneGraph {
   bool draw_skeleton_edges_ = false;
   bool merge_close_ = true;
   std::string serialization_dir_ = ".";
-  std::string deserialization_file_ = ".";
   std::string human_topic_;
   bool filter_centroid_ = true;
   bool filter_mesh_ = true;

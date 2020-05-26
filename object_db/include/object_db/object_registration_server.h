@@ -1,22 +1,25 @@
 #pragma once
 
-#include <actionlib/server/simple_action_server.h>
-#include <geometry_msgs/Point32.h>
-#include <object_db/ObjectRegistrationAction.h>
-#include <object_db/common.h>
-#include <object_db/matcher.h>
-#include <object_db/object_registration_server.h>
-#include <object_db/ply_io.h>
+#include <unordered_map>
+#include <vector>
+
+#include <pcl/common/geometry.h>
 #include <pcl/common/transforms.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <pcl/common/geometry.h>
 #include <pcl_ros/point_cloud.h>
+
 #include <ros/ros.h>
+#include <actionlib/server/simple_action_server.h>
+#include <geometry_msgs/Point32.h>
+
 #include <teaser/registration.h>
 
-#include <map>
-#include <vector>
+#include "object_db/ObjectRegistrationAction.h"
+#include "object_db/common.h"
+#include "object_db/matcher.h"
+#include "object_db/object_registration_server.h"
+#include "object_db/ply_io.h"
 
 namespace object_registration {
 
@@ -24,6 +27,63 @@ namespace object_registration {
  * Server for solving registration with TEASER++
  */
 class ObjectRegistrationServer {
+ public:
+  explicit ObjectRegistrationServer(const std::string& name);
+
+  ObjectRegistrationServer(
+      const std::string name,
+      teaser::RobustRegistrationSolver::Params solver_params);
+
+  ObjectRegistrationServer(
+      const std::string name,
+      const std::string db_path,
+      teaser::RobustRegistrationSolver::Params solver_params);
+
+  ObjectRegistrationServer(
+      const std::string name,
+      const std::string db_path,
+      teaser::RobustRegistrationSolver::Params solver_params,
+      MatcherParams matcher_params);
+
+  ObjectRegistrationServer(
+      const std::string name,
+      const std::string db_path,
+      const std::string gt_path,
+      teaser::RobustRegistrationSolver::Params solver_params,
+      MatcherParams matcher_params);
+
+  ObjectRegistrationServer(
+      const std::string& name,
+      const std::string& db_path,
+      const std::string& gt_path,
+      const std::string& label_path,
+      teaser::RobustRegistrationSolver::Params solver_params,
+      MatcherParams matcher_params);
+
+  ~ObjectRegistrationServer() = default;
+
+  /**
+   * Call back function for the action server
+   * @param goal
+   */
+  void executeCB(const object_db::ObjectRegistrationGoalConstPtr& goal);
+
+  /**
+   * Load a database
+   * @param db_path
+   */
+  int loadObjectDB(const std::string& db_path);
+
+  /**
+   * Load GT data
+   */
+  int loadGTDB(const std::string& gt_file);
+
+  /**
+   * Load label db
+   */
+  int loadLabelDB(const std::string& label_file);
+
  protected:
   ros::NodeHandle nh_;
   actionlib::SimpleActionServer<object_db::ObjectRegistrationAction> as_;
@@ -66,126 +126,6 @@ class ObjectRegistrationServer {
   std::unordered_map<std::string, pcl::PointCloud<pcl::PointXYZ>>
       dst_keypoints_db_;
   std::unordered_map<std::string, ros::Publisher> dst_keypoints_publishers_;
-
- public:
-  explicit ObjectRegistrationServer(const std::string name)
-      : as_(nh_,
-            name,
-            boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
-            false),
-        action_name_(name) {
-    as_.start();
-  }
-
-  ObjectRegistrationServer(
-      const std::string name,
-      teaser::RobustRegistrationSolver::Params solver_params)
-      : as_(nh_,
-            name,
-            boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
-            false),
-        action_name_(name),
-        solver_params_(solver_params) {
-    as_.start();
-  }
-
-  ObjectRegistrationServer(
-      const std::string name,
-      const std::string db_path,
-      teaser::RobustRegistrationSolver::Params solver_params)
-      : as_(nh_,
-            name,
-            boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
-            false),
-        action_name_(name),
-        solver_params_(solver_params) {
-    as_.start();
-    ROS_INFO("Loading object database.");
-    loadObjectDB(db_path);
-  }
-
-  ObjectRegistrationServer(
-      const std::string name,
-      const std::string db_path,
-      teaser::RobustRegistrationSolver::Params solver_params,
-      MatcherParams matcher_params)
-      : as_(nh_,
-            name,
-            boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
-            false),
-        action_name_(name),
-        solver_params_(solver_params),
-        matcher_(matcher_params) {
-    as_.start();
-    ROS_INFO("Loading object database.");
-    loadObjectDB(db_path);
-  }
-
-  ObjectRegistrationServer(
-      const std::string name,
-      const std::string db_path,
-      const std::string gt_path,
-      teaser::RobustRegistrationSolver::Params solver_params,
-      MatcherParams matcher_params)
-      : as_(nh_,
-            name,
-            boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
-            false),
-        action_name_(name),
-        solver_params_(solver_params),
-        matcher_(matcher_params) {
-    as_.start();
-    ROS_INFO("Loading object database.");
-    loadObjectDB(db_path);
-    loadGTDB(gt_path);
-  }
-
-  ObjectRegistrationServer(
-      const std::string& name,
-      const std::string& db_path,
-      const std::string& gt_path,
-      const std::string& label_path,
-      teaser::RobustRegistrationSolver::Params solver_params,
-      MatcherParams matcher_params)
-      : as_(nh_,
-            name,
-            boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
-            false),
-        action_name_(name),
-        solver_params_(solver_params),
-        matcher_(matcher_params) {
-    as_.start();
-    ROS_INFO("Loading label database.");
-    loadLabelDB(label_path);
-    ROS_INFO("Loading object database.");
-    loadObjectDB(db_path);
-    ROS_INFO("Loading GT database.");
-    loadGTDB(gt_path);
-  }
-
-  ~ObjectRegistrationServer() = default;
-
-  /**
-   * Call back function for the action server
-   * @param goal
-   */
-  void executeCB(const object_db::ObjectRegistrationGoalConstPtr& goal);
-
-  /**
-   * Load a database
-   * @param db_path
-   */
-  int loadObjectDB(const std::string& db_path);
-
-  /**
-   * Load GT data
-   */
-   int loadGTDB(const std::string& gt_file);
-
-  /**
-   * Load label db
-   */
-  int loadLabelDB(const std::string& label_file);
 };
 
 }  // namespace object_registration

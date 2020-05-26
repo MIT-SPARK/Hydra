@@ -14,11 +14,10 @@ int main(int argc, char** argv) {
   google::ParseCommandLineFlags(&argc, &argv, false);
   google::InstallFailureSignalHandler();
 
-  ros::NodeHandle nh;
-  ros::NodeHandle nh_private("~");
-
   // TODO(Toni): at the end this should be building the graph
   // (instead of the SimulationSceneGraphServer).
+  ros::NodeHandle nh;
+  ros::NodeHandle nh_private("~");
   // kimera::SceneGraphServer node(nh, nh_private);
 
   DynamicSceneGraphEvaluator dynamic_graph_evaluator(nh, nh_private);

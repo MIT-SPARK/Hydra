@@ -1,9 +1,105 @@
 #include <dirent.h>
-#include <object_db/object_registration_server.h>
 #include <stdlib.h>
 #include <sys/types.h>
 
+#include "object_db/object_registration_server.h"
+
 namespace object_registration {
+
+ObjectRegistrationServer::ObjectRegistrationServer(const std::string &name)
+    : as_(nh_,
+          name,
+          boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
+          false),
+      action_name_(name) {
+  as_.start();
+}
+
+ObjectRegistrationServer::ObjectRegistrationServer(
+    const std::string name,
+    teaser::RobustRegistrationSolver::Params solver_params)
+    : as_(nh_,
+          name,
+          boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
+          false),
+      action_name_(name),
+      solver_params_(solver_params) {
+  as_.start();
+}
+
+ObjectRegistrationServer::ObjectRegistrationServer(
+    const std::string name,
+    const std::string db_path,
+    teaser::RobustRegistrationSolver::Params solver_params)
+    : as_(nh_,
+          name,
+          boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
+          false),
+      action_name_(name),
+      solver_params_(solver_params) {
+  as_.start();
+  ROS_INFO("Loading object database.");
+  loadObjectDB(db_path);
+}
+
+ObjectRegistrationServer::ObjectRegistrationServer(
+    const std::string name,
+    const std::string db_path,
+    teaser::RobustRegistrationSolver::Params solver_params,
+    MatcherParams matcher_params)
+    : as_(nh_,
+          name,
+          boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
+          false),
+      action_name_(name),
+      solver_params_(solver_params),
+      matcher_(matcher_params) {
+  as_.start();
+  ROS_INFO("Loading object database.");
+  loadObjectDB(db_path);
+}
+
+ObjectRegistrationServer::ObjectRegistrationServer(
+    const std::string name,
+    const std::string db_path,
+    const std::string gt_path,
+    teaser::RobustRegistrationSolver::Params solver_params,
+    MatcherParams matcher_params)
+    : as_(nh_,
+          name,
+          boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
+          false),
+      action_name_(name),
+      solver_params_(solver_params),
+      matcher_(matcher_params) {
+  as_.start();
+  ROS_INFO("Loading object database.");
+  loadObjectDB(db_path);
+  loadGTDB(gt_path);
+}
+
+ObjectRegistrationServer::ObjectRegistrationServer(
+    const std::string &name,
+    const std::string &db_path,
+    const std::string &gt_path,
+    const std::string &label_path,
+    teaser::RobustRegistrationSolver::Params solver_params,
+    MatcherParams matcher_params)
+    : as_(nh_,
+          name,
+          boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
+          false),
+      action_name_(name),
+      solver_params_(solver_params),
+      matcher_(matcher_params) {
+  as_.start();
+  ROS_INFO("Loading label database.");
+  loadLabelDB(label_path);
+  ROS_INFO("Loading object database.");
+  loadObjectDB(db_path);
+  ROS_INFO("Loading GT database.");
+  loadGTDB(gt_path);
+}
 
 /**
  * Helper function to read in csv.
@@ -76,7 +172,7 @@ float calcCentroidErrors(pcl::PointCloud<pcl::PointXYZ> &est_cloud,
         sqrt(std::pow(gt_centroid.x - est_centroid_point.x, 2) +
              std::pow(gt_centroid.y - est_centroid_point.y, 2) +
              std::pow(gt_centroid.z - est_centroid_point.z, 2));
-    //ROS_INFO("Current error: %f", c_centroid_error);
+    // ROS_INFO("Current error: %f", c_centroid_error);
     if (c_centroid_error < centroid_error) {
       centroid_error = c_centroid_error;
     }
@@ -385,10 +481,10 @@ int ObjectRegistrationServer::loadGTDB(const std::string &gt_file) {
     auto name = result[0];
 
     std::istringstream name_stream(name);
-    vector<string> name_tokens;
-    copy(istream_iterator<string>(name_stream),
-         istream_iterator<string>(),
-         back_inserter(name_tokens));
+    std::vector<std::string> name_tokens;
+    std::copy(std::istream_iterator<std::string>(name_stream),
+              std::istream_iterator<std::string>(),
+              std::back_inserter(name_tokens));
 
     // For everything
     auto rend_name = name_tokens[0];

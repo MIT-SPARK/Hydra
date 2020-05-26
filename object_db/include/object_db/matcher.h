@@ -29,51 +29,21 @@ class KeypointsMatcher {
   MatcherParams params_;
 
  public:
-  KeypointsMatcher() : KeypointsMatcher(true, false, 0.3, 1e-4, 4) {}
+  KeypointsMatcher();
 
-  KeypointsMatcher(MatcherParams params)
-      : KeypointsMatcher(params.non_max_suppression,
-                         params.set_refine,
-                         params.radius,
-                         params.nms_threshold,
-                         params.num_threads) {}
+  KeypointsMatcher(const MatcherParams& params);
 
   KeypointsMatcher(bool use_non_max_suppression,
                    bool use_refine,
                    float radius,
                    float nms_threshold,
-                   int num_threads) {
-    // Update variables
-    params_.non_max_suppression = use_non_max_suppression;
-    params_.set_refine = use_refine;
-    params_.radius = radius;
-    params_.nms_threshold = nms_threshold;
-    params_.num_threads = num_threads;
-
-    // Reset Harris corner detector
-    harris_detector_ =
-        std::make_unique<pcl::HarrisKeypoint3D<pcl::PointXYZ, pcl::PointXYZI>>(
-            pcl::HarrisKeypoint3D<pcl::PointXYZ,
-                                  pcl::PointXYZI>::ResponseMethod::HARRIS,
-            params_.radius,
-            params_.nms_threshold);
-    harris_detector_->setNonMaxSupression(params_.non_max_suppression);
-    harris_detector_->setRefine(params_.set_refine);
-    harris_detector_->setNumberOfThreads(params_.num_threads);
-  }
+                   int num_threads);
 
   void updateParameters(bool use_non_max_suppression,
                         bool use_refine,
                         float radius,
                         float nms_threshold,
-                        int max_threads) {
-    // Update variables
-    params_.non_max_suppression = use_non_max_suppression;
-    params_.set_refine = use_refine;
-    params_.radius = radius;
-    params_.nms_threshold = nms_threshold;
-    params_.num_threads = max_threads;
-  }
+                        int max_threads);
 
   /**
    * Given a sensor_msgs::PointCloud, return an eigen matrix representing
@@ -117,4 +87,5 @@ class KeypointsMatcher {
                                Eigen::Matrix<double, 3, Eigen::Dynamic>* src,
                                Eigen::Matrix<double, 3, Eigen::Dynamic>* dst);
 };
+
 }  // namespace object_registration

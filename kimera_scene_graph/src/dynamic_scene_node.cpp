@@ -45,8 +45,6 @@ DynamicSceneGraph::DynamicSceneGraph(const ros::NodeHandle& nh,
   nh_private_.param("centroid_color", centroid_color_, centroid_color_);
   nh_private_.param(
       "serialization_dir", serialization_dir_, serialization_dir_);
-  nh_private_.param(
-      "deserialization_file", deserialization_file_, deserialization_file_);
   nh_private_.param("prune_theshold", prune_threshold_, prune_threshold_);
   nh_private_.param("single_sequence_smpl_mode",
                     single_sequence_smpl_mode_,
@@ -79,52 +77,78 @@ DynamicSceneGraph::DynamicSceneGraph(const ros::NodeHandle& nh,
       human_topic_, 1, &DynamicSceneGraph::humanCallback, this);
 }
 
-bool DynamicSceneGraph::deserializeAndPublish() {
-  if (makedirs(deserialization_file_, false)) {
-    bag_.open(deserialization_file_, rosbag::bagmode::Read);
+bool DynamicSceneGraph::deserializeAndPublish(
+    const std::string& deserialization_file) {
+  if (makedirs(deserialization_file, false)) {
+    try {
+      bag_.open(deserialization_file, rosbag::bagmode::Read);
+    } catch (const rosbag::BagException& e) {
+      LOG(ERROR) << "Failed to load rosbag at: " << deserialization_file.c_str();
+      LOG(ERROR) << e.what();
+      return false;
+    }
+
     rosbag::View view(bag_);
-    for(const rosbag::MessageInstance& m: view) {
+    for (const rosbag::MessageInstance& m : view) {
       std::string topic = m.getTopic();
       LOG(INFO) << "Deserializing from Topic " << topic;
+
       if (topic.compare(mesh_pub_.getTopic()) == 0) {
-        if (single_sequence_smpl_mode_) continue;
+        if (single_sequence_smpl_mode_) {
+          continue;
+        }
         graph_cmr_ros::SMPLList::ConstPtr smpls =
             m.instantiate<graph_cmr_ros::SMPLList>();
+        CHECK(smpls);
         mesh_pub_.publish(*smpls);
         continue;
       } else if (topic.compare(edges_pub_.getTopic()) == 0) {
         visualization_msgs::Marker::ConstPtr marker =
             m.instantiate<visualization_msgs::Marker>();
+        CHECK(marker);
         edges_pub_.publish(*marker);
         continue;
       } else if (topic.compare(semantic_instance_centroid_pub_.getTopic()) ==
                  0) {
         ColorPointCloud::ConstPtr pt_cloud = m.instantiate<ColorPointCloud>();
+        CHECK(pt_cloud);
         semantic_instance_centroid_pub_.publish(*pt_cloud);
         continue;
       }
 
       size_t chop_idx = topic.find_last_of('_');
-      AgentId id = std::stol(topic.substr(chop_idx + 1, topic.size()));
+      std::string id_str = topic.substr(chop_idx + 1);
+      AgentId id;
+      try {
+        id = std::stol(id_str);
+      } catch (...) {
+        LOG(ERROR) << "Not parsing non-numeric agent id: " << id_str.c_str();
+      }
       std::string smpl_msg_name = "human_smpl_msg_" + std::to_string(id);
+
       if (topic.compare(agent_centroids_.getTopic(id)) == 0) {
         ColorPointCloud::ConstPtr pt_cloud = m.instantiate<ColorPointCloud>();
+        CHECK(pt_cloud);
         agent_centroids_.publish(id, *pt_cloud);
       } else if (topic.compare(agent_graph_edges_.getTopic(id)) == 0) {
         visualization_msgs::Marker::ConstPtr marker =
             m.instantiate<visualization_msgs::Marker>();
+        CHECK(marker);
         agent_graph_edges_.publish(id, *marker);
       } else if (topic.compare(skeleton_points_pubs_.getTopic(id)) == 0) {
         ColorPointCloud::ConstPtr pt_cloud = m.instantiate<ColorPointCloud>();
+        CHECK(pt_cloud);
         skeleton_points_pubs_.publish(id, *pt_cloud);
       } else if (topic.compare(skeleton_edge_pubs_.getTopic(id)) == 0) {
         visualization_msgs::Marker::ConstPtr marker =
             m.instantiate<visualization_msgs::Marker>();
+        CHECK(marker);
         skeleton_edge_pubs_.publish(id, *marker);
       } else if (topic.compare(smpl_msg_name) == 0 &&
                  single_sequence_smpl_mode_) {
         graph_cmr_ros::SMPLList::ConstPtr smpls =
             m.instantiate<graph_cmr_ros::SMPLList>();
+        CHECK(smpls);
         mesh_pub_.publish(*smpls);
         continue;
       }

@@ -1,5 +1,54 @@
 #include "object_db/matcher.h"
 
+namespace object_registration {
+
+KeypointsMatcher::KeypointsMatcher()
+    : KeypointsMatcher(true, false, 0.3, 1e-4, 4) {}
+
+KeypointsMatcher::KeypointsMatcher(const MatcherParams& params)
+    : KeypointsMatcher(params.non_max_suppression,
+                       params.set_refine,
+                       params.radius,
+                       params.nms_threshold,
+                       params.num_threads) {}
+
+KeypointsMatcher::KeypointsMatcher(bool use_non_max_suppression,
+                                   bool use_refine,
+                                   float radius,
+                                   float nms_threshold,
+                                   int num_threads) {
+  // Update variables
+  params_.non_max_suppression = use_non_max_suppression;
+  params_.set_refine = use_refine;
+  params_.radius = radius;
+  params_.nms_threshold = nms_threshold;
+  params_.num_threads = num_threads;
+
+  // Reset Harris corner detector
+  harris_detector_ =
+      std::make_unique<pcl::HarrisKeypoint3D<pcl::PointXYZ, pcl::PointXYZI>>(
+          pcl::HarrisKeypoint3D<pcl::PointXYZ,
+                                pcl::PointXYZI>::ResponseMethod::HARRIS,
+          params_.radius,
+          params_.nms_threshold);
+  harris_detector_->setNonMaxSupression(params_.non_max_suppression);
+  harris_detector_->setRefine(params_.set_refine);
+  harris_detector_->setNumberOfThreads(params_.num_threads);
+}
+
+void KeypointsMatcher::updateParameters(bool use_non_max_suppression,
+                                        bool use_refine,
+                                        float radius,
+                                        float nms_threshold,
+                                        int max_threads) {
+  // Update variables
+  params_.non_max_suppression = use_non_max_suppression;
+  params_.set_refine = use_refine;
+  params_.radius = radius;
+  params_.nms_threshold = nms_threshold;
+  params_.num_threads = max_threads;
+}
+
 pcl::PointCloud<pcl::PointXYZ>::Ptr
 object_registration::KeypointsMatcher::calculateKeypoints(
     const sensor_msgs::PointCloud& input_cloud_msg) {
@@ -85,3 +134,5 @@ void object_registration::KeypointsMatcher::generateCorrespondences(
     }
   }
 }
+
+}  // namespace object_registration

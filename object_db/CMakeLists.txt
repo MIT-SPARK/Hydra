@@ -1,13 +1,18 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(object_db)
 
+set(CMAKE_CXX_STANDARD 14)
+
 # catkin_simple setup
 find_package(catkin_simple REQUIRED)
 catkin_simple(ALL_DEPS_REQUIRED)
 
 # Object Registration Server
-cs_add_library(object_registration_server src/object_registration_server.cpp)
-target_link_libraries(object_registration_server 
+cs_add_library(object_registration_server
+  src/object_registration_server.cpp
+  src/ply_io.cpp
+  include/object_db/tinyply.h)
+target_link_libraries(object_registration_server
     matcher teaserpp::teaser_registration ${PCL_LIBRARIES})
 
 # PCL Keypoints Module
@@ -16,7 +21,7 @@ target_link_libraries(matcher ${PCL_LIBRARIES})
 
 # Server node
 cs_add_executable(server_node src/server_node.cpp)
-target_link_libraries(server_node 
+target_link_libraries(server_node
     object_registration_server teaserpp::teaser_registration)
 
 # Sample client code
