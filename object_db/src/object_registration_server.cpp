@@ -17,12 +17,14 @@ ObjectRegistrationServer::ObjectRegistrationServer(const std::string &name)
 
 ObjectRegistrationServer::ObjectRegistrationServer(
     const std::string name,
+    const std::string target_object_label,
     teaser::RobustRegistrationSolver::Params solver_params)
     : as_(nh_,
           name,
           boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
           false),
       action_name_(name),
+      target_object_label_(target_object_label),
       solver_params_(solver_params) {
   as_.start();
 }
@@ -30,12 +32,14 @@ ObjectRegistrationServer::ObjectRegistrationServer(
 ObjectRegistrationServer::ObjectRegistrationServer(
     const std::string name,
     const std::string db_path,
+    const std::string target_object_label,
     teaser::RobustRegistrationSolver::Params solver_params)
     : as_(nh_,
           name,
           boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
           false),
       action_name_(name),
+      target_object_label_(target_object_label),
       solver_params_(solver_params) {
   as_.start();
   ROS_INFO("Loading object database.");
@@ -45,6 +49,7 @@ ObjectRegistrationServer::ObjectRegistrationServer(
 ObjectRegistrationServer::ObjectRegistrationServer(
     const std::string name,
     const std::string db_path,
+    const std::string target_object_label,
     teaser::RobustRegistrationSolver::Params solver_params,
     MatcherParams matcher_params)
     : as_(nh_,
@@ -52,6 +57,7 @@ ObjectRegistrationServer::ObjectRegistrationServer(
           boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
           false),
       action_name_(name),
+      target_object_label_(target_object_label),
       solver_params_(solver_params),
       matcher_(matcher_params) {
   as_.start();
@@ -63,6 +69,7 @@ ObjectRegistrationServer::ObjectRegistrationServer(
     const std::string name,
     const std::string db_path,
     const std::string gt_path,
+    const std::string target_object_label,
     teaser::RobustRegistrationSolver::Params solver_params,
     MatcherParams matcher_params)
     : as_(nh_,
@@ -70,6 +77,7 @@ ObjectRegistrationServer::ObjectRegistrationServer(
           boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
           false),
       action_name_(name),
+      target_object_label_(target_object_label),
       solver_params_(solver_params),
       matcher_(matcher_params) {
   as_.start();
@@ -79,10 +87,11 @@ ObjectRegistrationServer::ObjectRegistrationServer(
 }
 
 ObjectRegistrationServer::ObjectRegistrationServer(
-    const std::string &name,
-    const std::string &db_path,
-    const std::string &gt_path,
-    const std::string &label_path,
+    const std::string& name,
+    const std::string& db_path,
+    const std::string& gt_path,
+    const std::string& label_path,
+    const std::string& target_object_label,
     teaser::RobustRegistrationSolver::Params solver_params,
     MatcherParams matcher_params)
     : as_(nh_,
@@ -90,6 +99,7 @@ ObjectRegistrationServer::ObjectRegistrationServer(
           boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
           false),
       action_name_(name),
+      target_object_label_(target_object_label),
       solver_params_(solver_params),
       matcher_(matcher_params) {
   as_.start();
@@ -514,7 +524,7 @@ int ObjectRegistrationServer::loadGTDB(const std::string &gt_file) {
     gt_centroids_db_[id].push_back(cpoint);
 
     // Search for couch only
-    if (name_tokens[0] == "Couch_1seat") {
+    if (name_tokens[0] == target_object_label_) {
       gt_centroids_.push_back(cpoint);
     }
   }

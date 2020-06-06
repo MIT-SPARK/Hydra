@@ -71,6 +71,15 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
+  // Target object label
+  std::string object_label;
+  if (nh_private.getParam("target_object_label", object_label)) {
+    ROS_INFO("Target object label:%s", object_label.c_str());
+  } else {
+    ROS_ERROR("Cannot retrieve target object label. Abort.");
+    return EXIT_FAILURE;
+  }
+
   // Matcher params
   object_registration::MatcherParams matcher_params =
       object_registration::loadMatcherParams(nh_private);
@@ -84,11 +93,11 @@ int main(int argc, char *argv[]) {
     nh_private.getParam("semantic_label_csv_path", label_path);
     ROS_INFO("Preparing object database action server.");
     server = std::make_unique<object_registration::ObjectRegistrationServer>(
-        "object_db", db_path, gt_path, label_path, params, matcher_params);
+        "object_db", db_path, gt_path, label_path, object_label, params, matcher_params);
   } else {
     ROS_INFO("Preparing object database action server.");
     server = std::make_unique<object_registration::ObjectRegistrationServer>(
-        "object_db", db_path, params, matcher_params);
+        "object_db", db_path, object_label, params, matcher_params);
   }
   assert(server != nullptr);
 

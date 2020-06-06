@@ -32,16 +32,19 @@ class ObjectRegistrationServer {
 
   ObjectRegistrationServer(
       const std::string name,
+      const std::string target_object_label,
       teaser::RobustRegistrationSolver::Params solver_params);
 
   ObjectRegistrationServer(
       const std::string name,
       const std::string db_path,
+      const std::string target_object_label,
       teaser::RobustRegistrationSolver::Params solver_params);
 
   ObjectRegistrationServer(
       const std::string name,
       const std::string db_path,
+      const std::string target_object_label,
       teaser::RobustRegistrationSolver::Params solver_params,
       MatcherParams matcher_params);
 
@@ -49,6 +52,7 @@ class ObjectRegistrationServer {
       const std::string name,
       const std::string db_path,
       const std::string gt_path,
+      const std::string target_object_label,
       teaser::RobustRegistrationSolver::Params solver_params,
       MatcherParams matcher_params);
 
@@ -57,6 +61,7 @@ class ObjectRegistrationServer {
       const std::string& db_path,
       const std::string& gt_path,
       const std::string& label_path,
+      const std::string& target_object_label,
       teaser::RobustRegistrationSolver::Params solver_params,
       MatcherParams matcher_params);
 
@@ -99,6 +104,9 @@ class ObjectRegistrationServer {
 
   // Object database
   std::unordered_map<int, Object> object_db_;
+
+  // Target object label
+  std::string target_object_label_;
 
   // GT data
   std::vector<pcl::PointXYZ> gt_centroids_;
