@@ -72,9 +72,9 @@ class DynamicSceneGraphEvaluator {
    */
   bool getAllTransforms(std::vector<tf::StampedTransform>& out_transforms,
                         ros::Time& time) {
-    // All human frames are labelled object_n
-    size_t i = 0;
-    while (true) {
+    // All human frames are labeled object_n
+    size_t i;
+    for (i = 0; i < num_humans_; ++i) {
       tf::StampedTransform new_transform;
       try {
         listener_.lookupTransform(
@@ -82,9 +82,7 @@ class DynamicSceneGraphEvaluator {
         out_transforms.push_back(new_transform);
       } catch (tf::TransformException ex) {
         ROS_ERROR("%s", ex.what());
-        break;
       }
-      i++;
     }
 
     // Ensure that all transforms were read in properly.

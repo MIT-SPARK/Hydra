@@ -120,6 +120,26 @@ typename pcl::PointCloud<T>::Ptr passThroughFilter1D(
   return cloud_filtered;
 }
 
+template<class T>
+typename pcl::PointCloud<T>::Ptr downsamplePcl(
+    const typename pcl::PointCloud<T>::Ptr& input,
+    const float& leaf_size = 0.05f,
+    const bool& approx_downsampling = false) {
+  typename pcl::PointCloud<T>::Ptr downsampled_pcl(new pcl::PointCloud<T>);
+  if (approx_downsampling) {
+    pcl::ApproximateVoxelGrid<T> downsampler;
+    downsampler.setLeafSize(leaf_size, leaf_size, leaf_size);
+    downsampler.setInputCloud(input);
+    downsampler.filter(*downsampled_pcl);
+  } else {
+    pcl::VoxelGrid<T> downsampler;
+    downsampler.setInputCloud(input);
+    downsampler.setLeafSize(leaf_size, leaf_size, leaf_size);
+    downsampler.filter(*downsampled_pcl);
+  }
+  return downsampled_pcl;
+}
+
 class RoomFinder {
  public:
   RoomFinder(const ros::NodeHandle& nh_private, const std::string& world_frame);
@@ -216,26 +236,6 @@ class RoomFinder {
   cv::Mat getMorphologyRoom(const cv::Mat& img);
 
   void getSlicRoom(const cv::Mat& img);
-
-  template <class T>
-  typename pcl::PointCloud<T>::Ptr downsamplePcl(
-      const typename pcl::PointCloud<T>::Ptr& input,
-      const float& leaf_size = 0.05f) {
-    typename pcl::PointCloud<T>::Ptr downsampled_pcl(new pcl::PointCloud<T>);
-    static constexpr bool kApproxDownsampler = false;
-    if (kApproxDownsampler) {
-      pcl::ApproximateVoxelGrid<T> downsampler;
-      downsampler.setLeafSize(leaf_size, leaf_size, leaf_size);
-      downsampler.setInputCloud(input);
-      downsampler.filter(*downsampled_pcl);
-    } else {
-      pcl::VoxelGrid<T> downsampler;
-      downsampler.setInputCloud(input);
-      downsampler.setLeafSize(leaf_size, leaf_size, leaf_size);
-      downsampler.filter(*downsampled_pcl);
-    }
-    return downsampled_pcl;
-  }
 
  private:
   std::string world_frame_;

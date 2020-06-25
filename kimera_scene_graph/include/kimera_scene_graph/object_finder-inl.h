@@ -49,6 +49,7 @@ ColorPointCloud::Ptr ObjectFinder<T>::findObjects(
     Centroids* centroids,
     ObjectPointClouds* object_pcls,
     BoundingBoxes* bounding_boxes) {
+  CHECK(pointcloud);
   CHECK_NOTNULL(centroids);
   CHECK_NOTNULL(object_pcls);
   CHECK_NOTNULL(bounding_boxes);
@@ -164,6 +165,9 @@ ColorPointCloud::Ptr ObjectFinder<T>::regionGrowingClusterEstimator(
     const typename PointCloudT::Ptr& cloud,
     Centroids* centroids,
     ObjectPointClouds* object_pcls) {
+  CHECK(cloud);
+  CHECK_NOTNULL(centroids);
+  CHECK_NOTNULL(object_pcls);
   typename pcl::search::Search<T>::Ptr tree(new pcl::search::KdTree<T>);
   pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>);
   pcl::NormalEstimation<T, pcl::Normal> normal_estimator;
@@ -305,6 +309,8 @@ void ObjectFinder<T>::setupRegionGrowingClusterEstimator() {
       region_growing_estimator_params_.smoothness_threshold_);
   region_growing_cluster_estimator_.setCurvatureThreshold(
       region_growing_estimator_params_.curvature_threshold_);
+  CHECK(region_growing_cluster_estimator_.getCurvatureTestFlag());
+  CHECK(region_growing_cluster_estimator_.getSmoothModeFlag());
 }
 
 template <class T>

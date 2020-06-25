@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -25,13 +26,13 @@
 #include <graph_cmr_ros/SMPLList.h>
 
 #include <gtsam/geometry/Pose3.h>
-#include <gtsam/nonlinear/GaussNewtonOptimizer.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/Values.h>
 #include <gtsam/slam/BetweenFactor.h>
-#include <gtsam/slam/PriorFactor.h>
 
 #include <voxblox_msgs/FilePath.h>
+
+#include "KimeraRPGO/RobustSolver.h"
 
 #include "kimera_scene_graph/CentroidErrorRequest.h"
 #include "kimera_scene_graph/scene_node.h"
@@ -42,13 +43,17 @@ namespace kimera {
 typedef gtsam::NonlinearFactorGraph DynamicNodePoseGraph;
 typedef gtsam::BetweenFactor<gtsam::Pose3> OdometryFactor;
 // Number of joints sent over by the GraphCMR code.
+// TODO(marcus): update this if necessary!
 static constexpr int NUM_JOINTS = 19;
+static constexpr int NUM_BETAS = 10;
 using JointMatrix = Eigen::Matrix<double, NUM_JOINTS, 3, Eigen::RowMajor>;
+using BetasArray = std::vector<double>;
 
 using AgentId = long int;
 struct DynamicSceneNode : SceneNode {
   gtsam::Pose3 pose_;
   JointMatrix joints_;
+  BetasArray betas_;
   AgentId agent_id_;
   graph_cmr_ros::SMPL msg_;
 };
@@ -148,14 +153,14 @@ class DynamicSceneGraph : public SceneGraph {
    * @brief optimizedGraph prune and optimize the pose graph.
    * @param optimized_nodes: An empty vector to be filled with the resulting
    * nodes.
+   * TODO(marcus): why can't this be a void that just changes internal member?
    */
   inline void optimizedGraph(DynamicNodeList& optimized_node_list) {
     for (size_t i = 0; i < graph_priors_.size(); i++) {
-      if (counts_[i] < prune_threshold_) continue;
-      auto& values = graph_priors_[i];
-      auto& graph = pose_graphs_[i];
-      gtsam::GaussNewtonOptimizer optimizer(graph, values);
-      gtsam::Values result = optimizer.optimize();
+      if (counts_[i] < prune_threshold_)
+        continue;
+
+      gtsam::Values result = pgos_[i]->calculateBestEstimate();  // TODO(marcus): is this useful?
       std::vector<DynamicSceneNode> optimized_nodes;
       for (size_t j = 0; j < result.size(); j++) {
         // Purposefully copy.
@@ -215,6 +220,33 @@ class DynamicSceneGraph : public SceneGraph {
         (scene_node.attributes_.timestamp_ - last_node.attributes_.timestamp_) *
         pow(10, -6);
     return !filter_mesh_ || max_dist <= feasible_mesh_rate_ * time_diff;
+  }
+
+  /**
+   * @brief checkBetaFeasibility checks whether the beta parameters of two nodes
+   * are similar enough to belong to the same human.
+   * @param scene_node: The node to be checked as a feasible node in the graph.
+   * @param last_node: The last node currently in the graph to be checked 
+   * against.
+   * @return true if the nodes have similar beta parameters.
+   */
+  inline bool checkBetaFeasibility(const DynamicSceneNode& scene_node,
+                                   const DynamicSceneNode& last_node) {
+    CHECK_EQ(scene_node.betas_.size(), last_node.betas_.size());
+
+    size_t num_betas = scene_node.betas_.size();
+    // double beta_diffs [num_betas];
+    // for (size_t i = 0; i < num_betas; i++) {
+    //   beta_diffs[i] = abs(scene_node.betas_[i] - last_node.betas_[i]);
+    // }
+
+    double avg_beta_diff = 0.0;
+    for (size_t i = 0; i < num_betas; i++) {
+      avg_beta_diff += (abs(scene_node.betas_[i] - last_node.betas_[i]) / 
+                        num_betas);
+    }
+
+    return avg_beta_diff <= beta_diff_threshold_;
   }
 
  private:
@@ -330,6 +362,9 @@ class DynamicSceneGraph : public SceneGraph {
   std::vector<float> edge_color_ = {0.0, 0.0, 1.0};
   std::vector<float> centroid_color_ = {0.0, 0.0, 1.0};
   int prune_threshold_ = 3;
+  double pgo_trans_threshold_ = 0.05;
+  double pgo_rot_threshold_ = 0.005;
+  double beta_diff_threshold_;
   bool single_sequence_smpl_mode_ = false;
   bool draw_skeleton_edges_ = false;
   bool merge_close_ = true;
@@ -337,13 +372,16 @@ class DynamicSceneGraph : public SceneGraph {
   std::string human_topic_;
   bool filter_centroid_ = true;
   bool filter_mesh_ = true;
+  int centroid_joint_idx_;
 
   // Constant joint lookup table
+  // TODO(marcus): check consistency with GraphCMR
   const std::vector<int> joint_parents_ =
       {1, 2, 8, 9, 3, 4, 7, 8, 12, 12, 9, 10, 14, -1, 13, -1, -1, 15, 16};
 
   // Record Keeping for pose graphs.
-  std::vector<DynamicNodePoseGraph> pose_graphs_;
+  std::vector<std::unique_ptr<KimeraRPGO::RobustSolver>> pgos_;
+  KimeraRPGO::RobustSolverParams rpgo_params_;
   DynamicNodeList last_poses_;
   DynamicNodeList optimized_poses_;
   std::vector<size_t> counts_;

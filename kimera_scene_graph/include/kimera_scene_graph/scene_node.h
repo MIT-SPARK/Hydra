@@ -110,7 +110,7 @@ class SceneGraph {
   inline void getAllSceneNodes(std::vector<const SceneNode*>* scene_nodes) {
     CHECK_NOTNULL(scene_nodes);
     scene_nodes->resize(database_.size());
-    size_t i = 0;
+    size_t i = 0u;
     for (const auto& kv : database_) {
       scene_nodes->at(i) = &kv.second;
       ++i;
@@ -155,7 +155,7 @@ class SceneGraph {
   }
 
   // Visualization
-  inline void visualize() { visualizeImpl(); }
+  inline void visualize() const { visualizeImpl(); }
 
   inline void updateEdgeAlpha(const float& alpha) { edge_alpha_ = alpha; }
 

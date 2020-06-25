@@ -13,6 +13,9 @@
 #include <pcl/filters/crop_hull.h>
 #include <pcl/surface/concave_hull.h>
 
+#include "kimera_scene_graph/common.h"
+#include "kimera_scene_graph/utils/voxblox_to_pcl.h"
+
 namespace kimera {
 
 SceneGraphSimulationServer::SceneGraphSimulationServer(
@@ -30,6 +33,7 @@ SceneGraphSimulationServer::SceneGraphSimulationServer(
       room_finder_(nullptr),
       object_finder_(nullptr),
       wall_finder_(nullptr),
+      enclosing_wall_finder_(nullptr),
       building_finder_(nullptr),
       scene_graph_(nh, nh_private),
       reconstruct_scene_graph_srv_(),
@@ -45,6 +49,8 @@ SceneGraphSimulationServer::SceneGraphSimulationServer(
 
   // Build finders
   wall_finder_ = kimera::make_unique<WallFinder<ColorPoint>>(world_frame_);
+  enclosing_wall_finder_ =
+      kimera::make_unique<EnclosingWallFinder>(world_frame_);
   object_finder_ = kimera::make_unique<ObjectFinder<ColorPoint>>(
       world_frame_, static_cast<ObjectFinderType>(object_finder_type));
   room_finder_ = kimera::make_unique<RoomFinder>(nh_private, world_frame_);
@@ -77,6 +83,8 @@ SceneGraphSimulationServer::SceneGraphSimulationServer(
           "segmented_sparse_graph", 1, true);
   color_clustered_pcl_pub_ =
       nh_private_.advertise<IntensityPointCloud>("clustered_pcls", 1, true);
+  walls_clustered_pcl_pub_ = nh_private_.advertise<IntensityPointCloud>(
+      "walls_clustered_pcls", 1, true);
   esdf_truncated_pub_ =
       nh_private_.advertise<IntensityPointCloud>("esdf_truncated", 1, true);
   room_centroids_pub_ =
@@ -183,8 +191,9 @@ void SceneGraphSimulationServer::sceneGraphReconstruction(
   if (build_esdf_batch_) {
     reconstructEsdfOutOfTsdf(true);
   }
-  visualize();  // To visualize esdf and tsdf.
+  // visualize();  // To visualize esdf and tsdf.
 
+  vxb::Mesh::Ptr walls_mesh = nullptr;
   if (!only_rooms) {
     vxb::MeshLayer::Ptr mesh_test(new vxb::MeshLayer(tsdf_test_->block_size()));
     reconstructMeshOutOfTsdf(mesh_test);
@@ -211,7 +220,8 @@ void SceneGraphSimulationServer::sceneGraphReconstruction(
       semantic_pcl_pubs_.publish(semantic_label, *semantic_pcl);
 
       // Publish semantic mesh
-      publishSemanticMesh(semantic_label, *semantic_meshes.at(semantic_label));
+      vxb::Mesh::Ptr semantic_mesh = semantic_meshes.at(semantic_label);
+      publishSemanticMesh(semantic_label, *semantic_mesh);
 
       // Estimate objects in semantic pointcloud.
       // Only for those semantic labels that are not stuff (aka only for
@@ -242,7 +252,7 @@ void SceneGraphSimulationServer::sceneGraphReconstruction(
         if (is_floor) {
           // Can we use wall finder for ceiling/floor?
           // Centroids wall_centroids;
-          // std::vector<ColoredPointCloud::Ptr> wall_pcls;
+          // std::vector<ColorPointCloud::Ptr> wall_pcls;
           // const auto& pcls =
           //     wall_finder_->findWalls(semantic_pcl, &wall_centroids,
           //     &wall_pcls);
@@ -253,12 +263,21 @@ void SceneGraphSimulationServer::sceneGraphReconstruction(
                                   walls_labels_.end(),
                                   semantic_label) != walls_labels_.end();
         if (is_walls) {
-          LOG(WARNING) << "TODO add wall clustering.";
-          // Centroids wall_centroids;
-          // std::vector<ColoredPointCloud::Ptr> wall_pcls;
-          // color_clustered_pcl_pub_.publish(
-          //    wall_finder_->findWalls(semantic_pcl, &wall_centroids,
-          //    &wall_pcls));
+          static constexpr bool kUseEnclosingWallFinder = true;
+          if (!kUseEnclosingWallFinder) {
+            LOG(WARNING) << "Clustering walls...";
+            Centroids wall_centroids;
+            std::vector<ColorPointCloud::Ptr> wall_pcls;
+            ObjectFinder<ColorPoint>::BoundingBoxes wall_bounding_boxes;
+            walls_clustered_pcl_pub_.publish(
+                wall_finder_->findWalls(semantic_pcl,
+                                        &wall_centroids,
+                                        &wall_pcls,
+                                        &wall_bounding_boxes));
+            LOG(WARNING) << "Done clustering walls...";
+          } else {
+            walls_mesh = semantic_mesh;
+          }
         }
       }
     }
@@ -290,6 +309,7 @@ void SceneGraphSimulationServer::sceneGraphReconstruction(
   pcl::transformPointCloud(*esdf_truncated, *esdf_truncated_z_shift, z_esdf);
   esdf_truncated_pub_.publish(*esdf_truncated_z_shift);
 
+  //////////////// GRAPH INFERENCE after initial guess /////////////////////////
   // Show the graph before any inference
   visualization_msgs::MarkerArray marker_array;
   vxb::visualizeSkeletonGraph(sparse_skeleton_graph_,
@@ -300,25 +320,10 @@ void SceneGraphSimulationServer::sceneGraphReconstruction(
   segmented_sparse_graph_pub_.publish(marker_array);
 
   // Create cloud of the graph, make sure indices are 1-to-1
-  ColorPointCloud::Ptr graph_cloud(new ColorPointCloud);
-
-  // Get a list of all vertices
   std::vector<int64_t> vertex_ids;
-  sparse_skeleton_graph_.getAllVertexIds(&vertex_ids);
-  graph_cloud->resize(vertex_ids.size());
   std::map<int, int64_t> cloud_to_graph_ids;
-  size_t i = 0u;
-  for (const int64_t& vertex_id : vertex_ids) {
-    const vxb::SkeletonVertex& vertex =
-        sparse_skeleton_graph_.getVertex(vertex_id);
-    ColorPoint point;
-    point.x = vertex.point.x();
-    point.y = vertex.point.y();
-    point.z = vertex.point.z();
-    graph_cloud->at(i) = point;
-    cloud_to_graph_ids[i] = vertex_id;
-    ++i;
-  }
+  ColorPointCloud::Ptr skeleton_graph_cloud = createPclCloudFromSkeleton(
+      sparse_skeleton_graph_, &cloud_to_graph_ids, &vertex_ids);
 
   // Publish centroids
   // Create semantic instance for each centroid
@@ -372,13 +377,12 @@ void SceneGraphSimulationServer::sceneGraphReconstruction(
     // remove inside.
     hull_cropper.setCropOutside(true);
 
-    hull_cropper.setInputCloud(graph_cloud);
+    hull_cropper.setInputCloud(skeleton_graph_cloud);
     std::vector<int> removed_indices;
     hull_cropper.filter(removed_indices);
 
     // Loop over graph and associate room to the removed vertices
     // and label edges according to their type.
-    ColorPointCloud::Ptr filtered(new ColorPointCloud());
     std::vector<int64_t> edge_ids;
     for (const int& removed_index : removed_indices) {
       CHECK_LE(removed_index, cloud_to_graph_ids.size());
@@ -395,8 +399,7 @@ void SceneGraphSimulationServer::sceneGraphReconstruction(
       point.x = vertex.point.x();
       point.y = vertex.point.y();
       point.z = vertex.point.z();
-      const vxb::Color& color =
-          vxb::rainbowColorMap(vertex.room_id % 20 / 20.0);
+      const vxb::Color& color = getRoomColor(vertex.room_id);
       point.r = color.r;
       point.g = color.g;
       point.b = color.b;
@@ -714,7 +717,21 @@ void SceneGraphSimulationServer::sceneGraphReconstruction(
   /////////////////////// Objects-Skeleton /////////////////////////////////////
   // Extract links between objects and skeleton, should be done in scene
   // graph...
-  publishSkeletonToObjectLinks(graph_cloud);
+  publishSkeletonToObjectLinks(skeleton_graph_cloud);
+  //////////////////////////////////////////////////////////////////////////////
+
+  /////////////////////// Segment Walls Mesh ///////////////////////////////////
+  if (walls_mesh) {
+    LOG(WARNING) << "Clustering walls...";
+    vxb::Mesh segmented_walls_mesh;
+    enclosing_wall_finder_->findWalls(
+        *walls_mesh, sparse_skeleton_graph_, &segmented_walls_mesh);
+    // 19 overrides the old walls, use another one!
+    publishSemanticMesh(19, segmented_walls_mesh);
+    LOG(WARNING) << "Done clustering walls...";
+  } else {
+    LOG(WARNING) << "Not segmenting walls mesh bcs no walls mesh found.";
+  }
   //////////////////////////////////////////////////////////////////////////////
 
   ///////////////////////////////// BUILDINGS //////////////////////////////////
@@ -723,20 +740,20 @@ void SceneGraphSimulationServer::sceneGraphReconstruction(
   scene_graph_.addSceneNode(building_instance);
   //////////////////////////////////////////////////////////////////////////////
 
-  LOG(INFO) << "Visualize Scene Graph";
+  LOG(INFO) << "Visualizing Scene Graph";
   scene_graph_.visualize();
 }
 
 void SceneGraphSimulationServer::publishSkeletonToObjectLinks(
-    const ColorPointCloud::Ptr& graph_pcl) {
+    const ColorPointCloud::Ptr& skeleton_graph_pcl) {
   // TODO(TONI): bad, you should add the skeleton to the scene graph instead...
   // In the meantime:
 
   pcl::KdTreeFLANN<Point> kdtree;
-  CHECK(graph_pcl);
-  PointCloud::Ptr graph_pcl_converted(new PointCloud);
-  pcl::copyPointCloud(*graph_pcl, *graph_pcl_converted);
-  kdtree.setInputCloud(graph_pcl_converted);
+  CHECK(skeleton_graph_pcl);
+  PointCloud::Ptr skeleton_graph_pcl_converted(new PointCloud);
+  pcl::copyPointCloud(*skeleton_graph_pcl, *skeleton_graph_pcl_converted);
+  kdtree.setInputCloud(skeleton_graph_pcl_converted);
 
   // 1. Loop over the objects in the database_
   std::vector<const SceneNode*> scene_nodes;
@@ -760,7 +777,7 @@ void SceneGraphSimulationServer::publishSkeletonToObjectLinks(
         CHECK_GT(nn_indices.size(), 0);
         CHECK_GT(nn_squared_distances.size(), 0);
         CHECK_EQ(nn_indices.size(), nn_squared_distances.size());
-        Point pcl_point = graph_pcl_converted->at(nn_indices.at(0));
+        Point pcl_point = skeleton_graph_pcl_converted->at(nn_indices.at(0));
         // Pcl points leave in a diff layer than skeleton, separate them!
         // PCL points live at the first layer
         centroid.z += scene_graph_.getLayerStepZ();
@@ -827,12 +844,11 @@ void SceneGraphSimulationServer::extractThings(
   color_clustered_pcl_pub_.publish(object_finder_->findObjects(
       semantic_pcl, &centroids, &object_pcls, &bounding_boxes));
 
-
   // Call object registration server to get registrated point clouds
   ObjectPointClouds registrated_object_pcls =
-          objectDatabaseActionCall(object_pcls, std::to_string(semantic_label));
+      objectDatabaseActionCall(object_pcls, std::to_string(semantic_label));
 
-    const auto& n_centroids = centroids.size();
+  const auto& n_centroids = centroids.size();
   CHECK_EQ(n_centroids, object_pcls.size());
   CHECK_EQ(n_centroids, bounding_boxes.size());
 
@@ -1119,7 +1135,6 @@ void SceneGraphSimulationServer::rqtReconfigureCallback(
                "Run scene graph reconstruction ros service to see the effects.";
 }
 
-
 /**
  * Function to handle registration with object db
  * @param object_pcls
@@ -1152,7 +1167,7 @@ ObjectPointClouds SceneGraphSimulationServer::objectDatabaseActionCall(
     const auto& color_b = color_pcl->points[0].b;
 
     // Convert colored point cloud to sensor msg point cloud
-    for (size_t p_idx = 0; p_idx < color_pcl->size(); ++ p_idx) {
+    for (size_t p_idx = 0; p_idx < color_pcl->size(); ++p_idx) {
       geometry_msgs::Point32 c_point;
       c_point.x = color_pcl->points[p_idx].x;
       c_point.y = color_pcl->points[p_idx].y;
@@ -1165,8 +1180,8 @@ ObjectPointClouds SceneGraphSimulationServer::objectDatabaseActionCall(
 
     // Deal with the result
     bool finished = object_db_client_->waitForResult(ros::Duration(30));
-    bool aborted = object_db_client_->getState()
-                   == actionlib::SimpleClientGoalState::ABORTED;
+    bool aborted = object_db_client_->getState() ==
+                   actionlib::SimpleClientGoalState::ABORTED;
     if (aborted) {
       LOG(INFO) << "Object database aborted.";
       registrated_object_pcls.push_back(color_pcl);
@@ -1178,18 +1193,18 @@ ObjectPointClouds SceneGraphSimulationServer::objectDatabaseActionCall(
       auto registrated_object = result->aligned_object;
 
       // Convert sensor msg point cloud type to colored pcl
-       ColorPointCloud::Ptr registrated_pcl(new ColorPointCloud);
-       for (const auto& o_point : registrated_object.points) {
-         ColorPoint c_point;
-         c_point.x = o_point.x;
-         c_point.y = o_point.y;
-         c_point.z = o_point.z;
-         c_point.r = color_r;
-         c_point.g = color_g;
-         c_point.b = color_b;
-         registrated_pcl->points.push_back(c_point);
-       }
-       registrated_object_pcls.push_back(registrated_pcl);
+      ColorPointCloud::Ptr registrated_pcl(new ColorPointCloud);
+      for (const auto& o_point : registrated_object.points) {
+        ColorPoint c_point;
+        c_point.x = o_point.x;
+        c_point.y = o_point.y;
+        c_point.z = o_point.z;
+        c_point.r = color_r;
+        c_point.g = color_g;
+        c_point.b = color_b;
+        registrated_pcl->points.push_back(c_point);
+      }
+      registrated_object_pcls.push_back(registrated_pcl);
       LOG(INFO) << "Object database query successful.";
       LOG(INFO) << "Registrated object size: " << registrated_pcl->size();
     }

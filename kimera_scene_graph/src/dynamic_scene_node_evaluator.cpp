@@ -29,7 +29,10 @@ void DynamicSceneGraphEvaluator::humanCallback(
 
     // Ensure that we could get all transforms before adding them to
     // ground-truth.
-    if (!getAllTransforms(gt_human_transforms, time)) return;
+    if (!getAllTransforms(gt_human_transforms, time)) {
+      ROS_ERROR("ERROR: Could not get all object transforms.");
+      return;
+    }
 
     time_to_gt_[time.toSec()] = gt_human_transforms;
 

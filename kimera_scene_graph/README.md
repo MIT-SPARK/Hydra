@@ -16,3 +16,14 @@ Use rosservice:
 For orthographic projection in rviz, use:
 git@github.com:ajshort/rviz_ortho_view_controller.git
 https://github.com/PickNikRobotics/rviz_visual_tools
+
+#### ObjectDB
+
+I'm seeing a message:
+> Waiting for object database server
+
+You need to launch object database:
+```
+roslaunch object_db object_db_sim.launch 
+```
+

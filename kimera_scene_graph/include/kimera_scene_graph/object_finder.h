@@ -101,11 +101,14 @@ class ObjectFinder {
 
   void setupEuclideanClusterEstimator();
 
+ protected:
+  // Used as well by the wall finder
+  RegionGrowingClusterEstimatorParams region_growing_estimator_params_;
+
  private:
   std::string world_frame_;
   ObjectFinderType object_finder_type_;
 
-  RegionGrowingClusterEstimatorParams region_growing_estimator_params_;
   pcl::RegionGrowing<T, pcl::Normal> region_growing_cluster_estimator_;
 
   EuclideanClusterEstimatorParams euclidean_cluster_estimator_params_;

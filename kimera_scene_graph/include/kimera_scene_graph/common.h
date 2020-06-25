@@ -8,6 +8,9 @@
 
 #include <Eigen/Core>
 
+#include <kimera_semantics/common.h>
+#include <voxblox/core/color.h> // just for getroomcolor
+
 namespace kimera {
 
 // Kimera-X typedefs
@@ -60,5 +63,9 @@ struct BoundingBox {
   PointT position_;
   Eigen::Matrix3f orientation_matrix;
 };
+
+inline vxb::Color getRoomColor(int room_id) {
+  return vxb::rainbowColorMap(static_cast<double>(room_id % 20) / 20.0);
+}
 
 }  // namespace kimera

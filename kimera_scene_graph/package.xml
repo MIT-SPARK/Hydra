@@ -32,6 +32,7 @@
 
   <depend>kimera_semantics</depend>
   <depend>kimera_semantics_ros</depend>
+  <depend>kimera_rpgo</depend>
   <depend>object_db</depend>
   <depend>voxblox</depend>
   <depend>voxblox_ros</depend>

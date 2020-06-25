@@ -4,6 +4,11 @@
  * @author Antoni Rosinol
  */
 
+#include <ros/ros.h>
+
+#include <glog/logging.h>
+#include <gflags/gflags.h>
+
 #include "kimera_scene_graph/dynamic_scene_node_evaluator.h"
 #include "kimera_scene_graph/scene_graph_server.h"
 

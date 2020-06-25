@@ -87,6 +87,7 @@ class SceneGraphSimulationServer : public SemanticSimulationServer {
 
  protected:
   ros::Publisher color_clustered_pcl_pub_;
+  ros::Publisher walls_clustered_pcl_pub_;
   ros::Publisher room_centroids_pub_;
   ros::Publisher room_layout_pub_;
   ros::Publisher mesh_pub_;
@@ -118,6 +119,7 @@ class SceneGraphSimulationServer : public SemanticSimulationServer {
 
   // Finders
   std::unique_ptr<WallFinder<ColorPoint>> wall_finder_;
+  std::unique_ptr<EnclosingWallFinder> enclosing_wall_finder_;
   std::unique_ptr<ObjectFinder<ColorPoint>> object_finder_;
 
   // Action client for object db

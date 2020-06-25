@@ -7,8 +7,10 @@ catkin_simple()
 
 find_package(OpenCV REQUIRED)
 find_package(GTSAM REQUIRED)
+find_package(KimeraRPGO REQUIRED)
 
 cs_add_library(${PROJECT_NAME}
+  include/kimera_scene_graph/utils/voxblox_to_pcl.h
   include/kimera_scene_graph/common.h
   include/kimera_scene_graph/object_finder-inl.h # Just for IDEs
   src/object_finder.cpp
@@ -24,7 +26,13 @@ cs_add_library(${PROJECT_NAME}
   src/min_cut_solvers/stoer_wagner_min_cut_wrapper.cpp
 )
 
-target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBRARIES} ${PCL_LIBRARIES} gtsam gtsam_unstable tbb)
+target_link_libraries(${PROJECT_NAME} 
+  ${OpenCV_LIBRARIES} 
+  ${PCL_LIBRARIES} 
+  gtsam gtsam_unstable 
+  tbb
+  KimeraRPGO
+)
 target_include_directories(${PROJECT_NAME} PUBLIC ${OpenCV_INCLUDE_DIRS} ${CATKIN_INCLUDE_DIRS} ${GTSAM_INCLUDE_DIR})
 
 cs_add_executable(kimera_scene_graph_node

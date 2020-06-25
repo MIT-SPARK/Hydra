@@ -3,6 +3,7 @@
 #include <ros/ros.h>
 
 #include <glog/logging.h>
+#include <gflags/gflags.h>
 
 #include <voxblox/core/common.h>
 
@@ -39,9 +40,11 @@ class SceneGraphSimulationServerImpl : public SceneGraphSimulationServer {
 
 int main(int argc, char** argv) {
   ros::init(argc, argv, "kimera_scene_graph_simulator");
+
   google::InitGoogleLogging(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, false);
   google::InstallFailureSignalHandler();
+
   ros::NodeHandle nh;
   ros::NodeHandle nh_private("~");
 

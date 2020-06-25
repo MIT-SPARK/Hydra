@@ -44,7 +44,7 @@ IntensityPointCloud::Ptr RoomFinder::findRooms(
   object_finder.updateEuclideanClusterParams(params);
   std::vector<IntensityPointCloud::Ptr> room_pcls_noncolored;
   ObjectFinder<IntensityPoint>::BoundingBoxes bounding_boxes;
-  ColorPointCloud::Ptr pcl = object_finder.findObjects(
+  ColorPointCloud::Ptr room_pcl_colored = object_finder.findObjects(
       downsampled_pcl, room_centroids, &room_pcls_noncolored, &bounding_boxes);
   // Generate colored point cloud out of the noncolored rooms pcl.
   // Repaint room_pcls to uniform color for better visualization of edges.
@@ -59,12 +59,12 @@ IntensityPointCloud::Ptr RoomFinder::findRooms(
     for (auto& point : pcl_ptr->points) point.rgb = rgb;
   }
 
-  pcl->header.frame_id = world_frame_;
-  for (auto& it : pcl->points) {
+  room_pcl_colored->header.frame_id = world_frame_;
+  for (auto& it : room_pcl_colored->points) {
     // Move all points to level 5
     it.z = 10;
   }
-  pcl_pub_.publish(*pcl);
+  pcl_pub_.publish(*room_pcl_colored);
   LOG(INFO) << "Finished Room finding using ESDF";
   return downsampled_pcl;
 }

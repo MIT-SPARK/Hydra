@@ -3,3 +3,4 @@
 **/mesh_results/*
 **/tsdf_results/*
 *.ccls*
+*.vscode/
