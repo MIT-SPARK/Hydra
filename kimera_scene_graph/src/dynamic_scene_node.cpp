@@ -1,10 +1,5 @@
 #include "kimera_scene_graph/dynamic_scene_node.h"
 
-#include <KimeraRPGO/utils/type_utils.h>
-
-#include <gtsam/slam/PriorFactor.h>
-#include <gtsam/inference/Symbol.h>
-
 namespace kimera {
 
 DynamicSceneGraph::DynamicSceneGraph(const ros::NodeHandle& nh,
@@ -34,11 +29,6 @@ DynamicSceneGraph::DynamicSceneGraph(const ros::NodeHandle& nh,
   detection_noise_model_ =
       gtsam::noiseModel::Diagonal::Precisions(detection_precision);
 
-  // RPGO Setup
-  rpgo_params_ = KimeraRPGO::RobustSolverParams();
-  rpgo_params_.setPcmSimple3DParams(
-      pgo_trans_threshold_, pgo_rot_threshold_, KimeraRPGO::Verbosity::QUIET);
-
   // Params
   nh_private_.param("world_frame", world_frame_, world_frame_);
   nh_private_.param("human_topic", human_topic_, human_topic_);
@@ -56,9 +46,6 @@ DynamicSceneGraph::DynamicSceneGraph(const ros::NodeHandle& nh,
   nh_private_.param(
       "serialization_dir", serialization_dir_, serialization_dir_);
   nh_private_.param("prune_theshold", prune_threshold_, prune_threshold_);
-  nh_private_.param("beta_diff_threshold",
-                    beta_diff_threshold_,
-                    beta_diff_threshold_);
   nh_private_.param("single_sequence_smpl_mode",
                     single_sequence_smpl_mode_,
                     single_sequence_smpl_mode_);
@@ -66,8 +53,6 @@ DynamicSceneGraph::DynamicSceneGraph(const ros::NodeHandle& nh,
       "draw_skeleton_edges", draw_skeleton_edges_, draw_skeleton_edges_);
   nh_private_.param("edge_thickness", edge_thickness_, edge_thickness_);
   nh_private_.param("merge_close", merge_close_, merge_close_);
-  nh_private_.param(
-      "centroid_joint_idx", centroid_joint_idx_, centroid_joint_idx_);
 
   // Publishers
   mesh_pub_ =
@@ -187,21 +172,14 @@ void DynamicSceneGraph::humanCallback(
 
 void DynamicSceneGraph::dynamicSceneNodeFromSMPL(graph_cmr_ros::SMPL& mesh,
                                                  DynamicSceneNode& node) {
+  node.layer_id_ = LayerId::kAgentsLayerId;
+  node.attributes_.position_ =
+      NodePosition(mesh.centroid[0], mesh.centroid[1], mesh.centroid[2]);
 
   // Initialize joints
   node.joints_ = Eigen::Map<JointMatrix>(mesh.joints.data());
 
-  // Initialize global position
-  // node.attributes_.position_ =
-  //     NodePosition(mesh.centroid[0], mesh.centroid[1], mesh.centroid[2]);
-  node.attributes_.position_ =
-      NodePosition(node.joints_(centroid_joint_idx_, 0),
-                   node.joints_(centroid_joint_idx_, 1),
-                   node.joints_(centroid_joint_idx_, 2));
-
   pcl_conversions::toPCL(mesh.header.stamp, node.attributes_.timestamp_);
-
-  node.betas_ = mesh.betas;
 
   // Keep the mesh for later
   node.msg_ = mesh;
@@ -216,10 +194,7 @@ void DynamicSceneGraph::dynamicSceneNodeFromSMPL(graph_cmr_ros::SMPL& mesh,
                   mesh.orientation[6],
                   mesh.orientation[7],
                   mesh.orientation[8]),
-      // gtsam::Point3(mesh.centroid[0], mesh.centroid[1], mesh.centroid[2]));
-      gtsam::Point3(node.joints_(centroid_joint_idx_, 0),
-                    node.joints_(centroid_joint_idx_, 1),
-                    node.joints_(centroid_joint_idx_, 2)));
+      gtsam::Point3(mesh.centroid[0], mesh.centroid[1], mesh.centroid[2]));
 
   colorPclFromJoints(node);
 }
@@ -229,7 +204,7 @@ void DynamicSceneGraph::addSceneNodeToPoseGraphs(DynamicSceneNode& scene_node) {
   bool node_exists = false;
   float closest_dist = 10000.0;
   size_t closest_idx = 0;
-  for (int i = 0; i < pgos_.size(); i++) {
+  for (int i = 0; i < pose_graphs_.size(); i++) {
     auto last_node = last_poses_[i][last_poses_[i].size() - 1];
     float time_diff =
         (scene_node.attributes_.timestamp_ - last_node.attributes_.timestamp_) *
@@ -237,8 +212,7 @@ void DynamicSceneGraph::addSceneNodeToPoseGraphs(DynamicSceneNode& scene_node) {
     float c_dist = calcNodeDistance(scene_node, last_node);
     if (!checkCloseness(scene_node, last_node) || time_diff < time_cap_) {
       if (checkDynamicFeasibility(scene_node, last_node) &&
-          checkMeshFeasibility(scene_node, last_node) &&
-          checkBetaFeasibility(scene_node, last_node)) {
+          checkMeshFeasibility(scene_node, last_node)) {
         node_exists = true;
         if (c_dist < closest_dist) {
           closest_dist = c_dist;
@@ -258,47 +232,27 @@ void DynamicSceneGraph::addSceneNodeToPoseGraphs(DynamicSceneNode& scene_node) {
     scene_node.agent_id_ = last_node.agent_id_;
     if (checkCloseness(scene_node, last_node)) {
       // Assume no motion
-      DynamicNodePoseGraph pose_graph;
-      gtsam::Values prior_val;
-
-      pose_graph.push_back(
-          boost::make_shared<OdometryFactor>(gtsam::Symbol(last_node_key),
-                                             gtsam::Symbol(last_node_key + 1),
+      pose_graphs_[closest_idx].push_back(
+          boost::make_shared<OdometryFactor>(last_node_key,
+                                             last_node_key + 1,
                                              gtsam::Pose3(),
                                              motion_noise_model_));
-      // TODO(marcus): ask Luca why we can't use this factor and must use BetweenFactor?
-      // pose_graph.push_back(
-      //     boost::make_shared<gtsam::PriorFactor<gtsam::Pose3>>(
-      //         last_node_key + 1, scene_node.pose_, detection_noise_model_));
-      pose_graph.push_back(
-        boost::make_shared<OdometryFactor>(gtsam::Symbol(0),
-                                           gtsam::Symbol(last_node_key + 1),
-                                           scene_node.pose_,
-                                           detection_noise_model_));
-      prior_val.insert(gtsam::Symbol(last_node_key + 1), scene_node.pose_);
-
-      pgos_[closest_idx]->update(pose_graph, prior_val);
-      // TODO(marcus): see if we can get rid of this member
-      graph_priors_[closest_idx].insert(last_node_key + 1, scene_node.pose_);  
+      pose_graphs_[closest_idx].push_back(
+          boost::make_shared<gtsam::PriorFactor<gtsam::Pose3>>(
+              last_node_key + 1, scene_node.pose_, detection_noise_model_));
+      graph_priors_[closest_idx].insert(last_node_key + 1, scene_node.pose_);
 
       pose_vec.push_back(scene_node);
     } else {
       pose_vec[pose_vec.size() - 1] = scene_node;
     }
   } else {
-    pgos_.push_back(
-      KimeraRPGO::make_unique<KimeraRPGO::RobustSolver>(rpgo_params_));
-    size_t last_idx = pgos_.size() - 1;
-
-    DynamicNodePoseGraph pose_graph;
-    gtsam::Values prior_val;
-    prior_val.insert(gtsam::Symbol(0), scene_node.pose_);
-    pose_graph.push_back(gtsam::PriorFactor<gtsam::Pose3>(
-        gtsam::Symbol(0), scene_node.pose_, detection_noise_model_));
-
-    pgos_[last_idx]->update(pose_graph, prior_val);
-    graph_priors_.push_back(prior_val);
-
+    pose_graphs_.push_back(DynamicNodePoseGraph());
+    size_t last_idx = pose_graphs_.size() - 1;
+    graph_priors_.push_back(gtsam::Values());
+    pose_graphs_[last_idx].add(gtsam::PriorFactor<gtsam::Pose3>(
+        0, scene_node.pose_, detection_noise_model_));
+    graph_priors_[last_idx].insert(0, scene_node.pose_);
     // ID of the node is the same as the graph index
     scene_node.agent_id_ = last_idx + 1;
     last_poses_.push_back(std::vector<DynamicSceneNode>());
@@ -429,7 +383,6 @@ void DynamicSceneGraph::visualizeJoints(bool serialize) {
   }
 }
 
-// TODO(marcus): use PoseGraphTools in place of all this!
 void DynamicSceneGraph::visualizePoseGraphs(bool serialize) {
   AgentId id = 0;
   ColorPointCloud all_person_pointcloud;

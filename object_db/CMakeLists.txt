@@ -3,9 +3,12 @@ project(object_db)
 
 set(CMAKE_CXX_STANDARD 14)
 
+
 # catkin_simple setup
 find_package(catkin_simple REQUIRED)
 catkin_simple(ALL_DEPS_REQUIRED)
+
+find_package(Eigen3 3.2 QUIET REQUIRED NO_MODULE)
 
 # Object Registration Server
 cs_add_library(object_registration_server

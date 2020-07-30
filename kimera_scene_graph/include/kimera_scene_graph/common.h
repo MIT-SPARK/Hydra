@@ -9,7 +9,7 @@
 #include <Eigen/Core>
 
 #include <kimera_semantics/common.h>
-#include <voxblox/core/color.h> // just for getroomcolor
+#include <voxblox/core/color.h>  // just for getroomcolor
 
 namespace kimera {
 
@@ -22,8 +22,11 @@ typedef pcl::PointXYZI IntensityPoint;
 typedef pcl::PointCloud<IntensityPoint> IntensityPointCloud;
 
 typedef uint64_t Timestamp;
-typedef std::string NodeId;
-typedef int64_t InstanceId;
+//! Specifies the id of a node in a layer
+typedef int64_t NodeId;
+//! Specifies the id of a layer in the graph
+typedef int64_t EdgeId;
+typedef std::string NodeName;
 typedef Point NodePosition;
 typedef pcl::PointNormal NodeOrientation;
 typedef Eigen::Vector3i NodeColor;
@@ -38,6 +41,35 @@ typedef std::vector<ColorPointCloud::Ptr> ObjectPointClouds;
 static constexpr int kRoomSemanticLabel = 21u;
 static constexpr int kBuildingSemanticLabel = 22u;
 
+/**
+ * @brief The LayerId enum The numbering is important, as it determines the
+ * parentesco: a higher number corresponds to parents.
+ */
+enum class LayerId {
+  kInvalidLayerId = 0,
+  kObjectsLayerId = 1,
+  kAgentsLayerId = 2,
+  kPlacesLayerId = 3,
+  kRoomsLayerId = 4,
+  kBuildingsLayerId = 5
+};
+
+inline std::string getStringFromLayerId(const LayerId& layer_id) {
+  switch (layer_id) {
+    case LayerId::kBuildingsLayerId:
+      return "B";
+    case LayerId::kRoomsLayerId:
+      return "R";
+    case LayerId::kPlacesLayerId:
+      return "P";
+    case LayerId::kObjectsLayerId:
+      return "O";
+    default:
+      return "NA";
+  }
+}
+
+static const Eigen::Vector3i kPlaceColor(255u, 0u, 0u);
 static const Eigen::Vector3i kRoomColor(0u, 255u, 0u);
 static const Eigen::Vector3i kBuildingColor(255u, 0u, 0u);
 
@@ -56,16 +88,22 @@ enum class BoundingBoxType { kAABB = 0, kOBB = 1 };
 template <class PointT>
 struct BoundingBox {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  BoundingBoxType type_;
-  PointT max_;
-  PointT min_;
+  BoundingBoxType type_ = BoundingBoxType::kAABB;
+  PointT max_ = PointT();
+  PointT min_ = PointT();
   // Position and rotation is only used for BB type of bb box.
-  PointT position_;
-  Eigen::Matrix3f orientation_matrix;
+  PointT position_ = PointT();
+  Eigen::Matrix3f orientation_matrix = Eigen::Matrix3f();
 };
 
-inline vxb::Color getRoomColor(int room_id) {
+inline vxb::Color getRoomColor(const NodeId& room_id) {
   return vxb::rainbowColorMap(static_cast<double>(room_id % 20) / 20.0);
+}
+
+// Add way of printing strongly typed enums (enum class).
+template <typename E>
+constexpr typename std::underlying_type<E>::type to_underlying(E e) noexcept {
+  return static_cast<typename std::underlying_type<E>::type>(e);
 }
 
 }  // namespace kimera

@@ -15,6 +15,7 @@ cs_add_library(${PROJECT_NAME}
   include/kimera_scene_graph/object_finder-inl.h # Just for IDEs
   src/object_finder.cpp
   src/room_finder.cpp
+  src/room_connectivity_finder.cpp
   src/wall_finder.cpp
   src/building_finder.cpp
   src/scene_graph_server.cpp

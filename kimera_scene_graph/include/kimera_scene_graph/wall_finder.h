@@ -44,10 +44,11 @@ class EnclosingWallFinder {
   /**
    * @brief findWalls
    * @param walls_mesh[in/out] Mesh of the walls without room labels [in] and
-   * with room labels [out]
+   * with room labels [out].
+   * @param[out]
    */
   void findWalls(const vxb::Mesh& walls_mesh,
-                 const vxb::SparseSkeletonGraph& sparse_skeleton_graph,
+                 const SceneGraph& scene_graph,
                  vxb::Mesh* segmented_walls_mesh) {
     CHECK_NOTNULL(segmented_walls_mesh);
     CHECK(walls_mesh.hasNormals());
@@ -55,14 +56,14 @@ class EnclosingWallFinder {
 
     // Create cloud of the skeleton graph so we can do nearest neighbor queries
     // between a wall vertex and the nearest place, make sure indices are 1-to-1
-    std::vector<int64_t> vertex_ids;
-    std::map<int, int64_t> cloud_to_graph_ids;
-    ColorPointCloud::Ptr skeleton_graph_cloud = createPclCloudFromSkeleton(
-        sparse_skeleton_graph, &cloud_to_graph_ids, &vertex_ids);
+    SceneGraphLayer layer = scene_graph.getLayer(LayerId::kPlacesLayerId);
+    std::map<int, NodeId> cloud_to_graph_ids;
+    ColorPointCloud::Ptr skeleton_graph_cloud =
+        layer.convertLayerToPcl(&cloud_to_graph_ids, nullptr);
 
     pcl::KdTreeFLANN<ColorPoint> kdtree;
     kdtree.setInputCloud(skeleton_graph_cloud);
-    static constexpr int K = 30;  // find 5 nearest-neighbor
+    static constexpr int K = 30;
     std::vector<int> nn_indices(K);
     std::vector<float> nn_squared_distances(K);
 
@@ -97,12 +98,19 @@ class EnclosingWallFinder {
             CHECK_LT(nn_indices.at(i), cloud_to_graph_ids.size());
             auto nearest_place_to_wall_index =
                 cloud_to_graph_ids[nn_indices.at(i)];
-            const vxb::SkeletonVertex& nearest_place_to_wall =
-                sparse_skeleton_graph.getVertex(nearest_place_to_wall_index);
-            vxb::Ray direction = nearest_place_to_wall.point - wall_vertex;
+            const SceneGraphNode& nearest_place_to_wall =
+                layer.getNode(nearest_place_to_wall_index);
+            vxb::Ray direction =
+                pclPointToVxbPoint(
+                    nearest_place_to_wall.attributes_.position_) -
+                wall_vertex;
 
-            CHECK_NE(nearest_place_to_wall.room_id, 0u)
-                << "Vertex does not have room id when finding walls!";
+            NodeId room_id = nearest_place_to_wall.parent_edge_.start_node_id_;
+            if (room_id == -1) {
+              LOG(WARNING)
+                  << "Vertex does not have room id when finding walls!";
+              continue;
+            }
             // Check normal orientation
             CHECK_LT(wall_vertex_idx, walls_mesh.normals.size());
             vxb::Point normal =
@@ -113,15 +121,15 @@ class EnclosingWallFinder {
             if (dot_product_not_normalized > 0) {
               // Found valid place "inside" the wall as given by its normal...
               // Get the room id
-              if (room_id_votes.find(nearest_place_to_wall.room_id) ==
+              if (room_id_votes.find(room_id) ==
                   room_id_votes.end()) {
                 // Just to make sure we init the value to a 0
-                room_id_votes[nearest_place_to_wall.room_id] = 0u;
+                room_id_votes[room_id] = 0u;
               }
               // Weight the vote by the dot product, so just in front places
               // have more weight that the ones around.
               CHECK_GT(nn_squared_distance, 0.0);
-              room_id_votes[nearest_place_to_wall.room_id] +=
+              room_id_votes[room_id] +=
                   dot_product_not_normalized / nn_squared_distance;
             } else {
               VLOG(2)
@@ -160,6 +168,8 @@ class EnclosingWallFinder {
       CHECK_LT(wall_vertex_idx, walls_mesh.colors.size());
       segmented_walls_mesh->colors.at(wall_vertex_idx) =
           getRoomColor(max_room_id);
+
+      // TODO(Toni): Ideally we should update the scene graph at this stage
     }
   }
 

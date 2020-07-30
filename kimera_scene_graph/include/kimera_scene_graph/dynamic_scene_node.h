@@ -50,7 +50,7 @@ using JointMatrix = Eigen::Matrix<double, NUM_JOINTS, 3, Eigen::RowMajor>;
 using BetasArray = std::vector<double>;
 
 using AgentId = long int;
-struct DynamicSceneNode : SceneNode {
+struct DynamicSceneNode : SceneGraphNode {
   gtsam::Pose3 pose_;
   JointMatrix joints_;
   BetasArray betas_;

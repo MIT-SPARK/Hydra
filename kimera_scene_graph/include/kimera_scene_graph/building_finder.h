@@ -20,8 +20,7 @@ class BuildingFinder {
   /**
    * @brief findBuildings
    */
-  void findBuildings(const SceneGraph& scene_graph,
-                     SceneNode* building_instance);
+  void findBuildings(SceneGraph* scene_graph);
 
  private:
 };

@@ -27,6 +27,8 @@
 #include "kimera_scene_graph/building_finder.h"
 #include "kimera_scene_graph/common.h"
 #include "kimera_scene_graph/object_finder.h"
+#include "kimera_scene_graph/places_room_connectivity_finder.h"
+#include "kimera_scene_graph/room_connectivity_finder.h"
 #include "kimera_scene_graph/room_finder.h"
 #include "kimera_scene_graph/scene_node.h"
 #include "kimera_scene_graph/semantic_ros_publishers.h"
@@ -64,10 +66,6 @@ class SceneGraphSimulationServer : public SemanticSimulationServer {
                                  const vxb::ColorMode& color_mode,
                                  SemanticMeshMap* semantic_pointclouds);
 
-  void getPointcloudFromMesh(const vxb::MeshLayer::ConstPtr& mesh_layer,
-                             vxb::ColorMode color_mode,
-                             ColorPointCloud::Ptr pointcloud);
-
   ObjectPointClouds objectDatabaseActionCall(
       const ObjectPointClouds& object_pcls,
       const std::string semantic_label);
@@ -79,22 +77,27 @@ class SceneGraphSimulationServer : public SemanticSimulationServer {
 
   void publishSemanticMesh(const SemanticLabel& semantic_label,
                            const vxb::Mesh& semantic_mesh);
+  void publishExplodedWalls(const vxb::Mesh& segmented_walls,
+                            const double& explosion_factor = 2.0);
   void extractThings(const SemanticLabel& semantic_label,
                      const SemanticPointCloud::Ptr& semantic_pcl);
   void extractThings();
 
+  void countRooms() const;
   void publishSkeletonToObjectLinks(const ColorPointCloud::Ptr& graph_pcl);
+
+  // TODO(Toni): perhaps put this inside the scene graph as a conversion utility
+  // function
+  bool fillSceneGraphWithPlaces(
+      const vxb::SparseSkeletonGraph& sparse_skeleton);
 
  protected:
   ros::Publisher color_clustered_pcl_pub_;
   ros::Publisher walls_clustered_pcl_pub_;
   ros::Publisher room_centroids_pub_;
-  ros::Publisher room_layout_pub_;
   ros::Publisher mesh_pub_;
   ros::Publisher polygon_mesh_pub_;
   ros::Publisher sparse_graph_pub_;
-  ros::Publisher segmented_sparse_graph_pub_;
-  ros::Publisher esdf_truncated_pub_;
 
   // TODO(Toni): This guy should be in the scene graph visualization itself
   ros::Publisher edges_obj_skeleton_pub_;
@@ -122,12 +125,19 @@ class SceneGraphSimulationServer : public SemanticSimulationServer {
   std::unique_ptr<EnclosingWallFinder> enclosing_wall_finder_;
   std::unique_ptr<ObjectFinder<ColorPoint>> object_finder_;
 
-  // Action client for object db
-  std::unique_ptr<ObjectDBClient> object_db_client_;
-
   // Room finder
   std::unique_ptr<RoomFinder> room_finder_;
+  std::unique_ptr<PlacesRoomConnectivityFinder> places_in_rooms_finder_;
+  std::unique_ptr<RoomConnectivityFinder> room_connectivity_finder_;
   std::unique_ptr<BuildingFinder> building_finder_;
+
+  // This should be inside the object finder... (but this finder is used by
+  // the room finder as well).
+  // Perhaps put it inside the scene graph itself!
+  NodeId next_object_id_ = 0;
+
+  // Action client for object db
+  std::unique_ptr<ObjectDBClient> object_db_client_;
 
   // Labels of interesting things
   std::vector<int> stuff_labels_;

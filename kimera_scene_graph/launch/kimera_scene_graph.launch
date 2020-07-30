@@ -8,6 +8,7 @@
    - Or, if you want to use simulator's ground-truth: `left_cam`
   -->
   <arg name="sensor_frame" default="left_cam"/>
+  <arg name="num_humans"   default="6"/>
 
   <!-- Send colored pointcloud with scene_graph to kimera_scene_graph for 3D segmentation -->
   <!-- launch-prefix="gdb -ex run args" -->
@@ -41,15 +42,17 @@
     <param name="node_association_time_cap"          value="2.0"/>
     <param name="min_node_association_dist"          value="0.2"/>
     <param name="prune_threshold"                    value="10"/>
+    <param name="pgo_trans_threshold"                value="0.0005"/>
+    <param name="pgo_rot_threshold"                  value="0.00005"/>
     <param name="outlier_rejection_threshold"        value="1000"/>
-    <param name="beta_diff_threshold"                value="0.2"/>
+    <param name="beta_diff_threshold"                value="0.1"/>
     <param name="human_color"                        value="[0.0, 1.0, 0.0]"/>
     <param name="human_height"                       value="2.2"/>
     <param name="centroid_color"                     value="[0.0, 0.0, 1.0]"/>
     <param name="edge_thickness"                     value="0.02"/>
     <param name="serialization_dir"                  value="$(find kimera_scene_graph)/cfg/serialization"/>
     <param name="deserialization_file"               value="$(find kimera_scene_graph)/cfg/deserialization"/>
-    <param name="num_humans"                         value="6"/>
+    <param name="num_humans"                         value="$(arg num_humans)"/>
     <param name="centroid_joint_idx"                 value="13"/>
 
     <!-- Caution: Setting this to "true" will show the full smpl for each timestep for

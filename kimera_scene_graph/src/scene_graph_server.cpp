@@ -10,11 +10,14 @@
 #include <pcl/common/io.h>
 
 #include <pcl/common/transforms.h>
-#include <pcl/filters/crop_hull.h>
-#include <pcl/surface/concave_hull.h>
 
 #include "kimera_scene_graph/common.h"
+#include "kimera_scene_graph/object_finder.h"
+#include "kimera_scene_graph/places_room_connectivity_finder.h"
+#include "kimera_scene_graph/room_connectivity_finder.h"
+#include "kimera_scene_graph/room_finder.h"
 #include "kimera_scene_graph/utils/voxblox_to_pcl.h"
+#include "kimera_scene_graph/utils/voxblox_to_ros.h"
 
 namespace kimera {
 
@@ -31,11 +34,14 @@ SceneGraphSimulationServer::SceneGraphSimulationServer(
       rqt_server_(),
       rqt_callback_(),
       room_finder_(nullptr),
+      places_in_rooms_finder_(nullptr),
+      room_connectivity_finder_(nullptr),
       object_finder_(nullptr),
       wall_finder_(nullptr),
       enclosing_wall_finder_(nullptr),
       building_finder_(nullptr),
       scene_graph_(nh, nh_private),
+      dynamic_scene_graph_(nh, nh_private),
       reconstruct_scene_graph_srv_(),
       load_map_srv_() {
   // TODO(Toni): remove
@@ -53,7 +59,11 @@ SceneGraphSimulationServer::SceneGraphSimulationServer(
       kimera::make_unique<EnclosingWallFinder>(world_frame_);
   object_finder_ = kimera::make_unique<ObjectFinder<ColorPoint>>(
       world_frame_, static_cast<ObjectFinderType>(object_finder_type));
-  room_finder_ = kimera::make_unique<RoomFinder>(nh_private, world_frame_);
+  room_finder_ = kimera::make_unique<RoomFinder>(
+      nh_private, world_frame_, visualization_slice_level_, skeleton_z_level_);
+  places_in_rooms_finder_ = kimera::make_unique<PlacesRoomConnectivityFinder>(
+      nh_private, skeleton_z_level_, world_frame_);
+  room_connectivity_finder_ = kimera::make_unique<RoomConnectivityFinder>();
   building_finder_ = kimera::make_unique<BuildingFinder>();
 
   // Get labels of interesting things
@@ -74,23 +84,17 @@ SceneGraphSimulationServer::SceneGraphSimulationServer(
   CHECK(nh_private.getParam("load_sparse_graph", file_path));
   CHECK(vxb::io::loadSparseSkeletonGraphFromFile(file_path,
                                                  &sparse_skeleton_graph_));
+  LOG(INFO) << "Successfully loaded Skeleton map";
 
   // ROS publishers.
   sparse_graph_pub_ = nh_private_.advertise<visualization_msgs::MarkerArray>(
       "sparse_graph", 1, true);
-  segmented_sparse_graph_pub_ =
-      nh_private_.advertise<visualization_msgs::MarkerArray>(
-          "segmented_sparse_graph", 1, true);
   color_clustered_pcl_pub_ =
       nh_private_.advertise<IntensityPointCloud>("clustered_pcls", 1, true);
   walls_clustered_pcl_pub_ = nh_private_.advertise<IntensityPointCloud>(
       "walls_clustered_pcls", 1, true);
-  esdf_truncated_pub_ =
-      nh_private_.advertise<IntensityPointCloud>("esdf_truncated", 1, true);
   room_centroids_pub_ =
       nh_private_.advertise<ColorPointCloud>("room_centroids", 1, true);
-  room_layout_pub_ =
-      nh_private_.advertise<ColorPointCloud>("room_layout", 1, true);
   mesh_pub_ =
       nh_private_.advertise<voxblox_msgs::Mesh>("semantic_mesh", 1, true);
   polygon_mesh_pub_ = nh_private_.advertise<pcl_msgs::PolygonMesh>(
@@ -99,10 +103,15 @@ SceneGraphSimulationServer::SceneGraphSimulationServer(
       nh_private_.advertise<visualization_msgs::MarkerArray>(
           "obj_skeleton_edges", 1, true);
 
+  // This creates the places layer in the scene graph
+  fillSceneGraphWithPlaces(sparse_skeleton_graph_);
+
   // Publish the skeleton.
   visualization_msgs::MarkerArray marker_array;
-  vxb::visualizeSkeletonGraph(
-      sparse_skeleton_graph_, world_frame_, &marker_array);
+  vxb::SparseSkeletonGraph places_skeleton;
+  scene_graph_.getLayer(LayerId::kPlacesLayerId)
+      .convertLayerToSkeleton(&places_skeleton);
+  vxb::visualizeSkeletonGraph(places_skeleton, world_frame_, &marker_array);
   sparse_graph_pub_.publish(marker_array);
 
   // Attach rqt reconfigure
@@ -135,6 +144,53 @@ bool SceneGraphSimulationServer::sceneGraphReconstructionServiceCall(
   LOG(INFO) << "Requested scene graph reconstruction.";
   sceneGraphReconstruction(request.data);
   return true;
+}
+
+bool SceneGraphSimulationServer::fillSceneGraphWithPlaces(
+    const vxb::SparseSkeletonGraph& sparse_skeleton) {
+  std::vector<int64_t> vtx_ids;
+  sparse_skeleton.getAllVertexIds(&vtx_ids);
+  for (const auto& vtx_id : vtx_ids) {
+    const vxb::SkeletonVertex& vtx = sparse_skeleton.getVertex(vtx_id);
+    SceneGraphNode scene_graph_node;
+    scene_graph_node.layer_id_ = LayerId::kPlacesLayerId;
+    // Maybe we should use our own next_places_id_?
+    scene_graph_node.node_id_ = vtx.vertex_id;
+    // This will be filled automagically when adding the skeleton edges.
+    // scene_graph_node.neighborhood_edge_map_
+    scene_graph_node.attributes_.position_.x = vtx.point[0];
+    scene_graph_node.attributes_.position_.y = vtx.point[1];
+    scene_graph_node.attributes_.position_.z = vtx.point[2];
+    scene_graph_node.attributes_.color_ = kPlaceColor;
+    scene_graph_.addSceneNode(scene_graph_node);
+  }
+  CHECK(scene_graph_.hasLayer(LayerId::kPlacesLayerId));
+  CHECK_EQ(scene_graph_.getLayer(LayerId::kPlacesLayerId).getNumberOfNodes(),
+           vtx_ids.size())
+      << "The skeleton and the scene graph layer should have the same "
+         "number of nodes!";
+
+  std::vector<int64_t> edge_ids;
+  sparse_skeleton.getAllEdgeIds(&edge_ids);
+  size_t invalid_edges = 0u;
+  for (const auto& edge_id : edge_ids) {
+    const vxb::SkeletonEdge& edge = sparse_skeleton.getEdge(edge_id);
+    SceneGraphEdge scene_graph_edge;
+    scene_graph_edge.start_layer_id_ = LayerId::kPlacesLayerId;
+    scene_graph_edge.end_layer_id_ = LayerId::kPlacesLayerId;
+    scene_graph_edge.start_node_id_ = edge.start_vertex;
+    scene_graph_edge.end_node_id_ = edge.end_vertex;
+    if (!scene_graph_edge.isSelfEdge()) {
+      scene_graph_.addEdge(&scene_graph_edge);
+    } else {
+      LOG(ERROR) << "Not adding self-edge: " << scene_graph_edge.print();
+      invalid_edges++;
+    }
+  }
+  CHECK_EQ(scene_graph_.getLayer(LayerId::kPlacesLayerId).getNumberOfEdges(),
+           edge_ids.size() - invalid_edges)
+      << "The skeleton and the scene graph layer should have the same "
+         "number of edges!";
 }
 
 void SceneGraphSimulationServer::reconstructMeshOutOfTsdf(
@@ -187,7 +243,6 @@ void SceneGraphSimulationServer::sceneGraphReconstruction(
   // TODO(Toni): can't we load the mesh for now, this takes very long,
   // instead of re-building it ? The problem of doing so is that we might end
   // with inconsistent tsdf, esdf and mesh... Instead recompute all from tsdf...
-  // Reconstruct ESDF layer (TODO:Toni) save to file and reload...
   if (build_esdf_batch_) {
     reconstructEsdfOutOfTsdf(true);
   }
@@ -263,485 +318,91 @@ void SceneGraphSimulationServer::sceneGraphReconstruction(
                                   walls_labels_.end(),
                                   semantic_label) != walls_labels_.end();
         if (is_walls) {
-          static constexpr bool kUseEnclosingWallFinder = true;
-          if (!kUseEnclosingWallFinder) {
-            LOG(WARNING) << "Clustering walls...";
-            Centroids wall_centroids;
-            std::vector<ColorPointCloud::Ptr> wall_pcls;
-            ObjectFinder<ColorPoint>::BoundingBoxes wall_bounding_boxes;
-            walls_clustered_pcl_pub_.publish(
-                wall_finder_->findWalls(semantic_pcl,
-                                        &wall_centroids,
-                                        &wall_pcls,
-                                        &wall_bounding_boxes));
-            LOG(WARNING) << "Done clustering walls...";
-          } else {
-            walls_mesh = semantic_mesh;
-          }
+          // Store walls mesh for later segmentation
+          walls_mesh = semantic_mesh;
         }
       }
     }
   }
 
   ////////////////////////// FIND ROOMS ////////////////////////////////////////
-  LOG(INFO) << "Finding room layout.";
+  LOG(INFO) << "Start Room finding.";
   CHECK(room_finder_);
-  Centroids room_centroids;
-  std::vector<ColorPointCloud::Ptr> room_pcls;
-  IntensityPointCloud::Ptr esdf_pcl(new IntensityPointCloud);
-  createDistancePointcloudFromEsdfLayerSlice(
-      *esdf_test_, 2, visualization_slice_level_, &*esdf_pcl);
   IntensityPointCloud::Ptr room_clusters_cloud =
-      room_finder_->findRooms(esdf_pcl, &room_centroids, &room_pcls);
+      room_finder_->findRooms(*esdf_test_, &scene_graph_);
+  LOG(INFO) << "Finished Room finding.";
 
   // Publish cloud
   room_clusters_cloud->header.frame_id = world_frame_;
   color_clustered_pcl_pub_.publish(*room_clusters_cloud);
 
-  // Publish truncated ESDF to see wall layout:
-  IntensityPointCloud::Ptr esdf_truncated(new IntensityPointCloud);
-  esdf_truncated = passThroughFilter1D<IntensityPoint>(
-      esdf_pcl, "intensity", -1.0, kEsdfTruncation);
-  esdf_truncated->header.frame_id = world_frame_;
-  IntensityPointCloud::Ptr esdf_truncated_z_shift(new IntensityPointCloud);
-  Eigen::Affine3f z_esdf = Eigen::Affine3f::Identity();
-  z_esdf.translation() << 0.0, 0.0, skeleton_z_level_;
-  pcl::transformPointCloud(*esdf_truncated, *esdf_truncated_z_shift, z_esdf);
-  esdf_truncated_pub_.publish(*esdf_truncated_z_shift);
-
   //////////////// GRAPH INFERENCE after initial guess /////////////////////////
-  // Show the graph before any inference
-  visualization_msgs::MarkerArray marker_array;
-  vxb::visualizeSkeletonGraph(sparse_skeleton_graph_,
-                              world_frame_,
-                              &marker_array,
-                              vxb::SkeletonGraphVizType::kRoomId,
-                              skeleton_z_level_);
-  segmented_sparse_graph_pub_.publish(marker_array);
-
-  // Create cloud of the graph, make sure indices are 1-to-1
-  std::vector<int64_t> vertex_ids;
-  std::map<int, int64_t> cloud_to_graph_ids;
-  ColorPointCloud::Ptr skeleton_graph_cloud = createPclCloudFromSkeleton(
-      sparse_skeleton_graph_, &cloud_to_graph_ids, &vertex_ids);
-
-  // Publish centroids
-  // Create semantic instance for each centroid
-  InstanceId instance_id = 1;  // do not init to 0 (special null id).
-  ColorPointCloud::Ptr room_layout_pcl(new ColorPointCloud);
-  for (size_t idx = 0; idx < room_centroids.size(); ++idx) {
-    // Create SceneNode out of centroids
-    SceneNode room_instance;
-    room_instance.attributes_.semantic_label_ = kRoomSemanticLabel;
-    room_instance.attributes_.color_ = kRoomColor;
-    room_instance.attributes_.instance_id_ = instance_id;
-    room_instance.id_ =
-        std::to_string(kRoomSemanticLabel) + std::to_string(instance_id);
-    room_centroids.at(idx).get(room_instance.attributes_.position_);
-    CHECK_LT(idx, room_pcls.size());
-
-    // Associate room to sparse graph...
-    // Get section of the sparse graph that falls inside this room_pcl
-    const auto& room_pcl = room_pcls.at(idx);
-    CHECK(room_pcl);
-
-    // Find concave hull of pcl first
-    std::vector<pcl::Vertices> concave_polygon;
-    pcl::ConcaveHull<ColorPoint> concave_hull_adapter;
-    static constexpr double kAlpha = 0.30;
-    concave_hull_adapter.setAlpha(kAlpha);
-    concave_hull_adapter.setInputCloud(room_pcl);
-    concave_hull_adapter.setKeepInformation(true);
-    concave_hull_adapter.setDimension(2);
-    ColorPointCloud::Ptr concave_hull_pcl(new ColorPointCloud);
-    concave_hull_adapter.reconstruct(*concave_hull_pcl, concave_polygon);
-
-    pcl::KdTreeFLANN<ColorPoint> kdtree;
-    kdtree.setInputCloud(concave_hull_pcl);
-    static constexpr int K = 1;  // find nearest-neighbor
-    std::vector<int> nn_indices(K);
-    std::vector<float> nn_squared_distances(K);
-
-    // Don't show concave hull in pcl_, too much clutter with edges.
-    // room_instance.attributes_.pcl_ = concave_hull_pcl;
-    room_instance.attributes_.pcl_.reset(new ColorPointCloud);
-    *room_layout_pcl =
-        *room_layout_pcl + *concave_hull_pcl;  // concatenate the clouds.
-
-    // Create cropper to know which vertices are outside the room
-    pcl::CropHull<ColorPoint> hull_cropper;
-    hull_cropper.setHullIndices(concave_polygon);
-    hull_cropper.setHullCloud(concave_hull_pcl);
-    hull_cropper.setDim(2);
-    // because we can only get removed indices, tell the algorithm to
-    // remove inside.
-    hull_cropper.setCropOutside(true);
-
-    hull_cropper.setInputCloud(skeleton_graph_cloud);
-    std::vector<int> removed_indices;
-    hull_cropper.filter(removed_indices);
-
-    // Loop over graph and associate room to the removed vertices
-    // and label edges according to their type.
-    std::vector<int64_t> edge_ids;
-    for (const int& removed_index : removed_indices) {
-      CHECK_LE(removed_index, cloud_to_graph_ids.size());
-      vxb::SkeletonVertex& vertex =
-          sparse_skeleton_graph_.getVertex(cloud_to_graph_ids[removed_index]);
-      // Identify this vertex as belonging to the room
-      if (vertex.room_id != 0) {
-        // This vertex is already labeled!
-        LOG(WARNING) << "Vertex already labeled when finding rooms.";
-        continue;
-      }
-      vertex.room_id = instance_id;
-      ColorPoint point;
-      point.x = vertex.point.x();
-      point.y = vertex.point.y();
-      point.z = vertex.point.z();
-      const vxb::Color& color = getRoomColor(vertex.room_id);
-      point.r = color.r;
-      point.g = color.g;
-      point.b = color.b;
-      // Just append new points to the room (correspond to vertices of
-      // sparse graph.
-      CHECK(room_instance.attributes_.pcl_);
-      room_instance.attributes_.color_ << color.r, color.g, color.b;
-      room_instance.attributes_.pcl_->push_back(point);
-      edge_ids.insert(
-          edge_ids.end(), vertex.edge_list.begin(), vertex.edge_list.end());
-    }
-
-    // "Dilate" the labels, for every null vertex, if one of its neighbors
-    // is a room and they are closer than esdf truncation distance,
-    // change its id to room x.
-    // Label edges according to whether they are transition or not
-    // FLOODFILL LIKE CRAZY
-    while (edge_ids.size() > 0) {
-      // Depth first.
-      auto edge_idx = edge_ids.back();  // copy (bcs we delete next)
-      edge_ids.pop_back();
-      vxb::SkeletonEdge& edge = sparse_skeleton_graph_.getEdge(edge_idx);
-      vxb::SkeletonVertex& vtx_start =
-          sparse_skeleton_graph_.getVertex(edge.start_vertex);
-      vxb::SkeletonVertex& vtx_end =
-          sparse_skeleton_graph_.getVertex(edge.end_vertex);
-      bool is_start_in_room = false;
-      if (vtx_start.room_id == instance_id) {
-        is_start_in_room = true;
-      } else if (vtx_end.room_id == instance_id) {
-        is_start_in_room = false;
-      } else {
-        LOG(ERROR) << "At least one vertex of the edge should belong to this "
-                      "room.";
-        continue;
-      }
-      if (vtx_start.room_id == vtx_end.room_id) {
-        // We have a self-contained edge, label the edge as non-transition
-        edge.transition_edge = false;
-      } else {
-        // We have a transition edge, from one room to unknown.
-        // Search for its nearest neighbor to the current pcl of the room
-        // do the serach in 2D, because the truncation of the esdf is done
-        // in 2D...
-        ColorPoint search_point;
-        if (is_start_in_room) {
-          // If start is in room, we are trying to label the end.
-          search_point.x = vtx_end.point.x();
-          search_point.y = vtx_end.point.y();
-          search_point.z = 0.0;
-        } else {
-          search_point.x = vtx_start.point.x();
-          search_point.y = vtx_start.point.y();
-          search_point.z = 0.0;
-        }
-
-        float esdf_distance_approx = 0;
-        if (kdtree.nearestKSearch(
-                search_point, K, nn_indices, nn_squared_distances) > 0) {
-          // Found the nearest neighbor
-          CHECK_GT(nn_indices.size(), 0);
-          CHECK_GT(nn_squared_distances.size(), 0);
-          CHECK_EQ(nn_indices.size(), nn_squared_distances.size());
-          // Don't take the squared distances, since we need to project
-          // in 2D!
-          const ColorPoint& pcl_point = concave_hull_pcl->at(nn_indices.at(0));
-          esdf_distance_approx =
-              std::sqrt(std::pow(search_point.x - pcl_point.x, 2) +
-                        std::pow(search_point.y - pcl_point.y, 2));
-        } else {
-          LOG(WARNING) << "Didn't find NN! Not labeling this vertex...";
-          continue;
-        }
-
-        float kEpsilon = 0.10 * kEsdfTruncation;  // allow for 10% extra.
-        if (esdf_distance_approx < kEsdfTruncation + kEpsilon) {
-          // The node is inside the esdf truncation, so label the
-          // unknown vertex as in the room and add its neighbors to the
-          // queue.
-          if (is_start_in_room) {
-            vtx_end.room_id = instance_id;
-            edge_ids.insert(edge_ids.end(),
-                            vtx_end.edge_list.begin(),
-                            vtx_end.edge_list.end());
-          } else {
-            vtx_start.room_id = instance_id;
-            edge_ids.insert(edge_ids.end(),
-                            vtx_start.edge_list.begin(),
-                            vtx_start.edge_list.end());
-          }
-          CHECK_EQ(vtx_end.room_id, vtx_start.room_id);
-          edge.transition_edge = false;
-        } else {
-          // That is indeed a transition edge!
-          // Store what kind of transition
-          // If we transit to NULL, that is perhaps a corridor or door...
-          edge.transition_edge = true;
-        }
-      }
-    }
-
-    // Visualize new skeleton for each room.
-    visualization_msgs::MarkerArray marker_array;
-    vxb::visualizeSkeletonGraph(sparse_skeleton_graph_,
-                                world_frame_,
-                                &marker_array,
-                                vxb::SkeletonGraphVizType::kRoomId,
-                                skeleton_z_level_);
-    segmented_sparse_graph_pub_.publish(marker_array);
-
-    // Add the room to the database
-    scene_graph_.addSceneNode(room_instance);
-    instance_id++;
-  }
-  Eigen::Affine3f z_shift = Eigen::Affine3f::Identity();
-  z_shift.translation() << 0.0, 0.0, 10.0;
-  room_layout_pcl->header.frame_id = world_frame_;
-  ColorPointCloud::Ptr transformed_pcl(new ColorPointCloud);
-  pcl::transformPointCloud(*room_layout_pcl, *transformed_pcl, z_shift);
-  room_layout_pub_.publish(*transformed_pcl);
-
-  // Finally, do majority voting on the unknown folks...
-  // Get all vertices that do not know in which room they are.
-  std::list<int64_t> undecided_vertices_ids;
-  for (const auto& vertex_id : vertex_ids) {
-    undecided_vertices_ids.push_back(vertex_id);
-  }
-  std::unordered_map<int64_t, int> loopy_vertex;
-  while (undecided_vertices_ids.size() > 0) {
-    // Breadth first.
-    int64_t vertex_id = undecided_vertices_ids.front();  // copy
-    undecided_vertices_ids.pop_front();
-    vxb::SkeletonVertex& vertex = sparse_skeleton_graph_.getVertex(vertex_id);
-    std::map<int, int64_t> room_votes;
-    if (vertex.room_id == 0) {
-      // Bad one, it has no clue where it is.
-
-      // Check that it has neigbors
-      if (vertex.edge_list.size() == 0) {
-        // This folk has no neighbors :O
-        LOG(WARNING) << "Graph vertex with id " << vertex_id
-                     << " has no neighbors!";
-        continue;
-      }
-
-      // Ask its neighbors where it is!
-      for (const int64_t& edge_id : vertex.edge_list) {
-        const vxb::SkeletonEdge& edge = sparse_skeleton_graph_.getEdge(edge_id);
-
-        // Remove self-edges
-        if (edge.end_vertex == vertex_id && edge.start_vertex == vertex_id) {
-          LOG(ERROR) << "Self-edges are not allowed! Removing edge.\n"
-                     << "Offending edge id: " << edge.edge_id << '\n'
-                     << "Vertex id: " << vertex_id << '\n'
-                     << "Start vertex id: " << edge.start_vertex << '\n'
-                     << "End vertex id: " << edge.end_vertex;
-          // Remove from graph, at this point edge is a dangling ref!
-          sparse_skeleton_graph_.removeEdge(edge_id);
-          continue;
-        }
-
-        // Get neighbor voxel for this edge
-        vxb::SkeletonVertex* neighbor_vertex = nullptr;
-        if (edge.end_vertex != vertex_id) {
-          // Hello nice neighbor!
-          neighbor_vertex = &sparse_skeleton_graph_.getVertex(edge.end_vertex);
-        } else if (edge.start_vertex != vertex_id) {
-          // Oh the end_vertex was the current vertex, hi actual
-          // neighbor!
-          neighbor_vertex =
-              &sparse_skeleton_graph_.getVertex(edge.start_vertex);
-        } else {
-          LOG(ERROR) << "The edge does not belong to this vtx! "
-                     << "This shouldn't happen.\n"
-                     << "Vertex id: " << vertex_id << '\n'
-                     << "Start vertex id: " << edge.start_vertex << '\n'
-                     << "End vertex id: " << edge.end_vertex;
-          // Forget about this edge for now... but this should not
-          // happen!
-          continue;
-        }
-        CHECK(neighbor_vertex);
-
-        // So, neighbor, tell me, in which room are you?
-        auto it = room_votes.find(neighbor_vertex->room_id);
-        if (it == room_votes.end()) {
-          // First time we see this room id.
-          room_votes[neighbor_vertex->room_id] = 1;
-        } else {
-          // Ok, keep adding the votes for this room.
-          it->second += 1;
-        }
-      }
-
-      // Find max room id.
-      int max_room_id = 0;
-      int64_t max_room_count = 0;
-      for (const auto& kv : room_votes) {
-        if (kv.first != 0) {
-          // Only count those neighbors that know where they are
-          if (kv.second > max_room_count) {
-            max_room_id = kv.first;
-            max_room_count = kv.second;
-          }
-        }
-      }
-
-      if (max_room_id == 0) {
-        // Wow, none of our neighbors knows where it is!
-        // (do not think it has no neighbors, we check this above).
-
-        // Keep track of the id of this guy, to avoid infinite loops
-        // which may happen e.g. if a subgraph of two vertices with
-        // unknown rooms, then we will endlessly loop.
-        if (loopy_vertex.find(vertex_id) == loopy_vertex.end()) {
-          // First time we see this bad one, add to map
-          loopy_vertex[vertex_id] = 1;
-        } else {
-          // You again!?
-          CHECK_GT(loopy_vertex[vertex_id], 0);
-          // Typically we will revisit the same guy twice.
-          static constexpr int kMaxVertexRevisits = 4;
-          if (loopy_vertex[vertex_id] > kMaxVertexRevisits) {
-            // If we have revisited this voxel too many times, ignore it.
-            VLOG(1) << "Detected loop! Discarding vertex with id: " << vertex_id
-                    << "\n Position: " << vertex.point.transpose();
-            continue;
-          } else {
-            loopy_vertex[vertex_id] += 1;
-          }
-        }
-
-        // Re-add this guy to the list, perhaps when we label the rest
-        // of rooms we figure out this guy...
-        VLOG(1) << "Re-ADD vertex: " << vertex_id;
-        undecided_vertices_ids.push_back(vertex_id);
-      } else {
-        // Found the most likely room id!
-        vertex.room_id = max_room_id;
-
-        // Update all the edges of this vertex as non/transition.
-        for (const int64_t& edge_id : vertex.edge_list) {
-          vxb::SkeletonEdge& edge = sparse_skeleton_graph_.getEdge(edge_id);
-          const auto& vtx_1 =
-              sparse_skeleton_graph_.getVertex(edge.start_vertex);
-          const auto& vtx_2 = sparse_skeleton_graph_.getVertex(edge.end_vertex);
-          if (vtx_1.room_id == vtx_2.room_id) {
-            // This edge now belongs fully to the same room.
-            edge.transition_edge = false;
-            CHECK_NE(vtx_1.room_id, 0) << "Can't be! We know its room!";
-          } else {
-            CHECK_EQ(edge.transition_edge, true);
-          }
-        }
-      }
-    } else {
-      // Good one, it knows where it is.
-      continue;
-    }
-  }
-
-  // Visualize new skeleton.
-  visualization_msgs::MarkerArray new_marker_array;
-  vxb::visualizeSkeletonGraph(sparse_skeleton_graph_,
-                              world_frame_,
-                              &new_marker_array,
-                              vxb::SkeletonGraphVizType::kRoomId,
-                              skeleton_z_level_);
-  segmented_sparse_graph_pub_.publish(new_marker_array);
-  //////////////////////////////////////////////////////////////
+  LOG(INFO) << "Start Places Segmentation.";
+  CHECK_NOTNULL(places_in_rooms_finder_);
+  places_in_rooms_finder_->findPlacesRoomConnectivity(&scene_graph_);
+  LOG(INFO) << "Finished Places Segmentation.";
 
   // Now find the inter room connectivity
-  /// Loop over all edges, if two vertices of different rooms are
-  /// connected together, add such connection to the scene-graph
-  std::vector<int64_t> edge_ids;
-  sparse_skeleton_graph_.getAllEdgeIds(&edge_ids);
-  for (const auto& edge_id : edge_ids) {
-    vxb::SkeletonEdge& edge = sparse_skeleton_graph_.getEdge(edge_id);
-    const auto& vtx_1 = sparse_skeleton_graph_.getVertex(edge.start_vertex);
-    const auto& vtx_2 = sparse_skeleton_graph_.getVertex(edge.end_vertex);
-    if (vtx_1.room_id != vtx_2.room_id) {
-      NodeId room1 =
-          std::to_string(kRoomSemanticLabel) + std::to_string(vtx_1.room_id);
-      NodeId room2 =
-          std::to_string(kRoomSemanticLabel) + std::to_string(vtx_2.room_id);
-      scene_graph_.addEdge(room1, room2);
-    }
-  }
-  LOG(INFO) << "Done finding room layout.";
+  LOG(INFO) << "Start Room Connectivity finder.";
+  CHECK(room_connectivity_finder_);
+  room_connectivity_finder_->findRoomConnectivity(&scene_graph_);
+  LOG(INFO) << "Finished Room Connectivity finder.";
 
-
-  LOG(INFO) << "COUNTING ROOMS NODES";
-  std::vector<int64_t> all_vtx_ids;
-  sparse_skeleton_graph_.getAllVertexIds(&all_vtx_ids);
-  std::map<int, int> room_count;
-  for (const auto& id : all_vtx_ids) {
-    const vxb::SkeletonVertex& vertex = sparse_skeleton_graph_.getVertex(id);
-    const auto& room_id = vertex.room_id;
-    auto it = room_count.find(room_id);
-    if (it != room_count.end()) {
-      room_count[vertex.room_id] += 1;
-    } else {
-      // First time we see this
-      room_count[vertex.room_id] = 1;
-    }
-  }
-
-  for (const auto& kv : room_count) {
-    LOG(INFO) << "ROOM ID: " << kv.first
-              << " with N vertices: " << kv.second;
-  }
-
+  // Count the number of rooms to display stats
+  countRooms();
   //////////////////////////////////////////////////////////////////////////////
 
   /////////////////////// Objects-Skeleton /////////////////////////////////////
   // Extract links between objects and skeleton, should be done in scene
   // graph...
-  publishSkeletonToObjectLinks(skeleton_graph_cloud);
+  // TODO(TONI): update this function to use the objects/places layer a la
+  // places_in_rooms_finder_
+  // name it objects_in_places_finder_
+  // publishSkeletonToObjectLinks(skeleton_graph_cloud);
   //////////////////////////////////////////////////////////////////////////////
 
   /////////////////////// Segment Walls Mesh ///////////////////////////////////
   if (walls_mesh) {
-    LOG(WARNING) << "Clustering walls...";
+    LOG(INFO) << "Clustering walls...";
     vxb::Mesh segmented_walls_mesh;
+    // TODO(TONI): this has to be rephrased using the 3D scene-graph!
     enclosing_wall_finder_->findWalls(
-        *walls_mesh, sparse_skeleton_graph_, &segmented_walls_mesh);
+        *walls_mesh, scene_graph_, &segmented_walls_mesh);
     // 19 overrides the old walls, use another one!
     publishSemanticMesh(19, segmented_walls_mesh);
-    LOG(WARNING) << "Done clustering walls...";
+    // Publish exploded semantic walls
+    publishExplodedWalls(segmented_walls_mesh);
+    LOG(INFO) << "Done clustering walls...";
   } else {
     LOG(WARNING) << "Not segmenting walls mesh bcs no walls mesh found.";
   }
   //////////////////////////////////////////////////////////////////////////////
 
   ///////////////////////////////// BUILDINGS //////////////////////////////////
-  SceneNode building_instance;
-  building_finder_->findBuildings(scene_graph_, &building_instance);
-  scene_graph_.addSceneNode(building_instance);
+  building_finder_->findBuildings(&scene_graph_);
   //////////////////////////////////////////////////////////////////////////////
 
   LOG(INFO) << "Visualizing Scene Graph";
   scene_graph_.visualize();
+
+  LOG(INFO) << "Visualizing Human Pose Graphs";
+  dynamic_scene_graph_.visualizePoseGraphs();
+
+  LOG(INFO) << "Visualizing Human Skeletons";
+  dynamic_scene_graph_.visualizeJoints();
+}
+
+void SceneGraphSimulationServer::countRooms() const {
+  LOG(INFO) << "COUNTING ROOMS NODES";
+  SceneGraphLayer rooms_layer(LayerId::kRoomsLayerId);
+  CHECK(scene_graph_.getLayerSafe(LayerId::kRoomsLayerId, &rooms_layer));
+  LOG(INFO) << "There are: " << rooms_layer.getNumberOfNodes();
+
+  // Print room id and number of places
+  // for (const auto& kv : room_count) {
+  //   LOG(INFO) << "ROOM ID: " << kv.first << " with N vertices: " <<
+  //   kv.second;
+  // }
 }
 
 void SceneGraphSimulationServer::publishSkeletonToObjectLinks(
@@ -756,14 +417,13 @@ void SceneGraphSimulationServer::publishSkeletonToObjectLinks(
   kdtree.setInputCloud(skeleton_graph_pcl_converted);
 
   // 1. Loop over the objects in the database_
-  std::vector<const SceneNode*> scene_nodes;
+  std::vector<SceneGraphNode> scene_nodes;
   scene_graph_.getAllSceneNodes(&scene_nodes);
   visualization_msgs::MarkerArray obj_to_skeleton_markers;
-  for (const auto& node : scene_nodes) {
-    const NodeAttributes& attributes = node->attributes_;
+  for (const SceneGraphNode& node : scene_nodes) {
+    const NodeAttributes& attributes = node.attributes_;
     const SemanticLabel& semantic_label = attributes.semantic_label_;
-    if (semantic_label != kRoomSemanticLabel &&
-        semantic_label != kBuildingSemanticLabel) {
+    if (node.layer_id_ == LayerId::kObjectsLayerId) {
       // We have an object, get its centroid.
       NodePosition centroid = attributes.position_;
 
@@ -810,17 +470,22 @@ void SceneGraphSimulationServer::publishSemanticMesh(
       walls_labels_.end();
   // Publish twice: one at the mesh level, the other at the object level.
   // Except for walls, those should be at skeleton level.
-  vxb::fillMarkerWithMesh(
-      semantic_mesh,
-      vxb::ColorMode::kLambertColor,
-      &mesh_msg,
-      is_walls ? skeleton_z_level_ : scene_graph_.getLayerStepZ());
+  fillMarkerWithMesh(semantic_mesh,
+                     vxb::ColorMode::kLambertColor,
+                     &mesh_msg,
+                     is_walls ? 10 : scene_graph_.getLayerStepZ());
   semantic_mesh_2_pubs_.publish(semantic_label, mesh_msg);
   visualization_msgs::Marker new_mesh_msg;
   new_mesh_msg.header.frame_id = world_frame_;
-  vxb::fillMarkerWithMesh(
+  fillMarkerWithMesh(
       semantic_mesh, vxb::ColorMode::kLambertColor, &new_mesh_msg, 0.0);
   semantic_mesh_pubs_.publish(semantic_label, new_mesh_msg);
+}
+
+void SceneGraphSimulationServer::publishExplodedWalls(
+    const vxb::Mesh& segmented_walls,
+    const double& explosion_factor) {
+  // TODO
 }
 
 void SceneGraphSimulationServer::extractThings(
@@ -853,27 +518,31 @@ void SceneGraphSimulationServer::extractThings(
   CHECK_EQ(n_centroids, bounding_boxes.size());
 
   // Create semantic instance for each centroid
-  InstanceId instance_id = 0;
-  for (size_t idx = 0; idx < n_centroids; ++idx) {
+  NodeId object_instance_id = 0;
+  for (size_t idx = 0u; idx < n_centroids; ++idx) {
     // Create SceneNode out of centroids
-    SceneNode scene_node;
+    SceneGraphNode scene_node;
     NodeAttributes& attributes = scene_node.attributes_;
     attributes.semantic_label_ = semantic_label;
     const auto& color =
         semantic_config_.semantic_label_to_color_->getColorFromSemanticLabel(
             semantic_label);
     attributes.color_ << color.r, color.g, color.b;
-    attributes.instance_id_ = instance_id;
-    scene_node.id_ =
-        std::to_string(semantic_label) + std::to_string(instance_id);
+    attributes.name_ =
+        std::to_string(semantic_label) + std::to_string(object_instance_id);
+    scene_node.node_id_ = next_object_id_;
+    scene_node.layer_id_ = LayerId::kObjectsLayerId;
     centroids.at(idx).get(attributes.position_);  // Calculates centroid
     attributes.pcl_ = object_pcls.at(idx);
+    CHECK(attributes.pcl_);
     attributes.bounding_box_ = bounding_boxes.at(idx);
 
     // Add to database
     CHECK(scene_node.attributes_.pcl_) << "Pcl not initialized!";
+    CHECK(scene_node.layer_id_ == LayerId::kObjectsLayerId);
     scene_graph_.addSceneNode(scene_node);
-    ++instance_id;
+    ++object_instance_id;
+    ++next_object_id_;
   }
 }
 
@@ -1021,71 +690,6 @@ void SceneGraphSimulationServer::getSemanticMeshesFromMesh(
   }
 }
 
-void SceneGraphSimulationServer::getPointcloudFromMesh(
-    const vxb::MeshLayer::ConstPtr& mesh_layer,
-    vxb::ColorMode color_mode,
-    ColorPointCloud::Ptr pointcloud) {
-  CHECK_NOTNULL(pointcloud);
-  pointcloud->clear();
-
-  vxb::BlockIndexList mesh_indices;
-  mesh_layer->getAllAllocatedMeshes(&mesh_indices);
-
-  // Testing: only one centroid...
-  std::vector<std::pair<vxb::Color, pcl::CentroidPoint<ColorPoint>>> centroids(
-      1);
-  centroids.at(0).first = vxb::Color::Red();
-  for (const vxb::BlockIndex& block_index : mesh_indices) {
-    vxb::Mesh::ConstPtr mesh = mesh_layer->getMeshPtrByIndex(block_index);
-
-    if (!mesh->hasVertices()) {
-      continue;
-    }
-    // Check that we can actually do the color stuff.
-    if (color_mode == vxb::kColor || color_mode == vxb::kLambertColor) {
-      CHECK(mesh->hasColors());
-    }
-    if (color_mode == vxb::kNormals || color_mode == vxb::kLambert ||
-        color_mode == vxb::kLambertColor) {
-      CHECK(mesh->hasNormals());
-    }
-
-    for (size_t i = 0u; i < mesh->vertices.size(); i++) {
-      ColorPoint point;
-      point.x = mesh->vertices[i].x();
-      point.y = mesh->vertices[i].y();
-      point.z = mesh->vertices[i].z();
-
-      vxb::Color color;
-      vxb::colorMsgToVoxblox(getVertexColor(*mesh, color_mode, i), &color);
-      point.r = color.r;
-      point.g = color.g;
-      point.b = color.b;
-
-      // Add points that are red to centroid, very approx...
-      const vxb::Color& original_color = mesh->colors[i];
-      const vxb::Color& instance_color = centroids.at(0).first;
-      if (original_color.r == instance_color.r &&
-          original_color.g == instance_color.g &&
-          original_color.b == instance_color.b) {
-        // Add to centroids
-        centroids.at(0).second.add(point);
-      }
-
-      // Create and accumulate points
-      pointcloud->push_back(point);
-    }
-  }
-
-  // Create intermediate semantic instance
-  SceneNode semantic_instance;
-  semantic_instance.id_ = "x1";
-  semantic_instance.attributes_.semantic_label_ = 0;
-  centroids.at(0).second.get(semantic_instance.attributes_.position_);
-  // Overwrites...
-  scene_graph_.addSceneNode(semantic_instance);
-}
-
 void SceneGraphSimulationServer::rqtReconfigureCallback(
     RqtSceneGraphConfig& config,
     uint32_t level) {
@@ -1112,18 +716,6 @@ void SceneGraphSimulationServer::rqtReconfigureCallback(
   object_finder_->updateRegionGrowingParams(rg_params);
 
   // Room finder params
-  MarchingCubesParams mc_params;
-  mc_params.grid_res = config.grid_res;
-  mc_params.iso_level_ = config.iso_level;
-  mc_params.hoppe_or_rbf = config.hoppe_or_rbf;
-  mc_params.extend_percentage = config.extend_percentage;
-  mc_params.off_surface_displacement = config.off_surface_displacement;
-  room_finder_->updateMarchingCubesParams(mc_params);
-
-  OutlierFilterParams of_params;
-  of_params.radius_search = config.radius_search;
-  of_params.min_neighbors_in_radius = config.min_neighbors_in_radius;
-  room_finder_->updateOutlierFilterParams(of_params);
 
   // LOG(WARNING) << "Clearing Scene Graph";
   // scene_graph_.clear();
