@@ -6,28 +6,39 @@
 #include <voxblox_skeleton/skeleton_generator.h>
 
 #include <pcl/common/copy_point.h>
-
 #include <pcl/common/io.h>
-
 #include <pcl/common/transforms.h>
 
 #include "kimera_scene_graph/common.h"
+
 #include "kimera_scene_graph/object_finder.h"
 #include "kimera_scene_graph/places_room_connectivity_finder.h"
 #include "kimera_scene_graph/room_connectivity_finder.h"
 #include "kimera_scene_graph/room_finder.h"
+
+#include "kimera_scene_graph/scene_graph.h"
+#include "kimera_scene_graph/scene_graph_edge.h"
+#include "kimera_scene_graph/scene_graph_layer.h"
+#include "kimera_scene_graph/scene_graph_node.h"
+
+#include "kimera_scene_graph/utils/kimera_to_voxblox.h"
 #include "kimera_scene_graph/utils/voxblox_to_pcl.h"
 #include "kimera_scene_graph/utils/voxblox_to_ros.h"
 
 namespace kimera {
 
-SceneGraphSimulationServer::SceneGraphSimulationServer(
-    const ros::NodeHandle& nh,
-    const ros::NodeHandle& nh_private)
-    : SemanticSimulationServer(nh, nh_private),
+SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
+                                     const ros::NodeHandle& nh_private)
+    : nh_(nh),
+      nh_private_(nh_private),
       color_clustered_pcl_pub_(),
+      walls_clustered_pcl_pub_(),
+      room_centroids_pub_(),
       mesh_pub_(),
       polygon_mesh_pub_(),
+      sparse_graph_pub_(),
+      edges_obj_skeleton_pub_(),
+      world_frame_("world"),
       semantic_pcl_pubs_("pcl", nh_private),
       semantic_mesh_pubs_("mesh", nh_private),
       semantic_mesh_2_pubs_("mesh_2", nh_private),
@@ -37,15 +48,17 @@ SceneGraphSimulationServer::SceneGraphSimulationServer(
       places_in_rooms_finder_(nullptr),
       room_connectivity_finder_(nullptr),
       object_finder_(nullptr),
-      wall_finder_(nullptr),
       enclosing_wall_finder_(nullptr),
       building_finder_(nullptr),
-      scene_graph_(nh, nh_private),
-      dynamic_scene_graph_(nh, nh_private),
-      reconstruct_scene_graph_srv_(),
-      load_map_srv_() {
+      scene_graph_(nullptr),
+      // dynamic_scene_graph_(nh, nh_private),
+      semantic_config_(getSemanticTsdfIntegratorConfigFromRosParam(nh_private)),
+      reconstruct_scene_graph_srv_() {
+  // Create Scene graph
+  scene_graph_ = std::make_shared<SceneGraph>(nh, nh_private);
+
   // TODO(Toni): remove
-  skeleton_z_level_ = 2.0 * scene_graph_.getLayerStepZ();
+  skeleton_z_level_ = 2.0 * scene_graph_->getLayerStepZ();
 
   // TODO(Toni): put all of this in scene graph reconstructor config!
   // Build object finder
@@ -53,14 +66,30 @@ SceneGraphSimulationServer::SceneGraphSimulationServer(
   nh_private.param(
       "object_finder_type", object_finder_type, object_finder_type);
 
+  nh_private.param("world_frame", world_frame_, world_frame_);
+  nh_private.param("room_finder_esdf_slice_level",
+                   room_finder_esdf_slice_level_,
+                   room_finder_esdf_slice_level_);
+  nh_private.param("tsdf_voxel_size", voxel_size_, voxel_size_);
+  nh_private.param("tsdf_voxels_per_side", voxels_per_side_, voxels_per_side_);
+
+  tsdf_layer_.reset(
+      new vxb::Layer<vxb::TsdfVoxel>(voxel_size_, voxels_per_side_));
+  esdf_layer_.reset(
+      new vxb::Layer<vxb::EsdfVoxel>(voxel_size_, voxels_per_side_));
+
+  esdf_integrator_.reset(new vxb::EsdfIntegrator(
+      vxb::getEsdfIntegratorConfigFromRosParam(nh_private),
+      tsdf_layer_.get(),
+      esdf_layer_.get()));
+
   // Build finders
-  wall_finder_ = kimera::make_unique<WallFinder<ColorPoint>>(world_frame_);
   enclosing_wall_finder_ =
       kimera::make_unique<EnclosingWallFinder>(world_frame_);
   object_finder_ = kimera::make_unique<ObjectFinder<ColorPoint>>(
       world_frame_, static_cast<ObjectFinderType>(object_finder_type));
   room_finder_ = kimera::make_unique<RoomFinder>(
-      nh_private, world_frame_, visualization_slice_level_, skeleton_z_level_);
+      nh_private, world_frame_, room_finder_esdf_slice_level_, skeleton_z_level_);
   places_in_rooms_finder_ = kimera::make_unique<PlacesRoomConnectivityFinder>(
       nh_private, skeleton_z_level_, world_frame_);
   room_connectivity_finder_ = kimera::make_unique<RoomConnectivityFinder>();
@@ -107,38 +136,35 @@ SceneGraphSimulationServer::SceneGraphSimulationServer(
   fillSceneGraphWithPlaces(sparse_skeleton_graph_);
 
   // Publish the skeleton.
+  CHECK(scene_graph_);
   visualization_msgs::MarkerArray marker_array;
   vxb::SparseSkeletonGraph places_skeleton;
-  scene_graph_.getLayer(LayerId::kPlacesLayerId)
-      .convertLayerToSkeleton(&places_skeleton);
+  utils::convertLayerToSkeleton(scene_graph_->getLayer(LayerId::kPlacesLayerId),
+                                &places_skeleton);
   vxb::visualizeSkeletonGraph(places_skeleton, world_frame_, &marker_array);
   sparse_graph_pub_.publish(marker_array);
 
   // Attach rqt reconfigure
-  rqt_callback_ = boost::bind(
-      &SceneGraphSimulationServer::rqtReconfigureCallback, this, _1, _2);
+  rqt_callback_ =
+      boost::bind(&SceneGraphBuilder::rqtReconfigureCallback, this, _1, _2);
   rqt_server_.setCallback(rqt_callback_);
 
   // Add rosservice to reconstruct scene graph, this avoids having to
   // rebuild the simulation world and reintegrate the generated pointclouds.
   reconstruct_scene_graph_srv_ = nh_private_.advertiseService(
       "reconstruct_scene_graph",
-      &SceneGraphSimulationServer::sceneGraphReconstructionServiceCall,
+      &SceneGraphBuilder::sceneGraphReconstructionServiceCall,
       this);
-  load_map_srv_ = nh_private_.advertiseService(
-      "load_map",
-      &SemanticSimulationServer::loadMapCallback,
-      dynamic_cast<SemanticSimulationServer*>(this));
 
   // Build Object database action client
   LOG(INFO) << "Creating object database client.";
-  object_db_client_ = kimera::make_unique<ObjectDBClient>("object_db", true);
+  object_db_client_ = kimera::make_unique<ObjectDBClient>("/object_db", true);
   LOG(INFO) << "Waiting for object database server.";
   object_db_client_->waitForServer();
   LOG(INFO) << "Object database server connected.";
 }
 
-bool SceneGraphSimulationServer::sceneGraphReconstructionServiceCall(
+bool SceneGraphBuilder::sceneGraphReconstructionServiceCall(
     std_srvs::SetBool::Request& request,
     std_srvs::SetBool::Response& response) {
   LOG(INFO) << "Requested scene graph reconstruction.";
@@ -146,8 +172,10 @@ bool SceneGraphSimulationServer::sceneGraphReconstructionServiceCall(
   return true;
 }
 
-bool SceneGraphSimulationServer::fillSceneGraphWithPlaces(
+bool SceneGraphBuilder::fillSceneGraphWithPlaces(
     const vxb::SparseSkeletonGraph& sparse_skeleton) {
+  CHECK(scene_graph_);
+
   std::vector<int64_t> vtx_ids;
   sparse_skeleton.getAllVertexIds(&vtx_ids);
   for (const auto& vtx_id : vtx_ids) {
@@ -162,10 +190,10 @@ bool SceneGraphSimulationServer::fillSceneGraphWithPlaces(
     scene_graph_node.attributes_.position_.y = vtx.point[1];
     scene_graph_node.attributes_.position_.z = vtx.point[2];
     scene_graph_node.attributes_.color_ = kPlaceColor;
-    scene_graph_.addSceneNode(scene_graph_node);
+    scene_graph_->addSceneNode(scene_graph_node);
   }
-  CHECK(scene_graph_.hasLayer(LayerId::kPlacesLayerId));
-  CHECK_EQ(scene_graph_.getLayer(LayerId::kPlacesLayerId).getNumberOfNodes(),
+  CHECK(scene_graph_->hasLayer(LayerId::kPlacesLayerId));
+  CHECK_EQ(scene_graph_->getLayer(LayerId::kPlacesLayerId).getNumberOfNodes(),
            vtx_ids.size())
       << "The skeleton and the scene graph layer should have the same "
          "number of nodes!";
@@ -181,26 +209,56 @@ bool SceneGraphSimulationServer::fillSceneGraphWithPlaces(
     scene_graph_edge.start_node_id_ = edge.start_vertex;
     scene_graph_edge.end_node_id_ = edge.end_vertex;
     if (!scene_graph_edge.isSelfEdge()) {
-      scene_graph_.addEdge(&scene_graph_edge);
+      scene_graph_->addEdge(&scene_graph_edge);
     } else {
       LOG(ERROR) << "Not adding self-edge: " << scene_graph_edge.print();
       invalid_edges++;
     }
   }
-  CHECK_EQ(scene_graph_.getLayer(LayerId::kPlacesLayerId).getNumberOfEdges(),
+  CHECK_EQ(scene_graph_->getLayer(LayerId::kPlacesLayerId).getNumberOfEdges(),
            edge_ids.size() - invalid_edges)
       << "The skeleton and the scene graph layer should have the same "
          "number of edges!";
 }
 
-void SceneGraphSimulationServer::reconstructMeshOutOfTsdf(
+bool SceneGraphBuilder::loadTsdfMap(const std::string& file_path) {
+  constexpr bool kMulitpleLayerSupport = true;
+  bool success = vxb::io::LoadBlocksFromFile(
+      file_path,
+      vxb::Layer<vxb::TsdfVoxel>::BlockMergingStrategy::kReplace,
+      kMulitpleLayerSupport,
+      tsdf_layer_.get());
+  if (success) {
+    LOG(INFO) << "Successfully loaded TSDF layer.";
+  } else {
+    LOG(INFO) << "Failed to load TSDF layer.";
+  }
+  return success;
+}
+
+bool SceneGraphBuilder::loadEsdfMap(const std::string& file_path) {
+  constexpr bool kMulitpleLayerSupport = true;
+  bool success = vxb::io::LoadBlocksFromFile(
+      file_path,
+      vxb::Layer<vxb::EsdfVoxel>::BlockMergingStrategy::kReplace,
+      kMulitpleLayerSupport,
+      esdf_layer_.get());
+  if (success) {
+    LOG(INFO) << "Successfully loaded ESDF layer.";
+  } else {
+    LOG(INFO) << "Failed to load ESDF layer.";
+  }
+  return success;
+}
+
+void SceneGraphBuilder::reconstructMeshOutOfTsdf(
     vxb::MeshLayer::Ptr mesh_layer) {
   vxb::MeshIntegratorConfig mesh_config;
-  CHECK(tsdf_test_);
+  CHECK(tsdf_layer_);
   // TODO(Toni): mind that the parent server already builds the mesh (but that
   // is for the ground-truth sdf, not for the currently loaded one I believe.)
   vxb::MeshIntegrator<vxb::TsdfVoxel> mesh_integrator_test(
-      mesh_config, tsdf_test_.get(), mesh_layer.get());
+      mesh_config, tsdf_layer_.get(), mesh_layer.get());
   constexpr bool only_mesh_updated_blocks = false;
   constexpr bool clear_updated_flag = true;
   mesh_integrator_test.generateMesh(only_mesh_updated_blocks,
@@ -223,20 +281,18 @@ void SceneGraphSimulationServer::reconstructMeshOutOfTsdf(
   polygon_mesh_pub_.publish(pcl_msg_mesh);
 }
 
-void SceneGraphSimulationServer::reconstructEsdfOutOfTsdf(
-    const bool& save_to_file) {
+void SceneGraphBuilder::reconstructEsdfOutOfTsdf(const bool& save_to_file) {
   LOG(INFO) << "Building ESDF layer.";
   esdf_integrator_->setFullEuclidean(true);
   esdf_integrator_->updateFromTsdfLayerBatch();
   LOG(INFO) << "Saving ESDF layer.";
   if (save_to_file) {
-    esdf_test_->saveToFile("/home/tonirv/tesse_esdf.vxblx");
+    esdf_layer_->saveToFile("/home/tonirv/tesse_esdf.vxblx");
   }
   LOG(INFO) << "Done building ESDF layer.";
 }
 
-void SceneGraphSimulationServer::sceneGraphReconstruction(
-    const bool& only_rooms) {
+void SceneGraphBuilder::sceneGraphReconstruction(const bool& only_rooms) {
   // Also generate test mesh
   // TODO(Toni): this can be called from a rosservice now, so make sure
   // the sim world is ready before...
@@ -250,7 +306,8 @@ void SceneGraphSimulationServer::sceneGraphReconstruction(
 
   vxb::Mesh::Ptr walls_mesh = nullptr;
   if (!only_rooms) {
-    vxb::MeshLayer::Ptr mesh_test(new vxb::MeshLayer(tsdf_test_->block_size()));
+    vxb::MeshLayer::Ptr mesh_test(
+        new vxb::MeshLayer(tsdf_layer_->block_size()));
     reconstructMeshOutOfTsdf(mesh_test);
 
     // Get Semantic PCLs
@@ -326,10 +383,12 @@ void SceneGraphSimulationServer::sceneGraphReconstruction(
   }
 
   ////////////////////////// FIND ROOMS ////////////////////////////////////////
+  CHECK(scene_graph_);
   LOG(INFO) << "Start Room finding.";
   CHECK(room_finder_);
   IntensityPointCloud::Ptr room_clusters_cloud =
-      room_finder_->findRooms(*esdf_test_, &scene_graph_);
+      room_finder_->findRooms(*esdf_layer_, scene_graph_.get());
+  CHECK(room_clusters_cloud);
   LOG(INFO) << "Finished Room finding.";
 
   // Publish cloud
@@ -339,13 +398,13 @@ void SceneGraphSimulationServer::sceneGraphReconstruction(
   //////////////// GRAPH INFERENCE after initial guess /////////////////////////
   LOG(INFO) << "Start Places Segmentation.";
   CHECK_NOTNULL(places_in_rooms_finder_);
-  places_in_rooms_finder_->findPlacesRoomConnectivity(&scene_graph_);
+  places_in_rooms_finder_->findPlacesRoomConnectivity(scene_graph_.get());
   LOG(INFO) << "Finished Places Segmentation.";
 
   // Now find the inter room connectivity
   LOG(INFO) << "Start Room Connectivity finder.";
   CHECK(room_connectivity_finder_);
-  room_connectivity_finder_->findRoomConnectivity(&scene_graph_);
+  room_connectivity_finder_->findRoomConnectivity(scene_graph_.get());
   LOG(INFO) << "Finished Room Connectivity finder.";
 
   // Count the number of rooms to display stats
@@ -366,8 +425,9 @@ void SceneGraphSimulationServer::sceneGraphReconstruction(
     LOG(INFO) << "Clustering walls...";
     vxb::Mesh segmented_walls_mesh;
     // TODO(TONI): this has to be rephrased using the 3D scene-graph!
+    CHECK(scene_graph_);
     enclosing_wall_finder_->findWalls(
-        *walls_mesh, scene_graph_, &segmented_walls_mesh);
+        *walls_mesh, *scene_graph_, &segmented_walls_mesh);
     // 19 overrides the old walls, use another one!
     publishSemanticMesh(19, segmented_walls_mesh);
     // Publish exploded semantic walls
@@ -379,23 +439,26 @@ void SceneGraphSimulationServer::sceneGraphReconstruction(
   //////////////////////////////////////////////////////////////////////////////
 
   ///////////////////////////////// BUILDINGS //////////////////////////////////
-  building_finder_->findBuildings(&scene_graph_);
+  CHECK(scene_graph_);
+  building_finder_->findBuildings(scene_graph_.get());
   //////////////////////////////////////////////////////////////////////////////
 
   LOG(INFO) << "Visualizing Scene Graph";
-  scene_graph_.visualize();
+  CHECK(scene_graph_);
+  scene_graph_->visualize();
 
   LOG(INFO) << "Visualizing Human Pose Graphs";
-  dynamic_scene_graph_.visualizePoseGraphs();
+  // dynamic_scene_graph_.visualizePoseGraphs();
 
   LOG(INFO) << "Visualizing Human Skeletons";
-  dynamic_scene_graph_.visualizeJoints();
+  // dynamic_scene_graph_.visualizeJoints();
 }
 
-void SceneGraphSimulationServer::countRooms() const {
+void SceneGraphBuilder::countRooms() const {
   LOG(INFO) << "COUNTING ROOMS NODES";
   SceneGraphLayer rooms_layer(LayerId::kRoomsLayerId);
-  CHECK(scene_graph_.getLayerSafe(LayerId::kRoomsLayerId, &rooms_layer));
+  CHECK(scene_graph_);
+  CHECK(scene_graph_->getLayerSafe(LayerId::kRoomsLayerId, &rooms_layer));
   LOG(INFO) << "There are: " << rooms_layer.getNumberOfNodes();
 
   // Print room id and number of places
@@ -405,8 +468,9 @@ void SceneGraphSimulationServer::countRooms() const {
   // }
 }
 
-void SceneGraphSimulationServer::publishSkeletonToObjectLinks(
+void SceneGraphBuilder::publishSkeletonToObjectLinks(
     const ColorPointCloud::Ptr& skeleton_graph_pcl) {
+  CHECK(scene_graph_);
   // TODO(TONI): bad, you should add the skeleton to the scene graph instead...
   // In the meantime:
 
@@ -418,7 +482,7 @@ void SceneGraphSimulationServer::publishSkeletonToObjectLinks(
 
   // 1. Loop over the objects in the database_
   std::vector<SceneGraphNode> scene_nodes;
-  scene_graph_.getAllSceneNodes(&scene_nodes);
+  scene_graph_->getAllSceneNodes(&scene_nodes);
   visualization_msgs::MarkerArray obj_to_skeleton_markers;
   for (const SceneGraphNode& node : scene_nodes) {
     const NodeAttributes& attributes = node.attributes_;
@@ -440,11 +504,11 @@ void SceneGraphSimulationServer::publishSkeletonToObjectLinks(
         Point pcl_point = skeleton_graph_pcl_converted->at(nn_indices.at(0));
         // Pcl points leave in a diff layer than skeleton, separate them!
         // PCL points live at the first layer
-        centroid.z += scene_graph_.getLayerStepZ();
+        centroid.z += scene_graph_->getLayerStepZ();
         // Skeleton points live at the second layer;
         pcl_point.z += skeleton_z_level_;
         visualization_msgs::Marker marker =
-            scene_graph_.getLineFromPointToPoint(
+            scene_graph_->getLineFromPointToPoint(
                 pcl_point,
                 centroid,
                 attributes.color_,
@@ -460,9 +524,8 @@ void SceneGraphSimulationServer::publishSkeletonToObjectLinks(
   edges_obj_skeleton_pub_.publish(obj_to_skeleton_markers);
 }
 
-void SceneGraphSimulationServer::publishSemanticMesh(
-    const SemanticLabel& semantic_label,
-    const vxb::Mesh& semantic_mesh) {
+void SceneGraphBuilder::publishSemanticMesh(const SemanticLabel& semantic_label,
+                                            const vxb::Mesh& semantic_mesh) {
   visualization_msgs::Marker mesh_msg;
   mesh_msg.header.frame_id = world_frame_;
   bool is_walls =
@@ -470,27 +533,28 @@ void SceneGraphSimulationServer::publishSemanticMesh(
       walls_labels_.end();
   // Publish twice: one at the mesh level, the other at the object level.
   // Except for walls, those should be at skeleton level.
-  fillMarkerWithMesh(semantic_mesh,
-                     vxb::ColorMode::kLambertColor,
-                     &mesh_msg,
-                     is_walls ? 10 : scene_graph_.getLayerStepZ());
+  CHECK(scene_graph_);
+  utils::fillMarkerWithMesh(semantic_mesh,
+                            vxb::ColorMode::kLambertColor,
+                            &mesh_msg,
+                            is_walls ? 10 : scene_graph_->getLayerStepZ());
   semantic_mesh_2_pubs_.publish(semantic_label, mesh_msg);
   visualization_msgs::Marker new_mesh_msg;
   new_mesh_msg.header.frame_id = world_frame_;
-  fillMarkerWithMesh(
+  utils::fillMarkerWithMesh(
       semantic_mesh, vxb::ColorMode::kLambertColor, &new_mesh_msg, 0.0);
   semantic_mesh_pubs_.publish(semantic_label, new_mesh_msg);
 }
 
-void SceneGraphSimulationServer::publishExplodedWalls(
-    const vxb::Mesh& segmented_walls,
-    const double& explosion_factor) {
+void SceneGraphBuilder::publishExplodedWalls(const vxb::Mesh& segmented_walls,
+                                             const double& explosion_factor) {
   // TODO
 }
 
-void SceneGraphSimulationServer::extractThings(
+void SceneGraphBuilder::extractThings(
     const SemanticLabel& semantic_label,
     const SemanticPointCloud::Ptr& semantic_pcl) {
+  CHECK(scene_graph_);
   LOG(INFO) << "Extracting objects for label: "
             << std::to_string(semantic_label);
   CHECK(object_finder_);
@@ -540,13 +604,13 @@ void SceneGraphSimulationServer::extractThings(
     // Add to database
     CHECK(scene_node.attributes_.pcl_) << "Pcl not initialized!";
     CHECK(scene_node.layer_id_ == LayerId::kObjectsLayerId);
-    scene_graph_.addSceneNode(scene_node);
+    scene_graph_->addSceneNode(scene_node);
     ++object_instance_id;
     ++next_object_id_;
   }
 }
 
-void SceneGraphSimulationServer::getSemanticPointcloudsFromMesh(
+void SceneGraphBuilder::getSemanticPointcloudsFromMesh(
     const vxb::MeshLayer::ConstPtr& mesh_layer,
     const vxb::ColorMode& color_mode,
     SemanticPointCloudMap* semantic_pointclouds) {
@@ -612,7 +676,7 @@ void SceneGraphSimulationServer::getSemanticPointcloudsFromMesh(
   }
 }
 
-void SceneGraphSimulationServer::getSemanticMeshesFromMesh(
+void SceneGraphBuilder::getSemanticMeshesFromMesh(
     const vxb::MeshLayer::ConstPtr& mesh_layer,
     const vxb::ColorMode& color_mode,
     SemanticMeshMap* semantic_meshes) {
@@ -690,9 +754,8 @@ void SceneGraphSimulationServer::getSemanticMeshesFromMesh(
   }
 }
 
-void SceneGraphSimulationServer::rqtReconfigureCallback(
-    RqtSceneGraphConfig& config,
-    uint32_t level) {
+void SceneGraphBuilder::rqtReconfigureCallback(RqtSceneGraphConfig& config,
+                                               uint32_t level) {
   // Object Finder params
   object_finder_->updateClusterEstimator(
       static_cast<ObjectFinderType>(config.object_finder_type));
@@ -717,11 +780,12 @@ void SceneGraphSimulationServer::rqtReconfigureCallback(
 
   // Room finder params
 
+  CHECK(scene_graph_);
   // LOG(WARNING) << "Clearing Scene Graph";
-  // scene_graph_.clear();
+  // scene_graph_->clear();
 
-  scene_graph_.updateEdgeAlpha(config.edge_alpha);
-  scene_graph_.visualize();
+  scene_graph_->updateEdgeAlpha(config.edge_alpha);
+  scene_graph_->visualize();
 
   LOG(INFO) << "Object Finder params have been updated. "
                "Run scene graph reconstruction ros service to see the effects.";
@@ -732,7 +796,7 @@ void SceneGraphSimulationServer::rqtReconfigureCallback(
  * @param object_pcls
  * @param semantic_label
  */
-ObjectPointClouds SceneGraphSimulationServer::objectDatabaseActionCall(
+ObjectPointClouds SceneGraphBuilder::objectDatabaseActionCall(
     const ObjectPointClouds& object_pcls,
     const std::string semantic_label) {
   LOG(INFO) << "Sending object point clouds to object database.";

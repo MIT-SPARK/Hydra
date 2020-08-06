@@ -10,16 +10,25 @@ find_package(GTSAM REQUIRED)
 find_package(KimeraRPGO REQUIRED)
 
 cs_add_library(${PROJECT_NAME}
+  # Include files are just here for IDEs
   include/kimera_scene_graph/utils/voxblox_to_pcl.h
   include/kimera_scene_graph/common.h
-  include/kimera_scene_graph/object_finder-inl.h # Just for IDEs
+  include/kimera_scene_graph/object_finder-inl.h
+  include/kimera_scene_graph/scene_graph_node.h
+  include/kimera_scene_graph/scene_graph_edge.h
+  include/kimera_scene_graph/scene_graph_layer.h
+  include/kimera_scene_graph/scene_graph.h
   src/object_finder.cpp
   src/room_finder.cpp
+  src/places_room_connectivity_finder.cpp
   src/room_connectivity_finder.cpp
   src/wall_finder.cpp
   src/building_finder.cpp
   src/scene_graph_server.cpp
-  src/scene_node.cpp
+  src/scene_graph_node.cpp
+  src/scene_graph_edge.cpp
+  src/scene_graph_layer.cpp
+  src/scene_graph.cpp
   src/dynamic_scene_node.cpp
   src/dynamic_scene_node_evaluator.cpp
   src/semantic_ros_publishers.cpp

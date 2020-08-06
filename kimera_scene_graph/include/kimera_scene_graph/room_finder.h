@@ -1,14 +1,6 @@
 #pragma once
 
-#include <glog/logging.h>
-
-#include <cv_bridge/cv_bridge.h>
-#include <image_transport/image_transport.h>
 #include <ros/ros.h>
-
-#include <opencv2/core/utility.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
 
 // for subscribers
 #include <pcl/filters/approximate_voxel_grid.h>
@@ -23,9 +15,10 @@
 #include <kimera_semantics/common.h>
 
 #include "kimera_scene_graph/common.h"
-#include "kimera_scene_graph/scene_node.h"
 
 namespace kimera {
+
+class SceneGraph;
 
 template <class T>
 typename pcl::PointCloud<T>::Ptr passThroughFilter1D(
@@ -67,6 +60,14 @@ typename pcl::PointCloud<T>::Ptr downsamplePcl(
 
 class RoomFinder {
  public:
+  /**
+   * @brief RoomFinder
+   * @param nh_private
+   * @param world_frame
+   * @param esdf_slice_level Height at which the ESDF slice is computed for room
+   * clustering.
+   * @param skeleton_z_level
+   */
   RoomFinder(const ros::NodeHandle& nh_private,
              const std::string& world_frame,
              const vxb::FloatingPoint& esdf_slice_level,
@@ -76,10 +77,7 @@ class RoomFinder {
   /**
    * @brief findRooms Uses Semantic ESDF
    * @param esdf_layer
-   * @param slice_level Height at which the ESDF slice is computed for room
-   * clustering.
-   * @param room_centroids
-   * @param room_pcls
+   * @param[out] Scene Graph to be updated with Room layer.
    * @return
    */
   IntensityPointCloud::Ptr findRooms(
@@ -109,10 +107,11 @@ class RoomFinder {
   void publishTruncatedEsdf(const IntensityPointCloud::Ptr& esdf_pcl);
 
  private:
-  std::string world_frame_;
   ros::NodeHandle nh_private_;
   ros::Publisher pcl_pub_;
   ros::Publisher esdf_truncated_pub_;
+
+  std::string world_frame_;
 
   // Params
   //! Height where to cut the ESDF for room segmentation

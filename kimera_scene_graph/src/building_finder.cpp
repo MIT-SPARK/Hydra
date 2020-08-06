@@ -2,7 +2,13 @@
 
 #include <string>
 
+#include <kimera_semantics/common.h>
+
 #include "kimera_scene_graph/common.h"
+#include "kimera_scene_graph/scene_graph_edge.h"
+#include "kimera_scene_graph/scene_graph_layer.h"
+#include "kimera_scene_graph/scene_graph_node.h"
+#include "kimera_scene_graph/scene_graph.h"
 
 namespace kimera {
 
@@ -12,9 +18,8 @@ void BuildingFinder::findBuildings(SceneGraph* scene_graph) {
   building_instance.attributes_.semantic_label_ = kBuildingSemanticLabel;
   building_instance.attributes_.color_ = kBuildingColor;
   // We only have one building now.
-  building_instance.attributes_.name_ =
-      std::to_string(kBuildingSemanticLabel) +
-      building_instance.attributes_.name_;
+  building_instance.attributes_.name_ = std::to_string(kBuildingSemanticLabel) +
+                                        building_instance.attributes_.name_;
   building_instance.node_id_ = 1u;
   building_instance.layer_id_ = LayerId::kBuildingsLayerId;
   SceneGraphLayer room_layer(LayerId::kRoomsLayerId);

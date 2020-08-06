@@ -8,13 +8,13 @@
 #include <glog/logging.h>
 
 #include <voxblox/core/layer.h>
+#include <voxblox/integrator/esdf_integrator.h>
 #include <voxblox_ros/mesh_vis.h>
 #include <voxblox_skeleton/skeleton.h>
 
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/client/terminal_state.h>
 #include <dynamic_reconfigure/server.h>
-#include <kimera_scene_graph/kimera_scene_graphConfig.h>
 #include <std_srvs/Empty.h>
 #include <std_srvs/EmptyRequest.h>
 #include <std_srvs/EmptyResponse.h>
@@ -24,15 +24,20 @@
 
 #include <object_db/ObjectRegistrationAction.h>
 
-#include "kimera_scene_graph/building_finder.h"
+#include <kimera_scene_graph/kimera_scene_graphConfig.h>
 #include "kimera_scene_graph/common.h"
+#include "kimera_scene_graph/dynamic_scene_node.h"
+#include "kimera_scene_graph/semantic_ros_publishers.h"
+
+// Finders
+#include "kimera_scene_graph/building_finder.h"
 #include "kimera_scene_graph/object_finder.h"
 #include "kimera_scene_graph/places_room_connectivity_finder.h"
 #include "kimera_scene_graph/room_connectivity_finder.h"
 #include "kimera_scene_graph/room_finder.h"
-#include "kimera_scene_graph/scene_node.h"
-#include "kimera_scene_graph/semantic_ros_publishers.h"
 #include "kimera_scene_graph/wall_finder.h"
+
+#include "kimera_scene_graph/scene_graph.h"
 
 namespace kimera {
 
@@ -43,13 +48,14 @@ typedef std::unordered_map<SemanticLabel, vxb::Mesh::Ptr> SemanticMeshMap;
 typedef actionlib::SimpleActionClient<object_db::ObjectRegistrationAction>
     ObjectDBClient;
 
-class SceneGraphSimulationServer : public SemanticSimulationServer {
+class SceneGraphBuilder {
  private:
   typedef kimera_scene_graph::kimera_scene_graphConfig RqtSceneGraphConfig;
 
  public:
-  SceneGraphSimulationServer(const ros::NodeHandle& nh,
-                             const ros::NodeHandle& nh_private);
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  SceneGraphBuilder(const ros::NodeHandle& nh,
+                    const ros::NodeHandle& nh_private);
 
   bool sceneGraphReconstructionServiceCall(
       std_srvs::SetBool::Request& request,
@@ -57,18 +63,23 @@ class SceneGraphSimulationServer : public SemanticSimulationServer {
 
   void sceneGraphReconstruction(const bool& only_rooms);
 
-  void getSemanticPointcloudsFromMesh(
-      const vxb::MeshLayer::ConstPtr& mesh_layer,
-      const vxb::ColorMode& color_mode,
-      SemanticPointCloudMap* semantic_pointclouds);
-
-  void getSemanticMeshesFromMesh(const vxb::MeshLayer::ConstPtr& mesh_layer,
-                                 const vxb::ColorMode& color_mode,
-                                 SemanticMeshMap* semantic_pointclouds);
+  inline bool loadSceneGraph(const std::string& file_path) const {
+    LOG(FATAL) << "Serialization not implemented.";
+    return false;
+  }
 
   ObjectPointClouds objectDatabaseActionCall(
       const ObjectPointClouds& object_pcls,
       const std::string semantic_label);
+
+  /**
+   * @brief getSceneGraph Return the current scene-graph, you should call the
+   * sceneGraphReconstruction function or the
+   * sceneGraphReconstructionServiceCall
+   * before getting the scene_graph via this function
+   * @return Pointer to the Scene-Graph
+   */
+  SceneGraph::Ptr getSceneGraph() { return scene_graph_; }
 
  protected:
   void rqtReconfigureCallback(RqtSceneGraphConfig& config, uint32_t level);
@@ -83,6 +94,15 @@ class SceneGraphSimulationServer : public SemanticSimulationServer {
                      const SemanticPointCloud::Ptr& semantic_pcl);
   void extractThings();
 
+  void getSemanticPointcloudsFromMesh(
+      const vxb::MeshLayer::ConstPtr& mesh_layer,
+      const vxb::ColorMode& color_mode,
+      SemanticPointCloudMap* semantic_pointclouds);
+
+  void getSemanticMeshesFromMesh(const vxb::MeshLayer::ConstPtr& mesh_layer,
+                                 const vxb::ColorMode& color_mode,
+                                 SemanticMeshMap* semantic_pointclouds);
+
   void countRooms() const;
   void publishSkeletonToObjectLinks(const ColorPointCloud::Ptr& graph_pcl);
 
@@ -91,7 +111,13 @@ class SceneGraphSimulationServer : public SemanticSimulationServer {
   bool fillSceneGraphWithPlaces(
       const vxb::SparseSkeletonGraph& sparse_skeleton);
 
+  bool loadTsdfMap(const std::string& file_path);
+  bool loadEsdfMap(const std::string& file_path);
+
  protected:
+  ros::NodeHandle nh_;
+  ros::NodeHandle nh_private_;
+
   ros::Publisher color_clustered_pcl_pub_;
   ros::Publisher walls_clustered_pcl_pub_;
   ros::Publisher room_centroids_pub_;
@@ -101,6 +127,11 @@ class SceneGraphSimulationServer : public SemanticSimulationServer {
 
   // TODO(Toni): This guy should be in the scene graph visualization itself
   ros::Publisher edges_obj_skeleton_pub_;
+
+  std::string world_frame_;
+  float room_finder_esdf_slice_level_;
+  float voxel_size_;
+  int voxels_per_side_;
 
   // Rebuild esdf and save to file
   bool build_esdf_batch_ = false;
@@ -118,10 +149,8 @@ class SceneGraphSimulationServer : public SemanticSimulationServer {
 
   // Dynamically request a scene graph reconstruction
   ros::ServiceServer reconstruct_scene_graph_srv_;
-  ros::ServiceServer load_map_srv_;
 
   // Finders
-  std::unique_ptr<WallFinder<ColorPoint>> wall_finder_;
   std::unique_ptr<EnclosingWallFinder> enclosing_wall_finder_;
   std::unique_ptr<ObjectFinder<ColorPoint>> object_finder_;
 
@@ -145,10 +174,21 @@ class SceneGraphSimulationServer : public SemanticSimulationServer {
   std::vector<int> floor_labels_;
 
   // KimeraX
-  SceneGraph scene_graph_;
+  SceneGraph::Ptr scene_graph_;
+
+  // KimeraX Dynamic
+  // DynamicSceneGraph dynamic_scene_graph_;
 
   // TODO(Toni): remove
   float skeleton_z_level_;
+
+  // Layers
+  std::unique_ptr<vxb::Layer<vxb::TsdfVoxel>> tsdf_layer_;
+  std::unique_ptr<vxb::Layer<vxb::EsdfVoxel>> esdf_layer_;
+
+  // Integrators
+  SemanticIntegratorBase::SemanticConfig semantic_config_;
+  std::unique_ptr<vxb::EsdfIntegrator> esdf_integrator_;
 
   // Skeleton graph
   vxb::SparseSkeletonGraph sparse_skeleton_graph_;

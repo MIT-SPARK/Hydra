@@ -15,13 +15,13 @@
     type="scene_graph_eval" output="screen"
     args="-alsologtostderr -colorlogtostderr" clear_params="true">
     <!-- Scene Graph params -->
+    <param name="room_finder_esdf_slice_level"       value="3.2"/>
 
     <!-- Object Finder Type: 0: region growing, 1: euclidean clustering -->
     <param name="object_finder_type"                 value="1"/>
 
     <!-- Simulator params -->
     <param name="visualize"                          value="true"/>
-    <param name="visualization_slice_level"          value="3.2"/>
     <param name="tsdf_voxel_size"                    value="0.05"/>
     <param name="tsdf_voxels_per_side"               value="32"/>
     <param name="incremental"                        value="false"/>

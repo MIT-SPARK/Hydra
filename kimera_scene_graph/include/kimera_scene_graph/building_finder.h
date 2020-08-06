@@ -1,19 +1,11 @@
 #pragma once
 
-#include <string>
-
-#include <kimera_semantics/common.h>
-
-#include "kimera_scene_graph/common.h"
-#include "kimera_scene_graph/scene_node.h"
-
-#include <pcl/common/centroid.h>
-
 namespace kimera {
+
+class SceneGraph;
 
 class BuildingFinder {
  public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   BuildingFinder() = default;
   virtual ~BuildingFinder() = default;
 
@@ -21,8 +13,6 @@ class BuildingFinder {
    * @brief findBuildings
    */
   void findBuildings(SceneGraph* scene_graph);
-
- private:
 };
 
 }  // namespace kimera

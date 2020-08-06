@@ -14,18 +14,22 @@ DynamicSceneGraph::DynamicSceneGraph(const ros::NodeHandle& nh,
       edges_pub_(),
       serialize_graph_srv_(),
       deserialize_graph_srv_(),
+      motion_noise_model_(),
+      detection_noise_model_(),
       bag_(),
       br_() {
   // GTSAM noise model
+  CHECK_NE(motion_position_variance_, 0.0);
   gtsam::Vector motion_precision(6);
-  motion_precision.head<3>().setConstant(1 / (motion_position_variance_));
-  motion_precision.tail<3>().setConstant(1 / (motion_rotation_variance_));
+  motion_precision.head<3>().setConstant(1.0 / motion_position_variance_);
+  motion_precision.tail<3>().setConstant(1.0 / motion_rotation_variance_);
   motion_noise_model_ =
       gtsam::noiseModel::Diagonal::Precisions(motion_precision);
 
+  CHECK_NE(detection_rotation_variance_, 0.0);
   gtsam::Vector detection_precision(6);
-  detection_precision.tail<3>().setConstant(1 / (detection_rotation_variance_));
-  detection_precision.head<3>().setConstant(1 / (detection_position_variance_));
+  detection_precision.tail<3>().setConstant(1.0 / detection_rotation_variance_);
+  detection_precision.head<3>().setConstant(1.0 / detection_position_variance_);
   detection_noise_model_ =
       gtsam::noiseModel::Diagonal::Precisions(detection_precision);
 
@@ -83,7 +87,8 @@ bool DynamicSceneGraph::deserializeAndPublish(
     try {
       bag_.open(deserialization_file, rosbag::bagmode::Read);
     } catch (const rosbag::BagException& e) {
-      LOG(ERROR) << "Failed to load rosbag at: " << deserialization_file.c_str();
+      LOG(ERROR) << "Failed to load rosbag at: "
+                 << deserialization_file.c_str();
       LOG(ERROR) << e.what();
       return false;
     }

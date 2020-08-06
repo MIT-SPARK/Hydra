@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include <Eigen/Dense>
+#include <Eigen/Core>
 
 #include <pcl_conversions/pcl_conversions.h>
 
@@ -35,7 +35,8 @@
 #include "KimeraRPGO/RobustSolver.h"
 
 #include "kimera_scene_graph/CentroidErrorRequest.h"
-#include "kimera_scene_graph/scene_node.h"
+#include "kimera_scene_graph/scene_graph_node.h"
+#include "kimera_scene_graph/scene_graph.h"
 #include "kimera_scene_graph/semantic_ros_publishers.h"
 
 namespace kimera {
@@ -51,6 +52,7 @@ using BetasArray = std::vector<double>;
 
 using AgentId = long int;
 struct DynamicSceneNode : SceneGraphNode {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   gtsam::Pose3 pose_;
   JointMatrix joints_;
   BetasArray betas_;
@@ -65,6 +67,8 @@ using CentroidNodeList =
 
 class DynamicSceneGraph : public SceneGraph {
  public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
   DynamicSceneGraph(const ros::NodeHandle& nh,
                     const ros::NodeHandle& nh_private);
   virtual ~DynamicSceneGraph() = default;
@@ -77,7 +81,6 @@ class DynamicSceneGraph : public SceneGraph {
    * @param response: The empty response.
    * @return True always.
    */
-
   bool deserializeServiceCall(
       voxblox_msgs::FilePath::Request& request,
       voxblox_msgs::FilePath::Response& /*response*/) {  // NOLINT
@@ -388,7 +391,8 @@ class DynamicSceneGraph : public SceneGraph {
   std::vector<gtsam::Values> graph_priors_;
 
   // Noise models + params
-  gtsam::SharedNoiseModel detection_noise_model_, motion_noise_model_;
+  gtsam::SharedNoiseModel detection_noise_model_;
+  gtsam::SharedNoiseModel motion_noise_model_;
   double detection_position_variance_ = 0.01;
   double detection_rotation_variance_ = 0.1;
   double motion_position_variance_ = 0.5;

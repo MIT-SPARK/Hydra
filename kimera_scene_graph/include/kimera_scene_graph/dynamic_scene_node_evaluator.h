@@ -17,7 +17,6 @@
 #include <gtsam/slam/PriorFactor.h>
 
 #include "kimera_scene_graph/CentroidErrorRequest.h"
-#include "kimera_scene_graph/scene_node.h"
 #include "kimera_scene_graph/semantic_ros_publishers.h"
 
 #include "kimera_scene_graph/CentroidErrorRequest.h"

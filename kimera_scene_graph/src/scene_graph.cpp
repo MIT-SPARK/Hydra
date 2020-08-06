@@ -1,4 +1,4 @@
-﻿#include "kimera_scene_graph/scene_node.h"
+﻿#include "kimera_scene_graph/scene_graph.h"
 
 #include <map>
 #include <unordered_map>

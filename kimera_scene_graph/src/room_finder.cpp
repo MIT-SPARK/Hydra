@@ -1,5 +1,7 @@
 #include "kimera_scene_graph/room_finder.h"
 
+#include <glog/logging.h>
+
 #include <voxblox/core/layer.h>
 #include <voxblox/core/voxel.h>
 #include <voxblox_ros/ptcloud_vis.h>
@@ -8,9 +10,10 @@
 
 #include "kimera_scene_graph/common.h"
 #include "kimera_scene_graph/object_finder.h"
-#include "kimera_scene_graph/scene_node.h"
-
-#include <limits>
+#include "kimera_scene_graph/scene_graph.h"
+#include "kimera_scene_graph/scene_graph_edge.h"
+#include "kimera_scene_graph/scene_graph_layer.h"
+#include "kimera_scene_graph/scene_graph_node.h"
 
 namespace kimera {
 
@@ -44,6 +47,12 @@ IntensityPointCloud::Ptr RoomFinder::findRooms(
   IntensityPointCloud::Ptr esdf_pcl(new IntensityPointCloud);
   vxb::createDistancePointcloudFromEsdfLayerSlice(
       esdf_layer, 2, esdf_slice_level_, &*esdf_pcl);
+  if (esdf_pcl->empty()) {
+    LOG(ERROR) << "Pointcloud of ESDF slice is empty! Modify the esdf slice "
+                  "height to another value... \n Current value: "
+               << std::to_string(esdf_slice_level_);
+    return nullptr;
+  }
   if (visualize_) publishTruncatedEsdf(esdf_pcl);
 
   // Downsample pcl
