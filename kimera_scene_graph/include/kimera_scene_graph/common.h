@@ -27,9 +27,6 @@ typedef int64_t NodeId;
 //! Specifies the id of a layer in the graph
 typedef int64_t EdgeId;
 typedef std::string NodeName;
-typedef Point NodePosition;
-typedef pcl::PointNormal NodeOrientation;
-typedef Eigen::Vector3i NodeColor;
 
 // TODO(Toni): create a structure to hold both Centroids and ObjectPointClouds
 // associated to the centroids in the same object...
@@ -69,19 +66,7 @@ inline std::string getStringFromLayerId(const LayerId& layer_id) {
   }
 }
 
-static const Eigen::Vector3i kPlaceColor(255u, 0u, 0u);
-static const Eigen::Vector3i kRoomColor(0u, 255u, 0u);
-static const Eigen::Vector3i kBuildingColor(255u, 0u, 0u);
-
 static constexpr float kEsdfTruncation = 0.3;
-
-// inline Eigen::Vector3i getRandomColor() {
-//  Eigen::Vector3i random_color;
-// random_color.x =    static_cast<unsigned char>(rand() % 256),
-// random_color.x =    static_cast<unsigned char>(rand() % 256),
-// random_color.x =    static_cast<unsigned char>(rand() % 256));
-// return random_color;
-//}
 
 enum class BoundingBoxType { kAABB = 0, kOBB = 1 };
 

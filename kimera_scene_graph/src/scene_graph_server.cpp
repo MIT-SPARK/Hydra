@@ -20,6 +20,7 @@
 #include "kimera_scene_graph/scene_graph_edge.h"
 #include "kimera_scene_graph/scene_graph_layer.h"
 #include "kimera_scene_graph/scene_graph_node.h"
+#include "kimera_scene_graph/scene_graph_serialization.h"
 
 #include "kimera_scene_graph/utils/kimera_to_voxblox.h"
 #include "kimera_scene_graph/utils/voxblox_to_pcl.h"
@@ -39,6 +40,7 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
       sparse_graph_pub_(),
       edges_obj_skeleton_pub_(),
       world_frame_("world"),
+      scene_graph_output_path_(""),
       semantic_pcl_pubs_("pcl", nh_private),
       semantic_mesh_pubs_("mesh", nh_private),
       semantic_mesh_2_pubs_("mesh_2", nh_private),
@@ -51,14 +53,15 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
       enclosing_wall_finder_(nullptr),
       building_finder_(nullptr),
       scene_graph_(nullptr),
+      scene_graph_visualizer_(nh, nh_private_),
       // dynamic_scene_graph_(nh, nh_private),
       semantic_config_(getSemanticTsdfIntegratorConfigFromRosParam(nh_private)),
       reconstruct_scene_graph_srv_() {
   // Create Scene graph
-  scene_graph_ = std::make_shared<SceneGraph>(nh, nh_private);
+  scene_graph_ = std::make_shared<SceneGraph>();
 
   // TODO(Toni): remove
-  skeleton_z_level_ = 2.0 * scene_graph_->getLayerStepZ();
+  skeleton_z_level_ = 2.0 * scene_graph_visualizer_.getLayerStepZ();
 
   // TODO(Toni): put all of this in scene graph reconstructor config!
   // Build object finder
@@ -67,6 +70,9 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
       "object_finder_type", object_finder_type, object_finder_type);
 
   nh_private.param("world_frame", world_frame_, world_frame_);
+  nh_private.param("scene_graph_output_path",
+                   scene_graph_output_path_,
+                   scene_graph_output_path_);
   nh_private.param("room_finder_esdf_slice_level",
                    room_finder_esdf_slice_level_,
                    room_finder_esdf_slice_level_);
@@ -88,8 +94,10 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
       kimera::make_unique<EnclosingWallFinder>(world_frame_);
   object_finder_ = kimera::make_unique<ObjectFinder<ColorPoint>>(
       world_frame_, static_cast<ObjectFinderType>(object_finder_type));
-  room_finder_ = kimera::make_unique<RoomFinder>(
-      nh_private, world_frame_, room_finder_esdf_slice_level_, skeleton_z_level_);
+  room_finder_ = kimera::make_unique<RoomFinder>(nh_private,
+                                                 world_frame_,
+                                                 room_finder_esdf_slice_level_,
+                                                 skeleton_z_level_);
   places_in_rooms_finder_ = kimera::make_unique<PlacesRoomConnectivityFinder>(
       nh_private, skeleton_z_level_, world_frame_);
   room_connectivity_finder_ = kimera::make_unique<RoomConnectivityFinder>();
@@ -175,7 +183,7 @@ bool SceneGraphBuilder::sceneGraphReconstructionServiceCall(
 bool SceneGraphBuilder::fillSceneGraphWithPlaces(
     const vxb::SparseSkeletonGraph& sparse_skeleton) {
   CHECK(scene_graph_);
-
+  static const NodeColor kPlaceColor = NodeColor(255u, 0u, 0u);
   std::vector<int64_t> vtx_ids;
   sparse_skeleton.getAllVertexIds(&vtx_ids);
   for (const auto& vtx_id : vtx_ids) {
@@ -445,13 +453,20 @@ void SceneGraphBuilder::sceneGraphReconstruction(const bool& only_rooms) {
 
   LOG(INFO) << "Visualizing Scene Graph";
   CHECK(scene_graph_);
-  scene_graph_->visualize();
+  scene_graph_visualizer_.visualize(*scene_graph_);
 
   LOG(INFO) << "Visualizing Human Pose Graphs";
   // dynamic_scene_graph_.visualizePoseGraphs();
 
   LOG(INFO) << "Visualizing Human Skeletons";
   // dynamic_scene_graph_.visualizeJoints();
+
+  if (!scene_graph_output_path_.empty()) {
+    LOG(INFO) << "Saving Scene-Graph to file: "
+              << scene_graph_output_path_.c_str();
+    save(*scene_graph_, scene_graph_output_path_);
+    LOG(INFO) << "Done saving Scene-Graph to file";
+  }
 }
 
 void SceneGraphBuilder::countRooms() const {
@@ -490,13 +505,14 @@ void SceneGraphBuilder::publishSkeletonToObjectLinks(
     if (node.layer_id_ == LayerId::kObjectsLayerId) {
       // We have an object, get its centroid.
       NodePosition centroid = attributes.position_;
+      pcl::PointXYZ centroid_point(centroid.x, centroid.y, centroid.z);
 
       // Compute nearest skeleton vertex
       static constexpr int K = 1;
       std::vector<int> nn_indices(K);
       std::vector<float> nn_squared_distances(K);
-      if (kdtree.nearestKSearch(centroid, K, nn_indices, nn_squared_distances) >
-          0) {
+      if (kdtree.nearestKSearch(
+              centroid_point, K, nn_indices, nn_squared_distances) > 0) {
         // Found the nearest neighbor
         CHECK_GT(nn_indices.size(), 0);
         CHECK_GT(nn_squared_distances.size(), 0);
@@ -504,12 +520,12 @@ void SceneGraphBuilder::publishSkeletonToObjectLinks(
         Point pcl_point = skeleton_graph_pcl_converted->at(nn_indices.at(0));
         // Pcl points leave in a diff layer than skeleton, separate them!
         // PCL points live at the first layer
-        centroid.z += scene_graph_->getLayerStepZ();
+        centroid.z += scene_graph_visualizer_.getLayerStepZ();
         // Skeleton points live at the second layer;
         pcl_point.z += skeleton_z_level_;
         visualization_msgs::Marker marker =
-            scene_graph_->getLineFromPointToPoint(
-                pcl_point,
+            scene_graph_visualizer_.getLineFromPointToPoint(
+                NodePosition(pcl_point.x, pcl_point.y, pcl_point.z),
                 centroid,
                 attributes.color_,
                 0.04,
@@ -534,10 +550,11 @@ void SceneGraphBuilder::publishSemanticMesh(const SemanticLabel& semantic_label,
   // Publish twice: one at the mesh level, the other at the object level.
   // Except for walls, those should be at skeleton level.
   CHECK(scene_graph_);
-  utils::fillMarkerWithMesh(semantic_mesh,
-                            vxb::ColorMode::kLambertColor,
-                            &mesh_msg,
-                            is_walls ? 10 : scene_graph_->getLayerStepZ());
+  utils::fillMarkerWithMesh(
+      semantic_mesh,
+      vxb::ColorMode::kLambertColor,
+      &mesh_msg,
+      is_walls ? 10 : scene_graph_visualizer_.getLayerStepZ());
   semantic_mesh_2_pubs_.publish(semantic_label, mesh_msg);
   visualization_msgs::Marker new_mesh_msg;
   new_mesh_msg.header.frame_id = world_frame_;
@@ -591,12 +608,15 @@ void SceneGraphBuilder::extractThings(
     const auto& color =
         semantic_config_.semantic_label_to_color_->getColorFromSemanticLabel(
             semantic_label);
-    attributes.color_ << color.r, color.g, color.b;
+    attributes.color_ = NodeColor(color.r, color.g, color.b);
     attributes.name_ =
         std::to_string(semantic_label) + std::to_string(object_instance_id);
     scene_node.node_id_ = next_object_id_;
     scene_node.layer_id_ = LayerId::kObjectsLayerId;
-    centroids.at(idx).get(attributes.position_);  // Calculates centroid
+    pcl::PointXYZ centroid_point;
+    centroids.at(idx).get(centroid_point);  // Calculates centroid
+    attributes.position_ =
+        NodePosition(centroid_point.x, centroid_point.y, centroid_point.z);
     attributes.pcl_ = object_pcls.at(idx);
     CHECK(attributes.pcl_);
     attributes.bounding_box_ = bounding_boxes.at(idx);
@@ -784,8 +804,8 @@ void SceneGraphBuilder::rqtReconfigureCallback(RqtSceneGraphConfig& config,
   // LOG(WARNING) << "Clearing Scene Graph";
   // scene_graph_->clear();
 
-  scene_graph_->updateEdgeAlpha(config.edge_alpha);
-  scene_graph_->visualize();
+  scene_graph_visualizer_.updateEdgeAlpha(config.edge_alpha);
+  scene_graph_visualizer_.visualize(*scene_graph_);
 
   LOG(INFO) << "Object Finder params have been updated. "
                "Run scene graph reconstruction ros service to see the effects.";

@@ -4,7 +4,8 @@ namespace kimera {
 
 DynamicSceneGraph::DynamicSceneGraph(const ros::NodeHandle& nh,
                                      const ros::NodeHandle& nh_private)
-    : SceneGraph(nh, nh_private),
+    : SceneGraph(),
+      nh_private_(nh_private),
       human_sub_(),
       skeleton_points_pubs_("human_skeleton_points", nh_private),
       skeleton_edge_pubs_("human_skeleton_edges", nh_private),

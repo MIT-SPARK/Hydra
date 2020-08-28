@@ -9,8 +9,8 @@
 
 #include "kimera_scene_graph/common.h"
 #include "kimera_scene_graph/scene_graph_layer.h"
-#include "kimera_scene_graph/scene_graph_node.h"
 #include "kimera_scene_graph/scene_graph_layer.h"
+#include "kimera_scene_graph/scene_graph_node.h"
 
 namespace kimera {
 
@@ -71,7 +71,8 @@ void EnclosingWallFinder::findWalls(const vxb::Mesh& walls_mesh,
           const SceneGraphNode& nearest_place_to_wall =
               layer.getNode(nearest_place_to_wall_index);
           vxb::Ray direction =
-              pclPointToVxbPoint(nearest_place_to_wall.attributes_.position_) -
+              kimeraPointToVxbPoint(
+                  nearest_place_to_wall.attributes_.position_) -
               wall_vertex;
 
           NodeId room_id = nearest_place_to_wall.parent_edge_.start_node_id_;

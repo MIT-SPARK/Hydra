@@ -124,14 +124,17 @@ void RoomFinder::updateSceneGraph(
     room_instance.attributes_.name_ =
         std::to_string(kRoomSemanticLabel) + std::to_string(next_room_id_);
     const vxb::Color& room_color = getRoomColor(next_room_id_);
-    room_instance.attributes_.color_ << room_color.r, room_color.g,
-        room_color.b;
+    room_instance.attributes_.color_ = NodeColor(room_color.r, room_color.g,
+        room_color.b);
     room_instance.node_id_ = next_room_id_;
     room_instance.layer_id_ = LayerId::kRoomsLayerId;
     // TODO(Toni): project the centroid to the interior of the room.
     // otherwise the centroid might be outside of the room...
     // Ideally, this centroid should match the position of a 3D place
-    room_centroids.at(idx).get(room_instance.attributes_.position_);
+    pcl::PointXYZ centroid_point;
+    room_centroids.at(idx).get(centroid_point);
+    room_instance.attributes_.position_ =
+        NodePosition(centroid_point.x, centroid_point.y, centroid_point.z);
     // This assumes the room_pcls vector has the same order as the centroids...
     // aka, the pointcloud and the centroid correspond to the same room.
     ColorPointCloud::Ptr room_pcl = room_pcls.at(idx);

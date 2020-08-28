@@ -6,6 +6,10 @@
 
 #include <Eigen/Core>
 
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/serialization/serialization.hpp>
+
 #include <kimera_semantics/common.h>
 
 #include "kimera_scene_graph/common.h"
@@ -15,6 +19,69 @@ namespace kimera {
 
 typedef ColorPointCloud NodePcl;
 
+// We don't use pcl or eigen in order to ease the boost serialization...
+struct NodePosition {
+ public:
+  typedef double T;  // this is to avoid templating, but give flexibility...
+  NodePosition() : NodePosition(0.0, 0.0, 0.0) {}
+  NodePosition(T x, T y, T z) : x(x), y(y), z(z) {}
+  ~NodePosition() = default;
+
+ public:
+  T x = 0.0;
+  T y = 0.0;
+  T z = 0.0;
+
+ private:
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const NodePosition& node_position);
+  friend class boost::serialization::access;
+  template <class Archive>
+  void serialize(Archive& ar, const unsigned int version) {
+    ar& BOOST_SERIALIZATION_NVP(x);
+    ar& BOOST_SERIALIZATION_NVP(y);
+    ar& BOOST_SERIALIZATION_NVP(z);
+  }
+};
+
+inline std::ostream& operator<<(std::ostream& os,
+                                const NodePosition& node_position) {
+  os << "x: " << node_position.x << ", y: " << node_position.y
+     << ", z: " << node_position.z;
+  return os;
+}
+
+// We don't use pcl or eigen in order to ease the boost serialization...
+struct NodeColor {
+ public:
+  typedef uint8_t T;  // from 0 to 255
+  NodeColor() : NodeColor(0u, 0u, 0u) {}
+  NodeColor(T r, T g, T b) : r(r), g(g), b(b) {}
+  ~NodeColor() = default;
+
+ public:
+  T r = 0u;
+  T g = 0u;
+  T b = 0u;
+
+ private:
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const NodeColor& node_color);
+  friend class boost::serialization::access;
+  template <class Archive>
+  void serialize(Archive& ar, const unsigned int version) {
+    ar& BOOST_SERIALIZATION_NVP(r);
+    ar& BOOST_SERIALIZATION_NVP(g);
+    ar& BOOST_SERIALIZATION_NVP(b);
+  }
+};
+
+inline std::ostream& operator<<(std::ostream& os, const NodeColor& node_color) {
+  os << "r: " << node_color.r << ", g: " << node_color.g
+     << ", b: " << node_color.b;
+  return os;
+}
+
 struct NodeAttributes {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -22,8 +89,7 @@ struct NodeAttributes {
  public:
   Timestamp timestamp_ = 0u;
   NodePosition position_ = NodePosition();
-  NodeOrientation orientation_ = NodeOrientation();
-  NodeColor color_ = NodeColor();
+  NodeColor color_ = NodeColor(0u, 0u, 0u);
   SemanticLabel semantic_label_ = 0u;
   // This is what will be shown as label in the scene graph visualization
   NodeName name_ = "";
@@ -38,6 +104,8 @@ struct NodeAttributes {
 struct SceneGraphNode {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  SceneGraphNode();
+  ~SceneGraphNode() = default;
 
  public:
   inline bool hasParent() const { return parent_edge_.isEdgeValid(); }

@@ -35,8 +35,8 @@
 #include "KimeraRPGO/RobustSolver.h"
 
 #include "kimera_scene_graph/CentroidErrorRequest.h"
-#include "kimera_scene_graph/scene_graph_node.h"
 #include "kimera_scene_graph/scene_graph.h"
+#include "kimera_scene_graph/scene_graph_node.h"
 #include "kimera_scene_graph/semantic_ros_publishers.h"
 
 namespace kimera {
@@ -331,18 +331,17 @@ class DynamicSceneGraph : public SceneGraph {
 
   inline float calcNodeDistance(const DynamicSceneNode& scene_node,
                                 const DynamicSceneNode& last_node) {
-    Eigen::Vector3f diff = scene_node.attributes_.position_.getArray3fMap() -
-                           last_node.attributes_.position_.getArray3fMap();
-    return diff.norm();
+    auto sp = scene_node.attributes_.position_;
+    auto ep = last_node.attributes_.position_;
+    return std::sqrt(std::pow(sp.x - ep.x, 2) + std::pow(sp.y - ep.y, 2) +
+                     std::pow(sp.z - ep.z, 2));
   }
 
   inline bool checkCloseness(const DynamicSceneNode& scene_node,
                              const DynamicSceneNode& last_node) {
-    Eigen::Vector3f diff = scene_node.attributes_.position_.getArray3fMap() -
-                           last_node.attributes_.position_.getArray3fMap();
-    double distance = diff.norm();
-    return !merge_close_ ||
-           distance > min_node_dist_;  // Fail if the node is too close
+    double distance = calcNodeDistance(scene_node, last_node);
+    // Fail if the node is too close
+    return !merge_close_ || distance > min_node_dist_;
   }
 
   inline void setupEdgeMarker(visualization_msgs::Marker& edges,
@@ -399,9 +398,11 @@ class DynamicSceneGraph : public SceneGraph {
   double motion_rotation_variance_ = 1.0;
 
  protected:
+  ros::NodeHandle nh_private_;
   ros::Subscriber human_sub_;
   ros::Publisher mesh_pub_;
   ros::Publisher edges_pub_;
+  ros::Publisher semantic_instance_centroid_pub_;
 
   ros::ServiceServer serialize_graph_srv_;
   ros::ServiceServer deserialize_graph_srv_;
@@ -420,6 +421,8 @@ class DynamicSceneGraph : public SceneGraph {
   std::string joint_edges_prefix_ = "joint_edges_";
   std::string graph_edges_prefix_ = "graph_edges_";
   std::string graph_nodes_prefix_ = "graph_nodes_";
+
+  std::string world_frame_ = "world";
 
   float edge_thickness_ = 0.02;
 };

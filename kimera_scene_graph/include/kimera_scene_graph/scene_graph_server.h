@@ -38,6 +38,7 @@
 #include "kimera_scene_graph/wall_finder.h"
 
 #include "kimera_scene_graph/scene_graph.h"
+#include "kimera_scene_graph/scene_graph_visualizer.h"
 
 namespace kimera {
 
@@ -80,6 +81,11 @@ class SceneGraphBuilder {
    * @return Pointer to the Scene-Graph
    */
   SceneGraph::Ptr getSceneGraph() { return scene_graph_; }
+
+  void visualizeSceneGraph() const {
+    CHECK(scene_graph_);
+    scene_graph_visualizer_.visualize(*scene_graph_);
+  }
 
  protected:
   void rqtReconfigureCallback(RqtSceneGraphConfig& config, uint32_t level);
@@ -129,6 +135,7 @@ class SceneGraphBuilder {
   ros::Publisher edges_obj_skeleton_pub_;
 
   std::string world_frame_;
+  std::string scene_graph_output_path_;
   float room_finder_esdf_slice_level_;
   float voxel_size_;
   int voxels_per_side_;
@@ -175,6 +182,7 @@ class SceneGraphBuilder {
 
   // KimeraX
   SceneGraph::Ptr scene_graph_;
+  SceneGraphVisualizer scene_graph_visualizer_;
 
   // KimeraX Dynamic
   // DynamicSceneGraph dynamic_scene_graph_;

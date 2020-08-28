@@ -52,9 +52,9 @@ inline void fillMarkerWithMesh(const vxb::Mesh& mesh,
 
 inline NodeColor vxbColorToNodeColor(const vxb::Color& color) {
   NodeColor node_color;
-  node_color[0] = color.r;
-  node_color[1] = color.g;
-  node_color[2] = color.b;
+  node_color.r = color.r;
+  node_color.g = color.g;
+  node_color.b = color.b;
   return node_color;
 }
 
@@ -79,7 +79,7 @@ inline void convertLayerToSkeleton(const SceneGraphLayer& scene_graph_layer,
     // No need to update this, it will be automatically done once we add the
     // edges (and we will not have inter-layer edges).
     DCHECK_EQ(skeleton_vtx.edge_list.size(), 0u);
-    skeleton_vtx.point = pclPointToVxbPoint(vtx.second.attributes_.position_);
+    skeleton_vtx.point = kimeraPointToVxbPoint(vtx.second.attributes_.position_);
     // Vxb sets the vertex id, so it will be overwritten...
     // skeleton_vtx.vertex_id = vtx.second.node_id_;
     const auto& vxb_id = skeleton->addVertex(skeleton_vtx);

@@ -11,6 +11,15 @@
 
 namespace kimera {
 
+SceneGraphLayer::SceneGraphLayer()
+    : SceneGraphLayer(LayerId::kInvalidLayerId) {}
+
+SceneGraphLayer::SceneGraphLayer(const LayerId& layer_id)
+    : layer_id_(layer_id),
+      node_map_(),
+      next_intra_layer_edge_id_(0u),
+      intra_layer_edge_map_() {}
+
 ColorPointCloud::Ptr SceneGraphLayer::convertLayerToPcl(
     std::map<int, NodeId>* cloud_to_graph_ids,
     std::vector<NodeId>* vertex_ids) const {
@@ -21,7 +30,7 @@ ColorPointCloud::Ptr SceneGraphLayer::convertLayerToPcl(
   for (const std::pair<NodeId, SceneGraphNode>& node : node_map_) {
     CHECK_EQ(node.first, node.second.node_id_);
     CHECK(node.second.layer_id_ == layer_id_);
-    const Point& position = node.second.attributes_.position_;
+    const NodePosition& position = node.second.attributes_.position_;
     ColorPoint point;
     point.x = position.x;
     point.y = position.y;

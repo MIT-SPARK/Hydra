@@ -8,7 +8,6 @@ std::string NodeAttributes::print() const {
     ss << "Attributes: \n"
         << "Timestamp : " << std::to_string(timestamp_) << '\n'
         << "Position : " << position_ << '\n'
-        << "Orientation : " << orientation_ << '\n'
         << "Color : " << color_ << '\n'
         << "Semantic Label: " << std::to_string(semantic_label_) << '\n'
         << "Name: " << name_ << '\n'
@@ -17,6 +16,14 @@ std::string NodeAttributes::print() const {
   // clang-format on
   return ss.str();
 }
+
+SceneGraphNode::SceneGraphNode()
+    : attributes_(),
+      node_id_(-1),
+      layer_id_(LayerId::kInvalidLayerId),
+      siblings_edge_map_(),
+      parent_edge_(),
+      children_edge_map_() {}
 
 bool SceneGraphNode::checkSiblingEdgeMap() const {
   for (const std::pair<EdgeId, SceneGraphEdge>& edge_pair :

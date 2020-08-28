@@ -3,6 +3,10 @@
 #include <map>
 #include <vector>
 
+// For serialization
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
+
 #include <glog/logging.h>
 
 #include <kimera_semantics/color.h>
@@ -17,7 +21,8 @@ namespace kimera {
 class SceneGraphLayer {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  SceneGraphLayer(const LayerId& layer_id) : layer_id_(layer_id) {}
+  SceneGraphLayer(); // for serialization in a map...
+  SceneGraphLayer(const LayerId& layer_id);
   virtual ~SceneGraphLayer() = default;
 
  public:
@@ -92,6 +97,15 @@ class SceneGraphLayer {
    * given by the layer it is in.
    */
   void addIntraLayerEdge(SceneGraphEdge* edge);
+
+  friend class boost::serialization::access;
+  template <class Archive>
+  void serialize(Archive& ar, const unsigned int version) {
+    ar& BOOST_SERIALIZATION_NVP(layer_id_);
+    ar& BOOST_SERIALIZATION_NVP(node_map_);
+    ar& BOOST_SERIALIZATION_NVP(next_intra_layer_edge_id_);
+    ar& BOOST_SERIALIZATION_NVP(intra_layer_edge_map_);
+  }
 
  protected:
   LayerId layer_id_ = LayerId::kInvalidLayerId;

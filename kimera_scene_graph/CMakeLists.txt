@@ -17,6 +17,7 @@ cs_add_library(${PROJECT_NAME}
   include/kimera_scene_graph/scene_graph_node.h
   include/kimera_scene_graph/scene_graph_edge.h
   include/kimera_scene_graph/scene_graph_layer.h
+  include/kimera_scene_graph/scene_graph_visualizer.h
   include/kimera_scene_graph/scene_graph.h
   src/object_finder.cpp
   src/room_finder.cpp
@@ -28,11 +29,11 @@ cs_add_library(${PROJECT_NAME}
   src/scene_graph_node.cpp
   src/scene_graph_edge.cpp
   src/scene_graph_layer.cpp
+  src/scene_graph_visualizer.cpp
   src/scene_graph.cpp
   src/dynamic_scene_node.cpp
   src/dynamic_scene_node_evaluator.cpp
   src/semantic_ros_publishers.cpp
-  src/min_cut_solvers/stoer_wagner_min_cut.cpp
   src/min_cut_solvers/stoer_wagner_min_cut_wrapper.cpp
 )
 
@@ -50,6 +51,11 @@ cs_add_executable(kimera_scene_graph_node
 )
 target_link_libraries(kimera_scene_graph_node ${PROJECT_NAME} ${PCL_LIBRARIES} gtsam gtsam_unstable tbb)
 
+cs_add_executable(scene_graph_visualizer
+  src/scene_graph_visualizer.cpp
+)
+target_link_libraries(scene_graph_visualizer ${PROJECT_NAME})
+
 cs_add_executable(scene_graph_eval
   src/scene_graph_eval.cpp
 )
@@ -61,8 +67,15 @@ cs_add_executable(min_cut
 target_link_libraries(min_cut ${PROJECT_NAME} ${PCL_LIBRARIES})
 
 # Add tests
-catkin_add_gtest(test_scene_node tests/test_scene_node.cpp)
-target_link_libraries(test_scene_node ${PROJECT_NAME})
+if (CATKIN_ENABLE_TESTING)
+  catkin_add_gtest(test_scene_node tests/test_scene_node.cpp)
+  target_link_libraries(test_scene_node ${PROJECT_NAME})
+
+  catkin_add_gtest(test_scene_graph_serialization
+    tests/test_scene_graph_serialization.cpp
+  )
+  target_link_libraries(test_scene_graph_serialization ${PROJECT_NAME})
+endif()
 
 # catkin_add_gtest(test_scene_node_evaluator tests/test_scene_node_evaluator.cpp)
 # target_link_libraries(test_scene_node_evaluator ${PROJECT_NAME})

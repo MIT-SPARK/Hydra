@@ -41,6 +41,14 @@ struct SceneGraphEdge {
   }
   std::string print() const;
 
+  bool equal(const SceneGraphEdge& edge) const {
+    return edge_id_ == edge.edge_id_ &&
+           start_layer_id_ == edge.start_layer_id_ &&
+           start_node_id_ == edge.start_node_id_ &&
+           end_layer_id_ == edge.end_layer_id_ &&
+           end_node_id_ == edge.end_node_id_;
+  }
+
  public:
   // These could be protected if we add a ctor and a friend class for SceneGraph
   EdgeId edge_id_ = -1;

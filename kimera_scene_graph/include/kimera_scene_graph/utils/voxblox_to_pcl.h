@@ -5,6 +5,7 @@
 #include <kimera_semantics/common.h>
 
 #include "kimera_scene_graph/common.h"
+#include "kimera_scene_graph/scene_graph_node.h"
 
 #include <voxblox_skeleton/skeleton.h>
 
@@ -40,6 +41,14 @@ inline vxb::Point pclPointToVxbPoint(const Point& pcl_point) {
   vxb_point[0] = pcl_point.x;
   vxb_point[1] = pcl_point.y;
   vxb_point[2] = pcl_point.z;
+  return vxb_point;
+}
+
+inline vxb::Point kimeraPointToVxbPoint(const NodePosition& kimera_point) {
+  vxb::Point vxb_point;
+  vxb_point[0] = kimera_point.x;
+  vxb_point[1] = kimera_point.y;
+  vxb_point[2] = kimera_point.z;
   return vxb_point;
 }
 

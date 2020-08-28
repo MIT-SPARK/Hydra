@@ -10,6 +10,11 @@ catkin build kimera_scene_graph --no-deps --catkin_make_args run_tests
 
 Use rosservice:
 
+## Scene-Graph Serialization (Save/Load)
+
+After running `kimera_scene_graph_server`, the scene-graph will be serialized in the `vxblx_files` location (by default).
+You can then use `kimera_scene_graph_visualizer` to load the scene-graph and visualize it in Rviz.
+
 
 ## FAQ
 

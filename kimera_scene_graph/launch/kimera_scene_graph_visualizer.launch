@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="ISO-8859-15"?>
+<launch>
+  <!-- launch-prefix=gdb -ex run args" -->
+  <node name="kimera_scene_graph_visualizer" pkg="kimera_scene_graph"
+    type="scene_graph_visualizer" output="screen"
+    args="-alsologtostderr -colorlogtostderr" clear_params="true">
+    <param name="visualize"                 value="true"/>
+    <param name="world_frame"               value="map"/>
+    <param name="scene_graph_input_path"    value="$(find kimera_scene_graph)/vxblx_files/office_scene_graph.vxblx"/>
+    <param name="semantic_label_2_color_csv_filepath"
+    value="$(find kimera_semantics_ros)/cfg/tesse_multiscene_office1_segmentation_mapping.csv"/>
+  </node>
+</launch>

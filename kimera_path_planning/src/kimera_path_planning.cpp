@@ -197,11 +197,8 @@ void SceneGraphGlobalPlanner::generateSceneGraph() {
     scene_graph_builder_.sceneGraphReconstruction(true);
   }
 
-  scene_graph_ = scene_graph_builder_.getSceneGraph();
-  CHECK(scene_graph_);
-
   if (true && visualize_) {
-    scene_graph_->visualize();
+    scene_graph_builder_.visualizeSceneGraph();
   }
 
   setupSceneGraphPlanners();
