@@ -13,7 +13,6 @@
 #include <kimera_semantics/macros.h>
 
 #include "kimera_scene_graph/common.h"
-#include "kimera_scene_graph/semantic_ros_publishers.h"
 #include "kimera_scene_graph/utils/voxblox_to_pcl.h"
 
 #include "kimera_scene_graph/scene_graph_edge.h"

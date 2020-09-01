@@ -18,6 +18,7 @@
 #include "kimera_scene_graph/scene_graph_edge.h"
 #include "kimera_scene_graph/scene_graph_layer.h"
 #include "kimera_scene_graph/scene_graph_node.h"
+#include "kimera_scene_graph/semantic_ros_publishers.h"
 
 namespace kimera {
 

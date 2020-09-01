@@ -33,6 +33,7 @@
     <param name="verbose"                            value="true"/>
     <param name="max_attempts_to_generate_viewpoint" value="20"/>
     <param name="world_frame"                        value="map"/>
+    <param name="scene_graph_output_path"            value="$(find kimera_scene_graph)/vxblx_files/office_scene_graph.vxblx"/>
 
     <!-- Params -->
     <param name="max_ray_length_m"          value="10.0" />

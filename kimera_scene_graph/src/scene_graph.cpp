@@ -6,10 +6,6 @@
 
 #include <glog/logging.h>
 
-#include <ros/ros.h>
-#include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
-
 #include <kimera_semantics/common.h>
 
 #include "kimera_scene_graph/common.h"
