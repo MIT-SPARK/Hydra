@@ -9,7 +9,7 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
-#include <rviz_visual_tools/rviz_visual_tools.h>
+// #include <rviz_visual_tools/rviz_visual_tools.h>
 
 #include <kimera_semantics/macros.h>
 
@@ -22,7 +22,7 @@
 
 namespace kimera {
 
-namespace rvt = rviz_visual_tools;
+// namespace rvt = rviz_visual_tools;
 
 class SceneGraphVisualizer {
  public:
@@ -130,7 +130,7 @@ class SceneGraphVisualizer {
   float layer_step_z_ = 15;
 
   // For visualizing cuboid wireframes in rviz
-  rvt::RvizVisualToolsPtr visual_tools_;
+  // rvt::RvizVisualToolsPtr visual_tools_;
 };
 
 }  // namespace kimera

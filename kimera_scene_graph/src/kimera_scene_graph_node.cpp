@@ -10,7 +10,7 @@
 #include <gflags/gflags.h>
 
 #include "kimera_scene_graph/dynamic_scene_node_evaluator.h"
-#include "kimera_scene_graph/scene_graph_server.h"
+#include "kimera_scene_graph/scene_graph_builder.h"
 
 int main(int argc, char** argv) {
   ros::init(argc, argv, "kimera_scene_graph");

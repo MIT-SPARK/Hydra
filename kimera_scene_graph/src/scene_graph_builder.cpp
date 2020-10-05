@@ -1,4 +1,4 @@
-#include "kimera_scene_graph/scene_graph_server.h"
+#include "kimera_scene_graph/scene_graph_builder.h"
 
 #include <voxblox_ros/mesh_pcl.h>
 #include <voxblox_skeleton/io/skeleton_io.h>

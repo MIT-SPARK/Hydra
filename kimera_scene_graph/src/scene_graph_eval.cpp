@@ -1,4 +1,4 @@
-#include "kimera_scene_graph/scene_graph_server.h"
+#include "kimera_scene_graph/scene_graph_builder.h"
 
 #include <ros/ros.h>
 

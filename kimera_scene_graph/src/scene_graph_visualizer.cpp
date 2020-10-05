@@ -43,15 +43,15 @@ SceneGraphVisualizer::SceneGraphVisualizer(const ros::NodeHandle& nh,
       "edges_node_node", 1, true);
 
   // Create vtools
-  visual_tools_.reset(
-      new rvt::RvizVisualTools(world_frame_, "bounding_boxes_wireframe"));
-  visual_tools_->loadMarkerPub(false, true);  // create publisher before waiting
-  // Clear messages
-  visual_tools_->deleteAllMarkers();
-  visual_tools_->enableBatchPublishing();
-  visual_tools_->setAlpha(1.0);
-  visual_tools_->setGlobalScale(1.0);
-  visual_tools_->setPsychedelicMode(true);
+  // visual_tools_.reset(
+  //     new rvt::RvizVisualTools(world_frame_, "bounding_boxes_wireframe"));
+  // visual_tools_->loadMarkerPub(false, true);  // create publisher before waiting
+  // // Clear messages
+  // visual_tools_->deleteAllMarkers();
+  // visual_tools_->enableBatchPublishing();
+  // visual_tools_->setAlpha(1.0);
+  // visual_tools_->setGlobalScale(1.0);
+  // visual_tools_->setPsychedelicMode(true);
 }
 
 void SceneGraphVisualizer::visualizeImpl(const SceneGraph& scene_graph) const {
@@ -513,9 +513,9 @@ bool SceneGraphVisualizer::getBoundingBoxMarker(
   Eigen::Vector3d min_point, max_point;
   min_point << bb.min_.x, bb.min_.y, bb.min_.z;
   max_point << bb.max_.x, bb.max_.y, bb.max_.z;
-  CHECK(visual_tools_->publishWireframeCuboid(
-      pose1, min_point, max_point, rvt::RAND, std::to_string(semantic_label)));
-  CHECK(visual_tools_->trigger());
+  //CHECK(visual_tools_->publishWireframeCuboid(
+  //    pose1, min_point, max_point, rvt::RAND, std::to_string(semantic_label)));
+  //CHECK(visual_tools_->trigger());
 
   return true;
 }

@@ -25,7 +25,7 @@ cs_add_library(${PROJECT_NAME}
   src/room_connectivity_finder.cpp
   src/wall_finder.cpp
   src/building_finder.cpp
-  src/scene_graph_server.cpp
+  src/scene_graph_builder.cpp
   src/scene_graph_node.cpp
   src/scene_graph_edge.cpp
   src/scene_graph_layer.cpp
