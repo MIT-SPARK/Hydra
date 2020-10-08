@@ -311,7 +311,8 @@ void SceneGraphBuilder::reconstructEsdfOutOfTsdf(const bool& save_to_file) {
   esdf_integrator_->updateFromTsdfLayerBatch();
   LOG(INFO) << "Saving ESDF layer.";
   if (save_to_file) {
-    esdf_layer_->saveToFile("/home/tonirv/tesse_esdf.vxblx");
+//    esdf_layer_->saveToFile("/home/tonirv/tesse_esdf.vxblx");
+    esdf_layer_->saveToFile("/home/lisa/Documents/goseek_scene_01/scene_1/esdf_from_tsdf.vxblx");
   }
   LOG(INFO) << "Done building ESDF layer.";
 }

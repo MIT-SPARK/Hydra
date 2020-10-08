@@ -21,11 +21,16 @@
 
 namespace kimera {
 
+class BaseSceneGraph{
+  public:
+    virtual ~BaseSceneGraph() = default;
+};
+
 class SceneGraph {
  public:
   KIMERA_DELETE_COPY_CONSTRUCTORS(SceneGraph);
   KIMERA_POINTER_TYPEDEFS(SceneGraph);
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  //EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   SceneGraph();
   virtual ~SceneGraph() = default;
 
@@ -63,6 +68,10 @@ class SceneGraph {
 
   inline EdgeIdMap getInterLayerEdgesMap() const {
     return inter_layer_edge_map_;
+  }
+
+  inline LayerIdMap getDatabase() const {
+    return database_;
   }
 
   inline SceneGraphEdge getInterLayerEdge(const EdgeId& edge_id) const {

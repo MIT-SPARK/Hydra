@@ -8,6 +8,8 @@
 #include <boost/serialization/base_object.hpp>
 
 #include <glog/logging.h>
+#include <pcl_ros/point_cloud.h>
+#include <pcl/common/centroid.h>
 
 #include "kimera_scene_graph/scene_graph.h"
 #include "kimera_scene_graph/scene_graph_edge.h"
@@ -56,8 +58,21 @@ void serialize(Archive& ar,
   // Need to provide PCL serialization.
   // ar& BOOST_SERIALIZATION_NVP(attributes.pcl_);
   // Need to provide bounding box serialization.
-  // ar& BOOST_SERIALIZATION_NVP(attributes.bounding_box_);
+  ar& BOOST_SERIALIZATION_NVP(attributes.bounding_box_);
 }
+
+template <class Archive>
+void serialize(Archive& ar,
+               pcl::PointXYZRGB& point,
+               const unsigned int version) {
+  ar& BOOST_SERIALIZATION_NVP(point.x);
+  ar& BOOST_SERIALIZATION_NVP(point.y);
+  ar& BOOST_SERIALIZATION_NVP(point.z);
+  ar& BOOST_SERIALIZATION_NVP(point.r);
+  ar& BOOST_SERIALIZATION_NVP(point.g);
+  ar& BOOST_SERIALIZATION_NVP(point.b);
+}
+
 
 }  // namespace serialization
 

@@ -18,9 +18,14 @@
 
 namespace kimera {
 
+struct BaseSceneGraphLayer {
+  public:
+    virtual ~BaseSceneGraphLayer() = default;
+};
+
 class SceneGraphLayer {
  public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  //EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   SceneGraphLayer(); // for serialization in a map...
   SceneGraphLayer(const LayerId& layer_id);
   virtual ~SceneGraphLayer() = default;

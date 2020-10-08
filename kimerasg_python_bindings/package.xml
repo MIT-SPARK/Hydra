@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>kimerasg_python_bindings</name>
+    <version>0.0.1</version>
+    <description>A package</description>
+
+    <maintainer email="lisapeng@mit.edu">lisapeng</maintainer>
+
+    <license>MIT</license>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <build_depend>pybind11_catkin</build_depend>
+
+    <exec_depend>python-matplotlib</exec_depend>
+
+    <exec_depend>pybind11_catkin</exec_depend>
+
+    <depend>kimera_scene_graph</depend>
+
+    <depend>kimera_semantics</depend>
+
+</package>

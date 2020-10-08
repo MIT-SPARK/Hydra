@@ -8,6 +8,10 @@
 
 #include <Eigen/Core>
 
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/serialization/serialization.hpp>
+
 #include <kimera_semantics/common.h>
 #include <voxblox/core/color.h>  // just for getroomcolor
 
@@ -69,6 +73,12 @@ inline std::string getStringFromLayerId(const LayerId& layer_id) {
 
 static constexpr float kEsdfTruncation = 0.3;
 
+//// Add way of printing strongly typed enums (enum class).
+//template <typename E>
+//constexpr typename std::underlying_type<E>::type to_underlying(E e) noexcept {
+//  return static_cast<typename std::underlying_type<E>::type>(e);
+//}
+
 enum class BoundingBoxType { kAABB = 0, kOBB = 1 };
 
 template <class PointT>
@@ -80,7 +90,39 @@ struct BoundingBox {
   // Position and rotation is only used for BB type of bb box.
   PointT position_ = PointT();
   Eigen::Matrix3f orientation_matrix = Eigen::Matrix3f();
+
+  public:
+    std::string print() const;
+
+  private:
+    friend std::ostream& operator<<(std::ostream& os,
+                                    const BoundingBox& bounding_box){
+      os << " - max_ " << bounding_box.max_ << '\n'
+         << " - min_ " << bounding_box.min_ << '\n'
+         << " - position_ " << bounding_box.position_ << '\n';
+      return os;
+    };
+    friend class boost::serialization::access;
+    template <class Archive>
+    void serialize(Archive& ar, const unsigned int version) {
+    //TODO: serialize the strongly typed enum bb type as well?
+//      ar& BOOST_SERIALIZATION_NVP(type_);
+      ar& BOOST_SERIALIZATION_NVP(max_);
+      ar& BOOST_SERIALIZATION_NVP(min_);
+      ar& BOOST_SERIALIZATION_NVP(position_);
+    }
 };
+
+template <class PointT>
+std::string BoundingBox<PointT>::print() const {
+  std::stringstream ss;
+  ss << "BoundingBox: " << '\n'
+//    << " - type_ " << to_underlying(type_) << '\n'
+    << " - max_ " << max_ << '\n'
+    << " - min_ " << min_ << '\n'
+    << " - position_ " << position_ << '\n';
+  return ss.str();
+}
 
 inline vxb::Color getRoomColor(const NodeId& room_id) {
   return vxb::rainbowColorMap(static_cast<double>(room_id % 20) / 20.0);

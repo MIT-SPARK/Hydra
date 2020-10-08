@@ -11,6 +11,7 @@ std::string NodeAttributes::print() const {
         << "Color : " << color_ << '\n'
         << "Semantic Label: " << std::to_string(semantic_label_) << '\n'
         << "Name: " << name_ << '\n'
+				<< "Bounding Box: " << bounding_box_ << '\n'
         // << "Pcl size: " << pcl_ ? std::to_string(pcl_->size()) : "no pcl attached..."
            ;
   // clang-format on
