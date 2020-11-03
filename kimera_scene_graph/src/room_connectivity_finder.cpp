@@ -24,7 +24,7 @@ void RoomConnectivityFinder::findRoomConnectivity(SceneGraph* scene_graph) {
     if (!start_node.hasParent()) {
       // This node does not belong to any room
       // This can happen if the place node has not been segmented
-      LOG(WARNING) << "Place without room: " << start_node.print();
+      VLOG(1) << "Place without room: " << start_node.print();
       continue;
     }
     CHECK(start_node.parent_edge_.start_layer_id_ == LayerId::kRoomsLayerId);
@@ -33,7 +33,7 @@ void RoomConnectivityFinder::findRoomConnectivity(SceneGraph* scene_graph) {
     if (!end_node.hasParent()) {
       // This node does not belong to any room
       // This can happen if the place node has not been segmented
-      LOG(WARNING) << "Place without room: " << end_node.print();
+      VLOG(1) << "Place without room: " << end_node.print();
       continue;
     }
     CHECK(end_node.parent_edge_.start_layer_id_ == LayerId::kRoomsLayerId);
@@ -46,7 +46,7 @@ void RoomConnectivityFinder::findRoomConnectivity(SceneGraph* scene_graph) {
       scene_graph_edge.end_layer_id_ = LayerId::kRoomsLayerId;
       scene_graph_edge.end_node_id_ = room_id_end_node;
       scene_graph->addEdge(&scene_graph_edge);
-      LOG(INFO) << "Added room to room edge: " << scene_graph_edge.print();
+      VLOG(5) << "Added room to room edge: " << scene_graph_edge.print();
     } else {
       VLOG(10) << "This pair of places are in the same room.";
     }

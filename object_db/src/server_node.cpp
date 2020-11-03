@@ -93,11 +93,12 @@ int main(int argc, char *argv[]) {
     nh_private.getParam("semantic_label_csv_path", label_path);
     ROS_INFO("Preparing object database action server.");
     server = std::make_unique<object_registration::ObjectRegistrationServer>(
-        "object_db", db_path, gt_path, label_path, object_label, params, matcher_params);
+        "object_db", object_label, db_path, gt_path, label_path, params, matcher_params);
   } else {
+    ROS_ERROR("No gt_csv_path provided.");
     ROS_INFO("Preparing object database action server.");
     server = std::make_unique<object_registration::ObjectRegistrationServer>(
-        "object_db", db_path, object_label, params, matcher_params);
+        "object_db", object_label, db_path, "", "", params, matcher_params);
   }
   assert(server != nullptr);
 

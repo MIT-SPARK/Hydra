@@ -16,7 +16,7 @@ Panels:
         - /BoundingBoxes1/Namespaces1
         - /Walls1/Namespaces1
       Splitter Ratio: 0.7129629850387573
-    Tree Height: 584
+    Tree Height: 874
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -35,7 +35,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: HumanPointClouds
+    SyncSource: ""
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -47,7 +47,7 @@ Visualization Manager:
       Cell Size: 1
       Class: rviz/Grid
       Color: 160; 160; 164
-      Enabled: true
+      Enabled: false
       Line Style:
         Line Width: 0.029999999329447746
         Value: Lines
@@ -60,66 +60,7 @@ Visualization Manager:
       Plane: XY
       Plane Cell Count: 200
       Reference Frame: <Fixed Frame>
-      Value: true
-    - Class: rviz/TF
-      Enabled: true
-      Frame Timeout: 15
-      Frames:
-        All Enabled: true
-        base_link_gt:
-          Value: true
-        front_lidar:
-          Value: true
-        left_cam:
-          Value: true
-        object_0:
-          Value: true
-        object_1:
-          Value: true
-        object_2:
-          Value: true
-        object_3:
-          Value: true
-        object_4:
-          Value: true
-        object_5:
-          Value: true
-        rear_lidar:
-          Value: true
-        right_cam:
-          Value: true
-        world:
-          Value: true
-      Marker Scale: 1
-      Name: TF
-      Show Arrows: true
-      Show Axes: true
-      Show Names: true
-      Tree:
-        world:
-          base_link_gt:
-            front_lidar:
-              {}
-            left_cam:
-              {}
-            rear_lidar:
-              {}
-            right_cam:
-              {}
-          object_0:
-            {}
-          object_1:
-            {}
-          object_2:
-            {}
-          object_3:
-            {}
-          object_4:
-            {}
-          object_5:
-            {}
-      Update Interval: 0
-      Value: true
+      Value: false
     - Class: rviz/Axes
       Enabled: false
       Length: 10
@@ -128,13 +69,13 @@ Visualization Manager:
       Reference Frame: <Fixed Frame>
       Value: false
     - Class: rviz/MarkerArray
-      Enabled: true
+      Enabled: false
       Marker Topic: /kimera_scene_graph_eval_node/tsdf_test_mesh
       Name: SemanticMesh
       Namespaces:
         {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Class: voxblox_rviz_plugin/VoxbloxMesh
       Enabled: true
       Name: SemanticMesh
@@ -161,7 +102,7 @@ Visualization Manager:
       Buffer Length: 1
       Class: rviz/Path
       Color: 25; 255; 0
-      Enabled: true
+      Enabled: false
       Head Diameter: 0.30000001192092896
       Head Length: 0.20000000298023224
       Length: 0.5
@@ -179,7 +120,7 @@ Visualization Manager:
       Shaft Length: 0.30000001192092896
       Topic: /kimera_scene_graph_eval_node/view_path_pub
       Unreliable: true
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -243,13 +184,13 @@ Visualization Manager:
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
-      Enabled: true
+      Enabled: false
       Marker Topic: /kimera_scene_graph_eval_node/sparse_graph
       Name: SparseGraph
       Namespaces:
         {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Class: rviz/MarkerArray
       Enabled: true
       Marker Topic: /kimera_scene_graph_eval_node/segmented_sparse_graph
@@ -270,7 +211,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: Intensity
       Decay Time: 0
-      Enabled: false
+      Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 0.30000001192092896
@@ -287,15 +228,15 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: false
+      Value: true
     - Class: rviz/MarkerArray
-      Enabled: false
+      Enabled: true
       Marker Topic: /kimera_scene_graph_eval_node/bounding_boxes
       Name: BoundingBoxes
       Namespaces:
         {}
       Queue Size: 100
-      Value: false
+      Value: true
     - Class: rviz/MarkerArray
       Enabled: false
       Marker Topic: /kimera_scene_graph_eval_node/bounding_boxes_wireframe
@@ -476,7 +417,7 @@ Visualization Manager:
       Color: 239; 41; 41
       Color Transformer: FlatColor
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 4096
@@ -489,17 +430,17 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.07000000029802322
       Style: Flat Squares
-      Topic: /3D_human_mesh_viz
+      Topic: /kimera_scene_graph/human_meshes_vis
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Class: rviz/Marker
       Enabled: true
       Marker Topic: /kimera_scene_graph_node/all_graph_edges
       Name: HumanGraphEdges
       Namespaces:
-        node_edges: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -518,23 +459,1079 @@ Visualization Manager:
         {}
       Queue Size: 100
       Value: false
-    - Class: rviz/Image
+    - Class: rviz/TF
       Enabled: true
-      Image Topic: /tesse/left_cam/rgb/image_raw
-      Max Value: 1
-      Median window: 5
-      Min Value: 0
-      Name: Image
-      Normalize Range: true
-      Queue Size: 2
-      Transport Hint: raw
-      Unreliable: false
+      Frame Timeout: 15
+      Frames:
+        3pv:
+          Value: true
+        AirventilationGrid_A:
+          Value: true
+        AirventilationGrid_B:
+          Value: true
+        Airventilation_3x:
+          Value: true
+        Airventilation_CrossSection:
+          Value: true
+        All Enabled: true
+        Area:
+          Value: true
+        Books:
+          Value: true
+        Bookshelf:
+          Value: true
+        Bottle:
+          Value: true
+        Box_Black:
+          Value: true
+        Box_Cardboard:
+          Value: true
+        Box_Gray:
+          Value: true
+        CardboardBox01:
+          Value: true
+        Carpet_End:
+          Value: true
+        Carpet_Full_Short:
+          Value: true
+        Carpet_SingleSmallRound:
+          Value: true
+        Carpet_Tile:
+          Value: true
+        Cart:
+          Value: true
+        CeilingHang01:
+          Value: true
+        CeilingLamp:
+          Value: true
+        CeilingLamp_Embed:
+          Value: true
+        CeilingLamp_Roofpart:
+          Value: true
+        CeilingLamps:
+          Value: true
+        Cell_Bars_Large:
+          Value: true
+        Cell_Bed:
+          Value: true
+        Cell_Complete:
+          Value: true
+        Cell_Shelf:
+          Value: true
+        Cell_Sink:
+          Value: true
+        Cell_Toilet:
+          Value: true
+        Chair_LeatherOffice:
+          Value: true
+        Chair_Spinning:
+          Value: true
+        Chair_Wood:
+          Value: true
+        Closet_Door_L:
+          Value: true
+        Closet_Door_R:
+          Value: true
+        Closet_Metal:
+          Value: true
+        Collider_Backup:
+          Value: true
+        CorkBoard:
+          Value: true
+        Couch_1seat:
+          Value: true
+        Desk:
+          Value: true
+        Desk_and_Stool:
+          Value: true
+        Door_Bronze_Metal_Window:
+          Value: true
+        Door_Bronze_Metal_Window_Parent:
+          Value: true
+        Door_Bronze_Metal_Window_ParentMain:
+          Value: true
+        Door_Cell:
+          Value: true
+        Door_Cell_Parent:
+          Value: true
+        Door_L:
+          Value: true
+        Door_MetalDark:
+          Value: true
+        Door_MetalDark_Parent:
+          Value: true
+        Door_MetalDark_ParentMain:
+          Value: true
+        Door_Metal_Gray:
+          Value: true
+        Door_Metal_Gray_Parent:
+          Value: true
+        Door_Metal_Gray_ParentMain:
+          Value: true
+        Door_ParentScript:
+          Value: true
+        Door_R:
+          Value: true
+        Door_Toilet_Parent:
+          Value: true
+        Door_Toilet_ParentMain:
+          Value: true
+        Door_Wooden_Black:
+          Value: true
+        Door_Wooden_Black_Parent:
+          Value: true
+        Door_Wooden_Black_ParentMain:
+          Value: true
+        Doors:
+          Value: true
+        Drawer_A:
+          Value: true
+        Drawer_B:
+          Value: true
+        Drawer_C:
+          Value: true
+        Dresser_A_WithBooks:
+          Value: true
+        Elevator:
+          Value: true
+        ElevatorDoor_L:
+          Value: true
+        ElevatorDoor_R:
+          Value: true
+        Elevator_CompleteInside:
+          Value: true
+        Elevator_CompleteInside_Parent:
+          Value: true
+        Elevator_CompleteOutside_Parent:
+          Value: true
+        Elevator_Doors:
+          Value: true
+        Elevator_Doors_Parent_Inside:
+          Value: true
+        Elevator_Doors_Parent_Out:
+          Value: true
+        Elevator_Panel_Inside:
+          Value: true
+        Elevator_Panel_Outside:
+          Value: true
+        ExitSign_A:
+          Value: true
+        ExitSign_B:
+          Value: true
+        ExitWay_Lamp:
+          Value: true
+        FanTable:
+          Value: true
+        Fan_Blades:
+          Value: true
+        FileFolder:
+          Value: true
+        File_Papers:
+          Value: true
+        Files_Drawer:
+          Value: true
+        Flagpole_Wall:
+          Value: true
+        Floor_10x10:
+          Value: true
+        Floor_12x1:
+          Value: true
+        Floor_12x2:
+          Value: true
+        Floor_12x4:
+          Value: true
+        Floor_3x3:
+          Value: true
+        Floor_4x2:
+          Value: true
+        Floor_6x2:
+          Value: true
+        Floor_6x3:
+          Value: true
+        Floor_6x4:
+          Value: true
+        Floors:
+          Value: true
+        Floors_Floor1:
+          Value: true
+        Floors_Floor2:
+          Value: true
+        Floors_Floor3:
+          Value: true
+        Floors_Floor4:
+          Value: true
+        Folder01:
+          Value: true
+        Folder02:
+          Value: true
+        FolderHolder:
+          Value: true
+        FolderHolder_WithFiles:
+          Value: true
+        Graphics:
+          Value: true
+        Hand_Paper:
+          Value: true
+        Keyboard:
+          Value: true
+        LCD_ScreenSOLO_1:
+          Value: true
+        LCD_Screen_1:
+          Value: true
+        LCD_Screen_2:
+          Value: true
+        Lamp_Desk:
+          Value: true
+        Lamp_Fluorescent_A:
+          Value: true
+        Lamp_Fluorescent_A_Hang:
+          Value: true
+        Lamp_Fluorescent_B:
+          Value: true
+        Lamp_Fluorescent_B_Hang:
+          Value: true
+        Lamp_Fluorescent_C:
+          Value: true
+        Lamp_Fluorescent_C_Hang:
+          Value: true
+        Lamp_Spot:
+          Value: true
+        Lamp_SpotBulb:
+          Value: true
+        Lamp_SquareCeiling:
+          Value: true
+        Lamps:
+          Value: true
+        Laptop_1:
+          Value: true
+        Laptop_2:
+          Value: true
+        Leather_Bench:
+          Value: true
+        LidarObject:
+          Value: true
+        Light:
+          Value: true
+        Lights:
+          Value: true
+        Lights_Baked:
+          Value: true
+        MetalCabinet:
+          Value: true
+        MetalCabinet_GridDoors:
+          Value: true
+        MetalShelf_Open:
+          Value: true
+        MetalShelf_Open_WithProps:
+          Value: true
+        MetalShelf_Signle:
+          Value: true
+        Metal_Drawer:
+          Value: true
+        Metal_Drawer_SeparateDrawers:
+          Value: true
+        Mouse:
+          Value: true
+        MousePad:
+          Value: true
+        Mug:
+          Value: true
+        Mug_WithPens:
+          Value: true
+        PC:
+          Value: true
+        PaintingSet_A:
+          Value: true
+        PaintingSet_B:
+          Value: true
+        PaintingSet_C:
+          Value: true
+        PaintingSet_D:
+          Value: true
+        Painting_A:
+          Value: true
+        Painting_B:
+          Value: true
+        Painting_C:
+          Value: true
+        Painting_D:
+          Value: true
+        Painting_Diploma:
+          Value: true
+        Painting_E:
+          Value: true
+        Painting_F:
+          Value: true
+        Painting_G:
+          Value: true
+        Painting_Pic:
+          Value: true
+        Paper:
+          Value: true
+        Paper01:
+          Value: true
+        Paper02:
+          Value: true
+        PaperBag01:
+          Value: true
+        Pen:
+          Value: true
+        Pencil:
+          Value: true
+        Phone:
+          Value: true
+        PipeLargeCeiling2x:
+          Value: true
+        PipeLargeCeiling6x:
+          Value: true
+        Pipe_Holder:
+          Value: true
+        Plant_Inside_Large:
+          Value: true
+        Plant_Inside_Small:
+          Value: true
+        Props:
+          Value: true
+        Reflection:
+          Value: true
+        Roofs:
+          Value: true
+        Roofs_Floor1:
+          Value: true
+        Roofs_Floor2:
+          Value: true
+        Roofs_Floor3:
+          Value: true
+        Roofs_Floor4:
+          Value: true
+        Sign_Hanging:
+          Value: true
+        Sink3x:
+          Value: true
+        Sound_Aircon:
+          Value: true
+        Sounds:
+          Value: true
+        Spotlight:
+          Value: true
+        Spotlight_Desk:
+          Value: true
+        Stairs:
+          Value: true
+        StairsMod_Ground:
+          Value: true
+        StairsMod_Loop:
+          Value: true
+        StairsMod_RailingInside_Loop:
+          Value: true
+        StairsMod_RailingOutside:
+          Value: true
+        StairsMod_StepProtectors:
+          Value: true
+        StairsMod_Top:
+          Value: true
+        Stairs_RailingInside_Loop:
+          Value: true
+        Stairs_RailingInside_Top:
+          Value: true
+        Stairs_RailingOutside:
+          Value: true
+        Sticker01:
+          Value: true
+        Sticker02:
+          Value: true
+        Sticker03:
+          Value: true
+        TableScreen_A:
+          Value: true
+        TableScreen_B:
+          Value: true
+        TableScreen_C:
+          Value: true
+        TableScreen_C_Glass:
+          Value: true
+        TableScreen_E:
+          Value: true
+        TableScreen_E_Glass:
+          Value: true
+        TableWooden:
+          Value: true
+        TableWooden_B:
+          Value: true
+        TableWooden_B_WithProps_A:
+          Value: true
+        TableWooden_B_WithProps_B:
+          Value: true
+        TableWooden_B_WithProps_C:
+          Value: true
+        TableWooden_B_WithProps_D:
+          Value: true
+        TableWooden_B_WithProps_E:
+          Value: true
+        Table_Drawer:
+          Value: true
+        Table_DrawerSmall:
+          Value: true
+        Table_Flag:
+          Value: true
+        Table_Main:
+          Value: true
+        Table_MeetingWithChairs:
+          Value: true
+        Table_Office:
+          Value: true
+        Table_OfficeCorner:
+          Value: true
+        Table_OfficeCorner_WithProps_A:
+          Value: true
+        Table_OfficeCorner_WithProps_B:
+          Value: true
+        Table_OfficeCorner_WithProps_C:
+          Value: true
+        Table_OfficeDrawer:
+          Value: true
+        Toilet:
+          Value: true
+        ToiletSign:
+          Value: true
+        Toilet_Door:
+          Value: true
+        Toilet_Paper:
+          Value: true
+        Toilet_Partition_End:
+          Value: true
+        Toilet_Partition_Tile:
+          Value: true
+        Trashcan:
+          Value: true
+        Trashcan_Metal:
+          Value: true
+        Urinal:
+          Value: true
+        Urinal_Partition:
+          Value: true
+        W_1x:
+          Value: true
+        W_2x_glass_A:
+          Value: true
+        W_2x_glass_B:
+          Value: true
+        W_2x_glass_Door:
+          Value: true
+        W_2x_glass_DoorDouble:
+          Value: true
+        W_3x:
+          Value: true
+        W_3x_Elevator_Door:
+          Value: true
+        W_6x:
+          Value: true
+        W_6x_Door:
+          Value: true
+        W_6x_DoorDouble:
+          Value: true
+        W_6x_DoorWindow_Large:
+          Value: true
+        W_6x_Window_Large_B:
+          Value: true
+        W_6x_Window_MiniDouble:
+          Value: true
+        W_6x_Window_Small:
+          Value: true
+        W_ConnectSeam:
+          Value: true
+        W_Pilar_Large:
+          Value: true
+        W_Pilar_Small:
+          Value: true
+        Walkable:
+          Value: true
+        Walls:
+          Value: true
+        Walls_Floor1:
+          Value: true
+        Walls_Floor2:
+          Value: true
+        Walls_Floor3:
+          Value: true
+        Walls_Floor4:
+          Value: true
+        WaterSprinkler:
+          Value: true
+        WaterSprinklerPipe_3x:
+          Value: true
+        WaterSprinklerPipe_CornerRight:
+          Value: true
+        Water_Dispenser:
+          Value: true
+        Water_DispenserMUG:
+          Value: true
+        WhiteBoard:
+          Value: true
+        WhiteBoard_Walll:
+          Value: true
+        WindowBlinds_A:
+          Value: true
+        WindowBlinds_B:
+          Value: true
+        WindowBlinds_Closed:
+          Value: true
+        WindowBlinds_D:
+          Value: true
+        depth:
+          Value: true
+        hood_Lidar2D:
+          Value: true
+        map:
+          Value: true
+        rgb_left:
+          Value: true
+        rgb_right:
+          Value: true
+        segmentation:
+          Value: true
+        trunk_Lidar2D:
+          Value: true
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Tree:
+        map:
+          3pv:
+            {}
+          AirventilationGrid_A:
+            {}
+          AirventilationGrid_B:
+            {}
+          Airventilation_3x:
+            {}
+          Airventilation_CrossSection:
+            {}
+          Area:
+            {}
+          Books:
+            {}
+          Bookshelf:
+            {}
+          Bottle:
+            {}
+          Box_Black:
+            {}
+          Box_Cardboard:
+            {}
+          Box_Gray:
+            {}
+          CardboardBox01:
+            {}
+          Carpet_End:
+            {}
+          Carpet_Full_Short:
+            {}
+          Carpet_SingleSmallRound:
+            {}
+          Carpet_Tile:
+            {}
+          Cart:
+            {}
+          CeilingHang01:
+            {}
+          CeilingLamp:
+            {}
+          CeilingLamp_Embed:
+            {}
+          CeilingLamp_Roofpart:
+            {}
+          CeilingLamps:
+            {}
+          Cell_Bars_Large:
+            {}
+          Cell_Bed:
+            {}
+          Cell_Complete:
+            {}
+          Cell_Shelf:
+            {}
+          Cell_Sink:
+            {}
+          Cell_Toilet:
+            {}
+          Chair_LeatherOffice:
+            {}
+          Chair_Spinning:
+            {}
+          Chair_Wood:
+            {}
+          Closet_Door_L:
+            {}
+          Closet_Door_R:
+            {}
+          Closet_Metal:
+            {}
+          Collider_Backup:
+            {}
+          CorkBoard:
+            {}
+          Couch_1seat:
+            {}
+          Desk:
+            {}
+          Desk_and_Stool:
+            {}
+          Door_Bronze_Metal_Window:
+            {}
+          Door_Bronze_Metal_Window_Parent:
+            {}
+          Door_Bronze_Metal_Window_ParentMain:
+            {}
+          Door_Cell:
+            {}
+          Door_Cell_Parent:
+            {}
+          Door_L:
+            {}
+          Door_MetalDark:
+            {}
+          Door_MetalDark_Parent:
+            {}
+          Door_MetalDark_ParentMain:
+            {}
+          Door_Metal_Gray:
+            {}
+          Door_Metal_Gray_Parent:
+            {}
+          Door_Metal_Gray_ParentMain:
+            {}
+          Door_ParentScript:
+            {}
+          Door_R:
+            {}
+          Door_Toilet_Parent:
+            {}
+          Door_Toilet_ParentMain:
+            {}
+          Door_Wooden_Black:
+            {}
+          Door_Wooden_Black_Parent:
+            {}
+          Door_Wooden_Black_ParentMain:
+            {}
+          Doors:
+            {}
+          Drawer_A:
+            {}
+          Drawer_B:
+            {}
+          Drawer_C:
+            {}
+          Dresser_A_WithBooks:
+            {}
+          Elevator:
+            {}
+          ElevatorDoor_L:
+            {}
+          ElevatorDoor_R:
+            {}
+          Elevator_CompleteInside:
+            {}
+          Elevator_CompleteInside_Parent:
+            {}
+          Elevator_CompleteOutside_Parent:
+            {}
+          Elevator_Doors:
+            {}
+          Elevator_Doors_Parent_Inside:
+            {}
+          Elevator_Doors_Parent_Out:
+            {}
+          Elevator_Panel_Inside:
+            {}
+          Elevator_Panel_Outside:
+            {}
+          ExitSign_A:
+            {}
+          ExitSign_B:
+            {}
+          ExitWay_Lamp:
+            {}
+          FanTable:
+            {}
+          Fan_Blades:
+            {}
+          FileFolder:
+            {}
+          File_Papers:
+            {}
+          Files_Drawer:
+            {}
+          Flagpole_Wall:
+            {}
+          Floor_10x10:
+            {}
+          Floor_12x1:
+            {}
+          Floor_12x2:
+            {}
+          Floor_12x4:
+            {}
+          Floor_3x3:
+            {}
+          Floor_4x2:
+            {}
+          Floor_6x2:
+            {}
+          Floor_6x3:
+            {}
+          Floor_6x4:
+            {}
+          Floors:
+            {}
+          Floors_Floor1:
+            {}
+          Floors_Floor2:
+            {}
+          Floors_Floor3:
+            {}
+          Floors_Floor4:
+            {}
+          Folder01:
+            {}
+          Folder02:
+            {}
+          FolderHolder:
+            {}
+          FolderHolder_WithFiles:
+            {}
+          Graphics:
+            {}
+          Hand_Paper:
+            {}
+          Keyboard:
+            {}
+          LCD_ScreenSOLO_1:
+            {}
+          LCD_Screen_1:
+            {}
+          LCD_Screen_2:
+            {}
+          Lamp_Desk:
+            {}
+          Lamp_Fluorescent_A:
+            {}
+          Lamp_Fluorescent_A_Hang:
+            {}
+          Lamp_Fluorescent_B:
+            {}
+          Lamp_Fluorescent_B_Hang:
+            {}
+          Lamp_Fluorescent_C:
+            {}
+          Lamp_Fluorescent_C_Hang:
+            {}
+          Lamp_Spot:
+            {}
+          Lamp_SpotBulb:
+            {}
+          Lamp_SquareCeiling:
+            {}
+          Lamps:
+            {}
+          Laptop_1:
+            {}
+          Laptop_2:
+            {}
+          Leather_Bench:
+            {}
+          LidarObject:
+            {}
+          Light:
+            {}
+          Lights:
+            {}
+          Lights_Baked:
+            {}
+          MetalCabinet:
+            {}
+          MetalCabinet_GridDoors:
+            {}
+          MetalShelf_Open:
+            {}
+          MetalShelf_Open_WithProps:
+            {}
+          MetalShelf_Signle:
+            {}
+          Metal_Drawer:
+            {}
+          Metal_Drawer_SeparateDrawers:
+            {}
+          Mouse:
+            {}
+          MousePad:
+            {}
+          Mug:
+            {}
+          Mug_WithPens:
+            {}
+          PC:
+            {}
+          PaintingSet_A:
+            {}
+          PaintingSet_B:
+            {}
+          PaintingSet_C:
+            {}
+          PaintingSet_D:
+            {}
+          Painting_A:
+            {}
+          Painting_B:
+            {}
+          Painting_C:
+            {}
+          Painting_D:
+            {}
+          Painting_Diploma:
+            {}
+          Painting_E:
+            {}
+          Painting_F:
+            {}
+          Painting_G:
+            {}
+          Painting_Pic:
+            {}
+          Paper:
+            {}
+          Paper01:
+            {}
+          Paper02:
+            {}
+          PaperBag01:
+            {}
+          Pen:
+            {}
+          Pencil:
+            {}
+          Phone:
+            {}
+          PipeLargeCeiling2x:
+            {}
+          PipeLargeCeiling6x:
+            {}
+          Pipe_Holder:
+            {}
+          Plant_Inside_Large:
+            {}
+          Plant_Inside_Small:
+            {}
+          Props:
+            {}
+          Reflection:
+            {}
+          Roofs:
+            {}
+          Roofs_Floor1:
+            {}
+          Roofs_Floor2:
+            {}
+          Roofs_Floor3:
+            {}
+          Roofs_Floor4:
+            {}
+          Sign_Hanging:
+            {}
+          Sink3x:
+            {}
+          Sound_Aircon:
+            {}
+          Sounds:
+            {}
+          Spotlight:
+            {}
+          Spotlight_Desk:
+            {}
+          Stairs:
+            {}
+          StairsMod_Ground:
+            {}
+          StairsMod_Loop:
+            {}
+          StairsMod_RailingInside_Loop:
+            {}
+          StairsMod_RailingOutside:
+            {}
+          StairsMod_StepProtectors:
+            {}
+          StairsMod_Top:
+            {}
+          Stairs_RailingInside_Loop:
+            {}
+          Stairs_RailingInside_Top:
+            {}
+          Stairs_RailingOutside:
+            {}
+          Sticker01:
+            {}
+          Sticker02:
+            {}
+          Sticker03:
+            {}
+          TableScreen_A:
+            {}
+          TableScreen_B:
+            {}
+          TableScreen_C:
+            {}
+          TableScreen_C_Glass:
+            {}
+          TableScreen_E:
+            {}
+          TableScreen_E_Glass:
+            {}
+          TableWooden:
+            {}
+          TableWooden_B:
+            {}
+          TableWooden_B_WithProps_A:
+            {}
+          TableWooden_B_WithProps_B:
+            {}
+          TableWooden_B_WithProps_C:
+            {}
+          TableWooden_B_WithProps_D:
+            {}
+          TableWooden_B_WithProps_E:
+            {}
+          Table_Drawer:
+            {}
+          Table_DrawerSmall:
+            {}
+          Table_Flag:
+            {}
+          Table_Main:
+            {}
+          Table_MeetingWithChairs:
+            {}
+          Table_Office:
+            {}
+          Table_OfficeCorner:
+            {}
+          Table_OfficeCorner_WithProps_A:
+            {}
+          Table_OfficeCorner_WithProps_B:
+            {}
+          Table_OfficeCorner_WithProps_C:
+            {}
+          Table_OfficeDrawer:
+            {}
+          Toilet:
+            {}
+          ToiletSign:
+            {}
+          Toilet_Door:
+            {}
+          Toilet_Paper:
+            {}
+          Toilet_Partition_End:
+            {}
+          Toilet_Partition_Tile:
+            {}
+          Trashcan:
+            {}
+          Trashcan_Metal:
+            {}
+          Urinal:
+            {}
+          Urinal_Partition:
+            {}
+          W_1x:
+            {}
+          W_2x_glass_A:
+            {}
+          W_2x_glass_B:
+            {}
+          W_2x_glass_Door:
+            {}
+          W_2x_glass_DoorDouble:
+            {}
+          W_3x:
+            {}
+          W_3x_Elevator_Door:
+            {}
+          W_6x:
+            {}
+          W_6x_Door:
+            {}
+          W_6x_DoorDouble:
+            {}
+          W_6x_DoorWindow_Large:
+            {}
+          W_6x_Window_Large_B:
+            {}
+          W_6x_Window_MiniDouble:
+            {}
+          W_6x_Window_Small:
+            {}
+          W_ConnectSeam:
+            {}
+          W_Pilar_Large:
+            {}
+          W_Pilar_Small:
+            {}
+          Walkable:
+            {}
+          Walls:
+            {}
+          Walls_Floor1:
+            {}
+          Walls_Floor2:
+            {}
+          Walls_Floor3:
+            {}
+          Walls_Floor4:
+            {}
+          WaterSprinkler:
+            {}
+          WaterSprinklerPipe_3x:
+            {}
+          WaterSprinklerPipe_CornerRight:
+            {}
+          Water_Dispenser:
+            {}
+          Water_DispenserMUG:
+            {}
+          WhiteBoard:
+            {}
+          WhiteBoard_Walll:
+            {}
+          WindowBlinds_A:
+            {}
+          WindowBlinds_B:
+            {}
+          WindowBlinds_Closed:
+            {}
+          WindowBlinds_D:
+            {}
+          depth:
+            {}
+          hood_Lidar2D:
+            {}
+          rgb_left:
+            {}
+          rgb_right:
+            {}
+          segmentation:
+            {}
+          trunk_Lidar2D:
+            {}
+      Update Interval: 0
       Value: true
   Enabled: true
   Global Options:
-    Background Color: 255; 255; 255
+    Background Color: 0; 0; 0
     Default Light: true
-    Fixed Frame: world
+    Fixed Frame: map
     Frame Rate: 30
   Name: root
   Tools:
@@ -559,35 +1556,33 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 42.539432525634766
+      Distance: 4.086756229400635
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 3.123307943344116
-        Y: 23.758085250854492
-        Z: 1.9787483215332031
-      Focal Shape Fixed Size: true
+        X: 0
+        Y: 0
+        Z: 0
+      Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.35979726910591125
+      Pitch: 0.6003982424736023
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.4350194931030273
+      Yaw: 1.8653974533081055
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 1052
+  Height: 1025
   Hide Left Dock: false
   Hide Right Dock: true
-  Image:
-    collapsed: false
-  QMainWindow State: 000000ff00000000fd0000000400000000000001b2000003c2fc020000000bfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d00000285000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d00610067006501000002c8000001370000001600fffffffb0000000a0049006d0061006700650000000500000002a30000000000000000fb0000000a0049006d0061006700650100000332000000cd000000000000000000000001000002570000030cfc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d0000030c000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e1000001970000000300000ebd00000039fc0100000002fb0000000800540069006d0065000000000000000ebd000002eb00fffffffb0000000800540069006d00650100000000000004500000000000000000000005c8000003c200000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd0000000400000000000001b2000003a7fc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d000003a7000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d00610067006500000002da000002160000000000000000fb0000000a0049006d0061006700650000000500000002a300000000000000000000000100000257000003a7fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d000003a7000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e1000001970000000300000ebd00000039fc0100000002fb0000000800540069006d0065000000000000000ebd000002eb00fffffffb0000000800540069006d0065010000000000000450000000000000000000000585000003a700000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -596,6 +1591,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: true
-  Width: 1920
-  X: 1920
-  Y: 0
+  Width: 1853
+  X: 1987
+  Y: 87

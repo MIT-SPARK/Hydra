@@ -6,109 +6,48 @@
 
 namespace object_registration {
 
-ObjectRegistrationServer::ObjectRegistrationServer(const std::string &name)
-    : as_(nh_,
-          name,
-          boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
-          false),
-      action_name_(name) {
-  as_.start();
-}
-
-ObjectRegistrationServer::ObjectRegistrationServer(
-    const std::string name,
-    const std::string target_object_label,
-    teaser::RobustRegistrationSolver::Params solver_params)
-    : as_(nh_,
-          name,
-          boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
-          false),
-      action_name_(name),
-      target_object_label_(target_object_label),
-      solver_params_(solver_params) {
-  as_.start();
-}
-
-ObjectRegistrationServer::ObjectRegistrationServer(
-    const std::string name,
-    const std::string db_path,
-    const std::string target_object_label,
-    teaser::RobustRegistrationSolver::Params solver_params)
-    : as_(nh_,
-          name,
-          boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
-          false),
-      action_name_(name),
-      target_object_label_(target_object_label),
-      solver_params_(solver_params) {
-  as_.start();
-  ROS_INFO("Loading object database.");
-  loadObjectDB(db_path);
-}
-
-ObjectRegistrationServer::ObjectRegistrationServer(
-    const std::string name,
-    const std::string db_path,
-    const std::string target_object_label,
-    teaser::RobustRegistrationSolver::Params solver_params,
-    MatcherParams matcher_params)
-    : as_(nh_,
-          name,
-          boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
-          false),
-      action_name_(name),
-      target_object_label_(target_object_label),
-      solver_params_(solver_params),
-      matcher_(matcher_params) {
-  as_.start();
-  ROS_INFO("Loading object database.");
-  loadObjectDB(db_path);
-}
-
-ObjectRegistrationServer::ObjectRegistrationServer(
-    const std::string name,
-    const std::string db_path,
-    const std::string gt_path,
-    const std::string target_object_label,
-    teaser::RobustRegistrationSolver::Params solver_params,
-    MatcherParams matcher_params)
-    : as_(nh_,
-          name,
-          boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
-          false),
-      action_name_(name),
-      target_object_label_(target_object_label),
-      solver_params_(solver_params),
-      matcher_(matcher_params) {
-  as_.start();
-  ROS_INFO("Loading object database.");
-  loadObjectDB(db_path);
-  loadGTDB(gt_path);
-}
-
 ObjectRegistrationServer::ObjectRegistrationServer(
     const std::string& name,
+    const std::string& target_object_label,
     const std::string& db_path,
     const std::string& gt_path,
     const std::string& label_path,
-    const std::string& target_object_label,
-    teaser::RobustRegistrationSolver::Params solver_params,
-    MatcherParams matcher_params)
-    : as_(nh_,
+    const teaser::RobustRegistrationSolver::Params& solver_params,
+    const MatcherParams& matcher_params)
+    : nh_(),
+      nh_private_("~"),
+      action_server_(
+          nh_,
           name,
           boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
           false),
       action_name_(name),
       target_object_label_(target_object_label),
       solver_params_(solver_params),
-      matcher_(matcher_params) {
-  as_.start();
-  ROS_INFO("Loading label database.");
-  loadLabelDB(label_path);
-  ROS_INFO("Loading object database.");
-  loadObjectDB(db_path);
-  ROS_INFO("Loading GT database.");
-  loadGTDB(gt_path);
+      matcher_(matcher_params),
+      world_frame_id_("map") {
+  // Get ROS Params
+  nh_private_.getParam("world_frame_id", world_frame_id_);
+
+  action_server_.start();
+  if (!db_path.empty()) {
+    ROS_INFO("Loading Object database.");
+    loadObjectDB(db_path);
+  } else {
+    ROS_WARN("No Object database path provided...");
+  }
+  if (!label_path.empty()) {
+    ROS_INFO("Loading Label database.");
+    loadLabelDB(label_path);
+  } else {
+    ROS_WARN("No Label database path provided...");
+  }
+  if (!gt_path.empty()) {
+    ROS_INFO("Loading GT object database.");
+    loadGTDB(gt_path);
+  } else {
+    ROS_WARN("No GT Object database path provided...");
+  }
 }
 
 /**
@@ -214,14 +153,14 @@ float calcSD(const std::vector<float> &data) {
  * Helper function for publishing point clouds given a point cloud db
  * @param db
  */
-void dbPublishHelper(
+void ObjectRegistrationServer::dbPublishHelper(
     std::string prefix,
     std::string s_label,
     pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud,
     std::unordered_map<std::string, pcl::PointCloud<pcl::PointXYZ>> &db,
     std::unordered_map<std::string, ros::Publisher> &pubs,
     ros::NodeHandle &nh) {
-  point_cloud->header.frame_id = "map";
+  point_cloud->header.frame_id = world_frame_id_;
   bool not_in_reg_object_db = db.find(s_label) == db.end();
   // Create or merge point cloud depending on whether one already exists
   if (not_in_reg_object_db) {
@@ -287,8 +226,9 @@ void ObjectRegistrationServer::executeCB(
       ROS_INFO("Current UNKNOWN centroid SD:         %f",
                calcSD(unknown_centroid_errors_));
     }
-    ROS_WARN("Label not in database. Abort.");
-    as_.setAborted();
+
+    ROS_WARN("Label not in database. Aborting Teaser Registration.");
+    action_server_.setAborted();
     return;
   }
 
@@ -296,8 +236,8 @@ void ObjectRegistrationServer::executeCB(
 
   // Load src model
   auto src_cloud = object_db_[s_label];
-  ROS_INFO("Dst size: %d.", dst_points.size());
-  ROS_INFO("Src size: %d.", src_cloud.point_cloud->size());
+  ROS_INFO("Dst size: %lu.", dst_points.size());
+  ROS_INFO("Src size: %lu.", src_cloud.point_cloud->size());
 
   // Calculate dst keypoints
   ROS_INFO("Calculate Harris keypoints");
@@ -305,7 +245,7 @@ void ObjectRegistrationServer::executeCB(
 
   // Calculate src keypoints
   auto src_keypoints = matcher_.calculateKeypoints(src_cloud.point_cloud);
-  ROS_INFO("Number of Harris keypoints: src -- %d, dst -- %d",
+  ROS_INFO("Number of Harris keypoints: src -- %lu, dst -- %lu",
            src_keypoints->size(),
            dst_keypoints->size());
 
@@ -315,7 +255,7 @@ void ObjectRegistrationServer::executeCB(
   // Abort if somehow keypoints size equal to zero
   if (N == 0) {
     ROS_WARN("Keypoints size equal to zero. Abort.");
-    as_.setAborted();
+    action_server_.setAborted();
     return;
   }
 
@@ -330,7 +270,7 @@ void ObjectRegistrationServer::executeCB(
   auto solution = solver_.getSolution();
   if (!solution.valid) {
     ROS_WARN("TEASER++ failed. Abort.");
-    as_.setAborted();
+    action_server_.setAborted();
     return;
   }
   ROS_INFO("Solution valid!");
@@ -360,7 +300,7 @@ void ObjectRegistrationServer::executeCB(
 
   // Update registrated object db
   auto transformed_cloud = eigen2PclPointCloud(transformed_object);
-  transformed_cloud->header.frame_id = "map";
+  transformed_cloud->header.frame_id = world_frame_id_;
   dbPublishHelper("reg_pcl_",
                   s_label_str,
                   transformed_cloud,
@@ -381,7 +321,7 @@ void ObjectRegistrationServer::executeCB(
   pcl::PointCloud<pcl::PointXYZ>::Ptr src_keypoints_trans(
       new pcl::PointCloud<pcl::PointXYZ>);
   pcl::transformPointCloud(*src_keypoints, *src_keypoints_trans, trans_mat);
-  src_keypoints_trans->header.frame_id = "map";
+  src_keypoints_trans->header.frame_id = world_frame_id_;
   dbPublishHelper("src_keypoints_",
                   s_label_str,
                   src_keypoints_trans,
@@ -390,7 +330,7 @@ void ObjectRegistrationServer::executeCB(
                   nh_);
 
   // Update dst keypoints
-  dst_keypoints->header.frame_id = "map";
+  dst_keypoints->header.frame_id = world_frame_id_;
   dbPublishHelper("dst_keypoints_",
                   s_label_str,
                   dst_keypoints,
@@ -400,7 +340,7 @@ void ObjectRegistrationServer::executeCB(
 
   feedback_.percent_complete = 1;
   ROS_INFO("%s: Successful object alignment.", action_name_.c_str());
-  ROS_INFO("Aligned object size: %d", result_.aligned_object.points.size());
+  ROS_INFO("Aligned object size: %lu", result_.aligned_object.points.size());
   ROS_INFO("Current KNOWN mean centroid error:   %f",
            calcMean(known_centroid_errors_));
   ROS_INFO("Current KNOWN centroid SD:           %f",
@@ -410,7 +350,7 @@ void ObjectRegistrationServer::executeCB(
   ROS_INFO("Current UNKNOWN centroid SD:         %f",
            calcSD(unknown_centroid_errors_));
   // set the action state to succeeded
-  as_.setSucceeded(result_);
+  action_server_.setSucceeded(result_);
 }
 
 int ObjectRegistrationServer::loadObjectDB(const std::string &db_root_path) {
@@ -451,7 +391,7 @@ int ObjectRegistrationServer::loadObjectDB(const std::string &db_root_path) {
     // load point cloud
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(
         new pcl::PointCloud<pcl::PointXYZ>);
-    reader.read(ply_path, cloud);
+    ROS_ASSERT(reader.read(ply_path, cloud) == 0);
 
     // save to object db
     object_db_.insert(
@@ -483,49 +423,62 @@ int ObjectRegistrationServer::loadGTDB(const std::string &gt_file) {
   // Read file
   std::ifstream file(gt_file);
   auto result = getNextLineAndSplitIntoTokens(file);
+  std::unordered_map<std::string, size_t> counters;
   while (file) {
     result = getNextLineAndSplitIntoTokens(file);
     if (result.size() <= 1) {
       break;
     }
-    auto name = result[0];
-
-    std::istringstream name_stream(name);
+    std::istringstream name_stream (result[0]);
     std::vector<std::string> name_tokens;
     std::copy(std::istream_iterator<std::string>(name_stream),
               std::istream_iterator<std::string>(),
               std::back_inserter(name_tokens));
 
     // For everything
-    auto rend_name = name_tokens[0];
-    int id = semantic_label_map_[rend_name];
-    // Only keep the couches
-    float centroid_x = std::stof(result[4]);
-    float centroid_y = std::stof(result[5]);
-    float centroid_z = std::stof(result[6]);
+    std::string object_name = name_tokens[0];
+    int id = semantic_label_map_[object_name];
+    float centroid_x = std::stof(result[1]);
+    float centroid_y = std::stof(result[2]);
+    float centroid_z = std::stof(result[3]);
 
     Eigen::Matrix<float, 3, 1> point_mat(3, 1);
     point_mat << centroid_x, centroid_y, centroid_z;
-    Eigen::Matrix<float, 3, 3> enu_R_unity(3, 1);
-    enu_R_unity << 1, 0, 0, 0, 0, 1, 0, 1, 0;
     Eigen::Matrix<float, 3, 1> transformed_point(3, 1);
-    transformed_point = enu_R_unity * point_mat;
+    // Eigen::Matrix<float, 3, 3> enu_R_unity_;
+    // enu_R_unity_ << 1, 0, 0, 0, 0, 1, 0, 1, 0;
+    // transformed_point = enu_R_unity_ * point_mat;
+    transformed_point = point_mat;
 
-    pcl::PointXYZ cpoint;
-    cpoint.x = transformed_point[0];
-    cpoint.y = transformed_point[1];
-    cpoint.z = transformed_point[2];
+    pcl::PointXYZ centroid;
+    centroid.x = transformed_point[0];
+    centroid.y = transformed_point[1];
+    centroid.z = transformed_point[2];
 
     ROS_INFO("Label: %s, Centroid x: %f, y: %f, z: %f",
-             rend_name.c_str(),
-             cpoint.x,
-             cpoint.y,
-             cpoint.z);
-    gt_centroids_db_[id].push_back(cpoint);
+             object_name.c_str(),
+             centroid.x,
+             centroid.y,
+             centroid.z);
+    gt_centroids_db_[id].push_back(centroid);
+
+    // Publish centroid as static tf for RVIZ visualization
+    geometry_msgs::Transform static_tf;
+    static_tf.translation.x = centroid.x;
+    static_tf.translation.y = centroid.y;
+    static_tf.translation.z = centroid.z;
+    static_tf.rotation.w = std::stof(result[4]);
+    static_tf.rotation.x = std::stof(result[5]);
+    static_tf.rotation.y = std::stof(result[6]);
+    static_tf.rotation.z = std::stof(result[7]);
+    counters[object_name]++;
+    publishObjectStaticTf(static_tf,
+                          world_frame_id_,
+                          object_name + std::to_string(counters[object_name]));
 
     // Search for couch only
     if (name_tokens[0] == target_object_label_) {
-      gt_centroids_.push_back(cpoint);
+      gt_centroids_.push_back(centroid);
     }
   }
 

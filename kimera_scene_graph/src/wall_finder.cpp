@@ -77,9 +77,9 @@ void EnclosingWallFinder::findWalls(const vxb::Mesh& walls_mesh,
 
           NodeId room_id = nearest_place_to_wall.parent_edge_.start_node_id_;
           if (room_id == -1) {
-            LOG(WARNING) << "Place node with id "
-                         << nearest_place_to_wall.node_id_
-                         << " does not have room id when finding walls!";
+            LOG_EVERY_N(WARNING, 1000)
+                << "Place node with id " << nearest_place_to_wall.node_id_
+                << " does not have room id when finding walls!";
             continue;
           }
           // Check normal orientation

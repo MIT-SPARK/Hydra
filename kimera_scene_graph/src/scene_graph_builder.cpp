@@ -219,7 +219,7 @@ bool SceneGraphBuilder::fillSceneGraphWithPlaces(
     if (!scene_graph_edge.isSelfEdge()) {
       scene_graph_->addEdge(&scene_graph_edge);
     } else {
-      LOG(ERROR) << "Not adding self-edge: " << scene_graph_edge.print();
+      VLOG(1) << "Not adding self-edge: " << scene_graph_edge.print();
       invalid_edges++;
     }
   }
@@ -314,9 +314,11 @@ void SceneGraphBuilder::sceneGraphReconstruction(const bool& only_rooms) {
 
   vxb::Mesh::Ptr walls_mesh = nullptr;
   if (!only_rooms) {
+    LOG(INFO) << "Reconstructing Mesh out of TSDF.";
     vxb::MeshLayer::Ptr mesh_test(
         new vxb::MeshLayer(tsdf_layer_->block_size()));
     reconstructMeshOutOfTsdf(mesh_test);
+    LOG(INFO) << "Finished reconstructing Mesh out of TSDF.";
 
     // Get Semantic PCLs
     SemanticPointCloudMap semantic_pointclouds;
@@ -356,10 +358,15 @@ void SceneGraphBuilder::sceneGraphReconstruction(const bool& only_rooms) {
         // static size_t n = 0;
         // if (n < 3u) {
         // Only extract objects that are not unknown.
-        if (semantic_label == 2 || semantic_label == 7 || semantic_label == 5 ||
-            semantic_label == 8) {
+        // uH1 interesting labels: 2, 7, 5, 8
+        // uH2 interesting labels: 1 (couch), 3 (chairs)
+        //if (semantic_label == 1 || // Couch
+        //    semantic_label == 3) { // Chairs
           extractThings(semantic_label, semantic_pcl);
-        }
+        //} else {
+        //  LOG(INFO) << "Skipping object extraction for semantic label: "
+        //            << std::to_string(semantic_label);
+        //}
         //  ++n;
         //}
       } else {

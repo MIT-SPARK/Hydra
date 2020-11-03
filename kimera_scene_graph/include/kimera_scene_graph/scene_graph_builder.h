@@ -98,7 +98,6 @@ class SceneGraphBuilder {
                             const double& explosion_factor = 2.0);
   void extractThings(const SemanticLabel& semantic_label,
                      const SemanticPointCloud::Ptr& semantic_pcl);
-  void extractThings();
 
   void getSemanticPointcloudsFromMesh(
       const vxb::MeshLayer::ConstPtr& mesh_layer,

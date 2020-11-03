@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 
 # Put this in a yaml file perhaps
-ids = {"apartment_scene":
-       {"uHumans2_apartment_s1_00h.bag": '1kU_drpyG7glQ8pJyeztpiy214WbBEtbM',
-        "uHumans2_apartment_s1_01h.bag": '1jp7HrRsfGbmC-z757wwXDEpgNPHw0SbK',
-        "uHumans2_apartment_s1_02h.bag": '1ai2p6QVNFaPJfEFOOec6URp5Anu0MBoo'
-       },
-       "office_scene":
-       {"uHumans2_office_s1_00h.bag": '1CA_1Awu-bewJKpDrILzWok_H_6cOkGDb',
-        "uHumans2_office_s1_06h.bag": '1zECekG47mlGafaJ84vCbwcx3Dz03NuvN',
-        "uHumans2_office_s1_12h.bag": '1Of7s_QTE9nL1Hd69SFW1R5uDiJDiQrZr'
-       },
+ids = {#"apartment_scene":
+       #{"uHumans2_apartment_s1_00h.bag": '1kU_drpyG7glQ8pJyeztpiy214WbBEtbM',
+       # "uHumans2_apartment_s1_01h.bag": '1jp7HrRsfGbmC-z757wwXDEpgNPHw0SbK',
+       # "uHumans2_apartment_s1_02h.bag": '1ai2p6QVNFaPJfEFOOec6URp5Anu0MBoo'
+       #},
+       #"office_scene":
+       #{"uHumans2_office_s1_00h.bag": '1CA_1Awu-bewJKpDrILzWok_H_6cOkGDb',
+       # "uHumans2_office_s1_06h.bag": '1zECekG47mlGafaJ84vCbwcx3Dz03NuvN',
+       # "uHumans2_office_s1_12h.bag": '1Of7s_QTE9nL1Hd69SFW1R5uDiJDiQrZr'
+       #},
        "subway_scene":
        {
            "uHumans2_subway_s1_00h.bag": '1ChL1SW1tfZrCjn5XEf4GJG8nm_Cb5AEm',

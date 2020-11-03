@@ -2,8 +2,15 @@
 <launch>
   <!-- Number of threads used by OpenMP (for TEASER++)-->
   <env name="OMP_NUM_THREADS" value="12"/>
+
+  <arg name="semantic_label_2_color_csv_filename"
+    default="tesse_multiscene_office2_segmentation_mapping.csv"/>
+  <arg name="gt_csv_filename"
+    default="office_static_tfs_ros.csv"/>
+
   <node name="object_db_node" pkg="object_db"
     type="server_node" output="screen">
+    <param name="world_frame_id"                     value="map"/>
 
     <!-- Launch file for running on office2 scene with office1 seg-->
     <!-- refer to TEASER++ github for more information. See link below-->
@@ -34,14 +41,14 @@
 
     <!-- Object Database Params -->
     <!-- Path to the object database -->
-    <param name="object_db_path"                     value="$(find object_db)/data/sofa_db_1seat/" />
+    <param name="object_db_path"      value="$(find object_db)/data/sofa_db_1seat/" />
     <param name="target_object_label" value="Couch_1seat" />
 
     <!-- GT Data Params -->
     <!-- Path of the ground truth pose information csv file-->
-    <param name="gt_csv_path"    value="$(find object_db)/data/gt_data.csv" />
+    <param name="gt_csv_path"              value="$(find kimera_semantics_ros)/cfg/$(arg gt_csv_filename)"/>
     <!-- Path of the color to label mapping csv file-->
-    <param name="semantic_label_csv_path"  value="$(find kimera_semantics_ros)/cfg/tesse_multiscene_office1_segmentation_mapping.csv"/>
+    <param name="semantic_label_csv_path"  value="$(find kimera_semantics_ros)/cfg/$(arg semantic_label_2_color_csv_filename)"/>
 
   </node>
 </launch>
