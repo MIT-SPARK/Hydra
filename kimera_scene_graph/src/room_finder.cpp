@@ -123,8 +123,7 @@ void RoomFinder::updateSceneGraph(
     // Create SceneNode out of centroids
     SceneGraphNode room_instance;
     room_instance.attributes_.semantic_label_ = kRoomSemanticLabel;
-    room_instance.attributes_.name_ =
-        std::to_string(kRoomSemanticLabel) + std::to_string(next_room_id_);
+    room_instance.attributes_.name_ = std::to_string(next_room_id_);
     const vxb::Color& room_color = getRoomColor(next_room_id_);
     room_instance.attributes_.color_ = NodeColor(room_color.r, room_color.g,
         room_color.b);

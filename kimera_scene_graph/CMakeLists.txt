@@ -15,6 +15,8 @@ cs_add_library(${PROJECT_NAME}
   include/kimera_scene_graph/utils/voxblox_to_pcl.h
   include/kimera_scene_graph/common.h
   include/kimera_scene_graph/object_finder-inl.h
+  include/kimera_scene_graph/object_place_connectivity_finder.h
+  include/kimera_scene_graph/places_room_connectivity_finder.h
   include/kimera_scene_graph/scene_graph_node.h
   include/kimera_scene_graph/scene_graph_edge.h
   include/kimera_scene_graph/scene_graph_layer.h
@@ -24,6 +26,7 @@ cs_add_library(${PROJECT_NAME}
   include/kimera_scene_graph/dynamic_scene_graph_evaluator.h
   src/object_finder.cpp
   src/room_finder.cpp
+  src/object_place_connectivity_finder.cpp
   src/places_room_connectivity_finder.cpp
   src/room_connectivity_finder.cpp
   src/wall_finder.cpp

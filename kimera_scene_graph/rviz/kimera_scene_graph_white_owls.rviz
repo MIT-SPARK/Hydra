@@ -5,10 +5,9 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /SemanticMesh1
+        - /Axes1
         - /SemanticMesh1/Namespaces1
-        - /SemanticMesh2
-        - /SemanticMesh2/Status1
+        - /Centroids1
         - /Centroids1/Namespaces1
         - /InstanceIds1/Namespaces1
         - /EdgesObjectMesh1
@@ -22,11 +21,13 @@ Panels:
         - /SparseGraph1
         - /SparseGraph1/Namespaces1
         - /SegmentedSparseGraph1
+        - /SegmentedSparseGraph1/Namespaces1
+        - /TruncatedESDF1
         - /BoundingBoxes1/Namespaces1
-        - /TSDF1
         - /Walls1/Namespaces1
-      Splitter Ratio: 0.43717947602272034
-    Tree Height: 874
+        - /PointCloud21
+      Splitter Ratio: 0.49827587604522705
+    Tree Height: 1394
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -45,7 +46,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: RoomClusters
+    SyncSource: TruncatedESDF
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -57,7 +58,7 @@ Visualization Manager:
       Cell Size: 1
       Class: rviz/Grid
       Color: 160; 160; 164
-      Enabled: true
+      Enabled: false
       Line Style:
         Line Width: 0.029999999329447746
         Value: Lines
@@ -70,27 +71,26 @@ Visualization Manager:
       Plane: XY
       Plane Cell Count: 200
       Reference Frame: <Fixed Frame>
-      Value: true
+      Value: false
     - Class: rviz/Axes
-      Enabled: true
-      Length: 10
+      Enabled: false
+      Length: 5
       Name: Axes
-      Radius: 0.5
+      Radius: 0.20000000298023224
       Reference Frame: <Fixed Frame>
-      Value: true
+      Value: false
     - Class: rviz/MarkerArray
-      Enabled: true
+      Enabled: false
       Marker Topic: /kimera_scene_graph_eval_node/sparse_graph
       Name: SemanticMesh
       Namespaces:
-        transition_edges: true
-        vertices: true
+        {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Class: voxblox_rviz_plugin/VoxbloxMesh
       Enabled: true
       Name: SemanticMesh
-      Topic: /kimera_scene_graph_eval_node/semantic_mesh
+      Topic: /kimera_scene_graph_eval_node/rgb_mesh
       Unreliable: false
       Value: true
     - Class: rviz/MarkerArray
@@ -99,6 +99,7 @@ Visualization Manager:
       Name: Centroids
       Namespaces:
         B: true
+        O: true
         P: true
         R: true
       Queue Size: 100
@@ -109,6 +110,15 @@ Visualization Manager:
       Name: InstanceIds
       Namespaces:
         B: true
+        "L: 1": false
+        "L: 10": false
+        "L: 11": false
+        "L: 14": false
+        "L: 16": false
+        "L: 18": false
+        "L: 5": false
+        "L: 6": false
+        "L: 7": false
         R: true
       Queue Size: 100
       Value: true
@@ -116,7 +126,7 @@ Visualization Manager:
       Buffer Length: 1
       Class: rviz/Path
       Color: 25; 255; 0
-      Enabled: true
+      Enabled: false
       Head Diameter: 0.30000001192092896
       Head Length: 0.20000000298023224
       Length: 0.5
@@ -134,7 +144,7 @@ Visualization Manager:
       Shaft Length: 0.30000001192092896
       Topic: /kimera_scene_graph_eval_node/view_path_pub
       Unreliable: true
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -166,13 +176,13 @@ Visualization Manager:
       Use rainbow: true
       Value: true
     - Class: rviz/MarkerArray
-      Enabled: true
+      Enabled: false
       Marker Topic: /kimera_scene_graph_eval_node/edges_centroid_pcl
       Name: EdgesObjectMesh
       Namespaces:
         {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Class: rviz/MarkerArray
       Enabled: true
       Marker Topic: /kimera_scene_graph_eval_node/obj_skeleton_edges
@@ -187,9 +197,9 @@ Visualization Manager:
       Name: EdgesNodeToNode
       Namespaces:
         "Inter Layer : from B to R": true
+        "Inter Layer : from P to O": true
         "Inter Layer : from R to P": true
         "Intra Layer : from P to P": true
-        "Intra Layer : from R to R": true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -197,27 +207,35 @@ Visualization Manager:
       Marker Topic: /kimera_scene_graph_eval_node/edges_centroid_pcl
       Name: EdgesCentroidToPcl
       Namespaces:
-        {}
+        B: false
+        "L: 1": true
+        "L: 10": true
+        "L: 11": true
+        "L: 14": true
+        "L: 16": true
+        "L: 18": true
+        "L: 5": true
+        "L: 6": true
+        "L: 7": true
+        R: false
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
-      Enabled: true
+      Enabled: false
       Marker Topic: /kimera_scene_graph_eval_node/sparse_graph
       Name: SparseGraph
       Namespaces:
-        transition_edges: true
-        vertices: true
+        {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Class: rviz/MarkerArray
-      Enabled: true
+      Enabled: false
       Marker Topic: /kimera_scene_graph_eval_node/segmented_sparse_graph
       Name: SegmentedSparseGraph
       Namespaces:
-        transition_edges: true
-        vertices: true
+        {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -233,9 +251,9 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 0.30000001192092896
+      Max Intensity: 1.6084284782409668
       Min Color: 0; 0; 0
-      Min Intensity: -0.1999802589416504
+      Min Intensity: 0.3000555634498596
       Name: TruncatedESDF
       Position Transformer: XYZ
       Queue Size: 10
@@ -243,7 +261,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.05000000074505806
       Style: Flat Squares
-      Topic: /kimera_scene_graph_eval_node/esdf_truncated
+      Topic: /kimera_scene_graph_eval_node/clustered_pcls
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -253,7 +271,16 @@ Visualization Manager:
       Marker Topic: /kimera_scene_graph_eval_node/bounding_boxes
       Name: BoundingBoxes
       Namespaces:
-        "L: 0": true
+        "L: 1": true
+        "L: 10": true
+        "L: 11": true
+        "L: 14": true
+        "L: 16": true
+        "L: 18": true
+        "L: 23": true
+        "L: 5": true
+        "L: 6": true
+        "L: 7": true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -276,7 +303,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: Intensity
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 1.486911654472351
@@ -293,7 +320,7 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 0.800000011920929
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -306,7 +333,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: Intensity
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 0.20000000298023224
@@ -323,7 +350,7 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 0.30000001192092896
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -336,7 +363,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: RGB8
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 2
@@ -353,7 +380,7 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -366,7 +393,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: RGB8
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 2
@@ -383,47 +410,47 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: false
-      Value: true
+      Value: false
     - Class: rviz/Marker
-      Enabled: true
+      Enabled: false
       Marker Topic: /kimera_scene_graph_eval_node/mesh_2_semantic_label_18
       Name: Bins
       Namespaces:
         {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Class: rviz/Marker
-      Enabled: true
+      Enabled: false
       Marker Topic: /kimera_scene_graph_eval_node/mesh_2_semantic_label_7
       Name: Sofas
       Namespaces:
         {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Class: rviz/Marker
-      Enabled: true
+      Enabled: false
       Marker Topic: /kimera_scene_graph_eval_node/mesh_2_semantic_label_5
       Name: Chairs
       Namespaces:
         {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Class: rviz/Marker
-      Enabled: true
+      Enabled: false
       Marker Topic: /kimera_scene_graph_eval_node/mesh_semantic_label_2
       Name: Shelves
       Namespaces:
         {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Class: rviz/Marker
-      Enabled: true
+      Enabled: false
       Marker Topic: /kimera_scene_graph_eval_node/mesh_semantic_label_19
       Name: Walls
       Namespaces:
         {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -455,29 +482,29 @@ Visualization Manager:
       Use rainbow: true
       Value: false
     - Class: rviz/Marker
-      Enabled: true
+      Enabled: false
       Marker Topic: /kimera_scene_graph_node/all_graph_edges
       Name: HumanGraphEdges
       Namespaces:
         {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Class: rviz/Marker
-      Enabled: true
+      Enabled: false
       Marker Topic: /kimera_scene_graph/human_meshes_vis
       Name: HumanMarker
       Namespaces:
         {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Class: rviz/Marker
-      Enabled: true
+      Enabled: false
       Marker Topic: /kimera_scene_graph_eval_node/mesh_2_semantic_label_19
       Name: HighWalls
       Namespaces:
         {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Class: rviz/TF
       Enabled: false
       Frame Timeout: 15
@@ -492,6 +519,111 @@ Visualization Manager:
         {}
       Update Interval: 0
       Value: false
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Decay Time: 0
+      Enabled: false
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 1.4659624099731445
+      Min Color: 0; 0; 0
+      Min Intensity: 0.15000824630260468
+      Name: PointCloud2
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.10000000149011612
+      Style: Flat Squares
+      Topic: /kimera_scene_graph_eval_node/room_clusters
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: false
+    - Class: mesh_rviz_plugins/TexturedMesh
+      Enabled: true
+      Name: TexturedMesh
+      Normal Size: 0.05000000074505806
+      Phong Shading: true
+      Point Size: 1
+      Polygon Mode: ""
+      PolygonMesh Topic: ""
+      Queue Size: 25
+      Scene Color Scale: 1
+      Shader Program: ""
+      Show Normals: false
+      Texture Transport Hint: raw
+      Texture topic: ""
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: ""
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: PointCloud2
+      Position Transformer: ""
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.009999999776482582
+      Style: Flat Squares
+      Topic: /kimera_scene_graph_eval_node/room_centroids
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: ""
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: PointCloud2
+      Position Transformer: ""
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.009999999776482582
+      Style: Flat Squares
+      Topic: /kimera_scene_graph_eval_node/walls_clustered_pcls
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 255; 255; 255
@@ -521,33 +653,33 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 89.6664047241211
+      Distance: 37.54487991333008
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.3216354548931122
-        Y: -1.8713035583496094
-        Z: 11.012158393859863
+        X: -5.346954345703125
+        Y: -5.947956085205078
+        Z: 10.661367416381836
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.9203985929489136
+      Pitch: 0.4747963845729828
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 2.905393362045288
+      Yaw: 4.811770915985107
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 1025
+  Height: 1545
   Hide Left Dock: false
   Hide Right Dock: true
-  QMainWindow State: 000000ff00000000fd00000004000000000000030e000003a7fc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d000003a7000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d00610067006500000002da000002160000000000000000fb0000000a0049006d0061006700650000000500000002a300000000000000000000000100000257000003a7fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d000003a7000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e1000001970000000300000ebd00000039fc0100000002fb0000000800540069006d0065000000000000000ebd000002eb00fffffffb0000000800540069006d0065010000000000000450000000000000000000000429000003a700000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd000000040000000000000246000005affc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d000005af000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d00610067006500000002da000002160000000000000000fb0000000a0049006d0061006700650000000500000002a300000000000000000000000100000257000003a7fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d000003a7000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e1000001970000000300000ebd00000039fc0100000002fb0000000800540069006d0065000000000000000ebd000002eb00fffffffb0000000800540069006d0065010000000000000450000000000000000000000c71000005af00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -556,6 +688,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: true
-  Width: 1853
-  X: 1987
+  Width: 3773
+  X: 67
   Y: 27

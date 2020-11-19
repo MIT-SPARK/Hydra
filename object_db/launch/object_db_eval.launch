@@ -8,6 +8,9 @@
   <arg name="gt_csv_filename"
     default="office_static_tfs_ros.csv"/>
 
+  <arg name="target_object_label" default="Couch_1seat"/>
+  <arg name="scene" default="office"/>
+
   <node name="object_db_node" pkg="object_db"
     type="server_node" output="screen">
     <param name="world_frame_id"                     value="map"/>
@@ -41,8 +44,8 @@
 
     <!-- Object Database Params -->
     <!-- Path to the object database -->
-    <param name="object_db_path"      value="$(find object_db)/data/sofa_db_1seat/" />
-    <param name="target_object_label" value="Couch_1seat" />
+    <param name="object_db_path"      value="$(find object_db)/data/$(arg scene)_known_objects"/>
+    <param name="target_object_label" value="$(arg target_object_label)"/>
 
     <!-- GT Data Params -->
     <!-- Path of the ground truth pose information csv file-->

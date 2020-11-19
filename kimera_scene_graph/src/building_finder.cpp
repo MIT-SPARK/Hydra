@@ -19,9 +19,9 @@ void BuildingFinder::findBuildings(SceneGraph* scene_graph) {
   static const NodeColor kBuildingColor = NodeColor(255u, 0u, 0u);
   building_instance.attributes_.color_ = kBuildingColor;
   // We only have one building now.
-  building_instance.attributes_.name_ = std::to_string(kBuildingSemanticLabel) +
-                                        building_instance.attributes_.name_;
   building_instance.node_id_ = 1u;
+  building_instance.attributes_.name_ =
+      std::to_string(building_instance.node_id_);
   building_instance.layer_id_ = LayerId::kBuildingsLayerId;
   SceneGraphLayer room_layer(LayerId::kRoomsLayerId);
   CHECK(scene_graph->getLayerSafe(LayerId::kRoomsLayerId, &room_layer))

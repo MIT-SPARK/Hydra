@@ -32,6 +32,7 @@
 // Finders
 #include "kimera_scene_graph/building_finder.h"
 #include "kimera_scene_graph/object_finder.h"
+#include "kimera_scene_graph/object_place_connectivity_finder.h"
 #include "kimera_scene_graph/places_room_connectivity_finder.h"
 #include "kimera_scene_graph/room_connectivity_finder.h"
 #include "kimera_scene_graph/room_finder.h"
@@ -89,7 +90,9 @@ class SceneGraphBuilder {
 
  protected:
   void rqtReconfigureCallback(RqtSceneGraphConfig& config, uint32_t level);
-  void reconstructMeshOutOfTsdf(vxb::MeshLayer::Ptr mesh_layer);
+  voxblox_msgs::Mesh reconstructMeshOutOfTsdf(
+      vxb::Layer<vxb::TsdfVoxel>* tsdf_layer,
+      vxb::MeshLayer::Ptr mesh_layer);
   void reconstructEsdfOutOfTsdf(const bool& save_to_file);
 
   void publishSemanticMesh(const SemanticLabel& semantic_label,
@@ -116,7 +119,8 @@ class SceneGraphBuilder {
   bool fillSceneGraphWithPlaces(
       const vxb::SparseSkeletonGraph& sparse_skeleton);
 
-  bool loadTsdfMap(const std::string& file_path);
+  bool loadTsdfMap(const std::string& file_path,
+                   vxb::Layer<vxb::TsdfVoxel>* tsdf_layer);
   bool loadEsdfMap(const std::string& file_path);
 
  protected:
@@ -127,6 +131,7 @@ class SceneGraphBuilder {
   ros::Publisher walls_clustered_pcl_pub_;
   ros::Publisher room_centroids_pub_;
   ros::Publisher mesh_pub_;
+  ros::Publisher rgb_mesh_pub_;
   ros::Publisher polygon_mesh_pub_;
   ros::Publisher sparse_graph_pub_;
 
@@ -162,6 +167,8 @@ class SceneGraphBuilder {
 
   // Room finder
   std::unique_ptr<RoomFinder> room_finder_;
+  std::unique_ptr<ObjectPlaceConnectivityFinder>
+      object_place_connectivity_finder_;
   std::unique_ptr<PlacesRoomConnectivityFinder> places_in_rooms_finder_;
   std::unique_ptr<RoomConnectivityFinder> room_connectivity_finder_;
   std::unique_ptr<BuildingFinder> building_finder_;
@@ -175,6 +182,7 @@ class SceneGraphBuilder {
   std::unique_ptr<ObjectDBClient> object_db_client_;
 
   // Labels of interesting things
+  std::vector<int> dynamic_labels_;
   std::vector<int> stuff_labels_;
   std::vector<int> walls_labels_;
   std::vector<int> floor_labels_;
@@ -191,6 +199,7 @@ class SceneGraphBuilder {
 
   // Layers
   std::unique_ptr<vxb::Layer<vxb::TsdfVoxel>> tsdf_layer_;
+  std::unique_ptr<vxb::Layer<vxb::TsdfVoxel>> tsdf_layer_rgb_;
   std::unique_ptr<vxb::Layer<vxb::EsdfVoxel>> esdf_layer_;
 
   // Integrators

@@ -9,6 +9,7 @@
 namespace kimera {
 
 class SceneGraph;
+class SceneGraphNode;
 
 class PlacesRoomConnectivityFinder {
  public:
@@ -21,7 +22,7 @@ class PlacesRoomConnectivityFinder {
   void findPlacesRoomConnectivity(SceneGraph* scene_graph);
 
   void linkPlaceToRoom(const NodeId& room_id,
-                       const NodeId& place_id,
+                       SceneGraphNode* place_node,
                        SceneGraph* scene_graph);
 
  private:

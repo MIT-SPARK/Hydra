@@ -65,7 +65,7 @@ class SceneGraphLayer {
   }
 
   //! Setters
-  inline bool setLayerId(const LayerId& layer_id) { layer_id_ = layer_id; }
+  inline void setLayerId(const LayerId& layer_id) { layer_id_ = layer_id; }
 
   //! Checkers
   inline bool hasNode(const NodeId& node_id) const {
@@ -77,8 +77,25 @@ class SceneGraphLayer {
 
   //! Utils
   ColorPointCloud::Ptr convertLayerToPcl(
-      std::map<int, NodeId>* cloud_to_graph_ids,
-      std::vector<NodeId>* vertex_ids) const;
+      std::map<int, NodeId>* cloud_to_graph_ids = nullptr,
+      std::vector<NodeId>* vertex_ids = nullptr) const;
+
+  /**
+   * @brief findNearestSceneGraphNode Finds the nearest scene graph
+   * node to a query 3D point (query_point).
+   * Internally, it converts the scene graph layer to a pointcloud and builds
+   * a kd-tree out of it to answer NN queries.
+   * @param[in] query_point 3D point for which we want to find its nearest
+   * neighbor in the given layer_id.
+   * @param[out] nearest_scene_graph_node The actual scene-graph node (or nodes)
+   * that are the nearest to the query_point.
+   * @param[in] k_nearest_neighbors Number of nearest neighbors to find
+   * @return True if we found a nearest neighbor, false otherwise.
+   */
+  bool findNearestSceneGraphNode(
+      const NodePosition& query_point,
+      std::vector<SceneGraphNode>* nearest_scene_graph_nodes,
+      const size_t& k_nearest_neighbors = 1u);
 
  protected:
   //! Protected adders

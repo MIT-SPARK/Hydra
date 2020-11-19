@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="ISO-8859-15"?>
+<launch>
+  <arg name="voxel_size"      default="0.05"/>
+  <arg name="voxels_per_side" default="32"/>
+  <param name="use_sim_time"  value="false" />
+
+  <!-- These are for the RGB TSDF, which is a hack to load a RGB mesh, instead
+       of just the semantic mesh... -->
+  <arg name="rgb_voxel_size"      default="0.05"/>
+  <arg name="rgb_voxels_per_side" default="32"/>
+
+  <!-- Value at which we slice the 3D ESDF to know where the rooms are-->
+  <arg name="room_finder_esdf_slice_level" default="4.5"/>
+
+  <!-- Change sensor frame to:
+   - VIO's estimated base_link: `left_cam_base_link`
+   - Or, if you want to use simulator's ground-truth: `left_cam`
+  -->
+  <arg name="sensor_frame" default="left_cam"/>
+
+  <!-- Filename of the csv that associates colors and semantic labels.
+       We ask for the name only because we assume that the file is in
+       kimera_semantics_ros/cfg -->
+  <arg name="semantic_label_2_color_csv_filename"   default="tesse_multiscene_archviz1_segmentation_mapping.csv"/>
+  <arg name="semantic_label_typology_yaml_filename" default="uh2_apartment_semantic_label_typology.yaml"/>
+
+  <arg name="base_path" default="$(find kimera_scene_graph)/vxblx_files/apartment_vxblx/"/>
+  <arg name="tsdf_map_path"     default="$(arg base_path)/tsdf_esdf_gt_4.vxblx"/>
+  <arg name="rgb_tsdf_map_path" default="$(arg base_path)/tsdf_esdf_gt_rgb_4.vxblx"/>
+  <arg name="esdf_map_path"     default="$(arg base_path)/tsdf_esdf_gt_4.vxblx"/>
+  <arg name="sparse_graph_path" default="$(arg base_path)/sparse_graph_gt_4.vxblx"/>
+
+  <!--launch-prefix="gdb -ex run args"-->
+  <include file="$(find kimera_scene_graph)/launch/kimera_scene_graph_eval.launch" pass_all_args="true"/>
+</launch>

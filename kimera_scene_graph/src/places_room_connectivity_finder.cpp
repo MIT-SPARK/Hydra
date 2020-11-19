@@ -132,11 +132,8 @@ void PlacesRoomConnectivityFinder::findPlacesRoomConnectivity(
       }
       // Identify this vertex as belonging to the room by updating its parent
       // edge. (but this is an inter layer edge, use scene graph!
-      linkPlaceToRoom(room.first, place_node.node_id_, scene_graph);
+      linkPlaceToRoom(room.first, &place_node, scene_graph);
 
-      // Color the place node with the same color of the room it is in.
-      place_node.attributes_.color_ =
-          utils::vxbColorToNodeColor(getRoomColor(room.second.node_id_));
       std::vector<EdgeId> siblings =
           getEdgeIdsInEdgeIdMap(place_node.siblings_edge_map_);
       edge_ids.insert(edge_ids.end(), siblings.begin(), siblings.end());
@@ -240,14 +237,13 @@ void PlacesRoomConnectivityFinder::findPlacesRoomConnectivity(
           // queue.
           std::vector<EdgeId> siblings;
           if (is_start_place_inside_room) {
-            linkPlaceToRoom(room.first, vtx_end.node_id_, scene_graph);
+            linkPlaceToRoom(room.first, &vtx_end, scene_graph);
             siblings = getEdgeIdsInEdgeIdMap(vtx_end.siblings_edge_map_);
           } else {
-            linkPlaceToRoom(room.first, vtx_start.node_id_, scene_graph);
+            linkPlaceToRoom(room.first, &vtx_start, scene_graph);
             siblings = getEdgeIdsInEdgeIdMap(vtx_start.siblings_edge_map_);
           }
-          // edge_ids.insert(edge_ids.end(), siblings.begin(),
-          // siblings.end());
+          // edge_ids.insert(edge_ids.end(), siblings.begin(), siblings.end());
           CHECK_EQ(vtx_end.parent_edge_.start_node_id_,
                    vtx_start.parent_edge_.start_node_id_);
         } else {
@@ -384,7 +380,7 @@ void PlacesRoomConnectivityFinder::findPlacesRoomConnectivity(
         undecided_vertices_ids.push_back(vertex_id);
       } else {
         // Found the most likely room id!
-        linkPlaceToRoom(max_room_id, place_node.node_id_, scene_graph);
+        linkPlaceToRoom(max_room_id, &place_node, scene_graph);
       }
     } else {
       // Good one, it knows where it is.
@@ -406,13 +402,19 @@ void PlacesRoomConnectivityFinder::findPlacesRoomConnectivity(
 }
 
 void PlacesRoomConnectivityFinder::linkPlaceToRoom(const NodeId& room_id,
-                                                   const NodeId& place_id,
+                                                   SceneGraphNode* place_node,
                                                    SceneGraph* scene_graph) {
+  CHECK_NOTNULL(place_node);
+  CHECK(place_node->layer_id_ == LayerId::kPlacesLayerId);
   CHECK_NOTNULL(scene_graph);
+  // Color the place node with the same color of the room it is in.
+  place_node->attributes_.color_ =
+      utils::vxbColorToNodeColor(getRoomColor(room_id));
+  // Connect the place and the room.
   SceneGraphEdge parent_edge;
   parent_edge.start_node_id_ = room_id;
   parent_edge.start_layer_id_ = LayerId::kRoomsLayerId;
-  parent_edge.end_node_id_ = place_id;
+  parent_edge.end_node_id_ = place_node->node_id_;
   parent_edge.end_layer_id_ = LayerId::kPlacesLayerId;
   scene_graph->addEdge(&parent_edge);
 }

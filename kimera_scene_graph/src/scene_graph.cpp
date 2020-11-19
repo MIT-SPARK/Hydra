@@ -125,4 +125,17 @@ SceneGraphLayer* SceneGraph::getLayerMutable(const LayerId& layer_id) {
   }
 }
 
+bool SceneGraph::findNearestSceneGraphNodeInLayer(
+    const NodePosition& query_point,
+    const LayerId& layer_id,
+    std::vector<SceneGraphNode>* nearest_scene_graph_node,
+    const size_t& n_nearest_neighbors) {
+  CHECK_NOTNULL(nearest_scene_graph_node);
+  SceneGraphLayer scene_graph_layer;
+  getLayerSafe(layer_id, &scene_graph_layer);
+  return scene_graph_layer.findNearestSceneGraphNode(query_point,
+                                                     nearest_scene_graph_node,
+                                                     n_nearest_neighbors);
+}
+
 }  // namespace kimera

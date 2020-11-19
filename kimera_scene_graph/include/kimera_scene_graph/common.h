@@ -35,6 +35,7 @@ typedef std::vector<Centroid> Centroids;
 typedef std::vector<ColorPointCloud::Ptr> ObjectPointClouds;
 
 // Hardcoded for now
+static constexpr int kPlaceSemanticLabel = 23u;
 static constexpr int kRoomSemanticLabel = 21u;
 static constexpr int kBuildingSemanticLabel = 22u;
 

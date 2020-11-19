@@ -1,7 +1,16 @@
 <?xml version="1.0" encoding="ISO-8859-15"?>
 <launch>
-  <arg name="voxel_size"     default="0.05"/>
-  <param name="use_sim_time" value="false" />
+  <arg name="voxel_size"      default="0.05"/>
+  <arg name="voxels_per_side" default="16"/>
+  <param name="use_sim_time"  value="false" />
+
+  <!-- These are for the RGB TSDF, which is a hack to load a RGB mesh, instead
+       of just the semantic mesh... -->
+  <arg name="rgb_voxel_size"      default="0.05"/>
+  <arg name="rgb_voxels_per_side" default="16"/>
+
+  <!-- Value at which we slice the 3D ESDF to know where the rooms are-->
+  <arg name="room_finder_esdf_slice_level" default="1.0"/>
 
   <!-- Change sensor frame to:
    - VIO's estimated base_link: `left_cam_base_link`
@@ -12,11 +21,16 @@
   <!-- Filename of the csv that associates colors and semantic labels.
        We ask for the name only because we assume that the file is in
        kimera_semantics_ros/cfg -->
-  <arg name="semantic_label_2_color_csv_filename" default="tesse_multiscene_office2_segmentation_mapping.csv"/>
+  <arg name="semantic_label_2_color_csv_filename"   default="maskrcnn_mapping.csv"/>
+  <arg name="semantic_label_typology_yaml_filename" default="maskrcnn_typology.yaml"/>
 
-  <arg name="tsdf_map_path"     default="/home/tonirv/Documents/uHumans2_VIO_vxblx/office_scene/uHumans2_office_s1_06h/tsdf_esdf_DVIO.vxblx"/>
-  <arg name="esdf_map_path"     default="/home/tonirv/Documents/uHumans2_VIO_vxblx/office_scene/uHumans2_office_s1_06h/tsdf_esdf_DVIO.vxblx"/>
-  <arg name="sparse_graph_path" default="/home/tonirv/Documents/uHumans2_VIO_vxblx/office_scene/uHumans2_office_s1_06h/sparse_graph_DVIO.vxblx"/>
+  <arg name="tsdf_map_path"     default="$(find kimera_scene_graph)/vxblx_files/white_owls_tsdf.vxblx"/>
+  <arg name="rgb_tsdf_map_path" default="$(find kimera_scene_graph)/vxblx_files/white_owls_tsdf_rgb_2.vxblx"/>
+  <arg name="esdf_map_path"     default="$(find kimera_scene_graph)/vxblx_files/white_owls_esdf_tsdf.vxblx"/>
+  <arg name="sparse_graph_path" default="$(find kimera_scene_graph)/vxblx_files/white_owls_sparse_graph.vxblx"/>
+
+  <!-- Args for visualization of Scene-Graph -->
+  <arg name="layer_step_z" default="5.0"/>
 
   <!-- Send colored pointcloud with scene_graph to kimera_scene_graph for 3D segmentation -->
   <!--launch-prefix="gdb -ex run args"-->
@@ -24,31 +38,34 @@
     type="scene_graph_eval" output="screen"
     args="-alsologtostderr -colorlogtostderr" clear_params="true">
     <!-- Scene Graph params -->
-    <param name="room_finder_esdf_slice_level"       value="0.2"/>
+    <param name="room_finder_esdf_slice_level"       value="$(arg room_finder_esdf_slice_level)"/>
 
     <!-- Object Finder Type: 0: region growing, 1: euclidean clustering -->
     <param name="object_finder_type"                 value="1"/>
 
     <!-- Simulator params -->
     <param name="visualize"                          value="true"/>
-    <param name="tsdf_voxel_size"                    value="0.05"/>
-    <param name="tsdf_voxels_per_side"               value="32"/>
+    <param name="tsdf_voxel_size"                    value="$(arg voxel_size)"/>
+    <param name="tsdf_voxels_per_side"               value="$(arg voxels_per_side)"/>
+    <param name="rgb_tsdf_voxel_size"                    value="$(arg rgb_voxel_size)"/>
+    <param name="rgb_tsdf_voxels_per_side"               value="$(arg rgb_voxels_per_side)"/>
     <param name="incremental"                        value="false"/>
     <param name="add_robot_pose"                     value="false"/>
     <param name="generate_mesh"                      value="true"/>
     <param name="num_viewpoints"                     value="50"/>
-    <param name="truncation_distance"                value="0.4"/>
-    <param name="esdf_min_distance_m"                value="0.2"/>
+    <param name="truncation_distance"                value="0.2"/>
+    <param name="esdf_min_distance_m"                value="0.1"/>
     <param name="verbose"                            value="true"/>
     <param name="max_attempts_to_generate_viewpoint" value="20"/>
     <param name="world_frame"                        value="map"/>
-    <param name="scene_graph_output_path"            value="$(find kimera_scene_graph)/vxblx_files/office_scene_graph.vxblx"/>
+    <param name="layer_step_z"                       value="$(arg layer_step_z)"/>
+    <param name="scene_graph_output_path"            value="$(find kimera_scene_graph)/vxblx_files/white_owls_scene_graph.vxblx"/>
 
     <!-- Params -->
     <param name="max_ray_length_m"          value="10.0" />
     <param name="min_time_between_msgs_sec" value="0.2" />
     <param name="voxel_carving_enabled"     value="true" />
-    <param name="color_mode"                value="lambert_color"/>
+    <param name="color_mode"                value="color"/>
     <param name="use_const_weight"          value="false" />
 
     <param name="sensor_frame"              value="$(arg sensor_frame)"/>
@@ -60,30 +77,25 @@
     <!-- "fast" or "merged" -->
     <param name="semantic_tsdf_integrator_type"    value="fast" />
     <!-- "color", "semantic" or "semantic_probability" -->
-    <param name="semantic_color_mode"              value="semantic"/>
+    <param name="semantic_color_mode"              value="color"/>
     <param name="semantic_measurement_probability" value="0.8" />
-    <!-- The only dynamic label we have right now are humans, with label 20 -->
-    <rosparam param="dynamic_semantic_labels">[20]</rosparam>
-    <!-- Stuff are: walls (?), ceiling and floor (?) -->
-    <rosparam param="stuff_labels">[19, 0, 12, 2, 7, 1]</rosparam>
-    <rosparam param="walls_labels">[19, 12]</rosparam>
-    <rosparam param="floor_labels">[2, 7, 1]</rosparam>
+
+    <!-- Load what are the semantic labels typology: dynamic, stuff, things -->
+    <rosparam command="load"
+    file="$(find kimera_scene_graph)/cfg/$(arg semantic_label_typology_yaml_filename)"/>
 
     <param name="load_tsdf_map"     value="$(arg tsdf_map_path)"/>
+    <param name="load_rgb_tsdf_map" value="$(arg rgb_tsdf_map_path)"/>
     <param name="load_esdf_map"     value="$(arg esdf_map_path)"/>
     <param name="load_sparse_graph" value="$(arg sparse_graph_path)"/>
 
     <!-- Whether to rebuild the esdf layer from scratch -->
-    <param name="build_esdf_batch" value="false"/>
+    <param name="build_esdf_batch" value="true"/>
 
     <!-- Is this needed? -->
-    <param name="slice_level" value="1.0" />
+    <param name="slice_level" value="0.5" />
 
     <param name="semantic_label_2_color_csv_filepath" value="$(find kimera_semantics_ros)/cfg/$(arg semantic_label_2_color_csv_filename)"/>
-  <!--
-    <param name="semantic_label_2_color_csv_filepath"
-    value="$(find kimera_semantics_ros)/cfg/simulation.csv"/>
--->
 
     <param name="publish_pointclouds"     value="true"/>
     <param name="update_mesh_every_n_sec" value="0.1" />

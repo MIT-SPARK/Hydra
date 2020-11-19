@@ -27,6 +27,9 @@ SceneGraphVisualizer::SceneGraphVisualizer(const ros::NodeHandle& nh,
       server("simple_marker") {
   // Params
   nh_private_.param("world_frame", world_frame_, world_frame_);
+  nh_private_.param("layer_step_z", layer_step_z_, layer_step_z_);
+  nh_private_.param("edge_alpha", edge_alpha_, edge_alpha_);
+  nh_private_.param("edge_scale", edge_scale_, edge_scale_);
 
   // Publishers
   semantic_instance_centroid_pub_ =
@@ -40,7 +43,7 @@ SceneGraphVisualizer::SceneGraphVisualizer(const ros::NodeHandle& nh,
       nh_private_.advertise<visualization_msgs::MarkerArray>(
           "edges_centroid_pcl", 1, true);
   edges_node_node_pub_ = nh_private_.advertise<visualization_msgs::MarkerArray>(
-      "edges_node_node", 1, true);
+      "edges_node_node", 10, true);
 
   // Create vtools
   // visual_tools_.reset(
@@ -56,12 +59,23 @@ SceneGraphVisualizer::SceneGraphVisualizer(const ros::NodeHandle& nh,
 
 void SceneGraphVisualizer::visualizeImpl(const SceneGraph& scene_graph) const {
   LOG(INFO) << "Requested Scene-Graph visualization";
-  LOG(INFO) << "Display Centroids";
+  VLOG(1) << "Display Centroids";
   displayCentroids(scene_graph);
-  LOG(INFO) << "Display Inter Layer Edges";
-  displayInterLayerEdges(scene_graph);
-  LOG(INFO) << "Display Intra Layer Edges";
-  displayIntraLayerEdges(scene_graph);
+  VLOG(1) << "Display Inter Layer Edges";
+  visualization_msgs::MarkerArray all_markers;
+  visualization_msgs::MarkerArray n2n_markers =
+      getInterLayerEdgesMarkers(scene_graph);
+  all_markers.markers.insert(all_markers.markers.end(),
+                             n2n_markers.markers.begin(),
+                             n2n_markers.markers.end());
+  VLOG(1) << "Display Intra Layer Edges";
+  visualization_msgs::MarkerArray l2l_markers =
+      getIntraLayerEdgesMarkers(scene_graph);
+  all_markers.markers.insert(all_markers.markers.end(),
+                             l2l_markers.markers.begin(),
+                             l2l_markers.markers.end());
+  // Publish all edges at once, otw you mess up with the latching msg system...
+  edges_node_node_pub_.publish(all_markers);
 }
 
 ColorPoint SceneGraphVisualizer::getColorPointFromNode(
@@ -84,11 +98,11 @@ bool SceneGraphVisualizer::displayCentroids(
   visualization_msgs::MarkerArray bounding_boxes;
   visualization_msgs::Marker bounding_box;
 
-  LOG(INFO) << "Retrieving all scene nodes in scene graph.";
+  VLOG(1) << "Retrieving all scene nodes in scene graph.";
   std::vector<SceneGraphNode> all_scene_nodes;
   scene_graph.getAllSceneNodes(&all_scene_nodes);
   CHECK_EQ(scene_graph.getNumberOfUniqueSceneNodes(), all_scene_nodes.size());
-  LOG(INFO) << "Done retrieving all scene nodes in scene graph.";
+  VLOG(1) << "Done retrieving all scene nodes in scene graph.";
 
   if (scene_graph.getNumberOfUniqueSceneNodes() == 0) {
     LOG(WARNING)
@@ -109,9 +123,10 @@ bool SceneGraphVisualizer::displayCentroids(
 
     // Publish edges from centroid to its associated pointcloud
     // TODO(Toni): perhaps print the inter_layer edges?
-    // if (getNodeCentroidToPclLineMarker(node, &line_marker)) {
-    //  line_assoc_markers.markers.push_back(line_marker);
-    //}
+    visualization_msgs::Marker line_marker;
+    if (getNodeCentroidToPclLineMarker(node, &line_marker)) {
+      line_assoc_markers.markers.push_back(line_marker);
+    }
 
     // Publish bounding boxes
     if (getBoundingBoxMarker(node, &bounding_box)) {
@@ -148,20 +163,25 @@ bool SceneGraphVisualizer::getNodeCentroidToPclLineMarker(
     }
     // This copies the pcl to be able to shift it in z...
     NodePcl shifted_node_pcl = *node_pcl;
+    const LayerId& node_layer_id = node.layer_id_;
     const SemanticLabel& node_label = node_attributes.semantic_label_;
-    const auto& z_semantic_level = getLayerZLevel(node.layer_id_);
+    const auto& z_semantic_level = getLayerZLevel(node_layer_id);
     // We plot this node's pcl below its semantic level to avoid clutter.
-    float z_shift; /*z_semantic_level -  (node_label == kBuildingSemanticLabel
-                                        ? 0.25 * layer_step_z_ :
+    float z_shift = 0.0; /*z_semantic_level -  (node_label ==
+                            kBuildingSemanticLabel ? 0.25 * layer_step_z_ :
                                         0.5 * layer_step_z_); */
-    switch (node_label) {
-      case kRoomSemanticLabel:
-        LOG(WARNING) << "Got kRoom label";
+    switch (node_layer_id) {
+      case LayerId::kRoomsLayerId:
+        VLOG(5) << "Got kRoom label";
         z_shift = z_semantic_level - 0.5 * layer_step_z_;
         break;
-      case kBuildingSemanticLabel:
-        LOG(WARNING) << "Got kBuilding label";
+      case LayerId::kBuildingsLayerId:
+        VLOG(5) << "Got kBuilding label";
         z_shift = z_semantic_level - 0.3 * layer_step_z_;
+        break;
+      case LayerId::kObjectsLayerId:
+        // For objects, we want the pcl to touch the base mesh.
+        z_shift = 0.0;
         break;
       default:
         z_shift = z_semantic_level - layer_step_z_;
@@ -173,7 +193,7 @@ bool SceneGraphVisualizer::getNodeCentroidToPclLineMarker(
     NodePosition node_position = node_attributes.position_;
     node_position.z += z_semantic_level;
 
-    // Don't dropout lines if the pointcloud is already small.
+    // Prune edges: Don't dropout lines if the pointcloud is already small.
     size_t dropout_ratio = shifted_node_pcl.size() > 30u
                                ? getSemanticDropoutRatio(node_label)
                                : 1u;
@@ -188,16 +208,20 @@ bool SceneGraphVisualizer::getNodeCentroidToPclLineMarker(
         dropout_ratio);
     return true;
   } else {
-    LOG(ERROR) << "Uninitialized pointcloud for node with id: "
-               << node.node_id_;
+    if (node.layer_id_ == LayerId::kObjectsLayerId) {
+      LOG(ERROR) << "Uninitialized pointcloud for object with id: "
+                 << node.node_id_;
+    } else {
+      VLOG(5) << "Uninitialized pointcloud for node with id: " << node.node_id_;
+    }
     return false;
   }
 }
 
-void SceneGraphVisualizer::displayIntraLayerEdges(
+visualization_msgs::MarkerArray SceneGraphVisualizer::getIntraLayerEdgesMarkers(
     const SceneGraph& scene_graph) const {
   visualization_msgs::MarkerArray n2n_markers;
-  // For each layer, get the inter-layer edges and publish them to rviz.
+  // For each layer, get the intra-layer edges and publish them to rviz.
   for (const std::pair<LayerId, SceneGraphLayer>& layer_it :
        scene_graph.database_) {
     for (const std::pair<EdgeId, SceneGraphEdge>& edge_it :
@@ -206,16 +230,17 @@ void SceneGraphVisualizer::displayIntraLayerEdges(
           getMarkerFromSceneGraphEdge(scene_graph, edge_it.second));
     }
   }
-  edges_node_node_pub_.publish(n2n_markers);
+  return n2n_markers;
 }
 
-void SceneGraphVisualizer::displayInterLayerEdges(
+visualization_msgs::MarkerArray SceneGraphVisualizer::getInterLayerEdgesMarkers(
     const SceneGraph& scene_graph) const {
   LOG_IF(WARNING, scene_graph.inter_layer_edge_map_.size() == 0)
       << "No Inter Layer edges in Scene-Graph...";
   visualization_msgs::MarkerArray l2l_markers;
   size_t room_to_place_count = 0u;
-  static constexpr size_t dropout_ratio_room_to_place = 2u;
+  size_t dropout_ratio_room_to_place =
+      getSemanticDropoutRatio(kRoomSemanticLabel);
   for (const std::pair<EdgeId, SceneGraphEdge>& edge_it :
        scene_graph.inter_layer_edge_map_) {
     // Dropout some room to place edges, not to clutter the visualization.
@@ -231,7 +256,7 @@ void SceneGraphVisualizer::displayInterLayerEdges(
     l2l_markers.markers.push_back(
         getMarkerFromSceneGraphEdge(scene_graph, edge_it.second));
   }
-  edges_node_node_pub_.publish(l2l_markers);
+  return l2l_markers;
 }
 
 visualization_msgs::Marker SceneGraphVisualizer::getMarkerFromSceneGraphEdge(
@@ -260,7 +285,13 @@ visualization_msgs::Marker SceneGraphVisualizer::getMarkerFromSceneGraphEdge(
   std::string prefix;
   NodeColor edge_color;
   if (inter_layer_edge) {
-    edge_color = scene_node_start.attributes_.color_;
+    if (layer_start == LayerId::kPlacesLayerId) {
+      // Color object-place edges with objects color instead of places, just
+      // looks nicer.
+      edge_color = scene_node_end.attributes_.color_;
+    } else {
+      edge_color = scene_node_start.attributes_.color_;
+    }
     prefix = "Inter Layer";
   } else {
     edge_color = NodeColor(0, 0, 0);
@@ -293,14 +324,14 @@ float SceneGraphVisualizer::getLayerZLevel(const LayerId& layer_id) const {
   // Display each layer 0.5 meters apart.
   switch (layer_id) {
     case LayerId::kBuildingsLayerId:
-      return 3.0 * layer_step_z_;
+      return 4.0 * layer_step_z_;
     case LayerId::kRoomsLayerId:
-      return 2.5 * layer_step_z_;
+      return 3.0 * layer_step_z_;
     case LayerId::kPlacesLayerId:
     case LayerId::kAgentsLayerId:
       return 2.0 * layer_step_z_;
     case LayerId::kObjectsLayerId:
-      return 1.5 * layer_step_z_;
+      return 1.0 * layer_step_z_;
     case LayerId::kInvalidLayerId:
       LOG(WARNING) << "Requested z level of invalid layer...";
       return layer_step_z_;
@@ -337,6 +368,8 @@ float SceneGraphVisualizer::getSemanticPclEdgeAlpha(
 float SceneGraphVisualizer::getSemanticCentroidScale(
     const SemanticLabel& semantic_label) const {
   switch (semantic_label) {
+    case kPlaceSemanticLabel:
+      return 0.3;
     case kRoomSemanticLabel:
       return 0.8;
     case kBuildingSemanticLabel:
@@ -360,7 +393,7 @@ float SceneGraphVisualizer::getLayerIdCentroidAlpha(
     case LayerId::kObjectsLayerId:
       return 1.0;
     case LayerId::kInvalidLayerId:
-      LOG(WARNING) << "Requested z level of invalid layer...";
+      LOG(WARNING) << "Requested centroid alpha of invalid layer...";
       return 0.8;
     default:
       return 0.8;
@@ -398,7 +431,7 @@ visualization_msgs::Marker SceneGraphVisualizer::getCentroidMarker(
   // for rviz to render much faster...
   bool is_object = layer_id == LayerId::kObjectsLayerId;
   bool is_place = layer_id == LayerId::kPlacesLayerId;
-  if (is_object || is_place) {
+  if (is_object) {
     // Add a centroid both at the mesh level and at the object level
     marker.type = visualization_msgs::Marker::SPHERE_LIST;
   } else {
@@ -411,6 +444,8 @@ visualization_msgs::Marker SceneGraphVisualizer::getCentroidMarker(
   marker.id = ++marker_id;
   marker.ns = getStringFromLayerId(scene_node.layer_id_);
 
+  // TODO(Toni): shouldn't we use getLayerIdCentroidScale? but then all centroid
+  // in a layer will have the same scale...
   marker.scale.x = getSemanticCentroidScale(semantic_label);
   marker.scale.y = marker.scale.x;
   marker.scale.z = marker.scale.x;
@@ -727,13 +762,13 @@ int main(int argc, char** argv) {
   kimera::SceneGraphVisualizer scene_graph_visualizer(nh, nh_private);
 
   CHECK(!scene_graph_input_path.empty()) << "Empty scene graph input path...";
-  LOG(INFO) << "Loading scene graph from: " << scene_graph_input_path.c_str();
+  VLOG(1) << "Loading scene graph from: " << scene_graph_input_path.c_str();
   kimera::SceneGraph scene_graph;
   kimera::load(scene_graph_input_path, &scene_graph);
 
-  LOG(INFO) << "Starting scene graph visualizer.";
+  VLOG(1) << "Starting scene graph visualizer.";
   scene_graph_visualizer.visualize(scene_graph);
-  LOG(INFO) << "Finished scene graph visualizer.";
+  VLOG(1) << "Finished scene graph visualizer.";
 
   ros::spin();
 

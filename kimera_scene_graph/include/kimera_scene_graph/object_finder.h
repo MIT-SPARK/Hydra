@@ -68,6 +68,25 @@ class ObjectFinder {
   void updateEuclideanClusterParams(
       const EuclideanClusterEstimatorParams& new_params);
 
+  void print() const {
+    switch (static_cast<ObjectFinderType>(object_finder_type_)) {
+      case ObjectFinderType::kEuclidean: {
+        LOG(INFO) << "Object Finder Type: Euclidean.\n"
+                  << euclidean_cluster_estimator_params_.print();
+        break;
+      };
+      case ObjectFinderType::kRegionGrowing: {
+        LOG(INFO) << "Object Finder Type: Region-Growing. \n"
+                  << region_growing_estimator_params_.print();
+        break;
+      }
+      default: {
+        LOG(FATAL) << "Unknown object finder type";
+        break;
+      }
+    }
+  }
+
  private:
   ColorPointCloud::Ptr regionGrowingClusterEstimator(
       const typename PointCloudT::Ptr& cloud,

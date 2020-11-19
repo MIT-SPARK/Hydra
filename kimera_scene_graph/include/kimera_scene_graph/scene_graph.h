@@ -160,6 +160,27 @@ class SceneGraph {
     return inter_layer_edge_map_.find(edge_id) != inter_layer_edge_map_.end();
   }
 
+  /**
+   * @brief findNearestSceneGraphNodeInLayer Finds the nearest scene graph
+   * node in a given layer (layer_id) to a query 3D point (query_point).
+   * Internally, it builds a kd-tree for the scene-graph layer requested,
+   * and queries the query_point to get the nearest node of the layer.
+   * @param[in] query_point 3D point for which we want to find its nearest
+   * neighbor in the given layer_id.
+   * @param[in] layer_id Layer id where to find the nearest scene-graph node
+   * neighbor of the query_point.
+   * @param[out] nearest_scene_graph_node The actual scene-graph node that is
+   * the nearest to the query_point.
+   * @param[in] n_nearest_neighbors Find up to n nearest neighbors instead of
+   * one
+   * @return True if we found a nearest neighbor, false otherwise.
+   */
+  bool findNearestSceneGraphNodeInLayer(
+      const NodePosition& query_point,
+      const LayerId& layer_id,
+      std::vector<SceneGraphNode>* nearest_scene_graph_node,
+      const size_t& n_nearest_neighbors = 1u);
+
   inline void clear() {
     next_inter_layer_edge_id_ = 0;
     database_.clear();

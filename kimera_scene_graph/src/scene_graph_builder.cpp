@@ -11,6 +11,7 @@
 
 #include "kimera_scene_graph/common.h"
 
+#include "kimera_scene_graph/common.h"
 #include "kimera_scene_graph/object_finder.h"
 #include "kimera_scene_graph/places_room_connectivity_finder.h"
 #include "kimera_scene_graph/room_connectivity_finder.h"
@@ -47,6 +48,7 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
       rqt_server_(),
       rqt_callback_(),
       room_finder_(nullptr),
+      object_place_connectivity_finder_(nullptr),
       places_in_rooms_finder_(nullptr),
       room_connectivity_finder_(nullptr),
       object_finder_(nullptr),
@@ -84,6 +86,14 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
   esdf_layer_.reset(
       new vxb::Layer<vxb::EsdfVoxel>(voxel_size_, voxels_per_side_));
 
+  // Load RGB TSDF for RGB mesh, overkill...
+  double rgb_voxel_size = 0.025;
+  double rgb_voxels_per_side = 16;
+  nh_private.param("rgb_tsdf_voxel_size", rgb_voxel_size, rgb_voxel_size);
+  nh_private.param("rgb_tsdf_voxels_per_side", rgb_voxels_per_side, rgb_voxels_per_side);
+  tsdf_layer_rgb_.reset(
+      new vxb::Layer<vxb::TsdfVoxel>(rgb_voxel_size, rgb_voxels_per_side));
+
   esdf_integrator_.reset(new vxb::EsdfIntegrator(
       vxb::getEsdfIntegratorConfigFromRosParam(nh_private),
       tsdf_layer_.get(),
@@ -104,6 +114,7 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
   building_finder_ = kimera::make_unique<BuildingFinder>();
 
   // Get labels of interesting things
+  CHECK(nh_private.getParam("dynamic_semantic_labels", dynamic_labels_));
   CHECK(nh_private.getParam("stuff_labels", stuff_labels_));
   CHECK(nh_private.getParam("walls_labels", walls_labels_));
   CHECK(nh_private.getParam("floor_labels", floor_labels_));
@@ -112,7 +123,12 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
   std::string file_path;
   LOG(INFO) << "Loading TSDF map:";
   CHECK(nh_private.getParam("load_tsdf_map", file_path));
-  loadTsdfMap(file_path);
+  CHECK(tsdf_layer_);
+  loadTsdfMap(file_path, tsdf_layer_.get());
+  LOG(INFO) << "Loading RGB TSDF map:";
+  CHECK(nh_private.getParam("load_rgb_tsdf_map", file_path));
+  CHECK(tsdf_layer_rgb_);
+  loadTsdfMap(file_path, tsdf_layer_rgb_.get());
   LOG(INFO) << "Loading ESDF map:";
   CHECK(nh_private.getParam("load_esdf_map", file_path));
   CHECK(nh_private.getParam("build_esdf_batch", build_esdf_batch_));
@@ -134,23 +150,13 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
       nh_private_.advertise<ColorPointCloud>("room_centroids", 1, true);
   mesh_pub_ =
       nh_private_.advertise<voxblox_msgs::Mesh>("semantic_mesh", 1, true);
+  rgb_mesh_pub_ =
+      nh_private_.advertise<voxblox_msgs::Mesh>("rgb_mesh", 1, true);
   polygon_mesh_pub_ = nh_private_.advertise<pcl_msgs::PolygonMesh>(
       "polygon_semantic_mesh", 1, true);
   edges_obj_skeleton_pub_ =
       nh_private_.advertise<visualization_msgs::MarkerArray>(
           "obj_skeleton_edges", 1, true);
-
-  // This creates the places layer in the scene graph
-  fillSceneGraphWithPlaces(sparse_skeleton_graph_);
-
-  // Publish the skeleton.
-  CHECK(scene_graph_);
-  visualization_msgs::MarkerArray marker_array;
-  vxb::SparseSkeletonGraph places_skeleton;
-  utils::convertLayerToSkeleton(scene_graph_->getLayer(LayerId::kPlacesLayerId),
-                                &places_skeleton);
-  vxb::visualizeSkeletonGraph(places_skeleton, world_frame_, &marker_array);
-  sparse_graph_pub_.publish(marker_array);
 
   // Attach rqt reconfigure
   rqt_callback_ =
@@ -176,6 +182,7 @@ bool SceneGraphBuilder::sceneGraphReconstructionServiceCall(
     std_srvs::SetBool::Request& request,
     std_srvs::SetBool::Response& response) {
   LOG(INFO) << "Requested scene graph reconstruction.";
+  scene_graph_->clear();
   sceneGraphReconstruction(request.data);
   return true;
 }
@@ -188,17 +195,19 @@ bool SceneGraphBuilder::fillSceneGraphWithPlaces(
   sparse_skeleton.getAllVertexIds(&vtx_ids);
   for (const auto& vtx_id : vtx_ids) {
     const vxb::SkeletonVertex& vtx = sparse_skeleton.getVertex(vtx_id);
-    SceneGraphNode scene_graph_node;
-    scene_graph_node.layer_id_ = LayerId::kPlacesLayerId;
+    SceneGraphNode place_scene_graph_node;
+    place_scene_graph_node.layer_id_ = LayerId::kPlacesLayerId;
     // Maybe we should use our own next_places_id_?
-    scene_graph_node.node_id_ = vtx.vertex_id;
+    place_scene_graph_node.node_id_ = vtx.vertex_id;
     // This will be filled automagically when adding the skeleton edges.
     // scene_graph_node.neighborhood_edge_map_
-    scene_graph_node.attributes_.position_.x = vtx.point[0];
-    scene_graph_node.attributes_.position_.y = vtx.point[1];
-    scene_graph_node.attributes_.position_.z = vtx.point[2];
-    scene_graph_node.attributes_.color_ = kPlaceColor;
-    scene_graph_->addSceneNode(scene_graph_node);
+    place_scene_graph_node.attributes_.semantic_label_ = kPlaceSemanticLabel;
+    place_scene_graph_node.attributes_.position_.x = vtx.point[0];
+    place_scene_graph_node.attributes_.position_.y = vtx.point[1];
+    place_scene_graph_node.attributes_.position_.z = vtx.point[2];
+    // This gets modified with the room's color later.
+    place_scene_graph_node.attributes_.color_ = kPlaceColor;
+    scene_graph_->addSceneNode(place_scene_graph_node);
   }
   CHECK(scene_graph_->hasLayer(LayerId::kPlacesLayerId));
   CHECK_EQ(scene_graph_->getLayer(LayerId::kPlacesLayerId).getNumberOfNodes(),
@@ -227,15 +236,18 @@ bool SceneGraphBuilder::fillSceneGraphWithPlaces(
            edge_ids.size() - invalid_edges)
       << "The skeleton and the scene graph layer should have the same "
          "number of edges!";
+  return true;
 }
 
-bool SceneGraphBuilder::loadTsdfMap(const std::string& file_path) {
+bool SceneGraphBuilder::loadTsdfMap(const std::string& file_path,
+                                    vxb::Layer<vxb::TsdfVoxel>* tsdf_layer) {
+  CHECK_NOTNULL(tsdf_layer);
   constexpr bool kMulitpleLayerSupport = true;
   bool success = vxb::io::LoadBlocksFromFile(
       file_path,
       vxb::Layer<vxb::TsdfVoxel>::BlockMergingStrategy::kReplace,
       kMulitpleLayerSupport,
-      tsdf_layer_.get());
+      tsdf_layer);
   if (success) {
     LOG(INFO) << "Successfully loaded TSDF layer.";
   } else {
@@ -259,25 +271,27 @@ bool SceneGraphBuilder::loadEsdfMap(const std::string& file_path) {
   return success;
 }
 
-void SceneGraphBuilder::reconstructMeshOutOfTsdf(
+voxblox_msgs::Mesh SceneGraphBuilder::reconstructMeshOutOfTsdf(
+    vxb::Layer<vxb::TsdfVoxel>* tsdf_layer,
     vxb::MeshLayer::Ptr mesh_layer) {
   vxb::MeshIntegratorConfig mesh_config;
-  CHECK(tsdf_layer_);
+  CHECK_NOTNULL(tsdf_layer);
   // TODO(Toni): mind that the parent server already builds the mesh (but that
   // is for the ground-truth sdf, not for the currently loaded one I believe.)
   vxb::MeshIntegrator<vxb::TsdfVoxel> mesh_integrator_test(
-      mesh_config, tsdf_layer_.get(), mesh_layer.get());
+      mesh_config, tsdf_layer, mesh_layer.get());
   constexpr bool only_mesh_updated_blocks = false;
   constexpr bool clear_updated_flag = true;
   mesh_integrator_test.generateMesh(only_mesh_updated_blocks,
                                     clear_updated_flag);
 
   // Pubish mesh as vxblx msg
+  // WARNING, everytime someone calls this function we will override the
+  // previous ros topic!
   voxblox_msgs::Mesh mesh_msg;
   vxb::generateVoxbloxMeshMsg(
       mesh_layer, vxb::ColorMode::kLambertColor, &mesh_msg);
   mesh_msg.header.frame_id = world_frame_;
-  mesh_pub_.publish(mesh_msg);
 
   // (Redundant) Publish mesh as PCL polygon mesh.
   pcl::PolygonMesh poly_mesh;
@@ -287,6 +301,8 @@ void SceneGraphBuilder::reconstructMeshOutOfTsdf(
   pcl_msg_mesh.header.stamp = ros::Time::now();
   pcl_msg_mesh.header.frame_id = world_frame_;
   polygon_mesh_pub_.publish(pcl_msg_mesh);
+
+  return mesh_msg;
 }
 
 void SceneGraphBuilder::reconstructEsdfOutOfTsdf(const bool& save_to_file) {
@@ -301,6 +317,20 @@ void SceneGraphBuilder::reconstructEsdfOutOfTsdf(const bool& save_to_file) {
 }
 
 void SceneGraphBuilder::sceneGraphReconstruction(const bool& only_rooms) {
+  // This creates the places layer in the scene graph
+  fillSceneGraphWithPlaces(sparse_skeleton_graph_);
+
+  // Publish the skeleton.
+  CHECK(scene_graph_);
+  if (false) {
+    visualization_msgs::MarkerArray marker_array;
+    vxb::SparseSkeletonGraph places_skeleton;
+    utils::convertLayerToSkeleton(
+        scene_graph_->getLayer(LayerId::kPlacesLayerId), &places_skeleton);
+    vxb::visualizeSkeletonGraph(places_skeleton, world_frame_, &marker_array);
+    sparse_graph_pub_.publish(marker_array);
+  }
+
   // Also generate test mesh
   // TODO(Toni): this can be called from a rosservice now, so make sure
   // the sim world is ready before...
@@ -313,11 +343,20 @@ void SceneGraphBuilder::sceneGraphReconstruction(const bool& only_rooms) {
   // visualize();  // To visualize esdf and tsdf.
 
   vxb::Mesh::Ptr walls_mesh = nullptr;
-  if (!only_rooms) {
+  if (true) {
+    // TODO(TONI): Allow to parse a mesh ply file instead of reconstructing it!
+    // this also will allow us to evaluate the performance on a deformed mesh
+    // that is not necessarily coherent with the TSDF.
     LOG(INFO) << "Reconstructing Mesh out of TSDF.";
     vxb::MeshLayer::Ptr mesh_test(
         new vxb::MeshLayer(tsdf_layer_->block_size()));
-    reconstructMeshOutOfTsdf(mesh_test);
+    auto mesh_msg = reconstructMeshOutOfTsdf(tsdf_layer_.get(), mesh_test);
+    mesh_pub_.publish(mesh_msg);
+    vxb::MeshLayer::Ptr mesh_test_rgb(
+        new vxb::MeshLayer(tsdf_layer_rgb_->block_size()));
+    auto rgb_mesh_msg =
+        reconstructMeshOutOfTsdf(tsdf_layer_rgb_.get(), mesh_test_rgb);
+    rgb_mesh_pub_.publish(rgb_mesh_msg);
     LOG(INFO) << "Finished reconstructing Mesh out of TSDF.";
 
     // Get Semantic PCLs
@@ -332,7 +371,9 @@ void SceneGraphBuilder::sceneGraphReconstruction(const bool& only_rooms) {
       const SemanticLabel& semantic_label = semantic_pcl_it.first;
       const SemanticPointCloud::Ptr& semantic_pcl = semantic_pcl_it.second;
       CHECK(semantic_pcl);
-      CHECK(semantic_meshes.find(semantic_label) != semantic_meshes.end());
+      CHECK(semantic_meshes.find(semantic_label) != semantic_meshes.end())
+          << "Couldn't find semantic mesh for semantic label: "
+          << std::to_string(semantic_label);
       if (semantic_pcl->empty()) {
         LOG(WARNING) << "Semantic pointcloud for label "
                      << std::to_string(semantic_label) << " is empty.";
@@ -351,51 +392,65 @@ void SceneGraphBuilder::sceneGraphReconstruction(const bool& only_rooms) {
       bool is_not_stuff = std::find(stuff_labels_.begin(),
                                     stuff_labels_.end(),
                                     semantic_label) == stuff_labels_.end();
-      if (is_not_stuff) {
-        // TODO(Toni): at some point we should use the 3D mesh, not the
-        // pointcloud.
-        // TODO(Toni):  REMOVE FOR FULL OBJECT DISCOVERY
-        // static size_t n = 0;
-        // if (n < 3u) {
-        // Only extract objects that are not unknown.
-        // uH1 interesting labels: 2, 7, 5, 8
-        // uH2 interesting labels: 1 (couch), 3 (chairs)
-        //if (semantic_label == 1 || // Couch
-        //    semantic_label == 3) { // Chairs
+      bool is_not_dynamic = std::find(dynamic_labels_.begin(),
+                                      dynamic_labels_.end(),
+                                      semantic_label) == dynamic_labels_.end();
+      if (is_not_dynamic) {
+        if (is_not_stuff) {
+          // TODO(Toni): at some point we should use the 3D mesh, not the
+          // pointcloud.
+          // TODO(Toni):  REMOVE FOR FULL OBJECT DISCOVERY
+          // static size_t n = 0;
+          // if (n < 3u) {
+          // Only extract objects that are not unknown.
+          // uH1 interesting labels: 2, 7, 5, 8
+          // uH2 interesting labels: 1 (couch), 3 (chairs)
+          // if (semantic_label == 1 || // Couch
+          //    semantic_label == 3) { // Chairs
           extractThings(semantic_label, semantic_pcl);
-        //} else {
-        //  LOG(INFO) << "Skipping object extraction for semantic label: "
-        //            << std::to_string(semantic_label);
-        //}
-        //  ++n;
-        //}
+          //} else {
+          //  LOG(INFO) << "Skipping object extraction for semantic label: "
+          //            << std::to_string(semantic_label);
+          //}
+          //  ++n;
+          //}
+        } else {
+          LOG(INFO) << "Skipping object extraction for `stuff` semantic label: "
+                    << std::to_string(semantic_label);
+
+          bool is_floor = std::find(floor_labels_.begin(),
+                                    floor_labels_.end(),
+                                    semantic_label) != floor_labels_.end();
+          if (is_floor) {
+            // Can we use wall finder for ceiling/floor?
+            // Centroids wall_centroids;
+            // std::vector<ColorPointCloud::Ptr> wall_pcls;
+            // const auto& pcls =
+            //     wall_finder_->findWalls(semantic_pcl, &wall_centroids,
+            //     &wall_pcls);
+            // ceil_floor_pcl_pub_.publish(pcls);
+          }
+
+          bool is_walls = std::find(walls_labels_.begin(),
+                                    walls_labels_.end(),
+                                    semantic_label) != walls_labels_.end();
+          if (is_walls) {
+            // Store walls mesh for later segmentation
+            walls_mesh = semantic_mesh;
+          }
+        }
       } else {
-        LOG(INFO) << "Skipping object extraction for semantic label: "
+        LOG(INFO) << "Not extracting things/stuff from dynamic "
+                     "label: "
                   << std::to_string(semantic_label);
-
-        bool is_floor = std::find(floor_labels_.begin(),
-                                  floor_labels_.end(),
-                                  semantic_label) != floor_labels_.end();
-        if (is_floor) {
-          // Can we use wall finder for ceiling/floor?
-          // Centroids wall_centroids;
-          // std::vector<ColorPointCloud::Ptr> wall_pcls;
-          // const auto& pcls =
-          //     wall_finder_->findWalls(semantic_pcl, &wall_centroids,
-          //     &wall_pcls);
-          // ceil_floor_pcl_pub_.publish(pcls);
-        }
-
-        bool is_walls = std::find(walls_labels_.begin(),
-                                  walls_labels_.end(),
-                                  semantic_label) != walls_labels_.end();
-        if (is_walls) {
-          // Store walls mesh for later segmentation
-          walls_mesh = semantic_mesh;
-        }
       }
     }
   }
+
+  ////////////////////////// Objects - Places connectivity /////////////////////
+  // Connect objects and places
+  object_place_connectivity_finder_->findObjectPlaceConnectivity(
+      scene_graph_.get());
 
   ////////////////////////// FIND ROOMS ////////////////////////////////////////
   CHECK(scene_graph_);
@@ -609,8 +664,8 @@ void SceneGraphBuilder::extractThings(
   NodeId object_instance_id = 0;
   for (size_t idx = 0u; idx < n_centroids; ++idx) {
     // Create SceneNode out of centroids
-    SceneGraphNode scene_node;
-    NodeAttributes& attributes = scene_node.attributes_;
+    SceneGraphNode object_scene_node;
+    NodeAttributes& attributes = object_scene_node.attributes_;
     attributes.semantic_label_ = semantic_label;
     const auto& color =
         semantic_config_.semantic_label_to_color_->getColorFromSemanticLabel(
@@ -618,8 +673,8 @@ void SceneGraphBuilder::extractThings(
     attributes.color_ = NodeColor(color.r, color.g, color.b);
     attributes.name_ =
         std::to_string(semantic_label) + std::to_string(object_instance_id);
-    scene_node.node_id_ = next_object_id_;
-    scene_node.layer_id_ = LayerId::kObjectsLayerId;
+    object_scene_node.node_id_ = next_object_id_;
+    object_scene_node.layer_id_ = LayerId::kObjectsLayerId;
     pcl::PointXYZ centroid_point;
     centroids.at(idx).get(centroid_point);  // Calculates centroid
     attributes.position_ =
@@ -629,9 +684,9 @@ void SceneGraphBuilder::extractThings(
     attributes.bounding_box_ = bounding_boxes.at(idx);
 
     // Add to database
-    CHECK(scene_node.attributes_.pcl_) << "Pcl not initialized!";
-    CHECK(scene_node.layer_id_ == LayerId::kObjectsLayerId);
-    scene_graph_->addSceneNode(scene_node);
+    CHECK(object_scene_node.attributes_.pcl_) << "Pcl not initialized!";
+    CHECK(object_scene_node.layer_id_ == LayerId::kObjectsLayerId);
+    scene_graph_->addSceneNode(object_scene_node);
     ++object_instance_id;
     ++next_object_id_;
   }
@@ -783,6 +838,8 @@ void SceneGraphBuilder::getSemanticMeshesFromMesh(
 
 void SceneGraphBuilder::rqtReconfigureCallback(RqtSceneGraphConfig& config,
                                                uint32_t level) {
+  LOG(INFO) << "Updating Object Finder params...";
+
   // Object Finder params
   object_finder_->updateClusterEstimator(
       static_cast<ObjectFinderType>(config.object_finder_type));
@@ -791,7 +848,6 @@ void SceneGraphBuilder::rqtReconfigureCallback(RqtSceneGraphConfig& config,
   ec_params.cluster_tolerance_ = config.cluster_tolerance;
   ec_params.max_cluster_size_ = config.ec_max_cluster_size;
   ec_params.min_cluster_size_ = config.ec_min_cluster_size;
-  LOG(INFO) << ec_params.print();
   object_finder_->updateEuclideanClusterParams(ec_params);
 
   RegionGrowingClusterEstimatorParams rg_params;
@@ -802,10 +858,11 @@ void SceneGraphBuilder::rqtReconfigureCallback(RqtSceneGraphConfig& config,
       config.normal_estimator_neighbour_size;
   rg_params.number_of_neighbours_ = config.number_of_neighbours;
   rg_params.smoothness_threshold_ = config.smoothness_threshold;
-  LOG(INFO) << rg_params.print();
   object_finder_->updateRegionGrowingParams(rg_params);
 
-  // Room finder params
+  object_finder_->print();
+
+  // Room Finder params
 
   CHECK(scene_graph_);
   // LOG(WARNING) << "Clearing Scene Graph";

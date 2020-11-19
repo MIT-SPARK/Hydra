@@ -53,8 +53,10 @@ class SceneGraphVisualizer {
  protected:
   virtual void visualizeImpl(const SceneGraph& scene_graph) const;
   bool displayCentroids(const SceneGraph& scene_graph) const;
-  void displayInterLayerEdges(const SceneGraph& scene_graph) const;
-  void displayIntraLayerEdges(const SceneGraph& scene_graph) const;
+  visualization_msgs::MarkerArray getInterLayerEdgesMarkers(
+      const SceneGraph& scene_graph) const;
+  visualization_msgs::MarkerArray
+  getIntraLayerEdgesMarkers(const SceneGraph& scene_graph) const;
   visualization_msgs::Marker getMarkerFromSceneGraphEdge(
       const SceneGraph& scene_graph,
       const SceneGraphEdge& edge) const;
@@ -123,7 +125,7 @@ class SceneGraphVisualizer {
   interactive_markers::InteractiveMarkerServer server;
 
   // Visualization params.
-  float edge_alpha_ = 0.1;
+  float edge_alpha_ = 0.01;
   float edge_scale_ = 0.01;
 
   // Step in Z axis for the different layers of the scene graph
