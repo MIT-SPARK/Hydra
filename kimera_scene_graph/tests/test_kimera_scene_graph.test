@@ -1,0 +1,3 @@
+<launch>
+  <test test-name="testKimeraSceneGraph" pkg="kimera_scene_graph" type="testKimeraSceneGraph"/>
+</launch>

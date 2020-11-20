@@ -7,6 +7,7 @@ catkin_simple()
 
 find_package(OpenCV REQUIRED)
 find_package(GTSAM REQUIRED)
+find_package(KimeraRPGO REQUIRED)
 
 # Main library for kimera Scene-Graph
 cs_add_library(${PROJECT_NAME}
@@ -19,6 +20,8 @@ cs_add_library(${PROJECT_NAME}
   include/kimera_scene_graph/scene_graph_layer.h
   include/kimera_scene_graph/scene_graph_visualizer.h
   include/kimera_scene_graph/scene_graph.h
+  include/kimera_scene_graph/dynamic_scene_graph.h
+  include/kimera_scene_graph/dynamic_scene_graph_evaluator.h
   src/object_finder.cpp
   src/room_finder.cpp
   src/places_room_connectivity_finder.cpp
@@ -31,20 +34,22 @@ cs_add_library(${PROJECT_NAME}
   src/scene_graph_layer.cpp
   src/scene_graph_visualizer.cpp
   src/scene_graph.cpp
-  #src/dynamic_scene_node.cpp
-  #src/dynamic_scene_node_evaluator.cpp
+  src/dynamic_scene_graph.cpp
+  src/dynamic_scene_graph_evaluator.cpp
   src/semantic_ros_publishers.cpp
   src/min_cut_solvers/stoer_wagner_min_cut_wrapper.cpp
 )
-
-target_link_libraries(${PROJECT_NAME}
-  ${OpenCV_LIBRARIES}
-  ${PCL_LIBRARIES}
+target_link_libraries(${PROJECT_NAME} 
+  ${OpenCV_LIBRARIES} 
+  ${PCL_LIBRARIES} 
+  gtsam gtsam_unstable
   tbb
+  KimeraRPGO
 )
-target_include_directories(${PROJECT_NAME} PUBLIC
+target_include_directories(${PROJECT_NAME} PUBLIC 
   ${OpenCV_INCLUDE_DIRS}
   ${CATKIN_INCLUDE_DIRS}
+  ${GTSAM_INCLUDE_DIR}
 )
 
 # ROS node
@@ -55,6 +60,20 @@ target_link_libraries(kimera_scene_graph_node
   ${PROJECT_NAME}
   ${PCL_LIBRARIES}
   tbb
+)
+
+cs_add_executable(kimera_dynamic_scene_graph_node
+  src/kimera_dynamic_scene_graph_node.cpp
+)
+target_link_libraries(kimera_dynamic_scene_graph_node
+  ${PROJECT_NAME}
+)
+
+cs_add_executable(kimera_dynamic_scene_graph_eval_node
+  src/kimera_dynamic_scene_graph_eval_node.cpp
+)
+target_link_libraries(kimera_dynamic_scene_graph_eval_node
+  ${PROJECT_NAME}
 )
 
 # For Visualization of the Scene Graph
@@ -85,17 +104,15 @@ target_link_libraries(min_cut
 
 # Add tests
 if (CATKIN_ENABLE_TESTING)
-  catkin_add_gtest(test_scene_node tests/test_scene_node.cpp)
-  target_link_libraries(test_scene_node ${PROJECT_NAME})
-
-  catkin_add_gtest(test_scene_graph_serialization
-    tests/test_scene_graph_serialization.cpp
+  add_rostest_gtest(
+    testKimeraSceneGraph
+    tests/test_kimera_scene_graph.test
+    tests/test_kimera_scene_graph.cpp
+    tests/test_dynamic_scene_graph.cpp
+    tests/test_dynamic_scene_graph_evaluator.cpp
   )
-  target_link_libraries(test_scene_graph_serialization ${PROJECT_NAME})
+  target_link_libraries(testKimeraSceneGraph ${PROJECT_NAME})
 endif()
-
-# catkin_add_gtest(test_scene_node_evaluator tests/test_scene_node_evaluator.cpp)
-# target_link_libraries(test_scene_node_evaluator ${PROJECT_NAME})
 
 cs_install()
 

@@ -41,5 +41,6 @@
   <depend>voxblox_skeleton</depend>
   <depend>rviz_visual_tools</depend>
 
+  <depend>rostest</depend>
   <test_depend>rosunit</test_depend>
 </package>

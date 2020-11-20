@@ -9,7 +9,6 @@
 #include <glog/logging.h>
 #include <gflags/gflags.h>
 
-// #include "kimera_scene_graph/dynamic_scene_node_evaluator.h"
 #include "kimera_scene_graph/scene_graph_builder.h"
 
 int main(int argc, char** argv) {
@@ -23,9 +22,7 @@ int main(int argc, char** argv) {
   // (instead of the SimulationSceneGraphServer).
   ros::NodeHandle nh;
   ros::NodeHandle nh_private("~");
-  // kimera::SceneGraphServer node(nh, nh_private);
-
-  // DynamicSceneGraphEvaluator dynamic_graph_evaluator(nh, nh_private);
+  kimera::SceneGraphBuilder node(nh, nh_private);
 
   ros::spin();
 

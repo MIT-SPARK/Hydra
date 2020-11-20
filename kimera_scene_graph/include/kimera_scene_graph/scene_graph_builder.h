@@ -26,7 +26,7 @@
 
 #include <kimera_scene_graph/kimera_scene_graphConfig.h>
 #include "kimera_scene_graph/common.h"
-//#include "kimera_scene_graph/dynamic_scene_node.h"
+#include "kimera_scene_graph/dynamic_scene_graph.h"
 #include "kimera_scene_graph/semantic_ros_publishers.h"
 
 // Finders
@@ -184,7 +184,7 @@ class SceneGraphBuilder {
   SceneGraphVisualizer scene_graph_visualizer_;
 
   // KimeraX Dynamic
-  // DynamicSceneGraph dynamic_scene_graph_;
+  DynamicSceneGraph dynamic_scene_graph_;
 
   // TODO(Toni): remove
   float skeleton_z_level_;

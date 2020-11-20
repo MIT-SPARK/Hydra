@@ -1,0 +1,106 @@
+<launch>
+  <!-- Change sensor frame to:
+   - VIO's estimated base_link: `left_cam_base_link`
+   - Or, if you want to use simulator's ground-truth: `left_cam`
+  -->
+  <arg name="sensor_frame" default="left_cam"/>
+
+  <arg name="filter_detections"              default="true"/>
+  <arg name="online"                         default="false"/>
+  <arg name="dataset_path"                   default="/home/marcus/drive_2/datasets/uHumans2/neighborhood_scene/uHumans2_neighborhood_s1_24h.bag"/>
+  <arg name="world_frame"                    default="world"/>
+  <arg name="human_topic"                    default="/graph_cmr_ros_node/human_meshes"/>
+  <arg name="check_position_closeness"       default="true"/>
+  <arg name="check_pose_dynamic_feasibility" default="true"/>
+  <arg name="check_mesh_dynamic_feasibility" default="true"/>
+  <arg name="check_shape_feasibility"        default="true"/>
+  <arg name="visualize_pose_graphs"          default="true"/>
+  <arg name="visualize_joints"               default="true"/>
+  <arg name="feasible_dyn_rate"              default="3.0"/>
+  <arg name="feasible_mesh_rate"             default="2.5"/>
+  <arg name="node_association_time_cap"      default="2.0"/>
+  <arg name="min_node_association_dist"      default="0.2"/>
+  <arg name="max_pose_rot"                   default="1.57"/>
+  <arg name="pgo_trans_threshold"            default="0.5"/>
+  <arg name="pgo_rot_threshold"              default="0.5"/>
+  <arg name="beta_diff_threshold"            default="0.1"/>
+  <arg name="prune_threshold"                default="10"/>
+  <arg name="human_color"                    default="[0.0, 1.0, 0.0]"/>
+  <arg name="centroid_color"                 default="[0.0, 0.0, 1.0]"/>
+  <arg name="edge_thickness"                 default="0.02"/>
+  <arg name="detection_position_variance"    default="0.1"/>
+  <arg name="detection_rotation_variance"    default="0.1"/>
+  <arg name="motion_position_variance"       default="1.0"/>
+  <arg name="motion_rotation_variance"       default="1.0"/>
+
+  <param name="use_sim_time" value="true" />
+
+  <!-- Send colored pointcloud with scene_graph to kimera_scene_graph for 3D segmentation -->
+  <!-- launch-prefix="gdb -ex run args" -->
+  <!-- launch-prefix="valgrind" -->
+  <node name="kimera_dynamic_scene_graph_node" pkg="kimera_scene_graph"
+    type="kimera_dynamic_scene_graph_node" output="screen"
+    args="-alsologtostderr -colorlogtostderr" clear_params="true">
+
+    <!-- Dynamic Scene Graph Params -->
+    <param name="world_frame"                        value="$(arg world_frame)"/>
+    <param name="human_topic"                        value="$(arg human_topic)"/>
+    <param name="check_position_closeness"           value="$(arg check_position_closeness)"/>
+    <param name="check_pose_dynamic_feasibility"     value="$(arg check_pose_dynamic_feasibility)"/>
+    <param name="check_mesh_dynamic_feasibility"     value="$(arg check_mesh_dynamic_feasibility)"/>
+    <param name="check_shape_feasibility"            value="$(arg check_shape_feasibility)"/>
+    <param name="visualize_pose_graphs"              value="$(arg visualize_pose_graphs)"/>
+    <param name="visualize_joints"                   value="$(arg visualize_joints)"/>
+    <param name="feasible_dyn_rate"                  value="$(arg feasible_dyn_rate)"/>
+    <param name="feasible_mesh_rate"                 value="$(arg feasible_mesh_rate)"/>
+    <param name="node_association_time_cap"          value="$(arg node_association_time_cap)"/>
+    <param name="min_node_association_dist"          value="$(arg min_node_association_dist)"/>
+    <param name="max_pose_rot"                       value="$(arg max_pose_rot)"/>
+    <param name="pgo_trans_threshold"                value="$(arg pgo_trans_threshold)"/>
+    <param name="pgo_rot_threshold"                  value="$(arg pgo_rot_threshold)"/>
+    <param name="beta_diff_threshold"                value="$(arg beta_diff_threshold)"/>
+    <param name="prune_threshold"                    value="$(arg prune_threshold)"/>
+    <param name="human_color"                        value="$(arg human_color)"/>
+    <param name="centroid_color"                     value="$(arg centroid_color)"/>
+    <param name="serialization_dir"                  value="$(find kimera_scene_graph)/cfg/serialization"/>
+    <param name="edge_thickness"                     value="$(arg edge_thickness)"/>
+    <param name="detection_position_variance"        value="$(arg detection_position_variance)"/>
+    <param name="detection_rotation_variance"        value="$(arg detection_rotation_variance)"/>
+    <param name="motion_position_variance"           value="$(arg motion_position_variance)"/>
+    <param name="motion_rotation_variance"           value="$(arg motion_rotation_variance)"/>
+
+    <!-- Caution: Setting this to "true" will show the full smpl for each timestep for
+                  one human at the expense of showing the final smpl for each human -->
+    <param name="single_sequence_smpl_mode"                     value="false"/>
+    <param name="draw_skeleton_edges"                           value="false"/>
+  </node>
+
+  <include file="$(find graph_cmr_ros)/launch/graph_cmr_ros.launch">
+    <!-- Set filter_detections to true to remove detections near the edges of the image -->
+    <!-- Set visualize_point_clouds to false to turn off raw GraphCMR mesh visualizations -->
+    <arg name="filter_detections"      value="$(arg filter_detections)"/>
+    <arg name="online"                 value="$(arg online)"/>
+    <arg name="dataset_path"           value="$(arg dataset_path)"/>
+    <arg name="visualize_point_clouds" value="true"/>
+    <arg name="vis_seg_img"            value="true"/>
+    <arg name="launch_rviz"            value="false"/>
+    <arg name="human_topic"            value="human_meshes"/>
+    <arg name="mesh_vis_topic"         value="human_meshes_vis"/>
+    <arg name="seg_img_topic"          value="human_mesh_seg_image"/>
+
+    <arg name="left_cam_info_topic"    default="/tesse/left_cam/camera_info"/>
+    <arg name="left_cam_topic"         default="/tesse/left_cam/mono/image_raw"/>
+    <arg name="depth_cam_topic"        default="/tesse/depth_cam/mono/image_raw"/>
+    <arg name="seg_cam_topic"          default="/tesse/seg_cam/rgb/image_raw"/>
+  </include>
+
+  <!-- This node visualizes the meshes for human detections accepted to the pose graph -->
+  <node name="kimera_scene_graph_vis" pkg="graph_cmr_ros" type="vis_graph_script" output="screen" args="">
+    <param name="visualizer_type"        value="point_cloud"/>
+    <param name="human_topic"            value="kimera_dynamic_scene_graph_node/optimized_human_meshes"/>
+    <param name="mesh_vis_topic"         value="kimera_dynamic_scene_graph_node/optimized_human_meshes_vis"/>
+    <param name="use_time_color"         value="false"/>
+    <param name="use_time_transparency"  value="false"/>
+    <param name="publish_as_series"      value="false"/>
+  </node>
+</launch>

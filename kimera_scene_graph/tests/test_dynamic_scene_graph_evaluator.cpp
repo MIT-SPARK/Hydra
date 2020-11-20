@@ -1,20 +1,28 @@
+#include <gflags/gflags.h>
 #include <gtest/gtest.h>
+#include <glog/logging.h>
+
 #include <tf/transform_broadcaster.h>
-#include "kimera_scene_graph/dynamic_scene_node_evaluator.h"
+#include "kimera_scene_graph/dynamic_scene_graph_evaluator.h"
 
 // Keep node handles persistent.
-class DynamicSceneNodeEvaluatorTest : public testing::Test {
+class DynamicHumanNodeEvaluatorTestFixture : public ::testing::Test {
  public:
-  DynamicSceneNodeEvaluatorTest() {}
-  ~DynamicSceneNodeEvaluatorTest() {}
+  DynamicHumanNodeEvaluatorTestFixture() {}
+  ~DynamicHumanNodeEvaluatorTestFixture() {}
+
+ protected:
+  void SetUp() override {}
+  void TearDown() override {}
 
  protected:
   ros::NodeHandle nh;
   ros::NodeHandle nh_private;
 };
 
-TEST_F(DynamicSceneNodeEvaluatorTest, testVariance) {
-  DynamicSceneGraphEvaluator dsn_eval(nh, nh_private);
+TEST_F(DynamicHumanNodeEvaluatorTestFixture, testVariance) {
+  LOG(INFO) << "Running testVariance";
+  kimera::DynamicSceneGraphEvaluator dsn_eval(nh, nh_private);
   float err = 0;
   float sq_err = 0;
   int count = 0;
@@ -28,14 +36,14 @@ TEST_F(DynamicSceneNodeEvaluatorTest, testVariance) {
   }
   variance = variance / count;
   float online_variance = dsn_eval.calcVariance(err, sq_err, count);
-  EXPECT_TRUE(abs(variance - online_variance) < 0.3)
+  EXPECT_LT(abs(variance - online_variance), 0.3)
       << "Variance: " << variance << "  Online Variance: " << online_variance;
 }
 
-TEST_F(DynamicSceneNodeEvaluatorTest, testSmallestCentroidDistance) {
-  DynamicSceneGraphEvaluator dsn_eval(nh, nh_private);
-  dsn_eval.human_height_ = 1.0;
-  kimera::DynamicSceneNode node;
+TEST_F(DynamicHumanNodeEvaluatorTestFixture, testSmallestCentroidDistAndAng) {
+  LOG(INFO) << "Running testSmallestCentroidDistAndAng";
+  kimera::DynamicSceneGraphEvaluator dsn_eval(nh, nh_private);
+  kimera::DynamicHumanNode node;
   node.pose_ =
       gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(1.0, 1.0, 1.0));
 
@@ -43,7 +51,8 @@ TEST_F(DynamicSceneNodeEvaluatorTest, testSmallestCentroidDistance) {
   node.msg_.header.stamp = ros::Time(base_time);
 
   // Test when the time is not in the ground-truth
-  EXPECT_TRUE(abs(dsn_eval.smallestCentroidDistance(node) + 1) < 0.000001);
+  EXPECT_EQ(dsn_eval.smallestCentroidDistAndAng(node).first, -1);
+  EXPECT_EQ(dsn_eval.smallestCentroidDistAndAng(node).second, -1);
 
   // Test when the time is in the ground-truth
   tf::Transform tr1(tf::Quaternion(0, 0, 0, 1), tf::Vector3(1, 1, -0.5));
@@ -54,19 +63,21 @@ TEST_F(DynamicSceneNodeEvaluatorTest, testSmallestCentroidDistance) {
   tf2.setData(tr2);
   dsn_eval.time_to_gt_[node.msg_.header.stamp.toSec()] =
       std::vector<tf::StampedTransform>({tf1, tf2});
-  EXPECT_TRUE(abs(dsn_eval.smallestCentroidDistance(node) - 1.0) < 0.0000001)
-      << dsn_eval.smallestCentroidDistance(node);
+  EXPECT_EQ(abs(dsn_eval.smallestCentroidDistAndAng(node).first), 1.5)
+      << dsn_eval.smallestCentroidDistAndAng(node).first;
+  EXPECT_LT(abs(dsn_eval.smallestCentroidDistAndAng(node).second), 1e-6)
+      << dsn_eval.smallestCentroidDistAndAng(node).second;
 }
 
 /*
-TEST_F(DynamicSceneNodeEvaluatorTest, testErrorServiceCall){
+TEST_F(DynamicHumanNodeEvaluatorTestFixture, testErrorServiceCall){
     DynamicSceneGraphEvaluator dsg_eval(nh, nh_private);
     tf::TransformBroadcaster br;
 
     dsg_eval.dynamic_scene_graph_.feasible_dyn_rate_ = 2.0;
     dsg_eval.dynamic_scene_graph_.feasible_mesh_rate_ = 1.5;
     dsg_eval.dynamic_scene_graph_.time_cap_ = 10.0;
-    dsg_eval.dynamic_scene_graph_.merge_close_ = false;
+    dsg_eval.dynamic_scene_graph_.check_position_closeness_ = false;
     dsg_eval.world_frame_ = "world";
     dsg_eval.num_humans_ = 1;
     dsg_eval.human_height_ = 2.1;
@@ -143,12 +154,6 @@ things change accordingly.
 
         // Run the Error calculations for the nodes that should have been in
 place.
-        EXPECT_TRUE(res.raw_error > res.optimized_error);
+        CHECK_TRUE(res.raw_error > res.optimized_error);
     }
 }*/
-
-int main(int argc, char* argv[]) {
-  testing::InitGoogleTest(&argc, argv);
-  ros::init(argc, argv, "tester");
-  return RUN_ALL_TESTS();
-}

@@ -54,7 +54,7 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
       building_finder_(nullptr),
       scene_graph_(nullptr),
       scene_graph_visualizer_(nh, nh_private_),
-      // dynamic_scene_graph_(nh, nh_private),
+      dynamic_scene_graph_(nh, nh_private),
       semantic_config_(getSemanticTsdfIntegratorConfigFromRosParam(nh_private)),
       reconstruct_scene_graph_srv_() {
   // Create Scene graph
@@ -463,10 +463,10 @@ void SceneGraphBuilder::sceneGraphReconstruction(const bool& only_rooms) {
   scene_graph_visualizer_.visualize(*scene_graph_);
 
   LOG(INFO) << "Visualizing Human Pose Graphs";
-  // dynamic_scene_graph_.visualizePoseGraphs();
+  dynamic_scene_graph_.visualizePoseGraphs();
 
   LOG(INFO) << "Visualizing Human Skeletons";
-  // dynamic_scene_graph_.visualizeJoints();
+  dynamic_scene_graph_.publishOptimizedMeshesAndVis();
 
   if (!scene_graph_output_path_.empty()) {
     LOG(INFO) << "Saving Scene-Graph to file: "
