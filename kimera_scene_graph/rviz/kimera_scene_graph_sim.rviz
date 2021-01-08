@@ -4,8 +4,7 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /Global Options1
-        - /SemanticMesh1
+        - /TF1/Frames1
         - /SemanticMesh1/Namespaces1
         - /SemanticMesh2
         - /SemanticMesh2/Status1
@@ -25,8 +24,10 @@ Panels:
         - /BoundingBoxes1/Namespaces1
         - /TSDF1
         - /Walls1/Namespaces1
-      Splitter Ratio: 0.43717947602272034
-    Tree Height: 874
+        - /GT Odometry1/Shape1
+        - /Kimera Odometry1/Shape1
+      Splitter Ratio: 0.7597087621688843
+    Tree Height: 645
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -45,7 +46,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: RoomClusters
+    SyncSource: HumanCentroids
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -70,6 +71,92 @@ Visualization Manager:
       Plane: XY
       Plane Cell Count: 200
       Reference Frame: <Fixed Frame>
+      Value: false
+    - Class: rviz/TF
+      Enabled: true
+      Frame Timeout: 15
+      Frames:
+        All Enabled: false
+        base_link_gt:
+          Value: true
+        base_link_kimera:
+          Value: true
+        left_cam:
+          Value: true
+        left_cam_kimera:
+          Value: true
+        object_0:
+          Value: true
+        object_1:
+          Value: true
+        object_10:
+          Value: true
+        object_11:
+          Value: true
+        object_2:
+          Value: true
+        object_3:
+          Value: true
+        object_4:
+          Value: true
+        object_5:
+          Value: true
+        object_6:
+          Value: true
+        object_7:
+          Value: true
+        object_8:
+          Value: true
+        object_9:
+          Value: true
+        right_cam:
+          Value: true
+        right_cam_kimera:
+          Value: true
+        world:
+          Value: true
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Tree:
+        world:
+          base_link_gt:
+            left_cam:
+              {}
+            right_cam:
+              {}
+          base_link_kimera:
+            left_cam_kimera:
+              {}
+            right_cam_kimera:
+              {}
+          object_0:
+            {}
+          object_1:
+            {}
+          object_10:
+            {}
+          object_11:
+            {}
+          object_2:
+            {}
+          object_3:
+            {}
+          object_4:
+            {}
+          object_5:
+            {}
+          object_6:
+            {}
+          object_7:
+            {}
+          object_8:
+            {}
+          object_9:
+            {}
+      Update Interval: 0
       Value: true
     - Class: rviz/Axes
       Enabled: true
@@ -77,10 +164,22 @@ Visualization Manager:
       Name: Axes
       Radius: 0.5
       Reference Frame: <Fixed Frame>
+      Value: false
+    - Class: rviz/Image
+      Enabled: true
+      Image Topic: /tesse/left_cam/rgb/image_raw
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: Image
+      Normalize Range: true
+      Queue Size: 2
+      Transport Hint: raw
+      Unreliable: false
       Value: true
     - Class: rviz/MarkerArray
       Enabled: true
-      Marker Topic: /kimera_scene_graph_eval_node/sparse_graph
+      Marker Topic: /kimera_scene_graph_eval_node/tsdf_test_mesh
       Name: SemanticMesh
       Namespaces:
         transition_edges: true
@@ -230,7 +329,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: Intensity
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 0.30000001192092896
@@ -247,15 +346,15 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Class: rviz/MarkerArray
-      Enabled: true
+      Enabled: false
       Marker Topic: /kimera_scene_graph_eval_node/bounding_boxes
       Name: BoundingBoxes
       Namespaces:
         "L: 0": true
       Queue Size: 100
-      Value: true
+      Value: false
     - Class: rviz/MarkerArray
       Enabled: true
       Marker Topic: /kimera_scene_graph_eval_node/bounding_boxes_wireframe
@@ -436,39 +535,91 @@ Visualization Manager:
       Color: 239; 41; 41
       Color Transformer: FlatColor
       Decay Time: 0
-      Enabled: false
+      Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 4096
       Min Color: 0; 0; 0
       Min Intensity: 0
-      Name: HumanPointClouds
+      Name: GraphCMRHumanDetections
       Position Transformer: XYZ
       Queue Size: 10
       Selectable: true
       Size (Pixels): 3
       Size (m): 0.07000000029802322
       Style: Flat Squares
-      Topic: /kimera_scene_graph/human_meshes_vis
+      Topic: /graph_cmr_ros_node/human_meshes_vis
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: false
-    - Class: rviz/Marker
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud
+      Color: 78; 154; 6
+      Color Transformer: FlatColor
+      Decay Time: 0
       Enabled: true
-      Marker Topic: /kimera_scene_graph_node/all_graph_edges
-      Name: HumanGraphEdges
-      Namespaces:
-        {}
-      Queue Size: 100
+      Invert Rainbow: false
+      Max Color: 32; 74; 135
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: OptimizedHumanDetections
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.07000000029802322
+      Style: Flat Squares
+      Topic: /kimera_dynamic_scene_graph_node/optimized_human_meshes_vis
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /kimera_scene_graph/human_meshes_vis
-      Name: HumanMarker
+      Marker Topic: /kimera_dynamic_scene_graph_node/all_graph_edges
+      Name: HumanGraphEdges
       Namespaces:
-        {}
+        node_edges: true
       Queue Size: 100
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: RGB8
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: HumanCentroids
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.10000000149011612
+      Style: Flat Squares
+      Topic: /kimera_dynamic_scene_graph_node/all_human_centroids
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
       Value: true
     - Class: rviz/Marker
       Enabled: true
@@ -477,26 +628,80 @@ Visualization Manager:
       Namespaces:
         {}
       Queue Size: 100
-      Value: true
-    - Class: rviz/TF
-      Enabled: false
-      Frame Timeout: 15
-      Frames:
-        All Enabled: true
-      Marker Scale: 1
-      Name: TF
-      Show Arrows: true
-      Show Axes: true
-      Show Names: true
-      Tree:
-        {}
-      Update Interval: 0
       Value: false
+    - Angle Tolerance: 0.10000000149011612
+      Class: rviz/Odometry
+      Covariance:
+        Orientation:
+          Alpha: 0.5
+          Color: 255; 255; 127
+          Color Style: Unique
+          Frame: Local
+          Offset: 1
+          Scale: 1
+          Value: true
+        Position:
+          Alpha: 0.30000001192092896
+          Color: 204; 51; 204
+          Scale: 1
+          Value: true
+        Value: true
+      Enabled: true
+      Keep: 1000000
+      Name: GT Odometry
+      Position Tolerance: 0.10000000149011612
+      Shape:
+        Alpha: 1
+        Axes Length: 0.10000000149011612
+        Axes Radius: 0.009999999776482582
+        Color: 255; 25; 0
+        Head Length: 0.30000001192092896
+        Head Radius: 0.10000000149011612
+        Shaft Length: 1
+        Shaft Radius: 0.05000000074505806
+        Value: Axes
+      Topic: /tesse/odom
+      Unreliable: false
+      Value: true
+    - Angle Tolerance: 0.10000000149011612
+      Class: rviz/Odometry
+      Covariance:
+        Orientation:
+          Alpha: 0.5
+          Color: 255; 255; 127
+          Color Style: Unique
+          Frame: Local
+          Offset: 1
+          Scale: 1
+          Value: true
+        Position:
+          Alpha: 0.30000001192092896
+          Color: 204; 51; 204
+          Scale: 1
+          Value: true
+        Value: true
+      Enabled: true
+      Keep: 1000000
+      Name: Kimera Odometry
+      Position Tolerance: 0.10000000149011612
+      Shape:
+        Alpha: 1
+        Axes Length: 0.10000000149011612
+        Axes Radius: 0.009999999776482582
+        Color: 255; 25; 0
+        Head Length: 0.30000001192092896
+        Head Radius: 0.10000000149011612
+        Shaft Length: 1
+        Shaft Radius: 0.05000000074505806
+        Value: Axes
+      Topic: /kimera_vio_ros/odometry
+      Unreliable: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 255; 255; 255
     Default Light: true
-    Fixed Frame: map
+    Fixed Frame: world
     Frame Rate: 30
   Name: root
   Tools:
@@ -521,33 +726,35 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 89.6664047241211
+      Distance: 49.412078857421875
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.3216354548931122
-        Y: -1.8713035583496094
-        Z: 11.012158393859863
+        X: 7.07457160949707
+        Y: 17.461811065673828
+        Z: 2.230398416519165
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.9203985929489136
+      Pitch: 0.24539843201637268
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 2.905393362045288
+      Yaw: 5.083563327789307
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 1025
+  Height: 1052
   Hide Left Dock: false
   Hide Right Dock: true
-  QMainWindow State: 000000ff00000000fd00000004000000000000030e000003a7fc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d000003a7000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d00610067006500000002da000002160000000000000000fb0000000a0049006d0061006700650000000500000002a300000000000000000000000100000257000003a7fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d000003a7000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e1000001970000000300000ebd00000039fc0100000002fb0000000800540069006d0065000000000000000ebd000002eb00fffffffb0000000800540069006d0065010000000000000450000000000000000000000429000003a700000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Image:
+    collapsed: false
+  QMainWindow State: 000000ff00000000fd000000040000000000000165000003c2fc020000000bfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d000002c2000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d0061006700650100000305000000fa0000001600fffffffb0000000a0049006d0061006700650000000500000002a30000000000000000fb0000000a0049006d00610067006501000002af0000015000000000000000000000000100000257000003a7fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d000003a7000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e1000001970000000300000ebd00000039fc0100000002fb0000000800540069006d0065000000000000000ebd000002eb00fffffffb0000000800540069006d0065010000000000000450000000000000000000000615000003c200000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -556,6 +763,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: true
-  Width: 1853
-  X: 1987
-  Y: 27
+  Width: 1920
+  X: 1920
+  Y: 0
