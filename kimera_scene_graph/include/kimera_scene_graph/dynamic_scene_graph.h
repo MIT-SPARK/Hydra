@@ -1,15 +1,14 @@
 #pragma once
 
+#include <ros/ros.h>
 #include <KimeraRPGO/utils/type_utils.h>
-#include <graph_cmr_ros/SMPL.h>
-#include <graph_cmr_ros/SMPLList.h>
+#include <KimeraRPGO/RobustSolver.h>
 #include <gtsam/geometry/Pose3.h>
 #include <pcl_conversions/pcl_conversions.h>
-#include <ros/ros.h>
-#include <rosbag/bag.h>
-#include <rosbag/view.h>
-#include <std_srvs/Empty.h>
 #include <tf/transform_broadcaster.h>
+#include <std_srvs/Empty.h>
+#include <graph_cmr_ros/SMPL.h>
+#include <graph_cmr_ros/SMPLList.h>
 #include <visualization_msgs/Marker.h>
 #include <voxblox_msgs/FilePath.h>
 
@@ -18,9 +17,9 @@
 #include <string>
 #include <vector>
 
-#include "KimeraRPGO/RobustSolver.h"
 #include "kimera_scene_graph/scene_graph_node.h"
 #include "kimera_scene_graph/semantic_ros_publishers.h"
+#include "kimera_scene_graph/humans_serialization.h"
 
 namespace kimera {
 
@@ -49,7 +48,7 @@ struct DynamicHumanNodesAndPGO {
   DynamicHumanNodesAndPGO(const KimeraRPGO::RobustSolverParams& params)
       : human_nodes_(),
         pgo_(KimeraRPGO::make_unique<KimeraRPGO::RobustSolver>(params)) {}
-  
+
   DynamicHumanNodes human_nodes_;
   std::unique_ptr<KimeraRPGO::RobustSolver> pgo_;
 };
@@ -98,14 +97,15 @@ class DynamicSceneGraph {
    * for each human individually. It additionally publishes all the centroids
    * and all the edges.
    */
-  void visualizePoseGraphs(bool serialize = false);
+  void visualizePoseGraphs(HumansSerializer* serializer = nullptr);
 
   /**
    * @brief publishOptimizedMeshesAndVis visualizes the skeleton edges for each
    * human, the joint vertices, and an SMPL list with the SMPL of the final
    * human SMPL in each pose graph.
+   * @param serializer optional serializer handle
    */
-  void publishOptimizedMeshesAndVis(bool serialize = false);
+  void publishOptimizedMeshesAndVis(HumansSerializer* serializer = nullptr);
 
   /**
    * @brief addSceneNode adds a new DynamicHumanNode to the graph.
@@ -126,7 +126,7 @@ class DynamicSceneGraph {
   void getAllOptimizedHumanNodes(
       DynamicHumanNodeList* optimized_node_list) const;
 
-  /** 
+  /**
    * getOptimizedPoses collects poses of the human pgo at index idx.
    * @param idx index in human_db_, representing the human for the query
    * @param pose_list output list of poses to be filled for the human
@@ -200,7 +200,7 @@ class DynamicSceneGraph {
    * @brief isShapeFeasible checks whether the beta parameters of two nodes
    * are similar enough to belong to the same human.
    * @param scene_node: The node to be checked as a feasible node in the graph.
-   * @param last_node: The last node currently in the graph to be checked 
+   * @param last_node: The last node currently in the graph to be checked
    * against.
    * @return true if the nodes have similar beta parameters.
    */
@@ -222,16 +222,6 @@ class DynamicSceneGraph {
    *  of pose graphs.
    */
   bool serialize();
-
-  /**
-   * @brief makedirs makes all directories needed to get to a given file path.
-   * @param filepath: The path to the directory or file to check and make.
-   * @param create_dirs: If true, makes the directories if they do not already
-   * exist.
-   * @return true if the directory exists or was successfully made, false
-   * otherwise.
-   */
-  bool makedirs(const std::string& filepath, bool create_dirs = true);
 
   static void colorPclFromJoints(const std::vector<float>& human_color,
                                  DynamicHumanNode* scene_node);
@@ -279,7 +269,7 @@ class DynamicSceneGraph {
   int prune_threshold_ = 0;
   bool single_sequence_smpl_mode_ = false;
   bool draw_skeleton_edges_ = false;
-  std::string human_topic_;
+  std::string human_topic_{"human_meshes"};
   bool check_position_closeness_ = true;
   bool check_pose_dynamic_feasibility_ = true;
   bool check_mesh_dynamic_feasibility_ = true;
@@ -320,11 +310,8 @@ class DynamicSceneGraph {
 
   tf::TransformBroadcaster br_;
 
-  // Serializers for the visualization data.
-  std::string serialization_dir_ = ".";
   ros::ServiceServer serialize_graph_srv_;
   ros::ServiceServer deserialize_graph_srv_;
-  rosbag::Bag bag_;
   std::string joint_prefix_ = "joints_";
   std::string joint_edges_prefix_ = "joint_edges_";
   std::string graph_edges_prefix_ = "graph_edges_";

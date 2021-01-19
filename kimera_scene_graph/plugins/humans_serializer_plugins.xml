@@ -1,0 +1,8 @@
+<library path="lib/libhumans_serialization_plugins">
+    <class type="kimera::HumansRosbagSerializer" base_class_type="kimera::HumansSerializer">
+        <description>Plugin to serialize human information to a rosbag</description>
+    </class>
+    <class type="kimera::HumansRosbagDeserializer" base_class_type="kimera::HumansDeserializer">
+        <description>Plugin to deserialize human information from a rosbag</description>
+    </class>
+</library>

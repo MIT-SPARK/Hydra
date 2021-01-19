@@ -11,7 +11,6 @@
 #include <pcl/filters/passthrough.h>
 #include <pcl/search/search.h>
 #include <pcl/segmentation/region_growing.h>
-#include <pcl/visualization/cloud_viewer.h>
 
 // Euclidean pcl
 #include <pcl/ModelCoefficients.h>
@@ -19,10 +18,7 @@
 #include <pcl/features/normal_3d.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/voxel_grid.h>
-#include <pcl/sample_consensus/method_types.h>
-#include <pcl/sample_consensus/model_types.h>
 #include <pcl/segmentation/extract_clusters.h>
-#include <pcl/segmentation/sac_segmentation.h>
 
 // Bounding Box
 #include <pcl/features/moment_of_inertia_estimation.h>

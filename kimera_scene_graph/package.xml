@@ -29,6 +29,7 @@
   <depend>sensor_msgs</depend>
   <depend>tf</depend>
   <depend>graph_cmr_ros</depend>
+  <depend>pluginlib</depend>
 
   <depend>kimera_semantics</depend>
   <depend>kimera_semantics_ros</depend>
@@ -43,4 +44,9 @@
 
   <depend>rostest</depend>
   <test_depend>rosunit</test_depend>
+
+  <export>
+      <kimera_scene_graph plugin="${prefix}/plugins/humans_serializer_plugins.xml"/>
+  </export>
+
 </package>

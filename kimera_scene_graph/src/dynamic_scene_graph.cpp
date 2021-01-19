@@ -51,8 +51,6 @@ DynamicSceneGraph::DynamicSceneGraph(const ros::NodeHandle& nh,
   nh_private_.param("human_color", human_color_, human_color_);
   nh_private_.param("centroid_color", centroid_color_, centroid_color_);
   nh_private_.param(
-      "serialization_dir", serialization_dir_, serialization_dir_);
-  nh_private_.param(
       "pgo_trans_threshold", pgo_trans_threshold_, pgo_trans_threshold_);
   nh_private_.param(
       "pgo_rot_threshold", pgo_rot_threshold_, pgo_rot_threshold_);
@@ -140,95 +138,90 @@ bool DynamicSceneGraph::deserializeServiceCall(
   }
 }
 
+inline auto get_agent_id(const std::string& topic) -> AgentId {
+  size_t chop_idx = topic.find_last_of('_');
+  std::string id_str = topic.substr(chop_idx + 1);
+  AgentId id;
+  try {
+    id = std::stol(id_str);
+  } catch (...) {
+    LOG(ERROR) << "Not parsing non-numeric agent id: " << id_str.c_str();
+  }
+  return id;
+}
+
 bool DynamicSceneGraph::deserializeAndPublish(
     const std::string& deserialization_file) {
-  if (makedirs(deserialization_file, false)) {
-    try {
-      bag_.open(deserialization_file, rosbag::bagmode::Read);
-    } catch (const rosbag::BagException& e) {
-      LOG(ERROR) << "Failed to load rosbag at: "
-                 << deserialization_file.c_str();
-      LOG(ERROR) << e.what();
-      return false;
-    }
-
-    rosbag::View view(bag_);
-    for (const rosbag::MessageInstance& m : view) {
-      std::string topic = m.getTopic();
-      LOG(INFO) << "Deserializing from Topic " << topic;
-
-      if (topic.compare(mesh_pub_.getTopic()) == 0) {
-        if (single_sequence_smpl_mode_) {
-          continue;
-        }
-        graph_cmr_ros::SMPLList::ConstPtr smpls =
-            m.instantiate<graph_cmr_ros::SMPLList>();
-        CHECK(smpls);
-        mesh_pub_.publish(*smpls);
-        continue;
-      } else if (topic.compare(edges_pub_.getTopic()) == 0) {
-        visualization_msgs::Marker::ConstPtr marker =
-            m.instantiate<visualization_msgs::Marker>();
-        CHECK(marker);
-        edges_pub_.publish(*marker);
-        continue;
-      } else if (topic.compare(semantic_instance_centroid_pub_.getTopic()) ==
-                 0) {
-        ColorPointCloud::ConstPtr pt_cloud = m.instantiate<ColorPointCloud>();
-        CHECK(pt_cloud);
-        semantic_instance_centroid_pub_.publish(*pt_cloud);
-        continue;
-      }
-
-      size_t chop_idx = topic.find_last_of('_');
-      std::string id_str = topic.substr(chop_idx + 1);
-      AgentId id;
-      try {
-        id = std::stol(id_str);
-      } catch (...) {
-        LOG(ERROR) << "Not parsing non-numeric agent id: " << id_str.c_str();
-      }
-      std::string smpl_msg_name = "human_smpl_msg_" + std::to_string(id);
-
-      if (topic.compare(agent_centroids_.getTopic(id)) == 0) {
-        ColorPointCloud::ConstPtr pt_cloud = m.instantiate<ColorPointCloud>();
-        CHECK(pt_cloud);
-        agent_centroids_.publish(id, *pt_cloud);
-      } else if (topic.compare(agent_graph_edges_.getTopic(id)) == 0) {
-        visualization_msgs::Marker::ConstPtr marker =
-            m.instantiate<visualization_msgs::Marker>();
-        CHECK(marker);
-        agent_graph_edges_.publish(id, *marker);
-      } else if (topic.compare(skeleton_points_pubs_.getTopic(id)) == 0) {
-        ColorPointCloud::ConstPtr pt_cloud = m.instantiate<ColorPointCloud>();
-        CHECK(pt_cloud);
-        skeleton_points_pubs_.publish(id, *pt_cloud);
-      } else if (topic.compare(skeleton_edge_pubs_.getTopic(id)) == 0) {
-        visualization_msgs::Marker::ConstPtr marker =
-            m.instantiate<visualization_msgs::Marker>();
-        CHECK(marker);
-        skeleton_edge_pubs_.publish(id, *marker);
-      } else if (topic.compare(smpl_msg_name) == 0 &&
-                 single_sequence_smpl_mode_) {
-        graph_cmr_ros::SMPLList::ConstPtr smpls =
-            m.instantiate<graph_cmr_ros::SMPLList>();
-        CHECK(smpls);
-        mesh_pub_.publish(*smpls);
-        continue;
-      }
-    }
-    bag_.close();
-    return true;
+  SerializationHandle<DeserializerHandleInfo> handle(nh_private_,
+                                                     deserialization_file);
+  if (not handle.get()) {
+    LOG(ERROR) << "Deserialization failed";
+    return false;
   }
-  return false;
+
+  for (const EntryInfo& info : *(handle.get())) {
+    LOG(INFO) << "Deserializing from Topic " << info.topic;
+
+    if (info.topic.compare(mesh_pub_.getTopic()) == 0) {
+      if (single_sequence_smpl_mode_) {
+        continue;
+      }
+      graph_cmr_ros::SMPLList::ConstPtr smpls = info.getSMPL();
+      CHECK(smpls);
+      mesh_pub_.publish(*smpls);
+      continue;
+    }
+
+    if (info.topic.compare(edges_pub_.getTopic()) == 0) {
+      visualization_msgs::Marker::ConstPtr marker = info.getMarker();
+      CHECK(marker);
+      edges_pub_.publish(*marker);
+      continue;
+    }
+
+    if (info.topic.compare(semantic_instance_centroid_pub_.getTopic()) == 0) {
+      ColorPointCloud::ConstPtr pt_cloud = info.getPCL();
+      CHECK(pt_cloud);
+      semantic_instance_centroid_pub_.publish(*pt_cloud);
+      continue;
+    }
+
+    AgentId id = get_agent_id(info.topic);
+    std::string smpl_msg_name = "human_smpl_msg_" + std::to_string(id);
+
+    if (info.topic.compare(agent_centroids_.getTopic(id)) == 0) {
+      ColorPointCloud::ConstPtr pt_cloud = info.getPCL();
+      CHECK(pt_cloud);
+      agent_centroids_.publish(id, *pt_cloud);
+    } else if (info.topic.compare(agent_graph_edges_.getTopic(id)) == 0) {
+      visualization_msgs::Marker::ConstPtr marker = info.getMarker();
+      CHECK(marker);
+      agent_graph_edges_.publish(id, *marker);
+    } else if (info.topic.compare(skeleton_points_pubs_.getTopic(id)) == 0) {
+      ColorPointCloud::ConstPtr pt_cloud = info.getPCL();
+      CHECK(pt_cloud);
+      skeleton_points_pubs_.publish(id, *pt_cloud);
+    } else if (info.topic.compare(skeleton_edge_pubs_.getTopic(id)) == 0) {
+      visualization_msgs::Marker::ConstPtr marker = info.getMarker();
+      CHECK(marker);
+      skeleton_edge_pubs_.publish(id, *marker);
+    } else if (info.topic.compare(smpl_msg_name) == 0 &&
+               single_sequence_smpl_mode_) {
+      graph_cmr_ros::SMPLList::ConstPtr smpls = info.getSMPL();
+      CHECK(smpls);
+      mesh_pub_.publish(*smpls);
+      continue;
+    }
+  }
+
+  return true;
 }
 
 bool DynamicSceneGraph::serializeServiceCall(
     std_srvs::Empty::Request& request,
     std_srvs::Empty::Response& response) {
   LOG(INFO) << "DynamicSceneNode: Serialization Requested";
-  serialize();
-  return true;
+  return serialize();
 }
 
 void DynamicSceneGraph::humanCallback(
@@ -283,7 +276,8 @@ void DynamicSceneGraph::DynamicHumanNodeFromSMPL(
   DynamicSceneGraph::colorPclFromJoints(human_color, node);
 }
 
-int DynamicSceneGraph::findClosestFeasibleHuman(const DynamicHumanNode& scene_node) const {
+int DynamicSceneGraph::findClosestFeasibleHuman(
+    const DynamicHumanNode& scene_node) const {
   // Find the scene node that passes all time-checks
   float closest_dist = std::numeric_limits<float>::max();
   int closest_idx = -1;
@@ -324,12 +318,11 @@ int DynamicSceneGraph::findClosestFeasibleHuman(const DynamicHumanNode& scene_no
   return closest_idx;
 }
 
-void DynamicSceneGraph::addHumanNodeToPoseGraphs(
-    DynamicHumanNode& scene_node) {
+void DynamicSceneGraph::addHumanNodeToPoseGraphs(DynamicHumanNode& scene_node) {
   int closest_idx = findClosestFeasibleHuman(scene_node);
 
   if (closest_idx == -1) {
-    // Add a new pose graph for a new human because no matches were 
+    // Add a new pose graph for a new human because no matches were
     // found in the db.
     human_db_.push_back(DynamicHumanNodesAndPGO(rpgo_params_));
 
@@ -339,9 +332,7 @@ void DynamicSceneGraph::addHumanNodeToPoseGraphs(
     // Add world-pose prior factor (identity)
     prior_val.insert(gtsam::Key(0), gtsam::Pose3::identity());
     pose_graph.add(gtsam::PriorFactor<gtsam::Pose3>(
-        gtsam::Key(0),
-        gtsam::Pose3::identity(),
-        detection_noise_model_));
+        gtsam::Key(0), gtsam::Pose3::identity(), detection_noise_model_));
 
     // Add detection factor
     prior_val.insert(gtsam::Key(1), scene_node.pose_);
@@ -362,25 +353,22 @@ void DynamicSceneGraph::addHumanNodeToPoseGraphs(
     int new_node_key = last_node_key + 1;
 
     // Sanity check
-    CHECK_EQ(human_db_[closest_idx].human_nodes_.back().agent_id_,
-             closest_idx);
+    CHECK_EQ(human_db_[closest_idx].human_nodes_.back().agent_id_, closest_idx);
 
     gtsam::NonlinearFactorGraph pose_graph;
     gtsam::Values prior_val;
 
     // Assume no motion
     prior_val.insert(gtsam::Key(new_node_key), scene_node.pose_);
-    pose_graph.add(gtsam::BetweenFactor<gtsam::Pose3>(
-        gtsam::Key(last_node_key),
-        gtsam::Key(new_node_key),
-        gtsam::Pose3::identity(),
-        motion_noise_model_));
+    pose_graph.add(gtsam::BetweenFactor<gtsam::Pose3>(gtsam::Key(last_node_key),
+                                                      gtsam::Key(new_node_key),
+                                                      gtsam::Pose3::identity(),
+                                                      motion_noise_model_));
     // NOTE: PCM requires BetweenFactors, cannot use PriorFactors.
-    pose_graph.add(
-        gtsam::BetweenFactor<gtsam::Pose3>(gtsam::Key(0),
-                                           gtsam::Key(new_node_key),
-                                           scene_node.pose_,
-                                           detection_noise_model_));
+    pose_graph.add(gtsam::BetweenFactor<gtsam::Pose3>(gtsam::Key(0),
+                                                      gtsam::Key(new_node_key),
+                                                      scene_node.pose_,
+                                                      detection_noise_model_));
 
     // Assign correct ID to current detection
     scene_node.agent_id_ = closest_idx;
@@ -453,7 +441,7 @@ void DynamicSceneGraph::drawSkeletonEdges(DynamicHumanNode& node,
 }
 
 // TODO(marcus): use PoseGraphTools in place of all this!
-void DynamicSceneGraph::visualizePoseGraphs(bool serialize) {
+void DynamicSceneGraph::visualizePoseGraphs(HumansSerializer* serializer) {
   AgentId id = 0;
   ColorPointCloud all_person_pointcloud;
   visualization_msgs::Marker all_edges;
@@ -467,8 +455,8 @@ void DynamicSceneGraph::visualizePoseGraphs(bool serialize) {
       optimized_pose_lists.push_back(i_optimized_poses);
     }
   }
-  for (const std::vector<gtsam::Pose3>& optimized_poses
-       : optimized_pose_lists) {
+  for (const std::vector<gtsam::Pose3>& optimized_poses :
+       optimized_pose_lists) {
     visualization_msgs::Marker marker;
     setupEdgeMarker(marker, edge_color_);
     ColorPointCloud centroid_pointcloud;
@@ -503,10 +491,10 @@ void DynamicSceneGraph::visualizePoseGraphs(bool serialize) {
       last_centroid = pcl_centroid;
     }
     centroid_pointcloud.header.frame_id = world_frame_;
-    if (serialize) {
-      bag_.write(
-          agent_centroids_.getTopic(id), ros::Time(1), centroid_pointcloud);
-      bag_.write(agent_graph_edges_.getTopic(id), ros::Time(1), marker);
+    if (serializer) {
+      LOG(INFO) << "writing centroid and edges";
+      serializer->write(agent_centroids_.getTopic(id), centroid_pointcloud);
+      serializer->write(agent_graph_edges_.getTopic(id), marker);
     }
     agent_centroids_.publish(id, centroid_pointcloud);
     if (!draw_skeleton_edges_) {
@@ -515,17 +503,20 @@ void DynamicSceneGraph::visualizePoseGraphs(bool serialize) {
     id++;
   }
   all_person_pointcloud.header.frame_id = world_frame_;
-  if (serialize) {
-    bag_.write(edges_pub_.getTopic(), ros::Time(1), all_edges);
-    bag_.write(semantic_instance_centroid_pub_.getTopic(),
-               ros::Time(1),
-               all_person_pointcloud);
+
+  if (serializer) {
+    LOG(INFO) << "writing edges and pointcloud";
+    serializer->write(edges_pub_.getTopic(), all_edges);
+    serializer->write(semantic_instance_centroid_pub_.getTopic(),
+                      all_person_pointcloud);
   }
+
   edges_pub_.publish(all_edges);
   semantic_instance_centroid_pub_.publish(all_person_pointcloud);
 }
 
-void DynamicSceneGraph::publishOptimizedMeshesAndVis(bool serialize) {
+void DynamicSceneGraph::publishOptimizedMeshesAndVis(
+    HumansSerializer* serializer) {
   DynamicHumanNodeList optimized_human_nodes;
   getAllOptimizedHumanNodes(&optimized_human_nodes);
   graph_cmr_ros::SMPLList msg;
@@ -554,16 +545,14 @@ void DynamicSceneGraph::publishOptimizedMeshesAndVis(bool serialize) {
     }
     last_node.attributes_.pcl_->header.frame_id = world_frame_;
 
-    if (serialize) {
-      bag_.write("human_smpl_msg_" + std::to_string(last_node.agent_id_),
-                 ros::Time(1),
-                 agent_msg);
-      bag_.write(skeleton_points_pubs_.getTopic(last_node.agent_id_),
-                 ros::Time(1),
-                 *last_node.attributes_.pcl_);
-      bag_.write(skeleton_edge_pubs_.getTopic(last_node.agent_id_),
-                 ros::Time(1),
-                 marker);
+    if (serializer) {
+      LOG(INFO) << "writing smpl information";
+      serializer->write("human_smpl_msg_" + std::to_string(last_node.agent_id_),
+                        agent_msg);
+      serializer->write(skeleton_points_pubs_.getTopic(last_node.agent_id_),
+                        *last_node.attributes_.pcl_);
+      serializer->write(skeleton_edge_pubs_.getTopic(last_node.agent_id_),
+                        marker);
     }
 
     skeleton_points_pubs_.publish(last_node.agent_id_,
@@ -578,8 +567,9 @@ void DynamicSceneGraph::publishOptimizedMeshesAndVis(bool serialize) {
       mesh_pub_.publish(agent_msg);
     }
   }
-  if (serialize) {
-    bag_.write(mesh_pub_.getTopic(), ros::Time(1), msg);
+
+  if (serializer) {
+    serializer->write(mesh_pub_.getTopic(), msg);
   }
   if (!single_sequence_smpl_mode_) {
     mesh_pub_.publish(msg);
@@ -608,10 +598,9 @@ void DynamicSceneGraph::getAllOptimizedHumanNodes(
   }
 }
 
-void DynamicSceneGraph::getOptimizedPoses(
-    size_t idx,
-    std::vector<gtsam::Pose3>* pose_list,
-    bool include_prior) const {
+void DynamicSceneGraph::getOptimizedPoses(size_t idx,
+                                          std::vector<gtsam::Pose3>* pose_list,
+                                          bool include_prior) const {
   CHECK_NOTNULL(pose_list);
   pose_list->clear();
 
@@ -700,43 +689,13 @@ bool DynamicSceneGraph::isShapeFeasible(
 }
 
 bool DynamicSceneGraph::serialize() {
-  if (makedirs(serialization_dir_)) {
-    // Put in the number of humans as the file name so we know how many
-    // topics.
-    std::string file_path =
-        serialization_dir_ + "/" + std::to_string(human_db_.size()) + ".bag";
-    bag_.open(file_path, rosbag::bagmode::Write);
-    publishOptimizedMeshesAndVis(true);
-    visualizePoseGraphs(true);
-    bag_.close();
-    return true;
-  } else {
-    LOG(ERROR) << "Serialization for dynamic scene nodes failed!";
+  std::string name = "humans_" + std::to_string(human_db_.size());
+  SerializationHandle<SerializerHandleInfo> handle(nh_private_, name);
+  if (not handle.get()) {
     return false;
   }
-}
-
-bool DynamicSceneGraph::makedirs(const std::string& filepath,
-                                 bool create_dirs) {
-  // Ensure that the directory exists
-  boost::filesystem::path dir(filepath);
-  if (!(boost::filesystem::exists(dir))) {
-    LOG(WARNING) << "Serialization Directory: " << filepath
-                 << " Doesn't Exist...";
-    if (create_dirs) {
-      LOG(WARNING) << "Creating Directory: " << filepath;
-      if (boost::filesystem::create_directory(dir)) {
-        LOG(WARNING) << "...Successfully Created !";
-        return true;
-      } else {
-        LOG(ERROR) << "...Failed! Aborting Serialization. Please change in "
-                      "launch file!";
-        return false;
-      }
-    } else {
-      return false;
-    }
-  }
+  publishOptimizedMeshesAndVis(handle.get());
+  visualizePoseGraphs(handle.get());
   return true;
 }
 

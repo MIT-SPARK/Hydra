@@ -1,16 +1,28 @@
-#include <glog/logging.h>
-#include <gtest/gtest.h>
-#include <gflags/gflags.h>
-
 #include "kimera_scene_graph/dynamic_scene_graph.h"
 
+#include <gflags/gflags.h>
+#include <glog/logging.h>
+#include <gtest/gtest.h>
+#include <std_srvs/Empty.h>
+
 namespace kimera {
+
+namespace fs = boost::filesystem;
 
 // Keep node handles persistent.
 class DynamicHumanNodeTestFixture : public ::testing::Test {
  public:
-  DynamicHumanNodeTestFixture() {}
-  ~DynamicHumanNodeTestFixture() {}
+  DynamicHumanNodeTestFixture() {
+    // TODO(nathan) should remove explicit tmp when we can use std::filesystem
+    temporary_dir = fs::path("/tmp") / "humans_test_serialization";
+    nh_private.setParam("serialization_dir", temporary_dir.string());
+  }
+
+  ~DynamicHumanNodeTestFixture() {
+    if (fs::exists(temporary_dir)) {
+      fs::remove_all(temporary_dir);
+    }
+  }
 
  protected:
   void SetUp() override {}
@@ -19,11 +31,12 @@ class DynamicHumanNodeTestFixture : public ::testing::Test {
  protected:
   ros::NodeHandle nh;
   ros::NodeHandle nh_private;
+  fs::path temporary_dir;
 };
 
 /*
-* Test the isPoseDynamicallyFeasible method
-*/
+ * Test the isPoseDynamicallyFeasible method
+ */
 TEST_F(DynamicHumanNodeTestFixture, testIsPoseDynamicallyFeasible) {
   LOG(INFO) << "Running testIsPoseDynamicallyFeasible";
   kimera::DynamicSceneGraph d_graph(nh, nh_private);
@@ -56,8 +69,8 @@ TEST_F(DynamicHumanNodeTestFixture, testIsPoseDynamicallyFeasible) {
 }
 
 /*
-* Test the isMeshDynamicallyFeasible method
-*/
+ * Test the isMeshDynamicallyFeasible method
+ */
 TEST_F(DynamicHumanNodeTestFixture, testIsMeshDynamicallyFeasible) {
   LOG(INFO) << "Running testIsMeshDynamicallyFeasible";
   kimera::DynamicSceneGraph d_graph(nh, nh_private);
@@ -120,8 +133,8 @@ TEST_F(DynamicHumanNodeTestFixture, testIsShapeFeasible) {
   EXPECT_TRUE(d_graph.isShapeFeasible(node2, node1));
 
   std::vector<double> break_betas;
-  for (size_t i =0u; i < kimera::NUM_BETAS; i++) {
-    break_betas.push_back(i*10);
+  for (size_t i = 0u; i < kimera::NUM_BETAS; i++) {
+    break_betas.push_back(i * 10);
   }
 
   // If all betas are far away the test fails
@@ -130,8 +143,8 @@ TEST_F(DynamicHumanNodeTestFixture, testIsShapeFeasible) {
 }
 
 /*
-* Check that the SMPLList msg is converted properly.
-*/
+ * Check that the SMPLList msg is converted properly.
+ */
 TEST_F(DynamicHumanNodeTestFixture, testSceneNodeFromSMPL) {
   LOG(INFO) << "Running testSceneNodeFromSMPL";
   kimera::DynamicSceneGraph d_graph(nh, nh_private);
@@ -159,9 +172,9 @@ TEST_F(DynamicHumanNodeTestFixture, testSceneNodeFromSMPL) {
 }
 
 /*
-* Check that if we send one human, we get the correct number of graphs and
-* connectivity.
-*/
+ * Check that if we send one human, we get the correct number of graphs and
+ * connectivity.
+ */
 TEST_F(DynamicHumanNodeTestFixture, testGraphConnection) {
   LOG(INFO) << "Running testGraphConnection";
   kimera::DynamicSceneGraph d_graph(nh, nh_private);
@@ -198,9 +211,9 @@ TEST_F(DynamicHumanNodeTestFixture, testGraphConnection) {
     // Ensure that the optimized poses are all the same for one human.
     DynamicHumanNodeList opt_nodes;
     d_graph.getAllOptimizedHumanNodes(&opt_nodes);
-    EXPECT_EQ(opt_nodes.size(), 1u) 
+    EXPECT_EQ(opt_nodes.size(), 1u)
         << "STILL -- too many humans -- iter: " << i;
-    EXPECT_EQ(opt_nodes[0].size(), i + 1) 
+    EXPECT_EQ(opt_nodes[0].size(), i + 1)
         << "STILL -- too many poses -- iter: " << i;
     EXPECT_EQ(opt_nodes[0].front().pose_.translation(),
               opt_nodes[0].back().pose_.translation())
@@ -250,7 +263,66 @@ TEST_F(DynamicHumanNodeTestFixture, testGraphConnection) {
   }
 }
 
-// TODO(marcus): add test that fails if you don't have the correct reference frame at world pose (pose0 must be identity)
-// TODO(marcus): add similar tests that have consecutive detections and the pgo looks right.
+/*
+ * Verify round-trip serialization / deserialization for one human
+ */
+TEST_F(DynamicHumanNodeTestFixture, testHumansSerialization) {
+  LOG(INFO) << "Running testGraphConnection";
+  nh_private.setParam("visualize_joints", true);
+  nh_private.setParam("visualize_pose_graphs", true);
+
+  kimera::DynamicSceneGraph d_graph(nh, nh_private);
+  d_graph.feasible_dyn_rate_ = 2.0;
+  d_graph.feasible_mesh_rate_ = 1.5;
+  d_graph.time_cap_ = 10.0;
+
+  boost::shared_ptr<graph_cmr_ros::SMPLList> msg(new graph_cmr_ros::SMPLList);
+  std::vector<double> test_joints;
+  for (size_t i = 0; i < kimera::NUM_JOINTS * 3; i++) {
+    test_joints.push_back(i);
+  }
+  graph_cmr_ros::SMPL smpl;
+  float base_time = 0.1;
+  smpl.header.stamp = ros::Time(base_time);
+  smpl.centroid = {0, 1, 1};
+  for (size_t i = 0; i < kimera::NUM_BETAS; i++) {
+    smpl.betas.push_back(i);
+  }
+  smpl.orientation = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+  smpl.joints = test_joints;
+
+  msg->human_meshes.push_back(smpl);
+
+  for (size_t i = 0; i < 2; i++) {
+    d_graph.humanCallback(msg);
+
+    base_time += 2.0;
+    msg->human_meshes[0].header.stamp = ros::Time(base_time);
+  }
+
+  EXPECT_EQ(d_graph.human_db_.size(), 1u) << "too many pose graphs";
+  std_srvs::Empty::Request serialization_req;
+  std_srvs::Empty::Response serialization_res;
+  EXPECT_TRUE(
+      d_graph.serializeServiceCall(serialization_req, serialization_res));
+  EXPECT_TRUE(fs::exists(temporary_dir / "humans_1.bag"));
+
+  kimera::DynamicSceneGraph other_dgraph(nh, nh_private);
+  d_graph.feasible_dyn_rate_ = 2.0;
+  d_graph.feasible_mesh_rate_ = 1.5;
+  d_graph.time_cap_ = 10.0;
+
+  voxblox_msgs::FilePath::Request deserialization_req;
+  deserialization_req.file_path = (temporary_dir / "humans_1.bag").string();
+  voxblox_msgs::FilePath::Response deserialization_res;
+  EXPECT_TRUE(other_dgraph.deserializeServiceCall(deserialization_req,
+                                                  deserialization_res));
+  // TODO(nathan) maybe add more thorough checks here
+}
+
+// TODO(marcus): add test that fails if you don't have the correct reference
+// frame at world pose (pose0 must be identity)
+// TODO(marcus): add similar tests that have consecutive detections and the pgo
+// looks right.
 
 }  // namespace kimera

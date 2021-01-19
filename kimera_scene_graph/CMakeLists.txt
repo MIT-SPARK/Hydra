@@ -9,6 +9,10 @@ find_package(OpenCV REQUIRED)
 find_package(GTSAM REQUIRED)
 find_package(KimeraRPGO REQUIRED)
 
+# Serialization plugins (mostly to get around lz4 problems with flann)
+cs_add_library(humans_serialization_plugins
+    src/humans_serialization_plugins.cpp)
+
 # Main library for kimera Scene-Graph
 cs_add_library(${PROJECT_NAME}
   # Include files are just here for IDEs
@@ -42,14 +46,14 @@ cs_add_library(${PROJECT_NAME}
   src/semantic_ros_publishers.cpp
   src/min_cut_solvers/stoer_wagner_min_cut_wrapper.cpp
 )
-target_link_libraries(${PROJECT_NAME} 
-  ${OpenCV_LIBRARIES} 
-  ${PCL_LIBRARIES} 
+target_link_libraries(${PROJECT_NAME}
+  ${OpenCV_LIBRARIES}
+  ${PCL_LIBRARIES}
   gtsam gtsam_unstable
   tbb
   KimeraRPGO
 )
-target_include_directories(${PROJECT_NAME} PUBLIC 
+target_include_directories(${PROJECT_NAME} PUBLIC
   ${OpenCV_INCLUDE_DIRS}
   ${CATKIN_INCLUDE_DIRS}
   ${GTSAM_INCLUDE_DIR}
