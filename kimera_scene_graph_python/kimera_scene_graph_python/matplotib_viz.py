@@ -210,7 +210,7 @@ if __name__ == '__main__':
     plt.legend(handles=color_handles)
 
     # sg = load_graph_pkl(project_dir + '/dataset_loader/Stanford_graphs/Leonardo.pkl')
-    sg = load_graph_pkl(pickled_output_graphs_dir + "goseek_scene_graph_02_no_places.pkl")
+    sg = load_graph_pkl(pickled_output_graphs_dir + "goseek_scene_graph_scene3_no_places.pkl")
     # sg = load_graph_pkl(pickled_output_graphs_dir + "office_scene_graph_esdf_slice_1_3_medium.pkl")
 
     all_nodes = list(map(lambda node: z_offset(node), sg.get_nodes_copy()))

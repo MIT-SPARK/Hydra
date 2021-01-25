@@ -12,13 +12,13 @@
   <!-- Filename of the csv that associates colors and semantic labels.
        We ask for the name only because we assume that the file is in
        kimera_semantics_ros/cfg -->
-  <arg name="semantic_label_2_color_csv_filename" default="goseek_scene1_segmentation_mapping.csv"/>
+  <arg name="semantic_label_2_color_csv_filename" default="goseek_scene5_with_coco_segmentation_mapping.csv"/>
   <arg name="semantic_label_typology_yaml_filename" default="goseek_typology.yaml"/>
 
-  <arg name="tsdf_map_path"     default="/home/lisa/Documents/goseek_scene_01/scene_1/tsdf.vxblx"/>
-  <arg name="rgb_tsdf_map_path" default="/home/lisa/Documents/goseek_scene_01/scene_1/tsdf.vxblx"/>
-  <arg name="esdf_map_path"     default="/home/lisa/Documents/goseek_scene_01/scene_1/esdf_from_tsdf.vxblx"/>
-  <arg name="sparse_graph_path" default="/home/lisa/Documents/goseek_scene_01/scene_1/sparse_graph.vxblx"/>
+  <arg name="tsdf_map_path"     default="/home/lisa/Documents/goseek_scenes/Voxblox_Files/scene5/scene5_tsdf.vxblx"/>
+  <arg name="rgb_tsdf_map_path" default="/home/lisa/Documents/goseek_scenes/Voxblox_Files/scene5/scene5_tsdf.vxblx"/>
+  <arg name="esdf_map_path"     default="/home/lisa/Documents/goseek_scenes/Voxblox_Files/scene5/scene5_esdf.vxblx"/>
+  <arg name="sparse_graph_path" default="/home/lisa/Documents/goseek_scenes/Voxblox_Files/scene5/scene5_sparse_graph.vxblx"/>
 
 
   <!-- Send colored pointcloud with scene_graph to kimera_scene_graph for 3D segmentation -->
@@ -27,8 +27,8 @@
     type="scene_graph_eval" output="screen"
     args="-alsologtostderr -colorlogtostderr" clear_params="true">
     <!-- Scene Graph params -->
-    <param name="room_finder_esdf_slice_level"       value="2.1"/>
-<!--     1.1 - 6 rooms -->
+    <param name="room_finder_esdf_slice_level"       value="2.05"/>
+<!--    2.1- scenes 1-4 -->
 
     <!-- Object Finder Type: 0: region growing, 1: euclidean clustering -->
     <param name="object_finder_type"                 value="1"/>
@@ -78,7 +78,7 @@
     <param name="load_sparse_graph" value="$(arg sparse_graph_path)"/>
 
     <!-- Whether to rebuild the esdf layer from scratch -->
-    <param name="build_esdf_batch" value="true"/>
+    <param name="build_esdf_batch" value="false"/>
 
     <!-- Is this needed? -->
     <param name="slice_level" value="1.0" />

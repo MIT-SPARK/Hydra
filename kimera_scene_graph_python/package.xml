@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-    <name>kimerasg_python_bindings</name>
+    <name>kimera_scene_graph_python</name>
     <version>0.0.1</version>
     <description>A package</description>
 

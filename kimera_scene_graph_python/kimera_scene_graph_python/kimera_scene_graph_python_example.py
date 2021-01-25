@@ -1,4 +1,4 @@
-import kimerasg_python as sg
+import kimera_scene_graph_pybind as sg
 import os
 import numpy as np
 
@@ -14,8 +14,7 @@ def load_graph_manual_test():
     layer = sg.SceneGraphLayer() # segfault due to eigen aligned operator - got rid of macro
     graph = sg.SceneGraph()
 
-    sg.load_scene_graph(os.path.dirname(os.getcwd())+"/kimerasg_python/vxblx_files/goseek_scene_graph.vxblx", graph)
-    # sg.load_scene_graph(os.path.dirname(os.getcwd())+"/kimerasg_python/vxblx_files/office_scene_graph_esdf_slice_1-3.vxblx", graph)
+    sg.load_scene_graph(os.path.dirname(os.getcwd())+"/kimera_scene_graph_python/vxblx_files/goseek_scene_graph_scene1.vxblx", graph)
     inter_layer_edges = graph.getInterLayerEdgesMap()
     database = graph.getDatabase()
     # print("database \n" + str(database))

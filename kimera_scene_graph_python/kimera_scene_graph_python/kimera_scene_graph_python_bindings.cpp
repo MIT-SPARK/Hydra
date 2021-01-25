@@ -19,20 +19,25 @@
 
 namespace py = pybind11;
 
-/*Convenience Fxn to test module import success*/
+/*Convenience Fxn to test  module import success*/
 int add(int i, int j) {
 	return i + j;
 }
 
-PYBIND11_MODULE(kimerasg_python, m) {
-    m.def("add", &add, py::arg("i"), py::arg("j"));
-    m.def("load_scene_graph", &kimera::load<kimera::SceneGraph>);
-    py::class_<kimera::NodePosition>(m, "NodePosition")
+int sub(int i, int j) {
+	return i - j;
+}
+
+PYBIND11_MODULE(kimera_scene_graph_pybind,  module) {
+    module.def("add", &add, py::arg("i"), py::arg("j"));
+    module.def("sub", &sub, py::arg("i"), py::arg("j"));
+    module.def("load_scene_graph", &kimera::load<kimera::SceneGraph>);
+    py::class_<kimera::NodePosition>(module, "NodePosition")
         .def(py::init<>())
         .def(py::init<const kimera::NodePosition::T&, const kimera::NodePosition::T&, const kimera::NodePosition::T&>())
         .def("__repr__",
             [](const kimera::NodePosition &pos) {
-                return "<kimerasg_python.NodePosition> x, y, z: "
+                return "<kimera_scene_graph_python.NodePosition> x, y, z: "
                     + std::to_string(pos.x) + ","
                     + std::to_string(pos.y) + ","
                     + std::to_string(pos.z);
@@ -40,22 +45,22 @@ PYBIND11_MODULE(kimerasg_python, m) {
 				.def_readwrite("x", &kimera::NodePosition::x)
 				.def_readwrite("y", &kimera::NodePosition::y)
 				.def_readwrite("z", &kimera::NodePosition::z);
-    py::class_<kimera::NodeColor>(m, "NodeColor")
+    py::class_<kimera::NodeColor>(module, "NodeColor")
         .def(py::init<>())
         .def(py::init<const kimera::NodeColor::T&, const kimera::NodeColor::T&, const kimera::NodeColor::T&>())
         .def("__repr__",
             [](const kimera::NodeColor &color) {
-                return "<kimerasg_python.NodeColor> r, g, b: "
+                return "<kimera_scene_graph_python.NodeColor> r, g, b: "
                     + std::to_string(color.r) + ","
                     + std::to_string(color.g) + ","
                     + std::to_string(color.b);
             });
-    py::class_<kimera::NodeAttributes>(m, "NodeAttributes")
+    py::class_<kimera::NodeAttributes>(module, "NodeAttributes")
         .def(py::init<>())
         .def("__repr__",
           [](const kimera::NodeAttributes &attrs) {
             std::stringstream out;
-            out << "<kimerasg_python.NodeAttributes>: \n"
+            out << "<kimera_scene_graph_python.NodeAttributes>: \n"
             << "timestamp_: " << std::to_string(attrs.timestamp_) << ",\n"
             << "position_: " << attrs.position_ << ",\n"
 //            << "color_: " << attrs.color_ << ",\n"; //color isn't working because voxblox::Color missing stream operator
@@ -74,7 +79,7 @@ PYBIND11_MODULE(kimerasg_python, m) {
 
     //BoundingBox-related bindings
     //BoundingBox is a template class. In implementation only uses typedef pcl::PointXYZRGB ColorPoint
-    py::class_<kimera::ColorPoint>(m, "ColorPoint")
+    py::class_<kimera::ColorPoint>(module, "ColorPoint")
         .def(py::init<>())
         .def_readwrite("x", &kimera::ColorPoint::x)
         .def_readwrite("y", &kimera::ColorPoint::y)
@@ -84,12 +89,12 @@ PYBIND11_MODULE(kimerasg_python, m) {
         .def_readwrite("b", &kimera::ColorPoint::b)
         .def("__repr__",
           [](const kimera::ColorPoint &point) {
-            return "<kimerasg_python.ColorPoint> (x, y, z): ("
+            return "<kimera_scene_graph_python.ColorPoint> (x, y, z): ("
             + std::to_string(point.x) + ","
             + std::to_string(point.y) + ","
             + std::to_string(point.z) + ")";
         });
-    py::class_<kimera::BoundingBox<kimera::ColorPoint>>(m, "BoundingBox")
+    py::class_<kimera::BoundingBox<kimera::ColorPoint>>(module, "BoundingBox")
         .def(py::init<>())
         .def_readwrite("type_", &kimera::BoundingBox<kimera::ColorPoint>::type_)
         .def_readwrite("max_", &kimera::BoundingBox<kimera::ColorPoint>::max_)
@@ -98,18 +103,18 @@ PYBIND11_MODULE(kimerasg_python, m) {
         .def("__repr__",
           [](const kimera::BoundingBox<kimera::ColorPoint>  &bounding_box) {
             std::stringstream out;
-            out << "<kimerasg_python.BoundingBox> max_, min_, position_: " << ",\n"
+            out << "<kimera_scene_graph_python.BoundingBox> max_, min_, position_: " << ",\n"
               << bounding_box.max_ << ",\n"
               << bounding_box.min_ << ",\n"
               << bounding_box.position_ << ",\n";
             return out.str();
         });
-    py::enum_<kimera::BoundingBoxType>(m, "BoundingBoxType")
+    py::enum_<kimera::BoundingBoxType>(module, "BoundingBoxType")
         .value("kAABB", kimera::BoundingBoxType::kAABB)
         .value("kOBB", kimera::BoundingBoxType::kOBB);
 
     //SceneGraphNode binding
-    py::class_<kimera::SceneGraphNode>(m, "SceneGraphNode")
+    py::class_<kimera::SceneGraphNode>(module, "SceneGraphNode")
         .def(py::init<>())
         .def("hasParent", &kimera::SceneGraphNode::hasParent)
         .def("hasSiblings", &kimera::SceneGraphNode::hasSiblings)
@@ -123,7 +128,7 @@ PYBIND11_MODULE(kimerasg_python, m) {
         .def_readwrite("children_edge_map_", &kimera::SceneGraphNode::children_edge_map_);
 
     //SceneGraphEdge binding
-    py::class_<kimera::SceneGraphEdge>(m, "SceneGraphEdge")
+    py::class_<kimera::SceneGraphEdge>(module, "SceneGraphEdge")
         .def(py::init<>())
         .def_readwrite("edge_id_", &kimera::SceneGraphEdge::edge_id_)
         .def_readwrite("start_layer_id_", &kimera::SceneGraphEdge::start_layer_id_)
@@ -144,7 +149,7 @@ PYBIND11_MODULE(kimerasg_python, m) {
             }, py::is_operator())
         .def("__repr__",
             [](const kimera::SceneGraphEdge &edge) {
-                return "<kimerasg_python.SceneGraphEdge>: \n EdgeId: "
+                return "<kimera_scene_graph_python.SceneGraphEdge>: \n EdgeId: "
                     + std::to_string(edge.edge_id_)
                     + ", Start Layer Id: " + std::to_string(static_cast<typename std::underlying_type<kimera::LayerId>::type>(edge.start_layer_id_)) //bind to_underlying typename
                     + ", Start Node Id: " + std::to_string(edge.start_node_id_)
@@ -152,20 +157,20 @@ PYBIND11_MODULE(kimerasg_python, m) {
                     + ", End Node Id: " + std::to_string(edge.end_node_id_);
             });
 
-    m.def("getEdgeIdsInEdgeIdMap", &kimera::getEdgeIdsInEdgeIdMap);
+    module.def("getEdgeIdsInEdgeIdMap", &kimera::getEdgeIdsInEdgeIdMap);
 
     //LayerId strongly typed enum binding
-    py::enum_<kimera::LayerId>(m, "LayerId")
+    py::enum_<kimera::LayerId>(module, "LayerId")
         .value("kInvalidLayerId", kimera::LayerId::kInvalidLayerId)
         .value("kObjectsLayerId", kimera::LayerId::kObjectsLayerId)
         .value("kAgentsLayerId", kimera::LayerId::kAgentsLayerId)
         .value("kPlacesLayerId", kimera::LayerId::kPlacesLayerId)
         .value("kRoomsLayerId", kimera::LayerId::kRoomsLayerId)
         .value("kBuildingsLayerId", kimera::LayerId::kBuildingsLayerId);
-    m.def("getStringFromLayerId", &kimera::getStringFromLayerId);
+    module.def("getStringFromLayerId", &kimera::getStringFromLayerId);
 
     //SceneGraphLayer binding
-    py::class_<kimera::SceneGraphLayer>(m, "SceneGraphLayer")
+    py::class_<kimera::SceneGraphLayer>(module, "SceneGraphLayer")
       .def(py::init<>())
       .def(py::init<const kimera::LayerId&>())
       //attributes to remain private, ensure getters have return_value_policy::reference IFF the no bindings for returned pointer's type
@@ -194,7 +199,7 @@ PYBIND11_MODULE(kimerasg_python, m) {
 //        .def("addIntraLayerEdge", &kimera::SceneGraphLayer::addIntraLayerEdge);
 
 		//SceneGraph binding
-    py::class_<kimera::SceneGraph>(m, "SceneGraph")
+    py::class_<kimera::SceneGraph>(module, "SceneGraph")
         .def(py::init<>())
         // protected
 //        .def_readwrite("database_", &kimera::SceneGraph::database_)
