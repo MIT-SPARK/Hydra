@@ -1,6 +1,10 @@
 #include "kimera_scene_graph/scene_graph_builder.h"
 
+// clang-format off
+// TODO(nathan) fix when voxblox fixes the missing header
+#include <voxblox/io/mesh_ply.h>
 #include <voxblox_ros/mesh_pcl.h>
+// clang-format on
 #include <voxblox_skeleton/io/skeleton_io.h>
 #include <voxblox_skeleton/ros/skeleton_vis.h>
 #include <voxblox_skeleton/skeleton_generator.h>
@@ -25,9 +29,18 @@
 
 #include "kimera_scene_graph/utils/kimera_to_voxblox.h"
 #include "kimera_scene_graph/utils/voxblox_to_pcl.h"
-#include "kimera_scene_graph/utils/voxblox_to_ros.h"
 
 namespace kimera {
+
+// TODO(nathan) this should be part of voxblox, but...
+inline auto operator==(const vxb::Color& lhs, const vxb::Color& rhs) -> bool {
+  return lhs.r == rhs.r && lhs.g == rhs.g && lhs.b == rhs.b && lhs.a == rhs.a;
+}
+
+// TODO(nathan) this should be part of voxblox, but...
+inline auto operator!=(const vxb::Color& lhs, const vxb::Color& rhs) -> bool {
+  return not(lhs == rhs);
+}
 
 SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
                                      const ros::NodeHandle& nh_private)
@@ -90,7 +103,8 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
   double rgb_voxel_size = 0.025;
   double rgb_voxels_per_side = 16;
   nh_private.param("rgb_tsdf_voxel_size", rgb_voxel_size, rgb_voxel_size);
-  nh_private.param("rgb_tsdf_voxels_per_side", rgb_voxels_per_side, rgb_voxels_per_side);
+  nh_private.param(
+      "rgb_tsdf_voxels_per_side", rgb_voxels_per_side, rgb_voxels_per_side);
   tsdf_layer_rgb_.reset(
       new vxb::Layer<vxb::TsdfVoxel>(rgb_voxel_size, rgb_voxels_per_side));
 
@@ -311,8 +325,9 @@ void SceneGraphBuilder::reconstructEsdfOutOfTsdf(const bool& save_to_file) {
   esdf_integrator_->updateFromTsdfLayerBatch();
   LOG(INFO) << "Saving ESDF layer.";
   if (save_to_file) {
-//    esdf_layer_->saveToFile("/home/tonirv/tesse_esdf.vxblx");
-    esdf_layer_->saveToFile("/home/lisa/Documents/goseek_scene_01/scene_1/esdf_from_tsdf.vxblx");
+    //    esdf_layer_->saveToFile("/home/tonirv/tesse_esdf.vxblx");
+    esdf_layer_->saveToFile(
+        "/home/lisa/Documents/goseek_scene_01/scene_1/esdf_from_tsdf.vxblx");
   }
   LOG(INFO) << "Done building ESDF layer.";
 }

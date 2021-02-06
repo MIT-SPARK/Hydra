@@ -9,10 +9,50 @@
 
 #include <glog/logging.h>
 
+namespace voxblox {
+inline std_msgs::ColorRGBA getVertexColor(const Mesh& mesh,
+                                          const ColorMode& color_mode,
+                                          const size_t index) {
+  std_msgs::ColorRGBA color_msg;
+  switch (color_mode) {
+    case kColor:
+      colorVoxbloxToMsg(mesh.colors[index], &color_msg);
+      break;
+    case kHeight:
+      heightColorFromVertex(mesh.vertices[index], &color_msg);
+      break;
+    case kNormals:
+      normalColorFromNormal(mesh.normals[index], &color_msg);
+      break;
+    case kLambert:
+      lambertColorFromNormal(mesh.normals[index], &color_msg);
+      break;
+    case kLambertColor:
+      lambertColorFromColorAndNormal(mesh.colors[index], mesh.normals[index],
+                                     &color_msg);
+      break;
+    case kGray:
+      color_msg.r = color_msg.g = color_msg.b = 0.5;
+      color_msg.a = 1.0;
+      break;
+  }
+  return color_msg;
+} // namespace voxblox
+
+}
+
 namespace kimera {
 
 namespace utils {
 
+/**
+ * @brief fillMarkerWithMesh Get a ROS viz msg marker with the mesh, and
+ * optionally add a shift in the z axis (for the scene graph visualization).
+ * @param mesh Actual semantic mesh
+ * @param color_mode How to color the mesh
+ * @param marker Output generated viz msg marker
+ * @param z_shift Shift in the z axis
+ */
 inline void fillMarkerWithMesh(const vxb::Mesh& mesh,
                                const vxb::ColorMode& color_mode,
                                visualization_msgs::Marker* marker,
