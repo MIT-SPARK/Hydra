@@ -53,6 +53,7 @@
 - git:
     local-name: mav_voxblox_planning
     uri: git@github.com:ToniRV/mav_voxblox_planning_private.git
+    version: feature/voxblox_protobuf_update
 - git:
     local-name: minkindr
     uri: git@github.com:ethz-asl/minkindr.git
@@ -79,4 +80,4 @@
     uri: git@github.com:MIT-SPARK/TEASER-plusplus.git
 - git:
     local-name: voxblox
-    uri: git@github.com:ToniRV/voxblox-private.git
+    uri: git@github.com:ethz-asl/voxblox.git
