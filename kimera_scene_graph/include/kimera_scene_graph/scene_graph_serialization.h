@@ -2,14 +2,14 @@
 
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/archive/text_oarchive.hpp>
+#include <boost/serialization/base_object.hpp>
 #include <boost/serialization/binary_object.hpp>
 #include <boost/serialization/map.hpp>
 #include <boost/serialization/serialization.hpp>
-#include <boost/serialization/base_object.hpp>
 
 #include <glog/logging.h>
-#include <pcl_ros/point_cloud.h>
 #include <pcl/common/centroid.h>
+#include <pcl_ros/point_cloud.h>
 
 #include "kimera_scene_graph/scene_graph.h"
 #include "kimera_scene_graph/scene_graph_edge.h"
@@ -24,7 +24,7 @@ namespace serialization {
 template <class Archive>
 void serialize(Archive& ar,
                kimera::SceneGraphEdge& edge,
-               const unsigned int version) {
+               const unsigned int /*version*/) {
   ar& BOOST_SERIALIZATION_NVP(edge.edge_id_);
   ar& BOOST_SERIALIZATION_NVP(edge.start_layer_id_);
   ar& BOOST_SERIALIZATION_NVP(edge.start_node_id_);
@@ -35,7 +35,7 @@ void serialize(Archive& ar,
 template <class Archive>
 void serialize(Archive& ar,
                kimera::SceneGraphNode& node,
-               const unsigned int version) {
+               const unsigned int /*version*/) {
   ar& BOOST_SERIALIZATION_NVP(node.attributes_);
   ar& BOOST_SERIALIZATION_NVP(node.node_id_);
   ar& BOOST_SERIALIZATION_NVP(node.layer_id_);
@@ -47,7 +47,7 @@ void serialize(Archive& ar,
 template <class Archive>
 void serialize(Archive& ar,
                kimera::NodeAttributes& attributes,
-               const unsigned int version) {
+               const unsigned int /*version*/) {
   ar& BOOST_SERIALIZATION_NVP(attributes.timestamp_);
   // Need to provide PCL Point serialization
   ar& BOOST_SERIALIZATION_NVP(attributes.position_);
@@ -64,7 +64,7 @@ void serialize(Archive& ar,
 template <class Archive>
 void serialize(Archive& ar,
                pcl::PointXYZRGB& point,
-               const unsigned int version) {
+               const unsigned int /*version*/) {
   ar& BOOST_SERIALIZATION_NVP(point.x);
   ar& BOOST_SERIALIZATION_NVP(point.y);
   ar& BOOST_SERIALIZATION_NVP(point.z);
@@ -72,7 +72,6 @@ void serialize(Archive& ar,
   ar& BOOST_SERIALIZATION_NVP(point.g);
   ar& BOOST_SERIALIZATION_NVP(point.b);
 }
-
 
 }  // namespace serialization
 

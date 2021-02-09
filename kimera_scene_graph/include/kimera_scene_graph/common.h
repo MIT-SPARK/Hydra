@@ -104,7 +104,7 @@ struct BoundingBox {
     };
     friend class boost::serialization::access;
     template <class Archive>
-    void serialize(Archive& ar, const unsigned int version) {
+    void serialize(Archive& ar, const unsigned int /*version*/) {
     //TODO: serialize the strongly typed enum bb type as well?
 //      ar& BOOST_SERIALIZATION_NVP(type_);
       ar& BOOST_SERIALIZATION_NVP(max_);

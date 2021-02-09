@@ -93,7 +93,6 @@ BoundingBox<T> ObjectFinder<T>::findBoundingBox(
   std::vector<float> moment_of_inertia;
   std::vector<float> eccentricity;
   Eigen::Matrix3f rotational_matrix_OBB;
-  float major_value, middle_value, minor_value;
   Eigen::Vector3f major_vector, middle_vector, minor_vector;
   Eigen::Vector3f mass_center;
 

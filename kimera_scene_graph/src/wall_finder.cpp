@@ -57,15 +57,15 @@ void EnclosingWallFinder::findWalls(const vxb::Mesh& walls_mesh,
         search_point, K, nn_indices, nn_squared_distances);
     if (nn_size > 0) {
       // Found the nearest neighbor in the skeleton to the wall vertex.
-      CHECK_GT(nn_indices.size(), 0);
-      CHECK_GT(nn_squared_distances.size(), 0);
+      CHECK_GT(nn_indices.size(), 0u);
+      CHECK_GT(nn_squared_distances.size(), 0u);
       CHECK_EQ(nn_indices.size(), nn_squared_distances.size());
-      for (size_t i = 0u; i < nn_size; i++) {
+      for (int i = 0u; i < nn_size; i++) {
         // Avoid voters that are very far away
         static constexpr double kMaxSquaredDistance = std::pow(5.0, 2);
         const double& nn_squared_distance = nn_squared_distances.at(i);
         if (nn_squared_distance < kMaxSquaredDistance) {
-          CHECK_LT(nn_indices.at(i), cloud_to_graph_ids.size());
+          CHECK_LT(nn_indices.at(i), static_cast<int>(cloud_to_graph_ids.size()));
           auto nearest_place_to_wall_index =
               cloud_to_graph_ids[nn_indices.at(i)];
           const SceneGraphNode& nearest_place_to_wall =
@@ -113,7 +113,7 @@ void EnclosingWallFinder::findWalls(const vxb::Mesh& walls_mesh,
 
     // Take as room id the most voted room id:
     // Find most voted room id
-    int max_room_id = 0u;
+    int max_room_id = 0;
     size_t max_room_id_votes = 0u;
     for (const std::pair<int, size_t>& kv : room_id_votes) {
       if (kv.second > max_room_id_votes) {
@@ -126,7 +126,7 @@ void EnclosingWallFinder::findWalls(const vxb::Mesh& walls_mesh,
       LOG_EVERY_N(ERROR, 100) << "No valid room id found for vertex of wall..."
                                  "Assigning room id: "
                               << max_room_id;
-      CHECK_EQ(max_room_id, 0u);
+      CHECK_EQ(max_room_id, 0);
     }
 
     // Assign to the wall vertex the color corresponding to the most voted

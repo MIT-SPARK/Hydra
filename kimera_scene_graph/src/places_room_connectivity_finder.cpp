@@ -27,8 +27,8 @@ PlacesRoomConnectivityFinder::PlacesRoomConnectivityFinder(
     const std::string& world_frame)
     : nh_private_(nh_private),
       segmented_sparse_graph_pub_(),
-      skeleton_z_level_(skeleton_z_level),
-      world_frame_(world_frame) {
+      world_frame_(world_frame),
+      skeleton_z_level_(skeleton_z_level) {
   segmented_sparse_graph_pub_ =
       nh_private_.advertise<visualization_msgs::MarkerArray>(
           "segmented_sparse_graph", 1, true);
@@ -121,7 +121,8 @@ void PlacesRoomConnectivityFinder::findPlacesRoomConnectivity(
     LOG(INFO) << "Starting Initial linking of places to rooms.";
     std::vector<EdgeId> edge_ids;
     for (const int& inside_room_place_index : removed_indices_inside_room) {
-      CHECK_LE(inside_room_place_index, cloud_to_layer_ids.size());
+      CHECK_LE(inside_room_place_index,
+               static_cast<int>(cloud_to_layer_ids.size()));
       CHECK_NOTNULL(places_layer);
       SceneGraphNode& place_node = places_layer->getNodeMutable(
           cloud_to_layer_ids[inside_room_place_index]);
@@ -217,8 +218,8 @@ void PlacesRoomConnectivityFinder::findPlacesRoomConnectivity(
         if (kdtree.nearestKSearch(
                 search_point, K, nn_indices, nn_squared_distances) > 0) {
           // Found the nearest neighbor
-          CHECK_GT(nn_indices.size(), 0);
-          CHECK_GT(nn_squared_distances.size(), 0);
+          CHECK_GT(nn_indices.size(), 0u);
+          CHECK_GT(nn_squared_distances.size(), 0u);
           CHECK_EQ(nn_indices.size(), nn_squared_distances.size());
           // Don't take the squared distances, since we need to project in 2D!
           const ColorPoint& pcl_point = concave_hull_pcl->at(nn_indices.at(0));

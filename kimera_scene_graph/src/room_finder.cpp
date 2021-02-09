@@ -22,8 +22,8 @@ RoomFinder::RoomFinder(const ros::NodeHandle& nh_private,
                        const vxb::FloatingPoint& esdf_slice_level,
                        const float& skeleton_z_level,
                        const bool& visualize)
-    : pcl_pub_(),
-      nh_private_(nh_private),
+    : nh_private_(nh_private),
+      pcl_pub_(),
       world_frame_(world_frame),
       esdf_slice_level_(esdf_slice_level),
       skeleton_z_level_(skeleton_z_level),
@@ -125,8 +125,8 @@ void RoomFinder::updateSceneGraph(
     room_instance.attributes_.semantic_label_ = kRoomSemanticLabel;
     room_instance.attributes_.name_ = std::to_string(next_room_id_);
     const vxb::Color& room_color = getRoomColor(next_room_id_);
-    room_instance.attributes_.color_ = NodeColor(room_color.r, room_color.g,
-        room_color.b);
+    room_instance.attributes_.color_ =
+        NodeColor(room_color.r, room_color.g, room_color.b);
     room_instance.node_id_ = next_room_id_;
     room_instance.layer_id_ = LayerId::kRoomsLayerId;
     // TODO(Toni): project the centroid to the interior of the room.

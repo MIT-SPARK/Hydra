@@ -82,7 +82,7 @@
 
     <!-- Load what are the semantic labels typology: dynamic, stuff, things -->
     <rosparam command="load"
-    file="$(find kimera_scene_graph)/cfg/$(arg semantic_label_typology_yaml_filename)"/>
+    file="$(find kimera_scene_graph)/config/$(arg semantic_label_typology_yaml_filename)"/>
 
     <param name="load_tsdf_map"     value="$(arg tsdf_map_path)"/>
     <param name="load_rgb_tsdf_map" value="$(arg rgb_tsdf_map_path)"/>

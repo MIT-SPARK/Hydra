@@ -8,20 +8,22 @@
   <license>MIT</license>
 
   <buildtool_depend>catkin</buildtool_depend>
-  <buildtool_depend>catkin_simple</buildtool_depend>
 
-  <depend>teaserpp</depend>
+  <build_depend>message_generation</build_depend>
+  <build_export_depend>message_runtime</build_export_depend>
+  <exec_depend>message_runtime</exec_depend>
+
+  <depend>roscpp</depend>
   <depend>actionlib</depend>
   <depend>actionlib_msgs</depend>
-  <depend>message_generation</depend>
-  <depend>message_runtime</depend>
   <depend>std_msgs</depend>
-  <depend>geometry_msgs</depend>
   <depend>sensor_msgs</depend>
-  <depend>pcl_conversions</depend>
+  <depend>geometry_msgs</depend>
+  <depend>teaserpp</depend>
   <depend>pcl_ros</depend>
 
-  <build_depend>roscpp</build_depend>
-  <build_depend>genmsg</build_depend>
+  <!--<depend>pcl_conversions</depend>-->
+
+  <test_depend>rosunit</test_depend>
 
 </package>

@@ -20,10 +20,10 @@ SceneGraphVisualizer::SceneGraphVisualizer(const ros::NodeHandle& nh,
     : nh_(nh),
       nh_private_(nh_private),
       semantic_instance_centroid_pub_(),
-      text_markers_pub_(),
-      node_pcl_publishers_("centroid", nh_private),
       edges_centroid_pcl_pub_(),
       edges_node_node_pub_(),
+      text_markers_pub_(),
+      node_pcl_publishers_("centroid", nh_private),
       server("simple_marker") {
   // Params
   nh_private_.param("world_frame", world_frame_, world_frame_);
@@ -430,7 +430,6 @@ visualization_msgs::Marker SceneGraphVisualizer::getCentroidMarker(
   // TODO(Toni): ideally batch-up all layer-specific centroids into a cube_list
   // for rviz to render much faster...
   bool is_object = layer_id == LayerId::kObjectsLayerId;
-  bool is_place = layer_id == LayerId::kPlacesLayerId;
   if (is_object) {
     // Add a centroid both at the mesh level and at the object level
     marker.type = visualization_msgs::Marker::SPHERE_LIST;

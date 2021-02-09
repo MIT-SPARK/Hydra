@@ -34,7 +34,7 @@ struct SceneGraphEdge {
     return (start_layer_id_ == end_layer_id_) &&
            (start_node_id_ == end_node_id_);
   }
-  inline bool swapDirection() {
+  inline void swapDirection() {
     CHECK(isEdgeValid());
     std::swap(start_layer_id_, end_layer_id_);
     std::swap(start_node_id_, end_node_id_);

@@ -65,7 +65,7 @@ class SceneGraphBuilder {
 
   void sceneGraphReconstruction(const bool& only_rooms);
 
-  inline bool loadSceneGraph(const std::string& file_path) const {
+  inline bool loadSceneGraph(const std::string& /*file_path*/) const {
     LOG(FATAL) << "Serialization not implemented.";
     return false;
   }
@@ -191,9 +191,6 @@ class SceneGraphBuilder {
   SceneGraph::Ptr scene_graph_;
   SceneGraphVisualizer scene_graph_visualizer_;
 
-  // KimeraX Dynamic
-  DynamicSceneGraph dynamic_scene_graph_;
-
   // TODO(Toni): remove
   float skeleton_z_level_;
 
@@ -208,6 +205,10 @@ class SceneGraphBuilder {
 
   // Skeleton graph
   vxb::SparseSkeletonGraph sparse_skeleton_graph_;
+
+  // KimeraX Dynamic
+  DynamicSceneGraph dynamic_scene_graph_;
+
 };
 
 }  // namespace kimera

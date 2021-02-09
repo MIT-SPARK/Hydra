@@ -76,10 +76,10 @@ bool SceneGraphLayer::findNearestSceneGraphNode(
   // Compute nearest skeleton vertex
   std::vector<int> nn_indices(k_nearest_neighbors);
   std::vector<float> nn_squared_distances(k_nearest_neighbors);
-  if (int n_neighbors = kdtree.nearestKSearch(query_point_pcl,
-                                              k_nearest_neighbors,
-                                              nn_indices,
-                                              nn_squared_distances) > 0) {
+  if (kdtree.nearestKSearch(query_point_pcl,
+                            k_nearest_neighbors,
+                            nn_indices,
+                            nn_squared_distances) > 0) {
     // Get node ids from cloud ids:
     for (const auto& nn_idx : nn_indices) {
       const NodeId& node_id = cloud_to_graph_ids[nn_idx];

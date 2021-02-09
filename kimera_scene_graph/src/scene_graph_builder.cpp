@@ -60,18 +60,18 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
       semantic_mesh_2_pubs_("mesh_2", nh_private),
       rqt_server_(),
       rqt_callback_(),
+      reconstruct_scene_graph_srv_(),
+      enclosing_wall_finder_(nullptr),
+      object_finder_(nullptr),
       room_finder_(nullptr),
       object_place_connectivity_finder_(nullptr),
       places_in_rooms_finder_(nullptr),
       room_connectivity_finder_(nullptr),
-      object_finder_(nullptr),
-      enclosing_wall_finder_(nullptr),
       building_finder_(nullptr),
       scene_graph_(nullptr),
       scene_graph_visualizer_(nh, nh_private_),
-      dynamic_scene_graph_(nh, nh_private),
       semantic_config_(getSemanticTsdfIntegratorConfigFromRosParam(nh_private)),
-      reconstruct_scene_graph_srv_() {
+      dynamic_scene_graph_(nh, nh_private) {
   // Create Scene graph
   scene_graph_ = std::make_shared<SceneGraph>();
 
@@ -194,7 +194,7 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
 
 bool SceneGraphBuilder::sceneGraphReconstructionServiceCall(
     std_srvs::SetBool::Request& request,
-    std_srvs::SetBool::Response& response) {
+    std_srvs::SetBool::Response&) {
   LOG(INFO) << "Requested scene graph reconstruction.";
   scene_graph_->clear();
   sceneGraphReconstruction(request.data);
@@ -332,7 +332,7 @@ void SceneGraphBuilder::reconstructEsdfOutOfTsdf(const bool& save_to_file) {
   LOG(INFO) << "Done building ESDF layer.";
 }
 
-void SceneGraphBuilder::sceneGraphReconstruction(const bool& only_rooms) {
+void SceneGraphBuilder::sceneGraphReconstruction(const bool& /*only_rooms*/) {
   // This creates the places layer in the scene graph
   fillSceneGraphWithPlaces(sparse_skeleton_graph_);
 
@@ -592,8 +592,8 @@ void SceneGraphBuilder::publishSkeletonToObjectLinks(
       if (kdtree.nearestKSearch(
               centroid_point, K, nn_indices, nn_squared_distances) > 0) {
         // Found the nearest neighbor
-        CHECK_GT(nn_indices.size(), 0);
-        CHECK_GT(nn_squared_distances.size(), 0);
+        CHECK_GT(nn_indices.size(), 0u);
+        CHECK_GT(nn_squared_distances.size(), 0u);
         CHECK_EQ(nn_indices.size(), nn_squared_distances.size());
         Point pcl_point = skeleton_graph_pcl_converted->at(nn_indices.at(0));
         // Pcl points leave in a diff layer than skeleton, separate them!
@@ -641,8 +641,9 @@ void SceneGraphBuilder::publishSemanticMesh(const SemanticLabel& semantic_label,
   semantic_mesh_pubs_.publish(semantic_label, new_mesh_msg);
 }
 
-void SceneGraphBuilder::publishExplodedWalls(const vxb::Mesh& segmented_walls,
-                                             const double& explosion_factor) {
+void SceneGraphBuilder::publishExplodedWalls(
+    const vxb::Mesh& /*segmented_walls*/,
+    const double& /*explosion_factor*/) {
   // TODO
 }
 
@@ -853,7 +854,7 @@ void SceneGraphBuilder::getSemanticMeshesFromMesh(
 }
 
 void SceneGraphBuilder::rqtReconfigureCallback(RqtSceneGraphConfig& config,
-                                               uint32_t level) {
+                                               uint32_t /*level*/) {
   LOG(INFO) << "Updating Object Finder params...";
 
   // Object Finder params

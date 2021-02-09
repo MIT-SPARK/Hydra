@@ -65,14 +65,14 @@ class EntryInfo {
 
   EntryInfo(const std::string& name,
             const visualization_msgs::Marker::ConstPtr& marker)
-      : topic(name), type(Type::MARKER), marker_handle_(marker) {}
+      : type(Type::MARKER), topic(name), marker_handle_(marker) {}
 
   EntryInfo(const std::string& name,
             const graph_cmr_ros::SMPLList::ConstPtr& list)
-      : topic(name), type(Type::SMPL), smpl_handle_(list) {}
+      : type(Type::SMPL), topic(name), smpl_handle_(list) {}
 
   EntryInfo(const std::string& name, const ColorPointCloud::ConstPtr& cloud)
-      : topic(name), type(Type::PCL), pcl_handle_(cloud) {}
+      : type(Type::PCL), topic(name), pcl_handle_(cloud) {}
 
   inline auto getMarker() const -> visualization_msgs::Marker::ConstPtr {
     if (type != Type::MARKER) {
@@ -109,7 +109,7 @@ class HumansDeserializer {
   HumansDeserializer() = default;
   virtual ~HumansDeserializer() = default;
 
-  virtual void initialize(const ros::NodeHandle& nh) {}
+  virtual void initialize(const ros::NodeHandle&) {}
 
   virtual auto start(const std::string& filepath) -> bool = 0;
 

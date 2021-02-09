@@ -12,10 +12,10 @@ DynamicSceneGraphEvaluator::DynamicSceneGraphEvaluator(
       dsg_pcm_(nullptr),
       dsg_pcm_mesh_(nullptr),
       dsg_pcm_mesh_shape_(nullptr),
-      optimized_centroid_check_srv_(),
-      human_sub_(),
       nh_(nh),
       nh_private_(nh_private),
+      human_sub_(),
+      optimized_centroid_check_srv_(),
       num_humans_(-1) {
   nh_private_.getParam("human_topic", human_topic_);
   nh_private_.getParam("world_frame", world_frame_);
@@ -72,7 +72,7 @@ DynamicSceneGraphEvaluator::DynamicSceneGraphEvaluator(
 }
 
 bool DynamicSceneGraphEvaluator::errorServiceCall(
-    kimera_scene_graph::CentroidErrorRequest::Request& request,
+    kimera_scene_graph::CentroidErrorRequest::Request&,
     kimera_scene_graph::CentroidErrorRequest::Response& response) {
   LOG(INFO) << "DynamicHumanNode: Optimized Error Requested.";
 
@@ -240,7 +240,7 @@ inline bool DynamicSceneGraphEvaluator::getAllTransforms(
   out_transforms->clear();
 
   // All human frames are labeled object_n
-  size_t i = 0;
+  int i = 0;
   bool is_finished = false;
   while (!is_finished) {
     tf::StampedTransform new_transform;
@@ -255,7 +255,10 @@ inline bool DynamicSceneGraphEvaluator::getAllTransforms(
     }
   }
 
-  if (num_humans_ == -1) num_humans_ = i;
+  if (num_humans_ == -1) {
+    num_humans_ = i;
+  }
+
   if (i != num_humans_) {
     LOG(ERROR) << "Could not get all human transforms: Found " << i
                << " GT poses for humans but previously found " << num_humans_

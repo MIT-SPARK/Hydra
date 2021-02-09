@@ -7,18 +7,18 @@
 
 namespace kimera {
 
-DynamicSceneGraph::DynamicSceneGraph(const ros::NodeHandle& nh,
+DynamicSceneGraph::DynamicSceneGraph(const ros::NodeHandle&,
                                      const ros::NodeHandle& nh_private)
-    : nh_private_(nh_private),
+    : detection_noise_model_(),
+      motion_noise_model_(),
+      nh_private_(nh_private),
       human_sub_(),
+      mesh_pub_(),
+      edges_pub_(),
       skeleton_points_pubs_("human_skeleton_points", nh_private),
       skeleton_edge_pubs_("human_skeleton_edges", nh_private),
       agent_centroids_("agent_centroids", nh_private),
       agent_graph_edges_("agent_graph_edges", nh_private),
-      mesh_pub_(),
-      edges_pub_(),
-      motion_noise_model_(),
-      detection_noise_model_(),
       br_(),
       serialize_graph_srv_(),
       deserialize_graph_srv_() {
@@ -56,7 +56,12 @@ DynamicSceneGraph::DynamicSceneGraph(const ros::NodeHandle& nh,
       "pgo_rot_threshold", pgo_rot_threshold_, pgo_rot_threshold_);
   nh_private_.param(
       "beta_diff_threshold", beta_diff_threshold_, beta_diff_threshold_);
-  nh_private_.param("prune_threshold", prune_threshold_, prune_threshold_);
+
+  int prune_threshold = prune_threshold_;
+  nh_private_.param("prune_threshold", prune_threshold, prune_threshold);
+  CHECK(prune_threshold >= 0);
+  prune_threshold_ = static_cast<size_t>(prune_threshold);
+
   nh_private_.param("single_sequence_smpl_mode",
                     single_sequence_smpl_mode_,
                     single_sequence_smpl_mode_);
@@ -127,7 +132,7 @@ DynamicSceneGraph::DynamicSceneGraph(const ros::NodeHandle& nh,
 
 bool DynamicSceneGraph::deserializeServiceCall(
     voxblox_msgs::FilePath::Request& request,
-    voxblox_msgs::FilePath::Response& response) {
+    voxblox_msgs::FilePath::Response&) {
   LOG(INFO) << "DynamicSceneNode: Deserialization Requested...";
   if (!deserializeAndPublish(request.file_path)) {
     LOG(ERROR) << "Failed to load map!";
@@ -141,7 +146,7 @@ bool DynamicSceneGraph::deserializeServiceCall(
 inline auto get_agent_id(const std::string& topic) -> AgentId {
   size_t chop_idx = topic.find_last_of('_');
   std::string id_str = topic.substr(chop_idx + 1);
-  AgentId id;
+  AgentId id = -1;
   try {
     id = std::stol(id_str);
   } catch (...) {
@@ -217,9 +222,8 @@ bool DynamicSceneGraph::deserializeAndPublish(
   return true;
 }
 
-bool DynamicSceneGraph::serializeServiceCall(
-    std_srvs::Empty::Request& request,
-    std_srvs::Empty::Response& response) {
+bool DynamicSceneGraph::serializeServiceCall(std_srvs::Empty::Request&,
+                                             std_srvs::Empty::Response&) {
   LOG(INFO) << "DynamicSceneNode: Serialization Requested";
   return serialize();
 }
@@ -281,7 +285,7 @@ int DynamicSceneGraph::findClosestFeasibleHuman(
   // Find the scene node that passes all time-checks
   float closest_dist = std::numeric_limits<float>::max();
   int closest_idx = -1;
-  for (int i = 0; i < human_db_.size(); i++) {
+  for (size_t i = 0; i < human_db_.size(); i++) {
     auto last_node = human_db_[i].human_nodes_.back();
     float time_diff =
         (scene_node.attributes_.timestamp_ - last_node.attributes_.timestamp_) *
@@ -639,7 +643,7 @@ void DynamicSceneGraph::getAllOptimizedAndPrunedPoses(
 
   for (size_t i = 0; i < human_db_.size(); i++) {
     std::vector<gtsam::Pose3> poses_i;
-    bool pass = getOptimizedAndPrunedPoses(i, &poses_i, include_prior);
+    getOptimizedAndPrunedPoses(i, &poses_i, include_prior);
     pose_lists->push_back(poses_i);
   }
 }

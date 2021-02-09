@@ -266,7 +266,7 @@ class DynamicSceneGraph {
   double pgo_trans_threshold_ = 0.05;
   double pgo_rot_threshold_ = 0.005;
   double beta_diff_threshold_ = 0.1;
-  int prune_threshold_ = 0;
+  size_t prune_threshold_ = 0;
   bool single_sequence_smpl_mode_ = false;
   bool draw_skeleton_edges_ = false;
   std::string human_topic_{"human_meshes"};

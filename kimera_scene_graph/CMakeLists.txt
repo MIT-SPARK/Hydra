@@ -1,20 +1,64 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.1)
 project(kimera_scene_graph)
 
+add_compile_options(-Wall -Wextra)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 # Setup and linking for normal files
-find_package(catkin_simple REQUIRED)
-catkin_simple()
+find_package(catkin REQUIRED COMPONENTS
+    message_generation
+    roscpp
+    dynamic_reconfigure
+    pluginlib
+    std_msgs
+    graph_cmr_ros
+    kimera_semantics
+    kimera_semantics_ros
+    object_db
+    voxblox
+    voxblox_ros
+    voxblox_skeleton)
 
 find_package(OpenCV REQUIRED)
 find_package(GTSAM REQUIRED)
 find_package(KimeraRPGO REQUIRED)
 
+add_service_files(DIRECTORY srv FILES CentroidErrorRequest.srv)
+
+generate_dynamic_reconfigure_options(cfg/kimera_scene_graph.cfg)
+
+generate_messages(DEPENDENCIES std_msgs)
+
+catkin_package(
+    CATKIN_DEPENDS
+        message_runtime
+        roscpp
+        dynamic_reconfigure
+        object_db
+        pluginlib
+        std_msgs
+        graph_cmr_ros
+        kimera_semantics
+        kimera_semantics_ros
+        voxblox
+        voxblox_ros
+        voxblox_skeleton
+    DEPENDS
+    INCLUDE_DIRS include
+    LIBRARIES ${PROJECT_NAME})
+
 # Serialization plugins (mostly to get around lz4 problems with flann)
-cs_add_library(humans_serialization_plugins
+add_library(humans_serialization_plugins
     src/humans_serialization_plugins.cpp)
+target_include_directories(humans_serialization_plugins PUBLIC
+  include
+  ${catkin_INCLUDE_DIRS}
+)
 
 # Main library for kimera Scene-Graph
-cs_add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME}
   # Include files are just here for IDEs
   include/kimera_scene_graph/utils/voxblox_to_pcl.h
   include/kimera_scene_graph/common.h
@@ -44,39 +88,38 @@ cs_add_library(${PROJECT_NAME}
   src/dynamic_scene_graph.cpp
   src/dynamic_scene_graph_evaluator.cpp
   src/semantic_ros_publishers.cpp
-  src/min_cut_solvers/stoer_wagner_min_cut_wrapper.cpp
-)
-target_link_libraries(${PROJECT_NAME}
-  ${OpenCV_LIBRARIES}
-  ${PCL_LIBRARIES}
-  gtsam gtsam_unstable
-  tbb
-  KimeraRPGO
 )
 target_include_directories(${PROJECT_NAME} PUBLIC
+  include
   ${OpenCV_INCLUDE_DIRS}
-  ${CATKIN_INCLUDE_DIRS}
-  ${GTSAM_INCLUDE_DIR}
+  ${catkin_INCLUDE_DIRS}
 )
+target_link_libraries(${PROJECT_NAME}
+  KimeraRPGO
+  gtsam
+  ${OpenCV_LIBRARIES}
+  ${PCL_LIBRARIES}
+  ${catkin_LIBRARIES}
+)
+add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
 
 # ROS node
-cs_add_executable(kimera_scene_graph_node
+add_executable(kimera_scene_graph_node
   src/kimera_scene_graph_node.cpp
 )
 target_link_libraries(kimera_scene_graph_node
   ${PROJECT_NAME}
   ${PCL_LIBRARIES}
-  tbb
 )
 
-cs_add_executable(kimera_dynamic_scene_graph_node
+add_executable(kimera_dynamic_scene_graph_node
   src/kimera_dynamic_scene_graph_node.cpp
 )
 target_link_libraries(kimera_dynamic_scene_graph_node
   ${PROJECT_NAME}
 )
 
-cs_add_executable(kimera_dynamic_scene_graph_eval_node
+add_executable(kimera_dynamic_scene_graph_eval_node
   src/kimera_dynamic_scene_graph_eval_node.cpp
 )
 target_link_libraries(kimera_dynamic_scene_graph_eval_node
@@ -84,13 +127,13 @@ target_link_libraries(kimera_dynamic_scene_graph_eval_node
 )
 
 # For Visualization of the Scene Graph
-cs_add_executable(scene_graph_visualizer
+add_executable(scene_graph_visualizer
   src/scene_graph_visualizer.cpp
 )
 target_link_libraries(scene_graph_visualizer ${PROJECT_NAME})
 
 # For Evaluation of the Scene Graph (and construction)
-cs_add_executable(scene_graph_eval
+add_executable(scene_graph_eval
   src/scene_graph_eval.cpp
 )
 target_link_libraries(scene_graph_eval
@@ -100,17 +143,9 @@ target_link_libraries(scene_graph_eval
   tbb
 )
 
-# Miscellaneous, todo(toni): remove...
-cs_add_executable(min_cut
-  src/min_cut_solvers/stoer_wagner_min_cut.cpp
-)
-target_link_libraries(min_cut
-  ${PROJECT_NAME}
-  ${PCL_LIBRARIES}
-)
-
 # Add tests
 if (CATKIN_ENABLE_TESTING)
+  find_package(rostest REQUIRED)
   add_rostest_gtest(
     testKimeraSceneGraph
     tests/test_kimera_scene_graph.test
@@ -121,6 +156,4 @@ if (CATKIN_ENABLE_TESTING)
   target_link_libraries(testKimeraSceneGraph ${PROJECT_NAME})
 endif()
 
-cs_install()
-
-cs_export()
+# TODO(nathan) handle install

@@ -199,7 +199,7 @@ class SceneGraph {
   // For serialization (save/load) of the scene-graph
   friend class boost::serialization::access;
   template <class Archive>
-  void serialize(Archive& ar, const unsigned int version) {
+  void serialize(Archive& ar, const unsigned int /*version*/) {
     ar& BOOST_SERIALIZATION_NVP(database_);
     ar& BOOST_SERIALIZATION_NVP(next_inter_layer_edge_id_);
     ar& BOOST_SERIALIZATION_NVP(inter_layer_edge_map_);

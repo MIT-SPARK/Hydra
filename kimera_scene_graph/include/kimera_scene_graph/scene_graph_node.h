@@ -37,7 +37,7 @@ struct NodePosition {
                                   const NodePosition& node_position);
   friend class boost::serialization::access;
   template <class Archive>
-  void serialize(Archive& ar, const unsigned int version) {
+  void serialize(Archive& ar, const unsigned int /*version*/) {
     ar& BOOST_SERIALIZATION_NVP(x);
     ar& BOOST_SERIALIZATION_NVP(y);
     ar& BOOST_SERIALIZATION_NVP(z);
@@ -69,7 +69,7 @@ struct NodeColor {
                                   const NodeColor& node_color);
   friend class boost::serialization::access;
   template <class Archive>
-  void serialize(Archive& ar, const unsigned int version) {
+  void serialize(Archive& ar, const unsigned int /*version*/) {
     ar& BOOST_SERIALIZATION_NVP(r);
     ar& BOOST_SERIALIZATION_NVP(g);
     ar& BOOST_SERIALIZATION_NVP(b);

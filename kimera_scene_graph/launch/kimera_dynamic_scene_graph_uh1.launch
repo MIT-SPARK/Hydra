@@ -62,7 +62,7 @@
     <param name="prune_threshold"                    value="$(arg prune_threshold)"/>
     <param name="human_color"                        value="$(arg human_color)"/>
     <param name="centroid_color"                     value="$(arg centroid_color)"/>
-    <param name="serialization_dir"                  value="$(find kimera_scene_graph)/cfg/serialization"/>
+    <param name="serialization_dir"                  value="$(find kimera_scene_graph)/artifacts/serialization"/>
     <param name="edge_thickness"                     value="$(arg edge_thickness)"/>
     <param name="detection_position_variance"        value="$(arg detection_position_variance)"/>
     <param name="detection_rotation_variance"        value="$(arg detection_rotation_variance)"/>

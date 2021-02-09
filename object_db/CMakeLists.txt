@@ -1,39 +1,71 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.1)
 project(object_db)
 
+add_compile_options(-Wall -Wextra -Wno-unused-parameter)
 set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
+find_package(teaserpp REQUIRED)
+find_package(catkin REQUIRED COMPONENTS
+    message_generation
+    actionlib_msgs
+    sensor_msgs
+    std_msgs
+    pcl_ros)
 
-# catkin_simple setup
-find_package(catkin_simple REQUIRED)
-catkin_simple(ALL_DEPS_REQUIRED)
+add_action_files(DIRECTORY action
+    FILES ObjectRegistration.action)
 
-find_package(Eigen3 3.2 QUIET REQUIRED NO_MODULE)
+generate_messages(DEPENDENCIES std_msgs sensor_msgs actionlib_msgs)
+
+catkin_package(
+    CATKIN_DEPENDS
+        message_runtime
+        actionlib_msgs
+        sensor_msgs
+        std_msgs
+        pcl_ros
+    DEPENDS
+    INCLUDE_DIRS include
+    LIBRARIES object_registration_server matcher)
 
 # Object Registration Server
-cs_add_library(object_registration_server
+add_library(object_registration_server
   src/object_registration_server.cpp
-  src/ply_io.cpp
-  include/object_db/tinyply.h)
+  src/ply_io.cpp)
+target_include_directories(object_registration_server PUBLIC
+    include
+    ${catkin_INCLUDE_DIRS})
 target_link_libraries(object_registration_server
-    matcher teaserpp::teaser_registration ${PCL_LIBRARIES})
+    matcher
+    teaserpp::teaser_registration
+    ${catkin_LIBRARIES})
+add_dependencies(object_registration_server ${catkin_EXPORTED_TARGETS})
 
 # PCL Keypoints Module
-cs_add_library(matcher src/matcher.cpp)
-target_link_libraries(matcher ${PCL_LIBRARIES})
+add_library(matcher src/matcher.cpp)
+target_include_directories(matcher PUBLIC
+    include
+    ${catkin_INCLUDE_DIRS})
+target_link_libraries(matcher ${catkin_LIBRARIES})
 
 # Server node
-cs_add_executable(server_node src/server_node.cpp)
+add_executable(server_node src/server_node.cpp)
 target_link_libraries(server_node
-    object_registration_server teaserpp::teaser_registration)
+    object_registration_server
+    teaserpp::teaser_registration)
 
 # Sample client code
-cs_add_executable(sample_client src/sample_client.cpp)
-target_link_libraries(sample_client object_registration_server teaserpp::teaser_registration)
+add_executable(sample_client src/sample_client.cpp)
+target_link_libraries(sample_client
+    object_registration_server
+    teaserpp::teaser_registration)
 
-# Add tests
-add_subdirectory(test)
+if (CATKIN_ENABLE_TESTING)
+    catkin_add_gtest(test_matcher tests/matcher_test.cpp)
+    target_link_libraries(test_matcher object_registration_server matcher)
+    target_include_directories(test_matcher PRIVATE include)
+endif()
 
-# Install & Export
-cs_install()
-cs_export()
+# TODO(nathan) install

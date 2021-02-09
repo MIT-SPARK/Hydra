@@ -234,7 +234,7 @@ TEST_F(DynamicHumanNodeTestFixture, testGraphConnection) {
     d_graph.humanCallback(msg);
 
     // Ensure that there are the correct number of graphs.
-    EXPECT_EQ(d_graph.human_db_.size(), 1)
+    EXPECT_EQ(d_graph.human_db_.size(), 1u)
         << "MOVING -- too many pose graphs -- iter: " << i;
     EXPECT_EQ(d_graph.human_db_[0].human_nodes_.size(), i + 1)
         << "MOVING -- too many poses -- iter: " << i;

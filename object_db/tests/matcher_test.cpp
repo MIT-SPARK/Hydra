@@ -17,7 +17,8 @@ TEST(MatcherTest, BruteForce) {
   pcl::PointCloud<pcl::PointXYZ>::Ptr src_cloud(
       new pcl::PointCloud<pcl::PointXYZ>);
   for (size_t i = 0; i < src_size; ++i) {
-    src_cloud->push_back({i, i, i});
+    src_cloud->push_back(
+        {static_cast<float>(i), static_cast<float>(i), static_cast<float>(i)});
   }
   pcl::PointCloud<pcl::PointXYZ>::Ptr dst_cloud(
       new pcl::PointCloud<pcl::PointXYZ>);
@@ -32,8 +33,8 @@ TEST(MatcherTest, BruteForce) {
 
   matcher.generateCorrespondences(src_cloud, dst_cloud, &src, &dst);
 
-  ASSERT_EQ(src.cols(), src_size * dst_size);
-  ASSERT_EQ(dst.cols(), src_size * dst_size);
+  ASSERT_EQ(static_cast<size_t>(src.cols()), src_size * dst_size);
+  ASSERT_EQ(static_cast<size_t>(dst.cols()), src_size * dst_size);
   std::cout << "SRC correspondences:" << std::endl;
   std::cout << src << std::endl;
   std::cout << "DST correspondences:" << std::endl;

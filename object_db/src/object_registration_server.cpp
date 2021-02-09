@@ -7,13 +7,13 @@
 namespace object_registration {
 
 ObjectRegistrationServer::ObjectRegistrationServer(
-    const std::string& name,
-    const std::string& target_object_label,
-    const std::string& db_path,
-    const std::string& gt_path,
-    const std::string& label_path,
-    const teaser::RobustRegistrationSolver::Params& solver_params,
-    const MatcherParams& matcher_params)
+    const std::string &name,
+    const std::string &target_object_label,
+    const std::string &db_path,
+    const std::string &gt_path,
+    const std::string &label_path,
+    const teaser::RobustRegistrationSolver::Params &solver_params,
+    const MatcherParams &matcher_params)
     : nh_(),
       nh_private_("~"),
       action_server_(
@@ -22,10 +22,10 @@ ObjectRegistrationServer::ObjectRegistrationServer(
           boost::bind(&ObjectRegistrationServer::executeCB, this, _1),
           false),
       action_name_(name),
-      target_object_label_(target_object_label),
       solver_params_(solver_params),
+      world_frame_id_("map"),
       matcher_(matcher_params),
-      world_frame_id_("map") {
+      target_object_label_(target_object_label) {
   // Get ROS Params
   nh_private_.getParam("world_frame_id", world_frame_id_);
 
@@ -92,7 +92,7 @@ void pclPointCloud2Eigen(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
 pcl::PointCloud<pcl::PointXYZ>::Ptr eigen2PclPointCloud(
     const Eigen::Matrix<double, 3, Eigen::Dynamic> &mat) {
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  for (size_t i = 0; i < mat.cols(); ++i) {
+  for (int i = 0; i < mat.cols(); ++i) {
     pcl::PointXYZ cpoint;
     cpoint.x = mat(0, i);
     cpoint.y = mat(1, i);
@@ -284,7 +284,7 @@ void ObjectRegistrationServer::executeCB(
       3, src_cloud.point_cloud->size());
   pclPointCloud2Eigen(src_cloud.point_cloud, &src_mat);
   transformed_object = (R * src_mat).colwise() + t;
-  for (size_t i = 0; i < transformed_object.cols(); ++i) {
+  for (int i = 0; i < transformed_object.cols(); ++i) {
     geometry_msgs::Point32 cpoint;
     cpoint.x = transformed_object(0, i);
     cpoint.y = transformed_object(1, i);
@@ -429,7 +429,7 @@ int ObjectRegistrationServer::loadGTDB(const std::string &gt_file) {
     if (result.size() <= 1) {
       break;
     }
-    std::istringstream name_stream (result[0]);
+    std::istringstream name_stream(result[0]);
     std::vector<std::string> name_tokens;
     std::copy(std::istream_iterator<std::string>(name_stream),
               std::istream_iterator<std::string>(),
