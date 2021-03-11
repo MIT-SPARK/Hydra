@@ -39,8 +39,8 @@
     local-name: kimera_rpgo
     uri: git@github.com:MIT-SPARK/Kimera-RPGO.git
 - git:
-    local-name: kimera_scene_graph
-    uri: git@github.mit.edu:SPARK/Kimera-DSG.git
+    local-name: kimera_dsg_builder
+    uri: git@github.mit.edu:SPARK/Kimera-DSG-Builder.git
 - git:
     local-name: kimera_semantics
     uri: git@github.mit.edu:SPARK/Kimera-Semantics.git
