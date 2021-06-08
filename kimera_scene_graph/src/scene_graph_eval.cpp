@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
   kimera::SceneGraphBuilder scene_graph_builder(nh, nh_private);
 
   LOG(INFO) << "Starting scene graph construction.";
-  scene_graph_builder.sceneGraphReconstruction(false);
+  scene_graph_builder.sceneGraphReconstruction();
   LOG(INFO) << "Finishing scene graph construction.";
 
   ros::spin();

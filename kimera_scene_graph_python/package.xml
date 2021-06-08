@@ -11,7 +11,7 @@
 
     <buildtool_depend>catkin</buildtool_depend>
     <depend>pybind11_catkin</depend>
-    <depend>kimera_scene_graph</depend>
+    <depend>kimera_scene_graph_definitions</depend>
     <depend>kimera_semantics</depend>
     <exec_depend>python-matplotlib</exec_depend>
 

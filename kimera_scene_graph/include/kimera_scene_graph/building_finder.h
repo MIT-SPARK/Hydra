@@ -1,18 +1,8 @@
 #pragma once
+#include <kimera_dsg/scene_graph.h>
 
 namespace kimera {
 
-class SceneGraph;
-
-class BuildingFinder {
- public:
-  BuildingFinder() = default;
-  virtual ~BuildingFinder() = default;
-
-  /**
-   * @brief findBuildings
-   */
-  void findBuildings(SceneGraph* scene_graph);
-};
+void findBuildings(SceneGraph* scene_graph);
 
 }  // namespace kimera

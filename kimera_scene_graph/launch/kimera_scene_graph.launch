@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="ISO-8859-15"?>
 <launch>
   <arg name="voxel_size"     default="0.05"/>
-  <param name="use_sim_time" value="true" />
 
   <!-- Change sensor frame to:
    - VIO's estimated base_link: `left_cam_base_link`
@@ -9,20 +8,24 @@
   -->
   <arg name="sensor_frame" default="left_cam"/>
 
+  <arg name="verbosity" default="0"/>
+
   <!-- Send colored pointcloud with scene_graph to kimera_scene_graph for 3D segmentation -->
   <!-- launch-prefix="gdb -ex run args" -->
   <!-- launch-prefix="valgrind" -->
-  <node name="kimera_scene_graph_node" pkg="kimera_scene_graph"
-    type="kimera_scene_graph_node" output="screen"
-    args="-alsologtostderr -colorlogtostderr" clear_params="true">
-    <!-- Scene Graph params -->
+  <node name="kimera_scene_graph_node"
+        pkg="kimera_scene_graph"
+        type="kimera_scene_graph_node"
+        output="screen"
+        args="-alsologtostderr -colorlogtostderr -v=$(arg verbosity)">
     <!-- Object Finder Type: 0: region growing, 1: euclidean clustering -->
     <param name="object_finder_type"                 value="1"/>
 
-    <!-- Simulator params -->
     <param name="visualize"                          value="true"/>
     <param name="tsdf_voxel_size"                    value="0.05"/>
     <param name="tsdf_voxels_per_side"               value="16"/>
+    <param name="rgb_tsdf_voxel_size"                value="0.05"/>
+    <param name="rgb_tsdf_voxels_per_side"           value="32"/>
     <param name="incremental"                        value="false"/>
     <param name="add_robot_pose"                     value="false"/>
     <param name="generate_mesh"                      value="true"/>

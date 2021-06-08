@@ -8,7 +8,7 @@ namespace kimera {
 class HumansRosbagSerializer : public HumansSerializer {
  public:
   HumansRosbagSerializer() : HumansSerializer() {}
-  ~HumansRosbagSerializer() = default;
+  virtual ~HumansRosbagSerializer() = default;
 
   virtual auto start(const std::string& name) -> bool override {
     if (not make_directories_(serialization_dir_)) {
@@ -91,6 +91,7 @@ class HumansRosbagDeserializer : public HumansDeserializer {
 
   struct BagIter : public HumansDeserializer::Iter {
     BagIter(const rosbag::View::iterator& bag_iter) : bag_iter_(bag_iter) {}
+    virtual ~BagIter() = default;
 
     virtual auto get() -> EntryInfo override {
       rosbag::MessageInstance m = *bag_iter_;

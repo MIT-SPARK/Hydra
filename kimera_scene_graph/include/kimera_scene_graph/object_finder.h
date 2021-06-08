@@ -1,135 +1,115 @@
 #pragma once
+#include "kimera_scene_graph/common.h"
 
-#include <string>
+#include <actionlib/client/simple_action_client.h>
+#include <object_db/ObjectRegistrationAction.h>
 
-#include <pcl/io/pcd_io.h>
-#include <pcl/point_types.h>
-#include <pcl/search/kdtree.h>
+#include <kimera_dsg/node_attributes.h>
+#include <kimera_dsg/scene_graph.h>
 
-// Region growing pcl
-#include <pcl/features/normal_3d.h>
-#include <pcl/filters/passthrough.h>
-#include <pcl/search/search.h>
+#include <pcl/segmentation/extract_clusters.h>
 #include <pcl/segmentation/region_growing.h>
 
-// Euclidean pcl
-#include <pcl/ModelCoefficients.h>
-#include <pcl/common/centroid.h>
-#include <pcl/features/normal_3d.h>
-#include <pcl/filters/extract_indices.h>
-#include <pcl/filters/voxel_grid.h>
-#include <pcl/segmentation/extract_clusters.h>
+#include <Eigen/StdVector>
 
-// Bounding Box
-#include <pcl/features/moment_of_inertia_estimation.h>
-
-#include <kimera_semantics/common.h>
-
-#include "kimera_scene_graph/common.h"
-#include "kimera_scene_graph/object_finder-definitions.h"
+#include <cmath>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace kimera {
 
-template <class T>
+using ObjectDBClient =
+    actionlib::SimpleActionClient<object_db::ObjectRegistrationAction>;
+using ObjectPointClouds = std::vector<ColorPointCloud::Ptr>;
+using NodeColor = SemanticNodeAttributes::ColorVector;
+using BoundingBoxes =
+    std::vector<BoundingBox, Eigen::aligned_allocator<BoundingBox>>;
+
+enum class ObjectFinderType { kRegionGrowing = 0, kEuclidean = 1 };
+
+struct RegionGrowingClusteringParams {
+  size_t normal_estimator_neighbour_size = 50;
+  size_t min_cluster_size = 250;
+  size_t max_cluster_size = 10000000;
+  size_t number_of_neighbours = 20;
+  double smoothness_threshold = 3.0 / 180.0 * M_PI;
+  double curvature_threshold = 1.0;
+};
+
+struct EuclideanClusteringParams {
+  size_t min_cluster_size = 50;
+  size_t max_cluster_size = 1000000;
+  double cluster_tolerance = 0.25;
+};
+
 class ObjectFinder {
  public:
-  typedef pcl::PointCloud<T> PointCloudT;
-  typedef std::vector<typename PointCloudT::Ptr> ObjectPointClouds;
-  typedef std::vector<BoundingBox<T>> BoundingBoxes;
-
   ObjectFinder(const std::string& world_frame,
-               const ObjectFinderType& object_finder_type);
-  ~ObjectFinder() = default;
+               ObjectFinderType object_finder_type);
 
-  /**
-   * @brief findObjects in a given pointcloud by using region growing techniques
-   * We assume this pointcloud has already been Semantically segmented (aka
-   * it only contains one semantic label)
-   * @param pointcloud
-   * @return colored pointcloud for cluster visualization...
-   */
-  ColorPointCloud::Ptr findObjects(const typename PointCloudT::Ptr& pointcloud,
-                                   Centroids* centroids,
-                                   ObjectPointClouds* object_pcls,
-                                   BoundingBoxes* bounding_boxes);
+  void connectToObjectDb();
 
-  BoundingBox<T> findBoundingBox(const typename PointCloudT::Ptr& cloud,
-                                 const BoundingBoxType& bb_type);
+  void addObjectsToGraph(const ColorPointCloud::Ptr& semantic_pcl,
+                         const NodeColor& label_color,
+                         SemanticLabel label,
+                         SceneGraph* scene_graph);
 
-  void updateClusterEstimator(const ObjectFinderType& object_finder_type);
+  void updateClusterEstimator(ObjectFinderType object_finder_type);
 
   void updateRegionGrowingParams(
-      const RegionGrowingClusterEstimatorParams& new_params);
+      const RegionGrowingClusteringParams& new_params);
 
   void updateEuclideanClusterParams(
-      const EuclideanClusterEstimatorParams& new_params);
+      const EuclideanClusteringParams& new_params);
 
-  void print() const {
-    switch (static_cast<ObjectFinderType>(object_finder_type_)) {
-      case ObjectFinderType::kEuclidean: {
-        LOG(INFO) << "Object Finder Type: Euclidean.\n"
-                  << euclidean_cluster_estimator_params_.print();
-        break;
-      };
-      case ObjectFinderType::kRegionGrowing: {
-        LOG(INFO) << "Object Finder Type: Region-Growing. \n"
-                  << region_growing_estimator_params_.print();
-        break;
-      }
-      default: {
-        LOG(FATAL) << "Unknown object finder type";
-        break;
-      }
-    }
-  }
+  friend std::ostream& operator<<(std::ostream& out,
+                                  const ObjectFinder& finder);
 
  private:
-  ColorPointCloud::Ptr regionGrowingClusterEstimator(
-      const typename PointCloudT::Ptr& cloud,
-      Centroids* centroids,
-      ObjectPointClouds* object_pcls);
-
-  ColorPointCloud::Ptr euclideanClusterEstimator(
-      const typename PointCloudT::Ptr& cloud,
-      Centroids* centroids,
-      ObjectPointClouds* object_pcls);
-
-  ColorPointCloud::Ptr getColoredCloud(
-      const typename pcl::PointCloud<T>::Ptr& input,
-      const std::vector<pcl::PointIndices>& clusters);
-
-  /**
-   * @brief getCentroidsGivenClusters returns the centroids (and pointclouds
-   * associated to the centroids) given the clusters and the original pointcloud
-   * @param cloud original cloud where the clusters are
-   * @param cluster_indices indices of the clusters in the original cloud
-   * @param centroids centroids of the clusters
-   * @param object_pcls chunks of pointclouds associated to the clusters.
-   */
-  void getCentroidsGivenClusters(
-      const typename pcl::PointCloud<T>::Ptr& cloud,
-      const std::vector<pcl::PointIndices>& cluster_indices,
-      Centroids* centroids,
-      ObjectPointClouds* object_pcls);
-
   void setupRegionGrowingClusterEstimator();
 
   void setupEuclideanClusterEstimator();
 
- protected:
-  // Used as well by the wall finder
-  RegionGrowingClusterEstimatorParams region_growing_estimator_params_;
+  ColorPointCloud::Ptr findObjects(const ColorPointCloud::Ptr& pointcloud,
+                                   Centroids* centroids,
+                                   ObjectPointClouds* object_pcls,
+                                   BoundingBoxes* bounding_boxes);
 
- private:
+  ColorPointCloud::Ptr regionGrowingClusterEstimator(
+      const ColorPointCloud::Ptr& cloud,
+      Centroids* centroids,
+      ObjectPointClouds* object_pcls);
+
+  ColorPointCloud::Ptr euclideanClusterEstimator(
+      const ColorPointCloud::Ptr& cloud,
+      Centroids* centroids,
+      ObjectPointClouds* object_pcls);
+
+  ColorPointCloud::Ptr getColoredCloud(
+      const ColorPointCloud::Ptr& input,
+      const std::vector<pcl::PointIndices>& clusters);
+
+  void getCentroidsGivenClusters(
+      const ColorPointCloud::Ptr& cloud,
+      const std::vector<pcl::PointIndices>& cluster_indices,
+      Centroids* centroids,
+      ObjectPointClouds* object_pcls);
+
+  ObjectPointClouds registerObjects(const ObjectPointClouds& object_pcls,
+                                    const std::string semantic_label);
+
   std::string world_frame_;
-  ObjectFinderType object_finder_type_;
+  ObjectFinderType type_;
 
-  pcl::RegionGrowing<T, pcl::Normal> region_growing_cluster_estimator_;
+  RegionGrowingClusteringParams region_growing_params_;
+  EuclideanClusteringParams euclidean_params_;
 
-  EuclideanClusterEstimatorParams euclidean_cluster_estimator_params_;
-  pcl::EuclideanClusterExtraction<T> euclidean_cluster_estimator_;
+  pcl::RegionGrowing<ColorPoint, pcl::Normal> region_growing_estimator_;
+  pcl::EuclideanClusterExtraction<ColorPoint> euclidean_estimator_;
+
+  std::unique_ptr<ObjectDBClient> object_db_client_;
+  NodeSymbol next_object_id_;
 };
 
 }  // namespace kimera
-
-#include "./object_finder-inl.h"

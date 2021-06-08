@@ -2,9 +2,10 @@ cmake_minimum_required(VERSION 3.1)
 project(kimera_scene_graph)
 
 add_compile_options(-Wall -Wextra)
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+option(DSG_USE_ASAN "enable address sanatizer" OFF)
 
 # Setup and linking for normal files
 find_package(catkin REQUIRED COMPONENTS
@@ -14,15 +15,16 @@ find_package(catkin REQUIRED COMPONENTS
     pluginlib
     std_msgs
     graph_cmr_ros
+    kimera_dsg
     kimera_semantics
     kimera_semantics_ros
     object_db
+    tf2_eigen
     voxblox
     voxblox_ros
     voxblox_skeleton)
 
-find_package(OpenCV REQUIRED)
-find_package(GTSAM REQUIRED)
+find_package(Eigen3 REQUIRED)
 find_package(KimeraRPGO REQUIRED)
 
 add_service_files(DIRECTORY srv FILES CentroidErrorRequest.srv)
@@ -40,8 +42,10 @@ catkin_package(
         pluginlib
         std_msgs
         graph_cmr_ros
+        kimera_dsg
         kimera_semantics
         kimera_semantics_ros
+        tf2_eigen
         voxblox
         voxblox_ros
         voxblox_skeleton
@@ -59,46 +63,27 @@ target_include_directories(humans_serialization_plugins PUBLIC
 
 # Main library for kimera Scene-Graph
 add_library(${PROJECT_NAME}
-  # Include files are just here for IDEs
-  include/kimera_scene_graph/utils/voxblox_to_pcl.h
-  include/kimera_scene_graph/common.h
-  include/kimera_scene_graph/object_finder-inl.h
-  include/kimera_scene_graph/object_place_connectivity_finder.h
-  include/kimera_scene_graph/places_room_connectivity_finder.h
-  include/kimera_scene_graph/scene_graph_node.h
-  include/kimera_scene_graph/scene_graph_edge.h
-  include/kimera_scene_graph/scene_graph_layer.h
-  include/kimera_scene_graph/scene_graph_visualizer.h
-  include/kimera_scene_graph/scene_graph.h
-  include/kimera_scene_graph/dynamic_scene_graph.h
-  include/kimera_scene_graph/dynamic_scene_graph_evaluator.h
+  src/connectivity_utils.cpp
   src/object_finder.cpp
   src/room_finder.cpp
-  src/object_place_connectivity_finder.cpp
-  src/places_room_connectivity_finder.cpp
-  src/room_connectivity_finder.cpp
   src/wall_finder.cpp
   src/building_finder.cpp
   src/scene_graph_builder.cpp
-  src/scene_graph_node.cpp
-  src/scene_graph_edge.cpp
-  src/scene_graph_layer.cpp
   src/scene_graph_visualizer.cpp
-  src/scene_graph.cpp
-  src/dynamic_scene_graph.cpp
-  src/dynamic_scene_graph_evaluator.cpp
+  #src/dynamic_scene_graph_evaluator.cpp
   src/semantic_ros_publishers.cpp
+  src/visualizer_utils.cpp
+  src/voxblox_conversions.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC
   include
-  ${OpenCV_INCLUDE_DIRS}
+  #${OpenCV_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
 )
 target_link_libraries(${PROJECT_NAME}
-  KimeraRPGO
-  gtsam
-  ${OpenCV_LIBRARIES}
-  ${PCL_LIBRARIES}
+  #KimeraRPGO
+  #gtsam
+  #${OpenCV_LIBRARIES}
   ${catkin_LIBRARIES}
 )
 add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
@@ -109,26 +94,25 @@ add_executable(kimera_scene_graph_node
 )
 target_link_libraries(kimera_scene_graph_node
   ${PROJECT_NAME}
-  ${PCL_LIBRARIES}
 )
 
-add_executable(kimera_dynamic_scene_graph_node
-  src/kimera_dynamic_scene_graph_node.cpp
-)
-target_link_libraries(kimera_dynamic_scene_graph_node
-  ${PROJECT_NAME}
-)
+#add_executable(kimera_dynamic_scene_graph_node
+  #src/kimera_dynamic_scene_graph_node.cpp
+#)
+#target_link_libraries(kimera_dynamic_scene_graph_node
+  #${PROJECT_NAME}
+#)
 
-add_executable(kimera_dynamic_scene_graph_eval_node
-  src/kimera_dynamic_scene_graph_eval_node.cpp
-)
-target_link_libraries(kimera_dynamic_scene_graph_eval_node
-  ${PROJECT_NAME}
-)
+#add_executable(kimera_dynamic_scene_graph_eval_node
+  #src/kimera_dynamic_scene_graph_eval_node.cpp
+#)
+#target_link_libraries(kimera_dynamic_scene_graph_eval_node
+  #${PROJECT_NAME}
+#)
 
 # For Visualization of the Scene Graph
 add_executable(scene_graph_visualizer
-  src/scene_graph_visualizer.cpp
+  src/scene_graph_visualizer_node.cpp
 )
 target_link_libraries(scene_graph_visualizer ${PROJECT_NAME})
 
@@ -138,22 +122,27 @@ add_executable(scene_graph_eval
 )
 target_link_libraries(scene_graph_eval
   ${PROJECT_NAME}
-  ${OpenCV_LIBRARIES}
-  ${PCL_LIBRARIES}
   tbb
 )
+if (DSG_USE_ASAN)
+    # TODO(nathan) later cmake has better options for this
+    # TODO(nathan) allow choice of sanitizer
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+    target_compile_options(scene_graph_eval PUBLIC -fsanitize=address -fno-omit-frame-pointer)
+endif()
 
 # Add tests
 if (CATKIN_ENABLE_TESTING)
-  find_package(rostest REQUIRED)
-  add_rostest_gtest(
-    testKimeraSceneGraph
-    tests/test_kimera_scene_graph.test
-    tests/test_kimera_scene_graph.cpp
-    tests/test_dynamic_scene_graph.cpp
-    tests/test_dynamic_scene_graph_evaluator.cpp
-  )
-  target_link_libraries(testKimeraSceneGraph ${PROJECT_NAME})
+    # TODO(nathan) clean up
+    find_package(rostest REQUIRED)
+    add_rostest_gtest(
+        testKimeraSceneGraph
+        tests/test_kimera_scene_graph.test
+        tests/utest_main.cpp
+        tests/test_dynamic_scene_graph.cpp
+        tests/test_dynamic_scene_graph_evaluator.cpp
+    )
+    target_link_libraries(testKimeraSceneGraph ${PROJECT_NAME})
 endif()
 
 # TODO(nathan) handle install

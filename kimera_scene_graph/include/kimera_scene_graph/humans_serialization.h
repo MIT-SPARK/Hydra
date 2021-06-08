@@ -121,6 +121,7 @@ class HumansDeserializer {
 
   struct Iter {
     typedef std::shared_ptr<Iter> Ptr;
+    virtual ~Iter() = default;
     virtual auto get() -> EntryInfo = 0;
     virtual void increment() = 0;
     virtual auto equals(const Iter::Ptr& other) -> bool = 0;
