@@ -34,7 +34,7 @@ void findRoomConnectivity(SceneGraph* scene_graph) {
     // layer
 
     NodeId source_room = *(source.getParent());
-    NodeId target_room = *(source.getParent());
+    NodeId target_room = *(target.getParent());
     if (source_room != target_room) {
       // the graph takes care of filtering repeated edges
       scene_graph->insertEdge(source_room, target_room);

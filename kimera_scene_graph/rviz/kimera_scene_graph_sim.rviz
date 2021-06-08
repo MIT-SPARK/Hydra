@@ -5,13 +5,13 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /TF1/Frames1
-        - /Centroids1/Status1
         - /Centroids1/Namespaces1
         - /InstanceIds1/Namespaces1
+        - /BoundingBoxes1
+        - /BoundingBoxes1/Status1
+        - /BoundingBoxes1/Namespaces1
         - /Edges1/Namespaces1
         - /EdgesCentroidToPcl1/Namespaces1
-        - /GT Odometry1/Shape1
-        - /Kimera Odometry1/Shape1
       Splitter Ratio: 0.7597087621688843
     Tree Height: 880
   - Class: rviz/Selection
@@ -96,7 +96,7 @@ Visualization Manager:
       Marker Topic: /kimera_scene_graph_eval_node/semantic_instance_centroid
       Name: Centroids
       Namespaces:
-        {}
+        layer_centroids: true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -104,7 +104,8 @@ Visualization Manager:
       Marker Topic: /kimera_scene_graph_eval_node/instance_ids
       Name: InstanceIds
       Namespaces:
-        {}
+        layer_4_text: true
+        layer_5_text: true
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -120,7 +121,7 @@ Visualization Manager:
       Marker Topic: /kimera_scene_graph_eval_node/bounding_boxes
       Name: BoundingBoxes
       Namespaces:
-        {}
+        bounding_box: true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -128,7 +129,9 @@ Visualization Manager:
       Marker Topic: /kimera_scene_graph_eval_node/edges_node_node
       Name: Edges
       Namespaces:
-        {}
+        graph_edges: true
+        layer_3_edges: true
+        layer_4_edges: true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -136,227 +139,8 @@ Visualization Manager:
       Marker Topic: /kimera_scene_graph_eval_node/edges_centroid_pcl
       Name: EdgesCentroidToPcl
       Namespaces:
-        {}
+        mesh_layer_edges: true
       Queue Size: 100
-      Value: true
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz/PointCloud
-      Color: 239; 41; 41
-      Color Transformer: FlatColor
-      Decay Time: 0
-      Enabled: true
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Max Intensity: 4096
-      Min Color: 0; 0; 0
-      Min Intensity: 0
-      Name: GraphCMRHumanDetections
-      Position Transformer: XYZ
-      Queue Size: 10
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.07000000029802322
-      Style: Flat Squares
-      Topic: /graph_cmr_ros_node/human_meshes_vis
-      Unreliable: false
-      Use Fixed Frame: true
-      Use rainbow: true
-      Value: true
-    - Alpha: 1
-      Buffer Length: 1
-      Class: rviz/Path
-      Color: 25; 255; 0
-      Enabled: true
-      Head Diameter: 0.30000001192092896
-      Head Length: 0.20000000298023224
-      Length: 0.5
-      Line Style: Lines
-      Line Width: 0.10000000149011612
-      Name: Camera Pose-Graph
-      Offset:
-        X: 0
-        Y: 0
-        Z: 0
-      Pose Color: 255; 85; 255
-      Pose Style: Axes
-      Radius: 0.10000000149011612
-      Shaft Diameter: 0.10000000149011612
-      Shaft Length: 0.30000001192092896
-      Topic: /kimera_scene_graph_eval_node/view_path_pub
-      Unreliable: true
-      Value: true
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz/PointCloud
-      Color: 78; 154; 6
-      Color Transformer: FlatColor
-      Decay Time: 0
-      Enabled: true
-      Invert Rainbow: false
-      Max Color: 32; 74; 135
-      Max Intensity: 4096
-      Min Color: 0; 0; 0
-      Min Intensity: 0
-      Name: OptimizedHumanDetections
-      Position Transformer: XYZ
-      Queue Size: 10
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.07000000029802322
-      Style: Flat Squares
-      Topic: /kimera_dynamic_scene_graph_node/optimized_human_meshes_vis
-      Unreliable: false
-      Use Fixed Frame: true
-      Use rainbow: true
-      Value: true
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz/PointCloud2
-      Color: 255; 255; 255
-      Color Transformer: RGB8
-      Decay Time: 0
-      Enabled: true
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Max Intensity: 4096
-      Min Color: 0; 0; 0
-      Min Intensity: 0
-      Name: Camera Poses
-      Position Transformer: XYZ
-      Queue Size: 10
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.30000001192092896
-      Style: Spheres
-      Topic: /kimera_scene_graph_eval_node/view_ptcloud_pub
-      Unreliable: false
-      Use Fixed Frame: true
-      Use rainbow: true
-      Value: true
-    - Class: rviz/Marker
-      Enabled: true
-      Marker Topic: /kimera_dynamic_scene_graph_node/all_graph_edges
-      Name: HumanGraphEdges
-      Namespaces:
-        {}
-      Queue Size: 100
-      Value: true
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz/PointCloud2
-      Color: 255; 255; 255
-      Color Transformer: RGB8
-      Decay Time: 0
-      Enabled: true
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Max Intensity: 4096
-      Min Color: 0; 0; 0
-      Min Intensity: 0
-      Name: HumanCentroids
-      Position Transformer: XYZ
-      Queue Size: 10
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.10000000149011612
-      Style: Flat Squares
-      Topic: /kimera_dynamic_scene_graph_node/all_human_centroids
-      Unreliable: false
-      Use Fixed Frame: true
-      Use rainbow: true
-      Value: true
-    - Angle Tolerance: 0.10000000149011612
-      Class: rviz/Odometry
-      Covariance:
-        Orientation:
-          Alpha: 0.5
-          Color: 255; 255; 127
-          Color Style: Unique
-          Frame: Local
-          Offset: 1
-          Scale: 1
-          Value: true
-        Position:
-          Alpha: 0.30000001192092896
-          Color: 204; 51; 204
-          Scale: 1
-          Value: true
-        Value: true
-      Enabled: true
-      Keep: 1000000
-      Name: GT Odometry
-      Position Tolerance: 0.10000000149011612
-      Shape:
-        Alpha: 1
-        Axes Length: 0.10000000149011612
-        Axes Radius: 0.009999999776482582
-        Color: 255; 25; 0
-        Head Length: 0.30000001192092896
-        Head Radius: 0.10000000149011612
-        Shaft Length: 1
-        Shaft Radius: 0.05000000074505806
-        Value: Axes
-      Topic: /tesse/odom
-      Unreliable: false
-      Value: true
-    - Angle Tolerance: 0.10000000149011612
-      Class: rviz/Odometry
-      Covariance:
-        Orientation:
-          Alpha: 0.5
-          Color: 255; 255; 127
-          Color Style: Unique
-          Frame: Local
-          Offset: 1
-          Scale: 1
-          Value: true
-        Position:
-          Alpha: 0.30000001192092896
-          Color: 204; 51; 204
-          Scale: 1
-          Value: true
-        Value: true
-      Enabled: true
-      Keep: 1000000
-      Name: Kimera Odometry
-      Position Tolerance: 0.10000000149011612
-      Shape:
-        Alpha: 1
-        Axes Length: 0.10000000149011612
-        Axes Radius: 0.009999999776482582
-        Color: 255; 25; 0
-        Head Length: 0.30000001192092896
-        Head Radius: 0.10000000149011612
-        Shaft Length: 1
-        Shaft Radius: 0.05000000074505806
-        Value: Axes
-      Topic: /kimera_vio_ros/odometry
-      Unreliable: false
       Value: true
   Enabled: true
   Global Options:
@@ -387,25 +171,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 46.84074401855469
+      Distance: 37.68202590942383
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 13.056052207946777
-        Y: -9.194031715393066
-        Z: 6.859407901763916
+        X: 16.51310157775879
+        Y: -3.9845616817474365
+        Z: 5.7294745445251465
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.13979625701904297
+      Pitch: 0.3147972822189331
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 1.0035587549209595
+      Yaw: 1.0935603380203247
     Saved: ~
 Window Geometry:
   Displays:
