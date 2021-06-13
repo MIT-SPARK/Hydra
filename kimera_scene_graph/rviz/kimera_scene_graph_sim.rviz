@@ -8,7 +8,6 @@ Panels:
         - /Centroids1/Namespaces1
         - /InstanceIds1/Namespaces1
         - /BoundingBoxes1
-        - /BoundingBoxes1/Status1
         - /BoundingBoxes1/Namespaces1
         - /Edges1/Namespaces1
         - /EdgesCentroidToPcl1/Namespaces1
@@ -104,6 +103,7 @@ Visualization Manager:
       Marker Topic: /kimera_scene_graph_eval_node/instance_ids
       Name: InstanceIds
       Namespaces:
+        layer_1_bounding_boxes: true
         layer_4_text: true
         layer_5_text: true
       Queue Size: 100
@@ -121,7 +121,7 @@ Visualization Manager:
       Marker Topic: /kimera_scene_graph_eval_node/bounding_boxes
       Name: BoundingBoxes
       Namespaces:
-        bounding_box: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -171,25 +171,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 37.68202590942383
+      Distance: 44.60392761230469
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 16.51310157775879
-        Y: -3.9845616817474365
-        Z: 5.7294745445251465
+        X: 14.154191017150879
+        Y: -4.19466495513916
+        Z: 10.333741188049316
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.3147972822189331
+      Pitch: 0.08479733020067215
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 1.0935603380203247
+      Yaw: 1.0885603427886963
     Saved: ~
 Window Geometry:
   Displays:

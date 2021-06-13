@@ -1,0 +1,22 @@
+# general
+z_offset_scale: 2.5
+visualize: true
+# nodes
+marker_scale: 0.2
+marker_alpha: 0.5
+use_sphere_marker: false
+use_label: false
+label_height: 1.0
+label_scale: 0.5
+use_bounding_box: false
+bounding_box_alpha: 0.5
+#edges
+use_edge_source: false
+interlayer_edge_scale: 0.1
+interlayer_edge_alpha: 0.4
+interlayer_edge_use_color: true
+interlayer_edge_insertion_skip: 0
+intralayer_edge_scale: 0.03
+intralayer_edge_alpha: 0.4
+intralayer_edge_use_color: false
+intralayer_edge_insertion_skip: 0

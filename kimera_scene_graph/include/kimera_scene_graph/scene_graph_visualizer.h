@@ -5,6 +5,7 @@
 
 #include <ros/ros.h>
 
+#include <dynamic_reconfigure/server.h>
 #include <kimera_dsg/scene_graph.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -14,30 +15,40 @@
 
 namespace kimera {
 
-// TODO(nathan) reconsider rviz visual tools
-
 class SceneGraphVisualizer {
  public:
+  using RqtMutexPtr = std::unique_ptr<boost::recursive_mutex>;
+  using LayerRqtServer = dynamic_reconfigure::Server<LayerConfig>;
+  using LayerRqtCb = LayerRqtServer::CallbackType;
+  using RqtServer = dynamic_reconfigure::Server<VisualizerConfig>;
+  using RqtCb = RqtServer::CallbackType;
+
   SceneGraphVisualizer(const ros::NodeHandle& nh,
-                       const ros::NodeHandle& nh_private);
+                       const ros::NodeHandle& nh_private,
+                       const SceneGraph::LayerIds& layer_ids);
 
   virtual ~SceneGraphVisualizer() = default;
 
-  // Visualization
-  inline void visualize(const SceneGraph& scene_graph) const {
-    visualizeImpl(scene_graph);
-  }
-
-  inline void updateEdgeAlpha(const float& alpha) { edge_alpha_ = alpha; }
+  void visualize(const SceneGraph::Ptr& scene_graph);
 
   void visualizeMesh(voxblox::MeshLayer* mesh,
                      voxblox::ColorMode color_mode,
-                     bool is_rgb_mesh = true) const;
+                     bool is_rgb_mesh = true,
+                     bool force_updated = true) const;
 
   void visualizeWalls(const voxblox::Mesh& mesh) const;
 
+  void clear();
+
  protected:
-  virtual void visualizeImpl(const SceneGraph& scene_graph) const;
+  void displayLoop(const ros::TimerEvent&);
+
+  void configUpdateCb(kimera_scene_graph::VisualizerConfig& config,
+                      uint32_t level);
+
+  void layerConfigUpdateCb(LayerId layer_id,
+                           LayerConfig& config,
+                           uint32_t level);
 
   void fillHeader(visualization_msgs::Marker& marker,
                   const ros::Time& current_time) const;
@@ -46,16 +57,45 @@ class SceneGraphVisualizer {
 
   void displayEdges(const SceneGraph& scene_graph) const;
 
-  visualization_msgs::Marker makeGraphEdgeMarkers(
-      const SceneGraph& scene_graph,
-      const std::map<LayerId, LayerConfig>& configs,
-      double scale = 0.07) const;
+  void handleCentroids(const SceneGraphLayer& layer,
+                       const LayerConfig& config,
+                       const ros::Time& current_time,
+                       visualization_msgs::MarkerArray& markers) const;
+
+  void handleMeshEdges(const SceneGraphLayer& layer,
+                       const LayerConfig& config,
+                       const ros::Time& current_time,
+                       visualization_msgs::MarkerArray& markers) const;
+
+  void handleLabels(const SceneGraphLayer& layer,
+                    const LayerConfig& config,
+                    const ros::Time& current_time,
+                    visualization_msgs::MarkerArray& markers) const;
+
+  void handleBoundingBoxes(const SceneGraphLayer& layer,
+                           const LayerConfig& config,
+                           const ros::Time& current_time,
+                           visualization_msgs::MarkerArray& markers) const;
 
  protected:
+  SceneGraph::Ptr scene_graph_;
+
   ros::NodeHandle nh_;
   ros::NodeHandle nh_private_;
 
-  // ROS publishers
+  bool need_redraw_;
+  std::string world_frame_;
+
+  ros::Timer visualizer_loop_timer_;
+
+  std::unique_ptr<RqtServer> config_server_;
+
+  std::map<LayerId, RqtMutexPtr> layer_config_server_mutexes_;
+  std::map<LayerId, std::unique_ptr<LayerRqtServer>> layer_config_servers_;
+  std::map<LayerId, LayerRqtCb> layer_config_cb_;
+  std::map<LayerId, LayerConfig> layer_configs_;
+  VisualizerConfig visualizer_config_;
+
   ros::Publisher semantic_instance_centroid_pub_;
   ros::Publisher bounding_box_pub_;
   ros::Publisher edges_centroid_pcl_pub_;
@@ -65,15 +105,6 @@ class SceneGraphVisualizer {
 
   ros::Publisher semantic_mesh_pub_;
   ros::Publisher rgb_mesh_pub_;
-
-  // Reference frame id
-  std::string world_frame_;
-
-  // Visualization params.
-  double edge_alpha_ = 0.01;
-
-  // Step in Z axis for the different layers of the scene graph
-  double layer_step_z_ = 15;
 };
 
 }  // namespace kimera

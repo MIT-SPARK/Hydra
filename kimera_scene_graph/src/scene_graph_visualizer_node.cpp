@@ -1,5 +1,7 @@
-#include <ros/ros.h>
 #include "kimera_scene_graph/scene_graph_visualizer.h"
+
+#include <ros/ros.h>
+#include <kimera_dsg/scene_graph.h>
 
 #include <glog/logging.h>
 
@@ -17,12 +19,13 @@ int main(int argc, char** argv) {
   nh_private.param(
       "scene_graph_input_path", scene_graph_input_path, scene_graph_input_path);
 
-  kimera::SceneGraphVisualizer scene_graph_visualizer(nh, nh_private);
+  kimera::SceneGraphVisualizer scene_graph_visualizer(
+      nh, nh_private, kimera::getDefaultLayerIds());
 
   CHECK(!scene_graph_input_path.empty()) << "Empty scene graph input path...";
   VLOG(1) << "Loading scene graph from: " << scene_graph_input_path.c_str();
-  kimera::SceneGraph scene_graph;
-  //kimera::load(scene_graph_input_path, &scene_graph);
+  kimera::SceneGraph::Ptr scene_graph(new kimera::SceneGraph());
+  // kimera::load(scene_graph_input_path, &scene_graph);
 
   VLOG(1) << "Starting scene graph visualizer.";
   scene_graph_visualizer.visualize(scene_graph);

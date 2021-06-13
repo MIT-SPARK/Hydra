@@ -7,21 +7,19 @@
 namespace kimera {
 
 using visualization_msgs::Marker;
+using visualization_msgs::MarkerArray;
 using Node = SceneGraphLayer::Node;
 
-// TODO(nathan) replace everything with tf2 conversions
+namespace {
 
-void fillPoseWithIdentity(geometry_msgs::Pose& pose) {
-  pose.position.x = 0.0;
-  pose.position.y = 0.0;
-  pose.position.z = 0.0;
-  pose.orientation.x = 0.0;
-  pose.orientation.y = 0.0;
-  pose.orientation.z = 0.0;
-  pose.orientation.w = 1.0;
+inline void fillPoseWithIdentity(geometry_msgs::Pose& pose) {
+  Eigen::Vector3d identity_pos = Eigen::Vector3d::Zero();
+  tf2::convert(identity_pos, pose.position);
+  tf2::convert(Eigen::Quaterniond::Identity(), pose.orientation);
 }
 
-std_msgs::ColorRGBA makeColorMsg(const NodeColor& color, double alpha) {
+inline std_msgs::ColorRGBA makeColorMsg(const NodeColor& color,
+                                        double alpha = 1.0) {
   std_msgs::ColorRGBA msg;
   msg.r = static_cast<double>(color(0)) / 255.0;
   msg.g = static_cast<double>(color(1)) / 255.0;
@@ -30,56 +28,59 @@ std_msgs::ColorRGBA makeColorMsg(const NodeColor& color, double alpha) {
   return msg;
 }
 
+inline double getZOffset(const LayerConfig& config,
+                         const VisualizerConfig& visualizer_config) {
+  if (visualizer_config.collapse) {
+    return 0.0;
+  }
+
+  return config.z_offset_scale * visualizer_config.layer_z_step;
+}
+
+}  // namespace
+
 Marker makeBoundingBoxMarker(const LayerConfig& config,
                              const Node& node,
+                             const VisualizerConfig& visualizer_config,
                              const std::string& marker_namespace) {
-  // TODO(nathan) think about direct cast to object attributes
   Marker marker;
   marker.type = Marker::CUBE;
   marker.action = Marker::ADD;
-
   marker.id = node.id;
   marker.ns = marker_namespace;
+  marker.color = makeColorMsg(node.attributes<SemanticNodeAttributes>().color,
+                              config.bounding_box_alpha);
 
   BoundingBox bounding_box =
       node.attributes<ObjectNodeAttributes>().bounding_box;
 
   switch (bounding_box.type) {
     case BoundingBox::Type::OBB:
-      marker.pose.position.x = bounding_box.world_P_center(0);
-      marker.pose.position.y = bounding_box.world_P_center(1);
-      marker.pose.position.z = bounding_box.world_P_center(2) + config.z_offset;
-      marker.pose.orientation.x = bounding_box.world_R_center.x();
-      marker.pose.orientation.y = bounding_box.world_R_center.y();
-      marker.pose.orientation.z = bounding_box.world_R_center.z();
-      marker.pose.orientation.w = bounding_box.world_R_center.w();
+      marker.pose.position =
+          tf2::toMsg(bounding_box.world_P_center.cast<double>().eval());
+      tf2::convert(bounding_box.world_R_center.cast<double>(),
+                   marker.pose.orientation);
+      marker.pose.position.z += getZOffset(config, visualizer_config);
       break;
     case BoundingBox::Type::AABB:
-      marker.pose.position.x = bounding_box.world_P_center(0);
-      marker.pose.position.y = bounding_box.world_P_center(1);
-      marker.pose.position.z = bounding_box.world_P_center(2) + config.z_offset;
-      marker.pose.orientation.x = 0.0;
-      marker.pose.orientation.y = 0.0;
-      marker.pose.orientation.z = 0.0;
-      marker.pose.orientation.w = 1.0;
+      marker.pose.position =
+          tf2::toMsg(bounding_box.world_P_center.cast<double>().eval());
+      tf2::convert(Eigen::Quaterniond::Identity(), marker.pose.orientation);
+      marker.pose.position.z += getZOffset(config, visualizer_config);
       break;
     default:
       ROS_ERROR("Invalid bounding box encountered!");
       break;
   }
 
-  marker.scale.x = bounding_box.max(0) - bounding_box.min(0);
-  marker.scale.y = bounding_box.max(1) - bounding_box.min(1);
-  marker.scale.z = bounding_box.max(2) - bounding_box.min(2);
-
-  marker.color = makeColorMsg(node.attributes<SemanticNodeAttributes>().color,
-                              config.bounding_box_alpha);
-
+  tf2::toMsg((bounding_box.max - bounding_box.min).cast<double>().eval(),
+             marker.scale);
   return marker;
 }
 
 Marker makeTextMarker(const LayerConfig& config,
                       const Node& node,
+                      const VisualizerConfig& visualizer_config,
                       const std::string& marker_namespace) {
   Marker marker;
   marker.ns = marker_namespace;
@@ -87,21 +88,21 @@ Marker makeTextMarker(const LayerConfig& config,
   marker.type = Marker::TEXT_VIEW_FACING;
   marker.action = Marker::ADD;
   marker.lifetime = ros::Duration(0);
+  marker.text = NodeSymbol(node.id).getLabel();
+  marker.scale.z = config.label_scale;
+  marker.color = makeColorMsg(NodeColor::Zero());
 
   fillPoseWithIdentity(marker.pose);
-  Eigen::Vector3d position = node.attributes().position;
-  position(2) += config.z_offset + config.text_height;
-  tf2::convert(position, marker.pose.position);
-
-  marker.text = NodeSymbol(node.id).getLabel();
-  marker.scale.z = config.text_scale;
-  marker.color = makeColorMsg(NodeColor::Zero());
+  tf2::convert(node.attributes().position, marker.pose.position);
+  marker.pose.position.z +=
+      getZOffset(config, visualizer_config) + config.label_height;
 
   return marker;
 }
 
 Marker makeCentroidMarkers(const LayerConfig& config,
                            const SceneGraphLayer& layer,
+                           const VisualizerConfig& visualizer_config,
                            std::optional<NodeColor> layer_color,
                            const std::string& marker_namespace) {
   Marker marker;
@@ -121,20 +122,17 @@ Marker makeCentroidMarkers(const LayerConfig& config,
   marker.points.reserve(layer.numNodes());
   marker.colors.reserve(layer.numNodes());
   for (const auto& id_node_pair : layer.nodes) {
-    Eigen::Vector3d position = id_node_pair.second->attributes().position;
-    position(2) += config.z_offset;
-
     geometry_msgs::Point node_centroid;
-    tf2::convert(position, node_centroid);
-
+    tf2::convert(id_node_pair.second->attributes().position, node_centroid);
+    node_centroid.z += getZOffset(config, visualizer_config);
     marker.points.push_back(node_centroid);
 
     // get the color of the node
+    // TODO(nathan) refactor or pull out into function
     NodeColor desired_color;
     if (layer_color) {
       desired_color = *layer_color;
     } else if (!node_colors_valid) {
-      // TODO(nathan) not ideal, but maybe not much we can do about it
       desired_color << 1.0, 0.0, 0.0;
     } else {
       try {
@@ -142,7 +140,6 @@ Marker makeCentroidMarkers(const LayerConfig& config,
             id_node_pair.second->attributes<SemanticNodeAttributes>().color;
       } catch (const std::bad_cast) {
         node_colors_valid = false;
-        // TODO(nathan) not ideal, but maybe not much we can do about it
         desired_color << 1.0, 0.0, 0.0;
       }
     }
@@ -153,18 +150,112 @@ Marker makeCentroidMarkers(const LayerConfig& config,
   return marker;
 }
 
+namespace {
+
+inline Marker makeNewEdgeList(const LayerConfig& config, LayerId layer_id) {
+  Marker marker;
+  marker.type = Marker::LINE_LIST;
+  if (config.visualize) {
+    marker.action = Marker::ADD;
+  } else {
+    marker.action = Marker::DELETE;
+  }
+  marker.id = layer_id;
+  marker.ns = "graph_edges";
+  marker.scale.x = config.interlayer_edge_scale;
+  fillPoseWithIdentity(marker.pose);
+  return marker;
+}
+
+}  // namespace
+
+MarkerArray makeGraphEdgeMarkers(const SceneGraph& graph,
+                                 const std::map<LayerId, LayerConfig>& configs,
+                                 const VisualizerConfig& visualizer_config) {
+  MarkerArray layer_edges;
+  std::map<LayerId, Marker> layer_markers;
+  std::map<LayerId, size_t> num_since_last_insertion;
+
+  for (const auto& edge : graph.inter_layer_edges) {
+    const Node& source = *(graph.getNode(edge.second.source));
+    const Node& target = *(graph.getNode(edge.second.target));
+
+    // parent is always source
+    // TODO(nathan) make the above statement an invariant
+    if (layer_markers.count(source.layer) == 0) {
+      layer_markers[source.layer] =
+          makeNewEdgeList(configs.at(source.layer), source.layer);
+      if (!configs.at(target.layer).visualize) {
+        // TODO(nathan) this assumes only adjacent layer edges
+        layer_markers[source.layer].action = Marker::DELETE;
+      }
+      num_since_last_insertion[source.layer] = 0;
+    }
+
+    if (!configs.at(source.layer).visualize) {
+      continue;
+    }
+
+    if (!configs.at(target.layer).visualize) {
+      continue;
+    }
+
+    size_t num_between_insertions =
+        configs.at(source.layer).interlayer_edge_insertion_skip;
+    if (num_since_last_insertion[source.layer] >= num_between_insertions) {
+      num_since_last_insertion[source.layer] = 0;
+    } else {
+      num_since_last_insertion[source.layer]++;
+      continue;
+    }
+
+    Marker& marker = layer_markers.at(source.layer);
+    geometry_msgs::Point source_point;
+    tf2::convert(source.attributes().position, source_point);
+    source_point.z += getZOffset(configs.at(source.layer), visualizer_config);
+    marker.points.push_back(source_point);
+
+    geometry_msgs::Point target_point;
+    tf2::convert(target.attributes().position, target_point);
+    target_point.z += getZOffset(configs.at(target.layer), visualizer_config);
+    marker.points.push_back(target_point);
+
+    NodeColor edge_color;
+    if (configs.at(source.layer).interlayer_edge_use_color) {
+      if (configs.at(source.layer).use_edge_source) {
+        // TODO(nathan) this might not be a safe cast in general
+        edge_color = source.attributes<SemanticNodeAttributes>().color;
+      } else {
+        // TODO(nathan) this might not be a safe cast in general
+        edge_color = target.attributes<SemanticNodeAttributes>().color;
+      }
+    } else {
+      edge_color = NodeColor::Zero();
+    }
+
+    marker.colors.push_back(makeColorMsg(
+        edge_color, configs.at(source.layer).intralayer_edge_alpha));
+    marker.colors.push_back(makeColorMsg(
+        edge_color, configs.at(source.layer).intralayer_edge_alpha));
+  }
+
+  for (const auto& id_marker_pair : layer_markers) {
+    layer_edges.markers.push_back(id_marker_pair.second);
+  }
+  return layer_edges;
+}
+
 Marker makeMeshEdgesMarker(const LayerConfig& config,
                            const SceneGraphLayer& layer,
-                           double secondary_offset,
-                           double mesh_offset) {
+                           const VisualizerConfig& visualizer_config,
+                           const std::string& marker_namespace) {
   Marker marker;
   marker.type = Marker::LINE_LIST;
   marker.action = Marker::ADD;
-  // TODO(nathan) these probably should be arguments
-  marker.id = 0;
-  marker.ns = "mesh_layer_edges";
+  marker.id = layer.id;
+  marker.ns = marker_namespace;
 
-  marker.scale.x = config.edge_scale;
+  marker.scale.x = config.interlayer_edge_scale;
   fillPoseWithIdentity(marker.pose);
 
   for (const auto& id_node_pair : layer.nodes) {
@@ -176,23 +267,26 @@ Marker makeMeshEdgesMarker(const LayerConfig& config,
 
     geometry_msgs::Point center_point;
     tf2::convert(attrs.position, center_point);
-    center_point.z += secondary_offset;
+    center_point.z += visualizer_config.mesh_edge_break_ratio *
+                      getZOffset(config, visualizer_config);
 
     geometry_msgs::Point centroid_location;
     tf2::convert(attrs.position, centroid_location);
-    centroid_location.z += config.z_offset;
+    centroid_location.z += getZOffset(config, visualizer_config);
 
     // make first edge
     marker.points.push_back(centroid_location);
     marker.points.push_back(center_point);
     if (config.interlayer_edge_use_color) {
-      marker.colors.push_back(makeColorMsg(attrs.color, config.edge_alpha));
-      marker.colors.push_back(makeColorMsg(attrs.color, config.edge_alpha));
+      marker.colors.push_back(
+          makeColorMsg(attrs.color, config.interlayer_edge_alpha));
+      marker.colors.push_back(
+          makeColorMsg(attrs.color, config.interlayer_edge_alpha));
     } else {
       marker.colors.push_back(
-          makeColorMsg(NodeColor::Zero(), config.edge_alpha));
+          makeColorMsg(NodeColor::Zero(), config.interlayer_edge_alpha));
       marker.colors.push_back(
-          makeColorMsg(NodeColor::Zero(), config.edge_alpha));
+          makeColorMsg(NodeColor::Zero(), config.interlayer_edge_alpha));
     }
 
     for (size_t i = 0; i < attrs.points->size();
@@ -200,19 +294,24 @@ Marker makeMeshEdgesMarker(const LayerConfig& config,
       geometry_msgs::Point vertex;
       vertex.x = attrs.points->at(i).x;
       vertex.y = attrs.points->at(i).y;
-      vertex.z = attrs.points->at(i).z + mesh_offset;
+      vertex.z = attrs.points->at(i).z;
+      if (!visualizer_config.collapse) {
+        vertex.z += visualizer_config.mesh_layer_offset;
+      }
 
       marker.points.push_back(center_point);
       marker.points.push_back(vertex);
 
       if (config.interlayer_edge_use_color) {
-        marker.colors.push_back(makeColorMsg(attrs.color, config.edge_alpha));
-        marker.colors.push_back(makeColorMsg(attrs.color, config.edge_alpha));
+        marker.colors.push_back(
+            makeColorMsg(attrs.color, config.interlayer_edge_alpha));
+        marker.colors.push_back(
+            makeColorMsg(attrs.color, config.interlayer_edge_alpha));
       } else {
         marker.colors.push_back(
-            makeColorMsg(NodeColor::Zero(), config.edge_alpha));
+            makeColorMsg(NodeColor::Zero(), config.interlayer_edge_alpha));
         marker.colors.push_back(
-            makeColorMsg(NodeColor::Zero(), config.edge_alpha));
+            makeColorMsg(NodeColor::Zero(), config.interlayer_edge_alpha));
       }
     }
   }
@@ -222,29 +321,33 @@ Marker makeMeshEdgesMarker(const LayerConfig& config,
 
 Marker makeLayerEdgeMarkers(const LayerConfig& config,
                             const SceneGraphLayer& layer,
+                            const VisualizerConfig& visualizer_config,
                             const NodeColor& color) {
   Marker marker;
   marker.type = Marker::LINE_LIST;
-  marker.action = Marker::ADD;
   marker.id = 0;
   marker.ns = "layer_" + std::to_string(layer.id) + "_edges";
-  marker.scale.x = config.edge_scale;
-  marker.color = makeColorMsg(color, config.edge_alpha);
+
+  if (!config.visualize) {
+    marker.action = Marker::DELETE;
+    return marker;
+  }
+
+  marker.action = Marker::ADD;
+  marker.scale.x = config.intralayer_edge_scale;
+  marker.color = makeColorMsg(color, config.intralayer_edge_alpha);
   fillPoseWithIdentity(marker.pose);
 
   auto edge_iter = layer.edges.begin();
   while (edge_iter != layer.edges.end()) {
-    Eigen::Vector3d source_pos = layer.getPosition(edge_iter->second.source);
-    source_pos(2) += config.z_offset;
-    Eigen::Vector3d target_pos = layer.getPosition(edge_iter->second.target);
-    target_pos(2) += config.z_offset;
-
     geometry_msgs::Point source;
-    tf2::convert(source_pos, source);
-    geometry_msgs::Point target;
-    tf2::convert(target_pos, target);
-
+    tf2::convert(layer.getPosition(edge_iter->second.source), source);
+    source.z += getZOffset(config, visualizer_config);
     marker.points.push_back(source);
+
+    geometry_msgs::Point target;
+    tf2::convert(layer.getPosition(edge_iter->second.target), target);
+    target.z += getZOffset(config, visualizer_config);
     marker.points.push_back(target);
 
     std::advance(edge_iter, config.intralayer_edge_insertion_skip + 1);
@@ -254,6 +357,7 @@ Marker makeLayerEdgeMarkers(const LayerConfig& config,
 }
 
 Marker makeMeshMarker(const LayerConfig& config,
+                      const VisualizerConfig& visualizer_config,
                       const voxblox::Mesh& mesh,
                       voxblox::ColorMode color_mode,
                       const std::string& marker_namespace) {
@@ -269,7 +373,7 @@ Marker makeMeshMarker(const LayerConfig& config,
     geometry_msgs::Point point;
     Eigen::Vector3d vertex_pos = mesh.vertices.at(i).cast<double>();
     tf2::convert(vertex_pos, point);
-    point.z += config.z_offset;
+    point.z += getZOffset(config, visualizer_config);
     marker.points.push_back(point);
 
     std_msgs::ColorRGBA color = voxblox::getVertexColor(mesh, color_mode, i);

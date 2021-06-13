@@ -43,7 +43,6 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
       mesh_pub_(),
       polygon_mesh_pub_(),
       sparse_graph_pub_(),
-      edges_obj_skeleton_pub_(),
       world_frame_("world"),
       scene_graph_output_path_(""),
       semantic_pcl_pubs_("pcl", nh_private),
@@ -54,7 +53,7 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
       object_finder_(nullptr),
       room_finder_(nullptr),
       scene_graph_(nullptr),
-      visualizer_(nh, nh_private_),
+      visualizer_(nh, nh_private_, getDefaultLayerIds()),
       semantic_config_(
           getSemanticTsdfIntegratorConfigFromRosParam(nh_private)) {
   // dynamic_scene_graph_(nh, nh_private) {
@@ -77,6 +76,11 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
       new vxb::Layer<vxb::TsdfVoxel>(voxel_size_, voxels_per_side_));
   esdf_layer_.reset(
       new vxb::Layer<vxb::EsdfVoxel>(voxel_size_, voxels_per_side_));
+
+  // purple-ish
+  default_building_color_ = std::vector<int>{169, 8, 194};
+  nh_private_.getParam("default_building_color", default_building_color_);
+  CHECK_EQ(3u, default_building_color_.size()) << "Color must be three elements";
 
   // Load RGB TSDF for RGB mesh, overkill...
   double rgb_voxel_size = 0.025;
@@ -140,9 +144,6 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
       nh_private_.advertise<voxblox_msgs::Mesh>("rgb_mesh", 1, true);
   polygon_mesh_pub_ = nh_private_.advertise<pcl_msgs::PolygonMesh>(
       "polygon_semantic_mesh", 1, true);
-  edges_obj_skeleton_pub_ =
-      nh_private_.advertise<visualization_msgs::MarkerArray>(
-          "obj_skeleton_edges", 1, true);
 
   // Attach rqt reconfigure
   rqt_callback_ =
@@ -155,6 +156,11 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
       "reconstruct_scene_graph",
       &SceneGraphBuilder::sceneGraphReconstructionServiceCall,
       this);
+
+  // Add rosservice to reconstruct scene graph, this avoids having to
+  // rebuild the simulation world and reintegrate the generated pointclouds.
+  visualizer_srv_ = nh_private_.advertiseService(
+      "visualize", &SceneGraphBuilder::visualizerServiceCall, this);
 }
 
 bool SceneGraphBuilder::sceneGraphReconstructionServiceCall(
@@ -163,6 +169,19 @@ bool SceneGraphBuilder::sceneGraphReconstructionServiceCall(
   LOG(INFO) << "Requested scene graph reconstruction.";
   scene_graph_->clear();
   sceneGraphReconstruction();
+  return true;
+}
+
+bool SceneGraphBuilder::visualizerServiceCall(
+    std_srvs::Trigger::Request&,
+    std_srvs::Trigger::Response& resp) {
+  if (scene_graph_) {
+    visualize();
+    resp.success = true;
+  } else {
+    resp.success = false;
+    resp.message = "scene graph not initialized";
+  }
   return true;
 }
 
@@ -327,7 +346,10 @@ void SceneGraphBuilder::sceneGraphReconstruction() {
   VLOG(1) << "Finished Room finding.";
 
   VLOG(1) << "Start Building finding.";
-  findBuildings(scene_graph_.get());
+  NodeColor building_color;
+  building_color << default_building_color_.at(0),
+      default_building_color_.at(1), default_building_color_.at(2);
+  findBuildings(scene_graph_.get(), building_color);
   VLOG(1) << "Finished Building finding.";
 
   VLOG(1) << "Start Places Segmentation";
@@ -364,13 +386,16 @@ void SceneGraphBuilder::sceneGraphReconstruction() {
   }
 }
 
-void SceneGraphBuilder::visualize() const {
+void SceneGraphBuilder::visualize() {
+  // TODO(nathan) fix exception here
+  // visualizer_.clear();
+
   if (!scene_graph_) {
     ROS_ERROR("Scene graph wasn't constructed yet. Not visualizing");
     return;
   }
 
-  visualizer_.visualize(*scene_graph_);
+  visualizer_.visualize(scene_graph_);
 
   if (rgb_mesh_) {
     visualizer_.visualizeMesh(
@@ -568,10 +593,6 @@ void SceneGraphBuilder::rqtReconfigureCallback(RqtSceneGraphConfig& config,
   object_finder_->updateRegionGrowingParams(rg_params);
 
   ROS_INFO_STREAM("Object finder: " << *object_finder_);
-
-  CHECK(scene_graph_);
-  visualizer_.updateEdgeAlpha(config.edge_alpha);
-  // TODO(nathan) we probably still want to visualize here
 
   ROS_WARN("Parameters updated. Reconstruct scene graph to see the effects.");
 }

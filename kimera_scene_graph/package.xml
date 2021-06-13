@@ -11,11 +11,6 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
-  <!-- message dependencies -->
-  <build_depend>message_generation</build_depend>
-  <build_export_depend>message_runtime</build_export_depend>
-  <exec_depend>message_runtime</exec_depend>
-
   <!-- standard dependencies -->
   <depend>roscpp</depend>
   <depend>dynamic_reconfigure</depend>
@@ -45,8 +40,6 @@
   <!--<depend>pcl_conversions</depend>-->
   <!--<depend>pcl_ros</depend>-->
   <!--<depend>geometry_msgs</depend>-->
-  <!--<depend>actionlib</depend>-->
-  <!--<depend>actionlib_msgs</depend>-->
   <!--<depend>sensor_msgs</depend>-->
   <!--<depend>tf</depend>-->
   <!--<depend>rviz_visual_tools</depend>-->

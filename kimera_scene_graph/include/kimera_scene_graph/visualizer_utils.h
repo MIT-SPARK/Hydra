@@ -2,7 +2,9 @@
 #include "kimera_scene_graph/common.h"
 
 #include <kimera_dsg/node_attributes.h>
-#include <kimera_dsg/scene_graph_layer.h>
+#include <kimera_dsg/scene_graph.h>
+#include <kimera_scene_graph/LayerVisualizerConfig.h>
+#include <kimera_scene_graph/VisualizerConfig.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <voxblox_ros/mesh_vis.h>
@@ -10,52 +12,45 @@
 namespace kimera {
 
 using NodeColor = SemanticNodeAttributes::ColorVector;
-
-struct LayerConfig {
-  double z_offset = 0.0;
-  double marker_scale = 0.1;
-  double marker_alpha = 1.0;
-  bool use_sphere_marker = false;
-  double edge_scale = 0.03;
-  double edge_alpha = 1.0;
-  bool use_label = false;
-  double text_height = 1.0;
-  double text_scale = 0.5;
-  size_t intralayer_edge_insertion_skip = 0;
-  size_t interlayer_edge_insertion_skip = 0;
-  bool interlayer_edge_use_color = false;
-  double bounding_box_alpha = 0.5;
-  bool use_edge_source = true;
-};
-
-std_msgs::ColorRGBA makeColorMsg(const NodeColor& color, double alpha = 1.0);
-
-void fillPoseWithIdentity(geometry_msgs::Pose& pose);
+using LayerConfig = kimera_scene_graph::LayerVisualizerConfig;
+using VisualizerConfig = kimera_scene_graph::VisualizerConfig;
 
 visualization_msgs::Marker makeBoundingBoxMarker(
     const LayerConfig& config,
     const SceneGraphNode& node,
+    const VisualizerConfig& visualizer_config,
     const std::string& marker_namespace = "bounding_box");
 
 visualization_msgs::Marker makeTextMarker(
     const LayerConfig& config,
     const SceneGraphNode& node,
+    const VisualizerConfig& visualizer_config,
     const std::string& marker_namespace = "text_label");
 
 visualization_msgs::Marker makeCentroidMarkers(
     const LayerConfig& config,
     const SceneGraphLayer& layer,
+    const VisualizerConfig& visualizer_config,
     std::optional<NodeColor> layer_color = std::nullopt,
     const std::string& marker_namespace = "layer_centroids");
 
-visualization_msgs::Marker makeMeshEdgesMarker(const LayerConfig& config,
-                                               const SceneGraphLayer& layer,
-                                               double secondary_offset,
-                                               double mesh_offset);
+visualization_msgs::MarkerArray makeGraphEdgeMarkers(
+    const SceneGraph& scene_graph,
+    const std::map<LayerId, LayerConfig>& configs,
+    const VisualizerConfig& visualizer_config);
 
-visualization_msgs::Marker makeLayerEdgeMarkers(const LayerConfig& config,
-                                                const SceneGraphLayer& layer,
-                                                const NodeColor& color);
+// TODO(nathan) this will get merged with other functions probably
+visualization_msgs::Marker makeMeshEdgesMarker(
+    const LayerConfig& config,
+    const SceneGraphLayer& layer,
+    const VisualizerConfig& visualizer_config,
+    const std::string& marker_namespace = "mesh_layer_edges");
+
+visualization_msgs::Marker makeLayerEdgeMarkers(
+    const LayerConfig& config,
+    const SceneGraphLayer& layer,
+    const VisualizerConfig& visualizer_config,
+    const NodeColor& color);
 
 /**
  * @brief construct an rviz marker for the provided mesh
@@ -65,6 +60,7 @@ visualization_msgs::Marker makeLayerEdgeMarkers(const LayerConfig& config,
  */
 visualization_msgs::Marker makeMeshMarker(
     const LayerConfig& config,
+    const VisualizerConfig& visualizer_config,
     const voxblox::Mesh& mesh,
     voxblox::ColorMode color_mode,
     const std::string& marker_namespace = "mesh");

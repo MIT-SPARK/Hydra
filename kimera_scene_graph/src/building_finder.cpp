@@ -7,14 +7,14 @@ namespace kimera {
 
 //  TODO(Toni): assumes we only have one building, ideally get the sub-graph
 // spanned by the inter-class room traversability edges.
-void findBuildings(SceneGraph* scene_graph) {
+void findBuildings(SceneGraph* scene_graph, const NodeColor& color) {
   CHECK_NOTNULL(scene_graph);
 
   // TODO(nathan) consider unique class for buildings
   RoomNodeAttributes::Ptr building_attrs =
       std::make_unique<RoomNodeAttributes>();
   building_attrs->semantic_label = kBuildingSemanticLabel;
-  building_attrs->color << 255u, 0u, 0u;
+  building_attrs->color = color;
 
   NodeSymbol building_id('B', 1u);
   building_attrs->name = std::to_string(building_id);

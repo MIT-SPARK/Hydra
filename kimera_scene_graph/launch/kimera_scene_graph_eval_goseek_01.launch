@@ -3,6 +3,7 @@
   <arg name="voxel_size"     default="0.05"/>
 
   <arg name="sensor_frame" default="left_cam"/>
+  <arg name="world_frame" default="world"/>
 
   <arg name="scene" default="scene5"/>
   <arg name="data_path" default="/home/ubuntu/datasets/tesse_goseek"/>
@@ -23,8 +24,7 @@
   <arg name="debug" default="false"/>
   <arg name="launch-prefix" default="gdb --args" if="$(arg debug)"/>
   <arg name="launch-prefix" default="" unless="$(arg debug)"/>
-  <!-- Send colored pointcloud with scene_graph to kimera_scene_graph for 3D segmentation -->
-  <!--launch-prefix="gdb -ex run args"-->
+
   <node name="kimera_scene_graph_eval_node"
         pkg="kimera_scene_graph"
         type="scene_graph_eval"
@@ -32,28 +32,29 @@
         launch-prefix="$(arg launch-prefix)"
         required="true"
         args="-alsologtostderr -colorlogtostderr -v=$(arg verbosity)">
+    <!--    2.1- scenes 1-4 -->
     <param name="room_finder_esdf_slice_level"       value="2.05"/>
-<!--    2.1- scenes 1-4 -->
 
     <!-- Object Finder Type: 0: region growing, 1: euclidean clustering -->
     <param name="object_finder_type"                 value="1"/>
 
-    <param name="visualize"                          value="true"/>
+    <!-- visualizer -->
+    <param name="layer_step_z" value="5"/>
+    <rosparam file="$(find kimera_scene_graph)/config/visualizer/objects_layer.yaml" ns="layer1"/>
+    <rosparam file="$(find kimera_scene_graph)/config/visualizer/places_layer.yaml" ns="layer3"/>
+    <rosparam file="$(find kimera_scene_graph)/config/visualizer/rooms_layer.yaml" ns="layer4"/>
+    <rosparam file="$(find kimera_scene_graph)/config/visualizer/buildings_layer.yaml" ns="layer5"/>
+
     <param name="tsdf_voxel_size"                    value="0.05"/>
     <param name="tsdf_voxels_per_side"               value="32"/>
     <param name="rgb_tsdf_voxel_size"                value="0.05"/>
     <param name="rgb_tsdf_voxels_per_side"           value="32"/>
-    <param name="incremental"                        value="false"/>
     <param name="add_robot_pose"                     value="false"/>
     <param name="generate_mesh"                      value="true"/>
-    <param name="num_viewpoints"                     value="50"/>
     <param name="truncation_distance"                value="0.4"/>
     <param name="esdf_min_distance_m"                value="0.2"/>
-    <param name="verbose"                            value="true"/>
-    <param name="max_attempts_to_generate_viewpoint" value="20"/>
-    <param name="world_frame"                        value="world"/>
+    <param name="world_frame"                        value="$(arg world_frame)"/>
     <param name="scene_graph_output_path"            value="$(find kimera_scene_graph)/vxblx_files/goseek_scene_graph.vxblx"/>
-    <param name="layer_step_z"                       value="5"/>
 
     <!-- Params -->
     <param name="max_ray_length_m"          value="10.0" />
@@ -85,16 +86,23 @@
     <!-- Whether to rebuild the esdf layer from scratch -->
     <param name="build_esdf_batch" value="false"/>
 
-    <!-- Is this needed? -->
-    <param name="slice_level" value="1.0" />
-
     <param name="semantic_label_2_color_csv_filepath" value="$(arg semantic_map_path)"/>
 
     <param name="publish_pointclouds"     value="true"/>
-    <param name="update_mesh_every_n_sec" value="0.1" />
-    <param name="mesh_filename"           value="$(find kimera_semantics_ros)/mesh_results/$(anon tesse).ply" />
+    <param name="update_mesh_every_n_sec" value="0.1"/>
+    <param name="mesh_filename"           value="$(find kimera_semantics_ros)/mesh_results/$(anon tesse).ply"/>
   </node>
 
   <!-- Publish a static tf to visualize scene-graph in orthographic projection sideways -->
-  <node pkg="tf" type="static_transform_publisher" name="link1_broadcaster" args="0 0 0 0.707 0 0 0.707 world rviz_ortho 100" />
+  <node pkg="tf2_ros"
+        type="static_transform_publisher"
+        name="ortho_tf_publisher"
+        args="0 0 0 0.707 0 0 0.707 $(arg world_frame) rviz_ortho"/>
+
+  <!-- Publish a static tf to visualize scene-graph top-down -->
+  <node pkg="tf2_ros"
+        type="static_transform_publisher"
+        name="topdown_tf_publisher"
+        args="0 0 0 0 0.707 0 0.707 $(arg world_frame) rviz_topdown"/>
+
 </launch>

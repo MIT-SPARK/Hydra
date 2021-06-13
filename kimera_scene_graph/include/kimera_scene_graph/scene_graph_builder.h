@@ -19,6 +19,7 @@
 #include <std_srvs/EmptyRequest.h>
 #include <std_srvs/EmptyResponse.h>
 #include <std_srvs/SetBool.h>
+#include <std_srvs/Trigger.h>
 
 #include <iostream>
 #include <map>
@@ -45,6 +46,9 @@ class SceneGraphBuilder {
       std_srvs::SetBool::Request& request,
       std_srvs::SetBool::Response& response);
 
+  bool visualizerServiceCall(std_srvs::Trigger::Request&,
+                             std_srvs::Trigger::Response& resp);
+
   void sceneGraphReconstruction();
 
   inline bool loadSceneGraph(const std::string& /*file_path*/) const {
@@ -60,7 +64,7 @@ class SceneGraphBuilder {
    */
   SceneGraph::Ptr getSceneGraph() { return scene_graph_; }
 
-  void visualize() const;
+  void visualize();
 
  protected:
   void rqtReconfigureCallback(RqtSceneGraphConfig& config, uint32_t level);
@@ -99,9 +103,6 @@ class SceneGraphBuilder {
   ros::Publisher polygon_mesh_pub_;
   ros::Publisher sparse_graph_pub_;
 
-  // TODO(Toni): This guy should be in the scene graph visualization itself
-  ros::Publisher edges_obj_skeleton_pub_;
-
   std::string world_frame_;
   std::string scene_graph_output_path_;
   float room_finder_esdf_slice_level_;
@@ -120,11 +121,15 @@ class SceneGraphBuilder {
 
   // Dynamically request a scene graph reconstruction
   ros::ServiceServer reconstruct_scene_graph_srv_;
+  ros::ServiceServer visualizer_srv_;
 
   // Finders
   std::unique_ptr<EnclosingWallFinder> enclosing_wall_finder_;
   std::unique_ptr<ObjectFinder> object_finder_;
   std::unique_ptr<RoomFinder> room_finder_;
+
+  // colors
+  std::vector<int> default_building_color_;
 
   // Labels of interesting things
   std::vector<int> dynamic_labels_;
