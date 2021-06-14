@@ -19,6 +19,8 @@
   <arg name="semantic_typology_file" default="goseek_typology.yaml"/>
   <arg name="semantic_typology_path" default="$(find kimera_scene_graph)/config/$(arg semantic_typology_file)"/>
 
+  <arg name="viz_config_dir" default="$(find kimera_scene_graph)/config/visualizer"/>
+
   <arg name="verbosity" default="0"/>
 
   <arg name="debug" default="false"/>
@@ -39,11 +41,11 @@
     <param name="object_finder_type"                 value="1"/>
 
     <!-- visualizer -->
-    <param name="layer_step_z" value="5"/>
-    <rosparam file="$(find kimera_scene_graph)/config/visualizer/objects_layer.yaml" ns="layer1"/>
-    <rosparam file="$(find kimera_scene_graph)/config/visualizer/places_layer.yaml" ns="layer3"/>
-    <rosparam file="$(find kimera_scene_graph)/config/visualizer/rooms_layer.yaml" ns="layer4"/>
-    <rosparam file="$(find kimera_scene_graph)/config/visualizer/buildings_layer.yaml" ns="layer5"/>
+    <rosparam file="$(arg viz_config_dir)/visualizer.yaml" ns="visualizer"/>
+    <rosparam file="$(arg viz_config_dir)/objects_layer.yaml" ns="visualizer/layer1"/>
+    <rosparam file="$(arg viz_config_dir)/places_layer.yaml" ns="visualizer/layer3"/>
+    <rosparam file="$(arg viz_config_dir)/rooms_layer.yaml" ns="visualizer/layer4"/>
+    <rosparam file="$(arg viz_config_dir)/buildings_layer.yaml" ns="visualizer/layer5"/>
 
     <param name="tsdf_voxel_size"                    value="0.05"/>
     <param name="tsdf_voxels_per_side"               value="32"/>

@@ -77,6 +77,9 @@ class SceneGraphVisualizer {
                            const ros::Time& current_time,
                            visualization_msgs::MarkerArray& markers) const;
 
+ private:
+  void setupDynamicReconfigure(const SceneGraph::LayerIds& layer_ids);
+
  protected:
   SceneGraph::Ptr scene_graph_;
 
@@ -85,14 +88,17 @@ class SceneGraphVisualizer {
 
   bool need_redraw_;
   std::string world_frame_;
+  std::string visualizer_ns_;
+  std::string visualizer_layer_ns_;
 
   ros::Timer visualizer_loop_timer_;
 
   std::unique_ptr<RqtServer> config_server_;
-
+  RqtMutexPtr config_server_mutex_;
   std::map<LayerId, RqtMutexPtr> layer_config_server_mutexes_;
   std::map<LayerId, std::unique_ptr<LayerRqtServer>> layer_config_servers_;
   std::map<LayerId, LayerRqtCb> layer_config_cb_;
+
   std::map<LayerId, LayerConfig> layer_configs_;
   VisualizerConfig visualizer_config_;
 

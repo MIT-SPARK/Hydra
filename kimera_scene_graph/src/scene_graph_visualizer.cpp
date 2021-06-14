@@ -21,6 +21,25 @@ namespace {
   }                                                               \
   static_assert(true, "")
 
+VisualizerConfig getVisualizerConfig(const std::string& visualizer_namespace) {
+  ros::NodeHandle nh(visualizer_namespace);
+  VisualizerConfig config;
+  READ_PARAM(nh, config, layer_z_step);
+  READ_PARAM(nh, config, mesh_edge_break_ratio);
+  READ_PARAM(nh, config, mesh_layer_offset);
+  READ_PARAM(nh, config, collapse_layers);
+  READ_PARAM(nh, config, color_places_by_distance);
+  READ_PARAM(nh, config, places_min_distance);
+  READ_PARAM(nh, config, places_max_distance);
+  READ_PARAM(nh, config, places_min_hue);
+  READ_PARAM(nh, config, places_min_saturation);
+  READ_PARAM(nh, config, places_min_luminance);
+  READ_PARAM(nh, config, places_max_hue);
+  READ_PARAM(nh, config, places_max_saturation);
+  READ_PARAM(nh, config, places_max_luminance);
+  return config;
+}
+
 LayerConfig getLayerConfig(const std::string& layer_namespace) {
   ros::NodeHandle nh(layer_namespace);
   LayerConfig config;
@@ -54,8 +73,16 @@ SceneGraphVisualizer::SceneGraphVisualizer(
     const ros::NodeHandle& nh,
     const ros::NodeHandle& nh_private,
     const SceneGraph::LayerIds& layer_ids)
-    : nh_(nh), nh_private_(nh_private), need_redraw_(false) {
+    : nh_(nh),
+      nh_private_(nh_private),
+      need_redraw_(false),
+      world_frame_("world"),
+      visualizer_ns_("~/visualizer"),
+      visualizer_layer_ns_("~/visualizer/layer") {
   nh_private_.param("world_frame", world_frame_, world_frame_);
+  nh_private_.param("visualizer_ns", visualizer_ns_, visualizer_ns_);
+  nh_private_.param(
+      "visualizer_layer_ns", visualizer_layer_ns_, visualizer_layer_ns_);
 
   semantic_instance_centroid_pub_ =
       nh_private_.advertise<MarkerArray>("semantic_instance_centroid", 1, true);
@@ -73,28 +100,7 @@ SceneGraphVisualizer::SceneGraphVisualizer(
   rgb_mesh_pub_ =
       nh_private_.advertise<voxblox_msgs::Mesh>("rgb_mesh", 1, true);
 
-  config_server_ = std::make_unique<RqtServer>(ros::NodeHandle("~/visualizer"));
-  config_server_->setCallback(
-      boost::bind(&SceneGraphVisualizer::configUpdateCb, this, _1, _2));
-
-  for (const auto& layer : layer_ids) {
-    layer_configs_[layer] = getLayerConfig("~/layer" + std::to_string(layer));
-    // required for updating the rqt server
-    layer_config_server_mutexes_[layer] =
-        std::make_unique<boost::recursive_mutex>();
-    layer_config_servers_[layer] = std::make_unique<LayerRqtServer>(
-        *layer_config_server_mutexes_.at(layer),
-        ros::NodeHandle("~/layer" + std::to_string(layer)));
-
-    {  // set the defaults correctly
-      boost::recursive_mutex::scoped_lock lock(
-          *layer_config_server_mutexes_.at(layer));
-      layer_config_servers_.at(layer)->updateConfig(layer_configs_.at(layer));
-    }
-    layer_config_cb_[layer] = boost::bind(
-        &SceneGraphVisualizer::layerConfigUpdateCb, this, layer, _1, _2);
-    layer_config_servers_.at(layer)->setCallback(layer_config_cb_[layer]);
-  }
+  setupDynamicReconfigure(layer_ids);
 
   double visualizer_loop_period = 1.0e-1;
   nh_private_.param(
@@ -103,6 +109,43 @@ SceneGraphVisualizer::SceneGraphVisualizer(
       nh_.createTimer(ros::Duration(visualizer_loop_period),
                       &SceneGraphVisualizer::displayLoop,
                       this);
+}
+
+void SceneGraphVisualizer::setupDynamicReconfigure(
+    const SceneGraph::LayerIds& layer_ids) {
+  visualizer_config_ = getVisualizerConfig(visualizer_ns_);
+
+  // required for "safely" updating the rqt server
+  config_server_mutex_ = std::make_unique<boost::recursive_mutex>();
+  config_server_ = std::make_unique<RqtServer>(*config_server_mutex_,
+                                               ros::NodeHandle(visualizer_ns_));
+  {  // critical region for dynamic reconfigure (probably unneeded)
+    boost::recursive_mutex::scoped_lock lock(*config_server_mutex_);
+    config_server_->updateConfig(visualizer_config_);
+  }
+
+  config_server_->setCallback(
+      boost::bind(&SceneGraphVisualizer::configUpdateCb, this, _1, _2));
+
+  for (const auto& layer : layer_ids) {
+    const std::string layer_ns = visualizer_layer_ns_ + std::to_string(layer);
+    layer_configs_[layer] = getLayerConfig(layer_ns);
+    // required for "safely" updating the rqt server
+    layer_config_server_mutexes_[layer] =
+        std::make_unique<boost::recursive_mutex>();
+    layer_config_servers_[layer] = std::make_unique<LayerRqtServer>(
+        *layer_config_server_mutexes_.at(layer), ros::NodeHandle(layer_ns));
+
+    {  // critical region for dynamic reconfigure (probably unneeded)
+      boost::recursive_mutex::scoped_lock lock(
+          *layer_config_server_mutexes_.at(layer));
+      layer_config_servers_.at(layer)->updateConfig(layer_configs_.at(layer));
+    }
+
+    layer_config_cb_[layer] = boost::bind(
+        &SceneGraphVisualizer::layerConfigUpdateCb, this, layer, _1, _2);
+    layer_config_servers_.at(layer)->setCallback(layer_config_cb_[layer]);
+  }
 }
 
 void SceneGraphVisualizer::configUpdateCb(VisualizerConfig& config, uint32_t) {

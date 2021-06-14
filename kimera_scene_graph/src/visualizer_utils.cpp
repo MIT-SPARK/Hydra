@@ -3,6 +3,7 @@
 
 #include <kimera_dsg/scene_graph_layer.h>
 #include <tf2_eigen/tf2_eigen.h>
+#include <opencv2/imgproc.hpp>
 
 namespace kimera {
 
@@ -11,6 +12,46 @@ using visualization_msgs::MarkerArray;
 using Node = SceneGraphLayer::Node;
 
 namespace {
+
+inline double lerp(double min, double max, double ratio) {
+  return (max - min) * ratio + min;
+}
+
+inline double getRatio(double min, double max, double value) {
+  double ratio = (value - min) / (max - min);
+  ratio = !std::isfinite(ratio) ? 0.0 : ratio;
+  ratio = ratio > 1.0 ? 1.0 : ratio;
+  ratio = ratio < 0.0 ? 0.0 : ratio;
+  return ratio;
+}
+
+inline NodeColor getDistanceColor(const VisualizerConfig& config,
+                                  double distance) {
+  if (config.places_max_distance <= config.places_min_distance) {
+    // TODO(nathan) consider warning
+    return NodeColor::Zero();
+  }
+
+  double ratio = getRatio(
+      config.places_min_distance, config.places_max_distance, distance);
+  cv::Mat hls_value(1, 1, CV_32FC3);
+  // hue is in degrees, not [0, 1]
+  hls_value.at<float>(0) =
+      lerp(config.places_min_hue, config.places_max_hue, ratio) * 360.0;
+  hls_value.at<float>(1) =
+      lerp(config.places_min_luminance, config.places_max_luminance, ratio);
+  hls_value.at<float>(2) =
+      lerp(config.places_min_saturation, config.places_max_saturation, ratio);
+
+  cv::Mat bgr_value;
+  cv::cvtColor(hls_value, bgr_value, cv::COLOR_HLS2BGR);
+
+  NodeColor color;
+  color << static_cast<uint8_t>(255 * bgr_value.at<float>(2)),
+      static_cast<uint8_t>(255 * bgr_value.at<float>(1)),
+      static_cast<uint8_t>(255 * bgr_value.at<float>(0));
+  return color;
+}
 
 inline void fillPoseWithIdentity(geometry_msgs::Pose& pose) {
   Eigen::Vector3d identity_pos = Eigen::Vector3d::Zero();
@@ -30,7 +71,7 @@ inline std_msgs::ColorRGBA makeColorMsg(const NodeColor& color,
 
 inline double getZOffset(const LayerConfig& config,
                          const VisualizerConfig& visualizer_config) {
-  if (visualizer_config.collapse) {
+  if (visualizer_config.collapse_layers) {
     return 0.0;
   }
 
@@ -134,6 +175,11 @@ Marker makeCentroidMarkers(const LayerConfig& config,
       desired_color = *layer_color;
     } else if (!node_colors_valid) {
       desired_color << 1.0, 0.0, 0.0;
+    } else if (visualizer_config.color_places_by_distance &&
+               layer.id == to_underlying(KimeraDsgLayers::PLACES)) {
+      desired_color = getDistanceColor(
+          visualizer_config,
+          id_node_pair.second->attributes<PlaceNodeAttributes>().distance);
     } else {
       try {
         desired_color =
@@ -295,7 +341,7 @@ Marker makeMeshEdgesMarker(const LayerConfig& config,
       vertex.x = attrs.points->at(i).x;
       vertex.y = attrs.points->at(i).y;
       vertex.z = attrs.points->at(i).z;
-      if (!visualizer_config.collapse) {
+      if (!visualizer_config.collapse_layers) {
         vertex.z += visualizer_config.mesh_layer_offset;
       }
 

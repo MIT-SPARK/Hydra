@@ -82,8 +82,9 @@ void fillLayerFromSkeleton(const vxb::SparseSkeletonGraph& skeleton,
   for (const auto& idx : vertex_ids) {
     const vxb::SkeletonVertex& vertex = skeleton.getVertex(idx);
 
-    SemanticNodeAttributes::Ptr attrs =
-        std::make_unique<SemanticNodeAttributes>();
+    // TODO(nathan) basis points aren't actually propagated through
+    PlaceNodeAttributes::Ptr attrs =
+        std::make_unique<PlaceNodeAttributes>(vertex.distance, 0);
     attrs->semantic_label = kPlaceSemanticLabel;
     attrs->position << vertex.point[0], vertex.point[1], vertex.point[2];
     attrs->color << 255u, 0u, 0u;
