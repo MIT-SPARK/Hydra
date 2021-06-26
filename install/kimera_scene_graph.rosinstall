@@ -11,9 +11,6 @@
     local-name: disparity_image_proc
     uri: git@github.com:ToniRV/disparity_image_proc.git
 - git:
-    local-name: dynamic_scene_graph_planning
-    uri: git@github.mit.edu:SPARK/dynamic_scene_graph_planning.git
-- git:
     local-name: eigen_catkin
     uri: git@github.com:ethz-asl/eigen_catkin.git
 - git:
@@ -38,6 +35,9 @@
 - git:
     local-name: kimera_rpgo
     uri: git@github.com:MIT-SPARK/Kimera-RPGO.git
+- git:
+    local-name: kimera_dsg
+    uri: git@github.mit.edu:SPARK/Kimera-DSG.git
 - git:
     local-name: kimera_dsg_builder
     uri: git@github.mit.edu:SPARK/Kimera-DSG-Builder.git
