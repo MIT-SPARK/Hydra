@@ -2,12 +2,12 @@
 #include "kimera_scene_graph/common.h"
 
 #include <kimera_dsg/node_attributes.h>
-#include <kimera_dsg/scene_graph.h>
+#include <kimera_dsg/dynamic_scene_graph.h>
 #include <kimera_scene_graph/LayerVisualizerConfig.h>
 #include <kimera_scene_graph/VisualizerConfig.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
-#include <voxblox_ros/mesh_vis.h>
+#include <mesh_msgs/TriangleMesh.h>
 
 namespace kimera {
 
@@ -39,11 +39,11 @@ visualization_msgs::MarkerArray makeGraphEdgeMarkers(
     const std::map<LayerId, LayerConfig>& configs,
     const VisualizerConfig& visualizer_config);
 
-// TODO(nathan) this will get merged with other functions probably
 visualization_msgs::Marker makeMeshEdgesMarker(
     const LayerConfig& config,
-    const SceneGraphLayer& layer,
     const VisualizerConfig& visualizer_config,
+    const DynamicSceneGraph& graph,
+    const SceneGraphLayer& layer,
     const std::string& marker_namespace = "mesh_layer_edges");
 
 visualization_msgs::Marker makeLayerEdgeMarkers(
@@ -52,17 +52,8 @@ visualization_msgs::Marker makeLayerEdgeMarkers(
     const VisualizerConfig& visualizer_config,
     const NodeColor& color);
 
-/**
- * @brief construct an rviz marker for the provided mesh
- * @param config visualization config for layer this mesh belongs to
- * @param mesh Actual semantic mesh
- * @param color_mode How to color the mesh
- */
-visualization_msgs::Marker makeMeshMarker(
-    const LayerConfig& config,
-    const VisualizerConfig& visualizer_config,
-    const voxblox::Mesh& mesh,
-    voxblox::ColorMode color_mode,
-    const std::string& marker_namespace = "mesh");
+void adjustMesh(const LayerConfig& config,
+                const VisualizerConfig& visualizer_config,
+                mesh_msgs::TriangleMesh& msg);
 
 }  // namespace kimera

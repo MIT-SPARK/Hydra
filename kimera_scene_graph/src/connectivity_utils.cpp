@@ -1,11 +1,8 @@
 #include "kimera_scene_graph/connectivity_utils.h"
 #include "kimera_scene_graph/pcl_conversion.h"
+#include "kimera_scene_graph/pcl_types.h"
 
 #include <glog/logging.h>
-
-#include <pcl/filters/crop_hull.h>
-#include <pcl/search/kdtree.h>
-#include <pcl/surface/concave_hull.h>
 
 #include <kimera_dsg/node_attributes.h>
 
@@ -42,47 +39,6 @@ void findRoomConnectivity(SceneGraph* scene_graph) {
   }
 }
 
-// TODO(nathan) this is hardcoded for 2 dimensions: does this cause problems
-// with multiple floors?
-std::vector<int> getPlaceIndicesInsideRoom(pcl::KdTreeFLANN<ColorPoint>& kdtree,
-                                           ColorPointCloud::Ptr room_pcl,
-                                           ColorPointCloud::Ptr places_pcl) {
-  CHECK(room_pcl);
-  CHECK(places_pcl);
-  // Find concave hull of pcl first
-  VLOG(2) << "Finding concave hull of room.";
-  pcl::ConcaveHull<ColorPoint> concave_hull_adapter;
-  static constexpr double kAlpha = 0.30;
-  concave_hull_adapter.setAlpha(kAlpha);
-  concave_hull_adapter.setKeepInformation(true);
-  concave_hull_adapter.setDimension(2);
-  concave_hull_adapter.setInputCloud(room_pcl);
-  ColorPointCloud::Ptr concave_hull_pcl(new ColorPointCloud());
-  std::vector<pcl::Vertices> concave_polygon;
-  concave_hull_adapter.reconstruct(*concave_hull_pcl, concave_polygon);
-  VLOG(2) << "Done finding concave hull of room.";
-
-  // Setup kd-tree
-  kdtree.setInputCloud(concave_hull_pcl);
-
-  // Create cropper to know which vertices are outside the room
-  VLOG(2) << "Finding indices of places inside room.";
-  pcl::CropHull<ColorPoint> hull_cropper;
-  hull_cropper.setHullIndices(concave_polygon);
-  hull_cropper.setHullCloud(concave_hull_pcl);
-  hull_cropper.setDim(2);
-  // because we can only get removed indices, tell the algorithm to
-  // remove inside.
-  hull_cropper.setCropOutside(true);
-
-  hull_cropper.setInputCloud(places_pcl);
-  // These indices correspond to nodes inside the current room.
-  std::vector<int> removed_indices_inside_room;
-  hull_cropper.filter(removed_indices_inside_room);
-  VLOG(2) << "Done finding indices of places inside room.";
-  return removed_indices_inside_room;
-}
-
 struct NNResult {
   bool valid;
   float distance_nn_2d;
@@ -116,6 +72,7 @@ NNResult getDistanceToRoom(const pcl::KdTreeFLANN<ColorPoint>& kdtree,
 }
 
 void findPlacesRoomConnectivity(SceneGraph* scene_graph,
+                                const RoomHullMap& room_hulls,
                                 float esdf_truncation_distance) {
   CHECK_NOTNULL(scene_graph);
 
@@ -128,21 +85,16 @@ void findPlacesRoomConnectivity(SceneGraph* scene_graph,
   PclLayer<ColorPointCloud> places_pcl =
       convertLayerToPcl<ColorPointCloud>(places_layer);
 
-  // Init kd-tree
-  pcl::KdTreeFLANN<ColorPoint> kdtree;
   for (const auto& id_node_pair : room_layer.nodes) {
     const NodeId room_id = id_node_pair.first;
     LOG(INFO) << "Segmenting places for room with id: "
               << NodeSymbol(room_id).getLabel();
 
-    ColorPointCloud::Ptr room_pcl =
-        id_node_pair.second->attributes<RoomNodeAttributes>().points;
-    CHECK(room_pcl);
-    CHECK(!room_pcl->empty());
+    room_hulls.at(room_id).cropper->setInputCloud(places_pcl.cloud);
 
-    // Get section of the sparse graph that falls inside this room_pcl
-    std::vector<int> removed_indices_inside_room =
-        getPlaceIndicesInsideRoom(kdtree, room_pcl, places_pcl.cloud);
+    // These indices correspond to nodes inside the current room.
+    std::vector<int> removed_indices_inside_room;
+    room_hulls.at(room_id).cropper->filter(removed_indices_inside_room);
 
     // add edges between room and places nodes within the room
     VLOG(2) << "Starting Initial linking of places to rooms.";
@@ -176,7 +128,8 @@ void findPlacesRoomConnectivity(SceneGraph* scene_graph,
         }
 
         NNResult result =
-            getDistanceToRoom(kdtree, sibling_node.attributes().position);
+            getDistanceToRoom(*(room_hulls.at(room_id).hull_kdtree),
+                              sibling_node.attributes().position);
         if (!result.valid) {
           LOG(WARNING) << "Failed to find nearest neighbor to place "
                        << sibling_id << " w.r.t. room " << room_id;

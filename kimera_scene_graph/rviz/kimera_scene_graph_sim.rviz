@@ -5,12 +5,18 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /TF1/Frames1
+        - /Centroids1
         - /Centroids1/Namespaces1
         - /InstanceIds1/Namespaces1
         - /BoundingBoxes1
         - /BoundingBoxes1/Namespaces1
         - /Edges1/Namespaces1
+        - /EdgesCentroidToPcl1
         - /EdgesCentroidToPcl1/Namespaces1
+        - /TriangleMesh1
+        - /TriangleMesh1/Display Type1
+        - /TriangleMesh1/Show Wireframe1
+        - /TriangleMesh1/Show Normals1
       Splitter Ratio: 0.7597087621688843
     Tree Height: 880
   - Class: rviz/Selection
@@ -64,6 +70,8 @@ Visualization Manager:
         All Enabled: false
         rviz_ortho:
           Value: true
+        rviz_topdown:
+          Value: true
         world:
           Value: true
       Marker Scale: 1
@@ -75,6 +83,8 @@ Visualization Manager:
         world:
           rviz_ortho:
             {}
+          rviz_topdown:
+            {}
       Update Interval: 0
       Value: true
     - Class: rviz/Axes
@@ -84,12 +94,6 @@ Visualization Manager:
       Radius: 0.5
       Reference Frame: <Fixed Frame>
       Value: false
-    - Class: voxblox_rviz_plugin/VoxbloxMesh
-      Enabled: true
-      Name: SemanticMesh
-      Topic: /kimera_scene_graph_eval_node/semantic_mesh
-      Unreliable: false
-      Value: true
     - Class: rviz/MarkerArray
       Enabled: true
       Marker Topic: /kimera_scene_graph_eval_node/semantic_instance_centroid
@@ -103,7 +107,7 @@ Visualization Manager:
       Marker Topic: /kimera_scene_graph_eval_node/instance_ids
       Name: InstanceIds
       Namespaces:
-        layer_1_bounding_boxes: true
+        layer_2_bounding_boxes: true
         layer_4_text: true
         layer_5_text: true
       Queue Size: 100
@@ -142,6 +146,25 @@ Visualization Manager:
         mesh_layer_edges: true
       Queue Size: 100
       Value: true
+    - Class: rviz_mesh_plugin/TriangleMesh
+      Display Type:
+        Faces Alpha: 1
+        Faces Color: 0; 255; 0
+        Value: Vertex Color
+      Enabled: true
+      Mesh Buffer Size: 1
+      Name: TriangleMesh
+      Show Normals:
+        Normals Alpha: 1
+        Normals Color: 255; 0; 255
+        Normals Scaling Factor: 0.10000000149011612
+        Value: false
+      Show Wireframe:
+        Value: true
+        Wireframe Alpha: 0.20000000298023224
+        Wireframe Color: 0; 0; 0
+      Topic: kimera_scene_graph_eval_node/semantic_mesh
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 255; 255; 255
@@ -171,25 +194,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 44.60392761230469
+      Distance: 48.40510940551758
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 14.154191017150879
-        Y: -4.19466495513916
-        Z: 10.333741188049316
+        X: 1.0980961322784424
+        Y: -1.0413912534713745
+        Z: 10.855714797973633
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.08479733020067215
+      Pitch: 0.29520267248153687
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 1.0885603427886963
+      Yaw: 3.928565502166748
     Saved: ~
 Window Geometry:
   Displays:

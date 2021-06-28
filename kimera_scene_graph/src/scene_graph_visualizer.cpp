@@ -1,6 +1,9 @@
 ﻿#include "kimera_scene_graph/scene_graph_visualizer.h"
 #include "kimera_scene_graph/visualizer_utils.h"
 
+#include <kimera_pgmo/utils/CommonFunctions.h>
+#include <mesh_msgs/TriangleMeshStamped.h>
+
 #include <glog/logging.h>
 
 #include <tf2_eigen/tf2_eigen.h>
@@ -94,11 +97,11 @@ SceneGraphVisualizer::SceneGraphVisualizer(
       nh_private_.advertise<MarkerArray>("edges_centroid_pcl", 1, true);
   edges_node_node_pub_ =
       nh_private_.advertise<MarkerArray>("edges_node_node", 1, true);
-  wall_pub_ = nh_private_.advertise<Marker>("wall_mesh", 1, true);
-  semantic_mesh_pub_ =
-      nh_private_.advertise<voxblox_msgs::Mesh>("semantic_mesh", 1, true);
-  rgb_mesh_pub_ =
-      nh_private_.advertise<voxblox_msgs::Mesh>("rgb_mesh", 1, true);
+  wall_pub_ = nh_private_.advertise<mesh_msgs::TriangleMeshStamped>("wall_mesh", 1, true);
+  semantic_mesh_pub_ = nh_private_.advertise<mesh_msgs::TriangleMeshStamped>(
+      "semantic_mesh", 1, true);
+  rgb_mesh_pub_ = nh_private_.advertise<mesh_msgs::TriangleMeshStamped>(
+      "rgb_mesh", 1, true);
 
   setupDynamicReconfigure(layer_ids);
 
@@ -160,7 +163,8 @@ void SceneGraphVisualizer::layerConfigUpdateCb(LayerId layer_id,
   need_redraw_ = true;
 }
 
-void SceneGraphVisualizer::visualize(const SceneGraph::Ptr& scene_graph) {
+void SceneGraphVisualizer::visualize(
+    const DynamicSceneGraph::Ptr& scene_graph) {
   if (scene_graph == nullptr || scene_graph->empty()) {
     ROS_WARN("Request to visualize empty scene graph, skipping.");
     return;
@@ -180,6 +184,9 @@ void SceneGraphVisualizer::displayLoop(const ros::TimerEvent&) {
   }
 
   need_redraw_ = false;
+  if (scene_graph_->hasLayer(scene_graph_->mesh_layer_id)) {
+    visualizeMesh(*(scene_graph_->getMesh()), false);
+  }
   displayLayers(*scene_graph_);
   displayEdges(*scene_graph_);
 }
@@ -225,7 +232,8 @@ void SceneGraphVisualizer::handleMeshEdges(const SceneGraphLayer& layer,
 
   const std::string ns = "mesh_layer_edges";
   if (config.visualize) {
-    Marker marker = makeMeshEdgesMarker(config, layer, visualizer_config_, ns);
+    Marker marker = makeMeshEdgesMarker(
+        config, visualizer_config_, *scene_graph_, layer, ns);
     fillHeader(marker, current_time);
     markers.markers.push_back(marker);
   } else {
@@ -369,13 +377,6 @@ void SceneGraphVisualizer::clear() {
   }
 
   ros::spinOnce();
-  // voxblox_msgs::Mesh msg;
-  // msg.header.stamp = curr_time;
-  // msg.block_edge_length = 0;
-  // msg.mesh_blocks.clear();
-
-  // semantic_mesh_pub_.publish(msg);
-  /*rgb_mesh_pub_.publish(msg);*/
 }
 
 void SceneGraphVisualizer::displayEdges(const SceneGraph& scene_graph) const {
@@ -407,43 +408,12 @@ void SceneGraphVisualizer::displayEdges(const SceneGraph& scene_graph) const {
   edges_node_node_pub_.publish(edge_markers);
 }
 
-voxblox::ColorMode getValidColorMode(const voxblox::Mesh& mesh,
-                                     voxblox::ColorMode color_mode) {
-  if (color_mode == voxblox::ColorMode::kColor ||
-      color_mode == voxblox::ColorMode::kLambertColor) {
-    if (!mesh.hasColors()) {
-      return voxblox::kGray;
-    }
-  }
-
-  if (color_mode == voxblox::ColorMode::kNormals ||
-      color_mode == voxblox::ColorMode::kLambert ||
-      color_mode == voxblox::ColorMode::kLambertColor) {
-    if (!mesh.hasNormals()) {
-      return voxblox::kColor;
-    }
-  }
-
-  return color_mode;
-}
-
-void SceneGraphVisualizer::visualizeMesh(voxblox::MeshLayer* mesh,
-                                         voxblox::ColorMode color_mode,
-                                         bool rgb_mesh,
-                                         bool force_updated) const {
-  CHECK(mesh);
-  if (force_updated) {
-    voxblox::BlockIndexList blocks;
-    mesh->getAllAllocatedMeshes(&blocks);
-    for (const auto& idx : blocks) {
-      mesh->getMeshByIndex(idx).updated = true;
-    }
-  }
-
-  voxblox_msgs::Mesh msg;
-  voxblox::generateVoxbloxMeshMsg(mesh, color_mode, &msg);
+void SceneGraphVisualizer::visualizeMesh(const pcl::PolygonMesh& mesh,
+                                         bool rgb_mesh) const {
+  mesh_msgs::TriangleMeshStamped msg;
   msg.header.frame_id = world_frame_;
   msg.header.stamp = ros::Time::now();  // TODO(nathan) unify time
+  msg.mesh = kimera_pgmo::PolygonMeshToTriangleMeshMsg(mesh);
 
   if (rgb_mesh) {
     rgb_mesh_pub_.publish(msg);
@@ -452,8 +422,8 @@ void SceneGraphVisualizer::visualizeMesh(voxblox::MeshLayer* mesh,
   }
 }
 
-void SceneGraphVisualizer::visualizeWalls(const voxblox::Mesh& mesh) const {
-  if (!mesh.hasVertices()) {
+void SceneGraphVisualizer::visualizeWalls(const pcl::PolygonMesh& mesh) const {
+  if (mesh.polygons.empty()) {
     return;  // better to not publish an empty marker
   }
 
@@ -462,13 +432,14 @@ void SceneGraphVisualizer::visualizeWalls(const voxblox::Mesh& mesh) const {
     return;
   }
 
+  mesh_msgs::TriangleMeshStamped msg;
+  msg.header.frame_id = world_frame_;
+  msg.header.stamp = ros::Time::now();  // TODO(nathan) unify time
+  msg.mesh = kimera_pgmo::PolygonMeshToTriangleMeshMsg(mesh);
+
   LayerConfig config =
       layer_configs_.at(to_underlying(KimeraDsgLayers::PLACES));
-  voxblox::ColorMode mode =
-      getValidColorMode(mesh, voxblox::ColorMode::kLambertColor);
-  Marker msg = makeMeshMarker(config, visualizer_config_, mesh, mode);
-  ros::Time curr_time = ros::Time::now();
-  fillHeader(msg, curr_time);  // TODO(nathan) unify time
+  adjustMesh(config, visualizer_config_, msg.mesh);
 
   wall_pub_.publish(msg);
 }

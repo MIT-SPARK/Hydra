@@ -15,7 +15,7 @@ To get started (YMMV):
 mkdir -p catkin_ws/src
 cd catkin_ws
 catkin init
-catkin config -DCMAKE_BUILD_TYPE=Release -DGTSAM_TANGENT_PREINTEGRATION=OFF
+catkin config -DCMAKE_BUILD_TYPE=Release -DGTSAM_TANGENT_PREINTEGRATION=OFF -DGTSAM_BUILD_WITH_MARCH_NATIVE=OFF
 
 wstool init -t src
 wstool merge -t src https://github.mit.edu/SPARK/Kimera-DSG/blob/master/install/kimera_scene_graph.rosinstall

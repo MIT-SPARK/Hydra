@@ -1,4 +1,5 @@
 #include "kimera_scene_graph/room_finder.h"
+#include "kimera_scene_graph/pcl_types.h"
 
 #include <glog/logging.h>
 
@@ -12,9 +13,16 @@
 #include <pcl/filters/passthrough.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/segmentation/extract_clusters.h>
+#include <pcl/surface/concave_hull.h>
 #include <pcl_ros/point_cloud.h>
 
 namespace kimera {
+
+struct RoomPclClusters {
+  using CloudCentroidPair = std::pair<ColorPointCloud::Ptr, Centroid>;
+  IntensityPointCloud::Ptr colored_room_cloud;
+  std::vector<CloudCentroidPair> room_info;
+};
 
 RoomFinder::RoomFinder(const ros::NodeHandle& nh_private,
                        const std::string& world_frame,
@@ -98,34 +106,85 @@ RoomPclClusters getRoomClusters(const IntensityPointCloud::Ptr& input,
     // color point cloud and get centroid
     Centroid centroid;
     for (auto& point : colored_room_cloud->points) {
-      point.g = 255;  // TODO(nathan) accept full colors?
-      centroid.add(Point(point.x, point.y, point.z));
+      centroid.add(pcl::PointXYZ(point.x, point.y, point.z));
     }
 
     clusters.room_info.push_back(std::make_pair(colored_room_cloud, centroid));
   }
 
-  // getColoredCloud(cloud, cluster_indices);
   return clusters;
 }
 
-IntensityPointCloud::Ptr RoomFinder::findRooms(
-    const vxb::Layer<vxb::EsdfVoxel>& esdf_layer,
-    SceneGraph* scene_graph) {
+// TODO(nathan) this is hardcoded for 2 dimensions
+RoomHull makeRoomHull(const ColorPointCloud::Ptr& room_pcl) {
+  pcl::ConcaveHull<ColorPoint> concave_hull_adapter;
+  static constexpr double kAlpha = 0.30;
+  concave_hull_adapter.setAlpha(kAlpha);
+  concave_hull_adapter.setKeepInformation(true);
+  concave_hull_adapter.setDimension(2);
+  concave_hull_adapter.setInputCloud(room_pcl);
+
+  std::vector<pcl::Vertices> concave_polygon;
+  ColorPointCloud::Ptr concave_hull_pcl(new ColorPointCloud());
+  concave_hull_adapter.reconstruct(*concave_hull_pcl, concave_polygon);
+
+  RoomHull hull;
+  hull.hull_kdtree.reset(new pcl::KdTreeFLANN<ColorPoint>());
+  hull.hull_kdtree->setInputCloud(concave_hull_pcl);
+
+  hull.cropper.reset(new pcl::CropHull<ColorPoint>());
+  hull.cropper->setHullIndices(concave_polygon);
+  hull.cropper->setHullCloud(concave_hull_pcl);
+  hull.cropper->setDim(2);
+  hull.cropper->setCropOutside(true);
+
+  return hull;
+}
+
+RoomHullMap updateSceneGraph(const RoomPclClusters& room_clusters,
+                             SceneGraph* scene_graph,
+                             NodeSymbol next_room_id) {
+  CHECK_NOTNULL(scene_graph);
+
+  RoomHullMap room_hull_map;
+  for (const auto& cloud_centroid_pair : room_clusters.room_info) {
+    RoomNodeAttributes::Ptr room_attrs = std::make_unique<RoomNodeAttributes>();
+
+    room_attrs->semantic_label = kRoomSemanticLabel;
+    room_attrs->name = next_room_id.getLabel();
+    // TODO(nathan) fix this when we make this conversion more explicit
+    const voxblox::Color& room_color = getRoomColor(next_room_id.categoryId());
+    room_attrs->color << room_color.r, room_color.g, room_color.b;
+
+    // TODO(Toni): project the centroid to the interior of the room.
+    pcl::PointXYZ centroid;
+    cloud_centroid_pair.second.get(centroid);
+    room_attrs->position << centroid.x, centroid.y, centroid.z;
+
+    scene_graph->emplaceNode(to_underlying(KimeraDsgLayers::ROOMS),
+                             next_room_id,
+                             std::move(room_attrs));
+
+    room_hull_map[next_room_id] = makeRoomHull(cloud_centroid_pair.first);
+
+    ++next_room_id;
+  }
+
+  return room_hull_map;
+}
+
+RoomHullMap RoomFinder::findRooms(const vxb::Layer<vxb::EsdfVoxel>& esdf,
+                                  SceneGraph* scene_graph) {
   CHECK_NOTNULL(scene_graph);
 
   IntensityPointCloud::Ptr esdf_pcl(new IntensityPointCloud);
   vxb::createDistancePointcloudFromEsdfLayerSlice(
-      esdf_layer, 2, esdf_slice_level_, &*esdf_pcl);
+      esdf, 2, esdf_slice_level_, esdf_pcl.get());
   if (esdf_pcl->empty()) {
     LOG(ERROR) << "Pointcloud of ESDF slice is empty! Modify the esdf slice "
                   "height to another value... \n Current value: "
                << std::to_string(esdf_slice_level_);
-    return nullptr;
-  }
-
-  if (visualize_) {
-    publishTruncatedEsdf(esdf_pcl);
+    return RoomHullMap();
   }
 
   IntensityPointCloud::Ptr downsampled_esdf_pcl(new IntensityPointCloud());
@@ -138,66 +197,26 @@ IntensityPointCloud::Ptr RoomFinder::findRooms(
 
   RoomPclClusters clusters = getRoomClusters(downsampled_esdf_pcl);
 
-  // TODO(nathan) is this needed?
-  // room_pcl_colored->header.frame_id = world_frame_;
-  // for (auto& it : room_pcl_colored->points) {
-  //// Move all points to level 5
-  // it.z = 10;
-  //}
-  // pcl_pub_.publish(*room_pcl_colored);
+  // TODO(nathan) was this needed? maybe cache
+  // return downsampled_esdf_pcl;
 
-  updateSceneGraph(clusters, scene_graph);
-
-  // TODO(nathan) is this needed? maybe cache
-  return downsampled_esdf_pcl;
-}
-
-void RoomFinder::updateSceneGraph(const RoomPclClusters& room_clusters,
-                                  SceneGraph* scene_graph) {
-  CHECK_NOTNULL(scene_graph);
-
-  for (const auto& cloud_centroid_pair : room_clusters.room_info) {
-    RoomNodeAttributes::Ptr room_attrs = std::make_unique<RoomNodeAttributes>();
-
-    // TODO(nathan) this will all be fine for now but can be cleaned up
-    room_attrs->semantic_label = kRoomSemanticLabel;
-    room_attrs->name = next_room_id_.getLabel();
-    // TODO(nathan) fix this when we make this conversion more explicit
-    const voxblox::Color& room_color = getRoomColor(next_room_id_.categoryId());
-    room_attrs->color << room_color.r, room_color.g, room_color.b;
-
-    // TODO(Toni): project the centroid to the interior of the room.
-    // otherwise the centroid might be outside of the room...
-    // Ideally, this centroid should match the position of a 3D place
-    pcl::PointXYZ centroid;
-    cloud_centroid_pair.second.get(centroid);
-    room_attrs->position << centroid.x, centroid.y, centroid.z;
-
-    ColorPointCloud::Ptr room_pcl = cloud_centroid_pair.first;
-    CHECK(room_pcl);
-    room_attrs->points = room_pcl;  // used later for room-places edges
-
-    scene_graph->emplaceNode(to_underlying(KimeraDsgLayers::ROOMS),
-                             next_room_id_,
-                             std::move(room_attrs));
-    ++next_room_id_;
-  }
+  return updateSceneGraph(clusters, scene_graph, next_room_id_);
 }
 
 // TODO(nathan) consider moving this to visualization
-void RoomFinder::publishTruncatedEsdf(
-    const IntensityPointCloud::Ptr& esdf_pcl) {
-  // Publish truncated ESDF to see wall layout:
-  IntensityPointCloud::Ptr esdf_truncated(new IntensityPointCloud);
-  esdf_truncated = passThroughFilter1D<IntensityPoint>(
-      esdf_pcl, "intensity", -1.0, kEsdfTruncation, false);
-  esdf_truncated->header.frame_id = world_frame_;
-  IntensityPointCloud::Ptr esdf_truncated_z_shift(new IntensityPointCloud);
-  Eigen::Affine3f z_esdf = Eigen::Affine3f::Identity();
-  // TODO(nathan) this used to be configurable
-  z_esdf.translation() << 0.0, 0.0, 30.0;
-  pcl::transformPointCloud(*esdf_truncated, *esdf_truncated_z_shift, z_esdf);
-  esdf_truncated_pub_.publish(*esdf_truncated_z_shift);
-}
+/*void RoomFinder::publishTruncatedEsdf(*/
+// const IntensityPointCloud::Ptr& esdf_pcl) {
+//// Publish truncated ESDF to see wall layout:
+// IntensityPointCloud::Ptr esdf_truncated(new IntensityPointCloud);
+// esdf_truncated = passThroughFilter1D<IntensityPoint>(
+// esdf_pcl, "intensity", -1.0, kEsdfTruncation, false);
+// esdf_truncated->header.frame_id = world_frame_;
+// IntensityPointCloud::Ptr esdf_truncated_z_shift(new IntensityPointCloud);
+// Eigen::Affine3f z_esdf = Eigen::Affine3f::Identity();
+//// TODO(nathan) this used to be configurable
+// z_esdf.translation() << 0.0, 0.0, 30.0;
+// pcl::transformPointCloud(*esdf_truncated, *esdf_truncated_z_shift, z_esdf);
+// esdf_truncated_pub_.publish(*esdf_truncated_z_shift);
+//}
 
 }  // namespace kimera

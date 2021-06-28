@@ -1,5 +1,6 @@
 #include "kimera_scene_graph/building_finder.h"
 #include "kimera_scene_graph/common.h"
+#include "kimera_scene_graph/pcl_types.h"
 
 #include <kimera_dsg/node_attributes.h>
 

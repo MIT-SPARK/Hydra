@@ -64,87 +64,6 @@ void ObjectFinder::connectToObjectDb() {
   ROS_INFO("Object database server connected");
 }
 
-void ObjectFinder::addObjectsToGraph(const ColorPointCloud::Ptr& input,
-                                     const NodeColor& label_color,
-                                     SemanticLabel label,
-                                     SceneGraph* scene_graph) {
-  CHECK(scene_graph);
-  CHECK(input);
-
-  VLOG(1) << "Extracting objects for label: " << std::to_string(label);
-  if (input->empty()) {
-    VLOG(1) << "Skipping label " << label << " as input was empty";
-    return;
-  }
-
-  // TODO(nathan) eventually we'll refactor this to group centroid and pcls
-  Centroids centroids;
-  ObjectPointClouds objects;
-  BoundingBoxes bounding_boxes;
-  findObjects(input, &centroids, &objects, &bounding_boxes);
-  // TODO(nathan) used to publish the clustered pointcloud?
-  // color_clustered_pcl_pub_.publish();
-
-  // TODO(nathan) use the registration for something
-  // ObjectPointClouds registered_objects =
-  // registerObjects(objects, std::to_string(label));
-
-  // Create semantic instance for each centroid
-  for (size_t idx = 0u; idx < centroids.size(); ++idx) {
-    ObjectNodeAttributes::Ptr attrs = std::make_unique<ObjectNodeAttributes>();
-    attrs->semantic_label = label;
-    attrs->color = label_color,
-    attrs->name = std::to_string(label) + std::to_string(idx);
-    attrs->points = objects.at(idx);
-    attrs->bounding_box = bounding_boxes.at(idx);
-
-    pcl::PointXYZ centroid;
-    centroids.at(idx).get(centroid);
-    attrs->position << centroid.x, centroid.y, centroid.z;
-
-    scene_graph->emplaceNode(to_underlying(KimeraDsgLayers::OBJECTS),
-                             next_object_id_,
-                             std::move(attrs));
-    ++next_object_id_;
-  }
-}
-
-ColorPointCloud::Ptr ObjectFinder::findObjects(
-    const ColorPointCloud::Ptr& pointcloud,
-    Centroids* centroids,
-    ObjectPointClouds* object_pcls,
-    BoundingBoxes* bounding_boxes) {
-  CHECK(pointcloud);
-  CHECK_NOTNULL(centroids);
-  CHECK_NOTNULL(object_pcls);
-  CHECK_NOTNULL(bounding_boxes);
-  ColorPointCloud::Ptr clustered_colored_pcl = nullptr;
-  switch (type_) {
-    case ObjectFinderType::kRegionGrowing:
-      VLOG(2) << "Using region growing object finder.";
-      clustered_colored_pcl =
-          regionGrowingClusterEstimator(pointcloud, centroids, object_pcls);
-      break;
-    case ObjectFinderType::kEuclidean:
-    default:
-      VLOG(2) << "Using euclidean object finder.";
-      clustered_colored_pcl =
-          euclideanClusterEstimator(pointcloud, centroids, object_pcls);
-      break;
-  }
-  CHECK(clustered_colored_pcl);
-
-  // Find BB
-  bounding_boxes->resize(object_pcls->size());
-  for (size_t i = 0; i < object_pcls->size(); ++i) {
-    bounding_boxes->at(i) =
-        BoundingBox::extract(object_pcls->at(i), BoundingBox::Type::AABB);
-  }
-
-  clustered_colored_pcl->header.frame_id = world_frame_;
-  return clustered_colored_pcl;
-}
-
 void ObjectFinder::updateClusterEstimator(ObjectFinderType type) {
   type_ = type;
 }
@@ -199,13 +118,107 @@ void ObjectFinder::setupEuclideanClusterEstimator() {
   euclidean_estimator_.setMaxClusterSize(euclidean_params_.max_cluster_size);
 }
 
+void ObjectFinder::addObjectsToGraph(const SubMesh& mesh,
+                                     const NodeColor& label_color,
+                                     SemanticLabel label,
+                                     DynamicSceneGraph* scene_graph) {
+  CHECK(scene_graph);
+  CHECK(mesh.vertices);
+
+  VLOG(1) << "Extracting objects for label: " << std::to_string(label);
+  if (mesh.vertices->empty()) {
+    VLOG(1) << "Skipping label " << label << " as input was empty";
+    return;
+  }
+
+  // TODO(nathan) eventually we'll refactor this to group centroids and stuff
+  ObjectClusters clusters;
+  findObjects(mesh.vertices, clusters);
+
+  // TODO(nathan) use the registration for something
+  // ObjectPointClouds registered_objects =
+  // registerObjects(objects, std::to_string(label));
+
+  size_t num_objects = 0;
+  for (const auto& cluster : clusters) {
+    ObjectNodeAttributes::Ptr attrs = std::make_unique<ObjectNodeAttributes>();
+    attrs->semantic_label = label;
+    attrs->color = label_color,
+    attrs->name = std::to_string(label) + std::to_string(num_objects);
+    attrs->bounding_box =
+        BoundingBox::extract(cluster.cloud, BoundingBox::Type::AABB);
+
+    pcl::PointXYZ centroid;
+    cluster.centroid.get(centroid);
+    attrs->position << centroid.x, centroid.y, centroid.z;
+
+    scene_graph->emplaceNode(to_underlying(KimeraDsgLayers::OBJECTS),
+                             next_object_id_,
+                             std::move(attrs));
+
+    for (const auto& idx : cluster.indices.indices) {
+      scene_graph->insertMeshEdge(next_object_id_, mesh.vertex_map.at(idx));
+    }
+
+    ++next_object_id_;
+    ++num_objects;
+  }
+}
+
+ColorPointCloud::Ptr ObjectFinder::findObjects(
+    const ColorPointCloud::Ptr& cloud,
+    ObjectClusters& clusters) {
+  CHECK(cloud);
+
+  ColorPointCloud::Ptr colored_pcl;
+  ClusterIndices cluster_indices;
+  switch (type_) {
+    case ObjectFinderType::kRegionGrowing:
+      VLOG(2) << "Using region growing object finder.";
+      colored_pcl = regionGrowingClusterEstimator(cloud, cluster_indices);
+      break;
+    case ObjectFinderType::kEuclidean:
+    default:
+      VLOG(2) << "Using euclidean object finder.";
+      colored_pcl = euclideanClusterEstimator(cloud, cluster_indices);
+      break;
+  }
+
+  CHECK(colored_pcl);
+  colored_pcl->header.frame_id = world_frame_;
+
+  clusters = getClusterInfo(cloud, cluster_indices);
+
+  return colored_pcl;
+}
+
+ObjectClusters ObjectFinder::getClusterInfo(const ColorPointCloud::Ptr& cloud,
+                                            const ClusterIndices& indices) {
+  ObjectClusters clusters;
+  clusters.resize(indices.size());
+  for (size_t k = 0; k < indices.size(); ++k) {
+    clusters.at(k).cloud.reset(new ColorPointCloud());
+
+    const auto& object_indices = indices.at(k).indices;
+    clusters.at(k).cloud->resize(object_indices.size());
+    clusters.at(k).indices = indices.at(k);
+
+    for (size_t i = 0; i < object_indices.size(); ++i) {
+      const ColorPoint& color_point = cloud->at(object_indices.at(i));
+      clusters.at(k).cloud->at(i) = color_point;
+
+      clusters.at(k).centroid.add(
+          pcl::PointXYZ(color_point.x, color_point.y, color_point.z));
+    }
+  }
+
+  return clusters;
+}
+
 ColorPointCloud::Ptr ObjectFinder::regionGrowingClusterEstimator(
     const ColorPointCloud::Ptr& cloud,
-    Centroids* centroids,
-    ObjectPointClouds* object_pcls) {
+    ClusterIndices& cluster_indices) {
   CHECK(cloud);
-  CHECK_NOTNULL(centroids);
-  CHECK_NOTNULL(object_pcls);
   pcl::search::Search<ColorPoint>::Ptr tree(
       new pcl::search::KdTree<ColorPoint>);
   pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>);
@@ -222,11 +235,7 @@ ColorPointCloud::Ptr ObjectFinder::regionGrowingClusterEstimator(
   region_growing_estimator_.setInputCloud(cloud);
   region_growing_estimator_.setInputNormals(normals);
 
-  std::vector<pcl::PointIndices> cluster_indices;
   region_growing_estimator_.extract(cluster_indices);
-
-  // Get centroids of clusters.
-  getCentroidsGivenClusters(cloud, cluster_indices, centroids, object_pcls);
 
   LOG(INFO) << "Number of clusters found: " << cluster_indices.size();
   return region_growing_estimator_.getColoredCloud();
@@ -234,10 +243,7 @@ ColorPointCloud::Ptr ObjectFinder::regionGrowingClusterEstimator(
 
 ColorPointCloud::Ptr ObjectFinder::euclideanClusterEstimator(
     const ColorPointCloud::Ptr& cloud,
-    Centroids* centroids,
-    ObjectPointClouds* object_pcls) {
-  CHECK_NOTNULL(centroids);
-  CHECK_NOTNULL(object_pcls);
+    ClusterIndices& cluster_indices) {
   pcl::search::KdTree<ColorPoint>::Ptr tree(
       new pcl::search::KdTree<ColorPoint>);
   tree->setInputCloud(cloud);
@@ -245,19 +251,14 @@ ColorPointCloud::Ptr ObjectFinder::euclideanClusterEstimator(
   euclidean_estimator_.setSearchMethod(tree);
   euclidean_estimator_.setInputCloud(cloud);
 
-  // Extract clusters
-  std::vector<pcl::PointIndices> cluster_indices;
   euclidean_estimator_.extract(cluster_indices);
-
-  // Get centroids of clusters.
-  getCentroidsGivenClusters(cloud, cluster_indices, centroids, object_pcls);
 
   return getColoredCloud(cloud, cluster_indices);
 }
 
 ColorPointCloud::Ptr ObjectFinder::getColoredCloud(
     const ColorPointCloud::Ptr& input,
-    const std::vector<pcl::PointIndices>& clusters) {
+    const ClusterIndices& clusters) {
   ColorPointCloud::Ptr colored_cloud(new ColorPointCloud);
 
   if (!clusters.empty()) {
@@ -300,30 +301,6 @@ ColorPointCloud::Ptr ObjectFinder::getColoredCloud(
   }
 
   return colored_cloud;
-}
-
-void ObjectFinder::getCentroidsGivenClusters(
-    const ColorPointCloud::Ptr& cloud,
-    const std::vector<pcl::PointIndices>& cluster_indices,
-    Centroids* centroids,
-    ObjectPointClouds* object_pcls) {
-  CHECK_NOTNULL(centroids);
-  CHECK_NOTNULL(object_pcls);
-  centroids->resize(cluster_indices.size());
-  object_pcls->resize(cluster_indices.size());
-  for (size_t k = 0; k < cluster_indices.size(); ++k) {
-    Centroid& centroid = centroids->at(k);
-    ColorPointCloud::Ptr pcl(new ColorPointCloud());
-    const auto& indices = cluster_indices.at(k).indices;
-    pcl->resize(indices.size());
-    for (size_t i = 0; i < indices.size(); ++i) {
-      // For centroid of cluster k, add all points belonging to it.
-      const ColorPoint& color_point = cloud->at(indices.at(i));
-      centroid.add(Point(color_point.x, color_point.y, color_point.z));
-      pcl->at(i) = color_point;
-    }
-    object_pcls->at(k) = pcl;
-  }
 }
 
 ObjectPointClouds ObjectFinder::registerObjects(

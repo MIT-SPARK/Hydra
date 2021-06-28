@@ -1,5 +1,4 @@
 #include "kimera_scene_graph/visualizer_utils.h"
-#include "kimera_scene_graph/voxblox_conversions.h"
 
 #include <kimera_dsg/scene_graph_layer.h>
 #include <tf2_eigen/tf2_eigen.h>
@@ -292,8 +291,9 @@ MarkerArray makeGraphEdgeMarkers(const SceneGraph& graph,
 }
 
 Marker makeMeshEdgesMarker(const LayerConfig& config,
-                           const SceneGraphLayer& layer,
                            const VisualizerConfig& visualizer_config,
+                           const DynamicSceneGraph& graph,
+                           const SceneGraphLayer& layer,
                            const std::string& marker_namespace) {
   Marker marker;
   marker.type = Marker::LINE_LIST;
@@ -306,10 +306,12 @@ Marker makeMeshEdgesMarker(const LayerConfig& config,
 
   for (const auto& id_node_pair : layer.nodes) {
     const Node& node = *id_node_pair.second;
-    ObjectNodeAttributes attrs = node.attributes<ObjectNodeAttributes>();
-    if (attrs.points == nullptr || attrs.points->size() == 0) {
+    auto mesh_points = graph.getMeshCloudForNode(node.id);
+    if (mesh_points == nullptr || mesh_points->size() == 0) {
       continue;
     }
+
+    SemanticNodeAttributes attrs = node.attributes<SemanticNodeAttributes>();
 
     geometry_msgs::Point center_point;
     tf2::convert(attrs.position, center_point);
@@ -335,12 +337,12 @@ Marker makeMeshEdgesMarker(const LayerConfig& config,
           makeColorMsg(NodeColor::Zero(), config.interlayer_edge_alpha));
     }
 
-    for (size_t i = 0; i < attrs.points->size();
+    for (size_t i = 0; i < mesh_points->size();
          i += config.interlayer_edge_insertion_skip + 1) {
       geometry_msgs::Point vertex;
-      vertex.x = attrs.points->at(i).x;
-      vertex.y = attrs.points->at(i).y;
-      vertex.z = attrs.points->at(i).z;
+      vertex.x = mesh_points->at(i).x;
+      vertex.y = mesh_points->at(i).y;
+      vertex.z = mesh_points->at(i).z;
       if (!visualizer_config.collapse_layers) {
         vertex.z += visualizer_config.mesh_layer_offset;
       }
@@ -402,31 +404,12 @@ Marker makeLayerEdgeMarkers(const LayerConfig& config,
   return marker;
 }
 
-Marker makeMeshMarker(const LayerConfig& config,
-                      const VisualizerConfig& visualizer_config,
-                      const voxblox::Mesh& mesh,
-                      voxblox::ColorMode color_mode,
-                      const std::string& marker_namespace) {
-  Marker marker;
-  marker.ns = marker_namespace;
-  marker.type = Marker::TRIANGLE_LIST;
-  marker.scale.x = 1.0;
-  marker.scale.y = 1.0;
-  marker.scale.z = 1.0;
-  fillPoseWithIdentity(marker.pose);
-
-  for (size_t i = 0u; i < mesh.vertices.size(); i++) {
-    geometry_msgs::Point point;
-    Eigen::Vector3d vertex_pos = mesh.vertices.at(i).cast<double>();
-    tf2::convert(vertex_pos, point);
+void adjustMesh(const LayerConfig& config,
+                const VisualizerConfig& visualizer_config,
+                mesh_msgs::TriangleMesh& msg) {
+  for (auto& point : msg.vertices) {
     point.z += getZOffset(config, visualizer_config);
-    marker.points.push_back(point);
-
-    std_msgs::ColorRGBA color = voxblox::getVertexColor(mesh, color_mode, i);
-    marker.colors.push_back(color);
   }
-
-  return marker;
 }
 
 }  // namespace kimera

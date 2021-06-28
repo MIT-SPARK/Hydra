@@ -9,6 +9,7 @@
 #include <kimera_dsg/scene_graph.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <pcl/PolygonMesh.h>
 
 #include <string>
 #include <vector>
@@ -29,14 +30,12 @@ class SceneGraphVisualizer {
 
   virtual ~SceneGraphVisualizer() = default;
 
-  void visualize(const SceneGraph::Ptr& scene_graph);
+  void visualize(const DynamicSceneGraph::Ptr& scene_graph);
 
-  void visualizeMesh(voxblox::MeshLayer* mesh,
-                     voxblox::ColorMode color_mode,
-                     bool is_rgb_mesh = true,
-                     bool force_updated = true) const;
+  void visualizeMesh(const pcl::PolygonMesh& mesh,
+                     bool is_rgb_mesh = true) const;
 
-  void visualizeWalls(const voxblox::Mesh& mesh) const;
+  void visualizeWalls(const pcl::PolygonMesh& mesh) const;
 
   void clear();
 
@@ -81,7 +80,7 @@ class SceneGraphVisualizer {
   void setupDynamicReconfigure(const SceneGraph::LayerIds& layer_ids);
 
  protected:
-  SceneGraph::Ptr scene_graph_;
+  DynamicSceneGraph::Ptr scene_graph_;
 
   ros::NodeHandle nh_;
   ros::NodeHandle nh_private_;
