@@ -5,38 +5,106 @@
 namespace kimera {
 namespace topology {
 
-struct GvdVoxelIndex {
+using ParentMap = Eigen::Map<const GlobalIndex>;
+
+struct GvdVoxelWithIndex {
   GvdVoxel voxel;
   GlobalIndex index;
 };
 
-GvdVoxelIndex makeGvdVoxel(uint64_t x, uint64_t y, uint64_t z) {
-  GvdVoxelIndex to_return;
+GvdVoxelWithIndex makeGvdVoxel(uint64_t x, uint64_t y, uint64_t z) {
+  GvdVoxelWithIndex to_return;
   to_return.index << x, y, z;
   return to_return;
 }
 
-GvdVoxelIndex makeGvdVoxel(uint64_t x, uint64_t y, uint64_t z, double distance) {
-  GvdVoxelIndex to_return = makeGvdVoxel(x, y, z);
-  to_return.index << x, y, z;
+GvdVoxelWithIndex makeGvdVoxel(uint64_t x, uint64_t y, uint64_t z, float distance) {
+  GvdVoxelWithIndex to_return = makeGvdVoxel(x, y, z);
   to_return.voxel.distance = distance;
   to_return.voxel.observed = true;
   return to_return;
 }
 
-GvdVoxelIndex makeGvdVoxel(uint64_t x,
-                           uint64_t y,
-                           uint64_t z,
-                           double distance,
-                           uint64_t px,
-                           uint64_t py,
-                           uint64_t pz) {
-  GvdVoxelIndex to_return = makeGvdVoxel(x, y, z, distance);
+GvdVoxelWithIndex makeGvdVoxel(uint64_t x,
+                               uint64_t y,
+                               uint64_t z,
+                               float distance,
+                               uint64_t px,
+                               uint64_t py,
+                               uint64_t pz) {
+  GvdVoxelWithIndex to_return = makeGvdVoxel(x, y, z, distance);
   to_return.voxel.has_parent = true;
   to_return.voxel.parent[0] = px;
   to_return.voxel.parent[1] = py;
   to_return.voxel.parent[2] = pz;
   return to_return;
+}
+
+TEST(GvdUtilities, setGvdParent) {
+  {  // assign parent from neighbor parent
+    GvdVoxelWithIndex neighbor = makeGvdVoxel(1, 2, 3, 4.0, 5, 6, 7);
+    GvdVoxel current;
+    EXPECT_FALSE(current.has_parent);
+
+    setGvdParent(current, neighbor.voxel, neighbor.index);
+
+    GlobalIndex expected;
+    expected << 5, 6, 7;
+    EXPECT_TRUE(current.has_parent);
+    EXPECT_EQ(expected, ParentMap(current.parent));
+  }
+
+  {  // assign parent from neighbor
+    GvdVoxelWithIndex neighbor = makeGvdVoxel(1, 2, 3, 4.0);
+    GvdVoxel current;
+    EXPECT_FALSE(current.has_parent);
+
+    setGvdParent(current, neighbor.voxel, neighbor.index);
+
+    GlobalIndex expected;
+    expected << 1, 2, 3;
+    EXPECT_TRUE(current.has_parent);
+    EXPECT_EQ(expected, ParentMap(current.parent));
+  }
+}
+
+TEST(GvdUtilities, ressetGvdParent) {
+  GvdVoxelWithIndex current;
+  // invariant of new voxels
+  EXPECT_FALSE(current.voxel.has_parent);
+  // resetting can't assign a new parent
+  resetGvdParent(current.voxel);
+  EXPECT_FALSE(current.voxel.has_parent);
+
+  current = makeGvdVoxel(1, 2, 3, 4.0, 5, 6, 7);
+  EXPECT_TRUE(current.voxel.has_parent);
+  // resetting should clear a previous parent
+  resetGvdParent(current.voxel);
+  EXPECT_FALSE(current.voxel.has_parent);
+}
+
+TEST(GvdUtilities, setGvdSurfaceVoxel) {
+  {  // assign parent from neighbor parent
+    GvdVoxel current;
+    EXPECT_FALSE(current.has_parent);
+    EXPECT_FALSE(current.on_surface);
+
+    setGvdSurfaceVoxel(current);
+
+    EXPECT_FALSE(current.has_parent);
+    EXPECT_TRUE(current.on_surface);
+  }
+
+  {  // assign parent from neighbor parent
+    GvdVoxel current = makeGvdVoxel(1, 2, 3, 4.0, 5, 6, 7).voxel;
+    EXPECT_TRUE(current.has_parent);
+    EXPECT_FALSE(current.on_surface);
+
+    setGvdSurfaceVoxel(current);
+
+    EXPECT_FALSE(current.has_parent);
+    EXPECT_TRUE(current.on_surface);
+  }
 }
 
 // test that estimate distance handles all the different
@@ -111,10 +179,10 @@ TEST(GvdUtilities, estimateDistanceCorrect) {
   // the last case (that both are zero) is intentionally not handled
 }
 
-TEST(GvdUtilities, DISABLED_checkVoronoiNoParent) {
+TEST(GvdUtilities, checkVoronoiMinDistance) {
   {  // current is invalid
-    GvdVoxelIndex current = makeGvdVoxel(1, 2, 3, 0.05, 0, 0, 0);
-    GvdVoxelIndex neighbor = makeGvdVoxel(1, 2, 4, 1.0, 5, 5, 5);
+    GvdVoxelWithIndex current = makeGvdVoxel(1, 2, 3, 0.05, 0, 0, 0);
+    GvdVoxelWithIndex neighbor = makeGvdVoxel(1, 2, 4, 1.0, 5, 5, 5);
     VoronoiCondition result =
         checkVoronoi(current.voxel, current.index, neighbor.voxel, neighbor.index, 0.1);
     EXPECT_FALSE(result.neighbor_is_voronoi);
@@ -122,8 +190,8 @@ TEST(GvdUtilities, DISABLED_checkVoronoiNoParent) {
   }
 
   {  // neighbor is invalid
-    GvdVoxelIndex current = makeGvdVoxel(1, 2, 3, 1.0, 0, 0, 0);
-    GvdVoxelIndex neighbor = makeGvdVoxel(1, 2, 4, 0.05, 5, 5, 5);
+    GvdVoxelWithIndex current = makeGvdVoxel(1, 2, 3, 1.0, 0, 0, 0);
+    GvdVoxelWithIndex neighbor = makeGvdVoxel(1, 2, 4, 0.05, 5, 5, 5);
     VoronoiCondition result =
         checkVoronoi(current.voxel, current.index, neighbor.voxel, neighbor.index, 0.1);
     EXPECT_FALSE(result.neighbor_is_voronoi);
@@ -131,23 +199,50 @@ TEST(GvdUtilities, DISABLED_checkVoronoiNoParent) {
   }
 }
 
-TEST(GvdUtilities, DISABLED_checkVoronoiMinDistance) {
-  {  // current is invalid
-    GvdVoxelIndex current = makeGvdVoxel(1, 2, 3, 0.05, 0, 0, 0);
-    GvdVoxelIndex neighbor = makeGvdVoxel(1, 2, 4, 1.0, 5, 5, 5);
+TEST(GvdUtilities, checkVoronoiParentsSame) {
+  GvdVoxelWithIndex current = makeGvdVoxel(1, 2, 3, 1.0, 0, 0, 0);
+  GvdVoxelWithIndex neighbor = makeGvdVoxel(1, 2, 4, 1.0, 0, 0, 0);
+  VoronoiCondition result =
+      checkVoronoi(current.voxel, current.index, neighbor.voxel, neighbor.index, 0.1);
+  EXPECT_FALSE(result.neighbor_is_voronoi);
+  EXPECT_FALSE(result.current_is_voronoi);
+}
+
+TEST(GvdUtilities, checkVoronoiParentNeighbors) {
+  {  // neighbor are 1 step away
+    GvdVoxelWithIndex current = makeGvdVoxel(1, 2, 3, 1.0, 0, 0, 0);
+    GvdVoxelWithIndex neighbor = makeGvdVoxel(1, 2, 4, 1.0, 0, 0, 1);
     VoronoiCondition result =
         checkVoronoi(current.voxel, current.index, neighbor.voxel, neighbor.index, 0.1);
     EXPECT_FALSE(result.neighbor_is_voronoi);
     EXPECT_FALSE(result.current_is_voronoi);
   }
 
-  {  // neighbor is invalid
-    GvdVoxelIndex current = makeGvdVoxel(1, 2, 3, 1.0, 0, 0, 0);
-    GvdVoxelIndex neighbor = makeGvdVoxel(1, 2, 4, 0.05, 5, 5, 5);
+  {  // neighbor are 8-connected
+    GvdVoxelWithIndex current = makeGvdVoxel(1, 2, 3, 1.0, 0, 0, 0);
+    GvdVoxelWithIndex neighbor = makeGvdVoxel(1, 2, 4, 1.0, 0, 1, 1);
     VoronoiCondition result =
         checkVoronoi(current.voxel, current.index, neighbor.voxel, neighbor.index, 0.1);
     EXPECT_FALSE(result.neighbor_is_voronoi);
     EXPECT_FALSE(result.current_is_voronoi);
+  }
+
+  {  // neighbor are 28-connected
+    GvdVoxelWithIndex current = makeGvdVoxel(1, 2, 3, 1.0, 0, 0, 0);
+    GvdVoxelWithIndex neighbor = makeGvdVoxel(1, 2, 4, 1.0, 1, 1, 1);
+    VoronoiCondition result =
+        checkVoronoi(current.voxel, current.index, neighbor.voxel, neighbor.index, 0.1);
+    EXPECT_FALSE(result.neighbor_is_voronoi);
+    EXPECT_FALSE(result.current_is_voronoi);
+  }
+
+  {  // neighbor are not connected
+    GvdVoxelWithIndex current = makeGvdVoxel(1, 2, 3, 1.0, 1, 0, 3);
+    GvdVoxelWithIndex neighbor = makeGvdVoxel(1, 2, 4, 1.0, 3, 2, 4);
+    VoronoiCondition result =
+        checkVoronoi(current.voxel, current.index, neighbor.voxel, neighbor.index, 0.1);
+    EXPECT_TRUE(result.neighbor_is_voronoi);
+    EXPECT_TRUE(result.current_is_voronoi);
   }
 }
 

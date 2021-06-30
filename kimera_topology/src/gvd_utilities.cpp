@@ -36,29 +36,32 @@ VoronoiCondition checkVoronoi(const GvdVoxel& current,
                               const GlobalIndex& neighbor_idx,
                               double gvd_min_distance,
                               double parent_min_separation) {
+  VoronoiCondition result;
+
+  // if only one voxel fails this, we still want to reject the candidate
+  // as a successful check for the passing voxel would mean that it would
+  // be closer than the min distance to the other parent
+  if (current.distance <= gvd_min_distance || neighbor.distance <= gvd_min_distance) {
+    return result;
+  }
+
   Eigen::Map<const GlobalIndex> neighbor_parent(neighbor.parent);
   Eigen::Map<const GlobalIndex> current_parent(current.parent);
 
-  VoronoiCondition voxel_conditions;
-  if (neighbor_parent == current_parent) {
-    return voxel_conditions;
+  if ((neighbor_parent - current_parent).lpNorm<1>() <= parent_min_separation) {
+    return result;
   }
-
-  if ((neighbor_parent - current_parent).lpNorm<1>() < parent_min_separation) {
-    return voxel_conditions;
-  }
-  // TODO(nathan) parent adjacency checks
 
   // Algorithm 4: 51-52 of Lau et al. 2013
-  double dist_c_pn = (current_idx - neighbor_parent).norm();
-  double dist_n_pc = (neighbor_idx - current_parent).norm();
+  const GlobalIndex c_pn = current_idx - neighbor_parent;
+  const GlobalIndex n_pc = neighbor_idx - current_parent;
+  const GlobalIndex::Scalar dist_c_pn = c_pn.dot(c_pn);
+  const GlobalIndex::Scalar dist_n_pc = n_pc.dot(n_pc);
 
-  VLOG(5) << "  d_c_pn: " << dist_c_pn << " d_n_pc: " << dist_n_pc;
-  // rather than stopping the check early, we use the fixed flag to determine if
-  // the voronoi condition is truly met for a voxel
-  voxel_conditions.current_is_voronoi = (dist_c_pn <= dist_n_pc) && !current.fixed;
-  voxel_conditions.neighbor_is_voronoi = (dist_n_pc <= dist_c_pn) && !neighbor.fixed;
-  return voxel_conditions;
+  VLOG(10) << "  d_c_pn: " << dist_c_pn << " d_n_pc: " << dist_n_pc;
+  result.current_is_voronoi = (dist_c_pn <= dist_n_pc);
+  result.neighbor_is_voronoi = (dist_n_pc <= dist_c_pn);
+  return result;
 }
 
 }  // namespace topology

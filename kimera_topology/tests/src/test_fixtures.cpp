@@ -59,14 +59,21 @@ Transformation EsdfTestFixture::getPose(size_t index) const {
       Quaternion(Eigen::AngleAxis<float>(yaw, Point::UnitZ()) *
                  Eigen::AngleAxis<float>(camera_pitch, Point::UnitY()));
 
+  /*      Quaternion(Eigen::AngleAxis<float>(camera_pitch, Point::UnitY()) **/
+  // Eigen::AngleAxis<float>(yaw, Point::UnitZ()));
+
+  /*  Quaternion rotation =*/
+  // Quaternion(Eigen::AngleAxis<float>(yaw, Point::UnitZ()) *
+  // Eigen::AngleAxis<float>(camera_pitch, Point::UnitY()));
+
   return Transformation(rotation, position);
 }
 
 GvdTestFixture::GvdTestFixture() : EsdfTestFixture() {
-  depth_camera_max_distance = 2.0;
+  depth_camera_max_distance = 3.0;
   depth_camera_fov = M_PI / 7.0;
-  pose_radius = 2.5;
-  pose_height = 1.2;
+  pose_radius = 2.0;
+  pose_height = 1.5;
   num_angles = 50;
   num_poses = 2;
   camera_pitch = 0.6;
@@ -119,6 +126,7 @@ void SingleBlockTestFixture::SetUp() {
 
   tsdf_layer.reset(new Layer<TsdfVoxel>(voxel_size, voxels_per_side));
   gvd_layer.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
+  mesh_layer.reset(new MeshLayer(voxel_size * voxels_per_side));
 
   BlockIndex block_index = BlockIndex::Zero();
   tsdf_block = tsdf_layer->allocateBlockPtrByIndex(block_index);
@@ -130,6 +138,51 @@ void SingleBlockTestFixture::SetUp() {
       for (int z = 0; z < voxels_per_side; ++z) {
         const bool is_edge = (x == 0) || (y == 0) || (z == 0);
         setTsdfVoxel(x, y, z, is_edge ? 0.0 : truncation_distance);
+      }
+    }
+  }
+}
+
+void TestFixture2d::setTsdfVoxel(int x, int y, float distance, float weight) {
+  CHECK_LT(x, voxels_per_side);
+  CHECK_LT(y, voxels_per_side);
+
+  VoxelIndex v_index;
+  v_index << x, y, 0;
+
+  auto& voxel = tsdf_block->getVoxelByVoxelIndex(v_index);
+  voxel.distance = distance;
+  voxel.weight = weight;
+}
+
+const GvdVoxel& TestFixture2d::getGvdVoxel(int x, int y) {
+  CHECK_LT(x, voxels_per_side);
+  CHECK_LT(y, voxels_per_side);
+
+  VoxelIndex v_index;
+  v_index << x, y, 0;
+
+  return gvd_block->getVoxelByVoxelIndex(v_index);
+}
+
+void TestFixture2d::SetUp() {
+  tsdf_layer.reset(new Layer<TsdfVoxel>(voxel_size, voxels_per_side));
+  gvd_layer.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
+  mesh_layer.reset(new MeshLayer(voxel_size * voxels_per_side));
+
+  BlockIndex block_index = BlockIndex::Zero();
+  tsdf_block = tsdf_layer->allocateBlockPtrByIndex(block_index);
+  gvd_block = gvd_layer->allocateBlockPtrByIndex(block_index);
+  tsdf_block->updated().set();
+
+  for (int x = 0; x < voxels_per_side; ++x) {
+    for (int y = 0; y < voxels_per_side; ++y) {
+      for (int z = 1; z < voxels_per_side; ++z) {
+        VoxelIndex v_index;
+        v_index << x, y, 0;
+
+        auto& voxel = tsdf_block->getVoxelByVoxelIndex(v_index);
+        voxel.weight = 0.0;
       }
     }
   }

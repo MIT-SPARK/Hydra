@@ -59,12 +59,37 @@ class SingleBlockTestFixture : public ::testing::Test {
 
   const GvdVoxel& getGvdVoxel(int x, int y, int z);
 
-  const float voxel_size = 0.1f;
-  const int voxels_per_side = 4;
-  const double truncation_distance = 0.1;
+  float voxel_size = 0.1f;
+  int voxels_per_side = 4;
+  double truncation_distance = 0.1;
 
   Layer<TsdfVoxel>::Ptr tsdf_layer;
   Layer<GvdVoxel>::Ptr gvd_layer;
+  MeshLayer::Ptr mesh_layer;
+
+  GvdIntegratorConfig gvd_config;
+  voxblox::Block<voxblox::TsdfVoxel>::Ptr tsdf_block;
+  voxblox::Block<GvdVoxel>::Ptr gvd_block;
+};
+
+class TestFixture2d : public ::testing::Test {
+ public:
+  TestFixture2d() = default;
+  virtual ~TestFixture2d() = default;
+
+  virtual void SetUp() override;
+
+  void setTsdfVoxel(int x, int y, float distance, float weight = 0.1f);
+
+  const GvdVoxel& getGvdVoxel(int x, int y);
+
+  float voxel_size = 1.0f;
+  int voxels_per_side = 8;
+  double truncation_distance = 0.1;
+
+  Layer<TsdfVoxel>::Ptr tsdf_layer;
+  Layer<GvdVoxel>::Ptr gvd_layer;
+  MeshLayer::Ptr mesh_layer;
 
   GvdIntegratorConfig gvd_config;
   voxblox::Block<voxblox::TsdfVoxel>::Ptr tsdf_block;

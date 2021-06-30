@@ -1,6 +1,7 @@
 #pragma once
 #include <ros/ros.h>
 
+#include <kimera_topology/gvd_voxel.h>
 #include <kimera_topology/voxblox_types.h>
 
 #include <visualization_msgs/Marker.h>
@@ -21,6 +22,12 @@ class TestVisualizer {
   void visualizePointcloud(const voxblox::Pointcloud& pointcloud) const;
 
   void visualizeGvd(const Layer<GvdVoxel>& layer) const;
+
+  void visualizeParents(const Layer<GvdVoxel>& layer,
+                        double size = 0.5,
+                        double end_scale = 0.1,
+                        double edge_scale = 0.05,
+                        double max_basis = 10.0) const;
 
   void visualizeTsdf(const Layer<TsdfVoxel>& layer, double truncation_distance) const;
 
@@ -50,6 +57,7 @@ class TestVisualizer {
   ros::Publisher esdf_pub;
   ros::Publisher tsdf_pub;
   ros::Publisher gvd_pub;
+  ros::Publisher gvd_parent_pub;
   ros::Publisher marker_pub;
   ros::Publisher camera_pub;
   ros::Publisher esdf_block_pub;

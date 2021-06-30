@@ -37,7 +37,8 @@ TEST_F(EsdfTestFixture, TestEsdfSame) {
 
   GvdIntegratorConfig gvd_config = test_helpers::gvdConfigFromEsdfConfig(esdf_config);
   Layer<GvdVoxel>::Ptr gvd_layer(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
-  GvdIntegrator gvd_integrator(gvd_config, tsdf_layer, gvd_layer);
+  MeshLayer::Ptr mesh_layer(new MeshLayer(voxel_size * voxels_per_side));
+  GvdIntegrator gvd_integrator(gvd_config, tsdf_layer, gvd_layer, mesh_layer);
 
   for (size_t i = 0; i < num_poses; ++i) {
     updateTsdfIntegrator(tsdf_integrator, i);

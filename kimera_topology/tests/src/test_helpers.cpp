@@ -8,7 +8,6 @@ namespace test_helpers {
 
 GvdIntegratorConfig gvdConfigFromEsdfConfig(const EsdfIntegrator::Config& esdf) {
   GvdIntegratorConfig config;
-  COPY_FIELD(config, esdf, full_euclidean_distance);
   COPY_FIELD(config, esdf, max_distance_m);
   COPY_FIELD(config, esdf, min_distance_m);
   COPY_FIELD(config, esdf, min_diff_m);

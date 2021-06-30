@@ -19,7 +19,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_library(${PROJECT_NAME} src/gvd_integrator.cpp src/gvd_utilities.cpp src/voxblox_types.cpp)
+add_library(
+  ${PROJECT_NAME}
+  src/gvd_integrator.cpp
+  src/gvd_utilities.cpp
+  src/gvd_voxel.cpp
+  src/voxel_aware_marching_cubes.cpp
+  src/voxel_aware_mesh_integrator.cpp
+)
 target_link_libraries(${PROJECT_NAME} PUBLIC ${catkin_LIBRARIES})
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
 
@@ -34,6 +41,7 @@ if(CATKIN_ENABLE_TESTING)
     tests/utest_esdf_helpers.cpp
     tests/utest_gvd_utilities.cpp
     tests/utest_gvd_visualization.cpp
+    tests/utest_marching_cubes.cpp
     tests/utest_incremental_gvd.cpp
   )
   target_include_directories(

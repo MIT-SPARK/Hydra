@@ -9,14 +9,15 @@ class GvdTestIntegrator : public GvdIntegrator {
  public:
   GvdTestIntegrator(const GvdIntegratorConfig& config,
                     const Layer<TsdfVoxel>::Ptr& tsdf_layer,
-                    const Layer<GvdVoxel>::Ptr& gvd_layer)
-      : GvdIntegrator(config, tsdf_layer, gvd_layer) {
+                    const Layer<GvdVoxel>::Ptr& gvd_layer,
+                    const MeshLayer::Ptr& mesh_layer)
+      : GvdIntegrator(config, tsdf_layer, gvd_layer, mesh_layer) {
     update_stats_.clear();
   }
 
   ~GvdTestIntegrator() = default;
 
-  using GvdIntegrator::open_;
+  using GvdIntegrator::lower_;
   using GvdIntegrator::pushToQueue;
   using GvdIntegrator::PushType;
   using GvdIntegrator::raise_;
@@ -30,17 +31,19 @@ struct EsdfHelpers : ::testing::Test {
     const size_t voxels_per_side = 16;
     tsdf_layer.reset(new Layer<TsdfVoxel>(voxel_size, voxels_per_side));
     gvd_layer.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
+    mesh_layer.reset(new MeshLayer(voxel_size * voxels_per_side));
     GvdIntegratorConfig config;
-    integrator.reset(new GvdTestIntegrator(config, tsdf_layer, gvd_layer));
+    integrator.reset(new GvdTestIntegrator(config, tsdf_layer, gvd_layer, mesh_layer));
   }
 
   void reset(const GvdIntegratorConfig& config) {
-    integrator.reset(new GvdTestIntegrator(config, tsdf_layer, gvd_layer));
+    integrator.reset(new GvdTestIntegrator(config, tsdf_layer, gvd_layer, mesh_layer));
   }
 
   std::unique_ptr<GvdTestIntegrator> integrator;
   Layer<TsdfVoxel>::Ptr tsdf_layer;
   Layer<GvdVoxel>::Ptr gvd_layer;
+  MeshLayer::Ptr mesh_layer;
 };
 
 TEST_F(EsdfHelpers, TestPushQueueNew) {
@@ -52,7 +55,7 @@ TEST_F(EsdfHelpers, TestPushQueueNew) {
   EXPECT_EQ(1u, integrator->update_stats_.number_new_voxels);
   EXPECT_EQ(0u, integrator->update_stats_.number_lowered_voxels);
   EXPECT_EQ(0u, integrator->update_stats_.number_raised_voxels);
-  EXPECT_FALSE(integrator->open_.empty());
+  EXPECT_FALSE(integrator->lower_.empty());
   EXPECT_TRUE(integrator->raise_.empty());
   EXPECT_TRUE(voxel.in_queue);
 }
@@ -67,7 +70,7 @@ TEST_F(EsdfHelpers, TestPushQueueLower) {
   EXPECT_EQ(0u, integrator->update_stats_.number_new_voxels);
   EXPECT_EQ(1u, integrator->update_stats_.number_lowered_voxels);
   EXPECT_EQ(0u, integrator->update_stats_.number_raised_voxels);
-  EXPECT_FALSE(integrator->open_.empty());
+  EXPECT_FALSE(integrator->lower_.empty());
   EXPECT_TRUE(integrator->raise_.empty());
   EXPECT_TRUE(voxel.in_queue);
 }
@@ -82,7 +85,7 @@ TEST_F(EsdfHelpers, TestPushQueueRaise) {
   EXPECT_EQ(0u, integrator->update_stats_.number_new_voxels);
   EXPECT_EQ(0u, integrator->update_stats_.number_lowered_voxels);
   EXPECT_EQ(1u, integrator->update_stats_.number_raised_voxels);
-  EXPECT_TRUE(integrator->open_.empty());
+  EXPECT_TRUE(integrator->lower_.empty());
   EXPECT_FALSE(integrator->raise_.empty());
   EXPECT_FALSE(voxel.in_queue);
 }
@@ -97,7 +100,7 @@ TEST_F(EsdfHelpers, TestPushQueueBoth) {
   EXPECT_EQ(0u, integrator->update_stats_.number_new_voxels);
   EXPECT_EQ(0u, integrator->update_stats_.number_lowered_voxels);
   EXPECT_EQ(1u, integrator->update_stats_.number_raised_voxels);
-  EXPECT_FALSE(integrator->open_.empty());
+  EXPECT_FALSE(integrator->lower_.empty());
   EXPECT_FALSE(integrator->raise_.empty());
   EXPECT_TRUE(voxel.in_queue);
 }
@@ -123,7 +126,7 @@ TEST_F(EsdfHelpers, TestObservedVoxel) {
     EXPECT_EQ(0u, integrator->update_stats_.number_new_voxels);
     EXPECT_EQ(1u, integrator->update_stats_.number_lowered_voxels);
     EXPECT_EQ(0u, integrator->update_stats_.number_raised_voxels);
-    EXPECT_FALSE(integrator->open_.empty());
+    EXPECT_FALSE(integrator->lower_.empty());
     EXPECT_TRUE(integrator->raise_.empty());
     EXPECT_TRUE(gvd_voxel.in_queue);
   }

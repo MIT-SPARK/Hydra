@@ -39,7 +39,10 @@ class GvdVizFixture : public test_helpers::GvdTestFixture,
     visualizePointcloud(camera_pointcloud);
   }
 
-  void showGvd(const Layer<GvdVoxel>& layer) { visualizeGvd(layer); }
+  void showGvd(const Layer<GvdVoxel>& layer) {
+    visualizeGvd(layer);
+    visualizeParents(layer, 0.4, 0.2, 0.05);
+  }
 
   void showTsdf(const TsdfIntegratorBase::Config& config,
                 const Layer<TsdfVoxel>& layer) {
@@ -72,8 +75,10 @@ TEST_F(GvdVizFixture, DISABLED_VisualizeTestEsdf) {
   GvdIntegratorConfig gvd_config;
   gvd_config.min_distance_m = tsdf_config.default_truncation_distance;
   gvd_config.max_distance_m = 10.0;
+  gvd_config.voronoi_neighbor_l1_separation = 5.0;
   Layer<GvdVoxel>::Ptr gvd_layer(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
-  GvdIntegrator gvd_integrator(gvd_config, tsdf_layer, gvd_layer);
+  MeshLayer::Ptr mesh_layer(new MeshLayer(voxel_size * voxels_per_side));
+  GvdIntegrator gvd_integrator(gvd_config, tsdf_layer, gvd_layer, mesh_layer);
 
   for (size_t i = 0; i < num_poses; ++i) {
     updateTsdfIntegrator(tsdf_integrator, i);

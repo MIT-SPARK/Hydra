@@ -1,4 +1,4 @@
-#include <kimera_topology/voxblox_types.h>
+#include "kimera_topology/gvd_voxel.h"
 
 namespace kimera {
 namespace topology {
@@ -6,8 +6,9 @@ namespace topology {
 std::ostream& operator<<(std::ostream& out, const GvdVoxel& voxel) {
   out << "GvdVoxel<flags=";
   out << (voxel.observed ? 'y' : 'n');
-  out << (voxel.in_queue ? 'y' : 'n');
+  out << (voxel.on_surface ? 'y' : 'n');
   out << (voxel.fixed ? 'y' : 'n');
+  out << (voxel.in_queue ? 'y' : 'n');
   out << (voxel.is_voronoi ? 'y' : 'n');
   out << (voxel.is_voronoi_parent ? 'y' : 'n');
   out << ", distance=" << voxel.distance << " -> ";

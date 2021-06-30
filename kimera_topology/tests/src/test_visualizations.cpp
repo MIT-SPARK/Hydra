@@ -256,6 +256,7 @@ TestVisualizer::TestVisualizer()
   pointcloud_pub = nh.advertise<Marker>("input_pointcloud", 10, true);
   tsdf_pub = nh.advertise<Marker>("tsdf_marker", 10, true);
   gvd_pub = nh.advertise<Marker>("gvd_marker", 10, true);
+  gvd_parent_pub = nh.advertise<MarkerArray>("gvd_parent_marker", 10, true);
 
   ros::param::get("~camera_marker_scale", camera_marker_scale);
   ros::param::get("~camera_line_scale", camera_line_scale);
@@ -311,7 +312,8 @@ void TestVisualizer::visualizePointcloud(const voxblox::Pointcloud& pointcloud) 
   pointcloud_pub.publish(marker);
 }
 
-void TestVisualizer::visualizeTsdf(const Layer<TsdfVoxel>& layer, double truncation_distance) const {
+void TestVisualizer::visualizeTsdf(const Layer<TsdfVoxel>& layer,
+                                   double truncation_distance) const {
   Marker marker = makeEsdfMarker(layer, -0.1, truncation_distance);
   tsdf_pub.publish(marker);
 }
@@ -342,6 +344,70 @@ void TestVisualizer::visualizeGvd(const Layer<GvdVoxel>& layer) const {
   }
 
   gvd_pub.publish(marker);
+}
+
+void TestVisualizer::visualizeParents(const Layer<GvdVoxel>& layer,
+                                      double size,
+                                      double end_scale,
+                                      double edge_scale,
+                                      double max_basis) const {
+  MarkerArray msg;
+
+  Marker end_marker =
+      getDefaultMarker(0, end_scale * layer.voxel_size(), "parent_start");
+  end_marker.type = Marker::SPHERE_LIST;
+  // setColor(end_marker, 0.6, 0.4, 0.0, 0.6);
+
+  Marker edge_marker =
+      getDefaultMarker(0, edge_scale * layer.voxel_size(), "parent_lines");
+  edge_marker.type = Marker::LINE_LIST;
+  setColor(edge_marker, 0.0, 1.0, 0.0, 0.6);
+
+  BlockIndexList blocks;
+  layer.getAllAllocatedBlocks(&blocks);
+
+  for (const auto& idx : blocks) {
+    const auto& block = layer.getBlockByIndex(idx);
+    for (size_t i = 0; i < block.num_voxels(); ++i) {
+      const auto& voxel = block.getVoxelByLinearIndex(i);
+      if (!voxel.has_parent) {
+        continue;
+      }
+
+      Eigen::Vector3d center =
+          block.computeCoordinatesFromLinearIndex(i).cast<double>();
+
+      geometry_msgs::Point marker_center;
+      tf2::convert(center, marker_center);
+
+      GlobalIndex curr = getGlobalVoxelIndexFromBlockAndVoxelIndex(
+          idx, block.computeVoxelIndexFromLinearIndex(i), layer.voxels_per_side());
+      Eigen::Vector3d dir = (Eigen::Map<const GlobalIndex>(voxel.parent) - curr)
+                                .cast<double>()
+                                .normalized();
+      Eigen::Vector3d end_point = center + size * layer.voxel_size() * dir;
+
+      geometry_msgs::Point marker_end;
+      tf2::convert(end_point, marker_end);
+
+      end_marker.points.push_back(marker_center);
+
+      std_msgs::ColorRGBA end_color;
+      end_color.r =
+          voxel.is_voronoi ? static_cast<double>(voxel.num_basis) / max_basis : 0.0;
+      end_color.g = 0.0;
+      end_color.b = 0.0;
+      end_color.a = 0.8;
+      end_marker.colors.push_back(end_color);
+
+      edge_marker.points.push_back(marker_center);
+      edge_marker.points.push_back(marker_end);
+    }
+  }
+
+  msg.markers.push_back(end_marker);
+  msg.markers.push_back(edge_marker);
+  gvd_parent_pub.publish(msg);
 }
 
 void TestVisualizer::visualize(const Layer<GvdVoxel>& layer,

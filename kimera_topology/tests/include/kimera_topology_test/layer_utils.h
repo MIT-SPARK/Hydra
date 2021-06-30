@@ -1,4 +1,5 @@
 #pragma once
+#include <kimera_topology/gvd_voxel.h>
 #include <kimera_topology/voxblox_types.h>
 #include <voxblox/core/layer.h>
 #include <voxblox/utils/evaluation_utils.h>
