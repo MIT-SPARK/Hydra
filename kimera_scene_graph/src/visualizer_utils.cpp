@@ -161,7 +161,7 @@ Marker makeCentroidMarkers(const LayerConfig& config,
   bool node_colors_valid = true;
   marker.points.reserve(layer.numNodes());
   marker.colors.reserve(layer.numNodes());
-  for (const auto& id_node_pair : layer.nodes) {
+  for (const auto& id_node_pair : layer.nodes()) {
     geometry_msgs::Point node_centroid;
     tf2::convert(id_node_pair.second->attributes().position, node_centroid);
     node_centroid.z += getZOffset(config, visualizer_config);
@@ -221,7 +221,7 @@ MarkerArray makeGraphEdgeMarkers(const SceneGraph& graph,
   std::map<LayerId, Marker> layer_markers;
   std::map<LayerId, size_t> num_since_last_insertion;
 
-  for (const auto& edge : graph.inter_layer_edges) {
+  for (const auto& edge : graph.inter_layer_edges()) {
     const Node& source = *(graph.getNode(edge.second.source));
     const Node& target = *(graph.getNode(edge.second.target));
 
@@ -304,7 +304,7 @@ Marker makeMeshEdgesMarker(const LayerConfig& config,
   marker.scale.x = config.interlayer_edge_scale;
   fillPoseWithIdentity(marker.pose);
 
-  for (const auto& id_node_pair : layer.nodes) {
+  for (const auto& id_node_pair : layer.nodes()) {
     const Node& node = *id_node_pair.second;
     auto mesh_points = graph.getMeshCloudForNode(node.id);
     if (mesh_points == nullptr || mesh_points->size() == 0) {
@@ -386,8 +386,8 @@ Marker makeLayerEdgeMarkers(const LayerConfig& config,
   marker.color = makeColorMsg(color, config.intralayer_edge_alpha);
   fillPoseWithIdentity(marker.pose);
 
-  auto edge_iter = layer.edges.begin();
-  while (edge_iter != layer.edges.end()) {
+  auto edge_iter = layer.edges().begin();
+  while (edge_iter != layer.edges().end()) {
     geometry_msgs::Point source;
     tf2::convert(layer.getPosition(edge_iter->second.source), source);
     source.z += getZOffset(config, visualizer_config);

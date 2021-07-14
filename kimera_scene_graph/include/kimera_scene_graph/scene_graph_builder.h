@@ -33,7 +33,7 @@ class SceneGraphBuilder {
 
   void reconstruct();
 
-  inline bool loadSceneGraph(const std::string&) const { return false; }
+  void saveSceneGraph(const std::string& filepath) const;
 
   DynamicSceneGraph::Ptr getSceneGraph() { return scene_graph_; }
 

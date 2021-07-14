@@ -19,7 +19,7 @@ PclLayer<CloudType> convertLayerToPcl(const SceneGraphLayer& layer) {
   to_return.cloud->resize(layer.numNodes());
 
   size_t next_point_id = 0u;
-  for (const auto& id_node_pair : layer.nodes) {
+  for (const auto& id_node_pair : layer.nodes()) {
     Eigen::Vector3d position = id_node_pair.second->attributes().position;
     typename CloudType::PointType point;
     point.x = position(0);

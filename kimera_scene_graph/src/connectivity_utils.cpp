@@ -16,7 +16,7 @@ void findRoomConnectivity(SceneGraph* scene_graph) {
   const SceneGraphLayer& places_layer =
       *(scene_graph->getLayer(to_underlying(KimeraDsgLayers::PLACES)));
 
-  for (const auto& edge : places_layer.edges) {
+  for (const auto& edge : places_layer.edges()) {
     const Node& source = *(scene_graph->getNode(edge.second.source));
     if (!source.hasParent()) {
       continue;  // we could warn here, but covered by room-places connectivity
@@ -85,7 +85,7 @@ void findPlacesRoomConnectivity(SceneGraph* scene_graph,
   PclLayer<ColorPointCloud> places_pcl =
       convertLayerToPcl<ColorPointCloud>(places_layer);
 
-  for (const auto& id_node_pair : room_layer.nodes) {
+  for (const auto& id_node_pair : room_layer.nodes()) {
     const NodeId room_id = id_node_pair.first;
     LOG(INFO) << "Segmenting places for room with id: "
               << NodeSymbol(room_id).getLabel();
@@ -113,7 +113,7 @@ void findPlacesRoomConnectivity(SceneGraph* scene_graph,
           places_pcl.cloud_to_layer_ids.at(inside_room_place_index);
       CHECK(scene_graph->hasNode(place_id));
       const Node& place_node = *(scene_graph->getNode(place_id));
-      for (const auto& sibling_id : place_node.siblings) {
+      for (const auto& sibling_id : place_node.siblings()) {
         const Node& sibling_node = *(scene_graph->getNode(sibling_id));
 
         std::optional<NodeId> sibling_room = sibling_node.getParent();
@@ -147,7 +147,7 @@ void findPlacesRoomConnectivity(SceneGraph* scene_graph,
   }
 
   std::list<NodeId> unlabeled_nodes;
-  for (const auto& id_node_pair : places_layer.nodes) {
+  for (const auto& id_node_pair : places_layer.nodes()) {
     if (!id_node_pair.second->hasParent() &&
         id_node_pair.second->hasSiblings()) {
       unlabeled_nodes.push_back(id_node_pair.first);
@@ -175,7 +175,7 @@ void findPlacesRoomConnectivity(SceneGraph* scene_graph,
     const Node& node = *(scene_graph->getNode(node_id));
 
     std::map<NodeId, size_t> room_votes;
-    for (const auto& sibling_id : node.siblings) {
+    for (const auto& sibling_id : node.siblings()) {
       const Node& sibling_node = *(scene_graph->getNode(sibling_id));
       if (!sibling_node.hasParent()) {
         continue;  // another undecided node
@@ -204,7 +204,7 @@ void findPlacesRoomConnectivity(SceneGraph* scene_graph,
     scene_graph->insertEdge(best_room->first, node_id);
   }
 
-  for (const auto& id_place_pair : places_layer.nodes) {
+  for (const auto& id_place_pair : places_layer.nodes()) {
     const Node& place = *id_place_pair.second;
     if (!place.hasParent()) {
       continue;
@@ -252,7 +252,7 @@ void findObjectPlaceConnectivity(SceneGraph* scene_graph) {
   kd_tree.setInputCloud(pcl_places.cloud);
 
   // Iterate over the nodes of objects layer
-  for (const auto& id_node_pair : objects_layer.nodes) {
+  for (const auto& id_node_pair : objects_layer.nodes()) {
     if (id_node_pair.second->hasParent()) {
       LOG(WARNING) << "Object " << id_node_pair.first
                    << "has a parent already!";

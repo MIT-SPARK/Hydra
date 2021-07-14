@@ -19,18 +19,17 @@ int main(int argc, char** argv) {
   nh_private.param(
       "scene_graph_input_path", scene_graph_input_path, scene_graph_input_path);
 
-  kimera::SceneGraphVisualizer scene_graph_visualizer(
-      nh, nh_private, kimera::getDefaultLayerIds());
-
   CHECK(!scene_graph_input_path.empty()) << "Empty scene graph input path...";
   VLOG(1) << "Loading scene graph from: " << scene_graph_input_path.c_str();
   kimera::DynamicSceneGraph::Ptr scene_graph(new kimera::DynamicSceneGraph());
-  // kimera::load(scene_graph_input_path, &scene_graph);
+  scene_graph->load(scene_graph_input_path);
+  VLOG(1) << "Loaded scene graph";
 
-  VLOG(1) << "Starting scene graph visualizer.";
+  kimera::SceneGraphVisualizer scene_graph_visualizer(
+      nh, nh_private, kimera::getDefaultLayerIds());
+
   scene_graph_visualizer.visualize(scene_graph);
-  VLOG(1) << "Finished scene graph visualizer.";
-
+  VLOG(1) << "Visualizer running";
   ros::spin();
 
   return 0;

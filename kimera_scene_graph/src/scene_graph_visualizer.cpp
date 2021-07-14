@@ -184,7 +184,7 @@ void SceneGraphVisualizer::displayLoop(const ros::TimerEvent&) {
   }
 
   need_redraw_ = false;
-  if (scene_graph_->hasLayer(scene_graph_->mesh_layer_id)) {
+  if (scene_graph_->hasLayer(scene_graph_->getMeshLayerId())) {
     visualizeMesh(*(scene_graph_->getMesh()), false);
   }
   displayLayers(*scene_graph_);
@@ -249,7 +249,7 @@ void SceneGraphVisualizer::handleLabels(const SceneGraphLayer& layer,
                                         MarkerArray& markers) const {
   const std::string ns = "layer_" + std::to_string(layer.id) + "_text";
 
-  for (const auto& id_node_pair : layer.nodes) {
+  for (const auto& id_node_pair : layer.nodes()) {
     const Node& node = *id_node_pair.second;
 
     if (config.visualize && config.use_label) {
@@ -271,7 +271,7 @@ void SceneGraphVisualizer::handleBoundingBoxes(const SceneGraphLayer& layer,
   const std::string ns =
       "layer_" + std::to_string(layer.id) + "_bounding_boxes";
 
-  for (const auto& id_node_pair : layer.nodes) {
+  for (const auto& id_node_pair : layer.nodes()) {
     const Node& node = *id_node_pair.second;
 
     if (config.visualize && config.use_bounding_box) {
@@ -302,7 +302,7 @@ void SceneGraphVisualizer::displayLayers(const SceneGraph& scene_graph) const {
 
   // TODO(nathan) book-keeping for mutating scene graph
   ros::Time current_time = ros::Time::now();
-  for (const auto& id_layer_pair : scene_graph.layers) {
+  for (const auto& id_layer_pair : scene_graph.layers()) {
     if (!layer_configs_.count(id_layer_pair.first)) {
       LOG(WARNING) << "failed to find config for layer " << id_layer_pair.first;
       continue;
@@ -388,7 +388,7 @@ void SceneGraphVisualizer::displayEdges(const SceneGraph& scene_graph) const {
     fillHeader(marker, current_time);
   }
 
-  for (const auto& id_layer_pair : scene_graph.layers) {
+  for (const auto& id_layer_pair : scene_graph.layers()) {
     if (id_layer_pair.second->numEdges() == 0) {
       continue;  // skip empty layer to avoid rviz errors
     }

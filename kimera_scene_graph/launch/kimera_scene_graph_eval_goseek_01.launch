@@ -67,7 +67,7 @@
     <param name="rgb/esdf_min_distance_m" value="0.2"/>
 
     <param name="world_frame" value="$(arg world_frame)"/>
-    <param name="scene_graph_output_path" value="$(find kimera_scene_graph)/vxblx_files/goseek_scene_graph.vxblx"/>
+    <param name="scene_graph_output_path" value="$(find kimera_scene_graph)/output/goseek_$(arg scene)_dsg.json"/>
 
     <rosparam command="load" file="$(arg semantic_typology_path)"/>
     <param name="skeleton_file" value="$(arg sparse_graph_path)"/>

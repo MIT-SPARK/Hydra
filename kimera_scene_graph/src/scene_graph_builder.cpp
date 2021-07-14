@@ -4,11 +4,11 @@
 #include "kimera_scene_graph/voxblox_utils.h"
 #include "kimera_scene_graph/wall_finder.h"
 
-#include <voxblox_msgs/Mesh.h>
 #include <kimera_semantics_ros/ros_params.h>
 #include <pcl/PolygonMesh.h>
 #include <pcl/conversions.h>
 #include <pcl_ros/point_cloud.h>
+#include <voxblox_msgs/Mesh.h>
 
 #include <glog/logging.h>
 
@@ -19,9 +19,8 @@ using std_srvs::Trigger;
 
 using SemanticMeshMap = std::map<SemanticLabel, SubMesh>;
 
-SemanticMeshMap getSemanticMeshes(
-    const SemanticIntegratorBase::SemanticConfig& config,
-    const pcl::PolygonMesh::ConstPtr& mesh) {
+SemanticMeshMap getSemanticMeshes(const SemanticIntegratorBase::SemanticConfig& config,
+                                  const pcl::PolygonMesh::ConstPtr& mesh) {
   CHECK(mesh);
   CHECK(config.semantic_label_to_color_);
 
@@ -79,8 +78,7 @@ void SceneGraphBuilder::loadParams() {
 
   nh_private_.getParam("world_frame", world_frame_);
   nh_private_.getParam("scene_graph_output_path", scene_graph_output_path_);
-  nh_private_.getParam("room_finder_esdf_slice_level",
-                       room_finder_esdf_slice_level_);
+  nh_private_.getParam("room_finder_esdf_slice_level", room_finder_esdf_slice_level_);
 
   CHECK(nh_private_.getParam("dynamic_semantic_labels", dynamic_labels_));
   CHECK(nh_private_.getParam("stuff_labels", stuff_labels_));
@@ -89,8 +87,7 @@ void SceneGraphBuilder::loadParams() {
 
   default_building_color_ = std::vector<int>{169, 8, 194};
   nh_private_.getParam("default_building_color", default_building_color_);
-  CHECK_EQ(3u, default_building_color_.size())
-      << "Color must be three elements";
+  CHECK_EQ(3u, default_building_color_.size()) << "Color must be three elements";
 }
 
 SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
@@ -125,8 +122,7 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
   room_finder_ = kimera::make_unique<RoomFinder>(
       nh_private, world_frame_, room_finder_esdf_slice_level_);
 
-  rqt_callback_ =
-      boost::bind(&SceneGraphBuilder::rqtReconfigureCallback, this, _1, _2);
+  rqt_callback_ = boost::bind(&SceneGraphBuilder::rqtReconfigureCallback, this, _1, _2);
   rqt_server_.setCallback(rqt_callback_);
 
   reconstruct_scene_graph_srv_ = nh_private_.advertiseService(
@@ -156,17 +152,16 @@ void SceneGraphBuilder::reconstruct() {
     CHECK(label_mesh_pair.second.mesh);
 
     if (label_mesh_pair.second.vertices->empty()) {
-      LOG(WARNING) << "Semantic pointcloud for label "
-                   << std::to_string(semantic_label) << " is empty.";
+      LOG(WARNING) << "Semantic pointcloud for label " << std::to_string(semantic_label)
+                   << " is empty.";
       continue;
     }
 
-    semantic_pcl_pubs_.publish(semantic_label,
-                               *label_mesh_pair.second.vertices);
+    semantic_pcl_pubs_.publish(semantic_label, *label_mesh_pair.second.vertices);
 
-    bool is_dynamic = std::find(dynamic_labels_.begin(),
-                                dynamic_labels_.end(),
-                                semantic_label) != dynamic_labels_.end();
+    bool is_dynamic =
+        std::find(dynamic_labels_.begin(), dynamic_labels_.end(), semantic_label) !=
+        dynamic_labels_.end();
     if (is_dynamic) {
       continue;
     }
@@ -186,22 +181,19 @@ void SceneGraphBuilder::reconstruct() {
 
     NodeColor label_color;
     label_color << label_color_vbx.r, label_color_vbx.g, label_color_vbx.b;
-    object_finder_->addObjectsToGraph(label_mesh_pair.second,
-                                      label_color,
-                                      semantic_label,
-                                      scene_graph_.get());
+    object_finder_->addObjectsToGraph(
+        label_mesh_pair.second, label_color, semantic_label, scene_graph_.get());
   }
 
   VLOG(1) << "Start Room finding.";
   CHECK(room_finder_);
-  RoomHullMap room_hulls =
-      room_finder_->findRooms(*esdf_layer_, scene_graph_.get());
+  RoomHullMap room_hulls = room_finder_->findRooms(*esdf_layer_, scene_graph_.get());
   VLOG(1) << "Finished Room finding.";
 
   VLOG(1) << "Start Building finding.";
   NodeColor building_color;
-  building_color << default_building_color_.at(0),
-      default_building_color_.at(1), default_building_color_.at(2);
+  building_color << default_building_color_.at(0), default_building_color_.at(1),
+      default_building_color_.at(2);
   findBuildings(scene_graph_.get(), building_color);
   VLOG(1) << "Finished Building finding.";
 
@@ -227,14 +219,23 @@ void SceneGraphBuilder::reconstruct() {
   }
 
   visualize();
+  saveSceneGraph(scene_graph_output_path_);
+}
 
-  // if (!scene_graph_output_path_.empty()) {
-  // LOG(INFO) << "Saving Scene-Graph to file: "
-  //<< scene_graph_output_path_.c_str();
-  //// TODO(nathan) serialization
-  //// save(*scene_graph_, scene_graph_output_path_);
-  // LOG(INFO) << "Done saving Scene-Graph to file";
-  //}
+void SceneGraphBuilder::saveSceneGraph(const std::string& filepath) const {
+  if (filepath.empty()) {
+    VLOG(5) << "Not saving scene graph: filepath is empty";
+    return;
+  }
+
+  if (!scene_graph_) {
+    VLOG(5) << "Not saving scene graph: scene graph isn't initialized";
+    return;
+  }
+
+  LOG(INFO) << "Saving to file: " << filepath;
+  scene_graph_->save(filepath);
+  LOG(INFO) << "Finished saving DSG";
 }
 
 void SceneGraphBuilder::visualize() {
@@ -268,16 +269,14 @@ void SceneGraphBuilder::visualize() {
   // TODO(nathan) add back in sliced esdf and room clusters visualization
 }
 
-bool SceneGraphBuilder::reconstructSrvCb(SetBool::Request&,
-                                         SetBool::Response&) {
+bool SceneGraphBuilder::reconstructSrvCb(SetBool::Request&, SetBool::Response&) {
   LOG(INFO) << "Requested scene graph reconstruction.";
   scene_graph_->clear();
   reconstruct();
   return true;
 }
 
-bool SceneGraphBuilder::visualizeSrvCb(Trigger::Request&,
-                                       Trigger::Response& resp) {
+bool SceneGraphBuilder::visualizeSrvCb(Trigger::Request&, Trigger::Response& resp) {
   if (scene_graph_) {
     visualize();
     resp.success = true;
@@ -305,8 +304,7 @@ void SceneGraphBuilder::rqtReconfigureCallback(RqtSceneGraphConfig& config,
   rg_params.curvature_threshold = config.curvature_threshold;
   rg_params.max_cluster_size = config.rg_max_cluster_size;
   rg_params.min_cluster_size = config.rg_min_cluster_size;
-  rg_params.normal_estimator_neighbour_size =
-      config.normal_estimator_neighbour_size;
+  rg_params.normal_estimator_neighbour_size = config.normal_estimator_neighbour_size;
   rg_params.number_of_neighbours = config.number_of_neighbours;
   rg_params.smoothness_threshold = config.smoothness_threshold;
   object_finder_->updateRegionGrowingParams(rg_params);

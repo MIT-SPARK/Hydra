@@ -35,7 +35,7 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
   pgmo_.reset(new KimeraPgmo());
 
   graph_->setMesh(pgmo_->getOptimizedMeshPtr());
-  CHECK(graph_->hasLayer(graph_->mesh_layer_id))
+  CHECK(graph_->hasLayer(graph_->getMeshLayerId()))
       << "Uninitialized mesh from PGMO";
 
   pgmo_->initialize(nh);
@@ -95,7 +95,7 @@ void DsgBackend::addPlacesToDeformationGraph() {
   CHECK(graph_->hasLayer(KimeraDsgLayers::PLACES));
   const SceneGraphLayer& places = *(graph_->getLayer(KimeraDsgLayers::PLACES));
 
-  if (places.nodes.empty()) {
+  if (places.nodes().empty()) {
     LOG(WARNING) << "Attempting to add places to deformation graph with empty "
                     "places layer";
     return;
@@ -107,7 +107,7 @@ void DsgBackend::addPlacesToDeformationGraph() {
   fillKdTreeFromDeformationGraph(deformations, kd_tree);
 
   std::queue<NodeId> frontier;
-  frontier.push(places.nodes.begin()->first);
+  frontier.push(places.nodes().begin()->first);
   std::set<NodeId> visited;
   while (!frontier.empty()) {
     const Node& node = graph_->getNode(frontier.front()).value();
@@ -122,7 +122,7 @@ void DsgBackend::addPlacesToDeformationGraph() {
     bool is_min_neighbor = true;
     const double curr_distance =
         node.attributes<PlaceNodeAttributes>().distance;
-    for (const auto& sibling : node.siblings) {
+    for (const auto& sibling : node.siblings()) {
       const Node& sibling_node = graph_->getNode(sibling).value();
       const double sibling_distance =
           sibling_node.attributes<PlaceNodeAttributes>().distance;
@@ -169,7 +169,7 @@ void DsgBackend::deformGraph() {
 
   DeformationGraphPtr deformations = pgmo_->getDeformationGraphPtr();
   gtsam::Values new_values = deformations->getGtsamValues();
-  for (const auto& id_node_pair : places.nodes) {
+  for (const auto& id_node_pair : places.nodes()) {
     if (!new_values.exists(id_node_pair.first)) {
     // TODO(nathan) use deformPoints for places if we don't add all of them to the graph
       VLOG(1) << "Place " << NodeSymbol(id_node_pair.first).getLabel()
