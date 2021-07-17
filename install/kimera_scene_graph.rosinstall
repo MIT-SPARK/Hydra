@@ -32,6 +32,7 @@
 - git:
     local-name: kimera_pgmo
     uri: git@github.mit.edu:SPARK/Kimera-PGMO.git
+    version: feature/dsg_integration
 - git:
     local-name: kimera_rpgo
     uri: git@github.com:MIT-SPARK/Kimera-RPGO.git
@@ -53,7 +54,7 @@
 - git:
     local-name: mav_voxblox_planning
     uri: git@github.com:ToniRV/mav_voxblox_planning_private.git
-    version: feature/voxblox_protobuf_update
+    version: fix/voxblox_protobuf_update
 - git:
     local-name: minkindr
     uri: git@github.com:ethz-asl/minkindr.git
@@ -73,11 +74,9 @@
     local-name: protobuf_catkin
     uri: git@github.com:ethz-asl/protobuf_catkin.git
 - git:
-    local-name: pybind11_catkin
-    uri: git@github.com:ipab-slmc/pybind11_catkin.git
-- git:
     local-name: teaser_plusplus
     uri: git@github.com:MIT-SPARK/TEASER-plusplus.git
 - git:
     local-name: voxblox
-    uri: git@github.com:ethz-asl/voxblox.git
+    uri: git@github.mit:SPARK/voxblox.git
+    version: fix/migrate_voxblox_changes
