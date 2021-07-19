@@ -3,13 +3,13 @@
 #include "kimera_scene_graph/common.h"
 #include "kimera_scene_graph/object_finder.h"
 #include "kimera_scene_graph/room_finder.h"
-#include "kimera_scene_graph/scene_graph_visualizer.h"
 #include "kimera_scene_graph/semantic_ros_publishers.h"
 
 #include <kimera_dsg/dynamic_scene_graph.h>
 
-#include <voxblox/core/layer.h>
+#include <kimera_dsg_visualizer/dynamic_scene_graph_visualizer.h>
 #include <kimera_semantics/semantic_integrator_base.h>
+#include <voxblox/core/layer.h>
 
 #include <dynamic_reconfigure/server.h>
 #include <kimera_scene_graph/kimera_scene_graphConfig.h>
@@ -28,8 +28,7 @@ class SceneGraphBuilder {
 
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  SceneGraphBuilder(const ros::NodeHandle& nh,
-                    const ros::NodeHandle& nh_private);
+  SceneGraphBuilder(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private);
 
   void reconstruct();
 
@@ -79,7 +78,7 @@ class SceneGraphBuilder {
   std::unique_ptr<RoomFinder> room_finder_;
 
   DynamicSceneGraph::Ptr scene_graph_;
-  SceneGraphVisualizer visualizer_;
+  std::unique_ptr<DynamicSceneGraphVisualizer> visualizer_;
 
   vxb::Layer<vxb::EsdfVoxel>::Ptr esdf_layer_;
 

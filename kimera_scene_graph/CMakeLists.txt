@@ -15,6 +15,7 @@ find_package(
              pluginlib
              std_msgs
              kimera_dsg
+             kimera_dsg_visualizer
              kimera_pgmo
              kimera_semantics
              kimera_semantics_ros
@@ -41,6 +42,7 @@ catkin_package(
   pluginlib
   std_msgs
   kimera_dsg
+  kimera_dsg_visualizer
   kimera_pgmo
   kimera_semantics
   kimera_semantics_ros
@@ -55,9 +57,8 @@ catkin_package(
 
 # Serialization plugins (mostly to get around lz4 problems with flann)
 # add_library(humans_serialization_plugins src/humans_serialization_plugins.cpp)
-# target_include_directories(
-# humans_serialization_plugins PUBLIC include ${catkin_INCLUDE_DIRS}
-# )
+# target_include_directories( humans_serialization_plugins PUBLIC include
+# ${catkin_INCLUDE_DIRS} )
 
 add_library(
   ${PROJECT_NAME}
@@ -68,10 +69,7 @@ add_library(
   src/building_finder.cpp
   src/dsg_backend.cpp
   src/scene_graph_builder.cpp
-  src/scene_graph_visualizer.cpp
-  # src/dynamic_scene_graph_evaluator.cpp
   src/semantic_ros_publishers.cpp
-  src/visualizer_utils.cpp
   src/voxblox_utils.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
@@ -80,16 +78,6 @@ add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
 
 add_executable(kimera_scene_graph_node src/kimera_scene_graph_node.cpp)
 target_link_libraries(kimera_scene_graph_node ${PROJECT_NAME})
-
-# add_executable(kimera_dynamic_scene_graph_node src/kimera_dynamic_scene_graph_node.cpp
-# ) target_link_libraries(kimera_dynamic_scene_graph_node ${PROJECT_NAME} )
-
-# add_executable(kimera_dynamic_scene_graph_eval_node
-# src/kimera_dynamic_scene_graph_eval_node.cpp )
-# target_link_libraries(kimera_dynamic_scene_graph_eval_node ${PROJECT_NAME} )
-
-add_executable(scene_graph_visualizer src/scene_graph_visualizer_node.cpp)
-target_link_libraries(scene_graph_visualizer ${PROJECT_NAME})
 
 add_executable(scene_graph_eval src/scene_graph_eval.cpp)
 target_link_libraries(scene_graph_eval ${PROJECT_NAME} tbb)

@@ -21,6 +21,7 @@
   <!-- less standard dependencies -->
   <depend>gtsam</depend>
   <depend>kimera_dsg</depend>
+  <depend>kimera_dsg_visualizer</depend>
   <depend>kimera_pgmo</depend>
   <depend>kimera_semantics</depend>
   <depend>kimera_semantics_ros</depend>

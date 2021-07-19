@@ -97,9 +97,15 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
       world_frame_("world"),
       scene_graph_output_path_(""),
       object_finder_type_(0),
-      semantic_pcl_pubs_("pcl", nh_private),
-      visualizer_(nh, nh_private_, getDefaultLayerIds()) {
+      semantic_pcl_pubs_("pcl", nh_private) {
   scene_graph_ = std::make_shared<DynamicSceneGraph>();
+
+  std::string visualizer_ns;
+  nh_private.param<std::string>(
+      "visualizer_ns", visualizer_ns, "/kimera_dsg_visualizer");
+  visualizer_.reset(new DynamicSceneGraphVisualizer(ros::NodeHandle(visualizer_ns),
+                                                    getDefaultLayerIds()));
+  visualizer_->start();
 
   loadParams();
 
@@ -247,16 +253,16 @@ void SceneGraphBuilder::visualize() {
     return;
   }
 
-  visualizer_.visualize(scene_graph_);
+  visualizer_->setGraph(scene_graph_);
 
   if (rgb_mesh_) {
-    // visualizer_.visualizeMesh(*rgb_mesh_.get(), true);
+    visualizer_->visualizeMesh(*rgb_mesh_.get(), true);
   } else {
     ROS_WARN("Invalid RGB mesh when visualizing");
   }
 
   if (segmented_walls_mesh_) {
-    visualizer_.visualizeWalls(*segmented_walls_mesh_);
+    visualizer_->visualizeWalls(*segmented_walls_mesh_);
   }
 
   // TODO(nathan) dynamic stuff
