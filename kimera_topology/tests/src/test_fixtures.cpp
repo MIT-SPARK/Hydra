@@ -1,4 +1,6 @@
-#include <kimera_topology_test/test_fixtures.h>
+#include "kimera_topology_test/test_fixtures.h"
+
+#include <kimera_topology/gvd_utilities.h>
 #include <voxblox/core/voxel.h>
 #include <voxblox/integrator/esdf_integrator.h>
 #include <voxblox/integrator/tsdf_integrator.h>
@@ -58,13 +60,6 @@ Transformation EsdfTestFixture::getPose(size_t index) const {
   Quaternion rotation =
       Quaternion(Eigen::AngleAxis<float>(yaw, Point::UnitZ()) *
                  Eigen::AngleAxis<float>(camera_pitch, Point::UnitY()));
-
-  /*      Quaternion(Eigen::AngleAxis<float>(camera_pitch, Point::UnitY()) **/
-  // Eigen::AngleAxis<float>(yaw, Point::UnitZ()));
-
-  /*  Quaternion rotation =*/
-  // Quaternion(Eigen::AngleAxis<float>(yaw, Point::UnitZ()) *
-  // Eigen::AngleAxis<float>(camera_pitch, Point::UnitY()));
 
   return Transformation(rotation, position);
 }
@@ -143,6 +138,22 @@ void SingleBlockTestFixture::SetUp() {
   }
 }
 
+void SingleBlockExtractionTestFixture::SetUp() {
+  SingleBlockTestFixture::SetUp();
+  setBlockState();
+
+  gvd_integrator.reset(
+      new GvdIntegrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer));
+  gvd_integrator->updateFromTsdfLayer(true);
+}
+
+void SingleBlockExtractionTestFixture::setBlockState() {}
+
+void LargeSingleBlockTestFixture::SetUp() {
+  voxels_per_side = 8;
+  SingleBlockTestFixture::SetUp();
+}
+
 void TestFixture2d::setTsdfVoxel(int x, int y, float distance, float weight) {
   CHECK_LT(x, voxels_per_side);
   CHECK_LT(y, voxels_per_side);
@@ -153,6 +164,13 @@ void TestFixture2d::setTsdfVoxel(int x, int y, float distance, float weight) {
   auto& voxel = tsdf_block->getVoxelByVoxelIndex(v_index);
   voxel.distance = distance;
   voxel.weight = weight;
+
+  auto& gvd_voxel = gvd_block->getVoxelByVoxelIndex(v_index);
+  if (distance == 0.0) {
+    setGvdSurfaceVoxel(gvd_voxel);
+  } else {
+    gvd_voxel.on_surface = false;
+  }
 }
 
 const GvdVoxel& TestFixture2d::getGvdVoxel(int x, int y) {

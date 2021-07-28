@@ -11,8 +11,12 @@
 
   <buildtool_depend>catkin</buildtool_depend>
   <depend>roscpp</depend>
+  <depend>dynamic_reconfigure</depend>
+  <depend>kimera_dsg</depend>
+  <depend>kimera_dsg_visualizer</depend>
   <depend>voxblox</depend>
   <depend>voxblox_ros</depend>
+  <depend>tf2_eigen</depend>
 
   <export>
   </export>

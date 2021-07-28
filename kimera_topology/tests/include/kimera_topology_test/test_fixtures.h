@@ -1,7 +1,7 @@
 #pragma once
 #include <gtest/gtest.h>
-#include <kimera_topology/voxblox_types.h>
 #include <kimera_topology/gvd_integrator.h>
+#include <kimera_topology/voxblox_types.h>
 #include <voxblox/integrator/tsdf_integrator.h>
 #include <voxblox/simulation/simulation_world.h>
 
@@ -70,6 +70,27 @@ class SingleBlockTestFixture : public ::testing::Test {
   GvdIntegratorConfig gvd_config;
   voxblox::Block<voxblox::TsdfVoxel>::Ptr tsdf_block;
   voxblox::Block<GvdVoxel>::Ptr gvd_block;
+};
+
+class LargeSingleBlockTestFixture : public SingleBlockTestFixture {
+ public:
+  LargeSingleBlockTestFixture() = default;
+  virtual ~LargeSingleBlockTestFixture() = default;
+
+  virtual void SetUp() override;
+};
+
+class SingleBlockExtractionTestFixture : public SingleBlockTestFixture {
+ public:
+  SingleBlockExtractionTestFixture() = default;
+  virtual ~SingleBlockExtractionTestFixture() = default;
+
+  virtual void SetUp() override;
+
+  std::unique_ptr<GvdIntegrator> gvd_integrator;
+
+ protected:
+  virtual void setBlockState();
 };
 
 class TestFixture2d : public ::testing::Test {

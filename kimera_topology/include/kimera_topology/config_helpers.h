@@ -1,12 +1,13 @@
-#include <kimera_topology_test/test_helpers.h>
+#pragma once
+#include "kimera_topology/gvd_integrator.h"
+#include <voxblox/integrator/esdf_integrator.h>
 
 namespace kimera {
 namespace topology {
-namespace test_helpers {
 
 #define COPY_FIELD(dest, src, field) dest.field = src.field;
 
-GvdIntegratorConfig gvdConfigFromEsdfConfig(const EsdfIntegrator::Config& esdf) {
+inline GvdIntegratorConfig gvdConfigFromEsdfConfig(const voxblox::EsdfIntegrator::Config& esdf) {
   GvdIntegratorConfig config;
   COPY_FIELD(config, esdf, max_distance_m);
   COPY_FIELD(config, esdf, min_distance_m);
@@ -19,6 +20,5 @@ GvdIntegratorConfig gvdConfigFromEsdfConfig(const EsdfIntegrator::Config& esdf) 
 
 #undef COPY_FIELD
 
-}  // namespace test_helpers
-}  // namespace topology
-}  // namespace kimera
+}
+}

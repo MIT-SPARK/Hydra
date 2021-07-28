@@ -1,0 +1,72 @@
+<launch>
+    <param name="use_sim_time" value="true"/>
+
+    <arg name="min_glog_level" default="3"/>
+    <arg name="verbosity" default="0"/>
+    <arg name="config_dir" default="$(find kimera_topology)/config"/>
+    <arg name="config" default="uhumans2_topology_config.yaml"/>
+
+    <arg name="graph_viz_config_dir" default="$(find kimera_topology)/config"/>
+    <arg name="graph_viz_config" default="graph_visualization_config.yaml"/>
+    <arg name="graph_viz_config_file" value="$(arg graph_viz_config_dir)/$(arg graph_viz_config)"/>
+
+    <arg name="voxel_size" default="0.10"/>
+    <arg name="max_ray_length_m" default="4.5"/>
+    <arg name="update_period_s" default="0.5"/>
+
+    <arg name="use_gt_frame" default="true"/>
+    <arg name="sensor_frame" default="left_cam_base_link" unless="$(arg use_gt_frame)"/>
+    <arg name="sensor_frame" default="left_cam" if="$(arg use_gt_frame)"/>
+
+    <arg name="convert_rgbd_to_pointcloud" default="true"/>
+    <arg name="camera_info_topic" default="/tesse/left_cam/camera_info"/>
+    <arg name="camera_topic" default="/tesse/left_cam/rgb/image_raw"/>
+    <arg name="depth_topic" default="/tesse/depth_cam/mono/image_raw"/>
+    <arg name="pointcloud_topic" default="/pointcloud"/>
+
+    <include file="$(find kimera_topology)/launch/includes/rgbd_to_pointcloud.xml">
+        <arg name="camera_info_topic" value="$(arg camera_info_topic)"/>
+        <arg name="camera_topic" value="$(arg camera_topic)"/>
+        <arg name="depth_topic" value="$(arg depth_topic)"/>
+        <arg name="pointcloud_topic" default="$(arg pointcloud_topic)"/>
+    </include>
+
+    <arg name="debug" default="false"/>
+    <arg name="launch-prefix" default="gdb --args" if="$(arg debug)"/>
+    <arg name="launch-prefix" default="" unless="$(arg debug)"/>
+
+    <arg name="glog_to_file" default="false"/>
+    <arg name="glog_dir" default="$(find kimera_topology)/glogs"/>
+    <arg name="glog_file_args" value="--logtostderr=0 --log_dir=$(arg glog_dir)" if="$(arg glog_to_file)"/>
+    <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
+
+    <node name="kimera_topology_node"
+          type="kimera_topology_node"
+          pkg="kimera_topology"
+          output="screen"
+          launch-prefix="$(arg launch-prefix)"
+          args="--minloglevel=$(arg min_glog_level) -v=$(arg verbosity) $(arg glog_file_args)"
+          required="true">
+        <remap from="pointcloud" to="$(arg pointcloud_topic)"/>
+        <param name="sensor_frame" value="$(arg sensor_frame)"/>
+
+        <rosparam command="load" file="$(arg graph_viz_config_file)" ns="graph_visualizer"/>
+        <rosparam command="load" file="$(arg config_dir)/$(arg config)"/>
+        <param name="tsdf_voxel_size" value="$(arg voxel_size)"/>
+        <param name="max_ray_length_m" value="$(arg max_ray_length_m)"/>
+        <param name="verbose" value="false"/>
+        <param name="publish_pointclouds" value="false"/>
+        <param name="update_period_s" value="$(arg update_period_s)"/>
+
+        <param name="max_distance_m" value="$(arg max_ray_length_m)"/>
+        <param name="voronoi_min_distance_m" value="0.25"/>
+        <param name="voronoi_neighbor_l1_separation" value="12.0"/>
+        <param name="voronoi_use_angle" value="true"/>
+        <param name="voronoi_neighbor_cos_separation" value="0.0"/>
+        <param name="min_basis_for_extraction" value="2"/>
+        <param name="graph_extraction_min_vertex_basis" value="4"/>
+        <param name="graph_extraction_min_extra_basis" value="2"/>
+        <param name="graph_extraction_max_edge_deviation" value="4"/>
+    </node>
+
+</launch>

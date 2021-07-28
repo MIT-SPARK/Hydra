@@ -1,0 +1,10 @@
+use_freespace_pointcloud: false
+tsdf_voxels_per_side: 16
+voxel_carving_enabled: true
+mesh_color_mode: "lambert_color"
+semantic_color_mode: "semantic"
+use_const_weight: false
+use_tf_transforms: true
+method: "fast"
+enable_icp: false
+semantic_measurement_probability: 0.8

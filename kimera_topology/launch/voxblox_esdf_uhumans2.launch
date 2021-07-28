@@ -1,0 +1,46 @@
+<launch>
+    <param name="use_sim_time" value="true"/>
+
+    <arg name="min_glog_level" default="3"/>
+    <arg name="verbosity" default="0"/>
+    <arg name="config_dir" default="$(find kimera_topology)/config"/>
+    <arg name="config" default="uhumans2_topology_config.yaml"/>
+
+    <arg name="voxel_size" default="0.05"/>
+    <arg name="max_ray_length_m" default="10.0"/>
+    <!-- eventually this will control ESDF & GVD & Mesh updates -->
+    <arg name="update_period_s" default="1.0"/>
+
+    <!-- left_cam_base_link for VIO output -->
+    <arg name="sensor_frame" default="left_cam"/>
+
+    <arg name="convert_rgbd_to_pointcloud" default="true"/>
+    <arg name="camera_info_topic" default="/tesse/left_cam/camera_info"/>
+    <arg name="camera_topic" default="/tesse/left_cam/rgb/image_raw"/>
+    <arg name="depth_topic" default="/tesse/depth_cam/mono/image_raw"/>
+    <arg name="pointcloud_topic" default="/pointcloud"/>
+
+    <include file="$(find kimera_topology)/launch/includes/rgbd_to_pointcloud.xml">
+        <arg name="camera_info_topic" value="$(arg camera_info_topic)"/>
+        <arg name="camera_topic" value="$(arg camera_topic)"/>
+        <arg name="depth_topic" value="$(arg depth_topic)"/>
+        <arg name="pointcloud_topic" default="$(arg pointcloud_topic)"/>
+    </include>
+
+    <node name="kimera_topology_node"
+          type="esdf_server"
+          pkg="voxblox_ros"
+          args="--minloglevel=$(arg min_glog_level) -v=$(arg verbosity)"
+          output="screen"
+          required="true">
+        <remap from="pointcloud" to="$(arg pointcloud_topic)"/>
+
+        <rosparam command="load" file="$(arg config_dir)/$(arg config)"/>
+        <param name="tsdf_voxel_size" value="$(arg voxel_size)"/>
+        <param name="max_ray_length_m" value="$(arg max_ray_length_m)"/>
+        <param name="verbose" value="true"/>
+        <param name="publish_pointclouds" value="false"/>
+        <param name="update_every_n_sec" value="$(arg update_period_s)"/>
+    </node>
+
+</launch>

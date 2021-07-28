@@ -1,12 +1,12 @@
 # general
-z_offset_scale: 2.5
+z_offset_scale: 0.0
 visualize: true
 # nodes
 marker_scale: 0.2
-marker_alpha: 0.5
-use_sphere_marker: false
+marker_alpha: 0.9
+use_sphere_marker: true
 use_label: false
-label_height: 8.0
+label_height: 0.7
 label_scale: 0.3
 use_bounding_box: false
 bounding_box_alpha: 0.5

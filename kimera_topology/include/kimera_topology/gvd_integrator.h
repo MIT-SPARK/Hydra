@@ -1,7 +1,11 @@
 #pragma once
+#include "kimera_topology/graph_extractor.h"
+#include "kimera_topology/gvd_utilities.h"
 #include "kimera_topology/gvd_voxel.h"
 #include "kimera_topology/voxblox_types.h"
 #include "kimera_topology/voxel_aware_mesh_integrator.h"
+
+#include <kimera_dsg/scene_graph_layer.h>
 
 #include <utility>
 
@@ -13,13 +17,14 @@ struct GvdIntegratorConfig {
   FloatingPoint min_distance_m = 0.2;
   FloatingPoint min_diff_m = 1.0e-3;
   FloatingPoint min_weight = 1.0e-6;
-  double voronoi_min_distance_m = 0.2;
-  double voronoi_neighbor_l1_separation = 2.0;
   int num_buckets = 20;
   bool multi_queue = false;
   bool positive_distance_only = true;
   bool parent_derived_distance = true;
+  uint8_t min_basis_for_extraction = 3;
+  VoronoiCheckConfig voronoi_config;
   voxblox::MeshIntegratorConfig mesh_integrator_config;
+  GraphExtractorConfig graph_extractor_config;
 };
 
 /**
@@ -33,6 +38,8 @@ struct UpdateStatistics {
   size_t number_voronoi_found;
   size_t number_lower_skipped;
   size_t number_lower_updated;
+  size_t number_fixed_no_parent;
+  size_t number_force_lowered;
 
   void clear();
 };
@@ -45,13 +52,19 @@ class GvdIntegrator {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   GvdIntegrator(const GvdIntegratorConfig& config,
-                const Layer<TsdfVoxel>::Ptr& tsdf_layer,
+                Layer<TsdfVoxel>* tsdf_layer,
                 const Layer<GvdVoxel>::Ptr& gvd_layer,
                 const MeshLayer::Ptr& mesh_layer);
 
   virtual ~GvdIntegrator() = default;
 
-  void updateFromTsdfLayer(bool clear_updated_flag);
+  void updateFromTsdfLayer(bool clear_updated_flag, bool clear_surface_flag = true);
+
+  inline const SceneGraphLayer& getGraph() const {
+    return graph_extractor_->getGraph();
+  }
+
+  inline const GraphExtractor& getGraphExtractor() const { return *graph_extractor_; }
 
  protected:
   void processTsdfBlock(const Block<TsdfVoxel>& block, const BlockIndex& index);
@@ -83,8 +96,18 @@ class GvdIntegrator {
                               const GlobalIndex& index,
                               GvdVoxel& gvd_voxel);
 
-  void setFixedParent(const Neighborhood<>::IndexMatrix& neighbor_indices,
+  void setFixedParent(const GvdNeighborhood::IndexMatrix& neighbor_indices,
                       GvdVoxel& voxel);
+
+  void raiseVoxel(GvdVoxel& voxel, const GlobalIndex& voxel_index);
+
+  uint8_t updateGvdParentMap(const GlobalIndex& voxel_index, const GvdVoxel& neighbor);
+
+  void removeVoronoiFromGvdParentMap(const GlobalIndex& voxel_index);
+
+  void updateGvdVoxel(const GlobalIndex& voxel_index, GvdVoxel& voxel, GvdVoxel& other);
+
+  void clearGvdVoxel(const GlobalIndex& index, GvdVoxel& voxel);
 
  protected:
   std::unique_ptr<VoxelAwareMeshIntegrator> mesh_integrator_;
@@ -99,9 +122,12 @@ class GvdIntegrator {
   UpdateStatistics update_stats_;
 
   GvdIntegratorConfig config_;
-  Layer<TsdfVoxel>::Ptr tsdf_layer_;
+  Layer<TsdfVoxel>* tsdf_layer_;
   Layer<GvdVoxel>::Ptr gvd_layer_;
   MeshLayer::Ptr mesh_layer_;
+
+  GvdParentMap gvd_parents_;
+  GraphExtractor::Ptr graph_extractor_;
 
   BucketQueue<GlobalIndex> lower_;
 
@@ -178,6 +204,7 @@ class GvdIntegrator {
     return true;
   }
 
+  // TODO(nathan) merge with utility in graph_extractor
   inline voxblox::Point getVoxelCoordinates(const GlobalIndex& index) {
     BlockIndex block_idx;
     VoxelIndex voxel_idx;

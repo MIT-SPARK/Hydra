@@ -8,7 +8,7 @@ namespace topology {
 class GvdTestIntegrator : public GvdIntegrator {
  public:
   GvdTestIntegrator(const GvdIntegratorConfig& config,
-                    const Layer<TsdfVoxel>::Ptr& tsdf_layer,
+                    Layer<TsdfVoxel>* tsdf_layer,
                     const Layer<GvdVoxel>::Ptr& gvd_layer,
                     const MeshLayer::Ptr& mesh_layer)
       : GvdIntegrator(config, tsdf_layer, gvd_layer, mesh_layer) {
@@ -33,11 +33,11 @@ struct EsdfHelpers : ::testing::Test {
     gvd_layer.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
     mesh_layer.reset(new MeshLayer(voxel_size * voxels_per_side));
     GvdIntegratorConfig config;
-    integrator.reset(new GvdTestIntegrator(config, tsdf_layer, gvd_layer, mesh_layer));
+    integrator.reset(new GvdTestIntegrator(config, tsdf_layer.get(), gvd_layer, mesh_layer));
   }
 
   void reset(const GvdIntegratorConfig& config) {
-    integrator.reset(new GvdTestIntegrator(config, tsdf_layer, gvd_layer, mesh_layer));
+    integrator.reset(new GvdTestIntegrator(config, tsdf_layer.get(), gvd_layer, mesh_layer));
   }
 
   std::unique_ptr<GvdTestIntegrator> integrator;

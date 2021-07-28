@@ -30,25 +30,24 @@ DistancePotential getLowerDistance(FloatingPoint v_dist,
   return to_return;
 }
 
-VoronoiCondition checkVoronoi(const GvdVoxel& current,
+VoronoiCondition checkVoronoi(const VoronoiCheckConfig& cfg,
+                              const GvdVoxel& current,
                               const GlobalIndex& current_idx,
                               const GvdVoxel& neighbor,
-                              const GlobalIndex& neighbor_idx,
-                              double gvd_min_distance,
-                              double parent_min_separation) {
+                              const GlobalIndex& neighbor_idx) {
   VoronoiCondition result;
 
   // if only one voxel fails this, we still want to reject the candidate
   // as a successful check for the passing voxel would mean that it would
   // be closer than the min distance to the other parent
-  if (current.distance <= gvd_min_distance || neighbor.distance <= gvd_min_distance) {
+  if (current.distance <= cfg.min_distance_m || neighbor.distance <= cfg.min_distance_m) {
     return result;
   }
 
   Eigen::Map<const GlobalIndex> neighbor_parent(neighbor.parent);
   Eigen::Map<const GlobalIndex> current_parent(current.parent);
 
-  if ((neighbor_parent - current_parent).lpNorm<1>() <= parent_min_separation) {
+  if (!isParentUnique(cfg, current_idx, current_parent, neighbor_parent)) {
     return result;
   }
 

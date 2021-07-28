@@ -1,0 +1,3 @@
+[submodule "kimera_topology/third_party/nanoflann"]
+	path = kimera_topology/third_party/nanoflann
+	url = git@github.com:jlblancoc/nanoflann.git
