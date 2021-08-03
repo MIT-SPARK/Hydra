@@ -1,5 +1,6 @@
 #pragma once
 #include "kimera_topology/graph_extraction_utilities.h"
+#include "kimera_topology/graph_extractor_types.h"
 #include "kimera_topology/gvd_voxel.h"
 #include "kimera_topology/voxblox_types.h"
 
@@ -10,78 +11,75 @@
 namespace kimera {
 namespace topology {
 
-inline Eigen::Vector3d getVoxelPosition(const Layer<GvdVoxel>& layer,
-                                        const GlobalIndex& index) {
-  BlockIndex block_idx;
-  VoxelIndex voxel_idx;
-  voxblox::getBlockAndVoxelIndexFromGlobalVoxelIndex(
-      index, layer.voxels_per_side(), &block_idx, &voxel_idx);
-
-  return layer.getBlockByIndex(block_idx)
-      .computeCoordinatesFromVoxelIndex(voxel_idx)
-      .cast<double>();
-}
-
+/**
+ * @brief Configuration structure for graph extraction
+ * @note We use vertex to refer to a voxel in the GVD that either acts as a connection
+ * point between voxels that are topologically relevant (typically those with 3 or more
+ * basis points) or encode curvature in topologically relevant voxels. We use node to
+ * refer to a member of the places graph. This distinction becomes especially meaningful
+ * when talking about constructing connections between disconnected components: these
+ * connections can be comprised of nodes that are not backed by any specific vertex in
+ * the GVD that still encode meaningful information about the curvature of the GVD.
+ */
 struct GraphExtractorConfig {
+  //! Number of basis points for a voxel to be consider for extraction
   uint8_t min_extra_basis = 2;
+  //! Number of basis points for a voxel to be automatically labeled a vertex
   uint8_t min_vertex_basis = 3;
-  int64_t max_edge_deviation = 4;
+  //! Whether or not to merge nodes close together during initial edge extraction
+  bool merge_new_nodes = true;
+  //! Maximum distance between two nodes to consider a merge
+  double node_merge_distance_m = 0.2;
+  /** @brief Whether or not to merge nodes close together when splitting edges
+   *  @warning There is no guarantee that edge splitting will terminate in a fixed
+   *           number of iterations with this option active.
+   */
+  bool edge_splitting_merge_nodes = true;
+  //! Number of maximum iterations to run edges splitting (set to 0 to disable)
   size_t max_edge_split_iterations = 5;
-  bool add_cleared_indices_to_wavefront = true;
+  //! Maximum squared voxel distance an edge can be from supporting voxels at any point
+  int64_t max_edge_deviation = 4;
+  //! Add edges between nodes that have overlapping free-space regions
+  bool add_freespace_edges = true;
+  //! Maximum number of hops used to compute the candidate nodes for free-space edges
+  size_t freespace_active_neighborhood_hops = 2;
+  //! Number of nearest neighbors to check for each free-space edge candidate node
+  size_t freespace_edge_num_neighbors = 3;
+  //! Minimum clearance at edge intersection
+  double freespace_edge_min_clearance_m = 0.2;
+  //! Add edges between disconnected components to attempt to improve graph connectivity
+  bool add_component_connection_edges = true;
+  //! Number of iterations of visited nodes to keep
+  size_t connected_component_window = 5;
+  //! Maximum number of hops used to compute the candidate connected components
+  size_t connected_component_hops = 2;
+  //! Number of candidate nodes in each connected component to consider adding edges to
+  size_t component_nodes_to_check = 5;
+  //! Number of nearest neighbors to check for each connected component candidate node
+  size_t component_nearest_neighbors = 3;
+  //! Maximum permissible length for an edge between disconnected component nodes
+  double component_max_edge_length_m = 5.0;
+  //! Minimum distance from obstacle for a straight-line edge
+  double component_min_clearance_m = 0.2;
+  //! Remove nodes with no edges
+  bool remove_isolated_nodes = true;
 };
-
-struct VoxelGraphInfo {
-  VoxelGraphInfo() : is_node(false), is_split_node(false) {}
-
-  explicit VoxelGraphInfo(NodeId id, bool is_from_split)
-      : id(id), is_node(true), is_split_node(is_from_split) {}
-
-  NodeId id;
-  bool is_node;
-  bool is_split_node;
-  size_t edge_id;
-};
-
-struct EdgeInfo {
-  EdgeInfo() = default;
-
-  EdgeInfo(size_t id, NodeId source) : id(id), source(source) {}
-
-  size_t id;
-  NodeId source;
-  voxblox::LongIndexSet indices;
-  std::set<NodeId> node_connections;
-  std::set<size_t> connections;
-};
-
-struct EdgeDeviation {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
-  EdgeDeviation(const GlobalIndex& index, double distance_to_edge, size_t edge_id)
-      : index(index), distance_to_edge(distance_to_edge), edge_id(edge_id) {}
-
-  GlobalIndex index;
-  double distance_to_edge;
-  size_t edge_id;
-};
-
-inline bool operator<(const EdgeDeviation& lhs, const EdgeDeviation& rhs) {
-  return lhs.distance_to_edge < rhs.distance_to_edge;
-}
-
-// TODO(nathan) consider namespacing in class
-// TODO(nathan) may need aligned allocator
-using IdIndexMap = std::unordered_map<NodeId, GlobalIndex>;
-using IdIndiceMap = std::unordered_map<NodeId, voxblox::LongIndexSet>;
-using IndexInfoMap = voxblox::LongIndexHashMapType<VoxelGraphInfo>::type;
-using EdgeInfoMap = std::unordered_map<size_t, EdgeInfo>;
-using EdgeDeviationQueue =
-    std::priority_queue<EdgeDeviation, voxblox::AlignedVector<EdgeDeviation>>;
 
 class GraphExtractor {
  public:
   using Ptr = std::unique_ptr<GraphExtractor>;
   using GvdLayer = Layer<GvdVoxel>;
+
+  // TODO(nathan) may need aligned allocator
+  using NodeIdRootMap = std::unordered_map<NodeId, GlobalIndex>;
+  using NodeIdIndexMap = std::unordered_map<NodeId, voxblox::LongIndexSet>;
+  using IndexGraphInfoMap = voxblox::LongIndexHashMapType<VoxelGraphInfo>::type;
+  using EdgeInfoMap = std::unordered_map<size_t, EdgeInfo>;
+  using EdgeSplitQueue =
+      std::priority_queue<EdgeSplitSeed, voxblox::AlignedVector<EdgeSplitSeed>>;
+  using PseudoEdgeInfoMap = std::map<size_t, PseudoEdgeInfo>;
+  using PseudoEdgeMap = voxblox::LongIndexHashMapType<std::unordered_set<size_t>>::type;
+  using Components = std::vector<std::vector<NodeId>>;
 
   explicit GraphExtractor(const GraphExtractorConfig& config);
 
@@ -91,13 +89,98 @@ class GraphExtractor {
 
   void clearGvdIndex(const GlobalIndex& index);
 
+  void removeDistantIndex(const GlobalIndex& index);
+
   void extract(const GvdLayer& layer);
 
   inline const SceneGraphLayer& getGraph() const { return *graph_; }
 
   inline const EdgeInfoMap& getGvdEdgeInfo() const { return edge_info_map_; }
 
-  inline const IdIndexMap& getNodeIndexMap() const { return id_root_index_map_; }
+  inline const NodeIdRootMap& getNodeRootMap() const { return node_id_root_map_; }
+
+ protected:
+  void clearNodeInfo(NodeId node_id);
+
+  void clearEdgeInfo(size_t edge_id, bool clear_indices = true);
+
+  void removeNodeIndex(NodeId node_id);
+
+  void removeEdgeIndices(size_t edge_id, bool clear_indices);
+
+  void clearPseudoEdgeInfo(const GlobalIndex& index);
+
+  void addNeighborToFrontier(const VoxelGraphInfo& info,
+                             const GlobalIndex& neighbor_index);
+
+  void addPlaceToGraph(const GvdLayer& layer,
+                       const GvdVoxel& voxel,
+                       const GlobalIndex& index,
+                       bool is_from_split = false);
+
+  bool updateEdgeMaps(const VoxelGraphInfo& info, const VoxelGraphInfo& neighbor_info);
+
+  void addEdgeToGraph(const VoxelGraphInfo& curr_info,
+                      const VoxelGraphInfo& neighbor_info);
+
+  void findBadEdgeIndices(const EdgeInfo& info);
+
+  void findNewVertices(const GvdLayer& layer);
+
+  bool attemptNodeMerge(const GvdLayer& layer,
+                        const VoxelGraphInfo& curr_info,
+                        const VoxelGraphInfo& neighbor_info);
+
+  void extractEdges(const GvdLayer& layer, bool allow_merging = false);
+
+  void filterRemovedConnections();
+
+  void splitEdges(const GvdLayer& layer);
+
+  void findFreespaceEdges();
+
+  Components filterComponents(const Components& to_filter) const;
+
+  bool addPseudoEdge(const GvdLayer& layer, NodeId source, NodeId target);
+
+  void findComponentConnections(const GvdLayer& layer);
+
+  void filterIsolatedNodes();
+
+  void checkState(const GvdLayer& layer);
+
+ protected:
+  GraphExtractorConfig config_;
+
+  CornerFinder corner_finder_;
+
+  AlignedQueue<GlobalIndex> modified_voxel_queue_;
+  AlignedQueue<GlobalIndex> floodfill_frontier_;
+
+  NodeSymbol next_node_id_;
+  IndexGraphInfoMap index_graph_info_map_;
+  NodeIdIndexMap node_id_index_map_;
+  NodeIdRootMap node_id_root_map_;
+
+  size_t next_edge_id_;
+  EdgeInfoMap edge_info_map_;
+  std::map<NodeId, std::set<size_t>> node_edge_id_map_;
+  std::map<NodeId, std::set<size_t>> node_edge_connections_;
+
+  EdgeSplitQueue edge_split_queue_;
+
+  // TODO(nathan) rename these
+  std::map<size_t, std::set<size_t>> checked_edges_;
+  std::set<size_t> connected_edges_;
+  std::unordered_set<NodeId> visited_nodes_;
+
+  size_t next_pseudo_edge_id_;
+  PseudoEdgeInfoMap pseudo_edge_info_;
+  PseudoEdgeMap pseudo_edge_map_;
+  std::list<std::unordered_set<NodeId>> pseudo_edge_window_;
+  std::list<std::pair<NodeId, NodeId>> removed_pseudo_edges_;
+
+  IsolatedSceneGraphLayer::Ptr graph_;
 
  protected:
   inline GlobalIndex popFromModifiedGvd() {
@@ -110,6 +193,14 @@ class GraphExtractor {
     GlobalIndex index = floodfill_frontier_.front();
     floodfill_frontier_.pop();
     return index;
+  }
+
+  inline void clearNewConnections(bool clear_modified_voxels) {
+    checked_edges_.clear();
+    connected_edges_.clear();
+    if (clear_modified_voxels) {
+      modified_voxel_queue_ = AlignedQueue<GlobalIndex>();
+    }
   }
 
   inline bool isVertex(const GvdLayer& layer,
@@ -127,54 +218,6 @@ class GraphExtractor {
 
     return false;
   }
-
-  void removeNodeInfo(NodeId node_id);
-
-  void removeEdgeInfo(size_t edge_id, bool clear_indices = true);
-
-  void addNeighborToFrontier(const VoxelGraphInfo& info,
-                             const GlobalIndex& neighbor_index);
-
-  void addPlaceToGraph(const GvdLayer& layer,
-                       const GvdVoxel& voxel,
-                       const GlobalIndex& index,
-                       bool is_from_split = false);
-
-  void addEdgeToGraph(const VoxelGraphInfo& curr_info,
-                      const VoxelGraphInfo& neighbor_info);
-
-  void findBadEdgeIndices(const EdgeInfo& info);
-
-  void findNewVertices(const GvdLayer& layer);
-
-  void extractEdges(const GvdLayer& layer);
-
-  void splitEdges(const GvdLayer& layer);
-
-  bool updateEdgeMaps(const VoxelGraphInfo& info, const VoxelGraphInfo& neighbor_info);
-
-  GraphExtractorConfig config_;
-
-  AlignedQueue<GlobalIndex> modified_voxel_queue_;
-  AlignedQueue<GlobalIndex> floodfill_frontier_;
-  CornerFinder corner_finder_;
-
-  NodeSymbol next_node_id_;
-  size_t next_edge_id_;
-  IndexInfoMap index_info_map_;
-  IdIndiceMap id_index_map_;
-  IdIndexMap id_root_index_map_;
-
-  EdgeInfoMap edge_info_map_;
-  std::map<NodeId, std::set<size_t>> node_edge_id_map_;
-  std::map<NodeId, std::set<size_t>> node_edge_connections_;
-
-  // TODO(nathan) rename all of these
-  EdgeDeviationQueue edge_deviation_queue_;
-  std::map<size_t, std::set<size_t>> checked_edges_;
-  std::set<size_t> connected_edges_;
-
-  IsolatedSceneGraphLayer::Ptr graph_;
 };
 
 }  // namespace topology

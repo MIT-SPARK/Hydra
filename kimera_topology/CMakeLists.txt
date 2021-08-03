@@ -14,6 +14,7 @@ find_package(
              kimera_dsg_visualizer
              voxblox
              voxblox_ros
+             kimera_semantics_ros
              tf2_eigen
 )
 
@@ -35,12 +36,16 @@ catkin_package(
 
 add_library(
   ${PROJECT_NAME}
+  src/config_parser.cpp
   src/graph_extractor.cpp
+  src/graph_extractor_types.cpp
   src/graph_extraction_utilities.cpp
   src/gvd_integrator.cpp
   src/gvd_utilities.cpp
   src/gvd_visualization_utilities.cpp
   src/gvd_voxel.cpp
+  src/nearest_neighbor_utilities.cpp
+  src/topology_server_visualizer.cpp
   src/voxel_aware_marching_cubes.cpp
   src/voxel_aware_mesh_integrator.cpp
 )

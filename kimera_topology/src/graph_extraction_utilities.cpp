@@ -1,5 +1,7 @@
 #include "kimera_topology/graph_extraction_utilities.h"
 
+#include <kimera_dsg/node_attributes.h>
+
 namespace kimera {
 namespace topology {
 
@@ -187,6 +189,63 @@ voxblox::AlignedVector<GlobalIndex> makeBresenhamLine(const GlobalIndex& start,
   }
 
   return line_points;
+}
+
+// TODO(nathan) consider removing
+double getNeighborhoodOverlap(const SceneGraphLayer& graph,
+                              std::unordered_set<NodeId> neighborhood,
+                              NodeId other_node,
+                              size_t num_hops) {
+  std::unordered_set<NodeId> other_neighborhood =
+      graph.getNeighborhood(other_node, num_hops);
+
+  size_t num_same = 0;
+  for (const auto neighbor : neighborhood) {
+    if (other_neighborhood.count(neighbor)) {
+      num_same++;
+    }
+  }
+
+  size_t union_cardinality = neighborhood.size() + other_neighborhood.size() - num_same;
+
+  return static_cast<double>(num_same) / static_cast<double>(union_cardinality);
+}
+
+void addFreespaceEdge(SceneGraphLayer& graph,
+                      NodeId node,
+                      NodeId neighbor,
+                      double min_clearance) {
+  if (node == neighbor) {
+    return;
+  }
+
+  if (graph.hasEdge(node, neighbor)) {
+    return;
+  }
+
+  const double r1 = getNodeGvdDistance(graph, node);
+  const double r2 = getNodeGvdDistance(graph, neighbor);
+  const double d = (graph.getPosition(node) - graph.getPosition(neighbor)).norm();
+
+  if (d >= r1 + r2) {
+    return;
+  }
+
+  if (d <= r1 || d <= r2) {
+    graph.insertEdge(node, neighbor); // intersection is inside one node's sphere
+    return;
+  }
+
+  // see https://mathworld.wolfram.com/Sphere-SphereIntersection.html
+  const double clearance =
+      std::sqrt(4 * std::pow(d, 2) * std::pow(r1, 2) -
+                std::pow(std::pow(d, 2) - std::pow(r2, 2) + std::pow(r1, 2), 2)) /
+      (2 * d);
+  if (clearance >= min_clearance) {
+    return;
+  }
+
+  graph.insertEdge(node, neighbor);
 }
 
 }  // namespace topology

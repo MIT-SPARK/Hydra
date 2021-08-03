@@ -16,6 +16,8 @@ struct GvdVoxel {
 
   bool has_parent = false;
   GlobalIndex::Scalar parent[3];
+  // required for removing blocks (parents leave a dangling reference otherwise)
+  voxblox::Point::Scalar parent_pos[3];
 
   uint8_t num_extra_basis = 0;
   // TODO(nathan) on GVD boundary flag
@@ -29,6 +31,23 @@ std::ostream& operator<<(std::ostream& out, const GvdVoxel& voxel);
 
 using GvdParentMap = voxblox::LongIndexHashMapType<voxblox::LongIndexSet>::type;
 using GvdNeighborhood = Neighborhood<voxblox::Connectivity::kTwentySix>;
+
+template <typename Scalar = double>
+inline Eigen::Matrix<Scalar, 3, 1> getVoxelPosition(const Layer<GvdVoxel>& layer,
+                                                    const GlobalIndex& index) {
+  BlockIndex block_idx;
+  VoxelIndex voxel_idx;
+  voxblox::getBlockAndVoxelIndexFromGlobalVoxelIndex(
+      index, layer.voxels_per_side(), &block_idx, &voxel_idx);
+
+  CHECK(layer.hasBlock(block_idx))
+      << "Attempting to look up coordinates for " << index.transpose()
+      << ", which is outside of the allocated blocks";
+
+  return layer.getBlockByIndex(block_idx)
+      .computeCoordinatesFromVoxelIndex(voxel_idx)
+      .cast<Scalar>();
+}
 
 }  // namespace topology
 }  // namespace kimera

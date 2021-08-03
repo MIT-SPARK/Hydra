@@ -16,6 +16,7 @@
   <depend>kimera_dsg_visualizer</depend>
   <depend>voxblox</depend>
   <depend>voxblox_ros</depend>
+  <depend>kimera_semantics_ros</depend>
   <depend>tf2_eigen</depend>
 
   <export>

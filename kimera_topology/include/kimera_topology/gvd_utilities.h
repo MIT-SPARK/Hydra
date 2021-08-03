@@ -9,14 +9,17 @@ inline void resetVoronoi(GvdVoxel& voxel) { voxel.num_extra_basis = 0; }
 
 inline bool isVoronoi(const GvdVoxel& voxel) { return voxel.num_extra_basis != 0; }
 
-inline void setGvdParent(GvdVoxel& voxel,
+inline void setSdfParent(GvdVoxel& voxel,
                          const GvdVoxel& ancestor,
-                         const GlobalIndex& ancestor_index) {
+                         const GlobalIndex& ancestor_index,
+                         const voxblox::Point& ancestor_pos) {
   voxel.has_parent = true;
   if (ancestor.has_parent) {
-    std::memcpy(voxel.parent, ancestor.parent, sizeof(ancestor.parent));
+    std::memcpy(voxel.parent, ancestor.parent, sizeof(voxel.parent));
+    std::memcpy(voxel.parent_pos, ancestor.parent_pos, sizeof(voxel.parent_pos));
   } else {
     Eigen::Map<GlobalIndex>(voxel.parent) = ancestor_index;
+    Eigen::Map<voxblox::Point>(voxel.parent_pos) = ancestor_pos;
   }
 }
 

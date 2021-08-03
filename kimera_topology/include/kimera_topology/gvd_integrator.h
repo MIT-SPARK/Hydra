@@ -66,6 +66,8 @@ class GvdIntegrator {
 
   inline const GraphExtractor& getGraphExtractor() const { return *graph_extractor_; }
 
+  void removeDistantBlocks(const voxblox::Point& center, double max_distance);
+
  protected:
   void processTsdfBlock(const Block<TsdfVoxel>& block, const BlockIndex& index);
 
@@ -202,17 +204,6 @@ class GvdIntegrator {
     }
 
     return true;
-  }
-
-  // TODO(nathan) merge with utility in graph_extractor
-  inline voxblox::Point getVoxelCoordinates(const GlobalIndex& index) {
-    BlockIndex block_idx;
-    VoxelIndex voxel_idx;
-    voxblox::getBlockAndVoxelIndexFromGlobalVoxelIndex(
-        index, gvd_layer_->voxels_per_side(), &block_idx, &voxel_idx);
-
-    return gvd_layer_->getBlockByIndex(block_idx).computeCoordinatesFromVoxelIndex(
-        voxel_idx);
   }
 };
 

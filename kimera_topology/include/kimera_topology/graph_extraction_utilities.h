@@ -2,6 +2,9 @@
 #include "kimera_topology/gvd_voxel.h"
 #include "kimera_topology/voxblox_types.h"
 
+#include <kimera_dsg/scene_graph_layer.h>
+#include <kimera_dsg/node_attributes.h>
+
 #include <bitset>
 #include <iostream>
 
@@ -66,6 +69,17 @@ struct CornerFinder {
 
 voxblox::AlignedVector<GlobalIndex> makeBresenhamLine(const GlobalIndex& start,
                                                       const GlobalIndex& end);
+
+double getNeighborhoodOverlap(const SceneGraphLayer& graph,
+                              std::unordered_set<NodeId> neighborhood,
+                              NodeId other_node,
+                              size_t num_hops);
+
+inline double getNodeGvdDistance(const SceneGraphLayer& graph, NodeId node) {
+  return graph.getNode(node).value().get().attributes<PlaceNodeAttributes>().distance;
+}
+
+void addFreespaceEdge(SceneGraphLayer& graph, NodeId node, NodeId neighbor, double min_clearance);
 
 }  // namespace topology
 }  // namespace kimera

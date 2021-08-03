@@ -1,5 +1,6 @@
 #include "kimera_topology/gvd_visualization_utilities.h"
 
+#include <kimera_dsg_visualizer/colormap_utils.h>
 #include <tf2_eigen/tf2_eigen.h>
 
 #include <random>
@@ -9,42 +10,25 @@ using visualization_msgs::Marker;
 namespace kimera {
 namespace topology {
 
-#define RETURN_MODE_IF_MATCH(mode, string) \
-  if (string == #mode) {                   \
-    return GvdVisualizationMode::mode;     \
-  }                                        \
-  static_assert(true, "")
-
-GvdVisualizationMode getModeFromString(const std::string& mode) {
-  RETURN_MODE_IF_MATCH(DEFAULT, mode);
-  RETURN_MODE_IF_MATCH(DISTANCE, mode);
-  RETURN_MODE_IF_MATCH(BASIS_POINTS, mode);
-  ROS_WARN_STREAM("Invalid mode: " << mode << ". Using DEFAULT color mode");
-  return GvdVisualizationMode::DEFAULT;
-}
-
-#undef RETURN_MODE_IF_MATCH
-
 double computeRatio(double min, double max, double value) {
   double ratio = (value - min) / (max - min);
   ratio = !std::isfinite(ratio) ? 0.0 : ratio;
   return ratio;
 }
 
-double getRatioFromDistance(const GvdVisualizationConfig& config,
-                            const GvdVoxel& voxel) {
-  return computeRatio(config.min_distance, config.max_distance, voxel.distance);
+double getRatioFromDistance(const GvdVisualizerConfig& config, const GvdVoxel& voxel) {
+  return computeRatio(config.gvd_min_distance, config.gvd_max_distance, voxel.distance);
 }
 
-double getRatioFromBasisPoints(const GvdVisualizationConfig& config,
+double getRatioFromBasisPoints(const GvdVisualizerConfig& config,
                                const GvdVoxel& voxel) {
   return computeRatio(static_cast<double>(config.min_num_basis),
                       static_cast<double>(config.max_num_basis),
                       static_cast<double>(voxel.num_extra_basis));
 }
 
-double getRatio(const GvdVisualizationConfig& config, const GvdVoxel& voxel) {
-  switch (config.mode) {
+double getRatio(const GvdVisualizerConfig& config, const GvdVoxel& voxel) {
+  switch (static_cast<GvdVisualizationMode>(config.gvd_mode)) {
     case GvdVisualizationMode::BASIS_POINTS:
       return getRatioFromBasisPoints(config, voxel);
     case GvdVisualizationMode::DISTANCE:
@@ -55,9 +39,9 @@ double getRatio(const GvdVisualizationConfig& config, const GvdVoxel& voxel) {
   return 0.0;
 }
 
-Marker makeGvdMarker(const Layer<GvdVoxel>& layer,
-                     const dsg_utils::HlsColorMapConfig& color_config,
-                     const GvdVisualizationConfig& gvd_config) {
+Marker makeGvdMarker(const GvdVisualizerConfig& config,
+                     const ColormapConfig& colors,
+                     const Layer<GvdVoxel>& layer) {
   BlockIndexList blocks;
   layer.getAllAllocatedBlocks(&blocks);
 
@@ -79,7 +63,7 @@ Marker makeGvdMarker(const Layer<GvdVoxel>& layer,
     const auto& block = layer.getBlockByIndex(idx);
     for (size_t i = 0; i < block.num_voxels(); ++i) {
       const auto& voxel = block.getVoxelByLinearIndex(i);
-      if (!voxel.observed || voxel.num_extra_basis < gvd_config.basis_threshold) {
+      if (!voxel.observed || voxel.num_extra_basis < config.basis_threshold) {
         continue;
       }
 
@@ -89,10 +73,10 @@ Marker makeGvdMarker(const Layer<GvdVoxel>& layer,
       tf2::convert(voxel_pos, marker_pos);
       marker.points.push_back(marker_pos);
 
-      double ratio = getRatio(gvd_config, voxel);
-      NodeColor color = dsg_utils::interpolateColorMap(color_config, ratio);
+      double ratio = getRatio(config, voxel);
+      NodeColor color = dsg_utils::interpolateColorMap(colors, ratio);
 
-      std_msgs::ColorRGBA color_msg = dsg_utils::makeColorMsg(color, gvd_config.alpha);
+      std_msgs::ColorRGBA color_msg = dsg_utils::makeColorMsg(color, config.gvd_alpha);
       marker.colors.push_back(color_msg);
     }
   }
@@ -100,9 +84,9 @@ Marker makeGvdMarker(const Layer<GvdVoxel>& layer,
   return marker;
 }
 
-Marker makeEsdfMarker(const Layer<GvdVoxel>& layer,
-                      const dsg_utils::HlsColorMapConfig& color_config,
-                      const EsdfVisualizationConfig& esdf_config) {
+Marker makeEsdfMarker(const GvdVisualizerConfig& config,
+                      const ColormapConfig& colors,
+                      const Layer<GvdVoxel>& layer) {
   BlockIndexList blocks;
   layer.getAllAllocatedBlocks(&blocks);
 
@@ -124,7 +108,7 @@ Marker makeEsdfMarker(const Layer<GvdVoxel>& layer,
   const FloatingPoint half_voxel_size = voxel_size / 2.0;
   // rounds down and points the slice at the middle of the nearest voxel boundary
   const FloatingPoint slice_height =
-      std::floor(esdf_config.slice_height / voxel_size) * voxel_size + half_voxel_size;
+      std::floor(config.slice_height / voxel_size) * voxel_size + half_voxel_size;
 
   for (const auto& idx : blocks) {
     const auto& block = layer.getBlockByIndex(idx);
@@ -146,10 +130,10 @@ Marker makeEsdfMarker(const Layer<GvdVoxel>& layer,
       marker.points.push_back(marker_pos);
 
       double ratio = computeRatio(
-          esdf_config.min_distance, esdf_config.max_distance, voxel.distance);
-      NodeColor color = dsg_utils::interpolateColorMap(color_config, ratio);
+          config.esdf_min_distance, config.esdf_max_distance, voxel.distance);
+      NodeColor color = dsg_utils::interpolateColorMap(colors, ratio);
 
-      std_msgs::ColorRGBA color_msg = dsg_utils::makeColorMsg(color, esdf_config.alpha);
+      std_msgs::ColorRGBA color_msg = dsg_utils::makeColorMsg(color, config.esdf_alpha);
       marker.colors.push_back(color_msg);
     }
   }
@@ -158,8 +142,8 @@ Marker makeEsdfMarker(const Layer<GvdVoxel>& layer,
 }
 
 Marker makeGvdEdgeMarker(const Layer<GvdVoxel>& layer,
-                         const EdgeInfoMap& edge_info_map,
-                         const IdIndexMap& id_root_index_map) {
+                         const GraphExtractor::EdgeInfoMap& edge_info_map,
+                         const GraphExtractor::NodeIdRootMap& id_root_index_map) {
   const double alpha = 0.8;
   Marker marker;
   marker.type = Marker::CUBE_LIST;
@@ -249,6 +233,92 @@ Marker makeGvdEdgeMarker(const Layer<GvdVoxel>& layer,
   }
 
   return marker;
+}
+
+inline Eigen::Vector3d getOffset(double side_length,
+                                 bool x_high,
+                                 bool y_high,
+                                 bool z_high) {
+  Eigen::Vector3d offset;
+  offset(0) = x_high ? side_length : 0.0;
+  offset(1) = y_high ? side_length : 0.0;
+  offset(2) = z_high ? side_length : 0.0;
+  return offset;
+}
+
+geometry_msgs::Point getPointFromMatrix(const Eigen::MatrixXd& matrix, int col) {
+  geometry_msgs::Point point;
+  tf2::convert(matrix.block<3, 1>(0, col).eval(), point);
+  return point;
+}
+
+void fillMarkerFromBlock(Marker& marker,
+                         const Eigen::Vector3d& position,
+                         double side_length) {
+  Eigen::MatrixXd corners(3, 8);
+  for (int c = 0; c < corners.cols(); ++c) {
+    // x: lsb, y: second lsb, z: third lsb
+    corners.block<3, 1>(0, c) =
+        position +
+        getOffset(side_length, ((c & 0x01) != 0), ((c & 0x02) != 0), ((c & 0x04) != 0));
+  }
+
+  for (int c = 0; c < corners.cols(); ++c) {
+    // edges are 1-bit pertubations
+    int x_neighbor = c | 0x01;
+    int y_neighbor = c | 0x02;
+    int z_neighbor = c | 0x04;
+    if (c != x_neighbor) {
+      marker.points.push_back(getPointFromMatrix(corners, c));
+      marker.points.push_back(getPointFromMatrix(corners, x_neighbor));
+    }
+    if (c != y_neighbor) {
+      marker.points.push_back(getPointFromMatrix(corners, c));
+      marker.points.push_back(getPointFromMatrix(corners, y_neighbor));
+    }
+    if (c != z_neighbor) {
+      marker.points.push_back(getPointFromMatrix(corners, c));
+      marker.points.push_back(getPointFromMatrix(corners, z_neighbor));
+    }
+  }
+}
+
+template <typename LayerType>
+Marker makeBlocksMarkerImpl(const LayerType& layer) {
+  Marker marker;
+  marker.type = Marker::LINE_LIST;
+  marker.action = Marker::ADD;
+  marker.id = 0;
+  marker.color.r = 0.662;
+  marker.color.g = 0.0313;
+  marker.color.b = 0.7607;
+  marker.color.a = 0.8;
+  marker.scale.x = 0.01;
+  marker.scale.y = 0.01;
+  marker.scale.z = 0.01;
+
+  Eigen::Vector3d identity_pos = Eigen::Vector3d::Zero();
+  tf2::convert(identity_pos, marker.pose.position);
+  tf2::convert(Eigen::Quaterniond::Identity(), marker.pose.orientation);
+
+  BlockIndexList blocks;
+  layer.getAllAllocatedBlocks(&blocks);
+
+  for (const auto& idx : blocks) {
+    const auto& block = layer.getBlockByIndex(idx);
+    Eigen::Vector3f block_pos = block.origin();
+    fillMarkerFromBlock(marker, block_pos.cast<double>(), block.block_size());
+  }
+
+  return marker;
+}
+
+Marker makeBlocksMarker(const Layer<TsdfVoxel>& layer) {
+  return makeBlocksMarkerImpl(layer);
+}
+
+Marker makeBlocksMarker(const Layer<GvdVoxel>& layer) {
+  return makeBlocksMarkerImpl(layer);
 }
 
 }  // namespace topology

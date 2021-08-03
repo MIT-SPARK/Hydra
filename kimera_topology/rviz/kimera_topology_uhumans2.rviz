@@ -5,7 +5,6 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /TF1/Tree1
-        - /GVD Visualization1/Status1
         - /GVD Visualization1/Namespaces1
         - /Graph Visualization1/Namespaces1
       Splitter Ratio: 0.5
@@ -110,11 +109,11 @@ Visualization Manager:
     - Class: rviz/Image
       Enabled: true
       Image Topic: /tesse/depth_cam/mono/image_raw
-      Max Value: 1
+      Max Value: 30
       Median window: 5
       Min Value: 0
       Name: Depth Image
-      Normalize Range: true
+      Normalize Range: false
       Queue Size: 2
       Transport Hint: raw
       Unreliable: false
@@ -144,13 +143,13 @@ Visualization Manager:
       Unreliable: false
       Value: true
     - Class: rviz/Marker
-      Enabled: false
+      Enabled: true
       Marker Topic: /kimera_topology_node/gvd_viz
       Name: GVD Visualization
       Namespaces:
-        {}
+        gvd_visualizer: true
       Queue Size: 100
-      Value: false
+      Value: true
     - Class: rviz/MarkerArray
       Enabled: true
       Marker Topic: /kimera_topology_node/graph_viz
@@ -176,6 +175,14 @@ Visualization Manager:
         {}
       Queue Size: 100
       Value: false
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /kimera_topology_node/voxel_block_viz
+      Name: Allocated Block Outlines
+      Namespaces:
+        topology_server_blocks: true
+      Queue Size: 100
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 255; 255; 255
@@ -204,25 +211,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 19.43128204345703
+      Distance: 22.960479736328125
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 3.4092540740966797
-        Y: 0.5955750942230225
-        Z: -0.21809121966362
+        X: 0.9548983573913574
+        Y: -1.0042327642440796
+        Z: -1.955553412437439
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.004795789718628
+      Pitch: 0.7747955322265625
       Target Frame: left_cam
       Value: Orbit (rviz)
-      Yaw: 3.274967908859253
+      Yaw: 2.724970579147339
     Saved: ~
 Window Geometry:
   Depth Image:

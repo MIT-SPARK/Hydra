@@ -6,6 +6,7 @@ namespace kimera {
 namespace topology {
 
 using ParentMap = Eigen::Map<const GlobalIndex>;
+using ParentPosMap = Eigen::Map<const voxblox::Point>;
 
 struct GvdVoxelWithIndex {
   GvdVoxel voxel;
@@ -37,6 +38,9 @@ GvdVoxelWithIndex makeGvdVoxel(uint64_t x,
   to_return.voxel.parent[0] = px;
   to_return.voxel.parent[1] = py;
   to_return.voxel.parent[2] = pz;
+  to_return.voxel.parent_pos[0] = px;
+  to_return.voxel.parent_pos[1] = py;
+  to_return.voxel.parent_pos[2] = pz;
   return to_return;
 }
 
@@ -69,31 +73,36 @@ VoronoiCheckConfig makeL1AndAngleConfig(double min_distance_m = 0.1,
   return config;
 }
 
-TEST(GvdUtilities, setGvdParent) {
+TEST(GvdUtilities, setSdfParent) {
   {  // assign parent from neighbor parent
     GvdVoxelWithIndex neighbor = makeGvdVoxel(1, 2, 3, 4.0, 5, 6, 7);
+    voxblox::Point neighbor_pos(1.0, 2.0, 3.0);
     GvdVoxel current;
     EXPECT_FALSE(current.has_parent);
 
-    setGvdParent(current, neighbor.voxel, neighbor.index);
+    setSdfParent(current, neighbor.voxel, neighbor.index, neighbor_pos);
 
     GlobalIndex expected;
     expected << 5, 6, 7;
+    voxblox::Point expected_pos;
+    expected_pos << 5.0f, 6.0f, 7.0f;
     EXPECT_TRUE(current.has_parent);
     EXPECT_EQ(expected, ParentMap(current.parent));
+    EXPECT_EQ(expected_pos, ParentPosMap(current.parent_pos));
   }
 
   {  // assign parent from neighbor
     GvdVoxelWithIndex neighbor = makeGvdVoxel(1, 2, 3, 4.0);
+    voxblox::Point neighbor_pos(1.0f, 2.0f, 3.0f);
     GvdVoxel current;
     EXPECT_FALSE(current.has_parent);
 
-    setGvdParent(current, neighbor.voxel, neighbor.index);
+    setSdfParent(current, neighbor.voxel, neighbor.index, neighbor_pos);
 
-    GlobalIndex expected;
-    expected << 1, 2, 3;
+    GlobalIndex expected(1, 2, 3);
     EXPECT_TRUE(current.has_parent);
     EXPECT_EQ(expected, ParentMap(current.parent));
+    EXPECT_EQ(neighbor_pos, ParentPosMap(current.parent_pos));
   }
 }
 
@@ -321,7 +330,8 @@ TEST(GvdUtilities, checkVoronoiParentSeparation) {
     GlobalIndex voxel1(1, 2, 3);
     GlobalIndex parent1(5, 6, 6);
     GlobalIndex parent2(5, 7, 10);
-    EXPECT_FALSE(isParentUnique(makeL1AndAngleConfig(0.1, 10.0), voxel1, parent1, parent2));
+    EXPECT_FALSE(
+        isParentUnique(makeL1AndAngleConfig(0.1, 10.0), voxel1, parent1, parent2));
 
     // test a previously bad angle
     GlobalIndex voxel2(0, 6, 8);

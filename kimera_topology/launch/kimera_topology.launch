@@ -31,6 +31,8 @@
         <arg name="pointcloud_topic" default="$(arg pointcloud_topic)"/>
     </include>
 
+    <arg name="show_stats" default="true"/>
+
     <arg name="debug" default="false"/>
     <arg name="launch-prefix" default="gdb --args" if="$(arg debug)"/>
     <arg name="launch-prefix" default="" unless="$(arg debug)"/>
@@ -39,6 +41,11 @@
     <arg name="glog_dir" default="$(find kimera_topology)/glogs"/>
     <arg name="glog_file_args" value="--logtostderr=0 --log_dir=$(arg glog_dir)" if="$(arg glog_to_file)"/>
     <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
+
+    <arg name="ros_verbose_logging" default="false"/>
+    <env name="ROSCONSOLE_CONFIG_FILE"
+         value="$(find kimera_topology)/config/logging.config"
+         if="$(arg ros_verbose_logging)"/>
 
     <node name="kimera_topology_node"
           type="kimera_topology_node"
@@ -49,24 +56,17 @@
           required="true">
         <remap from="pointcloud" to="$(arg pointcloud_topic)"/>
         <param name="sensor_frame" value="$(arg sensor_frame)"/>
-
-        <rosparam command="load" file="$(arg graph_viz_config_file)" ns="graph_visualizer"/>
-        <rosparam command="load" file="$(arg config_dir)/$(arg config)"/>
-        <param name="tsdf_voxel_size" value="$(arg voxel_size)"/>
-        <param name="max_ray_length_m" value="$(arg max_ray_length_m)"/>
         <param name="verbose" value="false"/>
         <param name="publish_pointclouds" value="false"/>
-        <param name="update_period_s" value="$(arg update_period_s)"/>
 
+        <rosparam command="load" file="$(arg graph_viz_config_file)"/>
+
+        <rosparam command="load" file="$(arg config_dir)/$(arg config)"/>
+        <param name="show_stats" value="$(arg show_stats)"/>
+        <param name="tsdf_voxel_size" value="$(arg voxel_size)"/>
+        <param name="max_ray_length_m" value="$(arg max_ray_length_m)"/>
         <param name="max_distance_m" value="$(arg max_ray_length_m)"/>
-        <param name="voronoi_min_distance_m" value="0.25"/>
-        <param name="voronoi_neighbor_l1_separation" value="12.0"/>
-        <param name="voronoi_use_angle" value="true"/>
-        <param name="voronoi_neighbor_cos_separation" value="0.0"/>
-        <param name="min_basis_for_extraction" value="2"/>
-        <param name="graph_extraction_min_vertex_basis" value="4"/>
-        <param name="graph_extraction_min_extra_basis" value="2"/>
-        <param name="graph_extraction_max_edge_deviation" value="4"/>
+        <param name="update_period_s" value="$(arg update_period_s)"/>
     </node>
 
 </launch>

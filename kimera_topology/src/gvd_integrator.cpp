@@ -133,6 +133,39 @@ void GvdIntegrator::updateVoronoiQueue(GvdVoxel& voxel,
   }
 }
 
+void GvdIntegrator::removeDistantBlocks(const voxblox::Point& center,
+                                        double max_distance) {
+  BlockIndexList blocks;
+  gvd_layer_->getAllAllocatedBlocks(&blocks);
+
+  for (const auto& idx : blocks) {
+    Block<GvdVoxel>::Ptr block = gvd_layer_->getBlockPtrByIndex(idx);
+    if ((center - block->origin()).norm() < max_distance) {
+      continue;
+    }
+
+    for (size_t v = 0; v < block->num_voxels(); ++v) {
+      const GvdVoxel& voxel = block->getVoxelByLinearIndex(v);
+      if (!voxel.observed) {
+        continue;
+      }
+
+      const GlobalIndex global_index =
+          voxblox::getGlobalVoxelIndexFromBlockAndVoxelIndex(
+              idx,
+              block->computeVoxelIndexFromLinearIndex(v),
+              gvd_layer_->voxels_per_side());
+      graph_extractor_->removeDistantIndex(global_index);
+
+      removeVoronoiFromGvdParentMap(global_index);
+    }
+
+    // we explicitly tsdf and gvd blocks here to avoid potential weirdness
+    tsdf_layer_->removeBlock(idx);
+    gvd_layer_->removeBlock(idx);
+  }
+}
+
 void GvdIntegrator::updateFromTsdfLayer(bool clear_updated_flag,
                                         bool clear_surface_flag) {
   update_stats_.clear();
@@ -182,7 +215,7 @@ void GvdIntegrator::updateFromTsdfLayer(bool clear_updated_flag,
 
   gvd_timer.Stop();
 
-  VLOG(1) << "[GVD update]: " << std::endl << update_stats_;
+  VLOG(2) << "[GVD update]: " << std::endl << update_stats_;
 
   if (!clear_updated_flag) {
     return;
@@ -244,12 +277,14 @@ void GvdIntegrator::updateObservedGvdVoxel(const TsdfVoxel& tsdf_voxel,
       return;
     }
 
+    // TODO(nathan) reseting here is suspect
     resetGvdParent(gvd_voxel);
     gvd_voxel.distance = tsdf_voxel.distance;
     return;
   }
 
   if (gvd_voxel.fixed) {
+    // TODO(nathan) reseting here is suspect
     // tsdf voxel isn't fixed, so reset this voxel
     resetGvdParent(gvd_voxel);
     gvd_voxel.fixed = false;
@@ -382,12 +417,13 @@ bool GvdIntegrator::processNeighbor(GvdVoxel& voxel,
                                     GvdVoxel& neighbor) {
   DistancePotential candidate;
   if (config_.parent_derived_distance) {
-    const voxblox::Point neighbor_pos = getVoxelCoordinates(neighbor_idx);
+    const voxblox::Point neighbor_pos =
+        getVoxelPosition<float>(*gvd_layer_, neighbor_idx);
     voxblox::Point parent_pos;
     if (voxel.has_parent) {
-      parent_pos = getVoxelCoordinates(Eigen::Map<const GlobalIndex>(voxel.parent));
+      parent_pos = Eigen::Map<const voxblox::Point>(voxel.parent_pos);
     } else {
-      parent_pos = getVoxelCoordinates(voxel_idx);
+      parent_pos = getVoxelPosition<float>(*gvd_layer_, voxel_idx);
     }
 
     candidate.distance =
@@ -413,8 +449,9 @@ bool GvdIntegrator::processNeighbor(GvdVoxel& voxel,
   }
 
   neighbor.distance = candidate.distance;
-  // TODO(nathan) refactor function name
-  setGvdParent(neighbor, voxel, voxel_idx);
+  const voxblox::Point voxel_pos = getVoxelPosition<float>(*gvd_layer_, voxel_idx);
+  setSdfParent(neighbor, voxel, voxel_idx, voxel_pos);
+
   // TODO(nathan) ?
   if (config_.multi_queue || !neighbor.in_queue) {
     pushToQueue(neighbor_idx, neighbor, PushType::LOWER);
@@ -446,6 +483,7 @@ void GvdIntegrator::setFixedParent(const GvdNeighborhood::IndexMatrix& neighbor_
       continue;
     }
 
+    // TODO(nathan) might need to double check handling of negative distances here
     FloatingPoint distance = NeighborhoodLookupTables::kDistances[n] * voxel_size_;
     FloatingPoint neighbor_distance =
         neighbor->distance + std::copysign(distance, voxel.distance);
@@ -463,7 +501,9 @@ void GvdIntegrator::setFixedParent(const GvdNeighborhood::IndexMatrix& neighbor_
     // setting these voxels as surfaces probably distorts the gvd...
     // setGvdSurfaceVoxel(voxel);
   } else {
-    setGvdParent(voxel, *best_neighbor, best_neighbor_index);
+    const voxblox::Point neighbor_pos =
+        getVoxelPosition<float>(*gvd_layer_, best_neighbor_index);
+    setSdfParent(voxel, *best_neighbor, best_neighbor_index, neighbor_pos);
   }
 }
 
