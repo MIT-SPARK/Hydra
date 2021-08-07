@@ -17,6 +17,11 @@ pcl::PolygonMesh::Ptr findWalls(const SubMesh& mesh,
   CHECK(scene_graph.hasLayer(to_underlying(KimeraDsgLayers::PLACES)));
   const SceneGraphLayer& layer =
       *(scene_graph.getLayer(to_underlying(KimeraDsgLayers::PLACES)));
+  if (layer.nodes().empty()) {
+    LOG(WARNING) << "Places layer empty: cannot cluster wall vertices to rooms";
+    return nullptr;
+  }
+
   PclLayer<ColorPointCloud> pcl_layer =
       convertLayerToPcl<ColorPointCloud>(layer);
 

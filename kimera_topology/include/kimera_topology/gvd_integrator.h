@@ -58,7 +58,9 @@ class GvdIntegrator {
 
   virtual ~GvdIntegrator() = default;
 
-  void updateFromTsdfLayer(bool clear_updated_flag, bool clear_surface_flag = true);
+  void updateFromTsdfLayer(bool clear_updated_flag,
+                           bool clear_surface_flag = true,
+                           bool use_all_blocks = false);
 
   inline const SceneGraphLayer& getGraph() const {
     return graph_extractor_->getGraph();

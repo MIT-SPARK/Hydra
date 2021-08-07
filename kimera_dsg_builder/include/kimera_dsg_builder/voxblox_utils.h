@@ -9,14 +9,13 @@ namespace kimera {
 
 namespace utils {
 
-void fillLayerFromSkeleton(const std::string& skeleton_file,
-                           SceneGraph* scene_graph);
-
 struct VoxbloxConfig {
   voxblox::EsdfIntegrator::Config esdf_config;
   std::string tsdf_file;
   std::string esdf_file;
   std::string mesh_file;
+  std::string gvd_namespace;
+  bool load_places = false;
   bool load_esdf;
   bool load_mesh;
   double voxel_size;
@@ -28,7 +27,8 @@ std::optional<VoxbloxConfig> loadVoxbloxConfig(const ros::NodeHandle& nh);
 bool loadVoxbloxInfo(const VoxbloxConfig& config,
                      voxblox::Layer<voxblox::EsdfVoxel>::Ptr& esdf,
                      pcl::PolygonMesh::Ptr& mesh,
-                     ros::Publisher* mesh_pub = nullptr);
+                     ros::Publisher* mesh_pub = nullptr,
+                     SceneGraph* graph = nullptr);
 
 }  // namespace utils
 

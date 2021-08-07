@@ -31,13 +31,19 @@
   <include file="$(find kimera_dsg_visualizer)/launch/includes/kimera_dsg_visualizer_base.xml"
            pass_all_args="true"/>
 
+   <!-- TODO(nathan) fix this namespacing -->
+   <!-- TODO(nathan) check truncation distance -->
+   <rosparam file="$(find kimera_topology)/config/uhumans2_topology_config.yaml"
+             command="load"
+             ns="/gvd_integrator"/>
+
   <node name="kimera_dsg_builder_offline_node"
-        pkg="kimera_dsg_builder"
         type="kimera_dsg_builder_offline_node"
+        pkg="kimera_dsg_builder"
         output="screen"
         launch-prefix="$(arg launch-prefix)"
-        required="true"
-        args="-alsologtostderr -colorlogtostderr -v=$(arg verbosity)">
+        args="-alsologtostderr -colorlogtostderr -v=$(arg verbosity)"
+        required="true" >
     <param name="visualizer_ns" value="$(arg visualizer_ns)"/>
 
     <!--    2.1- scenes 1-4 -->

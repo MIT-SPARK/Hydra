@@ -64,9 +64,8 @@ NNResult getDistanceToRoom(const pcl::KdTreeFLANN<ColorPoint>& kdtree,
   CHECK_GT(nn_distances.size(), 0u);
   // Don't take the squared distances, since we need to project in 2D!
   const ColorPoint& pcl_point = kdtree.getInputCloud()->at(nn_indices.at(0));
-  float esdf_distance_approx =
-      std::sqrt(std::pow(search_point.x - pcl_point.x, 2) +
-                std::pow(search_point.y - pcl_point.y, 2));
+  float esdf_distance_approx = std::sqrt(std::pow(search_point.x - pcl_point.x, 2) +
+                                         std::pow(search_point.y - pcl_point.y, 2));
 
   return {true, esdf_distance_approx};
 }
@@ -109,8 +108,7 @@ void findPlacesRoomConnectivity(SceneGraph* scene_graph,
     // handle adding connections between the concave hull and the room extents
     VLOG(2) << "Labeling place neighbors that are within truncation distance";
     for (const auto& inside_room_place_index : removed_indices_inside_room) {
-      const NodeId place_id =
-          places_pcl.cloud_to_layer_ids.at(inside_room_place_index);
+      const NodeId place_id = places_pcl.cloud_to_layer_ids.at(inside_room_place_index);
       CHECK(scene_graph->hasNode(place_id));
       const Node& place_node = *(scene_graph->getNode(place_id));
       for (const auto& sibling_id : place_node.siblings()) {
@@ -127,12 +125,11 @@ void findPlacesRoomConnectivity(SceneGraph* scene_graph,
           continue;  // transition edge, skip
         }
 
-        NNResult result =
-            getDistanceToRoom(*(room_hulls.at(room_id).hull_kdtree),
-                              sibling_node.attributes().position);
+        NNResult result = getDistanceToRoom(*(room_hulls.at(room_id).hull_kdtree),
+                                            sibling_node.attributes().position);
         if (!result.valid) {
-          LOG(WARNING) << "Failed to find nearest neighbor to place "
-                       << sibling_id << " w.r.t. room " << room_id;
+          LOG(WARNING) << "Failed to find nearest neighbor to place " << sibling_id
+                       << " w.r.t. room " << room_id;
         }
 
         const float truncation_threshold = 1.1f * esdf_truncation_distance;
@@ -148,8 +145,7 @@ void findPlacesRoomConnectivity(SceneGraph* scene_graph,
 
   std::list<NodeId> unlabeled_nodes;
   for (const auto& id_node_pair : places_layer.nodes()) {
-    if (!id_node_pair.second->hasParent() &&
-        id_node_pair.second->hasSiblings()) {
+    if (!id_node_pair.second->hasParent() && id_node_pair.second->hasSiblings()) {
       unlabeled_nodes.push_back(id_node_pair.first);
     }
   }
@@ -195,11 +191,10 @@ void findPlacesRoomConnectivity(SceneGraph* scene_graph,
       continue;
     }
 
-    auto best_room = std::max_element(room_votes.begin(),
-                                      room_votes.end(),
-                                      [](const auto& lhs, const auto& rhs) {
-                                        return lhs.second < rhs.second;
-                                      });
+    auto best_room = std::max_element(
+        room_votes.begin(), room_votes.end(), [](const auto& lhs, const auto& rhs) {
+          return lhs.second < rhs.second;
+        });
     CHECK(best_room != room_votes.end());
     scene_graph->insertEdge(best_room->first, node_id);
   }
@@ -215,10 +210,9 @@ void findPlacesRoomConnectivity(SceneGraph* scene_graph,
   }
 }
 
-std::optional<NodeId> findNearestPlace(
-    const pcl::KdTreeFLANN<ColorPoint>& kd_tree,
-    const PclLayer<ColorPointCloud>& pcl_layer,
-    const Eigen::Vector3d& position) {
+std::optional<NodeId> findNearestPlace(const pcl::KdTreeFLANN<ColorPoint>& kd_tree,
+                                       const PclLayer<ColorPointCloud>& pcl_layer,
+                                       const Eigen::Vector3d& position) {
   ColorPoint query_point;
   query_point.x = position(0);
   query_point.y = position(1);
@@ -243,7 +237,11 @@ void findObjectPlaceConnectivity(SceneGraph* scene_graph) {
   CHECK(scene_graph->hasLayer(to_underlying(KimeraDsgLayers::PLACES)));
   const SceneGraphLayer& places_layer =
       *(scene_graph->getLayer(to_underlying(KimeraDsgLayers::PLACES)));
-  CHECK_GE(places_layer.numNodes(), 0u) << "Empty places layer";
+  if (places_layer.nodes().empty()) {
+    LOG(WARNING) << "Empty places layer: will not have interlayer edges between places "
+                    "and objects";
+    return;
+  }
 
   PclLayer<ColorPointCloud> pcl_places =
       convertLayerToPcl<ColorPointCloud>(places_layer);
@@ -254,8 +252,7 @@ void findObjectPlaceConnectivity(SceneGraph* scene_graph) {
   // Iterate over the nodes of objects layer
   for (const auto& id_node_pair : objects_layer.nodes()) {
     if (id_node_pair.second->hasParent()) {
-      LOG(WARNING) << "Object " << id_node_pair.first
-                   << "has a parent already!";
+      LOG(WARNING) << "Object " << id_node_pair.first << "has a parent already!";
       continue;
     }
 
@@ -264,8 +261,7 @@ void findObjectPlaceConnectivity(SceneGraph* scene_graph) {
     std::optional<NodeId> nearest_place = findNearestPlace(
         kd_tree, pcl_places, id_node_pair.second->attributes().position);
     if (!nearest_place) {
-      LOG(WARNING) << "No place found for object with id: "
-                   << id_node_pair.first;
+      LOG(WARNING) << "No place found for object with id: " << id_node_pair.first;
       continue;
     }
 

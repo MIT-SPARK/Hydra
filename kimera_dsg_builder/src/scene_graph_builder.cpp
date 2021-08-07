@@ -114,7 +114,9 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
   utils::VoxbloxConfig semantic_config =
       utils::loadVoxbloxConfig(ros::NodeHandle("~/semantic")).value();
   pcl::PolygonMesh::Ptr semantic_mesh;
-  utils::loadVoxbloxInfo(semantic_config, esdf_layer_, semantic_mesh, &debug_pub_);
+  semantic_config.load_places = true;
+  utils::loadVoxbloxInfo(
+      semantic_config, esdf_layer_, semantic_mesh, &debug_pub_, scene_graph_.get());
   scene_graph_->setMesh(semantic_mesh, true);
 
   utils::VoxbloxConfig rgb_config =
@@ -142,12 +144,6 @@ void SceneGraphBuilder::reconstruct() {
   if (!scene_graph_) {
     scene_graph_.reset(new DynamicSceneGraph());
   }
-
-  std::string skeleton_file;
-  if (!nh_private_.getParam("skeleton_file", skeleton_file)) {
-    LOG(FATAL) << "Failed to get skeleton file";
-  }
-  utils::fillLayerFromSkeleton(skeleton_file, scene_graph_.get());
 
   SemanticMeshMap semantic_meshes =
       getSemanticMeshes(semantic_config_, scene_graph_->getMesh());

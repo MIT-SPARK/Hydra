@@ -4,13 +4,13 @@
 #include <kimera_dsg/node_attributes.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
 #include <kimera_pgmo/utils/VoxbloxUtils.h>
+#include <kimera_topology/config_parser.h>
+#include <kimera_topology/gvd_integrator.h>
 
 #include <voxblox/mesh/mesh_integrator.h>
+#include <voxblox_ros/mesh_pcl.h>
 #include <voxblox_ros/mesh_vis.h>
 #include <voxblox_ros/ros_params.h>
-#include <voxblox_skeleton/io/skeleton_io.h>
-#include <voxblox_skeleton/skeleton.h>
-#include <voxblox_ros/mesh_pcl.h>
 
 #include <glog/logging.h>
 
@@ -19,51 +19,12 @@ namespace kimera {
 namespace utils {
 
 using namespace voxblox;
+using namespace topology;
 
-void fillLayerFromSkeleton(const std::string& filepath,
-                           SceneGraph* scene_graph) {
-  CHECK(scene_graph);
-
-  SparseSkeletonGraph skeleton;
-  CHECK(voxblox::io::loadSparseSkeletonGraphFromFile(filepath, &skeleton));
-
-  std::vector<int64_t> vertex_ids;
-  skeleton.getAllVertexIds(&vertex_ids);
-
-  for (const auto& idx : vertex_ids) {
-    const SkeletonVertex& vertex = skeleton.getVertex(idx);
-
-    // TODO(nathan) basis points aren't actually propagated through
-    PlaceNodeAttributes::Ptr attrs =
-        std::make_unique<PlaceNodeAttributes>(vertex.distance, 0);
-    attrs->semantic_label = kPlaceSemanticLabel;
-    attrs->position << vertex.point[0], vertex.point[1], vertex.point[2];
-    attrs->color << 255u, 0u, 0u;
-
-    scene_graph->emplaceNode(to_underlying(KimeraDsgLayers::PLACES),
-                             NodeSymbol('P', idx),
-                             std::move(attrs));
-  }
-
-  std::vector<int64_t> edge_ids;
-  skeleton.getAllEdgeIds(&edge_ids);
-
-  for (const auto& edge_id : edge_ids) {
-    const SkeletonEdge& edge = skeleton.getEdge(edge_id);
-    if (edge.start_vertex == edge.end_vertex) {
-      continue;
-    }
-
-    scene_graph->insertEdge(NodeSymbol('P', edge.start_vertex),
-                            NodeSymbol('P', edge.end_vertex));
-  }
-}
-
-#define READ_PARAM(nh, config, field, default)    \
-  if (!nh.param(#field, config.field, default)) { \
-    VLOG(1) << "missing value for " << #field     \
-            << ". defaulting to: " << default;    \
-  }                                               \
+#define READ_PARAM(nh, config, field, default)                                   \
+  if (!nh.param(#field, config.field, default)) {                                \
+    VLOG(1) << "missing value for " << #field << ". defaulting to: " << default; \
+  }                                                                              \
   static_assert(true, "")
 
 std::optional<VoxbloxConfig> loadVoxbloxConfig(const ros::NodeHandle& nh) {
@@ -77,8 +38,7 @@ std::optional<VoxbloxConfig> loadVoxbloxConfig(const ros::NodeHandle& nh) {
 
   int voxels_per_side;
   if (!nh.getParam("voxels_per_side", voxels_per_side)) {
-    LOG(ERROR) << "Missing voxels per side under namespace "
-               << nh.getNamespace();
+    LOG(ERROR) << "Missing voxels per side under namespace " << nh.getNamespace();
     return std::nullopt;
   }
   config.voxels_per_side = static_cast<size_t>(voxels_per_side);
@@ -86,6 +46,7 @@ std::optional<VoxbloxConfig> loadVoxbloxConfig(const ros::NodeHandle& nh) {
   READ_PARAM(nh, config, tsdf_file, std::string(""));
   READ_PARAM(nh, config, esdf_file, std::string(""));
   READ_PARAM(nh, config, mesh_file, std::string(""));
+  READ_PARAM(nh, config, gvd_namespace, std::string("gvd_integrator"));
   READ_PARAM(nh, config, load_esdf, true);
   READ_PARAM(nh, config, load_mesh, true);
   return config;
@@ -95,16 +56,13 @@ std::optional<VoxbloxConfig> loadVoxbloxConfig(const ros::NodeHandle& nh) {
 
 namespace {
 
-inline bool loadEsdfFromFile(const VoxbloxConfig& config,
-                             Layer<EsdfVoxel>::Ptr& esdf) {
+inline bool loadEsdfFromFile(const VoxbloxConfig& config, Layer<EsdfVoxel>::Ptr& esdf) {
   esdf.reset(new Layer<EsdfVoxel>(config.voxel_size, config.voxels_per_side));
   const auto strat = Layer<EsdfVoxel>::BlockMergingStrategy::kReplace;
-  return voxblox::io::LoadBlocksFromFile(
-      config.esdf_file, strat, true, esdf.get());
+  return voxblox::io::LoadBlocksFromFile(config.esdf_file, strat, true, esdf.get());
 }
 
-inline bool loadMeshFromFile(const VoxbloxConfig& config,
-                             pcl::PolygonMesh::Ptr& mesh) {
+inline bool loadMeshFromFile(const VoxbloxConfig& config, pcl::PolygonMesh::Ptr& mesh) {
   mesh.reset(new pcl::PolygonMesh());
   kimera_pgmo::ReadMeshFromPly(config.mesh_file, mesh);
   return true;
@@ -137,8 +95,7 @@ inline void makeMeshFromTsdf(const Layer<TsdfVoxel>& tsdf,
   }
 
   mesh.reset(new pcl::PolygonMesh());
-  // TODO(nathan) not sure why this isn't working
-  //*mesh = kimera_pgmo::VoxbloxToPolygonMesh(mesh_msg);
+
   Mesh full_mesh;
   convertMeshLayerToMesh(voxblox_mesh, &full_mesh, true, 1.0e-10f);
 
@@ -169,12 +126,45 @@ inline void makeMeshFromTsdf(const Layer<TsdfVoxel>& tsdf,
   }
 }
 
+void makePlacesFromTsdf(const VoxbloxConfig& config,
+                        Layer<TsdfVoxel>* tsdf,
+                        SceneGraph* graph) {
+  CHECK(graph);
+  CHECK(tsdf);
+
+  GvdIntegratorConfig gvd_config;
+  fillGvdIntegratorConfig(ros::NodeHandle(config.gvd_namespace), gvd_config);
+
+  Layer<GvdVoxel>::Ptr gvd(
+      new Layer<GvdVoxel>(tsdf->voxel_size(), tsdf->voxels_per_side()));
+  MeshLayer::Ptr mesh(new MeshLayer(tsdf->block_size()));
+
+  GvdIntegrator integrator(gvd_config, tsdf, gvd, mesh);
+  // do batch update of gvd
+  integrator.updateFromTsdfLayer(false, true, false);
+
+  const SceneGraphLayer& places_layer = integrator.getGraph();
+  for (const auto& id_node_pair : places_layer.nodes()) {
+    const SceneGraphNode& other_node = *id_node_pair.second;
+    PlaceNodeAttributes::Ptr new_attrs(
+        new PlaceNodeAttributes(other_node.attributes<PlaceNodeAttributes>()));
+    graph->emplaceNode(
+        to_underlying(KimeraDsgLayers::PLACES), other_node.id, std::move(new_attrs));
+  }
+
+  for (const auto& id_edge_pair : places_layer.edges()) {
+    const auto& edge = id_edge_pair.second;
+    graph->insertEdge(edge.source, edge.target);
+  }
+}
+
 }  // namespace
 
 bool loadVoxbloxInfo(const VoxbloxConfig& config,
                      Layer<EsdfVoxel>::Ptr& esdf,
                      pcl::PolygonMesh::Ptr& mesh,
-                     ros::Publisher* mesh_pub) {
+                     ros::Publisher* mesh_pub,
+                     SceneGraph* graph) {
   if (!config.load_esdf && !config.load_mesh) {
     LOG(ERROR) << "Invalid config for loading voxblox files";
     return false;
@@ -211,6 +201,17 @@ bool loadVoxbloxInfo(const VoxbloxConfig& config,
 
   if (!have_mesh) {
     makeMeshFromTsdf(tsdf, mesh, mesh_pub);
+  }
+
+  if (config.load_places) {
+    if (!graph) {
+      LOG(ERROR) << "Scene graph pointer invalid.";
+      return false;
+    }
+
+    LOG(INFO) << "Starting places extraction. May take a while";
+    makePlacesFromTsdf(config, &tsdf, graph);
+    LOG(INFO) << "Finished places extraction.";
   }
 
   return true;

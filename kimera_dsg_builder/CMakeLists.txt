@@ -19,11 +19,11 @@ find_package(
              kimera_pgmo
              kimera_semantics
              kimera_semantics_ros
+             kimera_topology
              object_db
              tf2_eigen
              voxblox
              voxblox_ros
-             voxblox_skeleton
 )
 
 find_package(GTSAM REQUIRED)
@@ -44,10 +44,10 @@ catkin_package(
   kimera_pgmo
   kimera_semantics
   kimera_semantics_ros
+  kimera_topology
   tf2_eigen
   voxblox
   voxblox_ros
-  voxblox_skeleton
   DEPENDS
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}

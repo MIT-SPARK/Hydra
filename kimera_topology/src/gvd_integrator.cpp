@@ -167,11 +167,16 @@ void GvdIntegrator::removeDistantBlocks(const voxblox::Point& center,
 }
 
 void GvdIntegrator::updateFromTsdfLayer(bool clear_updated_flag,
-                                        bool clear_surface_flag) {
+                                        bool clear_surface_flag,
+                                        bool use_all_blocks) {
   update_stats_.clear();
 
   BlockIndexList blocks;
-  tsdf_layer_->getAllUpdatedBlocks(voxblox::Update::kEsdf, &blocks);
+  if (use_all_blocks) {
+    tsdf_layer_->getAllAllocatedBlocks(&blocks);
+  } else {
+    tsdf_layer_->getAllUpdatedBlocks(voxblox::Update::kEsdf, &blocks);
+  }
 
   voxblox::timing::Timer gvd_timer("gvd");
 
