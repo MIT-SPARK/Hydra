@@ -63,4 +63,4 @@
 - git:
     local-name: voxblox
     uri: git@github.mit:SPARK/voxblox.git
-    version: fix/migrate_voxblox_changes
+    version: feature/migrate_voxblox_changes
