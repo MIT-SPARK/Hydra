@@ -6,7 +6,7 @@
     uri: git@github.com:catkin/catkin_simple.git
 - git:
     local-name: disparity_image_proc
-    uri: git@github.com:ToniRV/disparity_image_proc.git
+    uri: git@github.com:MIT-SPARK/disparity_image_proc.git
 - git:
     local-name: eigen_catkin
     uri: git@github.com:ethz-asl/eigen_catkin.git
