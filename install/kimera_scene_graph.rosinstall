@@ -62,5 +62,5 @@
     uri: git@github.com:MIT-SPARK/TEASER-plusplus.git
 - git:
     local-name: voxblox
-    uri: git@github.mit:SPARK/voxblox.git
+    uri: git@github.mit.edu:SPARK/voxblox.git
     version: feature/migrate_voxblox_changes
