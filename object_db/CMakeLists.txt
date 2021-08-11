@@ -41,7 +41,7 @@ target_link_libraries(object_registration_server
     matcher
     teaserpp::teaser_registration
     ${catkin_LIBRARIES})
-add_dependencies(object_registration_server ${catkin_EXPORTED_TARGETS})
+add_dependencies(object_registration_server ${catkin_EXPORTED_TARGETS} ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
 # PCL Keypoints Module
 add_library(matcher src/matcher.cpp)
