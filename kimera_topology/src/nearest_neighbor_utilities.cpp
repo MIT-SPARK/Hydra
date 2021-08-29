@@ -7,6 +7,7 @@ namespace kimera {
 namespace topology {
 
 using nanoflann::KDTreeSingleIndexAdaptor;
+using nanoflann::KDTreeSingleIndexDynamicAdaptor;
 using nanoflann::L2_Simple_Adaptor;
 using GlobalIndexVector = voxblox::AlignedVector<GlobalIndex>;
 
@@ -121,6 +122,154 @@ void NearestVoxelFinder::find(const GlobalIndex& index,
 
   for (size_t i = 0; i < num_found; ++i) {
     callback(internals_->adaptor.indices[nn_indices[i]], nn_indices[i], distances[i]);
+  }
+}
+
+// TODO(nathan) not working: bug in nanoflann w.r.t accessing removed indices
+// during index building
+struct GraphDynamicKdTreeAdaptor {
+  GraphDynamicKdTreeAdaptor(const SceneGraphLayer& layer) : layer(layer), count(0) {}
+
+  struct AddInfo {
+    size_t start;
+    size_t num_added = 0;
+  };
+
+  struct RemoveInfo {
+    size_t index = 0;
+    bool valid = false;
+  };
+
+  AddInfo addNodes(const std::unordered_set<NodeId>& new_nodes) {
+    AddInfo info;
+    info.start = count;
+
+    for (const auto& node : new_nodes) {
+      if (curr_nodes.count(node)) {
+        continue;
+      }
+
+      idx_node_map[count] = node;
+      node_idx_map[node] = count;
+      curr_nodes.insert(node);
+
+      info.num_added++;
+      count++;
+    }
+    LOG(WARNING) << "Added " << info.start << " through " << count - 1;
+
+    return info;
+  }
+
+  RemoveInfo removeNode(NodeId node) {
+    RemoveInfo info;
+    if (!curr_nodes.count(node)) {
+      return info;
+    }
+
+    info.index = node_idx_map.at(node);
+    LOG(WARNING) << "Removing " << info.index;
+    node_idx_map.erase(node);
+    idx_node_map.erase(info.index);
+    curr_nodes.erase(node);
+    info.valid = true;
+    return info;
+  }
+
+  inline size_t kdtree_get_point_count() const { return curr_nodes.size(); }
+
+  inline double kdtree_get_pt(const size_t idx, const size_t dim) const {
+    if (!idx_node_map.count(idx)) {
+      std::stringstream ss;
+      auto iter = idx_node_map.begin();
+      ss << "[";
+      while (iter != idx_node_map.end()) {
+        ss << iter->first;
+        ++iter;
+        if (iter != idx_node_map.end()) {
+          ss << ", ";
+        }
+      }
+      ss << "]";
+
+      LOG(FATAL) << "idx: " << idx << " doesn't exist. current count: " << count
+                 << " indices: " << ss.str();
+    }
+    return layer.getPosition(idx_node_map.at(idx))(dim);
+  }
+
+  template <class T>
+  bool kdtree_get_bbox(T&) const {
+    return false;
+  }
+
+  const SceneGraphLayer& layer;
+  size_t count;
+  std::map<size_t, NodeId> idx_node_map;
+  std::map<NodeId, size_t> node_idx_map;
+  std::unordered_set<NodeId> curr_nodes;
+};
+
+struct DynamicNearestNodeFinder::Detail {
+  using Dist = L2_Simple_Adaptor<double, GraphDynamicKdTreeAdaptor>;
+  using KDTree = KDTreeSingleIndexDynamicAdaptor<Dist, GraphDynamicKdTreeAdaptor, 3>;
+  using Adaptor = GraphDynamicKdTreeAdaptor;
+
+  Detail(const SceneGraph::Ptr& graph, LayerId layer)
+      : graph(graph), adaptor(graph->getLayer(layer).value().get()), params(10) {
+    kdtree.reset(new KDTree(3, adaptor));
+  }
+
+  void addNodes(const std::unordered_set<NodeId>& nodes) {
+    Adaptor::AddInfo info = adaptor.addNodes(nodes);
+    if (info.num_added > 0) {
+      kdtree->addPoints(info.start, info.start + info.num_added - 1);
+    }
+  }
+
+  void removeNode(NodeId node) {
+    Adaptor::RemoveInfo info = adaptor.removeNode(node);
+    if (info.valid) {
+      kdtree->removePoint(info.index);
+    }
+  }
+
+  ~Detail() = default;
+
+  SceneGraph::Ptr graph;
+  GraphDynamicKdTreeAdaptor adaptor;
+  std::unique_ptr<KDTree> kdtree;
+  nanoflann::SearchParams params;
+};
+
+DynamicNearestNodeFinder::DynamicNearestNodeFinder(const SceneGraph::Ptr& graph,
+                                                   LayerId layer)
+    : internals_(new Detail(graph, layer)) {}
+
+DynamicNearestNodeFinder::~DynamicNearestNodeFinder() {}
+
+void DynamicNearestNodeFinder::addNodes(const std::unordered_set<NodeId>& new_nodes) {
+  internals_->addNodes(new_nodes);
+}
+
+void DynamicNearestNodeFinder::removeNode(NodeId to_remove) {
+  internals_->removeNode(to_remove);
+}
+
+void DynamicNearestNodeFinder::find(const Eigen::Vector3d& position,
+                                    size_t num_to_find,
+                                    bool skip_first,
+                                    const DynamicNearestNodeFinder::Callback& cb) {
+  size_t nn_indices[num_to_find];
+  double distances[num_to_find];
+  nanoflann::KNNResultSet<double> results(num_to_find);
+  results.init(nn_indices, distances);
+
+  internals_->kdtree->findNeighbors(results, position.data(), internals_->params);
+
+  size_t i = skip_first ? 1 : 0;
+  for (i = 0; i < results.size(); ++i) {
+    cb(internals_->adaptor.idx_node_map[nn_indices[i]], std::sqrt(distances[i]));
   }
 }
 

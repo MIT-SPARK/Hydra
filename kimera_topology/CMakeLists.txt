@@ -12,11 +12,17 @@ find_package(
              dynamic_reconfigure
              kimera_dsg
              kimera_dsg_visualizer
+             kimera_semantics_ros
+             message_generation
+             std_msgs
+             tf2_eigen
              voxblox
              voxblox_ros
-             kimera_semantics_ros
-             tf2_eigen
 )
+
+add_message_files(FILES ActiveLayer.msg)
+
+generate_messages(DEPENDENCIES std_msgs)
 
 generate_dynamic_reconfigure_options(cfg/GvdVisualizerConfig.cfg)
 
@@ -26,6 +32,8 @@ catkin_package(
   dynamic_reconfigure
   kimera_dsg
   kimera_dsg_visualizer
+  kimera_semantics_ros
+  message_runtime
   voxblox
   voxblox_ros
   tf2_eigen
@@ -59,7 +67,7 @@ target_include_directories(
 add_executable(${PROJECT_NAME}_node src/kimera_topology_node.cpp)
 target_link_libraries(${PROJECT_NAME}_node PUBLIC ${PROJECT_NAME} ${catkin_LIBRARIES})
 target_include_directories(${PROJECT_NAME}_node PUBLIC include ${catkin_INCLUDE_DIRS})
-add_dependencies(${PROJECT_NAME}_node ${catkin_EXPORTED_TARGETS})
+add_dependencies(${PROJECT_NAME}_node ${catkin_EXPORTED_TARGETS} ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
 if(CATKIN_ENABLE_TESTING)
   catkin_add_gtest(
@@ -72,6 +80,7 @@ if(CATKIN_ENABLE_TESTING)
     tests/utest_graph_extractor.cpp
     tests/utest_gvd_utilities.cpp
     tests/utest_marching_cubes.cpp
+    tests/utest_nearest_neighbor_utilities.cpp
     tests/utest_incremental_gvd.cpp
   )
   target_include_directories(

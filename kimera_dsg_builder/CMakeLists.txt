@@ -53,21 +53,18 @@ catkin_package(
   LIBRARIES ${PROJECT_NAME}
 )
 
-# Serialization plugins (mostly to get around lz4 problems with flann)
-# add_library(humans_serialization_plugins src/humans_serialization_plugins.cpp)
-# target_include_directories( humans_serialization_plugins PUBLIC include
-# ${catkin_INCLUDE_DIRS} )
-
 add_library(
   ${PROJECT_NAME}
-  src/connectivity_utils.cpp
-  src/object_finder.cpp
-  src/room_finder.cpp
-  src/wall_finder.cpp
   src/building_finder.cpp
+  src/connectivity_utils.cpp
   src/dsg_backend.cpp
-  src/scene_graph_builder.cpp
+  src/incremental_dsg_frontend.cpp
+  src/incremental_mesh_segmenter.cpp
+  src/object_finder.cpp
+  src/offline_dsg_builder.cpp
+  src/room_finder.cpp
   src/voxblox_utils.cpp
+  src/wall_finder.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} gtsam)
@@ -75,6 +72,9 @@ add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
 
 add_executable(${PROJECT_NAME}_offline_node src/kimera_dsg_builder_offline_node.cpp)
 target_link_libraries(${PROJECT_NAME}_offline_node ${PROJECT_NAME})
+
+add_executable(${PROJECT_NAME}_incremental_node src/incremental_dsg_builder_node.cpp)
+target_link_libraries(${PROJECT_NAME}_incremental_node ${PROJECT_NAME})
 
 # TODO(nathan) allow choice of sanitizer
 if(DSG_USE_ASAN)

@@ -22,14 +22,14 @@
 
 namespace kimera {
 
-class SceneGraphBuilder {
+class OfflineDsgBuilder {
  private:
   // TODO(nathan) name is misleading, refactor
   using RqtSceneGraphConfig = kimera_dsg_builder::DsgBuilderConfig;
 
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  SceneGraphBuilder(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private);
+  OfflineDsgBuilder(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private);
 
   void reconstruct();
 

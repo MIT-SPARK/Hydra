@@ -93,6 +93,12 @@ class GraphExtractor {
 
   void extract(const GvdLayer& layer);
 
+  std::unordered_set<NodeId> getActiveNodes() const;
+
+  std::unordered_set<NodeId> getDeletedNodes() const;
+
+  void clearDeletedNodes();
+
   inline const SceneGraphLayer& getGraph() const { return *graph_; }
 
   inline const EdgeInfoMap& getGvdEdgeInfo() const { return edge_info_map_; }
@@ -147,8 +153,6 @@ class GraphExtractor {
 
   void filterIsolatedNodes();
 
-  void checkState(const GvdLayer& layer);
-
  protected:
   GraphExtractorConfig config_;
 
@@ -173,6 +177,7 @@ class GraphExtractor {
   std::map<size_t, std::set<size_t>> checked_edges_;
   std::set<size_t> connected_edges_;
   std::unordered_set<NodeId> visited_nodes_;
+  std::unordered_set<NodeId> deleted_nodes_;
 
   size_t next_pseudo_edge_id_;
   PseudoEdgeInfoMap pseudo_edge_info_;

@@ -1,13 +1,11 @@
 use_freespace_pointcloud: false
 tsdf_voxels_per_side: 16
 voxel_carving_enabled: true
-mesh_color_mode: "lambert_color"
-semantic_color_mode: "semantic"
+mesh_color_mode: "color"
 use_const_weight: false
 use_tf_transforms: true
 method: "fast"
 enable_icp: false
-semantic_measurement_probability: 0.8
 # topology server config
 world_frame: "world"
 clear_distant_blocks: true

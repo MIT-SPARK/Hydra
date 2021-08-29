@@ -1,3 +1,5 @@
-*
-*/
-!.gitignore
+*.swp
+*.idea
+*.ccls*
+*.vscode/
+*.ipynb_checkpoints/

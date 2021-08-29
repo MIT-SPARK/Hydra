@@ -36,6 +36,22 @@ GraphExtractor::GraphExtractor(const GraphExtractorConfig& config)
       next_pseudo_edge_id_(0),
       graph_(new IsolatedSceneGraphLayer(to_underlying(KimeraDsgLayers::PLACES))) {}
 
+std::unordered_set<NodeId> GraphExtractor::getActiveNodes() const {
+  std::unordered_set<NodeId> nodes;
+  for (const auto& id_index_pair : node_id_root_map_) {
+    nodes.insert(id_index_pair.first);
+  }
+  return nodes;
+}
+
+std::unordered_set<NodeId> GraphExtractor::getDeletedNodes() const {
+  return deleted_nodes_;
+}
+
+void GraphExtractor::clearDeletedNodes() {
+  deleted_nodes_.clear();
+}
+
 void GraphExtractor::clearGvdIndex(const GlobalIndex& index) {
   const auto& info_iter = index_graph_info_map_.find(index);
   if (info_iter == index_graph_info_map_.end()) {
@@ -58,6 +74,7 @@ void GraphExtractor::clearNodeInfo(NodeId node_id) {
     }
   }
   graph_->removeNode(node_id);
+  deleted_nodes_.insert(node_id);
   modified_voxel_queue_.push(node_id_root_map_.at(node_id));
 
   index_graph_info_map_.erase(node_id_root_map_.at(node_id));

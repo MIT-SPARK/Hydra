@@ -1,0 +1,54 @@
+<launch>
+
+    <arg name="use_gt_semantics" default="true"/>
+    <arg name="use_gt_frame" default="true"/>
+    <arg name="use_oriented_bounding_boxes" default="false"/>
+    <arg name="pgmo_log_path" default="$(find kimera_pgmo)/log"/>
+    <arg name="pgmo_should_log" default="true"/>
+
+    <include file="$(find kimera_topology)/launch/kimera_topology_semantic.launch">
+        <arg name="use_gt_semantics" value="$(arg use_gt_semantics)"/>
+        <arg name="use_gt_frame" value="$(arg use_gt_frame)"/>
+        <arg name="show_stats" value="false"/>
+    </include>
+
+    <arg name="semantic_map_path"
+         default="$(find kimera_semantics_ros)/cfg/tesse_multiscene_office1_segmentation_mapping.csv"/>
+
+    <arg name="debug" default="false"/>
+    <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
+    <arg name="launch_prefix" value="" unless="$(arg debug)"/>
+
+    <arg name="min_glog_level" default="3"/>
+    <arg name="verbosity" default="0"/>
+    <arg name="glog_to_file" default="false"/>
+    <arg name="glog_dir" default="$(find kimera_dsg_builder)/glogs"/>
+    <arg name="glog_file_args" value="--logtostderr=0 --log_dir=$(arg glog_dir)" if="$(arg glog_to_file)"/>
+    <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
+
+    <include file="$(find kimera_dsg_visualizer)/launch/includes/kimera_dsg_visualizer_params.xml">
+        <arg name="viz_config_dir" value="$(find kimera_dsg_builder)/config/incremental_visualizer"/>
+    </include>
+
+    <node pkg="kimera_dsg_builder" type="kimera_dsg_builder_incremental_node"
+          name="incremental_dsg_builder_node"
+          launch-prefix="$(arg launch_prefix)"
+          args="--minloglevel=$(arg min_glog_level) -v=$(arg verbosity) $(arg glog_file_args)"
+          required="true"
+          output="screen">
+        <param name="log_path" value="$(arg pgmo_log_path)"/>
+        <param name="log_output" value="$(arg pgmo_should_log)"/>
+        <rosparam file="$(find kimera_dsg_builder)/config/pgmo_frontend_config.yaml"/>
+
+        <param name="use_oriented_bounding_boxes" value="$(arg use_oriented_bounding_boxes)"/>
+        <param name="semantic_label_2_color_csv_filepath" value="$(arg semantic_map_path)"/>
+
+        <rosparam param="dynamic_semantic_labels">[20]</rosparam>
+        <!-- ignoring 1, -->
+        <rosparam param="structure_labels">[0, 3, 4, 9, 11, 14, 19]</rosparam>
+        <rosparam param="object_labels">[2, 5, 6, 7, 10, 11, 12, 13, 16, 17, 18]</rosparam>
+        <remap from="~voxblox_mesh" to="/kimera_topology_node/mesh"/>
+        <remap from="~active_places" to="/kimera_topology_node/active_layer"/>
+    </node>
+
+</launch>

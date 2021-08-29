@@ -25,8 +25,7 @@ using ObjectDBClient =
     actionlib::SimpleActionClient<object_db::ObjectRegistrationAction>;
 using ObjectPointClouds = std::vector<ColorPointCloud::Ptr>;
 using NodeColor = SemanticNodeAttributes::ColorVector;
-using BoundingBoxes =
-    std::vector<BoundingBox, Eigen::aligned_allocator<BoundingBox>>;
+using BoundingBoxes = std::vector<BoundingBox, Eigen::aligned_allocator<BoundingBox>>;
 using ClusterIndices = std::vector<pcl::PointIndices>;
 
 enum class ObjectFinderType { kRegionGrowing = 0, kEuclidean = 1 };
@@ -46,21 +45,25 @@ struct EuclideanClusteringParams {
   double cluster_tolerance = 0.25;
 };
 
-struct ObjectCluster {
+template <typename PointT>
+struct Cluster {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  using Vector =
+      std::vector<Cluster<PointT>, Eigen::aligned_allocator<Cluster<PointT>>>;
+
   Centroid centroid;
-  ColorPointCloud::Ptr cloud;
+  typename pcl::PointCloud<PointT>::Ptr cloud;
   pcl::PointIndices indices;
 };
-using ObjectClusters =
-    std::vector<ObjectCluster, Eigen::aligned_allocator<ObjectCluster>>;
+
+using ObjectClusters = Cluster<pcl::PointXYZRGBA>::Vector;
+using OfflineObjectClusters = Cluster<pcl::PointXYZRGB>::Vector;
 
 class ObjectFinder {
  public:
   using ClusterIndices = std::vector<pcl::PointIndices>;
 
-  ObjectFinder(const std::string& world_frame,
-               ObjectFinderType object_finder_type);
+  explicit ObjectFinder(ObjectFinderType object_finder_type);
 
   void connectToObjectDb();
 
@@ -69,35 +72,20 @@ class ObjectFinder {
                          SemanticLabel label,
                          DynamicSceneGraph* scene_graph);
 
+  ObjectClusters findObjects(const pcl::PointCloud<pcl::PointXYZRGBA>::Ptr& cloud,
+                             const std::vector<size_t>& active_indices);
+
   void updateClusterEstimator(ObjectFinderType object_finder_type);
 
-  void updateRegionGrowingParams(
-      const RegionGrowingClusteringParams& new_params);
+  void setRegionGrowingParams(const RegionGrowingClusteringParams& params);
 
-  void updateEuclideanClusterParams(
-      const EuclideanClusteringParams& new_params);
+  void setEuclideanClusterParams(const EuclideanClusteringParams& params);
 
-  friend std::ostream& operator<<(std::ostream& out,
-                                  const ObjectFinder& finder);
+  friend std::ostream& operator<<(std::ostream& out, const ObjectFinder& finder);
 
  private:
-  void setupRegionGrowingClusterEstimator();
-
-  void setupEuclideanClusterEstimator();
-
-  ColorPointCloud::Ptr findObjects(const ColorPointCloud::Ptr& mesh,
-                                   ObjectClusters& clusters);
-
-  ObjectClusters getClusterInfo(const ColorPointCloud::Ptr& cloud,
-                                const ClusterIndices& cluster_indices);
-
-  ColorPointCloud::Ptr regionGrowingClusterEstimator(
-      const ColorPointCloud::Ptr& cloud,
-      ClusterIndices& clusters);
-
-  ColorPointCloud::Ptr euclideanClusterEstimator(
-      const ColorPointCloud::Ptr& cloud,
-      ClusterIndices& clusters);
+  ColorPointCloud::Ptr findObjectsOffline(const ColorPointCloud::Ptr& mesh,
+                                          OfflineObjectClusters& clusters);
 
   ColorPointCloud::Ptr getColoredCloud(const ColorPointCloud::Ptr& input,
                                        const ClusterIndices& clusters);
@@ -105,14 +93,10 @@ class ObjectFinder {
   ObjectPointClouds registerObjects(const ObjectPointClouds& object_pcls,
                                     const std::string semantic_label);
 
-  std::string world_frame_;
   ObjectFinderType type_;
 
   RegionGrowingClusteringParams region_growing_params_;
   EuclideanClusteringParams euclidean_params_;
-
-  pcl::RegionGrowing<ColorPoint, pcl::Normal> region_growing_estimator_;
-  pcl::EuclideanClusterExtraction<ColorPoint> euclidean_estimator_;
 
   std::unique_ptr<ObjectDBClient> object_db_client_;
   NodeSymbol next_object_id_;

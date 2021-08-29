@@ -3,6 +3,7 @@
 #include "kimera_topology/gvd_integrator.h"
 #include "kimera_topology/topology_server_visualizer.h"
 
+#include <kimera_topology/ActiveLayer.h>
 #include <voxblox_ros/conversions.h>
 #include <voxblox_ros/mesh_vis.h>
 #include <voxblox_ros/ros_params.h>
@@ -56,6 +57,7 @@ class TopologyServer {
     visualizer_.reset(new TopologyServerVisualizer("~"));
 
     mesh_pub_ = nh_.advertise<voxblox_msgs::Mesh>("mesh", 1, true);
+    layer_pub_ = nh_.advertise<kimera_topology::ActiveLayer>("active_layer", 2, false);
 
     update_timer_ = nh_.createTimer(ros::Duration(config_.update_period_s),
                                     [&](const ros::TimerEvent&) { runUpdate(); });
@@ -93,6 +95,23 @@ class TopologyServer {
     mesh_pub_.publish(mesh_msg);
   }
 
+  void publishActiveLayer() const {
+    kimera_topology::ActiveLayer msg;
+    // TODO(nathan) we might care about more exact timestamping
+    msg.header.stamp = ros::Time::now();
+    msg.header.frame_id = config_.world_frame;
+
+    // non-const, as clearDeletedNodes modifies internal state
+    GraphExtractor& extractor = gvd_integrator_->getGraphExtractor();
+    std::unordered_set<NodeId> active_nodes = extractor.getActiveNodes();
+    std::unordered_set<NodeId> removed_nodes = extractor.getDeletedNodes();
+    extractor.clearDeletedNodes();
+    msg.layer_contents = extractor.getGraph().serializeLayer(active_nodes);
+    msg.deleted_nodes.insert(
+        msg.deleted_nodes.begin(), removed_nodes.begin(), removed_nodes.end());
+    layer_pub_.publish(msg);
+  }
+
   void showStats() const {
     ROS_INFO_STREAM("Timings: " << std::endl << voxblox::timing::Timing::Print());
     const std::string tsdf_memory_str =
@@ -125,6 +144,7 @@ class TopologyServer {
     }
 
     publishMesh();
+    publishActiveLayer();
 
     visualizer_->visualize(gvd_integrator_->getGraphExtractor(),
                            gvd_integrator_->getGraph(),
@@ -145,6 +165,7 @@ class TopologyServer {
   std::unique_ptr<TopologyServerVisualizer> visualizer_;
 
   ros::Publisher mesh_pub_;
+  ros::Publisher layer_pub_;
 
   Layer<TsdfVoxel>* tsdf_layer_;
   Layer<GvdVoxel>::Ptr gvd_layer_;

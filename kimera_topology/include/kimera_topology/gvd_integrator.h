@@ -66,7 +66,7 @@ class GvdIntegrator {
     return graph_extractor_->getGraph();
   }
 
-  inline const GraphExtractor& getGraphExtractor() const { return *graph_extractor_; }
+  inline GraphExtractor& getGraphExtractor() const { return *graph_extractor_; }
 
   void removeDistantBlocks(const voxblox::Point& center, double max_distance);
 

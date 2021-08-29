@@ -34,7 +34,7 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
   graph_.reset(new DynamicSceneGraph(layer_ids, mesh_layer_id));
   pgmo_.reset(new KimeraPgmo());
 
-  graph_->setMesh(pgmo_->getOptimizedMeshPtr());
+  //graph_->setMesh(pgmo_->getOptimizedMeshPtr());
   CHECK(graph_->hasLayer(graph_->getMeshLayerId()))
       << "Uninitialized mesh from PGMO";
 

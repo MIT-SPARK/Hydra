@@ -19,8 +19,99 @@
 
 namespace kimera {
 
-std::ostream& operator<<(std::ostream& out,
-                         const RegionGrowingClusteringParams& p) {
+template <typename PointT>
+ClusterIndices estimateClustersRegionGrowing(
+    const RegionGrowingClusteringParams& params,
+    const typename pcl::PointCloud<PointT>::Ptr& cloud,
+    const pcl::IndicesPtr& active_indices = nullptr) {
+  CHECK(cloud);
+
+  using namespace pcl::search;
+  typename Search<PointT>::Ptr tree(new KdTree<PointT>());
+  pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>());
+
+  typename pcl::NormalEstimation<PointT, pcl::Normal> normal_estimator;
+  normal_estimator.setSearchMethod(tree);
+  normal_estimator.setKSearch(params.normal_estimator_neighbour_size);
+  normal_estimator.setInputCloud(cloud);
+  if (active_indices) {
+    normal_estimator.setIndices(active_indices);
+  }
+
+  normal_estimator.compute(*normals);
+
+  typename pcl::RegionGrowing<PointT, pcl::Normal> estimator;
+  estimator.setMinClusterSize(params.min_cluster_size);
+  estimator.setMaxClusterSize(params.max_cluster_size);
+  estimator.setNumberOfNeighbours(params.number_of_neighbours);
+  estimator.setSmoothnessThreshold(params.smoothness_threshold);
+  estimator.setCurvatureThreshold(params.curvature_threshold);
+  CHECK(estimator.getCurvatureTestFlag());
+  CHECK(estimator.getSmoothModeFlag());
+
+  estimator.setSearchMethod(tree);
+  estimator.setInputNormals(normals);
+  estimator.setInputCloud(cloud);
+  if (active_indices) {
+    estimator.setIndices(active_indices);
+  }
+
+  ClusterIndices cluster_indices;
+  estimator.extract(cluster_indices);
+  return cluster_indices;
+}
+
+template <typename PointT>
+ClusterIndices estimateClustersEuclidean(
+    const EuclideanClusteringParams& params,
+    const typename pcl::PointCloud<PointT>::Ptr& cloud,
+    const pcl::IndicesPtr& active_indices = nullptr) {
+  using namespace pcl::search;
+  typename KdTree<PointT>::Ptr tree(new KdTree<PointT>());
+  tree->setInputCloud(cloud);
+
+  typename pcl::EuclideanClusterExtraction<PointT> estimator;
+  estimator.setClusterTolerance(params.cluster_tolerance);
+  estimator.setMinClusterSize(params.min_cluster_size);
+  estimator.setMaxClusterSize(params.max_cluster_size);
+  estimator.setSearchMethod(tree);
+  estimator.setInputCloud(cloud);
+  if (active_indices) {
+    estimator.setIndices(active_indices);
+  }
+
+  ClusterIndices cluster_indices;
+  estimator.extract(cluster_indices);
+  return cluster_indices;
+}
+
+// TODO(nathan) consider not making individual pointclouds for each object...
+template <typename PointT>
+typename Cluster<PointT>::Vector getClusterInfo(
+    const typename pcl::PointCloud<PointT>::Ptr& cloud,
+    const ClusterIndices& indices) {
+  typename Cluster<PointT>::Vector clusters;
+  clusters.resize(indices.size());
+  for (size_t k = 0; k < indices.size(); ++k) {
+    clusters.at(k).cloud.reset(new pcl::PointCloud<PointT>());
+
+    const auto& object_indices = indices.at(k).indices;
+    clusters.at(k).cloud->resize(object_indices.size());
+    clusters.at(k).indices = indices.at(k);
+
+    for (size_t i = 0; i < object_indices.size(); ++i) {
+      const PointT& color_point = cloud->at(object_indices.at(i));
+      clusters.at(k).cloud->at(i) = color_point;
+
+      clusters.at(k).centroid.add(
+          pcl::PointXYZ(color_point.x, color_point.y, color_point.z));
+    }
+  }
+
+  return clusters;
+}
+
+std::ostream& operator<<(std::ostream& out, const RegionGrowingClusteringParams& p) {
   // clang-format off
   out << "\n================== Region Growing Cluster Config ====================\n";
   out << " - normal_estimator_neighbour_size:  " << p.normal_estimator_neighbour_size << '\n';
@@ -34,8 +125,7 @@ std::ostream& operator<<(std::ostream& out,
   return out;
 }
 
-std::ostream& operator<<(std::ostream& out,
-                         const EuclideanClusteringParams& p) {
+std::ostream& operator<<(std::ostream& out, const EuclideanClusteringParams& p) {
   std::stringstream ss;
   // clang-format off
   out << "\n================== Euclidean Cluster Config ====================\n";
@@ -47,36 +137,26 @@ std::ostream& operator<<(std::ostream& out,
   return out;
 }
 
-ObjectFinder::ObjectFinder(const std::string& world_frame,
-                           ObjectFinderType type)
-    : world_frame_(world_frame), type_(type), next_object_id_('O', 0) {
-  setupRegionGrowingClusterEstimator();
-  setupEuclideanClusterEstimator();
-}
+ObjectFinder::ObjectFinder(ObjectFinderType type)
+    : type_(type), next_object_id_('O', 0) {}
 
 void ObjectFinder::connectToObjectDb() {
   // Build Object database action client
   ROS_INFO("Creating object database client");
-  object_db_client_ = kimera::make_unique<ObjectDBClient>("/object_db", true);
+  object_db_client_.reset(new ObjectDBClient("/object_db", true));
   ROS_INFO("Waiting for object database server");
   object_db_client_->waitForServer();
   ROS_INFO("Object database server connected");
 }
 
-void ObjectFinder::updateClusterEstimator(ObjectFinderType type) {
-  type_ = type;
+void ObjectFinder::updateClusterEstimator(ObjectFinderType type) { type_ = type; }
+
+void ObjectFinder::setRegionGrowingParams(const RegionGrowingClusteringParams& params) {
+  region_growing_params_ = params;
 }
 
-void ObjectFinder::updateRegionGrowingParams(
-    const RegionGrowingClusteringParams& new_params) {
-  region_growing_params_ = new_params;
-  setupRegionGrowingClusterEstimator();
-}
-
-void ObjectFinder::updateEuclideanClusterParams(
-    const EuclideanClusteringParams& new_params) {
-  euclidean_params_ = new_params;
-  setupEuclideanClusterEstimator();
+void ObjectFinder::setEuclideanClusterParams(const EuclideanClusteringParams& params) {
+  euclidean_params_ = params;
 }
 
 std::ostream& operator<<(std::ostream& out, const ObjectFinder& finder) {
@@ -96,27 +176,6 @@ std::ostream& operator<<(std::ostream& out, const ObjectFinder& finder) {
   return out;
 }
 
-void ObjectFinder::setupRegionGrowingClusterEstimator() {
-  region_growing_estimator_.setMinClusterSize(
-      region_growing_params_.min_cluster_size);
-  region_growing_estimator_.setMaxClusterSize(
-      region_growing_params_.max_cluster_size);
-  region_growing_estimator_.setNumberOfNeighbours(
-      region_growing_params_.number_of_neighbours);
-  region_growing_estimator_.setSmoothnessThreshold(
-      region_growing_params_.smoothness_threshold);
-  region_growing_estimator_.setCurvatureThreshold(
-      region_growing_params_.curvature_threshold);
-  CHECK(region_growing_estimator_.getCurvatureTestFlag());
-  CHECK(region_growing_estimator_.getSmoothModeFlag());
-}
-
-void ObjectFinder::setupEuclideanClusterEstimator() {
-  euclidean_estimator_.setClusterTolerance(euclidean_params_.cluster_tolerance);
-  euclidean_estimator_.setMinClusterSize(euclidean_params_.min_cluster_size);
-  euclidean_estimator_.setMaxClusterSize(euclidean_params_.max_cluster_size);
-}
-
 void ObjectFinder::addObjectsToGraph(const SubMesh& mesh,
                                      const NodeColor& label_color,
                                      SemanticLabel label,
@@ -131,8 +190,8 @@ void ObjectFinder::addObjectsToGraph(const SubMesh& mesh,
   }
 
   // TODO(nathan) eventually we'll refactor this to group centroids and stuff
-  ObjectClusters clusters;
-  findObjects(mesh.vertices, clusters);
+  OfflineObjectClusters clusters;
+  findObjectsOffline(mesh.vertices, clusters);
 
   // TODO(nathan) use the registration for something
   // ObjectPointClouds registered_objects =
@@ -144,16 +203,14 @@ void ObjectFinder::addObjectsToGraph(const SubMesh& mesh,
     attrs->semantic_label = label;
     attrs->color = label_color,
     attrs->name = std::to_string(label) + std::to_string(num_objects);
-    attrs->bounding_box =
-        BoundingBox::extract(cluster.cloud, BoundingBox::Type::AABB);
+    attrs->bounding_box = BoundingBox::extract(cluster.cloud, BoundingBox::Type::AABB);
 
     pcl::PointXYZ centroid;
     cluster.centroid.get(centroid);
     attrs->position << centroid.x, centroid.y, centroid.z;
 
-    scene_graph->emplaceNode(to_underlying(KimeraDsgLayers::OBJECTS),
-                             next_object_id_,
-                             std::move(attrs));
+    scene_graph->emplaceNode(
+        to_underlying(KimeraDsgLayers::OBJECTS), next_object_id_, std::move(attrs));
 
     for (const auto& idx : cluster.indices.indices) {
       scene_graph->insertMeshEdge(next_object_id_, mesh.vertex_map.at(idx));
@@ -164,100 +221,56 @@ void ObjectFinder::addObjectsToGraph(const SubMesh& mesh,
   }
 }
 
-ColorPointCloud::Ptr ObjectFinder::findObjects(
-    const ColorPointCloud::Ptr& cloud,
-    ObjectClusters& clusters) {
+ColorPointCloud::Ptr ObjectFinder::findObjectsOffline(const ColorPointCloud::Ptr& cloud,
+                                                      OfflineObjectClusters& clusters) {
   CHECK(cloud);
 
-  ColorPointCloud::Ptr colored_pcl;
   ClusterIndices cluster_indices;
   switch (type_) {
     case ObjectFinderType::kRegionGrowing:
       VLOG(2) << "Using region growing object finder.";
-      colored_pcl = regionGrowingClusterEstimator(cloud, cluster_indices);
+      cluster_indices = estimateClustersRegionGrowing<pcl::PointXYZRGB>(
+          region_growing_params_, cloud);
       break;
     case ObjectFinderType::kEuclidean:
     default:
       VLOG(2) << "Using euclidean object finder.";
-      colored_pcl = euclideanClusterEstimator(cloud, cluster_indices);
+      cluster_indices =
+          estimateClustersEuclidean<pcl::PointXYZRGB>(euclidean_params_, cloud);
       break;
   }
 
-  CHECK(colored_pcl);
-  colored_pcl->header.frame_id = world_frame_;
-
-  clusters = getClusterInfo(cloud, cluster_indices);
-
-  return colored_pcl;
-}
-
-ObjectClusters ObjectFinder::getClusterInfo(const ColorPointCloud::Ptr& cloud,
-                                            const ClusterIndices& indices) {
-  ObjectClusters clusters;
-  clusters.resize(indices.size());
-  for (size_t k = 0; k < indices.size(); ++k) {
-    clusters.at(k).cloud.reset(new ColorPointCloud());
-
-    const auto& object_indices = indices.at(k).indices;
-    clusters.at(k).cloud->resize(object_indices.size());
-    clusters.at(k).indices = indices.at(k);
-
-    for (size_t i = 0; i < object_indices.size(); ++i) {
-      const ColorPoint& color_point = cloud->at(object_indices.at(i));
-      clusters.at(k).cloud->at(i) = color_point;
-
-      clusters.at(k).centroid.add(
-          pcl::PointXYZ(color_point.x, color_point.y, color_point.z));
-    }
-  }
-
-  return clusters;
-}
-
-ColorPointCloud::Ptr ObjectFinder::regionGrowingClusterEstimator(
-    const ColorPointCloud::Ptr& cloud,
-    ClusterIndices& cluster_indices) {
-  CHECK(cloud);
-  pcl::search::Search<ColorPoint>::Ptr tree(
-      new pcl::search::KdTree<ColorPoint>);
-  pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>);
-  pcl::NormalEstimation<ColorPoint, pcl::Normal> normal_estimator;
-  normal_estimator.setSearchMethod(tree);
-  normal_estimator.setKSearch(
-      region_growing_params_.normal_estimator_neighbour_size);
-
-  normal_estimator.setInputCloud(cloud);
-  normal_estimator.compute(*normals);
-
-  region_growing_estimator_.setSearchMethod(tree);
-
-  region_growing_estimator_.setInputCloud(cloud);
-  region_growing_estimator_.setInputNormals(normals);
-
-  region_growing_estimator_.extract(cluster_indices);
-
-  LOG(INFO) << "Number of clusters found: " << cluster_indices.size();
-  return region_growing_estimator_.getColoredCloud();
-}
-
-ColorPointCloud::Ptr ObjectFinder::euclideanClusterEstimator(
-    const ColorPointCloud::Ptr& cloud,
-    ClusterIndices& cluster_indices) {
-  pcl::search::KdTree<ColorPoint>::Ptr tree(
-      new pcl::search::KdTree<ColorPoint>);
-  tree->setInputCloud(cloud);
-
-  euclidean_estimator_.setSearchMethod(tree);
-  euclidean_estimator_.setInputCloud(cloud);
-
-  euclidean_estimator_.extract(cluster_indices);
-
+  clusters = getClusterInfo<pcl::PointXYZRGB>(cloud, cluster_indices);
   return getColoredCloud(cloud, cluster_indices);
 }
 
-ColorPointCloud::Ptr ObjectFinder::getColoredCloud(
-    const ColorPointCloud::Ptr& input,
-    const ClusterIndices& clusters) {
+ObjectClusters ObjectFinder::findObjects(
+    const pcl::PointCloud<pcl::PointXYZRGBA>::Ptr& cloud,
+    const std::vector<size_t>& active_indices) {
+  CHECK(cloud);
+
+  // in general, this is unsafe, but PCL doesn't offer us any alternative
+  pcl::IndicesPtr cloud_indices(
+      new std::vector<int>(active_indices.begin(), active_indices.end()));
+
+  ClusterIndices cluster_indices;
+  switch (type_) {
+    case ObjectFinderType::kRegionGrowing:
+      cluster_indices = estimateClustersRegionGrowing<pcl::PointXYZRGBA>(
+          region_growing_params_, cloud, cloud_indices);
+      break;
+    case ObjectFinderType::kEuclidean:
+    default:
+      cluster_indices = estimateClustersEuclidean<pcl::PointXYZRGBA>(
+          euclidean_params_, cloud, cloud_indices);
+      break;
+  }
+
+  return getClusterInfo<pcl::PointXYZRGBA>(cloud, cluster_indices);
+}
+
+ColorPointCloud::Ptr ObjectFinder::getColoredCloud(const ColorPointCloud::Ptr& input,
+                                                   const ClusterIndices& clusters) {
   ColorPointCloud::Ptr colored_cloud(new ColorPointCloud);
 
   if (!clusters.empty()) {
@@ -302,9 +315,8 @@ ColorPointCloud::Ptr ObjectFinder::getColoredCloud(
   return colored_cloud;
 }
 
-ObjectPointClouds ObjectFinder::registerObjects(
-    const ObjectPointClouds& object_pcls,
-    const std::string semantic_label) {
+ObjectPointClouds ObjectFinder::registerObjects(const ObjectPointClouds& object_pcls,
+                                                const std::string semantic_label) {
   CHECK(object_db_client_);
   LOG(INFO) << "Sending object point clouds to object database.";
   // For storing all registrated object point clouds
@@ -343,8 +355,8 @@ ObjectPointClouds ObjectFinder::registerObjects(
 
     // Deal with the result
     bool finished = object_db_client_->waitForResult(ros::Duration(30));
-    bool aborted = object_db_client_->getState() ==
-                   actionlib::SimpleClientGoalState::ABORTED;
+    bool aborted =
+        object_db_client_->getState() == actionlib::SimpleClientGoalState::ABORTED;
     if (aborted) {
       LOG(INFO) << "Object database aborted.";
       registrated_object_pcls.push_back(color_pcl);

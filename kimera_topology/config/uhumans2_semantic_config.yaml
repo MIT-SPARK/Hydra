@@ -1,0 +1,3 @@
+semantic_color_mode: "semantic"
+semantic_measurement_probability: 0.8
+dynamic_semantic_labels: [20]

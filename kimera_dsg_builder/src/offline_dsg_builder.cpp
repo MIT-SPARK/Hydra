@@ -1,4 +1,4 @@
-#include "kimera_dsg_builder/scene_graph_builder.h"
+#include "kimera_dsg_builder/offline_dsg_builder.h"
 #include "kimera_dsg_builder/building_finder.h"
 #include "kimera_dsg_builder/connectivity_utils.h"
 #include "kimera_dsg_builder/voxblox_utils.h"
@@ -20,18 +20,15 @@ using std_srvs::Trigger;
 using SemanticMeshMap = std::map<SemanticLabel, SubMesh>;
 
 SemanticMeshMap getSemanticMeshes(const SemanticIntegratorBase::SemanticConfig& config,
-                                  const pcl::PolygonMesh::ConstPtr& mesh) {
-  CHECK(mesh);
+                                  const pcl::PointCloud<pcl::PointXYZRGBA>& vertices,
+                                  const std::vector<pcl::Vertices>& faces) {
   CHECK(config.semantic_label_to_color_);
-
-  pcl::PointCloud<pcl::PointXYZRGB> vertices;
-  pcl::fromPCLPointCloud2(mesh->cloud, vertices);
 
   SemanticMeshMap map;
   std::map<size_t, SemanticLabel> vertex_to_label;
   std::map<size_t, size_t> vertex_to_subvertex;
   for (size_t i = 0; i < vertices.size(); ++i) {
-    const pcl::PointXYZRGB& color_point = vertices.at(i);
+    const pcl::PointXYZRGBA& color_point = vertices.at(i);
     const HashableColor color(color_point.r, color_point.g, color_point.b, 255);
     const SemanticLabel semantic_label =
         config.semantic_label_to_color_->getSemanticLabelFromColor(color);
@@ -44,12 +41,19 @@ SemanticMeshMap getSemanticMeshes(const SemanticIntegratorBase::SemanticConfig& 
       map[semantic_label] = submesh;
     }
 
+    pcl::PointXYZRGB new_point;
+    new_point.x = color_point.x;
+    new_point.y = color_point.y;
+    new_point.z = color_point.z;
+    new_point.r = color_point.r;
+    new_point.g = color_point.g;
+    new_point.b = color_point.b;
     vertex_to_subvertex[i] = map.at(semantic_label).vertices->size();
-    map.at(semantic_label).vertices->push_back(color_point);
+    map.at(semantic_label).vertices->push_back(new_point);
     map.at(semantic_label).vertex_map.push_back(i);
   }
 
-  for (const auto& face : mesh->polygons) {
+  for (const auto& face : faces) {
     CHECK_EQ(face.vertices.size(), 3u);
     SemanticLabel label = vertex_to_label.at(face.vertices[0]);
     if (label == vertex_to_label.at(face.vertices[1]) &&
@@ -72,7 +76,7 @@ SemanticMeshMap getSemanticMeshes(const SemanticIntegratorBase::SemanticConfig& 
 }
 
 // TODO(nathan) clean up
-void SceneGraphBuilder::loadParams() {
+void OfflineDsgBuilder::loadParams() {
   semantic_config_ = getSemanticTsdfIntegratorConfigFromRosParam(nh_private_);
   nh_private_.getParam("object_finder_type", object_finder_type_);
 
@@ -90,7 +94,7 @@ void SceneGraphBuilder::loadParams() {
   CHECK_EQ(3u, default_building_color_.size()) << "Color must be three elements";
 }
 
-SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
+OfflineDsgBuilder::OfflineDsgBuilder(const ros::NodeHandle& nh,
                                      const ros::NodeHandle& nh_private)
     : nh_(nh),
       nh_private_(nh_private),
@@ -117,7 +121,16 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
   semantic_config.load_places = true;
   utils::loadVoxbloxInfo(
       semantic_config, esdf_layer_, semantic_mesh, &debug_pub_, scene_graph_.get());
-  scene_graph_->setMesh(semantic_mesh, true);
+
+  // TODO(nathan) this is ugly
+  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr vertices(
+      new pcl::PointCloud<pcl::PointXYZRGBA>());
+  pcl::fromPCLPointCloud2(semantic_mesh->cloud, *vertices);
+  std::shared_ptr<const std::vector<pcl::Vertices>> faces(
+      new std::vector<pcl::Vertices>(semantic_mesh->polygons.begin(),
+                                     semantic_mesh->polygons.end()));
+
+  scene_graph_->setMesh(vertices, faces, true);
 
   utils::VoxbloxConfig rgb_config =
       utils::loadVoxbloxConfig(ros::NodeHandle("~/rgb")).value();
@@ -125,28 +138,30 @@ SceneGraphBuilder::SceneGraphBuilder(const ros::NodeHandle& nh,
   voxblox::Layer<voxblox::EsdfVoxel>::Ptr temp;
   utils::loadVoxbloxInfo(rgb_config, temp, rgb_mesh_);
 
-  object_finder_ = kimera::make_unique<ObjectFinder>(
-      world_frame_, static_cast<ObjectFinderType>(object_finder_type_));
-  room_finder_ = kimera::make_unique<RoomFinder>(
-      nh_private, world_frame_, room_finder_esdf_slice_level_);
+  object_finder_.reset(
+      new ObjectFinder(static_cast<ObjectFinderType>(object_finder_type_)));
+  room_finder_.reset(
+      new RoomFinder(nh_private, world_frame_, room_finder_esdf_slice_level_));
 
-  rqt_callback_ = boost::bind(&SceneGraphBuilder::rqtReconfigureCallback, this, _1, _2);
+  rqt_callback_ = boost::bind(&OfflineDsgBuilder::rqtReconfigureCallback, this, _1, _2);
   rqt_server_.setCallback(rqt_callback_);
 
   reconstruct_scene_graph_srv_ = nh_private_.advertiseService(
-      "reconstruct_scene_graph", &SceneGraphBuilder::reconstructSrvCb, this);
+      "reconstruct_scene_graph", &OfflineDsgBuilder::reconstructSrvCb, this);
 
   visualizer_srv_ = nh_private_.advertiseService(
-      "visualize", &SceneGraphBuilder::visualizeSrvCb, this);
+      "visualize", &OfflineDsgBuilder::visualizeSrvCb, this);
 }
 
-void SceneGraphBuilder::reconstruct() {
+void OfflineDsgBuilder::reconstruct() {
   if (!scene_graph_) {
     scene_graph_.reset(new DynamicSceneGraph());
   }
 
-  SemanticMeshMap semantic_meshes =
-      getSemanticMeshes(semantic_config_, scene_graph_->getMesh());
+  CHECK(scene_graph_->hasMesh());
+  SemanticMeshMap semantic_meshes = getSemanticMeshes(semantic_config_,
+                                                      *scene_graph_->getMeshVertices(),
+                                                      *scene_graph_->getMeshFaces());
 
   for (const auto& label_mesh_pair : semantic_meshes) {
     SemanticLabel semantic_label = label_mesh_pair.first;
@@ -183,6 +198,7 @@ void SceneGraphBuilder::reconstruct() {
 
     NodeColor label_color;
     label_color << label_color_vbx.r, label_color_vbx.g, label_color_vbx.b;
+    // TODO(nathan) add world frame to PCL if publishing object finder results
     object_finder_->addObjectsToGraph(
         label_mesh_pair.second, label_color, semantic_label, scene_graph_.get());
   }
@@ -224,7 +240,7 @@ void SceneGraphBuilder::reconstruct() {
   saveSceneGraph(scene_graph_output_path_);
 }
 
-void SceneGraphBuilder::saveSceneGraph(const std::string& filepath) const {
+void OfflineDsgBuilder::saveSceneGraph(const std::string& filepath) const {
   if (filepath.empty()) {
     VLOG(5) << "Not saving scene graph: filepath is empty";
     return;
@@ -240,7 +256,7 @@ void SceneGraphBuilder::saveSceneGraph(const std::string& filepath) const {
   LOG(INFO) << "Finished saving DSG";
 }
 
-void SceneGraphBuilder::visualize() {
+void OfflineDsgBuilder::visualize() {
   // TODO(nathan) fix exception here
   // visualizer_.clear();
 
@@ -271,14 +287,14 @@ void SceneGraphBuilder::visualize() {
   // TODO(nathan) add back in sliced esdf and room clusters visualization
 }
 
-bool SceneGraphBuilder::reconstructSrvCb(SetBool::Request&, SetBool::Response&) {
+bool OfflineDsgBuilder::reconstructSrvCb(SetBool::Request&, SetBool::Response&) {
   LOG(INFO) << "Requested scene graph reconstruction.";
   scene_graph_->clear();
   reconstruct();
   return true;
 }
 
-bool SceneGraphBuilder::visualizeSrvCb(Trigger::Request&, Trigger::Response& resp) {
+bool OfflineDsgBuilder::visualizeSrvCb(Trigger::Request&, Trigger::Response& resp) {
   if (scene_graph_) {
     visualize();
     resp.success = true;
@@ -289,7 +305,7 @@ bool SceneGraphBuilder::visualizeSrvCb(Trigger::Request&, Trigger::Response& res
   return true;
 }
 
-void SceneGraphBuilder::rqtReconfigureCallback(RqtSceneGraphConfig& config,
+void OfflineDsgBuilder::rqtReconfigureCallback(RqtSceneGraphConfig& config,
                                                uint32_t /*level*/) {
   ROS_INFO("Updating Object Finder params.");
 
@@ -300,7 +316,7 @@ void SceneGraphBuilder::rqtReconfigureCallback(RqtSceneGraphConfig& config,
   ec_params.cluster_tolerance = config.cluster_tolerance;
   ec_params.max_cluster_size = config.ec_max_cluster_size;
   ec_params.min_cluster_size = config.ec_min_cluster_size;
-  object_finder_->updateEuclideanClusterParams(ec_params);
+  object_finder_->setEuclideanClusterParams(ec_params);
 
   RegionGrowingClusteringParams rg_params;
   rg_params.curvature_threshold = config.curvature_threshold;
@@ -309,7 +325,7 @@ void SceneGraphBuilder::rqtReconfigureCallback(RqtSceneGraphConfig& config,
   rg_params.normal_estimator_neighbour_size = config.normal_estimator_neighbour_size;
   rg_params.number_of_neighbours = config.number_of_neighbours;
   rg_params.smoothness_threshold = config.smoothness_threshold;
-  object_finder_->updateRegionGrowingParams(rg_params);
+  object_finder_->setRegionGrowingParams(rg_params);
 
   ROS_INFO_STREAM("Object finder: " << *object_finder_);
 
