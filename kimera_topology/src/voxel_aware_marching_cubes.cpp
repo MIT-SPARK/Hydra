@@ -34,7 +34,10 @@ static constexpr FloatingPoint kMinSdfDifference = 1e-6;
 void interpolateEdges(const PointMatrix& vertex_coords,
                       const SdfMatrix& vertex_sdf,
                       EdgeIndexMatrix& edge_coords,
+                      std::vector<uint8_t>& edge_status,
                       const std::vector<GvdVoxel*>& gvd_voxels) {
+  // we use the first two bits to denote status
+  edge_status = std::vector<uint8_t>(12, 0);
   for (size_t i = 0; i < 12; ++i) {
     const int* pairs = voxblox::MarchingCubes::kEdgeIndexPairs[i];
     const int edge0 = pairs[0];
@@ -54,11 +57,11 @@ void interpolateEdges(const PointMatrix& vertex_coords,
       edge_coords.col(i) = Point(0.5f * (vertex0 + vertex1));
 
       if (gvd_voxels[edge0]) {
-        setGvdSurfaceVoxel(*gvd_voxels[edge0]);
+        edge_status[i] |= 0x01;
       }
 
       if (gvd_voxels[edge1]) {
-        setGvdSurfaceVoxel(*gvd_voxels[edge1]);
+        edge_status[i] |= 0x02;
       }
 
       continue;
@@ -69,10 +72,10 @@ void interpolateEdges(const PointMatrix& vertex_coords,
     edge_coords.col(i) = Point(vertex0 + t * (vertex1 - vertex0));
 
     if (gvd_voxels[edge0] && std::abs(t) <= 0.5) {
-      setGvdSurfaceVoxel(*gvd_voxels[edge0]);
+      edge_status[i] |= 0x01;
     }
     if (gvd_voxels[edge1] && std::abs(t) >= 0.5) {
-      setGvdSurfaceVoxel(*gvd_voxels[edge1]);
+      edge_status[i] |= 0x02;
     }
   }
 }
@@ -94,11 +97,33 @@ inline int calculateVertexConfig(const SdfMatrix& vertex_sdf) {
   return to_return;
 }
 
+inline void updateVoxels(int edge_coord,
+                         VertexIndex new_vertex_index,
+                         const std::vector<uint8_t>& status,
+                         const std::vector<GvdVoxel*>& gvd_voxels,
+                         const std::vector<bool>& voxels_in_block) {
+  const int* pairs = voxblox::MarchingCubes::kEdgeIndexPairs[edge_coord];
+  const uint8_t curr_status = status[edge_coord];
+
+  GvdVoxel* first_voxel = gvd_voxels[pairs[0]];
+  if (first_voxel && voxels_in_block[pairs[0]] && (curr_status & 0x01)) {
+    setGvdSurfaceVoxel(*first_voxel);
+    first_voxel->block_vertex_index = new_vertex_index;
+  }
+
+  GvdVoxel* second_voxel = gvd_voxels[pairs[1]];
+  if (second_voxel && voxels_in_block[pairs[1]] && (curr_status & 0x02)) {
+    setGvdSurfaceVoxel(*second_voxel);
+    second_voxel->block_vertex_index = new_vertex_index;
+  }
+}
+
 void VoxelAwareMarchingCubes::meshCube(const PointMatrix& vertex_coords,
                                        const SdfMatrix& vertex_sdf,
                                        VertexIndex* next_index,
                                        Mesh* mesh,
-                                       const std::vector<GvdVoxel*>& gvd_voxels) {
+                                       const std::vector<GvdVoxel*>& gvd_voxels,
+                                       const std::vector<bool>& voxels_in_block) {
   // TODO(nathan) references
   DCHECK(next_index != nullptr);
   DCHECK(mesh != nullptr);
@@ -109,7 +134,9 @@ void VoxelAwareMarchingCubes::meshCube(const PointMatrix& vertex_coords,
   }
 
   EdgeIndexMatrix edge_vertex_coordinates;
-  interpolateEdges(vertex_coords, vertex_sdf, edge_vertex_coordinates, gvd_voxels);
+  std::vector<uint8_t> edge_status;
+  interpolateEdges(
+      vertex_coords, vertex_sdf, edge_vertex_coordinates, edge_status, gvd_voxels);
 
   const int* table_row = kTriangleTable[index];
 
@@ -130,6 +157,25 @@ void VoxelAwareMarchingCubes::meshCube(const PointMatrix& vertex_coords,
     mesh->normals.push_back(n);
     mesh->normals.push_back(n);
     mesh->normals.push_back(n);
+
+    // mark voxels with a nearest vertex. overwriting is okay (as remapping downstream
+    // tracks which vertices are the same)
+    updateVoxels(table_row[table_col + 2],
+                 *next_index,
+                 edge_status,
+                 gvd_voxels,
+                 voxels_in_block);
+    updateVoxels(table_row[table_col + 1],
+                 *next_index + 1,
+                 edge_status,
+                 gvd_voxels,
+                 voxels_in_block);
+    updateVoxels(table_row[table_col],
+                 *next_index + 2,
+                 edge_status,
+                 gvd_voxels,
+                 voxels_in_block);
+
     *next_index += 3;
     table_col += 3;
   }

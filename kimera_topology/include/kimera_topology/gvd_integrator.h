@@ -25,6 +25,7 @@ struct GvdIntegratorConfig {
   VoronoiCheckConfig voronoi_config;
   voxblox::MeshIntegratorConfig mesh_integrator_config;
   GraphExtractorConfig graph_extractor_config;
+  bool extract_graph = true;
 };
 
 /**
@@ -107,11 +108,18 @@ class GvdIntegrator {
 
   uint8_t updateGvdParentMap(const GlobalIndex& voxel_index, const GvdVoxel& neighbor);
 
+  void updateNearestParent(const GvdVoxel& voxel,
+                           const GlobalIndex& voxel_index,
+                           const GvdVoxel& neighbor,
+                           const GlobalIndex& parent);
+
   void removeVoronoiFromGvdParentMap(const GlobalIndex& voxel_index);
 
   void updateGvdVoxel(const GlobalIndex& voxel_index, GvdVoxel& voxel, GvdVoxel& other);
 
   void clearGvdVoxel(const GlobalIndex& index, GvdVoxel& voxel);
+
+  void updateVertexMapping();
 
  protected:
   std::unique_ptr<VoxelAwareMeshIntegrator> mesh_integrator_;
@@ -131,6 +139,8 @@ class GvdIntegrator {
   MeshLayer::Ptr mesh_layer_;
 
   GvdParentMap gvd_parents_;
+  GvdVertexMap gvd_parent_vertices_;
+
   GraphExtractor::Ptr graph_extractor_;
 
   BucketQueue<GlobalIndex> lower_;

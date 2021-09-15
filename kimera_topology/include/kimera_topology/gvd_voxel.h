@@ -10,7 +10,6 @@ namespace topology {
 struct GvdVoxel {
   float distance;
   bool observed = false;
-  bool on_surface = false;
   bool fixed = false;
   bool in_queue = false;
 
@@ -20,7 +19,10 @@ struct GvdVoxel {
   voxblox::Point::Scalar parent_pos[3];
 
   uint8_t num_extra_basis = 0;
-  // TODO(nathan) on GVD boundary flag
+
+  bool on_surface = false;
+  // TODO(nathan) leave this unitialized
+  size_t block_vertex_index = 123456789;
 
   bool is_voronoi_parent = false;
   GlobalIndex::Scalar nearest_voronoi[3];
@@ -29,7 +31,14 @@ struct GvdVoxel {
 
 std::ostream& operator<<(std::ostream& out, const GvdVoxel& voxel);
 
+struct GvdVertexInfo {
+  size_t vertex;
+  double pos[3];
+  size_t ref_count = 0;
+};
+
 using GvdParentMap = voxblox::LongIndexHashMapType<voxblox::LongIndexSet>::type;
+using GvdVertexMap = voxblox::LongIndexHashMapType<GvdVertexInfo>::type;
 using GvdNeighborhood = Neighborhood<voxblox::Connectivity::kTwentySix>;
 
 template <typename Scalar = double>

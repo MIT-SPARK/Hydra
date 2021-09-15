@@ -23,6 +23,7 @@ inline void setSdfParent(GvdVoxel& voxel,
   }
 }
 
+// TODO(nathan) should probably be resetSdfParent
 inline void resetGvdParent(GvdVoxel& voxel) { voxel.has_parent = false; }
 
 inline void setGvdSurfaceVoxel(GvdVoxel& voxel) {

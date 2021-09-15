@@ -56,11 +56,15 @@ class TopologyServer {
 
     visualizer_.reset(new TopologyServerVisualizer("~"));
 
+    // we need two publishers for the mesh: voxblox offers no way to distinguish between
+    // deleted blocks and blocks that were cleared by observation
     mesh_pub_ = nh_.advertise<voxblox_msgs::Mesh>("mesh", 1, true);
+    mesh_viz_pub_ = nh_.advertise<voxblox_msgs::Mesh>("mesh_viz", 1, true);
+
     layer_pub_ = nh_.advertise<kimera_topology::ActiveLayer>("active_layer", 2, false);
 
     update_timer_ = nh_.createTimer(ros::Duration(config_.update_period_s),
-                                    [&](const ros::TimerEvent&) { runUpdate(); });
+                                    [&](const ros::TimerEvent& event) { runUpdate(event.current_real); });
   }
 
   void spin() const { ros::spin(); }
@@ -88,17 +92,33 @@ class TopologyServer {
     fillTopologyServerConfig(ros::NodeHandle(config_ns), config_);
   }
 
-  void publishMesh() {
+  void publishMesh(const ros::Time& timestamp) {
     voxblox_msgs::Mesh mesh_msg;
     generateVoxbloxMeshMsg(mesh_layer_, config_.mesh_color_mode, &mesh_msg);
     mesh_msg.header.frame_id = config_.world_frame;
+    mesh_msg.header.stamp = timestamp;
+    mesh_viz_pub_.publish(mesh_msg);
+
+    auto iter = mesh_msg.mesh_blocks.begin();
+    while (iter != mesh_msg.mesh_blocks.end()) {
+      // we can't just check if the message is empty (it's valid for an observed and
+      // active block to be empty), so we have to check if the GVD layer has pruned the
+      // corresponding block yet)
+      BlockIndex idx(iter->index[0], iter->index[1], iter->index[2]);
+      if (!gvd_layer_->hasBlock(idx)) {
+        iter = mesh_msg.mesh_blocks.erase(iter);
+        continue;
+      }
+
+      ++iter;
+    }
+
     mesh_pub_.publish(mesh_msg);
   }
 
-  void publishActiveLayer() const {
+  void publishActiveLayer(const ros::Time& timestamp) const {
     kimera_topology::ActiveLayer msg;
-    // TODO(nathan) we might care about more exact timestamping
-    msg.header.stamp = ros::Time::now();
+    msg.header.stamp = timestamp;
     msg.header.frame_id = config_.world_frame;
 
     // non-const, as clearDeletedNodes modifies internal state
@@ -110,6 +130,22 @@ class TopologyServer {
     msg.deleted_nodes.insert(
         msg.deleted_nodes.begin(), removed_nodes.begin(), removed_nodes.end());
     layer_pub_.publish(msg);
+
+    for (const auto& id : active_nodes) {
+      auto& attr =
+          extractor.getGraph().getNode(id)->get().attributes<PlaceNodeAttributes>();
+      for (const auto& connection : attr.voxblox_mesh_connections) {
+        BlockIndex idx = Eigen::Map<const BlockIndex>(connection.block);
+        // mesh api is stupid and logs warnings...
+        if (!gvd_layer_->hasBlock(idx)) {
+          continue;
+        }
+        CHECK(connection.vertex < mesh_layer_->getMeshByIndex(idx).size())
+            << "invalid vertex @ " << idx.transpose() << " -> " << connection.vertex
+            << " >= " << mesh_layer_->getMeshByIndex(idx).size() << " for "
+            << NodeSymbol(id).getLabel();
+      }
+    }
   }
 
   void showStats() const {
@@ -125,7 +161,7 @@ class TopologyServer {
                                           << ", Mesh= " << mesh_memory_str << "]");
   }
 
-  void runUpdate() {
+  void runUpdate(const ros::Time& timestamp) {
     if (!tsdf_layer_ || tsdf_layer_->getNumberOfAllocatedBlocks() == 0) {
       return;
     }
@@ -143,8 +179,8 @@ class TopologyServer {
                                     config_.dense_representation_radius_m);
     }
 
-    publishMesh();
-    publishActiveLayer();
+    publishMesh(timestamp);
+    publishActiveLayer(timestamp);
 
     visualizer_->visualize(gvd_integrator_->getGraphExtractor(),
                            gvd_integrator_->getGraph(),
@@ -164,6 +200,7 @@ class TopologyServer {
 
   std::unique_ptr<TopologyServerVisualizer> visualizer_;
 
+  ros::Publisher mesh_viz_pub_;
   ros::Publisher mesh_pub_;
   ros::Publisher layer_pub_;
 

@@ -48,9 +48,7 @@ std::unordered_set<NodeId> GraphExtractor::getDeletedNodes() const {
   return deleted_nodes_;
 }
 
-void GraphExtractor::clearDeletedNodes() {
-  deleted_nodes_.clear();
-}
+void GraphExtractor::clearDeletedNodes() { deleted_nodes_.clear(); }
 
 void GraphExtractor::clearGvdIndex(const GlobalIndex& index) {
   const auto& info_iter = index_graph_info_map_.find(index);
@@ -298,12 +296,50 @@ bool GraphExtractor::updateEdgeMaps(const VoxelGraphInfo& info,
       .second;
 }
 
-void GraphExtractor::addEdgeToGraph(const VoxelGraphInfo& curr_info,
+SceneGraphEdgeInfo::Ptr GraphExtractor::makeEdgeInfo(const GvdLayer& layer,
+                                                     NodeId source_id,
+                                                     NodeId target_id) const {
+  SceneGraphEdgeInfo::Ptr edge_info(new SceneGraphEdgeInfo());
+  edge_info->weighted = true;
+
+  const double source_dist =
+      graph_->getNode(source_id)->get().attributes<PlaceNodeAttributes>().distance;
+  const double target_dist =
+      graph_->getNode(target_id)->get().attributes<PlaceNodeAttributes>().distance;
+  edge_info->weight = std::min(source_dist, target_dist);
+
+  const GlobalIndex source = node_id_root_map_.at(source_id);
+  const GlobalIndex target = node_id_root_map_.at(target_id);
+  GlobalIndexVector path = makeBresenhamLine(source, target);
+  if (path.empty()) {
+    // edge is smaller than voxel size, so we just take the min distance between two
+    // voxels
+    return edge_info;
+  }
+
+  for (const auto& index : path) {
+    const GvdVoxel* voxel = layer.getVoxelPtrByGlobalIndex(index);
+    if (!voxel) {
+      continue;
+    }
+
+    if (voxel->distance < edge_info->weight) {
+      edge_info->weight = voxel->distance;
+    }
+  }
+
+  return edge_info;
+}
+
+void GraphExtractor::addEdgeToGraph(const GvdLayer& layer,
+                                    const VoxelGraphInfo& curr_info,
                                     const VoxelGraphInfo& neighbor_info) {
   if (curr_info.is_node && neighbor_info.is_node) {
     // this case can happen (potentially frequently) if the basis count is noisy
     // ideally adjacent vertices get clustered downstream and pruned
-    graph_->insertEdge(curr_info.id, neighbor_info.id);
+    graph_->insertEdge(curr_info.id,
+                       neighbor_info.id,
+                       makeEdgeInfo(layer, curr_info.id, neighbor_info.id));
     return;
   }
 
@@ -314,7 +350,9 @@ void GraphExtractor::addEdgeToGraph(const VoxelGraphInfo& curr_info,
   // TODO(nathan) check if we really need symmetric lookup
   updateEdgeMaps(neighbor_info, curr_info);
 
-  graph_->insertEdge(curr_info.id, neighbor_info.id);
+  graph_->insertEdge(curr_info.id,
+                     neighbor_info.id,
+                     makeEdgeInfo(layer, curr_info.id, neighbor_info.id));
 
   if (!curr_info.is_node) {
     connected_edges_.insert(curr_info.edge_id);
@@ -488,7 +526,7 @@ void GraphExtractor::extractEdges(const GvdLayer& layer, bool allow_merging) {
         }
       }
 
-      addEdgeToGraph(curr_info, neighbor_info_iter->second);
+      addEdgeToGraph(layer, curr_info, neighbor_info_iter->second);
     }
   }
 }
@@ -648,10 +686,26 @@ bool GraphExtractor::addPseudoEdge(const GvdLayer& layer,
     return false;
   }
 
+  SceneGraphEdgeInfo::Ptr edge_info(new SceneGraphEdgeInfo());
+  edge_info->weighted = true;
+  const double source_dist =
+      graph_->getNode(node)->get().attributes<PlaceNodeAttributes>().distance;
+  const double target_dist =
+      graph_->getNode(other_node)->get().attributes<PlaceNodeAttributes>().distance;
+  edge_info->weight = std::min(source_dist, target_dist);
+
   bool valid_path = true;
   for (const auto& index : path) {
-    const GvdVoxel& voxel = *CHECK_NOTNULL(layer.getVoxelPtrByGlobalIndex(index));
-    if (voxel.distance <= config_.component_min_clearance_m || !voxel.observed) {
+    const GvdVoxel* voxel = layer.getVoxelPtrByGlobalIndex(index);
+    if (!voxel) {
+      return false;  // avoid adding edges along removed voxels
+    }
+
+    if (voxel->distance < edge_info->weight) {
+      edge_info->weight = voxel->distance;
+    }
+
+    if (voxel->distance <= config_.component_min_clearance_m || !voxel->observed) {
       valid_path = false;
       break;
     }
@@ -661,7 +715,7 @@ bool GraphExtractor::addPseudoEdge(const GvdLayer& layer,
     return false;
   }
 
-  graph_->insertEdge(node, other_node);
+  graph_->insertEdge(node, other_node, std::move(edge_info));
 
   // no split nodes yet
   PseudoEdgeInfo info;
@@ -799,6 +853,51 @@ void GraphExtractor::extract(const GvdLayer& layer) {
   }
 
   visited_nodes_.clear();
+
+  // TODO(nathan) remove when we're more certain
+  size_t num_valid = 0;
+  size_t num_total = 0;
+  for (const auto& id_edge_pair : graph_->edges()) {
+    num_total++;
+    if (id_edge_pair.second.info->weighted) {
+      num_valid++;
+    }
+  }
+
+  CHECK_EQ(num_valid, num_total) << num_valid << " / " << num_total;
+}
+
+void GraphExtractor::assignMeshVertices(const GvdLayer& layer,
+                                        const GvdParentMap& parents,
+                                        const GvdVertexMap& parent_vertices) {
+  const auto vps_inv = layer.voxels_per_side_inv();
+
+  for (const auto& id_index_pair : node_id_root_map_) {
+    const NodeId node_id = id_index_pair.first;
+    const GlobalIndex& node_index = id_index_pair.second;
+
+    auto& attrs = graph_->getNode(node_id)->get().attributes<PlaceNodeAttributes>();
+    attrs.voxblox_mesh_connections.clear();
+
+    CHECK(parents.count(node_index));
+    for (const auto& parent : parents.at(node_index)) {
+      if (!parent_vertices.count(parent)) {
+        continue;
+      }
+
+      NearestVertexInfo info;
+      Eigen::Map<BlockIndex> block_map(info.block);
+      block_map = voxblox::getBlockIndexFromGlobalVoxelIndex(parent, vps_inv);
+
+      std::memcpy(
+          info.voxel_pos, parent_vertices.at(parent).pos, sizeof(info.voxel_pos));
+      // Eigen::Map<Eigen::Vector3d> pos_map(info.voxel_pos);
+      // pos_map = getVoxelPosition(layer, parent);
+
+      info.vertex = parent_vertices.at(parent).vertex;
+      attrs.voxblox_mesh_connections.push_back(info);
+    }
+  }
 }
 
 }  // namespace topology

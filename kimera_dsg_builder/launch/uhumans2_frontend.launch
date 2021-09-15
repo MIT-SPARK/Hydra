@@ -30,6 +30,7 @@
         <arg name="viz_config_dir" value="$(find kimera_dsg_builder)/config/incremental_visualizer"/>
     </include>
 
+
     <node pkg="kimera_dsg_builder" type="kimera_dsg_builder_incremental_node"
           name="incremental_dsg_builder_node"
           launch-prefix="$(arg launch_prefix)"
@@ -39,6 +40,7 @@
         <param name="log_path" value="$(arg pgmo_log_path)"/>
         <param name="log_output" value="$(arg pgmo_should_log)"/>
         <rosparam file="$(find kimera_dsg_builder)/config/pgmo_frontend_config.yaml"/>
+        <rosparam file="$(find kimera_dsg_builder)/config/dsg_backend_config.yaml"/>
 
         <param name="use_oriented_bounding_boxes" value="$(arg use_oriented_bounding_boxes)"/>
         <param name="semantic_label_2_color_csv_filepath" value="$(arg semantic_map_path)"/>
@@ -49,6 +51,24 @@
         <rosparam param="object_labels">[2, 5, 6, 7, 10, 11, 12, 13, 16, 17, 18]</rosparam>
         <remap from="~voxblox_mesh" to="/kimera_topology_node/mesh"/>
         <remap from="~active_places" to="/kimera_topology_node/active_layer"/>
+        <remap from="~pose_graph_incremental" to="/kimera_vio_ros/pose_graph_incremental"
+               unless="$(arg use_gt_frame)"/>
+
+
+        <rosparam file="$(find kimera_dsg_builder)/config/place_mesh_graph_viz.yaml"
+                  ns="pm_graph_viz"/>
+    </node>
+
+    <node pkg="kimera_dsg_builder" type="pose_graph_publisher_node"
+          if="$(arg use_gt_frame)"
+          name="pose_graph_publisher_node"
+          required="true"
+          output="log">
+          <param name="keyframe_period_s" value="0.2"/>
+          <param name="world_frame" value="world"/>
+          <param name="robot_frame" value="left_cam"/>
+          <param name="robot_id" value="0"/>
+          <remap from="~pose_graph" to="/incremental_dsg_builder_node/pose_graph_incremental"/>
     </node>
 
 </launch>

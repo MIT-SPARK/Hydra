@@ -200,6 +200,7 @@ void fillGvdIntegratorConfigFields(const ros::NodeHandle& nh,
   READ_PARAM(nh, config, positive_distance_only);
   READ_PARAM(nh, config, parent_derived_distance);
   READ_PARAM(nh, config, min_basis_for_extraction, 0, 26);
+  READ_PARAM(nh, config, extract_graph);
 };
 
 void fillVoronoiCheckConfig(const ros::NodeHandle& nh, VoronoiCheckConfig& config) {
@@ -238,6 +239,7 @@ GvdVisualizerConfig getGvdVisualizerConfig(const std::string& ns) {
   ros::NodeHandle nh(ns);
   GvdVisualizerConfig config;
   READ_PARAM(nh, config, visualization_type, 0, 2);
+  READ_PARAM(nh, config, color_nearest_vertices);
   READ_PARAM(nh, config, gvd_alpha);
   READ_PARAM(nh, config, gvd_min_distance);
   READ_PARAM(nh, config, gvd_max_distance);

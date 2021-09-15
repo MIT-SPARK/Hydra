@@ -5,7 +5,6 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /TF1/Tree1
-        - /VoxbloxMesh1
         - /GVD Visualization1/Namespaces1
         - /Graph Visualization1/Namespaces1
       Splitter Ratio: 0.5
@@ -28,7 +27,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: RGB Image
+    SyncSource: ""
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -41,40 +40,19 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        base_link_gt:
-          Value: true
-        front_lidar:
-          Value: true
-        left_cam:
-          Value: true
-        rear_lidar:
-          Value: true
-        right_cam:
-          Value: true
-        world:
-          Value: true
       Marker Scale: 1
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        world:
-          base_link_gt:
-            front_lidar:
-              {}
-            left_cam:
-              {}
-            rear_lidar:
-              {}
-            right_cam:
-              {}
+        {}
       Update Interval: 0
       Value: true
     - Class: voxblox_rviz_plugin/VoxbloxMesh
       Enabled: true
       Name: VoxbloxMesh
-      Topic: /kimera_topology_node/mesh
+      Topic: /kimera_topology_node/mesh_viz
       Unreliable: false
       Value: true
     - Alpha: 1
@@ -156,8 +134,7 @@ Visualization Manager:
       Marker Topic: /kimera_topology_node/graph_viz
       Name: Graph Visualization
       Namespaces:
-        topology_graph_edges: true
-        topology_graph_nodes: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray

@@ -3,6 +3,7 @@ show_block_outlines: true
 use_gvd_block_outlines: false
 gvd_visualizer:
     visualization_type: 2  # 0 -> NONE, 1 -> ESDF_SLICE, 2 -> GVD
+    color_nearest_vertices: false
     gvd_alpha: 0.6
     gvd_min_distance: 0.2
     gvd_max_distance: 5.0

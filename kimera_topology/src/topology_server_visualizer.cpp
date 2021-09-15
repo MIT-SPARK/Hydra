@@ -46,8 +46,25 @@ void TopologyServerVisualizer::visualizeGraph(const SceneGraphLayer& graph) {
   ros::Time draw_time = ros::Time::now();
   MarkerArray markers;
 
-  Marker node_marker =
-      makeCentroidMarkers(config_.graph_layer, graph, config_.graph, config_.colormap);
+  Marker node_marker;
+  if (config_.gvd.color_nearest_vertices) {
+    node_marker = makeCentroidMarkers(
+        config_.graph_layer,
+        graph,
+        config_.graph,
+        "layer_centroids",
+        [](const SceneGraphNode& node) {
+          if (node.attributes<PlaceNodeAttributes>().voxblox_mesh_connections.empty()) {
+            return NodeColor(0, 0, 0);
+          } else {
+            return NodeColor(0, 255, 0);
+          }
+        });
+  } else {
+    node_marker = makeCentroidMarkers(
+        config_.graph_layer, graph, config_.graph, config_.colormap);
+  }
+
   node_marker.header.stamp = draw_time;
   node_marker.header.frame_id = config_.world_frame;
   node_marker.ns = config_.topology_marker_ns + "_nodes";

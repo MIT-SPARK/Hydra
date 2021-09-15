@@ -60,8 +60,9 @@ void VoxelAwareMeshIntegrator::extractMeshInsideBlock(const TsdfBlock& block,
   }
 
   if (all_neighbors_observed) {
+    std::vector<bool> voxels_in_block(8, true);
     VoxelAwareMarchingCubes::meshCube(
-        corner_coords, corner_sdf, next_mesh_index, mesh, gvd_voxels);
+        corner_coords, corner_sdf, next_mesh_index, mesh, gvd_voxels, voxels_in_block);
   }
 }
 
@@ -83,10 +84,12 @@ void VoxelAwareMeshIntegrator::extractMeshOnBorder(const TsdfBlock& block,
 
   bool all_neighbors_observed = true;
 
+  std::vector<bool> voxels_in_block(8);
   for (int i = 0; i < 8; ++i) {
     VoxelIndex corner_index = index + cube_index_offsets_.col(i);
 
     if (block.isValidVoxelIndex(corner_index)) {
+      voxels_in_block[i] = true;
       const TsdfVoxel& voxel = block.getVoxelByVoxelIndex(corner_index);
 
       if (!vutils::getSdfIfValid(voxel, config_.min_weight, &(corner_sdf(i)))) {
@@ -97,6 +100,7 @@ void VoxelAwareMeshIntegrator::extractMeshOnBorder(const TsdfBlock& block,
       corner_coords.col(i) = coords + cube_coord_offsets_.col(i);
       gvd_voxels[i] = &gvd_block->getVoxelByVoxelIndex(corner_index);
     } else {
+      voxels_in_block[i] = false;
       // We have to access a different block.
       BlockIndex block_offset = BlockIndex::Zero();
 
@@ -136,7 +140,7 @@ void VoxelAwareMeshIntegrator::extractMeshOnBorder(const TsdfBlock& block,
 
   if (all_neighbors_observed) {
     VoxelAwareMarchingCubes::meshCube(
-        corner_coords, corner_sdf, next_mesh_index, mesh, gvd_voxels);
+        corner_coords, corner_sdf, next_mesh_index, mesh, gvd_voxels, voxels_in_block);
   }
 }
 

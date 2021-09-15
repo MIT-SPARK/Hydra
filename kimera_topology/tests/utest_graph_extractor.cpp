@@ -183,7 +183,7 @@ TEST_F(GraphExtractorTestFixture, AddEdgeMapsCorrect) {
   extractor.addNeighborToFrontier(second_info, second_neighbor.index);
 
   second_info.is_node = false;
-  extractor.addEdgeToGraph(curr_info, second_info);
+  extractor.addEdgeToGraph(*layer, curr_info, second_info);
 
   // TOOD(nathan) unclear how merge nodes affects this
   EXPECT_LT(0u, extractor.connected_edges_.size());

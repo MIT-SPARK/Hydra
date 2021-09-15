@@ -126,9 +126,8 @@ OfflineDsgBuilder::OfflineDsgBuilder(const ros::NodeHandle& nh,
   pcl::PointCloud<pcl::PointXYZRGBA>::Ptr vertices(
       new pcl::PointCloud<pcl::PointXYZRGBA>());
   pcl::fromPCLPointCloud2(semantic_mesh->cloud, *vertices);
-  std::shared_ptr<const std::vector<pcl::Vertices>> faces(
-      new std::vector<pcl::Vertices>(semantic_mesh->polygons.begin(),
-                                     semantic_mesh->polygons.end()));
+  std::shared_ptr<std::vector<pcl::Vertices>> faces(new std::vector<pcl::Vertices>(
+      semantic_mesh->polygons.begin(), semantic_mesh->polygons.end()));
 
   scene_graph_->setMesh(vertices, faces, true);
 

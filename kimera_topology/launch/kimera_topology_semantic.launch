@@ -30,7 +30,7 @@
     <arg name="graph_viz_config" default="graph_visualization_config.yaml"/>
     <arg name="graph_viz_config_file" value="$(arg graph_viz_config_dir)/$(arg graph_viz_config)"/>
 
-    <arg name="sensor_frame" default="left_cam_base_link" unless="$(arg use_gt_frame)"/>
+    <arg name="sensor_frame" default="left_cam_kimera" unless="$(arg use_gt_frame)"/>
     <arg name="sensor_frame" default="left_cam" if="$(arg use_gt_frame)"/>
 
     <arg name="camera_info_topic" default="/tesse/seg_cam/camera_info" if="$(arg use_gt_semantics)"/>

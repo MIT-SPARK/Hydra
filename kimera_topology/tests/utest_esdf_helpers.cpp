@@ -121,6 +121,7 @@ TEST_F(EsdfHelpers, TestObservedVoxel) {
     GvdVoxel gvd_voxel;
     gvd_voxel.distance = -0.1;
     gvd_voxel.in_queue = false;
+    gvd_voxel.has_parent = true;  // avoid raising voxel
 
     integrator->updateObservedGvdVoxel(tsdf_voxel, GlobalIndex::Zero(), gvd_voxel);
     EXPECT_EQ(0u, integrator->update_stats_.number_new_voxels);

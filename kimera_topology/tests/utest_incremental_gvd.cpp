@@ -90,6 +90,7 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
   gvd_config.parent_derived_distance = true;
   gvd_config.voronoi_config.min_distance_m = 1.0;
   gvd_config.voronoi_config.parent_l1_separation = 2.0;
+  gvd_config.extract_graph = false;
 
   GvdIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
   gvd_integrator.updateFromTsdfLayer(false, false);
@@ -293,7 +294,10 @@ TEST_F(ParentTestFixture, ParentsCorrect) {
         const auto& voxel = getGvdVoxel(x, y, z);
 
         if (x == 0 || y == 0 || z == 0) {
-          EXPECT_TRUE(voxel.on_surface)
+          // marching cubes can't handle sharp corners, so any "edge" (two zeros) or
+          // "corner" (three zeros) voxel isn't on the surface
+          int num_zeros = (x == 0 ? 1 : 0) + (y == 0 ? 1 : 0) + (z == 0 ? 1 : 0);
+          EXPECT_TRUE(num_zeros >= 2 || voxel.on_surface)
               << voxel << " @ (" << x << ", " << y << ", " << z << ")";
           continue;
         }

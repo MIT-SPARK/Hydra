@@ -38,6 +38,7 @@ using EdgeIndexMatrix = Eigen::Matrix<FloatingPoint, 3, 12>;
 void interpolateEdges(const PointMatrix& vertex_coords,
                       const SdfMatrix& vertex_sdf,
                       EdgeIndexMatrix& edge_coords,
+                      std::vector<uint8_t>& edge_status,
                       const std::vector<GvdVoxel*>& gvd_voxels);
 
 /**
@@ -55,7 +56,8 @@ class VoxelAwareMarchingCubes : voxblox::MarchingCubes {
                        const SdfMatrix& vertex_sdf,
                        VertexIndex* next_index,
                        Mesh* mesh,
-                       const std::vector<GvdVoxel*>& gvd_voxels);
+                       const std::vector<GvdVoxel*>& gvd_voxels,
+                       const std::vector<bool>& voxels_in_block);
 };
 
 }  // namespace topology

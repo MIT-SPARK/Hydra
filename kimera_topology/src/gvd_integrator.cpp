@@ -65,8 +65,6 @@ uint8_t GvdIntegrator::updateGvdParentMap(const GlobalIndex& voxel_index,
   const GlobalIndex neighbor_parent = Eigen::Map<const GlobalIndex>(neighbor.parent);
   if (!gvd_parents_.count(voxel_index)) {
     gvd_parents_[voxel_index] = voxblox::LongIndexSet();
-    gvd_parents_[voxel_index].insert(neighbor_parent);
-    return 1;
   }
 
   uint8_t curr_extra_basis = gvd_parents_[voxel_index].size();
@@ -80,13 +78,90 @@ uint8_t GvdIntegrator::updateGvdParentMap(const GlobalIndex& voxel_index,
 
   // parent is unique enough
   gvd_parents_[voxel_index].insert(neighbor_parent);
+
+  if (gvd_parent_vertices_.count(neighbor_parent)) {
+    // make sure the parent vertex map stays alive for this gvd member
+    gvd_parent_vertices_[neighbor_parent].ref_count++;
+    return curr_extra_basis + 1;
+  }
+
+  GvdVoxel* parent_voxel = gvd_layer_->getVoxelPtrByGlobalIndex(neighbor_parent);
+  if (!parent_voxel || !parent_voxel->on_surface) {
+    // we can't do anything for parents that have left the active mesh before being used
+    // as a GVD parent, or parents that aren't registered to the mesh
+    return curr_extra_basis + 1;
+  }
+
+  GvdVertexInfo info;
+  info.vertex = parent_voxel->block_vertex_index;
+  info.ref_count = 1;
+
+  BlockIndex block_index = voxblox::getBlockIndexFromGlobalVoxelIndex(
+      neighbor_parent, gvd_layer_->voxels_per_side_inv());
+  const auto& mesh_block = mesh_layer_->getMeshByIndex(block_index);
+  if (info.vertex < mesh_block.vertices.size()) {
+    voxblox::Point vertex_pos = mesh_block.vertices.at(info.vertex);
+    info.pos[0] = vertex_pos(0);
+    info.pos[1] = vertex_pos(1);
+    info.pos[2] = vertex_pos(2);
+  }
+
+  gvd_parent_vertices_[neighbor_parent] = info;
   return curr_extra_basis + 1;
 }
 
 void GvdIntegrator::removeVoronoiFromGvdParentMap(const GlobalIndex& voxel_index) {
   auto voxel_parents = gvd_parents_.find(voxel_index);
   if (voxel_parents != gvd_parents_.end()) {
+    for (const auto& parent : voxel_parents->second) {
+      if (gvd_parent_vertices_.count(parent)) {
+        // decrement the ref count (we garbage collect later to avoid losing parents
+        // due to thrashing)
+        gvd_parent_vertices_[parent].ref_count--;
+      }
+    }
+
     gvd_parents_.erase(voxel_parents);
+  }
+}
+
+void GvdIntegrator::updateVertexMapping() {
+  auto iter = gvd_parent_vertices_.begin();
+  while (iter != gvd_parent_vertices_.end()) {
+    if (!iter->second.ref_count) {
+      iter = gvd_parent_vertices_.erase(iter);
+      continue;
+    }
+
+    GvdVoxel* voxel = gvd_layer_->getVoxelPtrByGlobalIndex(iter->first);
+    if (!voxel) {
+      ++iter;
+      continue;
+    }
+
+    if (!voxel->on_surface) {
+      iter = gvd_parent_vertices_.erase(iter);
+      continue;
+    }
+
+    iter->second.vertex = voxel->block_vertex_index;
+
+    BlockIndex block_index = voxblox::getBlockIndexFromGlobalVoxelIndex(
+        iter->first, gvd_layer_->voxels_per_side_inv());
+    const auto& mesh_block = mesh_layer_->getMeshByIndex(block_index);
+    if (voxel->block_vertex_index >= mesh_block.vertices.size()) {
+      LOG(ERROR) << "Invalid vertex: " << voxel->block_vertex_index
+                 << " >= " << mesh_block.vertices.size();
+      iter = gvd_parent_vertices_.erase(iter);
+      continue;
+    }
+
+    voxblox::Point vertex_pos = mesh_block.vertices.at(iter->second.vertex);
+    iter->second.pos[0] = vertex_pos(0);
+    iter->second.pos[1] = vertex_pos(1);
+    iter->second.pos[2] = vertex_pos(2);
+
+    ++iter;
   }
 }
 
@@ -97,7 +172,13 @@ void GvdIntegrator::updateGvdVoxel(const GlobalIndex& voxel_index,
     update_stats_.number_voronoi_found++;
   }
 
-  voxel.num_extra_basis = updateGvdParentMap(voxel_index, other);
+  auto new_basis = updateGvdParentMap(voxel_index, other);
+  if (new_basis == voxel.num_extra_basis) {
+    return;
+  }
+
+  voxel.num_extra_basis = new_basis;
+
   if (voxel.num_extra_basis == config_.min_basis_for_extraction) {
     graph_extractor_->pushGvdIndex(voxel_index);
   }
@@ -196,27 +277,41 @@ void GvdIntegrator::updateFromTsdfLayer(bool clear_updated_flag,
   allocate_timer.Stop();
 
   // sets voxel surface flags
+  VLOG(3) << "[GVD update]: starting marching cubes";
   voxblox::timing::Timer marching_cubes_timer("gvd/marching_cubes");
   mesh_integrator_->generateMesh(true, false);
   marching_cubes_timer.Stop();
+  VLOG(3) << "[GVD update]: finished marching cubes";
 
+  VLOG(3) << "[GVD update]: propagating TSDF";
   voxblox::timing::Timer propagate_timer("gvd/propagate_tsdf");
   for (const BlockIndex& idx : blocks) {
     processTsdfBlock(tsdf_layer_->getBlockByIndex(idx), idx);
   }
   propagate_timer.Stop();
+  VLOG(3) << "[GVD update]: finished propagating TSDF";
 
+  VLOG(3) << "[GVD update]: raising invalid voxels";
   voxblox::timing::Timer raise_timer("gvd/raise_esdf");
   processRaiseSet();
   raise_timer.Stop();
 
+  VLOG(3) << "[GVD update]: lowering all voxels";
   voxblox::timing::Timer update_timer("gvd/update_esdf");
   processLowerSet();
   update_timer.Stop();
+  VLOG(3) << "[GVD update]: finished lowering all voxels";
 
-  voxblox::timing::Timer extraction_timer("gvd/extract_graph");
-  graph_extractor_->extract(*gvd_layer_);
-  extraction_timer.Stop();
+  if (config_.extract_graph) {
+    VLOG(3) << "[GVD update]: starting graph extraction";
+    voxblox::timing::Timer extraction_timer("gvd/extract_graph");
+    updateVertexMapping();
+    graph_extractor_->extract(*gvd_layer_);
+    graph_extractor_->assignMeshVertices(
+        *gvd_layer_, gvd_parents_, gvd_parent_vertices_);
+    extraction_timer.Stop();
+    VLOG(3) << "[GVD update]: finished graph extraction";
+  }
 
   gvd_timer.Stop();
 
@@ -262,6 +357,15 @@ void GvdIntegrator::updateObservedGvdVoxel(const TsdfVoxel& tsdf_voxel,
     // start a lower-wavefront from the surface if the distance has changed enough
     gvd_voxel.distance = tsdf_voxel.distance;
     pushToQueue(index, gvd_voxel, PushType::LOWER);
+    return;
+  }
+
+  if (!gvd_voxel.on_surface && !gvd_voxel.has_parent) {
+    // force a raise when on_surface flips. this can also potentially trigger for
+    // non-surface isolated fixed voxels
+    gvd_voxel.fixed = false;
+    setDefaultDistance(gvd_voxel, tsdf_voxel.distance);
+    pushToQueue(index, gvd_voxel, PushType::RAISE);
     return;
   }
 

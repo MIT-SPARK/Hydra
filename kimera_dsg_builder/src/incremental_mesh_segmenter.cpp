@@ -61,19 +61,15 @@ std::set<uint8_t> readSemanticLabels(const ros::NodeHandle& nh,
   return actual_labels;
 }
 
+// TODO(nathan) allow for different node symbol prefix
 MeshSegmenter::MeshSegmenter(const ros::NodeHandle& nh,
-                             const DynamicSceneGraph::Ptr& scene_graph)
+                             const MeshVertexCloud::Ptr& full_mesh_vertices)
     : nh_(nh),
-      scene_graph_(scene_graph),
-      next_object_id_('O', 0),
+      full_mesh_vertices_(full_mesh_vertices),
+      next_node_id_('O', 0),
       active_object_horizon_s_(10.0),
       enable_active_mesh_pub_(false),
       enable_segmented_mesh_pub_(false) {
-  // TODO(nathan) handle triangles better
-  // TODO(nathan) will need to rethink this re PGMO backend
-  std::shared_ptr<const std::vector<pcl::Vertices>> empty_faces;
-  scene_graph_->setMesh(mesh_frontend_.getFullMeshVertices(), empty_faces);
-
   nh_.getParam("active_object_horizon_s", active_object_horizon_s_);
   nh_.getParam("enable_active_mesh_pub", enable_active_mesh_pub_);
   nh_.getParam("enable_segmented_mesh_pub", enable_segmented_mesh_pub_);
@@ -86,7 +82,8 @@ MeshSegmenter::MeshSegmenter(const ros::NodeHandle& nh,
     active_objects_[label] = std::set<NodeId>();
   }
 
-  // TODO(nathan) look at CGAL for better oriented bounding volumnes (min volume ellipse)
+  // TODO(nathan) look at CGAL for better oriented bounding volumnes (min volume
+  // ellipse)
   bool use_oriented_bounding_boxes = false;
   nh_.getParam("use_oriented_bounding_boxes", use_oriented_bounding_boxes);
   bounding_box_type_ =
@@ -109,73 +106,58 @@ MeshSegmenter::MeshSegmenter(const ros::NodeHandle& nh,
 
   rqt_callback_ = boost::bind(&MeshSegmenter::objectFinderConfigCb, this, _1, _2);
   rqt_server_.setCallback(rqt_callback_);
-
-  // TODO(nathan) consider mesh namespace
-  mesh_frontend_.initialize(nh_);
 }
 
-bool MeshSegmenter::detectObjects(std::mutex& scene_graph_mutex) {
-  if (!mesh_frontend_.wasFrontendUpdated()) {
-    return false;
-  }
-
+bool MeshSegmenter::detectObjects(const SharedDsgInfo::Ptr& dsg,
+                                  const std::vector<size_t>& active_indices) {
   const double latest_timestamp = ros::Time::now().toSec();
-  archiveOldObjects(latest_timestamp);
+  archiveOldObjects(*dsg->graph, latest_timestamp);
 
-  const std::vector<size_t>& active_indices =
-      mesh_frontend_.getActiveFullMeshVertices();
-  MeshVertexCloud::Ptr cloud = mesh_frontend_.getFullMeshVertices();
-  CHECK(cloud);
-
-  publishActiveVertices(cloud, active_indices);
+  publishActiveVertices(active_indices);
 
   if (active_indices.empty()) {
     LOG(INFO) << "[Object Detection] No active indices in mesh";
     return false;
   }
 
-  LabelIndices label_indices = getLabelIndices(cloud, active_indices);
+  LabelIndices label_indices = getLabelIndices(active_indices);
   if (label_indices.empty()) {
-    VLOG(1) << "[Object Detection] No object vertices found";
+    VLOG(3) << "[Object Detection] No object vertices found";
     return false;
   }
 
-  publishObjectClouds(cloud, label_indices);
+  publishObjectClouds(label_indices);
 
-  VLOG(1) << "[Object Detection] Detecting objects";
+  VLOG(3) << "[Object Detection] Detecting objects";
   for (const auto label : object_labels_) {
     if (!label_indices.count(label)) {
       continue;
     }
 
     ObjectClusters clusters =
-        object_finder_->findObjects(cloud, label_indices.at(label));
+        object_finder_->findObjects(full_mesh_vertices_, label_indices.at(label));
 
-    VLOG(1) << "[Object Detection]  - Found " << clusters.size() << " objects of label "
+    VLOG(3) << "[Object Detection]  - Found " << clusters.size() << " objects of label "
             << static_cast<int>(label);
 
     {  // start graph update critical section
-      std::unique_lock<std::mutex> lock(scene_graph_mutex);
-      updateGraph(clusters, label, latest_timestamp);
+      std::unique_lock<std::mutex> lock(dsg->mutex);
+      updateGraph(*dsg->graph, clusters, label, latest_timestamp);
     }  // end graph update critical section
   }
-
-  LOG(INFO) << "[Object Detection] Object layer has "
-            << scene_graph_->getLayer(KimeraDsgLayers::OBJECTS).value().get().numNodes()
-            << " nodes";
 
   return true;
 }
 
-void MeshSegmenter::pruneObjectsToCheckForPlaces() {
+void MeshSegmenter::pruneObjectsToCheckForPlaces(const DynamicSceneGraph& graph) {
   std::list<NodeId> to_remove;
   for (const auto& object_id : objects_to_check_for_places_) {
-    if (!scene_graph_->hasNode(object_id)) {
+    if (!graph.hasNode(object_id)) {
       LOG(ERROR) << "Missing node " << NodeSymbol(object_id).getLabel();
       to_remove.push_back(object_id);
     }
 
-    if (scene_graph_->getNode(object_id).value().get().hasParent()) {
+    if (graph.getNode(object_id).value().get().hasParent()) {
       to_remove.push_back(object_id);
     }
   }
@@ -185,13 +167,14 @@ void MeshSegmenter::pruneObjectsToCheckForPlaces() {
   }
 }
 
-void MeshSegmenter::archiveOldObjects(double latest_timestamp) {
+void MeshSegmenter::archiveOldObjects(const DynamicSceneGraph& graph,
+                                      double latest_timestamp) {
   std::list<NodeId> removed_nodes;
   for (const auto id_time_pair : active_object_timestamps_) {
     if (latest_timestamp - id_time_pair.second > active_object_horizon_s_) {
       const NodeId curr_id = id_time_pair.first;
       removed_nodes.push_back(curr_id);
-      uint8_t label = scene_graph_->getNode(curr_id)
+      uint8_t label = graph.getNode(curr_id)
                           .value()
                           .get()
                           .attributes<SemanticNodeAttributes>()
@@ -205,13 +188,12 @@ void MeshSegmenter::archiveOldObjects(double latest_timestamp) {
   }
 }
 
-LabelIndices MeshSegmenter::getLabelIndices(const MeshVertexCloud::Ptr cloud,
-                                            const std::vector<size_t>& indices) {
+LabelIndices MeshSegmenter::getLabelIndices(const std::vector<size_t>& indices) const {
   LabelIndices label_indices;
 
   std::set<uint8_t> seen_labels;
   for (const auto idx : indices) {
-    const pcl::PointXYZRGBA& point = cloud->at(idx);
+    const pcl::PointXYZRGBA& point = full_mesh_vertices_->at(idx);
     const HashableColor color(point.r, point.g, point.b, 255);
 
     const uint8_t label =
@@ -229,40 +211,40 @@ LabelIndices MeshSegmenter::getLabelIndices(const MeshVertexCloud::Ptr cloud,
     label_indices[label].push_back(idx);
   }
 
-  VLOG(1) << "[Object Detection] Seen labels: " << seen_labels;
+  VLOG(3) << "[Object Detection] Seen labels: " << seen_labels;
 
   return label_indices;
 }
 
-void MeshSegmenter::updateGraph(const ObjectClusters& clusters,
+void MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
+                                const ObjectClusters& clusters,
                                 uint8_t label,
                                 double timestamp) {
   for (const auto& cluster : clusters) {
     bool matches_prev_object = false;
     for (const auto& prev_node_id : active_objects_.at(label)) {
-      const SceneGraphNode& prev_node = scene_graph_->getNode(prev_node_id).value();
+      const SceneGraphNode& prev_node = graph.getNode(prev_node_id).value();
       if (objectsMatch(cluster, prev_node)) {
-        updateObjectInGraph(cluster, prev_node, timestamp);
+        updateObjectInGraph(graph, cluster, prev_node, timestamp);
         matches_prev_object = true;
         break;
       }
     }
 
-    if (matches_prev_object) {
-      continue;
+    if (!matches_prev_object) {
+      addObjectToGraph(graph, cluster, label, timestamp);
     }
-
-    addObjectToGraph(cluster, label, timestamp);
   }
 }
 
-void MeshSegmenter::updateObjectInGraph(const ObjectCluster& cluster,
+void MeshSegmenter::updateObjectInGraph(DynamicSceneGraph& graph,
+                                        const ObjectCluster& cluster,
                                         const SceneGraphNode& node,
                                         double timestamp) {
   active_object_timestamps_.at(node.id) = timestamp;
 
   for (const auto& idx : cluster.indices.indices) {
-    scene_graph_->insertMeshEdge(node.id, idx);
+    graph.insertMeshEdge(node.id, idx);
   }
 
   auto new_box = BoundingBox::extract(cluster.cloud, bounding_box_type_);
@@ -280,14 +262,15 @@ void MeshSegmenter::updateObjectInGraph(const ObjectCluster& cluster,
   attrs.bounding_box = new_box;
 }
 
-void MeshSegmenter::addObjectToGraph(const ObjectCluster& cluster,
+void MeshSegmenter::addObjectToGraph(DynamicSceneGraph& graph,
+                                     const ObjectCluster& cluster,
                                      uint8_t label,
                                      double timestamp) {
   CHECK(!cluster.cloud->empty());
 
   ObjectNodeAttributes::Ptr attrs = std::make_unique<ObjectNodeAttributes>();
   attrs->semantic_label = label;
-  attrs->name = NodeSymbol(next_object_id_).getLabel();
+  attrs->name = NodeSymbol(next_node_id_).getLabel();
   attrs->bounding_box = BoundingBox::extract(cluster.cloud, bounding_box_type_);
 
   const pcl::PointXYZRGBA& point = cluster.cloud->at(0);
@@ -297,19 +280,18 @@ void MeshSegmenter::addObjectToGraph(const ObjectCluster& cluster,
   cluster.centroid.get(centroid);
   attrs->position << centroid.x, centroid.y, centroid.z;
 
-  scene_graph_->emplaceNode(
-      to_underlying(KimeraDsgLayers::OBJECTS), next_object_id_, std::move(attrs));
+  graph.emplaceNode(
+      to_underlying(KimeraDsgLayers::OBJECTS), next_node_id_, std::move(attrs));
 
-  // TODO(nathan) doesn't need to be safe access
-  active_objects_.at(label).insert(next_object_id_);
-  active_object_timestamps_[next_object_id_] = timestamp;
-  objects_to_check_for_places_.insert(next_object_id_);
+  active_objects_.at(label).insert(next_node_id_);
+  active_object_timestamps_[next_node_id_] = timestamp;
+  objects_to_check_for_places_.insert(next_node_id_);
 
   for (const auto& idx : cluster.indices.indices) {
-    scene_graph_->insertMeshEdge(next_object_id_, idx);
+    graph.insertMeshEdge(next_node_id_, idx);
   }
 
-  ++next_object_id_;
+  ++next_node_id_;
 }
 
 void MeshSegmenter::objectFinderConfigCb(DsgBuilderConfig& config, uint32_t) {
@@ -336,8 +318,7 @@ void MeshSegmenter::objectFinderConfigCb(DsgBuilderConfig& config, uint32_t) {
   ROS_INFO_STREAM("Object finder: " << *object_finder_);
 }
 
-void MeshSegmenter::publishActiveVertices(const MeshVertexCloud::Ptr& cloud,
-                                          const std::vector<size_t>& indices) const {
+void MeshSegmenter::publishActiveVertices(const std::vector<size_t>& indices) const {
   if (!enable_active_mesh_pub_) {
     return;
   }
@@ -345,7 +326,7 @@ void MeshSegmenter::publishActiveVertices(const MeshVertexCloud::Ptr& cloud,
   MeshVertexCloud::Ptr active_cloud(new MeshVertexCloud());
   active_cloud->reserve(indices.size());
   for (const auto idx : indices) {
-    active_cloud->push_back(cloud->at(idx));
+    active_cloud->push_back(full_mesh_vertices_->at(idx));
   }
 
   active_cloud->header.frame_id = "world";
@@ -353,8 +334,7 @@ void MeshSegmenter::publishActiveVertices(const MeshVertexCloud::Ptr& cloud,
   active_mesh_vertex_pub_.publish(active_cloud);
 }
 
-void MeshSegmenter::publishObjectClouds(const MeshVertexCloud::Ptr& cloud,
-                                        const LabelIndices& label_indices) const {
+void MeshSegmenter::publishObjectClouds(const LabelIndices& label_indices) const {
   if (!enable_segmented_mesh_pub_) {
     return;
   }
@@ -363,7 +343,7 @@ void MeshSegmenter::publishObjectClouds(const MeshVertexCloud::Ptr& cloud,
     MeshVertexCloud label_cloud;
     label_cloud.reserve(label_index_pair.second.size());
     for (const auto idx : label_index_pair.second) {
-      label_cloud.push_back(cloud->at(idx));
+      label_cloud.push_back(full_mesh_vertices_->at(idx));
     }
 
     label_cloud.header.frame_id = "world";

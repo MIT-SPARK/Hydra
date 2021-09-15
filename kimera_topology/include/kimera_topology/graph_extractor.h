@@ -93,6 +93,10 @@ class GraphExtractor {
 
   void extract(const GvdLayer& layer);
 
+  void assignMeshVertices(const GvdLayer& layer,
+                          const GvdParentMap& parents,
+                          const GvdVertexMap& parent_vertices);
+
   std::unordered_set<NodeId> getActiveNodes() const;
 
   std::unordered_set<NodeId> getDeletedNodes() const;
@@ -126,7 +130,12 @@ class GraphExtractor {
 
   bool updateEdgeMaps(const VoxelGraphInfo& info, const VoxelGraphInfo& neighbor_info);
 
-  void addEdgeToGraph(const VoxelGraphInfo& curr_info,
+  SceneGraphEdgeInfo::Ptr makeEdgeInfo(const GvdLayer& layer,
+                                       NodeId source_id,
+                                       NodeId target_id) const;
+
+  void addEdgeToGraph(const GvdLayer& layer,
+                      const VoxelGraphInfo& curr_info,
                       const VoxelGraphInfo& neighbor_info);
 
   void findBadEdgeIndices(const EdgeInfo& info);

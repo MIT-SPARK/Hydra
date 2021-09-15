@@ -1,145 +1,230 @@
 #include "kimera_dsg_builder/incremental_dsg_frontend.h"
+#include "kimera_dsg_builder/timing_utilities.h"
 
 #include <glog/logging.h>
 
 namespace kimera {
 namespace incremental {
 
-DsgFrontend::DsgFrontend(const ros::NodeHandle& nh) : nh_(nh) {
-  scene_graph_ = std::make_shared<DynamicSceneGraph>();
-
-  active_places_sub_ =
-      nh_.subscribe("active_places", 5, &DsgFrontend::handleActivePlaces, this);
-
-  startVisualizer();
-  startSegmenter();
+DsgFrontend::DsgFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg)
+    : nh_(nh), dsg_(dsg) {
+  // TODO(nathan) consider mesh namespace
+  mesh_frontend_.initialize(nh_, false);
+  last_mesh_timestamp_ = 0;
+  last_places_timestamp_ = 0;
 }
 
 DsgFrontend::~DsgFrontend() {
   should_shutdown_ = true;
-  LOG(INFO) << "joining segmentation thread";
-  if (segmenter_thread_) {
-    segmenter_thread_->join();
+  VLOG(2) << "[DSG Frontend] joining mesh thread";
+  if (mesh_frontend_thread_) {
+    mesh_frontend_thread_->join();
   }
+  VLOG(2) << "[DSG Frontend] joined mesh thread";
 
-  LOG(INFO) << "joining visualizer thread";
-  if (visualizer_thread_) {
-    visualizer_thread_->join();
+  VLOG(2) << "[DSG Frontend] joining places thread";
+  if (places_thread_) {
+    places_thread_->join();
   }
-
-  LOG(INFO) << "joined threads";
-}
-
-void DsgFrontend::spin() { ros::spin(); }
-
-void DsgFrontend::startVisualizer() {
-  std::string visualizer_ns;
-  nh_.param<std::string>("visualizer_ns", visualizer_ns, "/kimera_dsg_visualizer");
-
-  visualizer_queue_.reset(new ros::CallbackQueue());
-
-  ros::NodeHandle nh(visualizer_ns);
-  nh.setCallbackQueue(visualizer_queue_.get());
-
-  visualizer_.reset(new DynamicSceneGraphVisualizer(nh, getDefaultLayerIds()));
-  visualizer_->setGraph(scene_graph_);
-
-  visualizer_thread_.reset(new std::thread(&DsgFrontend::runVisualizer, this));
-}
-
-void DsgFrontend::runVisualizer() {
-  ros::Rate r(10);
-  while (ros::ok() && !should_shutdown_) {
-    // process any config changes
-    visualizer_queue_->callAvailable(ros::WallDuration(0));
-    {  // start graph update critical section
-      std::unique_lock<std::mutex> graph_lock(scene_graph_mutex_);
-      visualizer_->redraw();
-    }  // end graph update critical section
-
-    r.sleep();
-  }
-}
-
-void DsgFrontend::startSegmenter() {
-  std::string mesh_ns;
-  nh_.param<std::string>("mesh_ns", mesh_ns, "");
-
-  segmenter_queue_.reset(new ros::CallbackQueue());
-
-  ros::NodeHandle mesh_nh(nh_, mesh_ns);
-  mesh_nh.setCallbackQueue(segmenter_queue_.get());
-  segmenter_.reset(new MeshSegmenter(mesh_nh, scene_graph_));
-
-  segmenter_thread_.reset(new std::thread(&DsgFrontend::runSegmenter, this));
-}
-
-void DsgFrontend::runSegmenter() {
-  ros::Rate r(10);
-  while (ros::ok() && !should_shutdown_) {
-    // process everything for the mesh frontend
-    // note that at the moment, this is mostly thread safe: it only adds vertices to
-    // the mesh (and doesn't touch anything in the graph)
-    // TODO(nathan) callOne?
-    segmenter_queue_->callAvailable(ros::WallDuration(0.0));
-
-    // this isn't threadsafe, and takes a mutex
-    if (segmenter_->detectObjects(scene_graph_mutex_)) {
-      addPlaceObjectEdges();
-      visualizer_->setGraphUpdated();
-    }
-
-    r.sleep();
-  }
+  VLOG(2) << "[DSG Frontend] joined places thread";
 }
 
 void DsgFrontend::handleActivePlaces(const PlacesLayerMsg::ConstPtr& msg) {
+  std::unique_lock<std::mutex> queue_lock(places_queue_mutex_);
+  places_queue_.push(msg);
+}
+
+void DsgFrontend::handleLatestMesh(const voxblox_msgs::Mesh::ConstPtr& msg) {
+  {  // start mesh frontend critical section
+    std::unique_lock<std::mutex> mesh_lock(mesh_frontend_mutex_);
+    if (!latest_mesh_msg_) {
+      latest_mesh_msg_ = msg;
+      return;
+    }
+  }  // end mesh frontend critical section
+
+  // we warn outside to keep I/O out of the way of the mutex
+  ROS_WARN_STREAM("[DSG Frontend] Dropping mesh update @ "
+                  << msg->header.stamp.toSec() << " [s] (" << msg->header.stamp.toNSec()
+                  << " [ns])");
+}
+
+void DsgFrontend::start() {
+  startMeshFrontend();
+  startPlaces();
+}
+
+void DsgFrontend::startMeshFrontend() {
+  std::string mesh_ns;
+  nh_.param<std::string>("mesh_ns", mesh_ns, "");
+
+  mesh_frontend_ros_queue_.reset(new ros::CallbackQueue());
+
+  ros::NodeHandle mesh_nh(nh_, mesh_ns);
+  mesh_nh.setCallbackQueue(mesh_frontend_ros_queue_.get());
+  segmenter_.reset(new MeshSegmenter(mesh_nh, mesh_frontend_.getFullMeshVertices()));
+
+  mesh_frontend_thread_.reset(new std::thread(&DsgFrontend::runMeshFrontend, this));
+
+  mesh_sub_ = nh_.subscribe("voxblox_mesh", 5, &DsgFrontend::handleLatestMesh, this);
+}
+
+void DsgFrontend::runMeshFrontend() {
+  ros::Rate r(10);
+  bool have_new_mesh = false;
+  while (ros::ok() && !should_shutdown_) {
+    // identify if the places thread is waiting on a new mesh message to start running
+    // again
+    PlacesQueueState state = getPlacesQueueState();
+    bool places_has_newer_msg =
+        !state.empty && state.timestamp_ns > last_mesh_timestamp_;
+
+    if (last_mesh_timestamp_ > last_places_timestamp_ && !places_has_newer_msg) {
+      // the mesh thread is running ahead, so we sleep and spin for a little bit
+      r.sleep();
+      continue;
+    }
+
+    if (have_new_mesh && last_mesh_timestamp_ == last_places_timestamp_) {
+      ScopedTimer timer("frontend/place_mesh_mapping", true, 1, false);
+      updatePlaceMeshMapping();
+
+      dsg_->updated = true;
+      have_new_mesh = false;
+    }
+
+    voxblox_msgs::Mesh::ConstPtr msg;
+    {  // start mesh critical region
+      std::unique_lock<std::mutex> mesh_lock(mesh_frontend_mutex_);
+      msg = latest_mesh_msg_;
+    }  // end mesh critical region
+
+    if (!msg) {
+      // we don't have any work to do, wait for a little
+      r.sleep();
+      continue;
+    }
+
+    // let the places thread start working on queued messages before we process the
+    // latest mesh
+    last_mesh_timestamp_ = msg->header.stamp.toNSec();
+
+    // TODO(nathan) this probably doesn't do anything at the moment
+    mesh_frontend_ros_queue_->callAvailable(ros::WallDuration(0.0));
+
+    mesh_frontend_.voxbloxCallback(msg);
+    have_new_mesh = true;
+
+    // inform the mesh callback we can accept more meshes
+    {  // start mesh critical region
+      std::unique_lock<std::mutex> mesh_lock(mesh_frontend_mutex_);
+      latest_mesh_msg_.reset();
+    }
+
+    segmenter_->detectObjects(dsg_, mesh_frontend_.getActiveFullMeshVertices());
+    addPlaceObjectEdges();
+    dsg_->updated = true;
+
+    VLOG(2) << "[Object Detection] Object layer: "
+            << dsg_->graph->getLayer(KimeraDsgLayers::OBJECTS).value().get().numNodes()
+            << " nodes";
+  }
+}
+
+void DsgFrontend::startPlaces() {
+  active_places_sub_ =
+      nh_.subscribe("active_places", 5, &DsgFrontend::handleActivePlaces, this);
+
+  places_thread_.reset(new std::thread(&DsgFrontend::runPlaces, this));
+}
+
+PlacesQueueState DsgFrontend::getPlacesQueueState() {
+  std::unique_lock<std::mutex> places_lock(places_queue_mutex_);
+  if (places_queue_.empty()) {
+    return {};
+  }
+
+  return {false, places_queue_.front()->header.stamp.toNSec()};
+}
+
+void DsgFrontend::runPlaces() {
+  ros::Rate r(10);
+  while (ros::ok() && !should_shutdown_) {
+    PlacesQueueState state = getPlacesQueueState();
+    if (state.empty || state.timestamp_ns > last_mesh_timestamp_) {
+      // we only sleep if there's no pending work
+      r.sleep();
+      continue;
+    }
+
+    // we only peek at the current message (to gate mesh processing)
+    PlacesLayerMsg::ConstPtr curr_message;
+    {  // start places queue critical section
+      std::unique_lock<std::mutex> places_lock(places_queue_mutex_);
+      curr_message = places_queue_.front();
+    }  // end places queue critical section
+
+    processLatestPlacesMsg(curr_message);
+
+    // pop the most recently processed message (to inform mesh processing that the
+    // timestamp is valid)
+    {  // start places queue critical section
+      std::unique_lock<std::mutex> places_lock(places_queue_mutex_);
+      places_queue_.pop();
+    }  // end places queue critical section
+
+    last_places_timestamp_ = curr_message->header.stamp.toNSec();
+  }
+}
+
+void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
   SceneGraphLayer temp_layer(to_underlying(KimeraDsgLayers::PLACES));
   std::unique_ptr<SceneGraphLayer::Edges> edges =
       temp_layer.deserializeLayer(msg->layer_contents);
-  VLOG(1) << "[Places Frontend] Received " << temp_layer.numNodes() << " nodes and "
+  VLOG(3) << "[Places Frontend] Received " << temp_layer.numNodes() << " nodes and "
           << edges->size() << " edges from kimera_topology";
 
   NodeIdSet active_nodes;
   for (const auto& id_node_pair : temp_layer.nodes()) {
     active_nodes.insert(id_node_pair.first);
+    auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
+    attrs.is_active = true;
   }
 
   const SceneGraphLayer& places_layer =
-      scene_graph_->getLayer(KimeraDsgLayers::PLACES).value();
+      dsg_->graph->getLayer(KimeraDsgLayers::PLACES).value();
 
   NodeIdSet objects_to_check;
   {  // start graph update critical section
-    std::unique_lock<std::mutex> graph_lock(scene_graph_mutex_);
+    std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
     for (const auto& node_id : msg->deleted_nodes) {
-      if (scene_graph_->hasNode(node_id)) {
-        const SceneGraphNode& to_check = scene_graph_->getNode(node_id).value();
+      if (dsg_->graph->hasNode(node_id)) {
+        const SceneGraphNode& to_check = dsg_->graph->getNode(node_id).value();
         for (const auto& child : to_check.children()) {
           objects_to_check.insert(child);
         }
       }
-      scene_graph_->removeNode(node_id);
+      dsg_->graph->removeNode(node_id);
     }
 
     // TODO(nathan) figure out reindexing (for more logical node ids)
-    scene_graph_->updateFromLayer(temp_layer, std::move(edges));
+    dsg_->graph->updateFromLayer(temp_layer, std::move(edges));
 
     places_nn_finder_.reset(new NearestNodeFinder(places_layer, active_nodes));
   }  // end graph update critical section
 
   addPlaceObjectEdges(&objects_to_check);
+  dsg_->updated = true;
 
-  LOG(INFO) << "[Places Frontend] Places layer has " << places_layer.numNodes()
-            << " nodes and " << places_layer.numEdges() << " edges";
-
-  visualizer_->setGraphUpdated();
+  VLOG(3) << "[Places Frontend] Places layer: " << places_layer.numNodes() << " nodes, "
+          << places_layer.numEdges() << " edges";
 }
 
 void DsgFrontend::addPlaceObjectEdges(NodeIdSet* extra_objects_to_check) {
   {  // start graph update critical section
-    std::unique_lock<std::mutex> graph_lock(scene_graph_mutex_);
+    std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
     if (!places_nn_finder_) {
-      return; // haven't received places yet
+      return;  // haven't received places yet
     }
 
     NodeIdSet objects_to_check = segmenter_->getObjectsToCheckForPlaces();
@@ -149,14 +234,73 @@ void DsgFrontend::addPlaceObjectEdges(NodeIdSet* extra_objects_to_check) {
     }
 
     for (const auto& object_id : objects_to_check) {
-      const Eigen::Vector3d object_position = scene_graph_->getPosition(object_id);
-      places_nn_finder_->find(object_position, 1, false, [&](NodeId place_id, size_t, double) {
-        scene_graph_->insertEdge(place_id, object_id);
-      });
+      const Eigen::Vector3d object_position = dsg_->graph->getPosition(object_id);
+      places_nn_finder_->find(
+          object_position, 1, false, [&](NodeId place_id, size_t, double) {
+            dsg_->graph->insertEdge(place_id, object_id);
+          });
     }
 
-    segmenter_->pruneObjectsToCheckForPlaces();
+    segmenter_->pruneObjectsToCheckForPlaces(*dsg_->graph);
   }  // end graph update critical section
+}
+
+void DsgFrontend::updatePlaceMeshMapping() {
+  std::unique_lock<std::mutex> lock(dsg_->mutex);
+
+  const SceneGraphLayer& places_layer =
+      dsg_->graph->getLayer(KimeraDsgLayers::PLACES).value();
+
+  const auto& index_mapping = mesh_frontend_.getVoxbloxMsgMapping();
+
+  size_t nodes_visited = 0;
+  size_t total_connections = 0;
+  size_t num_block_invalid = 0;
+  size_t num_invalid = 0;
+  size_t num_valid = 0;
+  for (const auto& id_node_pair : places_layer.nodes()) {
+    auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
+    if (!attrs.is_active) {
+      continue;
+    }
+
+    if (attrs.voxblox_mesh_connections.empty()) {
+      continue;
+    }
+
+    nodes_visited++;
+
+    // reset connections (and mark inactive to avoid processing outside active window)
+    attrs.is_active = false;
+    attrs.pcl_mesh_connections.clear();
+    attrs.pcl_mesh_connections.reserve(attrs.voxblox_mesh_connections.size());
+
+    for (const auto& connection : attrs.voxblox_mesh_connections) {
+      total_connections++;
+      voxblox::BlockIndex index =
+          Eigen::Map<const voxblox::BlockIndex>(connection.block);
+      if (!index_mapping.count(index)) {
+        num_block_invalid++;
+        continue;
+      }
+
+      const auto& vertex_mapping = index_mapping.at(index);
+      if (!vertex_mapping.count(connection.vertex)) {
+        num_invalid++;
+        continue;
+      }
+
+      num_valid++;
+      attrs.pcl_mesh_connections.push_back(vertex_mapping.at(connection.vertex));
+    }
+  }
+
+  // TODO(nathan) prune removed blocks? requires more of a handshake with gvd integrator
+
+  VLOG(2) << "[DSG Frontend] Place-Mesh Update: " << std::endl
+          << "\tnodes: " << nodes_visited << " total: " << total_connections << " -> "
+          << num_valid << " valid, " << num_block_invalid << " block invalid, "
+          << num_invalid << " invalid";
 }
 
 }  // namespace incremental

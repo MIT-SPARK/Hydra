@@ -231,8 +231,12 @@ void addFreespaceEdge(SceneGraphLayer& graph,
     return;
   }
 
+  SceneGraphEdgeInfo::Ptr edge_info(new SceneGraphEdgeInfo());
+  edge_info->weighted = true;
+
   if (d <= r1 || d <= r2) {
-    graph.insertEdge(node, neighbor); // intersection is inside one node's sphere
+    edge_info->weight = std::min(r1, r2);
+    graph.insertEdge(node, neighbor, std::move(edge_info));  // intersection is inside one node's sphere
     return;
   }
 
@@ -245,7 +249,8 @@ void addFreespaceEdge(SceneGraphLayer& graph,
     return;
   }
 
-  graph.insertEdge(node, neighbor);
+  edge_info->weight = clearance;
+  graph.insertEdge(node, neighbor, std::move(edge_info));
 }
 
 }  // namespace topology

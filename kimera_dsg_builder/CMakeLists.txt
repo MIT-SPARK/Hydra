@@ -57,12 +57,16 @@ add_library(
   ${PROJECT_NAME}
   src/building_finder.cpp
   src/connectivity_utils.cpp
-  src/dsg_backend.cpp
+  src/dsg_update_functions.cpp
+  src/incremental_dsg_backend.cpp
   src/incremental_dsg_frontend.cpp
   src/incremental_mesh_segmenter.cpp
+  src/minimum_spanning_tree.cpp
   src/object_finder.cpp
   src/offline_dsg_builder.cpp
   src/room_finder.cpp
+  src/timing_utilities.cpp
+  src/visualizer_plugins.cpp
   src/voxblox_utils.cpp
   src/wall_finder.cpp
 )
@@ -76,6 +80,10 @@ target_link_libraries(${PROJECT_NAME}_offline_node ${PROJECT_NAME})
 add_executable(${PROJECT_NAME}_incremental_node src/incremental_dsg_builder_node.cpp)
 target_link_libraries(${PROJECT_NAME}_incremental_node ${PROJECT_NAME})
 
+add_executable(pose_graph_publisher_node src/pose_graph_publisher_node.cpp)
+target_include_directories(pose_graph_publisher_node PUBLIC ${catkin_INCLUDE_DIRS})
+target_link_libraries(pose_graph_publisher_node ${catkin_LIBRARIES} gtsam)
+
 # TODO(nathan) allow choice of sanitizer
 if(DSG_USE_ASAN)
   # TODO(nathan) later cmake has better options for this
@@ -87,16 +95,15 @@ if(DSG_USE_ASAN)
   )
 endif()
 
-# Add tests
 if(CATKIN_ENABLE_TESTING)
-  # TODO(nathan) clean up
-  find_package(rostest REQUIRED)
-  add_rostest_gtest(
-    testDsgOfflineBuilder tests/test_dsg_offline_builder.test
-    tests/utest_main.cpp tests/test_dynamic_scene_graph.cpp
-    tests/test_dynamic_scene_graph_evaluator.cpp
+  catkin_add_gtest(
+    utest_${PROJECT_NAME}
+    tests/utest_main.cpp
+    tests/utest_dsg_update_functions.cpp
+    tests/utest_minimum_spanning_tree.cpp
+    tests/utest_timing_utilities.cpp
   )
-  target_link_libraries(testDsgOfflineBuilder ${PROJECT_NAME})
+  target_link_libraries(utest_${PROJECT_NAME} ${PROJECT_NAME})
 endif()
 
 # TODO(nathan) handle install

@@ -1,0 +1,13 @@
+dsg:
+    add_places_to_deformation_graph: true
+    optimize_on_lc: true
+    rpgo_verbosity: "verbose"
+    rpgo_solver: "LM"
+pgmo:
+    run_mode: 0  # kimera_pgmo run mode FULL (required)
+    use_msg_time: false
+    embed_trajectory_delta_t: 5.0
+    rpgo:
+        translation_threshold: 0.1
+        rotation_threshold: 0.01
+        gnc_alpha: 0.9
