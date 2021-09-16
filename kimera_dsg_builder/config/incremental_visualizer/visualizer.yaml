@@ -1,5 +1,5 @@
 # general options
-layer_z_step: 3.0  # unit separation between layers
+layer_z_step: 4.5  # unit separation between layers
 # ratio of where the split from a single edge to the multiple edges to the mesh occurs.
 # 0 -> at the height of the mesh
 # 1 -> at the height of the object layer
@@ -9,7 +9,7 @@ mesh_layer_offset: 0.0
 # whether or not to apply offsets to each of the layers
 collapse_layers: false
 # color places by their distance to the nearest obstalce
-color_places_by_distance: true
+color_places_by_distance: false
 # minimum distance to clip to for places colormap
 places_colormap_min_distance: 0.0
 # maximum distance to clip to for places colormap

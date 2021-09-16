@@ -146,7 +146,7 @@ Visualization Manager:
     - Class: rviz/MarkerArray
       Enabled: true
       Marker Topic: /kimera_dsg_visualizer/bounding_boxes
-      Name: DSG Node Labels
+      Name: DSG Bounding Boxes
       Namespaces:
         {}
       Queue Size: 100
@@ -179,9 +179,10 @@ Visualization Manager:
     - Class: rviz/MarkerArray
       Enabled: true
       Marker Topic: /kimera_dsg_visualizer/instance_ids
-      Name: Dsg Bounding Boxes
+      Name: DSG Labels
       Namespaces:
         layer_2_bounding_boxes: true
+        layer_nodes_text: true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -252,25 +253,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 29.158525466918945
+      Distance: 36.91674041748047
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 2.682053565979004
-        Y: 0.05826100707054138
-        Z: 0.6917114853858948
+        X: 6.240083694458008
+        Y: -2.6863932609558105
+        Z: 4.966164588928223
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.6347962617874146
+      Pitch: 0.8247976899147034
       Target Frame: left_cam
       Value: Orbit (rviz)
-      Yaw: 3.7299985885620117
+      Yaw: 2.3218328952789307
     Saved: ~
 Window Geometry:
   Depth Image:

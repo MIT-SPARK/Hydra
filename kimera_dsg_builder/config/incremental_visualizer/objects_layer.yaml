@@ -25,10 +25,10 @@ dynamic_num_colors: 5
 dynamic_saturation: 0.9
 dynamic_luminance: 0.7
 dynamic_edge_sl_ratio: 0.6
-dynamic_marker_scale: 0.1
+dynamic_marker_scale: 0.25
 dynamic_marker_alpha: 0.9
 dynamic_use_sphere_marker: true
 dynamic_edge_scale: 0.04
 dynamic_edge_alpha: 0.9
-dynamic_label_height: 0.5
-dynamic_label_scale: 0.4
+dynamic_label_height: 0.9
+dynamic_label_scale: 0.8

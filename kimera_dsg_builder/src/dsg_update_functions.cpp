@@ -1,4 +1,5 @@
 #include "kimera_dsg_builder/dsg_update_functions.h"
+#include "kimera_dsg_builder/incremental_room_finder.h"
 #include "kimera_dsg_builder/pcl_types.h"
 
 #include <gtsam/geometry/Pose3.h>
@@ -76,6 +77,7 @@ void updatePlaces(const DynamicSceneGraph& graph,
   }
 }
 
+// TODO(nathan) add unit test for this
 void updateRooms(const DynamicSceneGraph& graph,
                  const gtsam::Values&,
                  const gtsam::Values&) {
@@ -83,7 +85,10 @@ void updateRooms(const DynamicSceneGraph& graph,
     return;
   }
 
-  // TODO(nathan) fill this out once we have room detecction
+  const SceneGraphLayer& rooms = graph.getLayer(KimeraDsgLayers::ROOMS).value();
+  for (const auto& id_node_pair : rooms.nodes()) {
+    incremental::updateRoomCentroid(graph, id_node_pair.first);
+  }
 }
 
 void updateBuildings(const DynamicSceneGraph& graph,

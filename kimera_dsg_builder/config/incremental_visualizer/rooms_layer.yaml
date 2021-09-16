@@ -12,10 +12,10 @@ use_bounding_box: false
 bounding_box_alpha: 0.5
 # edges
 use_edge_source: false
-interlayer_edge_scale: 0.1
-interlayer_edge_alpha: 0.6
+interlayer_edge_scale: 0.08
+interlayer_edge_alpha: 0.4
 interlayer_edge_use_color: true
-interlayer_edge_insertion_skip: 20
+interlayer_edge_insertion_skip: 1
 intralayer_edge_scale: 0.1
 intralayer_edge_alpha: 0.8
 intralayer_edge_use_color: false

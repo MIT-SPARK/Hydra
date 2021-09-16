@@ -3,3 +3,4 @@
 *.ccls*
 *.vscode/
 *.ipynb_checkpoints/
+*.ipynb

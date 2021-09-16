@@ -29,6 +29,7 @@
   <depend>object_db</depend>
   <depend>voxblox</depend>
   <depend>voxblox_ros</depend>
+  <depend>libarmadillo_dev</depend>
   <!-- TODO(nathan) invert this dependency -->
   <!--<depend>graph_cmr_ros</depend> -->
 

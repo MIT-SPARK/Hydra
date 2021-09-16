@@ -1,5 +1,6 @@
 #pragma once
 #include "kimera_dsg_builder/incremental_mesh_segmenter.h"
+#include "kimera_dsg_builder/incremental_room_finder.h"
 #include "kimera_dsg_builder/incremental_types.h"
 
 #include <ros/callback_queue.h>
@@ -49,7 +50,11 @@ class DsgFrontend {
 
   PlacesQueueState getPlacesQueueState();
 
-  void processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg);
+  NodeIdSet processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg);
+
+  ActiveNodeSet getNodesForRoomDetection(const NodeIdSet& latest_places);
+
+  void storeUnlabeledPlaces(const ActiveNodeSet active_nodes);
 
   void addPlaceObjectEdges(NodeIdSet* extra_objects_to_check = nullptr);
 
@@ -77,7 +82,9 @@ class DsgFrontend {
 
   ros::Subscriber active_places_sub_;
   std::unique_ptr<NearestNodeFinder> places_nn_finder_;
+  std::unique_ptr<RoomFinder> room_finder_;
   std::unique_ptr<std::thread> places_thread_;
+  NodeIdSet unlabeled_place_nodes_;
 };
 
 }  // namespace incremental

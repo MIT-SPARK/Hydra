@@ -131,9 +131,60 @@ void DsgFrontend::runMeshFrontend() {
   }
 }
 
+template <typename T>
+void parseParam(const ros::NodeHandle& nh, const std::string& name, T& param) {
+  int value = param;
+  nh.getParam(name, value);
+  param = value;
+}
+
+void parseRoomClusterMode(const ros::NodeHandle& nh,
+                          const std::string& name,
+                          RoomFinder::Config::ClusterMode& param) {
+  std::string clustering_mode = "MODULARITY";
+  nh.getParam(name, clustering_mode);
+
+  std::string to_check = clustering_mode;
+  std::transform(to_check.begin(), to_check.end(), to_check.begin(), [](const auto& c) {
+    return std::toupper(c);
+  });
+
+  if (to_check == "SPECTRAL") {
+    param = RoomFinder::Config::ClusterMode::SPECTRAL;
+  } else if (to_check == "MODULARITY") {
+    param = RoomFinder::Config::ClusterMode::MODULARITY;
+  } else if (to_check == "NONE") {
+    param = RoomFinder::Config::ClusterMode::NONE;
+  } else {
+    ROS_ERROR_STREAM("Unrecognized room clustering mode: " << to_check
+                                                           << ". Defaulting to NONE");
+    param = RoomFinder::Config::ClusterMode::NONE;
+  }
+}
+
 void DsgFrontend::startPlaces() {
   active_places_sub_ =
       nh_.subscribe("active_places", 5, &DsgFrontend::handleActivePlaces, this);
+
+  bool enable_rooms = true;
+  nh_.getParam("enable_rooms", enable_rooms);
+  if (enable_rooms) {
+    // TODO(nathan) clean up
+    RoomFinder::Config config;
+    nh_.getParam("room_finder/min_dilation_m", config.min_dilation_m);
+    nh_.getParam("room_finder/max_dilation_m", config.max_dilation_m);
+    parseParam(nh_, "room_finder/num_steps", config.num_steps);
+    parseParam(nh_, "room_finder/min_component_size", config.min_component_size);
+    parseParam(nh_, "room_finder/max_kmeans_iters", config.max_kmeans_iters);
+    parseParam(nh_, "room_finder/min_room_size", config.min_room_size);
+    nh_.getParam("room_finder/room_vote_min_overlap", config.room_vote_min_overlap);
+    nh_.getParam("room_finder/use_sparse_eigen_decomp", config.use_sparse_eigen_decomp);
+    nh_.getParam("room_finder/sparse_decomp_tolerance", config.sparse_decomp_tolerance);
+    nh_.getParam("room_finder/max_modularity_iters", config.max_modularity_iters);
+    nh_.getParam("room_finder/modularity_gamma", config.modularity_gamma);
+    parseRoomClusterMode(nh_, "room_finder/clustering_mode", config.clustering_mode);
+    room_finder_.reset(new RoomFinder(config));
+  }
 
   places_thread_.reset(new std::thread(&DsgFrontend::runPlaces, this));
 }
@@ -145,6 +196,51 @@ PlacesQueueState DsgFrontend::getPlacesQueueState() {
   }
 
   return {false, places_queue_.front()->header.stamp.toNSec()};
+}
+
+ActiveNodeSet DsgFrontend::getNodesForRoomDetection(const NodeIdSet& latest_places) {
+  std::unordered_set<NodeId> active_places(latest_places.begin(), latest_places.end());
+
+  // TODO(nathan) this is threadsafe as long as places and rooms are on the same thread
+  // TODO(nathan) grab this from a set of active rooms
+  const SceneGraphLayer& rooms =
+      dsg_->graph->getLayer(static_cast<LayerId>(KimeraDsgLayers::ROOMS)).value();
+  for (const auto& id_node_pair : rooms.nodes()) {
+    active_places.insert(id_node_pair.second->children().begin(),
+                         id_node_pair.second->children().end());
+  }
+
+  // TODO(nathan) this is threadsafe as long as places and rooms are on the same thread
+  const SceneGraphLayer& places =
+      dsg_->graph->getLayer(static_cast<LayerId>(KimeraDsgLayers::PLACES)).value();
+  for (const auto& node_id : unlabeled_place_nodes_) {
+    if (!places.hasNode(node_id)) {
+      continue;
+    }
+
+    active_places.insert(node_id);
+  }
+
+  return active_places;
+}
+
+void DsgFrontend::storeUnlabeledPlaces(const ActiveNodeSet active_nodes) {
+  // TODO(nathan) this is threadsafe as long as places and rooms are on the same thread
+  const SceneGraphLayer& places =
+      dsg_->graph->getLayer(static_cast<LayerId>(KimeraDsgLayers::PLACES)).value();
+
+  unlabeled_place_nodes_.clear();
+  for (const auto& node_id : active_nodes) {
+    if (!places.hasNode(node_id)) {
+      continue;
+    }
+
+    if (places.getNode(node_id)->get().hasParent()) {
+      continue;
+    }
+
+    unlabeled_place_nodes_.insert(node_id);
+  }
 }
 
 void DsgFrontend::runPlaces() {
@@ -164,7 +260,14 @@ void DsgFrontend::runPlaces() {
       curr_message = places_queue_.front();
     }  // end places queue critical section
 
-    processLatestPlacesMsg(curr_message);
+    NodeIdSet latest_places = processLatestPlacesMsg(curr_message);
+
+    if (room_finder_) {
+      ScopedTimer timer("frontend/room_detection", true, 0, false);
+      ActiveNodeSet active_place_nodes = getNodesForRoomDetection(latest_places);
+      room_finder_->findRooms(*dsg_, active_place_nodes);
+      storeUnlabeledPlaces(active_place_nodes);
+    }
 
     // pop the most recently processed message (to inform mesh processing that the
     // timestamp is valid)
@@ -177,7 +280,8 @@ void DsgFrontend::runPlaces() {
   }
 }
 
-void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
+DsgFrontend::NodeIdSet DsgFrontend::processLatestPlacesMsg(
+    const PlacesLayerMsg::ConstPtr& msg) {
   SceneGraphLayer temp_layer(to_underlying(KimeraDsgLayers::PLACES));
   std::unique_ptr<SceneGraphLayer::Edges> edges =
       temp_layer.deserializeLayer(msg->layer_contents);
@@ -194,6 +298,7 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
   const SceneGraphLayer& places_layer =
       dsg_->graph->getLayer(KimeraDsgLayers::PLACES).value();
 
+  NodeIdSet rooms_to_check;
   NodeIdSet objects_to_check;
   {  // start graph update critical section
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
@@ -203,6 +308,11 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
         for (const auto& child : to_check.children()) {
           objects_to_check.insert(child);
         }
+
+        std::optional<NodeId> parent = to_check.getParent();
+        if (parent) {
+          rooms_to_check.insert(*parent);
+        }
       }
       dsg_->graph->removeNode(node_id);
     }
@@ -211,6 +321,27 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
     dsg_->graph->updateFromLayer(temp_layer, std::move(edges));
 
     places_nn_finder_.reset(new NearestNodeFinder(places_layer, active_nodes));
+
+    for (const auto& node_id : rooms_to_check) {
+      if (!dsg_->graph->getNode(node_id).value().get().hasChildren()) {
+        dsg_->graph->removeNode(node_id);
+      }
+    }
+
+    // TODO(nathan) use active nodes or copy color before update
+    for (const auto& id_node_pair : places_layer.nodes()) {
+      const auto& node = *id_node_pair.second;
+      if (node.hasParent()) {
+        node.attributes<SemanticNodeAttributes>().color =
+            dsg_->graph->getNode(*node.getParent())
+                .value()
+                .get()
+                .attributes<SemanticNodeAttributes>()
+                .color;
+      } else {
+        node.attributes<SemanticNodeAttributes>().color = NodeColor::Zero();
+      }
+    }
   }  // end graph update critical section
 
   addPlaceObjectEdges(&objects_to_check);
@@ -218,6 +349,8 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
 
   VLOG(3) << "[Places Frontend] Places layer: " << places_layer.numNodes() << " nodes, "
           << places_layer.numEdges() << " edges";
+
+  return active_nodes;
 }
 
 void DsgFrontend::addPlaceObjectEdges(NodeIdSet* extra_objects_to_check) {
@@ -253,11 +386,7 @@ void DsgFrontend::updatePlaceMeshMapping() {
 
   const auto& index_mapping = mesh_frontend_.getVoxbloxMsgMapping();
 
-  size_t nodes_visited = 0;
-  size_t total_connections = 0;
-  size_t num_block_invalid = 0;
   size_t num_invalid = 0;
-  size_t num_valid = 0;
   for (const auto& id_node_pair : places_layer.nodes()) {
     auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
     if (!attrs.is_active) {
@@ -268,19 +397,16 @@ void DsgFrontend::updatePlaceMeshMapping() {
       continue;
     }
 
-    nodes_visited++;
-
     // reset connections (and mark inactive to avoid processing outside active window)
     attrs.is_active = false;
     attrs.pcl_mesh_connections.clear();
     attrs.pcl_mesh_connections.reserve(attrs.voxblox_mesh_connections.size());
 
     for (const auto& connection : attrs.voxblox_mesh_connections) {
-      total_connections++;
       voxblox::BlockIndex index =
           Eigen::Map<const voxblox::BlockIndex>(connection.block);
       if (!index_mapping.count(index)) {
-        num_block_invalid++;
+        num_invalid++;
         continue;
       }
 
@@ -290,17 +416,16 @@ void DsgFrontend::updatePlaceMeshMapping() {
         continue;
       }
 
-      num_valid++;
       attrs.pcl_mesh_connections.push_back(vertex_mapping.at(connection.vertex));
     }
   }
 
   // TODO(nathan) prune removed blocks? requires more of a handshake with gvd integrator
 
-  VLOG(2) << "[DSG Frontend] Place-Mesh Update: " << std::endl
-          << "\tnodes: " << nodes_visited << " total: " << total_connections << " -> "
-          << num_valid << " valid, " << num_block_invalid << " block invalid, "
-          << num_invalid << " invalid";
+  if (num_invalid) {
+    LOG(ERROR) << "[DSG Frontend] Place-Mesh Update: " << num_invalid
+               << " invalid connections";
+  }
 }
 
 }  // namespace incremental

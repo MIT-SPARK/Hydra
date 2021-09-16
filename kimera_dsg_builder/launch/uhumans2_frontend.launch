@@ -40,6 +40,7 @@
         <param name="log_path" value="$(arg pgmo_log_path)"/>
         <param name="log_output" value="$(arg pgmo_should_log)"/>
         <rosparam file="$(find kimera_dsg_builder)/config/pgmo_frontend_config.yaml"/>
+        <rosparam file="$(find kimera_dsg_builder)/config/dsg_frontend_config.yaml"/>
         <rosparam file="$(find kimera_dsg_builder)/config/dsg_backend_config.yaml"/>
 
         <param name="use_oriented_bounding_boxes" value="$(arg use_oriented_bounding_boxes)"/>

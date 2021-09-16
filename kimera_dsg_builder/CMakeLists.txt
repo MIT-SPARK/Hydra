@@ -61,6 +61,7 @@ add_library(
   src/incremental_dsg_backend.cpp
   src/incremental_dsg_frontend.cpp
   src/incremental_mesh_segmenter.cpp
+  src/incremental_room_finder.cpp
   src/minimum_spanning_tree.cpp
   src/object_finder.cpp
   src/offline_dsg_builder.cpp
@@ -71,7 +72,7 @@ add_library(
   src/wall_finder.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} gtsam)
+target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} gtsam armadillo)
 add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
 
 add_executable(${PROJECT_NAME}_offline_node src/kimera_dsg_builder_offline_node.cpp)
@@ -91,7 +92,13 @@ if(DSG_USE_ASAN)
       "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address -fno-omit-frame-pointer"
   )
   target_compile_options(
+    ${PROJECT_NAME} PUBLIC -fsanitize=address -fno-omit-frame-pointer
+  )
+  target_compile_options(
     ${PROJECT_NAME}_offline_node PUBLIC -fsanitize=address -fno-omit-frame-pointer
+  )
+  target_compile_options(
+    ${PROJECT_NAME}_incremental_node PUBLIC -fsanitize=address -fno-omit-frame-pointer
   )
 endif()
 
@@ -100,6 +107,7 @@ if(CATKIN_ENABLE_TESTING)
     utest_${PROJECT_NAME}
     tests/utest_main.cpp
     tests/utest_dsg_update_functions.cpp
+    tests/utest_incremental_room_finder.cpp
     tests/utest_minimum_spanning_tree.cpp
     tests/utest_timing_utilities.cpp
   )
