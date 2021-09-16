@@ -137,7 +137,7 @@ void DsgBackend::startVisualizer() {
 }
 
 void DsgBackend::runVisualizer() {
-  ros::WallRate r(10);
+  ros::WallRate r(5);
   while (ros::ok() && !should_shutdown_) {
     // process any config changes
     visualizer_queue_->callAvailable(ros::WallDuration(0));

@@ -738,15 +738,6 @@ void RoomFinder::findRooms(SharedDsgInfo& dsg, const ActiveNodeSet& active_nodes
 
     previous_rooms = getPreviousPlaceRoomMap(*dsg.graph, *active_places);
 
-    // pre-clear old edges to active nodes
-    for (const auto& node_id : active_nodes) {
-      const SceneGraphNode& node = dsg.graph->getNode(node_id).value();
-      std::optional<NodeId> parent = node.getParent();
-      if (parent) {
-        dsg.graph->removeEdge(node_id, *parent);
-        node.attributes<SemanticNodeAttributes>().color = NodeColor::Zero();
-      }
-    }
   }  // end dsg critical section
 
   std::vector<double> thresholds = getThresholds();
@@ -804,6 +795,19 @@ void RoomFinder::findRooms(SharedDsgInfo& dsg, const ActiveNodeSet& active_nodes
     }
     return;
   }
+
+  {  // start dsg critical section
+    std::unique_lock<std::mutex> graph_lock(dsg.mutex);
+    // pre-clear old edges to active nodes
+    for (const auto& node_id : active_nodes) {
+      const SceneGraphNode& node = dsg.graph->getNode(node_id).value();
+      std::optional<NodeId> parent = node.getParent();
+      if (parent) {
+        dsg.graph->removeEdge(node_id, *parent);
+        node.attributes<SemanticNodeAttributes>().color = NodeColor::Zero();
+      }
+    }
+  } // end dsg critical section
 
   std::map<NodeId, size_t> rooms_to_clusters =
       mapRoomsToClusters(clusters, previous_rooms, config_.room_vote_min_overlap);

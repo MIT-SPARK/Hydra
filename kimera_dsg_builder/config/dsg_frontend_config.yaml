@@ -1,4 +1,5 @@
 enable_rooms: true
+building_color: [0.572, 0.204, 0.922]
 room_finder:
     min_dilation_m: 0.43
     max_dilation_m: 1.2

@@ -60,6 +60,8 @@ class DsgFrontend {
 
   void updatePlaceMeshMapping();
 
+  void updateBuildingNode();
+
  private:
   ros::NodeHandle nh_;
   std::atomic<bool> should_shutdown_{false};
@@ -85,6 +87,8 @@ class DsgFrontend {
   std::unique_ptr<RoomFinder> room_finder_;
   std::unique_ptr<std::thread> places_thread_;
   NodeIdSet unlabeled_place_nodes_;
+
+  SemanticNodeAttributes::ColorVector building_color_;
 };
 
 }  // namespace incremental
