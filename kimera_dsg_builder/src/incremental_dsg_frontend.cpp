@@ -217,8 +217,7 @@ ActiveNodeSet DsgFrontend::getNodesForRoomDetection(const NodeIdSet& latest_plac
 
   // TODO(nathan) this is threadsafe as long as places and rooms are on the same thread
   // TODO(nathan) grab this from a set of active rooms
-  const SceneGraphLayer& rooms =
-      dsg_->graph->getLayer(static_cast<LayerId>(KimeraDsgLayers::ROOMS)).value();
+  const SceneGraphLayer& rooms = dsg_->graph->getLayer(KimeraDsgLayers::ROOMS).value();
   for (const auto& id_node_pair : rooms.nodes()) {
     active_places.insert(id_node_pair.second->children().begin(),
                          id_node_pair.second->children().end());
@@ -226,7 +225,7 @@ ActiveNodeSet DsgFrontend::getNodesForRoomDetection(const NodeIdSet& latest_plac
 
   // TODO(nathan) this is threadsafe as long as places and rooms are on the same thread
   const SceneGraphLayer& places =
-      dsg_->graph->getLayer(static_cast<LayerId>(KimeraDsgLayers::PLACES)).value();
+      dsg_->graph->getLayer(KimeraDsgLayers::PLACES).value();
   for (const auto& node_id : unlabeled_place_nodes_) {
     if (!places.hasNode(node_id)) {
       continue;
@@ -241,7 +240,7 @@ ActiveNodeSet DsgFrontend::getNodesForRoomDetection(const NodeIdSet& latest_plac
 void DsgFrontend::storeUnlabeledPlaces(const ActiveNodeSet active_nodes) {
   // TODO(nathan) this is threadsafe as long as places and rooms are on the same thread
   const SceneGraphLayer& places =
-      dsg_->graph->getLayer(static_cast<LayerId>(KimeraDsgLayers::PLACES)).value();
+      dsg_->graph->getLayer(KimeraDsgLayers::PLACES).value();
 
   unlabeled_place_nodes_.clear();
   for (const auto& node_id : active_nodes) {
@@ -298,7 +297,7 @@ void DsgFrontend::runPlaces() {
 
 DsgFrontend::NodeIdSet DsgFrontend::processLatestPlacesMsg(
     const PlacesLayerMsg::ConstPtr& msg) {
-  SceneGraphLayer temp_layer(to_underlying(KimeraDsgLayers::PLACES));
+  SceneGraphLayer temp_layer(KimeraDsgLayers::PLACES);
   std::unique_ptr<SceneGraphLayer::Edges> edges =
       temp_layer.deserializeLayer(msg->layer_contents);
   VLOG(3) << "[Places Frontend] Received " << temp_layer.numNodes() << " nodes and "
@@ -470,9 +469,8 @@ void DsgFrontend::updateBuildingNode() {
     attrs->color = building_color_;
     attrs->semantic_label = kBuildingSemanticLabel;
     attrs->name = building_node_id.getLabel();
-    dsg_->graph->emplaceNode(static_cast<LayerId>(KimeraDsgLayers::BUILDINGS),
-                             building_node_id,
-                             std::move(attrs));
+    dsg_->graph->emplaceNode(
+        KimeraDsgLayers::BUILDINGS, building_node_id, std::move(attrs));
   } else {
     dsg_->graph->getNode(building_node_id)->get().attributes().position = centroid;
   }

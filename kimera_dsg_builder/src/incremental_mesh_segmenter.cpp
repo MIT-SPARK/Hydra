@@ -87,7 +87,7 @@ MeshSegmenter::MeshSegmenter(const ros::NodeHandle& nh,
   bool use_oriented_bounding_boxes = false;
   nh_.getParam("use_oriented_bounding_boxes", use_oriented_bounding_boxes);
   bounding_box_type_ =
-      use_oriented_bounding_boxes ? BoundingBox::Type::OBB : BoundingBox::Type::AABB;
+      use_oriented_bounding_boxes ? BoundingBox::Type::RAABB : BoundingBox::Type::AABB;
 
   semantic_config_ = getSemanticTsdfIntegratorConfigFromRosParam(nh_);
   CHECK(semantic_config_.semantic_label_to_color_);
@@ -280,8 +280,7 @@ void MeshSegmenter::addObjectToGraph(DynamicSceneGraph& graph,
   cluster.centroid.get(centroid);
   attrs->position << centroid.x, centroid.y, centroid.z;
 
-  graph.emplaceNode(
-      to_underlying(KimeraDsgLayers::OBJECTS), next_node_id_, std::move(attrs));
+  graph.emplaceNode(KimeraDsgLayers::OBJECTS, next_node_id_, std::move(attrs));
 
   active_objects_.at(label).insert(next_node_id_);
   active_object_timestamps_[next_node_id_] = timestamp;

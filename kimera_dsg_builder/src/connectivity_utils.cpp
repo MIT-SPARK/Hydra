@@ -12,9 +12,9 @@ using Node = SceneGraph::Node;
 
 void findRoomConnectivity(SceneGraph* scene_graph) {
   CHECK_NOTNULL(scene_graph);
-  CHECK(scene_graph->hasLayer(to_underlying(KimeraDsgLayers::PLACES)));
+  CHECK(scene_graph->hasLayer(KimeraDsgLayers::PLACES));
   const SceneGraphLayer& places_layer =
-      *(scene_graph->getLayer(to_underlying(KimeraDsgLayers::PLACES)));
+      *(scene_graph->getLayer(KimeraDsgLayers::PLACES));
 
   for (const auto& edge : places_layer.edges()) {
     const Node& source = *(scene_graph->getNode(edge.second.source));
@@ -75,10 +75,9 @@ void findPlacesRoomConnectivity(SceneGraph* scene_graph,
                                 float esdf_truncation_distance) {
   CHECK_NOTNULL(scene_graph);
 
-  const SceneGraphLayer& room_layer =
-      *(scene_graph->getLayer(to_underlying(KimeraDsgLayers::ROOMS)));
+  const SceneGraphLayer& room_layer = *(scene_graph->getLayer(KimeraDsgLayers::ROOMS));
   const SceneGraphLayer& places_layer =
-      *(scene_graph->getLayer(to_underlying(KimeraDsgLayers::PLACES)));
+      *(scene_graph->getLayer(KimeraDsgLayers::PLACES));
 
   // Create cloud of the graph, make sure indices are 1-to-1
   PclLayer<ColorPointCloud> places_pcl =
@@ -230,13 +229,13 @@ std::optional<NodeId> findNearestPlace(const pcl::KdTreeFLANN<ColorPoint>& kd_tr
 void findObjectPlaceConnectivity(SceneGraph* scene_graph) {
   CHECK_NOTNULL(scene_graph);
 
-  CHECK(scene_graph->hasLayer(to_underlying(KimeraDsgLayers::OBJECTS)));
+  CHECK(scene_graph->hasLayer(KimeraDsgLayers::OBJECTS));
   const SceneGraphLayer& objects_layer =
-      *(scene_graph->getLayer(to_underlying(KimeraDsgLayers::OBJECTS)));
+      *(scene_graph->getLayer(KimeraDsgLayers::OBJECTS));
 
-  CHECK(scene_graph->hasLayer(to_underlying(KimeraDsgLayers::PLACES)));
+  CHECK(scene_graph->hasLayer(KimeraDsgLayers::PLACES));
   const SceneGraphLayer& places_layer =
-      *(scene_graph->getLayer(to_underlying(KimeraDsgLayers::PLACES)));
+      *(scene_graph->getLayer(KimeraDsgLayers::PLACES));
   if (places_layer.nodes().empty()) {
     LOG(WARNING) << "Empty places layer: will not have interlayer edges between places "
                     "and objects";

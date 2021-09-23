@@ -161,7 +161,7 @@ RoomHullMap updateSceneGraph(const RoomPclClusters& room_clusters,
     cloud_centroid_pair.second.get(centroid);
     room_attrs->position << centroid.x, centroid.y, centroid.z;
 
-    scene_graph->emplaceNode(to_underlying(KimeraDsgLayers::ROOMS),
+    scene_graph->emplaceNode(KimeraDsgLayers::ROOMS,
                              next_room_id,
                              std::move(room_attrs));
 

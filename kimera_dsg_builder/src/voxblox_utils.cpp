@@ -148,8 +148,7 @@ void makePlacesFromTsdf(const VoxbloxConfig& config,
     const SceneGraphNode& other_node = *id_node_pair.second;
     PlaceNodeAttributes::Ptr new_attrs(
         new PlaceNodeAttributes(other_node.attributes<PlaceNodeAttributes>()));
-    graph->emplaceNode(
-        to_underlying(KimeraDsgLayers::PLACES), other_node.id, std::move(new_attrs));
+    graph->emplaceNode(KimeraDsgLayers::PLACES, other_node.id, std::move(new_attrs));
   }
 
   for (const auto& id_edge_pair : places_layer.edges()) {

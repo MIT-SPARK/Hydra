@@ -2,6 +2,10 @@
 #include <kimera_dsg_visualizer/dsg_visualizer_plugin.h>
 #include <kimera_dsg_visualizer/visualizer_types.h>
 #include <kimera_pgmo/DeformationGraph.h>
+
+#include <voxblox/core/common.h>
+#include <voxblox/core/block_hash.h>
+#include <voxblox_msgs/Mesh.h>
 #include <visualization_msgs/Marker.h>
 
 namespace kimera {
@@ -9,7 +13,6 @@ namespace kimera {
 struct PMGraphPluginConfig {
   explicit PMGraphPluginConfig(const ros::NodeHandle& nh);
 
-  std::string frame = "world";
   double mesh_edge_scale = 0.005;
   double mesh_edge_alpha = 0.8;
   double mesh_marker_scale = 0.1;
@@ -17,6 +20,30 @@ struct PMGraphPluginConfig {
   NodeColor leaf_color;
   NodeColor interior_color;
   LayerConfig layer_config;
+};
+
+class PgmoMeshPlugin : public DsgVisualizerPlugin {
+ public:
+  PgmoMeshPlugin(const ros::NodeHandle& nh, const std::string& name);
+
+  virtual ~PgmoMeshPlugin() = default;
+
+  void draw(const std_msgs::Header& header, const DynamicSceneGraph& graph) override;
+
+ protected:
+  ros::Publisher mesh_pub_;
+};
+
+class VoxbloxMeshPlugin : public DsgVisualizerPlugin {
+ public:
+  VoxbloxMeshPlugin(const ros::NodeHandle& nh, const std::string& name);
+
+  virtual ~VoxbloxMeshPlugin() = default;
+
+  void draw(const std_msgs::Header& header, const DynamicSceneGraph& graph) override;
+
+ protected:
+  ros::Publisher mesh_pub_;
 };
 
 class MeshPlaceConnectionsPlugin : public DsgVisualizerPlugin {
@@ -28,7 +55,7 @@ class MeshPlaceConnectionsPlugin : public DsgVisualizerPlugin {
 
   virtual ~MeshPlaceConnectionsPlugin() = default;
 
-  void draw(const DynamicSceneGraph& graph) override;
+  void draw(const std_msgs::Header& header, const DynamicSceneGraph& graph) override;
 
  protected:
   ros::Publisher marker_pub_;

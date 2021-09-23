@@ -11,19 +11,16 @@ namespace kimera {
 using NodeColor = SemanticNodeAttributes::ColorVector;
 using Node = SceneGraph::Node;
 
-pcl::PolygonMesh::Ptr findWalls(const SubMesh& mesh,
-                                const SceneGraph& scene_graph) {
+pcl::PolygonMesh::Ptr findWalls(const SubMesh& mesh, const SceneGraph& scene_graph) {
   // Create cloud of the places so we can do nearest neighbor queries
-  CHECK(scene_graph.hasLayer(to_underlying(KimeraDsgLayers::PLACES)));
-  const SceneGraphLayer& layer =
-      *(scene_graph.getLayer(to_underlying(KimeraDsgLayers::PLACES)));
+  CHECK(scene_graph.hasLayer(KimeraDsgLayers::PLACES));
+  const SceneGraphLayer& layer = *(scene_graph.getLayer(KimeraDsgLayers::PLACES));
   if (layer.nodes().empty()) {
     LOG(WARNING) << "Places layer empty: cannot cluster wall vertices to rooms";
     return nullptr;
   }
 
-  PclLayer<ColorPointCloud> pcl_layer =
-      convertLayerToPcl<ColorPointCloud>(layer);
+  PclLayer<ColorPointCloud> pcl_layer = convertLayerToPcl<ColorPointCloud>(layer);
 
   Eigen::MatrixXd normals = getNormals(*mesh.mesh, *mesh.vertices);
   ColorPointCloud segmented_vertices(*mesh.vertices);
@@ -70,14 +67,12 @@ pcl::PolygonMesh::Ptr findWalls(const SubMesh& mesh,
         continue;
       }
 
-      CHECK_LT(nn_indices.at(i),
-               static_cast<int>(pcl_layer.cloud_to_layer_ids.size()));
+      CHECK_LT(nn_indices.at(i), static_cast<int>(pcl_layer.cloud_to_layer_ids.size()));
       auto nearest_node_idx = pcl_layer.cloud_to_layer_ids[nn_indices.at(i)];
       const Node& nearest_node = *(scene_graph.getNode(nearest_node_idx));
       Eigen::Vector3d node_pos = nearest_node.attributes().position;
 
-      Eigen::Vector3d direction =
-          node_pos - toEigen(segmented_vertices.at(idx));
+      Eigen::Vector3d direction = node_pos - toEigen(segmented_vertices.at(idx));
       double cos_normal_angle = normals.block<3, 1>(idx, 0).dot(direction);
       if (cos_normal_angle <= 0.0) {
         num_outside++;
@@ -112,9 +107,8 @@ pcl::PolygonMesh::Ptr findWalls(const SubMesh& mesh,
 
     if (room_id_votes.empty() || !scene_graph.hasNode(max_room_id)) {
       if (!room_id_votes.empty()) {
-        LOG_FIRST_N(WARNING, 10)
-            << "Room ID: " << NodeSymbol(max_room_id)
-            << " -> raw: " << max_room_id << " is not in graph";
+        LOG_FIRST_N(WARNING, 10) << "Room ID: " << NodeSymbol(max_room_id)
+                                 << " -> raw: " << max_room_id << " is not in graph";
       }
       default_vertices++;
       segmented_point.r = 0;
@@ -133,8 +127,7 @@ pcl::PolygonMesh::Ptr findWalls(const SubMesh& mesh,
     // TODO(Toni): Ideally we should update the scene graph at this stage
   }
   VLOG(1) << "Clustered wall vertices: " << labeled_vertices << " (labeled) "
-          << unlabeled_vertices << " (unlabeled) " << default_vertices
-          << " (default)";
+          << unlabeled_vertices << " (unlabeled) " << default_vertices << " (default)";
 
   pcl::PolygonMesh::Ptr segmented_mesh(new pcl::PolygonMesh());
   pcl::toPCLPointCloud2(segmented_vertices, segmented_mesh->cloud);

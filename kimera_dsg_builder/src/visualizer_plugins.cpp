@@ -5,6 +5,9 @@
 #include <kimera_dsg_visualizer/colormap_utils.h>
 #include <kimera_dsg_visualizer/visualizer_utils.h>
 
+#include <mesh_msgs/TriangleMesh.h>
+#include <mesh_msgs/TriangleMeshStamped.h>
+
 #include <tf2_eigen/tf2_eigen.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -44,6 +47,148 @@ PMGraphPluginConfig::PMGraphPluginConfig(const ros::NodeHandle& nh) {
       255 * interior_color_float[2];
 
   layer_config = getLayerConfig(nh.resolveName("graph"));
+}
+
+#undef READ_PARAM
+
+PgmoMeshPlugin::PgmoMeshPlugin(const ros::NodeHandle& nh, const std::string& name)
+    : DsgVisualizerPlugin(nh, name) {
+  // namespacing gives us a reasonable topic
+  mesh_pub_ = nh_.advertise<mesh_msgs::TriangleMeshStamped>("", 1, true);
+}
+
+void PgmoMeshPlugin::draw(const std_msgs::Header& header,
+                          const DynamicSceneGraph& graph) {
+  if (!graph.hasMesh()) {
+    ROS_ERROR("Attempting to visualize unitialized mesh");
+    return;
+  }
+
+  mesh_msgs::TriangleMeshStamped msg;
+  msg.header = header;
+
+  // vertices and meshes are guaranteed to not be null (from hasMesh)
+  msg.mesh = kimera_pgmo::PolygonMeshToTriangleMeshMsg(*graph.getMeshVertices(),
+                                                       *graph.getMeshFaces());
+  mesh_pub_.publish(msg);
+}
+
+VoxbloxMeshPlugin::VoxbloxMeshPlugin(const ros::NodeHandle& nh, const std::string& name)
+    : DsgVisualizerPlugin(nh, name) {
+  // namespacing gives us a reasonable topic
+  mesh_pub_ = nh_.advertise<voxblox_msgs::Mesh>("", 1, true);
+}
+
+voxblox::Point getPoint(const pcl::PointXYZRGBA& point) {
+  voxblox::Point vox_point;
+  vox_point << point.x, point.y, point.z;
+  return vox_point;
+}
+
+voxblox::BlockIndex getBlockIndex(const voxblox::Point& point) {
+  voxblox::BlockIndex index;
+  index << std::floor(point.x()), std::floor(point.y()), std::floor(point.z());
+  return index;
+}
+
+struct BestIndex {
+  bool valid;
+  voxblox::BlockIndex index;
+};
+
+bool vectorHasNegativeElement(const voxblox::Point& point) {
+  return (point.array() < 0.0).any();
+}
+
+BestIndex getBestBlockIndex(const pcl::PointCloud<pcl::PointXYZRGBA>& cloud,
+                            const std::vector<uint32_t>& indices) {
+  const voxblox::Point point1 = getPoint(cloud.at(indices.at(0)));
+  const voxblox::Point point2 = getPoint(cloud.at(indices.at(1)));
+  const voxblox::Point point3 = getPoint(cloud.at(indices.at(2)));
+
+  const voxblox::BlockIndex index1 = getBlockIndex(point1);
+  const voxblox::BlockIndex index2 = getBlockIndex(point2);
+  const voxblox::BlockIndex index3 = getBlockIndex(point3);
+
+  // TODO(nathan) this is ugly, fix
+  voxblox::BlockIndex best_index;
+  best_index << std::min(index1.x(), std::min(index2.x(), index3.x())),
+      std::min(index1.y(), std::min(index2.y(), index3.y())),
+      std::min(index1.z(), std::min(index2.z(), index3.z()));
+
+  const voxblox::Point norm1 = (point1 - best_index.cast<float>()) / 2.0;
+  if (norm1.squaredNorm() > 1.0 || (norm1.array() < 0).any()) {
+    LOG(ERROR) << "best index: " << best_index.transpose() << " is invalid";
+    return {false, voxblox::BlockIndex::Zero()};
+  }
+
+  const voxblox::Point norm2 = (point2 - best_index.cast<float>()) / 2.0;
+  if (norm2.squaredNorm() > 1.0 || (norm2.array() < 0).any()) {
+    LOG(ERROR) << "best index: " << best_index.transpose() << " is invalid";
+    return {false, voxblox::BlockIndex::Zero()};
+  }
+
+  const voxblox::Point norm3 = (point3 - best_index.cast<float>()) / 2.0;
+  if (norm3.squaredNorm() > 1.0 || (norm3.array() < 0).any()) {
+    LOG(ERROR) << "best index: " << best_index.transpose() << " is invalid";
+    return {false, voxblox::BlockIndex::Zero()};
+  }
+
+  return {true, best_index};
+}
+
+void VoxbloxMeshPlugin::draw(const std_msgs::Header& header,
+                             const DynamicSceneGraph& graph) {
+  if (!graph.hasMesh()) {
+    ROS_ERROR("Attempting to visualize unitialized mesh");
+    return;
+  }
+
+  voxblox_msgs::Mesh msg;
+  msg.header = header;
+  msg.block_edge_length = 1.0;
+
+  voxblox::AnyIndexHashMapType<size_t>::type block_to_index;
+
+  const auto& vertices = *graph.getMeshVertices();
+  const auto& faces = *graph.getMeshFaces();
+
+  for (const auto& face : faces) {
+    const auto block_idx_result = getBestBlockIndex(vertices, face.vertices);
+    if (!block_idx_result.valid) {
+      continue;
+    }
+
+    const auto block_idx = block_idx_result.index;
+    if (!block_to_index.count(block_idx)) {
+      block_to_index[block_idx] = msg.mesh_blocks.size();
+      voxblox_msgs::MeshBlock block_msg;
+      block_msg.index[0] = block_idx.x();
+      block_msg.index[1] = block_idx.y();
+      block_msg.index[2] = block_idx.z();
+      msg.mesh_blocks.push_back(block_msg);
+    }
+
+    auto& block = msg.mesh_blocks.at(block_to_index.at(block_idx));
+    const voxblox::Point block_pos = block_idx.cast<float>();
+
+    for (const auto& vertex_idx : face.vertices) {
+      const auto& point = vertices.at(vertex_idx);
+      voxblox::Point vox_point;
+      vox_point << point.x, point.y, point.z;
+      const voxblox::Point normalized_point = (vox_point - block_pos) / 2.0f;
+
+      const uint16_t max_value = std::numeric_limits<uint16_t>::max();
+      block.x.push_back(max_value * normalized_point.x());
+      block.y.push_back(max_value * normalized_point.y());
+      block.z.push_back(max_value * normalized_point.z());
+      block.r.push_back(point.r);
+      block.g.push_back(point.g);
+      block.b.push_back(point.b);
+    }
+  }
+
+  mesh_pub_.publish(msg);
 }
 
 MeshPlaceConnectionsPlugin::MeshPlaceConnectionsPlugin(const ros::NodeHandle& nh,
@@ -168,7 +313,8 @@ Marker makeMstEdges(const PMGraphPluginConfig& config,
   return edges;
 }
 
-void MeshPlaceConnectionsPlugin::draw(const DynamicSceneGraph& graph) {
+void MeshPlaceConnectionsPlugin::draw(const std_msgs::Header& header,
+                                      const DynamicSceneGraph& graph) {
   if (!graph.hasLayer(KimeraDsgLayers::PLACES)) {
     return;
   }
@@ -191,7 +337,8 @@ void MeshPlaceConnectionsPlugin::draw(const DynamicSceneGraph& graph) {
   VisualizerConfig viz_config;
   viz_config.layer_z_step = 0.0;
 
-  Marker node_marker = makeCentroidMarkers(config_.layer_config,
+  Marker node_marker = makeCentroidMarkers(header,
+                                           config_.layer_config,
                                            layer,
                                            viz_config,
                                            "place_mesh_graph_nodes",
@@ -210,10 +357,9 @@ void MeshPlaceConnectionsPlugin::draw(const DynamicSceneGraph& graph) {
     msg.markers.push_back(mst_edge_marker);
   }
 
-  ros::Time curr_time = ros::Time::now();
+  // TODO(nathan) propagate to makeLeafEdges instead
   for (auto& marker : msg.markers) {
-    marker.header.stamp = curr_time;
-    marker.header.frame_id = config_.frame;
+    marker.header = header;
   }
 
   if (!msg.markers.empty()) {

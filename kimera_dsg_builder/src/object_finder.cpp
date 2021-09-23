@@ -210,7 +210,7 @@ void ObjectFinder::addObjectsToGraph(const SubMesh& mesh,
     attrs->position << centroid.x, centroid.y, centroid.z;
 
     scene_graph->emplaceNode(
-        to_underlying(KimeraDsgLayers::OBJECTS), next_object_id_, std::move(attrs));
+        KimeraDsgLayers::OBJECTS, next_object_id_, std::move(attrs));
 
     for (const auto& idx : cluster.indices.indices) {
       scene_graph->insertMeshEdge(next_object_id_, mesh.vertex_map.at(idx));

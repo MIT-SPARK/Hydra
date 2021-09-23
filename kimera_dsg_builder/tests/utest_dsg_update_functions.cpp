@@ -26,8 +26,7 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
   attrs->bounding_box.type = BoundingBox::Type::AABB;
   attrs->bounding_box.min << 1.0f, 2.0f, 3.0f;
   attrs->bounding_box.max << 1.0f, 2.0f, 3.0f;
-  graph.emplaceNode(
-      static_cast<LayerId>(KimeraDsgLayers::OBJECTS), 0, std::move(attrs));
+  graph.emplaceNode(KimeraDsgLayers::OBJECTS, 0, std::move(attrs));
 
   gtsam::Values values;
   dsg_updates::updateObjects(graph, values, values);
@@ -74,15 +73,15 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
 
 TEST(DsgInterpolationTests, BuildingUpdate) {
   DynamicSceneGraph graph;
-  graph.emplaceNode(static_cast<LayerId>(KimeraDsgLayers::BUILDINGS),
+  graph.emplaceNode(KimeraDsgLayers::BUILDINGS,
                     0,
                     std::make_unique<NodeAttributes>(Eigen::Vector3d(1.0, 2.0, 3.0)));
 
-  graph.emplaceNode(static_cast<LayerId>(KimeraDsgLayers::BUILDINGS),
+  graph.emplaceNode(KimeraDsgLayers::BUILDINGS,
                     1,
                     std::make_unique<NodeAttributes>(Eigen::Vector3d(4.0, 5.0, 6.0)));
 
-  graph.emplaceNode(static_cast<LayerId>(KimeraDsgLayers::BUILDINGS),
+  graph.emplaceNode(KimeraDsgLayers::BUILDINGS,
                     2,
                     std::make_unique<NodeAttributes>(Eigen::Vector3d(4.0, 5.0, 6.0)));
 
@@ -127,7 +126,7 @@ TEST(DsgInterpolationTests, BuildingUpdate) {
 }
 
 TEST(DsgInterpolationTests, PlaceUpdate) {
-  const LayerId place_layer = static_cast<LayerId>(KimeraDsgLayers::PLACES);
+  const LayerId place_layer = KimeraDsgLayers::PLACES;
   DynamicSceneGraph graph;
   graph.emplaceNode(place_layer,
                     NodeSymbol('p', 0),
@@ -168,7 +167,7 @@ TEST(DsgInterpolationTests, PlaceUpdate) {
 }
 
 TEST(DsgInterpolationTests, AgentUpdate) {
-  const LayerId agent_layer = static_cast<LayerId>(KimeraDsgLayers::AGENTS);
+  const LayerId agent_layer = KimeraDsgLayers::AGENTS;
   DynamicSceneGraph graph;
   {
     NodeAttributes::Ptr attrs =

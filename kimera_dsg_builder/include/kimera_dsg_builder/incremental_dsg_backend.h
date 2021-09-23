@@ -56,8 +56,6 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void runPgmo();
 
-  void drawPlacesSkeleton();
-
   void addNewAgentPoses();
 
   void addPlacesToDeformationGraph();
@@ -90,8 +88,6 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   std::unique_ptr<DynamicSceneGraphVisualizer> visualizer_;
   std::unique_ptr<ros::CallbackQueue> visualizer_queue_;
   std::unique_ptr<std::thread> visualizer_thread_;
-
-  std::shared_ptr<DsgVisualizerPlugin> mesh_viz_plugin_;
 
   std::list<LayerUpdateFunc> dsg_update_funcs_;
 

@@ -266,16 +266,6 @@ void OfflineDsgBuilder::visualize() {
 
   visualizer_->setGraph(scene_graph_);
 
-  if (rgb_mesh_) {
-    visualizer_->visualizeMesh(*rgb_mesh_.get(), true);
-  } else {
-    ROS_WARN("Invalid RGB mesh when visualizing");
-  }
-
-  if (segmented_walls_mesh_) {
-    visualizer_->visualizeWalls(*segmented_walls_mesh_);
-  }
-
   // TODO(nathan) dynamic stuff
   // LOG(INFO) << "Visualizing Human Pose Graphs";
   // dynamic_scene_graph_.visualizePoseGraphs();

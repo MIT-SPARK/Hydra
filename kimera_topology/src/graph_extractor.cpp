@@ -34,7 +34,7 @@ GraphExtractor::GraphExtractor(const GraphExtractorConfig& config)
       next_node_id_('p', 0),
       next_edge_id_(0),
       next_pseudo_edge_id_(0),
-      graph_(new IsolatedSceneGraphLayer(to_underlying(KimeraDsgLayers::PLACES))) {}
+      graph_(new IsolatedSceneGraphLayer(KimeraDsgLayers::PLACES)) {}
 
 std::unordered_set<NodeId> GraphExtractor::getActiveNodes() const {
   std::unordered_set<NodeId> nodes;

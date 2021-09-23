@@ -108,11 +108,10 @@ TEST(IncrementalRoomsTests, TestThresholds) {
 
 TEST(IncrementalRoomsTests, UpdateFromEmptyClustersCorrect) {
   const LayerId mesh_layer_id = 1;
-  const std::map<LayerId, char>& layer_id_map{
-      {to_underlying(KimeraDsgLayers::OBJECTS), 'o'},
-      {to_underlying(KimeraDsgLayers::PLACES), 'p'},
-      {to_underlying(KimeraDsgLayers::ROOMS), 'r'},
-      {to_underlying(KimeraDsgLayers::BUILDINGS), 'b'}};
+  const std::map<LayerId, char>& layer_id_map{{KimeraDsgLayers::OBJECTS, 'o'},
+                                              {KimeraDsgLayers::PLACES, 'p'},
+                                              {KimeraDsgLayers::ROOMS, 'r'},
+                                              {KimeraDsgLayers::BUILDINGS, 'b'}};
 
   SharedDsgInfo::Ptr dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));
 
@@ -132,14 +131,13 @@ TEST(IncrementalRoomsTests, UpdateFromEmptyClustersCorrect) {
 
 TEST(IncrementalRoomsTests, UpdateFromClustersWithPruningCorrect) {
   const LayerId mesh_layer_id = 1;
-  const std::map<LayerId, char>& layer_id_map{
-      {to_underlying(KimeraDsgLayers::OBJECTS), 'o'},
-      {to_underlying(KimeraDsgLayers::PLACES), 'p'},
-      {to_underlying(KimeraDsgLayers::ROOMS), 'r'},
-      {to_underlying(KimeraDsgLayers::BUILDINGS), 'b'}};
+  const std::map<LayerId, char>& layer_id_map{{KimeraDsgLayers::OBJECTS, 'o'},
+                                              {KimeraDsgLayers::PLACES, 'p'},
+                                              {KimeraDsgLayers::ROOMS, 'r'},
+                                              {KimeraDsgLayers::BUILDINGS, 'b'}};
 
   SharedDsgInfo::Ptr dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));
-  dsg->graph->emplaceNode(static_cast<LayerId>(KimeraDsgLayers::PLACES),
+  dsg->graph->emplaceNode(KimeraDsgLayers::PLACES,
                           NodeSymbol('p', 3),
                           std::make_unique<PlaceNodeAttributes>());
 
@@ -164,20 +162,19 @@ TEST(IncrementalRoomsTests, UpdateFromClustersWithPruningCorrect) {
 
 TEST(IncrementalRoomsTests, UpdateFromClustersWithMinSizeCorrect) {
   const LayerId mesh_layer_id = 1;
-  const std::map<LayerId, char>& layer_id_map{
-      {to_underlying(KimeraDsgLayers::OBJECTS), 'o'},
-      {to_underlying(KimeraDsgLayers::PLACES), 'p'},
-      {to_underlying(KimeraDsgLayers::ROOMS), 'r'},
-      {to_underlying(KimeraDsgLayers::BUILDINGS), 'b'}};
+  const std::map<LayerId, char>& layer_id_map{{KimeraDsgLayers::OBJECTS, 'o'},
+                                              {KimeraDsgLayers::PLACES, 'p'},
+                                              {KimeraDsgLayers::ROOMS, 'r'},
+                                              {KimeraDsgLayers::BUILDINGS, 'b'}};
 
   SharedDsgInfo::Ptr dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));
-  dsg->graph->emplaceNode(static_cast<LayerId>(KimeraDsgLayers::PLACES),
+  dsg->graph->emplaceNode(KimeraDsgLayers::PLACES,
                           NodeSymbol('p', 3),
                           std::make_unique<PlaceNodeAttributes>());
-  dsg->graph->emplaceNode(static_cast<LayerId>(KimeraDsgLayers::PLACES),
+  dsg->graph->emplaceNode(KimeraDsgLayers::PLACES,
                           NodeSymbol('p', 5),
                           std::make_unique<PlaceNodeAttributes>());
-  dsg->graph->emplaceNode(static_cast<LayerId>(KimeraDsgLayers::PLACES),
+  dsg->graph->emplaceNode(KimeraDsgLayers::PLACES,
                           NodeSymbol('p', 6),
                           std::make_unique<PlaceNodeAttributes>());
 
@@ -203,31 +200,30 @@ TEST(IncrementalRoomsTests, UpdateFromClustersWithMinSizeCorrect) {
 
 TEST(IncrementalRoomsTests, UpdateFromClustersWithAssocationCorrect) {
   const LayerId mesh_layer_id = 1;
-  const std::map<LayerId, char>& layer_id_map{
-      {to_underlying(KimeraDsgLayers::OBJECTS), 'o'},
-      {to_underlying(KimeraDsgLayers::PLACES), 'p'},
-      {to_underlying(KimeraDsgLayers::ROOMS), 'r'},
-      {to_underlying(KimeraDsgLayers::BUILDINGS), 'b'}};
+  const std::map<LayerId, char>& layer_id_map{{KimeraDsgLayers::OBJECTS, 'o'},
+                                              {KimeraDsgLayers::PLACES, 'p'},
+                                              {KimeraDsgLayers::ROOMS, 'r'},
+                                              {KimeraDsgLayers::BUILDINGS, 'b'}};
 
   SharedDsgInfo::Ptr dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));
   std::vector<NodeId> to_add{3, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16};
   for (const auto& idx : to_add) {
-    dsg->graph->emplaceNode(static_cast<LayerId>(KimeraDsgLayers::PLACES),
+    dsg->graph->emplaceNode(KimeraDsgLayers::PLACES,
                             NodeSymbol('p', idx),
                             std::make_unique<PlaceNodeAttributes>());
   }
 
   // previous rooms
-  dsg->graph->emplaceNode(static_cast<LayerId>(KimeraDsgLayers::ROOMS),
+  dsg->graph->emplaceNode(KimeraDsgLayers::ROOMS,
                           NodeSymbol('R', 3),
                           std::make_unique<SemanticNodeAttributes>());
-  dsg->graph->emplaceNode(static_cast<LayerId>(KimeraDsgLayers::ROOMS),
+  dsg->graph->emplaceNode(KimeraDsgLayers::ROOMS,
                           NodeSymbol('R', 4),
                           std::make_unique<SemanticNodeAttributes>());
-  dsg->graph->emplaceNode(static_cast<LayerId>(KimeraDsgLayers::ROOMS),
+  dsg->graph->emplaceNode(KimeraDsgLayers::ROOMS,
                           NodeSymbol('R', 5),
                           std::make_unique<SemanticNodeAttributes>());
-  dsg->graph->emplaceNode(static_cast<LayerId>(KimeraDsgLayers::ROOMS),
+  dsg->graph->emplaceNode(KimeraDsgLayers::ROOMS,
                           NodeSymbol('R', 6),
                           std::make_unique<SemanticNodeAttributes>());
 

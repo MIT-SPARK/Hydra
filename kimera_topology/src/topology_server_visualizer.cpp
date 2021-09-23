@@ -43,16 +43,22 @@ void TopologyServerVisualizer::visualizeGraph(const SceneGraphLayer& graph) {
     return;
   }
 
-  ros::Time draw_time = ros::Time::now();
+  std_msgs::Header header;
+  header.stamp = ros::Time::now();
+  header.frame_id = config_.world_frame;
+
   MarkerArray markers;
 
   Marker node_marker;
+
+  const std::string node_ns = config_.topology_marker_ns + "_nodes";
   if (config_.gvd.color_nearest_vertices) {
     node_marker = makeCentroidMarkers(
+        header,
         config_.graph_layer,
         graph,
         config_.graph,
-        "layer_centroids",
+        node_ns,
         [](const SceneGraphNode& node) {
           if (node.attributes<PlaceNodeAttributes>().voxblox_mesh_connections.empty()) {
             return NodeColor(0, 0, 0);
@@ -62,21 +68,18 @@ void TopologyServerVisualizer::visualizeGraph(const SceneGraphLayer& graph) {
         });
   } else {
     node_marker = makeCentroidMarkers(
-        config_.graph_layer, graph, config_.graph, config_.colormap);
+        header, config_.graph_layer, graph, config_.graph, node_ns, config_.colormap);
   }
 
-  node_marker.header.stamp = draw_time;
-  node_marker.header.frame_id = config_.world_frame;
-  node_marker.ns = config_.topology_marker_ns + "_nodes";
   markers.markers.push_back(node_marker);
 
   if (!graph.edges().empty()) {
-    Marker edge_marker = makeLayerEdgeMarkers(
-        config_.graph_layer, graph, config_.graph, NodeColor::Zero());
-    edge_marker.header.stamp =
-        draw_time + ros::Duration(1.0e-2);  // potentially force draw order
-    edge_marker.header.frame_id = config_.world_frame;
-    edge_marker.ns = config_.topology_marker_ns + "_edges";
+    Marker edge_marker = makeLayerEdgeMarkers(header,
+                                              config_.graph_layer,
+                                              graph,
+                                              config_.graph,
+                                              NodeColor::Zero(),
+                                              config_.topology_marker_ns + "_edges");
     markers.markers.push_back(edge_marker);
   }
 
@@ -103,7 +106,8 @@ void TopologyServerVisualizer::visualizeGvd(const Layer<GvdVoxel>& gvd) const {
     return;
   }
 
-  msg.header.frame_id = "world";
+  msg.header.frame_id = config_.world_frame;
+
   msg.header.stamp = ros::Time::now();
   msg.ns = "gvd_visualizer";
   gvd_viz_pub_.publish(msg);
@@ -118,7 +122,7 @@ void TopologyServerVisualizer::visualizeBlocks(const Layer<GvdVoxel>& gvd,
     msg = makeBlocksMarker(tsdf);
   }
 
-  msg.header.frame_id = "world";
+  msg.header.frame_id = config_.world_frame;
   msg.header.stamp = ros::Time::now();
   msg.ns = "topology_server_blocks";
   block_viz_pub_.publish(msg);
@@ -127,7 +131,7 @@ void TopologyServerVisualizer::visualizeBlocks(const Layer<GvdVoxel>& gvd,
 void TopologyServerVisualizer::visualizeGvdEdges(const GraphExtractor& graph,
                                                  const Layer<GvdVoxel>& gvd) const {
   auto msg = makeGvdEdgeMarker(gvd, graph.getGvdEdgeInfo(), graph.getNodeRootMap());
-  msg.header.frame_id = "world";
+  msg.header.frame_id = config_.world_frame;
   msg.header.stamp = ros::Time::now();
   gvd_edge_viz_pub_.publish(msg);
 }
@@ -137,15 +141,16 @@ void TopologyServerVisualizer::publishGraphLabels(const SceneGraphLayer& graph) 
     return;
   }
 
-  ros::Time draw_time = ros::Time::now();
+  std_msgs::Header header;
+  header.stamp = ros::Time::now();
+  header.frame_id = config_.world_frame;
   const std::string label_ns = config_.topology_marker_ns + "_labels";
 
   MarkerArray labels;
   for (const auto& id_node_pair : graph.nodes()) {
     const SceneGraphNode& node = *id_node_pair.second;
-    Marker label = makeTextMarker(config_.graph_layer, node, config_.graph, label_ns);
-    label.header.frame_id = "world";
-    label.header.stamp = draw_time;
+    Marker label =
+        makeTextMarker(header, config_.graph_layer, node, config_.graph, label_ns);
     labels.markers.push_back(label);
   }
 

@@ -131,6 +131,9 @@ void DsgBackend::startVisualizer() {
   nh.setCallbackQueue(visualizer_queue_.get());
 
   visualizer_.reset(new DynamicSceneGraphVisualizer(nh, getDefaultLayerIds()));
+  visualizer_->addPlugin(std::make_shared<PgmoMeshPlugin>(nh, "dsg_mesh"));
+  //visualizer_->addPlugin(std::make_shared<VoxbloxMeshPlugin>(nh, "dsg_mesh"));
+
   visualizer_->setGraph(dsg_->graph);
 
   visualizer_thread_.reset(new std::thread(&DsgBackend::runVisualizer, this));
@@ -187,12 +190,6 @@ void DsgBackend::startPgmo() {
     }
   }  // end graph update critical section
 
-  mesh_viz_plugin_.reset(
-      new MeshPlaceConnectionsPlugin(ros::NodeHandle(nh_, "pm_graph_viz"),
-                                     "mesh_connection_plugin",
-                                     robot_vertex_prefix_,
-                                     deformation_graph_));
-
   full_mesh_sub_ =
       pgmo_nh_.subscribe("full_mesh", 1, &DsgBackend::fullMeshCallback, this);
   // TODO(nathan) may need to handle these in a different thread from optimization
@@ -204,13 +201,6 @@ void DsgBackend::startPgmo() {
   pgmo_thread_.reset(new std::thread(&DsgBackend::runPgmo, this));
 }
 
-void DsgBackend::drawPlacesSkeleton() {
-  std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-  // this points to the deformation graph, so we need to run this in the same
-  // thread pgmo runs in
-  mesh_viz_plugin_->draw(*dsg_->graph);
-}
-
 void DsgBackend::runPgmo() {
   ros::Rate r(10);
   while (ros::ok() && !should_shutdown_) {
@@ -220,7 +210,6 @@ void DsgBackend::runPgmo() {
     if (optimize_on_lc_ && prev_loop_closures != num_loop_closures_) {
       // TODO(nathan) management of this will have to change
       optimize();
-      drawPlacesSkeleton();
       // we already filled the mesh from the latest message via optimze
       have_new_mesh_ = false;
     }
@@ -228,11 +217,6 @@ void DsgBackend::runPgmo() {
     if (have_new_mesh_) {
       updateDsgMesh();
       have_new_mesh_ = false;
-    }
-
-    if (have_new_deformation_graph_) {
-      drawPlacesSkeleton();
-      have_new_deformation_graph_ = false;
     }
 
     if (have_new_poses_) {

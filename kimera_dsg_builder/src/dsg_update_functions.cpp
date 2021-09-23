@@ -118,7 +118,7 @@ void updateBuildings(const DynamicSceneGraph& graph,
 void updateAgents(const DynamicSceneGraph& graph,
                   const gtsam::Values&,
                   const gtsam::Values& values) {
-  const LayerId desired_layer = static_cast<LayerId>(KimeraDsgLayers::AGENTS);
+  const LayerId desired_layer = KimeraDsgLayers::AGENTS;
 
   for (const auto& prefix_layer_pair : graph.dynamicLayersOfType(desired_layer)) {
     std::set<NodeId> missing_nodes;
@@ -136,7 +136,7 @@ void updateAgents(const DynamicSceneGraph& graph,
     }
 
     if (!missing_nodes.empty()) {
-      LOG(WARNING) << "Layer " << static_cast<LayerId>(KimeraDsgLayers::AGENTS) << "("
+      LOG(WARNING) << "Layer " << KimeraDsgLayers::AGENTS << "("
                    << prefix_layer_pair.first << "): could not update "
                    << displayNodeSymbolContainer(missing_nodes);
     }
