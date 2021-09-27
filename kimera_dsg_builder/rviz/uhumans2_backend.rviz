@@ -41,13 +41,21 @@ Visualization Manager:
         All Enabled: false
         base_link_gt:
           Value: true
+        base_link_kimera:
+          Value: true
         front_lidar:
           Value: true
         left_cam:
           Value: true
+        left_cam_kimera:
+          Value: true
+        map:
+          Value: true
         rear_lidar:
           Value: true
         right_cam:
+          Value: true
+        right_cam_kimera:
           Value: true
         world:
           Value: true
@@ -67,6 +75,13 @@ Visualization Manager:
               {}
             right_cam:
               {}
+          base_link_kimera:
+            left_cam_kimera:
+              {}
+            right_cam_kimera:
+              {}
+          map:
+            {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -161,12 +176,6 @@ Visualization Manager:
         {}
       Queue Size: 100
       Value: true
-    - Class: voxblox_rviz_plugin/VoxbloxMesh
-      Enabled: true
-      Name: VoxbloxMesh
-      Topic: /kimera_dsg_visualizer/dsg_mesh
-      Unreliable: false
-      Value: true
     - Class: rviz/MarkerArray
       Enabled: true
       Marker Topic: /kimera_dsg_visualizer/dsg_markers
@@ -186,6 +195,25 @@ Visualization Manager:
         layer_nodes_5: true
         mesh_object_connections: true
       Queue Size: 100
+      Value: true
+    - Class: rviz_mesh_plugin/TriangleMesh
+      Display Type:
+        Faces Alpha: 1
+        Faces Color: 0; 255; 0
+        Value: Vertex Color
+      Enabled: true
+      Mesh Buffer Size: 1
+      Name: DSG Mesh
+      Show Normals:
+        Normals Alpha: 1
+        Normals Color: 255; 0; 255
+        Normals Scaling Factor: 0.10000000149011612
+        Value: false
+      Show Wireframe:
+        Value: false
+        Wireframe Alpha: 1
+        Wireframe Color: 0; 0; 0
+      Topic: /kimera_dsg_visualizer/dsg_mesh
       Value: true
   Enabled: true
   Global Options:
@@ -215,25 +243,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 51.118499755859375
+      Distance: 70.78363037109375
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 9.035565376281738
-        Y: -3.3252131938934326
-        Z: 8.705241203308105
+        X: 7.4949212074279785
+        Y: -2.775383234024048
+        Z: 2.9567534923553467
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.3597981929779053
+      Pitch: 0.26479822397232056
       Target Frame: left_cam
       Value: Orbit (rviz)
-      Yaw: 3.151846408843994
+      Yaw: 3.1068530082702637
     Saved: ~
 Window Geometry:
   Depth Image:

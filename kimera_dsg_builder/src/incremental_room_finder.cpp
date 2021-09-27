@@ -585,7 +585,7 @@ Components RoomFinder::getBestComponents(const SceneGraphLayer& places,
     num_components.push_back(components.size());
   }
 
-  LOG(WARNING) << "Component sequence: " << displayNodeSymbolContainer(num_components);
+  VLOG(3) << "Component sequence: " << displayNodeSymbolContainer(num_components);
   // auto best_sequence_start = getLongestSequence(num_components);
   auto best_sequence_start = getMedianComponentSize(num_components);
   if (!best_sequence_start) {
@@ -593,8 +593,8 @@ Components RoomFinder::getBestComponents(const SceneGraphLayer& places,
   }
 
   const double best_threshold = thresholds.at(*best_sequence_start);
-  LOG(WARNING) << " Best threshold: " << best_threshold << " (index "
-               << *best_sequence_start << ")";
+  VLOG(3) << " Best threshold: " << best_threshold << " (index " << *best_sequence_start
+          << ")";
 
   auto best_components = graph_utilities::getConnectedComponents(
       places,
@@ -744,14 +744,14 @@ void RoomFinder::findRooms(SharedDsgInfo& dsg, const ActiveNodeSet& active_nodes
 
   Components components = getBestComponents(*active_places, thresholds);
   if (components.empty()) {
-    LOG(WARNING) << "No rooms found";
+    VLOG(1) << "No rooms found";
     return;
   }
 
   ClusterResults clusters;
 
   {  // clustering scope
-    ScopedTimer timer("frontend/room_clustering", true, 0, true);
+    ScopedTimer timer("frontend/room_clustering", true, 2, true);
     switch (config_.clustering_mode) {
       case Config::ClusterMode::SPECTRAL:
         clusters = clusterGraph(*active_places,
@@ -807,7 +807,7 @@ void RoomFinder::findRooms(SharedDsgInfo& dsg, const ActiveNodeSet& active_nodes
         node.attributes<SemanticNodeAttributes>().color = NodeColor::Zero();
       }
     }
-  } // end dsg critical section
+  }  // end dsg critical section
 
   std::map<NodeId, size_t> rooms_to_clusters =
       mapRoomsToClusters(clusters, previous_rooms, config_.room_vote_min_overlap);

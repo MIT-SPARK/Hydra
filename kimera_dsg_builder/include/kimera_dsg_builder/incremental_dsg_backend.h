@@ -79,7 +79,6 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   kimera_pgmo::Path trajectory_;
   std::vector<ros::Time> timestamps_;
   std::queue<size_t> unconnected_nodes_;
-  kimera_pgmo::TriangleMeshIdStamped::ConstPtr last_mesh_msg_;
 
   ros::Subscriber full_mesh_sub_;
   ros::Subscriber deformation_graph_sub_;
@@ -94,8 +93,12 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   bool have_new_mesh_;
   bool have_new_poses_;
   bool have_new_deformation_graph_;
-  ros::NodeHandle pgmo_nh_;
-  std::unique_ptr<ros::CallbackQueue> pgmo_queue_;
+
+  kimera_pgmo::TriangleMeshIdStamped::ConstPtr latest_mesh_;
+  pose_graph_tools::PoseGraph::Ptr deformation_graph_updates_;
+  pose_graph_tools::PoseGraph::Ptr pose_graph_updates_;
+
+  std::mutex pgmo_mutex_;
   std::unique_ptr<std::thread> pgmo_thread_;
 };
 

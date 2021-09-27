@@ -21,11 +21,11 @@ int main(int argc, char* argv[]) {
   bool use_semantic_tsdf_server = false;
   pnh.getParam("use_semantic_tsdf_server", use_semantic_tsdf_server);
   if (use_semantic_tsdf_server) {
-    ROS_INFO("Using Semantic TSDF Server");
+    ROS_DEBUG("Using Semantic TSDF Server");
     kimera::topology::TopologyServer<kimera::SemanticTsdfServer> server(pnh);
     server.spin();
   } else {
-    ROS_INFO("Using Normal (Non-Semantic) TSDF Server");
+    ROS_DEBUG("Using Normal (Non-Semantic) TSDF Server");
     kimera::topology::TopologyServer<voxblox::TsdfServer> server(pnh);
     server.spin();
   }

@@ -1,3 +1,10 @@
+pgmo:
+    horizon: 5.0
+    output_mesh_resolution: 0.04
+    compression_method: 1  # voxblox
+    robot_id: 0
+    d_graph_resolution: 1.0
+    voxblox_queue_size: 1
 enable_rooms: true
 building_color: [0.572, 0.204, 0.922]
 room_finder:

@@ -60,7 +60,6 @@ PgmoMeshPlugin::PgmoMeshPlugin(const ros::NodeHandle& nh, const std::string& nam
 void PgmoMeshPlugin::draw(const std_msgs::Header& header,
                           const DynamicSceneGraph& graph) {
   if (!graph.hasMesh()) {
-    ROS_ERROR("Attempting to visualize unitialized mesh");
     return;
   }
 
@@ -140,7 +139,6 @@ BestIndex getBestBlockIndex(const pcl::PointCloud<pcl::PointXYZRGBA>& cloud,
 void VoxbloxMeshPlugin::draw(const std_msgs::Header& header,
                              const DynamicSceneGraph& graph) {
   if (!graph.hasMesh()) {
-    ROS_ERROR("Attempting to visualize unitialized mesh");
     return;
   }
 

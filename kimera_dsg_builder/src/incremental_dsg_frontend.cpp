@@ -40,8 +40,8 @@ void parseRoomClusterMode(const ros::NodeHandle& nh,
 
 DsgFrontend::DsgFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg)
     : nh_(nh), dsg_(dsg) {
-  // TODO(nathan) consider mesh namespace
-  mesh_frontend_.initialize(nh_, false);
+  ros::NodeHandle pgmo_nh(nh_, "pgmo");
+  CHECK(mesh_frontend_.initialize(pgmo_nh, false));
   last_mesh_timestamp_ = 0;
   last_places_timestamp_ = 0;
 
@@ -117,6 +117,7 @@ void DsgFrontend::handleLatestMesh(const voxblox_msgs::Mesh::ConstPtr& msg) {
 void DsgFrontend::start() {
   startMeshFrontend();
   startPlaces();
+  LOG(INFO) << "[DSG Frontend] started!";
 }
 
 void DsgFrontend::startMeshFrontend() {
@@ -283,7 +284,7 @@ void DsgFrontend::runPlaces() {
     }  // end places queue critical section
 
     if (room_finder_) {
-      ScopedTimer timer("frontend/room_detection", true, 0, false);
+      ScopedTimer timer("frontend/room_detection", true, 1, false);
       ActiveNodeSet active_place_nodes = getNodesForRoomDetection(latest_places);
       room_finder_->findRooms(*dsg_, active_place_nodes);
       storeUnlabeledPlaces(active_place_nodes);
@@ -438,8 +439,8 @@ void DsgFrontend::updatePlaceMeshMapping() {
   // TODO(nathan) prune removed blocks? requires more of a handshake with gvd integrator
 
   if (num_invalid) {
-    LOG(ERROR) << "[DSG Frontend] Place-Mesh Update: " << num_invalid
-               << " invalid connections";
+    VLOG(2) << "[DSG Frontend] Place-Mesh Update: " << num_invalid
+            << " invalid connections";
   }
 }
 

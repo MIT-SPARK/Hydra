@@ -42,13 +42,26 @@ struct PoseGraphPublisherNode {
     nh.getParam("robot_id", robot_id);
 
     pg_pub = nh.advertise<pose_graph_tools::PoseGraph>("pose_graph", 10, true);
-    ROS_WARN("PoseGraphPublisher waiting for subscriber...");
+    ROS_DEBUG("PoseGraphPublisher waiting for subscriber...");
     ros::Rate r(10);
     while (ros::ok() && !pg_pub.getNumSubscribers()) {
       r.sleep();
     }
 
     tf_listener.reset(new tf2_ros::TransformListener(buffer));
+
+    ROS_DEBUG_STREAM("PoseGraphPublisher waiting for transform: "
+                     << robot_frame << " -> " << world_frame);
+    while (ros::ok()) {
+      try {
+        buffer.lookupTransform(world_frame, robot_frame, ros::Time(0));
+        break;
+      } catch (const tf2::TransformException& ex) {
+        r.sleep();
+        continue;
+      }
+    }
+
     timer = nh.createTimer(
         ros::Duration(keyframe_period_s), &PoseGraphPublisherNode::timerCallback, this);
   }

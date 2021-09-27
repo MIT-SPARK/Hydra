@@ -16,7 +16,18 @@ namespace incremental {
 using kimera_pgmo::DeformationGraph;
 using kimera_pgmo::DeformationGraphPtr;
 using kimera_pgmo::KimeraPgmoInterface;
+using kimera_pgmo::TriangleMeshIdStamped;
+using pose_graph_tools::PoseGraph;
 using Node = SceneGraph::Node;
+
+inline void mergePoseGraphs(const PoseGraph& new_graph, PoseGraph& graph_to_fill) {
+  // TODO(nathan) this needs checks for the multi-robot case
+  graph_to_fill.header = new_graph.header;
+  graph_to_fill.nodes.insert(
+      graph_to_fill.nodes.end(), new_graph.nodes.begin(), new_graph.nodes.end());
+  graph_to_fill.edges.insert(
+      graph_to_fill.edges.end(), new_graph.edges.begin(), new_graph.edges.end());
+}
 
 KimeraRPGO::Verbosity parseVerbosityFromString(const std::string& verb_str) {
   std::string to_check = verb_str;
@@ -86,6 +97,7 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh, const SharedDsgInfo::Ptr& dsg)
   params.solver = parseSolverFromString(rpgo_solver);
 
   deformation_graph_->setParams(params);
+  setVerboseFlag(false);
 
   robot_prefix_ = kimera_pgmo::robot_id_to_prefix.at(robot_id_);
   robot_vertex_prefix_ = kimera_pgmo::robot_id_to_vertex_prefix.at(robot_id_);
@@ -106,19 +118,19 @@ DsgBackend::~DsgBackend() {
   if (visualizer_thread_) {
     visualizer_thread_->join();
   }
-  VLOG(2) << "[DSG Backend] joined visualized thread";
+  VLOG(2) << " [DSG Backend] joined visualized thread";
 
-  VLOG(2) << "[DSG Backend] joining pgmo thread";
+  VLOG(2) << " [DSG Backend] joining pgmo thread";
   if (pgmo_thread_) {
     pgmo_thread_->join();
   }
-  VLOG(2) << "[DSG Backend] joined pgmo thread";
+  VLOG(2) << " [DSG Backend] joined pgmo thread";
 }
 
 void DsgBackend::start() {
   startPgmo();
   startVisualizer();
-  LOG(INFO) << "[DSG Backend] started!";
+  LOG(INFO) << " [DSG Backend] started!";
 }
 
 void DsgBackend::startVisualizer() {
@@ -132,7 +144,9 @@ void DsgBackend::startVisualizer() {
 
   visualizer_.reset(new DynamicSceneGraphVisualizer(nh, getDefaultLayerIds()));
   visualizer_->addPlugin(std::make_shared<PgmoMeshPlugin>(nh, "dsg_mesh"));
-  //visualizer_->addPlugin(std::make_shared<VoxbloxMeshPlugin>(nh, "dsg_mesh"));
+  // TODO(nathan) voxblox mesh plugin in rviz doesn't handle large graphs well
+  // (rviz frame-rate drops significantly after ~15 seconds)
+  // visualizer_->addPlugin(std::make_shared<VoxbloxMeshPlugin>(nh, "dsg_mesh"));
 
   visualizer_->setGraph(dsg_->graph);
 
@@ -160,29 +174,31 @@ void DsgBackend::runVisualizer() {
   }
 }
 
-void DsgBackend::fullMeshCallback(
-    const kimera_pgmo::TriangleMeshIdStamped::ConstPtr& msg) {
-  last_mesh_msg_ = msg;
+void DsgBackend::fullMeshCallback(const TriangleMeshIdStamped::ConstPtr& msg) {
+  std::unique_lock<std::mutex> lock(pgmo_mutex_);
+  latest_mesh_ = msg;
   have_new_mesh_ = true;
 }
 
-void DsgBackend::deformationGraphCallback(
-    const pose_graph_tools::PoseGraph::ConstPtr& msg) {
-  processIncrementalMeshGraph(msg, timestamps_, &unconnected_nodes_);
-  have_new_deformation_graph_ = true;
+void DsgBackend::deformationGraphCallback(const PoseGraph::ConstPtr& msg) {
+  std::unique_lock<std::mutex> lock(pgmo_mutex_);
+  if (!deformation_graph_updates_) {
+    deformation_graph_updates_.reset(new PoseGraph(*msg));
+  } else {
+    mergePoseGraphs(*msg, *deformation_graph_updates_);
+  }
 }
 
-void DsgBackend::poseGraphCallback(const pose_graph_tools::PoseGraph::ConstPtr& msg) {
-  processIncrementalPoseGraph(msg, &trajectory_, &unconnected_nodes_, &timestamps_);
-  have_new_poses_ = true;
+void DsgBackend::poseGraphCallback(const PoseGraph::ConstPtr& msg) {
+  std::unique_lock<std::mutex> lock(pgmo_mutex_);
+  if (!pose_graph_updates_) {
+    pose_graph_updates_.reset(new PoseGraph(*msg));
+  } else {
+    mergePoseGraphs(*msg, *pose_graph_updates_);
+  }
 }
 
 void DsgBackend::startPgmo() {
-  pgmo_queue_.reset(new ros::CallbackQueue());
-
-  pgmo_nh_ = ros::NodeHandle(nh_);
-  pgmo_nh_.setCallbackQueue(pgmo_queue_.get());
-
   {  // start graph update critical section
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
     if (!dsg_->graph->hasDynamicLayer(KimeraDsgLayers::AGENTS, robot_prefix_)) {
@@ -191,12 +207,11 @@ void DsgBackend::startPgmo() {
   }  // end graph update critical section
 
   full_mesh_sub_ =
-      pgmo_nh_.subscribe("full_mesh", 1, &DsgBackend::fullMeshCallback, this);
-  // TODO(nathan) may need to handle these in a different thread from optimization
-  deformation_graph_sub_ = pgmo_nh_.subscribe(
-      "mesh_graph_incremental", 20, &DsgBackend::deformationGraphCallback, this);
-  pose_graph_sub_ = pgmo_nh_.subscribe(
-      "pose_graph_incremental", 20, &DsgBackend::poseGraphCallback, this);
+      nh_.subscribe("pgmo/full_mesh", 1, &DsgBackend::fullMeshCallback, this);
+  deformation_graph_sub_ = nh_.subscribe(
+      "pgmo/mesh_graph_incremental", 20, &DsgBackend::deformationGraphCallback, this);
+  pose_graph_sub_ =
+      nh_.subscribe("pose_graph_incremental", 20, &DsgBackend::poseGraphCallback, this);
 
   pgmo_thread_.reset(new std::thread(&DsgBackend::runPgmo, this));
 }
@@ -205,10 +220,26 @@ void DsgBackend::runPgmo() {
   ros::Rate r(10);
   while (ros::ok() && !should_shutdown_) {
     const size_t prev_loop_closures = num_loop_closures_;
-    pgmo_queue_->callAvailable(ros::WallDuration(0));
+
+    {  // start pgmo critical section
+      std::unique_lock<std::mutex> lock(pgmo_mutex_);
+
+      if (deformation_graph_updates_) {
+        processIncrementalMeshGraph(
+            deformation_graph_updates_, timestamps_, &unconnected_nodes_);
+        deformation_graph_updates_.reset();
+        have_new_deformation_graph_ = true;
+      }
+
+      if (pose_graph_updates_) {
+        processIncrementalPoseGraph(
+            pose_graph_updates_, &trajectory_, &unconnected_nodes_, &timestamps_);
+        pose_graph_updates_.reset();
+        have_new_poses_ = true;
+      }
+    }  // end pgmo critical section
 
     if (optimize_on_lc_ && prev_loop_closures != num_loop_closures_) {
-      // TODO(nathan) management of this will have to change
       optimize();
       // we already filled the mesh from the latest message via optimze
       have_new_mesh_ = false;
@@ -301,12 +332,17 @@ void DsgBackend::addPlacesToDeformationGraph() {
 }
 
 void DsgBackend::updateDsgMesh() {
-  if (!last_mesh_msg_) {
-    return;
-  }
+  pcl::PolygonMesh input_mesh;
 
-  const pcl::PolygonMesh input_mesh =
-      kimera_pgmo::TriangleMeshMsgToPolygonMesh(last_mesh_msg_->mesh);
+  {  // pgmo critical section
+    std::unique_lock<std::mutex> lock(pgmo_mutex_);
+    if (!latest_mesh_) {
+      return;
+    }
+
+    input_mesh = kimera_pgmo::TriangleMeshMsgToPolygonMesh(latest_mesh_->mesh);
+  }  // pgmo critical section
+
   if (input_mesh.cloud.height * input_mesh.cloud.width == 0) {
     return;
   }
@@ -330,7 +366,7 @@ void DsgBackend::optimize() {
   }
 
   {  // timer scope
-    ScopedTimer timer("backend/optimization", true, 1, false);
+    ScopedTimer timer("backend/optimization", true, 0, false);
     deformation_graph_->optimize();
   }  // timer scope
 

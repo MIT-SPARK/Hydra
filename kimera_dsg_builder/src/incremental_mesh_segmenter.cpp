@@ -294,7 +294,7 @@ void MeshSegmenter::addObjectToGraph(DynamicSceneGraph& graph,
 }
 
 void MeshSegmenter::objectFinderConfigCb(DsgBuilderConfig& config, uint32_t) {
-  ROS_INFO("Updating Object Finder params.");
+  VLOG(3) << "Updating Object Finder params.";
 
   object_finder_->updateClusterEstimator(
       static_cast<ObjectFinderType>(config.object_finder_type));
@@ -314,7 +314,7 @@ void MeshSegmenter::objectFinderConfigCb(DsgBuilderConfig& config, uint32_t) {
   rg_params.smoothness_threshold = config.smoothness_threshold;
   object_finder_->setRegionGrowingParams(rg_params);
 
-  ROS_INFO_STREAM("Object finder: " << *object_finder_);
+  VLOG(3) << "Object finder: " << *object_finder_;
 }
 
 void MeshSegmenter::publishActiveVertices(const std::vector<size_t>& indices) const {
