@@ -96,6 +96,16 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh, const SharedDsgInfo::Ptr& dsg)
   dsg_nh.getParam("rpgo_solver", rpgo_solver);
   params.solver = parseSolverFromString(rpgo_solver);
 
+  nh_.getParam("pgmo/log_output", log_);
+  if (log_) {
+    std::string log_path_;
+    if (nh_.getParam("pgmo/log_path", log_path_)) {
+      params.logOutput(log_path_);
+    } else {
+      ROS_ERROR("Failed to get backend log path");
+    }
+  }
+
   deformation_graph_->setParams(params);
   setVerboseFlag(false);
 

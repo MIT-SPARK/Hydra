@@ -100,6 +100,9 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   std::mutex pgmo_mutex_;
   std::unique_ptr<std::thread> pgmo_thread_;
+
+  bool log_;
+  std::string log_path_;
 };
 
 }  // namespace incremental

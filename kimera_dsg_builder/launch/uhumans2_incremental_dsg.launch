@@ -40,8 +40,8 @@
           args="--minloglevel=$(arg min_glog_level) -v=$(arg verbosity) $(arg glog_file_args)"
           required="true"
           output="screen">
-        <param name="log_path" value="$(arg pgmo_log_path)"/>
-        <param name="log_output" value="$(arg pgmo_should_log)"/>
+        <param name="pgmo/log_path" value="$(arg pgmo_log_path)"/>
+        <param name="pgmo/log_output" value="$(arg pgmo_should_log)"/>
         <rosparam file="$(find kimera_dsg_builder)/config/dsg_frontend_config.yaml"/>
         <rosparam file="$(find kimera_dsg_builder)/config/dsg_backend_config.yaml"/>
 
