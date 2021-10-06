@@ -1,0 +1,20 @@
+- git:
+    local-name: opencv3_catkin
+    uri: git@github.com:ethz-asl/opencv3_catkin.git
+    version: master
+- git:
+    local-name: opengv_catkin
+    uri: git@github.com:nathanhhughes/opengv_catkin.git
+    version: fix/march_native_optional
+- git:
+    local-name: dbow2_catkin
+    uri: git@github.com:marcusabate/dbow2_catkin.git
+    version: master
+- git:
+    local-name: kimera_vio
+    uri: git@github.mit.edu:SPARK/Kimera-VIO.git
+    version: feature/online_dsg
+- git:
+    local-name: kimera_vio_ros
+    uri: git@github.mit.edu:SPARK/Kimera-VIO-ROS.git
+    version: feature/online_dsg

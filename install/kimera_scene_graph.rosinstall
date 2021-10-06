@@ -33,6 +33,7 @@
 - git:
     local-name: kimera_rpgo
     uri: git@github.com:MIT-SPARK/Kimera-RPGO.git
+    version: feature/online_dsg
 - git:
     local-name: kimera_dsg
     uri: git@github.mit.edu:SPARK/Kimera-DSG.git
@@ -42,6 +43,7 @@
 - git:
     local-name: kimera_semantics
     uri: git@github.mit.edu:SPARK/Kimera-Semantics.git
+    version: feature/noetic_fixes
 - git:
     local-name: minkindr
     uri: git@github.com:ethz-asl/minkindr.git
