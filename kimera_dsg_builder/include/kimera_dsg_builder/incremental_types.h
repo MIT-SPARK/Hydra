@@ -31,5 +31,25 @@ struct SharedDsgInfo {
   std::atomic<bool> updated;
 };
 
+struct DsgBackendStatus {
+  size_t total_loop_closures_;
+  size_t new_loop_closures_;
+  size_t total_factors_;
+  size_t total_values_;
+  size_t new_factors_;
+  size_t new_graph_factors_;
+  size_t trajectory_len_;
+
+  void reset() {
+    total_loop_closures_ = 0;
+    new_loop_closures_ = 0;
+    total_factors_ = 0;
+    total_values_ = 0;
+    new_factors_ = 0;
+    new_graph_factors_ = 0;
+    trajectory_len_ = 0;
+  }
+};
+
 }  // namespace incremental
 }  // namespace kimera

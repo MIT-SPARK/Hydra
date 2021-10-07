@@ -64,6 +64,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void optimize();
 
+  void logStatus(bool init = false) const;
+
  private:
   ros::NodeHandle nh_;
   std::atomic<bool> should_shutdown_{false};
@@ -103,6 +105,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   bool log_;
   std::string log_path_;
+  DsgBackendStatus status_;
 };
 
 }  // namespace incremental

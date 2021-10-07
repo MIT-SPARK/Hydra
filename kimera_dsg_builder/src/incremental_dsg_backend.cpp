@@ -98,9 +98,9 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh, const SharedDsgInfo::Ptr& dsg)
 
   nh_.getParam("pgmo/log_output", log_);
   if (log_) {
-    std::string log_path_;
     if (nh_.getParam("pgmo/log_path", log_path_)) {
       params.logOutput(log_path_);
+      logStatus(true);
     } else {
       ROS_ERROR("Failed to get backend log path");
     }
@@ -229,40 +229,61 @@ void DsgBackend::startPgmo() {
 void DsgBackend::runPgmo() {
   ros::Rate r(10);
   while (ros::ok() && !should_shutdown_) {
-    const size_t prev_loop_closures = num_loop_closures_;
+    status_.reset();
+    {  // spin timer scope
+      ScopedTimer spin_timer("pgmo/spin");
+      const size_t prev_loop_closures = num_loop_closures_;
 
-    {  // start pgmo critical section
-      std::unique_lock<std::mutex> lock(pgmo_mutex_);
+      {  // start pgmo critical section
+        std::unique_lock<std::mutex> lock(pgmo_mutex_);
 
-      if (deformation_graph_updates_) {
-        processIncrementalMeshGraph(
-            deformation_graph_updates_, timestamps_, &unconnected_nodes_);
-        deformation_graph_updates_.reset();
-        have_new_deformation_graph_ = true;
+        if (deformation_graph_updates_) {
+          status_.new_graph_factors_ = deformation_graph_updates_->edges.size();
+          status_.new_factors_ += deformation_graph_updates_->edges.size();
+          processIncrementalMeshGraph(
+              deformation_graph_updates_, timestamps_, &unconnected_nodes_);
+          deformation_graph_updates_.reset();
+          have_new_deformation_graph_ = true;
+        }
+
+        if (pose_graph_updates_) {
+          status_.new_factors_ += pose_graph_updates_->edges.size();
+          processIncrementalPoseGraph(
+              pose_graph_updates_, &trajectory_, &unconnected_nodes_, &timestamps_);
+          pose_graph_updates_.reset();
+          have_new_poses_ = true;
+        }
+      }  // end pgmo critical section
+      if (num_loop_closures_ > 0) {
+        status_.total_loop_closures_ = num_loop_closures_;
+        status_.new_loop_closures_ = num_loop_closures_ - prev_loop_closures;
+      }
+      status_.trajectory_len_ = trajectory_.size();
+
+      if (optimize_on_lc_ && prev_loop_closures != num_loop_closures_) {
+        ScopedTimer optimize_timer("pgmo/optimize");
+        optimize();
+        // we already filled the mesh from the latest message via optimze
+        have_new_mesh_ = false;
       }
 
-      if (pose_graph_updates_) {
-        processIncrementalPoseGraph(
-            pose_graph_updates_, &trajectory_, &unconnected_nodes_, &timestamps_);
-        pose_graph_updates_.reset();
-        have_new_poses_ = true;
+      if (have_new_mesh_) {
+        ScopedTimer mesh_update_time("pgmo/mesh_update");
+        updateDsgMesh();
+        have_new_mesh_ = false;
       }
-    }  // end pgmo critical section
 
-    if (optimize_on_lc_ && prev_loop_closures != num_loop_closures_) {
-      optimize();
-      // we already filled the mesh from the latest message via optimze
-      have_new_mesh_ = false;
-    }
+      if (have_new_poses_) {
+        addNewAgentPoses();
+        have_new_poses_ = false;
+      }
 
-    if (have_new_mesh_) {
-      updateDsgMesh();
-      have_new_mesh_ = false;
-    }
+      status_.total_factors_ = deformation_graph_->getGtsamFactors().size();
+      status_.total_values_ = deformation_graph_->getGtsamValues().size();
+    }  // end spin timer scope
 
-    if (have_new_poses_) {
-      addNewAgentPoses();
-      have_new_poses_ = false;
+    if (log_) {
+      logStatus();
     }
 
     r.sleep();
@@ -393,6 +414,33 @@ void DsgBackend::optimize() {
       dsg_->updated = true;
     }  // end dsg mutex criticial section
   }
+}
+
+void DsgBackend::logStatus(bool init) const {
+  std::ofstream file;
+  std::string filename = log_path_ + std::string("/dsg_pgmo_status.csv");
+  if (init) {
+    ROS_INFO("DSG Backend logging PGMO status output to %s", filename.c_str());
+    file.open(filename);
+    // file format
+    file << "total_lc,new_lc,total_factors,total_values,new_factors,new_graph_"
+            "factors,trajectory_len,run_time,optimize_time,mesh_update_time\n";
+    file.close();
+    return;
+  }
+
+  const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  file.open(filename, std::ofstream::out | std::ofstream::app);
+  file << status_.total_loop_closures_ << "," << status_.new_loop_closures_ << ","
+       << status_.total_factors_ << "," << status_.total_values_ << ","
+       << status_.new_factors_ << "," << status_.new_graph_factors_ << ","
+       << status_.trajectory_len_ << ","
+       << timer.getLastElapsed("pgmo/spin").value_or(nan) << ","
+       << timer.getLastElapsed("pgmo/optimize").value_or(nan) << ","
+       << timer.getLastElapsed("pgmo/mesh_update").value_or(nan) << std::endl;
+  file.close();
+  return;
 }
 
 }  // namespace incremental
