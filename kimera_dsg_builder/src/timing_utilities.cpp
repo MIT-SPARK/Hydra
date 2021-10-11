@@ -15,45 +15,87 @@ std::ostream& operator<<(std::ostream& out, const ElapsedStatistics& stats) {
              << " measurements)";
 }
 
-ElapsedTimeRecorder::ElapsedTimeRecorder() {}
+ElapsedTimeRecorder::ElapsedTimeRecorder() { mutex_.reset(new std::mutex()); }
 
 void ElapsedTimeRecorder::start(const std::string& timer_name) {
-  if (starts_.count(timer_name)) {
+  bool have_start_already = false;
+  {  // start critical section
+    std::unique_lock<std::mutex> lock(*mutex_);
+    if (starts_.count(timer_name)) {
+      have_start_already = true;
+    } else {
+      starts_[timer_name] = std::chrono::high_resolution_clock::now();
+    }
+  }  // end critical section
+
+  if (have_start_already) {
     LOG(ERROR) << "Timer " << timer_name
                << " was already started. Discarding current time point";
-    return;
   }
-
-  starts_[timer_name] = std::chrono::high_resolution_clock::now();
 }
 
 void ElapsedTimeRecorder::stop(const std::string& timer_name) {
   // we grab the time point first (to not mess up timing with later processing)
   const auto stop_point = std::chrono::high_resolution_clock::now();
-  if (!starts_.count(timer_name)) {
+
+  bool no_start_present = false;
+  {  // start critical section
+    std::unique_lock<std::mutex> lock(*mutex_);
+
+    if (!starts_.count(timer_name)) {
+      no_start_present = true;
+    } else {
+      if (!elapsed_.count(timer_name)) {
+        elapsed_[timer_name] = TimeList();
+      }
+
+      elapsed_[timer_name].push_back(stop_point - starts_.at(timer_name));
+      starts_.erase(timer_name);
+    }
+  }  // end critical section
+
+  if (no_start_present) {
     LOG(ERROR) << "Timer " << timer_name
                << " was not started. Discarding current time point";
-    return;
   }
-
-  if (!elapsed_.count(timer_name)) {
-    elapsed_[timer_name] = TimeList();
-  }
-
-  elapsed_[timer_name].push_back(stop_point - starts_.at(timer_name));
-  starts_.erase(timer_name);
 }
 
 void ElapsedTimeRecorder::reset() { instance_.reset(new ElapsedTimeRecorder()); }
 
-ElapsedStatistics ElapsedTimeRecorder::getStats(const std::string& name) const {
-  if (!elapsed_.count(name)) {
-    return {0.0, 0.0, 0.0, 0};
+std::optional<double> ElapsedTimeRecorder::getLastElapsed(
+    const std::string& name) const {
+  std::optional<std::chrono::nanoseconds> elapsed_ns = std::nullopt;
+
+  {  // start critical section
+    std::unique_lock<std::mutex> lock(*mutex_);
+    if (elapsed_.count(name)) {
+      elapsed_ns = elapsed_.at(name).back();
+    }
+  }  // end critical section
+
+  if (!elapsed_ns) {
+    return std::nullopt;
   }
 
-  const auto& durations = elapsed_.at(name);
-  const size_t N = durations.size();
+  std::chrono::duration<double> elapsed_s = *elapsed_ns;
+  return elapsed_s.count();
+}
+
+ElapsedStatistics ElapsedTimeRecorder::getStats(const std::string& name) const {
+  TimeList durations;
+  {  // start critical section
+    std::unique_lock<std::mutex> lock(*mutex_);
+
+    if (!elapsed_.count(name)) {
+      return {0.0, 0.0, 0.0, 0};
+    }
+
+    durations = elapsed_.at(name);
+  }  // end critical section
+
   const double last_elapsed = *getLastElapsed(name);
+
+  const size_t N = durations.size();
   if (durations.size() == 1) {
     return {last_elapsed, last_elapsed, 0.0, 1};
   }
@@ -74,30 +116,30 @@ ElapsedStatistics ElapsedTimeRecorder::getStats(const std::string& name) const {
   return {last_elapsed, mean, std::sqrt(variance), durations.size()};
 }
 
-std::optional<double> ElapsedTimeRecorder::getLastElapsed(
-    const std::string& name) const {
-  if (!elapsed_.count(name)) {
-    return std::nullopt;
-  }
-
-  std::chrono::duration<double> elapsed_s = elapsed_.at(name).back();
-  return elapsed_s.count();
-}
-
 ScopedTimer::ScopedTimer(const std::string& name,
                          bool verbose,
                          int verbosity,
-                         bool elapsed_only)
+                         bool elapsed_only,
+                         bool verbosity_disables)
     : name_(name),
       verbose_(verbose),
       verbosity_(verbosity),
-      elapsed_only_(elapsed_only) {
+      elapsed_only_(elapsed_only),
+      verbosity_disables_(verbosity_disables) {
+  if (verbosity_disables_ and !VLOG_IS_ON(verbosity_)) {
+    return;
+  }
   ElapsedTimeRecorder::instance().start(name_);
 }
 
-ScopedTimer::ScopedTimer(const std::string& name) : ScopedTimer(name, false, 1, true) {}
+ScopedTimer::ScopedTimer(const std::string& name)
+    : ScopedTimer(name, false, 1, true, false) {}
 
 ScopedTimer::~ScopedTimer() {
+  if (verbosity_disables_ and !VLOG_IS_ON(verbosity_)) {
+    return;
+  }
+
   ElapsedTimeRecorder::instance().stop(name_);
   if (!verbose_) {
     return;

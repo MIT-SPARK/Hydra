@@ -3,6 +3,7 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 
@@ -32,9 +33,9 @@ class ElapsedTimeRecorder {
 
   void reset();
 
-  ElapsedStatistics getStats(const std::string& timer_name) const;
-
   std::optional<double> getLastElapsed(const std::string& timer_name) const;
+
+  ElapsedStatistics getStats(const std::string& timer_name) const;
 
  private:
   using TimeList = std::list<std::chrono::nanoseconds>;
@@ -47,6 +48,7 @@ class ElapsedTimeRecorder {
 
   TimeMap starts_;
   std::map<std::string, TimeList> elapsed_;
+  std::unique_ptr<std::mutex> mutex_;
 };
 
 class ScopedTimer {
@@ -56,7 +58,8 @@ class ScopedTimer {
   ScopedTimer(const std::string& name,
               bool verbose,
               int verbosity,
-              bool elapsed_only = true);
+              bool elapsed_only = true,
+              bool verbosity_disables = false);
 
   ~ScopedTimer();
 
@@ -65,6 +68,7 @@ class ScopedTimer {
   bool verbose_;
   int verbosity_;
   bool elapsed_only_;
+  bool verbosity_disables_;
 };
 
 }  // namespace kimera
