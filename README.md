@@ -1,4 +1,8 @@
-## Kimera-DSG
+## Kimera-DSG-Builder
+
+Code to build DSGs (both offline and incrementally)
+
+### Quick Start
 
 Requirements (you likely have them):
 
@@ -33,6 +37,17 @@ catkin build
 :warning: If you're getting errors with nanoflann (for `kimera_topology` or `pybind11`) you may need to go manually initialize those submodules (go to the appropriate repo and run `git submodule update --init --recursive`).
 
 File any and all build errors as an issue
+
+### Using a Semantic Segmentation Network
+
+Add `semantic_recolor` to your workspace via:
+
+```
+roscd && cd ../src
+wstool merge kimera_dsg_builder/install/semantic_overlay.rosinstall
+```
+
+Then, follow the instructions to install cuda and other dependencies for the `semantic_recolor` package (which can be found [here](https://github.mit.edu/SPARK/semantic_recolor_nodelet#semantic-recolor-utilities)).
 
 ### Components
 
