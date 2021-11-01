@@ -20,7 +20,9 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
  public:
   using Ptr = std::shared_ptr<DsgBackend>;
 
-  DsgBackend(const ros::NodeHandle nh, const SharedDsgInfo::Ptr& dsg);
+  DsgBackend(const ros::NodeHandle nh,
+             const SharedDsgInfo::Ptr& dsg,
+             const SharedDsgInfo::Ptr& backend_dsg);
 
   ~DsgBackend();
 
@@ -62,7 +64,12 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void updateDsgMesh();
 
+  void updatePlaceMeshMapping();
+
   void optimize();
+
+  void callUpdateFunctions(const gtsam::Values& places_values = gtsam::Values(),
+                           const gtsam::Values& pgmo_values = gtsam::Values());
 
   void logStatus(bool init = false) const;
 
@@ -70,11 +77,13 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   ros::NodeHandle nh_;
   std::atomic<bool> should_shutdown_{false};
 
-  SharedDsgInfo::Ptr dsg_;
+  SharedDsgInfo::Ptr shared_dsg_;
+  SharedDsgInfo::Ptr private_dsg_;
 
   int robot_id_;
   bool add_places_to_deformation_graph_;
   bool optimize_on_lc_;
+  bool enable_node_merging_;
 
   char robot_prefix_;
   char robot_vertex_prefix_;

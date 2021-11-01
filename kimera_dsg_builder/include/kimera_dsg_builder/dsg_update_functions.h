@@ -5,29 +5,34 @@
 namespace kimera {
 
 using LayerUpdateFunc = std::function<
-    void(const DynamicSceneGraph&, const gtsam::Values&, const gtsam::Values&)>;
+    void(DynamicSceneGraph&, const gtsam::Values&, const gtsam::Values&, bool)>;
 
 namespace dsg_updates {
 
-void updateObjects(const DynamicSceneGraph& graph,
+void updateObjects(DynamicSceneGraph& graph,
                    const gtsam::Values& places_values,
-                   const gtsam::Values& pgmo_values);
+                   const gtsam::Values& pgmo_values,
+                   bool allow_node_merging);
 
-void updatePlaces(const DynamicSceneGraph& graph,
+void updatePlaces(DynamicSceneGraph& graph,
                   const gtsam::Values& places_values,
-                  const gtsam::Values& pgmo_values);
+                  const gtsam::Values& pgmo_values,
+                  bool allow_node_merging);
 
-void updateRooms(const DynamicSceneGraph& graph,
+void updateRooms(DynamicSceneGraph& graph,
                  const gtsam::Values& places_values,
-                 const gtsam::Values& pgmo_values);
+                 const gtsam::Values& pgmo_values,
+                 bool allow_node_merging);
 
-void updateBuildings(const DynamicSceneGraph& graph,
+void updateBuildings(DynamicSceneGraph& graph,
                      const gtsam::Values& places_values,
-                     const gtsam::Values& pgmo_values);
+                     const gtsam::Values& pgmo_values,
+                     bool allow_node_merging);
 
-void updateAgents(const DynamicSceneGraph& graph,
+void updateAgents(DynamicSceneGraph& graph,
                   const gtsam::Values& places_values,
-                  const gtsam::Values& pgmo_values);
+                  const gtsam::Values& pgmo_values,
+                  bool allow_node_merging);
 
 }  // namespace dsg_updates
 

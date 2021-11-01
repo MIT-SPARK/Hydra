@@ -171,6 +171,9 @@ void MeshSegmenter::archiveOldObjects(const DynamicSceneGraph& graph,
                                       double latest_timestamp) {
   std::list<NodeId> removed_nodes;
   for (const auto id_time_pair : active_object_timestamps_) {
+    if (!graph.hasNode(id_time_pair.first)) {
+      continue;
+    }
     if (latest_timestamp - id_time_pair.second > active_object_horizon_s_) {
       const NodeId curr_id = id_time_pair.first;
       removed_nodes.push_back(curr_id);
@@ -222,7 +225,12 @@ void MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
                                 double timestamp) {
   for (const auto& cluster : clusters) {
     bool matches_prev_object = false;
+    std::vector<NodeId> nodes_not_in_graph;
     for (const auto& prev_node_id : active_objects_.at(label)) {
+      if (!graph.hasNode(prev_node_id)) {
+        nodes_not_in_graph.push_back(prev_node_id);
+        continue;
+      }
       const SceneGraphNode& prev_node = graph.getNode(prev_node_id).value();
       if (objectsMatch(cluster, prev_node)) {
         updateObjectInGraph(graph, cluster, prev_node, timestamp);
@@ -233,6 +241,12 @@ void MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
 
     if (!matches_prev_object) {
       addObjectToGraph(graph, cluster, label, timestamp);
+    }
+
+    // Remove the nodes that do not exist in graph
+    for (const auto& node_id : nodes_not_in_graph) {
+      active_object_timestamps_.erase(node_id);
+      active_objects_[label].erase(node_id);
     }
   }
 }

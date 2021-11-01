@@ -23,11 +23,12 @@ int main(int argc, char* argv[]) {
                                               {KimeraDsgLayers::ROOMS, 'r'},
                                               {KimeraDsgLayers::BUILDINGS, 'b'}};
 
-  SharedDsgInfo::Ptr dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));
+  SharedDsgInfo::Ptr frontend_dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));
+  SharedDsgInfo::Ptr backend_dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));
 
   {  // scope for frontend / backend pair
-    kimera::incremental::DsgBackend backend(nh, dsg);
-    kimera::incremental::DsgFrontend frontend(nh, dsg);
+    kimera::incremental::DsgBackend backend(nh, frontend_dsg, backend_dsg);
+    kimera::incremental::DsgFrontend frontend(nh, frontend_dsg);
 
     frontend.start();
     backend.start();

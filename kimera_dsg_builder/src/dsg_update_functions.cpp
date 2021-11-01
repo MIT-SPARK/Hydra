@@ -10,10 +10,12 @@ namespace kimera {
 namespace dsg_updates {
 
 using MeshVertices = DynamicSceneGraph::MeshVertices;
+using Node = SceneGraph::Node;
 
-void updateObjects(const DynamicSceneGraph& graph,
+void updateObjects(DynamicSceneGraph& graph,
                    const gtsam::Values&,
-                   const gtsam::Values&) {
+                   const gtsam::Values&,
+                   bool allow_node_merging) {
   if (!graph.hasLayer(KimeraDsgLayers::OBJECTS)) {
     return;
   }
@@ -21,6 +23,8 @@ void updateObjects(const DynamicSceneGraph& graph,
   const SceneGraphLayer& layer = *graph.getLayer(KimeraDsgLayers::OBJECTS);
   MeshVertices::Ptr mesh = graph.getMeshVertices();
 
+  std::vector<std::pair<NodeId, NodeId> > nodes_to_merge;
+  std::map<SemanticLabel, std::vector<NodeId> > semantic_nodes_map;
   for (const auto& id_node_pair : layer.nodes()) {
     auto& attrs = id_node_pair.second->attributes<ObjectNodeAttributes>();
 
@@ -46,19 +50,65 @@ void updateObjects(const DynamicSceneGraph& graph,
     pcl::PointXYZ pcl_pos;
     centroid.get(pcl_pos);
     attrs.position << pcl_pos.x, pcl_pos.y, pcl_pos.z;
+
+    if (allow_node_merging) {
+      bool to_be_merged = false;
+      // TODO(yun) faster and smarter way to find overlap?
+      if (semantic_nodes_map.count(attrs.semantic_label) > 0) {
+        for (const auto& node_target_id :
+             semantic_nodes_map[attrs.semantic_label]) {
+          if (graph.hasEdge(id_node_pair.first, node_target_id)) {
+            // Do not merge two nodes already connected by an edge
+            continue;
+          }
+          const Node& node_target = layer.getNode(node_target_id).value();
+          auto& attrs_target = node_target.attributes<ObjectNodeAttributes>();
+          // Check for overlap
+          if ((attrs_target.position - attrs.position).norm() <
+              (attrs.bounding_box.max - attrs.bounding_box.min).norm()) {
+            nodes_to_merge.push_back({id_node_pair.first, node_target_id});
+            to_be_merged = true;
+            break;
+            // TODO(Yun) Merge ones with larger overlap? For now assume more
+            // will be merged next round
+          }
+        }
+      } else {
+        semantic_nodes_map[attrs.semantic_label] = std::vector<NodeId>();
+      }
+      if (!to_be_merged) {
+        // Prohibit merging to a node that is already to be merged
+        semantic_nodes_map[attrs.semantic_label].push_back(id_node_pair.first);
+      }
+    }
   }
+  if (nodes_to_merge.size() > 0) {
+    LOG(INFO) << "In DSG update, found " << nodes_to_merge.size()
+              << " pairs of overlapping objects. Merging...";
+    for (const auto& node_pair : nodes_to_merge) {
+      graph.mergeNodes(node_pair.first, node_pair.second);
+    }
+  }
+  // TODO(yun) trigger to regenerate object place parents... or leave as is?
 }
 
-void updatePlaces(const DynamicSceneGraph& graph,
+void updatePlaces(DynamicSceneGraph& graph,
                   const gtsam::Values& values,
-                  const gtsam::Values&) {
+                  const gtsam::Values&,
+                  bool allow_node_merging) {
   if (!graph.hasLayer(KimeraDsgLayers::PLACES)) {
+    return;
+  }
+
+  if (values.size() == 0) {
     return;
   }
 
   const SceneGraphLayer& layer = graph.getLayer(KimeraDsgLayers::PLACES).value();
 
   std::unordered_set<NodeId> missing_nodes;
+  std::vector<NodeId> updated_nodes;
+  std::vector<std::pair<NodeId, NodeId> > nodes_to_merge;
   for (const auto& id_node_pair : layer.nodes()) {
     if (!values.exists(id_node_pair.first)) {
       missing_nodes.insert(id_node_pair.first);
@@ -68,8 +118,53 @@ void updatePlaces(const DynamicSceneGraph& graph,
     id_node_pair.second->attributes().position =
         values.at<gtsam::Pose3>(id_node_pair.first).translation();
 
-    // TODO(nathan) consider updating distance via parents + deformation graph
+    if (auto* attrs = dynamic_cast<PlaceNodeAttributes*>(
+            id_node_pair.second->getAttributesPtr())) {
+      attrs->position =
+          values.at<gtsam::Pose3>(id_node_pair.first).translation();
+
+      // TODO(nathan) consider updating distance via parents + deformation graph
+
+      // TODO(yun) faster and smarter way to find overlap?
+      double threshold = 0.1;  // TODO make this a parameter
+      double tolerance = 0.01;
+      bool to_be_merged = false;
+      // Only try merge if is not active
+      if (!attrs->is_active) {
+        for (const auto& node_target_id : updated_nodes) {
+          if (graph.hasEdge(id_node_pair.first, node_target_id)) {
+            // Do not merge nodes already connected by an edge
+            continue;
+          }
+
+          const Node& node_target = layer.getNode(node_target_id).value();
+          auto& attrs_target = node_target.attributes<PlaceNodeAttributes>();
+
+          // Check for overlap
+          if ((attrs->position - attrs_target.position).norm() < threshold &&
+              abs(attrs->distance - attrs_target.distance) < tolerance) {
+            nodes_to_merge.push_back({id_node_pair.first, node_target_id});
+            to_be_merged = true;
+            break;
+          }
+        }
+
+        if (!to_be_merged) {
+          // Prohibit merging to a node that is already to be merged
+          updated_nodes.push_back(id_node_pair.first);
+        }
+      }
+    }
   }
+
+  if (nodes_to_merge.size() > 0) {
+    LOG(INFO) << "In DSG update, found " << nodes_to_merge.size()
+              << " pairs of overlapping places. Merging...";
+    for (const auto& node_pair : nodes_to_merge) {
+      graph.mergeNodes(node_pair.first, node_pair.second);
+    }
+  }
+  // TODO(yun) regenerate rooms. Or trigger to regenerate rooms.
 
   if (!missing_nodes.empty()) {
     LOG(WARNING) << "[Places Layer]: could not update "
@@ -78,9 +173,10 @@ void updatePlaces(const DynamicSceneGraph& graph,
 }
 
 // TODO(nathan) add unit test for this
-void updateRooms(const DynamicSceneGraph& graph,
+void updateRooms(DynamicSceneGraph& graph,
                  const gtsam::Values&,
-                 const gtsam::Values&) {
+                 const gtsam::Values&,
+                 bool) {
   if (!graph.hasLayer(KimeraDsgLayers::ROOMS)) {
     return;
   }
@@ -91,9 +187,10 @@ void updateRooms(const DynamicSceneGraph& graph,
   }
 }
 
-void updateBuildings(const DynamicSceneGraph& graph,
+void updateBuildings(DynamicSceneGraph& graph,
                      const gtsam::Values&,
-                     const gtsam::Values&) {
+                     const gtsam::Values&,
+                     bool) {
   if (!graph.hasLayer(KimeraDsgLayers::BUILDINGS)) {
     return;
   }
@@ -115,9 +212,14 @@ void updateBuildings(const DynamicSceneGraph& graph,
   }
 }
 
-void updateAgents(const DynamicSceneGraph& graph,
+void updateAgents(DynamicSceneGraph& graph,
                   const gtsam::Values&,
-                  const gtsam::Values& values) {
+                  const gtsam::Values& values,
+                  bool) {
+  if (values.size() == 0) {
+    return;
+  }
+
   const LayerId desired_layer = KimeraDsgLayers::AGENTS;
 
   for (const auto& prefix_layer_pair : graph.dynamicLayersOfType(desired_layer)) {

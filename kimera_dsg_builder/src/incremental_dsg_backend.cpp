@@ -65,10 +65,13 @@ KimeraRPGO::Solver parseSolverFromString(const std::string& solver_str) {
   }
 }
 
-DsgBackend::DsgBackend(const ros::NodeHandle nh, const SharedDsgInfo::Ptr& dsg)
+DsgBackend::DsgBackend(const ros::NodeHandle nh,
+                       const SharedDsgInfo::Ptr& dsg,
+                       const SharedDsgInfo::Ptr& backend_dsg)
     : KimeraPgmoInterface(),
       nh_(nh),
-      dsg_(dsg),
+      shared_dsg_(dsg),
+      private_dsg_(backend_dsg),
       robot_id_(0),
       add_places_to_deformation_graph_(true),
       optimize_on_lc_(true),
@@ -85,6 +88,7 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh, const SharedDsgInfo::Ptr& dsg)
   ros::NodeHandle dsg_nh(nh_, "dsg");
   dsg_nh.getParam("add_places_to_deformation_graph", add_places_to_deformation_graph_);
   dsg_nh.getParam("optimize_on_lc", optimize_on_lc_);
+  dsg_nh.getParam("enable_node_merging", enable_node_merging_);
 
   KimeraRPGO::RobustSolverParams params = deformation_graph_->getParams();
 
@@ -158,7 +162,7 @@ void DsgBackend::startVisualizer() {
   // (rviz frame-rate drops significantly after ~15 seconds)
   // visualizer_->addPlugin(std::make_shared<VoxbloxMeshPlugin>(nh, "dsg_mesh"));
 
-  visualizer_->setGraph(dsg_->graph);
+  visualizer_->setGraph(private_dsg_->graph);
 
   visualizer_thread_.reset(new std::thread(&DsgBackend::runVisualizer, this));
 }
@@ -170,13 +174,13 @@ void DsgBackend::runVisualizer() {
     visualizer_queue_->callAvailable(ros::WallDuration(0));
 
     // TODO(nathan) this is janky, avoid weird updated / redraw split
-    if (dsg_->updated) {
+    if (private_dsg_->updated) {
       visualizer_->setGraphUpdated();
-      dsg_->updated = false;
+      private_dsg_->updated = false;
     }
 
     {  // start graph update critical section
-      std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
+      std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
       visualizer_->redraw();
     }  // end graph update critical section
 
@@ -210,9 +214,9 @@ void DsgBackend::poseGraphCallback(const PoseGraph::ConstPtr& msg) {
 
 void DsgBackend::startPgmo() {
   {  // start graph update critical section
-    std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-    if (!dsg_->graph->hasDynamicLayer(KimeraDsgLayers::AGENTS, robot_prefix_)) {
-      dsg_->graph->createDynamicLayer(KimeraDsgLayers::AGENTS, robot_prefix_);
+    std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
+    if (!private_dsg_->graph->hasDynamicLayer(KimeraDsgLayers::AGENTS, robot_prefix_)) {
+      private_dsg_->graph->createDynamicLayer(KimeraDsgLayers::AGENTS, robot_prefix_);
     }
   }  // end graph update critical section
 
@@ -260,11 +264,22 @@ void DsgBackend::runPgmo() {
       }
       status_.trajectory_len_ = trajectory_.size();
 
+      // TODO(Yun) Fix to update with only new changes while ignoring old
+      {
+        std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
+        std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
+        private_dsg_->graph->mergeGraph(*shared_dsg_->graph);
+      }
+
+      updatePlaceMeshMapping();
+
       if (optimize_on_lc_ && prev_loop_closures != num_loop_closures_) {
         ScopedTimer optimize_timer("pgmo/optimize");
         optimize();
         // we already filled the mesh from the latest message via optimze
         have_new_mesh_ = false;
+      } else {
+        callUpdateFunctions();
       }
 
       if (have_new_mesh_) {
@@ -300,10 +315,12 @@ void DsgBackend::addNewAgentPoses() {
   const auto& trajectory = trajectory_;
 
   const DynamicSceneGraphLayer& agent_layer =
-      dsg_->graph->getDynamicLayer(KimeraDsgLayers::AGENTS, robot_prefix_)->get();
+      private_dsg_->graph
+          ->getDynamicLayer(KimeraDsgLayers::AGENTS, robot_prefix_)
+          ->get();
 
   {  // start graph update critical section
-    std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
+    std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
 
     for (size_t i = agent_layer.numNodes(); i < trajectory.size(); ++i) {
       Eigen::Vector3d position = trajectory[i].translation();
@@ -312,7 +329,7 @@ void DsgBackend::addNewAgentPoses() {
       // TODO(nathan) implicit assumption that pgmo ids are sequential starting at 0
       NodeSymbol pgmo_key(robot_prefix_, i);
 
-      dsg_->graph->emplaceDynamicNode(
+      private_dsg_->graph->emplaceDynamicNode(
           agent_layer.id,
           agent_layer.prefix,
           std::chrono::nanoseconds(timestamps_.at(i).toNSec()),
@@ -322,8 +339,9 @@ void DsgBackend::addNewAgentPoses() {
 }
 
 void DsgBackend::addPlacesToDeformationGraph() {
-  CHECK(dsg_->graph->hasLayer(KimeraDsgLayers::PLACES));
-  const SceneGraphLayer& places = *(dsg_->graph->getLayer(KimeraDsgLayers::PLACES));
+  CHECK(shared_dsg_->graph->hasLayer(KimeraDsgLayers::PLACES));
+  const SceneGraphLayer& places =
+      *(shared_dsg_->graph->getLayer(KimeraDsgLayers::PLACES));
 
   if (places.nodes().empty()) {
     LOG(WARNING) << "Attempting to add places to deformation graph with empty "
@@ -382,16 +400,72 @@ void DsgBackend::updateDsgMesh() {
       deformation_graph_->deformMesh(input_mesh, robot_vertex_prefix_);
 
   {  // start graph update critical section
-    std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-    dsg_->graph->setMeshDirectly(opt_mesh);
-    dsg_->updated = true;
+    std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
+    private_dsg_->graph->setMeshDirectly(opt_mesh);
+    private_dsg_->updated = true;
   }  // end graph update critical section
+}
+
+void DsgBackend::updatePlaceMeshMapping() {
+  {  // get block mesh mapping from shared dsg
+    std::unique_lock<std::mutex> lock(shared_dsg_->mutex);
+    *private_dsg_->block_mesh_mapping = *shared_dsg_->block_mesh_mapping;
+  }
+
+  std::unique_lock<std::mutex> lock(private_dsg_->mutex);
+
+  const SceneGraphLayer& places_layer =
+      private_dsg_->graph->getLayer(KimeraDsgLayers::PLACES).value();
+
+  size_t num_invalid = 0;
+  for (const auto& id_node_pair : places_layer.nodes()) {
+    auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
+    if (!attrs.is_active) {
+      continue;
+    }
+
+    if (attrs.voxblox_mesh_connections.empty()) {
+      continue;
+    }
+
+    // reset connections (and mark inactive to avoid processing outside active
+    // window)
+    attrs.is_active = false;
+    attrs.pcl_mesh_connections.clear();
+    attrs.pcl_mesh_connections.reserve(attrs.voxblox_mesh_connections.size());
+
+    for (const auto& connection : attrs.voxblox_mesh_connections) {
+      voxblox::BlockIndex index =
+          Eigen::Map<const voxblox::BlockIndex>(connection.block);
+      if (!private_dsg_->block_mesh_mapping->count(index)) {
+        num_invalid++;
+        continue;
+      }
+
+      const auto& vertex_mapping = private_dsg_->block_mesh_mapping->at(index);
+      if (!vertex_mapping.count(connection.vertex)) {
+        num_invalid++;
+        continue;
+      }
+
+      attrs.pcl_mesh_connections.push_back(
+          vertex_mapping.at(connection.vertex));
+    }
+  }
+
+  // TODO(nathan) prune removed blocks? requires more of a handshake with gvd
+  // integrator
+
+  if (num_invalid) {
+    VLOG(2) << "[DSG Backend] Place-Mesh Update: " << num_invalid
+            << " invalid connections";
+  }
 }
 
 void DsgBackend::optimize() {
   if (add_places_to_deformation_graph_) {
     {  // start dsg mutex critical section
-      std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
+      std::unique_lock<std::mutex> graph_lock(shared_dsg_->mutex);
       addPlacesToDeformationGraph();
     }  // end dsg mutex critical section
   }
@@ -406,14 +480,18 @@ void DsgBackend::optimize() {
   gtsam::Values pgmo_values = deformation_graph_->getGtsamValues();
   gtsam::Values places_values = deformation_graph_->getGtsamTempValues();
 
+  callUpdateFunctions(places_values, pgmo_values);
+}
+
+void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,
+                                     const gtsam::Values& pgmo_values) {
+  std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
   for (const auto& update_func : dsg_update_funcs_) {
-    {  // start dsg mutex critical section
-      std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-      // TODO(nathan) might need diferrent values
-      update_func(*dsg_->graph, places_values, pgmo_values);
-      dsg_->updated = true;
-    }  // end dsg mutex criticial section
+    // TODO(nathan) might need diferrent values
+    update_func(
+        *private_dsg_->graph, places_values, pgmo_values, enable_node_merging_);
   }
+  private_dsg_->updated = true;
 }
 
 void DsgBackend::logStatus(bool init) const {

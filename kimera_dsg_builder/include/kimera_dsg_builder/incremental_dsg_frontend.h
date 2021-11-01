@@ -58,8 +58,6 @@ class DsgFrontend {
 
   void addPlaceObjectEdges(NodeIdSet* extra_objects_to_check = nullptr);
 
-  void updatePlaceMeshMapping();
-
   void updateBuildingNode();
 
  private:

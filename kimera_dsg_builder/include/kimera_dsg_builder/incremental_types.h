@@ -1,5 +1,6 @@
 #pragma once
 #include <kimera_dsg/dynamic_scene_graph.h>
+#include <kimera_pgmo/utils/CommonStructs.h>
 
 #include <atomic>
 #include <map>
@@ -24,10 +25,12 @@ struct SharedDsgInfo {
     }
 
     graph.reset(new DynamicSceneGraph(layer_ids, mesh_layer_id));
+    block_mesh_mapping.reset(new kimera_pgmo::VoxbloxIndexMapping);
   }
 
   std::mutex mutex;
   DynamicSceneGraph::Ptr graph;
+  std::shared_ptr<kimera_pgmo::VoxbloxIndexMapping> block_mesh_mapping;
   std::atomic<bool> updated;
 };
 

@@ -29,7 +29,7 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
   graph.emplaceNode(KimeraDsgLayers::OBJECTS, 0, std::move(attrs));
 
   gtsam::Values values;
-  dsg_updates::updateObjects(graph, values, values);
+  dsg_updates::updateObjects(graph, values, values, false);
 
   const ObjectNodeAttributes& result =
       graph.getNode(0)->get().attributes<ObjectNodeAttributes>();
@@ -56,7 +56,7 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
   graph.insertMeshEdge(0, 0);
   graph.insertMeshEdge(0, 1);
 
-  dsg_updates::updateObjects(graph, values, values);
+  dsg_updates::updateObjects(graph, values, values, false);
 
   {
     // valid mesh: things should change
@@ -68,6 +68,81 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
 
     Eigen::Vector3f expected_max(1.0, 2.0, 3.0);
     EXPECT_NEAR(0.0, (expected_max - result.bounding_box.max).norm(), 1.0e-7);
+  }
+}
+
+TEST(DsgInterpolationTests, ObjectUpdateMerge) {
+  DynamicSceneGraph graph;
+  ObjectNodeAttributes::Ptr attrs0(new ObjectNodeAttributes);
+  attrs0->position << 1.0, 2.0, 3.0;
+  attrs0->bounding_box.type = BoundingBox::Type::AABB;
+  attrs0->bounding_box.min << 1.0f, 2.0f, 3.0f;
+  attrs0->bounding_box.max << 1.0f, 2.0f, 3.0f;
+  attrs0->semantic_label = 1u;
+  ObjectNodeAttributes::Ptr attrs1(new ObjectNodeAttributes);
+  attrs1->position << 2.0, 3.0, 4.0;
+  attrs1->bounding_box.type = BoundingBox::Type::AABB;
+  attrs1->bounding_box.min << 2.0f, 3.0f, 4.0f;
+  attrs1->bounding_box.max << 2.0f, 3.0f, 4.0f;
+  attrs1->semantic_label = 1u;
+  graph.emplaceNode(KimeraDsgLayers::OBJECTS, 0, std::move(attrs0));
+  graph.emplaceNode(KimeraDsgLayers::OBJECTS, 1, std::move(attrs1));
+
+  gtsam::Values values;
+  dsg_updates::updateObjects(graph, values, values, true);
+
+  const ObjectNodeAttributes& result0 =
+      graph.getNode(0)->get().attributes<ObjectNodeAttributes>();
+  const ObjectNodeAttributes& result1 =
+      graph.getNode(1)->get().attributes<ObjectNodeAttributes>();
+
+  {
+    // No mesh, so nothing should change
+    Eigen::Vector3d expected_pos0(1.0, 2.0, 3.0);
+    EXPECT_NEAR(0.0, (expected_pos0 - result0.position).norm(), 1.0e-7);
+
+    Eigen::Vector3f expected_min0(1.0, 2.0, 3.0);
+    EXPECT_NEAR(0.0, (expected_min0 - result0.bounding_box.min).norm(), 1.0e-7);
+
+    Eigen::Vector3f expected_max0(1.0, 2.0, 3.0);
+    EXPECT_NEAR(0.0, (expected_max0 - result0.bounding_box.max).norm(), 1.0e-7);
+
+    Eigen::Vector3d expected_pos1(2.0, 3.0, 4.0);
+    EXPECT_NEAR(0.0, (expected_pos1 - result1.position).norm(), 1.0e-7);
+
+    Eigen::Vector3f expected_min1(2.0, 3.0, 4.0);
+    EXPECT_NEAR(0.0, (expected_min1 - result1.bounding_box.min).norm(), 1.0e-7);
+
+    Eigen::Vector3f expected_max1(2.0, 3.0, 4.0);
+    EXPECT_NEAR(0.0, (expected_max1 - result1.bounding_box.max).norm(), 1.0e-7);
+  }
+
+  MeshVertices::Ptr cloud(new MeshVertices);
+  MAKE_POINT(cloud, -1.0, -2.0, -3.0);
+  MAKE_POINT(cloud, 1.0, 2.0, 3.0);
+
+  std::shared_ptr<MeshFaces> faces(new MeshFaces());
+  graph.setMesh(cloud, faces);
+
+  graph.insertMeshEdge(0, 0);
+  graph.insertMeshEdge(0, 1);
+  graph.insertMeshEdge(1, 0);
+  graph.insertMeshEdge(1, 1);
+
+  dsg_updates::updateObjects(graph, values, values, true);
+
+  {
+    // valid mesh: things should change
+    Eigen::Vector3d expected_pos(0.0, 0.0, 0.0);
+    EXPECT_NEAR(0.0, (expected_pos - result0.position).norm(), 1.0e-7);
+
+    Eigen::Vector3f expected_min(-1.0, -2.0, -3.0);
+    EXPECT_NEAR(0.0, (expected_min - result0.bounding_box.min).norm(), 1.0e-7);
+
+    Eigen::Vector3f expected_max(1.0, 2.0, 3.0);
+    EXPECT_NEAR(0.0, (expected_max - result0.bounding_box.max).norm(), 1.0e-7);
+
+    EXPECT_FALSE(graph.hasNode(1));
   }
 }
 
@@ -110,7 +185,7 @@ TEST(DsgInterpolationTests, BuildingUpdate) {
   graph.insertEdge(1, 2);
 
   gtsam::Values values;
-  dsg_updates::updateBuildings(graph, values, values);
+  dsg_updates::updateBuildings(graph, values, values, false);
 
   Eigen::Vector3d first_expected(-1.0, 0.0, 1.0);
   Eigen::Vector3d first_result = graph.getPosition(0);
@@ -145,7 +220,7 @@ TEST(DsgInterpolationTests, PlaceUpdate) {
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
   gtsam::Values pgmo_values;
-  dsg_updates::updatePlaces(graph, values, pgmo_values);
+  dsg_updates::updatePlaces(graph, values, pgmo_values, false);
 
   {  // first key exists: new value
     Eigen::Vector3d expected(4.0, 5.0, 6.0);
@@ -164,6 +239,53 @@ TEST(DsgInterpolationTests, PlaceUpdate) {
     Eigen::Vector3d result = graph.getPosition(NodeSymbol('p', 6));
     EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
   }
+}
+
+TEST(DsgInterpolationTests, PlaceUpdateMerge) {
+  const LayerId place_layer = KimeraDsgLayers::PLACES;
+  DynamicSceneGraph graph;
+  PlaceNodeAttributes::Ptr attrs0(new PlaceNodeAttributes);
+  attrs0->position << 1.0, 2.0, 3.0;
+  attrs0->distance = 1.0;
+  attrs0->is_active = false;
+  PlaceNodeAttributes::Ptr attrs5(new PlaceNodeAttributes);
+  attrs5->position << 1.0, 2.0, 3.0;
+  attrs5->distance = 1.0;
+  attrs5->is_active = false;
+  PlaceNodeAttributes::Ptr attrs6(new PlaceNodeAttributes);
+  attrs6->position << 1.0, 2.0, 3.0;
+  attrs6->distance = 1.0;
+  attrs6->is_active = false;
+
+  graph.emplaceNode(place_layer, NodeSymbol('p', 0), std::move(attrs0));
+  graph.emplaceNode(place_layer, NodeSymbol('p', 5), std::move(attrs5));
+  graph.emplaceNode(place_layer, NodeSymbol('p', 6), std::move(attrs6));
+
+  gtsam::Values values;
+  values.insert(NodeSymbol('p', 0),
+                gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(4.0, 5.0, 6.0)));
+  values.insert(NodeSymbol('p', 5),
+                gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
+  values.insert(NodeSymbol('p', 6),
+                gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
+
+  gtsam::Values pgmo_values;
+  dsg_updates::updatePlaces(graph, values, pgmo_values, true);
+
+  // {  // first key exists: new value
+  //   Eigen::Vector3d expected(4.0, 5.0, 6.0);
+  //   Eigen::Vector3d result = graph.getPosition(NodeSymbol('p', 0));
+  //   EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
+  // }
+
+  // {  // non-zero key exists: new value
+  //   Eigen::Vector3d expected(7.0, 8.0, 9.0);
+  //   Eigen::Vector3d result = graph.getPosition(NodeSymbol('p', 5));
+  //   EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
+  // }
+
+  // // node p6 merged with node p5
+  // EXPECT_FALSE(graph.hasNode(NodeSymbol('p', 6)));
 }
 
 TEST(DsgInterpolationTests, AgentUpdate) {
@@ -207,7 +329,7 @@ TEST(DsgInterpolationTests, AgentUpdate) {
       gtsam::Pose3(gtsam::Rot3(0.0, 0.0, 1.0, 0.0), gtsam::Point3(7.0, 8.0, 9.0)));
 
   gtsam::Values places_values;
-  dsg_updates::updateAgents(graph, places_values, agent_values);
+  dsg_updates::updateAgents(graph, places_values, agent_values, false);
 
   {  // external_key == node_id and in values
     const auto& attrs = graph.getDynamicNode(NodeSymbol('a', 0))

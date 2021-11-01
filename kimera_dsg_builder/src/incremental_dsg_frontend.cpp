@@ -153,7 +153,13 @@ void DsgFrontend::runMeshFrontend() {
 
     if (have_new_mesh && last_mesh_timestamp_ == last_places_timestamp_) {
       ScopedTimer timer("frontend/place_mesh_mapping", true, 1, false);
-      updatePlaceMeshMapping();
+      {  // start dsg critical region
+        std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
+        *dsg_->block_mesh_mapping = mesh_frontend_.getVoxbloxMsgMapping();
+        // TODO(Yun) add faces also? (Currently not needed)
+        dsg_->graph->setMesh(mesh_frontend_.getFullMeshVertices(),
+                             std::make_shared<std::vector<pcl::Vertices>>());
+      }
 
       dsg_->updated = true;
       have_new_mesh = false;
@@ -392,56 +398,6 @@ void DsgFrontend::addPlaceObjectEdges(NodeIdSet* extra_objects_to_check) {
 
     segmenter_->pruneObjectsToCheckForPlaces(*dsg_->graph);
   }  // end graph update critical section
-}
-
-void DsgFrontend::updatePlaceMeshMapping() {
-  std::unique_lock<std::mutex> lock(dsg_->mutex);
-
-  const SceneGraphLayer& places_layer =
-      dsg_->graph->getLayer(KimeraDsgLayers::PLACES).value();
-
-  const auto& index_mapping = mesh_frontend_.getVoxbloxMsgMapping();
-
-  size_t num_invalid = 0;
-  for (const auto& id_node_pair : places_layer.nodes()) {
-    auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
-    if (!attrs.is_active) {
-      continue;
-    }
-
-    if (attrs.voxblox_mesh_connections.empty()) {
-      continue;
-    }
-
-    // reset connections (and mark inactive to avoid processing outside active window)
-    attrs.is_active = false;
-    attrs.pcl_mesh_connections.clear();
-    attrs.pcl_mesh_connections.reserve(attrs.voxblox_mesh_connections.size());
-
-    for (const auto& connection : attrs.voxblox_mesh_connections) {
-      voxblox::BlockIndex index =
-          Eigen::Map<const voxblox::BlockIndex>(connection.block);
-      if (!index_mapping.count(index)) {
-        num_invalid++;
-        continue;
-      }
-
-      const auto& vertex_mapping = index_mapping.at(index);
-      if (!vertex_mapping.count(connection.vertex)) {
-        num_invalid++;
-        continue;
-      }
-
-      attrs.pcl_mesh_connections.push_back(vertex_mapping.at(connection.vertex));
-    }
-  }
-
-  // TODO(nathan) prune removed blocks? requires more of a handshake with gvd integrator
-
-  if (num_invalid) {
-    VLOG(2) << "[DSG Frontend] Place-Mesh Update: " << num_invalid
-            << " invalid connections";
-  }
 }
 
 void DsgFrontend::updateBuildingNode() {
