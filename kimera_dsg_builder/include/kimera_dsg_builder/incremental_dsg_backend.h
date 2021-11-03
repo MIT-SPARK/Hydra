@@ -1,5 +1,6 @@
 #pragma once
 #include "kimera_dsg_builder/dsg_update_functions.h"
+#include "kimera_dsg_builder/incremental_room_finder.h"
 #include "kimera_dsg_builder/incremental_types.h"
 
 #include <kimera_dsg_visualizer/dynamic_scene_graph_visualizer.h>
@@ -15,6 +16,13 @@
 
 namespace kimera {
 namespace incremental {
+
+template <typename T>
+void parseParam(const ros::NodeHandle& nh, const std::string& name, T& param) {
+  int value = param;
+  nh.getParam(name, value);
+  param = value;
+}
 
 class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
  public:
@@ -71,6 +79,14 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   void callUpdateFunctions(const gtsam::Values& places_values = gtsam::Values(),
                            const gtsam::Values& pgmo_values = gtsam::Values());
 
+  ActiveNodeSet getNodesForRoomDetection(const NodeIdSet& latest_places);
+
+  void storeUnlabeledPlaces(const ActiveNodeSet active_nodes);
+
+  void updateRoomsNodes();
+
+  void updateBuildingNode();
+
   void logStatus(bool init = false) const;
 
  private:
@@ -84,12 +100,14 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   bool add_places_to_deformation_graph_;
   bool optimize_on_lc_;
   bool enable_node_merging_;
+  bool call_update_periodically_;
 
   char robot_prefix_;
   char robot_vertex_prefix_;
   kimera_pgmo::Path trajectory_;
   std::vector<ros::Time> timestamps_;
   std::queue<size_t> unconnected_nodes_;
+  NodeIdSet unlabeled_place_nodes_;
 
   ros::Subscriber full_mesh_sub_;
   ros::Subscriber deformation_graph_sub_;
@@ -98,12 +116,15 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   std::unique_ptr<DynamicSceneGraphVisualizer> visualizer_;
   std::unique_ptr<ros::CallbackQueue> visualizer_queue_;
   std::unique_ptr<std::thread> visualizer_thread_;
+  std::unique_ptr<RoomFinder> room_finder_;
 
   std::list<LayerUpdateFunc> dsg_update_funcs_;
 
   bool have_new_mesh_;
   bool have_new_poses_;
   bool have_new_deformation_graph_;
+
+  SemanticNodeAttributes::ColorVector building_color_;
 
   kimera_pgmo::TriangleMeshIdStamped::ConstPtr latest_mesh_;
   pose_graph_tools::PoseGraph::Ptr deformation_graph_updates_;

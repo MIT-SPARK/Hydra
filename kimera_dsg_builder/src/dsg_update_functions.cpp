@@ -55,8 +55,7 @@ void updateObjects(DynamicSceneGraph& graph,
       bool to_be_merged = false;
       // TODO(yun) faster and smarter way to find overlap?
       if (semantic_nodes_map.count(attrs.semantic_label) > 0) {
-        for (const auto& node_target_id :
-             semantic_nodes_map[attrs.semantic_label]) {
+        for (const auto& node_target_id : semantic_nodes_map[attrs.semantic_label]) {
           if (graph.hasEdge(id_node_pair.first, node_target_id)) {
             // Do not merge two nodes already connected by an edge
             continue;
@@ -64,8 +63,7 @@ void updateObjects(DynamicSceneGraph& graph,
           const Node& node_target = layer.getNode(node_target_id).value();
           auto& attrs_target = node_target.attributes<ObjectNodeAttributes>();
           // Check for overlap
-          if ((attrs_target.position - attrs.position).norm() <
-              (attrs.bounding_box.max - attrs.bounding_box.min).norm()) {
+          if (attrs.bounding_box.isInside(attrs_target.position)) {
             nodes_to_merge.push_back({id_node_pair.first, node_target_id});
             to_be_merged = true;
             break;
@@ -76,12 +74,14 @@ void updateObjects(DynamicSceneGraph& graph,
       } else {
         semantic_nodes_map[attrs.semantic_label] = std::vector<NodeId>();
       }
+
       if (!to_be_merged) {
         // Prohibit merging to a node that is already to be merged
         semantic_nodes_map[attrs.semantic_label].push_back(id_node_pair.first);
       }
     }
   }
+
   if (nodes_to_merge.size() > 0) {
     LOG(INFO) << "In DSG update, found " << nodes_to_merge.size()
               << " pairs of overlapping objects. Merging...";
@@ -120,8 +120,7 @@ void updatePlaces(DynamicSceneGraph& graph,
 
     if (auto* attrs = dynamic_cast<PlaceNodeAttributes*>(
             id_node_pair.second->getAttributesPtr())) {
-      attrs->position =
-          values.at<gtsam::Pose3>(id_node_pair.first).translation();
+      attrs->position = values.at<gtsam::Pose3>(id_node_pair.first).translation();
 
       // TODO(nathan) consider updating distance via parents + deformation graph
 
@@ -181,9 +180,18 @@ void updateRooms(DynamicSceneGraph& graph,
     return;
   }
 
+  std::set<NodeId> empty_rooms;
   const SceneGraphLayer& rooms = graph.getLayer(KimeraDsgLayers::ROOMS).value();
   for (const auto& id_node_pair : rooms.nodes()) {
-    incremental::updateRoomCentroid(graph, id_node_pair.first);
+    if (id_node_pair.second->children().empty()) {
+      empty_rooms.insert(id_node_pair.first);
+    } else {
+      incremental::updateRoomCentroid(graph, id_node_pair.first);
+    }
+  }
+
+  for (const auto& room : empty_rooms) {
+    graph.removeNode(room);
   }
 }
 

@@ -16,6 +16,8 @@ int main(int argc, char* argv[]) {
   google::InitGoogleLogging(argv[0]);
 
   ros::NodeHandle nh("~");
+  std::string dsg_output_path = "";
+  nh.getParam("dsg_output_path", dsg_output_path);
 
   const LayerId mesh_layer_id = 1;
   const std::map<LayerId, char>& layer_id_map{{KimeraDsgLayers::OBJECTS, 'o'},
@@ -34,6 +36,12 @@ int main(int argc, char* argv[]) {
     backend.start();
 
     ros::spin();
+  }
+
+  if (!dsg_output_path.empty()) {
+    LOG(INFO) << "[DSG Node] Saving scene graph to " << dsg_output_path;
+    backend_dsg->graph->save(dsg_output_path);
+    LOG(INFO) << "[DSG Node] Saved scene graph to " << dsg_output_path;
   }
 
   return 0;

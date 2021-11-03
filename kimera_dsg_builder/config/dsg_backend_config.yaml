@@ -2,6 +2,7 @@ dsg:
     add_places_to_deformation_graph: true
     optimize_on_lc: true
     enable_node_merging: true
+    call_update_periodically: true
     rpgo_verbosity: "update"
     rpgo_solver: "LM"
 pgmo:
@@ -12,3 +13,19 @@ pgmo:
         translation_threshold: 0.1
         rotation_threshold: 0.01
         gnc_alpha: 0.9
+enable_rooms: true
+room_finder:
+    min_dilation_m: 0.43
+    max_dilation_m: 1.2
+    num_steps: 10
+    min_component_size: 10
+    room_vote_min_overlap: 0.1
+    min_room_size: 1
+    max_kmeans_iters: 5
+    do_spectral_clustering: true
+    use_sparse_eigen_decomp: true
+    sparse_decomp_tolerance: 1.0e-2
+    max_modularity_iters: 5
+    modularity_gamma: 1.0
+    clustering_mode: "MODULARITY"
+

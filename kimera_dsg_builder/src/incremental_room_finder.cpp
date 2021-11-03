@@ -12,8 +12,6 @@
 namespace kimera {
 namespace incremental {
 
-using NodeColor = SemanticNodeAttributes::ColorVector;
-
 ClusterResults createClustersFromComponents(const Components& components) {
   ClusterResults to_return;
   to_return.valid = true;
@@ -377,14 +375,17 @@ IsolatedSceneGraphLayer::Ptr getActiveSubgraph(const SceneGraph& graph,
 
 template <typename A, typename B>
 double getOverlap(const A& lhs, const B& rhs) {
+  if (lhs.empty() || rhs.empty()) {
+    return 0.0;
+  }
+
   size_t num_same = 0;
   for (const auto& entry : lhs) {
     num_same += rhs.count(entry);
   }
 
   const double min_size = std::min(lhs.size(), rhs.size());
-  double overlap = static_cast<double>(num_same) / min_size;
-  return overlap;
+  return static_cast<double>(num_same) / min_size;
 }
 
 std::map<NodeId, size_t> mapRoomsToClusters(const ClusterResults& cluster_results,
@@ -428,6 +429,9 @@ void addNewRoomNode(SceneGraph& graph, NodeSymbol node_id) {
 
 void updateRoomCentroid(const SceneGraph& graph, NodeId room_id) {
   const SceneGraphNode& room = graph.getNode(room_id).value();
+  if (!room.hasChildren()) {
+    return;
+  }
 
   Eigen::Vector3d room_position = Eigen::Vector3d::Zero();
   for (const auto& child : room.children()) {
@@ -630,61 +634,76 @@ using RoomClusterMap = std::map<NodeId, size_t>;
 void RoomFinder::updateRoomsFromClusters(SharedDsgInfo& dsg,
                                          ClusterResults& cluster_results,
                                          const RoomMap& previous_rooms,
-                                         const RoomClusterMap& rooms_to_clusters) {
+                                         const ActiveNodeSet& active_nodes) {
+  std::unique_lock<std::mutex> graph_lock(dsg.mutex);
+  pruneClusters(*dsg.graph, cluster_results);
+
+  std::map<NodeId, size_t> rooms_to_clusters = mapRoomsToClusters(
+      cluster_results, previous_rooms, config_.room_vote_min_overlap);
+
   std::map<size_t, NodeId> clusters_to_rooms;
   for (const auto& room_cluster_pair : rooms_to_clusters) {
     clusters_to_rooms[room_cluster_pair.second] = room_cluster_pair.first;
   }
 
-  {  // start dsg critical section
-    std::unique_lock<std::mutex> graph_lock(dsg.mutex);
-    // note that this can potentially lead to problems with clusters full of recently
-    // deleted nodes potentially masking association with previous rooms (and then
-    // getting removed) when used in a different thread than the places frontend. This
-    // is probably isn't a big deal, as the overlap means that the room had a bunch of
-    // deleted children and will probably get pruned as well
-    pruneClusters(*dsg.graph, cluster_results);
-
-    std::set<NodeId> seen_rooms;
-    for (const auto id_cluster_pair : cluster_results.clusters) {
-      const bool has_association = clusters_to_rooms.count(id_cluster_pair.first);
-      if (!has_association && id_cluster_pair.second.size() < config_.min_room_size) {
-        // we can reject new nodes immediately, but previous room nodes may meet min
-        // size threshold by union of previous nodes and the new associated cluster
-        continue;
-      }
-
-      NodeId room_id;
-      if (has_association) {
-        room_id = clusters_to_rooms.at(id_cluster_pair.first);
-      } else {
-        room_id = next_room_id_;
-        addNewRoomNode(*dsg.graph, next_room_id_);
-        next_room_id_++;
-      }
-      seen_rooms.insert(room_id);
-
-      const SceneGraphNode& room_node = dsg.graph->getNode(room_id).value();
-      const auto& color = room_node.attributes<SemanticNodeAttributes>().color;
-
-      for (const auto& node_id : id_cluster_pair.second) {
-        const SceneGraphNode& child_node = dsg.graph->getNode(node_id).value();
-        dsg.graph->insertEdge(room_node.id, node_id);
-        child_node.attributes<SemanticNodeAttributes>().color = color;
-      }
+  std::set<NodeId> seen_rooms;
+  std::set<NodeId> seen_nodes;
+  for (const auto id_cluster_pair : cluster_results.clusters) {
+    const bool has_association = clusters_to_rooms.count(id_cluster_pair.first);
+    if (!has_association && id_cluster_pair.second.size() < config_.min_room_size) {
+      // we can reject new nodes immediately, but previous room nodes may meet min
+      // size threshold by union of previous nodes and the new associated cluster
+      continue;
     }
 
-    for (const auto& room : seen_rooms) {
-      updateRoomCentroid(*dsg.graph, room);
+    NodeId room_id;
+    if (has_association) {
+      room_id = clusters_to_rooms.at(id_cluster_pair.first);
+    } else {
+      room_id = next_room_id_;
+      addNewRoomNode(*dsg.graph, next_room_id_);
+      next_room_id_++;
+    }
+    seen_rooms.insert(room_id);
+
+    for (const auto& node_id : id_cluster_pair.second) {
+      const SceneGraphNode& child_node = dsg.graph->getNode(node_id).value();
+      auto parent = child_node.getParent();
+      if (parent && *parent != room_id) {
+        dsg.graph->removeEdge(*parent, node_id);
+      }
+
+      dsg.graph->insertEdge(room_id, node_id);
+      seen_nodes.insert(node_id);
+    }
+  }
+
+  for (const auto& room : seen_rooms) {
+    updateRoomCentroid(*dsg.graph, room);
+  }
+
+  for (const auto& id_room_pair : previous_rooms) {
+    const SceneGraphNode& room = dsg.graph->getNode(id_room_pair.first).value();
+    if (room.children().size() < config_.min_room_size) {
+      dsg.graph->removeNode(id_room_pair.first);
+    }
+  }
+
+  for (const auto& node_id : active_nodes) {
+    if (seen_nodes.count(node_id)) {
+      continue;
     }
 
-    for (const auto& id_room_pair : previous_rooms) {
-      const SceneGraphNode& room = dsg.graph->getNode(id_room_pair.first).value();
-      if (room.children().size() < config_.min_room_size) {
-        dsg.graph->removeNode(id_room_pair.first);
-      }
+    if (!dsg.graph->hasNode(node_id)) {
+      continue;
     }
-  }  // end dsg critical section
+
+    const SceneGraphNode& node = dsg.graph->getNode(node_id).value();
+    std::optional<NodeId> parent = node.getParent();
+    if (parent) {
+      dsg.graph->removeEdge(node_id, *parent);
+    }
+  }
 }
 
 void updateRoomEdges(SceneGraph& graph,
@@ -774,45 +793,11 @@ void RoomFinder::findRooms(SharedDsgInfo& dsg, const ActiveNodeSet& active_nodes
   }  // clustering scope
 
   if (!clusters.valid) {
-    LOG(WARNING) << "Reverting to previous rooms";
-    {  // start dsg critical section
-      std::unique_lock<std::mutex> graph_lock(dsg.mutex);
-      for (const auto& room_contents_pair : previous_rooms) {
-        const SceneGraphNode& room =
-            dsg.graph->getNode(room_contents_pair.first).value();
-        for (const auto& node : room_contents_pair.second) {
-          if (!dsg.graph->insertEdge(room_contents_pair.first, node)) {
-            continue;
-          }
-
-          dsg.graph->getNode(node)
-              .value()
-              .get()
-              .attributes<SemanticNodeAttributes>()
-              .color = room.attributes<SemanticNodeAttributes>().color;
-        }
-      }
-    }
+    LOG(WARNING) << "[Room Finder] Room clustering failed. Keeping previous rooms!";
     return;
   }
 
-  {  // start dsg critical section
-    std::unique_lock<std::mutex> graph_lock(dsg.mutex);
-    // pre-clear old edges to active nodes
-    for (const auto& node_id : active_nodes) {
-      const SceneGraphNode& node = dsg.graph->getNode(node_id).value();
-      std::optional<NodeId> parent = node.getParent();
-      if (parent) {
-        dsg.graph->removeEdge(node_id, *parent);
-        node.attributes<SemanticNodeAttributes>().color = NodeColor::Zero();
-      }
-    }
-  }  // end dsg critical section
-
-  std::map<NodeId, size_t> rooms_to_clusters =
-      mapRoomsToClusters(clusters, previous_rooms, config_.room_vote_min_overlap);
-
-  updateRoomsFromClusters(dsg, clusters, previous_rooms, rooms_to_clusters);
+  updateRoomsFromClusters(dsg, clusters, previous_rooms, active_nodes);
 
   {  // start dsg critical section
     std::unique_lock<std::mutex> graph_lock(dsg.mutex);

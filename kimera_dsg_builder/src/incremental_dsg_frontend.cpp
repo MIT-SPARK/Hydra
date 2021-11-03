@@ -7,76 +7,12 @@
 namespace kimera {
 namespace incremental {
 
-template <typename T>
-void parseParam(const ros::NodeHandle& nh, const std::string& name, T& param) {
-  int value = param;
-  nh.getParam(name, value);
-  param = value;
-}
-
-void parseRoomClusterMode(const ros::NodeHandle& nh,
-                          const std::string& name,
-                          RoomFinder::Config::ClusterMode& param) {
-  std::string clustering_mode = "MODULARITY";
-  nh.getParam(name, clustering_mode);
-
-  std::string to_check = clustering_mode;
-  std::transform(to_check.begin(), to_check.end(), to_check.begin(), [](const auto& c) {
-    return std::toupper(c);
-  });
-
-  if (to_check == "SPECTRAL") {
-    param = RoomFinder::Config::ClusterMode::SPECTRAL;
-  } else if (to_check == "MODULARITY") {
-    param = RoomFinder::Config::ClusterMode::MODULARITY;
-  } else if (to_check == "NONE") {
-    param = RoomFinder::Config::ClusterMode::NONE;
-  } else {
-    ROS_ERROR_STREAM("Unrecognized room clustering mode: " << to_check
-                                                           << ". Defaulting to NONE");
-    param = RoomFinder::Config::ClusterMode::NONE;
-  }
-}
-
 DsgFrontend::DsgFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg)
     : nh_(nh), dsg_(dsg) {
   ros::NodeHandle pgmo_nh(nh_, "pgmo");
   CHECK(mesh_frontend_.initialize(pgmo_nh, false));
   last_mesh_timestamp_ = 0;
   last_places_timestamp_ = 0;
-
-  bool enable_rooms = true;
-  nh_.getParam("enable_rooms", enable_rooms);
-  if (enable_rooms) {
-    // TODO(nathan) clean up
-    RoomFinder::Config config;
-    nh_.getParam("room_finder/min_dilation_m", config.min_dilation_m);
-    nh_.getParam("room_finder/max_dilation_m", config.max_dilation_m);
-    parseParam(nh_, "room_finder/num_steps", config.num_steps);
-    parseParam(nh_, "room_finder/min_component_size", config.min_component_size);
-    parseParam(nh_, "room_finder/max_kmeans_iters", config.max_kmeans_iters);
-    parseParam(nh_, "room_finder/min_room_size", config.min_room_size);
-    nh_.getParam("room_finder/room_vote_min_overlap", config.room_vote_min_overlap);
-    nh_.getParam("room_finder/use_sparse_eigen_decomp", config.use_sparse_eigen_decomp);
-    nh_.getParam("room_finder/sparse_decomp_tolerance", config.sparse_decomp_tolerance);
-    nh_.getParam("room_finder/max_modularity_iters", config.max_modularity_iters);
-    nh_.getParam("room_finder/modularity_gamma", config.modularity_gamma);
-    parseRoomClusterMode(nh_, "room_finder/clustering_mode", config.clustering_mode);
-    room_finder_.reset(new RoomFinder(config));
-  }
-
-  // purple
-  std::vector<double> building_color{0.662, 0.0313, 0.7607};
-  nh_.getParam("building_color", building_color);
-  if (building_color.size() != 3) {
-    ROS_ERROR_STREAM("supplied building color size " << building_color.size()
-                                                     << " != 3");
-    building_color = std::vector<double>{0.662, 0.0313, 0.7607};
-  }
-
-  building_color_ << std::clamp(static_cast<int>(255 * building_color.at(0)), 0, 255),
-      std::clamp(static_cast<int>(255 * building_color.at(1)), 0, 255),
-      std::clamp(static_cast<int>(255 * building_color.at(2)), 0, 255);
 }
 
 DsgFrontend::~DsgFrontend() {
@@ -219,50 +155,6 @@ PlacesQueueState DsgFrontend::getPlacesQueueState() {
   return {false, places_queue_.front()->header.stamp.toNSec()};
 }
 
-ActiveNodeSet DsgFrontend::getNodesForRoomDetection(const NodeIdSet& latest_places) {
-  std::unordered_set<NodeId> active_places(latest_places.begin(), latest_places.end());
-
-  // TODO(nathan) this is threadsafe as long as places and rooms are on the same thread
-  // TODO(nathan) grab this from a set of active rooms
-  const SceneGraphLayer& rooms = dsg_->graph->getLayer(KimeraDsgLayers::ROOMS).value();
-  for (const auto& id_node_pair : rooms.nodes()) {
-    active_places.insert(id_node_pair.second->children().begin(),
-                         id_node_pair.second->children().end());
-  }
-
-  // TODO(nathan) this is threadsafe as long as places and rooms are on the same thread
-  const SceneGraphLayer& places =
-      dsg_->graph->getLayer(KimeraDsgLayers::PLACES).value();
-  for (const auto& node_id : unlabeled_place_nodes_) {
-    if (!places.hasNode(node_id)) {
-      continue;
-    }
-
-    active_places.insert(node_id);
-  }
-
-  return active_places;
-}
-
-void DsgFrontend::storeUnlabeledPlaces(const ActiveNodeSet active_nodes) {
-  // TODO(nathan) this is threadsafe as long as places and rooms are on the same thread
-  const SceneGraphLayer& places =
-      dsg_->graph->getLayer(KimeraDsgLayers::PLACES).value();
-
-  unlabeled_place_nodes_.clear();
-  for (const auto& node_id : active_nodes) {
-    if (!places.hasNode(node_id)) {
-      continue;
-    }
-
-    if (places.getNode(node_id)->get().hasParent()) {
-      continue;
-    }
-
-    unlabeled_place_nodes_.insert(node_id);
-  }
-}
-
 void DsgFrontend::runPlaces() {
   ros::Rate r(10);
   while (ros::ok() && !should_shutdown_) {
@@ -280,7 +172,7 @@ void DsgFrontend::runPlaces() {
       curr_message = places_queue_.front();
     }  // end places queue critical section
 
-    NodeIdSet latest_places = processLatestPlacesMsg(curr_message);
+    processLatestPlacesMsg(curr_message);
 
     // pop the most recently processed message (to inform mesh processing that the
     // timestamp is valid)
@@ -289,21 +181,11 @@ void DsgFrontend::runPlaces() {
       places_queue_.pop();
     }  // end places queue critical section
 
-    if (room_finder_) {
-      ScopedTimer timer("frontend/room_detection", true, 1, false);
-      ActiveNodeSet active_place_nodes = getNodesForRoomDetection(latest_places);
-      room_finder_->findRooms(*dsg_, active_place_nodes);
-      storeUnlabeledPlaces(active_place_nodes);
-    }
-
-    updateBuildingNode();
-
     last_places_timestamp_ = curr_message->header.stamp.toNSec();
   }
 }
 
-DsgFrontend::NodeIdSet DsgFrontend::processLatestPlacesMsg(
-    const PlacesLayerMsg::ConstPtr& msg) {
+void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
   SceneGraphLayer temp_layer(KimeraDsgLayers::PLACES);
   std::unique_ptr<SceneGraphLayer::Edges> edges =
       temp_layer.deserializeLayer(msg->layer_contents);
@@ -364,6 +246,8 @@ DsgFrontend::NodeIdSet DsgFrontend::processLatestPlacesMsg(
         node.attributes<SemanticNodeAttributes>().color = NodeColor::Zero();
       }
     }
+
+    *dsg_->latest_places = active_nodes;
   }  // end graph update critical section
 
   addPlaceObjectEdges(&objects_to_check);
@@ -372,7 +256,7 @@ DsgFrontend::NodeIdSet DsgFrontend::processLatestPlacesMsg(
   VLOG(3) << "[Places Frontend] Places layer: " << places_layer.numNodes() << " nodes, "
           << places_layer.numEdges() << " edges";
 
-  return active_nodes;
+  return;
 }
 
 void DsgFrontend::addPlaceObjectEdges(NodeIdSet* extra_objects_to_check) {
@@ -398,43 +282,6 @@ void DsgFrontend::addPlaceObjectEdges(NodeIdSet* extra_objects_to_check) {
 
     segmenter_->pruneObjectsToCheckForPlaces(*dsg_->graph);
   }  // end graph update critical section
-}
-
-void DsgFrontend::updateBuildingNode() {
-  const NodeSymbol building_node_id('B', 0);
-  std::unique_lock<std::mutex> lock(dsg_->mutex);
-  const SceneGraphLayer& rooms_layer =
-      dsg_->graph->getLayer(KimeraDsgLayers::ROOMS).value();
-
-  if (!rooms_layer.numNodes()) {
-    if (dsg_->graph->hasNode(building_node_id)) {
-      dsg_->graph->removeNode(building_node_id);
-    }
-
-    return;
-  }
-
-  Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
-  for (const auto& id_node_pair : rooms_layer.nodes()) {
-    centroid += id_node_pair.second->attributes().position;
-  }
-  centroid /= rooms_layer.numNodes();
-
-  if (!dsg_->graph->hasNode(building_node_id)) {
-    SemanticNodeAttributes::Ptr attrs(new SemanticNodeAttributes());
-    attrs->position = centroid;
-    attrs->color = building_color_;
-    attrs->semantic_label = kBuildingSemanticLabel;
-    attrs->name = building_node_id.getLabel();
-    dsg_->graph->emplaceNode(
-        KimeraDsgLayers::BUILDINGS, building_node_id, std::move(attrs));
-  } else {
-    dsg_->graph->getNode(building_node_id)->get().attributes().position = centroid;
-  }
-
-  for (const auto& id_node_pair : rooms_layer.nodes()) {
-    dsg_->graph->insertEdge(building_node_id, id_node_pair.first);
-  }
 }
 
 }  // namespace incremental

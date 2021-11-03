@@ -116,7 +116,7 @@ bool MeshSegmenter::detectObjects(const SharedDsgInfo::Ptr& dsg,
   publishActiveVertices(active_indices);
 
   if (active_indices.empty()) {
-    LOG(INFO) << "[Object Detection] No active indices in mesh";
+    VLOG(3) << "[Object Detection] No active indices in mesh";
     return false;
   }
 

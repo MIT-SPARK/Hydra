@@ -11,7 +11,7 @@ label_scale: 0.75
 use_bounding_box: false
 bounding_box_alpha: 0.5
 # edges
-use_edge_source: false
+use_edge_source: true
 interlayer_edge_scale: 0.08
 interlayer_edge_alpha: 0.4
 interlayer_edge_use_color: true

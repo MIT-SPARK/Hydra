@@ -59,6 +59,8 @@
 
         <rosparam file="$(find kimera_dsg_builder)/config/place_mesh_graph_viz.yaml"
                   ns="pm_graph_viz"/>
+
+        <param name="dsg_output_path" value="$(find kimera_dsg_builder)/output/backend_dsg.json"/>
     </node>
 
     <node pkg="kimera_dsg_builder" type="pose_graph_publisher_node"

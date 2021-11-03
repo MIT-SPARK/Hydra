@@ -120,9 +120,7 @@ TEST(IncrementalRoomsTests, UpdateFromEmptyClustersCorrect) {
 
   ClusterResults clusters;
   RoomMap previous_rooms;
-  std::map<size_t, NodeId> rooms_to_clusters;
-
-  finder.updateRoomsFromClusters(*dsg, clusters, previous_rooms, rooms_to_clusters);
+  finder.updateRoomsFromClusters(*dsg, clusters, previous_rooms, {});
 
   const SceneGraphLayer& rooms = dsg->graph->getLayer(KimeraDsgLayers::ROOMS).value();
   EXPECT_EQ(0u, rooms.numNodes());
@@ -150,9 +148,7 @@ TEST(IncrementalRoomsTests, UpdateFromClustersWithPruningCorrect) {
   results.clusters[1] = {NodeSymbol('p', 3), NodeSymbol('p', 4)};
 
   RoomMap previous_rooms;
-  std::map<size_t, NodeId> rooms_to_clusters;
-
-  finder.updateRoomsFromClusters(*dsg, results, previous_rooms, rooms_to_clusters);
+  finder.updateRoomsFromClusters(*dsg, results, previous_rooms, {});
 
   const SceneGraphLayer& rooms = dsg->graph->getLayer(KimeraDsgLayers::ROOMS).value();
   EXPECT_EQ(1u, rooms.numNodes());
@@ -188,9 +184,7 @@ TEST(IncrementalRoomsTests, UpdateFromClustersWithMinSizeCorrect) {
   results.clusters[2] = {NodeSymbol('p', 5), NodeSymbol('p', 6)};
 
   RoomMap previous_rooms;
-  std::map<size_t, NodeId> rooms_to_clusters;
-
-  finder.updateRoomsFromClusters(*dsg, results, previous_rooms, rooms_to_clusters);
+  finder.updateRoomsFromClusters(*dsg, results, previous_rooms, {});
 
   const SceneGraphLayer& rooms = dsg->graph->getLayer(KimeraDsgLayers::ROOMS).value();
   EXPECT_EQ(1u, rooms.numNodes());
@@ -247,14 +241,13 @@ TEST(IncrementalRoomsTests, UpdateFromClustersWithAssocationCorrect) {
   results.clusters[2] = {NodeSymbol('p', 5), NodeSymbol('p', 6)};
   results.clusters[3] = {NodeSymbol('p', 8), NodeSymbol('p', 9), NodeSymbol('p', 11)};
 
-  RoomMap previous_rooms{{NodeSymbol('R', 3), {}},
-                         {NodeSymbol('R', 4), {}},
-                         {NodeSymbol('R', 5), {}},
-                         {NodeSymbol('R', 6), {}}};
-  std::map<size_t, NodeId> rooms_to_clusters{{NodeSymbol('R', 3), 1},
-                                             {NodeSymbol('R', 6), 2}};
+  RoomMap previous_rooms{
+      {NodeSymbol('R', 3), {NodeSymbol('p', 3), NodeSymbol('p', 4)}},
+      {NodeSymbol('R', 4), {}},
+      {NodeSymbol('R', 5), {}},
+      {NodeSymbol('R', 6), {NodeSymbol('p', 5), NodeSymbol('p', 6)}}};
 
-  finder.updateRoomsFromClusters(*dsg, results, previous_rooms, rooms_to_clusters);
+  finder.updateRoomsFromClusters(*dsg, results, previous_rooms, {});
 
   const SceneGraphLayer& rooms = dsg->graph->getLayer(KimeraDsgLayers::ROOMS).value();
   EXPECT_EQ(3u, rooms.numNodes());

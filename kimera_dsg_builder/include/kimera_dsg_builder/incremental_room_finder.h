@@ -75,7 +75,7 @@ class RoomFinder {
   void updateRoomsFromClusters(SharedDsgInfo& dsg,
                                ClusterResults& cluster_results,
                                const RoomMap& previous_rooms,
-                               const std::map<size_t, NodeId>& rooms_to_clusters);
+                               const ActiveNodeSet& active_nodes);
 
  protected:
   Config config_;

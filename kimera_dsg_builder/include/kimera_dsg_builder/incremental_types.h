@@ -10,6 +10,8 @@
 namespace kimera {
 namespace incremental {
 
+typedef std::unordered_set<NodeId> NodeIdSet;
+
 struct SharedDsgInfo {
   using Ptr = std::shared_ptr<SharedDsgInfo>;
 
@@ -26,11 +28,13 @@ struct SharedDsgInfo {
 
     graph.reset(new DynamicSceneGraph(layer_ids, mesh_layer_id));
     block_mesh_mapping.reset(new kimera_pgmo::VoxbloxIndexMapping);
+    latest_places.reset(new NodeIdSet);
   }
 
   std::mutex mutex;
   DynamicSceneGraph::Ptr graph;
   std::shared_ptr<kimera_pgmo::VoxbloxIndexMapping> block_mesh_mapping;
+  std::shared_ptr<NodeIdSet> latest_places;
   std::atomic<bool> updated;
 };
 
