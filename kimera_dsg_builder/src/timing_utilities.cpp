@@ -135,6 +135,22 @@ void ElapsedTimeRecorder::logElapsed(const std::string& name,
   const std::string output_csv = output_folder + "/" + name + "_timing_raw.csv";
   std::ofstream output_file;
   output_file.open(output_csv);
+  TimeList durations;
+  {  // start critical section
+    std::unique_lock<std::mutex> lock(*mutex_);
+
+    if (!elapsed_.count(name)) {
+      output_file.close();
+      return;
+    }
+
+    durations = elapsed_.at(name);
+  }  // end critical section
+  for (const auto& d : durations) {
+    std::chrono::duration<double> elapsed_s = d;
+    output_file << elapsed_s.count() << "\n";
+  }
+  output_file.close();
 }
 
 void ElapsedTimeRecorder::logAllElapsed(const std::string& output_folder) const {

@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
   if (!dsg_output_path.empty()) {
     LOG(INFO) << "[DSG Node] Saving scene graph and other stats and logs to "
               << dsg_output_path;
-    backend_dsg->graph->save(dsg_output_path + "/backend_dsg.json");
+    backend_dsg->graph->save(dsg_output_path + "/backend/dsg.json");
     // Output timing statistics
     const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
     timer.logAllElapsed(dsg_output_path);
