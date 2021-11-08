@@ -63,12 +63,22 @@ void PgmoMeshPlugin::draw(const std_msgs::Header& header,
     return;
   }
 
+  if (!graph.getMeshVertices()->size()) {
+    return;
+  }
+
   mesh_msgs::TriangleMeshStamped msg;
   msg.header = header;
 
   // vertices and meshes are guaranteed to not be null (from hasMesh)
   msg.mesh = kimera_pgmo::PolygonMeshToTriangleMeshMsg(*graph.getMeshVertices(),
                                                        *graph.getMeshFaces());
+  mesh_pub_.publish(msg);
+}
+
+void PgmoMeshPlugin::reset(const std_msgs::Header& header, const DynamicSceneGraph&) {
+  mesh_msgs::TriangleMeshStamped msg;
+  msg.header = header;
   mesh_pub_.publish(msg);
 }
 
@@ -151,6 +161,8 @@ void VoxbloxMeshPlugin::draw(const std_msgs::Header& header,
   const auto& vertices = *graph.getMeshVertices();
   const auto& faces = *graph.getMeshFaces();
 
+  curr_blocks_.clear();
+
   for (const auto& face : faces) {
     const auto block_idx_result = getBestBlockIndex(vertices, face.vertices);
     if (!block_idx_result.valid) {
@@ -165,6 +177,7 @@ void VoxbloxMeshPlugin::draw(const std_msgs::Header& header,
       block_msg.index[1] = block_idx.y();
       block_msg.index[2] = block_idx.z();
       msg.mesh_blocks.push_back(block_msg);
+      curr_blocks_.push_back(block_idx);
     }
 
     auto& block = msg.mesh_blocks.at(block_to_index.at(block_idx));
@@ -186,6 +199,28 @@ void VoxbloxMeshPlugin::draw(const std_msgs::Header& header,
     }
   }
 
+  mesh_pub_.publish(msg);
+}
+
+void VoxbloxMeshPlugin::reset(const std_msgs::Header& header,
+                              const DynamicSceneGraph&) {
+  if (curr_blocks_.empty()) {
+    return;
+  }
+
+  voxblox_msgs::Mesh msg;
+  msg.header = header;
+  msg.block_edge_length = 1.0;
+
+  for (const auto& block_idx : curr_blocks_) {
+    voxblox_msgs::MeshBlock block_msg;
+    block_msg.index[0] = block_idx.x();
+    block_msg.index[1] = block_idx.y();
+    block_msg.index[2] = block_idx.z();
+    msg.mesh_blocks.push_back(block_msg);
+  }
+
+  curr_blocks_.clear();
   mesh_pub_.publish(msg);
 }
 
@@ -363,6 +398,11 @@ void MeshPlaceConnectionsPlugin::draw(const std_msgs::Header& header,
   if (!msg.markers.empty()) {
     marker_pub_.publish(msg);
   }
+}
+
+void MeshPlaceConnectionsPlugin::reset(const std_msgs::Header&,
+                                       const DynamicSceneGraph&) {
+  LOG(FATAL) << "Not implemented yet";
 }
 
 }  // namespace kimera

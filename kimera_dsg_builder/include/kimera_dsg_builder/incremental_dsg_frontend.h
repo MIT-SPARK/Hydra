@@ -1,4 +1,5 @@
 #pragma once
+#include "kimera_dsg_builder/dsg_lcd_module.h"
 #include "kimera_dsg_builder/incremental_mesh_segmenter.h"
 #include "kimera_dsg_builder/incremental_types.h"
 
@@ -9,6 +10,8 @@
 #include <kimera_pgmo/MeshFrontend.h>
 #include <kimera_topology/ActiveLayer.h>
 #include <kimera_topology/nearest_neighbor_utilities.h>
+#include <kimera_vio_ros/BowQuery.h>
+#include <pose_graph_tools/PoseGraph.h>
 
 #include <memory>
 #include <mutex>
@@ -37,6 +40,10 @@ class DsgFrontend {
 
   void handleLatestMesh(const voxblox_msgs::Mesh::ConstPtr& msg);
 
+  void handleLatestPoseGraph(const pose_graph_tools::PoseGraph::ConstPtr& msg);
+
+  void handleDbowMsg(const kimera_vio_ros::BowQuery::ConstPtr& msg);
+
   void startMeshFrontend();
 
   void runMeshFrontend();
@@ -45,13 +52,25 @@ class DsgFrontend {
 
   void runPlaces();
 
+  void startLcd();
+
+  void runLcd();
+
   PlacesQueueState getPlacesQueueState();
 
   void processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg);
 
   void addPlaceObjectEdges(NodeIdSet* extra_objects_to_check = nullptr);
 
-  void updateBuildingNode();
+  void updatePlaceMeshMapping();
+
+  void addAgentPlaceEdges();
+
+  lcd::DsgLcdConfig initializeLcdStructures();
+
+  void assignBowVectors();
+
+  std::optional<NodeId> getLatestAgentId();
 
  private:
   ros::NodeHandle nh_;
@@ -76,6 +95,28 @@ class DsgFrontend {
   ros::Subscriber active_places_sub_;
   std::unique_ptr<NearestNodeFinder> places_nn_finder_;
   std::unique_ptr<std::thread> places_thread_;
+  NodeIdSet unlabeled_place_nodes_;
+  NodeIdSet archived_places_;
+  NodeIdSet previous_active_places_;
+
+  std::map<char, std::set<NodeId>> deleted_agent_edge_indices_;
+  std::map<char, size_t> last_agent_edge_index_;
+
+  SemanticNodeAttributes::ColorVector building_color_;
+
+  double lcd_agent_horizon_s_;
+  std::unique_ptr<std::thread> lcd_thread_;
+  std::unique_ptr<lcd::DsgLcdModule> lcd_module_;
+  std::unique_ptr<lcd::ObjectDescriptorFactory> object_lcd_factory_;
+  std::unique_ptr<lcd::PlaceDescriptorFactory> place_lcd_factory_;
+  std::unique_ptr<lcd::ObjectRegistrationFunctor> object_lcd_registration_;
+  std::unique_ptr<lcd::PlaceRegistrationFunctor> places_lcd_registration_;
+  char robot_prefix_;
+
+  ros::Subscriber bow_sub_;
+  ros::Subscriber pose_graph_sub_;
+  std::list<kimera_vio_ros::BowQuery::ConstPtr> bow_messages_;
+  std::map<NodeId, size_t> agent_key_map_;
 };
 
 }  // namespace incremental

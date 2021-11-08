@@ -13,7 +13,7 @@ dense_representation_radius_m: 15.0
 # gvd integration and graph extraction
 min_diff_m: 1.0e-3
 min_weight: 1.0e-6
-positive_distance_only: true
+positive_distance_only: false
 parent_derived_distance: true
 min_basis_for_extraction: 2
 extract_graph: true

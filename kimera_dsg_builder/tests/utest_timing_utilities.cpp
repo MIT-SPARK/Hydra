@@ -56,7 +56,7 @@ TEST_F(TimingUtilityTests, TestMultipleMeasurements) {
   auto stats = ElapsedTimeRecorder::instance().getStats("test");
   EXPECT_EQ(3u, stats.num_measurements);
   EXPECT_EQ(*elapsed, stats.last_s);
-  EXPECT_NEAR(0.02, stats.mean_s, 1.0e-3);
+  EXPECT_NEAR(0.02, stats.mean_s, 1.0e-2);
   EXPECT_NEAR(0.01, stats.stddev_s, 1.0e-2);
 }
 

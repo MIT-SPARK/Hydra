@@ -258,7 +258,7 @@ void MeshSegmenter::updateObjectInGraph(DynamicSceneGraph& graph,
   active_object_timestamps_.at(node.id) = timestamp;
 
   for (const auto& idx : cluster.indices.indices) {
-    graph.insertMeshEdge(node.id, idx);
+    graph.insertMeshEdge(node.id, idx, true);
   }
 
   auto new_box = BoundingBox::extract(cluster.cloud, bounding_box_type_);
@@ -301,7 +301,7 @@ void MeshSegmenter::addObjectToGraph(DynamicSceneGraph& graph,
   objects_to_check_for_places_.insert(next_node_id_);
 
   for (const auto& idx : cluster.indices.indices) {
-    graph.insertMeshEdge(next_node_id_, idx);
+    graph.insertMeshEdge(next_node_id_, idx, true);
   }
 
   ++next_node_id_;

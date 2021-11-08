@@ -31,8 +31,8 @@ void updateObjects(DynamicSceneGraph& graph,
     std::vector<size_t> connections =
         graph.getMeshConnectionIndices(id_node_pair.first);
     if (connections.empty()) {
-      LOG(WARNING) << "Found empty object node "
-                   << NodeSymbol(id_node_pair.first).getLabel();
+      VLOG(2) << "Found empty object node "
+              << NodeSymbol(id_node_pair.first).getLabel();
       continue;
     }
 

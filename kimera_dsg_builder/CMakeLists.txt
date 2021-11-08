@@ -20,12 +20,14 @@ find_package(
              kimera_semantics
              kimera_semantics_ros
              kimera_topology
+             kimera_vio_ros
              object_db
              tf2_eigen
              voxblox
              voxblox_ros
 )
 
+find_package(teaserpp REQUIRED)
 find_package(GTSAM REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(KimeraRPGO REQUIRED)
@@ -45,6 +47,7 @@ catkin_package(
   kimera_semantics
   kimera_semantics_ros
   kimera_topology
+  kimera_vio_ros
   tf2_eigen
   voxblox
   voxblox_ros
@@ -57,6 +60,10 @@ add_library(
   ${PROJECT_NAME}
   src/building_finder.cpp
   src/connectivity_utils.cpp
+  src/dsg_lcd_descriptors.cpp
+  src/dsg_lcd_matching.cpp
+  src/dsg_lcd_module.cpp
+  src/dsg_lcd_registration.cpp
   src/dsg_update_functions.cpp
   src/incremental_dsg_backend.cpp
   src/incremental_dsg_frontend.cpp
@@ -72,7 +79,12 @@ add_library(
   src/wall_finder.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} gtsam armadillo)
+target_link_libraries(
+  ${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+  gtsam
+  teaserpp::teaser_registration
+)
 add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
 
 add_executable(${PROJECT_NAME}_offline_node src/kimera_dsg_builder_offline_node.cpp)
@@ -106,6 +118,10 @@ if(CATKIN_ENABLE_TESTING)
   catkin_add_gtest(
     utest_${PROJECT_NAME}
     tests/utest_main.cpp
+    tests/utest_dsg_lcd_registration.cpp
+    tests/utest_dsg_lcd_descriptors.cpp
+    tests/utest_dsg_lcd_matching.cpp
+    tests/utest_dsg_lcd_module.cpp
     tests/utest_dsg_update_functions.cpp
     tests/utest_incremental_room_finder.cpp
     tests/utest_minimum_spanning_tree.cpp

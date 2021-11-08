@@ -1,6 +1,7 @@
 #pragma once
 #include <kimera_dsg/dynamic_scene_graph.h>
 #include <kimera_pgmo/utils/CommonStructs.h>
+#include <gtsam/geometry/Pose3.h>
 
 #include <atomic>
 #include <map>
@@ -8,6 +9,19 @@
 #include <mutex>
 
 namespace kimera {
+
+namespace lcd {
+
+struct DsgRegistrationSolution {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  bool valid = false;
+  NodeId from_node;
+  NodeId to_node;
+  gtsam::Pose3 to_T_from;
+};
+
+}  // namespace lcd
+
 namespace incremental {
 
 typedef std::unordered_set<NodeId> NodeIdSet;
@@ -27,15 +41,15 @@ struct SharedDsgInfo {
     }
 
     graph.reset(new DynamicSceneGraph(layer_ids, mesh_layer_id));
-    block_mesh_mapping.reset(new kimera_pgmo::VoxbloxIndexMapping);
     latest_places.reset(new NodeIdSet);
   }
 
   std::mutex mutex;
-  DynamicSceneGraph::Ptr graph;
-  std::shared_ptr<kimera_pgmo::VoxbloxIndexMapping> block_mesh_mapping;
-  std::shared_ptr<NodeIdSet> latest_places;
   std::atomic<bool> updated;
+  DynamicSceneGraph::Ptr graph;
+  std::shared_ptr<NodeIdSet> latest_places;
+  std::mutex lcd_mutex;
+  std::queue<lcd::DsgRegistrationSolution> loop_closures;
 };
 
 struct DsgBackendStatus {

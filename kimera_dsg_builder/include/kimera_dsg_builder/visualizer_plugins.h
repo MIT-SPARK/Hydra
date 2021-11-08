@@ -30,6 +30,8 @@ class PgmoMeshPlugin : public DsgVisualizerPlugin {
 
   void draw(const std_msgs::Header& header, const DynamicSceneGraph& graph) override;
 
+  void reset(const std_msgs::Header& header, const DynamicSceneGraph& graph) override;
+
  protected:
   ros::Publisher mesh_pub_;
 };
@@ -42,8 +44,11 @@ class VoxbloxMeshPlugin : public DsgVisualizerPlugin {
 
   void draw(const std_msgs::Header& header, const DynamicSceneGraph& graph) override;
 
+  void reset(const std_msgs::Header& header, const DynamicSceneGraph& graph) override;
+
  protected:
   ros::Publisher mesh_pub_;
+  voxblox::BlockIndexList curr_blocks_;
 };
 
 class MeshPlaceConnectionsPlugin : public DsgVisualizerPlugin {
@@ -56,6 +61,8 @@ class MeshPlaceConnectionsPlugin : public DsgVisualizerPlugin {
   virtual ~MeshPlaceConnectionsPlugin() = default;
 
   void draw(const std_msgs::Header& header, const DynamicSceneGraph& graph) override;
+
+  void reset(const std_msgs::Header& header, const DynamicSceneGraph& graph) override;
 
  protected:
   ros::Publisher marker_pub_;

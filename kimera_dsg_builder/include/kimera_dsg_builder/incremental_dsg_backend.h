@@ -52,6 +52,10 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   }
 
  private:
+  bool setVisualizeBackend(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+
+  bool setVisualizeFrontend(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+
   void fullMeshCallback(const kimera_pgmo::TriangleMeshIdStamped::ConstPtr& msg);
 
   void deformationGraphCallback(const pose_graph_tools::PoseGraph::ConstPtr& msg);
@@ -66,13 +70,17 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void runPgmo();
 
+  void startDsgUpdater();
+
+  void runDsgUpdater();
+
   void addNewAgentPoses();
+
+  void assignBowVectors();
 
   void addPlacesToDeformationGraph();
 
   void updateDsgMesh();
-
-  void updatePlaceMeshMapping();
 
   void optimize();
 
@@ -88,6 +96,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   void updateBuildingNode();
 
   void logStatus(bool init = false) const;
+
+  bool addInternalLCDToDeformationGraph();
 
  private:
   ros::NodeHandle nh_;
@@ -120,9 +130,10 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   std::list<LayerUpdateFunc> dsg_update_funcs_;
 
+  std::atomic<bool> have_new_loopclosure_;
+  std::atomic<bool> have_dsg_updates_;
+
   bool have_new_mesh_;
-  bool have_new_poses_;
-  bool have_new_deformation_graph_;
 
   SemanticNodeAttributes::ColorVector building_color_;
 
@@ -132,10 +143,16 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   std::mutex pgmo_mutex_;
   std::unique_ptr<std::thread> pgmo_thread_;
+  std::unique_ptr<std::thread> optimizer_thread_;
 
   bool log_;
   std::string log_path_;
   DsgBackendStatus status_;
+
+  std::atomic<bool> visualizer_should_reset_;
+  std::atomic<bool> visualizer_show_frontend_;
+  ros::ServiceServer frontend_viz_srv_;
+  ros::ServiceServer backend_viz_srv_;
 };
 
 }  // namespace incremental

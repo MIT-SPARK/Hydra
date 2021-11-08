@@ -103,8 +103,7 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
       enable_node_merging_(true),
       call_update_periodically_(true),
       have_new_mesh_(false),
-      have_new_poses_(false),
-      have_new_deformation_graph_(false) {
+      visualizer_should_reset_(false) {
   nh_.getParam("robot_id", robot_id_);
 
   if (!loadParameters(ros::NodeHandle(nh_, "pgmo"))) {
@@ -200,10 +199,17 @@ DsgBackend::~DsgBackend() {
     pgmo_thread_->join();
   }
   VLOG(2) << " [DSG Backend] joined pgmo thread";
+
+  VLOG(2) << " [DSG Backend] joining optimizer thread";
+  if (optimizer_thread_) {
+    optimizer_thread_->join();
+  }
+  VLOG(2) << " [DSG Backend] joining optimizer thread";
 }
 
 void DsgBackend::start() {
   startPgmo();
+  startDsgUpdater();
   startVisualizer();
   LOG(INFO) << " [DSG Backend] started!";
 }
@@ -223,9 +229,38 @@ void DsgBackend::startVisualizer() {
   // (rviz frame-rate drops significantly after ~15 seconds)
   // visualizer_->addPlugin(std::make_shared<VoxbloxMeshPlugin>(nh, "dsg_mesh"));
 
-  visualizer_->setGraph(private_dsg_->graph);
+  visualizer_should_reset_ = true;
+
+  bool show_frontend_dsg;
+  nh_.param<bool>("show_frontend_dsg", show_frontend_dsg, false);
+  visualizer_show_frontend_ = show_frontend_dsg;
+
+  frontend_viz_srv_ = nh.advertiseService(
+      "visualize_frontend_dsg", &DsgBackend::setVisualizeFrontend, this);
+  backend_viz_srv_ = nh.advertiseService(
+      "visualize_backend_dsg", &DsgBackend::setVisualizeBackend, this);
 
   visualizer_thread_.reset(new std::thread(&DsgBackend::runVisualizer, this));
+}
+
+bool DsgBackend::setVisualizeFrontend(std_srvs::Empty::Request&,
+                                      std_srvs::Empty::Response&) {
+  if (!visualizer_show_frontend_) {
+    visualizer_should_reset_ = true;
+  }
+
+  visualizer_show_frontend_ = true;
+  return true;
+}
+
+bool DsgBackend::setVisualizeBackend(std_srvs::Empty::Request&,
+                                     std_srvs::Empty::Response&) {
+  if (visualizer_show_frontend_) {
+    visualizer_should_reset_ = true;
+  }
+
+  visualizer_show_frontend_ = false;
+  return true;
 }
 
 void DsgBackend::runVisualizer() {
@@ -234,18 +269,139 @@ void DsgBackend::runVisualizer() {
     // process any config changes
     visualizer_queue_->callAvailable(ros::WallDuration(0));
 
+    if (visualizer_should_reset_) {
+      if (visualizer_show_frontend_) {
+        std::unique_lock<std::mutex> lock(shared_dsg_->mutex);
+        visualizer_->setGraph(shared_dsg_->graph);
+      } else {
+        std::unique_lock<std::mutex> lock(private_dsg_->mutex);
+        visualizer_->setGraph(private_dsg_->graph);
+      }
+      visualizer_should_reset_ = false;
+    }
+
     // TODO(nathan) this is janky, avoid weird updated / redraw split
     if (private_dsg_->updated) {
+      // the frontend dsg update flag propagates to the backend flag, so we always check
+      // the backend flag to see if we need to redraw
       visualizer_->setGraphUpdated();
       private_dsg_->updated = false;
     }
 
-    {  // start graph update critical section
+    if (visualizer_show_frontend_) {
+      std::unique_lock<std::mutex> graph_lock(shared_dsg_->mutex);
+      visualizer_->redraw();
+    } else {
       std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
       visualizer_->redraw();
-    }  // end graph update critical section
+    }
 
     r.sleep();
+  }
+}
+
+void DsgBackend::startDsgUpdater() {
+  full_mesh_sub_ =
+      nh_.subscribe("pgmo/full_mesh", 1, &DsgBackend::fullMeshCallback, this);
+  deformation_graph_sub_ = nh_.subscribe(
+      "pgmo/mesh_graph_incremental", 20, &DsgBackend::deformationGraphCallback, this);
+  pose_graph_sub_ =
+      nh_.subscribe("pose_graph_incremental", 20, &DsgBackend::poseGraphCallback, this);
+
+  pgmo_thread_.reset(new std::thread(&DsgBackend::runDsgUpdater, this));
+}
+
+void DsgBackend::runDsgUpdater() {
+  ros::Rate r(10);
+  while (ros::ok() && !should_shutdown_) {
+    // TODO(Yun) Fix to update with only new changes while ignoring old
+    bool have_frontend_updates = shared_dsg_->updated;
+    if (have_frontend_updates) {
+      {  // start joint critical section
+        std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
+        std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
+        private_dsg_->graph->mergeGraph(*shared_dsg_->graph);
+        *private_dsg_->latest_places = *shared_dsg_->latest_places;
+      }  // end joint critical section
+      shared_dsg_->updated = false;
+      private_dsg_->updated = true;
+      have_dsg_updates_ = true;
+    }
+
+    r.sleep();
+  }
+}
+
+void DsgBackend::startPgmo() {
+  optimizer_thread_.reset(new std::thread(&DsgBackend::runPgmo, this));
+}
+
+void DsgBackend::runPgmo() {
+  ros::Rate r(10);
+  while (ros::ok() && !should_shutdown_) {
+    status_.reset();
+    ScopedTimer spin_timer("pgmo/spin");
+    const size_t prev_loop_closures = num_loop_closures_;
+
+    {  // start pgmo critical section
+      std::unique_lock<std::mutex> lock(pgmo_mutex_);
+
+      if (deformation_graph_updates_) {
+        status_.new_graph_factors_ = deformation_graph_updates_->edges.size();
+        status_.new_factors_ += deformation_graph_updates_->edges.size();
+        processIncrementalMeshGraph(
+            deformation_graph_updates_, timestamps_, &unconnected_nodes_);
+        deformation_graph_updates_.reset();
+      }
+
+      if (pose_graph_updates_) {
+        status_.new_factors_ += pose_graph_updates_->edges.size();
+        processIncrementalPoseGraph(
+            pose_graph_updates_, &trajectory_, &unconnected_nodes_, &timestamps_);
+        pose_graph_updates_.reset();
+      }
+    }  // end pgmo critical section
+
+    addInternalLCDToDeformationGraph();
+    if (num_loop_closures_ > prev_loop_closures) {
+      LOG(WARNING) << "Loop closures increased: optimizing!";
+      have_new_loopclosure_ = true;
+    }
+
+    if (num_loop_closures_ > 0) {
+      status_.total_loop_closures_ = num_loop_closures_;
+      status_.new_loop_closures_ = num_loop_closures_ - prev_loop_closures;
+    }
+    status_.trajectory_len_ = trajectory_.size();
+    status_.total_factors_ = deformation_graph_->getGtsamFactors().size();
+    status_.total_values_ = deformation_graph_->getGtsamValues().size();
+
+    if (!have_dsg_updates_) {
+      if (log_) {
+        logStatus();
+      }
+
+      r.sleep();
+      continue;
+    }
+
+    have_dsg_updates_ = false;
+
+    if (optimize_on_lc_ && have_new_loopclosure_) {
+      have_new_loopclosure_ = false;
+      ScopedTimer optimize_timer("pgmo/optimize");
+      optimize();
+    } else if (call_update_periodically_) {
+      updateDsgMesh();
+      callUpdateFunctions();
+    }
+
+    if (log_) {
+      logStatus();
+    }
+
+    updateRoomsNodes();
+    updateBuildingNode();
   }
 }
 
@@ -271,134 +427,6 @@ void DsgBackend::poseGraphCallback(const PoseGraph::ConstPtr& msg) {
   } else {
     mergePoseGraphs(*msg, *pose_graph_updates_);
   }
-}
-
-void DsgBackend::startPgmo() {
-  {  // start graph update critical section
-    std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
-    if (!private_dsg_->graph->hasDynamicLayer(KimeraDsgLayers::AGENTS, robot_prefix_)) {
-      private_dsg_->graph->createDynamicLayer(KimeraDsgLayers::AGENTS, robot_prefix_);
-    }
-  }  // end graph update critical section
-
-  full_mesh_sub_ =
-      nh_.subscribe("pgmo/full_mesh", 1, &DsgBackend::fullMeshCallback, this);
-  deformation_graph_sub_ = nh_.subscribe(
-      "pgmo/mesh_graph_incremental", 20, &DsgBackend::deformationGraphCallback, this);
-  pose_graph_sub_ =
-      nh_.subscribe("pose_graph_incremental", 20, &DsgBackend::poseGraphCallback, this);
-
-  pgmo_thread_.reset(new std::thread(&DsgBackend::runPgmo, this));
-}
-
-void DsgBackend::runPgmo() {
-  ros::Rate r(10);
-  while (ros::ok() && !should_shutdown_) {
-    status_.reset();
-    {  // spin timer scope
-      ScopedTimer spin_timer("pgmo/spin");
-      const size_t prev_loop_closures = num_loop_closures_;
-
-      {  // start pgmo critical section
-        std::unique_lock<std::mutex> lock(pgmo_mutex_);
-
-        if (deformation_graph_updates_) {
-          status_.new_graph_factors_ = deformation_graph_updates_->edges.size();
-          status_.new_factors_ += deformation_graph_updates_->edges.size();
-          processIncrementalMeshGraph(
-              deformation_graph_updates_, timestamps_, &unconnected_nodes_);
-          deformation_graph_updates_.reset();
-          have_new_deformation_graph_ = true;
-        }
-
-        if (pose_graph_updates_) {
-          status_.new_factors_ += pose_graph_updates_->edges.size();
-          processIncrementalPoseGraph(
-              pose_graph_updates_, &trajectory_, &unconnected_nodes_, &timestamps_);
-          pose_graph_updates_.reset();
-          have_new_poses_ = true;
-        }
-      }  // end pgmo critical section
-      if (num_loop_closures_ > 0) {
-        status_.total_loop_closures_ = num_loop_closures_;
-        status_.new_loop_closures_ = num_loop_closures_ - prev_loop_closures;
-      }
-      status_.trajectory_len_ = trajectory_.size();
-
-      // TODO(nathan) check if updated before merging
-      // TODO(Yun) Fix to update with only new changes while ignoring old
-      {  // start joint critical section
-        std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
-        std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
-        private_dsg_->graph->mergeGraph(*shared_dsg_->graph);
-      }  // end joint critical section
-
-      updatePlaceMeshMapping();
-      updateRoomsNodes();
-      updateBuildingNode();
-
-      if (optimize_on_lc_ && prev_loop_closures != num_loop_closures_) {
-        ScopedTimer optimize_timer("pgmo/optimize");
-        optimize();
-        // we already filled the mesh from the latest message via optimze
-        have_new_mesh_ = false;
-      } else if (call_update_periodically_) {
-        callUpdateFunctions();
-      }
-
-      if (have_new_mesh_) {
-        ScopedTimer mesh_update_time("pgmo/mesh_update");
-        updateDsgMesh();
-        have_new_mesh_ = false;
-      }
-
-      if (have_new_poses_) {
-        addNewAgentPoses();
-        have_new_poses_ = false;
-      }
-
-      status_.total_factors_ = deformation_graph_->getGtsamFactors().size();
-      status_.total_values_ = deformation_graph_->getGtsamValues().size();
-    }  // end spin timer scope
-
-    if (log_) {
-      logStatus();
-    }
-
-    r.sleep();
-  }
-}
-
-void DsgBackend::addNewAgentPoses() {
-  if (timestamps_.empty()) {
-    // we don't have any pose graph updates, don't try and fill dynamic graph
-    return;
-  }
-
-  // TODO(nathan) consider grabbing optimized trajectory from deformation graph
-  const auto& trajectory = trajectory_;
-
-  const DynamicSceneGraphLayer& agent_layer =
-      private_dsg_->graph->getDynamicLayer(KimeraDsgLayers::AGENTS, robot_prefix_)
-          ->get();
-
-  {  // start graph update critical section
-    std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
-
-    for (size_t i = agent_layer.numNodes(); i < trajectory.size(); ++i) {
-      Eigen::Vector3d position = trajectory[i].translation();
-      Eigen::Quaterniond rotation(trajectory[i].rotation().matrix());
-
-      // TODO(nathan) implicit assumption that pgmo ids are sequential starting at 0
-      NodeSymbol pgmo_key(robot_prefix_, i);
-
-      private_dsg_->graph->emplaceDynamicNode(
-          agent_layer.id,
-          agent_layer.prefix,
-          std::chrono::nanoseconds(timestamps_.at(i).toNSec()),
-          std::make_unique<AgentNodeAttributes>(rotation, position, pgmo_key));
-    }
-  }  // end graph update critical section
 }
 
 void DsgBackend::addPlacesToDeformationGraph() {
@@ -443,85 +471,67 @@ void DsgBackend::addPlacesToDeformationGraph() {
   }
 }
 
-void DsgBackend::updateDsgMesh() {
-  pcl::PolygonMesh input_mesh;
+bool DsgBackend::addInternalLCDToDeformationGraph() {
+  bool added_new_loop_closure = false;
+  std::unique_lock<std::mutex> lock(shared_dsg_->lcd_mutex);
+  while (!shared_dsg_->loop_closures.empty()) {
+    auto result = shared_dsg_->loop_closures.front();
+    shared_dsg_->loop_closures.pop();
 
+    // TODO(nathan) this is kinda ugly, we can probably grab the GTSAM symbol in the
+    // frontend and pass it with the result
+    NodeId from_key;
+    NodeId to_key;
+    const auto& from_attrs = shared_dsg_->graph->getDynamicNode(result.from_node)
+                                 .value()
+                                 .get()
+                                 .attributes<AgentNodeAttributes>();
+    from_key = from_attrs.external_key;
+    const auto& to_attrs = shared_dsg_->graph->getDynamicNode(result.to_node)
+                               .value()
+                               .get()
+                               .attributes<AgentNodeAttributes>();
+    to_key = to_attrs.external_key;
+
+    deformation_graph_->addNewBetween(from_key, to_key, result.to_T_from);
+    added_new_loop_closure = true;
+    num_loop_closures_++;
+  }
+
+  return added_new_loop_closure;
+}
+
+void DsgBackend::updateDsgMesh() {
+  // avoid scope problems by using a smart pointer
+  std::unique_ptr<ScopedTimer> timer;
+
+  pcl::PolygonMesh opt_mesh;
   {  // pgmo critical section
     std::unique_lock<std::mutex> lock(pgmo_mutex_);
     if (!latest_mesh_) {
       return;
     }
 
-    input_mesh = kimera_pgmo::TriangleMeshMsgToPolygonMesh(latest_mesh_->mesh);
+    if (!have_new_mesh_) {
+      return;
+    }
+
+    timer.reset(new ScopedTimer("pgmo/mesh_update"));
+    auto input_mesh = kimera_pgmo::TriangleMeshMsgToPolygonMesh(latest_mesh_->mesh);
+    have_new_mesh_ = false;
+
+    if (input_mesh.cloud.height * input_mesh.cloud.width == 0) {
+      return;
+    }
+
+    opt_mesh = deformation_graph_->deformMesh(input_mesh, robot_vertex_prefix_);
   }  // pgmo critical section
-
-  if (input_mesh.cloud.height * input_mesh.cloud.width == 0) {
-    return;
-  }
-
-  const pcl::PolygonMesh opt_mesh =
-      deformation_graph_->deformMesh(input_mesh, robot_vertex_prefix_);
 
   {  // start graph update critical section
     std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
     private_dsg_->graph->setMeshDirectly(opt_mesh);
     private_dsg_->updated = true;
   }  // end graph update critical section
-}
-
-void DsgBackend::updatePlaceMeshMapping() {
-  std::unique_lock<std::mutex> lock(private_dsg_->mutex);
-  {  // get block mesh mapping from shared dsg
-    std::unique_lock<std::mutex> lock(shared_dsg_->mutex);
-    *private_dsg_->block_mesh_mapping = *shared_dsg_->block_mesh_mapping;
-    *private_dsg_->latest_places = *shared_dsg_->latest_places;
-  }
-
-  const SceneGraphLayer& places_layer =
-      private_dsg_->graph->getLayer(KimeraDsgLayers::PLACES).value();
-
-  size_t num_invalid = 0;
-  for (const auto& id_node_pair : places_layer.nodes()) {
-    auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
-    if (!attrs.is_active) {
-      continue;
-    }
-
-    if (attrs.voxblox_mesh_connections.empty()) {
-      continue;
-    }
-
-    // reset connections (and mark inactive to avoid processing outside active
-    // window)
-    attrs.is_active = false;
-    attrs.pcl_mesh_connections.clear();
-    attrs.pcl_mesh_connections.reserve(attrs.voxblox_mesh_connections.size());
-
-    for (const auto& connection : attrs.voxblox_mesh_connections) {
-      voxblox::BlockIndex index =
-          Eigen::Map<const voxblox::BlockIndex>(connection.block);
-      if (!private_dsg_->block_mesh_mapping->count(index)) {
-        num_invalid++;
-        continue;
-      }
-
-      const auto& vertex_mapping = private_dsg_->block_mesh_mapping->at(index);
-      if (!vertex_mapping.count(connection.vertex)) {
-        num_invalid++;
-        continue;
-      }
-
-      attrs.pcl_mesh_connections.push_back(vertex_mapping.at(connection.vertex));
-    }
-  }
-
-  // TODO(nathan) prune removed blocks? requires more of a handshake with gvd
-  // integrator
-
-  if (num_invalid) {
-    VLOG(2) << "[DSG Backend] Place-Mesh Update: " << num_invalid
-            << " invalid connections";
-  }
 }
 
 void DsgBackend::optimize() {
@@ -604,6 +614,7 @@ void DsgBackend::updateRoomsNodes() {
     ScopedTimer timer("backend/room_detection", true, 1, false);
     ActiveNodeSet active_place_nodes =
         getNodesForRoomDetection(*private_dsg_->latest_places);
+    VLOG(3) << "Detecting rooms for " << active_place_nodes.size() << " nodes";
     room_finder_->findRooms(*private_dsg_, active_place_nodes);
     storeUnlabeledPlaces(active_place_nodes);
   }

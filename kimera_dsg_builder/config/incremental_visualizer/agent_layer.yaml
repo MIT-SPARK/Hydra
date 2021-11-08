@@ -10,3 +10,4 @@ edge_scale: 0.04
 edge_alpha: 0.9
 label_height: 0.9
 label_scale: 0.8
+interlayer_edge_insertion_skip: 10

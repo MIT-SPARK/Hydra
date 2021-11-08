@@ -7,7 +7,7 @@ dsg:
     rpgo_solver: "LM"
 pgmo:
     run_mode: 0  # kimera_pgmo run mode FULL (required)
-    use_msg_time: false
+    use_msg_time: true
     embed_trajectory_delta_t: 5.0
     rpgo:
         translation_threshold: 0.1
