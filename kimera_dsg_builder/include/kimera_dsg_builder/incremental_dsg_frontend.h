@@ -7,6 +7,7 @@
 #include <ros/ros.h>
 
 #include <kimera_dsg/node_symbol.h>
+#include <kimera_dsg/scene_graph_logger.h>
 #include <kimera_pgmo/MeshFrontend.h>
 #include <kimera_topology/ActiveLayer.h>
 #include <kimera_topology/nearest_neighbor_utilities.h>
@@ -117,6 +118,10 @@ class DsgFrontend {
   ros::Subscriber pose_graph_sub_;
   std::list<kimera_vio_ros::BowQuery::ConstPtr> bow_messages_;
   std::map<NodeId, size_t> agent_key_map_;
+
+  bool log_;
+  std::string log_path_;
+  SceneGraphLogger frontend_graph_logger_;
 };
 
 }  // namespace incremental

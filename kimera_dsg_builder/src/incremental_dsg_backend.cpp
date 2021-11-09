@@ -127,23 +127,11 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
   dsg_nh.getParam("rpgo_solver", rpgo_solver);
   params.solver = parseSolverFromString(rpgo_solver);
 
-  nh_.getParam("pgmo/log_output", log_);
-  if (log_) {
-    if (nh_.getParam("pgmo/log_path", log_path_)) {
-      params.logOutput(log_path_);
+  nh_.getParam("pgmo/log_output", pgmo_log_);
+  if (pgmo_log_) {
+    if (nh_.getParam("pgmo/log_path", pgmo_log_path_)) {
+      params.logOutput(pgmo_log_path_);
       logStatus(true);
-    } else {
-      ROS_ERROR("Failed to get pgmo log path");
-    }
-
-    if (nh_.getParam("dsg_output_path", log_path_)) {
-      backend_graph_logger_.setOutputPath(log_path_ + "/backend");
-      ROS_INFO("Logging backend graph to %s", (log_path_ + "/backend").c_str());
-      backend_graph_logger_.setLayerName(KimeraDsgLayers::OBJECTS, "objects");
-      backend_graph_logger_.setLayerName(KimeraDsgLayers::PLACES, "places");
-      backend_graph_logger_.setLayerName(KimeraDsgLayers::ROOMS, "rooms");
-      backend_graph_logger_.setLayerName(KimeraDsgLayers::BUILDINGS,
-                                         "buildings");
     } else {
       ROS_ERROR("Failed to get pgmo log path");
     }
@@ -195,6 +183,19 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
   building_color_ << std::clamp(static_cast<int>(255 * building_color.at(0)), 0, 255),
       std::clamp(static_cast<int>(255 * building_color.at(1)), 0, 255),
       std::clamp(static_cast<int>(255 * building_color.at(2)), 0, 255);
+
+  nh_.getParam("dsg_log_output", dsg_log_);
+  if (dsg_log_ && nh_.getParam("dsg_output_path", dsg_log_path_)) {
+    backend_graph_logger_.setOutputPath(dsg_log_path_ + "/backend");
+    ROS_INFO("Logging backend graph to %s",
+             (dsg_log_path_ + "/backend").c_str());
+    backend_graph_logger_.setLayerName(KimeraDsgLayers::OBJECTS, "objects");
+    backend_graph_logger_.setLayerName(KimeraDsgLayers::PLACES, "places");
+    backend_graph_logger_.setLayerName(KimeraDsgLayers::ROOMS, "rooms");
+    backend_graph_logger_.setLayerName(KimeraDsgLayers::BUILDINGS, "buildings");
+  } else {
+    ROS_ERROR("DSG Backend logging disabled. ");
+  }
 }
 
 DsgBackend::~DsgBackend() {
@@ -334,7 +335,7 @@ void DsgBackend::runDsgUpdater() {
         std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
         private_dsg_->graph->mergeGraph(*shared_dsg_->graph);
         *private_dsg_->latest_places = *shared_dsg_->latest_places;
-        if (log_) {
+        if (dsg_log_) {
           backend_graph_logger_.logGraph(private_dsg_->graph);
         }
       }  // end joint critical section
@@ -392,7 +393,7 @@ void DsgBackend::runPgmo() {
     status_.total_values_ = deformation_graph_->getGtsamValues().size();
 
     if (!have_dsg_updates_) {
-      if (log_) {
+      if (pgmo_log_) {
         logStatus();
       }
 
@@ -411,7 +412,7 @@ void DsgBackend::runPgmo() {
       callUpdateFunctions();
     }
 
-    if (log_) {
+    if (pgmo_log_) {
       logStatus();
     }
 
@@ -675,7 +676,7 @@ void DsgBackend::updateBuildingNode() {
 
 void DsgBackend::logStatus(bool init) const {
   std::ofstream file;
-  std::string filename = log_path_ + std::string("/dsg_pgmo_status.csv");
+  std::string filename = pgmo_log_path_ + std::string("/dsg_pgmo_status.csv");
   if (init) {
     ROS_INFO("DSG Backend logging PGMO status output to %s", filename.c_str());
     file.open(filename);

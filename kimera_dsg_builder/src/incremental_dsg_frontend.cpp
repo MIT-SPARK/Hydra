@@ -19,6 +19,16 @@ DsgFrontend::DsgFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& ds
   CHECK(mesh_frontend_.initialize(pgmo_nh, false));
   last_mesh_timestamp_ = 0;
   last_places_timestamp_ = 0;
+
+  nh_.getParam("dsg_log_output", log_);
+  if (log_ && nh_.getParam("dsg_output_path", log_path_)) {
+    frontend_graph_logger_.setOutputPath(log_path_ + "/frontend");
+    ROS_INFO("Logging frontend graph to %s", (log_path_ + "/frontend").c_str());
+    frontend_graph_logger_.setLayerName(KimeraDsgLayers::OBJECTS, "objects");
+    frontend_graph_logger_.setLayerName(KimeraDsgLayers::PLACES, "places");
+  } else {
+    ROS_WARN("DSG Frontend logging is disabled. ");
+  }
 }
 
 DsgFrontend::~DsgFrontend() {
@@ -272,6 +282,11 @@ void DsgFrontend::runPlaces() {
     previous_active_places_ = latest_places;
 
     last_places_timestamp_ = curr_message->header.stamp.toNSec();
+
+    if (log_) {
+      std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
+      frontend_graph_logger_.logGraph(dsg_->graph);
+    }
   }
 }
 

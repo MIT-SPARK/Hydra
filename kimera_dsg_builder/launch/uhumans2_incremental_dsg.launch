@@ -10,6 +10,7 @@
     <arg name="dsg_output_prefix" default="uhumans2_office"/>
     <arg name="dsg_output_use_date" default="false"/>
 
+    <arg name="dsg_should_log" default="true" />
     <arg name="pgmo_should_log" default="true"/>
 
     <include file="$(find kimera_topology)/launch/kimera_topology_semantic.launch">
@@ -80,6 +81,7 @@
         <rosparam file="$(find kimera_dsg_builder)/config/place_mesh_graph_viz.yaml"
                   ns="pm_graph_viz"/>
 
+        <param name="dsg_log_output" value="$(arg dsg_should_log)" />
         <param name="dsg_output_path" value="$(arg dsg_path)"/>
     </node>
 
