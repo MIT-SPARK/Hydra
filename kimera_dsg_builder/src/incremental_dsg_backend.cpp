@@ -133,7 +133,19 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
       params.logOutput(log_path_);
       logStatus(true);
     } else {
-      ROS_ERROR("Failed to get backend log path");
+      ROS_ERROR("Failed to get pgmo log path");
+    }
+
+    if (nh_.getParam("dsg_output_path", log_path_)) {
+      backend_graph_logger_.setOutputPath(log_path_ + "/backend");
+      ROS_INFO("Logging backend graph to %s", (log_path_ + "/backend").c_str());
+      backend_graph_logger_.setLayerName(KimeraDsgLayers::OBJECTS, "objects");
+      backend_graph_logger_.setLayerName(KimeraDsgLayers::PLACES, "places");
+      backend_graph_logger_.setLayerName(KimeraDsgLayers::ROOMS, "rooms");
+      backend_graph_logger_.setLayerName(KimeraDsgLayers::BUILDINGS,
+                                         "buildings");
+    } else {
+      ROS_ERROR("Failed to get pgmo log path");
     }
   }
 
@@ -322,6 +334,9 @@ void DsgBackend::runDsgUpdater() {
         std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
         private_dsg_->graph->mergeGraph(*shared_dsg_->graph);
         *private_dsg_->latest_places = *shared_dsg_->latest_places;
+        if (log_) {
+          backend_graph_logger_.logGraph(private_dsg_->graph);
+        }
       }  // end joint critical section
       shared_dsg_->updated = false;
       private_dsg_->updated = true;
