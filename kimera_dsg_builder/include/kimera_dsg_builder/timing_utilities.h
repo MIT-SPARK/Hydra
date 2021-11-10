@@ -12,6 +12,8 @@ namespace kimera {
 struct ElapsedStatistics {
   double last_s;
   double mean_s;
+  double min_s;
+  double max_s;
   double stddev_s;
   size_t num_measurements;
 };
@@ -36,6 +38,13 @@ class ElapsedTimeRecorder {
   std::optional<double> getLastElapsed(const std::string& timer_name) const;
 
   ElapsedStatistics getStats(const std::string& timer_name) const;
+
+  void logElapsed(const std::string& name,
+                  const std::string& output_folder) const;
+
+  void logAllElapsed(const std::string& output_folder) const;
+
+  void logStats(const std::string& output_folder) const;
 
  private:
   using TimeList = std::list<std::chrono::nanoseconds>;

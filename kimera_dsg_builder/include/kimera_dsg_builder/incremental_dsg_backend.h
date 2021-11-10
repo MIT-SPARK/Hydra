@@ -3,6 +3,7 @@
 #include "kimera_dsg_builder/incremental_room_finder.h"
 #include "kimera_dsg_builder/incremental_types.h"
 
+#include <kimera_dsg/scene_graph_logger.h>
 #include <kimera_dsg_visualizer/dynamic_scene_graph_visualizer.h>
 #include <kimera_pgmo/KimeraPgmoInterface.h>
 
@@ -145,14 +146,18 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   std::unique_ptr<std::thread> pgmo_thread_;
   std::unique_ptr<std::thread> optimizer_thread_;
 
-  bool log_;
-  std::string log_path_;
+  bool pgmo_log_;
+  std::string pgmo_log_path_;
   DsgBackendStatus status_;
 
   std::atomic<bool> visualizer_should_reset_;
   std::atomic<bool> visualizer_show_frontend_;
   ros::ServiceServer frontend_viz_srv_;
   ros::ServiceServer backend_viz_srv_;
+
+  bool dsg_log_;
+  std::string dsg_log_path_;
+  SceneGraphLogger backend_graph_logger_;
 };
 
 }  // namespace incremental

@@ -2,7 +2,10 @@
 
 #include <glog/logging.h>
 
+#include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <iostream>
 #include <numeric>
 
 namespace kimera {
@@ -87,7 +90,7 @@ ElapsedStatistics ElapsedTimeRecorder::getStats(const std::string& name) const {
     std::unique_lock<std::mutex> lock(*mutex_);
 
     if (!elapsed_.count(name)) {
-      return {0.0, 0.0, 0.0, 0};
+      return {0.0, 0.0, 0.0, 0.0, 0.0, 0};
     }
 
     durations = elapsed_.at(name);
@@ -95,16 +98,22 @@ ElapsedStatistics ElapsedTimeRecorder::getStats(const std::string& name) const {
 
   const double last_elapsed = *getLastElapsed(name);
 
-  const size_t N = durations.size();
   if (durations.size() == 1) {
-    return {last_elapsed, last_elapsed, 0.0, 1};
+    return {last_elapsed, last_elapsed, last_elapsed, last_elapsed, 0.0, 1};
   }
 
+  const size_t N = durations.size();
   const double mean = std::accumulate(
       durations.begin(), durations.end(), 0.0, [&](double total, const auto& elapsed) {
         std::chrono::duration<double> elapsed_s = elapsed;
         return total + (elapsed_s.count() / N);
       });
+
+  std::chrono::duration<double> min_elapsed_s =
+      *std::min_element(durations.begin(), durations.end());
+
+  std::chrono::duration<double> max_elapsed_s =
+      *std::max_element(durations.begin(), durations.end());
 
   const double variance = std::accumulate(
       durations.begin(), durations.end(), 0.0, [&](double total, const auto& elapsed) {
@@ -113,7 +122,57 @@ ElapsedStatistics ElapsedTimeRecorder::getStats(const std::string& name) const {
         return total + (mean_diff * mean_diff / N);
       });
 
-  return {last_elapsed, mean, std::sqrt(variance), durations.size()};
+  return {last_elapsed,
+          mean,
+          min_elapsed_s.count(),
+          max_elapsed_s.count(),
+          std::sqrt(variance),
+          durations.size()};
+}
+
+void ElapsedTimeRecorder::logElapsed(const std::string& name,
+                                     const std::string& output_folder) const {
+  const std::string output_csv = output_folder + "/" + name + "_timing_raw.csv";
+  std::ofstream output_file;
+  output_file.open(output_csv);
+  TimeList durations;
+  {  // start critical section
+    std::unique_lock<std::mutex> lock(*mutex_);
+
+    if (!elapsed_.count(name)) {
+      output_file.close();
+      return;
+    }
+
+    durations = elapsed_.at(name);
+  }  // end critical section
+  for (const auto& d : durations) {
+    std::chrono::duration<double> elapsed_s = d;
+    output_file << elapsed_s.count() << "\n";
+  }
+  output_file.close();
+}
+
+void ElapsedTimeRecorder::logAllElapsed(const std::string& output_folder) const {
+  for (const auto& str_timer_pair : elapsed_) {
+    logElapsed(str_timer_pair.first, output_folder);
+  }
+}
+
+void ElapsedTimeRecorder::logStats(const std::string& output_folder) const {
+  const std::string output_csv = output_folder + "/timing stats.csv";
+  std::ofstream output_file;
+  output_file.open(output_csv);
+
+  // file format
+  output_file << "name,mean[s],min[s],max[s],std-dev[s]\n";
+  for (const auto& str_timer_pair : elapsed_) {
+    const ElapsedStatistics& stats = getStats(str_timer_pair.first);
+    output_file << str_timer_pair.first << "," << stats.mean_s << ","
+                << stats.min_s << "," << stats.max_s << "," << stats.stddev_s
+                << "\n";
+  }
+  output_file.close();
 }
 
 ScopedTimer::ScopedTimer(const std::string& name,

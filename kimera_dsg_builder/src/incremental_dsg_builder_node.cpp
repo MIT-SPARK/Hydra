@@ -1,6 +1,8 @@
 #include "kimera_dsg_builder/incremental_dsg_backend.h"
 #include "kimera_dsg_builder/incremental_dsg_frontend.h"
+#include "kimera_dsg_builder/timing_utilities.h"
 
+using kimera::ElapsedTimeRecorder;
 using kimera::KimeraDsgLayers;
 using kimera::LayerId;
 using kimera::incremental::SharedDsgInfo;
@@ -39,9 +41,16 @@ int main(int argc, char* argv[]) {
   }
 
   if (!dsg_output_path.empty()) {
-    LOG(INFO) << "[DSG Node] Saving scene graph to " << dsg_output_path;
-    backend_dsg->graph->save(dsg_output_path);
-    LOG(INFO) << "[DSG Node] Saved scene graph to " << dsg_output_path;
+    LOG(INFO) << "[DSG Node] Saving scene graph and other stats and logs to "
+              << dsg_output_path;
+    backend_dsg->graph->save(dsg_output_path + "/backend/dsg.json");
+    frontend_dsg->graph->save(dsg_output_path + "/frontend/dsg.json");
+    // Output timing statistics
+    const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
+    timer.logAllElapsed(dsg_output_path);
+    timer.logStats(dsg_output_path);
+    LOG(INFO) << "[DSG Node] Saved scene graph, stats, and logs to "
+              << dsg_output_path;
   }
 
   return 0;

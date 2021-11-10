@@ -3,14 +3,15 @@
     <arg name="use_gt_semantics" default="true"/>
     <arg name="use_gt_frame" default="true"/>
     <arg name="use_oriented_bounding_boxes" default="false"/>
-    <arg name="pgmo_log_path" default="$(find kimera_pgmo)/log"/>
-    <arg name="pgmo_should_log" default="true"/>
 
     <arg name="enable_dsg_lcd" default="false"/>
 
     <arg name="dsg_output_dir" value="$(find kimera_dsg_builder)/output/uhumans2"/>
     <arg name="dsg_output_prefix" default="uhumans2_office"/>
     <arg name="dsg_output_use_date" default="false"/>
+
+    <arg name="dsg_should_log" default="true" />
+    <arg name="pgmo_should_log" default="true"/>
 
     <include file="$(find kimera_topology)/launch/kimera_topology_semantic.launch">
         <arg name="use_gt_semantics" value="$(arg use_gt_semantics)"/>
@@ -41,6 +42,7 @@
               ns="/kimera_dsg_visualizer/config/dynamic_layer/2"/>
 
     <arg name="dsg_path" value="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
+    <arg name="pgmo_log_path" default="$(arg dsg_path)/pgmo"/>
     <node pkg="kimera_dsg_builder" type="kimera_dsg_builder_incremental_node"
           name="incremental_dsg_builder_node"
           launch-prefix="$(arg launch_prefix)"
@@ -79,7 +81,8 @@
         <rosparam file="$(find kimera_dsg_builder)/config/place_mesh_graph_viz.yaml"
                   ns="pm_graph_viz"/>
 
-        <param name="dsg_output_path" value="$(find kimera_dsg_builder)/output/backend_dsg.json"/>
+        <param name="dsg_log_output" value="$(arg dsg_should_log)" />
+        <param name="dsg_output_path" value="$(arg dsg_path)"/>
     </node>
 
     <node pkg="kimera_dsg_builder" type="pose_graph_publisher_node"
