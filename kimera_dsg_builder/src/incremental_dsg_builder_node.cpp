@@ -44,6 +44,7 @@ int main(int argc, char* argv[]) {
     LOG(INFO) << "[DSG Node] Saving scene graph and other stats and logs to "
               << dsg_output_path;
     backend_dsg->graph->save(dsg_output_path + "/backend/dsg.json");
+    frontend_dsg->graph->save(dsg_output_path + "/frontend/dsg.json");
     // Output timing statistics
     const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
     timer.logAllElapsed(dsg_output_path);
