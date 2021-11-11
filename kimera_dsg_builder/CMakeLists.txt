@@ -90,6 +90,9 @@ add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
 add_executable(${PROJECT_NAME}_offline_node src/kimera_dsg_builder_offline_node.cpp)
 target_link_libraries(${PROJECT_NAME}_offline_node ${PROJECT_NAME})
 
+add_executable(${PROJECT_NAME}_batch_node src/batch_dsg_builder_node.cpp)
+target_link_libraries(${PROJECT_NAME}_batch_node ${PROJECT_NAME})
+
 add_executable(${PROJECT_NAME}_incremental_node src/incremental_dsg_builder_node.cpp)
 target_link_libraries(${PROJECT_NAME}_incremental_node ${PROJECT_NAME})
 

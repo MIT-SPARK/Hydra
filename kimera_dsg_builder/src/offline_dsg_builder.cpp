@@ -5,6 +5,8 @@
 #include "kimera_dsg_builder/wall_finder.h"
 
 #include <kimera_semantics_ros/ros_params.h>
+#include <kimera_semantics_ros/semantic_tsdf_server.h>
+
 #include <pcl/PolygonMesh.h>
 #include <pcl/conversions.h>
 #include <pcl_ros/point_cloud.h>
@@ -136,6 +138,62 @@ OfflineDsgBuilder::OfflineDsgBuilder(const ros::NodeHandle& nh,
   rgb_config.load_esdf = false;
   voxblox::Layer<voxblox::EsdfVoxel>::Ptr temp;
   utils::loadVoxbloxInfo(rgb_config, temp, rgb_mesh_);
+
+  object_finder_.reset(
+      new ObjectFinder(static_cast<ObjectFinderType>(object_finder_type_)));
+  room_finder_.reset(
+      new RoomFinder(nh_private, world_frame_, room_finder_esdf_slice_level_));
+
+  rqt_callback_ = boost::bind(&OfflineDsgBuilder::rqtReconfigureCallback, this, _1, _2);
+  rqt_server_.setCallback(rqt_callback_);
+
+  reconstruct_scene_graph_srv_ = nh_private_.advertiseService(
+      "reconstruct_scene_graph", &OfflineDsgBuilder::reconstructSrvCb, this);
+
+  visualizer_srv_ = nh_private_.advertiseService(
+      "visualize", &OfflineDsgBuilder::visualizeSrvCb, this);
+}
+
+OfflineDsgBuilder::OfflineDsgBuilder(const ros::NodeHandle& nh,
+                                     const ros::NodeHandle& nh_private,
+                                     voxblox::TsdfServer& server)
+    : nh_(nh),
+      nh_private_(nh_private),
+      world_frame_("world"),
+      scene_graph_output_path_(""),
+      object_finder_type_(0),
+      semantic_pcl_pubs_("pcl", nh_private) {
+  scene_graph_ = std::make_shared<DynamicSceneGraph>();
+
+  std::string visualizer_ns;
+  nh_private.param<std::string>(
+      "visualizer_ns", visualizer_ns, "/kimera_dsg_visualizer");
+  visualizer_.reset(new DynamicSceneGraphVisualizer(ros::NodeHandle(visualizer_ns),
+                                                    getDefaultLayerIds()));
+  visualizer_->start();
+
+  loadParams();
+
+  debug_pub_ = nh_private_.advertise<voxblox_msgs::Mesh>("debug_mesh", 10);
+
+  utils::VoxbloxConfig semantic_config =
+      utils::loadVoxbloxConfig(ros::NodeHandle("~/semantic")).value();
+  pcl::PolygonMesh::Ptr semantic_mesh;
+  semantic_config.load_places = true;
+  utils::updateFromTsdf(semantic_config,
+                        *server.getTsdfMapPtr()->getTsdfLayerPtr(),
+                        esdf_layer_,
+                        semantic_mesh,
+                        scene_graph_.get());
+
+  // TODO(nathan) this is ugly
+  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr vertices(
+      new pcl::PointCloud<pcl::PointXYZRGBA>());
+  pcl::fromPCLPointCloud2(semantic_mesh->cloud, *vertices);
+  std::shared_ptr<std::vector<pcl::Vertices>> faces(new std::vector<pcl::Vertices>(
+      semantic_mesh->polygons.begin(), semantic_mesh->polygons.end()));
+
+  scene_graph_->setMesh(vertices, faces, true);
 
   object_finder_.reset(
       new ObjectFinder(static_cast<ObjectFinderType>(object_finder_type_)));

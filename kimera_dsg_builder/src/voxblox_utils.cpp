@@ -141,7 +141,7 @@ void makePlacesFromTsdf(const VoxbloxConfig& config,
 
   GvdIntegrator integrator(gvd_config, tsdf, gvd, mesh);
   // do batch update of gvd
-  integrator.updateFromTsdfLayer(false, true, false);
+  integrator.updateFromTsdfLayer(false, true, true);
 
   const SceneGraphLayer& places_layer = integrator.getGraph();
   for (const auto& id_node_pair : places_layer.nodes()) {
@@ -159,6 +159,21 @@ void makePlacesFromTsdf(const VoxbloxConfig& config,
 }
 
 }  // namespace
+
+bool updateFromTsdf(const VoxbloxConfig& config,
+                    Layer<TsdfVoxel>& tsdf,
+                    Layer<EsdfVoxel>::Ptr& esdf,
+                    pcl::PolygonMesh::Ptr& mesh,
+                    SceneGraph* graph) {
+  makeEsdfFromTsdf(config, tsdf, esdf);
+
+  makeMeshFromTsdf(tsdf, mesh, nullptr);
+
+  LOG(INFO) << "Starting places extraction. May take a while";
+  makePlacesFromTsdf(config, &tsdf, graph);
+  LOG(INFO) << "Finished places extraction.";
+  return true;
+}
 
 bool loadVoxbloxInfo(const VoxbloxConfig& config,
                      Layer<EsdfVoxel>::Ptr& esdf,

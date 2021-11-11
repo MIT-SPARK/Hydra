@@ -30,6 +30,12 @@ bool loadVoxbloxInfo(const VoxbloxConfig& config,
                      ros::Publisher* mesh_pub = nullptr,
                      SceneGraph* graph = nullptr);
 
+bool updateFromTsdf(const VoxbloxConfig& config,
+                    voxblox::Layer<voxblox::TsdfVoxel>& tsdf,
+                    voxblox::Layer<voxblox::EsdfVoxel>::Ptr& esdf,
+                    pcl::PolygonMesh::Ptr& mesh,
+                    SceneGraph* graph);
+
 }  // namespace utils
 
 }  // namespace kimera

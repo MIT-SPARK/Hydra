@@ -3,24 +3,27 @@
     <arg name="use_gt_semantics" default="true"/>
     <arg name="use_gt_frame" default="true"/>
     <arg name="use_oriented_bounding_boxes" default="false"/>
+    <arg name="exit_after_bag" default="false"/>
 
     <arg name="enable_dsg_lcd" default="false"/>
 
-    <arg name="dsg_output_dir" value="$(find kimera_dsg_builder)/output/uhumans2"/>
+    <arg name="dsg_output_dir" default="$(find kimera_dsg_builder)/output/uhumans2"/>
     <arg name="dsg_output_prefix" default="uhumans2_office"/>
     <arg name="dsg_output_use_date" default="false"/>
 
     <arg name="dsg_should_log" default="true" />
     <arg name="pgmo_should_log" default="true"/>
 
+    <arg name="semantic_map_dir" default="$(find kimera_semantics_ros)/cfg"/>
+    <arg name="semantic_map_file" default="tesse_multiscene_office1_segmentation_mapping.csv"/>
+    <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
+
     <include file="$(find kimera_topology)/launch/kimera_topology_semantic.launch">
         <arg name="use_gt_semantics" value="$(arg use_gt_semantics)"/>
         <arg name="use_gt_frame" value="$(arg use_gt_frame)"/>
         <arg name="show_stats" value="false"/>
+        <arg name="semantic_color_path" value="$(arg semantic_map_path)" if="$(arg use_gt_semantics)"/>
     </include>
-
-    <arg name="semantic_map_path"
-         default="$(find kimera_semantics_ros)/cfg/tesse_multiscene_office1_segmentation_mapping.csv"/>
 
     <arg name="debug" default="false"/>
     <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
@@ -57,6 +60,8 @@
         <rosparam file="$(find kimera_dsg_builder)/config/dsg_backend_config.yaml"/>
         <rosparam file="$(find kimera_dsg_builder)/config/dsg_lcd_config.yaml" ns="lcd"/>
 
+
+        <param name="exit_after_bag" value="$(arg exit_after_bag)"/>
         <param name="use_oriented_bounding_boxes" value="$(arg use_oriented_bounding_boxes)"/>
         <param name="semantic_label_2_color_csv_filepath" value="$(arg semantic_map_path)"/>
 

@@ -9,6 +9,7 @@
 #include <kimera_dsg_visualizer/dynamic_scene_graph_visualizer.h>
 
 #include <kimera_semantics/semantic_integrator_base.h>
+#include <kimera_semantics_ros/semantic_tsdf_server.h>
 #include <voxblox/core/layer.h>
 
 #include <dynamic_reconfigure/server.h>
@@ -30,6 +31,10 @@ class OfflineDsgBuilder {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   OfflineDsgBuilder(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private);
+
+  OfflineDsgBuilder(const ros::NodeHandle& nh,
+                    const ros::NodeHandle& nh_private,
+                    voxblox::TsdfServer& server);
 
   void reconstruct();
 

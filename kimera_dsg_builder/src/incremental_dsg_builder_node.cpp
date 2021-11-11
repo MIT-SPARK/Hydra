@@ -2,10 +2,35 @@
 #include "kimera_dsg_builder/incremental_dsg_frontend.h"
 #include "kimera_dsg_builder/timing_utilities.h"
 
+#include <ros/topic_manager.h>
+
 using kimera::ElapsedTimeRecorder;
 using kimera::KimeraDsgLayers;
 using kimera::LayerId;
 using kimera::incremental::SharedDsgInfo;
+
+inline bool haveClock() {
+  return ros::TopicManager::instance()->getNumPublishers("/clock");
+}
+
+void spinUntilBagFinished() {
+  ros::WallRate r(50);
+  ROS_INFO("Waiting for bag to start");
+  while (ros::ok() && !haveClock()) {
+    ros::spinOnce();
+    r.sleep();
+  }
+
+  ROS_INFO("Running...");
+  while (ros::ok() && haveClock()) {
+    ros::spinOnce();
+    r.sleep();
+  }
+
+  ros::spinOnce();  // make sure all the callbacks are processed
+  ROS_WARN("Exiting!");
+  ros::shutdown();
+}
 
 int main(int argc, char* argv[]) {
   ros::init(argc, argv, "incremental_dsg_builder_node");
@@ -20,6 +45,9 @@ int main(int argc, char* argv[]) {
   ros::NodeHandle nh("~");
   std::string dsg_output_path = "";
   nh.getParam("dsg_output_path", dsg_output_path);
+
+  bool exit_after_bag = false;
+  nh.getParam("exit_after_bag", exit_after_bag);
 
   const LayerId mesh_layer_id = 1;
   const std::map<LayerId, char>& layer_id_map{{KimeraDsgLayers::OBJECTS, 'o'},
@@ -37,7 +65,11 @@ int main(int argc, char* argv[]) {
     frontend.start();
     backend.start();
 
-    ros::spin();
+    if (exit_after_bag) {
+      spinUntilBagFinished();
+    } else {
+      ros::spin();
+    }
   }
 
   if (!dsg_output_path.empty()) {
@@ -49,8 +81,7 @@ int main(int argc, char* argv[]) {
     const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
     timer.logAllElapsed(dsg_output_path);
     timer.logStats(dsg_output_path);
-    LOG(INFO) << "[DSG Node] Saved scene graph, stats, and logs to "
-              << dsg_output_path;
+    LOG(INFO) << "[DSG Node] Saved scene graph, stats, and logs to " << dsg_output_path;
   }
 
   return 0;
