@@ -201,6 +201,7 @@ void fillGvdIntegratorConfigFields(const ros::NodeHandle& nh,
   READ_PARAM(nh, config, parent_derived_distance);
   READ_PARAM(nh, config, min_basis_for_extraction, 0, 26);
   READ_PARAM(nh, config, extract_graph);
+  READ_PARAM(nh, config, mesh_only);
 };
 
 void fillVoronoiCheckConfig(const ros::NodeHandle& nh, VoronoiCheckConfig& config) {

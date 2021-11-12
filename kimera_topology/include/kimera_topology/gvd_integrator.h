@@ -26,6 +26,7 @@ struct GvdIntegratorConfig {
   voxblox::MeshIntegratorConfig mesh_integrator_config;
   GraphExtractorConfig graph_extractor_config;
   bool extract_graph = true;
+  bool mesh_only = false;
 };
 
 /**

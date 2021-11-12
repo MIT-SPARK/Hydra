@@ -8,7 +8,7 @@ method: "fast"
 enable_icp: false
 # topology server config
 world_frame: "world"
-clear_distant_blocks: true
+clear_distant_blocks: false
 dense_representation_radius_m: 15.0
 # gvd integration and graph extraction
 min_diff_m: 1.0e-3

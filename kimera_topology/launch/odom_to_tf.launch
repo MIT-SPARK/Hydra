@@ -1,0 +1,20 @@
+<launch>
+
+    <arg name="odom_frame" default="t265_odom"/>
+    <arg name="sensor_frame" default="rgb_camera_link"/>
+
+    <node pkg="kimera_topology" type="odom_to_tf" name="odom_to_tf"
+          output="screen"
+          required="true">
+        <param name="parent_frame" value="world"/>
+        <param name="child_frame" value="$(arg odom_frame)"/>
+        <remap from="odom" to="/camera/odom/sample"/>
+    </node>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="t265_to_kimera"
+          args="0 0 0 0 0 0 1 world camera_odom_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="t265_to_azure"
+          args="0 0 0 -0.5 0.5 -0.5 0.5 $(arg odom_frame) $(arg sensor_frame)"/>
+
+</launch>

@@ -283,6 +283,10 @@ void GvdIntegrator::updateFromTsdfLayer(bool clear_updated_flag,
   marching_cubes_timer.Stop();
   VLOG(3) << "[GVD update]: finished marching cubes";
 
+  if (config_.mesh_only) {
+    return;
+  }
+
   VLOG(3) << "[GVD update]: propagating TSDF";
   voxblox::timing::Timer propagate_timer("gvd/propagate_tsdf");
   for (const BlockIndex& idx : blocks) {
