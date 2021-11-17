@@ -24,6 +24,10 @@ struct VoxbloxConfig {
 
 std::optional<VoxbloxConfig> loadVoxbloxConfig(const ros::NodeHandle& nh);
 
+void makeMeshFromTsdf(const voxblox::Layer<voxblox::TsdfVoxel>& tsdf,
+                      pcl::PolygonMesh::Ptr& mesh,
+                      ros::Publisher* mesh_pub);
+
 bool loadVoxbloxInfo(const VoxbloxConfig& config,
                      voxblox::Layer<voxblox::EsdfVoxel>::Ptr& esdf,
                      pcl::PolygonMesh::Ptr& mesh,

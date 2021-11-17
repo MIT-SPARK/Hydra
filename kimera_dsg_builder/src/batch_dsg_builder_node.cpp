@@ -16,9 +16,12 @@ inline bool haveClock() {
 int main(int argc, char** argv) {
   ros::init(argc, argv, "kimera_offline_dsg_builder");
 
+  FLAGS_minloglevel = 3;
+  FLAGS_logtostderr = 1;
+  FLAGS_colorlogtostderr = 1;
+
+  google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
-  google::ParseCommandLineFlags(&argc, &argv, false);
-  google::InstallFailureSignalHandler();
 
   ros::NodeHandle nh;
   ros::NodeHandle nh_private("~");
@@ -56,7 +59,9 @@ int main(int argc, char** argv) {
 
   std::string dsg_output_path = "";
   ros::param::get("~dsg_output_path", dsg_output_path);
-  builder.saveSceneGraph(dsg_output_path + "/dsg.json");
+  builder.saveSceneGraph(dsg_output_path + "/dsg.json", false);
+  builder.saveSceneGraph(dsg_output_path + "/dsg_with_mesh.json", true);
+
   tsdf_server.saveMap(dsg_output_path + "/tsdf.vxblx");
 
   return 0;

@@ -41,21 +41,13 @@ Visualization Manager:
         All Enabled: false
         base_link_gt:
           Value: true
-        base_link_kimera:
-          Value: true
         front_lidar:
           Value: true
         left_cam:
           Value: true
-        left_cam_kimera:
-          Value: true
-        map:
-          Value: true
         rear_lidar:
           Value: true
         right_cam:
-          Value: true
-        right_cam_kimera:
           Value: true
         world:
           Value: true
@@ -75,13 +67,6 @@ Visualization Manager:
               {}
             right_cam:
               {}
-          base_link_kimera:
-            left_cam_kimera:
-              {}
-            right_cam_kimera:
-              {}
-          map:
-            {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -99,9 +84,7 @@ Visualization Manager:
       Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 4096
       Min Color: 0; 0; 0
-      Min Intensity: 0
       Name: Input Pointcloud
       Position Transformer: XYZ
       Queue Size: 10
@@ -163,9 +146,7 @@ Visualization Manager:
       Marker Topic: /kimera_dsg_visualizer/dynamic_layers_viz
       Name: Dsg Dynamic Layers
       Namespaces:
-        dynamic_edges_a: true
-        dynamic_label_a: true
-        dynamic_nodes_a: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -181,19 +162,7 @@ Visualization Manager:
       Marker Topic: /kimera_dsg_visualizer/dsg_markers
       Name: Scene Graph
       Namespaces:
-        interlayer_edges_3_2: true
-        interlayer_edges_4_3: true
-        interlayer_edges_5_4: true
-        layer_bounding_boxes_2: true
-        layer_edges_3: true
-        layer_edges_4: true
-        layer_labels_4: true
-        layer_labels_5: true
-        layer_nodes_2: true
-        layer_nodes_3: true
-        layer_nodes_4: true
-        layer_nodes_5: true
-        mesh_object_connections: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz_mesh_plugin/TriangleMesh
@@ -214,6 +183,12 @@ Visualization Manager:
         Wireframe Alpha: 1
         Wireframe Color: 0; 0; 0
       Topic: /kimera_dsg_visualizer/dsg_mesh
+      Value: true
+    - Class: voxblox_rviz_plugin/VoxbloxMesh
+      Enabled: true
+      Name: VoxbloxMesh
+      Topic: /batch_dsg_builder_node/mesh
+      Unreliable: false
       Value: true
   Enabled: true
   Global Options:

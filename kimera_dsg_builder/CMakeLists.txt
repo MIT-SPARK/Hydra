@@ -31,6 +31,7 @@ find_package(teaserpp REQUIRED)
 find_package(GTSAM REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(KimeraRPGO REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 generate_dynamic_reconfigure_options(cfg/DsgBuilderConfig.cfg)
 
@@ -95,6 +96,12 @@ target_link_libraries(${PROJECT_NAME}_batch_node ${PROJECT_NAME})
 
 add_executable(${PROJECT_NAME}_incremental_node src/incremental_dsg_builder_node.cpp)
 target_link_libraries(${PROJECT_NAME}_incremental_node ${PROJECT_NAME})
+
+add_executable(room_visualizer_node src/room_visualizer_node.cpp)
+target_link_libraries(room_visualizer_node ${PROJECT_NAME} yaml-cpp)
+
+add_executable(room_eval_node src/room_eval_node.cpp)
+target_link_libraries(room_eval_node ${PROJECT_NAME} yaml-cpp)
 
 add_executable(pose_graph_publisher_node src/pose_graph_publisher_node.cpp)
 target_include_directories(pose_graph_publisher_node PUBLIC ${catkin_INCLUDE_DIRS})

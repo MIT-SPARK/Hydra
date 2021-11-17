@@ -249,6 +249,7 @@ void OfflineDsgBuilder::reconstruct() {
       continue;
     }
 
+    LOG(ERROR) << "Processing " << static_cast<int>(semantic_label) << " for objects";
     const auto& label_color_vbx =
         semantic_config_.semantic_label_to_color_->getColorFromSemanticLabel(
             semantic_label);
@@ -297,7 +298,8 @@ void OfflineDsgBuilder::reconstruct() {
   saveSceneGraph(scene_graph_output_path_);
 }
 
-void OfflineDsgBuilder::saveSceneGraph(const std::string& filepath) const {
+void OfflineDsgBuilder::saveSceneGraph(const std::string& filepath,
+                                       bool include_mesh) const {
   if (filepath.empty()) {
     VLOG(5) << "Not saving scene graph: filepath is empty";
     return;
@@ -309,7 +311,7 @@ void OfflineDsgBuilder::saveSceneGraph(const std::string& filepath) const {
   }
 
   LOG(INFO) << "Saving to file: " << filepath;
-  scene_graph_->save(filepath);
+  scene_graph_->save(filepath, include_mesh);
   LOG(INFO) << "Finished saving DSG";
 }
 

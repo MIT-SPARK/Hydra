@@ -54,8 +54,6 @@ std::optional<VoxbloxConfig> loadVoxbloxConfig(const ros::NodeHandle& nh) {
 
 #undef READ_PARAM
 
-namespace {
-
 inline bool loadEsdfFromFile(const VoxbloxConfig& config, Layer<EsdfVoxel>::Ptr& esdf) {
   esdf.reset(new Layer<EsdfVoxel>(config.voxel_size, config.voxels_per_side));
   const auto strat = Layer<EsdfVoxel>::BlockMergingStrategy::kReplace;
@@ -78,9 +76,9 @@ inline void makeEsdfFromTsdf(const VoxbloxConfig& config,
   integrator.updateFromTsdfLayerBatch();
 }
 
-inline void makeMeshFromTsdf(const Layer<TsdfVoxel>& tsdf,
-                             pcl::PolygonMesh::Ptr& mesh,
-                             ros::Publisher* mesh_pub) {
+void makeMeshFromTsdf(const Layer<TsdfVoxel>& tsdf,
+                      pcl::PolygonMesh::Ptr& mesh,
+                      ros::Publisher* mesh_pub) {
   MeshIntegratorConfig config;
   MeshLayer voxblox_mesh(tsdf.block_size());
   MeshIntegrator<TsdfVoxel> integrator(config, tsdf, &voxblox_mesh);
@@ -134,6 +132,7 @@ void makePlacesFromTsdf(const VoxbloxConfig& config,
 
   GvdIntegratorConfig gvd_config;
   fillGvdIntegratorConfig(ros::NodeHandle(config.gvd_namespace), gvd_config);
+  topology::showConfig(gvd_config);
 
   Layer<GvdVoxel>::Ptr gvd(
       new Layer<GvdVoxel>(tsdf->voxel_size(), tsdf->voxels_per_side()));
@@ -157,8 +156,6 @@ void makePlacesFromTsdf(const VoxbloxConfig& config,
     graph->insertEdge(edge.source, edge.target, std::move(info));
   }
 }
-
-}  // namespace
 
 bool updateFromTsdf(const VoxbloxConfig& config,
                     Layer<TsdfVoxel>& tsdf,

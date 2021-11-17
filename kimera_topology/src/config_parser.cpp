@@ -257,5 +257,74 @@ GvdVisualizerConfig getGvdVisualizerConfig(const std::string& ns) {
 
 #undef READ_PARAM
 
+#define SHOW_PARAM(config, param) " - " #param ": " << config.param << std::endl
+
+#define SHOW_NS_PARAM(config, ns, param) \
+  " - " << ns << "/" #param ": " << config.param << std::endl
+
+#define SHOW_BYTE_PARAM(config, param) \
+  " - " #param ": " << static_cast<int>(config.param) << std::endl
+
+#define SHOW_NS_BYTE_PARAM(config, ns, param) \
+  " - " << ns << "/" #param ": " << static_cast<int>(config.param) << std::endl
+
+#define SHOW_BOOL_PARAM(config, param) \
+  " - " #param ": " << (config.param ? "yes" : "no") << std::endl
+
+#define SHOW_NS_BOOL_PARAM(config, ns, param) \
+  " - " << ns << "/" #param ": " << (config.param ? "yes" : "no") << std::endl
+
+void showConfig(const GvdIntegratorConfig& config) {
+  LOG(INFO)
+      << "GVD Config: " << std::endl
+      << SHOW_PARAM(config, max_distance_m) << SHOW_PARAM(config, min_distance_m)
+      << SHOW_PARAM(config, min_diff_m) << SHOW_PARAM(config, min_weight)
+      << SHOW_PARAM(config, num_buckets) << SHOW_BOOL_PARAM(config, multi_queue)
+      << SHOW_BOOL_PARAM(config, positive_distance_only)
+      << SHOW_BOOL_PARAM(config, parent_derived_distance)
+      << SHOW_BOOL_PARAM(config, extract_graph) << SHOW_BOOL_PARAM(config, mesh_only)
+      << SHOW_BYTE_PARAM(config, min_basis_for_extraction)
+      << SHOW_NS_PARAM(config.voronoi_config, "voronoi", min_distance_m)
+      << SHOW_NS_PARAM(config.voronoi_config, "voronoi", parent_l1_separation)
+      << SHOW_NS_PARAM(config.voronoi_config, "voronoi", parent_cos_angle_separation)
+      << SHOW_NS_BYTE_PARAM(config.graph_extractor_config, "graph", min_extra_basis)
+      << SHOW_NS_BYTE_PARAM(config.graph_extractor_config, "graph", min_vertex_basis)
+      << SHOW_NS_BOOL_PARAM(config.graph_extractor_config, "graph", merge_new_nodes)
+      << SHOW_NS_PARAM(config.graph_extractor_config, "graph", node_merge_distance_m)
+      << SHOW_NS_BOOL_PARAM(
+             config.graph_extractor_config, "graph", edge_splitting_merge_nodes)
+      << SHOW_NS_PARAM(
+             config.graph_extractor_config, "graph", max_edge_split_iterations)
+      << SHOW_NS_PARAM(config.graph_extractor_config, "graph", max_edge_deviation)
+      << SHOW_NS_BOOL_PARAM(config.graph_extractor_config, "graph", add_freespace_edges)
+      << SHOW_NS_PARAM(
+             config.graph_extractor_config, "graph", freespace_active_neighborhood_hops)
+      << SHOW_NS_PARAM(
+             config.graph_extractor_config, "graph", freespace_edge_num_neighbors)
+      << SHOW_NS_PARAM(
+             config.graph_extractor_config, "graph", freespace_edge_min_clearance_m)
+      << SHOW_NS_BOOL_PARAM(
+             config.graph_extractor_config, "graph", add_component_connection_edges)
+      << SHOW_NS_PARAM(
+             config.graph_extractor_config, "graph", connected_component_window)
+      << SHOW_NS_PARAM(config.graph_extractor_config, "graph", connected_component_hops)
+      << SHOW_NS_PARAM(config.graph_extractor_config, "graph", component_nodes_to_check)
+      << SHOW_NS_PARAM(
+             config.graph_extractor_config, "graph", component_nearest_neighbors)
+      << SHOW_NS_PARAM(
+             config.graph_extractor_config, "graph", component_max_edge_length_m)
+      << SHOW_NS_PARAM(
+             config.graph_extractor_config, "graph", component_min_clearance_m)
+      << SHOW_NS_BOOL_PARAM(
+             config.graph_extractor_config, "graph", remove_isolated_nodes);
+}
+
+#undef SHOW_PARAM
+#undef SHOW_NS_PARAM
+#undef SHOW_BOOL_PARAM
+#undef SHOW_NS_BOOL_PARAM
+#undef SHOW_BYTE_PARAM
+#undef SHOW_NS_BYTE_PARAM
+
 }  // namespace topology
 }  // namespace kimera

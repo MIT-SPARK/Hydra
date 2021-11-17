@@ -32,5 +32,7 @@ void fillTopologyServerVizConfig(const ros::NodeHandle& nh,
 
 GvdVisualizerConfig getGvdVisualizerConfig(const std::string& ns);
 
+void showConfig(const GvdIntegratorConfig& config);
+
 }  // namespace topology
 }  // namespace kimera

@@ -38,7 +38,7 @@ class OfflineDsgBuilder {
 
   void reconstruct();
 
-  void saveSceneGraph(const std::string& filepath) const;
+  void saveSceneGraph(const std::string& filepath, bool include_mesh = true) const;
 
   DynamicSceneGraph::Ptr getSceneGraph() { return scene_graph_; }
 

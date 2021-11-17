@@ -18,6 +18,9 @@
     <arg name="max_ray_length_m" default="4.5"/>
     <arg name="update_period_s" default="1.0"/>
 
+    <arg name="typology_dir" default="$(find kimera_dsg_builder)/config"/>
+    <arg name="typology_config" default="uhumans2_office_typology.yaml"/>
+
     <arg name="config_dir" default="$(find kimera_topology)/config"/>
     <arg name="config" default="uhumans2_topology_config.yaml"/>
     <arg name="semantic_config" default="uhumans2_semantic_config.yaml" if="$(arg use_gt_semantics)"/>
@@ -84,7 +87,7 @@
         <param name="verbose" value="false"/>
         <param name="publish_pointclouds" value="false"/>
 
-        <rosparam command="load" file="$(arg config_dir)/$(arg config)"/>
+        <rosparam command="load" file="$(arg typology_dir)/$(arg typology_config)"/>
         <rosparam command="load" file="$(arg config_dir)/$(arg semantic_config)"/>
         <param name="semantic_label_2_color_csv_filepath" value="$(arg semantic_color_path)"/>
 
@@ -102,17 +105,9 @@
         <param name="semantic/generate_mesh" value="true"/>
         <param name="semantic/truncation_distance" value="0.4"/>
         <param name="semantic/esdf_min_distance_m" value="0.2"/>
-
-        <param name="dsg/output_path" command="date +'$(arg dsg_path)_%Y_%m_%d_%I_%M_%S.json'"
-               if="$(arg dsg_output_use_date)"/>
-        <param name="dsg/output_path" value="$(arg dsg_path).json"
-               unless="$(arg dsg_output_use_date)"/>
-
-        <rosparam param="dynamic_semantic_labels">[20]</rosparam>
-        <rosparam param="stuff_labels">[0, 3, 4, 9, 11, 14, 19]</rosparam>
-        <rosparam param="object_labels">[2, 5, 6, 7, 10, 11, 12, 13, 16, 17, 18]</rosparam>
-        <rosparam param="walls_labels">[]</rosparam>
-        <rosparam param="floor_labels">[]</rosparam>
+        <param name="semantic/gvd_namespace" value="~gvd_integrator"/>
+        <param name="gvd_integrator/max_distance_m" value="$(arg max_ray_length_m)"/>
+        <rosparam file="$(arg config_dir)/$(arg config)" ns="gvd_integrator"/>
 
         <param name="dsg_log_output" value="$(arg dsg_should_log)" />
         <param name="dsg_output_path" value="$(arg dsg_path)"/>

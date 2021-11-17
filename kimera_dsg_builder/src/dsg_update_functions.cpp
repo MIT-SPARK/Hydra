@@ -44,7 +44,19 @@ void updateObjects(DynamicSceneGraph& graph,
     Centroid centroid;
     for (const auto& idx : *indices) {
       const auto& point = mesh->at(idx);
+      if (std::isnan(point.x) || std::isnan(point.y) || std::isnan(point.z)) {
+        VLOG(4) << "found nan at index: " << idx << " with point: [" << point.x << ", "
+                << point.y << ", " << point.z << "]";
+        continue;
+      }
+
       centroid.add(pcl::PointXYZ(point.x, point.y, point.z));
+    }
+
+    if (!centroid.getSize()) {
+      VLOG(2) << "Invalid centroid for object "
+              << NodeSymbol(id_node_pair.first).getLabel();
+      continue;
     }
 
     pcl::PointXYZ pcl_pos;

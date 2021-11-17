@@ -14,6 +14,9 @@
     <arg name="dsg_should_log" default="true" />
     <arg name="pgmo_should_log" default="true"/>
 
+    <arg name="typology_dir" default="$(find kimera_dsg_builder)/config"/>
+    <arg name="typology_config" default="uhumans2_office_typology.yaml"/>
+
     <arg name="semantic_map_dir" default="$(find kimera_semantics_ros)/cfg"/>
     <arg name="semantic_map_file" default="tesse_multiscene_office1_segmentation_mapping.csv"/>
     <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
@@ -54,40 +57,29 @@
           output="screen">
         <env name="OMP_NUM_THREADS" value="12"/>
 
-        <param name="pgmo/log_path" value="$(arg pgmo_log_path)"/>
-        <param name="pgmo/log_output" value="$(arg pgmo_should_log)"/>
-        <rosparam file="$(find kimera_dsg_builder)/config/dsg_frontend_config.yaml"/>
-        <rosparam file="$(find kimera_dsg_builder)/config/dsg_backend_config.yaml"/>
-        <rosparam file="$(find kimera_dsg_builder)/config/dsg_lcd_config.yaml" ns="lcd"/>
-
-
+        <param name="enable_lcd" value="$(arg enable_dsg_lcd)"/>
         <param name="exit_after_bag" value="$(arg exit_after_bag)"/>
         <param name="use_oriented_bounding_boxes" value="$(arg use_oriented_bounding_boxes)"/>
         <param name="semantic_label_2_color_csv_filepath" value="$(arg semantic_map_path)"/>
 
-        <param name="dsg/output_path" command="date +'$(arg dsg_path)_%Y_%m_%d_%I_%M_%S.json'"
-               if="$(arg dsg_output_use_date)"/>
-        <param name="dsg/output_path" value="$(arg dsg_path).json"
-               unless="$(arg dsg_output_use_date)"/>
+        <rosparam file="$(arg typology_dir)/$(arg typology_config)"/>
+        <rosparam file="$(find kimera_dsg_builder)/config/dsg_frontend_config.yaml"/>
+        <rosparam file="$(find kimera_dsg_builder)/config/dsg_backend_config.yaml"/>
+        <rosparam file="$(find kimera_dsg_builder)/config/dsg_lcd_config.yaml" ns="lcd"/>
+        <rosparam file="$(find kimera_dsg_builder)/config/place_mesh_graph_viz.yaml"
+                  ns="pm_graph_viz"/>
 
-        <param name="enable_lcd" value="$(arg enable_dsg_lcd)"/>
+        <param name="pgmo/log_path" value="$(arg pgmo_log_path)"/>
+        <param name="pgmo/log_output" value="$(arg pgmo_should_log)"/>
+        <param name="dsg_log_output" value="$(arg dsg_should_log)" />
+        <param name="dsg_output_path" value="$(arg dsg_path)"/>
 
-        <rosparam param="dynamic_semantic_labels">[20]</rosparam>
-        <!-- ignoring 1, -->
-        <rosparam param="structure_labels">[0, 3, 4, 9, 11, 14, 19]</rosparam>
-        <rosparam param="object_labels">[2, 5, 6, 7, 10, 11, 12, 13, 16, 17, 18]</rosparam>
         <remap from="~voxblox_mesh" to="/kimera_topology_node/mesh"/>
         <remap from="~active_places" to="/kimera_topology_node/active_layer"/>
         <remap from="~pose_graph_incremental" to="/kimera_vio_ros/pose_graph_incremental"
                unless="$(arg use_gt_frame)"/>
         <remap from="~/bow_vectors" to="/kimera_vio_ros/bow_query"/>
         <remap from="frame_registration" to="/kimera_vio_ros/kimera_vio_ros_node/register_lcd_frames"/>
-
-        <rosparam file="$(find kimera_dsg_builder)/config/place_mesh_graph_viz.yaml"
-                  ns="pm_graph_viz"/>
-
-        <param name="dsg_log_output" value="$(arg dsg_should_log)" />
-        <param name="dsg_output_path" value="$(arg dsg_path)"/>
     </node>
 
     <node pkg="kimera_dsg_builder" type="pose_graph_publisher_node"
