@@ -29,10 +29,14 @@ using voxblox::TsdfVoxel;
 void redrawBoundingBoxes(ros::Publisher& bbox_pub) {
   YAML::Node root = YAML::LoadFile(FLAGS_bbox_file);
 
+  const double angle_degrees = !root["angle"] ? 0.0 : root["angle"].as<double>();
+  LOG(INFO) << "Using angle: " << angle_degrees;
+  const double angle = angle_degrees * M_PI / 180.0;
+
   visualization_msgs::MarkerArray msg;
-  size_t num_rooms = root.size();
+  size_t num_rooms = root["rooms"].size();
   size_t idx = 0;
-  for (size_t room = 0; room < root.size(); ++room) {
+  for (size_t room = 0; room < root["rooms"].size(); ++room) {
     const double hue = static_cast<double>(room) / static_cast<double>(num_rooms);
     auto rgb = kimera::dsg_utils::getRgbFromHls(hue, FLAGS_luminance, FLAGS_saturation);
 
@@ -42,7 +46,7 @@ void redrawBoundingBoxes(ros::Publisher& bbox_pub) {
     color.b = rgb(2) / 255.0;
     color.a = FLAGS_alpha;
 
-    for (const auto& bbox : root[room]) {
+    for (const auto& bbox : root["rooms"][room]) {
       visualization_msgs::Marker bbox_marker;
       bbox_marker.header.frame_id = "world";
       bbox_marker.header.stamp = ros::Time::now();
@@ -54,10 +58,10 @@ void redrawBoundingBoxes(ros::Publisher& bbox_pub) {
       bbox_marker.pose.position.x = bbox["pos"][0].as<double>();
       bbox_marker.pose.position.y = bbox["pos"][1].as<double>();
       bbox_marker.pose.position.z = bbox["pos"][2].as<double>();
-      bbox_marker.pose.orientation.w = 1.0;
+      bbox_marker.pose.orientation.w = std::cos(angle / 2);
       bbox_marker.pose.orientation.x = 0.0;
       bbox_marker.pose.orientation.y = 0.0;
-      bbox_marker.pose.orientation.z = 0.0;
+      bbox_marker.pose.orientation.z = std::sin(angle / 2);
       bbox_marker.scale.x = bbox["scale"][0].as<double>();
       bbox_marker.scale.y = bbox["scale"][1].as<double>();
       bbox_marker.scale.z = bbox["scale"][2].as<double>();

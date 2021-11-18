@@ -50,19 +50,29 @@ void getGtRoomIndices(const Layer<TsdfVoxel>& tsdf,
                       std::map<NodeId, voxblox::LongIndexSet>& room_indices) {
   YAML::Node root = YAML::LoadFile(FLAGS_bbox_file);
 
+  const double angle_degrees = !root["angle"] ? 0.0 : root["angle"].as<double>();
+  LOG(INFO) << "Using angle: " << angle_degrees;
+  const double angle = angle_degrees * M_PI / 180.0;
+
   std::vector<std::pair<size_t, BoundingBox>> boxes;
-  for (size_t room = 0; room < root.size(); ++room) {
+  for (size_t room = 0; room < root["rooms"].size(); ++room) {
     room_indices[room] = voxblox::LongIndexSet();
-    for (const auto& bbox : root[room]) {
+    for (const auto& bbox : root["rooms"][room]) {
       Eigen::Vector3f pos(bbox["pos"][0].as<double>(),
                           bbox["pos"][1].as<double>(),
                           bbox["pos"][2].as<double>());
       Eigen::Vector3f scale(bbox["scale"][0].as<double>(),
                             bbox["scale"][1].as<double>(),
                             bbox["scale"][2].as<double>());
+      Eigen::Quaternionf rot(
+          std::cos(angle / 2.0f), 0.0f, 0.0f, std::sin(angle / 2.0f));
 
-      boxes.push_back(
-          std::make_pair(room, BoundingBox(pos - scale / 2.0f, pos + scale / 2.0f)));
+      boxes.push_back(std::make_pair(room,
+                                     BoundingBox(BoundingBox::Type::RAABB,
+                                                 -scale / 2.0f,
+                                                 scale / 2.0f,
+                                                 pos,
+                                                 rot.toRotationMatrix())));
     }
   }
 
