@@ -277,6 +277,17 @@ void DsgFrontend::runPlaces() {
         }
 
         archived_places_.insert(prev_node);
+        {  // start graph update critical section
+          std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
+          // march archived places as inactive
+          if (dsg_->graph->hasNode(prev_node)) {
+            auto& attrs = dsg_->graph->getNode(prev_node)
+                              .value()
+                              .get()
+                              .attributes<PlaceNodeAttributes>();
+            attrs.is_active = false;
+          }
+        }
       }
     }  // end places queue critical section
     previous_active_places_ = latest_places;
@@ -662,7 +673,6 @@ void DsgFrontend::updatePlaceMeshMapping() {
 
     // reset connections (and mark inactive to avoid processing outside active
     // window)
-    attrs.is_active = false;
     attrs.pcl_mesh_connections.clear();
     attrs.pcl_mesh_connections.reserve(attrs.voxblox_mesh_connections.size());
 

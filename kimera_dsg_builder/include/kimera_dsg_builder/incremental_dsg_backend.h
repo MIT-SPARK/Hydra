@@ -63,6 +63,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void poseGraphCallback(const pose_graph_tools::PoseGraph::ConstPtr& msg);
 
+  bool saveMeshCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+
   void startVisualizer();
 
   void runVisualizer();
@@ -124,6 +126,11 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   ros::Subscriber deformation_graph_sub_;
   ros::Subscriber pose_graph_sub_;
 
+  ros::ServiceServer save_mesh_srv_;
+
+  ros::Publisher viz_mesh_mesh_edges_pub_;
+  ros::Publisher viz_pose_mesh_edges_pub_;
+
   std::unique_ptr<DynamicSceneGraphVisualizer> visualizer_;
   std::unique_ptr<ros::CallbackQueue> visualizer_queue_;
   std::unique_ptr<std::thread> visualizer_thread_;
@@ -131,7 +138,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   std::list<LayerUpdateFunc> dsg_update_funcs_;
 
-  std::atomic<bool> have_new_loopclosure_;
+  std::atomic<bool> have_loopclosures_;
   std::atomic<bool> have_dsg_updates_;
 
   bool have_new_mesh_;

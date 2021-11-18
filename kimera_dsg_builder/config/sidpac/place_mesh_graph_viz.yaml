@@ -1,0 +1,26 @@
+mesh_edge_scale: 0.01
+mesh_edge_alpha: 0.9
+mesh_marker_scale: 0.1
+mesh_marker_alpha: 0.9
+leaf_color_float: [0.662, 0.0313, 0.7607]
+interior_color_float: [0.3333, 0.3764, 0.4509]
+graph:
+    visualize: true
+    z_offset_scale: 0.0
+    marker_scale: 0.15
+    marker_alpha: 0.9
+    use_sphere_marker: true
+    use_label: false
+    label_height: 0.0
+    label_scale: 0.0
+    use_bounding_box: false
+    bounding_box_alpha: 0.0
+    use_edge_source: false
+    interlayer_edge_scale: 0.0
+    interlayer_edge_alpha: 0.0
+    interlayer_edge_use_color: false
+    interlayer_edge_insertion_skip: 0
+    intralayer_edge_scale: 0.01
+    intralayer_edge_alpha: 0.8
+    intralayer_edge_use_color: false
+    intralayer_edge_insertion_skip: 0

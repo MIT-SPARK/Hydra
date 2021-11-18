@@ -17,8 +17,8 @@ pgmo:
         gnc_alpha: 0.9
 enable_rooms: true
 room_finder:
-    min_dilation_m: 0.43
-    max_dilation_m: 1.2
+    min_dilation_m: 0.33
+    max_dilation_m: 0.8
     num_steps: 10
     min_component_size: 10
     room_vote_min_overlap: 0.1

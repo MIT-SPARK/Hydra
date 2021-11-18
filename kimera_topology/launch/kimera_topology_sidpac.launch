@@ -3,8 +3,9 @@
     <param name="use_sim_time" value="$(arg sim_time_required)"/>
 
     <arg name="use_semantics" default="true"/>
+    <arg name="use_kimera_frame" default="true"/>
 
-    <arg name="voxel_size" default="0.10"/>
+    <arg name="voxel_size" default="0.15"/>
     <arg name="max_ray_length_m" default="4.5"/>
     <arg name="update_period_s" default="0.5"/>
 
@@ -14,7 +15,7 @@
     <arg name="debug" default="false"/>
 
     <arg name="config_dir" default="$(find kimera_topology)/config"/>
-    <arg name="config" default="uhumans2_topology_config.yaml"/>
+    <arg name="config" default="sidpac_topology_config.yaml"/>
 
     <arg name="semantic_config" default="ade150_semantic_config.yaml"/>
     <arg name="semantic_color_path"
@@ -24,14 +25,15 @@
     <arg name="graph_viz_config" default="graph_visualization_config.yaml"/>
     <arg name="graph_viz_config_file" value="$(arg graph_viz_config_dir)/$(arg graph_viz_config)"/>
 
-    <arg name="sensor_frame" default="rgb_camera_link"/>
+    <arg name="sensor_frame" default="rgb_camera_link" unless="$(arg use_kimera_frame)"/>
+    <arg name="sensor_frame" default="left_cam" if="$(arg use_kimera_frame)"/>
 
     <arg name="camera_info_topic" default="/azure/rgb/camera_info"/>
     <arg name="camera_topic" default="/azure/rgb/image_raw"/>
     <arg name="depth_topic" default="/azure/depth_to_rgb/image_raw"/>
     <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
 
-    <include file="$(find kimera_topology)/launch/odom_to_tf.launch">
+    <include unless="$(arg use_kimera_frame)" file="$(find kimera_topology)/launch/odom_to_tf.launch">
         <param name="sensor_frame" value="$(arg sensor_frame)"/>
     </include>
 
@@ -78,7 +80,7 @@
         <param name="max_ray_length_m" value="$(arg max_ray_length_m)"/>
         <param name="max_distance_m" value="$(arg max_ray_length_m)"/>
         <param name="update_period_s" value="$(arg update_period_s)"/>
-        <param name="mesh_only" value="true"/>
+        <param name="mesh_only" value="false"/>
     </node>
 
 </launch>

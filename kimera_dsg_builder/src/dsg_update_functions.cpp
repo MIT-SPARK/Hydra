@@ -137,8 +137,8 @@ void updatePlaces(DynamicSceneGraph& graph,
       // TODO(nathan) consider updating distance via parents + deformation graph
 
       // TODO(yun) faster and smarter way to find overlap?
-      double threshold = 0.1;  // TODO make this a parameter
-      double tolerance = 0.01;
+      double threshold = 0.4;  // TODO make this a parameter
+      double tolerance = 0.3;
       bool to_be_merged = false;
       // Only try merge if is not active
       if (!attrs->is_active) {

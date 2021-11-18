@@ -100,6 +100,7 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
       robot_id_(0),
       add_places_to_deformation_graph_(true),
       optimize_on_lc_(true),
+      have_loopclosures_(false),
       enable_node_merging_(true),
       call_update_periodically_(true),
       have_new_mesh_(false),
@@ -317,15 +318,15 @@ void DsgBackend::startDsgUpdater() {
   full_mesh_sub_ =
       nh_.subscribe("pgmo/full_mesh", 1, &DsgBackend::fullMeshCallback, this);
   deformation_graph_sub_ = nh_.subscribe(
-      "pgmo/mesh_graph_incremental", 20, &DsgBackend::deformationGraphCallback, this);
+      "pgmo/mesh_graph_incremental", 1000, &DsgBackend::deformationGraphCallback, this);
   pose_graph_sub_ =
-      nh_.subscribe("pose_graph_incremental", 20, &DsgBackend::poseGraphCallback, this);
+      nh_.subscribe("pose_graph_incremental", 1000, &DsgBackend::poseGraphCallback, this);
 
   pgmo_thread_.reset(new std::thread(&DsgBackend::runDsgUpdater, this));
 }
 
 void DsgBackend::runDsgUpdater() {
-  ros::Rate r(10);
+  ros::Rate r(2);
   while (ros::ok() && !should_shutdown_) {
     // TODO(Yun) Fix to update with only new changes while ignoring old
     bool have_frontend_updates = shared_dsg_->updated;
@@ -349,15 +350,24 @@ void DsgBackend::runDsgUpdater() {
 }
 
 void DsgBackend::startPgmo() {
+  viz_mesh_mesh_edges_pub_ = nh_.advertise<visualization_msgs::Marker>(
+      "pgmo/deformation_graph_mesh_mesh", 10, false);
+  viz_pose_mesh_edges_pub_ = nh_.advertise<visualization_msgs::Marker>(
+      "pgmo/deformation_graph_pose_mesh", 10, false);
+
+  save_mesh_srv_ =
+      nh_.advertiseService("save_mesh", &DsgBackend::saveMeshCallback, this);
+
   optimizer_thread_.reset(new std::thread(&DsgBackend::runPgmo, this));
 }
 
 void DsgBackend::runPgmo() {
-  ros::Rate r(10);
+  ros::Rate r(2);
   while (ros::ok() && !should_shutdown_) {
     status_.reset();
     ScopedTimer spin_timer("pgmo/spin");
     const size_t prev_loop_closures = num_loop_closures_;
+    bool have_graph_updates;
 
     {  // start pgmo critical section
       std::unique_lock<std::mutex> lock(pgmo_mutex_);
@@ -368,6 +378,7 @@ void DsgBackend::runPgmo() {
         processIncrementalMeshGraph(
             deformation_graph_updates_, timestamps_, &unconnected_nodes_);
         deformation_graph_updates_.reset();
+        have_graph_updates = true;
       }
 
       if (pose_graph_updates_) {
@@ -375,18 +386,19 @@ void DsgBackend::runPgmo() {
         processIncrementalPoseGraph(
             pose_graph_updates_, &trajectory_, &unconnected_nodes_, &timestamps_);
         pose_graph_updates_.reset();
+        have_graph_updates = true;
       }
     }  // end pgmo critical section
 
     addInternalLCDToDeformationGraph();
     if (num_loop_closures_ > prev_loop_closures) {
-      LOG(WARNING) << "Loop closures increased: optimizing!";
-      have_new_loopclosure_ = true;
+      LOG(WARNING) << "New loop closures detected!";
     }
 
     if (num_loop_closures_ > 0) {
       status_.total_loop_closures_ = num_loop_closures_;
       status_.new_loop_closures_ = num_loop_closures_ - prev_loop_closures;
+      have_loopclosures_ = true;
     }
     status_.trajectory_len_ = trajectory_.size();
     status_.total_factors_ = deformation_graph_->getGtsamFactors().size();
@@ -403,8 +415,7 @@ void DsgBackend::runPgmo() {
 
     have_dsg_updates_ = false;
 
-    if (optimize_on_lc_ && have_new_loopclosure_) {
-      have_new_loopclosure_ = false;
+    if (have_graph_updates && optimize_on_lc_ && have_loopclosures_) {
       ScopedTimer optimize_timer("pgmo/optimize");
       optimize();
     } else if (call_update_periodically_) {
@@ -443,6 +454,19 @@ void DsgBackend::poseGraphCallback(const PoseGraph::ConstPtr& msg) {
   } else {
     mergePoseGraphs(*msg, *pose_graph_updates_);
   }
+}
+
+bool DsgBackend::saveMeshCallback(std_srvs::Empty::Request&,
+                                  std_srvs::Empty::Response&) {
+  pcl::PolygonMesh opt_mesh;
+  {
+    std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
+    opt_mesh = private_dsg_->graph->getMesh();
+  }
+  // Save mesh
+  std::string ply_name = pgmo_log_path_ + std::string("/mesh_pgmo.ply");
+  saveMesh(opt_mesh, ply_name);
+  return true;
 }
 
 void DsgBackend::addPlacesToDeformationGraph() {
@@ -548,6 +572,12 @@ void DsgBackend::updateDsgMesh() {
     private_dsg_->graph->setMeshDirectly(opt_mesh);
     private_dsg_->updated = true;
   }  // end graph update critical section
+
+  if (viz_mesh_mesh_edges_pub_.getNumSubscribers() > 0 ||
+      viz_pose_mesh_edges_pub_.getNumSubscribers() > 0) {
+    visualizeDeformationGraphMeshEdges(&viz_mesh_mesh_edges_pub_,
+                                       &viz_pose_mesh_edges_pub_);
+  }
 }
 
 void DsgBackend::optimize() {
