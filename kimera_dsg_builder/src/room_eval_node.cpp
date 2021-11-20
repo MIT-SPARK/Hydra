@@ -152,8 +152,8 @@ void eval_rooms(const Layer<TsdfVoxel>& tsdf, const DynamicSceneGraph& graph) {
       }
     }
 
-    recall += max_overlap / gt_sizes[i];
-    recalls.push_back(max_overlap / gt_sizes[i]);
+    recall += gt_sizes[i] ? max_overlap / gt_sizes[i] : 0.0;
+    recalls.push_back(gt_sizes[i] ? max_overlap / gt_sizes[i] : 0.0);
   }
   recall /= overlaps.rows();
 
@@ -167,8 +167,8 @@ void eval_rooms(const Layer<TsdfVoxel>& tsdf, const DynamicSceneGraph& graph) {
       }
     }
 
-    precision += max_overlap / est_sizes[j];
-    precisions.push_back(max_overlap / est_sizes[j]);
+    precision += est_sizes[j] ? max_overlap / est_sizes[j] : 0.0;
+    precisions.push_back(est_sizes[j] ? max_overlap / est_sizes[j] : 0.0);
   }
   precision /= overlaps.cols();
 
