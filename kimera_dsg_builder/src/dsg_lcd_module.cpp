@@ -101,7 +101,8 @@ void DsgLcdModule::updateDescriptorCache(
 
 DsgRegistrationSolution DsgLcdModule::registerAndVerify(
     SharedDsgInfo& dsg,
-    const std::map<size_t, LayerSearchResults>& matches) const {
+    const std::map<size_t, LayerSearchResults>& matches,
+    NodeId agent_id) const {
   DsgRegistrationSolution registration_result;
 
   size_t idx;
@@ -129,7 +130,7 @@ DsgRegistrationSolution DsgLcdModule::registerAndVerify(
       continue;
     }
 
-    registration_result = registration_funcs_.at(idx)(dsg, match);
+    registration_result = registration_funcs_.at(idx)(dsg, match, agent_id);
     if (registration_result.valid) {
       ++idx;  // start validation at next layer up
       break;
@@ -215,7 +216,7 @@ DsgRegistrationSolution DsgLcdModule::detect(SharedDsgInfo& dsg, NodeId agent_id
   VLOG(2) << "===========================================================";
 
   // TODO(nathan) maybe don't call directly
-  return registerAndVerify(dsg, matches);
+  return registerAndVerify(dsg, matches, agent_id);
 }
 
 }  // namespace lcd

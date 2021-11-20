@@ -17,7 +17,8 @@ struct LayerRegistrationConfig {
 
 using RegistrationFunc =
     std::function<DsgRegistrationSolution(incremental::SharedDsgInfo&,
-                                          const LayerSearchResults& match)>;
+                                          const LayerSearchResults&,
+                                          NodeId)>;
 
 using TeaserParams = teaser::RobustRegistrationSolver::Params;
 
@@ -26,7 +27,8 @@ struct PlaceRegistrationFunctor {
                            const TeaserParams& params);
 
   DsgRegistrationSolution operator()(incremental::SharedDsgInfo& dsg,
-                                     const LayerSearchResults& match);
+                                     const LayerSearchResults& match,
+                                     NodeId query_agent_id);
 
   LayerRegistrationConfig config;
   teaser::RobustRegistrationSolver solver;
@@ -37,14 +39,16 @@ struct ObjectRegistrationFunctor {
                             const TeaserParams& params);
 
   DsgRegistrationSolution operator()(incremental::SharedDsgInfo& dsg,
-                                     const LayerSearchResults& match);
+                                     const LayerSearchResults& match,
+                                     NodeId query_agent_id);
 
   LayerRegistrationConfig config;
   teaser::RobustRegistrationSolver solver;
 };
 
 DsgRegistrationSolution registerAgentMatch(incremental::SharedDsgInfo& dsg,
-                                           const LayerSearchResults& match);
+                                           const LayerSearchResults& match,
+                                           NodeId query_agent_id);
 
 // start of graph registration
 

@@ -5,7 +5,7 @@
     <arg name="use_semantics" default="true"/>
     <arg name="use_kimera_frame" default="true"/>
 
-    <arg name="voxel_size" default="0.15"/>
+    <arg name="voxel_size" default="0.10"/>
     <arg name="max_ray_length_m" default="4.5"/>
     <arg name="update_period_s" default="0.5"/>
 

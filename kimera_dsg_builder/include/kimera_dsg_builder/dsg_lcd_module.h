@@ -59,7 +59,8 @@ class DsgLcdModule {
 
   DsgRegistrationSolution registerAndVerify(
       incremental::SharedDsgInfo& dsg,
-      const std::map<size_t, LayerSearchResults>& matches) const;
+      const std::map<size_t, LayerSearchResults>& matches,
+      NodeId agent_node) const;
 
   DsgLcdConfig config_;
   std::map<LayerId, DescriptorFactoryFunc> layer_factories_;

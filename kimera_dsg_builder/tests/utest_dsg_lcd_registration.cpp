@@ -252,7 +252,7 @@ TEST_F(DsgRegistrationTests, TestFullObjectRegistration) {
   teaser::RobustRegistrationSolver::Params params;
   ObjectRegistrationFunctor functor(reg_config, params);
 
-  auto result = functor(*dsg, match);
+  auto result = functor(*dsg, match, NodeSymbol('a', 1));
   EXPECT_TRUE(result.valid);
   EXPECT_EQ(NodeSymbol('a', 1), result.from_node);
   EXPECT_EQ(NodeSymbol('a', 0), result.to_node);
@@ -274,7 +274,7 @@ TEST_F(DsgRegistrationTests, DISABLED_TestFullPlaceRegistration) {
   teaser::RobustRegistrationSolver::Params params;
   PlaceRegistrationFunctor functor(reg_config, params);
 
-  auto result = functor(*dsg, match);
+  auto result = functor(*dsg, match, NodeSymbol('a', 1));
   EXPECT_TRUE(result.valid);
   EXPECT_EQ(NodeSymbol('a', 1), result.from_node);
   EXPECT_EQ(NodeSymbol('a', 0), result.to_node);

@@ -65,6 +65,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   bool saveMeshCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
+  bool saveTrajectoryCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+
   void startVisualizer();
 
   void runVisualizer();
@@ -127,6 +129,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   ros::Subscriber pose_graph_sub_;
 
   ros::ServiceServer save_mesh_srv_;
+  ros::ServiceServer save_traj_srv_;
 
   ros::Publisher viz_mesh_mesh_edges_pub_;
   ros::Publisher viz_pose_mesh_edges_pub_;

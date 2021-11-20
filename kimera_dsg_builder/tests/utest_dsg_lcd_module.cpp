@@ -45,12 +45,12 @@ struct DsgLcdModuleTests : public ::testing::Test {
         };
 
     registration_funcs[KimeraDsgLayers::OBJECTS] =
-        [&](SharedDsgInfo& dsg, const LayerSearchResults& match) {
-          return (*object_registration)(dsg, match);
+        [&](SharedDsgInfo& dsg, const LayerSearchResults& match, NodeId agent_node) {
+          return (*object_registration)(dsg, match, agent_node);
         };
     registration_funcs[KimeraDsgLayers::PLACES] = [&](SharedDsgInfo& dsg,
-                                                      const LayerSearchResults& match) {
-      return (*places_registration)(dsg, match);
+                                                      const LayerSearchResults& match, NodeId agent_node) {
+      return (*places_registration)(dsg, match, agent_node);
     };
   }
 

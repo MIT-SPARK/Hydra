@@ -106,7 +106,7 @@ void DsgFrontend::handleLatestPoseGraph(const PoseGraph::ConstPtr& msg) {
       continue;
     }
 
-    agent_key_map_[pgmo_key] = node.key;
+    agent_key_map_[pgmo_key] = agent_layer.nodes().size() - 1;
   }
 }
 
@@ -557,13 +557,13 @@ void DsgFrontend::startLcd() {
 
   std::map<LayerId, lcd::RegistrationFunc> registration_funcs;
   registration_funcs[KimeraDsgLayers::OBJECTS] =
-      [&](SharedDsgInfo& dsg, const lcd::LayerSearchResults& match) {
-        return (*object_lcd_registration_)(dsg, match);
+      [&](SharedDsgInfo& dsg, const lcd::LayerSearchResults& match, NodeId agent_id) {
+        return (*object_lcd_registration_)(dsg, match, agent_id);
       };
   if (places_lcd_registration_) {
     registration_funcs[KimeraDsgLayers::PLACES] =
-        [&](SharedDsgInfo& dsg, const lcd::LayerSearchResults& match) {
-          return (*places_lcd_registration_)(dsg, match);
+        [&](SharedDsgInfo& dsg, const lcd::LayerSearchResults& match, NodeId agent_id) {
+          return (*places_lcd_registration_)(dsg, match, agent_id);
         };
   }
 

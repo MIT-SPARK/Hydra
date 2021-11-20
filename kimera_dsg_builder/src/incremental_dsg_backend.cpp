@@ -17,6 +17,7 @@ namespace incremental {
 using kimera_pgmo::DeformationGraph;
 using kimera_pgmo::DeformationGraphPtr;
 using kimera_pgmo::KimeraPgmoInterface;
+using kimera_pgmo::Path;
 using kimera_pgmo::TriangleMeshIdStamped;
 using pose_graph_tools::PoseGraph;
 using Node = SceneGraph::Node;
@@ -358,6 +359,10 @@ void DsgBackend::startPgmo() {
   save_mesh_srv_ =
       nh_.advertiseService("save_mesh", &DsgBackend::saveMeshCallback, this);
 
+  // Initialize save trajectory service
+  save_traj_srv_ = nh_.advertiseService(
+      "save_trajectory", &DsgBackend::saveTrajectoryCallback, this);
+
   optimizer_thread_.reset(new std::thread(&DsgBackend::runPgmo, this));
 }
 
@@ -466,6 +471,19 @@ bool DsgBackend::saveMeshCallback(std_srvs::Empty::Request&,
   // Save mesh
   std::string ply_name = pgmo_log_path_ + std::string("/mesh_pgmo.ply");
   saveMesh(opt_mesh, ply_name);
+  return true;
+}
+
+bool DsgBackend::saveTrajectoryCallback(std_srvs::Empty::Request&,
+                                        std_srvs::Empty::Response&) {
+  Path optimized_path;
+  {
+    std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
+    optimized_path = getOptimizedTrajectory(robot_id_);
+  }
+  // Save trajectory
+  std::string csv_name = pgmo_log_path_ + std::string("/traj_pgmo.csv");
+  saveTrajectory(optimized_path, timestamps_, csv_name);
   return true;
 }
 

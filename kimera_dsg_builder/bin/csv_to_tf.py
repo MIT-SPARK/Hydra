@@ -40,10 +40,10 @@ def main():
             t.transform.translation.x = pose[0]
             t.transform.translation.y = pose[1]
             t.transform.translation.z = pose[2]
-            t.transform.rotation.x = pose[3]
-            t.transform.rotation.y = pose[4]
-            t.transform.rotation.z = pose[5]
-            t.transform.rotation.w = pose[6]
+            t.transform.rotation.w = pose[3]
+            t.transform.rotation.x = pose[4]
+            t.transform.rotation.y = pose[5]
+            t.transform.rotation.z = pose[6]
 
             while not rospy.is_shutdown():
                 if rospy.Time.now() - t.header.stamp > delta_t:
