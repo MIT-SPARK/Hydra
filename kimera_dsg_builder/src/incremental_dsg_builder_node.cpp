@@ -70,6 +70,12 @@ int main(int argc, char* argv[]) {
     } else {
       ros::spin();
     }
+
+    if (!dsg_output_path.empty()) {
+      // save pgmo trajectory
+      std_srvs::Empty temp;
+      backend.saveTrajectoryCallback(temp.request, temp.response);
+    }
   }
 
   if (!dsg_output_path.empty()) {
@@ -79,6 +85,7 @@ int main(int argc, char* argv[]) {
     backend_dsg->graph->save(dsg_output_path + "/backend/dsg_with_mesh.json");
     frontend_dsg->graph->save(dsg_output_path + "/frontend/dsg.json", false);
     frontend_dsg->graph->save(dsg_output_path + "/frontend/dsg_with_mesh.json");
+
     // Output timing statistics
     const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
     timer.logAllElapsed(dsg_output_path);

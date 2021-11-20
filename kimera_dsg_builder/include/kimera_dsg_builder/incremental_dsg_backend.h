@@ -52,6 +52,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
     dsg_update_funcs_ = update_funcs;
   }
 
+  bool saveTrajectoryCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+
  private:
   bool setVisualizeBackend(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
@@ -64,8 +66,6 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   void poseGraphCallback(const pose_graph_tools::PoseGraph::ConstPtr& msg);
 
   bool saveMeshCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
-
-  bool saveTrajectoryCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
   void startVisualizer();
 
