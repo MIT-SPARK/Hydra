@@ -1,5 +1,6 @@
 #include "kimera_dsg_builder/dsg_lcd_module.h"
 #include "kimera_dsg_builder/dsg_lcd_registration.h"
+#include "kimera_dsg_builder/timing_utilities.h"
 
 namespace kimera {
 namespace lcd {
@@ -75,6 +76,7 @@ bool DsgLcdModule::addNewDescriptors(const DynamicSceneGraph& graph,
 void DsgLcdModule::updateDescriptorCache(
     SharedDsgInfo& dsg,
     const std::unordered_set<NodeId>& archived_places) {
+  ScopedTimer timer("lcd/update_descriptors", true, 2, false);
   std::unique_lock<std::mutex> lock(dsg.mutex);
 
   std::set<NodeId> new_agent_nodes;
@@ -103,6 +105,7 @@ DsgRegistrationSolution DsgLcdModule::registerAndVerify(
     SharedDsgInfo& dsg,
     const std::map<size_t, LayerSearchResults>& matches,
     NodeId agent_id) const {
+  ScopedTimer timer("lcd/register", true, 2, false);
   DsgRegistrationSolution registration_result;
 
   size_t idx;
@@ -159,6 +162,7 @@ DsgRegistrationSolution DsgLcdModule::registerAndVerify(
 }
 
 DsgRegistrationSolution DsgLcdModule::detect(SharedDsgInfo& dsg, NodeId agent_id) {
+  ScopedTimer timer("lcd/detect", true, 2, false);
   std::set<NodeId> prev_valid_roots;
   for (const auto& id_desc_pair : cache_map_[config_.search_configs.front().layer]) {
     prev_valid_roots.insert(id_desc_pair.first);
