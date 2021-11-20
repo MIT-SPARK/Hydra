@@ -68,14 +68,24 @@ target_include_directories(
 add_executable(${PROJECT_NAME}_node src/kimera_topology_node.cpp)
 target_link_libraries(${PROJECT_NAME}_node PUBLIC ${PROJECT_NAME} ${catkin_LIBRARIES})
 target_include_directories(${PROJECT_NAME}_node PUBLIC include ${catkin_INCLUDE_DIRS})
-add_dependencies(${PROJECT_NAME}_node ${catkin_EXPORTED_TARGETS} ${${PROJECT_NAME}_EXPORTED_TARGETS})
+add_dependencies(
+  ${PROJECT_NAME}_node ${catkin_EXPORTED_TARGETS} ${${PROJECT_NAME}_EXPORTED_TARGETS}
+)
 
 add_executable(places_eval_node src/places_eval_node.cpp)
-target_link_libraries(places_eval_node PUBLIC ${PROJECT_NAME} ${catkin_LIBRARIES} yaml-cpp)
-target_include_directories(places_eval_node PUBLIC include ${catkin_INCLUDE_DIRS})
+target_link_libraries(
+  places_eval_node PUBLIC ${PROJECT_NAME} ${catkin_LIBRARIES} yaml-cpp
+)
+target_include_directories(
+  places_eval_node
+  PUBLIC include ${catkin_INCLUDE_DIRS}
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/nanoflann/include
+)
 
 add_executable(places_eval_viz_node src/places_eval_viz_node.cpp)
-target_link_libraries(places_eval_viz_node PUBLIC ${PROJECT_NAME} ${catkin_LIBRARIES} yaml-cpp)
+target_link_libraries(
+  places_eval_viz_node PUBLIC ${PROJECT_NAME} ${catkin_LIBRARIES} yaml-cpp
+)
 target_include_directories(places_eval_viz_node PUBLIC include ${catkin_INCLUDE_DIRS})
 
 if(CATKIN_ENABLE_TESTING)

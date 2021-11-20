@@ -1,6 +1,8 @@
 #include <kimera_dsg/dynamic_scene_graph.h>
 #include <voxblox/io/layer_io.h>
 #include <yaml-cpp/yaml.h>
+#include <nanoflann.hpp>
+
 #include "kimera_topology/config_parser.h"
 #include "kimera_topology/gvd_integrator.h"
 
@@ -13,11 +15,12 @@ DEFINE_double(max_distance_m, 4.5, "max distance");
 DEFINE_string(tsdf_file, "", "tsdf file to read");
 DEFINE_string(dsg_file, "", "dsg file to read");
 DEFINE_string(gvd_config, "", "gvd integrator config");
-DEFINE_bool(extract_graph, false, "extract graph from GVD");
-DEFINE_bool(suppress_data, false, "collapse lists to mean");
 
 using voxblox::Layer;
 using voxblox::TsdfVoxel;
+using nanoflann::KDTreeSingleIndexAdaptor;
+using nanoflann::KDTreeSingleIndexDynamicAdaptor;
+using nanoflann::L2_Simple_Adaptor;
 
 namespace kimera {
 namespace topology {
@@ -88,25 +91,91 @@ GvdIntegratorConfig readGvdConfig(const std::string& filename) {
     config.voronoi_config = readVoronoiConfig(config_root["voronoi_check"]);
   }
 
-  config.extract_graph = FLAGS_extract_graph;
-  if (config_root["graph_extractor"]) {
-    config.graph_extractor_config = readGraphConfig(config_root["graph_extractor"]);
-  }
+  config.extract_graph = true;
+  config.graph_extractor_config = readGraphConfig(config_root["graph_extractor"]);
   config.mesh_only = false;
 
   return config;
 }
 
+void fillGvdPositions(const GvdIntegratorConfig& gvd_config,
+                      const Layer<GvdVoxel>& layer,
+                      voxblox::AlignedVector<Eigen::Vector3d>& result) {
+  result.clear();
+
+  voxblox::BlockIndexList blocks;
+  layer.getAllAllocatedBlocks(&blocks);
+
+  for (const auto& idx : blocks) {
+    const auto& block = layer.getBlockByIndex(idx);
+    for (size_t i = 0; i < block.num_voxels(); ++i) {
+      const auto& voxel = block.getVoxelByLinearIndex(i);
+      if (!voxel.observed ||
+          voxel.num_extra_basis < gvd_config.min_basis_for_extraction) {
+        continue;
+      }
+
+      result.push_back(block.computeCoordinatesFromLinearIndex(i).cast<double>());
+    }
+  }
+}
+
+struct VoxelKdTreeAdaptor {
+  VoxelKdTreeAdaptor(const voxblox::AlignedVector<Eigen::Vector3d>& positions)
+      : positions(positions) {}
+
+  inline size_t kdtree_get_point_count() const { return positions.size(); }
+
+  inline double kdtree_get_pt(const size_t idx, const size_t dim) const {
+    return positions[idx](dim);
+  }
+
+  template <class T>
+  bool kdtree_get_bbox(T&) const {
+    return false;
+  }
+
+  voxblox::AlignedVector<Eigen::Vector3d> positions;
+};
+
+struct DistanceFinder {
+  using Dist = L2_Simple_Adaptor<double, VoxelKdTreeAdaptor>;
+  using KDTree = KDTreeSingleIndexAdaptor<Dist, VoxelKdTreeAdaptor, 3>;
+
+  DistanceFinder(voxblox::AlignedVector<Eigen::Vector3d>& positions)
+      : adaptor(positions) {
+    kdtree.reset(new KDTree(3, adaptor));
+    kdtree->buildIndex();
+  }
+
+  double distance(const Eigen::Vector3d& pos) {
+    size_t idx;
+    double dist;
+    size_t num_found = kdtree->knnSearch(pos.data(), 1, &idx, &dist);
+    return num_found ? dist : std::numeric_limits<double>::quiet_NaN();
+  }
+
+  VoxelKdTreeAdaptor adaptor;
+  std::unique_ptr<KDTree> kdtree;
+};
+
 void eval_layer(const GvdIntegratorConfig& gvd_config,
                 const SceneGraphLayer& places,
                 const Layer<GvdVoxel>& gvd_layer) {
+  voxblox::AlignedVector<Eigen::Vector3d> gvd_positions;
+  fillGvdPositions(gvd_config, gvd_layer, gvd_positions);
+  DistanceFinder finder(gvd_positions);
+
+  double mean = 0.0;
   size_t missing = 0;
   size_t unobserved = 0;
-  size_t num_correct = 0;
+  size_t valid = 0;
   std::vector<double> dist_errors;
-  double mean = 0.0;
+  std::vector<double> dist_to_closest;
   for (const auto& id_node_pair : places.nodes()) {
     Eigen::Vector3d position = id_node_pair.second->attributes().position;
+    dist_to_closest.push_back(finder.distance(position));
+
     voxblox::Point vox_pos = position.cast<float>();
     const GvdVoxel* voxel = gvd_layer.getVoxelPtrByCoordinates(vox_pos);
     if (!voxel) {
@@ -119,43 +188,30 @@ void eval_layer(const GvdIntegratorConfig& gvd_config,
       continue;
     }
 
-    if (voxel->num_extra_basis >= gvd_config.min_basis_for_extraction) {
-      num_correct++;
-    }
-
+    ++valid;
     const double node_distance =
         id_node_pair.second->attributes<PlaceNodeAttributes>().distance;
     dist_errors.push_back(std::abs(voxel->distance - node_distance));
     mean += std::abs(voxel->distance - node_distance);
   }
 
-  mean /= num_correct;
+  mean /= valid;
+  auto min = std::min_element(dist_errors.begin(), dist_errors.end());
+  auto max = std::max_element(dist_errors.begin(), dist_errors.end());
 
-  if (FLAGS_suppress_data) {
-    auto min = std::min_element(dist_errors.begin(), dist_errors.end());
-    auto max = std::max_element(dist_errors.begin(), dist_errors.end());
-
-    nlohmann::json json_results = {
-        {"missing", missing},
-        {"correct", num_correct},
-        {"dist_errors", mean},
-        {"total", places.numNodes()},
-        {"min", *min},
-        {"max", *max},
-    };
-    std::cout << json_results << std::endl;
-  } else {
-    nlohmann::json json_results = {
-        {"missing", missing},
-        {"correct", num_correct},
-        {"dist_errors", dist_errors},
-        {"total", places.numNodes()},
-    };
-    std::cout << json_results << std::endl;
-  }
+  nlohmann::json json_results = {
+      {"missing", missing},
+      {"valid", valid},
+      {"dist_errors", dist_errors},
+      {"closest_dists", dist_to_closest},
+      {"total", places.numNodes()},
+      {"mean", mean},
+      {"min", valid ? *min : std::numeric_limits<double>::quiet_NaN()},
+      {"max", valid ? *max : std::numeric_limits<double>::quiet_NaN()},
+  };
+  std::cout << json_results << std::endl;
 }  // namespace topology
 
-// TODO(nathan) export and test
 void eval_places(const DynamicSceneGraph& graph, const Layer<TsdfVoxel>::Ptr& tsdf) {
   GvdIntegratorConfig gvd_config = readGvdConfig(FLAGS_gvd_config);
   showConfig(gvd_config);
@@ -169,38 +225,6 @@ void eval_places(const DynamicSceneGraph& graph, const Layer<TsdfVoxel>::Ptr& ts
   CHECK(graph.hasLayer(KimeraDsgLayers::PLACES));
   const SceneGraphLayer& places = graph.getLayer(KimeraDsgLayers::PLACES).value();
   eval_layer(gvd_config, places, *gvd_layer);
-
-  if (gvd_config.extract_graph) {
-    std::cout << "gvd integrator graph: ";
-    eval_layer(gvd_config, integrator.getGraphExtractor().getGraph(), *gvd_layer);
-
-    DynamicSceneGraph new_graph;
-    const SceneGraphLayer& new_places = integrator.getGraphExtractor().getGraph();
-
-    for (const auto& id_node_pair : new_places.nodes()) {
-      const SceneGraphNode& other_node = *id_node_pair.second;
-      PlaceNodeAttributes::Ptr new_attrs(
-          new PlaceNodeAttributes(other_node.attributes<PlaceNodeAttributes>()));
-      new_graph.emplaceNode(
-          KimeraDsgLayers::PLACES, other_node.id, std::move(new_attrs));
-    }
-
-    for (const auto& id_edge_pair : new_places.edges()) {
-      const auto& edge = id_edge_pair.second;
-      SceneGraphEdgeInfo::Ptr info(new SceneGraphEdgeInfo(*id_edge_pair.second.info));
-      new_graph.insertEdge(edge.source, edge.target, std::move(info));
-    }
-
-    new_graph.save("/tmp/dsg.json");
-
-    DynamicSceneGraph new_dsg;
-    new_dsg.load("/tmp/dsg.json");
-
-    std::cout << "serialized places: ";
-    eval_layer(gvd_config,
-               new_dsg.getLayer(KimeraDsgLayers::PLACES).value().get(),
-               *gvd_layer);
-  }
 }
 
 }  // namespace topology
