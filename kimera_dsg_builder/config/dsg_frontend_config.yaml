@@ -3,6 +3,6 @@ pgmo:
     output_mesh_resolution: 0.04
     compression_method: 1  # voxblox
     robot_id: 0
-    d_graph_resolution: 1.0
+    d_graph_resolution: 2.5
     voxblox_queue_size: 1
 building_color: [0.572, 0.204, 0.922]

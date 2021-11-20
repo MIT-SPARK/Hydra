@@ -2,16 +2,13 @@
     <arg name="sim_time_required" default="true"/>
     <param name="use_sim_time" value="$(arg sim_time_required)"/>
 
-    <arg name="use_gt_semantics" default="true"/>
     <arg name="use_gt_frame" default="true"/>
     <arg name="use_oriented_bounding_boxes" default="false"/>
     <arg name="visualize" default="false"/>
-    <arg name="room_height" default="2.0"/>
+    <arg name="room_height" default="2.5"/>
 
     <arg name="dsg_output_dir" default="$(find kimera_dsg_builder)/output/uhumans2"/>
     <arg name="dsg_output_prefix" default="uhumans2_office"/>
-    <arg name="dsg_output_use_date" default="false"/>
-    <arg name="dsg_should_log" default="true" />
     <arg name="dsg_path" value="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
 
     <arg name="voxel_size" default="0.10"/>
@@ -23,43 +20,19 @@
 
     <arg name="config_dir" default="$(find kimera_topology)/config"/>
     <arg name="config" default="uhumans2_topology_config.yaml"/>
-    <arg name="semantic_config" default="uhumans2_semantic_config.yaml" if="$(arg use_gt_semantics)"/>
-    <arg name="semantic_config" default="ade150_semantic_config.yaml" unless="$(arg use_gt_semantics)"/>
+    <arg name="semantic_config" default="uhumans2_semantic_config.yaml"/>
 
     <arg name="semantic_map_dir" default="$(find kimera_semantics_ros)/cfg"/>
     <arg name="semantic_map_file" default="tesse_multiscene_office1_segmentation_mapping.csv"/>
     <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
 
-    <arg name="semantic_color_path" default="$(arg semantic_map_path)" if="$(arg use_gt_semantics)"/>
-    <arg name="semantic_color_path"
-         default="$(find semantic_recolor)/config/colors/ade150_config.csv"
-         unless="$(arg use_gt_semantics)"/>
-
     <arg name="sensor_frame" default="left_cam_kimera" unless="$(arg use_gt_frame)"/>
     <arg name="sensor_frame" default="left_cam" if="$(arg use_gt_frame)"/>
 
-    <arg name="camera_info_topic" default="/tesse/seg_cam/camera_info" if="$(arg use_gt_semantics)"/>
-    <arg name="camera_info_topic" default="/tesse/left_cam/camera_info" unless="$(arg use_gt_semantics)"/>
-    <arg name="camera_topic" default="/tesse/seg_cam/rgb/image_raw" if="$(arg use_gt_semantics)"/>
-    <arg name="camera_topic" default="/tesse/left_cam/rgb/image_raw" unless="$(arg use_gt_semantics)"/>
+    <arg name="camera_info_topic" default="/tesse/seg_cam/camera_info"/>
+    <arg name="camera_topic" default="/tesse/seg_cam/rgb/image_raw"/>
     <arg name="depth_topic" default="/tesse/depth_cam/mono/image_raw"/>
     <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
-
-    <include file="$(find kimera_topology)/launch/includes/rgbd_to_pointcloud.xml"
-             if="$(arg use_gt_semantics)">
-        <arg name="camera_info_topic" value="$(arg camera_info_topic)"/>
-        <arg name="camera_topic" value="$(arg camera_topic)"/>
-        <arg name="depth_topic" value="$(arg depth_topic)"/>
-        <arg name="pointcloud_topic" default="$(arg pointcloud_topic)"/>
-    </include>
-
-    <include file="$(find semantic_recolor)/launch/semantic_recolor_pointcloud.launch"
-             unless="$(arg use_gt_semantics)">
-        <arg name="rgb_info_topic" value="$(arg camera_info_topic)"/>
-        <arg name="rgb_topic" value="$(arg camera_topic)"/>
-        <arg name="depth_topic" value="$(arg depth_topic)"/>
-        <arg name="pointcloud_topic" default="$(arg pointcloud_topic)"/>
-    </include>
 
     <arg name="debug" default="false"/>
     <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
@@ -71,6 +44,18 @@
     <arg name="glog_dir" default="$(find kimera_dsg_builder)/glogs"/>
     <arg name="glog_file_args" value="--logtostderr=0 --log_dir=$(arg glog_dir)" if="$(arg glog_to_file)"/>
     <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
+    <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
+    <arg name="ros_output" value="log" if="$(arg glog_to_file)"/>
+
+    <arg name="use_static_tfs" default="true"/>
+    <include file="$(find kimera_dsg_builder)/launch/uhumans2_static_tfs.launch" if="$(arg use_static_tfs)"/>
+
+    <include file="$(find kimera_topology)/launch/includes/rgbd_to_pointcloud.xml">
+        <arg name="camera_info_topic" value="$(arg camera_info_topic)"/>
+        <arg name="camera_topic" value="$(arg camera_topic)"/>
+        <arg name="depth_topic" value="$(arg depth_topic)"/>
+        <arg name="pointcloud_topic" default="$(arg pointcloud_topic)"/>
+    </include>
 
     <include file="$(find kimera_dsg_visualizer)/launch/includes/kimera_dsg_visualizer_params.xml">
         <arg name="viz_config_dir" value="$(find kimera_dsg_builder)/config/incremental_visualizer"/>
@@ -81,7 +66,7 @@
           launch-prefix="$(arg launch_prefix)"
           args="--minloglevel=$(arg min_glog_level) -v=$(arg verbosity) $(arg glog_file_args)"
           required="true"
-          output="screen">
+          output="$(arg ros_output)">
         <remap from="pointcloud" to="$(arg pointcloud_topic)"/>
         <param name="sensor_frame" value="$(arg sensor_frame)"/>
         <param name="verbose" value="false"/>
@@ -89,7 +74,7 @@
 
         <rosparam command="load" file="$(arg typology_dir)/$(arg typology_config)"/>
         <rosparam command="load" file="$(arg config_dir)/$(arg semantic_config)"/>
-        <param name="semantic_label_2_color_csv_filepath" value="$(arg semantic_color_path)"/>
+        <param name="semantic_label_2_color_csv_filepath" value="$(arg semantic_map_path)"/>
 
         <param name="use_oriented_bounding_boxes" value="$(arg use_oriented_bounding_boxes)"/>
         <param name="room_finder_esdf_slice_level" value="$(arg room_height)"/>
@@ -109,7 +94,7 @@
         <param name="gvd_integrator/max_distance_m" value="$(arg max_ray_length_m)"/>
         <rosparam file="$(arg config_dir)/$(arg config)" ns="gvd_integrator"/>
 
-        <param name="dsg_log_output" value="$(arg dsg_should_log)" />
+        <param name="dsg_log_output" value="true"/>
         <param name="dsg_output_path" value="$(arg dsg_path)"/>
         <param name="visualize" value="$(arg visualize)"/>
     </node>

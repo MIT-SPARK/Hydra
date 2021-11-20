@@ -17,7 +17,9 @@ void updateObjects(DynamicSceneGraph& graph,
 void updatePlaces(DynamicSceneGraph& graph,
                   const gtsam::Values& places_values,
                   const gtsam::Values& pgmo_values,
-                  bool allow_node_merging);
+                  bool allow_node_merging,
+                  double pos_threshold_m,
+                  double distance_tolerance_m);
 
 void updateRooms(DynamicSceneGraph& graph,
                  const gtsam::Values& places_values,

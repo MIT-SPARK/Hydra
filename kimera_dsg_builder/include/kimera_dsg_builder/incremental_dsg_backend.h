@@ -139,6 +139,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   std::unique_ptr<std::thread> visualizer_thread_;
   std::unique_ptr<RoomFinder> room_finder_;
 
+  double places_merge_pos_threshold_m_;
+  double places_merge_distance_tolerance_m_;
   std::list<LayerUpdateFunc> dsg_update_funcs_;
 
   std::atomic<bool> have_loopclosures_;

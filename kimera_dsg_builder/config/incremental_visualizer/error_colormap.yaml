@@ -1,0 +1,6 @@
+min_hue: 0.5
+max_hue: 0.86
+min_saturation: 0.7
+max_saturation: 0.9
+min_luminance: 0.6
+max_luminance: 0.85

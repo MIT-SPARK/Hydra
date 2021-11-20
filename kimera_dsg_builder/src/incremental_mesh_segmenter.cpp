@@ -82,8 +82,6 @@ MeshSegmenter::MeshSegmenter(const ros::NodeHandle& nh,
     active_objects_[label] = std::set<NodeId>();
   }
 
-  // TODO(nathan) look at CGAL for better oriented bounding volumnes (min volume
-  // ellipse)
   bool use_oriented_bounding_boxes = false;
   nh_.getParam("use_oriented_bounding_boxes", use_oriented_bounding_boxes);
   bounding_box_type_ =
@@ -231,6 +229,7 @@ void MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
         nodes_not_in_graph.push_back(prev_node_id);
         continue;
       }
+
       const SceneGraphNode& prev_node = graph.getNode(prev_node_id).value();
       if (objectsMatch(cluster, prev_node)) {
         updateObjectInGraph(graph, cluster, prev_node, timestamp);

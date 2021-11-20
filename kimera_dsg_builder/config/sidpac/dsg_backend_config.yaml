@@ -5,6 +5,8 @@ dsg:
     call_update_periodically: true
     rpgo_verbosity: "update"
     rpgo_solver: "LM"
+    places_merge_pos_threshold_m: 0.4
+    places_merge_distance_tolerance_m: 0.3
 pgmo:
     run_mode: 0  # kimera_pgmo run mode FULL (required)
     use_msg_time: true

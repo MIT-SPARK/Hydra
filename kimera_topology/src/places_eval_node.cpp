@@ -14,6 +14,7 @@ DEFINE_string(tsdf_file, "", "tsdf file to read");
 DEFINE_string(dsg_file, "", "dsg file to read");
 DEFINE_string(gvd_config, "", "gvd integrator config");
 DEFINE_bool(extract_graph, false, "extract graph from GVD");
+DEFINE_bool(suppress_data, false, "collapse lists to mean");
 
 using voxblox::Layer;
 using voxblox::TsdfVoxel;
@@ -103,6 +104,7 @@ void eval_layer(const GvdIntegratorConfig& gvd_config,
   size_t unobserved = 0;
   size_t num_correct = 0;
   std::vector<double> dist_errors;
+  double mean = 0.0;
   for (const auto& id_node_pair : places.nodes()) {
     Eigen::Vector3d position = id_node_pair.second->attributes().position;
     voxblox::Point vox_pos = position.cast<float>();
@@ -124,16 +126,34 @@ void eval_layer(const GvdIntegratorConfig& gvd_config,
     const double node_distance =
         id_node_pair.second->attributes<PlaceNodeAttributes>().distance;
     dist_errors.push_back(std::abs(voxel->distance - node_distance));
+    mean += std::abs(voxel->distance - node_distance);
   }
 
-  nlohmann::json json_results = {
-      {"missing", missing},
-      {"correct", num_correct},
-      {"dist_errors", dist_errors},
-      {"total", places.numNodes()},
-  };
-  std::cout << json_results;
-}
+  mean /= num_correct;
+
+  if (FLAGS_suppress_data) {
+    auto min = std::min_element(dist_errors.begin(), dist_errors.end());
+    auto max = std::max_element(dist_errors.begin(), dist_errors.end());
+
+    nlohmann::json json_results = {
+        {"missing", missing},
+        {"correct", num_correct},
+        {"dist_errors", mean},
+        {"total", places.numNodes()},
+        {"min", *min},
+        {"max", *max},
+    };
+    std::cout << json_results << std::endl;
+  } else {
+    nlohmann::json json_results = {
+        {"missing", missing},
+        {"correct", num_correct},
+        {"dist_errors", dist_errors},
+        {"total", places.numNodes()},
+    };
+    std::cout << json_results << std::endl;
+  }
+}  // namespace topology
 
 // TODO(nathan) export and test
 void eval_places(const DynamicSceneGraph& graph, const Layer<TsdfVoxel>::Ptr& tsdf) {
@@ -151,7 +171,35 @@ void eval_places(const DynamicSceneGraph& graph, const Layer<TsdfVoxel>::Ptr& ts
   eval_layer(gvd_config, places, *gvd_layer);
 
   if (gvd_config.extract_graph) {
+    std::cout << "gvd integrator graph: ";
     eval_layer(gvd_config, integrator.getGraphExtractor().getGraph(), *gvd_layer);
+
+    DynamicSceneGraph new_graph;
+    const SceneGraphLayer& new_places = integrator.getGraphExtractor().getGraph();
+
+    for (const auto& id_node_pair : new_places.nodes()) {
+      const SceneGraphNode& other_node = *id_node_pair.second;
+      PlaceNodeAttributes::Ptr new_attrs(
+          new PlaceNodeAttributes(other_node.attributes<PlaceNodeAttributes>()));
+      new_graph.emplaceNode(
+          KimeraDsgLayers::PLACES, other_node.id, std::move(new_attrs));
+    }
+
+    for (const auto& id_edge_pair : new_places.edges()) {
+      const auto& edge = id_edge_pair.second;
+      SceneGraphEdgeInfo::Ptr info(new SceneGraphEdgeInfo(*id_edge_pair.second.info));
+      new_graph.insertEdge(edge.source, edge.target, std::move(info));
+    }
+
+    new_graph.save("/tmp/dsg.json");
+
+    DynamicSceneGraph new_dsg;
+    new_dsg.load("/tmp/dsg.json");
+
+    std::cout << "serialized places: ";
+    eval_layer(gvd_config,
+               new_dsg.getLayer(KimeraDsgLayers::PLACES).value().get(),
+               *gvd_layer);
   }
 }
 

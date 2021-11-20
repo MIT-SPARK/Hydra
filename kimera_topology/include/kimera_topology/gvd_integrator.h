@@ -196,7 +196,7 @@ class GvdIntegrator {
   }
 
   inline bool isTsdfFixed(const TsdfVoxel& voxel) {
-    return voxel.distance < config_.min_distance_m;
+    return std::abs(voxel.distance) < config_.min_distance_m;
   }
 
   inline bool voxelHasDistance(const GvdVoxel& voxel) {

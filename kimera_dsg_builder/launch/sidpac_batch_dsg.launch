@@ -1,20 +1,14 @@
 <launch>
-    <arg name="path_to_csv" />
     <arg name="sim_time_required" default="true"/>
     <param name="use_sim_time" value="$(arg sim_time_required)"/>
 
-    <arg name="use_kimera_frame" default="true"/>
+    <arg name="use_gt_frame" default="true"/>
     <arg name="use_oriented_bounding_boxes" default="true"/>
-    <arg name="exit_after_bag" default="false"/>
-    <arg name="visualize" default="true"/>
+    <arg name="visualize" default="false"/>
     <arg name="room_height" default="2.0"/>
-
-    <arg name="enable_dsg_lcd" default="false"/>
 
     <arg name="dsg_output_dir" default="$(find kimera_dsg_builder)/output/sidpac"/>
     <arg name="dsg_output_prefix" default="sidpac_f1_3"/>
-    <arg name="dsg_output_use_date" default="false"/>
-    <arg name="dsg_should_log" default="true" />
     <arg name="dsg_path" value="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
 
     <arg name="voxel_size" default="0.10"/>
@@ -22,7 +16,7 @@
     <arg name="update_period_s" default="0.5"/>
 
     <arg name="typology_dir" default="$(find kimera_dsg_builder)/config"/>
-    <arg name="typology_config" default="uhumans2_office_typology.yaml"/>
+    <arg name="typology_config" default="sidpac_typology.yaml"/>
 
     <arg name="config_dir" default="$(find kimera_topology)/config"/>
     <arg name="config" default="sidpac_topology_config.yaml"/>
@@ -32,13 +26,23 @@
     <arg name="semantic_map_file" default="ade150_config.csv"/>
     <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
 
-    <arg name="sensor_frame" default="rgb_camera_link" unless="$(arg use_kimera_frame)"/>
-    <arg name="sensor_frame" default="left_cam" if="$(arg use_kimera_frame)"/>
+    <arg name="sensor_frame" default="left_cam"/>
 
     <arg name="camera_info_topic" default="/azure/rgb/camera_info"/>
     <arg name="camera_topic" default="/azure/rgb/image_raw"/>
     <arg name="depth_topic" default="/azure/depth_to_rgb/image_raw"/>
     <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
+
+    <arg name="debug" default="false"/>
+    <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
+    <arg name="launch_prefix" value="" unless="$(arg debug)"/>
+
+    <arg name="glog_to_file" default="false"/>
+    <arg name="glog_dir" default="$(find kimera_dsg_builder)/glogs"/>
+    <arg name="glog_file_args" value="--logtostderr=0 --log_dir=$(arg glog_dir)" if="$(arg glog_to_file)"/>
+    <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
+    <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
+    <arg name="ros_output" value="log" if="$(arg glog_to_file)"/>
 
     <include file="$(find semantic_recolor)/launch/semantic_recolor_pointcloud.launch">
         <arg name="rgb_info_topic" value="$(arg camera_info_topic)"/>
@@ -46,17 +50,6 @@
         <arg name="depth_topic" value="$(arg depth_topic)"/>
         <arg name="pointcloud_topic" default="$(arg pointcloud_topic)"/>
     </include>
-
-    <arg name="debug" default="false"/>
-    <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
-    <arg name="launch_prefix" value="" unless="$(arg debug)"/>
-
-    <arg name="min_glog_level" default="0"/>
-    <arg name="verbosity" default="0"/>
-    <arg name="glog_to_file" default="false"/>
-    <arg name="glog_dir" default="$(find kimera_dsg_builder)/glogs"/>
-    <arg name="glog_file_args" value="--logtostderr=0 --log_dir=$(arg glog_dir)" if="$(arg glog_to_file)"/>
-    <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
 
     <include file="$(find kimera_dsg_visualizer)/launch/includes/kimera_dsg_visualizer_params.xml">
         <arg name="viz_config_dir" value="$(find kimera_dsg_builder)/config/incremental_visualizer"/>
@@ -67,7 +60,7 @@
           launch-prefix="$(arg launch_prefix)"
           args="--minloglevel=$(arg min_glog_level) -v=$(arg verbosity) $(arg glog_file_args)"
           required="true"
-          output="screen">
+          output="$(arg ros_output)">
         <remap from="pointcloud" to="$(arg pointcloud_topic)"/>
         <param name="sensor_frame" value="$(arg sensor_frame)"/>
         <param name="verbose" value="false"/>
@@ -95,18 +88,9 @@
         <param name="gvd_integrator/max_distance_m" value="$(arg max_ray_length_m)"/>
         <rosparam file="$(arg config_dir)/$(arg config)" ns="gvd_integrator"/>
 
-        <param name="dsg_log_output" value="$(arg dsg_should_log)" />
+        <param name="dsg_log_output" value="true"/>
         <param name="dsg_output_path" value="$(arg dsg_path)"/>
         <param name="visualize" value="$(arg visualize)"/>
     </node>
-
-    <node pkg="kimera_dsg_builder" type="csv_to_tf.py" name="csv_to_tf" > 
-        <param name="parent_frame" value="world"/>
-        <param name="child_frame" value="base_link_pgo"/>
-        <param name="trajectory_file" value="$(arg path_to_csv)"/>
-    </node>
-
-    <node pkg="tf2_ros" type="static_transform_publisher" name="base_pgo_to_cam"
-          args="0.00012095 -0.0008438 0.00026236 0.489216945549 -0.497966285936 -0.499874528495 0.512661503821 base_link_pgo $(arg sensor_frame)"/>
 
 </launch>

@@ -1,0 +1,32 @@
+<launch>
+
+    <arg name="debug" default="false"/>
+    <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
+    <arg name="launch_prefix" value="" unless="$(arg debug)"/>
+    <arg name="min_cmap_distance" default="0.0"/>
+    <arg name="max_cmap_distance" default="2.0"/>
+    <arg name="offset" default="1.5"/>
+    <arg name="max_error" default="1.5"/>
+
+    <arg name="tsdf_file"/>
+    <arg name="dsg_file"/>
+
+    <node pkg="rviz" type="rviz" name="rviz"
+          args="-d $(find kimera_topology)/rviz/places_eval_viz.rviz"/>
+
+    <node pkg="kimera_topology" type="places_eval_viz_node" name="places_eval_viz_node"
+        args="-tsdf_file=$(arg tsdf_file)
+              -dsg_file=$(arg dsg_file)
+              -gvd_config=$(find kimera_topology)/config/uhumans2_topology_config.yaml
+              -min_cmap_distance=$(arg min_cmap_distance)
+              -max_cmap_distance=$(arg max_cmap_distance)
+              -offset=$(arg offset)
+              -max_error=$(arg max_error)
+              --minloglevel=0
+              -v=2"
+          launch-prefix="$(arg launch_prefix)"
+          output="screen"
+          required="true">
+    </node>
+
+</launch>

@@ -1,0 +1,15 @@
+<launch>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_0" args="0.0 0.05 0.0 0.5 -0.5 0.5 -0.5 base_link_gt left_cam"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_1" args="0.0 -0.05 0.0 0.5 -0.5 0.5 -0.5 base_link_gt right_cam"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_2" args="0.0 0.05 0.0 0.5 -0.5 0.5 -0.5 base_link_gt left_cam"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_3" args="0.0 0.05 0.0 0.5 -0.5 0.5 -0.5 base_link_gt left_cam"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_4" args="0.17 -0.017 0.0 0.0 0.0 0.0 1.0 base_link_gt front_lidar"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_5" args="-0.17 -0.017 0.0 0.0 0.0 0.0 1.0 base_link_gt rear_lidar"/>
+
+</launch>

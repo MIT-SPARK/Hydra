@@ -101,9 +101,11 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
       robot_id_(0),
       add_places_to_deformation_graph_(true),
       optimize_on_lc_(true),
-      have_loopclosures_(false),
       enable_node_merging_(true),
       call_update_periodically_(true),
+      places_merge_pos_threshold_m_(0.4),
+      places_merge_distance_tolerance_m_(0.3),
+      have_loopclosures_(false),
       have_new_mesh_(false),
       visualizer_should_reset_(false) {
   nh_.getParam("robot_id", robot_id_);
@@ -118,6 +120,9 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
   dsg_nh.getParam("optimize_on_lc", optimize_on_lc_);
   dsg_nh.getParam("enable_node_merging", enable_node_merging_);
   dsg_nh.getParam("call_update_periodically", call_update_periodically_);
+  dsg_nh.getParam("places_merge_pos_threshold_m", places_merge_pos_threshold_m_);
+  dsg_nh.getParam("places_merge_distance_tolerance_m",
+                  places_merge_distance_tolerance_m_);
 
   KimeraRPGO::RobustSolverParams params = deformation_graph_->getParams();
 
@@ -167,7 +172,17 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
 
   dsg_update_funcs_.push_back(&dsg_updates::updateAgents);
   dsg_update_funcs_.push_back(&dsg_updates::updateObjects);
-  dsg_update_funcs_.push_back(&dsg_updates::updatePlaces);
+  dsg_update_funcs_.push_back([&](auto& graph,
+                                  const auto& place_values,
+                                  const auto& pgmo_values,
+                                  bool allow_merging) {
+    dsg_updates::updatePlaces(graph,
+                              place_values,
+                              pgmo_values,
+                              allow_merging,
+                              places_merge_pos_threshold_m_,
+                              places_merge_distance_tolerance_m_);
+  });
   dsg_update_funcs_.push_back(&dsg_updates::updateRooms);
   dsg_update_funcs_.push_back(&dsg_updates::updateBuildings);
 
@@ -189,8 +204,7 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
   nh_.getParam("dsg_log_output", dsg_log_);
   if (dsg_log_ && nh_.getParam("dsg_output_path", dsg_log_path_)) {
     backend_graph_logger_.setOutputPath(dsg_log_path_ + "/backend");
-    ROS_INFO("Logging backend graph to %s",
-             (dsg_log_path_ + "/backend").c_str());
+    ROS_INFO("Logging backend graph to %s", (dsg_log_path_ + "/backend").c_str());
     backend_graph_logger_.setLayerName(KimeraDsgLayers::OBJECTS, "objects");
     backend_graph_logger_.setLayerName(KimeraDsgLayers::PLACES, "places");
     backend_graph_logger_.setLayerName(KimeraDsgLayers::ROOMS, "rooms");
@@ -320,8 +334,8 @@ void DsgBackend::startDsgUpdater() {
       nh_.subscribe("pgmo/full_mesh", 1, &DsgBackend::fullMeshCallback, this);
   deformation_graph_sub_ = nh_.subscribe(
       "pgmo/mesh_graph_incremental", 1000, &DsgBackend::deformationGraphCallback, this);
-  pose_graph_sub_ =
-      nh_.subscribe("pose_graph_incremental", 1000, &DsgBackend::poseGraphCallback, this);
+  pose_graph_sub_ = nh_.subscribe(
+      "pose_graph_incremental", 1000, &DsgBackend::poseGraphCallback, this);
 
   pgmo_thread_.reset(new std::thread(&DsgBackend::runDsgUpdater, this));
 }

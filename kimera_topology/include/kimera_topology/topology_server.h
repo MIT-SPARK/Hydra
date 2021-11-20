@@ -63,8 +63,9 @@ class TopologyServer {
 
     layer_pub_ = nh_.advertise<kimera_topology::ActiveLayer>("active_layer", 2, false);
 
-    update_timer_ = nh_.createTimer(ros::Duration(config_.update_period_s),
-                                    [&](const ros::TimerEvent& event) { runUpdate(event.current_real); });
+    update_timer_ = nh_.createTimer(
+        ros::Duration(config_.update_period_s),
+        [&](const ros::TimerEvent& event) { runUpdate(event.current_real); });
   }
 
   void spin() const { ros::spin(); }
@@ -149,16 +150,15 @@ class TopologyServer {
   }
 
   void showStats() const {
-    ROS_INFO_STREAM("Timings: " << std::endl << voxblox::timing::Timing::Print());
+    LOG(INFO) << "Timings: " << std::endl << voxblox::timing::Timing::Print();
     const std::string tsdf_memory_str =
         getHumanReadableMemoryString(tsdf_layer_->getMemorySize());
     const std::string gvd_memory_str =
         getHumanReadableMemoryString(gvd_layer_->getMemorySize());
     const std::string mesh_memory_str =
         getHumanReadableMemoryString(mesh_layer_->getMemorySize());
-    ROS_INFO_STREAM("Memory used: [TSDF=" << tsdf_memory_str
-                                          << ", GVD=" << gvd_memory_str
-                                          << ", Mesh= " << mesh_memory_str << "]");
+    LOG(INFO) << "Memory used: [TSDF=" << tsdf_memory_str << ", GVD=" << gvd_memory_str
+              << ", Mesh= " << mesh_memory_str << "]";
   }
 
   void runUpdate(const ros::Time& timestamp) {

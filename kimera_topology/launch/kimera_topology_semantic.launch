@@ -14,6 +14,11 @@
     <arg name="show_stats" default="true"/>
     <arg name="debug" default="false"/>
 
+    <arg name="glog_to_file" default="false"/>
+    <arg name="glog_dir" default="$(find kimera_dsg_builder)/glogs"/>
+    <arg name="glog_file_args" value="--logtostderr=0 --log_dir=$(arg glog_dir)" if="$(arg glog_to_file)"/>
+    <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
+
     <arg name="config_dir" default="$(find kimera_topology)/config"/>
     <arg name="config" default="uhumans2_topology_config.yaml"/>
     <arg name="semantic_config" default="uhumans2_semantic_config.yaml" if="$(arg use_gt_semantics)"/>
@@ -40,6 +45,12 @@
     <arg name="depth_topic" default="/tesse/depth_cam/mono/image_raw"/>
     <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
 
+    <arg name="launch-prefix" default="gdb --args" if="$(arg debug)"/>
+    <arg name="launch-prefix" default="" unless="$(arg debug)"/>
+
+    <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
+    <arg name="ros_output" value="log" if="$(arg glog_to_file)"/>
+
     <include file="$(find kimera_topology)/launch/includes/rgbd_to_pointcloud.xml"
              if="$(arg use_gt_semantics)">
         <arg name="camera_info_topic" value="$(arg camera_info_topic)"/>
@@ -56,15 +67,12 @@
         <arg name="pointcloud_topic" default="$(arg pointcloud_topic)"/>
     </include>
 
-    <arg name="launch-prefix" default="gdb --args" if="$(arg debug)"/>
-    <arg name="launch-prefix" default="" unless="$(arg debug)"/>
-
     <node name="kimera_topology_node"
           type="kimera_topology_node"
           pkg="kimera_topology"
-          output="screen"
+          output="$(arg ros_output)"
           launch-prefix="$(arg launch-prefix)"
-          args="--minloglevel=$(arg min_glog_level) -v=$(arg verbosity)"
+          args="--minloglevel=$(arg min_glog_level) -v=$(arg verbosity) $(arg glog_file_args)"
           required="true">
         <remap from="pointcloud" to="$(arg pointcloud_topic)"/>
         <param name="sensor_frame" value="$(arg sensor_frame)"/>

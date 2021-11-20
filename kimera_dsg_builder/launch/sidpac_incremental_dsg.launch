@@ -1,6 +1,8 @@
 <launch>
 
-    <arg name="use_kimera_frame" default="true"/>
+    <!-- use_gt_semantics for uh2 -->
+    <arg name="use_gt_frame" default="false"/>
+    <arg name="sensor_frame" default="left_cam"/>
     <arg name="use_oriented_bounding_boxes" default="true"/>
     <arg name="exit_after_bag" default="false"/>
 
@@ -8,19 +10,16 @@
 
     <arg name="dsg_output_dir" default="$(find kimera_dsg_builder)/output/sidpac"/>
     <arg name="dsg_output_prefix" default="sidpac_f1_3"/>
-    <arg name="dsg_output_use_date" default="false"/>
 
     <arg name="dsg_should_log" default="true" />
     <arg name="pgmo_should_log" default="true"/>
 
+    <arg name="typology_dir" default="$(find kimera_dsg_builder)/config"/>
+    <arg name="typology_config" default="sidpac_typology.yaml"/>
+
     <arg name="semantic_map_dir" default="$(find semantic_recolor)/config/colors"/>
     <arg name="semantic_map_file" default="ade150_config.csv"/>
     <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
-
-    <include file="$(find kimera_topology)/launch/kimera_topology_sidpac.launch">
-        <arg name="use_kimera_frame" value="$(arg use_kimera_frame)"/>
-        <arg name="show_stats" value="false"/>
-    </include>
 
     <arg name="debug" default="false"/>
     <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
@@ -30,19 +29,33 @@
     <arg name="verbosity" default="0"/>
     <arg name="glog_to_file" default="false"/>
     <arg name="glog_dir" default="$(find kimera_dsg_builder)/glogs"/>
+    <arg name="topology_glog_dir" default="$(find kimera_topology)/glogs"/>
     <arg name="glog_file_args" value="--logtostderr=0 --log_dir=$(arg glog_dir)" if="$(arg glog_to_file)"/>
     <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
+
+    <arg name="dsg_path" value="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
+    <arg name="pgmo_log_path" default="$(arg dsg_path)/pgmo"/>
+    <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
+    <arg name="ros_output" value="log" if="$(arg glog_to_file)"/>
+
+    <!-- use_static_tfs in uh2 -->
+    <!-- use_static_tfs in uh2 -->
+
+    <include file="$(find kimera_topology)/launch/kimera_topology_sidpac.launch">
+        <!-- use_gt_semantics in uh2 -->
+        <!-- use_gt_frame in uh2 -->
+        <arg name="show_stats" value="$(arg glog_to_file)"/>
+        <!-- semantic_color_path in uh2 -->
+        <arg name="glog_to_file" value="$(arg glog_to_file)"/>
+        <arg name="glog_dir" value="$(arg topology_glog_dir)"/>
+        <arg name="verbosity" value="$(arg verbosity)" if="$(arg glog_to_file)"/>
+        <arg name="min_glog_level" value="$(arg min_glog_level)" if="$(arg glog_to_file)"/>
+    </include>
 
     <include file="$(find kimera_dsg_visualizer)/launch/includes/kimera_dsg_visualizer_params.xml">
         <arg name="viz_config_dir" value="$(find kimera_dsg_builder)/config/incremental_visualizer"/>
     </include>
 
-    <rosparam command="load"
-              file="$(find kimera_dsg_builder)/config/incremental_visualizer/agent_layer.yaml"
-              ns="/kimera_dsg_visualizer/config/dynamic_layer/2"/>
-
-    <arg name="dsg_path" value="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
-    <arg name="pgmo_log_path" default="$(arg dsg_path)/pgmo"/>
     <node pkg="kimera_dsg_builder" type="kimera_dsg_builder_incremental_node"
           name="incremental_dsg_builder_node"
           launch-prefix="$(arg launch_prefix)"
@@ -51,39 +64,39 @@
           output="screen">
         <env name="OMP_NUM_THREADS" value="12"/>
 
-        <param name="pgmo/log_path" value="$(arg pgmo_log_path)"/>
-        <param name="pgmo/log_output" value="$(arg pgmo_should_log)"/>
-        <rosparam file="$(find kimera_dsg_builder)/config/sidpac/dsg_frontend_config.yaml"/>
-        <rosparam file="$(find kimera_dsg_builder)/config/sidpac/dsg_backend_config.yaml"/>
-        <rosparam file="$(find kimera_dsg_builder)/config/sidpac/dsg_lcd_config.yaml" ns="lcd"/>
-
-
+        <param name="enable_lcd" value="$(arg enable_dsg_lcd)"/>
         <param name="exit_after_bag" value="$(arg exit_after_bag)"/>
         <param name="use_oriented_bounding_boxes" value="$(arg use_oriented_bounding_boxes)"/>
         <param name="semantic_label_2_color_csv_filepath" value="$(arg semantic_map_path)"/>
 
-        <param name="dsg/output_path" command="date +'$(arg dsg_path)_%Y_%m_%d_%I_%M_%S.json'"
-               if="$(arg dsg_output_use_date)"/>
-        <param name="dsg/output_path" value="$(arg dsg_path).json"
-               unless="$(arg dsg_output_use_date)"/>
+        <rosparam file="$(arg typology_dir)/$(arg typology_config)"/>
+        <rosparam file="$(find kimera_dsg_builder)/config/sidpac/dsg_frontend_config.yaml"/>
+        <rosparam file="$(find kimera_dsg_builder)/config/sidpac/dsg_backend_config.yaml"/>
+        <rosparam file="$(find kimera_dsg_builder)/config/sidpac/dsg_lcd_config.yaml" ns="lcd"/>
 
-        <param name="enable_lcd" value="$(arg enable_dsg_lcd)"/>
+        <param name="pgmo/log_path" value="$(arg pgmo_log_path)"/>
+        <param name="pgmo/log_output" value="$(arg pgmo_should_log)"/>
+        <param name="dsg_log_output" value="$(arg dsg_should_log)"/>
+        <param name="dsg_output_path" value="$(arg dsg_path)"/>
 
-        <rosparam param="dynamic_semantic_labels">[20]</rosparam>
-        <!-- ignoring 1, -->
-        <rosparam param="structure_labels">[0, 1, 2, 3, 4, 5, 6, 7]</rosparam>
-        <rosparam param="object_labels">[8, 9, 10, 11, 12, 13, 14, 15, 16]</rosparam>
         <remap from="~voxblox_mesh" to="/kimera_topology_node/mesh"/>
         <remap from="~active_places" to="/kimera_topology_node/active_layer"/>
-        <remap from="~pose_graph_incremental" to="/kimera_vio_ros/pose_graph_incremental"/>
+        <remap from="~pose_graph_incremental" to="/kimera_vio_ros/pose_graph_incremental"
+               unless="$(arg use_gt_frame)"/>
         <remap from="~/bow_vectors" to="/kimera_vio_ros/bow_query"/>
         <remap from="frame_registration" to="/kimera_vio_ros/kimera_vio_ros_node/register_lcd_frames"/>
+    </node>
 
-        <rosparam file="$(find kimera_dsg_builder)/config/sidpac/place_mesh_graph_viz.yaml"
-                  ns="pm_graph_viz"/>
-
-        <param name="dsg_log_output" value="$(arg dsg_should_log)" />
-        <param name="dsg_output_path" value="$(arg dsg_path)"/>
+    <node pkg="kimera_dsg_builder" type="pose_graph_publisher_node"
+          if="$(arg use_gt_frame)"
+          name="pose_graph_publisher_node"
+          required="true"
+          output="log">
+          <param name="keyframe_period_s" value="0.2"/>
+          <param name="world_frame" value="world"/>
+          <param name="robot_frame" value="$(arg sensor_frame)"/>
+          <param name="robot_id" value="0"/>
+          <remap from="~pose_graph" to="/incremental_dsg_builder_node/pose_graph_incremental"/>
     </node>
 
 </launch>

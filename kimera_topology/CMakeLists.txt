@@ -74,6 +74,10 @@ add_executable(places_eval_node src/places_eval_node.cpp)
 target_link_libraries(places_eval_node PUBLIC ${PROJECT_NAME} ${catkin_LIBRARIES} yaml-cpp)
 target_include_directories(places_eval_node PUBLIC include ${catkin_INCLUDE_DIRS})
 
+add_executable(places_eval_viz_node src/places_eval_viz_node.cpp)
+target_link_libraries(places_eval_viz_node PUBLIC ${PROJECT_NAME} ${catkin_LIBRARIES} yaml-cpp)
+target_include_directories(places_eval_viz_node PUBLIC include ${catkin_INCLUDE_DIRS})
+
 if(CATKIN_ENABLE_TESTING)
   catkin_add_gtest(
     utest_${PROJECT_NAME}

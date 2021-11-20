@@ -41,7 +41,11 @@ int main(int argc, char** argv) {
     r.sleep();
   }
 
-  ros::spinOnce();  // make sure all the callbacks are processed
+  // make sure we're done integrating the tsdf
+  ros::getGlobalCallbackQueue()->callAvailable(ros::WallDuration(5.0));
+
+  std::string dsg_output_path = "";
+  ros::param::get("~dsg_output_path", dsg_output_path);
 
   ROS_INFO("Bag finished, making DSG builder");
   kimera::OfflineDsgBuilder builder(nh, nh_private, tsdf_server);
@@ -57,8 +61,6 @@ int main(int argc, char** argv) {
     ros::spin();
   }
 
-  std::string dsg_output_path = "";
-  ros::param::get("~dsg_output_path", dsg_output_path);
   builder.saveSceneGraph(dsg_output_path + "/dsg.json", false);
   builder.saveSceneGraph(dsg_output_path + "/dsg_with_mesh.json", true);
 

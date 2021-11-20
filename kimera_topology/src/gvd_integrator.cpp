@@ -279,7 +279,7 @@ void GvdIntegrator::updateFromTsdfLayer(bool clear_updated_flag,
   // sets voxel surface flags
   VLOG(3) << "[GVD update]: starting marching cubes";
   voxblox::timing::Timer marching_cubes_timer("gvd/marching_cubes");
-  mesh_integrator_->generateMesh(true, false);
+  mesh_integrator_->generateMesh(!use_all_blocks, false);
   marching_cubes_timer.Stop();
   VLOG(3) << "[GVD update]: finished marching cubes";
 

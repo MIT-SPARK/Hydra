@@ -9,7 +9,6 @@
 
     <arg name="dsg_output_dir" default="$(find kimera_dsg_builder)/output/uhumans2"/>
     <arg name="dsg_output_prefix" default="uhumans2_office"/>
-    <arg name="dsg_output_use_date" default="false"/>
 
     <arg name="dsg_should_log" default="true" />
     <arg name="pgmo_should_log" default="true"/>
@@ -21,13 +20,6 @@
     <arg name="semantic_map_file" default="tesse_multiscene_office1_segmentation_mapping.csv"/>
     <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
 
-    <include file="$(find kimera_topology)/launch/kimera_topology_semantic.launch">
-        <arg name="use_gt_semantics" value="$(arg use_gt_semantics)"/>
-        <arg name="use_gt_frame" value="$(arg use_gt_frame)"/>
-        <arg name="show_stats" value="false"/>
-        <arg name="semantic_color_path" value="$(arg semantic_map_path)" if="$(arg use_gt_semantics)"/>
-    </include>
-
     <arg name="debug" default="false"/>
     <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
     <arg name="launch_prefix" value="" unless="$(arg debug)"/>
@@ -36,25 +28,39 @@
     <arg name="verbosity" default="0"/>
     <arg name="glog_to_file" default="false"/>
     <arg name="glog_dir" default="$(find kimera_dsg_builder)/glogs"/>
+    <arg name="topology_glog_dir" default="$(find kimera_topology)/glogs"/>
     <arg name="glog_file_args" value="--logtostderr=0 --log_dir=$(arg glog_dir)" if="$(arg glog_to_file)"/>
     <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
+
+    <arg name="dsg_path" value="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
+    <arg name="pgmo_log_path" default="$(arg dsg_path)/pgmo"/>
+    <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
+    <arg name="ros_output" value="log" if="$(arg glog_to_file)"/>
+
+    <arg name="use_static_tfs" default="true"/>
+    <include file="$(find kimera_dsg_builder)/launch/uhumans2_static_tfs.launch" if="$(arg use_static_tfs)"/>
+
+    <include file="$(find kimera_topology)/launch/kimera_topology_semantic.launch">
+        <arg name="use_gt_semantics" value="$(arg use_gt_semantics)"/>
+        <arg name="use_gt_frame" value="$(arg use_gt_frame)"/>
+        <arg name="show_stats" value="$(arg glog_to_file)"/>
+        <arg name="semantic_color_path" value="$(arg semantic_map_path)" if="$(arg use_gt_semantics)"/>
+        <arg name="glog_to_file" value="$(arg glog_to_file)"/>
+        <arg name="glog_dir" value="$(arg topology_glog_dir)"/>
+        <arg name="verbosity" value="$(arg verbosity)" if="$(arg glog_to_file)"/>
+        <arg name="min_glog_level" value="$(arg min_glog_level)" if="$(arg glog_to_file)"/>
+    </include>
 
     <include file="$(find kimera_dsg_visualizer)/launch/includes/kimera_dsg_visualizer_params.xml">
         <arg name="viz_config_dir" value="$(find kimera_dsg_builder)/config/incremental_visualizer"/>
     </include>
 
-    <rosparam command="load"
-              file="$(find kimera_dsg_builder)/config/incremental_visualizer/agent_layer.yaml"
-              ns="/kimera_dsg_visualizer/config/dynamic_layer/2"/>
-
-    <arg name="dsg_path" value="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
-    <arg name="pgmo_log_path" default="$(arg dsg_path)/pgmo"/>
     <node pkg="kimera_dsg_builder" type="kimera_dsg_builder_incremental_node"
           name="incremental_dsg_builder_node"
           launch-prefix="$(arg launch_prefix)"
           args="--minloglevel=$(arg min_glog_level) -v=$(arg verbosity) $(arg glog_file_args)"
           required="true"
-          output="screen">
+          output="$(arg ros_output)">
         <env name="OMP_NUM_THREADS" value="12"/>
 
         <param name="enable_lcd" value="$(arg enable_dsg_lcd)"/>
@@ -66,12 +72,10 @@
         <rosparam file="$(find kimera_dsg_builder)/config/dsg_frontend_config.yaml"/>
         <rosparam file="$(find kimera_dsg_builder)/config/dsg_backend_config.yaml"/>
         <rosparam file="$(find kimera_dsg_builder)/config/dsg_lcd_config.yaml" ns="lcd"/>
-        <rosparam file="$(find kimera_dsg_builder)/config/place_mesh_graph_viz.yaml"
-                  ns="pm_graph_viz"/>
 
         <param name="pgmo/log_path" value="$(arg pgmo_log_path)"/>
         <param name="pgmo/log_output" value="$(arg pgmo_should_log)"/>
-        <param name="dsg_log_output" value="$(arg dsg_should_log)" />
+        <param name="dsg_log_output" value="$(arg dsg_should_log)"/>
         <param name="dsg_output_path" value="$(arg dsg_path)"/>
 
         <remap from="~voxblox_mesh" to="/kimera_topology_node/mesh"/>
