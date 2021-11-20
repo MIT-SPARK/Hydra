@@ -69,6 +69,7 @@ class OfflineDsgBuilder {
   std::vector<int> stuff_labels_;
   std::vector<int> walls_labels_;
   std::vector<int> floor_labels_;
+  bool use_oriented_bounding_boxes_;
 
   SemanticIntegratorBase::SemanticConfig semantic_config_;
 

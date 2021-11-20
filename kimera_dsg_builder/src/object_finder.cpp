@@ -179,7 +179,8 @@ std::ostream& operator<<(std::ostream& out, const ObjectFinder& finder) {
 void ObjectFinder::addObjectsToGraph(const SubMesh& mesh,
                                      const NodeColor& label_color,
                                      SemanticLabel label,
-                                     DynamicSceneGraph* scene_graph) {
+                                     DynamicSceneGraph* scene_graph,
+                                     BoundingBox::Type type) {
   CHECK(scene_graph);
   CHECK(mesh.vertices);
 
@@ -203,7 +204,7 @@ void ObjectFinder::addObjectsToGraph(const SubMesh& mesh,
     attrs->semantic_label = label;
     attrs->color = label_color,
     attrs->name = std::to_string(label) + std::to_string(num_objects);
-    attrs->bounding_box = BoundingBox::extract(cluster.cloud, BoundingBox::Type::AABB);
+    attrs->bounding_box = BoundingBox::extract(cluster.cloud, type);
 
     pcl::PointXYZ centroid;
     cluster.centroid.get(centroid);

@@ -74,7 +74,11 @@ int main(int argc, char* argv[]) {
     if (!dsg_output_path.empty()) {
       // save pgmo trajectory
       std_srvs::Empty temp;
-      backend.saveTrajectoryCallback(temp.request, temp.response);
+      try {
+        backend.saveTrajectoryCallback(temp.request, temp.response);
+      } catch (const std::exception& e) {
+        LOG(ERROR) << "Saving trajectory failed: " << e.what();
+      }
     }
   }
 

@@ -85,6 +85,7 @@ void OfflineDsgBuilder::loadParams() {
   nh_private_.getParam("world_frame", world_frame_);
   nh_private_.getParam("scene_graph_output_path", scene_graph_output_path_);
   nh_private_.getParam("room_finder_esdf_slice_level", room_finder_esdf_slice_level_);
+  nh_private_.getParam("use_oriented_bounding_boxes", use_oriented_bounding_boxes_);
 
   CHECK(nh_private_.getParam("dynamic_semantic_labels", dynamic_labels_));
   CHECK(nh_private_.getParam("stuff_labels", stuff_labels_));
@@ -103,6 +104,7 @@ OfflineDsgBuilder::OfflineDsgBuilder(const ros::NodeHandle& nh,
       world_frame_("world"),
       scene_graph_output_path_(""),
       object_finder_type_(0),
+      use_oriented_bounding_boxes_(false),
       semantic_pcl_pubs_("pcl", nh_private) {
   scene_graph_ = std::make_shared<DynamicSceneGraph>();
 
@@ -257,8 +259,13 @@ void OfflineDsgBuilder::reconstruct() {
     NodeColor label_color;
     label_color << label_color_vbx.r, label_color_vbx.g, label_color_vbx.b;
     // TODO(nathan) add world frame to PCL if publishing object finder results
-    object_finder_->addObjectsToGraph(
-        label_mesh_pair.second, label_color, semantic_label, scene_graph_.get());
+    object_finder_->addObjectsToGraph(label_mesh_pair.second,
+                                      label_color,
+                                      semantic_label,
+                                      scene_graph_.get(),
+                                      use_oriented_bounding_boxes_
+                                          ? BoundingBox::Type::RAABB
+                                          : BoundingBox::Type::AABB);
   }
 
   VLOG(1) << "Start Room finding.";

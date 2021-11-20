@@ -70,7 +70,8 @@ class ObjectFinder {
   void addObjectsToGraph(const SubMesh& mesh,
                          const NodeColor& label_color,
                          SemanticLabel label,
-                         DynamicSceneGraph* scene_graph);
+                         DynamicSceneGraph* scene_graph,
+                         BoundingBox::Type type);
 
   ObjectClusters findObjects(const pcl::PointCloud<pcl::PointXYZRGBA>::Ptr& cloud,
                              const std::vector<size_t>& active_indices);
