@@ -380,6 +380,19 @@ void DsgBackend::startPgmo() {
   optimizer_thread_.reset(new std::thread(&DsgBackend::runPgmo, this));
 }
 
+void DsgBackend::logIncrementalLoopClosures(const PoseGraph& msg) {
+  for (const auto& edge : msg.edges) {
+    if (edge.type != pose_graph_tools::PoseGraphEdge::LOOPCLOSE) {
+      continue;
+    }
+
+    gtsam::Pose3 pose = kimera_pgmo::RosToGtsam(edge.pose);
+    const gtsam::Symbol from_key(robot_prefix_, edge.key_from);
+    const gtsam::Symbol to_key(robot_prefix_, edge.key_to);
+    loop_closures_.push_back({from_key, to_key, pose});
+  }
+}
+
 void DsgBackend::runPgmo() {
   ros::Rate r(2);
   while (ros::ok() && !should_shutdown_) {
@@ -404,12 +417,14 @@ void DsgBackend::runPgmo() {
         status_.new_factors_ += pose_graph_updates_->edges.size();
         processIncrementalPoseGraph(
             pose_graph_updates_, &trajectory_, &unconnected_nodes_, &timestamps_);
+        logIncrementalLoopClosures(*pose_graph_updates_);
         pose_graph_updates_.reset();
         have_graph_updates = true;
       }
+
+      addInternalLCDToDeformationGraph();
     }  // end pgmo critical section
 
-    addInternalLCDToDeformationGraph();
     if (num_loop_closures_ > prev_loop_closures) {
       LOG(WARNING) << "New loop closures detected!";
     }
@@ -566,6 +581,7 @@ bool DsgBackend::addInternalLCDToDeformationGraph() {
     to_key = to_attrs.external_key;
 
     deformation_graph_->addNewBetween(from_key, to_key, result.to_T_from);
+    loop_closures_.push_back({from_key, to_key, result.to_T_from});
     added_new_loop_closure = true;
     num_loop_closures_++;
   }

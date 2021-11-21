@@ -25,6 +25,12 @@ void parseParam(const ros::NodeHandle& nh, const std::string& name, T& param) {
   param = value;
 }
 
+struct LoopClosureLog {
+  gtsam::Symbol from;
+  gtsam::Symbol to;
+  gtsam::Pose3 to_T_from;
+};
+
 class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
  public:
   using Ptr = std::shared_ptr<DsgBackend>;
@@ -53,6 +59,11 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   }
 
   bool saveTrajectoryCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+
+  std::list<LoopClosureLog> getLoopClosures() {
+    std::unique_lock<std::mutex> lock(pgmo_mutex_);
+    return loop_closures_;
+  }
 
  private:
   bool setVisualizeBackend(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
@@ -103,6 +114,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   void logStatus(bool init = false) const;
 
   bool addInternalLCDToDeformationGraph();
+
+  void logIncrementalLoopClosures(const pose_graph_tools::PoseGraph& msg);
 
  private:
   ros::NodeHandle nh_;
@@ -170,6 +183,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   bool dsg_log_;
   std::string dsg_log_path_;
   SceneGraphLogger backend_graph_logger_;
+
+  std::list<LoopClosureLog> loop_closures_;
 };
 
 }  // namespace incremental

@@ -13,6 +13,14 @@ inline bool haveClock() {
   return ros::TopicManager::instance()->getNumPublishers("/clock");
 }
 
+std::optional<uint64_t> getTimeNs(const kimera::DynamicSceneGraph& graph, gtsam::Symbol key) {
+  kimera::NodeSymbol node(key.chr(), key.index());
+  if (!graph.hasNode(node)) {
+    LOG(ERROR) << "Missing node << " << node.getLabel() << "when logging loop closure";
+  }
+  return graph.getDynamicNode(node).value().get().timestamp.count();
+}
+
 void spinUntilBagFinished() {
   ros::WallRate r(50);
   ROS_INFO("Waiting for bag to start");
@@ -58,6 +66,7 @@ int main(int argc, char* argv[]) {
   SharedDsgInfo::Ptr frontend_dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));
   SharedDsgInfo::Ptr backend_dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));
 
+  std::list<kimera::incremental::LoopClosureLog> loop_closures;
   {  // scope for frontend / backend pair
     kimera::incremental::DsgBackend backend(nh, frontend_dsg, backend_dsg);
     kimera::incremental::DsgFrontend frontend(nh, frontend_dsg);
@@ -80,6 +89,7 @@ int main(int argc, char* argv[]) {
         LOG(ERROR) << "Saving trajectory failed: " << e.what();
       }
     }
+    loop_closures = backend.getLoopClosures();
   }
 
   if (!dsg_output_path.empty()) {
@@ -95,7 +105,28 @@ int main(int argc, char* argv[]) {
     timer.logAllElapsed(dsg_output_path);
     timer.logStats(dsg_output_path);
     LOG(INFO) << "[DSG Node] Saved scene graph, stats, and logs to " << dsg_output_path;
+
+    const std::string output_csv = dsg_output_path + "/loop_closures.csv";
+    std::ofstream output_file;
+    output_file.open(output_csv);
+
+    output_file << "time_from_ns,time_to_ns,x,y,z,qw,qx,qy,qz" << std::endl;
+    for (const auto& loop_closure : loop_closures) {
+      auto time_from = getTimeNs(*frontend_dsg->graph, loop_closure.from);
+      auto time_to = getTimeNs(*frontend_dsg->graph, loop_closure.from);
+      if (!time_from || !time_to) {
+        continue;
+      }
+      output_file << *time_from << "," << *time_to << ",";
+      gtsam::Point3 pos = loop_closure.to_T_from.translation();
+      output_file << pos.x() << "," << pos.y() << "," << pos.z() << ",";
+      gtsam::Quaternion quat = loop_closure.to_T_from.rotation().toQuaternion();
+      output_file << quat.w() << ", " << quat.x() << "," << pos.y() << "," << pos.z();
+      output_file << std::endl;
+    }
   }
 
   return 0;
 }
+
+
