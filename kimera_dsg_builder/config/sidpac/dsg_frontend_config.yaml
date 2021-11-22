@@ -1,5 +1,5 @@
 pgmo:
-    horizon: 10.0
+    horizon: 5.0
     output_mesh_resolution: 0.04
     compression_method: 1  # voxblox
     robot_id: 0
