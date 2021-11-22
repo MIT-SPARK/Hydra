@@ -160,7 +160,6 @@ void DsgFrontend::startMeshFrontend() {
 
 void DsgFrontend::runMeshFrontend() {
   ros::Rate r(10);
-  bool have_new_mesh = false;
   while (ros::ok() && !should_shutdown_) {
     // identify if the places thread is waiting on a new mesh message
     PlacesQueueState state = getPlacesQueueState();
@@ -169,13 +168,6 @@ void DsgFrontend::runMeshFrontend() {
     if (last_mesh_timestamp_ > last_places_timestamp_ && !newer_place_msg) {
       r.sleep();  // the mesh thread is running ahead, spin for a little bit
       continue;
-    }
-
-    if (have_new_mesh && last_mesh_timestamp_ == last_places_timestamp_) {
-      ScopedTimer timer("frontend/place_mesh_mapping", true, 1, false);
-      updatePlaceMeshMapping();
-      dsg_->updated = true;
-      have_new_mesh = false;
     }
 
     voxblox_msgs::Mesh::ConstPtr msg;
@@ -212,6 +204,7 @@ void DsgFrontend::runMeshFrontend() {
     // inform the mesh callback we can accept more meshes
     {  // start mesh critical region
       std::unique_lock<std::mutex> mesh_lock(mesh_frontend_mutex_);
+      latest_mesh_mappings_ = mesh_frontend_.getVoxbloxMsgMapping();
       latest_mesh_msg_.reset();
     }  // end mesh critical region
 
@@ -221,6 +214,7 @@ void DsgFrontend::runMeshFrontend() {
     }
     addPlaceObjectEdges();
     dsg_->updated = true;
+    r.sleep();
   }
 }
 
@@ -259,6 +253,11 @@ void DsgFrontend::runPlaces() {
 
     processLatestPlacesMsg(curr_message);
     addAgentPlaceEdges();
+
+    {
+      ScopedTimer timer("frontend/place_mesh_mapping", true, 1, false);
+      updatePlaceMeshMapping();
+    }
 
     // note that we don't need a mutex because this is the same thread as
     // processLatestPlacesMsg
@@ -661,11 +660,10 @@ void DsgFrontend::runLcd() {
 
 void DsgFrontend::updatePlaceMeshMapping() {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
+  std::unique_lock<std::mutex> mesh_lock(mesh_frontend_mutex_);
 
   const SceneGraphLayer& places_layer =
       dsg_->graph->getLayer(KimeraDsgLayers::PLACES).value();
-
-  const auto& index_mapping = mesh_frontend_.getVoxbloxMsgMapping();
 
   size_t num_invalid = 0;
   for (const auto& id_node_pair : places_layer.nodes()) {
@@ -686,12 +684,12 @@ void DsgFrontend::updatePlaceMeshMapping() {
     for (const auto& connection : attrs.voxblox_mesh_connections) {
       voxblox::BlockIndex index =
           Eigen::Map<const voxblox::BlockIndex>(connection.block);
-      if (!index_mapping.count(index)) {
+      if (!latest_mesh_mappings_.count(index)) {
         num_invalid++;
         continue;
       }
 
-      const auto& vertex_mapping = index_mapping.at(index);
+      const auto& vertex_mapping = latest_mesh_mappings_.at(index);
       if (!vertex_mapping.count(connection.vertex)) {
         num_invalid++;
         continue;
@@ -708,6 +706,7 @@ void DsgFrontend::updatePlaceMeshMapping() {
     VLOG(2) << "[DSG Backend] Place-Mesh Update: " << num_invalid
             << " invalid connections";
   }
+  dsg_->updated = true;
 }
 
 void DsgFrontend::assignBowVectors() {

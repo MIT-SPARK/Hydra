@@ -99,6 +99,7 @@ class DsgFrontend {
   NodeIdSet unlabeled_place_nodes_;
   NodeIdSet archived_places_;
   NodeIdSet previous_active_places_;
+  kimera_pgmo::VoxbloxIndexMapping latest_mesh_mappings_;
 
   std::map<char, std::set<NodeId>> deleted_agent_edge_indices_;
   std::map<char, size_t> last_agent_edge_index_;
