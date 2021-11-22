@@ -1,6 +1,5 @@
 dsg:
     add_places_to_deformation_graph: true
-    optimize_on_lc: true
     enable_node_merging: true
     call_update_periodically: true
     rpgo_verbosity: "update"

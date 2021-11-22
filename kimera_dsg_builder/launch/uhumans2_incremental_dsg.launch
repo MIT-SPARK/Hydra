@@ -6,6 +6,8 @@
     <arg name="exit_after_bag" default="false"/>
 
     <arg name="enable_dsg_lcd" default="false"/>
+    <arg name="lcd_config" default="$(find kimera_dsg_builder)/config/dsg_lcd_config.yaml"/>
+    <arg name="optimize_on_lc" default="true"/>
 
     <arg name="dsg_output_dir" default="$(find kimera_dsg_builder)/output/uhumans2"/>
     <arg name="dsg_output_prefix" default="uhumans2_office"/>
@@ -71,7 +73,8 @@
         <rosparam file="$(arg typology_dir)/$(arg typology_config)"/>
         <rosparam file="$(find kimera_dsg_builder)/config/dsg_frontend_config.yaml"/>
         <rosparam file="$(find kimera_dsg_builder)/config/dsg_backend_config.yaml"/>
-        <rosparam file="$(find kimera_dsg_builder)/config/dsg_lcd_config.yaml" ns="lcd"/>
+        <rosparam file="$(arg lcd_config)" ns="lcd"/>
+        <param name="dsg/optimize_on_lc" value="$(arg optimize_on_lc)"/>
 
         <param name="pgmo/log_path" value="$(arg pgmo_log_path)"/>
         <param name="pgmo/log_output" value="$(arg pgmo_should_log)"/>

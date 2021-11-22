@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
     output_file << "time_from_ns,time_to_ns,x,y,z,qw,qx,qy,qz" << std::endl;
     for (const auto& loop_closure : loop_closures) {
       auto time_from = getTimeNs(*frontend_dsg->graph, loop_closure.from);
-      auto time_to = getTimeNs(*frontend_dsg->graph, loop_closure.from);
+      auto time_to = getTimeNs(*frontend_dsg->graph, loop_closure.to);
       if (!time_from || !time_to) {
         continue;
       }
