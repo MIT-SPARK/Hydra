@@ -86,9 +86,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void runPgmo();
 
-  void startDsgUpdater();
-
-  void runDsgUpdater();
+  void updatePrivateDsg();
 
   void addNewAgentPoses();
 
@@ -157,7 +155,6 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   std::list<LayerUpdateFunc> dsg_update_funcs_;
 
   std::atomic<bool> have_loopclosures_;
-  std::atomic<bool> have_dsg_updates_;
 
   bool have_new_mesh_;
 
@@ -168,7 +165,6 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   pose_graph_tools::PoseGraph::Ptr pose_graph_updates_;
 
   std::mutex pgmo_mutex_;
-  std::unique_ptr<std::thread> pgmo_thread_;
   std::unique_ptr<std::thread> optimizer_thread_;
 
   bool pgmo_log_;

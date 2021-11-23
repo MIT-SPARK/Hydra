@@ -223,12 +223,6 @@ DsgBackend::~DsgBackend() {
   }
   VLOG(2) << " [DSG Backend] joined visualized thread";
 
-  VLOG(2) << " [DSG Backend] joining pgmo thread";
-  if (pgmo_thread_) {
-    pgmo_thread_->join();
-  }
-  VLOG(2) << " [DSG Backend] joined pgmo thread";
-
   VLOG(2) << " [DSG Backend] joining optimizer thread";
   if (optimizer_thread_) {
     optimizer_thread_->join();
@@ -238,7 +232,6 @@ DsgBackend::~DsgBackend() {
 
 void DsgBackend::start() {
   startPgmo();
-  startDsgUpdater();
   startVisualizer();
   LOG(INFO) << " [DSG Backend] started!";
 }
@@ -329,41 +322,32 @@ void DsgBackend::runVisualizer() {
   }
 }
 
-void DsgBackend::startDsgUpdater() {
-  full_mesh_sub_ =
-      nh_.subscribe("pgmo/full_mesh", 1, &DsgBackend::fullMeshCallback, this);
-  deformation_graph_sub_ = nh_.subscribe(
-      "pgmo/mesh_graph_incremental", 1000, &DsgBackend::deformationGraphCallback, this);
-  pose_graph_sub_ = nh_.subscribe(
-      "pose_graph_incremental", 1000, &DsgBackend::poseGraphCallback, this);
-
-  pgmo_thread_.reset(new std::thread(&DsgBackend::runDsgUpdater, this));
-}
-
-void DsgBackend::runDsgUpdater() {
-  ros::Rate r(2);
-  while (ros::ok() && !should_shutdown_) {
-    // TODO(Yun) Fix to update with only new changes while ignoring old
-    bool have_frontend_updates = shared_dsg_->updated;
-    if (have_frontend_updates) {
-      {  // start joint critical section
-        std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
-        std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
-        private_dsg_->graph->mergeGraph(*shared_dsg_->graph);
-        *private_dsg_->latest_places = *shared_dsg_->latest_places;
-        if (dsg_log_) {
-          backend_graph_logger_.logGraph(private_dsg_->graph);
-        }
-      }  // end joint critical section
-      private_dsg_->updated = true;
-      have_dsg_updates_ = true;
-    }
-
-    r.sleep();
+void DsgBackend::updatePrivateDsg() {
+  // TODO(Yun) Fix to update with only new changes while ignoring old
+  bool have_frontend_updates = shared_dsg_->updated;
+  if (have_frontend_updates) {
+    {  // start joint critical section
+      std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
+      private_dsg_->graph->mergeGraph(*shared_dsg_->graph);
+      *private_dsg_->latest_places = *shared_dsg_->latest_places;
+      if (dsg_log_) {
+        backend_graph_logger_.logGraph(private_dsg_->graph);
+      }
+    }  // end joint critical section
+    shared_dsg_->updated = false;
   }
 }
 
 void DsgBackend::startPgmo() {
+  full_mesh_sub_ =
+      nh_.subscribe("pgmo/full_mesh", 1, &DsgBackend::fullMeshCallback, this);
+  deformation_graph_sub_ = nh_.subscribe("pgmo/mesh_graph_incremental",
+                                         1000,
+                                         &DsgBackend::deformationGraphCallback,
+                                         this);
+  pose_graph_sub_ = nh_.subscribe(
+      "pose_graph_incremental", 1000, &DsgBackend::poseGraphCallback, this);
+
   viz_mesh_mesh_edges_pub_ = nh_.advertise<visualization_msgs::Marker>(
       "pgmo/deformation_graph_mesh_mesh", 10, false);
   viz_pose_mesh_edges_pub_ = nh_.advertise<visualization_msgs::Marker>(
@@ -437,26 +421,21 @@ void DsgBackend::runPgmo() {
     status_.total_factors_ = deformation_graph_->getGtsamFactors().size();
     status_.total_values_ = deformation_graph_->getGtsamValues().size();
 
-    if (!have_dsg_updates_) {
-      if (pgmo_log_) {
-        logStatus();
+    {
+      // start private dsg critical section
+      std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
+      updatePrivateDsg();
+      if (have_graph_updates && optimize_on_lc_ && have_loopclosures_) {
+        ScopedTimer optimize_timer("pgmo/optimize");
+        optimize();
+      } else if (call_update_periodically_) {
+        updateDsgMesh();
+        callUpdateFunctions();
       }
+      private_dsg_->updated = true;
+    }  // end private dsg critical section
 
-      r.sleep();
-      continue;
-    }
-
-    have_dsg_updates_ = false;
-
-    if (have_graph_updates && optimize_on_lc_ && have_loopclosures_) {
-      ScopedTimer optimize_timer("pgmo/optimize");
-      optimize();
-    } else if (call_update_periodically_) {
-      updateDsgMesh();
-      callUpdateFunctions();
-    }
-
-    if (pgmo_log_) {
+    if (have_graph_updates && pgmo_log_) {
       logStatus();
     }
 
@@ -583,6 +562,7 @@ bool DsgBackend::addInternalLCDToDeformationGraph() {
     loop_closures_.push_back({from_key, to_key, result.to_T_from});
     added_new_loop_closure = true;
     num_loop_closures_++;
+    have_loopclosures_ = true;
   }
 
   return added_new_loop_closure;
@@ -612,11 +592,8 @@ void DsgBackend::updateDsgMesh() {
 
   opt_mesh = deformation_graph_->deformMesh(input_mesh, robot_vertex_prefix_);
 
-  {  // start graph update critical section
-    std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
-    private_dsg_->graph->setMeshDirectly(opt_mesh);
-    private_dsg_->updated = true;
-  }  // end graph update critical section
+  private_dsg_->graph->setMeshDirectly(opt_mesh);
+  private_dsg_->updated = true;
 
   if (viz_mesh_mesh_edges_pub_.getNumSubscribers() > 0 ||
       viz_pose_mesh_edges_pub_.getNumSubscribers() > 0) {
@@ -649,12 +626,10 @@ void DsgBackend::optimize() {
 
 void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,
                                      const gtsam::Values& pgmo_values) {
-  std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
   for (const auto& update_func : dsg_update_funcs_) {
     // TODO(nathan) might need diferrent values
     update_func(*private_dsg_->graph, places_values, pgmo_values, enable_node_merging_);
   }
-  private_dsg_->updated = true;
 }
 
 ActiveNodeSet DsgBackend::getNodesForRoomDetection(const NodeIdSet& latest_places) {
