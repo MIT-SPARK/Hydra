@@ -54,6 +54,12 @@ bool DsgLcdModule::addNewDescriptors(const DynamicSceneGraph& graph,
     return false;
   }
 
+  if (!root_leaf_map_.count(*parent)) {
+    root_leaf_map_[*parent] = std::set<NodeId>();
+  }
+
+  root_leaf_map_[*parent].insert(agent_node.id);
+
   if (!leaf_cache_.count(*parent)) {
     leaf_cache_[*parent] = DescriptorCache();
   }
@@ -180,8 +186,12 @@ DsgRegistrationSolution DsgLcdModule::detect(SharedDsgInfo& dsg, NodeId agent_id
     }  // end dsg critical section
 
     if (descriptor) {
-      matches[idx] = searchDescriptors(
-          *descriptor, config, prev_valid_roots, cache_map_[config.layer]);
+      matches[idx] = searchDescriptors(*descriptor,
+                                       config,
+                                       prev_valid_roots,
+                                       cache_map_[config.layer],
+                                       root_leaf_map_,
+                                       agent_id);
       prev_valid_roots = matches[idx].valid_matches;
     } else {
       prev_valid_roots = std::set<NodeId>();
@@ -197,8 +207,11 @@ DsgRegistrationSolution DsgLcdModule::detect(SharedDsgInfo& dsg, NodeId agent_id
   }  // end dsg critical section
 
   if (descriptor) {
-    matches[0] = searchLeafDescriptors(
-        *descriptor, config_.agent_search_config, prev_valid_roots, leaf_cache_);
+    matches[0] = searchLeafDescriptors(*descriptor,
+                                       config_.agent_search_config,
+                                       prev_valid_roots,
+                                       leaf_cache_,
+                                       agent_id);
   }
 
   if (matches.empty()) {

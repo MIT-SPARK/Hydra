@@ -75,14 +75,21 @@ float computeDescriptorScore(const Descriptor& lhs,
   }
 }
 
-LayerSearchResults searchDescriptors(const Descriptor& descriptor,
-                                     const DescriptorMatchConfig& match_config,
-                                     const std::set<NodeId>& valid_matches,
-                                     const DescriptorCache& descriptors) {
+LayerSearchResults searchDescriptors(
+    const Descriptor& descriptor,
+    const DescriptorMatchConfig& match_config,
+    const std::set<NodeId>& valid_matches,
+    const DescriptorCache& descriptors,
+    const std::map<NodeId, std::set<NodeId>>& root_leaf_map,
+    NodeId query_id) {
   float best_score = 0.0f;
   NodeId best_node = 0;  // gets overwritten on valid match
   std::set<NodeId> new_valid_matches;
   for (const auto& valid_id : valid_matches) {
+    if (root_leaf_map.at(valid_id).count(query_id)) {
+      continue;
+    }
+
     const Descriptor& other_descriptor = *descriptors.at(valid_id);
     const float curr_score =
         computeDescriptorScore(descriptor, other_descriptor, match_config.type);
@@ -113,7 +120,8 @@ LayerSearchResults searchDescriptors(const Descriptor& descriptor,
 LayerSearchResults searchLeafDescriptors(const Descriptor& descriptor,
                                          const DescriptorMatchConfig& match_config,
                                          const std::set<NodeId>& valid_matches,
-                                         const DescriptorCacheMap& leaf_cache_map) {
+                                         const DescriptorCacheMap& leaf_cache_map,
+                                         NodeId query_id) {
   float best_score = 0.0f;
   NodeId best_node = 0;  // gets overwritten on valid match
   NodeId best_root = 0;  // gets overwritten on valid match
@@ -122,6 +130,10 @@ LayerSearchResults searchLeafDescriptors(const Descriptor& descriptor,
     const DescriptorCache& leaf_cache = leaf_cache_map.at(valid_id);
 
     for (const auto& id_desc_pair : leaf_cache) {
+      if (id_desc_pair.first == query_id) {
+        continue;  // disallow self matches even if they probably can't happen
+      }
+
       const Descriptor& other_descriptor = *id_desc_pair.second;
       const float curr_score =
           computeDescriptorScore(descriptor, other_descriptor, match_config.type);

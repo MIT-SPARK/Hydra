@@ -73,6 +73,7 @@ class DsgLcdModule {
 
   std::map<LayerId, DescriptorCache> cache_map_;
   std::map<NodeId, DescriptorCache> leaf_cache_;
+  std::map<NodeId, std::set<NodeId>> root_leaf_map_;
 };
 
 }  // namespace lcd

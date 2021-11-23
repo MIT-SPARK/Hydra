@@ -455,6 +455,7 @@ void DsgBackend::runPgmo() {
 
     updateRoomsNodes();
     updateBuildingNode();
+    r.sleep();
   }
 }
 

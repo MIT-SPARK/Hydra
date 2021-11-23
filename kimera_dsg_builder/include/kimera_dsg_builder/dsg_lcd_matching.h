@@ -62,15 +62,19 @@ float computeDescriptorScore(const Descriptor& lhs,
                              const Descriptor& rhs,
                              DescriptorScoreType type);
 
-LayerSearchResults searchDescriptors(const Descriptor& descriptor,
-                                     const DescriptorMatchConfig& match_config,
-                                     const std::set<NodeId>& valid_matches,
-                                     const DescriptorCache& descriptors);
+LayerSearchResults searchDescriptors(
+    const Descriptor& descriptor,
+    const DescriptorMatchConfig& match_config,
+    const std::set<NodeId>& valid_matches,
+    const DescriptorCache& descriptors,
+    const std::map<NodeId, std::set<NodeId>>& root_leaf_map,
+    NodeId query_id);
 
 LayerSearchResults searchLeafDescriptors(const Descriptor& descriptor,
                                          const DescriptorMatchConfig& match_config,
                                          const std::set<NodeId>& valid_matches,
-                                         const DescriptorCacheMap& leaf_cache_map);
+                                         const DescriptorCacheMap& leaf_cache_map,
+                                         NodeId query_id);
 
 }  // namespace lcd
 }  // namespace kimera
