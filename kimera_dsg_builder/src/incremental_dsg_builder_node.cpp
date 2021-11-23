@@ -110,7 +110,7 @@ int main(int argc, char* argv[]) {
     std::ofstream output_file;
     output_file.open(output_csv);
 
-    output_file << "time_from_ns,time_to_ns,x,y,z,qw,qx,qy,qz" << std::endl;
+    output_file << "time_from_ns,time_to_ns,x,y,z,qw,qx,qy,qz,type" << std::endl;
     for (const auto& loop_closure : loop_closures) {
       auto time_from = getTimeNs(*frontend_dsg->graph, loop_closure.from);
       auto time_to = getTimeNs(*frontend_dsg->graph, loop_closure.to);
@@ -121,7 +121,8 @@ int main(int argc, char* argv[]) {
       gtsam::Point3 pos = loop_closure.to_T_from.translation();
       output_file << pos.x() << "," << pos.y() << "," << pos.z() << ",";
       gtsam::Quaternion quat = loop_closure.to_T_from.rotation().toQuaternion();
-      output_file << quat.w() << ", " << quat.x() << "," << pos.y() << "," << pos.z();
+      output_file << quat.w() << ", " << quat.x() << "," << quat.y() << "," << quat.z() <<",";
+      output_file << (loop_closure.dsg ? 1 : 0);
       output_file << std::endl;
     }
   }

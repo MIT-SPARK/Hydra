@@ -29,6 +29,7 @@ struct LoopClosureLog {
   gtsam::Symbol from;
   gtsam::Symbol to;
   gtsam::Pose3 to_T_from;
+  bool dsg;
 };
 
 class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {

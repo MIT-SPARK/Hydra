@@ -372,7 +372,7 @@ void DsgBackend::logIncrementalLoopClosures(const PoseGraph& msg) {
     gtsam::Pose3 pose = kimera_pgmo::RosToGtsam(edge.pose);
     const gtsam::Symbol from_key(robot_prefix_, edge.key_from);
     const gtsam::Symbol to_key(robot_prefix_, edge.key_to);
-    loop_closures_.push_back({from_key, to_key, pose});
+    loop_closures_.push_back({from_key, to_key, pose, false});
   }
 }
 
@@ -559,7 +559,7 @@ bool DsgBackend::addInternalLCDToDeformationGraph() {
     to_key = to_attrs.external_key;
 
     deformation_graph_->addNewBetween(from_key, to_key, result.to_T_from);
-    loop_closures_.push_back({from_key, to_key, result.to_T_from});
+    loop_closures_.push_back({from_key, to_key, result.to_T_from, true});
     added_new_loop_closure = true;
     num_loop_closures_++;
     have_loopclosures_ = true;
