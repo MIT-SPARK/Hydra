@@ -9,6 +9,7 @@ enum class DescriptorScoreType { COSINE, L1 };
 struct DescriptorMatchConfig {
   LayerId layer;
   float min_score;
+  float min_registration_score;
   DescriptorScoreType type = DescriptorScoreType::COSINE;
 };
 

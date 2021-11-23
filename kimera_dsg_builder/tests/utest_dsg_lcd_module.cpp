@@ -29,11 +29,11 @@ struct DsgLcdModuleTests : public ::testing::Test {
     object_registration.reset(new ObjectRegistrationFunctor(reg_config, teaser_params));
     places_registration.reset(new PlaceRegistrationFunctor(reg_config, teaser_params));
 
-    config.agent_search_config = {KimeraDsgLayers::AGENTS, 0.8};
+    config.agent_search_config = {KimeraDsgLayers::AGENTS, 0.8, 0.8};
     config.search_configs.push_back(
-        DescriptorMatchConfig{KimeraDsgLayers::OBJECTS, 0.8});
+        DescriptorMatchConfig{KimeraDsgLayers::OBJECTS, 0.8, 0.8});
     config.search_configs.push_back(
-        DescriptorMatchConfig{KimeraDsgLayers::PLACES, 0.8});
+        DescriptorMatchConfig{KimeraDsgLayers::PLACES, 0.8, 0.8});
 
     descriptor_factories[KimeraDsgLayers::OBJECTS] =
         [&](const DynamicSceneGraph& graph, const DynamicSceneGraphNode& node) {

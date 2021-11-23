@@ -17,7 +17,9 @@ std::optional<uint64_t> getTimeNs(const kimera::DynamicSceneGraph& graph, gtsam:
   kimera::NodeSymbol node(key.chr(), key.index());
   if (!graph.hasNode(node)) {
     LOG(ERROR) << "Missing node << " << node.getLabel() << "when logging loop closure";
+    return std::nullopt;
   }
+
   return graph.getDynamicNode(node).value().get().timestamp.count();
 }
 
