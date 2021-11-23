@@ -347,15 +347,14 @@ void DsgBackend::runDsgUpdater() {
     bool have_frontend_updates = shared_dsg_->updated;
     if (have_frontend_updates) {
       {  // start joint critical section
-        std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
         std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
+        std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
         private_dsg_->graph->mergeGraph(*shared_dsg_->graph);
         *private_dsg_->latest_places = *shared_dsg_->latest_places;
         if (dsg_log_) {
           backend_graph_logger_.logGraph(private_dsg_->graph);
         }
       }  // end joint critical section
-      shared_dsg_->updated = false;
       private_dsg_->updated = true;
       have_dsg_updates_ = true;
     }
@@ -594,26 +593,24 @@ void DsgBackend::updateDsgMesh() {
   std::unique_ptr<ScopedTimer> timer;
 
   pcl::PolygonMesh opt_mesh;
-  {  // pgmo critical section
-    std::unique_lock<std::mutex> lock(pgmo_mutex_);
-    if (!latest_mesh_) {
-      return;
-    }
+  if (!latest_mesh_) {
+    return;
+  }
 
-    if (!have_new_mesh_) {
-      return;
-    }
+  if (!have_new_mesh_) {
+    return;
+  }
 
-    timer.reset(new ScopedTimer("pgmo/mesh_update"));
-    auto input_mesh = kimera_pgmo::TriangleMeshMsgToPolygonMesh(latest_mesh_->mesh);
-    have_new_mesh_ = false;
+  timer.reset(new ScopedTimer("pgmo/mesh_update"));
+  auto input_mesh =
+      kimera_pgmo::TriangleMeshMsgToPolygonMesh(latest_mesh_->mesh);
+  have_new_mesh_ = false;
 
-    if (input_mesh.cloud.height * input_mesh.cloud.width == 0) {
-      return;
-    }
+  if (input_mesh.cloud.height * input_mesh.cloud.width == 0) {
+    return;
+  }
 
-    opt_mesh = deformation_graph_->deformMesh(input_mesh, robot_vertex_prefix_);
-  }  // pgmo critical section
+  opt_mesh = deformation_graph_->deformMesh(input_mesh, robot_vertex_prefix_);
 
   {  // start graph update critical section
     std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
@@ -629,6 +626,7 @@ void DsgBackend::updateDsgMesh() {
 }
 
 void DsgBackend::optimize() {
+  std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
   if (add_places_to_deformation_graph_) {
     {  // start dsg mutex critical section
       std::unique_lock<std::mutex> graph_lock(shared_dsg_->mutex);
