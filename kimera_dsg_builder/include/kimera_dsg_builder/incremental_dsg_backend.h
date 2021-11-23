@@ -154,6 +154,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   double places_merge_pos_threshold_m_;
   double places_merge_distance_tolerance_m_;
   std::list<LayerUpdateFunc> dsg_update_funcs_;
+  SceneGraphLayer shared_places_copy_;
 
   std::atomic<bool> have_loopclosures_;
 

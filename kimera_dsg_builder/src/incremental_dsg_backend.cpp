@@ -98,6 +98,7 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
       nh_(nh),
       shared_dsg_(dsg),
       private_dsg_(backend_dsg),
+      shared_places_copy_(KimeraDsgLayers::PLACES),
       robot_id_(0),
       add_places_to_deformation_graph_(true),
       optimize_on_lc_(true),
@@ -330,6 +331,18 @@ void DsgBackend::updatePrivateDsg() {
       std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
       private_dsg_->graph->mergeGraph(*shared_dsg_->graph);
       *private_dsg_->latest_places = *shared_dsg_->latest_places;
+
+      if (shared_dsg_->graph->hasLayer(KimeraDsgLayers::PLACES)) {
+        const SceneGraphLayer& shared_places =
+            *(shared_dsg_->graph->getLayer(KimeraDsgLayers::PLACES));
+        shared_places_copy_.mergeLayer(shared_places);
+        std::vector<NodeId> removed_place_nodes;
+        shared_places.getRemovedNodes(&removed_place_nodes);
+        for (const auto& place_id : removed_place_nodes) {
+          shared_places_copy_.removeNode(place_id);
+        }
+      }
+
       if (dsg_log_) {
         backend_graph_logger_.logGraph(private_dsg_->graph);
       }
@@ -429,6 +442,7 @@ void DsgBackend::runPgmo() {
         ScopedTimer optimize_timer("pgmo/optimize");
         optimize();
       } else if (call_update_periodically_) {
+        std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
         updateDsgMesh();
         callUpdateFunctions();
       }
@@ -495,11 +509,7 @@ bool DsgBackend::saveTrajectoryCallback(std_srvs::Empty::Request&,
 }
 
 void DsgBackend::addPlacesToDeformationGraph() {
-  CHECK(shared_dsg_->graph->hasLayer(KimeraDsgLayers::PLACES));
-  const SceneGraphLayer& places =
-      *(shared_dsg_->graph->getLayer(KimeraDsgLayers::PLACES));
-
-  if (places.nodes().empty()) {
+  if (shared_places_copy_.nodes().empty()) {
     LOG(WARNING) << "Attempting to add places to deformation graph with empty "
                     "places layer";
     return;
@@ -507,9 +517,10 @@ void DsgBackend::addPlacesToDeformationGraph() {
 
   deformation_graph_->clearTemporaryStructures();
 
-  MinimumSpanningTreeInfo mst_info = getMinimumSpanningEdges(places);
+  MinimumSpanningTreeInfo mst_info =
+      getMinimumSpanningEdges(shared_places_copy_);
 
-  for (const auto& id_node_pair : places.nodes()) {
+  for (const auto& id_node_pair : shared_places_copy_.nodes()) {
     const auto& node = *id_node_pair.second;
     const auto& attrs = node.attributes<PlaceNodeAttributes>();
 
@@ -529,8 +540,10 @@ void DsgBackend::addPlacesToDeformationGraph() {
   }
 
   for (const auto& edge : mst_info.edges) {
-    gtsam::Pose3 source(gtsam::Rot3(), places.getPosition(edge.source));
-    gtsam::Pose3 target(gtsam::Rot3(), places.getPosition(edge.target));
+    gtsam::Pose3 source(gtsam::Rot3(),
+                        shared_places_copy_.getPosition(edge.source));
+    gtsam::Pose3 target(gtsam::Rot3(),
+                        shared_places_copy_.getPosition(edge.target));
     deformation_graph_->addNewTempBetween(
         edge.source, edge.target, source.between(target));
   }
@@ -605,10 +618,7 @@ void DsgBackend::updateDsgMesh() {
 void DsgBackend::optimize() {
   std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
   if (add_places_to_deformation_graph_) {
-    {  // start dsg mutex critical section
-      std::unique_lock<std::mutex> graph_lock(shared_dsg_->mutex);
-      addPlacesToDeformationGraph();
-    }  // end dsg mutex critical section
+    addPlacesToDeformationGraph();
   }
 
   {  // timer scope
