@@ -97,6 +97,9 @@ target_link_libraries(${PROJECT_NAME}_batch_node ${PROJECT_NAME})
 add_executable(${PROJECT_NAME}_incremental_node src/incremental_dsg_builder_node.cpp)
 target_link_libraries(${PROJECT_NAME}_incremental_node ${PROJECT_NAME})
 
+add_executable(dsg_visualizer_node src/dsg_visualizer_node.cpp)
+target_link_libraries(dsg_visualizer_node ${PROJECT_NAME} yaml-cpp)
+
 add_executable(room_visualizer_node src/room_visualizer_node.cpp)
 target_link_libraries(room_visualizer_node ${PROJECT_NAME} yaml-cpp)
 
