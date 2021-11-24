@@ -1,4 +1,5 @@
 #include "kimera_dsg_builder/dsg_lcd_registration.h"
+#include "kimera_dsg_builder/timing_utilities.h"
 #include <kimera_vio_ros/LcdFrameRegistration.h>
 #include <ros/service.h>
 #include <tf2_eigen/tf2_eigen.h>
@@ -118,6 +119,7 @@ ObjectRegistrationFunctor::ObjectRegistrationFunctor(
 
 DsgRegistrationSolution ObjectRegistrationFunctor::
 operator()(SharedDsgInfo& dsg, const LayerSearchResults& match, NodeId query_agent_id) {
+  ScopedTimer timer("lcd/register_object", true, 2, false);
   if (match.query_nodes.size() <= 3 || match.match_nodes.size() <= 3) {
     return {};
   }
@@ -143,6 +145,7 @@ inline size_t getFrameIdFromNode(const DynamicSceneGraph& graph, NodeId node_id)
 DsgRegistrationSolution registerAgentMatch(incremental::SharedDsgInfo& dsg,
                                            const LayerSearchResults& match,
                                            NodeId) {
+  ScopedTimer timer("lcd/register_agent", true, 2, false);
   if (match.query_nodes.empty() || match.match_nodes.empty()) {
     return {};
   }

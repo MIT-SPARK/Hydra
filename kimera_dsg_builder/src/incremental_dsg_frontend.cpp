@@ -184,8 +184,8 @@ void DsgFrontend::runMeshFrontend() {
     // let the places thread start working on queued messages
     last_mesh_timestamp_ = msg->header.stamp.toNSec();
 
-    { // start timing scope
-    ScopedTimer timer("frontend/mesh_compression", true, 1, false);
+    {  // start timing scope
+      ScopedTimer timer("frontend/mesh_compression", true, 1, false);
 
       mesh_frontend_ros_queue_->callAvailable(ros::WallDuration(0.0));
       mesh_frontend_.voxbloxCallback(msg);
@@ -199,7 +199,7 @@ void DsgFrontend::runMeshFrontend() {
 
         spin_rate.sleep();
       }
-    } // end timing scope
+    }  // end timing scope
 
     // inform the mesh callback we can accept more meshes
     {  // start mesh critical region
@@ -453,9 +453,11 @@ void DsgFrontend::addAgentPlaceEdges() {
   }
 }
 
-float readMatchScore(ros::NodeHandle nh, double default_value) {
+float readMatchScore(ros::NodeHandle nh,
+                     const std::string& name,
+                     double default_value) {
   double min_score;
-  nh.param<double>("min_score", min_score, default_value);
+  nh.param<double>(name, min_score, default_value);
   return static_cast<float>(min_score);
 }
 
@@ -527,20 +529,26 @@ lcd::DsgLcdConfig DsgFrontend::initializeLcdStructures() {
   ros::NodeHandle agent_nh(lcd_nh, "agent");
   lcd::DsgLcdConfig config;
   config.agent_search_config.layer = KimeraDsgLayers::AGENTS;
-  config.agent_search_config.min_score = readMatchScore(agent_nh, 0.8);
+  config.agent_search_config.min_score = readMatchScore(agent_nh, "min_score", 0.1);
+  config.agent_search_config.min_registration_score =
+      config.agent_search_config.min_score;
   config.agent_search_config.type = readScoreType(agent_nh);
 
   ros::NodeHandle object_nh(lcd_nh, "object");
   lcd::DescriptorMatchConfig object_config;
   object_config.layer = KimeraDsgLayers::OBJECTS;
-  object_config.min_score = readMatchScore(object_nh, 0.8);
+  object_config.min_score = readMatchScore(object_nh, "min_score", 0.8);
+  object_config.min_registration_score =
+      readMatchScore(object_nh, "min_registration_score", 0.8);
   object_config.type = readScoreType(object_nh);
   config.search_configs.push_back(object_config);
 
   ros::NodeHandle place_nh(lcd_nh, "place");
   lcd::DescriptorMatchConfig place_config;
   place_config.layer = KimeraDsgLayers::PLACES;
-  place_config.min_score = readMatchScore(place_nh, 0.8);
+  place_config.min_score = readMatchScore(place_nh, "min_score", 0.8);
+  place_config.min_registration_score =
+      readMatchScore(place_nh, "min_registration_score", 0.8);
   place_config.type = readScoreType(place_nh);
   config.search_configs.push_back(place_config);
   return config;
@@ -613,7 +621,7 @@ std::optional<NodeId> DsgFrontend::getLatestAgentId() {
 void DsgFrontend::runLcd() {
   std::optional<NodeId> last_agent_id;
 
-  ros::Rate r(10);
+  ros::Rate r(30);
   while (ros::ok() && !should_shutdown_) {
     assignBowVectors();
 

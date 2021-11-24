@@ -203,15 +203,17 @@ TEST(DsgInterpolationTests, BuildingUpdate) {
 TEST(DsgInterpolationTests, PlaceUpdate) {
   const LayerId place_layer = KimeraDsgLayers::PLACES;
   DynamicSceneGraph graph;
-  graph.emplaceNode(place_layer,
-                    NodeSymbol('p', 0),
-                    std::make_unique<NodeAttributes>(Eigen::Vector3d(1.0, 2.0, 3.0)));
-  graph.emplaceNode(place_layer,
-                    NodeSymbol('p', 5),
-                    std::make_unique<NodeAttributes>(Eigen::Vector3d(1.0, 2.0, 3.0)));
-  graph.emplaceNode(place_layer,
-                    NodeSymbol('p', 6),
-                    std::make_unique<NodeAttributes>(Eigen::Vector3d(1.0, 2.0, 3.0)));
+  auto attrs1 = std::make_unique<PlaceNodeAttributes>(0.0, 0.0);
+  attrs1->position = Eigen::Vector3d(1.0, 2.0, 3.0);
+  graph.emplaceNode(place_layer, NodeSymbol('p', 0), std::move(attrs1));
+
+  auto attrs2 = std::make_unique<PlaceNodeAttributes>(0.0, 0.0);
+  attrs2->position = Eigen::Vector3d(1.0, 2.0, 3.0);
+  graph.emplaceNode(place_layer, NodeSymbol('p', 5), std::move(attrs2));
+
+  auto attrs3 = std::make_unique<PlaceNodeAttributes>(0.0, 0.0);
+  attrs3->position = Eigen::Vector3d(1.0, 2.0, 3.0);
+  graph.emplaceNode(place_layer, NodeSymbol('p', 6), std::move(attrs3));
 
   gtsam::Values values;
   values.insert(NodeSymbol('p', 0),
@@ -220,7 +222,7 @@ TEST(DsgInterpolationTests, PlaceUpdate) {
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
   gtsam::Values pgmo_values;
-  dsg_updates::updatePlaces(graph, values, pgmo_values, false);
+  dsg_updates::updatePlaces(graph, values, pgmo_values, false, 0.0, 0.0);
 
   {  // first key exists: new value
     Eigen::Vector3d expected(4.0, 5.0, 6.0);
@@ -270,7 +272,7 @@ TEST(DsgInterpolationTests, PlaceUpdateMerge) {
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
   gtsam::Values pgmo_values;
-  dsg_updates::updatePlaces(graph, values, pgmo_values, true);
+  dsg_updates::updatePlaces(graph, values, pgmo_values, true, 0.4, 0.3);
 
   // {  // first key exists: new value
   //   Eigen::Vector3d expected(4.0, 5.0, 6.0);
