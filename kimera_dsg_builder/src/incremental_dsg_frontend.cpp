@@ -621,7 +621,7 @@ std::optional<NodeId> DsgFrontend::getLatestAgentId() {
 void DsgFrontend::runLcd() {
   std::optional<NodeId> last_agent_id;
 
-  ros::Rate r(10);
+  ros::Rate r(30);
   while (ros::ok() && !should_shutdown_) {
     assignBowVectors();
 

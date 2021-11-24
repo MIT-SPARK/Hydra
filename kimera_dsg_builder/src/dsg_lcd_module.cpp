@@ -122,6 +122,10 @@ DsgRegistrationSolution DsgLcdModule::registerAndVerify(
 
     CHECK(match_config_map_.count(idx));
     const LayerSearchResults& match = matches.at(idx);
+    if (match.valid_matches.empty()) {
+      continue;
+    }
+
     if (match.best_score < match_config_map_.at(idx).min_registration_score) {
       continue;
     }
