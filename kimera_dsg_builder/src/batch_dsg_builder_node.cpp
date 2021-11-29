@@ -9,6 +9,8 @@
 
 #include <voxblox/core/common.h>
 
+#include <chrono>
+
 inline bool haveClock() {
   return ros::TopicManager::instance()->getNumPublishers("/clock");
 }
@@ -50,7 +52,15 @@ int main(int argc, char** argv) {
   ROS_INFO("Bag finished, making DSG builder");
   kimera::OfflineDsgBuilder builder(nh, nh_private, tsdf_server);
   ROS_INFO("Starting scene graph construction");
+  auto start = std::chrono::high_resolution_clock::now();
   builder.reconstruct();
+  auto stop = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed_s = stop - start;
+  std::ofstream file;
+  file.open(dsg_output_path + "/batch_timing.csv",
+            std::ofstream::out | std::ofstream::app);
+  file << elapsed_s.count() << "\n";
+  file.close();
   ROS_INFO("Finished scene graph construction");
 
   ROS_WARN("Exiting!");

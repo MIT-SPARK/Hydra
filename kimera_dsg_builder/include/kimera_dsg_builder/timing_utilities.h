@@ -29,7 +29,7 @@ class ElapsedTimeRecorder {
     return *instance_;
   }
 
-  void start(const std::string& timer_name);
+  void start(const std::string& timer_name, const uint64_t& timestamp);
 
   void stop(const std::string& timer_name);
 
@@ -50,21 +50,26 @@ class ElapsedTimeRecorder {
   using TimeList = std::list<std::chrono::nanoseconds>;
   using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
   using TimeMap = std::map<std::string, TimePoint>;
+  using TimeStamps = std::list<uint64_t>;
+  using TimeStamp = std::map<std::string, uint64_t>;
 
   ElapsedTimeRecorder();
 
   static std::unique_ptr<ElapsedTimeRecorder> instance_;
 
   TimeMap starts_;
+  TimeStamp start_stamps_;
   std::map<std::string, TimeList> elapsed_;
+  std::map<std::string, TimeStamps> stamps_;
   std::unique_ptr<std::mutex> mutex_;
 };
 
 class ScopedTimer {
  public:
-  explicit ScopedTimer(const std::string& name);
+  explicit ScopedTimer(const std::string& name, uint64_t timestamp);
 
   ScopedTimer(const std::string& name,
+              uint64_t timestamp,
               bool verbose,
               int verbosity,
               bool elapsed_only = true,

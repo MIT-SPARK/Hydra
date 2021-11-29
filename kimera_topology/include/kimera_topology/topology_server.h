@@ -149,8 +149,8 @@ class TopologyServer {
     }
   }
 
-  void showStats() const {
-    LOG(INFO) << "Timings: " << std::endl << voxblox::timing::Timing::Print();
+  void showStats(const ros::Time& timestamp) const {
+    LOG(INFO) << "Timings: (stamp: " << timestamp.toNSec() << ")" << std::endl << voxblox::timing::Timing::Print();
     const std::string tsdf_memory_str =
         getHumanReadableMemoryString(tsdf_layer_->getMemorySize());
     const std::string gvd_memory_str =
@@ -188,7 +188,7 @@ class TopologyServer {
                            *tsdf_layer_);
 
     if (config_.show_stats) {
-      showStats();
+      showStats(timestamp);
     }
   }
 

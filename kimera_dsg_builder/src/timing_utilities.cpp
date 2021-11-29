@@ -20,7 +20,8 @@ std::ostream& operator<<(std::ostream& out, const ElapsedStatistics& stats) {
 
 ElapsedTimeRecorder::ElapsedTimeRecorder() { mutex_.reset(new std::mutex()); }
 
-void ElapsedTimeRecorder::start(const std::string& timer_name) {
+void ElapsedTimeRecorder::start(const std::string& timer_name,
+                                const uint64_t& timestamp) {
   bool have_start_already = false;
   {  // start critical section
     std::unique_lock<std::mutex> lock(*mutex_);
@@ -28,6 +29,7 @@ void ElapsedTimeRecorder::start(const std::string& timer_name) {
       have_start_already = true;
     } else {
       starts_[timer_name] = std::chrono::high_resolution_clock::now();
+      start_stamps_[timer_name] = timestamp;
     }
   }  // end critical section
 
@@ -50,9 +52,11 @@ void ElapsedTimeRecorder::stop(const std::string& timer_name) {
     } else {
       if (!elapsed_.count(timer_name)) {
         elapsed_[timer_name] = TimeList();
+        stamps_[timer_name] = TimeStamps();
       }
 
       elapsed_[timer_name].push_back(stop_point - starts_.at(timer_name));
+      stamps_[timer_name].push_back(start_stamps_.at(timer_name));
       starts_.erase(timer_name);
     }
   }  // end critical section
@@ -136,6 +140,7 @@ void ElapsedTimeRecorder::logElapsed(const std::string& name,
   std::ofstream output_file;
   output_file.open(output_csv);
   TimeList durations;
+  TimeStamps stamps;
   {  // start critical section
     std::unique_lock<std::mutex> lock(*mutex_);
 
@@ -145,10 +150,14 @@ void ElapsedTimeRecorder::logElapsed(const std::string& name,
     }
 
     durations = elapsed_.at(name);
+    stamps = stamps_.at(name);
   }  // end critical section
-  for (const auto& d : durations) {
-    std::chrono::duration<double> elapsed_s = d;
-    output_file << elapsed_s.count() << "\n";
+  output_file << "timestamp(ns),elapsed(s)\n";
+  TimeList::iterator d_it = durations.begin();
+  TimeStamps::iterator s_it = stamps.begin();
+  for (; d_it != durations.end() && s_it != stamps.end(); ++d_it, ++s_it) {
+    std::chrono::duration<double> elapsed_s = *d_it;
+    output_file << *s_it << "," << elapsed_s.count() << std::endl;
   }
   output_file.close();
 }
@@ -176,6 +185,7 @@ void ElapsedTimeRecorder::logStats(const std::string& output_folder) const {
 }
 
 ScopedTimer::ScopedTimer(const std::string& name,
+                         uint64_t timestamp,
                          bool verbose,
                          int verbosity,
                          bool elapsed_only,
@@ -188,11 +198,11 @@ ScopedTimer::ScopedTimer(const std::string& name,
   if (verbosity_disables_ and !VLOG_IS_ON(verbosity_)) {
     return;
   }
-  ElapsedTimeRecorder::instance().start(name_);
+  ElapsedTimeRecorder::instance().start(name_, timestamp);
 }
 
-ScopedTimer::ScopedTimer(const std::string& name)
-    : ScopedTimer(name, false, 1, true, false) {}
+ScopedTimer::ScopedTimer(const std::string& name, uint64_t timestamp)
+    : ScopedTimer(name, timestamp, false, 1, true, false) {}
 
 ScopedTimer::~ScopedTimer() {
   if (verbosity_disables_ and !VLOG_IS_ON(verbosity_)) {

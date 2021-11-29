@@ -183,9 +183,10 @@ void DsgFrontend::runMeshFrontend() {
 
     // let the places thread start working on queued messages
     last_mesh_timestamp_ = msg->header.stamp.toNSec();
-
-    {  // start timing scope
-      ScopedTimer timer("frontend/mesh_compression", true, 1, false);
+    uint64_t object_timestamp = msg->header.stamp.toNSec();
+    { // start timing scope
+      ScopedTimer timer(
+          "frontend/mesh_compression", last_mesh_timestamp_, true, 1, false);
 
       mesh_frontend_ros_queue_->callAvailable(ros::WallDuration(0.0));
       mesh_frontend_.voxbloxCallback(msg);
@@ -209,7 +210,8 @@ void DsgFrontend::runMeshFrontend() {
     }  // end mesh critical region
 
     {  // timing scope
-      ScopedTimer timer("frontend/object_detection", true, 1, false);
+      ScopedTimer timer(
+          "frontend/object_detection", object_timestamp, true, 1, false);
       segmenter_->detectObjects(dsg_, mesh_frontend_.getActiveFullMeshVertices());
     }
     addPlaceObjectEdges();
@@ -255,7 +257,11 @@ void DsgFrontend::runPlaces() {
     addAgentPlaceEdges();
 
     {
-      ScopedTimer timer("frontend/place_mesh_mapping", true, 1, false);
+      ScopedTimer timer("frontend/place_mesh_mapping",
+                        last_places_timestamp_,
+                        true,
+                        1,
+                        false);
       updatePlaceMeshMapping();
     }
 
@@ -305,7 +311,8 @@ void DsgFrontend::runPlaces() {
 }
 
 void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
-  ScopedTimer timer("frontend/update_places", true, 2, false);
+  ScopedTimer timer(
+      "frontend/update_places", msg->header.stamp.toNSec(), true, 2, false);
   SceneGraphLayer temp_layer(KimeraDsgLayers::PLACES);
   std::unique_ptr<SceneGraphLayer::Edges> edges =
       temp_layer.deserializeLayer(msg->layer_contents);
@@ -389,7 +396,8 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
 }
 
 void DsgFrontend::addPlaceObjectEdges(NodeIdSet* extra_objects_to_check) {
-  ScopedTimer timer("frontend/place_object_edges", true, 2, false);
+  ScopedTimer timer(
+      "frontend/place_object_edges", last_places_timestamp_, true, 2, false);
   {  // start graph update critical section
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
     if (!places_nn_finder_) {
@@ -415,7 +423,8 @@ void DsgFrontend::addPlaceObjectEdges(NodeIdSet* extra_objects_to_check) {
 }
 
 void DsgFrontend::addAgentPlaceEdges() {
-  ScopedTimer timer("frontend/place_agent_edges", true, 2, false);
+  ScopedTimer timer(
+      "frontend/place_agent_edges", last_places_timestamp_, true, 2, false);
   std::unique_lock<std::mutex> lock(dsg_->mutex);
   if (!places_nn_finder_) {
     return;  // haven't received places yet

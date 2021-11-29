@@ -213,6 +213,8 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
   } else {
     ROS_ERROR("DSG Backend logging disabled. ");
   }
+
+  last_timestamp_ = 0;
 }
 
 DsgBackend::~DsgBackend() {
@@ -393,7 +395,7 @@ void DsgBackend::runPgmo() {
   ros::Rate r(2);
   while (ros::ok() && !should_shutdown_) {
     status_.reset();
-    ScopedTimer spin_timer("pgmo/spin");
+    ScopedTimer spin_timer("pgmo/spin", last_timestamp_);
     const size_t prev_loop_closures = num_loop_closures_;
     bool have_graph_updates;
 
@@ -439,7 +441,7 @@ void DsgBackend::runPgmo() {
       std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
       updatePrivateDsg();
       if (have_graph_updates && optimize_on_lc_ && have_loopclosures_) {
-        ScopedTimer optimize_timer("pgmo/optimize");
+        ScopedTimer optimize_timer("pgmo/optimize", last_timestamp_);
         optimize();
       } else if (call_update_periodically_) {
         std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
@@ -472,6 +474,7 @@ void DsgBackend::deformationGraphCallback(const PoseGraph::ConstPtr& msg) {
   } else {
     mergePoseGraphs(*msg, *deformation_graph_updates_);
   }
+  last_timestamp_ = msg->header.stamp.toNSec();
 }
 
 void DsgBackend::poseGraphCallback(const PoseGraph::ConstPtr& msg) {
@@ -595,7 +598,7 @@ void DsgBackend::updateDsgMesh() {
     return;
   }
 
-  timer.reset(new ScopedTimer("pgmo/mesh_update"));
+  timer.reset(new ScopedTimer("pgmo/mesh_update", last_timestamp_));
   std::vector<ros::Time> mesh_vertex_stamps;
   auto input_mesh =
       kimera_pgmo::PgmoMeshMsgToPolygonMesh(*latest_mesh_, &mesh_vertex_stamps);
@@ -628,7 +631,7 @@ void DsgBackend::optimize() {
   }
 
   {  // timer scope
-    ScopedTimer timer("backend/optimization", true, 0, false);
+    ScopedTimer timer("backend/optimization", last_timestamp_, true, 0, false);
     deformation_graph_->optimize();
   }  // timer scope
 
@@ -694,7 +697,8 @@ void DsgBackend::storeUnlabeledPlaces(const ActiveNodeSet active_nodes) {
 
 void DsgBackend::updateRoomsNodes() {
   if (room_finder_) {
-    ScopedTimer timer("backend/room_detection", true, 1, false);
+    ScopedTimer timer(
+        "backend/room_detection", last_timestamp_, true, 1, false);
     ActiveNodeSet active_place_nodes =
         getNodesForRoomDetection(*private_dsg_->latest_places);
     VLOG(3) << "Detecting rooms for " << active_place_nodes.size() << " nodes";

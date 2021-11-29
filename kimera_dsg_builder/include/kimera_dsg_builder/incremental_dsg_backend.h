@@ -133,6 +133,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   char robot_vertex_prefix_;
   kimera_pgmo::Path trajectory_;
   std::vector<ros::Time> timestamps_;
+  std::atomic<uint64_t> last_timestamp_;
   std::queue<size_t> unconnected_nodes_;
   NodeIdSet unlabeled_place_nodes_;
 
