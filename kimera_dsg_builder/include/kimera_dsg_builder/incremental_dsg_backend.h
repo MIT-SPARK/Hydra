@@ -71,7 +71,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   bool setVisualizeFrontend(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
-  void fullMeshCallback(const kimera_pgmo::TriangleMeshIdStamped::ConstPtr& msg);
+  void fullMeshCallback(const kimera_pgmo::KimeraPgmoMesh::ConstPtr& msg);
 
   void deformationGraphCallback(const pose_graph_tools::PoseGraph::ConstPtr& msg);
 
@@ -162,7 +162,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   SemanticNodeAttributes::ColorVector building_color_;
 
-  kimera_pgmo::TriangleMeshIdStamped::ConstPtr latest_mesh_;
+  kimera_pgmo::KimeraPgmoMesh::ConstPtr latest_mesh_;
   pose_graph_tools::PoseGraph::Ptr deformation_graph_updates_;
   pose_graph_tools::PoseGraph::Ptr pose_graph_updates_;
 

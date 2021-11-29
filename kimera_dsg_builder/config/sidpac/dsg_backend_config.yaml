@@ -11,6 +11,8 @@ pgmo:
     run_mode: 0  # kimera_pgmo run mode FULL (required)
     use_msg_time: true
     embed_trajectory_delta_t: 5.0
+    num_interp_pts: 4
+    interp_horizon: 300.0
     rpgo:
         odom_trans_threshold: 0.005
         odom_rot_threshold: 0.001

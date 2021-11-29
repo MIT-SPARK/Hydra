@@ -17,8 +17,8 @@ namespace incremental {
 using kimera_pgmo::DeformationGraph;
 using kimera_pgmo::DeformationGraphPtr;
 using kimera_pgmo::KimeraPgmoInterface;
+using kimera_pgmo::KimeraPgmoMesh;
 using kimera_pgmo::Path;
-using kimera_pgmo::TriangleMeshIdStamped;
 using pose_graph_tools::PoseGraph;
 using Node = SceneGraph::Node;
 
@@ -459,7 +459,7 @@ void DsgBackend::runPgmo() {
   }
 }
 
-void DsgBackend::fullMeshCallback(const TriangleMeshIdStamped::ConstPtr& msg) {
+void DsgBackend::fullMeshCallback(const KimeraPgmoMesh::ConstPtr& msg) {
   std::unique_lock<std::mutex> lock(pgmo_mutex_);
   latest_mesh_ = msg;
   have_new_mesh_ = true;
@@ -596,15 +596,20 @@ void DsgBackend::updateDsgMesh() {
   }
 
   timer.reset(new ScopedTimer("pgmo/mesh_update"));
+  std::vector<ros::Time> mesh_vertex_stamps;
   auto input_mesh =
-      kimera_pgmo::TriangleMeshMsgToPolygonMesh(latest_mesh_->mesh);
+      kimera_pgmo::PgmoMeshMsgToPolygonMesh(*latest_mesh_, &mesh_vertex_stamps);
   have_new_mesh_ = false;
 
   if (input_mesh.cloud.height * input_mesh.cloud.width == 0) {
     return;
   }
 
-  opt_mesh = deformation_graph_->deformMesh(input_mesh, robot_vertex_prefix_);
+  opt_mesh = deformation_graph_->deformMesh(input_mesh,
+                                            mesh_vertex_stamps,
+                                            robot_vertex_prefix_,
+                                            num_interp_pts_,
+                                            interp_horizon_);
 
   private_dsg_->graph->setMeshDirectly(opt_mesh);
   private_dsg_->updated = true;
