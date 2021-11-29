@@ -395,13 +395,13 @@ void DsgBackend::runPgmo() {
   ros::Rate r(2);
   while (ros::ok() && !should_shutdown_) {
     status_.reset();
-    ScopedTimer spin_timer("pgmo/spin", last_timestamp_);
+    ScopedTimer spin_timer("backend/spin", last_timestamp_);
     const size_t prev_loop_closures = num_loop_closures_;
     bool have_graph_updates;
 
     {  // start pgmo critical section
       std::unique_lock<std::mutex> lock(pgmo_mutex_);
-
+      ScopedTimer spin_timer("backend/process_factors", last_timestamp_);
       if (deformation_graph_updates_) {
         status_.new_graph_factors_ = deformation_graph_updates_->edges.size();
         status_.new_factors_ += deformation_graph_updates_->edges.size();
@@ -441,7 +441,6 @@ void DsgBackend::runPgmo() {
       std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
       updatePrivateDsg();
       if (have_graph_updates && optimize_on_lc_ && have_loopclosures_) {
-        ScopedTimer optimize_timer("pgmo/optimize", last_timestamp_);
         optimize();
       } else if (call_update_periodically_) {
         std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
@@ -519,10 +518,15 @@ void DsgBackend::addPlacesToDeformationGraph() {
     return;
   }
 
+  ScopedTimer spin_timer("backend/add_places", last_timestamp_);
+
   deformation_graph_->clearTemporaryStructures();
 
-  MinimumSpanningTreeInfo mst_info =
-      getMinimumSpanningEdges(shared_places_copy_);
+  MinimumSpanningTreeInfo mst_info;
+  {
+    ScopedTimer spin_timer("backend/places_mst", last_timestamp_);
+    mst_info = getMinimumSpanningEdges(shared_places_copy_);
+  }
 
   for (const auto& id_node_pair : shared_places_copy_.nodes()) {
     const auto& node = *id_node_pair.second;
@@ -598,7 +602,7 @@ void DsgBackend::updateDsgMesh() {
     return;
   }
 
-  timer.reset(new ScopedTimer("pgmo/mesh_update", last_timestamp_));
+  timer.reset(new ScopedTimer("backend/mesh_update", last_timestamp_));
   std::vector<ros::Time> mesh_vertex_stamps;
   auto input_mesh =
       kimera_pgmo::PgmoMeshMsgToPolygonMesh(*latest_mesh_, &mesh_vertex_stamps);
@@ -645,6 +649,7 @@ void DsgBackend::optimize() {
 
 void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,
                                      const gtsam::Values& pgmo_values) {
+  ScopedTimer spin_timer("backend/update_layers", last_timestamp_);
   for (const auto& update_func : dsg_update_funcs_) {
     // TODO(nathan) might need diferrent values
     update_func(*private_dsg_->graph, places_values, pgmo_values, enable_node_merging_);
@@ -761,13 +766,14 @@ void DsgBackend::logStatus(bool init) const {
   const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
   const double nan = std::numeric_limits<double>::quiet_NaN();
   file.open(filename, std::ofstream::out | std::ofstream::app);
-  file << status_.total_loop_closures_ << "," << status_.new_loop_closures_ << ","
-       << status_.total_factors_ << "," << status_.total_values_ << ","
+  file << status_.total_loop_closures_ << "," << status_.new_loop_closures_
+       << "," << status_.total_factors_ << "," << status_.total_values_ << ","
        << status_.new_factors_ << "," << status_.new_graph_factors_ << ","
        << status_.trajectory_len_ << ","
-       << timer.getLastElapsed("pgmo/spin").value_or(nan) << ","
-       << timer.getLastElapsed("pgmo/optimize").value_or(nan) << ","
-       << timer.getLastElapsed("pgmo/mesh_update").value_or(nan) << std::endl;
+       << timer.getLastElapsed("backend/spin").value_or(nan) << ","
+       << timer.getLastElapsed("backend/optimization").value_or(nan) << ","
+       << timer.getLastElapsed("backend/mesh_update").value_or(nan)
+       << std::endl;
   file.close();
   return;
 }
