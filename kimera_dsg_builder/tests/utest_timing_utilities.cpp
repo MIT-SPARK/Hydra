@@ -19,7 +19,7 @@ TEST_F(TimingUtilityTests, TestNoMeasurements) {
 }
 
 TEST_F(TimingUtilityTests, TestSingleMeasurement) {
-  ElapsedTimeRecorder::instance().start("test");
+  ElapsedTimeRecorder::instance().start("test", 0);
   EXPECT_FALSE(ElapsedTimeRecorder::instance().getLastElapsed("test"));
   ElapsedTimeRecorder::instance().stop("test");
 
@@ -37,15 +37,15 @@ TEST_F(TimingUtilityTests, TestSingleMeasurement) {
 TEST_F(TimingUtilityTests, TestMultipleMeasurements) {
   using namespace std::chrono_literals;
 
-  ElapsedTimeRecorder::instance().start("test");
+  ElapsedTimeRecorder::instance().start("test", 0);
   std::this_thread::sleep_for(10ms);
   ElapsedTimeRecorder::instance().stop("test");
 
-  ElapsedTimeRecorder::instance().start("test");
+  ElapsedTimeRecorder::instance().start("test", 0);
   std::this_thread::sleep_for(20ms);
   ElapsedTimeRecorder::instance().stop("test");
 
-  ElapsedTimeRecorder::instance().start("test");
+  ElapsedTimeRecorder::instance().start("test", 0);
   std::this_thread::sleep_for(30ms);
   ElapsedTimeRecorder::instance().stop("test");
 
@@ -63,13 +63,13 @@ TEST_F(TimingUtilityTests, TestMultipleMeasurements) {
 TEST_F(TimingUtilityTests, TestScopedTimers) {
   using namespace std::chrono_literals;
 
-  ElapsedTimeRecorder::instance().start("test1");
-  ElapsedTimeRecorder::instance().start("test2");
+  ElapsedTimeRecorder::instance().start("test1", 0);
+  ElapsedTimeRecorder::instance().start("test2", 0);
   {  // timer test3
-    ScopedTimer timer3("test3");
+    ScopedTimer timer3("test3", 0);
 
     {  // timer test 4
-      ScopedTimer timer4("test4");
+      ScopedTimer timer4("test4", 0);
       std::this_thread::sleep_for(2ms);
     }  // timer test 4
 
