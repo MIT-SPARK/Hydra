@@ -20,6 +20,10 @@ struct VoxbloxConfig {
   bool load_mesh;
   double voxel_size;
   size_t voxels_per_side;
+  double min_gvd_distance = 0.05;
+  double min_separation_angle = 0.78;
+  bool generate_by_layer_neighbors = false;
+  size_t num_neighbors_for_edge = 18;
 };
 
 std::optional<VoxbloxConfig> loadVoxbloxConfig(const ros::NodeHandle& nh);

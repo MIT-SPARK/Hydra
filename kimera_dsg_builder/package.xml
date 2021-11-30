@@ -31,6 +31,7 @@
   <depend>teaserpp</depend>
   <depend>voxblox</depend>
   <depend>voxblox_ros</depend>
+  <depend>voxblox_skeleton</depend>
   <!-- TODO(nathan) invert this dependency -->
   <!--<depend>graph_cmr_ros</depend> -->
 

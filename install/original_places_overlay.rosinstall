@@ -1,0 +1,4 @@
+- git:
+    local-name: mav_voxblox_planning
+    uri: git@github.com:ToniRV/mav_voxblox_planning_private.git
+    version: fix/voxblox_protobuf_update

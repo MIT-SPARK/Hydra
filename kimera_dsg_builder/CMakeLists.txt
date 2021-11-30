@@ -25,6 +25,7 @@ find_package(
              tf2_eigen
              voxblox
              voxblox_ros
+             voxblox_skeleton
 )
 
 find_package(teaserpp REQUIRED)
@@ -52,6 +53,7 @@ catkin_package(
   tf2_eigen
   voxblox
   voxblox_ros
+  voxblox_skeleton
   DEPENDS
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}
