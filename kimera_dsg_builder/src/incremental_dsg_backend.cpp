@@ -528,32 +528,49 @@ void DsgBackend::addPlacesToDeformationGraph() {
     mst_info = getMinimumSpanningEdges(shared_places_copy_);
   }
 
-  for (const auto& id_node_pair : shared_places_copy_.nodes()) {
-    const auto& node = *id_node_pair.second;
-    const auto& attrs = node.attributes<PlaceNodeAttributes>();
+  {
+    ScopedTimer spin_timer("backend/add_places_nodes", last_timestamp_);
 
-    gtsam::Pose3 curr_pose(gtsam::Rot3(), attrs.position);
-    deformation_graph_->addNewTempNode(node.id, curr_pose, false);
+    std::vector<gtsam::Key> place_nodes;
+    std::vector<gtsam::Pose3> place_node_poses;
+    std::vector<std::vector<size_t>> place_node_valences;
 
-    if (!mst_info.leaves.count(node.id)) {
-      continue;
+    for (const auto& id_node_pair : shared_places_copy_.nodes()) {
+      const auto& node = *id_node_pair.second;
+      const auto& attrs = node.attributes<PlaceNodeAttributes>();
+
+      place_nodes.push_back(node.id);
+      place_node_poses.push_back(gtsam::Pose3(gtsam::Rot3(), attrs.position));
+
+      if (mst_info.leaves.count(node.id)) {
+        place_node_valences.push_back(attrs.pcl_mesh_connections);
+      } else {
+        place_node_valences.push_back(std::vector<size_t>{});
+      }
     }
 
-    if (attrs.pcl_mesh_connections.empty()) {
-      continue;
-    }
-
-    deformation_graph_->addTempNodeValence(
-        node.id, attrs.pcl_mesh_connections, robot_vertex_prefix_);
+    deformation_graph_->addNewTempNodesValences(place_nodes,
+                                                place_node_poses,
+                                                place_node_valences,
+                                                robot_vertex_prefix_,
+                                                false);
   }
 
-  for (const auto& edge : mst_info.edges) {
-    gtsam::Pose3 source(gtsam::Rot3(),
-                        shared_places_copy_.getPosition(edge.source));
-    gtsam::Pose3 target(gtsam::Rot3(),
-                        shared_places_copy_.getPosition(edge.target));
-    deformation_graph_->addNewTempBetween(
-        edge.source, edge.target, source.between(target));
+  {
+    ScopedTimer spin_timer("backend/add_places_between", last_timestamp_);
+    PoseGraph mst_edges;
+    for (const auto& edge : mst_info.edges) {
+      gtsam::Pose3 source(gtsam::Rot3(),
+                          shared_places_copy_.getPosition(edge.source));
+      gtsam::Pose3 target(gtsam::Rot3(),
+                          shared_places_copy_.getPosition(edge.target));
+      pose_graph_tools::PoseGraphEdge mst_e;
+      mst_e.key_from = edge.source;
+      mst_e.key_to = edge.target;
+      mst_e.pose = kimera_pgmo::GtsamToRos(source.between(target));
+      mst_edges.edges.push_back(mst_e);
+    }
+    deformation_graph_->addNewTempEdges(mst_edges);
   }
 }
 
