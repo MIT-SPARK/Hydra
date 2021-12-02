@@ -13,7 +13,8 @@ inline bool haveClock() {
   return ros::TopicManager::instance()->getNumPublishers("/clock");
 }
 
-std::optional<uint64_t> getTimeNs(const kimera::DynamicSceneGraph& graph, gtsam::Symbol key) {
+std::optional<uint64_t> getTimeNs(const kimera::DynamicSceneGraph& graph,
+                                  gtsam::Symbol key) {
   kimera::NodeSymbol node(key.chr(), key.index());
   if (!graph.hasNode(node)) {
     LOG(ERROR) << "Missing node << " << node.getLabel() << "when logging loop closure";
@@ -40,8 +41,87 @@ void spinUntilBagFinished() {
 
   ros::spinOnce();  // make sure all the callbacks are processed
   ROS_WARN("Exiting!");
-  ros::shutdown();
 }
+
+namespace kimera {
+
+void checkAllAgentFrames(SharedDsgInfo& dsg) {
+  size_t num_found = 0;
+
+  const DynamicSceneGraph& graph = *dsg.graph;
+  const double window_size_s = 10.0;
+  const DynamicSceneGraphLayer& layer =
+      graph.getDynamicLayer(KimeraDsgLayers::AGENTS, 'a').value();
+  for (const auto& node : layer.nodes()) {
+    lcd::Descriptor::Ptr desc = lcd::makeAgentDescriptor(graph, *node);
+    if (!desc) {
+      LOG(ERROR) << "agent without a parent: " << NodeSymbol(node->id).getLabel();
+      continue;
+    }
+
+    VLOG(5) << "node has " << desc->words.rows() << " words and " << desc->values.rows()
+            << " values";
+
+    float best_score = 0.0f;
+
+    float mean_score = 0.0f;
+    size_t num_search = 0;
+    std::optional<NodeId> best_node = std::nullopt;
+    for (const auto& other_node : layer.nodes()) {
+      if (node->id <= other_node->id) {
+        continue;
+      }
+
+      std::chrono::duration<double> timestamp_diff_s =
+          node->timestamp - other_node->timestamp;
+      if (std::abs(timestamp_diff_s.count()) < window_size_s) {
+        continue;
+      }
+
+      lcd::Descriptor::Ptr other_desc = lcd::makeAgentDescriptor(graph, *other_node);
+      if (!other_desc) {
+        continue;
+      }
+
+      auto score =
+          lcd::computeDescriptorScore(*desc, *other_desc, lcd::DescriptorScoreType::L1);
+      mean_score += score;
+      num_search++;
+      if (score > best_score) {
+        best_score = score;
+        best_node = other_node->id;
+      }
+    }
+
+    if (!best_node) {
+      LOG(ERROR) << "Failed to find match for node " << NodeSymbol(node->id).getLabel()
+                 << ". Average score: " << mean_score / num_search << " with "
+                 << num_search << " searched";
+      continue;
+    }
+
+    VLOG(5) << "Found at least one match for " << NodeSymbol(node->id).getLabel()
+            << " with average score: " << mean_score / num_search;
+
+    lcd::LayerSearchResults match{*best_node,
+                                  best_score,
+                                  {*best_node},
+                                  desc->nodes,
+                                  {*best_node},
+                                  desc->root_node,
+                                  0};
+
+    auto solution = registerAgentMatch(dsg, match, 0);
+    if (solution.valid) {
+      num_found++;
+    }
+  }
+
+  LOG(INFO) << "Of " << layer.numNodes() << " nodes, found " << num_found
+            << " valid registrations";
+}
+
+}  // namespace kimera
 
 int main(int argc, char* argv[]) {
   ros::init(argc, argv, "incremental_dsg_builder_node");
@@ -92,6 +172,9 @@ int main(int argc, char* argv[]) {
         LOG(ERROR) << "Saving trajectory failed: " << e.what();
       }
     }
+
+    frontend.stop();
+    backend.stop();
     loop_closures = backend.getLoopClosures();
   }
 
@@ -113,24 +196,28 @@ int main(int argc, char* argv[]) {
     std::ofstream output_file;
     output_file.open(output_csv);
 
-    output_file << "time_from_ns,time_to_ns,x,y,z,qw,qx,qy,qz,type" << std::endl;
+    output_file << "time_from_ns,time_to_ns,x,y,z,qw,qx,qy,qz,type,level" << std::endl;
     for (const auto& loop_closure : loop_closures) {
-      auto time_from = getTimeNs(*frontend_dsg->graph, loop_closure.from);
-      auto time_to = getTimeNs(*frontend_dsg->graph, loop_closure.to);
+      // pose = src.between(dest) or to_T_from
+      auto time_from = getTimeNs(*frontend_dsg->graph, loop_closure.dest);
+      auto time_to = getTimeNs(*frontend_dsg->graph, loop_closure.src);
       if (!time_from || !time_to) {
         continue;
       }
+
       output_file << *time_from << "," << *time_to << ",";
-      gtsam::Point3 pos = loop_closure.to_T_from.translation();
+      gtsam::Point3 pos = loop_closure.src_T_dest.translation();
       output_file << pos.x() << "," << pos.y() << "," << pos.z() << ",";
-      gtsam::Quaternion quat = loop_closure.to_T_from.rotation().toQuaternion();
-      output_file << quat.w() << ", " << quat.x() << "," << quat.y() << "," << quat.z() <<",";
-      output_file << (loop_closure.dsg ? 1 : 0);
+      gtsam::Quaternion quat = loop_closure.src_T_dest.rotation().toQuaternion();
+      output_file << quat.w() << ", " << quat.x() << "," << quat.y() << "," << quat.z()
+                  << ",";
+      output_file << (loop_closure.dsg ? 1 : 0) << "," << loop_closure.level;
       output_file << std::endl;
     }
   }
 
+  //kimera::checkAllAgentFrames(*frontend_dsg);
+  //LOG(INFO) << "During run: " << loop_closures.size() << " loop closures were found";
+
   return 0;
 }
-
-

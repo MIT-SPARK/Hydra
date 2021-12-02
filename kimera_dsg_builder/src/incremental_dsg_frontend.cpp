@@ -31,26 +31,32 @@ DsgFrontend::DsgFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& ds
   }
 }
 
-DsgFrontend::~DsgFrontend() {
+void DsgFrontend::stop() {
+  lcd_shutting_down_ = true;
+  if (lcd_thread_) {
+    VLOG(2) << "[DSG Frontend] joining lcd thread";
+    lcd_thread_->join();
+    lcd_thread_.reset();
+    VLOG(2) << "[DSG Frontend] joined lcd thread";
+  }
+
   should_shutdown_ = true;
   if (mesh_frontend_thread_) {
     VLOG(2) << "[DSG Frontend] joining mesh thread";
     mesh_frontend_thread_->join();
+    mesh_frontend_thread_.reset();
     VLOG(2) << "[DSG Frontend] joined mesh thread";
   }
 
   if (places_thread_) {
     VLOG(2) << "[DSG Frontend] joining places thread";
     places_thread_->join();
+    places_thread_.reset();
     VLOG(2) << "[DSG Frontend] joined places thread";
   }
-
-  if (lcd_thread_) {
-    VLOG(2) << "[DSG Frontend] joining lcd thread";
-    lcd_thread_->join();
-    VLOG(2) << "[DSG Frontend] joined lcd thread";
-  }
 }
+
+DsgFrontend::~DsgFrontend() { stop(); }
 
 void DsgFrontend::handleActivePlaces(const PlacesLayerMsg::ConstPtr& msg) {
   std::unique_lock<std::mutex> queue_lock(places_queue_mutex_);
@@ -108,6 +114,8 @@ void DsgFrontend::handleLatestPoseGraph(const PoseGraph::ConstPtr& msg) {
 
     agent_key_map_[pgmo_key] = agent_layer.nodes().size() - 1;
   }
+
+  addAgentPlaceEdges();
 }
 
 void DsgFrontend::handleDbowMsg(const kimera_vio_ros::BowQuery::ConstPtr& msg) {
@@ -123,7 +131,7 @@ void DsgFrontend::start() {
 
   dsg_->graph->createDynamicLayer(KimeraDsgLayers::AGENTS, robot_prefix_);
   pose_graph_sub_ = nh_.subscribe(
-      "pose_graph_incremental", 20, &DsgFrontend::handleLatestPoseGraph, this);
+      "pose_graph_incremental", 100, &DsgFrontend::handleLatestPoseGraph, this);
 
   startMeshFrontend();
   startPlaces();
@@ -159,7 +167,7 @@ void DsgFrontend::startMeshFrontend() {
 }
 
 void DsgFrontend::runMeshFrontend() {
-  ros::Rate r(10);
+  ros::WallRate r(10);
   while (ros::ok() && !should_shutdown_) {
     // identify if the places thread is waiting on a new mesh message
     PlacesQueueState state = getPlacesQueueState();
@@ -184,7 +192,7 @@ void DsgFrontend::runMeshFrontend() {
     // let the places thread start working on queued messages
     last_mesh_timestamp_ = msg->header.stamp.toNSec();
     uint64_t object_timestamp = msg->header.stamp.toNSec();
-    { // start timing scope
+    {  // start timing scope
       ScopedTimer timer(
           "frontend/mesh_compression", last_mesh_timestamp_, true, 1, false);
 
@@ -210,11 +218,18 @@ void DsgFrontend::runMeshFrontend() {
     }  // end mesh critical region
 
     {  // timing scope
-      ScopedTimer timer(
-          "frontend/object_detection", object_timestamp, true, 1, false);
+      ScopedTimer timer("frontend/object_detection", object_timestamp, true, 1, false);
       segmenter_->detectObjects(dsg_, mesh_frontend_.getActiveFullMeshVertices());
     }
-    addPlaceObjectEdges();
+
+    {  // start dsg critical section
+      std::unique_lock<std::mutex> lock(dsg_->mutex);
+      // TODO(nathan) unlike agent-place edges, we can't guarantee that all objects will
+      // be connected to parents inside the dsg critical section (would need to make
+      // detectObjects non-threadsafe / integrate more cleanly)
+      addPlaceObjectEdges();
+    }  // end dsg critical section
+
     dsg_->updated = true;
     r.sleep();
   }
@@ -237,7 +252,7 @@ PlacesQueueState DsgFrontend::getPlacesQueueState() {
 }
 
 void DsgFrontend::runPlaces() {
-  ros::Rate r(10);
+  ros::WallRate r(10);
   while (ros::ok() && !should_shutdown_) {
     PlacesQueueState state = getPlacesQueueState();
     if (state.empty || state.timestamp_ns > last_mesh_timestamp_) {
@@ -254,14 +269,10 @@ void DsgFrontend::runPlaces() {
     }  // end places queue critical section
 
     processLatestPlacesMsg(curr_message);
-    addAgentPlaceEdges();
 
     {
-      ScopedTimer timer("frontend/place_mesh_mapping",
-                        last_places_timestamp_,
-                        true,
-                        1,
-                        false);
+      ScopedTimer timer(
+          "frontend/place_mesh_mapping", last_places_timestamp_, true, 1, false);
       updatePlaceMeshMapping();
     }
 
@@ -370,25 +381,12 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
       }
     }
 
-    // TODO(nathan) use active nodes or copy color before update
-    for (const auto& id_node_pair : places_layer.nodes()) {
-      const auto& node = *id_node_pair.second;
-      if (node.hasParent()) {
-        node.attributes<SemanticNodeAttributes>().color =
-            dsg_->graph->getNode(*node.getParent())
-                .value()
-                .get()
-                .attributes<SemanticNodeAttributes>()
-                .color;
-      } else {
-        node.attributes<SemanticNodeAttributes>().color = NodeColor::Zero();
-      }
-    }
+    addAgentPlaceEdges();
+    addPlaceObjectEdges(&objects_to_check);
 
     *dsg_->latest_places = active_nodes;
   }  // end graph update critical section
 
-  addPlaceObjectEdges(&objects_to_check);
   dsg_->updated = true;
 
   VLOG(3) << "[Places Frontend] Places layer: " << places_layer.numNodes() << " nodes, "
@@ -398,34 +396,30 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
 void DsgFrontend::addPlaceObjectEdges(NodeIdSet* extra_objects_to_check) {
   ScopedTimer timer(
       "frontend/place_object_edges", last_places_timestamp_, true, 2, false);
-  {  // start graph update critical section
-    std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-    if (!places_nn_finder_) {
-      return;  // haven't received places yet
-    }
+  if (!places_nn_finder_) {
+    return;  // haven't received places yet
+  }
 
-    NodeIdSet objects_to_check = segmenter_->getObjectsToCheckForPlaces();
-    if (extra_objects_to_check) {
-      objects_to_check.insert(extra_objects_to_check->begin(),
-                              extra_objects_to_check->end());
-    }
+  NodeIdSet objects_to_check = segmenter_->getObjectsToCheckForPlaces();
+  if (extra_objects_to_check) {
+    objects_to_check.insert(extra_objects_to_check->begin(),
+                            extra_objects_to_check->end());
+  }
 
-    for (const auto& object_id : objects_to_check) {
-      const Eigen::Vector3d object_position = dsg_->graph->getPosition(object_id);
-      places_nn_finder_->find(
-          object_position, 1, false, [&](NodeId place_id, size_t, double) {
-            dsg_->graph->insertEdge(place_id, object_id);
-          });
-    }
+  for (const auto& object_id : objects_to_check) {
+    const Eigen::Vector3d object_position = dsg_->graph->getPosition(object_id);
+    places_nn_finder_->find(
+        object_position, 1, false, [&](NodeId place_id, size_t, double) {
+          dsg_->graph->insertEdge(place_id, object_id);
+        });
+  }
 
-    segmenter_->pruneObjectsToCheckForPlaces(*dsg_->graph);
-  }  // end graph update critical section
+  segmenter_->pruneObjectsToCheckForPlaces(*dsg_->graph);
 }
 
 void DsgFrontend::addAgentPlaceEdges() {
   ScopedTimer timer(
       "frontend/place_agent_edges", last_places_timestamp_, true, 2, false);
-  std::unique_lock<std::mutex> lock(dsg_->mutex);
   if (!places_nn_finder_) {
     return;  // haven't received places yet
   }
@@ -442,9 +436,10 @@ void DsgFrontend::addAgentPlaceEdges() {
     for (size_t i = last_agent_edge_index_[prefix]; i < layer.numNodes(); ++i) {
       places_nn_finder_->find(
           layer.getPositionByIndex(i), 1, false, [&](NodeId place_id, size_t, double) {
-            dsg_->graph->insertEdge(place_id, NodeSymbol(prefix, i));
+            CHECK(dsg_->graph->insertEdge(place_id, NodeSymbol(prefix, i)));
           });
     }
+    last_agent_edge_index_[prefix] = layer.numNodes();
 
     if (!deleted_agent_edge_indices_.count(prefix)) {
       continue;
@@ -453,12 +448,11 @@ void DsgFrontend::addAgentPlaceEdges() {
     for (const auto& node : deleted_agent_edge_indices_[prefix]) {
       places_nn_finder_->find(
           layer.getPosition(node), 1, false, [&](NodeId place_id, size_t, double) {
-            dsg_->graph->insertEdge(place_id, node);
+            CHECK(dsg_->graph->insertEdge(place_id, node));
           });
     }
 
     deleted_agent_edge_indices_.erase(prefix);
-    last_agent_edge_index_[prefix] = layer.numNodes();
   }
 }
 
@@ -496,6 +490,23 @@ size_t readUnsignedParam(ros::NodeHandle nh,
   return static_cast<size_t>(value);
 }
 
+lcd::TeaserParams loadTeaserParams(const ros::NodeHandle& nh) {
+  lcd::TeaserParams params;
+  params.estimate_scaling = false;
+  nh.getParam("noise_bound", params.noise_bound);
+  nh.getParam("cbar2", params.cbar2);
+  nh.getParam("rotation_gnc_factor", params.rotation_gnc_factor);
+  int max_iters = params.rotation_max_iterations;
+  nh.getParam("rotation_max_iterations", max_iters);
+  params.rotation_max_iterations = max_iters;
+  nh.getParam("rotation_cost_threshold", params.rotation_cost_threshold);
+  nh.getParam("kcore_heuristic_threshold", params.kcore_heuristic_threshold);
+  nh.getParam("use_max_clique", params.use_max_clique);
+  nh.getParam("max_clique_exact_solution", params.max_clique_exact_solution);
+  nh.getParam("max_clique_time_limit", params.max_clique_time_limit);
+  return params;
+}
+
 lcd::DsgLcdConfig DsgFrontend::initializeLcdStructures() {
   ros::NodeHandle lcd_nh(nh_, "lcd");
   lcd_nh.param<double>("agent_horizon_s", lcd_agent_horizon_s_, 1.5);
@@ -522,8 +533,11 @@ lcd::DsgLcdConfig DsgFrontend::initializeLcdStructures() {
       readUnsignedParam(lcd_nh, "min_correspondences", reg_config.min_correspondences);
   reg_config.min_inliers =
       readUnsignedParam(lcd_nh, "min_inliers", reg_config.min_inliers);
+  lcd_nh.getParam("log_registration_problem", reg_config.log_registration_problem);
+  reg_config.registration_output_path = log_path_ + "/lcd/";
 
-  lcd::TeaserParams teaser_params;
+  ros::NodeHandle teaser_nh(lcd_nh, "teaser");
+  auto teaser_params = loadTeaserParams(teaser_nh);
   object_lcd_registration_.reset(
       new lcd::ObjectRegistrationFunctor(reg_config, teaser_params));
 
@@ -564,7 +578,7 @@ lcd::DsgLcdConfig DsgFrontend::initializeLcdStructures() {
 }
 
 void DsgFrontend::startLcd() {
-  bow_sub_ = nh_.subscribe("bow_vectors", 1, &DsgFrontend::handleDbowMsg, this);
+  bow_sub_ = nh_.subscribe("bow_vectors", 100, &DsgFrontend::handleDbowMsg, this);
 
   lcd::DsgLcdConfig config = initializeLcdStructures();
 
@@ -600,39 +614,56 @@ void DsgFrontend::startLcd() {
 }
 
 std::optional<NodeId> DsgFrontend::getLatestAgentId() {
-  std::unique_lock<std::mutex> lock(dsg_->mutex);
-  if (!dsg_->graph->hasDynamicLayer(KimeraDsgLayers::AGENTS, robot_prefix_)) {
+  if (lcd_queue_.empty()) {
     return std::nullopt;
   }
 
-  const DynamicSceneGraphLayer& agent_layer =
-      dsg_->graph->getDynamicLayer(KimeraDsgLayers::AGENTS, robot_prefix_).value();
+  bool has_parent;
+  std::chrono::nanoseconds prev_time;
+  {
+    std::unique_lock<std::mutex> lock(dsg_->mutex);
+    const DynamicSceneGraphNode& node =
+        dsg_->graph->getDynamicNode(lcd_queue_.top()).value();
+    prev_time = node.timestamp;
+    has_parent = node.hasParent();
+  }
 
-  if (agent_layer.nodes().empty()) {
+  if (!has_parent) {
+    LOG(ERROR) << "Found agent node without parent: "
+               << NodeSymbol(lcd_queue_.top()).getLabel() << ". Discarding!";
+    lcd_queue_.pop();
     return std::nullopt;
   }
 
-  auto last_time = agent_layer.nodes().back()->timestamp;
-
-  auto iter = agent_layer.nodes().rbegin();
-  while (iter != agent_layer.nodes().rend()) {
-    std::chrono::duration<double> diff_s = last_time - (*iter)->timestamp;
-    if (diff_s.count() >= lcd_agent_horizon_s_) {
-      return (*iter)->id;
-    }
-
-    ++iter;
+  const std::chrono::nanoseconds curr_time(last_places_timestamp_);
+  std::chrono::duration<double> diff_s = curr_time - prev_time;
+  // we consider lcd_shutting_down_ here to make sure we're not waiting on popping from
+  // the LCD queue while not getting new place messages
+  if (!lcd_shutting_down_ && diff_s.count() < lcd_agent_horizon_s_) {
+    return std::nullopt;
   }
 
-  return std::nullopt;
+  const bool forced_pop = (diff_s.count() < lcd_agent_horizon_s_);
+  if (lcd_shutting_down_ && forced_pop) {
+    LOG(ERROR) << "Forcing pop of node " << NodeSymbol(lcd_queue_.top()).getLabel()
+               << " from lcd queue due to shutdown: parent? "
+               << (has_parent ? "yes" : "no") << ", diff: " << diff_s.count() << " / "
+               << lcd_agent_horizon_s_;
+  }
+
+  auto valid_node = lcd_queue_.top();
+  lcd_queue_.pop();
+  return valid_node;
 }
 
 void DsgFrontend::runLcd() {
-  std::optional<NodeId> last_agent_id;
-
-  ros::Rate r(30);
-  while (ros::ok() && !should_shutdown_) {
+  ros::WallRate r(10);
+  while (ros::ok()) {
     assignBowVectors();
+
+    if (lcd_shutting_down_ && lcd_queue_.empty()) {
+      break;
+    }
 
     NodeIdSet archived_places;
     {  // start critical section
@@ -642,7 +673,10 @@ void DsgFrontend::runLcd() {
       archived_places_.clear();
     }  // end critical section
 
-    lcd_module_->updateDescriptorCache(*dsg_, archived_places);
+    if (!archived_places.empty()) {
+      auto curr_time = ros::Time::now();
+      lcd_module_->updateDescriptorCache(*dsg_, archived_places, curr_time.toNSec());
+    }
 
     auto latest_agent_id = getLatestAgentId();
     if (!latest_agent_id) {
@@ -650,13 +684,14 @@ void DsgFrontend::runLcd() {
       continue;
     }
 
-    if (last_agent_id == latest_agent_id) {
-      r.sleep();
-      continue;
-    }
+    uint64_t timestamp;
+    {  // start critical section
+      std::unique_lock<std::mutex> lock(dsg_->mutex);
+      timestamp =
+          dsg_->graph->getDynamicNode(*latest_agent_id).value().get().timestamp.count();
+    }  // end critical section
 
-    auto result = lcd_module_->detect(*dsg_, *latest_agent_id);
-    last_agent_id = latest_agent_id;
+    auto result = lcd_module_->detect(*dsg_, *latest_agent_id, timestamp);
     if (!result.valid) {
       r.sleep();
       continue;
@@ -741,12 +776,14 @@ void DsgFrontend::assignBowVectors() {
     if (agent_key_map_.count(pgmo_key)) {
       const DynamicSceneGraphNode& node =
           agent_layer.getNodeByIndex(agent_key_map_.at(pgmo_key)).value();
-      AgentNodeAttributes& attrs = node.attributes<AgentNodeAttributes>();
+      lcd_queue_.push(node.id);
 
+      AgentNodeAttributes& attrs = node.attributes<AgentNodeAttributes>();
       attrs.dbow_ids = Eigen::Map<const AgentNodeAttributes::BowIdVector>(
           msg->bow_vector.word_ids.data(), msg->bow_vector.word_ids.size());
       attrs.dbow_values = Eigen::Map<const Eigen::VectorXf>(
           msg->bow_vector.word_values.data(), msg->bow_vector.word_values.size());
+
       iter = bow_messages_.erase(iter);
     } else {
       ++iter;

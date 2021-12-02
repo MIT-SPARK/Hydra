@@ -5,7 +5,8 @@
   <arg name="scene_graph_path" value="$(arg scene_graph_dir)/$(arg scene_graph)"/>
 
   <arg name="viz_config_dir" default="$(find kimera_dsg_builder)/config/incremental_visualizer"/>
-  <arg name="visualizer_ns" value="/kimera_dsg_visualizer"/>
+  <arg name="visualizer_ns" default="/kimera_dsg_visualizer"/>
+  <arg name="start_rviz" default="true"/>
 
   <arg name="verbosity" default="0"/>
   <arg name="debug" default="false"/>
@@ -13,7 +14,7 @@
   <arg name="launch-prefix" default="gdb --args" if="$(arg debug)"/>
   <arg name="launch-prefix" default="" unless="$(arg debug)"/>
 
-  <arg name="publish_view_transforms" default="true"/>
+  <arg name="publish_view_transforms" default="$(arg start_rviz)"/>
   <arg name="world_frame" default="world"/>
 
   <include file="$(find kimera_dsg_visualizer)/launch/includes/kimera_dsg_visualizer_params.xml">
@@ -22,7 +23,7 @@
       <arg name="world_frame" default="$(arg world_frame)"/>
   </include>
 
-  <node name="dsg_visualizer_node"
+  <node name="$(anon dsg_visualizer_node)"
         pkg="kimera_dsg_builder"
         type="dsg_visualizer_node"
         output="screen"
@@ -32,7 +33,7 @@
     <param name="scene_graph_input_path" value="$(arg scene_graph_path)"/>
   </node>
 
-  <node name="rviz" pkg="rviz" type="rviz" output="log"
+  <node name="rviz" pkg="rviz" type="rviz" output="log" if="$(arg start_rviz)"
           args="-d $(find kimera_dsg_builder)/rviz/dsg_visualizer.rviz"/>
 
   <group if="$(arg publish_view_transforms)">

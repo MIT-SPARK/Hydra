@@ -39,9 +39,9 @@ visualization_msgs::Marker makeGvdEdgeMarker(
     const GraphExtractor::EdgeInfoMap& edge_info_map,
     const GraphExtractor::NodeIdRootMap& id_root_index_map);
 
-visualization_msgs::Marker makeBlocksMarker(const Layer<TsdfVoxel>& layer);
+visualization_msgs::Marker makeBlocksMarker(const Layer<TsdfVoxel>& layer, double scale);
 
-visualization_msgs::Marker makeBlocksMarker(const Layer<GvdVoxel>& layer);
+visualization_msgs::Marker makeBlocksMarker(const Layer<GvdVoxel>& layer, double scale);
 
 }  // namespace topology
 }  // namespace kimera

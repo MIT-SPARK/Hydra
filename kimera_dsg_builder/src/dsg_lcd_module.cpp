@@ -81,9 +81,11 @@ bool DsgLcdModule::addNewDescriptors(const DynamicSceneGraph& graph,
 
 void DsgLcdModule::updateDescriptorCache(
     SharedDsgInfo& dsg,
-    const std::unordered_set<NodeId>& archived_places) {
-  ScopedTimer timer("lcd/update_descriptors", true, 2, false);
+    const std::unordered_set<NodeId>& archived_places,
+    uint64_t timestamp) {
   std::unique_lock<std::mutex> lock(dsg.mutex);
+
+  ScopedTimer timer("lcd/update_descriptors", timestamp, true, 2, false);
 
   std::set<NodeId> new_agent_nodes;
   for (const auto& place_id : archived_places) {
@@ -110,8 +112,9 @@ void DsgLcdModule::updateDescriptorCache(
 DsgRegistrationSolution DsgLcdModule::registerAndVerify(
     SharedDsgInfo& dsg,
     const std::map<size_t, LayerSearchResults>& matches,
-    NodeId agent_id) const {
-  ScopedTimer timer("lcd/register", true, 2, false);
+    NodeId agent_id,
+    uint64_t timestamp) const {
+  ScopedTimer timer("lcd/register", timestamp, true, 2, false);
   DsgRegistrationSolution registration_result;
 
   size_t idx;
@@ -144,6 +147,7 @@ DsgRegistrationSolution DsgLcdModule::registerAndVerify(
     }
 
     registration_result = registration_funcs_.at(idx)(dsg, match, agent_id);
+    registration_result.level = static_cast<int64_t>(idx);
     if (registration_result.valid) {
       ++idx;  // start validation at next layer up
       break;
@@ -171,8 +175,8 @@ DsgRegistrationSolution DsgLcdModule::registerAndVerify(
   return registration_result;
 }
 
-DsgRegistrationSolution DsgLcdModule::detect(SharedDsgInfo& dsg, NodeId agent_id) {
-  ScopedTimer timer("lcd/detect", true, 2, false);
+DsgRegistrationSolution DsgLcdModule::detect(SharedDsgInfo& dsg, NodeId agent_id, uint64_t timestamp) {
+  ScopedTimer timer("lcd/detect", timestamp, true, 2, false);
   std::set<NodeId> prev_valid_roots;
   for (const auto& id_desc_pair : cache_map_[config_.search_configs.front().layer]) {
     prev_valid_roots.insert(id_desc_pair.first);
@@ -237,7 +241,7 @@ DsgRegistrationSolution DsgLcdModule::detect(SharedDsgInfo& dsg, NodeId agent_id
   VLOG(2) << "===========================================================";
 
   // TODO(nathan) maybe don't call directly
-  return registerAndVerify(dsg, matches, agent_id);
+  return registerAndVerify(dsg, matches, agent_id, timestamp);
 }
 
 }  // namespace lcd

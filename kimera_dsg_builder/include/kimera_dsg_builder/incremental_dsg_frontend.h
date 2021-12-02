@@ -36,6 +36,8 @@ class DsgFrontend {
 
   void start();
 
+  void stop();
+
  private:
   void handleActivePlaces(const PlacesLayerMsg::ConstPtr& msg);
 
@@ -107,6 +109,8 @@ class DsgFrontend {
   SemanticNodeAttributes::ColorVector building_color_;
 
   double lcd_agent_horizon_s_;
+  std::atomic<bool> lcd_shutting_down_{false};
+  std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> lcd_queue_;
   std::unique_ptr<std::thread> lcd_thread_;
   std::unique_ptr<lcd::DsgLcdModule> lcd_module_;
   std::unique_ptr<lcd::ObjectDescriptorFactory> object_lcd_factory_;

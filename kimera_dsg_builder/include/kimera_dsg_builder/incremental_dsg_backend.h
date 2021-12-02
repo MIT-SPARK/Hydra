@@ -26,10 +26,11 @@ void parseParam(const ros::NodeHandle& nh, const std::string& name, T& param) {
 }
 
 struct LoopClosureLog {
-  gtsam::Symbol from;
-  gtsam::Symbol to;
-  gtsam::Pose3 to_T_from;
+  gtsam::Symbol src; // factor edge "source"
+  gtsam::Symbol dest; // factor edge "dest"
+  gtsam::Pose3 src_T_dest; // src_frame.between(dest_frame)
   bool dsg;
+  int64_t level;
 };
 
 class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
@@ -40,7 +41,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
              const SharedDsgInfo::Ptr& dsg,
              const SharedDsgInfo::Ptr& backend_dsg);
 
-  ~DsgBackend();
+  virtual ~DsgBackend();
 
   DsgBackend(const DsgBackend& other) = delete;
 
@@ -52,6 +53,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   virtual bool createPublishers(const ros::NodeHandle&) override { return true; }
 
   virtual bool registerCallbacks(const ros::NodeHandle&) override { return true; }
+
+  void stop();
 
   void start();
 
@@ -87,7 +90,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void runPgmo();
 
-  void updatePrivateDsg();
+  bool updatePrivateDsg();
 
   void addNewAgentPoses();
 

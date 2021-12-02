@@ -18,6 +18,7 @@ struct DsgRegistrationSolution {
   NodeId from_node;
   NodeId to_node;
   gtsam::Pose3 to_T_from;
+  int64_t level;
 };
 
 }  // namespace lcd

@@ -4,15 +4,25 @@ num_semantic_classes: 20
 min_distance_m: 0.5
 max_distance_m: 2.5
 distance_bins: 30
-min_correspondences: 10
+min_correspondences: 7
 min_inliers: 7
 agent:
-    min_score: 0.01
+    min_score: 0.059
     type: "L1"
 object:
-    min_score: 0.2
-    min_registration_score: 0.8
+    min_score: 0.56
+    min_registration_score: 0.95
     type: "L1"
 places:
-    min_score: 0.2
+    min_score: 0.56
     type: "L1"
+teaser:
+    noise_bound: 0.1
+    cbar2: 1.0
+    rotation_gnc_factor: 1.4
+    rotation_max_iterations: 100
+    rotation_cost_threshold: 1.0e-6
+    kcore_heuristic_threshold: 0.5
+    use_max_clique: true
+    max_clique_exact_solution: true
+    max_clique_time_limit: 10

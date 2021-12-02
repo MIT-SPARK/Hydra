@@ -234,6 +234,7 @@ void fillTopologyServerVizConfig(const ros::NodeHandle& nh,
   READ_PARAM(nh, config, topology_marker_ns);
   READ_PARAM(nh, config, show_block_outlines);
   READ_PARAM(nh, config, use_gvd_block_outlines);
+  READ_PARAM(nh, config, outline_scale);
 }
 
 GvdVisualizerConfig getGvdVisualizerConfig(const std::string& ns) {

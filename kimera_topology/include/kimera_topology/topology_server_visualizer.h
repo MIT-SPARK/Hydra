@@ -18,6 +18,7 @@ struct TopologyVisualizerConfig {
   std::string topology_marker_ns = "topology_graph";
   bool show_block_outlines = false;
   bool use_gvd_block_outlines = false;
+  double outline_scale = 0.01;
 
   ColormapConfig colormap;
   GvdVisualizerConfig gvd;

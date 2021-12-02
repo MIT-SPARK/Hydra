@@ -98,7 +98,6 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
       nh_(nh),
       shared_dsg_(dsg),
       private_dsg_(backend_dsg),
-      shared_places_copy_(KimeraDsgLayers::PLACES),
       robot_id_(0),
       add_places_to_deformation_graph_(true),
       optimize_on_lc_(true),
@@ -106,6 +105,7 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
       call_update_periodically_(true),
       places_merge_pos_threshold_m_(0.4),
       places_merge_distance_tolerance_m_(0.3),
+      shared_places_copy_(KimeraDsgLayers::PLACES),
       have_loopclosures_(false),
       have_new_mesh_(false),
       visualizer_should_reset_(false) {
@@ -217,20 +217,30 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
   last_timestamp_ = 0;
 }
 
-DsgBackend::~DsgBackend() {
+void DsgBackend::stop() {
+  LOG(INFO) << "[DSG Backend] stopping!";
   should_shutdown_ = true;
 
   VLOG(2) << "[DSG Backend] joining visualizer thread";
   if (visualizer_thread_) {
     visualizer_thread_->join();
+    visualizer_thread_.reset();
   }
   VLOG(2) << " [DSG Backend] joined visualized thread";
+
+  visualizer_.reset();
 
   VLOG(2) << " [DSG Backend] joining optimizer thread";
   if (optimizer_thread_) {
     optimizer_thread_->join();
+    optimizer_thread_.reset();
   }
-  VLOG(2) << " [DSG Backend] joining optimizer thread";
+  VLOG(2) << " [DSG Backend] joined optimizer thread";
+}
+
+DsgBackend::~DsgBackend() {
+  LOG(INFO) << " [DSG Backend] destructor called!";
+  stop();
 }
 
 void DsgBackend::start() {
@@ -325,7 +335,7 @@ void DsgBackend::runVisualizer() {
   }
 }
 
-void DsgBackend::updatePrivateDsg() {
+bool DsgBackend::updatePrivateDsg() {
   // TODO(Yun) Fix to update with only new changes while ignoring old
   bool have_frontend_updates = shared_dsg_->updated;
   if (have_frontend_updates) {
@@ -351,15 +361,15 @@ void DsgBackend::updatePrivateDsg() {
     }  // end joint critical section
     shared_dsg_->updated = false;
   }
+
+  return have_frontend_updates;
 }
 
 void DsgBackend::startPgmo() {
   full_mesh_sub_ =
       nh_.subscribe("pgmo/full_mesh", 1, &DsgBackend::fullMeshCallback, this);
-  deformation_graph_sub_ = nh_.subscribe("pgmo/mesh_graph_incremental",
-                                         1000,
-                                         &DsgBackend::deformationGraphCallback,
-                                         this);
+  deformation_graph_sub_ = nh_.subscribe(
+      "pgmo/mesh_graph_incremental", 1000, &DsgBackend::deformationGraphCallback, this);
   pose_graph_sub_ = nh_.subscribe(
       "pose_graph_incremental", 1000, &DsgBackend::poseGraphCallback, this);
 
@@ -385,19 +395,21 @@ void DsgBackend::logIncrementalLoopClosures(const PoseGraph& msg) {
     }
 
     gtsam::Pose3 pose = kimera_pgmo::RosToGtsam(edge.pose);
-    const gtsam::Symbol from_key(robot_prefix_, edge.key_from);
-    const gtsam::Symbol to_key(robot_prefix_, edge.key_to);
-    loop_closures_.push_back({from_key, to_key, pose, false});
+    const gtsam::Symbol src_key(robot_prefix_, edge.key_from);
+    const gtsam::Symbol dest_key(robot_prefix_, edge.key_to);
+    // note that pose graph convention is pose = src.between(dest) where the edge
+    // connects frames "to -> from" (i.e. src = to, dest = from, pose = to_T_from)
+    loop_closures_.push_back({src_key, dest_key, pose, false, 0});
   }
 }
 
 void DsgBackend::runPgmo() {
-  ros::Rate r(2);
-  while (ros::ok() && !should_shutdown_) {
+  ros::WallRate r(5);
+  while (ros::ok()) {
     status_.reset();
     ScopedTimer spin_timer("backend/spin", last_timestamp_);
     const size_t prev_loop_closures = num_loop_closures_;
-    bool have_graph_updates;
+    bool have_graph_updates = false;
 
     {  // start pgmo critical section
       std::unique_lock<std::mutex> lock(pgmo_mutex_);
@@ -420,7 +432,7 @@ void DsgBackend::runPgmo() {
         have_graph_updates = true;
       }
 
-      addInternalLCDToDeformationGraph();
+      have_graph_updates |= addInternalLCDToDeformationGraph();
     }  // end pgmo critical section
 
     if (num_loop_closures_ > prev_loop_closures) {
@@ -436,13 +448,14 @@ void DsgBackend::runPgmo() {
     status_.total_factors_ = deformation_graph_->getGtsamFactors().size();
     status_.total_values_ = deformation_graph_->getGtsamValues().size();
 
+    bool have_dsg_updates = false;
     {
       // start private dsg critical section
       std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
-      updatePrivateDsg();
-      if (have_graph_updates && optimize_on_lc_ && have_loopclosures_) {
+      have_dsg_updates = updatePrivateDsg();
+      if (optimize_on_lc_ && (have_graph_updates || have_loopclosures_)) {
         optimize();
-      } else if (call_update_periodically_) {
+      } else if (call_update_periodically_ && have_dsg_updates) {
         std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
         updateDsgMesh();
         callUpdateFunctions();
@@ -454,8 +467,15 @@ void DsgBackend::runPgmo() {
       logStatus();
     }
 
-    updateRoomsNodes();
-    updateBuildingNode();
+    if (have_dsg_updates) {
+      updateRoomsNodes();
+      updateBuildingNode();
+    }
+
+    if (should_shutdown_ && !have_graph_updates && !have_dsg_updates) {
+      break;
+    }
+
     r.sleep();
   }
 }
@@ -596,8 +616,12 @@ bool DsgBackend::addInternalLCDToDeformationGraph() {
                                .attributes<AgentNodeAttributes>();
     to_key = to_attrs.external_key;
 
-    deformation_graph_->addNewBetween(from_key, to_key, result.to_T_from);
-    loop_closures_.push_back({result.from_node, result.to_node, result.to_T_from, true});
+    // note that pose graph convention is pose = src.between(dest) where the edge
+    // connects frames "to -> from" (i.e. src = to, dest = from, pose = to_T_from)
+    deformation_graph_->addNewBetween(to_key, from_key, result.to_T_from);
+    loop_closures_.push_back(
+        {result.to_node, result.from_node, result.to_T_from, true, result.level});
+
     added_new_loop_closure = true;
     num_loop_closures_++;
     have_loopclosures_ = true;
@@ -719,8 +743,7 @@ void DsgBackend::storeUnlabeledPlaces(const ActiveNodeSet active_nodes) {
 
 void DsgBackend::updateRoomsNodes() {
   if (room_finder_) {
-    ScopedTimer timer(
-        "backend/room_detection", last_timestamp_, true, 1, false);
+    ScopedTimer timer("backend/room_detection", last_timestamp_, true, 1, false);
     ActiveNodeSet active_place_nodes =
         getNodesForRoomDetection(*private_dsg_->latest_places);
     VLOG(3) << "Detecting rooms for " << active_place_nodes.size() << " nodes";
@@ -783,14 +806,13 @@ void DsgBackend::logStatus(bool init) const {
   const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
   const double nan = std::numeric_limits<double>::quiet_NaN();
   file.open(filename, std::ofstream::out | std::ofstream::app);
-  file << status_.total_loop_closures_ << "," << status_.new_loop_closures_
-       << "," << status_.total_factors_ << "," << status_.total_values_ << ","
+  file << status_.total_loop_closures_ << "," << status_.new_loop_closures_ << ","
+       << status_.total_factors_ << "," << status_.total_values_ << ","
        << status_.new_factors_ << "," << status_.new_graph_factors_ << ","
        << status_.trajectory_len_ << ","
        << timer.getLastElapsed("backend/spin").value_or(nan) << ","
        << timer.getLastElapsed("backend/optimization").value_or(nan) << ","
-       << timer.getLastElapsed("backend/mesh_update").value_or(nan)
-       << std::endl;
+       << timer.getLastElapsed("backend/mesh_update").value_or(nan) << std::endl;
   file.close();
   return;
 }

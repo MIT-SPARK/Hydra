@@ -38,6 +38,7 @@
     <arg name="pgmo_log_path" default="$(arg dsg_path)/pgmo"/>
     <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
     <arg name="ros_output" value="log" if="$(arg glog_to_file)"/>
+    <arg name="log_registration" default="false"/>
 
     <arg name="use_static_tfs" default="true"/>
     <include file="$(find kimera_dsg_builder)/launch/uhumans2_static_tfs.launch" if="$(arg use_static_tfs)"/>
@@ -77,6 +78,7 @@
         <rosparam file="$(find kimera_dsg_builder)/config/dsg_backend_config.yaml"/>
         <rosparam file="$(arg lcd_config)" ns="lcd"/>
         <param name="dsg/optimize_on_lc" value="$(arg optimize_on_lc)"/>
+        <param name="lcd/log_registration_problem" value="$(arg log_registration)"/>
 
         <param name="pgmo/log_path" value="$(arg pgmo_log_path)"/>
         <param name="pgmo/log_output" value="$(arg pgmo_should_log)"/>

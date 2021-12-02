@@ -284,7 +284,7 @@ void fillMarkerFromBlock(Marker& marker,
 }
 
 template <typename LayerType>
-Marker makeBlocksMarkerImpl(const LayerType& layer) {
+Marker makeBlocksMarkerImpl(const LayerType& layer, double scale) {
   Marker marker;
   marker.type = Marker::LINE_LIST;
   marker.action = Marker::ADD;
@@ -293,9 +293,9 @@ Marker makeBlocksMarkerImpl(const LayerType& layer) {
   marker.color.g = 0.0313;
   marker.color.b = 0.7607;
   marker.color.a = 0.8;
-  marker.scale.x = 0.01;
-  marker.scale.y = 0.01;
-  marker.scale.z = 0.01;
+  marker.scale.x = scale;
+  marker.scale.y = scale;
+  marker.scale.z = scale;
 
   Eigen::Vector3d identity_pos = Eigen::Vector3d::Zero();
   tf2::convert(identity_pos, marker.pose.position);
@@ -313,12 +313,12 @@ Marker makeBlocksMarkerImpl(const LayerType& layer) {
   return marker;
 }
 
-Marker makeBlocksMarker(const Layer<TsdfVoxel>& layer) {
-  return makeBlocksMarkerImpl(layer);
+Marker makeBlocksMarker(const Layer<TsdfVoxel>& layer, double scale) {
+  return makeBlocksMarkerImpl(layer, scale);
 }
 
-Marker makeBlocksMarker(const Layer<GvdVoxel>& layer) {
-  return makeBlocksMarkerImpl(layer);
+Marker makeBlocksMarker(const Layer<GvdVoxel>& layer, double scale) {
+  return makeBlocksMarkerImpl(layer, scale);
 }
 
 }  // namespace topology

@@ -24,10 +24,12 @@ class DsgLcdModule {
                const std::map<LayerId, ValidationFunc>& layer_validation_funcs);
 
   void updateDescriptorCache(incremental::SharedDsgInfo& dsg,
-                             const std::unordered_set<NodeId>& archived_places);
+                             const std::unordered_set<NodeId>& archived_places,
+                             uint64_t timestamp = 0);
 
   DsgRegistrationSolution detect(incremental::SharedDsgInfo& dsg,
-                                 NodeId latest_agent_id);
+                                 NodeId latest_agent_id,
+                                 uint64_t timestamp = 0);
 
   inline size_t numDescriptors() const {
     size_t num_descriptors = 0;
@@ -60,7 +62,8 @@ class DsgLcdModule {
   DsgRegistrationSolution registerAndVerify(
       incremental::SharedDsgInfo& dsg,
       const std::map<size_t, LayerSearchResults>& matches,
-      NodeId agent_node) const;
+      NodeId agent_node,
+      uint64_t timestamp = 0) const;
 
   DsgLcdConfig config_;
   std::map<LayerId, DescriptorFactoryFunc> layer_factories_;

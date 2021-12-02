@@ -117,9 +117,9 @@ void TopologyServerVisualizer::visualizeBlocks(const Layer<GvdVoxel>& gvd,
                                                const Layer<TsdfVoxel>& tsdf) const {
   Marker msg;
   if (config_.use_gvd_block_outlines) {
-    msg = makeBlocksMarker(gvd);
+    msg = makeBlocksMarker(gvd, config_.outline_scale);
   } else {
-    msg = makeBlocksMarker(tsdf);
+    msg = makeBlocksMarker(tsdf, config_.outline_scale);
   }
 
   msg.header.frame_id = config_.world_frame;
