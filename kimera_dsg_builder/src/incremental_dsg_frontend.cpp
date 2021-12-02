@@ -501,8 +501,10 @@ lcd::TeaserParams loadTeaserParams(const ros::NodeHandle& nh) {
   params.rotation_max_iterations = max_iters;
   nh.getParam("rotation_cost_threshold", params.rotation_cost_threshold);
   nh.getParam("kcore_heuristic_threshold", params.kcore_heuristic_threshold);
-  nh.getParam("use_max_clique", params.use_max_clique);
-  nh.getParam("max_clique_exact_solution", params.max_clique_exact_solution);
+  int inlier_selection_mode = static_cast<int>(params.inlier_selection_mode);
+  nh.getParam("inlier_selection_mode", inlier_selection_mode);
+  params.inlier_selection_mode =
+      static_cast<lcd::TeaserInlierMode>(inlier_selection_mode);
   nh.getParam("max_clique_time_limit", params.max_clique_time_limit);
   return params;
 }

@@ -23,6 +23,8 @@ using RegistrationFunc =
                                           NodeId)>;
 
 using TeaserParams = teaser::RobustRegistrationSolver::Params;
+using TeaserInlierMode =
+    teaser::RobustRegistrationSolver::INLIER_SELECTION_MODE;
 
 struct PlaceRegistrationFunctor {
   PlaceRegistrationFunctor(const LayerRegistrationConfig& config,

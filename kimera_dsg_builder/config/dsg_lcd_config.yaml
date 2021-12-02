@@ -23,6 +23,5 @@ teaser:
     rotation_max_iterations: 100
     rotation_cost_threshold: 1.0e-6
     kcore_heuristic_threshold: 0.5
-    use_max_clique: true
-    max_clique_exact_solution: true
+    inlier_selection_mode: 0 # (pcm_exact = 0, pcm_heu = 1, kcore_heu = 2, none = 3)
     max_clique_time_limit: 10
