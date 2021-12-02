@@ -91,6 +91,12 @@ LayerSearchResults searchDescriptors(
     }
 
     const Descriptor& other_descriptor = *descriptors.at(valid_id);
+    std::chrono::duration<double> diff_s =
+        descriptor.timestamp - other_descriptor.timestamp;
+    if (diff_s.count() < match_config.min_time_separation_s) {
+      continue;
+    }
+
     const float curr_score =
         computeDescriptorScore(descriptor, other_descriptor, match_config.type);
     if (curr_score > best_score) {
@@ -135,6 +141,12 @@ LayerSearchResults searchLeafDescriptors(const Descriptor& descriptor,
       }
 
       const Descriptor& other_descriptor = *id_desc_pair.second;
+      std::chrono::duration<double> diff_s =
+          descriptor.timestamp - other_descriptor.timestamp;
+      if (diff_s.count() < match_config.min_time_separation_s) {
+        continue;
+      }
+
       const float curr_score =
           computeDescriptorScore(descriptor, other_descriptor, match_config.type);
 

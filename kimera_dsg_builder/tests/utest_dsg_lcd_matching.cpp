@@ -229,6 +229,7 @@ TEST(DsgLcdMatchingTests, SearchDescriptorsValidSomeMatches) {
 
   DescriptorMatchConfig config;
   config.min_score = 0.9f;
+  config.min_time_separation_s = 0.0;
 
   std::set<NodeId> valid_matches{1, 2, 3};
 
@@ -289,6 +290,7 @@ TEST(DsgLcdMatchingTests, SearchLeafDescriptorsAllValid) {
   Descriptor::Ptr query = makeDescriptor(1.0f);
 
   DescriptorMatchConfig config;
+  config.min_time_separation_s = 0.0;
 
   std::set<NodeId> valid_matches{1, 2};
 
@@ -310,6 +312,30 @@ TEST(DsgLcdMatchingTests, SearchLeafDescriptorsAllValid) {
   EXPECT_TRUE(results.query_nodes.empty());
   std::set<NodeId> expected_match_nodes{1};
   EXPECT_EQ(expected_match_nodes, results.match_nodes);
+}
+
+TEST(DsgLcdMatchingTests, SearchLeafDescriptorsTimeSeparation) {
+  Descriptor::Ptr query = makeDescriptor(1.0f);
+
+  DescriptorMatchConfig config;
+  config.min_time_separation_s = 10.0;
+
+  std::set<NodeId> valid_matches{1, 2};
+
+  DescriptorCacheMap descriptors;
+  descriptors[1] = DescriptorCache();
+  descriptors[2] = DescriptorCache();
+  descriptors[1][1] = makeDescriptor(0.9f);
+  descriptors[1][2] = makeDescriptor(0.9f);
+  descriptors[1][3] = makeDescriptor(0.9f);
+  descriptors[2][4] = makeDescriptor(0.9f);
+
+  LayerSearchResults results =
+      searchLeafDescriptors(*query, config, valid_matches, descriptors, 10);
+  EXPECT_EQ(0.0f, results.best_score);
+  EXPECT_TRUE(results.valid_matches.empty());
+  EXPECT_TRUE(results.query_nodes.empty());
+  EXPECT_TRUE(results.match_nodes.empty());
 }
 
 }  // namespace lcd

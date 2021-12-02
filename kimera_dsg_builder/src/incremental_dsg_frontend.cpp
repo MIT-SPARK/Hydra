@@ -456,6 +456,14 @@ void DsgFrontend::addAgentPlaceEdges() {
   }
 }
 
+float readMinTimeSeparation(ros::NodeHandle nh,
+                            const std::string& name,
+                            double default_value) {
+  double min_time_separation_s;
+  nh.param<double>(name, min_time_separation_s, default_value);
+  return static_cast<float>(min_time_separation_s);
+}
+
 float readMatchScore(ros::NodeHandle nh,
                      const std::string& name,
                      double default_value) {
@@ -554,6 +562,8 @@ lcd::DsgLcdConfig DsgFrontend::initializeLcdStructures() {
   ros::NodeHandle agent_nh(lcd_nh, "agent");
   lcd::DsgLcdConfig config;
   config.agent_search_config.layer = KimeraDsgLayers::AGENTS;
+  config.agent_search_config.min_time_separation_s =
+      readMinTimeSeparation(agent_nh, "min_time_separation_s", 10.0);
   config.agent_search_config.min_score = readMatchScore(agent_nh, "min_score", 0.1);
   config.agent_search_config.min_registration_score =
       config.agent_search_config.min_score;
@@ -562,6 +572,8 @@ lcd::DsgLcdConfig DsgFrontend::initializeLcdStructures() {
   ros::NodeHandle object_nh(lcd_nh, "object");
   lcd::DescriptorMatchConfig object_config;
   object_config.layer = KimeraDsgLayers::OBJECTS;
+  object_config.min_time_separation_s =
+      readMinTimeSeparation(object_nh, "min_time_separation_s", 10.0);
   object_config.min_score = readMatchScore(object_nh, "min_score", 0.8);
   object_config.min_registration_score =
       readMatchScore(object_nh, "min_registration_score", 0.8);
@@ -571,6 +583,8 @@ lcd::DsgLcdConfig DsgFrontend::initializeLcdStructures() {
   ros::NodeHandle place_nh(lcd_nh, "place");
   lcd::DescriptorMatchConfig place_config;
   place_config.layer = KimeraDsgLayers::PLACES;
+  place_config.min_time_separation_s =
+      readMinTimeSeparation(place_nh, "min_time_separation_s", 10.0);
   place_config.min_score = readMatchScore(place_nh, "min_score", 0.8);
   place_config.min_registration_score =
       readMatchScore(place_nh, "min_registration_score", 0.8);

@@ -7,13 +7,16 @@ distance_bins: 30
 min_correspondences: 7
 min_inliers: 7
 agent:
+    min_time_separation_s: 50.0
     min_score: 0.059
     type: "L1"
 object:
+    min_time_separation_s: 50.0
     min_score: 0.56
     min_registration_score: 0.95
     type: "L1"
 places:
+    min_time_separation_s: 50.0
     min_score: 0.56
     type: "L1"
 teaser:

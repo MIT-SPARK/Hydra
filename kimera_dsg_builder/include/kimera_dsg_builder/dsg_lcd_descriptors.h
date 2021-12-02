@@ -11,6 +11,7 @@ struct Descriptor {
   bool normalized = false;
   std::set<NodeId> nodes;
   NodeId root_node;
+  std::chrono::nanoseconds timestamp;
 };
 
 using DescriptorFactoryFunc =

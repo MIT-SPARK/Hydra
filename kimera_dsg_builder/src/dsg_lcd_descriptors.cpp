@@ -21,6 +21,7 @@ Descriptor::Ptr makeAgentDescriptor(const Dsg&, const DsgNode& agent_node) {
   descriptor->values = attrs.dbow_values;
   descriptor->root_node = *parent;
   descriptor->nodes.insert(agent_node.id);
+  descriptor->timestamp = agent_node.timestamp;
   return descriptor;
 }
 
@@ -38,6 +39,7 @@ Descriptor::Ptr ObjectDescriptorFactory::operator()(const Dsg& graph,
   descriptor->normalized = false;
   descriptor->values = decltype(descriptor->values)::Zero(num_classes, 1);
   descriptor->root_node = *parent;
+  descriptor->timestamp = agent_node.timestamp;
 
   const SceneGraphLayer& places = *graph.getLayer(KimeraDsgLayers::PLACES);
   std::deque<NodeId> frontier{*parent};
@@ -104,6 +106,7 @@ Descriptor::Ptr PlaceDescriptorFactory::operator()(const Dsg& graph,
   descriptor->normalized = false;
   descriptor->values = decltype(descriptor->values)::Zero(config.bins, 1);
   descriptor->root_node = *parent;
+  descriptor->timestamp = agent_node.timestamp;
 
   const SceneGraphLayer& places = *graph.getLayer(KimeraDsgLayers::PLACES);
   std::deque<NodeId> frontier{*parent};
