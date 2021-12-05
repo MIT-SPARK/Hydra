@@ -27,9 +27,9 @@ class DsgLcdModule {
                              const std::unordered_set<NodeId>& archived_places,
                              uint64_t timestamp = 0);
 
-  DsgRegistrationSolution detect(incremental::SharedDsgInfo& dsg,
-                                 NodeId latest_agent_id,
-                                 uint64_t timestamp = 0);
+  std::vector<DsgRegistrationSolution> detect(incremental::SharedDsgInfo& dsg,
+                                              NodeId latest_agent_id,
+                                              uint64_t timestamp = 0);
 
   inline size_t numDescriptors() const {
     size_t num_descriptors = 0;
@@ -59,7 +59,7 @@ class DsgLcdModule {
   bool addNewDescriptors(const DynamicSceneGraph& graph,
                          const DynamicSceneGraphNode& agent_node);
 
-  DsgRegistrationSolution registerAndVerify(
+  std::vector<DsgRegistrationSolution> registerAndVerify(
       incremental::SharedDsgInfo& dsg,
       const std::map<size_t, LayerSearchResults>& matches,
       NodeId agent_node,

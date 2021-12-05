@@ -456,12 +456,36 @@ void DsgFrontend::addAgentPlaceEdges() {
   }
 }
 
-float readMinTimeSeparation(ros::NodeHandle nh,
-                            const std::string& name,
-                            double default_value) {
+size_t readMaxRegistrationMatches(ros::NodeHandle nh,
+                                  const std::string& name,
+                                  int default_value) {
+  int max_registration_matches;
+  nh.param<int>(name, max_registration_matches, default_value);
+  return static_cast<size_t>(max_registration_matches);
+}
+
+double readMinScoreRatio(ros::NodeHandle nh,
+                         const std::string& name,
+                         double default_value) {
+  double min_score_ratio;
+  nh.param<double>(name, min_score_ratio, default_value);
+  return min_score_ratio;
+}
+
+double readMinMatchSeparation(ros::NodeHandle nh,
+                              const std::string& name,
+                              double default_value) {
+  double min_match_separation_m;
+  nh.param<double>(name, min_match_separation_m, default_value);
+  return min_match_separation_m;
+}
+
+double readMinTimeSeparation(ros::NodeHandle nh,
+                             const std::string& name,
+                             double default_value) {
   double min_time_separation_s;
   nh.param<double>(name, min_time_separation_s, default_value);
-  return static_cast<float>(min_time_separation_s);
+  return min_time_separation_s;
 }
 
 float readMatchScore(ros::NodeHandle nh,
@@ -567,6 +591,9 @@ lcd::DsgLcdConfig DsgFrontend::initializeLcdStructures() {
   config.agent_search_config.min_score = readMatchScore(agent_nh, "min_score", 0.1);
   config.agent_search_config.min_registration_score =
       config.agent_search_config.min_score;
+  config.agent_search_config.max_registration_matches = 1u;
+  config.agent_search_config.min_score_ratio = 0.0;
+  config.agent_search_config.min_match_separation_m = 0.0;
   config.agent_search_config.type = readScoreType(agent_nh);
 
   ros::NodeHandle object_nh(lcd_nh, "object");
@@ -577,6 +604,12 @@ lcd::DsgLcdConfig DsgFrontend::initializeLcdStructures() {
   object_config.min_score = readMatchScore(object_nh, "min_score", 0.8);
   object_config.min_registration_score =
       readMatchScore(object_nh, "min_registration_score", 0.8);
+  object_config.max_registration_matches =
+      readMaxRegistrationMatches(object_nh, "max_registration_matches", 1);
+  object_config.min_score_ratio =
+      readMinScoreRatio(object_nh, "min_score_ratio", 0.1);
+  object_config.min_match_separation_m =
+      readMinMatchSeparation(object_nh, "min_match_separation_m", 1.0);
   object_config.type = readScoreType(object_nh);
   config.search_configs.push_back(object_config);
 
@@ -588,6 +621,12 @@ lcd::DsgLcdConfig DsgFrontend::initializeLcdStructures() {
   place_config.min_score = readMatchScore(place_nh, "min_score", 0.8);
   place_config.min_registration_score =
       readMatchScore(place_nh, "min_registration_score", 0.8);
+  place_config.max_registration_matches =
+      readMaxRegistrationMatches(place_nh, "max_registration_matches", 1);
+  place_config.min_score_ratio =
+      readMinScoreRatio(place_nh, "min_score_ratio", 0.1);
+  place_config.min_match_separation_m =
+      readMinMatchSeparation(place_nh, "min_match_separation_m", 1.0);
   place_config.type = readScoreType(place_nh);
   config.search_configs.push_back(place_config);
   return config;
@@ -610,12 +649,16 @@ void DsgFrontend::startLcd() {
 
   std::map<LayerId, lcd::RegistrationFunc> registration_funcs;
   registration_funcs[KimeraDsgLayers::OBJECTS] =
-      [&](SharedDsgInfo& dsg, const lcd::LayerSearchResults& match, NodeId agent_id) {
+      [&](SharedDsgInfo& dsg,
+          const lcd::DsgRegistrationInput& match,
+          NodeId agent_id) {
         return (*object_lcd_registration_)(dsg, match, agent_id);
       };
   if (places_lcd_registration_) {
     registration_funcs[KimeraDsgLayers::PLACES] =
-        [&](SharedDsgInfo& dsg, const lcd::LayerSearchResults& match, NodeId agent_id) {
+        [&](SharedDsgInfo& dsg,
+            const lcd::DsgRegistrationInput& match,
+            NodeId agent_id) {
           return (*places_lcd_registration_)(dsg, match, agent_id);
         };
   }
@@ -707,19 +750,20 @@ void DsgFrontend::runLcd() {
           dsg_->graph->getDynamicNode(*latest_agent_id).value().get().timestamp.count();
     }  // end critical section
 
-    auto result = lcd_module_->detect(*dsg_, *latest_agent_id, timestamp);
-    if (!result.valid) {
+    auto results = lcd_module_->detect(*dsg_, *latest_agent_id, timestamp);
+    if (results.size() == 0) {
       r.sleep();
       continue;
     }
 
-    LOG(WARNING) << "Found valid loop-closure: "
-                 << NodeSymbol(result.from_node).getLabel() << " -> "
-                 << NodeSymbol(result.to_node).getLabel();
-
     {  // start lcd critical section
       std::unique_lock<std::mutex> lcd_lock(dsg_->lcd_mutex);
-      dsg_->loop_closures.push(result);
+      for (const auto& result : results) {
+        dsg_->loop_closures.push(result);
+        LOG(WARNING) << "Found valid loop-closure: "
+                     << NodeSymbol(result.from_node).getLabel() << " -> "
+                     << NodeSymbol(result.to_node).getLabel();
+      }
     }  // end lcd critical section
 
     r.sleep();

@@ -1,5 +1,5 @@
 agent_horizon_s: 1.75
-radius_m: 9.0
+radius_m: 15.0
 num_semantic_classes: 20
 min_distance_m: 0.5
 max_distance_m: 2.5
@@ -7,17 +7,20 @@ distance_bins: 30
 min_correspondences: 7
 min_inliers: 7
 agent:
-    min_time_separation_s: 50.0
+    min_time_separation_s: 150.0
     min_score: 0.059
     type: "L1"
 object:
-    min_time_separation_s: 50.0
-    min_score: 0.56
-    min_registration_score: 0.95
+    min_time_separation_s: 150.0
+    min_score: 0.66
+    min_registration_score: 0.9
+    max_registration_matches: 5
+    min_score_ratio: 0.5
+    min_match_separation_m: 5.0
     type: "L1"
 places:
-    min_time_separation_s: 50.0
-    min_score: 0.56
+    min_time_separation_s: 150.0
+    min_score: 0.75
     type: "L1"
 teaser:
     noise_bound: 0.1

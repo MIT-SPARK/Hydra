@@ -177,6 +177,7 @@ TEST(DsgLcdMatchingTests, SearchDescriptorsNoValid) {
 
   DescriptorMatchConfig config;
   config.min_score = 0.8f;
+  config.max_registration_matches = 1;
 
   std::set<NodeId> valid_matches;
 
@@ -191,7 +192,7 @@ TEST(DsgLcdMatchingTests, SearchDescriptorsNoValid) {
   root_leaf_map[3] = {};
   LayerSearchResults results =
       searchDescriptors(*query, config, valid_matches, descriptors, root_leaf_map, 5);
-  EXPECT_LT(results.best_score, config.min_score);
+  EXPECT_TRUE(results.score.empty());
   EXPECT_TRUE(results.valid_matches.empty());
   EXPECT_TRUE(results.query_nodes.empty());
   EXPECT_TRUE(results.match_nodes.empty());
@@ -202,6 +203,7 @@ TEST(DsgLcdMatchingTests, SearchDescriptorsValidNoMatches) {
 
   DescriptorMatchConfig config;
   config.min_score = 1.5f;
+  config.max_registration_matches = 1;
 
   std::set<NodeId> valid_matches{1, 2, 3};
 
@@ -217,7 +219,7 @@ TEST(DsgLcdMatchingTests, SearchDescriptorsValidNoMatches) {
 
   LayerSearchResults results =
       searchDescriptors(*query, config, valid_matches, descriptors, root_leaf_map, 5);
-  EXPECT_LT(results.best_score, config.min_score);
+  EXPECT_TRUE(results.score.empty());
   EXPECT_TRUE(results.valid_matches.empty());
   EXPECT_TRUE(results.query_nodes.empty());
   EXPECT_TRUE(results.match_nodes.empty());
@@ -230,6 +232,7 @@ TEST(DsgLcdMatchingTests, SearchDescriptorsValidSomeMatches) {
   DescriptorMatchConfig config;
   config.min_score = 0.9f;
   config.min_time_separation_s = 0.0;
+  config.max_registration_matches = 1;
 
   std::set<NodeId> valid_matches{1, 2, 3};
 
@@ -248,15 +251,15 @@ TEST(DsgLcdMatchingTests, SearchDescriptorsValidSomeMatches) {
 
   LayerSearchResults results =
       searchDescriptors(*query, config, valid_matches, descriptors, root_leaf_map, 5);
-  EXPECT_GT(results.best_score, config.min_score);
-  EXPECT_EQ(3u, results.best_node);
+  EXPECT_GT(results.score[0], config.min_score);
+  EXPECT_EQ(3u, results.match_root[0]);
 
   std::set<NodeId> expected_matches{1, 3};
   EXPECT_EQ(expected_matches, results.valid_matches);
 
   std::set<NodeId> expected_match_nodes{10, 11, 12};
-  EXPECT_EQ(expected_match_nodes, results.match_nodes);
-  EXPECT_EQ(3u, results.match_root);
+  EXPECT_EQ(expected_match_nodes, results.match_nodes[0]);
+  EXPECT_EQ(3u, results.match_root[0]);
 
   std::set<NodeId> expected_query_nodes{13, 14, 15};
   EXPECT_EQ(expected_query_nodes, results.query_nodes);
@@ -267,6 +270,7 @@ TEST(DsgLcdMatchingTests, searchLeafDescriptorsNoValid) {
   Descriptor::Ptr query = makeDescriptor(1.0f);
 
   DescriptorMatchConfig config;
+  config.max_registration_matches = 1;
 
   std::set<NodeId> valid_matches;
 
@@ -280,7 +284,7 @@ TEST(DsgLcdMatchingTests, searchLeafDescriptorsNoValid) {
 
   LayerSearchResults results =
       searchLeafDescriptors(*query, config, valid_matches, descriptors, 10);
-  EXPECT_EQ(0.0f, results.best_score);
+  EXPECT_TRUE(results.score.empty());
   EXPECT_TRUE(results.valid_matches.empty());
   EXPECT_TRUE(results.query_nodes.empty());
   EXPECT_TRUE(results.match_nodes.empty());
@@ -291,6 +295,7 @@ TEST(DsgLcdMatchingTests, SearchLeafDescriptorsAllValid) {
 
   DescriptorMatchConfig config;
   config.min_time_separation_s = 0.0;
+  config.max_registration_matches = 1;
 
   std::set<NodeId> valid_matches{1, 2};
 
@@ -304,14 +309,13 @@ TEST(DsgLcdMatchingTests, SearchLeafDescriptorsAllValid) {
 
   LayerSearchResults results =
       searchLeafDescriptors(*query, config, valid_matches, descriptors, 10);
-  EXPECT_EQ(1.0f, results.best_score);
-  EXPECT_EQ(1u, results.best_node);
+  EXPECT_EQ(1.0f, results.score[0]);
   std::set<NodeId> expected_matches{1};
   EXPECT_EQ(expected_matches, results.valid_matches);
 
   EXPECT_TRUE(results.query_nodes.empty());
   std::set<NodeId> expected_match_nodes{1};
-  EXPECT_EQ(expected_match_nodes, results.match_nodes);
+  EXPECT_EQ(expected_match_nodes, results.match_nodes[0]);
 }
 
 TEST(DsgLcdMatchingTests, SearchLeafDescriptorsTimeSeparation) {
@@ -319,6 +323,7 @@ TEST(DsgLcdMatchingTests, SearchLeafDescriptorsTimeSeparation) {
 
   DescriptorMatchConfig config;
   config.min_time_separation_s = 10.0;
+  config.max_registration_matches = 1;
 
   std::set<NodeId> valid_matches{1, 2};
 
@@ -332,10 +337,42 @@ TEST(DsgLcdMatchingTests, SearchLeafDescriptorsTimeSeparation) {
 
   LayerSearchResults results =
       searchLeafDescriptors(*query, config, valid_matches, descriptors, 10);
-  EXPECT_EQ(0.0f, results.best_score);
+  EXPECT_TRUE(results.score.empty());
   EXPECT_TRUE(results.valid_matches.empty());
   EXPECT_TRUE(results.query_nodes.empty());
   EXPECT_TRUE(results.match_nodes.empty());
+}
+
+TEST(DsgLcdMatchingTests, SearchLeafDescriptorsMaxRegistrationMatches) {
+  Descriptor::Ptr query = makeDescriptor(1.0f, 0.0f);
+  fillDescriptor(*query, 0, {13, 14, 15});
+
+  DescriptorMatchConfig config;
+  config.min_score = 0.9f;
+  config.min_time_separation_s = 0.0;
+  config.max_registration_matches = 3;
+  config.min_match_separation_m = 0.0;
+
+  std::set<NodeId> valid_matches{1, 2, 3};
+
+  DescriptorCache descriptors;
+  descriptors[1] = makeDescriptor(0.9f, 0.1f);
+  fillDescriptor(*descriptors[1], 1, {4, 5, 6});
+  descriptors[2] = makeDescriptor(0.9f, 0.9f);
+  fillDescriptor(*descriptors[2], 2, {7, 8, 9});
+  descriptors[3] = makeDescriptor(0.9f, 0.05f);
+  fillDescriptor(*descriptors[3], 3, {10, 11, 12});
+
+  std::map<NodeId, std::set<NodeId>> root_leaf_map;
+  root_leaf_map[1] = {};
+  root_leaf_map[2] = {};
+  root_leaf_map[3] = {};
+
+  LayerSearchResults results =
+      searchDescriptors(*query, config, valid_matches, descriptors, root_leaf_map, 5);
+  EXPECT_EQ(2u, results.score.size());
+  EXPECT_EQ(2u, results.match_root.size());
+  EXPECT_EQ(2u, results.match_nodes.size());
 }
 
 }  // namespace lcd

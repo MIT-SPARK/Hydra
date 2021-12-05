@@ -8,7 +8,8 @@ namespace lcd {
 using Dsg = DynamicSceneGraph;
 using DsgNode = DynamicSceneGraphNode;
 
-Descriptor::Ptr makeAgentDescriptor(const Dsg&, const DsgNode& agent_node) {
+Descriptor::Ptr makeAgentDescriptor(const Dsg& graph,
+                                    const DsgNode& agent_node) {
   auto parent = agent_node.getParent();
   if (!parent) {
     return nullptr;
@@ -22,6 +23,8 @@ Descriptor::Ptr makeAgentDescriptor(const Dsg&, const DsgNode& agent_node) {
   descriptor->root_node = *parent;
   descriptor->nodes.insert(agent_node.id);
   descriptor->timestamp = agent_node.timestamp;
+  descriptor->root_position =
+      graph.getNode(*parent).value().get().attributes().position;
   return descriptor;
 }
 
@@ -40,6 +43,7 @@ Descriptor::Ptr ObjectDescriptorFactory::operator()(const Dsg& graph,
   descriptor->values = decltype(descriptor->values)::Zero(num_classes, 1);
   descriptor->root_node = *parent;
   descriptor->timestamp = agent_node.timestamp;
+  descriptor->root_position = root_position;
 
   const SceneGraphLayer& places = *graph.getLayer(KimeraDsgLayers::PLACES);
   std::deque<NodeId> frontier{*parent};
@@ -107,6 +111,7 @@ Descriptor::Ptr PlaceDescriptorFactory::operator()(const Dsg& graph,
   descriptor->values = decltype(descriptor->values)::Zero(config.bins, 1);
   descriptor->root_node = *parent;
   descriptor->timestamp = agent_node.timestamp;
+  descriptor->root_position = root_position;
 
   const SceneGraphLayer& places = *graph.getLayer(KimeraDsgLayers::PLACES);
   std::deque<NodeId> frontier{*parent};

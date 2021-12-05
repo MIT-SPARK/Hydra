@@ -83,7 +83,7 @@ LayerSearchResults searchDescriptors(
     const std::map<NodeId, std::set<NodeId>>& root_leaf_map,
     NodeId query_id) {
   float best_score = 0.0f;
-  NodeId best_node = 0;  // gets overwritten on valid match
+  std::vector<std::pair<NodeId, float>> new_valid_match_scores;
   std::set<NodeId> new_valid_matches;
   for (const auto& valid_id : valid_matches) {
     if (root_leaf_map.at(valid_id).count(query_id)) {
@@ -101,26 +101,58 @@ LayerSearchResults searchDescriptors(
         computeDescriptorScore(descriptor, other_descriptor, match_config.type);
     if (curr_score > best_score) {
       best_score = curr_score;
-      best_node = valid_id;
     }
 
     if (curr_score > match_config.min_score) {
       new_valid_matches.insert(valid_id);
+      new_valid_match_scores.push_back({valid_id, curr_score});
     }
   }
 
-  std::set<NodeId> match_nodes;
-  if (best_score > match_config.min_score) {
-    match_nodes = descriptors.at(best_node)->nodes;
+  std::sort(
+      new_valid_match_scores.begin(),
+      new_valid_match_scores.end(),
+      [](const std::pair<NodeId, float>& a, const std::pair<NodeId, float>& b) {
+        return a.second > b.second;
+      });
+  std::vector<std::set<NodeId>> match_nodes;
+  std::vector<NodeId> matches;
+  std::vector<float> match_scores;
+  for (const auto& id_score : new_valid_match_scores) {
+    if (id_score.second < match_config.min_registration_score) {
+      break;
+    }
+
+    if (id_score.second > best_score * match_config.min_score_ratio) {
+      bool spatialy_distinct = true;
+      for (const auto& m : matches) {
+        if ((descriptors.at(id_score.first)->root_position -
+             descriptors.at(m)->root_position)
+                .norm() < match_config.min_match_separation_m) {
+          spatialy_distinct = false;
+          break;
+        }
+      }
+
+      if (!spatialy_distinct) {
+        continue;
+      }
+
+      match_nodes.push_back(descriptors.at(id_score.first)->nodes);
+      matches.push_back(id_score.first);
+      match_scores.push_back(id_score.second);
+    }
+    if (matches.size() == match_config.max_registration_matches) {
+      break;
+    }
   }
 
-  return {best_node,
-          best_score,
+  return {match_scores,
           new_valid_matches,
           descriptor.nodes,
           match_nodes,
           descriptor.root_node,
-          best_node};
+          matches};
 }
 
 LayerSearchResults searchLeafDescriptors(const Descriptor& descriptor,
@@ -160,16 +192,15 @@ LayerSearchResults searchLeafDescriptors(const Descriptor& descriptor,
   }
 
   if (!found_match) {
-    return {0, 0.0f, {}, {}, {}, descriptor.root_node, 0};
+    return {{}, {}, {}, {}, descriptor.root_node, {}};
   }
 
-  return {best_node,
-          best_score,
+  return {{best_score},
           {best_node},
           descriptor.nodes,
-          {best_node},
+          {{best_node}},
           descriptor.root_node,
-          best_root};
+          {best_root}};
 }
 
 }  // namespace lcd

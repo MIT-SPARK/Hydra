@@ -103,13 +103,8 @@ void checkAllAgentFrames(SharedDsgInfo& dsg) {
     VLOG(5) << "Found at least one match for " << NodeSymbol(node->id).getLabel()
             << " with average score: " << mean_score / num_search;
 
-    lcd::LayerSearchResults match{*best_node,
-                                  best_score,
-                                  {*best_node},
-                                  desc->nodes,
-                                  {*best_node},
-                                  desc->root_node,
-                                  0};
+    lcd::DsgRegistrationInput match{
+        desc->nodes, {*best_node}, desc->root_node, 0};
 
     auto solution = registerAgentMatch(dsg, match, 0);
     if (solution.valid) {

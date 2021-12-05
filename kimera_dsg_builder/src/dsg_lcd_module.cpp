@@ -109,16 +109,20 @@ void DsgLcdModule::updateDescriptorCache(
   }
 }
 
-DsgRegistrationSolution DsgLcdModule::registerAndVerify(
+std::vector<DsgRegistrationSolution> DsgLcdModule::registerAndVerify(
     SharedDsgInfo& dsg,
     const std::map<size_t, LayerSearchResults>& matches,
     NodeId agent_id,
     uint64_t timestamp) const {
   ScopedTimer timer("lcd/register", timestamp, true, 2, false);
-  DsgRegistrationSolution registration_result;
+  std::vector<DsgRegistrationSolution> results;
 
   size_t idx;
   for (idx = 0; idx < max_internal_index_; ++idx) {
+    if (!registration_funcs_.count(idx)) {
+      continue;
+    }
+
     if (!matches.count(idx)) {
       continue;
     }
@@ -129,53 +133,57 @@ DsgRegistrationSolution DsgLcdModule::registerAndVerify(
       continue;
     }
 
-    if (match.best_score < match_config_map_.at(idx).min_registration_score) {
-      continue;
-    }
+    for (size_t i = 0; i < match.match_root.size(); i++) {
+      if (match.score[i] < match_config_map_.at(idx).min_registration_score) {
+        break;
+      }
 
-    if (idx == 0) {
-      NodeId query_node = *match.query_nodes.begin();
-      NodeId match_node = *match.match_nodes.begin();
-      VLOG(3) << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!";
-      VLOG(3) << "Found Match! " << NodeSymbol(query_node).getLabel() << " -> "
-              << NodeSymbol(match_node).getLabel();
-      VLOG(3) << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!";
-    }
+      if (idx == 0) {
+        NodeId query_node = *match.query_nodes.begin();
+        NodeId match_node = *match.match_nodes[i].begin();
+        VLOG(3) << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!";
+        VLOG(3) << "Found Match! " << NodeSymbol(query_node).getLabel() << " -> "
+                << NodeSymbol(match_node).getLabel();
+        VLOG(3) << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!";
+      }
 
-    if (!registration_funcs_.count(idx)) {
-      continue;
-    }
+      DsgRegistrationInput registration_input = {match.query_nodes,
+                                                 match.match_nodes[i],
+                                                 match.query_root,
+                                                 match.match_root[i]};
+      DsgRegistrationSolution registration_result =
+          registration_funcs_.at(idx)(dsg, registration_input, agent_id);
+      registration_result.level = static_cast<int64_t>(idx);
+      if (registration_result.valid) {
+        size_t vidx = idx;
+        ++vidx;  // start validation at next layer up
+        for (; vidx < max_internal_index_; ++vidx) {
+          if (!validation_funcs_.count(vidx)) {
+            continue;
+          }
 
-    registration_result = registration_funcs_.at(idx)(dsg, match, agent_id);
-    registration_result.level = static_cast<int64_t>(idx);
-    if (registration_result.valid) {
-      ++idx;  // start validation at next layer up
-      break;
+          CHECK(matches.count(idx));
+          const LayerSearchResults& vmatch = matches.at(vidx);
+
+          if (!validation_funcs_.at(vidx)(*dsg.graph, vmatch)) {
+            registration_result.valid = false;
+            break;
+          }
+        }
+        // still valid after validation 
+        if (registration_result.valid) {
+          results.push_back(registration_result);
+        }
+      }
     }
   }
 
-  if (!registration_result.valid) {
-    return registration_result;
-  }
-
-  for (; idx < max_internal_index_; ++idx) {
-    if (!validation_funcs_.count(idx)) {
-      continue;
-    }
-
-    CHECK(matches.count(idx));
-    const LayerSearchResults& match = matches.at(idx);
-
-    if (!validation_funcs_.at(idx)(*dsg.graph, match)) {
-      registration_result.valid = false;
-      break;
-    }
-  }
-
-  return registration_result;
+  return results;
 }
 
-DsgRegistrationSolution DsgLcdModule::detect(SharedDsgInfo& dsg, NodeId agent_id, uint64_t timestamp) {
+std::vector<DsgRegistrationSolution> DsgLcdModule::detect(SharedDsgInfo& dsg,
+                                                          NodeId agent_id,
+                                                          uint64_t timestamp) {
   ScopedTimer timer("lcd/detect", timestamp, true, 2, false);
   std::set<NodeId> prev_valid_roots;
   for (const auto& id_desc_pair : cache_map_[config_.search_configs.front().layer]) {
@@ -233,10 +241,17 @@ DsgRegistrationSolution DsgLcdModule::detect(SharedDsgInfo& dsg, NodeId agent_id
           << " against " << numAgentDescriptors() << " / " << numDescriptors()
           << " (agent / all) descriptors";
   for (const auto& id_match_pair : matches) {
-    VLOG(2) << " - index " << id_match_pair.first << ": "
-            << NodeSymbol(id_match_pair.second.best_node).getLabel() << " -> "
-            << id_match_pair.second.best_score << " with "
-            << id_match_pair.second.valid_matches.size() << " valid matches";
+    VLOG(2) << " - index " << id_match_pair.first << " with "
+            << id_match_pair.second.valid_matches.size()
+            << " valid matches and " << id_match_pair.second.match_root.size()
+            << " matches for registration: ";
+    for (size_t i = 0; i < id_match_pair.second.match_root.size(); ++i) {
+      VLOG(2) << " - - - query "
+              << NodeSymbol(id_match_pair.second.query_root).getLabel()
+              << " - match "
+              << NodeSymbol(id_match_pair.second.match_root[i]).getLabel()
+              << " -> " << id_match_pair.second.score[i];
+    }
   }
   VLOG(2) << "===========================================================";
 

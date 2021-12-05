@@ -240,7 +240,7 @@ TEST_F(LayerRegistrationTests, TestSemanticRegistration) {
 }
 
 TEST_F(DsgRegistrationTests, TestFullObjectRegistration) {
-  LayerSearchResults match;
+  DsgRegistrationInput match;
   for (int i = 0; i < src_points.cols(); ++i) {
     match.query_nodes.insert(NodeSymbol('O', i + src_points.cols()));
     match.match_nodes.insert(NodeSymbol('O', i));
@@ -262,7 +262,7 @@ TEST_F(DsgRegistrationTests, TestFullObjectRegistration) {
 }
 
 TEST_F(DsgRegistrationTests, DISABLED_TestFullPlaceRegistration) {
-  LayerSearchResults match;
+  DsgRegistrationInput match;
   for (int i = 0; i < src_points.cols(); ++i) {
     match.query_nodes.insert(NodeSymbol('p', i + src_points.cols()));
     match.match_nodes.insert(NodeSymbol('p', i));

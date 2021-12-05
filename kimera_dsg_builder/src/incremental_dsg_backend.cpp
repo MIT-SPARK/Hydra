@@ -371,7 +371,8 @@ void DsgBackend::startPgmo() {
   deformation_graph_sub_ = nh_.subscribe(
       "pgmo/mesh_graph_incremental", 1000, &DsgBackend::deformationGraphCallback, this);
   pose_graph_sub_ = nh_.subscribe(
-      "pose_graph_incremental", 1000, &DsgBackend::poseGraphCallback, this);
+      "pose_graph_incremental", 10000, &DsgBackend::poseGraphCallback, this);
+  // TODO(yun) with lower queue size we drop msgs, esp with permissive dsg lcd
 
   viz_mesh_mesh_edges_pub_ = nh_.advertise<visualization_msgs::Marker>(
       "pgmo/deformation_graph_mesh_mesh", 10, false);

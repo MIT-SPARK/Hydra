@@ -97,8 +97,10 @@ PlaceRegistrationFunctor::PlaceRegistrationFunctor(
     const TeaserParams& params)
     : config(config), solver(params) {}
 
-DsgRegistrationSolution PlaceRegistrationFunctor::
-operator()(SharedDsgInfo& dsg, const LayerSearchResults& match, NodeId query_agent_id) {
+DsgRegistrationSolution PlaceRegistrationFunctor::operator()(
+    SharedDsgInfo& dsg,
+    const DsgRegistrationInput& match,
+    NodeId query_agent_id) {
   if (match.query_nodes.size() <= 3 || match.match_nodes.size() <= 3) {
     return {};
   }
@@ -123,7 +125,7 @@ ObjectRegistrationFunctor::ObjectRegistrationFunctor(
 void logRegistrationProblem(const std::string& dir_path,
                             SharedDsgInfo& info,
                             const LayerRegistrationSolution& solution,
-                            const LayerSearchResults& match,
+                            const DsgRegistrationInput& match,
                             NodeId query_agent_id) {
   std::unique_lock<std::mutex> lock(info.mutex);
 
@@ -160,8 +162,10 @@ void logRegistrationProblem(const std::string& dir_path,
   outfile << record;
 }
 
-DsgRegistrationSolution ObjectRegistrationFunctor::
-operator()(SharedDsgInfo& dsg, const LayerSearchResults& match, NodeId query_agent_id) {
+DsgRegistrationSolution ObjectRegistrationFunctor::operator()(
+    SharedDsgInfo& dsg,
+    const DsgRegistrationInput& match,
+    NodeId query_agent_id) {
   uint64_t timestamp;
   {  // start critical section
     std::unique_lock<std::mutex> lock(dsg.mutex);
@@ -205,7 +209,7 @@ inline size_t getTimestampFromNode(const DynamicSceneGraph& graph, NodeId node_i
 }
 
 DsgRegistrationSolution registerAgentMatch(incremental::SharedDsgInfo& dsg,
-                                           const LayerSearchResults& match,
+                                           const DsgRegistrationInput& match,
                                            NodeId) {
   if (match.query_nodes.empty() || match.match_nodes.empty()) {
     return {};

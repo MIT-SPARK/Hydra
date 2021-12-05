@@ -45,13 +45,15 @@ struct DsgLcdModuleTests : public ::testing::Test {
         };
 
     registration_funcs[KimeraDsgLayers::OBJECTS] =
-        [&](SharedDsgInfo& dsg, const LayerSearchResults& match, NodeId agent_node) {
+        [&](SharedDsgInfo& dsg, const DsgRegistrationInput& match, NodeId agent_node) {
           return (*object_registration)(dsg, match, agent_node);
         };
-    registration_funcs[KimeraDsgLayers::PLACES] = [&](SharedDsgInfo& dsg,
-                                                      const LayerSearchResults& match, NodeId agent_node) {
-      return (*places_registration)(dsg, match, agent_node);
-    };
+    registration_funcs[KimeraDsgLayers::PLACES] =
+        [&](SharedDsgInfo& dsg,
+            const DsgRegistrationInput& match,
+            NodeId agent_node) {
+          return (*places_registration)(dsg, match, agent_node);
+        };
   }
 
   const double radius = 5.0;
@@ -178,8 +180,9 @@ TEST_F(DsgLcdModuleTests, TestEmptySearch) {
       config, descriptor_factories, registration_funcs, validation_funcs);
   std::unordered_set<NodeId> active_places{1};
 
-  DsgRegistrationSolution result = module.detect(*dsg, NodeSymbol('a', 0));
-  EXPECT_FALSE(result.valid);
+  std::vector<DsgRegistrationSolution> results =
+      module.detect(*dsg, NodeSymbol('a', 0));
+  EXPECT_EQ(0u, results.size());
 }
 
 TEST_F(DsgLcdModuleTests, TestNonEmptySearch) {
@@ -212,8 +215,9 @@ TEST_F(DsgLcdModuleTests, TestNonEmptySearch) {
   EXPECT_EQ(1u, module.numGraphDescriptors(KimeraDsgLayers::OBJECTS));
   EXPECT_EQ(2u, module.numAgentDescriptors());
 
-  DsgRegistrationSolution result = module.detect(*dsg, NodeSymbol('a', 0));
-  EXPECT_FALSE(result.valid);
+  std::vector<DsgRegistrationSolution> results =
+      module.detect(*dsg, NodeSymbol('a', 0));
+  EXPECT_EQ(0u, results.size());
 }
 
 }  // namespace lcd

@@ -11,17 +11,19 @@ struct DescriptorMatchConfig {
   float min_score;
   float min_registration_score;
   double min_time_separation_s;
+  size_t max_registration_matches;
+  double min_score_ratio;
+  double min_match_separation_m;
   DescriptorScoreType type = DescriptorScoreType::COSINE;
 };
 
 struct LayerSearchResults {
-  NodeId best_node;
-  float best_score;
+  std::vector<float> score;
   std::set<NodeId> valid_matches;
   std::set<NodeId> query_nodes;
-  std::set<NodeId> match_nodes;
+  std::vector<std::set<NodeId>> match_nodes;
   NodeId query_root;
-  NodeId match_root;
+  std::vector<NodeId> match_root;
 };
 
 using DescriptorCache = std::map<NodeId, Descriptor::Ptr>;

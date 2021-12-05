@@ -11,6 +11,7 @@ struct Descriptor {
   bool normalized = false;
   std::set<NodeId> nodes;
   NodeId root_node;
+  Eigen::Vector3d root_position;
   std::chrono::nanoseconds timestamp;
 };
 
