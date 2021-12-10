@@ -752,7 +752,9 @@ void DsgFrontend::runLcd() {
 
     auto results = lcd_module_->detect(*dsg_, *latest_agent_id, timestamp);
     if (results.size() == 0) {
-      r.sleep();
+      if (!lcd_shutting_down_) {
+        r.sleep();
+      }
       continue;
     }
 
@@ -766,7 +768,9 @@ void DsgFrontend::runLcd() {
       }
     }  // end lcd critical section
 
-    r.sleep();
+    if (!lcd_shutting_down_) {
+      r.sleep();
+    }
   }
 }
 

@@ -454,7 +454,7 @@ void DsgBackend::runPgmo() {
       // start private dsg critical section
       std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
       have_dsg_updates = updatePrivateDsg();
-      if (optimize_on_lc_ && (have_graph_updates || have_loopclosures_)) {
+      if (optimize_on_lc_ && have_graph_updates && have_loopclosures_) {
         optimize();
       } else if (call_update_periodically_ && have_dsg_updates) {
         std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
