@@ -34,16 +34,17 @@ float computeDistance(const Descriptor& lhs,
                       const std::function<float(float, float)>& distance_func);
 
 inline float computeCosineDistance(const Descriptor& lhs, const Descriptor& rhs) {
-  float scale = 1.0;
-  if (!lhs.normalized) {
-    scale *= lhs.values.norm();
+  float lhs_scale = lhs.normalized ? 1.0f : lhs.values.norm();
+  float rhs_scale = rhs.normalized ? 1.0f : rhs.values.norm();
+
+  if (lhs_scale == 0.0f && rhs_scale == 0.0f) {
+    return 1.0f;
   }
-  if (!rhs.normalized) {
-    scale *= rhs.values.norm();
-  }
+
+  float scale = lhs_scale * rhs_scale;
   // TODO(nathan) we might want a looser check than this
-  if (scale == 0.0) {
-    scale = 1.0;  // force all zero descriptors to have 0 norm (instead of nan)
+  if (scale == 0.0f) {
+    scale = 1.0f;  // force all zero descriptors to have 0 norm (instead of nan)
   }
 
   return computeDistance(
@@ -51,8 +52,15 @@ inline float computeCosineDistance(const Descriptor& lhs, const Descriptor& rhs)
 }
 
 inline float computeL1Distance(const Descriptor& lhs, const Descriptor& rhs) {
-  const float lhs_scale = lhs.normalized ? 1.0f : lhs.values.lpNorm<1>();
-  const float rhs_scale = rhs.normalized ? 1.0f : rhs.values.lpNorm<1>();
+  float lhs_scale = lhs.normalized ? 1.0f : lhs.values.lpNorm<1>();
+  float rhs_scale = rhs.normalized ? 1.0f : rhs.values.lpNorm<1>();
+
+  if (rhs_scale == 0.0f and lhs_scale == 0.0f) {
+    return 0.0f;
+  }
+
+  lhs_scale = lhs_scale == 0.0f ? 1.0f : lhs_scale;
+  rhs_scale = rhs_scale == 0.0f ? 1.0f : rhs_scale;
 
   const float l1_diff = computeDistance(lhs, rhs, [&](float lhs, float rhs) {
     const float lhs_val = lhs / lhs_scale;

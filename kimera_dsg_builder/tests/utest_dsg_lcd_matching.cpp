@@ -155,6 +155,44 @@ TEST(DsgLcdMatchingTests, TestComputeL1DistanceFixed) {
   }
 }
 
+TEST(DsgLcdMatchingTests, TestComputeL1DistanceEmpty) {
+  Descriptor d1;
+  d1.values.resize(5, 1);
+  d1.values.setZero();
+  d1.normalized = false;
+
+  Descriptor d2;
+  d2.values.resize(5, 1);
+  d2.values.setZero();
+  d2.normalized = false;
+
+  {
+    float dist = computeL1Distance(d1, d2);
+    EXPECT_NEAR(0.0f, dist, 1.0e-6f);
+    float result = computeDescriptorScore(d1, d2, DescriptorScoreType::L1);
+    EXPECT_NEAR(1.0f, result, 1.0e-6f);
+  }
+}
+
+TEST(DsgLcdMatchingTests, TestComputeCosDistanceEmpty) {
+  Descriptor d1;
+  d1.values.resize(5, 1);
+  d1.values.setZero();
+  d1.normalized = false;
+
+  Descriptor d2;
+  d2.values.resize(5, 1);
+  d2.values.setZero();
+  d2.normalized = false;
+
+  {
+    float dist = computeCosineDistance(d1, d2);
+    EXPECT_NEAR(1.0f, dist, 1.0e-6f);
+    float result = computeDescriptorScore(d1, d2, DescriptorScoreType::COSINE);
+    EXPECT_NEAR(1.0f, result, 1.0e-6f);
+  }
+}
+
 template <typename... Ts>
 Descriptor::Ptr makeDescriptor(Ts... args) {
   Descriptor::Ptr descriptor(new Descriptor());
