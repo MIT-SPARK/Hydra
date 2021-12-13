@@ -184,8 +184,8 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
                               places_merge_pos_threshold_m_,
                               places_merge_distance_tolerance_m_);
   });
-  dsg_update_funcs_.push_back(&dsg_updates::updateRooms);
-  dsg_update_funcs_.push_back(&dsg_updates::updateBuildings);
+  // dsg_update_funcs_.push_back(&dsg_updates::updateRooms); // redundant to updateRoomsNodes
+  // dsg_update_funcs_.push_back(&dsg_updates::updateBuildings); // redundant to updateBuildingNode
 
   deformation_graph_->storeOnlyNoOptimization();
 
