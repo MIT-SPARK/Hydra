@@ -85,7 +85,8 @@ class DsgFrontend {
 
   std::mutex mesh_frontend_mutex_;
   std::atomic<uint64_t> last_mesh_timestamp_;
-  voxblox_msgs::Mesh::ConstPtr latest_mesh_msg_;
+  std::queue<voxblox_msgs::Mesh::ConstPtr> mesh_queue_;
+  size_t mesh_queue_size_;
 
   std::mutex places_queue_mutex_;
   std::atomic<uint64_t> last_places_timestamp_;

@@ -21,6 +21,9 @@ DsgFrontend::DsgFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& ds
   last_places_timestamp_ = 0;
 
   nh_.getParam("dsg_log_output", log_);
+  int mesh_queue_size;
+  nh_.getParam("mesh_queue_size", mesh_queue_size);
+  mesh_queue_size_ = static_cast<size_t>(mesh_queue_size);
   if (log_ && nh_.getParam("dsg_output_path", log_path_)) {
     frontend_graph_logger_.setOutputPath(log_path_ + "/frontend");
     ROS_INFO("Logging frontend graph to %s", (log_path_ + "/frontend").c_str());
@@ -66,8 +69,8 @@ void DsgFrontend::handleActivePlaces(const PlacesLayerMsg::ConstPtr& msg) {
 void DsgFrontend::handleLatestMesh(const voxblox_msgs::Mesh::ConstPtr& msg) {
   {  // start mesh frontend critical section
     std::unique_lock<std::mutex> mesh_lock(mesh_frontend_mutex_);
-    if (!latest_mesh_msg_) {
-      latest_mesh_msg_ = msg;
+    if (mesh_queue_.size() < mesh_queue_size_) {
+      mesh_queue_.push(msg);
       return;
     }
   }  // end mesh frontend critical section
@@ -178,16 +181,17 @@ void DsgFrontend::runMeshFrontend() {
       continue;
     }
 
+    if (mesh_queue_.empty()) {
+      r.sleep();
+      continue;
+    }
+
     voxblox_msgs::Mesh::ConstPtr msg;
     {  // start mesh critical region
       std::unique_lock<std::mutex> mesh_lock(mesh_frontend_mutex_);
-      msg = latest_mesh_msg_;
+      msg = mesh_queue_.front();
+      mesh_queue_.pop();
     }  // end mesh critical region
-
-    if (!msg) {
-      r.sleep();  // we don't have any work to do, wait for a little
-      continue;
-    }
 
     // let the places thread start working on queued messages
     last_mesh_timestamp_ = msg->header.stamp.toNSec();
@@ -214,13 +218,11 @@ void DsgFrontend::runMeshFrontend() {
     {  // start mesh critical region
       std::unique_lock<std::mutex> mesh_lock(mesh_frontend_mutex_);
       latest_mesh_mappings_ = mesh_frontend_.getVoxbloxMsgMapping();
-      latest_mesh_msg_.reset();
     }  // end mesh critical region
 
     {  // timing scope
       ScopedTimer timer("frontend/object_detection", object_timestamp, true, 1, false);
       segmenter_->detectObjects(dsg_, mesh_frontend_.getActiveFullMeshVertices());
-      dsg_->updated = true;
     }
 
     {  // start dsg critical section
@@ -229,9 +231,8 @@ void DsgFrontend::runMeshFrontend() {
       // be connected to parents inside the dsg critical section (would need to make
       // detectObjects non-threadsafe / integrate more cleanly)
       addPlaceObjectEdges();
-      dsg_->updated = true;
     }  // end dsg critical section
-
+    dsg_->updated = true;
     r.sleep();
   }
 }
@@ -308,7 +309,6 @@ void DsgFrontend::runPlaces() {
                               .attributes<PlaceNodeAttributes>();
             attrs.is_active = false;
           }
-          dsg_->updated = true;
         }
       }
     }  // end places queue critical section
@@ -320,7 +320,7 @@ void DsgFrontend::runPlaces() {
       std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
       frontend_graph_logger_.logGraph(dsg_->graph);
     }
-
+    dsg_->updated = true;
     r.sleep();
   }
 }
@@ -389,7 +389,6 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
     addPlaceObjectEdges(&objects_to_check);
 
     *dsg_->latest_places = active_nodes;
-    dsg_->updated = true;
   }  // end graph update critical section
 
   VLOG(3) << "[Places Frontend] Places layer: " << places_layer.numNodes() << " nodes, "
@@ -825,7 +824,6 @@ void DsgFrontend::updatePlaceMeshMapping() {
     VLOG(2) << "[DSG Backend] Place-Mesh Update: " << num_invalid
             << " invalid connections";
   }
-  dsg_->updated = true;
 }
 
 void DsgFrontend::assignBowVectors() {

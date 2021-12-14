@@ -6,3 +6,4 @@ pgmo:
     d_graph_resolution: 2.5
     voxblox_queue_size: 1
 building_color: [0.572, 0.204, 0.922]
+mesh_queue_size: 10
