@@ -18,6 +18,15 @@ pgmo:
         pcm_trans_threshold: 0.005
         pcm_rot_threshold: 0.001
         gnc_alpha: 0.0
+    add_initial_prior: true
+    covariance:
+        odom: 1.0e-06
+        loop_close: 1.0e-04
+        prior: 1.0e-08
+        mesh_mesh: 1.0e-02
+        pose_mesh: 1.0e-04
+        place_mesh: 1.0e-04
+        place_edge: 1.0e-04
 enable_rooms: true
 room_finder:
     min_dilation_m: 0.43

@@ -145,6 +145,9 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
     }
   }
 
+  nh_.getParam("pgmo/covariance/place_mesh", place_mesh_variance_);
+  nh_.getParam("pgmo/covariance/place_edge", place_edge_variance_);
+
   deformation_graph_->setParams(params);
   setVerboseFlag(false);
 
@@ -574,7 +577,8 @@ void DsgBackend::addPlacesToDeformationGraph() {
                                                 place_node_poses,
                                                 place_node_valences,
                                                 robot_vertex_prefix_,
-                                                false);
+                                                false,
+                                                place_mesh_variance_);
   }
 
   {
@@ -591,7 +595,7 @@ void DsgBackend::addPlacesToDeformationGraph() {
       mst_e.pose = kimera_pgmo::GtsamToRos(source.between(target));
       mst_edges.edges.push_back(mst_e);
     }
-    deformation_graph_->addNewTempEdges(mst_edges);
+    deformation_graph_->addNewTempEdges(mst_edges, place_edge_variance_);
   }
 }
 
@@ -619,7 +623,8 @@ bool DsgBackend::addInternalLCDToDeformationGraph() {
 
     // note that pose graph convention is pose = src.between(dest) where the edge
     // connects frames "to -> from" (i.e. src = to, dest = from, pose = to_T_from)
-    deformation_graph_->addNewBetween(to_key, from_key, result.to_T_from);
+    deformation_graph_->addNewBetween(
+        to_key, from_key, result.to_T_from, gtsam::Pose3(), lc_variance_);
     loop_closures_.push_back(
         {result.to_node, result.from_node, result.to_T_from, true, result.level});
 

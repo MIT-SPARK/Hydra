@@ -132,6 +132,9 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   bool enable_node_merging_;
   bool call_update_periodically_;
 
+  double place_mesh_variance_;
+  double place_edge_variance_;
+
   char robot_prefix_;
   char robot_vertex_prefix_;
   kimera_pgmo::Path trajectory_;
