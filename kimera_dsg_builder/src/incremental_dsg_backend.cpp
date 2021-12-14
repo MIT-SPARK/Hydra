@@ -339,7 +339,7 @@ void DsgBackend::runVisualizer() {
 }
 
 bool DsgBackend::updatePrivateDsg() {
-  // TODO(Yun) Fix to update with only new changes while ignoring old
+  std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
   bool have_frontend_updates = shared_dsg_->updated;
   if (have_frontend_updates) {
     {  // start joint critical section
@@ -357,12 +357,11 @@ bool DsgBackend::updatePrivateDsg() {
           shared_places_copy_.removeNode(place_id);
         }
       }
-
-      if (dsg_log_) {
-        backend_graph_logger_.logGraph(private_dsg_->graph);
-      }
+      shared_dsg_->updated = false;
     }  // end joint critical section
-    shared_dsg_->updated = false;
+    if (dsg_log_) {
+      backend_graph_logger_.logGraph(private_dsg_->graph);
+    }
   }
 
   return have_frontend_updates;
@@ -453,27 +452,17 @@ void DsgBackend::runPgmo() {
     status_.total_values_ = deformation_graph_->getGtsamValues().size();
 
     bool have_dsg_updates = false;
-    {
-      // start private dsg critical section
-      std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
-      have_dsg_updates = updatePrivateDsg();
-      if (optimize_on_lc_ && have_graph_updates && have_loopclosures_) {
-        optimize();
-      } else if (call_update_periodically_ && have_dsg_updates) {
-        std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
-        updateDsgMesh();
-        callUpdateFunctions();
-      }
-      private_dsg_->updated = true;
-    }  // end private dsg critical section
+    have_dsg_updates = updatePrivateDsg();
+    if (optimize_on_lc_ && have_graph_updates && have_loopclosures_) {
+      optimize();
+    } else if (call_update_periodically_ && have_dsg_updates) {
+      std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
+      updateDsgMesh();
+      callUpdateFunctions();
+    }
 
     if (have_graph_updates && pgmo_log_) {
       logStatus();
-    }
-
-    if (have_dsg_updates) {
-      updateRoomsNodes();
-      updateBuildingNode();
     }
 
     if (should_shutdown_ && !have_graph_updates && !have_dsg_updates) {
@@ -664,9 +653,12 @@ void DsgBackend::updateDsgMesh() {
                                             robot_vertex_prefix_,
                                             num_interp_pts_,
                                             interp_horizon_);
-
-  private_dsg_->graph->setMeshDirectly(opt_mesh);
-  private_dsg_->updated = true;
+  {
+    // start private dsg critical section
+    std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
+    private_dsg_->graph->setMeshDirectly(opt_mesh);
+    private_dsg_->updated = true;
+  }
 
   if (viz_mesh_mesh_edges_pub_.getNumSubscribers() > 0 ||
       viz_pose_mesh_edges_pub_.getNumSubscribers() > 0) {
@@ -697,10 +689,20 @@ void DsgBackend::optimize() {
 void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,
                                      const gtsam::Values& pgmo_values) {
   ScopedTimer spin_timer("backend/update_layers", last_timestamp_);
-  for (const auto& update_func : dsg_update_funcs_) {
-    // TODO(nathan) might need diferrent values
-    update_func(*private_dsg_->graph, places_values, pgmo_values, enable_node_merging_);
+  {
+    // start private dsg critical section
+    std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
+    for (const auto& update_func : dsg_update_funcs_) {
+      // TODO(nathan) might need diferrent values
+      update_func(*private_dsg_->graph,
+                  places_values,
+                  pgmo_values,
+                  enable_node_merging_);
+    }
   }
+  updateRoomsNodes();
+  updateBuildingNode();
+  private_dsg_->updated = true;
 }
 
 ActiveNodeSet DsgBackend::getNodesForRoomDetection(const NodeIdSet& latest_places) {

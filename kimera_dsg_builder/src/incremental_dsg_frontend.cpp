@@ -220,6 +220,7 @@ void DsgFrontend::runMeshFrontend() {
     {  // timing scope
       ScopedTimer timer("frontend/object_detection", object_timestamp, true, 1, false);
       segmenter_->detectObjects(dsg_, mesh_frontend_.getActiveFullMeshVertices());
+      dsg_->updated = true;
     }
 
     {  // start dsg critical section
@@ -228,9 +229,9 @@ void DsgFrontend::runMeshFrontend() {
       // be connected to parents inside the dsg critical section (would need to make
       // detectObjects non-threadsafe / integrate more cleanly)
       addPlaceObjectEdges();
+      dsg_->updated = true;
     }  // end dsg critical section
 
-    dsg_->updated = true;
     r.sleep();
   }
 }
@@ -307,6 +308,7 @@ void DsgFrontend::runPlaces() {
                               .attributes<PlaceNodeAttributes>();
             attrs.is_active = false;
           }
+          dsg_->updated = true;
         }
       }
     }  // end places queue critical section
@@ -318,6 +320,8 @@ void DsgFrontend::runPlaces() {
       std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
       frontend_graph_logger_.logGraph(dsg_->graph);
     }
+
+    r.sleep();
   }
 }
 
@@ -385,9 +389,8 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
     addPlaceObjectEdges(&objects_to_check);
 
     *dsg_->latest_places = active_nodes;
+    dsg_->updated = true;
   }  // end graph update critical section
-
-  dsg_->updated = true;
 
   VLOG(3) << "[Places Frontend] Places layer: " << places_layer.numNodes() << " nodes, "
           << places_layer.numEdges() << " edges";
