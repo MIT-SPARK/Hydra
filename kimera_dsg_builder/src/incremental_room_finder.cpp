@@ -678,15 +678,19 @@ void RoomFinder::updateRoomsFromClusters(SharedDsgInfo& dsg,
     }
   }
 
-  for (const auto& room : seen_rooms) {
-    updateRoomCentroid(*dsg.graph, room);
+  std::set<NodeId> empty_rooms;
+  const SceneGraphLayer& rooms =
+      dsg.graph->getLayer(KimeraDsgLayers::ROOMS).value();
+  for (const auto& id_node_pair : rooms.nodes()) {
+    if (id_node_pair.second->children().size() < config_.min_room_size) {
+      empty_rooms.insert(id_node_pair.first);
+    } else {
+      incremental::updateRoomCentroid(*dsg.graph, id_node_pair.first);
+    }
   }
 
-  for (const auto& id_room_pair : previous_rooms) {
-    const SceneGraphNode& room = dsg.graph->getNode(id_room_pair.first).value();
-    if (room.children().size() < config_.min_room_size) {
-      dsg.graph->removeNode(id_room_pair.first);
-    }
+  for (const auto& room : empty_rooms) {
+    dsg.graph->removeNode(room);
   }
 
   for (const auto& node_id : active_nodes) {
