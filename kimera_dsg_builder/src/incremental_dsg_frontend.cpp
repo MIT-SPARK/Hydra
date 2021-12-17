@@ -233,7 +233,6 @@ void DsgFrontend::runMeshFrontend() {
       addPlaceObjectEdges();
     }  // end dsg critical section
     dsg_->updated = true;
-    r.sleep();
   }
 }
 
@@ -321,7 +320,6 @@ void DsgFrontend::runPlaces() {
       frontend_graph_logger_.logGraph(dsg_->graph);
     }
     dsg_->updated = true;
-    r.sleep();
   }
 }
 
