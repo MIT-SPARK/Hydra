@@ -172,9 +172,11 @@ void eval_layer(const GvdIntegratorConfig& gvd_config,
   size_t valid = 0;
   std::vector<double> dist_errors;
   std::vector<double> dist_to_closest;
+  std::vector<NodeId> node_order;
   for (const auto& id_node_pair : places.nodes()) {
     Eigen::Vector3d position = id_node_pair.second->attributes().position;
     dist_to_closest.push_back(finder.distance(position));
+    node_order.push_back(id_node_pair.first);
 
     voxblox::Point vox_pos = position.cast<float>();
     const GvdVoxel* voxel = gvd_layer.getVoxelPtrByCoordinates(vox_pos);
@@ -206,6 +208,7 @@ void eval_layer(const GvdIntegratorConfig& gvd_config,
       {"closest_dists", dist_to_closest},
       {"total", places.numNodes()},
       {"mean", mean},
+      {"nodes", node_order},
       {"min", valid ? *min : std::numeric_limits<double>::quiet_NaN()},
       {"max", valid ? *max : std::numeric_limits<double>::quiet_NaN()},
   };

@@ -152,6 +152,10 @@ void DsgFrontend::startMeshFrontend() {
   std::string mesh_ns;
   nh_.param<std::string>("mesh_ns", mesh_ns, "");
 
+  int min_object_size = 30;
+  nh_.param<int>("ec_min_cluster_size", min_object_size);
+  min_object_size_ = static_cast<size_t>(min_object_size);
+
   mesh_frontend_ros_queue_.reset(new ros::CallbackQueue());
 
   ros::NodeHandle mesh_nh(nh_, mesh_ns);
@@ -222,6 +226,27 @@ void DsgFrontend::runMeshFrontend() {
 
     {  // timing scope
       ScopedTimer timer("frontend/object_detection", object_timestamp, true, 1, false);
+      auto invalid_indices = mesh_frontend_.getInvalidIndices();
+      { // start dsg critical section
+        std::unique_lock<std::mutex> lock(dsg_->mutex);
+        for (const auto& idx : invalid_indices) {
+          dsg_->graph->invalidateMeshVertex(idx);
+        }
+
+        std::vector<NodeId> objects_to_delete;
+        const SceneGraphLayer& objects = dsg_->graph->getLayer(KimeraDsgLayers::OBJECTS).value();
+        for (const auto& id_node_pair : objects.nodes()) {
+          auto connections = dsg_->graph->getMeshConnectionIndices(id_node_pair.first);
+          if (connections.size() < min_object_size_) {
+            objects_to_delete.push_back(id_node_pair.first);
+          }
+        }
+
+        for (const auto& node : objects_to_delete) {
+          dsg_->graph->removeNode(node);
+        }
+      } // end dsg critical section
+
       segmenter_->detectObjects(dsg_, mesh_frontend_.getActiveFullMeshVertices());
     }
 

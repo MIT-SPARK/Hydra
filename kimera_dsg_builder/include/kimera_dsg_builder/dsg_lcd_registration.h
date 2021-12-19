@@ -30,8 +30,7 @@ using RegistrationFunc =
                                           NodeId)>;
 
 using TeaserParams = teaser::RobustRegistrationSolver::Params;
-using TeaserInlierMode =
-    teaser::RobustRegistrationSolver::INLIER_SELECTION_MODE;
+using TeaserInlierMode = teaser::RobustRegistrationSolver::INLIER_SELECTION_MODE;
 
 struct PlaceRegistrationFunctor {
   PlaceRegistrationFunctor(const LayerRegistrationConfig& config,
@@ -104,9 +103,23 @@ LayerRegistrationSolution registerDsgLayer(
 
   const SceneGraphLayer& dest = problem.dest_layer ? *problem.dest_layer : src;
   for (const auto& src_id : problem.src_nodes) {
+    auto src_node_opt = src.getNode(src_id);
+    if (!src_node_opt) {
+      VLOG(1) << "[DSG LCD]: Missing source node " << NodeSymbol(src_id).getLabel()
+              << " from graph during registration";
+      continue;
+    }
+
+    const SceneGraphNode& src_node = *src_node_opt;
+
     for (const auto& dest_id : problem.dest_nodes) {
-      const SceneGraphNode& src_node = src.getNode(src_id).value();
-      const SceneGraphNode& dest_node = dest.getNode(dest_id).value();
+      auto dest_node_opt = dest.getNode(dest_id);
+      if (!dest_node_opt) {
+        VLOG(1) << "[DSG LCD]: Missing destination node "
+                << NodeSymbol(dest_id).getLabel() << " from graph during registration";
+        continue;
+      }
+      const SceneGraphNode& dest_node = *dest_node_opt;
 
       if (correspondence_func(src_node, dest_node)) {
         correspondences.emplace_back(src_id, dest_id);

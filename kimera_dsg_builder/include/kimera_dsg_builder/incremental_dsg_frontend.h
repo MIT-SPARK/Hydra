@@ -95,6 +95,7 @@ class DsgFrontend {
   ros::Subscriber mesh_sub_;
   std::unique_ptr<ros::CallbackQueue> mesh_frontend_ros_queue_;
   std::unique_ptr<std::thread> mesh_frontend_thread_;
+  size_t min_object_size_;
 
   ros::Subscriber active_places_sub_;
   std::unique_ptr<NearestNodeFinder> places_nn_finder_;

@@ -12,3 +12,4 @@ label_height: 0.9
 label_scale: 0.8
 interlayer_edge_insertion_skip: 10
 visualize_interlayer_edges: false
+z_offset_scale: 1.5

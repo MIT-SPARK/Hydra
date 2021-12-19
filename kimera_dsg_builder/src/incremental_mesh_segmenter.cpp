@@ -170,8 +170,10 @@ void MeshSegmenter::archiveOldObjects(const DynamicSceneGraph& graph,
   std::list<NodeId> removed_nodes;
   for (const auto id_time_pair : active_object_timestamps_) {
     if (!graph.hasNode(id_time_pair.first)) {
+      // TODO(nathan) consider removing node
       continue;
     }
+
     if (latest_timestamp - id_time_pair.second > active_object_horizon_s_) {
       const NodeId curr_id = id_time_pair.first;
       removed_nodes.push_back(curr_id);
