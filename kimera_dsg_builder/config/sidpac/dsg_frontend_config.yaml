@@ -1,7 +1,8 @@
 pgmo:
     horizon: 100.0
     output_mesh_resolution: 0.04
-    compression_method: 1  # voxblox
+    graph_compression_method: 1  # voxblox
+    full_compression_method: 2  # voxel clearing
     robot_id: 0
     d_graph_resolution: 2.5
     voxblox_queue_size: 1
