@@ -645,8 +645,7 @@ void DsgBackend::updateDsgMesh() {
   if (input_mesh.cloud.height * input_mesh.cloud.width == 0) {
     return;
   }
-  LOG(INFO) << "Deforming mesh with " << mesh_vertex_stamps.size()
-            << " vertices";
+  VLOG(3) << "Deforming mesh with " << mesh_vertex_stamps.size() << " vertices";
   opt_mesh = deformation_graph_->deformMesh(input_mesh,
                                             mesh_vertex_stamps,
                                             robot_vertex_prefix_,
