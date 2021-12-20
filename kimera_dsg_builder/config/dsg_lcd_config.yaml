@@ -7,11 +7,11 @@ distance_bins: 30
 min_correspondences: 5
 min_inliers: 5
 agent:
-    min_time_separation_s: 150.0
+    min_time_separation_s: 100.0
     min_score: 0.039
     type: "L1"
 object:
-    min_time_separation_s: 150.0
+    min_time_separation_s: 100.0
     min_score: 0.56
     min_registration_score: 0.88
     max_registration_matches: 5
@@ -19,7 +19,7 @@ object:
     min_match_separation_m: 5.0
     type: "L1"
 places:
-    min_time_separation_s: 150.0
+    min_time_separation_s: 100.0
     min_score: 0.76
     type: "L1"
 teaser:
