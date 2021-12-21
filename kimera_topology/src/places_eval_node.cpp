@@ -16,11 +16,11 @@ DEFINE_string(tsdf_file, "", "tsdf file to read");
 DEFINE_string(dsg_file, "", "dsg file to read");
 DEFINE_string(gvd_config, "", "gvd integrator config");
 
-using voxblox::Layer;
-using voxblox::TsdfVoxel;
 using nanoflann::KDTreeSingleIndexAdaptor;
 using nanoflann::KDTreeSingleIndexDynamicAdaptor;
 using nanoflann::L2_Simple_Adaptor;
+using voxblox::Layer;
+using voxblox::TsdfVoxel;
 
 namespace kimera {
 namespace topology {
@@ -152,7 +152,7 @@ struct DistanceFinder {
     size_t idx;
     double dist;
     size_t num_found = kdtree->knnSearch(pos.data(), 1, &idx, &dist);
-    return num_found ? dist : std::numeric_limits<double>::quiet_NaN();
+    return num_found ? std::sqrt(dist) : std::numeric_limits<double>::quiet_NaN();
   }
 
   VoxelKdTreeAdaptor adaptor;
