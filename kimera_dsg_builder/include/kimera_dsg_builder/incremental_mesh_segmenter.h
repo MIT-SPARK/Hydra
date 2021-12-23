@@ -32,7 +32,8 @@ class MeshSegmenter {
   virtual ~MeshSegmenter() = default;
 
   bool detectObjects(const SharedDsgInfo::Ptr& dsg,
-                     const std::vector<size_t>& active_indices);
+                     const std::vector<size_t>& active_indices,
+                     const std::optional<Eigen::Vector3d>& pos);
 
   inline std::unordered_set<NodeId> getObjectsToCheckForPlaces() const {
     return objects_to_check_for_places_;
@@ -75,6 +76,7 @@ class MeshSegmenter {
   std::unique_ptr<ObjectFinder> object_finder_;
 
   double active_object_horizon_s_;
+  double active_index_horizon_m_;
   std::map<uint8_t, std::set<NodeId>> active_objects_;
   std::map<NodeId, double> active_object_timestamps_;
   std::unordered_set<NodeId> objects_to_check_for_places_;

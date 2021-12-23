@@ -77,6 +77,8 @@
         <rosparam file="$(find kimera_dsg_builder)/config/dsg_frontend_config.yaml"/>
         <rosparam file="$(find kimera_dsg_builder)/config/dsg_backend_config.yaml"/>
         <rosparam file="$(arg lcd_config)" ns="lcd"/>
+        <param name="sensor_frame" value="left_cam" if="$(arg use_gt_frame)"/>
+        <param name="sensor_frame" value="left_cam_kimera" unless="$(arg use_gt_frame)"/>
         <param name="dsg/optimize_on_lc" value="$(arg optimize_on_lc)"/>
         <param name="lcd/log_registration_problem" value="$(arg log_registration)"/>
 

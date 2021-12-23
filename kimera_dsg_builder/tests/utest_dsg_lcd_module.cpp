@@ -13,11 +13,7 @@ struct DsgLcdModuleTests : public ::testing::Test {
   virtual ~DsgLcdModuleTests() = default;
 
   virtual void SetUp() override {
-    std::map<LayerId, char> layer_map = {{KimeraDsgLayers::PLACES, 'p'},
-                                         {KimeraDsgLayers::OBJECTS, 'O'},
-                                         {KimeraDsgLayers::ROOMS, 'R'}};
-
-    dsg.reset(new SharedDsgInfo(layer_map, KimeraDsgLayers::MESH));
+    dsg.reset(new DynamicSceneGraph());
 
     object_factory.reset(new ObjectDescriptorFactory(radius, num_classes));
 
@@ -45,13 +41,16 @@ struct DsgLcdModuleTests : public ::testing::Test {
         };
 
     registration_funcs[KimeraDsgLayers::OBJECTS] =
-        [&](SharedDsgInfo& dsg, const DsgRegistrationInput& match, NodeId agent_node) {
+        [&](const DynamicSceneGraph& dsg,
+            const DsgRegistrationInput& match,
+            NodeId agent_node) {
           return (*object_registration)(dsg, match, agent_node);
         };
-    registration_funcs[KimeraDsgLayers::PLACES] =
-        [&](SharedDsgInfo& dsg, const DsgRegistrationInput& match, NodeId agent_node) {
-          return (*places_registration)(dsg, match, agent_node);
-        };
+    registration_funcs[KimeraDsgLayers::PLACES] = [&](const DynamicSceneGraph& dsg,
+                                                      const DsgRegistrationInput& match,
+                                                      NodeId agent_node) {
+      return (*places_registration)(dsg, match, agent_node);
+    };
   }
 
   const double radius = 5.0;
@@ -71,7 +70,7 @@ struct DsgLcdModuleTests : public ::testing::Test {
   std::map<LayerId, RegistrationFunc> registration_funcs;
   std::map<LayerId, ValidationFunc> validation_funcs;
 
-  SharedDsgInfo::Ptr dsg;
+  DynamicSceneGraph::Ptr dsg;
 };
 
 TEST_F(DsgLcdModuleTests, TestEmptyUpdate) {
@@ -95,15 +94,15 @@ TEST_F(DsgLcdModuleTests, TestInvalidNodeUpdate) {
 }
 
 TEST_F(DsgLcdModuleTests, TestNoChildren) {
-  dsg->graph->emplaceNode(
+  dsg->emplaceNode(
       KimeraDsgLayers::PLACES, 1, std::make_unique<NodeAttributes>());
-  dsg->graph->emplaceNode(
+  dsg->emplaceNode(
       KimeraDsgLayers::PLACES, 2, std::make_unique<NodeAttributes>());
-  dsg->graph->emplaceNode(
+  dsg->emplaceNode(
       KimeraDsgLayers::PLACES, 3, std::make_unique<NodeAttributes>());
-  dsg->graph->emplaceNode(
+  dsg->emplaceNode(
       KimeraDsgLayers::PLACES, 4, std::make_unique<NodeAttributes>());
-  dsg->graph->emplaceNode(
+  dsg->emplaceNode(
       KimeraDsgLayers::PLACES, 5, std::make_unique<NodeAttributes>());
 
   DsgLcdModule module(
@@ -116,14 +115,14 @@ TEST_F(DsgLcdModuleTests, TestNoChildren) {
 }
 
 TEST_F(DsgLcdModuleTests, TestNoDynamicChildren) {
-  dsg->graph->emplaceNode(
+  dsg->emplaceNode(
       KimeraDsgLayers::PLACES, 1, std::make_unique<NodeAttributes>());
-  dsg->graph->emplaceNode(
+  dsg->emplaceNode(
       KimeraDsgLayers::OBJECTS, 2, std::make_unique<NodeAttributes>());
-  dsg->graph->emplaceNode(
+  dsg->emplaceNode(
       KimeraDsgLayers::OBJECTS, 3, std::make_unique<NodeAttributes>());
-  dsg->graph->insertEdge(1, 2);
-  dsg->graph->insertEdge(1, 3);
+  dsg->insertEdge(1, 2);
+  dsg->insertEdge(1, 3);
 
   DsgLcdModule module(
       config, descriptor_factories, registration_funcs, validation_funcs);
@@ -136,25 +135,25 @@ TEST_F(DsgLcdModuleTests, TestNoDynamicChildren) {
 
 TEST_F(DsgLcdModuleTests, TestActualChildren) {
   using namespace std::chrono_literals;
-  dsg->graph->emplaceNode(
+  dsg->emplaceNode(
       KimeraDsgLayers::PLACES, 1, std::make_unique<PlaceNodeAttributes>());
-  dsg->graph->emplaceNode(
+  dsg->emplaceNode(
       KimeraDsgLayers::OBJECTS, 2, std::make_unique<ObjectNodeAttributes>());
-  dsg->graph->emplaceDynamicNode(
+  dsg->emplaceDynamicNode(
       KimeraDsgLayers::AGENTS,
       'a',
       10ns,
       std::make_unique<AgentNodeAttributes>(
           Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
-  dsg->graph->emplaceDynamicNode(
+  dsg->emplaceDynamicNode(
       KimeraDsgLayers::AGENTS,
       'a',
       20ns,
       std::make_unique<AgentNodeAttributes>(
           Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
-  dsg->graph->insertEdge(1, 2);
-  dsg->graph->insertEdge(1, NodeSymbol('a', 0));
-  dsg->graph->insertEdge(1, NodeSymbol('a', 1));
+  dsg->insertEdge(1, 2);
+  dsg->insertEdge(1, NodeSymbol('a', 0));
+  dsg->insertEdge(1, NodeSymbol('a', 1));
 
   DsgLcdModule module(
       config, descriptor_factories, registration_funcs, validation_funcs);
@@ -167,7 +166,7 @@ TEST_F(DsgLcdModuleTests, TestActualChildren) {
 
 TEST_F(DsgLcdModuleTests, TestEmptySearch) {
   using namespace std::chrono_literals;
-  dsg->graph->emplaceDynamicNode(
+  dsg->emplaceDynamicNode(
       KimeraDsgLayers::AGENTS,
       'a',
       10ns,
@@ -185,25 +184,25 @@ TEST_F(DsgLcdModuleTests, TestEmptySearch) {
 
 TEST_F(DsgLcdModuleTests, TestNonEmptySearch) {
   using namespace std::chrono_literals;
-  dsg->graph->emplaceNode(
+  dsg->emplaceNode(
       KimeraDsgLayers::PLACES, 1, std::make_unique<PlaceNodeAttributes>());
-  dsg->graph->emplaceNode(
+  dsg->emplaceNode(
       KimeraDsgLayers::OBJECTS, 2, std::make_unique<ObjectNodeAttributes>());
-  dsg->graph->emplaceDynamicNode(
+  dsg->emplaceDynamicNode(
       KimeraDsgLayers::AGENTS,
       'a',
       10ns,
       std::make_unique<AgentNodeAttributes>(
           Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
-  dsg->graph->emplaceDynamicNode(
+  dsg->emplaceDynamicNode(
       KimeraDsgLayers::AGENTS,
       'a',
       20ns,
       std::make_unique<AgentNodeAttributes>(
           Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
-  dsg->graph->insertEdge(1, 2);
-  dsg->graph->insertEdge(1, NodeSymbol('a', 0));
-  dsg->graph->insertEdge(1, NodeSymbol('a', 1));
+  dsg->insertEdge(1, 2);
+  dsg->insertEdge(1, NodeSymbol('a', 0));
+  dsg->insertEdge(1, NodeSymbol('a', 1));
 
   DsgLcdModule module(
       config, descriptor_factories, registration_funcs, validation_funcs);

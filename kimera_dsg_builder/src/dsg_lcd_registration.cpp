@@ -98,7 +98,7 @@ PlaceRegistrationFunctor::PlaceRegistrationFunctor(
     : config(config), solver(params) {}
 
 DsgRegistrationSolution PlaceRegistrationFunctor::operator()(
-    SharedDsgInfo& dsg,
+    const DynamicSceneGraph& dsg,
     const DsgRegistrationInput& match,
     NodeId query_agent_id) {
   if (match.query_nodes.size() <= 3 || match.match_nodes.size() <= 3) {
@@ -108,13 +108,10 @@ DsgRegistrationSolution PlaceRegistrationFunctor::operator()(
   LayerRegistrationProblem<std::set<NodeId>> problem;
   problem.src_nodes = match.query_nodes;
   problem.dest_nodes = match.match_nodes;
-  problem.src_mutex = &dsg.mutex;
 
-  const SceneGraphLayer& layer = dsg.graph->getLayer(KimeraDsgLayers::PLACES).value();
+  const SceneGraphLayer& layer = dsg.getLayer(KimeraDsgLayers::PLACES).value();
   auto solution = registerDsgLayerPairwise(config, solver, problem, layer);
-  std::unique_lock<std::mutex> lock(dsg.mutex);
-  return getFullSolutionFromLayer(
-      *dsg.graph, solution, query_agent_id, match.match_root);
+  return getFullSolutionFromLayer(dsg, solution, query_agent_id, match.match_root);
 }
 
 ObjectRegistrationFunctor::ObjectRegistrationFunctor(
@@ -123,21 +120,19 @@ ObjectRegistrationFunctor::ObjectRegistrationFunctor(
     : config(config), solver(params) {}
 
 void logRegistrationProblem(const std::string& dir_path,
-                            SharedDsgInfo& info,
+                            const DynamicSceneGraph& dsg,
                             const LayerRegistrationSolution& solution,
                             const DsgRegistrationInput& match,
                             NodeId query_agent_id) {
-  std::unique_lock<std::mutex> lock(info.mutex);
-
   json record;
   record["query_id"] = query_agent_id;
   record["query_node"] =
-      info.graph->getNode(query_agent_id).value().get().attributes().toJson();
+      dsg.getNode(query_agent_id).value().get().attributes().toJson();
   record["query_set"] = match.query_nodes;
   record["match_set"] = match.match_nodes;
   record["nodes"] = {};
 
-  auto match_pose_info = getAgentPose(*info.graph, match.match_root);
+  auto match_pose_info = getAgentPose(dsg, match.match_root);
   record["match_id"] = match_pose_info.id;
   record["world_q_match"] = match_pose_info.world_T_body.rotation().quaternion();
   record["world_t_match"] = match_pose_info.world_T_body.translation();
@@ -145,7 +140,7 @@ void logRegistrationProblem(const std::string& dir_path,
 
   for (const auto& node : match.query_nodes) {
     record["nodes"][std::to_string(node)] =
-        info.graph->getNode(node).value().get().attributes().toJson();
+        dsg.getNode(node).value().get().attributes().toJson();
   }
 
   record["solution_valid"] = solution.valid;
@@ -163,15 +158,11 @@ void logRegistrationProblem(const std::string& dir_path,
 }
 
 DsgRegistrationSolution ObjectRegistrationFunctor::operator()(
-    SharedDsgInfo& dsg,
+    const DynamicSceneGraph& dsg,
     const DsgRegistrationInput& match,
     NodeId query_agent_id) {
-  uint64_t timestamp;
-  {  // start critical section
-    std::unique_lock<std::mutex> lock(dsg.mutex);
-    timestamp =
-        dsg.graph->getDynamicNode(query_agent_id).value().get().timestamp.count();
-  }  // end critical section
+  uint64_t timestamp =
+      dsg.getDynamicNode(query_agent_id).value().get().timestamp.count();
 
   ScopedTimer timer("lcd/register_object", timestamp, true, 2, false);
   if (match.query_nodes.size() <= 3 || match.match_nodes.size() <= 3) {
@@ -181,9 +172,8 @@ DsgRegistrationSolution ObjectRegistrationFunctor::operator()(
   LayerRegistrationProblem<std::set<NodeId>> problem;
   problem.src_nodes = match.query_nodes;
   problem.dest_nodes = match.match_nodes;
-  problem.src_mutex = &dsg.mutex;
 
-  const SceneGraphLayer& layer = dsg.graph->getLayer(KimeraDsgLayers::OBJECTS).value();
+  const SceneGraphLayer& layer = dsg.getLayer(KimeraDsgLayers::OBJECTS).value();
   auto solution = registerDsgLayerSemantic(config, solver, problem, layer);
 
   if (config.log_registration_problem) {
@@ -191,9 +181,7 @@ DsgRegistrationSolution ObjectRegistrationFunctor::operator()(
         config.registration_output_path, dsg, solution, match, query_agent_id);
   }
 
-  std::unique_lock<std::mutex> lock(dsg.mutex);
-  return getFullSolutionFromLayer(
-      *dsg.graph, solution, query_agent_id, match.match_root);
+  return getFullSolutionFromLayer(dsg, solution, query_agent_id, match.match_root);
 }
 
 inline size_t getFrameIdFromNode(const DynamicSceneGraph& graph, NodeId node_id) {
@@ -208,7 +196,7 @@ inline size_t getTimestampFromNode(const DynamicSceneGraph& graph, NodeId node_i
   return NodeSymbol(attrs.external_key).categoryId();
 }
 
-DsgRegistrationSolution registerAgentMatch(incremental::SharedDsgInfo& dsg,
+DsgRegistrationSolution registerAgentMatch(const DynamicSceneGraph& dsg,
                                            const DsgRegistrationInput& match,
                                            NodeId) {
   if (match.query_nodes.empty() || match.match_nodes.empty()) {
@@ -226,12 +214,9 @@ DsgRegistrationSolution registerAgentMatch(incremental::SharedDsgInfo& dsg,
 
   uint64_t timestamp;
   kimera_vio_ros::LcdFrameRegistration msg;
-  {  // start critical section
-    std::unique_lock<std::mutex> lock(dsg.mutex);
-    msg.request.query = getFrameIdFromNode(*dsg.graph, query_id);
-    msg.request.match = getFrameIdFromNode(*dsg.graph, match_id);
-    timestamp = dsg.graph->getDynamicNode(query_id).value().get().timestamp.count();
-  }  // end critical section
+  msg.request.query = getFrameIdFromNode(dsg, query_id);
+  msg.request.match = getFrameIdFromNode(dsg, match_id);
+  timestamp = dsg.getDynamicNode(query_id).value().get().timestamp.count();
 
   ScopedTimer timer("lcd/register_agent", timestamp, true, 2, false);
 

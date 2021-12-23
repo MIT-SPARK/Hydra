@@ -8,3 +8,7 @@ pgmo:
     voxblox_queue_size: 1
 building_color: [0.572, 0.204, 0.922]
 mesh_queue_size: 10
+active_objects_horizon_s: 10.0
+active_index_horizon_m: 5.0
+enable_active_mesh_pub: false
+enable_segmented_mesh_pub: false

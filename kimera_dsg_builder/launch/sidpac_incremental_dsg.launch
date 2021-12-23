@@ -74,6 +74,7 @@
         <rosparam file="$(find kimera_dsg_builder)/config/sidpac/dsg_frontend_config.yaml"/>
         <rosparam file="$(find kimera_dsg_builder)/config/sidpac/dsg_backend_config.yaml"/>
         <rosparam file="$(find kimera_dsg_builder)/config/sidpac/dsg_lcd_config.yaml" ns="lcd"/>
+        <param name="sensor_frame" value="$(arg sensor_frame)"/>
 
         <param name="pgmo/log_path" value="$(arg pgmo_log_path)"/>
         <param name="pgmo/log_output" value="$(arg pgmo_should_log)"/>

@@ -63,7 +63,7 @@ struct DsgRegistrationTests : public ::testing::Test {
                                          {KimeraDsgLayers::OBJECTS, 'O'},
                                          {KimeraDsgLayers::ROOMS, 'R'}};
 
-    dsg.reset(new SharedDsgInfo(layer_map, KimeraDsgLayers::MESH));
+    dsg.reset(new DynamicSceneGraph());
 
     using namespace std::chrono_literals;
 
@@ -74,36 +74,36 @@ struct DsgRegistrationTests : public ::testing::Test {
 
     src_points = 5.0 * Eigen::MatrixXd::Random(3, 30);
 
-    CHECK(dsg->graph->hasLayer(KimeraDsgLayers::OBJECTS));
+    CHECK(dsg->hasLayer(KimeraDsgLayers::OBJECTS));
 
     for (int i = 0; i < src_points.cols(); ++i) {
       SemanticNodeAttributes attrs;
       attrs.position = src_points.col(i);
       attrs.semantic_label = i;
-      CHECK(dsg->graph->emplaceNode(KimeraDsgLayers::PLACES,
-                                    NodeSymbol('p', i),
-                                    std::make_unique<SemanticNodeAttributes>(attrs)));
-      CHECK(dsg->graph->emplaceNode(KimeraDsgLayers::OBJECTS,
-                                    NodeSymbol('O', i),
-                                    std::make_unique<SemanticNodeAttributes>(attrs)));
-      dsg->graph->insertEdge(NodeSymbol('p', i), NodeSymbol('O', i));
+      CHECK(dsg->emplaceNode(KimeraDsgLayers::PLACES,
+                             NodeSymbol('p', i),
+                             std::make_unique<SemanticNodeAttributes>(attrs)));
+      CHECK(dsg->emplaceNode(KimeraDsgLayers::OBJECTS,
+                             NodeSymbol('O', i),
+                             std::make_unique<SemanticNodeAttributes>(attrs)));
+      dsg->insertEdge(NodeSymbol('p', i), NodeSymbol('O', i));
 
       attrs.position = dest_R_src * src_points.col(i) + dest_t_src;
-      CHECK(dsg->graph->emplaceNode(KimeraDsgLayers::PLACES,
-                                    NodeSymbol('p', i + src_points.cols()),
-                                    std::make_unique<SemanticNodeAttributes>(attrs)));
-      CHECK(dsg->graph->emplaceNode(KimeraDsgLayers::OBJECTS,
-                                    NodeSymbol('O', i + src_points.cols()),
-                                    std::make_unique<SemanticNodeAttributes>(attrs)));
-      dsg->graph->insertEdge(NodeSymbol('p', i + src_points.cols()),
-                             NodeSymbol('O', i + src_points.cols()));
+      CHECK(dsg->emplaceNode(KimeraDsgLayers::PLACES,
+                             NodeSymbol('p', i + src_points.cols()),
+                             std::make_unique<SemanticNodeAttributes>(attrs)));
+      CHECK(dsg->emplaceNode(KimeraDsgLayers::OBJECTS,
+                             NodeSymbol('O', i + src_points.cols()),
+                             std::make_unique<SemanticNodeAttributes>(attrs)));
+      dsg->insertEdge(NodeSymbol('p', i + src_points.cols()),
+                      NodeSymbol('O', i + src_points.cols()));
     }
 
-    CHECK(dsg->graph->hasNode(NodeSymbol('O', 40)));
+    CHECK(dsg->hasNode(NodeSymbol('O', 40)));
 
     Eigen::Quaterniond world_q_body1(std::cos(M_PI / 8), std::sin(M_PI / 8), 0.0, 0.0);
     Eigen::Vector3d world_t_body1(-1.0, 0.2, 0.5);
-    dsg->graph->emplaceDynamicNode(
+    dsg->emplaceDynamicNode(
         KimeraDsgLayers::AGENTS,
         'a',
         10ns,
@@ -114,14 +114,14 @@ struct DsgRegistrationTests : public ::testing::Test {
 
     Eigen::Quaterniond dest_q_body2 = Eigen::Quaterniond(dest_R_src) * world_q_body2;
     Eigen::Vector3d dest_t_body2 = dest_R_src * world_t_body2 + dest_t_src;
-    dsg->graph->emplaceDynamicNode(
+    dsg->emplaceDynamicNode(
         KimeraDsgLayers::AGENTS,
         'a',
         20ns,
         std::make_unique<AgentNodeAttributes>(dest_q_body2, dest_t_body2, NodeId(0)));
 
-    dsg->graph->insertEdge(NodeSymbol('p', 0), NodeSymbol('a', 0));
-    dsg->graph->insertEdge(NodeSymbol('p', src_points.cols()), NodeSymbol('a', 1));
+    dsg->insertEdge(NodeSymbol('p', 0), NodeSymbol('a', 0));
+    dsg->insertEdge(NodeSymbol('p', src_points.cols()), NodeSymbol('a', 1));
 
     gtsam::Pose3 world_T_to(gtsam::Rot3(world_q_body1), world_t_body1);
     gtsam::Pose3 world_T_from(gtsam::Rot3(world_q_body2), world_t_body2);
@@ -135,7 +135,7 @@ struct DsgRegistrationTests : public ::testing::Test {
 
   gtsam::Pose3 to_T_from;
 
-  SharedDsgInfo::Ptr dsg;
+  DynamicSceneGraph::Ptr dsg;
   LayerRegistrationConfig reg_config;
 };
 

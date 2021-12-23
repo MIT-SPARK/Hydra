@@ -80,37 +80,35 @@ bool DsgLcdModule::addNewDescriptors(const DynamicSceneGraph& graph,
 }
 
 void DsgLcdModule::updateDescriptorCache(
-    SharedDsgInfo& dsg,
+    const DynamicSceneGraph& dsg,
     const std::unordered_set<NodeId>& archived_places,
     uint64_t timestamp) {
-  std::unique_lock<std::mutex> lock(dsg.mutex);
-
   ScopedTimer timer("lcd/update_descriptors", timestamp, true, 2, false);
 
   std::set<NodeId> new_agent_nodes;
   for (const auto& place_id : archived_places) {
-    if (!dsg.graph->hasNode(place_id)) {
+    if (!dsg.hasNode(place_id)) {
       continue;  // ideally this doesn't happen in practice, but worth building in the
                  // sanity check for now
     }
 
-    const SceneGraphNode& node = dsg.graph->getNode(place_id).value();
+    const SceneGraphNode& node = dsg.getNode(place_id).value();
 
     for (const auto& child : node.children()) {
-      if (dsg.graph->isDynamic(child)) {
+      if (dsg.isDynamic(child)) {
         new_agent_nodes.insert(child);
       }
     }
   }
 
   for (const auto& agent_node : new_agent_nodes) {
-    const DynamicSceneGraphNode& node = dsg.graph->getDynamicNode(agent_node).value();
-    addNewDescriptors(*dsg.graph, node);
+    const DynamicSceneGraphNode& node = dsg.getDynamicNode(agent_node).value();
+    addNewDescriptors(dsg, node);
   }
 }
 
 std::vector<DsgRegistrationSolution> DsgLcdModule::registerAndVerify(
-    SharedDsgInfo& dsg,
+    const DynamicSceneGraph& dsg,
     const std::map<size_t, LayerSearchResults>& matches,
     NodeId agent_id,
     uint64_t timestamp) const {
@@ -165,12 +163,12 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::registerAndVerify(
           CHECK(matches.count(idx));
           const LayerSearchResults& vmatch = matches.at(vidx);
 
-          if (!validation_funcs_.at(vidx)(*dsg.graph, vmatch)) {
+          if (!validation_funcs_.at(vidx)(dsg, vmatch)) {
             registration_result.valid = false;
             break;
           }
         }
-        // still valid after validation 
+        // still valid after validation
         if (registration_result.valid) {
           results.push_back(registration_result);
         }
@@ -181,7 +179,7 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::registerAndVerify(
   return results;
 }
 
-std::vector<DsgRegistrationSolution> DsgLcdModule::detect(SharedDsgInfo& dsg,
+std::vector<DsgRegistrationSolution> DsgLcdModule::detect(const DynamicSceneGraph& dsg,
                                                           NodeId agent_id,
                                                           uint64_t timestamp) {
   ScopedTimer timer("lcd/detect", timestamp, true, 2, false);
@@ -190,16 +188,14 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::detect(SharedDsgInfo& dsg,
     prev_valid_roots.insert(id_desc_pair.first);
   }
 
+  const DsgNode& latest_node = dsg.getDynamicNode(agent_id).value();
+
   std::map<size_t, LayerSearchResults> matches;
   for (size_t idx = max_internal_index_ - 1; idx > 0; --idx) {
     const auto& config = match_config_map_.at(idx);
 
     Descriptor::Ptr descriptor;
-    {  // start dsg critical section
-      std::unique_lock<std::mutex> lock(dsg.mutex);
-      const DsgNode& latest_node = dsg.graph->getDynamicNode(agent_id).value();
-      descriptor = layer_factories_[config.layer](*dsg.graph, latest_node);
-    }  // end dsg critical section
+    descriptor = layer_factories_[config.layer](dsg, latest_node);
 
     if (descriptor) {
       matches[idx] = searchDescriptors(*descriptor,
@@ -216,11 +212,7 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::detect(SharedDsgInfo& dsg,
   }
 
   Descriptor::Ptr descriptor;
-  {  // start dsg critical section
-    std::unique_lock<std::mutex> lock(dsg.mutex);
-    const DsgNode& latest_node = dsg.graph->getDynamicNode(agent_id).value();
-    descriptor = makeAgentDescriptor(*dsg.graph, latest_node);
-  }  // end dsg critical section
+  descriptor = makeAgentDescriptor(dsg, latest_node);
 
   if (descriptor) {
     matches[0] = searchLeafDescriptors(*descriptor,
@@ -242,20 +234,17 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::detect(SharedDsgInfo& dsg,
           << " (agent / all) descriptors";
   for (const auto& id_match_pair : matches) {
     VLOG(2) << " - index " << id_match_pair.first << " with "
-            << id_match_pair.second.valid_matches.size()
-            << " valid matches and " << id_match_pair.second.match_root.size()
-            << " matches for registration: ";
+            << id_match_pair.second.valid_matches.size() << " valid matches and "
+            << id_match_pair.second.match_root.size() << " matches for registration: ";
     for (size_t i = 0; i < id_match_pair.second.match_root.size(); ++i) {
       VLOG(2) << " - - - query "
-              << NodeSymbol(id_match_pair.second.query_root).getLabel()
-              << " - match "
-              << NodeSymbol(id_match_pair.second.match_root[i]).getLabel()
-              << " -> " << id_match_pair.second.score[i];
+              << NodeSymbol(id_match_pair.second.query_root).getLabel() << " - match "
+              << NodeSymbol(id_match_pair.second.match_root[i]).getLabel() << " -> "
+              << id_match_pair.second.score[i];
     }
   }
   VLOG(2) << "===========================================================";
 
-  // TODO(nathan) maybe don't call directly
   return registerAndVerify(dsg, matches, agent_id, timestamp);
 }
 

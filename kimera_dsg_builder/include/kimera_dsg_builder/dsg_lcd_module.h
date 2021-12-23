@@ -23,11 +23,11 @@ class DsgLcdModule {
                const std::map<LayerId, RegistrationFunc>& layer_registration_funcs,
                const std::map<LayerId, ValidationFunc>& layer_validation_funcs);
 
-  void updateDescriptorCache(incremental::SharedDsgInfo& dsg,
+  void updateDescriptorCache(const DynamicSceneGraph& dsg,
                              const std::unordered_set<NodeId>& archived_places,
                              uint64_t timestamp = 0);
 
-  std::vector<DsgRegistrationSolution> detect(incremental::SharedDsgInfo& dsg,
+  std::vector<DsgRegistrationSolution> detect(const DynamicSceneGraph& dsg,
                                               NodeId latest_agent_id,
                                               uint64_t timestamp = 0);
 
@@ -60,7 +60,7 @@ class DsgLcdModule {
                          const DynamicSceneGraphNode& agent_node);
 
   std::vector<DsgRegistrationSolution> registerAndVerify(
-      incremental::SharedDsgInfo& dsg,
+      const DynamicSceneGraph& dsg,
       const std::map<size_t, LayerSearchResults>& matches,
       NodeId agent_node,
       uint64_t timestamp = 0) const;

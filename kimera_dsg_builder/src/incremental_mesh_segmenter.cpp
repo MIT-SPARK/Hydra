@@ -68,9 +68,11 @@ MeshSegmenter::MeshSegmenter(const ros::NodeHandle& nh,
       full_mesh_vertices_(full_mesh_vertices),
       next_node_id_('O', 0),
       active_object_horizon_s_(10.0),
+      active_index_horizon_m_(5.0),
       enable_active_mesh_pub_(false),
       enable_segmented_mesh_pub_(false) {
   nh_.getParam("active_object_horizon_s", active_object_horizon_s_);
+  nh_.getParam("active_index_horizon_m", active_index_horizon_m_);
   nh_.getParam("enable_active_mesh_pub", enable_active_mesh_pub_);
   nh_.getParam("enable_segmented_mesh_pub", enable_segmented_mesh_pub_);
 
@@ -107,9 +109,27 @@ MeshSegmenter::MeshSegmenter(const ros::NodeHandle& nh,
 }
 
 bool MeshSegmenter::detectObjects(const SharedDsgInfo::Ptr& dsg,
-                                  const std::vector<size_t>& active_indices) {
+                                  const std::vector<size_t>& frontend_indices,
+                                  const std::optional<Eigen::Vector3d>& pos) {
   const double latest_timestamp = ros::Time::now().toSec();
   archiveOldObjects(*dsg->graph, latest_timestamp);
+
+  std::vector<size_t> active_indices;
+  if (!pos) {
+    active_indices = frontend_indices;
+  } else {
+    active_indices.reserve(frontend_indices.size());
+    const Eigen::Vector3d root_pos = *pos;
+    for (const size_t idx : frontend_indices) {
+      const auto& p = full_mesh_vertices_->at(idx);
+      const Eigen::Vector3d vertex_pos(p.x, p.y, p.z);
+      if ((vertex_pos - root_pos).norm() < active_index_horizon_m_) {
+        active_indices.push_back(idx);
+      }
+    }
+  }
+  VLOG(1) << "active indices: " << frontend_indices.size()
+          << " used: " << active_indices.size();
 
   publishActiveVertices(active_indices);
 

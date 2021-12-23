@@ -106,7 +106,7 @@ void checkAllAgentFrames(SharedDsgInfo& dsg) {
     lcd::DsgRegistrationInput match{
         desc->nodes, {*best_node}, desc->root_node, 0};
 
-    auto solution = registerAgentMatch(dsg, match, 0);
+    auto solution = registerAgentMatch(*dsg.graph, match, 0);
     if (solution.valid) {
       num_found++;
     }

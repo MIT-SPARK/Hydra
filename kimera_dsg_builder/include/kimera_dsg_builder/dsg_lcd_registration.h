@@ -25,7 +25,7 @@ struct DsgRegistrationInput {
 };
 
 using RegistrationFunc =
-    std::function<DsgRegistrationSolution(incremental::SharedDsgInfo&,
+    std::function<DsgRegistrationSolution(const DynamicSceneGraph&,
                                           const DsgRegistrationInput&,
                                           NodeId)>;
 
@@ -36,7 +36,7 @@ struct PlaceRegistrationFunctor {
   PlaceRegistrationFunctor(const LayerRegistrationConfig& config,
                            const TeaserParams& params);
 
-  DsgRegistrationSolution operator()(incremental::SharedDsgInfo& dsg,
+  DsgRegistrationSolution operator()(const DynamicSceneGraph& dsg,
                                      const DsgRegistrationInput& match,
                                      NodeId query_agent_id);
 
@@ -48,7 +48,7 @@ struct ObjectRegistrationFunctor {
   ObjectRegistrationFunctor(const LayerRegistrationConfig& config,
                             const TeaserParams& params);
 
-  DsgRegistrationSolution operator()(incremental::SharedDsgInfo& dsg,
+  DsgRegistrationSolution operator()(const DynamicSceneGraph& dsg,
                                      const DsgRegistrationInput& match,
                                      NodeId query_agent_id);
 
@@ -56,7 +56,7 @@ struct ObjectRegistrationFunctor {
   teaser::RobustRegistrationSolver solver;
 };
 
-DsgRegistrationSolution registerAgentMatch(incremental::SharedDsgInfo& dsg,
+DsgRegistrationSolution registerAgentMatch(const DynamicSceneGraph& dsg,
                                            const DsgRegistrationInput& match,
                                            NodeId query_agent_id);
 

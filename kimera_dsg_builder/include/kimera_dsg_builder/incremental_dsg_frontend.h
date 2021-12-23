@@ -5,6 +5,8 @@
 
 #include <ros/callback_queue.h>
 #include <ros/ros.h>
+#include <tf2_ros/transform_listener.h>
+#include <geometry_msgs/TransformStamped.h>
 
 #include <kimera_dsg/node_symbol.h>
 #include <kimera_dsg/scene_graph_logger.h>
@@ -75,6 +77,8 @@ class DsgFrontend {
 
   std::optional<NodeId> getLatestAgentId();
 
+  std::optional<Eigen::Vector3d> getLatestPose();
+
  private:
   ros::NodeHandle nh_;
   std::atomic<bool> should_shutdown_{false};
@@ -96,6 +100,9 @@ class DsgFrontend {
   std::unique_ptr<ros::CallbackQueue> mesh_frontend_ros_queue_;
   std::unique_ptr<std::thread> mesh_frontend_thread_;
   size_t min_object_size_;
+  std::string sensor_frame_;
+  tf2_ros::Buffer tf_buffer_;
+  std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
 
   ros::Subscriber active_places_sub_;
   std::unique_ptr<NearestNodeFinder> places_nn_finder_;
@@ -119,6 +126,7 @@ class DsgFrontend {
   std::unique_ptr<lcd::PlaceDescriptorFactory> place_lcd_factory_;
   std::unique_ptr<lcd::ObjectRegistrationFunctor> object_lcd_registration_;
   std::unique_ptr<lcd::PlaceRegistrationFunctor> places_lcd_registration_;
+  DynamicSceneGraph::Ptr lcd_graph_;
   char robot_prefix_;
 
   ros::Subscriber bow_sub_;

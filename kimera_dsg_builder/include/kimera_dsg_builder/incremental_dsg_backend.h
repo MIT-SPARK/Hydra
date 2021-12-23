@@ -26,9 +26,9 @@ void parseParam(const ros::NodeHandle& nh, const std::string& name, T& param) {
 }
 
 struct LoopClosureLog {
-  gtsam::Symbol src; // factor edge "source"
-  gtsam::Symbol dest; // factor edge "dest"
-  gtsam::Pose3 src_T_dest; // src_frame.between(dest_frame)
+  gtsam::Symbol src;        // factor edge "source"
+  gtsam::Symbol dest;       // factor edge "dest"
+  gtsam::Pose3 src_T_dest;  // src_frame.between(dest_frame)
   bool dsg;
   int64_t level;
 };
@@ -36,6 +36,7 @@ struct LoopClosureLog {
 class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
  public:
   using Ptr = std::shared_ptr<DsgBackend>;
+  using PoseGraphQueue = std::queue<pose_graph_tools::PoseGraph::ConstPtr>;
 
   DsgBackend(const ros::NodeHandle nh,
              const SharedDsgInfo::Ptr& dsg,
@@ -65,8 +66,12 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   bool saveTrajectoryCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
   std::list<LoopClosureLog> getLoopClosures() {
-    std::unique_lock<std::mutex> lock(pgmo_mutex_);
-    return loop_closures_;
+    std::list<LoopClosureLog> to_return;
+    { // start pgmo critical section
+      std::unique_lock<std::mutex> lock(pgmo_mutex_);
+      to_return = loop_closures_;
+    } // end pgmo critical section
+    return to_return;
   }
 
  private:
@@ -119,6 +124,12 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void logIncrementalLoopClosures(const pose_graph_tools::PoseGraph& msg);
 
+  bool readPgmoUpdates();
+
+  pose_graph_tools::PoseGraph::ConstPtr popDeformationGraphQueue();
+
+  pose_graph_tools::PoseGraph::ConstPtr popAgentGraphQueue();
+
  private:
   ros::NodeHandle nh_;
   std::atomic<bool> should_shutdown_{false};
@@ -170,8 +181,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   SemanticNodeAttributes::ColorVector building_color_;
 
   kimera_pgmo::KimeraPgmoMesh::ConstPtr latest_mesh_;
-  pose_graph_tools::PoseGraph::Ptr deformation_graph_updates_;
-  pose_graph_tools::PoseGraph::Ptr pose_graph_updates_;
+  PoseGraphQueue deformation_graph_updates_;
+  PoseGraphQueue pose_graph_updates_;
 
   std::mutex pgmo_mutex_;
   std::unique_ptr<std::thread> optimizer_thread_;

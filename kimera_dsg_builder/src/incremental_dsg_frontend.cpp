@@ -14,7 +14,7 @@ using lcd::LayerRegistrationConfig;
 using pose_graph_tools::PoseGraph;
 
 DsgFrontend::DsgFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg)
-    : nh_(nh), dsg_(dsg) {
+    : nh_(nh), dsg_(dsg), lcd_graph_(new DynamicSceneGraph()) {
   ros::NodeHandle pgmo_nh(nh_, "pgmo");
   CHECK(mesh_frontend_.initialize(pgmo_nh, false));
   last_mesh_timestamp_ = 0;
@@ -152,11 +152,15 @@ void DsgFrontend::startMeshFrontend() {
   std::string mesh_ns;
   nh_.param<std::string>("mesh_ns", mesh_ns, "");
 
-  int min_object_size = 30;
-  nh_.param<int>("ec_min_cluster_size", min_object_size);
+  int min_object_size;
+  nh_.param<int>("ec_min_cluster_size", min_object_size, 30);
   min_object_size_ = static_cast<size_t>(min_object_size);
 
   mesh_frontend_ros_queue_.reset(new ros::CallbackQueue());
+
+  nh_.param<std::string>("sensor_frame", sensor_frame_, "base_link");
+
+  tf_listener_.reset(new tf2_ros::TransformListener(tf_buffer_));
 
   ros::NodeHandle mesh_nh(nh_, mesh_ns);
   mesh_nh.setCallbackQueue(mesh_frontend_ros_queue_.get());
@@ -173,6 +177,24 @@ void DsgFrontend::startMeshFrontend() {
   mesh_sub_ = nh_.subscribe("voxblox_mesh", 5, &DsgFrontend::handleLatestMesh, this);
 }
 
+std::optional<Eigen::Vector3d> DsgFrontend::getLatestPose() {
+  //ros::Time lookup_time;
+  //lookup_time.fromNSec(last_mesh_timestamp_);
+  geometry_msgs::TransformStamped msg;
+  try {
+    msg = tf_buffer_.lookupTransform("world", sensor_frame_, ros::Time(0));
+  } catch (tf2::TransformException& ex) {
+    LOG_FIRST_N(WARNING, 3) << "failed to look up transform to " << sensor_frame_
+                            << " @ " << last_mesh_timestamp_ << ": " << ex.what()
+                            << " Not filtering indices.";
+    return std::nullopt;
+  }
+
+  return Eigen::Vector3d(msg.transform.translation.x,
+                         msg.transform.translation.y,
+                         msg.transform.translation.z);
+}
+
 void DsgFrontend::runMeshFrontend() {
   ros::WallRate r(10);
   while (ros::ok() && !should_shutdown_) {
@@ -185,17 +207,19 @@ void DsgFrontend::runMeshFrontend() {
       continue;
     }
 
-    if (mesh_queue_.empty()) {
+    voxblox_msgs::Mesh::ConstPtr msg(nullptr);
+    {  // start mesh critical region
+      std::unique_lock<std::mutex> mesh_lock(mesh_frontend_mutex_);
+      if (!mesh_queue_.empty()) {
+        msg = mesh_queue_.front();
+        mesh_queue_.pop();
+      }
+    }  // end mesh critical region
+
+    if (!msg) {
       r.sleep();
       continue;
     }
-
-    voxblox_msgs::Mesh::ConstPtr msg;
-    {  // start mesh critical region
-      std::unique_lock<std::mutex> mesh_lock(mesh_frontend_mutex_);
-      msg = mesh_queue_.front();
-      mesh_queue_.pop();
-    }  // end mesh critical region
 
     // let the places thread start working on queued messages
     last_mesh_timestamp_ = msg->header.stamp.toNSec();
@@ -227,14 +251,15 @@ void DsgFrontend::runMeshFrontend() {
     {  // timing scope
       ScopedTimer timer("frontend/object_detection", object_timestamp, true, 1, false);
       auto invalid_indices = mesh_frontend_.getInvalidIndices();
-      { // start dsg critical section
+      {  // start dsg critical section
         std::unique_lock<std::mutex> lock(dsg_->mutex);
         for (const auto& idx : invalid_indices) {
           dsg_->graph->invalidateMeshVertex(idx);
         }
 
         std::vector<NodeId> objects_to_delete;
-        const SceneGraphLayer& objects = dsg_->graph->getLayer(KimeraDsgLayers::OBJECTS).value();
+        const SceneGraphLayer& objects =
+            dsg_->graph->getLayer(KimeraDsgLayers::OBJECTS).value();
         for (const auto& id_node_pair : objects.nodes()) {
           auto connections = dsg_->graph->getMeshConnectionIndices(id_node_pair.first);
           if (connections.size() < min_object_size_) {
@@ -245,9 +270,10 @@ void DsgFrontend::runMeshFrontend() {
         for (const auto& node : objects_to_delete) {
           dsg_->graph->removeNode(node);
         }
-      } // end dsg critical section
+      }  // end dsg critical section
 
-      segmenter_->detectObjects(dsg_, mesh_frontend_.getActiveFullMeshVertices());
+      segmenter_->detectObjects(
+          dsg_, mesh_frontend_.getActiveFullMeshVertices(), getLatestPose());
     }
 
     {  // start dsg critical section
@@ -369,7 +395,6 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
   const SceneGraphLayer& object_layer =
       dsg_->graph->getLayer(KimeraDsgLayers::OBJECTS).value();
 
-  NodeIdSet rooms_to_check;
   NodeIdSet objects_to_check;
   {  // start graph update critical section
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
@@ -388,11 +413,6 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
             deleted_agent_edge_indices_[dynamic_node.category()].insert(child);
           }
         }
-
-        std::optional<NodeId> parent = to_check.getParent();
-        if (parent) {
-          rooms_to_check.insert(*parent);
-        }
       }
       dsg_->graph->removeNode(node_id);
     }
@@ -401,12 +421,6 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
     dsg_->graph->updateFromLayer(temp_layer, std::move(edges));
 
     places_nn_finder_.reset(new NearestNodeFinder(places_layer, active_nodes));
-
-    for (const auto& node_id : rooms_to_check) {
-      if (!dsg_->graph->getNode(node_id).value().get().hasChildren()) {
-        dsg_->graph->removeNode(node_id);
-      }
-    }
 
     addAgentPlaceEdges();
     addPlaceObjectEdges(&objects_to_check);
@@ -631,8 +645,7 @@ lcd::DsgLcdConfig DsgFrontend::initializeLcdStructures() {
       readMatchScore(object_nh, "min_registration_score", 0.8);
   object_config.max_registration_matches =
       readMaxRegistrationMatches(object_nh, "max_registration_matches", 1);
-  object_config.min_score_ratio =
-      readMinScoreRatio(object_nh, "min_score_ratio", 0.1);
+  object_config.min_score_ratio = readMinScoreRatio(object_nh, "min_score_ratio", 0.1);
   object_config.min_match_separation_m =
       readMinMatchSeparation(object_nh, "min_match_separation_m", 1.0);
   object_config.type = readScoreType(object_nh);
@@ -648,8 +661,7 @@ lcd::DsgLcdConfig DsgFrontend::initializeLcdStructures() {
       readMatchScore(place_nh, "min_registration_score", 0.8);
   place_config.max_registration_matches =
       readMaxRegistrationMatches(place_nh, "max_registration_matches", 1);
-  place_config.min_score_ratio =
-      readMinScoreRatio(place_nh, "min_score_ratio", 0.1);
+  place_config.min_score_ratio = readMinScoreRatio(place_nh, "min_score_ratio", 0.1);
   place_config.min_match_separation_m =
       readMinMatchSeparation(place_nh, "min_match_separation_m", 1.0);
   place_config.type = readScoreType(place_nh);
@@ -674,14 +686,14 @@ void DsgFrontend::startLcd() {
 
   std::map<LayerId, lcd::RegistrationFunc> registration_funcs;
   registration_funcs[KimeraDsgLayers::OBJECTS] =
-      [&](SharedDsgInfo& dsg,
+      [&](const DynamicSceneGraph& dsg,
           const lcd::DsgRegistrationInput& match,
           NodeId agent_id) {
         return (*object_lcd_registration_)(dsg, match, agent_id);
       };
   if (places_lcd_registration_) {
     registration_funcs[KimeraDsgLayers::PLACES] =
-        [&](SharedDsgInfo& dsg,
+        [&](const DynamicSceneGraph& dsg,
             const lcd::DsgRegistrationInput& match,
             NodeId agent_id) {
           return (*places_lcd_registration_)(dsg, match, agent_id);
@@ -704,13 +716,10 @@ std::optional<NodeId> DsgFrontend::getLatestAgentId() {
 
   bool has_parent;
   std::chrono::nanoseconds prev_time;
-  {
-    std::unique_lock<std::mutex> lock(dsg_->mutex);
-    const DynamicSceneGraphNode& node =
-        dsg_->graph->getDynamicNode(lcd_queue_.top()).value();
-    prev_time = node.timestamp;
-    has_parent = node.hasParent();
-  }
+  const DynamicSceneGraphNode& node =
+      lcd_graph_->getDynamicNode(lcd_queue_.top()).value();
+  prev_time = node.timestamp;
+  has_parent = node.hasParent();
 
   if (!has_parent) {
     LOG(ERROR) << "Found agent node without parent: "
@@ -745,6 +754,11 @@ void DsgFrontend::runLcd() {
   while (ros::ok()) {
     assignBowVectors();
 
+    {  // start critical section
+      std::unique_lock<std::mutex> lock(dsg_->mutex);
+      lcd_graph_->mergeGraph(*dsg_->graph);
+    }  // end critical section
+
     if (lcd_shutting_down_ && lcd_queue_.empty()) {
       break;
     }
@@ -759,7 +773,8 @@ void DsgFrontend::runLcd() {
 
     if (!archived_places.empty()) {
       auto curr_time = ros::Time::now();
-      lcd_module_->updateDescriptorCache(*dsg_, archived_places, curr_time.toNSec());
+      lcd_module_->updateDescriptorCache(
+          *lcd_graph_, archived_places, curr_time.toNSec());
     }
 
     auto latest_agent_id = getLatestAgentId();
@@ -769,13 +784,10 @@ void DsgFrontend::runLcd() {
     }
 
     uint64_t timestamp;
-    {  // start critical section
-      std::unique_lock<std::mutex> lock(dsg_->mutex);
-      timestamp =
-          dsg_->graph->getDynamicNode(*latest_agent_id).value().get().timestamp.count();
-    }  // end critical section
+    timestamp =
+        lcd_graph_->getDynamicNode(*latest_agent_id).value().get().timestamp.count();
 
-    auto results = lcd_module_->detect(*dsg_, *latest_agent_id, timestamp);
+    auto results = lcd_module_->detect(*lcd_graph_, *latest_agent_id, timestamp);
     if (results.size() == 0) {
       if (!lcd_shutting_down_) {
         r.sleep();
@@ -784,6 +796,7 @@ void DsgFrontend::runLcd() {
     }
 
     {  // start lcd critical section
+      // TODO(nathan) double check logic here
       std::unique_lock<std::mutex> lcd_lock(dsg_->lcd_mutex);
       for (const auto& result : results) {
         dsg_->loop_closures.push(result);
