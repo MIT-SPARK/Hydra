@@ -16,18 +16,18 @@ pgmo:
     rpgo:
         odom_trans_threshold: 0.005
         odom_rot_threshold: 0.001
-        pcm_trans_threshold: 0.1
-        pcm_rot_threshold: 0.05
-        gnc_alpha: 0
+        pcm_trans_threshold: -1
+        pcm_rot_threshold: -1
+        gnc_alpha: 0.99
     add_initial_prior: true
     covariance:
-        odom: 1.0e-06
+        odom: 1.0e-04
         loop_close: 1.0e-04
-        prior: 1.0e-08
+        prior: 1.0e-06
         mesh_mesh: 1.0e-02
-        pose_mesh: 1.0e-04
-        place_mesh: 1.0e-04
-        place_edge: 1.0e-04
+        pose_mesh: 1.0e-03
+        place_mesh: 1.0e-03
+        place_edge: 1.0e-03
 enable_rooms: true
 room_finder:
     min_dilation_m: 0.33
