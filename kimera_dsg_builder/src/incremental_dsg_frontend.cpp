@@ -446,6 +446,9 @@ void DsgFrontend::addPlaceObjectEdges(NodeIdSet* extra_objects_to_check) {
   }
 
   for (const auto& object_id : objects_to_check) {
+    if (!dsg_->graph->hasNode(object_id)) {
+      continue;
+    }
     const Eigen::Vector3d object_position = dsg_->graph->getPosition(object_id);
     places_nn_finder_->find(
         object_position, 1, false, [&](NodeId place_id, size_t, double) {

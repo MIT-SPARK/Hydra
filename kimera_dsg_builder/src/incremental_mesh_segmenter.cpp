@@ -173,6 +173,7 @@ void MeshSegmenter::pruneObjectsToCheckForPlaces(const DynamicSceneGraph& graph)
     if (!graph.hasNode(object_id)) {
       LOG(ERROR) << "Missing node " << NodeSymbol(object_id).getLabel();
       to_remove.push_back(object_id);
+      continue;
     }
 
     if (graph.getNode(object_id).value().get().hasParent()) {
