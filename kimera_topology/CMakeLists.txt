@@ -14,8 +14,10 @@ find_package(
              kimera_dsg_visualizer
              kimera_semantics_ros
              message_generation
+             pcl_ros
              std_msgs
              tf2_eigen
+             tf2_ros
              voxblox
              voxblox_ros
 )
@@ -38,6 +40,8 @@ catkin_package(
   voxblox
   voxblox_ros
   tf2_eigen
+  tf2_ros
+  pcl_ros
   DEPENDS
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}
@@ -88,6 +92,10 @@ target_link_libraries(
 )
 target_include_directories(places_eval_viz_node PUBLIC include ${catkin_INCLUDE_DIRS})
 
+add_executable(pointcloud_saver src/pointcloud_saver.cpp)
+target_link_libraries(pointcloud_saver PUBLIC ${catkin_LIBRARIES})
+target_include_directories(pointcloud_saver PUBLIC ${catkin_INCLUDE_DIRS})
+
 if(CATKIN_ENABLE_TESTING)
   catkin_add_gtest(
     utest_${PROJECT_NAME}
@@ -101,6 +109,7 @@ if(CATKIN_ENABLE_TESTING)
     tests/utest_marching_cubes.cpp
     tests/utest_nearest_neighbor_utilities.cpp
     tests/utest_incremental_gvd.cpp
+    tests/utest_incremental_integration.cpp
   )
   target_include_directories(
     utest_${PROJECT_NAME} PUBLIC tests/include ${catkin_INCLUDE_DIRS}

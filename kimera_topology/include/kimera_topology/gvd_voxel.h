@@ -23,6 +23,7 @@ struct GvdVoxel {
   bool on_surface = false;
   // TODO(nathan) leave this unitialized
   size_t block_vertex_index = 123456789;
+  int32_t mesh_block[3];
 
   bool is_voronoi_parent = false;
   GlobalIndex::Scalar nearest_voronoi[3];
@@ -34,6 +35,7 @@ std::ostream& operator<<(std::ostream& out, const GvdVoxel& voxel);
 struct GvdVertexInfo {
   size_t vertex;
   double pos[3];
+  int32_t block[3];
   size_t ref_count = 0;
 };
 

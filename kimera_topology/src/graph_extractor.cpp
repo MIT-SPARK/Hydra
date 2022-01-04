@@ -865,11 +865,8 @@ void GraphExtractor::extract(const GvdLayer& layer) {
   CHECK_EQ(num_valid, num_total) << num_valid << " / " << num_total;
 }
 
-void GraphExtractor::assignMeshVertices(const GvdLayer& layer,
-                                        const GvdParentMap& parents,
+void GraphExtractor::assignMeshVertices(const GvdParentMap& parents,
                                         const GvdVertexMap& parent_vertices) {
-  const auto vps_inv = layer.voxels_per_side_inv();
-
   for (const auto& id_index_pair : node_id_root_map_) {
     const NodeId node_id = id_index_pair.first;
     const GlobalIndex& node_index = id_index_pair.second;
@@ -883,16 +880,11 @@ void GraphExtractor::assignMeshVertices(const GvdLayer& layer,
         continue;
       }
 
+      const auto& parent_info = parent_vertices.at(parent);
       NearestVertexInfo info;
-      Eigen::Map<BlockIndex> block_map(info.block);
-      block_map = voxblox::getBlockIndexFromGlobalVoxelIndex(parent, vps_inv);
-
-      std::memcpy(
-          info.voxel_pos, parent_vertices.at(parent).pos, sizeof(info.voxel_pos));
-      // Eigen::Map<Eigen::Vector3d> pos_map(info.voxel_pos);
-      // pos_map = getVoxelPosition(layer, parent);
-
-      info.vertex = parent_vertices.at(parent).vertex;
+      std::memcpy(info.block, parent_info.block, sizeof(info.block));
+      std::memcpy(info.voxel_pos, parent_info.pos, sizeof(info.voxel_pos));
+      info.vertex = parent_info.vertex;
       attrs.voxblox_mesh_connections.push_back(info);
     }
   }

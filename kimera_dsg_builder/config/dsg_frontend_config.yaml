@@ -1,5 +1,5 @@
 pgmo:
-    horizon: 10.0
+    horizon: 15.0
     output_mesh_resolution: 0.04
     graph_compression_method: 1  # voxblox
     full_compression_method: 2  # voxel clearing
@@ -9,6 +9,6 @@ pgmo:
 building_color: [0.572, 0.204, 0.922]
 mesh_queue_size: 10
 active_objects_horizon_s: 10.0
-active_index_horizon_m: 5.0
+active_index_horizon_m: 7.0
 enable_active_mesh_pub: false
 enable_segmented_mesh_pub: false

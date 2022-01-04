@@ -20,6 +20,8 @@
   <depend>voxblox_ros</depend>
   <depend>kimera_semantics_ros</depend>
   <depend>tf2_eigen</depend>
+  <depend>tf2_ros</depend>
+  <depend>pcl_ros</depend>
 
   <export>
   </export>

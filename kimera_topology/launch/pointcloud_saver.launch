@@ -1,0 +1,24 @@
+<launch>
+    <arg name="output_path"/>
+    <param name="use_sim_time" value="true"/>
+
+    <include file="$(find kimera_topology)/launch/includes/rgbd_to_pointcloud.xml">
+        <arg name="camera_info_topic" default="/tesse/seg_cam/camera_info"/>
+        <arg name="camera_topic" default="/tesse/seg_cam/rgb/image_raw"/>
+        <arg name="depth_topic" default="/tesse/depth_cam/mono/image_raw"/>
+        <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
+    </include>
+
+    <node name="pointcloud_saver" type="pointcloud_saver" pkg="kimera_topology"
+          output="screen" required="true">
+        <remap from="~pointcloud" to="/semantic_pointcloud"/>
+
+        <param name="output_path" value="$(arg output_path)"/>
+        <param name="prefix" value="pointcloud_"/>
+        <param name="max_output" value="100"/>
+        <param name="min_separation_s" value="0.2"/>
+        <param name="world_frame" value="world"/>
+        <param name="sensor_frame" value="left_cam"/>
+    </node>
+
+</launch>

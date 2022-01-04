@@ -5,6 +5,7 @@
 #include <voxblox/mesh/mesh_layer.h>
 #include <voxblox/utils/bucket_queue.h>
 #include <voxblox/utils/neighbor_tools.h>
+#include <voxblox/integrator/integrator_utils.h>
 
 namespace kimera {
 namespace topology {
@@ -26,6 +27,7 @@ using voxblox::SignedIndex;
 using voxblox::TsdfVoxel;
 using voxblox::VertexIndex;
 using voxblox::VoxelIndex;
+using voxblox::ThreadSafeIndex;
 
 }  // namespace topology
 }  // namespace kimera

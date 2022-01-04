@@ -169,6 +169,9 @@ void TestFixture2d::setTsdfVoxel(int x, int y, float distance, float weight) {
   if (distance == 0.0) {
     setGvdSurfaceVoxel(gvd_voxel);
     gvd_voxel.block_vertex_index = 0;
+    gvd_voxel.mesh_block[0] = 0;
+    gvd_voxel.mesh_block[1] = 0;
+    gvd_voxel.mesh_block[2] = 0;
   } else {
     gvd_voxel.on_surface = false;
   }

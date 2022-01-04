@@ -52,7 +52,8 @@ class VoxelAwareMarchingCubes : voxblox::MarchingCubes {
 
   virtual ~VoxelAwareMarchingCubes() = default;
 
-  static void meshCube(const PointMatrix& vertex_coords,
+  static void meshCube(const BlockIndex& block,
+                       const PointMatrix& vertex_coords,
                        const SdfMatrix& vertex_sdf,
                        VertexIndex* next_index,
                        Mesh* mesh,

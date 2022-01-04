@@ -26,7 +26,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: RGB Image
+    SyncSource: ""
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -49,24 +49,13 @@ Visualization Manager:
           Value: true
         right_cam:
           Value: true
-        world:
-          Value: true
       Marker Scale: 1
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        world:
-          base_link_gt:
-            front_lidar:
-              {}
-            left_cam:
-              {}
-            rear_lidar:
-              {}
-            right_cam:
-              {}
+        {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -186,9 +175,28 @@ Visualization Manager:
       Value: true
     - Class: voxblox_rviz_plugin/VoxbloxMesh
       Enabled: true
-      Name: VoxbloxMesh
+      Name: Offline DSG Mesh
       Topic: /batch_dsg_builder_node/mesh
       Unreliable: false
+      Value: true
+    - Class: rviz_mesh_plugin/TriangleMesh
+      Display Type:
+        Faces Alpha: 1
+        Faces Color: 0; 255; 0
+        Value: Hide Faces
+      Enabled: true
+      Mesh Buffer Size: 1
+      Name: Frontend Deformation Graph
+      Show Normals:
+        Normals Alpha: 1
+        Normals Color: 255; 0; 255
+        Normals Scaling Factor: 0.10000000149011612
+        Value: false
+      Show Wireframe:
+        Value: true
+        Wireframe Alpha: 1
+        Wireframe Color: 0; 0; 0
+      Topic: /incremental_dsg_builder_node/pgmo/deformation_graph_mesh
       Value: true
   Enabled: true
   Global Options:

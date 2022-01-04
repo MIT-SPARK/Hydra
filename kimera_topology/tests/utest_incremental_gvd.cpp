@@ -1,9 +1,8 @@
-#include "kimera_topology_test/test_fixtures.h"
-
 #include <gtest/gtest.h>
-
 #include <kimera_topology/gvd_integrator.h>
 #include <kimera_topology/gvd_utilities.h>
+
+#include "kimera_topology_test/test_fixtures.h"
 
 namespace kimera {
 namespace topology {
@@ -165,6 +164,83 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
   }
 
   VLOG(1) << "Result: " << result;
+}
+
+TEST_F(TestFixture2d, NegativeIntegrationCorrect) {
+  // exterior border is set to -truncation_distance
+  for (int i = 0; i < voxels_per_side; ++i) {
+    setTsdfVoxel(0, i, -2.0 * voxel_size);
+    setTsdfVoxel(7, i, -2.0 * voxel_size);
+    setTsdfVoxel(i, 0, -2.0 * voxel_size);
+    setTsdfVoxel(i, 7, -2.0 * voxel_size);
+  }
+
+  for (int i = 1; i < voxels_per_side - 1; ++i) {
+    setTsdfVoxel(1, i, -voxel_size);
+    setTsdfVoxel(6, i, -voxel_size);
+    setTsdfVoxel(i, 1, -voxel_size);
+    setTsdfVoxel(i, 6, -voxel_size);
+  }
+  setTsdfVoxel(1, 1, -std::sqrt(2) * voxel_size);
+  setTsdfVoxel(1, 6, -std::sqrt(2) * voxel_size);
+  setTsdfVoxel(6, 1, -std::sqrt(2) * voxel_size);
+  setTsdfVoxel(6, 6, -std::sqrt(2) * voxel_size);
+
+  for (int i = 2; i < voxels_per_side - 2; ++i) {
+    setTsdfVoxel(2, i, 0.0);
+    setTsdfVoxel(5, i, 0.0);
+    setTsdfVoxel(i, 2, 0.0);
+    setTsdfVoxel(i, 5, 0.0);
+  }
+
+  setTsdfVoxel(3, 3, 1.0);
+  setTsdfVoxel(3, 4, 1.0);
+  setTsdfVoxel(4, 3, 1.0);
+  setTsdfVoxel(4, 4, 1.0);
+
+  gvd_config.min_diff_m = 0.0;
+  gvd_config.min_distance_m = voxel_size;
+  gvd_config.max_distance_m = 50.0;
+  gvd_config.parent_derived_distance = true;
+  gvd_config.voronoi_config.min_distance_m = 1.0;
+  gvd_config.voronoi_config.parent_l1_separation = 2.0;
+  gvd_config.positive_distance_only = false;
+  gvd_config.extract_graph = false;
+
+  GvdIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
+  gvd_integrator.updateFromTsdfLayer(false, false);
+
+  GvdResult result(voxels_per_side, voxels_per_side);
+  for (int x = 0; x < voxels_per_side; ++x) {
+    for (int y = 0; y < voxels_per_side; ++y) {
+      const auto& voxel = getGvdVoxel(x, y);
+      result.distances(y, x) = voxel.observed ? voxel.distance : -1.0;
+      result.is_voronoi(y, x) = isVoronoi(voxel) ? 1.0 : 0.0;
+    }
+  }
+
+  VLOG(1) << "Result: " << result;
+  GvdResult expected(8, 8);
+  // clang-format off
+  expected.distances << -2.83, -2.24, -2.00, -2.00, -2.00, -2.00, -2.24, -2.83,
+                        -2.24, -1.41, -1.00, -1.00, -1.00, -1.00, -1.41, -2.24,
+                        -2.00, -1.00,  0.00,  0.00,  0.00,  0.00, -1.00, -2.00,
+                        -2.00, -1.00,  0.00,  1.00,  1.00,  0.00, -1.00, -2.00,
+                        -2.00, -1.00,  0.00,  1.00,  1.00,  0.00, -1.00, -2.00,
+                        -2.00, -1.00,  0.00,  0.00,  0.00,  0.00, -1.00, -2.00,
+                        -2.24, -1.41, -1.00, -1.00, -1.00, -1.00, -1.41, -2.24,
+                        -2.83, -2.24, -2.00, -2.00, -2.00, -2.00, -2.24, -2.83;
+  // clang-format on
+  expected.is_voronoi = Eigen::MatrixXd::Zero(8, 8);
+
+  for (int r = 0; r < expected.is_voronoi.rows(); ++r) {
+    for (int c = 0; c < expected.is_voronoi.cols(); ++c) {
+      EXPECT_EQ(expected.is_voronoi(r, c), result.is_voronoi(r, c))
+          << " @ (" << r << ", " << c << ")";
+      EXPECT_NEAR(expected.distances(r, c), result.distances(r, c), 1.0e-1)
+          << " @ (" << r << ", " << c << ")";
+    }
+  }
 }
 
 TEST_F(SingleBlockTestFixture, PlaneCorrect) {

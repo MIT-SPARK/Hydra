@@ -12,6 +12,7 @@ namespace topology {
 
 using voxblox::IndexElement;
 using voxblox::MeshIntegratorConfig;
+using voxblox::MixedThreadSafeIndex;
 using voxblox::Point;
 namespace vutils = voxblox::utils;
 
@@ -29,6 +30,140 @@ VoxelAwareMeshIntegrator::VoxelAwareMeshIntegrator(const MeshIntegratorConfig& c
   cube_coord_offsets_ = cube_index_offsets_.cast<FloatingPoint>() * voxel_size_;
 }
 
+void VoxelAwareMeshIntegrator::launchThreads(const BlockIndexList& blocks,
+                                             bool interior_pass) {
+  std::unique_ptr<ThreadSafeIndex> index_getter(
+      new MixedThreadSafeIndex(blocks.size()));
+
+  std::list<std::thread> threads;
+  for (size_t i = 0; i < config_.integrator_threads; ++i) {
+    if (interior_pass) {
+      threads.emplace_back(
+          &VoxelAwareMeshIntegrator::processInterior, this, blocks, index_getter.get());
+    } else {
+      threads.emplace_back(
+          &VoxelAwareMeshIntegrator::processExterior, this, blocks, index_getter.get());
+    }
+  }
+
+  for (std::thread& thread : threads) {
+    thread.join();
+  }
+}
+
+void VoxelAwareMeshIntegrator::generateMesh(bool only_mesh_updated_blocks,
+                                            bool clear_updated_flag) {
+  CHECK(!clear_updated_flag || (sdf_layer_mutable_ != nullptr))
+      << "integrator isn't mutable";
+
+  BlockIndexList blocks;
+  if (only_mesh_updated_blocks) {
+    sdf_layer_const_->getAllUpdatedBlocks(voxblox::Update::kMesh, &blocks);
+  } else {
+    sdf_layer_const_->getAllAllocatedBlocks(&blocks);
+  }
+
+  for (const BlockIndex& block_index : blocks) {
+    mesh_layer_->allocateMeshPtrByIndex(block_index);
+  }
+
+  launchThreads(blocks, true);
+  launchThreads(blocks, false);
+
+  if (clear_updated_flag) {
+    for (const auto& block_idx : blocks) {
+      auto block = sdf_layer_mutable_->getBlockPtrByIndex(block_idx);
+      block->updated().reset(voxblox::Update::kMesh);
+    }
+  }
+}
+
+void VoxelAwareMeshIntegrator::processInterior(const BlockIndexList& blocks,
+                                               ThreadSafeIndex* index_getter) {
+  DCHECK(index_getter != nullptr);
+
+  size_t list_idx;
+  while (index_getter->getNextIndex(&list_idx)) {
+    updateBlockInterior(blocks[list_idx]);
+  }
+}
+
+void VoxelAwareMeshIntegrator::processExterior(const BlockIndexList& blocks,
+                                               ThreadSafeIndex* index_getter) {
+  DCHECK(index_getter != nullptr);
+
+  size_t list_idx;
+  while (index_getter->getNextIndex(&list_idx)) {
+    updateBlockExterior(blocks[list_idx]);
+  }
+}
+
+void VoxelAwareMeshIntegrator::updateBlockInterior(const BlockIndex& block_index) {
+  auto mesh = mesh_layer_->getMeshPtrByIndex(block_index);
+  mesh->clear();
+  auto block = sdf_layer_const_->getBlockPtrByIndex(block_index);
+  DCHECK(block) << "invalid SDF block for mesh";
+
+  IndexElement vps = block->voxels_per_side();
+  VertexIndex next_mesh_index = 0;
+
+  VoxelIndex voxel_index;
+  for (voxel_index.x() = 0; voxel_index.x() < vps - 1; ++voxel_index.x()) {
+    for (voxel_index.y() = 0; voxel_index.y() < vps - 1; ++voxel_index.y()) {
+      for (voxel_index.z() = 0; voxel_index.z() < vps - 1; ++voxel_index.z()) {
+        Point coords = block->computeCoordinatesFromVoxelIndex(voxel_index);
+        extractMeshInsideBlock(
+            *block, voxel_index, coords, &next_mesh_index, mesh.get());
+      }
+    }
+  }
+}
+
+void VoxelAwareMeshIntegrator::updateBlockExterior(const BlockIndex& block_index) {
+  auto mesh = mesh_layer_->getMeshPtrByIndex(block_index);
+  auto block = sdf_layer_const_->getBlockPtrByIndex(block_index);
+
+  IndexElement vps = block->voxels_per_side();
+  VertexIndex next_mesh_index = mesh->size();
+
+  VoxelIndex voxel_index;
+
+  // Max X plane
+  // takes care of edge (x_max, y_max, z), takes care of edge (x_max, y, z_max).
+  voxel_index.x() = vps - 1;
+  for (voxel_index.z() = 0; voxel_index.z() < vps; voxel_index.z()++) {
+    for (voxel_index.y() = 0; voxel_index.y() < vps; voxel_index.y()++) {
+      Point coords = block->computeCoordinatesFromVoxelIndex(voxel_index);
+      extractMeshOnBorder(*block, voxel_index, coords, &next_mesh_index, mesh.get());
+    }
+  }
+
+  // Max Y plane.
+  // takes care of edge (x, y_max, z_max) without corner (x_max, y_max, z_max).
+  voxel_index.y() = vps - 1;
+  for (voxel_index.z() = 0; voxel_index.z() < vps; voxel_index.z()++) {
+    for (voxel_index.x() = 0; voxel_index.x() < vps - 1; voxel_index.x()++) {
+      Point coords = block->computeCoordinatesFromVoxelIndex(voxel_index);
+      extractMeshOnBorder(*block, voxel_index, coords, &next_mesh_index, mesh.get());
+    }
+  }
+
+  // Max Z plane.
+  voxel_index.z() = vps - 1;
+  for (voxel_index.y() = 0; voxel_index.y() < vps - 1; voxel_index.y()++) {
+    for (voxel_index.x() = 0; voxel_index.x() < vps - 1; voxel_index.x()++) {
+      Point coords = block->computeCoordinatesFromVoxelIndex(voxel_index);
+      extractMeshOnBorder(*block, voxel_index, coords, &next_mesh_index, mesh.get());
+    }
+  }
+
+  if (config_.use_color) {
+    updateMeshColor(*block, mesh.get());
+  }
+
+  mesh->updated = true;
+}
+
 void VoxelAwareMeshIntegrator::extractMeshInsideBlock(const TsdfBlock& block,
                                                       const VoxelIndex& index,
                                                       const Point& coords,
@@ -37,8 +172,8 @@ void VoxelAwareMeshIntegrator::extractMeshInsideBlock(const TsdfBlock& block,
   DCHECK(next_mesh_index != nullptr);
   DCHECK(mesh != nullptr);
 
-  // TODO(nathan) avoid multiple calls (though overhead isn't too bad)
-  GvdBlock::Ptr gvd_block = gvd_layer_->getBlockPtrByIndex(block.block_index());
+  const BlockIndex block_index = block.block_index();
+  GvdBlock::Ptr gvd_block = gvd_layer_->getBlockPtrByIndex(block_index);
   DCHECK(gvd_block != nullptr);
 
   PointMatrix corner_coords;
@@ -61,8 +196,13 @@ void VoxelAwareMeshIntegrator::extractMeshInsideBlock(const TsdfBlock& block,
 
   if (all_neighbors_observed) {
     std::vector<bool> voxels_in_block(8, true);
-    VoxelAwareMarchingCubes::meshCube(
-        corner_coords, corner_sdf, next_mesh_index, mesh, gvd_voxels, voxels_in_block);
+    VoxelAwareMarchingCubes::meshCube(block_index,
+                                      corner_coords,
+                                      corner_sdf,
+                                      next_mesh_index,
+                                      mesh,
+                                      gvd_voxels,
+                                      voxels_in_block);
   }
 }
 
@@ -74,8 +214,8 @@ void VoxelAwareMeshIntegrator::extractMeshOnBorder(const TsdfBlock& block,
   DCHECK(next_mesh_index != nullptr);
   DCHECK(mesh != nullptr);
 
-  // TODO(nathan) avoid multiple calls (though overhead isn't too bad)
-  GvdBlock::Ptr gvd_block = gvd_layer_->getBlockPtrByIndex(block.block_index());
+  const BlockIndex block_index = block.block_index();
+  GvdBlock::Ptr gvd_block = gvd_layer_->getBlockPtrByIndex(block_index);
   DCHECK(gvd_block != nullptr);
 
   PointMatrix corner_coords;
@@ -122,7 +262,8 @@ void VoxelAwareMeshIntegrator::extractMeshOnBorder(const TsdfBlock& block,
 
         CHECK(neighbor_block.isValidVoxelIndex(corner_index));
         const TsdfVoxel& voxel = neighbor_block.getVoxelByVoxelIndex(corner_index);
-        GvdBlock::Ptr neighbor_gvd_block = gvd_layer_->getBlockPtrByIndex(neighbor_index);
+        GvdBlock::Ptr neighbor_gvd_block =
+            gvd_layer_->getBlockPtrByIndex(neighbor_index);
         gvd_voxels[i] = &neighbor_gvd_block->getVoxelByVoxelIndex(corner_index);
 
         if (!vutils::getSdfIfValid(voxel, config_.min_weight, &(corner_sdf(i)))) {
@@ -139,8 +280,13 @@ void VoxelAwareMeshIntegrator::extractMeshOnBorder(const TsdfBlock& block,
   }
 
   if (all_neighbors_observed) {
-    VoxelAwareMarchingCubes::meshCube(
-        corner_coords, corner_sdf, next_mesh_index, mesh, gvd_voxels, voxels_in_block);
+    VoxelAwareMarchingCubes::meshCube(block_index,
+                                      corner_coords,
+                                      corner_sdf,
+                                      next_mesh_index,
+                                      mesh,
+                                      gvd_voxels,
+                                      voxels_in_block);
   }
 }
 

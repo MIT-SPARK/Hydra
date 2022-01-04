@@ -97,7 +97,8 @@ inline int calculateVertexConfig(const SdfMatrix& vertex_sdf) {
   return to_return;
 }
 
-inline void updateVoxels(int edge_coord,
+inline void updateVoxels(const BlockIndex& block,
+                         int edge_coord,
                          VertexIndex new_vertex_index,
                          const std::vector<uint8_t>& status,
                          const std::vector<GvdVoxel*>& gvd_voxels,
@@ -109,16 +110,20 @@ inline void updateVoxels(int edge_coord,
   if (first_voxel && voxels_in_block[pairs[0]] && (curr_status & 0x01)) {
     setGvdSurfaceVoxel(*first_voxel);
     first_voxel->block_vertex_index = new_vertex_index;
+    std::memcpy(first_voxel->mesh_block, block.data(), sizeof(first_voxel->mesh_block));
   }
 
   GvdVoxel* second_voxel = gvd_voxels[pairs[1]];
   if (second_voxel && voxels_in_block[pairs[1]] && (curr_status & 0x02)) {
     setGvdSurfaceVoxel(*second_voxel);
     second_voxel->block_vertex_index = new_vertex_index;
+    std::memcpy(
+        second_voxel->mesh_block, block.data(), sizeof(second_voxel->mesh_block));
   }
 }
 
-void VoxelAwareMarchingCubes::meshCube(const PointMatrix& vertex_coords,
+void VoxelAwareMarchingCubes::meshCube(const BlockIndex& block,
+                                       const PointMatrix& vertex_coords,
                                        const SdfMatrix& vertex_sdf,
                                        VertexIndex* next_index,
                                        Mesh* mesh,
@@ -160,17 +165,20 @@ void VoxelAwareMarchingCubes::meshCube(const PointMatrix& vertex_coords,
 
     // mark voxels with a nearest vertex. overwriting is okay (as remapping downstream
     // tracks which vertices are the same)
-    updateVoxels(table_row[table_col + 2],
+    updateVoxels(block,
+                 table_row[table_col + 2],
                  *next_index,
                  edge_status,
                  gvd_voxels,
                  voxels_in_block);
-    updateVoxels(table_row[table_col + 1],
+    updateVoxels(block,
+                 table_row[table_col + 1],
                  *next_index + 1,
                  edge_status,
                  gvd_voxels,
                  voxels_in_block);
-    updateVoxels(table_row[table_col],
+    updateVoxels(block,
+                 table_row[table_col],
                  *next_index + 2,
                  edge_status,
                  gvd_voxels,

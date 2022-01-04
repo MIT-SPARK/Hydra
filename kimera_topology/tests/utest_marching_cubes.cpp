@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
-
 #include <kimera_topology/voxel_aware_marching_cubes.h>
+
 #include <set>
 
 namespace kimera {
@@ -133,8 +133,14 @@ TEST(VoxelAwareMarchingCubes, CubeMeshingNearestVertexIndexCorrect) {
   vertex_coordinates.col(4) << 1.0, 1.0, 1.0;
 
   std::vector<bool> voxels_in_block(8, true);
-  VoxelAwareMarchingCubes::meshCube(
-      vertex_coordinates, sdf_values, &next_index, &mesh, gvd_voxels, voxels_in_block);
+  BlockIndex block = BlockIndex::Zero();
+  VoxelAwareMarchingCubes::meshCube(block,
+                                    vertex_coordinates,
+                                    sdf_values,
+                                    &next_index,
+                                    &mesh,
+                                    gvd_voxels,
+                                    voxels_in_block);
   EXPECT_EQ(3u, next_index);
 
   EXPECT_TRUE(actual_voxels[0].on_surface);
@@ -168,8 +174,14 @@ TEST(VoxelAwareMarchingCubes, CubeMeshingOutsideBlockCorrect) {
 
   std::vector<bool> voxels_in_block(8, true);
   voxels_in_block[1] = false;
-  VoxelAwareMarchingCubes::meshCube(
-      vertex_coordinates, sdf_values, &next_index, &mesh, gvd_voxels, voxels_in_block);
+  BlockIndex block = BlockIndex::Zero();
+  VoxelAwareMarchingCubes::meshCube(block,
+                                    vertex_coordinates,
+                                    sdf_values,
+                                    &next_index,
+                                    &mesh,
+                                    gvd_voxels,
+                                    voxels_in_block);
   EXPECT_EQ(3u, next_index);
 
   EXPECT_TRUE(actual_voxels[0].on_surface);

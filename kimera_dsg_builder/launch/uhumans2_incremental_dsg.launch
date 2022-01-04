@@ -51,7 +51,7 @@
         <arg name="glog_to_file" value="$(arg glog_to_file)"/>
         <arg name="glog_dir" value="$(arg topology_glog_dir)"/>
         <arg name="verbosity" value="$(arg verbosity)" if="$(arg glog_to_file)"/>
-        <arg name="min_glog_level" value="$(arg min_glog_level)" if="$(arg glog_to_file)"/>
+        <arg name="min_glog_level" value="$(arg min_glog_level)"/>
     </include>
 
     <include file="$(find kimera_dsg_visualizer)/launch/includes/kimera_dsg_visualizer_params.xml">

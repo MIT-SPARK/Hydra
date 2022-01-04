@@ -11,7 +11,7 @@ template <>
 bool isObservedVoxel(const ::kimera::topology::GvdVoxel& voxel);
 
 template <>
-bool isObservedVoxel(const ::kimera::topology::GvdVoxel& voxel) {
+inline bool isObservedVoxel(const ::kimera::topology::GvdVoxel& voxel) {
   return voxel.observed;
 }
 
@@ -123,17 +123,22 @@ LayerComparisonResult compareLayers(const voxblox::Layer<LhsVoxel>& lhs,
   return results;
 }
 
-bool gvdEsdfVoxelsSame(const GvdVoxel& lhs, const voxblox::EsdfVoxel& rhs) {
+inline bool gvdEsdfVoxelsSame(const GvdVoxel& lhs, const voxblox::EsdfVoxel& rhs) {
   // TODO(nathan) consider comparing parent to esdf parent direction
   return lhs.distance == rhs.distance && lhs.fixed == rhs.fixed;
 }
 
-bool esdfVoxelsSame(const voxblox::EsdfVoxel& lhs, const voxblox::EsdfVoxel& rhs) {
+inline bool gvdVoxelsSame(const GvdVoxel& lhs, const GvdVoxel& rhs) {
+  // TODO(nathan) consider comparing parent to esdf parent direction
+  return lhs.distance == rhs.distance && lhs.fixed == rhs.fixed;
+}
+
+inline bool esdfVoxelsSame(const voxblox::EsdfVoxel& lhs, const voxblox::EsdfVoxel& rhs) {
   return lhs.distance == rhs.distance && lhs.fixed == rhs.fixed &&
          lhs.parent == rhs.parent;
 }
 
-std::ostream& operator<<(std::ostream& out, const LayerComparisonResult& result) {
+inline std::ostream& operator<<(std::ostream& out, const LayerComparisonResult& result) {
   if (!result.valid) {
     out << "Invalid result!";
     return out;

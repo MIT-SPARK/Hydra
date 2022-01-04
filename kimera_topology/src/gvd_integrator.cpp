@@ -95,9 +95,10 @@ uint8_t GvdIntegrator::updateGvdParentMap(const GlobalIndex& voxel_index,
   GvdVertexInfo info;
   info.vertex = parent_voxel->block_vertex_index;
   info.ref_count = 1;
+  std::memcpy(info.block, parent_voxel->mesh_block, sizeof(info.block));
 
-  BlockIndex block_index = voxblox::getBlockIndexFromGlobalVoxelIndex(
-      neighbor_parent, gvd_layer_->voxels_per_side_inv());
+  // TODO(nathan) remove this at some point
+  BlockIndex block_index = Eigen::Map<BlockIndex>(parent_voxel->mesh_block);
   const auto& mesh_block = mesh_layer_->getMeshByIndex(block_index);
   if (info.vertex < mesh_block.vertices.size()) {
     voxblox::Point vertex_pos = mesh_block.vertices.at(info.vertex);
@@ -146,8 +147,9 @@ void GvdIntegrator::updateVertexMapping() {
 
     iter->second.vertex = voxel->block_vertex_index;
 
-    BlockIndex block_index = voxblox::getBlockIndexFromGlobalVoxelIndex(
-        iter->first, gvd_layer_->voxels_per_side_inv());
+    const BlockIndex block_index = Eigen::Map<BlockIndex>(voxel->mesh_block);
+    Eigen::Map<BlockIndex>(iter->second.block) = block_index;
+
     const auto& mesh_block = mesh_layer_->getMeshByIndex(block_index);
     if (voxel->block_vertex_index >= mesh_block.vertices.size()) {
       LOG(ERROR) << "Invalid vertex: " << voxel->block_vertex_index
@@ -279,7 +281,7 @@ void GvdIntegrator::updateFromTsdfLayer(bool clear_updated_flag,
   // sets voxel surface flags
   VLOG(3) << "[GVD update]: starting marching cubes";
   voxblox::timing::Timer marching_cubes_timer("gvd/marching_cubes");
-  mesh_integrator_->generateMesh(!use_all_blocks, false);
+  mesh_integrator_->generateMesh(!use_all_blocks, clear_updated_flag);
   marching_cubes_timer.Stop();
   VLOG(3) << "[GVD update]: finished marching cubes";
 
@@ -311,8 +313,7 @@ void GvdIntegrator::updateFromTsdfLayer(bool clear_updated_flag,
     voxblox::timing::Timer extraction_timer("gvd/extract_graph");
     updateVertexMapping();
     graph_extractor_->extract(*gvd_layer_);
-    graph_extractor_->assignMeshVertices(
-        *gvd_layer_, gvd_parents_, gvd_parent_vertices_);
+    graph_extractor_->assignMeshVertices(gvd_parents_, gvd_parent_vertices_);
     extraction_timer.Stop();
     VLOG(3) << "[GVD update]: finished graph extraction";
   }
@@ -539,8 +540,9 @@ bool GvdIntegrator::processNeighbor(GvdVoxel& voxel,
       parent_pos = getVoxelPosition<float>(*gvd_layer_, voxel_idx);
     }
 
+    // TODO(nathan): neighbor should have correct sign, but not sure
     candidate.distance =
-        std::copysign((neighbor_pos - parent_pos).norm(), voxel.distance);
+        std::copysign((neighbor_pos - parent_pos).norm(), neighbor.distance);
     candidate.is_lower = std::abs(candidate.distance) < std::abs(neighbor.distance);
   } else {
     candidate = getLowerDistance(
