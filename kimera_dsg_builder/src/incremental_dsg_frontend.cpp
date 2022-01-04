@@ -59,7 +59,10 @@ void DsgFrontend::stop() {
   }
 }
 
-DsgFrontend::~DsgFrontend() { stop(); }
+DsgFrontend::~DsgFrontend() {
+  stop();
+  segmenter_.reset();
+}
 
 void DsgFrontend::handleActivePlaces(const PlacesLayerMsg::ConstPtr& msg) {
   std::unique_lock<std::mutex> queue_lock(places_queue_mutex_);
@@ -178,8 +181,8 @@ void DsgFrontend::startMeshFrontend() {
 }
 
 std::optional<Eigen::Vector3d> DsgFrontend::getLatestPose() {
-  //ros::Time lookup_time;
-  //lookup_time.fromNSec(last_mesh_timestamp_);
+  // ros::Time lookup_time;
+  // lookup_time.fromNSec(last_mesh_timestamp_);
   geometry_msgs::TransformStamped msg;
   try {
     msg = tf_buffer_.lookupTransform("world", sensor_frame_, ros::Time(0));

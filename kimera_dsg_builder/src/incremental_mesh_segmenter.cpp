@@ -108,6 +108,11 @@ MeshSegmenter::MeshSegmenter(const ros::NodeHandle& nh,
   rqt_server_.setCallback(rqt_callback_);
 }
 
+MeshSegmenter::~MeshSegmenter() {
+  // handle this before node handle disappears
+  segmented_mesh_vertices_pub_.reset();
+}
+
 bool MeshSegmenter::detectObjects(const SharedDsgInfo::Ptr& dsg,
                                   const std::vector<size_t>& frontend_indices,
                                   const std::optional<Eigen::Vector3d>& pos) {

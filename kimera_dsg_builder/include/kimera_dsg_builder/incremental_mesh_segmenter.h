@@ -29,7 +29,7 @@ class MeshSegmenter {
   explicit MeshSegmenter(const ros::NodeHandle& nh,
                          const MeshVertexCloud::Ptr& active_vertices);
 
-  virtual ~MeshSegmenter() = default;
+  virtual ~MeshSegmenter();
 
   bool detectObjects(const SharedDsgInfo::Ptr& dsg,
                      const std::vector<size_t>& active_indices,
