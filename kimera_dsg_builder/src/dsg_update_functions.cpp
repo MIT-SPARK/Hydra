@@ -79,6 +79,11 @@ void updateObjects(DynamicSceneGraph& graph,
           if (attrs.bounding_box.isInside(attrs_target.position)) {
             const bool curr_bigger =
                 attrs.bounding_box.volume() > attrs_target.bounding_box.volume();
+            LOG(INFO) << "Merging " << NodeSymbol(id_node_pair.first).getLabel() << " ["
+                      << attrs.bounding_box.volume() << "] "
+                      << (curr_bigger ? " <-" : " -> ")
+                      << NodeSymbol(node_target_id).getLabel() << " ["
+                      << attrs_target.bounding_box.volume() << "]";
 
             if (curr_bigger) {
               nodes_to_merge.push_back({node_target_id, id_node_pair.first});
