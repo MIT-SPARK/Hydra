@@ -23,8 +23,8 @@ voronoi_check:
     parent_l1_separation: 12
     parent_cos_angle_separation: 0.0
 graph_extractor:
-    min_extra_basis: 1
-    min_vertex_basis: 3
+    min_extra_basis: 2
+    min_vertex_basis: 4
     merge_new_nodes: true
     node_merge_distance_m: 0.5
     edge_splitting_merge_nodes: true
@@ -33,12 +33,12 @@ graph_extractor:
     add_freespace_edges: true
     freespace_active_neighborhood_hops: 1
     freespace_edge_num_neighbors: 3
-    freespace_edge_min_clearance_m: 0.001
+    freespace_edge_min_clearance_m: 0.05
     add_component_connection_edges: true
     connected_component_window: 10
     connected_component_hops: 2
     component_nodes_to_check: 50
     component_nearest_neighbors: 1
-    component_max_edge_length_m: 10.0
-    component_min_clearance_m: 0.001
+    component_max_edge_length_m: 5.0
+    component_min_clearance_m: 0.05
     remove_isolated_nodes: true
