@@ -557,6 +557,10 @@ void DsgBackend::addPlacesToDeformationGraph() {
       const auto& node = *id_node_pair.second;
       const auto& attrs = node.attributes<PlaceNodeAttributes>();
 
+      if (!node.hasSiblings()) {
+        continue;
+      }
+
       place_nodes.push_back(node.id);
       place_node_poses.push_back(gtsam::Pose3(gtsam::Rot3(), attrs.position));
 

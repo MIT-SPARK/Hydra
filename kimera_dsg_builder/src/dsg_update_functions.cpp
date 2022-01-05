@@ -195,8 +195,19 @@ void updatePlaces(DynamicSceneGraph& graph,
   // TODO(yun) regenerate rooms. Or trigger to regenerate rooms.
 
   if (!missing_nodes.empty()) {
-    VLOG(6) << "[Places Layer]: could not update "
+    VLOG(4) << "[Places Layer]: could not update "
             << displayNodeSymbolContainer(missing_nodes);
+    for (const auto& place_id : missing_nodes) {
+      if (layer.hasNode(place_id)) {
+        const Node& missing_node = layer.getNode(place_id).value();
+        const auto& attrs = missing_node.attributes<PlaceNodeAttributes>();
+        if (!attrs.is_active) {
+          VLOG(4) << "[Places Layer]: removing node "
+                  << gtsam::DefaultKeyFormatter(place_id);
+          graph.removeNode(place_id);
+        }
+      }
+    }
   }
 }
 
