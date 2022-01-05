@@ -164,7 +164,9 @@ void ElapsedTimeRecorder::logElapsed(const std::string& name,
 
 void ElapsedTimeRecorder::logAllElapsed(const std::string& output_folder) const {
   for (const auto& str_timer_pair : elapsed_) {
+    VLOG(1) << "Saving " << str_timer_pair.first;
     logElapsed(str_timer_pair.first, output_folder);
+    VLOG(1) << "Saved " << str_timer_pair.first;
   }
 }
 

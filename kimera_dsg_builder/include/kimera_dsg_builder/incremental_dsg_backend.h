@@ -2,6 +2,7 @@
 #include "kimera_dsg_builder/dsg_update_functions.h"
 #include "kimera_dsg_builder/incremental_room_finder.h"
 #include "kimera_dsg_builder/incremental_types.h"
+#include "kimera_dsg_builder/visualizer_plugins.h"
 
 #include <kimera_dsg/scene_graph_logger.h>
 #include <kimera_dsg_visualizer/dynamic_scene_graph_visualizer.h>
@@ -195,6 +196,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   std::atomic<bool> visualizer_show_frontend_;
   ros::ServiceServer frontend_viz_srv_;
   ros::ServiceServer backend_viz_srv_;
+  PlacesFactorGraphViz::Ptr places_factors_visualizer_;
+  bool visualize_place_factors_;
 
   bool dsg_log_;
   std::string dsg_log_path_;

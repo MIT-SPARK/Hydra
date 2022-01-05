@@ -791,7 +791,7 @@ void GraphExtractor::filterIsolatedNodes() {
   for (const auto node : visited_nodes_) {
     if (!node_id_root_map_.count(node)) {
       if (graph_->hasNode(node)) {
-        LOG(WARNING) << "node_id_root_map invariant broken!";
+        VLOG(1) << "node_id_root_map invariant broken!";
       }
       continue;
     }

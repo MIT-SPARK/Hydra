@@ -3,7 +3,6 @@
 #include "kimera_dsg_builder/minimum_spanning_tree.h"
 #include "kimera_dsg_builder/pcl_conversion.h"
 #include "kimera_dsg_builder/timing_utilities.h"
-#include "kimera_dsg_builder/visualizer_plugins.h"
 
 #include <kimera_dsg/node_attributes.h>
 #include <pcl/search/kdtree.h>
@@ -99,7 +98,8 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
       shared_places_copy_(KimeraDsgLayers::PLACES),
       have_loopclosures_(false),
       have_new_mesh_(false),
-      visualizer_should_reset_(false) {
+      visualizer_should_reset_(false),
+      visualize_place_factors_(false) {
   nh_.getParam("robot_id", robot_id_);
 
   if (!loadParameters(ros::NodeHandle(nh_, "pgmo"))) {
@@ -116,6 +116,7 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
   dsg_nh.getParam("places_merge_distance_tolerance_m",
                   places_merge_distance_tolerance_m_);
 
+  dsg_nh.getParam("visualize_place_factors", visualize_place_factors_);
   KimeraRPGO::RobustSolverParams params = deformation_graph_->getParams();
 
   std::string rpgo_verbosity = "UPDATE";
@@ -178,9 +179,10 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
                               places_merge_pos_threshold_m_,
                               places_merge_distance_tolerance_m_);
   });
-  // dsg_update_funcs_.push_back(&dsg_updates::updateRooms); // redundant to
-  // updateRoomsNodes dsg_update_funcs_.push_back(&dsg_updates::updateBuildings); //
+  // redundant to updateRoomsNodes
+  // dsg_update_funcs_.push_back(&dsg_updates::updateRooms);
   // redundant to updateBuildingNode
+  // dsg_update_funcs_.push_back(&dsg_updates::updateBuildings);
 
   deformation_graph_->storeOnlyNoOptimization();
 
@@ -254,10 +256,22 @@ void DsgBackend::startVisualizer() {
   nh.setCallbackQueue(visualizer_queue_.get());
 
   visualizer_.reset(new DynamicSceneGraphVisualizer(nh, getDefaultLayerIds()));
-  visualizer_->addPlugin(std::make_shared<PgmoMeshPlugin>(nh, "dsg_mesh"));
-  // TODO(nathan) voxblox mesh plugin in rviz doesn't handle large graphs well
-  // (rviz frame-rate drops significantly after ~15 seconds)
-  // visualizer_->addPlugin(std::make_shared<VoxbloxMeshPlugin>(nh, "dsg_mesh"));
+
+  bool use_voxblox_mesh_plugin;
+  nh_.param<bool>("use_voxblox_mesh_plugin", use_voxblox_mesh_plugin, false);
+  if (use_voxblox_mesh_plugin) {
+    // TODO(nathan) voxblox mesh plugin in rviz doesn't handle large graphs well
+    visualizer_->addPlugin(std::make_shared<VoxbloxMeshPlugin>(nh, "dsg_mesh"));
+  } else {
+    visualizer_->addPlugin(std::make_shared<PgmoMeshPlugin>(nh, "dsg_mesh"));
+  }
+
+  bool use_mst_plugin;
+  nh_.param<bool>("use_mst_plugin", use_mst_plugin, false);
+  if (use_mst_plugin) {
+    // note that this only makes sense for the frontend graph
+    visualizer_->addPlugin(std::make_shared<MeshPlaceConnectionsPlugin>(nh, "mst"));
+  }
 
   visualizer_should_reset_ = true;
 
@@ -373,6 +387,10 @@ void DsgBackend::startPgmo() {
   viz_pose_mesh_edges_pub_ = nh_.advertise<visualization_msgs::Marker>(
       "pgmo/deformation_graph_pose_mesh", 10, false);
 
+  if (visualize_place_factors_) {
+    places_factors_visualizer_ = std::make_shared<PlacesFactorGraphViz>(nh_);
+  }
+
   save_mesh_srv_ =
       nh_.advertiseService("save_mesh", &DsgBackend::saveMeshCallback, this);
 
@@ -469,6 +487,13 @@ void DsgBackend::runPgmo() {
 
     bool have_dsg_updates = false;
     have_dsg_updates = updatePrivateDsg();
+
+    if (visualize_place_factors_ && (have_dsg_updates || have_graph_updates)) {
+      MinimumSpanningTreeInfo mst_info = getMinimumSpanningEdges(shared_places_copy_);
+      places_factors_visualizer_->draw(
+          robot_vertex_prefix_, shared_places_copy_, mst_info, *deformation_graph_);
+    }
+
     if (optimize_on_lc_ && have_graph_updates && have_loopclosures_) {
       optimize();
     } else if (call_update_periodically_ && have_dsg_updates) {
@@ -478,6 +503,10 @@ void DsgBackend::runPgmo() {
 
     if (have_graph_updates && pgmo_log_) {
       logStatus();
+    }
+
+    if (!have_graph_updates && !have_dsg_updates) {
+      r.sleep();
     }
 
     if (should_shutdown_ && !have_graph_updates && !have_dsg_updates) {

@@ -9,7 +9,7 @@ enable_icp: false
 # topology server config
 world_frame: "world"
 clear_distant_blocks: true
-dense_representation_radius_m: 5.0
+dense_representation_radius_m: 8.0
 # gvd integration and graph extraction
 min_diff_m: 1.0e-3
 min_weight: 1.0e-6

@@ -114,7 +114,7 @@ void DsgFrontend::handleLatestPoseGraph(const PoseGraph::ConstPtr& msg) {
         std::make_unique<AgentNodeAttributes>(rotation, position, pgmo_key));
 
     if (!node_valid) {
-      LOG(ERROR) << "repeated timestamp " << node.header.stamp.toNSec() << "[ns] found";
+      VLOG(1) << "repeated timestamp " << node.header.stamp.toNSec() << "[ns] found";
       continue;
     }
 
@@ -156,7 +156,7 @@ void DsgFrontend::startMeshFrontend() {
   nh_.param<std::string>("mesh_ns", mesh_ns, "");
 
   int min_object_size;
-  nh_.param<int>("ec_min_cluster_size", min_object_size, 30);
+  nh_.param<int>("min_object_vertices", min_object_size, 20);
   min_object_size_ = static_cast<size_t>(min_object_size);
 
   mesh_frontend_ros_queue_.reset(new ros::CallbackQueue());

@@ -1,5 +1,4 @@
 #include "kimera_dsg_builder/visualizer_plugins.h"
-#include "kimera_dsg_builder/minimum_spanning_tree.h"
 #include "kimera_dsg_builder/timing_utilities.h"
 
 #include <kimera_dsg_visualizer/colormap_utils.h>
@@ -36,6 +35,8 @@ PMGraphPluginConfig::PMGraphPluginConfig(const ros::NodeHandle& nh) {
   }
   leaf_color << 255 * leaf_color_float[0], 255 * leaf_color_float[1],
       255 * leaf_color_float[2];
+
+  invalid_color << 64, 235, 52;
 
   // grey
   std::vector<double> interior_color_float{0.3333, 0.3764, 0.4509};
@@ -224,17 +225,6 @@ void VoxbloxMeshPlugin::reset(const std_msgs::Header& header,
   mesh_pub_.publish(msg);
 }
 
-MeshPlaceConnectionsPlugin::MeshPlaceConnectionsPlugin(const ros::NodeHandle& nh,
-                                                       const std::string& name,
-                                                       char vertex_prefix,
-                                                       const DeformationGraphPtr& graph)
-    : DsgVisualizerPlugin(nh, name),
-      vertex_prefix_(vertex_prefix),
-      deformation_graph_(graph),
-      config_(nh) {
-  marker_pub_ = nh_.advertise<MarkerArray>("places_mesh_connection_viz", 10);
-}
-
 inline void fillPoseWithIdentity(Marker& marker) {
   Eigen::Vector3d origin = Eigen::Vector3d::Zero();
   tf2::convert(origin, marker.pose.position);
@@ -346,6 +336,15 @@ Marker makeMstEdges(const PMGraphPluginConfig& config,
   return edges;
 }
 
+MeshPlaceConnectionsPlugin::MeshPlaceConnectionsPlugin(const ros::NodeHandle& nh,
+                                                       const std::string& name)
+    : DsgVisualizerPlugin(nh, name),
+      config_(nh),
+      published_nodes_(false),
+      published_edges_(false) {
+  marker_pub_ = nh_.advertise<MarkerArray>("places_mesh_connection_viz", 10);
+}
+
 void MeshPlaceConnectionsPlugin::draw(const std_msgs::Header& header,
                                       const DynamicSceneGraph& graph) {
   if (!graph.hasLayer(KimeraDsgLayers::PLACES)) {
@@ -360,39 +359,40 @@ void MeshPlaceConnectionsPlugin::draw(const std_msgs::Header& header,
 
   MinimumSpanningTreeInfo mst_info;
   {  // timing scope
-    ScopedTimer timer("visualizer/mst_creation", true, 2, false);
+    ScopedTimer timer("visualizer/mst_creation", header.stamp.toNSec(), true, 2, false);
     mst_info = getMinimumSpanningEdges(layer);
   }  // timing scope
-
-  MarkerArray msg =
-      makeLeafEdges(config_, vertex_prefix_, mst_info, *deformation_graph_, layer);
 
   VisualizerConfig viz_config;
   viz_config.layer_z_step = 0.0;
 
-  Marker node_marker = makeCentroidMarkers(header,
-                                           config_.layer_config,
-                                           layer,
-                                           viz_config,
-                                           "place_mesh_graph_nodes",
-                                           [&](const SceneGraphNode& node) {
-                                             if (mst_info.leaves.count(node.id)) {
-                                               return config_.leaf_color;
-                                             }
-                                             return config_.interior_color;
-                                           });
+  MarkerArray msg;
+
+  Marker node_marker =
+      makeCentroidMarkers(header,
+                          config_.layer_config,
+                          layer,
+                          viz_config,
+                          "place_mesh_graph_nodes",
+                          [&](const SceneGraphNode& node) {
+                            if (mst_info.counts.at(node.id) == 0) {
+                              return config_.invalid_color;
+                            } else if (mst_info.leaves.count(node.id)) {
+                              return config_.leaf_color;
+                            } else {
+                              return config_.interior_color;
+                            }
+                          });
   if (!node_marker.points.empty()) {
     msg.markers.push_back(node_marker);
+    published_nodes_ = true;
   }
 
   Marker mst_edge_marker = makeMstEdges(config_, mst_info, layer);
   if (!mst_edge_marker.points.empty()) {
+    mst_edge_marker.header = header;
     msg.markers.push_back(mst_edge_marker);
-  }
-
-  // TODO(nathan) propagate to makeLeafEdges instead
-  for (auto& marker : msg.markers) {
-    marker.header = header;
+    published_edges_ = true;
   }
 
   if (!msg.markers.empty()) {
@@ -400,9 +400,75 @@ void MeshPlaceConnectionsPlugin::draw(const std_msgs::Header& header,
   }
 }
 
-void MeshPlaceConnectionsPlugin::reset(const std_msgs::Header&,
+void MeshPlaceConnectionsPlugin::reset(const std_msgs::Header& header,
                                        const DynamicSceneGraph&) {
-  LOG(FATAL) << "Not implemented yet";
+  MarkerArray msg;
+  if (published_nodes_) {
+    msg.markers.push_back(makeDeleteMarker(header, 0, "place_mesh_graph_nodes"));
+    published_nodes_ = false;
+  }
+
+  if (published_edges_) {
+    msg.markers.push_back(makeDeleteMarker(header, 0, "places_mesh_graph_mst_edges"));
+    published_edges_ = false;
+  }
+
+  if (!msg.markers.empty()) {
+    marker_pub_.publish(msg);
+  }
+}
+
+PlacesFactorGraphViz::PlacesFactorGraphViz(const ros::NodeHandle& nh)
+    : nh_(nh), config_(nh) {
+  marker_pub_ = nh_.advertise<MarkerArray>("places_factor_graph", 10);
+}
+
+void PlacesFactorGraphViz::draw(char vertex_prefix,
+                                const SceneGraphLayer& places,
+                                const MinimumSpanningTreeInfo& mst_info,
+                                const DeformationGraph& deformations) {
+  VisualizerConfig viz_config;
+  viz_config.layer_z_step = 0.0;
+
+  std_msgs::Header header;
+  header.frame_id = "world";
+  header.stamp = ros::Time::now();
+
+  MarkerArray msg =
+      makeLeafEdges(config_, vertex_prefix, mst_info, deformations, places);
+  for (auto& marker : msg.markers) {
+    marker.header = header;
+  }
+
+  Marker node_marker = makeCentroidMarkers(
+      header,
+      config_.layer_config,
+      places,
+      viz_config,
+      "place_factor_graph_nodes",
+      [&](const SceneGraphNode& node) {
+        if (!node.hasSiblings()) {
+          VLOG(3) << "Invalid node: " << NodeSymbol(node.id).getLabel();
+          return config_.invalid_color;
+        } else if (mst_info.leaves.count(node.id)) {
+          return config_.leaf_color;
+        } else {
+          return config_.interior_color;
+        }
+      });
+  if (!node_marker.points.empty()) {
+    msg.markers.push_back(node_marker);
+  }
+
+  Marker mst_edge_marker = makeMstEdges(config_, mst_info, places);
+  if (!mst_edge_marker.points.empty()) {
+    mst_edge_marker.header = header;
+    msg.markers.push_back(mst_edge_marker);
+  }
+
+  if (!msg.markers.empty()) {
+    marker_pub_.publish(msg);
+  }
 }
 
 }  // namespace kimera
