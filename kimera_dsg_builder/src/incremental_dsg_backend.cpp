@@ -350,6 +350,7 @@ bool DsgBackend::updatePrivateDsg() {
   if (have_frontend_updates) {
     {  // start joint critical section
       std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
+      private_dsg_->updated = false;
       private_dsg_->graph->mergeGraph(*shared_dsg_->graph);
       *private_dsg_->latest_places = *shared_dsg_->latest_places;
 
@@ -500,6 +501,7 @@ void DsgBackend::runPgmo() {
       updateDsgMesh();
       callUpdateFunctions();
     }
+    private_dsg_->updated = true;
 
     if (have_graph_updates && pgmo_log_) {
       logStatus();
@@ -705,7 +707,6 @@ void DsgBackend::updateDsgMesh() {
     // start private dsg critical section
     std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
     private_dsg_->graph->setMeshDirectly(opt_mesh);
-    private_dsg_->updated = true;
   }
 
   if (viz_mesh_mesh_edges_pub_.getNumSubscribers() > 0 ||
@@ -747,7 +748,6 @@ void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,
   }
   updateRoomsNodes();
   updateBuildingNode();
-  private_dsg_->updated = true;
 }
 
 ActiveNodeSet DsgBackend::getNodesForRoomDetection(const NodeIdSet& latest_places) {
