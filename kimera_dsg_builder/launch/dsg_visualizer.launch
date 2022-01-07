@@ -7,6 +7,7 @@
   <arg name="viz_config_dir" default="$(find kimera_dsg_builder)/config/incremental_visualizer"/>
   <arg name="visualizer_ns" default="/kimera_dsg_visualizer"/>
   <arg name="start_rviz" default="true"/>
+  <arg name="publish_rotation" default="false"/>
 
   <arg name="verbosity" default="0"/>
   <arg name="debug" default="false"/>
@@ -33,8 +34,8 @@
     <param name="scene_graph_input_path" value="$(arg scene_graph_path)"/>
   </node>
 
-  <node name="rviz" pkg="rviz" type="rviz" output="log" if="$(arg start_rviz)"
-          args="-d $(find kimera_dsg_builder)/rviz/dsg_visualizer.rviz"/>
+  <node name="rviz" pkg="rviz" type="rviz" output="screen" if="$(arg start_rviz)"
+          args="-d $(find kimera_dsg_builder)/rviz/dsg_visualizer.rviz --opengl 500"/>
 
   <group if="$(arg publish_view_transforms)">
     <!-- Publish a static tf to visualize scene-graph in orthographic projection sideways -->
@@ -50,5 +51,13 @@
         args="0 0 0 0 0.707 0 0.707 $(arg world_frame) rviz_topdown"/>
   </group>
 
+  <node pkg="kimera_dsg_visualizer" type="rotate_tf_node" name="$(anon rotate_tf_node)"
+        if="$(arg publish_rotation)">
+      <param name="parent_frame" value="world"/>
+      <param name="child_frame" value="rotated_view"/>
+      <param name="period_s" value="25.0"/>
+      <param name="radius" value="70.0"/>
+      <rosparam param="centroid">[3.0, 25.0, 40.0]</rosparam>
+  </node>
 
 </launch>
