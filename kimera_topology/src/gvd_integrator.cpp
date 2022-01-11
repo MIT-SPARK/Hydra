@@ -216,11 +216,12 @@ void GvdIntegrator::updateVoronoiQueue(GvdVoxel& voxel,
   }
 }
 
-void GvdIntegrator::removeDistantBlocks(const voxblox::Point& center,
-                                        double max_distance) {
+BlockIndexList GvdIntegrator::removeDistantBlocks(const voxblox::Point& center,
+                                                  double max_distance) {
   BlockIndexList blocks;
   gvd_layer_->getAllAllocatedBlocks(&blocks);
 
+  BlockIndexList archived;
   for (const auto& idx : blocks) {
     Block<GvdVoxel>::Ptr block = gvd_layer_->getBlockPtrByIndex(idx);
     if ((center - block->origin()).norm() < max_distance) {
@@ -246,7 +247,10 @@ void GvdIntegrator::removeDistantBlocks(const voxblox::Point& center,
     // we explicitly tsdf and gvd blocks here to avoid potential weirdness
     tsdf_layer_->removeBlock(idx);
     gvd_layer_->removeBlock(idx);
+    archived.push_back(idx);
   }
+
+  return archived;
 }
 
 void GvdIntegrator::updateFromTsdfLayer(bool clear_updated_flag,

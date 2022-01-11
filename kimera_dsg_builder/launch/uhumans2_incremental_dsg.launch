@@ -87,7 +87,7 @@
         <param name="dsg_log_output" value="$(arg dsg_should_log)"/>
         <param name="dsg_output_path" value="$(arg dsg_path)"/>
 
-        <remap from="~voxblox_mesh" to="/kimera_topology_node/mesh"/>
+        <remap from="~voxblox_mesh" to="/kimera_topology_node/active_mesh"/>
         <remap from="~active_places" to="/kimera_topology_node/active_layer"/>
         <remap from="~pose_graph_incremental" to="/kimera_vio_ros/pose_graph_incremental"
                unless="$(arg use_gt_frame)"/>

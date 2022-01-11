@@ -1,4 +1,5 @@
 #include "kimera_dsg_builder/incremental_mesh_segmenter.h"
+#include "kimera_dsg_builder/timing_utilities.h"
 
 #include <kimera_semantics_ros/ros_params.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -148,7 +149,6 @@ bool MeshSegmenter::detectObjects(const SharedDsgInfo::Ptr& dsg,
     VLOG(3) << "[Object Detection] No object vertices found";
     return false;
   }
-
   publishObjectClouds(label_indices);
 
   VLOG(3) << "[Object Detection] Detecting objects";

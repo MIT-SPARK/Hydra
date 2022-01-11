@@ -70,7 +70,7 @@ class GvdIntegrator {
 
   inline GraphExtractor& getGraphExtractor() const { return *graph_extractor_; }
 
-  void removeDistantBlocks(const voxblox::Point& center, double max_distance);
+  BlockIndexList removeDistantBlocks(const voxblox::Point& center, double max_distance);
 
  protected:
   void processTsdfBlock(const Block<TsdfVoxel>& block, const BlockIndex& index);

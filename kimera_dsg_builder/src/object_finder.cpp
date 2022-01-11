@@ -68,7 +68,7 @@ ClusterIndices estimateClustersEuclidean(
     const pcl::IndicesPtr& active_indices = nullptr) {
   using namespace pcl::search;
   typename KdTree<PointT>::Ptr tree(new KdTree<PointT>());
-  tree->setInputCloud(cloud);
+  tree->setInputCloud(cloud, active_indices);
 
   typename pcl::EuclideanClusterExtraction<PointT> estimator;
   estimator.setClusterTolerance(params.cluster_tolerance);

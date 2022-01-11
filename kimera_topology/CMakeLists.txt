@@ -23,9 +23,9 @@ find_package(
 )
 find_package(yaml-cpp REQUIRED)
 
-add_message_files(FILES ActiveLayer.msg)
+add_message_files(FILES ActiveLayer.msg ActiveMesh.msg)
 
-generate_messages(DEPENDENCIES std_msgs)
+generate_messages(DEPENDENCIES std_msgs voxblox_msgs)
 
 generate_dynamic_reconfigure_options(cfg/GvdVisualizerConfig.cfg)
 

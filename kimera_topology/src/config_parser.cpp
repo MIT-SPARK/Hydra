@@ -224,6 +224,7 @@ void fillTopologyServerConfig(const ros::NodeHandle& nh, TopologyServerConfig& c
   READ_PARAM(nh, config, show_stats);
   READ_PARAM(nh, config, clear_distant_blocks);
   READ_PARAM(nh, config, dense_representation_radius_m);
+  READ_PARAM(nh, config, publish_archived);
   READ_PARAM(nh, config, mesh_color_mode);
   READ_PARAM(nh, config, world_frame);
 }

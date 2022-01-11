@@ -1,7 +1,7 @@
 #include "kimera_dsg_builder/incremental_dsg_frontend.h"
 #include "kimera_dsg_builder/common.h"
-#include "kimera_dsg_builder/timing_utilities.h"
 #include "kimera_dsg_builder/serialization_helpers.h"
+#include "kimera_dsg_builder/timing_utilities.h"
 
 #include <kimera_pgmo/utils/CommonFunctions.h>
 #include <tf2_eigen/tf2_eigen.h>
@@ -72,7 +72,7 @@ void DsgFrontend::handleActivePlaces(const PlacesLayerMsg::ConstPtr& msg) {
   places_queue_.push(msg);
 }
 
-void DsgFrontend::handleLatestMesh(const voxblox_msgs::Mesh::ConstPtr& msg) {
+void DsgFrontend::handleLatestMesh(const kimera_topology::ActiveMesh::ConstPtr& msg) {
   {  // start mesh frontend critical section
     std::unique_lock<std::mutex> mesh_lock(mesh_frontend_mutex_);
     if (mesh_queue_.size() < mesh_queue_size_) {
@@ -162,6 +162,8 @@ void DsgFrontend::startMeshFrontend() {
   nh_.param<int>("min_object_vertices", min_object_size, 20);
   min_object_size_ = static_cast<size_t>(min_object_size);
 
+  nh_.param<bool>("prune_mesh_indices", prune_mesh_indices_, false);
+
   mesh_frontend_ros_queue_.reset(new ros::CallbackQueue());
 
   nh_.param<std::string>("sensor_frame", sensor_frame_, "base_link");
@@ -184,6 +186,9 @@ void DsgFrontend::startMeshFrontend() {
 }
 
 std::optional<Eigen::Vector3d> DsgFrontend::getLatestPose() {
+  if (!prune_mesh_indices_) {
+    return std::nullopt;
+  }
   // ros::Time lookup_time;
   // lookup_time.fromNSec(last_mesh_timestamp_);
   geometry_msgs::TransformStamped msg;
@@ -213,7 +218,7 @@ void DsgFrontend::runMeshFrontend() {
       continue;
     }
 
-    voxblox_msgs::Mesh::ConstPtr msg(nullptr);
+    kimera_topology::ActiveMesh::ConstPtr msg(nullptr);
     {  // start mesh critical region
       std::unique_lock<std::mutex> mesh_lock(mesh_frontend_mutex_);
       if (!mesh_queue_.empty()) {
@@ -227,6 +232,8 @@ void DsgFrontend::runMeshFrontend() {
       continue;
     }
 
+    voxblox_msgs::Mesh::ConstPtr mesh_msg(new voxblox_msgs::Mesh(msg->mesh));
+
     // let the places thread start working on queued messages
     last_mesh_timestamp_ = msg->header.stamp.toNSec();
     uint64_t object_timestamp = msg->header.stamp.toNSec();
@@ -235,7 +242,7 @@ void DsgFrontend::runMeshFrontend() {
           "frontend/mesh_compression", last_mesh_timestamp_, true, 1, false);
 
       mesh_frontend_ros_queue_->callAvailable(ros::WallDuration(0.0));
-      mesh_frontend_.voxbloxCallback(msg);
+      mesh_frontend_.voxbloxCallback(mesh_msg);
 
       // TODO(nathan) revisit for a more formal handshake with pgmo
       ros::WallRate spin_rate(100);
@@ -248,6 +255,8 @@ void DsgFrontend::runMeshFrontend() {
       }
     }  // end timing scope
 
+    mesh_frontend_.clearArchivedMeshFull(msg->archived_blocks);
+
     // inform the mesh callback we can accept more meshes
     {  // start mesh critical region
       std::unique_lock<std::mutex> mesh_lock(mesh_frontend_mutex_);
@@ -256,7 +265,7 @@ void DsgFrontend::runMeshFrontend() {
 
     {  // timing scope
       ScopedTimer timer("frontend/object_detection", object_timestamp, true, 1, false);
-      auto invalid_indices = mesh_frontend_.getInvalidIndices();
+      const auto& invalid_indices = mesh_frontend_.getInvalidIndices();
       {  // start dsg critical section
         std::unique_lock<std::mutex> lock(dsg_->mutex);
         for (const auto& idx : invalid_indices) {

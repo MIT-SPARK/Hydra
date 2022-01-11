@@ -4,6 +4,7 @@
 #include "kimera_topology/topology_server_visualizer.h"
 
 #include <kimera_topology/ActiveLayer.h>
+#include <kimera_topology/ActiveMesh.h>
 #include <voxblox_ros/conversions.h>
 #include <voxblox_ros/mesh_vis.h>
 #include <voxblox_ros/ros_params.h>
@@ -58,7 +59,12 @@ class TopologyServer {
 
     // we need two publishers for the mesh: voxblox offers no way to distinguish between
     // deleted blocks and blocks that were cleared by observation
-    mesh_pub_ = nh_.advertise<voxblox_msgs::Mesh>("mesh", 1, true);
+    if (config_.publish_archived) {
+      mesh_pub_ = nh_.advertise<kimera_topology::ActiveMesh>("active_mesh", 1, true);
+    } else {
+      mesh_pub_ = nh_.advertise<voxblox_msgs::Mesh>("active_mesh", 1, true);
+    }
+
     mesh_viz_pub_ = nh_.advertise<voxblox_msgs::Mesh>("mesh_viz", 1, true);
 
     layer_pub_ = nh_.advertise<kimera_topology::ActiveLayer>("active_layer", 2, false);
@@ -93,7 +99,7 @@ class TopologyServer {
     fillTopologyServerConfig(ros::NodeHandle(config_ns), config_);
   }
 
-  void publishMesh(const ros::Time& timestamp) {
+  void publishMesh(const ros::Time& timestamp, const BlockIndexList& archived_blocks) {
     voxblox_msgs::Mesh mesh_msg;
     generateVoxbloxMeshMsg(mesh_layer_, config_.mesh_color_mode, &mesh_msg);
     mesh_msg.header.frame_id = config_.world_frame;
@@ -114,7 +120,25 @@ class TopologyServer {
       ++iter;
     }
 
-    mesh_pub_.publish(mesh_msg);
+    if (!config_.publish_archived) {
+      mesh_pub_.publish(mesh_msg);
+      return;
+    }
+
+    voxblox_msgs::Mesh archived_msg;
+    for (const auto& block_idx : archived_blocks) {
+      voxblox_msgs::MeshBlock block;
+      block.index[0] = block_idx.x();
+      block.index[1] = block_idx.y();
+      block.index[2] = block_idx.z();
+      archived_msg.mesh_blocks.push_back(block);
+    }
+
+    kimera_topology::ActiveMesh msg;
+    msg.header.stamp = timestamp;
+    msg.mesh = mesh_msg;
+    msg.archived_blocks = archived_msg;
+    mesh_pub_.publish(msg);
   }
 
   void publishActiveLayer(const ros::Time& timestamp) const {
@@ -150,7 +174,8 @@ class TopologyServer {
   }
 
   void showStats(const ros::Time& timestamp) const {
-    LOG(INFO) << "Timings: (stamp: " << timestamp.toNSec() << ")" << std::endl << voxblox::timing::Timing::Print();
+    LOG(INFO) << "Timings: (stamp: " << timestamp.toNSec() << ")" << std::endl
+              << voxblox::timing::Timing::Print();
     const std::string tsdf_memory_str =
         getHumanReadableMemoryString(tsdf_layer_->getMemorySize());
     const std::string gvd_memory_str =
@@ -168,9 +193,11 @@ class TopologyServer {
 
     gvd_integrator_->updateFromTsdfLayer(true);
 
+    BlockIndexList archived_blocks;
     if (config_.clear_distant_blocks && tsdf_server_->has_pose) {
-      gvd_integrator_->removeDistantBlocks(tsdf_server_->T_G_C_last.getPosition(),
-                                           config_.dense_representation_radius_m);
+      archived_blocks =
+          gvd_integrator_->removeDistantBlocks(tsdf_server_->T_G_C_last.getPosition(),
+                                               config_.dense_representation_radius_m);
 
       // this needs to be paired with publishMesh (i.e. generateVoxbloxMeshMsg)
       // to actual remove allocated blocks (instead of getting rid of the contents).
@@ -179,7 +206,7 @@ class TopologyServer {
                                     config_.dense_representation_radius_m);
     }
 
-    publishMesh(timestamp);
+    publishMesh(timestamp, archived_blocks);
     publishActiveLayer(timestamp);
 
     visualizer_->visualize(gvd_integrator_->getGraphExtractor(),

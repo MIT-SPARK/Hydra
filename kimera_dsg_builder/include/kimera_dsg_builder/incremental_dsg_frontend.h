@@ -12,6 +12,7 @@
 #include <kimera_dsg/scene_graph_logger.h>
 #include <kimera_pgmo/MeshFrontend.h>
 #include <kimera_topology/ActiveLayer.h>
+#include <kimera_topology/ActiveMesh.h>
 #include <kimera_topology/nearest_neighbor_utilities.h>
 #include <kimera_vio_ros/BowQuery.h>
 #include <pose_graph_tools/PoseGraph.h>
@@ -45,7 +46,7 @@ class DsgFrontend {
  private:
   void handleActivePlaces(const PlacesLayerMsg::ConstPtr& msg);
 
-  void handleLatestMesh(const voxblox_msgs::Mesh::ConstPtr& msg);
+  void handleLatestMesh(const kimera_topology::ActiveMesh::ConstPtr& msg);
 
   void handleLatestPoseGraph(const pose_graph_tools::PoseGraph::ConstPtr& msg);
 
@@ -91,7 +92,7 @@ class DsgFrontend {
 
   std::mutex mesh_frontend_mutex_;
   std::atomic<uint64_t> last_mesh_timestamp_;
-  std::queue<voxblox_msgs::Mesh::ConstPtr> mesh_queue_;
+  std::queue<kimera_topology::ActiveMesh::ConstPtr> mesh_queue_;
   size_t mesh_queue_size_;
 
   std::mutex places_queue_mutex_;
@@ -102,6 +103,7 @@ class DsgFrontend {
   std::unique_ptr<ros::CallbackQueue> mesh_frontend_ros_queue_;
   std::unique_ptr<std::thread> mesh_frontend_thread_;
   size_t min_object_size_;
+  bool prune_mesh_indices_;
   std::string sensor_frame_;
   tf2_ros::Buffer tf_buffer_;
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
