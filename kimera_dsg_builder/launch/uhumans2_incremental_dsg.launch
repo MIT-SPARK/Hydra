@@ -6,7 +6,7 @@
     <arg name="exit_after_bag" default="false"/>
 
     <arg name="enable_dsg_lcd" default="false"/>
-    <arg name="lcd_config" default="$(find kimera_dsg_builder)/config/dsg_lcd_config.yaml"/>
+    <arg name="lcd_config" default="$(find kimera_dsg_builder)/config/uhumans/dsg_lcd_config.yaml"/>
     <arg name="optimize_on_lc" default="true"/>
 
     <arg name="dsg_output_dir" default="$(find kimera_dsg_builder)/output/uhumans2"/>
@@ -65,6 +65,7 @@
           required="true"
           output="$(arg ros_output)">
         <env name="OMP_NUM_THREADS" value="12"/>
+        <env name="TERM" value="xterm-256color"/>
 
         <param name="enable_lcd" value="$(arg enable_dsg_lcd)"/>
         <param name="exit_after_bag" value="$(arg exit_after_bag)"/>
@@ -72,9 +73,10 @@
         <param name="semantic_label_2_color_csv_filepath" value="$(arg semantic_map_path)"/>
 
         <rosparam file="$(arg typology_dir)/$(arg typology_config)"/>
-        <rosparam file="$(find kimera_dsg_builder)/config/dsg_frontend_config.yaml"/>
-        <rosparam file="$(find kimera_dsg_builder)/config/dsg_backend_config.yaml"/>
+        <rosparam file="$(find kimera_dsg_builder)/config/uhumans/dsg_frontend_config.yaml"/>
+        <rosparam file="$(find kimera_dsg_builder)/config/uhumans/dsg_backend_config.yaml"/>
         <rosparam file="$(arg lcd_config)" ns="lcd"/>
+
         <param name="sensor_frame" value="left_cam" if="$(arg use_gt_frame)"/>
         <param name="sensor_frame" value="left_cam_kimera" unless="$(arg use_gt_frame)"/>
         <param name="dsg/optimize_on_lc" value="$(arg optimize_on_lc)"/>

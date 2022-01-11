@@ -1,11 +1,14 @@
 #include "kimera_dsg_builder/incremental_dsg_frontend.h"
 #include "kimera_dsg_builder/common.h"
 #include "kimera_dsg_builder/timing_utilities.h"
+#include "kimera_dsg_builder/serialization_helpers.h"
 
 #include <kimera_pgmo/utils/CommonFunctions.h>
 #include <tf2_eigen/tf2_eigen.h>
 
 #include <glog/logging.h>
+
+#include <fstream>
 
 namespace kimera {
 namespace incremental {
@@ -899,6 +902,24 @@ void DsgFrontend::assignBowVectors() {
 
   VLOG(3) << "[DSG Frontend] " << bow_messages_.size() << " of " << prior_size
           << " bow vectors unassigned";
+}
+
+void DsgFrontend::saveState(const std::string& filepath) const {
+  using nlohmann::json;
+  json record;
+  record["mesh"]["vertices"] = *mesh_frontend_.getFullMeshVertices();
+  record["mesh"]["faces"] = mesh_frontend_.getFullMeshFaces();
+  std::vector<ros::Time> mesh_stamps = mesh_frontend_.getFullMeshTimes();
+  std::vector<double> mesh_seconds;
+  mesh_seconds.reserve(mesh_stamps.size());
+  std::transform(mesh_stamps.begin(),
+                 mesh_stamps.end(),
+                 std::back_inserter(mesh_seconds),
+                 [&](auto timestamp) { return timestamp.toSec(); });
+  record["mesh"]["times"] = mesh_seconds;
+
+  std::ofstream outfile(filepath);
+  outfile << record;
 }
 
 }  // namespace incremental

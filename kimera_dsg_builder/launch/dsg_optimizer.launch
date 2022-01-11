@@ -1,0 +1,38 @@
+<launch>
+
+    <arg name="dsg_dir" default="$(find kimera_dsg_builder)/output/sidpac/sidpac_f1_3"/>
+    <arg name="dsg_name" value="frontend/dsg_with_mesh.json"/>
+    <arg name="state_name" value="frontend/state.json"/>
+    <arg name="dgrf_name" value="pgmo/deformation_graph.dgrf"/>
+
+    <arg name="debug" default="false"/>
+    <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
+    <arg name="launch_prefix" value="" unless="$(arg debug)"/>
+
+    <arg name="min_glog_level" default="0"/>
+    <arg name="verbosity" default="0"/>
+
+    <include file="$(find kimera_dsg_visualizer)/launch/includes/kimera_dsg_visualizer_params.xml">
+        <arg name="viz_config_dir" value="$(find kimera_dsg_builder)/config/incremental_visualizer"/>
+    </include>
+
+    <node pkg="kimera_dsg_builder" type="dsg_optimizer_node" name="dsg_optimizer_node"
+          launch-prefix="$(arg launch_prefix)"
+          args="--minloglevel=$(arg min_glog_level) -v=$(arg verbosity)"
+          required="true"
+          output="screen">
+        <env name="TERM" value="xterm-256color"/>
+        <rosparam file="$(find kimera_dsg_builder)/config/sidpac/dsg_backend_config.yaml"/>
+        <param name="dsg/optimize_on_lc" value="true"/>
+        <param name="pgmo/log_output" value="false"/>
+        <param name="dsg_log_output" value="false"/>
+
+        <param name="dsg_filepath" value="$(arg dsg_dir)/$(arg dsg_name)"/>
+        <param name="dgrf_filepath" value="$(arg dsg_dir)/$(arg dgrf_name)"/>
+        <param name="frontend_state_filepath" value="$(arg dsg_dir)/$(arg state_name)"/>
+    </node>
+
+    <node name="rviz" pkg="rviz" type="rviz" output="log"
+          args="-d $(find kimera_dsg_builder)/rviz/dsg_optimizer.rviz"/>
+
+</launch>

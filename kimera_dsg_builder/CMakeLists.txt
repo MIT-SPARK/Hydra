@@ -74,6 +74,7 @@ add_library(
   src/object_finder.cpp
   src/offline_dsg_builder.cpp
   src/room_finder.cpp
+  src/serialization_helpers.cpp
   src/timing_utilities.cpp
   src/visualizer_plugins.cpp
   src/voxblox_utils.cpp
@@ -109,6 +110,9 @@ target_link_libraries(room_eval_node ${PROJECT_NAME} yaml-cpp)
 add_executable(pose_graph_publisher_node src/pose_graph_publisher_node.cpp)
 target_include_directories(pose_graph_publisher_node PUBLIC ${catkin_INCLUDE_DIRS})
 target_link_libraries(pose_graph_publisher_node ${catkin_LIBRARIES} gtsam)
+
+add_executable(dsg_optimizer_node src/dsg_optimizer_node.cpp)
+target_link_libraries(dsg_optimizer_node ${PROJECT_NAME})
 
 # TODO(nathan) allow choice of sanitizer
 if(DSG_USE_ASAN)

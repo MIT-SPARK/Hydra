@@ -40,6 +40,8 @@ class DsgFrontend {
 
   void stop();
 
+  void saveState(const std::string& filepath) const;
+
  private:
   void handleActivePlaces(const PlacesLayerMsg::ConstPtr& msg);
 

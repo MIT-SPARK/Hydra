@@ -64,6 +64,7 @@
           required="true"
           output="screen">
         <env name="OMP_NUM_THREADS" value="12"/>
+        <env name="TERM" value="xterm-256color"/>
 
         <param name="enable_lcd" value="$(arg enable_dsg_lcd)"/>
         <param name="exit_after_bag" value="$(arg exit_after_bag)"/>
@@ -74,6 +75,7 @@
         <rosparam file="$(find kimera_dsg_builder)/config/sidpac/dsg_frontend_config.yaml"/>
         <rosparam file="$(find kimera_dsg_builder)/config/sidpac/dsg_backend_config.yaml"/>
         <rosparam file="$(find kimera_dsg_builder)/config/sidpac/dsg_lcd_config.yaml" ns="lcd"/>
+
         <param name="sensor_frame" value="$(arg sensor_frame)"/>
 
         <param name="pgmo/log_path" value="$(arg pgmo_log_path)"/>

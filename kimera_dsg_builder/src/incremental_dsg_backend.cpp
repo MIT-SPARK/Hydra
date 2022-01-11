@@ -2,6 +2,7 @@
 #include "kimera_dsg_builder/common.h"
 #include "kimera_dsg_builder/minimum_spanning_tree.h"
 #include "kimera_dsg_builder/pcl_conversion.h"
+#include "kimera_dsg_builder/serialization_helpers.h"
 #include "kimera_dsg_builder/timing_utilities.h"
 
 #include <kimera_dsg/node_attributes.h>
@@ -88,6 +89,7 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
       nh_(nh),
       shared_dsg_(dsg),
       private_dsg_(backend_dsg),
+      shared_places_copy_(KimeraDsgLayers::PLACES),
       robot_id_(0),
       add_places_to_deformation_graph_(true),
       optimize_on_lc_(true),
@@ -95,7 +97,6 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
       call_update_periodically_(true),
       places_merge_pos_threshold_m_(0.4),
       places_merge_distance_tolerance_m_(0.3),
-      shared_places_copy_(KimeraDsgLayers::PLACES),
       have_loopclosures_(false),
       have_new_mesh_(false),
       visualizer_should_reset_(false),
@@ -330,6 +331,7 @@ void DsgBackend::runVisualizer() {
       // the backend flag to see if we need to redraw
       visualizer_->setGraphUpdated();
       private_dsg_->updated = false;
+      VLOG(5) << "Visualizer caught latched update!";
     }
 
     if (visualizer_show_frontend_) {
@@ -350,7 +352,7 @@ bool DsgBackend::updatePrivateDsg() {
   if (have_frontend_updates) {
     {  // start joint critical section
       std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
-      private_dsg_->updated = false;
+      //private_dsg_->updated = false;
       private_dsg_->graph->mergeGraph(*shared_dsg_->graph);
       *private_dsg_->latest_places = *shared_dsg_->latest_places;
 
@@ -465,7 +467,7 @@ bool DsgBackend::readPgmoUpdates() {
 }
 
 void DsgBackend::runPgmo() {
-  ros::WallRate r(5);
+  ros::WallRate r(10);
   while (ros::ok()) {
     status_.reset();
     ScopedTimer spin_timer("backend/spin", last_timestamp_);
@@ -495,19 +497,24 @@ void DsgBackend::runPgmo() {
           robot_vertex_prefix_, shared_places_copy_, mst_info, *deformation_graph_);
     }
 
+    bool was_updated = false;
     if (optimize_on_lc_ && have_graph_updates && have_loopclosures_) {
       optimize();
+      was_updated = true;
     } else if (call_update_periodically_ && have_dsg_updates) {
       updateDsgMesh();
       callUpdateFunctions();
+      was_updated = true;
     }
-    private_dsg_->updated = true;
 
     if (have_graph_updates && pgmo_log_) {
       logStatus();
     }
 
-    if (!have_graph_updates && !have_dsg_updates) {
+    if (was_updated) {
+      VLOG(5) << "Backend flipped flag!";
+      private_dsg_->updated = true;
+    } else {
       r.sleep();
     }
 
@@ -515,6 +522,8 @@ void DsgBackend::runPgmo() {
       break;
     }
   }
+  // TODO(Yun) Technically not strictly a g2o
+  deformation_graph_->save(pgmo_log_path_ + "/deformation_graph.dgrf");
 }
 
 void DsgBackend::fullMeshCallback(const KimeraPgmoMesh::ConstPtr& msg) {
@@ -675,7 +684,6 @@ void DsgBackend::updateDsgMesh() {
   // avoid scope problems by using a smart pointer
   std::unique_ptr<ScopedTimer> timer;
 
-  std::vector<ros::Time> mesh_vertex_stamps;
   pcl::PolygonMesh input_mesh;
   {  // start pgmo mesh critical section
     std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
@@ -689,17 +697,17 @@ void DsgBackend::updateDsgMesh() {
 
     timer.reset(new ScopedTimer("backend/mesh_update", last_timestamp_));
     input_mesh =
-        kimera_pgmo::PgmoMeshMsgToPolygonMesh(*latest_mesh_, &mesh_vertex_stamps);
+        kimera_pgmo::PgmoMeshMsgToPolygonMesh(*latest_mesh_, &mesh_vertex_stamps_);
     have_new_mesh_ = false;
   }  // end pgmo mesh critical section
 
   if (input_mesh.cloud.height * input_mesh.cloud.width == 0) {
     return;
   }
-  VLOG(3) << "Deforming mesh with " << mesh_vertex_stamps.size() << " vertices";
+  VLOG(3) << "Deforming mesh with " << mesh_vertex_stamps_.size() << " vertices";
 
   auto opt_mesh = deformation_graph_->deformMesh(input_mesh,
-                                                 mesh_vertex_stamps,
+                                                 mesh_vertex_stamps_,
                                                  robot_vertex_prefix_,
                                                  num_interp_pts_,
                                                  interp_horizon_);
@@ -866,6 +874,33 @@ void DsgBackend::logStatus(bool init) const {
        << timer.getLastElapsed("backend/mesh_update").value_or(nan) << std::endl;
   file.close();
   return;
+}
+
+void DsgBackend::loadState(const std::string& state_path,
+                           const std::string& dgrf_path) {
+  using nlohmann::json;
+  using Cloud = pcl::PointCloud<pcl::PointXYZRGBA>;
+  using Faces = std::vector<pcl::Vertices>;
+  using kimera_pgmo::PolygonMeshToPgmoMeshMsg;
+  json state;
+  std::ifstream infile(state_path);
+  infile >> state;
+
+  auto vertices = state.at("mesh").at("vertices").get<Cloud>();
+  auto faces = state.at("mesh").at("faces").get<Faces>();
+  auto times = state.at("mesh").at("times").get<std::vector<ros::Time>>();
+  std::vector<ros::Time> mesh_stamps;
+  mesh_stamps.reserve(times.size());
+  std::transform(
+      times.begin(), times.end(), std::back_inserter(mesh_stamps), [&](auto time) {
+        return ros::Time(time);
+      });
+  latest_mesh_.reset(new kimera_pgmo::KimeraPgmoMesh(
+      PolygonMeshToPgmoMeshMsg(0, vertices, faces, mesh_stamps, "world")));
+  have_new_mesh_ = true;
+
+  loadDeformationGraphFromFile(dgrf_path);
+  LOG(WARNING) << "Loaded " << deformation_graph_->getNumVertices() << " vertices for deformation graph";
 }
 
 }  // namespace incremental

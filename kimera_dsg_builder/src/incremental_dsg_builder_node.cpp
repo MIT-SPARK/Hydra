@@ -103,8 +103,7 @@ void checkAllAgentFrames(SharedDsgInfo& dsg) {
     VLOG(5) << "Found at least one match for " << NodeSymbol(node->id).getLabel()
             << " with average score: " << mean_score / num_search;
 
-    lcd::DsgRegistrationInput match{
-        desc->nodes, {*best_node}, desc->root_node, 0};
+    lcd::DsgRegistrationInput match{desc->nodes, {*best_node}, desc->root_node, 0};
 
     auto solution = registerAgentMatch(*dsg.graph, match, 0);
     if (solution.valid) {
@@ -171,6 +170,10 @@ int main(int argc, char* argv[]) {
     frontend.stop();
     backend.stop();
     loop_closures = backend.getLoopClosures();
+
+    if (!dsg_output_path.empty()) {
+      frontend.saveState(dsg_output_path + "/frontend/state.json");
+    }
   }
 
   if (!dsg_output_path.empty()) {
@@ -211,8 +214,8 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  //kimera::checkAllAgentFrames(*frontend_dsg);
-  //LOG(INFO) << "During run: " << loop_closures.size() << " loop closures were found";
+  // kimera::checkAllAgentFrames(*frontend_dsg);
+  // LOG(INFO) << "During run: " << loop_closures.size() << " loop closures were found";
 
   return 0;
 }

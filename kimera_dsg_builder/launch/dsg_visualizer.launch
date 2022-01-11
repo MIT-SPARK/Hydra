@@ -35,7 +35,7 @@
   </node>
 
   <node name="rviz" pkg="rviz" type="rviz" output="screen" if="$(arg start_rviz)"
-          args="-d $(find kimera_dsg_builder)/rviz/dsg_visualizer.rviz --opengl 500"/>
+          args="-d $(find kimera_dsg_builder)/rviz/dsg_visualizer.rviz"/>
 
   <group if="$(arg publish_view_transforms)">
     <!-- Publish a static tf to visualize scene-graph in orthographic projection sideways -->
