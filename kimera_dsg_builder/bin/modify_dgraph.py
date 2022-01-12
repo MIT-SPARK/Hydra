@@ -21,9 +21,9 @@ def remap_prior_covariance(config, match):
         return match.group(0)
 
     parts = match.group(0).split(" ")
-    parts[9] = str(config["prior"])
-    parts[15] = str(config["prior"])
-    parts[20] = str(config["prior"])
+    parts[9] = str(100 * config["prior"])
+    parts[15] = str(100 * config["prior"])
+    parts[20] = str(100 * config["prior"])
     parts[24] = str(config["prior"])
     parts[27] = str(config["prior"])
     parts[29] = str(config["prior"])
@@ -47,9 +47,9 @@ def remap_between_covariance(config, match):
     if key not in config:
         return match.group(0)
 
-    parts[10] = str(config[key])
-    parts[16] = str(config[key])
-    parts[21] = str(config[key])
+    parts[10] = str(100 * config[key])
+    parts[16] = str(100 * config[key])
+    parts[21] = str(100 * config[key])
     parts[25] = str(config[key])
     parts[28] = str(config[key])
     parts[30] = str(config[key])

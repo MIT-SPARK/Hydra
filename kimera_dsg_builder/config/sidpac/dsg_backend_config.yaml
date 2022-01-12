@@ -26,13 +26,13 @@ pgmo:
         gnc_weight_tolerance: 1.0e-04
     add_initial_prior: true
     covariance:
-        odom: 1.0e-03
-        loop_close: 4.0e-02
-        prior: 1.0e-06
-        mesh_mesh: 1.0e-01
-        pose_mesh: 1.0e-03
-        place_mesh: 1.0e-03
-        place_edge: 1.0e-01
+        odom: 1.0e-02
+        loop_close: 1.0e-02
+        prior: 1.0e-02
+        mesh_mesh: 1.0e-02
+        pose_mesh: 1.0e-02
+        place_mesh: 1.0e-02
+        place_edge: 1.0e-02
 enable_rooms: true
 room_finder:
     min_dilation_m: 0.33
