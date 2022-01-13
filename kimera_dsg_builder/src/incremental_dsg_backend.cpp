@@ -225,6 +225,13 @@ void DsgBackend::stop() {
   LOG(INFO) << "[DSG Backend] stopping!";
   should_shutdown_ = true;
 
+  VLOG(2) << " [DSG Backend] joining optimizer thread";
+  if (optimizer_thread_) {
+    optimizer_thread_->join();
+    optimizer_thread_.reset();
+  }
+  VLOG(2) << " [DSG Backend] joined optimizer thread";
+
   VLOG(2) << "[DSG Backend] joining visualizer thread";
   if (visualizer_thread_) {
     visualizer_thread_->join();
@@ -233,13 +240,6 @@ void DsgBackend::stop() {
   VLOG(2) << " [DSG Backend] joined visualized thread";
 
   visualizer_.reset();
-
-  VLOG(2) << " [DSG Backend] joining optimizer thread";
-  if (optimizer_thread_) {
-    optimizer_thread_->join();
-    optimizer_thread_.reset();
-  }
-  VLOG(2) << " [DSG Backend] joined optimizer thread";
 }
 
 DsgBackend::~DsgBackend() {
