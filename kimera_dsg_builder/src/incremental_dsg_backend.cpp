@@ -223,7 +223,7 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
 
 void DsgBackend::stop() {
   LOG(INFO) << "[DSG Backend] stopping!";
-  should_shutdown_ = true;
+  should_opt_shutdown_ = true;
 
   VLOG(2) << " [DSG Backend] joining optimizer thread";
   if (optimizer_thread_) {
@@ -231,6 +231,8 @@ void DsgBackend::stop() {
     optimizer_thread_.reset();
   }
   VLOG(2) << " [DSG Backend] joined optimizer thread";
+
+  should_viz_shutdown_ = true;
 
   VLOG(2) << "[DSG Backend] joining visualizer thread";
   if (visualizer_thread_) {
@@ -316,7 +318,7 @@ bool DsgBackend::setVisualizeBackend(std_srvs::Empty::Request&,
 
 void DsgBackend::runVisualizer() {
   ros::WallRate r(5);
-  while (ros::ok() && !should_shutdown_) {
+  while (ros::ok() && !should_viz_shutdown_) {
     // process any config changes
     visualizer_queue_->callAvailable(ros::WallDuration(0));
 
@@ -525,7 +527,7 @@ void DsgBackend::runPgmo() {
       r.sleep();
     }
 
-    if (should_shutdown_ && !have_graph_updates && !have_dsg_updates) {
+    if (should_opt_shutdown_ && !have_graph_updates && !have_dsg_updates) {
       break;
     }
   }

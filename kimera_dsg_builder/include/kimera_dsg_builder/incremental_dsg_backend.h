@@ -138,7 +138,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
  private:
   ros::NodeHandle nh_;
-  std::atomic<bool> should_shutdown_{false};
+  std::atomic<bool> should_viz_shutdown_{false};
+  std::atomic<bool> should_opt_shutdown_{false};
 
   SharedDsgInfo::Ptr shared_dsg_;
   SharedDsgInfo::Ptr private_dsg_;
