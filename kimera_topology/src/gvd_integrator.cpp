@@ -78,18 +78,22 @@ uint8_t GvdIntegrator::updateGvdParentMap(const GlobalIndex& voxel_index,
 
   // parent is unique enough
   gvd_parents_[voxel_index].insert(neighbor_parent);
+  markNewGvdParent(neighbor_parent);
+  return curr_extra_basis + 1;
+}
 
-  if (gvd_parent_vertices_.count(neighbor_parent)) {
+void GvdIntegrator::markNewGvdParent(const GlobalIndex& parent) {
+  if (gvd_parent_vertices_.count(parent)) {
     // make sure the parent vertex map stays alive for this gvd member
-    gvd_parent_vertices_[neighbor_parent].ref_count++;
-    return curr_extra_basis + 1;
+    gvd_parent_vertices_[parent].ref_count++;
+    return;
   }
 
-  GvdVoxel* parent_voxel = gvd_layer_->getVoxelPtrByGlobalIndex(neighbor_parent);
+  GvdVoxel* parent_voxel = gvd_layer_->getVoxelPtrByGlobalIndex(parent);
   if (!parent_voxel || !parent_voxel->on_surface) {
     // we can't do anything for parents that have left the active mesh before being used
     // as a GVD parent, or parents that aren't registered to the mesh
-    return curr_extra_basis + 1;
+    return;
   }
 
   GvdVertexInfo info;
@@ -97,7 +101,6 @@ uint8_t GvdIntegrator::updateGvdParentMap(const GlobalIndex& voxel_index,
   info.ref_count = 1;
   std::memcpy(info.block, parent_voxel->mesh_block, sizeof(info.block));
 
-  // TODO(nathan) remove this at some point
   BlockIndex block_index = Eigen::Map<BlockIndex>(parent_voxel->mesh_block);
   const auto& mesh_block = mesh_layer_->getMeshByIndex(block_index);
   if (info.vertex < mesh_block.vertices.size()) {
@@ -107,8 +110,7 @@ uint8_t GvdIntegrator::updateGvdParentMap(const GlobalIndex& voxel_index,
     info.pos[2] = vertex_pos(2);
   }
 
-  gvd_parent_vertices_[neighbor_parent] = info;
-  return curr_extra_basis + 1;
+  gvd_parent_vertices_[parent] = info;
 }
 
 void GvdIntegrator::removeVoronoiFromGvdParentMap(const GlobalIndex& voxel_index) {
@@ -172,6 +174,8 @@ void GvdIntegrator::updateGvdVoxel(const GlobalIndex& voxel_index,
                                    GvdVoxel& other) {
   if (!isVoronoi(voxel)) {
     update_stats_.number_voronoi_found++;
+    const GlobalIndex parent = Eigen::Map<const GlobalIndex>(voxel.parent);
+    markNewGvdParent(parent);
   }
 
   auto new_basis = updateGvdParentMap(voxel_index, other);
@@ -317,7 +321,8 @@ void GvdIntegrator::updateFromTsdfLayer(bool clear_updated_flag,
     voxblox::timing::Timer extraction_timer("gvd/extract_graph");
     updateVertexMapping();
     graph_extractor_->extract(*gvd_layer_);
-    graph_extractor_->assignMeshVertices(gvd_parents_, gvd_parent_vertices_);
+    graph_extractor_->assignMeshVertices(
+        *gvd_layer_, gvd_parents_, gvd_parent_vertices_);
     extraction_timer.Stop();
     VLOG(3) << "[GVD update]: finished graph extraction";
   }

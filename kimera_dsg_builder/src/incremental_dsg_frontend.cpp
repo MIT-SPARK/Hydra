@@ -257,12 +257,6 @@ void DsgFrontend::runMeshFrontend() {
 
     mesh_frontend_.clearArchivedMeshFull(msg->archived_blocks);
 
-    // inform the mesh callback we can accept more meshes
-    {  // start mesh critical region
-      std::unique_lock<std::mutex> mesh_lock(mesh_frontend_mutex_);
-      latest_mesh_mappings_ = mesh_frontend_.getVoxbloxMsgMapping();
-    }  // end mesh critical region
-
     {  // timing scope
       ScopedTimer timer("frontend/object_detection", object_timestamp, true, 1, false);
       const auto& invalid_indices = mesh_frontend_.getInvalidIndices();
@@ -298,6 +292,24 @@ void DsgFrontend::runMeshFrontend() {
       // detectObjects non-threadsafe / integrate more cleanly)
       addPlaceObjectEdges();
     }  // end dsg critical section
+
+    if (state.timestamp_ns != last_mesh_timestamp_) {
+      dsg_->updated = true;
+      continue;  // places dropped a message or is ahead of us, so we don't need to
+                 // update the mapping
+    }
+
+    // wait for the places thread to finish the latest message
+    while (!should_shutdown_ && last_mesh_timestamp_ > last_places_timestamp_) {
+      r.sleep();
+    }
+
+    {
+      ScopedTimer timer(
+          "frontend/place_mesh_mapping", last_places_timestamp_, true, 1, false);
+      updatePlaceMeshMapping();
+    }
+
     dsg_->updated = true;
   }
 }
@@ -336,12 +348,6 @@ void DsgFrontend::runPlaces() {
     }  // end places queue critical section
 
     processLatestPlacesMsg(curr_message);
-
-    {
-      ScopedTimer timer(
-          "frontend/place_mesh_mapping", last_places_timestamp_, true, 1, false);
-      updatePlaceMeshMapping();
-    }
 
     // note that we don't need a mutex because this is the same thread as
     // processLatestPlacesMsg
@@ -385,7 +391,7 @@ void DsgFrontend::runPlaces() {
       std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
       frontend_graph_logger_.logGraph(dsg_->graph);
     }
-    dsg_->updated = true;
+    // dsg_->updated = true;
   }
 }
 
@@ -832,12 +838,15 @@ void DsgFrontend::runLcd() {
 
 void DsgFrontend::updatePlaceMeshMapping() {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
-  std::unique_lock<std::mutex> mesh_lock(mesh_frontend_mutex_);
 
   const SceneGraphLayer& places_layer =
       dsg_->graph->getLayer(KimeraDsgLayers::PLACES).value();
 
+  const auto& mesh_mappings = mesh_frontend_.getVoxbloxMsgMapping();
+
   size_t num_invalid = 0;
+  size_t num_processed = 0;
+  size_t num_vertices_processed = 0;
   for (const auto& id_node_pair : places_layer.nodes()) {
     auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
     if (!attrs.is_active) {
@@ -848,6 +857,8 @@ void DsgFrontend::updatePlaceMeshMapping() {
       continue;
     }
 
+    ++num_processed;
+
     // reset connections (and mark inactive to avoid processing outside active
     // window)
     attrs.pcl_mesh_connections.clear();
@@ -856,12 +867,14 @@ void DsgFrontend::updatePlaceMeshMapping() {
     for (const auto& connection : attrs.voxblox_mesh_connections) {
       voxblox::BlockIndex index =
           Eigen::Map<const voxblox::BlockIndex>(connection.block);
-      if (!latest_mesh_mappings_.count(index)) {
+
+      ++num_vertices_processed;
+      if (!mesh_mappings.count(index)) {
         num_invalid++;
         continue;
       }
 
-      const auto& vertex_mapping = latest_mesh_mappings_.at(index);
+      const auto& vertex_mapping = mesh_mappings.at(index);
       if (!vertex_mapping.count(connection.vertex)) {
         num_invalid++;
         continue;
@@ -871,8 +884,8 @@ void DsgFrontend::updatePlaceMeshMapping() {
     }
   }
 
-  // TODO(nathan) prune removed blocks? requires more of a handshake with gvd
-  // integrator
+  VLOG(2) << "[DSG Frontend] Mesh-Remapping: " << num_processed << " places, "
+          << num_vertices_processed << " vertices";
 
   if (num_invalid) {
     VLOG(2) << "[DSG Backend] Place-Mesh Update: " << num_invalid

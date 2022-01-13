@@ -122,6 +122,8 @@ class GvdIntegrator {
 
   void updateVertexMapping();
 
+  void markNewGvdParent(const GlobalIndex& parent);
+
  protected:
   std::unique_ptr<VoxelAwareMeshIntegrator> mesh_integrator_;
 

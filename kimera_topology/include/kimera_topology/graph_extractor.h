@@ -93,7 +93,8 @@ class GraphExtractor {
 
   void extract(const GvdLayer& layer);
 
-  void assignMeshVertices(const GvdParentMap& parents,
+  void assignMeshVertices(const GvdLayer& gvd,
+                          const GvdParentMap& parents,
                           const GvdVertexMap& parent_vertices);
 
   std::unordered_set<NodeId> getActiveNodes() const;

@@ -86,7 +86,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   bool updatePrivateDsg();
 
-  void updateDsgMesh();
+  void updateDsgMesh(bool force_mesh_update = false);
 
   void optimize();
 
@@ -209,6 +209,9 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   SceneGraphLogger backend_graph_logger_;
 
   std::list<LoopClosureLog> loop_closures_;
+
+  std::map<LayerId, bool> merge_update_map_;
+  bool merge_update_dynamic_;
 };
 
 }  // namespace incremental

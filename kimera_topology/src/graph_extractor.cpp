@@ -865,7 +865,8 @@ void GraphExtractor::extract(const GvdLayer& layer) {
   CHECK_EQ(num_valid, num_total) << num_valid << " / " << num_total;
 }
 
-void GraphExtractor::assignMeshVertices(const GvdParentMap& parents,
+void GraphExtractor::assignMeshVertices(const GvdLayer& gvd,
+                                        const GvdParentMap& parents,
                                         const GvdVertexMap& parent_vertices) {
   for (const auto& id_index_pair : node_id_root_map_) {
     const NodeId node_id = id_index_pair.first;
@@ -873,6 +874,18 @@ void GraphExtractor::assignMeshVertices(const GvdParentMap& parents,
 
     auto& attrs = graph_->getNode(node_id)->get().attributes<PlaceNodeAttributes>();
     attrs.voxblox_mesh_connections.clear();
+
+    const GvdVoxel* voxel = CHECK_NOTNULL(gvd.getVoxelPtrByGlobalIndex(node_index));
+    const GlobalIndex curr_parent = Eigen::Map<const GlobalIndex>(voxel->parent);
+    auto iter = parent_vertices.find(curr_parent);
+    if (iter != parent_vertices.end()) {
+      const auto& parent_info = iter->second;
+      NearestVertexInfo info;
+      std::memcpy(info.block, parent_info.block, sizeof(info.block));
+      std::memcpy(info.voxel_pos, parent_info.pos, sizeof(info.voxel_pos));
+      info.vertex = parent_info.vertex;
+      attrs.voxblox_mesh_connections.push_back(info);
+    }
 
     CHECK(parents.count(node_index));
     for (const auto& parent : parents.at(node_index)) {

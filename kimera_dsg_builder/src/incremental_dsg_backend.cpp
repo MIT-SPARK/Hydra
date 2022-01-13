@@ -100,7 +100,8 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
       have_loopclosures_(false),
       have_new_mesh_(false),
       visualizer_should_reset_(false),
-      visualize_place_factors_(false) {
+      visualize_place_factors_(false),
+      merge_update_dynamic_(true) {
   nh_.getParam("robot_id", robot_id_);
 
   if (!loadParameters(ros::NodeHandle(nh_, "pgmo"))) {
@@ -213,6 +214,11 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
   }
 
   last_timestamp_ = 0;
+
+  merge_update_map_ = {{KimeraDsgLayers::OBJECTS, false},
+                       {KimeraDsgLayers::PLACES, true},
+                       {KimeraDsgLayers::ROOMS, false},
+                       {KimeraDsgLayers::BUILDINGS, false}};
 }
 
 void DsgBackend::stop() {
@@ -352,8 +358,9 @@ bool DsgBackend::updatePrivateDsg() {
   if (have_frontend_updates) {
     {  // start joint critical section
       std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
-      //private_dsg_->updated = false;
-      private_dsg_->graph->mergeGraph(*shared_dsg_->graph);
+      // private_dsg_->updated = false;
+      private_dsg_->graph->mergeGraph(
+          *shared_dsg_->graph, false, true, &merge_update_map_, merge_update_dynamic_);
       *private_dsg_->latest_places = *shared_dsg_->latest_places;
 
       if (shared_dsg_->graph->hasLayer(KimeraDsgLayers::PLACES)) {
@@ -680,7 +687,7 @@ bool DsgBackend::addInternalLCDToDeformationGraph() {
   return added_new_loop_closure;
 }
 
-void DsgBackend::updateDsgMesh() {
+void DsgBackend::updateDsgMesh(bool force_mesh_update) {
   // avoid scope problems by using a smart pointer
   std::unique_ptr<ScopedTimer> timer;
 
@@ -691,7 +698,7 @@ void DsgBackend::updateDsgMesh() {
       return;
     }
 
-    if (!have_new_mesh_) {
+    if (!force_mesh_update && !have_new_mesh_) {
       return;
     }
 
@@ -734,7 +741,7 @@ void DsgBackend::optimize() {
     deformation_graph_->optimize();
   }  // timer scope
 
-  updateDsgMesh();
+  updateDsgMesh(true);
 
   gtsam::Values pgmo_values = deformation_graph_->getGtsamValues();
   gtsam::Values places_values = deformation_graph_->getGtsamTempValues();
@@ -900,7 +907,8 @@ void DsgBackend::loadState(const std::string& state_path,
   have_new_mesh_ = true;
 
   loadDeformationGraphFromFile(dgrf_path);
-  LOG(WARNING) << "Loaded " << deformation_graph_->getNumVertices() << " vertices for deformation graph";
+  LOG(WARNING) << "Loaded " << deformation_graph_->getNumVertices()
+               << " vertices for deformation graph";
 }
 
 }  // namespace incremental
