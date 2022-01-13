@@ -126,6 +126,7 @@ int main(int argc, char* argv[]) {
 
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
+  google::InstallFailureSignalHandler();
 
   ros::NodeHandle nh("~");
   std::string dsg_output_path = "";
