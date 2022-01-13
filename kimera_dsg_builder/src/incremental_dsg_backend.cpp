@@ -895,15 +895,14 @@ void DsgBackend::loadState(const std::string& state_path,
 
   auto vertices = state.at("mesh").at("vertices").get<Cloud>();
   auto faces = state.at("mesh").at("faces").get<Faces>();
-  auto times = state.at("mesh").at("times").get<std::vector<ros::Time>>();
-  std::vector<ros::Time> mesh_stamps;
-  mesh_stamps.reserve(times.size());
-  std::transform(
-      times.begin(), times.end(), std::back_inserter(mesh_stamps), [&](auto time) {
-        return ros::Time(time);
-      });
-  latest_mesh_.reset(new kimera_pgmo::KimeraPgmoMesh(
-      PolygonMeshToPgmoMeshMsg(0, vertices, faces, mesh_stamps, "world")));
+  auto times = state.at("mesh").at("times").get<std::vector<double>>();
+  mesh_vertex_stamps_.clear();
+  mesh_vertex_stamps_.reserve(times.size());
+  std::transform(times.begin(), times.end(),
+                 std::back_inserter(mesh_vertex_stamps_),
+                 [&](auto time) { return ros::Time(time); });
+  latest_mesh_.reset(new kimera_pgmo::KimeraPgmoMesh(PolygonMeshToPgmoMeshMsg(
+      0, vertices, faces, mesh_vertex_stamps_, "world")));
   have_new_mesh_ = true;
 
   loadDeformationGraphFromFile(dgrf_path);
