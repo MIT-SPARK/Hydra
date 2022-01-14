@@ -27,7 +27,7 @@ pgmo:
     add_initial_prior: true
     covariance:
         odom: 1.0e-02
-        loop_close: 1.0e-02
+        loop_close: 5.0e-02
         prior: 1.0e-02
         mesh_mesh: 1.0e-02
         pose_mesh: 1.0e-02
