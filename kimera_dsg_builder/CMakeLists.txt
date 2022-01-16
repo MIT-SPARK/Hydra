@@ -114,6 +114,10 @@ target_link_libraries(pose_graph_publisher_node ${catkin_LIBRARIES} gtsam)
 add_executable(dsg_optimizer_node src/dsg_optimizer_node.cpp)
 target_link_libraries(dsg_optimizer_node ${PROJECT_NAME})
 
+add_executable(gt_trajectory_optimizer src/gt_trajectory_optimizer.cpp)
+target_include_directories(gt_trajectory_optimizer PUBLIC include ${catkin_INCLUDE_DIRS})
+target_link_libraries(gt_trajectory_optimizer ${PROJECT_NAME} yaml-cpp KimeraRPGO)
+
 # TODO(nathan) allow choice of sanitizer
 if(DSG_USE_ASAN)
   # TODO(nathan) later cmake has better options for this

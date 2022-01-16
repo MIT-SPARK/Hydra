@@ -1,0 +1,256 @@
+#include <KimeraRPGO/RobustSolver.h>
+#include <gtsam/inference/Symbol.h>
+#include <gtsam/nonlinear/GncOptimizer.h>
+#include <gtsam/slam/BoundingConstraint.h>
+#include <gtsam/slam/dataset.h>
+#include <kimera_dsg/dynamic_scene_graph.h>
+#include <ros/package.h>
+
+#include <gflags/gflags.h>
+#include <glog/logging.h>
+#include <yaml-cpp/yaml.h>
+
+DEFINE_string(result_dir, "", "directory to read from");
+DEFINE_string(g2o_file, "pgmo/result.g2o", "file to read");
+DEFINE_string(dsg_file, "backend/dsg.json", "file to read");
+DEFINE_string(config_file, "gt_sidpac_f34.yaml", "file to read");
+DEFINE_string(agent_prefix, "a", "agent prefix");
+
+using namespace KimeraRPGO;
+using namespace kimera;
+using PoseFactor = gtsam::BetweenFactor<gtsam::Pose3>;
+using PriorFactor = gtsam::PriorFactor<gtsam::Pose3>;
+
+class Pose3Bounds : public gtsam::BoundingConstraint1<gtsam::Pose3> {
+ public:
+  using shared_ptr = boost::shared_ptr<Pose3Bounds>;
+  Pose3Bounds(gtsam::Key key,
+              size_t idx,
+              double threshold,
+              bool is_greater,
+              double mu = 1000.0)
+      : gtsam::BoundingConstraint1<gtsam::Pose3>(key, threshold, is_greater, mu),
+        idx_(idx),
+        threshold_(threshold),
+        is_greater_(is_greater),
+        mu_(mu) {}
+
+  double value(const gtsam::Pose3& x,
+               boost::optional<gtsam::Matrix&> H = boost::none) const override {
+    if (H) {
+      gtsam::Matrix D =
+          gtsam::Matrix::Zero(1, gtsam::traits<gtsam::Pose3>::GetDimension(x));
+      D(0, idx_ + 3) = 1.0;
+      *H = D;
+    }
+    return x.translation()(idx_);
+  }
+
+  gtsam::NonlinearFactor::shared_ptr clone() const override {
+    return shared_ptr(new Pose3Bounds(front(), idx_, threshold_, is_greater_, mu_));
+  }
+
+ private:
+  size_t idx_;
+  double threshold_;
+  bool is_greater_;
+  double mu_;
+};
+
+void add_height_bounds(gtsam::NonlinearFactorGraph& factors,
+                       const gtsam::Values& values,
+                       size_t start,
+                       size_t end,
+                       size_t skip,
+                       double lower,
+                       double upper,
+                       double mu = 1000.0) {
+  for (size_t i = start; i < end; i += skip) {
+    const auto key = gtsam::Symbol(FLAGS_agent_prefix[0], i);
+    if (!values.exists(key)) {
+      return;
+    }
+
+    factors.emplace_shared<Pose3Bounds>(key, 2, lower, false, mu);
+    factors.emplace_shared<Pose3Bounds>(key, 2, upper, true, mu);
+  }
+}
+
+void add_height(gtsam::NonlinearFactorGraph& factors,
+                const gtsam::Values& values,
+                size_t start,
+                size_t end,
+                size_t skip,
+                double height,
+                double variance = 1e-1) {
+  for (size_t i = start; i < end; i += skip) {
+    const auto key = gtsam::Symbol(FLAGS_agent_prefix[0], i);
+    if (!values.exists(key)) {
+      return;
+    }
+
+    gtsam::Pose3 orig_pose = values.at<gtsam::Pose3>(key);
+    gtsam::Rot3 prior_rot = orig_pose.rotation();
+    gtsam::Point3 prior_trans(
+        orig_pose.translation().x(), orig_pose.translation().y(), height);
+
+    Eigen::VectorXd vars(6);
+    vars << 100, 100, 100, 100, 100, variance;
+    auto noise = gtsam::noiseModel::Diagonal::Variances(vars);
+
+    factors.add(PriorFactor(key, gtsam::Pose3(prior_rot, prior_trans), noise));
+  }
+}
+
+std::vector<size_t> read_timestamps(const std::string& filepath) {
+  DynamicSceneGraph graph;
+  graph.load(filepath);
+
+  const DynamicSceneGraphLayer& agents =
+      graph.getDynamicLayer(KimeraDsgLayers::AGENTS, 'a').value();
+
+  std::vector<size_t> times_ns;
+  for (const auto& node : agents.nodes()) {
+    times_ns.push_back(node->timestamp.count());
+  }
+
+  return times_ns;
+}
+
+int main(int argc, char* argv[]) {
+  FLAGS_minloglevel = 0;
+  FLAGS_logtostderr = 1;
+  FLAGS_colorlogtostderr = 1;
+
+  google::SetUsageMessage("utility for optimizing a trajectory again");
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  google::InitGoogleLogging(argv[0]);
+  google::InstallFailureSignalHandler();
+
+  if (FLAGS_result_dir == "") {
+    LOG(FATAL) << "result directory argument required!";
+    return 1;
+  }
+
+  const std::string g2o_file = FLAGS_result_dir + "/" + FLAGS_g2o_file;
+  auto g2o_info = gtsam::readG2o(g2o_file, true);
+  if (!g2o_info.first || g2o_info.first->size() == 0) {
+    LOG(FATAL) << "empty g2o file!";
+    return 1;
+  }
+
+  std::string config_path =
+      ros::package::getPath("kimera_dsg_builder") + "/config/" + FLAGS_config_file;
+  YAML::Node config = YAML::LoadFile(config_path);
+
+  auto old_factors = *g2o_info.first;
+  auto values = *g2o_info.second;
+  const char agent_prefix = FLAGS_agent_prefix[0];
+
+  std::vector<gtsam::Key> to_erase;
+  for (const auto& key : values.keys()) {
+    if (gtsam::Symbol(key).chr() != agent_prefix) {
+      to_erase.push_back(key);
+    }
+  }
+
+  for (const auto& key : to_erase) {
+    values.erase(key);
+  }
+
+  const double odom_rot_var = config["odom_rot"].as<double>();
+  const double odom_trans_var = config["odom_trans"].as<double>();
+  const double lc_rot_var = config["loop_close_rot"].as<double>();
+  const double lc_trans_var = config["loop_close_trans"].as<double>();
+  const bool use_height_bound = config["use_height_bound"].as<bool>();
+  const bool use_height_prior = config["use_height_prior"].as<bool>();
+
+  Eigen::VectorXd odom_vars(6);
+  odom_vars << odom_rot_var, odom_rot_var, odom_rot_var, odom_trans_var, odom_trans_var,
+      odom_trans_var;
+  auto odom_noise = gtsam::noiseModel::Diagonal::Variances(odom_vars);
+
+  Eigen::VectorXd lc_vars(6);
+  lc_vars << lc_rot_var, lc_rot_var, lc_rot_var, lc_trans_var, lc_trans_var,
+      lc_trans_var;
+  auto lc_noise = gtsam::noiseModel::Diagonal::Variances(lc_vars);
+
+  gtsam::NonlinearFactorGraph factors;
+  for (const auto& base_factor : old_factors) {
+    const auto& factor = dynamic_cast<const PoseFactor&>(*base_factor);
+    const int64_t idx1 = gtsam::Symbol(factor.keys()[0]).index();
+    const int64_t idx2 = gtsam::Symbol(factor.keys()[1]).index();
+    if (std::abs(idx1 - idx2) > 1) {
+      LOG(INFO) << "Loop closure: " << gtsam::Symbol(factor.keys()[0]) << " -> "
+                << gtsam::Symbol(factor.keys()[1]);
+      factors.emplace_shared<PoseFactor>(
+          factor.keys()[0], factor.keys()[1], factor.measured(), lc_noise);
+    } else {
+      factors.emplace_shared<PoseFactor>(
+          factor.keys()[0], factor.keys()[1], factor.measured(), odom_noise);
+    }
+  }
+
+  for (const auto& constraint : config["heights"]) {
+    size_t start = constraint["start"].as<size_t>();
+    size_t stop = constraint["stop"].as<size_t>();
+    size_t inc = constraint["inc"].as<size_t>();
+    double lower = constraint["lower"].as<double>();
+    double upper = constraint["upper"].as<double>();
+    double mu = constraint["mu"].as<double>();
+    LOG(INFO) << "Adding height constraint: range(" << start << ", " << stop << ", "
+              << inc << ") -> [" << lower << ", " << upper << "], mu=" << mu;
+    if (use_height_bound) {
+      add_height_bounds(factors, values, start, stop, inc, lower, upper, mu);
+    }
+    if (use_height_prior) {
+      add_height(factors, values, start, stop, inc, (lower + upper) / 2.0, mu * mu);
+    }
+  }
+
+  // TODO(nathan) parse from yaml
+  RobustSolverParams params;
+  params.setPcmSimple3DParams(config["odom_trans_threshold"].as<double>(),
+                              config["odom_rot_threshold"].as<double>(),
+                              config["pcm_trans_threshold"].as<double>(),
+                              config["pcm_rot_threshold"].as<double>(),
+                              KimeraRPGO::Verbosity::UPDATE);
+  params.setGncInlierCostThresholdsAtProbability(
+      config["gnc_alpha"].as<double>(),
+      config["gnc_max_iterations"].as<size_t>(),
+      config["gnc_mu_step"].as<double>(),
+      config["gnc_cost_tolerance"].as<double>(),
+      config["gnc_weight_tolerance"].as<double>());
+
+  RobustSolver solver(params);
+  solver.forceUpdate(factors, values);
+
+  auto opt_values = solver.calculateEstimate();
+  std::cout << "Finished!" << '\a' << std::endl;
+
+  gtsam::writeG2o(factors, opt_values, "opt_trajectory.g2o");
+
+  std::string dsg_file = FLAGS_result_dir + "/" + FLAGS_dsg_file;
+  auto timestamps = read_timestamps(dsg_file);
+  if (timestamps.size() != opt_values.size()) {
+    LOG(FATAL) << "timestamps and values disagree: " << timestamps.size()
+               << " != " << opt_values.size();
+  }
+
+  std::ofstream fout("opt_trajectory.csv");
+  fout << "#timestamp_kf,x,y,z,qw,qx,qy,qz" << std::endl;
+
+  for (const auto& kv_pair : opt_values) {
+    const size_t idx = gtsam::Symbol(kv_pair.key).index();
+    fout << timestamps[idx] << ",";
+
+    auto pose = kv_pair.value.cast<gtsam::Pose3>();
+    Eigen::Vector3d t = pose.translation();
+    auto q = pose.rotation().toQuaternion();
+
+    fout << t.x() << "," << t.y() << "," << t.z() << "," << q.w() << "," << q.x() << ","
+         << q.y() << "," << q.z() << std::endl;
+  }
+
+  return 0;
+}
