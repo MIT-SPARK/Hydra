@@ -82,6 +82,16 @@ class ObjectFinder {
 
   void setEuclideanClusterParams(const EuclideanClusteringParams& params);
 
+  inline size_t minClusterSize() const {
+    switch (type_) {
+      case ObjectFinderType::kRegionGrowing:
+        return region_growing_params_.min_cluster_size;
+      case ObjectFinderType::kEuclidean:
+      default:
+        return euclidean_params_.min_cluster_size;
+    }
+  }
+
   friend std::ostream& operator<<(std::ostream& out, const ObjectFinder& finder);
 
  private:

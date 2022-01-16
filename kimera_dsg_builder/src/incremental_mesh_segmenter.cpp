@@ -157,6 +157,10 @@ bool MeshSegmenter::detectObjects(const SharedDsgInfo::Ptr& dsg,
       continue;
     }
 
+    if (label_indices.at(label).size() < object_finder_->minClusterSize()) {
+      continue;
+    }
+
     ObjectClusters clusters =
         object_finder_->findObjects(full_mesh_vertices_, label_indices.at(label));
 
