@@ -21,18 +21,18 @@ pgmo:
         lm_diagonal_damping: true
         gnc_alpha: 0.99
         gnc_max_iterations: 100
-        gnc_mu_step: 1.5
+        gnc_mu_step: 1.6
         gnc_cost_tolerance: 1.0e-05
         gnc_weight_tolerance: 1.0e-04
     add_initial_prior: true
     covariance:
-        odom: 1.0e-04
-        loop_close: 1.0e-04
-        prior: 1.0e-06
+        odom: 1.0e-02
+        loop_close: 1.0e-02
+        prior: 1.0e-02
         mesh_mesh: 1.0e-02
-        pose_mesh: 1.0e-03
-        place_mesh: 1.0e-03
-        place_edge: 1.0e-03
+        pose_mesh: 1.0e-02
+        place_mesh: 1.0e-02
+        place_edge: 1.0e-02
 enable_rooms: true
 room_finder:
     min_dilation_m: 0.43
