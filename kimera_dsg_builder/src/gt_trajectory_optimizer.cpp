@@ -240,19 +240,32 @@ void load_factors_pgmo(const RobustSolverParams& params,
 }
 
 void add_manual_loop_clousres(const YAML::Node& config,
+                              const gtsam::Values& values,
                               gtsam::NonlinearFactorGraph& factors) {
   const double var = config["manual_lc_var"].as<double>();
 
-  Eigen::VectorXd lc_vars(1);
-  lc_vars(0) = var;
+  Eigen::VectorXd lc_vars(6);
+  lc_vars << var, var, var, var, var, var;
   auto lc_noise = gtsam::noiseModel::Diagonal::Variances(lc_vars);
 
   const char agent_prefix = FLAGS_agent_prefix[0];
   for (const auto& factor_info : config["manual_loop_closures"]) {
     gtsam::Symbol key1(agent_prefix, factor_info["index1"].as<size_t>());
+    if (!values.exists(key1)) {
+      LOG(WARNING) << "Invalid key for loop-closure: " << key1 << " (" << values.size()
+                   << " keys)";
+      continue;
+    }
+
     gtsam::Symbol key2(agent_prefix, factor_info["index2"].as<size_t>());
+    if (!values.exists(key2)) {
+      LOG(WARNING) << "Invalid key for loop-closure: " << key2 << " (" << values.size()
+                   << " keys)";
+      continue;
+    }
+
     LOG(INFO) << "Adding manual loop closure: " << key1 << " -> " << key2;
-    factors.emplace_shared<ManualLCFactor>(key1, key2, 0.0, lc_noise);
+    factors.emplace_shared<PoseFactor>(key1, key2, gtsam::Pose3::identity(), lc_noise);
   }
 }
 
@@ -346,7 +359,7 @@ int main(int argc, char* argv[]) {
   remap_covariances(config, old_factors, factors);
   add_priors_from_config(config, values, factors);
   add_bounds_from_config(config, values, factors);
-  add_manual_loop_clousres(config, factors);
+  add_manual_loop_clousres(config, values, factors);
 
   RobustSolver solver(params);
   solver.forceUpdate(factors, values);
