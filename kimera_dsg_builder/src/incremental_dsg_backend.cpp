@@ -398,6 +398,7 @@ void DsgBackend::startPgmo() {
       "pgmo/deformation_graph_mesh_mesh", 10, false);
   viz_pose_mesh_edges_pub_ = nh_.advertise<visualization_msgs::Marker>(
       "pgmo/deformation_graph_pose_mesh", 10, false);
+  pose_graph_pub_ = nh_.advertise<PoseGraph>("pgmo/pose_graph", 10, false);
 
   if (visualize_place_factors_) {
     places_factors_visualizer_ = std::make_shared<PlacesFactorGraphViz>(nh_);
@@ -728,8 +729,7 @@ void DsgBackend::updateDsgMesh(bool force_mesh_update) {
 
   if (viz_mesh_mesh_edges_pub_.getNumSubscribers() > 0 ||
       viz_pose_mesh_edges_pub_.getNumSubscribers() > 0) {
-    visualizeDeformationGraphMeshEdges(&viz_mesh_mesh_edges_pub_,
-                                       &viz_pose_mesh_edges_pub_);
+    visualizeDeformationGraphEdges();
   }
 }
 
@@ -749,6 +749,10 @@ void DsgBackend::optimize() {
   gtsam::Values places_values = deformation_graph_->getGtsamTempValues();
 
   callUpdateFunctions(places_values, pgmo_values);
+
+  if (pose_graph_pub_.getNumSubscribers() > 0) {
+    visualizePoseGraph();
+  }
 }
 
 void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,
@@ -883,6 +887,20 @@ void DsgBackend::logStatus(bool init) const {
        << timer.getLastElapsed("backend/mesh_update").value_or(nan) << std::endl;
   file.close();
   return;
+}
+
+void DsgBackend::visualizePoseGraph() const {
+  // Publish pose graph
+  std::map<size_t, std::vector<ros::Time>> id_timestamps;
+  id_timestamps[robot_id_] = timestamps_;
+  const PoseGraph::ConstPtr& pose_graph_ptr =
+      deformation_graph_->getPoseGraph(id_timestamps);
+  pose_graph_pub_.publish(*pose_graph_ptr);
+}
+
+void DsgBackend::visualizeDeformationGraphEdges() const {
+  visualizeDeformationGraphMeshEdges(&viz_mesh_mesh_edges_pub_,
+                                     &viz_pose_mesh_edges_pub_);
 }
 
 void DsgBackend::loadState(const std::string& state_path,

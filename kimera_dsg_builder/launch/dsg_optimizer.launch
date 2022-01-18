@@ -32,6 +32,12 @@
         <param name="frontend_state_filepath" value="$(arg dsg_dir)/$(arg state_name)"/>
     </node>
 
+    <include file="$(find pose_graph_tools)/launch/posegraph_view.launch" >
+        <arg name="frame_id"      value="world" />
+        <arg name="graph_topic"   value="/dsg_optimizer_node/pgmo/pose_graph" />
+        <arg name="ns"            value="dsg_optimizer_node/pgmo"/>
+    </include>
+
     <node name="rviz" pkg="rviz" type="rviz" output="log"
           args="-d $(find kimera_dsg_builder)/rviz/dsg_optimizer.rviz"/>
 

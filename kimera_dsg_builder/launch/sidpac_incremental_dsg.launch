@@ -103,4 +103,10 @@
           <remap from="~pose_graph" to="/incremental_dsg_builder_node/pose_graph_incremental"/>
     </node>
 
+    <include file="$(find pose_graph_tools)/launch/posegraph_view.launch" >
+        <arg name="frame_id"      value="world" />
+        <arg name="graph_topic"   value="/incremental_dsg_builder_node/pgmo/pose_graph" />
+        <arg name="ns"            value="incremental_dsg_builder_node/pgmo"/>
+    </include>
+
 </launch>

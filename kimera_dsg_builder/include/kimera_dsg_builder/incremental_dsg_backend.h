@@ -90,6 +90,10 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void optimize();
 
+  void visualizePoseGraph() const;
+
+  void visualizeDeformationGraphEdges() const;
+
  private:
   bool setVisualizeBackend(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
@@ -202,6 +206,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   ros::ServiceServer backend_viz_srv_;
   ros::Publisher viz_mesh_mesh_edges_pub_;
   ros::Publisher viz_pose_mesh_edges_pub_;
+  ros::Publisher pose_graph_pub_;
   bool visualize_place_factors_;
   SemanticNodeAttributes::ColorVector building_color_;
 

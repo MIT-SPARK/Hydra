@@ -53,6 +53,7 @@ struct DsgOptimizer {
 
   void do_optimize() {
     backend.reset(new DsgBackend(nh, frontend_dsg, backend_dsg));
+    backend->start();
     LOG(ERROR) << "Loading backend state!";
     backend->loadState(frontend_state_filepath, dgrf_filepath);
     LOG(ERROR) << "Loaded backend state!";
@@ -66,6 +67,9 @@ struct DsgOptimizer {
 
     visualizer->setGraph(backend_dsg->graph);
     visualizer->redraw();
+
+    backend->visualizePoseGraph();
+    backend->visualizeDeformationGraphEdges();
   }
 
   void run() {
@@ -110,6 +114,7 @@ int main(int argc, char* argv[]) {
   google::InitGoogleLogging(argv[0]);
 
   ros::NodeHandle nh("~");
+  nh.setParam("dsg/call_update_periodically", false);
   kimera::incremental::DsgOptimizer optimizer(nh);
   optimizer.run();
 
