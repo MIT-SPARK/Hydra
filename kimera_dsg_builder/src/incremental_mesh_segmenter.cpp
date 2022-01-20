@@ -226,6 +226,11 @@ LabelIndices MeshSegmenter::getLabelIndices(const std::vector<size_t>& indices) 
 
   std::set<uint8_t> seen_labels;
   for (const auto idx : indices) {
+    if (idx >= full_mesh_vertices_->size()) {
+      LOG(ERROR) << "Invalid indice: " << idx << "(out of "
+                 << full_mesh_vertices_->size() << ")";
+      continue;
+    }
     const pcl::PointXYZRGBA& point = full_mesh_vertices_->at(idx);
     const HashableColor color(point.r, point.g, point.b, 255);
 

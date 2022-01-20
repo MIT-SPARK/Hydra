@@ -27,12 +27,12 @@ pgmo:
     add_initial_prior: true
     covariance:
         odom: 1.0e-02
-        loop_close: 1.0e-02
+        loop_close: 5.0e-02
         prior: 1.0e-02
         mesh_mesh: 1.0e-02
         pose_mesh: 1.0e-02
-        place_mesh: 1.0e-02
-        place_edge: 1.0e-02
+        place_mesh: 10.0
+        place_edge: 10.0
 enable_rooms: true
 room_finder:
     min_dilation_m: 0.43
