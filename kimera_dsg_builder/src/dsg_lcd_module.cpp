@@ -113,7 +113,8 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::registerAndVerify(
     NodeId agent_id,
     uint64_t timestamp) const {
   ScopedTimer timer("lcd/register", timestamp, true, 2, false);
-  std::vector<DsgRegistrationSolution> results;
+
+  DsgRegistrationSolution registration_result;
 
   size_t idx;
   for (idx = 0; idx < max_internal_index_; ++idx) {
@@ -149,31 +150,39 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::registerAndVerify(
                                                  match.match_nodes[i],
                                                  match.query_root,
                                                  match.match_root[i]};
-      DsgRegistrationSolution registration_result =
+      registration_result =
           registration_funcs_.at(idx)(dsg, registration_input, agent_id);
       registration_result.level = static_cast<int64_t>(idx);
       if (registration_result.valid) {
-        size_t vidx = idx;
-        ++vidx;  // start validation at next layer up
-        for (; vidx < max_internal_index_; ++vidx) {
-          if (!validation_funcs_.count(vidx)) {
-            continue;
-          }
-
-          CHECK(matches.count(idx));
-          const LayerSearchResults& vmatch = matches.at(vidx);
-
-          if (!validation_funcs_.at(vidx)(dsg, vmatch)) {
-            registration_result.valid = false;
-            break;
-          }
-        }
-        // still valid after validation
-        if (registration_result.valid) {
-          results.push_back(registration_result);
-        }
+        break;
       }
     }
+
+    if (registration_result.valid) {
+      break;
+    }
+  }
+
+  // TODO(nathan) fix validation
+  // size_t vidx = idx;
+  /*++vidx;  // start validation at next layer up*/
+  /*for (; vidx < max_internal_index_; ++vidx) {*/
+  /*if (!validation_funcs_.count(vidx)) {*/
+  /*continue;*/
+  /*}*/
+
+  /*CHECK(matches.count(idx));*/
+  /*const LayerSearchResults& vmatch = matches.at(vidx);*/
+
+  /*if (!validation_funcs_.at(vidx)(dsg, vmatch)) {*/
+  /*registration_result.valid = false;*/
+  /*break;*/
+  /*}*/
+  /*}*/
+
+  std::vector<DsgRegistrationSolution> results;
+  if (registration_result.valid) {
+    results.push_back(registration_result);
   }
 
   return results;
@@ -189,6 +198,8 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::detect(const DynamicSceneGrap
   }
 
   const DsgNode& latest_node = dsg.getDynamicNode(agent_id).value();
+  VLOG(2) << "************************************************************";
+  VLOG(2) << "LCD Matching: " << NodeSymbol(latest_node.id).getLabel();
 
   std::map<size_t, LayerSearchResults> matches;
   for (size_t idx = max_internal_index_ - 1; idx > 0; --idx) {
@@ -198,6 +209,7 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::detect(const DynamicSceneGrap
     descriptor = layer_factories_[config.layer](dsg, latest_node);
 
     if (descriptor) {
+      VLOG(2) << "level " << idx << ": " << std::endl << "    " << descriptor->values.transpose();
       matches[idx] = searchDescriptors(*descriptor,
                                        config,
                                        prev_valid_roots,
@@ -206,6 +218,7 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::detect(const DynamicSceneGrap
                                        agent_id);
       prev_valid_roots = matches[idx].valid_matches;
     } else {
+      VLOG(2) << "level " << idx << " -> ?";
       prev_valid_roots = std::set<NodeId>();
       break;
     }
@@ -229,18 +242,17 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::detect(const DynamicSceneGrap
   }
 
   VLOG(2) << "===========================================================";
-  VLOG(2) << "LCD matching results for node " << NodeSymbol(agent_id).getLabel()
-          << " against " << numAgentDescriptors() << " / " << numDescriptors()
-          << " (agent / all) descriptors";
+  VLOG(2) << "LCD results for node " << NodeSymbol(agent_id).getLabel() << " against "
+          << numDescriptors() / 2 << " roots";
   for (const auto& id_match_pair : matches) {
-    VLOG(2) << " - index " << id_match_pair.first << " with "
-            << id_match_pair.second.valid_matches.size() << " valid matches and "
-            << id_match_pair.second.match_root.size() << " matches for registration: ";
+    VLOG(2) << " - index " << id_match_pair.first << ": "
+            << id_match_pair.second.valid_matches.size() << " valid matches, "
+            << id_match_pair.second.match_root.size() << " registration matches";
     for (size_t i = 0; i < id_match_pair.second.match_root.size(); ++i) {
-      VLOG(2) << " - - - query "
-              << NodeSymbol(id_match_pair.second.query_root).getLabel() << " - match "
-              << NodeSymbol(id_match_pair.second.match_root[i]).getLabel() << " -> "
-              << id_match_pair.second.score[i];
+      VLOG(2) << "   - #" << i
+              << ": query=" << NodeSymbol(id_match_pair.second.query_root).getLabel()
+              << ", match=" << NodeSymbol(id_match_pair.second.match_root[i]).getLabel()
+              << " -> " << id_match_pair.second.score[i];
     }
   }
   VLOG(2) << "===========================================================";

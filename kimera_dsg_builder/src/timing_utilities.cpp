@@ -18,7 +18,9 @@ std::ostream& operator<<(std::ostream& out, const ElapsedStatistics& stats) {
              << " measurements)";
 }
 
-ElapsedTimeRecorder::ElapsedTimeRecorder() { mutex_.reset(new std::mutex()); }
+ElapsedTimeRecorder::ElapsedTimeRecorder() : disable_output(false) {
+  mutex_.reset(new std::mutex());
+}
 
 void ElapsedTimeRecorder::start(const std::string& timer_name,
                                 const uint64_t& timestamp) {
@@ -179,9 +181,8 @@ void ElapsedTimeRecorder::logStats(const std::string& output_folder) const {
   output_file << "name,mean[s],min[s],max[s],std-dev[s]\n";
   for (const auto& str_timer_pair : elapsed_) {
     const ElapsedStatistics& stats = getStats(str_timer_pair.first);
-    output_file << str_timer_pair.first << "," << stats.mean_s << ","
-                << stats.min_s << "," << stats.max_s << "," << stats.stddev_s
-                << "\n";
+    output_file << str_timer_pair.first << "," << stats.mean_s << "," << stats.min_s
+                << "," << stats.max_s << "," << stats.stddev_s << "\n";
   }
   output_file.close();
 }
@@ -213,6 +214,10 @@ ScopedTimer::~ScopedTimer() {
 
   ElapsedTimeRecorder::instance().stop(name_);
   if (!verbose_) {
+    return;
+  }
+
+  if (ElapsedTimeRecorder::instance().disable_output) {
     return;
   }
 

@@ -606,6 +606,8 @@ lcd::TeaserParams loadTeaserParams(const ros::NodeHandle& nh) {
 
 lcd::DsgLcdConfig DsgFrontend::initializeLcdStructures() {
   ros::NodeHandle lcd_nh(nh_, "lcd");
+  lcd_nh.param<double>(
+      "descriptor_creation_horizon_m", descriptor_creation_horizon_m_, 10.0);
   lcd_nh.param<double>("agent_horizon_s", lcd_agent_horizon_s_, 1.5);
 
   double radius;
@@ -675,7 +677,7 @@ lcd::DsgLcdConfig DsgFrontend::initializeLcdStructures() {
   object_config.type = readScoreType(object_nh);
   config.search_configs.push_back(object_config);
 
-  ros::NodeHandle place_nh(lcd_nh, "place");
+  ros::NodeHandle place_nh(lcd_nh, "places");
   lcd::DescriptorMatchConfig place_config;
   place_config.layer = KimeraDsgLayers::PLACES;
   place_config.min_time_separation_s =
@@ -783,28 +785,45 @@ void DsgFrontend::runLcd() {
       lcd_graph_->mergeGraph(*dsg_->graph);
     }  // end critical section
 
+    if (lcd_graph_->getLayer(KimeraDsgLayers::PLACES).value().get().numNodes() == 0) {
+      continue;
+    }
+
     if (lcd_shutting_down_ && lcd_queue_.empty()) {
       break;
     }
 
-    NodeIdSet archived_places;
     {  // start critical section
       std::unique_lock<std::mutex> place_lock(places_queue_mutex_);
-      archived_places = archived_places_;
-      // TODO(nathan) think more about this
+      potential_lcd_root_nodes_.insert(potential_lcd_root_nodes_.end(),
+                                       archived_places_.begin(),
+                                       archived_places_.end());
       archived_places_.clear();
     }  // end critical section
-
-    if (!archived_places.empty()) {
-      auto curr_time = ros::Time::now();
-      lcd_module_->updateDescriptorCache(
-          *lcd_graph_, archived_places, curr_time.toNSec());
-    }
 
     auto latest_agent_id = getLatestAgentId();
     if (!latest_agent_id) {
       r.sleep();
       continue;
+    }
+
+    const Eigen::Vector3d latest_pos = lcd_graph_->getPosition(*latest_agent_id);
+
+    NodeIdSet to_cache;
+    auto iter = potential_lcd_root_nodes_.begin();
+    while (iter != potential_lcd_root_nodes_.end()) {
+      const Eigen::Vector3d pos = lcd_graph_->getPosition(*iter);
+      if ((latest_pos - pos).norm() < descriptor_creation_horizon_m_) {
+        ++iter;
+      } else {
+        to_cache.insert(*iter);
+        iter = potential_lcd_root_nodes_.erase(iter);
+      }
+    }
+
+    if (!to_cache.empty()) {
+      auto curr_time = ros::Time::now();
+      lcd_module_->updateDescriptorCache(*lcd_graph_, to_cache, curr_time.toNSec());
     }
 
     uint64_t timestamp;

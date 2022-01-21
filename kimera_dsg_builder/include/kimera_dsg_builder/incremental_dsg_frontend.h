@@ -121,6 +121,7 @@ class DsgFrontend {
   SemanticNodeAttributes::ColorVector building_color_;
 
   double lcd_agent_horizon_s_;
+  double descriptor_creation_horizon_m_;
   std::atomic<bool> lcd_shutting_down_{false};
   std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> lcd_queue_;
   std::unique_ptr<std::thread> lcd_thread_;
@@ -136,6 +137,8 @@ class DsgFrontend {
   ros::Subscriber pose_graph_sub_;
   std::list<kimera_vio_ros::BowQuery::ConstPtr> bow_messages_;
   std::map<NodeId, size_t> agent_key_map_;
+
+  std::list<NodeId> potential_lcd_root_nodes_;
 
   bool log_;
   std::string log_path_;

@@ -85,15 +85,26 @@ LayerSearchResults searchDescriptors(
   float best_score = 0.0f;
   std::vector<std::pair<NodeId, float>> new_valid_match_scores;
   std::set<NodeId> new_valid_matches;
+
+  size_t num_same_parent = 0;
+  size_t num_inside_horizon = 0;
+  size_t num_low_score = 0;
+
+  VLOG(5) << "--------------------------------------------------";
+
   for (const auto& valid_id : valid_matches) {
     if (root_leaf_map.at(valid_id).count(query_id)) {
+      ++num_same_parent;
       continue;
     }
 
     const Descriptor& other_descriptor = *descriptors.at(valid_id);
     std::chrono::duration<double> diff_s =
         descriptor.timestamp - other_descriptor.timestamp;
+    VLOG(5) << "diff: " << diff_s.count()
+            << " (threshold: " << match_config.min_time_separation_s << ")";
     if (diff_s.count() < match_config.min_time_separation_s) {
+      ++num_inside_horizon;
       continue;
     }
 
@@ -106,15 +117,20 @@ LayerSearchResults searchDescriptors(
     if (curr_score > match_config.min_score) {
       new_valid_matches.insert(valid_id);
       new_valid_match_scores.push_back({valid_id, curr_score});
+    } else {
+      ++num_low_score;
     }
   }
 
-  std::sort(
-      new_valid_match_scores.begin(),
-      new_valid_match_scores.end(),
-      [](const std::pair<NodeId, float>& a, const std::pair<NodeId, float>& b) {
-        return a.second > b.second;
-      });
+  VLOG(1) << "matching @ " << match_config.layer << " -> shared: " << num_same_parent
+          << ", horizon: " << num_inside_horizon << ", low: " << num_low_score
+          << ", valid: " << new_valid_match_scores.size();
+
+  std::sort(new_valid_match_scores.begin(),
+            new_valid_match_scores.end(),
+            [](const std::pair<NodeId, float>& a, const std::pair<NodeId, float>& b) {
+              return a.second > b.second;
+            });
   std::vector<std::set<NodeId>> match_nodes;
   std::vector<NodeId> matches;
   std::vector<float> match_scores;

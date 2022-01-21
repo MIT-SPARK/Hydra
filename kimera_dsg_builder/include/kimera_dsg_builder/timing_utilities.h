@@ -46,6 +46,8 @@ class ElapsedTimeRecorder {
 
   void logStats(const std::string& output_folder) const;
 
+  bool disable_output;
+
  private:
   using TimeList = std::list<std::chrono::nanoseconds>;
   using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;

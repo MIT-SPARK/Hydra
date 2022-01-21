@@ -135,6 +135,8 @@ int main(int argc, char* argv[]) {
   bool exit_after_bag = false;
   nh.getParam("exit_after_bag", exit_after_bag);
 
+  nh.getParam("disable_timer_output", ElapsedTimeRecorder::instance().disable_output);
+
   const LayerId mesh_layer_id = 1;
   const std::map<LayerId, char>& layer_id_map{{KimeraDsgLayers::OBJECTS, 'o'},
                                               {KimeraDsgLayers::PLACES, 'p'},

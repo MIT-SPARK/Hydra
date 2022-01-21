@@ -93,6 +93,7 @@
                unless="$(arg use_gt_frame)"/>
         <remap from="~/bow_vectors" to="/kimera_vio_ros/bow_query"/>
         <remap from="frame_registration" to="/kimera_vio_ros/kimera_vio_ros_node/register_lcd_frames"/>
+        <param name="disable_timer_output" value="true"/>
     </node>
 
     <node pkg="kimera_dsg_builder" type="pose_graph_publisher_node"

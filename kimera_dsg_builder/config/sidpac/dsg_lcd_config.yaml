@@ -1,4 +1,5 @@
 agent_horizon_s: 3.0
+descriptor_creation_horizon_m: 20.0
 radius_m: 15.0
 num_semantic_classes: 20
 min_distance_m: 0.5
