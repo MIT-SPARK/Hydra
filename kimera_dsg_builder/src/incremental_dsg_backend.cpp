@@ -186,6 +186,9 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
   // redundant to updateBuildingNode
   // dsg_update_funcs_.push_back(&dsg_updates::updateBuildings);
 
+  bool force_recalc = true;
+  nh_.getParam("pgmo/rpgo/gnc_fix_prev_inliers", force_recalc);
+  deformation_graph_->setForceRecalculate(force_recalc);
   deformation_graph_->storeOnlyNoOptimization();
 
   // purple
