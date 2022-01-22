@@ -346,7 +346,8 @@ int main(int argc, char* argv[]) {
       config["gnc_max_iterations"].as<size_t>(),
       config["gnc_mu_step"].as<double>(),
       config["gnc_cost_tolerance"].as<double>(),
-      config["gnc_weight_tolerance"].as<double>());
+      config["gnc_weight_tolerance"].as<double>(),
+      config["gnc_fix_prev_inliers"].as<bool>());
 
   gtsam::Values values;
   gtsam::NonlinearFactorGraph factors, old_factors;

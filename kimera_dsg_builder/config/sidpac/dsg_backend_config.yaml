@@ -24,6 +24,7 @@ pgmo:
         gnc_mu_step: 1.6
         gnc_cost_tolerance: 1.0e-05
         gnc_weight_tolerance: 1.0e-04
+        gnc_fix_prev_inliers: false
     add_initial_prior: true
     covariance:
         odom: 1.0e-02
