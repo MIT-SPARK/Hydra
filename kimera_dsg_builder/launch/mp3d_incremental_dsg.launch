@@ -42,6 +42,8 @@
     <arg name="ros_output" value="log" if="$(arg glog_to_file)"/>
     <arg name="log_registration" default="false"/>
 
+    <arg name="rgb_frame" value="rgb_camera_link"/>
+
     <arg name="use_static_tfs" default="true"/>
     <include file="$(find dsg_habitat_sim)/launch/habitat_static_tfs.launch" if="$(arg use_static_tfs)"/>
 
@@ -79,8 +81,8 @@
         <rosparam file="$(find kimera_dsg_builder)/config/habitat/dsg_backend_config.yaml"/>
         <rosparam file="$(arg lcd_config)" ns="lcd"/>
 
-        <param name="sensor_frame" value="left_cam" if="$(arg use_gt_frame)"/>
-        <param name="sensor_frame" value="left_cam_kimera" unless="$(arg use_gt_frame)"/>
+        <param name="sensor_frame" value="$(arg rgb_frame)" if="$(arg use_gt_frame)"/>
+        <param name="sensor_frame" value="$(arg rgb_frame)" unless="$(arg use_gt_frame)"/>
         <param name="dsg/optimize_on_lc" value="$(arg optimize_on_lc)"/>
         <param name="lcd/log_registration_problem" value="$(arg log_registration)"/>
 
@@ -104,7 +106,7 @@
           output="log">
           <param name="keyframe_period_s" value="0.2"/>
           <param name="world_frame" value="world"/>
-          <param name="robot_frame" value="left_cam"/>
+          <param name="robot_frame" value="$(arg rgb_frame)"/>
           <param name="robot_id" value="0"/>
           <remap from="~pose_graph" to="/incremental_dsg_builder_node/pose_graph_incremental"/>
     </node>
