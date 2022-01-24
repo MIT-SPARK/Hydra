@@ -12,7 +12,7 @@ pgmo:
     use_msg_time: true
     embed_trajectory_delta_t: 5.0
     num_interp_pts: 4
-    interp_horizon: 300.0
+    interp_horizon: 100.0
     rpgo:
         odom_trans_threshold: 0.05
         odom_rot_threshold: 0.01
