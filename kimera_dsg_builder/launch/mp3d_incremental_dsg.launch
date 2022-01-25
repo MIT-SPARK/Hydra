@@ -56,6 +56,19 @@
         <arg name="glog_dir" value="$(arg topology_glog_dir)"/>
         <arg name="verbosity" value="$(arg verbosity)" if="$(arg glog_to_file)"/>
         <arg name="min_glog_level" value="$(arg min_glog_level)"/>
+
+        <arg name="camera_info_topic" default="/habitat/agent_0/rgb_info" if="$(arg use_gt_semantics)"/>
+        <arg name="camera_info_topic" default="/habitat/agent_0/rgb_info" unless="$(arg use_gt_semantics)"/>
+        <arg name="camera_topic" default="/habitat/agent_0/rgb" if="$(arg use_gt_semantics)"/>
+        <arg name="camera_topic" default="/habitat/agent_0/rgb" unless="$(arg use_gt_semantics)"/>
+        <arg name="depth_topic" default="/habitat/agent_0/depth"/>
+        <arg name="pointcloud_topic" default="/habitat/agent_0/pointcloud"/>
+
+        <arg name="config" default="mp3d_topology_config.yaml"/>
+        <arg name="semantic_config" default="mp3d_semantic_config.yaml" if="$(arg use_gt_semantics)"/>
+        <arg name="semantic_config" default="ade150_semantic_config.yaml" unless="$(arg use_gt_semantics)"/>
+
+        <arg name="include_pointcloud" value="false"/>
     </include>
 
     <include file="$(find kimera_dsg_visualizer)/launch/includes/kimera_dsg_visualizer_params.xml">
@@ -110,11 +123,5 @@
           <param name="robot_id" value="0"/>
           <remap from="~pose_graph" to="/incremental_dsg_builder_node/pose_graph_incremental"/>
     </node>
-
-    <include file="$(find pose_graph_tools)/launch/posegraph_view.launch" >
-        <arg name="frame_id"      value="world" />
-        <arg name="graph_topic"   value="/incremental_dsg_builder_node/pgmo/pose_graph" />
-        <arg name="ns"            value="incremental_dsg_builder_node/pgmo"/>
-    </include>
 
 </launch>
