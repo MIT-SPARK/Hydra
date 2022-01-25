@@ -1,5 +1,5 @@
-agent_horizon_s: 3.0
-descriptor_creation_horizon_m: 20.0
+agent_horizon_s: 3.5
+descriptor_creation_horizon_m: 17.0
 radius_m: 15.0
 num_semantic_classes: 20
 min_distance_m: 0.5
@@ -13,7 +13,7 @@ agent:
     type: "L1"
 object:
     min_time_separation_s: 150.0
-    min_score: 0.56
+    min_score: 0.3
     min_registration_score: 0.93
     max_registration_matches: 5
     min_score_ratio: 0.7
@@ -21,14 +21,14 @@ object:
     type: "L1"
 places:
     min_time_separation_s: 150.0
-    min_score: 0.76
+    min_registration_score: 1.5
+    min_score: 0.5
     type: "L1"
 teaser:
-    noise_bound: 0.05
+    noise_bound: 0.10
     cbar2: 1.0
     rotation_gnc_factor: 1.4
     rotation_max_iterations: 100
     rotation_cost_threshold: 1.0e-6
     kcore_heuristic_threshold: 0.5
     inlier_selection_mode: 0 # (pmc_exact = 0, pmc_heu = 1, kcore_heu = 2, none = 3)
-    max_clique_time_limit: 0 # deprecated
