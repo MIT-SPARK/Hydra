@@ -535,6 +535,10 @@ void DsgBackend::runPgmo() {
       break;
     }
   }
+
+  // TODO(nathan) figure this out instead of forcing an update before exiting
+  updateDsgMesh();
+  callUpdateFunctions();
   // TODO(Yun) Technically not strictly a g2o
   deformation_graph_->save(pgmo_log_path_ + "/deformation_graph.dgrf");
 }
