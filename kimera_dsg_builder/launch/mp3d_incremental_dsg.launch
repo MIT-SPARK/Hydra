@@ -44,8 +44,8 @@
 
     <arg name="rgb_frame" value="rgb_camera_link"/>
 
-    <arg name="use_static_tfs" default="true"/>
-    <include file="$(find dsg_habitat_sim)/launch/habitat_static_tfs.launch" if="$(arg use_static_tfs)"/>
+    <!-- <arg name="use_static_tfs" default="true"/>
+    <include file="$(find dsg_habitat_sim)/launch/habitat_static_tfs.launch" if="$(arg use_static_tfs)"/> -->
 
     <include file="$(find kimera_topology)/launch/kimera_topology_semantic.launch">
         <arg name="use_gt_semantics" value="$(arg use_gt_semantics)"/>
