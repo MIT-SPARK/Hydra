@@ -278,6 +278,12 @@ void DsgBackend::startVisualizer() {
     visualizer_->addPlugin(std::make_shared<PgmoMeshPlugin>(nh, "dsg_mesh"));
   }
 
+  bool use_parent_plugin;
+  nh_.param<bool>("use_parent_plugin", use_parent_plugin, false);
+  if (use_parent_plugin) {
+    visualizer_->addPlugin(std::make_shared<PlaceParentsPlugin>(nh, "parents"));
+  }
+
   bool use_mst_plugin;
   nh_.param<bool>("use_mst_plugin", use_mst_plugin, false);
   if (use_mst_plugin) {
@@ -925,11 +931,12 @@ void DsgBackend::loadState(const std::string& state_path,
   auto times = state.at("mesh").at("times").get<std::vector<double>>();
   mesh_vertex_stamps_.clear();
   mesh_vertex_stamps_.reserve(times.size());
-  std::transform(times.begin(), times.end(),
+  std::transform(times.begin(),
+                 times.end(),
                  std::back_inserter(mesh_vertex_stamps_),
                  [&](auto time) { return ros::Time(time); });
-  latest_mesh_.reset(new kimera_pgmo::KimeraPgmoMesh(PolygonMeshToPgmoMeshMsg(
-      0, vertices, faces, mesh_vertex_stamps_, "world")));
+  latest_mesh_.reset(new kimera_pgmo::KimeraPgmoMesh(
+      PolygonMeshToPgmoMeshMsg(0, vertices, faces, mesh_vertex_stamps_, "world")));
   have_new_mesh_ = true;
 
   loadDeformationGraphFromFile(dgrf_path);

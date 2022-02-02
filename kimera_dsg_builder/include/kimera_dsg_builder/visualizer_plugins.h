@@ -90,4 +90,21 @@ class PlacesFactorGraphViz {
   PMGraphPluginConfig config_;
 };
 
+class PlaceParentsPlugin : public DsgVisualizerPlugin {
+ public:
+  PlaceParentsPlugin(const ros::NodeHandle& nh, const std::string& name);
+
+  virtual ~PlaceParentsPlugin() = default;
+
+  void draw(const std_msgs::Header& header, const DynamicSceneGraph& graph) override;
+
+  void reset(const std_msgs::Header& header, const DynamicSceneGraph& graph) override;
+
+ protected:
+  ros::Publisher marker_pub_;
+  PMGraphPluginConfig config_;
+  bool published_nodes_;
+  bool published_edges_;
+};
+
 }  // namespace kimera

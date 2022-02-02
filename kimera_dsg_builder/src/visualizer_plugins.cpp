@@ -471,4 +471,108 @@ void PlacesFactorGraphViz::draw(char vertex_prefix,
   }
 }
 
+PlaceParentsPlugin::PlaceParentsPlugin(const ros::NodeHandle& nh,
+                                       const std::string& name)
+    : DsgVisualizerPlugin(nh, name),
+      config_(nh),
+      published_nodes_(false),
+      published_edges_(false) {
+  marker_pub_ = nh_.advertise<MarkerArray>("places_parents", 10);
+}
+
+void PlaceParentsPlugin::draw(const std_msgs::Header& header,
+                              const DynamicSceneGraph& graph) {
+  if (!graph.hasLayer(KimeraDsgLayers::PLACES)) {
+    return;
+  }
+
+  const SceneGraphLayer& layer = *graph.getLayer(KimeraDsgLayers::PLACES);
+
+  VisualizerConfig viz_config;
+  viz_config.layer_z_step = 0.0;
+
+  MarkerArray msg;
+
+  Marker nodes = makeCentroidMarkers(
+      header,
+      config_.layer_config,
+      layer,
+      viz_config,
+      "places_parent_graph_nodes",
+      [&](const SceneGraphNode&) { return config_.interior_color; });
+
+  if (!nodes.points.empty()) {
+    msg.markers.push_back(nodes);
+    published_nodes_ = true;
+  }
+
+  Marker edges;
+  edges.type = Marker::LINE_LIST;
+  edges.action = Marker::ADD;
+  edges.id = 0;
+  edges.ns = "places_parent_edges";
+  edges.scale.x = config_.mesh_edge_scale;
+  edges.color =
+      makeColorMsg(config_.interior_color, config_.layer_config.intralayer_edge_alpha);
+
+  Marker parents;
+  parents.type = Marker::CUBE_LIST;
+  parents.action = Marker::ADD;
+  parents.id = 0;
+  parents.ns = "places_parents";
+  parents.scale.x = config_.mesh_marker_scale;
+  parents.scale.y = config_.mesh_marker_scale;
+  parents.scale.z = config_.mesh_marker_scale;
+  parents.color = makeColorMsg(config_.leaf_color, config_.mesh_marker_alpha);
+
+  fillPoseWithIdentity(edges);
+  fillPoseWithIdentity(parents);
+
+  for (const auto& id_node_pair : layer.nodes()) {
+    auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
+    geometry_msgs::Point start;
+    tf2::convert(attrs.position, start);
+
+    for (const auto& info : attrs.voxblox_mesh_connections) {
+      geometry_msgs::Point end;
+      Eigen::Vector3d pos = Eigen::Map<const Eigen::Vector3d>(info.voxel_pos);
+      tf2::convert(pos, end);
+      edges.points.push_back(start);
+      edges.points.push_back(end);
+      parents.points.push_back(end);
+    }
+  }
+
+  if (!edges.points.empty()) {
+    edges.header = header;
+    parents.header = header;
+    msg.markers.push_back(edges);
+    msg.markers.push_back(parents);
+    published_edges_ = true;
+  }
+
+  if (!msg.markers.empty()) {
+    marker_pub_.publish(msg);
+  }
+}
+
+void PlaceParentsPlugin::reset(const std_msgs::Header& header,
+                               const DynamicSceneGraph&) {
+  MarkerArray msg;
+  if (published_nodes_) {
+    msg.markers.push_back(makeDeleteMarker(header, 0, "places_parent_graph_nodes"));
+    published_nodes_ = false;
+  }
+
+  if (published_edges_) {
+    msg.markers.push_back(makeDeleteMarker(header, 0, "places_parent_edges"));
+    msg.markers.push_back(makeDeleteMarker(header, 0, "places_parents"));
+    published_edges_ = false;
+  }
+
+  if (!msg.markers.empty()) {
+    marker_pub_.publish(msg);
+  }
+}
+
 }  // namespace kimera
