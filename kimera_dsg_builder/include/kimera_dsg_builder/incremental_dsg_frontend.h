@@ -2,6 +2,7 @@
 #include "kimera_dsg_builder/dsg_lcd_module.h"
 #include "kimera_dsg_builder/incremental_mesh_segmenter.h"
 #include "kimera_dsg_builder/incremental_types.h"
+#include "kimera_dsg_builder/lcd_visualizer.h"
 
 #include <ros/callback_queue.h>
 #include <ros/ros.h>
@@ -82,6 +83,8 @@ class DsgFrontend {
 
   std::optional<Eigen::Vector3d> getLatestPose();
 
+  void startLcdVisualizer();
+
  private:
   ros::NodeHandle nh_;
   std::atomic<bool> should_shutdown_{false};
@@ -143,6 +146,9 @@ class DsgFrontend {
   bool log_;
   std::string log_path_;
   SceneGraphLogger frontend_graph_logger_;
+
+  std::unique_ptr<lcd::LcdVisualizer> lcd_visualizer_;
+  std::unique_ptr<ros::CallbackQueue> visualizer_queue_;
 };
 
 }  // namespace incremental

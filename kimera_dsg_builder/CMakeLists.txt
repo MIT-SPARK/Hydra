@@ -70,6 +70,7 @@ add_library(
   src/incremental_dsg_frontend.cpp
   src/incremental_mesh_segmenter.cpp
   src/incremental_room_finder.cpp
+  src/lcd_visualizer.cpp
   src/minimum_spanning_tree.cpp
   src/object_finder.cpp
   src/offline_dsg_builder.cpp

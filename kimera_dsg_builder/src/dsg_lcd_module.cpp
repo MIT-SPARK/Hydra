@@ -201,22 +201,22 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::detect(const DynamicSceneGrap
   VLOG(2) << "************************************************************";
   VLOG(2) << "LCD Matching: " << NodeSymbol(latest_node.id).getLabel();
 
-  std::map<size_t, LayerSearchResults> matches;
+  matches_.clear();
   for (size_t idx = max_internal_index_ - 1; idx > 0; --idx) {
     const auto& config = match_config_map_.at(idx);
-
     Descriptor::Ptr descriptor;
     descriptor = layer_factories_[config.layer](dsg, latest_node);
 
     if (descriptor) {
-      VLOG(2) << "level " << idx << ": " << std::endl << "    " << descriptor->values.transpose();
-      matches[idx] = searchDescriptors(*descriptor,
-                                       config,
-                                       prev_valid_roots,
-                                       cache_map_[config.layer],
-                                       root_leaf_map_,
-                                       agent_id);
-      prev_valid_roots = matches[idx].valid_matches;
+      VLOG(2) << "level " << idx << ": " << std::endl
+              << "    " << descriptor->values.transpose();
+      matches_[idx] = searchDescriptors(*descriptor,
+                                        config,
+                                        prev_valid_roots,
+                                        cache_map_[config.layer],
+                                        root_leaf_map_,
+                                        agent_id);
+      prev_valid_roots = matches_[idx].valid_matches;
     } else {
       VLOG(2) << "level " << idx << " -> ?";
       prev_valid_roots = std::set<NodeId>();
@@ -228,14 +228,14 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::detect(const DynamicSceneGrap
   descriptor = makeAgentDescriptor(dsg, latest_node);
 
   if (descriptor) {
-    matches[0] = searchLeafDescriptors(*descriptor,
-                                       config_.agent_search_config,
-                                       prev_valid_roots,
-                                       leaf_cache_,
-                                       agent_id);
+    matches_[0] = searchLeafDescriptors(*descriptor,
+                                        config_.agent_search_config,
+                                        prev_valid_roots,
+                                        leaf_cache_,
+                                        agent_id);
   }
 
-  if (matches.empty()) {
+  if (matches_.empty()) {
     VLOG(1) << "No LCD matches for node " << NodeSymbol(agent_id).getLabel()
             << " against " << numDescriptors() << " descriptors";
     return {};
@@ -244,7 +244,7 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::detect(const DynamicSceneGrap
   VLOG(2) << "===========================================================";
   VLOG(2) << "LCD results for node " << NodeSymbol(agent_id).getLabel() << " against "
           << numDescriptors() / 2 << " roots";
-  for (const auto& id_match_pair : matches) {
+  for (const auto& id_match_pair : matches_) {
     VLOG(2) << " - index " << id_match_pair.first << ": "
             << id_match_pair.second.valid_matches.size() << " valid matches, "
             << id_match_pair.second.match_root.size() << " registration matches";
@@ -257,7 +257,7 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::detect(const DynamicSceneGrap
   }
   VLOG(2) << "===========================================================";
 
-  return registerAndVerify(dsg, matches, agent_id, timestamp);
+  return registerAndVerify(dsg, matches_, agent_id, timestamp);
 }
 
 }  // namespace lcd

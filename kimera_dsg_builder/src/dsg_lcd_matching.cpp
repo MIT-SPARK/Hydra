@@ -90,7 +90,7 @@ LayerSearchResults searchDescriptors(
   size_t num_inside_horizon = 0;
   size_t num_low_score = 0;
 
-  VLOG(5) << "--------------------------------------------------";
+  VLOG(10) << "--------------------------------------------------";
 
   for (const auto& valid_id : valid_matches) {
     if (root_leaf_map.at(valid_id).count(query_id)) {
@@ -101,8 +101,8 @@ LayerSearchResults searchDescriptors(
     const Descriptor& other_descriptor = *descriptors.at(valid_id);
     std::chrono::duration<double> diff_s =
         descriptor.timestamp - other_descriptor.timestamp;
-    VLOG(5) << "diff: " << diff_s.count()
-            << " (threshold: " << match_config.min_time_separation_s << ")";
+    VLOG(10) << "diff: " << diff_s.count()
+             << " (threshold: " << match_config.min_time_separation_s << ")";
     if (diff_s.count() < match_config.min_time_separation_s) {
       ++num_inside_horizon;
       continue;
@@ -208,7 +208,7 @@ LayerSearchResults searchLeafDescriptors(const Descriptor& descriptor,
   }
 
   if (!found_match) {
-    return {{}, {}, {}, {}, descriptor.root_node, {}};
+    return {{}, {}, descriptor.nodes, {}, descriptor.root_node, {}};
   }
 
   return {{best_score},

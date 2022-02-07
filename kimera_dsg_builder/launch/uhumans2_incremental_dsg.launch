@@ -6,6 +6,7 @@
     <arg name="exit_after_bag" default="false"/>
 
     <arg name="enable_dsg_lcd" default="false"/>
+    <arg name="enable_lcd_viz" default="false"/>
     <arg name="lcd_config" default="$(find kimera_dsg_builder)/config/uhumans/dsg_lcd_config.yaml"/>
     <arg name="optimize_on_lc" default="true"/>
 
@@ -58,6 +59,14 @@
         <arg name="viz_config_dir" value="$(find kimera_dsg_builder)/config/incremental_visualizer"/>
     </include>
 
+    <arg name="lcd_viz_path" default="$(find kimera_dsg_builder)/config/lcd_visualizer"/>
+    <group ns="/dsg_lcd_visualizer" if="$(arg enable_lcd_viz)">
+        <rosparam file="$(arg lcd_viz_path)/visualizer.yaml" ns="config"/>
+        <rosparam file="$(arg lcd_viz_path)/objects_layer.yaml" ns="config/layer2"/>
+        <rosparam file="$(arg lcd_viz_path)/places_layer.yaml" ns="config/layer3"/>
+        <rosparam file="$(arg lcd_viz_path)/agent_layer.yaml" ns="config/agent_layer"/>
+    </group>
+
     <node pkg="kimera_dsg_builder" type="kimera_dsg_builder_incremental_node"
           name="incremental_dsg_builder_node"
           launch-prefix="$(arg launch_prefix)"
@@ -94,6 +103,7 @@
         <remap from="~/bow_vectors" to="/kimera_vio_ros/bow_query"/>
         <remap from="frame_registration" to="/kimera_vio_ros/kimera_vio_ros_node/register_lcd_frames"/>
         <param name="disable_timer_output" value="true"/>
+        <param name="visualize_dsg_lcd" value="$(arg enable_lcd_viz)"/>
     </node>
 
     <node pkg="kimera_dsg_builder" type="pose_graph_publisher_node"

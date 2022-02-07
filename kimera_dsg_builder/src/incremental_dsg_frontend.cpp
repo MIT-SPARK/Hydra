@@ -38,6 +38,8 @@ DsgFrontend::DsgFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& ds
 }
 
 void DsgFrontend::stop() {
+  VLOG(2) << "[DSG Frontend] stopping frontend!";
+
   lcd_shutting_down_ = true;
   if (lcd_thread_) {
     VLOG(2) << "[DSG Frontend] joining lcd thread";
@@ -45,6 +47,8 @@ void DsgFrontend::stop() {
     lcd_thread_.reset();
     VLOG(2) << "[DSG Frontend] joined lcd thread";
   }
+
+  lcd_visualizer_.reset();
 
   should_shutdown_ = true;
   if (mesh_frontend_thread_) {
@@ -695,6 +699,28 @@ lcd::DsgLcdConfig DsgFrontend::initializeLcdStructures() {
   return config;
 }
 
+void DsgFrontend::startLcdVisualizer() {
+  bool visualize_dsg_lcd;
+  nh_.param<bool>("visualize_dsg_lcd", visualize_dsg_lcd, false);
+  if (!visualize_dsg_lcd) {
+    return;
+  }
+
+  double radius;
+  nh_.param<double>("lcd/radius_m", radius, 5.0);
+
+  std::string visualizer_ns;
+  nh_.param<std::string>("visualizer_ns", visualizer_ns, "/dsg_lcd_visualizer");
+
+  ros::NodeHandle nh(visualizer_ns);
+  visualizer_queue_.reset(new ros::CallbackQueue());
+  nh.setCallbackQueue(visualizer_queue_.get());
+
+  lcd_visualizer_.reset(new lcd::LcdVisualizer(nh, radius));
+  lcd_visualizer_->setGraph(lcd_graph_);
+  lcd_visualizer_->setLcdModule(lcd_module_.get());
+}
+
 void DsgFrontend::startLcd() {
   bow_sub_ = nh_.subscribe("bow_vectors", 100, &DsgFrontend::handleDbowMsg, this);
 
@@ -731,6 +757,7 @@ void DsgFrontend::startLcd() {
 
   lcd_module_.reset(new lcd::DsgLcdModule(
       config, descriptor_factories, registration_funcs, validation_funcs));
+  startLcdVisualizer();
 
   lcd_thread_.reset(new std::thread(&DsgFrontend::runLcd, this));
 }
@@ -786,6 +813,7 @@ void DsgFrontend::runLcd() {
     }  // end critical section
 
     if (lcd_graph_->getLayer(KimeraDsgLayers::PLACES).value().get().numNodes() == 0) {
+      r.sleep();
       continue;
     }
 
@@ -831,6 +859,11 @@ void DsgFrontend::runLcd() {
         lcd_graph_->getDynamicNode(*latest_agent_id).value().get().timestamp.count();
 
     auto results = lcd_module_->detect(*lcd_graph_, *latest_agent_id, timestamp);
+    if (lcd_visualizer_) {
+      lcd_visualizer_->setGraphUpdated();
+      lcd_visualizer_->redraw();
+    }
+
     if (results.size() == 0) {
       if (!lcd_shutting_down_) {
         r.sleep();

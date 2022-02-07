@@ -55,6 +55,18 @@ class DsgLcdModule {
     return count;
   }
 
+  inline const std::map<size_t, LayerSearchResults>& getLatestMatches() const {
+    return matches_;
+  }
+
+  inline const std::map<LayerId, size_t>& getLayerRemapping() const {
+    return layer_to_internal_index_;
+  }
+
+  inline const DescriptorCache& getDescriptorCache(LayerId layer) {
+    return cache_map_.at(layer);
+  }
+
  private:
   bool addNewDescriptors(const DynamicSceneGraph& graph,
                          const DynamicSceneGraphNode& agent_node);
@@ -77,6 +89,8 @@ class DsgLcdModule {
   std::map<LayerId, DescriptorCache> cache_map_;
   std::map<NodeId, DescriptorCache> leaf_cache_;
   std::map<NodeId, std::set<NodeId>> root_leaf_map_;
+
+  std::map<size_t, LayerSearchResults> matches_;
 };
 
 }  // namespace lcd

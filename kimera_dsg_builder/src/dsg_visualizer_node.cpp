@@ -6,6 +6,9 @@
 
 #include <glog/logging.h>
 
+using kimera::VoxbloxMeshPlugin;
+using kimera::PgmoMeshPlugin;
+
 int main(int argc, char** argv) {
   ros::init(argc, argv, "dsg_visualizer_node");
 
@@ -13,8 +16,7 @@ int main(int argc, char** argv) {
   ros::NodeHandle nh_private("~");
 
   std::string visualizer_ns;
-  nh_private.param<std::string>(
-      "visualizer_ns", visualizer_ns, "/dsg_visualizer");
+  nh_private.param<std::string>("visualizer_ns", visualizer_ns, "/dsg_visualizer");
 
   std::string scene_graph_input_path;
   nh_private.param<std::string>("scene_graph_input_path", scene_graph_input_path, "");
@@ -37,8 +39,15 @@ int main(int argc, char** argv) {
   kimera::DynamicSceneGraphVisualizer scene_graph_visualizer(
       visualizer_nh, kimera::getDefaultLayerIds());
 
-  scene_graph_visualizer.addPlugin(
-      std::make_shared<kimera::VoxbloxMeshPlugin>(visualizer_nh, "dsg_mesh"));
+  bool use_voxblox_mesh_plugin;
+  nh_private.param<bool>("use_voxblox_mesh_plugin", use_voxblox_mesh_plugin, false);
+  if (use_voxblox_mesh_plugin) {
+    // TODO(nathan) voxblox mesh plugin in rviz doesn't handle large graphs well
+    scene_graph_visualizer.addPlugin(
+        std::make_shared<VoxbloxMeshPlugin>(nh, "dsg_mesh"));
+  } else {
+    scene_graph_visualizer.addPlugin(std::make_shared<PgmoMeshPlugin>(nh, "dsg_mesh"));
+  }
 
   scene_graph_visualizer.setGraph(scene_graph);
 
