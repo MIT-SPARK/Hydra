@@ -1,0 +1,47 @@
+#!/usr/bin/env python
+"""Broadcast a tf from odom."""
+import rospy
+import tf2_ros
+import nav_msgs.msg
+import geometry_msgs.msg
+
+
+def broadcast_tf(msg, arg_tuple):
+    """Re-broadcast the msg pose as a tf."""
+    broadcaster, parent_frame, child_frame = arg_tuple
+    pose = geometry_msgs.msg.TransformStamped()
+    pose.header.stamp = msg.header.stamp
+    pose.header.frame_id = parent_frame
+    pose.child_frame_id = child_frame
+    pose.transform.translation.x = msg.pose.pose.position.x
+    pose.transform.translation.y = msg.pose.pose.position.y
+    pose.transform.translation.z = msg.pose.pose.position.z
+    pose.transform.rotation.w = msg.pose.pose.orientation.w
+    pose.transform.rotation.x = msg.pose.pose.orientation.x
+    pose.transform.rotation.y = msg.pose.pose.orientation.y
+    pose.transform.rotation.z = msg.pose.pose.orientation.z
+
+    broadcaster.sendTransform(pose)
+
+
+def main():
+    """Do stuff."""
+    rospy.init_node("odom_to_tf")
+
+    parent_frame = rospy.get_param("~parent_frame", "world")
+    child_frame = rospy.get_param("~child_frame", "t265_odom")
+    broadcaster = tf2_ros.TransformBroadcaster()
+
+    rospy.Subscriber(
+        "odom",
+        nav_msgs.msg.Odometry,
+        broadcast_tf,
+        (broadcaster, parent_frame, child_frame),
+        tcp_nodelay=True
+    )
+
+    rospy.spin()
+
+
+if __name__ == "__main__":
+    main()
