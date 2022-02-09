@@ -508,23 +508,26 @@ void DsgBackend::runPgmo() {
     status_.total_values_ = deformation_graph_->getGtsamValues().size();
 
     bool have_dsg_updates = false;
-    have_dsg_updates = updatePrivateDsg();
-
-    if (visualize_place_factors_ && (have_dsg_updates || have_graph_updates)) {
-      MinimumSpanningTreeInfo mst_info = getMinimumSpanningEdges(shared_places_copy_);
-      places_factors_visualizer_->draw(
-          robot_vertex_prefix_, shared_places_copy_, mst_info, *deformation_graph_);
-    }
-
     bool was_updated = false;
-    if (optimize_on_lc_ && have_graph_updates && have_loopclosures_) {
-      optimize();
-      was_updated = true;
-    } else if (call_update_periodically_ && have_dsg_updates) {
-      updateDsgMesh();
-      callUpdateFunctions();
-      was_updated = true;
-    }
+    {  // start pgmo mesh critical section
+      std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
+      have_dsg_updates = updatePrivateDsg();
+
+      if (visualize_place_factors_ && (have_dsg_updates || have_graph_updates)) {
+        MinimumSpanningTreeInfo mst_info = getMinimumSpanningEdges(shared_places_copy_);
+        places_factors_visualizer_->draw(
+            robot_vertex_prefix_, shared_places_copy_, mst_info, *deformation_graph_);
+      }
+
+      if (optimize_on_lc_ && have_graph_updates && have_loopclosures_) {
+        optimize();
+        was_updated = true;
+      } else if (call_update_periodically_ && have_dsg_updates) {
+        updateDsgMesh();
+        callUpdateFunctions();
+        was_updated = true;
+      }
+    }  // end pgmo mesh critical section
 
     if (have_graph_updates && pgmo_log_) {
       logStatus();
@@ -708,21 +711,18 @@ void DsgBackend::updateDsgMesh(bool force_mesh_update) {
   std::unique_ptr<ScopedTimer> timer;
 
   pcl::PolygonMesh input_mesh;
-  {  // start pgmo mesh critical section
-    std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
-    if (!latest_mesh_) {
-      return;
-    }
+  if (!latest_mesh_) {
+    return;
+  }
 
-    if (!force_mesh_update && !have_new_mesh_) {
-      return;
-    }
+  if (!force_mesh_update && !have_new_mesh_) {
+    return;
+  }
 
-    timer.reset(new ScopedTimer("backend/mesh_update", last_timestamp_));
-    input_mesh =
-        kimera_pgmo::PgmoMeshMsgToPolygonMesh(*latest_mesh_, &mesh_vertex_stamps_);
-    have_new_mesh_ = false;
-  }  // end pgmo mesh critical section
+  timer.reset(new ScopedTimer("backend/mesh_update", last_timestamp_));
+  input_mesh =
+      kimera_pgmo::PgmoMeshMsgToPolygonMesh(*latest_mesh_, &mesh_vertex_stamps_);
+  have_new_mesh_ = false;
 
   if (input_mesh.cloud.height * input_mesh.cloud.width == 0) {
     return;
