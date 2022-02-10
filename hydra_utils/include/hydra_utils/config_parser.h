@@ -1,13 +1,13 @@
 #pragma once
+#include <string>
 #include <type_traits>
 #include <utility>
-#include <string>
 
 // argument-dependent-lookup for arbitrary config structures. See the following:
 // - http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2015/n4381.html
 // - https:://github.com/nlohmann/json/blob/develop/include/nlohmann/adl_serializer.hpp
 
-namespace config {
+namespace config_parser {
 
 namespace detail {
 
@@ -49,9 +49,10 @@ struct ConfigVisitorSpecializer {
    */
   template <typename Visitor, typename ValueType>
   static auto visit_config(Visitor&& v, ValueType& val)
-      -> decltype(::config::visit_config(std::forward<Visitor>(v), val), void()) {
-    ::config::visit_config(std::forward<Visitor>(v), val);
+      -> decltype(::config_parser::visit_config(std::forward<Visitor>(v), val),
+                  void()) {
+    ::config_parser::visit_config(std::forward<Visitor>(v), val);
   }
 };
 
-}  // namespace config
+}  // namespace config_parser

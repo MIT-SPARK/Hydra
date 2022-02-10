@@ -16,12 +16,8 @@ catkin_package(
   LIBRARIES ${PROJECT_NAME}
 )
 
-add_library(
-  ${PROJECT_NAME}
-  src/config_parser.cpp
-)
-target_link_libraries(${PROJECT_NAME} PUBLIC ${catkin_LIBRARIES})
-target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
+add_library(${PROJECT_NAME} INTERFACE)
+target_include_directories(${PROJECT_NAME} INTERFACE include ${catkin_INCLUDE_DIRS})
 
 if(CATKIN_ENABLE_TESTING)
   catkin_add_gtest(

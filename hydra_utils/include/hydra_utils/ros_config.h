@@ -3,7 +3,7 @@
 
 #include <type_traits>
 
-namespace kimera {
+namespace config_parser {
 
 template <typename T>
 struct is_base_ros_param : std::false_type {};
@@ -23,93 +23,67 @@ struct is_base_ros_param<int> : std::true_type {};
 template <>
 struct is_base_ros_param<bool> : std::true_type {};
 
-template <typename T, std::enable_if_t<is_base_ros_param<T>::value, bool> = true>
-bool parseParam(const ros::NodeHandle& nh, const std::string& name, T& value) {
-  return nh.getParam(name, value);
-}
+class RosParser {
+ public:
+  RosParser(const ros::NodeHandle& nh, const std::string& name)
+      : nh_(nh), name_(name) {}
 
-template <typename T, std::enable_if_t<is_base_ros_param<T>::value, bool> = true>
-bool parseParam(const ros::NodeHandle& nh,
-                const std::string& name,
-                std::vector<T>& value) {
-  return nh.getParam(name, value);
-}
+  explicit RosParser(const ros::NodeHandle& nh) : RosParser(nh, "") {}
 
-template <typename T,
-          typename Bounds,
-          std::enable_if_t<std::is_integral<T>::value, bool> = true>
-bool parseParam(const ros::NodeHandle& nh,
-                const std::string& name,
-                T& value,
-                const Bounds lo_value,
-                const Bounds hi_value) {
-  int placeholder = 0;  // putting default value into int is overflow prone
-  bool had_param = nh.getParam(name, placeholder);
-  if (!had_param) {
-    return false;
+  static RosParser Public() { return RosParser(ros::NodeHandle()); }
+
+  static RosParser Private() { return RosParser(ros::NodeHandle("~")); }
+
+  RosParser operator[](const std::string& new_name) const {
+    // push name onto nodehandle namespace if name isn't empty
+    ros::NodeHandle new_nh = (name_ != "") ? nh_ : ros::NodeHandle(nh_, name_);
+    return RosParser(new_nh, new_name);
   }
-
-  if (sizeof(T) < sizeof(int)) {
-    // avoid overflow on uint16_t and smaller
-    int old_placeholder = placeholder;
-    placeholder =
-        std::clamp(placeholder, static_cast<int>(lo_value), static_cast<int>(hi_value));
-    if (placeholder != old_placeholder) {
-      ROS_WARN_STREAM("Parameter "
-                      << nh.resolveName(name) << " had a value " << old_placeholder
-                      << " which was outside the bounds of [" << lo_value << ", "
-                      << hi_value << "]");
-    }
-  }
-
-  value = static_cast<T>(placeholder);
-
-  if (sizeof(T) >= sizeof(int)) {
-    // avoid clamping issues with values larger than int
-    T old_value = value;
-    value = std::clamp(value, static_cast<T>(lo_value), static_cast<T>(hi_value));
-    if (value != old_value) {
-      ROS_WARN_STREAM("Parameter " << nh.resolveName(name) << " had a value "
-                                   << old_value << " which was outside the bounds of ["
-                                   << lo_value << ", " << hi_value << "]");
-    }
-  }
-  return had_param;
-}
-
-template <typename T,
-          std::enable_if_t<!is_base_ros_param<T>::value && std::is_integral<T>::value,
-                           bool> = true>
-bool parseParam(const ros::NodeHandle& nh, const std::string& name, T& value) {
-  return parseParam(
-      nh, name, value, std::numeric_limits<T>::min(), std::numeric_limits<T>::max());
-}
-
-template <typename T>
-void showParam(std::ostream& out, const T& value) {
-  out << value;
-}
-
-template <>
-void showParam(std::ostream& out, const uint8_t& value) {
-  out << static_cast<int>(value);
-}
-
-template <>
-void showParam(std::ostream& out, const bool& value) {
-  out << (value ? "yes" : "no");
-}
-
-struct RosParser {
-
-  explicit RosParser(const ros::NodeHandle& nh) : nh_(nh) {}
 
   template <typename T>
-  void call(const std::string& name, T& value) const {
-    parseParam(nh_, name, value);
+  void visit(T& value) const;
+
+  template <typename T, std::enable_if_t<is_base_ros_param<T>::value, bool> = true>
+  void visit(T& value) {
+    nh_.getParam(name_, value);
   }
 
+  // TODO(nathan) map
+  template <typename T, std::enable_if_t<is_base_ros_param<T>::value, bool> = true>
+  void visit(std::vector<T>& value) {
+    nh_.getParam(name_, value);
+  }
+
+  template <typename T,
+            std::enable_if_t<std::conjunction<std::negation<is_base_ros_param<T>>,
+                                              std::is_integral<T>>::value,
+                             bool> = true>
+  void visit(T& value) {
+    int placeholder = 0;
+    if (!nh_.getParam(name_, placeholder)) {
+      return;
+    }
+
+    if (sizeof(T) < sizeof(int)) {
+      // avoid overflow on uint16_t and smaller
+      constexpr const int lo_value = static_cast<int>(std::numeric_limits<T>::min());
+      constexpr const int hi_value = static_cast<int>(std::numeric_limits<T>::max());
+      int old_placeholder = placeholder;
+      placeholder = std::clamp(placeholder, lo_value, hi_value);
+      if (placeholder != old_placeholder) {
+        ROS_WARN_STREAM("Parameter "
+                        << nh_.resolveName(name_) << " had a value " << old_placeholder
+                        << " which was outside the bounds of [" << lo_value << ", "
+                        << hi_value << "]");
+      }
+    }
+
+    value = static_cast<T>(placeholder);
+  }
+
+ private:
   ros::NodeHandle nh_;
+  std::string name_;
 };
 
-} // namespace kimera
+}  // namespace config_parser
