@@ -5,6 +5,23 @@
 
 namespace kimera {
 
+class FakeParser {
+ public:
+  FakeParser() = default;
+
+  explicit FakeParser(const std::string& name) : name_(name) {}
+
+  FakeParser operator[](const std::string& name) const { return FakeParser(name); }
+
+  template <typename T>
+  void visit(T& val) const {
+    std::cout << name_ << ": " << val << std::endl;
+  }
+
+ private:
+  std::string name_;
+};
+
 struct FakeConfig {
   float foo = 5.0f;
   double bar = 10.0;
@@ -14,37 +31,46 @@ struct FakeConfig {
   std::string msg = "hello";
 };
 
-struct FakeParser {
+template <typename Visitor>
+void visit_config(Visitor& v, FakeConfig& config) {
+  config::visit_config(v["foo"], config.foo);
+  config::visit_config(v["bar"], config.bar);
+  config::visit_config(v["a"], config.a);
+  config::visit_config(v["b"], config.b);
+  config::visit_config(v["c"], config.c);
+  config::visit_config(v["msg"], config.msg);
+}
 
-  void visit(std::string& str) const {
-    std::cout << str << std::endl;
-  }
-
-  void visit(float& val) const {
-    std::cout << val << std::endl;
-  }
-
+struct FakeConfig2 {
+  FakeConfig fake_config;
+  std::string msg = "world";
 };
 
 template <typename Visitor>
-void visit_config(Visitor& v, FakeConfig& config) {
-  config::visit_config(v, config.foo);
-  config::visit_config(v, config.msg);
+void visit_config(Visitor& v, FakeConfig2& config) {
+  config::visit_config(v["fake_config"], config.fake_config);
+  config::visit_config(v["msg"], config.msg);
 }
 
 FakeConfig foo() {
-  // ros::NodeHandle nh;
-  // RosParser parser(nh);
-
+  std::cout << std::endl << "*** FOO ***" << std::endl << std::endl;
   FakeParser parser;
-
   FakeConfig config;
+  config::visit_config(parser, config);
+  return config;
+}
+
+FakeConfig2 bar() {
+  std::cout << std::endl << "*** BAR ***" << std::endl << std::endl;
+  FakeParser parser;
+  FakeConfig2 config;
   config::visit_config(parser, config);
   return config;
 }
 
 TEST(ConfigParsing, defaultTest) {
   foo();
+  bar();
   SUCCEED();
 }
 

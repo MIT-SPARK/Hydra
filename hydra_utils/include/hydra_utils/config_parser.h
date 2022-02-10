@@ -1,6 +1,7 @@
 #pragma once
 #include <type_traits>
 #include <utility>
+#include <string>
 
 // argument-dependent-lookup for arbitrary config structures. See the following:
 // - http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2015/n4381.html
@@ -12,8 +13,8 @@ namespace detail {
 
 // default for primitive types: makes sure that the visitor bottoms-out on leaves
 template <typename Visitor, typename T>
-void visit_config(Visitor& v, T& val) {
-  v.visit(val);
+void visit_config(Visitor&& v, T& val) {
+  std::forward<Visitor>(v).visit(val);
 }
 
 // adl indirection
