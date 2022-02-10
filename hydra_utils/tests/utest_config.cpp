@@ -1,24 +1,12 @@
-#include <hydra_utils/config_parser.h>
-#include <hydra_utils/ros_config.h>
+#include <hydra_utils/config.h>
+
+#include <ros/package.h>
 
 #include <gtest/gtest.h>
 
-class FakeParser {
- public:
-  FakeParser() = default;
-
-  explicit FakeParser(const std::string& name) : name_(name) {}
-
-  FakeParser operator[](const std::string& name) const { return FakeParser(name); }
-
-  template <typename T>
-  void visit(T& val) const {
-    std::cout << name_ << ": " << val << std::endl;
-  }
-
- private:
-  std::string name_;
-};
+std::string get_test_path() {
+  return ros::package::getPath("hydra_utils") + "/tests/resources/";
+}
 
 namespace hydra_utils {
 
@@ -54,32 +42,54 @@ void visit_config(Visitor& v, FakeConfig2& config) {
 
 }  // namespace hydra_utils
 
-hydra_utils::FakeConfig foo() {
-  std::cout << std::endl << "*** FOO ***" << std::endl << std::endl;
-  FakeParser parser;
-  hydra_utils::FakeConfig config;
-  config_parser::visit_config(parser, config);
-  return config;
-}
+template <>
+struct config_parser::is_config<hydra_utils::FakeConfig> : std::true_type {};
 
-hydra_utils::FakeConfig2 bar() {
-  std::cout << std::endl << "*** BAR ***" << std::endl << std::endl;
-  FakeParser parser;
-  hydra_utils::FakeConfig2 config;
-  config_parser::visit_config(parser, config);
-  return config;
-}
+template <>
+struct config_parser::is_config<hydra_utils::FakeConfig2> : std::true_type {};
 
 hydra_utils::FakeConfig load_from_ros() {
-  auto parser = config_parser::RosParser::Private();
-
-  hydra_utils::FakeConfig config;
-  config_parser::visit_config(parser, config);
-  return config;
+  return config_parser::load_from_ros<hydra_utils::FakeConfig>("~");
 }
 
-TEST(ConfigParsing, defaultTest) {
-  foo();
-  bar();
-  SUCCEED();
+//template <typename Config, std::enable_if_t<is_config<Config>::value, bool> = true>
+std::ostream& operator<<(std::ostream& out, const hydra_utils::FakeConfig& config) {
+  config_parser::ConfigDisplay visitor(out);
+  config_parser::visit_config(visitor, config);
+  return out;
+}
+
+
+void show_config() {
+  auto visitor = config_parser::ConfigDisplay(std::cout);
+
+  hydra_utils::FakeConfig config;
+  config_parser::visit_config(visitor, config);
+
+  std::cout << config << std::endl;
+}
+
+TEST(ConfigParsing, ParseSingleStructYaml) {
+  const std::string filepath = get_test_path() + "test_config.yaml";
+  auto config = config_parser::load_from_yaml<hydra_utils::FakeConfig>(filepath);
+
+  EXPECT_EQ(config.foo, 10.0f);
+  EXPECT_EQ(config.bar, 5.0);
+  EXPECT_EQ(config.a, -3);
+  EXPECT_EQ(static_cast<int>(config.b), 1);
+  EXPECT_EQ(config.c, 2);
+  EXPECT_EQ(config.msg, "world");
+}
+
+TEST(ConfigParsing, ParseNestedStructYaml) {
+  const std::string filepath = get_test_path() + "nested_test_config.yaml";
+  auto config = config_parser::load_from_yaml<hydra_utils::FakeConfig2>(filepath);
+
+  EXPECT_EQ(config.fake_config.foo, 10.0f);
+  EXPECT_EQ(config.fake_config.bar, 5.0);
+  EXPECT_EQ(config.fake_config.a, -3);
+  EXPECT_EQ(static_cast<int>(config.fake_config.b), 1);
+  EXPECT_EQ(config.fake_config.c, 2);
+  EXPECT_EQ(config.fake_config.msg, "hello");
+  EXPECT_EQ(config.msg, "again");
 }

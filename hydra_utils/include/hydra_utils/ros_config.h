@@ -30,9 +30,7 @@ class RosParser {
 
   explicit RosParser(const ros::NodeHandle& nh) : RosParser(nh, "") {}
 
-  static RosParser Public() { return RosParser(ros::NodeHandle()); }
-
-  static RosParser Private() { return RosParser(ros::NodeHandle("~")); }
+  static RosParser FromNs(const std::string& ns) { return RosParser(ros::NodeHandle(ns)); }
 
   RosParser operator[](const std::string& new_name) const {
     // push name onto nodehandle namespace if name isn't empty

@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(catkin REQUIRED COMPONENTS roscpp)
+find_package(catkin REQUIRED COMPONENTS roscpp roslib)
 find_package(yaml-cpp REQUIRED)
 
 catkin_package(
@@ -18,6 +18,7 @@ catkin_package(
 
 add_library(${PROJECT_NAME} INTERFACE)
 target_include_directories(${PROJECT_NAME} INTERFACE include ${catkin_INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME} INTERFACE yaml-cpp ${catkin_LIBRARIES})
 
 if(CATKIN_ENABLE_TESTING)
   catkin_add_gtest(
@@ -25,7 +26,6 @@ if(CATKIN_ENABLE_TESTING)
     tests/utest_main.cpp
     tests/utest_config.cpp
   )
-  #target_include_directories(utest_${PROJECT_NAME} PRIVATE include)
   target_link_libraries(utest_${PROJECT_NAME} ${PROJECT_NAME} ${catkin_LIBRARIES})
 endif()
 
