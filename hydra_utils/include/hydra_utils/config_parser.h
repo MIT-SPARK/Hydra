@@ -1,115 +1,56 @@
 #pragma once
-#include <ros/ros.h>
-
 #include <type_traits>
+#include <utility>
 
-namespace kimera {
+// argument-dependent-lookup for arbitrary config structures. See the following:
+// - http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2015/n4381.html
+// - https:://github.com/nlohmann/json/blob/develop/include/nlohmann/adl_serializer.hpp
 
-template <typename T>
-struct is_base_ros_param : std::false_type {};
+namespace config {
 
-template <>
-struct is_base_ros_param<std::string> : std::true_type {};
+namespace detail {
 
-template <>
-struct is_base_ros_param<double> : std::true_type {};
-
-template <>
-struct is_base_ros_param<float> : std::true_type {};
-
-template <>
-struct is_base_ros_param<int> : std::true_type {};
-
-template <>
-struct is_base_ros_param<bool> : std::true_type {};
-
-template <typename T, std::enable_if_t<is_base_ros_param<T>::value, bool> = true>
-bool parseParam(const ros::NodeHandle& nh, const std::string& name, T& value) {
-  return nh.getParam(name, value);
+// default for primitive types: makes sure that the visitor bottoms-out on leaves
+template <typename Visitor, typename T>
+void visit_config(Visitor& v, T& val) {
+  v.visit(val);
 }
 
-template <typename T, std::enable_if_t<is_base_ros_param<T>::value, bool> = true>
-bool parseParam(const ros::NodeHandle& nh,
-                const std::string& name,
-                std::vector<T>& value) {
-  return nh.getParam(name, value);
-}
-
-template <typename T,
-          typename Bounds,
-          std::enable_if_t<std::is_integral<T>::value, bool> = true>
-bool parseParam(const ros::NodeHandle& nh,
-                const std::string& name,
-                T& value,
-                const Bounds lo_value,
-                const Bounds hi_value) {
-  int placeholder = 0;  // putting default value into int is overflow prone
-  bool had_param = nh.getParam(name, placeholder);
-  if (!had_param) {
-    return false;
+// adl indirection
+struct visit_config_fn {
+  template <typename Visitor, typename ValueType>
+  constexpr auto operator()(Visitor&& v, ValueType& val) const
+      -> decltype(visit_config(std::forward<Visitor>(v), val)) {
+    return visit_config(v, val);
   }
-
-  if (sizeof(T) < sizeof(int)) {
-    // avoid overflow on uint16_t and smaller
-    int old_placeholder = placeholder;
-    placeholder =
-        std::clamp(placeholder, static_cast<int>(lo_value), static_cast<int>(hi_value));
-    if (placeholder != old_placeholder) {
-      ROS_WARN_STREAM("Parameter "
-                      << nh.resolveName(name) << " had a value " << old_placeholder
-                      << " which was outside the bounds of [" << lo_value << ", "
-                      << hi_value << "]");
-    }
-  }
-
-  value = static_cast<T>(placeholder);
-
-  if (sizeof(T) >= sizeof(int)) {
-    // avoid clamping issues with values larger than int
-    T old_value = value;
-    value = std::clamp(value, static_cast<T>(lo_value), static_cast<T>(hi_value));
-    if (value != old_value) {
-      ROS_WARN_STREAM("Parameter " << nh.resolveName(name) << " had a value "
-                                   << old_value << " which was outside the bounds of ["
-                                   << lo_value << ", " << hi_value << "]");
-    }
-  }
-  return had_param;
-}
-
-template <typename T,
-          std::enable_if_t<!is_base_ros_param<T>::value && std::is_integral<T>::value,
-                           bool> = true>
-bool parseParam(const ros::NodeHandle& nh, const std::string& name, T& value) {
-  return parseParam(
-      nh, name, value, std::numeric_limits<T>::min(), std::numeric_limits<T>::max());
-}
-
-template <typename T>
-void showParam(std::ostream& out, const T& value) {
-  out << value;
-}
-
-template <>
-void showParam(std::ostream& out, const uint8_t& value) {
-  out << static_cast<int>(value);
-}
-
-template <>
-void showParam(std::ostream& out, const bool& value) {
-  out << (value ? "yes" : "no");
-}
-
-
-struct FakeConfig {
-  float foo = 5.0f;
-  double bar = 10.0;
-  int a = 1;
-  uint8_t b = 2;
-  int64_t c = -3;
-  std::string msg = "hello";
 };
 
-FakeConfig foo();
+// used for ODR workaround
+template <class T>
+constexpr T static_const{};
 
-}  // namespace kimera
+}  // namespace detail
+
+namespace {
+
+constexpr const auto& visit_config = detail::static_const<detail::visit_config_fn>;
+
+}  // namespace
+
+// TODO(nathan) this might need more work
+template <typename T = void, typename SFINAE = void>
+struct ConfigVisitorSpecializer;
+
+template <typename, typename>
+struct ConfigVisitorSpecializer {
+  /*
+   * @brief apply visitor to any value type
+   */
+  template <typename Visitor, typename ValueType>
+  static auto visit_config(Visitor&& v, ValueType& val)
+      -> decltype(::config::visit_config(std::forward<Visitor>(v), val), void()) {
+    ::config::visit_config(std::forward<Visitor>(v), val);
+  }
+};
+
+}  // namespace config

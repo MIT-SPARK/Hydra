@@ -29,6 +29,7 @@ if(CATKIN_ENABLE_TESTING)
     tests/utest_main.cpp
     tests/utest_config.cpp
   )
+  #target_include_directories(utest_${PROJECT_NAME} PRIVATE include)
   target_link_libraries(utest_${PROJECT_NAME} ${PROJECT_NAME} ${catkin_LIBRARIES})
 endif()
 
