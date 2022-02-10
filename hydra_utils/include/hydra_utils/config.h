@@ -30,11 +30,12 @@ Config load_from_ros_nh(const ros::NodeHandle& nh) {
 template <typename T>
 struct is_config : std::false_type {};
 
-template <typename Config, std::enable_if_t<is_config<Config>::value, bool> = true>
+}  // namespace config_parser
+
+template <typename Config,
+          std::enable_if_t<config_parser::is_config<Config>::value, bool> = true>
 std::ostream& operator<<(std::ostream& out, const Config& config) {
-  ConfigDisplay visitor(out);
-  visit_config(visitor, config);
+  config_parser::ConfigDisplay visitor(out);
+  config_parser::visit_config(visitor, config);
   return out;
 }
-
-}  // namespace config_parser

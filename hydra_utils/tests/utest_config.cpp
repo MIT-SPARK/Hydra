@@ -42,23 +42,15 @@ void visit_config(Visitor& v, FakeConfig2& config) {
 
 }  // namespace hydra_utils
 
+hydra_utils::FakeConfig load_from_ros() {
+  return config_parser::load_from_ros<hydra_utils::FakeConfig>("~");
+}
+
 template <>
 struct config_parser::is_config<hydra_utils::FakeConfig> : std::true_type {};
 
 template <>
 struct config_parser::is_config<hydra_utils::FakeConfig2> : std::true_type {};
-
-hydra_utils::FakeConfig load_from_ros() {
-  return config_parser::load_from_ros<hydra_utils::FakeConfig>("~");
-}
-
-//template <typename Config, std::enable_if_t<is_config<Config>::value, bool> = true>
-std::ostream& operator<<(std::ostream& out, const hydra_utils::FakeConfig& config) {
-  config_parser::ConfigDisplay visitor(out);
-  config_parser::visit_config(visitor, config);
-  return out;
-}
-
 
 void show_config() {
   auto visitor = config_parser::ConfigDisplay(std::cout);
