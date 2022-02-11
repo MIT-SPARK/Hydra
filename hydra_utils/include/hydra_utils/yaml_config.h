@@ -5,13 +5,11 @@ namespace config_parser {
 
 class YamlParser {
  public:
-  explicit YamlParser(const std::string& file) : node_(YAML::LoadFile(file)) {}
+  explicit YamlParser(const std::string& file);
 
-  explicit YamlParser(const YAML::Node& node) : node_(node) {}
+  explicit YamlParser(const YAML::Node& node);
 
-  YamlParser operator[](const std::string& new_name) const {
-    return YamlParser(node_[new_name]);
-  }
+  YamlParser operator[](const std::string& new_name) const;
 
   template <typename T>
   void visit(T& value) const {
@@ -19,18 +17,17 @@ class YamlParser {
       return;
     }
 
-    value = node_.as<T>();
-  }
-
-  void visit(uint8_t& value) const {
-    if (!node_) {
-      return;
-    }
-
-    value = node_.as<uint16_t>();
+    visitImpl(value);
   }
 
  private:
+  template <typename T>
+  void visitImpl(T& value) const {
+    value = node_.as<T>();
+  }
+
+  void visitImpl(uint8_t& value) const;
+
   YAML::Node node_;
 };
 

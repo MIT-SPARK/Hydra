@@ -27,9 +27,6 @@ Config load_from_ros_nh(const ros::NodeHandle& nh) {
   return config;
 }
 
-template <typename T>
-struct is_config : std::false_type {};
-
 }  // namespace config_parser
 
 template <typename Config,

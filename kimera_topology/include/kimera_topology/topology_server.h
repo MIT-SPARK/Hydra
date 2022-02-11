@@ -1,6 +1,5 @@
 #pragma once
 #include "kimera_topology/configs.h"
-#include "kimera_topology/gvd_integrator.h"
 #include "kimera_topology/topology_server_visualizer.h"
 
 #include <hydra_utils/display_utils.h>
@@ -15,28 +14,6 @@
 
 namespace kimera {
 namespace topology {
-
-struct TopologyServerConfig {
-  double update_period_s = 1.0;
-  bool show_stats = true;
-  bool clear_distant_blocks = true;
-  double dense_representation_radius_m = 5.0;
-  bool publish_archived = true;
-
-  voxblox::ColorMode mesh_color_mode = voxblox::ColorMode::kLambertColor;
-  std::string world_frame = "world";
-};
-
-template <typename Visitor>
-void visit_config(Visitor& v, TopologyServerConfig& config) {
-  config_parser::visit_config(v["update_period_s"], config.update_period_s);
-  config_parser::visit_config(v["show_stats"], config.show_stats);
-  config_parser::visit_config(v["dense_representation_radius_m"],
-                              config.dense_representation_radius_m);
-  config_parser::visit_config(v["publish_archived"], config.publish_archived);
-  config_parser::visit_config(v["mesh_color_mode"], config.mesh_color_mode);
-  config_parser::visit_config(v["world_frame"], config.world_frame);
-}
 
 template <typename BaseTsdfServerType>
 class TopologyServer {
@@ -99,8 +76,8 @@ class TopologyServer {
   }
 
   void setupConfig(const std::string& config_ns) {
-    fillGvdIntegratorConfig(ros::NodeHandle(config_ns), gvd_config_);
-    fillTopologyServerConfig(ros::NodeHandle(config_ns), config_);
+    gvd_config_ = config_parser::load_from_ros<GvdIntegratorConfig>(config_ns);
+    config_ = config_parser::load_from_ros<TopologyServerConfig>(config_ns);
   }
 
   void publishMesh(const ros::Time& timestamp, const BlockIndexList& archived_blocks) {
@@ -247,7 +224,3 @@ class TopologyServer {
 
 }  // namespace topology
 }  // namespace kimera
-
-template <>
-struct config_parser::is_config<kimera::topology::TopologyServerConfig>
-    : std::true_type {};

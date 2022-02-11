@@ -49,6 +49,7 @@ catkin_package(
 
 add_library(
   ${PROJECT_NAME}
+  src/configs.cpp
   src/graph_extractor.cpp
   src/graph_extractor_types.cpp
   src/graph_extraction_utilities.cpp

@@ -1,6 +1,6 @@
 #pragma once
+#include "hydra_utils/config_traits.h"
 #include <string>
-#include <type_traits>
 #include <utility>
 
 // argument-dependent-lookup for arbitrary config structures. See the following:
@@ -25,10 +25,6 @@ struct visit_config_fn {
     return visit_config(v, val);
   }
 };
-
-// used for ODR workaround
-template <class T>
-constexpr T static_const{};
 
 }  // namespace detail
 

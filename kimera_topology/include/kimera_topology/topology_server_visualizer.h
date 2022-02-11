@@ -1,5 +1,6 @@
 #pragma once
 #include "kimera_topology/gvd_visualization_utilities.h"
+#include "kimera_topology/configs.h"
 
 #include <hydra_utils/config.h>
 #include <kimera_dsg_visualizer/visualizer_types.h>
@@ -10,6 +11,9 @@
 
 namespace kimera {
 namespace topology {
+
+using kimera_topology::GvdVisualizerConfig;
+using RqtMutexPtr = std::unique_ptr<boost::recursive_mutex>;
 
 struct TopologyVisualizerConfig {
   std::string world_frame = "world";
@@ -33,9 +37,6 @@ void visit_config(Visitor& v, TopologyVisualizerConfig& config) {
                               config.use_gvd_block_outlines);
   config_parser::visit_config(v["outline_scale"], config.outline_scale);
 }
-
-using kimera_topology::GvdVisualizerConfig;
-using RqtMutexPtr = std::unique_ptr<boost::recursive_mutex>;
 
 class TopologyServerVisualizer {
  public:
@@ -99,3 +100,5 @@ class TopologyServerVisualizer {
 template <>
 struct config_parser::is_config<kimera::topology::TopologyVisualizerConfig>
     : std::true_type {};
+
+

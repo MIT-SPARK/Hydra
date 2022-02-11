@@ -16,7 +16,10 @@ catkin_package(
   LIBRARIES ${PROJECT_NAME}
 )
 
-add_library(${PROJECT_NAME} src/display_utils.cpp)
+add_library(${PROJECT_NAME}
+    src/display_utils.cpp
+    src/ros_config.cpp
+    src/yaml_config.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PUBLIC yaml-cpp ${catkin_LIBRARIES})
 
