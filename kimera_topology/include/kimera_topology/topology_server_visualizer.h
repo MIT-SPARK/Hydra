@@ -60,18 +60,8 @@ class TopologyServerVisualizer {
   template <typename Config, typename Callback>
   void startRqtServer(const std::string& config_ns,
                       std::unique_ptr<dynamic_reconfigure::Server<Config>>& server,
-                      RqtMutexPtr& mutex,
-                      const Config default_config,
                       const Callback& callback) {
-    mutex.reset(new boost::recursive_mutex());
-    server.reset(
-        new dynamic_reconfigure::Server<Config>(*mutex, ros::NodeHandle(config_ns)));
-
-    {  // critical region for dynamic reconfigure
-      boost::recursive_mutex::scoped_lock lock(*mutex);
-      server->updateConfig(default_config);
-    }
-
+    server.reset(new dynamic_reconfigure::Server<Config>(ros::NodeHandle(config_ns)));
     server->setCallback(boost::bind(callback, this, _1, _2));
   }
 
@@ -87,13 +77,8 @@ class TopologyServerVisualizer {
   TopologyVisualizerConfig config_;
   std::set<int> previous_labels_;
 
-  RqtMutexPtr gvd_rqt_mutex_;
   std::unique_ptr<dynamic_reconfigure::Server<GvdVisualizerConfig>> gvd_config_server_;
-
-  RqtMutexPtr graph_rqt_mutex_;
   std::unique_ptr<dynamic_reconfigure::Server<LayerConfig>> graph_config_server_;
-
-  RqtMutexPtr colormap_rqt_mutex_;
   std::unique_ptr<dynamic_reconfigure::Server<ColormapConfig>> colormap_server_;
 };
 

@@ -1,11 +1,20 @@
 #include "kimera_topology/topology_server_visualizer.h"
-#include "kimera_topology/config_parser.h"
+#include "hydra_utils/config.h"
 
 namespace kimera {
 namespace topology {
 
 using visualization_msgs::Marker;
 using visualization_msgs::MarkerArray;
+
+template <typename Visitor>
+void visit_config(Visitor& v, TopologyVisualizerConfig& config) {
+  config_parser::visit_config(v["world_frame"], config.world_frame);
+  config_parser::visit_config(v["topology_marker_ns"], config.topology_marker_ns);
+  config_parser::visit_config(v["show_block_outlines"], config.show_block_outlines);
+  config_parser::visit_config(v["use_gvd_block_outlines"], config.use_gvd_block_outlines);
+  config_parser::visit_config(v["outline_scale"], config.outline_scale);
+}
 
 TopologyServerVisualizer::TopologyServerVisualizer(const std::string& ns) : nh_(ns) {
   gvd_viz_pub_ = nh_.advertise<Marker>("gvd_viz", 1, true);
@@ -14,14 +23,9 @@ TopologyServerVisualizer::TopologyServerVisualizer(const std::string& ns) : nh_(
   label_viz_pub_ = nh_.advertise<MarkerArray>("graph_label_viz", 1, true);
   block_viz_pub_ = nh_.advertise<Marker>("voxel_block_viz", 1, true);
 
+  config_ = config_parser::load_from_ros_nh<TopologyVisualizerConfig>(nh_);
   config_.graph.layer_z_step = 0;
   config_.graph.color_places_by_distance = true;
-
-  config_.graph_layer = getLayerConfig("~/graph_visualizer");
-  config_.colormap = getColormapConfig("~/visualizer_colormap");
-  config_.gvd = getGvdVisualizerConfig("~/gvd_visualizer");
-
-  fillTopologyServerVizConfig(nh_, config_);
 
   setupConfigServers();
 }
@@ -195,23 +199,15 @@ void TopologyServerVisualizer::gvdConfigCb(GvdVisualizerConfig& config, uint32_t
 }
 
 void TopologyServerVisualizer::setupConfigServers() {
-  startRqtServer("~/gvd_visualizer",
-                 gvd_config_server_,
-                 gvd_rqt_mutex_,
-                 config_.gvd,
-                 &TopologyServerVisualizer::gvdConfigCb);
+  startRqtServer(
+      "~/gvd_visualizer", gvd_config_server_, &TopologyServerVisualizer::gvdConfigCb);
 
   startRqtServer("~/graph_visualizer",
                  graph_config_server_,
-                 graph_rqt_mutex_,
-                 config_.graph_layer,
                  &TopologyServerVisualizer::graphConfigCb);
 
-  startRqtServer("~/visualizer_colormap",
-                 colormap_server_,
-                 colormap_rqt_mutex_,
-                 config_.colormap,
-                 &TopologyServerVisualizer::colormapCb);
+  startRqtServer(
+      "~/visualizer_colormap", colormap_server_, &TopologyServerVisualizer::colormapCb);
 }
 
 }  // namespace topology

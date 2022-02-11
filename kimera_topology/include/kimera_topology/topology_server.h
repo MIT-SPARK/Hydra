@@ -15,24 +15,16 @@
 namespace kimera {
 namespace topology {
 
-std::string getHumanReadableMemoryString(size_t bytes) {
-  const size_t log_bytes = static_cast<size_t>(std::floor(std::log2(bytes)));
-  const size_t unit_index = log_bytes / 10;
+struct TopologyServerConfig {
+  double update_period_s = 1.0;
+  bool show_stats = true;
+  bool clear_distant_blocks = true;
+  double dense_representation_radius_m = 5.0;
+  bool publish_archived = true;
 
-  std::stringstream ss;
-  ss << std::setprecision(3);
-  if (unit_index == 0) {
-    ss << bytes << " bytes";
-  } else if (unit_index == 1) {
-    ss << (static_cast<double>(bytes) / std::pow(2.0, 10)) << " KiB";
-  } else if (unit_index == 2) {
-    ss << (static_cast<double>(bytes) / std::pow(2.0, 20)) << " MiB";
-  } else {
-    ss << (static_cast<double>(bytes) / std::pow(2.0, 30)) << " GiB";
-  }
-
-  return ss.str();
-}
+  voxblox::ColorMode mesh_color_mode = voxblox::ColorMode::kLambertColor;
+  std::string world_frame = "world";
+};
 
 template <typename BaseTsdfServerType>
 class TopologyServer {

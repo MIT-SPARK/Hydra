@@ -11,6 +11,7 @@ find_package(
   catkin REQUIRED
   COMPONENTS roscpp
              dynamic_reconfigure
+             hydra_utils
              kimera_dsg_visualizer
              kimera_semantics_ros
              message_generation
@@ -48,7 +49,6 @@ catkin_package(
 
 add_library(
   ${PROJECT_NAME}
-  src/config_parser.cpp
   src/graph_extractor.cpp
   src/graph_extractor_types.cpp
   src/graph_extraction_utilities.cpp
@@ -90,10 +90,6 @@ target_link_libraries(
   places_eval_viz_node PUBLIC ${PROJECT_NAME} ${catkin_LIBRARIES} yaml-cpp
 )
 target_include_directories(places_eval_viz_node PUBLIC include ${catkin_INCLUDE_DIRS})
-
-add_executable(pointcloud_saver src/pointcloud_saver.cpp)
-target_link_libraries(pointcloud_saver PUBLIC ${catkin_LIBRARIES})
-target_include_directories(pointcloud_saver PUBLIC ${catkin_INCLUDE_DIRS})
 
 if(CATKIN_ENABLE_TESTING)
   catkin_add_gtest(

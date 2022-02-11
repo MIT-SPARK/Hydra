@@ -1,0 +1,13 @@
+<launch>
+
+    <arg name="odom_frame" default="t265_odom"/>
+    <arg name="sensor_frame" default="rgb_camera_link"/>
+    <arg name="required" default="true"/>
+
+    <node pkg="hydra_utils" type="odom_to_tf" name="odom_to_tf" output="screen" required="$(arg required)">
+        <param name="parent_frame" value="world"/>
+        <param name="child_frame" value="$(arg odom_frame)"/>
+        <remap from="odom" to="/camera/odom/sample"/>
+    </node>
+
+</launch>

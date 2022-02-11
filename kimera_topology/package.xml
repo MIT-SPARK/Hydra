@@ -14,6 +14,7 @@
   <exec_depend>message_runtime</exec_depend>
   <depend>roscpp</depend>
   <depend>dynamic_reconfigure</depend>
+  <depend>hydra_utils</depend>
   <depend>kimera_dsg</depend>
   <depend>kimera_dsg_visualizer</depend>
   <depend>voxblox</depend>
