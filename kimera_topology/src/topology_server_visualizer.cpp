@@ -1,20 +1,10 @@
 #include "kimera_topology/topology_server_visualizer.h"
-#include "hydra_utils/config.h"
 
 namespace kimera {
 namespace topology {
 
 using visualization_msgs::Marker;
 using visualization_msgs::MarkerArray;
-
-template <typename Visitor>
-void visit_config(Visitor& v, TopologyVisualizerConfig& config) {
-  config_parser::visit_config(v["world_frame"], config.world_frame);
-  config_parser::visit_config(v["topology_marker_ns"], config.topology_marker_ns);
-  config_parser::visit_config(v["show_block_outlines"], config.show_block_outlines);
-  config_parser::visit_config(v["use_gvd_block_outlines"], config.use_gvd_block_outlines);
-  config_parser::visit_config(v["outline_scale"], config.outline_scale);
-}
 
 TopologyServerVisualizer::TopologyServerVisualizer(const std::string& ns) : nh_(ns) {
   gvd_viz_pub_ = nh_.advertise<Marker>("gvd_viz", 1, true);

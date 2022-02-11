@@ -38,8 +38,8 @@ class RosParser {
     return RosParser(new_nh, new_name);
   }
 
-  template <typename T>
-  void visit(T& value) const;
+  template <typename T = void, typename SFINAE = void>
+  void visit(T& value);
 
   template <typename T, std::enable_if_t<is_base_ros_param<T>::value, bool> = true>
   void visit(T& value) {

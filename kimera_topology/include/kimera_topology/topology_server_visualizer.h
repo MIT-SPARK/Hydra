@@ -1,6 +1,7 @@
 #pragma once
 #include "kimera_topology/gvd_visualization_utilities.h"
 
+#include <hydra_utils/config.h>
 #include <kimera_dsg_visualizer/visualizer_types.h>
 #include <kimera_dsg_visualizer/visualizer_utils.h>
 
@@ -9,9 +10,6 @@
 
 namespace kimera {
 namespace topology {
-
-using kimera_topology::GvdVisualizerConfig;
-using RqtMutexPtr = std::unique_ptr<boost::recursive_mutex>;
 
 struct TopologyVisualizerConfig {
   std::string world_frame = "world";
@@ -25,6 +23,19 @@ struct TopologyVisualizerConfig {
   VisualizerConfig graph;
   LayerConfig graph_layer;
 };
+
+template <typename Visitor>
+void visit_config(Visitor& v, TopologyVisualizerConfig& config) {
+  config_parser::visit_config(v["world_frame"], config.world_frame);
+  config_parser::visit_config(v["topology_marker_ns"], config.topology_marker_ns);
+  config_parser::visit_config(v["show_block_outlines"], config.show_block_outlines);
+  config_parser::visit_config(v["use_gvd_block_outlines"],
+                              config.use_gvd_block_outlines);
+  config_parser::visit_config(v["outline_scale"], config.outline_scale);
+}
+
+using kimera_topology::GvdVisualizerConfig;
+using RqtMutexPtr = std::unique_ptr<boost::recursive_mutex>;
 
 class TopologyServerVisualizer {
  public:
@@ -84,3 +95,7 @@ class TopologyServerVisualizer {
 
 }  // namespace topology
 }  // namespace kimera
+
+template <>
+struct config_parser::is_config<kimera::topology::TopologyVisualizerConfig>
+    : std::true_type {};
