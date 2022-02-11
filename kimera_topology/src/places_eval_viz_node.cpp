@@ -1,12 +1,10 @@
+#include "kimera_topology/topology_server_visualizer.h"
+
 #include <kimera_dsg/dynamic_scene_graph.h>
 #include <kimera_dsg_visualizer/colormap_utils.h>
 #include <kimera_topology/GvdVisualizerConfig.h>
 #include <nav_msgs/LoadMap.h>
 #include <voxblox/io/layer_io.h>
-#include <yaml-cpp/yaml.h>
-#include "kimera_topology/config_parser.h"
-#include "kimera_topology/gvd_integrator.h"
-#include "kimera_topology/topology_server_visualizer.h"
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
@@ -34,133 +32,54 @@ using visualization_msgs::MarkerArray;
 using voxblox::Layer;
 using voxblox::TsdfVoxel;
 
-#define READ_PARAM_AUTO(config, node, name)                                        \
-  if (node[#name]) {                                                               \
-    config.name = node[#name].as<decltype(config.name)>();                         \
-  } else {                                                                         \
-    LOG(INFO) << "Missing param: " << #name << ". Defaulting to: " << config.name; \
-  }                                                                                \
-  static_assert(true, "")
+namespace kimera_dsg_visualizer {
 
-#define READ_PARAM(config, node, name, type)                                       \
-  if (node[#name]) {                                                               \
-    config.name = node[#name].as<type>();                                          \
-  } else {                                                                         \
-    LOG(INFO) << "Missing param: " << #name << ". Defaulting to: " << config.name; \
-  }                                                                                \
-  static_assert(true, "")
-
-VoronoiCheckConfig readVoronoiConfig(const YAML::Node& config_root) {
-  VoronoiCheckConfig config;
-  READ_PARAM_AUTO(config, config_root, min_distance_m);
-  READ_PARAM_AUTO(config, config_root, parent_l1_separation);
-  READ_PARAM_AUTO(config, config_root, parent_cos_angle_separation);
-  return config;
+template <typename Visitor>
+void visit_config(Visitor& v, ColormapConfig& config) {
+  config_parser::visit_config(v["min_hue"], config.min_hue);
+  config_parser::visit_config(v["max_hue"], config.max_hue);
+  config_parser::visit_config(v["min_saturation"], config.min_saturation);
+  config_parser::visit_config(v["max_saturation"], config.max_saturation);
+  config_parser::visit_config(v["min_luminance"], config.min_luminance);
+  config_parser::visit_config(v["max_luminance"], config.max_luminance);
 }
 
-GraphExtractorConfig readGraphConfig(const YAML::Node& config_root) {
-  GraphExtractorConfig config;
-  READ_PARAM(config, config_root, min_extra_basis, uint32_t);
-  READ_PARAM(config, config_root, min_vertex_basis, uint32_t);
-  READ_PARAM_AUTO(config, config_root, merge_new_nodes);
-  READ_PARAM_AUTO(config, config_root, node_merge_distance_m);
-  READ_PARAM_AUTO(config, config_root, edge_splitting_merge_nodes);
-  READ_PARAM_AUTO(config, config_root, max_edge_split_iterations);
-  READ_PARAM_AUTO(config, config_root, max_edge_deviation);
-  READ_PARAM_AUTO(config, config_root, add_freespace_edges);
-  READ_PARAM_AUTO(config, config_root, freespace_active_neighborhood_hops);
-  READ_PARAM_AUTO(config, config_root, freespace_edge_num_neighbors);
-  READ_PARAM_AUTO(config, config_root, freespace_edge_min_clearance_m);
-  READ_PARAM_AUTO(config, config_root, add_component_connection_edges);
-  READ_PARAM_AUTO(config, config_root, connected_component_window);
-  READ_PARAM_AUTO(config, config_root, connected_component_hops);
-  READ_PARAM_AUTO(config, config_root, component_nodes_to_check);
-  READ_PARAM_AUTO(config, config_root, component_nearest_neighbors);
-  READ_PARAM_AUTO(config, config_root, component_max_edge_length_m);
-  READ_PARAM_AUTO(config, config_root, component_min_clearance_m);
-  READ_PARAM_AUTO(config, config_root, remove_isolated_nodes);
-  return config;
+template <typename Visitor>
+void visit_config(Visitor& v, VisualizerConfig& config) {
+  config_parser::visit_config(v["layer_z_step"], config.layer_z_step);
+  config_parser::visit_config(v["mesh_edge_break_ratio"], config.mesh_edge_break_ratio);
+  config_parser::visit_config(v["mesh_layer_offset"], config.mesh_layer_offset);
+  config_parser::visit_config(v["collapse_layers"], config.collapse_layers);
+  config_parser::visit_config(v["color_places_by_distance"],
+                              config.color_places_by_distance);
 }
 
-GvdIntegratorConfig readGvdConfig(const std::string& filename) {
-  YAML::Node config_root = YAML::LoadFile(filename);
-
-  GvdIntegratorConfig config;
-  config.max_distance_m = FLAGS_max_distance_m;
-  READ_PARAM_AUTO(config, config_root, min_distance_m);
-  READ_PARAM_AUTO(config, config_root, min_diff_m);
-  READ_PARAM_AUTO(config, config_root, min_weight);
-  READ_PARAM_AUTO(config, config_root, num_buckets);
-  READ_PARAM_AUTO(config, config_root, multi_queue);
-  READ_PARAM_AUTO(config, config_root, positive_distance_only);
-  READ_PARAM_AUTO(config, config_root, parent_derived_distance);
-  READ_PARAM(config, config_root, min_basis_for_extraction, uint32_t);
-
-  if (config_root["voronoi_check"]) {
-    config.voronoi_config = readVoronoiConfig(config_root["voronoi_check"]);
-  }
-
-  config.extract_graph = true;
-  if (config_root["graph_extractor"]) {
-    config.graph_extractor_config = readGraphConfig(config_root["graph_extractor"]);
-  }
-  config.mesh_only = false;
-
-  return config;
+template <typename Visitor>
+void visit_config(Visitor& v, LayerConfig& config) {
+  config_parser::visit_config(v["z_offset_scale"], config.z_offset_scale);
+  config_parser::visit_config(v["visualize"], config.visualize);
+  config_parser::visit_config(v["marker_scale"], config.marker_scale);
+  config_parser::visit_config(v["marker_alpha"], config.marker_alpha);
+  config_parser::visit_config(v["use_sphere_marker"], config.use_sphere_marker);
+  config_parser::visit_config(v["use_label"], config.use_label);
+  config_parser::visit_config(v["label_height"], config.label_height);
+  config_parser::visit_config(v["label_scale"], config.label_scale);
+  config_parser::visit_config(v["use_bounding_box"], config.use_bounding_box);
+  config_parser::visit_config(v["bounding_box_alpha"], config.bounding_box_alpha);
+  config_parser::visit_config(v["use_edge_source"], config.use_edge_source);
+  config_parser::visit_config(v["interlayer_edge_scale"], config.interlayer_edge_scale);
+  config_parser::visit_config(v["interlayer_edge_alpha"], config.interlayer_edge_alpha);
+  config_parser::visit_config(v["interlayer_edge_use_color"],
+                              config.interlayer_edge_use_color);
+  config_parser::visit_config(v["interlayer_edge_insertion_skip"],
+                              config.interlayer_edge_insertion_skip);
+  config_parser::visit_config(v["intralayer_edge_scale"], config.intralayer_edge_scale);
+  config_parser::visit_config(v["intralayer_edge_alpha"], config.intralayer_edge_alpha);
+  config_parser::visit_config(v["intralayer_edge_insertion_skip"],
+                              config.intralayer_edge_insertion_skip);
 }
 
-ColormapConfig readColormapConfig(const std::string& filename) {
-  YAML::Node config_root = YAML::LoadFile(filename);
-
-  ColormapConfig config;
-  READ_PARAM_AUTO(config, config_root, min_hue);
-  READ_PARAM_AUTO(config, config_root, max_hue);
-  READ_PARAM_AUTO(config, config_root, min_saturation);
-  READ_PARAM_AUTO(config, config_root, max_saturation);
-  READ_PARAM_AUTO(config, config_root, min_luminance);
-  READ_PARAM_AUTO(config, config_root, max_luminance);
-  return config;
-}
-
-VisualizerConfig readVisualizerConfig(const std::string& filename) {
-  YAML::Node config_root = YAML::LoadFile(filename);
-
-  VisualizerConfig config;
-  READ_PARAM_AUTO(config, config_root, layer_z_step);
-  READ_PARAM_AUTO(config, config_root, mesh_edge_break_ratio);
-  READ_PARAM_AUTO(config, config_root, mesh_layer_offset);
-  READ_PARAM_AUTO(config, config_root, collapse_layers);
-  READ_PARAM_AUTO(config, config_root, color_places_by_distance);
-  config.places_colormap_min_distance = FLAGS_min_cmap_distance;
-  config.places_colormap_max_distance = FLAGS_max_cmap_distance;
-  return config;
-}
-
-LayerConfig readLayerConfig(const std::string& filename) {
-  YAML::Node config_root = YAML::LoadFile(filename);
-
-  LayerConfig config;
-  READ_PARAM_AUTO(config, config_root, z_offset_scale);
-  READ_PARAM_AUTO(config, config_root, visualize);
-  READ_PARAM_AUTO(config, config_root, marker_scale);
-  READ_PARAM_AUTO(config, config_root, marker_alpha);
-  READ_PARAM_AUTO(config, config_root, use_sphere_marker);
-  READ_PARAM_AUTO(config, config_root, use_label);
-  READ_PARAM_AUTO(config, config_root, use_label);
-  READ_PARAM_AUTO(config, config_root, label_height);
-  READ_PARAM_AUTO(config, config_root, label_scale);
-  READ_PARAM_AUTO(config, config_root, use_bounding_box);
-  READ_PARAM_AUTO(config, config_root, bounding_box_alpha);
-  READ_PARAM_AUTO(config, config_root, use_edge_source);
-  READ_PARAM_AUTO(config, config_root, interlayer_edge_scale);
-  READ_PARAM_AUTO(config, config_root, interlayer_edge_alpha);
-  READ_PARAM_AUTO(config, config_root, interlayer_edge_use_color);
-  READ_PARAM_AUTO(config, config_root, interlayer_edge_insertion_skip);
-  READ_PARAM_AUTO(config, config_root, intralayer_edge_scale);
-  READ_PARAM_AUTO(config, config_root, intralayer_edge_alpha);
-  READ_PARAM_AUTO(config, config_root, intralayer_edge_insertion_skip);
-  return config;
-}
+}  // namespace kimera_dsg_visualizer
 
 struct ToggleFunctor {
   bool show_error = true;
@@ -210,17 +129,17 @@ void visualize_places(ros::Publisher& pub,
 
   std::string dsg_path = ros::package::getPath("kimera_dsg_builder");
 
-  ColormapConfig colormap =
-      readColormapConfig(ros::package::getPath("kimera_dsg_builder") +
-                         "/config/incremental_visualizer/colormap.yaml");
-  ColormapConfig error_colormap =
-      readColormapConfig(ros::package::getPath("kimera_dsg_builder") +
-                         "/config/incremental_visualizer/error_colormap.yaml");
-  VisualizerConfig graph_cfg = readVisualizerConfig(
-      ros::package::getPath("kimera_dsg_visualizer") + "/config/visualizer.yaml");
-  LayerConfig layer_cfg =
-      readLayerConfig(ros::package::getPath("kimera_dsg_builder") +
-                      "/config/incremental_visualizer/places_layer.yaml");
+  auto colormap = config_parser::load_from_yaml<ColormapConfig>(
+      dsg_path + "/config/incremental_visualizer/colormap.yaml");
+  auto error_colormap = config_parser::load_from_yaml<ColormapConfig>(
+      dsg_path + "/config/incremental_visualizer/error_colormap.yaml");
+  auto graph_cfg = config_parser::load_from_yaml<VisualizerConfig>(
+      dsg_path + "/config/visualizer.yaml");
+  graph_cfg.places_colormap_min_distance = FLAGS_min_cmap_distance;
+  graph_cfg.places_colormap_max_distance = FLAGS_max_cmap_distance;
+
+  auto layer_cfg = config_parser::load_from_yaml<LayerConfig>(
+      dsg_path + "/config/incremental_visualizer/places_layer.yaml");
   layer_cfg.z_offset_scale = offset;
 
   std_msgs::Header header;
@@ -262,6 +181,12 @@ void visualize_places(ros::Publisher& pub,
   pub.publish(markers);
 }
 
+std::ostream& operator<<(std::ostream& out, const GvdIntegratorConfig& config) {
+  config_parser::ConfigDisplay visitor(out);
+  config_parser::visit_config(visitor, config);
+  return out;
+}
+
 int main(int argc, char* argv[]) {
   ros::init(argc, argv, "places_eval_viz_node");
   ros::NodeHandle nh("");
@@ -296,8 +221,13 @@ int main(int argc, char* argv[]) {
   kimera::DynamicSceneGraph graph;
   graph.load(FLAGS_dsg_file);
 
-  GvdIntegratorConfig gvd_config = readGvdConfig(FLAGS_gvd_config);
-  showConfig(gvd_config);
+  auto gvd_config =
+      config_parser::load_from_yaml<GvdIntegratorConfig>(FLAGS_gvd_config);
+  gvd_config.max_distance_m = FLAGS_max_distance_m;
+  gvd_config.extract_graph = true;
+  gvd_config.mesh_only = false;
+
+  LOG(INFO) << "Gvd Config: " << std::endl << gvd_config;
 
   Layer<GvdVoxel>::Ptr gvd_layer(
       new Layer<GvdVoxel>(FLAGS_voxel_size, FLAGS_voxels_per_side));
@@ -324,9 +254,9 @@ int main(int argc, char* argv[]) {
   ros::Publisher vxblx_mesh_pub =
       nh.advertise<voxblox_msgs::Mesh>("vxblx_mesh", 1, true);
 
-  ColormapConfig colormap =
-      readColormapConfig(ros::package::getPath("kimera_dsg_builder") +
-                         "/config/incremental_visualizer/colormap.yaml");
+  auto colormap = config_parser::load_from_yaml<ColormapConfig>(
+      ros::package::getPath("kimera_dsg_builder") +
+      "/config/incremental_visualizer/colormap.yaml");
 
   GvdVisualizerConfig gvd_viz_config;
   gvd_viz_config.gvd_min_distance = FLAGS_min_cmap_distance;

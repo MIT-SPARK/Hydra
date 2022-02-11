@@ -65,6 +65,17 @@ struct convert<kimera::topology::ParentUniquenessMode> {
 
 }  // namespace YAML
 
+namespace voxblox {
+
+template <typename Visitor>
+void visit_config(Visitor& v, MeshIntegratorConfig& config) {
+  config_parser::visit_config(v["use_color"], config.use_color);
+  config_parser::visit_config(v["min_weight"], config.min_weight);
+  config_parser::visit_config(v["integrator_threads"], config.integrator_threads);
+}
+
+}  // namespace voxblox
+
 namespace kimera {
 namespace topology {
 
@@ -86,6 +97,39 @@ void visit_config(Visitor& v, VoronoiCheckConfig& config) {
   config_parser::visit_config(v["parent_l1_separation"], config.parent_l1_separation);
   config_parser::visit_config(v["parent_cos_angle_separation"],
                               config.parent_cos_angle_separation);
+}
+
+template <typename Visitor>
+void visit_config(Visitor& v, GraphExtractorConfig& config) {
+  config_parser::visit_config(v["min_extra_basis"], config.min_extra_basis);
+  config_parser::visit_config(v["min_vertex_basis"], config.min_vertex_basis);
+  config_parser::visit_config(v["merge_new_nodes"], config.merge_new_nodes);
+  config_parser::visit_config(v["node_merge_distance_m"], config.node_merge_distance_m);
+  config_parser::visit_config(v["edge_splitting_merge_nodes"],
+                              config.edge_splitting_merge_nodes);
+  config_parser::visit_config(v["max_edge_split_iterations"],
+                              config.max_edge_split_iterations);
+  config_parser::visit_config(v["max_edge_deviation"], config.max_edge_deviation);
+  config_parser::visit_config(v["add_freespace_edges"], config.add_freespace_edges);
+  config_parser::visit_config(v["freespace_active_neighborhood_hops"],
+                              config.freespace_active_neighborhood_hops);
+  config_parser::visit_config(v["freespace_edge_num_neighbors"],
+                              config.freespace_edge_num_neighbors);
+  config_parser::visit_config(v["freespace_edge_min_clearance_m"],
+                              config.freespace_edge_min_clearance_m);
+  config_parser::visit_config(v["add_component_connection_edges"],
+                              config.add_component_connection_edges);
+  config_parser::visit_config(v["connected_component_window"],
+                              config.connected_component_window);
+  config_parser::visit_config(v["connected_component_hops"],
+                              config.connected_component_hops);
+  config_parser::visit_config(v["component_nearest_neighbors"],
+                              config.component_nearest_neighbors);
+  config_parser::visit_config(v["component_max_edge_length_m"],
+                              config.component_max_edge_length_m);
+  config_parser::visit_config(v["component_min_clearance_m"],
+                              config.component_min_clearance_m);
+  config_parser::visit_config(v["remove_isolated_nodes"], config.remove_isolated_nodes);
 }
 
 template <typename Visitor>
@@ -126,12 +170,19 @@ void visit_config(Visitor& v, TopologyServerConfig& config) {
 }  // namespace kimera
 
 template <>
+struct config_parser::is_config<voxblox::MeshIntegratorConfig> : std::true_type {};
+
+template <>
 struct config_parser::is_config<kimera::topology::TopologyServerConfig>
     : std::true_type {};
 
 template <>
 struct config_parser::is_config<kimera::topology::VoronoiCheckConfig> : std::true_type {
 };
+
+template <>
+struct config_parser::is_config<kimera::topology::GraphExtractorConfig>
+    : std::true_type {};
 
 template <>
 struct config_parser::is_config<kimera::topology::GvdIntegratorConfig>

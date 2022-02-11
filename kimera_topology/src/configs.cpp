@@ -78,10 +78,10 @@ std::ostream& operator<<(std::ostream& out, ParentUniquenessMode mode) {
     case ParentUniquenessMode::ANGLE:
       out << "ANGLE";
       break;
-    case ColorMode::L1_DISTANCE:
+    case ParentUniquenessMode::L1_DISTANCE:
       out << "L1_DISTANCE";
       break;
-    case ColorMode::L1_THEN_ANGLE:
+    case ParentUniquenessMode::L1_THEN_ANGLE:
       out << "L1_THEN_ANGLE";
       break;
     default:

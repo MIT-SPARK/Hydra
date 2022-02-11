@@ -1,10 +1,8 @@
+#include "kimera_topology/configs.h"
+
 #include <kimera_dsg/dynamic_scene_graph.h>
 #include <voxblox/io/layer_io.h>
-#include <yaml-cpp/yaml.h>
 #include <nanoflann.hpp>
-
-#include "kimera_topology/config_parser.h"
-#include "kimera_topology/gvd_integrator.h"
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
@@ -24,79 +22,6 @@ using voxblox::TsdfVoxel;
 
 namespace kimera {
 namespace topology {
-
-#define READ_PARAM_AUTO(config, node, name)                                        \
-  if (node[#name]) {                                                               \
-    config.name = node[#name].as<decltype(config.name)>();                         \
-  } else {                                                                         \
-    LOG(INFO) << "Missing param: " << #name << ". Defaulting to: " << config.name; \
-  }                                                                                \
-  static_assert(true, "")
-
-#define READ_PARAM(config, node, name, type)                                       \
-  if (node[#name]) {                                                               \
-    config.name = node[#name].as<type>();                                          \
-  } else {                                                                         \
-    LOG(INFO) << "Missing param: " << #name << ". Defaulting to: " << config.name; \
-  }                                                                                \
-  static_assert(true, "")
-
-VoronoiCheckConfig readVoronoiConfig(const YAML::Node& config_root) {
-  VoronoiCheckConfig config;
-  READ_PARAM_AUTO(config, config_root, min_distance_m);
-  READ_PARAM_AUTO(config, config_root, parent_l1_separation);
-  READ_PARAM_AUTO(config, config_root, parent_cos_angle_separation);
-  return config;
-}
-
-GraphExtractorConfig readGraphConfig(const YAML::Node& config_root) {
-  GraphExtractorConfig config;
-  READ_PARAM(config, config_root, min_extra_basis, uint32_t);
-  READ_PARAM(config, config_root, min_vertex_basis, uint32_t);
-  READ_PARAM_AUTO(config, config_root, merge_new_nodes);
-  READ_PARAM_AUTO(config, config_root, node_merge_distance_m);
-  READ_PARAM_AUTO(config, config_root, edge_splitting_merge_nodes);
-  READ_PARAM_AUTO(config, config_root, max_edge_split_iterations);
-  READ_PARAM_AUTO(config, config_root, max_edge_deviation);
-  READ_PARAM_AUTO(config, config_root, add_freespace_edges);
-  READ_PARAM_AUTO(config, config_root, freespace_active_neighborhood_hops);
-  READ_PARAM_AUTO(config, config_root, freespace_edge_num_neighbors);
-  READ_PARAM_AUTO(config, config_root, freespace_edge_min_clearance_m);
-  READ_PARAM_AUTO(config, config_root, add_component_connection_edges);
-  READ_PARAM_AUTO(config, config_root, connected_component_window);
-  READ_PARAM_AUTO(config, config_root, connected_component_hops);
-  READ_PARAM_AUTO(config, config_root, component_nodes_to_check);
-  READ_PARAM_AUTO(config, config_root, component_nearest_neighbors);
-  READ_PARAM_AUTO(config, config_root, component_max_edge_length_m);
-  READ_PARAM_AUTO(config, config_root, component_min_clearance_m);
-  READ_PARAM_AUTO(config, config_root, remove_isolated_nodes);
-  return config;
-}
-
-GvdIntegratorConfig readGvdConfig(const std::string& filename) {
-  YAML::Node config_root = YAML::LoadFile(filename);
-
-  GvdIntegratorConfig config;
-  config.max_distance_m = FLAGS_max_distance_m;
-  READ_PARAM_AUTO(config, config_root, min_distance_m);
-  READ_PARAM_AUTO(config, config_root, min_diff_m);
-  READ_PARAM_AUTO(config, config_root, min_weight);
-  READ_PARAM_AUTO(config, config_root, num_buckets);
-  READ_PARAM_AUTO(config, config_root, multi_queue);
-  READ_PARAM_AUTO(config, config_root, positive_distance_only);
-  READ_PARAM_AUTO(config, config_root, parent_derived_distance);
-  READ_PARAM(config, config_root, min_basis_for_extraction, uint32_t);
-
-  if (config_root["voronoi_check"]) {
-    config.voronoi_config = readVoronoiConfig(config_root["voronoi_check"]);
-  }
-
-  config.extract_graph = true;
-  config.graph_extractor_config = readGraphConfig(config_root["graph_extractor"]);
-  config.mesh_only = false;
-
-  return config;
-}
 
 void fillGvdPositions(const GvdIntegratorConfig& gvd_config,
                       const Layer<GvdVoxel>& layer,
@@ -213,11 +138,21 @@ void eval_layer(const GvdIntegratorConfig& gvd_config,
       {"max", valid ? *max : std::numeric_limits<double>::quiet_NaN()},
   };
   std::cout << json_results << std::endl;
-}  // namespace topology
+}
+
+std::ostream& operator<<(std::ostream& out, const GvdIntegratorConfig& config) {
+  config_parser::ConfigDisplay visitor(out);
+  config_parser::visit_config(visitor, config);
+  return out;
+}
 
 void eval_places(const DynamicSceneGraph& graph, const Layer<TsdfVoxel>::Ptr& tsdf) {
-  GvdIntegratorConfig gvd_config = readGvdConfig(FLAGS_gvd_config);
-  showConfig(gvd_config);
+  auto gvd_config = config_parser::load_from_yaml<GvdIntegratorConfig>(FLAGS_gvd_config);
+  gvd_config.max_distance_m = FLAGS_max_distance_m;
+  gvd_config.extract_graph = true;
+  gvd_config.mesh_only = false;
+
+  LOG(INFO) << "Gvd Config: " << std::endl << gvd_config;
 
   Layer<GvdVoxel>::Ptr gvd_layer(
       new Layer<GvdVoxel>(FLAGS_voxel_size, FLAGS_voxels_per_side));

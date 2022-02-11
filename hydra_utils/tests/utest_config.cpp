@@ -147,7 +147,7 @@ void show_config() {
   hydra_utils::FakeConfig config;
   config_parser::visit_config(visitor, config);
 
-  std::cout << config << std::endl;
+  //std::cout << config << std::endl;
 }
 
 TEST(ConfigParsing, ParseSingleStructYaml) {
