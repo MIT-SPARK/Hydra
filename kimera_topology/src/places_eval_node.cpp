@@ -140,19 +140,14 @@ void eval_layer(const GvdIntegratorConfig& gvd_config,
   std::cout << json_results << std::endl;
 }
 
-std::ostream& operator<<(std::ostream& out, const GvdIntegratorConfig& config) {
-  config_parser::ConfigDisplay visitor(out);
-  config_parser::visit_config(visitor, config);
-  return out;
-}
-
 void eval_places(const DynamicSceneGraph& graph, const Layer<TsdfVoxel>::Ptr& tsdf) {
-  auto gvd_config = config_parser::load_from_yaml<GvdIntegratorConfig>(FLAGS_gvd_config);
+  auto gvd_config =
+      config_parser::load_from_yaml<GvdIntegratorConfig>(FLAGS_gvd_config);
   gvd_config.max_distance_m = FLAGS_max_distance_m;
   gvd_config.extract_graph = true;
   gvd_config.mesh_only = false;
 
-  LOG(INFO) << "Gvd Config: " << std::endl << gvd_config;
+   LOG(INFO) << "Gvd Config: " << std::endl << gvd_config;
 
   Layer<GvdVoxel>::Ptr gvd_layer(
       new Layer<GvdVoxel>(FLAGS_voxel_size, FLAGS_voxels_per_side));

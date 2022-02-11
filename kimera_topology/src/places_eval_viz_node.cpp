@@ -181,12 +181,6 @@ void visualize_places(ros::Publisher& pub,
   pub.publish(markers);
 }
 
-std::ostream& operator<<(std::ostream& out, const GvdIntegratorConfig& config) {
-  config_parser::ConfigDisplay visitor(out);
-  config_parser::visit_config(visitor, config);
-  return out;
-}
-
 int main(int argc, char* argv[]) {
   ros::init(argc, argv, "places_eval_viz_node");
   ros::NodeHandle nh("");

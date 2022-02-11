@@ -29,10 +29,10 @@ Config load_from_ros_nh(const ros::NodeHandle& nh) {
 
 }  // namespace config_parser
 
-/*template <typename Config,*/
-          /*std::enable_if_t<config_parser::is_config<Config>::value, bool> = true>*/
-/*std::ostream& operator<<(std::ostream& out, const Config& config) {*/
-  /*config_parser::ConfigDisplay visitor(out);*/
-  /*config_parser::visit_config(visitor, config);*/
-  /*return out;*/
-/*}*/
+// must be used within the namespace of the config
+#define DECLARE_CONFIG_OSTREAM_OPERATOR(name)                        \
+  inline std::ostream& operator<<(std::ostream& out, name& config) { \
+    config_parser::ConfigDisplay visitor(out);                       \
+    config_parser::visit_config(visitor, config);                    \
+    return out;                                                      \
+  }

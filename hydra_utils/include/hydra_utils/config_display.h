@@ -1,7 +1,24 @@
 #pragma once
 #include <ostream>
+#include <vector>
 
 namespace config_parser {
+
+// make sure vector operator is present in the right namespace
+template <typename T>
+std::ostream& operator<<(std::ostream& out, const std::vector<T>& values) {
+  out << "[";
+  auto iter = values.begin();
+  while (iter != values.end()) {
+    out << *iter;
+    ++iter;
+    if (iter != values.end()) {
+      out << ", ";
+    }
+  }
+  out << "]";
+  return out;
+}
 
 class ConfigDisplay {
  public:

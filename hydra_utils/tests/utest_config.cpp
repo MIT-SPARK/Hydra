@@ -35,6 +35,8 @@ void visit_config(Visitor& v, FakeConfig& config) {
   config_parser::visit_config(v["type"], config.type);
 }
 
+DECLARE_CONFIG_OSTREAM_OPERATOR(FakeConfig)
+
 struct FakeConfig2 {
   FakeConfig fake_config;
   std::string msg = "world";
@@ -125,21 +127,6 @@ struct config_parser::is_config<hydra_utils::FakeConfig> : std::true_type {};
 template <>
 struct config_parser::is_config<hydra_utils::FakeConfig2> : std::true_type {};
 
-template <typename T>
-std::ostream& operator<<(std::ostream& out, const std::vector<T>& values) {
-  out << "[";
-  auto iter = values.begin();
-  while (iter != values.end()) {
-    out << *iter;
-    ++iter;
-    if (iter != values.end()) {
-      out << ", ";
-    }
-  }
-  out << "]";
-  return out;
-}
-
 // make sure our ostream operator works (even if we're not directly testing)
 void show_config() {
   auto visitor = config_parser::ConfigDisplay(std::cout);
@@ -147,7 +134,7 @@ void show_config() {
   hydra_utils::FakeConfig config;
   config_parser::visit_config(visitor, config);
 
-  //std::cout << config << std::endl;
+  std::cout << config << std::endl;
 }
 
 TEST(ConfigParsing, ParseSingleStructYaml) {

@@ -74,6 +74,8 @@ void visit_config(Visitor& v, MeshIntegratorConfig& config) {
   config_parser::visit_config(v["integrator_threads"], config.integrator_threads);
 }
 
+DECLARE_CONFIG_OSTREAM_OPERATOR(MeshIntegratorConfig)
+
 }  // namespace voxblox
 
 namespace kimera {
@@ -165,6 +167,11 @@ void visit_config(Visitor& v, TopologyServerConfig& config) {
   config_parser::visit_config(v["mesh_color_mode"], config.mesh_color_mode);
   config_parser::visit_config(v["world_frame"], config.world_frame);
 }
+
+DECLARE_CONFIG_OSTREAM_OPERATOR(TopologyServerConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(VoronoiCheckConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(GraphExtractorConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(GvdIntegratorConfig)
 
 }  // namespace topology
 }  // namespace kimera
