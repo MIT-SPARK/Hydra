@@ -1,4 +1,5 @@
 #pragma once
+#include "kimera_dsg_builder/configs.h"
 #include "kimera_dsg_builder/dsg_lcd_module.h"
 #include "kimera_dsg_builder/incremental_mesh_segmenter.h"
 #include "kimera_dsg_builder/incremental_types.h"
@@ -89,6 +90,8 @@ class DsgFrontend {
   ros::NodeHandle nh_;
   std::atomic<bool> should_shutdown_{false};
 
+  DsgFrontendConfig config_;
+
   SharedDsgInfo::Ptr dsg_;
   kimera_pgmo::MeshFrontend mesh_frontend_;
   std::unique_ptr<MeshSegmenter> segmenter_;
@@ -96,7 +99,6 @@ class DsgFrontend {
   std::mutex mesh_frontend_mutex_;
   std::atomic<uint64_t> last_mesh_timestamp_;
   std::queue<kimera_topology::ActiveMesh::ConstPtr> mesh_queue_;
-  size_t mesh_queue_size_;
 
   std::mutex places_queue_mutex_;
   std::atomic<uint64_t> last_places_timestamp_;
@@ -105,9 +107,6 @@ class DsgFrontend {
   ros::Subscriber mesh_sub_;
   std::unique_ptr<ros::CallbackQueue> mesh_frontend_ros_queue_;
   std::unique_ptr<std::thread> mesh_frontend_thread_;
-  size_t min_object_size_;
-  bool prune_mesh_indices_;
-  std::string sensor_frame_;
   tf2_ros::Buffer tf_buffer_;
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
 
@@ -121,10 +120,6 @@ class DsgFrontend {
   std::map<char, std::set<NodeId>> deleted_agent_edge_indices_;
   std::map<char, size_t> last_agent_edge_index_;
 
-  SemanticNodeAttributes::ColorVector building_color_;
-
-  double lcd_agent_horizon_s_;
-  double descriptor_creation_horizon_m_;
   std::atomic<bool> lcd_shutting_down_{false};
   std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> lcd_queue_;
   std::unique_ptr<std::thread> lcd_thread_;
@@ -134,17 +129,15 @@ class DsgFrontend {
   std::unique_ptr<lcd::ObjectRegistrationFunctor> object_lcd_registration_;
   std::unique_ptr<lcd::PlaceRegistrationFunctor> places_lcd_registration_;
   DynamicSceneGraph::Ptr lcd_graph_;
+  // TODO(nathan) replace with struct passed in through constructor
   char robot_prefix_;
 
   ros::Subscriber bow_sub_;
   ros::Subscriber pose_graph_sub_;
   std::list<kimera_vio_ros::BowQuery::ConstPtr> bow_messages_;
+  std::list<NodeId> potential_lcd_root_nodes_;
   std::map<NodeId, size_t> agent_key_map_;
 
-  std::list<NodeId> potential_lcd_root_nodes_;
-
-  bool log_;
-  std::string log_path_;
   SceneGraphLogger frontend_graph_logger_;
 
   std::unique_ptr<lcd::LcdVisualizer> lcd_visualizer_;

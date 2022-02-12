@@ -1,5 +1,4 @@
 #include "kimera_dsg_builder/incremental_dsg_frontend.h"
-#include "kimera_dsg_builder/common.h"
 #include "kimera_dsg_builder/serialization_helpers.h"
 #include "kimera_dsg_builder/timing_utilities.h"
 
@@ -18,22 +17,18 @@ using pose_graph_tools::PoseGraph;
 
 DsgFrontend::DsgFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg)
     : nh_(nh), dsg_(dsg), lcd_graph_(new DynamicSceneGraph()) {
+  config_ = config_parser::load_from_ros_nh<DsgFrontendConfig>(nh_);
+
   ros::NodeHandle pgmo_nh(nh_, "pgmo");
   CHECK(mesh_frontend_.initialize(pgmo_nh, false));
   last_mesh_timestamp_ = 0;
   last_places_timestamp_ = 0;
 
-  nh_.getParam("dsg_log_output", log_);
-  int mesh_queue_size;
-  nh_.getParam("mesh_queue_size", mesh_queue_size);
-  mesh_queue_size_ = static_cast<size_t>(mesh_queue_size);
-  if (log_ && nh_.getParam("dsg_output_path", log_path_)) {
-    frontend_graph_logger_.setOutputPath(log_path_ + "/frontend");
-    ROS_INFO("Logging frontend graph to %s", (log_path_ + "/frontend").c_str());
+  if (config_.should_log) {
+    frontend_graph_logger_.setOutputPath(config_.log_path + "/frontend");
+    ROS_INFO("Logging frontend graph to %s", (config_.log_path + "/frontend").c_str());
     frontend_graph_logger_.setLayerName(KimeraDsgLayers::OBJECTS, "objects");
     frontend_graph_logger_.setLayerName(KimeraDsgLayers::PLACES, "places");
-  } else {
-    ROS_WARN("DSG Frontend logging is disabled. ");
   }
 }
 
@@ -79,7 +74,7 @@ void DsgFrontend::handleActivePlaces(const PlacesLayerMsg::ConstPtr& msg) {
 void DsgFrontend::handleLatestMesh(const kimera_topology::ActiveMesh::ConstPtr& msg) {
   {  // start mesh frontend critical section
     std::unique_lock<std::mutex> mesh_lock(mesh_frontend_mutex_);
-    if (mesh_queue_.size() < mesh_queue_size_) {
+    if (mesh_queue_.size() < config_.mesh_queue_size) {
       mesh_queue_.push(msg);
       return;
     }
@@ -159,22 +154,10 @@ void DsgFrontend::start() {
 }
 
 void DsgFrontend::startMeshFrontend() {
-  std::string mesh_ns;
-  nh_.param<std::string>("mesh_ns", mesh_ns, "");
-
-  int min_object_size;
-  nh_.param<int>("min_object_vertices", min_object_size, 20);
-  min_object_size_ = static_cast<size_t>(min_object_size);
-
-  nh_.param<bool>("prune_mesh_indices", prune_mesh_indices_, false);
-
   mesh_frontend_ros_queue_.reset(new ros::CallbackQueue());
-
-  nh_.param<std::string>("sensor_frame", sensor_frame_, "base_link");
-
   tf_listener_.reset(new tf2_ros::TransformListener(tf_buffer_));
 
-  ros::NodeHandle mesh_nh(nh_, mesh_ns);
+  ros::NodeHandle mesh_nh(nh_, config_.mesh_ns);
   mesh_nh.setCallbackQueue(mesh_frontend_ros_queue_.get());
   segmenter_.reset(new MeshSegmenter(mesh_nh, mesh_frontend_.getFullMeshVertices()));
 
@@ -190,16 +173,16 @@ void DsgFrontend::startMeshFrontend() {
 }
 
 std::optional<Eigen::Vector3d> DsgFrontend::getLatestPose() {
-  if (!prune_mesh_indices_) {
+  if (!config_.prune_mesh_indices) {
     return std::nullopt;
   }
   // ros::Time lookup_time;
   // lookup_time.fromNSec(last_mesh_timestamp_);
   geometry_msgs::TransformStamped msg;
   try {
-    msg = tf_buffer_.lookupTransform("world", sensor_frame_, ros::Time(0));
+    msg = tf_buffer_.lookupTransform("world", config_.sensor_frame, ros::Time(0));
   } catch (tf2::TransformException& ex) {
-    LOG_FIRST_N(WARNING, 3) << "failed to look up transform to " << sensor_frame_
+    LOG_FIRST_N(WARNING, 3) << "failed to look up transform to " << config_.sensor_frame
                             << " @ " << last_mesh_timestamp_ << ": " << ex.what()
                             << " Not filtering indices.";
     return std::nullopt;
@@ -275,7 +258,7 @@ void DsgFrontend::runMeshFrontend() {
             dsg_->graph->getLayer(KimeraDsgLayers::OBJECTS).value();
         for (const auto& id_node_pair : objects.nodes()) {
           auto connections = dsg_->graph->getMeshConnectionIndices(id_node_pair.first);
-          if (connections.size() < min_object_size_) {
+          if (connections.size() < config_.min_object_vertices) {
             objects_to_delete.push_back(id_node_pair.first);
           }
         }
@@ -391,7 +374,7 @@ void DsgFrontend::runPlaces() {
 
     last_places_timestamp_ = curr_message->header.stamp.toNSec();
 
-    if (log_) {
+    if (config_.should_log) {
       std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
       frontend_graph_logger_.logGraph(dsg_->graph);
     }
@@ -610,10 +593,6 @@ lcd::TeaserParams loadTeaserParams(const ros::NodeHandle& nh) {
 
 lcd::DsgLcdConfig DsgFrontend::initializeLcdStructures() {
   ros::NodeHandle lcd_nh(nh_, "lcd");
-  lcd_nh.param<double>(
-      "descriptor_creation_horizon_m", descriptor_creation_horizon_m_, 10.0);
-  lcd_nh.param<double>("agent_horizon_s", lcd_agent_horizon_s_, 1.5);
-
   double radius;
   lcd_nh.param<double>("radius_m", radius, 5.0);
 
@@ -637,7 +616,7 @@ lcd::DsgLcdConfig DsgFrontend::initializeLcdStructures() {
   reg_config.min_inliers =
       readUnsignedParam(lcd_nh, "min_inliers", reg_config.min_inliers);
   lcd_nh.getParam("log_registration_problem", reg_config.log_registration_problem);
-  reg_config.registration_output_path = log_path_ + "/lcd/";
+  reg_config.registration_output_path = config_.log_path + "/lcd/";
 
   ros::NodeHandle teaser_nh(lcd_nh, "teaser");
   auto teaser_params = loadTeaserParams(teaser_nh);
@@ -785,16 +764,16 @@ std::optional<NodeId> DsgFrontend::getLatestAgentId() {
   std::chrono::duration<double> diff_s = curr_time - prev_time;
   // we consider lcd_shutting_down_ here to make sure we're not waiting on popping from
   // the LCD queue while not getting new place messages
-  if (!lcd_shutting_down_ && diff_s.count() < lcd_agent_horizon_s_) {
+  if (!lcd_shutting_down_ && diff_s.count() < config_.lcd_agent_horizon_s) {
     return std::nullopt;
   }
 
-  const bool forced_pop = (diff_s.count() < lcd_agent_horizon_s_);
+  const bool forced_pop = (diff_s.count() < config_.lcd_agent_horizon_s);
   if (lcd_shutting_down_ && forced_pop) {
     LOG(ERROR) << "Forcing pop of node " << NodeSymbol(lcd_queue_.top()).getLabel()
                << " from lcd queue due to shutdown: parent? "
                << (has_parent ? "yes" : "no") << ", diff: " << diff_s.count() << " / "
-               << lcd_agent_horizon_s_;
+               << config_.lcd_agent_horizon_s;
   }
 
   auto valid_node = lcd_queue_.top();
@@ -841,7 +820,7 @@ void DsgFrontend::runLcd() {
     auto iter = potential_lcd_root_nodes_.begin();
     while (iter != potential_lcd_root_nodes_.end()) {
       const Eigen::Vector3d pos = lcd_graph_->getPosition(*iter);
-      if ((latest_pos - pos).norm() < descriptor_creation_horizon_m_) {
+      if ((latest_pos - pos).norm() < config_.descriptor_creation_horizon_m) {
         ++iter;
       } else {
         to_cache.insert(*iter);

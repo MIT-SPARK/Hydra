@@ -18,6 +18,53 @@ void readRosParam(const ros::NodeHandle& nh,
 
 std::ostream& operator<<(std::ostream& out, RoomFinder::Config::ClusterMode mode);
 
+template <typename Visitor>
+void parse_layer_map(Visitor v, std::map<LayerId, bool>& value) {
+  std::map<std::string, bool> raw_values;
+  config_parser::visit_config(v, raw_values);
+
+  for (const auto& kv_pair : raw_values) {
+    value[KimeraDsgLayers::StringToLayerId(kv_pair.first)] = kv_pair.second;
+  }
+}
+
+template <typename Visitor>
+void display_layer_map(Visitor v, std::map<LayerId, bool>& value) {
+  std::map<std::string, bool> raw_values;
+  for (const auto& kv_pair : value) {
+    raw_values[KimeraDsgLayers::LayerIdToString(kv_pair.first)] = kv_pair.second;
+  }
+
+  config_parser::visit_config(v, raw_values);
+}
+
+template <typename Visitor,
+          typename std::enable_if<config_parser::is_parser<Visitor>::value,
+                                  bool>::type = true>
+void handle_color(Visitor v, SemanticNodeAttributes::ColorVector& value) {
+  std::vector<int> raw_values;
+  config_parser::visit_config(v, raw_values);
+
+  if (raw_values.size() < 3) {
+    return;
+  }
+
+  value << static_cast<uint8_t>(raw_values[0]), static_cast<uint8_t>(raw_values[1]),
+      static_cast<uint8_t>(raw_values[2]);
+}
+
+template <
+    typename Visitor,
+    typename std::enable_if<std::negation<config_parser::is_parser<Visitor>>::value,
+                            bool>::type = true>
+void handle_color(Visitor v, SemanticNodeAttributes::ColorVector& value) {
+  std::vector<uint8_t> raw_values(3);
+  raw_values[0] = value(0);
+  raw_values[1] = value(0);
+  raw_values[2] = value(0);
+  config_parser::visit_config(v, raw_values);
+}
+
 }  // namespace incremental
 }  // namespace kimera
 
@@ -97,6 +144,33 @@ struct convert<KimeraRPGO::Solver> {
 namespace kimera {
 namespace incremental {
 
+struct DsgFrontendConfig {
+  bool should_log = true;
+  std::string log_path = "";
+  size_t mesh_queue_size = 10;
+  size_t min_object_vertices = 20;
+  bool prune_mesh_indices = false;
+  std::string sensor_frame = "base_link";
+  double lcd_agent_horizon_s = 1.5;
+  double descriptor_creation_horizon_m = 10.0;
+  std::string mesh_ns = "";
+};
+
+template <typename Visitor>
+void visit_config(Visitor& v, DsgFrontendConfig& config) {
+  // TODO(nathan) replace with single param (derive should_log from log_path)
+  config_parser::visit_config(v["should_log"], config.should_log);
+  config_parser::visit_config(v["log_path"], config.log_path);
+  config_parser::visit_config(v["mesh_queue_size"], config.mesh_queue_size);
+  config_parser::visit_config(v["min_object_vertices"], config.min_object_vertices);
+  config_parser::visit_config(v["prune_mesh_indices"], config.prune_mesh_indices);
+  config_parser::visit_config(v["sensor_frame"], config.sensor_frame);
+  config_parser::visit_config(v["lcd_agent_horizon_s"], config.lcd_agent_horizon_s);
+  config_parser::visit_config(v["descriptor_creation_horizon_m"],
+                              config.descriptor_creation_horizon_m);
+  config_parser::visit_config(v["mesh_ns"], config.mesh_ns);
+}
+
 struct DsgBackendConfig {
   bool should_log = true;
   std::string log_path;
@@ -133,53 +207,6 @@ struct DsgBackendConfig {
   double places_merge_pos_threshold_m = 0.4;
   double places_merge_distance_tolerance_m = 0.3;
 };
-
-template <typename Visitor>
-void parse_layer_map(Visitor v, std::map<LayerId, bool>& value) {
-  std::map<std::string, bool> raw_values;
-  config_parser::visit_config(v, raw_values);
-
-  for (const auto& kv_pair : raw_values) {
-    value[KimeraDsgLayers::StringToLayerId(kv_pair.first)] = kv_pair.second;
-  }
-}
-
-template <typename Visitor>
-void display_layer_map(Visitor v, std::map<LayerId, bool>& value) {
-  std::map<std::string, bool> raw_values;
-  for (const auto& kv_pair : value) {
-    raw_values[KimeraDsgLayers::LayerIdToString(kv_pair.first)] = kv_pair.second;
-  }
-
-  config_parser::visit_config(v, raw_values);
-}
-
-template <typename Visitor,
-          typename std::enable_if<config_parser::is_parser<Visitor>::value,
-                                  bool>::type = true>
-void handle_color(Visitor v, SemanticNodeAttributes::ColorVector& value) {
-  std::vector<int> raw_values;
-  config_parser::visit_config(v, raw_values);
-
-  if (raw_values.size() < 3) {
-    return;
-  }
-
-  value << static_cast<uint8_t>(raw_values[0]), static_cast<uint8_t>(raw_values[1]),
-      static_cast<uint8_t>(raw_values[2]);
-}
-
-template <
-    typename Visitor,
-    typename std::enable_if<std::negation<config_parser::is_parser<Visitor>>::value,
-                            bool>::type = true>
-void handle_color(Visitor v, SemanticNodeAttributes::ColorVector& value) {
-  std::vector<uint8_t> raw_values(3);
-  raw_values[0] = value(0);
-  raw_values[1] = value(0);
-  raw_values[2] = value(0);
-  config_parser::visit_config(v, raw_values);
-}
 
 template <typename Visitor>
 void visit_config(Visitor& v, DsgBackendConfig& config) {
