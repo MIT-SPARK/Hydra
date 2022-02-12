@@ -4,7 +4,7 @@
 #include <kimera_dsg/node_attributes.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
 #include <kimera_pgmo/utils/VoxbloxUtils.h>
-#include <kimera_topology/config_parser.h>
+#include <kimera_topology/configs.h>
 #include <kimera_topology/gvd_integrator.h>
 
 #include <voxblox/mesh/mesh_integrator.h>
@@ -21,10 +21,10 @@ namespace utils {
 using namespace voxblox;
 using namespace topology;
 
-#define READ_PARAM(nh, config, field, default)                                   \
-  if (!nh.param(#field, config.field, default)) {                                \
-    VLOG(1) << "missing value for " << #field << ". defaulting to: " << default; \
-  }                                                                              \
+#define READ_PARAM(nh, config, field, default_val)                                   \
+  if (!nh.param(#field, config.field, default_val)) {                                \
+    VLOG(1) << "missing value for " << #field << ". defaulting to: " << default_val; \
+  }                                                                                  \
   static_assert(true, "")
 
 std::optional<VoxbloxConfig> loadVoxbloxConfig(const ros::NodeHandle& nh) {
@@ -130,9 +130,9 @@ void makePlacesFromTsdf(const VoxbloxConfig& config,
   CHECK(graph);
   CHECK(tsdf);
 
-  GvdIntegratorConfig gvd_config;
-  fillGvdIntegratorConfig(ros::NodeHandle(config.gvd_namespace), gvd_config);
-  topology::showConfig(gvd_config);
+  auto gvd_config =
+      config_parser::load_from_ros<GvdIntegratorConfig>(config.gvd_namespace);
+  LOG(INFO) << "Gvd Config" << std::endl << gvd_config;
 
   Layer<GvdVoxel>::Ptr gvd(
       new Layer<GvdVoxel>(tsdf->voxel_size(), tsdf->voxels_per_side()));

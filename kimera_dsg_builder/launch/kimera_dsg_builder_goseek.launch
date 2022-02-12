@@ -37,8 +37,8 @@
              command="load"
              ns="/gvd_integrator"/>
 
-  <node name="kimera_dsg_builder_offline_node"
-        type="kimera_dsg_builder_offline_node"
+  <node name="kimera_dsg_builder_batch_node"
+        type="kimera_dsg_builder_batch_node"
         pkg="kimera_dsg_builder"
         output="screen"
         launch-prefix="$(arg launch-prefix)"

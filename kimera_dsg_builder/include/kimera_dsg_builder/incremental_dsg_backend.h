@@ -1,4 +1,5 @@
 #pragma once
+#include "kimera_dsg_builder/configs.h"
 #include "kimera_dsg_builder/dsg_update_functions.h"
 #include "kimera_dsg_builder/incremental_room_finder.h"
 #include "kimera_dsg_builder/incremental_types.h"
@@ -19,13 +20,6 @@
 
 namespace kimera {
 namespace incremental {
-
-template <typename T>
-void parseParam(const ros::NodeHandle& nh, const std::string& name, T& param) {
-  int value = param;
-  nh.getParam(name, value);
-  param = value;
-}
 
 struct LoopClosureLog {
   gtsam::Symbol src;        // factor edge "source"
@@ -95,6 +89,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   void visualizeDeformationGraphEdges() const;
 
  private:
+  void setSolverParams();
+
   bool setVisualizeBackend(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
   bool setVisualizeFrontend(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
@@ -144,22 +140,20 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   ros::NodeHandle nh_;
   std::atomic<bool> should_viz_shutdown_{false};
   std::atomic<bool> should_opt_shutdown_{false};
+  std::atomic<bool> have_loopclosures_{false};
+  std::atomic<bool> visualizer_should_reset_{false};
+  bool have_new_mesh_{false};
+
+  DsgBackendConfig config_;
 
   SharedDsgInfo::Ptr shared_dsg_;
   SharedDsgInfo::Ptr private_dsg_;
   SceneGraphLayer shared_places_copy_;
 
   int robot_id_;
-  bool add_places_to_deformation_graph_;
-  bool optimize_on_lc_;
-  bool enable_node_merging_;
-  bool call_update_periodically_;
-
-  double place_mesh_variance_;
-  double place_edge_variance_;
-
   char robot_prefix_;
   char robot_vertex_prefix_;
+
   kimera_pgmo::Path trajectory_;
   std::vector<ros::Time> timestamps_;
   std::atomic<uint64_t> last_timestamp_;
@@ -175,13 +169,10 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   NodeIdSet unlabeled_place_nodes_;
   std::unique_ptr<RoomFinder> room_finder_;
 
-  double places_merge_pos_threshold_m_;
-  double places_merge_distance_tolerance_m_;
+  DsgBackendStatus status_;
+
   std::list<LayerUpdateFunc> dsg_update_funcs_;
 
-  std::atomic<bool> have_loopclosures_;
-
-  bool have_new_mesh_;
   kimera_pgmo::KimeraPgmoMesh::ConstPtr latest_mesh_;
   std::vector<ros::Time> mesh_vertex_stamps_;
 
@@ -191,33 +182,20 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   std::mutex pgmo_mutex_;
   std::unique_ptr<std::thread> optimizer_thread_;
 
-  bool pgmo_log_;
-  std::string pgmo_log_path_;
-  DsgBackendStatus status_;
-
   std::unique_ptr<DynamicSceneGraphVisualizer> visualizer_;
   std::unique_ptr<ros::CallbackQueue> visualizer_queue_;
   std::unique_ptr<std::thread> visualizer_thread_;
   PlacesFactorGraphViz::Ptr places_factors_visualizer_;
 
-  std::atomic<bool> visualizer_should_reset_;
   std::atomic<bool> visualizer_show_frontend_;
   ros::ServiceServer frontend_viz_srv_;
   ros::ServiceServer backend_viz_srv_;
   ros::Publisher viz_mesh_mesh_edges_pub_;
   ros::Publisher viz_pose_mesh_edges_pub_;
   ros::Publisher pose_graph_pub_;
-  bool visualize_place_factors_;
-  SemanticNodeAttributes::ColorVector building_color_;
 
-  bool dsg_log_;
-  std::string dsg_log_path_;
   SceneGraphLogger backend_graph_logger_;
-
   std::list<LoopClosureLog> loop_closures_;
-
-  std::map<LayerId, bool> merge_update_map_;
-  bool merge_update_dynamic_;
 };
 
 }  // namespace incremental

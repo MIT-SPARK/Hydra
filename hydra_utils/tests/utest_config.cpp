@@ -66,11 +66,7 @@ std::ostream& operator<<(std::ostream& out, TestEnum v) {
 }
 
 TestEnum readFromString(const std::string& enum_string) {
-  std::string to_compare = "";
-  std::transform(
-      enum_string.begin(), enum_string.end(), to_compare.begin(), [](unsigned char c) {
-        return std::toupper(c);
-      });
+  auto to_compare = config_parser::to_uppercase(enum_string);
 
   if (to_compare == "RED") {
     return TestEnum::RED;
@@ -94,7 +90,7 @@ void readRosParam(const ros::NodeHandle& nh, const std::string& name, TestEnum& 
   value = readFromString(color);
 }
 
-}
+}  // namespace hydra_utils
 
 namespace YAML {
 template <>

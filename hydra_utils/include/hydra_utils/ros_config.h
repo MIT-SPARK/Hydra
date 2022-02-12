@@ -20,6 +20,17 @@ void readRosParam(const ros::NodeHandle& nh,
   nh.getParam(name, value);
 }
 
+template <typename K,
+          typename V,
+          typename std::enable_if<
+              std::conjunction<is_base_ros_param<K>, is_base_ros_param<V>>::value,
+              bool>::type = true>
+void readRosParam(const ros::NodeHandle& nh,
+                  const std::string& name,
+                  std::map<K, V>& value) {
+  nh.getParam(name, value);
+}
+
 template <typename T,
           typename std::enable_if<std::conjunction<std::negation<is_base_ros_param<T>>,
                                                    std::is_integral<T>>::value,

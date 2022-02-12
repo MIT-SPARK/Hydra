@@ -1,6 +1,7 @@
 #pragma once
 #include <ostream>
 #include <vector>
+#include <map>
 
 namespace config_parser {
 
@@ -17,6 +18,21 @@ std::ostream& operator<<(std::ostream& out, const std::vector<T>& values) {
     }
   }
   out << "]";
+  return out;
+}
+
+template <typename K, typename V>
+std::ostream& operator<<(std::ostream& out, const std::map<K, V>& values) {
+  out << "{";
+  auto iter = values.begin();
+  while (iter != values.end()) {
+    out << iter->first << ": " << iter->second;
+    ++iter;
+    if (iter != values.end()) {
+      out << ", ";
+    }
+  }
+  out << "}";
   return out;
 }
 
@@ -40,6 +56,7 @@ class ConfigDisplay {
     out_ << prefix_ << static_cast<int>(value) << std::endl;
   }
 
+  // TODO(nathan) consider using std::boolalpha instead
   void visit(bool& value) {
     out_ << prefix_ << (value ? "true" : "false");
   }

@@ -58,8 +58,7 @@ catkin_package(
 
 add_library(
   ${PROJECT_NAME}
-  src/building_finder.cpp
-  src/connectivity_utils.cpp
+  src/configs.cpp
   src/dsg_lcd_descriptors.cpp
   src/dsg_lcd_matching.cpp
   src/dsg_lcd_module.cpp
@@ -72,13 +71,9 @@ add_library(
   src/lcd_visualizer.cpp
   src/minimum_spanning_tree.cpp
   src/object_finder.cpp
-  src/offline_dsg_builder.cpp
-  src/room_finder.cpp
   src/serialization_helpers.cpp
   src/timing_utilities.cpp
   src/visualizer_plugins.cpp
-  src/voxblox_utils.cpp
-  src/wall_finder.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
 target_link_libraries(
@@ -90,34 +85,48 @@ target_link_libraries(
 )
 add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
 
-add_executable(${PROJECT_NAME}_offline_node src/kimera_dsg_builder_offline_node.cpp)
-target_link_libraries(${PROJECT_NAME}_offline_node ${PROJECT_NAME})
-
-add_executable(${PROJECT_NAME}_batch_node src/batch_dsg_builder_node.cpp)
-target_link_libraries(${PROJECT_NAME}_batch_node ${PROJECT_NAME})
-
 add_executable(${PROJECT_NAME}_incremental_node src/incremental_dsg_builder_node.cpp)
 target_link_libraries(${PROJECT_NAME}_incremental_node ${PROJECT_NAME})
 
 add_executable(dsg_visualizer_node src/dsg_visualizer_node.cpp)
 target_link_libraries(dsg_visualizer_node ${PROJECT_NAME} yaml-cpp)
 
-add_executable(room_visualizer_node src/room_visualizer_node.cpp)
-target_link_libraries(room_visualizer_node ${PROJECT_NAME} yaml-cpp)
+add_executable(dsg_optimizer_node src/dsg_optimizer_node.cpp)
+target_link_libraries(dsg_optimizer_node ${PROJECT_NAME})
+
+# utilities that don't need main library
+
+add_executable(${PROJECT_NAME}_batch_node
+  src/batch_dsg_builder_node.cpp
+  src/building_finder.cpp
+  src/connectivity_utils.cpp
+  src/object_finder.cpp
+  src/room_finder.cpp
+  src/voxblox_utils.cpp
+  src/wall_finder.cpp
+  src/offline_dsg_builder.cpp
+)
+target_include_directories(${PROJECT_NAME}_batch_node PUBLIC include ${catkin_INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME}_batch_node ${catkin_LIBRARIES} gtsam)
+
+# TODO(nathan) load in ply instead, and avoid voxblox utils
+add_executable(room_visualizer_node
+    src/voxblox_utils.cpp
+    src/room_visualizer_node.cpp)
+target_include_directories(room_visualizer_node PUBLIC include ${catkin_INCLUDE_DIRS})
+target_link_libraries(room_visualizer_node ${catkin_LIBRARIES} yaml-cpp gtsam)
 
 add_executable(room_eval_node src/room_eval_node.cpp)
-target_link_libraries(room_eval_node ${PROJECT_NAME} yaml-cpp)
+target_include_directories(room_eval_node PUBLIC ${catkin_INCLUDE_DIRS})
+target_link_libraries(room_eval_node ${catkin_LIBRARIES} yaml-cpp)
 
 add_executable(pose_graph_publisher_node src/pose_graph_publisher_node.cpp)
 target_include_directories(pose_graph_publisher_node PUBLIC ${catkin_INCLUDE_DIRS})
 target_link_libraries(pose_graph_publisher_node ${catkin_LIBRARIES} gtsam)
 
-add_executable(dsg_optimizer_node src/dsg_optimizer_node.cpp)
-target_link_libraries(dsg_optimizer_node ${PROJECT_NAME})
-
 add_executable(gt_trajectory_optimizer src/gt_trajectory_optimizer.cpp)
-target_include_directories(gt_trajectory_optimizer PUBLIC include ${catkin_INCLUDE_DIRS})
-target_link_libraries(gt_trajectory_optimizer ${PROJECT_NAME} yaml-cpp KimeraRPGO)
+target_include_directories(gt_trajectory_optimizer PUBLIC ${catkin_INCLUDE_DIRS})
+target_link_libraries(gt_trajectory_optimizer ${catkin_LIBRARIES} yaml-cpp KimeraRPGO)
 
 # TODO(nathan) allow choice of sanitizer
 if(DSG_USE_ASAN)

@@ -44,10 +44,7 @@ namespace kimera {
 namespace topology {
 
 ParentUniquenessMode getParentUniquenessModeFromString(const std::string& mode) {
-  std::string to_compare = "";
-  std::transform(mode.begin(), mode.end(), to_compare.begin(), [](unsigned char c) {
-    return std::toupper(c);
-  });
+  auto to_compare = config_parser::to_uppercase(mode);
 
   if (to_compare == "ANGLE") {
     return ParentUniquenessMode::ANGLE;

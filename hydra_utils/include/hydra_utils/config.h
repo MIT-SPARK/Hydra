@@ -6,6 +6,12 @@
 
 namespace config_parser {
 
+template <>
+struct is_parser<YamlParser> : public std::true_type {};
+
+template <>
+struct is_parser<RosParser> : public std::true_type {};
+
 template <typename Config>
 Config load_from_yaml(const std::string& filepath) {
   Config config;
@@ -25,6 +31,14 @@ Config load_from_ros_nh(const ros::NodeHandle& nh) {
   Config config;
   visit_config(RosParser(nh), config);
   return config;
+}
+
+inline std::string to_uppercase(const std::string& original) {
+  std::string result = original;
+  std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) {
+    return std::toupper(c);
+  });
+  return result;
 }
 
 }  // namespace config_parser

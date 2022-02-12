@@ -1,5 +1,5 @@
 #include "kimera_dsg_builder/incremental_dsg_backend.h"
-#include "kimera_dsg_builder/common.h"
+#include "kimera_dsg_builder/configs.h"
 #include "kimera_dsg_builder/minimum_spanning_tree.h"
 #include "kimera_dsg_builder/pcl_conversion.h"
 #include "kimera_dsg_builder/serialization_helpers.h"
@@ -22,64 +22,17 @@ using kimera_pgmo::Path;
 using pose_graph_tools::PoseGraph;
 using Node = SceneGraph::Node;
 
-void parseRoomClusterMode(const ros::NodeHandle& nh,
-                          const std::string& name,
-                          RoomFinder::Config::ClusterMode& param) {
-  std::string clustering_mode = "MODULARITY";
-  nh.getParam(name, clustering_mode);
-
-  std::string to_check = clustering_mode;
-  std::transform(to_check.begin(), to_check.end(), to_check.begin(), [](const auto& c) {
-    return std::toupper(c);
-  });
-
-  if (to_check == "SPECTRAL") {
-    param = RoomFinder::Config::ClusterMode::SPECTRAL;
-  } else if (to_check == "MODULARITY") {
-    param = RoomFinder::Config::ClusterMode::MODULARITY;
-  } else if (to_check == "NONE") {
-    param = RoomFinder::Config::ClusterMode::NONE;
-  } else {
-    ROS_ERROR_STREAM("Unrecognized room clustering mode: " << to_check
-                                                           << ". Defaulting to NONE");
-    param = RoomFinder::Config::ClusterMode::NONE;
+void DsgBackend::setSolverParams() {
+  KimeraRPGO::RobustSolverParams params = deformation_graph_->getParams();
+  params.verbosity = config_.pgmo.rpgo_verbosity;
+  params.solver = config_.pgmo.rpgo_solver;
+  ;
+  if (config_.pgmo.should_log) {
+    params.logOutput(config_.pgmo.log_path);
+    logStatus(true);
   }
-}
-
-KimeraRPGO::Verbosity parseVerbosityFromString(const std::string& verb_str) {
-  std::string to_check = verb_str;
-  std::transform(to_check.begin(), to_check.end(), to_check.begin(), [](const auto& c) {
-    return std::toupper(c);
-  });
-
-  if (to_check == "UPDATE") {
-    return KimeraRPGO::Verbosity::UPDATE;
-  } else if (to_check == "QUIET") {
-    return KimeraRPGO::Verbosity::QUIET;
-  } else if (to_check == "VERBOSE") {
-    return KimeraRPGO::Verbosity::VERBOSE;
-  } else {
-    ROS_ERROR_STREAM("unrecognized verbosity option: " << to_check
-                                                       << ". defaulting to UPDATE");
-    return KimeraRPGO::Verbosity::UPDATE;
-  }
-}
-
-KimeraRPGO::Solver parseSolverFromString(const std::string& solver_str) {
-  std::string to_check = solver_str;
-  std::transform(to_check.begin(), to_check.end(), to_check.begin(), [](const auto& c) {
-    return std::toupper(c);
-  });
-
-  if (to_check == "LM") {
-    return KimeraRPGO::Solver::LM;
-  } else if (to_check == "GN") {
-    return KimeraRPGO::Solver::GN;
-  } else {
-    ROS_ERROR_STREAM("unrecognized solver option: " << to_check
-                                                    << ". defaulting to LM");
-    return KimeraRPGO::Solver::LM;
-  }
+  deformation_graph_->setParams(params);
+  setVerboseFlag(false);
 }
 
 DsgBackend::DsgBackend(const ros::NodeHandle nh,
@@ -90,82 +43,20 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
       shared_dsg_(dsg),
       private_dsg_(backend_dsg),
       shared_places_copy_(KimeraDsgLayers::PLACES),
-      robot_id_(0),
-      add_places_to_deformation_graph_(true),
-      optimize_on_lc_(true),
-      enable_node_merging_(true),
-      call_update_periodically_(true),
-      places_merge_pos_threshold_m_(0.4),
-      places_merge_distance_tolerance_m_(0.3),
-      have_loopclosures_(false),
-      have_new_mesh_(false),
-      visualizer_should_reset_(false),
-      visualize_place_factors_(false),
-      merge_update_dynamic_(true) {
-  nh_.getParam("robot_id", robot_id_);
+      robot_id_(0) {
+  config_ = config_parser::load_from_ros_nh<DsgBackendConfig>(nh_);
 
+  nh_.getParam("robot_id", robot_id_);
   if (!loadParameters(ros::NodeHandle(nh_, "pgmo"))) {
     ROS_FATAL("Failed to initialize pgmo parameters!");
     throw std::runtime_error("pgmo parameter parsing failed");
   }
 
-  ros::NodeHandle dsg_nh(nh_, "dsg");
-  dsg_nh.getParam("add_places_to_deformation_graph", add_places_to_deformation_graph_);
-  dsg_nh.getParam("optimize_on_lc", optimize_on_lc_);
-  dsg_nh.getParam("enable_node_merging", enable_node_merging_);
-  dsg_nh.getParam("call_update_periodically", call_update_periodically_);
-  dsg_nh.getParam("places_merge_pos_threshold_m", places_merge_pos_threshold_m_);
-  dsg_nh.getParam("places_merge_distance_tolerance_m",
-                  places_merge_distance_tolerance_m_);
-
-  dsg_nh.getParam("visualize_place_factors", visualize_place_factors_);
-  KimeraRPGO::RobustSolverParams params = deformation_graph_->getParams();
-
-  std::string rpgo_verbosity = "UPDATE";
-  dsg_nh.getParam("rpgo_verbosity", rpgo_verbosity);
-  params.verbosity = parseVerbosityFromString(rpgo_verbosity);
-
-  std::string rpgo_solver = "LM";
-  dsg_nh.getParam("rpgo_solver", rpgo_solver);
-  params.solver = parseSolverFromString(rpgo_solver);
-
-  nh_.getParam("pgmo/log_output", pgmo_log_);
-  if (pgmo_log_) {
-    if (nh_.getParam("pgmo/log_path", pgmo_log_path_)) {
-      params.logOutput(pgmo_log_path_);
-      logStatus(true);
-    } else {
-      ROS_ERROR("Failed to get pgmo log path");
-    }
-  }
-
-  nh_.getParam("pgmo/covariance/place_mesh", place_mesh_variance_);
-  nh_.getParam("pgmo/covariance/place_edge", place_edge_variance_);
-
-  deformation_graph_->setParams(params);
-  setVerboseFlag(false);
-
   robot_prefix_ = kimera_pgmo::robot_id_to_prefix.at(robot_id_);
   robot_vertex_prefix_ = kimera_pgmo::robot_id_to_vertex_prefix.at(robot_id_);
 
-  bool enable_rooms = true;
-  nh_.getParam("enable_rooms", enable_rooms);
-  if (enable_rooms) {
-    // TODO(nathan) clean up
-    RoomFinder::Config config;
-    nh_.getParam("room_finder/min_dilation_m", config.min_dilation_m);
-    nh_.getParam("room_finder/max_dilation_m", config.max_dilation_m);
-    parseParam(nh_, "room_finder/num_steps", config.num_steps);
-    parseParam(nh_, "room_finder/min_component_size", config.min_component_size);
-    parseParam(nh_, "room_finder/max_kmeans_iters", config.max_kmeans_iters);
-    parseParam(nh_, "room_finder/min_room_size", config.min_room_size);
-    nh_.getParam("room_finder/room_vote_min_overlap", config.room_vote_min_overlap);
-    nh_.getParam("room_finder/use_sparse_eigen_decomp", config.use_sparse_eigen_decomp);
-    nh_.getParam("room_finder/sparse_decomp_tolerance", config.sparse_decomp_tolerance);
-    nh_.getParam("room_finder/max_modularity_iters", config.max_modularity_iters);
-    nh_.getParam("room_finder/modularity_gamma", config.modularity_gamma);
-    parseRoomClusterMode(nh_, "room_finder/clustering_mode", config.clustering_mode);
-    room_finder_.reset(new RoomFinder(config));
+  if (config_.enable_rooms) {
+    room_finder_.reset(new RoomFinder(config_.room_finder));
   }
 
   dsg_update_funcs_.push_back(&dsg_updates::updateAgents);
@@ -178,36 +69,16 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
                               place_values,
                               pgmo_values,
                               allow_merging,
-                              places_merge_pos_threshold_m_,
-                              places_merge_distance_tolerance_m_);
+                              config_.places_merge_pos_threshold_m,
+                              config_.places_merge_distance_tolerance_m);
   });
-  // redundant to updateRoomsNodes
-  // dsg_update_funcs_.push_back(&dsg_updates::updateRooms);
-  // redundant to updateBuildingNode
-  // dsg_update_funcs_.push_back(&dsg_updates::updateBuildings);
 
-  bool fix_inliers = true;
-  nh_.getParam("pgmo/rpgo/gnc_fix_prev_inliers", fix_inliers);
-  deformation_graph_->setForceRecalculate(!fix_inliers);
+  deformation_graph_->setForceRecalculate(!config_.pgmo.gnc_fix_prev_inliers);
   deformation_graph_->storeOnlyNoOptimization();
 
-  // purple
-  std::vector<double> building_color{0.662, 0.0313, 0.7607};
-  nh_.getParam("building_color", building_color);
-  if (building_color.size() != 3) {
-    ROS_ERROR_STREAM("supplied building color size " << building_color.size()
-                                                     << " != 3");
-    building_color = std::vector<double>{0.662, 0.0313, 0.7607};
-  }
-
-  building_color_ << std::clamp(static_cast<int>(255 * building_color.at(0)), 0, 255),
-      std::clamp(static_cast<int>(255 * building_color.at(1)), 0, 255),
-      std::clamp(static_cast<int>(255 * building_color.at(2)), 0, 255);
-
-  nh_.getParam("dsg_log_output", dsg_log_);
-  if (dsg_log_ && nh_.getParam("dsg_output_path", dsg_log_path_)) {
-    backend_graph_logger_.setOutputPath(dsg_log_path_ + "/backend");
-    ROS_INFO("Logging backend graph to %s", (dsg_log_path_ + "/backend").c_str());
+  if (config_.should_log) {
+    backend_graph_logger_.setOutputPath(config_.log_path + "/backend");
+    ROS_INFO("Logging backend graph to %s", (config_.log_path + "/backend").c_str());
     backend_graph_logger_.setLayerName(KimeraDsgLayers::OBJECTS, "objects");
     backend_graph_logger_.setLayerName(KimeraDsgLayers::PLACES, "places");
     backend_graph_logger_.setLayerName(KimeraDsgLayers::ROOMS, "rooms");
@@ -217,11 +88,6 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
   }
 
   last_timestamp_ = 0;
-
-  merge_update_map_ = {{KimeraDsgLayers::OBJECTS, false},
-                       {KimeraDsgLayers::PLACES, true},
-                       {KimeraDsgLayers::ROOMS, false},
-                       {KimeraDsgLayers::BUILDINGS, false}};
 }
 
 void DsgBackend::stop() {
@@ -370,8 +236,11 @@ bool DsgBackend::updatePrivateDsg() {
     {  // start joint critical section
       std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
       // private_dsg_->updated = false;
-      private_dsg_->graph->mergeGraph(
-          *shared_dsg_->graph, false, true, &merge_update_map_, merge_update_dynamic_);
+      private_dsg_->graph->mergeGraph(*shared_dsg_->graph,
+                                      false,
+                                      true,
+                                      &config_.merge_update_map,
+                                      config_.merge_update_dynamic);
       *private_dsg_->latest_places = *shared_dsg_->latest_places;
 
       if (shared_dsg_->graph->hasLayer(KimeraDsgLayers::PLACES)) {
@@ -386,7 +255,7 @@ bool DsgBackend::updatePrivateDsg() {
       }
       shared_dsg_->updated = false;
     }  // end joint critical section
-    if (dsg_log_) {
+    if (config_.should_log) {
       backend_graph_logger_.logGraph(private_dsg_->graph);
     }
   }
@@ -409,7 +278,7 @@ void DsgBackend::startPgmo() {
       "pgmo/deformation_graph_pose_mesh", 10, false);
   pose_graph_pub_ = nh_.advertise<PoseGraph>("pgmo/pose_graph", 10, false);
 
-  if (visualize_place_factors_) {
+  if (config_.visualize_place_factors) {
     places_factors_visualizer_ = std::make_shared<PlacesFactorGraphViz>(nh_);
   }
 
@@ -513,23 +382,24 @@ void DsgBackend::runPgmo() {
       std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
       have_dsg_updates = updatePrivateDsg();
 
-      if (visualize_place_factors_ && (have_dsg_updates || have_graph_updates)) {
+      // TODO(nathan) move to helper
+      if (config_.visualize_place_factors && (have_dsg_updates || have_graph_updates)) {
         MinimumSpanningTreeInfo mst_info = getMinimumSpanningEdges(shared_places_copy_);
         places_factors_visualizer_->draw(
             robot_vertex_prefix_, shared_places_copy_, mst_info, *deformation_graph_);
       }
 
-      if (optimize_on_lc_ && have_graph_updates && have_loopclosures_) {
+      if (config_.optimize_on_lc && have_graph_updates && have_loopclosures_) {
         optimize();
         was_updated = true;
-      } else if (call_update_periodically_ && have_dsg_updates) {
+      } else if (config_.call_update_periodically && have_dsg_updates) {
         updateDsgMesh();
         callUpdateFunctions();
         was_updated = true;
       }
     }  // end pgmo mesh critical section
 
-    if (have_graph_updates && pgmo_log_) {
+    if (have_graph_updates && config_.pgmo.should_log) {
       logStatus();
     }
 
@@ -549,7 +419,7 @@ void DsgBackend::runPgmo() {
   updateDsgMesh();
   callUpdateFunctions();
   // TODO(Yun) Technically not strictly a g2o
-  deformation_graph_->save(pgmo_log_path_ + "/deformation_graph.dgrf");
+  deformation_graph_->save(config_.pgmo.log_path + "/deformation_graph.dgrf");
 }
 
 void DsgBackend::fullMeshCallback(const KimeraPgmoMesh::ConstPtr& msg) {
@@ -577,7 +447,7 @@ bool DsgBackend::saveMeshCallback(std_srvs::Empty::Request&,
     opt_mesh = private_dsg_->graph->getMesh();
   }
   // Save mesh
-  std::string ply_name = pgmo_log_path_ + std::string("/mesh_pgmo.ply");
+  std::string ply_name = config_.pgmo.log_path + std::string("/mesh_pgmo.ply");
   saveMesh(opt_mesh, ply_name);
   return true;
 }
@@ -590,7 +460,7 @@ bool DsgBackend::saveTrajectoryCallback(std_srvs::Empty::Request&,
     optimized_path = getOptimizedTrajectory(robot_id_);
   }
   // Save trajectory
-  std::string csv_name = pgmo_log_path_ + std::string("/traj_pgmo.csv");
+  std::string csv_name = config_.pgmo.log_path + std::string("/traj_pgmo.csv");
   saveTrajectory(optimized_path, timestamps_, csv_name);
   return true;
 }
@@ -642,7 +512,7 @@ void DsgBackend::addPlacesToDeformationGraph() {
                                                 place_node_valences,
                                                 robot_vertex_prefix_,
                                                 false,
-                                                place_mesh_variance_);
+                                                config_.pgmo.place_mesh_variance);
   }
 
   {
@@ -657,7 +527,7 @@ void DsgBackend::addPlacesToDeformationGraph() {
       mst_e.pose = kimera_pgmo::GtsamToRos(source.between(target));
       mst_edges.edges.push_back(mst_e);
     }
-    deformation_graph_->addNewTempEdges(mst_edges, place_edge_variance_);
+    deformation_graph_->addNewTempEdges(mst_edges, config_.pgmo.place_edge_variance);
   }
 }
 
@@ -747,7 +617,7 @@ void DsgBackend::updateDsgMesh(bool force_mesh_update) {
 }
 
 void DsgBackend::optimize() {
-  if (add_places_to_deformation_graph_) {
+  if (config_.add_places_to_deformation_graph) {
     addPlacesToDeformationGraph();
   }
 
@@ -771,15 +641,15 @@ void DsgBackend::optimize() {
 void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,
                                      const gtsam::Values& pgmo_values) {
   ScopedTimer spin_timer("backend/update_layers", last_timestamp_);
-  {
-    // start private dsg critical section
+  {  // start private dsg critical section
     std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
     for (const auto& update_func : dsg_update_funcs_) {
-      // TODO(nathan) might need diferrent values
-      update_func(
-          *private_dsg_->graph, places_values, pgmo_values, enable_node_merging_);
+      update_func(*private_dsg_->graph,
+                  places_values,
+                  pgmo_values,
+                  config_.enable_node_merging);
     }
-  }
+  }  // end private dsg critical section
   updateRoomsNodes();
   updateBuildingNode();
 }
@@ -860,8 +730,8 @@ void DsgBackend::updateBuildingNode() {
   if (!private_dsg_->graph->hasNode(building_node_id)) {
     SemanticNodeAttributes::Ptr attrs(new SemanticNodeAttributes());
     attrs->position = centroid;
-    attrs->color = building_color_;
-    attrs->semantic_label = kBuildingSemanticLabel;
+    attrs->color = config_.building_color;
+    attrs->semantic_label = config_.building_semantic_label;
     attrs->name = building_node_id.getLabel();
     private_dsg_->graph->emplaceNode(
         KimeraDsgLayers::BUILDINGS, building_node_id, std::move(attrs));
@@ -877,7 +747,7 @@ void DsgBackend::updateBuildingNode() {
 
 void DsgBackend::logStatus(bool init) const {
   std::ofstream file;
-  std::string filename = pgmo_log_path_ + std::string("/dsg_pgmo_status.csv");
+  std::string filename = config_.pgmo.log_path + std::string("/dsg_pgmo_status.csv");
   if (init) {
     ROS_INFO("DSG Backend logging PGMO status output to %s", filename.c_str());
     file.open(filename);

@@ -34,6 +34,7 @@ catkin_package(
   CATKIN_DEPENDS
   roscpp
   dynamic_reconfigure
+  hydra_utils
   kimera_dsg_visualizer
   kimera_semantics_ros
   message_runtime
