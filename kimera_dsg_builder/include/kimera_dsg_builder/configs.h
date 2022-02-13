@@ -1,4 +1,5 @@
 #pragma once
+#include "kimera_dsg_builder/dsg_lcd_registration.h"
 #include "kimera_dsg_builder/incremental_room_finder.h"
 
 #include <KimeraRPGO/SolverParams.h>
@@ -67,6 +68,20 @@ void handle_color(Visitor v, SemanticNodeAttributes::ColorVector& value) {
 
 }  // namespace incremental
 }  // namespace kimera
+
+namespace teaser {
+
+RobustRegistrationSolver::INLIER_SELECTION_MODE getInlierSelectionFromString(
+    const std::string& mode);
+
+void readRosParam(const ros::NodeHandle& nh,
+                  const std::string& name,
+                  RobustRegistrationSolver::INLIER_SELECTION_MODE& mode);
+
+std::ostream& operator<<(std::ostream& out,
+                         RobustRegistrationSolver::INLIER_SELECTION_MODE mode);
+
+}  // namespace teaser
 
 namespace KimeraRPGO {
 
@@ -151,6 +166,7 @@ struct DsgFrontendConfig {
   size_t min_object_vertices = 20;
   bool prune_mesh_indices = false;
   std::string sensor_frame = "base_link";
+  bool enable_lcd = false;
   double lcd_agent_horizon_s = 1.5;
   double descriptor_creation_horizon_m = 10.0;
   std::string mesh_ns = "";
@@ -165,6 +181,7 @@ void visit_config(Visitor& v, DsgFrontendConfig& config) {
   config_parser::visit_config(v["min_object_vertices"], config.min_object_vertices);
   config_parser::visit_config(v["prune_mesh_indices"], config.prune_mesh_indices);
   config_parser::visit_config(v["sensor_frame"], config.sensor_frame);
+  config_parser::visit_config(v["enable_lcd"], config.enable_lcd);
   config_parser::visit_config(v["lcd_agent_horizon_s"], config.lcd_agent_horizon_s);
   config_parser::visit_config(v["descriptor_creation_horizon_m"],
                               config.descriptor_creation_horizon_m);
@@ -283,3 +300,22 @@ DECLARE_CONFIG_OSTREAM_OPERATOR(DsgBackendConfig)
 
 }  // namespace incremental
 }  // namespace kimera
+
+namespace teaser {
+
+template <typename Visitor>
+void visit_config(Visitor& v, teaser::RobustRegistrationSolver::Params& config) {
+  config_parser::visit_config(v["estimate_scaling"], config.estimate_scaling);
+  config_parser::visit_config(v["cbar2"], config.cbar2);
+  config_parser::visit_config(v["rotation_gnc_factor"], config.rotation_gnc_factor);
+  config_parser::visit_config(v["rotation_max_iterations"],
+                              config.rotation_max_iterations);
+  config_parser::visit_config(v["kcore_heuristic_threshold"],
+                              config.kcore_heuristic_threshold);
+  config_parser::visit_config(v["inlier_selection_mode"], config.inlier_selection_mode);
+  config_parser::visit_config(v["max_clique_time_limit"], config.max_clique_time_limit);
+}
+
+DECLARE_CONFIG_OSTREAM_OPERATOR(teaser::RobustRegistrationSolver::Params)
+
+}  // namespace teaser

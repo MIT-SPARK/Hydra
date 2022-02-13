@@ -53,6 +53,62 @@ std::ostream& operator<<(std::ostream& out, RoomFinder::Config::ClusterMode mode
 }  // namespace incremental
 }  // namespace kimera
 
+namespace teaser {
+
+RobustRegistrationSolver::INLIER_SELECTION_MODE getInlierSelectionFromString(
+    const std::string& mode) {
+  auto to_check = config_parser::to_uppercase(mode);
+
+  if (to_check == "PMC_EXACT") {
+    return RobustRegistrationSolver::INLIER_SELECTION_MODE::PMC_EXACT;
+  } else if (to_check == "PMC_HEU") {
+    return RobustRegistrationSolver::INLIER_SELECTION_MODE::PMC_HEU;
+  } else if (to_check == "KCORE_HEU") {
+    return RobustRegistrationSolver::INLIER_SELECTION_MODE::KCORE_HEU;
+  } else if (to_check == "NONE") {
+    return RobustRegistrationSolver::INLIER_SELECTION_MODE::NONE;
+  } else {
+    ROS_ERROR_STREAM("unrecognized inlier selection option: "
+                     << to_check << ". defaulting to PMC_EXACT");
+    return RobustRegistrationSolver::INLIER_SELECTION_MODE::PMC_EXACT;
+  }
+}
+
+void readRosParam(const ros::NodeHandle& nh,
+                  const std::string& name,
+                  RobustRegistrationSolver::INLIER_SELECTION_MODE& mode) {
+  std::string mode_str;
+  if (!nh.getParam(name, mode_str)) {
+    return;
+  }
+
+  mode = getInlierSelectionFromString(mode_str);
+}
+
+std::ostream& operator<<(std::ostream& out,
+                         RobustRegistrationSolver::INLIER_SELECTION_MODE mode) {
+  switch (mode) {
+    case RobustRegistrationSolver::INLIER_SELECTION_MODE::PMC_EXACT:
+      out << "PMC_EXACT";
+      break;
+    case RobustRegistrationSolver::INLIER_SELECTION_MODE::PMC_HEU:
+      out << "PMC_HEU";
+      break;
+    case RobustRegistrationSolver::INLIER_SELECTION_MODE::KCORE_HEU:
+      out << "KCORE_HEU";
+      break;
+    case RobustRegistrationSolver::INLIER_SELECTION_MODE::NONE:
+      out << "NONE";
+      break;
+    default:
+      out << "INVALID";
+      break;
+  }
+  return out;
+}
+
+}  // namespace teaser
+
 namespace KimeraRPGO {
 
 Verbosity getRpgoVerbosityFromString(const std::string& verb_str) {

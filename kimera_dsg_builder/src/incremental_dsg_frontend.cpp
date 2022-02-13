@@ -144,9 +144,7 @@ void DsgFrontend::start() {
   startMeshFrontend();
   startPlaces();
 
-  bool enable_lcd;
-  nh_.param<bool>("enable_lcd", enable_lcd, false);
-  if (enable_lcd) {
+  if (config_.enable_lcd) {
     LOG(INFO) << "[DSG Frontend] LCD enabled!";
     startLcd();
   }
