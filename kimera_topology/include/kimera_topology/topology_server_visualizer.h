@@ -1,6 +1,6 @@
 #pragma once
-#include "kimera_topology/gvd_visualization_utilities.h"
 #include "kimera_topology/configs.h"
+#include "kimera_topology/gvd_visualization_utilities.h"
 
 #include <hydra_utils/config.h>
 #include <kimera_dsg_visualizer/visualizer_types.h>
@@ -29,7 +29,7 @@ struct TopologyVisualizerConfig {
 };
 
 template <typename Visitor>
-void visit_config(Visitor& v, TopologyVisualizerConfig& config) {
+void visit_config(const Visitor& v, const TopologyVisualizerConfig& config) {
   config_parser::visit_config(v["world_frame"], config.world_frame);
   config_parser::visit_config(v["topology_marker_ns"], config.topology_marker_ns);
   config_parser::visit_config(v["show_block_outlines"], config.show_block_outlines);
@@ -97,8 +97,4 @@ class TopologyServerVisualizer {
 }  // namespace topology
 }  // namespace kimera
 
-template <>
-struct config_parser::is_config<kimera::topology::TopologyVisualizerConfig>
-    : std::true_type {};
-
-
+DECLARE_CONFIG_OSTREAM_OPERATOR(kimera::topology, TopologyVisualizerConfig)

@@ -1,9 +1,11 @@
 #pragma once
+#include "kimera_dsg_builder/config_types.h"
 #include "kimera_dsg_builder/dsg_lcd_registration.h"
 #include "kimera_dsg_builder/incremental_room_finder.h"
 
 #include <KimeraRPGO/SolverParams.h>
 #include <hydra_utils/config.h>
+#include <hydra_utils/eigen_config_types.h>
 #include <voxblox_ros/mesh_vis.h>
 
 #include <sstream>
@@ -11,16 +13,43 @@
 namespace kimera {
 namespace incremental {
 
-RoomFinder::Config::ClusterMode getRoomClusterModeFromString(const std::string& mode);
+using RoomClusterModeEnum = RoomFinder::Config::ClusterMode;
 
-void readRosParam(const ros::NodeHandle& nh,
-                  const std::string& name,
-                  RoomFinder::Config::ClusterMode& mode);
+}  // namespace incremental
+}  // namespace kimera
 
-std::ostream& operator<<(std::ostream& out, RoomFinder::Config::ClusterMode mode);
+DECLARE_CONFIG_ENUM(kimera::incremental,
+                    RoomClusterModeEnum,
+                    {RoomClusterModeEnum::SPECTRAL, "SPECTRAL"},
+                    {RoomClusterModeEnum::MODULARITY, "MODULARITY"},
+                    {RoomClusterModeEnum::NONE, "NONE"})
+
+namespace teaser {
+
+using TeaserInlierSelectionMode = RobustRegistrationSolver::INLIER_SELECTION_MODE;
+
+}  // namespace teaser
+
+DECLARE_CONFIG_ENUM(teaser,
+                    TeaserInlierSelectionMode,
+                    {TeaserInlierSelectionMode::PMC_EXACT, "PMC_EXACT"},
+                    {TeaserInlierSelectionMode::PMC_HEU, "PMC_HEU"},
+                    {TeaserInlierSelectionMode::KCORE_HEU, "KCORE_HEU"},
+                    {TeaserInlierSelectionMode::NONE, "NONE"})
+
+DECLARE_CONFIG_ENUM(KimeraRPGO,
+                    Verbosity,
+                    {Verbosity::UPDATE, "UPDATE"},
+                    {Verbosity::QUIET, "QUIET"},
+                    {Verbosity::VERBOSE, "VERBOSE"})
+
+DECLARE_CONFIG_ENUM(KimeraRPGO, Solver, {Solver::LM, "LM"}, {Solver::GN, "GN"})
+
+namespace kimera {
+namespace incremental {
 
 template <typename Visitor>
-void parse_layer_map(Visitor v, std::map<LayerId, bool>& value) {
+void parse_layer_map(const Visitor& v, const std::map<LayerId, bool>& value) {
   std::map<std::string, bool> raw_values;
   config_parser::visit_config(v, raw_values);
 
@@ -30,7 +59,7 @@ void parse_layer_map(Visitor v, std::map<LayerId, bool>& value) {
 }
 
 template <typename Visitor>
-void display_layer_map(Visitor v, std::map<LayerId, bool>& value) {
+void display_layer_map(const Visitor& v, const std::map<LayerId, bool>& value) {
   std::map<std::string, bool> raw_values;
   for (const auto& kv_pair : value) {
     raw_values[KimeraDsgLayers::LayerIdToString(kv_pair.first)] = kv_pair.second;
@@ -39,122 +68,8 @@ void display_layer_map(Visitor v, std::map<LayerId, bool>& value) {
   config_parser::visit_config(v, raw_values);
 }
 
-template <typename Visitor,
-          typename std::enable_if<config_parser::is_parser<Visitor>::value,
-                                  bool>::type = true>
-void handle_color(Visitor v, SemanticNodeAttributes::ColorVector& value) {
-  std::vector<int> raw_values;
-  config_parser::visit_config(v, raw_values);
-
-  if (raw_values.size() < 3) {
-    return;
-  }
-
-  value << static_cast<uint8_t>(raw_values[0]), static_cast<uint8_t>(raw_values[1]),
-      static_cast<uint8_t>(raw_values[2]);
-}
-
-template <
-    typename Visitor,
-    typename std::enable_if<std::negation<config_parser::is_parser<Visitor>>::value,
-                            bool>::type = true>
-void handle_color(Visitor v, SemanticNodeAttributes::ColorVector& value) {
-  std::vector<uint8_t> raw_values(3);
-  raw_values[0] = value(0);
-  raw_values[1] = value(0);
-  raw_values[2] = value(0);
-  config_parser::visit_config(v, raw_values);
-}
-
 }  // namespace incremental
 }  // namespace kimera
-
-namespace teaser {
-
-RobustRegistrationSolver::INLIER_SELECTION_MODE getInlierSelectionFromString(
-    const std::string& mode);
-
-void readRosParam(const ros::NodeHandle& nh,
-                  const std::string& name,
-                  RobustRegistrationSolver::INLIER_SELECTION_MODE& mode);
-
-std::ostream& operator<<(std::ostream& out,
-                         RobustRegistrationSolver::INLIER_SELECTION_MODE mode);
-
-}  // namespace teaser
-
-namespace KimeraRPGO {
-
-Verbosity getRpgoVerbosityFromString(const std::string& mode);
-
-void readRosParam(const ros::NodeHandle& nh, const std::string& name, Verbosity& mode);
-
-std::ostream& operator<<(std::ostream& out, Verbosity mode);
-
-Solver getRpgoSolverFromString(const std::string& mode);
-
-void readRosParam(const ros::NodeHandle& nh, const std::string& name, Solver& mode);
-
-std::ostream& operator<<(std::ostream& out, Solver mode);
-
-}  // namespace KimeraRPGO
-
-namespace YAML {
-
-using RoomClusterMode = kimera::incremental::RoomFinder::Config::ClusterMode;
-
-template <>
-struct convert<RoomClusterMode> {
-  static Node encode(const RoomClusterMode& rhs) {
-    std::stringstream ss;
-    ss << rhs;
-    return Node(ss.str());
-  }
-
-  static bool decode(const Node& node, RoomClusterMode& rhs) {
-    if (node.IsNull()) {
-      return false;
-    }
-    rhs = kimera::incremental::getRoomClusterModeFromString(node.as<std::string>());
-    return true;
-  }
-};
-
-template <>
-struct convert<KimeraRPGO::Verbosity> {
-  static Node encode(const KimeraRPGO::Verbosity& rhs) {
-    std::stringstream ss;
-    ss << rhs;
-    return Node(ss.str());
-  }
-
-  static bool decode(const Node& node, KimeraRPGO::Verbosity& rhs) {
-    if (node.IsNull()) {
-      return false;
-    }
-    rhs = KimeraRPGO::getRpgoVerbosityFromString(node.as<std::string>());
-    return true;
-  }
-};
-
-template <>
-struct convert<KimeraRPGO::Solver> {
-  static Node encode(const KimeraRPGO::Solver& rhs) {
-    std::stringstream ss;
-    ss << rhs;
-    return Node(ss.str());
-  }
-
-  static bool decode(const Node& node, KimeraRPGO::Solver& rhs) {
-    if (node.IsNull()) {
-      return false;
-    }
-    rhs = KimeraRPGO::getRpgoSolverFromString(node.as<std::string>());
-    return true;
-  }
-};
-
-}  // namespace YAML
 
 namespace kimera {
 namespace incremental {
@@ -171,22 +86,6 @@ struct DsgFrontendConfig {
   double descriptor_creation_horizon_m = 10.0;
   std::string mesh_ns = "";
 };
-
-template <typename Visitor>
-void visit_config(Visitor& v, DsgFrontendConfig& config) {
-  // TODO(nathan) replace with single param (derive should_log from log_path)
-  config_parser::visit_config(v["should_log"], config.should_log);
-  config_parser::visit_config(v["log_path"], config.log_path);
-  config_parser::visit_config(v["mesh_queue_size"], config.mesh_queue_size);
-  config_parser::visit_config(v["min_object_vertices"], config.min_object_vertices);
-  config_parser::visit_config(v["prune_mesh_indices"], config.prune_mesh_indices);
-  config_parser::visit_config(v["sensor_frame"], config.sensor_frame);
-  config_parser::visit_config(v["enable_lcd"], config.enable_lcd);
-  config_parser::visit_config(v["lcd_agent_horizon_s"], config.lcd_agent_horizon_s);
-  config_parser::visit_config(v["descriptor_creation_horizon_m"],
-                              config.descriptor_creation_horizon_m);
-  config_parser::visit_config(v["mesh_ns"], config.mesh_ns);
-}
 
 struct DsgBackendConfig {
   bool should_log = true;
@@ -226,13 +125,29 @@ struct DsgBackendConfig {
 };
 
 template <typename Visitor>
-void visit_config(Visitor& v, DsgBackendConfig& config) {
+void visit_config(const Visitor& v, const DsgFrontendConfig& config) {
+  // TODO(nathan) replace with single param (derive should_log from log_path)
+  config_parser::visit_config(v["should_log"], config.should_log);
+  config_parser::visit_config(v["log_path"], config.log_path);
+  config_parser::visit_config(v["mesh_queue_size"], config.mesh_queue_size);
+  config_parser::visit_config(v["min_object_vertices"], config.min_object_vertices);
+  config_parser::visit_config(v["prune_mesh_indices"], config.prune_mesh_indices);
+  config_parser::visit_config(v["sensor_frame"], config.sensor_frame);
+  config_parser::visit_config(v["enable_lcd"], config.enable_lcd);
+  config_parser::visit_config(v["lcd_agent_horizon_s"], config.lcd_agent_horizon_s);
+  config_parser::visit_config(v["descriptor_creation_horizon_m"],
+                              config.descriptor_creation_horizon_m);
+  config_parser::visit_config(v["mesh_ns"], config.mesh_ns);
+}
+
+template <typename Visitor>
+void visit_config(const Visitor& v, const DsgBackendConfig& config) {
   // TODO(nathan) replace with single param (derive should_log from log_path)
   config_parser::visit_config(v["should_log"], config.should_log);
   config_parser::visit_config(v["log_path"], config.log_path);
   config_parser::visit_config(v["visualize_place_factors"],
                               config.visualize_place_factors);
-  handle_color(v["building_color"], config.building_color);
+  config_parser::visit_config(v["building_color"], config.building_color);
   config_parser::visit_config(v["building_semantic_label"],
                               config.building_semantic_label);
   config_parser::visit_config(v["enable_rooms"], config.enable_rooms);
@@ -240,6 +155,7 @@ void visit_config(Visitor& v, DsgBackendConfig& config) {
 
   config_parser::visit_config(v["pgmo"], config.pgmo);
 
+  // TODO(nathan) handle these namespaces better
   auto dsg_handle = v["dsg"];
   config_parser::visit_config(dsg_handle["add_places_to_deformation_graph"],
                               config.add_places_to_deformation_graph);
@@ -248,6 +164,7 @@ void visit_config(Visitor& v, DsgBackendConfig& config) {
                               config.enable_node_merging);
   config_parser::visit_config(dsg_handle["call_update_periodically"],
                               config.call_update_periodically);
+  // TODO(nathan) replace with sfinae enable_if dispatch
   if (config_parser::is_parser<Visitor>()) {
     parse_layer_map(dsg_handle["merge_update_map"], config.merge_update_map);
   } else {
@@ -262,7 +179,7 @@ void visit_config(Visitor& v, DsgBackendConfig& config) {
 }
 
 template <typename Visitor>
-void visit_config(Visitor& v, DsgBackendConfig::PgmoConfig& config) {
+void visit_config(const Visitor& v, const DsgBackendConfig::PgmoConfig& config) {
   // TODO(nathan) replace with single param (derive should_log from log_path)
   config_parser::visit_config(v["should_log"], config.should_log);
   config_parser::visit_config(v["log_path"], config.log_path);
@@ -277,7 +194,7 @@ void visit_config(Visitor& v, DsgBackendConfig::PgmoConfig& config) {
 }
 
 template <typename Visitor>
-void visit_config(Visitor& v, RoomFinder::Config& config) {
+void visit_config(const Visitor& v, const RoomFinder::Config& config) {
   config_parser::visit_config(v["min_dilation_m"], config.min_dilation_m);
   config_parser::visit_config(v["max_dilation_m"], config.max_dilation_m);
   config_parser::visit_config(v["num_steps"], config.num_steps);
@@ -295,16 +212,14 @@ void visit_config(Visitor& v, RoomFinder::Config& config) {
   config_parser::visit_config(v["clustering_mode"], config.clustering_mode);
 }
 
-DECLARE_CONFIG_OSTREAM_OPERATOR(RoomFinder::Config)
-DECLARE_CONFIG_OSTREAM_OPERATOR(DsgBackendConfig)
-
 }  // namespace incremental
 }  // namespace kimera
 
 namespace teaser {
 
 template <typename Visitor>
-void visit_config(Visitor& v, teaser::RobustRegistrationSolver::Params& config) {
+void visit_config(const Visitor& v,
+                  const teaser::RobustRegistrationSolver::Params& config) {
   config_parser::visit_config(v["estimate_scaling"], config.estimate_scaling);
   config_parser::visit_config(v["cbar2"], config.cbar2);
   config_parser::visit_config(v["rotation_gnc_factor"], config.rotation_gnc_factor);
@@ -316,6 +231,8 @@ void visit_config(Visitor& v, teaser::RobustRegistrationSolver::Params& config) 
   config_parser::visit_config(v["max_clique_time_limit"], config.max_clique_time_limit);
 }
 
-DECLARE_CONFIG_OSTREAM_OPERATOR(teaser::RobustRegistrationSolver::Params)
-
 }  // namespace teaser
+
+DECLARE_CONFIG_OSTREAM_OPERATOR(teaser, RobustRegistrationSolver::Params)
+DECLARE_CONFIG_OSTREAM_OPERATOR(kimera::incremental, RoomFinder::Config)
+DECLARE_CONFIG_OSTREAM_OPERATOR(kimera::incremental, DsgBackendConfig)

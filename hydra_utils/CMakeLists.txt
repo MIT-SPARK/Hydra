@@ -7,12 +7,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(catkin REQUIRED COMPONENTS roscpp roslib)
+find_package(Eigen3 REQUIRED)
 find_package(yaml-cpp REQUIRED)
 
 catkin_package(
   CATKIN_DEPENDS roscpp
   DEPENDS
-  INCLUDE_DIRS include
+  INCLUDE_DIRS include ${EIGEN3_INCLUDE_DIRS}
   LIBRARIES ${PROJECT_NAME}
 )
 
@@ -20,7 +21,7 @@ add_library(${PROJECT_NAME}
     src/display_utils.cpp
     src/ros_config.cpp
     src/yaml_config.cpp)
-target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
+target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PUBLIC yaml-cpp ${catkin_LIBRARIES})
 
 if(CATKIN_ENABLE_TESTING)

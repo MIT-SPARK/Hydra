@@ -1,4 +1,5 @@
 #include <hydra_utils/config.h>
+#include <hydra_utils/eigen_config_types.h>
 
 #include <ros/package.h>
 
@@ -20,22 +21,10 @@ struct FakeConfig {
   int64_t c = -3;
   std::string msg = "hello";
   std::vector<int> values{1, 2, 3};
-  TestEnum type;
+  std::map<std::string, int> value_map{{"1", 2}, {"3", 4}};
+  TestEnum type = TestEnum::RED;
+  Eigen::Matrix<uint8_t, 3, 1> vec = Eigen::Matrix<uint8_t, 3, 1>::Zero();
 };
-
-template <typename Visitor>
-void visit_config(Visitor& v, FakeConfig& config) {
-  config_parser::visit_config(v["foo"], config.foo);
-  config_parser::visit_config(v["bar"], config.bar);
-  config_parser::visit_config(v["a"], config.a);
-  config_parser::visit_config(v["b"], config.b);
-  config_parser::visit_config(v["c"], config.c);
-  config_parser::visit_config(v["msg"], config.msg);
-  config_parser::visit_config(v["values"], config.values);
-  config_parser::visit_config(v["type"], config.type);
-}
-
-DECLARE_CONFIG_OSTREAM_OPERATOR(FakeConfig)
 
 struct FakeConfig2 {
   FakeConfig fake_config;
@@ -43,99 +32,46 @@ struct FakeConfig2 {
 };
 
 template <typename Visitor>
-void visit_config(Visitor& v, FakeConfig2& config) {
+void visit_config(const Visitor& v, const FakeConfig& config) {
+  config_parser::visit_config(v["foo"], config.foo);
+  config_parser::visit_config(v["bar"], config.bar);
+  config_parser::visit_config(v["a"], config.a);
+  config_parser::visit_config(v["b"], config.b);
+  config_parser::visit_config(v["c"], config.c);
+  config_parser::visit_config(v["msg"], config.msg);
+  config_parser::visit_config(v["values"], config.values);
+  config_parser::visit_config(v["value_map"], config.value_map);
+  config_parser::visit_config(v["type"], config.type);
+  config_parser::visit_config(v["vec"], config.vec);
+}
+
+template <typename Visitor>
+void visit_config(const Visitor& v, const FakeConfig2& config) {
   config_parser::visit_config(v["fake_config"], config.fake_config);
   config_parser::visit_config(v["msg"], config.msg);
 }
 
-std::ostream& operator<<(std::ostream& out, TestEnum v) {
-  switch (v) {
-    case TestEnum::RED:
-      out << "RED";
-      return out;
-    case TestEnum::GREEN:
-      out << "GREEN";
-      return out;
-    case TestEnum::BLUE:
-      out << "BLUE";
-      return out;
-    default:
-      out << "INVALID";
-      return out;
-  }
-}
-
-TestEnum readFromString(const std::string& enum_string) {
-  auto to_compare = config_parser::to_uppercase(enum_string);
-
-  if (to_compare == "RED") {
-    return TestEnum::RED;
-  }
-  if (to_compare == "GREEN") {
-    return TestEnum::GREEN;
-  }
-  if (to_compare == "BLUE") {
-    return TestEnum::BLUE;
-  }
-
-  return TestEnum::RED;
-}
-
-void readRosParam(const ros::NodeHandle& nh, const std::string& name, TestEnum& value) {
-  std::string color = "";
-  if (!nh.getParam(name, color)) {
-    return;
-  }
-
-  value = readFromString(color);
-}
-
 }  // namespace hydra_utils
 
-namespace YAML {
-template <>
-struct convert<hydra_utils::TestEnum> {
-  static Node encode(const hydra_utils::TestEnum& rhs) {
-    std::stringstream ss;
-    ss << rhs;
-    return Node(ss.str());
-  }
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra_utils, FakeConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra_utils, FakeConfig2)
 
-  static bool decode(const Node& node, hydra_utils::TestEnum& rhs) {
-    if (node.IsNull()) {
-      return false;
-    }
-    rhs = hydra_utils::readFromString(node.as<std::string>());
-    return true;
-  }
-};
-
-}  // namespace YAML
+DECLARE_CONFIG_ENUM(hydra_utils,
+                    TestEnum,
+                    {TestEnum::RED, "RED"},
+                    {TestEnum::GREEN, "GREEN"},
+                    {TestEnum::BLUE, "BLUE"})
 
 // make sure the ros side compiles (even if we're not directly testing)
 hydra_utils::FakeConfig load_from_ros() {
   return config_parser::load_from_ros<hydra_utils::FakeConfig>("~");
 }
 
-template <>
-struct config_parser::is_config<hydra_utils::FakeConfig> : std::true_type {};
-
-template <>
-struct config_parser::is_config<hydra_utils::FakeConfig2> : std::true_type {};
-
-// make sure our ostream operator works (even if we're not directly testing)
-void show_config() {
-  auto visitor = config_parser::ConfigDisplay(std::cout);
-
-  hydra_utils::FakeConfig config;
-  config_parser::visit_config(visitor, config);
-
-  std::cout << config << std::endl;
-}
+namespace hydra_utils {
 
 TEST(ConfigParsing, ParseSingleStructYaml) {
   const std::string filepath = get_test_path() + "test_config.yaml";
-  auto config = config_parser::load_from_yaml<hydra_utils::FakeConfig>(filepath);
+  auto config = config_parser::load_from_yaml<FakeConfig>(filepath);
 
   EXPECT_EQ(config.foo, 10.0f);
   EXPECT_EQ(config.bar, 5.0);
@@ -144,13 +80,22 @@ TEST(ConfigParsing, ParseSingleStructYaml) {
   EXPECT_EQ(config.c, 2);
   EXPECT_EQ(config.msg, "world");
 
-  std::vector<int> expected_values{1, 2, 3};
+  std::vector<int> expected_values{4, 5, 6};
   EXPECT_EQ(config.values, expected_values);
+
+  std::map<std::string, int> expected_value_map{{"3", 4}, {"5", 6}};
+  EXPECT_EQ(config.value_map, expected_value_map);
+
+  EXPECT_EQ(config.type, TestEnum::GREEN);
+
+  Eigen::Matrix<uint8_t, 3, 1> expected_vec;
+  expected_vec << 7, 8, 9;
+  EXPECT_EQ(config.vec, expected_vec);
 }
 
 TEST(ConfigParsing, ParseNestedStructYaml) {
   const std::string filepath = get_test_path() + "nested_test_config.yaml";
-  auto config = config_parser::load_from_yaml<hydra_utils::FakeConfig2>(filepath);
+  auto config = config_parser::load_from_yaml<FakeConfig2>(filepath);
 
   EXPECT_EQ(config.fake_config.foo, 10.0f);
   EXPECT_EQ(config.fake_config.bar, 5.0);
@@ -163,3 +108,51 @@ TEST(ConfigParsing, ParseNestedStructYaml) {
   EXPECT_EQ(config.fake_config.values, expected_values);
   EXPECT_EQ(config.msg, "again");
 }
+
+TEST(ConfigParsing, OutputSingleConfig) {
+  FakeConfig config;
+  std::stringstream ss;
+  // endl to make expected easier to write
+  ss << std::endl << config;
+
+  std::string expected = R"out(
+- foo: 5
+- bar: 10
+- a: 1
+- b: 2
+- c: -3
+- msg: hello
+- values: [1, 2, 3]
+- value_map: {1: 2, 3: 4}
+- type: RED
+- vec: [0, 0, 0]
+)out";
+
+  EXPECT_EQ(expected, ss.str()) << "config:" << std::endl << ss.str();
+}
+
+TEST(ConfigParsing, OutputNestedConfig) {
+  FakeConfig2 config;
+  std::stringstream ss;
+  // endl to make expected easier to write
+  ss << std::endl << config;
+
+  std::string expected = R"out(
+- fake_config:
+  - foo: 5
+  - bar: 10
+  - a: 1
+  - b: 2
+  - c: -3
+  - msg: hello
+  - values: [1, 2, 3]
+  - value_map: {1: 2, 3: 4}
+  - type: RED
+  - vec: [0, 0, 0]
+- msg: world
+)out";
+
+  EXPECT_EQ(expected, ss.str()) << "config:" << std::endl << ss.str();
+}
+
+}  // namespace hydra_utils

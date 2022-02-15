@@ -5,28 +5,28 @@
 namespace config_parser {
 
 template <typename T>
-struct is_base_ros_param : public std::false_type {};
+struct is_base_ros_param : std::false_type {};
 
 template <>
-struct is_base_ros_param<std::string> : public std::true_type {};
+struct is_base_ros_param<std::string> : std::true_type {};
 
 template <>
-struct is_base_ros_param<double> : public std::true_type {};
+struct is_base_ros_param<double> : std::true_type {};
 
 template <>
-struct is_base_ros_param<float> : public std::true_type {};
+struct is_base_ros_param<float> : std::true_type {};
 
 template <>
-struct is_base_ros_param<int> : public std::true_type {};
+struct is_base_ros_param<int> : std::true_type {};
 
 template <>
-struct is_base_ros_param<bool> : public std::true_type {};
+struct is_base_ros_param<bool> : std::true_type {};
 
 template <typename T>
-struct is_config : public std::false_type {};
+struct is_config : std::false_type {};
 
 template <typename T>
-struct is_parser : public std::false_type {};
+struct is_parser : std::false_type {};
 
 namespace detail {
 

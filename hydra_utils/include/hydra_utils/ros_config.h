@@ -20,15 +20,25 @@ void readRosParam(const ros::NodeHandle& nh,
   nh.getParam(name, value);
 }
 
-template <typename K,
-          typename V,
-          typename std::enable_if<
-              std::conjunction<is_base_ros_param<K>, is_base_ros_param<V>>::value,
-              bool>::type = true>
+template <typename T,
+          typename std::enable_if<is_base_ros_param<T>::value, bool>::type = true>
 void readRosParam(const ros::NodeHandle& nh,
                   const std::string& name,
-                  std::map<K, V>& value) {
+                  std::map<std::string, T>& value) {
   nh.getParam(name, value);
+}
+
+template <typename T>
+void convertFromInt(int placeholder, T& value) {
+  if (sizeof(T) < sizeof(int)) {
+    // avoid overflow on uint16_t and smaller
+    constexpr const int lo_value = static_cast<int>(std::numeric_limits<T>::min());
+    constexpr const int hi_value = static_cast<int>(std::numeric_limits<T>::max());
+    placeholder = std::clamp(placeholder, lo_value, hi_value);
+    // TODO(nathan) think about warning
+  }
+
+  value = static_cast<T>(placeholder);
 }
 
 template <typename T,
@@ -41,21 +51,26 @@ void readRosParam(const ros::NodeHandle& nh, const std::string& name, T& value) 
     return;
   }
 
-  if (sizeof(T) < sizeof(int)) {
-    // avoid overflow on uint16_t and smaller
-    constexpr const int lo_value = static_cast<int>(std::numeric_limits<T>::min());
-    constexpr const int hi_value = static_cast<int>(std::numeric_limits<T>::max());
-    int old_placeholder = placeholder;
-    placeholder = std::clamp(placeholder, lo_value, hi_value);
-    if (placeholder != old_placeholder) {
-      ROS_WARN_STREAM("Parameter "
-                      << nh.resolveName(name) << " had a value " << old_placeholder
-                      << " which was outside the bounds of [" << lo_value << ", "
-                      << hi_value << "]");
-    }
+  convertFromInt(placeholder, value);
+}
+
+template <typename T,
+          typename std::enable_if<std::conjunction<std::negation<is_base_ros_param<T>>,
+                                                   std::is_integral<T>>::value,
+                                  bool>::type = true>
+void readRosParam(const ros::NodeHandle& nh,
+                  const std::string& name,
+                  std::vector<T>& value) {
+  std::vector<int> placeholders;
+  if (!nh.getParam(name, placeholders)) {
+    return;
   }
 
-  value = static_cast<T>(placeholder);
+  for (const int placeholder : placeholders) {
+    T new_value;
+    convertFromInt(placeholder, new_value);
+    value.push_back(new_value);
+  }
 }
 
 // adl indirection
@@ -89,7 +104,7 @@ class RosParser {
   RosParser operator[](const std::string& new_name) const;
 
   template <typename T>
-  void visit(T& value) {
+  void visit(T& value) const {
     ::config_parser::readRosParam(nh_, name_, value);
   }
 

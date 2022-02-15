@@ -5,78 +5,33 @@
 #include <voxblox_ros/mesh_vis.h>
 #include <sstream>
 
-namespace voxblox {
+DECLARE_CONFIG_ENUM(voxblox,
+                    ColorMode,
+                    {ColorMode::kColor, "color"},
+                    {ColorMode::kHeight, "height"},
+                    {ColorMode::kNormals, "normals"},
+                    {ColorMode::kGray, "gray"},
+                    {ColorMode::kLambert, "lambert"},
+                    {ColorMode::kLambertColor, "lambert_color"});
 
-void readRosParam(const ros::NodeHandle& nh, const std::string& name, ColorMode& mode);
-
-std::ostream& operator<<(std::ostream& out, ColorMode mode);
-
-}  // namespace voxblox
-
-namespace kimera {
-namespace topology {
-
-ParentUniquenessMode getParentUniquenessModeFromString(const std::string& mode);
-
-void readRosParam(const ros::NodeHandle& nh,
-                  const std::string& name,
-                  ParentUniquenessMode& mode);
-
-std::ostream& operator<<(std::ostream& out, ParentUniquenessMode mode);
-
-}  // namespace topology
-}  // namespace kimera
-
-namespace YAML {
-
-template <>
-struct convert<voxblox::ColorMode> {
-  static Node encode(const voxblox::ColorMode& rhs) {
-    std::stringstream ss;
-    ss << rhs;
-    return Node(ss.str());
-  }
-
-  static bool decode(const Node& node, voxblox::ColorMode& rhs) {
-    if (node.IsNull()) {
-      return false;
-    }
-    rhs = voxblox::getColorModeFromString(node.as<std::string>());
-    return true;
-  }
-};
-
-template <>
-struct convert<kimera::topology::ParentUniquenessMode> {
-  static Node encode(const kimera::topology::ParentUniquenessMode& rhs) {
-    std::stringstream ss;
-    ss << rhs;
-    return Node(ss.str());
-  }
-
-  static bool decode(const Node& node, kimera::topology::ParentUniquenessMode& rhs) {
-    if (node.IsNull()) {
-      return false;
-    }
-    rhs = kimera::topology::getParentUniquenessModeFromString(node.as<std::string>());
-    return true;
-  }
-};
-
-}  // namespace YAML
+DECLARE_CONFIG_ENUM(kimera::topology,
+                    ParentUniquenessMode,
+                    {ParentUniquenessMode::ANGLE, "ANGLE"},
+                    {ParentUniquenessMode::L1_DISTANCE, "L1_DISTANCE"},
+                    {ParentUniquenessMode::L1_THEN_ANGLE, "L1_THEN_ANGLE"});
 
 namespace voxblox {
 
 template <typename Visitor>
-void visit_config(Visitor& v, MeshIntegratorConfig& config) {
+void visit_config(const Visitor& v, const MeshIntegratorConfig& config) {
   config_parser::visit_config(v["use_color"], config.use_color);
   config_parser::visit_config(v["min_weight"], config.min_weight);
   config_parser::visit_config(v["integrator_threads"], config.integrator_threads);
 }
 
-DECLARE_CONFIG_OSTREAM_OPERATOR(MeshIntegratorConfig)
-
 }  // namespace voxblox
+
+
 
 namespace kimera {
 namespace topology {
@@ -93,7 +48,7 @@ struct TopologyServerConfig {
 };
 
 template <typename Visitor>
-void visit_config(Visitor& v, VoronoiCheckConfig& config) {
+void visit_config(const Visitor& v, const VoronoiCheckConfig& config) {
   config_parser::visit_config(v["mode"], config.mode);
   config_parser::visit_config(v["min_distance_m"], config.min_distance_m);
   config_parser::visit_config(v["parent_l1_separation"], config.parent_l1_separation);
@@ -102,7 +57,7 @@ void visit_config(Visitor& v, VoronoiCheckConfig& config) {
 }
 
 template <typename Visitor>
-void visit_config(Visitor& v, GraphExtractorConfig& config) {
+void visit_config(const Visitor& v, const GraphExtractorConfig& config) {
   config_parser::visit_config(v["min_extra_basis"], config.min_extra_basis);
   config_parser::visit_config(v["min_vertex_basis"], config.min_vertex_basis);
   config_parser::visit_config(v["merge_new_nodes"], config.merge_new_nodes);
@@ -135,7 +90,7 @@ void visit_config(Visitor& v, GraphExtractorConfig& config) {
 }
 
 template <typename Visitor>
-void visit_config(Visitor& v, GvdIntegratorConfig& config) {
+void visit_config(const Visitor& v, const GvdIntegratorConfig& config) {
   config_parser::visit_config(v["max_distance_m"], config.max_distance_m);
   config_parser::visit_config(v["min_distance_m"], config.min_distance_m);
   config_parser::visit_config(v["min_diff_m"], config.min_diff_m);
@@ -158,7 +113,7 @@ void visit_config(Visitor& v, GvdIntegratorConfig& config) {
 }
 
 template <typename Visitor>
-void visit_config(Visitor& v, TopologyServerConfig& config) {
+void visit_config(const Visitor& v, const TopologyServerConfig& config) {
   config_parser::visit_config(v["update_period_s"], config.update_period_s);
   config_parser::visit_config(v["show_stats"], config.show_stats);
   config_parser::visit_config(v["dense_representation_radius_m"],
@@ -168,29 +123,12 @@ void visit_config(Visitor& v, TopologyServerConfig& config) {
   config_parser::visit_config(v["world_frame"], config.world_frame);
 }
 
-DECLARE_CONFIG_OSTREAM_OPERATOR(TopologyServerConfig)
-DECLARE_CONFIG_OSTREAM_OPERATOR(VoronoiCheckConfig)
-DECLARE_CONFIG_OSTREAM_OPERATOR(GraphExtractorConfig)
-DECLARE_CONFIG_OSTREAM_OPERATOR(GvdIntegratorConfig)
 
 }  // namespace topology
 }  // namespace kimera
 
-template <>
-struct config_parser::is_config<voxblox::MeshIntegratorConfig> : std::true_type {};
-
-template <>
-struct config_parser::is_config<kimera::topology::TopologyServerConfig>
-    : std::true_type {};
-
-template <>
-struct config_parser::is_config<kimera::topology::VoronoiCheckConfig> : std::true_type {
-};
-
-template <>
-struct config_parser::is_config<kimera::topology::GraphExtractorConfig>
-    : std::true_type {};
-
-template <>
-struct config_parser::is_config<kimera::topology::GvdIntegratorConfig>
-    : std::true_type {};
+DECLARE_CONFIG_OSTREAM_OPERATOR(voxblox, MeshIntegratorConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(kimera::topology, TopologyServerConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(kimera::topology, VoronoiCheckConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(kimera::topology, GraphExtractorConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(kimera::topology, GvdIntegratorConfig)
