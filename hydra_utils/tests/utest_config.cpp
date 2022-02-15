@@ -62,11 +62,6 @@ DECLARE_CONFIG_ENUM(hydra_utils,
                     {TestEnum::GREEN, "GREEN"},
                     {TestEnum::BLUE, "BLUE"})
 
-// make sure the ros side compiles (even if we're not directly testing)
-hydra_utils::FakeConfig load_from_ros() {
-  return config_parser::load_from_ros<hydra_utils::FakeConfig>("~");
-}
-
 namespace hydra_utils {
 
 TEST(ConfigParsing, ParseSingleStructYaml) {
@@ -93,9 +88,48 @@ TEST(ConfigParsing, ParseSingleStructYaml) {
   EXPECT_EQ(config.vec, expected_vec);
 }
 
+TEST(ConfigParsing, ParseSingleStructRos) {
+  auto config = config_parser::load_from_ros<FakeConfig>("/plain_test_config");
+
+  EXPECT_EQ(config.foo, 10.0f);
+  EXPECT_EQ(config.bar, 5.0);
+  EXPECT_EQ(config.a, -3);
+  EXPECT_EQ(static_cast<int>(config.b), 1);
+  EXPECT_EQ(config.c, 2);
+  EXPECT_EQ(config.msg, "world");
+
+  std::vector<int> expected_values{4, 5, 6};
+  EXPECT_EQ(config.values, expected_values);
+
+  std::map<std::string, int> expected_value_map{{"3", 4}, {"5", 6}};
+  EXPECT_EQ(config.value_map, expected_value_map);
+
+  EXPECT_EQ(config.type, TestEnum::GREEN);
+
+  Eigen::Matrix<uint8_t, 3, 1> expected_vec;
+  expected_vec << 7, 8, 9;
+  EXPECT_EQ(config.vec, expected_vec);
+}
+
 TEST(ConfigParsing, ParseNestedStructYaml) {
   const std::string filepath = get_test_path() + "nested_test_config.yaml";
   auto config = config_parser::load_from_yaml<FakeConfig2>(filepath);
+
+  EXPECT_EQ(config.fake_config.foo, 10.0f);
+  EXPECT_EQ(config.fake_config.bar, 5.0);
+  EXPECT_EQ(config.fake_config.a, -3);
+  EXPECT_EQ(static_cast<int>(config.fake_config.b), 1);
+  EXPECT_EQ(config.fake_config.c, 2);
+  EXPECT_EQ(config.fake_config.msg, "hello");
+
+  std::vector<int> expected_values{1, 2, 3};
+  EXPECT_EQ(config.fake_config.values, expected_values);
+  EXPECT_EQ(config.msg, "again");
+}
+
+TEST(ConfigParsing, ParseNestedStructRos) {
+  auto config = config_parser::load_from_ros<FakeConfig2>("/nested_test_config");
+  ros::NodeHandle nh("/nested_test_config");
 
   EXPECT_EQ(config.fake_config.foo, 10.0f);
   EXPECT_EQ(config.fake_config.bar, 5.0);

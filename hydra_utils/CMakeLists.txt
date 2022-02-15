@@ -25,8 +25,10 @@ target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS}
 target_link_libraries(${PROJECT_NAME} PUBLIC yaml-cpp ${catkin_LIBRARIES})
 
 if(CATKIN_ENABLE_TESTING)
-  catkin_add_gtest(
+  find_package(rostest REQUIRED)
+  add_rostest_gtest(
     utest_${PROJECT_NAME}
+    tests/hydra_utils.test
     tests/utest_main.cpp
     tests/utest_config.cpp
   )

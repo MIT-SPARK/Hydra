@@ -13,7 +13,7 @@ RosParser RosParser::FromNs(const std::string& ns) {
 
 RosParser RosParser::operator[](const std::string& new_name) const {
   // push name onto nodehandle namespace if name isn't empty
-  ros::NodeHandle new_nh = (name_ != "") ? nh_ : ros::NodeHandle(nh_, name_);
+  ros::NodeHandle new_nh = (name_ == "") ? nh_ : ros::NodeHandle(nh_, name_);
   return RosParser(new_nh, new_name);
 }
 

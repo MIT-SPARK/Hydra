@@ -64,6 +64,9 @@ void readRosParam(const ros::NodeHandle& nh,
                   Matrix<Scalar, N, 1>& value) {
   std::vector<Scalar> raw_values;
   config_parser::readRosParam(nh, name, raw_values);
+  if (raw_values.empty()) {
+    return;
+  }
 
   if (raw_values.size() != static_cast<size_t>(N)) {
     std::stringstream ss;

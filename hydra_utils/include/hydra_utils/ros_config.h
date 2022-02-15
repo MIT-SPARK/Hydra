@@ -25,6 +25,11 @@ template <typename T,
 void readRosParam(const ros::NodeHandle& nh,
                   const std::string& name,
                   std::map<std::string, T>& value) {
+  if (!nh.hasParam(name)) {
+    return;
+  }
+
+  value.clear();
   nh.getParam(name, value);
 }
 
