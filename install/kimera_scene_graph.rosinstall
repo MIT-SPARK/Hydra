@@ -24,16 +24,16 @@
     uri: git@github.mit.edu:SPARK/GraphCMR-ROS.git
 - git:
     local-name: gtsam
-    uri: git@github.com:borglab/gtsam.git
-    version: develop
+    uri: git@github.com:yunzc/gtsam.git
+    version: feature/gnc_base_params
 - git:
     local-name: kimera_pgmo
     uri: git@github.mit.edu:SPARK/Kimera-PGMO.git
-    version: feature/dsg_integration
+    version: master
 - git:
     local-name: kimera_rpgo
     uri: git@github.com:MIT-SPARK/Kimera-RPGO.git
-    version: feature/online_dsg
+    version: master
 - git:
     local-name: kimera_dsg
     uri: git@github.mit.edu:SPARK/Kimera-DSG.git
@@ -44,6 +44,9 @@
     local-name: kimera_semantics
     uri: git@github.mit.edu:SPARK/Kimera-Semantics.git
     version: feature/noetic_fixes
+- git:
+    local-name: mesh_tools
+    uri: git@github.com:yunzc/mesh_tools.git
 - git:
     local-name: minkindr
     uri: git@github.com:ethz-asl/minkindr.git
