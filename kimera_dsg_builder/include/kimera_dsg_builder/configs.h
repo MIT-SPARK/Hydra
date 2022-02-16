@@ -13,67 +13,6 @@
 namespace kimera {
 namespace incremental {
 
-using RoomClusterModeEnum = RoomFinder::Config::ClusterMode;
-
-}  // namespace incremental
-}  // namespace kimera
-
-DECLARE_CONFIG_ENUM(kimera::incremental,
-                    RoomClusterModeEnum,
-                    {RoomClusterModeEnum::SPECTRAL, "SPECTRAL"},
-                    {RoomClusterModeEnum::MODULARITY, "MODULARITY"},
-                    {RoomClusterModeEnum::NONE, "NONE"})
-
-namespace teaser {
-
-using TeaserInlierSelectionMode = RobustRegistrationSolver::INLIER_SELECTION_MODE;
-
-}  // namespace teaser
-
-DECLARE_CONFIG_ENUM(teaser,
-                    TeaserInlierSelectionMode,
-                    {TeaserInlierSelectionMode::PMC_EXACT, "PMC_EXACT"},
-                    {TeaserInlierSelectionMode::PMC_HEU, "PMC_HEU"},
-                    {TeaserInlierSelectionMode::KCORE_HEU, "KCORE_HEU"},
-                    {TeaserInlierSelectionMode::NONE, "NONE"})
-
-DECLARE_CONFIG_ENUM(KimeraRPGO,
-                    Verbosity,
-                    {Verbosity::UPDATE, "UPDATE"},
-                    {Verbosity::QUIET, "QUIET"},
-                    {Verbosity::VERBOSE, "VERBOSE"})
-
-DECLARE_CONFIG_ENUM(KimeraRPGO, Solver, {Solver::LM, "LM"}, {Solver::GN, "GN"})
-
-namespace kimera {
-namespace incremental {
-
-template <typename Visitor>
-void parse_layer_map(const Visitor& v, const std::map<LayerId, bool>& value) {
-  std::map<std::string, bool> raw_values;
-  config_parser::visit_config(v, raw_values);
-
-  for (const auto& kv_pair : raw_values) {
-    value[KimeraDsgLayers::StringToLayerId(kv_pair.first)] = kv_pair.second;
-  }
-}
-
-template <typename Visitor>
-void display_layer_map(const Visitor& v, const std::map<LayerId, bool>& value) {
-  std::map<std::string, bool> raw_values;
-  for (const auto& kv_pair : value) {
-    raw_values[KimeraDsgLayers::LayerIdToString(kv_pair.first)] = kv_pair.second;
-  }
-
-  config_parser::visit_config(v, raw_values);
-}
-
-}  // namespace incremental
-}  // namespace kimera
-
-namespace kimera {
-namespace incremental {
-
 struct DsgFrontendConfig {
   bool should_log = true;
   std::string log_path = "";
@@ -125,7 +64,7 @@ struct DsgBackendConfig {
 };
 
 template <typename Visitor>
-void visit_config(const Visitor& v, const DsgFrontendConfig& config) {
+void visit_config(const Visitor& v, DsgFrontendConfig& config) {
   // TODO(nathan) replace with single param (derive should_log from log_path)
   config_parser::visit_config(v["should_log"], config.should_log);
   config_parser::visit_config(v["log_path"], config.log_path);
@@ -140,8 +79,16 @@ void visit_config(const Visitor& v, const DsgFrontendConfig& config) {
   config_parser::visit_config(v["mesh_ns"], config.mesh_ns);
 }
 
+struct EnableMapConverter {
+  EnableMapConverter() = default;
+
+  std::map<std::string, bool> from(const std::map<LayerId, bool>& other) const;
+
+  std::map<LayerId, bool> from(const std::map<std::string, bool>& other) const;
+};
+
 template <typename Visitor>
-void visit_config(const Visitor& v, const DsgBackendConfig& config) {
+void visit_config(const Visitor& v, DsgBackendConfig& config) {
   // TODO(nathan) replace with single param (derive should_log from log_path)
   config_parser::visit_config(v["should_log"], config.should_log);
   config_parser::visit_config(v["log_path"], config.log_path);
@@ -164,12 +111,8 @@ void visit_config(const Visitor& v, const DsgBackendConfig& config) {
                               config.enable_node_merging);
   config_parser::visit_config(dsg_handle["call_update_periodically"],
                               config.call_update_periodically);
-  // TODO(nathan) replace with sfinae enable_if dispatch
-  if (config_parser::is_parser<Visitor>()) {
-    parse_layer_map(dsg_handle["merge_update_map"], config.merge_update_map);
-  } else {
-    display_layer_map(dsg_handle["merge_update_map"], config.merge_update_map);
-  }
+  config_parser::visit_config(
+      dsg_handle["merge_update_map"], config.merge_update_map, EnableMapConverter());
   config_parser::visit_config(dsg_handle["merge_update_dynamic"],
                               config.merge_update_dynamic);
   config_parser::visit_config(dsg_handle["places_merge_pos_threshold_m"],
@@ -179,7 +122,7 @@ void visit_config(const Visitor& v, const DsgBackendConfig& config) {
 }
 
 template <typename Visitor>
-void visit_config(const Visitor& v, const DsgBackendConfig::PgmoConfig& config) {
+void visit_config(const Visitor& v, DsgBackendConfig::PgmoConfig& config) {
   // TODO(nathan) replace with single param (derive should_log from log_path)
   config_parser::visit_config(v["should_log"], config.should_log);
   config_parser::visit_config(v["log_path"], config.log_path);
@@ -194,7 +137,7 @@ void visit_config(const Visitor& v, const DsgBackendConfig::PgmoConfig& config) 
 }
 
 template <typename Visitor>
-void visit_config(const Visitor& v, const RoomFinder::Config& config) {
+void visit_config(const Visitor& v, RoomFinder::Config& config) {
   config_parser::visit_config(v["min_dilation_m"], config.min_dilation_m);
   config_parser::visit_config(v["max_dilation_m"], config.max_dilation_m);
   config_parser::visit_config(v["num_steps"], config.num_steps);
@@ -218,8 +161,7 @@ void visit_config(const Visitor& v, const RoomFinder::Config& config) {
 namespace teaser {
 
 template <typename Visitor>
-void visit_config(const Visitor& v,
-                  const teaser::RobustRegistrationSolver::Params& config) {
+void visit_config(const Visitor& v, teaser::RobustRegistrationSolver::Params& config) {
   config_parser::visit_config(v["estimate_scaling"], config.estimate_scaling);
   config_parser::visit_config(v["cbar2"], config.cbar2);
   config_parser::visit_config(v["rotation_gnc_factor"], config.rotation_gnc_factor);

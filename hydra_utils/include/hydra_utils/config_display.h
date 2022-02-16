@@ -14,11 +14,13 @@ void displayParam(std::ostream& out, const T& value) {
   out << value;
 }
 
-void displayParam(std::ostream& out, const uint8_t& value) {
+template <>
+inline void displayParam<uint8_t>(std::ostream& out, const uint8_t& value) {
   out << static_cast<int>(value);
 }
 
-void displayParam(std::ostream& out, const bool& value) {
+template <>
+inline void displayParam<bool>(std::ostream& out, const bool& value) {
   out << (value ? "true" : "false");
 }
 
@@ -90,13 +92,13 @@ class ConfigDisplay {
     return ConfigDisplay(out_, new_prefix);
   }
 
-  void pre_visit() const {
+  inline void pre_visit() const {
     if (!root_call_) {
       out_ << prefix_;
     }
   }
 
-  void post_visit() const {
+  inline void post_visit() const {
     if (!root_call_) {
       out_ << std::endl;
     }

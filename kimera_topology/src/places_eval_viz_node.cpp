@@ -35,7 +35,7 @@ using voxblox::TsdfVoxel;
 namespace kimera_dsg_visualizer {
 
 template <typename Visitor>
-void visit_config(const Visitor& v, const ColormapConfig& config) {
+void visit_config(const Visitor& v, ColormapConfig& config) {
   config_parser::visit_config(v["min_hue"], config.min_hue);
   config_parser::visit_config(v["max_hue"], config.max_hue);
   config_parser::visit_config(v["min_saturation"], config.min_saturation);
@@ -45,7 +45,7 @@ void visit_config(const Visitor& v, const ColormapConfig& config) {
 }
 
 template <typename Visitor>
-void visit_config(const Visitor& v, const VisualizerConfig& config) {
+void visit_config(const Visitor& v, VisualizerConfig& config) {
   config_parser::visit_config(v["layer_z_step"], config.layer_z_step);
   config_parser::visit_config(v["mesh_edge_break_ratio"], config.mesh_edge_break_ratio);
   config_parser::visit_config(v["mesh_layer_offset"], config.mesh_layer_offset);
@@ -55,7 +55,7 @@ void visit_config(const Visitor& v, const VisualizerConfig& config) {
 }
 
 template <typename Visitor>
-void visit_config(const Visitor& v, const LayerConfig& config) {
+void visit_config(const Visitor& v, LayerConfig& config) {
   config_parser::visit_config(v["z_offset_scale"], config.z_offset_scale);
   config_parser::visit_config(v["visualize"], config.visualize);
   config_parser::visit_config(v["marker_scale"], config.marker_scale);

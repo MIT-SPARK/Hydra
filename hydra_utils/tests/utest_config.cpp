@@ -24,6 +24,7 @@ struct FakeConfig {
   std::map<std::string, int> value_map{{"1", 2}, {"3", 4}};
   TestEnum type = TestEnum::RED;
   Eigen::Matrix<uint8_t, 3, 1> vec = Eigen::Matrix<uint8_t, 3, 1>::Zero();
+  std::map<TestEnum, bool> enable_map{{TestEnum::RED, true}, {TestEnum::GREEN, false}};
 };
 
 struct FakeConfig2 {
@@ -31,8 +32,16 @@ struct FakeConfig2 {
   std::string msg = "world";
 };
 
+struct MapConverter {
+  MapConverter() = default;
+
+  std::map<TestEnum, bool> from(const std::map<std::string, bool>& other) const;
+
+  std::map<std::string, bool> from(const std::map<TestEnum, bool>& other) const;
+};
+
 template <typename Visitor>
-void visit_config(const Visitor& v, const FakeConfig& config) {
+void visit_config(const Visitor& v, FakeConfig& config) {
   config_parser::visit_config(v["foo"], config.foo);
   config_parser::visit_config(v["bar"], config.bar);
   config_parser::visit_config(v["a"], config.a);
@@ -43,10 +52,11 @@ void visit_config(const Visitor& v, const FakeConfig& config) {
   config_parser::visit_config(v["value_map"], config.value_map);
   config_parser::visit_config(v["type"], config.type);
   config_parser::visit_config(v["vec"], config.vec);
+  config_parser::visit_config(v["enable_map"], config.enable_map, MapConverter());
 }
 
 template <typename Visitor>
-void visit_config(const Visitor& v, const FakeConfig2& config) {
+void visit_config(const Visitor& v, FakeConfig2& config) {
   config_parser::visit_config(v["fake_config"], config.fake_config);
   config_parser::visit_config(v["msg"], config.msg);
 }
@@ -63,6 +73,29 @@ DECLARE_CONFIG_ENUM(hydra_utils,
                     {TestEnum::BLUE, "BLUE"})
 
 namespace hydra_utils {
+
+std::map<TestEnum, bool> MapConverter::from(
+    const std::map<std::string, bool>& other) const {
+  std::map<TestEnum, bool> to_return;
+  for (const auto& kv_pair : other) {
+    // defined by enum macro
+    TestEnum new_enum = readTestEnumFromString(kv_pair.first);
+    to_return[new_enum] = kv_pair.second;
+  }
+  return to_return;
+}
+
+std::map<std::string, bool> MapConverter::from(
+    const std::map<TestEnum, bool>& other) const {
+  std::map<std::string, bool> to_return;
+  for (const auto& kv_pair : other) {
+    std::stringstream ss;
+    ss << kv_pair.first;
+    to_return[ss.str()] = kv_pair.second;
+  }
+
+  return to_return;
+}
 
 TEST(ConfigParsing, ParseSingleStructYaml) {
   const std::string filepath = get_test_path() + "test_config.yaml";
@@ -86,6 +119,10 @@ TEST(ConfigParsing, ParseSingleStructYaml) {
   Eigen::Matrix<uint8_t, 3, 1> expected_vec;
   expected_vec << 7, 8, 9;
   EXPECT_EQ(config.vec, expected_vec);
+
+  std::map<TestEnum, bool> expected_enable_map{{TestEnum::BLUE, 0},
+                                               {TestEnum::GREEN, 1}};
+  EXPECT_EQ(config.enable_map, expected_enable_map);
 }
 
 TEST(ConfigParsing, ParseSingleStructRos) {
@@ -109,6 +146,10 @@ TEST(ConfigParsing, ParseSingleStructRos) {
   Eigen::Matrix<uint8_t, 3, 1> expected_vec;
   expected_vec << 7, 8, 9;
   EXPECT_EQ(config.vec, expected_vec);
+
+  std::map<TestEnum, bool> expected_enable_map{{TestEnum::BLUE, 0},
+                                               {TestEnum::GREEN, 1}};
+  EXPECT_EQ(config.enable_map, expected_enable_map);
 }
 
 TEST(ConfigParsing, ParseNestedStructYaml) {
@@ -125,6 +166,11 @@ TEST(ConfigParsing, ParseNestedStructYaml) {
   std::vector<int> expected_values{1, 2, 3};
   EXPECT_EQ(config.fake_config.values, expected_values);
   EXPECT_EQ(config.msg, "again");
+
+  // make sure conversion respects the default
+  std::map<TestEnum, bool> expected_enable_map{{TestEnum::RED, 1},
+                                               {TestEnum::GREEN, 0}};
+  EXPECT_EQ(config.fake_config.enable_map, expected_enable_map);
 }
 
 TEST(ConfigParsing, ParseNestedStructRos) {
@@ -141,6 +187,11 @@ TEST(ConfigParsing, ParseNestedStructRos) {
   std::vector<int> expected_values{1, 2, 3};
   EXPECT_EQ(config.fake_config.values, expected_values);
   EXPECT_EQ(config.msg, "again");
+
+  // make sure conversion respects the default
+  std::map<TestEnum, bool> expected_enable_map{{TestEnum::RED, 1},
+                                               {TestEnum::GREEN, 0}};
+  EXPECT_EQ(config.fake_config.enable_map, expected_enable_map);
 }
 
 TEST(ConfigParsing, OutputSingleConfig) {
@@ -160,6 +211,7 @@ TEST(ConfigParsing, OutputSingleConfig) {
 - value_map: {1: 2, 3: 4}
 - type: RED
 - vec: [0, 0, 0]
+- enable_map: {GREEN: 0, RED: 1}
 )out";
 
   EXPECT_EQ(expected, ss.str()) << "config:" << std::endl << ss.str();
@@ -183,6 +235,7 @@ TEST(ConfigParsing, OutputNestedConfig) {
   - value_map: {1: 2, 3: 4}
   - type: RED
   - vec: [0, 0, 0]
+  - enable_map: {GREEN: 0, RED: 1}
 - msg: world
 )out";
 

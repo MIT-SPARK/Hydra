@@ -23,7 +23,7 @@ DECLARE_CONFIG_ENUM(kimera::topology,
 namespace voxblox {
 
 template <typename Visitor>
-void visit_config(const Visitor& v, const MeshIntegratorConfig& config) {
+void visit_config(const Visitor& v, MeshIntegratorConfig& config) {
   config_parser::visit_config(v["use_color"], config.use_color);
   config_parser::visit_config(v["min_weight"], config.min_weight);
   config_parser::visit_config(v["integrator_threads"], config.integrator_threads);
@@ -48,7 +48,7 @@ struct TopologyServerConfig {
 };
 
 template <typename Visitor>
-void visit_config(const Visitor& v, const VoronoiCheckConfig& config) {
+void visit_config(const Visitor& v, VoronoiCheckConfig& config) {
   config_parser::visit_config(v["mode"], config.mode);
   config_parser::visit_config(v["min_distance_m"], config.min_distance_m);
   config_parser::visit_config(v["parent_l1_separation"], config.parent_l1_separation);
@@ -57,7 +57,7 @@ void visit_config(const Visitor& v, const VoronoiCheckConfig& config) {
 }
 
 template <typename Visitor>
-void visit_config(const Visitor& v, const GraphExtractorConfig& config) {
+void visit_config(const Visitor& v, GraphExtractorConfig& config) {
   config_parser::visit_config(v["min_extra_basis"], config.min_extra_basis);
   config_parser::visit_config(v["min_vertex_basis"], config.min_vertex_basis);
   config_parser::visit_config(v["merge_new_nodes"], config.merge_new_nodes);
@@ -90,7 +90,7 @@ void visit_config(const Visitor& v, const GraphExtractorConfig& config) {
 }
 
 template <typename Visitor>
-void visit_config(const Visitor& v, const GvdIntegratorConfig& config) {
+void visit_config(const Visitor& v, GvdIntegratorConfig& config) {
   config_parser::visit_config(v["max_distance_m"], config.max_distance_m);
   config_parser::visit_config(v["min_distance_m"], config.min_distance_m);
   config_parser::visit_config(v["min_diff_m"], config.min_diff_m);
@@ -113,7 +113,7 @@ void visit_config(const Visitor& v, const GvdIntegratorConfig& config) {
 }
 
 template <typename Visitor>
-void visit_config(const Visitor& v, const TopologyServerConfig& config) {
+void visit_config(const Visitor& v, TopologyServerConfig& config) {
   config_parser::visit_config(v["update_period_s"], config.update_period_s);
   config_parser::visit_config(v["show_stats"], config.show_stats);
   config_parser::visit_config(v["dense_representation_radius_m"],

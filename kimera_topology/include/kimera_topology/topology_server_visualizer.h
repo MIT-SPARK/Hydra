@@ -29,7 +29,7 @@ struct TopologyVisualizerConfig {
 };
 
 template <typename Visitor>
-void visit_config(const Visitor& v, const TopologyVisualizerConfig& config) {
+void visit_config(const Visitor& v, TopologyVisualizerConfig& config) {
   config_parser::visit_config(v["world_frame"], config.world_frame);
   config_parser::visit_config(v["topology_marker_ns"], config.topology_marker_ns);
   config_parser::visit_config(v["show_block_outlines"], config.show_block_outlines);
