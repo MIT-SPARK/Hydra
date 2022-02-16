@@ -250,9 +250,10 @@ TEST_F(DsgRegistrationTests, TestFullObjectRegistration) {
   match.match_root = NodeSymbol('p', 0);
 
   teaser::RobustRegistrationSolver::Params params;
-  ObjectRegistrationFunctor functor(reg_config, params);
+  reg_config.use_pairwise_registration = false;
+  DsgTeaserSolver solver(KimeraDsgLayers::OBJECTS, reg_config, params);
 
-  auto result = functor(*dsg, match, NodeSymbol('a', 1));
+  auto result = solver.solve(*dsg, match, NodeSymbol('a', 1));
   EXPECT_TRUE(result.valid);
   EXPECT_EQ(NodeSymbol('a', 1), result.from_node);
   EXPECT_EQ(NodeSymbol('a', 0), result.to_node);
@@ -272,9 +273,10 @@ TEST_F(DsgRegistrationTests, DISABLED_TestFullPlaceRegistration) {
   match.match_root = NodeSymbol('p', 0);
 
   teaser::RobustRegistrationSolver::Params params;
-  PlaceRegistrationFunctor functor(reg_config, params);
+  reg_config.use_pairwise_registration = true;
+  DsgTeaserSolver solver(KimeraDsgLayers::PLACES, reg_config, params);
 
-  auto result = functor(*dsg, match, NodeSymbol('a', 1));
+  auto result = solver.solve(*dsg, match, NodeSymbol('a', 1));
   EXPECT_TRUE(result.valid);
   EXPECT_EQ(NodeSymbol('a', 1), result.from_node);
   EXPECT_EQ(NodeSymbol('a', 0), result.to_node);

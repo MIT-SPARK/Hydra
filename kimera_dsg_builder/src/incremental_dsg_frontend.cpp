@@ -504,178 +504,6 @@ void DsgFrontend::addAgentPlaceEdges() {
   }
 }
 
-size_t readMaxRegistrationMatches(ros::NodeHandle nh,
-                                  const std::string& name,
-                                  int default_value) {
-  int max_registration_matches;
-  nh.param<int>(name, max_registration_matches, default_value);
-  return static_cast<size_t>(max_registration_matches);
-}
-
-double readMinScoreRatio(ros::NodeHandle nh,
-                         const std::string& name,
-                         double default_value) {
-  double min_score_ratio;
-  nh.param<double>(name, min_score_ratio, default_value);
-  return min_score_ratio;
-}
-
-double readMinMatchSeparation(ros::NodeHandle nh,
-                              const std::string& name,
-                              double default_value) {
-  double min_match_separation_m;
-  nh.param<double>(name, min_match_separation_m, default_value);
-  return min_match_separation_m;
-}
-
-double readMinTimeSeparation(ros::NodeHandle nh,
-                             const std::string& name,
-                             double default_value) {
-  double min_time_separation_s;
-  nh.param<double>(name, min_time_separation_s, default_value);
-  return min_time_separation_s;
-}
-
-float readMatchScore(ros::NodeHandle nh,
-                     const std::string& name,
-                     double default_value) {
-  double min_score;
-  nh.param<double>(name, min_score, default_value);
-  return static_cast<float>(min_score);
-}
-
-lcd::DescriptorScoreType readScoreType(ros::NodeHandle nh) {
-  std::string type;
-  nh.param<std::string>("type", type, "COSINE");
-  std::transform(
-      type.begin(), type.end(), type.begin(), [](char c) { return std::toupper(c); });
-  if (type == "L1") {
-    return lcd::DescriptorScoreType::L1;
-  } else if (type == "COSINE") {
-    return lcd::DescriptorScoreType::COSINE;
-  } else {
-    ROS_WARN_STREAM("Read invalid descriptor score type " << type << " for "
-                                                          << nh.resolveName("type")
-                                                          << ". Defaulting to COSINE");
-    return lcd::DescriptorScoreType::COSINE;
-  }
-}
-
-size_t readUnsignedParam(ros::NodeHandle nh,
-                         const std::string& name,
-                         size_t default_value) {
-  int value;
-  nh.param<int>(name, value, static_cast<int>(default_value));
-  CHECK(value > 0);
-  return static_cast<size_t>(value);
-}
-
-lcd::TeaserParams loadTeaserParams(const ros::NodeHandle& nh) {
-  lcd::TeaserParams params;
-  params.estimate_scaling = false;
-  nh.getParam("noise_bound", params.noise_bound);
-  nh.getParam("cbar2", params.cbar2);
-  nh.getParam("rotation_gnc_factor", params.rotation_gnc_factor);
-  int max_iters = params.rotation_max_iterations;
-  nh.getParam("rotation_max_iterations", max_iters);
-  params.rotation_max_iterations = max_iters;
-  nh.getParam("rotation_cost_threshold", params.rotation_cost_threshold);
-  nh.getParam("kcore_heuristic_threshold", params.kcore_heuristic_threshold);
-  int inlier_selection_mode = static_cast<int>(params.inlier_selection_mode);
-  nh.getParam("inlier_selection_mode", inlier_selection_mode);
-  params.inlier_selection_mode =
-      static_cast<lcd::TeaserInlierMode>(inlier_selection_mode);
-  nh.getParam("max_clique_time_limit", params.max_clique_time_limit);
-  return params;
-}
-
-lcd::DsgLcdConfig DsgFrontend::initializeLcdStructures() {
-  ros::NodeHandle lcd_nh(nh_, "lcd");
-  double radius;
-  lcd_nh.param<double>("radius_m", radius, 5.0);
-
-  int num_classes;
-  lcd_nh.param<int>("num_semantic_classes", num_classes, 20);
-
-  double hist_min;
-  lcd_nh.param<double>("min_distance_m", hist_min, 0.5);
-  double hist_max;
-  lcd_nh.param<double>("max_distance_m", hist_max, 2.5);
-  double hist_bins;
-  lcd_nh.param<double>("distance_bins", hist_bins, 30);
-  lcd::HistogramConfig<double> hist_config(hist_min, hist_max, hist_bins);
-
-  object_lcd_factory_.reset(new lcd::ObjectDescriptorFactory(radius, num_classes));
-  place_lcd_factory_.reset(new lcd::PlaceDescriptorFactory(radius, hist_config));
-
-  LayerRegistrationConfig reg_config;
-  reg_config.min_correspondences =
-      readUnsignedParam(lcd_nh, "min_correspondences", reg_config.min_correspondences);
-  reg_config.min_inliers =
-      readUnsignedParam(lcd_nh, "min_inliers", reg_config.min_inliers);
-  lcd_nh.getParam("log_registration_problem", reg_config.log_registration_problem);
-  reg_config.registration_output_path = config_.log_path + "/lcd/";
-
-  ros::NodeHandle teaser_nh(lcd_nh, "teaser");
-  auto teaser_params = loadTeaserParams(teaser_nh);
-  object_lcd_registration_.reset(
-      new lcd::ObjectRegistrationFunctor(reg_config, teaser_params));
-
-  bool register_places;
-  lcd_nh.param<bool>("register_places", register_places, false);
-
-  if (register_places) {
-    places_lcd_registration_.reset(
-        new lcd::PlaceRegistrationFunctor(reg_config, teaser_params));
-  }
-
-  ros::NodeHandle agent_nh(lcd_nh, "agent");
-  lcd::DsgLcdConfig config;
-  config.agent_search_config.layer = KimeraDsgLayers::AGENTS;
-  config.agent_search_config.min_time_separation_s =
-      readMinTimeSeparation(agent_nh, "min_time_separation_s", 10.0);
-  config.agent_search_config.min_score = readMatchScore(agent_nh, "min_score", 0.1);
-  config.agent_search_config.min_registration_score =
-      config.agent_search_config.min_score;
-  config.agent_search_config.max_registration_matches = 1u;
-  config.agent_search_config.min_score_ratio = 0.0;
-  config.agent_search_config.min_match_separation_m = 0.0;
-  config.agent_search_config.type = readScoreType(agent_nh);
-
-  ros::NodeHandle object_nh(lcd_nh, "object");
-  lcd::DescriptorMatchConfig object_config;
-  object_config.layer = KimeraDsgLayers::OBJECTS;
-  object_config.min_time_separation_s =
-      readMinTimeSeparation(object_nh, "min_time_separation_s", 10.0);
-  object_config.min_score = readMatchScore(object_nh, "min_score", 0.8);
-  object_config.min_registration_score =
-      readMatchScore(object_nh, "min_registration_score", 0.8);
-  object_config.max_registration_matches =
-      readMaxRegistrationMatches(object_nh, "max_registration_matches", 1);
-  object_config.min_score_ratio = readMinScoreRatio(object_nh, "min_score_ratio", 0.1);
-  object_config.min_match_separation_m =
-      readMinMatchSeparation(object_nh, "min_match_separation_m", 1.0);
-  object_config.type = readScoreType(object_nh);
-  config.search_configs.push_back(object_config);
-
-  ros::NodeHandle place_nh(lcd_nh, "places");
-  lcd::DescriptorMatchConfig place_config;
-  place_config.layer = KimeraDsgLayers::PLACES;
-  place_config.min_time_separation_s =
-      readMinTimeSeparation(place_nh, "min_time_separation_s", 10.0);
-  place_config.min_score = readMatchScore(place_nh, "min_score", 0.8);
-  place_config.min_registration_score =
-      readMatchScore(place_nh, "min_registration_score", 0.8);
-  place_config.max_registration_matches =
-      readMaxRegistrationMatches(place_nh, "max_registration_matches", 1);
-  place_config.min_score_ratio = readMinScoreRatio(place_nh, "min_score_ratio", 0.1);
-  place_config.min_match_separation_m =
-      readMinMatchSeparation(place_nh, "min_match_separation_m", 1.0);
-  place_config.type = readScoreType(place_nh);
-  config.search_configs.push_back(place_config);
-  return config;
-}
-
 void DsgFrontend::startLcdVisualizer() {
   bool visualize_dsg_lcd;
   nh_.param<bool>("visualize_dsg_lcd", visualize_dsg_lcd, false);
@@ -701,7 +529,23 @@ void DsgFrontend::startLcdVisualizer() {
 void DsgFrontend::startLcd() {
   bow_sub_ = nh_.subscribe("bow_vectors", 100, &DsgFrontend::handleDbowMsg, this);
 
-  lcd::DsgLcdConfig config = initializeLcdStructures();
+  ros::NodeHandle lcd_nh(nh_, "lcd");
+  double radius;
+  lcd_nh.param<double>("radius_m", radius, 5.0);
+
+  int num_classes;
+  lcd_nh.param<int>("num_semantic_classes", num_classes, 20);
+
+  double hist_min;
+  lcd_nh.param<double>("min_distance_m", hist_min, 0.5);
+  double hist_max;
+  lcd_nh.param<double>("max_distance_m", hist_max, 2.5);
+  double hist_bins;
+  lcd_nh.param<double>("distance_bins", hist_bins, 30);
+  lcd::HistogramConfig<double> hist_config(hist_min, hist_max, hist_bins);
+
+  object_lcd_factory_.reset(new lcd::ObjectDescriptorFactory(radius, num_classes));
+  place_lcd_factory_.reset(new lcd::PlaceDescriptorFactory(radius, hist_config));
 
   std::map<LayerId, lcd::DescriptorFactoryFunc> descriptor_factories;
   descriptor_factories[KimeraDsgLayers::OBJECTS] =
@@ -713,27 +557,12 @@ void DsgFrontend::startLcd() {
         return (*place_lcd_factory_)(graph, node);
       };
 
-  std::map<LayerId, lcd::RegistrationFunc> registration_funcs;
-  registration_funcs[KimeraDsgLayers::OBJECTS] =
-      [&](const DynamicSceneGraph& dsg,
-          const lcd::DsgRegistrationInput& match,
-          NodeId agent_id) {
-        return (*object_lcd_registration_)(dsg, match, agent_id);
-      };
-  if (places_lcd_registration_) {
-    registration_funcs[KimeraDsgLayers::PLACES] =
-        [&](const DynamicSceneGraph& dsg,
-            const lcd::DsgRegistrationInput& match,
-            NodeId agent_id) {
-          return (*places_lcd_registration_)(dsg, match, agent_id);
-        };
-  }
+  lcd::DsgLcdConfig config;
+  // TODO(nathan) explicitly set these after or during loading
+  //reg_config.registration_output_path = config_.log_path + "/lcd/";
+  //config.agent_search_config.min_registration_score = config.agent_search_config.min_score;
 
-  // unused at the moment
-  std::map<LayerId, lcd::ValidationFunc> validation_funcs;
-
-  lcd_module_.reset(new lcd::DsgLcdModule(
-      config, descriptor_factories, registration_funcs, validation_funcs));
+  lcd_module_.reset(new lcd::DsgLcdModule(config, descriptor_factories));
   startLcdVisualizer();
 
   lcd_thread_.reset(new std::thread(&DsgFrontend::runLcd, this));

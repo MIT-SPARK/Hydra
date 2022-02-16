@@ -1,6 +1,5 @@
 #pragma once
-#include "kimera_dsg_builder/config_types.h"
-#include "kimera_dsg_builder/dsg_lcd_registration.h"
+#include "kimera_dsg_builder/dsg_lcd_module.h"
 #include "kimera_dsg_builder/incremental_room_finder.h"
 
 #include <KimeraRPGO/SolverParams.h>
@@ -13,9 +12,49 @@
 namespace kimera {
 namespace incremental {
 
+using RoomClusterModeEnum = RoomFinder::Config::ClusterMode;
+
+}  // namespace incremental
+}  // namespace kimera
+
+DECLARE_CONFIG_ENUM(kimera::incremental,
+                    RoomClusterModeEnum,
+                    {RoomClusterModeEnum::SPECTRAL, "SPECTRAL"},
+                    {RoomClusterModeEnum::MODULARITY, "MODULARITY"},
+                    {RoomClusterModeEnum::NONE, "NONE"})
+
+DECLARE_CONFIG_ENUM(kimera::lcd,
+                    DescriptorScoreType,
+                    {DescriptorScoreType::COSINE, "COSINE"},
+                    {DescriptorScoreType::L1, "L1"})
+
+namespace teaser {
+
+using TeaserInlierSelectionMode = RobustRegistrationSolver::INLIER_SELECTION_MODE;
+
+}  // namespace teaser
+
+DECLARE_CONFIG_ENUM(teaser,
+                    TeaserInlierSelectionMode,
+                    {TeaserInlierSelectionMode::PMC_EXACT, "PMC_EXACT"},
+                    {TeaserInlierSelectionMode::PMC_HEU, "PMC_HEU"},
+                    {TeaserInlierSelectionMode::KCORE_HEU, "KCORE_HEU"},
+                    {TeaserInlierSelectionMode::NONE, "NONE"})
+
+DECLARE_CONFIG_ENUM(KimeraRPGO,
+                    Verbosity,
+                    {Verbosity::UPDATE, "UPDATE"},
+                    {Verbosity::QUIET, "QUIET"},
+                    {Verbosity::VERBOSE, "VERBOSE"})
+
+DECLARE_CONFIG_ENUM(KimeraRPGO, Solver, {Solver::LM, "LM"}, {Solver::GN, "GN"})
+namespace kimera {
+namespace incremental {
+
 struct DsgFrontendConfig {
+  // TODO(nathan) consider unifying with backend
   bool should_log = true;
-  std::string log_path = "";
+  std::string log_path;
   size_t mesh_queue_size = 10;
   size_t min_object_vertices = 20;
   bool prune_mesh_indices = false;
@@ -156,6 +195,36 @@ void visit_config(const Visitor& v, RoomFinder::Config& config) {
 }
 
 }  // namespace incremental
+
+namespace lcd {
+
+template <typename Visitor>
+void visit_config(const Visitor& v, LayerRegistrationConfig& config) {
+  config_parser::visit_config(v["min_correspondences"], config.min_correspondences);
+  config_parser::visit_config(v["min_inliers"], config.min_inliers);
+  config_parser::visit_config(v["log_registration_problem"],
+                              config.log_registration_problem);
+  config_parser::visit_config(v["registration_output_path"],
+                              config.registration_output_path);
+}
+
+template <typename Visitor>
+void visit_config(const Visitor& v, DescriptorMatchConfig& config) {
+  // TODO(nathan) layer
+  config_parser::visit_config(v["min_score"], config.min_score);
+  config_parser::visit_config(v["min_registration_score"],
+                              config.min_registration_score);
+  config_parser::visit_config(v["min_time_separation_s"], config.min_time_separation_s);
+  config_parser::visit_config(v["max_registration_matches"],
+                              config.max_registration_matches);
+  config_parser::visit_config(v["min_score_ratio"], config.min_score_ratio);
+  config_parser::visit_config(v["min_match_separation_m"],
+                              config.min_match_separation_m);
+  config_parser::visit_config(v["type"], config.type);
+}
+
+}  // namespace lcd
+
 }  // namespace kimera
 
 namespace teaser {

@@ -92,34 +92,7 @@ DsgRegistrationSolution getFullSolutionFromLayer(
   return {true, from_pose_info.id, to_pose_info.id, to_T_from, -1};
 }
 
-PlaceRegistrationFunctor::PlaceRegistrationFunctor(
-    const LayerRegistrationConfig& config,
-    const TeaserParams& params)
-    : config(config), solver(params) {}
-
-DsgRegistrationSolution PlaceRegistrationFunctor::operator()(
-    const DynamicSceneGraph& dsg,
-    const DsgRegistrationInput& match,
-    NodeId query_agent_id) {
-  if (match.query_nodes.size() <= 3 || match.match_nodes.size() <= 3) {
-    return {};
-  }
-
-  LayerRegistrationProblem<std::set<NodeId>> problem;
-  problem.src_nodes = match.query_nodes;
-  problem.dest_nodes = match.match_nodes;
-
-  const SceneGraphLayer& layer = dsg.getLayer(KimeraDsgLayers::PLACES).value();
-  auto solution = registerDsgLayerPairwise(config, solver, problem, layer);
-  return getFullSolutionFromLayer(dsg, solution, query_agent_id, match.match_root);
-}
-
-ObjectRegistrationFunctor::ObjectRegistrationFunctor(
-    const LayerRegistrationConfig& config,
-    const TeaserParams& params)
-    : config(config), solver(params) {}
-
-void logRegistrationProblem(const std::string& dir_path,
+void logRegistrationProblem(const std::string& path_prefix,
                             const DynamicSceneGraph& dsg,
                             const LayerRegistrationSolution& solution,
                             const DsgRegistrationInput& match,
@@ -150,21 +123,30 @@ void logRegistrationProblem(const std::string& dir_path,
 
   static size_t registration_index = 0;
   std::stringstream ss;
-  ss << dir_path << "/object_registration_" << registration_index << ".json";
+  ss << path_prefix << registration_index << ".json";
   ++registration_index;
 
   std::ofstream outfile(ss.str());
   outfile << record;
 }
 
-DsgRegistrationSolution ObjectRegistrationFunctor::operator()(
-    const DynamicSceneGraph& dsg,
-    const DsgRegistrationInput& match,
-    NodeId query_agent_id) {
-  uint64_t timestamp =
-      dsg.getDynamicNode(query_agent_id).value().get().timestamp.count();
+DsgTeaserSolver::DsgTeaserSolver(LayerId layer_id,
+                                 const LayerRegistrationConfig& config,
+                                 const TeaserParams& params)
+    : layer_id(layer_id), config(config), solver(params) {
+  const std::string layer_str = KimeraDsgLayers::LayerIdToString(layer_id);
+  timer_prefix = "lcd/" + layer_str + "_registration";
+  log_prefix = config.registration_output_path + "/" + layer_str + "_registration_";
+}
 
-  ScopedTimer timer("lcd/register_object", timestamp, true, 2, false);
+DsgRegistrationSolution DsgTeaserSolver::solve(const DynamicSceneGraph& dsg,
+                                               const DsgRegistrationInput& match,
+                                               NodeId query_agent_id) const {
+  // TODO(nathan) helper function in dsg
+  const uint64_t timestamp =
+      dsg.getDynamicNode(query_agent_id).value().get().timestamp.count();
+  ScopedTimer timer(timer_prefix, timestamp, true, 2, false);
+
   if (match.query_nodes.size() <= 3 || match.match_nodes.size() <= 3) {
     return {};
   }
@@ -173,12 +155,16 @@ DsgRegistrationSolution ObjectRegistrationFunctor::operator()(
   problem.src_nodes = match.query_nodes;
   problem.dest_nodes = match.match_nodes;
 
-  const SceneGraphLayer& layer = dsg.getLayer(KimeraDsgLayers::OBJECTS).value();
-  auto solution = registerDsgLayerSemantic(config, solver, problem, layer);
+  const SceneGraphLayer& layer = dsg.getLayer(layer_id).value();
+  LayerRegistrationSolution solution;
+  if (config.use_pairwise_registration) {
+    solution = registerDsgLayerPairwise(config, solver, problem, layer);
+  } else {
+    solution = registerDsgLayerSemantic(config, solver, problem, layer);
+  }
 
   if (config.log_registration_problem) {
-    logRegistrationProblem(
-        config.registration_output_path, dsg, solution, match, query_agent_id);
+    logRegistrationProblem(log_prefix, dsg, solution, match, query_agent_id);
   }
 
   return getFullSolutionFromLayer(dsg, solution, query_agent_id, match.match_root);
@@ -196,9 +182,9 @@ inline size_t getTimestampFromNode(const DynamicSceneGraph& graph, NodeId node_i
   return NodeSymbol(attrs.external_key).categoryId();
 }
 
-DsgRegistrationSolution registerAgentMatch(const DynamicSceneGraph& dsg,
-                                           const DsgRegistrationInput& match,
-                                           NodeId) {
+DsgRegistrationSolution DsgAgentSolver::solve(const DynamicSceneGraph& dsg,
+                                              const DsgRegistrationInput& match,
+                                              NodeId) const {
   if (match.query_nodes.empty() || match.match_nodes.empty()) {
     return {};
   }

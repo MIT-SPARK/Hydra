@@ -76,8 +76,6 @@ class DsgFrontend {
 
   void addAgentPlaceEdges();
 
-  lcd::DsgLcdConfig initializeLcdStructures();
-
   void assignBowVectors();
 
   std::optional<NodeId> getLatestAgentId();
@@ -126,8 +124,6 @@ class DsgFrontend {
   std::unique_ptr<lcd::DsgLcdModule> lcd_module_;
   std::unique_ptr<lcd::ObjectDescriptorFactory> object_lcd_factory_;
   std::unique_ptr<lcd::PlaceDescriptorFactory> place_lcd_factory_;
-  std::unique_ptr<lcd::ObjectRegistrationFunctor> object_lcd_registration_;
-  std::unique_ptr<lcd::PlaceRegistrationFunctor> places_lcd_registration_;
   DynamicSceneGraph::Ptr lcd_graph_;
   // TODO(nathan) replace with struct passed in through constructor
   char robot_prefix_;

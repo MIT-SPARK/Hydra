@@ -43,80 +43,6 @@ void spinUntilBagFinished() {
   ROS_WARN("Exiting!");
 }
 
-namespace kimera {
-
-void checkAllAgentFrames(SharedDsgInfo& dsg) {
-  size_t num_found = 0;
-
-  const DynamicSceneGraph& graph = *dsg.graph;
-  const double window_size_s = 10.0;
-  const DynamicSceneGraphLayer& layer =
-      graph.getDynamicLayer(KimeraDsgLayers::AGENTS, 'a').value();
-  for (const auto& node : layer.nodes()) {
-    lcd::Descriptor::Ptr desc = lcd::makeAgentDescriptor(graph, *node);
-    if (!desc) {
-      LOG(ERROR) << "agent without a parent: " << NodeSymbol(node->id).getLabel();
-      continue;
-    }
-
-    VLOG(5) << "node has " << desc->words.rows() << " words and " << desc->values.rows()
-            << " values";
-
-    float best_score = 0.0f;
-
-    float mean_score = 0.0f;
-    size_t num_search = 0;
-    std::optional<NodeId> best_node = std::nullopt;
-    for (const auto& other_node : layer.nodes()) {
-      if (node->id <= other_node->id) {
-        continue;
-      }
-
-      std::chrono::duration<double> timestamp_diff_s =
-          node->timestamp - other_node->timestamp;
-      if (std::abs(timestamp_diff_s.count()) < window_size_s) {
-        continue;
-      }
-
-      lcd::Descriptor::Ptr other_desc = lcd::makeAgentDescriptor(graph, *other_node);
-      if (!other_desc) {
-        continue;
-      }
-
-      auto score =
-          lcd::computeDescriptorScore(*desc, *other_desc, lcd::DescriptorScoreType::L1);
-      mean_score += score;
-      num_search++;
-      if (score > best_score) {
-        best_score = score;
-        best_node = other_node->id;
-      }
-    }
-
-    if (!best_node) {
-      LOG(ERROR) << "Failed to find match for node " << NodeSymbol(node->id).getLabel()
-                 << ". Average score: " << mean_score / num_search << " with "
-                 << num_search << " searched";
-      continue;
-    }
-
-    VLOG(5) << "Found at least one match for " << NodeSymbol(node->id).getLabel()
-            << " with average score: " << mean_score / num_search;
-
-    lcd::DsgRegistrationInput match{desc->nodes, {*best_node}, desc->root_node, 0};
-
-    auto solution = registerAgentMatch(*dsg.graph, match, 0);
-    if (solution.valid) {
-      num_found++;
-    }
-  }
-
-  LOG(INFO) << "Of " << layer.numNodes() << " nodes, found " << num_found
-            << " valid registrations";
-}
-
-}  // namespace kimera
-
 int main(int argc, char* argv[]) {
   ros::init(argc, argv, "incremental_dsg_builder_node");
 
@@ -206,19 +132,17 @@ int main(int argc, char* argv[]) {
         continue;
       }
 
+      const gtsam::Point3 pos = loop_closure.src_T_dest.translation();
+      const gtsam::Quaternion quat = loop_closure.src_T_dest.rotation().toQuaternion();
+
       output_file << *time_from << "," << *time_to << ",";
-      gtsam::Point3 pos = loop_closure.src_T_dest.translation();
       output_file << pos.x() << "," << pos.y() << "," << pos.z() << ",";
-      gtsam::Quaternion quat = loop_closure.src_T_dest.rotation().toQuaternion();
       output_file << quat.w() << ", " << quat.x() << "," << quat.y() << "," << quat.z()
                   << ",";
       output_file << (loop_closure.dsg ? 1 : 0) << "," << loop_closure.level;
       output_file << std::endl;
     }
   }
-
-  // kimera::checkAllAgentFrames(*frontend_dsg);
-  // LOG(INFO) << "During run: " << loop_closures.size() << " loop closures were found";
 
   return 0;
 }

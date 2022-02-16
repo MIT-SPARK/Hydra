@@ -7,7 +7,6 @@ namespace lcd {
 enum class DescriptorScoreType { COSINE, L1 };
 
 struct DescriptorMatchConfig {
-  LayerId layer;
   float min_score;
   float min_registration_score;
   double min_time_separation_s;

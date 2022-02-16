@@ -10,41 +10,47 @@ using DsgNode = DynamicSceneGraphNode;
 
 DsgLcdModule::DsgLcdModule(
     const DsgLcdConfig& config,
-    const std::map<LayerId, DescriptorFactoryFunc>& layer_factories,
-    const std::map<LayerId, RegistrationFunc>& registration_funcs,
-    const std::map<LayerId, ValidationFunc>& validation_funcs)
+    const std::map<LayerId, DescriptorFactoryFunc>& layer_factories)
     : config_(config), layer_factories_(layer_factories) {
   for (const auto& id_func_pair : layer_factories_) {
     cache_map_[id_func_pair.first] = DescriptorCache();
   }
 
   size_t internal_idx = 1;  // agent is 0
-  for (const auto& layer_config : config_.search_configs) {
-    if (!layer_factories_.count(layer_config.layer)) {
+  for (const auto& id_config_pair : config_.search_configs) {
+    const LayerId layer = id_config_pair.first;
+
+    if (!layer_factories_.count(layer)) {
       continue;
     }
 
-    layer_to_internal_index_[layer_config.layer] = internal_idx;
+    const auto& layer_config = id_config_pair.second;
+    layer_to_internal_index_[layer] = internal_idx;
+    internal_index_to_layer_[internal_idx] = layer;
     match_config_map_[internal_idx] = layer_config;
 
-    if (registration_funcs.count(layer_config.layer)) {
-      registration_funcs_[internal_idx] = registration_funcs.at(layer_config.layer);
+    auto iter = config_.registration_configs.find(layer);
+    if (iter != config_.registration_configs.end()) {
+      registration_solvers_.emplace(internal_idx,
+                                    std::make_unique<DsgTeaserSolver>(
+                                        layer, iter->second, config_.teaser_config));
     }
 
-    if (validation_funcs.count(layer_config.layer)) {
-      validation_funcs_[internal_idx] = validation_funcs.at(layer_config.layer);
-    }
+    // if (validation_funcs.count(layer_config.layer)) {
+    // validation_funcs_[internal_idx] = validation_funcs.at(layer_config.layer);
+    //}
 
     internal_idx++;
   }
+
+  // TODO(nathan) make root layer requirements explicit
   max_internal_index_ = internal_idx;
+  root_layer_ = internal_index_to_layer_.at(internal_idx - 1);
 
   match_config_map_[0] = config.agent_search_config;
-  registration_funcs_[0] = &registerAgentMatch;
-  validation_funcs_[0] = [](const DynamicSceneGraph&,
-                            const LayerSearchResults&) -> bool {
-    throw std::runtime_error("can not validate at agent layer!");
-  };
+  if (config_.enable_agent_registration) {
+    registration_solvers_.emplace(0, std::make_unique<DsgAgentSolver>());
+  }
 }
 
 bool DsgLcdModule::addNewDescriptors(const DynamicSceneGraph& graph,
@@ -118,7 +124,7 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::registerAndVerify(
 
   size_t idx;
   for (idx = 0; idx < max_internal_index_; ++idx) {
-    if (!registration_funcs_.count(idx)) {
+    if (!registration_solvers_.count(idx)) {
       continue;
     }
 
@@ -151,7 +157,7 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::registerAndVerify(
                                                  match.query_root,
                                                  match.match_root[i]};
       registration_result =
-          registration_funcs_.at(idx)(dsg, registration_input, agent_id);
+          registration_solvers_.at(idx)->solve(dsg, registration_input, agent_id);
       registration_result.level = static_cast<int64_t>(idx);
       if (registration_result.valid) {
         break;
@@ -193,7 +199,7 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::detect(const DynamicSceneGrap
                                                           uint64_t timestamp) {
   ScopedTimer timer("lcd/detect", timestamp, true, 2, false);
   std::set<NodeId> prev_valid_roots;
-  for (const auto& id_desc_pair : cache_map_[config_.search_configs.front().layer]) {
+  for (const auto& id_desc_pair : cache_map_[root_layer_]) {
     prev_valid_roots.insert(id_desc_pair.first);
   }
 
@@ -204,8 +210,9 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::detect(const DynamicSceneGrap
   matches_.clear();
   for (size_t idx = max_internal_index_ - 1; idx > 0; --idx) {
     const auto& config = match_config_map_.at(idx);
+    const LayerId layer = internal_index_to_layer_.at(idx);
     Descriptor::Ptr descriptor;
-    descriptor = layer_factories_[config.layer](dsg, latest_node);
+    descriptor = layer_factories_[layer](dsg, latest_node);
 
     if (descriptor) {
       VLOG(2) << "level " << idx << ": " << std::endl
@@ -213,7 +220,7 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::detect(const DynamicSceneGrap
       matches_[idx] = searchDescriptors(*descriptor,
                                         config,
                                         prev_valid_roots,
-                                        cache_map_[config.layer],
+                                        cache_map_[layer],
                                         root_leaf_map_,
                                         agent_id);
       prev_valid_roots = matches_[idx].valid_matches;

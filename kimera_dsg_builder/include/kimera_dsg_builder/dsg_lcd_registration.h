@@ -14,6 +14,7 @@ struct LayerRegistrationConfig {
   size_t min_correspondences = 5;
   size_t min_inliers = 5;
   bool log_registration_problem = false;
+  bool use_pairwise_registration = false;
   std::string registration_output_path = "";
 };
 
@@ -24,43 +25,46 @@ struct DsgRegistrationInput {
   NodeId match_root;
 };
 
-using RegistrationFunc =
-    std::function<DsgRegistrationSolution(const DynamicSceneGraph&,
-                                          const DsgRegistrationInput&,
-                                          NodeId)>;
+struct DsgRegistrationSolver {
+  using Ptr = std::unique_ptr<DsgRegistrationSolver>;
+
+  virtual ~DsgRegistrationSolver() = default;
+
+  virtual DsgRegistrationSolution solve(const DynamicSceneGraph& dsg,
+                                        const DsgRegistrationInput& match,
+                                        NodeId query_agent_id) const = 0;
+};
 
 using TeaserParams = teaser::RobustRegistrationSolver::Params;
-using TeaserInlierMode = teaser::RobustRegistrationSolver::INLIER_SELECTION_MODE;
 
-struct PlaceRegistrationFunctor {
-  PlaceRegistrationFunctor(const LayerRegistrationConfig& config,
-                           const TeaserParams& params);
+struct DsgTeaserSolver : DsgRegistrationSolver {
+  DsgTeaserSolver(LayerId layer_id,
+                  const LayerRegistrationConfig& config,
+                  const TeaserParams& params);
 
-  DsgRegistrationSolution operator()(const DynamicSceneGraph& dsg,
-                                     const DsgRegistrationInput& match,
-                                     NodeId query_agent_id);
+  virtual ~DsgTeaserSolver() = default;
 
+  DsgRegistrationSolution solve(const DynamicSceneGraph& dsg,
+                                const DsgRegistrationInput& match,
+                                NodeId query_agent_id) const override;
+
+  LayerId layer_id;
   LayerRegistrationConfig config;
-  teaser::RobustRegistrationSolver solver;
+  std::string timer_prefix;
+  std::string log_prefix;
+  // registration call mutates the solver
+  mutable teaser::RobustRegistrationSolver solver;
 };
 
-struct ObjectRegistrationFunctor {
-  ObjectRegistrationFunctor(const LayerRegistrationConfig& config,
-                            const TeaserParams& params);
+struct DsgAgentSolver : DsgRegistrationSolver {
+  DsgAgentSolver() = default;
 
-  DsgRegistrationSolution operator()(const DynamicSceneGraph& dsg,
-                                     const DsgRegistrationInput& match,
-                                     NodeId query_agent_id);
+  virtual ~DsgAgentSolver() = default;
 
-  LayerRegistrationConfig config;
-  teaser::RobustRegistrationSolver solver;
+  DsgRegistrationSolution solve(const DynamicSceneGraph& dsg,
+                                const DsgRegistrationInput& match,
+                                NodeId query_agent_id) const override;
 };
-
-DsgRegistrationSolution registerAgentMatch(const DynamicSceneGraph& dsg,
-                                           const DsgRegistrationInput& match,
-                                           NodeId query_agent_id);
-
-// start of graph registration
 
 using CorrespondenceFunc =
     std::function<bool(const SceneGraphNode&, const SceneGraphNode&)>;
