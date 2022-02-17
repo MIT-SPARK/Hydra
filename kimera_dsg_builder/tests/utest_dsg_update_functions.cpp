@@ -213,6 +213,7 @@ TEST(DsgInterpolationTests, PlaceUpdate) {
 
   auto attrs3 = std::make_unique<PlaceNodeAttributes>(0.0, 0.0);
   attrs3->position = Eigen::Vector3d(1.0, 2.0, 3.0);
+  attrs3->is_active = true; // make sure it doesn't get dropped
   graph.emplaceNode(place_layer, NodeSymbol('p', 6), std::move(attrs3));
 
   gtsam::Values values;
