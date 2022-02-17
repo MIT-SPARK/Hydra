@@ -48,6 +48,7 @@ DECLARE_CONFIG_ENUM(KimeraRPGO,
                     {Verbosity::VERBOSE, "VERBOSE"})
 
 DECLARE_CONFIG_ENUM(KimeraRPGO, Solver, {Solver::LM, "LM"}, {Solver::GN, "GN"})
+
 namespace kimera {
 namespace incremental {
 
@@ -223,8 +224,27 @@ void visit_config(const Visitor& v, DescriptorMatchConfig& config) {
   config_parser::visit_config(v["type"], config.type);
 }
 
-}  // namespace lcd
+template <typename Visitor, typename T>
+void visit_config(const Visitor& v, HistogramConfig<T>& config) {
+  config_parser::visit_config(v["min"], config.min);
+  config_parser::visit_config(v["max"], config.max);
+  config_parser::visit_config(v["bins"], config.bins);
+}
 
+template <typename Visitor>
+void visit_config(const Visitor& v, DsgLcdConfig& config) {
+  // search configs
+  config_parser::visit_config(v["agent_search_config"], config.agent_search_config);
+  // registration configs
+  config_parser::visit_config(v["teaser_config"], config.teaser_config);
+  config_parser::visit_config(v["enable_agent_registration"], config.enable_agent_registration);
+  config_parser::visit_config(v["object_radius_m"], config.object_radius_m);
+  config_parser::visit_config(v["num_semantic_classes"], config.num_semantic_classes);
+  config_parser::visit_config(v["place_radius_m"], config.place_radius_m);
+  config_parser::visit_config(v["place_histogram_config"], config.place_histogram_config);
+}
+
+}  // namespace lcd
 }  // namespace kimera
 
 namespace teaser {
@@ -247,3 +267,5 @@ void visit_config(const Visitor& v, teaser::RobustRegistrationSolver::Params& co
 DECLARE_CONFIG_OSTREAM_OPERATOR(teaser, RobustRegistrationSolver::Params)
 DECLARE_CONFIG_OSTREAM_OPERATOR(kimera::incremental, RoomFinder::Config)
 DECLARE_CONFIG_OSTREAM_OPERATOR(kimera::incremental, DsgBackendConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(kimera::lcd, HistogramConfig<double>)
+DECLARE_CONFIG_OSTREAM_OPERATOR(kimera::lcd, DsgLcdConfig)

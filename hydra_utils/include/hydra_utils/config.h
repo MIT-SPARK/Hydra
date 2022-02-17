@@ -15,21 +15,21 @@ struct is_parser<RosParser> : std::true_type {};
 template <typename Config>
 Config load_from_yaml(const std::string& filepath) {
   Config config;
-  visit_config(YamlParser(filepath), config);
+  ConfigVisitor<Config>::visit_config(YamlParser(filepath), config);
   return config;
 }
 
 template <typename Config>
 Config load_from_ros(const std::string& ns) {
   Config config;
-  visit_config(RosParser::FromNs(ns), config);
+  ConfigVisitor<Config>::visit_config(RosParser::FromNs(ns), config);
   return config;
 }
 
 template <typename Config>
 Config load_from_ros_nh(const ros::NodeHandle& nh) {
   Config config;
-  visit_config(RosParser(nh), config);
+  ConfigVisitor<Config>::visit_config(RosParser(nh), config);
   return config;
 }
 

@@ -69,7 +69,6 @@ struct visit_config_fn {
     auto intermediate_value = converter.from(value);
     this->operator()(visitor, intermediate_value);
   }
-
 };
 
 }  // namespace detail
@@ -79,5 +78,14 @@ namespace {
 constexpr const auto& visit_config = detail::static_const<detail::visit_config_fn>;
 
 }  // namespace
+
+template <typename ValueType = void, typename SFINAE = void>
+struct ConfigVisitor {
+  template <typename Visitor, typename T = ValueType>
+  static auto visit_config(const Visitor& visitor, T& value)
+      -> decltype(::config_parser::visit_config(visitor, value), void()) {
+    ::config_parser::visit_config(visitor, value);
+  }
+};
 
 }  // namespace config_parser

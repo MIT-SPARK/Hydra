@@ -45,13 +45,11 @@ struct ObjectDescriptorFactory : DescriptorFactory {
 
 template <typename T>
 struct HistogramConfig {
-  HistogramConfig(T min, T max, size_t bins)
-      : min(min), max(max), bins(bins), step((max - min) / bins) {}
+  HistogramConfig(T min, T max, size_t bins) : min(min), max(max), bins(bins) {}
 
   T min;
   T max;
   size_t bins;
-  T step;
 
   size_t getBin(T value) const {
     if (value <= min) {
@@ -62,6 +60,7 @@ struct HistogramConfig {
       return bins - 1;
     }
 
+    const T step = (max - min) / bins;
     return std::floor((value - min) / step);
   }
 };
