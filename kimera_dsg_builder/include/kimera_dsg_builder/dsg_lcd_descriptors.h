@@ -48,10 +48,10 @@ struct HistogramConfig {
   HistogramConfig(T min, T max, size_t bins)
       : min(min), max(max), bins(bins), step((max - min) / bins) {}
 
-  const T min;
-  const T max;
-  const size_t bins;
-  const T step;
+  T min;
+  T max;
+  size_t bins;
+  T step;
 
   size_t getBin(T value) const {
     if (value <= min) {

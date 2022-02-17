@@ -15,42 +15,21 @@ struct DsgLcdModuleTests : public ::testing::Test {
   virtual void SetUp() override {
     dsg.reset(new DynamicSceneGraph());
 
-    object_factory.reset(new ObjectDescriptorFactory(radius, num_classes));
-
-    HistogramConfig<double> hist_config(hist_min, hist_max, hist_bins);
-    place_factory.reset(new PlaceDescriptorFactory(radius, hist_config));
-
+    config.object_radius_m = 5.0;
+    config.place_radius_m = 5.0;
+    config.num_semantic_classes = 20;
+    config.place_histogram_config = HistogramConfig<double>(0.5, 2.5, 30);
     config.agent_search_config = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
     config.search_configs[KimeraDsgLayers::OBJECTS] = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
     config.search_configs[KimeraDsgLayers::PLACES] = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
-
-    descriptor_factories[KimeraDsgLayers::OBJECTS] =
-        [&](const DynamicSceneGraph& graph, const DynamicSceneGraphNode& node) {
-          return (*object_factory)(graph, node);
-        };
-    descriptor_factories[KimeraDsgLayers::PLACES] =
-        [&](const DynamicSceneGraph& graph, const DynamicSceneGraphNode& node) {
-          return (*place_factory)(graph, node);
-        };
   }
 
-  const double radius = 5.0;
-  const int num_classes = 20;
-  const double hist_min = 0.5;
-  const double hist_max = 2.5;
-  const size_t hist_bins = 30;
-
   DsgLcdConfig config;
-
-  std::unique_ptr<ObjectDescriptorFactory> object_factory;
-  std::unique_ptr<PlaceDescriptorFactory> place_factory;
-  std::map<LayerId, DescriptorFactoryFunc> descriptor_factories;
-
   DynamicSceneGraph::Ptr dsg;
 };
 
 TEST_F(DsgLcdModuleTests, TestEmptyUpdate) {
-  DsgLcdModule module(config, descriptor_factories);
+  DsgLcdModule module(config);
   std::unordered_set<NodeId> active_places;
   module.updateDescriptorCache(*dsg, active_places);
   EXPECT_EQ(0u, module.numGraphDescriptors(KimeraDsgLayers::PLACES));
@@ -59,7 +38,7 @@ TEST_F(DsgLcdModuleTests, TestEmptyUpdate) {
 }
 
 TEST_F(DsgLcdModuleTests, TestInvalidNodeUpdate) {
-  DsgLcdModule module(config, descriptor_factories);
+  DsgLcdModule module(config);
   std::unordered_set<NodeId> active_places{1, 2, 3, 4, 5};
   module.updateDescriptorCache(*dsg, active_places);
   EXPECT_EQ(0u, module.numGraphDescriptors(KimeraDsgLayers::PLACES));
@@ -74,7 +53,7 @@ TEST_F(DsgLcdModuleTests, TestNoChildren) {
   dsg->emplaceNode(KimeraDsgLayers::PLACES, 4, std::make_unique<NodeAttributes>());
   dsg->emplaceNode(KimeraDsgLayers::PLACES, 5, std::make_unique<NodeAttributes>());
 
-  DsgLcdModule module(config, descriptor_factories);
+  DsgLcdModule module(config);
   std::unordered_set<NodeId> active_places{1, 2, 3, 4, 5};
   module.updateDescriptorCache(*dsg, active_places);
   EXPECT_EQ(0u, module.numGraphDescriptors(KimeraDsgLayers::PLACES));
@@ -89,7 +68,7 @@ TEST_F(DsgLcdModuleTests, TestNoDynamicChildren) {
   dsg->insertEdge(1, 2);
   dsg->insertEdge(1, 3);
 
-  DsgLcdModule module(config, descriptor_factories);
+  DsgLcdModule module(config);
   std::unordered_set<NodeId> active_places{1, 2, 3, 4, 5};
   module.updateDescriptorCache(*dsg, active_places);
   EXPECT_EQ(0u, module.numGraphDescriptors(KimeraDsgLayers::PLACES));
@@ -118,7 +97,7 @@ TEST_F(DsgLcdModuleTests, TestActualChildren) {
   dsg->insertEdge(1, NodeSymbol('a', 0));
   dsg->insertEdge(1, NodeSymbol('a', 1));
 
-  DsgLcdModule module(config, descriptor_factories);
+  DsgLcdModule module(config);
   std::unordered_set<NodeId> active_places{1};
   module.updateDescriptorCache(*dsg, active_places);
   EXPECT_EQ(1u, module.numGraphDescriptors(KimeraDsgLayers::PLACES));
@@ -135,7 +114,7 @@ TEST_F(DsgLcdModuleTests, TestEmptySearch) {
       std::make_unique<AgentNodeAttributes>(
           Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
 
-  DsgLcdModule module(config, descriptor_factories);
+  DsgLcdModule module(config);
   std::unordered_set<NodeId> active_places{1};
 
   std::vector<DsgRegistrationSolution> results =
@@ -164,7 +143,7 @@ TEST_F(DsgLcdModuleTests, TestNonEmptySearch) {
   dsg->insertEdge(1, NodeSymbol('a', 0));
   dsg->insertEdge(1, NodeSymbol('a', 1));
 
-  DsgLcdModule module(config, descriptor_factories);
+  DsgLcdModule module(config);
   std::unordered_set<NodeId> active_places{1};
   module.updateDescriptorCache(*dsg, active_places);
   EXPECT_EQ(1u, module.numGraphDescriptors(KimeraDsgLayers::PLACES));

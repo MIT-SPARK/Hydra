@@ -37,8 +37,10 @@ TEST(DsgLcdDescriptorTests, TestAgentDescriptor) {
   attrs.dbow_values.resize(3, 1);
   attrs.dbow_values << 6.0, 7.0, 8.0;
 
+  AgentDescriptorFactory factory;
+
   {  // no parent -> no descriptor
-    Descriptor::Ptr descriptor = makeAgentDescriptor(graph, node);
+    auto descriptor = factory.construct(graph, node);
     EXPECT_TRUE(descriptor == nullptr);
   }
 
@@ -47,7 +49,7 @@ TEST(DsgLcdDescriptorTests, TestAgentDescriptor) {
   graph.insertEdge(NodeSymbol('a', 0), NodeSymbol('p', 0));
 
   {  // valid parent -> valid descriptor
-    Descriptor::Ptr descriptor = makeAgentDescriptor(graph, node);
+    auto descriptor = factory.construct(graph, node);
     ASSERT_TRUE(descriptor != nullptr);
     EXPECT_EQ(attrs.dbow_ids, descriptor->words);
     EXPECT_EQ(attrs.dbow_values, descriptor->values);
@@ -100,7 +102,7 @@ TEST(DsgLcdDescriptorTests, TestPlaceDescriptor) {
 
   {  // no parent: empty descriptor
     PlaceDescriptorFactory factory(1.0, HistogramConfig<double>(0, 1.0, 1));
-    Descriptor::Ptr descriptor = factory(graph, node);
+    Descriptor::Ptr descriptor = factory.construct(graph, node);
     EXPECT_TRUE(descriptor == nullptr);
   }
 
@@ -108,7 +110,7 @@ TEST(DsgLcdDescriptorTests, TestPlaceDescriptor) {
 
   {  // 1 bin: correct count
     PlaceDescriptorFactory factory(1.0, HistogramConfig<double>(0, 1.0, 1));
-    Descriptor::Ptr descriptor = factory(graph, node);
+    Descriptor::Ptr descriptor = factory.construct(graph, node);
     ASSERT_TRUE(descriptor != nullptr);
     ASSERT_EQ(1, descriptor->values.rows());
     EXPECT_NEAR(4.0f, descriptor->values(0), 1.0e-5);
@@ -120,7 +122,7 @@ TEST(DsgLcdDescriptorTests, TestPlaceDescriptor) {
 
   {  // 1 bin + bigger radius: correct count
     PlaceDescriptorFactory factory(1000.0, HistogramConfig<double>(0, 1.0, 1));
-    Descriptor::Ptr descriptor = factory(graph, node);
+    Descriptor::Ptr descriptor = factory.construct(graph, node);
     ASSERT_TRUE(descriptor != nullptr);
     ASSERT_EQ(1, descriptor->values.rows());
     EXPECT_NEAR(7.0f, descriptor->values(0), 1.0e-5);
@@ -137,7 +139,7 @@ TEST(DsgLcdDescriptorTests, TestPlaceDescriptor) {
 
   {  // 4 bins: one in each
     PlaceDescriptorFactory factory(1.0, HistogramConfig<double>(0.05, 0.45, 4));
-    Descriptor::Ptr descriptor = factory(graph, node);
+    Descriptor::Ptr descriptor = factory.construct(graph, node);
     ASSERT_TRUE(descriptor != nullptr);
     ASSERT_EQ(4, descriptor->values.rows());
     EXPECT_NEAR(1.0f, descriptor->values(0), 1.0e-5);
@@ -187,7 +189,7 @@ TEST(DsgLcdDescriptorTests, TestObjectDescriptor) {
 
   {  // no parent: empty descriptor
     ObjectDescriptorFactory factory(1.0, 5);
-    Descriptor::Ptr descriptor = factory(graph, node);
+    Descriptor::Ptr descriptor = factory.construct(graph, node);
     ASSERT_TRUE(descriptor == nullptr);
   }
 
@@ -195,7 +197,7 @@ TEST(DsgLcdDescriptorTests, TestObjectDescriptor) {
 
   {  // no objects: zero counts
     ObjectDescriptorFactory factory(1.0, 5);
-    Descriptor::Ptr descriptor = factory(graph, node);
+    Descriptor::Ptr descriptor = factory.construct(graph, node);
     ASSERT_TRUE(descriptor != nullptr);
     EXPECT_EQ(Eigen::VectorXf::Zero(5), descriptor->values);
     EXPECT_EQ(NodeSymbol('p', 0), descriptor->root_node);
@@ -212,7 +214,7 @@ TEST(DsgLcdDescriptorTests, TestObjectDescriptor) {
 
   {  // some objects: expected counts
     ObjectDescriptorFactory factory(1.0, 5);
-    Descriptor::Ptr descriptor = factory(graph, node);
+    Descriptor::Ptr descriptor = factory.construct(graph, node);
     ASSERT_TRUE(descriptor != nullptr);
 
     Eigen::VectorXf expected(5);
@@ -233,7 +235,7 @@ TEST(DsgLcdDescriptorTests, TestObjectDescriptor) {
 
   {  // boundary conditions: expected counts
     ObjectDescriptorFactory factory(1.0, 5);
-    Descriptor::Ptr descriptor = factory(graph, node);
+    Descriptor::Ptr descriptor = factory.construct(graph, node);
     ASSERT_TRUE(descriptor != nullptr);
 
     Eigen::VectorXf expected(5);
