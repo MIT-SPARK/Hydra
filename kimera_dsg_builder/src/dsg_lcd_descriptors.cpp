@@ -8,8 +8,8 @@ namespace lcd {
 using Dsg = DynamicSceneGraph;
 using DsgNode = DynamicSceneGraphNode;
 
-Descriptor::Ptr makeAgentDescriptor(const Dsg& graph,
-                                    const DsgNode& agent_node) {
+Descriptor::Ptr AgentDescriptorFactory::construct(const Dsg& graph,
+                                                  const DsgNode& agent_node) const {
   auto parent = agent_node.getParent();
   if (!parent) {
     return nullptr;
@@ -28,8 +28,11 @@ Descriptor::Ptr makeAgentDescriptor(const Dsg& graph,
   return descriptor;
 }
 
-Descriptor::Ptr ObjectDescriptorFactory::operator()(const Dsg& graph,
-                                                    const DsgNode& agent_node) const {
+ObjectDescriptorFactory::ObjectDescriptorFactory(double radius, size_t num_classes)
+    : radius(radius), num_classes(num_classes) {}
+
+Descriptor::Ptr ObjectDescriptorFactory::construct(const Dsg& graph,
+                                                   const DsgNode& agent_node) const {
   auto parent = agent_node.getParent();
   if (!parent) {
     return nullptr;
@@ -96,8 +99,12 @@ Descriptor::Ptr ObjectDescriptorFactory::operator()(const Dsg& graph,
   return descriptor;
 }
 
-Descriptor::Ptr PlaceDescriptorFactory::operator()(const Dsg& graph,
-                                                   const DsgNode& agent_node) const {
+PlaceDescriptorFactory::PlaceDescriptorFactory(double radius,
+                                               const HistogramConfig<double>& config)
+    : radius(radius), config(config) {}
+
+Descriptor::Ptr PlaceDescriptorFactory::construct(const Dsg& graph,
+                                                  const DsgNode& agent_node) const {
   auto parent = agent_node.getParent();
   if (!parent) {
     return nullptr;

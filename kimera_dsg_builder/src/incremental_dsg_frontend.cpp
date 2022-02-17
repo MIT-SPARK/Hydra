@@ -529,40 +529,12 @@ void DsgFrontend::startLcdVisualizer() {
 void DsgFrontend::startLcd() {
   bow_sub_ = nh_.subscribe("bow_vectors", 100, &DsgFrontend::handleDbowMsg, this);
 
-  ros::NodeHandle lcd_nh(nh_, "lcd");
-  double radius;
-  lcd_nh.param<double>("radius_m", radius, 5.0);
-
-  int num_classes;
-  lcd_nh.param<int>("num_semantic_classes", num_classes, 20);
-
-  double hist_min;
-  lcd_nh.param<double>("min_distance_m", hist_min, 0.5);
-  double hist_max;
-  lcd_nh.param<double>("max_distance_m", hist_max, 2.5);
-  double hist_bins;
-  lcd_nh.param<double>("distance_bins", hist_bins, 30);
-  lcd::HistogramConfig<double> hist_config(hist_min, hist_max, hist_bins);
-
-  object_lcd_factory_.reset(new lcd::ObjectDescriptorFactory(radius, num_classes));
-  place_lcd_factory_.reset(new lcd::PlaceDescriptorFactory(radius, hist_config));
-
-  std::map<LayerId, lcd::DescriptorFactoryFunc> descriptor_factories;
-  descriptor_factories[KimeraDsgLayers::OBJECTS] =
-      [&](const DynamicSceneGraph& graph, const DynamicSceneGraphNode& node) {
-        return (*object_lcd_factory_)(graph, node);
-      };
-  descriptor_factories[KimeraDsgLayers::PLACES] =
-      [&](const DynamicSceneGraph& graph, const DynamicSceneGraphNode& node) {
-        return (*place_lcd_factory_)(graph, node);
-      };
-
   lcd::DsgLcdConfig config;
   // TODO(nathan) explicitly set these after or during loading
   //reg_config.registration_output_path = config_.log_path + "/lcd/";
   //config.agent_search_config.min_registration_score = config.agent_search_config.min_score;
+  lcd_module_.reset(new lcd::DsgLcdModule(config));
 
-  lcd_module_.reset(new lcd::DsgLcdModule(config, descriptor_factories));
   startLcdVisualizer();
 
   lcd_thread_.reset(new std::thread(&DsgFrontend::runLcd, this));

@@ -7,13 +7,13 @@ namespace lcd {
 enum class DescriptorScoreType { COSINE, L1 };
 
 struct DescriptorMatchConfig {
-  float min_score;
-  float min_registration_score;
-  double min_time_separation_s;
-  size_t max_registration_matches;
-  double min_score_ratio;
-  double min_match_separation_m;
-  DescriptorScoreType type = DescriptorScoreType::COSINE;
+  float min_score = 1.0;
+  float min_registration_score = 1.0;
+  double min_time_separation_s = 0.0;
+  size_t max_registration_matches = 5;
+  double min_score_ratio = 0.7;
+  double min_match_separation_m = 5.0;
+  DescriptorScoreType type = DescriptorScoreType::L1;
 };
 
 struct LayerSearchResults {

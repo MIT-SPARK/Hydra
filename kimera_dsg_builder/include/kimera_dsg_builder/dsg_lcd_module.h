@@ -3,8 +3,6 @@
 #include "kimera_dsg_builder/dsg_lcd_matching.h"
 #include "kimera_dsg_builder/dsg_lcd_registration.h"
 
-#include "kimera_dsg_builder/incremental_types.h"
-
 namespace kimera {
 namespace lcd {
 
@@ -15,15 +13,16 @@ struct DsgLcdConfig {
   std::map<LayerId, LayerRegistrationConfig> registration_configs;
   TeaserParams teaser_config;
   bool enable_agent_registration = true;
-};
 
-using ValidationFunc =
-    std::function<bool(const DynamicSceneGraph&, const LayerSearchResults&)>;
+  double object_radius_m = 5.0;
+  size_t num_semantic_classes = 20;
+  double place_radius_m = 5.0;
+  HistogramConfig<double> place_histogram_config;
+};
 
 class DsgLcdModule {
  public:
-  DsgLcdModule(const DsgLcdConfig& config,
-               const std::map<LayerId, DescriptorFactoryFunc>& layer_factories);
+  explicit DsgLcdModule(const DsgLcdConfig& config);
 
   void updateDescriptorCache(const DynamicSceneGraph& dsg,
                              const std::unordered_set<NodeId>& archived_places,
@@ -80,7 +79,8 @@ class DsgLcdModule {
       uint64_t timestamp = 0) const;
 
   DsgLcdConfig config_;
-  std::map<LayerId, DescriptorFactoryFunc> layer_factories_;
+  DescriptorFactory::Ptr agent_factory_;
+  std::map<LayerId, DescriptorFactory::Ptr> layer_factories_;
 
   LayerId root_layer_;
   size_t max_internal_index_;
@@ -89,7 +89,7 @@ class DsgLcdModule {
 
   std::map<size_t, DescriptorMatchConfig> match_config_map_;
   std::map<size_t, DsgRegistrationSolver::Ptr> registration_solvers_;
-  std::map<size_t, ValidationFunc> validation_funcs_;
+  // std::map<size_t, ValidationFunc> validation_funcs_;
 
   std::map<LayerId, DescriptorCache> cache_map_;
   std::map<NodeId, DescriptorCache> leaf_cache_;

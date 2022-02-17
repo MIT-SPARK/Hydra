@@ -15,19 +15,29 @@ struct Descriptor {
   std::chrono::nanoseconds timestamp;
 };
 
-using DescriptorFactoryFunc =
-    std::function<Descriptor::Ptr(const DynamicSceneGraph&,
-                                  const DynamicSceneGraphNode&)>;
+struct DescriptorFactory {
+  using Ptr = std::unique_ptr<DescriptorFactory>;
 
-Descriptor::Ptr makeAgentDescriptor(const DynamicSceneGraph& graph,
-                                    const DynamicSceneGraphNode& agent_node);
+  virtual ~DescriptorFactory() = default;
 
-struct ObjectDescriptorFactory {
-  ObjectDescriptorFactory(double radius, size_t num_classes)
-      : radius(radius), num_classes(num_classes) {}
+  virtual Descriptor::Ptr construct(const DynamicSceneGraph& dsg,
+                                    const DynamicSceneGraphNode& agent_node) const = 0;
+};
 
-  Descriptor::Ptr operator()(const DynamicSceneGraph& graph,
-                             const DynamicSceneGraphNode& agent_node) const;
+struct AgentDescriptorFactory : DescriptorFactory {
+  AgentDescriptorFactory() = default;
+
+  virtual ~AgentDescriptorFactory() = default;
+
+  Descriptor::Ptr construct(const DynamicSceneGraph& graph,
+                            const DynamicSceneGraphNode& agent_node) const override;
+};
+
+struct ObjectDescriptorFactory : DescriptorFactory {
+  ObjectDescriptorFactory(double radius, size_t num_classes);
+
+  Descriptor::Ptr construct(const DynamicSceneGraph& graph,
+                            const DynamicSceneGraphNode& agent_node) const override;
 
   const double radius;
   const size_t num_classes;
@@ -56,12 +66,11 @@ struct HistogramConfig {
   }
 };
 
-struct PlaceDescriptorFactory {
-  PlaceDescriptorFactory(double radius, const HistogramConfig<double>& config)
-      : radius(radius), config(config) {}
+struct PlaceDescriptorFactory : DescriptorFactory {
+  PlaceDescriptorFactory(double radius, const HistogramConfig<double>& config);
 
-  Descriptor::Ptr operator()(const DynamicSceneGraph& graph,
-                             const DynamicSceneGraphNode& agent_node) const;
+  Descriptor::Ptr construct(const DynamicSceneGraph& graph,
+                            const DynamicSceneGraphNode& agent_node) const override;
 
   const double radius;
   const HistogramConfig<double> config;

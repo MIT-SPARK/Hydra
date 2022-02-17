@@ -8,13 +8,18 @@ namespace lcd {
 using incremental::SharedDsgInfo;
 using DsgNode = DynamicSceneGraphNode;
 
-DsgLcdModule::DsgLcdModule(
-    const DsgLcdConfig& config,
-    const std::map<LayerId, DescriptorFactoryFunc>& layer_factories)
-    : config_(config), layer_factories_(layer_factories) {
+DsgLcdModule::DsgLcdModule(const DsgLcdConfig& config) : config_(config) {
   for (const auto& id_func_pair : layer_factories_) {
     cache_map_[id_func_pair.first] = DescriptorCache();
   }
+
+  layer_factories_.emplace(KimeraDsgLayers::OBJECTS,
+                           std::make_unique<ObjectDescriptorFactory>(
+                               config_.object_radius_m, config_.num_semantic_classes));
+  layer_factories_.emplace(KimeraDsgLayers::PLACES,
+                           std::make_unique<PlaceDescriptorFactory>(
+                               config_.place_radius_m, config_.place_histogram_config));
+  agent_factory_ = std::make_unique<AgentDescriptorFactory>();
 
   size_t internal_idx = 1;  // agent is 0
   for (const auto& id_config_pair : config_.search_configs) {
@@ -70,7 +75,7 @@ bool DsgLcdModule::addNewDescriptors(const DynamicSceneGraph& graph,
     leaf_cache_[*parent] = DescriptorCache();
   }
 
-  leaf_cache_[*parent][agent_node.id] = makeAgentDescriptor(graph, agent_node);
+  leaf_cache_[*parent][agent_node.id] = agent_factory_->construct(graph, agent_node);
 
   for (const auto& prefix_func_pair : layer_factories_) {
     if (cache_map_[prefix_func_pair.first].count(*parent)) {
@@ -78,7 +83,8 @@ bool DsgLcdModule::addNewDescriptors(const DynamicSceneGraph& graph,
     }
 
     // guaranteed to exist by constructor
-    Descriptor::Ptr layer_descriptor = prefix_func_pair.second(graph, agent_node);
+    Descriptor::Ptr layer_descriptor =
+        prefix_func_pair.second->construct(graph, agent_node);
     cache_map_[prefix_func_pair.first][*parent] = std::move(layer_descriptor);
   }
 
@@ -211,9 +217,7 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::detect(const DynamicSceneGrap
   for (size_t idx = max_internal_index_ - 1; idx > 0; --idx) {
     const auto& config = match_config_map_.at(idx);
     const LayerId layer = internal_index_to_layer_.at(idx);
-    Descriptor::Ptr descriptor;
-    descriptor = layer_factories_[layer](dsg, latest_node);
-
+    auto descriptor = layer_factories_[layer]->construct(dsg, latest_node);
     if (descriptor) {
       VLOG(2) << "level " << idx << ": " << std::endl
               << "    " << descriptor->values.transpose();
@@ -231,9 +235,7 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::detect(const DynamicSceneGrap
     }
   }
 
-  Descriptor::Ptr descriptor;
-  descriptor = makeAgentDescriptor(dsg, latest_node);
-
+  auto descriptor = agent_factory_->construct(dsg, latest_node);
   if (descriptor) {
     matches_[0] = searchLeafDescriptors(*descriptor,
                                         config_.agent_search_config,
