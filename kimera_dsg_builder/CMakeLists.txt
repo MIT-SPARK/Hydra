@@ -118,7 +118,7 @@ target_link_libraries(room_visualizer_node ${catkin_LIBRARIES} yaml-cpp gtsam)
 
 add_executable(room_eval_node src/room_eval_node.cpp)
 target_include_directories(room_eval_node PUBLIC ${catkin_INCLUDE_DIRS})
-target_link_libraries(room_eval_node ${catkin_LIBRARIES} yaml-cpp)
+target_link_libraries(room_eval_node ${catkin_LIBRARIES} yaml-cpp kimera_dsg::kimera_dsg)
 
 add_executable(pose_graph_publisher_node src/pose_graph_publisher_node.cpp)
 target_include_directories(pose_graph_publisher_node PUBLIC ${catkin_INCLUDE_DIRS})

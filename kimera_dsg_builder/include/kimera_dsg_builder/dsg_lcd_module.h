@@ -17,7 +17,7 @@ struct DsgLcdConfig {
   double object_radius_m = 5.0;
   size_t num_semantic_classes = 20;
   double place_radius_m = 5.0;
-  HistogramConfig<double> place_histogram_config;
+  HistogramConfig<double> place_histogram_config{0.5, 2.5, 30};
 };
 
 class DsgLcdModule {
