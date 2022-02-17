@@ -6,11 +6,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+find_package(kimera_dsg REQUIRED)
 find_package(
   catkin REQUIRED
   COMPONENTS roscpp
              dynamic_reconfigure
-             kimera_dsg
              kimera_dsg_visualizer
              kimera_semantics_ros
              message_generation
@@ -27,13 +27,12 @@ add_message_files(FILES ActiveLayer.msg ActiveMesh.msg)
 
 generate_messages(DEPENDENCIES std_msgs voxblox_msgs)
 
-generate_dynamic_reconfigure_options(cfg/GvdVisualizerConfig.cfg)
+generate_dynamic_reconfigure_options(cfg/GvdVisualizer.cfg)
 
 catkin_package(
   CATKIN_DEPENDS
   roscpp
   dynamic_reconfigure
-  kimera_dsg
   kimera_dsg_visualizer
   kimera_semantics_ros
   message_runtime
@@ -42,7 +41,7 @@ catkin_package(
   tf2_eigen
   tf2_ros
   pcl_ros
-  DEPENDS
+  DEPENDS kimera_dsg
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}
 )
@@ -62,7 +61,7 @@ add_library(
   src/voxel_aware_marching_cubes.cpp
   src/voxel_aware_mesh_integrator.cpp
 )
-target_link_libraries(${PROJECT_NAME} PUBLIC ${catkin_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PUBLIC ${catkin_LIBRARIES} kimera_dsg::kimera_dsg)
 target_include_directories(
   ${PROJECT_NAME}
   PUBLIC include ${catkin_INCLUDE_DIRS}

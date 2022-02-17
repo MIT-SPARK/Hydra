@@ -7,14 +7,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 option(DSG_USE_ASAN "enable address sanatizer" OFF)
 
-# Setup and linking for normal files
+find_package(Boost REQUIRED COMPONENTS timer)
+find_package(kimera_dsg REQUIRED)
 find_package(
   catkin REQUIRED
   COMPONENTS roscpp
              dynamic_reconfigure
              pluginlib
              std_msgs
-             kimera_dsg
              kimera_dsg_visualizer
              kimera_pgmo
              kimera_semantics
@@ -33,7 +33,7 @@ find_package(Eigen3 REQUIRED)
 find_package(KimeraRPGO REQUIRED)
 find_package(yaml-cpp REQUIRED)
 
-generate_dynamic_reconfigure_options(cfg/DsgBuilderConfig.cfg)
+generate_dynamic_reconfigure_options(cfg/DsgBuilder.cfg)
 
 catkin_package(
   CATKIN_DEPENDS
@@ -42,7 +42,6 @@ catkin_package(
   object_db
   pluginlib
   std_msgs
-  kimera_dsg
   kimera_dsg_visualizer
   kimera_pgmo
   kimera_semantics
@@ -52,7 +51,7 @@ catkin_package(
   tf2_eigen
   voxblox
   voxblox_ros
-  DEPENDS
+  DEPENDS kimera_dsg
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}
 )
@@ -87,6 +86,7 @@ target_link_libraries(
   ${catkin_LIBRARIES}
   gtsam
   teaserpp::teaser_registration
+  kimera_dsg::kimera_dsg
 )
 add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
 
