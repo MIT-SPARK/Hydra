@@ -18,4 +18,17 @@ void YamlParser::parseImpl(uint8_t& value) const {
   value = node_.as<uint16_t>();
 }
 
+std::vector<std::string> YamlParser::children() const {
+  if (!node_.IsMap()) {
+    return {};
+  }
+
+  std::vector<std::string> children;
+  for (const auto& kv_pair : node_) {
+    children.push_back(kv_pair.first.as<std::string>());
+  }
+
+  return children;
+}
+
 }  // namespace config_parser

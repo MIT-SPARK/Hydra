@@ -33,6 +33,13 @@ Config load_from_ros_nh(const ros::NodeHandle& nh) {
   return config;
 }
 
+template <typename Config>
+Config load_from_ros_nh(const ros::NodeHandle& nh, std::string ns) {
+  Config config;
+  ConfigVisitor<Config>::visit_config(RosParser(nh, ns), config);
+  return config;
+}
+
 inline std::string to_uppercase(const std::string& original) {
   std::string result = original;
   std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) {

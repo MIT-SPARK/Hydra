@@ -82,8 +82,6 @@ class DsgFrontend {
 
   std::optional<Eigen::Vector3d> getLatestPose();
 
-  void startLcdVisualizer();
-
  private:
   ros::NodeHandle nh_;
   std::atomic<bool> should_shutdown_{false};
@@ -122,8 +120,8 @@ class DsgFrontend {
   std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> lcd_queue_;
   std::unique_ptr<std::thread> lcd_thread_;
   std::unique_ptr<lcd::DsgLcdModule> lcd_module_;
-  std::unique_ptr<lcd::ObjectDescriptorFactory> object_lcd_factory_;
-  std::unique_ptr<lcd::PlaceDescriptorFactory> place_lcd_factory_;
+  std::unique_ptr<lcd::LcdVisualizer> lcd_visualizer_;
+  std::unique_ptr<ros::CallbackQueue> visualizer_queue_;
   DynamicSceneGraph::Ptr lcd_graph_;
   // TODO(nathan) replace with struct passed in through constructor
   char robot_prefix_;
@@ -135,9 +133,6 @@ class DsgFrontend {
   std::map<NodeId, size_t> agent_key_map_;
 
   SceneGraphLogger frontend_graph_logger_;
-
-  std::unique_ptr<lcd::LcdVisualizer> lcd_visualizer_;
-  std::unique_ptr<ros::CallbackQueue> visualizer_queue_;
 };
 
 }  // namespace incremental

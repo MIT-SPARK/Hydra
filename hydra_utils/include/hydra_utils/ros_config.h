@@ -2,6 +2,7 @@
 #include "hydra_utils/config_visitor.h"
 
 #include <ros/ros.h>
+#include <vector>
 
 namespace config_parser {
 
@@ -99,15 +100,25 @@ constexpr const auto& readRosParam = detail::static_const<detail::read_ros_param
 
 class RosParser {
  public:
-  RosParser(const ros::NodeHandle& nh, const std::string& name);
+  RosParser();
 
   explicit RosParser(const ros::NodeHandle& nh);
+
+  RosParser(const ros::NodeHandle& nh, const std::string& name);
+
+  RosParser(const RosParser& other) = default;
+
+  RosParser& operator=(const RosParser& other) = default;
 
   ~RosParser() = default;
 
   static RosParser FromNs(const std::string& ns);
 
   RosParser operator[](const std::string& new_name) const;
+
+  std::vector<std::string> children() const;
+
+  inline std::string name() const { return name_; }
 
   template <typename T>
   void visit(const std::string& name, T& value) const {

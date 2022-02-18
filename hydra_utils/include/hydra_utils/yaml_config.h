@@ -2,16 +2,27 @@
 #include "hydra_utils/config_visitor.h"
 
 #include <yaml-cpp/yaml.h>
+#include <vector>
 
 namespace config_parser {
 
 class YamlParser {
  public:
+  YamlParser() = default;
+
+  YamlParser(const YamlParser& other) = default;
+
   explicit YamlParser(const std::string& file);
 
   explicit YamlParser(const YAML::Node& node);
 
+  YamlParser& operator=(const YamlParser& other) = default;
+
+  ~YamlParser() = default;
+
   YamlParser operator[](const std::string& new_name) const;
+
+  std::vector<std::string> children() const;
 
   template <typename T>
   void visit(const std::string& name, T& value) const {

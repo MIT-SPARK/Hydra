@@ -97,6 +97,35 @@ std::map<std::string, bool> MapConverter::from(
   return to_return;
 }
 
+TEST(ConfigParsing, RosChildren) {
+  config_parser::RosParser parser = config_parser::RosParser::FromNs("/plain_test_config");
+  auto children = parser.children();
+  EXPECT_EQ(children.size(), 11u);
+
+  auto value_parser = parser["value_map"];
+  auto value_children = value_parser.children();
+  EXPECT_EQ(value_children.size(), 2u);
+
+  auto enable_parser = parser["enable_map"];
+  auto enable_children = enable_parser.children();
+  EXPECT_EQ(enable_children.size(), 2u);
+}
+
+TEST(ConfigParsing, YamlChildren) {
+  const std::string filepath = get_test_path() + "test_config.yaml";
+  config_parser::YamlParser parser(filepath);
+  auto children = parser.children();
+  EXPECT_EQ(children.size(), 11u);
+
+  auto value_parser = parser["value_map"];
+  auto value_children = value_parser.children();
+  EXPECT_EQ(value_children.size(), 2u);
+
+  auto enable_parser = parser["enable_map"];
+  auto enable_children = enable_parser.children();
+  EXPECT_EQ(enable_children.size(), 2u);
+}
+
 TEST(ConfigParsing, ParseSingleStructYaml) {
   const std::string filepath = get_test_path() + "test_config.yaml";
   auto config = config_parser::load_from_yaml<FakeConfig>(filepath);

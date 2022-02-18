@@ -49,6 +49,34 @@ DECLARE_CONFIG_ENUM(KimeraRPGO,
 
 DECLARE_CONFIG_ENUM(KimeraRPGO, Solver, {Solver::LM, "LM"}, {Solver::GN, "GN"})
 
+namespace config_parser {
+
+template <typename T>
+struct ConfigVisitor<std::map<kimera::LayerId, T>> {
+  using ConfigMap = std::map<kimera::LayerId, T>;
+  using MapType = typename ConfigMap::mapped_type;
+
+  template <typename V, typename std::enable_if<is_parser<V>::value, bool>::type = true>
+  static auto visit_config(const V& v, ConfigMap& value) {
+    for (const auto& child : v.children()) {
+      const auto layer = kimera::KimeraDsgLayers::StringToLayerId(child);
+      value[layer] = MapType();
+      v.visit(child, value[layer]);
+    }
+  }
+
+  template <typename V,
+            typename std::enable_if<!is_parser<V>::value, bool>::type = true>
+  static auto visit_config(const V& v, ConfigMap& value) {
+    for (auto& kv_pair : value) {
+      const auto layer_str = kimera::KimeraDsgLayers::LayerIdToString(kv_pair.first);
+      v.visit(layer_str, kv_pair.second);
+    }
+  }
+};
+
+}  // namespace config_parser
+
 namespace kimera {
 namespace incremental {
 
@@ -61,6 +89,8 @@ struct DsgFrontendConfig {
   bool prune_mesh_indices = false;
   std::string sensor_frame = "base_link";
   bool enable_lcd = false;
+  bool visualize_dsg_lcd = false;
+  std::string lcd_visualizer_ns = "/dsg/lcd_visualizer";
   double lcd_agent_horizon_s = 1.5;
   double descriptor_creation_horizon_m = 10.0;
   std::string mesh_ns = "";
@@ -113,6 +143,8 @@ void visit_config(const Visitor& v, DsgFrontendConfig& config) {
   v.visit("prune_mesh_indices", config.prune_mesh_indices);
   v.visit("sensor_frame", config.sensor_frame);
   v.visit("enable_lcd", config.enable_lcd);
+  v.visit("visualize_dsg_lcd", config.visualize_dsg_lcd);
+  v.visit("lcd_visualizer_ns", config.lcd_visualizer_ns);
   v.visit("lcd_agent_horizon_s", config.lcd_agent_horizon_s);
   v.visit("descriptor_creation_horizon_m", config.descriptor_creation_horizon_m);
   v.visit("mesh_ns", config.mesh_ns);
@@ -140,14 +172,17 @@ void visit_config(const Visitor& v, DsgBackendConfig& config) {
   v.visit("pgmo", config.pgmo);
 
   auto dsg_handle = v["dsg"];
-  dsg_handle.visit("add_places_to_deformation_graph", config.add_places_to_deformation_graph);
+  dsg_handle.visit("add_places_to_deformation_graph",
+                   config.add_places_to_deformation_graph);
   dsg_handle.visit("optimize_on_lc", config.optimize_on_lc);
   dsg_handle.visit("enable_node_merging", config.enable_node_merging);
   dsg_handle.visit("call_update_periodically", config.call_update_periodically);
-  dsg_handle.visit("merge_update_map", config.merge_update_map, EnableMapConverter());
+  //dsg_handle.visit("merge_update_map", config.merge_update_map, EnableMapConverter());
+  dsg_handle.visit("merge_update_map", config.merge_update_map);
   dsg_handle.visit("merge_update_dynamic", config.merge_update_dynamic);
   dsg_handle.visit("places_merge_pos_threshold_m", config.places_merge_pos_threshold_m);
-  dsg_handle.visit("places_merge_distance_tolerance_m", config.places_merge_distance_tolerance_m);
+  dsg_handle.visit("places_merge_distance_tolerance_m",
+                   config.places_merge_distance_tolerance_m);
 }
 
 template <typename Visitor>
@@ -213,9 +248,9 @@ void visit_config(const Visitor& v, HistogramConfig<T>& config) {
 
 template <typename Visitor>
 void visit_config(const Visitor& v, DsgLcdConfig& config) {
-  // search configs
+  v.visit("search_configs", config.search_configs);
   v.visit("agent_search_config", config.agent_search_config);
-  // registration configs
+  v.visit("registration_configs", config.registration_configs);
   v.visit("teaser_config", config.teaser_config);
   v.visit("enable_agent_registration", config.enable_agent_registration);
   v.visit("object_radius_m", config.object_radius_m);
@@ -246,4 +281,6 @@ DECLARE_CONFIG_OSTREAM_OPERATOR(teaser, RobustRegistrationSolver::Params)
 DECLARE_CONFIG_OSTREAM_OPERATOR(kimera::incremental, RoomFinder::Config)
 DECLARE_CONFIG_OSTREAM_OPERATOR(kimera::incremental, DsgBackendConfig)
 DECLARE_CONFIG_OSTREAM_OPERATOR(kimera::lcd, HistogramConfig<double>)
+DECLARE_CONFIG_OSTREAM_OPERATOR(kimera::lcd, LayerRegistrationConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(kimera::lcd, DescriptorMatchConfig)
 DECLARE_CONFIG_OSTREAM_OPERATOR(kimera::lcd, DsgLcdConfig)

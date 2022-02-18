@@ -504,38 +504,25 @@ void DsgFrontend::addAgentPlaceEdges() {
   }
 }
 
-void DsgFrontend::startLcdVisualizer() {
-  bool visualize_dsg_lcd;
-  nh_.param<bool>("visualize_dsg_lcd", visualize_dsg_lcd, false);
-  if (!visualize_dsg_lcd) {
-    return;
-  }
-
-  double radius;
-  nh_.param<double>("lcd/radius_m", radius, 5.0);
-
-  std::string visualizer_ns;
-  nh_.param<std::string>("visualizer_ns", visualizer_ns, "/dsg_lcd_visualizer");
-
-  ros::NodeHandle nh(visualizer_ns);
-  visualizer_queue_.reset(new ros::CallbackQueue());
-  nh.setCallbackQueue(visualizer_queue_.get());
-
-  lcd_visualizer_.reset(new lcd::LcdVisualizer(nh, radius));
-  lcd_visualizer_->setGraph(lcd_graph_);
-  lcd_visualizer_->setLcdModule(lcd_module_.get());
-}
-
 void DsgFrontend::startLcd() {
   bow_sub_ = nh_.subscribe("bow_vectors", 100, &DsgFrontend::handleDbowMsg, this);
 
-  lcd::DsgLcdConfig config;
-  // TODO(nathan) explicitly set these after or during loading
-  //reg_config.registration_output_path = config_.log_path + "/lcd/";
-  //config.agent_search_config.min_registration_score = config.agent_search_config.min_score;
+  auto config = config_parser::load_from_ros_nh<lcd::DsgLcdConfig>(nh_, "lcd");
+  for (auto& kv_pair : config.registration_configs) {
+    kv_pair.second.registration_output_path = config_.log_path + "/lcd/";
+  }
+  config.agent_search_config.min_registration_score = config.agent_search_config.min_score;
   lcd_module_.reset(new lcd::DsgLcdModule(config));
 
-  startLcdVisualizer();
+  if (config_.visualize_dsg_lcd) {
+    ros::NodeHandle nh(config_.lcd_visualizer_ns);
+    visualizer_queue_.reset(new ros::CallbackQueue());
+    nh.setCallbackQueue(visualizer_queue_.get());
+
+    lcd_visualizer_.reset(new lcd::LcdVisualizer(nh, config.object_radius_m));
+    lcd_visualizer_->setGraph(lcd_graph_);
+    lcd_visualizer_->setLcdModule(lcd_module_.get());
+  }
 
   lcd_thread_.reset(new std::thread(&DsgFrontend::runLcd, this));
 }
