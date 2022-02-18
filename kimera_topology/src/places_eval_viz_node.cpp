@@ -36,47 +36,43 @@ namespace kimera_dsg_visualizer {
 
 template <typename Visitor>
 void visit_config(const Visitor& v, ColormapConfig& config) {
-  config_parser::visit_config(v["min_hue"], config.min_hue);
-  config_parser::visit_config(v["max_hue"], config.max_hue);
-  config_parser::visit_config(v["min_saturation"], config.min_saturation);
-  config_parser::visit_config(v["max_saturation"], config.max_saturation);
-  config_parser::visit_config(v["min_luminance"], config.min_luminance);
-  config_parser::visit_config(v["max_luminance"], config.max_luminance);
+  v.visit("min_hue", config.min_hue);
+  v.visit("max_hue", config.max_hue);
+  v.visit("min_saturation", config.min_saturation);
+  v.visit("max_saturation", config.max_saturation);
+  v.visit("min_luminance", config.min_luminance);
+  v.visit("max_luminance", config.max_luminance);
 }
 
 template <typename Visitor>
 void visit_config(const Visitor& v, VisualizerConfig& config) {
-  config_parser::visit_config(v["layer_z_step"], config.layer_z_step);
-  config_parser::visit_config(v["mesh_edge_break_ratio"], config.mesh_edge_break_ratio);
-  config_parser::visit_config(v["mesh_layer_offset"], config.mesh_layer_offset);
-  config_parser::visit_config(v["collapse_layers"], config.collapse_layers);
-  config_parser::visit_config(v["color_places_by_distance"],
-                              config.color_places_by_distance);
+  v.visit("layer_z_step", config.layer_z_step);
+  v.visit("mesh_edge_break_ratio", config.mesh_edge_break_ratio);
+  v.visit("mesh_layer_offset", config.mesh_layer_offset);
+  v.visit("collapse_layers", config.collapse_layers);
+  v.visit("color_places_by_distance", config.color_places_by_distance);
 }
 
 template <typename Visitor>
 void visit_config(const Visitor& v, LayerConfig& config) {
-  config_parser::visit_config(v["z_offset_scale"], config.z_offset_scale);
-  config_parser::visit_config(v["visualize"], config.visualize);
-  config_parser::visit_config(v["marker_scale"], config.marker_scale);
-  config_parser::visit_config(v["marker_alpha"], config.marker_alpha);
-  config_parser::visit_config(v["use_sphere_marker"], config.use_sphere_marker);
-  config_parser::visit_config(v["use_label"], config.use_label);
-  config_parser::visit_config(v["label_height"], config.label_height);
-  config_parser::visit_config(v["label_scale"], config.label_scale);
-  config_parser::visit_config(v["use_bounding_box"], config.use_bounding_box);
-  config_parser::visit_config(v["bounding_box_alpha"], config.bounding_box_alpha);
-  config_parser::visit_config(v["use_edge_source"], config.use_edge_source);
-  config_parser::visit_config(v["interlayer_edge_scale"], config.interlayer_edge_scale);
-  config_parser::visit_config(v["interlayer_edge_alpha"], config.interlayer_edge_alpha);
-  config_parser::visit_config(v["interlayer_edge_use_color"],
-                              config.interlayer_edge_use_color);
-  config_parser::visit_config(v["interlayer_edge_insertion_skip"],
-                              config.interlayer_edge_insertion_skip);
-  config_parser::visit_config(v["intralayer_edge_scale"], config.intralayer_edge_scale);
-  config_parser::visit_config(v["intralayer_edge_alpha"], config.intralayer_edge_alpha);
-  config_parser::visit_config(v["intralayer_edge_insertion_skip"],
-                              config.intralayer_edge_insertion_skip);
+  v.visit("z_offset_scale", config.z_offset_scale);
+  v.visit("visualize", config.visualize);
+  v.visit("marker_scale", config.marker_scale);
+  v.visit("marker_alpha", config.marker_alpha);
+  v.visit("use_sphere_marker", config.use_sphere_marker);
+  v.visit("use_label", config.use_label);
+  v.visit("label_height", config.label_height);
+  v.visit("label_scale", config.label_scale);
+  v.visit("use_bounding_box", config.use_bounding_box);
+  v.visit("bounding_box_alpha", config.bounding_box_alpha);
+  v.visit("use_edge_source", config.use_edge_source);
+  v.visit("interlayer_edge_scale", config.interlayer_edge_scale);
+  v.visit("interlayer_edge_alpha", config.interlayer_edge_alpha);
+  v.visit("interlayer_edge_use_color", config.interlayer_edge_use_color);
+  v.visit("interlayer_edge_insertion_skip", config.interlayer_edge_insertion_skip);
+  v.visit("intralayer_edge_scale", config.intralayer_edge_scale);
+  v.visit("intralayer_edge_alpha", config.intralayer_edge_alpha);
+  v.visit("intralayer_edge_insertion_skip", config.intralayer_edge_insertion_skip);
 }
 
 }  // namespace kimera_dsg_visualizer

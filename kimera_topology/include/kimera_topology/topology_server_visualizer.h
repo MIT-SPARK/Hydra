@@ -30,12 +30,11 @@ struct TopologyVisualizerConfig {
 
 template <typename Visitor>
 void visit_config(const Visitor& v, TopologyVisualizerConfig& config) {
-  config_parser::visit_config(v["world_frame"], config.world_frame);
-  config_parser::visit_config(v["topology_marker_ns"], config.topology_marker_ns);
-  config_parser::visit_config(v["show_block_outlines"], config.show_block_outlines);
-  config_parser::visit_config(v["use_gvd_block_outlines"],
-                              config.use_gvd_block_outlines);
-  config_parser::visit_config(v["outline_scale"], config.outline_scale);
+  v.visit("world_frame", config.world_frame);
+  v.visit("topology_marker_ns", config.topology_marker_ns);
+  v.visit("show_block_outlines", config.show_block_outlines);
+  v.visit("use_gvd_block_outlines", config.use_gvd_block_outlines);
+  v.visit("outline_scale", config.outline_scale);
 }
 
 class TopologyServerVisualizer {
