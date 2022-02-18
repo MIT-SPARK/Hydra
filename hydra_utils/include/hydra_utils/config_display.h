@@ -1,5 +1,5 @@
 #pragma once
-#include "hydra_utils/config_traits.h"
+#include "hydra_utils/config_visitor.h"
 
 #include <map>
 #include <ostream>
@@ -92,6 +92,19 @@ class ConfigDisplay {
     return ConfigDisplay(out_, new_prefix);
   }
 
+  template <typename T>
+  void visit(const std::string& name, T& value) const {
+    auto new_parser = this->operator[](name);
+    ConfigVisitor<T>::visit_config(new_parser, value);
+  }
+
+ template <typename T, typename C>
+  void visit(const std::string& name, T& value, const C& converter) const {
+    auto new_parser = this->operator[](name);
+    auto intermediate_value = converter.from(value);
+    ConfigVisitor<T>::visit_config(new_parser, intermediate_value);
+  }
+
   inline void pre_visit() const {
     if (!root_call_) {
       out_ << prefix_;
@@ -105,7 +118,7 @@ class ConfigDisplay {
   }
 
   template <typename T>
-  void visit(const T& value) const {
+  void show(const T& value) const {
     out_ << " ";
     displayParam(out_, value);
   }

@@ -1,6 +1,6 @@
 #pragma once
-#include <type_traits>
 #include <string>
+#include <type_traits>
 
 namespace config_parser {
 

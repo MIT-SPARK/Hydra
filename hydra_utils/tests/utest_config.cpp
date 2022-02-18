@@ -42,23 +42,23 @@ struct MapConverter {
 
 template <typename Visitor>
 void visit_config(const Visitor& v, FakeConfig& config) {
-  config_parser::visit_config(v["foo"], config.foo);
-  config_parser::visit_config(v["bar"], config.bar);
-  config_parser::visit_config(v["a"], config.a);
-  config_parser::visit_config(v["b"], config.b);
-  config_parser::visit_config(v["c"], config.c);
-  config_parser::visit_config(v["msg"], config.msg);
-  config_parser::visit_config(v["values"], config.values);
-  config_parser::visit_config(v["value_map"], config.value_map);
-  config_parser::visit_config(v["type"], config.type);
-  config_parser::visit_config(v["vec"], config.vec);
-  config_parser::visit_config(v["enable_map"], config.enable_map, MapConverter());
+  v.visit("foo", config.foo);
+  v.visit("bar", config.bar);
+  v.visit("a", config.a);
+  v.visit("b", config.b);
+  v.visit("c", config.c);
+  v.visit("msg", config.msg);
+  v.visit("values", config.values);
+  v.visit("value_map", config.value_map);
+  v.visit("type", config.type);
+  v.visit("vec", config.vec);
+  v.visit("enable_map", config.enable_map, MapConverter());
 }
 
 template <typename Visitor>
 void visit_config(const Visitor& v, FakeConfig2& config) {
-  config_parser::visit_config(v["fake_config"], config.fake_config);
-  config_parser::visit_config(v["msg"], config.msg);
+  v.visit("fake_config", config.fake_config);
+  v.visit("msg", config.msg);
 }
 
 }  // namespace hydra_utils

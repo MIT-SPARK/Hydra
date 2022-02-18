@@ -1,6 +1,7 @@
 #pragma once
+#include "hydra_utils/config_visitor.h"
+
 #include <ros/ros.h>
-#include "hydra_utils/config_traits.h"
 
 namespace config_parser {
 
@@ -109,7 +110,21 @@ class RosParser {
   RosParser operator[](const std::string& new_name) const;
 
   template <typename T>
-  void visit(T& value) const {
+  void visit(const std::string& name, T& value) const {
+    auto new_parser = this->operator[](name);
+    ConfigVisitor<T>::visit_config(new_parser, value);
+  }
+
+  template <typename T, typename C>
+  void visit(const std::string& name, T& value, const C& converter) const {
+    auto new_parser = this->operator[](name);
+    auto intermediate_value = converter.from(value);
+    ConfigVisitor<T>::visit_config(new_parser, intermediate_value);
+    value = converter.from(intermediate_value);
+  }
+
+  template <typename T>
+  void parse(T& value) const {
     ::config_parser::readRosParam(nh_, name_, value);
   }
 

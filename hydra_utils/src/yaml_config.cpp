@@ -10,7 +10,7 @@ YamlParser YamlParser::operator[](const std::string& new_name) const {
   return YamlParser(node_[new_name]);
 }
 
-void YamlParser::visitImpl(uint8_t& value) const {
+void YamlParser::parseImpl(uint8_t& value) const {
   if (!node_) {
     return;
   }

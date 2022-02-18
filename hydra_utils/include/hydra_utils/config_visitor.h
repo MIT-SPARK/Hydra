@@ -17,7 +17,7 @@ template <typename V,
           typename T,
           typename std::enable_if<!is_parser<V>::value, bool>::type = true>
 void visit_config(const V& visitor, T& value) {
-  visitor.visit(value);
+  visitor.show(value);
   visitor.post_visit();
 }
 
@@ -26,7 +26,7 @@ template <typename V,
           typename T,
           typename std::enable_if<is_parser<V>::value, bool>::type = true>
 void visit_config(const V& visitor, T& value) {
-  visitor.visit(value);
+  visitor.parse(value);
 }
 
 // adl indirection
@@ -41,16 +41,6 @@ struct visit_config_fn {
 
   template <typename V,
             typename T,
-            typename C,
-            typename std::enable_if<is_parser<V>::value, bool>::type = true>
-  constexpr void operator()(const V& visitor, T& value, const C& converter) const {
-    auto intermediate_value = converter.from(value);
-    this->operator()(visitor, intermediate_value);
-    value = converter.from(intermediate_value);
-  }
-
-  template <typename V,
-            typename T,
             typename std::enable_if<!is_parser<V>::value, bool>::type = true>
   constexpr auto operator()(const V& visitor, T& value) const
       -> decltype(visit_config(visitor, value)) {
@@ -59,15 +49,6 @@ struct visit_config_fn {
       visitor.post_visit();
     }
     visit_config(visitor, value);
-  }
-
-  template <typename V,
-            typename T,
-            typename C,
-            typename std::enable_if<!is_parser<V>::value, bool>::type = true>
-  constexpr void operator()(const V& visitor, T& value, const C& converter) const {
-    auto intermediate_value = converter.from(value);
-    this->operator()(visitor, intermediate_value);
   }
 };
 
