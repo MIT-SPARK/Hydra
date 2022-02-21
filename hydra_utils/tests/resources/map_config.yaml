@@ -1,9 +1,9 @@
 configs:
     config_a:
         a: -3
-        b: 1
-        c: 2
+        b: 5.2
+        c: "hello"
     config_b:
-        a: -3
-        b: 1
-        c: 2
+        a: 5
+        b: -1.2
+        c: "other"

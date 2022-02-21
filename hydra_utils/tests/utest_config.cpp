@@ -336,6 +336,16 @@ TEST(ConfigParsing, ParseMapStructYaml) {
   EXPECT_EQ(config.configs.size(), 2u);
   ASSERT_TRUE(config.configs.count("config_a"));
   ASSERT_TRUE(config.configs.count("config_b"));
+
+  BarConfig config_a = config.configs["config_a"];
+  EXPECT_EQ(config_a.a, -3);
+  EXPECT_NEAR(config_a.b, 5.2f, 1.0e-6f);
+  EXPECT_EQ(config_a.c, "hello");
+
+  BarConfig config_b = config.configs["config_b"];
+  EXPECT_EQ(config_b.a, 5);
+  EXPECT_NEAR(config_b.b, -1.2f, 1.0e-6f);
+  EXPECT_EQ(config_b.c, "other");
 }
 
 TEST(ConfigParsing, ParseMapStructRos) {
@@ -344,6 +354,16 @@ TEST(ConfigParsing, ParseMapStructRos) {
   EXPECT_EQ(config.configs.size(), 2u);
   ASSERT_TRUE(config.configs.count("config_a"));
   ASSERT_TRUE(config.configs.count("config_b"));
+
+  BarConfig config_a = config.configs["config_a"];
+  EXPECT_EQ(config_a.a, -3);
+  EXPECT_NEAR(config_a.b, 5.2f, 1.0e-6f);
+  EXPECT_EQ(config_a.c, "hello");
+
+  BarConfig config_b = config.configs["config_b"];
+  EXPECT_EQ(config_b.a, 5);
+  EXPECT_NEAR(config_b.b, -1.2f, 1.0e-6f);
+  EXPECT_EQ(config_b.c, "other");
 }
 
 TEST(ConfigParsing, OutputMapConfig) {
@@ -357,13 +377,13 @@ TEST(ConfigParsing, OutputMapConfig) {
   std::string expected = R"out(
 - configs:
   - config_a:
-    - a: 1
-    - b: 2
-    - c: -3
+    - a: -3
+    - b: 5.2
+    - c: hello
   - config_b:
-    - a: 1
-    - b: 2
-    - c: -3
+    - a: 5
+    - b: -1.2
+    - c: other
 )out";
 
   EXPECT_EQ(expected, ss.str()) << "config:" << std::endl << ss.str();
