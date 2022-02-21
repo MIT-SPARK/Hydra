@@ -5,6 +5,9 @@ Contains common code used between the different hydra packages, which primarily 
 To build and run tests (assuming you've built the package normally):
 
 ```
-catkin build hydra_utils --no-deps --catkin-make-args tests
-rosrun hydra_utils utest_hyrda_utils
+catkin build hydra_utils --catkin-make-args tests
+rostest hydra_utils hydra_utils.test
 ```
+
+Documentation:
+-  [Config Parsing](doc/config_parsing.md)
