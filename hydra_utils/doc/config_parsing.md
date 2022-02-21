@@ -167,7 +167,7 @@ struct SomeStruct {
 } // namespace fake_ns
 ```
 
-There are two problems here. First, you might not want to actually specify integers as configuration keys or values (e.g. the keys are enums and have nice human-readable strings). This can be addressed by parsing a different type (e.g. `std::map<std::string, SomeConfig>`) and then converting. `visit` is overloaded to take a `Converter`, which has a signature of:
+There are two problems here. First, you might not specify integers as configuration keys or values (e.g. if the keys are enums and have nice human-readable strings), and you might want to parse a different type (e.g. `std::map<std::string, SomeConfig>`). `visit` is overloaded to take a `Converter`, which has a signature of:
 
 ```cpp
 struct SomeConverter {
@@ -185,7 +185,7 @@ OrigType to(const ParsingType& value) const {
 
 and gets used like so:
 
-```
+```cpp
 template <typename Visitor>
 void visit_config(const Visitor& v, SomeStruct& config) {
     v.visit("configs", config.configs, SomeConverter());
@@ -194,7 +194,7 @@ void visit_config(const Visitor& v, SomeStruct& config) {
 
 However, this doesn't really work when you don't have an intermediate type to convert to for parsing purposes.  In this case, you have to specialize `visit_config` for the collection type in question. However, doing this for stl members requires working in the `std` namespace (a bad idea). Instead, you can specialize the `ConfigVisitor` struct like so:
 
-```
+```cpp
 namespace config_parser {
 
 template <>
