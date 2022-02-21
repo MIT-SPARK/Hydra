@@ -35,7 +35,7 @@ struct FakeConfig2 {
 struct MapConverter {
   MapConverter() = default;
 
-  std::map<TestEnum, bool> from(const std::map<std::string, bool>& other) const;
+  std::map<TestEnum, bool> to(const std::map<std::string, bool>& other) const;
 
   std::map<std::string, bool> from(const std::map<TestEnum, bool>& other) const;
 };
@@ -74,7 +74,7 @@ DECLARE_CONFIG_ENUM(hydra_utils,
 
 namespace hydra_utils {
 
-std::map<TestEnum, bool> MapConverter::from(
+std::map<TestEnum, bool> MapConverter::to(
     const std::map<std::string, bool>& other) const {
   std::map<TestEnum, bool> to_return;
   for (const auto& kv_pair : other) {
@@ -98,38 +98,38 @@ std::map<std::string, bool> MapConverter::from(
 }
 
 TEST(ConfigParser, RosName) {
-  config_parser::RosParser parser = config_parser::RosParser::FromNs("/plain_test_config");
+  config_parser::RosParserImpl parser(ros::NodeHandle("/plain_test_config"));
   EXPECT_EQ(parser.name(), "/plain_test_config");
 
-  auto new_parser = parser["foo"];
-  EXPECT_EQ(parser.name(), "/plain_test_config/foo");
+  auto new_parser = parser.child("foo");
+  EXPECT_EQ(new_parser.name(), "/plain_test_config/foo");
 }
 
 TEST(ConfigParsing, RosChildren) {
-  config_parser::RosParser parser = config_parser::RosParser::FromNs("/plain_test_config");
+  config_parser::RosParserImpl parser(ros::NodeHandle("/plain_test_config"));
   auto children = parser.children();
   EXPECT_EQ(children.size(), 11u);
 
-  auto value_parser = parser["value_map"];
+  auto value_parser = parser.child("value_map");
   auto value_children = value_parser.children();
   EXPECT_EQ(value_children.size(), 2u);
 
-  auto enable_parser = parser["enable_map"];
+  auto enable_parser = parser.child("enable_map");
   auto enable_children = enable_parser.children();
   EXPECT_EQ(enable_children.size(), 2u);
 }
 
 TEST(ConfigParsing, YamlChildren) {
   const std::string filepath = get_test_path() + "test_config.yaml";
-  config_parser::YamlParser parser(filepath);
+  config_parser::YamlParserImpl parser(filepath);
   auto children = parser.children();
   EXPECT_EQ(children.size(), 11u);
 
-  auto value_parser = parser["value_map"];
+  auto value_parser = parser.child("value_map");
   auto value_children = value_parser.children();
   EXPECT_EQ(value_children.size(), 2u);
 
-  auto enable_parser = parser["enable_map"];
+  auto enable_parser = parser.child("enable_map");
   auto enable_children = enable_parser.children();
   EXPECT_EQ(enable_children.size(), 2u);
 }
@@ -212,7 +212,6 @@ TEST(ConfigParsing, ParseNestedStructYaml) {
 
 TEST(ConfigParsing, ParseNestedStructRos) {
   auto config = config_parser::load_from_ros<FakeConfig2>("/nested_test_config");
-  ros::NodeHandle nh("/nested_test_config");
 
   EXPECT_EQ(config.fake_config.foo, 10.0f);
   EXPECT_EQ(config.fake_config.bar, 5.0);

@@ -1,5 +1,5 @@
 #pragma once
-#include "hydra_utils/config_visitor.h"
+#include "hydra_utils/config_parser.h"
 
 #include <ros/ros.h>
 #include <vector>
@@ -102,41 +102,25 @@ constexpr const auto& readRosParam = detail::static_const<detail::read_ros_param
 
 }  // namespace
 
-class RosParser {
+class RosParserImpl {
  public:
-  RosParser();
+  RosParserImpl();
 
-  explicit RosParser(const ros::NodeHandle& nh);
+  explicit RosParserImpl(const ros::NodeHandle& nh);
 
-  RosParser(const ros::NodeHandle& nh, const std::string& name);
+  RosParserImpl(const ros::NodeHandle& nh, const std::string& name);
 
-  RosParser(const RosParser& other) = default;
+  RosParserImpl(const RosParserImpl& other) = default;
 
-  RosParser& operator=(const RosParser& other) = default;
+  RosParserImpl& operator=(const RosParserImpl& other) = default;
 
-  ~RosParser() = default;
+  ~RosParserImpl() = default;
 
-  static RosParser FromNs(const std::string& ns);
-
-  RosParser operator[](const std::string& new_name) const;
+  RosParserImpl child(const std::string& new_name) const;
 
   std::vector<std::string> children() const;
 
-  inline std::string name() const { return name_; }
-
-  template <typename T>
-  void visit(const std::string& name, T& value) const {
-    auto new_parser = this->operator[](name);
-    ConfigVisitor<T>::visit_config(new_parser, value);
-  }
-
-  template <typename T, typename C>
-  void visit(const std::string& name, T& value, const C& converter) const {
-    auto new_parser = this->operator[](name);
-    auto intermediate_value = converter.from(value);
-    ConfigVisitor<T>::visit_config(new_parser, intermediate_value);
-    value = converter.from(intermediate_value);
-  }
+  inline std::string name() const { return nh_.resolveName(name_); }
 
   template <typename T>
   void parse(T& value) const {
@@ -147,5 +131,7 @@ class RosParser {
   ros::NodeHandle nh_;
   std::string name_;
 };
+
+using RosParser = Parser<RosParserImpl>;
 
 }  // namespace config_parser

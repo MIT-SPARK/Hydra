@@ -1,5 +1,5 @@
 #pragma once
-#include "hydra_utils/config_visitor.h"
+#include "hydra_utils/config_formatter.h"
 
 #include <map>
 #include <ostream>
@@ -72,12 +72,11 @@ std::ostream& operator<<(std::ostream& out, const std::map<K, V>& values) {
   return out;
 }
 
-class ConfigDisplay {
+class OstreamFormatImpl {
  public:
-  explicit ConfigDisplay(std::ostream& out)
-      : out_(out), prefix_(""), root_call_(true) {}
+  explicit OstreamFormatImpl(std::ostream& out) : out_(out), prefix_("") {}
 
-  ConfigDisplay operator[](const std::string& name) const {
+  inline OstreamFormatImpl child(const std::string& name) const {
     std::string new_prefix = "";
 
     const auto prev_pos = prefix_.find("-");
@@ -89,33 +88,12 @@ class ConfigDisplay {
       new_prefix = "  " + prefix_.substr(prev_pos) + "- " + name + ":";
     }
 
-    return ConfigDisplay(out_, new_prefix);
+    return OstreamFormatImpl(out_, new_prefix);
   }
 
-  template <typename T>
-  void visit(const std::string& name, T& value) const {
-    auto new_parser = this->operator[](name);
-    ConfigVisitor<T>::visit_config(new_parser, value);
-  }
+  inline void pre_visit() const { out_ << prefix_; }
 
- template <typename T, typename C>
-  void visit(const std::string& name, T& value, const C& converter) const {
-    auto new_parser = this->operator[](name);
-    auto intermediate_value = converter.from(value);
-    ConfigVisitor<T>::visit_config(new_parser, intermediate_value);
-  }
-
-  inline void pre_visit() const {
-    if (!root_call_) {
-      out_ << prefix_;
-    }
-  }
-
-  inline void post_visit() const {
-    if (!root_call_) {
-      out_ << std::endl;
-    }
-  }
+  inline void post_visit() const { out_ << std::endl; }
 
   template <typename T>
   void show(const T& value) const {
@@ -124,12 +102,13 @@ class ConfigDisplay {
   }
 
  private:
-  ConfigDisplay(std::ostream& out, const std::string& prefix)
-      : out_(out), prefix_(prefix), root_call_(false) {}
+  OstreamFormatImpl(std::ostream& out, const std::string& prefix)
+      : out_(out), prefix_(prefix) {}
 
   std::ostream& out_;
   std::string prefix_;
-  bool root_call_;
 };
+
+using OstreamFormatter = Formatter<OstreamFormatImpl>;
 
 }  // namespace config_parser

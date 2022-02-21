@@ -1,27 +1,23 @@
-#include "hydra_utils/ros_config.h"
+#include "hydra_utils/ros_parser.h"
 
 #include <iostream>
 
 namespace config_parser {
 
-RosParser::RosParser(const ros::NodeHandle& nh, const std::string& name)
+RosParserImpl::RosParserImpl(const ros::NodeHandle& nh, const std::string& name)
     : nh_(nh), name_(name) {}
 
-RosParser::RosParser(const ros::NodeHandle& nh) : RosParser(nh, "") {}
+RosParserImpl::RosParserImpl(const ros::NodeHandle& nh) : RosParserImpl(nh, "") {}
 
-RosParser::RosParser() : RosParser(ros::NodeHandle(), "") {}
+RosParserImpl::RosParserImpl() : RosParserImpl(ros::NodeHandle(), "") {}
 
-RosParser RosParser::FromNs(const std::string& ns) {
-  return RosParser(ros::NodeHandle(ns));
-}
-
-RosParser RosParser::operator[](const std::string& new_name) const {
+RosParserImpl RosParserImpl::child(const std::string& new_name) const {
   // push name onto nodehandle namespace if name isn't empty
   ros::NodeHandle new_nh = (name_ == "") ? nh_ : ros::NodeHandle(nh_, name_);
-  return RosParser(new_nh, new_name);
+  return RosParserImpl(new_nh, new_name);
 }
 
-std::vector<std::string> RosParser::children() const {
+std::vector<std::string> RosParserImpl::children() const {
   const std::string resolved_name = nh_.resolveName(name_);
   if (resolved_name == "") {
     return {};

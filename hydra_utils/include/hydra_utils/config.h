@@ -1,42 +1,34 @@
 #pragma once
-#include "hydra_utils/config_display.h"
-#include "hydra_utils/config_visitor.h"
-#include "hydra_utils/ros_config.h"
-#include "hydra_utils/yaml_config.h"
+#include "hydra_utils/ostream_formatter.h"
+#include "hydra_utils/ros_parser.h"
+#include "hydra_utils/yaml_parser.h"
 
 namespace config_parser {
 
-template <>
-struct is_parser<YamlParser> : std::true_type {};
-
-template <>
-struct is_parser<RosParser> : std::true_type {};
-
 template <typename Config>
 Config load_from_yaml(const std::string& filepath) {
+  YamlParser parser(std::make_unique<YamlParserImpl>(filepath));
+
   Config config;
-  ConfigVisitor<Config>::visit_config(YamlParser(filepath), config);
+  ConfigVisitor<Config>::visit_config(parser, config);
   return config;
 }
 
 template <typename Config>
 Config load_from_ros(const std::string& ns) {
+  RosParser parser(std::make_unique<RosParserImpl>(ros::NodeHandle(ns)));
+
   Config config;
-  ConfigVisitor<Config>::visit_config(RosParser::FromNs(ns), config);
+  ConfigVisitor<Config>::visit_config(parser, config);
   return config;
 }
 
 template <typename Config>
-Config load_from_ros_nh(const ros::NodeHandle& nh) {
-  Config config;
-  ConfigVisitor<Config>::visit_config(RosParser(nh), config);
-  return config;
-}
+Config load_from_ros_nh(const ros::NodeHandle& nh, const std::string& ns = "") {
+  RosParser parser(std::make_unique<RosParserImpl>(nh, ns));
 
-template <typename Config>
-Config load_from_ros_nh(const ros::NodeHandle& nh, std::string ns) {
   Config config;
-  ConfigVisitor<Config>::visit_config(RosParser(nh, ns), config);
+  ConfigVisitor<Config>::visit_config(parser, config);
   return config;
 }
 
@@ -51,16 +43,17 @@ inline std::string to_uppercase(const std::string& original) {
 }  // namespace config_parser
 
 // must be called in the global namespace
-#define DECLARE_CONFIG_OSTREAM_OPERATOR(ns, name)                    \
-  template <>                                                        \
-  struct config_parser::is_config<ns::name> : std::true_type {};     \
-                                                                     \
-  namespace ns {                                                     \
-  inline std::ostream& operator<<(std::ostream& out, name& config) { \
-    config_parser::ConfigDisplay visitor(out);                       \
-    config_parser::visit_config(visitor, config);                    \
-    return out;                                                      \
-  }                                                                  \
+#define DECLARE_CONFIG_OSTREAM_OPERATOR(ns, name)                        \
+  template <>                                                            \
+  struct config_parser::is_config<ns::name> : std::true_type {};         \
+                                                                         \
+  namespace ns {                                                         \
+  inline std::ostream& operator<<(std::ostream& out, name& config) {     \
+    auto impl = std::make_unique<config_parser::OstreamFormatImpl>(out); \
+    config_parser::OstreamFormatter visitor(std::move(impl));            \
+    config_parser::visit_config(visitor, config);                        \
+    return out;                                                          \
+  }                                                                      \
   }
 
 // must be called in the global namespace
