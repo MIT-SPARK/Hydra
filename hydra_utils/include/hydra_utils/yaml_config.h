@@ -24,6 +24,8 @@ class YamlParser {
 
   std::vector<std::string> children() const;
 
+  inline std::string name() const { return name_; }
+
   template <typename T>
   void visit(const std::string& name, T& value) const {
     auto new_parser = this->operator[](name);
@@ -39,15 +41,18 @@ class YamlParser {
   }
 
   template <typename T>
-  void parse(T& value) const {
+  bool parse(T& value) const {
     if (!node_) {
-      return;
+      return false;
     }
 
     parseImpl(value);
+    return true;
   }
 
  private:
+  YamlParser(const YAML::Node& node, const std::string& name);
+
   template <typename T>
   void parseImpl(T& value) const {
     value = node_.as<T>();
@@ -56,6 +61,7 @@ class YamlParser {
   void parseImpl(uint8_t& value) const;
 
   YAML::Node node_;
+  std::string name_;
 };
 
 }  // namespace config_parser

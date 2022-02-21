@@ -65,7 +65,7 @@ struct ConfigVisitor {
   template <typename Visitor, typename T = ValueType>
   static auto visit_config(const Visitor& visitor, T& value)
       -> decltype(::config_parser::visit_config(visitor, value), void()) {
-    ::config_parser::visit_config(visitor, value);
+    return ::config_parser::visit_config(visitor, value);
   }
 };
 

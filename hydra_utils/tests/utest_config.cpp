@@ -97,6 +97,14 @@ std::map<std::string, bool> MapConverter::from(
   return to_return;
 }
 
+TEST(ConfigParser, RosName) {
+  config_parser::RosParser parser = config_parser::RosParser::FromNs("/plain_test_config");
+  EXPECT_EQ(parser.name(), "/plain_test_config");
+
+  auto new_parser = parser["foo"];
+  EXPECT_EQ(parser.name(), "/plain_test_config/foo");
+}
+
 TEST(ConfigParsing, RosChildren) {
   config_parser::RosParser parser = config_parser::RosParser::FromNs("/plain_test_config");
   auto children = parser.children();

@@ -10,29 +10,30 @@ namespace detail {
 
 template <typename T,
           typename std::enable_if<is_base_ros_param<T>::value, bool>::type = true>
-void readRosParam(const ros::NodeHandle& nh, const std::string& name, T& value) {
-  nh.getParam(name, value);
+bool readRosParam(const ros::NodeHandle& nh, const std::string& name, T& value) {
+  return nh.getParam(name, value);
 }
 
 template <typename T,
           typename std::enable_if<is_base_ros_param<T>::value, bool>::type = true>
-void readRosParam(const ros::NodeHandle& nh,
+bool readRosParam(const ros::NodeHandle& nh,
                   const std::string& name,
                   std::vector<T>& value) {
-  nh.getParam(name, value);
+  return nh.getParam(name, value);
 }
 
 template <typename T,
           typename std::enable_if<is_base_ros_param<T>::value, bool>::type = true>
-void readRosParam(const ros::NodeHandle& nh,
+bool readRosParam(const ros::NodeHandle& nh,
                   const std::string& name,
                   std::map<std::string, T>& value) {
   if (!nh.hasParam(name)) {
-    return;
+    return false;
   }
 
   value.clear();
   nh.getParam(name, value);
+  return true;
 }
 
 template <typename T>
@@ -52,25 +53,26 @@ template <typename T,
           typename std::enable_if<std::conjunction<std::negation<is_base_ros_param<T>>,
                                                    std::is_integral<T>>::value,
                                   bool>::type = true>
-void readRosParam(const ros::NodeHandle& nh, const std::string& name, T& value) {
+bool readRosParam(const ros::NodeHandle& nh, const std::string& name, T& value) {
   int placeholder = 0;
   if (!nh.getParam(name, placeholder)) {
-    return;
+    return false;
   }
 
   convertFromInt(placeholder, value);
+  return true;
 }
 
 template <typename T,
           typename std::enable_if<std::conjunction<std::negation<is_base_ros_param<T>>,
                                                    std::is_integral<T>>::value,
                                   bool>::type = true>
-void readRosParam(const ros::NodeHandle& nh,
+bool readRosParam(const ros::NodeHandle& nh,
                   const std::string& name,
                   std::vector<T>& value) {
   std::vector<int> placeholders;
   if (!nh.getParam(name, placeholders)) {
-    return;
+    return false;
   }
 
   for (const int placeholder : placeholders) {
@@ -78,6 +80,8 @@ void readRosParam(const ros::NodeHandle& nh,
     convertFromInt(placeholder, new_value);
     value.push_back(new_value);
   }
+
+  return true;
 }
 
 // adl indirection
