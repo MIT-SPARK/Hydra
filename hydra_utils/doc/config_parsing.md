@@ -110,10 +110,10 @@ a side-effect of the parsing and output code both making use of `visit_config`
 
 This is all you need to do as long as the configuration structure is default constructible and only contains:
 
-  * ROS primitive types (bool, float, double, std::string, int)
-  * [Integral types](https://en.cppreference.com/w/cpp/types/is_integral), e.g. uint8_t, int64_t
-  * Any std::vector of ROS primitive types or integral types
-  * Any std::map with std::string for keys and ROS primitive types for values
+  * ROS primitive types (`bool`, `float`, `double`, `std::string`, `int`)
+  * [Integral types](https://en.cppreference.com/w/cpp/types/is_integral), e.g. `uint8_t`, `int64_t`
+  * Any `std::vector` of ROS primitive types or integral types
+  * Any `std::map` with std::string for keys and ROS primitive types for values
   * Any structure that contains only members of the above (or other nested structures)
 
 Note that this doesn't apply to any parts of the config you **do not** want to parse, as well as any class methods. This does mean that if you had some complex member type that doesn't follow these rules, you could conceivably do something like:
@@ -151,6 +151,68 @@ DECLARE_CONFIG_ENUM(some_ns,
                     {FakeEnum::RED, "RED"},
                     {FakeEnum::GREEN, "GREEN"},
                     {FakeEnum::BLUE, "BLUE"})
+```
+
+### Maps, Collections, and Conversions
+
+Occasionally, you might have to parse a struct like this:
+
+```cpp
+namespace fake_ns {
+
+struct SomeStruct {
+    std::map<int, SomeConfig> configs;
+};
+
+} // namespace fake_ns
+```
+
+There are two problems here. First, you might not want to actually specify integers as configuration keys or values (e.g. the keys are enums and have nice human-readable strings). This can be addressed by parsing a different type (e.g. `std::map<std::string, SomeConfig>`) and then converting. `visit` is overloaded to take a `Converter`, which has a signature of:
+
+```cpp
+struct SomeConverter {
+SomeConverter() = default;
+
+ParsingType from(const OrigType& value) const {
+    // convert from the configuration value to something the parsing understands
+}
+
+OrigType to(const ParsingType& value) const {
+    // do the opposite conversion
+}
+};
+```
+
+and gets used like so:
+
+```
+template <typename Visitor>
+void visit_config(const Visitor& v, SomeStruct& config) {
+    v.visit("configs", config.configs, SomeConverter());
+}
+```
+
+However, this doesn't really work when you don't have an intermediate type to convert to for parsing purposes.  In this case, you have to specialize `visit_config` for the collection type in question. However, doing this for stl members requires working in the `std` namespace (a bad idea). Instead, you can specialize the `ConfigVisitor` struct like so:
+
+```
+namespace config_parser {
+
+template <>
+ConfigVisitor<std::map<int, fake_ns::SomeConfig>> {
+
+    // most likely you'd want to use SFINAE / enable_if to have a non-parsing version
+    template <typename Visitor>
+    static auto visit_config(const Visitor& v, std::map<int, fake_ns::SomeConfig>& value) {
+        for (const std::string& child_name : v.children()) {
+            int new_key = std::atoi(child_name);
+            value[new_key] = fake_ns::SomeConfig();
+            v.visit(child_name, value[new_key]);
+        }
+    }
+
+};
+
+} // namespace config_parser
 ```
 
 ### New Parsers or Formatters
