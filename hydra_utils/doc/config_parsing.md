@@ -50,8 +50,8 @@ struct FooConfig {
     std::string param_1 = "hello";            // Any base ros XmlRpcValue types are supported automatically
     int64_t param_2 = 50;                     // Arbitrary integral types are also supported
     std::vector<uint64_t> param_3 = {};       // As well as vectors of arbitrary integral types
-    std::map<std::string, bool> param_4 = {}; // Finally, maps with string keys and base ros XmlRpcValue types are supported
-    BarConfig nested_config;
+    std::map<std::string, bool> param_4 = {}; // Maps with string keys and base ros types are supported
+    BarConfig nested_config;                  // Nested structure are also supported
 };
 
 } // namespace foo_ns
@@ -106,15 +106,15 @@ DECLARE_CONFIG_OSTREAM_OPERATOR(foo_ns, FooConfig)
 
 :warning: `visit_config` must declare the config argument as non-const. This is
 a side-effect of the parsing and output code both making use of `visit_config`
-(parsing requires that the config is non-const so that the parser can modify
-the configuration fields).
+(parsing requires that the config is non-const so we can modify configuration fields).
 
 This is all you need to do as long as the configuration structure is default constructible and only contains:
-    - ROS primitive types (bool, float, double, std::string, int)
-    - [Integral types](https://en.cppreference.com/w/cpp/types/is_integral), e.g. uint8_t, int64_t
-    - Any std::vector of ROS primitive types or integral types
-    - Any std::map with std::string for keys and ROS primitive types for values
-    - Any structure that contains only members of the above (or other nested structures)
+
+  * ROS primitive types (bool, float, double, std::string, int)
+  * [Integral types](https://en.cppreference.com/w/cpp/types/is_integral), e.g. uint8_t, int64_t
+  * Any std::vector of ROS primitive types or integral types
+  * Any std::map with std::string for keys and ROS primitive types for values
+  * Any structure that contains only members of the above (or other nested structures)
 
 Note that this doesn't apply to any parts of the config you **do not** want to parse, as well as any class methods. This does mean that if you had some complex member type that doesn't follow these rules, you could conceivably do something like:
 
@@ -131,9 +131,10 @@ void visit_config(const Visitor& v, SomeConfig& config) {
 ```
 
 It can be tedious to maintain members used for the constructor, so you could also declare a version of `visit_config` for the member type.  For more primitive member types that aren't enabled by default, you can enable them by:
-    - defining a version of `readRosParam` (see [here](../include/hydra_utils/ros_parser.h) for details) in the **same** namespace as the type
-    - defining a version of `displayParam` (see [here](../include/hydra_utils/ostream_formatter.h) for details) in the **same** namespace as the type
-    - defining a specialization of `YAML::converter` in the `YAML` namespace
+
+  * Defining a version of `readRosParam` (see [here](../include/hydra_utils/ros_parser.h) for details) in the **same** namespace as the type
+  * Defining a version of `displayParam` (see [here](../include/hydra_utils/ostream_formatter.h) for details) in the **same** namespace as the type
+  * Defining a specialization of `YAML::converter` in the `YAML` namespace
 
 This can be tedious for enums, so this can be directly handled by a macro in `config.h`:
 
