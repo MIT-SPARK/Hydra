@@ -32,6 +32,16 @@ struct FakeConfig2 {
   std::string msg = "world";
 };
 
+struct BarConfig {
+  int a = 1;
+  float b = 2.0f;
+  std::string c = "test";
+};
+
+struct BarMapConfig {
+  std::map<std::string, BarConfig> configs;
+};
+
 struct MapConverter {
   MapConverter() = default;
 
@@ -61,10 +71,51 @@ void visit_config(const Visitor& v, FakeConfig2& config) {
   v.visit("msg", config.msg);
 }
 
+template <typename Visitor>
+void visit_config(const Visitor& v, BarConfig& config) {
+  v.visit("a", config.a);
+  v.visit("b", config.b);
+  v.visit("c", config.c);
+}
+
+template <typename Visitor>
+void visit_config(const Visitor& v, BarMapConfig& config) {
+  v.visit("configs", config.configs);
+}
+
 }  // namespace hydra_utils
+
+namespace config_parser {
+
+template <>
+struct ConfigVisitor<std::map<std::string, hydra_utils::BarConfig>> {
+  using MapType = std::map<std::string, hydra_utils::BarConfig>;
+
+  template <typename V, typename std::enable_if<is_parser<V>::value, bool>::type = true>
+  static auto visit_config(const V& v, MapType& value) {
+    for (const auto& child : v.children()) {
+      value[child] = hydra_utils::BarConfig();
+      v.visit(child, value[child]);
+    }
+  }
+
+  template <typename V,
+            typename std::enable_if<!is_parser<V>::value, bool>::type = true>
+  static auto visit_config(const V& v, MapType& value) {
+    v.pre_visit();
+    v.post_visit();
+    for (auto& kv_pair : value) {
+      v.visit(kv_pair.first, kv_pair.second);
+    }
+  }
+};
+
+}  // namespace config_parser
 
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra_utils, FakeConfig)
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra_utils, FakeConfig2)
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra_utils, BarConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra_utils, BarMapConfig)
 
 DECLARE_CONFIG_ENUM(hydra_utils,
                     TestEnum,
@@ -273,6 +324,46 @@ TEST(ConfigParsing, OutputNestedConfig) {
   - vec: [0, 0, 0]
   - enable_map: {GREEN: 0, RED: 1}
 - msg: world
+)out";
+
+  EXPECT_EQ(expected, ss.str()) << "config:" << std::endl << ss.str();
+}
+
+TEST(ConfigParsing, ParseMapStructYaml) {
+  const std::string filepath = get_test_path() + "map_config.yaml";
+  auto config = config_parser::load_from_yaml<BarMapConfig>(filepath);
+
+  EXPECT_EQ(config.configs.size(), 2u);
+  ASSERT_TRUE(config.configs.count("config_a"));
+  ASSERT_TRUE(config.configs.count("config_b"));
+}
+
+TEST(ConfigParsing, ParseMapStructRos) {
+  auto config = config_parser::load_from_ros<BarMapConfig>("/map_test_config");
+
+  EXPECT_EQ(config.configs.size(), 2u);
+  ASSERT_TRUE(config.configs.count("config_a"));
+  ASSERT_TRUE(config.configs.count("config_b"));
+}
+
+TEST(ConfigParsing, OutputMapConfig) {
+  const std::string filepath = get_test_path() + "map_config.yaml";
+  auto config = config_parser::load_from_yaml<BarMapConfig>(filepath);
+
+  std::stringstream ss;
+  // endl to make expected easier to write
+  ss << std::endl << config;
+
+  std::string expected = R"out(
+- configs:
+  - config_a:
+    - a: 1
+    - b: 2
+    - c: -3
+  - config_b:
+    - a: 1
+    - b: 2
+    - c: -3
 )out";
 
   EXPECT_EQ(expected, ss.str()) << "config:" << std::endl << ss.str();

@@ -24,7 +24,7 @@ class Formatter {
   template <typename T, typename C>
   void visit(const std::string& name, T& value, const C& converter) const {
     auto intermediate_value = converter.from(value);
-    this->visit(name, intermediate_value);
+    visit(name, intermediate_value);
   }
 
   template <typename T>
@@ -47,6 +47,10 @@ class Formatter {
   template <typename T>
   void show(const T& value) const {
     impl_->show(value);
+  }
+
+  std::string prefix() const {
+    return impl_->prefix();
   }
 
  private:

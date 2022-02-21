@@ -85,7 +85,7 @@ class OstreamFormatImpl {
     } else if (prev_pos == 0) {
       new_prefix = "  - " + name + ":";
     } else {
-      new_prefix = "  " + prefix_.substr(prev_pos) + "- " + name + ":";
+      new_prefix = "  " + prefix_.substr(0, prev_pos) + "- " + name + ":";
     }
 
     return OstreamFormatImpl(out_, new_prefix);
@@ -99,6 +99,10 @@ class OstreamFormatImpl {
   void show(const T& value) const {
     out_ << " ";
     displayParam(out_, value);
+  }
+
+  std::string prefix() const {
+    return prefix_;
   }
 
  private:

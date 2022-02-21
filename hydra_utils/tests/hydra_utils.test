@@ -7,5 +7,9 @@
               file="$(find hydra_utils)/tests/resources/nested_test_config.yaml"
               ns="/nested_test_config"/>
 
+    <rosparam command="load"
+              file="$(find hydra_utils)/tests/resources/map_config.yaml"
+              ns="/map_test_config"/>
+
     <test pkg="hydra_utils" type="utest_hydra_utils" test-name="utest_hydra_utils"/>
 </launch>

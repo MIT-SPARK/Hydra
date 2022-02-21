@@ -1,0 +1,9 @@
+configs:
+    config_a:
+        a: -3
+        b: 1
+        c: 2
+    config_b:
+        a: -3
+        b: 1
+        c: 2
