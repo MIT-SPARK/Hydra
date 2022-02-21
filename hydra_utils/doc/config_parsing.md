@@ -31,7 +31,7 @@ std::cout << config << std::endl;
 
 ```
 
-See the main header file [here](include/hydra_utils/config.h) for more details.
+See the main header file [here](../include/hydra_utils/config.h) for more details.
 
 ### Declaring a new Configuration Structure (or Class)
 
@@ -131,8 +131,8 @@ void visit_config(const Visitor& v, SomeConfig& config) {
 ```
 
 It can be tedious to maintain members used for the constructor, so you could also declare a version of `visit_config` for the member type.  For more primitive member types that aren't enabled by default, you can enable them by:
-    - defining a version of `readRosParam` (see [here](include/hydra_utils/ros_parser.h) for details) in the **same** namespace as the type
-    - defining a version of `displayParam` (see [here](include/hydra_utils/ostream_formatter.h) for details) in the **same** namespace as the type
+    - defining a version of `readRosParam` (see [here](../include/hydra_utils/ros_parser.h) for details) in the **same** namespace as the type
+    - defining a version of `displayParam` (see [here](../include/hydra_utils/ostream_formatter.h) for details) in the **same** namespace as the type
     - defining a specialization of `YAML::converter` in the `YAML` namespace
 
 This can be tedious for enums, so this can be directly handled by a macro in `config.h`:
@@ -157,5 +157,5 @@ DECLARE_CONFIG_ENUM(some_ns,
 Most of the recursive logic happens in `config_parser::Parser` or
 `config_parser::Formatter`. Each follows the PIMPL design pattern, so for a new
 parser or formatter, you only need to define a new implementation (see
-[here](include/hydra_utils/ros_parser.h) for a parsing example, and
-[here](include/hydra_utils/ostream_formatter.h) for a output example).
+[here](../include/hydra_utils/ros_parser.h) for a parsing example, and
+[here](../include/hydra_utils/ostream_formatter.h) for a output example).
