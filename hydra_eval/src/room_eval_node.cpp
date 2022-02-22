@@ -1,3 +1,5 @@
+#include "hydra_eval/room_utils.h"
+
 #include <kimera_dsg/dynamic_scene_graph.h>
 #include <voxblox/io/layer_io.h>
 #include <voxblox/utils/planning_utils.h>
@@ -16,35 +18,6 @@ using voxblox::Layer;
 using voxblox::TsdfVoxel;
 
 namespace kimera {
-
-void getEstimatedRoomIndices(const DynamicSceneGraph& graph,
-                             std::map<NodeId, voxblox::LongIndexSet>& room_indices) {
-  Layer<TsdfVoxel> layer(FLAGS_voxel_size, FLAGS_voxels_per_side);
-
-  const SceneGraphLayer& rooms = graph.getLayer(KimeraDsgLayers::ROOMS).value();
-  const SceneGraphLayer& places = graph.getLayer(KimeraDsgLayers::PLACES).value();
-
-  for (const auto& id_node_pair : rooms.nodes()) {
-    const NodeId room = id_node_pair.first;
-    room_indices[room] = voxblox::LongIndexSet();
-
-    for (const auto& child : id_node_pair.second->children()) {
-      const SceneGraphNode& place = places.getNode(child).value();
-      const auto& attrs = place.attributes<PlaceNodeAttributes>();
-
-      voxblox::HierarchicalIndexMap indices;
-      voxblox::utils::getSphereAroundPoint(
-          layer, attrs.position.cast<float>(), attrs.distance, &indices);
-
-      for (const auto& block_idx_pair : indices) {
-        for (const auto& voxel_idx : block_idx_pair.second) {
-          room_indices[room].insert(voxblox::getGlobalVoxelIndexFromBlockAndVoxelIndex(
-              block_idx_pair.first, voxel_idx, FLAGS_voxels_per_side));
-        }
-      }
-    }
-  }
-}
 
 void getGtRoomIndices(const Layer<TsdfVoxel>& tsdf,
                       std::map<NodeId, voxblox::LongIndexSet>& room_indices) {
@@ -134,7 +107,9 @@ void eval_rooms(const Layer<TsdfVoxel>& tsdf, const DynamicSceneGraph& graph) {
   }
 
   std::map<NodeId, voxblox::LongIndexSet> est_rooms;
-  getEstimatedRoomIndices(graph, est_rooms);
+  hydra::fillRoomIndicesFromDsg(
+      graph, FLAGS_voxel_size, FLAGS_voxels_per_side, est_rooms);
+
   std::vector<size_t> est_sizes;
   for (const auto& room : est_rooms) {
     est_sizes.push_back(room.second.size());

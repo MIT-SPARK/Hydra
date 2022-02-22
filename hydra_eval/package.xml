@@ -12,6 +12,8 @@
   <buildtool_depend>catkin</buildtool_depend>
   <depend>voxblox</depend>
   <depend>kimera_dsg</depend>
+  <depend>kimera_dsg_visualizer</depend>
+  <depend>visualization_msgs</depend>
 
   <export>
   </export>
