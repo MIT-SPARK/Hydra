@@ -83,6 +83,16 @@ void visit_config(const Visitor& v, BarMapConfig& config) {
   v.visit("configs", config.configs);
 }
 
+struct TestLogger : config_parser::Logger {
+  TestLogger() = default;
+
+  ~TestLogger() = default;
+
+  inline void log_missing(const std::string& message) const override { ss << message; }
+
+  mutable std::stringstream ss;
+};
+
 }  // namespace hydra_utils
 
 namespace config_parser {
@@ -387,6 +397,22 @@ TEST(ConfigParsing, OutputMapConfig) {
 )out";
 
   EXPECT_EQ(expected, ss.str()) << "config:" << std::endl << ss.str();
+}
+
+TEST(ConfigParsing, TestMissing) {
+  auto logger = std::make_shared<TestLogger>();
+  const std::string filepath = get_test_path() + "missing_config.yaml";
+  auto config = config_parser::load_from_yaml<BarConfig>(filepath, logger);
+
+  std::string expected = R"out(
+missing param /c. defaulting to test
+)out";
+
+  // newline makes it easier to write string
+  std::stringstream result;
+  result << std::endl << logger->ss.str();
+
+  EXPECT_EQ(expected, result.str());
 }
 
 }  // namespace hydra_utils

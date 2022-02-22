@@ -2,12 +2,17 @@
 #include "hydra_utils/ostream_formatter.h"
 #include "hydra_utils/ros_parser.h"
 #include "hydra_utils/yaml_parser.h"
+#include <iostream>
 
 namespace config_parser {
 
 template <typename Config>
-Config load_from_yaml(const std::string& filepath) {
+Config load_from_yaml(const std::string& filepath, Logger::Ptr logger = nullptr) {
   YamlParser parser(std::make_unique<YamlParserImpl>(filepath));
+  if (logger) {
+    std::cout << "using logger!" << std::endl;
+    parser.setLogger(logger);
+  }
 
   Config config;
   ConfigVisitor<Config>::visit_config(parser, config);
@@ -15,8 +20,11 @@ Config load_from_yaml(const std::string& filepath) {
 }
 
 template <typename Config>
-Config load_from_ros(const std::string& ns) {
+Config load_from_ros(const std::string& ns, Logger::Ptr logger = nullptr) {
   RosParser parser(std::make_unique<RosParserImpl>(ros::NodeHandle(ns)));
+  if (logger) {
+    parser.setLogger(logger);
+  }
 
   Config config;
   ConfigVisitor<Config>::visit_config(parser, config);
@@ -24,8 +32,13 @@ Config load_from_ros(const std::string& ns) {
 }
 
 template <typename Config>
-Config load_from_ros_nh(const ros::NodeHandle& nh, const std::string& ns = "") {
+Config load_from_ros_nh(const ros::NodeHandle& nh,
+                        const std::string& ns = "",
+                        Logger::Ptr logger = nullptr) {
   RosParser parser(std::make_unique<RosParserImpl>(nh, ns));
+  if (logger) {
+    parser.setLogger(logger);
+  }
 
   Config config;
   ConfigVisitor<Config>::visit_config(parser, config);
@@ -79,14 +92,15 @@ inline std::string to_uppercase(const std::string& original) {
     return out;                                                                  \
   }                                                                              \
                                                                                  \
-  inline void readRosParam(const ros::NodeHandle& nh,                            \
+  inline bool readRosParam(const ros::NodeHandle& nh,                            \
                            const std::string& name,                              \
                            enum_name& value) {                                   \
     std::string value_str = "";                                                  \
     if (!nh.getParam(name, value_str)) {                                         \
-      return;                                                                    \
+      return false;                                                              \
     }                                                                            \
     value = read##enum_name##FromString(value_str);                              \
+    return true;                                                                 \
   }                                                                              \
   }                                                                              \
                                                                                  \

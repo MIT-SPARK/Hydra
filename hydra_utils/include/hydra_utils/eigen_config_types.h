@@ -59,13 +59,13 @@ struct convert<Eigen::Matrix<uint8_t, N, 1>> {
 namespace Eigen {
 
 template <typename Scalar, int N>
-void readRosParam(const ros::NodeHandle& nh,
+bool readRosParam(const ros::NodeHandle& nh,
                   const std::string& name,
                   Matrix<Scalar, N, 1>& value) {
   std::vector<Scalar> raw_values;
   config_parser::readRosParam(nh, name, raw_values);
   if (raw_values.empty()) {
-    return;
+    return false;
   }
 
   if (raw_values.size() != static_cast<size_t>(N)) {
@@ -77,6 +77,8 @@ void readRosParam(const ros::NodeHandle& nh,
   for (int i = 0; i < N; ++i) {
     value(i) = raw_values[i];
   }
+
+  return true;
 }
 
 template <typename Scalar, int N>
