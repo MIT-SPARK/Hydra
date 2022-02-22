@@ -17,7 +17,7 @@ using pose_graph_tools::PoseGraph;
 
 DsgFrontend::DsgFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg)
     : nh_(nh), dsg_(dsg), lcd_graph_(new DynamicSceneGraph()) {
-  config_ = config_parser::load_from_ros_nh<DsgFrontendConfig>(nh_);
+  config_ = load_config<DsgFrontendConfig>(nh_);
 
   ros::NodeHandle pgmo_nh(nh_, "pgmo");
   CHECK(mesh_frontend_.initialize(pgmo_nh, false));
@@ -507,7 +507,7 @@ void DsgFrontend::addAgentPlaceEdges() {
 void DsgFrontend::startLcd() {
   bow_sub_ = nh_.subscribe("bow_vectors", 100, &DsgFrontend::handleDbowMsg, this);
 
-  auto config = config_parser::load_from_ros_nh<lcd::DsgLcdConfig>(nh_, "lcd");
+  auto config = load_config<lcd::DsgLcdConfig>(nh_, "lcd");
   for (auto& kv_pair : config.registration_configs) {
     kv_pair.second.registration_output_path = config_.log_path + "/lcd/";
   }

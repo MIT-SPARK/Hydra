@@ -44,7 +44,7 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
       private_dsg_(backend_dsg),
       shared_places_copy_(KimeraDsgLayers::PLACES),
       robot_id_(0) {
-  config_ = config_parser::load_from_ros_nh<DsgBackendConfig>(nh_);
+  config_ = load_config<DsgBackendConfig>(nh_);
 
   nh_.getParam("robot_id", robot_id_);
   if (!loadParameters(ros::NodeHandle(nh_, "pgmo"))) {

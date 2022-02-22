@@ -7,6 +7,8 @@
 #include <hydra_utils/eigen_config_types.h>
 #include <voxblox_ros/mesh_vis.h>
 
+#include <glog/logging.h>
+
 #include <sstream>
 
 namespace kimera {
@@ -91,6 +93,7 @@ struct DsgFrontendConfig {
   bool enable_lcd = false;
   bool visualize_dsg_lcd = false;
   std::string lcd_visualizer_ns = "/dsg/lcd_visualizer";
+  // TODO(nathan) consider moving to lcd config
   double lcd_agent_horizon_s = 1.5;
   double descriptor_creation_horizon_m = 10.0;
   std::string mesh_ns = "";
@@ -167,7 +170,7 @@ void visit_config(const Visitor& v, DsgBackendConfig& config) {
   v.visit("building_color", config.building_color);
   v.visit("building_semantic_label", config.building_semantic_label);
   v.visit("enable_rooms", config.enable_rooms);
-  v.visit("room_finder", config.enable_rooms);
+  v.visit("room_finder", config.room_finder);
 
   v.visit("pgmo", config.pgmo);
 
@@ -249,9 +252,10 @@ void visit_config(const Visitor& v, HistogramConfig<T>& config) {
 template <typename Visitor>
 void visit_config(const Visitor& v, DsgLcdConfig& config) {
   v.visit("search_configs", config.search_configs);
-  v.visit("agent_search_config", config.agent_search_config);
+  auto v_search = v["search_configs"];
+  v_search.visit("agent", config.agent_search_config);
   v.visit("registration_configs", config.registration_configs);
-  v.visit("teaser_config", config.teaser_config);
+  v.visit("teaser", config.teaser_config);
   v.visit("enable_agent_registration", config.enable_agent_registration);
   v.visit("object_radius_m", config.object_radius_m);
   v.visit("num_semantic_classes", config.num_semantic_classes);
@@ -260,6 +264,21 @@ void visit_config(const Visitor& v, DsgLcdConfig& config) {
 }
 
 }  // namespace lcd
+
+struct DsgParamLogger : config_parser::Logger {
+
+  inline void log_missing(const std::string& message) const override {
+    LOG(INFO) << message;
+  }
+
+};
+
+template <typename Config>
+Config load_config(const ros::NodeHandle& nh, const std::string& ns = "") {
+  auto logger = std::make_shared<DsgParamLogger>();
+  return config_parser::load_from_ros_nh<Config>(nh, ns, logger);
+}
+
 }  // namespace kimera
 
 namespace teaser {

@@ -2,7 +2,6 @@
 #include "hydra_utils/ostream_formatter.h"
 #include "hydra_utils/ros_parser.h"
 #include "hydra_utils/yaml_parser.h"
-#include <iostream>
 
 namespace config_parser {
 
@@ -10,7 +9,6 @@ template <typename Config>
 Config load_from_yaml(const std::string& filepath, Logger::Ptr logger = nullptr) {
   YamlParser parser(std::make_unique<YamlParserImpl>(filepath));
   if (logger) {
-    std::cout << "using logger!" << std::endl;
     parser.setLogger(logger);
   }
 

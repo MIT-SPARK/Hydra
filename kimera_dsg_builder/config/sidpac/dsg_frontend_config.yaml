@@ -16,3 +16,5 @@ min_object_vertices: 20
 ec_min_cluster_size: 25
 cluster_tolerance: 0.25
 prune_mesh_indices: true
+mesh_ns: ""
+visualize_dsg_lcd: false

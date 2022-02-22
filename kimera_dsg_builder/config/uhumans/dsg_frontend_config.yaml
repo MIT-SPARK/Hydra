@@ -15,3 +15,5 @@ enable_segmented_mesh_pub: false
 min_object_vertices: 40
 ec_min_cluster_size: 40
 cluster_tolerance: 0.25
+mesh_ns: ""
+prune_mesh_indices: true

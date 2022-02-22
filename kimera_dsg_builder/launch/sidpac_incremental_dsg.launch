@@ -74,14 +74,14 @@
         <rosparam file="$(arg typology_dir)/$(arg typology_config)"/>
         <rosparam file="$(find kimera_dsg_builder)/config/sidpac/dsg_frontend_config.yaml"/>
         <rosparam file="$(find kimera_dsg_builder)/config/sidpac/dsg_backend_config.yaml"/>
-        <rosparam file="$(find kimera_dsg_builder)/config/sidpac/dsg_lcd_config.yaml" ns="lcd"/>
+        <rosparam file="$(find kimera_dsg_builder)/config/sidpac/dsg_lcd_config.yaml"/>
 
         <param name="sensor_frame" value="$(arg sensor_frame)"/>
 
         <param name="pgmo/log_path" value="$(arg pgmo_log_path)"/>
-        <param name="pgmo/log_output" value="$(arg pgmo_should_log)"/>
-        <param name="dsg_log_output" value="$(arg dsg_should_log)"/>
-        <param name="dsg_output_path" value="$(arg dsg_path)"/>
+        <param name="pgmo/should_log" value="$(arg pgmo_should_log)"/>
+        <param name="should_log" value="$(arg dsg_should_log)"/>
+        <param name="log_path" value="$(arg dsg_path)"/>
 
         <remap from="~voxblox_mesh" to="/kimera_topology_node/active_mesh"/>
         <remap from="~active_places" to="/kimera_topology_node/active_layer"/>

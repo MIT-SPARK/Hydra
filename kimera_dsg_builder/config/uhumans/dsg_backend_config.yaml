@@ -7,6 +7,7 @@ dsg:
     rpgo_solver: "LM"
     places_merge_pos_threshold_m: 0.4
     places_merge_distance_tolerance_m: 0.3
+    merge_update_dynamic: true
 pgmo:
     run_mode: 0  # kimera_pgmo run mode FULL (required)
     use_msg_time: true
@@ -25,6 +26,8 @@ pgmo:
         gnc_cost_tolerance: 1.0e-05
         gnc_weight_tolerance: 1.0e-04
         gnc_fix_prev_inliers: true
+        verbosity: "UPDATE"
+        solver: "LM"
     add_initial_prior: true
     covariance:
         odom: 1.0e-02
@@ -34,6 +37,8 @@ pgmo:
         pose_mesh: 1.0e-02
         place_mesh: 10.0
         place_edge: 10.0
+building_semantic_label: 22
+visualize_place_factors: false
 enable_rooms: true
 room_finder:
     min_dilation_m: 0.43
@@ -49,4 +54,4 @@ room_finder:
     max_modularity_iters: 5
     modularity_gamma: 1.0
     clustering_mode: "MODULARITY"
-
+    room_prefix: 'R'

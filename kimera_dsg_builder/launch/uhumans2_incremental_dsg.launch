@@ -84,7 +84,7 @@
         <rosparam file="$(arg typology_dir)/$(arg typology_config)"/>
         <rosparam file="$(find kimera_dsg_builder)/config/uhumans/dsg_frontend_config.yaml"/>
         <rosparam file="$(find kimera_dsg_builder)/config/uhumans/dsg_backend_config.yaml"/>
-        <rosparam file="$(arg lcd_config)" ns="lcd"/>
+        <rosparam file="$(arg lcd_config)"/>
 
         <param name="sensor_frame" value="left_cam" if="$(arg use_gt_frame)"/>
         <param name="sensor_frame" value="left_cam_kimera" unless="$(arg use_gt_frame)"/>
@@ -92,9 +92,9 @@
         <param name="lcd/log_registration_problem" value="$(arg log_registration)"/>
 
         <param name="pgmo/log_path" value="$(arg pgmo_log_path)"/>
-        <param name="pgmo/log_output" value="$(arg pgmo_should_log)"/>
-        <param name="dsg_log_output" value="$(arg dsg_should_log)"/>
-        <param name="dsg_output_path" value="$(arg dsg_path)"/>
+        <param name="pgmo/should_log" value="$(arg pgmo_should_log)"/>
+        <param name="should_log" value="$(arg dsg_should_log)"/>
+        <param name="log_path" value="$(arg dsg_path)"/>
 
         <remap from="~voxblox_mesh" to="/kimera_topology_node/active_mesh"/>
         <remap from="~active_places" to="/kimera_topology_node/active_layer"/>
