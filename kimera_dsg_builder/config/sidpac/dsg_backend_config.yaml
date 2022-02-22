@@ -36,6 +36,7 @@ pgmo:
         place_mesh: 10.0
         place_edge: 10.0
 building_semantic_label: 22
+building_color: [169, 8, 194]
 visualize_place_factors: false
 enable_rooms: true
 room_finder:
