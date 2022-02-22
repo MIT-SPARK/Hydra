@@ -11,6 +11,11 @@
 
   <buildtool_depend>catkin</buildtool_depend>
   <depend>roscpp</depend>
+  <depend>geometry_msgs</depend>
+  <depend>pose_graph_tools</depend>
+  <depend>tf2_eigen</depend>
+  <depend>tf2_ros</depend>
+  <depend>gtsam</depend>
 
   <export>
   </export>

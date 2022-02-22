@@ -4,7 +4,7 @@
     <arg name="path_to_csv"/>
     <arg name="sensor_frame" default="left_cam"/>
 
-    <node pkg="kimera_dsg_builder" type="csv_to_tf.py" name="csv_to_tf">
+    <node pkg="hydra_utils" type="csv_to_tf" name="csv_to_tf">
         <param name="parent_frame" value="world"/>
         <param name="child_frame" value="base_link_pgo"/>
         <param name="trajectory_file" value="$(arg path_to_csv)"/>

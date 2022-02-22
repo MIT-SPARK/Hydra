@@ -120,10 +120,6 @@ add_executable(room_eval_node src/room_eval_node.cpp)
 target_include_directories(room_eval_node PUBLIC ${catkin_INCLUDE_DIRS})
 target_link_libraries(room_eval_node ${catkin_LIBRARIES} yaml-cpp kimera_dsg::kimera_dsg)
 
-add_executable(pose_graph_publisher_node src/pose_graph_publisher_node.cpp)
-target_include_directories(pose_graph_publisher_node PUBLIC ${catkin_INCLUDE_DIRS})
-target_link_libraries(pose_graph_publisher_node ${catkin_LIBRARIES} gtsam)
-
 add_executable(gt_trajectory_optimizer src/gt_trajectory_optimizer.cpp)
 target_include_directories(gt_trajectory_optimizer PUBLIC ${catkin_INCLUDE_DIRS})
 target_link_libraries(gt_trajectory_optimizer ${catkin_LIBRARIES} yaml-cpp KimeraRPGO)

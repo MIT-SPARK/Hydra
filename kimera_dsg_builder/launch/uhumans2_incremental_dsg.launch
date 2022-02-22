@@ -106,7 +106,7 @@
         <param name="visualize_dsg_lcd" value="$(arg enable_lcd_viz)"/>
     </node>
 
-    <node pkg="kimera_dsg_builder" type="pose_graph_publisher_node"
+    <node pkg="hydra_utils" type="pose_graph_publisher_node"
           if="$(arg use_gt_frame)"
           name="pose_graph_publisher_node"
           required="true"
