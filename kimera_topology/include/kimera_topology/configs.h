@@ -90,7 +90,7 @@ void visit_config(const Visitor& v, GvdIntegratorConfig& config) {
   v.visit("min_basis_for_extraction", config.min_basis_for_extraction);
   v.visit("voronoi_config", config.voronoi_config);
   v.visit("mesh_integrator_config", config.mesh_integrator_config);
-  v.visit("graph_extractor_config", config.graph_extractor_config);
+  v.visit("graph_extractor", config.graph_extractor_config);
   v.visit("extract_graph", config.extract_graph);
   v.visit("mesh_only", config.mesh_only);
 }
@@ -104,7 +104,6 @@ void visit_config(const Visitor& v, TopologyServerConfig& config) {
   v.visit("mesh_color_mode", config.mesh_color_mode);
   v.visit("world_frame", config.world_frame);
 }
-
 
 }  // namespace topology
 }  // namespace kimera

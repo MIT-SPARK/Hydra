@@ -17,8 +17,8 @@ positive_distance_only: true
 parent_derived_distance: true
 min_basis_for_extraction: 2
 extract_graph: true
-voronoi_check:
-    mode: "l1_then_angle"
+voronoi_config:
+    mode: "L1_THEN_ANGLE"
     min_distance_m: 0.40
     parent_l1_separation: 12
     parent_cos_angle_separation: 0.0

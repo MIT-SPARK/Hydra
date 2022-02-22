@@ -15,6 +15,12 @@
 namespace kimera {
 namespace topology {
 
+struct TopologyParamLogger : config_parser::Logger {
+  inline void log_missing(const std::string& message) const override {
+    VLOG(1) << message;
+  }
+};
+
 template <typename BaseTsdfServerType>
 class TopologyServer {
  public:
@@ -76,8 +82,10 @@ class TopologyServer {
   }
 
   void setupConfig(const std::string& config_ns) {
-    gvd_config_ = config_parser::load_from_ros<GvdIntegratorConfig>(config_ns);
-    config_ = config_parser::load_from_ros<TopologyServerConfig>(config_ns);
+    gvd_config_ = config_parser::load_from_ros<GvdIntegratorConfig>(
+        config_ns, std::make_shared<TopologyParamLogger>());
+    config_ = config_parser::load_from_ros<TopologyServerConfig>(
+        config_ns, std::make_shared<TopologyParamLogger>());
   }
 
   void publishMesh(const ros::Time& timestamp, const BlockIndexList& archived_blocks) {
