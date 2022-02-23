@@ -49,7 +49,7 @@ add_library(
   ${PROJECT_NAME}
   src/building_finder.cpp
   src/connectivity_utils.cpp
-  #src/object_finder.cpp
+  src/object_finder.cpp
   src/room_finder.cpp
   src/voxblox_utils.cpp
   src/wall_finder.cpp

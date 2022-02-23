@@ -1,6 +1,6 @@
 #pragma once
 #include "kimera_batch_dsg/common.h"
-//#include "kimera_batch_dsg/object_finder.h"
+#include "kimera_batch_dsg/object_finder.h"
 #include "kimera_batch_dsg/room_finder.h"
 
 #include <hydra_utils/semantic_ros_publishers.h>

@@ -1,5 +1,4 @@
-#include "kimera_dsg_builder/object_finder.h"
-#include "kimera_dsg_builder/common.h"
+#include "kimera_batch_dsg/object_finder.h"
 
 #include <actionlib/client/terminal_state.h>
 #include <kimera_dsg/bounding_box.h>

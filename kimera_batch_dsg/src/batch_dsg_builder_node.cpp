@@ -1,13 +1,12 @@
-#include <kimera_semantics_ros/semantic_tsdf_server.h>
-#include "kimera_dsg_builder/offline_dsg_builder.h"
+#include "kimera_batch_dsg/offline_dsg_builder.h"
 
+#include <kimera_semantics_ros/semantic_tsdf_server.h>
 #include <ros/ros.h>
 #include <ros/topic_manager.h>
+#include <voxblox/core/common.h>
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-
-#include <voxblox/core/common.h>
 
 #include <chrono>
 
