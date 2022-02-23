@@ -7,27 +7,68 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(kimera_dsg REQUIRED)
-find_package(catkin REQUIRED COMPONENTS voxblox kimera_dsg_visualizer visualization_msgs)
+find_package(
+  catkin REQUIRED
+  COMPONENTS voxblox
+             kimera_dsg_visualizer
+             kimera_topology
+             visualization_msgs
+)
 find_package(yaml-cpp REQUIRED)
 
+configure_file(cmake/nanoflann.CMakeLists.txt.in nanoflann-download/CMakeLists.txt)
+execute_process(
+  COMMAND "${CMAKE_COMMAND}" -G "${CMAKE_GENERATOR}" .
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/nanoflann-download"
+  OUTPUT_QUIET
+)
+execute_process(
+  COMMAND "${CMAKE_COMMAND}" --build .
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/nanoflann-download"
+  OUTPUT_QUIET
+)
+
+set(NANOFLANN_BUILD_EXAMPLES
+    OFF
+    CACHE INTERNAL ""
+)
+set(NANOFLANN_BUILD_TESTS
+    OFF
+    CACHE INTERNAL ""
+)
+add_subdirectory(${CMAKE_BINARY_DIR}/nanoflann-src ${CMAKE_BINARY_DIR}/nanoflann-build)
+
 catkin_package(
-  CATKIN_DEPENDS voxblox kimera_dsg_visualizer visualization_msgs
+  CATKIN_DEPENDS
+  voxblox
+  kimera_dsg_visualizer
+  kimera_topology
+  visualization_msgs
   DEPENDS
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}
 )
 
-add_library(${PROJECT_NAME}
-    src/room_utils.cpp)
+add_library(${PROJECT_NAME} src/room_utils.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} yaml-cpp kimera_dsg::kimera_dsg)
+target_link_libraries(
+  ${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+  yaml-cpp
+  kimera_dsg::kimera_dsg
+)
 
 add_executable(room_eval_node src/room_eval_node.cpp)
 target_link_libraries(room_eval_node ${PROJECT_NAME})
 
-# TODO(nathan) load in ply instead, and avoid voxblox utils
+add_executable(places_eval_node src/places_eval_node.cpp)
+target_link_libraries(places_eval_node PUBLIC ${PROJECT_NAME} nanoflann::nanoflann)
+
 add_executable(room_visualizer_node src/room_visualizer_node.cpp)
 target_link_libraries(room_visualizer_node ${PROJECT_NAME})
+
+add_executable(places_visualizer_node src/places_visualizer_node.cpp)
+target_link_libraries(places_visualizer_node PUBLIC ${PROJECT_NAME})
 
 install(
   TARGETS ${PROJECT_NAME} room_eval_node room_visualizer_node

@@ -110,13 +110,14 @@ int main(int argc, char* argv[]) {
   ros::Publisher mesh_pub =
       nh.advertise<mesh_msgs::TriangleMeshStamped>("full_mesh", 1, true);
 
+  // TODO(nathan) load in ply instead, and avoid voxblox utils
   // pcl::PolygonMesh::Ptr mesh;
   // kimera::utils::makeMeshFromTsdf(tsdf, mesh, &vxblx_mesh_pub);
 
   mesh_msgs::TriangleMeshStamped msg;
   msg.header.frame_id = "world";
   msg.header.stamp = ros::Time::now();
-  //msg.mesh = kimera_pgmo::PolygonMeshToTriangleMeshMsg(*mesh);
+  // msg.mesh = kimera_pgmo::PolygonMeshToTriangleMeshMsg(*mesh);
   mesh_pub.publish(msg);
 
   std_srvs::Empty temp;

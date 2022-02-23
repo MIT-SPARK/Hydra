@@ -65,7 +65,7 @@ struct VoxelKdTreeAdaptor {
 
 struct DistanceFinder {
   using Dist = L2_Simple_Adaptor<double, VoxelKdTreeAdaptor>;
-  using KDTree = KDTreeSingleIndexAdaptor<Dist, VoxelKdTreeAdaptor, 3>;
+  using KDTree = KDTreeSingleIndexAdaptor<Dist, VoxelKdTreeAdaptor, 3, size_t>;
 
   DistanceFinder(voxblox::AlignedVector<Eigen::Vector3d>& positions)
       : adaptor(positions) {
