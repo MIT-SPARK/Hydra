@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(kimera_dsg REQUIRED)
+find_package(KimeraRPGO REQUIRED)
 find_package(
   catkin REQUIRED
   COMPONENTS voxblox
@@ -73,6 +74,10 @@ target_link_libraries(room_visualizer_node ${PROJECT_NAME} gtsam)
 
 add_executable(places_visualizer_node src/places_visualizer_node.cpp)
 target_link_libraries(places_visualizer_node PUBLIC ${PROJECT_NAME})
+
+add_executable(gt_trajectory_optimizer src/gt_trajectory_optimizer.cpp)
+target_include_directories(gt_trajectory_optimizer PUBLIC ${catkin_INCLUDE_DIRS})
+target_link_libraries(gt_trajectory_optimizer ${catkin_LIBRARIES} yaml-cpp KimeraRPGO)
 
 install(
   TARGETS ${PROJECT_NAME} room_eval_node room_visualizer_node

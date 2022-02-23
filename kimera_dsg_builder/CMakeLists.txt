@@ -83,11 +83,6 @@ target_link_libraries(dsg_visualizer_node ${PROJECT_NAME} yaml-cpp)
 add_executable(dsg_optimizer_node src/dsg_optimizer_node.cpp)
 target_link_libraries(dsg_optimizer_node ${PROJECT_NAME})
 
-# utilities that don't need main library
-add_executable(gt_trajectory_optimizer src/gt_trajectory_optimizer.cpp)
-target_include_directories(gt_trajectory_optimizer PUBLIC ${catkin_INCLUDE_DIRS})
-target_link_libraries(gt_trajectory_optimizer ${catkin_LIBRARIES} yaml-cpp KimeraRPGO)
-
 if(CATKIN_ENABLE_TESTING)
   catkin_add_gtest(
     utest_${PROJECT_NAME}
