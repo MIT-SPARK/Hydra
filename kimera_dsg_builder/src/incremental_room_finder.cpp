@@ -1,8 +1,8 @@
 #include "kimera_dsg_builder/incremental_room_finder.h"
-#include "kimera_dsg_builder/common.h"
-#include "kimera_dsg_builder/timing_utilities.h"
 
+#include <hydra_utils/timing_utilities.h>
 #include <kimera_dsg/adjacency_matrix.h>
+#include <voxblox/core/color.h>
 
 #include <Eigen/Dense>
 #include <armadillo>
@@ -11,6 +11,14 @@
 
 namespace kimera {
 namespace incremental {
+
+using hydra::timing::ScopedTimer;
+
+// TODO(nathan) read in qualitative cmap
+inline voxblox::Color getRoomColor(const NodeId& room_id) {
+  static std::vector<double> taps{0.0, 0.1, 0.8, 0.35, 0.55, 0.9, 0.05, 0.7, 0.2, 0.65};
+  return voxblox::rainbowColorMap(taps.at(room_id % taps.size()));
+}
 
 ClusterResults createClustersFromComponents(const Components& components) {
   ClusterResults to_return;
@@ -416,9 +424,9 @@ std::map<NodeId, size_t> mapRoomsToClusters(const ClusterResults& cluster_result
   return best_clusters;
 }
 
-void addNewRoomNode(SceneGraph& graph, NodeSymbol node_id) {
+void addNewRoomNode(SceneGraph& graph, NodeSymbol node_id, uint8_t label) {
   RoomNodeAttributes::Ptr room_attrs = std::make_unique<RoomNodeAttributes>();
-  room_attrs->semantic_label = kRoomSemanticLabel;
+  room_attrs->semantic_label = label;
   room_attrs->name = node_id.getLabel();
   const voxblox::Color& room_color = getRoomColor(node_id.categoryId());
   room_attrs->color << room_color.r, room_color.g, room_color.b;
@@ -661,7 +669,7 @@ void RoomFinder::updateRoomsFromClusters(SharedDsgInfo& dsg,
       room_id = clusters_to_rooms.at(id_cluster_pair.first);
     } else {
       room_id = next_room_id_;
-      addNewRoomNode(*dsg.graph, next_room_id_);
+      addNewRoomNode(*dsg.graph, next_room_id_, config_.room_semantic_label);
       next_room_id_++;
     }
     seen_rooms.insert(room_id);
@@ -679,8 +687,7 @@ void RoomFinder::updateRoomsFromClusters(SharedDsgInfo& dsg,
   }
 
   std::set<NodeId> empty_rooms;
-  const SceneGraphLayer& rooms =
-      dsg.graph->getLayer(KimeraDsgLayers::ROOMS).value();
+  const SceneGraphLayer& rooms = dsg.graph->getLayer(KimeraDsgLayers::ROOMS).value();
   for (const auto& id_node_pair : rooms.nodes()) {
     if (id_node_pair.second->children().size() < config_.min_room_size) {
       empty_rooms.insert(id_node_pair.first);

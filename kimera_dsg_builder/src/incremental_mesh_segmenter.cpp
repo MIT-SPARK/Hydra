@@ -1,6 +1,6 @@
 #include "kimera_dsg_builder/incremental_mesh_segmenter.h"
-#include "kimera_dsg_builder/timing_utilities.h"
 
+#include <hydra_utils/timing_utilities.h>
 #include <kimera_semantics_ros/ros_params.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl_ros/point_cloud.h>
@@ -32,8 +32,7 @@ std::ostream& operator<<(std::ostream& out, const HashableColor& color) {
              << "]";
 }
 
-bool objectsMatch(const Cluster<pcl::PointXYZRGBA>& cluster,
-                  const SceneGraphNode& node) {
+bool objectsMatch(const Cluster& cluster, const SceneGraphNode& node) {
   pcl::PointXYZ centroid;
   cluster.centroid.get(centroid);
 
@@ -93,7 +92,8 @@ MeshSegmenter::MeshSegmenter(const ros::NodeHandle& nh,
   semantic_config_ = getSemanticTsdfIntegratorConfigFromRosParam(nh_);
   CHECK(semantic_config_.semantic_label_to_color_);
 
-  object_finder_.reset(new ObjectFinder(ObjectFinderType::kRegionGrowing));
+  // TODO(nathan) set up object config here
+  // object_finder_.reset(new ObjectFinder(ObjectFinderType::kRegionGrowing));
 
   if (enable_active_mesh_pub_) {
     active_mesh_vertex_pub_ =
@@ -104,9 +104,6 @@ MeshSegmenter::MeshSegmenter(const ros::NodeHandle& nh,
     segmented_mesh_vertices_pub_.reset(
         new ObjectCloudPublishers("object_mesh_vertices", nh_));
   }
-
-  rqt_callback_ = boost::bind(&MeshSegmenter::objectFinderConfigCb, this, _1, _2);
-  rqt_server_.setCallback(rqt_callback_);
 }
 
 MeshSegmenter::~MeshSegmenter() {
@@ -161,7 +158,7 @@ bool MeshSegmenter::detectObjects(const SharedDsgInfo::Ptr& dsg,
       continue;
     }
 
-    ObjectClusters clusters =
+    std::vector<Cluster> clusters =
         object_finder_->findObjects(full_mesh_vertices_, label_indices.at(label));
 
     VLOG(3) << "[Object Detection]  - Found " << clusters.size() << " objects of label "
@@ -255,7 +252,7 @@ LabelIndices MeshSegmenter::getLabelIndices(const std::vector<size_t>& indices) 
 }
 
 void MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
-                                const ObjectClusters& clusters,
+                                const std::vector<Cluster>& clusters,
                                 uint8_t label,
                                 double timestamp) {
   for (const auto& cluster : clusters) {
@@ -326,7 +323,7 @@ void MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
 }
 
 void MeshSegmenter::updateObjectInGraph(DynamicSceneGraph& graph,
-                                        const ObjectCluster& cluster,
+                                        const Cluster& cluster,
                                         const SceneGraphNode& node,
                                         double timestamp) {
   active_object_timestamps_.at(node.id) = timestamp;
@@ -351,7 +348,7 @@ void MeshSegmenter::updateObjectInGraph(DynamicSceneGraph& graph,
 }
 
 void MeshSegmenter::addObjectToGraph(DynamicSceneGraph& graph,
-                                     const ObjectCluster& cluster,
+                                     const Cluster& cluster,
                                      uint8_t label,
                                      double timestamp) {
   CHECK(!cluster.cloud->empty());
@@ -379,30 +376,6 @@ void MeshSegmenter::addObjectToGraph(DynamicSceneGraph& graph,
   }
 
   ++next_node_id_;
-}
-
-void MeshSegmenter::objectFinderConfigCb(DsgBuilderConfig& config, uint32_t) {
-  VLOG(3) << "Updating Object Finder params.";
-
-  object_finder_->updateClusterEstimator(
-      static_cast<ObjectFinderType>(config.object_finder_type));
-
-  EuclideanClusteringParams ec_params;
-  ec_params.cluster_tolerance = config.cluster_tolerance;
-  ec_params.max_cluster_size = config.ec_max_cluster_size;
-  ec_params.min_cluster_size = config.ec_min_cluster_size;
-  object_finder_->setEuclideanClusterParams(ec_params);
-
-  RegionGrowingClusteringParams rg_params;
-  rg_params.curvature_threshold = config.curvature_threshold;
-  rg_params.max_cluster_size = config.rg_max_cluster_size;
-  rg_params.min_cluster_size = config.rg_min_cluster_size;
-  rg_params.normal_estimator_neighbour_size = config.normal_estimator_neighbour_size;
-  rg_params.number_of_neighbours = config.number_of_neighbours;
-  rg_params.smoothness_threshold = config.smoothness_threshold;
-  object_finder_->setRegionGrowingParams(rg_params);
-
-  VLOG(3) << "Object finder: " << *object_finder_;
 }
 
 void MeshSegmenter::publishActiveVertices(const std::vector<size_t>& indices) const {

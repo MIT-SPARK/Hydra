@@ -62,9 +62,8 @@ add_library(
   src/incremental_room_finder.cpp
   src/lcd_visualizer.cpp
   src/minimum_spanning_tree.cpp
-  src/object_finder.cpp
+  #src/object_finder.cpp
   src/serialization_helpers.cpp
-  src/timing_utilities.cpp
   src/visualizer_plugins.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
@@ -101,7 +100,6 @@ if(CATKIN_ENABLE_TESTING)
     tests/utest_dsg_update_functions.cpp
     tests/utest_incremental_room_finder.cpp
     tests/utest_minimum_spanning_tree.cpp
-    tests/utest_timing_utilities.cpp
   )
   target_link_libraries(utest_${PROJECT_NAME} ${PROJECT_NAME})
 endif()

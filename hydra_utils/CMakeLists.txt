@@ -11,6 +11,10 @@ find_package(Eigen3 REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(GTSAM REQUIRED)
 
+# TODO(nathan) clean up
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(glog REQUIRED IMPORTED_TARGET libglog)
+
 catkin_package(
   CATKIN_DEPENDS roscpp geometry_msgs pose_graph_tools tf2_eigen tf2_ros
   DEPENDS
@@ -21,9 +25,10 @@ catkin_package(
 add_library(${PROJECT_NAME}
     src/display_utils.cpp
     src/ros_parser.cpp
+    src/timing_utilities.cpp
     src/yaml_parser.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME} PUBLIC yaml-cpp ${catkin_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PUBLIC yaml-cpp ${catkin_LIBRARIES} PRIVATE PkgConfig::glog)
 
 add_executable(pose_graph_publisher_node src/pose_graph_publisher_node.cpp)
 target_include_directories(pose_graph_publisher_node PUBLIC ${catkin_INCLUDE_DIRS})
@@ -36,6 +41,7 @@ if(CATKIN_ENABLE_TESTING)
     tests/hydra_utils.test
     tests/utest_main.cpp
     tests/utest_config.cpp
+    tests/utest_timing_utilities.cpp
   )
   target_link_libraries(utest_${PROJECT_NAME} ${PROJECT_NAME} ${catkin_LIBRARIES})
 endif()

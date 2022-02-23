@@ -1,10 +1,9 @@
 #include "kimera_dsg_builder/incremental_dsg_backend.h"
 #include "kimera_dsg_builder/configs.h"
 #include "kimera_dsg_builder/minimum_spanning_tree.h"
-#include "kimera_dsg_builder/pcl_conversion.h"
 #include "kimera_dsg_builder/serialization_helpers.h"
-#include "kimera_dsg_builder/timing_utilities.h"
 
+#include <hydra_utils/timing_utilities.h>
 #include <kimera_dsg/node_attributes.h>
 #include <pcl/search/kdtree.h>
 #include <voxblox/core/block_hash.h>
@@ -21,6 +20,7 @@ using kimera_pgmo::KimeraPgmoMesh;
 using kimera_pgmo::Path;
 using pose_graph_tools::PoseGraph;
 using Node = SceneGraph::Node;
+using hydra::timing::ScopedTimer;
 
 void DsgBackend::setSolverParams() {
   KimeraRPGO::RobustSolverParams params = deformation_graph_->getParams();
@@ -758,7 +758,7 @@ void DsgBackend::logStatus(bool init) const {
     return;
   }
 
-  const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
+  const auto& timer = hydra::timing::ElapsedTimeRecorder::instance();
   const double nan = std::numeric_limits<double>::quiet_NaN();
   file.open(filename, std::ofstream::out | std::ofstream::app);
   file << status_.total_loop_closures_ << "," << status_.new_loop_closures_ << ","

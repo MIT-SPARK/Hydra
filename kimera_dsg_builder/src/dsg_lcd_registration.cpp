@@ -1,6 +1,6 @@
 #include "kimera_dsg_builder/dsg_lcd_registration.h"
-#include "kimera_dsg_builder/timing_utilities.h"
 
+#include <hydra_utils/timing_utilities.h>
 #include <kimera_dsg/serialization_helpers.h>
 #include <kimera_vio_ros/LcdFrameRegistration.h>
 #include <ros/service.h>
@@ -12,6 +12,7 @@ namespace lcd {
 
 using incremental::SharedDsgInfo;
 using DsgNode = DynamicSceneGraphNode;
+using hydra::timing::ScopedTimer;
 using nlohmann::json;
 
 struct AgentNodePose {

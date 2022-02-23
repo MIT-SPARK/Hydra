@@ -7,7 +7,8 @@
 #include <optional>
 #include <string>
 
-namespace kimera {
+namespace hydra {
+namespace timing {
 
 struct ElapsedStatistics {
   double last_s;
@@ -39,8 +40,7 @@ class ElapsedTimeRecorder {
 
   ElapsedStatistics getStats(const std::string& timer_name) const;
 
-  void logElapsed(const std::string& name,
-                  const std::string& output_folder) const;
+  void logElapsed(const std::string& name, const std::string& output_folder) const;
 
   void logAllElapsed(const std::string& output_folder) const;
 
@@ -87,4 +87,5 @@ class ScopedTimer {
   bool verbosity_disables_;
 };
 
-}  // namespace kimera
+}  // namespace timing
+}  // namespace hydra

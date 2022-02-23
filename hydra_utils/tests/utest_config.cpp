@@ -9,7 +9,7 @@ std::string get_test_path() {
   return ros::package::getPath("hydra_utils") + "/tests/resources/";
 }
 
-namespace hydra_utils {
+namespace hydra {
 
 enum class TestEnum { RED, GREEN, BLUE };
 
@@ -93,18 +93,18 @@ struct TestLogger : config_parser::Logger {
   mutable std::stringstream ss;
 };
 
-}  // namespace hydra_utils
+}  // namespace hydra
 
 namespace config_parser {
 
 template <>
-struct ConfigVisitor<std::map<std::string, hydra_utils::BarConfig>> {
-  using MapType = std::map<std::string, hydra_utils::BarConfig>;
+struct ConfigVisitor<std::map<std::string, hydra::BarConfig>> {
+  using MapType = std::map<std::string, hydra::BarConfig>;
 
   template <typename V, typename std::enable_if<is_parser<V>::value, bool>::type = true>
   static auto visit_config(const V& v, MapType& value) {
     for (const auto& child : v.children()) {
-      value[child] = hydra_utils::BarConfig();
+      value[child] = hydra::BarConfig();
       v.visit(child, value[child]);
     }
   }
@@ -122,18 +122,18 @@ struct ConfigVisitor<std::map<std::string, hydra_utils::BarConfig>> {
 
 }  // namespace config_parser
 
-DECLARE_CONFIG_OSTREAM_OPERATOR(hydra_utils, FakeConfig)
-DECLARE_CONFIG_OSTREAM_OPERATOR(hydra_utils, FakeConfig2)
-DECLARE_CONFIG_OSTREAM_OPERATOR(hydra_utils, BarConfig)
-DECLARE_CONFIG_OSTREAM_OPERATOR(hydra_utils, BarMapConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, FakeConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, FakeConfig2)
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, BarConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, BarMapConfig)
 
-DECLARE_CONFIG_ENUM(hydra_utils,
+DECLARE_CONFIG_ENUM(hydra,
                     TestEnum,
                     {TestEnum::RED, "RED"},
                     {TestEnum::GREEN, "GREEN"},
                     {TestEnum::BLUE, "BLUE"})
 
-namespace hydra_utils {
+namespace hydra {
 
 std::map<TestEnum, bool> MapConverter::to(
     const std::map<std::string, bool>& other) const {
@@ -415,4 +415,4 @@ missing param /c. defaulting to test
   EXPECT_EQ(expected, result.str());
 }
 
-}  // namespace hydra_utils
+}  // namespace hydra

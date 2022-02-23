@@ -1,5 +1,4 @@
 #include "kimera_dsg_builder/visualizer_plugins.h"
-#include "kimera_dsg_builder/timing_utilities.h"
 
 #include <kimera_dsg_visualizer/colormap_utils.h>
 #include <kimera_dsg_visualizer/visualizer_utils.h>
@@ -357,11 +356,7 @@ void MeshPlaceConnectionsPlugin::draw(const std_msgs::Header& header,
 
   const SceneGraphLayer& layer = *graph.getLayer(KimeraDsgLayers::PLACES);
 
-  MinimumSpanningTreeInfo mst_info;
-  {  // timing scope
-    ScopedTimer timer("visualizer/mst_creation", header.stamp.toNSec(), true, 2, false);
-    mst_info = getMinimumSpanningEdges(layer);
-  }  // timing scope
+  MinimumSpanningTreeInfo mst_info = getMinimumSpanningEdges(layer);
 
   VisualizerConfig viz_config;
   viz_config.layer_z_step = 0.0;

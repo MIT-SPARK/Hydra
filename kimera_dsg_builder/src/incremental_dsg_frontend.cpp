@@ -1,7 +1,7 @@
 #include "kimera_dsg_builder/incremental_dsg_frontend.h"
 #include "kimera_dsg_builder/serialization_helpers.h"
-#include "kimera_dsg_builder/timing_utilities.h"
 
+#include <hydra_utils/timing_utilities.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
 #include <tf2_eigen/tf2_eigen.h>
 
@@ -14,6 +14,7 @@ namespace incremental {
 
 using lcd::LayerRegistrationConfig;
 using pose_graph_tools::PoseGraph;
+using hydra::timing::ScopedTimer;
 
 DsgFrontend::DsgFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg)
     : nh_(nh), dsg_(dsg), lcd_graph_(new DynamicSceneGraph()) {

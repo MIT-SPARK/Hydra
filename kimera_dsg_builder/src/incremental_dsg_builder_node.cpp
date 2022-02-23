@@ -1,6 +1,5 @@
 #include "kimera_dsg_builder/incremental_dsg_backend.h"
 #include "kimera_dsg_builder/incremental_dsg_frontend.h"
-#include "kimera_dsg_builder/timing_utilities.h"
 
 #include <ros/topic_manager.h>
 

@@ -209,6 +209,7 @@ void visit_config(const Visitor& v, RoomFinder::Config& config) {
   v.visit("num_steps", config.num_steps);
   v.visit("min_component_size", config.min_component_size);
   v.visit("room_prefix", config.room_prefix);
+  v.visit("room_semantic_label", config.room_semantic_label);
   v.visit("max_kmeans_iters", config.max_kmeans_iters);
   v.visit("room_vote_min_overlap", config.room_vote_min_overlap);
   v.visit("min_room_size", config.min_room_size);

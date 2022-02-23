@@ -1,8 +1,9 @@
 #include "kimera_dsg_builder/dsg_update_functions.h"
 #include "kimera_dsg_builder/incremental_room_finder.h"
-#include "kimera_dsg_builder/pcl_types.h"
 
 #include <gtsam/geometry/Pose3.h>
+#include <pcl/common/centroid.h>
+#include <pcl/point_types.h>
 
 #include <glog/logging.h>
 
@@ -11,6 +12,7 @@ namespace dsg_updates {
 
 using MeshVertices = DynamicSceneGraph::MeshVertices;
 using Node = SceneGraph::Node;
+using Centroid = pcl::CentroidPoint<pcl::PointXYZ>;
 
 void updateObjects(DynamicSceneGraph& graph,
                    const gtsam::Values&,

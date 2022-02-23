@@ -1,4 +1,4 @@
-#include "kimera_dsg_builder/timing_utilities.h"
+#include "hydra_utils/timing_utilities.h"
 
 #include <glog/logging.h>
 
@@ -8,7 +8,8 @@
 #include <iostream>
 #include <numeric>
 
-namespace kimera {
+namespace hydra {
+namespace timing {
 
 decltype(ElapsedTimeRecorder::instance_) ElapsedTimeRecorder::instance_;
 
@@ -235,4 +236,5 @@ ScopedTimer::~ScopedTimer() {
   }
 }
 
-}  // namespace kimera
+}  // namespace timing
+}  // namespace hydra

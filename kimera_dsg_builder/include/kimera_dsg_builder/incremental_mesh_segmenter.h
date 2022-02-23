@@ -1,14 +1,12 @@
 #pragma once
 #include "kimera_dsg_builder/incremental_types.h"
-#include "kimera_dsg_builder/object_finder.h"
-#include "kimera_dsg_builder/semantic_ros_publishers.h"
 
+#include <hydra_utils/semantic_ros_publishers.h>
 #include <kimera_dsg/dynamic_scene_graph.h>
 #include <kimera_dsg/node_symbol.h>
 #include <kimera_semantics/semantic_integrator_base.h>
-
-#include <dynamic_reconfigure/server.h>
-#include <kimera_dsg_builder/DsgBuilderConfig.h>
+#include <pcl/common/centroid.h>
+#include <pcl/point_types.h>
 #include <ros/ros.h>
 
 #include <memory>
@@ -17,14 +15,20 @@
 namespace kimera {
 namespace incremental {
 
-using kimera_dsg_builder::DsgBuilderConfig;
+struct Cluster {
+  using PointT = pcl::PointXYZRGBA;
+  using CloudT = pcl::PointCloud<PointT>;
+  using CentroidT = pcl::CentroidPoint<pcl::PointXYZ>;
+  CentroidT centroid;
+  CloudT::Ptr cloud;
+  pcl::PointIndices indices;
+};
 
 class MeshSegmenter {
  public:
   using LabelIndices = std::map<uint8_t, std::vector<size_t>>;
-  using MeshVertexCloud = pcl::PointCloud<pcl::PointXYZRGBA>;
+  using MeshVertexCloud = Cluster::CloudT;
   using ObjectCloudPublishers = SemanticRosPublishers<uint8_t, MeshVertexCloud>;
-  using ObjectCluster = Cluster<pcl::PointXYZRGBA>;
 
   explicit MeshSegmenter(const ros::NodeHandle& nh,
                          const MeshVertexCloud::Ptr& active_vertices);
@@ -47,21 +51,19 @@ class MeshSegmenter {
   LabelIndices getLabelIndices(const std::vector<size_t>& indices) const;
 
   void updateGraph(DynamicSceneGraph& graph,
-                   const ObjectClusters& clusters,
+                   const std::vector<Cluster>& clusters,
                    uint8_t label,
                    double timestamp);
 
   void addObjectToGraph(DynamicSceneGraph& graph,
-                        const ObjectCluster& cluster,
+                        const Cluster& cluster,
                         uint8_t label,
                         double timestamp);
 
   void updateObjectInGraph(DynamicSceneGraph& graph,
-                           const ObjectCluster& cluster,
+                           const Cluster& cluster,
                            const SceneGraphNode& node,
                            double timestamp);
-
-  void objectFinderConfigCb(DsgBuilderConfig& config, uint32_t);
 
   void publishActiveVertices(const std::vector<size_t>& indices) const;
 
@@ -73,8 +75,6 @@ class MeshSegmenter {
   MeshVertexCloud::Ptr full_mesh_vertices_;
 
   NodeSymbol next_node_id_;
-  std::unique_ptr<ObjectFinder> object_finder_;
-
   double active_object_horizon_s_;
   double active_index_horizon_m_;
   std::map<uint8_t, std::set<NodeId>> active_objects_;
@@ -92,9 +92,6 @@ class MeshSegmenter {
 
   // TODO(nathan) think about replacing this
   SemanticIntegratorBase::SemanticConfig semantic_config_;
-
-  dynamic_reconfigure::Server<DsgBuilderConfig> rqt_server_;
-  dynamic_reconfigure::Server<DsgBuilderConfig>::CallbackType rqt_callback_;
 };
 
 }  // namespace incremental

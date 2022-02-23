@@ -46,6 +46,7 @@ class RoomFinder {
     size_t num_steps = 5;
     size_t min_component_size = 15;
     char room_prefix = 'R';
+    SemanticNodeAttributes::Label room_semantic_label = 21u;
     size_t max_kmeans_iters = 5;
     double room_vote_min_overlap = 0.3;
     size_t min_room_size = 10;

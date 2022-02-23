@@ -1,10 +1,11 @@
-#include "kimera_dsg_builder/timing_utilities.h"
+#include "hydra_utils/timing_utilities.h"
 
 #include <gtest/gtest.h>
 
 #include <thread>
 
-namespace kimera {
+namespace hydra {
+namespace timing {
 
 struct TimingUtilityTests : public ::testing::Test {
   virtual void SetUp() override { ElapsedTimeRecorder::instance().reset(); }
@@ -104,4 +105,5 @@ TEST_F(TimingUtilityTests, TestScopedTimers) {
   EXPECT_GT(*elapsed_2, *elapsed_4);
 }
 
-}  // namespace kimera
+}  // namespace timing
+}  // namespace hydra

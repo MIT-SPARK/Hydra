@@ -1,12 +1,14 @@
 #include "kimera_dsg_builder/dsg_lcd_module.h"
 #include "kimera_dsg_builder/dsg_lcd_registration.h"
-#include "kimera_dsg_builder/timing_utilities.h"
+
+#include <hydra_utils/timing_utilities.h>
 
 namespace kimera {
 namespace lcd {
 
 using incremental::SharedDsgInfo;
 using DsgNode = DynamicSceneGraphNode;
+using hydra::timing::ScopedTimer;
 
 DsgLcdModule::DsgLcdModule(const DsgLcdConfig& config) : config_(config) {
   for (const auto& id_func_pair : layer_factories_) {

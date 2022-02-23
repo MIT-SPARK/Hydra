@@ -4,7 +4,6 @@
 #include "kimera_dsg_builder/incremental_room_finder.h"
 #include "kimera_dsg_builder/incremental_types.h"
 #include "kimera_dsg_builder/visualizer_plugins.h"
-#include "kimera_dsg_builder/timing_utilities.h"
 
 #include <kimera_dsg/scene_graph_logger.h>
 #include <kimera_dsg_visualizer/dynamic_scene_graph_visualizer.h>
