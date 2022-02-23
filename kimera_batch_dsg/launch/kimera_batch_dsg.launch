@@ -1,0 +1,67 @@
+<launch>
+    <arg name="sensor_frame"/>
+    <arg name="pointcloud_topic"/>
+    <arg name="topology_config"/>
+    <arg name="semantic_config"/>
+    <arg name="typology_config"/>
+    <arg name="room_height"/>
+
+    <arg name="use_oriented_bounding_boxes" default="false"/>
+    <arg name="visualize" default="false"/>
+    <arg name="voxel_size" default="0.10"/>
+    <arg name="max_ray_length_m" default="4.5"/>
+    <arg name="update_period_s" default="1.0"/>
+
+    <arg name="dsg_output_path" default="$(find kimera_batch_dsg)/output"/>
+
+    <arg name="typology_dir" default="$(find kimera_batch_dsg)/config"/>
+    <arg name="topology_dir" default="$(find kimera_topology)/config"/>
+    <arg name="semantic_dir" default="$(find kimera_semantics_ros)/cfg"/>
+
+    <arg name="semantic_map_file" default="tesse_multiscene_office1_segmentation_mapping.csv"/>
+    <arg name="semantic_map_path" default="$(arg semantic_dir)/$(arg semantic_map_file)"/>
+
+    <arg name="min_glog_level" default="0"/>
+    <arg name="verbosity" default="0"/>
+    <arg name="glog_to_file" default="false"/>
+    <arg name="glog_dir" if="$(arg glog_to_file)"/>
+    <arg name="glog_file_args" value="--logtostderr=0 --log_dir=$(arg glog_dir)" if="$(arg glog_to_file)"/>
+    <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
+    <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
+    <arg name="ros_output" value="log" if="$(arg glog_to_file)"/>
+
+    <node pkg="kimera_batch_dsg" type="kimera_batch_dsg_node" name="kimera_batch_dsg_node"
+          args="--minloglevel=$(arg min_glog_level) -v=$(arg verbosity) $(arg glog_file_args)"
+          output="$(arg ros_output)"
+          required="true">
+        <remap from="pointcloud" to="$(arg pointcloud_topic)"/>
+        <param name="sensor_frame" value="$(arg sensor_frame)"/>
+        <param name="verbose" value="false"/>
+        <param name="publish_pointclouds" value="false"/>
+
+        <rosparam command="load" file="$(arg typology_dir)/$(arg typology_config)"/>
+        <rosparam command="load" file="$(arg topology_dir)/$(arg semantic_config)"/>
+        <rosparam command="load" file="$(arg topology_dir)/$(arg topology_config)" ns="gvd_integrator"/>
+        <param name="gvd_integrator/max_distance_m" value="$(arg max_ray_length_m)"/>
+
+        <param name="semantic_label_2_color_csv_filepath" value="$(arg semantic_map_path)"/>
+
+        <param name="use_oriented_bounding_boxes" value="$(arg use_oriented_bounding_boxes)"/>
+        <param name="room_finder_esdf_slice_level" value="$(arg room_height)"/>
+        <param name="tsdf_voxel_size" value="$(arg voxel_size)"/>
+        <param name="max_ray_length_m" value="$(arg max_ray_length_m)"/>
+        <param name="max_distance_m" value="$(arg max_ray_length_m)"/>
+        <param name="update_period_s" value="$(arg update_period_s)"/>
+        <param name="semantic/voxel_size" value="$(arg voxel_size)"/>
+        <param name="semantic/voxels_per_side" value="16"/>
+        <param name="semantic/add_robot_pose" value="false"/>
+        <param name="semantic/generate_mesh" value="true"/>
+        <param name="semantic/truncation_distance" value="0.4"/>
+        <param name="semantic/esdf_min_distance_m" value="0.2"/>
+        <param name="semantic/gvd_namespace" value="~gvd_integrator"/>
+
+        <param name="dsg_log_output" value="true"/>
+        <param name="dsg_output_path" value="$(arg dsg_output_path)"/>
+        <param name="visualize" value="$(arg visualize)"/>
+    </node>
+</launch>

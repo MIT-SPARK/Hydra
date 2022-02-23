@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="ISO-8859-15"?>
+<launch>
+
+    <arg name="sim_time_required" default="true"/>
+    <param name="use_sim_time" value="$(arg sim_time_required)"/>
+
+    <arg name="room_height" default="2.0"/>
+
+    <include file="$(find semantic_recolor)/launch/semantic_recolor_pointcloud.launch">
+        <arg name="rgb_info_topic" value="/azure/rgb/camera_info"/>
+        <arg name="rgb_topic" value="/azure/rgb/image_raw"/>
+        <arg name="depth_topic" value="/azure/depth_to_rgb/image_raw"/>
+        <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
+    </include>
+
+    <include file="$(find kimera_batch_dsg)/launch/kimera_batch_dsg.launch" pass_all_args="true">
+        <arg name="pointcloud_topic" value="/semantic_pointcloud"/>
+        <arg name="sensor_frame" value="left_cam"/>
+        <arg name="topology_config" value="sidpac_topology_config.yaml"/>
+        <arg name="semantic_config" value="ade150_semantic_config.yaml"/>
+        <arg name="typology_config" value="sidpac_typology.yaml"/>
+        <arg name="semantic_map_path" value="$(find semantic_recolor)/config/colors/ade150_config.csv"/>
+    </include>
+
+</launch>

@@ -1,0 +1,4 @@
+dynamic_semantic_labels: [20]
+stuff_labels: [0, 1, 2, 3, 4, 8, 9, 11, 14, 15, 16, 17, 19]
+walls_labels: [12, 19]
+floor_labels: [1, 2, 7]

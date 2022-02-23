@@ -1,0 +1,30 @@
+<launch>
+
+    <arg name="sim_time_required" default="true"/>
+    <param name="use_sim_time" value="$(arg sim_time_required)"/>
+
+    <arg name="use_gt_frame" default="true"/>
+
+    <arg name="room_height" default="2.5"/>
+    <arg name="typology_config" default="uhumans2_office_typology.yaml"/>
+    <arg name="semantic_map_file" default="tesse_multiscene_office1_segmentation_mapping.csv"/>
+
+    <arg name="use_static_tfs" default="true"/>
+    <include file="$(find hydra_utils)/launch/includes/uhumans2_static_tfs.xml" if="$(arg use_static_tfs)"/>
+
+    <include file="$(find hydra_utils)/launch/includes/rgbd_to_pointcloud.xml">
+        <arg name="camera_info_topic" value="/tesse/seg_cam/camera_info"/>
+        <arg name="camera_topic" value="/tesse/seg_cam/rgb/image_raw"/>
+        <arg name="depth_topic" value="/tesse/depth_cam/mono/image_raw"/>
+        <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
+    </include>
+
+    <include file="$(find kimera_batch_dsg)/launch/kimera_batch_dsg.launch" pass_all_args="true">
+        <arg name="pointcloud_topic" value="/semantic_pointcloud"/>
+        <arg name="sensor_frame" value="left_cam_kimera" unless="$(arg use_gt_frame)"/>
+        <arg name="sensor_frame" value="left_cam" if="$(arg use_gt_frame)"/>
+        <arg name="topology_config" value="uhumans2_topology_config.yaml"/>
+        <arg name="semantic_config" value="uhumans2_semantic_config.yaml"/>
+    </include>
+
+</launch>
