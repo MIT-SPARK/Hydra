@@ -56,7 +56,7 @@
               args="0 0 0 -0.5 0.5 -0.5 0.5 $(arg odom_frame) $(arg sensor_frame)"/>
       </group>
 
-    <include file="$(find kimera_topology)/launch/includes/rgbd_to_pointcloud.xml"
+    <include file="$(find hydra_utils)/launch/includes/rgbd_to_pointcloud.xml"
              unless="$(arg use_semantics)">
         <arg name="camera_info_topic" value="$(arg camera_info_topic)"/>
         <arg name="camera_topic" value="$(arg camera_topic)"/>

@@ -42,7 +42,7 @@
     <arg name="log_registration" default="false"/>
 
     <arg name="use_static_tfs" default="true"/>
-    <include file="$(find kimera_dsg_builder)/launch/uhumans2_static_tfs.launch" if="$(arg use_static_tfs)"/>
+    <include file="$(find hydra_utils)/launch/includes/uhumans2_static_tfs.xml" if="$(arg use_static_tfs)"/>
 
     <include file="$(find kimera_topology)/launch/kimera_topology_semantic.launch">
         <arg name="use_gt_semantics" value="$(arg use_gt_semantics)"/>
