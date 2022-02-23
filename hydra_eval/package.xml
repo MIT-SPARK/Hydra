@@ -14,6 +14,7 @@
   <depend>kimera_dsg</depend>
   <depend>kimera_dsg_visualizer</depend>
   <depend>kimera_topology</depend>
+  <depend>kimera_pgmo</depend>
   <depend>visualization_msgs</depend>
 
   <export>

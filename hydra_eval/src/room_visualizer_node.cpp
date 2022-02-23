@@ -1,6 +1,6 @@
 #include <kimera_dsg/dynamic_scene_graph.h>
 #include <kimera_dsg_visualizer/colormap_utils.h>
-//#include <kimera_pgmo/utils/CommonFunctions.h>
+#include <kimera_pgmo/utils/CommonFunctions.h>
 #include <mesh_msgs/TriangleMeshStamped.h>
 #include <std_srvs/Empty.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -10,14 +10,11 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-DEFINE_int32(voxels_per_side, 16, "voxels per side");
-DEFINE_double(voxel_size, 0.1, "voxel size");
 DEFINE_double(alpha, 0.6, "bbox alpha");
 DEFINE_double(luminance, 0.6, "bbox luminance");
 DEFINE_double(saturation, 0.8, "bbox saturation");
-DEFINE_string(tsdf_file, "", "tsdf file to read");
 DEFINE_string(bbox_file, "", "bounding box config file");
-DEFINE_string(dsg_file, "", "dsg file to read");
+DEFINE_string(mesh_file, "", "mesh file to read");
 
 using namespace kimera;
 
@@ -96,28 +93,26 @@ int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
 
-  if (FLAGS_tsdf_file == "") {
-    LOG(FATAL) << "TSDF file is required!";
+  if (FLAGS_mesh_file == "") {
+    LOG(FATAL) << "Mesh file is required!";
+  }
+
+  if (FLAGS_bbox_file == "") {
+    LOG(FATAL) << "bounding-box file is required!";
   }
 
   LOG(INFO) << "Reading boxes from " << FLAGS_bbox_file;
 
-  ros::Publisher room_pub =
-      nh.advertise<visualization_msgs::Marker>("room_freespace", 1, true);
-
-  ros::Publisher vxblx_mesh_pub =
-      nh.advertise<voxblox_msgs::Mesh>("vxblx_mesh", 1, true);
   ros::Publisher mesh_pub =
       nh.advertise<mesh_msgs::TriangleMeshStamped>("full_mesh", 1, true);
 
-  // TODO(nathan) load in ply instead, and avoid voxblox utils
-  // pcl::PolygonMesh::Ptr mesh;
-  // kimera::utils::makeMeshFromTsdf(tsdf, mesh, &vxblx_mesh_pub);
+  pcl::PolygonMesh::Ptr mesh(new pcl::PolygonMesh());
+  kimera_pgmo::ReadMeshFromPly(FLAGS_mesh_file, mesh);
 
   mesh_msgs::TriangleMeshStamped msg;
   msg.header.frame_id = "world";
   msg.header.stamp = ros::Time::now();
-  // msg.mesh = kimera_pgmo::PolygonMeshToTriangleMeshMsg(*mesh);
+  msg.mesh = kimera_pgmo::PolygonMeshToTriangleMeshMsg(*mesh);
   mesh_pub.publish(msg);
 
   std_srvs::Empty temp;

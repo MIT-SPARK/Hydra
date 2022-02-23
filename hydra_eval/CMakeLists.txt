@@ -11,9 +11,12 @@ find_package(
   catkin REQUIRED
   COMPONENTS voxblox
              kimera_dsg_visualizer
+             kimera_pgmo
              kimera_topology
              visualization_msgs
 )
+find_package(Boost REQUIRED COMPONENTS timer)
+find_package(GTSAM REQUIRED)
 find_package(yaml-cpp REQUIRED)
 
 configure_file(cmake/nanoflann.CMakeLists.txt.in nanoflann-download/CMakeLists.txt)
@@ -43,6 +46,7 @@ catkin_package(
   voxblox
   kimera_dsg_visualizer
   kimera_topology
+  kimera_pgmo
   visualization_msgs
   DEPENDS
   INCLUDE_DIRS include
@@ -65,7 +69,7 @@ add_executable(places_eval_node src/places_eval_node.cpp)
 target_link_libraries(places_eval_node PUBLIC ${PROJECT_NAME} nanoflann::nanoflann)
 
 add_executable(room_visualizer_node src/room_visualizer_node.cpp)
-target_link_libraries(room_visualizer_node ${PROJECT_NAME})
+target_link_libraries(room_visualizer_node ${PROJECT_NAME} gtsam)
 
 add_executable(places_visualizer_node src/places_visualizer_node.cpp)
 target_link_libraries(places_visualizer_node PUBLIC ${PROJECT_NAME})
