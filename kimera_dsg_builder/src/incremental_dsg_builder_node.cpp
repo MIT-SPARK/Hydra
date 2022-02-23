@@ -1,9 +1,10 @@
 #include "kimera_dsg_builder/incremental_dsg_backend.h"
 #include "kimera_dsg_builder/incremental_dsg_frontend.h"
 
+#include <hydra_utils/timing_utilities.h>
 #include <ros/topic_manager.h>
 
-using kimera::ElapsedTimeRecorder;
+using hydra::timing::ElapsedTimeRecorder;
 using kimera::KimeraDsgLayers;
 using kimera::LayerId;
 using kimera::incremental::SharedDsgInfo;

@@ -245,31 +245,6 @@ ColorPointCloud::Ptr ObjectFinder::findObjectsOffline(const ColorPointCloud::Ptr
   return getColoredCloud(cloud, cluster_indices);
 }
 
-ObjectClusters ObjectFinder::findObjects(
-    const pcl::PointCloud<pcl::PointXYZRGBA>::Ptr& cloud,
-    const std::vector<size_t>& active_indices) {
-  CHECK(cloud);
-
-  // in general, this is unsafe, but PCL doesn't offer us any alternative
-  pcl::IndicesPtr cloud_indices(
-      new std::vector<int>(active_indices.begin(), active_indices.end()));
-
-  ClusterIndices cluster_indices;
-  switch (type_) {
-    case ObjectFinderType::kRegionGrowing:
-      cluster_indices = estimateClustersRegionGrowing<pcl::PointXYZRGBA>(
-          region_growing_params_, cloud, cloud_indices);
-      break;
-    case ObjectFinderType::kEuclidean:
-    default:
-      cluster_indices = estimateClustersEuclidean<pcl::PointXYZRGBA>(
-          euclidean_params_, cloud, cloud_indices);
-      break;
-  }
-
-  return getClusterInfo<pcl::PointXYZRGBA>(cloud, cluster_indices);
-}
-
 ColorPointCloud::Ptr ObjectFinder::getColoredCloud(const ColorPointCloud::Ptr& input,
                                                    const ClusterIndices& clusters) {
   ColorPointCloud::Ptr colored_cloud(new ColorPointCloud);

@@ -12,7 +12,7 @@ active_index_horizon_m: 5.0
 enable_active_mesh_pub: false
 enable_segmented_mesh_pub: false
 min_object_vertices: 20
-ec_min_cluster_size: 25
+min_cluster_size: 25
 cluster_tolerance: 0.25
 prune_mesh_indices: true
 mesh_ns: ""

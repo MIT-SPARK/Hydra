@@ -2,6 +2,7 @@
 
 #include <hydra_utils/timing_utilities.h>
 #include <kimera_semantics_ros/ros_params.h>
+#include <pcl/segmentation/extract_clusters.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl_ros/point_cloud.h>
 
@@ -10,6 +11,7 @@
 namespace kimera {
 namespace incremental {
 
+using Clusters = MeshSegmenter::Clusters;
 using LabelIndices = MeshSegmenter::LabelIndices;
 
 std::ostream& operator<<(std::ostream& out, const std::set<uint8_t>& labels) {
@@ -69,10 +71,19 @@ MeshSegmenter::MeshSegmenter(const ros::NodeHandle& nh,
       next_node_id_('O', 0),
       active_object_horizon_s_(10.0),
       active_index_horizon_m_(5.0),
+      cluster_tolerance_(0.25),
       enable_active_mesh_pub_(false),
       enable_segmented_mesh_pub_(false) {
+  // TODO(nathan) make a config
   nh_.getParam("active_object_horizon_s", active_object_horizon_s_);
   nh_.getParam("active_index_horizon_m", active_index_horizon_m_);
+  nh_.getParam("cluster_tolerance", cluster_tolerance_);
+  int min_cluster_size = 25;
+  nh_.getParam("min_cluster_size", min_cluster_size);
+  min_cluster_size_ = static_cast<size_t>(min_cluster_size);
+  int max_cluster_size = 100000;
+  nh_.getParam("max_cluster_size", max_cluster_size);
+  max_cluster_size_ = static_cast<size_t>(max_cluster_size);
   nh_.getParam("enable_active_mesh_pub", enable_active_mesh_pub_);
   nh_.getParam("enable_segmented_mesh_pub", enable_segmented_mesh_pub_);
 
@@ -92,9 +103,6 @@ MeshSegmenter::MeshSegmenter(const ros::NodeHandle& nh,
   semantic_config_ = getSemanticTsdfIntegratorConfigFromRosParam(nh_);
   CHECK(semantic_config_.semantic_label_to_color_);
 
-  // TODO(nathan) set up object config here
-  // object_finder_.reset(new ObjectFinder(ObjectFinderType::kRegionGrowing));
-
   if (enable_active_mesh_pub_) {
     active_mesh_vertex_pub_ =
         nh_.advertise<MeshVertexCloud>("active_mesh_vertices", 1, true);
@@ -109,6 +117,46 @@ MeshSegmenter::MeshSegmenter(const ros::NodeHandle& nh,
 MeshSegmenter::~MeshSegmenter() {
   // handle this before node handle disappears
   segmented_mesh_vertices_pub_.reset();
+}
+
+Clusters MeshSegmenter::findClusters(const MeshVertexCloud::Ptr& cloud,
+                                     const std::vector<size_t>& indices) const {
+  CHECK(cloud);
+
+  // in general, this is unsafe, but PCL doesn't offer us any alternative
+  pcl::IndicesPtr cloud_indices(new std::vector<int>(indices.begin(), indices.end()));
+
+  KdTreeT::Ptr tree(new KdTreeT());
+  tree->setInputCloud(cloud, cloud_indices);
+
+  pcl::EuclideanClusterExtraction<Cluster::PointT> estimator;
+  estimator.setClusterTolerance(cluster_tolerance_);
+  estimator.setMinClusterSize(min_cluster_size_);
+  estimator.setMaxClusterSize(max_cluster_size_);
+  estimator.setSearchMethod(tree);
+  estimator.setInputCloud(cloud);
+  estimator.setIndices(cloud_indices);
+
+  std::vector<pcl::PointIndices> cluster_indices;
+  estimator.extract(cluster_indices);
+
+  Clusters clusters;
+  clusters.resize(cluster_indices.size());
+  for (size_t k = 0; k < clusters.size(); ++k) {
+    clusters.at(k).indices = cluster_indices.at(k);
+    clusters.at(k).cloud.reset(new MeshVertexCloud());
+
+    const auto& object_indices = cluster_indices.at(k).indices;
+    clusters.at(k).cloud->resize(object_indices.size());
+
+    for (size_t i = 0; i < object_indices.size(); ++i) {
+      const auto& cp = cloud->at(object_indices.at(i));
+      clusters.at(k).cloud->at(i) = cp;
+      clusters.at(k).centroid.add(pcl::PointXYZ(cp.x, cp.y, cp.z));
+    }
+  }
+
+  return clusters;
 }
 
 bool MeshSegmenter::detectObjects(const SharedDsgInfo::Ptr& dsg,
@@ -154,12 +202,11 @@ bool MeshSegmenter::detectObjects(const SharedDsgInfo::Ptr& dsg,
       continue;
     }
 
-    if (label_indices.at(label).size() < object_finder_->minClusterSize()) {
+    if (label_indices.at(label).size() < min_cluster_size_) {
       continue;
     }
 
-    std::vector<Cluster> clusters =
-        object_finder_->findObjects(full_mesh_vertices_, label_indices.at(label));
+    const auto clusters = findClusters(full_mesh_vertices_, label_indices.at(label));
 
     VLOG(3) << "[Object Detection]  - Found " << clusters.size() << " objects of label "
             << static_cast<int>(label);
