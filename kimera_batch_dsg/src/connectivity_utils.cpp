@@ -1,6 +1,5 @@
-#include "kimera_dsg_builder/connectivity_utils.h"
-#include "kimera_dsg_builder/pcl_conversion.h"
-#include "kimera_dsg_builder/pcl_types.h"
+#include "kimera_batch_dsg/connectivity_utils.h"
+#include "kimera_batch_dsg/pcl_conversion.h"
 
 #include <glog/logging.h>
 

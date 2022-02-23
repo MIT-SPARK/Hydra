@@ -1,5 +1,5 @@
 #pragma once
-#include "kimera_dsg_builder/pcl_conversion.h"
+#include "kimera_batch_dsg/pcl_conversion.h"
 #include <kimera_dsg/scene_graph.h>
 
 namespace kimera {

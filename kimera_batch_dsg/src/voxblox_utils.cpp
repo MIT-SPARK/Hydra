@@ -1,5 +1,5 @@
-#include "kimera_dsg_builder/voxblox_utils.h"
-#include "kimera_dsg_builder/common.h"
+#include "kimera_batch_dsg/voxblox_utils.h"
+#include "kimera_batch_dsg/common.h"
 
 #include <kimera_dsg/node_attributes.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>

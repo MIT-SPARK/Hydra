@@ -1,10 +1,9 @@
 #pragma once
-// TODO(nathan) condense
-#include "kimera_dsg_builder/common.h"
-#include "kimera_dsg_builder/object_finder.h"
-#include "kimera_dsg_builder/room_finder.h"
-#include "kimera_dsg_builder/semantic_ros_publishers.h"
+#include "kimera_batch_dsg/common.h"
+//#include "kimera_batch_dsg/object_finder.h"
+#include "kimera_batch_dsg/room_finder.h"
 
+#include <hydra_utils/semantic_ros_publishers.h>
 #include <kimera_dsg/dynamic_scene_graph.h>
 #include <kimera_dsg_visualizer/dynamic_scene_graph_visualizer.h>
 
@@ -13,7 +12,7 @@
 #include <voxblox/core/layer.h>
 
 #include <dynamic_reconfigure/server.h>
-#include <kimera_dsg_builder/DsgBuilderConfig.h>
+#include <kimera_batch_dsg/DsgBuilderConfig.h>
 #include <std_srvs/SetBool.h>
 #include <std_srvs/Trigger.h>
 
@@ -25,8 +24,7 @@ namespace kimera {
 
 class OfflineDsgBuilder {
  private:
-  // TODO(nathan) name is misleading, refactor
-  using RqtSceneGraphConfig = kimera_dsg_builder::DsgBuilderConfig;
+  using RqtSceneGraphConfig = kimera_batch_dsg::DsgBuilderConfig;
 
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

@@ -13,8 +13,6 @@
 
   <!-- standard dependencies -->
   <depend>roscpp</depend>
-  <depend>dynamic_reconfigure</depend>
-  <depend>pluginlib</depend>
   <depend>std_msgs</depend>
   <depend>tf2_eigen</depend>
 

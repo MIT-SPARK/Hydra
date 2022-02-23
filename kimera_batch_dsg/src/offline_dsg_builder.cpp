@@ -1,8 +1,8 @@
-#include "kimera_dsg_builder/offline_dsg_builder.h"
-#include "kimera_dsg_builder/building_finder.h"
-#include "kimera_dsg_builder/connectivity_utils.h"
-#include "kimera_dsg_builder/voxblox_utils.h"
-#include "kimera_dsg_builder/wall_finder.h"
+#include "kimera_batch_dsg/offline_dsg_builder.h"
+#include "kimera_batch_dsg/building_finder.h"
+#include "kimera_batch_dsg/connectivity_utils.h"
+#include "kimera_batch_dsg/voxblox_utils.h"
+#include "kimera_batch_dsg/wall_finder.h"
 
 #include <kimera_semantics_ros/ros_params.h>
 #include <kimera_semantics_ros/semantic_tsdf_server.h>

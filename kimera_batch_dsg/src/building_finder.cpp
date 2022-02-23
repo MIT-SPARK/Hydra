@@ -1,6 +1,6 @@
-#include "kimera_dsg_builder/building_finder.h"
-#include "kimera_dsg_builder/common.h"
-#include "kimera_dsg_builder/pcl_types.h"
+#include "kimera_batch_dsg/building_finder.h"
+#include "kimera_batch_dsg/common.h"
+#include "kimera_batch_dsg/pcl_types.h"
 
 #include <kimera_dsg/node_attributes.h>
 

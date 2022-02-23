@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>kimera_batch_dsg</name>
+  <version>0.0.1</version>
+  <description>Original DSG code</description>
+
+  <author email="na26933@mit.edu">Nathan Hughes</author>
+  <maintainer email="na26933@mit.edu">Nathan Hughes</maintainer>
+
+  <license>BSD</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>roscpp</depend>
+  <depend>dynamic_reconfigure</depend>
+  <depend>hydra_utils</depend>
+  <depend>kimera_dsg</depend>
+  <depend>kimera_dsg_visualizer</depend>
+  <depend>kimera_pgmo</depend>
+  <depend>kimera_semantics</depend>
+  <depend>kimera_semantics_ros</depend>
+  <depend>kimera_topology</depend>
+  <depend>std_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>voxblox</depend>
+  <depend>voxblox_ros</depend>
+
+  <export>
+  </export>
+
+</package>

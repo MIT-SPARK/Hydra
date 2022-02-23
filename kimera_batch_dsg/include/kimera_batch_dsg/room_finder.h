@@ -1,6 +1,6 @@
 #pragma once
-#include "kimera_dsg_builder/common.h"
-#include "kimera_dsg_builder/connectivity_utils.h"
+#include "kimera_batch_dsg/common.h"
+#include "kimera_batch_dsg/connectivity_utils.h"
 
 #include <kimera_dsg/scene_graph.h>
 #include <kimera_semantics/common.h>

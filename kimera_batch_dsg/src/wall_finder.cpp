@@ -1,7 +1,7 @@
-#include "kimera_dsg_builder/wall_finder.h"
-#include "kimera_dsg_builder/common.h"
-#include "kimera_dsg_builder/pcl_conversion.h"
-#include "kimera_dsg_builder/pcl_types.h"
+#include "kimera_batch_dsg/wall_finder.h"
+#include "kimera_batch_dsg/common.h"
+#include "kimera_batch_dsg/pcl_conversion.h"
+#include "kimera_batch_dsg/pcl_types.h"
 
 #include <kimera_dsg/node_attributes.h>
 #include <pcl/search/kdtree.h>

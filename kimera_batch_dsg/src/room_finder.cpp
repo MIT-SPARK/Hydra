@@ -1,5 +1,5 @@
-#include "kimera_dsg_builder/room_finder.h"
-#include "kimera_dsg_builder/pcl_types.h"
+#include "kimera_batch_dsg/room_finder.h"
+#include "kimera_batch_dsg/pcl_types.h"
 
 #include <glog/logging.h>
 
