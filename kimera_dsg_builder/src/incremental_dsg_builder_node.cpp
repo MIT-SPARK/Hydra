@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
 
   ros::NodeHandle nh("~");
   std::string dsg_output_path = "";
-  nh.getParam("dsg_output_path", dsg_output_path);
+  nh.getParam("log_path", dsg_output_path);
 
   bool exit_after_bag = false;
   nh.getParam("exit_after_bag", exit_after_bag);
