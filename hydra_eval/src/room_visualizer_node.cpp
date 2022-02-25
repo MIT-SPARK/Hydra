@@ -30,7 +30,7 @@ void redrawBoundingBoxes(ros::Publisher& bbox_pub) {
   size_t idx = 0;
   for (size_t room = 0; room < root["rooms"].size(); ++room) {
     const double hue = static_cast<double>(room) / static_cast<double>(num_rooms);
-    auto rgb = kimera::dsg_utils::getRgbFromHls(hue, FLAGS_luminance, FLAGS_saturation);
+    auto rgb = dsg_utils::getRgbFromHls(hue, FLAGS_luminance, FLAGS_saturation);
 
     std_msgs::ColorRGBA color;
     color.r = rgb(0) / 255.0;

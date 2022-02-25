@@ -29,7 +29,7 @@ RoomBoundingBoxes loadBoundingBoxesFromYaml(const std::string& filepath) {
 
   RoomBoundingBoxes boxes;
   for (size_t room = 0; room < root["rooms"].size(); ++room) {
-    std::vector<kimera::BoundingBox> room_boxes;
+    std::vector<BoundingBox> room_boxes;
     for (const auto& bbox : root["rooms"][room]) {
       Eigen::Vector3f pos = loadVector(bbox["pos"]);
       Eigen::Vector3f scale = loadVector(bbox["scale"]);

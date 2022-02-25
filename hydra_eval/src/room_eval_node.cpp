@@ -14,10 +14,12 @@ DEFINE_string(tsdf_file, "", "tsdf file to read");
 DEFINE_string(bbox_file, "", "bounding box config file");
 DEFINE_string(dsg_file, "", "dsg file to read");
 
+using kimera::NodeId;
+using kimera::BoundingBox;
+using kimera::DynamicSceneGraph;
+using kimera::KimeraDsgLayers;
 using voxblox::Layer;
 using voxblox::TsdfVoxel;
-
-namespace kimera {
 
 void getGtRoomIndices(const Layer<TsdfVoxel>& tsdf,
                       std::map<NodeId, voxblox::LongIndexSet>& room_indices) {
@@ -156,8 +158,6 @@ void eval_rooms(const Layer<TsdfVoxel>& tsdf, const DynamicSceneGraph& graph) {
   std::cout << json_results;
 }
 
-}  // namespace kimera
-
 int main(int argc, char* argv[]) {
   FLAGS_minloglevel = 0;
   FLAGS_logtostderr = 1;
@@ -185,9 +185,9 @@ int main(int argc, char* argv[]) {
     LOG(FATAL) << "Failed to load TSDF from: " << FLAGS_tsdf_file;
   }
 
-  kimera::DynamicSceneGraph graph;
+  DynamicSceneGraph graph;
   graph.load(FLAGS_dsg_file);
-  if (!graph.hasLayer(kimera::KimeraDsgLayers::ROOMS)) {
+  if (!graph.hasLayer(KimeraDsgLayers::ROOMS)) {
     LOG(FATAL) << "Graph file: " << FLAGS_dsg_file << " does not have rooms";
   }
 

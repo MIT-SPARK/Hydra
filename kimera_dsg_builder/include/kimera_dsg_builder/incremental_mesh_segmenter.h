@@ -28,7 +28,7 @@ class MeshSegmenter {
  public:
   using LabelIndices = std::map<uint8_t, std::vector<size_t>>;
   using MeshVertexCloud = Cluster::CloudT;
-  using ObjectCloudPublishers = SemanticRosPublishers<uint8_t, MeshVertexCloud>;
+  using ObjectCloudPublishers = hydra::SemanticRosPublishers<uint8_t, MeshVertexCloud>;
   using KdTreeT = pcl::search::KdTree<Cluster::PointT>;
   using Clusters = std::vector<Cluster>;
 

@@ -4,19 +4,15 @@
   <version>1.0.0</version>
   <description>Utilities for building a Kimera-DSG from sensor data</description>
 
-  <author email="arosinol@mit.edu">Antoni Rosinol</author>
+  <author email="na26933@mit.edu">Nathan Hughes</author>
   <maintainer email="na26933@mit.edu">Nathan Hughes</maintainer>
 
   <license>BSD</license>
 
   <buildtool_depend>catkin</buildtool_depend>
-
-  <!-- standard dependencies -->
   <depend>roscpp</depend>
   <depend>std_msgs</depend>
   <depend>tf2_eigen</depend>
-
-  <!-- less standard dependencies -->
   <depend>gtsam</depend>
   <depend>kimera_dsg</depend>
   <depend>kimera_dsg_visualizer</depend>
@@ -29,10 +25,8 @@
   <depend>teaserpp</depend>
   <depend>voxblox</depend>
   <depend>voxblox_ros</depend>
-  <!-- TODO(nathan) invert this dependency -->
-  <!--<depend>graph_cmr_ros</depend> -->
 
-  <test_depend>rostest</test_depend>
-  <test_depend>rosunit</test_depend>
+  <export>
+  </export>
 
 </package>

@@ -208,7 +208,7 @@ int main(int argc, char* argv[]) {
     LOG(FATAL) << "Failed to load TSDF from: " << FLAGS_tsdf_file;
   }
 
-  kimera::DynamicSceneGraph graph;
+  DynamicSceneGraph graph;
   graph.load(FLAGS_dsg_file);
 
   auto gvd_config =

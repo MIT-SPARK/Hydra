@@ -1,3 +1,3 @@
-## Hydra Evaluation
+## Kimera Batch DSG
 
-Contains evaluation and visualization utilities
+Original code from https://arxiv.org/abs/2101.06894 and precursor

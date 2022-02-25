@@ -72,7 +72,7 @@ class OfflineDsgBuilder {
   SemanticIntegratorBase::SemanticConfig semantic_config_;
 
   // To publish msgs to different topics according to semantic label.
-  SemanticRosPublishers<SemanticLabel, ColorPointCloud> semantic_pcl_pubs_;
+  hydra::SemanticRosPublishers<SemanticLabel, ColorPointCloud> semantic_pcl_pubs_;
 
   dynamic_reconfigure::Server<RqtSceneGraphConfig> rqt_server_;
   dynamic_reconfigure::Server<RqtSceneGraphConfig>::CallbackType rqt_callback_;

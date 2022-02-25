@@ -14,14 +14,20 @@ DEFINE_string(tsdf_file, "", "tsdf file to read");
 DEFINE_string(dsg_file, "", "dsg file to read");
 DEFINE_string(gvd_config, "", "gvd integrator config");
 
+using kimera::DynamicSceneGraph;
+using kimera::KimeraDsgLayers;
+using kimera::NodeId;
+using kimera::PlaceNodeAttributes;
+using kimera::SceneGraphLayer;
+using kimera::topology::GvdIntegrator;
+using kimera::topology::GvdIntegratorConfig;
+using kimera::topology::GvdVoxel;
 using nanoflann::KDTreeSingleIndexAdaptor;
 using nanoflann::KDTreeSingleIndexDynamicAdaptor;
 using nanoflann::L2_Simple_Adaptor;
 using voxblox::Layer;
+using voxblox::MeshLayer;
 using voxblox::TsdfVoxel;
-
-namespace kimera {
-namespace topology {
 
 void fillGvdPositions(const GvdIntegratorConfig& gvd_config,
                       const Layer<GvdVoxel>& layer,
@@ -147,7 +153,7 @@ void eval_places(const DynamicSceneGraph& graph, const Layer<TsdfVoxel>::Ptr& ts
   gvd_config.extract_graph = true;
   gvd_config.mesh_only = false;
 
-   LOG(INFO) << "Gvd Config: " << std::endl << gvd_config;
+  LOG(INFO) << "Gvd Config: " << std::endl << gvd_config;
 
   Layer<GvdVoxel>::Ptr gvd_layer(
       new Layer<GvdVoxel>(FLAGS_voxel_size, FLAGS_voxels_per_side));
@@ -159,9 +165,6 @@ void eval_places(const DynamicSceneGraph& graph, const Layer<TsdfVoxel>::Ptr& ts
   const SceneGraphLayer& places = graph.getLayer(KimeraDsgLayers::PLACES).value();
   eval_layer(gvd_config, places, *gvd_layer);
 }
-
-}  // namespace topology
-}  // namespace kimera
 
 int main(int argc, char* argv[]) {
   FLAGS_minloglevel = 3;
@@ -191,9 +194,9 @@ int main(int argc, char* argv[]) {
     LOG(FATAL) << "Failed to load TSDF from: " << FLAGS_tsdf_file;
   }
 
-  kimera::DynamicSceneGraph graph;
+  DynamicSceneGraph graph;
   graph.load(FLAGS_dsg_file);
 
-  kimera::topology::eval_places(graph, tsdf);
+  eval_places(graph, tsdf);
   return 0;
 }

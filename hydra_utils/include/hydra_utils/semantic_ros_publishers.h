@@ -1,11 +1,11 @@
 #pragma once
+// originally part of kimera_batch_dsg
+#include <ros/ros.h>
 
 #include <string>
 #include <unordered_map>
 
-#include <ros/ros.h>
-
-namespace kimera {
+namespace hydra {
 
 template <class LabelType, class MsgType>
 class SemanticRosPublishers {
@@ -34,9 +34,7 @@ class SemanticRosPublishers {
     const auto& pub_it = pubs_.find(semantic_label);
     if (pub_it == pubs_.end()) {
       pubs_[semantic_label] = nh_private_.advertise<MsgType>(
-          topic_name_ + "_semantic_label_" + std::to_string(semantic_label),
-          1,
-          true);
+          topic_name_ + "_semantic_label_" + std::to_string(semantic_label), 1, true);
     }
     // Publish semantic pointcloud
     pubs_.at(semantic_label).publish(msg);
@@ -49,9 +47,7 @@ class SemanticRosPublishers {
     const auto& pub_it = pubs_.find(semantic_label);
     if (pub_it == pubs_.end()) {
       pubs_[semantic_label] = nh_private_.advertise<MsgType>(
-          topic_name_ + "_semantic_label_" + std::to_string(semantic_label),
-          1,
-          true);
+          topic_name_ + "_semantic_label_" + std::to_string(semantic_label), 1, true);
     }
     return pubs_.at(semantic_label).getTopic();
   }
@@ -65,4 +61,5 @@ class SemanticRosPublishers {
   ros::NodeHandle nh_private_;
   SemanticRosPubs pubs_;
 };
-}
+
+}  // namespace hydra
