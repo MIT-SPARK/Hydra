@@ -152,7 +152,7 @@ void makePlacesFromTsdf(const VoxbloxConfig& config,
 
   for (const auto& id_edge_pair : places_layer.edges()) {
     const auto& edge = id_edge_pair.second;
-    SceneGraphEdgeInfo::Ptr info(new SceneGraphEdgeInfo(*id_edge_pair.second.info));
+    EdgeAttributes::Ptr info(new EdgeAttributes(*id_edge_pair.second.info));
     graph->insertEdge(edge.source, edge.target, std::move(info));
   }
 }

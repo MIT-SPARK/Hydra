@@ -62,7 +62,6 @@ add_library(
   src/incremental_room_finder.cpp
   src/lcd_visualizer.cpp
   src/minimum_spanning_tree.cpp
-  src/serialization_helpers.cpp
   src/visualizer_plugins.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})

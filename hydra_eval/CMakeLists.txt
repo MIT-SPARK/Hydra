@@ -42,6 +42,29 @@ set(NANOFLANN_BUILD_TESTS
 )
 add_subdirectory(${CMAKE_BINARY_DIR}/nanoflann-src ${CMAKE_BINARY_DIR}/nanoflann-build)
 
+# TODO(nathan) fetch content when possible on 20.04
+configure_file(cmake/json.CMakeLists.txt.in json-download/CMakeLists.txt)
+execute_process(
+  COMMAND "${CMAKE_COMMAND}" -G "${CMAKE_GENERATOR}" .
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/json-download"
+  OUTPUT_QUIET
+)
+execute_process(
+  COMMAND "${CMAKE_COMMAND}" --build .
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/json-download"
+  OUTPUT_QUIET
+)
+
+set(JSON_BuildTests
+    OFF
+    CACHE INTERNAL ""
+)
+set(JSON_Install
+    OFF
+    CACHE INTERNAL ""
+)
+add_subdirectory(${CMAKE_BINARY_DIR}/json-src ${CMAKE_BINARY_DIR}/json-build)
+
 catkin_package(
   CATKIN_DEPENDS
   voxblox
@@ -64,10 +87,13 @@ target_link_libraries(
 )
 
 add_executable(room_eval_node src/room_eval_node.cpp)
-target_link_libraries(room_eval_node ${PROJECT_NAME})
+target_link_libraries(room_eval_node ${PROJECT_NAME} nlohmann_json::nlohmann_json)
 
 add_executable(places_eval_node src/places_eval_node.cpp)
-target_link_libraries(places_eval_node PUBLIC ${PROJECT_NAME} nanoflann::nanoflann)
+target_link_libraries(
+  places_eval_node PUBLIC ${PROJECT_NAME} nanoflann::nanoflann
+                          nlohmann_json::nlohmann_json
+)
 
 add_executable(room_visualizer_node src/room_visualizer_node.cpp)
 target_link_libraries(room_visualizer_node ${PROJECT_NAME} gtsam)
@@ -77,7 +103,12 @@ target_link_libraries(places_visualizer_node PUBLIC ${PROJECT_NAME})
 
 add_executable(gt_trajectory_optimizer src/gt_trajectory_optimizer.cpp)
 target_include_directories(gt_trajectory_optimizer PUBLIC ${catkin_INCLUDE_DIRS})
-target_link_libraries(gt_trajectory_optimizer ${catkin_LIBRARIES} yaml-cpp KimeraRPGO)
+target_link_libraries(
+  gt_trajectory_optimizer
+  ${catkin_LIBRARIES}
+  yaml-cpp
+  KimeraRPGO
+)
 
 install(
   TARGETS ${PROJECT_NAME} room_eval_node room_visualizer_node

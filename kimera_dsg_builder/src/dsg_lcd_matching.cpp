@@ -1,5 +1,7 @@
 #include "kimera_dsg_builder/dsg_lcd_matching.h"
 
+#include <glog/logging.h>
+
 namespace kimera {
 namespace lcd {
 

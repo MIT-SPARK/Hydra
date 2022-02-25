@@ -1,7 +1,6 @@
 #include "kimera_dsg_builder/dsg_lcd_registration.h"
 
 #include <hydra_utils/timing_utilities.h>
-#include <kimera_dsg/serialization_helpers.h>
 #include <kimera_vio_ros/LcdFrameRegistration.h>
 #include <ros/service.h>
 #include <tf2_eigen/tf2_eigen.h>
@@ -13,7 +12,6 @@ namespace lcd {
 using incremental::SharedDsgInfo;
 using DsgNode = DynamicSceneGraphNode;
 using hydra::timing::ScopedTimer;
-using nlohmann::json;
 
 struct AgentNodePose {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -98,37 +96,31 @@ void logRegistrationProblem(const std::string& path_prefix,
                             const LayerRegistrationSolution& solution,
                             const DsgRegistrationInput& match,
                             NodeId query_agent_id) {
-  json record;
-  record["query_id"] = query_agent_id;
-  record["query_node"] =
-      dsg.getNode(query_agent_id).value().get().attributes().toJson();
-  record["query_set"] = match.query_nodes;
-  record["match_set"] = match.match_nodes;
-  record["nodes"] = {};
-
-  auto match_pose_info = getAgentPose(dsg, match.match_root);
-  record["match_id"] = match_pose_info.id;
-  record["world_q_match"] = match_pose_info.world_T_body.rotation().quaternion();
-  record["world_t_match"] = match_pose_info.world_T_body.translation();
-  record["match_valid"] = match_pose_info.valid;
-
-  for (const auto& node : match.query_nodes) {
-    record["nodes"][std::to_string(node)] =
-        dsg.getNode(node).value().get().attributes().toJson();
-  }
-
-  record["solution_valid"] = solution.valid;
-  record["dest_q_src"] = solution.dest_T_src.rotation().quaternion();
-  record["dest_t_src"] = solution.dest_T_src.translation();
-  record["solution_inliers"] = solution.inliers;
-
   static size_t registration_index = 0;
   std::stringstream ss;
   ss << path_prefix << registration_index << ".json";
   ++registration_index;
 
   std::ofstream outfile(ss.str());
-  outfile << record;
+  outfile << "query_id: " << query_agent_id << std::endl;
+  outfile << "query_set: " << displayNodeSymbolContainer(match.query_nodes)
+          << std::endl;
+  outfile << "match_set: " << displayNodeSymbolContainer(match.match_nodes)
+          << std::endl;
+
+  auto match_pose_info = getAgentPose(dsg, match.match_root);
+  outfile << "match_id: " << match_pose_info.id << std::endl;
+  outfile << "world_q_match: " << match_pose_info.world_T_body.rotation().quaternion()
+          << std::endl;
+  outfile << "world_t_match: " << match_pose_info.world_T_body.translation()
+          << std::endl;
+  outfile << "match_valid: " << match_pose_info.valid << std::endl;
+
+  outfile << "solution_valid: " << solution.valid << std::endl;
+  outfile << "dest_q_src: " << solution.dest_T_src.rotation().quaternion() << std::endl;
+  outfile << "dest_t_src: " << solution.dest_T_src.translation() << std::endl;
+
+  // TODO(nathan) output position data
 }
 
 DsgTeaserSolver::DsgTeaserSolver(LayerId layer_id,

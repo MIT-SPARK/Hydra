@@ -1,0 +1,17 @@
+cmake_minimum_required(VERSION 3.1)
+
+project(json_download NONE)
+
+include(ExternalProject)
+ExternalProject_Add(json
+      URL https://github.com/nlohmann/json/archive/refs/tags/v3.10.5.zip
+      # GIT_REPOSITORY "https://github.com/nlohmann/json.git"
+      # GIT_TAG "v3.9.1"
+      # GIT_SHALLOW TRUE
+      SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/json-src"
+      BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/json-build"
+      CONFIGURE_COMMAND ""
+      BUILD_COMMAND ""
+      INSTALL_COMMAND ""
+      TEST_COMMAND ""
+)

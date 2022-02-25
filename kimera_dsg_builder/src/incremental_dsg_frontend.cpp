@@ -1,5 +1,4 @@
 #include "kimera_dsg_builder/incremental_dsg_frontend.h"
-#include "kimera_dsg_builder/serialization_helpers.h"
 
 #include <hydra_utils/timing_utilities.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
@@ -745,21 +744,27 @@ void DsgFrontend::assignBowVectors() {
 }
 
 void DsgFrontend::saveState(const std::string& filepath) const {
-  using nlohmann::json;
-  json record;
-  record["mesh"]["vertices"] = *mesh_frontend_.getFullMeshVertices();
-  record["mesh"]["faces"] = mesh_frontend_.getFullMeshFaces();
+  pcl::PolygonMesh mesh;
+  mesh.polygons = mesh_frontend_.getFullMeshFaces();
+
+  const auto vertices = mesh_frontend_.getFullMeshVertices();
+  pcl::toPCLPointCloud2(*vertices, mesh.cloud);
+
+  kimera_pgmo::WriteMeshToPly(filepath + "/mesh.ply", mesh);
+
   std::vector<ros::Time> mesh_stamps = mesh_frontend_.getFullMeshTimes();
-  std::vector<double> mesh_seconds;
-  mesh_seconds.reserve(mesh_stamps.size());
+  std::vector<uint64_t> mesh_ns;
+  mesh_ns.reserve(mesh_stamps.size());
   std::transform(mesh_stamps.begin(),
                  mesh_stamps.end(),
-                 std::back_inserter(mesh_seconds),
-                 [&](auto timestamp) { return timestamp.toSec(); });
-  record["mesh"]["times"] = mesh_seconds;
+                 std::back_inserter(mesh_ns),
+                 [&](auto timestamp) { return timestamp.toNSec(); });
 
-  std::ofstream outfile(filepath);
-  outfile << record;
+  std::ofstream outfile(filepath + "/mesh_times.csv");
+  outfile << "index,time_ns" << std::endl;
+  for (size_t i = 0; i < mesh_ns.size(); ++i) {
+    outfile << i << "," << mesh_ns.at(i) << std::endl;
+  }
 }
 
 }  // namespace incremental

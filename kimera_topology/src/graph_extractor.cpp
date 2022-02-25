@@ -297,9 +297,9 @@ bool GraphExtractor::updateEdgeMaps(const VoxelGraphInfo& info,
       .second;
 }
 
-SceneGraphEdgeInfo::Ptr GraphExtractor::makeEdgeInfo(const GvdLayer& layer,
-                                                     NodeId source_id,
-                                                     NodeId target_id) const {
+EdgeAttributes::Ptr GraphExtractor::makeEdgeInfo(const GvdLayer& layer,
+                                                 NodeId source_id,
+                                                 NodeId target_id) const {
   const double source_dist =
       graph_->getNode(source_id)->get().attributes<PlaceNodeAttributes>().distance;
   const double target_dist =
@@ -313,7 +313,7 @@ SceneGraphEdgeInfo::Ptr GraphExtractor::makeEdgeInfo(const GvdLayer& layer,
   if (path.empty()) {
     // edge is smaller than voxel size, so we just take the min distance between two
     // voxels
-    return std::make_unique<SceneGraphEdgeInfo>(min_weight);
+    return std::make_unique<EdgeAttributes>(min_weight);
   }
 
   for (const auto& index : path) {
@@ -327,7 +327,7 @@ SceneGraphEdgeInfo::Ptr GraphExtractor::makeEdgeInfo(const GvdLayer& layer,
     }
   }
 
-  return std::make_unique<SceneGraphEdgeInfo>(min_weight);
+  return std::make_unique<EdgeAttributes>(min_weight);
 }
 
 void GraphExtractor::addEdgeToGraph(const GvdLayer& layer,
@@ -713,7 +713,7 @@ bool GraphExtractor::addPseudoEdge(const GvdLayer& layer,
   }
 
   graph_->insertEdge(
-      node, other_node, std::make_unique<SceneGraphEdgeInfo>(min_weight));
+      node, other_node, std::make_unique<EdgeAttributes>(min_weight));
 
   // no split nodes yet
   PseudoEdgeInfo info;

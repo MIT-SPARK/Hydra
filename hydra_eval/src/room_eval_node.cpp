@@ -3,6 +3,7 @@
 #include <kimera_dsg/dynamic_scene_graph.h>
 #include <voxblox/io/layer_io.h>
 #include <voxblox/utils/planning_utils.h>
+#include <nlohmann/json.hpp>
 #include <yaml-cpp/yaml.h>
 
 #include <gflags/gflags.h>

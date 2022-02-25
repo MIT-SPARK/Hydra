@@ -101,7 +101,7 @@ int main(int argc, char* argv[]) {
     loop_closures = backend.getLoopClosures();
 
     if (!dsg_output_path.empty()) {
-      frontend.saveState(dsg_output_path + "/frontend/state.json");
+      frontend.saveState(dsg_output_path + "/frontend/");
     }
   }
 

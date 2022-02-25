@@ -234,7 +234,7 @@ void addFreespaceEdge(SceneGraphLayer& graph,
   if (d <= r1 || d <= r2) {
     // intersection is inside one node's sphere
     graph.insertEdge(
-        node, neighbor, std::make_unique<SceneGraphEdgeInfo>(std::min(r1, r2)));
+        node, neighbor, std::make_unique<EdgeAttributes>(std::min(r1, r2)));
     return;
   }
 
@@ -247,7 +247,7 @@ void addFreespaceEdge(SceneGraphLayer& graph,
     return;
   }
 
-  graph.insertEdge(node, neighbor, std::make_unique<SceneGraphEdgeInfo>(clearance));
+  graph.insertEdge(node, neighbor, std::make_unique<EdgeAttributes>(clearance));
 }
 
 }  // namespace topology

@@ -130,9 +130,9 @@ class GraphExtractor {
 
   bool updateEdgeMaps(const VoxelGraphInfo& info, const VoxelGraphInfo& neighbor_info);
 
-  SceneGraphEdgeInfo::Ptr makeEdgeInfo(const GvdLayer& layer,
-                                       NodeId source_id,
-                                       NodeId target_id) const;
+  EdgeAttributes::Ptr makeEdgeInfo(const GvdLayer& layer,
+                                   NodeId source_id,
+                                   NodeId target_id) const;
 
   void addEdgeToGraph(const GvdLayer& layer,
                       const VoxelGraphInfo& curr_info,

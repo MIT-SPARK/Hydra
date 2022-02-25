@@ -2,6 +2,7 @@
 
 #include <kimera_dsg/dynamic_scene_graph.h>
 #include <voxblox/io/layer_io.h>
+#include <nlohmann/json.hpp>
 #include <nanoflann.hpp>
 
 #include <gflags/gflags.h>

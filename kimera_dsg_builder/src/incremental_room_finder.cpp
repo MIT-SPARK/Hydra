@@ -355,7 +355,7 @@ void addMissingEdges(const SceneGraph& graph,
     }
 
     const auto& info = *(graph.getEdge(node.id, sibling)->get().info);
-    new_layer.insertEdge(node.id, sibling, std::make_unique<SceneGraphEdgeInfo>(info));
+    new_layer.insertEdge(node.id, sibling, std::make_unique<EdgeAttributes>(info));
   }
 }
 

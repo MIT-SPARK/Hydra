@@ -1,5 +1,6 @@
 #include "kimera_dsg_builder/dsg_lcd_descriptors.h"
 
+#include <glog/logging.h>
 #include <kimera_dsg/node_attributes.h>
 
 namespace kimera {

@@ -1,7 +1,6 @@
 #include "kimera_dsg_builder/incremental_dsg_backend.h"
 #include "kimera_dsg_builder/configs.h"
 #include "kimera_dsg_builder/minimum_spanning_tree.h"
-#include "kimera_dsg_builder/serialization_helpers.h"
 
 #include <hydra_utils/timing_utilities.h>
 #include <kimera_dsg/node_attributes.h>
@@ -788,25 +787,36 @@ void DsgBackend::visualizeDeformationGraphEdges() const {
 
 void DsgBackend::loadState(const std::string& state_path,
                            const std::string& dgrf_path) {
-  using nlohmann::json;
-  using Cloud = pcl::PointCloud<pcl::PointXYZRGBA>;
-  using Faces = std::vector<pcl::Vertices>;
-  using kimera_pgmo::PolygonMeshToPgmoMeshMsg;
-  json state;
-  std::ifstream infile(state_path);
-  infile >> state;
+  std::ifstream infile(state_path + "/mesh_times.csv");
+  if (!infile.good()) {
+    throw std::runtime_error("file " + state_path +
+                             "/mesh_times.csv is missing or invalid!");
+  }
 
-  auto vertices = state.at("mesh").at("vertices").get<Cloud>();
-  auto faces = state.at("mesh").at("faces").get<Faces>();
-  auto times = state.at("mesh").at("times").get<std::vector<double>>();
   mesh_vertex_stamps_.clear();
-  mesh_vertex_stamps_.reserve(times.size());
-  std::transform(times.begin(),
-                 times.end(),
-                 std::back_inserter(mesh_vertex_stamps_),
-                 [&](auto time) { return ros::Time(time); });
+
+  std::string line;
+  std::getline(infile, line);  // read and ignore header
+  while (std::getline(infile, line)) {
+    std::stringstream ss(line);
+    std::vector<std::string> contents;
+
+    std::string col;
+    while (std::getline(ss, col, ',')) {
+      contents.push_back(col);
+    }
+
+    const uint64_t time_ns = std::stoull(contents.at(1));
+    ros::Time stamp;
+    stamp.fromNSec(time_ns);
+    mesh_vertex_stamps_.push_back(stamp);
+  }
+
+  pcl::PolygonMeshPtr mesh(new pcl::PolygonMesh());
+  kimera_pgmo::ReadMeshFromPly(state_path + "/mesh.ply", mesh);
+
   latest_mesh_.reset(new kimera_pgmo::KimeraPgmoMesh(
-      PolygonMeshToPgmoMeshMsg(0, vertices, faces, mesh_vertex_stamps_, "world")));
+      kimera_pgmo::PolygonMeshToPgmoMeshMsg(0, *mesh, mesh_vertex_stamps_, "world")));
   have_new_mesh_ = true;
 
   loadDeformationGraphFromFile(dgrf_path);
