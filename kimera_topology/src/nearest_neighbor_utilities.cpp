@@ -210,69 +210,6 @@ struct GraphDynamicKdTreeAdaptor {
   std::unordered_set<NodeId> curr_nodes;
 };
 
-struct DynamicNearestNodeFinder::Detail {
-  using Dist = L2_Simple_Adaptor<double, GraphDynamicKdTreeAdaptor>;
-  using KDTree = KDTreeSingleIndexDynamicAdaptor<Dist, GraphDynamicKdTreeAdaptor, 3>;
-  using Adaptor = GraphDynamicKdTreeAdaptor;
-
-  Detail(const SceneGraph::Ptr& graph, LayerId layer)
-      : graph(graph), adaptor(graph->getLayer(layer).value().get()), params(10) {
-    kdtree.reset(new KDTree(3, adaptor));
-  }
-
-  void addNodes(const std::unordered_set<NodeId>& nodes) {
-    Adaptor::AddInfo info = adaptor.addNodes(nodes);
-    if (info.num_added > 0) {
-      kdtree->addPoints(info.start, info.start + info.num_added - 1);
-    }
-  }
-
-  void removeNode(NodeId node) {
-    Adaptor::RemoveInfo info = adaptor.removeNode(node);
-    if (info.valid) {
-      kdtree->removePoint(info.index);
-    }
-  }
-
-  ~Detail() = default;
-
-  SceneGraph::Ptr graph;
-  GraphDynamicKdTreeAdaptor adaptor;
-  std::unique_ptr<KDTree> kdtree;
-  nanoflann::SearchParams params;
-};
-
-DynamicNearestNodeFinder::DynamicNearestNodeFinder(const SceneGraph::Ptr& graph,
-                                                   LayerId layer)
-    : internals_(new Detail(graph, layer)) {}
-
-DynamicNearestNodeFinder::~DynamicNearestNodeFinder() {}
-
-void DynamicNearestNodeFinder::addNodes(const std::unordered_set<NodeId>& new_nodes) {
-  internals_->addNodes(new_nodes);
-}
-
-void DynamicNearestNodeFinder::removeNode(NodeId to_remove) {
-  internals_->removeNode(to_remove);
-}
-
-void DynamicNearestNodeFinder::find(const Eigen::Vector3d& position,
-                                    size_t num_to_find,
-                                    bool skip_first,
-                                    const DynamicNearestNodeFinder::Callback& cb) {
-  size_t nn_indices[num_to_find];
-  double distances[num_to_find];
-  nanoflann::KNNResultSet<double> results(num_to_find);
-  results.init(nn_indices, distances);
-
-  internals_->kdtree->findNeighbors(results, position.data(), internals_->params);
-
-  size_t i = skip_first ? 1 : 0;
-  for (i = 0; i < results.size(); ++i) {
-    cb(internals_->adaptor.idx_node_map[nn_indices[i]], std::sqrt(distances[i]));
-  }
-}
-
 FurthestIndexResult findFurthestIndexFromLine(const GlobalIndexVector& indices,
                                               const GlobalIndex& start,
                                               const GlobalIndex& end,
