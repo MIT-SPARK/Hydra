@@ -8,7 +8,7 @@ namespace kimera {
 
 //  TODO(Toni): assumes we only have one building, ideally get the sub-graph
 // spanned by the inter-class room traversability edges.
-void findBuildings(SceneGraph* scene_graph, const NodeColor& color) {
+void findBuildings(DynamicSceneGraph* scene_graph, const NodeColor& color) {
   CHECK_NOTNULL(scene_graph);
 
   // TODO(nathan) consider unique class for buildings

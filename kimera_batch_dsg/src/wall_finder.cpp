@@ -9,9 +9,9 @@
 namespace kimera {
 
 using NodeColor = SemanticNodeAttributes::ColorVector;
-using Node = SceneGraph::Node;
+using Node = SceneGraphNode;
 
-pcl::PolygonMesh::Ptr findWalls(const SubMesh& mesh, const SceneGraph& scene_graph) {
+pcl::PolygonMesh::Ptr findWalls(const SubMesh& mesh, const DynamicSceneGraph& scene_graph) {
   // Create cloud of the places so we can do nearest neighbor queries
   CHECK(scene_graph.hasLayer(KimeraDsgLayers::PLACES));
   const SceneGraphLayer& layer = *(scene_graph.getLayer(KimeraDsgLayers::PLACES));

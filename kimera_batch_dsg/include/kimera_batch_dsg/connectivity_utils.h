@@ -1,7 +1,7 @@
 #pragma once
 #include "kimera_batch_dsg/pcl_types.h"
 
-#include <kimera_dsg/scene_graph.h>
+#include <kimera_dsg/dynamic_scene_graph.h>
 #include <pcl/filters/crop_hull.h>
 #include <pcl/search/kdtree.h>
 #include <map>
@@ -15,12 +15,12 @@ struct RoomHull {
 
 using RoomHullMap = std::map<NodeId, RoomHull>;
 
-void findRoomConnectivity(SceneGraph* scene_graph);
+void findRoomConnectivity(DynamicSceneGraph* scene_graph);
 
-void findPlacesRoomConnectivity(SceneGraph* scene_graph,
+void findPlacesRoomConnectivity(DynamicSceneGraph* scene_graph,
                                 const RoomHullMap& room_hulls,
                                 float esdf_truncation_distance);
 
-void findObjectPlaceConnectivity(SceneGraph* scene_graph);
+void findObjectPlaceConnectivity(DynamicSceneGraph* scene_graph);
 
 }  // namespace kimera

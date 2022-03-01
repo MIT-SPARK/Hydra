@@ -7,9 +7,9 @@
 
 namespace kimera {
 
-using Node = SceneGraph::Node;
+using Node = SceneGraphNode;
 
-void findRoomConnectivity(SceneGraph* scene_graph) {
+void findRoomConnectivity(DynamicSceneGraph* scene_graph) {
   CHECK_NOTNULL(scene_graph);
   CHECK(scene_graph->hasLayer(KimeraDsgLayers::PLACES));
   const SceneGraphLayer& places_layer =
@@ -69,7 +69,7 @@ NNResult getDistanceToRoom(const pcl::KdTreeFLANN<ColorPoint>& kdtree,
   return {true, esdf_distance_approx};
 }
 
-void findPlacesRoomConnectivity(SceneGraph* scene_graph,
+void findPlacesRoomConnectivity(DynamicSceneGraph* scene_graph,
                                 const RoomHullMap& room_hulls,
                                 float esdf_truncation_distance) {
   CHECK_NOTNULL(scene_graph);
@@ -225,7 +225,7 @@ std::optional<NodeId> findNearestPlace(const pcl::KdTreeFLANN<ColorPoint>& kd_tr
   return pcl_layer.cloud_to_layer_ids.at(nn_indices.at(0));
 }
 
-void findObjectPlaceConnectivity(SceneGraph* scene_graph) {
+void findObjectPlaceConnectivity(DynamicSceneGraph* scene_graph) {
   CHECK_NOTNULL(scene_graph);
 
   CHECK(scene_graph->hasLayer(KimeraDsgLayers::OBJECTS));

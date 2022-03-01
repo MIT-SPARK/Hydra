@@ -1,7 +1,7 @@
 #pragma once
 #include <ros/ros.h>
 
-#include <kimera_dsg/scene_graph.h>
+#include <kimera_dsg/dynamic_scene_graph.h>
 #include <pcl/PolygonMesh.h>
 #include <voxblox/integrator/esdf_integrator.h>
 
@@ -32,13 +32,13 @@ bool loadVoxbloxInfo(const VoxbloxConfig& config,
                      voxblox::Layer<voxblox::EsdfVoxel>::Ptr& esdf,
                      pcl::PolygonMesh::Ptr& mesh,
                      ros::Publisher* mesh_pub = nullptr,
-                     SceneGraph* graph = nullptr);
+                     DynamicSceneGraph* graph = nullptr);
 
 bool updateFromTsdf(const VoxbloxConfig& config,
                     voxblox::Layer<voxblox::TsdfVoxel>& tsdf,
                     voxblox::Layer<voxblox::EsdfVoxel>::Ptr& esdf,
                     pcl::PolygonMesh::Ptr& mesh,
-                    SceneGraph* graph);
+                    DynamicSceneGraph* graph);
 
 }  // namespace utils
 

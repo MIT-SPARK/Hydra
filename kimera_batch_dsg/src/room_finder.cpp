@@ -142,7 +142,7 @@ RoomHull makeRoomHull(const ColorPointCloud::Ptr& room_pcl) {
 }
 
 RoomHullMap updateSceneGraph(const RoomPclClusters& room_clusters,
-                             SceneGraph* scene_graph,
+                             DynamicSceneGraph* scene_graph,
                              NodeSymbol next_room_id) {
   CHECK_NOTNULL(scene_graph);
 
@@ -174,7 +174,7 @@ RoomHullMap updateSceneGraph(const RoomPclClusters& room_clusters,
 }
 
 RoomHullMap RoomFinder::findRooms(const vxb::Layer<vxb::EsdfVoxel>& esdf,
-                                  SceneGraph* scene_graph) {
+                                  DynamicSceneGraph* scene_graph) {
   CHECK_NOTNULL(scene_graph);
 
   IntensityPointCloud::Ptr esdf_pcl(new IntensityPointCloud);

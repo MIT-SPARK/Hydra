@@ -2,7 +2,7 @@
 #include "kimera_batch_dsg/common.h"
 #include "kimera_batch_dsg/connectivity_utils.h"
 
-#include <kimera_dsg/scene_graph.h>
+#include <kimera_dsg/dynamic_scene_graph.h>
 #include <kimera_semantics/common.h>
 #include <ros/ros.h>
 #include <voxblox/core/layer.h>
@@ -34,7 +34,7 @@ class RoomFinder {
    * @return
    */
   RoomHullMap findRooms(const vxb::Layer<vxb::EsdfVoxel>& esdf_layer,
-                        SceneGraph* scene_graph);
+                        DynamicSceneGraph* scene_graph);
 
   // private:
   /**

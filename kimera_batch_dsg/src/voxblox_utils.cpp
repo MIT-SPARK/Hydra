@@ -126,7 +126,7 @@ void makeMeshFromTsdf(const Layer<TsdfVoxel>& tsdf,
 
 void makePlacesFromTsdf(const VoxbloxConfig& config,
                         Layer<TsdfVoxel>* tsdf,
-                        SceneGraph* graph) {
+                        DynamicSceneGraph* graph) {
   CHECK(graph);
   CHECK(tsdf);
 
@@ -161,7 +161,7 @@ bool updateFromTsdf(const VoxbloxConfig& config,
                     Layer<TsdfVoxel>& tsdf,
                     Layer<EsdfVoxel>::Ptr& esdf,
                     pcl::PolygonMesh::Ptr& mesh,
-                    SceneGraph* graph) {
+                    DynamicSceneGraph* graph) {
   makeEsdfFromTsdf(config, tsdf, esdf);
 
   makeMeshFromTsdf(tsdf, mesh, nullptr);
@@ -176,7 +176,7 @@ bool loadVoxbloxInfo(const VoxbloxConfig& config,
                      Layer<EsdfVoxel>::Ptr& esdf,
                      pcl::PolygonMesh::Ptr& mesh,
                      ros::Publisher* mesh_pub,
-                     SceneGraph* graph) {
+                     DynamicSceneGraph* graph) {
   if (!config.load_esdf && !config.load_mesh) {
     LOG(ERROR) << "Invalid config for loading voxblox files";
     return false;
