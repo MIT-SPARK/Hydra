@@ -48,7 +48,7 @@ void readColor(const ros::NodeHandle& nh,
 }
 
 LcdVisualizer::LcdVisualizer(const ros::NodeHandle& nh, double radius)
-    : SceneGraphVisualizer(nh, LcdVisualizer::getDefaultLayerIds()), radius_(radius) {
+    : DynamicSceneGraphVisualizer(nh, LcdVisualizer::getDefaultLayerIds()), radius_(radius) {
   // red-ish
   std::vector<double> invalid_color{0.78, 0.192, 0.173};
   readColor(nh, "invalid_color", invalid_color, invalid_match_color_);
@@ -209,7 +209,7 @@ void LcdVisualizer::redrawImpl(const std_msgs::Header& header, MarkerArray& msg)
     return;
   }
 
-  SceneGraphVisualizer::redrawImpl(header, msg);
+  DynamicSceneGraphVisualizer::redrawImpl(header, msg);
   drawAgent(header, msg);
 }
 
