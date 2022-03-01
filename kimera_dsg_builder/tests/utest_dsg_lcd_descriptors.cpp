@@ -16,7 +16,7 @@ const DynamicSceneGraphNode& makeDefaultAgentNode(DynamicSceneGraph& graph) {
   return graph.getDynamicNode(NodeSymbol('a', 0)).value();
 }
 
-void emplacePlaceNode(SceneGraph& graph,
+void emplacePlaceNode(DynamicSceneGraph& graph,
                       const Eigen::Vector3d& pos,
                       double distance,
                       size_t& next_index) {
@@ -153,7 +153,7 @@ TEST(DsgLcdDescriptorTests, TestPlaceDescriptor) {
   }
 }
 
-void emplaceObjectNode(SceneGraph& graph,
+void emplaceObjectNode(DynamicSceneGraph& graph,
                        const Eigen::Vector3d& pos,
                        uint8_t label,
                        size_t& next_index) {

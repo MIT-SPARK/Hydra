@@ -16,7 +16,7 @@ class TestableRoomFinder : public RoomFinder {
 };
 
 TEST(IncrementalRoomsTests, ActiveSubgraphEmptyLayer) {
-  SceneGraph graph({1});
+  DynamicSceneGraph graph({1});
 
   ActiveNodeSet nodes{1, 2, 3, 4};
   IsolatedSceneGraphLayer::Ptr new_layer = getActiveSubgraph(graph, 1, nodes);
@@ -27,7 +27,7 @@ TEST(IncrementalRoomsTests, ActiveSubgraphEmptyLayer) {
 }
 
 TEST(IncrementalRoomsTests, ActiveSubgraphEmptyNodes) {
-  SceneGraph graph({1});
+  DynamicSceneGraph graph({1});
   graph.emplaceNode(1, 1, std::make_unique<PlaceNodeAttributes>());
   graph.emplaceNode(1, 2, std::make_unique<PlaceNodeAttributes>());
   graph.emplaceNode(1, 3, std::make_unique<PlaceNodeAttributes>());
@@ -42,7 +42,7 @@ TEST(IncrementalRoomsTests, ActiveSubgraphEmptyNodes) {
 }
 
 TEST(IncrementalRoomsTests, ActiveSubgraphSomeNodes) {
-  SceneGraph graph({1});
+  DynamicSceneGraph graph({1});
   graph.emplaceNode(1, 1, std::make_unique<PlaceNodeAttributes>());
   graph.emplaceNode(1, 2, std::make_unique<PlaceNodeAttributes>());
   graph.emplaceNode(1, 3, std::make_unique<PlaceNodeAttributes>());
@@ -57,7 +57,7 @@ TEST(IncrementalRoomsTests, ActiveSubgraphSomeNodes) {
 }
 
 TEST(IncrementalRoomsTests, ActiveSubgraphNodesAndEdges) {
-  SceneGraph graph({1});
+  DynamicSceneGraph graph({1});
   graph.emplaceNode(1, 1, std::make_unique<PlaceNodeAttributes>());
   graph.emplaceNode(1, 2, std::make_unique<PlaceNodeAttributes>());
   graph.emplaceNode(1, 3, std::make_unique<PlaceNodeAttributes>());
@@ -282,25 +282,25 @@ TEST(IncrementalRoomsTests, SpectralClusteringCorrect) {
   }
 
   // first clique (3 nodes)
-  layer.insertEdge(0, 1, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(0, 2, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(1, 2, std::make_unique<SceneGraphEdgeInfo>(1.0));
+  layer.insertEdge(0, 1, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(0, 2, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(1, 2, std::make_unique<EdgeAttributes>(1.0));
   // bridge between cliques (biased so 3 is in first cluster)
-  layer.insertEdge(2, 3, std::make_unique<SceneGraphEdgeInfo>(0.1));
-  layer.insertEdge(3, 4, std::make_unique<SceneGraphEdgeInfo>(0.01));
+  layer.insertEdge(2, 3, std::make_unique<EdgeAttributes>(0.1));
+  layer.insertEdge(3, 4, std::make_unique<EdgeAttributes>(0.01));
   // second clique (5 nodes)
-  layer.insertEdge(4, 5, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(4, 6, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(4, 7, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(4, 8, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(5, 6, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(5, 7, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(5, 8, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(6, 7, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(6, 8, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(7, 8, std::make_unique<SceneGraphEdgeInfo>(1.0));
+  layer.insertEdge(4, 5, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(4, 6, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(4, 7, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(4, 8, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(5, 6, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(5, 7, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(5, 8, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(6, 7, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(6, 8, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(7, 8, std::make_unique<EdgeAttributes>(1.0));
   // extra connection to second clique
-  layer.insertEdge(6, 9, std::make_unique<SceneGraphEdgeInfo>(0.3));
+  layer.insertEdge(6, 9, std::make_unique<EdgeAttributes>(0.3));
 
   Components components{{1}, {4, 6}};  // seed components with both cliques
   auto cluster_results = clusterGraph(layer, components);
@@ -340,25 +340,25 @@ TEST(IncrementalRoomsTests, ClusteringSparseDenseCorrecet) {
   }
 
   // first clique (3 nodes)
-  layer.insertEdge(0, 1, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(0, 2, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(1, 2, std::make_unique<SceneGraphEdgeInfo>(1.0));
+  layer.insertEdge(0, 1, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(0, 2, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(1, 2, std::make_unique<EdgeAttributes>(1.0));
   // bridge between cliques (biased so 3 is in first cluster)
-  layer.insertEdge(2, 3, std::make_unique<SceneGraphEdgeInfo>(0.1));
-  layer.insertEdge(3, 4, std::make_unique<SceneGraphEdgeInfo>(0.01));
+  layer.insertEdge(2, 3, std::make_unique<EdgeAttributes>(0.1));
+  layer.insertEdge(3, 4, std::make_unique<EdgeAttributes>(0.01));
   // second clique (5 nodes)
-  layer.insertEdge(4, 5, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(4, 6, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(4, 7, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(4, 8, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(5, 6, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(5, 7, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(5, 8, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(6, 7, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(6, 8, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(7, 8, std::make_unique<SceneGraphEdgeInfo>(1.0));
+  layer.insertEdge(4, 5, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(4, 6, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(4, 7, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(4, 8, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(5, 6, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(5, 7, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(5, 8, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(6, 7, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(6, 8, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(7, 8, std::make_unique<EdgeAttributes>(1.0));
   // extra connection to second clique
-  layer.insertEdge(6, 9, std::make_unique<SceneGraphEdgeInfo>(0.3));
+  layer.insertEdge(6, 9, std::make_unique<EdgeAttributes>(0.3));
 
   Components components{{1}, {4, 6}};  // seed components with both cliques
   auto dense_results = clusterGraph(layer, components, 5, false);
@@ -376,25 +376,25 @@ TEST(IncrementalRoomsTests, ModularityClusteringCorrect) {
   }
 
   // first clique (3 nodes)
-  layer.insertEdge(0, 1, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(0, 2, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(1, 2, std::make_unique<SceneGraphEdgeInfo>(1.0));
+  layer.insertEdge(0, 1, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(0, 2, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(1, 2, std::make_unique<EdgeAttributes>(1.0));
   // bridge between cliques (biased so 3 is in first cluster)
-  layer.insertEdge(2, 3, std::make_unique<SceneGraphEdgeInfo>(0.1));
-  layer.insertEdge(3, 4, std::make_unique<SceneGraphEdgeInfo>(0.01));
+  layer.insertEdge(2, 3, std::make_unique<EdgeAttributes>(0.1));
+  layer.insertEdge(3, 4, std::make_unique<EdgeAttributes>(0.01));
   // second clique (5 nodes)
-  layer.insertEdge(4, 5, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(4, 6, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(4, 7, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(4, 8, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(5, 6, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(5, 7, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(5, 8, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(6, 7, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(6, 8, std::make_unique<SceneGraphEdgeInfo>(1.0));
-  layer.insertEdge(7, 8, std::make_unique<SceneGraphEdgeInfo>(1.0));
+  layer.insertEdge(4, 5, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(4, 6, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(4, 7, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(4, 8, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(5, 6, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(5, 7, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(5, 8, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(6, 7, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(6, 8, std::make_unique<EdgeAttributes>(1.0));
+  layer.insertEdge(7, 8, std::make_unique<EdgeAttributes>(1.0));
   // extra connection to second clique
-  layer.insertEdge(6, 9, std::make_unique<SceneGraphEdgeInfo>(0.3));
+  layer.insertEdge(6, 9, std::make_unique<EdgeAttributes>(0.3));
 
   Components components{{1}, {4, 6, 8}};  // seed components with both cliques
   auto cluster_results = clusterGraphByModularity(layer, components, 4);
