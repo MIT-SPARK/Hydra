@@ -1,16 +1,16 @@
 #pragma once
 #include "kimera_dsg_builder/dsg_lcd_module.h"
 
-#include <kimera_dsg_visualizer/scene_graph_visualizer.h>
+#include <kimera_dsg_visualizer/dynamic_scene_graph_visualizer.h>
 
 namespace kimera {
 namespace lcd {
 
-class LcdVisualizer : public SceneGraphVisualizer {
+class LcdVisualizer : public DynamicSceneGraphVisualizer {
  public:
   using DynamicLayerConfigManager = ConfigManager<DynamicLayerConfig>;
 
-  static SceneGraph::LayerIds getDefaultLayerIds() {
+  static DynamicSceneGraph::LayerIds getDefaultLayerIds() {
     return {KimeraDsgLayers::OBJECTS, KimeraDsgLayers::PLACES};
   }
 

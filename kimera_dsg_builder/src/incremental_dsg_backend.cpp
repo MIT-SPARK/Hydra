@@ -18,7 +18,6 @@ using kimera_pgmo::KimeraPgmoInterface;
 using kimera_pgmo::KimeraPgmoMesh;
 using kimera_pgmo::Path;
 using pose_graph_tools::PoseGraph;
-using Node = SceneGraph::Node;
 using hydra::timing::ScopedTimer;
 
 void DsgBackend::setSolverParams() {

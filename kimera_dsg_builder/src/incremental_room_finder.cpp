@@ -5,7 +5,6 @@
 #include <voxblox/core/color.h>
 
 #include <Eigen/Dense>
-#include <armadillo>
 
 #include <algorithm>
 
@@ -47,70 +46,10 @@ Eigen::MatrixXd getEigenvectorsDense(const SceneGraphLayer& layer,
   return v;
 }
 
-Eigen::MatrixXd getEigenvectorsSparse(const SceneGraphLayer& layer,
-                                      const std::map<NodeId, size_t> ordering,
-                                      size_t k,
-                                      double tolerance) {
-  // indices are col-major (so row, col, row, col, ...)
-  std::vector<arma::uword> indices;
-  indices.reserve(4 * layer.numEdges() + 2 * layer.numNodes());
-  std::vector<double> values;
-  values.reserve(2 * layer.numEdges() + layer.numNodes());
-
-  for (const auto& id_index_pair : ordering) {
-    const size_t source = id_index_pair.first;
-    const size_t source_idx = id_index_pair.second;
-    const SceneGraphNode& node = layer.getNode(source).value();
-
-    double degree = 0.0;
-    for (const auto& sibling : node.siblings()) {
-      if (!ordering.count(sibling)) {
-        continue;
-      }
-
-      const size_t target_idx = ordering.at(sibling);
-      const double edge_weight =
-          layer.getEdge(source, sibling).value().get().info->weight;
-
-      indices.push_back(source_idx);
-      indices.push_back(target_idx);
-      values.push_back(-edge_weight);
-      degree += edge_weight;
-    }
-    indices.push_back(source_idx);
-    indices.push_back(source_idx);
-    values.push_back(degree);
-  }
-
-  arma::umat index_mat(indices.data(), 2, values.size(), false, true);
-  arma::vec value_mat(values.data(), values.size(), false, true);
-
-  // TODO(nathan) dense inverse to sparse to arpack is slow (because it's basically
-  // solving the dense eigen decomposition)
-  arma::sp_mat L(index_mat, value_mat, ordering.size(), ordering.size());
-
-  arma::vec eigval;
-  arma::mat eigvec;
-  // TODO(nathan) apparently sigma was added in a later version, matters for speed and
-  // stability
-  if (!arma::eigs_sym(eigval, eigvec, L, k, "sm", tolerance)) {
-    return Eigen::MatrixXd();
-  }
-
-  if (eigvec.n_cols != k) {
-    return Eigen::MatrixXd();
-  }
-
-  Eigen::MatrixXd v =
-      Eigen::Map<Eigen::MatrixXd>(eigvec.memptr(), eigvec.n_rows, eigvec.n_cols);
-  return v;
-}
-
 ClusterResults clusterGraph(const SceneGraphLayer& layer,
                             const Components& components,
                             size_t max_iters,
-                            bool use_sparse,
-                            double sparse_tolerance) {
+                            bool use_sparse) {
   std::map<NodeId, size_t> ordering;
   size_t index = 0;
   for (const auto& id_node_pair : layer.nodes()) {
@@ -122,11 +61,8 @@ ClusterResults clusterGraph(const SceneGraphLayer& layer,
   const size_t k = components.size();
   Eigen::MatrixXd v;
   if (use_sparse) {
-    v = getEigenvectorsSparse(layer, ordering, k, sparse_tolerance);
-    if (!v.size()) {
-      LOG(ERROR) << "Eigen Decomposition failed!";
-      return {};
-    }
+    LOG(ERROR) << "Sparse Eigen Decomposition not supported";
+    return {};
   } else {
     v = getEigenvectorsDense(layer, ordering, k);
   }
@@ -324,7 +260,7 @@ Components filterComponents(const Components& original, size_t min_size) {
   return filtered;
 }
 
-RoomMap getPreviousPlaceRoomMap(const SceneGraph& graph,
+RoomMap getPreviousPlaceRoomMap(const DynamicSceneGraph& graph,
                                 const SceneGraphLayer& active_places) {
   RoomMap active_rooms;
 
@@ -342,7 +278,7 @@ RoomMap getPreviousPlaceRoomMap(const SceneGraph& graph,
   return active_rooms;
 }
 
-void addMissingEdges(const SceneGraph& graph,
+void addMissingEdges(const DynamicSceneGraph& graph,
                      SceneGraphLayer& new_layer,
                      const SceneGraphNode& node) {
   for (const auto& sibling : node.siblings()) {
@@ -359,7 +295,7 @@ void addMissingEdges(const SceneGraph& graph,
   }
 }
 
-IsolatedSceneGraphLayer::Ptr getActiveSubgraph(const SceneGraph& graph,
+IsolatedSceneGraphLayer::Ptr getActiveSubgraph(const DynamicSceneGraph& graph,
                                                LayerId layer_id,
                                                const ActiveNodeSet& active_nodes) {
   IsolatedSceneGraphLayer::Ptr subgraph(new IsolatedSceneGraphLayer(layer_id));
@@ -424,7 +360,7 @@ std::map<NodeId, size_t> mapRoomsToClusters(const ClusterResults& cluster_result
   return best_clusters;
 }
 
-void addNewRoomNode(SceneGraph& graph, NodeSymbol node_id, uint8_t label) {
+void addNewRoomNode(DynamicSceneGraph& graph, NodeSymbol node_id, uint8_t label) {
   RoomNodeAttributes::Ptr room_attrs = std::make_unique<RoomNodeAttributes>();
   room_attrs->semantic_label = label;
   room_attrs->name = node_id.getLabel();
@@ -435,7 +371,7 @@ void addNewRoomNode(SceneGraph& graph, NodeSymbol node_id, uint8_t label) {
       static_cast<LayerId>(KimeraDsgLayers::ROOMS), node_id, std::move(room_attrs));
 }
 
-void updateRoomCentroid(const SceneGraph& graph, NodeId room_id) {
+void updateRoomCentroid(const DynamicSceneGraph& graph, NodeId room_id) {
   const SceneGraphNode& room = graph.getNode(room_id).value();
   if (!room.hasChildren()) {
     return;
@@ -617,7 +553,7 @@ Components RoomFinder::getBestComponents(const SceneGraphLayer& places,
   return filterComponents(best_components, config_.min_component_size);
 }
 
-void pruneClusters(const SceneGraph& graph, ClusterResults& results) {
+void pruneClusters(const DynamicSceneGraph& graph, ClusterResults& results) {
   auto iter = results.clusters.begin();
   while (iter != results.clusters.end()) {
     auto node_iter = iter->second.begin();
@@ -717,7 +653,7 @@ void RoomFinder::updateRoomsFromClusters(SharedDsgInfo& dsg,
   }
 }
 
-void updateRoomEdges(SceneGraph& graph,
+void updateRoomEdges(DynamicSceneGraph& graph,
                      const RoomMap& previous_rooms,
                      const ActiveNodeSet& active_nodes) {
   if (previous_rooms.size() > 1) {
@@ -787,8 +723,7 @@ void RoomFinder::findRooms(SharedDsgInfo& dsg, const ActiveNodeSet& active_nodes
         clusters = clusterGraph(*active_places,
                                 components,
                                 config_.max_kmeans_iters,
-                                config_.use_sparse_eigen_decomp,
-                                config_.sparse_decomp_tolerance);
+                                config_.use_sparse_eigen_decomp);
         break;
       case Config::ClusterMode::MODULARITY:
         clusters = clusterGraphByModularity(*active_places,

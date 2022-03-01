@@ -17,21 +17,20 @@ struct ClusterResults {
   bool valid = false;
 };
 
-void updateRoomCentroid(const SceneGraph& graph, NodeId room_id);
+void updateRoomCentroid(const DynamicSceneGraph& graph, NodeId room_id);
 
 std::optional<size_t> getLongestSequence(const std::vector<size_t>& values);
 
 std::optional<size_t> getMedianComponentSize(const std::vector<size_t>& values);
 
-IsolatedSceneGraphLayer::Ptr getActiveSubgraph(const SceneGraph& graph,
+IsolatedSceneGraphLayer::Ptr getActiveSubgraph(const DynamicSceneGraph& graph,
                                                LayerId layer_id,
                                                const ActiveNodeSet& active_nodes);
 
 ClusterResults clusterGraph(const SceneGraphLayer& layer,
                             const Components& components,
                             size_t max_iters = 5,
-                            bool use_sparse = false,
-                            double sparse_tolerance = 1.0e-5);
+                            bool use_sparse = false);
 
 ClusterResults clusterGraphByModularity(const SceneGraphLayer& layer,
                                         const Components& components,

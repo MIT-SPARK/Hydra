@@ -1,7 +1,6 @@
 #include <kimera_dsg_visualizer/dynamic_scene_graph_visualizer.h>
 #include "kimera_dsg_builder/visualizer_plugins.h"
 
-#include <kimera_dsg/scene_graph.h>
 #include <ros/ros.h>
 
 #include <glog/logging.h>

@@ -11,7 +11,7 @@ namespace kimera {
 namespace dsg_updates {
 
 using MeshVertices = DynamicSceneGraph::MeshVertices;
-using Node = SceneGraph::Node;
+using Node = SceneGraphNode;
 using Centroid = pcl::CentroidPoint<pcl::PointXYZ>;
 
 void updateObjects(DynamicSceneGraph& graph,

@@ -212,8 +212,6 @@ void visit_config(const Visitor& v, RoomFinder::Config& config) {
   v.visit("max_kmeans_iters", config.max_kmeans_iters);
   v.visit("room_vote_min_overlap", config.room_vote_min_overlap);
   v.visit("min_room_size", config.min_room_size);
-  v.visit("use_sparse_eigen_decomp", config.use_sparse_eigen_decomp);
-  v.visit("sparse_decomp_tolerance", config.sparse_decomp_tolerance);
   v.visit("max_modularity_iters", config.max_modularity_iters);
   v.visit("modularity_gamma", config.modularity_gamma);
   v.visit("clustering_mode", config.clustering_mode);
