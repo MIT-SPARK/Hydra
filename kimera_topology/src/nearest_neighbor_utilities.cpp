@@ -32,7 +32,7 @@ struct GraphKdTreeAdaptor {
 
 struct NearestNodeFinder::Detail {
   using Dist = L2_Simple_Adaptor<double, GraphKdTreeAdaptor>;
-  using KDTree = KDTreeSingleIndexAdaptor<Dist, GraphKdTreeAdaptor, 3>;
+  using KDTree = KDTreeSingleIndexAdaptor<Dist, GraphKdTreeAdaptor, 3, size_t>;
 
   Detail(const SceneGraphLayer& layer, const std::vector<NodeId>& nodes)
       : adaptor(layer, nodes) {
@@ -93,7 +93,7 @@ struct VoxelKdTreeAdaptor {
 
 struct NearestVoxelFinder::Detail {
   using Dist = L2_Simple_Adaptor<int64_t, VoxelKdTreeAdaptor>;
-  using KDTree = KDTreeSingleIndexAdaptor<Dist, VoxelKdTreeAdaptor, 3>;
+  using KDTree = KDTreeSingleIndexAdaptor<Dist, VoxelKdTreeAdaptor, 3, size_t>;
 
   explicit Detail(const GlobalIndexVector& indices) : adaptor(indices) {
     kdtree.reset(new KDTree(3, adaptor));
