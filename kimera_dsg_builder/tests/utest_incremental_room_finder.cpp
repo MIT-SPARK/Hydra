@@ -16,7 +16,7 @@ class TestableRoomFinder : public RoomFinder {
 };
 
 TEST(IncrementalRoomsTests, ActiveSubgraphEmptyLayer) {
-  DynamicSceneGraph graph({1});
+  DynamicSceneGraph graph({1}, 0);
 
   ActiveNodeSet nodes{1, 2, 3, 4};
   IsolatedSceneGraphLayer::Ptr new_layer = getActiveSubgraph(graph, 1, nodes);
@@ -27,7 +27,7 @@ TEST(IncrementalRoomsTests, ActiveSubgraphEmptyLayer) {
 }
 
 TEST(IncrementalRoomsTests, ActiveSubgraphEmptyNodes) {
-  DynamicSceneGraph graph({1});
+  DynamicSceneGraph graph({1}, 0);
   graph.emplaceNode(1, 1, std::make_unique<PlaceNodeAttributes>());
   graph.emplaceNode(1, 2, std::make_unique<PlaceNodeAttributes>());
   graph.emplaceNode(1, 3, std::make_unique<PlaceNodeAttributes>());
@@ -42,7 +42,7 @@ TEST(IncrementalRoomsTests, ActiveSubgraphEmptyNodes) {
 }
 
 TEST(IncrementalRoomsTests, ActiveSubgraphSomeNodes) {
-  DynamicSceneGraph graph({1});
+  DynamicSceneGraph graph({1}, 0);
   graph.emplaceNode(1, 1, std::make_unique<PlaceNodeAttributes>());
   graph.emplaceNode(1, 2, std::make_unique<PlaceNodeAttributes>());
   graph.emplaceNode(1, 3, std::make_unique<PlaceNodeAttributes>());
@@ -57,7 +57,7 @@ TEST(IncrementalRoomsTests, ActiveSubgraphSomeNodes) {
 }
 
 TEST(IncrementalRoomsTests, ActiveSubgraphNodesAndEdges) {
-  DynamicSceneGraph graph({1});
+  DynamicSceneGraph graph({1}, 0);
   graph.emplaceNode(1, 1, std::make_unique<PlaceNodeAttributes>());
   graph.emplaceNode(1, 2, std::make_unique<PlaceNodeAttributes>());
   graph.emplaceNode(1, 3, std::make_unique<PlaceNodeAttributes>());
