@@ -354,7 +354,7 @@ void MeshPlaceConnectionsPlugin::draw(const std_msgs::Header& header,
     return;
   }
 
-  const SceneGraphLayer& layer = *graph.getLayer(KimeraDsgLayers::PLACES);
+  const auto& layer = graph.getLayer(KimeraDsgLayers::PLACES);
 
   MinimumSpanningTreeInfo mst_info = getMinimumSpanningEdges(layer);
 
@@ -481,7 +481,7 @@ void PlaceParentsPlugin::draw(const std_msgs::Header& header,
     return;
   }
 
-  const SceneGraphLayer& layer = *graph.getLayer(KimeraDsgLayers::PLACES);
+  const auto& layer = graph.getLayer(KimeraDsgLayers::PLACES);
 
   VisualizerConfig viz_config;
   viz_config.layer_z_step = 0.0;

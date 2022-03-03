@@ -12,8 +12,7 @@ using Node = SceneGraphNode;
 void findRoomConnectivity(DynamicSceneGraph* scene_graph) {
   CHECK_NOTNULL(scene_graph);
   CHECK(scene_graph->hasLayer(KimeraDsgLayers::PLACES));
-  const SceneGraphLayer& places_layer =
-      *(scene_graph->getLayer(KimeraDsgLayers::PLACES));
+  const auto& places_layer = scene_graph->getLayer(KimeraDsgLayers::PLACES);
 
   for (const auto& edge : places_layer.edges()) {
     const Node& source = *(scene_graph->getNode(edge.second.source));
@@ -74,9 +73,8 @@ void findPlacesRoomConnectivity(DynamicSceneGraph* scene_graph,
                                 float esdf_truncation_distance) {
   CHECK_NOTNULL(scene_graph);
 
-  const SceneGraphLayer& room_layer = *(scene_graph->getLayer(KimeraDsgLayers::ROOMS));
-  const SceneGraphLayer& places_layer =
-      *(scene_graph->getLayer(KimeraDsgLayers::PLACES));
+  const auto& room_layer = scene_graph->getLayer(KimeraDsgLayers::ROOMS);
+  const auto& places_layer = scene_graph->getLayer(KimeraDsgLayers::PLACES);
 
   // Create cloud of the graph, make sure indices are 1-to-1
   PclLayer<ColorPointCloud> places_pcl =
@@ -229,12 +227,10 @@ void findObjectPlaceConnectivity(DynamicSceneGraph* scene_graph) {
   CHECK_NOTNULL(scene_graph);
 
   CHECK(scene_graph->hasLayer(KimeraDsgLayers::OBJECTS));
-  const SceneGraphLayer& objects_layer =
-      *(scene_graph->getLayer(KimeraDsgLayers::OBJECTS));
+  const auto& objects_layer = scene_graph->getLayer(KimeraDsgLayers::OBJECTS);
 
   CHECK(scene_graph->hasLayer(KimeraDsgLayers::PLACES));
-  const SceneGraphLayer& places_layer =
-      *(scene_graph->getLayer(KimeraDsgLayers::PLACES));
+  const auto& places_layer = scene_graph->getLayer(KimeraDsgLayers::PLACES);
   if (places_layer.nodes().empty()) {
     LOG(WARNING) << "Empty places layer: will not have interlayer edges between places "
                     "and objects";

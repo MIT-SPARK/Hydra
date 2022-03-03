@@ -113,8 +113,7 @@ std::vector<size_t> read_timestamps(const std::string& filepath) {
   DynamicSceneGraph graph;
   graph.load(filepath);
 
-  const DynamicSceneGraphLayer& agents =
-      graph.getDynamicLayer(KimeraDsgLayers::AGENTS, 'a').value();
+  const auto& agents = graph.getLayer(KimeraDsgLayers::AGENTS, 'a');
 
   std::vector<size_t> times_ns;
   for (const auto& node : agents.nodes()) {

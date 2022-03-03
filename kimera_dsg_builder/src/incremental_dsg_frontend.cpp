@@ -11,9 +11,9 @@
 namespace kimera {
 namespace incremental {
 
+using hydra::timing::ScopedTimer;
 using lcd::LayerRegistrationConfig;
 using pose_graph_tools::PoseGraph;
-using hydra::timing::ScopedTimer;
 
 DsgFrontend::DsgFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg)
     : nh_(nh), dsg_(dsg), lcd_graph_(new DynamicSceneGraph()) {
@@ -92,11 +92,10 @@ void DsgFrontend::handleLatestPoseGraph(const PoseGraph::ConstPtr& msg) {
   }
 
   std::unique_lock<std::mutex> lock(dsg_->mutex);
-  const DynamicSceneGraphLayer& agent_layer =
-      dsg_->graph->getDynamicLayer(KimeraDsgLayers::AGENTS, robot_prefix_)->get();
+  const auto& agents = dsg_->graph->getLayer(KimeraDsgLayers::AGENTS, robot_prefix_);
 
   for (const auto& node : msg->nodes) {
-    if (node.key < agent_layer.numNodes()) {
+    if (node.key < agents.numNodes()) {
       continue;
     }
 
@@ -109,18 +108,17 @@ void DsgFrontend::handleLatestPoseGraph(const PoseGraph::ConstPtr& msg) {
     // TODO(nathan) implicit assumption that gtsam symbol and dsg node symbol are same
     NodeSymbol pgmo_key(robot_prefix_, node.key);
 
-    bool node_valid = dsg_->graph->emplaceDynamicNode(
-        agent_layer.id,
-        agent_layer.prefix,
-        std::chrono::nanoseconds(node.header.stamp.toNSec()),
-        std::make_unique<AgentNodeAttributes>(rotation, position, pgmo_key));
+    const std::chrono::nanoseconds stamp(node.header.stamp.toNSec());
+    auto attrs = std::make_unique<AgentNodeAttributes>(rotation, position, pgmo_key);
+    bool valid =
+        dsg_->graph->emplaceNode(agents.id, agents.prefix, stamp, std::move(attrs));
 
-    if (!node_valid) {
-      VLOG(1) << "repeated timestamp " << node.header.stamp.toNSec() << "[ns] found";
+    if (!valid) {
+      VLOG(1) << "repeated timestamp " << stamp.count() << "[ns] found";
       continue;
     }
 
-    agent_key_map_[pgmo_key] = agent_layer.nodes().size() - 1;
+    agent_key_map_[pgmo_key] = agents.nodes().size() - 1;
   }
 
   addAgentPlaceEdges();
@@ -252,8 +250,7 @@ void DsgFrontend::runMeshFrontend() {
         }
 
         std::vector<NodeId> objects_to_delete;
-        const SceneGraphLayer& objects =
-            dsg_->graph->getLayer(KimeraDsgLayers::OBJECTS).value();
+        const auto& objects = dsg_->graph->getLayer(KimeraDsgLayers::OBJECTS);
         for (const auto& id_node_pair : objects.nodes()) {
           auto connections = dsg_->graph->getMeshConnectionIndices(id_node_pair.first);
           if (connections.size() < config_.min_object_vertices) {
@@ -396,10 +393,8 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
     attrs.is_active = true;
   }
 
-  const SceneGraphLayer& places_layer =
-      dsg_->graph->getLayer(KimeraDsgLayers::PLACES).value();
-  const SceneGraphLayer& object_layer =
-      dsg_->graph->getLayer(KimeraDsgLayers::OBJECTS).value();
+  const auto& objects = dsg_->graph->getLayer(KimeraDsgLayers::OBJECTS);
+  const auto& places = dsg_->graph->getLayer(KimeraDsgLayers::PLACES);
 
   NodeIdSet objects_to_check;
   {  // start graph update critical section
@@ -409,7 +404,7 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
         const SceneGraphNode& to_check = dsg_->graph->getNode(node_id).value();
         for (const auto& child : to_check.children()) {
           // TODO(nathan) this isn't very robust
-          if (object_layer.hasNode(child)) {
+          if (objects.hasNode(child)) {
             objects_to_check.insert(child);
           } else {
             NodeSymbol dynamic_node(child);
@@ -426,7 +421,7 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
     // TODO(nathan) figure out reindexing (for more logical node ids)
     dsg_->graph->updateFromLayer(temp_layer, std::move(edges));
 
-    places_nn_finder_.reset(new NearestNodeFinder(places_layer, active_nodes));
+    places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
 
     addAgentPlaceEdges();
     addPlaceObjectEdges(&objects_to_check);
@@ -434,8 +429,8 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
     *dsg_->latest_places = active_nodes;
   }  // end graph update critical section
 
-  VLOG(3) << "[Places Frontend] Places layer: " << places_layer.numNodes() << " nodes, "
-          << places_layer.numEdges() << " edges";
+  VLOG(3) << "[Places Frontend] Places layer: " << places.numNodes() << " nodes, "
+          << places.numEdges() << " edges";
 }
 
 void DsgFrontend::addPlaceObjectEdges(NodeIdSet* extra_objects_to_check) {
@@ -466,16 +461,14 @@ void DsgFrontend::addPlaceObjectEdges(NodeIdSet* extra_objects_to_check) {
 }
 
 void DsgFrontend::addAgentPlaceEdges() {
-  ScopedTimer timer(
-      "frontend/place_agent_edges", last_places_timestamp_, true, 2, false);
+  ScopedTimer timer("frontend/place_agent_edges", last_places_timestamp_);
   if (!places_nn_finder_) {
     return;  // haven't received places yet
   }
 
-  for (const auto& prefix_layer_pair :
-       dsg_->graph->dynamicLayersOfType(KimeraDsgLayers::AGENTS)) {
-    const char prefix = prefix_layer_pair.first;
-    const auto& layer = *prefix_layer_pair.second;
+  for (const auto& pair : dsg_->graph->dynamicLayersOfType(KimeraDsgLayers::AGENTS)) {
+    const char prefix = pair.first;
+    const auto& layer = *pair.second;
 
     if (!last_agent_edge_index_.count(prefix)) {
       last_agent_edge_index_[prefix] = 0;
@@ -511,7 +504,8 @@ void DsgFrontend::startLcd() {
   for (auto& kv_pair : config.registration_configs) {
     kv_pair.second.registration_output_path = config_.log_path + "/lcd/";
   }
-  config.agent_search_config.min_registration_score = config.agent_search_config.min_score;
+  config.agent_search_config.min_registration_score =
+      config.agent_search_config.min_score;
   lcd_module_.reset(new lcd::DsgLcdModule(config));
 
   if (config_.visualize_dsg_lcd) {
@@ -577,7 +571,7 @@ void DsgFrontend::runLcd() {
       lcd_graph_->mergeGraph(*dsg_->graph);
     }  // end critical section
 
-    if (lcd_graph_->getLayer(KimeraDsgLayers::PLACES).value().get().numNodes() == 0) {
+    if (lcd_graph_->getLayer(KimeraDsgLayers::PLACES).numNodes() == 0) {
       r.sleep();
       continue;
     }
@@ -594,13 +588,13 @@ void DsgFrontend::runLcd() {
       archived_places_.clear();
     }  // end critical section
 
-    auto latest_agent_id = getLatestAgentId();
-    if (!latest_agent_id) {
+    auto latest_agent = getLatestAgentId();
+    if (!latest_agent) {
       r.sleep();
       continue;
     }
 
-    const Eigen::Vector3d latest_pos = lcd_graph_->getPosition(*latest_agent_id);
+    const Eigen::Vector3d latest_pos = lcd_graph_->getPosition(*latest_agent);
 
     NodeIdSet to_cache;
     auto iter = potential_lcd_root_nodes_.begin();
@@ -619,11 +613,8 @@ void DsgFrontend::runLcd() {
       lcd_module_->updateDescriptorCache(*lcd_graph_, to_cache, curr_time.toNSec());
     }
 
-    uint64_t timestamp;
-    timestamp =
-        lcd_graph_->getDynamicNode(*latest_agent_id).value().get().timestamp.count();
-
-    auto results = lcd_module_->detect(*lcd_graph_, *latest_agent_id, timestamp);
+    auto time = lcd_graph_->getDynamicNode(*latest_agent).value().get().timestamp;
+    auto results = lcd_module_->detect(*lcd_graph_, *latest_agent, time.count());
     if (lcd_visualizer_) {
       lcd_visualizer_->setGraphUpdated();
       lcd_visualizer_->redraw();
@@ -655,16 +646,13 @@ void DsgFrontend::runLcd() {
 
 void DsgFrontend::updatePlaceMeshMapping() {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
-
-  const SceneGraphLayer& places_layer =
-      dsg_->graph->getLayer(KimeraDsgLayers::PLACES).value();
-
+  const auto& places = dsg_->graph->getLayer(KimeraDsgLayers::PLACES);
   const auto& mesh_mappings = mesh_frontend_.getVoxbloxMsgMapping();
 
   size_t num_invalid = 0;
   size_t num_processed = 0;
   size_t num_vertices_processed = 0;
-  for (const auto& id_node_pair : places_layer.nodes()) {
+  for (const auto& id_node_pair : places.nodes()) {
     auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
     if (!attrs.is_active) {
       continue;
@@ -676,8 +664,7 @@ void DsgFrontend::updatePlaceMeshMapping() {
 
     ++num_processed;
 
-    // reset connections (and mark inactive to avoid processing outside active
-    // window)
+    // reset connections (and mark inactive to avoid processing outside active window)
     attrs.pcl_mesh_connections.clear();
     attrs.pcl_mesh_connections.reserve(attrs.voxblox_mesh_connections.size());
 
@@ -712,8 +699,7 @@ void DsgFrontend::updatePlaceMeshMapping() {
 
 void DsgFrontend::assignBowVectors() {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
-  const DynamicSceneGraphLayer& agent_layer =
-      dsg_->graph->getDynamicLayer(KimeraDsgLayers::AGENTS, robot_prefix_)->get();
+  const auto& agents = dsg_->graph->getLayer(KimeraDsgLayers::AGENTS, robot_prefix_);
 
   const size_t prior_size = bow_messages_.size();
   auto iter = bow_messages_.begin();
@@ -723,8 +709,7 @@ void DsgFrontend::assignBowVectors() {
     char prefix = kimera_pgmo::robot_id_to_prefix.at(msg->robot_id);
     NodeSymbol pgmo_key(prefix, msg->pose_id);
     if (agent_key_map_.count(pgmo_key)) {
-      const DynamicSceneGraphNode& node =
-          agent_layer.getNodeByIndex(agent_key_map_.at(pgmo_key)).value();
+      const auto& node = agents.getNodeByIndex(agent_key_map_.at(pgmo_key))->get();
       lcd_queue_.push(node.id);
 
       AgentNodeAttributes& attrs = node.attributes<AgentNodeAttributes>();

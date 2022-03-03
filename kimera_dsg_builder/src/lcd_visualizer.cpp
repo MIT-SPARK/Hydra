@@ -48,7 +48,8 @@ void readColor(const ros::NodeHandle& nh,
 }
 
 LcdVisualizer::LcdVisualizer(const ros::NodeHandle& nh, double radius)
-    : DynamicSceneGraphVisualizer(nh, LcdVisualizer::getDefaultLayerIds()), radius_(radius) {
+    : DynamicSceneGraphVisualizer(nh, LcdVisualizer::getDefaultLayerIds()),
+      radius_(radius) {
   // red-ish
   std::vector<double> invalid_color{0.78, 0.192, 0.173};
   readColor(nh, "invalid_color", invalid_color, invalid_match_color_);
@@ -171,8 +172,7 @@ void LcdVisualizer::drawAgent(const std_msgs::Header& header, MarkerArray& msg) 
     return;
   }
 
-  const DynamicSceneGraphLayer& agent_layer =
-      scene_graph_->getDynamicLayer(KimeraDsgLayers::AGENTS, 'a').value();
+  const auto& agent_layer = scene_graph_->getLayer(KimeraDsgLayers::AGENTS, 'a');
 
   auto query_node = getQueryNode();
   if (!query_node) {

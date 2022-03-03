@@ -163,7 +163,7 @@ void eval_places(const DynamicSceneGraph& graph, const Layer<TsdfVoxel>::Ptr& ts
   integrator.updateFromTsdfLayer(false, true, true);
 
   CHECK(graph.hasLayer(KimeraDsgLayers::PLACES));
-  const SceneGraphLayer& places = graph.getLayer(KimeraDsgLayers::PLACES).value();
+  const auto& places = graph.getLayer(KimeraDsgLayers::PLACES);
   eval_layer(gvd_config, places, *gvd_layer);
 }
 

@@ -213,7 +213,7 @@ TEST(DsgInterpolationTests, PlaceUpdate) {
 
   auto attrs3 = std::make_unique<PlaceNodeAttributes>(0.0, 0.0);
   attrs3->position = Eigen::Vector3d(1.0, 2.0, 3.0);
-  attrs3->is_active = true; // make sure it doesn't get dropped
+  attrs3->is_active = true;  // make sure it doesn't get dropped
   graph.emplaceNode(place_layer, NodeSymbol('p', 6), std::move(attrs3));
 
   gtsam::Values values;
@@ -299,24 +299,21 @@ TEST(DsgInterpolationTests, AgentUpdate) {
         std::make_unique<AgentNodeAttributes>(Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0),
                                               Eigen::Vector3d(1.0, 2.0, 3.0),
                                               NodeSymbol('a', 0));
-    graph.emplaceDynamicNode(
-        agent_layer, 'a', std::chrono::seconds(1), std::move(attrs));
+    graph.emplaceNode(agent_layer, 'a', std::chrono::seconds(1), std::move(attrs));
   }
   {
     NodeAttributes::Ptr attrs =
         std::make_unique<AgentNodeAttributes>(Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0),
                                               Eigen::Vector3d(1.0, 2.0, 3.0),
                                               NodeSymbol('a', 5));
-    graph.emplaceDynamicNode(
-        agent_layer, 'a', std::chrono::seconds(2), std::move(attrs));
+    graph.emplaceNode(agent_layer, 'a', std::chrono::seconds(2), std::move(attrs));
   }
   {
     NodeAttributes::Ptr attrs =
         std::make_unique<AgentNodeAttributes>(Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0),
                                               Eigen::Vector3d(1.0, 2.0, 3.0),
                                               NodeSymbol('c', 5));
-    graph.emplaceDynamicNode(
-        agent_layer, 'b', std::chrono::seconds(2), std::move(attrs));
+    graph.emplaceNode(agent_layer, 'b', std::chrono::seconds(2), std::move(attrs));
   }
 
   gtsam::Values agent_values;

@@ -11,10 +11,11 @@ namespace kimera {
 using NodeColor = SemanticNodeAttributes::ColorVector;
 using Node = SceneGraphNode;
 
-pcl::PolygonMesh::Ptr findWalls(const SubMesh& mesh, const DynamicSceneGraph& scene_graph) {
+pcl::PolygonMesh::Ptr findWalls(const SubMesh& mesh,
+                                const DynamicSceneGraph& scene_graph) {
   // Create cloud of the places so we can do nearest neighbor queries
   CHECK(scene_graph.hasLayer(KimeraDsgLayers::PLACES));
-  const SceneGraphLayer& layer = *(scene_graph.getLayer(KimeraDsgLayers::PLACES));
+  const auto& layer = scene_graph.getLayer(KimeraDsgLayers::PLACES);
   if (layer.nodes().empty()) {
     LOG(WARNING) << "Places layer empty: cannot cluster wall vertices to rooms";
     return nullptr;

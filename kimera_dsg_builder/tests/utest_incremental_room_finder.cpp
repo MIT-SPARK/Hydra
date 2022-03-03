@@ -122,7 +122,7 @@ TEST(IncrementalRoomsTests, UpdateFromEmptyClustersCorrect) {
   RoomMap previous_rooms;
   finder.updateRoomsFromClusters(*dsg, clusters, previous_rooms, {});
 
-  const SceneGraphLayer& rooms = dsg->graph->getLayer(KimeraDsgLayers::ROOMS).value();
+  const auto& rooms = dsg->graph->getLayer(KimeraDsgLayers::ROOMS);
   EXPECT_EQ(0u, rooms.numNodes());
   EXPECT_EQ(0u, rooms.numEdges());
 }
@@ -150,7 +150,7 @@ TEST(IncrementalRoomsTests, UpdateFromClustersWithPruningCorrect) {
   RoomMap previous_rooms;
   finder.updateRoomsFromClusters(*dsg, results, previous_rooms, {});
 
-  const SceneGraphLayer& rooms = dsg->graph->getLayer(KimeraDsgLayers::ROOMS).value();
+  const auto& rooms = dsg->graph->getLayer(KimeraDsgLayers::ROOMS);
   EXPECT_EQ(1u, rooms.numNodes());
   EXPECT_TRUE(rooms.hasNode(NodeSymbol('R', 0)));
   EXPECT_EQ(0u, rooms.numEdges());
@@ -186,7 +186,7 @@ TEST(IncrementalRoomsTests, UpdateFromClustersWithMinSizeCorrect) {
   RoomMap previous_rooms;
   finder.updateRoomsFromClusters(*dsg, results, previous_rooms, {});
 
-  const SceneGraphLayer& rooms = dsg->graph->getLayer(KimeraDsgLayers::ROOMS).value();
+  const auto& rooms = dsg->graph->getLayer(KimeraDsgLayers::ROOMS);
   EXPECT_EQ(1u, rooms.numNodes());
   EXPECT_TRUE(rooms.hasNode(NodeSymbol('R', 0)));
   EXPECT_EQ(0u, rooms.numEdges());
@@ -249,7 +249,7 @@ TEST(IncrementalRoomsTests, UpdateFromClustersWithAssocationCorrect) {
 
   finder.updateRoomsFromClusters(*dsg, results, previous_rooms, {});
 
-  const SceneGraphLayer& rooms = dsg->graph->getLayer(KimeraDsgLayers::ROOMS).value();
+  const auto& rooms = dsg->graph->getLayer(KimeraDsgLayers::ROOMS);
   EXPECT_EQ(3u, rooms.numNodes());
   EXPECT_TRUE(rooms.hasNode(NodeSymbol('R', 0)));
   EXPECT_TRUE(rooms.hasNode(NodeSymbol('R', 5)));

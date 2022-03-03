@@ -53,8 +53,8 @@ void fillRoomIndicesFromDsg(const DynamicSceneGraph& graph,
                             RoomVoxelIndices& room_indices) {
   voxblox::Layer<voxblox::TsdfVoxel> layer(voxel_size, voxels_per_side);
 
-  const SceneGraphLayer& rooms = graph.getLayer(KimeraDsgLayers::ROOMS).value();
-  const SceneGraphLayer& places = graph.getLayer(KimeraDsgLayers::PLACES).value();
+  const auto& rooms = graph.getLayer(KimeraDsgLayers::ROOMS);
+  const auto& places = graph.getLayer(KimeraDsgLayers::PLACES);
 
   for (const auto& id_node_pair : rooms.nodes()) {
     const NodeId room = id_node_pair.first;

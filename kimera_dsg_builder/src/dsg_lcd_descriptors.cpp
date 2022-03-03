@@ -49,7 +49,7 @@ Descriptor::Ptr ObjectDescriptorFactory::construct(const Dsg& graph,
   descriptor->timestamp = agent_node.timestamp;
   descriptor->root_position = root_position;
 
-  const SceneGraphLayer& places = *graph.getLayer(KimeraDsgLayers::PLACES);
+  const auto& places = graph.getLayer(KimeraDsgLayers::PLACES);
   std::deque<NodeId> frontier{*parent};
   std::unordered_set<NodeId> visited{*parent};
   graph_utilities::breadthFirstSearch(
@@ -121,7 +121,7 @@ Descriptor::Ptr PlaceDescriptorFactory::construct(const Dsg& graph,
   descriptor->timestamp = agent_node.timestamp;
   descriptor->root_position = root_position;
 
-  const SceneGraphLayer& places = *graph.getLayer(KimeraDsgLayers::PLACES);
+  const auto& places = graph.getLayer(KimeraDsgLayers::PLACES);
   std::deque<NodeId> frontier{*parent};
   std::unordered_set<NodeId> visited{*parent};
   graph_utilities::breadthFirstSearch(

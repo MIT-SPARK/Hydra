@@ -81,18 +81,16 @@ TEST_F(DsgLcdModuleTests, TestActualChildren) {
   dsg->emplaceNode(KimeraDsgLayers::PLACES, 1, std::make_unique<PlaceNodeAttributes>());
   dsg->emplaceNode(
       KimeraDsgLayers::OBJECTS, 2, std::make_unique<ObjectNodeAttributes>());
-  dsg->emplaceDynamicNode(
-      KimeraDsgLayers::AGENTS,
-      'a',
-      10ns,
-      std::make_unique<AgentNodeAttributes>(
-          Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
-  dsg->emplaceDynamicNode(
-      KimeraDsgLayers::AGENTS,
-      'a',
-      20ns,
-      std::make_unique<AgentNodeAttributes>(
-          Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
+  dsg->emplaceNode(KimeraDsgLayers::AGENTS,
+                   'a',
+                   10ns,
+                   std::make_unique<AgentNodeAttributes>(
+                       Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
+  dsg->emplaceNode(KimeraDsgLayers::AGENTS,
+                   'a',
+                   20ns,
+                   std::make_unique<AgentNodeAttributes>(
+                       Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
   dsg->insertEdge(1, 2);
   dsg->insertEdge(1, NodeSymbol('a', 0));
   dsg->insertEdge(1, NodeSymbol('a', 1));
@@ -107,12 +105,11 @@ TEST_F(DsgLcdModuleTests, TestActualChildren) {
 
 TEST_F(DsgLcdModuleTests, TestEmptySearch) {
   using namespace std::chrono_literals;
-  dsg->emplaceDynamicNode(
-      KimeraDsgLayers::AGENTS,
-      'a',
-      10ns,
-      std::make_unique<AgentNodeAttributes>(
-          Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
+  dsg->emplaceNode(KimeraDsgLayers::AGENTS,
+                   'a',
+                   10ns,
+                   std::make_unique<AgentNodeAttributes>(
+                       Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
 
   DsgLcdModule module(config);
   std::unordered_set<NodeId> active_places{1};
@@ -127,18 +124,16 @@ TEST_F(DsgLcdModuleTests, TestNonEmptySearch) {
   dsg->emplaceNode(KimeraDsgLayers::PLACES, 1, std::make_unique<PlaceNodeAttributes>());
   dsg->emplaceNode(
       KimeraDsgLayers::OBJECTS, 2, std::make_unique<ObjectNodeAttributes>());
-  dsg->emplaceDynamicNode(
-      KimeraDsgLayers::AGENTS,
-      'a',
-      10ns,
-      std::make_unique<AgentNodeAttributes>(
-          Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
-  dsg->emplaceDynamicNode(
-      KimeraDsgLayers::AGENTS,
-      'a',
-      20ns,
-      std::make_unique<AgentNodeAttributes>(
-          Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
+  dsg->emplaceNode(KimeraDsgLayers::AGENTS,
+                   'a',
+                   10ns,
+                   std::make_unique<AgentNodeAttributes>(
+                       Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
+  dsg->emplaceNode(KimeraDsgLayers::AGENTS,
+                   'a',
+                   20ns,
+                   std::make_unique<AgentNodeAttributes>(
+                       Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
   dsg->insertEdge(1, 2);
   dsg->insertEdge(1, NodeSymbol('a', 0));
   dsg->insertEdge(1, NodeSymbol('a', 1));

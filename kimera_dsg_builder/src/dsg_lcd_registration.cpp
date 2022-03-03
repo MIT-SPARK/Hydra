@@ -148,7 +148,7 @@ DsgRegistrationSolution DsgTeaserSolver::solve(const DynamicSceneGraph& dsg,
   problem.src_nodes = match.query_nodes;
   problem.dest_nodes = match.match_nodes;
 
-  const SceneGraphLayer& layer = dsg.getLayer(layer_id).value();
+  const auto& layer = dsg.getLayer(layer_id);
   LayerRegistrationSolution solution;
   if (config.use_pairwise_registration) {
     solution = registerDsgLayerPairwise(config, solver, problem, layer);

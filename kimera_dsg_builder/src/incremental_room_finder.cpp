@@ -623,7 +623,7 @@ void RoomFinder::updateRoomsFromClusters(SharedDsgInfo& dsg,
   }
 
   std::set<NodeId> empty_rooms;
-  const SceneGraphLayer& rooms = dsg.graph->getLayer(KimeraDsgLayers::ROOMS).value();
+  const auto& rooms = dsg.graph->getLayer(KimeraDsgLayers::ROOMS);
   for (const auto& id_node_pair : rooms.nodes()) {
     if (id_node_pair.second->children().size() < config_.min_room_size) {
       empty_rooms.insert(id_node_pair.first);

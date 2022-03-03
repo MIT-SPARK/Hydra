@@ -12,13 +12,13 @@
 namespace kimera {
 namespace incremental {
 
+using hydra::timing::ScopedTimer;
 using kimera_pgmo::DeformationGraph;
 using kimera_pgmo::DeformationGraphPtr;
 using kimera_pgmo::KimeraPgmoInterface;
 using kimera_pgmo::KimeraPgmoMesh;
 using kimera_pgmo::Path;
 using pose_graph_tools::PoseGraph;
-using hydra::timing::ScopedTimer;
 
 void DsgBackend::setSolverParams() {
   KimeraRPGO::RobustSolverParams params = deformation_graph_->getParams();
@@ -242,17 +242,17 @@ bool DsgBackend::updatePrivateDsg() {
       *private_dsg_->latest_places = *shared_dsg_->latest_places;
 
       if (shared_dsg_->graph->hasLayer(KimeraDsgLayers::PLACES)) {
-        const SceneGraphLayer& shared_places =
-            *(shared_dsg_->graph->getLayer(KimeraDsgLayers::PLACES));
-        shared_places_copy_.mergeLayer(shared_places);
+        const auto& places = shared_dsg_->graph->getLayer(KimeraDsgLayers::PLACES);
+        shared_places_copy_.mergeLayer(places);
         std::vector<NodeId> removed_place_nodes;
-        shared_places.getRemovedNodes(&removed_place_nodes);
+        places.getRemovedNodes(&removed_place_nodes);
         for (const auto& place_id : removed_place_nodes) {
           shared_places_copy_.removeNode(place_id);
         }
       }
       shared_dsg_->updated = false;
     }  // end joint critical section
+
     if (config_.should_log) {
       backend_graph_logger_.logGraph(private_dsg_->graph);
     }
@@ -655,16 +655,14 @@ void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,
 ActiveNodeSet DsgBackend::getNodesForRoomDetection(const NodeIdSet& latest_places) {
   std::unordered_set<NodeId> active_places(latest_places.begin(), latest_places.end());
   // TODO(nathan) grab this from a set of active rooms
-  const SceneGraphLayer& rooms =
-      private_dsg_->graph->getLayer(KimeraDsgLayers::ROOMS).value();
+  const auto& rooms = private_dsg_->graph->getLayer(KimeraDsgLayers::ROOMS);
   for (const auto& id_node_pair : rooms.nodes()) {
     active_places.insert(id_node_pair.second->children().begin(),
                          id_node_pair.second->children().end());
   }
 
   // TODO(nathan) this is threadsafe as long as places and rooms are on the same thread
-  const SceneGraphLayer& places =
-      private_dsg_->graph->getLayer(KimeraDsgLayers::PLACES).value();
+  const auto& places = private_dsg_->graph->getLayer(KimeraDsgLayers::PLACES);
   for (const auto& node_id : unlabeled_place_nodes_) {
     if (!places.hasNode(node_id)) {
       continue;
@@ -677,8 +675,7 @@ ActiveNodeSet DsgBackend::getNodesForRoomDetection(const NodeIdSet& latest_place
 }
 
 void DsgBackend::storeUnlabeledPlaces(const ActiveNodeSet active_nodes) {
-  const SceneGraphLayer& places =
-      private_dsg_->graph->getLayer(KimeraDsgLayers::PLACES).value();
+  const auto& places = private_dsg_->graph->getLayer(KimeraDsgLayers::PLACES);
 
   unlabeled_place_nodes_.clear();
   for (const auto& node_id : active_nodes) {
@@ -708,10 +705,9 @@ void DsgBackend::updateRoomsNodes() {
 void DsgBackend::updateBuildingNode() {
   const NodeSymbol building_node_id('B', 0);
   std::unique_lock<std::mutex> lock(private_dsg_->mutex);
-  const SceneGraphLayer& rooms_layer =
-      private_dsg_->graph->getLayer(KimeraDsgLayers::ROOMS).value();
+  const auto& rooms = private_dsg_->graph->getLayer(KimeraDsgLayers::ROOMS);
 
-  if (!rooms_layer.numNodes()) {
+  if (!rooms.numNodes()) {
     if (private_dsg_->graph->hasNode(building_node_id)) {
       private_dsg_->graph->removeNode(building_node_id);
     }
@@ -720,10 +716,10 @@ void DsgBackend::updateBuildingNode() {
   }
 
   Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
-  for (const auto& id_node_pair : rooms_layer.nodes()) {
+  for (const auto& id_node_pair : rooms.nodes()) {
     centroid += id_node_pair.second->attributes().position;
   }
-  centroid /= rooms_layer.numNodes();
+  centroid /= rooms.numNodes();
 
   if (!private_dsg_->graph->hasNode(building_node_id)) {
     SemanticNodeAttributes::Ptr attrs(new SemanticNodeAttributes());
@@ -738,7 +734,7 @@ void DsgBackend::updateBuildingNode() {
         centroid;
   }
 
-  for (const auto& id_node_pair : rooms_layer.nodes()) {
+  for (const auto& id_node_pair : rooms.nodes()) {
     private_dsg_->graph->insertEdge(building_node_id, id_node_pair.first);
   }
 }

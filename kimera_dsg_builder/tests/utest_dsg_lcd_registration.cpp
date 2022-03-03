@@ -103,7 +103,7 @@ struct DsgRegistrationTests : public ::testing::Test {
 
     Eigen::Quaterniond world_q_body1(std::cos(M_PI / 8), std::sin(M_PI / 8), 0.0, 0.0);
     Eigen::Vector3d world_t_body1(-1.0, 0.2, 0.5);
-    dsg->emplaceDynamicNode(
+    dsg->emplaceNode(
         KimeraDsgLayers::AGENTS,
         'a',
         10ns,
@@ -114,7 +114,7 @@ struct DsgRegistrationTests : public ::testing::Test {
 
     Eigen::Quaterniond dest_q_body2 = Eigen::Quaterniond(dest_R_src) * world_q_body2;
     Eigen::Vector3d dest_t_body2 = dest_R_src * world_t_body2 + dest_t_src;
-    dsg->emplaceDynamicNode(
+    dsg->emplaceNode(
         KimeraDsgLayers::AGENTS,
         'a',
         20ns,

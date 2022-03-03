@@ -147,7 +147,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   SharedDsgInfo::Ptr shared_dsg_;
   SharedDsgInfo::Ptr private_dsg_;
-  SceneGraphLayer shared_places_copy_;
+  IsolatedSceneGraphLayer shared_places_copy_;
 
   int robot_id_;
   char robot_prefix_;

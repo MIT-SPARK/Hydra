@@ -22,7 +22,7 @@ void updateObjects(DynamicSceneGraph& graph,
     return;
   }
 
-  const SceneGraphLayer& layer = *graph.getLayer(KimeraDsgLayers::OBJECTS);
+  const auto& layer = graph.getLayer(KimeraDsgLayers::OBJECTS);
   MeshVertices::Ptr mesh = graph.getMeshVertices();
 
   std::vector<std::pair<NodeId, NodeId>> nodes_to_merge;
@@ -133,7 +133,7 @@ void updatePlaces(DynamicSceneGraph& graph,
     return;
   }
 
-  const SceneGraphLayer& layer = graph.getLayer(KimeraDsgLayers::PLACES).value();
+  const auto& layer = graph.getLayer(KimeraDsgLayers::PLACES);
 
   std::unordered_set<NodeId> missing_nodes;
   std::vector<NodeId> updated_nodes;
@@ -223,7 +223,7 @@ void updateRooms(DynamicSceneGraph& graph,
   }
 
   std::set<NodeId> empty_rooms;
-  const SceneGraphLayer& rooms = graph.getLayer(KimeraDsgLayers::ROOMS).value();
+  const auto& rooms = graph.getLayer(KimeraDsgLayers::ROOMS);
   for (const auto& id_node_pair : rooms.nodes()) {
     if (id_node_pair.second->children().empty()) {
       empty_rooms.insert(id_node_pair.first);
@@ -245,7 +245,7 @@ void updateBuildings(DynamicSceneGraph& graph,
     return;
   }
 
-  const SceneGraphLayer& layer = graph.getLayer(KimeraDsgLayers::BUILDINGS).value();
+  const auto& layer = graph.getLayer(KimeraDsgLayers::BUILDINGS);
 
   for (const auto& id_node_pair : layer.nodes()) {
     if (!id_node_pair.second->hasChildren()) {

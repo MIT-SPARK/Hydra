@@ -20,7 +20,7 @@ void findBuildings(DynamicSceneGraph* scene_graph, const NodeColor& color) {
   building_attrs->name = std::to_string(building_id);
 
   CHECK(scene_graph->hasLayer(KimeraDsgLayers::ROOMS));
-  const SceneGraphLayer& room_layer = *scene_graph->getLayer(KimeraDsgLayers::ROOMS);
+  const auto& room_layer = scene_graph->getLayer(KimeraDsgLayers::ROOMS);
 
   // Calculate the building's centroid: centroid of rooms' centroids.
   Centroid building_centroid;

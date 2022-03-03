@@ -226,7 +226,7 @@ int main(int argc, char* argv[]) {
   integrator.updateFromTsdfLayer(false, true, true);
 
   CHECK(graph.hasLayer(KimeraDsgLayers::PLACES));
-  const SceneGraphLayer& places = graph.getLayer(KimeraDsgLayers::PLACES).value();
+  const auto& places = graph.getLayer(KimeraDsgLayers::PLACES);
   auto errors = get_errors(places, *gvd_layer);
 
   ros::Publisher gt_pub =
