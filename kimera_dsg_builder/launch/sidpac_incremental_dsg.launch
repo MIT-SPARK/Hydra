@@ -1,6 +1,6 @@
 <launch>
     <arg name="robot_id" default="0"/>
-    <arg name="config_dir" default="$(find kimera_dsg_builder)/config/uhumans2"/>
+    <arg name="config_dir" default="$(find kimera_dsg_builder)/config/sidpac"/>
     <arg name="dsg_output_dir" default="$(find kimera_dsg_builder)/output/sidpac"/>
     <arg name="dsg_output_prefix" default="sidpac_f1_3"/>
     <arg name="typology_dir" default="$(find kimera_dsg_builder)/config"/>
@@ -11,6 +11,7 @@
 
     <arg name="use_semantics" default="true"/>
     <arg name="use_gt_frame" default="false"/>
+    <arg name="gt_path_csv" default="/dev/null"/>
     <arg name="use_oriented_bounding_boxes" default="true"/>
     <arg name="exit_after_bag" default="false"/>
 
@@ -34,6 +35,11 @@
 
     <arg name="sensor_frame" default="left_cam"/>
 
+    <include if="$(arg use_gt_frame)" file="$(find kimera_dsg_builder)/launch/sidpac_gt_pose_source.launch">
+        <arg name="path_to_csv" value="$(arg gt_path_csv)"/>
+        <arg name="sensor_frame" value="$(arg sensor_frame)"/>
+    </include>
+
     <include file="$(find kimera_topology)/launch/kimera_topology_sidpac.launch">
         <arg name="use_semantics" value="$(arg use_semantics)"/>
         <arg name="show_stats" value="$(arg glog_to_file)"/>
@@ -42,7 +48,7 @@
         <arg name="glog_dir" value="$(arg topology_glog_dir)"/>
         <arg name="verbosity" value="$(arg verbosity)" if="$(arg glog_to_file)"/>
         <arg name="min_glog_level" value="$(arg min_glog_level)"/>
-    </include>   
+    </include>
 
     <include file="$(find kimera_dsg_builder)/launch/dsg_builder.launch" pass_all_args="true"/>
 
