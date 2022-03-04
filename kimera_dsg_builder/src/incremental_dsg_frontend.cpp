@@ -110,10 +110,7 @@ void DsgFrontend::handleLatestPoseGraph(const PoseGraph::ConstPtr& msg) {
 
     const std::chrono::nanoseconds stamp(node.header.stamp.toNSec());
     auto attrs = std::make_unique<AgentNodeAttributes>(rotation, position, pgmo_key);
-    bool valid =
-        dsg_->graph->emplaceNode(agents.id, agents.prefix, stamp, std::move(attrs));
-
-    if (!valid) {
+    if (!dsg_->graph->emplaceNode(agents.id, agents.prefix, stamp, std::move(attrs))) {
       VLOG(1) << "repeated timestamp " << stamp.count() << "[ns] found";
       continue;
     }

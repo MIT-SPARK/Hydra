@@ -692,24 +692,25 @@ void DsgBackend::storeUnlabeledPlaces(const ActiveNodeSet active_nodes) {
 }
 
 void DsgBackend::updateRoomsNodes() {
-  if (room_finder_) {
-    ScopedTimer timer("backend/room_detection", last_timestamp_, true, 1, false);
-    ActiveNodeSet active_place_nodes =
-        getNodesForRoomDetection(*private_dsg_->latest_places);
-    VLOG(3) << "Detecting rooms for " << active_place_nodes.size() << " nodes";
-    room_finder_->findRooms(*private_dsg_, active_place_nodes);
-    storeUnlabeledPlaces(active_place_nodes);
+  if (!room_finder_) {
+    return;
   }
+
+  ScopedTimer timer("backend/room_detection", last_timestamp_, true, 1, false);
+  ActiveNodeSet active_nodes = getNodesForRoomDetection(*private_dsg_->latest_places);
+  VLOG(3) << "Detecting rooms for " << active_nodes.size() << " nodes";
+  room_finder_->findRooms(*private_dsg_, active_nodes);
+  storeUnlabeledPlaces(active_nodes);
 }
 
 void DsgBackend::updateBuildingNode() {
-  const NodeSymbol building_node_id('B', 0);
+  const NodeSymbol node_id('B', 0);
   std::unique_lock<std::mutex> lock(private_dsg_->mutex);
   const auto& rooms = private_dsg_->graph->getLayer(KimeraDsgLayers::ROOMS);
 
   if (!rooms.numNodes()) {
-    if (private_dsg_->graph->hasNode(building_node_id)) {
-      private_dsg_->graph->removeNode(building_node_id);
+    if (private_dsg_->graph->hasNode(node_id)) {
+      private_dsg_->graph->removeNode(node_id);
     }
 
     return;
@@ -721,21 +722,20 @@ void DsgBackend::updateBuildingNode() {
   }
   centroid /= rooms.numNodes();
 
-  if (!private_dsg_->graph->hasNode(building_node_id)) {
+  if (!private_dsg_->graph->hasNode(node_id)) {
     SemanticNodeAttributes::Ptr attrs(new SemanticNodeAttributes());
     attrs->position = centroid;
     attrs->color = config_.building_color;
     attrs->semantic_label = config_.building_semantic_label;
-    attrs->name = building_node_id.getLabel();
+    attrs->name = node_id.getLabel();
     private_dsg_->graph->emplaceNode(
-        KimeraDsgLayers::BUILDINGS, building_node_id, std::move(attrs));
+        KimeraDsgLayers::BUILDINGS, node_id, std::move(attrs));
   } else {
-    private_dsg_->graph->getNode(building_node_id)->get().attributes().position =
-        centroid;
+    private_dsg_->graph->getNode(node_id)->get().attributes().position = centroid;
   }
 
   for (const auto& id_node_pair : rooms.nodes()) {
-    private_dsg_->graph->insertEdge(building_node_id, id_node_pair.first);
+    private_dsg_->graph->insertEdge(node_id, id_node_pair.first);
   }
 }
 
