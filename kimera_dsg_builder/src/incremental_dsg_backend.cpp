@@ -786,8 +786,9 @@ void DsgBackend::loadState(const std::string& state_path,
   kimera_pgmo::ReadMeshWithStampsFromPly(
       state_path + "/mesh.ply", mesh, &mesh_vertex_stamps_);
 
-  latest_mesh_.reset(new kimera_pgmo::KimeraPgmoMesh(
-      kimera_pgmo::PolygonMeshToPgmoMeshMsg(0, *mesh, mesh_vertex_stamps_, "world")));
+  latest_mesh_.reset(
+      new kimera_pgmo::KimeraPgmoMesh(kimera_pgmo::PolygonMeshToPgmoMeshMsg(
+          robot_id_, *mesh, mesh_vertex_stamps_, "world")));
   have_new_mesh_ = true;
 
   loadDeformationGraphFromFile(dgrf_path);
