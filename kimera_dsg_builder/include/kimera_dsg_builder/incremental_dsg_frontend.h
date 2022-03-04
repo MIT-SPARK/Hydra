@@ -113,8 +113,8 @@ class DsgFrontend {
   NodeIdSet archived_places_;
   NodeIdSet previous_active_places_;
 
-  std::map<char, std::set<NodeId>> deleted_agent_edge_indices_;
-  std::map<char, size_t> last_agent_edge_index_;
+  std::set<NodeId> deleted_agent_edge_indices_;
+  std::map<LayerPrefix, size_t> last_agent_edge_index_;
 
   std::atomic<bool> lcd_shutting_down_{false};
   std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> lcd_queue_;

@@ -407,11 +407,7 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
           if (objects.hasNode(child)) {
             objects_to_check.insert(child);
           } else {
-            NodeSymbol dynamic_node(child);
-            if (!deleted_agent_edge_indices_.count(dynamic_node.category())) {
-              deleted_agent_edge_indices_[dynamic_node.category()] = std::set<NodeId>();
-            }
-            deleted_agent_edge_indices_[dynamic_node.category()].insert(child);
+            deleted_agent_edge_indices_.insert(child);
           }
         }
       }
@@ -434,8 +430,7 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
 }
 
 void DsgFrontend::addPlaceObjectEdges(NodeIdSet* extra_objects_to_check) {
-  ScopedTimer timer(
-      "frontend/place_object_edges", last_places_timestamp_, true, 2, false);
+  ScopedTimer timer("frontend/place_object_edges", last_places_timestamp_);
   if (!places_nn_finder_) {
     return;  // haven't received places yet
   }
@@ -467,7 +462,7 @@ void DsgFrontend::addAgentPlaceEdges() {
   }
 
   for (const auto& pair : dsg_->graph->dynamicLayersOfType(KimeraDsgLayers::AGENTS)) {
-    const char prefix = pair.first;
+    const LayerPrefix prefix = pair.first;
     const auto& layer = *pair.second;
 
     if (!last_agent_edge_index_.count(prefix)) {
@@ -477,24 +472,20 @@ void DsgFrontend::addAgentPlaceEdges() {
     for (size_t i = last_agent_edge_index_[prefix]; i < layer.numNodes(); ++i) {
       places_nn_finder_->find(
           layer.getPositionByIndex(i), 1, false, [&](NodeId place_id, size_t, double) {
-            CHECK(dsg_->graph->insertEdge(place_id, NodeSymbol(prefix, i)));
+            CHECK(dsg_->graph->insertEdge(place_id, prefix.makeId(i)));
           });
     }
     last_agent_edge_index_[prefix] = layer.numNodes();
-
-    if (!deleted_agent_edge_indices_.count(prefix)) {
-      continue;
-    }
-
-    for (const auto& node : deleted_agent_edge_indices_[prefix]) {
-      places_nn_finder_->find(
-          layer.getPosition(node), 1, false, [&](NodeId place_id, size_t, double) {
-            CHECK(dsg_->graph->insertEdge(place_id, node));
-          });
-    }
-
-    deleted_agent_edge_indices_.erase(prefix);
   }
+
+  for (const auto& node : deleted_agent_edge_indices_) {
+    const Eigen::Vector3d pos = dsg_->graph->getPosition(node);
+    places_nn_finder_->find(pos, 1, false, [&](NodeId place_id, size_t, double) {
+      CHECK(dsg_->graph->insertEdge(place_id, node));
+    });
+  }
+
+  deleted_agent_edge_indices_.clear();
 }
 
 void DsgFrontend::startLcd() {
