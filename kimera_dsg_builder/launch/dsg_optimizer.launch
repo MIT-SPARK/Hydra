@@ -2,7 +2,7 @@
 
     <arg name="dsg_dir" default="$(find kimera_dsg_builder)/output/sidpac/sidpac_f1_3"/>
     <arg name="dsg_name" value="frontend/dsg_with_mesh.json"/>
-    <arg name="state_name" value="frontend/state.json"/>
+    <arg name="frontend_path" value="frontend"/>
     <arg name="dgrf_name" value="pgmo/deformation_graph.dgrf"/>
 
     <arg name="debug" default="false"/>
@@ -23,13 +23,12 @@
           output="screen">
         <env name="TERM" value="xterm-256color"/>
         <rosparam file="$(find kimera_dsg_builder)/config/sidpac/dsg_backend_config.yaml"/>
-        <param name="dsg/optimize_on_lc" value="true"/>
-        <param name="pgmo/log_output" value="false"/>
-        <param name="dsg_log_output" value="false"/>
+        <param name="pgmo/should_log" value="false"/>
+        <param name="should_log" value="false"/>
 
         <param name="dsg_filepath" value="$(arg dsg_dir)/$(arg dsg_name)"/>
         <param name="dgrf_filepath" value="$(arg dsg_dir)/$(arg dgrf_name)"/>
-        <param name="frontend_state_filepath" value="$(arg dsg_dir)/$(arg state_name)"/>
+        <param name="frontend_filepath" value="$(arg dsg_dir)/$(arg frontend_path)"/>
     </node>
 
     <include file="$(find pose_graph_tools)/launch/posegraph_view.launch" >

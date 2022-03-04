@@ -208,7 +208,6 @@ void visit_config(const Visitor& v, RoomFinder::Config& config) {
   v.visit("max_dilation_m", config.max_dilation_m);
   v.visit("num_steps", config.num_steps);
   v.visit("min_component_size", config.min_component_size);
-  v.visit("room_prefix", config.room_prefix);
   v.visit("room_semantic_label", config.room_semantic_label);
   v.visit("max_kmeans_iters", config.max_kmeans_iters);
   v.visit("room_vote_min_overlap", config.room_vote_min_overlap);
@@ -218,6 +217,12 @@ void visit_config(const Visitor& v, RoomFinder::Config& config) {
   v.visit("max_modularity_iters", config.max_modularity_iters);
   v.visit("modularity_gamma", config.modularity_gamma);
   v.visit("clustering_mode", config.clustering_mode);
+
+  std::string prefix_string;
+  v.visit("room_prefix", prefix_string);
+  if (config_parser::is_parser<Visitor>()) {
+    config.room_prefix = prefix_string[0];
+  }
 }
 
 }  // namespace incremental

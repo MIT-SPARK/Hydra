@@ -787,33 +787,9 @@ void DsgBackend::visualizeDeformationGraphEdges() const {
 
 void DsgBackend::loadState(const std::string& state_path,
                            const std::string& dgrf_path) {
-  std::ifstream infile(state_path + "/mesh_times.csv");
-  if (!infile.good()) {
-    throw std::runtime_error("file " + state_path +
-                             "/mesh_times.csv is missing or invalid!");
-  }
-
-  mesh_vertex_stamps_.clear();
-
-  std::string line;
-  std::getline(infile, line);  // read and ignore header
-  while (std::getline(infile, line)) {
-    std::stringstream ss(line);
-    std::vector<std::string> contents;
-
-    std::string col;
-    while (std::getline(ss, col, ',')) {
-      contents.push_back(col);
-    }
-
-    const uint64_t time_ns = std::stoull(contents.at(1));
-    ros::Time stamp;
-    stamp.fromNSec(time_ns);
-    mesh_vertex_stamps_.push_back(stamp);
-  }
-
   pcl::PolygonMeshPtr mesh(new pcl::PolygonMesh());
-  kimera_pgmo::ReadMeshFromPly(state_path + "/mesh.ply", mesh);
+  kimera_pgmo::ReadMeshWithStampsFromPly(
+      state_path + "/mesh.ply", mesh, &mesh_vertex_stamps_);
 
   latest_mesh_.reset(new kimera_pgmo::KimeraPgmoMesh(
       kimera_pgmo::PolygonMeshToPgmoMeshMsg(0, *mesh, mesh_vertex_stamps_, "world")));

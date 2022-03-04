@@ -53,4 +53,5 @@ room_finder:
     max_modularity_iters: 5
     modularity_gamma: 1.0
     clustering_mode: "MODULARITY"
+    room_semantic_label: 21
     room_prefix: 'R'

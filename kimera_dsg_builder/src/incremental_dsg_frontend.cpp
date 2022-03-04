@@ -750,21 +750,9 @@ void DsgFrontend::saveState(const std::string& filepath) const {
   const auto vertices = mesh_frontend_.getFullMeshVertices();
   pcl::toPCLPointCloud2(*vertices, mesh.cloud);
 
-  kimera_pgmo::WriteMeshToPly(filepath + "/mesh.ply", mesh);
-
   std::vector<ros::Time> mesh_stamps = mesh_frontend_.getFullMeshTimes();
-  std::vector<uint64_t> mesh_ns;
-  mesh_ns.reserve(mesh_stamps.size());
-  std::transform(mesh_stamps.begin(),
-                 mesh_stamps.end(),
-                 std::back_inserter(mesh_ns),
-                 [&](auto timestamp) { return timestamp.toNSec(); });
-
-  std::ofstream outfile(filepath + "/mesh_times.csv");
-  outfile << "index,time_ns" << std::endl;
-  for (size_t i = 0; i < mesh_ns.size(); ++i) {
-    outfile << i << "," << mesh_ns.at(i) << std::endl;
-  }
+  kimera_pgmo::WriteMeshWithStampsToPly(
+      filepath + "/mesh.ply", mesh, mesh_stamps);
 }
 
 }  // namespace incremental

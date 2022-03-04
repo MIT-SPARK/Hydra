@@ -11,7 +11,7 @@ struct DsgOptimizer {
       : nh(node_handle), reset_backend(false) {
     CHECK(nh.getParam("dsg_filepath", dsg_filepath)) << "missing dsg_filepath!";
     CHECK(nh.getParam("dgrf_filepath", dgrf_filepath)) << "missing dgrf_filepath!";
-    CHECK(nh.getParam("frontend_state_filepath", frontend_state_filepath))
+    CHECK(nh.getParam("frontend_filepath", frontend_filepath))
         << "missing frontend_state_filepath";
 
     const LayerId mesh_layer_id = 1;
@@ -53,9 +53,9 @@ struct DsgOptimizer {
 
   void do_optimize() {
     backend.reset(new DsgBackend(nh, frontend_dsg, backend_dsg));
-    backend->start();
+    backend->startPgmo();
     LOG(ERROR) << "Loading backend state!";
-    backend->loadState(frontend_state_filepath, dgrf_filepath);
+    backend->loadState(frontend_filepath, dgrf_filepath);
     LOG(ERROR) << "Loaded backend state!";
 
     backend->updateDsgMesh();
@@ -88,7 +88,7 @@ struct DsgOptimizer {
   bool reset_backend;
 
   std::string dsg_filepath;
-  std::string frontend_state_filepath;
+  std::string frontend_filepath;
   std::string dgrf_filepath;
 
   SharedDsgInfo::Ptr frontend_dsg;

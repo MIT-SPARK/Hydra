@@ -87,6 +87,10 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void visualizeDeformationGraphEdges() const;
 
+  void startVisualizer();
+
+  void startPgmo();
+
  private:
   void setSolverParams();
 
@@ -102,11 +106,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   bool saveMeshCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
-  void startVisualizer();
-
   void runVisualizer();
-
-  void startPgmo();
 
   void runPgmo();
 
