@@ -31,15 +31,15 @@ class MeshSegmenter {
   using ObjectCloudPublishers = hydra::SemanticRosPublishers<uint8_t, MeshVertexCloud>;
   using KdTreeT = pcl::search::KdTree<Cluster::PointT>;
   using Clusters = std::vector<Cluster>;
+  using LabelClusters = std::map<uint8_t, Clusters>;
 
   explicit MeshSegmenter(const ros::NodeHandle& nh,
                          const MeshVertexCloud::Ptr& active_vertices);
 
   virtual ~MeshSegmenter();
 
-  bool detectObjects(const SharedDsgInfo::Ptr& dsg,
-                     const std::vector<size_t>& active_indices,
-                     const std::optional<Eigen::Vector3d>& pos);
+  LabelClusters detectObjects(const std::vector<size_t>& active_indices,
+                              const std::optional<Eigen::Vector3d>& pos);
 
   inline std::unordered_set<NodeId> getObjectsToCheckForPlaces() const {
     return objects_to_check_for_places_;
@@ -47,18 +47,18 @@ class MeshSegmenter {
 
   void pruneObjectsToCheckForPlaces(const DynamicSceneGraph& graph);
 
+  void updateGraph(DynamicSceneGraph& graph, const LabelClusters& clusters);
+
  private:
+  LabelClusters findNewObjectClusters(
+      const std::vector<size_t> active_indices) const;
+
   Clusters findClusters(const MeshVertexCloud::Ptr& cloud,
                         const std::vector<size_t>& indices) const;
 
   void archiveOldObjects(const DynamicSceneGraph& graph, double latest_timestamp);
 
   LabelIndices getLabelIndices(const std::vector<size_t>& indices) const;
-
-  void updateGraph(DynamicSceneGraph& graph,
-                   const Clusters& clusters,
-                   uint8_t label,
-                   double timestamp);
 
   void addObjectToGraph(DynamicSceneGraph& graph,
                         const Cluster& cluster,

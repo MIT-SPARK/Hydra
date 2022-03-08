@@ -15,6 +15,8 @@ using hydra::timing::ScopedTimer;
 using lcd::LayerRegistrationConfig;
 using pose_graph_tools::PoseGraph;
 
+using LabelClusters = MeshSegmenter::LabelClusters;
+
 DsgFrontend::DsgFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg)
     : nh_(nh), dsg_(dsg), lcd_graph_(new DynamicSceneGraph()) {
   config_ = load_config<DsgFrontendConfig>(nh_);
@@ -236,6 +238,7 @@ void DsgFrontend::runMeshFrontend() {
     }  // end timing scope
 
     mesh_frontend_.clearArchivedMeshFull(msg->archived_blocks);
+    LabelClusters object_clusters;
 
     {  // timing scope
       ScopedTimer timer("frontend/object_detection", object_timestamp, true, 1, false);
@@ -260,8 +263,8 @@ void DsgFrontend::runMeshFrontend() {
         }
       }  // end dsg critical section
 
-      segmenter_->detectObjects(
-          dsg_, mesh_frontend_.getActiveFullMeshVertices(), getLatestPose());
+      object_clusters = segmenter_->detectObjects(
+          mesh_frontend_.getActiveFullMeshVertices(), getLatestPose());
     }
 
     {  // start dsg critical section
@@ -269,6 +272,7 @@ void DsgFrontend::runMeshFrontend() {
       // TODO(nathan) unlike agent-place edges, we can't guarantee that all objects will
       // be connected to parents inside the dsg critical section (would need to make
       // detectObjects non-threadsafe / integrate more cleanly)
+      segmenter_->updateGraph(*dsg_->graph, object_clusters);
       addPlaceObjectEdges();
     }  // end dsg critical section
 

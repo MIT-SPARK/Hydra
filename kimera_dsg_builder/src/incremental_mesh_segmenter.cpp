@@ -12,6 +12,7 @@ namespace kimera {
 namespace incremental {
 
 using Clusters = MeshSegmenter::Clusters;
+using LabelClusters = MeshSegmenter::LabelClusters;
 using LabelIndices = MeshSegmenter::LabelIndices;
 
 std::ostream& operator<<(std::ostream& out, const std::set<uint8_t>& labels) {
@@ -159,12 +160,45 @@ Clusters MeshSegmenter::findClusters(const MeshVertexCloud::Ptr& cloud,
   return clusters;
 }
 
-bool MeshSegmenter::detectObjects(const SharedDsgInfo::Ptr& dsg,
-                                  const std::vector<size_t>& frontend_indices,
-                                  const std::optional<Eigen::Vector3d>& pos) {
-  const double latest_timestamp = ros::Time::now().toSec();
-  archiveOldObjects(*dsg->graph, latest_timestamp);
+LabelClusters MeshSegmenter::findNewObjectClusters(
+    const std::vector<size_t> active_indices) const {
+  LabelClusters object_clusters;
 
+  if (active_indices.empty()) {
+    VLOG(3) << "[Object Detection] No active indices in mesh";
+    return object_clusters;
+  }
+
+  LabelIndices label_indices = getLabelIndices(active_indices);
+  if (label_indices.empty()) {
+    VLOG(3) << "[Object Detection] No object vertices found";
+    return object_clusters;
+  }
+  publishObjectClouds(label_indices);
+
+  VLOG(3) << "[Object Detection] Detecting objects";
+  for (const auto label : object_labels_) {
+    if (!label_indices.count(label)) {
+      continue;
+    }
+
+    if (label_indices.at(label).size() < min_cluster_size_) {
+      continue;
+    }
+
+    const auto clusters =
+        findClusters(full_mesh_vertices_, label_indices.at(label));
+
+    VLOG(3) << "[Object Detection]  - Found " << clusters.size()
+            << " objects of label " << static_cast<int>(label);
+    object_clusters.insert({label, clusters});
+  }
+  return object_clusters;
+}
+
+LabelClusters MeshSegmenter::detectObjects(
+    const std::vector<size_t>& frontend_indices,
+    const std::optional<Eigen::Vector3d>& pos) {
   std::vector<size_t> active_indices;
   if (!pos) {
     active_indices = frontend_indices;
@@ -184,40 +218,7 @@ bool MeshSegmenter::detectObjects(const SharedDsgInfo::Ptr& dsg,
 
   publishActiveVertices(active_indices);
 
-  if (active_indices.empty()) {
-    VLOG(3) << "[Object Detection] No active indices in mesh";
-    return false;
-  }
-
-  LabelIndices label_indices = getLabelIndices(active_indices);
-  if (label_indices.empty()) {
-    VLOG(3) << "[Object Detection] No object vertices found";
-    return false;
-  }
-  publishObjectClouds(label_indices);
-
-  VLOG(3) << "[Object Detection] Detecting objects";
-  for (const auto label : object_labels_) {
-    if (!label_indices.count(label)) {
-      continue;
-    }
-
-    if (label_indices.at(label).size() < min_cluster_size_) {
-      continue;
-    }
-
-    const auto clusters = findClusters(full_mesh_vertices_, label_indices.at(label));
-
-    VLOG(3) << "[Object Detection]  - Found " << clusters.size() << " objects of label "
-            << static_cast<int>(label);
-
-    {  // start graph update critical section
-      std::unique_lock<std::mutex> lock(dsg->mutex);
-      updateGraph(*dsg->graph, clusters, label, latest_timestamp);
-    }  // end graph update critical section
-  }
-
-  return true;
+  return findNewObjectClusters(active_indices);
 }
 
 void MeshSegmenter::pruneObjectsToCheckForPlaces(const DynamicSceneGraph& graph) {
@@ -299,74 +300,83 @@ LabelIndices MeshSegmenter::getLabelIndices(const std::vector<size_t>& indices) 
 }
 
 void MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
-                                const std::vector<Cluster>& clusters,
-                                uint8_t label,
-                                double timestamp) {
-  for (const auto& cluster : clusters) {
-    bool matches_prev_object = false;
-    std::vector<NodeId> nodes_not_in_graph;
-    for (const auto& prev_node_id : active_objects_.at(label)) {
-      if (!graph.hasNode(prev_node_id)) {
-        nodes_not_in_graph.push_back(prev_node_id);
+                                const LabelClusters& clusters) {
+  const double timestamp = ros::Time::now().toSec();
+  archiveOldObjects(graph, timestamp);
+
+  for (const auto& label_clusters : clusters) {
+    for (const auto& cluster : label_clusters.second) {
+      bool matches_prev_object = false;
+      std::vector<NodeId> nodes_not_in_graph;
+      for (const auto& prev_node_id :
+           active_objects_.at(label_clusters.first)) {
+        if (!graph.hasNode(prev_node_id)) {
+          nodes_not_in_graph.push_back(prev_node_id);
+          continue;
+        }
+
+        const SceneGraphNode& prev_node = graph.getNode(prev_node_id).value();
+        if (objectsMatch(cluster, prev_node)) {
+          updateObjectInGraph(graph, cluster, prev_node, timestamp);
+          matches_prev_object = true;
+          break;
+        }
+      }
+
+      if (!matches_prev_object) {
+        addObjectToGraph(graph, cluster, label_clusters.first, timestamp);
+      }
+
+      // Remove the nodes that do not exist in graph
+      for (const auto& node_id : nodes_not_in_graph) {
+        active_object_timestamps_.erase(node_id);
+        active_objects_[label_clusters.first].erase(node_id);
+      }
+    }
+
+    auto to_check = active_objects_[label_clusters.first];
+    for (const auto& node_id : to_check) {
+      if (!graph.hasNode(node_id)) {
         continue;
       }
 
-      const SceneGraphNode& prev_node = graph.getNode(prev_node_id).value();
-      if (objectsMatch(cluster, prev_node)) {
-        updateObjectInGraph(graph, cluster, prev_node, timestamp);
-        matches_prev_object = true;
-        break;
-      }
-    }
+      const auto& node = graph.getNode(node_id)
+                             .value()
+                             .get()
+                             .attributes<SemanticNodeAttributes>();
 
-    if (!matches_prev_object) {
-      addObjectToGraph(graph, cluster, label, timestamp);
-    }
+      for (const auto& other_id : to_check) {
+        if (node_id == other_id) {
+          continue;
+        }
 
-    // Remove the nodes that do not exist in graph
-    for (const auto& node_id : nodes_not_in_graph) {
-      active_object_timestamps_.erase(node_id);
-      active_objects_[label].erase(node_id);
-    }
-  }
+        if (!graph.hasNode(other_id)) {
+          continue;
+        }
 
-  auto to_check = active_objects_[label];
-  for (const auto& node_id : to_check) {
-    if (!graph.hasNode(node_id)) {
-      continue;
-    }
+        const auto& other = graph.getNode(other_id)
+                                .value()
+                                .get()
+                                .attributes<SemanticNodeAttributes>();
 
-    const auto& node =
-        graph.getNode(node_id).value().get().attributes<SemanticNodeAttributes>();
-
-    for (const auto& other_id : to_check) {
-      if (node_id == other_id) {
-        continue;
-      }
-
-      if (!graph.hasNode(other_id)) {
-        continue;
-      }
-
-      const auto& other =
-          graph.getNode(other_id).value().get().attributes<SemanticNodeAttributes>();
-
-      if (node.bounding_box.isInside(other.position) ||
-          other.bounding_box.isInside(node.position)) {
-        if (node.bounding_box.volume() >= other.bounding_box.volume()) {
-          graph.removeNode(other_id);
-          active_objects_[label].erase(other_id);
-          active_object_timestamps_.erase(other_id);
-          objects_to_check_for_places_.erase(other_id);
-        } else {
-          graph.removeNode(node_id);
-          active_objects_[label].erase(node_id);
-          active_object_timestamps_.erase(node_id);
-          objects_to_check_for_places_.erase(node_id);
+        if (node.bounding_box.isInside(other.position) ||
+            other.bounding_box.isInside(node.position)) {
+          if (node.bounding_box.volume() >= other.bounding_box.volume()) {
+            graph.removeNode(other_id);
+            active_objects_[label_clusters.first].erase(other_id);
+            active_object_timestamps_.erase(other_id);
+            objects_to_check_for_places_.erase(other_id);
+          } else {
+            graph.removeNode(node_id);
+            active_objects_[label_clusters.first].erase(node_id);
+            active_object_timestamps_.erase(node_id);
+            objects_to_check_for_places_.erase(node_id);
+          }
         }
       }
     }
   }
+  // TODO(yun) Update the interlayer edges
 }
 
 void MeshSegmenter::updateObjectInGraph(DynamicSceneGraph& graph,
