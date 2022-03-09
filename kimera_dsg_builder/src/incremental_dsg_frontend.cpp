@@ -241,7 +241,8 @@ void DsgFrontend::runMeshFrontend() {
     LabelClusters object_clusters;
 
     {  // timing scope
-      ScopedTimer timer("frontend/object_detection", object_timestamp, true, 1, false);
+      ScopedTimer timer(
+          "frontend/object_detection", object_timestamp, true, 1, false);
       const auto& invalid_indices = mesh_frontend_.getInvalidIndices();
       {  // start dsg critical section
         std::unique_lock<std::mutex> lock(dsg_->mutex);
@@ -252,7 +253,8 @@ void DsgFrontend::runMeshFrontend() {
         std::vector<NodeId> objects_to_delete;
         const auto& objects = dsg_->graph->getLayer(KimeraDsgLayers::OBJECTS);
         for (const auto& id_node_pair : objects.nodes()) {
-          auto connections = dsg_->graph->getMeshConnectionIndices(id_node_pair.first);
+          auto connections =
+              dsg_->graph->getMeshConnectionIndices(id_node_pair.first);
           if (connections.size() < config_.min_object_vertices) {
             objects_to_delete.push_back(id_node_pair.first);
           }
@@ -269,17 +271,14 @@ void DsgFrontend::runMeshFrontend() {
 
     {  // start dsg critical section
       std::unique_lock<std::mutex> lock(dsg_->mutex);
-      // TODO(nathan) unlike agent-place edges, we can't guarantee that all objects will
-      // be connected to parents inside the dsg critical section (would need to make
-      // detectObjects non-threadsafe / integrate more cleanly)
       segmenter_->updateGraph(*dsg_->graph, object_clusters);
       addPlaceObjectEdges();
     }  // end dsg critical section
 
     if (state.timestamp_ns != last_mesh_timestamp_) {
       dsg_->updated = true;
-      continue;  // places dropped a message or is ahead of us, so we don't need to
-                 // update the mapping
+      continue;  // places dropped a message or is ahead of us, so we don't need
+                 // to update the mapping
     }
 
     // wait for the places thread to finish the latest message
@@ -288,8 +287,11 @@ void DsgFrontend::runMeshFrontend() {
     }
 
     {
-      ScopedTimer timer(
-          "frontend/place_mesh_mapping", last_places_timestamp_, true, 1, false);
+      ScopedTimer timer("frontend/place_mesh_mapping",
+                        last_places_timestamp_,
+                        true,
+                        1,
+                        false);
       updatePlaceMeshMapping();
     }
 

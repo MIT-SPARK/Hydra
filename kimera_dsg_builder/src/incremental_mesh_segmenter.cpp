@@ -376,7 +376,6 @@ void MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
       }
     }
   }
-  // TODO(yun) Update the interlayer edges
 }
 
 void MeshSegmenter::updateObjectInGraph(DynamicSceneGraph& graph,
