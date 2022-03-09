@@ -18,6 +18,11 @@ struct DsgLcdConfig {
   size_t num_semantic_classes = 20;
   double place_radius_m = 5.0;
   HistogramConfig<double> place_histogram_config{0.5, 2.5, 30};
+
+  bool visualize_dsg_lcd = false;
+  std::string lcd_visualizer_ns = "/dsg/lcd_visualizer";
+  double lcd_agent_horizon_s = 1.5;
+  double descriptor_creation_horizon_m = 10.0;
 };
 
 class DsgLcdModule {

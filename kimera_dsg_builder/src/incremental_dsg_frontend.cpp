@@ -12,13 +12,12 @@ namespace kimera {
 namespace incremental {
 
 using hydra::timing::ScopedTimer;
-using lcd::LayerRegistrationConfig;
 using pose_graph_tools::PoseGraph;
 
 using LabelClusters = MeshSegmenter::LabelClusters;
 
 DsgFrontend::DsgFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg)
-    : nh_(nh), dsg_(dsg), lcd_graph_(new DynamicSceneGraph()) {
+    : nh_(nh), dsg_(dsg) {
   config_ = load_config<DsgFrontendConfig>(nh_);
 
   ros::NodeHandle pgmo_nh(nh_, "pgmo");
@@ -36,16 +35,6 @@ DsgFrontend::DsgFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& ds
 
 void DsgFrontend::stop() {
   VLOG(2) << "[DSG Frontend] stopping frontend!";
-
-  lcd_shutting_down_ = true;
-  if (lcd_thread_) {
-    VLOG(2) << "[DSG Frontend] joining lcd thread";
-    lcd_thread_->join();
-    lcd_thread_.reset();
-    VLOG(2) << "[DSG Frontend] joined lcd thread";
-  }
-
-  lcd_visualizer_.reset();
 
   should_shutdown_ = true;
   if (mesh_frontend_thread_) {
@@ -123,11 +112,6 @@ void DsgFrontend::handleLatestPoseGraph(const PoseGraph::ConstPtr& msg) {
   addAgentPlaceEdges();
 }
 
-void DsgFrontend::handleDbowMsg(const kimera_vio_ros::BowQuery::ConstPtr& msg) {
-  std::unique_lock<std::mutex> lock(dsg_->mutex);
-  bow_messages_.push_back(msg);
-}
-
 void DsgFrontend::start() {
   // TODO(nathan) rethink
   int robot_id = 0;
@@ -141,10 +125,6 @@ void DsgFrontend::start() {
   startMeshFrontend();
   startPlaces();
 
-  if (config_.enable_lcd) {
-    LOG(INFO) << "[DSG Frontend] LCD enabled!";
-    startLcd();
-  }
   LOG(INFO) << "[DSG Frontend] started!";
 }
 
@@ -171,8 +151,7 @@ std::optional<Eigen::Vector3d> DsgFrontend::getLatestPose() {
   if (!config_.prune_mesh_indices) {
     return std::nullopt;
   }
-  // ros::Time lookup_time;
-  // lookup_time.fromNSec(last_mesh_timestamp_);
+
   geometry_msgs::TransformStamped msg;
   try {
     msg = tf_buffer_.lookupTransform("world", config_.sensor_frame, ros::Time(0));
@@ -486,153 +465,6 @@ void DsgFrontend::addAgentPlaceEdges() {
   deleted_agent_edge_indices_.clear();
 }
 
-void DsgFrontend::startLcd() {
-  bow_sub_ = nh_.subscribe("bow_vectors", 100, &DsgFrontend::handleDbowMsg, this);
-
-  auto config = load_config<lcd::DsgLcdConfig>(nh_, "lcd");
-  for (auto& kv_pair : config.registration_configs) {
-    kv_pair.second.registration_output_path = config_.log_path + "/lcd/";
-  }
-  config.agent_search_config.min_registration_score =
-      config.agent_search_config.min_score;
-  lcd_module_.reset(new lcd::DsgLcdModule(config));
-
-  if (config_.visualize_dsg_lcd) {
-    ros::NodeHandle nh(config_.lcd_visualizer_ns);
-    visualizer_queue_.reset(new ros::CallbackQueue());
-    nh.setCallbackQueue(visualizer_queue_.get());
-
-    lcd_visualizer_.reset(new lcd::LcdVisualizer(nh, config.object_radius_m));
-    lcd_visualizer_->setGraph(lcd_graph_);
-    lcd_visualizer_->setLcdModule(lcd_module_.get());
-  }
-
-  lcd_thread_.reset(new std::thread(&DsgFrontend::runLcd, this));
-}
-
-std::optional<NodeId> DsgFrontend::getLatestAgentId() {
-  if (lcd_queue_.empty()) {
-    return std::nullopt;
-  }
-
-  bool has_parent;
-  std::chrono::nanoseconds prev_time;
-  const DynamicSceneGraphNode& node =
-      lcd_graph_->getDynamicNode(lcd_queue_.top()).value();
-  prev_time = node.timestamp;
-  has_parent = node.hasParent();
-
-  if (!has_parent) {
-    LOG(ERROR) << "Found agent node without parent: "
-               << NodeSymbol(lcd_queue_.top()).getLabel() << ". Discarding!";
-    lcd_queue_.pop();
-    return std::nullopt;
-  }
-
-  const std::chrono::nanoseconds curr_time(last_places_timestamp_);
-  std::chrono::duration<double> diff_s = curr_time - prev_time;
-  // we consider lcd_shutting_down_ here to make sure we're not waiting on popping from
-  // the LCD queue while not getting new place messages
-  if (!lcd_shutting_down_ && diff_s.count() < config_.lcd_agent_horizon_s) {
-    return std::nullopt;
-  }
-
-  const bool forced_pop = (diff_s.count() < config_.lcd_agent_horizon_s);
-  if (lcd_shutting_down_ && forced_pop) {
-    LOG(ERROR) << "Forcing pop of node " << NodeSymbol(lcd_queue_.top()).getLabel()
-               << " from lcd queue due to shutdown: parent? "
-               << (has_parent ? "yes" : "no") << ", diff: " << diff_s.count() << " / "
-               << config_.lcd_agent_horizon_s;
-  }
-
-  auto valid_node = lcd_queue_.top();
-  lcd_queue_.pop();
-  return valid_node;
-}
-
-void DsgFrontend::runLcd() {
-  ros::WallRate r(10);
-  while (ros::ok()) {
-    assignBowVectors();
-
-    {  // start critical section
-      std::unique_lock<std::mutex> lock(dsg_->mutex);
-      lcd_graph_->mergeGraph(*dsg_->graph);
-    }  // end critical section
-
-    if (lcd_graph_->getLayer(KimeraDsgLayers::PLACES).numNodes() == 0) {
-      r.sleep();
-      continue;
-    }
-
-    if (lcd_shutting_down_ && lcd_queue_.empty()) {
-      break;
-    }
-
-    {  // start critical section
-      std::unique_lock<std::mutex> place_lock(places_queue_mutex_);
-      potential_lcd_root_nodes_.insert(potential_lcd_root_nodes_.end(),
-                                       archived_places_.begin(),
-                                       archived_places_.end());
-      archived_places_.clear();
-    }  // end critical section
-
-    auto latest_agent = getLatestAgentId();
-    if (!latest_agent) {
-      r.sleep();
-      continue;
-    }
-
-    const Eigen::Vector3d latest_pos = lcd_graph_->getPosition(*latest_agent);
-
-    NodeIdSet to_cache;
-    auto iter = potential_lcd_root_nodes_.begin();
-    while (iter != potential_lcd_root_nodes_.end()) {
-      const Eigen::Vector3d pos = lcd_graph_->getPosition(*iter);
-      if ((latest_pos - pos).norm() < config_.descriptor_creation_horizon_m) {
-        ++iter;
-      } else {
-        to_cache.insert(*iter);
-        iter = potential_lcd_root_nodes_.erase(iter);
-      }
-    }
-
-    if (!to_cache.empty()) {
-      auto curr_time = ros::Time::now();
-      lcd_module_->updateDescriptorCache(*lcd_graph_, to_cache, curr_time.toNSec());
-    }
-
-    auto time = lcd_graph_->getDynamicNode(*latest_agent).value().get().timestamp;
-    auto results = lcd_module_->detect(*lcd_graph_, *latest_agent, time.count());
-    if (lcd_visualizer_) {
-      lcd_visualizer_->setGraphUpdated();
-      lcd_visualizer_->redraw();
-    }
-
-    if (results.size() == 0) {
-      if (!lcd_shutting_down_) {
-        r.sleep();
-      }
-      continue;
-    }
-
-    {  // start lcd critical section
-      // TODO(nathan) double check logic here
-      std::unique_lock<std::mutex> lcd_lock(dsg_->lcd_mutex);
-      for (const auto& result : results) {
-        dsg_->loop_closures.push(result);
-        LOG(WARNING) << "Found valid loop-closure: "
-                     << NodeSymbol(result.from_node).getLabel() << " -> "
-                     << NodeSymbol(result.to_node).getLabel();
-      }
-    }  // end lcd critical section
-
-    if (!lcd_shutting_down_) {
-      r.sleep();
-    }
-  }
-}
-
 void DsgFrontend::updatePlaceMeshMapping() {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
   const auto& places = dsg_->graph->getLayer(KimeraDsgLayers::PLACES);
@@ -684,37 +516,6 @@ void DsgFrontend::updatePlaceMeshMapping() {
     VLOG(2) << "[DSG Backend] Place-Mesh Update: " << num_invalid
             << " invalid connections";
   }
-}
-
-void DsgFrontend::assignBowVectors() {
-  std::unique_lock<std::mutex> lock(dsg_->mutex);
-  const auto& agents = dsg_->graph->getLayer(KimeraDsgLayers::AGENTS, robot_prefix_);
-
-  const size_t prior_size = bow_messages_.size();
-  auto iter = bow_messages_.begin();
-  while (iter != bow_messages_.end()) {
-    // TODO(nathan) implicit assumption that gtsam symbol and dsg node symbol are same
-    const auto& msg = *iter;
-    char prefix = kimera_pgmo::robot_id_to_prefix.at(msg->robot_id);
-    NodeSymbol pgmo_key(prefix, msg->pose_id);
-    if (agent_key_map_.count(pgmo_key)) {
-      const auto& node = agents.getNodeByIndex(agent_key_map_.at(pgmo_key))->get();
-      lcd_queue_.push(node.id);
-
-      AgentNodeAttributes& attrs = node.attributes<AgentNodeAttributes>();
-      attrs.dbow_ids = Eigen::Map<const AgentNodeAttributes::BowIdVector>(
-          msg->bow_vector.word_ids.data(), msg->bow_vector.word_ids.size());
-      attrs.dbow_values = Eigen::Map<const Eigen::VectorXf>(
-          msg->bow_vector.word_values.data(), msg->bow_vector.word_values.size());
-
-      iter = bow_messages_.erase(iter);
-    } else {
-      ++iter;
-    }
-  }
-
-  VLOG(3) << "[DSG Frontend] " << bow_messages_.size() << " of " << prior_size
-          << " bow vectors unassigned";
 }
 
 void DsgFrontend::saveState(const std::string& filepath) const {

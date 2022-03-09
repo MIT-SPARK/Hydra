@@ -1,9 +1,7 @@
 #pragma once
 #include "kimera_dsg_builder/configs.h"
-#include "kimera_dsg_builder/dsg_lcd_module.h"
 #include "kimera_dsg_builder/incremental_mesh_segmenter.h"
 #include "kimera_dsg_builder/incremental_types.h"
-#include "kimera_dsg_builder/lcd_visualizer.h"
 
 #include <ros/callback_queue.h>
 #include <ros/ros.h>
@@ -16,7 +14,6 @@
 #include <kimera_topology/ActiveLayer.h>
 #include <kimera_topology/ActiveMesh.h>
 #include <kimera_topology/nearest_neighbor_utilities.h>
-#include <kimera_vio_ros/BowQuery.h>
 #include <pose_graph_tools/PoseGraph.h>
 
 #include <memory>
@@ -52,8 +49,6 @@ class DsgFrontend {
 
   void handleLatestPoseGraph(const pose_graph_tools::PoseGraph::ConstPtr& msg);
 
-  void handleDbowMsg(const kimera_vio_ros::BowQuery::ConstPtr& msg);
-
   void startMeshFrontend();
 
   void runMeshFrontend();
@@ -61,10 +56,6 @@ class DsgFrontend {
   void startPlaces();
 
   void runPlaces();
-
-  void startLcd();
-
-  void runLcd();
 
   PlacesQueueState getPlacesQueueState();
 
@@ -75,10 +66,6 @@ class DsgFrontend {
   void updatePlaceMeshMapping();
 
   void addAgentPlaceEdges();
-
-  void assignBowVectors();
-
-  std::optional<NodeId> getLatestAgentId();
 
   std::optional<Eigen::Vector3d> getLatestPose();
 
@@ -116,20 +103,8 @@ class DsgFrontend {
   std::set<NodeId> deleted_agent_edge_indices_;
   std::map<LayerPrefix, size_t> last_agent_edge_index_;
 
-  std::atomic<bool> lcd_shutting_down_{false};
-  std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> lcd_queue_;
-  std::unique_ptr<std::thread> lcd_thread_;
-  std::unique_ptr<lcd::DsgLcdModule> lcd_module_;
-  std::unique_ptr<lcd::LcdVisualizer> lcd_visualizer_;
-  std::unique_ptr<ros::CallbackQueue> visualizer_queue_;
-  DynamicSceneGraph::Ptr lcd_graph_;
-  // TODO(nathan) replace with struct passed in through constructor
   char robot_prefix_;
-
-  ros::Subscriber bow_sub_;
   ros::Subscriber pose_graph_sub_;
-  std::list<kimera_vio_ros::BowQuery::ConstPtr> bow_messages_;
-  std::list<NodeId> potential_lcd_root_nodes_;
   std::map<NodeId, size_t> agent_key_map_;
 
   SceneGraphLogger frontend_graph_logger_;

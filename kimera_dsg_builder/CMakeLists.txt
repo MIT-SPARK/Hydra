@@ -58,6 +58,7 @@ add_library(
   src/dsg_update_functions.cpp
   src/incremental_dsg_backend.cpp
   src/incremental_dsg_frontend.cpp
+  src/incremental_dsg_lcd.cpp
   src/incremental_mesh_segmenter.cpp
   src/incremental_room_finder.cpp
   src/lcd_visualizer.cpp

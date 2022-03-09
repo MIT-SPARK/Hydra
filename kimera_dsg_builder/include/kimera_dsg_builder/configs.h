@@ -90,12 +90,6 @@ struct DsgFrontendConfig {
   size_t min_object_vertices = 20;
   bool prune_mesh_indices = false;
   std::string sensor_frame = "base_link";
-  bool enable_lcd = false;
-  bool visualize_dsg_lcd = false;
-  std::string lcd_visualizer_ns = "/dsg/lcd_visualizer";
-  // TODO(nathan) consider moving to lcd config
-  double lcd_agent_horizon_s = 1.5;
-  double descriptor_creation_horizon_m = 10.0;
   std::string mesh_ns = "";
 };
 
@@ -145,11 +139,6 @@ void visit_config(const Visitor& v, DsgFrontendConfig& config) {
   v.visit("min_object_vertices", config.min_object_vertices);
   v.visit("prune_mesh_indices", config.prune_mesh_indices);
   v.visit("sensor_frame", config.sensor_frame);
-  v.visit("enable_lcd", config.enable_lcd);
-  v.visit("visualize_dsg_lcd", config.visualize_dsg_lcd);
-  v.visit("lcd_visualizer_ns", config.lcd_visualizer_ns);
-  v.visit("lcd_agent_horizon_s", config.lcd_agent_horizon_s);
-  v.visit("descriptor_creation_horizon_m", config.descriptor_creation_horizon_m);
   v.visit("mesh_ns", config.mesh_ns);
 }
 
@@ -265,6 +254,10 @@ void visit_config(const Visitor& v, DsgLcdConfig& config) {
   v.visit("num_semantic_classes", config.num_semantic_classes);
   v.visit("place_radius_m", config.place_radius_m);
   v.visit("place_histogram_config", config.place_histogram_config);
+  v.visit("visualize_dsg_lcd", config.visualize_dsg_lcd);
+  v.visit("lcd_visualizer_ns", config.lcd_visualizer_ns);
+  v.visit("lcd_agent_horizon_s", config.lcd_agent_horizon_s);
+  v.visit("descriptor_creation_horizon_m", config.descriptor_creation_horizon_m);
 }
 
 }  // namespace lcd
