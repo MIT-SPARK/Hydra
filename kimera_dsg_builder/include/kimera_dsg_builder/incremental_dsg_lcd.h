@@ -1,7 +1,6 @@
 #pragma once
-#include "kimera_dsg_builder/configs.h"
+#include "kimera_dsg_builder/lcd_module_config.h"
 #include "kimera_dsg_builder/dsg_lcd_detector.h"
-#include "kimera_dsg_builder/incremental_types.h"
 #include "kimera_dsg_builder/lcd_visualizer.h"
 
 #include <geometry_msgs/TransformStamped.h>
@@ -14,6 +13,7 @@
 
 #include <memory>
 #include <mutex>
+#include <thread>
 
 namespace kimera {
 namespace incremental {
@@ -41,7 +41,7 @@ class DsgLcd {
   ros::NodeHandle nh_;
   std::atomic<bool> should_shutdown_{false};
 
-  lcd::DsgLcdConfig config_;
+  DsgLcdModuleConfig config_;
   SharedDsgInfo::Ptr dsg_;
 
   std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> lcd_queue_;

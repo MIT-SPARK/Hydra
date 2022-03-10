@@ -6,7 +6,7 @@
 namespace kimera {
 namespace lcd {
 
-struct DsgLcdConfig {
+struct DsgLcdDetectorConfig {
   std::map<LayerId, DescriptorMatchConfig> search_configs;
   DescriptorMatchConfig agent_search_config;
 
@@ -18,16 +18,11 @@ struct DsgLcdConfig {
   size_t num_semantic_classes = 20;
   double place_radius_m = 5.0;
   HistogramConfig<double> place_histogram_config{0.5, 2.5, 30};
-
-  bool visualize_dsg_lcd = false;
-  std::string lcd_visualizer_ns = "/dsg/lcd_visualizer";
-  double lcd_agent_horizon_s = 1.5;
-  double descriptor_creation_horizon_m = 10.0;
 };
 
 class DsgLcdDetector {
  public:
-  explicit DsgLcdDetector(const DsgLcdConfig& config);
+  explicit DsgLcdDetector(const DsgLcdDetectorConfig& config);
 
   void updateDescriptorCache(const DynamicSceneGraph& dsg,
                              const std::unordered_set<NodeId>& archived_places,
@@ -83,7 +78,7 @@ class DsgLcdDetector {
       NodeId agent_node,
       uint64_t timestamp = 0) const;
 
-  DsgLcdConfig config_;
+  DsgLcdDetectorConfig config_;
   DescriptorFactory::Ptr agent_factory_;
   std::map<LayerId, DescriptorFactory::Ptr> layer_factories_;
 

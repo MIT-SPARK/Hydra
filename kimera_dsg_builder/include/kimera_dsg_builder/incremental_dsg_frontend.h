@@ -1,12 +1,12 @@
 #pragma once
-#include "kimera_dsg_builder/configs.h"
+#include "kimera_dsg_builder/frontend_config.h"
 #include "kimera_dsg_builder/incremental_mesh_segmenter.h"
 #include "kimera_dsg_builder/incremental_types.h"
 
+#include <geometry_msgs/TransformStamped.h>
 #include <ros/callback_queue.h>
 #include <ros/ros.h>
 #include <tf2_ros/transform_listener.h>
-#include <geometry_msgs/TransformStamped.h>
 
 #include <kimera_dsg/node_symbol.h>
 #include <kimera_dsg/scene_graph_logger.h>

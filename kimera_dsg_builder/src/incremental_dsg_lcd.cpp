@@ -17,12 +17,9 @@ DsgLcd::DsgLcd(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg)
   nh_.getParam("robot_id", robot_id);
   robot_prefix_ = kimera_pgmo::robot_id_to_prefix.at(robot_id);
 
-  config_ = load_config<lcd::DsgLcdConfig>(nh_, "lcd");
   // TODO(nathan) think about fixing lcd log path
-
-  config_.agent_search_config.min_registration_score =
-      config_.agent_search_config.min_score;
-  lcd_detector_.reset(new lcd::DsgLcdDetector(config_));
+  config_ = load_config<DsgLcdModuleConfig>(nh_, "");
+  lcd_detector_.reset(new lcd::DsgLcdDetector(config_.detector));
 }
 
 void DsgLcd::stop() {
@@ -54,7 +51,7 @@ void DsgLcd::start() {
     visualizer_queue_.reset(new ros::CallbackQueue());
     nh.setCallbackQueue(visualizer_queue_.get());
 
-    lcd_visualizer_.reset(new lcd::LcdVisualizer(nh, config_.object_radius_m));
+    lcd_visualizer_.reset(new lcd::LcdVisualizer(nh, config_.detector.object_radius_m));
     lcd_visualizer_->setGraph(lcd_graph_);
     lcd_visualizer_->setLcdDetector(lcd_detector_.get());
   }

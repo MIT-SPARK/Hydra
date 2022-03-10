@@ -1,5 +1,4 @@
 #include "kimera_dsg_builder/incremental_dsg_backend.h"
-#include "kimera_dsg_builder/configs.h"
 #include "kimera_dsg_builder/minimum_spanning_tree.h"
 
 #include <hydra_utils/timing_utilities.h>

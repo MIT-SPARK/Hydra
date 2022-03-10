@@ -1,5 +1,5 @@
 #pragma once
-#include "kimera_dsg_builder/configs.h"
+#include "kimera_dsg_builder/backend_config.h"
 #include "kimera_dsg_builder/dsg_update_functions.h"
 #include "kimera_dsg_builder/incremental_room_finder.h"
 #include "kimera_dsg_builder/incremental_types.h"

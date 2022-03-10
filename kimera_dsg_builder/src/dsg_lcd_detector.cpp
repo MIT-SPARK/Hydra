@@ -8,7 +8,7 @@ namespace lcd {
 using DsgNode = DynamicSceneGraphNode;
 using hydra::timing::ScopedTimer;
 
-DsgLcdDetector::DsgLcdDetector(const DsgLcdConfig& config) : config_(config) {
+DsgLcdDetector::DsgLcdDetector(const DsgLcdDetectorConfig& config) : config_(config) {
   for (const auto& id_func_pair : layer_factories_) {
     cache_map_[id_func_pair.first] = DescriptorCache();
   }

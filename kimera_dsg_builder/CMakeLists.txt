@@ -50,7 +50,6 @@ catkin_package(
 
 add_library(
   ${PROJECT_NAME}
-  src/configs.cpp
   src/dsg_lcd_descriptors.cpp
   src/dsg_lcd_matching.cpp
   src/dsg_lcd_detector.cpp
