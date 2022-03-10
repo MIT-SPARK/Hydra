@@ -270,8 +270,9 @@ void DsgFrontend::runMeshFrontend() {
     }
 
     {  // start dsg critical section
+      ScopedTimer timer("frontend/object_graph_update", last_places_timestamp_);
       std::unique_lock<std::mutex> lock(dsg_->mutex);
-      segmenter_->updateGraph(*dsg_->graph, object_clusters);
+      segmenter_->updateGraph(*dsg_->graph, object_clusters, last_places_timestamp_);
       addPlaceObjectEdges();
     }  // end dsg critical section
 
@@ -287,11 +288,7 @@ void DsgFrontend::runMeshFrontend() {
     }
 
     {
-      ScopedTimer timer("frontend/place_mesh_mapping",
-                        last_places_timestamp_,
-                        true,
-                        1,
-                        false);
+      ScopedTimer timer("frontend/place_mesh_mapping", last_places_timestamp_);
       updatePlaceMeshMapping();
     }
 

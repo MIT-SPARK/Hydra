@@ -47,28 +47,29 @@ class MeshSegmenter {
 
   void pruneObjectsToCheckForPlaces(const DynamicSceneGraph& graph);
 
-  void updateGraph(DynamicSceneGraph& graph, const LabelClusters& clusters);
+  void updateGraph(DynamicSceneGraph& graph,
+                   const LabelClusters& clusters,
+                   uint64_t timestamp);
 
  private:
-  LabelClusters findNewObjectClusters(
-      const std::vector<size_t> active_indices) const;
+  LabelClusters findNewObjectClusters(const std::vector<size_t>& active_indices) const;
 
   Clusters findClusters(const MeshVertexCloud::Ptr& cloud,
                         const std::vector<size_t>& indices) const;
 
-  void archiveOldObjects(const DynamicSceneGraph& graph, double latest_timestamp);
+  void archiveOldObjects(const DynamicSceneGraph& graph, uint64_t latest_timestamp);
 
   LabelIndices getLabelIndices(const std::vector<size_t>& indices) const;
 
   void addObjectToGraph(DynamicSceneGraph& graph,
                         const Cluster& cluster,
                         uint8_t label,
-                        double timestamp);
+                        uint64_t timestamp);
 
   void updateObjectInGraph(DynamicSceneGraph& graph,
                            const Cluster& cluster,
                            const SceneGraphNode& node,
-                           double timestamp);
+                           uint64_t timestamp);
 
   void publishActiveVertices(const std::vector<size_t>& indices) const;
 
@@ -86,7 +87,7 @@ class MeshSegmenter {
   size_t min_cluster_size_;
   size_t max_cluster_size_;
   std::map<uint8_t, std::set<NodeId>> active_objects_;
-  std::map<NodeId, double> active_object_timestamps_;
+  std::map<NodeId, uint64_t> active_object_timestamps_;
   std::unordered_set<NodeId> objects_to_check_for_places_;
 
   std::set<uint8_t> object_labels_;

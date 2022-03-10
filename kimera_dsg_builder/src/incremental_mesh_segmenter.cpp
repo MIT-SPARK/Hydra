@@ -161,7 +161,7 @@ Clusters MeshSegmenter::findClusters(const MeshVertexCloud::Ptr& cloud,
 }
 
 LabelClusters MeshSegmenter::findNewObjectClusters(
-    const std::vector<size_t> active_indices) const {
+    const std::vector<size_t>& active_indices) const {
   LabelClusters object_clusters;
 
   if (active_indices.empty()) {
@@ -241,28 +241,24 @@ void MeshSegmenter::pruneObjectsToCheckForPlaces(const DynamicSceneGraph& graph)
 }
 
 void MeshSegmenter::archiveOldObjects(const DynamicSceneGraph& graph,
-                                      double latest_timestamp) {
-  std::list<NodeId> removed_nodes;
-  for (const auto id_time_pair : active_object_timestamps_) {
-    if (!graph.hasNode(id_time_pair.first)) {
-      // TODO(nathan) consider removing node
-      continue;
+                                      uint64_t latest_timestamp) {
+  for (const auto& label : object_labels_) {
+    std::list<NodeId> removed_nodes;
+    for (const auto& object_node : active_objects_.at(label)) {
+      if (!graph.hasNode(object_node)) {
+        removed_nodes.push_back(object_node);
+      }
+
+      if (latest_timestamp - active_object_timestamps_.at(object_node) >
+          static_cast<uint64_t>(active_object_horizon_s_ * 1e9)) {
+        removed_nodes.push_back(object_node);
+      }
     }
 
-    if (latest_timestamp - id_time_pair.second > active_object_horizon_s_) {
-      const NodeId curr_id = id_time_pair.first;
-      removed_nodes.push_back(curr_id);
-      uint8_t label = graph.getNode(curr_id)
-                          .value()
-                          .get()
-                          .attributes<SemanticNodeAttributes>()
-                          .semantic_label;
-      active_objects_[label].erase(curr_id);
+    for (const auto& node_id : removed_nodes) {
+      active_objects_[label].erase(node_id);
+      active_object_timestamps_.erase(node_id);
     }
-  }
-
-  for (const auto node_id : removed_nodes) {
-    active_object_timestamps_.erase(node_id);
   }
 }
 
@@ -300,8 +296,8 @@ LabelIndices MeshSegmenter::getLabelIndices(const std::vector<size_t>& indices) 
 }
 
 void MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
-                                const LabelClusters& clusters) {
-  const double timestamp = ros::Time::now().toSec();
+                                const LabelClusters& clusters,
+                                uint64_t timestamp) {
   archiveOldObjects(graph, timestamp);
 
   for (const auto& label_clusters : clusters) {
@@ -310,11 +306,6 @@ void MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
       std::vector<NodeId> nodes_not_in_graph;
       for (const auto& prev_node_id :
            active_objects_.at(label_clusters.first)) {
-        if (!graph.hasNode(prev_node_id)) {
-          nodes_not_in_graph.push_back(prev_node_id);
-          continue;
-        }
-
         const SceneGraphNode& prev_node = graph.getNode(prev_node_id).value();
         if (objectsMatch(cluster, prev_node)) {
           updateObjectInGraph(graph, cluster, prev_node, timestamp);
@@ -325,12 +316,6 @@ void MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
 
       if (!matches_prev_object) {
         addObjectToGraph(graph, cluster, label_clusters.first, timestamp);
-      }
-
-      // Remove the nodes that do not exist in graph
-      for (const auto& node_id : nodes_not_in_graph) {
-        active_object_timestamps_.erase(node_id);
-        active_objects_[label_clusters.first].erase(node_id);
       }
     }
 
@@ -381,7 +366,7 @@ void MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
 void MeshSegmenter::updateObjectInGraph(DynamicSceneGraph& graph,
                                         const Cluster& cluster,
                                         const SceneGraphNode& node,
-                                        double timestamp) {
+                                        uint64_t timestamp) {
   active_object_timestamps_.at(node.id) = timestamp;
 
   for (const auto& idx : cluster.indices.indices) {
@@ -406,7 +391,7 @@ void MeshSegmenter::updateObjectInGraph(DynamicSceneGraph& graph,
 void MeshSegmenter::addObjectToGraph(DynamicSceneGraph& graph,
                                      const Cluster& cluster,
                                      uint8_t label,
-                                     double timestamp) {
+                                     uint64_t timestamp) {
   CHECK(!cluster.cloud->empty());
 
   ObjectNodeAttributes::Ptr attrs = std::make_unique<ObjectNodeAttributes>();
