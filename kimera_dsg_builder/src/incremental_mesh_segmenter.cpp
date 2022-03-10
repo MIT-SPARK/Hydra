@@ -186,19 +186,17 @@ LabelClusters MeshSegmenter::findNewObjectClusters(
       continue;
     }
 
-    const auto clusters =
-        findClusters(full_mesh_vertices_, label_indices.at(label));
+    const auto clusters = findClusters(full_mesh_vertices_, label_indices.at(label));
 
-    VLOG(3) << "[Object Detection]  - Found " << clusters.size()
-            << " objects of label " << static_cast<int>(label);
+    VLOG(3) << "[Object Detection]  - Found " << clusters.size() << " objects of label "
+            << static_cast<int>(label);
     object_clusters.insert({label, clusters});
   }
   return object_clusters;
 }
 
-LabelClusters MeshSegmenter::detectObjects(
-    const std::vector<size_t>& frontend_indices,
-    const std::optional<Eigen::Vector3d>& pos) {
+LabelClusters MeshSegmenter::detectObjects(const std::vector<size_t>& frontend_indices,
+                                           const std::optional<Eigen::Vector3d>& pos) {
   std::vector<size_t> active_indices;
   if (!pos) {
     active_indices = frontend_indices;
@@ -304,8 +302,7 @@ void MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
     for (const auto& cluster : label_clusters.second) {
       bool matches_prev_object = false;
       std::vector<NodeId> nodes_not_in_graph;
-      for (const auto& prev_node_id :
-           active_objects_.at(label_clusters.first)) {
+      for (const auto& prev_node_id : active_objects_.at(label_clusters.first)) {
         const SceneGraphNode& prev_node = graph.getNode(prev_node_id).value();
         if (objectsMatch(cluster, prev_node)) {
           updateObjectInGraph(graph, cluster, prev_node, timestamp);
@@ -325,10 +322,8 @@ void MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
         continue;
       }
 
-      const auto& node = graph.getNode(node_id)
-                             .value()
-                             .get()
-                             .attributes<SemanticNodeAttributes>();
+      const auto& node =
+          graph.getNode(node_id).value().get().attributes<SemanticNodeAttributes>();
 
       for (const auto& other_id : to_check) {
         if (node_id == other_id) {
@@ -339,10 +334,8 @@ void MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
           continue;
         }
 
-        const auto& other = graph.getNode(other_id)
-                                .value()
-                                .get()
-                                .attributes<SemanticNodeAttributes>();
+        const auto& other =
+            graph.getNode(other_id).value().get().attributes<SemanticNodeAttributes>();
 
         if (node.bounding_box.isInside(other.position) ||
             other.bounding_box.isInside(node.position)) {

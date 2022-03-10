@@ -83,7 +83,7 @@ class MeshSegmenter {
   NodeSymbol next_node_id_;
   double active_object_horizon_s_;
   double active_index_horizon_m_;
-  double cluster_tolerance_; // maxium radius
+  double cluster_tolerance_;  // maxium radius
   size_t min_cluster_size_;
   size_t max_cluster_size_;
   std::map<uint8_t, std::set<NodeId>> active_objects_;

@@ -241,8 +241,7 @@ void DsgFrontend::runMeshFrontend() {
     LabelClusters object_clusters;
 
     {  // timing scope
-      ScopedTimer timer(
-          "frontend/object_detection", object_timestamp, true, 1, false);
+      ScopedTimer timer("frontend/object_detection", object_timestamp, true, 1, false);
       const auto& invalid_indices = mesh_frontend_.getInvalidIndices();
       {  // start dsg critical section
         std::unique_lock<std::mutex> lock(dsg_->mutex);
@@ -253,8 +252,7 @@ void DsgFrontend::runMeshFrontend() {
         std::vector<NodeId> objects_to_delete;
         const auto& objects = dsg_->graph->getLayer(KimeraDsgLayers::OBJECTS);
         for (const auto& id_node_pair : objects.nodes()) {
-          auto connections =
-              dsg_->graph->getMeshConnectionIndices(id_node_pair.first);
+          auto connections = dsg_->graph->getMeshConnectionIndices(id_node_pair.first);
           if (connections.size() < config_.min_object_vertices) {
             objects_to_delete.push_back(id_node_pair.first);
           }
@@ -727,8 +725,7 @@ void DsgFrontend::saveState(const std::string& filepath) const {
   pcl::toPCLPointCloud2(*vertices, mesh.cloud);
 
   std::vector<ros::Time> mesh_stamps = mesh_frontend_.getFullMeshTimes();
-  kimera_pgmo::WriteMeshWithStampsToPly(
-      filepath + "/mesh.ply", mesh, mesh_stamps);
+  kimera_pgmo::WriteMeshWithStampsToPly(filepath + "/mesh.ply", mesh, mesh_stamps);
 }
 
 }  // namespace incremental
