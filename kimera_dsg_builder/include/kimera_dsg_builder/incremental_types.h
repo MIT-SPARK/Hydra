@@ -47,8 +47,13 @@ struct SharedDsgInfo {
 
   std::mutex mutex;
   std::atomic<bool> updated;
+  std::atomic<uint64_t> last_update_time;
   DynamicSceneGraph::Ptr graph;
   std::shared_ptr<NodeIdSet> latest_places;
+
+  std::map<NodeId, size_t> agent_key_map;
+  NodeIdSet archived_places;
+
   std::mutex lcd_mutex;
   std::queue<lcd::DsgRegistrationSolution> loop_closures;
 };

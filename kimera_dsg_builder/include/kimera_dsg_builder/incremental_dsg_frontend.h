@@ -97,7 +97,6 @@ class DsgFrontend {
   std::unique_ptr<NearestNodeFinder> places_nn_finder_;
   std::unique_ptr<std::thread> places_thread_;
   NodeIdSet unlabeled_place_nodes_;
-  NodeIdSet archived_places_;
   NodeIdSet previous_active_places_;
 
   std::set<NodeId> deleted_agent_edge_indices_;
@@ -105,7 +104,6 @@ class DsgFrontend {
 
   char robot_prefix_;
   ros::Subscriber pose_graph_sub_;
-  std::map<NodeId, size_t> agent_key_map_;
 
   SceneGraphLogger frontend_graph_logger_;
 };

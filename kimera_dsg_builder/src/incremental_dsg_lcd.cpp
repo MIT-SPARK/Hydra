@@ -76,7 +76,7 @@ std::optional<NodeId> DsgLcd::getLatestAgentId() {
     return std::nullopt;
   }
 
-  const std::chrono::nanoseconds curr_time(last_places_timestamp_);
+  const std::chrono::nanoseconds curr_time(dsg_->last_update_time);
   std::chrono::duration<double> diff_s = curr_time - prev_time;
   // we consider should_shutdown_ here to make sure we're not waiting on popping from
   // the LCD queue while not getting new place messages
@@ -105,6 +105,11 @@ void DsgLcd::runLcd() {
     {  // start critical section
       std::unique_lock<std::mutex> lock(dsg_->mutex);
       lcd_graph_->mergeGraph(*dsg_->graph);
+
+      potential_lcd_root_nodes_.insert(potential_lcd_root_nodes_.end(),
+                                       dsg_->archived_places.begin(),
+                                       dsg_->archived_places.end());
+      dsg_->archived_places.clear();
     }  // end critical section
 
     if (lcd_graph_->getLayer(KimeraDsgLayers::PLACES).numNodes() == 0) {
@@ -115,14 +120,6 @@ void DsgLcd::runLcd() {
     if (should_shutdown_ && lcd_queue_.empty()) {
       break;
     }
-
-    {  // start critical section
-      std::unique_lock<std::mutex> place_lock(places_queue_mutex_);
-      potential_lcd_root_nodes_.insert(potential_lcd_root_nodes_.end(),
-                                       archived_places_.begin(),
-                                       archived_places_.end());
-      archived_places_.clear();
-    }  // end critical section
 
     auto latest_agent = getLatestAgentId();
     if (!latest_agent) {
@@ -191,8 +188,8 @@ void DsgLcd::assignBowVectors() {
     const auto& msg = *iter;
     char prefix = kimera_pgmo::robot_id_to_prefix.at(msg->robot_id);
     NodeSymbol pgmo_key(prefix, msg->pose_id);
-    if (agent_key_map_.count(pgmo_key)) {
-      const auto& node = agents.getNodeByIndex(agent_key_map_.at(pgmo_key))->get();
+    if (dsg_->agent_key_map.count(pgmo_key)) {
+      const auto& node = agents.getNodeByIndex(dsg_->agent_key_map.at(pgmo_key))->get();
       lcd_queue_.push(node.id);
 
       AgentNodeAttributes& attrs = node.attributes<AgentNodeAttributes>();
