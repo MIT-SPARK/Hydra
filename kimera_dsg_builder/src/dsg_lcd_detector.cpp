@@ -1,16 +1,14 @@
-#include "kimera_dsg_builder/dsg_lcd_module.h"
-#include "kimera_dsg_builder/dsg_lcd_registration.h"
+#include "kimera_dsg_builder/dsg_lcd_detector.h"
 
 #include <hydra_utils/timing_utilities.h>
 
 namespace kimera {
 namespace lcd {
 
-using incremental::SharedDsgInfo;
 using DsgNode = DynamicSceneGraphNode;
 using hydra::timing::ScopedTimer;
 
-DsgLcdModule::DsgLcdModule(const DsgLcdConfig& config) : config_(config) {
+DsgLcdDetector::DsgLcdDetector(const DsgLcdConfig& config) : config_(config) {
   for (const auto& id_func_pair : layer_factories_) {
     cache_map_[id_func_pair.first] = DescriptorCache();
   }
@@ -60,8 +58,8 @@ DsgLcdModule::DsgLcdModule(const DsgLcdConfig& config) : config_(config) {
   }
 }
 
-bool DsgLcdModule::addNewDescriptors(const DynamicSceneGraph& graph,
-                                     const DynamicSceneGraphNode& agent_node) {
+bool DsgLcdDetector::addNewDescriptors(const DynamicSceneGraph& graph,
+                                       const DynamicSceneGraphNode& agent_node) {
   auto parent = agent_node.getParent();
   if (!parent) {
     return false;
@@ -93,7 +91,7 @@ bool DsgLcdModule::addNewDescriptors(const DynamicSceneGraph& graph,
   return true;
 }
 
-void DsgLcdModule::updateDescriptorCache(
+void DsgLcdDetector::updateDescriptorCache(
     const DynamicSceneGraph& dsg,
     const std::unordered_set<NodeId>& archived_places,
     uint64_t timestamp) {
@@ -121,7 +119,7 @@ void DsgLcdModule::updateDescriptorCache(
   }
 }
 
-std::vector<DsgRegistrationSolution> DsgLcdModule::registerAndVerify(
+std::vector<DsgRegistrationSolution> DsgLcdDetector::registerAndVerify(
     const DynamicSceneGraph& dsg,
     const std::map<size_t, LayerSearchResults>& matches,
     NodeId agent_id,
@@ -202,9 +200,10 @@ std::vector<DsgRegistrationSolution> DsgLcdModule::registerAndVerify(
   return results;
 }
 
-std::vector<DsgRegistrationSolution> DsgLcdModule::detect(const DynamicSceneGraph& dsg,
-                                                          NodeId agent_id,
-                                                          uint64_t timestamp) {
+std::vector<DsgRegistrationSolution> DsgLcdDetector::detect(
+    const DynamicSceneGraph& dsg,
+    NodeId agent_id,
+    uint64_t timestamp) {
   ScopedTimer timer("lcd/detect", timestamp, true, 2, false);
   std::set<NodeId> prev_valid_roots;
   for (const auto& id_desc_pair : cache_map_[root_layer_]) {

@@ -22,7 +22,7 @@ DsgLcd::DsgLcd(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg)
 
   config_.agent_search_config.min_registration_score =
       config_.agent_search_config.min_score;
-  lcd_module_.reset(new lcd::DsgLcdModule(config_));
+  lcd_detector_.reset(new lcd::DsgLcdDetector(config_));
 }
 
 void DsgLcd::stop() {
@@ -56,7 +56,7 @@ void DsgLcd::start() {
 
     lcd_visualizer_.reset(new lcd::LcdVisualizer(nh, config_.object_radius_m));
     lcd_visualizer_->setGraph(lcd_graph_);
-    lcd_visualizer_->setLcdModule(lcd_module_.get());
+    lcd_visualizer_->setLcdDetector(lcd_detector_.get());
   }
 
   lcd_thread_.reset(new std::thread(&DsgLcd::runLcd, this));
@@ -149,11 +149,11 @@ void DsgLcd::runLcd() {
 
     if (!to_cache.empty()) {
       auto curr_time = ros::Time::now();
-      lcd_module_->updateDescriptorCache(*lcd_graph_, to_cache, curr_time.toNSec());
+      lcd_detector_->updateDescriptorCache(*lcd_graph_, to_cache, curr_time.toNSec());
     }
 
     auto time = lcd_graph_->getDynamicNode(*latest_agent).value().get().timestamp;
-    auto results = lcd_module_->detect(*lcd_graph_, *latest_agent, time.count());
+    auto results = lcd_detector_->detect(*lcd_graph_, *latest_agent, time.count());
     if (lcd_visualizer_) {
       lcd_visualizer_->setGraphUpdated();
       lcd_visualizer_->redraw();

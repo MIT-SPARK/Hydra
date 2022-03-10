@@ -1,5 +1,5 @@
 #pragma once
-#include "kimera_dsg_builder/dsg_lcd_module.h"
+#include "kimera_dsg_builder/dsg_lcd_detector.h"
 
 #include <kimera_dsg_visualizer/dynamic_scene_graph_visualizer.h>
 
@@ -16,7 +16,7 @@ class LcdVisualizer : public DynamicSceneGraphVisualizer {
 
   LcdVisualizer(const ros::NodeHandle& nh, double radius);
 
-  void setLcdModule(DsgLcdModule* module);
+  void setLcdDetector(DsgLcdDetector* detector);
 
  protected:
   virtual void redrawImpl(const std_msgs::Header& header, MarkerArray& msg) override;
@@ -42,7 +42,7 @@ class LcdVisualizer : public DynamicSceneGraphVisualizer {
   std::set<NodeId> getValidNodes(LayerId layer) const;
 
  private:
-  DsgLcdModule* lcd_module_;
+  DsgLcdDetector* lcd_detector_;
 
   double radius_;
 

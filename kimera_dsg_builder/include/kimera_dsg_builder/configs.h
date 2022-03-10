@@ -1,5 +1,5 @@
 #pragma once
-#include "kimera_dsg_builder/dsg_lcd_module.h"
+#include "kimera_dsg_builder/dsg_lcd_detector.h"
 #include "kimera_dsg_builder/incremental_room_finder.h"
 
 #include <KimeraRPGO/SolverParams.h>

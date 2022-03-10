@@ -53,7 +53,7 @@ add_library(
   src/configs.cpp
   src/dsg_lcd_descriptors.cpp
   src/dsg_lcd_matching.cpp
-  src/dsg_lcd_module.cpp
+  src/dsg_lcd_detector.cpp
   src/dsg_lcd_registration.cpp
   src/dsg_update_functions.cpp
   src/incremental_dsg_backend.cpp

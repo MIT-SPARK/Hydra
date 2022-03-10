@@ -25,9 +25,9 @@ struct DsgLcdConfig {
   double descriptor_creation_horizon_m = 10.0;
 };
 
-class DsgLcdModule {
+class DsgLcdDetector {
  public:
-  explicit DsgLcdModule(const DsgLcdConfig& config);
+  explicit DsgLcdDetector(const DsgLcdConfig& config);
 
   void updateDescriptorCache(const DynamicSceneGraph& dsg,
                              const std::unordered_set<NodeId>& archived_places,

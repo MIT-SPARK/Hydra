@@ -71,15 +71,17 @@ LcdVisualizer::LcdVisualizer(const ros::NodeHandle& nh, double radius)
       });
 }
 
-void LcdVisualizer::setLcdModule(DsgLcdModule* module) { lcd_module_ = module; }
+void LcdVisualizer::setLcdDetector(DsgLcdDetector* detector) {
+  lcd_detector_ = detector;
+}
 
 std::vector<NodeId> LcdVisualizer::getMatchRoots(LayerId layer) const {
-  const auto& layer_match_map = lcd_module_->getLayerRemapping();
+  const auto& layer_match_map = lcd_detector_->getLayerRemapping();
   if (!layer_match_map.count(layer)) {
     return {};
   }
 
-  const auto& matches = lcd_module_->getLatestMatches();
+  const auto& matches = lcd_detector_->getLatestMatches();
   const size_t match_idx = layer_match_map.at(layer);
   if (!matches.count(match_idx)) {
     return {};
@@ -89,12 +91,12 @@ std::vector<NodeId> LcdVisualizer::getMatchRoots(LayerId layer) const {
 }
 
 std::set<NodeId> LcdVisualizer::getMatchedNodes(LayerId layer) const {
-  const auto& layer_match_map = lcd_module_->getLayerRemapping();
+  const auto& layer_match_map = lcd_detector_->getLayerRemapping();
   if (!layer_match_map.count(layer)) {
     return {};
   }
 
-  const auto& matches = lcd_module_->getLatestMatches();
+  const auto& matches = lcd_detector_->getLatestMatches();
   const size_t match_idx = layer_match_map.at(layer);
   if (!matches.count(match_idx)) {
     return {};
@@ -111,7 +113,7 @@ std::set<NodeId> LcdVisualizer::getMatchedNodes(LayerId layer) const {
 }
 
 std::optional<NodeId> LcdVisualizer::getQueryNode() const {
-  const auto& matches = lcd_module_->getLatestMatches();
+  const auto& matches = lcd_detector_->getLatestMatches();
   if (!matches.count(0)) {
     return std::nullopt;
   }
@@ -120,18 +122,18 @@ std::optional<NodeId> LcdVisualizer::getQueryNode() const {
 }
 
 std::set<NodeId> LcdVisualizer::getValidNodes(LayerId layer) const {
-  const auto& layer_match_map = lcd_module_->getLayerRemapping();
+  const auto& layer_match_map = lcd_detector_->getLayerRemapping();
   if (!layer_match_map.count(layer)) {
     return {};
   }
 
-  const auto& matches = lcd_module_->getLatestMatches();
+  const auto& matches = lcd_detector_->getLatestMatches();
   const size_t match_idx = layer_match_map.at(layer);
   if (!matches.count(match_idx)) {
     return {};
   }
 
-  const auto& descriptor_cache = lcd_module_->getDescriptorCache(layer);
+  const auto& descriptor_cache = lcd_detector_->getDescriptorCache(layer);
   const auto& result = matches.at(match_idx);
 
   std::set<NodeId> to_return;
@@ -205,7 +207,7 @@ void LcdVisualizer::drawAgent(const std_msgs::Header& header, MarkerArray& msg) 
 }
 
 void LcdVisualizer::redrawImpl(const std_msgs::Header& header, MarkerArray& msg) {
-  if (!lcd_module_) {
+  if (!lcd_detector_) {
     return;
   }
 

@@ -1,6 +1,6 @@
 #pragma once
 #include "kimera_dsg_builder/configs.h"
-#include "kimera_dsg_builder/dsg_lcd_module.h"
+#include "kimera_dsg_builder/dsg_lcd_detector.h"
 #include "kimera_dsg_builder/incremental_types.h"
 #include "kimera_dsg_builder/lcd_visualizer.h"
 
@@ -46,7 +46,7 @@ class DsgLcd {
 
   std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> lcd_queue_;
   std::unique_ptr<std::thread> lcd_thread_;
-  std::unique_ptr<lcd::DsgLcdModule> lcd_module_;
+  std::unique_ptr<lcd::DsgLcdDetector> lcd_detector_;
   std::unique_ptr<lcd::LcdVisualizer> lcd_visualizer_;
   std::unique_ptr<ros::CallbackQueue> visualizer_queue_;
   DynamicSceneGraph::Ptr lcd_graph_;
