@@ -1,5 +1,6 @@
 #include "kimera_dsg_builder/incremental_dsg_backend.h"
 #include "kimera_dsg_builder/incremental_dsg_frontend.h"
+#include "kimera_dsg_builder/incremental_dsg_lcd.h"
 
 #include <hydra_utils/timing_utilities.h>
 #include <ros/topic_manager.h>
@@ -61,6 +62,9 @@ int main(int argc, char* argv[]) {
   bool exit_after_bag = false;
   nh.getParam("exit_after_bag", exit_after_bag);
 
+  bool enable_lcd = false;
+  nh.getParam("enable_lcd", enable_lcd);
+
   nh.getParam("disable_timer_output", ElapsedTimeRecorder::instance().disable_output);
 
   const LayerId mesh_layer_id = 1;
@@ -76,14 +80,32 @@ int main(int argc, char* argv[]) {
   {  // scope for frontend / backend pair
     kimera::incremental::DsgBackend backend(nh, frontend_dsg, backend_dsg);
     kimera::incremental::DsgFrontend frontend(nh, frontend_dsg);
+    std::shared_ptr<kimera::incremental::DsgLcd> lcd;
+    if (enable_lcd) {
+      lcd.reset(new kimera::incremental::DsgLcd(nh, frontend_dsg));
+    }
 
     frontend.start();
     backend.start();
+    if (lcd) {
+      lcd->start();
+    }
 
     if (exit_after_bag) {
       spinUntilBagFinished();
     } else {
       ros::spin();
+    }
+
+    frontend.stop();
+    if (lcd) {
+      lcd->stop();
+    }
+    backend.stop();
+    loop_closures = backend.getLoopClosures();
+
+    if (!dsg_output_path.empty()) {
+      frontend.saveState(dsg_output_path + "/frontend/");
     }
 
     if (!dsg_output_path.empty()) {
@@ -94,14 +116,6 @@ int main(int argc, char* argv[]) {
       } catch (const std::exception& e) {
         LOG(ERROR) << "Saving trajectory failed: " << e.what();
       }
-    }
-
-    frontend.stop();
-    backend.stop();
-    loop_closures = backend.getLoopClosures();
-
-    if (!dsg_output_path.empty()) {
-      frontend.saveState(dsg_output_path + "/frontend/");
     }
   }
 
