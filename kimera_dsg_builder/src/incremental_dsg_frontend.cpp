@@ -319,18 +319,19 @@ void DsgFrontend::runPlaces() {
       places_queue_.pop();
     }  // end places queue critical section
 
-    // find node ids that are valid, but outside active place window
-    for (const auto& prev : previous_active_places_) {
-      if (latest_places.count(prev)) {
-        continue;
-      }
+    {  // start graph update critical section
+      std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
 
-      if (!dsg_->graph->hasNode(prev)) {
-        continue;
-      }
+      // find node ids that are valid, but outside active place window
+      for (const auto& prev : previous_active_places_) {
+        if (latest_places.count(prev)) {
+          continue;
+        }
 
-      {  // start graph update critical section
-        std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
+        if (!dsg_->graph->hasNode(prev)) {
+          continue;
+        }
+
         // mark archived places as inactive
         if (dsg_->graph->hasNode(prev)) {
           dsg_->graph->getNode(prev)
@@ -342,13 +343,14 @@ void DsgFrontend::runPlaces() {
 
         dsg_->archived_places.insert(prev);
       }
-    }
+
+      dsg_->last_update_time = curr_message->header.stamp.toNSec();
+    }  // end graph update critical section
 
     previous_active_places_ = latest_places;
 
     // TODO(nathan) consider moving timestamp solely to dsg structure
     last_places_timestamp_ = curr_message->header.stamp.toNSec();
-    dsg_->last_update_time = curr_message->header.stamp.toNSec();
 
     if (config_.should_log) {
       std::unique_lock<std::mutex> graph_lock(dsg_->mutex);

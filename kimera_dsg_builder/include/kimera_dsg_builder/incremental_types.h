@@ -47,7 +47,7 @@ struct SharedDsgInfo {
 
   std::mutex mutex;
   std::atomic<bool> updated;
-  std::atomic<uint64_t> last_update_time;
+  uint64_t last_update_time;
   DynamicSceneGraph::Ptr graph;
   std::shared_ptr<NodeIdSet> latest_places;
 
