@@ -1,88 +1,26 @@
 <launch>
+
     <arg name="sim_time_required" default="true"/>
     <param name="use_sim_time" value="$(arg sim_time_required)"/>
 
     <arg name="use_semantics" default="true"/>
-
-    <arg name="voxel_size" default="0.10"/>
-    <arg name="max_ray_length_m" default="4.5"/>
-    <arg name="update_period_s" default="1.0"/>
-
-    <arg name="min_glog_level" default="3"/>
-    <arg name="verbosity" default="0"/>
-    <arg name="show_stats" default="true"/>
-    <arg name="debug" default="false"/>
-
-    <arg name="glog_to_file" default="false"/>
-    <arg name="glog_dir" default="$(find kimera_dsg_builder)/glogs"/>
-    <arg name="glog_file_args" value="--logtostderr=0 --log_dir=$(arg glog_dir)" if="$(arg glog_to_file)"/>
-    <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
-
-    <arg name="config_dir" default="$(find kimera_topology)/config"/>
-    <arg name="config" default="sidpac_topology_config.yaml"/>
-    <arg name="semantic_config" default="ade150_semantic_config.yaml"/>
-
-    <arg name="semantic_color_path"
-         default="$(find semantic_recolor)/config/colors/ade150_config.csv"/>
-
-    <arg name="graph_viz_config_dir" default="$(find kimera_topology)/config"/>
-    <arg name="graph_viz_config" default="graph_visualization_config.yaml"/>
-    <arg name="graph_viz_config_file" value="$(arg graph_viz_config_dir)/$(arg graph_viz_config)"/>
-
     <arg name="sensor_frame" default="left_cam"/>
 
-    <arg name="camera_info_topic" default="/azure/rgb/camera_info"/>
-    <arg name="camera_topic" default="/azure/rgb/image_raw"/>
+    <arg name="rgb_info_topic" default="/azure/rgb/camera_info"/>
+    <arg name="rgb_topic" default="/azure/rgb/image_raw"/>
     <arg name="depth_topic" default="/azure/depth_to_rgb/image_raw"/>
     <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
 
-    <arg name="launch-prefix" default="gdb --args" if="$(arg debug)"/>
-    <arg name="launch-prefix" default="" unless="$(arg debug)"/>
+    <include file="$(find hydra_utils)/launch/includes/rgbd_to_pointcloud.xml" pass_all_args="true"
+             unless="$(arg use_semantics)"/>
 
-    <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
-    <arg name="ros_output" value="log" if="$(arg glog_to_file)"/>
+    <include file="$(find semantic_recolor)/launch/semantic_recolor_pointcloud.launch" pass_all_args="true"
+             if="$(arg use_semantics)"/>
 
-    <include file="$(find hydra_utils)/launch/includes/rgbd_to_pointcloud.xml"
-             unless="$(arg use_semantics)">
-        <arg name="camera_info_topic" value="$(arg camera_info_topic)"/>
-        <arg name="camera_topic" value="$(arg camera_topic)"/>
-        <arg name="depth_topic" value="$(arg depth_topic)"/>
-        <arg name="pointcloud_topic" default="$(arg pointcloud_topic)"/>
+    <include file="$(find kimera_topology)/launch/kimera_topology.launch" pass_all_args="true">
+        <arg name="config" value="sidpac_topology_config.yaml"/>
+        <arg name="semantic_config" default="ade150_semantic_config.yaml"/>
+        <arg name="semantic_color_path" default="$(find semantic_recolor)/config/colors/ade150_config.csv"/>
     </include>
-
-    <include file="$(find semantic_recolor)/launch/semantic_recolor_pointcloud.launch"
-             if="$(arg use_semantics)">
-        <arg name="rgb_info_topic" value="$(arg camera_info_topic)"/>
-        <arg name="rgb_topic" value="$(arg camera_topic)"/>
-        <arg name="depth_topic" value="$(arg depth_topic)"/>
-        <arg name="pointcloud_topic" default="$(arg pointcloud_topic)"/>
-    </include>
-
-    <node name="kimera_topology_node"
-          type="kimera_topology_node"
-          pkg="kimera_topology"
-          output="$(arg ros_output)"
-          launch-prefix="$(arg launch-prefix)"
-          args="--minloglevel=$(arg min_glog_level) -v=$(arg verbosity) $(arg glog_file_args)"
-          required="true">
-        <remap from="pointcloud" to="$(arg pointcloud_topic)"/>
-        <param name="sensor_frame" value="$(arg sensor_frame)"/>
-        <param name="verbose" value="false"/>
-        <param name="publish_pointclouds" value="false"/>
-
-        <param name="use_semantic_tsdf_server" value="$(arg use_semantics)"/>
-
-        <rosparam command="load" file="$(arg graph_viz_config_file)"/>
-        <rosparam command="load" file="$(arg config_dir)/$(arg config)"/>
-        <rosparam command="load" file="$(arg config_dir)/$(arg semantic_config)"/>
-        <param name="semantic_label_2_color_csv_filepath" value="$(arg semantic_color_path)"/>
-
-        <param name="show_stats" value="$(arg show_stats)"/>
-        <param name="tsdf_voxel_size" value="$(arg voxel_size)"/>
-        <param name="max_ray_length_m" value="$(arg max_ray_length_m)"/>
-        <param name="max_distance_m" value="$(arg max_ray_length_m)"/>
-        <param name="update_period_s" value="$(arg update_period_s)"/>
-        <param name="mesh_only" value="false"/>
-    </node>
 
 </launch>
