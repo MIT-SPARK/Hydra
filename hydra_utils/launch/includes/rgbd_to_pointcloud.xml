@@ -1,8 +1,8 @@
 <!-- derived from kimera_semantics_ros/launch/kimera_semantics.launch -->
 <launch>
 
-  <arg name="camera_info_topic"/>
-  <arg name="camera_topic"/>
+  <arg name="rgb_info_topic"/>
+  <arg name="rgb_topic"/>
   <arg name="depth_topic"/>
   <arg name="pointcloud_topic"/>
   <arg name="queue_size" default="20"/>
@@ -26,8 +26,8 @@
         output="$(arg nodelet_output)">
     <param name="queue_size" value="$(arg queue_size)"/>
 
-    <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
-    <remap from="rgb/image_rect_color" to="$(arg camera_topic)"/>
+    <remap from="rgb/camera_info" to="$(arg rgb_info_topic)"/>
+    <remap from="rgb/image_rect_color" to="$(arg rgb_topic)"/>
     <remap from="depth_registered/image_rect" to="$(arg depth_topic)"/>
     <remap from="depth_registered/points" to="$(arg pointcloud_topic)"/>
   </node>
