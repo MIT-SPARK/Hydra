@@ -17,7 +17,6 @@ find_package(
              kimera_semantics
              kimera_semantics_ros
              kimera_topology
-             kimera_vio_ros
              object_db
              tf2_eigen
              voxblox
@@ -39,7 +38,6 @@ catkin_package(
   kimera_semantics
   kimera_semantics_ros
   kimera_topology
-  kimera_vio_ros
   tf2_eigen
   voxblox
   voxblox_ros

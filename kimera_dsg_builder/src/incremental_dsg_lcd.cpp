@@ -38,7 +38,7 @@ void DsgLcd::stop() {
 
 DsgLcd::~DsgLcd() { stop(); }
 
-void DsgLcd::handleDbowMsg(const kimera_vio_ros::BowQuery::ConstPtr& msg) {
+void DsgLcd::handleDbowMsg(const pose_graph_tools::BowQuery::ConstPtr& msg) {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
   bow_messages_.push_back(msg);
 }

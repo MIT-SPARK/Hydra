@@ -1,7 +1,7 @@
 #include "kimera_dsg_builder/dsg_lcd_registration.h"
 
 #include <hydra_utils/timing_utilities.h>
-#include <kimera_vio_ros/LcdFrameRegistration.h>
+#include <pose_graph_tools/LcdFrameRegistration.h>
 #include <ros/service.h>
 #include <tf2_eigen/tf2_eigen.h>
 #include <fstream>
@@ -192,7 +192,7 @@ DsgRegistrationSolution DsgAgentSolver::solve(const DynamicSceneGraph& dsg,
   const NodeId match_id = *match.match_nodes.begin();
 
   uint64_t timestamp;
-  kimera_vio_ros::LcdFrameRegistration msg;
+  pose_graph_tools::LcdFrameRegistration msg;
   msg.request.query = getFrameIdFromNode(dsg, query_id);
   msg.request.match = getFrameIdFromNode(dsg, match_id);
   timestamp = dsg.getDynamicNode(query_id).value().get().timestamp.count();

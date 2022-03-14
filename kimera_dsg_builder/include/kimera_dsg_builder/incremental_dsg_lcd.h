@@ -9,7 +9,7 @@
 #include <tf2_ros/transform_listener.h>
 
 #include <kimera_dsg/node_symbol.h>
-#include <kimera_vio_ros/BowQuery.h>
+#include <pose_graph_tools/BowQuery.h>
 
 #include <memory>
 #include <mutex>
@@ -29,7 +29,7 @@ class DsgLcd {
   void stop();
 
  private:
-  void handleDbowMsg(const kimera_vio_ros::BowQuery::ConstPtr& msg);
+  void handleDbowMsg(const pose_graph_tools::BowQuery::ConstPtr& msg);
 
   void runLcd();
 
@@ -54,7 +54,7 @@ class DsgLcd {
   char robot_prefix_;
 
   ros::Subscriber bow_sub_;
-  std::list<kimera_vio_ros::BowQuery::ConstPtr> bow_messages_;
+  std::list<pose_graph_tools::BowQuery::ConstPtr> bow_messages_;
   std::list<NodeId> potential_lcd_root_nodes_;
 };
 

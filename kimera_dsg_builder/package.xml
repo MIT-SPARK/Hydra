@@ -20,7 +20,6 @@
   <depend>kimera_semantics</depend>
   <depend>kimera_semantics_ros</depend>
   <depend>kimera_topology</depend>
-  <depend>kimera_vio_ros</depend>
   <depend>object_db</depend>
   <depend>teaserpp</depend>
   <depend>voxblox</depend>
