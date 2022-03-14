@@ -10,7 +10,6 @@
     <arg name="semantic_map_path"/>
     <arg name="sensor_frame"/>
 
-    <arg name="use_semantics" default="true"/>
     <arg name="use_gt_frame" default="true"/>
     <arg name="use_oriented_bounding_boxes" default="false"/>
     <arg name="exit_after_bag" default="false"/>
@@ -31,7 +30,6 @@
     <arg name="verbosity" default="0"/>
     <arg name="glog_to_file" default="false"/>
     <arg name="glog_dir" default="$(find kimera_dsg_builder)/glogs"/>
-    <arg name="topology_glog_dir" default="$(find kimera_topology)/glogs"/>
     <arg name="glog_file_args" value="--logtostderr=0 --log_dir=$(arg glog_dir)" if="$(arg glog_to_file)"/>
     <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
 

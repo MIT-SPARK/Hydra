@@ -11,7 +11,6 @@
     <arg name="voxel_size" default="0.10"/>
     <arg name="max_ray_length_m" default="4.5"/>
     <arg name="update_period_s" default="0.5"/>
-    <arg name="show_stats" default="true"/>
 
     <arg name="graph_viz_config_dir" default="$(find kimera_topology)/config"/>
     <arg name="graph_viz_config" default="graph_visualization_config.yaml"/>
@@ -29,6 +28,7 @@
     <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
     <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
     <arg name="ros_output" value="log" if="$(arg glog_to_file)"/>
+    <arg name="show_stats" default="$(arg glog_to_file)"/>
 
     <node name="kimera_topology_node" type="kimera_topology_node" pkg="kimera_topology"
           args="--minloglevel=$(arg min_glog_level) -v=$(arg verbosity) $(arg glog_file_args)"

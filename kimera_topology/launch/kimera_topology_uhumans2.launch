@@ -6,6 +6,9 @@
     <arg name="use_gt_semantics" default="true"/>
     <arg name="use_gt_frame" default="true"/>
 
+    <arg name="sensor_frame" value="left_cam_kimera" unless="$(arg use_gt_frame)"/>
+    <arg name="sensor_frame" value="left_cam" if="$(arg use_gt_frame)"/>
+
     <arg name="semantic_color_path"
          default="$(find kimera_semantics_ros)/cfg/tesse_multiscene_office1_segmentation_mapping.csv"
          if="$(arg use_gt_semantics)"/>
@@ -30,9 +33,6 @@
 
     <include file="$(find kimera_topology)/launch/kimera_topology.launch" pass_all_args="true">
         <arg name="config" value="uhumans2_topology_config.yaml"/>
-        <!-- set sensor frame based on pose source -->
-        <arg name="sensor_frame" value="left_cam_kimera" unless="$(arg use_gt_frame)"/>
-        <arg name="sensor_frame" value="left_cam" if="$(arg use_gt_frame)"/>
         <!-- set semantic config based on semantics choice -->
         <arg name="semantic_config" default="uhumans2_semantic_config.yaml" if="$(arg use_gt_semantics)"/>
         <arg name="semantic_config" default="ade150_semantic_config.yaml" unless="$(arg use_gt_semantics)"/>
