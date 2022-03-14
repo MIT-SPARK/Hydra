@@ -1,0 +1,26 @@
+<launch>
+    <param name="use_sim_time" value="true"/>
+
+    <arg name="path_to_csv"/>
+    <arg name="sensor_frame" default="left_cam"/>
+
+    <include file="$(find hydra_utils)/launch/odom_to_tf.launch">
+        <arg name="odom_frame" value="t265_odom"/>
+        <arg name="odom_topic" value="/cam_t265/odom/sample"/>
+    </include>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="odom_to_left_cam"
+          args="0.00012095 -0.0008438 0.00026236
+                0.489216945549 -0.497966285936 -0.499874528495 0.512661503821
+                t265_odom $(arg sensor_frame)"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="left_cam_to_d455"
+          args="0 0 0 0 0 0 1 $(arg sensor_frame) cam_d455_color_optical_frame"/>
+
+    <arg name="rgb_info_topic" default="/cam_d455/color/camera_info"/>
+    <arg name="rgb_topic" default="/cam_d455/color/image_raw"/>
+    <arg name="depth_topic" default="/cam_d455/aligned_depth_to_color/image_raw"/>
+    <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
+
+    <include file="$(find hydra_utils)/launch/includes/rgbd_to_pointcloud.xml" pass_all_args="true"/>
+</launch>

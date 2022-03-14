@@ -1,0 +1,25 @@
+<launch>
+    <arg name="robot_id" default="0"/>
+    <arg name="config_dir" default="$(find kimera_dsg_builder)/config/d455"/>
+    <arg name="dsg_output_dir" default="$(find kimera_dsg_builder)/output"/>
+    <arg name="dsg_output_prefix" default="d455"/>
+    <arg name="typology_dir" default="$(find kimera_dsg_builder)/config/d455"/>
+    <arg name="typology_config" default="d455_typology.yaml"/>
+    <arg name="semantic_map_dir" default="$(find semantic_recolor)/config/colors"/>
+    <arg name="semantic_map_file" default="ade150_config.csv"/>
+    <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
+
+    <arg name="use_gt_frame" default="true"/>
+    <arg name="sensor_frame" default="left_cam"/>
+
+    <include file="$(find kimera_topology)/launch/kimera_topology_uhumans2.launch" pass_all_args="true">
+        <arg name="semantic_color_path" value="$(arg semantic_map_path)"/>
+        <arg name="config_dir" value="$(find kimera_topology)/config"/>
+        <arg name="glog_dir" value="$(find kimera_topology)/glogs"/>
+        <arg name="debug" value="false"/>
+    </include>
+
+    <include file="$(find kimera_dsg_builder)/launch/dsg_builder.launch" pass_all_args="true">
+        <arg name="use_oriented_bounding_boxes" value="true"/>
+    </include>
+</launch>
