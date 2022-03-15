@@ -11,6 +11,7 @@
     <arg name="voxel_size" default="0.10"/>
     <arg name="max_ray_length_m" default="4.5"/>
     <arg name="update_period_s" default="0.5"/>
+    <arg name="publish_archived" default="true"/>
 
     <arg name="graph_viz_config_dir" default="$(find kimera_topology)/config"/>
     <arg name="graph_viz_config" default="graph_visualization_config.yaml"/>
@@ -52,6 +53,7 @@
         <param name="max_ray_length_m" value="$(arg max_ray_length_m)"/>
         <param name="max_distance_m" value="$(arg max_ray_length_m)"/>
         <param name="update_period_s" value="$(arg update_period_s)"/>
+        <param name="publish_archived" value="$(arg publish_archived)"/>
     </node>
 
 </launch>
