@@ -56,6 +56,7 @@
         <arg name="glog_dir" value="$(arg topology_glog_dir)"/>
         <arg name="verbosity" value="$(arg verbosity)" if="$(arg glog_to_file)"/>
         <arg name="min_glog_level" value="$(arg min_glog_level)"/>
+        <arg name="sensor_frame" value="$(arg rgb_frame)"/>
 
         <arg name="camera_info_topic" default="/habitat/agent_0/rgb_info" if="$(arg use_gt_semantics)"/>
         <arg name="camera_info_topic" default="/habitat/agent_0/rgb_info" unless="$(arg use_gt_semantics)"/>
