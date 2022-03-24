@@ -587,8 +587,8 @@ void DsgBackend::updateDsgMesh(bool force_mesh_update) {
   }
 
   timer.reset(new ScopedTimer("backend/mesh_update", last_timestamp_));
-  input_mesh =
-      kimera_pgmo::PgmoMeshMsgToPolygonMesh(*latest_mesh_, &mesh_vertex_stamps_);
+  input_mesh = kimera_pgmo::PgmoMeshMsgToPolygonMesh(
+      *latest_mesh_, &mesh_vertex_stamps_, &mesh_vertex_graph_inds_);
   have_new_mesh_ = false;
 
   if (input_mesh.cloud.height * input_mesh.cloud.width == 0) {
@@ -598,6 +598,7 @@ void DsgBackend::updateDsgMesh(bool force_mesh_update) {
 
   auto opt_mesh = deformation_graph_->deformMesh(input_mesh,
                                                  mesh_vertex_stamps_,
+                                                 mesh_vertex_graph_inds_,
                                                  robot_vertex_prefix_,
                                                  num_interp_pts_,
                                                  interp_horizon_);

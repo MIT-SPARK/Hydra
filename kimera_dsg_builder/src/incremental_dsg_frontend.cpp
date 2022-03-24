@@ -204,16 +204,6 @@ void DsgFrontend::runMeshFrontend() {
 
       mesh_frontend_ros_queue_->callAvailable(ros::WallDuration(0.0));
       mesh_frontend_.voxbloxCallback(mesh_msg);
-
-      // TODO(nathan) revisit for a more formal handshake with pgmo
-      ros::WallRate spin_rate(100);
-      while (ros::ok() && !should_shutdown_) {
-        if (mesh_frontend_.getLastFullCompressionStamp() >= msg->header.stamp) {
-          break;
-        }
-
-        spin_rate.sleep();
-      }
     }  // end timing scope
 
     mesh_frontend_.clearArchivedMeshFull(msg->archived_blocks);
@@ -474,7 +464,7 @@ void DsgFrontend::addAgentPlaceEdges() {
 void DsgFrontend::updatePlaceMeshMapping() {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
   const auto& places = dsg_->graph->getLayer(KimeraDsgLayers::PLACES);
-  const auto& mesh_mappings = mesh_frontend_.getVoxbloxMsgMapping();
+  const auto& mesh_mappings = mesh_frontend_.getVoxbloxMsgToGraphMapping();
 
   size_t num_invalid = 0;
   size_t num_processed = 0;

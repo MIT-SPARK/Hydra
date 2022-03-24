@@ -174,6 +174,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   kimera_pgmo::KimeraPgmoMesh::ConstPtr latest_mesh_;
   std::vector<ros::Time> mesh_vertex_stamps_;
+  std::vector<int> mesh_vertex_graph_inds_;
 
   PoseGraphQueue deformation_graph_updates_;
   PoseGraphQueue pose_graph_updates_;
