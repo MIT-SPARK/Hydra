@@ -4,29 +4,36 @@
 
 #include <hydra_utils/timing_utilities.h>
 #include <ros/topic_manager.h>
+#include <std_srvs/Empty.h>
 
 using hydra::timing::ElapsedTimeRecorder;
 using kimera::KimeraDsgLayers;
 using kimera::LayerId;
 using kimera::incremental::SharedDsgInfo;
 
+enum class ExitMode { CLOCK, SERVICE, NORMAL };
+
 inline bool haveClock() {
   return ros::TopicManager::instance()->getNumPublishers("/clock");
 }
 
-std::optional<uint64_t> getTimeNs(const kimera::DynamicSceneGraph& graph,
-                                  gtsam::Symbol key) {
-  kimera::NodeSymbol node(key.chr(), key.index());
-  if (!graph.hasNode(node)) {
-    LOG(ERROR) << "Missing node << " << node.getLabel() << "when logging loop closure";
-    LOG(ERROR) << "Num dynamic nodes: " << graph.numDynamicNodes();
-    return std::nullopt;
-  }
+ExitMode getExitMode(const ros::NodeHandle& nh) {
+  std::string exit_mode_str = "NORMAL";
+  nh.getParam("exit_mode", exit_mode_str);
 
-  return graph.getDynamicNode(node).value().get().timestamp.count();
+  if (exit_mode_str == "CLOCK") {
+    return ExitMode::CLOCK;
+  } else if (exit_mode_str == "SERVICE") {
+    return ExitMode::SERVICE;
+  } else if (exit_mode_str == "NORMAL") {
+    return ExitMode::NORMAL;
+  } else {
+    ROS_WARN_STREAM("Unrecognized option: " << exit_mode_str << ". Defaulting to NORMAL");
+    return ExitMode::NORMAL;
+  }
 }
 
-void spinUntilBagFinished() {
+void spinWhileClockPresent() {
   ros::WallRate r(50);
   ROS_INFO("Waiting for bag to start");
   while (ros::ok() && !haveClock()) {
@@ -44,6 +51,47 @@ void spinUntilBagFinished() {
   ROS_WARN("Exiting!");
 }
 
+struct ServiceFunctor {
+  ServiceFunctor() : should_exit(false) {}
+
+  bool callback(std_srvs::Empty::Request&, std_srvs::Empty::Response&) {
+    should_exit = true;
+    return true;
+  }
+
+  bool should_exit;
+};
+
+void spinUntilExitRequested() {
+  ServiceFunctor functor;
+
+  ros::NodeHandle nh("~");
+  ros::ServiceServer service =
+      nh.advertiseService("shutdown", &ServiceFunctor::callback, &functor);
+
+  ros::WallRate r(50);
+  ROS_INFO("Running...");
+  while (ros::ok() && !functor.should_exit) {
+    ros::spinOnce();
+    r.sleep();
+  }
+
+  ros::spinOnce();  // make sure all the callbacks are processed
+  ROS_WARN("Exiting!");
+}
+
+std::optional<uint64_t> getTimeNs(const kimera::DynamicSceneGraph& graph,
+                                  gtsam::Symbol key) {
+  kimera::NodeSymbol node(key.chr(), key.index());
+  if (!graph.hasNode(node)) {
+    LOG(ERROR) << "Missing node << " << node.getLabel() << "when logging loop closure";
+    LOG(ERROR) << "Num dynamic nodes: " << graph.numDynamicNodes();
+    return std::nullopt;
+  }
+
+  return graph.getDynamicNode(node).value().get().timestamp.count();
+}
+
 int main(int argc, char* argv[]) {
   ros::init(argc, argv, "incremental_dsg_builder_node");
 
@@ -59,8 +107,7 @@ int main(int argc, char* argv[]) {
   std::string dsg_output_path = "";
   nh.getParam("log_path", dsg_output_path);
 
-  bool exit_after_bag = false;
-  nh.getParam("exit_after_bag", exit_after_bag);
+  const auto exit_mode = getExitMode(nh);
 
   bool enable_lcd = false;
   nh.getParam("enable_lcd", enable_lcd);
@@ -91,10 +138,17 @@ int main(int argc, char* argv[]) {
       lcd->start();
     }
 
-    if (exit_after_bag) {
-      spinUntilBagFinished();
-    } else {
-      ros::spin();
+    switch (exit_mode) {
+      case ExitMode::CLOCK:
+        spinWhileClockPresent();
+        break;
+      case ExitMode::SERVICE:
+        spinUntilExitRequested();
+        break;
+      case ExitMode::NORMAL:
+      default:
+        ros::spin();
+        break;
     }
 
     frontend.stop();

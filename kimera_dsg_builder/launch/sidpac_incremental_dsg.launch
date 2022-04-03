@@ -22,7 +22,6 @@
     <include file="$(find kimera_topology)/launch/kimera_topology_sidpac.launch" pass_all_args="true">
         <arg name="semantic_color_path" value="$(arg semantic_map_path)"/>
         <arg name="config_dir" value="$(find kimera_topology)/config"/>
-        <arg name="glog_dir" value="$(find kimera_topology)/glogs"/>
         <arg name="default" value="false"/>
     </include>
 

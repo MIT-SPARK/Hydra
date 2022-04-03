@@ -12,7 +12,7 @@
     <arg name="max_ray_length_m" default="4.5"/>
     <arg name="update_period_s" default="1.0"/>
 
-    <arg name="dsg_output_path" default="$(find kimera_batch_dsg)/output"/>
+    <arg name="dsg_path" default="$(find kimera_batch_dsg)/output"/>
 
     <arg name="typology_dir" default="$(find kimera_batch_dsg)/config"/>
     <arg name="topology_dir" default="$(find kimera_topology)/config"/>
@@ -61,7 +61,7 @@
         <param name="semantic/gvd_namespace" value="~gvd_integrator"/>
 
         <param name="dsg_log_output" value="true"/>
-        <param name="dsg_output_path" value="$(arg dsg_output_path)"/>
+        <param name="dsg_output_path" value="$(arg dsg_path)"/>
         <param name="visualize" value="$(arg visualize)"/>
     </node>
 </launch>

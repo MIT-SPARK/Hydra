@@ -12,7 +12,7 @@
 
     <arg name="use_gt_frame" default="true"/>
     <arg name="use_oriented_bounding_boxes" default="false"/>
-    <arg name="exit_after_bag" default="false"/>
+    <arg name="exit_mode" default="NORMAL"/>
 
     <arg name="enable_dsg_lcd" default="false"/>
     <arg name="enable_lcd_viz" default="false"/>
@@ -60,7 +60,7 @@
         <env name="TERM" value="xterm-256color"/>
 
         <param name="enable_lcd" value="$(arg enable_dsg_lcd)"/>
-        <param name="exit_after_bag" value="$(arg exit_after_bag)"/>
+        <param name="exit_mode" value="$(arg exit_mode)"/>
         <param name="use_oriented_bounding_boxes" value="$(arg use_oriented_bounding_boxes)"/>
         <param name="semantic_label_2_color_csv_filepath" value="$(arg semantic_map_path)"/>
 

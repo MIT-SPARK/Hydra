@@ -113,6 +113,10 @@ void DsgLcd::runLcd() {
     }  // end critical section
 
     if (lcd_graph_->getLayer(KimeraDsgLayers::PLACES).numNodes() == 0) {
+      if (should_shutdown_) {
+        break;
+      }
+
       r.sleep();
       continue;
     }
