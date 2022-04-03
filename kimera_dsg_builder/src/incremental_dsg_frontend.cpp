@@ -351,8 +351,8 @@ void DsgFrontend::runPlaces() {
 }
 
 void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
-  ScopedTimer timer(
-      "frontend/update_places", msg->header.stamp.toNSec(), true, 2, false);
+  const uint64_t msg_time_ns = msg->header.stamp.toNSec();
+  ScopedTimer timer("frontend/update_places", msg_time_ns, true, 2, false);
   SceneGraphLayer temp_layer(KimeraDsgLayers::PLACES);
   std::unique_ptr<SceneGraphLayer::Edges> edges =
       temp_layer.deserializeLayer(msg->layer_contents);
@@ -364,6 +364,7 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
     active_nodes.insert(id_node_pair.first);
     auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
     attrs.is_active = true;
+    attrs.last_update_time_ns = msg_time_ns;
   }
 
   const auto& objects = dsg_->graph->getLayer(KimeraDsgLayers::OBJECTS);

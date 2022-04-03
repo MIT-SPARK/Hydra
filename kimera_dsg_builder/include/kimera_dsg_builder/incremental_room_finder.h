@@ -53,6 +53,7 @@ class RoomFinder {
     double sparse_decomp_tolerance = 1.0e-5;
     double max_modularity_iters = 5;
     double modularity_gamma = 1.0;
+    bool use_previous_rooms = false;
     enum class ClusterMode {
       SPECTRAL,
       MODULARITY,
@@ -76,6 +77,8 @@ class RoomFinder {
                                ClusterResults& cluster_results,
                                const RoomMap& previous_rooms,
                                const ActiveNodeSet& active_nodes);
+
+  void assignRooms(SharedDsgInfo& dsg, ClusterResults& cluster_results);
 
  protected:
   Config config_;

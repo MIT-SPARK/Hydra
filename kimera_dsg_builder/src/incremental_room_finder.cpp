@@ -575,11 +575,60 @@ void pruneClusters(const DynamicSceneGraph& graph, ClusterResults& results) {
 
 using RoomClusterMap = std::map<NodeId, size_t>;
 
+struct IndexTimePair {
+  size_t index;
+  uint64_t time_ns;
+
+  inline bool operator>(const IndexTimePair& other) const {
+    return time_ns > other.time_ns;
+  }
+};
+
+using IndexTimePairQueue = std::priority_queue<IndexTimePair,
+                                               std::vector<IndexTimePair>,
+                                               std::greater<IndexTimePair>>;
+
+void RoomFinder::assignRooms(SharedDsgInfo& dsg, ClusterResults& cluster_results) {
+  pruneClusters(*dsg.graph, cluster_results);
+
+  IndexTimePairQueue index_queue;
+  for (const auto id_cluster_pair : cluster_results.clusters) {
+    if (id_cluster_pair.second.size() < config_.min_room_size) {
+      continue;
+    }
+
+    uint64_t oldest_time_ns = std::numeric_limits<uint64_t>::max();
+    for (const auto& place : id_cluster_pair.second) {
+      const auto& attrs = dsg.graph->getNode(place)->get().attributes();
+      if (attrs.last_update_time_ns < oldest_time_ns) {
+        oldest_time_ns = attrs.last_update_time_ns;
+      }
+    }
+
+    index_queue.push({id_cluster_pair.first, oldest_time_ns});
+  }
+
+  NodeSymbol next_id(config_.room_prefix, 0);
+  while (!index_queue.empty()) {
+    const auto next_cluster = index_queue.top();
+    index_queue.pop();
+
+    addNewRoomNode(*dsg.graph, next_id, config_.room_semantic_label);
+
+    const auto& cluster = cluster_results.clusters.at(next_cluster.index);
+    for (const auto& node_id : cluster) {
+      dsg.graph->insertEdge(next_id, node_id);
+    }
+
+    incremental::updateRoomCentroid(*dsg.graph, next_id);
+    ++next_id;
+  }
+}
+
 void RoomFinder::updateRoomsFromClusters(SharedDsgInfo& dsg,
                                          ClusterResults& cluster_results,
                                          const RoomMap& previous_rooms,
                                          const ActiveNodeSet& active_nodes) {
-  std::unique_lock<std::mutex> graph_lock(dsg.mutex);
   pruneClusters(*dsg.graph, cluster_results);
 
   std::map<NodeId, size_t> rooms_to_clusters = mapRoomsToClusters(
@@ -694,6 +743,18 @@ void updateRoomEdges(DynamicSceneGraph& graph,
   }
 }
 
+void removeOldRooms(SharedDsgInfo& dsg) {
+  std::vector<NodeId> to_remove;
+  const auto& rooms = dsg.graph->getLayer(KimeraDsgLayers::ROOMS);
+  for (const auto& id_node_pair : rooms.nodes()) {
+    to_remove.push_back(id_node_pair.first);
+  }
+
+  for (const auto node_id : to_remove) {
+    dsg.graph->removeNode(node_id);
+  }
+}
+
 void RoomFinder::findRooms(SharedDsgInfo& dsg, const ActiveNodeSet& active_nodes) {
   RoomMap previous_rooms;
   IsolatedSceneGraphLayer::Ptr active_places;
@@ -702,7 +763,9 @@ void RoomFinder::findRooms(SharedDsgInfo& dsg, const ActiveNodeSet& active_nodes
     active_places = getActiveSubgraph(
         *dsg.graph, static_cast<LayerId>(KimeraDsgLayers::PLACES), active_nodes);
 
-    previous_rooms = getPreviousPlaceRoomMap(*dsg.graph, *active_places);
+    if (config_.use_previous_rooms) {
+      previous_rooms = getPreviousPlaceRoomMap(*dsg.graph, *active_places);
+    }
 
   }  // end dsg critical section
 
@@ -743,10 +806,14 @@ void RoomFinder::findRooms(SharedDsgInfo& dsg, const ActiveNodeSet& active_nodes
     return;
   }
 
-  updateRoomsFromClusters(dsg, clusters, previous_rooms, active_nodes);
-
   {  // start dsg critical section
     std::unique_lock<std::mutex> graph_lock(dsg.mutex);
+    if (config_.use_previous_rooms) {
+      updateRoomsFromClusters(dsg, clusters, previous_rooms, active_nodes);
+    } else {
+      removeOldRooms(dsg);
+      assignRooms(dsg, clusters);
+    }
     updateRoomEdges(*dsg.graph, previous_rooms, active_nodes);
   }  // end dsg critical section
 }

@@ -144,6 +144,7 @@ void visit_config(const Visitor& v, RoomFinder::Config& config) {
   v.visit("min_room_size", config.min_room_size);
   v.visit("max_modularity_iters", config.max_modularity_iters);
   v.visit("modularity_gamma", config.modularity_gamma);
+  v.visit("use_previous_rooms", config.use_previous_rooms);
   v.visit("clustering_mode", config.clustering_mode);
 
   std::string prefix_string;
