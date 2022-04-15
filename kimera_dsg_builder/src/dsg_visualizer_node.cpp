@@ -27,8 +27,7 @@ int main(int argc, char** argv) {
   }
 
   ROS_INFO_STREAM("Loading scene graph from: " << scene_graph_input_path.c_str());
-  kimera::DynamicSceneGraph::Ptr scene_graph(new kimera::DynamicSceneGraph());
-  scene_graph->load(scene_graph_input_path);
+  auto scene_graph = kimera::DynamicSceneGraph::load(scene_graph_input_path);
   ROS_INFO_STREAM("Loaded scene graph: " << scene_graph->numNodes() << " nodes, "
                                          << scene_graph->numEdges() << ", "
                                          << "has mesh? "

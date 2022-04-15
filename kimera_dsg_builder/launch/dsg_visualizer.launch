@@ -32,6 +32,7 @@
         args="-alsologtostderr -colorlogtostderr -v=$(arg verbosity)">
     <param name="visualizer_ns" value="$(arg visualizer_ns)"/>
     <param name="scene_graph_input_path" value="$(arg scene_graph_path)"/>
+    <param name="use_voxblox_mesh_plugin" value="true"/>
   </node>
 
   <node name="rviz" pkg="rviz" type="rviz" output="screen" if="$(arg start_rviz)"
