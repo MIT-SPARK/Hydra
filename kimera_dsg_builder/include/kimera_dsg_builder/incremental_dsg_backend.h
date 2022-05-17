@@ -91,7 +91,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void startPgmo();
 
- private:
+ protected:
   void setSolverParams();
 
   bool setVisualizeBackend(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
@@ -135,11 +135,12 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   pose_graph_tools::PoseGraph::ConstPtr popAgentGraphQueue();
 
- private:
+ protected:
   ros::NodeHandle nh_;
   std::atomic<bool> should_viz_shutdown_{false};
   std::atomic<bool> should_opt_shutdown_{false};
   std::atomic<bool> have_loopclosures_{false};
+  std::atomic<bool> have_graph_updates_{false};
   std::atomic<bool> visualizer_should_reset_{false};
   bool have_new_mesh_{false};
 
@@ -149,18 +150,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   SharedDsgInfo::Ptr private_dsg_;
   IsolatedSceneGraphLayer shared_places_copy_;
 
-  int robot_id_;
-  char robot_prefix_;
-  char robot_vertex_prefix_;
-
-  kimera_pgmo::Path trajectory_;
-  std::vector<ros::Time> timestamps_;
   std::atomic<uint64_t> last_timestamp_;
-  std::queue<size_t> unconnected_nodes_;
-
-  ros::Subscriber full_mesh_sub_;
-  ros::Subscriber deformation_graph_sub_;
-  ros::Subscriber pose_graph_sub_;
 
   ros::ServiceServer save_mesh_srv_;
   ros::ServiceServer save_traj_srv_;
@@ -172,8 +162,6 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   std::list<LayerUpdateFunc> dsg_update_funcs_;
 
-  kimera_pgmo::KimeraPgmoMesh::ConstPtr latest_mesh_;
-  std::vector<ros::Time> mesh_vertex_stamps_;
   std::vector<int> mesh_vertex_graph_inds_;
 
   PoseGraphQueue deformation_graph_updates_;
@@ -196,6 +184,21 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   SceneGraphLogger backend_graph_logger_;
   std::list<LoopClosureLog> loop_closures_;
+
+ private:
+  int robot_id_;
+  char robot_prefix_;
+  char robot_vertex_prefix_;
+
+  kimera_pgmo::Path trajectory_;
+  std::vector<ros::Time> timestamps_;
+  std::queue<size_t> unconnected_nodes_;
+  kimera_pgmo::KimeraPgmoMesh::ConstPtr latest_mesh_;
+  std::vector<ros::Time> mesh_vertex_stamps_;
+
+  ros::Subscriber full_mesh_sub_;
+  ros::Subscriber deformation_graph_sub_;
+  ros::Subscriber pose_graph_sub_;
 };
 
 }  // namespace incremental

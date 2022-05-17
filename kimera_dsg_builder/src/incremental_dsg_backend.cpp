@@ -358,7 +358,9 @@ void DsgBackend::runPgmo() {
     ScopedTimer spin_timer("backend/spin", last_timestamp_);
     const size_t prev_loop_closures = num_loop_closures_;
 
-    bool have_graph_updates = readPgmoUpdates();
+    if (readPgmoUpdates()) {
+      have_graph_updates_ = true;
+    }
 
     if (num_loop_closures_ > prev_loop_closures) {
       LOG(WARNING) << "New loop closures detected!";
@@ -380,13 +382,14 @@ void DsgBackend::runPgmo() {
       have_dsg_updates = updatePrivateDsg();
 
       // TODO(nathan) move to helper
-      if (config_.visualize_place_factors && (have_dsg_updates || have_graph_updates)) {
+      if (config_.visualize_place_factors &&
+          (have_dsg_updates || have_graph_updates_)) {
         MinimumSpanningTreeInfo mst_info = getMinimumSpanningEdges(shared_places_copy_);
         places_factors_visualizer_->draw(
             robot_vertex_prefix_, shared_places_copy_, mst_info, *deformation_graph_);
       }
 
-      if (config_.optimize_on_lc && have_graph_updates && have_loopclosures_) {
+      if (config_.optimize_on_lc && have_graph_updates_ && have_loopclosures_) {
         optimize();
         was_updated = true;
       } else if (config_.call_update_periodically && have_dsg_updates) {
@@ -396,7 +399,7 @@ void DsgBackend::runPgmo() {
       }
     }  // end pgmo mesh critical section
 
-    if (have_graph_updates && config_.pgmo.should_log) {
+    if (have_graph_updates_ && config_.pgmo.should_log) {
       logStatus();
     }
 
@@ -407,9 +410,11 @@ void DsgBackend::runPgmo() {
       r.sleep();
     }
 
-    if (should_opt_shutdown_ && !have_graph_updates && !have_dsg_updates) {
+    if (should_opt_shutdown_ && !have_graph_updates_ && !have_dsg_updates) {
       break;
     }
+
+    have_graph_updates_ = false;
   }
 
   // TODO(nathan) figure this out instead of forcing an update before exiting
