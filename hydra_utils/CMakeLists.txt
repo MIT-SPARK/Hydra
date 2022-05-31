@@ -23,7 +23,7 @@ find_package(GTSAM REQUIRED)
 find_package(kimera_dsg REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(yaml-cpp REQUIRED)
-find_package(OpenCV)
+find_package(OpenCV REQUIRED)
 
 # TODO(nathan) clean up
 find_package(PkgConfig REQUIRED)
