@@ -1,0 +1,24 @@
+<launch>
+  <arg name="camera_ns" default="/azure"/>
+  <arg name="use_lcd" default="true"/>
+  <arg name="lcd_no_optimize" default="true"/>
+  <arg name="lcd_no_detection" default="false"/>
+  <arg name="use_external_odom" default="true"/>
+
+  <arg name="log_output_path" default="$(find hydra_utils)/output/kinect_azure"/>
+
+  <include file="$(find kimera_vio_ros)/launch/kimera_vio_ros.launch" pass_all_args="true">
+      <arg name="online" value="true"/>
+      <arg name="log_output" value="true"/>
+      <arg name="include_pipeline_flags" value="true"/>
+      <arg name="viz_type" value="1"/>
+      <arg name="use_rviz" value="true"/>
+      <arg name="log_gt_data" value="true"/>
+      <arg name="left_cam_topic" value="$(arg camera_ns)/rgb/image_raw"/>
+      <arg name="depth_cam_topic" value="$(arg camera_ns)/depth_to_rgb/image_raw"/>
+      <arg name="imu_topic"  value="$(arg camera_ns)/imu"/>
+      <arg name="external_odom_topic" value="/camera/odom/sample"/>
+      <arg name="gt_topic" value="/camera/odom/sample"/>
+      <arg name="params_folder" value="$(find hydra_utils)/config/kinect_azure_vio/"/>
+  </include>
+</launch>

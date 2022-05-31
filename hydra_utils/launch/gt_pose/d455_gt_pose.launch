@@ -1,0 +1,69 @@
+<launch>
+    <arg name="sensor_frame" default="left_cam"/>
+    <arg name="debug" default="false"/>
+    <arg name="include_a1_static_tfs" default="true"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="fake_tf3"
+          args="0 0 0 0 0 0 1 world cam_t265_odom_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="odom_to_d455"
+          args="0.01013482803317757 0.0575326517096797 -0.10924056589710966
+                0.6948450240211475 -0.12581651886500167 0.6960702447804906 -0.12979526380023104
+                cam_t265_accel_frame d455_body"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="body_to_left_cam"
+          args="0 0 0 0.5 -0.5 -0.5 -0.5 d455_body left_cam"/>
+
+    <group if="$(arg debug)">
+        <arg name="rgb_info_topic" default="/cam_d455/color/camera_info"/>
+        <arg name="rgb_topic" default="/cam_d455/color/image_raw"/>
+        <arg name="depth_topic" default="/cam_d455/aligned_depth_to_color/image_raw"/>
+        <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
+
+        <include file="$(find hydra_utils)/launch/includes/rgbd_to_pointcloud.xml" pass_all_args="true"/>
+    </group>
+
+    <group if="$(arg include_a1_static_tfs)">
+        <node pkg="tf2_ros" type="static_transform_publisher" name="fake_static_tf_0"
+            args="0.0 -0.0 -0.0 0.0 0.0 0.0 1.0 cam_d455_link cam_d455_depth_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="fake_static_tf_1"
+            args="0.0 -0.0 -0.0 -0.5 0.4999999999999999 -0.5 0.5000000000000001 cam_d455_depth_frame cam_d455_depth_optical_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="fake_static_tf_2"
+            args="-0.00038633792428299785 -0.059247035533189774 -8.276366133941337e-05 -0.0015963022597134113 0.0005432427278719842 0.0021099590230733156 0.9999963641166687 cam_d455_link cam_d455_color_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="fake_static_tf_3"
+            args="0.0 -0.0 -0.0 -0.5 0.4999999999999999 -0.5 0.5000000000000001 cam_d455_aligned_depth_to_color_frame cam_d455_color_optical_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="fake_static_tf_4"
+            args="-0.00038633792428299785 -0.059247035533189774 -8.276366133941337e-05 -0.0015963022597134113 0.0005432427278719842 0.0021099590230733156 0.9999963641166687 cam_d455_link cam_d455_aligned_depth_to_color_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="fake_static_tf_5"
+            args="-0.016019999980926514 -0.030220000073313713 0.007400000002235174 0.0 0.0 0.0 1.0 cam_d455_link cam_d455_gyro_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="fake_static_tf_6"
+            args="0.0 -0.0 -0.0 -0.5 0.4999999999999999 -0.5 0.5000000000000001 cam_d455_gyro_frame cam_d455_imu_optical_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="fake_static_tf_7"
+            args="-0.016019999980926514 -0.030220000073313713 0.007400000002235174 0.0 0.0 0.0 1.0 cam_d455_link cam_d455_accel_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="fake_static_tf_8"
+            args="0.0 -0.0 -0.0 -0.5 0.4999999999999999 -0.5 0.5000000000000001 cam_d455_accel_frame cam_d455_accel_optical_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="fake_static_tf_9"
+            args="0.00017012987518683076 0.021037839353084564 -4.3279324017930776e-05 2.220446049250313e-16 0.0 1.0 0.0 cam_t265_link cam_t265_gyro_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="fake_static_tf_10"
+            args="0.0 -0.0 -0.0 0.5 -0.4999999999999999 -0.5 0.5000000000000001 cam_t265_gyro_frame cam_t265_imu_optical_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="fake_static_tf_11"
+            args="0.00017012987518683076 0.021037839353084564 -4.3279324017930776e-05 2.220446049250313e-16 0.0 1.0 0.0 cam_t265_link cam_t265_accel_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="fake_static_tf_12"
+            args="0.0 -0.0 -0.0 0.5 -0.4999999999999999 -0.5 0.5000000000000001 cam_t265_accel_frame cam_t265_accel_optical_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="fake_static_tf_13"
+            args="0.0 -0.0 -0.0 -0.0 -0.0 -0.0 1.0 cam_t265_pose_frame cam_t265_link"/>
+    </group>
+</launch>

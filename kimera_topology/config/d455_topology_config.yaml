@@ -19,9 +19,9 @@ min_basis_for_extraction: 2
 extract_graph: true
 voronoi_config:
     mode: "L1_THEN_ANGLE"
-    min_distance_m: 0.40
-    parent_l1_separation: 12
-    parent_cos_angle_separation: 0.0
+    min_distance_m: 0.30
+    parent_l1_separation: 10
+    parent_cos_angle_separation: 0.1
 graph_extractor:
     min_extra_basis: 2
     min_vertex_basis: 4

@@ -3,55 +3,60 @@
 #include <gtsam/geometry/Pose3.h>
 #include <pose_graph_tools/PoseGraph.h>
 #include <ros/ros.h>
+#include <std_msgs/Time.h>
 #include <tf2_eigen/tf2_eigen.h>
 #include <tf2_ros/transform_listener.h>
+
+gtsam::Pose3 getPose(const geometry_msgs::Pose& pose) {
+  Eigen::Vector3d world_P_body;
+  Eigen::Quaterniond world_R_body;
+  tf2::convert(pose.position, world_P_body);
+  tf2::convert(pose.orientation, world_R_body);
+  return gtsam::Pose3(gtsam::Rot3(world_R_body), world_P_body);
+}
+
+void fillPose(const gtsam::Pose3& pose, geometry_msgs::Pose& msg) {
+  Eigen::Vector3d position = pose.translation();
+  Eigen::Quaterniond rotation = Eigen::Quaterniond(pose.rotation().matrix());
+  tf2::convert(position, msg.position);
+  tf2::convert(rotation, msg.orientation);
+}
 
 void fillBetweenPose(const geometry_msgs::Pose prev_pose,
                      const geometry_msgs::Pose curr_pose,
                      pose_graph_tools::PoseGraphEdge& edge) {
-  Eigen::Vector3d world_P_body_i;
-  Eigen::Quaterniond world_R_body_i;
-  tf2::convert(prev_pose.position, world_P_body_i);
-  tf2::convert(prev_pose.orientation, world_R_body_i);
-
-  Eigen::Vector3d world_P_body_j;
-  Eigen::Quaterniond world_R_body_j;
-  tf2::convert(curr_pose.position, world_P_body_j);
-  tf2::convert(curr_pose.orientation, world_R_body_j);
-
-  gtsam::Pose3 world_T_body_i(gtsam::Rot3(world_R_body_i.toRotationMatrix()),
-                              world_P_body_i);
-  gtsam::Pose3 world_T_body_j(gtsam::Rot3(world_R_body_j.toRotationMatrix()),
-                              world_P_body_j);
+  gtsam::Pose3 world_T_body_i = getPose(prev_pose);
+  gtsam::Pose3 world_T_body_j = getPose(curr_pose);
   gtsam::Pose3 body_i_T_body_j = world_T_body_i.between(world_T_body_j);
 
-  Eigen::Vector3d body_i_P_body_j = body_i_T_body_j.translation();
-  Eigen::Quaterniond body_i_R_body_j =
-      Eigen::Quaterniond(body_i_T_body_j.rotation().matrix());
-  tf2::convert(body_i_P_body_j, edge.pose.position);
-  tf2::convert(body_i_R_body_j, edge.pose.orientation);
+  fillPose(body_i_T_body_j, edge.pose);
 }
 
 struct PoseGraphPublisherNode {
   PoseGraphPublisherNode(ros::NodeHandle nh)
-      : num_poses(0), world_frame("world"), robot_frame("base_link"), robot_id(0) {
+      : num_poses(0),
+        world_frame("world"),
+        robot_frame("base_link"),
+        robot_id(0),
+        use_pointcloud_time(false) {
     double keyframe_period_s = 0.2;
     nh.getParam("keyframe_period_s", keyframe_period_s);
     nh.getParam("world_frame", world_frame);
     nh.getParam("robot_frame", robot_frame);
     nh.getParam("robot_id", robot_id);
+    nh.getParam("use_pointcloud_time", use_pointcloud_time);
 
     pg_pub = nh.advertise<pose_graph_tools::PoseGraph>("pose_graph", 10, true);
-    ROS_DEBUG("PoseGraphPublisher waiting for subscriber...");
-    ros::Rate r(10);
+    ROS_WARN("PoseGraphPublisher waiting for subscriber...");
+    ros::WallRate r(10);
     while (ros::ok() && !pg_pub.getNumSubscribers()) {
       r.sleep();
     }
 
     tf_listener.reset(new tf2_ros::TransformListener(buffer));
 
-    ROS_DEBUG_STREAM("PoseGraphPublisher waiting for transform: "
-                     << robot_frame << " -> " << world_frame);
+    ROS_WARN_STREAM("PoseGraphPublisher waiting for transform: "
+                    << robot_frame << " -> " << world_frame);
     while (ros::ok()) {
       try {
         buffer.lookupTransform(world_frame, robot_frame, ros::Time(0));
@@ -62,22 +67,31 @@ struct PoseGraphPublisherNode {
       }
     }
 
-    timer = nh.createTimer(
-        ros::Duration(keyframe_period_s), &PoseGraphPublisherNode::timerCallback, this);
+    if (!use_pointcloud_time) {
+      ROS_WARN_STREAM("using timer!");
+      ros::Duration loop_dur(keyframe_period_s);
+      timer = nh.createTimer(loop_dur, &PoseGraphPublisherNode::timerCallback, this);
+    } else {
+      ROS_WARN_STREAM("using pointcloud time!");
+      time_sub =
+          nh.subscribe("time_point", 10, &PoseGraphPublisherNode::timeCallback, this);
+    }
   }
 
   inline void spin() { ros::spin(); }
 
-  void timerCallback(const ros::TimerEvent&) {
+  void timerCallback(const ros::TimerEvent&) { publishNewPose(ros::Time::now()); }
+
+  void timeCallback(const std_msgs::Time& msg) { publishNewPose(msg.data); }
+
+  void publishNewPose(const ros::Time& time_to_use) {
     geometry_msgs::TransformStamped transform;
     try {
-      transform = buffer.lookupTransform(world_frame, robot_frame, ros::Time(0));
+      transform = buffer.lookupTransform(world_frame, robot_frame, time_to_use);
     } catch (const tf2::TransformException& ex) {
       ROS_WARN_STREAM(ex.what());
       return;
     }
-
-    ros::Time curr_time = transform.header.stamp;
 
     geometry_msgs::Pose curr_pose;
     curr_pose.position.x = transform.transform.translation.x;
@@ -88,7 +102,7 @@ struct PoseGraphPublisherNode {
     if (num_poses > 0) {
       ROS_INFO_STREAM(" Publishing edge " << num_poses - 1 << " -> " << num_poses);
       pose_graph_tools::PoseGraph pose_graph;
-      pose_graph.header.stamp = curr_time;
+      pose_graph.header.stamp = time_to_use;
       pose_graph.header.frame_id = world_frame;
 
       pose_graph_tools::PoseGraphNode prev_node;
@@ -101,7 +115,7 @@ struct PoseGraphPublisherNode {
       pose_graph.nodes.push_back(prev_node);
 
       pose_graph_tools::PoseGraphNode curr_node;
-      curr_node.header.stamp = curr_time;
+      curr_node.header.stamp = time_to_use;
       curr_node.header.frame_id = world_frame;
       curr_node.robot_id = robot_id;
       curr_node.key = num_poses;
@@ -110,7 +124,7 @@ struct PoseGraphPublisherNode {
       pose_graph.nodes.push_back(curr_node);
 
       pose_graph_tools::PoseGraphEdge edge;
-      edge.header.stamp = curr_time;
+      edge.header.stamp = time_to_use;
       edge.header.frame_id = world_frame;
       edge.key_from = num_poses - 1;
       edge.key_to = num_poses;
@@ -124,20 +138,21 @@ struct PoseGraphPublisherNode {
     }
 
     prev_pose = curr_pose;
-    prev_time = curr_time;
-    num_poses++;
+    ++num_poses;
   }
 
   size_t num_poses;
   std::string world_frame;
   std::string robot_frame;
   int robot_id;
+  bool use_pointcloud_time;
 
   ros::Time prev_time;
   geometry_msgs::Pose prev_pose;
 
   ros::Timer timer;
   ros::Publisher pg_pub;
+  ros::Subscriber time_sub;
   tf2_ros::Buffer buffer;
   std::unique_ptr<tf2_ros::TransformListener> tf_listener;
 };

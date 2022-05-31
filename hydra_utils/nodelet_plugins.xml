@@ -1,0 +1,5 @@
+<library path="lib/libhydra_utils_nodelet">
+    <class name="hydra_utils/mask" type="hydra::MaskNodelet" base_class_type="nodelet::Nodelet">
+        <description>nodelet to mask an arbitrary image</description>
+    </class>
+</library>

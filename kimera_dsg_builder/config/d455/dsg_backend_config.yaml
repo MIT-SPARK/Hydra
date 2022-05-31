@@ -28,7 +28,7 @@ pgmo:
         solver: "LM"
     add_initial_prior: true
     covariance:
-        odom: 1.0e-02
+        odom: 1.0e-02  # 1.0e-1 resulted in inliers for bulding 31
         loop_close: 5.0e-02
         prior: 1.0e-02
         mesh_mesh: 1.0e-02

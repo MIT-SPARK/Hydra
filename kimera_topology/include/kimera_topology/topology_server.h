@@ -5,6 +5,7 @@
 #include <hydra_utils/display_utils.h>
 #include <kimera_topology/ActiveLayer.h>
 #include <kimera_topology/ActiveMesh.h>
+#include <std_msgs/Time.h>
 #include <voxblox_ros/conversions.h>
 #include <voxblox_ros/mesh_vis.h>
 #include <voxblox_ros/ros_params.h>
@@ -27,15 +28,25 @@ class TopologyServer {
   class TsdfServerType : public BaseTsdfServerType {
    public:
     TsdfServerType(const ros::NodeHandle& nh, const ros::NodeHandle& pnh)
-        : BaseTsdfServerType(nh, pnh), has_pose(false) {}
+        : BaseTsdfServerType(nh, pnh), has_pose(false) {
+      time_pub = nh_.template advertise<std_msgs::Time>("pointcloud_time", 1);
+    }
 
     virtual void newPoseCallback(const voxblox::Transformation& T_G_C) override {
       has_pose = true;
       T_G_C_last = T_G_C;
+
+      std_msgs::Time msg;
+      msg.data = BaseTsdfServerType::last_msg_time_ptcloud_;
+      time_pub.publish(msg);
     }
 
     bool has_pose;
     voxblox::Transformation T_G_C_last;
+    ros::Publisher time_pub;
+
+   protected:
+    using BaseTsdfServerType::nh_;
   };
 
   explicit TopologyServer(const ros::NodeHandle& nh) : nh_(nh) {

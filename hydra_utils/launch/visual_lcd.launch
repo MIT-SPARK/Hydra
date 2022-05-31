@@ -1,0 +1,24 @@
+<launch>
+
+    <arg name="params_path" value="$(find hydra_utils)/config/kinect_azure_vio"/>
+    <arg name="rgb_topic" default="color/image_raw"/>
+    <arg name="depth_topic" default="depth/image_raw"/>
+
+    <arg name="debug" default="false"/>
+    <arg name="node_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
+    <arg name="node_prefix" value="" unless="$(arg debug)"/>
+
+    <node pkg="kimera_vio_ros" type="lcd_only_node" name="lcd_only_node"
+          args="--vocabulary_path=$(find kimera_vio)/vocabulary/ORBvoc.yml"
+          launch-prefix="$(arg node_prefix)"
+          output="screen">
+        <param name="params_path" value="$(arg params_path)"/>
+        <param name="robot_id" value="0"/>
+        <param name="keyframe_delay" value="0.2"/>
+        <param name="log_output" value="false"/>
+
+        <remap from="~/color/image_raw" to="$(arg rgb_topic)"/>
+        <remap from="~/depth/image_raw" to="$(arg depth_topic)"/>
+    </node>
+
+</launch>
