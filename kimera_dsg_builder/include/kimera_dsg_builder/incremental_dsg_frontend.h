@@ -8,11 +8,11 @@
 #include <ros/ros.h>
 #include <tf2_ros/transform_listener.h>
 
+#include <hydra_msgs/ActiveLayer.h>
+#include <hydra_msgs/ActiveMesh.h>
 #include <kimera_dsg/node_symbol.h>
 #include <kimera_dsg/scene_graph_logger.h>
 #include <kimera_pgmo/MeshFrontend.h>
-#include <kimera_topology/ActiveLayer.h>
-#include <kimera_topology/ActiveMesh.h>
 #include <kimera_topology/nearest_neighbor_utilities.h>
 #include <pose_graph_tools/PoseGraph.h>
 
@@ -22,7 +22,7 @@
 namespace kimera {
 namespace incremental {
 
-using PlacesLayerMsg = kimera_topology::ActiveLayer;
+using PlacesLayerMsg = hydra_msgs::ActiveLayer;
 using topology::NearestNodeFinder;
 
 struct PlacesQueueState {
@@ -40,12 +40,23 @@ class DsgFrontend {
 
   void stop();
 
-  void saveState(const std::string& filepath) const;
+  pcl::PolygonMesh getFrontendMesh() const {
+    pcl::PolygonMesh mesh;
+    mesh.polygons = mesh_frontend_.getFullMeshFaces();
+
+    const auto vertices = mesh_frontend_.getFullMeshVertices();
+    pcl::toPCLPointCloud2(*vertices, mesh.cloud);
+    return mesh;
+  }
+
+  std::vector<ros::Time> getFrontendMeshStamps() const {
+    return mesh_frontend_.getFullMeshTimes();
+  }
 
  private:
   void handleActivePlaces(const PlacesLayerMsg::ConstPtr& msg);
 
-  void handleLatestMesh(const kimera_topology::ActiveMesh::ConstPtr& msg);
+  void handleLatestMesh(const hydra_msgs::ActiveMesh::ConstPtr& msg);
 
   void handleLatestPoseGraph(const pose_graph_tools::PoseGraph::ConstPtr& msg);
 
@@ -81,7 +92,7 @@ class DsgFrontend {
 
   std::mutex mesh_frontend_mutex_;
   std::atomic<uint64_t> last_mesh_timestamp_;
-  std::queue<kimera_topology::ActiveMesh::ConstPtr> mesh_queue_;
+  std::queue<hydra_msgs::ActiveMesh::ConstPtr> mesh_queue_;
 
   std::mutex places_queue_mutex_;
   std::atomic<uint64_t> last_places_timestamp_;

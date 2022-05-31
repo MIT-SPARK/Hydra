@@ -26,9 +26,7 @@
         <arg name="semantic_config" default="mp3d_semantic_config.yaml"/>
         <arg name="semantic_color_path" value="$(arg semantic_map_path)"/>
         <arg name="config_dir" value="$(find kimera_topology)/config"/>
-        <arg name="glog_dir" value="$(find kimera_topology)/glogs"/>
         <arg name="debug" value="false"/>
-
     </include>
 
     <include file="$(find kimera_dsg_builder)/launch/dsg_builder.launch" pass_all_args="true"/>

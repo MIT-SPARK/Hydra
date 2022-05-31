@@ -54,7 +54,6 @@ class Parser {
       std::stringstream ss;
       ss << "missing param " << impl_->name() << ". defaulting to ";
       config_parser::displayParam(ss, value);
-      ss << std::endl;
 
       logger_->log_missing(ss.str());
     }

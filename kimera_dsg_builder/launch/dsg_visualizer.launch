@@ -8,6 +8,7 @@
   <arg name="visualizer_ns" default="/kimera_dsg_visualizer"/>
   <arg name="start_rviz" default="true"/>
   <arg name="publish_rotation" default="false"/>
+  <arg name="mesh_plugin_type" default="PGMO"/>
 
   <arg name="verbosity" default="0"/>
   <arg name="debug" default="false"/>
@@ -31,8 +32,9 @@
         required="true"
         args="-alsologtostderr -colorlogtostderr -v=$(arg verbosity)">
     <param name="visualizer_ns" value="$(arg visualizer_ns)"/>
-    <param name="scene_graph_input_path" value="$(arg scene_graph_path)"/>
-    <param name="use_voxblox_mesh_plugin" value="true"/>
+    <param name="scene_graph_filepath" value="$(arg scene_graph_path)"/>
+    <param name="load_graph" value="true"/>
+    <param name="mesh_plugin_type" value="$(arg mesh_plugin_type)"/>
   </node>
 
   <node name="rviz" pkg="rviz" type="rviz" output="screen" if="$(arg start_rviz)"

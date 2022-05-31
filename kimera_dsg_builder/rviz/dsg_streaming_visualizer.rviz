@@ -1,0 +1,232 @@
+Panels:
+  - Class: rviz/Displays
+    Help Height: 0
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /TF1/Frames1
+      Splitter Ratio: 0.7597087621688843
+    Tree Height: 259
+  - Class: rviz/Selection
+    Name: Selection
+  - Class: rviz/Tool Properties
+    Expanded:
+      - /2D Pose Estimate1
+      - /2D Nav Goal1
+      - /Publish Point1
+    Name: Tool Properties
+    Splitter Ratio: 0.5886790156364441
+  - Class: rviz/Views
+    Expanded:
+      - /Current View1
+    Name: Views
+    Splitter Ratio: 0.5
+  - Class: rviz/Time
+    Experimental: false
+    Name: Time
+    SyncMode: 0
+    SyncSource: ""
+Preferences:
+  PromptSaveOnExit: true
+Toolbars:
+  toolButtonStyle: 0
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 0.5
+      Cell Size: 1
+      Class: rviz/Grid
+      Color: 160; 160; 164
+      Enabled: true
+      Line Style:
+        Line Width: 0.029999999329447746
+        Value: Lines
+      Name: Grid
+      Normal Cell Count: 0
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Plane: XY
+      Plane Cell Count: 200
+      Reference Frame: <Fixed Frame>
+      Value: true
+    - Class: rviz/TF
+      Enabled: true
+      Frame Timeout: 15
+      Frames:
+        All Enabled: false
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Tree:
+        {}
+      Update Interval: 0
+      Value: true
+    - Class: rviz/Axes
+      Enabled: true
+      Length: 10
+      Name: Axes
+      Radius: 0.5
+      Reference Frame: <Fixed Frame>
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /kimera_dsg_visualizer/dsg_markers
+      Name: DSG
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /kimera_dsg_visualizer/dynamic_layers_viz
+      Name: DSG - Dynamic
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
+    - Class: rviz_mesh_plugin/TriangleMesh
+      Display Type:
+        Faces Alpha: 1
+        Faces Color: 0; 255; 0
+        Value: Vertex Color
+      Enabled: false
+      Mesh Buffer Size: 1
+      Name: Mesh
+      Show Normals:
+        Normals Alpha: 1
+        Normals Color: 255; 0; 255
+        Normals Scaling Factor: 0.10000000149011612
+        Value: false
+      Show Wireframe:
+        Value: false
+        Wireframe Alpha: 1
+        Wireframe Color: 0; 0; 0
+      Topic: /kimera_dsg_visualizer/dsg_mesh
+      Value: false
+    - Class: rviz/Image
+      Enabled: true
+      Image Topic: /habitat/agent_0/depth
+      Max Value: 1
+      Median window: 300
+      Min Value: 0
+      Name: Depth
+      Normalize Range: true
+      Queue Size: 2
+      Transport Hint: raw
+      Unreliable: false
+      Value: true
+    - Class: rviz/Image
+      Enabled: true
+      Image Topic: /habitat/agent_0/rgb
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: RGB
+      Normalize Range: true
+      Queue Size: 2
+      Transport Hint: raw
+      Unreliable: false
+      Value: true
+    - Class: rviz/Image
+      Enabled: true
+      Image Topic: /habitat/agent_0/semantic
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: GT Semantics
+      Normalize Range: true
+      Queue Size: 2
+      Transport Hint: raw
+      Unreliable: false
+      Value: true
+    - Class: rviz/Image
+      Enabled: true
+      Image Topic: /semantic/image_raw
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: Image
+      Normalize Range: true
+      Queue Size: 2
+      Transport Hint: raw
+      Unreliable: false
+      Value: true
+  Enabled: true
+  Global Options:
+    Background Color: 255; 255; 255
+    Default Light: true
+    Fixed Frame: world
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz/Interact
+      Hide Inactive Objects: true
+    - Class: rviz/MoveCamera
+    - Class: rviz/Select
+    - Class: rviz/FocusCamera
+    - Class: rviz/Measure
+    - Class: rviz/SetInitialPose
+      Theta std deviation: 0.2617993950843811
+      Topic: /initialpose
+      X std deviation: 0.5
+      Y std deviation: 0.5
+    - Class: rviz/SetGoal
+      Topic: /move_base_simple/goal
+    - Class: rviz/PublishPoint
+      Single click: true
+      Topic: /clicked_point
+    - Class: rviz_visual_tools/KeyTool
+  Value: true
+  Views:
+    Current:
+      Class: rviz/Orbit
+      Distance: 31.08834457397461
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.05999999865889549
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
+      Focal Point:
+        X: -0.04297766834497452
+        Y: -8.315868377685547
+        Z: 2.0215229988098145
+      Focal Shape Fixed Size: false
+      Focal Shape Size: 0.05000000074505806
+      Invert Z Axis: false
+      Name: Current View
+      Near Clip Distance: 0.009999999776482582
+      Pitch: 0.9653979539871216
+      Target Frame: world
+      Value: Orbit (rviz)
+      Yaw: 5.2554144859313965
+    Saved: ~
+Window Geometry:
+  Depth:
+    collapsed: false
+  Displays:
+    collapsed: false
+  GT Semantics:
+    collapsed: false
+  Height: 1016
+  Hide Left Dock: false
+  Hide Right Dock: true
+  Image:
+    collapsed: false
+  QMainWindow State: 000000ff00000000fd000000040000000000000156000003a2fc020000000ffb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f00700065007200740069006500730200000780000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003b0000013e000000c700fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d006100670065010000017f000000920000001600fffffffb0000000a0049006d0061006700650000000500000002a30000000000000000fb0000000a0049006d00610067006501000002af000001500000000000000000fb0000000a004400650070007400680100000217000000920000001600fffffffb0000000600520047004201000002af000000930000001600fffffffb0000001800470054002000530065006d0061006e00740069006300730100000348000000950000001600fffffffb0000000a0049006d0061006700650100000313000000ca00000000000000000000000100000257000003a2fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003b000003a2000000a000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000078000000039fc0100000002fb0000000800540069006d00650000000000000007800000042700fffffffb0000000800540069006d0065010000000000000450000000000000000000000624000003a200000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  RGB:
+    collapsed: false
+  Selection:
+    collapsed: false
+  Time:
+    collapsed: false
+  Tool Properties:
+    collapsed: false
+  Views:
+    collapsed: true
+  Width: 1920
+  X: 0
+  Y: 27

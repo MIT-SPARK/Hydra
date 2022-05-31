@@ -174,7 +174,7 @@ void ElapsedTimeRecorder::logAllElapsed(const std::string& output_folder) const 
 }
 
 void ElapsedTimeRecorder::logStats(const std::string& output_folder) const {
-  const std::string output_csv = output_folder + "/timing stats.csv";
+  const std::string output_csv = output_folder + "/timing_stats.csv";
   std::ofstream output_file;
   output_file.open(output_csv);
 

@@ -62,7 +62,7 @@ void DsgFrontend::handleActivePlaces(const PlacesLayerMsg::ConstPtr& msg) {
   places_queue_.push(msg);
 }
 
-void DsgFrontend::handleLatestMesh(const kimera_topology::ActiveMesh::ConstPtr& msg) {
+void DsgFrontend::handleLatestMesh(const hydra_msgs::ActiveMesh::ConstPtr& msg) {
   {  // start mesh frontend critical section
     std::unique_lock<std::mutex> mesh_lock(mesh_frontend_mutex_);
     if (mesh_queue_.size() < config_.mesh_queue_size) {
@@ -179,7 +179,7 @@ void DsgFrontend::runMeshFrontend() {
       continue;
     }
 
-    kimera_topology::ActiveMesh::ConstPtr msg(nullptr);
+    hydra_msgs::ActiveMesh::ConstPtr msg(nullptr);
     {  // start mesh critical region
       std::unique_lock<std::mutex> mesh_lock(mesh_frontend_mutex_);
       if (!mesh_queue_.empty()) {
@@ -513,17 +513,6 @@ void DsgFrontend::updatePlaceMeshMapping() {
     VLOG(2) << "[DSG Backend] Place-Mesh Update: " << num_invalid
             << " invalid connections";
   }
-}
-
-void DsgFrontend::saveState(const std::string& filepath) const {
-  pcl::PolygonMesh mesh;
-  mesh.polygons = mesh_frontend_.getFullMeshFaces();
-
-  const auto vertices = mesh_frontend_.getFullMeshVertices();
-  pcl::toPCLPointCloud2(*vertices, mesh.cloud);
-
-  std::vector<ros::Time> mesh_stamps = mesh_frontend_.getFullMeshTimes();
-  kimera_pgmo::WriteMeshWithStampsToPly(filepath + "/mesh.ply", mesh, mesh_stamps);
 }
 
 }  // namespace incremental

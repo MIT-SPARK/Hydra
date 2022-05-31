@@ -2,9 +2,9 @@
 #include "kimera_topology/configs.h"
 #include "kimera_topology/topology_server_visualizer.h"
 
+#include <hydra_msgs/ActiveLayer.h>
+#include <hydra_msgs/ActiveMesh.h>
 #include <hydra_utils/display_utils.h>
-#include <kimera_topology/ActiveLayer.h>
-#include <kimera_topology/ActiveMesh.h>
 #include <std_msgs/Time.h>
 #include <voxblox_ros/conversions.h>
 #include <voxblox_ros/mesh_vis.h>
@@ -58,14 +58,14 @@ class TopologyServer {
     // we need two publishers for the mesh: voxblox offers no way to distinguish between
     // deleted blocks and blocks that were cleared by observation
     if (config_.publish_archived) {
-      mesh_pub_ = nh_.advertise<kimera_topology::ActiveMesh>("active_mesh", 1, true);
+      mesh_pub_ = nh_.advertise<hydra_msgs::ActiveMesh>("active_mesh", 1, true);
     } else {
       mesh_pub_ = nh_.advertise<voxblox_msgs::Mesh>("active_mesh", 1, true);
     }
 
     mesh_viz_pub_ = nh_.advertise<voxblox_msgs::Mesh>("mesh_viz", 1, true);
 
-    layer_pub_ = nh_.advertise<kimera_topology::ActiveLayer>("active_layer", 2, false);
+    layer_pub_ = nh_.advertise<hydra_msgs::ActiveLayer>("active_layer", 2, false);
 
     update_timer_ = nh_.createTimer(
         ros::Duration(config_.update_period_s),
@@ -134,7 +134,7 @@ class TopologyServer {
       archived_msg.mesh_blocks.push_back(block);
     }
 
-    kimera_topology::ActiveMesh msg;
+    hydra_msgs::ActiveMesh msg;
     msg.header.stamp = timestamp;
     msg.mesh = mesh_msg;
     msg.archived_blocks = archived_msg;
@@ -142,7 +142,7 @@ class TopologyServer {
   }
 
   void publishActiveLayer(const ros::Time& timestamp) const {
-    kimera_topology::ActiveLayer msg;
+    hydra_msgs::ActiveLayer msg;
     msg.header.stamp = timestamp;
     msg.header.frame_id = config_.world_frame;
 

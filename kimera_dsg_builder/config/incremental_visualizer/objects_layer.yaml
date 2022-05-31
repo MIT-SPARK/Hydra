@@ -9,7 +9,7 @@ use_label: false
 label_height: 0.5
 label_scale: 0.25
 use_bounding_box: true
-bounding_box_alpha: 0.3
+bounding_box_alpha: 0.6
 # edge
 use_edge_source: true
 interlayer_edge_scale: 0.05

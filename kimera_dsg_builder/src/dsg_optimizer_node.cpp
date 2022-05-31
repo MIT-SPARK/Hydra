@@ -1,5 +1,8 @@
 #include "kimera_dsg_builder/incremental_dsg_backend.h"
 #include "kimera_dsg_builder/incremental_dsg_frontend.h"
+#include "kimera_dsg_builder/visualizer_plugins.h"
+
+#include <kimera_dsg_visualizer/dynamic_scene_graph_visualizer.h>
 
 #include "kimera_pgmo/DeformationGraph.h"
 

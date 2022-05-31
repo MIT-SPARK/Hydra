@@ -5,7 +5,7 @@ visualize: true
 marker_scale: 0.6
 marker_alpha: 0.8
 use_sphere_marker: false
-use_label: true
+use_label: false
 label_height: 1.0
 label_scale: 0.75
 use_bounding_box: false

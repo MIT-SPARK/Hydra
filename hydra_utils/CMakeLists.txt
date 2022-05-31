@@ -47,11 +47,12 @@ catkin_package(
 
 add_library(${PROJECT_NAME}
     src/display_utils.cpp
+    src/dsg_streaming_interface.cpp
     src/ros_parser.cpp
     src/timing_utilities.cpp
     src/yaml_parser.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME} PUBLIC yaml-cpp ${catkin_LIBRARIES} PRIVATE PkgConfig::glog)
+target_link_libraries(${PROJECT_NAME} PUBLIC yaml-cpp ${catkin_LIBRARIES} PRIVATE PkgConfig::glog kimera_dsg::kimera_dsg)
 
 add_executable(pose_graph_publisher_node src/pose_graph_publisher_node.cpp)
 target_include_directories(pose_graph_publisher_node PUBLIC ${catkin_INCLUDE_DIRS})

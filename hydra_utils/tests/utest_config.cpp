@@ -88,7 +88,9 @@ struct TestLogger : config_parser::Logger {
 
   ~TestLogger() = default;
 
-  inline void log_missing(const std::string& message) const override { ss << message; }
+  inline void log_missing(const std::string& message) const override {
+    ss << message << std::endl;
+  }
 
   mutable std::stringstream ss;
 };

@@ -3,10 +3,9 @@
 #include "kimera_dsg_builder/dsg_update_functions.h"
 #include "kimera_dsg_builder/incremental_room_finder.h"
 #include "kimera_dsg_builder/incremental_types.h"
-#include "kimera_dsg_builder/visualizer_plugins.h"
 
+#include <hydra_utils/dsg_streaming_interface.h>
 #include <kimera_dsg/scene_graph_logger.h>
-#include <kimera_dsg_visualizer/dynamic_scene_graph_visualizer.h>
 #include <kimera_pgmo/KimeraPgmoInterface.h>
 
 #include <ros/callback_queue.h>
@@ -87,16 +86,10 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void visualizeDeformationGraphEdges() const;
 
-  void startVisualizer();
-
   void startPgmo();
 
  protected:
   void setSolverParams();
-
-  bool setVisualizeBackend(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
-
-  bool setVisualizeFrontend(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
   void fullMeshCallback(const kimera_pgmo::KimeraPgmoMesh::ConstPtr& msg);
 
@@ -105,8 +98,6 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   void poseGraphCallback(const pose_graph_tools::PoseGraph::ConstPtr& msg);
 
   bool saveMeshCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
-
-  void runVisualizer();
 
   void runPgmo();
 
@@ -137,11 +128,9 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
  protected:
   ros::NodeHandle nh_;
-  std::atomic<bool> should_viz_shutdown_{false};
-  std::atomic<bool> should_opt_shutdown_{false};
+  std::atomic<bool> should_shutdown_{false};
   std::atomic<bool> have_loopclosures_{false};
   std::atomic<bool> have_graph_updates_{false};
-  std::atomic<bool> visualizer_should_reset_{false};
   bool have_new_mesh_{false};
 
   DsgBackendConfig config_;
@@ -170,17 +159,10 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   std::mutex pgmo_mutex_;
   std::unique_ptr<std::thread> optimizer_thread_;
 
-  std::unique_ptr<DynamicSceneGraphVisualizer> visualizer_;
-  std::unique_ptr<ros::CallbackQueue> visualizer_queue_;
-  std::unique_ptr<std::thread> visualizer_thread_;
-  PlacesFactorGraphViz::Ptr places_factors_visualizer_;
-
-  std::atomic<bool> visualizer_show_frontend_;
-  ros::ServiceServer frontend_viz_srv_;
-  ros::ServiceServer backend_viz_srv_;
   ros::Publisher viz_mesh_mesh_edges_pub_;
   ros::Publisher viz_pose_mesh_edges_pub_;
   ros::Publisher pose_graph_pub_;
+  ros::Publisher opt_mesh_pub_;
 
   SceneGraphLogger backend_graph_logger_;
   std::list<LoopClosureLog> loop_closures_;
@@ -199,6 +181,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   ros::Subscriber full_mesh_sub_;
   ros::Subscriber deformation_graph_sub_;
   ros::Subscriber pose_graph_sub_;
+  std::unique_ptr<hydra::DsgSender> dsg_sender_;
 };
 
 }  // namespace incremental

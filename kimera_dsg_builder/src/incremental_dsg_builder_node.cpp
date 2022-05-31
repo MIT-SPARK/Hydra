@@ -28,7 +28,8 @@ ExitMode getExitMode(const ros::NodeHandle& nh) {
   } else if (exit_mode_str == "NORMAL") {
     return ExitMode::NORMAL;
   } else {
-    ROS_WARN_STREAM("Unrecognized option: " << exit_mode_str << ". Defaulting to NORMAL");
+    ROS_WARN_STREAM("Unrecognized option: " << exit_mode_str
+                                            << ". Defaulting to NORMAL");
     return ExitMode::NORMAL;
   }
 }
@@ -123,6 +124,9 @@ int main(int argc, char* argv[]) {
   SharedDsgInfo::Ptr frontend_dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));
   SharedDsgInfo::Ptr backend_dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));
 
+  pcl::PolygonMesh frontend_mesh;
+  std::vector<ros::Time> frontend_mesh_times;
+
   std::list<kimera::incremental::LoopClosureLog> loop_closures;
   {  // scope for frontend / backend pair
     kimera::incremental::DsgBackend backend(nh, frontend_dsg, backend_dsg);
@@ -159,7 +163,8 @@ int main(int argc, char* argv[]) {
     loop_closures = backend.getLoopClosures();
 
     if (!dsg_output_path.empty()) {
-      frontend.saveState(dsg_output_path + "/frontend/");
+      frontend_mesh = frontend.getFrontendMesh();
+      frontend_mesh_times = frontend.getFrontendMeshStamps();
     }
 
     if (!dsg_output_path.empty()) {
@@ -210,6 +215,9 @@ int main(int argc, char* argv[]) {
       output_file << (loop_closure.dsg ? 1 : 0) << "," << loop_closure.level;
       output_file << std::endl;
     }
+
+    kimera_pgmo::WriteMeshWithStampsToPly(
+        dsg_output_path + "/frontend/mesh.ply", frontend_mesh, frontend_mesh_times);
   }
 
   return 0;

@@ -12,21 +12,16 @@ find_package(
   COMPONENTS roscpp
              dynamic_reconfigure
              hydra_utils
+             hydra_msgs
              kimera_dsg_visualizer
              kimera_semantics_ros
-             message_generation
              pcl_ros
-             std_msgs
              tf2_eigen
              tf2_ros
              voxblox
              voxblox_ros
 )
 find_package(yaml-cpp REQUIRED)
-
-add_message_files(FILES ActiveLayer.msg ActiveMesh.msg)
-
-generate_messages(DEPENDENCIES std_msgs voxblox_msgs)
 
 generate_dynamic_reconfigure_options(cfg/GvdVisualizer.cfg)
 
@@ -35,9 +30,9 @@ catkin_package(
   roscpp
   dynamic_reconfigure
   hydra_utils
+  hydra_msgs
   kimera_dsg_visualizer
   kimera_semantics_ros
-  message_runtime
   voxblox
   voxblox_ros
   tf2_eigen

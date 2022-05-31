@@ -13,6 +13,7 @@
     <arg name="use_gt_frame" default="true"/>
     <arg name="use_oriented_bounding_boxes" default="false"/>
     <arg name="exit_mode" default="NORMAL"/>
+    <arg name="start_visualizer" default="false"/>
 
     <arg name="enable_dsg_lcd" default="false"/>
     <arg name="enable_lcd_viz" default="false"/>
@@ -23,7 +24,7 @@
     <arg name="log_registration" default="false"/>
 
     <arg name="debug" default="false"/>
-    <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
+    <arg name="launch_prefix" value="gdb --args" if="$(arg debug)"/>
     <arg name="launch_prefix" value="" unless="$(arg debug)"/>
 
     <arg name="min_glog_level" default="3"/>
@@ -33,7 +34,7 @@
     <arg name="glog_file_args" value="--logtostderr=0 --log_dir=$(arg glog_dir)" if="$(arg glog_to_file)"/>
     <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
 
-    <arg name="dsg_path" value="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
+    <arg name="dsg_path" default="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
     <arg name="pgmo_log_path" value="$(arg dsg_path)/pgmo"/>
     <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
     <arg name="ros_output" value="log" if="$(arg glog_to_file)"/>
@@ -87,6 +88,27 @@
         <remap from="frame_registration" to="/kimera_vio_ros/kimera_vio_ros_node/register_lcd_frames"/>
         <param name="disable_timer_output" value="true"/>
         <param name="visualize_dsg_lcd" value="$(arg enable_lcd_viz)"/>
+    </node>
+
+    <arg name="profile_visualizer" default="false"/>
+    <arg if="$(arg profile_visualizer)"
+         name="viz_launch_prefix" value="perf record -g --output='$(arg dsg_path)/viz_perf.data'"/>
+    <arg unless="$(arg profile_visualizer)" name="viz_launch_prefix" value=""/>
+
+    <node pkg="kimera_dsg_builder" type="dsg_visualizer_node"
+          name="dsg_visualizer_node"
+          output="$(arg ros_output)"
+          launch-prefix="$(arg viz_launch_prefix)"
+          if="$(arg start_visualizer)">
+        <param name="mesh_plugin_type" value="PGMO"/>
+        <param name="load_graph" value="false"/>
+        <param name="scene_graph_filepath" value=""/>
+        <param name="visualizer_ns" value="/kimera_dsg_visualizer"/>
+        <param name="mesh_plugin_ns" value="dsg_mesh"/>
+        <param name="output_path" value="$(arg dsg_path)"/>
+
+        <remap from="~dsg" to="/incremental_dsg_builder_node/dsg"/>
+        <remap from="~dsg_mesh_updates" to="/incremental_dsg_builder_node/pgmo/optimized_mesh"/>
     </node>
 
     <node pkg="hydra_utils" type="pose_graph_publisher_node"

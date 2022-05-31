@@ -85,11 +85,12 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
   }
 
   last_timestamp_ = 0;
+  dsg_sender_.reset(new hydra::DsgSender(nh_));
 }
 
 void DsgBackend::stop() {
   LOG(INFO) << "[DSG Backend] stopping!";
-  should_opt_shutdown_ = true;
+  should_shutdown_ = true;
 
   VLOG(2) << " [DSG Backend] joining optimizer thread";
   if (optimizer_thread_) {
@@ -97,17 +98,6 @@ void DsgBackend::stop() {
     optimizer_thread_.reset();
   }
   VLOG(2) << " [DSG Backend] joined optimizer thread";
-
-  should_viz_shutdown_ = true;
-
-  VLOG(2) << "[DSG Backend] joining visualizer thread";
-  if (visualizer_thread_) {
-    visualizer_thread_->join();
-    visualizer_thread_.reset();
-  }
-  VLOG(2) << " [DSG Backend] joined visualized thread";
-
-  visualizer_.reset();
 }
 
 DsgBackend::~DsgBackend() {
@@ -117,113 +107,7 @@ DsgBackend::~DsgBackend() {
 
 void DsgBackend::start() {
   startPgmo();
-  startVisualizer();
   LOG(INFO) << " [DSG Backend] started!";
-}
-
-void DsgBackend::startVisualizer() {
-  std::string visualizer_ns;
-  nh_.param<std::string>("visualizer_ns", visualizer_ns, "/kimera_dsg_visualizer");
-
-  visualizer_queue_.reset(new ros::CallbackQueue());
-
-  ros::NodeHandle nh(visualizer_ns);
-  nh.setCallbackQueue(visualizer_queue_.get());
-
-  visualizer_.reset(new DynamicSceneGraphVisualizer(nh, getDefaultLayerIds()));
-
-  bool use_voxblox_mesh_plugin;
-  nh_.param<bool>("use_voxblox_mesh_plugin", use_voxblox_mesh_plugin, false);
-  if (use_voxblox_mesh_plugin) {
-    // TODO(nathan) voxblox mesh plugin in rviz doesn't handle large graphs well
-    visualizer_->addPlugin(std::make_shared<VoxbloxMeshPlugin>(nh, "dsg_mesh"));
-  } else {
-    visualizer_->addPlugin(std::make_shared<PgmoMeshPlugin>(nh, "dsg_mesh"));
-  }
-
-  bool use_parent_plugin;
-  nh_.param<bool>("use_parent_plugin", use_parent_plugin, false);
-  if (use_parent_plugin) {
-    visualizer_->addPlugin(std::make_shared<PlaceParentsPlugin>(nh, "parents"));
-  }
-
-  bool use_mst_plugin;
-  nh_.param<bool>("use_mst_plugin", use_mst_plugin, false);
-  if (use_mst_plugin) {
-    // note that this only makes sense for the frontend graph
-    visualizer_->addPlugin(std::make_shared<MeshPlaceConnectionsPlugin>(nh, "mst"));
-  }
-
-  visualizer_should_reset_ = true;
-
-  bool show_frontend_dsg;
-  nh_.param<bool>("show_frontend_dsg", show_frontend_dsg, false);
-  visualizer_show_frontend_ = show_frontend_dsg;
-
-  frontend_viz_srv_ = nh.advertiseService(
-      "visualize_frontend_dsg", &DsgBackend::setVisualizeFrontend, this);
-  backend_viz_srv_ = nh.advertiseService(
-      "visualize_backend_dsg", &DsgBackend::setVisualizeBackend, this);
-
-  visualizer_thread_.reset(new std::thread(&DsgBackend::runVisualizer, this));
-}
-
-bool DsgBackend::setVisualizeFrontend(std_srvs::Empty::Request&,
-                                      std_srvs::Empty::Response&) {
-  if (!visualizer_show_frontend_) {
-    visualizer_should_reset_ = true;
-  }
-
-  visualizer_show_frontend_ = true;
-  return true;
-}
-
-bool DsgBackend::setVisualizeBackend(std_srvs::Empty::Request&,
-                                     std_srvs::Empty::Response&) {
-  if (visualizer_show_frontend_) {
-    visualizer_should_reset_ = true;
-  }
-
-  visualizer_show_frontend_ = false;
-  return true;
-}
-
-void DsgBackend::runVisualizer() {
-  ros::WallRate r(5);
-  while (ros::ok() && !should_viz_shutdown_) {
-    // process any config changes
-    visualizer_queue_->callAvailable(ros::WallDuration(0));
-
-    if (visualizer_should_reset_) {
-      if (visualizer_show_frontend_) {
-        std::unique_lock<std::mutex> lock(shared_dsg_->mutex);
-        visualizer_->setGraph(shared_dsg_->graph);
-      } else {
-        std::unique_lock<std::mutex> lock(private_dsg_->mutex);
-        visualizer_->setGraph(private_dsg_->graph);
-      }
-      visualizer_should_reset_ = false;
-    }
-
-    // TODO(nathan) this is janky, avoid weird updated / redraw split
-    if (private_dsg_->updated) {
-      // the frontend dsg update flag propagates to the backend flag, so we always check
-      // the backend flag to see if we need to redraw
-      visualizer_->setGraphUpdated();
-      private_dsg_->updated = false;
-      VLOG(5) << "Visualizer caught latched update!";
-    }
-
-    if (visualizer_show_frontend_) {
-      std::unique_lock<std::mutex> graph_lock(shared_dsg_->mutex);
-      visualizer_->redraw();
-    } else {
-      std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
-      visualizer_->redraw();
-    }
-
-    r.sleep();
-  }
 }
 
 bool DsgBackend::updatePrivateDsg() {
@@ -241,10 +125,11 @@ bool DsgBackend::updatePrivateDsg() {
       *private_dsg_->latest_places = *shared_dsg_->latest_places;
 
       if (shared_dsg_->graph->hasLayer(KimeraDsgLayers::PLACES)) {
-        const auto& places = shared_dsg_->graph->getLayer(KimeraDsgLayers::PLACES);
+        // TODO(nathan) simplify
+        auto& places = shared_dsg_->graph->getLayer(KimeraDsgLayers::PLACES);
         shared_places_copy_.mergeLayer(places);
         std::vector<NodeId> removed_place_nodes;
-        places.getRemovedNodes(&removed_place_nodes);
+        places.getRemovedNodes(removed_place_nodes);
         for (const auto& place_id : removed_place_nodes) {
           shared_places_copy_.removeNode(place_id);
         }
@@ -273,11 +158,9 @@ void DsgBackend::startPgmo() {
       "pgmo/deformation_graph_mesh_mesh", 10, false);
   viz_pose_mesh_edges_pub_ = nh_.advertise<visualization_msgs::Marker>(
       "pgmo/deformation_graph_pose_mesh", 10, false);
+  opt_mesh_pub_ =
+      nh_.advertise<mesh_msgs::TriangleMeshStamped>("pgmo/optimized_mesh", 1, false);
   pose_graph_pub_ = nh_.advertise<PoseGraph>("pgmo/pose_graph", 10, false);
-
-  if (config_.visualize_place_factors) {
-    places_factors_visualizer_ = std::make_shared<PlacesFactorGraphViz>(nh_);
-  }
 
   save_mesh_srv_ =
       nh_.advertiseService("save_mesh", &DsgBackend::saveMeshCallback, this);
@@ -381,14 +264,6 @@ void DsgBackend::runPgmo() {
       std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
       have_dsg_updates = updatePrivateDsg();
 
-      // TODO(nathan) move to helper
-      if (config_.visualize_place_factors &&
-          (have_dsg_updates || have_graph_updates_)) {
-        MinimumSpanningTreeInfo mst_info = getMinimumSpanningEdges(shared_places_copy_);
-        places_factors_visualizer_->draw(
-            robot_vertex_prefix_, shared_places_copy_, mst_info, *deformation_graph_);
-      }
-
       if (config_.optimize_on_lc && have_graph_updates_ && have_loopclosures_) {
         optimize();
         was_updated = true;
@@ -404,13 +279,15 @@ void DsgBackend::runPgmo() {
     }
 
     if (was_updated) {
-      VLOG(5) << "Backend flipped flag!";
       private_dsg_->updated = true;
+      ros::Time stamp;
+      stamp.fromNSec(last_timestamp_);
+      dsg_sender_->sendGraph(*private_dsg_->graph, stamp);
     } else {
       r.sleep();
     }
 
-    if (should_opt_shutdown_ && !have_graph_updates_ && !have_dsg_updates) {
+    if (should_shutdown_ && !have_graph_updates_ && !have_dsg_updates) {
       break;
     }
 
@@ -582,7 +459,6 @@ void DsgBackend::updateDsgMesh(bool force_mesh_update) {
   // avoid scope problems by using a smart pointer
   std::unique_ptr<ScopedTimer> timer;
 
-  pcl::PolygonMesh input_mesh;
   if (!latest_mesh_) {
     return;
   }
@@ -592,7 +468,7 @@ void DsgBackend::updateDsgMesh(bool force_mesh_update) {
   }
 
   timer.reset(new ScopedTimer("backend/mesh_update", last_timestamp_));
-  input_mesh = kimera_pgmo::PgmoMeshMsgToPolygonMesh(
+  auto input_mesh = kimera_pgmo::PgmoMeshMsgToPolygonMesh(
       *latest_mesh_, &mesh_vertex_stamps_, &mesh_vertex_graph_inds_);
   have_new_mesh_ = false;
 
@@ -612,6 +488,10 @@ void DsgBackend::updateDsgMesh(bool force_mesh_update) {
     std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
     private_dsg_->graph->setMeshDirectly(opt_mesh);
   }
+
+  std_msgs::Header header;
+  header.stamp.fromNSec(last_timestamp_);
+  publishMesh(opt_mesh, header, &opt_mesh_pub_);
 
   if (viz_mesh_mesh_edges_pub_.getNumSubscribers() > 0 ||
       viz_pose_mesh_edges_pub_.getNumSubscribers() > 0) {
