@@ -1,8 +1,8 @@
-#include "kimera_topology/topology_server_visualizer.h"
+#include "hydra_topology/topology_server_visualizer.h"
 
+#include <hydra_topology/GvdVisualizerConfig.h>
 #include <kimera_dsg/dynamic_scene_graph.h>
 #include <kimera_dsg_visualizer/colormap_utils.h>
-#include <kimera_topology/GvdVisualizerConfig.h>
 #include <nav_msgs/LoadMap.h>
 #include <voxblox/io/layer_io.h>
 
@@ -26,7 +26,7 @@ DEFINE_double(max_cmap_distance, 2.0, "max distance for colormap");
 DEFINE_int32(basis_threshold, 2, "basis threshold");
 
 using namespace kimera;
-using namespace kimera::topology;
+using namespace hydra::topology;
 using visualization_msgs::Marker;
 using visualization_msgs::MarkerArray;
 using voxblox::Layer;
@@ -123,7 +123,7 @@ void visualize_places(ros::Publisher& pub,
     return;
   }
 
-  std::string dsg_path = ros::package::getPath("kimera_dsg_builder");
+  std::string dsg_path = ros::package::getPath("hydra_dsg_builder");
 
   auto colormap = config_parser::load_from_yaml<ColormapConfig>(
       dsg_path + "/config/incremental_visualizer/colormap.yaml");
@@ -245,7 +245,7 @@ int main(int argc, char* argv[]) {
       nh.advertise<voxblox_msgs::Mesh>("vxblx_mesh", 1, true);
 
   auto colormap = config_parser::load_from_yaml<ColormapConfig>(
-      ros::package::getPath("kimera_dsg_builder") +
+      ros::package::getPath("hydra_dsg_builder") +
       "/config/incremental_visualizer/colormap.yaml");
 
   GvdVisualizerConfig gvd_viz_config;

@@ -1,4 +1,4 @@
-#include "kimera_topology/configs.h"
+#include "hydra_topology/configs.h"
 
 #include <kimera_dsg/dynamic_scene_graph.h>
 #include <voxblox/io/layer_io.h>
@@ -20,9 +20,9 @@ using kimera::KimeraDsgLayers;
 using kimera::NodeId;
 using kimera::PlaceNodeAttributes;
 using kimera::SceneGraphLayer;
-using kimera::topology::GvdIntegrator;
-using kimera::topology::GvdIntegratorConfig;
-using kimera::topology::GvdVoxel;
+using hydra::topology::GvdIntegrator;
+using hydra::topology::GvdIntegratorConfig;
+using hydra::topology::GvdVoxel;
 using nanoflann::KDTreeSingleIndexAdaptor;
 using nanoflann::KDTreeSingleIndexDynamicAdaptor;
 using nanoflann::L2_Simple_Adaptor;

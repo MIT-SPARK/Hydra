@@ -18,7 +18,7 @@
   <depend>kimera_pgmo</depend>
   <depend>kimera_semantics</depend>
   <depend>kimera_semantics_ros</depend>
-  <depend>kimera_topology</depend>
+  <depend>hydra_topology</depend>
   <depend>std_msgs</depend>
   <depend>visualization_msgs</depend>
   <depend>voxblox</depend>

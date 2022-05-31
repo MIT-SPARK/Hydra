@@ -15,7 +15,7 @@ find_package(
              kimera_pgmo
              kimera_semantics
              kimera_semantics_ros
-             kimera_topology
+             hydra_topology
              std_msgs
              visualization_msgs
              voxblox
@@ -35,7 +35,7 @@ catkin_package(
   kimera_pgmo
   kimera_semantics
   kimera_semantics_ros
-  kimera_topology
+  hydra_topology
   std_msgs
   visualization_msgs
   voxblox

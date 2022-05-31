@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<launch>
+
+    <arg name="robot_id" default="0"/>
+    <arg name="config_dir" default="$(find hydra_dsg_builder)/config/habitat"/>
+    <arg name="dsg_output_dir" default="$(find hydra_dsg_builder)/output/"/>
+    <arg name="dsg_output_prefix" default="mp3d"/>
+    <arg name="typology_dir" default="$(find hydra_dsg_builder)/config/habitat"/>
+    <arg name="typology_config" default="mp3d_typology.yaml"/>
+    <arg name="semantic_map_dir" default="$(find dsg_habitat_sim)/config"/>
+    <arg name="semantic_map_file" default="mp3d_segmentation_mapping.csv"/>
+    <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
+
+    <arg name="use_gt_frame" default="true"/>
+    <arg name="use_oriented_bounding_boxes" default="false"/>
+    <arg name="sensor_frame" value="rgb_camera_link"/>
+
+    <arg name="sim_time_required" default="true"/>
+    <param name="use_sim_time" value="$(arg sim_time_required)"/>
+
+    <arg name="pointcloud_topic" default="/habitat/agent_0/pointcloud"/>
+
+    <include file="$(find hydra_topology)/launch/hydra_topology.launch" pass_all_args="true">
+        <arg name="config" default="mp3d_topology_config.yaml"/>
+        <arg name="semantic_config" default="mp3d_semantic_config.yaml"/>
+        <arg name="semantic_color_path" value="$(arg semantic_map_path)"/>
+        <arg name="config_dir" value="$(find hydra_topology)/config"/>
+        <arg name="debug" value="false"/>
+    </include>
+
+    <include file="$(find hydra_dsg_builder)/launch/dsg_builder.launch" pass_all_args="true"/>
+
+</launch>

@@ -15,7 +15,7 @@
     <arg name="dsg_path" default="$(find kimera_batch_dsg)/output"/>
 
     <arg name="typology_dir" default="$(find kimera_batch_dsg)/config"/>
-    <arg name="topology_dir" default="$(find kimera_topology)/config"/>
+    <arg name="topology_dir" default="$(find hydra_topology)/config"/>
     <arg name="semantic_dir" default="$(find kimera_semantics_ros)/cfg"/>
 
     <arg name="semantic_map_file" default="tesse_multiscene_office1_segmentation_mapping.csv"/>

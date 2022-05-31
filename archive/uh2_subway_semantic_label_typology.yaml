@@ -1,7 +1,0 @@
-# Dynamic elements in the scene
-dynamic_semantic_labels: [20]
-# Stuff, mainly: walls, floor, ceiling...
-# Put here as well things you don't want to reconstruct
-stuff_labels: [0, 1, 2, 3, 4, 6, 9, 9, 11, 12, 13, 14, 15, 16, 17, 19]
-walls_labels: [19, 12]
-floor_labels: [3]

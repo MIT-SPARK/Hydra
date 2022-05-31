@@ -4,8 +4,8 @@
 #include <kimera_dsg/node_attributes.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
 #include <kimera_pgmo/utils/VoxbloxUtils.h>
-#include <kimera_topology/configs.h>
-#include <kimera_topology/gvd_integrator.h>
+#include <hydra_topology/configs.h>
+#include <hydra_topology/gvd_integrator.h>
 
 #include <voxblox/mesh/mesh_integrator.h>
 #include <voxblox_ros/mesh_pcl.h>
@@ -19,7 +19,7 @@ namespace kimera {
 namespace utils {
 
 using namespace voxblox;
-using namespace topology;
+using namespace hydra::topology;
 
 #define READ_PARAM(nh, config, field, default_val)                                   \
   if (!nh.param(#field, config.field, default_val)) {                                \

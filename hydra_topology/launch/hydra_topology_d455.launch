@@ -1,0 +1,39 @@
+<launch>
+    <arg name="sim_time_required" default="true"/>
+    <param name="use_sim_time" value="$(arg sim_time_required)"/>
+
+    <arg name="use_semantics" default="true"/>
+    <arg name="use_gt_poses" default="true"/>
+    <arg name="sensor_frame" default="left_cam"/>
+    <arg name="publish_archived" default="false"/>
+
+    <include file="$(find hydra_utils)/launch/gt_pose/d455_gt_pose.launch" if="$(arg use_gt_poses)">
+        <arg name="sensor_frame" value="$(arg sensor_frame)"/>
+    </include>
+
+    <arg name="rgb_info_topic" default="/cam_d455/color/camera_info"/>
+    <arg name="rgb_topic" default="/cam_d455/color/image_raw"/>
+    <arg name="depth_topic" default="/cam_d455/depth_masked/image_raw"/>
+    <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
+
+    <include file="$(find hydra_utils)/launch/includes/rgbd_to_pointcloud.xml" pass_all_args="true"
+             unless="$(arg use_semantics)"/>
+
+    <include file="$(find semantic_recolor)/launch/semantic_recolor_pointcloud.launch" pass_all_args="true"
+             if="$(arg use_semantics)"/>
+
+    <node pkg="nodelet" type="nodelet" name="depth_mask"
+          args="load hydra_utils/mask nodelet_manager --no-bond"
+          output="screen"
+          required="true">
+        <remap from="depth/image_raw" to="/cam_d455/aligned_depth_to_color/image_raw"/>
+        <remap from="depth_masked/image_raw" to="/cam_d455/depth_masked/image_raw"/>
+        <param name="mask_path" value="$(find hydra_utils)/resources/a1_left_mask_roi.png"/>
+    </node>
+
+    <include file="$(find hydra_topology)/launch/hydra_topology.launch" pass_all_args="true">
+        <arg name="config" value="d455_topology_config.yaml"/>
+        <arg name="semantic_config" default="ade150_semantic_config.yaml"/>
+        <arg name="semantic_color_path" default="$(find semantic_recolor)/config/colors/ade150_config.csv"/>
+    </include>
+</launch>

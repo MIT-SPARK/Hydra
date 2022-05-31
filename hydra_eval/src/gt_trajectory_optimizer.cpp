@@ -331,7 +331,7 @@ int main(int argc, char* argv[]) {
   }
 
   std::string config_path =
-      ros::package::getPath("kimera_dsg_builder") + "/config/" + FLAGS_config_file;
+      ros::package::getPath("hydra_dsg_builder") + "/config/" + FLAGS_config_file;
   YAML::Node config = YAML::LoadFile(config_path);
 
   RobustSolverParams params;

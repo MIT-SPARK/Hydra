@@ -13,7 +13,7 @@ find_package(
   COMPONENTS voxblox
              kimera_dsg_visualizer
              kimera_pgmo
-             kimera_topology
+             hydra_topology
              visualization_msgs
 )
 find_package(Boost REQUIRED COMPONENTS timer)
@@ -69,7 +69,7 @@ catkin_package(
   CATKIN_DEPENDS
   voxblox
   kimera_dsg_visualizer
-  kimera_topology
+  hydra_topology
   kimera_pgmo
   visualization_msgs
   DEPENDS
