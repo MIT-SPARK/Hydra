@@ -1,0 +1,137 @@
+#!/usr/bin/env python
+"""Quick script to publish room meshes from command line."""
+from visualization_msgs.msg import Marker, MarkerArray
+from geometry_msgs.msg import Point
+from std_msgs.msg import ColorRGBA
+import numpy as np
+import rospy
+import json
+
+
+def _get_vertex_point(room, index):
+    vertex = room["vertices"][index]
+    point = Point()
+    point.x = vertex[0]
+    point.y = vertex[1]
+    point.z = vertex[2]
+    return point
+
+
+def _get_color(room, alpha):
+    color = ColorRGBA()
+    color.r = room["color"][0]
+    color.g = room["color"][1]
+    color.b = room["color"][2]
+    color.a = alpha
+    return color
+
+
+def _make_mesh_marker(rooms, alpha):
+    msg = Marker()
+    msg.header.stamp = rospy.Time.now()
+    msg.header.frame_id = "world"
+    msg.ns = "room_mesh_ns"
+    msg.id = 0
+    msg.type = msg.TRIANGLE_LIST
+    msg.action = msg.ADD
+    msg.pose.position.x = 0.0
+    msg.pose.position.y = 0.0
+    msg.pose.position.z = 0.0
+    msg.pose.orientation.x = 0.0
+    msg.pose.orientation.y = 0.0
+    msg.pose.orientation.z = 0.0
+    msg.pose.orientation.w = 1.0
+    msg.scale.x = 1.0
+    msg.scale.y = 1.0
+    msg.scale.z = 1.0
+
+    for room in rooms:
+        color = _get_color(room, alpha)
+        for face in room["faces"]:
+            msg.points.append(_get_vertex_point(room, face[0]))
+            msg.colors.append(color)
+            msg.points.append(_get_vertex_point(room, face[1]))
+            msg.colors.append(color)
+            msg.points.append(_get_vertex_point(room, face[2]))
+            msg.colors.append(color)
+
+    return msg
+
+
+def _make_point_from_array(p):
+    point = Point()
+    point.x = p[0]
+    point.y = p[1]
+    point.z = p[2]
+    return point
+
+
+def _make_normal_marker(room, face, index, length=0.4, scale=0.1):
+    msg = Marker()
+    msg.header.stamp = rospy.Time.now()
+    msg.header.frame_id = "world"
+    msg.ns = "room_normal_ns"
+    msg.id = index
+    msg.type = msg.ARROW
+    msg.action = msg.ADD
+    msg.pose.position.x = 0.0
+    msg.pose.position.y = 0.0
+    msg.pose.position.z = 0.0
+    msg.pose.orientation.x = 0.0
+    msg.pose.orientation.y = 0.0
+    msg.pose.orientation.z = 0.0
+    msg.pose.orientation.w = 1.0
+    msg.color.r = 1.0
+    msg.color.g = 0.0
+    msg.color.b = 0.0
+    msg.color.a = 1.0
+    msg.scale.x = 0.4 * scale
+    msg.scale.y = scale
+    msg.scale.z = 0.0
+
+    v0 = np.squeeze(np.array(room["vertices"][face[0]]))
+    v1 = np.squeeze(np.array(room["vertices"][face[1]]))
+    v2 = np.squeeze(np.array(room["vertices"][face[2]]))
+
+    start = (v0 + v1 + v2) / 3.0
+    normal = np.cross(v1 - v0, v2 - v0)
+    normal /= np.linalg.norm(normal)
+    end = start + normal * 0.4
+
+    msg.points.append(_make_point_from_array(start))
+    msg.points.append(_make_point_from_array(end))
+    return msg
+
+
+def _make_normal_markers(rooms):
+    msg = MarkerArray()
+    face_idx = 0
+    for room in rooms:
+        for face in room["faces"]:
+            msg.markers.append(_make_normal_marker(room, face, face_idx))
+            face_idx += 1
+
+    return msg
+
+
+def main():
+    """Start node, read in meshes and publish."""
+    rospy.init_node("publish_room_mesh")
+    pub = rospy.Publisher("~room_mesh", Marker, latch=True, queue_size=1)
+    npub = rospy.Publisher("~wall_normals", MarkerArray, latch=True, queue_size=1)
+
+    alpha = rospy.get_param("~alpha", 1.0)
+    room_contents = rospy.get_param("~rooms", "")
+    rooms = json.loads(room_contents)
+
+    msg = _make_mesh_marker(rooms, alpha)
+    pub.publish(msg)
+
+    nmsg = _make_normal_markers(rooms)
+    npub.publish(nmsg)
+
+    rospy.spin()
+
+
+if __name__ == "__main__":
+    main()
