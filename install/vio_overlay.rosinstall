@@ -8,7 +8,7 @@
     version: fix/march_native_optional
 - git:
     local-name: dbow2_catkin
-    uri: git@github.com:marcusabate/dbow2_catkin.git
+    uri: git@github.com:MIT-SPARK/dbow2_catkin.git
     version: master
 - git:
     local-name: kimera_vio

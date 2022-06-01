@@ -1,12 +1,6 @@
 - git:
-    local-name: catkin_boost_python_buildtool
-    uri: git@github.com:ethz-asl/catkin_boost_python_buildtool.git
-- git:
     local-name: catkin_simple
     uri: git@github.com:catkin/catkin_simple.git
-- git:
-    local-name: disparity_image_proc
-    uri: git@github.com:MIT-SPARK/disparity_image_proc.git
 - git:
     local-name: eigen_catkin
     uri: git@github.com:ethz-asl/eigen_catkin.git
@@ -20,12 +14,9 @@
     local-name: glog_catkin
     uri: git@github.com:ethz-asl/glog_catkin.git
 - git:
-    local-name: graphcmr_ros
-    uri: git@github.mit.edu:SPARK/GraphCMR-ROS.git
-- git:
     local-name: gtsam
-    uri: git@github.com:yunzc/gtsam.git
-    version: feature/gnc_base_params
+    uri: git@github.com:borglab/gtsam.git
+    version: develop
 - git:
     local-name: kimera_pgmo
     uri: git@github.mit.edu:SPARK/Kimera-PGMO.git
@@ -54,14 +45,8 @@
     local-name: minkindr_ros
     uri: git@github.com:ethz-asl/minkindr_ros.git
 - git:
-    local-name: numpy_eigen
-    uri: git@github.com:ethz-asl/numpy_eigen.git
-- git:
     local-name: pose_graph_tools
     uri: git@github.mit.edu:SPARK/pose_graph_tools.git
-- git:
-    local-name: protobuf_catkin
-    uri: git@github.com:ethz-asl/protobuf_catkin.git
 - git:
     local-name: teaser_plusplus
     uri: git@github.com:MIT-SPARK/TEASER-plusplus.git

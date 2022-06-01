@@ -80,14 +80,15 @@ struct PoseGraphPublisherNode {
 
   inline void spin() { ros::spin(); }
 
-  void timerCallback(const ros::TimerEvent&) { publishNewPose(ros::Time::now()); }
+  void timerCallback(const ros::TimerEvent&) { publishNewPose(ros::Time::now(), true); }
 
-  void timeCallback(const std_msgs::Time& msg) { publishNewPose(msg.data); }
+  void timeCallback(const std_msgs::Time& msg) { publishNewPose(msg.data, false); }
 
-  void publishNewPose(const ros::Time& time_to_use) {
+  void publishNewPose(const ros::Time& time_to_use, bool use_latest) {
     geometry_msgs::TransformStamped transform;
     try {
-      transform = buffer.lookupTransform(world_frame, robot_frame, time_to_use);
+      transform = buffer.lookupTransform(
+          world_frame, robot_frame, use_latest ? ros::Time(0) : time_to_use);
     } catch (const tf2::TransformException& ex) {
       ROS_WARN_STREAM(ex.what());
       return;
