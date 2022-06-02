@@ -1,5 +1,41 @@
-// TODO(nathan) double check open-chisel license
-// TODO(nathan) figure out voxblox license
+// The original implementation from https://github.com/personalrobotics/OpenChisel and
+// subsequent modifications falls under the following license:
+//
+// The MIT License (MIT)
+// Copyright (c) 2014 Matthew Klingensmith and Ivan Dryanovski
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
+// Modifications are also subject to the following copyright and disclaimer:
+//
+// Copyright 2022 Massachusetts Institute of Technology.
+// All Rights Reserved
+//
+// Research was sponsored by the United States Air Force Research Laboratory and
+// the United States Air Force Artificial Intelligence Accelerator and was
+// accomplished under Cooperative Agreement Number FA8750-19-2-1000. The views
+// and conclusions contained in this document are those of the authors and should
+// not be interpreted as representing the official policies, either expressed or
+// implied, of the United States Air Force or the U.S. Government. The U.S.
+// Government is authorized to reproduce and distribute reprints for Government
+// purposes notwithstanding any copyright notation herein.
 #include "hydra_topology/voxel_aware_mesh_integrator.h"
 #include "hydra_topology/voxel_aware_marching_cubes.h"
 
