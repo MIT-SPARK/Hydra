@@ -1,6 +1,6 @@
 #include "hydra_topology/gvd_visualization_utilities.h"
 
-#include <kimera_dsg_visualizer/colormap_utils.h>
+#include <hydra_utils/colormap_utils.h>
 #include <tf2_eigen/tf2_eigen.h>
 
 #include <random>
@@ -9,8 +9,6 @@ using visualization_msgs::Marker;
 
 namespace hydra {
 namespace topology {
-
-namespace dsg_utils = kimera::dsg_utils;
 
 double computeRatio(double min, double max, double value) {
   double ratio = (value - min) / (max - min);

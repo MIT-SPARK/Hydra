@@ -111,8 +111,8 @@ OfflineDsgBuilder::OfflineDsgBuilder(const ros::NodeHandle& nh,
   std::string visualizer_ns;
   nh_private.param<std::string>(
       "visualizer_ns", visualizer_ns, "/kimera_dsg_visualizer");
-  visualizer_.reset(new DynamicSceneGraphVisualizer(ros::NodeHandle(visualizer_ns),
-                                                    getDefaultLayerIds()));
+  visualizer_.reset(new hydra::DynamicSceneGraphVisualizer(
+      ros::NodeHandle(visualizer_ns), getDefaultLayerIds()));
   visualizer_->start();
 
   loadParams();
@@ -170,8 +170,8 @@ OfflineDsgBuilder::OfflineDsgBuilder(const ros::NodeHandle& nh,
   std::string visualizer_ns;
   nh_private.param<std::string>(
       "visualizer_ns", visualizer_ns, "/kimera_dsg_visualizer");
-  visualizer_.reset(new DynamicSceneGraphVisualizer(ros::NodeHandle(visualizer_ns),
-                                                    getDefaultLayerIds()));
+  visualizer_.reset(new hydra::DynamicSceneGraphVisualizer(
+      ros::NodeHandle(visualizer_ns), getDefaultLayerIds()));
   visualizer_->start();
 
   loadParams();

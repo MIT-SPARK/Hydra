@@ -1,15 +1,12 @@
 Panels:
   - Class: rviz/Displays
-    Help Height: 0
+    Help Height: 78
     Name: Displays
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /TF1/Frames1
-        - /GVD Visualization1/Namespaces1
-        - /Graph Visualization1/Namespaces1
       Splitter Ratio: 0.5
-    Tree Height: 227
+    Tree Height: 242
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -28,7 +25,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: RGB Image
+    SyncSource: Semantics
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -36,33 +33,49 @@ Toolbars:
 Visualization Manager:
   Class: ""
   Displays:
+    - Alpha: 0.5
+      Cell Size: 0.5
+      Class: rviz/Grid
+      Color: 160; 160; 164
+      Enabled: true
+      Line Style:
+        Line Width: 0.029999999329447746
+        Value: Lines
+      Name: Grid
+      Normal Cell Count: 0
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Plane: XY
+      Plane Cell Count: 1000
+      Reference Frame: <Fixed Frame>
+      Value: true
     - Class: rviz/TF
       Enabled: true
       Frame Timeout: 15
       Frames:
-        All Enabled: false
-        base_link:
+        All Enabled: true
+        base_link_pgo:
           Value: true
         camera_accel_frame:
-          Value: false
+          Value: true
         camera_accel_optical_frame:
-          Value: false
+          Value: true
         camera_gyro_frame:
-          Value: false
+          Value: true
         camera_imu_optical_frame:
-          Value: false
+          Value: true
         camera_link:
-          Value: false
+          Value: true
         camera_odom_frame:
-          Value: false
+          Value: true
         camera_pose_frame:
-          Value: false
+          Value: true
         left_cam:
           Value: true
-        map:
-          Value: true
         world:
-          Value: false
+          Value: true
       Marker Scale: 1
       Name: TF
       Show Arrows: true
@@ -70,36 +83,78 @@ Visualization Manager:
       Show Names: true
       Tree:
         world:
-          base_link:
+          base_link_pgo:
             left_cam:
               {}
-          camera_odom_frame:
-            camera_pose_frame:
-              camera_link:
-                camera_accel_frame:
-                  camera_accel_optical_frame:
-                    {}
-                camera_gyro_frame:
-                  camera_imu_optical_frame:
-                    {}
-          map:
-            {}
       Update Interval: 0
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /hydra_topology_node/graph_viz
+      Name: Places
+      Namespaces:
+        topology_graph_edges: true
+        topology_graph_nodes: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: false
+      Marker Topic: /hydra_topology_node/graph_label_viz
+      Name: Places (Labels)
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: false
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /hydra_topology_node/gvd_viz
+      Name: GVD
+      Namespaces:
+        gvd_visualizer: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: false
+      Marker Topic: /hydra_topology_node/gvd_edge_viz
+      Name: GVD Edges (Debug)
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: false
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /hydra_topology_node/voxel_block_viz
+      Name: Active Window
+      Namespaces:
+        topology_server_blocks: true
+      Queue Size: 100
       Value: true
     - Class: voxblox_rviz_plugin/VoxbloxMesh
       Enabled: true
-      Name: VoxbloxMesh
-      Topic: /hydra_topology_node/mesh
+      Name: Mesh
+      Topic: /hydra_topology_node/mesh_viz
+      Unreliable: false
+      Value: true
+    - Class: rviz/Image
+      Enabled: true
+      Image Topic: /semantic/image_raw
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: Semantics
+      Normalize Range: true
+      Queue Size: 2
+      Transport Hint: raw
       Unreliable: false
       Value: true
     - Class: rviz/Image
       Enabled: true
       Image Topic: /azure/depth_to_rgb/image_raw
-      Max Value: 3
-      Median window: 5
+      Max Value: 1
+      Median window: 300
       Min Value: 0
-      Name: Depth Image
-      Normalize Range: false
+      Name: Depth
+      Normalize Range: true
       Queue Size: 2
       Transport Hint: raw
       Unreliable: false
@@ -110,74 +165,15 @@ Visualization Manager:
       Max Value: 1
       Median window: 5
       Min Value: 0
-      Name: RGB Image
+      Name: RGB
       Normalize Range: true
       Queue Size: 2
       Transport Hint: raw
-      Unreliable: false
-      Value: true
-    - Class: rviz/Image
-      Enabled: true
-      Image Topic: /semantic/image_raw
-      Max Value: 1
-      Median window: 5
-      Min Value: 0
-      Name: Segmentation Image
-      Normalize Range: true
-      Queue Size: 2
-      Transport Hint: raw
-      Unreliable: false
-      Value: true
-    - Class: rviz/Marker
-      Enabled: false
-      Marker Topic: /hydra_topology_node/gvd_viz
-      Name: GVD Visualization
-      Namespaces:
-        {}
-      Queue Size: 100
-      Value: false
-    - Class: rviz/MarkerArray
-      Enabled: true
-      Marker Topic: /hydra_topology_node/graph_viz
-      Name: Graph Visualization
-      Namespaces:
-        topology_graph_edges: true
-        topology_graph_nodes: true
-      Queue Size: 100
-      Value: true
-    - Class: rviz/MarkerArray
-      Enabled: false
-      Marker Topic: /hydra_topology_node/graph_label_viz
-      Name: Graph Node Labels
-      Namespaces:
-        {}
-      Queue Size: 100
-      Value: false
-    - Class: rviz/Marker
-      Enabled: false
-      Marker Topic: /hydra_topology_node/gvd_edge_viz
-      Name: GVD Edge Visualization
-      Namespaces:
-        {}
-      Queue Size: 100
-      Value: false
-    - Class: rviz/Marker
-      Enabled: false
-      Marker Topic: /hydra_topology_node/voxel_block_viz
-      Name: Allocated Block Outlines
-      Namespaces:
-        {}
-      Queue Size: 100
-      Value: false
-    - Class: voxblox_rviz_plugin/VoxbloxMesh
-      Enabled: true
-      Name: VoxbloxMesh
-      Topic: /hydra_topology_node/mesh_viz
       Unreliable: false
       Value: true
   Enabled: true
   Global Options:
-    Background Color: 240; 240; 240
+    Background Color: 48; 48; 48
     Default Light: true
     Fixed Frame: world
     Frame Rate: 30
@@ -203,47 +199,47 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 2.927891731262207
+      Distance: 14.049280166625977
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -2.6395459175109863
-        Y: 2.273453712463379
-        Z: 2.855137348175049
+        X: -2.1918060779571533
+        Y: 1.3951830863952637
+        Z: 0.5632979273796082
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.6199991703033447
-      Target Frame: t265_odom
+      Pitch: 0.785398006439209
+      Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.9815917015075684
+      Yaw: 0.785398006439209
     Saved: ~
 Window Geometry:
-  Depth Image:
+  Depth:
     collapsed: false
   Displays:
     collapsed: false
-  Height: 1025
+  Height: 1016
   Hide Left Dock: false
-  Hide Right Dock: true
-  QMainWindow State: 000000ff00000000fd0000000400000000000001f80000033ffc020000000dfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005d00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003e00000120000000cb00fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d00610067006500000002da000002160000000000000000fb0000000a0049006d0061006700650000000500000002a30000000000000000fb000000160044006500700074006800200049006d0061006700650100000164000000a40000001600fffffffb0000001200520047004200200049006d006100670065010000020e000000d70000001600fffffffb00000024005300650067006d0065006e0074006100740069006f006e00200049006d00610067006501000002eb000000920000001600ffffff000000010000025700000344fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003b00000344000000a500fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000073800000061fc0100000002fb0000000800540069006d00650100000000000007380000026c00fffffffb0000000800540069006d006501000000000000045000000000000000000000053a0000033f00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
-  RGB Image:
-    collapsed: false
-  Segmentation Image:
+  Hide Right Dock: false
+  QMainWindow State: 000000ff00000000fd0000000400000000000001560000035efc020000000bfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003b0000017b000000c700fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000001200530065006d0061006e007400690063007301000001bc0000009b0000001600fffffffb0000000a00440065007000740068010000025d0000009c0000001600fffffffb0000000600520047004201000002ff0000009a0000001600ffffff000000010000010f0000035efc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073010000003b0000035e000000a000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007800000003efc0100000002fb0000000800540069006d00650100000000000007800000024400fffffffb0000000800540069006d006501000000000000045000000000000000000000050f0000035e00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  RGB:
     collapsed: false
   Selection:
+    collapsed: false
+  Semantics:
     collapsed: false
   Time:
     collapsed: false
   Tool Properties:
     collapsed: false
   Views:
-    collapsed: true
-  Width: 1848
-  X: 72
-  Y: 29
+    collapsed: false
+  Width: 1920
+  X: 0
+  Y: 27

@@ -77,6 +77,24 @@ wstool merge hydra_dsg_builder/install/hydra.rosinstall
 wstool up
 ```
 
+### Running Hydra (Quickstart)
+
+The only dataset that is supported out-of-the-box is [uHumans2](http://web.mit.edu/sparklab/datasets/uHumans2/).
+To test Hydra out, you can just download a single scene (the office scene without humans is recommended, and can be found [here](https://drive.google.com/uc?id=1CA_1Awu-bewJKpDrILzWok_H_6cOkGDb).
+Make sure to decompress the rosbag (`rosbag decompress path/to/bagfile`) before running!
+
+:warning: Also make sure to source the workspace before starting (typically `source path/to/catkin_ws/devel/setup.bash`, though if you use zsh you should use the correct setup file for that).
+
+To start Hydra:
+```
+roslaunch hydra_dsg_builder uhumans2_incremental_dsg.launch start_visualizer:=true
+```
+
+Then, start the rosbag in a separate terminal:
+```
+rosbag play path/to/rosbag --clock
+```
+
 ### Using a Semantic Segmentation Network
 
 Add `semantic_recolor` to your workspace via:

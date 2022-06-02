@@ -9,13 +9,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(kimera_dsg REQUIRED)
 find_package(
   catkin REQUIRED
-  COMPONENTS roscpp
-             dynamic_reconfigure
-             kimera_dsg_visualizer
+  COMPONENTS dynamic_reconfigure
+             hydra_utils
+             hydra_topology
              kimera_pgmo
              kimera_semantics
              kimera_semantics_ros
-             hydra_topology
+             roscpp
              std_msgs
              visualization_msgs
              voxblox
@@ -28,14 +28,13 @@ generate_dynamic_reconfigure_options(cfg/DsgBuilder.cfg)
 
 catkin_package(
   CATKIN_DEPENDS
-  roscpp
   dynamic_reconfigure
   hydra_utils
-  kimera_dsg_visualizer
+  hydra_topology
   kimera_pgmo
   kimera_semantics
   kimera_semantics_ros
-  hydra_topology
+  roscpp
   std_msgs
   visualization_msgs
   voxblox

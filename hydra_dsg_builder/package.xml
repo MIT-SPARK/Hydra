@@ -10,18 +10,16 @@
   <license>BSD</license>
 
   <buildtool_depend>catkin</buildtool_depend>
-  <depend>roscpp</depend>
-  <depend>std_msgs</depend>
-  <depend>tf2_eigen</depend>
   <depend>gtsam</depend>
+  <depend>hydra_topology</depend>
   <depend>kimera_dsg</depend>
-  <depend>kimera_dsg_visualizer</depend>
   <depend>kimera_pgmo</depend>
   <depend>kimera_semantics</depend>
   <depend>kimera_semantics_ros</depend>
-  <depend>hydra_topology</depend>
-  <depend>object_db</depend>
+  <depend>roscpp</depend>
+  <depend>std_msgs</depend>
   <depend>teaserpp</depend>
+  <depend>tf2_eigen</depend>
   <depend>voxblox</depend>
   <depend>voxblox_ros</depend>
 

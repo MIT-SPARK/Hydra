@@ -39,10 +39,6 @@
     <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
     <arg name="ros_output" value="log" if="$(arg glog_to_file)"/>
 
-    <include file="$(find kimera_dsg_visualizer)/launch/includes/kimera_dsg_visualizer_params.xml">
-        <arg name="viz_config_dir" value="$(find hydra_dsg_builder)/config/incremental_visualizer"/>
-    </include>
-
     <arg name="lcd_viz_path" default="$(find hydra_dsg_builder)/config/lcd_visualizer"/>
     <group ns="/dsg_lcd_visualizer" if="$(arg enable_lcd_viz)">
         <rosparam file="$(arg lcd_viz_path)/visualizer.yaml" ns="config"/>
@@ -50,6 +46,9 @@
         <rosparam file="$(arg lcd_viz_path)/places_layer.yaml" ns="config/layer3"/>
         <rosparam file="$(arg lcd_viz_path)/agent_layer.yaml" ns="config/agent_layer"/>
     </group>
+
+    <include if="$(arg start_visualizer)" file="$(find hydra_utils)/launch/hydra_streaming_visualizer.launch" pass_all_args="true">
+    </include>
 
     <node pkg="hydra_dsg_builder" type="hydra_dsg_builder_incremental_node"
           name="incremental_dsg_builder_node"
@@ -88,27 +87,6 @@
         <remap from="frame_registration" to="/kimera_vio_ros/kimera_vio_ros_node/register_lcd_frames"/>
         <param name="disable_timer_output" value="true"/>
         <param name="visualize_dsg_lcd" value="$(arg enable_lcd_viz)"/>
-    </node>
-
-    <arg name="profile_visualizer" default="false"/>
-    <arg if="$(arg profile_visualizer)"
-         name="viz_launch_prefix" value="perf record -g --output='$(arg dsg_path)/viz_perf.data'"/>
-    <arg unless="$(arg profile_visualizer)" name="viz_launch_prefix" value=""/>
-
-    <node pkg="hydra_dsg_builder" type="dsg_visualizer_node"
-          name="dsg_visualizer_node"
-          output="$(arg ros_output)"
-          launch-prefix="$(arg viz_launch_prefix)"
-          if="$(arg start_visualizer)">
-        <param name="mesh_plugin_type" value="PGMO"/>
-        <param name="load_graph" value="false"/>
-        <param name="scene_graph_filepath" value=""/>
-        <param name="visualizer_ns" value="/kimera_dsg_visualizer"/>
-        <param name="mesh_plugin_ns" value="dsg_mesh"/>
-        <param name="output_path" value="$(arg dsg_path)"/>
-
-        <remap from="~dsg" to="/incremental_dsg_builder_node/dsg"/>
-        <remap from="~dsg_mesh_updates" to="/incremental_dsg_builder_node/pgmo/optimized_mesh"/>
     </node>
 
     <node pkg="hydra_utils" type="pose_graph_publisher_node"

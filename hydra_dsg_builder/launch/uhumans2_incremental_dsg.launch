@@ -14,6 +14,9 @@
     <arg name="sensor_frame" default="left_cam" if="$(arg use_gt_frame)"/>
     <arg name="sensor_frame" default="left_cam_kimera" unless="$(arg use_gt_frame)"/>
 
+    <arg name="rviz_dir" default="$(find hydra_dsg_builder)/rviz"/>
+    <arg name="rviz_file" default="uhumans2.rviz"/>
+
     <arg name="use_static_tfs" default="true"/>
     <include file="$(find hydra_utils)/launch/includes/uhumans2_static_tfs.xml" if="$(arg use_static_tfs)"/>
 

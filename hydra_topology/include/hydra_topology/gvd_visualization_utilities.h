@@ -3,7 +3,7 @@
 #include "hydra_topology/gvd_voxel.h"
 #include "hydra_topology/voxblox_types.h"
 
-#include <kimera_dsg_visualizer/visualizer_types.h>
+#include <hydra_utils/visualizer_types.h>
 #include <hydra_topology/GvdVisualizerConfig.h>
 #include <visualization_msgs/Marker.h>
 
@@ -11,10 +11,6 @@ namespace hydra {
 namespace topology {
 
 using hydra_topology::GvdVisualizerConfig;
-using kimera::ColormapConfig;
-using kimera::NodeColor;
-using kimera::VisualizerConfig;
-using kimera::LayerConfig;
 
 enum class GvdVisualizationMode : int {
   DEFAULT = hydra_topology::GvdVisualizer_DEFAULT,

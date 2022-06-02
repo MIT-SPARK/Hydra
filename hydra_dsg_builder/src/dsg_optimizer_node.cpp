@@ -1,8 +1,8 @@
 #include "hydra_dsg_builder/incremental_dsg_backend.h"
 #include "hydra_dsg_builder/incremental_dsg_frontend.h"
-#include "hydra_dsg_builder/visualizer_plugins.h"
 
-#include <kimera_dsg_visualizer/dynamic_scene_graph_visualizer.h>
+#include <hydra_utils/dsg_mesh_plugins.h>
+#include <hydra_utils/dynamic_scene_graph_visualizer.h>
 
 #include "kimera_pgmo/DeformationGraph.h"
 
@@ -32,8 +32,7 @@ struct DsgOptimizer {
     frontend_dsg->updated = true;
 
     ros::NodeHandle vnh("/kimera_dsg_visualizer");
-    visualizer.reset(
-        new kimera::DynamicSceneGraphVisualizer(vnh, getDefaultLayerIds()));
+    visualizer.reset(new DynamicSceneGraphVisualizer(vnh, getDefaultLayerIds()));
 
     bool use_voxblox_mesh_plugin;
     nh.param<bool>("use_voxblox_mesh_plugin", use_voxblox_mesh_plugin, false);
@@ -101,7 +100,7 @@ struct DsgOptimizer {
   SharedDsgInfo::Ptr backend_dsg;
 
   DsgBackend::Ptr backend;
-  std::unique_ptr<kimera::DynamicSceneGraphVisualizer> visualizer;
+  std::unique_ptr<DynamicSceneGraphVisualizer> visualizer;
 
   ros::ServiceServer optimize_service;
 };

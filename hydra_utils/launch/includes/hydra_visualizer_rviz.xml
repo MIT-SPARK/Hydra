@@ -1,0 +1,10 @@
+<launch>
+
+    <arg name="verbose" default="false"/>
+    <arg name="log_output" value="screen" if="$(arg verbose)"/>
+    <arg name="log_output" value="log" unless="$(arg verbose)"/>
+
+    <node name="rviz" pkg="rviz" type="rviz" output="$(arg log_output)"
+          args="-d $(find hydra_utils)/rviz/hydra_visualizer.rviz"/>
+
+</launch>

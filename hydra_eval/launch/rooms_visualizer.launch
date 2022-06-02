@@ -10,6 +10,6 @@
     </node>
 
     <node pkg="rviz" type="rviz" name="rviz"
-          args="-d $(find hydra_dsg_builder)/rviz/room_visualizer.rviz"/>
+          args="-d $(find hydra_eval)/rviz/room_visualizer.rviz"/>
 
 </launch>

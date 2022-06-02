@@ -2,24 +2,15 @@
 
 ## Running online
 
-Steps to running with ground truth:
+Steps to running with ground truth for the uhumans2 office dataset:
 
   1. Grab the uhumans2 dataset (if you haven't already). You can probably just use the office scene without any humans (`uHumans2_office_s1_00h.bag`)
 
-  2. Start up ROS (allows Rviz to persist between runs)
+  2. Start up the DSG builder
 
-    roscore
+    roslaunch hydra_dsg_builder uhumans2_incremental_dsg.launch start_visualizer:=true
 
-  3. Start up the DSG builder (starting this before rviz makes sure `use_sim_time` is set properly)
-
-    roslaunch hydra_dsg_builder uhumans2_incremental_dsg.launch
-
-  4. Start rviz:
-
-    roscd hydra_dsg_builder
-    rviz -d rviz/uhumans2_backend.rviz
-
-  5. Start the bag:
+  3. Start the bag:
 
     cd /path/to/uhumans2/office/scene
     rosbag play uHumans2_office_s1_00h.bag --clock --pause -r 0.5

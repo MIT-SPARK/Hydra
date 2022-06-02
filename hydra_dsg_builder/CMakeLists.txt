@@ -10,14 +10,12 @@ find_package(Boost REQUIRED COMPONENTS timer)
 find_package(kimera_dsg REQUIRED)
 find_package(
   catkin REQUIRED
-  COMPONENTS roscpp
-             std_msgs
-             kimera_dsg_visualizer
+  COMPONENTS hydra_topology
              kimera_pgmo
              kimera_semantics
              kimera_semantics_ros
-             hydra_topology
-             object_db
+             roscpp
+             std_msgs
              tf2_eigen
              voxblox
              voxblox_ros
@@ -31,13 +29,12 @@ find_package(yaml-cpp REQUIRED)
 
 catkin_package(
   CATKIN_DEPENDS
-  roscpp
-  object_db
-  kimera_dsg_visualizer
+  hydra_topology
   kimera_pgmo
   kimera_semantics
   kimera_semantics_ros
-  hydra_topology
+  roscpp
+  std_msgs
   tf2_eigen
   voxblox
   voxblox_ros
@@ -73,9 +70,6 @@ target_link_libraries(
 
 add_executable(${PROJECT_NAME}_incremental_node src/incremental_dsg_builder_node.cpp)
 target_link_libraries(${PROJECT_NAME}_incremental_node ${PROJECT_NAME})
-
-add_executable(dsg_visualizer_node src/dsg_visualizer_node.cpp)
-target_link_libraries(dsg_visualizer_node ${PROJECT_NAME} yaml-cpp)
 
 add_executable(dsg_optimizer_node src/dsg_optimizer_node.cpp)
 target_link_libraries(dsg_optimizer_node ${PROJECT_NAME})

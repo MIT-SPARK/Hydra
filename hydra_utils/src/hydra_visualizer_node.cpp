@@ -1,20 +1,19 @@
+#include "hydra_utils/config.h"
+#include "hydra_utils/dsg_mesh_plugins.h"
+#include "hydra_utils/dsg_streaming_interface.h"
+#include "hydra_utils/dynamic_scene_graph_visualizer.h"
+#include "hydra_utils/timing_utilities.h"
+
 #include <glog/logging.h>
-#include <hydra_utils/dsg_streaming_interface.h>
-#include <hydra_utils/timing_utilities.h>
-#include <kimera_dsg_visualizer/dsg_mesh_plugin.h>
-#include <kimera_dsg_visualizer/dynamic_scene_graph_visualizer.h>
 #include <ros/ros.h>
 
 #include <fstream>
 
-#include "hydra_dsg_builder/config_utils.h"
-#include "hydra_dsg_builder/visualizer_plugins.h"
-
-using DsgVisualizer = kimera::DynamicSceneGraphVisualizer;
-using kimera::DsgMeshPlugin;
-using kimera::getDefaultLayerIds;
+using DsgVisualizer = hydra::DynamicSceneGraphVisualizer;
 using hydra::PgmoMeshPlugin;
+using hydra::RvizMeshPlugin;
 using hydra::VoxbloxMeshPlugin;
+using kimera::getDefaultLayerIds;
 
 namespace hydra {
 
@@ -90,7 +89,7 @@ struct VisualizerNode {
         plugin = std::make_shared<VoxbloxMeshPlugin>(viz_nh, mesh_ns);
         break;
       case MeshPluginEnum::RVIZ:
-        plugin = std::make_shared<DsgMeshPlugin>(viz_nh, mesh_ns);
+        plugin = std::make_shared<RvizMeshPlugin>(viz_nh, mesh_ns);
         break;
       case MeshPluginEnum::PGMO:
       default:

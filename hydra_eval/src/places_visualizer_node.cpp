@@ -1,8 +1,8 @@
 #include "hydra_topology/topology_server_visualizer.h"
 
 #include <hydra_topology/GvdVisualizerConfig.h>
+#include <hydra_utils/colormap_utils.h>
 #include <kimera_dsg/dynamic_scene_graph.h>
-#include <kimera_dsg_visualizer/colormap_utils.h>
 #include <nav_msgs/LoadMap.h>
 #include <voxblox/io/layer_io.h>
 
@@ -27,12 +27,13 @@ DEFINE_int32(basis_threshold, 2, "basis threshold");
 
 using namespace kimera;
 using namespace hydra::topology;
+using namespace hydra;
 using visualization_msgs::Marker;
 using visualization_msgs::MarkerArray;
 using voxblox::Layer;
 using voxblox::TsdfVoxel;
 
-namespace kimera_dsg_visualizer {
+namespace hydra_utils {
 
 template <typename Visitor>
 void visit_config(const Visitor& v, ColormapConfig& config) {
@@ -75,7 +76,7 @@ void visit_config(const Visitor& v, LayerConfig& config) {
   v.visit("intralayer_edge_insertion_skip", config.intralayer_edge_insertion_skip);
 }
 
-}  // namespace kimera_dsg_visualizer
+}  // namespace hydra_utils
 
 struct ToggleFunctor {
   bool show_error = true;

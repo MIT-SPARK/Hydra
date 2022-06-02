@@ -3,8 +3,8 @@
 #include "hydra_topology/gvd_visualization_utilities.h"
 
 #include <hydra_utils/config.h>
-#include <kimera_dsg_visualizer/visualizer_types.h>
-#include <kimera_dsg_visualizer/visualizer_utils.h>
+#include <hydra_utils/visualizer_types.h>
+#include <hydra_utils/visualizer_utils.h>
 
 #include <dynamic_reconfigure/server.h>
 #include <hydra_topology/GvdVisualizerConfig.h>

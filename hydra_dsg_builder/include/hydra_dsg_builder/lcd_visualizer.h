@@ -1,21 +1,15 @@
 #pragma once
 #include "hydra_dsg_builder/dsg_lcd_detector.h"
 
-#include <kimera_dsg_visualizer/dynamic_scene_graph_visualizer.h>
+#include <hydra_utils/dynamic_scene_graph_visualizer.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
 namespace hydra {
 namespace lcd {
 
-using kimera::ConfigManager;
-using kimera::DynamicLayerConfig;
-using kimera::DynamicSceneGraphVisualizer;
-using kimera::LayerConfig;
-using kimera::NodeColor;
 using visualization_msgs::Marker;
 using visualization_msgs::MarkerArray;
-
 
 class LcdVisualizer : public DynamicSceneGraphVisualizer {
  public:

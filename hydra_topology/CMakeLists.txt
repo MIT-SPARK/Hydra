@@ -9,19 +9,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(kimera_dsg REQUIRED)
 find_package(
   catkin REQUIRED
-  COMPONENTS roscpp
-             dynamic_reconfigure
+  COMPONENTS dynamic_reconfigure
              hydra_utils
              hydra_msgs
-             kimera_dsg_visualizer
              kimera_semantics_ros
              pcl_ros
+             roscpp
              tf2_eigen
              tf2_ros
              voxblox
              voxblox_ros
 )
-find_package(yaml-cpp REQUIRED)
 
 generate_dynamic_reconfigure_options(cfg/GvdVisualizer.cfg)
 
@@ -49,17 +47,16 @@ add_subdirectory(${CMAKE_BINARY_DIR}/nanoflann-src ${CMAKE_BINARY_DIR}/nanoflann
 
 catkin_package(
   CATKIN_DEPENDS
-  roscpp
   dynamic_reconfigure
   hydra_utils
   hydra_msgs
-  kimera_dsg_visualizer
   kimera_semantics_ros
-  voxblox
-  voxblox_ros
+  pcl_ros
+  roscpp
   tf2_eigen
   tf2_ros
-  pcl_ros
+  voxblox
+  voxblox_ros
   DEPENDS kimera_dsg
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}

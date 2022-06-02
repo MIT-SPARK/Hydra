@@ -8,16 +8,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(
   catkin REQUIRED
-  COMPONENTS roscpp
-             roslib
-             nodelet
-             cv_bridge
-             image_transport
+  COMPONENTS cv_bridge
+             dynamic_reconfigure
              geometry_msgs
+             image_transport
              kimera_pgmo
+             nodelet
              pose_graph_tools
+             roscpp
              tf2_eigen
              tf2_ros
+             visualization_msgs
 )
 find_package(GTSAM REQUIRED)
 find_package(kimera_dsg REQUIRED)
@@ -29,17 +30,26 @@ find_package(OpenCV REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(glog REQUIRED IMPORTED_TARGET libglog)
 
+generate_dynamic_reconfigure_options(
+  cfg/Colormap.cfg
+  cfg/DynamicLayerVisualizer.cfg
+  cfg/LayerVisualizer.cfg
+  cfg/Visualizer.cfg
+)
+
 catkin_package(
   CATKIN_DEPENDS
-  roscpp
   cv_bridge
+  dynamic_reconfigure
   geometry_msgs
   image_transport
-  nodelet
   kimera_pgmo
+  nodelet
   pose_graph_tools
+  roscpp
   tf2_eigen
   tf2_ros
+  visualization_msgs
   DEPENDS OpenCV
   INCLUDE_DIRS include ${EIGEN3_INCLUDE_DIRS}
   LIBRARIES ${PROJECT_NAME}
@@ -50,9 +60,20 @@ add_library(${PROJECT_NAME}
     src/dsg_streaming_interface.cpp
     src/ros_parser.cpp
     src/timing_utilities.cpp
+    src/dsg_mesh_plugins.cpp
+    src/dynamic_scene_graph_visualizer.cpp
+    src/visualizer_utils.cpp
     src/yaml_parser.cpp)
-target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME} PUBLIC yaml-cpp ${catkin_LIBRARIES} PRIVATE PkgConfig::glog kimera_dsg::kimera_dsg)
+target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME} PUBLIC yaml-cpp ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} kimera_dsg::kimera_dsg PRIVATE PkgConfig::glog)
+add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
+
+add_executable(hydra_visualizer_node src/hydra_visualizer_node.cpp)
+target_link_libraries(hydra_visualizer_node ${PROJECT_NAME})
+
+add_executable(rotate_tf_node src/rotate_tf_node.cpp)
+target_link_libraries(rotate_tf_node ${catkin_LIBRARIES})
+target_include_directories(rotate_tf_node PUBLIC ${catkin_INCLUDE_DIRS})
 
 add_executable(pose_graph_publisher_node src/pose_graph_publisher_node.cpp)
 target_include_directories(pose_graph_publisher_node PUBLIC ${catkin_INCLUDE_DIRS})
@@ -75,7 +96,7 @@ if(CATKIN_ENABLE_TESTING)
 endif()
 
 install(
-  TARGETS ${PROJECT_NAME} pose_graph_publisher_node ${PROJECT_NAME}_nodelet
+  TARGETS ${PROJECT_NAME} pose_graph_publisher_node ${PROJECT_NAME}_nodelet hydra_visualizer_node rotate_tf_node
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}

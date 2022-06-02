@@ -11,6 +11,8 @@
 
   <buildtool_depend>catkin</buildtool_depend>
   <depend>roscpp</depend>
+  <!--<depend>roslib</depend>-->
+  <depend>dynamic_reconfigure</depend>
   <depend>geometry_msgs</depend>
   <depend>gtsam</depend>
   <depend>cv_bridge</depend>
@@ -20,6 +22,7 @@
   <depend>kimera_pgmo</depend>
   <depend>pose_graph_tools</depend>
   <depend>tf2_eigen</depend>
+  <depend>visualization_msgs</depend>
   <depend>tf2_ros</depend>
 
   <export>

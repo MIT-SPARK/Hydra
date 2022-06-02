@@ -12,6 +12,9 @@
     <arg name="use_gt_frame" default="true"/>
     <arg name="sensor_frame" default="left_cam"/>
 
+    <arg name="rviz_dir" default="$(find hydra_dsg_builder)/rviz"/>
+    <arg name="rviz_file" default="d455.rviz"/>
+
     <include file="$(find hydra_utils)/launch/gt_pose/d455_gt_pose.launch" if="$(arg use_gt_frame)">
         <arg name="sensor_frame" value="$(arg sensor_frame)"/>
     </include>

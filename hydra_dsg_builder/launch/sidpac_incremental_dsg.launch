@@ -14,6 +14,9 @@
     <arg name="use_oriented_bounding_boxes" default="true"/>
     <arg name="sensor_frame" default="left_cam"/>
 
+    <arg name="rviz_dir" default="$(find hydra_dsg_builder)/rviz"/>
+    <arg name="rviz_file" default="sidpac.rviz"/>
+
     <include if="$(arg use_gt_frame)" file="$(find hydra_utils)/launch/gt_pose/sidpac_gt_pose.launch">
         <arg name="path_to_csv" value="$(arg gt_path_csv)"/>
         <arg name="sensor_frame" value="$(arg sensor_frame)"/>

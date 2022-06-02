@@ -1,5 +1,5 @@
+#include <hydra_utils/colormap_utils.h>
 #include <kimera_dsg/dynamic_scene_graph.h>
-#include <kimera_dsg_visualizer/colormap_utils.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
 #include <mesh_msgs/TriangleMeshStamped.h>
 #include <std_srvs/Empty.h>
@@ -17,6 +17,7 @@ DEFINE_string(bbox_file, "", "bounding box config file");
 DEFINE_string(mesh_file, "", "mesh file to read");
 
 using namespace kimera;
+using namespace hydra;
 
 void redrawBoundingBoxes(ros::Publisher& bbox_pub) {
   YAML::Node root = YAML::LoadFile(FLAGS_bbox_file);

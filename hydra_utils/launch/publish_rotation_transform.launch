@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="ISO-8859-15"?>
+<launch>
+
+  <arg name="parent_frame" default="world"/>
+  <arg name="child_frame" default="rotated_view"/>
+  <arg name="period_s" default="25.0"/>
+  <arg name="radius_m" default="70.0"/>
+  <arg name="centroid" default="[3.0, 25.0, 40.0]"/>
+
+  <node pkg="hydra_utils" type="rotate_tf_node" name="$(anon rotate_tf_node)">
+      <param name="parent_frame" value="$(arg parent_frame)"/>
+      <param name="child_frame" value="$(arg child_frame)"/>
+      <param name="period_s" value="$(arg period_s)"/>
+      <param name="radius" value="$(arg radius_m)"/>
+      <rosparam param="centroid" subst_value="True">$(arg centroid)</rosparam>
+  </node>
+
+</launch>

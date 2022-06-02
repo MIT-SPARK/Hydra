@@ -2,22 +2,13 @@
 #include "hydra_dsg_builder/dsg_types.h"
 #include "hydra_dsg_builder/minimum_spanning_tree.h"
 
-#include <kimera_dsg_visualizer/dsg_visualizer_plugin.h>
-#include <kimera_dsg_visualizer/visualizer_types.h>
+#include <hydra_utils/dsg_visualizer_plugin.h>
+#include <hydra_utils/visualizer_types.h>
 #include <kimera_pgmo/DeformationGraph.h>
 
 #include <visualization_msgs/Marker.h>
-#include <voxblox/core/block_hash.h>
-#include <voxblox/core/common.h>
-#include <voxblox_msgs/Mesh.h>
 
 namespace hydra {
-
-using kimera::DsgVisualizerPlugin;
-using kimera::getLayerConfig;
-using kimera::LayerConfig;
-using kimera::NodeColor;
-using kimera::VisualizerConfig;
 
 struct PMGraphPluginConfig {
   explicit PMGraphPluginConfig(const ros::NodeHandle& nh);
@@ -30,35 +21,6 @@ struct PMGraphPluginConfig {
   NodeColor interior_color;
   NodeColor invalid_color;
   LayerConfig layer_config;
-};
-
-class PgmoMeshPlugin : public DsgVisualizerPlugin {
- public:
-  PgmoMeshPlugin(const ros::NodeHandle& nh, const std::string& name);
-
-  virtual ~PgmoMeshPlugin() = default;
-
-  void draw(const std_msgs::Header& header, const DynamicSceneGraph& graph) override;
-
-  void reset(const std_msgs::Header& header, const DynamicSceneGraph& graph) override;
-
- protected:
-  ros::Publisher mesh_pub_;
-};
-
-class VoxbloxMeshPlugin : public DsgVisualizerPlugin {
- public:
-  VoxbloxMeshPlugin(const ros::NodeHandle& nh, const std::string& name);
-
-  virtual ~VoxbloxMeshPlugin() = default;
-
-  void draw(const std_msgs::Header& header, const DynamicSceneGraph& graph) override;
-
-  void reset(const std_msgs::Header& header, const DynamicSceneGraph& graph) override;
-
- protected:
-  ros::Publisher mesh_pub_;
-  voxblox::BlockIndexList curr_blocks_;
 };
 
 class MeshPlaceConnectionsPlugin : public DsgVisualizerPlugin {

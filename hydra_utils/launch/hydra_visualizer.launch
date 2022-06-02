@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="ISO-8859-15"?>
+<launch>
+  <arg name="mesh_plugin_type" default="VOXBLOX"/>
+
+  <arg name="scene_graph"/>
+  <arg name="scene_graph_dir" default="$(find hydra_dsg_builder)/output"/>
+  <arg name="scene_graph_path" value="$(arg scene_graph_dir)/$(arg scene_graph)"/>
+
+  <arg name="viz_config_dir" default="$(find hydra_utils)/config/hydra_visualizer"/>
+  <arg name="visualizer_ns" value="/hydra_visualizer"/>
+  <arg name="include_rviz" default="true"/>
+
+  <arg name="verbosity" default="0"/>
+
+  <include file="$(find hydra_utils)/launch/includes/hydra_visualizer_base.xml"
+           pass_all_args="true"/>
+
+  <node pkg="hydra_utils" name="$(anon hydra_visualizer_node)" type="hydra_visualizer_node"
+        output="screen"
+        required="true"
+        args="-alsologtostderr -colorlogtostderr -v=$(arg verbosity)">
+    <param name="visualizer_ns" value="$(arg visualizer_ns)"/>
+    <param name="scene_graph_filepath" value="$(arg scene_graph_path)"/>
+    <param name="load_graph" value="true"/>
+    <param name="mesh_plugin_type" value="$(arg mesh_plugin_type)"/>
+  </node>
+
+</launch>

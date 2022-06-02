@@ -1,7 +1,7 @@
 #include "hydra_dsg_builder/lcd_visualizer.h"
 
-#include <kimera_dsg_visualizer/colormap_utils.h>
-#include <kimera_dsg_visualizer/visualizer_utils.h>
+#include <hydra_utils/colormap_utils.h>
+#include <hydra_utils/visualizer_utils.h>
 
 #include <tf2_eigen/tf2_eigen.h>
 
@@ -11,10 +11,6 @@ namespace lcd {
 using visualization_msgs::Marker;
 using visualization_msgs::MarkerArray;
 using Node = SceneGraphLayer::Node;
-using kimera::getDynamicLayerConfig;
-using kimera::getZOffset;
-
-namespace dsg_utils = kimera::dsg_utils;
 
 void makeCircle(Marker& marker,
                 const Eigen::Vector3d& position,
@@ -69,10 +65,7 @@ LcdVisualizer::LcdVisualizer(const ros::NodeHandle& nh, double radius)
   readColor(nh, "query_color", query_color, query_color_);
 
   const std::string ns = visualizer_ns_ + "/agent_layer";
-  agent_config_ = std::make_shared<DynamicLayerConfigManager>(
-      ros::NodeHandle(""), ns, [](const ros::NodeHandle& nh, auto& config) {
-        config = getDynamicLayerConfig(nh);
-      });
+  agent_config_ = std::make_shared<DynamicLayerConfigManager>(ros::NodeHandle(""), ns);
 }
 
 void LcdVisualizer::setLcdDetector(DsgLcdDetector* detector) {

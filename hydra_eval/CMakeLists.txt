@@ -10,11 +10,11 @@ find_package(kimera_dsg REQUIRED)
 find_package(KimeraRPGO REQUIRED)
 find_package(
   catkin REQUIRED
-  COMPONENTS voxblox
-             kimera_dsg_visualizer
+  COMPONENTS hydra_topology
+             hydra_utils
              kimera_pgmo
-             hydra_topology
              visualization_msgs
+             voxblox
 )
 find_package(Boost REQUIRED COMPONENTS timer)
 find_package(GTSAM REQUIRED)
@@ -67,11 +67,11 @@ add_subdirectory(${CMAKE_BINARY_DIR}/json-src ${CMAKE_BINARY_DIR}/json-build)
 
 catkin_package(
   CATKIN_DEPENDS
-  voxblox
-  kimera_dsg_visualizer
   hydra_topology
+  hydra_utils
   kimera_pgmo
   visualization_msgs
+  voxblox
   DEPENDS
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}

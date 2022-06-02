@@ -1,0 +1,16 @@
+<launch>
+  <arg name="viz_config_dir"/>
+  <arg name="visualizer_ns" default="/hydra_visualizer"/>
+  <arg name="world_frame" default="world"/>
+
+  <group ns="$(arg visualizer_ns)">
+    <param name="world_frame" value="$(arg world_frame)"/>
+    <rosparam file="$(arg viz_config_dir)/visualizer.yaml" ns="config"/>
+    <rosparam file="$(arg viz_config_dir)/objects_layer.yaml" ns="config/layer2"/>
+    <rosparam file="$(arg viz_config_dir)/places_layer.yaml" ns="config/layer3"/>
+    <rosparam file="$(arg viz_config_dir)/rooms_layer.yaml" ns="config/layer4"/>
+    <rosparam file="$(arg viz_config_dir)/buildings_layer.yaml" ns="config/layer5"/>
+    <rosparam file="$(arg viz_config_dir)/agent_layer.yaml" ns="config/dynamic_layer/2"/>
+  </group>
+
+</launch>

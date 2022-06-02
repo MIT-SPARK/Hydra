@@ -4,8 +4,8 @@
 #include "kimera_batch_dsg/room_finder.h"
 
 #include <hydra_utils/semantic_ros_publishers.h>
+#include <hydra_utils/dynamic_scene_graph_visualizer.h>
 #include <kimera_dsg/dynamic_scene_graph.h>
-#include <kimera_dsg_visualizer/dynamic_scene_graph_visualizer.h>
 
 #include <kimera_semantics/semantic_integrator_base.h>
 #include <kimera_semantics_ros/semantic_tsdf_server.h>
@@ -83,7 +83,7 @@ class OfflineDsgBuilder {
   std::unique_ptr<RoomFinder> room_finder_;
 
   DynamicSceneGraph::Ptr scene_graph_;
-  std::unique_ptr<DynamicSceneGraphVisualizer> visualizer_;
+  std::unique_ptr<hydra::DynamicSceneGraphVisualizer> visualizer_;
 
   vxb::Layer<vxb::EsdfVoxel>::Ptr esdf_layer_;
 
