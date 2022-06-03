@@ -2,9 +2,10 @@
 <package format="2">
   <name>hydra_dsg_builder</name>
   <version>1.0.0</version>
-  <description>Utilities for building a Kimera-DSG from sensor data</description>
+  <description>Utilities for building a scene graph from sensor data</description>
 
   <author email="na26933@mit.edu">Nathan Hughes</author>
+  <author email="yunchang@mit.edu">Yun Chang</author>
   <maintainer email="na26933@mit.edu">Nathan Hughes</maintainer>
 
   <license>BSD</license>
