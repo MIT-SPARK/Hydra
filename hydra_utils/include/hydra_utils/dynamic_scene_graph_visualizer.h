@@ -212,7 +212,7 @@ class DynamicSceneGraphVisualizer {
   const std::string bbox_ns_prefix_ = "layer_bounding_boxes_";
   const std::string mesh_edge_ns_ = "mesh_object_connections";
   const std::string interlayer_edge_ns_prefix_ = "interlayer_edges_";
-  const LayerId mesh_edge_source_layer_ = KimeraDsgLayers::OBJECTS;
+  const LayerId mesh_edge_source_layer_ = DsgLayers::OBJECTS;
   const std::string dynamic_node_ns_prefix_ = "dynamic_nodes_";
   const std::string dynamic_edge_ns_prefix_ = "dynamic_edges_";
   const std::string dynamic_label_ns_prefix_ = "dynamic_label_";

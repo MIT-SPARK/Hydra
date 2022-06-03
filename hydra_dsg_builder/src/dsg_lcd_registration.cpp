@@ -162,7 +162,7 @@ DsgTeaserSolver::DsgTeaserSolver(LayerId layer_id,
                                  const LayerRegistrationConfig& config,
                                  const TeaserParams& params)
     : layer_id(layer_id), config(config), solver(params) {
-  const std::string layer_str = KimeraDsgLayers::LayerIdToString(layer_id);
+  const std::string layer_str = DsgLayers::LayerIdToString(layer_id);
   timer_prefix = "lcd/" + layer_str + "_registration";
   log_prefix = config.registration_output_path + "/" + layer_str + "_registration_";
 }

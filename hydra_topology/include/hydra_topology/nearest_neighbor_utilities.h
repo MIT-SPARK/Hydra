@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include "hydra_topology/voxblox_types.h"
-#include "hydra_topology/dsg_types.h"
+#include <hydra_utils/dsg_types.h>
 
 #include <memory>
 #include <unordered_set>
@@ -43,7 +43,7 @@
 namespace hydra {
 namespace topology {
 
-// TODO(nathan) this probably belongs in kimera_dsg
+// TODO(nathan) this probably belongs in spark_dsg
 class NearestNodeFinder {
  public:
   using Callback = std::function<void(NodeId, size_t, double)>;

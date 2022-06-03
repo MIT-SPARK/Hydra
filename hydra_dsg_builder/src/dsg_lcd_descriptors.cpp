@@ -35,14 +35,12 @@
 #include "hydra_dsg_builder/dsg_lcd_descriptors.h"
 
 #include <glog/logging.h>
-#include <kimera_dsg/node_attributes.h>
 
 namespace hydra {
 namespace lcd {
 
 using Dsg = DynamicSceneGraph;
 using DsgNode = DynamicSceneGraphNode;
-namespace graph_utilities = kimera::graph_utilities;
 
 Descriptor::Ptr AgentDescriptorFactory::construct(const Dsg& graph,
                                                   const DsgNode& agent_node) const {
@@ -84,7 +82,7 @@ Descriptor::Ptr ObjectDescriptorFactory::construct(const Dsg& graph,
   descriptor->timestamp = agent_node.timestamp;
   descriptor->root_position = root_position;
 
-  const auto& places = graph.getLayer(KimeraDsgLayers::PLACES);
+  const auto& places = graph.getLayer(DsgLayers::PLACES);
   std::deque<NodeId> frontier{*parent};
   std::unordered_set<NodeId> visited{*parent};
   graph_utilities::breadthFirstSearch(
@@ -156,7 +154,7 @@ Descriptor::Ptr PlaceDescriptorFactory::construct(const Dsg& graph,
   descriptor->timestamp = agent_node.timestamp;
   descriptor->root_position = root_position;
 
-  const auto& places = graph.getLayer(KimeraDsgLayers::PLACES);
+  const auto& places = graph.getLayer(DsgLayers::PLACES);
   std::deque<NodeId> frontier{*parent};
   std::unordered_set<NodeId> visited{*parent};
   graph_utilities::breadthFirstSearch(

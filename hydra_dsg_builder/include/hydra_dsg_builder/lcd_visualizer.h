@@ -50,7 +50,7 @@ class LcdVisualizer : public DynamicSceneGraphVisualizer {
   using DynamicLayerConfigManager = ConfigManager<DynamicLayerConfig>;
 
   static DynamicSceneGraph::LayerIds getDefaultLayerIds() {
-    return {KimeraDsgLayers::OBJECTS, KimeraDsgLayers::PLACES};
+    return {DsgLayers::OBJECTS, DsgLayers::PLACES};
   }
 
   LcdVisualizer(const ros::NodeHandle& nh, double radius);

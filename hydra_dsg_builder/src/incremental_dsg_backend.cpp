@@ -36,7 +36,6 @@
 #include "hydra_dsg_builder/minimum_spanning_tree.h"
 
 #include <hydra_utils/timing_utilities.h>
-#include <kimera_dsg/node_attributes.h>
 #include <pcl/search/kdtree.h>
 #include <voxblox/core/block_hash.h>
 
@@ -73,7 +72,7 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
       nh_(nh),
       shared_dsg_(dsg),
       private_dsg_(backend_dsg),
-      shared_places_copy_(KimeraDsgLayers::PLACES),
+      shared_places_copy_(DsgLayers::PLACES),
       robot_id_(0) {
   config_ = load_config<DsgBackendConfig>(nh_);
 
@@ -110,10 +109,10 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
   if (config_.should_log) {
     backend_graph_logger_.setOutputPath(config_.log_path + "/backend");
     ROS_INFO("Logging backend graph to %s", (config_.log_path + "/backend").c_str());
-    backend_graph_logger_.setLayerName(KimeraDsgLayers::OBJECTS, "objects");
-    backend_graph_logger_.setLayerName(KimeraDsgLayers::PLACES, "places");
-    backend_graph_logger_.setLayerName(KimeraDsgLayers::ROOMS, "rooms");
-    backend_graph_logger_.setLayerName(KimeraDsgLayers::BUILDINGS, "buildings");
+    backend_graph_logger_.setLayerName(DsgLayers::OBJECTS, "objects");
+    backend_graph_logger_.setLayerName(DsgLayers::PLACES, "places");
+    backend_graph_logger_.setLayerName(DsgLayers::ROOMS, "rooms");
+    backend_graph_logger_.setLayerName(DsgLayers::BUILDINGS, "buildings");
   } else {
     ROS_ERROR("DSG Backend logging disabled. ");
   }
@@ -158,9 +157,9 @@ bool DsgBackend::updatePrivateDsg() {
                                       config_.merge_update_dynamic);
       *private_dsg_->latest_places = *shared_dsg_->latest_places;
 
-      if (shared_dsg_->graph->hasLayer(KimeraDsgLayers::PLACES)) {
+      if (shared_dsg_->graph->hasLayer(DsgLayers::PLACES)) {
         // TODO(nathan) simplify
-        auto& places = shared_dsg_->graph->getLayer(KimeraDsgLayers::PLACES);
+        auto& places = shared_dsg_->graph->getLayer(DsgLayers::PLACES);
         shared_places_copy_.mergeLayer(places);
         std::vector<NodeId> removed_place_nodes;
         places.getRemovedNodes(removed_place_nodes);
@@ -574,14 +573,14 @@ void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,
 ActiveNodeSet DsgBackend::getNodesForRoomDetection(const NodeIdSet& latest_places) {
   std::unordered_set<NodeId> active_places(latest_places.begin(), latest_places.end());
   // TODO(nathan) grab this from a set of active rooms
-  const auto& rooms = private_dsg_->graph->getLayer(KimeraDsgLayers::ROOMS);
+  const auto& rooms = private_dsg_->graph->getLayer(DsgLayers::ROOMS);
   for (const auto& id_node_pair : rooms.nodes()) {
     active_places.insert(id_node_pair.second->children().begin(),
                          id_node_pair.second->children().end());
   }
 
   // TODO(nathan) this is threadsafe as long as places and rooms are on the same thread
-  const auto& places = private_dsg_->graph->getLayer(KimeraDsgLayers::PLACES);
+  const auto& places = private_dsg_->graph->getLayer(DsgLayers::PLACES);
   for (const auto& node_id : unlabeled_place_nodes_) {
     if (!places.hasNode(node_id)) {
       continue;
@@ -594,7 +593,7 @@ ActiveNodeSet DsgBackend::getNodesForRoomDetection(const NodeIdSet& latest_place
 }
 
 void DsgBackend::storeUnlabeledPlaces(const ActiveNodeSet active_nodes) {
-  const auto& places = private_dsg_->graph->getLayer(KimeraDsgLayers::PLACES);
+  const auto& places = private_dsg_->graph->getLayer(DsgLayers::PLACES);
 
   unlabeled_place_nodes_.clear();
   for (const auto& node_id : active_nodes) {
@@ -625,7 +624,7 @@ void DsgBackend::updateRoomsNodes() {
 void DsgBackend::updateBuildingNode() {
   const NodeSymbol node_id('B', 0);
   std::unique_lock<std::mutex> lock(private_dsg_->mutex);
-  const auto& rooms = private_dsg_->graph->getLayer(KimeraDsgLayers::ROOMS);
+  const auto& rooms = private_dsg_->graph->getLayer(DsgLayers::ROOMS);
 
   if (!rooms.numNodes()) {
     if (private_dsg_->graph->hasNode(node_id)) {
@@ -648,7 +647,7 @@ void DsgBackend::updateBuildingNode() {
     attrs->semantic_label = config_.building_semantic_label;
     attrs->name = node_id.getLabel();
     private_dsg_->graph->emplaceNode(
-        KimeraDsgLayers::BUILDINGS, node_id, std::move(attrs));
+        DsgLayers::BUILDINGS, node_id, std::move(attrs));
   } else {
     private_dsg_->graph->getNode(node_id)->get().attributes().position = centroid;
   }

@@ -39,8 +39,6 @@
 #include "hydra_topology/voxblox_types.h"
 #include "hydra_topology/voxel_aware_mesh_integrator.h"
 
-#include <kimera_dsg/scene_graph_layer.h>
-
 #include <utility>
 
 namespace hydra {

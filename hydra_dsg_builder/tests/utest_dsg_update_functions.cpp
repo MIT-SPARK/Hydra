@@ -60,7 +60,7 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
   attrs->bounding_box.type = BoundingBox::Type::AABB;
   attrs->bounding_box.min << 1.0f, 2.0f, 3.0f;
   attrs->bounding_box.max << 1.0f, 2.0f, 3.0f;
-  graph.emplaceNode(KimeraDsgLayers::OBJECTS, 0, std::move(attrs));
+  graph.emplaceNode(DsgLayers::OBJECTS, 0, std::move(attrs));
 
   gtsam::Values values;
   dsg_updates::updateObjects(graph, values, values, false);
@@ -119,8 +119,8 @@ TEST(DsgInterpolationTests, ObjectUpdateMerge) {
   attrs1->bounding_box.min << 2.0f, 3.0f, 4.0f;
   attrs1->bounding_box.max << 2.0f, 3.0f, 4.0f;
   attrs1->semantic_label = 1u;
-  graph.emplaceNode(KimeraDsgLayers::OBJECTS, 0, std::move(attrs0));
-  graph.emplaceNode(KimeraDsgLayers::OBJECTS, 1, std::move(attrs1));
+  graph.emplaceNode(DsgLayers::OBJECTS, 0, std::move(attrs0));
+  graph.emplaceNode(DsgLayers::OBJECTS, 1, std::move(attrs1));
 
   gtsam::Values values;
   dsg_updates::updateObjects(graph, values, values, true);
@@ -182,15 +182,15 @@ TEST(DsgInterpolationTests, ObjectUpdateMerge) {
 
 TEST(DsgInterpolationTests, BuildingUpdate) {
   DynamicSceneGraph graph;
-  graph.emplaceNode(KimeraDsgLayers::BUILDINGS,
+  graph.emplaceNode(DsgLayers::BUILDINGS,
                     0,
                     std::make_unique<NodeAttributes>(Eigen::Vector3d(1.0, 2.0, 3.0)));
 
-  graph.emplaceNode(KimeraDsgLayers::BUILDINGS,
+  graph.emplaceNode(DsgLayers::BUILDINGS,
                     1,
                     std::make_unique<NodeAttributes>(Eigen::Vector3d(4.0, 5.0, 6.0)));
 
-  graph.emplaceNode(KimeraDsgLayers::BUILDINGS,
+  graph.emplaceNode(DsgLayers::BUILDINGS,
                     2,
                     std::make_unique<NodeAttributes>(Eigen::Vector3d(4.0, 5.0, 6.0)));
 
@@ -235,7 +235,7 @@ TEST(DsgInterpolationTests, BuildingUpdate) {
 }
 
 TEST(DsgInterpolationTests, PlaceUpdate) {
-  const LayerId place_layer = KimeraDsgLayers::PLACES;
+  const LayerId place_layer = DsgLayers::PLACES;
   DynamicSceneGraph graph;
   auto attrs1 = std::make_unique<PlaceNodeAttributes>(0.0, 0.0);
   attrs1->position = Eigen::Vector3d(1.0, 2.0, 3.0);
@@ -279,7 +279,7 @@ TEST(DsgInterpolationTests, PlaceUpdate) {
 }
 
 TEST(DsgInterpolationTests, PlaceUpdateMerge) {
-  const LayerId place_layer = KimeraDsgLayers::PLACES;
+  const LayerId place_layer = DsgLayers::PLACES;
   DynamicSceneGraph graph;
   PlaceNodeAttributes::Ptr attrs0(new PlaceNodeAttributes);
   attrs0->position << 1.0, 2.0, 3.0;
@@ -326,7 +326,7 @@ TEST(DsgInterpolationTests, PlaceUpdateMerge) {
 }
 
 TEST(DsgInterpolationTests, AgentUpdate) {
-  const LayerId agent_layer = KimeraDsgLayers::AGENTS;
+  const LayerId agent_layer = DsgLayers::AGENTS;
   DynamicSceneGraph graph;
   {
     NodeAttributes::Ptr attrs =

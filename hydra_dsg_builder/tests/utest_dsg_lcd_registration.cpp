@@ -93,9 +93,9 @@ struct DsgRegistrationTests : public ::testing::Test {
   ~DsgRegistrationTests() = default;
 
   virtual void SetUp() override {
-    std::map<LayerId, char> layer_map = {{KimeraDsgLayers::PLACES, 'p'},
-                                         {KimeraDsgLayers::OBJECTS, 'O'},
-                                         {KimeraDsgLayers::ROOMS, 'R'}};
+    std::map<LayerId, char> layer_map = {{DsgLayers::PLACES, 'p'},
+                                         {DsgLayers::OBJECTS, 'O'},
+                                         {DsgLayers::ROOMS, 'R'}};
 
     dsg.reset(new DynamicSceneGraph());
 
@@ -108,25 +108,25 @@ struct DsgRegistrationTests : public ::testing::Test {
 
     src_points = 5.0 * Eigen::MatrixXd::Random(3, 30);
 
-    CHECK(dsg->hasLayer(KimeraDsgLayers::OBJECTS));
+    CHECK(dsg->hasLayer(DsgLayers::OBJECTS));
 
     for (int i = 0; i < src_points.cols(); ++i) {
       SemanticNodeAttributes attrs;
       attrs.position = src_points.col(i);
       attrs.semantic_label = i;
-      CHECK(dsg->emplaceNode(KimeraDsgLayers::PLACES,
+      CHECK(dsg->emplaceNode(DsgLayers::PLACES,
                              NodeSymbol('p', i),
                              std::make_unique<SemanticNodeAttributes>(attrs)));
-      CHECK(dsg->emplaceNode(KimeraDsgLayers::OBJECTS,
+      CHECK(dsg->emplaceNode(DsgLayers::OBJECTS,
                              NodeSymbol('O', i),
                              std::make_unique<SemanticNodeAttributes>(attrs)));
       dsg->insertEdge(NodeSymbol('p', i), NodeSymbol('O', i));
 
       attrs.position = dest_R_src * src_points.col(i) + dest_t_src;
-      CHECK(dsg->emplaceNode(KimeraDsgLayers::PLACES,
+      CHECK(dsg->emplaceNode(DsgLayers::PLACES,
                              NodeSymbol('p', i + src_points.cols()),
                              std::make_unique<SemanticNodeAttributes>(attrs)));
-      CHECK(dsg->emplaceNode(KimeraDsgLayers::OBJECTS,
+      CHECK(dsg->emplaceNode(DsgLayers::OBJECTS,
                              NodeSymbol('O', i + src_points.cols()),
                              std::make_unique<SemanticNodeAttributes>(attrs)));
       dsg->insertEdge(NodeSymbol('p', i + src_points.cols()),
@@ -138,7 +138,7 @@ struct DsgRegistrationTests : public ::testing::Test {
     Eigen::Quaterniond world_q_body1(std::cos(M_PI / 8), std::sin(M_PI / 8), 0.0, 0.0);
     Eigen::Vector3d world_t_body1(-1.0, 0.2, 0.5);
     dsg->emplaceNode(
-        KimeraDsgLayers::AGENTS,
+        DsgLayers::AGENTS,
         'a',
         10ns,
         std::make_unique<AgentNodeAttributes>(world_q_body1, world_t_body1, NodeId(0)));
@@ -149,7 +149,7 @@ struct DsgRegistrationTests : public ::testing::Test {
     Eigen::Quaterniond dest_q_body2 = Eigen::Quaterniond(dest_R_src) * world_q_body2;
     Eigen::Vector3d dest_t_body2 = dest_R_src * world_t_body2 + dest_t_src;
     dsg->emplaceNode(
-        KimeraDsgLayers::AGENTS,
+        DsgLayers::AGENTS,
         'a',
         20ns,
         std::make_unique<AgentNodeAttributes>(dest_q_body2, dest_t_body2, NodeId(0)));
@@ -285,7 +285,7 @@ TEST_F(DsgRegistrationTests, TestFullObjectRegistration) {
 
   teaser::RobustRegistrationSolver::Params params;
   reg_config.use_pairwise_registration = false;
-  DsgTeaserSolver solver(KimeraDsgLayers::OBJECTS, reg_config, params);
+  DsgTeaserSolver solver(DsgLayers::OBJECTS, reg_config, params);
 
   auto result = solver.solve(*dsg, match, NodeSymbol('a', 1));
   EXPECT_TRUE(result.valid);
@@ -308,7 +308,7 @@ TEST_F(DsgRegistrationTests, DISABLED_TestFullPlaceRegistration) {
 
   teaser::RobustRegistrationSolver::Params params;
   reg_config.use_pairwise_registration = true;
-  DsgTeaserSolver solver(KimeraDsgLayers::PLACES, reg_config, params);
+  DsgTeaserSolver solver(DsgLayers::PLACES, reg_config, params);
 
   auto result = solver.solve(*dsg, match, NodeSymbol('a', 1));
   EXPECT_TRUE(result.valid);

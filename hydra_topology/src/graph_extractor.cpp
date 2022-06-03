@@ -35,8 +35,6 @@
 #include "hydra_topology/graph_extractor.h"
 #include "hydra_topology/nearest_neighbor_utilities.h"
 
-#include <kimera_dsg/node_attributes.h>
-
 namespace hydra {
 namespace topology {
 
@@ -68,7 +66,7 @@ GraphExtractor::GraphExtractor(const GraphExtractorConfig& config)
       next_node_id_('p', 0),
       next_edge_id_(0),
       next_pseudo_edge_id_(0),
-      graph_(new IsolatedSceneGraphLayer(KimeraDsgLayers::PLACES)) {}
+      graph_(new IsolatedSceneGraphLayer(DsgLayers::PLACES)) {}
 
 std::unordered_set<NodeId> GraphExtractor::getActiveNodes() const {
   std::unordered_set<NodeId> nodes;

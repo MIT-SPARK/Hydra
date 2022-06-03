@@ -43,8 +43,6 @@
 namespace hydra {
 namespace incremental {
 
-using kimera::getDefaultLayerIds;
-
 struct DsgOptimizer {
   DsgOptimizer(const ros::NodeHandle& node_handle)
       : nh(node_handle), reset_backend(false) {
@@ -54,10 +52,10 @@ struct DsgOptimizer {
         << "missing frontend_state_filepath";
 
     const LayerId mesh_layer_id = 1;
-    const std::map<LayerId, char>& layer_id_map{{KimeraDsgLayers::OBJECTS, 'o'},
-                                                {KimeraDsgLayers::PLACES, 'p'},
-                                                {KimeraDsgLayers::ROOMS, 'r'},
-                                                {KimeraDsgLayers::BUILDINGS, 'b'}};
+    const std::map<LayerId, char>& layer_id_map{{DsgLayers::OBJECTS, 'o'},
+                                                {DsgLayers::PLACES, 'p'},
+                                                {DsgLayers::ROOMS, 'r'},
+                                                {DsgLayers::BUILDINGS, 'b'}};
 
     frontend_dsg = std::make_shared<SharedDsgInfo>(layer_id_map, mesh_layer_id);
     backend_dsg = std::make_shared<SharedDsgInfo>(layer_id_map, mesh_layer_id);
@@ -65,7 +63,7 @@ struct DsgOptimizer {
     frontend_dsg->graph->load(dsg_filepath);
     frontend_dsg->updated = true;
 
-    ros::NodeHandle vnh("/kimera_dsg_visualizer");
+    ros::NodeHandle vnh("/hydra_dsg_visualizer");
     visualizer.reset(new DynamicSceneGraphVisualizer(vnh, getDefaultLayerIds()));
 
     bool use_voxblox_mesh_plugin;

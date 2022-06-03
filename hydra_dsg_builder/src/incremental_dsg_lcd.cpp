@@ -146,7 +146,7 @@ void DsgLcd::runLcd() {
       dsg_->archived_places.clear();
     }  // end critical section
 
-    if (lcd_graph_->getLayer(KimeraDsgLayers::PLACES).numNodes() == 0) {
+    if (lcd_graph_->getLayer(DsgLayers::PLACES).numNodes() == 0) {
       if (should_shutdown_) {
         break;
       }
@@ -217,7 +217,7 @@ void DsgLcd::runLcd() {
 
 void DsgLcd::assignBowVectors() {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
-  const auto& agents = dsg_->graph->getLayer(KimeraDsgLayers::AGENTS, robot_prefix_);
+  const auto& agents = dsg_->graph->getLayer(DsgLayers::AGENTS, robot_prefix_);
 
   const size_t prior_size = bow_messages_.size();
   auto iter = bow_messages_.begin();

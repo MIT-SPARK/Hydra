@@ -33,7 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/dsg_types.h"
 #include "hydra_dsg_builder/minimum_spanning_tree.h"
 
 #include <hydra_utils/dsg_visualizer_plugin.h>

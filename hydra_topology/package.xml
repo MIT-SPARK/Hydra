@@ -13,10 +13,10 @@
   <depend>dynamic_reconfigure</depend>
   <depend>hydra_msgs</depend>
   <depend>hydra_utils</depend>
-  <depend>kimera_dsg</depend>
   <depend>kimera_semantics_ros</depend>
   <depend>pcl_ros</depend>
   <depend>roscpp</depend>
+  <depend>spark_dsg</depend>
   <depend>tf2_eigen</depend>
   <depend>tf2_ros</depend>
   <depend>voxblox</depend>

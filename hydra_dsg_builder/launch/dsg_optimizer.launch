@@ -12,7 +12,7 @@
     <arg name="min_glog_level" default="0"/>
     <arg name="verbosity" default="0"/>
 
-    <include file="$(find kimera_dsg_visualizer)/launch/includes/kimera_dsg_visualizer_params.xml">
+    <include file="$(find hydra_utils)/launch/includes/hydra_visualizer_params.xml">
         <arg name="viz_config_dir" value="$(find hydra_dsg_builder)/config/incremental_visualizer"/>
     </include>
 

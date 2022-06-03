@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(kimera_dsg REQUIRED)
+find_package(spark_dsg REQUIRED)
 find_package(
   catkin REQUIRED
   COMPONENTS dynamic_reconfigure
@@ -57,7 +57,7 @@ catkin_package(
   tf2_ros
   voxblox
   voxblox_ros
-  DEPENDS kimera_dsg
+  DEPENDS spark_dsg
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}
 )
@@ -78,7 +78,7 @@ add_library(
 )
 target_link_libraries(
   ${PROJECT_NAME}
-  PUBLIC ${catkin_LIBRARIES} kimera_dsg::kimera_dsg
+  PUBLIC ${catkin_LIBRARIES} spark_dsg::spark_dsg
   PRIVATE nanoflann::nanoflann
 )
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})

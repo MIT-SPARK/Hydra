@@ -52,11 +52,11 @@ void updateObjects(DynamicSceneGraph& graph,
                    const gtsam::Values&,
                    const gtsam::Values&,
                    bool allow_node_merging) {
-  if (!graph.hasLayer(KimeraDsgLayers::OBJECTS)) {
+  if (!graph.hasLayer(DsgLayers::OBJECTS)) {
     return;
   }
 
-  const auto& layer = graph.getLayer(KimeraDsgLayers::OBJECTS);
+  const auto& layer = graph.getLayer(DsgLayers::OBJECTS);
   MeshVertices::Ptr mesh = graph.getMeshVertices();
 
   std::vector<std::pair<NodeId, NodeId>> nodes_to_merge;
@@ -159,7 +159,7 @@ void updatePlaces(DynamicSceneGraph& graph,
                   bool allow_node_merging,
                   double pos_threshold_m,
                   double distance_tolerance_m) {
-  if (!graph.hasLayer(KimeraDsgLayers::PLACES)) {
+  if (!graph.hasLayer(DsgLayers::PLACES)) {
     return;
   }
 
@@ -167,7 +167,7 @@ void updatePlaces(DynamicSceneGraph& graph,
     return;
   }
 
-  const auto& layer = graph.getLayer(KimeraDsgLayers::PLACES);
+  const auto& layer = graph.getLayer(DsgLayers::PLACES);
 
   std::unordered_set<NodeId> missing_nodes;
   std::vector<NodeId> updated_nodes;
@@ -252,12 +252,12 @@ void updateRooms(DynamicSceneGraph& graph,
                  const gtsam::Values&,
                  const gtsam::Values&,
                  bool) {
-  if (!graph.hasLayer(KimeraDsgLayers::ROOMS)) {
+  if (!graph.hasLayer(DsgLayers::ROOMS)) {
     return;
   }
 
   std::set<NodeId> empty_rooms;
-  const auto& rooms = graph.getLayer(KimeraDsgLayers::ROOMS);
+  const auto& rooms = graph.getLayer(DsgLayers::ROOMS);
   for (const auto& id_node_pair : rooms.nodes()) {
     if (id_node_pair.second->children().empty()) {
       empty_rooms.insert(id_node_pair.first);
@@ -275,11 +275,11 @@ void updateBuildings(DynamicSceneGraph& graph,
                      const gtsam::Values&,
                      const gtsam::Values&,
                      bool) {
-  if (!graph.hasLayer(KimeraDsgLayers::BUILDINGS)) {
+  if (!graph.hasLayer(DsgLayers::BUILDINGS)) {
     return;
   }
 
-  const auto& layer = graph.getLayer(KimeraDsgLayers::BUILDINGS);
+  const auto& layer = graph.getLayer(DsgLayers::BUILDINGS);
 
   for (const auto& id_node_pair : layer.nodes()) {
     if (!id_node_pair.second->hasChildren()) {
@@ -304,7 +304,7 @@ void updateAgents(DynamicSceneGraph& graph,
     return;
   }
 
-  const LayerId desired_layer = KimeraDsgLayers::AGENTS;
+  const LayerId desired_layer = DsgLayers::AGENTS;
 
   for (const auto& prefix_layer_pair : graph.dynamicLayersOfType(desired_layer)) {
     std::set<NodeId> missing_nodes;
@@ -322,7 +322,7 @@ void updateAgents(DynamicSceneGraph& graph,
     }
 
     if (!missing_nodes.empty()) {
-      LOG(WARNING) << "Layer " << KimeraDsgLayers::AGENTS << "("
+      LOG(WARNING) << "Layer " << DsgLayers::AGENTS << "("
                    << prefix_layer_pair.first << "): could not update "
                    << displayNodeSymbolContainer(missing_nodes);
     }

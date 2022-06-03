@@ -207,7 +207,7 @@ MeshPlaceConnectionsPlugin::MeshPlaceConnectionsPlugin(const ros::NodeHandle& nh
 
 void MeshPlaceConnectionsPlugin::draw(const std_msgs::Header& header,
                                       const DynamicSceneGraph& graph) {
-  if (!graph.hasLayer(KimeraDsgLayers::PLACES)) {
+  if (!graph.hasLayer(DsgLayers::PLACES)) {
     return;
   }
 
@@ -215,7 +215,7 @@ void MeshPlaceConnectionsPlugin::draw(const std_msgs::Header& header,
     return;
   }
 
-  const auto& layer = graph.getLayer(KimeraDsgLayers::PLACES);
+  const auto& layer = graph.getLayer(DsgLayers::PLACES);
 
   MinimumSpanningTreeInfo mst_info = getMinimumSpanningEdges(layer);
 
@@ -338,11 +338,11 @@ PlaceParentsPlugin::PlaceParentsPlugin(const ros::NodeHandle& nh,
 
 void PlaceParentsPlugin::draw(const std_msgs::Header& header,
                               const DynamicSceneGraph& graph) {
-  if (!graph.hasLayer(KimeraDsgLayers::PLACES)) {
+  if (!graph.hasLayer(DsgLayers::PLACES)) {
     return;
   }
 
-  const auto& layer = graph.getLayer(KimeraDsgLayers::PLACES);
+  const auto& layer = graph.getLayer(DsgLayers::PLACES);
 
   VisualizerConfig viz_config;
   viz_config.layer_z_step = 0.0;

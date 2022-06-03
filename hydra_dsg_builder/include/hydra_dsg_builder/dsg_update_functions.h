@@ -33,9 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/dsg_types.h"
-
 #include <gtsam/nonlinear/Values.h>
+#include <hydra_utils/dsg_types.h>
 
 namespace hydra {
 

@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(Boost REQUIRED COMPONENTS timer)
-find_package(kimera_dsg REQUIRED)
+find_package(spark_dsg REQUIRED)
 find_package(
   catkin REQUIRED
   COMPONENTS hydra_topology
@@ -38,7 +38,7 @@ catkin_package(
   tf2_eigen
   voxblox
   voxblox_ros
-  DEPENDS kimera_dsg
+  DEPENDS spark_dsg
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}
 )
@@ -65,7 +65,7 @@ target_link_libraries(
   ${catkin_LIBRARIES}
   gtsam
   teaserpp::teaser_registration
-  kimera_dsg::kimera_dsg
+  spark_dsg::spark_dsg
 )
 
 add_executable(${PROJECT_NAME}_incremental_node src/incremental_dsg_builder_node.cpp)

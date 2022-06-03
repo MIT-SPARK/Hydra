@@ -38,8 +38,6 @@
 #include "hydra_topology/gvd_voxel.h"
 #include "hydra_topology/voxblox_types.h"
 
-#include <kimera_dsg/scene_graph_layer.h>
-
 #include <queue>
 
 namespace hydra {

@@ -34,8 +34,6 @@
  * -------------------------------------------------------------------------- */
 #include "hydra_topology/graph_extraction_utilities.h"
 
-#include <kimera_dsg/node_attributes.h>
-
 namespace hydra {
 namespace topology {
 

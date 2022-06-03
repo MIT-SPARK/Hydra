@@ -18,9 +18,9 @@
   <depend>cv_bridge</depend>
   <depend>nodelet</depend>
   <depend>image_transport</depend>
-  <depend>kimera_dsg</depend>
   <depend>kimera_pgmo</depend>
   <depend>pose_graph_tools</depend>
+  <depend>spark_dsg</depend>
   <depend>tf2_eigen</depend>
   <depend>visualization_msgs</depend>
   <depend>tf2_ros</depend>

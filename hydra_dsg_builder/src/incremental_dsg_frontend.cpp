@@ -62,8 +62,8 @@ DsgFrontend::DsgFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& ds
   if (config_.should_log) {
     frontend_graph_logger_.setOutputPath(config_.log_path + "/frontend");
     ROS_INFO("Logging frontend graph to %s", (config_.log_path + "/frontend").c_str());
-    frontend_graph_logger_.setLayerName(KimeraDsgLayers::OBJECTS, "objects");
-    frontend_graph_logger_.setLayerName(KimeraDsgLayers::PLACES, "places");
+    frontend_graph_logger_.setLayerName(DsgLayers::OBJECTS, "objects");
+    frontend_graph_logger_.setLayerName(DsgLayers::PLACES, "places");
   }
 }
 
@@ -117,7 +117,7 @@ void DsgFrontend::handleLatestPoseGraph(const PoseGraph::ConstPtr& msg) {
   }
 
   std::unique_lock<std::mutex> lock(dsg_->mutex);
-  const auto& agents = dsg_->graph->getLayer(KimeraDsgLayers::AGENTS, robot_prefix_);
+  const auto& agents = dsg_->graph->getLayer(DsgLayers::AGENTS, robot_prefix_);
 
   for (const auto& node : msg->nodes) {
     if (node.key < agents.numNodes()) {
@@ -152,7 +152,7 @@ void DsgFrontend::start() {
   nh_.getParam("robot_id", robot_id);
   robot_prefix_ = kimera_pgmo::robot_id_to_prefix.at(robot_id);
 
-  dsg_->graph->createDynamicLayer(KimeraDsgLayers::AGENTS, robot_prefix_);
+  dsg_->graph->createDynamicLayer(DsgLayers::AGENTS, robot_prefix_);
   pose_graph_sub_ = nh_.subscribe(
       "pose_graph_incremental", 100, &DsgFrontend::handleLatestPoseGraph, this);
 
@@ -253,7 +253,7 @@ void DsgFrontend::runMeshFrontend() {
         }
 
         std::vector<NodeId> objects_to_delete;
-        const auto& objects = dsg_->graph->getLayer(KimeraDsgLayers::OBJECTS);
+        const auto& objects = dsg_->graph->getLayer(DsgLayers::OBJECTS);
         for (const auto& id_node_pair : objects.nodes()) {
           auto connections = dsg_->graph->getMeshConnectionIndices(id_node_pair.first);
           if (connections.size() < config_.min_object_vertices) {
@@ -387,7 +387,7 @@ void DsgFrontend::runPlaces() {
 void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
   const uint64_t msg_time_ns = msg->header.stamp.toNSec();
   ScopedTimer timer("frontend/update_places", msg_time_ns, true, 2, false);
-  SceneGraphLayer temp_layer(KimeraDsgLayers::PLACES);
+  SceneGraphLayer temp_layer(DsgLayers::PLACES);
   std::unique_ptr<SceneGraphLayer::Edges> edges =
       temp_layer.deserializeLayer(msg->layer_contents);
   VLOG(3) << "[Places Frontend] Received " << temp_layer.numNodes() << " nodes and "
@@ -401,8 +401,8 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
     attrs.last_update_time_ns = msg_time_ns;
   }
 
-  const auto& objects = dsg_->graph->getLayer(KimeraDsgLayers::OBJECTS);
-  const auto& places = dsg_->graph->getLayer(KimeraDsgLayers::PLACES);
+  const auto& objects = dsg_->graph->getLayer(DsgLayers::OBJECTS);
+  const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
 
   NodeIdSet objects_to_check;
   {  // start graph update critical section
@@ -469,7 +469,7 @@ void DsgFrontend::addAgentPlaceEdges() {
     return;  // haven't received places yet
   }
 
-  for (const auto& pair : dsg_->graph->dynamicLayersOfType(KimeraDsgLayers::AGENTS)) {
+  for (const auto& pair : dsg_->graph->dynamicLayersOfType(DsgLayers::AGENTS)) {
     const LayerPrefix prefix = pair.first;
     const auto& layer = *pair.second;
 
@@ -498,7 +498,7 @@ void DsgFrontend::addAgentPlaceEdges() {
 
 void DsgFrontend::updatePlaceMeshMapping() {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
-  const auto& places = dsg_->graph->getLayer(KimeraDsgLayers::PLACES);
+  const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
   const auto& mesh_mappings = mesh_frontend_.getVoxbloxMsgToGraphMapping();
 
   size_t num_invalid = 0;

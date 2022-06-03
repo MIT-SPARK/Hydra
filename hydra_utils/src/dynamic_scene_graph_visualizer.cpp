@@ -514,14 +514,14 @@ void DynamicSceneGraphVisualizer::drawLayer(const std_msgs::Header& header,
   const auto& viz_config = visualizer_config_->get();
   const std::string node_ns = getLayerNodeNamespace(layer.id);
 
-  const bool color_by_distance = layer.id == KimeraDsgLayers::PLACES &&
+  const bool color_by_distance = layer.id == DsgLayers::PLACES &&
                                  visualizer_config_->get().color_places_by_distance;
 
   Marker nodes;
   if (color_by_distance) {
     nodes = makeCentroidMarkers(
         header, config, layer, viz_config, node_ns, places_colormap_->get());
-  } else if (layer.id == KimeraDsgLayers::PLACES) {
+  } else if (layer.id == DsgLayers::PLACES) {
     nodes = makeCentroidMarkers(header,
                                 config,
                                 layer,

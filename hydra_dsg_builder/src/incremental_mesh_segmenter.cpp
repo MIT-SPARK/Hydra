@@ -434,7 +434,7 @@ void MeshSegmenter::addObjectToGraph(DynamicSceneGraph& graph,
   cluster.centroid.get(centroid);
   attrs->position << centroid.x, centroid.y, centroid.z;
 
-  graph.emplaceNode(KimeraDsgLayers::OBJECTS, next_node_id_, std::move(attrs));
+  graph.emplaceNode(DsgLayers::OBJECTS, next_node_id_, std::move(attrs));
 
   active_objects_.at(label).insert(next_node_id_);
   active_object_timestamps_[next_node_id_] = timestamp;

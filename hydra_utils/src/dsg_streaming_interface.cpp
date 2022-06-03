@@ -32,11 +32,12 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
+#include "hydra_utils/dsg_types.h"
 #include "hydra_utils/dsg_streaming_interface.h"
 #include "hydra_utils/display_utils.h"
 #include "hydra_utils/timing_utilities.h"
 
-#include <kimera_dsg/graph_binary_serialization.h>
+#include <spark_dsg/graph_binary_serialization.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
 
 namespace hydra {
@@ -45,7 +46,7 @@ DsgSender::DsgSender(const ros::NodeHandle& nh) : nh_(nh) {
   pub_ = nh_.advertise<hydra_msgs::DsgUpdate>("dsg", 1);
 }
 
-void DsgSender::sendGraph(kimera::DynamicSceneGraph& graph,
+void DsgSender::sendGraph(DynamicSceneGraph& graph,
                           const ros::Time& stamp) const {
   timing::ScopedTimer timer("publish_dsg", stamp.toNSec());
   if (!pub_.getNumSubscribers()) {
@@ -54,7 +55,7 @@ void DsgSender::sendGraph(kimera::DynamicSceneGraph& graph,
 
   hydra_msgs::DsgUpdate msg;
   msg.header.stamp = stamp;
-  kimera::writeGraph(graph, msg.layer_contents);
+  spark_dsg::writeGraph(graph, msg.layer_contents);
 
   msg.deleted_nodes = graph.getRemovedNodes(true);
 
@@ -95,9 +96,9 @@ void DsgReceiver::handleUpdate(const hydra_msgs::DsgUpdate::ConstPtr& msg) {
   ROS_INFO_STREAM("Received dsg update message of " << size_bytes);
   try {
     if (!graph_) {
-      graph_ = kimera::readGraph(msg->layer_contents);
+      graph_ = spark_dsg::readGraph(msg->layer_contents);
     } else {
-      kimera::updateGraph(*graph_, msg->layer_contents);
+      spark_dsg::updateGraph(*graph_, msg->layer_contents);
       for (const auto& node : msg->deleted_nodes) {
         graph_->removeNode(node);
       }

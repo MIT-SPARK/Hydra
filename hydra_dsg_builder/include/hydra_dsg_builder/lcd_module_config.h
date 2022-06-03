@@ -64,7 +64,7 @@ struct ConfigVisitor<std::map<hydra::LayerId, T>> {
   template <typename V, typename std::enable_if<is_parser<V>::value, bool>::type = true>
   static auto visit_config(const V& v, ConfigMap& value) {
     for (const auto& child : v.children()) {
-      const auto layer = hydra::KimeraDsgLayers::StringToLayerId(child);
+      const auto layer = hydra::DsgLayers::StringToLayerId(child);
       value[layer] = MapType();
       v.visit(child, value[layer]);
     }
@@ -74,7 +74,7 @@ struct ConfigVisitor<std::map<hydra::LayerId, T>> {
             typename std::enable_if<!is_parser<V>::value, bool>::type = true>
   static auto visit_config(const V& v, ConfigMap& value) {
     for (auto& kv_pair : value) {
-      const auto layer_str = hydra::KimeraDsgLayers::LayerIdToString(kv_pair.first);
+      const auto layer_str = hydra::DsgLayers::LayerIdToString(kv_pair.first);
       v.visit(layer_str, kv_pair.second);
     }
   }

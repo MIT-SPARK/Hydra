@@ -21,7 +21,7 @@ find_package(
              visualization_msgs
 )
 find_package(GTSAM REQUIRED)
-find_package(kimera_dsg REQUIRED)
+find_package(spark_dsg REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(OpenCV REQUIRED)
@@ -65,7 +65,7 @@ add_library(${PROJECT_NAME}
     src/visualizer_utils.cpp
     src/yaml_parser.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME} PUBLIC yaml-cpp ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} kimera_dsg::kimera_dsg PRIVATE PkgConfig::glog)
+target_link_libraries(${PROJECT_NAME} PUBLIC yaml-cpp ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} spark_dsg::spark_dsg PRIVATE PkgConfig::glog)
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
 
 add_executable(hydra_visualizer_node src/hydra_visualizer_node.cpp)

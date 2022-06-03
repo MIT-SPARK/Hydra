@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_dsg_builder/dsg_lcd_module.h"
+#include "hydra_dsg_builder/dsg_lcd_detector.h"
 
 #include <gtest/gtest.h>
 
@@ -54,7 +54,7 @@ void emplacePlaceNode(DynamicSceneGraph& graph,
   auto attrs = std::make_unique<PlaceNodeAttributes>(distance, 0);
   attrs->position = pos;
   graph.emplaceNode(
-      KimeraDsgLayers::PLACES, NodeSymbol('p', next_index), std::move(attrs));
+      DsgLayers::PLACES, NodeSymbol('p', next_index), std::move(attrs));
   ++next_index;
 }
 
@@ -192,7 +192,7 @@ void emplaceObjectNode(DynamicSceneGraph& graph,
   attrs->semantic_label = label;
   attrs->position = pos;
   graph.emplaceNode(
-      KimeraDsgLayers::OBJECTS, NodeSymbol('o', next_index), std::move(attrs));
+      DsgLayers::OBJECTS, NodeSymbol('o', next_index), std::move(attrs));
   ++next_index;
 }
 

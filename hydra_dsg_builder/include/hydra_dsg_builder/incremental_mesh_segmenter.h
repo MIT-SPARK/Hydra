@@ -36,8 +36,6 @@
 #include "hydra_dsg_builder/incremental_types.h"
 
 #include <hydra_utils/semantic_ros_publishers.h>
-#include <kimera_dsg/dynamic_scene_graph.h>
-#include <kimera_dsg/node_symbol.h>
 #include <kimera_semantics/semantic_integrator_base.h>
 #include <pcl/common/centroid.h>
 #include <pcl/point_types.h>

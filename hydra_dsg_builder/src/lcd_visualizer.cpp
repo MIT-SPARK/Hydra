@@ -205,7 +205,7 @@ void LcdVisualizer::drawAgent(const std_msgs::Header& header, MarkerArray& msg) 
     return;
   }
 
-  const auto& agent_layer = scene_graph_->getLayer(KimeraDsgLayers::AGENTS, 'a');
+  const auto& agent_layer = scene_graph_->getLayer(DsgLayers::AGENTS, 'a');
 
   auto query_node = getQueryNode();
   if (!query_node) {

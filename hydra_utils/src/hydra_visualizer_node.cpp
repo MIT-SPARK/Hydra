@@ -47,7 +47,7 @@ using DsgVisualizer = hydra::DynamicSceneGraphVisualizer;
 using hydra::PgmoMeshPlugin;
 using hydra::RvizMeshPlugin;
 using hydra::VoxbloxMeshPlugin;
-using kimera::getDefaultLayerIds;
+using spark_dsg::getDefaultLayerIds;
 
 namespace hydra {
 
@@ -59,7 +59,7 @@ struct NodeConfig {
   } mesh_plugin_type = MeshPluginType::PGMO;
   bool load_graph = false;
   std::string scene_graph_filepath = "";
-  std::string visualizer_ns = "/kimera_dsg_visualizer";
+  std::string visualizer_ns = "/hydra_dsg_visualizer";
   std::string mesh_plugin_ns = "dsg_mesh";
   std::string output_path = "";
 };

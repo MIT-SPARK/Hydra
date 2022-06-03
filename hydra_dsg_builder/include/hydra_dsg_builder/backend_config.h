@@ -92,10 +92,10 @@ struct DsgBackendConfig {
   bool optimize_on_lc = true;
   bool enable_node_merging = true;
   bool call_update_periodically = true;
-  std::map<LayerId, bool> merge_update_map{{KimeraDsgLayers::OBJECTS, false},
-                                           {KimeraDsgLayers::PLACES, true},
-                                           {KimeraDsgLayers::ROOMS, false},
-                                           {KimeraDsgLayers::BUILDINGS, false}};
+  std::map<LayerId, bool> merge_update_map{{DsgLayers::OBJECTS, false},
+                                           {DsgLayers::PLACES, true},
+                                           {DsgLayers::ROOMS, false},
+                                           {DsgLayers::BUILDINGS, false}};
   bool merge_update_dynamic = true;
   double places_merge_pos_threshold_m = 0.4;
   double places_merge_distance_tolerance_m = 0.3;
@@ -110,7 +110,7 @@ struct EnableMapConverter {
   inline TargetMap from(const SourceMap& other) const {
     TargetMap to_return;
     for (const auto& kv_pair : other) {
-      to_return[KimeraDsgLayers::LayerIdToString(kv_pair.first)] = kv_pair.second;
+      to_return[DsgLayers::LayerIdToString(kv_pair.first)] = kv_pair.second;
     }
 
     return to_return;
@@ -119,7 +119,7 @@ struct EnableMapConverter {
   inline SourceMap to(const TargetMap& other) const {
     SourceMap to_return;
     for (const auto& kv_pair : other) {
-      to_return[KimeraDsgLayers::StringToLayerId(kv_pair.first)] = kv_pair.second;
+      to_return[DsgLayers::StringToLayerId(kv_pair.first)] = kv_pair.second;
     }
 
     return to_return;

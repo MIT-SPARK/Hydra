@@ -35,7 +35,7 @@
 #include "hydra_dsg_builder/incremental_room_finder.h"
 
 #include <hydra_utils/timing_utilities.h>
-#include <kimera_dsg/adjacency_matrix.h>
+#include <spark_dsg/adjacency_matrix.h>
 #include <voxblox/core/color.h>
 
 #include <Eigen/Dense>
@@ -46,7 +46,6 @@ namespace hydra {
 namespace incremental {
 
 using hydra::timing::ScopedTimer;
-namespace graph_utilities = kimera::graph_utilities;
 
 // TODO(nathan) read in qualitative cmap
 inline voxblox::Color getRoomColor(const NodeId& room_id) {
@@ -403,7 +402,7 @@ void addNewRoomNode(DynamicSceneGraph& graph, NodeSymbol node_id, uint8_t label)
   room_attrs->color << room_color.r, room_color.g, room_color.b;
 
   graph.emplaceNode(
-      static_cast<LayerId>(KimeraDsgLayers::ROOMS), node_id, std::move(room_attrs));
+      static_cast<LayerId>(DsgLayers::ROOMS), node_id, std::move(room_attrs));
 }
 
 void updateRoomCentroid(const DynamicSceneGraph& graph, NodeId room_id) {
@@ -707,7 +706,7 @@ void RoomFinder::updateRoomsFromClusters(SharedDsgInfo& dsg,
   }
 
   std::set<NodeId> empty_rooms;
-  const auto& rooms = dsg.graph->getLayer(KimeraDsgLayers::ROOMS);
+  const auto& rooms = dsg.graph->getLayer(DsgLayers::ROOMS);
   for (const auto& id_node_pair : rooms.nodes()) {
     if (id_node_pair.second->children().size() < config_.min_room_size) {
       empty_rooms.insert(id_node_pair.first);
@@ -780,7 +779,7 @@ void updateRoomEdges(DynamicSceneGraph& graph,
 
 void removeOldRooms(SharedDsgInfo& dsg) {
   std::vector<NodeId> to_remove;
-  const auto& rooms = dsg.graph->getLayer(KimeraDsgLayers::ROOMS);
+  const auto& rooms = dsg.graph->getLayer(DsgLayers::ROOMS);
   for (const auto& id_node_pair : rooms.nodes()) {
     to_remove.push_back(id_node_pair.first);
   }
@@ -796,7 +795,7 @@ void RoomFinder::findRooms(SharedDsgInfo& dsg, const ActiveNodeSet& active_nodes
   {  // start dsg critical section
     std::unique_lock<std::mutex> graph_lock(dsg.mutex);
     active_places = getActiveSubgraph(
-        *dsg.graph, static_cast<LayerId>(KimeraDsgLayers::PLACES), active_nodes);
+        *dsg.graph, static_cast<LayerId>(DsgLayers::PLACES), active_nodes);
 
     if (config_.use_previous_rooms) {
       previous_rooms = getPreviousPlaceRoomMap(*dsg.graph, *active_places);

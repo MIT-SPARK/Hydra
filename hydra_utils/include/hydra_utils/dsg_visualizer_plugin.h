@@ -33,12 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <kimera_dsg/dynamic_scene_graph.h>
+#include "hydra_utils/dsg_types.h"
 #include <ros/ros.h>
 
 namespace hydra {
-
-using kimera::DynamicSceneGraph;
 
 class DsgVisualizerPlugin {
  public:

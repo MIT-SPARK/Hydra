@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_dsg_builder/dsg_lcd_module.h"
+#include "hydra_dsg_builder/dsg_lcd_detector.h"
 
 #include <gtest/gtest.h>
 
@@ -41,10 +41,10 @@ namespace lcd {
 
 using incremental::SharedDsgInfo;
 
-struct DsgLcdModuleTests : public ::testing::Test {
-  DsgLcdModuleTests() = default;
+struct DsgLcdDetectorTests : public ::testing::Test {
+  DsgLcdDetectorTests() = default;
 
-  virtual ~DsgLcdModuleTests() = default;
+  virtual ~DsgLcdDetectorTests() = default;
 
   virtual void SetUp() override {
     dsg.reset(new DynamicSceneGraph());
@@ -54,73 +54,72 @@ struct DsgLcdModuleTests : public ::testing::Test {
     config.num_semantic_classes = 20;
     config.place_histogram_config = HistogramConfig<double>(0.5, 2.5, 30);
     config.agent_search_config = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
-    config.search_configs[KimeraDsgLayers::OBJECTS] = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
-    config.search_configs[KimeraDsgLayers::PLACES] = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
+    config.search_configs[DsgLayers::OBJECTS] = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
+    config.search_configs[DsgLayers::PLACES] = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
   }
 
-  DsgLcdConfig config;
+  DsgLcdDetectorConfig config;
   DynamicSceneGraph::Ptr dsg;
 };
 
-TEST_F(DsgLcdModuleTests, TestEmptyUpdate) {
-  DsgLcdModule module(config);
+TEST_F(DsgLcdDetectorTests, TestEmptyUpdate) {
+  DsgLcdDetector module(config);
   std::unordered_set<NodeId> active_places;
   module.updateDescriptorCache(*dsg, active_places);
-  EXPECT_EQ(0u, module.numGraphDescriptors(KimeraDsgLayers::PLACES));
-  EXPECT_EQ(0u, module.numGraphDescriptors(KimeraDsgLayers::OBJECTS));
+  EXPECT_EQ(0u, module.numGraphDescriptors(DsgLayers::PLACES));
+  EXPECT_EQ(0u, module.numGraphDescriptors(DsgLayers::OBJECTS));
   EXPECT_EQ(0u, module.numAgentDescriptors());
 }
 
-TEST_F(DsgLcdModuleTests, TestInvalidNodeUpdate) {
-  DsgLcdModule module(config);
+TEST_F(DsgLcdDetectorTests, TestInvalidNodeUpdate) {
+  DsgLcdDetector module(config);
   std::unordered_set<NodeId> active_places{1, 2, 3, 4, 5};
   module.updateDescriptorCache(*dsg, active_places);
-  EXPECT_EQ(0u, module.numGraphDescriptors(KimeraDsgLayers::PLACES));
-  EXPECT_EQ(0u, module.numGraphDescriptors(KimeraDsgLayers::OBJECTS));
+  EXPECT_EQ(0u, module.numGraphDescriptors(DsgLayers::PLACES));
+  EXPECT_EQ(0u, module.numGraphDescriptors(DsgLayers::OBJECTS));
   EXPECT_EQ(0u, module.numAgentDescriptors());
 }
 
-TEST_F(DsgLcdModuleTests, TestNoChildren) {
-  dsg->emplaceNode(KimeraDsgLayers::PLACES, 1, std::make_unique<NodeAttributes>());
-  dsg->emplaceNode(KimeraDsgLayers::PLACES, 2, std::make_unique<NodeAttributes>());
-  dsg->emplaceNode(KimeraDsgLayers::PLACES, 3, std::make_unique<NodeAttributes>());
-  dsg->emplaceNode(KimeraDsgLayers::PLACES, 4, std::make_unique<NodeAttributes>());
-  dsg->emplaceNode(KimeraDsgLayers::PLACES, 5, std::make_unique<NodeAttributes>());
+TEST_F(DsgLcdDetectorTests, TestNoChildren) {
+  dsg->emplaceNode(DsgLayers::PLACES, 1, std::make_unique<NodeAttributes>());
+  dsg->emplaceNode(DsgLayers::PLACES, 2, std::make_unique<NodeAttributes>());
+  dsg->emplaceNode(DsgLayers::PLACES, 3, std::make_unique<NodeAttributes>());
+  dsg->emplaceNode(DsgLayers::PLACES, 4, std::make_unique<NodeAttributes>());
+  dsg->emplaceNode(DsgLayers::PLACES, 5, std::make_unique<NodeAttributes>());
 
-  DsgLcdModule module(config);
+  DsgLcdDetector module(config);
   std::unordered_set<NodeId> active_places{1, 2, 3, 4, 5};
   module.updateDescriptorCache(*dsg, active_places);
-  EXPECT_EQ(0u, module.numGraphDescriptors(KimeraDsgLayers::PLACES));
-  EXPECT_EQ(0u, module.numGraphDescriptors(KimeraDsgLayers::OBJECTS));
+  EXPECT_EQ(0u, module.numGraphDescriptors(DsgLayers::PLACES));
+  EXPECT_EQ(0u, module.numGraphDescriptors(DsgLayers::OBJECTS));
   EXPECT_EQ(0u, module.numAgentDescriptors());
 }
 
-TEST_F(DsgLcdModuleTests, TestNoDynamicChildren) {
-  dsg->emplaceNode(KimeraDsgLayers::PLACES, 1, std::make_unique<NodeAttributes>());
-  dsg->emplaceNode(KimeraDsgLayers::OBJECTS, 2, std::make_unique<NodeAttributes>());
-  dsg->emplaceNode(KimeraDsgLayers::OBJECTS, 3, std::make_unique<NodeAttributes>());
+TEST_F(DsgLcdDetectorTests, TestNoDynamicChildren) {
+  dsg->emplaceNode(DsgLayers::PLACES, 1, std::make_unique<NodeAttributes>());
+  dsg->emplaceNode(DsgLayers::OBJECTS, 2, std::make_unique<NodeAttributes>());
+  dsg->emplaceNode(DsgLayers::OBJECTS, 3, std::make_unique<NodeAttributes>());
   dsg->insertEdge(1, 2);
   dsg->insertEdge(1, 3);
 
-  DsgLcdModule module(config);
+  DsgLcdDetector module(config);
   std::unordered_set<NodeId> active_places{1, 2, 3, 4, 5};
   module.updateDescriptorCache(*dsg, active_places);
-  EXPECT_EQ(0u, module.numGraphDescriptors(KimeraDsgLayers::PLACES));
-  EXPECT_EQ(0u, module.numGraphDescriptors(KimeraDsgLayers::OBJECTS));
+  EXPECT_EQ(0u, module.numGraphDescriptors(DsgLayers::PLACES));
+  EXPECT_EQ(0u, module.numGraphDescriptors(DsgLayers::OBJECTS));
   EXPECT_EQ(0u, module.numAgentDescriptors());
 }
 
-TEST_F(DsgLcdModuleTests, TestActualChildren) {
+TEST_F(DsgLcdDetectorTests, TestActualChildren) {
   using namespace std::chrono_literals;
-  dsg->emplaceNode(KimeraDsgLayers::PLACES, 1, std::make_unique<PlaceNodeAttributes>());
-  dsg->emplaceNode(
-      KimeraDsgLayers::OBJECTS, 2, std::make_unique<ObjectNodeAttributes>());
-  dsg->emplaceNode(KimeraDsgLayers::AGENTS,
+  dsg->emplaceNode(DsgLayers::PLACES, 1, std::make_unique<PlaceNodeAttributes>());
+  dsg->emplaceNode(DsgLayers::OBJECTS, 2, std::make_unique<ObjectNodeAttributes>());
+  dsg->emplaceNode(DsgLayers::AGENTS,
                    'a',
                    10ns,
                    std::make_unique<AgentNodeAttributes>(
                        Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
-  dsg->emplaceNode(KimeraDsgLayers::AGENTS,
+  dsg->emplaceNode(DsgLayers::AGENTS,
                    'a',
                    20ns,
                    std::make_unique<AgentNodeAttributes>(
@@ -129,23 +128,23 @@ TEST_F(DsgLcdModuleTests, TestActualChildren) {
   dsg->insertEdge(1, NodeSymbol('a', 0));
   dsg->insertEdge(1, NodeSymbol('a', 1));
 
-  DsgLcdModule module(config);
+  DsgLcdDetector module(config);
   std::unordered_set<NodeId> active_places{1};
   module.updateDescriptorCache(*dsg, active_places);
-  EXPECT_EQ(1u, module.numGraphDescriptors(KimeraDsgLayers::PLACES));
-  EXPECT_EQ(1u, module.numGraphDescriptors(KimeraDsgLayers::OBJECTS));
+  EXPECT_EQ(1u, module.numGraphDescriptors(DsgLayers::PLACES));
+  EXPECT_EQ(1u, module.numGraphDescriptors(DsgLayers::OBJECTS));
   EXPECT_EQ(2u, module.numAgentDescriptors());
 }
 
-TEST_F(DsgLcdModuleTests, TestEmptySearch) {
+TEST_F(DsgLcdDetectorTests, TestEmptySearch) {
   using namespace std::chrono_literals;
-  dsg->emplaceNode(KimeraDsgLayers::AGENTS,
+  dsg->emplaceNode(DsgLayers::AGENTS,
                    'a',
                    10ns,
                    std::make_unique<AgentNodeAttributes>(
                        Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
 
-  DsgLcdModule module(config);
+  DsgLcdDetector module(config);
   std::unordered_set<NodeId> active_places{1};
 
   std::vector<DsgRegistrationSolution> results =
@@ -153,17 +152,16 @@ TEST_F(DsgLcdModuleTests, TestEmptySearch) {
   EXPECT_EQ(0u, results.size());
 }
 
-TEST_F(DsgLcdModuleTests, TestNonEmptySearch) {
+TEST_F(DsgLcdDetectorTests, TestNonEmptySearch) {
   using namespace std::chrono_literals;
-  dsg->emplaceNode(KimeraDsgLayers::PLACES, 1, std::make_unique<PlaceNodeAttributes>());
-  dsg->emplaceNode(
-      KimeraDsgLayers::OBJECTS, 2, std::make_unique<ObjectNodeAttributes>());
-  dsg->emplaceNode(KimeraDsgLayers::AGENTS,
+  dsg->emplaceNode(DsgLayers::PLACES, 1, std::make_unique<PlaceNodeAttributes>());
+  dsg->emplaceNode(DsgLayers::OBJECTS, 2, std::make_unique<ObjectNodeAttributes>());
+  dsg->emplaceNode(DsgLayers::AGENTS,
                    'a',
                    10ns,
                    std::make_unique<AgentNodeAttributes>(
                        Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
-  dsg->emplaceNode(KimeraDsgLayers::AGENTS,
+  dsg->emplaceNode(DsgLayers::AGENTS,
                    'a',
                    20ns,
                    std::make_unique<AgentNodeAttributes>(
@@ -172,11 +170,11 @@ TEST_F(DsgLcdModuleTests, TestNonEmptySearch) {
   dsg->insertEdge(1, NodeSymbol('a', 0));
   dsg->insertEdge(1, NodeSymbol('a', 1));
 
-  DsgLcdModule module(config);
+  DsgLcdDetector module(config);
   std::unordered_set<NodeId> active_places{1};
   module.updateDescriptorCache(*dsg, active_places);
-  EXPECT_EQ(1u, module.numGraphDescriptors(KimeraDsgLayers::PLACES));
-  EXPECT_EQ(1u, module.numGraphDescriptors(KimeraDsgLayers::OBJECTS));
+  EXPECT_EQ(1u, module.numGraphDescriptors(DsgLayers::PLACES));
+  EXPECT_EQ(1u, module.numGraphDescriptors(DsgLayers::OBJECTS));
   EXPECT_EQ(2u, module.numAgentDescriptors());
 
   std::vector<DsgRegistrationSolution> results =

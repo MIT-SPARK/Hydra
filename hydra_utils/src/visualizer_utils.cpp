@@ -41,7 +41,7 @@ namespace hydra {
 
 using visualization_msgs::Marker;
 using visualization_msgs::MarkerArray;
-using Node = kimera::SceneGraphLayer::Node;
+using Node = SceneGraphLayer::Node;
 using dsg_utils::makeColorMsg;
 
 namespace {

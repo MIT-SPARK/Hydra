@@ -35,7 +35,8 @@
 #pragma once
 #include "hydra_topology/gvd_voxel.h"
 #include "hydra_topology/voxblox_types.h"
-#include "hydra_topology/dsg_types.h"
+
+#include <hydra_utils/dsg_types.h>
 
 #include <bitset>
 #include <iostream>
@@ -111,7 +112,10 @@ inline double getNodeGvdDistance(const SceneGraphLayer& graph, NodeId node) {
   return graph.getNode(node).value().get().attributes<PlaceNodeAttributes>().distance;
 }
 
-void addFreespaceEdge(SceneGraphLayer& graph, NodeId node, NodeId neighbor, double min_clearance);
+void addFreespaceEdge(SceneGraphLayer& graph,
+                      NodeId node,
+                      NodeId neighbor,
+                      double min_clearance);
 
 }  // namespace topology
 }  // namespace hydra

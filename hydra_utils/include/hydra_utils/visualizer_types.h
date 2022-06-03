@@ -33,13 +33,12 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include "hydra_utils/dsg_types.h"
+
 #include <hydra_utils/ColormapConfig.h>
 #include <hydra_utils/DynamicLayerVisualizerConfig.h>
 #include <hydra_utils/LayerVisualizerConfig.h>
 #include <hydra_utils/VisualizerConfig.h>
-
-#include <kimera_dsg/dynamic_scene_graph.h>
-#include <kimera_dsg/node_attributes.h>
 
 namespace hydra {
 
@@ -47,21 +46,7 @@ using LayerConfig = hydra_utils::LayerVisualizerConfig;
 using DynamicLayerConfig = hydra_utils::DynamicLayerVisualizerConfig;
 using VisualizerConfig = hydra_utils::VisualizerConfig;
 using ColormapConfig = hydra_utils::ColormapConfig;
-using NodeColor = kimera::SemanticNodeAttributes::ColorVector;
-
-using kimera::BoundingBox;
-using kimera::DynamicSceneGraph;
-using kimera::DynamicSceneGraphLayer;
-using kimera::KimeraDsgLayers;
-using kimera::LayerId;
-using kimera::NodeId;
-using kimera::NodeSymbol;
-using kimera::ObjectNodeAttributes;
-using kimera::PlaceNodeAttributes;
-using kimera::SceneGraphEdge;
-using kimera::SceneGraphLayer;
-using kimera::SceneGraphNode;
-using kimera::SemanticNodeAttributes;
+using NodeColor = SemanticNodeAttributes::ColorVector;
 
 inline double getZOffset(double z_offset_scale,
                          const VisualizerConfig& visualizer_config) {

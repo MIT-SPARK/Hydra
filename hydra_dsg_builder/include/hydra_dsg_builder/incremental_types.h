@@ -33,10 +33,9 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/dsg_types.h"
-
-#include <kimera_pgmo/utils/CommonStructs.h>
 #include <gtsam/geometry/Pose3.h>
+#include <hydra_utils/dsg_types.h>
+#include <kimera_pgmo/utils/CommonStructs.h>
 
 #include <atomic>
 #include <map>

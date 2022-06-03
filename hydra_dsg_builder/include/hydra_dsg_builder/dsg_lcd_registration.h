@@ -37,8 +37,6 @@
 #include "hydra_dsg_builder/incremental_types.h"
 
 #include <gtsam/geometry/Pose3.h>
-#include <kimera_dsg/node_attributes.h>
-#include <kimera_dsg/scene_graph_layer.h>
 #include <teaser/registration.h>
 
 namespace hydra {

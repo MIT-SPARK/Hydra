@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_dsg_builder/dsg_lcd_module.h"
+#include "hydra_dsg_builder/dsg_lcd_detector.h"
 
 #include <gtest/gtest.h>
 

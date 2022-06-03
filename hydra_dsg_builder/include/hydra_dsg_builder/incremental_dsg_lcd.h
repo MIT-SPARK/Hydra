@@ -42,7 +42,6 @@
 #include <ros/ros.h>
 #include <tf2_ros/transform_listener.h>
 
-#include <kimera_dsg/node_symbol.h>
 #include <pose_graph_tools/BowQuery.h>
 
 #include <memory>

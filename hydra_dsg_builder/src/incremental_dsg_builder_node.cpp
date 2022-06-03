@@ -41,7 +41,7 @@
 #include <std_srvs/Empty.h>
 
 using hydra::timing::ElapsedTimeRecorder;
-using hydra::KimeraDsgLayers;
+using hydra::DsgLayers;
 using hydra::LayerId;
 using hydra::incremental::SharedDsgInfo;
 
@@ -150,10 +150,10 @@ int main(int argc, char* argv[]) {
   nh.getParam("disable_timer_output", ElapsedTimeRecorder::instance().disable_output);
 
   const LayerId mesh_layer_id = 1;
-  const std::map<LayerId, char>& layer_id_map{{KimeraDsgLayers::OBJECTS, 'o'},
-                                              {KimeraDsgLayers::PLACES, 'p'},
-                                              {KimeraDsgLayers::ROOMS, 'r'},
-                                              {KimeraDsgLayers::BUILDINGS, 'b'}};
+  const std::map<LayerId, char>& layer_id_map{{DsgLayers::OBJECTS, 'o'},
+                                              {DsgLayers::PLACES, 'p'},
+                                              {DsgLayers::ROOMS, 'r'},
+                                              {DsgLayers::BUILDINGS, 'b'}};
 
   SharedDsgInfo::Ptr frontend_dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));
   SharedDsgInfo::Ptr backend_dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));

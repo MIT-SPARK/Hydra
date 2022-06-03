@@ -47,10 +47,10 @@ DsgLcdDetector::DsgLcdDetector(const DsgLcdDetectorConfig& config) : config_(con
     cache_map_[id_func_pair.first] = DescriptorCache();
   }
 
-  layer_factories_.emplace(KimeraDsgLayers::OBJECTS,
+  layer_factories_.emplace(DsgLayers::OBJECTS,
                            std::make_unique<ObjectDescriptorFactory>(
                                config_.object_radius_m, config_.num_semantic_classes));
-  layer_factories_.emplace(KimeraDsgLayers::PLACES,
+  layer_factories_.emplace(DsgLayers::PLACES,
                            std::make_unique<PlaceDescriptorFactory>(
                                config_.place_radius_m, config_.place_histogram_config));
   agent_factory_ = std::make_unique<AgentDescriptorFactory>();

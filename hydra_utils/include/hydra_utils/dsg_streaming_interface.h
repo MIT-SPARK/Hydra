@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <kimera_dsg/dynamic_scene_graph.h>
+#include "hydra_utils/dsg_types.h"
 
 #include <hydra_msgs/DsgUpdate.h>
 #include <mesh_msgs/TriangleMeshStamped.h>
@@ -45,7 +45,7 @@ class DsgSender {
  public:
   explicit DsgSender(const ros::NodeHandle& nh);
 
-  void sendGraph(kimera::DynamicSceneGraph& graph, const ros::Time& stamp) const;
+  void sendGraph(DynamicSceneGraph& graph, const ros::Time& stamp) const;
 
  private:
   ros::NodeHandle nh_;
@@ -60,7 +60,7 @@ class DsgReceiver {
 
   DsgReceiver(const ros::NodeHandle& nh, const LogCallback& cb);
 
-  inline kimera::DynamicSceneGraph::Ptr graph() const { return graph_; }
+  inline DynamicSceneGraph::Ptr graph() const { return graph_; }
 
   inline bool updated() const { return has_update_; }
 
@@ -76,7 +76,7 @@ class DsgReceiver {
   ros::Subscriber mesh_sub_;
 
   bool has_update_;
-  kimera::DynamicSceneGraph::Ptr graph_;
+  DynamicSceneGraph::Ptr graph_;
   std::unique_ptr<pcl::PolygonMesh> mesh_;
 
   std::unique_ptr<LogCallback> log_callback_;

@@ -44,8 +44,7 @@
 
 #include <hydra_msgs/ActiveLayer.h>
 #include <hydra_msgs/ActiveMesh.h>
-#include <kimera_dsg/node_symbol.h>
-#include <kimera_dsg/scene_graph_logger.h>
+#include <spark_dsg/scene_graph_logger.h>
 #include <kimera_pgmo/MeshFrontend.h>
 #include <hydra_topology/nearest_neighbor_utilities.h>
 #include <pose_graph_tools/PoseGraph.h>
