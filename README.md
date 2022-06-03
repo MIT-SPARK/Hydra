@@ -56,9 +56,9 @@ catkin config -DCMAKE_BUILD_TYPE=Release -DGTSAM_TANGENT_PREINTEGRATION=OFF -DGT
 catkin config --blacklist hdf5_map_io mesh_msgs_hdf5 label_manager mesh_tools rviz_map_plugin minkindr_python
 
 cd src
-git clone git@github.mit.edu:SPARK/Kimera-DSG-Builder.git hydra_dsg_builder
-vcs import . < hydra_dsg_builder/install/hydra.rosinstall
-# vcs import . < hydra_dsg_builder/install/vio_overlay.rosinstall # (if you want to use Kimera-VIO)
+git clone git@github.mit.edu:SPARK/Hydra.git hydra
+vcs import . < hydra/install/hydra.rosinstall
+# vcs import . < hydra/install/vio_overlay.rosinstall # (if you want to use Kimera-VIO)
 
 rosdep install --from-paths . --ignore-src -r -y
 sudo apt install libprotobuf-dev
@@ -74,7 +74,7 @@ Please help us by creating new issues when you run into problems with these inst
 Finally, if you'd prefer to use the older `wstool` instead of `vcs`, you can do the following instead of `vcs import`:
 ```
 wstool init
-wstool merge hydra_dsg_builder/install/hydra.rosinstall
+wstool merge hydra/install/hydra.rosinstall
 wstool up
 ```
 
@@ -102,7 +102,7 @@ Add `semantic_recolor` to your workspace via:
 
 ```
 roscd && cd ../src
-vcs import . < hydra_dsg_builder/install/semantic_overlay.rosinstall
+vcs import . < hydra/install/semantic_overlay.rosinstall
 ```
 
 Then, follow the instructions to install cuda and other dependencies for the `semantic_recolor` package (which can be found [here](https://github.mit.edu/SPARK/semantic_recolor_nodelet#semantic-recolor-utilities)).
