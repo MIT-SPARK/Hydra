@@ -32,13 +32,13 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_utils/dsg_types.h"
 #include "hydra_utils/dsg_streaming_interface.h"
 #include "hydra_utils/display_utils.h"
+#include "hydra_utils/dsg_types.h"
 #include "hydra_utils/timing_utilities.h"
 
-#include <spark_dsg/graph_binary_serialization.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
+#include <spark_dsg/graph_binary_serialization.h>
 
 namespace hydra {
 
@@ -46,8 +46,7 @@ DsgSender::DsgSender(const ros::NodeHandle& nh) : nh_(nh) {
   pub_ = nh_.advertise<hydra_msgs::DsgUpdate>("dsg", 1);
 }
 
-void DsgSender::sendGraph(DynamicSceneGraph& graph,
-                          const ros::Time& stamp) const {
+void DsgSender::sendGraph(DynamicSceneGraph& graph, const ros::Time& stamp) const {
   timing::ScopedTimer timer("publish_dsg", stamp.toNSec());
   if (!pub_.getNumSubscribers()) {
     return;

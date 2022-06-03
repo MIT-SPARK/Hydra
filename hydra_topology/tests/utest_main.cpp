@@ -32,9 +32,9 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <ros/ros.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
+#include <ros/ros.h>
 
 auto main(int argc, char **argv) -> int {
   ::testing::InitGoogleTest(&argc, argv);

@@ -65,8 +65,6 @@ void visit_config(const Visitor& v, MeshIntegratorConfig& config) {
 
 }  // namespace voxblox
 
-
-
 namespace hydra {
 namespace topology {
 
@@ -99,7 +97,8 @@ void visit_config(const Visitor& v, GraphExtractorConfig& config) {
   v.visit("max_edge_split_iterations", config.max_edge_split_iterations);
   v.visit("max_edge_deviation", config.max_edge_deviation);
   v.visit("add_freespace_edges", config.add_freespace_edges);
-  v.visit("freespace_active_neighborhood_hops", config.freespace_active_neighborhood_hops);
+  v.visit("freespace_active_neighborhood_hops",
+          config.freespace_active_neighborhood_hops);
   v.visit("freespace_edge_num_neighbors", config.freespace_edge_num_neighbors);
   v.visit("freespace_edge_min_clearance_m", config.freespace_edge_min_clearance_m);
   v.visit("add_component_connection_edges", config.add_component_connection_edges);

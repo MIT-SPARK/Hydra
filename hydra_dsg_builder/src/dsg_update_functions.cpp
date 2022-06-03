@@ -322,8 +322,8 @@ void updateAgents(DynamicSceneGraph& graph,
     }
 
     if (!missing_nodes.empty()) {
-      LOG(WARNING) << "Layer " << DsgLayers::AGENTS << "("
-                   << prefix_layer_pair.first << "): could not update "
+      LOG(WARNING) << "Layer " << DsgLayers::AGENTS << "(" << prefix_layer_pair.first
+                   << "): could not update "
                    << displayNodeSymbolContainer(missing_nodes);
     }
   }

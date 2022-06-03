@@ -135,9 +135,7 @@ class OstreamFormatImpl {
     displayParam(out_, value);
   }
 
-  std::string prefix() const {
-    return prefix_;
-  }
+  std::string prefix() const { return prefix_; }
 
  private:
   OstreamFormatImpl(std::ostream& out, const std::string& prefix)

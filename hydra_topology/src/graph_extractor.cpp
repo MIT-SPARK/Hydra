@@ -744,8 +744,7 @@ bool GraphExtractor::addPseudoEdge(const GvdLayer& layer,
     return false;
   }
 
-  graph_->insertEdge(
-      node, other_node, std::make_unique<EdgeAttributes>(min_weight));
+  graph_->insertEdge(node, other_node, std::make_unique<EdgeAttributes>(min_weight));
 
   // no split nodes yet
   PseudoEdgeInfo info;

@@ -33,8 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_utils/dsg_types.h"
 #include <ros/ros.h>
+#include "hydra_utils/dsg_types.h"
 
 namespace hydra {
 

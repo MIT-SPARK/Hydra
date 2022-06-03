@@ -83,9 +83,7 @@ class Formatter {
     impl_->show(value);
   }
 
-  std::string prefix() const {
-    return impl_->prefix();
-  }
+  std::string prefix() const { return impl_->prefix(); }
 
  private:
   Formatter(std::unique_ptr<Impl>&& impl, bool root_call)

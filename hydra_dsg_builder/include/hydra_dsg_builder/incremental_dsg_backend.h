@@ -39,8 +39,8 @@
 #include "hydra_dsg_builder/incremental_types.h"
 
 #include <hydra_utils/dsg_streaming_interface.h>
-#include <spark_dsg/scene_graph_logger.h>
 #include <kimera_pgmo/KimeraPgmoInterface.h>
+#include <spark_dsg/scene_graph_logger.h>
 
 #include <ros/callback_queue.h>
 #include <ros/ros.h>

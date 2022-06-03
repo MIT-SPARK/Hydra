@@ -44,10 +44,10 @@
 
 #include <hydra_msgs/ActiveLayer.h>
 #include <hydra_msgs/ActiveMesh.h>
-#include <spark_dsg/scene_graph_logger.h>
-#include <kimera_pgmo/MeshFrontend.h>
 #include <hydra_topology/nearest_neighbor_utilities.h>
+#include <kimera_pgmo/MeshFrontend.h>
 #include <pose_graph_tools/PoseGraph.h>
+#include <spark_dsg/scene_graph_logger.h>
 
 #include <memory>
 #include <mutex>

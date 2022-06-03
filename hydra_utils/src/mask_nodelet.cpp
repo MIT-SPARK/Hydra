@@ -42,7 +42,7 @@
 
 namespace hydra {
 
-struct MaskNodelet : public nodelet::Nodelet  {
+struct MaskNodelet : public nodelet::Nodelet {
   void onInit() {
     auto& pnh = getPrivateNodeHandle();
 
@@ -78,7 +78,8 @@ struct MaskNodelet : public nodelet::Nodelet  {
     if (!result_image_) {
       result_image_.reset(new cv_bridge::CvImage());
       result_image_->encoding = img_ptr->encoding;
-      result_image_->image = cv::Mat(img_ptr->image.rows, img_ptr->image.cols, img_ptr->image.type());
+      result_image_->image =
+          cv::Mat(img_ptr->image.rows, img_ptr->image.cols, img_ptr->image.type());
     }
 
     result_image_->image.setTo(0);

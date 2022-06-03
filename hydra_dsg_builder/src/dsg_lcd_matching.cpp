@@ -159,9 +159,9 @@ LayerSearchResults searchDescriptors(
   }
 
   // TODO(nathan) add layer id in again or handle stats better
-  VLOG(1) << "matching " << " -> shared: " << num_same_parent
-          << ", horizon: " << num_inside_horizon << ", low: " << num_low_score
-          << ", valid: " << new_valid_match_scores.size();
+  VLOG(1) << "matching "
+          << " -> shared: " << num_same_parent << ", horizon: " << num_inside_horizon
+          << ", low: " << num_low_score << ", valid: " << new_valid_match_scores.size();
 
   std::sort(new_valid_match_scores.begin(),
             new_valid_match_scores.end(),

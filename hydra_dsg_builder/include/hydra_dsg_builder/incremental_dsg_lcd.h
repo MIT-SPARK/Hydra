@@ -33,8 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/lcd_module_config.h"
 #include "hydra_dsg_builder/dsg_lcd_detector.h"
+#include "hydra_dsg_builder/lcd_module_config.h"
 #include "hydra_dsg_builder/lcd_visualizer.h"
 
 #include <geometry_msgs/TransformStamped.h>

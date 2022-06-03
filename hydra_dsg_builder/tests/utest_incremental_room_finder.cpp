@@ -169,9 +169,8 @@ TEST(IncrementalRoomsTests, UpdateFromClustersWithPruningCorrect) {
                                               {DsgLayers::BUILDINGS, 'b'}};
 
   SharedDsgInfo::Ptr dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));
-  dsg->graph->emplaceNode(DsgLayers::PLACES,
-                          NodeSymbol('p', 3),
-                          std::make_unique<PlaceNodeAttributes>());
+  dsg->graph->emplaceNode(
+      DsgLayers::PLACES, NodeSymbol('p', 3), std::make_unique<PlaceNodeAttributes>());
 
   RoomFinder::Config config;
   config.min_room_size = 1;
@@ -198,15 +197,12 @@ TEST(IncrementalRoomsTests, UpdateFromClustersWithMinSizeCorrect) {
                                               {DsgLayers::BUILDINGS, 'b'}};
 
   SharedDsgInfo::Ptr dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));
-  dsg->graph->emplaceNode(DsgLayers::PLACES,
-                          NodeSymbol('p', 3),
-                          std::make_unique<PlaceNodeAttributes>());
-  dsg->graph->emplaceNode(DsgLayers::PLACES,
-                          NodeSymbol('p', 5),
-                          std::make_unique<PlaceNodeAttributes>());
-  dsg->graph->emplaceNode(DsgLayers::PLACES,
-                          NodeSymbol('p', 6),
-                          std::make_unique<PlaceNodeAttributes>());
+  dsg->graph->emplaceNode(
+      DsgLayers::PLACES, NodeSymbol('p', 3), std::make_unique<PlaceNodeAttributes>());
+  dsg->graph->emplaceNode(
+      DsgLayers::PLACES, NodeSymbol('p', 5), std::make_unique<PlaceNodeAttributes>());
+  dsg->graph->emplaceNode(
+      DsgLayers::PLACES, NodeSymbol('p', 6), std::make_unique<PlaceNodeAttributes>());
 
   RoomFinder::Config config;
   config.min_room_size = 2;
@@ -242,18 +238,14 @@ TEST(IncrementalRoomsTests, UpdateFromClustersWithAssocationCorrect) {
   }
 
   // previous rooms
-  dsg->graph->emplaceNode(DsgLayers::ROOMS,
-                          NodeSymbol('R', 3),
-                          std::make_unique<SemanticNodeAttributes>());
-  dsg->graph->emplaceNode(DsgLayers::ROOMS,
-                          NodeSymbol('R', 4),
-                          std::make_unique<SemanticNodeAttributes>());
-  dsg->graph->emplaceNode(DsgLayers::ROOMS,
-                          NodeSymbol('R', 5),
-                          std::make_unique<SemanticNodeAttributes>());
-  dsg->graph->emplaceNode(DsgLayers::ROOMS,
-                          NodeSymbol('R', 6),
-                          std::make_unique<SemanticNodeAttributes>());
+  dsg->graph->emplaceNode(
+      DsgLayers::ROOMS, NodeSymbol('R', 3), std::make_unique<SemanticNodeAttributes>());
+  dsg->graph->emplaceNode(
+      DsgLayers::ROOMS, NodeSymbol('R', 4), std::make_unique<SemanticNodeAttributes>());
+  dsg->graph->emplaceNode(
+      DsgLayers::ROOMS, NodeSymbol('R', 5), std::make_unique<SemanticNodeAttributes>());
+  dsg->graph->emplaceNode(
+      DsgLayers::ROOMS, NodeSymbol('R', 6), std::make_unique<SemanticNodeAttributes>());
 
   // two rooms without cluster associations: one at min size, one not
   dsg->graph->insertEdge(NodeSymbol('R', 5), NodeSymbol('p', 14));

@@ -33,8 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_topology/voxblox_types.h"
 #include <hydra_utils/dsg_types.h>
+#include "hydra_topology/voxblox_types.h"
 
 #include <memory>
 #include <unordered_set>

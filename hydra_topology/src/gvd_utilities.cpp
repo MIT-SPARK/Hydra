@@ -74,7 +74,8 @@ VoronoiCondition checkVoronoi(const VoronoiCheckConfig& cfg,
   // if only one voxel fails this, we still want to reject the candidate
   // as a successful check for the passing voxel would mean that it would
   // be closer than the min distance to the other parent
-  if (current.distance <= cfg.min_distance_m || neighbor.distance <= cfg.min_distance_m) {
+  if (current.distance <= cfg.min_distance_m ||
+      neighbor.distance <= cfg.min_distance_m) {
     return result;
   }
 

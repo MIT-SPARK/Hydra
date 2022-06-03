@@ -40,10 +40,10 @@
 #include <ros/topic_manager.h>
 #include <std_srvs/Empty.h>
 
-using hydra::timing::ElapsedTimeRecorder;
 using hydra::DsgLayers;
 using hydra::LayerId;
 using hydra::incremental::SharedDsgInfo;
+using hydra::timing::ElapsedTimeRecorder;
 
 enum class ExitMode { CLOCK, SERVICE, NORMAL };
 

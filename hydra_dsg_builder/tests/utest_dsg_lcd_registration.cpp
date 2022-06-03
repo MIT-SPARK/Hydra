@@ -93,9 +93,8 @@ struct DsgRegistrationTests : public ::testing::Test {
   ~DsgRegistrationTests() = default;
 
   virtual void SetUp() override {
-    std::map<LayerId, char> layer_map = {{DsgLayers::PLACES, 'p'},
-                                         {DsgLayers::OBJECTS, 'O'},
-                                         {DsgLayers::ROOMS, 'R'}};
+    std::map<LayerId, char> layer_map = {
+        {DsgLayers::PLACES, 'p'}, {DsgLayers::OBJECTS, 'O'}, {DsgLayers::ROOMS, 'R'}};
 
     dsg.reset(new DynamicSceneGraph());
 

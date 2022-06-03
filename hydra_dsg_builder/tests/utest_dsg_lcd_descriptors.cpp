@@ -53,8 +53,7 @@ void emplacePlaceNode(DynamicSceneGraph& graph,
                       size_t& next_index) {
   auto attrs = std::make_unique<PlaceNodeAttributes>(distance, 0);
   attrs->position = pos;
-  graph.emplaceNode(
-      DsgLayers::PLACES, NodeSymbol('p', next_index), std::move(attrs));
+  graph.emplaceNode(DsgLayers::PLACES, NodeSymbol('p', next_index), std::move(attrs));
   ++next_index;
 }
 
@@ -191,8 +190,7 @@ void emplaceObjectNode(DynamicSceneGraph& graph,
   auto attrs = std::make_unique<SemanticNodeAttributes>();
   attrs->semantic_label = label;
   attrs->position = pos;
-  graph.emplaceNode(
-      DsgLayers::OBJECTS, NodeSymbol('o', next_index), std::move(attrs));
+  graph.emplaceNode(DsgLayers::OBJECTS, NodeSymbol('o', next_index), std::move(attrs));
   ++next_index;
 }
 

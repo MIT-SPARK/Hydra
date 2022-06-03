@@ -67,11 +67,13 @@ struct EsdfHelpers : ::testing::Test {
     gvd_layer.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
     mesh_layer.reset(new MeshLayer(voxel_size * voxels_per_side));
     GvdIntegratorConfig config;
-    integrator.reset(new GvdTestIntegrator(config, tsdf_layer.get(), gvd_layer, mesh_layer));
+    integrator.reset(
+        new GvdTestIntegrator(config, tsdf_layer.get(), gvd_layer, mesh_layer));
   }
 
   void reset(const GvdIntegratorConfig& config) {
-    integrator.reset(new GvdTestIntegrator(config, tsdf_layer.get(), gvd_layer, mesh_layer));
+    integrator.reset(
+        new GvdTestIntegrator(config, tsdf_layer.get(), gvd_layer, mesh_layer));
   }
 
   std::unique_ptr<GvdTestIntegrator> integrator;

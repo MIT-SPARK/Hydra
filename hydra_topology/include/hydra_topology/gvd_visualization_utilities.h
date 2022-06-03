@@ -37,8 +37,8 @@
 #include "hydra_topology/gvd_voxel.h"
 #include "hydra_topology/voxblox_types.h"
 
-#include <hydra_utils/visualizer_types.h>
 #include <hydra_topology/GvdVisualizerConfig.h>
+#include <hydra_utils/visualizer_types.h>
 #include <visualization_msgs/Marker.h>
 
 namespace hydra {
@@ -73,7 +73,8 @@ visualization_msgs::Marker makeGvdEdgeMarker(
     const GraphExtractor::EdgeInfoMap& edge_info_map,
     const GraphExtractor::NodeIdRootMap& id_root_index_map);
 
-visualization_msgs::Marker makeBlocksMarker(const Layer<TsdfVoxel>& layer, double scale);
+visualization_msgs::Marker makeBlocksMarker(const Layer<TsdfVoxel>& layer,
+                                            double scale);
 
 visualization_msgs::Marker makeBlocksMarker(const Layer<GvdVoxel>& layer, double scale);
 

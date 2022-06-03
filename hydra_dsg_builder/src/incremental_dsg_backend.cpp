@@ -646,8 +646,7 @@ void DsgBackend::updateBuildingNode() {
     attrs->color = config_.building_color;
     attrs->semantic_label = config_.building_semantic_label;
     attrs->name = node_id.getLabel();
-    private_dsg_->graph->emplaceNode(
-        DsgLayers::BUILDINGS, node_id, std::move(attrs));
+    private_dsg_->graph->emplaceNode(DsgLayers::BUILDINGS, node_id, std::move(attrs));
   } else {
     private_dsg_->graph->getNode(node_id)->get().attributes().position = centroid;
   }
