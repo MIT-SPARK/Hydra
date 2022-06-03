@@ -26,7 +26,7 @@
     uri: git@github.com:MIT-SPARK/Kimera-RPGO.git
     version: master
 - git:
-    local-name: kimera_dsg
+    local-name: spark_dsg
     uri: git@github.mit.edu:SPARK/Kimera-DSG.git
 - git:
     local-name: hydra_dsg_builder

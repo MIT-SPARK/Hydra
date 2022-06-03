@@ -60,9 +60,10 @@ git clone git@github.mit.edu:SPARK/Kimera-DSG-Builder.git hydra_dsg_builder
 vcs import . < hydra_dsg_builder/install/hydra.rosinstall
 # vcs import . < hydra_dsg_builder/install/vio_overlay.rosinstall # (if you want to use Kimera-VIO)
 
-rosdep install --from-paths src --ignore-src -r -y
+rosdep install --from-paths . --ignore-src -r -y
 sudo apt install libprotobuf-dev
 
+cd ..
 catkin build
 ```
 
@@ -110,6 +111,8 @@ Then, follow the instructions to install cuda and other dependencies for the `se
 
 See the following for more information:
   - [hydra_dsg_builder](hydra_dsg_builder/README.md)
+  - [hydra_topology](hydra_topology/README.md)
+  - [hydra_utils](hydra_utils/README.md)
 
 ### Filing Issues
 
