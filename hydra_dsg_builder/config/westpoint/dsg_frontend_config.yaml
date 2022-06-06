@@ -1,0 +1,19 @@
+pgmo:
+    horizon: 100.0
+    output_mesh_resolution: 0.02
+    graph_compression_method: 1  # voxblox
+    full_compression_method: 2  # voxel clearing
+    robot_id: 0
+    d_graph_resolution: 2.5
+    voxblox_queue_size: 1
+mesh_queue_size: 10
+active_objects_horizon_s: 10.0
+active_index_horizon_m: 5.0
+enable_active_mesh_pub: false
+enable_segmented_mesh_pub: false
+min_object_vertices: 20
+min_cluster_size: 25
+cluster_tolerance: 0.25
+prune_mesh_indices: true
+mesh_ns: ""
+visualize_dsg_lcd: false
