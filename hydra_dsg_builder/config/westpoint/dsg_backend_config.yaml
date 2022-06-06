@@ -1,0 +1,58 @@
+dsg:
+    add_places_to_deformation_graph: true
+    optimize_on_lc: true
+    enable_node_merging: true
+    call_update_periodically: true
+    places_merge_pos_threshold_m: 0.4
+    places_merge_distance_tolerance_m: 0.3
+    merge_update_dynamic: true
+pgmo:
+    run_mode: 0  # kimera_pgmo run mode FULL (required)
+    use_msg_time: true
+    embed_trajectory_delta_t: 5.0
+    num_interp_pts: 3
+    interp_horizon: 10.0
+    rpgo:
+        odom_trans_threshold: 0.05
+        odom_rot_threshold: 0.01
+        pcm_trans_threshold: -1
+        pcm_rot_threshold: -1
+        lm_diagonal_damping: true
+        gnc_alpha: 0.99
+        gnc_max_iterations: 100
+        gnc_mu_step: 1.6
+        gnc_cost_tolerance: 1.0e-05
+        gnc_weight_tolerance: 1.0e-04
+        gnc_fix_prev_inliers: true
+        verbosity: "UPDATE"
+        solver: "LM"
+    add_initial_prior: true
+    covariance:
+        odom: 1.0e-02  # 1.0e-1 resulted in inliers for bulding 31
+        loop_close: 5.0e-02
+        prior: 1.0e-02
+        mesh_mesh: 1.0e-02
+        pose_mesh: 1.0e-02
+        place_mesh: 10.0
+        place_edge: 10.0
+building_semantic_label: 22
+building_color: [169, 8, 194]
+visualize_place_factors: false
+enable_rooms: true
+room_finder:
+    min_dilation_m: 0.33
+    max_dilation_m: 0.8
+    num_steps: 10
+    min_component_size: 10
+    room_vote_min_overlap: 0.1
+    min_room_size: 1
+    max_kmeans_iters: 5
+    do_spectral_clustering: true
+    use_sparse_eigen_decomp: true
+    sparse_decomp_tolerance: 1.0e-2
+    max_modularity_iters: 5
+    modularity_gamma: 1.0
+    clustering_mode: "MODULARITY"
+    room_semantic_label: 21
+    use_previous_rooms: false
+    room_prefix: 'R'
