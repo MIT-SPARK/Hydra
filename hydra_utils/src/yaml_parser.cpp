@@ -46,6 +46,10 @@ YamlParserImpl::YamlParserImpl(const YAML::Node& node) : YamlParserImpl(node, ""
 
 YamlParserImpl YamlParserImpl::child(const std::string& child_name) const {
   auto new_name = name_ + "/" + child_name;
+  if (!node_) {
+    return YamlParserImpl(node_, new_name);
+  }
+
   return YamlParserImpl(node_[child_name], new_name);
 }
 
