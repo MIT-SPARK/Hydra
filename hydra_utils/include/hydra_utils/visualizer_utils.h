@@ -121,7 +121,8 @@ visualization_msgs::Marker makeDynamicCentroidMarkers(
     const DynamicSceneGraphLayer& layer,
     const VisualizerConfig& visualizer_config,
     const NodeColor& color,
-    const std::string& ns);
+    const std::string& ns,
+    size_t marker_id = 0);
 
 visualization_msgs::Marker makeDynamicCentroidMarkers(
     const std_msgs::Header& header,
@@ -130,7 +131,8 @@ visualization_msgs::Marker makeDynamicCentroidMarkers(
     double layer_offset_scale,
     const VisualizerConfig& visualizer_config,
     const std::string& ns,
-    const ColorFunction& color_func);
+    const ColorFunction& color_func,
+    size_t marker_id = 0);
 
 visualization_msgs::MarkerArray makeDynamicGraphEdgeMarkers(
     const std_msgs::Header& header,
@@ -146,13 +148,15 @@ visualization_msgs::Marker makeDynamicEdgeMarkers(
     const DynamicSceneGraphLayer& layer,
     const VisualizerConfig& visualizer_config,
     const NodeColor& color,
-    const std::string& ns);
+    const std::string& ns,
+    size_t marker_id);
 
 visualization_msgs::Marker makeDynamicLabelMarker(
     const std_msgs::Header& header,
     const DynamicLayerConfig& config,
     const DynamicSceneGraphLayer& layer,
     const VisualizerConfig& visualizer_config,
-    const std::string& ns);
+    const std::string& ns,
+    size_t marker_id);
 
 }  // namespace hydra

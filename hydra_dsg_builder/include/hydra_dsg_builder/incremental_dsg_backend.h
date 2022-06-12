@@ -203,6 +203,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   ros::Publisher viz_pose_mesh_edges_pub_;
   ros::Publisher pose_graph_pub_;
   ros::Publisher opt_mesh_pub_;
+  std::unique_ptr<hydra::DsgSender> dsg_sender_;
 
   SceneGraphLogger backend_graph_logger_;
   std::list<LoopClosureLog> loop_closures_;
@@ -223,7 +224,6 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   ros::Subscriber full_mesh_sub_;
   ros::Subscriber deformation_graph_sub_;
   ros::Subscriber pose_graph_sub_;
-  std::unique_ptr<hydra::DsgSender> dsg_sender_;
 };
 
 }  // namespace incremental

@@ -183,6 +183,7 @@ class DynamicSceneGraphVisualizer {
                         const DynamicSceneGraphLayer& layer,
                         const DynamicLayerConfig& config,
                         const VisualizerConfig& viz_config,
+                        size_t viz_idx,
                         MarkerArray& msg);
 
   void deleteLabel(const std_msgs::Header& header, char prefix, MarkerArray& msg);
