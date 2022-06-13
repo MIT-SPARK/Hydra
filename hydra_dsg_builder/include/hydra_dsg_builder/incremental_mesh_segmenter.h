@@ -79,6 +79,8 @@ class MeshSegmenter {
 
   void pruneObjectsToCheckForPlaces(const DynamicSceneGraph& graph);
 
+  std::optional<uint8_t> getVertexLabel(size_t index) const;
+
   void updateGraph(DynamicSceneGraph& graph,
                    const LabelClusters& clusters,
                    uint64_t timestamp);
