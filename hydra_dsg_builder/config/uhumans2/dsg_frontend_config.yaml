@@ -16,3 +16,5 @@ min_cluster_size: 40
 cluster_tolerance: 0.25
 mesh_ns: ""
 prune_mesh_indices: true
+enforce_place_connectivity: false
+connectivity_radius: 2.0

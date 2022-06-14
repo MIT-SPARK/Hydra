@@ -51,7 +51,7 @@ using pose_graph_tools::PoseGraph;
 using LabelClusters = MeshSegmenter::LabelClusters;
 
 DsgFrontend::DsgFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg)
-    : nh_(nh), dsg_(dsg) {
+    : nh_(nh), dsg_(dsg), next_hallucinated_node_id_('h', 0) {
   config_ = load_config<DsgFrontendConfig>(nh_);
 
   ros::NodeHandle pgmo_nh(nh_, "pgmo");
@@ -347,6 +347,7 @@ void DsgFrontend::runPlaces() {
       std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
 
       // find node ids that are valid, but outside active place window
+      NodeIdSet new_inactive_places;
       for (const auto& prev : previous_active_places_) {
         if (latest_places.count(prev)) {
           continue;
@@ -357,7 +358,7 @@ void DsgFrontend::runPlaces() {
         }
 
         // mark archived places as inactive
-        if (dsg_->graph->hasNode(prev)) {
+        if (dsg_->graph->hasNode(prev)) { //this if seems unecessary
           dsg_->graph->getNode(prev)
               .value()
               .get()
@@ -366,9 +367,17 @@ void DsgFrontend::runPlaces() {
         }
 
         dsg_->archived_places.insert(prev);
+
+        if(config_.enforce_place_connectivity) {
+          new_inactive_places.insert(prev);
+        }
       }
 
       dsg_->last_update_time = curr_message->header.stamp.toNSec();
+
+      if(config_.enforce_place_connectivity) {
+        enforcePlaceConnectivity(latest_places, new_inactive_places);
+      }
     }  // end graph update critical section
 
     previous_active_places_ = latest_places;
@@ -494,6 +503,276 @@ void DsgFrontend::addAgentPlaceEdges() {
   }
 
   deleted_agent_edge_indices_.clear();
+}
+
+//todo(jared): move
+bool DsgFrontend::checkIfNodesIntersect(const NodeId& nodei, const NodeId& nodej, double radius) {
+  if (nodei == nodej) {
+    return false;
+  }
+
+  if (dsg_->graph->hasEdge(nodei, nodej)) {
+    return false;
+  }
+
+  const double r1 = dsg_->graph->getNode(nodei).value().get().attributes<PlaceNodeAttributes>().distance;
+  const double r2 = radius;
+  const double d = (dsg_->graph->getPosition(nodei) - dsg_->graph->getPosition(nodej)).norm();
+
+  if (d >= r1 + r2) {
+    return false;
+  }
+
+  if (d <= r1 || d <= r2) {
+    // intersection is inside one node's sphere
+    // graph.insertEdge(nodei, nodej, std::make_unique<EdgeAttributes>(std::min(r1, r2)));
+    return true;
+  }
+
+  // see https://mathworld.wolfram.com/Sphere-SphereIntersection.html
+  const double clearance =
+      std::sqrt(4 * std::pow(d, 2) * std::pow(r1, 2) -
+                std::pow(std::pow(d, 2) - std::pow(r2, 2) + std::pow(r1, 2), 2)) /
+      (2 * d);
+  if (clearance <= 0) {
+    return false;
+  }
+
+  // graph.insertEdge(nodei, nodej, std::make_unique<EdgeAttributes>(clearance));
+  return true;
+}
+
+//todo(jared): move, not efficient, update nn finder for archived places
+bool DsgFrontend::getNearestVertex(const NodeId& query_id, const NodeIdSet& id_set, NodeId& nearest_id, double& distance) {
+  if(id_set.count(query_id)) {
+    return false;
+  }
+
+  distance=1e9;
+  bool is_min_valid=false;
+  for(const auto& id : id_set) {
+    double d = (dsg_->graph->getPosition(query_id) - dsg_->graph->getPosition(id)).norm();
+    if(d < distance) {
+      distance = d;
+      nearest_id = id;
+      is_min_valid = true;
+    }
+  }
+  return is_min_valid;
+}
+
+void DsgFrontend::handleNoExistingActiveNodes() {
+  const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
+  const auto& agents = dsg_->graph->getLayer(DsgLayers::AGENTS, robot_prefix_);
+
+  NodeId candidate_agent_id;
+  NodeId candidate_place_id;
+  bool create_node = false;
+  bool create_edge = false;
+
+  std::vector<NodeId> agent_ids;
+  for(const auto& agent : agents.nodes()) {
+    agent_ids.push_back(agent->id);
+  }
+  std::reverse(agent_ids.begin(),agent_ids.end());
+
+  bool no_inactive_places = (dsg_->archived_places.size() == 0);
+  if(no_inactive_places) {
+    //if no active or inactive places, copy most recent agent node to places without edge
+    candidate_agent_id = agent_ids.front();
+    create_node = true;
+    create_edge = false;
+  }
+  else {
+    //if no active but inactive places exist, create node and add edge to existing inactive place
+    //needed to prevent gaps
+    for(const auto& agent_id : agent_ids) {
+      candidate_agent_id = agent_id;
+      double distance;
+      getNearestVertex(agent_id, dsg_->archived_places, candidate_place_id, distance);
+      if(distance > config_.connectivity_radius) { //check if within footprint, skip if not, check intersection instead
+        continue;
+      }
+      if(agent_id == agent_ids.front()) { //wait to create until places not within footprint
+        break;
+      }
+      create_node=true;
+      create_edge=true;
+      break;
+    }
+  }
+
+  //add node
+  if(create_node) {
+    auto attr = std::make_unique<PlaceNodeAttributes>();
+    attr->position = dsg_->graph->getNode(candidate_agent_id)
+                      .value()
+                      .get()
+                      .attributes<AgentNodeAttributes>()
+                      .position;
+    attr->distance = config_.connectivity_radius;
+    attr->is_active = false;
+    attr->is_hallucinated = true;
+    dsg_->graph->emplaceNode(places.id, next_hallucinated_node_id_, std::move(attr));
+    dsg_->archived_places.insert(next_hallucinated_node_id_); //must add to archived
+  }
+
+  //add edge
+  if(create_edge) {
+    dsg_->graph->insertEdge(next_hallucinated_node_id_, candidate_place_id);
+  }
+
+  if(create_node) { //wait to increment until after adding edge
+    next_hallucinated_node_id_++;
+  }
+}
+
+void DsgFrontend::handleExistingActiveNodes(const NodeIdSet& new_inactive_places) {
+  const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
+
+  auto components = graph_utilities::getConnectedComponents(places, new_inactive_places, true);
+  std::cout << components.size() << " components in new inactive places." << std::endl;
+
+  //find connceted components not adjacent previous inactive nodes
+  std::vector<std::vector<NodeId>> isolated_components;
+  for (size_t i = 0; i < components.size(); ++i) {
+    const auto& component = components[i];
+    std::cout << component.size() << " nodes in component " << i << std::endl;
+
+    bool is_connected = false;
+    for (const auto& node_id : component) {
+      auto neighbors =
+        graph_utilities::graph_traits<SceneGraphLayer>::neighbors(places, node_id);
+
+      for(const auto& neighbor : neighbors) {
+        if(new_inactive_places.count(neighbor)) {
+          continue;
+        }
+        if(dsg_->archived_places.count(neighbor)) {
+          is_connected=true;
+          break;
+        }
+      }
+      if(is_connected) {
+        break;
+      }
+    }
+    if(!is_connected) {
+      isolated_components.push_back(component);
+    }
+  }
+  std::cout << components.size() << " isolated components" << std::endl;
+
+  //DEBUG: index isolated components to visualize each component as a different color
+  //       up to 5 colors
+  // for(const auto& isolated_component : isolated_components) {
+  //   for(const auto& isolated_id : isolated_component) {
+  //     dsg_->graph->getNode(isolated_id)
+  //       .value()
+  //       .get()
+  //       .attributes<PlaceNodeAttributes>()
+  //       .is_hallucinated = true;
+  //   }
+  // }
+
+  //convert to unordered_set
+  std::unordered_set<NodeId> all_isolated_places;
+  std::vector<std::unordered_set<NodeId>> isolated_sets;
+  for(const auto& isolated_component : isolated_components) {
+    std::unordered_set<NodeId> isolated_set;
+    for(const auto& isolated_id : isolated_component) {
+      isolated_set.insert(isolated_id);
+      all_isolated_places.insert(isolated_id);
+    }
+    isolated_sets.push_back(isolated_set);
+  }
+
+  //DEBUG: add connections to arbitrary nodes in previously inactive places
+  //       to check isolated vertices are correct
+  // for(const auto& isolated_set : isolated_sets) {
+  //   for(const auto& isolated_id : isolated_set) {
+  //     for(const auto& archived_place : dsg_->archived_places) {
+  //       if(all_isolated_places.count(archived_place)) {
+  //         continue;
+  //       }
+  //       dsg_->graph->insertEdge(isolated_id, archived_place);
+  //       break;
+  //     }
+  //     break;
+  //   }
+  // }
+
+  //add edges between existing nodes and isolated components
+  //todo(jared): more expensive, but more accurate to find closest vertex from all sets, then
+  //             add connection and remove component from set of components, repeat
+  for(const auto& isolated_set : isolated_sets) {
+    double min_distance = 1e9;
+    NodeId min_isolated_id;
+    NodeId min_place_id;
+    bool is_min_valid = false;
+    NodeId isolated_id;
+    double distance;
+    for(const auto& archived_place : dsg_->archived_places) {
+      if(all_isolated_places.count(archived_place)) {
+        continue;
+      }
+      getNearestVertex(archived_place, isolated_set, isolated_id, distance);
+      if(distance < min_distance) {
+        min_distance = distance;
+        min_isolated_id = isolated_id;
+        min_place_id = archived_place;
+        is_min_valid = true;
+      }
+    }
+    if(is_min_valid) {
+      dsg_->graph->insertEdge(min_isolated_id, min_place_id);
+    }
+    for(const auto& id_to_erase : isolated_set) {
+      all_isolated_places.erase(id_to_erase);
+      if(!dsg_->archived_places.count(id_to_erase)) {
+        dsg_->archived_places.insert(id_to_erase);
+      }
+    }
+  }
+}
+
+void DsgFrontend::enforcePlaceConnectivity(const NodeIdSet& latest_places,
+                                           const NodeIdSet& new_inactive_places) {
+  std::cout << "Running enforcePlaceConnectivity..." << std::endl;
+
+  //check connection conditions
+  bool no_place_within_footprint = false;
+  if(latest_places.size() == 0 || dsg_->archived_places.size() == 0) { //maybe can only use else part, must check archived places for case where first scan detects places
+    no_place_within_footprint = true;
+  }
+  else {
+    //todo(jared): remove for loop, and just access most recent
+    const auto& agents = dsg_->graph->getLayer(DsgLayers::AGENTS, robot_prefix_);
+    NodeId agent_id;
+    for(const auto& agent : agents.nodes()) {
+      agent_id = agent->id;
+      break;
+    }
+
+    //todo(jared): replace this and below call to getNearestVertex with nn finder
+    const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
+    NodeIdSet all_nodes;
+    for(const auto& place : places.nodes()) {
+      all_nodes.insert(place.first);
+    }
+    NodeId candidate_id;
+    double distance;
+    getNearestVertex(agent_id, all_nodes, candidate_id, distance);
+    if(distance > config_.connectivity_radius) { //todo(jared): check intersection instead
+      no_place_within_footprint = true;
+    }
+  }
+
+  if(no_place_within_footprint) {
+    handleNoExistingActiveNodes(); //run this if can't make connections with isolated vertices, rename to fill gaps, make to increment e.g., copy an agent node until path reaches new inactive node, this could be called in a loop, don't like this because these places won't be generated until a place is created then becomes inactive
+  }
+
+  handleExistingActiveNodes(new_inactive_places); //run this to connect new inactive places, rename to connect_inactive_places
 }
 
 void DsgFrontend::updatePlaceMeshMapping() {

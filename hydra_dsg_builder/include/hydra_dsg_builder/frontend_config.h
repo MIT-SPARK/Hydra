@@ -47,6 +47,8 @@ struct DsgFrontendConfig {
   bool prune_mesh_indices = false;
   std::string sensor_frame = "base_link";
   std::string mesh_ns = "";
+  double enforce_place_connectivity = true;
+  double connectivity_radius = 2.0;
 };
 
 template <typename Visitor>
@@ -59,6 +61,8 @@ void visit_config(const Visitor& v, DsgFrontendConfig& config) {
   v.visit("prune_mesh_indices", config.prune_mesh_indices);
   v.visit("sensor_frame", config.sensor_frame);
   v.visit("mesh_ns", config.mesh_ns);
+  v.visit("enforce_place_connectivity", config.enforce_place_connectivity);
+  v.visit("connectivity_radius", config.connectivity_radius);
 }
 
 }  // namespace incremental

@@ -92,7 +92,7 @@ void DsgReceiver::handleUpdate(const hydra_msgs::DsgUpdate::ConstPtr& msg) {
 
   const auto size_bytes =
       hydra_utils::getHumanReadableMemoryString(msg->layer_contents.size());
-  ROS_INFO_STREAM("Received dsg update message of " << size_bytes);
+  // ROS_INFO_STREAM("Received dsg update message of " << size_bytes);
   try {
     if (!graph_) {
       graph_ = spark_dsg::readGraph(msg->layer_contents);

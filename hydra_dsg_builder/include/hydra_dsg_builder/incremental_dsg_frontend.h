@@ -111,6 +111,17 @@ class DsgFrontend {
 
   void addAgentPlaceEdges();
 
+  //todo(jared): may not be best location for all these methods
+  void enforcePlaceConnectivity(const NodeIdSet& latest_places, const NodeIdSet& new_inactive_places);
+
+  bool checkIfNodesIntersect(const NodeId& nodei, const NodeId& nodej, double min_clearance);
+
+  bool getNearestVertex(const NodeId& query_id, const NodeIdSet& id_set, NodeId& nearest_id, double& distance);
+
+  void handleNoExistingActiveNodes();
+
+  void handleExistingActiveNodes(const NodeIdSet& new_inactive_places);
+
   std::optional<Eigen::Vector3d> getLatestPose();
 
  private:
@@ -150,6 +161,9 @@ class DsgFrontend {
   ros::Subscriber pose_graph_sub_;
 
   SceneGraphLogger frontend_graph_logger_;
+
+  //todo(jared): maybe better place to keep this
+  NodeSymbol next_hallucinated_node_id_;
 };
 
 }  // namespace incremental

@@ -527,17 +527,54 @@ void DynamicSceneGraphVisualizer::drawLayer(const std_msgs::Header& header,
                                 layer,
                                 viz_config,
                                 node_ns,
-                                [&](const SceneGraphNode& node) -> NodeColor {
-                                  auto parent = node.getParent();
-                                  if (!parent) {
-                                    return NodeColor::Zero();
+                                [&](const SceneGraphNode& node) -> NodeColor {  
+                                  //DEBUG:
+                                  bool is_hallucinated = node.attributes<PlaceNodeAttributes>().is_hallucinated;
+                                  bool is_active = node.attributes<PlaceNodeAttributes>().is_active;
+                                  if(!is_active && is_hallucinated) {
+                                    return NodeColor(255,0,255);
+                                  }
+                                  int component_index = node.attributes<PlaceNodeAttributes>().component_index; 
+                                  if(is_hallucinated) {
+                                    NodeColor(255,0,0);
+                                    // switch(component_index) {
+                                    //   case 0:
+                                    //     return NodeColor(255,0,0);
+                                    //     break;
+                                    //   case 1:
+                                    //     return NodeColor(0,255,0);
+                                    //     break;
+                                    //   case 2:
+                                    //     return NodeColor(0,0,255);
+                                    //     break;
+                                    //   case 3:
+                                    //     return NodeColor(255,0,255);
+                                    //     break;
+                                    //   case 4:
+                                    //     return NodeColor(0,255,255);
+                                    //     break;
+                                    //   default:
+                                    //     return NodeColor(255,255,0);
+                                    //     break;
+                                    // }
+                                  }
+                                  
+                                  if(!is_active) {
+                                    return NodeColor(0,0,255);
                                   }
 
-                                  return scene_graph_->getNode(*parent)
-                                      .value()
-                                      .get()
-                                      .attributes<SemanticNodeAttributes>()
-                                      .color;
+                                  // auto parent = node.getParent();
+                                  // if (!parent) {
+                                  //   return NodeColor(150,150,150);
+                                  // }
+
+                                  //DEBUG:
+                                  // return scene_graph_->getNode(*parent)
+                                  //     .value()
+                                  //     .get()
+                                  //     .attributes<SemanticNodeAttributes>()
+                                  //     .color;
+                                  return NodeColor(150,150,150);;
                                 });
   } else {
     nodes = makeCentroidMarkers(header, config, layer, viz_config, node_ns);
