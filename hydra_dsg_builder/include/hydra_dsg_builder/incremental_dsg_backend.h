@@ -118,7 +118,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   bool updatePrivateDsg();
 
-  void updateDsgMesh(bool force_mesh_update = false);
+  virtual void updateDsgMesh(bool force_mesh_update = false);
 
   void optimize(bool new_loop_closure = false);
 
