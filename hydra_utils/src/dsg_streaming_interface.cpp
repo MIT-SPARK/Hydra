@@ -108,7 +108,7 @@ void DsgReceiver::handleUpdate(const hydra_msgs::DsgUpdate::ConstPtr& msg) {
     }
     has_update_ = true;
   } catch (const std::exception& e) {
-:   ROS_FATAL_STREAM("Received invalid message: " << e.what());
+    ROS_FATAL_STREAM("Received invalid message: " << e.what());
     ros::shutdown();
     return;
   }
