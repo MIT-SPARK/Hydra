@@ -17,5 +17,5 @@ cluster_tolerance: 0.25
 prune_mesh_indices: true
 mesh_ns: ""
 visualize_dsg_lcd: false
-enforce_place_connectivity: false
+enforce_place_connectivity: true
 connectivity_radius: 2.0
