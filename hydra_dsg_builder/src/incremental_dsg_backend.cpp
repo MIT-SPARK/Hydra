@@ -73,7 +73,8 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
       shared_dsg_(dsg),
       private_dsg_(backend_dsg),
       shared_places_copy_(DsgLayers::PLACES),
-      robot_id_(0) {
+      robot_id_(0),
+      next_building_id_('B',0) {
   config_ = load_config<DsgBackendConfig>(nh_);
 
   nh_.getParam("robot_id", robot_id_);
@@ -621,38 +622,169 @@ void DsgBackend::updateRoomsNodes() {
   storeUnlabeledPlaces(active_nodes);
 }
 
+// void DsgBackend::updateBuildingNode() {
+//   const NodeSymbol node_id('B', 0);
+//   std::unique_lock<std::mutex> lock(private_dsg_->mutex);
+//   const auto& rooms = private_dsg_->graph->getLayer(DsgLayers::ROOMS);
+
+//   if (!rooms.numNodes()) {
+//     if (private_dsg_->graph->hasNode(node_id)) {
+//       private_dsg_->graph->removeNode(node_id);
+//     }
+
+//     return;
+//   }
+
+//   Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+//   for (const auto& id_node_pair : rooms.nodes()) {
+//     centroid += id_node_pair.second->attributes().position;
+//   }
+//   centroid /= rooms.numNodes();
+
+//   if (!private_dsg_->graph->hasNode(node_id)) {
+//     SemanticNodeAttributes::Ptr attrs(new SemanticNodeAttributes());
+//     attrs->position = centroid;
+//     attrs->color = config_.building_color;
+//     attrs->semantic_label = config_.building_semantic_label;
+//     attrs->name = node_id.getLabel();
+//     private_dsg_->graph->emplaceNode(DsgLayers::BUILDINGS, node_id, std::move(attrs));
+//   } else {
+//     private_dsg_->graph->getNode(node_id)->get().attributes().position = centroid;
+//   }
+
+//   for (const auto& id_node_pair : rooms.nodes()) {
+//     private_dsg_->graph->insertEdge(node_id, id_node_pair.first);
+//   }
+// }
+
 void DsgBackend::updateBuildingNode() {
-  const NodeSymbol node_id('B', 0);
   std::unique_lock<std::mutex> lock(private_dsg_->mutex);
+  next_building_id_ = NodeSymbol('b',0);
   const auto& rooms = private_dsg_->graph->getLayer(DsgLayers::ROOMS);
+  const auto& buildings = private_dsg_->graph->getLayer(DsgLayers::BUILDINGS);
+
+  //delete existing building
+  //todo(jared): recreates buildings each call to updateBuildingNode, replace with window but
+  //             unclear of choose such a window
+  for(const auto& building_pair : buildings.nodes()) {
+    NodeId building_id = building_pair.first;
+    if (private_dsg_->graph->hasNode(building_id)) {
+      private_dsg_->graph->removeNode(building_id);
+    }
+  }
 
   if (!rooms.numNodes()) {
-    if (private_dsg_->graph->hasNode(node_id)) {
-      private_dsg_->graph->removeNode(node_id);
-    }
-
     return;
   }
 
-  Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
-  for (const auto& id_node_pair : rooms.nodes()) {
-    centroid += id_node_pair.second->attributes().position;
-  }
-  centroid /= rooms.numNodes();
-
-  if (!private_dsg_->graph->hasNode(node_id)) {
-    SemanticNodeAttributes::Ptr attrs(new SemanticNodeAttributes());
-    attrs->position = centroid;
-    attrs->color = config_.building_color;
-    attrs->semantic_label = config_.building_semantic_label;
-    attrs->name = node_id.getLabel();
-    private_dsg_->graph->emplaceNode(DsgLayers::BUILDINGS, node_id, std::move(attrs));
-  } else {
-    private_dsg_->graph->getNode(node_id)->get().attributes().position = centroid;
+  std::vector<std::unordered_set<NodeId>> room_place_ids_vec; 
+  std::vector<NodeId> room_id_vec;
+  std::vector<Eigen::Vector3d> room_pos_vec;
+  for (const auto& room_id_pair : rooms.nodes()) {
+    std::unordered_set<NodeId> room_place_ids;
+    room_place_ids.insert(room_id_pair.second->children().begin(),
+                          room_id_pair.second->children().end());
+    room_place_ids_vec.push_back(room_place_ids);
+    room_id_vec.push_back(room_id_pair.first);
+    room_pos_vec.push_back(room_id_pair.second->attributes().position);
   }
 
-  for (const auto& id_node_pair : rooms.nodes()) {
-    private_dsg_->graph->insertEdge(node_id, id_node_pair.first);
+  //compute room categories based on semantics of place basis points
+  std::vector<bool> room_categories;
+  room_categories.reserve(room_id_vec.size());
+  NodeIdSet outdoor_rooms;
+  for(size_t i=0; i<room_place_ids_vec.size(); i++) {
+    std::unordered_set<NodeId> room_place_ids = room_place_ids_vec[i];
+
+    //calculate of percentage of vertices indoor for each room
+    int num_indoor=0;
+    int num_total=0;
+    // Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+    for(const auto& room_place_id : room_place_ids) {
+      std::vector<uint8_t> mesh_vertex_labels =
+        private_dsg_->graph->getNode(room_place_id)
+                               .value()
+                               .get()
+                               .attributes<PlaceNodeAttributes>()
+                               .mesh_vertex_labels;
+        for(const auto& mesh_vertex_label : mesh_vertex_labels) {
+          int mesh_vertex_label_int = (int)mesh_vertex_label;
+
+          //todo(jared): add categories labels to config
+          if(mesh_vertex_label_int == 16 || mesh_vertex_label_int == 17 || mesh_vertex_label_int == 18) { //16=wall, 17=floor, 18=ceiling
+            num_indoor++;
+          }
+          num_total++;
+        }
+    }
+
+    //assign category based on percentage
+    double percentage = (double)num_indoor/(double)num_total;
+    if(percentage > 0.25) { //todo(jared): replace with config parameter
+      room_categories.push_back(true);
+      private_dsg_->graph->getNode(room_id_vec[i])->get().attributes<RoomNodeAttributes>().is_indoor = true;
+      outdoor_rooms.insert(room_id_vec[i]);
+    }
+    else {
+      room_categories.push_back(false);
+      private_dsg_->graph->getNode(room_id_vec[i])->get().attributes<RoomNodeAttributes>().is_indoor = false;
+      // outdoor_rooms.insert(room_id_vec[i]);
+      private_dsg_->graph->removeNode(room_id_vec[i]);
+    }
+  }
+
+  //segment buildings
+  auto components = graph_utilities::getConnectedComponents(rooms, outdoor_rooms, true); 
+  for (size_t i = 0; i < components.size(); ++i) {
+    const auto& component = components[i];
+
+    //only keep rooms classified as indoors
+    NodeIdSet rooms_to_add_to_building;
+    bool are_labels_valid = false;
+    for (const auto& room_id : component) {
+      bool is_indoor = private_dsg_->graph->getNode(room_id)->get().attributes<RoomNodeAttributes>().is_indoor;
+      if(!is_indoor) {
+        std::cout << "skipping room outdoors!" << std::endl;
+        //todo(jared): delete rooms from room layer right here
+        continue;
+      }
+      are_labels_valid = true;
+      rooms_to_add_to_building.insert(room_id);
+    }
+
+    //compute centroid
+    Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+    for (const auto& room_to_add : rooms_to_add_to_building) {
+      centroid += private_dsg_->graph->getNode(room_to_add)->get().attributes().position;
+    }
+    centroid /= rooms_to_add_to_building.size();
+
+    //create building
+    if(are_labels_valid) {
+      //add node for building
+      std::cout << "adding building node " << next_building_id_ << std::endl;
+      SemanticNodeAttributes::Ptr attrs(new SemanticNodeAttributes());
+      attrs->position = centroid;
+      attrs->color = config_.building_color;
+      attrs->semantic_label = config_.building_semantic_label;
+      // attrs->name = "";
+      if(i==0) {
+        attrs->name = "0A";
+      } else if(i==1) {
+        attrs->name = "0B";
+      } else {
+        attrs->name = "0C";
+      }
+      private_dsg_->graph->emplaceNode(DsgLayers::BUILDINGS, next_building_id_, std::move(attrs));
+
+      //add edges for building
+      for(const auto& room_to_add : rooms_to_add_to_building) {
+        std::cout << "adding edge between building " << next_building_id_ << " and room " << room_to_add << std::endl;
+        private_dsg_->graph->insertEdge(next_building_id_, room_to_add);
+      }
+
+      next_building_id_++;
+    }
   }
 }
 

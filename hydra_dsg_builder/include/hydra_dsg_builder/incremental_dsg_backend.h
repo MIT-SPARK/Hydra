@@ -216,6 +216,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   ros::Subscriber deformation_graph_sub_;
   ros::Subscriber pose_graph_sub_;
   std::unique_ptr<hydra::DsgSender> dsg_sender_;
+
+  NodeSymbol next_building_id_;
 };
 
 }  // namespace incremental
