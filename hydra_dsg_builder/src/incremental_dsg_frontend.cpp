@@ -538,7 +538,6 @@ bool DsgFrontend::checkIfNodesIntersect(const NodeId& nodei, const NodeId& nodej
     return false;
   }
 
-  // graph.insertEdge(nodei, nodej, std::make_unique<EdgeAttributes>(clearance));
   return true;
 }
 
@@ -575,6 +574,9 @@ void DsgFrontend::handleNoExistingActiveNodes() {
     agent_ids.push_back(agent->id);
   }
   std::reverse(agent_ids.begin(),agent_ids.end());
+  if(agent_ids.empty()) {
+    return;
+  }
 
   bool no_inactive_places = (dsg_->archived_places.size() == 0);
   if(no_inactive_places) {
@@ -663,18 +665,6 @@ void DsgFrontend::handleExistingActiveNodes(const NodeIdSet& new_inactive_places
   }
   std::cout << components.size() << " isolated components" << std::endl;
 
-  //DEBUG: index isolated components to visualize each component as a different color
-  //       up to 5 colors
-  // for(const auto& isolated_component : isolated_components) {
-  //   for(const auto& isolated_id : isolated_component) {
-  //     dsg_->graph->getNode(isolated_id)
-  //       .value()
-  //       .get()
-  //       .attributes<PlaceNodeAttributes>()
-  //       .is_hallucinated = true;
-  //   }
-  // }
-
   //convert to unordered_set
   std::unordered_set<NodeId> all_isolated_places;
   std::vector<std::unordered_set<NodeId>> isolated_sets;
@@ -686,21 +676,6 @@ void DsgFrontend::handleExistingActiveNodes(const NodeIdSet& new_inactive_places
     }
     isolated_sets.push_back(isolated_set);
   }
-
-  //DEBUG: add connections to arbitrary nodes in previously inactive places
-  //       to check isolated vertices are correct
-  // for(const auto& isolated_set : isolated_sets) {
-  //   for(const auto& isolated_id : isolated_set) {
-  //     for(const auto& archived_place : dsg_->archived_places) {
-  //       if(all_isolated_places.count(archived_place)) {
-  //         continue;
-  //       }
-  //       dsg_->graph->insertEdge(isolated_id, archived_place);
-  //       break;
-  //     }
-  //     break;
-  //   }
-  // }
 
   //add edges between existing nodes and isolated components
   //todo(jared): more expensive, but more accurate to find closest vertex from all sets, then
