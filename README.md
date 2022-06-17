@@ -4,11 +4,11 @@
     <img src="doc/media/hydra.GIF">
 </div>
 
-This repository contains code to build DSGs (both offline and incrementally) and is primarily based on the paper ["Hydra: A Real-time Spatial Perception System for 3D Scene Graph Construction and Optimization"](http://www.roboticsproceedings.org/rss18/p050.pdf).  If you find this code relevant for your work, please consider citing this paper. A bibtex entry is provided below:
+This repository contains code to build 3D Dynamic Scene Graphs (DSGs) --both offline and incrementally-- and is primarily based on the paper ["Hydra: A Real-time Spatial Perception System for 3D Scene Graph Construction and Optimization"](http://www.roboticsproceedings.org/rss18/p050.pdf). If you find this code relevant for your work, please consider citing this paper. A bibtex entry is provided below:
 
 ```
 @article{hughes2022hydra,
-    title={Hydra: A Real-time Spatial Perception Engine for 3D Scene Graph Construction and Optimization},
+    title={Hydra: A Real-time Spatial Perception System for {3D} Scene Graph Construction and Optimization},
     fullauthor={Nathan Hughes, Yun Chang, and Luca Carlone},
     author={N. Hughes and Y. Chang and L. Carlone},
     booktitle={Robotics: Science and Systems (RSS)},
@@ -19,14 +19,14 @@ This repository contains code to build DSGs (both offline and incrementally) and
 
 ### General Requirements
 
-Hydra has only been tested on the following systems:
+Hydra has been tested on the following systems:
 
 - Ubuntu 18.04 and ROS Melodic
-- Ubuntu 20.04 and ROS Noetic (*recommended if possible*)
+- Ubuntu 20.04 and ROS Noetic (*recommended*)
 
 You can follow the instructions [here](http://wiki.ros.org/ROS/Installation) to install ROS if you haven't already.
 
-Then, make sure you have some general requirements.
+Then, make sure you have some general requirements:
 
 For melodic:
 ```
