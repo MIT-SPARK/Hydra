@@ -116,7 +116,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void updateFromSharedState();
 
-  bool updatePrivateDsg();
+  virtual bool updatePrivateDsg();
 
   virtual void updateDsgMesh(bool force_mesh_update = false);
 
@@ -143,7 +143,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void runPgmo();
 
-  void addPlacesToDeformationGraph();
+  virtual void addPlacesToDeformationGraph();
 
   void callUpdateFunctions(const gtsam::Values& places_values = gtsam::Values(),
                            const gtsam::Values& pgmo_values = gtsam::Values(),

@@ -216,6 +216,7 @@ bool DsgBackend::updatePrivateDsg() {
       std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
       private_dsg_->graph->mergeGraph(*shared_dsg_->graph,
                                       merged_nodes_,
+                                      true,
                                       false,
                                       true,
                                       &config_.merge_update_map,
