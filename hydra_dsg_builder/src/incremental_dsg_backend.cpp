@@ -659,6 +659,7 @@ void DsgBackend::updateRoomsNodes() {
 
 void DsgBackend::updateBuildingNode() {
   std::unique_lock<std::mutex> lock(private_dsg_->mutex);
+  std::cout << "1" << std::endl;
   next_building_id_ = NodeSymbol('b',0);
   const auto& rooms = private_dsg_->graph->getLayer(DsgLayers::ROOMS);
   const auto& buildings = private_dsg_->graph->getLayer(DsgLayers::BUILDINGS);
@@ -666,11 +667,16 @@ void DsgBackend::updateBuildingNode() {
   //delete existing building
   //todo(jared): recreates buildings each call to updateBuildingNode, replace with window but
   //             unclear of choose such a window
+  std::unordered_set<NodeId> building_ids;
   for(const auto& building_pair : buildings.nodes()) {
     NodeId building_id = building_pair.first;
     if (private_dsg_->graph->hasNode(building_id)) {
-      private_dsg_->graph->removeNode(building_id);
+      building_ids.insert(building_id);
     }
+  }
+
+  for(const auto& building_id : building_ids) {
+    private_dsg_->graph->removeNode(building_id);
   }
 
   if (!rooms.numNodes()) {

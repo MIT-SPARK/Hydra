@@ -1,0 +1,49 @@
+<launch>
+    <arg name="sensor_frame" default="left_cam"/>
+    <arg name="debug" default="false"/>
+    <arg name="include_a1_static_tfs" default="true"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="fake_tf3"
+          args="0 0 0 0 0 0 1 world cam_t265_odom_frame"/>
+
+    <!-- calibration parameters for d455#2 with serial: 114122250655, payload front/back -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="t265_imu_to_kalibr_optical"
+          args="0.02216565 0.01795623 -0.21828447
+                0.004334249473494838 0.006530518690349069 0.9999320589420063 -0.008628001195529594
+                cam_t265_imu_optical_frame cam_d455_kalibr"/>
+
+   <node pkg="tf2_ros" type="static_transform_publisher" name="kalibr_optical_to_cam_d455_link"
+          args="0 0 0 0 1 0 0 cam_d455_kalibr cam_d455_link"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="cam_d455_link_to_left_cam"
+          args="0 0 0 0 0 0 1 cam_d455_link left_cam"/>
+
+    <group if="$(arg debug)">
+        <arg name="rgb_info_topic" default="/cam_d455/color/camera_info"/>
+        <arg name="rgb_topic" default="/cam_d455/color/image_raw"/>
+        <arg name="depth_topic" default="/cam_d455/aligned_depth_to_color/image_raw"/>
+        <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
+
+        <include file="$(find hydra_utils)/launch/includes/rgbd_to_pointcloud.xml" pass_all_args="true"/>
+    </group>
+
+    <group if="$(arg include_a1_static_tfs)">
+        <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_0" args="0.0 -0.0 -0.0 0.0 0.0 0.0 1.0 cam_d455_link cam_d455_depth_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_1" args="0.0 -0.0 -0.0 -0.5 0.5 -0.5 0.5 cam_d455_depth_frame cam_d455_depth_optical_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_2" args="-0.000190051636309 -0.0590947009623 3.64310144505e-05 0.000733761698939 -0.00329480459914 0.00146671861876 0.99999320507 cam_d455_link cam_d455_color_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_3" args="0.0 -0.0 -0.0 -0.5 0.5 -0.5 0.5 cam_d455_aligned_depth_to_color_frame cam_d455_color_optical_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_4" args="-0.000190051636309 -0.0590947009623 3.64310144505e-05 0.000733761698939 -0.00329480459914 0.00146671861876 0.99999320507 cam_d455_link cam_d455_aligned_depth_to_color_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_5" args="-0.0160199999809 -0.0302200000733 0.00740000000224 0.0 0.0 0.0 1.0 cam_d455_link cam_d455_gyro_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_6" args="0.0 -0.0 -0.0 -0.5 0.5 -0.5 0.5 cam_d455_gyro_frame cam_d455_imu_optical_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_7" args="-0.0160199999809 -0.0302200000733 0.00740000000224 0.0 0.0 0.0 1.0 cam_d455_link cam_d455_accel_frame"/>
+
+        <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_8" args="0.0 -0.0 -0.0 -0.5 0.5 -0.5 0.5 cam_d455_accel_frame cam_d455_accel_optical_frame"/>
+    </group>
+</launch>

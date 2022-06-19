@@ -1,0 +1,28 @@
+<launch>
+    <arg name="sensor_frame" default="right_cam"/>
+    <arg name="debug" default="false"/>
+    <arg name="include_a1_static_tfs" default="true"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="fake_tf3"
+          args="0 0 0 0 0 0 1 world cam_t265_odom_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="odom_to_d455"
+          args="0.08937583 0.05073359 -0.16322368
+                0.4017443351692391 -0.1582844109050835 0.8984350018226137 -0.07976267048214225
+                cam_t265_imu_optical_frame cam_right_d455_kalibr"/>
+
+   <node pkg="tf2_ros" type="static_transform_publisher" name="kalibr_optical_to_cam_right_d455_link"
+          args="0 0 0 0 1 0 0 cam_right_d455_kalibr cam_right_d455_link"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="cam_right_d455_link_to_right"
+          args="0 0 0 0 0 0 1 cam_right_d455_link right_cam"/>
+
+    <group if="$(arg debug)">
+        <arg name="rgb_info_topic" default="/cam_right_d455/color/camera_info"/>
+        <arg name="rgb_topic" default="/cam_right_d455/color/image_raw"/>
+        <arg name="depth_topic" default="/cam_right_d455/aligned_depth_to_color/image_raw"/>
+        <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
+
+        <include file="$(find hydra_utils)/launch/includes/rgbd_to_pointcloud.xml" pass_all_args="true"/>
+    </group>
+</launch>
