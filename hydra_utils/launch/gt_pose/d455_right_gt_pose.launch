@@ -8,11 +8,11 @@
 
     <node pkg="tf2_ros" type="static_transform_publisher" name="odom_to_d455"
           args="0.08937583 0.05073359 -0.16322368
-                0.4017443351692391 -0.1582844109050835 0.8984350018226137 -0.07976267048214225
+                0.8984350018226137 -0.07976267048214225 0.4017443351692391 -0.1582844109050835
                 cam_t265_imu_optical_frame cam_right_d455_kalibr"/>
 
    <node pkg="tf2_ros" type="static_transform_publisher" name="kalibr_optical_to_cam_right_d455_link"
-          args="0 0 0 0 1 0 0 cam_right_d455_kalibr cam_right_d455_link"/>
+          args="0 0 0 0 0 0 1 cam_right_d455_kalibr cam_right_d455_link"/>
 
     <node pkg="tf2_ros" type="static_transform_publisher" name="cam_right_d455_link_to_right"
           args="0 0 0 0 0 0 1 cam_right_d455_link right_cam"/>
