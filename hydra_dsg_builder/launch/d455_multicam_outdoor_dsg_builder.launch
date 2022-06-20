@@ -1,9 +1,7 @@
 <launch>
-<!--     <arg name="d455_configuration" default="d455_left"/>
-    <arg name="d455_prefix" default="cam_left_d455"/> -->
     <arg name="d455_configuration" default="d455_left"/>
     <arg name="d455_prefix" default="cam_left_d455"/>
-    <arg name="use_mask" default="false"/>
+    <arg name="use_mask" default="true"/>
 
     <arg name="robot_id" default="0"/>
     <arg name="config_dir" default="$(find hydra_dsg_builder)/config/d455"/>
@@ -26,7 +24,7 @@
         <arg name="sensor_frame" value="$(arg sensor_frame)"/>
     </include>
 
-    <include file="$(find hydra_topology)/launch/hydra_topology_d455.launch" pass_all_args="true">
+    <include file="$(find hydra_topology)/launch/hydra_topology_d455_multicam.launch" pass_all_args="true">
         <arg name="semantic_color_path" value="$(arg semantic_map_path)"/>
         <arg name="config_dir" value="$(find hydra_topology)/config"/>
         <arg name="glog_dir" value="$(find hydra_topology)/glogs"/>
@@ -59,12 +57,8 @@
         <param name="robot_id" value="0"/>
         <param name="log_output" value="false"/>
 
-<!--         <remap from="~color/image_raw" to="/cam_d455/color/image_raw"/>
-        <remap from="~depth/image_raw" to="/cam_d455/depth_masked/image_raw"/> -->
-        <remap from="~color/image_raw" to="/cam_left_d455/color/image_raw"/>
-        <remap from="~depth/image_raw" to="/cam_left_d455/depth_masked/image_raw"/>
-<!--         <remap from="~color/image_raw" to="/cam_right_d455/color/image_raw"/>
-        <remap from="~depth/image_raw" to="/cam_right_d455/depth_masked/image_raw"/> -->
+        <remap from="~color/image_raw" to="/$(arg d455_prefix)/color/image_raw"/>
+        <remap from="~depth/image_raw" to="/$(arg d455_prefix)/depth_masked/image_raw"/>
         <remap from="~time_point" to="/pointcloud_time"/>
         <remap from="~bow_vectors" to="/kimera_vio_ros/bow_query"/>
         <remap from="~register_lcd_frames" to="/kimera_vio_ros/kimera_vio_ros_node/register_lcd_frames"/>

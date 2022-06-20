@@ -6,9 +6,9 @@
     <node pkg="tf2_ros" type="static_transform_publisher" name="fake_tf3"
           args="0 0 0 0 0 0 1 world cam_t265_odom_frame"/>
 
-    <!-- LEFT -->
+    <!-- Left -->
     <node pkg="tf2_ros" type="static_transform_publisher" name="left_odom_to_d455"
-          args="-0.07034613000000001 0.06830940000000001 -0.22065005 0.9013236197393253 0.06352858867335608 -0.3958319267203753 -0.1640028528740336  cam_t265_imu_optical_frame cam_left_d455_kalibr"/>
+          args="-0.07034613000000001 0.06830940000000001 -0.22065005 0.9013236197393253 0.06352858867335608 -0.3958319267203753 0.1640028528740336  cam_t265_imu_optical_frame cam_left_d455_kalibr"/>
 
    <node pkg="tf2_ros" type="static_transform_publisher" name="kalibr_optical_to_cam_left_d455_link"
           args="0 0 0 0 0 0 1 cam_left_d455_kalibr cam_left_d455_link"/>
@@ -26,10 +26,10 @@
     </group>
 
 
-    <!-- RIGHT -->
+    <!-- Right -->
     <node pkg="tf2_ros" type="static_transform_publisher" name="odom_to_d455"
           args="0.08937583 0.05073359 -0.16322368
-                0.8984350018226137 -0.07976267048214225 0.4017443351692391 -0.1582844109050835
+                0.8984350018226137 -0.07976267048214225 0.4017443351692391 0.1582844109050835
                 cam_t265_imu_optical_frame cam_right_d455_kalibr"/>
 
    <node pkg="tf2_ros" type="static_transform_publisher" name="kalibr_optical_to_cam_right_d455_link"
@@ -38,15 +38,24 @@
     <node pkg="tf2_ros" type="static_transform_publisher" name="cam_right_d455_link_to_right"
           args="0 0 0 0 0 0 1 cam_right_d455_link right_cam"/>
 
+    <!-- Static TFs -->
     <group if="$(arg include_a1_static_tfs)">
-        <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_0" args="0.000170129875187 0.0210378393531 -4.32793240179e-05 2.22044604925e-16 0.0 1.0 0.0 cam_t265_link cam_t265_gyro_frame"/>
+      <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_0" args="0.0 -0.0 -0.0 0.0 0.0 0.0 1.0 cam_left_d455_link cam_left_d455_depth_frame"/>
 
-        <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_1" args="0.0 -0.0 -0.0 0.5 -0.5 -0.5 0.5 cam_t265_gyro_frame cam_t265_imu_optical_frame"/>
+      <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_1" args="0.0 -0.0 -0.0 -0.5 0.5 -0.5 0.5 cam_left_d455_depth_frame cam_left_d455_depth_optical_frame"/>
 
-        <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_2" args="0.000170129875187 0.0210378393531 -4.32793240179e-05 2.22044604925e-16 0.0 1.0 0.0 cam_t265_link cam_t265_accel_frame"/>
+      <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_2" args="-0.000281336862827 -0.0592799223959 -3.93726113543e-05 4.35935944552e-05 0.000206549331779 0.00220689224079 0.99999755621 cam_left_d455_link cam_left_d455_color_frame"/>
 
-        <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_3" args="0.0 -0.0 -0.0 0.5 -0.5 -0.5 0.5 cam_t265_accel_frame cam_t265_accel_optical_frame"/>
+      <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_3" args="0.0 -0.0 -0.0 -0.5 0.5 -0.5 0.5 cam_left_d455_aligned_depth_to_color_frame cam_left_d455_color_optical_frame"/>
 
-        <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_4" args="0.0 -0.0 -0.0 -0.0 -0.0 -0.0 1.0 cam_t265_pose_frame cam_t265_link"/>
+      <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_4" args="-0.000281336862827 -0.0592799223959 -3.93726113543e-05 4.35935944552e-05 0.000206549331779 0.00220689224079 0.99999755621 cam_left_d455_link cam_left_d455_aligned_depth_to_color_frame"/>
+
+      <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_5" args="-0.0160199999809 -0.0302200000733 0.00740000000224 0.0 0.0 0.0 1.0 cam_left_d455_link cam_left_d455_gyro_frame"/>
+
+      <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_6" args="0.0 -0.0 -0.0 -0.5 0.5 -0.5 0.5 cam_left_d455_gyro_frame cam_left_d455_imu_optical_frame"/>
+
+      <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_7" args="-0.0160199999809 -0.0302200000733 0.00740000000224 0.0 0.0 0.0 1.0 cam_left_d455_link cam_left_d455_accel_frame"/>
+
+      <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_8" args="0.0 -0.0 -0.0 -0.5 0.5 -0.5 0.5 cam_left_d455_accel_frame cam_left_d455_accel_optical_frame"/>
     </group>
 </launch>

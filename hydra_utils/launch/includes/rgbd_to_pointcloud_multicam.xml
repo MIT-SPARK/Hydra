@@ -1,0 +1,53 @@
+<!-- derived from kimera_semantics_ros/launch/kimera_semantics.launch -->
+<launch>
+  <arg name="rgb_info_topic_left"/>
+  <arg name="rgb_topic_left"/>
+  <arg name="depth_topic_left"/>
+  <arg name="pointcloud_topic_left"/>
+
+  <arg name="rgb_info_topic_right"/>
+  <arg name="rgb_topic_right"/>
+  <arg name="depth_topic_right"/>
+  <arg name="pointcloud_topic_right"/>
+
+  <arg name="queue_size" default="20"/>
+  <arg name="verbose" default="false"/>
+
+  <arg name="nodelet_output" value="screen" if="$(arg verbose)"/>
+  <arg name="nodelet_output" value="log" unless="$(arg verbose)"/>
+
+  <node pkg="nodelet"
+        type="nodelet"
+        name="nodelet_manager"
+        args="manager"
+        output="$(arg nodelet_output)"/>
+
+  <!-- TODO(nathan) add optional rgb to depth registration -->
+
+  <node pkg="nodelet"
+        type="nodelet"
+        name="cloudify_left"
+        args="load depth_image_proc/point_cloud_xyzrgb nodelet_manager -no-bond"
+        output="$(arg nodelet_output)">
+    <param name="queue_size" value="$(arg queue_size)"/>
+
+    <remap from="rgb/camera_info" to="$(arg rgb_info_topic_left)"/>
+    <remap from="rgb/image_rect_color" to="$(arg rgb_topic_left)"/>
+    <remap from="depth_registered/image_rect" to="$(arg depth_topic_left)"/>
+    <remap from="depth_registered/points" to="$(arg pointcloud_topic_left)"/>
+  </node>
+
+  <node pkg="nodelet"
+        type="nodelet"
+        name="cloudify_right"
+        args="load depth_image_proc/point_cloud_xyzrgb nodelet_manager -no-bond"
+        output="$(arg nodelet_output)">
+    <param name="queue_size" value="$(arg queue_size)"/>
+
+    <remap from="rgb/camera_info" to="$(arg rgb_info_topic_right)"/>
+    <remap from="rgb/image_rect_color" to="$(arg rgb_topic_right)"/>
+    <remap from="depth_registered/image_rect" to="$(arg depth_topic_right)"/>
+    <remap from="depth_registered/points" to="$(arg pointcloud_topic_right)"/>
+  </node>
+
+</launch>
