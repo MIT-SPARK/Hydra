@@ -2,6 +2,8 @@
     <arg name="d455_configuration" default="d455_left"/>
     <arg name="d455_prefix" default="cam_left_d455"/>
     <arg name="use_mask" default="true"/>
+    <arg name="mask_size" default="640"/>
+    <!-- <arg name="mask_size" default="1280"/> -->
 
     <arg name="robot_id" default="0"/>
     <arg name="config_dir" default="$(find hydra_dsg_builder)/config/d455"/>

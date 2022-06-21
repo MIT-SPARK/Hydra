@@ -1,7 +1,9 @@
 <launch>
     <arg name="d455_configuration" default="d455_left"/>
     <arg name="d455_prefix" default="cam_left_d455"/>
-    <arg name="use_mask" default="false"/>
+    <arg name="use_mask" default="true"/>
+    <arg name="mask_size" default="640"/>
+    <!-- <arg name="mask_size" default="1280"/> -->
 
     <arg name="sim_time_required" default="true"/>
     <param name="use_sim_time" value="$(arg sim_time_required)"/>
@@ -41,6 +43,7 @@
         <remap from="depth/image_raw" to="/cam_left_d455/aligned_depth_to_color/image_raw"/>
         <remap from="depth_masked/image_raw" to="/cam_left_d455/depth_masked/image_raw"/>
         <param name="mask_path" value="$(find hydra_utils)/resources/a1_left_multicam_mask_roi.png"/>
+        <!-- <param name="mask_path" value="$(find hydra_utils)/resources/a1_center_mask_roi_$(arg mask_size).png"/> -->
     </node>
 
     <include file="$(find hydra_topology)/launch/hydra_topology.launch" pass_all_args="true">
