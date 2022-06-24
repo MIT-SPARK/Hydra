@@ -96,7 +96,7 @@
           output="log">
           <param name="keyframe_period_s" value="0.2"/>
           <param name="world_frame" value="world"/>
-          <param name="robot_frame" value="left_cam"/>
+          <param name="robot_frame" value="$(arg sensor_frame)"/>
           <param name="robot_id" value="$(arg robot_id)"/>
           <remap from="~pose_graph" to="/incremental_dsg_builder_node/pose_graph_incremental"/>
     </node>
