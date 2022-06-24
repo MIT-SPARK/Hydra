@@ -48,18 +48,18 @@ using MeshVertices = DynamicSceneGraph::MeshVertices;
 using Node = SceneGraphNode;
 using Centroid = pcl::CentroidPoint<pcl::PointXYZ>;
 
-void updateObjects(DynamicSceneGraph& graph,
-                   const gtsam::Values&,
-                   const gtsam::Values&,
-                   bool allow_node_merging) {
+std::map<NodeId, NodeId> updateObjects(DynamicSceneGraph& graph,
+                                       const gtsam::Values&,
+                                       const gtsam::Values&,
+                                       bool allow_node_merging) {
   if (!graph.hasLayer(DsgLayers::OBJECTS)) {
-    return;
+    return {};
   }
 
   const auto& layer = graph.getLayer(DsgLayers::OBJECTS);
   MeshVertices::Ptr mesh = graph.getMeshVertices();
 
-  std::vector<std::pair<NodeId, NodeId>> nodes_to_merge;
+  std::map<NodeId, NodeId> nodes_to_merge;
   std::map<SemanticLabel, std::vector<NodeId>> semantic_nodes_map;
   for (const auto& id_node_pair : layer.nodes()) {
     auto& attrs = id_node_pair.second->attributes<ObjectNodeAttributes>();
@@ -122,9 +122,9 @@ void updateObjects(DynamicSceneGraph& graph,
                     << attrs_target.bounding_box.volume() << "]";
 
             if (curr_bigger) {
-              nodes_to_merge.push_back({node_target_id, id_node_pair.first});
+              nodes_to_merge[node_target_id] = id_node_pair.first;
             } else {
-              nodes_to_merge.push_back({id_node_pair.first, node_target_id});
+              nodes_to_merge[id_node_pair.first] = node_target_id;
             }
             to_be_merged = true;
             break;
@@ -148,30 +148,33 @@ void updateObjects(DynamicSceneGraph& graph,
             << " pairs of overlapping objects. Merging...";
     for (const auto& node_pair : nodes_to_merge) {
       graph.mergeNodes(node_pair.first, node_pair.second);
+      VLOG(3) << "merging " << NodeSymbol(node_pair.first).getLabel() << " -> "
+              << NodeSymbol(node_pair.second).getLabel();
     }
   }
-  // TODO(yun) trigger to regenerate object place parents... or leave as is?
+
+  return nodes_to_merge;
 }
 
-void updatePlaces(DynamicSceneGraph& graph,
-                  const gtsam::Values& values,
-                  const gtsam::Values&,
-                  bool allow_node_merging,
-                  double pos_threshold_m,
-                  double distance_tolerance_m) {
+std::map<NodeId, NodeId> updatePlaces(DynamicSceneGraph& graph,
+                                      const gtsam::Values& values,
+                                      const gtsam::Values&,
+                                      bool allow_node_merging,
+                                      double pos_threshold_m,
+                                      double distance_tolerance_m) {
   if (!graph.hasLayer(DsgLayers::PLACES)) {
-    return;
+    return {};
   }
 
   if (values.size() == 0 && !allow_node_merging) {
-    return;
+    return {};
   }
 
   const auto& layer = graph.getLayer(DsgLayers::PLACES);
 
   std::unordered_set<NodeId> missing_nodes;
   std::vector<NodeId> updated_nodes;
-  std::vector<std::pair<NodeId, NodeId>> nodes_to_merge;
+  std::map<NodeId, NodeId> nodes_to_merge;
   for (const auto& id_node_pair : layer.nodes()) {
     auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
     if (!values.exists(id_node_pair.first)) {
@@ -206,9 +209,9 @@ void updatePlaces(DynamicSceneGraph& graph,
 
       if (attrs_target.is_active) {
         // try to prefer merging active into non-active
-        nodes_to_merge.push_back({node_target_id, id_node_pair.first});
+        nodes_to_merge[node_target_id] = id_node_pair.first;
       } else {
-        nodes_to_merge.push_back({id_node_pair.first, node_target_id});
+        nodes_to_merge[id_node_pair.first] = node_target_id;
       }
 
       to_be_merged = true;
@@ -226,6 +229,8 @@ void updatePlaces(DynamicSceneGraph& graph,
             << " pairs of overlapping places. Merging...";
     for (const auto& node_pair : nodes_to_merge) {
       graph.mergeNodes(node_pair.first, node_pair.second);
+      VLOG(3) << "merging " << NodeSymbol(node_pair.first).getLabel() << " -> "
+              << NodeSymbol(node_pair.second).getLabel();
     }
   }
   // TODO(yun) regenerate rooms. Or trigger to regenerate rooms.
@@ -245,15 +250,17 @@ void updatePlaces(DynamicSceneGraph& graph,
       }
     }
   }
+
+  return nodes_to_merge;
 }
 
 // TODO(nathan) add unit test for this
-void updateRooms(DynamicSceneGraph& graph,
-                 const gtsam::Values&,
-                 const gtsam::Values&,
-                 bool) {
+std::map<NodeId, NodeId> updateRooms(DynamicSceneGraph& graph,
+                                     const gtsam::Values&,
+                                     const gtsam::Values&,
+                                     bool) {
   if (!graph.hasLayer(DsgLayers::ROOMS)) {
-    return;
+    return {};
   }
 
   std::set<NodeId> empty_rooms;
@@ -269,14 +276,16 @@ void updateRooms(DynamicSceneGraph& graph,
   for (const auto& room : empty_rooms) {
     graph.removeNode(room);
   }
+
+  return {};
 }
 
-void updateBuildings(DynamicSceneGraph& graph,
-                     const gtsam::Values&,
-                     const gtsam::Values&,
-                     bool) {
+std::map<NodeId, NodeId> updateBuildings(DynamicSceneGraph& graph,
+                                         const gtsam::Values&,
+                                         const gtsam::Values&,
+                                         bool) {
   if (!graph.hasLayer(DsgLayers::BUILDINGS)) {
-    return;
+    return {};
   }
 
   const auto& layer = graph.getLayer(DsgLayers::BUILDINGS);
@@ -294,14 +303,16 @@ void updateBuildings(DynamicSceneGraph& graph,
     mean_pos /= id_node_pair.second->children().size();
     id_node_pair.second->attributes().position = mean_pos;
   }
+
+  return {};
 }
 
-void updateAgents(DynamicSceneGraph& graph,
-                  const gtsam::Values&,
-                  const gtsam::Values& values,
-                  bool) {
+std::map<NodeId, NodeId> updateAgents(DynamicSceneGraph& graph,
+                                      const gtsam::Values&,
+                                      const gtsam::Values& values,
+                                      bool) {
   if (values.size() == 0) {
-    return;
+    return {};
   }
 
   const LayerId desired_layer = DsgLayers::AGENTS;
@@ -327,6 +338,8 @@ void updateAgents(DynamicSceneGraph& graph,
                    << displayNodeSymbolContainer(missing_nodes);
     }
   }
+
+  return {};
 }
 
 }  // namespace dsg_updates

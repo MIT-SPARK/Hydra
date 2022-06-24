@@ -122,6 +122,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void startPgmo();
 
+  void updateMergedNodes(const std::map<NodeId, NodeId>& new_merges);
+
  protected:
   void setSolverParams();
 
@@ -172,6 +174,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   SharedDsgInfo::Ptr shared_dsg_;
   SharedDsgInfo::Ptr private_dsg_;
   IsolatedSceneGraphLayer shared_places_copy_;
+  std::map<NodeId, NodeId> merged_nodes_;
+  std::map<NodeId, std::set<NodeId>> merged_nodes_parents_;
 
   std::atomic<uint64_t> last_timestamp_;
 

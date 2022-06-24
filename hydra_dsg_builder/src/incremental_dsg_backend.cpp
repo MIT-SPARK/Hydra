@@ -94,13 +94,13 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
   dsg_update_funcs_.push_back([&](auto& graph,
                                   const auto& place_values,
                                   const auto& pgmo_values,
-                                  bool allow_merging) {
-    dsg_updates::updatePlaces(graph,
-                              place_values,
-                              pgmo_values,
-                              allow_merging,
-                              config_.places_merge_pos_threshold_m,
-                              config_.places_merge_distance_tolerance_m);
+                                  bool allow_merging) -> auto {
+    return dsg_updates::updatePlaces(graph,
+                                     place_values,
+                                     pgmo_values,
+                                     allow_merging,
+                                     config_.places_merge_pos_threshold_m,
+                                     config_.places_merge_distance_tolerance_m);
   });
 
   deformation_graph_->setForceRecalculate(!config_.pgmo.gnc_fix_prev_inliers);
@@ -149,8 +149,8 @@ bool DsgBackend::updatePrivateDsg() {
   if (have_frontend_updates) {
     {  // start joint critical section
       std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
-      // private_dsg_->updated = false;
       private_dsg_->graph->mergeGraph(*shared_dsg_->graph,
+                                      merged_nodes_,
                                       false,
                                       true,
                                       &config_.merge_update_map,
@@ -160,7 +160,7 @@ bool DsgBackend::updatePrivateDsg() {
       if (shared_dsg_->graph->hasLayer(DsgLayers::PLACES)) {
         // TODO(nathan) simplify
         auto& places = shared_dsg_->graph->getLayer(DsgLayers::PLACES);
-        shared_places_copy_.mergeLayer(places);
+        shared_places_copy_.mergeLayer(places, {});
         std::vector<NodeId> removed_place_nodes;
         places.getRemovedNodes(removed_place_nodes);
         for (const auto& place_id : removed_place_nodes) {
@@ -554,16 +554,42 @@ void DsgBackend::optimize() {
   }
 }
 
+void DsgBackend::updateMergedNodes(const std::map<NodeId, NodeId>& new_merges) {
+  for (const auto& id_node_pair : new_merges) {
+    auto iter = merged_nodes_parents_.find(id_node_pair.second);
+    if (iter == merged_nodes_parents_.end()) {
+      iter =
+          merged_nodes_parents_.emplace(id_node_pair.second, std::set<NodeId>()).first;
+    }
+
+    iter->second.insert(id_node_pair.first);
+    merged_nodes_[id_node_pair.first] = id_node_pair.second;
+
+    auto old_iter = merged_nodes_parents_.find(id_node_pair.first);
+    if (old_iter == merged_nodes_parents_.end()) {
+      continue;
+    }
+
+    for (const auto child : old_iter->second) {
+      merged_nodes_[child] = id_node_pair.second;
+      iter->second.insert(child);
+    }
+
+    merged_nodes_parents_.erase(iter);
+  }
+}
+
 void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,
                                      const gtsam::Values& pgmo_values) {
   ScopedTimer spin_timer("backend/update_layers", last_timestamp_);
   {  // start private dsg critical section
     std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
     for (const auto& update_func : dsg_update_funcs_) {
-      update_func(*private_dsg_->graph,
-                  places_values,
-                  pgmo_values,
-                  config_.enable_node_merging);
+      auto merged_nodes = update_func(*private_dsg_->graph,
+                                      places_values,
+                                      pgmo_values,
+                                      config_.enable_node_merging);
+      updateMergedNodes(merged_nodes);
     }
   }  // end private dsg critical section
   updateRoomsNodes();

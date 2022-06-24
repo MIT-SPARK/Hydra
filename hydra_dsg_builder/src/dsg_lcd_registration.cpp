@@ -44,6 +44,12 @@
 namespace hydra {
 namespace lcd {
 
+inline std::ostream& operator<<(std::ostream& out, const gtsam::Quaternion& q) {
+  out << "{w: " << q.w() << ", x: " << q.x() << ", y: " << q.y() << ", z: " << q.z()
+      << "}";
+  return out;
+}
+
 using incremental::SharedDsgInfo;
 using DsgNode = DynamicSceneGraphNode;
 using hydra::timing::ScopedTimer;
@@ -145,14 +151,15 @@ void logRegistrationProblem(const std::string& path_prefix,
 
   auto match_pose_info = getAgentPose(dsg, match.match_root);
   outfile << "match_id: " << match_pose_info.id << std::endl;
-  outfile << "world_q_match: " << match_pose_info.world_T_body.rotation().quaternion()
+  outfile << "world_q_match: " << match_pose_info.world_T_body.rotation().toQuaternion()
           << std::endl;
   outfile << "world_t_match: " << match_pose_info.world_T_body.translation()
           << std::endl;
   outfile << "match_valid: " << match_pose_info.valid << std::endl;
 
   outfile << "solution_valid: " << solution.valid << std::endl;
-  outfile << "dest_q_src: " << solution.dest_T_src.rotation().quaternion() << std::endl;
+  outfile << "dest_q_src: " << solution.dest_T_src.rotation().toQuaternion()
+          << std::endl;
   outfile << "dest_t_src: " << solution.dest_T_src.translation() << std::endl;
 
   // TODO(nathan) output position data
