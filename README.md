@@ -4,7 +4,7 @@
     <img src="doc/media/hydra.GIF">
 </div>
 
-This repository contains code to build 3D Dynamic Scene Graphs (DSGs) --both offline and incrementally-- and is primarily based on the paper ["Hydra: A Real-time Spatial Perception System for 3D Scene Graph Construction and Optimization"](http://www.roboticsproceedings.org/rss18/p050.pdf). If you find this code relevant for your work, please consider citing this paper. A bibtex entry is provided below:
+This repository contains code to incrementally build 3D Dynamic Scene Graphs (DSGs) in real-time and is primarily based on the paper ["Hydra: A Real-time Spatial Perception System for 3D Scene Graph Construction and Optimization"](http://www.roboticsproceedings.org/rss18/p050.pdf). If you find this code relevant for your work, please consider citing this paper. A bibtex entry is provided below:
 
 ```
 @article{hughes2022hydra,
