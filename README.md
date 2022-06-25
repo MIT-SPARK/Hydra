@@ -17,6 +17,12 @@ This repository contains code to build 3D Dynamic Scene Graphs (DSGs) --both off
 }
 ```
 
+### Acknowledgements and Disclaimer
+
+**Acknowledgements:** This work was partially funded by the AIA CRA FA8750-19-2-1000, ARL DCIST CRA W911NF-17-2-0181, and ONR RAIDER N00014-18-1-2828.
+
+**Disclaimer:** Research was sponsored by the United States Air Force Research Laboratory and the United States Air Force Artificial Intelligence Accelerator and was accomplished under Cooperative Agreement Number FA8750-19-2-1000. The views and conclusions contained in this document are those of the authors and should not be interpreted as representing the official policies, either expressed or implied, of the United States Air Force or the U.S. Government. The U.S. Government is authorized to reproduce and distribute reprints for Government purposes notwithstanding any copyright notation herein.
+
 ### General Requirements
 
 Hydra has been tested on the following systems:
@@ -56,9 +62,8 @@ catkin config -DCMAKE_BUILD_TYPE=Release -DGTSAM_TANGENT_PREINTEGRATION=OFF -DGT
 catkin config --blacklist hdf5_map_io mesh_msgs_hdf5 label_manager mesh_tools rviz_map_plugin minkindr_python
 
 cd src
-git clone git@github.mit.edu:SPARK/Hydra.git hydra
+git clone git@github.com:MIT-SPARK/Hydra.git hydra
 vcs import . < hydra/install/hydra.rosinstall
-# vcs import . < hydra/install/vio_overlay.rosinstall # (if you want to use Kimera-VIO)
 
 rosdep install --from-paths . --ignore-src -r -y
 sudo apt install libprotobuf-dev
@@ -96,7 +101,21 @@ Then, start the rosbag in a separate terminal:
 rosbag play path/to/rosbag --clock
 ```
 
+### Using Kimera-VIO
+
+:warning: Hydra relies on unreleased changes to Kimera-VIO to handle visual loop-closures (and therefore our rosinstall file currently points to a unavailable repo).
+
+We use a specific version of Kimera-VIO that reports the pose graph of the robot as well as the DBoW2 descriptors for each frame. You can configure your workspace to use this version via:
+```
+roscd && cd ../src
+vcs import . < hydra/install/vio_overlay.rosinstall
+
+catkin build
+```
+
 ### Using a Semantic Segmentation Network
+
+:warning: This package is not public (yet)
 
 Add `semantic_recolor` to your workspace via:
 
@@ -106,6 +125,12 @@ vcs import . < hydra/install/semantic_overlay.rosinstall
 ```
 
 Then, follow the instructions to install cuda and other dependencies for the `semantic_recolor` package (which can be found [here](https://github.mit.edu/SPARK/semantic_recolor_nodelet#semantic-recolor-utilities)).
+
+Finally, build your workspace:
+
+```
+catkin build
+```
 
 ### Components
 

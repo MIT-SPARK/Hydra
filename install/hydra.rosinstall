@@ -19,7 +19,7 @@
     version: develop
 - git:
     local-name: kimera_pgmo
-    uri: git@github.mit.edu:SPARK/Kimera-PGMO.git
+    uri: git@github.com:MIT-SPARK/Kimera-PGMO.git
     version: master
 - git:
     local-name: kimera_rpgo
@@ -27,13 +27,13 @@
     version: master
 - git:
     local-name: spark_dsg
-    uri: git@github.mit.edu:SPARK/Spark-DSG.git
+    uri: git@github.com:MIT-SPARK/Spark-DSG.git
 - git:
     local-name: hydra
-    uri: git@github.mit.edu:SPARK/Hydra.git
+    uri: git@github.com:MIT-SPARK/Hydra.git
 - git:
     local-name: kimera_semantics
-    uri: git@github.mit.edu:SPARK/Kimera-Semantics.git
+    uri: git@github.com:MIT-SPARK/Kimera-Semantics.git
     version: feature/noetic_fixes
 - git:
     local-name: mesh_tools
@@ -46,11 +46,12 @@
     uri: git@github.com:ethz-asl/minkindr_ros.git
 - git:
     local-name: pose_graph_tools
-    uri: git@github.mit.edu:SPARK/pose_graph_tools.git
+    uri: git@github.com:MIT-SPARK/pose_graph_tools.git
+    version: feature/hydra
 - git:
     local-name: teaser_plusplus
     uri: git@github.com:MIT-SPARK/TEASER-plusplus.git
 - git:
     local-name: voxblox
-    uri: git@github.mit.edu:SPARK/voxblox.git
-    version: feature/migrate_voxblox_changes
+    uri: git@github.com:MIT-SPARK/voxblox.git
+    version: feature/hydra
