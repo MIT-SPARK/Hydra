@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="ISO-8859-15"?>
 <launch>
-  <arg name="dsg_topic" default="/incremental_dsg_builder_node/dsg"/>
-  <arg name="dsg_mesh_topic" default="/incremental_dsg_builder_node/pgmo/optimized_mesh"/>
+  <arg name="dsg_topic" default="incremental_dsg_builder_node/dsg"/>
+  <arg name="dsg_mesh_topic" default="incremental_dsg_builder_node/pgmo/optimized_mesh"/>
   <arg name="world_frame" value="world"/>
 
   <arg name="viz_config_dir" default="$(find hydra_utils)/config/hydra_visualizer"/>

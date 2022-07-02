@@ -6,10 +6,10 @@
     <arg name="use_semantics" default="true"/>
     <arg name="sensor_frame" default="left_cam"/>
 
-    <arg name="rgb_info_topic" default="/azure/rgb/camera_info"/>
-    <arg name="rgb_topic" default="/azure/rgb/image_raw"/>
-    <arg name="depth_topic" default="/azure/depth_to_rgb/image_raw"/>
-    <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
+    <arg name="rgb_info_topic" default="azure/rgb/camera_info"/>
+    <arg name="rgb_topic" default="azure/rgb/image_raw"/>
+    <arg name="depth_topic" default="azure/depth_to_rgb/image_raw"/>
+    <arg name="pointcloud_topic" default="semantic_pointcloud"/>
 
     <arg name="dataset_name" default="ade150_config"/>
 
