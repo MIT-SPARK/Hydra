@@ -43,6 +43,7 @@
 #include <hydra_msgs/ActiveMesh.h>
 #include <hydra_topology/nearest_neighbor_utilities.h>
 #include <kimera_pgmo/MeshFrontendInterface.h>
+#include <hydra_utils/dsg_streaming_interface.h>
 #include <pose_graph_tools/PoseGraph.h>
 #include <spark_dsg/scene_graph_logger.h>
 
@@ -116,6 +117,8 @@ class DsgFrontend {
   kimera_pgmo::MeshFrontendInterface mesh_frontend_;
   std::unique_ptr<MeshSegmenter> segmenter_;
   SceneGraphLogger frontend_graph_logger_;
+
+  std::unique_ptr<hydra::DsgSender> dsg_sender_;
 
   std::unique_ptr<NearestNodeFinder> places_nn_finder_;
   NodeIdSet unlabeled_place_nodes_;
