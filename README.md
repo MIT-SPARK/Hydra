@@ -66,7 +66,7 @@ git clone git@github.com:MIT-SPARK/Hydra.git hydra
 vcs import . < hydra/install/hydra.rosinstall
 
 rosdep install --from-paths . --ignore-src -r -y
-sudo apt install libprotobuf-dev
+sudo apt install libprotobuf-dev protobuf-compiler
 
 cd ..
 catkin build
