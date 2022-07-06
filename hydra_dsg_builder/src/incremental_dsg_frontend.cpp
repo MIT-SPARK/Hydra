@@ -162,6 +162,20 @@ void DsgFrontend::start() {
   LOG(INFO) << "[DSG Frontend] started!";
 }
 
+void DsgFrontend::save(const std::string& output_path) {
+  dsg_->graph->save(output_path + "/dsg.json", false);
+  dsg_->graph->save(output_path + "/dsg_with_mesh.json");
+
+  pcl::PolygonMesh mesh;
+  mesh.polygons = mesh_frontend_.getFullMeshFaces();
+
+  const auto vertices = mesh_frontend_.getFullMeshVertices();
+  pcl::toPCLPointCloud2(*vertices, mesh.cloud);
+
+  kimera_pgmo::WriteMeshWithStampsToPly(
+      output_path + "/mesh.ply", mesh, mesh_frontend_.getFullMeshTimes());
+}
+
 void DsgFrontend::startMeshFrontend() {
   mesh_frontend_ros_queue_.reset(new ros::CallbackQueue());
   tf_listener_.reset(new tf2_ros::TransformListener(tf_buffer_));

@@ -94,6 +94,8 @@ void DsgLcd::start() {
   LOG(INFO) << "[DSG LCD] LCD started!";
 }
 
+void DsgLcd::save(const std::string& output_path) {}
+
 std::optional<NodeId> DsgLcd::getLatestAgentId() {
   if (lcd_queue_.empty()) {
     return std::nullopt;

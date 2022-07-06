@@ -162,6 +162,53 @@ void DsgBackend::start() {
   LOG(INFO) << " [DSG Backend] started!";
 }
 
+std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol key) {
+  NodeSymbol node(key.chr(), key.index());
+  if (!graph.hasNode(node)) {
+    LOG(ERROR) << "Missing node << " << node.getLabel() << "when logging loop closure";
+    LOG(ERROR) << "Num dynamic nodes: " << graph.numDynamicNodes();
+    return std::nullopt;
+  }
+
+  return graph.getDynamicNode(node).value().get().timestamp.count();
+}
+
+void DsgBackend::save(const std::string& output_path) {
+  private_dsg_->graph->save(output_path + "/dsg.json", false);
+  private_dsg_->graph->save(output_path + "/dsg_with_mesh.json");
+
+  Path optimized_path = getOptimizedTrajectory(robot_id_);
+  std::string csv_name = config_.pgmo.log_path + std::string("/traj_pgmo.csv");
+  saveTrajectory(optimized_path, timestamps_, csv_name);
+
+  kimera_pgmo::WriteMeshWithStampsToPly(
+      output_path + "/mesh.ply", private_dsg_->graph->getMesh(), mesh_vertex_stamps_);
+
+  const std::string output_csv = output_path + "/loop_closures.csv";
+  std::ofstream output_file;
+  output_file.open(output_csv);
+
+  output_file << "time_from_ns,time_to_ns,x,y,z,qw,qx,qy,qz,type,level" << std::endl;
+  for (const auto& loop_closure : loop_closures_) {
+    // pose = src.between(dest) or to_T_from
+    auto time_from = getTimeNs(*private_dsg_->graph, loop_closure.dest);
+    auto time_to = getTimeNs(*private_dsg_->graph, loop_closure.src);
+    if (!time_from || !time_to) {
+      continue;
+    }
+
+    const gtsam::Point3 pos = loop_closure.src_T_dest.translation();
+    const gtsam::Quaternion quat = loop_closure.src_T_dest.rotation().toQuaternion();
+
+    output_file << *time_from << "," << *time_to << ",";
+    output_file << pos.x() << "," << pos.y() << "," << pos.z() << ",";
+    output_file << quat.w() << ", " << quat.x() << "," << quat.y() << "," << quat.z()
+                << ",";
+    output_file << (loop_closure.dsg ? 1 : 0) << "," << loop_closure.level;
+    output_file << std::endl;
+  }
+}
+
 bool DsgBackend::updatePrivateDsg() {
   std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
   bool have_frontend_updates = shared_dsg_->updated;

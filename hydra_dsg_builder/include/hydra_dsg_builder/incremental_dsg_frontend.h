@@ -73,6 +73,8 @@ class DsgFrontend {
 
   void stop();
 
+  void save(const std::string& output_path);
+
   pcl::PolygonMesh getFrontendMesh() const {
     pcl::PolygonMesh mesh;
     mesh.polygons = mesh_frontend_.getFullMeshFaces();

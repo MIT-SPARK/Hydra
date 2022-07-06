@@ -87,6 +87,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void start();
 
+  void save(const std::string& output_path);
+
   inline void setUpdateFuncs(const std::list<LayerUpdateFunc>& update_funcs) {
     dsg_update_funcs_ = update_funcs;
   }
