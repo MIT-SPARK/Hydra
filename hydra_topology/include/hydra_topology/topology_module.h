@@ -48,8 +48,6 @@ struct TopologyModuleConfig {
   bool show_stats = true;
   bool clear_distant_blocks = true;
   double dense_representation_radius_m = 5.0;
-
-  voxblox::ColorMode mesh_color_mode = voxblox::ColorMode::kLambertColor;
 };
 
 using SemanticIntegratorConfig = kimera::SemanticIntegratorBase::SemanticConfig;
