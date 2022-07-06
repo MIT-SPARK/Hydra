@@ -43,6 +43,57 @@ using namespace hydra;
 using namespace hydra::incremental;
 using namespace hydra::timing;
 
+void run(const ros::NodeHandle& nh,
+         const SharedDsgInfo::Ptr& frontend_dsg,
+         const SharedDsgInfo::Ptr& backend_dsg,
+         const std::string& output_path) {
+  const auto exit_mode = getExitMode(nh);
+
+  bool enable_lcd = false;
+  nh.getParam("enable_lcd", enable_lcd);
+
+  DsgBackend backend(nh, frontend_dsg, backend_dsg);
+  DsgFrontend frontend(nh, frontend_dsg);
+
+  std::shared_ptr<DsgLcd> lcd;
+  if (enable_lcd) {
+    lcd.reset(new DsgLcd(nh, frontend_dsg));
+  }
+
+  frontend.start();
+  backend.start();
+  if (lcd) {
+    lcd->start();
+  }
+
+  switch (exit_mode) {
+    case ExitMode::CLOCK:
+      spinWhileClockPresent();
+      break;
+    case ExitMode::SERVICE:
+      spinUntilExitRequested();
+      break;
+    case ExitMode::NORMAL:
+    default:
+      ros::spin();
+      break;
+  }
+
+  frontend.stop();
+  if (lcd) {
+    lcd->stop();
+  }
+  backend.stop();
+
+  if (!output_path.empty()) {
+    frontend.save(output_path + "/frontend/");
+    backend.save(output_path + "/backend/");
+    if (lcd) {
+      lcd->save(output_path + "/lcd/");
+    }
+  }
+}
+
 int main(int argc, char* argv[]) {
   ros::init(argc, argv, "incremental_dsg_builder_node");
 
@@ -57,11 +108,6 @@ int main(int argc, char* argv[]) {
   ros::NodeHandle nh("~");
   std::string dsg_output_path = "";
   nh.getParam("log_path", dsg_output_path);
-
-  const auto exit_mode = getExitMode(nh);
-
-  bool enable_lcd = false;
-  nh.getParam("enable_lcd", enable_lcd);
 
   nh.getParam("disable_timer_output", ElapsedTimeRecorder::instance().disable_output);
 
@@ -80,47 +126,7 @@ int main(int argc, char* argv[]) {
   SharedDsgInfo::Ptr frontend_dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));
   SharedDsgInfo::Ptr backend_dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));
 
-  {  // scope for modules
-    hydra::incremental::DsgBackend backend(nh, frontend_dsg, backend_dsg);
-    hydra::incremental::DsgFrontend frontend(nh, frontend_dsg);
-    std::shared_ptr<hydra::incremental::DsgLcd> lcd;
-    if (enable_lcd) {
-      lcd.reset(new hydra::incremental::DsgLcd(nh, frontend_dsg));
-    }
-
-    frontend.start();
-    backend.start();
-    if (lcd) {
-      lcd->start();
-    }
-
-    switch (exit_mode) {
-      case ExitMode::CLOCK:
-        spinWhileClockPresent();
-        break;
-      case ExitMode::SERVICE:
-        spinUntilExitRequested();
-        break;
-      case ExitMode::NORMAL:
-      default:
-        ros::spin();
-        break;
-    }
-
-    frontend.stop();
-    if (lcd) {
-      lcd->stop();
-    }
-    backend.stop();
-
-    if (!dsg_output_path.empty()) {
-      frontend.save(dsg_output_path + "/frontend/");
-      backend.save(dsg_output_path + "/backend/");
-      if (lcd) {
-        lcd->save(dsg_output_path + "/lcd/");
-      }
-    }
-  }
+  run(nh, frontend_dsg, backend_dsg, dsg_output_path);
 
   if (!dsg_output_path.empty()) {
     LOG(INFO) << "[DSG Node] saving timing information to " << dsg_output_path;
