@@ -73,6 +73,7 @@ add_library(
   src/gvd_visualization_utilities.cpp
   src/gvd_voxel.cpp
   src/nearest_neighbor_utilities.cpp
+  src/topology_module.cpp
   src/topology_server_visualizer.cpp
   src/voxel_aware_marching_cubes.cpp
   src/voxel_aware_mesh_integrator.cpp
