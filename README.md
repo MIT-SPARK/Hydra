@@ -113,6 +113,17 @@ vcs import . < hydra/install/vio_public_overlay.rosinstall
 catkin build
 ```
 
+To run Hydra using Kimera:
+
+```
+roslaunch kimera_vio_ros kimera_vio_ros kimera_vio_ros_uhumans2.launch
+
+# in separate terminal
+roslaunch hydra_dsg_builder uhumans2_incremental_dsg.launch start_visualizer:=true use_gt_frame:=false
+```
+
+To achieve the best results with Kimera-VIO, you should run the rosbag for about half a second, pause to wait for the LCD vocabulary to load, and then unpause the rosbag.
+
 ### Using a Semantic Segmentation Network
 
 :warning: This package is not public (yet)
