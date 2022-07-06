@@ -58,8 +58,10 @@ To get started:
 mkdir -p catkin_ws/src
 cd catkin_ws
 catkin init
-catkin config -DCMAKE_BUILD_TYPE=Release -DGTSAM_TANGENT_PREINTEGRATION=OFF -DGTSAM_BUILD_WITH_MARCH_NATIVE=OFF -DOPENGV_BUILD_WITH_MARCH_NATIVE=OFF
-catkin config --blacklist hdf5_map_io mesh_msgs_hdf5 label_manager mesh_tools rviz_map_plugin minkindr_python
+catkin config -DCMAKE_BUILD_TYPE=Release -DGTSAM_TANGENT_PREINTEGRATION=OFF \
+              -DGTSAM_BUILD_WITH_MARCH_NATIVE=OFF -DOPENGV_BUILD_WITH_MARCH_NATIVE=OFF
+catkin config --blacklist hdf5_map_io mesh_msgs_hdf5 label_manager mesh_tools \
+                          rviz_map_plugin minkindr_python
 
 cd src
 git clone git@github.com:MIT-SPARK/Hydra.git hydra
@@ -103,15 +105,28 @@ rosbag play path/to/rosbag --clock
 
 ### Using Kimera-VIO
 
-:warning: Hydra relies on unreleased changes to Kimera-VIO to handle visual loop-closures (and therefore our rosinstall file currently points to a unavailable repo).
+:warning: Hydra relies on unreleased changes to Kimera-VIO to handle visual loop-closures and receive the robot pose graph. The current public version of Kimera-VIO that Hydra points to will not generate loop closures or pose graph information for Hydra, but has been tested against the `uHumans2_office_s1_00h.bag.bag.bag.bag`.
 
-We use a specific version of Kimera-VIO that reports the pose graph of the robot as well as the DBoW2 descriptors for each frame. You can configure your workspace to use this version via:
+You can configure your workspace to also include Kimera-VIO by:
 ```
 roscd && cd ../src
-vcs import . < hydra/install/vio_overlay.rosinstall
+vcs import . < hydra/install/vio_public_overlay.rosinstall
 
 catkin build
 ```
+
+To run Hydra using Kimera:
+
+```
+roslaunch kimera_vio_ros kimera_vio_ros kimera_vio_ros_uhumans2.launch
+
+# in separate terminal
+roslaunch hydra_dsg_builder uhumans2_incremental_dsg.launch \
+     start_visualizer:=true \
+     use_gt_frame:=false
+```
+
+To achieve the best results with Kimera-VIO, you should run the rosbag for about half a second, pause to wait for the LCD vocabulary to load, and then unpause the rosbag.
 
 ### Using a Semantic Segmentation Network
 
