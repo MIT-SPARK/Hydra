@@ -47,6 +47,9 @@ struct DsgFrontendConfig {
   bool prune_mesh_indices = false;
   std::string sensor_frame = "base_link";
   std::string mesh_ns = "";
+  bool enable_active_mesh_pub = false;
+  bool enable_segmented_mesh_pub = false;
+  std::string semantic_label_file;
 };
 
 template <typename Visitor>
@@ -59,6 +62,9 @@ void visit_config(const Visitor& v, DsgFrontendConfig& config) {
   v.visit("prune_mesh_indices", config.prune_mesh_indices);
   v.visit("sensor_frame", config.sensor_frame);
   v.visit("mesh_ns", config.mesh_ns);
+  v.visit("enable_active_mesh_pub", config.enable_active_mesh_pub);
+  v.visit("enable_segmented_mesh_pub", config.enable_segmented_mesh_pub);
+  v.visit("semantic_label_file", config.semantic_label_file);
 }
 
 }  // namespace incremental

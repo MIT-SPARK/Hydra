@@ -49,10 +49,13 @@ using hydra::timing::ScopedTimer;
 using pose_graph_tools::PoseGraph;
 
 using LabelClusters = MeshSegmenter::LabelClusters;
+using MeshVertexCloud = MeshSegmenter::MeshVertexCloud;
+using LabelIndices = MeshSegmenter::LabelIndices;
 
 DsgFrontend::DsgFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg)
     : nh_(nh), dsg_(dsg) {
   config_ = load_config<DsgFrontendConfig>(nh_);
+  label_map_.reset(new kimera::SemanticLabel2Color(config_.semantic_label_file));
 
   ros::NodeHandle pgmo_nh(nh_, "pgmo");
   CHECK(mesh_frontend_.initialize(pgmo_nh, false));
@@ -88,7 +91,8 @@ void DsgFrontend::stop() {
 
 DsgFrontend::~DsgFrontend() {
   stop();
-  segmenter_.reset();
+  // handle this before node handle disappears
+  segmented_mesh_vertices_pub_.reset();
 }
 
 void DsgFrontend::handleActivePlaces(const PlacesLayerMsg::ConstPtr& msg) {
@@ -181,9 +185,11 @@ void DsgFrontend::startMeshFrontend() {
   tf_listener_.reset(new tf2_ros::TransformListener(tf_buffer_));
 
   ros::NodeHandle mesh_nh(nh_, config_.mesh_ns);
-  mesh_nh.setCallbackQueue(mesh_frontend_ros_queue_.get());
-  segmenter_.reset(new MeshSegmenter(mesh_nh, mesh_frontend_.getFullMeshVertices()));
 
+  MeshSegmenterConfig config;
+  segmenter_.reset(new MeshSegmenter(config, mesh_frontend_.getFullMeshVertices()));
+
+  // TODO(nathan) move to spark_dsg
   // allow mesh edges to be added
   DynamicSceneGraph::MeshVertices fake_vertices;
   pcl::PolygonMesh fake_mesh;
@@ -193,6 +199,16 @@ void DsgFrontend::startMeshFrontend() {
   mesh_frontend_thread_.reset(new std::thread(&DsgFrontend::runMeshFrontend, this));
 
   mesh_sub_ = nh_.subscribe("voxblox_mesh", 5, &DsgFrontend::handleLatestMesh, this);
+
+  if (config_.enable_active_mesh_pub) {
+    active_mesh_vertex_pub_ =
+        nh_.advertise<MeshVertexCloud>("active_mesh_vertices", 1, true);
+  }
+
+  if (config_.enable_segmented_mesh_pub) {
+    segmented_mesh_vertices_pub_.reset(
+        new ObjectCloudPublishers("object_mesh_vertices", nh_));
+  }
 }
 
 std::optional<Eigen::Vector3d> DsgFrontend::getLatestPose() {
@@ -280,8 +296,8 @@ void DsgFrontend::runMeshFrontend() {
         }
       }  // end dsg critical section
 
-      object_clusters = segmenter_->detectObjects(
-          mesh_frontend_.getActiveFullMeshVertices(), getLatestPose());
+      object_clusters = segmenter_->detect(
+          *label_map_, mesh_frontend_.getActiveFullMeshVertices(), getLatestPose());
     }
 
     {  // start dsg critical section
@@ -308,6 +324,36 @@ void DsgFrontend::runMeshFrontend() {
     }
 
     dsg_->updated = true;
+  }
+}
+
+void DsgFrontend::publishActiveVertices(const MeshVertexCloud& vertices,
+                                        const std::vector<size_t>& indices,
+                                        const LabelIndices&) const {
+  MeshVertexCloud::Ptr active_cloud(new MeshVertexCloud());
+  active_cloud->reserve(indices.size());
+  for (const auto idx : indices) {
+    active_cloud->push_back(vertices.at(idx));
+  }
+
+  active_cloud->header.frame_id = "world";
+  pcl_conversions::toPCL(ros::Time::now(), active_cloud->header.stamp);
+  active_mesh_vertex_pub_.publish(active_cloud);
+}
+
+void DsgFrontend::publishObjectClouds(const MeshVertexCloud& vertices,
+                                      const std::vector<size_t>&,
+                                      const LabelIndices& label_indices) const {
+  for (const auto& label_index_pair : label_indices) {
+    MeshVertexCloud label_cloud;
+    label_cloud.reserve(label_index_pair.second.size());
+    for (const auto idx : label_index_pair.second) {
+      label_cloud.push_back(vertices.at(idx));
+    }
+
+    label_cloud.header.frame_id = "world";
+    pcl_conversions::toPCL(ros::Time::now(), label_cloud.header.stamp);
+    segmented_mesh_vertices_pub_->publish(label_index_pair.first, label_cloud);
   }
 }
 

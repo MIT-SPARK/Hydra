@@ -45,7 +45,10 @@
 #include <hydra_msgs/ActiveLayer.h>
 #include <hydra_msgs/ActiveMesh.h>
 #include <hydra_topology/nearest_neighbor_utilities.h>
+#include <hydra_utils/semantic_ros_publishers.h>
 #include <kimera_pgmo/MeshFrontend.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl_ros/point_cloud.h>
 #include <pose_graph_tools/PoseGraph.h>
 #include <spark_dsg/scene_graph_logger.h>
 
@@ -57,6 +60,8 @@ namespace incremental {
 
 using PlacesLayerMsg = hydra_msgs::ActiveLayer;
 using topology::NearestNodeFinder;
+using ObjectCloudPublishers =
+    SemanticRosPublishers<uint8_t, MeshSegmenter::MeshVertexCloud>;
 
 struct PlacesQueueState {
   bool empty = true;
@@ -94,6 +99,14 @@ class DsgFrontend {
   void handleLatestMesh(const hydra_msgs::ActiveMesh::ConstPtr& msg);
 
   void handleLatestPoseGraph(const pose_graph_tools::PoseGraph::ConstPtr& msg);
+
+  void publishActiveVertices(const MeshSegmenter::MeshVertexCloud& vertices,
+                             const std::vector<size_t>& indices,
+                             const MeshSegmenter::LabelIndices&) const;
+
+  void publishObjectClouds(const MeshSegmenter::MeshVertexCloud& vertices,
+                           const std::vector<size_t>&,
+                           const MeshSegmenter::LabelIndices& label_indices) const;
 
   void startMeshFrontend();
 
@@ -152,6 +165,9 @@ class DsgFrontend {
   ros::Subscriber pose_graph_sub_;
 
   SceneGraphLogger frontend_graph_logger_;
+  ros::Publisher active_mesh_vertex_pub_;
+  std::unique_ptr<ObjectCloudPublishers> segmented_mesh_vertices_pub_;
+  std::unique_ptr<kimera::SemanticLabel2Color> label_map_;
 };
 
 }  // namespace incremental
