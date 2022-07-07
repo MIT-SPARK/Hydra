@@ -447,13 +447,17 @@ void DsgBackend::fullMeshCallback(const KimeraPgmoMesh::ConstPtr& msg) {
 
 void DsgBackend::deformationGraphCallback(const PoseGraph::ConstPtr& msg) {
   std::unique_lock<std::mutex> lock(pgmo_mutex_);
-  deformation_graph_updates_.push(msg);
+  if (msg->nodes.size() > 0 && msg->edges.size() > 0) {
+    deformation_graph_updates_.push(msg);
+  }
   last_timestamp_ = msg->header.stamp.toNSec();
 }
 
 void DsgBackend::poseGraphCallback(const PoseGraph::ConstPtr& msg) {
   std::unique_lock<std::mutex> lock(pgmo_mutex_);
-  pose_graph_updates_.push(msg);
+  if (msg->nodes.size() > 0 && msg->edges.size() > 0) {
+    pose_graph_updates_.push(msg);
+  }
 }
 
 bool DsgBackend::saveMeshCallback(std_srvs::Empty::Request&,

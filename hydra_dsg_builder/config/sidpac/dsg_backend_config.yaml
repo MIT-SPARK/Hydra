@@ -9,7 +9,7 @@ dsg:
     merge_update_map: {"BUILDINGS": 0, "ROOMS": 0, "PLACES": 1, "OBJECTS": 0}
 pgmo:
     run_mode: 0  # kimera_pgmo run mode FULL (required)
-    use_msg_time: true
+    use_msg_time: false
     embed_trajectory_delta_t: 5.0
     num_interp_pts: 3
     interp_horizon: 10.0

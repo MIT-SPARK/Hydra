@@ -155,7 +155,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void logIncrementalLoopClosures(const pose_graph_tools::PoseGraph& msg);
 
-  bool readPgmoUpdates();
+  virtual bool readPgmoUpdates();
 
   pose_graph_tools::PoseGraph::ConstPtr popDeformationGraphQueue();
 

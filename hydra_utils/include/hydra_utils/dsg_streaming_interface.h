@@ -45,7 +45,8 @@ class DsgSender {
  public:
   explicit DsgSender(const ros::NodeHandle& nh);
 
-  void sendGraph(DynamicSceneGraph& graph, const ros::Time& stamp) const;
+  void sendGraph(DynamicSceneGraph& graph,
+                 const ros::Time& stamp) const;
 
  private:
   ros::NodeHandle nh_;

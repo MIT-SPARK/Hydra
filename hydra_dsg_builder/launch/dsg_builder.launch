@@ -82,6 +82,7 @@
         <param name="pgmo/should_log" value="$(arg pgmo_should_log)"/>
         <param name="objects/bounding_box_type" value="RAABB" if="$(arg use_oriented_bounding_boxes)"/>
         <param name="objects/bounding_box_type" value="AABB" unless="$(arg use_oriented_bounding_boxes)"/>
+        <param name="pgmo/robot_id" value="$(arg robot_id)"/>
 
         <remap from="~voxblox_mesh" to="hydra_topology_node/active_mesh"/>
         <remap from="~active_places" to="hydra_topology_node/active_layer"/>
