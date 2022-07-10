@@ -62,11 +62,12 @@ DsgFrontend::DsgFrontend(const DsgFrontendConfig& config,
   dsg_->graph->initMesh();
   dsg_->graph->createDynamicLayer(DsgLayers::AGENTS, robot_prefix_);
 
-  ros::NodeHandle pgmo_nh(nh_, "pgmo");
-  CHECK(mesh_frontend_.initialize(pgmo_nh, false));
+  // TODO(nathan) these should be part of the frontend config
+  kimera_pgmo::MeshFrontendConfig pgmo_config;
+  CHECK(mesh_frontend_.initialize(pgmo_config));
 
-  MeshSegmenterConfig config;
-  segmenter_.reset(new MeshSegmenter(config, mesh_frontend_.getFullMeshVertices()));
+  MeshSegmenterConfig obj_config;
+  segmenter_.reset(new MeshSegmenter(obj_config, mesh_frontend_.getFullMeshVertices()));
 
   if (config_.should_log) {
     LOG(INFO) << "Logging frontend graph to " << (config_.log_path + "/frontend");
@@ -78,30 +79,12 @@ DsgFrontend::DsgFrontend(const DsgFrontendConfig& config,
 
 DsgFrontend::~DsgFrontend() { stop(); }
 
-void DsgFrontend::start() {
-  mesh_frontend_thread_.reset(new std::thread(&DsgFrontend::runMeshFrontend, this));
-  places_thread_.reset(new std::thread(&DsgFrontend::runPlaces, this));
-
-  LOG(INFO) << "[Hydra Frontend] started!";
-}
+void DsgFrontend::start() { LOG(INFO) << "[Hydra Frontend] started!"; }
 
 void DsgFrontend::stop() {
   VLOG(2) << "[Hydra Frontend] stopping frontend!";
-
   should_shutdown_ = true;
-  if (mesh_frontend_thread_) {
-    VLOG(2) << "[Hydra Frontend] joining mesh thread";
-    mesh_frontend_thread_->join();
-    mesh_frontend_thread_.reset();
-    VLOG(2) << "[Hydra Frontend] joined mesh thread";
-  }
-
-  if (places_thread_) {
-    VLOG(2) << "[Hydra Frontend] joining places thread";
-    places_thread_->join();
-    places_thread_.reset();
-    VLOG(2) << "[Hydra Frontend] joined places thread";
-  }
+  VLOG(2) << "[Hydra Frontend] stopped!";
 }
 
 void DsgFrontend::save(const std::string& output_path) {
@@ -116,6 +99,62 @@ void DsgFrontend::save(const std::string& output_path) {
 
   kimera_pgmo::WriteMeshWithStampsToPly(
       output_path + "/mesh.ply", mesh, mesh_frontend_.getFullMeshTimes());
+}
+
+void DsgFrontend::spinOnce() {
+  if (should_shutdown_) {
+    return;
+  }
+
+  {
+    // ScopedTimer timer("frontend/place_mesh_mapping", ???);
+    updatePlaceMeshMapping();
+  }
+
+  // dsg_->last_update_time = curr_message->header.stamp.toNSec();
+  dsg_->updated = true;
+
+  if (config_.should_log) {
+    // mutex not required because nothing is modifying the graph
+    frontend_graph_logger_.logGraph(dsg_->graph);
+  }
+}
+
+void DsgFrontend::runMeshFrontend(const hydra_msgs::ActiveMesh::ConstPtr& msg) {
+  voxblox_msgs::Mesh::ConstPtr mesh_msg(new voxblox_msgs::Mesh(msg->mesh));
+
+  const uint64_t timestamp = msg->header.stamp.toNSec();
+  {  // start timing scope
+    ScopedTimer timer("frontend/mesh_compression", timestamp, true, 1, false);
+    mesh_frontend_.voxbloxCallback(mesh_msg);
+    mesh_frontend_.clearArchivedMeshFull(msg->archived_blocks);
+  }  // end timing scope
+
+  LabelClusters object_clusters;
+
+  {  // timing scope
+    ScopedTimer timer("frontend/object_detection", timestamp, true, 1, false);
+    invalidateMeshEdges();
+    // add latest position somehow
+    object_clusters = segmenter_->detect(
+        *label_map_, mesh_frontend_.getActiveFullMeshVertices(), std::nullopt);
+  }
+
+  {  // start dsg critical section
+    ScopedTimer timer("frontend/object_graph_update", timestamp);
+    std::unique_lock<std::mutex> lock(dsg_->mutex);
+    dsg_->archived_objects =
+        segmenter_->updateGraph(*dsg_->graph, object_clusters, timestamp);
+    addPlaceObjectEdges();
+  }  // end dsg critical section
+}
+
+void DsgFrontend::runPlaces(const PlacesLayerMsg::ConstPtr& curr_message) {
+  processLatestPlacesMsg(curr_message);
+
+  auto latest_places = *dsg_->latest_places;
+  archivePlaces(latest_places);
+  previous_active_places_ = latest_places;
 }
 
 void DsgFrontend::handleLatestPoseGraph(const PoseGraph::ConstPtr& msg) {
@@ -150,7 +189,7 @@ void DsgFrontend::handleLatestPoseGraph(const PoseGraph::ConstPtr& msg) {
     dsg_->agent_key_map[pgmo_key] = agents.nodes().size() - 1;
   }
 
-  addAgentPlaceEdges();
+  addPlaceAgentEdges();
 }
 
 void DsgFrontend::invalidateMeshEdges() {
@@ -176,70 +215,13 @@ void DsgFrontend::invalidateMeshEdges() {
   }  // end dsg critical section
 }
 
-void DsgFrontend::runMeshFrontend(const hydra_msgs::ActiveMesh::ConstPtr& msg) {
-  voxblox_msgs::Mesh::ConstPtr mesh_msg(new voxblox_msgs::Mesh(msg->mesh));
-
-  uint64_t object_timestamp = msg->header.stamp.toNSec();
-  {  // start timing scope
-    ScopedTimer timer(
-        "frontend/mesh_compression", last_mesh_timestamp_, true, 1, false);
-
-    mesh_frontend_ros_queue_->callAvailable(ros::WallDuration(0.0));
-    mesh_frontend_.voxbloxCallback(mesh_msg);
-  }  // end timing scope
-
-  mesh_frontend_.clearArchivedMeshFull(msg->archived_blocks);
-  LabelClusters object_clusters;
-
-  {  // timing scope
-    ScopedTimer timer("frontend/object_detection", object_timestamp, true, 1, false);
-    invalidateMeshEdges();
-    object_clusters = segmenter_->detect(
-        *label_map_, mesh_frontend_.getActiveFullMeshVertices(), getLatestPose());
-  }
-
-  {  // start dsg critical section
-    ScopedTimer timer("frontend/object_graph_update", last_places_timestamp_);
-    std::unique_lock<std::mutex> lock(dsg_->mutex);
-    dsg_->archived_objects =
-        segmenter_->updateGraph(*dsg_->graph, object_clusters, last_places_timestamp_);
-    addPlaceObjectEdges();
-  }  // end dsg critical section
-}
-
-void DsgFrontend::spinOnce() {
-  if (should_shutdown_) {
-    return;
-  }
-
-  {
-    ScopedTimer timer("frontend/place_mesh_mapping", last_places_timestamp_);
-    updatePlaceMeshMapping();
-  }
-
-  dsg_->updated = true;
-
-  if (config_.should_log) {
-    std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-    frontend_graph_logger_.logGraph(dsg_->graph);
-  }
-}
-
-void DsgFrontend::runPlaces(const PlacesLayerMsg::ConstPtr& curr_message) {
-  processLatestPlacesMsg(curr_message);
-
-  auto latest_places = *dsg_->latest_places;
-  archivePlaces(latest_places);
-  previous_active_places_ = latest_places;
-}
-
-void DsgFrontend::archivePlaces(const NodeIsSet active_places) {
+void DsgFrontend::archivePlaces(const NodeIdSet active_places) {
   {  // start graph update critical section
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
 
     // find node ids that are valid, but outside active place window
     for (const auto& prev : previous_active_places_) {
-      if (latest_places.count(prev)) {
+      if (active_places.count(prev)) {
         continue;
       }
 
@@ -259,7 +241,6 @@ void DsgFrontend::archivePlaces(const NodeIsSet active_places) {
       dsg_->archived_places.insert(prev);
     }
 
-    dsg_->last_update_time = curr_message->header.stamp.toNSec();
   }  // end graph update critical section
 }
 
@@ -306,7 +287,7 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
 
     places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
 
-    addAgentPlaceEdges();
+    addPlaceAgentEdges();
     addPlaceObjectEdges(&objects_to_check);
 
     *dsg_->latest_places = active_nodes;
@@ -317,7 +298,7 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
 }
 
 void DsgFrontend::addPlaceObjectEdges(NodeIdSet* extra_objects_to_check) {
-  ScopedTimer timer("frontend/place_object_edges", last_places_timestamp_);
+  // ScopedTimer timer("frontend/place_object_edges", ???);
   if (!places_nn_finder_) {
     return;  // haven't received places yet
   }
@@ -343,7 +324,7 @@ void DsgFrontend::addPlaceObjectEdges(NodeIdSet* extra_objects_to_check) {
 }
 
 void DsgFrontend::addPlaceAgentEdges() {
-  ScopedTimer timer("frontend/place_agent_edges", last_places_timestamp_);
+  // ScopedTimer timer("frontend/place_agent_edges", ???);
   if (!places_nn_finder_) {
     return;  // haven't received places yet
   }

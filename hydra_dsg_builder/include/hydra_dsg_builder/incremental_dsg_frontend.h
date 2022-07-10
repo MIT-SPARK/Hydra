@@ -41,7 +41,7 @@
 #include <hydra_msgs/ActiveLayer.h>
 #include <hydra_msgs/ActiveMesh.h>
 #include <hydra_topology/nearest_neighbor_utilities.h>
-#include <kimera_pgmo/MeshFrontend.h>
+#include <kimera_pgmo/MeshFrontendInterface.h>
 #include <pose_graph_tools/PoseGraph.h>
 #include <spark_dsg/scene_graph_logger.h>
 
@@ -68,14 +68,20 @@ class DsgFrontend {
 
   void save(const std::string& output_path);
 
- protected:
-  void runMeshFrontend();
+  void spinOnce();
 
-  void runPlaces();
+ protected:
+  void runMeshFrontend(const hydra_msgs::ActiveMesh::ConstPtr& msg);
+
+  void runPlaces(const PlacesLayerMsg::ConstPtr& curr_message);
+
+  void handleLatestPoseGraph(const pose_graph_tools::PoseGraph::ConstPtr& msg);
 
   void processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg);
 
-  void archivePlaces(const NodeIsSet active_places);
+  void archivePlaces(const NodeIdSet active_places);
+
+  void invalidateMeshEdges();
 
   void addPlaceObjectEdges(NodeIdSet* extra_objects_to_check = nullptr);
 
@@ -95,7 +101,7 @@ class DsgFrontend {
   SharedDsgInfo::Ptr dsg_;
   char robot_prefix_;
 
-  kimera_pgmo::MeshFrontend mesh_frontend_;
+  kimera_pgmo::MeshFrontendInterface mesh_frontend_;
   std::unique_ptr<MeshSegmenter> segmenter_;
   SceneGraphLogger frontend_graph_logger_;
 

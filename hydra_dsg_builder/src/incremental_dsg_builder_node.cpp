@@ -53,7 +53,14 @@ void run(const ros::NodeHandle& nh,
   nh.getParam("enable_lcd", enable_lcd);
 
   DsgBackend backend(nh, frontend_dsg, backend_dsg);
-  DsgFrontend frontend(nh, frontend_dsg);
+
+  int robot_id = 0;
+  nh.getParam("robot_id", robot_id);
+
+  auto config = load_config<DsgFrontendConfig>(nh);
+  config.pgmo_config.robot_id = robot_id;
+  const auto robot_prefix = kimera_pgmo::robot_id_to_prefix.at(robot_id);
+  DsgFrontend frontend(config, frontend_dsg, robot_prefix);
 
   std::shared_ptr<DsgLcd> lcd;
   if (enable_lcd) {

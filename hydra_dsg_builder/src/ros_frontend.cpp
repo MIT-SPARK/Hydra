@@ -39,8 +39,6 @@ namespace hydra {
 ROSFrontend() {
   ros::NodeHandle mesh_nh(nh_, config_.mesh_ns);
 
-  config_ = load_config<DsgFrontendConfig>(nh);
-
   pose_graph_sub_ = nh_.subscribe(
       "pose_graph_incremental", 100, &DsgFrontend::handleLatestPoseGraph, this);
 

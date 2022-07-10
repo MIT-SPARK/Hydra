@@ -34,6 +34,39 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include "hydra_dsg_builder/config_utils.h"
+#include "hydra_dsg_builder/incremental_mesh_segmenter.h"
+
+#include <kimera_pgmo/MeshFrontendInterface.h>
+
+namespace spark_dsg {
+
+using BoundingBoxType = BoundingBox::Type;
+
+}  // namespace spark_dsg
+
+DECLARE_CONFIG_ENUM(spark_dsg,
+                    BoundingBoxType,
+                    {BoundingBoxType::INVALID, "INVALID"},
+                    {BoundingBoxType::AABB, "AABB"},
+                    {BoundingBoxType::OBB, "OBB"},
+                    {BoundingBoxType::RAABB, "RAABB"});
+
+namespace kimera_pgmo {
+
+template <typename Visitor>
+void visit_config(const Visitor& v, kimera_pgmo::MeshFrontendConfig& config) {
+  v.visit("robot_id", config.robot_id);
+  v.visit("time_horizon", config.time_horizon);
+  v.visit("b_track_mesh_graph_mapping", config.b_track_mesh_graph_mapping);
+  v.visit("log_path", config.log_path);
+  v.visit("log_output", config.log_output);
+  v.visit("full_compression_method", config.full_compression_method);
+  v.visit("graph_compression_method", config.graph_compression_method);
+  v.visit("d_graph_resolution", config.d_graph_resolution);
+  v.visit("mesh_resolution", config.mesh_resolution);
+}
+
+}  // namespace kimera_pgmo
 
 namespace hydra {
 namespace incremental {
@@ -42,32 +75,40 @@ struct DsgFrontendConfig {
   // TODO(nathan) consider unifying log path with backend
   bool should_log = true;
   std::string log_path;
-  size_t mesh_queue_size = 10;
   size_t min_object_vertices = 20;
   bool prune_mesh_indices = false;
-  std::string sensor_frame = "base_link";
-  std::string mesh_ns = "";
-  bool enable_active_mesh_pub = false;
-  bool enable_segmented_mesh_pub = false;
   std::string semantic_label_file;
+  kimera_pgmo::MeshFrontendConfig pgmo_config;
+  MeshSegmenterConfig object_config;
 };
+
+template <typename Visitor>
+void visit_config(const Visitor& v, MeshSegmenterConfig& config) {
+  v.visit("prefix", config.prefix);
+  v.visit("active_horizon_s", config.active_horizon_s);
+  v.visit("active_index_horizon_m", config.active_index_horizon_m);
+  v.visit("cluster_tolerance", config.cluster_tolerance);
+  v.visit("min_cluster_size", config.min_cluster_size);
+  v.visit("max_cluster_size", config.max_cluster_size);
+  v.visit("bounding_box_type", config.bounding_box_type);
+  v.visit("labels", config.labels);
+}
 
 template <typename Visitor>
 void visit_config(const Visitor& v, DsgFrontendConfig& config) {
   // TODO(nathan) replace with single param (derive should_log from log_path)
   v.visit("should_log", config.should_log);
   v.visit("log_path", config.log_path);
-  v.visit("mesh_queue_size", config.mesh_queue_size);
   v.visit("min_object_vertices", config.min_object_vertices);
   v.visit("prune_mesh_indices", config.prune_mesh_indices);
-  v.visit("sensor_frame", config.sensor_frame);
-  v.visit("mesh_ns", config.mesh_ns);
-  v.visit("enable_active_mesh_pub", config.enable_active_mesh_pub);
-  v.visit("enable_segmented_mesh_pub", config.enable_segmented_mesh_pub);
   v.visit("semantic_label_file", config.semantic_label_file);
+  v.visit("pgmo", config.pgmo_config);
+  v.visit("objects", config.object_config);
 }
 
 }  // namespace incremental
 }  // namespace hydra
 
+DECLARE_CONFIG_OSTREAM_OPERATOR(kimera_pgmo, MeshFrontendConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra::incremental, MeshSegmenterConfig)
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra::incremental, DsgFrontendConfig)
