@@ -36,27 +36,25 @@
 
 namespace hydra {
 
-ROSFrontend() {
-  ros::NodeHandle mesh_nh(nh_, config_.mesh_ns);
-
-  pose_graph_sub_ = nh_.subscribe(
-      "pose_graph_incremental", 100, &DsgFrontend::handleLatestPoseGraph, this);
-
-  active_places_sub_ =
-      nh_.subscribe("active_places", 5, &DsgFrontend::handleActivePlaces, this);
+ROSFrontend::ROSFrontend(const ros::NodeHandle& nh,
+                         const DsgFrontend::FrontendInputQueue::Ptr& queue)
+    : nh_(nh), queue_(queue) {
+  mesh_sub_.reset(new message_filters::Subscriber<ActiveMesh>(nh_, "voxblox_mesh", 5));
+  places_sub_.reset(
+      new message_filters::Subscriber<PlacesLayerMsg>(nh_, "active_places", 5));
+  pose_graph_sub_.reset(
+      new message_filters::Subscriber<PoseGraph>(nh_, "pose_graph_incremental", 5));
+  synchronizer_.reset(new Sync(Policy(10), *places_sub_, *mesh_sub_, *pose_graph_sub_));
+  synchronizer_->registerCallback(
+      boost::bind(&ROSFrontend::inputCallback, this, _1, _2, _3));
 
   tf_listener_.reset(new tf2_ros::TransformListener(tf_buffer_));
 
-  mesh_frontend_ros_queue_.reset(new ros::CallbackQueue());
-
-  mesh_sub_ = nh_.subscribe("voxblox_mesh", 5, &DsgFrontend::handleLatestMesh, this);
-
-  if (config_.enable_active_mesh_pub) {
+  if (ros_config_.enable_active_mesh_pub) {
     active_mesh_vertex_pub_ =
         nh_.advertise<MeshVertexCloud>("active_mesh_vertices", 1, true);
   }
-
-  if (config_.enable_segmented_mesh_pub) {
+  if (ros_config_.enable_segmented_mesh_pub) {
     segmented_mesh_vertices_pub_.reset(
         new ObjectCloudPublishers("object_mesh_vertices", nh_));
   }
@@ -64,24 +62,9 @@ ROSFrontend() {
 
 ROSFrontend::~ROSFrontend() { segmented_mesh_vertices_pub_.reset(); }
 
-void ROSFrontend::handleActivePlaces(const PlacesLayerMsg::ConstPtr& msg) {
-  std::unique_lock<std::mutex> queue_lock(places_queue_mutex_);
-  places_queue_.push(msg);
-}
-
-void ROSFrontend::handleLatestMesh(const hydra_msgs::ActiveMesh::ConstPtr& msg) {
-  {  // start mesh frontend critical section
-    std::unique_lock<std::mutex> mesh_lock(mesh_frontend_mutex_);
-    if (mesh_queue_.size() < config_.mesh_queue_size) {
-      mesh_queue_.push(msg);
-      return;
-    }
-  }  // end mesh frontend critical section
-
-  ROS_WARN_STREAM("[DSG Frontend] Dropping mesh update @ "
-                  << msg->header.stamp.toSec() << " [s] (" << msg->header.stamp.toNSec()
-                  << " [ns])");
-}
+void ROSFrontend::inputCallback(const PlacesLayerMsg::ConstPtr& places,
+                                const ActiveMesh::ConstPtr& mesh,
+                                const PoseGraph::ConstPtr& pose_graph) {}
 
 void ROSFrontend::publishActiveVertices(const MeshVertexCloud& vertices,
                                         const std::vector<size_t>& indices,
@@ -113,18 +96,14 @@ void ROSFrontend::publishObjectClouds(const MeshVertexCloud& vertices,
   }
 }
 
-std::optional<Eigen::Vector3d> DsgFrontend::getLatestPose() {
-  if (!config_.prune_mesh_indices) {
-    return std::nullopt;
-  }
-
+std::optional<Eigen::Vector3d> ROSFrontend::getLatestPose() {
   geometry_msgs::TransformStamped msg;
   try {
-    msg = tf_buffer_.lookupTransform("world", config_.sensor_frame, ros::Time(0));
+    msg = tf_buffer_.lookupTransform("world", ros_config_.sensor_frame, ros::Time(0));
   } catch (tf2::TransformException& ex) {
-    LOG_FIRST_N(WARNING, 3) << "failed to look up transform to " << config_.sensor_frame
-                            << " @ " << last_mesh_timestamp_ << ": " << ex.what()
-                            << " Not filtering indices.";
+    LOG_FIRST_N(WARNING, 3) << "failed to look up transform to "
+                            << ros_config_.sensor_frame << " @ " << ros::Time::now()
+                            << ": " << ex.what() << " Not filtering indices.";
     return std::nullopt;
   }
 

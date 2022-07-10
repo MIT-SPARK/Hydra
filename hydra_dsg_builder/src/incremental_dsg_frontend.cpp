@@ -49,14 +49,13 @@ using hydra::timing::ScopedTimer;
 using pose_graph_tools::PoseGraph;
 
 using LabelClusters = MeshSegmenter::LabelClusters;
-using MeshVertexCloud = MeshSegmenter::MeshVertexCloud;
-using LabelIndices = MeshSegmenter::LabelIndices;
 
 DsgFrontend::DsgFrontend(const DsgFrontendConfig& config,
                          const SharedDsgInfo::Ptr& dsg,
                          char robot_prefix)
     : config_(config), dsg_(dsg), robot_prefix_(robot_prefix) {
   label_map_.reset(new kimera::SemanticLabel2Color(config_.semantic_label_file));
+  queue_.reset(new FrontendInputQueue());
 
   // add placeholder mesh to allow mesh edges to be added
   dsg_->graph->initMesh();
@@ -101,26 +100,33 @@ void DsgFrontend::save(const std::string& output_path) {
       output_path + "/mesh.ply", mesh, mesh_frontend_.getFullMeshTimes());
 }
 
-void DsgFrontend::spinOnce() {
-  if (should_shutdown_) {
-    return;
-  }
+void DsgFrontend::spin() {
+  while (should_shutdown_) {
+    bool has_data = queue_->poll();
+    if (!has_data) {
+      continue;
+    }
 
-  {
-    // ScopedTimer timer("frontend/place_mesh_mapping", ???);
-    updatePlaceMeshMapping();
-  }
+    const auto msg = queue_->pop();
+    const auto timestamp = msg.places->header.stamp.toNSec();
 
-  // dsg_->last_update_time = curr_message->header.stamp.toNSec();
-  dsg_->updated = true;
+    {
+      ScopedTimer timer("frontend/place_mesh_mapping", timestamp);
+      updatePlaceMeshMapping();
+    }
 
-  if (config_.should_log) {
-    // mutex not required because nothing is modifying the graph
-    frontend_graph_logger_.logGraph(dsg_->graph);
+    dsg_->last_update_time = timestamp;
+    dsg_->updated = true;
+
+    if (config_.should_log) {
+      // mutex not required because nothing is modifying the graph
+      frontend_graph_logger_.logGraph(dsg_->graph);
+    }
   }
 }
 
-void DsgFrontend::runMeshFrontend(const hydra_msgs::ActiveMesh::ConstPtr& msg) {
+void DsgFrontend::runMeshFrontend(const hydra_msgs::ActiveMesh::ConstPtr& msg,
+                                  const Eigen::Vector3d& current_position) {
   voxblox_msgs::Mesh::ConstPtr mesh_msg(new voxblox_msgs::Mesh(msg->mesh));
 
   const uint64_t timestamp = msg->header.stamp.toNSec();
@@ -137,7 +143,7 @@ void DsgFrontend::runMeshFrontend(const hydra_msgs::ActiveMesh::ConstPtr& msg) {
     invalidateMeshEdges();
     // add latest position somehow
     object_clusters = segmenter_->detect(
-        *label_map_, mesh_frontend_.getActiveFullMeshVertices(), std::nullopt);
+        *label_map_, mesh_frontend_.getActiveFullMeshVertices(), current_position);
   }
 
   {  // start dsg critical section
@@ -146,6 +152,7 @@ void DsgFrontend::runMeshFrontend(const hydra_msgs::ActiveMesh::ConstPtr& msg) {
     dsg_->archived_objects =
         segmenter_->updateGraph(*dsg_->graph, object_clusters, timestamp);
     addPlaceObjectEdges();
+    addPlaceObjectEdges(timestamp);
   }  // end dsg critical section
 }
 
@@ -157,7 +164,8 @@ void DsgFrontend::runPlaces(const PlacesLayerMsg::ConstPtr& curr_message) {
   previous_active_places_ = latest_places;
 }
 
-void DsgFrontend::handleLatestPoseGraph(const PoseGraph::ConstPtr& msg) {
+void DsgFrontend::handleLatestPoseGraph(const PoseGraph::ConstPtr& msg,
+                                        uint64_t timestamp_ns) {
   if (msg->nodes.empty()) {
     return;
   }
@@ -189,7 +197,7 @@ void DsgFrontend::handleLatestPoseGraph(const PoseGraph::ConstPtr& msg) {
     dsg_->agent_key_map[pgmo_key] = agents.nodes().size() - 1;
   }
 
-  addPlaceAgentEdges();
+  addPlaceAgentEdges(timestamp_ns);
 }
 
 void DsgFrontend::invalidateMeshEdges() {
@@ -287,8 +295,8 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
 
     places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
 
-    addPlaceAgentEdges();
-    addPlaceObjectEdges(&objects_to_check);
+    addPlaceAgentEdges(msg_time_ns);
+    addPlaceObjectEdges(msg_time_ns, &objects_to_check);
 
     *dsg_->latest_places = active_nodes;
   }  // end graph update critical section
@@ -297,8 +305,9 @@ void DsgFrontend::processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg) {
           << places.numEdges() << " edges";
 }
 
-void DsgFrontend::addPlaceObjectEdges(NodeIdSet* extra_objects_to_check) {
-  // ScopedTimer timer("frontend/place_object_edges", ???);
+void DsgFrontend::addPlaceObjectEdges(uint64_t timestamp_ns,
+                                      NodeIdSet* extra_objects_to_check) {
+  ScopedTimer timer("frontend/place_object_edges", timestamp_ns);
   if (!places_nn_finder_) {
     return;  // haven't received places yet
   }
@@ -323,8 +332,8 @@ void DsgFrontend::addPlaceObjectEdges(NodeIdSet* extra_objects_to_check) {
   segmenter_->pruneObjectsToCheckForPlaces(*dsg_->graph);
 }
 
-void DsgFrontend::addPlaceAgentEdges() {
-  // ScopedTimer timer("frontend/place_agent_edges", ???);
+void DsgFrontend::addPlaceAgentEdges(uint64_t timestamp_ns) {
+  ScopedTimer timer("frontend/place_agent_edges", timestamp_ns);
   if (!places_nn_finder_) {
     return;  // haven't received places yet
   }

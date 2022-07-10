@@ -36,6 +36,7 @@
 #include "hydra_dsg_builder/frontend_config.h"
 #include "hydra_dsg_builder/incremental_mesh_segmenter.h"
 #include "hydra_dsg_builder/incremental_types.h"
+#include "hydra_dsg_builder/input_queue.h"
 
 #include <geometry_msgs/TransformStamped.h>
 #include <hydra_msgs/ActiveLayer.h>
@@ -54,8 +55,17 @@ namespace incremental {
 using PlacesLayerMsg = hydra_msgs::ActiveLayer;
 using topology::NearestNodeFinder;
 
+struct FrontendInput {
+  PlacesLayerMsg::ConstPtr places;
+  hydra_msgs::ActiveMesh::ConstPtr mesh;
+  pose_graph_tools::PoseGraph::ConstPtr pose_graph;
+  Eigen::Vector3d current_position;
+};
+
 class DsgFrontend {
  public:
+  using FrontendInputQueue = InputQueue<FrontendInput>;
+
   DsgFrontend(const DsgFrontendConfig& config,
               const SharedDsgInfo::Ptr& dsg,
               char robot_prefix);
@@ -68,14 +78,18 @@ class DsgFrontend {
 
   void save(const std::string& output_path);
 
-  void spinOnce();
+  void spin();
+
+  inline FrontendInputQueue::Ptr input() const { return queue_; }
 
  protected:
-  void runMeshFrontend(const hydra_msgs::ActiveMesh::ConstPtr& msg);
+  void runMeshFrontend(const hydra_msgs::ActiveMesh::ConstPtr& msg,
+                       const Eigen::Vector3d& latest_position);
 
   void runPlaces(const PlacesLayerMsg::ConstPtr& curr_message);
 
-  void handleLatestPoseGraph(const pose_graph_tools::PoseGraph::ConstPtr& msg);
+  void handleLatestPoseGraph(const pose_graph_tools::PoseGraph::ConstPtr& msg,
+                             uint64_t timestamp_ns);
 
   void processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg);
 
@@ -83,18 +97,16 @@ class DsgFrontend {
 
   void invalidateMeshEdges();
 
-  void addPlaceObjectEdges(NodeIdSet* extra_objects_to_check = nullptr);
+  void addPlaceObjectEdges(uint64_t timestamp_ns,
+                           NodeIdSet* extra_objects_to_check = nullptr);
 
-  void addPlaceAgentEdges();
+  void addPlaceAgentEdges(uint64_t timestamp_ns);
 
   void updatePlaceMeshMapping();
 
  private:
   std::atomic<bool> should_shutdown_{false};
-  std::mutex mesh_frontend_mutex_;
-  std::mutex places_queue_mutex_;
-  std::queue<hydra_msgs::ActiveMesh::ConstPtr> mesh_queue_;
-  std::queue<PlacesLayerMsg::ConstPtr> places_queue_;
+  FrontendInputQueue::Ptr queue_;
 
   DsgFrontendConfig config_;
   std::unique_ptr<kimera::SemanticLabel2Color> label_map_;
