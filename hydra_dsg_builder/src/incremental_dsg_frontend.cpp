@@ -72,7 +72,7 @@ DsgFrontend::DsgFrontend(const DsgFrontendConfig& config,
   segmenter_.reset(new MeshSegmenter(obj_config, mesh_frontend_.getFullMeshVertices()));
 
   if (config_.should_log) {
-    LOG(INFO) << "Logging frontend graph to " << (config_.log_path + "/frontend");
+    LOG(INFO) << "[Hydra Frontend] logging to " << (config_.log_path + "/frontend");
     frontend_graph_logger_.setOutputPath(config_.log_path + "/frontend");
     frontend_graph_logger_.setLayerName(DsgLayers::OBJECTS, "objects");
     frontend_graph_logger_.setLayerName(DsgLayers::PLACES, "places");
@@ -94,12 +94,14 @@ void DsgFrontend::start() {
 }
 
 void DsgFrontend::stop() {
-  VLOG(2) << "[Hydra Frontend] stopping frontend!";
   should_shutdown_ = true;
+
   if (spin_thread_) {
+    VLOG(2) << "[Hydra Frontend] stopping frontend!";
     spin_thread_->join();
+    spin_thread_.reset();
+    VLOG(2) << "[Hydra Frontend] stopped!";
   }
-  VLOG(2) << "[Hydra Frontend] stopped!";
 }
 
 void DsgFrontend::save(const std::string& output_path) {
@@ -110,6 +112,10 @@ void DsgFrontend::save(const std::string& output_path) {
   mesh.polygons = mesh_frontend_.getFullMeshFaces();
 
   const auto vertices = mesh_frontend_.getFullMeshVertices();
+  if (mesh.polygons.empty() || vertices->empty()) {
+    return;
+  }
+
   pcl::toPCLPointCloud2(*vertices, mesh.cloud);
 
   kimera_pgmo::WriteMeshWithStampsToPly(
@@ -117,14 +123,14 @@ void DsgFrontend::save(const std::string& output_path) {
 }
 
 void DsgFrontend::spin() {
-  while (should_shutdown_) {
+  while (!should_shutdown_) {
     bool has_data = queue_->poll();
     if (!has_data) {
       continue;
     }
 
     const auto msg = queue_->pop();
-    const auto timestamp = msg.places->header.stamp.toNSec();
+    VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg.timestamp_ns << " [ns]";
 
     std::list<std::thread> threads;
     for (const auto& callback : input_callbacks_) {
@@ -136,11 +142,11 @@ void DsgFrontend::spin() {
     }
 
     {
-      ScopedTimer timer("frontend/place_mesh_mapping", timestamp);
+      ScopedTimer timer("frontend/place_mesh_mapping", msg.timestamp_ns);
       updatePlaceMeshMapping();
     }
 
-    dsg_->last_update_time = timestamp;
+    dsg_->last_update_time = msg.timestamp_ns;
     dsg_->updated = true;
 
     if (config_.should_log) {
@@ -232,35 +238,38 @@ void DsgFrontend::updatePlaces(const FrontendInput& input) {
 }
 
 void DsgFrontend::updatePoseGraph(const FrontendInput& input) {
-  if (input.pose_graph->nodes.empty()) {
-    return;
-  }
-
   std::unique_lock<std::mutex> lock(dsg_->mutex);
   const auto& agents = dsg_->graph->getLayer(DsgLayers::AGENTS, robot_prefix_);
 
-  for (const auto& node : input.pose_graph->nodes) {
-    if (node.key < agents.numNodes()) {
+  for (const auto& pose_graph : input.pose_graphs) {
+    if (pose_graph->nodes.empty()) {
       continue;
     }
 
-    Eigen::Vector3d position;
-    tf2::convert(node.pose.position, position);
-    Eigen::Quaterniond rotation;
-    tf2::convert(node.pose.orientation, rotation);
+    for (const auto& node : pose_graph->nodes) {
+      if (node.key < agents.numNodes()) {
+        continue;
+      }
 
-    // TODO(nathan) implicit assumption that pgmo ids are sequential starting at 0
-    // TODO(nathan) implicit assumption that gtsam symbol and dsg node symbol are same
-    NodeSymbol pgmo_key(robot_prefix_, node.key);
+      Eigen::Vector3d position;
+      tf2::convert(node.pose.position, position);
+      Eigen::Quaterniond rotation;
+      tf2::convert(node.pose.orientation, rotation);
 
-    const std::chrono::nanoseconds stamp(node.header.stamp.toNSec());
-    auto attrs = std::make_unique<AgentNodeAttributes>(rotation, position, pgmo_key);
-    if (!dsg_->graph->emplaceNode(agents.id, agents.prefix, stamp, std::move(attrs))) {
-      VLOG(1) << "repeated timestamp " << stamp.count() << "[ns] found";
-      continue;
+      // TODO(nathan) implicit assumption that pgmo ids are sequential starting at 0
+      // TODO(nathan) implicit assumption that gtsam symbol and dsg node symbol are same
+      NodeSymbol pgmo_key(robot_prefix_, node.key);
+
+      const std::chrono::nanoseconds stamp(node.header.stamp.toNSec());
+      auto attrs = std::make_unique<AgentNodeAttributes>(rotation, position, pgmo_key);
+      if (!dsg_->graph->emplaceNode(
+              agents.id, agents.prefix, stamp, std::move(attrs))) {
+        VLOG(1) << "repeated timestamp " << stamp.count() << "[ns] found";
+        continue;
+      }
+
+      dsg_->agent_key_map[pgmo_key] = agents.nodes().size() - 1;
     }
-
-    dsg_->agent_key_map[pgmo_key] = agents.nodes().size() - 1;
   }
 
   addPlaceAgentEdges(input.timestamp_ns);

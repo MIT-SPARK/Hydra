@@ -182,6 +182,10 @@ void visit_config(const Visitor& v, RoomFinder::Config& config) {
   v.visit("clustering_mode", config.clustering_mode);
 
   std::string prefix_string;
+  if (!config_parser::is_parser<Visitor>()) {
+    prefix_string.push_back(config.room_prefix);
+  }
+
   v.visit("room_prefix", prefix_string);
   if (config_parser::is_parser<Visitor>()) {
     config.room_prefix = prefix_string[0];

@@ -38,7 +38,6 @@
 #include "hydra_dsg_builder/incremental_types.h"
 #include "hydra_dsg_builder/input_queue.h"
 
-#include <geometry_msgs/TransformStamped.h>
 #include <hydra_msgs/ActiveLayer.h>
 #include <hydra_msgs/ActiveMesh.h>
 #include <hydra_topology/nearest_neighbor_utilities.h>
@@ -58,7 +57,7 @@ using topology::NearestNodeFinder;
 struct FrontendInput {
   PlacesLayerMsg::ConstPtr places;
   hydra_msgs::ActiveMesh::ConstPtr mesh;
-  pose_graph_tools::PoseGraph::ConstPtr pose_graph;
+  std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
   Eigen::Vector3d current_position;
   uint64_t timestamp_ns;
 };
@@ -81,8 +80,6 @@ class DsgFrontend {
   void save(const std::string& output_path);
 
   void spin();
-
-  inline FrontendInputQueue::Ptr input() const { return queue_; }
 
  protected:
   void updateMeshAndObjects(const FrontendInput& input);

@@ -41,9 +41,7 @@
 #include <message_filters/synchronizer.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl_ros/point_cloud.h>
-#include <ros/callback_queue.h>
 #include <ros/ros.h>
-#include <tf2_ros/transform_listener.h>
 
 namespace hydra {
 
@@ -54,29 +52,24 @@ using incremental::PlacesLayerMsg;
 using incremental::SharedDsgInfo;
 using pose_graph_tools::PoseGraph;
 
-using ObjectCloudPublishers =
-    SemanticRosPublishers<uint8_t, MeshSegmenter::MeshVertexCloud>;
+using ObjectCloudPub = SemanticRosPublishers<uint8_t, MeshSegmenter::MeshVertexCloud>;
 using MeshVertexCloud = MeshSegmenter::MeshVertexCloud;
 using LabelIndices = MeshSegmenter::LabelIndices;
 
 struct ROSFrontendConfig {
   bool enable_active_mesh_pub = false;
   bool enable_segmented_mesh_pub = false;
-  std::string mesh_ns = "";
-  std::string sensor_frame = "left_cam";
 };
 
 template <typename Visitor>
 void visit_config(const Visitor& v, ROSFrontendConfig& config) {
   v.visit("enable_active_mesh_pub", config.enable_active_mesh_pub);
   v.visit("enable_segmented_mesh_pub", config.enable_segmented_mesh_pub);
-  v.visit("mesh_ns", config.mesh_ns);
-  v.visit("sensor_frame", config.sensor_frame);
 }
 
 struct ROSFrontend : public DsgFrontend {
-  using Policy = message_filters::sync_policies::
-      ApproximateTime<PlacesLayerMsg, ActiveMesh, PoseGraph>;
+  using Policy =
+      message_filters::sync_policies::ApproximateTime<PlacesLayerMsg, ActiveMesh>;
   using Sync = message_filters::Synchronizer<Policy>;
 
   ROSFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg, int robot_id);
@@ -84,8 +77,9 @@ struct ROSFrontend : public DsgFrontend {
   ~ROSFrontend();
 
   void inputCallback(const PlacesLayerMsg::ConstPtr& places,
-                     const hydra_msgs::ActiveMesh::ConstPtr& mesh,
-                     const pose_graph_tools::PoseGraph::ConstPtr& pose_graph);
+                     const hydra_msgs::ActiveMesh::ConstPtr& mesh);
+
+  void poseGraphCallback(const PoseGraph::ConstPtr& pose_graph);
 
   void publishActiveVertices(const MeshSegmenter::MeshVertexCloud& vertices,
                              const std::vector<size_t>& indices,
@@ -95,21 +89,20 @@ struct ROSFrontend : public DsgFrontend {
                            const std::vector<size_t>&,
                            const MeshSegmenter::LabelIndices& label_indices) const;
 
-  std::optional<Eigen::Vector3d> getLatestPose();
+  std::optional<Eigen::Vector3d> getLatestPosition();
 
   ros::NodeHandle nh_;
   ROSFrontendConfig ros_config_;
+  std::list<PoseGraph::ConstPtr> pose_graph_queue_;
 
   std::unique_ptr<message_filters::Subscriber<PlacesLayerMsg>> places_sub_;
   std::unique_ptr<message_filters::Subscriber<ActiveMesh>> mesh_sub_;
-  std::unique_ptr<message_filters::Subscriber<PoseGraph>> pose_graph_sub_;
-  std::unique_ptr<Sync> synchronizer_;
+  std::unique_ptr<Sync> sync_;
 
-  tf2_ros::Buffer tf_buffer_;
-  std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
+  ros::Subscriber pose_graph_sub_;
 
-  ros::Publisher active_mesh_vertex_pub_;
-  std::unique_ptr<ObjectCloudPublishers> segmented_mesh_vertices_pub_;
+  ros::Publisher active_vertices_pub_;
+  std::unique_ptr<ObjectCloudPub> segmented_vertices_pub_;
 };
 
 }  // namespace hydra

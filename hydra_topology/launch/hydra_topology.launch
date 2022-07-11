@@ -47,6 +47,7 @@
         <param name="verbose" value="false"/>
         <param name="log_path" value="$(arg dsg_path)"/>
         <param name="log_timing_incrementally" value="$(arg log_timing_incrementally)"/>
+        <param name="mesh_only" value="false"/>
 
         <param name="use_semantic_tsdf_server" value="$(arg use_semantics)"/>
         <rosparam command="load" file="$(arg graph_viz_config_file)"/>

@@ -56,14 +56,14 @@ namespace kimera_pgmo {
 template <typename Visitor>
 void visit_config(const Visitor& v, kimera_pgmo::MeshFrontendConfig& config) {
   v.visit("robot_id", config.robot_id);
-  v.visit("time_horizon", config.time_horizon);
-  v.visit("b_track_mesh_graph_mapping", config.b_track_mesh_graph_mapping);
+  v.visit("horizon", config.time_horizon);
+  v.visit("track_mesh_graph_mapping", config.b_track_mesh_graph_mapping);
   v.visit("log_path", config.log_path);
-  v.visit("log_output", config.log_output);
+  v.visit("should_log", config.log_output);
   v.visit("full_compression_method", config.full_compression_method);
   v.visit("graph_compression_method", config.graph_compression_method);
   v.visit("d_graph_resolution", config.d_graph_resolution);
-  v.visit("mesh_resolution", config.mesh_resolution);
+  v.visit("output_mesh_resolution", config.mesh_resolution);
 }
 
 }  // namespace kimera_pgmo
@@ -84,7 +84,16 @@ struct DsgFrontendConfig {
 
 template <typename Visitor>
 void visit_config(const Visitor& v, MeshSegmenterConfig& config) {
-  v.visit("prefix", config.prefix);
+  std::string prefix_string;
+  if (!config_parser::is_parser<Visitor>()) {
+    prefix_string.push_back(config.prefix);
+  }
+
+  v.visit("prefix", prefix_string);
+  if (config_parser::is_parser<Visitor>()) {
+    config.prefix = prefix_string.at(0);
+  }
+
   v.visit("active_horizon_s", config.active_horizon_s);
   v.visit("active_index_horizon_m", config.active_index_horizon_m);
   v.visit("cluster_tolerance", config.cluster_tolerance);

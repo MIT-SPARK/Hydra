@@ -1,3 +1,4 @@
+min_distance_m: 0.2
 use_freespace_pointcloud: false
 tsdf_voxels_per_side: 16
 voxel_carving_enabled: true
@@ -16,6 +17,8 @@ min_weight: 1.0e-6
 positive_distance_only: true
 parent_derived_distance: true
 min_basis_for_extraction: 2
+num_buckets: 20
+multi_queue: false
 extract_graph: true
 voronoi_config:
     mode: "L1_THEN_ANGLE"
@@ -42,3 +45,6 @@ graph_extractor:
     component_max_edge_length_m: 5.0
     component_min_clearance_m: 0.5
     remove_isolated_nodes: true
+mesh_integrator_config:
+    use_color: true
+    min_weight: 0.0001

@@ -36,6 +36,8 @@
 
 namespace hydra {
 
+using message_filters::Subscriber;
+
 ROSFrontend::ROSFrontend(const ros::NodeHandle& nh,
                          const SharedDsgInfo::Ptr& dsg,
                          int robot_id)
@@ -43,45 +45,48 @@ ROSFrontend::ROSFrontend(const ros::NodeHandle& nh,
       nh_(nh) {
   ros_config_ = load_config<ROSFrontendConfig>(nh);
 
-  mesh_sub_.reset(new message_filters::Subscriber<ActiveMesh>(nh_, "voxblox_mesh", 5));
-  places_sub_.reset(
-      new message_filters::Subscriber<PlacesLayerMsg>(nh_, "active_places", 5));
-  pose_graph_sub_.reset(
-      new message_filters::Subscriber<PoseGraph>(nh_, "pose_graph_incremental", 5));
-  synchronizer_.reset(new Sync(Policy(10), *places_sub_, *mesh_sub_, *pose_graph_sub_));
-  synchronizer_->registerCallback(
-      boost::bind(&ROSFrontend::inputCallback, this, _1, _2, _3));
+  pose_graph_sub_ = nh_.subscribe(
+      "pose_graph_incremental", 100, &ROSFrontend::poseGraphCallback, this);
 
-  tf_listener_.reset(new tf2_ros::TransformListener(tf_buffer_));
+  mesh_sub_.reset(new Subscriber<ActiveMesh>(nh_, "voxblox_mesh", 5));
+  places_sub_.reset(new Subscriber<PlacesLayerMsg>(nh_, "active_places", 5));
+  sync_.reset(new Sync(Policy(10), *places_sub_, *mesh_sub_));
+  sync_->registerCallback(boost::bind(&ROSFrontend::inputCallback, this, _1, _2));
 
   if (ros_config_.enable_active_mesh_pub) {
-    active_mesh_vertex_pub_ =
-        nh_.advertise<MeshVertexCloud>("active_mesh_vertices", 1, true);
+    active_vertices_pub_ = nh_.advertise<MeshVertexCloud>("active_vertices", 1, true);
   }
   if (ros_config_.enable_segmented_mesh_pub) {
-    segmented_mesh_vertices_pub_.reset(
-        new ObjectCloudPublishers("object_mesh_vertices", nh_));
+    segmented_vertices_pub_.reset(new ObjectCloudPub("object_vertices", nh_));
   }
 }
 
-ROSFrontend::~ROSFrontend() { segmented_mesh_vertices_pub_.reset(); }
+ROSFrontend::~ROSFrontend() { segmented_vertices_pub_.reset(); }
 
 void ROSFrontend::inputCallback(const PlacesLayerMsg::ConstPtr& places,
-                                const ActiveMesh::ConstPtr& mesh,
-                                const PoseGraph::ConstPtr& pose_graph) {
-  if (pose_graph->nodes.empty()) {
-    ROS_ERROR_STREAM("Invalid pose graph received! Message contains no nodes.");
+                                const ActiveMesh::ConstPtr& mesh) {
+  VLOG(5) << "Received input @ " << places->header.stamp.toNSec() << " [ns]";
+
+  const auto latest_position = getLatestPosition();
+  if (!latest_position) {
+    ROS_ERROR_STREAM("Could not extract position from pose graph!");
+    return;
   }
-  const auto& latest_pose = pose_graph->nodes.back();
 
   incremental::FrontendInput input;
   input.places = places;
   input.mesh = mesh;
-  input.pose_graph = pose_graph;
-  input.current_position << latest_pose.pose.position.x, latest_pose.pose.position.y,
-      latest_pose.pose.position.z;
+  input.current_position = *latest_position;
   input.timestamp_ns = places->header.stamp.toNSec();
+
+  input.pose_graphs = pose_graph_queue_;
+  pose_graph_queue_.clear();
+
   queue_->push(input);
+}
+
+void ROSFrontend::poseGraphCallback(const PoseGraph::ConstPtr& pose_graph) {
+  pose_graph_queue_.push_back(pose_graph);
 }
 
 void ROSFrontend::publishActiveVertices(const MeshVertexCloud& vertices,
@@ -95,7 +100,7 @@ void ROSFrontend::publishActiveVertices(const MeshVertexCloud& vertices,
 
   active_cloud->header.frame_id = "world";
   pcl_conversions::toPCL(ros::Time::now(), active_cloud->header.stamp);
-  active_mesh_vertex_pub_.publish(active_cloud);
+  active_vertices_pub_.publish(active_cloud);
 }
 
 void ROSFrontend::publishObjectClouds(const MeshVertexCloud& vertices,
@@ -110,24 +115,22 @@ void ROSFrontend::publishObjectClouds(const MeshVertexCloud& vertices,
 
     label_cloud.header.frame_id = "world";
     pcl_conversions::toPCL(ros::Time::now(), label_cloud.header.stamp);
-    segmented_mesh_vertices_pub_->publish(label_index_pair.first, label_cloud);
+    segmented_vertices_pub_->publish(label_index_pair.first, label_cloud);
   }
 }
 
-std::optional<Eigen::Vector3d> ROSFrontend::getLatestPose() {
-  geometry_msgs::TransformStamped msg;
-  try {
-    msg = tf_buffer_.lookupTransform("world", ros_config_.sensor_frame, ros::Time(0));
-  } catch (tf2::TransformException& ex) {
-    LOG_FIRST_N(WARNING, 3) << "failed to look up transform to "
-                            << ros_config_.sensor_frame << " @ " << ros::Time::now()
-                            << ": " << ex.what() << " Not filtering indices.";
+std::optional<Eigen::Vector3d> ROSFrontend::getLatestPosition() {
+  if (pose_graph_queue_.empty()) {
     return std::nullopt;
   }
 
-  return Eigen::Vector3d(msg.transform.translation.x,
-                         msg.transform.translation.y,
-                         msg.transform.translation.z);
+  const auto& msg = pose_graph_queue_.back();
+  if (msg->nodes.empty()) {
+    return std::nullopt;
+  }
+
+  const auto& pose = msg->nodes.back().pose;
+  return Eigen::Vector3d(pose.position.x, pose.position.y, pose.position.z);
 }
 
 }  // namespace hydra

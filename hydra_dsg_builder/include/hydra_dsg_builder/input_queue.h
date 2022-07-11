@@ -58,7 +58,7 @@ struct InputQueue {
     return queue.front();
   }
 
-  bool poll(int wait_time_us = 10) const {
+  bool poll(int wait_time_us = 1000) const {
     std::chrono::microseconds wait_duration(wait_time_us);
     std::unique_lock<std::mutex> lock(mutex);
     return cv.wait_for(lock, wait_duration, [&] { return !queue.empty(); });

@@ -126,14 +126,15 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
   deformation_graph_->storeOnlyNoOptimization();
 
   if (config_.should_log) {
-    backend_graph_logger_.setOutputPath(config_.log_path + "/backend");
-    ROS_INFO("Logging backend graph to %s", (config_.log_path + "/backend").c_str());
+    const std::string log_path = config_.log_path + "/backend";
+    backend_graph_logger_.setOutputPath(log_path);
+    LOG(INFO) << "[Hydra Backend] logging to " << log_path;
     backend_graph_logger_.setLayerName(DsgLayers::OBJECTS, "objects");
     backend_graph_logger_.setLayerName(DsgLayers::PLACES, "places");
     backend_graph_logger_.setLayerName(DsgLayers::ROOMS, "rooms");
     backend_graph_logger_.setLayerName(DsgLayers::BUILDINGS, "buildings");
   } else {
-    ROS_ERROR("DSG Backend logging disabled. ");
+    LOG(INFO) << "[Hydra Backend] logging disabled.";
   }
 
   last_timestamp_ = 0;
@@ -141,25 +142,24 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
 }
 
 void DsgBackend::stop() {
-  LOG(INFO) << "[DSG Backend] stopping!";
   should_shutdown_ = true;
 
-  VLOG(2) << " [DSG Backend] joining optimizer thread";
   if (optimizer_thread_) {
+    VLOG(2) << "[Hydra Backend] joining optimizer thread and stopping";
     optimizer_thread_->join();
     optimizer_thread_.reset();
+    VLOG(2) << "[Hydra Backend] stopped!";
   }
-  VLOG(2) << " [DSG Backend] joined optimizer thread";
 }
 
 DsgBackend::~DsgBackend() {
-  LOG(INFO) << " [DSG Backend] destructor called!";
+  LOG(INFO) << "[Hydra Backend] destructor called!";
   stop();
 }
 
 void DsgBackend::start() {
   startPgmo();
-  LOG(INFO) << " [DSG Backend] started!";
+  LOG(INFO) << "[Hydra Backend] started!";
 }
 
 std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol key) {
@@ -177,12 +177,16 @@ void DsgBackend::save(const std::string& output_path) {
   private_dsg_->graph->save(output_path + "/dsg.json", false);
   private_dsg_->graph->save(output_path + "/dsg_with_mesh.json");
 
-  Path optimized_path = getOptimizedTrajectory(robot_id_);
-  std::string csv_name = config_.pgmo.log_path + std::string("/traj_pgmo.csv");
-  saveTrajectory(optimized_path, timestamps_, csv_name);
+  if (deformation_graph_->hasPrefixPoses(robot_prefix_)) {
+    Path optimized_path = getOptimizedTrajectory(robot_id_);
+    std::string csv_name = config_.pgmo.log_path + std::string("/traj_pgmo.csv");
+    saveTrajectory(optimized_path, timestamps_, csv_name);
+  }
 
-  kimera_pgmo::WriteMeshWithStampsToPly(
-      output_path + "/mesh.ply", private_dsg_->graph->getMesh(), mesh_vertex_stamps_);
+  if (!private_dsg_->graph->isMeshEmpty()) {
+    kimera_pgmo::WriteMeshWithStampsToPly(
+        output_path + "/mesh.ply", private_dsg_->graph->getMesh(), mesh_vertex_stamps_);
+  }
 
   const std::string output_csv = output_path + "/loop_closures.csv";
   std::ofstream output_file;
@@ -761,7 +765,7 @@ void DsgBackend::logStatus(bool init) const {
   std::ofstream file;
   std::string filename = config_.pgmo.log_path + std::string("/dsg_pgmo_status.csv");
   if (init) {
-    ROS_INFO("DSG Backend logging PGMO status output to %s", filename.c_str());
+    LOG(INFO) << "[Hydra Backend] logging PGMO status output to " << filename;
     file.open(filename);
     // file format
     file << "total_lc,new_lc,total_factors,total_values,new_factors,new_graph_"

@@ -81,7 +81,7 @@ struct PoseGraphPublisherNode {
     nh.getParam("use_pointcloud_time", use_pointcloud_time);
 
     pg_pub = nh.advertise<pose_graph_tools::PoseGraph>("pose_graph", 10, true);
-    ROS_WARN("PoseGraphPublisher waiting for subscriber...");
+    ROS_INFO("PoseGraphPublisher waiting for subscriber...");
     ros::WallRate r(10);
     while (ros::ok() && !pg_pub.getNumSubscribers()) {
       r.sleep();
@@ -89,7 +89,7 @@ struct PoseGraphPublisherNode {
 
     tf_listener.reset(new tf2_ros::TransformListener(buffer));
 
-    ROS_WARN_STREAM("PoseGraphPublisher waiting for transform: "
+    ROS_INFO_STREAM("PoseGraphPublisher waiting for transform: "
                     << robot_frame << " -> " << world_frame);
     while (ros::ok()) {
       try {
@@ -102,11 +102,11 @@ struct PoseGraphPublisherNode {
     }
 
     if (!use_pointcloud_time) {
-      ROS_WARN_STREAM("using timer!");
+      ROS_INFO("using timer!");
       ros::Duration loop_dur(keyframe_period_s);
       timer = nh.createTimer(loop_dur, &PoseGraphPublisherNode::timerCallback, this);
     } else {
-      ROS_WARN_STREAM("using pointcloud time!");
+      ROS_INFO("using pointcloud time!");
       time_sub =
           nh.subscribe("time_point", 10, &PoseGraphPublisherNode::timeCallback, this);
     }
