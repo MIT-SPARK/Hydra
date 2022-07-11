@@ -122,7 +122,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void optimize(bool new_loop_closure = false);
 
-  void visualizePoseGraph() const;
+  virtual void visualizePoseGraph() const;
 
   void visualizeDeformationGraphEdges() const;
 

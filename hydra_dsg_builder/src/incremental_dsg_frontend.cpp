@@ -154,7 +154,12 @@ void DsgFrontend::spin() {
     dsg_->updated = true;
     ros::Time stamp;
     stamp.fromNSec(last_places_timestamp_);
-    dsg_sender_->sendGraph(*dsg_->graph, stamp);    
+    {  // start dsg critical section
+      std::unique_lock<std::mutex> lock(dsg_->mutex);
+      dsg_sender_->sendGraph(*dsg_->graph, stamp);
+    }
+  }
+}
 
     if (config_.should_log) {
       // mutex not required because nothing is modifying the graph

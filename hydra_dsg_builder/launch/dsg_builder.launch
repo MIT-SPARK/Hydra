@@ -24,7 +24,7 @@
     <arg name="log_registration" default="false"/>
 
     <arg name="debug" default="false"/>
-    <arg name="launch_prefix" value="gdb --args" if="$(arg debug)"/>
+    <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
     <arg name="launch_prefix" value="" unless="$(arg debug)"/>
 
     <arg name="min_glog_level" default="3"/>
