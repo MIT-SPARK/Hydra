@@ -55,9 +55,17 @@ ROSFrontend::ROSFrontend(const ros::NodeHandle& nh,
 
   if (ros_config_.enable_active_mesh_pub) {
     active_vertices_pub_ = nh_.advertise<MeshVertexCloud>("active_vertices", 1, true);
+    segmenter_->addVisualizationCallback(
+        [this](const auto& cloud, const auto& indices, const auto& labels) {
+          this->publishActiveVertices(cloud, indices, labels);
+        });
   }
   if (ros_config_.enable_segmented_mesh_pub) {
     segmented_vertices_pub_.reset(new ObjectCloudPub("object_vertices", nh_));
+    segmenter_->addVisualizationCallback(
+        [this](const auto& cloud, const auto& indices, const auto& labels) {
+          this->publishObjectClouds(cloud, indices, labels);
+        });
   }
 }
 

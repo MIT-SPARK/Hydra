@@ -81,6 +81,7 @@ inline bool objectsMatch(const Cluster& cluster, const SceneGraphNode& node) {
 MeshSegmenter::MeshSegmenter(const MeshSegmenterConfig& config,
                              const MeshVertexCloud::Ptr& vertices)
     : full_mesh_vertices_(vertices), config_(config), next_node_id_(config.prefix, 0) {
+  VLOG(1) << "[Hydra Frontend] Detecting objects for labels: " << config.labels;
   for (const auto& label : config.labels) {
     active_objects_[label] = std::set<NodeId>();
   }
@@ -159,6 +160,9 @@ LabelClusters MeshSegmenter::detect(const SemanticLabel2Color& label_map,
   LabelIndices label_indices = getLabelIndices(label_map, active_indices);
   if (label_indices.empty()) {
     VLOG(3) << "[Mesh Segmenter] No vertices found matching desired labels";
+    for (const auto& callback_func : callback_funcs_) {
+      callback_func(*full_mesh_vertices_, active_indices, label_indices);
+    }
     return label_clusters;
   }
 

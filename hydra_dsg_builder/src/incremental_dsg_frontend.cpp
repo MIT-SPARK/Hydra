@@ -64,12 +64,9 @@ DsgFrontend::DsgFrontend(const DsgFrontendConfig& config,
   dsg_->graph->initMesh();
   dsg_->graph->createDynamicLayer(DsgLayers::AGENTS, robot_prefix_);
 
-  // TODO(nathan) these should be part of the frontend config
-  kimera_pgmo::MeshFrontendConfig pgmo_config;
-  CHECK(mesh_frontend_.initialize(pgmo_config));
-
-  MeshSegmenterConfig obj_config;
-  segmenter_.reset(new MeshSegmenter(obj_config, mesh_frontend_.getFullMeshVertices()));
+  CHECK(mesh_frontend_.initialize(config_.pgmo_config));
+  segmenter_.reset(
+      new MeshSegmenter(config_.object_config, mesh_frontend_.getFullMeshVertices()));
 
   if (config_.should_log) {
     LOG(INFO) << "[Hydra Frontend] logging to " << (config_.log_path + "/frontend");

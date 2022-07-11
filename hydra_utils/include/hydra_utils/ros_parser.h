@@ -124,7 +124,9 @@ bool readRosParam(const ros::NodeHandle& nh,
                   const std::string& name,
                   std::set<T>& value) {
   std::vector<T> placeholders;
-  readRosParam(nh, name, placeholders);
+  if (!readRosParam(nh, name, placeholders)) {
+    return false;
+  }
 
   value.clear();
   value.insert(placeholders.begin(), placeholders.end());
