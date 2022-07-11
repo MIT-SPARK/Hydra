@@ -33,9 +33,9 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder/incremental_dsg_backend.h"
-#include "hydra_dsg_builder/incremental_dsg_frontend.h"
 #include "hydra_dsg_builder/incremental_dsg_lcd.h"
 #include "hydra_dsg_builder/node_utilities.h"
+#include "hydra_dsg_builder/ros_frontend.h"
 
 #include <hydra_utils/timing_utilities.h>
 
@@ -52,15 +52,11 @@ void run(const ros::NodeHandle& nh,
   bool enable_lcd = false;
   nh.getParam("enable_lcd", enable_lcd);
 
-  DsgBackend backend(nh, frontend_dsg, backend_dsg);
-
   int robot_id = 0;
   nh.getParam("robot_id", robot_id);
 
-  auto config = load_config<DsgFrontendConfig>(nh);
-  config.pgmo_config.robot_id = robot_id;
-  const auto robot_prefix = kimera_pgmo::robot_id_to_prefix.at(robot_id);
-  DsgFrontend frontend(config, frontend_dsg, robot_prefix);
+  DsgBackend backend(nh, frontend_dsg, backend_dsg);
+  ROSFrontend frontend(nh, frontend_dsg, robot_id);
 
   std::shared_ptr<DsgLcd> lcd;
   if (enable_lcd) {

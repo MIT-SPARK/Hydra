@@ -51,6 +51,7 @@ using hydra_msgs::ActiveMesh;
 using incremental::DsgFrontend;
 using incremental::MeshSegmenter;
 using incremental::PlacesLayerMsg;
+using incremental::SharedDsgInfo;
 using pose_graph_tools::PoseGraph;
 
 using ObjectCloudPublishers =
@@ -65,13 +66,20 @@ struct ROSFrontendConfig {
   std::string sensor_frame = "left_cam";
 };
 
-struct ROSFrontend {
+template <typename Visitor>
+void visit_config(const Visitor& v, ROSFrontendConfig& config) {
+  v.visit("enable_active_mesh_pub", config.enable_active_mesh_pub);
+  v.visit("enable_segmented_mesh_pub", config.enable_segmented_mesh_pub);
+  v.visit("mesh_ns", config.mesh_ns);
+  v.visit("sensor_frame", config.sensor_frame);
+}
+
+struct ROSFrontend : public DsgFrontend {
   using Policy = message_filters::sync_policies::
       ApproximateTime<PlacesLayerMsg, ActiveMesh, PoseGraph>;
   using Sync = message_filters::Synchronizer<Policy>;
 
-  ROSFrontend(const ros::NodeHandle& nh,
-              const DsgFrontend::FrontendInputQueue::Ptr& queue);
+  ROSFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg, int robot_id);
 
   ~ROSFrontend();
 
@@ -90,8 +98,6 @@ struct ROSFrontend {
   std::optional<Eigen::Vector3d> getLatestPose();
 
   ros::NodeHandle nh_;
-  DsgFrontend::FrontendInputQueue::Ptr queue_;
-
   ROSFrontendConfig ros_config_;
 
   std::unique_ptr<message_filters::Subscriber<PlacesLayerMsg>> places_sub_;
@@ -107,3 +113,5 @@ struct ROSFrontend {
 };
 
 }  // namespace hydra
+
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, ROSFrontendConfig)

@@ -60,15 +60,17 @@ struct FrontendInput {
   hydra_msgs::ActiveMesh::ConstPtr mesh;
   pose_graph_tools::PoseGraph::ConstPtr pose_graph;
   Eigen::Vector3d current_position;
+  uint64_t timestamp_ns;
 };
 
 class DsgFrontend {
  public:
   using FrontendInputQueue = InputQueue<FrontendInput>;
+  using InputCallback = std::function<void(const FrontendInput&)>;
 
   DsgFrontend(const DsgFrontendConfig& config,
               const SharedDsgInfo::Ptr& dsg,
-              char robot_prefix);
+              int robot_id);
 
   virtual ~DsgFrontend();
 
@@ -83,16 +85,13 @@ class DsgFrontend {
   inline FrontendInputQueue::Ptr input() const { return queue_; }
 
  protected:
-  void runMeshFrontend(const hydra_msgs::ActiveMesh::ConstPtr& msg,
-                       const Eigen::Vector3d& latest_position);
+  void updateMeshAndObjects(const FrontendInput& input);
 
-  void runPlaces(const PlacesLayerMsg::ConstPtr& curr_message);
+  void updatePlaces(const FrontendInput& input);
 
-  void handleLatestPoseGraph(const pose_graph_tools::PoseGraph::ConstPtr& msg,
-                             uint64_t timestamp_ns);
+  void updatePoseGraph(const FrontendInput& input);
 
-  void processLatestPlacesMsg(const PlacesLayerMsg::ConstPtr& msg);
-
+ protected:
   void archivePlaces(const NodeIdSet active_places);
 
   void invalidateMeshEdges();
@@ -104,9 +103,10 @@ class DsgFrontend {
 
   void updatePlaceMeshMapping();
 
- private:
+ protected:
   std::atomic<bool> should_shutdown_{false};
   FrontendInputQueue::Ptr queue_;
+  std::unique_ptr<std::thread> spin_thread_;
 
   DsgFrontendConfig config_;
   std::unique_ptr<kimera::SemanticLabel2Color> label_map_;
@@ -122,6 +122,8 @@ class DsgFrontend {
   NodeIdSet previous_active_places_;
   std::set<NodeId> deleted_agent_edge_indices_;
   std::map<LayerPrefix, size_t> last_agent_edge_index_;
+
+  std::vector<InputCallback> input_callbacks_;
 };
 
 }  // namespace incremental

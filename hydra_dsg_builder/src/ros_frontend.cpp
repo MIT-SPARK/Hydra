@@ -37,8 +37,12 @@
 namespace hydra {
 
 ROSFrontend::ROSFrontend(const ros::NodeHandle& nh,
-                         const DsgFrontend::FrontendInputQueue::Ptr& queue)
-    : nh_(nh), queue_(queue) {
+                         const SharedDsgInfo::Ptr& dsg,
+                         int robot_id)
+    : DsgFrontend(load_config<incremental::DsgFrontendConfig>(nh), dsg, robot_id),
+      nh_(nh) {
+  ros_config_ = load_config<ROSFrontendConfig>(nh);
+
   mesh_sub_.reset(new message_filters::Subscriber<ActiveMesh>(nh_, "voxblox_mesh", 5));
   places_sub_.reset(
       new message_filters::Subscriber<PlacesLayerMsg>(nh_, "active_places", 5));
@@ -64,7 +68,21 @@ ROSFrontend::~ROSFrontend() { segmented_mesh_vertices_pub_.reset(); }
 
 void ROSFrontend::inputCallback(const PlacesLayerMsg::ConstPtr& places,
                                 const ActiveMesh::ConstPtr& mesh,
-                                const PoseGraph::ConstPtr& pose_graph) {}
+                                const PoseGraph::ConstPtr& pose_graph) {
+  if (pose_graph->nodes.empty()) {
+    ROS_ERROR_STREAM("Invalid pose graph received! Message contains no nodes.");
+  }
+  const auto& latest_pose = pose_graph->nodes.back();
+
+  incremental::FrontendInput input;
+  input.places = places;
+  input.mesh = mesh;
+  input.pose_graph = pose_graph;
+  input.current_position << latest_pose.pose.position.x, latest_pose.pose.position.y,
+      latest_pose.pose.position.z;
+  input.timestamp_ns = places->header.stamp.toNSec();
+  queue_->push(input);
+}
 
 void ROSFrontend::publishActiveVertices(const MeshVertexCloud& vertices,
                                         const std::vector<size_t>& indices,
