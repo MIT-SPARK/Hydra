@@ -37,6 +37,7 @@
 #include "hydra_dsg_builder/dsg_update_functions.h"
 #include "hydra_dsg_builder/incremental_room_finder.h"
 #include "hydra_dsg_builder/incremental_types.h"
+#include "hydra_dsg_builder/shared_module_state.h"
 
 #include <hydra_utils/dsg_streaming_interface.h>
 #include <kimera_pgmo/KimeraPgmoInterface.h>
@@ -112,6 +113,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
     callUpdateFunctions();
     private_dsg_->updated = true;
   }
+
+  void updateFromSharedState();
 
   bool updatePrivateDsg();
 

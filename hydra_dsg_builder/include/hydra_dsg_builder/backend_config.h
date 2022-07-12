@@ -92,6 +92,7 @@ struct DsgBackendConfig {
   bool optimize_on_lc = true;
   bool enable_node_merging = true;
   bool call_update_periodically = true;
+  bool use_mesh_subscribers = false;
   std::map<LayerId, bool> merge_update_map{{DsgLayers::OBJECTS, false},
                                            {DsgLayers::PLACES, true},
                                            {DsgLayers::ROOMS, false},
@@ -150,6 +151,7 @@ void visit_config(const Visitor& v, DsgBackendConfig& config) {
   dsg_handle.visit("places_merge_pos_threshold_m", config.places_merge_pos_threshold_m);
   dsg_handle.visit("places_merge_distance_tolerance_m",
                    config.places_merge_distance_tolerance_m);
+  dsg_handle.visit("use_mesh_subscribers", config.use_mesh_subscribers);
 }
 
 template <typename Visitor>

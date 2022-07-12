@@ -67,6 +67,11 @@ DsgFrontend::DsgFrontend(const DsgFrontendConfig& config,
   dsg_->graph->createDynamicLayer(DsgLayers::AGENTS, robot_prefix_);
 
   CHECK(mesh_frontend_.initialize(config_.pgmo_config));
+  mesh_frontend_.addOutputCallback([&](const auto& frontend, const std_msgs::Header) {
+    std::unique_lock<std::mutex> lock(state_->mesh_mutex);
+    state_->deformation_graphs.emplace_back(
+        new PoseGraph(frontend.getLastProcessedMeshGraph()));
+  });
   segmenter_.reset(
       new MeshSegmenter(config_.object_config, mesh_frontend_.getFullMeshVertices()));
 

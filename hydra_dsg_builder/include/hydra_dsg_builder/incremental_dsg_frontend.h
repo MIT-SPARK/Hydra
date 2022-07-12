@@ -37,6 +37,7 @@
 #include "hydra_dsg_builder/incremental_mesh_segmenter.h"
 #include "hydra_dsg_builder/incremental_types.h"
 #include "hydra_dsg_builder/input_queue.h"
+#include "hydra_dsg_builder/shared_module_state.h"
 
 #include <hydra_msgs/ActiveLayer.h>
 #include <hydra_msgs/ActiveMesh.h>

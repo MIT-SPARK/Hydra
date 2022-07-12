@@ -36,6 +36,7 @@
 #include "hydra_dsg_builder/dsg_lcd_detector.h"
 #include "hydra_dsg_builder/lcd_module_config.h"
 #include "hydra_dsg_builder/lcd_visualizer.h"
+#include "hydra_dsg_builder/shared_module_state.h"
 
 #include <geometry_msgs/TransformStamped.h>
 #include <ros/callback_queue.h>

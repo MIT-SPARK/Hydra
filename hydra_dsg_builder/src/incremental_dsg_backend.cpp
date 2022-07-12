@@ -228,7 +228,6 @@ bool DsgBackend::updatePrivateDsg() {
                                       true,
                                       &config_.merge_update_map,
                                       config_.merge_update_dynamic);
-      //*private_dsg_->latest_places = *shared_dsg_->latest_places;
 
       private_dsg_->archived_objects = shared_dsg_->archived_objects;
 
@@ -258,11 +257,35 @@ bool DsgBackend::updatePrivateDsg() {
   return have_frontend_updates;
 }
 
+void DsgBackend::updateFromSharedState() {
+  {  // start critical section
+    std::unique_lock<std::mutex> lock(state_->mesh_mutex);
+    if (state_->have_new_mesh) {
+      // latch the pointer so that frontend can copy a new one without
+      // getting tied up waiting for the mesh interpolation
+      latest_mesh_ = state_->latest_mesh;
+      mesh_vertex_stamps_ = state_->mesh_vertex_stamps;
+      mesh_vertex_graph_inds_ = state_->mesh_vertex_graph_indices;
+      state_->have_new_mesh = false;
+      have_new_mesh_ = true;
+    }
+
+    for (const auto& msg : state_->deformation_graphs) {
+      deformation_graph_updates_.push(msg);
+    }
+  }  // end critical section
+}
+
 void DsgBackend::startPgmo() {
-  full_mesh_sub_ =
-      nh_.subscribe("pgmo/full_mesh", 1, &DsgBackend::fullMeshCallback, this);
-  deformation_graph_sub_ = nh_.subscribe(
-      "pgmo/mesh_graph_incremental", 1000, &DsgBackend::deformationGraphCallback, this);
+  if (config_.use_mesh_subscribers) {
+    full_mesh_sub_ =
+        nh_.subscribe("pgmo/full_mesh", 1, &DsgBackend::fullMeshCallback, this);
+    deformation_graph_sub_ = nh_.subscribe("pgmo/mesh_graph_incremental",
+                                           1000,
+                                           &DsgBackend::deformationGraphCallback,
+                                           this);
+  }
+
   pose_graph_sub_ = nh_.subscribe(
       "pose_graph_incremental", 10000, &DsgBackend::poseGraphCallback, this);
   // TODO(yun) with lower queue size we drop msgs, esp with permissive dsg lcd
@@ -353,6 +376,10 @@ void DsgBackend::runPgmo() {
     status_.reset();
     ScopedTimer spin_timer("backend/spin", last_timestamp_);
     const size_t prev_loop_closures = num_loop_closures_;
+
+    if (!config_.use_mesh_subscribers) {
+      updateFromSharedState();
+    }
 
     if (readPgmoUpdates()) {
       have_graph_updates_ = true;
@@ -571,19 +598,6 @@ bool DsgBackend::addInternalLCDToDeformationGraph() {
 void DsgBackend::updateDsgMesh(bool force_mesh_update) {
   // avoid scope problems by using a smart pointer
   std::unique_ptr<ScopedTimer> timer;
-
-  {  // start critical section
-    std::unique_lock<std::mutex> lock(state_->mesh_mutex);
-    if (state_->have_new_mesh) {
-      // latch the pointer so that frontend can copy a new one without
-      // getting tied up waiting for the mesh interpolation
-      latest_mesh_ = state_->latest_mesh;
-      mesh_vertex_stamps_ = state_->mesh_vertex_stamps;
-      mesh_vertex_graph_inds_ = state_->mesh_vertex_graph_indices;
-      state_->have_new_mesh = false;
-      have_new_mesh_ = true;
-    }
-  }  // end critical section
 
   if (!latest_mesh_) {
     return;

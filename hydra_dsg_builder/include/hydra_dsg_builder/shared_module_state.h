@@ -33,76 +33,41 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <gtsam/geometry/Pose3.h>
+#include "hydra_dsg_builder/incremental_types.h"
+
 #include <hydra_utils/dsg_types.h>
 #include <kimera_pgmo/utils/CommonStructs.h>
+#include <pose_graph_tools/PoseGraph.h>
 #include <ros/time.h>
 
 #include <atomic>
+#include <list>
 #include <map>
 #include <memory>
 #include <mutex>
+#include <vector>
 
 namespace hydra {
-
-namespace lcd {
-
-struct DsgRegistrationSolution {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  bool valid = false;
-  NodeId from_node;
-  NodeId to_node;
-  gtsam::Pose3 to_T_from;
-  int64_t level;
-};
-
-}  // namespace lcd
-
 namespace incremental {
 
-typedef std::unordered_set<NodeId> NodeIdSet;
+struct SharedModuleState {
+  using Ptr = std::shared_ptr<SharedModuleState>;
 
-struct SharedDsgInfo {
-  using Ptr = std::shared_ptr<SharedDsgInfo>;
+  NodeIdSet latest_places;
+  NodeIdSet archived_places;
+  std::set<NodeId> archived_objects;
 
-  SharedDsgInfo(const std::map<LayerId, char>& layer_id_map, LayerId mesh_layer_id)
-      : updated(false) {
-    DynamicSceneGraph::LayerIds layer_ids;
-    for (const auto& id_key_pair : layer_id_map) {
-      CHECK(id_key_pair.first != mesh_layer_id)
-          << "Found duplicate layer id " << id_key_pair.first
-          << " with mesh: " << mesh_layer_id;
+  std::mutex mesh_mutex;
+  bool have_new_mesh;
+  std::shared_ptr<pcl::PolygonMesh> latest_mesh;
+  std::shared_ptr<std::vector<ros::Time>> mesh_vertex_stamps;
+  std::shared_ptr<std::vector<int>> mesh_vertex_graph_indices;
+  std::list<pose_graph_tools::PoseGraph::ConstPtr> deformation_graphs;
 
-      layer_ids.push_back(id_key_pair.first);
-    }
+  std::map<NodeId, size_t> agent_key_map;
 
-    graph.reset(new DynamicSceneGraph(layer_ids, mesh_layer_id));
-  }
-
-  std::mutex mutex;
-  std::atomic<bool> updated;
-  uint64_t last_update_time;
-  DynamicSceneGraph::Ptr graph;
-};
-
-struct DsgBackendStatus {
-  size_t total_loop_closures_;
-  size_t new_loop_closures_;
-  size_t total_factors_;
-  size_t total_values_;
-  size_t new_factors_;
-  size_t new_graph_factors_;
-  size_t trajectory_len_;
-
-  void reset() {
-    total_loop_closures_ = 0;
-    new_loop_closures_ = 0;
-    total_factors_ = 0;
-    total_values_ = 0;
-    new_factors_ = 0;
-    new_graph_factors_ = 0;
-    trajectory_len_ = 0;
-  }
+  std::mutex lcd_mutex;
+  std::queue<lcd::DsgRegistrationSolution> loop_closures;
 };
 
 }  // namespace incremental
