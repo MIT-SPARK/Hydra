@@ -52,9 +52,11 @@ using LabelClusters = MeshSegmenter::LabelClusters;
 
 DsgFrontend::DsgFrontend(const DsgFrontendConfig& config,
                          const SharedDsgInfo::Ptr& dsg,
+                         const SharedModuleState::Ptr& state,
                          int robot_id)
     : config_(config),
       dsg_(dsg),
+      state_(state),
       robot_prefix_(kimera_pgmo::robot_id_to_prefix.at(robot_id)) {
   config_.pgmo_config.robot_id = robot_id;
   label_map_.reset(new kimera::SemanticLabel2Color(config_.semantic_label_file));
@@ -224,7 +226,7 @@ void DsgFrontend::updatePlaces(const FrontendInput& input) {
     addPlaceAgentEdges(input.timestamp_ns);
     addPlaceObjectEdges(input.timestamp_ns, &objects_to_check);
 
-    *dsg_->latest_places = active_nodes;
+    state_->latest_places = active_nodes;
   }  // end graph update critical section
 
   VLOG(3) << "[Places] " << places.numNodes() << " nodes, " << places.numEdges()
@@ -265,7 +267,7 @@ void DsgFrontend::updatePoseGraph(const FrontendInput& input) {
         continue;
       }
 
-      dsg_->agent_key_map[pgmo_key] = agents.nodes().size() - 1;
+      state_->agent_key_map[pgmo_key] = agents.nodes().size() - 1;
     }
   }
 
@@ -318,7 +320,7 @@ void DsgFrontend::archivePlaces(const NodeIdSet active_places) {
             .is_active = false;
       }
 
-      dsg_->archived_places.insert(prev);
+      state_->archived_places.insert(prev);
     }
 
   }  // end graph update critical section

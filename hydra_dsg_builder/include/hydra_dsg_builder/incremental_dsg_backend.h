@@ -68,7 +68,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   DsgBackend(const ros::NodeHandle nh,
              const SharedDsgInfo::Ptr& dsg,
-             const SharedDsgInfo::Ptr& backend_dsg);
+             const SharedDsgInfo::Ptr& backend_dsg,
+             const SharedModuleState::Ptr& state);
 
   virtual ~DsgBackend();
 
@@ -145,10 +146,6 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
                            const gtsam::Values& pgmo_values = gtsam::Values(),
                            bool new_loop_closure = false);
 
-  ActiveNodeSet getNodesForRoomDetection(const NodeIdSet& latest_places);
-
-  void storeUnlabeledPlaces(const ActiveNodeSet active_nodes);
-
   void updateRoomsNodes();
 
   void updateBuildingNode();
@@ -176,6 +173,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   SharedDsgInfo::Ptr shared_dsg_;
   SharedDsgInfo::Ptr private_dsg_;
+  SharedModuleState::Ptr state_;
+
   IsolatedSceneGraphLayer shared_places_copy_;
   std::map<NodeId, NodeId> merged_nodes_;
   std::map<NodeId, std::set<NodeId>> merged_nodes_parents_;
@@ -186,7 +185,6 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   ros::ServiceServer save_mesh_srv_;
   ros::ServiceServer save_traj_srv_;
 
-  NodeIdSet unlabeled_place_nodes_;
   std::unique_ptr<RoomFinder> room_finder_;
 
   DsgBackendStatus status_;

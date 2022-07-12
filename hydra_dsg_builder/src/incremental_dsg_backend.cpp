@@ -66,11 +66,13 @@ void DsgBackend::setSolverParams() {
 
 DsgBackend::DsgBackend(const ros::NodeHandle nh,
                        const SharedDsgInfo::Ptr& dsg,
-                       const SharedDsgInfo::Ptr& backend_dsg)
+                       const SharedDsgInfo::Ptr& backend_dsg,
+                       const SharedModuleState::Ptr& state)
     : KimeraPgmoInterface(),
       nh_(nh),
       shared_dsg_(dsg),
       private_dsg_(backend_dsg),
+      state_(state),
       shared_places_copy_(DsgLayers::PLACES),
       robot_id_(0) {
   config_ = load_config<DsgBackendConfig>(nh_);
@@ -225,7 +227,7 @@ bool DsgBackend::updatePrivateDsg() {
                                       true,
                                       &config_.merge_update_map,
                                       config_.merge_update_dynamic);
-      *private_dsg_->latest_places = *shared_dsg_->latest_places;
+      //*private_dsg_->latest_places = *shared_dsg_->latest_places;
 
       private_dsg_->archived_objects = shared_dsg_->archived_objects;
 
@@ -524,10 +526,10 @@ bool DsgBackend::addInternalLCDToDeformationGraph() {
   std::list<LoopClosureLog> to_process;
 
   {  // start critical section
-    std::unique_lock<std::mutex> lock(shared_dsg_->lcd_mutex);
-    while (!shared_dsg_->loop_closures.empty()) {
-      auto result = shared_dsg_->loop_closures.front();
-      shared_dsg_->loop_closures.pop();
+    std::unique_lock<std::mutex> lock(state_->lcd_mutex);
+    while (!state_->loop_closures.empty()) {
+      auto result = state_->loop_closures.front();
+      state_->loop_closures.pop();
 
       // TODO(nathan) this is kinda ugly, we can probably grab the GTSAM symbol in the
       // frontend and pass it with the result
@@ -675,55 +677,24 @@ void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,
   updateBuildingNode();
 }
 
-ActiveNodeSet DsgBackend::getNodesForRoomDetection(const NodeIdSet& latest_places) {
-  std::unordered_set<NodeId> active_places(latest_places.begin(), latest_places.end());
-  // TODO(nathan) grab this from a set of active rooms
-  const auto& rooms = private_dsg_->graph->getLayer(DsgLayers::ROOMS);
-  for (const auto& id_node_pair : rooms.nodes()) {
-    active_places.insert(id_node_pair.second->children().begin(),
-                         id_node_pair.second->children().end());
-  }
-
-  // TODO(nathan) this is threadsafe as long as places and rooms are on the same thread
-  const auto& places = private_dsg_->graph->getLayer(DsgLayers::PLACES);
-  for (const auto& node_id : unlabeled_place_nodes_) {
-    if (!places.hasNode(node_id)) {
-      continue;
-    }
-
-    active_places.insert(node_id);
-  }
-
-  return active_places;
-}
-
-void DsgBackend::storeUnlabeledPlaces(const ActiveNodeSet active_nodes) {
-  const auto& places = private_dsg_->graph->getLayer(DsgLayers::PLACES);
-
-  unlabeled_place_nodes_.clear();
-  for (const auto& node_id : active_nodes) {
-    if (!places.hasNode(node_id)) {
-      continue;
-    }
-
-    if (places.getNode(node_id)->get().hasParent()) {
-      continue;
-    }
-
-    unlabeled_place_nodes_.insert(node_id);
-  }
-}
-
 void DsgBackend::updateRoomsNodes() {
   if (!room_finder_) {
     return;
   }
 
   ScopedTimer timer("backend/room_detection", last_timestamp_, true, 1, false);
-  ActiveNodeSet active_nodes = getNodesForRoomDetection(*private_dsg_->latest_places);
-  VLOG(3) << "Detecting rooms for " << active_nodes.size() << " nodes";
-  room_finder_->findRooms(*private_dsg_, active_nodes);
-  storeUnlabeledPlaces(active_nodes);
+
+  std::unordered_set<NodeId> place_ids;
+  {  // start critical section
+    std::unique_lock<std::mutex> lock(private_dsg_->mutex);
+    const auto& places = private_dsg_->graph->getLayer(DsgLayers::PLACES);
+    for (const auto& id_node_pair : places.nodes()) {
+      place_ids.insert(id_node_pair.first);
+    }
+  }  // enable critical section
+
+  VLOG(3) << "Detecting rooms for " << place_ids.size() << " nodes";
+  room_finder_->findRooms(*private_dsg_, place_ids);
 }
 
 void DsgBackend::updateBuildingNode() {

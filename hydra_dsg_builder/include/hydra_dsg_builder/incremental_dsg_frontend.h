@@ -69,6 +69,7 @@ class DsgFrontend {
 
   DsgFrontend(const DsgFrontendConfig& config,
               const SharedDsgInfo::Ptr& dsg,
+              const SharedModuleState::Ptr& state,
               int robot_id);
 
   virtual ~DsgFrontend();
@@ -108,6 +109,7 @@ class DsgFrontend {
   DsgFrontendConfig config_;
   std::unique_ptr<kimera::SemanticLabel2Color> label_map_;
   SharedDsgInfo::Ptr dsg_;
+  SharedModuleState::Ptr state_;
   char robot_prefix_;
 
   kimera_pgmo::MeshFrontendInterface mesh_frontend_;

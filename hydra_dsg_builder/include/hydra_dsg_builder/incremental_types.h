@@ -76,17 +76,25 @@ struct SharedDsgInfo {
     }
 
     graph.reset(new DynamicSceneGraph(layer_ids, mesh_layer_id));
-    latest_places.reset(new NodeIdSet);
   }
 
   std::mutex mutex;
   std::atomic<bool> updated;
   uint64_t last_update_time;
   DynamicSceneGraph::Ptr graph;
-  std::shared_ptr<NodeIdSet> latest_places;
+
+};
+
+struct SharedModuleState {
+  using Ptr = std::shared_ptr<SharedModuleState>;
+
+  NodeIdSet latest_places;
+  NodeIdSet archived_places;
+
+  std::mutex mesh_mutex;
+  std::shared_ptr<pcl::PolygonMesh> latest_mesh;
 
   std::map<NodeId, size_t> agent_key_map;
-  NodeIdSet archived_places;
 
   std::mutex lcd_mutex;
   std::queue<lcd::DsgRegistrationSolution> loop_closures;

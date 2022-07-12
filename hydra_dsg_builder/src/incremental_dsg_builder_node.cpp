@@ -55,12 +55,13 @@ void run(const ros::NodeHandle& nh,
   int robot_id = 0;
   nh.getParam("robot_id", robot_id);
 
-  DsgBackend backend(nh, frontend_dsg, backend_dsg);
-  ROSFrontend frontend(nh, frontend_dsg, robot_id);
+  SharedModuleState::Ptr shared_state(new SharedModuleState());
+  ROSFrontend frontend(nh, frontend_dsg, shared_state, robot_id);
+  DsgBackend backend(nh, frontend_dsg, backend_dsg, shared_state);
 
   std::shared_ptr<DsgLcd> lcd;
   if (enable_lcd) {
-    lcd.reset(new DsgLcd(nh, frontend_dsg));
+    lcd.reset(new DsgLcd(nh, frontend_dsg, shared_state));
   }
 
   frontend.start();

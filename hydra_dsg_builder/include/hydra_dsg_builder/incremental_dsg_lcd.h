@@ -53,7 +53,9 @@ namespace incremental {
 
 class DsgLcd {
  public:
-  DsgLcd(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg);
+  DsgLcd(const ros::NodeHandle& nh,
+         const SharedDsgInfo::Ptr& dsg,
+         const SharedModuleState::Ptr& state);
 
   virtual ~DsgLcd();
 
@@ -78,6 +80,7 @@ class DsgLcd {
 
   DsgLcdModuleConfig config_;
   SharedDsgInfo::Ptr dsg_;
+  SharedModuleState::Ptr state_;
 
   std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> lcd_queue_;
   std::unique_ptr<std::thread> lcd_thread_;

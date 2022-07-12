@@ -50,6 +50,7 @@ using incremental::DsgFrontend;
 using incremental::MeshSegmenter;
 using incremental::PlacesLayerMsg;
 using incremental::SharedDsgInfo;
+using incremental::SharedModuleState;
 using pose_graph_tools::PoseGraph;
 
 using ObjectCloudPub = SemanticRosPublishers<uint8_t, MeshSegmenter::MeshVertexCloud>;
@@ -72,7 +73,10 @@ struct ROSFrontend : public DsgFrontend {
       message_filters::sync_policies::ApproximateTime<PlacesLayerMsg, ActiveMesh>;
   using Sync = message_filters::Synchronizer<Policy>;
 
-  ROSFrontend(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg, int robot_id);
+  ROSFrontend(const ros::NodeHandle& nh,
+              const SharedDsgInfo::Ptr& dsg,
+              const SharedModuleState::Ptr& state,
+              int robot_id);
 
   ~ROSFrontend();
 

@@ -89,7 +89,8 @@ struct DsgOptimizer {
   }
 
   void do_optimize() {
-    backend.reset(new DsgBackend(nh, frontend_dsg, backend_dsg));
+    SharedModuleState::Ptr state(new SharedModuleState());
+    backend.reset(new DsgBackend(nh, frontend_dsg, backend_dsg, state));
     backend->startPgmo();
     LOG(ERROR) << "Loading backend state!";
     backend->loadState(frontend_filepath, dgrf_filepath);

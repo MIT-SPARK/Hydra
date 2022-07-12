@@ -40,8 +40,12 @@ using message_filters::Subscriber;
 
 ROSFrontend::ROSFrontend(const ros::NodeHandle& nh,
                          const SharedDsgInfo::Ptr& dsg,
+                         const SharedModuleState::Ptr& state,
                          int robot_id)
-    : DsgFrontend(load_config<incremental::DsgFrontendConfig>(nh), dsg, robot_id),
+    : DsgFrontend(load_config<incremental::DsgFrontendConfig>(nh),
+                  dsg,
+                  state,
+                  robot_id),
       nh_(nh) {
   ros_config_ = load_config<ROSFrontendConfig>(nh);
 
