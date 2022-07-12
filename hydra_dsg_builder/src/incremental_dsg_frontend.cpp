@@ -178,6 +178,19 @@ void DsgFrontend::updateMeshAndObjects(const FrontendInput& input) {
       pcl::toPCLPointCloud2(*vertices, state_->latest_mesh->cloud);
     }
 
+    state_->mesh_vertex_stamps.reset(
+        new std::vector<ros::Time>(mesh_frontend_.getFullMeshTimes()));
+
+    state_->mesh_vertex_graph_indices.reset(new std::vector<int>(vertices->size(), -1));
+    state_->mesh_vertex_graph_indices->resize(vertices->size());
+    const auto& index_mapping = mesh_frontend_.getFullMeshToGraphMapping();
+    for (size_t i = 0; i < vertices->size(); ++i) {
+      const auto iter = index_mapping.find(i);
+      if (iter != index_mapping.end()) {
+        state_->mesh_vertex_graph_indices->push_back(iter->second);
+      }
+    }
+
     state_->have_new_mesh = true;
   }  // end critical section
 
