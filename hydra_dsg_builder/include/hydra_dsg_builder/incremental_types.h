@@ -36,6 +36,7 @@
 #include <gtsam/geometry/Pose3.h>
 #include <hydra_utils/dsg_types.h>
 #include <kimera_pgmo/utils/CommonStructs.h>
+#include <ros/time.h>
 
 #include <atomic>
 #include <map>
@@ -82,7 +83,6 @@ struct SharedDsgInfo {
   std::atomic<bool> updated;
   uint64_t last_update_time;
   DynamicSceneGraph::Ptr graph;
-
 };
 
 struct SharedModuleState {
@@ -92,7 +92,10 @@ struct SharedModuleState {
   NodeIdSet archived_places;
 
   std::mutex mesh_mutex;
+  bool have_new_mesh;
   std::shared_ptr<pcl::PolygonMesh> latest_mesh;
+  std::shared_ptr<std::vector<ros::Time>> mesh_vertex_stamps;
+  std::shared_ptr<std::vector<int>> mesh_vertex_graph_indices;
 
   std::map<NodeId, size_t> agent_key_map;
 

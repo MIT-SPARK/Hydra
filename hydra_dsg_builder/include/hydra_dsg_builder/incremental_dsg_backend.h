@@ -191,7 +191,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   std::list<LayerUpdateFunc> dsg_update_funcs_;
 
-  std::vector<int> mesh_vertex_graph_inds_;
+  std::shared_ptr<std::vector<int>> mesh_vertex_graph_inds_;
 
   PoseGraphQueue deformation_graph_updates_;
   PoseGraphQueue pose_graph_updates_;
@@ -215,8 +215,10 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   kimera_pgmo::Path trajectory_;
   std::vector<ros::Time> timestamps_;
   std::queue<size_t> unconnected_nodes_;
-  kimera_pgmo::KimeraPgmoMesh::ConstPtr latest_mesh_;
-  std::vector<ros::Time> mesh_vertex_stamps_;
+  kimera_pgmo::KimeraPgmoMesh::ConstPtr latest_mesh_msg_;
+  std::shared_ptr<pcl::PolygonMesh> latest_mesh_;
+
+  std::shared_ptr<std::vector<ros::Time>> mesh_vertex_stamps_;
 
   ros::Subscriber full_mesh_sub_;
   ros::Subscriber deformation_graph_sub_;

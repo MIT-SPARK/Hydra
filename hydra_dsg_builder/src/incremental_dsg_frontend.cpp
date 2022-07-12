@@ -162,6 +162,20 @@ void DsgFrontend::updateMeshAndObjects(const FrontendInput& input) {
     mesh_frontend_.clearArchivedMeshFull(input.mesh->archived_blocks);
   }  // end timing scope
 
+  {  // start critical section
+    ScopedTimer timer("frontend/copy_mesh", input.timestamp_ns);
+    std::unique_lock<std::mutex> lock(state_->mesh_mutex);
+    state_->latest_mesh.reset(new pcl::PolygonMesh());
+    state_->latest_mesh->polygons = mesh_frontend_.getFullMeshFaces();
+
+    const auto vertices = mesh_frontend_.getFullMeshVertices();
+    if (!vertices->empty()) {
+      pcl::toPCLPointCloud2(*vertices, state_->latest_mesh->cloud);
+    }
+
+    state_->have_new_mesh = true;
+  }  // end critical section
+
   LabelClusters object_clusters;
 
   {  // timing scope

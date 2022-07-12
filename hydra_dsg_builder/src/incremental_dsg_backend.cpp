@@ -186,8 +186,9 @@ void DsgBackend::save(const std::string& output_path) {
   }
 
   if (!private_dsg_->graph->isMeshEmpty()) {
-    kimera_pgmo::WriteMeshWithStampsToPly(
-        output_path + "/mesh.ply", private_dsg_->graph->getMesh(), mesh_vertex_stamps_);
+    kimera_pgmo::WriteMeshWithStampsToPly(output_path + "/mesh.ply",
+                                          private_dsg_->graph->getMesh(),
+                                          *mesh_vertex_stamps_);
   }
 
   const std::string output_csv = output_path + "/loop_closures.csv";
@@ -415,7 +416,7 @@ void DsgBackend::runPgmo() {
 
 void DsgBackend::fullMeshCallback(const KimeraPgmoMesh::ConstPtr& msg) {
   std::unique_lock<std::mutex> lock(pgmo_mutex_);
-  latest_mesh_ = msg;
+  latest_mesh_msg_ = msg;
   have_new_mesh_ = true;
 }
 
@@ -571,6 +572,19 @@ void DsgBackend::updateDsgMesh(bool force_mesh_update) {
   // avoid scope problems by using a smart pointer
   std::unique_ptr<ScopedTimer> timer;
 
+  {  // start critical section
+    std::unique_lock<std::mutex> lock(state_->mesh_mutex);
+    if (state_->have_new_mesh) {
+      // latch the pointer so that frontend can copy a new one without
+      // getting tied up waiting for the mesh interpolation
+      latest_mesh_ = state_->latest_mesh;
+      mesh_vertex_stamps_ = state_->mesh_vertex_stamps;
+      mesh_vertex_graph_inds_ = state_->mesh_vertex_graph_indices;
+      state_->have_new_mesh = false;
+      have_new_mesh_ = true;
+    }
+  }  // end critical section
+
   if (!latest_mesh_) {
     return;
   }
@@ -580,18 +594,16 @@ void DsgBackend::updateDsgMesh(bool force_mesh_update) {
   }
 
   timer.reset(new ScopedTimer("backend/mesh_update", last_timestamp_));
-  auto input_mesh = kimera_pgmo::PgmoMeshMsgToPolygonMesh(
-      *latest_mesh_, &mesh_vertex_stamps_, &mesh_vertex_graph_inds_);
   have_new_mesh_ = false;
 
-  if (input_mesh.cloud.height * input_mesh.cloud.width == 0) {
+  if (latest_mesh_->cloud.height * latest_mesh_->cloud.width == 0) {
     return;
   }
-  VLOG(3) << "Deforming mesh with " << mesh_vertex_stamps_.size() << " vertices";
+  VLOG(3) << "Deforming mesh with " << mesh_vertex_stamps_->size() << " vertices";
 
-  auto opt_mesh = deformation_graph_->deformMesh(input_mesh,
-                                                 mesh_vertex_stamps_,
-                                                 mesh_vertex_graph_inds_,
+  auto opt_mesh = deformation_graph_->deformMesh(*latest_mesh_,
+                                                 *mesh_vertex_stamps_,
+                                                 *mesh_vertex_graph_inds_,
                                                  robot_vertex_prefix_,
                                                  num_interp_pts_,
                                                  interp_horizon_);
@@ -776,12 +788,13 @@ void DsgBackend::visualizeDeformationGraphEdges() const {
 void DsgBackend::loadState(const std::string& state_path,
                            const std::string& dgrf_path) {
   pcl::PolygonMeshPtr mesh(new pcl::PolygonMesh());
+  mesh_vertex_stamps_.reset(new std::vector<ros::Time>());
   kimera_pgmo::ReadMeshWithStampsFromPly(
-      state_path + "/mesh.ply", mesh, &mesh_vertex_stamps_);
+      state_path + "/mesh.ply", mesh, mesh_vertex_stamps_.get());
 
-  latest_mesh_.reset(
+  latest_mesh_msg_.reset(
       new kimera_pgmo::KimeraPgmoMesh(kimera_pgmo::PolygonMeshToPgmoMeshMsg(
-          robot_id_, *mesh, mesh_vertex_stamps_, "world")));
+          robot_id_, *mesh, *mesh_vertex_stamps_, "world")));
   have_new_mesh_ = true;
 
   loadDeformationGraphFromFile(dgrf_path);
