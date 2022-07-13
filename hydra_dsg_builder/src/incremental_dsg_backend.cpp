@@ -272,7 +272,9 @@ void DsgBackend::updateFromSharedState() {
 
     for (const auto& msg : state_->deformation_graphs) {
       deformation_graph_updates_.push(msg);
+      last_timestamp_ = msg->header.stamp.toNSec();
     }
+    state_->deformation_graphs.clear();
   }  // end critical section
 }
 
@@ -355,7 +357,12 @@ bool DsgBackend::readPgmoUpdates() {
   while ((msg = popDeformationGraphQueue()) != nullptr) {
     status_.new_graph_factors_ += msg->edges.size();
     status_.new_factors_ += msg->edges.size();
-    processIncrementalMeshGraph(msg, timestamps_, &unconnected_nodes_);
+    try {
+      processIncrementalMeshGraph(msg, timestamps_, &unconnected_nodes_);
+    } catch (const gtsam::ValuesKeyDoesNotExist& e) {
+      LOG(ERROR) << *msg;
+      throw std::logic_error(e.what());
+    }
     have_updates = true;
   }
 

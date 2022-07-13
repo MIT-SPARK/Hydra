@@ -168,16 +168,24 @@ void DsgFrontend::updateMeshAndObjects(const FrontendInput& input) {
   }  // end timing scope
 
   {  // start critical section
-    ScopedTimer timer("frontend/copy_mesh", input.timestamp_ns);
+    ScopedTimer t1("frontend/copy_mesh", input.timestamp_ns);
     std::unique_lock<std::mutex> lock(state_->mesh_mutex);
     state_->latest_mesh.reset(new pcl::PolygonMesh());
-    state_->latest_mesh->polygons = mesh_frontend_.getFullMeshFaces();
+
+    { // start timing scope
+      ScopedTimer t2("frontend/copy_mesh_faces", input.timestamp_ns);
+      state_->latest_mesh->polygons = mesh_frontend_.getFullMeshFaces();
+    } // end timing scope
 
     const auto vertices = mesh_frontend_.getFullMeshVertices();
-    if (!vertices->empty()) {
-      pcl::toPCLPointCloud2(*vertices, state_->latest_mesh->cloud);
-    }
+    { // start timing scope
+      ScopedTimer t3("frontend/copy_mesh_vertices", input.timestamp_ns);
+      if (!vertices->empty()) {
+        pcl::toPCLPointCloud2(*vertices, state_->latest_mesh->cloud);
+      }
+    } // end timing scope
 
+    ScopedTimer t4("frontend/copy_mesh_info", input.timestamp_ns);
     state_->mesh_vertex_stamps.reset(
         new std::vector<ros::Time>(mesh_frontend_.getFullMeshTimes()));
 
