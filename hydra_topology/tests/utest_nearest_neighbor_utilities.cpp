@@ -39,8 +39,39 @@
 namespace hydra {
 namespace topology {
 
-TEST(NearestNeighborUtilities, TestBasic) {
-  // TODO(nathan) actual test nearest node
+TEST(NearestNeighborUtilities, TestSkipFirst) {
+  IsolatedSceneGraphLayer layer(1);
+  layer.emplaceNode(0, std::make_unique<NodeAttributes>(Eigen::Vector3d(0, 0, 3)));
+  layer.emplaceNode(1, std::make_unique<NodeAttributes>(Eigen::Vector3d(0, 0, 0)));
+  layer.emplaceNode(2, std::make_unique<NodeAttributes>(Eigen::Vector3d(3, 0, 0)));
+  layer.emplaceNode(3, std::make_unique<NodeAttributes>(Eigen::Vector3d(0, 3, 0)));
+
+  std::vector<NodeId> nodes{0, 1, 2, 3};
+  NearestNodeFinder finder(layer, nodes);
+
+  {  // test 1:
+    NodeId result;
+    double distance;
+    finder.find(
+        Eigen::Vector3d(0, 0, 2), 1, false, [&](NodeId node, size_t, double dist) {
+          result = node;
+          distance = std::sqrt(dist);
+        });
+    EXPECT_EQ(result, 0u);
+    EXPECT_NEAR(distance, 1.0, 1.0e-9);
+  }
+
+  {  // test 1:
+    NodeId result;
+    double distance;
+    finder.find(
+        Eigen::Vector3d(0, 0, 2), 1, true, [&](NodeId node, size_t, double dist) {
+          result = node;
+          distance = std::sqrt(dist);
+        });
+    EXPECT_EQ(result, 1u);
+    EXPECT_NEAR(distance, 2.0, 1.0e-9);
+  }
 }
 
 }  // namespace topology
