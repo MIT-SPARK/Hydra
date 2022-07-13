@@ -398,10 +398,9 @@ void DsgBackend::runPgmo() {
 
     bool have_dsg_updates = false;
     bool was_updated = false;
+    have_dsg_updates = updatePrivateDsg();
     {  // start pgmo mesh critical section
       std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
-      have_dsg_updates = updatePrivateDsg();
-
       if (config_.optimize_on_lc && have_graph_updates_ && have_loopclosures_) {
         optimize(status_.new_loop_closures_ > 0);
         was_updated = true;
