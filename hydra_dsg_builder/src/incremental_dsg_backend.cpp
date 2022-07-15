@@ -35,11 +35,10 @@
 #include "hydra_dsg_builder/incremental_dsg_backend.h"
 #include "hydra_dsg_builder/minimum_spanning_tree.h"
 
+#include <glog/logging.h>
 #include <hydra_utils/timing_utilities.h>
 #include <pcl/search/kdtree.h>
 #include <voxblox/core/block_hash.h>
-
-#include <glog/logging.h>
 
 namespace hydra {
 namespace incremental {
@@ -89,18 +88,38 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
     room_finder_.reset(new RoomFinder(config_.room_finder));
   }
 
-  dsg_update_funcs_.push_back(&dsg_updates::updateAgents);
-  dsg_update_funcs_.push_back(&dsg_updates::updateObjects);
   dsg_update_funcs_.push_back([&](auto& graph,
                                   const auto& place_values,
                                   const auto& pgmo_values,
-                                  bool allow_merging) -> auto {
+                                  bool allow_merging,
+                                  bool new_loop_closure) -> auto{
+    return dsg_updates::updateAgents(graph, place_values, pgmo_values, allow_merging);
+  });
+  dsg_update_funcs_.push_back([&](auto& graph,
+                                  const auto& place_values,
+                                  const auto& pgmo_values,
+                                  bool allow_merging,
+                                  bool new_loop_closure) -> auto{
+    return dsg_updates::updateObjects(graph,
+                                      place_values,
+                                      pgmo_values,
+                                      allow_merging,
+                                      new_loop_closure,
+                                      last_timestamp_,
+                                      archived_object_ids_);
+  });
+  dsg_update_funcs_.push_back([&](auto& graph,
+                                  const auto& place_values,
+                                  const auto& pgmo_values,
+                                  bool allow_merging,
+                                  bool new_loop_closure) -> auto{
     return dsg_updates::updatePlaces(graph,
                                      place_values,
                                      pgmo_values,
                                      allow_merging,
                                      config_.places_merge_pos_threshold_m,
-                                     config_.places_merge_distance_tolerance_m);
+                                     config_.places_merge_distance_tolerance_m,
+                                     last_timestamp_);
   });
 
   deformation_graph_->setForceRecalculate(!config_.pgmo.gnc_fix_prev_inliers);
@@ -156,6 +175,13 @@ bool DsgBackend::updatePrivateDsg() {
                                       &config_.merge_update_map,
                                       config_.merge_update_dynamic);
       *private_dsg_->latest_places = *shared_dsg_->latest_places;
+
+      private_dsg_->archived_objects = shared_dsg_->archived_objects;
+
+      if (shared_dsg_->archived_objects.size() > 0) {
+        // clear out the shared_dsg set of archived objects and transfer to private
+        archived_object_ids_.merge(shared_dsg_->archived_objects);
+      }
 
       if (shared_dsg_->graph->hasLayer(DsgLayers::PLACES)) {
         // TODO(nathan) simplify
@@ -298,7 +324,7 @@ void DsgBackend::runPgmo() {
       have_dsg_updates = updatePrivateDsg();
 
       if (config_.optimize_on_lc && have_graph_updates_ && have_loopclosures_) {
-        optimize();
+        optimize(status_.new_loop_closures_ > 0);
         was_updated = true;
       } else if (config_.call_update_periodically && have_dsg_updates) {
         updateDsgMesh();
@@ -532,7 +558,7 @@ void DsgBackend::updateDsgMesh(bool force_mesh_update) {
   }
 }
 
-void DsgBackend::optimize() {
+void DsgBackend::optimize(bool new_loop_closure) {
   if (config_.add_places_to_deformation_graph) {
     addPlacesToDeformationGraph();
   }
@@ -547,7 +573,7 @@ void DsgBackend::optimize() {
   gtsam::Values pgmo_values = deformation_graph_->getGtsamValues();
   gtsam::Values places_values = deformation_graph_->getGtsamTempValues();
 
-  callUpdateFunctions(places_values, pgmo_values);
+  callUpdateFunctions(places_values, pgmo_values, new_loop_closure);
 
   if (pose_graph_pub_.getNumSubscribers() > 0) {
     visualizePoseGraph();
@@ -580,7 +606,8 @@ void DsgBackend::updateMergedNodes(const std::map<NodeId, NodeId>& new_merges) {
 }
 
 void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,
-                                     const gtsam::Values& pgmo_values) {
+                                     const gtsam::Values& pgmo_values,
+                                     bool new_loop_closure) {
   ScopedTimer spin_timer("backend/update_layers", last_timestamp_);
   {  // start private dsg critical section
     std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
@@ -588,7 +615,8 @@ void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,
       auto merged_nodes = update_func(*private_dsg_->graph,
                                       places_values,
                                       pgmo_values,
-                                      config_.enable_node_merging);
+                                      config_.enable_node_merging,
+                                      new_loop_closure);
       updateMergedNodes(merged_nodes);
     }
   }  // end private dsg critical section
