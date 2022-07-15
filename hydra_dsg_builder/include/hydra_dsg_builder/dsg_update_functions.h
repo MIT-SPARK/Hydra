@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <gtsam/nonlinear/Values.h>
+#include <hydra_topology/nearest_neighbor_utilities.h>
 #include <hydra_utils/dsg_types.h>
 
 namespace hydra {
@@ -41,21 +42,34 @@ namespace hydra {
 using LayerUpdateFunc = std::function<std::map<NodeId, NodeId>(DynamicSceneGraph&,
                                                                const gtsam::Values&,
                                                                const gtsam::Values&,
+                                                               bool,
                                                                bool)>;
 
 namespace dsg_updates {
 
+using topology::NearestNodeFinder;
+
+void filterObject(DynamicSceneGraph& graph,
+                  std::list<NodeId>& valid_candidates,
+                  const NodeId& base_node,
+                  const NodeId& candidate,
+                  const std::unordered_set<NodeId>& semantic_set);
+
 std::map<NodeId, NodeId> updateObjects(DynamicSceneGraph& graph,
                                        const gtsam::Values& places_values,
                                        const gtsam::Values& pgmo_values,
-                                       bool allow_node_merging);
+                                       bool allow_node_merging,
+                                       bool loop_closure_detected = false,
+                                       uint64_t last_timestamp = 0,
+                                       const std::set<NodeId> archived_object_ids = {});
 
 std::map<NodeId, NodeId> updatePlaces(DynamicSceneGraph& graph,
                                       const gtsam::Values& places_values,
                                       const gtsam::Values& pgmo_values,
                                       bool allow_node_merging,
                                       double pos_threshold_m,
-                                      double distance_tolerance_m);
+                                      double distance_tolerance_m,
+                                      uint64_t last_timestamp = 0);
 
 std::map<NodeId, NodeId> updateRooms(DynamicSceneGraph& graph,
                                      const gtsam::Values& places_values,

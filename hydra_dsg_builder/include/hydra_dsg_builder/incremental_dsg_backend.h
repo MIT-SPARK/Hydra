@@ -114,7 +114,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void updateDsgMesh(bool force_mesh_update = false);
 
-  void optimize();
+  void optimize(bool new_loop_closure = false);
 
   void visualizePoseGraph() const;
 
@@ -140,7 +140,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   void addPlacesToDeformationGraph();
 
   void callUpdateFunctions(const gtsam::Values& places_values = gtsam::Values(),
-                           const gtsam::Values& pgmo_values = gtsam::Values());
+                           const gtsam::Values& pgmo_values = gtsam::Values(),
+                           bool new_loop_closure = false);
 
   ActiveNodeSet getNodesForRoomDetection(const NodeIdSet& latest_places);
 
@@ -176,6 +177,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   IsolatedSceneGraphLayer shared_places_copy_;
   std::map<NodeId, NodeId> merged_nodes_;
   std::map<NodeId, std::set<NodeId>> merged_nodes_parents_;
+  std::set<NodeId> archived_object_ids_;
 
   std::atomic<uint64_t> last_timestamp_;
 

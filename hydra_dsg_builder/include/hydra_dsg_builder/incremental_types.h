@@ -90,6 +90,8 @@ struct SharedDsgInfo {
 
   std::mutex lcd_mutex;
   std::queue<lcd::DsgRegistrationSolution> loop_closures;
+
+  std::set<NodeId> archived_objects;
 };
 
 struct DsgBackendStatus {
