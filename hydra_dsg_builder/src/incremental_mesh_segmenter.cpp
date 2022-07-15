@@ -275,8 +275,9 @@ void MeshSegmenter::pruneObjectsToCheckForPlaces(const DynamicSceneGraph& graph)
   }
 }
 
-void MeshSegmenter::archiveOldObjects(const DynamicSceneGraph& graph,
+std::set<NodeId> MeshSegmenter::archiveOldObjects(const DynamicSceneGraph& graph,
                                       uint64_t latest_timestamp) {
+  std::set<NodeId> archived = {};
   for (const auto& label : object_labels_) {
     std::list<NodeId> removed_nodes;
     for (const auto& object_node : active_objects_.at(label)) {
@@ -287,6 +288,7 @@ void MeshSegmenter::archiveOldObjects(const DynamicSceneGraph& graph,
       if (latest_timestamp - active_object_timestamps_.at(object_node) >
           static_cast<uint64_t>(active_object_horizon_s_ * 1e9)) {
         removed_nodes.push_back(object_node);
+        archived.insert(object_node);
       }
     }
 
@@ -295,6 +297,7 @@ void MeshSegmenter::archiveOldObjects(const DynamicSceneGraph& graph,
       active_object_timestamps_.erase(node_id);
     }
   }
+  return archived;
 }
 
 LabelIndices MeshSegmenter::getLabelIndices(const std::vector<size_t>& indices) const {
@@ -330,10 +333,10 @@ LabelIndices MeshSegmenter::getLabelIndices(const std::vector<size_t>& indices) 
   return label_indices;
 }
 
-void MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
+std::set<NodeId> MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
                                 const LabelClusters& clusters,
                                 uint64_t timestamp) {
-  archiveOldObjects(graph, timestamp);
+  std::set<NodeId> archived = archiveOldObjects(graph, timestamp);
 
   for (const auto& label_clusters : clusters) {
     for (const auto& cluster : label_clusters.second) {
@@ -391,6 +394,8 @@ void MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
       }
     }
   }
+
+  return archived;
 }
 
 void MeshSegmenter::updateObjectInGraph(DynamicSceneGraph& graph,

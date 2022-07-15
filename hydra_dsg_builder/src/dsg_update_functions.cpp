@@ -35,23 +35,42 @@
 #include "hydra_dsg_builder/dsg_update_functions.h"
 #include "hydra_dsg_builder/incremental_room_finder.h"
 
+#include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
+#include <hydra_utils/timing_utilities.h>
 #include <pcl/common/centroid.h>
 #include <pcl/point_types.h>
-
-#include <glog/logging.h>
 
 namespace hydra {
 namespace dsg_updates {
 
+using timing::ScopedTimer;
 using MeshVertices = DynamicSceneGraph::MeshVertices;
 using Node = SceneGraphNode;
 using Centroid = pcl::CentroidPoint<pcl::PointXYZ>;
 
-std::map<NodeId, NodeId> updateObjects(DynamicSceneGraph& graph,
-                                       const gtsam::Values&,
-                                       const gtsam::Values&,
-                                       bool allow_node_merging) {
+void filterObject(DynamicSceneGraph& graph,
+                  std::list<NodeId>& valid_candidates,
+                  const NodeId& base_node,
+                  const NodeId& candidate,
+                  const std::unordered_set<NodeId>& semantic_set) {
+  // there must not be an edge between nodes
+  // candidate must be in semantic map
+  if (!graph.hasEdge(base_node, candidate) && semantic_set.count(candidate)) {
+    valid_candidates.push_back(candidate);
+  }
+  return;
+}
+
+std::map<NodeId, NodeId> updateObjects(
+    DynamicSceneGraph& graph,
+    const gtsam::Values&,
+    const gtsam::Values&,
+    bool allow_node_merging,
+    bool loop_closure_detected,
+    uint64_t last_timestamp /*=0*/,
+    const std::set<NodeId> archived_object_ids /*= empty*/) {
+  ScopedTimer spin_timer("backend/update_objects", last_timestamp);
   if (!graph.hasLayer(DsgLayers::OBJECTS)) {
     return {};
   }
@@ -60,8 +79,44 @@ std::map<NodeId, NodeId> updateObjects(DynamicSceneGraph& graph,
   MeshVertices::Ptr mesh = graph.getMeshVertices();
 
   std::map<NodeId, NodeId> nodes_to_merge;
-  std::map<SemanticLabel, std::vector<NodeId>> semantic_nodes_map;
+  std::list<NodeId> valid_candidates;
+  std::map<SemanticLabel, std::unordered_set<NodeId>> semantic_nodes_map;
+  std::map<SemanticLabel, std::unique_ptr<NearestNodeFinder>> labeled_node_finders;
+
+  // creating semantic nodes map
+  if (loop_closure_detected || archived_object_ids.empty()) {
+    for (const auto& id_node_pair : layer.nodes()) {
+      auto& attrs = id_node_pair.second->attributes<ObjectNodeAttributes>();
+      if (!semantic_nodes_map.count(attrs.semantic_label)) {
+        semantic_nodes_map[attrs.semantic_label] = std::unordered_set<NodeId>();
+      }
+      semantic_nodes_map[attrs.semantic_label].insert(id_node_pair.first);
+    }
+  } else {
+    for (const auto& id_node_pair : layer.nodes()) {
+      auto& attrs = id_node_pair.second->attributes<ObjectNodeAttributes>();
+      if (!semantic_nodes_map.count(attrs.semantic_label)) {
+        semantic_nodes_map[attrs.semantic_label] = std::unordered_set<NodeId>();
+      }
+      if (archived_object_ids.count(id_node_pair.first)) {
+        semantic_nodes_map[attrs.semantic_label].insert(id_node_pair.first);
+      }
+    }
+  }
+
+  // creating nodefinders
+  for (const auto& label_nodes_pair : semantic_nodes_map) {
+    // NearestNodeFinder node_finder(layer,label_nodes_pair.second);
+    labeled_node_finders.emplace(
+        label_nodes_pair.first,
+        std::make_unique<NearestNodeFinder>(layer, label_nodes_pair.second));
+  }
+
   for (const auto& id_node_pair : layer.nodes()) {
+    // initial node must be active
+    if (!loop_closure_detected && archived_object_ids.count(id_node_pair.first)) {
+      continue;
+    }
     auto& attrs = id_node_pair.second->attributes<ObjectNodeAttributes>();
 
     std::vector<size_t> connections =
@@ -100,45 +155,46 @@ std::map<NodeId, NodeId> updateObjects(DynamicSceneGraph& graph,
     attrs.position << pcl_pos.x, pcl_pos.y, pcl_pos.z;
 
     if (allow_node_merging) {
-      bool to_be_merged = false;
       // TODO(yun) faster and smarter way to find overlap?
-      if (semantic_nodes_map.count(attrs.semantic_label) > 0) {
-        for (const auto& node_target_id : semantic_nodes_map[attrs.semantic_label]) {
-          if (graph.hasEdge(id_node_pair.first, node_target_id)) {
-            // Do not merge two nodes already connected by an edge
-            continue;
-          }
+      valid_candidates.clear();
 
-          const Node& node_target = layer.getNode(node_target_id).value();
-          auto& attrs_target = node_target.attributes<ObjectNodeAttributes>();
-          // Check for overlap
-          if (attrs.bounding_box.isInside(attrs_target.position)) {
-            const bool curr_bigger =
-                attrs.bounding_box.volume() > attrs_target.bounding_box.volume();
-            VLOG(2) << "Merging " << NodeSymbol(id_node_pair.first).getLabel() << " ["
-                    << attrs.bounding_box.volume() << "] "
-                    << (curr_bigger ? " <- " : " -> ")
-                    << NodeSymbol(node_target_id).getLabel() << " ["
-                    << attrs_target.bounding_box.volume() << "]";
+      labeled_node_finders[attrs.semantic_label]->find(
+          attrs.position,
+          1,  // Only need single closest node
+          true,
+          [&](NodeId object_id, size_t, double) {
+            filterObject(graph,
+                         valid_candidates,
+                         id_node_pair.first,
+                         object_id,
+                         semantic_nodes_map[attrs.semantic_label]);
+          });
 
-            if (curr_bigger) {
-              nodes_to_merge[node_target_id] = id_node_pair.first;
-            } else {
-              nodes_to_merge[id_node_pair.first] = node_target_id;
-            }
-            to_be_merged = true;
-            break;
-            // TODO(Yun) Merge ones with larger overlap? For now assume more
-            // will be merged next round
+      for (const auto& node_target_id : valid_candidates) {
+        const Node& node_target = layer.getNode(node_target_id).value();
+        auto& attrs_target = node_target.attributes<ObjectNodeAttributes>();
+        // Check for overlap
+        if (attrs.bounding_box.isInside(attrs_target.position)) {
+          const bool curr_bigger =
+              attrs.bounding_box.volume() > attrs_target.bounding_box.volume();
+          VLOG(2) << "Merging " << NodeSymbol(id_node_pair.first).getLabel() << " ["
+                  << attrs.bounding_box.volume() << "] "
+                  << (curr_bigger ? " <- " : " -> ")
+                  << NodeSymbol(node_target_id).getLabel() << " ["
+                  << attrs_target.bounding_box.volume() << "]";
+
+          // erase smaller node so that it isn't assigned for another merge
+          if (curr_bigger) {
+            nodes_to_merge[node_target_id] = id_node_pair.first;
+            semantic_nodes_map[attrs.semantic_label].erase(node_target_id);
+          } else {
+            nodes_to_merge[id_node_pair.first] = node_target_id;
+            semantic_nodes_map[attrs.semantic_label].erase(id_node_pair.first);
           }
+          break;
+          // TODO(Yun) Merge ones with larger overlap? For now assume more
+          // will be merged next round
         }
-      } else {
-        semantic_nodes_map[attrs.semantic_label] = std::vector<NodeId>();
-      }
-
-      if (!to_be_merged) {
-        // Prohibit merging to a node that is already to be merged
-        semantic_nodes_map[attrs.semantic_label].push_back(id_node_pair.first);
       }
     }
   }
@@ -161,7 +217,9 @@ std::map<NodeId, NodeId> updatePlaces(DynamicSceneGraph& graph,
                                       const gtsam::Values&,
                                       bool allow_node_merging,
                                       double pos_threshold_m,
-                                      double distance_tolerance_m) {
+                                      double distance_tolerance_m,
+                                      uint64_t last_timestamp) {
+  ScopedTimer spin_timer("backend/update_places", last_timestamp);
   if (!graph.hasLayer(DsgLayers::PLACES)) {
     return {};
   }
