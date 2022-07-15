@@ -1,6 +1,7 @@
 dsg:
     add_places_to_deformation_graph: true
     optimize_on_lc: true
+    select_merge_inliers: false
     enable_node_merging: true
     call_update_periodically: true
     places_merge_pos_threshold_m: 0.4
@@ -36,6 +37,7 @@ pgmo:
         pose_mesh: 1.0e-02
         place_mesh: 10.0
         place_edge: 10.0
+        merge_edge: 0.1
 building_semantic_label: 22
 building_color: [169, 8, 194]
 visualize_place_factors: false

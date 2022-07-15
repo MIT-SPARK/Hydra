@@ -406,8 +406,20 @@ void DsgBackend::runPgmo() {
         was_updated = true;
       } else if (config_.call_update_periodically && have_dsg_updates) {
         updateDsgMesh();
-        callUpdateFunctions();
+        // If we want to select the merge inliers via GNC. Here only propose merges
+        // without actually merging
+        callUpdateFunctions(!config_.select_merge_inliers);
         was_updated = true;
+      }
+      if (config_.select_merge_inliers && have_loopclosures_) {
+        addProposedMergeToDeformationGraph();
+        deformation_graph_->optimize();
+        std::map<NodeId, NodeId> valid_merges = extractValidMergesFromInliers();
+        updateDsgMesh(true);
+        gtsam::Values pgmo_values = deformation_graph_->getGtsamValues();
+        gtsam::Values places_values = deformation_graph_->getGtsamTempValues();
+        callUpdateFunctions(
+            config_.select_merge_inliers, places_values, pgmo_values, valid_merges);
       }
     }  // end pgmo mesh critical section
 

@@ -147,7 +147,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void callUpdateFunctions(const gtsam::Values& places_values = gtsam::Values(),
                            const gtsam::Values& pgmo_values = gtsam::Values(),
-                           bool new_loop_closure = false);
+                           bool new_loop_closure = false,
+                           const std::map<NodeId, NodeId>& given_merges = {});
 
   void logStatus(bool init = false) const;
 
@@ -176,6 +177,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   IsolatedSceneGraphLayer shared_places_copy_;
   std::map<NodeId, NodeId> merged_nodes_;
+  std::map<NodeId, NodeId> proposed_node_merges_;
   std::map<NodeId, std::set<NodeId>> merged_nodes_parents_;
 
   std::atomic<uint64_t> last_timestamp_;

@@ -81,6 +81,7 @@ struct DsgBackendConfig {
     // covariance
     double place_mesh_variance;
     double place_edge_variance;
+    double merge_edge_variance;
     // rpgo
     bool gnc_fix_prev_inliers = true;
     KimeraRPGO::Verbosity rpgo_verbosity = KimeraRPGO::Verbosity::UPDATE;
@@ -90,6 +91,7 @@ struct DsgBackendConfig {
   // dsg
   bool add_places_to_deformation_graph = true;
   bool optimize_on_lc = true;
+  bool select_merge_inliers = false;
   bool enable_node_merging = true;
   bool call_update_periodically = true;
   bool use_mesh_subscribers = false;
@@ -144,6 +146,7 @@ void visit_config(const Visitor& v, DsgBackendConfig& config) {
   dsg_handle.visit("add_places_to_deformation_graph",
                    config.add_places_to_deformation_graph);
   dsg_handle.visit("optimize_on_lc", config.optimize_on_lc);
+  dsg_handle.visit("select_merge_inliers", config.select_merge_inliers);
   dsg_handle.visit("enable_node_merging", config.enable_node_merging);
   dsg_handle.visit("call_update_periodically", config.call_update_periodically);
   dsg_handle.visit("merge_update_map", config.merge_update_map, EnableMapConverter());
@@ -162,6 +165,7 @@ void visit_config(const Visitor& v, DsgBackendConfig::PgmoConfig& config) {
   auto covar_handle = v["covariance"];
   covar_handle.visit("place_mesh", config.place_mesh_variance);
   covar_handle.visit("place_edge", config.place_edge_variance);
+  covar_handle.visit("merge_edge", config.merge_edge_variance);
   auto rpgo_handle = v["rpgo"];
   rpgo_handle.visit("gnc_fix_prev_inliers", config.gnc_fix_prev_inliers);
   rpgo_handle.visit("verbosity", config.rpgo_verbosity);

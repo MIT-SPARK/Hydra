@@ -94,7 +94,6 @@ struct UpdateBuildingsFunctor {
 
 std::map<NodeId, NodeId> updateAgents(incremental::SharedDsgInfo& graph,
                                       const UpdateInfo& info);
-
 }  // namespace dsg_updates
 
 }  // namespace hydra

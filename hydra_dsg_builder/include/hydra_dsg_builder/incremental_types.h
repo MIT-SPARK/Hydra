@@ -105,5 +105,12 @@ struct DsgBackendStatus {
   }
 };
 
+struct TransformEdge {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  NodeId from_node;
+  NodeId to_node;
+  gtsam::Pose3 to_T_from;
+};
+
 }  // namespace incremental
 }  // namespace hydra
