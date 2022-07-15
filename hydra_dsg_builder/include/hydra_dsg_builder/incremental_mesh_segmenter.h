@@ -78,7 +78,7 @@ class MeshSegmenter {
 
   void pruneObjectsToCheckForPlaces(const DynamicSceneGraph& graph);
 
-  void updateGraph(DynamicSceneGraph& graph,
+  std::set<NodeId> updateGraph(DynamicSceneGraph& graph,
                    const LabelClusters& clusters,
                    uint64_t timestamp);
 
@@ -88,7 +88,7 @@ class MeshSegmenter {
   Clusters findClusters(const MeshVertexCloud::Ptr& cloud,
                         const std::vector<size_t>& indices) const;
 
-  void archiveOldObjects(const DynamicSceneGraph& graph, uint64_t latest_timestamp);
+  std::set<NodeId> archiveOldObjects(const DynamicSceneGraph& graph, uint64_t latest_timestamp);
 
   LabelIndices getLabelIndices(const std::vector<size_t>& indices) const;
 
