@@ -55,16 +55,6 @@ void DsgSender::sendGraph(DynamicSceneGraph& graph, const ros::Time& stamp) cons
   hydra_msgs::DsgUpdate msg;
   msg.header.stamp = stamp;
   spark_dsg::writeGraph(graph, msg.layer_contents);
-
-  msg.deleted_nodes = graph.getRemovedNodes(true);
-
-  const auto deleted_edges = graph.getRemovedEdges(true);
-  msg.deleted_edges.reserve(2 * deleted_edges.size());
-  for (const auto& e : deleted_edges) {
-    msg.deleted_edges.push_back(e.k1);
-    msg.deleted_edges.push_back(e.k2);
-  }
-
   msg.full_update = true;
   pub_.publish(msg);
 }
@@ -97,14 +87,7 @@ void DsgReceiver::handleUpdate(const hydra_msgs::DsgUpdate::ConstPtr& msg) {
     if (!graph_) {
       graph_ = spark_dsg::readGraph(msg->layer_contents);
     } else {
-      spark_dsg::updateGraph(*graph_, msg->layer_contents);
-      for (const auto& node : msg->deleted_nodes) {
-        graph_->removeNode(node);
-      }
-
-      for (size_t i = 0; i < msg->deleted_edges.size(); i += 2) {
-        graph_->removeEdge(msg->deleted_edges[i], msg->deleted_edges[i + 1]);
-      }
+      spark_dsg::updateGraph(*graph_, msg->layer_contents, true);
     }
     has_update_ = true;
   } catch (const std::exception&) {
