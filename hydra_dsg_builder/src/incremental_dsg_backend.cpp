@@ -229,11 +229,9 @@ bool DsgBackend::updatePrivateDsg() {
                                       &config_.merge_update_map,
                                       config_.merge_update_dynamic);
 
-      private_dsg_->archived_objects = shared_dsg_->archived_objects;
-
-      if (shared_dsg_->archived_objects.size() > 0) {
+      if (state_->archived_objects.size() > 0) {
         // clear out the shared_dsg set of archived objects and transfer to private
-        archived_object_ids_.merge(shared_dsg_->archived_objects);
+        archived_object_ids_.merge(state_->archived_objects);
       }
 
       if (shared_dsg_->graph->hasLayer(DsgLayers::PLACES)) {

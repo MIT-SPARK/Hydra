@@ -216,7 +216,7 @@ void DsgFrontend::updateMeshAndObjects(const FrontendInput& input) {
   {  // start dsg critical section
     ScopedTimer timer("frontend/object_graph_update", input.timestamp_ns);
     std::unique_lock<std::mutex> lock(dsg_->mutex);
-    dsg_->archived_objects =
+    state_->archived_objects =
         segmenter_->updateGraph(*dsg_->graph, object_clusters, input.timestamp_ns);
     addPlaceObjectEdges(input.timestamp_ns);
   }  // end dsg critical section
