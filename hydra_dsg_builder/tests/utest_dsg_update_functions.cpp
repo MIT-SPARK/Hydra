@@ -62,8 +62,9 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
   attrs->bounding_box.max << 1.0f, 2.0f, 3.0f;
   graph.emplaceNode(DsgLayers::OBJECTS, 0, std::move(attrs));
 
-  gtsam::Values values;
-  dsg_updates::updateObjects(graph, values, values, false);
+  const UpdateInfo info{nullptr, nullptr, false, 0, false};
+  dsg_updates::UpdateObjectsFunctor functor;
+  functor.call(graph, info);
 
   const ObjectNodeAttributes& result =
       graph.getNode(0)->get().attributes<ObjectNodeAttributes>();
@@ -90,7 +91,7 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
   graph.insertMeshEdge(0, 0);
   graph.insertMeshEdge(0, 1);
 
-  dsg_updates::updateObjects(graph, values, values, false);
+  functor.call(graph, info);
 
   {
     // valid mesh: things should change
@@ -122,8 +123,9 @@ TEST(DsgInterpolationTests, ObjectUpdateMerge) {
   graph.emplaceNode(DsgLayers::OBJECTS, 0, std::move(attrs0));
   graph.emplaceNode(DsgLayers::OBJECTS, 1, std::move(attrs1));
 
-  gtsam::Values values;
-  dsg_updates::updateObjects(graph, values, values, true);
+  const UpdateInfo info{nullptr, nullptr, false, 0, true};
+  dsg_updates::UpdateObjectsFunctor functor;
+  functor.call(graph, info);
 
   const ObjectNodeAttributes& result0 =
       graph.getNode(0)->get().attributes<ObjectNodeAttributes>();
@@ -163,7 +165,7 @@ TEST(DsgInterpolationTests, ObjectUpdateMerge) {
   graph.insertMeshEdge(1, 0);
   graph.insertMeshEdge(1, 1);
 
-  dsg_updates::updateObjects(graph, values, values, true);
+  functor.call(graph, info);
 
   {
     // valid mesh: things should change
@@ -218,8 +220,9 @@ TEST(DsgInterpolationTests, BuildingUpdate) {
   graph.insertEdge(0, 2);
   graph.insertEdge(1, 2);
 
-  gtsam::Values values;
-  dsg_updates::updateBuildings(graph, values, values, false);
+  const UpdateInfo info{nullptr, nullptr, false, 0, false};
+  dsg_updates::UpdateBuildingsFunctor functor;
+  functor.call(graph, info);
 
   Eigen::Vector3d first_expected(-1.0, 0.0, 1.0);
   Eigen::Vector3d first_result = graph.getPosition(0);
@@ -256,8 +259,9 @@ TEST(DsgInterpolationTests, PlaceUpdate) {
   values.insert(NodeSymbol('p', 5),
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
-  gtsam::Values pgmo_values;
-  dsg_updates::updatePlaces(graph, values, pgmo_values, false, 0.0, 0.0);
+  const UpdateInfo info{&values, nullptr, false, 0, false};
+  dsg_updates::UpdatePlacesFunctor functor(0.4, 0.3);
+  functor.call(graph, info);
 
   {  // first key exists: new value
     Eigen::Vector3d expected(4.0, 5.0, 6.0);
@@ -306,23 +310,24 @@ TEST(DsgInterpolationTests, PlaceUpdateMerge) {
   values.insert(NodeSymbol('p', 6),
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
-  gtsam::Values pgmo_values;
-  dsg_updates::updatePlaces(graph, values, pgmo_values, true, 0.4, 0.3);
+  const UpdateInfo info{&values, nullptr, false, 0, true};
+  dsg_updates::UpdatePlacesFunctor functor(0.4, 0.3);
+  functor.call(graph, info);
 
-  // {  // first key exists: new value
-  //   Eigen::Vector3d expected(4.0, 5.0, 6.0);
-  //   Eigen::Vector3d result = graph.getPosition(NodeSymbol('p', 0));
-  //   EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
-  // }
+  {  // first key exists: new value
+    Eigen::Vector3d expected(4.0, 5.0, 6.0);
+    Eigen::Vector3d result = graph.getPosition(NodeSymbol('p', 0));
+    EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
+  }
 
-  // {  // non-zero key exists: new value
-  //   Eigen::Vector3d expected(7.0, 8.0, 9.0);
-  //   Eigen::Vector3d result = graph.getPosition(NodeSymbol('p', 5));
-  //   EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
-  // }
+  {  // non-zero key exists: new value
+    Eigen::Vector3d expected(7.0, 8.0, 9.0);
+    Eigen::Vector3d result = graph.getPosition(NodeSymbol('p', 5));
+    EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
+  }
 
-  // // node p6 merged with node p5
-  // EXPECT_FALSE(graph.hasNode(NodeSymbol('p', 6)));
+  // node p6 merged with node p5
+  EXPECT_FALSE(graph.hasNode(NodeSymbol('p', 6)));
 }
 
 TEST(DsgInterpolationTests, AgentUpdate) {
@@ -362,8 +367,8 @@ TEST(DsgInterpolationTests, AgentUpdate) {
       NodeSymbol('b', 5),
       gtsam::Pose3(gtsam::Rot3(0.0, 0.0, 1.0, 0.0), gtsam::Point3(7.0, 8.0, 9.0)));
 
-  gtsam::Values places_values;
-  dsg_updates::updateAgents(graph, places_values, agent_values, false);
+  const UpdateInfo info{nullptr, &agent_values, false, 0, false};
+  dsg_updates::updateAgents(graph, info);
 
   {  // external_key == node_id and in values
     const auto& attrs = graph.getDynamicNode(NodeSymbol('a', 0))

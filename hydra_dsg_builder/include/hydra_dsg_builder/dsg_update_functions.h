@@ -39,52 +39,46 @@
 
 namespace hydra {
 
-using LayerUpdateFunc = std::function<std::map<NodeId, NodeId>(DynamicSceneGraph&,
-                                                               const gtsam::Values&,
-                                                               const gtsam::Values&,
-                                                               bool,
-                                                               bool)>;
+struct UpdateInfo {
+  const gtsam::Values* places_values = nullptr;
+  const gtsam::Values* pgmo_values = nullptr;
+  bool loop_closure_detected = false;
+  uint64_t timestamp_ns = 0;
+  bool allow_node_merging = false;
+};
+
+using LayerUpdateFunc =
+    std::function<std::map<NodeId, NodeId>(DynamicSceneGraph&, const UpdateInfo&)>;
 
 namespace dsg_updates {
 
 using topology::NearestNodeFinder;
 
-void filterObject(DynamicSceneGraph& graph,
-                  std::list<NodeId>& valid_candidates,
-                  const NodeId& base_node,
-                  const NodeId& candidate,
-                  const std::unordered_set<NodeId>& semantic_set);
+struct UpdateObjectsFunctor {
+  std::map<NodeId, NodeId> call(DynamicSceneGraph& graph, const UpdateInfo& info) const;
 
-std::map<NodeId, NodeId> updateObjects(DynamicSceneGraph& graph,
-                                       const gtsam::Values& places_values,
-                                       const gtsam::Values& pgmo_values,
-                                       bool allow_node_merging,
-                                       bool loop_closure_detected = false,
-                                       uint64_t last_timestamp = 0,
-                                       const std::set<NodeId> archived_object_ids = {});
+  std::set<NodeId> archived_object_ids;
+};
 
-std::map<NodeId, NodeId> updatePlaces(DynamicSceneGraph& graph,
-                                      const gtsam::Values& places_values,
-                                      const gtsam::Values& pgmo_values,
-                                      bool allow_node_merging,
-                                      double pos_threshold_m,
-                                      double distance_tolerance_m,
-                                      uint64_t last_timestamp = 0);
+struct UpdatePlacesFunctor {
+  UpdatePlacesFunctor(double pos_threshold, double distance_tolerance)
+      : pos_threshold_m(pos_threshold), distance_tolerance_m(distance_tolerance) {}
 
-std::map<NodeId, NodeId> updateRooms(DynamicSceneGraph& graph,
-                                     const gtsam::Values& places_values,
-                                     const gtsam::Values& pgmo_values,
-                                     bool allow_node_merging);
+  std::map<NodeId, NodeId> call(DynamicSceneGraph& graph, const UpdateInfo& info) const;
 
-std::map<NodeId, NodeId> updateBuildings(DynamicSceneGraph& graph,
-                                         const gtsam::Values& places_values,
-                                         const gtsam::Values& pgmo_values,
-                                         bool allow_node_merging);
+  double pos_threshold_m;
+  double distance_tolerance_m;
+};
 
-std::map<NodeId, NodeId> updateAgents(DynamicSceneGraph& graph,
-                                      const gtsam::Values& places_values,
-                                      const gtsam::Values& pgmo_values,
-                                      bool allow_node_merging);
+struct UpdateRoomsFunctor {
+  std::map<NodeId, NodeId> call(DynamicSceneGraph& graph, const UpdateInfo& info) const;
+};
+
+struct UpdateBuildingsFunctor {
+  std::map<NodeId, NodeId> call(DynamicSceneGraph& graph, const UpdateInfo& info) const;
+};
+
+std::map<NodeId, NodeId> updateAgents(DynamicSceneGraph& graph, const UpdateInfo& info);
 
 }  // namespace dsg_updates
 

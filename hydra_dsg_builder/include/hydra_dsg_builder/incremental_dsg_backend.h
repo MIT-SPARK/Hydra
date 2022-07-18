@@ -181,7 +181,6 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   IsolatedSceneGraphLayer shared_places_copy_;
   std::map<NodeId, NodeId> merged_nodes_;
   std::map<NodeId, std::set<NodeId>> merged_nodes_parents_;
-  std::set<NodeId> archived_object_ids_;
 
   std::atomic<uint64_t> last_timestamp_;
 
@@ -193,6 +192,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   DsgBackendStatus status_;
 
   std::list<LayerUpdateFunc> dsg_update_funcs_;
+  std::unique_ptr<dsg_updates::UpdateObjectsFunctor> update_objects_functor_;
+  std::unique_ptr<dsg_updates::UpdatePlacesFunctor> update_places_functor_;
 
   std::shared_ptr<std::vector<int>> mesh_vertex_graph_inds_;
 

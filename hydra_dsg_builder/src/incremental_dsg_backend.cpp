@@ -90,39 +90,19 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
     room_finder_.reset(new RoomFinder(config_.room_finder));
   }
 
-  dsg_update_funcs_.push_back([&](auto& graph,
-                                  const auto& place_values,
-                                  const auto& pgmo_values,
-                                  bool allow_merging,
-                                  bool new_loop_closure) -> auto{
-    return dsg_updates::updateAgents(graph, place_values, pgmo_values, allow_merging);
-  });
-  dsg_update_funcs_.push_back([&](auto& graph,
-                                  const auto& place_values,
-                                  const auto& pgmo_values,
-                                  bool allow_merging,
-                                  bool new_loop_closure) -> auto{
-    return dsg_updates::updateObjects(graph,
-                                      place_values,
-                                      pgmo_values,
-                                      allow_merging,
-                                      new_loop_closure,
-                                      last_timestamp_,
-                                      archived_object_ids_);
-  });
-  dsg_update_funcs_.push_back([&](auto& graph,
-                                  const auto& place_values,
-                                  const auto& pgmo_values,
-                                  bool allow_merging,
-                                  bool new_loop_closure) -> auto{
-    return dsg_updates::updatePlaces(graph,
-                                     place_values,
-                                     pgmo_values,
-                                     allow_merging,
-                                     config_.places_merge_pos_threshold_m,
-                                     config_.places_merge_distance_tolerance_m,
-                                     last_timestamp_);
-  });
+  update_objects_functor_.reset(new dsg_updates::UpdateObjectsFunctor());
+  update_places_functor_.reset(new dsg_updates::UpdatePlacesFunctor(
+      config_.places_merge_pos_threshold_m, config_.places_merge_distance_tolerance_m));
+
+  dsg_update_funcs_.push_back(&dsg_updates::updateAgents);
+  dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdateObjectsFunctor::call,
+                                        update_objects_functor_.get(),
+                                        std::placeholders::_1,
+                                        std::placeholders::_2));
+  dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdatePlacesFunctor::call,
+                                        update_places_functor_.get(),
+                                        std::placeholders::_1,
+                                        std::placeholders::_2));
 
   deformation_graph_->setForceRecalculate(!config_.pgmo.gnc_fix_prev_inliers);
   deformation_graph_->storeOnlyNoOptimization();
@@ -231,7 +211,7 @@ bool DsgBackend::updatePrivateDsg() {
 
       if (state_->archived_objects.size() > 0) {
         // clear out the shared_dsg set of archived objects and transfer to private
-        archived_object_ids_.merge(state_->archived_objects);
+        update_objects_functor_->archived_object_ids.merge(state_->archived_objects);
       }
 
       if (shared_dsg_->graph->hasLayer(DsgLayers::PLACES)) {
@@ -692,18 +672,22 @@ void DsgBackend::updateMergedNodes(const std::map<NodeId, NodeId>& new_merges) {
 void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,
                                      const gtsam::Values& pgmo_values,
                                      bool new_loop_closure) {
+  const UpdateInfo info{&places_values,
+                        &pgmo_values,
+                        new_loop_closure,
+                        last_timestamp_,
+                        config_.enable_node_merging};
+
   ScopedTimer spin_timer("backend/update_layers", last_timestamp_);
   {  // start private dsg critical section
     std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
     for (const auto& update_func : dsg_update_funcs_) {
-      auto merged_nodes = update_func(*private_dsg_->graph,
-                                      places_values,
-                                      pgmo_values,
-                                      config_.enable_node_merging,
-                                      new_loop_closure);
+      auto merged_nodes = update_func(*private_dsg_->graph, info);
       updateMergedNodes(merged_nodes);
     }
   }  // end private dsg critical section
+
+  // TODO(nathan) migrate to functors
   updateRoomsNodes();
   updateBuildingNode();
 }

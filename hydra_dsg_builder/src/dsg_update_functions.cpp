@@ -62,15 +62,9 @@ void filterObject(DynamicSceneGraph& graph,
   return;
 }
 
-std::map<NodeId, NodeId> updateObjects(
-    DynamicSceneGraph& graph,
-    const gtsam::Values&,
-    const gtsam::Values&,
-    bool allow_node_merging,
-    bool loop_closure_detected,
-    uint64_t last_timestamp /*=0*/,
-    const std::set<NodeId> archived_object_ids /*= empty*/) {
-  ScopedTimer spin_timer("backend/update_objects", last_timestamp);
+std::map<NodeId, NodeId> UpdateObjectsFunctor::call(DynamicSceneGraph& graph,
+                                                    const UpdateInfo& info) const {
+  ScopedTimer spin_timer("backend/update_objects", info.timestamp_ns);
   if (!graph.hasLayer(DsgLayers::OBJECTS)) {
     return {};
   }
@@ -84,7 +78,7 @@ std::map<NodeId, NodeId> updateObjects(
   std::map<SemanticLabel, std::unique_ptr<NearestNodeFinder>> labeled_node_finders;
 
   // creating semantic nodes map
-  if (loop_closure_detected || archived_object_ids.empty()) {
+  if (info.loop_closure_detected || archived_object_ids.empty()) {
     for (const auto& id_node_pair : layer.nodes()) {
       auto& attrs = id_node_pair.second->attributes<ObjectNodeAttributes>();
       if (!semantic_nodes_map.count(attrs.semantic_label)) {
@@ -114,7 +108,7 @@ std::map<NodeId, NodeId> updateObjects(
 
   for (const auto& id_node_pair : layer.nodes()) {
     // initial node must be active
-    if (!loop_closure_detected && archived_object_ids.count(id_node_pair.first)) {
+    if (!info.loop_closure_detected && archived_object_ids.count(id_node_pair.first)) {
       continue;
     }
     auto& attrs = id_node_pair.second->attributes<ObjectNodeAttributes>();
@@ -154,7 +148,7 @@ std::map<NodeId, NodeId> updateObjects(
     centroid.get(pcl_pos);
     attrs.position << pcl_pos.x, pcl_pos.y, pcl_pos.z;
 
-    if (allow_node_merging) {
+    if (info.allow_node_merging) {
       // TODO(yun) faster and smarter way to find overlap?
       valid_candidates.clear();
 
@@ -212,38 +206,34 @@ std::map<NodeId, NodeId> updateObjects(
   return nodes_to_merge;
 }
 
-std::map<NodeId, NodeId> updatePlaces(DynamicSceneGraph& graph,
-                                      const gtsam::Values& values,
-                                      const gtsam::Values&,
-                                      bool allow_node_merging,
-                                      double pos_threshold_m,
-                                      double distance_tolerance_m,
-                                      uint64_t last_timestamp) {
-  ScopedTimer spin_timer("backend/update_places", last_timestamp);
-  if (!graph.hasLayer(DsgLayers::PLACES)) {
+std::map<NodeId, NodeId> UpdatePlacesFunctor::call(DynamicSceneGraph& graph,
+                                                   const UpdateInfo& info) const {
+  ScopedTimer spin_timer("backend/update_places", info.timestamp_ns);
+  if (!graph.hasLayer(DsgLayers::PLACES) || !info.places_values) {
     return {};
   }
 
-  if (values.size() == 0 && !allow_node_merging) {
+  if (info.places_values->size() == 0 && !info.allow_node_merging) {
     return {};
   }
 
   const auto& layer = graph.getLayer(DsgLayers::PLACES);
+  const auto& places_values = *info.places_values;
 
   std::unordered_set<NodeId> missing_nodes;
   std::vector<NodeId> updated_nodes;
   std::map<NodeId, NodeId> nodes_to_merge;
   for (const auto& id_node_pair : layer.nodes()) {
     auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
-    if (!values.exists(id_node_pair.first)) {
+    if (!places_values.exists(id_node_pair.first)) {
       missing_nodes.insert(id_node_pair.first);
     } else {
       // TODO(nathan) consider updating distance via parents + deformation graph
-      attrs.position = values.at<gtsam::Pose3>(id_node_pair.first).translation();
+      attrs.position = places_values.at<gtsam::Pose3>(id_node_pair.first).translation();
     }
 
     // TODO(yun) faster and smarter way to find overlap?
-    if (!allow_node_merging) {
+    if (!info.allow_node_merging) {
       continue;  // don't try to merge nodes when not allowed or active
     }
 
@@ -302,7 +292,7 @@ std::map<NodeId, NodeId> updatePlaces(DynamicSceneGraph& graph,
         const auto& attrs = missing_node.attributes<PlaceNodeAttributes>();
         if (!attrs.is_active && !missing_node.hasSiblings()) {
           VLOG(4) << "[Places Layer]: removing node "
-                  << gtsam::DefaultKeyFormatter(place_id);
+                  << NodeSymbol(place_id).getLabel();
           graph.removeNode(place_id);
         }
       }
@@ -312,11 +302,8 @@ std::map<NodeId, NodeId> updatePlaces(DynamicSceneGraph& graph,
   return nodes_to_merge;
 }
 
-// TODO(nathan) add unit test for this
-std::map<NodeId, NodeId> updateRooms(DynamicSceneGraph& graph,
-                                     const gtsam::Values&,
-                                     const gtsam::Values&,
-                                     bool) {
+std::map<NodeId, NodeId> UpdateRoomsFunctor::call(DynamicSceneGraph& graph,
+                                                  const UpdateInfo&) const {
   if (!graph.hasLayer(DsgLayers::ROOMS)) {
     return {};
   }
@@ -338,10 +325,8 @@ std::map<NodeId, NodeId> updateRooms(DynamicSceneGraph& graph,
   return {};
 }
 
-std::map<NodeId, NodeId> updateBuildings(DynamicSceneGraph& graph,
-                                         const gtsam::Values&,
-                                         const gtsam::Values&,
-                                         bool) {
+std::map<NodeId, NodeId> UpdateBuildingsFunctor::call(DynamicSceneGraph& graph,
+                                                      const UpdateInfo&) const {
   if (!graph.hasLayer(DsgLayers::BUILDINGS)) {
     return {};
   }
@@ -366,10 +351,8 @@ std::map<NodeId, NodeId> updateBuildings(DynamicSceneGraph& graph,
 }
 
 std::map<NodeId, NodeId> updateAgents(DynamicSceneGraph& graph,
-                                      const gtsam::Values&,
-                                      const gtsam::Values& values,
-                                      bool) {
-  if (values.size() == 0) {
+                                      const UpdateInfo& info) {
+  if (!info.pgmo_values || info.pgmo_values->size() == 0) {
     return {};
   }
 
@@ -380,12 +363,12 @@ std::map<NodeId, NodeId> updateAgents(DynamicSceneGraph& graph,
 
     for (const auto& node : prefix_layer_pair.second->nodes()) {
       auto& attrs = node->attributes<AgentNodeAttributes>();
-      if (!values.exists(attrs.external_key)) {
+      if (!info.pgmo_values->exists(attrs.external_key)) {
         missing_nodes.insert(node->id);
         continue;
       }
 
-      gtsam::Pose3 agent_pose = values.at<gtsam::Pose3>(attrs.external_key);
+      gtsam::Pose3 agent_pose = info.pgmo_values->at<gtsam::Pose3>(attrs.external_key);
       attrs.position = agent_pose.translation();
       attrs.world_R_body = Eigen::Quaterniond(agent_pose.rotation().matrix());
     }
