@@ -122,10 +122,10 @@ int main(int argc, char* argv[]) {
   }
 
   const LayerId mesh_layer_id = 1;
-  const std::map<LayerId, char>& layer_id_map{{DsgLayers::OBJECTS, 'o'},
-                                              {DsgLayers::PLACES, 'p'},
-                                              {DsgLayers::ROOMS, 'r'},
-                                              {DsgLayers::BUILDINGS, 'b'}};
+  const std::map<LayerId, char> layer_id_map{{DsgLayers::OBJECTS, 'o'},
+                                             {DsgLayers::PLACES, 'p'},
+                                             {DsgLayers::ROOMS, 'r'},
+                                             {DsgLayers::BUILDINGS, 'b'}};
 
   SharedDsgInfo::Ptr frontend_dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));
   SharedDsgInfo::Ptr backend_dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));

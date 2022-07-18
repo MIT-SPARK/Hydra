@@ -33,10 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder/dsg_update_functions.h"
-#include "hydra_dsg_builder/incremental_room_finder.h"
 
 #include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
+#include <hydra_topology/nearest_neighbor_utilities.h>
 #include <hydra_utils/timing_utilities.h>
 #include <pcl/common/centroid.h>
 #include <pcl/point_types.h>
@@ -44,10 +44,14 @@
 namespace hydra {
 namespace dsg_updates {
 
+using incremental::SharedDsgInfo;
 using timing::ScopedTimer;
+using topology::NearestNodeFinder;
 using MeshVertices = DynamicSceneGraph::MeshVertices;
 using Node = SceneGraphNode;
 using Centroid = pcl::CentroidPoint<pcl::PointXYZ>;
+using NodeColor = SemanticNodeAttributes::ColorVector;
+using SemanticLabel = SemanticNodeAttributes::Label;
 
 void filterObject(DynamicSceneGraph& graph,
                   std::list<NodeId>& valid_candidates,
@@ -62,9 +66,11 @@ void filterObject(DynamicSceneGraph& graph,
   return;
 }
 
-std::map<NodeId, NodeId> UpdateObjectsFunctor::call(DynamicSceneGraph& graph,
+std::map<NodeId, NodeId> UpdateObjectsFunctor::call(SharedDsgInfo& dsg,
                                                     const UpdateInfo& info) const {
   ScopedTimer spin_timer("backend/update_objects", info.timestamp_ns);
+  std::unique_lock<std::mutex> lock(dsg.mutex);
+  auto& graph = *dsg.graph;
   if (!graph.hasLayer(DsgLayers::OBJECTS)) {
     return {};
   }
@@ -206,9 +212,12 @@ std::map<NodeId, NodeId> UpdateObjectsFunctor::call(DynamicSceneGraph& graph,
   return nodes_to_merge;
 }
 
-std::map<NodeId, NodeId> UpdatePlacesFunctor::call(DynamicSceneGraph& graph,
+std::map<NodeId, NodeId> UpdatePlacesFunctor::call(SharedDsgInfo& dsg,
                                                    const UpdateInfo& info) const {
   ScopedTimer spin_timer("backend/update_places", info.timestamp_ns);
+  std::unique_lock<std::mutex> lock(dsg.mutex);
+  auto& graph = *dsg.graph;
+
   if (!graph.hasLayer(DsgLayers::PLACES) || !info.places_values) {
     return {};
   }
@@ -302,59 +311,85 @@ std::map<NodeId, NodeId> UpdatePlacesFunctor::call(DynamicSceneGraph& graph,
   return nodes_to_merge;
 }
 
-std::map<NodeId, NodeId> UpdateRoomsFunctor::call(DynamicSceneGraph& graph,
-                                                  const UpdateInfo&) const {
-  if (!graph.hasLayer(DsgLayers::ROOMS)) {
+UpdateRoomsFunctor::UpdateRoomsFunctor(const incremental::RoomFinder::Config& config)
+    : room_finder(new incremental::RoomFinder(config)) {}
+
+std::map<NodeId, NodeId> UpdateRoomsFunctor::call(SharedDsgInfo& dsg,
+                                                  const UpdateInfo& info) const {
+  if (!room_finder) {
     return {};
   }
 
-  std::set<NodeId> empty_rooms;
-  const auto& rooms = graph.getLayer(DsgLayers::ROOMS);
+  ScopedTimer timer("backend/room_detection", info.timestamp_ns, true, 1, false);
+
+  // TODO(nathan) this is kinda clunky
+  std::unordered_set<NodeId> place_ids;
+  {  // start critical section
+    std::unique_lock<std::mutex> lock(dsg.mutex);
+    const auto& places = dsg.graph->getLayer(DsgLayers::PLACES);
+    for (const auto& id_node_pair : places.nodes()) {
+      place_ids.insert(id_node_pair.first);
+    }
+  }  // end critical section
+
+  VLOG(3) << "Detecting rooms for " << place_ids.size() << " nodes";
+  room_finder->findRooms(dsg, place_ids);
+
+  return {};
+}
+
+UpdateBuildingsFunctor::UpdateBuildingsFunctor(const NodeColor& color,
+                                              SemanticLabel label)
+    : building_color(color), building_semantic_label(label) {}
+
+std::map<NodeId, NodeId> UpdateBuildingsFunctor::call(SharedDsgInfo& dsg,
+                                                      const UpdateInfo& info) const {
+  ScopedTimer timer("backend/building_detection", info.timestamp_ns, true, 1, false);
+
+  const NodeSymbol building_id('B', 0);
+  std::unique_lock<std::mutex> lock(dsg.mutex);
+  const auto& rooms = dsg.graph->getLayer(DsgLayers::ROOMS);
+
+  if (!rooms.numNodes()) {
+    if (dsg.graph->hasNode(building_id)) {
+      dsg.graph->removeNode(building_id);
+    }
+
+    return {};
+  }
+
+  Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
   for (const auto& id_node_pair : rooms.nodes()) {
-    if (id_node_pair.second->children().empty()) {
-      empty_rooms.insert(id_node_pair.first);
-    } else {
-      incremental::updateRoomCentroid(graph, id_node_pair.first);
-    }
+    centroid += id_node_pair.second->attributes().position;
+  }
+  centroid /= rooms.numNodes();
+
+  if (!dsg.graph->hasNode(building_id)) {
+    SemanticNodeAttributes::Ptr attrs(new SemanticNodeAttributes());
+    attrs->position = centroid;
+    attrs->color = building_color;
+    attrs->semantic_label = building_semantic_label;
+    attrs->name = building_id.getLabel();
+    dsg.graph->emplaceNode(DsgLayers::BUILDINGS, building_id, std::move(attrs));
+  } else {
+    dsg.graph->getNode(building_id)->get().attributes().position = centroid;
   }
 
-  for (const auto& room : empty_rooms) {
-    graph.removeNode(room);
-  }
-
-  return {};
-}
-
-std::map<NodeId, NodeId> UpdateBuildingsFunctor::call(DynamicSceneGraph& graph,
-                                                      const UpdateInfo&) const {
-  if (!graph.hasLayer(DsgLayers::BUILDINGS)) {
-    return {};
-  }
-
-  const auto& layer = graph.getLayer(DsgLayers::BUILDINGS);
-
-  for (const auto& id_node_pair : layer.nodes()) {
-    if (!id_node_pair.second->hasChildren()) {
-      continue;
-    }
-
-    Eigen::Vector3d mean_pos = Eigen::Vector3d::Zero();
-    for (const auto room_child : id_node_pair.second->children()) {
-      mean_pos += graph.getPosition(room_child);
-    }
-
-    mean_pos /= id_node_pair.second->children().size();
-    id_node_pair.second->attributes().position = mean_pos;
+  for (const auto& id_node_pair : rooms.nodes()) {
+    dsg.graph->insertEdge(building_id, id_node_pair.first);
   }
 
   return {};
 }
 
-std::map<NodeId, NodeId> updateAgents(DynamicSceneGraph& graph,
-                                      const UpdateInfo& info) {
+std::map<NodeId, NodeId> updateAgents(SharedDsgInfo& dsg, const UpdateInfo& info) {
   if (!info.pgmo_values || info.pgmo_values->size() == 0) {
     return {};
   }
+
+  ScopedTimer timer("backend/agent_update", info.timestamp_ns, true, 1, false);
+  std::unique_lock<std::mutex> lock(dsg.mutex);
+  auto& graph = *dsg.graph;
 
   const LayerId desired_layer = DsgLayers::AGENTS;
 

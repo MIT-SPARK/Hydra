@@ -33,9 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include "hydra_dsg_builder/incremental_room_finder.h"
+#include "hydra_dsg_builder/incremental_types.h"
+
 #include <gtsam/nonlinear/Values.h>
-#include <hydra_topology/nearest_neighbor_utilities.h>
-#include <hydra_utils/dsg_types.h>
 
 namespace hydra {
 
@@ -48,14 +49,14 @@ struct UpdateInfo {
 };
 
 using LayerUpdateFunc =
-    std::function<std::map<NodeId, NodeId>(DynamicSceneGraph&, const UpdateInfo&)>;
+    std::function<std::map<NodeId, NodeId>(incremental::SharedDsgInfo&,
+                                           const UpdateInfo&)>;
 
 namespace dsg_updates {
 
-using topology::NearestNodeFinder;
-
 struct UpdateObjectsFunctor {
-  std::map<NodeId, NodeId> call(DynamicSceneGraph& graph, const UpdateInfo& info) const;
+  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
+                                const UpdateInfo& info) const;
 
   std::set<NodeId> archived_object_ids;
 };
@@ -64,21 +65,35 @@ struct UpdatePlacesFunctor {
   UpdatePlacesFunctor(double pos_threshold, double distance_tolerance)
       : pos_threshold_m(pos_threshold), distance_tolerance_m(distance_tolerance) {}
 
-  std::map<NodeId, NodeId> call(DynamicSceneGraph& graph, const UpdateInfo& info) const;
+  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
+                                const UpdateInfo& info) const;
 
   double pos_threshold_m;
   double distance_tolerance_m;
 };
 
 struct UpdateRoomsFunctor {
-  std::map<NodeId, NodeId> call(DynamicSceneGraph& graph, const UpdateInfo& info) const;
+  UpdateRoomsFunctor(const incremental::RoomFinder::Config& config);
+
+  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
+                                const UpdateInfo& info) const;
+
+  std::unique_ptr<incremental::RoomFinder> room_finder;
 };
 
 struct UpdateBuildingsFunctor {
-  std::map<NodeId, NodeId> call(DynamicSceneGraph& graph, const UpdateInfo& info) const;
+  UpdateBuildingsFunctor(const SemanticNodeAttributes::ColorVector& color,
+                         SemanticNodeAttributes::Label label);
+
+  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
+                                const UpdateInfo& info) const;
+
+  SemanticNodeAttributes::ColorVector building_color;
+  SemanticNodeAttributes::Label building_semantic_label;
 };
 
-std::map<NodeId, NodeId> updateAgents(DynamicSceneGraph& graph, const UpdateInfo& info);
+std::map<NodeId, NodeId> updateAgents(incremental::SharedDsgInfo& graph,
+                                      const UpdateInfo& info);
 
 }  // namespace dsg_updates
 

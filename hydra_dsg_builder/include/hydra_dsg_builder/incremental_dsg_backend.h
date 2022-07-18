@@ -149,10 +149,6 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
                            const gtsam::Values& pgmo_values = gtsam::Values(),
                            bool new_loop_closure = false);
 
-  void updateRoomsNodes();
-
-  void updateBuildingNode();
-
   void logStatus(bool init = false) const;
 
   bool addInternalLCDToDeformationGraph();
@@ -187,13 +183,13 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   ros::ServiceServer save_mesh_srv_;
   ros::ServiceServer save_traj_srv_;
 
-  std::unique_ptr<RoomFinder> room_finder_;
-
   DsgBackendStatus status_;
 
   std::list<LayerUpdateFunc> dsg_update_funcs_;
   std::unique_ptr<dsg_updates::UpdateObjectsFunctor> update_objects_functor_;
   std::unique_ptr<dsg_updates::UpdatePlacesFunctor> update_places_functor_;
+  std::unique_ptr<dsg_updates::UpdateRoomsFunctor> update_rooms_functor_;
+  std::unique_ptr<dsg_updates::UpdateBuildingsFunctor> update_buildings_functor_;
 
   std::shared_ptr<std::vector<int>> mesh_vertex_graph_inds_;
 

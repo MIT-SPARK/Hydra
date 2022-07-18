@@ -86,13 +86,11 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
   robot_prefix_ = kimera_pgmo::robot_id_to_prefix.at(robot_id_);
   robot_vertex_prefix_ = kimera_pgmo::robot_id_to_vertex_prefix.at(robot_id_);
 
-  if (config_.enable_rooms) {
-    room_finder_.reset(new RoomFinder(config_.room_finder));
-  }
-
   update_objects_functor_.reset(new dsg_updates::UpdateObjectsFunctor());
   update_places_functor_.reset(new dsg_updates::UpdatePlacesFunctor(
       config_.places_merge_pos_threshold_m, config_.places_merge_distance_tolerance_m));
+  update_buildings_functor_.reset(new dsg_updates::UpdateBuildingsFunctor(
+      config_.building_color, config_.building_semantic_label));
 
   dsg_update_funcs_.push_back(&dsg_updates::updateAgents);
   dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdateObjectsFunctor::call,
@@ -101,6 +99,20 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
                                         std::placeholders::_2));
   dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdatePlacesFunctor::call,
                                         update_places_functor_.get(),
+                                        std::placeholders::_1,
+                                        std::placeholders::_2));
+
+  if (config_.enable_rooms) {
+    update_rooms_functor_.reset(
+        new dsg_updates::UpdateRoomsFunctor(config_.room_finder));
+    dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdateRoomsFunctor::call,
+                                          update_rooms_functor_.get(),
+                                          std::placeholders::_1,
+                                          std::placeholders::_2));
+  }
+
+  dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdateBuildingsFunctor::call,
+                                        update_buildings_functor_.get(),
                                         std::placeholders::_1,
                                         std::placeholders::_2));
 
@@ -679,71 +691,9 @@ void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,
                         config_.enable_node_merging};
 
   ScopedTimer spin_timer("backend/update_layers", last_timestamp_);
-  {  // start private dsg critical section
-    std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
-    for (const auto& update_func : dsg_update_funcs_) {
-      auto merged_nodes = update_func(*private_dsg_->graph, info);
-      updateMergedNodes(merged_nodes);
-    }
-  }  // end private dsg critical section
-
-  // TODO(nathan) migrate to functors
-  updateRoomsNodes();
-  updateBuildingNode();
-}
-
-void DsgBackend::updateRoomsNodes() {
-  if (!room_finder_) {
-    return;
-  }
-
-  ScopedTimer timer("backend/room_detection", last_timestamp_, true, 1, false);
-
-  std::unordered_set<NodeId> place_ids;
-  {  // start critical section
-    std::unique_lock<std::mutex> lock(private_dsg_->mutex);
-    const auto& places = private_dsg_->graph->getLayer(DsgLayers::PLACES);
-    for (const auto& id_node_pair : places.nodes()) {
-      place_ids.insert(id_node_pair.first);
-    }
-  }  // enable critical section
-
-  VLOG(3) << "Detecting rooms for " << place_ids.size() << " nodes";
-  room_finder_->findRooms(*private_dsg_, place_ids);
-}
-
-void DsgBackend::updateBuildingNode() {
-  const NodeSymbol node_id('B', 0);
-  std::unique_lock<std::mutex> lock(private_dsg_->mutex);
-  const auto& rooms = private_dsg_->graph->getLayer(DsgLayers::ROOMS);
-
-  if (!rooms.numNodes()) {
-    if (private_dsg_->graph->hasNode(node_id)) {
-      private_dsg_->graph->removeNode(node_id);
-    }
-
-    return;
-  }
-
-  Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
-  for (const auto& id_node_pair : rooms.nodes()) {
-    centroid += id_node_pair.second->attributes().position;
-  }
-  centroid /= rooms.numNodes();
-
-  if (!private_dsg_->graph->hasNode(node_id)) {
-    SemanticNodeAttributes::Ptr attrs(new SemanticNodeAttributes());
-    attrs->position = centroid;
-    attrs->color = config_.building_color;
-    attrs->semantic_label = config_.building_semantic_label;
-    attrs->name = node_id.getLabel();
-    private_dsg_->graph->emplaceNode(DsgLayers::BUILDINGS, node_id, std::move(attrs));
-  } else {
-    private_dsg_->graph->getNode(node_id)->get().attributes().position = centroid;
-  }
-
-  for (const auto& id_node_pair : rooms.nodes()) {
-    private_dsg_->graph->insertEdge(node_id, id_node_pair.first);
+  for (const auto& update_func : dsg_update_funcs_) {
+    auto merged_nodes = update_func(*private_dsg_, info);
+    updateMergedNodes(merged_nodes);
   }
 }
 
