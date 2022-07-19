@@ -100,6 +100,11 @@ struct DsgBackendConfig {
   bool merge_update_dynamic = true;
   double places_merge_pos_threshold_m = 0.4;
   double places_merge_distance_tolerance_m = 0.3;
+  std::string zmq_send_url = "tcp://127.0.0.1:8001";
+  std::string zmq_recv_url = "tcp://127.0.0.1:8002";
+  bool use_zmq_interface = false;
+  size_t zmq_num_threads = 2;
+  size_t poll_time_ms = 10;
 };
 
 struct EnableMapConverter {
@@ -152,6 +157,11 @@ void visit_config(const Visitor& v, DsgBackendConfig& config) {
   dsg_handle.visit("places_merge_distance_tolerance_m",
                    config.places_merge_distance_tolerance_m);
   dsg_handle.visit("use_mesh_subscribers", config.use_mesh_subscribers);
+  dsg_handle.visit("zmq_send_url", config.zmq_send_url);
+  dsg_handle.visit("zmq_recv_url", config.zmq_recv_url);
+  dsg_handle.visit("use_zmq_interface", config.use_zmq_interface);
+  dsg_handle.visit("zmq_num_threads", config.zmq_num_threads);
+  dsg_handle.visit("poll_time_ms", config.poll_time_ms);
 }
 
 template <typename Visitor>

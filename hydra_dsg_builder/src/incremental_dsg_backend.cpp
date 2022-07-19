@@ -133,6 +133,12 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
 
   last_timestamp_ = 0;
   dsg_sender_.reset(new hydra::DsgSender(nh_));
+  if (config_.use_zmq_interface) {
+    zmq_sender_.reset(
+        new spark_dsg::ZmqSender(config_.zmq_send_url, config_.zmq_num_threads));
+    zmq_receiver_.reset(
+        new spark_dsg::ZmqReceiver(config_.zmq_recv_url, config_.zmq_num_threads));
+  }
 }
 
 void DsgBackend::stop() {
@@ -144,6 +150,13 @@ void DsgBackend::stop() {
     optimizer_thread_.reset();
     VLOG(2) << "[Hydra Backend] stopped!";
   }
+
+  if (zmq_thread_) {
+    VLOG(2) << "[Hydra Backend] joining zmq thread and stopping";
+    zmq_thread_->join();
+    zmq_thread_.reset();
+    VLOG(2) << "[Hydra Backend] stopped!";
+  }
 }
 
 DsgBackend::~DsgBackend() {
@@ -153,6 +166,10 @@ DsgBackend::~DsgBackend() {
 
 void DsgBackend::start() {
   startPgmo();
+
+  if (config_.use_zmq_interface) {
+    zmq_thread_.reset(new std::thread(&DsgBackend::runZmqUpdates, this));
+  }
   LOG(INFO) << "[Hydra Backend] started!";
 }
 
@@ -420,6 +437,10 @@ void DsgBackend::runPgmo() {
       ros::Time stamp;
       stamp.fromNSec(last_timestamp_);
       dsg_sender_->sendGraph(*private_dsg_->graph, stamp);
+      if (config_.use_zmq_interface) {
+        // TODO(nathan) silly to serialize twice
+        zmq_sender_->send(*private_dsg_->graph);
+      }
     } else {
       r.sleep();
     }
@@ -544,6 +565,39 @@ void DsgBackend::addPlacesToDeformationGraph() {
       mst_edges.edges.push_back(mst_e);
     }
     deformation_graph_->addNewTempEdges(mst_edges, config_.pgmo.place_edge_variance);
+  }
+}
+
+void DsgBackend::runZmqUpdates() {
+  while (!should_shutdown_) {
+    if (!zmq_receiver_->recv(config_.poll_time_ms)) {
+      continue;
+    }
+
+    std::unique_lock<std::mutex> lock(private_dsg_->mutex);
+    auto update_graph = zmq_receiver_->graph();
+    if (!update_graph) {
+      LOG(ERROR) << "zmq receiver graph is invalid";
+      continue;
+    }
+
+    const auto& rooms = update_graph->getLayer(DsgLayers::ROOMS);
+    for (const auto& id_node_pair : rooms.nodes()) {
+      auto node_opt = private_dsg_->graph->getNode(id_node_pair.first);
+      if (!node_opt) {
+        VLOG(1) << "received update for node "
+                << NodeSymbol(id_node_pair.first).getLabel()
+                << " but node no longer exists";
+        continue;
+      }
+
+      const auto new_label =
+          id_node_pair.second->attributes<SemanticNodeAttributes>().semantic_label;
+
+      VLOG(2) << "assiging label " << static_cast<int>(new_label) << " to "
+              << NodeSymbol(id_node_pair.first).getLabel();
+      node_opt->get().attributes<SemanticNodeAttributes>().semantic_label = new_label;
+    }
   }
 }
 

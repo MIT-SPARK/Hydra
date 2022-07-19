@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+"""Run inference on received scene graphs."""
+import spark_dsg as dsg
+import logging
+import click
+
+
+@click.command()
+@click.option("--recv-url", "-r", default="tcp://127.0.0.1:8001")
+@click.option("--send-url", "-s", default="tcp://127.0.0.1:8002")
+@click.option("--num-threads", "-t", default=2)
+@click.option("--poll-time-ms", default=10)
+def main(recv_url, send_url, num_threads, poll_time_ms):
+    """Run everything."""
+    logging.basicConfig(
+        format="[%(asctime)s %(levelname)s] %(message)s", level=logging.DEBUG
+    )
+
+    logging.info(f"setting up sender @ {send_url}")
+    sender = dsg.DsgSender(send_url)
+
+    logging.info(f"setting up receiver @ {recv_url}")
+    receiver = dsg.DsgReceiver(recv_url)
+
+    attrs = dsg.SemanticNodeAttributes()
+    attrs.semantic_label = 5
+    print(type(attrs))
+    G = dsg.DynamicSceneGraph()
+    G.add_node(dsg.DsgLayers.ROOMS, dsg.NodeSymbol("R", 0).value, attrs)
+    G.add_node(dsg.DsgLayers.ROOMS, dsg.NodeSymbol("R", 1).value, attrs)
+    G.add_node(dsg.DsgLayers.ROOMS, dsg.NodeSymbol("R", 2).value, attrs)
+    G.add_node(dsg.DsgLayers.ROOMS, dsg.NodeSymbol("R", 3).value, attrs)
+
+    while True:
+        if not receiver.recv(poll_time_ms):
+            continue
+
+        logging.info(f"curr nodes: {receiver.graph.num_nodes(False)}")
+        sender.send(G)
+
+
+if __name__ == "__main__":
+    main()

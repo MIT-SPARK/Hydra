@@ -42,6 +42,7 @@
 #include <hydra_utils/dsg_streaming_interface.h>
 #include <kimera_pgmo/KimeraPgmoInterface.h>
 #include <spark_dsg/scene_graph_logger.h>
+#include <spark_dsg/zmq_interface.h>
 
 #include <ros/callback_queue.h>
 #include <ros/ros.h>
@@ -143,6 +144,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void runPgmo();
 
+  void runZmqUpdates();
+
   void addPlacesToDeformationGraph();
 
   void callUpdateFunctions(const gtsam::Values& places_values = gtsam::Values(),
@@ -223,7 +226,12 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   ros::Subscriber full_mesh_sub_;
   ros::Subscriber deformation_graph_sub_;
   ros::Subscriber pose_graph_sub_;
+
   std::unique_ptr<hydra::DsgSender> dsg_sender_;
+  std::unique_ptr<spark_dsg::ZmqSender> zmq_sender_;
+
+  std::unique_ptr<std::thread> zmq_thread_;
+  std::unique_ptr<spark_dsg::ZmqReceiver> zmq_receiver_;
 };
 
 }  // namespace incremental

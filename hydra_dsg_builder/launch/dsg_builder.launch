@@ -14,6 +14,7 @@
     <arg name="use_oriented_bounding_boxes" default="false"/>
     <arg name="exit_mode" default="NORMAL"/>
     <arg name="start_visualizer" default="false"/>
+    <arg name="use_zmq_interface" default="false"/>
 
     <arg name="enable_dsg_lcd" default="false"/>
     <arg name="enable_lcd_viz" default="false"/>
@@ -77,6 +78,7 @@
         <param name="sensor_frame" value="$(arg sensor_frame)"/>
 
         <param name="dsg/optimize_on_lc" value="$(arg optimize_on_lc)"/>
+        <param name="dsg/use_zmq_interface" value="$(arg use_zmq_interface)"/>
         <param name="lcd/log_registration_problem" value="$(arg log_registration)"/>
         <param name="pgmo/log_path" value="$(arg pgmo_log_path)"/>
         <param name="pgmo/should_log" value="$(arg pgmo_should_log)"/>
