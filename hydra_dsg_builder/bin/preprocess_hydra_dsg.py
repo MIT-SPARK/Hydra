@@ -2,21 +2,39 @@
 import spark_dsg as dsg
 import pandas as pd
 import numpy as np
-from scene_graph_learning.scene_graph import NodeType
-from preprocessing.utils import generate_semantic_embedding
+import gensim.models
 import torch_geometric
 import torch
 import heapq
+import yaml
 
 
 DEFAULT_LAYERS = (dsg.DsgLayers.OBJECTS, dsg.DsgLayers.ROOMS, dsg.DsgLayers.BUILDINGS)
+BUILDING_LABELS = ["house", "office_building", "resort"]
 
-label_mapping_file = "input/mp3d_segmentation_mapping.csv"
-room_conversion_file = "input/Matterport3d_room2.csv"
-building_conversion_file = "input/Matterport3d_building.csv"
-numberbatch_file = "knowledge_data/numberbatch.h5"
-word2vec_file = "knowledge_data/GoogleNews-vectors-negative300.bin"
-use_word2vec = True
+
+def _load_word2vec(model_file):
+    return gensim.models.KeyedVectors.load_word2vec_format(model_file, binary=True)
+
+
+def _get_embedding(model, label, dim=300):
+    vec = np.zeros(dim)
+    try:
+        vec = np.mean(
+            [model[s] for s in label.split("_") if s != "of"],
+            axis=0,
+        )
+    except KeyError:
+        print(f"{label} cannot be found in pretrained word2vec")
+
+    return torch.from_numpy(vec.astype(np.float32))
+
+
+def _get_room_labels(room_file):
+    room_df = pd.read_csv(
+        room_file, usecols=range(2), names=["char", "room_name"], header=None
+    )
+    return sorted(list(set(room_df["room_name"].to_list())))
 
 
 def _get_size(node):
@@ -168,10 +186,6 @@ def get_closest_neighbor_from_ids(
 
 def _get_object_room(G, node):
     return None
-
-
-def _get_size(node):
-    return node.attributes.bounding_box.max - node.attributes.bounding_box.min
 
 
 def _is_on(G, n1, n2, threshold_on=1.0):
@@ -355,31 +369,17 @@ def _add_object_room_edges(G):
             G.add_edge(room_node, node.id)
 
 
-def main():
-    object_df = pd.read_csv(label_mapping_file)
-    room_df = pd.read_csv(
-        room_conversion_file, usecols=range(2), names=["char", "room_name"], header=None
-    )
-    building_labels = ["house", "office_building", "resort"]
-    room_labels = sorted(list(set(room_df["room_name"].to_list())))
-    object_labels = sorted(list(set(object_df["id_name"].to_list())))
+def main(label_file, word2vec_file):
+    with label_file.open("r") as fin:
+        label_mapping = yaml.load(fin.read(), Loader=yaml.SafeLoader())
 
-    labels_all = building_labels + room_labels + object_labels
-    semantic_embedding_dict = generate_semantic_embedding(
-        labels_all, use_word2vec=use_word2vec, use_conceptnet=(not use_word2vec)
-    )
+    word2vec = _load_word2vec(word2vec_file)
+
+    object_labels = [x for _, x in label_mapping]
     object_embeddings = {
-        label: torch.from_numpy(semantic_embedding_dict[label].astype(np.float32))
-        for label in object_labels
+        label: _get_embedding(word2vec, label) for label in object_labels
     }
-
-    label_conversion = {
-        NodeType.building: dict(
-            zip(building_labels, list(range(len(building_labels))))
-        ),
-        NodeType.room: dict(zip(room_labels, list(range(len(room_labels))))),
-        NodeType.object: dict(zip(object_labels, list(range(len(object_labels))))),
-    }
+    print(object_embeddings)
 
 
 def hydra_to_torch(G, embeddings, threshold_near=2.0, threshold_on=1.0, max_near=2.0):
@@ -390,14 +390,5 @@ def hydra_to_torch(G, embeddings, threshold_near=2.0, threshold_on=1.0, max_near
     _add_object_connectivity(
         G, threshold_near=threshold_near, max_near=max_near, threshold_on=threshold_on
     )
-
-    # TODO(nathan) not sure we actual need this, but might be required for network output
-    label_list = []
-    for i in range(G.num_nodes()):
-        scene_node = G.get_node(i)
-        label_list.append(
-            label_conversion[scene_node.node_type][scene_node.semantic_label]
-        )
-    # data_torch.y = torch.tensor(label_list)
 
     return _convert_to_torch_data(G, embeddings, add_edge_attr=True)

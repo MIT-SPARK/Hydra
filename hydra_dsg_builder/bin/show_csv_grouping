@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+"""Read in a color csv and show mapping between label and names."""
+import pandas as pd
+import pathlib
+import pprint
+import sys
+
+
+def main():
+    """Run everything."""
+    color_file = pathlib.Path(sys.argv[1]).expanduser().absolute()
+    label_df = pd.read_csv(color_file)
+    unique_labels = sorted(label_df["id"].unique().tolist())
+    print(unique_labels)
+    for label in unique_labels:
+        names = label_df.loc[label_df["id"] == label, "name"].tolist()
+        print(f"label {label}:")
+        pprint.pprint(names)
+
+
+if __name__ == "__main__":
+    main()
