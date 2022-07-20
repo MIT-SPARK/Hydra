@@ -25,15 +25,15 @@ def _is_on(G, n1, n2, threshold_on=1.0):
     Requires that the n1 center is inside n2 on xy plane, and n1 is above
     n2 on z-axis within a threshold (or vice-versa).
     """
-    pos1 = G.get_position(n1)
-    pos2 = G.get_position(n2)
+    pos1 = G.get_position(n1.id.value)
+    pos2 = G.get_position(n2.id.value)
     size1 = _get_size(n1)
     size2 = _get_size(n2)
 
     xy_dist = np.abs(pos1[0:2] - pos2[0:2])
     z_dist = np.abs(pos1[2] - pos2[2])
     n1_above_n2 = pos1[2] > pos2[2]
-    new_thresh = threshold_on * (n1.size[2] + n2.size[2]) / 2
+    new_thresh = threshold_on * (size1[2] + size2[2]) / 2
 
     if all(xy_dist <= size2[0:2] / 2) and n1_above_n2 and z_dist <= new_thresh:
         return True
@@ -50,16 +50,16 @@ def _is_above(G, n1, n2, threshold_near=2.0, threshold_on=1.0):
     Requires that the n1 center and n2 are nearby on the xy plane, and n1 is above
     n2 on z-axis by an amount greater than a provided threshold.
     """
-    pos1 = G.get_position(n1)
-    pos2 = G.get_position(n2)
+    pos1 = G.get_position(n1.id.value)
+    pos2 = G.get_position(n2.id.value)
     size1 = _get_size(n1)
     size2 = _get_size(n2)
-    near_thresh = (size1 + size2) / 2.0 * threshold_near
+    near_thresh = (size1[0:2] + size2[0:2]) / 2.0 * threshold_near
 
     xy_dist = np.abs(pos1[0:2] - pos2[0:2])
     z_dist = np.abs(pos1[2] - pos2[2])
     n1_above_n2 = pos1[2] > pos2[2]
-    dist_thresh = threshold_on * (n1.size[2] + n2.size[2]) / 2
+    dist_thresh = threshold_on * (size1[2] + size2[2]) / 2
 
     if all(xy_dist <= near_thresh):
         if n1_above_n2 and z_dist > dist_thresh:
@@ -77,8 +77,8 @@ def _is_under(G, n1, n2):
     Requires that either n1 or n2 is inside the other node on the xy place and
     that the positions on the z-axis are distinct.
     """
-    pos1 = G.get_position(n1)
-    pos2 = G.get_position(n2)
+    pos1 = G.get_position(n1.id.value)
+    pos2 = G.get_position(n2.id.value)
     size1 = _get_size(n1)
     size2 = _get_size(n2)
 
@@ -100,8 +100,8 @@ def _is_near(G, n1, n2, threshold_near=2.0, max_near=2.0):
     Requires that either n1 or n2 is inside the other node on the xy place and
     that the positions on the z-axis are distinct.
     """
-    pos1 = G.get_position(n1)
-    pos2 = G.get_position(n2)
+    pos1 = G.get_position(n1.id.value)
+    pos2 = G.get_position(n2.id.value)
     size1 = _get_size(n1)
     size2 = _get_size(n2)
 
@@ -254,53 +254,55 @@ def _add_object_connectivity(G, threshold_near=2.0, threshold_on=1.0, max_near=2
 
             if is_on or is_above or is_under or is_near:
                 # TODO(nathan) consider getting direction
-                G.add_edge(node.id, cmp_node.id)
+                G.insert_edge(node.id.value, cmp_node.id.value)
 
         room_to_objects[room_id].append(node)
 
 
 def _get_closest_neighbor_with_parent(G, x, max_hop=1):
-    frontier = heapq.heapify([(_dist(x.id, n), n) for n in x.siblings])
-    visited = set([x.id])
+    frontier = [(_dist(G, x.id.value, n), n) for n in x.siblings()]
+    heapq.heapify(frontier)
+
+    visited = set([x.id.value])
 
     while len(frontier) != 0:
-        curr_id, dist = heapq.heappop(frontier)
-        visited.insert(curr_id)
+        dist, curr_id = heapq.heappop(frontier)
+        visited.add(curr_id)
         curr = G.get_node(curr_id)
 
-        if curr.has_parent:
-            return curr_id
+        if curr.has_parent():
+            return curr
 
         for s in curr.siblings():
             if s in visited:
                 continue
 
-            heapq.heappush((_dist(x.id, s), s))
+            heapq.heappush(frontier, (_dist(G, x.id.value, s), s))
 
     return None
 
 
 def _get_object_room(G, node):
     if node.has_parent():
-        place = G.get_node(node.parent())
+        place = G.get_node(node.get_parent())
         if place.has_parent():
-            return place.parent
+            return place.get_parent()
 
         closest_place = _get_closest_neighbor_with_parent(G, place)
         if closest_place is not None:
-            return closest_place.parent
+            return closest_place.get_parent()
 
-    node_pos = G.get_position(node)
+    node_pos = G.get_position(node.id.value)
     candidate_rooms = [
         x
-        for x in G.get_layer(dsg.DsgLayers.ROOMS)
+        for x in G.get_layer(dsg.DsgLayers.ROOMS).nodes
         if x.attributes.bounding_box.is_inside(node_pos)
     ]
     if len(candidate_rooms) == 0:
         return None
 
     # TODO(nathan) we should probably pick the closest, but...
-    return candidate_rooms[0]
+    return candidate_rooms[0].id.value
 
 
 def preprocess_dsg(G, threshold_near=2.0, threshold_on=1.0, max_near=2.0):
@@ -313,7 +315,7 @@ def preprocess_dsg(G, threshold_near=2.0, threshold_on=1.0, max_near=2.0):
         if room_id is None:
             raise ValueError("failed to find object parent.")
 
-        G.add_edge(node.id, room_id)
+        G.insert_edge(node.id.value, room_id)
 
     _add_object_connectivity(
         G, threshold_near=threshold_near, max_near=max_near, threshold_on=threshold_on
@@ -373,7 +375,51 @@ def convert_to_torch_data(G, embedding_dict, add_edge_attr=False):
     return torch_data
 
 
-@click.command()
+class GnnModel:
+    """Class to hold stuff regarding inference."""
+
+    def __init__(self, model_file, word2vec_file, config_file, load_word2vec=False):
+        """Load everything."""
+        model_path = pathlib.Path(model_file).expanduser().absolute()
+        with model_path.open("rb") as fin:
+            self.model = pickle.load(fin)
+
+        word2vec_path = pathlib.Path(word2vec_file).expanduser().absolute()
+        if load_word2vec:
+            word2vec = _load_word2vec(word2vec_path)
+        else:
+            word2vec = {}
+
+        config_path = pathlib.Path(config_file).expanduser().absolute()
+        with config_path.open("r") as fin:
+            self.config = yaml.load(fin.read(), Loader=yaml.SafeLoader)
+
+        self.object_labels = [x for _, x in self.config["label_map"].items()]
+        self.object_embeddings = {
+            label: _get_embedding(word2vec, label) for label in self.object_labels
+        }
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model.to(self.device)
+
+    def infer(self, G, run_inference=False):
+        preprocess_dsg(G)
+        if run_inference:
+            torch_graph = convert_to_torch_data(
+                G.graph, self.object_embeddings, add_edge_attr=True
+            )
+
+            with torch.no_grad():
+                pred = self.model(torch_graph.to(self.device))
+                print(pred)
+
+
+@click.group()
+def main():
+    pass
+
+
+@main.command()
 @click.argument("network")
 @click.argument("word2vec-file")
 @click.argument("config")
@@ -381,33 +427,13 @@ def convert_to_torch_data(G, embedding_dict, add_edge_attr=False):
 @click.option("--send-url", "-s", default="tcp://127.0.0.1:8002")
 @click.option("--num-threads", "-t", default=2)
 @click.option("--poll-time-ms", default=10)
-def main(network, word2vec_file, config, recv_url, send_url, num_threads, poll_time_ms):
+def run(network, word2vec_file, config, recv_url, send_url, num_threads, poll_time_ms):
     """Run everything."""
-    run_inference = False
     logging.basicConfig(
         format="[%(asctime)s %(levelname)s] %(message)s", level=logging.DEBUG
     )
 
-    network_path = pathlib.Path(network).expanduser().absolute()
-    with network_path.open("rb") as fin:
-        model = pickle.load(fin)
-
-    config_path = pathlib.Path(config).expanduser().absolute()
-    with config_path.open("r") as fin:
-        config = yaml.load(fin.read(), Loader=yaml.SafeLoader)
-
-    word2vec_path = pathlib.Path(word2vec_file).expanduser().absolute()
-    word2vec = _load_word2vec(word2vec_path)
-
-    label_mapping = config["label_map"]
-    print(label_mapping)
-    object_labels = [x for _, x in label_mapping.items()]
-    object_embeddings = {
-        label: _get_embedding(word2vec, label) for label in object_labels
-    }
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
+    model = GnnModel(network,  word2vec_file, config)
 
     logging.info(f"setting up sender @ {send_url}")
     sender = dsg.DsgSender(send_url)
@@ -420,20 +446,31 @@ def main(network, word2vec_file, config, recv_url, send_url, num_threads, poll_t
             continue
 
         logging.info(f"curr nodes: {receiver.graph.num_nodes(False)}")
-
-        preprocess_dsg(receiver.graph)
-        if run_inference:
-            torch_graph = convert_to_torch_data(
-                receiver.graph, object_embeddings, add_edge_attr=True
-            )
-
-            with torch.no_grad():
-                pred = model(torch_graph.to(device))
-                print(pred)
+        model.infer(receiver.graph)
 
         G = dsg.DynamicSceneGraph()
         # TODO(nathan) populate with corrections
         sender.send(G)
+
+
+@main.command()
+@click.argument("network")
+@click.argument("word2vec-file")
+@click.argument("config")
+@click.argument("dsg_file")
+def test(network, word2vec_file, config, dsg_file):
+    """Run everything."""
+    logging.basicConfig(
+        format="[%(asctime)s %(levelname)s] %(message)s", level=logging.DEBUG
+    )
+
+    model = GnnModel(network,  word2vec_file, config)
+
+    dsg_path = pathlib.Path(dsg_file).expanduser().absolute()
+    logging.info(f"loading scene graph from {dsg_path}")
+    G = dsg.DynamicSceneGraph.load(str(dsg_path))
+
+    model.infer(G)
 
 
 if __name__ == "__main__":
