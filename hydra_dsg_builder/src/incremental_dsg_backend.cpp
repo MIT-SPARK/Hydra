@@ -583,6 +583,10 @@ void DsgBackend::runZmqUpdates() {
 
     const auto& rooms = update_graph->getLayer(DsgLayers::ROOMS);
     for (const auto& id_node_pair : rooms.nodes()) {
+      const auto new_name =
+          id_node_pair.second->attributes<SemanticNodeAttributes>().name;
+      room_name_map_[id_node_pair.first] = new_name;
+
       auto node_opt = private_dsg_->graph->getNode(id_node_pair.first);
       if (!node_opt) {
         VLOG(1) << "received update for node "
@@ -591,12 +595,9 @@ void DsgBackend::runZmqUpdates() {
         continue;
       }
 
-      const auto new_label =
-          id_node_pair.second->attributes<SemanticNodeAttributes>().semantic_label;
-
-      VLOG(2) << "assiging label " << static_cast<int>(new_label) << " to "
+      VLOG(2) << "assiging name " << new_name << " to "
               << NodeSymbol(id_node_pair.first).getLabel();
-      node_opt->get().attributes<SemanticNodeAttributes>().semantic_label = new_label;
+      node_opt->get().attributes<SemanticNodeAttributes>().name = new_name;
     }
   }
 }
@@ -752,6 +753,17 @@ void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,
   for (const auto& update_func : dsg_update_funcs_) {
     auto merged_nodes = update_func(*private_dsg_, info);
     updateMergedNodes(merged_nodes);
+  }
+
+  std::unique_lock<std::mutex> lock(private_dsg_->mutex);
+  const auto& rooms = private_dsg_->graph->getLayer(DsgLayers::ROOMS);
+  for (auto& id_node_pair : rooms.nodes()) {
+    const auto iter = room_name_map_.find(id_node_pair.first);
+    if (iter == room_name_map_.end()) {
+      continue;
+    }
+
+    id_node_pair.second->attributes<SemanticNodeAttributes>().name = iter->second;
   }
 }
 

@@ -15,7 +15,6 @@ import yaml
 
 
 DEFAULT_LAYERS = (dsg.DsgLayers.OBJECTS, dsg.DsgLayers.ROOMS, dsg.DsgLayers.BUILDINGS)
-BUILDING_LABELS = ["house", "office_building", "resort"]
 
 
 def _is_on(G, n1, n2, threshold_on=1.0):
@@ -157,13 +156,15 @@ def _get_node_masks_and_features(
 
     features = []
     id_map = {}
+    ids = []
     for node in G.nodes:
         if node.layer not in layers:
             continue
 
         # len is a proxy for index
         masks[node.layer][len(features)] = True
-        id_map[node.id] = len(features)
+        id_map[node.id.value] = len(features)
+        ids.append(node.id.value)
 
         label = node.attributes.semantic_label
         if node.id.category == "O":
@@ -174,7 +175,13 @@ def _get_node_masks_and_features(
         size = _get_size(node)
         features.append(np.hstack((pos, size, embedding)))
 
-    return masks, id_map, torch.tensor(features, dtype=torch.float32)
+    id_tensor = torch.tensor(np.array([ids]).T)
+    return (
+        masks,
+        id_map,
+        id_tensor,
+        torch.tensor(np.array(features), dtype=torch.float32),
+    )
 
 
 def _get_layer_edge_index(masks, edge_idx, l1, l2=None, undirected=False):
@@ -188,11 +195,10 @@ def _get_layer_edge_index(masks, edge_idx, l1, l2=None, undirected=False):
     if not undirected:
         return layer_idx
 
-    return (
-        torch_geometric.utils.to_undirected(layer_idx)
-        if edge_mask.any().item()
-        else layer_idx
-    )
+    if edge_mask.any().item():
+        return torch_geometric.utils.to_undirected(layer_idx)
+    else:
+        return layer_idx
 
 
 def _add_edge_attr(data):
@@ -228,11 +234,22 @@ def _add_edge_attr(data):
     data.edge_attr = edge_attr
 
 
+def _get_room_parent(node, prefix="R"):
+    for parent in node.parents():
+        if dsg.NodeSymbol(parent).category == prefix:
+            return parent
+
+    return None
+
+
 def _add_object_connectivity(G, threshold_near=2.0, threshold_on=1.0, max_near=2.0):
     room_to_objects = dict()
     for node in G.get_layer(dsg.DsgLayers.OBJECTS).nodes:
-        # TODO(nathan) handle this when we can have multiple parents
-        room_id = None
+        room_id = _get_room_parent(node)
+        if room_id is None:
+            print(f"skipping invalid object {node.id}")
+            continue
+
         if room_id not in room_to_objects:
             room_to_objects[room_id] = [node]
             continue
@@ -259,7 +276,7 @@ def _add_object_connectivity(G, threshold_near=2.0, threshold_on=1.0, max_near=2
         room_to_objects[room_id].append(node)
 
 
-def _get_closest_neighbor_with_parent(G, x, max_hop=1):
+def _get_parent_of_closest_neighbor(G, x, max_hop=1):
     frontier = [(_dist(G, x.id.value, n), n) for n in x.siblings()]
     heapq.heapify(frontier)
 
@@ -270,8 +287,9 @@ def _get_closest_neighbor_with_parent(G, x, max_hop=1):
         visited.add(curr_id)
         curr = G.get_node(curr_id)
 
-        if curr.has_parent():
-            return curr
+        curr_parent = curr.get_parent()
+        if curr_parent is not None:
+            return curr_parent
 
         for s in curr.siblings():
             if s in visited:
@@ -282,15 +300,24 @@ def _get_closest_neighbor_with_parent(G, x, max_hop=1):
     return None
 
 
-def _get_object_room(G, node):
-    if node.has_parent():
-        place = G.get_node(node.get_parent())
-        if place.has_parent():
-            return place.get_parent()
+def _show_info(node):
+    print(f"node: {node.id}")
+    print(f"  - siblings: {[dsg.NodeSymbol(x) for x in node.siblings()]}")
+    print(f"  - parents: {[dsg.NodeSymbol(x) for x in node.parents()]}")
+    print(f"  - children: {[dsg.NodeSymbol(x) for x in node.children()]}")
 
-        closest_place = _get_closest_neighbor_with_parent(G, place)
-        if closest_place is not None:
-            return closest_place.get_parent()
+
+def _get_object_room(G, node):
+    place_id = node.get_parent()
+    if place_id is not None:
+        place = G.get_node(place_id)
+        place_parent = place.get_parent()
+        if place_parent is not None:
+            return place_parent
+
+        closest_place_parent = _get_parent_of_closest_neighbor(G, place)
+        if closest_place_parent is not None:
+            return closest_place_parent
 
     node_pos = G.get_position(node.id.value)
     candidate_rooms = [
@@ -310,12 +337,19 @@ def preprocess_dsg(G, threshold_near=2.0, threshold_on=1.0, max_near=2.0):
     dsg.add_bounding_boxes_to_layer(G, dsg.DsgLayers.BUILDINGS)
 
     objects = G.get_layer(dsg.DsgLayers.OBJECTS)
+    invalid_objects = []
     for node in objects.nodes:
         room_id = _get_object_room(G, node)
         if room_id is None:
-            raise ValueError("failed to find object parent.")
+            num_parents = len(node.parents())
+            print(f"failed to find parent for {node.id} ({num_parents} parents)")
+            invalid_objects.append(node.id.value)
+            continue
 
         assert G.insert_edge(node.id.value, room_id)
+
+    for object_id in invalid_objects:
+        G.remove_node(object_id)
 
     _add_object_connectivity(
         G, threshold_near=threshold_near, max_near=max_near, threshold_on=threshold_on
@@ -325,7 +359,7 @@ def preprocess_dsg(G, threshold_near=2.0, threshold_on=1.0, max_near=2.0):
 def convert_to_torch_data(G, embedding_dict, add_edge_attr=False):
     """Convert a graph to a pytorch tensor."""
     # this automatically maps all rooms and buildings to unknown (zero) embeddings
-    masks, id_map, x = _get_node_masks_and_features(G, embedding_dict)
+    masks, id_map, id_tensor, x = _get_node_masks_and_features(G, embedding_dict)
 
     # fill edge_index
     edge_index = []
@@ -340,7 +374,7 @@ def convert_to_torch_data(G, embedding_dict, add_edge_attr=False):
         else:
             edge_index.append([id_map[edge.source], id_map[edge.target]])
 
-    edge_index = torch.tensor(edge_index, dtype=torch.long)
+    edge_index = torch.tensor(edge_index, dtype=torch.long).T
 
     # TODO(nathan) make this more generic / check how sgl uses data fields
     R_edges = _get_layer_edge_index(
@@ -369,16 +403,20 @@ def convert_to_torch_data(G, embedding_dict, add_edge_attr=False):
         edge_index=torch.cat((RB_edges, OR_edges, R_edges, O_edges), dim=1),
     )
 
+    room_ids = id_tensor[masks[dsg.DsgLayers.ROOMS]]
+    room_ids = [dsg.NodeSymbol(x[0]) for x in room_ids.tolist()]
+    room_idx_map = {x: idx for idx, x in enumerate(room_ids)}
+
     if add_edge_attr:
         _add_edge_attr(torch_data)
 
-    return torch_data
+    return torch_data, room_idx_map
 
 
 class GnnModel:
     """Class to hold stuff regarding inference."""
 
-    def __init__(self, model_file, word2vec_file, config_file, load_word2vec=False):
+    def __init__(self, model_file, word2vec_file, config_file, load_word2vec=True):
         """Load everything."""
         model_path = pathlib.Path(model_file).expanduser().absolute()
         with model_path.open("rb") as fin:
@@ -396,22 +434,38 @@ class GnnModel:
 
         self.object_labels = [x for _, x in self.config["label_map"].items()]
         self.object_embeddings = {
-            label: _get_embedding(word2vec, label) for label in self.object_labels
+            idx: _get_embedding(word2vec, label)
+            for idx, label in enumerate(self.object_labels)
         }
+
+        self.building_labels = sorted(self.config["building_labels"])
+        self.room_labels = sorted(self.config["room_labels"])
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
 
-    def infer(self, G, run_inference=False):
+    def infer(self, G, run_inference=True):
         preprocess_dsg(G)
         if run_inference:
-            torch_graph = convert_to_torch_data(
-                G.graph, self.object_embeddings, add_edge_attr=True
+            torch_graph, room_idx_map = convert_to_torch_data(
+                G, self.object_embeddings, add_edge_attr=True
             )
 
             with torch.no_grad():
                 pred = self.model(torch_graph.to(self.device))
-                print(pred)
+                building_pred = pred[0].argmax(dim=1).cpu()
+                room_pred = pred[1].argmax(dim=1).cpu()
+                if len(building_pred) == 1:
+                    building_name = self.building_labels[building_pred[0]]
+                    print(f"building: {building_name}")
+                pred_room_labels = [self.room_labels[x] for x in room_pred]
+                pred_room_map = {
+                    room: pred_room_labels[idx] for room, idx in room_idx_map.items()
+                }
+                print(f"rooms: {pred_room_map}")
+                return pred_room_map
+
+        return None
 
 
 @click.group()
@@ -433,7 +487,7 @@ def run(network, word2vec_file, config, recv_url, send_url, num_threads, poll_ti
         format="[%(asctime)s %(levelname)s] %(message)s", level=logging.DEBUG
     )
 
-    model = GnnModel(network,  word2vec_file, config)
+    model = GnnModel(network, word2vec_file, config)
 
     logging.info(f"setting up sender @ {send_url}")
     sender = dsg.DsgSender(send_url)
@@ -446,10 +500,14 @@ def run(network, word2vec_file, config, recv_url, send_url, num_threads, poll_ti
             continue
 
         logging.info(f"curr nodes: {receiver.graph.num_nodes(False)}")
-        model.infer(receiver.graph)
+        pred_room_map = model.infer(receiver.graph)
 
         G = dsg.DynamicSceneGraph()
-        # TODO(nathan) populate with corrections
+        for room_id, label in pred_room_map.items():
+            attrs = dsg.RoomNodeAttributes()
+            attrs.name = f"{room_id}: {label}"
+            G.add_node(dsg.DsgLayers.ROOMS, room_id.value, attrs)
+
         sender.send(G)
 
 
@@ -464,7 +522,7 @@ def test(network, word2vec_file, config, dsg_file):
         format="[%(asctime)s %(levelname)s] %(message)s", level=logging.DEBUG
     )
 
-    model = GnnModel(network,  word2vec_file, config)
+    model = GnnModel(network, word2vec_file, config)
 
     dsg_path = pathlib.Path(dsg_file).expanduser().absolute()
     logging.info(f"loading scene graph from {dsg_path}")

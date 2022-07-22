@@ -215,6 +215,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   char robot_prefix_;
   char robot_vertex_prefix_;
 
+  std::map<NodeId, std::string> room_name_map_;
+
   kimera_pgmo::Path trajectory_;
   std::vector<ros::Time> timestamps_;
   std::queue<size_t> unconnected_nodes_;
