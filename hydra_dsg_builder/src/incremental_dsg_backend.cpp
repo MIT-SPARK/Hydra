@@ -74,7 +74,8 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
       private_dsg_(backend_dsg),
       state_(state),
       shared_places_copy_(DsgLayers::PLACES),
-      robot_id_(0) {
+      robot_id_(0),
+      have_new_mesh_(false) {
   config_ = load_config<DsgBackendConfig>(nh_);
 
   nh_.getParam("robot_id", robot_id_);
