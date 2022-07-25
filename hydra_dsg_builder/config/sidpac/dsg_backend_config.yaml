@@ -1,7 +1,6 @@
 dsg:
     add_places_to_deformation_graph: true
     optimize_on_lc: true
-    select_merge_inliers: false
     enable_node_merging: true
     call_update_periodically: true
     places_merge_pos_threshold_m: 0.4

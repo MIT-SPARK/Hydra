@@ -62,6 +62,8 @@ namespace incremental {
 
 typedef std::unordered_set<NodeId> NodeIdSet;
 
+typedef std::map<NodeId, NodeId> NodeMergeLog;
+
 struct SharedDsgInfo {
   using Ptr = std::shared_ptr<SharedDsgInfo>;
 
@@ -74,6 +76,7 @@ struct SharedDsgInfo {
           << " with mesh: " << mesh_layer_id;
 
       layer_ids.push_back(id_key_pair.first);
+      prefix_layer_map[id_key_pair.second] = id_key_pair.first;
     }
 
     graph.reset(new DynamicSceneGraph(layer_ids, mesh_layer_id));
