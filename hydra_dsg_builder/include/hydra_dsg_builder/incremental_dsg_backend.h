@@ -120,7 +120,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   virtual void updateDsgMesh(bool force_mesh_update = false);
 
-  void optimize(bool new_loop_closure = false);
+  virtual void optimize(bool new_loop_closure = false);
 
   virtual void visualizePoseGraph() const;
 
@@ -147,12 +147,11 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void callUpdateFunctions(const gtsam::Values& places_values = gtsam::Values(),
                            const gtsam::Values& pgmo_values = gtsam::Values(),
-                           bool new_loop_closure = false,
-                           const std::map<NodeId, NodeId>& given_merges = {});
+                           bool new_loop_closure = false);
 
   void logStatus(bool init = false) const;
 
-  bool addInternalLCDToDeformationGraph();
+  virtual bool addInternalLCDToDeformationGraph();
 
   void logIncrementalLoopClosures(const pose_graph_tools::PoseGraph& msg);
 

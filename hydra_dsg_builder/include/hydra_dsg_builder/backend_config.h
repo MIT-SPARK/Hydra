@@ -91,7 +91,6 @@ struct DsgBackendConfig {
   // dsg
   bool add_places_to_deformation_graph = true;
   bool optimize_on_lc = true;
-  bool select_merge_inliers = false;
   bool enable_node_merging = true;
   bool call_update_periodically = true;
   bool use_mesh_subscribers = false;
@@ -146,7 +145,6 @@ void visit_config(const Visitor& v, DsgBackendConfig& config) {
   dsg_handle.visit("add_places_to_deformation_graph",
                    config.add_places_to_deformation_graph);
   dsg_handle.visit("optimize_on_lc", config.optimize_on_lc);
-  dsg_handle.visit("select_merge_inliers", config.select_merge_inliers);
   dsg_handle.visit("enable_node_merging", config.enable_node_merging);
   dsg_handle.visit("call_update_periodically", config.call_update_periodically);
   dsg_handle.visit("merge_update_map", config.merge_update_map, EnableMapConverter());
