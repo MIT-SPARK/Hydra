@@ -157,3 +157,5 @@ See the following for more information:
 ### Filing Issues
 
 :warning: We don't support other platforms. Issues requesting support on other platforms (e.g. Ubuntu 16.04, Windows) will be summarily closed.
+
+Depending on the nature of the issue, it may be helpful to browse [this](doc/debugging.md) page about debugging Hydra first.
