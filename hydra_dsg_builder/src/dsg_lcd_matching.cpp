@@ -137,9 +137,10 @@ LayerSearchResults searchDescriptors(
     const Descriptor& other_descriptor = *descriptors.at(valid_id);
     std::chrono::duration<double> diff_s =
         descriptor.timestamp - other_descriptor.timestamp;
-    VLOG(10) << "diff: " << diff_s.count()
-             << " (threshold: " << match_config.min_time_separation_s << ")";
-    if (diff_s.count() < match_config.min_time_separation_s) {
+    if (NodeSymbol(query_id).category() == NodeSymbol(valid_id).category() &&
+        diff_s.count() < match_config.min_time_separation_s) {
+      VLOG(10) << "diff: " << diff_s.count()
+               << " (threshold: " << match_config.min_time_separation_s << ")";
       ++num_inside_horizon;
       continue;
     }
