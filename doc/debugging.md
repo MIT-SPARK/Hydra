@@ -59,5 +59,5 @@ Building with a single thread (i.e. `catkin build hydra_dsg_builder --no-deps -v
 
 ### Building with debug symbols
 
-You can enable debug symbols by changing the config flag `-DCMAKE_BUILD_TYPE=Release` to `-DCMAKE_BUILD_TYPE=RelWithDebInfo` and rebuilding.
+You can enable debug symbols by changing the flag `-DCMAKE_BUILD_TYPE=Release` to `-DCMAKE_BUILD_TYPE=RelWithDebInfo` and rebuilding.
 You can remove and add flags to the catkin config by using `-r` and `-a` respectively (e.g. `catkin config -a --cmake-flags -DCMAKE_BUILD_TYPE=Release`). This will add line numbers to any backtrace you create using gdb.
