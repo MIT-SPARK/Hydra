@@ -254,7 +254,7 @@ def _add_object_connectivity(G, threshold_near=2.0, threshold_on=1.0, max_near=2
 
             if is_on or is_above or is_under or is_near:
                 # TODO(nathan) consider getting direction
-                G.insert_edge(node.id.value, cmp_node.id.value)
+                assert G.insert_edge(node.id.value, cmp_node.id.value)
 
         room_to_objects[room_id].append(node)
 
@@ -315,7 +315,7 @@ def preprocess_dsg(G, threshold_near=2.0, threshold_on=1.0, max_near=2.0):
         if room_id is None:
             raise ValueError("failed to find object parent.")
 
-        G.insert_edge(node.id.value, room_id)
+        assert G.insert_edge(node.id.value, room_id)
 
     _add_object_connectivity(
         G, threshold_near=threshold_near, max_near=max_near, threshold_on=threshold_on
