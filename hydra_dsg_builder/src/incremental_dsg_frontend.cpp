@@ -172,18 +172,18 @@ void DsgFrontend::updateMeshAndObjects(const FrontendInput& input) {
     std::unique_lock<std::mutex> lock(state_->mesh_mutex);
     state_->latest_mesh.reset(new pcl::PolygonMesh());
 
-    { // start timing scope
+    {  // start timing scope
       ScopedTimer t2("frontend/copy_mesh_faces", input.timestamp_ns);
       state_->latest_mesh->polygons = mesh_frontend_.getFullMeshFaces();
-    } // end timing scope
+    }  // end timing scope
 
     const auto vertices = mesh_frontend_.getFullMeshVertices();
-    { // start timing scope
+    {  // start timing scope
       ScopedTimer t3("frontend/copy_mesh_vertices", input.timestamp_ns);
       if (!vertices->empty()) {
         pcl::toPCLPointCloud2(*vertices, state_->latest_mesh->cloud);
       }
-    } // end timing scope
+    }  // end timing scope
 
     ScopedTimer t4("frontend/copy_mesh_info", input.timestamp_ns);
     state_->mesh_vertex_stamps.reset(
@@ -380,9 +380,17 @@ void DsgFrontend::addPlaceObjectEdges(uint64_t timestamp_ns,
   }
 
   for (const auto& object_id : objects_to_check) {
-    if (!dsg_->graph->hasNode(object_id)) {
+    const auto object_opt = dsg_->graph->getNode(object_id);
+    if (!object_opt) {
       continue;
     }
+
+    const SceneGraphNode& object_node = *object_opt;
+    const auto parent_opt = object_node.getParent();
+    if (parent_opt) {
+      dsg_->graph->removeEdge(object_id, *parent_opt);
+    }
+
     const Eigen::Vector3d object_position = dsg_->graph->getPosition(object_id);
     places_nn_finder_->find(
         object_position, 1, false, [&](NodeId place_id, size_t, double) {
