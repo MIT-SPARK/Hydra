@@ -35,10 +35,6 @@
 #include "hydra_dsg_builder/dsg_lcd_registration.h"
 
 #include <hydra_utils/timing_utilities.h>
-#include <kimera_pgmo/utils/CommonFunctions.h>
-#include <pose_graph_tools/LcdFrameRegistration.h>
-#include <ros/service.h>
-#include <tf2_eigen/tf2_eigen.h>
 #include <fstream>
 
 namespace hydra {
@@ -203,83 +199,6 @@ DsgRegistrationSolution DsgTeaserSolver::solve(const DynamicSceneGraph& dsg,
   }
 
   return getFullSolutionFromLayer(dsg, solution, query_agent_id, match.match_root);
-}
-
-inline size_t getFrameIdFromNode(const DynamicSceneGraph& graph, NodeId node_id) {
-  const auto& attrs =
-      graph.getNode(node_id).value().get().attributes<AgentNodeAttributes>();
-  return NodeSymbol(attrs.external_key).categoryId();
-}
-
-inline size_t getRobotIdFromNode(const DynamicSceneGraph& graph, NodeId node_id) {
-  const auto& attrs =
-      graph.getNode(node_id).value().get().attributes<AgentNodeAttributes>();
-  // TODO(yun) cleaner way to track robot prefix to id?
-  return kimera_pgmo::robot_prefix_to_id.at(NodeSymbol(attrs.external_key).category());
-}
-
-inline size_t getTimestampFromNode(const DynamicSceneGraph& graph, NodeId node_id) {
-  const auto& attrs =
-      graph.getNode(node_id).value().get().attributes<AgentNodeAttributes>();
-  return NodeSymbol(attrs.external_key).categoryId();
-}
-
-DsgRegistrationSolution DsgAgentSolver::solve(const DynamicSceneGraph& dsg,
-                                              const DsgRegistrationInput& match,
-                                              NodeId) const {
-  if (match.query_nodes.empty() || match.match_nodes.empty()) {
-    return {};
-  }
-
-  if (!ros::service::exists("frame_registration", true)) {
-    LOG(ERROR) << "Frame registration service missing!";
-    return {};
-  }
-
-  // at the agent level, match sets are one node each
-  const NodeId query_id = *match.query_nodes.begin();
-  const NodeId match_id = *match.match_nodes.begin();
-
-  if (!dsg.hasNode(query_id) || !dsg.hasNode(match_id)) {
-    LOG(ERROR) << "Query or match node does not exist in graph!";
-    return {};
-  }
-
-  uint64_t timestamp;
-  pose_graph_tools::LcdFrameRegistration msg;
-  msg.request.query_robot = getRobotIdFromNode(dsg, query_id);
-  msg.request.match_robot = getRobotIdFromNode(dsg, match_id);
-  msg.request.query = getFrameIdFromNode(dsg, query_id);
-  msg.request.match = getFrameIdFromNode(dsg, match_id);
-  timestamp = dsg.getDynamicNode(query_id).value().get().timestamp.count();
-
-  ScopedTimer timer("lcd/register_agent", timestamp, true, 2, false);
-
-  if (!ros::service::call("frame_registration", msg)) {
-    LOG(ERROR) << "Frame registration service failed!";
-    return {};
-  }
-
-  VLOG(3) << "Visual Registration Request: " << msg.request;
-  VLOG(3) << "Visual Registration Response: " << msg.response;
-
-  if (!msg.response.valid) {
-    LOG(INFO) << "registration failed: " << NodeSymbol(query_id).getLabel() << " -> "
-              << NodeSymbol(match_id).getLabel();
-    return {};
-  }
-
-  Eigen::Quaterniond match_q_query;
-  Eigen::Vector3d match_t_query;
-  tf2::convert(msg.response.match_T_query.orientation, match_q_query);
-  tf2::convert(msg.response.match_T_query.position, match_t_query);
-  LOG(INFO) << "registration worked " << NodeSymbol(query_id).getLabel() << " -> "
-            << NodeSymbol(match_id).getLabel();
-  return {true,
-          query_id,
-          match_id,
-          gtsam::Pose3(gtsam::Rot3(match_q_query), match_t_query),
-          -1};
 }
 
 }  // namespace lcd

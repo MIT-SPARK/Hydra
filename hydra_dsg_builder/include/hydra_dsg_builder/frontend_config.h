@@ -33,9 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/config_utils.h"
 #include "hydra_dsg_builder/incremental_mesh_segmenter.h"
 
+#include <hydra_utils/config.h>
+#include <hydra_utils/eigen_config_types.h>
 #include <kimera_pgmo/MeshFrontendInterface.h>
 
 namespace spark_dsg {
@@ -78,6 +79,7 @@ struct DsgFrontendConfig {
   size_t min_object_vertices = 20;
   bool prune_mesh_indices = false;
   std::string semantic_label_file;
+  bool lcd_use_bow_vectors = true;
   kimera_pgmo::MeshFrontendConfig pgmo_config;
   MeshSegmenterConfig object_config;
 };
@@ -111,6 +113,7 @@ void visit_config(const Visitor& v, DsgFrontendConfig& config) {
   v.visit("min_object_vertices", config.min_object_vertices);
   v.visit("prune_mesh_indices", config.prune_mesh_indices);
   v.visit("semantic_label_file", config.semantic_label_file);
+  v.visit("lcd_use_bow_vectors", config.lcd_use_bow_vectors);
   v.visit("pgmo", config.pgmo_config);
   v.visit("objects", config.object_config);
 }

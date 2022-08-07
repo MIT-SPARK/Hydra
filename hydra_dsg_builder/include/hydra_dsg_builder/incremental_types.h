@@ -35,8 +35,7 @@
 #pragma once
 #include <gtsam/geometry/Pose3.h>
 #include <hydra_utils/dsg_types.h>
-#include <kimera_pgmo/utils/CommonStructs.h>
-#include <ros/time.h>
+#include <kimera_pgmo/utils/CommonFunctions.h>
 
 #include <atomic>
 #include <map>
@@ -44,6 +43,19 @@
 #include <mutex>
 
 namespace hydra {
+
+struct RobotPrefixConfig {
+  RobotPrefixConfig(int robot_id)
+      : id(robot_id),
+        key(kimera_pgmo::robot_id_to_prefix.at(robot_id)),
+        vertex_key(kimera_pgmo::robot_id_to_vertex_prefix.at(robot_id)) {}
+
+  RobotPrefixConfig() : RobotPrefixConfig(0) {}
+
+  int id;
+  char key;
+  char vertex_key;
+};
 
 namespace lcd {
 
@@ -90,6 +102,12 @@ struct SharedDsgInfo {
     graph.reset(new DynamicSceneGraph(layer_ids, mesh_layer_id));
   }
 
+  // mutexes are considered ordered (for avoiding deadlock):
+  // 1. SharedDsgInfo::mutex (lcd)
+  // 2. SharedDsgInfo::mutex (backend)
+  // 3. SharedDsgInfo::mutex (frontend)
+  // 4. SharedModuleState::mesh_mutex
+  // When acquiring two mutexes, always acquire the lowest mutex first
   std::mutex mutex;
   std::atomic<bool> updated;
   uint64_t last_update_time;

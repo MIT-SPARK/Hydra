@@ -32,61 +32,21 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_dsg_builder/node_utilities.h"
+#pragma once
+#include <hydra_dsg_builder/dsg_lcd_registration.h>
 
 namespace hydra {
+namespace lcd {
 
-ExitMode getExitMode(const ros::NodeHandle& nh) {
-  std::string exit_mode_str = "NORMAL";
-  nh.getParam("exit_mode", exit_mode_str);
+struct DsgAgentSolver : DsgRegistrationSolver {
+  DsgAgentSolver() = default;
 
-  if (exit_mode_str == "CLOCK") {
-    return ExitMode::CLOCK;
-  } else if (exit_mode_str == "SERVICE") {
-    return ExitMode::SERVICE;
-  } else if (exit_mode_str == "NORMAL") {
-    return ExitMode::NORMAL;
-  } else {
-    ROS_WARN_STREAM("Unrecognized option: " << exit_mode_str
-                                            << ". Defaulting to NORMAL");
-    return ExitMode::NORMAL;
-  }
-}
+  virtual ~DsgAgentSolver() = default;
 
-void spinWhileClockPresent() {
-  ros::WallRate r(50);
-  ROS_INFO("Waiting for bag to start");
-  while (ros::ok() && !haveClock()) {
-    ros::spinOnce();
-    r.sleep();
-  }
+  DsgRegistrationSolution solve(const DynamicSceneGraph& dsg,
+                                const DsgRegistrationInput& match,
+                                NodeId query_agent_id) const override;
+};
 
-  ROS_INFO("Running...");
-  while (ros::ok() && haveClock()) {
-    ros::spinOnce();
-    r.sleep();
-  }
-
-  ros::spinOnce();  // make sure all the callbacks are processed
-  ROS_WARN("Exiting!");
-}
-
-void spinUntilExitRequested() {
-  ServiceFunctor functor;
-
-  ros::NodeHandle nh("~");
-  ros::ServiceServer service =
-      nh.advertiseService("shutdown", &ServiceFunctor::callback, &functor);
-
-  ros::WallRate r(50);
-  ROS_INFO("Running...");
-  while (ros::ok() && !functor.should_exit) {
-    ros::spinOnce();
-    r.sleep();
-  }
-
-  ros::spinOnce();  // make sure all the callbacks are processed
-  ROS_WARN("Exiting!");
-}
-
+}  // namespace lcd
 }  // namespace hydra

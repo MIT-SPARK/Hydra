@@ -58,6 +58,8 @@ class DsgLcdDetector {
  public:
   explicit DsgLcdDetector(const DsgLcdDetectorConfig& config);
 
+  void setRegistrationSolver(size_t level, DsgRegistrationSolver::Ptr&& solver);
+
   void updateDescriptorCache(const DynamicSceneGraph& dsg,
                              const std::unordered_set<NodeId>& archived_places,
                              uint64_t timestamp = 0);

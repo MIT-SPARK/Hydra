@@ -39,7 +39,6 @@
 #include <pcl/point_types.h>
 
 #include <memory>
-#include <mutex>
 
 namespace hydra {
 namespace incremental {

@@ -20,7 +20,7 @@
     <arg name="sensor_frame" default="left_cam" if="$(arg use_gt_frame)"/>
     <arg name="sensor_frame" default="left_cam_kimera" unless="$(arg use_gt_frame)"/>
 
-    <arg name="rviz_dir" default="$(find hydra_dsg_builder)/rviz"/>
+    <arg name="rviz_dir" default="$(find hydra_dsg_builder_ros)/rviz"/>
     <arg name="rviz_file" default="uhumans2.rviz"/>
 
     <arg name="use_static_tfs" default="true"/>
@@ -32,5 +32,5 @@
         <arg name="debug" value="false"/>
     </include>
 
-    <include file="$(find hydra_dsg_builder)/launch/dsg_builder.launch" pass_all_args="true"/>
+    <include file="$(find hydra_dsg_builder_ros)/launch/dsg_builder.launch" pass_all_args="true"/>
 </launch>

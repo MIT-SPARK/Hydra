@@ -68,9 +68,10 @@ DsgFrontend::DsgFrontend(const DsgFrontendConfig& config,
 
   CHECK(mesh_frontend_.initialize(config_.pgmo_config));
   mesh_frontend_.addOutputCallback([&](const auto& frontend, const std_msgs::Header) {
-    std::unique_lock<std::mutex> lock(state_->mesh_mutex);
-    state_->deformation_graphs.emplace_back(
-        new PoseGraph(frontend.getLastProcessedMeshGraph()));
+    if (backend_input_) {
+      backend_input_->deformation_graph.reset(
+          new PoseGraph(frontend.getLastProcessedMeshGraph()));
+    }
   });
   segmenter_.reset(
       new MeshSegmenter(config_.object_config, mesh_frontend_.getFullMeshVertices()));
@@ -133,29 +134,46 @@ void DsgFrontend::spin() {
       continue;
     }
 
-    const auto msg = queue_->pop();
-    VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg.timestamp_ns << " [ns]";
+    spinOnce(queue_->front());
+    queue_->pop();
+  }
+}
 
-    std::list<std::thread> threads;
-    for (const auto& callback : input_callbacks_) {
-      threads.emplace_back(callback, msg);
-    }
+void DsgFrontend::spinOnce(const FrontendInput& msg) {
+  VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg.timestamp_ns << " [ns]";
+  ScopedTimer timer("frontend/spin", msg.timestamp_ns);
 
-    for (auto& thread : threads) {
-      thread.join();
-    }
+  backend_input_.reset(new BackendInput());
+  backend_input_->pose_graphs = msg.pose_graphs;
+  backend_input_->timestamp_ns = msg.timestamp_ns;
 
-    {
-      ScopedTimer timer("frontend/place_mesh_mapping", msg.timestamp_ns);
-      updatePlaceMeshMapping();
-    }
-    dsg_->last_update_time = msg.timestamp_ns;
-    dsg_->updated = true;
+  lcd_input_.reset(new LcdInput);
+  lcd_input_->timestamp_ns = msg.timestamp_ns;
 
-    if (config_.should_log) {
-      // mutex not required because nothing is modifying the graph
-      frontend_graph_logger_.logGraph(dsg_->graph);
-    }
+  std::list<std::thread> threads;
+  for (const auto& callback : input_callbacks_) {
+    threads.emplace_back(callback, msg);
+  }
+
+  for (auto& thread : threads) {
+    thread.join();
+  }
+
+  {
+    ScopedTimer timer("frontend/place_mesh_mapping", msg.timestamp_ns);
+    updatePlaceMeshMapping();
+  }
+
+  // TODO(nathan) only push if running
+  state_->lcd_queue.push(lcd_input_);
+  state_->backend_queue.push(backend_input_);
+
+  dsg_->last_update_time = msg.timestamp_ns;
+  dsg_->updated = true;
+
+  if (config_.should_log) {
+    // mutex not required because nothing is modifying the graph
+    frontend_graph_logger_.logGraph(dsg_->graph);
   }
 }
 
@@ -166,40 +184,8 @@ void DsgFrontend::updateMeshAndObjects(const FrontendInput& input) {
     mesh_frontend_.clearArchivedMeshFull(input.mesh->archived_blocks);
   }  // end timing scope
 
-  {  // start critical section
-    ScopedTimer t1("frontend/copy_mesh", input.timestamp_ns);
-    std::unique_lock<std::mutex> lock(state_->mesh_mutex);
-    state_->latest_mesh.reset(new pcl::PolygonMesh());
-
-    {  // start timing scope
-      ScopedTimer t2("frontend/copy_mesh_faces", input.timestamp_ns);
-      state_->latest_mesh->polygons = mesh_frontend_.getFullMeshFaces();
-    }  // end timing scope
-
-    const auto vertices = mesh_frontend_.getFullMeshVertices();
-    {  // start timing scope
-      ScopedTimer t3("frontend/copy_mesh_vertices", input.timestamp_ns);
-      if (!vertices->empty()) {
-        pcl::toPCLPointCloud2(*vertices, state_->latest_mesh->cloud);
-      }
-    }  // end timing scope
-
-    ScopedTimer t4("frontend/copy_mesh_info", input.timestamp_ns);
-    state_->mesh_vertex_stamps.reset(
-        new std::vector<ros::Time>(mesh_frontend_.getFullMeshTimes()));
-
-    state_->mesh_vertex_graph_indices.reset(new std::vector<int>(vertices->size(), -1));
-    state_->mesh_vertex_graph_indices->resize(vertices->size());
-    const auto& index_mapping = mesh_frontend_.getFullMeshToGraphMapping();
-    for (size_t i = 0; i < vertices->size(); ++i) {
-      const auto iter = index_mapping.find(i);
-      if (iter != index_mapping.end()) {
-        state_->mesh_vertex_graph_indices->push_back(iter->second);
-      }
-    }
-
-    state_->have_new_mesh = true;
-  }  // end critical section
+  // we copy the mesh state separately to avoid slowing down the mesh segmentation
+  std::thread copy_thread(&DsgFrontend::copyMesh, this, input.timestamp_ns);
 
   LabelClusters object_clusters;
 
@@ -217,7 +203,53 @@ void DsgFrontend::updateMeshAndObjects(const FrontendInput& input) {
     std::unique_lock<std::mutex> lock(dsg_->mutex);
     segmenter_->updateGraph(*dsg_->graph, object_clusters, input.timestamp_ns);
     addPlaceObjectEdges(input.timestamp_ns);
+
   }  // end dsg critical section
+
+  copy_thread.join();
+}
+
+void DsgFrontend::copyMesh(size_t timestamp_ns) {
+  // TODO(nathan) conditionally disable this for hydra multi
+  ScopedTimer t1("frontend/copy_mesh", timestamp_ns);
+  std::unique_lock<std::mutex> lock(state_->mesh_mutex);
+  state_->latest_mesh.reset(new pcl::PolygonMesh());
+
+  {  // start timing scope
+    ScopedTimer t2("frontend/copy_mesh_faces", timestamp_ns);
+    state_->latest_mesh->polygons = mesh_frontend_.getFullMeshFaces();
+  }  // end timing scope
+
+  {  // start timing scope
+    ScopedTimer t2("frontend/copy_invalid_indices", timestamp_ns);
+    state_->invalid_indices.reset(
+        new std::vector<size_t>(mesh_frontend_.getInvalidIndices().begin(),
+                                mesh_frontend_.getInvalidIndices().end()));
+  }  // end timing scope
+
+  const auto vertices = mesh_frontend_.getFullMeshVertices();
+  {  // start timing scope
+    ScopedTimer t3("frontend/copy_mesh_vertices", timestamp_ns);
+    if (!vertices->empty()) {
+      pcl::toPCLPointCloud2(*vertices, state_->latest_mesh->cloud);
+    }
+  }  // end timing scope
+
+  ScopedTimer t4("frontend/copy_mesh_info", timestamp_ns);
+  state_->mesh_vertex_stamps.reset(
+      new std::vector<ros::Time>(mesh_frontend_.getFullMeshTimes()));
+
+  state_->mesh_vertex_graph_indices.reset(new std::vector<int>(vertices->size(), -1));
+  state_->mesh_vertex_graph_indices->resize(vertices->size());
+  const auto& index_mapping = mesh_frontend_.getFullMeshToGraphMapping();
+  for (size_t i = 0; i < vertices->size(); ++i) {
+    const auto iter = index_mapping.find(i);
+    if (iter != index_mapping.end()) {
+      state_->mesh_vertex_graph_indices->push_back(iter->second);
+    }
+  }
+
+  state_->have_new_mesh = true;
 }
 
 void DsgFrontend::updatePlaces(const FrontendInput& input) {
@@ -278,6 +310,7 @@ void DsgFrontend::updatePoseGraph(const FrontendInput& input) {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
   const auto& agents = dsg_->graph->getLayer(DsgLayers::AGENTS, robot_prefix_);
 
+  lcd_input_->new_agent_nodes.clear();
   for (const auto& pose_graph : input.pose_graphs) {
     if (pose_graph->nodes.empty()) {
       continue;
@@ -305,11 +338,52 @@ void DsgFrontend::updatePoseGraph(const FrontendInput& input) {
         continue;
       }
 
-      state_->agent_key_map[pgmo_key] = agents.nodes().size() - 1;
+      // TODO(nathan) save key association for lcd
+      const size_t last_index = agents.nodes().size() - 1;
+      agent_key_map_[pgmo_key] = last_index;
+      lcd_input_->new_agent_nodes.push_back(agents.prefix.makeId(last_index));
     }
   }
 
   addPlaceAgentEdges(input.timestamp_ns);
+  if (config_.lcd_use_bow_vectors) {
+    assignBowVectors(input, agents);
+  }
+}
+
+void DsgFrontend::assignBowVectors(const FrontendInput& input,
+                                   const DynamicLayer& agents) {
+  lcd_input_->new_agent_nodes.clear();
+  cached_bow_messages_.insert(
+      cached_bow_messages_.end(), input.bow_messages.begin(), input.bow_messages.end());
+  const auto prior_size = cached_bow_messages_.size();
+
+  auto iter = cached_bow_messages_.begin();
+  while (iter != cached_bow_messages_.end()) {
+    const auto& msg = *iter;
+    const NodeSymbol pgmo_key(kimera_pgmo::robot_id_to_prefix.at(msg->robot_id),
+                              msg->pose_id);
+
+    auto agent_index = agent_key_map_.find(pgmo_key);
+    if (agent_index == agent_key_map_.end()) {
+      ++iter;
+      continue;
+    }
+
+    const auto& node = agents.getNodeByIndex(agent_index->second)->get();
+    lcd_input_->new_agent_nodes.push_back(node.id);
+
+    auto& attrs = node.attributes<AgentNodeAttributes>();
+    attrs.dbow_ids = Eigen::Map<const AgentNodeAttributes::BowIdVector>(
+        msg->bow_vector.word_ids.data(), msg->bow_vector.word_ids.size());
+    attrs.dbow_values = Eigen::Map<const Eigen::VectorXf>(
+        msg->bow_vector.word_values.data(), msg->bow_vector.word_values.size());
+
+    iter = cached_bow_messages_.erase(iter);
+  }
+
+  VLOG(3) << "[Hydra Frontend] " << cached_bow_messages_.size() << " of " << prior_size
+          << " bow vectors unassigned";
 }
 
 void DsgFrontend::invalidateMeshEdges() {
@@ -354,7 +428,7 @@ void DsgFrontend::archivePlaces(const NodeIdSet active_places) {
         dsg_->graph->getNode(prev)->get().attributes().is_active = false;
       }
 
-      state_->archived_places.insert(prev);
+      lcd_input_->archived_places.insert(prev);
     }
 
   }  // end graph update critical section

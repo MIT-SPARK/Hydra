@@ -33,9 +33,11 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/incremental_dsg_frontend.h"
+#include "hydra_dsg_builder_ros/ros_utilities.h"
 
+#include <hydra_dsg_builder/incremental_dsg_frontend.h>
 #include <hydra_utils/semantic_ros_publishers.h>
+#include <hydra_utils/dsg_streaming_interface.h>
 #include <kimera_pgmo/MeshFrontend.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/approximate_time.h>
@@ -53,6 +55,7 @@ using incremental::MeshSegmenter;
 using incremental::PlacesLayerMsg;
 using incremental::SharedDsgInfo;
 using incremental::SharedModuleState;
+using pose_graph_tools::BowQuery;
 using pose_graph_tools::PoseGraph;
 
 using ObjectCloudPub = SemanticRosPublishers<uint8_t, MeshSegmenter::MeshVertexCloud>;
@@ -95,6 +98,8 @@ struct ROSFrontend : public DsgFrontend {
 
   void poseGraphCallback(const PoseGraph::ConstPtr& pose_graph);
 
+  void bowCallback(const BowQuery::ConstPtr& msg);
+
   void publishActiveVertices(const MeshSegmenter::MeshVertexCloud& vertices,
                              const std::vector<size_t>& indices,
                              const MeshSegmenter::LabelIndices&) const;
@@ -111,11 +116,13 @@ struct ROSFrontend : public DsgFrontend {
   ros::NodeHandle nh_;
   ROSFrontendConfig ros_config_;
   std::list<PoseGraph::ConstPtr> pose_graph_queue_;
+  std::list<BowQuery::ConstPtr> bow_queue_;
 
   std::unique_ptr<message_filters::Subscriber<PlacesLayerMsg>> places_sub_;
   std::unique_ptr<message_filters::Subscriber<ActiveMesh>> mesh_sub_;
   std::unique_ptr<Sync> sync_;
 
+  ros::Subscriber bow_sub_;
   ros::Subscriber pose_graph_sub_;
 
   tf2_ros::Buffer buffer_;

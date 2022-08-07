@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_dsg_builder/ros_frontend.h"
+#include "hydra_dsg_builder_ros/ros_frontend.h"
 
 namespace hydra {
 
@@ -51,6 +51,7 @@ ROSFrontend::ROSFrontend(const ros::NodeHandle& nh,
 
   pose_graph_sub_ = nh_.subscribe(
       "pose_graph_incremental", 100, &ROSFrontend::poseGraphCallback, this);
+  bow_sub_ = nh_.subscribe("bow_vectors", 100, &ROSFrontend::bowCallback, this);
 
   mesh_sub_.reset(new Subscriber<ActiveMesh>(nh_, "voxblox_mesh", 5));
   places_sub_.reset(new Subscriber<PlacesLayerMsg>(nh_, "active_places", 5));
@@ -117,8 +118,11 @@ void ROSFrontend::inputCallback(const PlacesLayerMsg::ConstPtr& places,
   input.mesh = mesh;
   input.timestamp_ns = places->header.stamp.toNSec();
 
+  // send all cached messages to frontend
   input.pose_graphs = pose_graph_queue_;
   pose_graph_queue_.clear();
+  input.bow_messages = bow_queue_;
+  bow_queue_.clear();
 
   queue_->push(input);
 
@@ -132,6 +136,10 @@ void ROSFrontend::inputCallback(const PlacesLayerMsg::ConstPtr& places,
 
 void ROSFrontend::poseGraphCallback(const PoseGraph::ConstPtr& pose_graph) {
   pose_graph_queue_.push_back(pose_graph);
+}
+
+void ROSFrontend::bowCallback(const BowQuery::ConstPtr& msg) {
+  bow_queue_.push_back(msg);
 }
 
 void ROSFrontend::publishActiveVertices(const MeshVertexCloud& vertices,

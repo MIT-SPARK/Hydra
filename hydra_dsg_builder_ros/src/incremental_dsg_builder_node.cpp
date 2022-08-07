@@ -32,16 +32,36 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_dsg_builder/incremental_dsg_backend.h"
-#include "hydra_dsg_builder/incremental_dsg_lcd.h"
-#include "hydra_dsg_builder/node_utilities.h"
-#include "hydra_dsg_builder/ros_frontend.h"
+#include "hydra_dsg_builder_ros/node_utilities.h"
+#include "hydra_dsg_builder_ros/ros_backend.h"
+#include "hydra_dsg_builder_ros/ros_frontend.h"
 
+#include <hydra_dsg_builder/incremental_dsg_backend.h>
+#include <hydra_dsg_builder/incremental_dsg_lcd.h>
+#include <hydra_utils/dsg_streaming_interface.h>
 #include <hydra_utils/timing_utilities.h>
 
 using namespace hydra;
 using namespace hydra::incremental;
 using namespace hydra::timing;
+
+/*
+  // lcd visualization (output callback)
+  if (config_.visualize_dsg_lcd) {
+    ros::NodeHandle nh(config_.lcd_visualizer_ns);
+    visualizer_queue_.reset(new ros::CallbackQueue());
+    nh.setCallbackQueue(visualizer_queue_.get());
+
+    lcd_visualizer_.reset(new lcd::LcdVisualizer(nh, config_.detector.object_radius_m));
+    lcd_visualizer_->setGraph(lcd_graph_);
+    lcd_visualizer_->setLcdDetector(lcd_detector_.get());
+  }
+
+  if (lcd_visualizer_) {
+    lcd_visualizer_->setGraphUpdated();
+    lcd_visualizer_->redraw();
+  }
+*/
 
 void run(const ros::NodeHandle& nh,
          const SharedDsgInfo::Ptr& frontend_dsg,
@@ -54,14 +74,30 @@ void run(const ros::NodeHandle& nh,
 
   int robot_id = 0;
   nh.getParam("robot_id", robot_id);
+  RobotPrefixConfig prefix(robot_id);
+
+  auto backend_config = load_config<DsgBackendConfig>(nh);
+  auto pgmo_config = load_config<kimera_pgmo::KimeraPgmoConfig>(nh, "pgmo");
+  auto lcd_config = load_config<DsgLcdModuleConfig>(nh, "");
 
   SharedModuleState::Ptr shared_state(new SharedModuleState());
+  // TODO(nathan) fix robot_id for frontend
   ROSFrontend frontend(nh, frontend_dsg, shared_state, robot_id);
-  DsgBackend backend(nh, frontend_dsg, backend_dsg, shared_state);
+  // TODO(nathan) consider allowing sub-based version here as well
+  DsgBackend backend(
+      prefix, backend_config, pgmo_config, frontend_dsg, backend_dsg, shared_state);
+
+  RosBackendVisualizer backend_visualizer(nh);
+  backend.addOutputCallback([&backend_visualizer](const DynamicSceneGraph& graph,
+                                                  const pcl::PolygonMesh& mesh,
+                                                  const kimera_pgmo::DeformationGraph& dgraph,
+                                                  size_t timestamp_ns) {
+    backend_visualizer.publishOutputs(graph, mesh, dgraph, timestamp_ns);
+  });
 
   std::shared_ptr<DsgLcd> lcd;
   if (enable_lcd) {
-    lcd.reset(new DsgLcd(nh, frontend_dsg, shared_state));
+    lcd.reset(new DsgLcd(prefix, lcd_config, frontend_dsg, shared_state));
   }
 
   frontend.start();

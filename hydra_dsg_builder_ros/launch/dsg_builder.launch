@@ -14,7 +14,7 @@
     <arg name="use_gt_frame" default="true"/>
     <arg name="use_oriented_bounding_boxes" default="false"/>
     <arg name="exit_mode" default="NORMAL"/>
-    <arg name="start_visualizer" default="false"/>
+    <arg name="start_visualizer" default="true"/>
 
     <arg name="enable_dsg_lcd" default="false"/>
     <arg name="enable_lcd_viz" default="false"/>
@@ -24,6 +24,7 @@
     <arg name="dsg_should_log" default="true" />
     <arg name="pgmo_should_log" default="true"/>
     <arg name="log_registration" default="false"/>
+
 
     <arg name="debug" default="false"/>
     <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
@@ -53,7 +54,7 @@
     <include if="$(arg start_visualizer)" file="$(find hydra_utils)/launch/hydra_streaming_visualizer.launch" pass_all_args="true">
     </include>
 
-    <node pkg="hydra_dsg_builder" type="hydra_dsg_builder_incremental_node"
+    <node pkg="hydra_dsg_builder_ros" type="hydra_dsg_builder_ros_node"
           name="incremental_dsg_builder_node"
           launch-prefix="$(arg launch_prefix)"
           args="--minloglevel=$(arg min_glog_level) -v=$(arg verbosity) $(arg glog_file_args)"

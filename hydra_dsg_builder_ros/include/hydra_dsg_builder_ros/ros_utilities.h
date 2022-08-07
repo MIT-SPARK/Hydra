@@ -33,9 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <ros/ros.h>
 #include <hydra_utils/config.h>
-#include <hydra_utils/eigen_config_types.h>
-
 #include <glog/logging.h>
 
 namespace hydra {

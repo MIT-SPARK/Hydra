@@ -43,7 +43,7 @@
 #include <hydra_msgs/ActiveMesh.h>
 #include <hydra_topology/nearest_neighbor_utilities.h>
 #include <kimera_pgmo/MeshFrontendInterface.h>
-#include <hydra_utils/dsg_streaming_interface.h>
+#include <pose_graph_tools/BowQuery.h>
 #include <pose_graph_tools/PoseGraph.h>
 #include <spark_dsg/scene_graph_logger.h>
 
@@ -57,10 +57,12 @@ namespace incremental {
 using PlacesLayerMsg = hydra_msgs::ActiveLayer;
 using topology::NearestNodeFinder;
 
+// TODO(nathan) consider moving to shared module state
 struct FrontendInput {
   PlacesLayerMsg::ConstPtr places;
   hydra_msgs::ActiveMesh::ConstPtr mesh;
   std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
+  std::list<pose_graph_tools::BowQuery::ConstPtr> bow_messages;
   Eigen::Vector3d current_position;
   uint64_t timestamp_ns;
 };
@@ -69,6 +71,7 @@ class DsgFrontend {
  public:
   using FrontendInputQueue = InputQueue<FrontendInput>;
   using InputCallback = std::function<void(const FrontendInput&)>;
+  using DynamicLayer = DynamicSceneGraphLayer;
 
   DsgFrontend(const DsgFrontendConfig& config,
               const SharedDsgInfo::Ptr& dsg,
@@ -85,6 +88,8 @@ class DsgFrontend {
 
   void spin();
 
+  void spinOnce(const FrontendInput& input);
+
  protected:
   void updateMeshAndObjects(const FrontendInput& input);
 
@@ -97,10 +102,14 @@ class DsgFrontend {
 
   void invalidateMeshEdges();
 
+  void copyMesh(size_t timestamp_ns);
+
   void addPlaceObjectEdges(uint64_t timestamp_ns,
                            NodeIdSet* extra_objects_to_check = nullptr);
 
   void addPlaceAgentEdges(uint64_t timestamp_ns);
+
+  void assignBowVectors(const FrontendInput& input, const DynamicLayer& agents);
 
   void updatePlaceMeshMapping();
 
@@ -108,6 +117,9 @@ class DsgFrontend {
   std::atomic<bool> should_shutdown_{false};
   FrontendInputQueue::Ptr queue_;
   std::unique_ptr<std::thread> spin_thread_;
+
+  LcdInput::Ptr lcd_input_;
+  BackendInput::Ptr backend_input_;
 
   DsgFrontendConfig config_;
   std::unique_ptr<kimera::SemanticLabel2Color> label_map_;
@@ -122,8 +134,10 @@ class DsgFrontend {
   std::unique_ptr<NearestNodeFinder> places_nn_finder_;
   NodeIdSet unlabeled_place_nodes_;
   NodeIdSet previous_active_places_;
+  std::map<NodeId, size_t> agent_key_map_;
   std::set<NodeId> deleted_agent_edge_indices_;
   std::map<LayerPrefix, size_t> last_agent_edge_index_;
+  std::list<pose_graph_tools::BowQuery::ConstPtr> cached_bow_messages_;
 
   std::vector<InputCallback> input_callbacks_;
 };

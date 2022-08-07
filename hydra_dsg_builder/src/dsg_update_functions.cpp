@@ -104,7 +104,16 @@ void UpdateObjectsFunctor::updateObject(const MeshVertices::Ptr& mesh,
   }
 
   pcl::IndicesPtr indices;
-  indices.reset(new std::vector<int>(connections.begin(), connections.end()));
+  if (invalid_indices) {
+    indices.reset(new std::vector<int>());
+    for (const auto idx : connections) {
+      if (!invalid_indices->count(idx)) {
+        indices->push_back(idx);
+      }
+    }
+  } else {
+    indices.reset(new std::vector<int>(connections.begin(), connections.end()));
+  }
 
   attrs.bounding_box = bounding_box::extract(mesh, attrs.bounding_box.type, indices);
 
@@ -220,7 +229,8 @@ void UpdatePlacesFunctor::makeNodeFinder(const SceneGraphLayer& layer) const {
     }
   }
 
-  VLOG(5) << "[Hydra Backend] Using " << layer_nodes.size() << " archived places for update";
+  VLOG(5) << "[Hydra Backend] Using " << layer_nodes.size()
+          << " archived places for update";
   if (layer_nodes.empty()) {
     return;
   }

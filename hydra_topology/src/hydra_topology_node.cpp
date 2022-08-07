@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
 
   if (output_path != "") {
     boost::system::error_code code;
-    if (!fs::create_directory(timer_path, code)) {
+    if (!fs::exists(timer_path) && !fs::create_directory(timer_path, code)) {
       ROS_WARN_STREAM("Failed to create: " << timer_path);
     }
   }

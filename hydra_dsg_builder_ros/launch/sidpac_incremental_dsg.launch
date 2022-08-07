@@ -21,7 +21,7 @@
     <arg name="use_oriented_bounding_boxes" default="true"/>
     <arg name="sensor_frame" default="left_cam"/>
 
-    <arg name="rviz_dir" default="$(find hydra_dsg_builder)/rviz"/>
+    <arg name="rviz_dir" default="$(find hydra_dsg_builder_ros)/rviz"/>
     <arg name="rviz_file" default="sidpac.rviz"/>
 
     <include file="$(find hydra_topology)/launch/hydra_topology_sidpac.launch" pass_all_args="true">
@@ -30,6 +30,6 @@
         <arg name="default" value="false"/>
     </include>
 
-    <include file="$(find hydra_dsg_builder)/launch/dsg_builder.launch" pass_all_args="true"/>
+    <include file="$(find hydra_dsg_builder_ros)/launch/dsg_builder.launch" pass_all_args="true"/>
 
 </launch>

@@ -12,7 +12,7 @@
     <arg name="use_gt_frame" default="true"/>
     <arg name="sensor_frame" default="left_cam"/>
 
-    <arg name="rviz_dir" default="$(find hydra_dsg_builder)/rviz"/>
+    <arg name="rviz_dir" default="$(find hydra_dsg_builder_ros)/rviz"/>
     <arg name="rviz_file" default="d455.rviz"/>
 
     <include file="$(find hydra_utils)/launch/gt_pose/d455_gt_pose.launch" if="$(arg use_gt_frame)">
@@ -28,7 +28,7 @@
         <arg name="use_gt_poses" value="false"/>
     </include>
 
-    <include file="$(find hydra_dsg_builder)/launch/dsg_builder.launch" pass_all_args="true">
+    <include file="$(find hydra_dsg_builder_ros)/launch/dsg_builder.launch" pass_all_args="true">
         <arg name="use_oriented_bounding_boxes" value="true"/>
         <arg name="use_gt_frame" value="false"/>
     </include>

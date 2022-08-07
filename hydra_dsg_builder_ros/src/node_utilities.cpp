@@ -32,59 +32,61 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include "hydra_dsg_builder/dsg_lcd_detector.h"
-#include "hydra_dsg_builder/incremental_types.h"
-#include "hydra_dsg_builder/lcd_module_config.h"
-#include "hydra_dsg_builder/shared_module_state.h"
-
-#include <memory>
-#include <thread>
+#include "hydra_dsg_builder_ros/node_utilities.h"
 
 namespace hydra {
-namespace incremental {
 
-class DsgLcd {
- public:
-  DsgLcd(const RobotPrefixConfig& prefix,
-         const DsgLcdModuleConfig& config,
-         const SharedDsgInfo::Ptr& dsg,
-         const SharedModuleState::Ptr& state);
+ExitMode getExitMode(const ros::NodeHandle& nh) {
+  std::string exit_mode_str = "NORMAL";
+  nh.getParam("exit_mode", exit_mode_str);
 
-  virtual ~DsgLcd();
+  if (exit_mode_str == "CLOCK") {
+    return ExitMode::CLOCK;
+  } else if (exit_mode_str == "SERVICE") {
+    return ExitMode::SERVICE;
+  } else if (exit_mode_str == "NORMAL") {
+    return ExitMode::NORMAL;
+  } else {
+    ROS_WARN_STREAM("Unrecognized option: " << exit_mode_str
+                                            << ". Defaulting to NORMAL");
+    return ExitMode::NORMAL;
+  }
+}
 
-  void start();
+void spinWhileClockPresent() {
+  ros::WallRate r(50);
+  ROS_INFO("Waiting for bag to start");
+  while (ros::ok() && !haveClock()) {
+    ros::spinOnce();
+    r.sleep();
+  }
 
-  void stop();
+  ROS_INFO("Running...");
+  while (ros::ok() && haveClock()) {
+    ros::spinOnce();
+    r.sleep();
+  }
 
-  void save(const std::string& output_path);
+  ros::spinOnce();  // make sure all the callbacks are processed
+  ROS_WARN("Exiting!");
+}
 
-  void spin();
+void spinUntilExitRequested() {
+  ServiceFunctor functor;
 
- protected:
-  void spinOnce(bool force_update);
+  ros::NodeHandle nh("~");
+  ros::ServiceServer service =
+      nh.advertiseService("shutdown", &ServiceFunctor::callback, &functor);
 
-  size_t processFrontendOutput();
+  ros::WallRate r(50);
+  ROS_INFO("Running...");
+  while (ros::ok() && !functor.should_exit) {
+    ros::spinOnce();
+    r.sleep();
+  }
 
-  NodeIdSet getPlacesToCache(const Eigen::Vector3d& agent_pos);
+  ros::spinOnce();  // make sure all the callbacks are processed
+  ROS_WARN("Exiting!");
+}
 
-  std::optional<NodeId> getQueryAgentId(size_t timestamp_ns);
-
- protected:
-  std::atomic<bool> should_shutdown_{false};
-  std::unique_ptr<std::thread> spin_thread_;
-
-  RobotPrefixConfig prefix_;
-  DsgLcdModuleConfig config_;
-  SharedDsgInfo::Ptr dsg_;
-  SharedModuleState::Ptr state_;
-
-  std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> agent_queue_;
-  std::list<NodeId> potential_lcd_root_nodes_;
-
-  std::unique_ptr<lcd::DsgLcdDetector> lcd_detector_;
-  DynamicSceneGraph::Ptr lcd_graph_;
-};
-
-}  // namespace incremental
 }  // namespace hydra
