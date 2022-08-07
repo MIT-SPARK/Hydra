@@ -53,7 +53,8 @@ std::ostream& operator<<(std::ostream& out, const ElapsedStatistics& stats) {
              << " measurements)";
 }
 
-ElapsedTimeRecorder::ElapsedTimeRecorder() : disable_output(false) {
+ElapsedTimeRecorder::ElapsedTimeRecorder()
+    : disable_output(true), log_incrementally_(false) {
   mutex_.reset(new std::mutex());
 }
 
@@ -80,6 +81,9 @@ void ElapsedTimeRecorder::stop(const std::string& timer_name) {
   // we grab the time point first (to not mess up timing with later processing)
   const auto stop_point = std::chrono::high_resolution_clock::now();
 
+  std::chrono::nanoseconds elapsed;
+  uint64_t stamp;
+
   bool no_start_present = false;
   {  // start critical section
     std::unique_lock<std::mutex> lock(*mutex_);
@@ -92,8 +96,10 @@ void ElapsedTimeRecorder::stop(const std::string& timer_name) {
         stamps_[timer_name] = TimeStamps();
       }
 
-      elapsed_[timer_name].push_back(stop_point - starts_.at(timer_name));
-      stamps_[timer_name].push_back(start_stamps_.at(timer_name));
+      elapsed = stop_point - starts_.at(timer_name);
+      elapsed_[timer_name].push_back(elapsed);
+      stamp = start_stamps_.at(timer_name);
+      stamps_[timer_name].push_back(stamp);
       starts_.erase(timer_name);
     }
   }  // end critical section
@@ -101,7 +107,23 @@ void ElapsedTimeRecorder::stop(const std::string& timer_name) {
   if (no_start_present) {
     LOG(ERROR) << "Timer " << timer_name
                << " was not started. Discarding current time point";
+    return;
   }
+
+  if (!log_incrementally_) {
+    return;
+  }
+
+  auto iter = files_.find(timer_name);
+  if (iter == files_.end()) {
+    const std::string fname = output_path_ + "/" + timer_name + "_timing_raw.csv";
+    auto file_ptr = std::make_shared<std::ofstream>(fname);
+    iter = files_.emplace(std::make_pair(timer_name, file_ptr)).first;
+  }
+
+  auto& fout = *iter->second;
+  std::chrono::duration<double> elapsed_s = elapsed;
+  fout << stamp << "," << elapsed_s.count() << std::endl;
 }
 
 void ElapsedTimeRecorder::reset() { instance_.reset(new ElapsedTimeRecorder()); }
@@ -199,7 +221,16 @@ void ElapsedTimeRecorder::logElapsed(const std::string& name,
   output_file.close();
 }
 
+void ElapsedTimeRecorder::setupIncrementalLogging(const std::string& output_folder) {
+  log_incrementally_ = true;
+  output_path_ = output_folder;
+}
+
 void ElapsedTimeRecorder::logAllElapsed(const std::string& output_folder) const {
+  if (log_incrementally_) {
+    return;
+  }
+
   for (const auto& str_timer_pair : elapsed_) {
     VLOG(1) << "Saving " << str_timer_pair.first;
     logElapsed(str_timer_pair.first, output_folder);

@@ -225,7 +225,7 @@ class TopologyServer {
       return;
     }
 
-    gvd_integrator_->updateFromTsdfLayer(true);
+    gvd_integrator_->updateFromTsdfLayer(timestamp.toNSec(), true);
 
     BlockIndexList archived_blocks;
     if (config_.clear_distant_blocks && tsdf_server_->has_pose) {

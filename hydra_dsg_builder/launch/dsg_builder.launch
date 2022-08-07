@@ -34,6 +34,7 @@
     <arg name="glog_file_args" value="--logtostderr=0 --log_dir=$(arg glog_dir)" if="$(arg glog_to_file)"/>
     <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
 
+    <arg name="log_timing_incrementally" default="false"/>
     <arg name="dsg_path" default="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
     <arg name="pgmo_log_path" value="$(arg dsg_path)/pgmo"/>
     <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
@@ -63,6 +64,7 @@
         <param name="exit_mode" value="$(arg exit_mode)"/>
         <param name="use_oriented_bounding_boxes" value="$(arg use_oriented_bounding_boxes)"/>
         <param name="semantic_label_2_color_csv_filepath" value="$(arg semantic_map_path)"/>
+        <param name="log_timing_incrementally" value="$(arg log_timing_incrementally)"/>
 
         <rosparam file="$(arg typology_dir)/$(arg typology_config)"/>
         <rosparam file="$(arg config_dir)/dsg_frontend_config.yaml"/>

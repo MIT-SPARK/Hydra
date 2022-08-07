@@ -126,7 +126,7 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
   gvd_config.extract_graph = false;
 
   GvdIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
-  gvd_integrator.updateFromTsdfLayer(false, false);
+  gvd_integrator.updateFromTsdfLayer(0, false, false);
 
   GvdResult result(4, 8);
   for (int x = 0; x < voxels_per_side; ++x) {
@@ -163,7 +163,7 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
   // raise the middle obstacle and lower one on the side
   setTsdfVoxel(3, 2, 10.0);
   setTsdfVoxel(7, 2, 0.0);
-  gvd_integrator.updateFromTsdfLayer(true, false);
+  gvd_integrator.updateFromTsdfLayer(0, true, false);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < 4; ++y) {
@@ -242,7 +242,7 @@ TEST_F(TestFixture2d, NegativeIntegrationCorrect) {
   gvd_config.extract_graph = false;
 
   GvdIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
-  gvd_integrator.updateFromTsdfLayer(false, false);
+  gvd_integrator.updateFromTsdfLayer(0, false, false);
 
   GvdResult result(voxels_per_side, voxels_per_side);
   for (int x = 0; x < voxels_per_side; ++x) {
@@ -288,7 +288,7 @@ TEST_F(SingleBlockTestFixture, PlaneCorrect) {
     }
   }
 
-  gvd_integrator.updateFromTsdfLayer(true);
+  gvd_integrator.updateFromTsdfLayer(0, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -317,7 +317,7 @@ TEST_F(SingleBlockTestFixture, LCorrect) {
     }
   }
 
-  gvd_integrator.updateFromTsdfLayer(true);
+  gvd_integrator.updateFromTsdfLayer(0, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -349,7 +349,7 @@ TEST_F(LargeSingleBlockTestFixture, LCorrect) {
     }
   }
 
-  gvd_integrator.updateFromTsdfLayer(true);
+  gvd_integrator.updateFromTsdfLayer(0, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -372,7 +372,7 @@ TEST_F(LargeSingleBlockTestFixture, LCorrect) {
 
 TEST_F(SingleBlockTestFixture, CornerCorrect) {
   GvdIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
-  gvd_integrator.updateFromTsdfLayer(true);
+  gvd_integrator.updateFromTsdfLayer(0, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -396,7 +396,7 @@ TEST_F(SingleBlockTestFixture, CornerCorrect) {
 
 TEST_F(ParentTestFixture, ParentsCorrect) {
   GvdIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
-  gvd_integrator.updateFromTsdfLayer(true);
+  gvd_integrator.updateFromTsdfLayer(0, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {

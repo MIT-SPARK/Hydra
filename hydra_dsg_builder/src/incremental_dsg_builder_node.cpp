@@ -149,6 +149,12 @@ int main(int argc, char* argv[]) {
 
   nh.getParam("disable_timer_output", ElapsedTimeRecorder::instance().disable_output);
 
+  bool log_timing_incrementally = false;
+  nh.getParam("log_timing_incrementally", log_timing_incrementally);
+  if (log_timing_incrementally && dsg_output_path != "") {
+    ElapsedTimeRecorder::instance().setupIncrementalLogging(dsg_output_path);
+  }
+
   const LayerId mesh_layer_id = 1;
   const std::map<LayerId, char>& layer_id_map{{DsgLayers::OBJECTS, 'o'},
                                               {DsgLayers::PLACES, 'p'},

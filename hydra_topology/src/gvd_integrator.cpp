@@ -44,10 +44,12 @@
 #include "hydra_topology/gvd_integrator.h"
 #include "hydra_topology/gvd_utilities.h"
 
-#include <voxblox/utils/timing.h>
+#include <hydra_utils/timing_utilities.h>
 
 namespace hydra {
 namespace topology {
+
+using timing::ScopedTimer;
 
 void UpdateStatistics::clear() {
   number_lowered_voxels = 0;
@@ -299,9 +301,11 @@ BlockIndexList GvdIntegrator::removeDistantBlocks(const voxblox::Point& center,
   return archived;
 }
 
-void GvdIntegrator::updateFromTsdfLayer(bool clear_updated_flag,
+void GvdIntegrator::updateFromTsdfLayer(uint64_t timestamp_ns,
+                                        bool clear_updated_flag,
                                         bool clear_surface_flag,
                                         bool use_all_blocks) {
+  ScopedTimer timer("topology/overall", timestamp_ns);
   update_stats_.clear();
 
   BlockIndexList blocks;
@@ -311,65 +315,61 @@ void GvdIntegrator::updateFromTsdfLayer(bool clear_updated_flag,
     tsdf_layer_->getAllUpdatedBlocks(voxblox::Update::kEsdf, &blocks);
   }
 
-  voxblox::timing::Timer gvd_timer("gvd");
-
   VLOG(1) << "[GVD update]: Using " << blocks.size() << " updated TSDF blocks";
 
-  voxblox::timing::Timer allocate_timer("gvd/allocate_blocks");
-  for (const auto& idx : blocks) {
-    // make sure the blocks match the tsdf
-    Block<GvdVoxel>::Ptr gvd_block = gvd_layer_->allocateBlockPtrByIndex(idx);
-    if (clear_surface_flag) {
-      for (size_t idx = 0u; idx < gvd_block->num_voxels(); ++idx) {
-        // we need to reset these so that marching cubes can assign them correctly
-        gvd_block->getVoxelByLinearIndex(idx).on_surface = false;
+  {  // timing scope
+    ScopedTimer timer("topology/gvd_allocation", timestamp_ns);
+    for (const auto& idx : blocks) {
+      // make sure the blocks match the tsdf
+      Block<GvdVoxel>::Ptr gvd_block = gvd_layer_->allocateBlockPtrByIndex(idx);
+      if (clear_surface_flag) {
+        for (size_t idx = 0u; idx < gvd_block->num_voxels(); ++idx) {
+          // we need to reset these so that marching cubes can assign them correctly
+          gvd_block->getVoxelByLinearIndex(idx).on_surface = false;
+        }
       }
     }
-  }
-  allocate_timer.Stop();
+  }  // timing scope
 
   // sets voxel surface flags
   VLOG(3) << "[GVD update]: starting marching cubes";
-  voxblox::timing::Timer marching_cubes_timer("gvd/marching_cubes");
-  mesh_integrator_->generateMesh(!use_all_blocks, clear_updated_flag);
-  marching_cubes_timer.Stop();
-  VLOG(3) << "[GVD update]: finished marching cubes";
+  {  // timing scope
+    ScopedTimer timer("topology/mesh", timestamp_ns);
+    mesh_integrator_->generateMesh(!use_all_blocks, clear_updated_flag);
+  }  // timing scope
 
   if (config_.mesh_only) {
     return;
   }
 
   VLOG(3) << "[GVD update]: propagating TSDF";
-  voxblox::timing::Timer propagate_timer("gvd/propagate_tsdf");
-  for (const BlockIndex& idx : blocks) {
-    processTsdfBlock(tsdf_layer_->getBlockByIndex(idx), idx);
-  }
-  propagate_timer.Stop();
-  VLOG(3) << "[GVD update]: finished propagating TSDF";
+  {  // timing scope
+    ScopedTimer timer("topology/propagate_tsdf", timestamp_ns);
+    for (const BlockIndex& idx : blocks) {
+      processTsdfBlock(tsdf_layer_->getBlockByIndex(idx), idx);
+    }
+  }  // timing scope
 
   VLOG(3) << "[GVD update]: raising invalid voxels";
-  voxblox::timing::Timer raise_timer("gvd/raise_esdf");
-  processRaiseSet();
-  raise_timer.Stop();
+  {  // timing scope
+    ScopedTimer timer("topology/raise", timestamp_ns);
+    processRaiseSet();
+  }  // timing scope
 
   VLOG(3) << "[GVD update]: lowering all voxels";
-  voxblox::timing::Timer update_timer("gvd/update_esdf");
-  processLowerSet();
-  update_timer.Stop();
-  VLOG(3) << "[GVD update]: finished lowering all voxels";
+  {  // timing scope
+    ScopedTimer timer("topology/lower", timestamp_ns);
+    processLowerSet();
+  }  // timing scope
 
   if (config_.extract_graph) {
     VLOG(3) << "[GVD update]: starting graph extraction";
-    voxblox::timing::Timer extraction_timer("gvd/extract_graph");
+    ScopedTimer timer("topology/graph_extractor", timestamp_ns);
     updateVertexMapping();
     graph_extractor_->extract(*gvd_layer_);
     graph_extractor_->assignMeshVertices(
         *gvd_layer_, gvd_parents_, gvd_parent_vertices_);
-    extraction_timer.Stop();
-    VLOG(3) << "[GVD update]: finished graph extraction";
   }
-
-  gvd_timer.Stop();
 
   VLOG(2) << "[GVD update]: " << std::endl << update_stats_;
 

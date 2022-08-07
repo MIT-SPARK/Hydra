@@ -68,7 +68,7 @@ class IncrementalIntegrationTestFixture : public ::testing::Test {
     Layer<GvdVoxel>::Ptr gvd(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
     GvdIntegrator integrator(gvd_config, tsdf_layer.get(), gvd, mesh);
 
-    integrator.updateFromTsdfLayer(false, true, true);
+    integrator.updateFromTsdfLayer(0, false, true, true);
 
     return gvd;
   }
@@ -145,7 +145,7 @@ TEST_F(IncrementalIntegrationTestFixture, DISABLED_TestBatchSame) {
   for (size_t i = 0; i < num_poses; ++i) {
     integrateTsdf(i);
 
-    gvd_integrator.updateFromTsdfLayer(true);
+    gvd_integrator.updateFromTsdfLayer(0, true);
     auto batch_layer = getBatchGvd();
 
     LayerComparisonResult result =
