@@ -34,11 +34,16 @@
  * -------------------------------------------------------------------------- */
 #include "hydra_topology/topology_server.h"
 
+#include <hydra_utils/timing_utilities.h>
 #include <kimera_semantics_ros/semantic_tsdf_server.h>
 #include <voxblox_ros/tsdf_server.h>
 
 #include <glog/logging.h>
 #include <ros/ros.h>
+#include <boost/filesystem.hpp>
+
+using hydra::timing::ElapsedTimeRecorder;
+namespace fs = boost::filesystem;
 
 int main(int argc, char* argv[]) {
   ros::init(argc, argv, "hydra_topology_node");
@@ -52,6 +57,25 @@ int main(int argc, char* argv[]) {
 
   ros::NodeHandle pnh("~");
 
+  std::string output_path = "";
+  pnh.getParam("log_path", output_path);
+
+  fs::path timer_path(output_path);
+  timer_path /= "topology";
+
+  if (output_path != "") {
+    boost::system::error_code code;
+    if (!fs::create_directory(timer_path, code)) {
+      ROS_WARN_STREAM("Failed to create: " << timer_path);
+    }
+  }
+
+  bool log_timing_incrementally = false;
+  pnh.getParam("log_timing_incrementally", log_timing_incrementally);
+  if (log_timing_incrementally && output_path != "") {
+    ElapsedTimeRecorder::instance().setupIncrementalLogging(output_path);
+  }
+
   bool use_semantic_tsdf_server = false;
   pnh.getParam("use_semantic_tsdf_server", use_semantic_tsdf_server);
   if (use_semantic_tsdf_server) {
@@ -62,6 +86,12 @@ int main(int argc, char* argv[]) {
     ROS_DEBUG("Using Normal (Non-Semantic) TSDF Server");
     hydra::topology::TopologyServer<voxblox::TsdfServer> server(pnh);
     server.spin();
+  }
+
+  if (output_path != "") {
+    const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
+    timer.logAllElapsed(output_path);
+    timer.logStats(timer_path.native());
   }
 
   return 0;

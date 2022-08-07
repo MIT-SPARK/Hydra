@@ -92,7 +92,8 @@ class GvdIntegrator {
 
   virtual ~GvdIntegrator() = default;
 
-  void updateFromTsdfLayer(bool clear_updated_flag,
+  void updateFromTsdfLayer(uint64_t timestamp_ns,
+                           bool clear_updated_flag,
                            bool clear_surface_flag = true,
                            bool use_all_blocks = false);
 

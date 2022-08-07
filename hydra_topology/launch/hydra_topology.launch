@@ -30,6 +30,11 @@
     <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
     <arg name="ros_output" value="log" if="$(arg glog_to_file)"/>
     <arg name="show_stats" default="$(arg glog_to_file)"/>
+    <arg name="log_timing_incrementally" default="false"/>
+
+    <arg name="dsg_output_dir"/>
+    <arg name="dsg_output_prefix"/>
+    <arg name="dsg_path" default="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
 
     <node name="hydra_topology_node" type="hydra_topology_node" pkg="hydra_topology"
           args="--minloglevel=$(arg min_glog_level) -v=$(arg verbosity) $(arg glog_file_args)"
@@ -40,6 +45,8 @@
         <param name="sensor_frame" value="$(arg sensor_frame)"/>
         <param name="publish_pointclouds" value="false"/>
         <param name="verbose" value="false"/>
+        <param name="log_path" value="$(arg dsg_path)"/>
+        <param name="log_timing_incrementally" value="$(arg log_timing_incrementally)"/>
 
         <param name="use_semantic_tsdf_server" value="$(arg use_semantics)"/>
         <rosparam command="load" file="$(arg graph_viz_config_file)"/>
