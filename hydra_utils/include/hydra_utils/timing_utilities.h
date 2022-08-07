@@ -80,6 +80,8 @@ class ElapsedTimeRecorder {
 
   void logStats(const std::string& output_folder) const;
 
+  void setupIncrementalLogging(const std::string& output_folder);
+
   bool disable_output;
 
  private:
@@ -98,6 +100,10 @@ class ElapsedTimeRecorder {
   std::map<std::string, TimeList> elapsed_;
   std::map<std::string, TimeStamps> stamps_;
   std::unique_ptr<std::mutex> mutex_;
+
+  bool log_incrementally_;
+  std::string output_path_;
+  std::map<std::string, std::shared_ptr<std::ofstream>> files_;
 };
 
 class ScopedTimer {
