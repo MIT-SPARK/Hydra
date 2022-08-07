@@ -20,6 +20,7 @@ find_package(
              voxblox
              voxblox_ros
 )
+find_package(Boost REQUIRED COMPONENTS filesystem)
 
 generate_dynamic_reconfigure_options(cfg/GvdVisualizer.cfg)
 
@@ -84,7 +85,7 @@ target_link_libraries(
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
 
 add_executable(${PROJECT_NAME}_node src/hydra_topology_node.cpp)
-target_link_libraries(${PROJECT_NAME}_node PUBLIC ${PROJECT_NAME})
+target_link_libraries(${PROJECT_NAME}_node PUBLIC ${PROJECT_NAME} Boost::boost)
 add_dependencies(
   ${PROJECT_NAME}_node ${catkin_EXPORTED_TARGETS} ${${PROJECT_NAME}_EXPORTED_TARGETS}
 )

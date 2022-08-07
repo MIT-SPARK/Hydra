@@ -92,7 +92,7 @@ TEST_F(EsdfTestFixture, TestEsdfSame) {
     updateTsdfIntegrator(tsdf_integrator, i);
 
     // we need to keep the updated flags for the second integrator
-    gvd_integrator.updateFromTsdfLayer(false);
+    gvd_integrator.updateFromTsdfLayer(0, false);
     original_integrator.updateFromTsdfLayer(true);
 
     LayerComparisonResult result =
