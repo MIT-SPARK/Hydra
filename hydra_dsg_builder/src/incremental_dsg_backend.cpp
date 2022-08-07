@@ -581,8 +581,11 @@ bool DsgBackend::addInternalLCDToDeformationGraph() {
 
   bool added_new_loop_closure = false;
   for (const auto& lc : to_process) {
-    deformation_graph_->addNewBetween(
-        lc.src, lc.dest, lc.src_T_dest, gtsam::Pose3(), lc_variance_);
+    deformation_graph_->addNewBetween(lc.src,
+                                      lc.dest,
+                                      lc.src_T_dest,
+                                      gtsam::Pose3(),
+                                      KimeraPgmoInterface::config_.lc_variance);
     added_new_loop_closure = true;
     num_loop_closures_++;
 
@@ -612,12 +615,13 @@ void DsgBackend::updateDsgMesh(bool force_mesh_update) {
   }
   VLOG(3) << "Deforming mesh with " << mesh_vertex_stamps_->size() << " vertices";
 
-  auto opt_mesh = deformation_graph_->deformMesh(*latest_mesh_,
-                                                 *mesh_vertex_stamps_,
-                                                 *mesh_vertex_graph_inds_,
-                                                 robot_vertex_prefix_,
-                                                 num_interp_pts_,
-                                                 interp_horizon_);
+  auto opt_mesh =
+      deformation_graph_->deformMesh(*latest_mesh_,
+                                     *mesh_vertex_stamps_,
+                                     *mesh_vertex_graph_inds_,
+                                     robot_vertex_prefix_,
+                                     KimeraPgmoInterface::config_.num_interp_pts,
+                                     KimeraPgmoInterface::config_.interp_horizon);
   {
     // start private dsg critical section
     std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);

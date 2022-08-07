@@ -84,7 +84,8 @@ void TopologyModule::update(const voxblox::Transformation& T_G_C,
     return;
   }
 
-  gvd_integrator_->updateFromTsdfLayer(true);
+  // TODO(nathan) get actual timestamp
+  gvd_integrator_->updateFromTsdfLayer(0, true);
 
   BlockIndexList archived_blocks;
   if (config_.clear_distant_blocks) {
