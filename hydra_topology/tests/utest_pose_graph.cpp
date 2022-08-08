@@ -32,58 +32,20 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include "hydra_dsg_builder/incremental_types.h"
+#include <hydra_topology/reconstruction_module.h>
+#include <gtest/gtest.h>
 
-#include <hydra_utils/dsg_types.h>
-#include <hydra_utils/input_queue.h>
-#include <kimera_pgmo/utils/CommonStructs.h>
-#include <pose_graph_tools/BowQuery.h>
-#include <pose_graph_tools/PoseGraph.h>
-#include <ros/time.h>
+#include <iostream>
 
-#include <list>
-#include <map>
-#include <memory>
-#include <mutex>
-#include <vector>
+TEST(PoseGraph, TestAffineConstruction) {
+  Eigen::Quaterniond q(0.0, 1.0, 0.0, 0.0);
+  Eigen::Vector3d t(1, 2, 3);
 
-namespace hydra {
-namespace incremental {
+  Eigen::Matrix4d expected = Eigen::Matrix4d::Identity();
+  expected.block<3, 3>(0, 0) = q.toRotationMatrix();
+  expected.block<3, 1>(0, 3) = t;
 
-struct LcdInput {
-  using Ptr = std::shared_ptr<LcdInput>;
+  Eigen::Affine3d T(Eigen::Translation3d(t) * q);
+  EXPECT_TRUE(expected.isApprox(T.matrix(), 1.0e-6));
+}
 
-  uint64_t timestamp_ns;
-  NodeIdSet archived_places;
-  std::vector<NodeId> new_agent_nodes;
-};
-
-struct BackendInput {
-  using Ptr = std::shared_ptr<BackendInput>;
-
-  uint64_t timestamp_ns;
-  pose_graph_tools::PoseGraph::ConstPtr deformation_graph;
-  std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
-};
-
-struct SharedModuleState {
-  using Ptr = std::shared_ptr<SharedModuleState>;
-
-  NodeIdSet latest_places;
-
-  mutable std::mutex mesh_mutex;
-  bool have_new_mesh;
-  std::shared_ptr<pcl::PolygonMesh> latest_mesh;
-  std::shared_ptr<std::vector<ros::Time>> mesh_vertex_stamps;
-  std::shared_ptr<std::vector<int>> mesh_vertex_graph_indices;
-  std::shared_ptr<std::vector<size_t>> invalid_indices;
-
-  InputQueue<pose_graph_tools::BowQuery::ConstPtr> visual_lcd_queue;
-  InputQueue<BackendInput::Ptr> backend_queue;
-  InputQueue<LcdInput::Ptr> lcd_queue;
-  InputQueue<lcd::DsgRegistrationSolution> backend_lcd_queue;
-};
-
-}  // namespace incremental
-}  // namespace hydra

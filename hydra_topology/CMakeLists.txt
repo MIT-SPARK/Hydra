@@ -75,7 +75,8 @@ add_library(
   src/gvd_visualization_utilities.cpp
   src/gvd_voxel.cpp
   src/nearest_neighbor_utilities.cpp
-  src/topology_module.cpp
+  src/ros_reconstruction.cpp
+  src/reconstruction_module.cpp
   src/topology_server_visualizer.cpp
   src/update_statistics.cpp
   src/voxel_aware_marching_cubes.cpp
@@ -109,6 +110,7 @@ if(CATKIN_ENABLE_TESTING)
     tests/utest_gvd_utilities.cpp
     tests/utest_marching_cubes.cpp
     tests/utest_nearest_neighbor_utilities.cpp
+    tests/utest_pose_graph.cpp
     tests/utest_incremental_gvd.cpp
     tests/utest_incremental_integration.cpp
   )

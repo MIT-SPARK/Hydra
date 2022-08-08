@@ -36,9 +36,9 @@
 #include "hydra_dsg_builder_ros/ros_backend.h"
 #include "hydra_dsg_builder_ros/ros_frontend.h"
 
-#include <hydra_dsg_builder/incremental_dsg_backend.h>
 #include <hydra_dsg_builder/incremental_dsg_lcd.h>
-#include <hydra_utils/dsg_streaming_interface.h>
+#include <hydra_topology/ros_reconstruction.h>
+#include <hydra_utils/ros_utilities.h>
 #include <hydra_utils/timing_utilities.h>
 
 using namespace hydra;
@@ -63,76 +63,117 @@ using namespace hydra::timing;
   }
 */
 
-void run(const ros::NodeHandle& nh,
-         const SharedDsgInfo::Ptr& frontend_dsg,
-         const SharedDsgInfo::Ptr& backend_dsg,
-         const std::string& output_path) {
-  const auto exit_mode = getExitMode(nh);
-
+struct HydraRosConfig {
   bool enable_lcd = false;
-  nh.getParam("enable_lcd", enable_lcd);
+  bool use_ros_backend = false;
+  bool do_reconstruction = true;
+};
 
-  int robot_id = 0;
-  nh.getParam("robot_id", robot_id);
-  RobotPrefixConfig prefix(robot_id);
+template <typename Visitor>
+void visit_config(const Visitor& v, HydraRosConfig& config) {
+  v.visit("enable_lcd", config.enable_lcd);
+  v.visit("use_ros_backend", config.use_ros_backend);
+  v.visit("do_reconstruction", config.do_reconstruction);
+}
 
-  auto backend_config = load_config<DsgBackendConfig>(nh);
-  auto pgmo_config = load_config<kimera_pgmo::KimeraPgmoConfig>(nh, "pgmo");
-  auto lcd_config = load_config<DsgLcdModuleConfig>(nh, "");
+struct HydraRosPipeline {
+  explicit HydraRosPipeline(const ros::NodeHandle& nh, int robot_id = 0)
+      : prefix(robot_id) {
+    config_ = load_config<HydraRosConfig>(nh);
 
-  SharedModuleState::Ptr shared_state(new SharedModuleState());
-  // TODO(nathan) fix robot_id for frontend
-  ROSFrontend frontend(nh, frontend_dsg, shared_state, robot_id);
-  // TODO(nathan) consider allowing sub-based version here as well
-  DsgBackend backend(
-      prefix, backend_config, pgmo_config, frontend_dsg, backend_dsg, shared_state);
+    // TODO(nathan) parse and use at some point
+    const LayerId mesh_layer_id = 1;
+    const std::map<LayerId, char> layer_id_map{{DsgLayers::OBJECTS, 'o'},
+                                               {DsgLayers::PLACES, 'p'},
+                                               {DsgLayers::ROOMS, 'r'},
+                                               {DsgLayers::BUILDINGS, 'b'}};
 
-  RosBackendVisualizer backend_visualizer(nh);
-  backend.addOutputCallback([&backend_visualizer](const DynamicSceneGraph& graph,
-                                                  const pcl::PolygonMesh& mesh,
-                                                  const kimera_pgmo::DeformationGraph& dgraph,
-                                                  size_t timestamp_ns) {
-    backend_visualizer.publishOutputs(graph, mesh, dgraph, timestamp_ns);
-  });
+    frontend_dsg.reset(new SharedDsgInfo(layer_id_map, mesh_layer_id));
+    backend_dsg.reset(new SharedDsgInfo(layer_id_map, mesh_layer_id));
+    shared_state.reset(new SharedModuleState());
 
-  std::shared_ptr<DsgLcd> lcd;
-  if (enable_lcd) {
-    lcd.reset(new DsgLcd(prefix, lcd_config, frontend_dsg, shared_state));
-  }
+    if (config_.do_reconstruction) {
+      const auto frontend_config = load_config<DsgFrontendConfig>(nh);
+      frontend = std::make_shared<DsgFrontend>(
+          prefix, frontend_config, frontend_dsg, shared_state);
 
-  frontend.start();
-  backend.start();
-  if (lcd) {
-    lcd->start();
-  }
+      reconstruction =
+          std::make_shared<RosReconstruction>(nh, prefix, frontend->getQueue());
+    } else {
+      frontend = std::make_shared<RosFrontend>(nh, prefix, frontend_dsg, shared_state);
+    }
 
-  switch (exit_mode) {
-    case ExitMode::CLOCK:
-      spinWhileClockPresent();
-      break;
-    case ExitMode::SERVICE:
-      spinUntilExitRequested();
-      break;
-    case ExitMode::NORMAL:
-    default:
-      ros::spin();
-      break;
-  }
+    if (config_.use_ros_backend) {
+      backend = std::make_shared<RosBackend>(
+          nh, prefix, frontend_dsg, backend_dsg, shared_state);
+    } else {
+      const auto backend_config = load_config<DsgBackendConfig>(nh);
+      const auto pgmo_config = load_config<kimera_pgmo::KimeraPgmoConfig>(nh, "pgmo");
+      backend = std::make_shared<DsgBackend>(
+          prefix, backend_config, pgmo_config, frontend_dsg, backend_dsg, shared_state);
+    }
 
-  frontend.stop();
-  if (lcd) {
-    lcd->stop();
-  }
-  backend.stop();
+    backend_visualizer = std::make_shared<RosBackendVisualizer>(nh);
+    backend->addOutputCallback(std::bind(&RosBackendVisualizer::publishOutputs,
+                                         backend_visualizer.get(),
+                                         std::placeholders::_1,
+                                         std::placeholders::_2,
+                                         std::placeholders::_3,
+                                         std::placeholders::_4));
 
-  if (!output_path.empty()) {
-    frontend.save(output_path + "/frontend/");
-    backend.save(output_path + "/backend/");
-    if (lcd) {
-      lcd->save(output_path + "/lcd/");
+    if (config_.enable_lcd) {
+      const auto lcd_config = load_config<DsgLcdModuleConfig>(nh, "");
+      lcd.reset(new DsgLcd(prefix, lcd_config, frontend_dsg, shared_state));
     }
   }
-}
+
+  void start() {
+    if (reconstruction) {
+      reconstruction->start();
+    }
+    frontend->start();
+    backend->start();
+    if (lcd) {
+      lcd->start();
+    }
+  }
+
+  void stop() {
+    if (reconstruction) {
+      reconstruction->stop();
+    }
+    frontend->stop();
+    if (lcd) {
+      lcd->stop();
+    }
+    backend->stop();
+  }
+
+  void save(const std::string& output_path) {
+    if (!output_path.empty()) {
+      if (reconstruction) {
+        reconstruction->save(output_path + "/topology/");
+      }
+      frontend->save(output_path + "/frontend/");
+      backend->save(output_path + "/backend/");
+      if (lcd) {
+        lcd->save(output_path + "/lcd/");
+      }
+    }
+  }
+
+  HydraRosConfig config_;
+  RobotPrefixConfig prefix;
+  SharedDsgInfo::Ptr frontend_dsg;
+  SharedDsgInfo::Ptr backend_dsg;
+  SharedModuleState::Ptr shared_state;
+
+  std::shared_ptr<ReconstructionModule> reconstruction;
+  std::shared_ptr<DsgFrontend> frontend;
+  std::shared_ptr<DsgBackend> backend;
+  std::shared_ptr<RosBackendVisualizer> backend_visualizer;
+  std::shared_ptr<DsgLcd> lcd;
+};
 
 int main(int argc, char* argv[]) {
   ros::init(argc, argv, "incremental_dsg_builder_node");
@@ -157,16 +198,28 @@ int main(int argc, char* argv[]) {
     ElapsedTimeRecorder::instance().setupIncrementalLogging(dsg_output_path);
   }
 
-  const LayerId mesh_layer_id = 1;
-  const std::map<LayerId, char> layer_id_map{{DsgLayers::OBJECTS, 'o'},
-                                             {DsgLayers::PLACES, 'p'},
-                                             {DsgLayers::ROOMS, 'r'},
-                                             {DsgLayers::BUILDINGS, 'b'}};
+  int robot_id = 0;
+  nh.getParam("robot_id", robot_id);
 
-  SharedDsgInfo::Ptr frontend_dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));
-  SharedDsgInfo::Ptr backend_dsg(new SharedDsgInfo(layer_id_map, mesh_layer_id));
+  HydraRosPipeline hydra(nh, robot_id);
+  hydra.start();
 
-  run(nh, frontend_dsg, backend_dsg, dsg_output_path);
+  const auto exit_mode = getExitMode(nh);
+  switch (exit_mode) {
+    case ExitMode::CLOCK:
+      spinWhileClockPresent();
+      break;
+    case ExitMode::SERVICE:
+      spinUntilExitRequested();
+      break;
+    case ExitMode::NORMAL:
+    default:
+      ros::spin();
+      break;
+  }
+
+  hydra.stop();
+  hydra.save(dsg_output_path);
 
   if (!dsg_output_path.empty()) {
     LOG(INFO) << "[DSG Node] saving timing information to " << dsg_output_path;

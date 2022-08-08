@@ -1,6 +1,7 @@
 <launch>
-    <param name="use_sim_time" value="true"/>
 
+    <arg name="sim_time_required" default="true"/>
+    <param name="use_sim_time" value="$(arg sim_time_required)"/>
     <arg name="path_to_csv"/>
     <arg name="sensor_frame" default="left_cam"/>
 

@@ -33,96 +33,41 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <gtsam/geometry/Pose3.h>
-#include <hydra_utils/dsg_types.h>
 
-#include <atomic>
-#include <map>
-#include <memory>
-#include <mutex>
+#include <string>
 
 namespace hydra {
 
-namespace lcd {
-
-struct DsgRegistrationSolution {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  bool valid = false;
-  NodeId from_node;
-  NodeId to_node;
-  gtsam::Pose3 to_T_from;
-  int64_t level;
+struct LogConfig {
+  std::string log_dir = "";
+  bool make_topology_logs = true;
+  bool make_dsg_logs = true;
+  bool log_timing_incrementally = false;
+  std::string timing_stats_name = "timing_stats.csv";
 };
 
-}  // namespace lcd
+template <typename Visitor>
+void visit_config(const Visitor& v, LogConfig& config) {
+  v.visit("log_path", config.log_dir);
+  v.visit("make_topology_logs", config.make_topology_logs);
+  v.visit("make_dsg_logs", config.make_dsg_logs);
+  v.visit("log_timing_incrementally", config.log_timing_incrementally);
+  v.visit("timing_stats_name", config.timing_stats_name);
+}
 
-namespace dsg_updates {
-struct NodeMergeInfo {
-  NodeId to_node;
-  gtsam::Pose3 from_T_to;
+bool setupLogs(const std::string& log_dir,
+               bool make_topology = true,
+               bool make_dsg = true);
+
+struct LogSetup {
+  explicit LogSetup(const LogConfig& config);
+
+  ~LogSetup();
+
+  std::string getLogDir() const;
+
+  bool valid;
+  LogConfig config;
 };
 
-typedef std::unordered_map<NodeId, NodeMergeInfo> NodeMergeLog;
-
-}  // namespace dsg_updates
-
-namespace incremental {
-
-typedef std::unordered_set<NodeId> NodeIdSet;
-
-struct SharedDsgInfo {
-  using Ptr = std::shared_ptr<SharedDsgInfo>;
-
-  SharedDsgInfo(const std::map<LayerId, char>& layer_id_map, LayerId mesh_layer_id)
-      : updated(false), last_update_time(0) {
-    DynamicSceneGraph::LayerIds layer_ids;
-    for (const auto& id_key_pair : layer_id_map) {
-      if (id_key_pair.first == mesh_layer_id) {
-        throw std::runtime_error("layer id duplicated with mesh id");
-      }
-
-      layer_ids.push_back(id_key_pair.first);
-      prefix_layer_map[id_key_pair.second] = id_key_pair.first;
-    }
-
-    graph.reset(new DynamicSceneGraph(layer_ids, mesh_layer_id));
-  }
-
-  // mutexes are considered ordered (for avoiding deadlock):
-  // 1. SharedDsgInfo::mutex (lcd)
-  // 2. SharedDsgInfo::mutex (backend)
-  // 3. SharedDsgInfo::mutex (frontend)
-  // 4. SharedModuleState::mesh_mutex
-  // When acquiring two mutexes, always acquire the lowest mutex first
-  std::mutex mutex;
-  std::atomic<bool> updated;
-  uint64_t last_update_time;
-  DynamicSceneGraph::Ptr graph;
-  std::map<char, LayerId> prefix_layer_map;
-};
-
-// TODO(nathan) switch code style
-struct DsgBackendStatus {
-  size_t total_loop_closures_;
-  size_t new_loop_closures_;
-  size_t total_factors_;
-  size_t total_values_;
-  size_t new_factors_;
-  size_t new_graph_factors_;
-  size_t trajectory_len_;
-  size_t num_merges_undone_;
-
-  void reset() {
-    total_loop_closures_ = 0;
-    new_loop_closures_ = 0;
-    total_factors_ = 0;
-    total_values_ = 0;
-    new_factors_ = 0;
-    new_graph_factors_ = 0;
-    trajectory_len_ = 0;
-    num_merges_undone_ = 0;
-  }
-};
-
-}  // namespace incremental
 }  // namespace hydra

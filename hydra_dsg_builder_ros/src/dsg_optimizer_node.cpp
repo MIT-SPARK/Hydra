@@ -32,14 +32,12 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_dsg_builder_ros/ros_utilities.h"
-
 #include <hydra_dsg_builder/incremental_dsg_backend.h>
 #include <hydra_dsg_builder/incremental_dsg_frontend.h>
 #include <hydra_utils/dsg_mesh_plugins.h>
 #include <hydra_utils/dynamic_scene_graph_visualizer.h>
-
-#include "kimera_pgmo/DeformationGraph.h"
+#include <hydra_utils/ros_utilities.h>
+#include <kimera_pgmo/DeformationGraph.h>
 
 namespace hydra {
 namespace incremental {
@@ -82,7 +80,8 @@ struct DsgOptimizer {
     auto config = load_config<DsgBackendConfig>(nh);
     auto pgmo_config = load_config<kimera_pgmo::KimeraPgmoConfig>(nh, "pgmo");
     SharedModuleState::Ptr state(new SharedModuleState());
-    backend.reset(new DsgBackend(prefix, config, pgmo_config, frontend_dsg, backend_dsg, state));
+    backend.reset(
+        new DsgBackend(prefix, config, pgmo_config, frontend_dsg, backend_dsg, state));
     LOG(ERROR) << "Loading backend state!";
     backend->loadState(frontend_filepath, dgrf_filepath);
     LOG(ERROR) << "Loaded backend state!";

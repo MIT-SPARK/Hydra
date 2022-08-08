@@ -17,20 +17,26 @@
     <arg name="start_visualizer" default="true"/>
 
     <arg name="enable_dsg_lcd" default="false"/>
+    <arg name="lcd_use_bow_vectors" default="true"/>
     <arg name="enable_lcd_viz" default="false"/>
     <arg name="optimize_on_lc" default="true"/>
     <arg name="enable_merge_undos" default="false"/>
+    <arg name="visualize_reconstruction" default="true"/>
 
     <arg name="dsg_should_log" default="true" />
     <arg name="pgmo_should_log" default="true"/>
     <arg name="log_registration" default="false"/>
 
+    <arg name="do_reconstruction" default="true"/>
+    <arg name="reconstruction_config" if="$(arg do_reconstruction)"/>
+    <arg name="pointcloud_topic" if="$(arg do_reconstruction)"/>
+    <arg name="use_ros_backend" default="false"/>
 
     <arg name="debug" default="false"/>
     <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
     <arg name="launch_prefix" value="" unless="$(arg debug)"/>
 
-    <arg name="min_glog_level" default="3"/>
+    <arg name="min_glog_level" default="0"/>
     <arg name="verbosity" default="0"/>
     <arg name="glog_to_file" default="false"/>
     <arg name="glog_dir" default="$(find hydra_dsg_builder)/glogs"/>
@@ -38,18 +44,11 @@
     <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
 
     <arg name="log_timing_incrementally" default="false"/>
+    <arg name="show_topology_stats" default="false"/>
     <arg name="dsg_path" default="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
     <arg name="pgmo_log_path" value="$(arg dsg_path)/pgmo"/>
     <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
     <arg name="ros_output" value="log" if="$(arg glog_to_file)"/>
-
-    <arg name="lcd_viz_path" default="$(find hydra_dsg_builder)/config/lcd_visualizer"/>
-    <group ns="/dsg_lcd_visualizer" if="$(arg enable_lcd_viz)">
-        <rosparam file="$(arg lcd_viz_path)/visualizer.yaml" ns="config"/>
-        <rosparam file="$(arg lcd_viz_path)/objects_layer.yaml" ns="config/layer2"/>
-        <rosparam file="$(arg lcd_viz_path)/places_layer.yaml" ns="config/layer3"/>
-        <rosparam file="$(arg lcd_viz_path)/agent_layer.yaml" ns="config/agent_layer"/>
-    </group>
 
     <include if="$(arg start_visualizer)" file="$(find hydra_utils)/launch/hydra_streaming_visualizer.launch" pass_all_args="true">
     </include>
@@ -67,8 +66,17 @@
         <rosparam file="$(arg config_dir)/dsg_frontend_config.yaml"/>
         <rosparam file="$(arg config_dir)/dsg_backend_config.yaml"/>
         <rosparam file="$(arg config_dir)/dsg_lcd_config.yaml"/>
+        <rosparam file="$(arg reconstruction_config)" if="$(arg do_reconstruction)"/>
 
+        <param name="use_pose_graph" value="$(eval not arg('use_gt_frame'))"/>
+        <param name="do_reconstruction" value="$(arg do_reconstruction)"/>
+        <param name="visualize_reconstruction" value="$(arg visualize_reconstruction)"/>
+        <param name="enable_reconstruction_output_queue" value="true"/>
+        <param name="publish_reconstruction_mesh" value="$(arg visualize_reconstruction)"/>
+        <param name="use_ros_backend" value="$(arg use_ros_backend)"/>
+        <param name="dsg/use_mesh_subscribers" value="$(arg use_ros_backend)"/>
         <param name="enable_lcd" value="$(arg enable_dsg_lcd)"/>
+        <param name="lcd_use_bow_vectors" value="$(arg lcd_use_bow_vectors)"/>
         <param name="exit_mode" value="$(arg exit_mode)"/>
         <param name="should_log" value="$(arg dsg_should_log)"/>
         <param name="log_path" value="$(arg dsg_path)"/>
@@ -77,8 +85,9 @@
         <param name="visualize_dsg_lcd" value="$(arg enable_lcd_viz)"/>
         <param name="semantic_label_file" value="$(arg semantic_map_path)"/>
         <param name="robot_id" value="$(arg robot_id)"/>
-        <param name="sensor_frame" value="$(arg sensor_frame)"/>
         <param name="world_frame" value="$(arg world_frame)"/>
+        <param name="robot_frame" value="$(arg sensor_frame)"/>
+        <param name="show_stats" value="$(arg show_topology_stats)"/>
 
         <param name="dsg/optimize_on_lc" value="$(arg optimize_on_lc)"/>
         <param name="dsg/enable_merge_undos" value="$(arg enable_merge_undos)"/>
@@ -95,20 +104,7 @@
                unless="$(arg use_gt_frame)"/>
         <remap from="~/bow_vectors" to="kimera_vio_ros/bow_query"/>
         <remap from="frame_registration" to="kimera_vio_ros/kimera_vio_ros_node/register_lcd_frames"/>
-    </node>
-
-    <node pkg="hydra_utils" type="pose_graph_publisher_node"
-          if="$(arg use_gt_frame)"
-          name="pose_graph_publisher_node"
-          required="true"
-          output="log">
-          <param name="use_pointcloud_time" value="true"/>
-          <param name="keyframe_period_s" value="0.2"/>
-          <param name="world_frame" value="$(arg world_frame)"/>
-          <param name="robot_frame" value="$(arg sensor_frame)"/>
-          <param name="robot_id" value="$(arg robot_id)"/>
-          <remap from="~pose_graph" to="/incremental_dsg_builder_node/pose_graph_incremental"/>
-          <remap from="~time_point" to="/pointcloud_time"/>
+        <remap from="~pointcloud" to="$(arg pointcloud_topic)" if="$(arg do_reconstruction)"/>
     </node>
 
     <include file="$(find pose_graph_tools)/launch/posegraph_view.launch">

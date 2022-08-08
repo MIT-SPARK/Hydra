@@ -33,96 +33,24 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <gtsam/geometry/Pose3.h>
-#include <hydra_utils/dsg_types.h>
-
-#include <atomic>
-#include <map>
-#include <memory>
-#include <mutex>
+#include <glog/logging.h>
+#include <hydra_utils/config.h>
+#include <ros/ros.h>
 
 namespace hydra {
 
-namespace lcd {
-
-struct DsgRegistrationSolution {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  bool valid = false;
-  NodeId from_node;
-  NodeId to_node;
-  gtsam::Pose3 to_T_from;
-  int64_t level;
-};
-
-}  // namespace lcd
-
-namespace dsg_updates {
-struct NodeMergeInfo {
-  NodeId to_node;
-  gtsam::Pose3 from_T_to;
-};
-
-typedef std::unordered_map<NodeId, NodeMergeInfo> NodeMergeLog;
-
-}  // namespace dsg_updates
-
-namespace incremental {
-
-typedef std::unordered_set<NodeId> NodeIdSet;
-
-struct SharedDsgInfo {
-  using Ptr = std::shared_ptr<SharedDsgInfo>;
-
-  SharedDsgInfo(const std::map<LayerId, char>& layer_id_map, LayerId mesh_layer_id)
-      : updated(false), last_update_time(0) {
-    DynamicSceneGraph::LayerIds layer_ids;
-    for (const auto& id_key_pair : layer_id_map) {
-      if (id_key_pair.first == mesh_layer_id) {
-        throw std::runtime_error("layer id duplicated with mesh id");
-      }
-
-      layer_ids.push_back(id_key_pair.first);
-      prefix_layer_map[id_key_pair.second] = id_key_pair.first;
-    }
-
-    graph.reset(new DynamicSceneGraph(layer_ids, mesh_layer_id));
-  }
-
-  // mutexes are considered ordered (for avoiding deadlock):
-  // 1. SharedDsgInfo::mutex (lcd)
-  // 2. SharedDsgInfo::mutex (backend)
-  // 3. SharedDsgInfo::mutex (frontend)
-  // 4. SharedModuleState::mesh_mutex
-  // When acquiring two mutexes, always acquire the lowest mutex first
-  std::mutex mutex;
-  std::atomic<bool> updated;
-  uint64_t last_update_time;
-  DynamicSceneGraph::Ptr graph;
-  std::map<char, LayerId> prefix_layer_map;
-};
-
-// TODO(nathan) switch code style
-struct DsgBackendStatus {
-  size_t total_loop_closures_;
-  size_t new_loop_closures_;
-  size_t total_factors_;
-  size_t total_values_;
-  size_t new_factors_;
-  size_t new_graph_factors_;
-  size_t trajectory_len_;
-  size_t num_merges_undone_;
-
-  void reset() {
-    total_loop_closures_ = 0;
-    new_loop_closures_ = 0;
-    total_factors_ = 0;
-    total_values_ = 0;
-    new_factors_ = 0;
-    new_graph_factors_ = 0;
-    trajectory_len_ = 0;
-    num_merges_undone_ = 0;
+struct HydraParamLogger : config_parser::Logger {
+  inline void log_missing(const std::string& message) const override {
+    LOG(INFO) << message;
   }
 };
 
-}  // namespace incremental
+template <typename Config>
+Config load_config(const ros::NodeHandle& nh,
+                   const std::string& ns = "",
+                   bool verbose = true) {
+  auto logger = std::make_shared<HydraParamLogger>();
+  return config_parser::load_from_ros_nh<Config>(nh, ns, verbose ? logger : nullptr);
+}
+
 }  // namespace hydra

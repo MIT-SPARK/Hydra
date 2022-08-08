@@ -33,54 +33,17 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_topology/configs.h"
-
-#include <hydra_utils/display_utils.h>
-#include <kimera_semantics/semantic_integrator_base.h>
-#include <kimera_semantics/semantic_voxel.h>
 
 namespace hydra {
-namespace topology {
 
-struct TopologyModuleConfig {
-  float voxel_size = 0.1;
-  int voxels_per_side = 16;
-  bool show_stats = true;
-  bool clear_distant_blocks = true;
-  double dense_representation_radius_m = 5.0;
+struct RobotPrefixConfig {
+  RobotPrefixConfig(int robot_id);
+
+  RobotPrefixConfig();
+
+  int id;
+  char key;
+  char vertex_key;
 };
 
-using SemanticIntegratorConfig = kimera::SemanticIntegratorBase::SemanticConfig;
-using TsdfIntegratorConfig = voxblox::TsdfIntegratorBase::Config;
-
-class TopologyModule {
- public:
-  TopologyModule(const TopologyModuleConfig& config,
-                 const GvdIntegratorConfig& gvd_config,
-                 const TsdfIntegratorConfig& tsdf_config,
-                 const SemanticIntegratorConfig& semantic_config);
-
-  void update(const voxblox::Transformation& T_G_C,
-              const voxblox::Pointcloud& pointcloud,
-              const voxblox::Colors& colors,
-              bool full_update);
-
-  void showStats() const;
-
- protected:
-  TopologyModuleConfig config_;
-  GvdIntegratorConfig gvd_config_;
-  TsdfIntegratorConfig tsdf_config_;
-  SemanticIntegratorConfig semantic_config_;
-
-  Layer<TsdfVoxel>::Ptr tsdf_layer_;
-  Layer<kimera::SemanticVoxel>::Ptr semantic_layer_;
-  Layer<GvdVoxel>::Ptr gvd_layer_;
-  MeshLayer::Ptr mesh_layer_;
-
-  std::unique_ptr<voxblox::TsdfIntegratorBase> tsdf_integrator_;
-  std::unique_ptr<GvdIntegrator> gvd_integrator_;
-};
-
-}  // namespace topology
 }  // namespace hydra

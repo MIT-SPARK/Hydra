@@ -38,6 +38,8 @@
 #include "hydra_dsg_builder/lcd_module_config.h"
 #include "hydra_dsg_builder/shared_module_state.h"
 
+#include <hydra_utils/robot_prefix_config.h>
+
 #include <memory>
 #include <thread>
 
@@ -61,8 +63,10 @@ class DsgLcd {
 
   void spin();
 
- protected:
   void spinOnce(bool force_update);
+
+ protected:
+  void spinOnceImpl(bool force_update);
 
   size_t processFrontendOutput();
 

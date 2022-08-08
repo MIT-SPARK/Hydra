@@ -52,6 +52,21 @@ Config load_from_yaml(const std::string& filepath, Logger::Ptr logger = nullptr)
 }
 
 template <typename Config>
+Config load_from_yaml_ns(const std::string& filepath,
+                         const std::string& ns,
+                         Logger::Ptr logger = nullptr) {
+  YamlParser parser(std::make_unique<YamlParserImpl>(filepath));
+  auto child_parser = parser[ns];
+  if (logger) {
+    parser.setLogger(logger);
+  }
+
+  Config config;
+  ConfigVisitor<Config>::visit_config(child_parser, config);
+  return config;
+}
+
+template <typename Config>
 Config load_from_ros(const std::string& ns, Logger::Ptr logger = nullptr) {
   RosParser parser(std::make_unique<RosParserImpl>(ros::NodeHandle(ns)));
   if (logger) {

@@ -36,15 +36,13 @@
 #include "hydra_dsg_builder/frontend_config.h"
 #include "hydra_dsg_builder/incremental_mesh_segmenter.h"
 #include "hydra_dsg_builder/incremental_types.h"
-#include "hydra_dsg_builder/input_queue.h"
 #include "hydra_dsg_builder/shared_module_state.h"
 
-#include <hydra_msgs/ActiveLayer.h>
-#include <hydra_msgs/ActiveMesh.h>
 #include <hydra_topology/nearest_neighbor_utilities.h>
+#include <hydra_topology/reconstruction_output.h>
+#include <hydra_utils/input_queue.h>
+#include <hydra_utils/robot_prefix_config.h>
 #include <kimera_pgmo/MeshFrontendInterface.h>
-#include <pose_graph_tools/BowQuery.h>
-#include <pose_graph_tools/PoseGraph.h>
 #include <spark_dsg/scene_graph_logger.h>
 
 #include <memory>
@@ -54,29 +52,18 @@
 namespace hydra {
 namespace incremental {
 
-using PlacesLayerMsg = hydra_msgs::ActiveLayer;
 using topology::NearestNodeFinder;
-
-// TODO(nathan) consider moving to shared module state
-struct FrontendInput {
-  PlacesLayerMsg::ConstPtr places;
-  hydra_msgs::ActiveMesh::ConstPtr mesh;
-  std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
-  std::list<pose_graph_tools::BowQuery::ConstPtr> bow_messages;
-  Eigen::Vector3d current_position;
-  uint64_t timestamp_ns;
-};
 
 class DsgFrontend {
  public:
-  using FrontendInputQueue = InputQueue<FrontendInput>;
-  using InputCallback = std::function<void(const FrontendInput&)>;
+  using FrontendInputQueue = InputQueue<ReconstructionOutput::Ptr>;
+  using InputCallback = std::function<void(const ReconstructionOutput&)>;
   using DynamicLayer = DynamicSceneGraphLayer;
 
-  DsgFrontend(const DsgFrontendConfig& config,
+  DsgFrontend(const RobotPrefixConfig& prefix,
+              const DsgFrontendConfig& config,
               const SharedDsgInfo::Ptr& dsg,
-              const SharedModuleState::Ptr& state,
-              int robot_id);
+              const SharedModuleState::Ptr& state);
 
   virtual ~DsgFrontend();
 
@@ -88,14 +75,18 @@ class DsgFrontend {
 
   void spin();
 
-  void spinOnce(const FrontendInput& input);
+  bool spinOnce();
+
+  inline FrontendInputQueue::Ptr getQueue() const { return queue_; }
 
  protected:
-  void updateMeshAndObjects(const FrontendInput& input);
+  void spinOnce(const ReconstructionOutput& input);
 
-  void updatePlaces(const FrontendInput& input);
+  void updateMeshAndObjects(const ReconstructionOutput& input);
 
-  void updatePoseGraph(const FrontendInput& input);
+  void updatePlaces(const ReconstructionOutput& input);
+
+  void updatePoseGraph(const ReconstructionOutput& input);
 
  protected:
   void archivePlaces(const NodeIdSet active_places);
@@ -109,23 +100,23 @@ class DsgFrontend {
 
   void addPlaceAgentEdges(uint64_t timestamp_ns);
 
-  void assignBowVectors(const FrontendInput& input, const DynamicLayer& agents);
+  void assignBowVectors(const DynamicLayer& agents);
 
   void updatePlaceMeshMapping();
 
  protected:
   std::atomic<bool> should_shutdown_{false};
-  FrontendInputQueue::Ptr queue_;
   std::unique_ptr<std::thread> spin_thread_;
+  FrontendInputQueue::Ptr queue_;
 
   LcdInput::Ptr lcd_input_;
   BackendInput::Ptr backend_input_;
 
+  RobotPrefixConfig prefix_;
   DsgFrontendConfig config_;
   std::unique_ptr<kimera::SemanticLabel2Color> label_map_;
   SharedDsgInfo::Ptr dsg_;
   SharedModuleState::Ptr state_;
-  char robot_prefix_;
 
   kimera_pgmo::MeshFrontendInterface mesh_frontend_;
   std::unique_ptr<MeshSegmenter> segmenter_;

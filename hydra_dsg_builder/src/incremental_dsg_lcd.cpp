@@ -92,11 +92,21 @@ void DsgLcd::spin() {
     // pop another message from the queue) This could potentially starve running LCD
     // when popping frontend outputs takes longer than it takes the frontend to
     // reproduce them (which is unlikely)
-    spinOnce(false);
+    spinOnceImpl(false);
   }
 }
 
-void DsgLcd::spinOnce(bool force_update) {
+bool DsgLcd::spinOnce(bool force_update) {
+  bool has_data = state_->lcd_queue.poll();
+  if (!has_data) {
+    return false;
+  }
+
+  spinOnce(force_update);
+  return true;
+}
+
+void DsgLcd::spinOnceImpl(bool force_update) {
   const size_t timestamp_ns = processFrontendOutput();
 
   {  // start critical section

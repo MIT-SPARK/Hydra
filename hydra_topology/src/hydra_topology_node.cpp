@@ -32,18 +32,12 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_topology/topology_server.h"
+#include "hydra_topology/ros_reconstruction.h"
 
-#include <hydra_utils/timing_utilities.h>
-#include <kimera_semantics_ros/semantic_tsdf_server.h>
-#include <voxblox_ros/tsdf_server.h>
+#include <hydra_utils/log_utilities.h>
+#include <hydra_utils/ros_utilities.h>
 
 #include <glog/logging.h>
-#include <ros/ros.h>
-#include <boost/filesystem.hpp>
-
-using hydra::timing::ElapsedTimeRecorder;
-namespace fs = boost::filesystem;
 
 int main(int argc, char* argv[]) {
   ros::init(argc, argv, "hydra_topology_node");
@@ -55,44 +49,19 @@ int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
 
-  ros::NodeHandle pnh("~");
+  ros::NodeHandle nh("~");
 
-  std::string output_path = "";
-  pnh.getParam("log_path", output_path);
+  const auto log_config = hydra::load_config<hydra::LogConfig>(nh, "", false);
+  hydra::LogSetup logs(log_config);
 
-  fs::path timer_path(output_path);
-  timer_path /= "topology";
+  const hydra::RobotPrefixConfig prefix(nh.param<int>("robot_id", 0));
+  hydra::RosReconstruction module(nh, prefix);
+  module.start();
 
-  if (output_path != "") {
-    boost::system::error_code code;
-    if (!fs::exists(timer_path) && !fs::create_directory(timer_path, code)) {
-      ROS_WARN_STREAM("Failed to create: " << timer_path);
-    }
-  }
+  ros::spin();
 
-  bool log_timing_incrementally = false;
-  pnh.getParam("log_timing_incrementally", log_timing_incrementally);
-  if (log_timing_incrementally && output_path != "") {
-    ElapsedTimeRecorder::instance().setupIncrementalLogging(output_path);
-  }
-
-  bool use_semantic_tsdf_server = false;
-  pnh.getParam("use_semantic_tsdf_server", use_semantic_tsdf_server);
-  if (use_semantic_tsdf_server) {
-    ROS_DEBUG("Using Semantic TSDF Server");
-    hydra::topology::TopologyServer<kimera::SemanticTsdfServer> server(pnh);
-    server.spin();
-  } else {
-    ROS_DEBUG("Using Normal (Non-Semantic) TSDF Server");
-    hydra::topology::TopologyServer<voxblox::TsdfServer> server(pnh);
-    server.spin();
-  }
-
-  if (output_path != "") {
-    const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
-    timer.logAllElapsed(output_path);
-    timer.logStats(timer_path.native());
-  }
+  module.stop();
+  module.save(logs.getLogDir());
 
   return 0;
 }

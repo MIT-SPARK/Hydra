@@ -206,6 +206,7 @@ void GvdIntegrator::updateFromTsdfLayer(uint64_t timestamp_ns,
   }  // timing scope
 
   if (config_.mesh_only) {
+    VLOG(3) << "[GVD update]: Only integrating mesh";
     return;
   }
 

@@ -33,8 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder_ros/ros_utilities.h"
-
 #include <hydra_dsg_builder/incremental_dsg_frontend.h>
 #include <hydra_utils/semantic_ros_publishers.h>
 #include <hydra_utils/dsg_streaming_interface.h>
@@ -49,10 +47,10 @@
 
 namespace hydra {
 
+using hydra_msgs::ActiveLayer;
 using hydra_msgs::ActiveMesh;
 using incremental::DsgFrontend;
 using incremental::MeshSegmenter;
-using incremental::PlacesLayerMsg;
 using incremental::SharedDsgInfo;
 using incremental::SharedModuleState;
 using pose_graph_tools::BowQuery;
@@ -81,20 +79,20 @@ void visit_config(const Visitor& v, ROSFrontendConfig& config) {
   v.visit("use_posegraph_pos", config.use_posegraph_pos);
 }
 
-struct ROSFrontend : public DsgFrontend {
+struct RosFrontend : public DsgFrontend {
   using Policy =
-      message_filters::sync_policies::ApproximateTime<PlacesLayerMsg, ActiveMesh>;
+      message_filters::sync_policies::ApproximateTime<ActiveLayer, ActiveMesh>;
   using Sync = message_filters::Synchronizer<Policy>;
 
-  ROSFrontend(const ros::NodeHandle& nh,
+  RosFrontend(const ros::NodeHandle& nh,
+              const RobotPrefixConfig& prefix,
               const SharedDsgInfo::Ptr& dsg,
-              const SharedModuleState::Ptr& state,
-              int robot_id);
+              const SharedModuleState::Ptr& state);
 
-  ~ROSFrontend();
+  ~RosFrontend();
 
-  void inputCallback(const PlacesLayerMsg::ConstPtr& places,
-                     const hydra_msgs::ActiveMesh::ConstPtr& mesh);
+  void inputCallback(const ActiveLayer::ConstPtr& places,
+                     const ActiveMesh::ConstPtr& mesh);
 
   void poseGraphCallback(const PoseGraph::ConstPtr& pose_graph);
 
@@ -116,9 +114,8 @@ struct ROSFrontend : public DsgFrontend {
   ros::NodeHandle nh_;
   ROSFrontendConfig ros_config_;
   std::list<PoseGraph::ConstPtr> pose_graph_queue_;
-  std::list<BowQuery::ConstPtr> bow_queue_;
 
-  std::unique_ptr<message_filters::Subscriber<PlacesLayerMsg>> places_sub_;
+  std::unique_ptr<message_filters::Subscriber<ActiveLayer>> places_sub_;
   std::unique_ptr<message_filters::Subscriber<ActiveMesh>> mesh_sub_;
   std::unique_ptr<Sync> sync_;
 

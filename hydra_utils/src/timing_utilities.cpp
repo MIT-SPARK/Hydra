@@ -238,10 +238,9 @@ void ElapsedTimeRecorder::logAllElapsed(const std::string& output_folder) const 
   }
 }
 
-void ElapsedTimeRecorder::logStats(const std::string& output_folder) const {
-  const std::string output_csv = output_folder + "/timing_stats.csv";
+void ElapsedTimeRecorder::logStats(const std::string& filename) const {
   std::ofstream output_file;
-  output_file.open(output_csv);
+  output_file.open(filename);
 
   // file format
   output_file << "name,mean[s],min[s],max[s],std-dev[s]\n";

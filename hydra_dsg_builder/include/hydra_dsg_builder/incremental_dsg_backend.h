@@ -40,6 +40,7 @@
 #include "hydra_dsg_builder/merge_handler.h"
 #include "hydra_dsg_builder/shared_module_state.h"
 
+#include <hydra_utils/robot_prefix_config.h>
 #include <kimera_pgmo/KimeraPgmoInterface.h>
 #include <spark_dsg/scene_graph_logger.h>
 
@@ -88,6 +89,9 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void spin();
 
+  bool spinOnce(bool force_update = true);
+
+  // used by dsg_optimizer
   void spinOnce(const BackendInput& input, bool force_update = true);
 
   void loadState(const std::string& state_path, const std::string& dgrf_path);

@@ -84,6 +84,24 @@ struct DsgFrontendConfig {
   MeshSegmenterConfig object_config;
 };
 
+struct LabelConverter {
+  std::vector<int> from(const std::set<uint8_t>& input) const {
+    std::vector<int> to_return;
+    for (const auto& label : input) {
+      to_return.push_back(static_cast<int>(label));
+    }
+    return to_return;
+  }
+
+  std::set<uint8_t> to(const std::vector<int>& input) const {
+    std::set<uint8_t> to_return;
+    for (const auto& label : input) {
+      to_return.insert(static_cast<uint8_t>(label));
+    }
+    return to_return;
+  }
+};
+
 template <typename Visitor>
 void visit_config(const Visitor& v, MeshSegmenterConfig& config) {
   std::string prefix_string;
@@ -102,7 +120,7 @@ void visit_config(const Visitor& v, MeshSegmenterConfig& config) {
   v.visit("min_cluster_size", config.min_cluster_size);
   v.visit("max_cluster_size", config.max_cluster_size);
   v.visit("bounding_box_type", config.bounding_box_type);
-  v.visit("labels", config.labels);
+  v.visit("labels", config.labels, LabelConverter());
 }
 
 template <typename Visitor>

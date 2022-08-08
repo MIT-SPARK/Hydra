@@ -33,7 +33,9 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder_ros/ros_backend.h"
-#include "hydra_dsg_builder_ros/ros_utilities.h"
+
+#include <hydra_utils/ros_utilities.h>
+
 
 namespace hydra {
 

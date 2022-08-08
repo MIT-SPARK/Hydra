@@ -38,6 +38,7 @@
 
 #include <gtsam/geometry/Pose3.h>
 #include <teaser/registration.h>
+#include <glog/logging.h>
 
 #include <mutex>
 

@@ -34,7 +34,7 @@ catkin_package(
   voxblox
   DEPENDS spark_dsg
   INCLUDE_DIRS include
-  LIBRARIES ${PROJECT_NAME}
+  LIBRARIES ${PROJECT_NAME} gtsam
 )
 
 add_library(

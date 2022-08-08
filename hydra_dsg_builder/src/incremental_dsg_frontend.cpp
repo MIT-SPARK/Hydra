@@ -50,21 +50,21 @@ using pose_graph_tools::PoseGraph;
 
 using LabelClusters = MeshSegmenter::LabelClusters;
 
-DsgFrontend::DsgFrontend(const DsgFrontendConfig& config,
+DsgFrontend::DsgFrontend(const RobotPrefixConfig& prefix,
+                         const DsgFrontendConfig& config,
                          const SharedDsgInfo::Ptr& dsg,
-                         const SharedModuleState::Ptr& state,
-                         int robot_id)
-    : config_(config),
+                         const SharedModuleState::Ptr& state)
+    : queue_(std::make_shared<FrontendInputQueue>()),
+      prefix_(prefix),
+      config_(config),
       dsg_(dsg),
-      state_(state),
-      robot_prefix_(kimera_pgmo::robot_id_to_prefix.at(robot_id)) {
-  config_.pgmo_config.robot_id = robot_id;
+      state_(state) {
+  config_.pgmo_config.robot_id = prefix_.id;
   label_map_.reset(new kimera::SemanticLabel2Color(config_.semantic_label_file));
-  queue_.reset(new FrontendInputQueue());
 
   // add placeholder mesh to allow mesh edges to be added
   dsg_->graph->initMesh();
-  dsg_->graph->createDynamicLayer(DsgLayers::AGENTS, robot_prefix_);
+  dsg_->graph->createDynamicLayer(DsgLayers::AGENTS, prefix_.key);
 
   CHECK(mesh_frontend_.initialize(config_.pgmo_config));
   mesh_frontend_.addOutputCallback([&](const auto& frontend, const std_msgs::Header) {
@@ -84,11 +84,11 @@ DsgFrontend::DsgFrontend(const DsgFrontendConfig& config,
   }
 
   input_callbacks_.push_back(
-      [this](const FrontendInput& input) { this->updateMeshAndObjects(input); });
+      std::bind(&DsgFrontend::updateMeshAndObjects, this, std::placeholders::_1));
   input_callbacks_.push_back(
-      [this](const FrontendInput& input) { this->updatePoseGraph(input); });
+      std::bind(&DsgFrontend::updatePoseGraph, this, std::placeholders::_1));
   input_callbacks_.push_back(
-      [this](const FrontendInput& input) { this->updatePlaces(input); });
+      std::bind(&DsgFrontend::updatePlaces, this, std::placeholders::_1));
 }
 
 DsgFrontend::~DsgFrontend() { stop(); }
@@ -134,12 +134,23 @@ void DsgFrontend::spin() {
       continue;
     }
 
-    spinOnce(queue_->front());
+    spinOnce(*queue_->front());
     queue_->pop();
   }
 }
 
-void DsgFrontend::spinOnce(const FrontendInput& msg) {
+bool DsgFrontend::spinOnce() {
+  bool has_data = queue_->poll();
+  if (!has_data) {
+    return false;
+  }
+
+  spinOnce(*queue_->front());
+  queue_->pop();
+  return true;
+}
+
+void DsgFrontend::spinOnce(const ReconstructionOutput& msg) {
   VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg.timestamp_ns << " [ns]";
   ScopedTimer timer("frontend/spin", msg.timestamp_ns);
 
@@ -177,7 +188,7 @@ void DsgFrontend::spinOnce(const FrontendInput& msg) {
   }
 }
 
-void DsgFrontend::updateMeshAndObjects(const FrontendInput& input) {
+void DsgFrontend::updateMeshAndObjects(const ReconstructionOutput& input) {
   {  // start timing scope
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
     mesh_frontend_.voxbloxCallback(input.mesh->mesh);
@@ -252,7 +263,7 @@ void DsgFrontend::copyMesh(size_t timestamp_ns) {
   state_->have_new_mesh = true;
 }
 
-void DsgFrontend::updatePlaces(const FrontendInput& input) {
+void DsgFrontend::updatePlaces(const ReconstructionOutput& input) {
   ScopedTimer timer("frontend/update_places", input.timestamp_ns, true, 2, false);
   SceneGraphLayer temp_layer(DsgLayers::PLACES);
   auto edges = temp_layer.deserializeLayer(input.places->layer_contents);
@@ -306,9 +317,9 @@ void DsgFrontend::updatePlaces(const FrontendInput& input) {
   previous_active_places_ = active_nodes;
 }
 
-void DsgFrontend::updatePoseGraph(const FrontendInput& input) {
+void DsgFrontend::updatePoseGraph(const ReconstructionOutput& input) {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
-  const auto& agents = dsg_->graph->getLayer(DsgLayers::AGENTS, robot_prefix_);
+  const auto& agents = dsg_->graph->getLayer(DsgLayers::AGENTS, prefix_.key);
 
   lcd_input_->new_agent_nodes.clear();
   for (const auto& pose_graph : input.pose_graphs) {
@@ -328,7 +339,7 @@ void DsgFrontend::updatePoseGraph(const FrontendInput& input) {
 
       // TODO(nathan) implicit assumption that pgmo ids are sequential starting at 0
       // TODO(nathan) implicit assumption that gtsam symbol and dsg node symbol are same
-      NodeSymbol pgmo_key(robot_prefix_, node.key);
+      NodeSymbol pgmo_key(prefix_.key, node.key);
 
       const std::chrono::nanoseconds stamp(node.header.stamp.toNSec());
       auto attrs = std::make_unique<AgentNodeAttributes>(rotation, position, pgmo_key);
@@ -347,22 +358,29 @@ void DsgFrontend::updatePoseGraph(const FrontendInput& input) {
 
   addPlaceAgentEdges(input.timestamp_ns);
   if (config_.lcd_use_bow_vectors) {
-    assignBowVectors(input, agents);
+    assignBowVectors(agents);
   }
 }
 
-void DsgFrontend::assignBowVectors(const FrontendInput& input,
-                                   const DynamicLayer& agents) {
+void DsgFrontend::assignBowVectors(const DynamicLayer& agents) {
   lcd_input_->new_agent_nodes.clear();
-  cached_bow_messages_.insert(
-      cached_bow_messages_.end(), input.bow_messages.begin(), input.bow_messages.end());
+
+  // add bow messages received since last spin
+  while (!state_->visual_lcd_queue.empty()) {
+    cached_bow_messages_.push_back(state_->visual_lcd_queue.pop());
+  }
+
   const auto prior_size = cached_bow_messages_.size();
 
   auto iter = cached_bow_messages_.begin();
   while (iter != cached_bow_messages_.end()) {
     const auto& msg = *iter;
-    const NodeSymbol pgmo_key(kimera_pgmo::robot_id_to_prefix.at(msg->robot_id),
-                              msg->pose_id);
+    if (static_cast<int>(msg->robot_id) != prefix_.id) {
+      VLOG(1) << "rejected bow message from robot " << msg->robot_id;
+      iter = cached_bow_messages_.erase(iter);
+    }
+
+    const NodeSymbol pgmo_key(prefix_.key, msg->pose_id);
 
     auto agent_index = agent_key_map_.find(pgmo_key);
     if (agent_index == agent_key_map_.end()) {

@@ -77,6 +77,7 @@ DsgBackend::DsgBackend(const RobotPrefixConfig& prefix,
       shared_places_copy_(DsgLayers::PLACES),
       state_(state) {
   KimeraPgmoInterface::config_ = pgmo_config;
+
   if (!KimeraPgmoInterface::initializeFromConfig()) {
     throw std::runtime_error("invalid pgmo config");
   }
@@ -177,6 +178,17 @@ void DsgBackend::spin() {
 
     // TODO(nathan) don't exit if there are still messages in the queue
   }
+}
+
+bool DsgBackend::spinOnce(bool force_update) {
+  bool has_data = state_->backend_queue.poll();
+  if (!has_data) {
+    return false;
+  }
+
+  spinOnce(*state_->backend_queue.front(), force_update);
+  state_->backend_queue.pop();
+  return true;
 }
 
 void DsgBackend::spinOnce(const BackendInput& input, bool force_update) {

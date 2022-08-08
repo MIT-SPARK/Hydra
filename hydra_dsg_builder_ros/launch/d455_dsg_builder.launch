@@ -1,62 +1,26 @@
 <launch>
-    <arg name="robot_id" default="0"/>
-    <arg name="config_dir" default="$(find hydra_dsg_builder)/config/d455"/>
-    <arg name="dsg_output_dir" default="$(find hydra_dsg_builder)/output"/>
-    <arg name="dsg_output_prefix" default="d455"/>
-    <arg name="typology_dir" default="$(find hydra_dsg_builder)/config/d455"/>
-    <arg name="typology_config" default="d455_typology.yaml"/>
-    <arg name="semantic_map_dir" default="$(find semantic_recolor)/config/colors"/>
-    <arg name="semantic_map_file" default="ade150_config.csv"/>
-    <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
+   <arg name="sim_time_required" default="true"/>
+   <param name="use_sim_time" value="$(arg sim_time_required)"/>
 
-    <arg name="use_gt_frame" default="true"/>
-    <arg name="sensor_frame" default="left_cam"/>
+   <arg name="semantic_map_dir" default="$(find semantic_recolor)/config/colors"/>
+   <arg name="semantic_map_file" default="ade150_config.csv"/>
+   <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
+   <arg name="pointcloud_topic" value="/semantic_pointcloud"/>
+   <arg name="use_gt_frame" default="true"/>
+   <arg name="sensor_frame" default="left_cam"/>
 
-    <arg name="rviz_dir" default="$(find hydra_dsg_builder_ros)/rviz"/>
-    <arg name="rviz_file" default="d455.rviz"/>
+   <include file="$(find hydra_utils)/launch/data_sources/d455_pointcloud.launch" pass_all_args="true"/>
 
-    <include file="$(find hydra_utils)/launch/gt_pose/d455_gt_pose.launch" if="$(arg use_gt_frame)">
-        <arg name="sensor_frame" value="$(arg sensor_frame)"/>
-    </include>
-
-    <include file="$(find hydra_topology)/launch/hydra_topology_d455.launch" pass_all_args="true">
-        <arg name="semantic_color_path" value="$(arg semantic_map_path)"/>
-        <arg name="config_dir" value="$(find hydra_topology)/config"/>
-        <arg name="glog_dir" value="$(find hydra_topology)/glogs"/>
-        <arg name="debug" value="false"/>
-        <arg name="publish_archived" value="true"/>
-        <arg name="use_gt_poses" value="false"/>
-    </include>
-
-    <include file="$(find hydra_dsg_builder_ros)/launch/dsg_builder.launch" pass_all_args="true">
+   <include file="$(find hydra_dsg_builder_ros)/launch/dsg_builder.launch" pass_all_args="true">
+        <arg name="robot_id" default="0"/>
+        <arg name="config_dir" default="$(find hydra_dsg_builder)/config/d455"/>
+        <arg name="dsg_output_dir" default="$(find hydra_dsg_builder)/output"/>
+        <arg name="dsg_output_prefix" default="d455"/>
+        <arg name="reconstruction_config" default="$(find hydra_topology)/config/d455_topology_config.yaml"/>
+        <arg name="rviz_dir" default="$(find hydra_dsg_builder_ros)/rviz"/>
+        <arg name="rviz_file" default="d455.rviz"/>
         <arg name="use_oriented_bounding_boxes" value="true"/>
-        <arg name="use_gt_frame" value="false"/>
+        <arg name="typology_dir" default="$(find hydra_dsg_builder)/config/d455"/>
+        <arg name="typology_config" default="d455_typology.yaml"/>
     </include>
-
-    <node pkg="hydra_utils" type="pose_graph_publisher_node" name="pose_graph_publisher_node"
-          required="true"
-          output="log">
-          <param name="use_pointcloud_time" value="true"/>
-          <param name="world_frame" value="world"/>
-          <param name="robot_frame" value="left_cam"/>
-          <param name="robot_id" value="0"/>
-          <remap from="~pose_graph" to="/kimera_vio_ros/pose_graph_incremental"/>
-          <remap from="~time_point" to="/pointcloud_time"/>
-    </node>
-
-    <node pkg="kimera_vio_ros" type="lcd_only_node" name="lcd_only_node"
-          args="--vocabulary_path=$(find kimera_vio)/vocabulary/ORBvoc.yml"
-          output="log">
-        <param name="use_pointcloud_time" value="true"/>
-        <param name="params_path" value="$(find hydra_utils)/config/d455_vio"/>
-        <param name="robot_id" value="0"/>
-        <param name="log_output" value="false"/>
-
-        <remap from="~color/image_raw" to="/cam_d455/color/image_raw"/>
-        <remap from="~depth/image_raw" to="/cam_d455/depth_masked/image_raw"/>
-        <remap from="~time_point" to="/pointcloud_time"/>
-        <remap from="~bow_vectors" to="/kimera_vio_ros/bow_query"/>
-        <remap from="~register_lcd_frames" to="/kimera_vio_ros/kimera_vio_ros_node/register_lcd_frames"/>
-    </node>
-
 </launch>
