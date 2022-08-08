@@ -105,7 +105,7 @@ rosbag play path/to/rosbag --clock
 
 ### Using Kimera-VIO
 
-:warning: Hydra relies on unreleased changes to Kimera-VIO to handle visual loop-closures and receive the robot pose graph. The current public version of Kimera-VIO that Hydra points to will not generate loop closures or pose graph information for Hydra, but has been tested against the `uHumans2_office_s1_00h.bag.bag.bag.bag`.
+:warning: Hydra relies on unreleased changes to Kimera-VIO to handle visual loop-closures and receive the robot pose graph. The current public version of Kimera-VIO that Hydra points to will not generate loop closures or pose graph information for Hydra, but has been tested against the `uHumans2_office_s1_00h.bag`.
 
 You can configure your workspace to also include Kimera-VIO by:
 ```
