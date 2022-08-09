@@ -128,7 +128,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void startPgmo();
 
-  void updateMergedNodes(const NodeMergeLog& new_merges);
+  void updateMergedNodes(const std::map<NodeId, NodeId>& new_merges);
 
  protected:
   void setSolverParams();
@@ -146,8 +146,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   virtual void addPlacesToDeformationGraph();
 
   virtual void callUpdateFunctions(const gtsam::Values& places_values = gtsam::Values(),
-                           const gtsam::Values& pgmo_values = gtsam::Values(),
-                           bool new_loop_closure = false);
+                                   const gtsam::Values& pgmo_values = gtsam::Values(),
+                                   bool new_loop_closure = false);
 
   void logStatus(bool init = false) const;
 
@@ -175,8 +175,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   SharedModuleState::Ptr state_;
 
   IsolatedSceneGraphLayer shared_places_copy_;
-  NodeMergeLog merged_nodes_;
-  std::map<LayerId, NodeMergeLog> proposed_node_merges_;
+  std::map<NodeId, NodeId> merged_nodes_;
+  std::map<LayerId, dsg_updates::NodeMergeLog> proposed_node_merges_;
   std::map<NodeId, std::set<NodeId>> merged_nodes_parents_;
 
   std::atomic<uint64_t> last_timestamp_;

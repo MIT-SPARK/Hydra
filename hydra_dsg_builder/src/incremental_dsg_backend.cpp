@@ -43,6 +43,7 @@
 namespace hydra {
 namespace incremental {
 
+using hydra::dsg_updates::NodeMergeLog;
 using hydra::timing::ScopedTimer;
 using kimera_pgmo::DeformationGraph;
 using kimera_pgmo::DeformationGraphPtr;

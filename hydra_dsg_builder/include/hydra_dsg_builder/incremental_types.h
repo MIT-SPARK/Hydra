@@ -58,11 +58,19 @@ struct DsgRegistrationSolution {
 
 }  // namespace lcd
 
+namespace dsg_updates {
+struct NodeMergeInfo {
+  NodeId to_node;
+  gtsam::Pose3 from_T_to;
+};
+
+typedef std::unordered_map<NodeId, NodeMergeInfo> NodeMergeLog;
+
+}  // namespace dsg_updates
+
 namespace incremental {
 
 typedef std::unordered_set<NodeId> NodeIdSet;
-
-typedef std::map<NodeId, NodeId> NodeMergeLog;
 
 struct SharedDsgInfo {
   using Ptr = std::shared_ptr<SharedDsgInfo>;
