@@ -12,6 +12,10 @@
   <arg name="rviz_file" default="hydra_streaming_visualizer.rviz"/>
   <arg name="rviz_path" default="$(arg rviz_dir)/$(arg rviz_file)"/>
 
+  <arg name="viz_use_zmq_interface" default="false"/>
+  <arg name="viz_zmq_recv_url" default="tcp://127.0.0.1:8003"/>
+  <arg name="viz_zmq_num_threads" default="2"/>
+
   <arg name="verbosity" default="0"/>
 
   <include file="$(find hydra_utils)/launch/includes/hydra_visualizer_params.xml">
@@ -32,6 +36,10 @@
     <param name="visualizer_ns" value="$(arg visualizer_ns)"/>
     <param name="mesh_plugin_ns" value="dsg_mesh"/>
     <param name="output_path" value=""/>
+
+    <param name="use_zmq_interface" value="$(arg viz_use_zmq_interface)"/>
+    <param name="zmq_recv_url" value="$(arg viz_zmq_recv_url)"/>
+    <param name="zmq_num_threads" value="$(arg viz_zmq_num_threads)"/>
 
     <remap from="~dsg" to="$(arg dsg_topic)"/>
     <remap from="~dsg_mesh_updates" to="$(arg dsg_mesh_topic)"/>

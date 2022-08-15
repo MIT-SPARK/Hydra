@@ -38,6 +38,8 @@
 #include "hydra_utils/dynamic_scene_graph_visualizer.h"
 #include "hydra_utils/timing_utilities.h"
 
+#include <spark_dsg/zmq_interface.h>
+
 #include <glog/logging.h>
 #include <ros/ros.h>
 
@@ -62,6 +64,9 @@ struct NodeConfig {
   std::string visualizer_ns = "/hydra_dsg_visualizer";
   std::string mesh_plugin_ns = "dsg_mesh";
   std::string output_path = "";
+  bool use_zmq_interface = false;
+  std::string zmq_recv_url = "tcp://127.0.0.1:8003";
+  int zmq_num_threads = 2;
 };
 
 template <typename Visitor>
@@ -72,6 +77,9 @@ void visit_config(const Visitor& v, NodeConfig& config) {
   v.visit("visualizer_ns", config.visualizer_ns);
   v.visit("mesh_plugin_ns", config.mesh_plugin_ns);
   v.visit("output_path", config.output_path);
+  v.visit("use_zmq_interface", config.use_zmq_interface);
+  v.visit("zmq_recv_url", config.zmq_recv_url);
+  v.visit("zmq_num_threads", config.zmq_num_threads);
 }
 
 using MeshPluginEnum = NodeConfig::MeshPluginType;
@@ -140,11 +148,16 @@ struct VisualizerNode {
     }
 
     if (!config_.load_graph || config_.scene_graph_filepath.empty()) {
-      receiver_.reset(new DsgReceiver(nh_, [&](const ros::Time& stamp, size_t bytes) {
-        if (size_log_file_) {
-          *size_log_file_ << stamp.toNSec() << "," << bytes << std::endl;
-        }
-      }));
+      if (!config_.use_zmq_interface) {
+        receiver_.reset(new DsgReceiver(nh_, [&](const ros::Time& stamp, size_t bytes) {
+          if (size_log_file_) {
+            *size_log_file_ << stamp.toNSec() << "," << bytes << std::endl;
+          }
+        }));
+      } else {
+        zmq_receiver_.reset(
+            new spark_dsg::ZmqReceiver(config_.zmq_recv_url, config_.zmq_num_threads));
+      }
     } else {
       loadGraph();
     }
@@ -196,6 +209,16 @@ struct VisualizerNode {
           receiver_->clearUpdated();
         }
 
+        if (config_.use_zmq_interface && zmq_receiver_ && zmq_receiver_->recv(10)) {
+          if (!graph_set) {
+            visualizer_->setGraph(zmq_receiver_->graph());
+            graph_set = true;
+          } else {
+            visualizer_->setGraphUpdated();
+          }
+          visualizer_->redraw();
+        }
+
         r.sleep();
       }
     } else {
@@ -207,6 +230,7 @@ struct VisualizerNode {
   ros::NodeHandle nh_;
   std::unique_ptr<DsgVisualizer> visualizer_;
   std::unique_ptr<DsgReceiver> receiver_;
+  std::unique_ptr<spark_dsg::ZmqReceiver> zmq_receiver_;
   NodeConfig config_;
   std::unique_ptr<std::ofstream> size_log_file_;
 };

@@ -14,6 +14,8 @@
     <arg name="sensor_frame" default="left_cam" if="$(arg use_gt_frame)"/>
     <arg name="sensor_frame" default="left_cam_kimera" unless="$(arg use_gt_frame)"/>
 
+    <arg name="use_zmq_interface" default="false"/>
+
     <arg name="rviz_dir" default="$(find hydra_dsg_builder)/rviz"/>
     <arg name="rviz_file" default="uhumans2.rviz"/>
 
