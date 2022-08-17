@@ -242,18 +242,8 @@ Marker makeGvdEdgeMarker(const Layer<GvdVoxel>& layer,
   std::shuffle(hues.begin(), hues.end(), g);
 
   for (const auto& id_edge_pair : edge_info_map) {
-    cv::Mat hls_value(1, 1, CV_32FC3);
-    hls_value.at<float>(0) = hues.at(edge_color_map.at(id_edge_pair.first)) * 360.0;
-    hls_value.at<float>(1) = 0.7;
-    hls_value.at<float>(2) = 0.9;
-
-    cv::Mat bgr;
-    cv::cvtColor(hls_value, bgr, cv::COLOR_HLS2BGR);
-    NodeColor color;
-    color(0, 0) = static_cast<uint8_t>(255 * bgr.at<float>(2));
-    color(1, 0) = static_cast<uint8_t>(255 * bgr.at<float>(1));
-    color(2, 0) = static_cast<uint8_t>(255 * bgr.at<float>(0));
-
+    NodeColor color = dsg_utils::getRgbFromHls(
+        hues.at(edge_color_map.at(id_edge_pair.first)), 0.7, 0.9);
     for (const auto& index : id_edge_pair.second.indices) {
       Eigen::Vector3d voxel_pos = getVoxelPosition(layer, index);
 
