@@ -39,7 +39,6 @@
 #include <kimera_semantics/semantic_integrator_base.h>
 #include <pcl/common/centroid.h>
 #include <pcl/point_types.h>
-#include <pcl/search/kdtree.h>
 #include <ros/ros.h>
 
 #include <memory>
@@ -62,7 +61,6 @@ class MeshSegmenter {
   using LabelIndices = std::map<uint8_t, std::vector<size_t>>;
   using MeshVertexCloud = Cluster::CloudT;
   using ObjectCloudPublishers = SemanticRosPublishers<uint8_t, MeshVertexCloud>;
-  using KdTreeT = pcl::search::KdTree<Cluster::PointT>;
   using Clusters = std::vector<Cluster>;
   using LabelClusters = std::map<uint8_t, Clusters>;
 
