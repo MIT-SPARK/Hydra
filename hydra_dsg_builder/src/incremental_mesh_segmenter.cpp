@@ -155,6 +155,8 @@ MeshSegmenter::~MeshSegmenter() {
   segmented_mesh_vertices_pub_.reset();
 }
 
+using KdTreeT = pcl::search::KdTree<pcl::PointXYZRGBA>;
+
 Clusters MeshSegmenter::findClusters(const MeshVertexCloud::Ptr& cloud,
                                      const std::vector<size_t>& indices) const {
   CHECK(cloud);
