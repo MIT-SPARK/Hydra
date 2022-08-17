@@ -39,6 +39,7 @@
 #include <kimera_semantics/semantic_integrator_base.h>
 #include <pcl/common/centroid.h>
 #include <pcl/point_types.h>
+#include <pcl/search/kdtree.h>
 #include <ros/ros.h>
 
 #include <memory>
