@@ -36,7 +36,6 @@
 #include "hydra_dsg_builder/minimum_spanning_tree.h"
 
 #include <hydra_utils/timing_utilities.h>
-#include <pcl/search/kdtree.h>
 #include <voxblox/core/block_hash.h>
 
 #include <glog/logging.h>

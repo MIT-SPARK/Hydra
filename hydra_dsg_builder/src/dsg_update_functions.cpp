@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder/dsg_update_functions.h"
 #include "hydra_dsg_builder/incremental_room_finder.h"
+#include "hydra_dsg_builder/object_helpers.h"
 
 #include <gtsam/geometry/Pose3.h>
 #include <pcl/common/centroid.h>
@@ -46,7 +47,6 @@ namespace dsg_updates {
 
 using MeshVertices = DynamicSceneGraph::MeshVertices;
 using Node = SceneGraphNode;
-using Centroid = pcl::CentroidPoint<pcl::PointXYZ>;
 
 std::map<NodeId, NodeId> updateObjects(DynamicSceneGraph& graph,
                                        const gtsam::Values&,
@@ -75,29 +75,11 @@ std::map<NodeId, NodeId> updateObjects(DynamicSceneGraph& graph,
     pcl::IndicesPtr indices;
     indices.reset(new std::vector<int>(connections.begin(), connections.end()));
 
-    attrs.bounding_box = BoundingBox::extract(mesh, attrs.bounding_box.type, indices);
-
-    Centroid centroid;
-    for (const auto& idx : *indices) {
-      const auto& point = mesh->at(idx);
-      if (std::isnan(point.x) || std::isnan(point.y) || std::isnan(point.z)) {
-        VLOG(4) << "found nan at index: " << idx << " with point: [" << point.x << ", "
-                << point.y << ", " << point.z << "]";
-        continue;
-      }
-
-      centroid.add(pcl::PointXYZ(point.x, point.y, point.z));
-    }
-
-    if (!centroid.getSize()) {
+    if (!updateObjectSpatialAttributes(mesh, indices, attrs)) {
       VLOG(2) << "Invalid centroid for object "
               << NodeSymbol(id_node_pair.first).getLabel();
       continue;
     }
-
-    pcl::PointXYZ pcl_pos;
-    centroid.get(pcl_pos);
-    attrs.position << pcl_pos.x, pcl_pos.y, pcl_pos.z;
 
     if (allow_node_merging) {
       bool to_be_merged = false;

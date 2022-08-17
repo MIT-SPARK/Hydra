@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include "hydra_dsg_builder/frontend_config.h"
-#include "hydra_dsg_builder/incremental_mesh_segmenter.h"
 #include "hydra_dsg_builder/incremental_types.h"
 
 #include <geometry_msgs/TransformStamped.h>
@@ -54,6 +53,8 @@
 
 namespace hydra {
 namespace incremental {
+
+class MeshSegmenter;
 
 using PlacesLayerMsg = hydra_msgs::ActiveLayer;
 using topology::NearestNodeFinder;

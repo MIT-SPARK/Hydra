@@ -65,6 +65,7 @@ class MeshSegmenter {
   using LabelClusters = std::map<uint8_t, Clusters>;
 
   explicit MeshSegmenter(const ros::NodeHandle& nh,
+                         const kimera::SemanticIntegratorBase::SemanticConfig& config,
                          const MeshVertexCloud::Ptr& active_vertices);
 
   virtual ~MeshSegmenter();

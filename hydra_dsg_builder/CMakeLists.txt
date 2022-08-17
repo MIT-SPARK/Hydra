@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(PCL_FIND_QUIETLY TRUE)
+find_package(PCL REQUIRED)
 find_package(Boost REQUIRED COMPONENTS timer)
 find_package(spark_dsg REQUIRED)
 find_package(
@@ -44,6 +46,26 @@ catkin_package(
 )
 
 add_library(
+  ${PROJECT_NAME}_pcl src/incremental_mesh_segmenter.cpp src/object_helpers.cpp
+)
+target_include_directories(
+  ${PROJECT_NAME}_pcl
+  PUBLIC include
+         ${PCL_INCLUDE_DIRS}
+         ${kimera_semantics_INCLUDE_DIRS}
+         ${roscpp_INCLUDE_DIRS}
+         ${hydra_utils_INCLUDE_DIRS}
+)
+target_link_libraries(
+  ${PROJECT_NAME}_pcl
+  PUBLIC ${PCL_LIBRARIES}
+         ${kimera_semantics_LIBRARIES}
+         ${roscpp_LIBRARIES}
+         ${hydra_utils_LIBRARIES}
+         spark_dsg::spark_dsg
+)
+
+add_library(
   ${PROJECT_NAME}
   src/dsg_lcd_descriptors.cpp
   src/dsg_lcd_matching.cpp
@@ -53,7 +75,6 @@ add_library(
   src/incremental_dsg_backend.cpp
   src/incremental_dsg_frontend.cpp
   src/incremental_dsg_lcd.cpp
-  src/incremental_mesh_segmenter.cpp
   src/incremental_room_finder.cpp
   src/lcd_visualizer.cpp
   src/minimum_spanning_tree.cpp
@@ -62,10 +83,11 @@ add_library(
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
 target_link_libraries(
   ${PROJECT_NAME}
-  ${catkin_LIBRARIES}
-  gtsam
-  teaserpp::teaser_registration
-  spark_dsg::spark_dsg
+  PUBLIC ${PROJECT_NAME}_pcl
+         ${catkin_LIBRARIES}
+         teaserpp::teaser_registration
+         spark_dsg::spark_dsg
+         gtsam
 )
 
 add_executable(${PROJECT_NAME}_incremental_node src/incremental_dsg_builder_node.cpp)
