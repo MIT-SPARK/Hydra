@@ -8,8 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(
   catkin REQUIRED
-  COMPONENTS cv_bridge
-             dynamic_reconfigure
+  COMPONENTS dynamic_reconfigure
              geometry_msgs
              image_transport
              kimera_pgmo
@@ -25,6 +24,7 @@ find_package(spark_dsg REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(cv_bridge REQUIRED)
 
 # TODO(nathan) clean up
 find_package(PkgConfig REQUIRED)
@@ -44,7 +44,6 @@ generate_dynamic_reconfigure_options(
 
 catkin_package(
   CATKIN_DEPENDS
-  cv_bridge
   dynamic_reconfigure
   geometry_msgs
   image_transport
@@ -55,13 +54,14 @@ catkin_package(
   tf2_eigen
   tf2_ros
   visualization_msgs
-  DEPENDS OpenCV
+  DEPENDS
   INCLUDE_DIRS include ${EIGEN3_INCLUDE_DIRS}
   LIBRARIES ${PROJECT_NAME}
 )
 
 add_library(
   ${PROJECT_NAME}
+  src/colormap_utils.cpp
   src/display_utils.cpp
   src/dsg_streaming_interface.cpp
   src/ros_parser.cpp
@@ -73,18 +73,13 @@ add_library(
 )
 target_include_directories(
   ${PROJECT_NAME}
-  PUBLIC include
-         ${catkin_INCLUDE_DIRS}
-         ${EIGEN3_INCLUDE_DIRS}
-         ${OpenCV_INCLUDE_DIRS}
+  PUBLIC include ${catkin_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS}
+  PRIVATE ${OpenCV_INCLUDE_DIRS}
 )
 target_link_libraries(
   ${PROJECT_NAME}
-  PUBLIC yaml-cpp
-         ${catkin_LIBRARIES}
-         ${OpenCV_LIBRARIES}
-         spark_dsg::spark_dsg
-  PRIVATE PkgConfig::glog
+  PUBLIC yaml-cpp ${catkin_LIBRARIES} spark_dsg::spark_dsg
+  PRIVATE PkgConfig::glog ${OpenCV_LIBRARIES}
 )
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
 
@@ -102,8 +97,14 @@ target_link_libraries(pose_graph_publisher_node ${catkin_LIBRARIES} gtsam)
 add_library(${PROJECT_NAME}_nodelet src/mask_nodelet.cpp)
 target_include_directories(
   ${PROJECT_NAME}_nodelet PUBLIC ${catkin_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS}
+                                 ${cv_bridge_INCLUDE_DIRS}
 )
-target_link_libraries(${PROJECT_NAME}_nodelet ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+target_link_libraries(
+  ${PROJECT_NAME}_nodelet
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${cv_bridge_LIBRARIES}
+)
 
 if(CATKIN_ENABLE_TESTING)
   find_package(rostest REQUIRED)
