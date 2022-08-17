@@ -35,7 +35,6 @@
 #include "hydra_dsg_builder/incremental_mesh_segmenter.h"
 
 #include <hydra_utils/timing_utilities.h>
-#include <kimera_semantics_ros/ros_params.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl_ros/point_cloud.h>
@@ -100,8 +99,10 @@ std::set<uint8_t> readSemanticLabels(const ros::NodeHandle& nh,
 }
 
 // TODO(nathan) allow for different node symbol prefix
-MeshSegmenter::MeshSegmenter(const ros::NodeHandle& nh,
-                             const MeshVertexCloud::Ptr& full_mesh_vertices)
+MeshSegmenter::MeshSegmenter(
+    const ros::NodeHandle& nh,
+    const kimera::SemanticIntegratorBase::SemanticConfig config,
+    const MeshVertexCloud::Ptr& full_mesh_vertices)
     : nh_(nh),
       full_mesh_vertices_(full_mesh_vertices),
       next_node_id_('O', 0),
@@ -109,7 +110,8 @@ MeshSegmenter::MeshSegmenter(const ros::NodeHandle& nh,
       active_index_horizon_m_(5.0),
       cluster_tolerance_(0.25),
       enable_active_mesh_pub_(false),
-      enable_segmented_mesh_pub_(false) {
+      enable_segmented_mesh_pub_(false),
+      semantic_config_(config) {
   // TODO(nathan) make a config
   nh_.getParam("active_object_horizon_s", active_object_horizon_s_);
   nh_.getParam("active_index_horizon_m", active_index_horizon_m_);
@@ -136,7 +138,7 @@ MeshSegmenter::MeshSegmenter(const ros::NodeHandle& nh,
   bounding_box_type_ =
       use_oriented_bounding_boxes ? BoundingBox::Type::RAABB : BoundingBox::Type::AABB;
 
-  semantic_config_ = kimera::getSemanticTsdfIntegratorConfigFromRosParam(nh_);
+  // semantic_config_ = kimera::getSemanticTsdfIntegratorConfigFromRosParam(nh_);
   CHECK(semantic_config_.semantic_label_to_color_);
 
   if (enable_active_mesh_pub_) {

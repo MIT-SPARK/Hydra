@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(PCL_FIND_QUIETLY TRUE)
+find_package(PCL REQUIRED)
 find_package(Boost REQUIRED COMPONENTS timer)
 find_package(spark_dsg REQUIRED)
 find_package(
@@ -43,6 +45,26 @@ catkin_package(
   LIBRARIES ${PROJECT_NAME}
 )
 
+set(SEGMENTER_INCLUDE_DIRS
+    ${PCL_INCLUDE_DIRS}
+    ${kimera_semantics_INCLUDE_DIRS}
+    ${roscpp_INCLUDE_DIRS}
+    ${hydra_utils_INCLUDE_DIRS}
+)
+set(SEGMENTER_LIBRARIES
+    ${PCL_LIBRARIES}
+    ${kimera_semantics_LIBRARIES}
+    ${roscpp_LIBRARIES}
+    ${hydra_utils_LIBRARIES}
+    spark_dsg::spark_dsg
+)
+
+add_library(${PROJECT_NAME}_mesh_segmenter src/incremental_mesh_segmenter.cpp)
+target_include_directories(
+  ${PROJECT_NAME}_mesh_segmenter PUBLIC include ${SEGMENTER_INCLUDE_DIRS}
+)
+target_link_libraries(${PROJECT_NAME}_mesh_segmenter PUBLIC ${SEGMENTER_LIBRARIES})
+
 add_library(
   ${PROJECT_NAME}
   src/dsg_lcd_descriptors.cpp
@@ -53,7 +75,6 @@ add_library(
   src/incremental_dsg_backend.cpp
   src/incremental_dsg_frontend.cpp
   src/incremental_dsg_lcd.cpp
-  src/incremental_mesh_segmenter.cpp
   src/incremental_room_finder.cpp
   src/lcd_visualizer.cpp
   src/minimum_spanning_tree.cpp
@@ -62,6 +83,7 @@ add_library(
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
 target_link_libraries(
   ${PROJECT_NAME}
+  ${PROJECT_NAME}_mesh_segmenter
   ${catkin_LIBRARIES}
   gtsam
   teaserpp::teaser_registration

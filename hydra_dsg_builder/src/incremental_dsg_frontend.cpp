@@ -36,6 +36,7 @@
 
 #include <hydra_utils/timing_utilities.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
+#include <kimera_semantics_ros/ros_params.h>
 #include <tf2_eigen/tf2_eigen.h>
 
 #include <glog/logging.h>
@@ -168,7 +169,9 @@ void DsgFrontend::startMeshFrontend() {
 
   ros::NodeHandle mesh_nh(nh_, config_.mesh_ns);
   mesh_nh.setCallbackQueue(mesh_frontend_ros_queue_.get());
-  segmenter_.reset(new MeshSegmenter(mesh_nh, mesh_frontend_.getFullMeshVertices()));
+  const auto mesh_config = kimera::getSemanticTsdfIntegratorConfigFromRosParam(mesh_nh);
+  segmenter_.reset(
+      new MeshSegmenter(mesh_nh, mesh_config, mesh_frontend_.getFullMeshVertices()));
 
   // allow mesh edges to be added
   DynamicSceneGraph::MeshVertices fake_vertices;

@@ -33,8 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/incremental_types.h"
-
+#include <hydra_utils/dsg_types.h>
 #include <hydra_utils/semantic_ros_publishers.h>
 #include <kimera_semantics/semantic_integrator_base.h>
 #include <pcl/common/centroid.h>
@@ -65,6 +64,7 @@ class MeshSegmenter {
   using LabelClusters = std::map<uint8_t, Clusters>;
 
   explicit MeshSegmenter(const ros::NodeHandle& nh,
+                         const kimera::SemanticIntegratorBase::SemanticConfig config,
                          const MeshVertexCloud::Ptr& active_vertices);
 
   virtual ~MeshSegmenter();
