@@ -1,0 +1,17 @@
+<launch>
+	<arg name="start_manager"              default="true"/>
+
+    <node pkg="nodelet" type="nodelet" name="nodelet_manager"
+          args="manager"
+          output="screen"
+          required="true"/>
+
+    <node pkg="nodelet" type="nodelet" name="depth_rectifier"
+          args="load depth_image_proc/register nodelet_manager --no-bond"
+          output="screen"
+          required="true">
+        <remap from="rgb/camera_info" to="/cam_d455/color/camera_info"/>
+        <remap from="depth/image_rect" to="/cam_d455/depth/image_rect_raw"/>
+        <remap from="depth/camera_info" to="/cam_d455/depth/camera_info"/>
+    </node>
+</launch>

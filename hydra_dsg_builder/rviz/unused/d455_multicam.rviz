@@ -1,12 +1,12 @@
 Panels:
   - Class: rviz/Displays
-    Help Height: 70
+    Help Height: 138
     Name: Displays
     Property Tree Widget:
       Expanded:
         - /Global Options1
       Splitter Ratio: 0.5
-    Tree Height: 409
+    Tree Height: 683
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -25,7 +25,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: ImgRGB
+    SyncSource: ""
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -37,7 +37,7 @@ Visualization Manager:
       Cell Size: 0.5
       Class: rviz/Grid
       Color: 160; 160; 164
-      Enabled: false
+      Enabled: true
       Line Style:
         Line Width: 0.029999999329447746
         Value: Lines
@@ -50,7 +50,7 @@ Visualization Manager:
       Plane: XY
       Plane Cell Count: 1000
       Reference Frame: <Fixed Frame>
-      Value: false
+      Value: true
     - Class: rviz/Group
       Displays:
         - Class: rviz/MarkerArray
@@ -58,18 +58,7 @@ Visualization Manager:
           Marker Topic: /hydra_dsg_visualizer/dsg_markers
           Name: Scene Graph (Static)
           Namespaces:
-            interlayer_edges_3_2: true
-            interlayer_edges_4_3: true
-            interlayer_edges_5_4: true
-            layer_bounding_boxes_2: true
-            layer_edges_3: true
-            layer_edges_4: true
-            layer_labels_5: true
-            layer_nodes_2: true
-            layer_nodes_3: true
-            layer_nodes_4: true
-            layer_nodes_5: true
-            mesh_object_connections: true
+            {}
           Queue Size: 100
           Value: true
         - Class: rviz/MarkerArray
@@ -77,9 +66,7 @@ Visualization Manager:
           Marker Topic: /hydra_dsg_visualizer/dynamic_layers_viz
           Name: Scene Graph (Dynamic)
           Namespaces:
-            "dynamic_edges_\x00": true
-            "dynamic_label_\x00": true
-            "dynamic_nodes_\x00": true
+            {}
           Queue Size: 100
           Value: true
       Enabled: true
@@ -104,36 +91,12 @@ Visualization Manager:
       Topic: /hydra_dsg_visualizer/dsg_mesh/pgmo
       Value: true
     - Class: rviz/Image
-      Enabled: false
-      Image Topic: /cam_d455/aligned_depth_to_color/image_raw
+      Enabled: true
+      Image Topic: /cam_left_d455/aligned_depth_to_color/image_raw
       Max Value: 1
       Median window: 300
       Min Value: 0
-      Name: ImgDepth
-      Normalize Range: true
-      Queue Size: 2
-      Transport Hint: raw
-      Unreliable: false
-      Value: false
-    - Class: rviz/Image
-      Enabled: false
-      Image Topic: /depth_registered/image_rect
-      Max Value: 1
-      Median window: 5
-      Min Value: 0
-      Name: ImgRegDepth
-      Normalize Range: true
-      Queue Size: 2
-      Transport Hint: raw
-      Unreliable: false
-      Value: false
-    - Class: rviz/Image
-      Enabled: true
-      Image Topic: /cam_d455/depth_masked/image_raw
-      Max Value: 1
-      Median window: 5
-      Min Value: 0
-      Name: ImgDepthMasked
+      Name: ImgLeftDepth
       Normalize Range: true
       Queue Size: 2
       Transport Hint: raw
@@ -141,11 +104,11 @@ Visualization Manager:
       Value: true
     - Class: rviz/Image
       Enabled: true
-      Image Topic: /cam_d455/color/image_raw
+      Image Topic: /cam_left_d455/color/image_raw
       Max Value: 1
       Median window: 5
       Min Value: 0
-      Name: ImgRGB
+      Name: ImgLeftRGB
       Normalize Range: true
       Queue Size: 2
       Transport Hint: raw
@@ -157,26 +120,33 @@ Visualization Manager:
       Max Value: 1
       Median window: 5
       Min Value: 0
-      Name: ImgSemantics
+      Name: ImgLeftSemantics
       Normalize Range: true
       Queue Size: 2
-      Transport Hint: compressed
+      Transport Hint: raw
       Unreliable: false
       Value: true
     - Class: rviz/Axes
       Enabled: true
       Length: 0.5
-      Name: AxesD455
-      Radius: 0.10000000149011612
+      Name: AxesLeft
+      Radius: 0.05000000074505806
       Reference Frame: left_cam
       Value: true
     - Class: rviz/Axes
       Enabled: true
       Length: 0.5
-      Name: AxesT265
-      Radius: 0.10000000149011612
-      Reference Frame: cam_t265_pose_frame
+      Name: AxesRight
+      Radius: 0.05000000074505806
+      Reference Frame: right_cam
       Value: true
+    - Class: rviz/Axes
+      Enabled: false
+      Length: 0.5
+      Name: AxesT265
+      Radius: 0.05000000074505806
+      Reference Frame: cam_t265_pose_frame
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -239,9 +209,45 @@ Visualization Manager:
       Topic: /cam_t265/odom/sample
       Unreliable: false
       Value: false
+    - Class: rviz/Image
+      Enabled: true
+      Image Topic: /cam_right_d455/aligned_depth_to_color/image_raw
+      Max Value: 1
+      Median window: 300
+      Min Value: 0
+      Name: ImgRightDepth
+      Normalize Range: true
+      Queue Size: 2
+      Transport Hint: raw
+      Unreliable: false
+      Value: true
+    - Class: rviz/Image
+      Enabled: true
+      Image Topic: /cam_right_d455/color/image_raw
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: ImgRightRGB
+      Normalize Range: true
+      Queue Size: 2
+      Transport Hint: raw
+      Unreliable: false
+      Value: true
+    - Class: rviz/Image
+      Enabled: true
+      Image Topic: /semantic/overlay_right/image_raw
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: ImgRightSemantics
+      Normalize Range: true
+      Queue Size: 2
+      Transport Hint: raw
+      Unreliable: false
+      Value: true
   Enabled: true
   Global Options:
-    Background Color: 238; 238; 236
+    Background Color: 48; 48; 48
     Default Light: true
     Fixed Frame: world
     Frame Rate: 30
@@ -267,43 +273,45 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 44.97028350830078
+      Distance: 4.716421127319336
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -6.6899237632751465
-        Y: 14.003643035888672
-        Z: 12.216889381408691
+        X: 1.8060321807861328
+        Y: 1.4648317098617554
+        Z: 0.929134726524353
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.38479742407798767
+      Pitch: 0.5453987121582031
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.5053931474685669
+      Yaw: 4.825456619262695
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 1025
+  Height: 2049
   Hide Left Dock: false
   Hide Right Dock: false
-  ImgDepth:
+  ImgLeftDepth:
     collapsed: false
-  ImgDepthMasked:
+  ImgLeftRGB:
     collapsed: false
-  ImgRGB:
+  ImgLeftSemantics:
     collapsed: false
-  ImgRegDepth:
+  ImgRightDepth:
     collapsed: false
-  ImgSemantics:
+  ImgRightRGB:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd00000004000000000000015600000363fc020000000bfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d0000021c000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb000000100049006d00670044006500700074006800000001dd000000c90000001600fffffffb000000160049006d006700520065006700440065007000740068000000023c000000970000001600fffffffb0000001c0049006d006700440065007000740068004d00610073006b00650064010000025f000001410000001600ffffff00000001000001c600000363fc0200000005fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d000000f0000000a400fffffffb0000000c0049006d0067005200470042010000003d000001af0000001600fffffffb000000180049006d006700530065006d0061006e007400690063007301000001f2000001ae0000001600fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007550000003efc0100000002fb0000000800540069006d0065010000000000000755000002eb00fffffffb0000000800540069006d006501000000000000045000000000000000000000042d0000036300000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  ImgRightSemantics:
+    collapsed: false
+  QMainWindow State: 000000ff00000000fd0000000400000000000001f7000006f9fc020000000bfb0000001200530065006c0065006300740069006f006e00000001e10000009b000000b000fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000b0fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000006e000003a30000018200fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb000000180049006d0067004c00650066007400440065007000740068010000041d000001230000002600fffffffb000000140049006d0067004c006500660074005200470042010000054c0000010d0000002600fffffffb000000200049006d0067004c00650066007400530065006d0061006e00740069006300730100000665000001020000002600ffffff000000010000015f000006f9fc0200000006fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073010000006e000003170000013200fffffffb0000001a0049006d0067005200690067006800740044006500700074006801000003910000013c0000002600fffffffb000000160049006d00670052006900670068007400520047004201000004d90000013c0000002600fffffffb000000220049006d00670052006900670068007400530065006d0061006e00740069006300730100000621000001460000002600fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e1000001970000000300000e9a00000060fc0100000002fb0000000800540069006d0065010000000000000e9a0000057100fffffffb0000000800540069006d0065010000000000000450000000000000000000000b2c000006f900000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -312,6 +320,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: false
-  Width: 1877
-  X: 1723
-  Y: 27
+  Width: 3738
+  X: 102
+  Y: 55

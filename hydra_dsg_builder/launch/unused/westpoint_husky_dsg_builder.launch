@@ -1,16 +1,10 @@
 <launch>
-    <arg name="d455_configuration" default="d455_center"/>
-    <arg name="d455_prefix" default="cam_d455"/>
-    <arg name="use_mask" default="true"/>
-    <!-- <arg name="mask_size" default="640"/> -->
-    <arg name="mask_size" default="1280"/>
-
     <arg name="robot_id" default="0"/>
-    <arg name="config_dir" default="$(find hydra_dsg_builder)/config/d455"/>
+    <arg name="config_dir" default="$(find hydra_dsg_builder)/config/westpoint"/>
     <arg name="dsg_output_dir" default="$(find hydra_dsg_builder)/output"/>
-    <arg name="dsg_output_prefix" default="d455"/>
-    <arg name="typology_dir" default="$(find hydra_dsg_builder)/config/d455"/>
-    <arg name="typology_config" default="d455_outdoor_typology.yaml"/>
+    <arg name="dsg_output_prefix" default="westpoint"/>
+    <arg name="typology_dir" default="$(find hydra_dsg_builder)/config/westpoint"/>
+    <arg name="typology_config" default="westpoint_typology.yaml"/>
     <arg name="semantic_map_dir" default="$(find semantic_recolor)/config/colors"/>
     <arg name="semantic_map_file" default="ade150_expanded_config.csv"/>
     <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
@@ -19,14 +13,13 @@
     <arg name="sensor_frame" default="left_cam"/>
 
     <arg name="rviz_dir" default="$(find hydra_dsg_builder)/rviz"/>
-    <arg name="rviz_file" default="d455.rviz"/>
+    <arg name="rviz_file" default="westpoint_husky.rviz"/>
 
-    <!-- todo(jared): add if to select proper 455 gt -->
-    <include file="$(find hydra_utils)/launch/gt_pose/$(arg d455_configuration)_gt_pose.launch" if="$(arg use_gt_frame)">
+    <include file="$(find hydra_utils)/launch/gt_pose/westpoint_husky_gt_pose.launch" if="$(arg use_gt_frame)">
         <arg name="sensor_frame" value="$(arg sensor_frame)"/>
     </include>
 
-    <include file="$(find hydra_topology)/launch/hydra_topology_d455.launch" pass_all_args="true">
+    <include file="$(find hydra_topology)/launch/hydra_topology_westpoint_husky.launch" pass_all_args="true">
         <arg name="semantic_color_path" value="$(arg semantic_map_path)"/>
         <arg name="config_dir" value="$(find hydra_topology)/config"/>
         <arg name="glog_dir" value="$(find hydra_topology)/glogs"/>
@@ -59,17 +52,11 @@
         <param name="robot_id" value="0"/>
         <param name="log_output" value="false"/>
 
-        <remap from="~color/image_raw" to="/$(arg d455_prefix)/color/image_raw"/>
-        <remap from="~depth/image_raw" to="/$(arg d455_prefix)/depth_masked/image_raw"/>
+        <remap from="~color/image_raw" to="/chinook/forward/color/image_rect_color"/>
+        <remap from="~depth/image_raw" to="/chinook/forward/image_rect_raw"/>
         <remap from="~time_point" to="/pointcloud_time"/>
         <remap from="~bow_vectors" to="/kimera_vio_ros/bow_query"/>
         <remap from="~register_lcd_frames" to="/kimera_vio_ros/kimera_vio_ros_node/register_lcd_frames"/>
-
-<!--         <remap from="~color/image_raw" to="/cam_d455/color/image_raw"/>
-        <remap from="~depth/image_raw" to="/cam_d455/depth_masked/image_raw"/>
-        <remap from="~time_point" to="/pointcloud_time"/>
-        <remap from="~bow_vectors" to="/kimera_vio_ros/bow_query"/>
-        <remap from="~register_lcd_frames" to="/kimera_vio_ros/kimera_vio_ros_node/register_lcd_frames"/> -->
     </node>
 
 </launch>

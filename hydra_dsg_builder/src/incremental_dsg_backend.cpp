@@ -659,7 +659,6 @@ void DsgBackend::updateRoomsNodes() {
 
 void DsgBackend::updateBuildingNode() {
   std::unique_lock<std::mutex> lock(private_dsg_->mutex);
-  std::cout << "1" << std::endl;
   next_building_id_ = NodeSymbol('b',0);
   const auto& rooms = private_dsg_->graph->getLayer(DsgLayers::ROOMS);
   const auto& buildings = private_dsg_->graph->getLayer(DsgLayers::BUILDINGS);
@@ -750,7 +749,7 @@ void DsgBackend::updateBuildingNode() {
     for (const auto& room_id : component) {
       bool is_indoor = private_dsg_->graph->getNode(room_id)->get().attributes<RoomNodeAttributes>().is_indoor;
       if(!is_indoor) {
-        std::cout << "skipping room outdoors!" << std::endl;
+        // std::cout << "skipping room outdoors!" << std::endl;
         //todo(jared): delete rooms from room layer right here
         continue;
       }
@@ -768,7 +767,7 @@ void DsgBackend::updateBuildingNode() {
     //create building
     if(are_labels_valid) {
       //add node for building
-      std::cout << "adding building node " << next_building_id_ << std::endl;
+      // std::cout << "adding building node " << next_building_id_ << std::endl;
       SemanticNodeAttributes::Ptr attrs(new SemanticNodeAttributes());
       attrs->position = centroid;
       attrs->color = config_.building_color;
@@ -785,7 +784,7 @@ void DsgBackend::updateBuildingNode() {
 
       //add edges for building
       for(const auto& room_to_add : rooms_to_add_to_building) {
-        std::cout << "adding edge between building " << next_building_id_ << " and room " << room_to_add << std::endl;
+        // std::cout << "adding edge between building " << next_building_id_ << " and room " << room_to_add << std::endl;
         private_dsg_->graph->insertEdge(next_building_id_, room_to_add);
       }
 

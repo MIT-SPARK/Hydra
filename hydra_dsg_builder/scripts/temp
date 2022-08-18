@@ -1,0 +1,5 @@
+<launch>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_0" args="0.0 0.0 0.0 0.479425538604 0.0 0.0 0.87758256189 world sparkal1/map"/>
+
+</launch>

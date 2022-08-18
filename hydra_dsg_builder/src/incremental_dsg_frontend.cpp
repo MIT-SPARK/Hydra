@@ -368,6 +368,7 @@ void DsgFrontend::runPlaces() {
 
         dsg_->archived_places.insert(prev);
 
+        //todo(jared): config not being loaded
         if(config_.enforce_place_connectivity) {
           new_inactive_places.insert(prev);
         }
@@ -633,13 +634,13 @@ void DsgFrontend::handleExistingActiveNodes(const NodeIdSet& new_inactive_places
   const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
 
   auto components = graph_utilities::getConnectedComponents(places, new_inactive_places, true);
-  std::cout << components.size() << " components in new inactive places." << std::endl;
+  // std::cout << components.size() << " components in new inactive places." << std::endl;
 
   //find connceted components not adjacent previous inactive nodes
   std::vector<std::vector<NodeId>> isolated_components;
   for (size_t i = 0; i < components.size(); ++i) {
     const auto& component = components[i];
-    std::cout << component.size() << " nodes in component " << i << std::endl;
+    // std::cout << component.size() << " nodes in component " << i << std::endl;
 
     bool is_connected = false;
     for (const auto& node_id : component) {
@@ -663,7 +664,7 @@ void DsgFrontend::handleExistingActiveNodes(const NodeIdSet& new_inactive_places
       isolated_components.push_back(component);
     }
   }
-  std::cout << components.size() << " isolated components" << std::endl;
+  // std::cout << components.size() << " isolated components" << std::endl;
 
   //convert to unordered_set
   std::unordered_set<NodeId> all_isolated_places;
@@ -713,7 +714,7 @@ void DsgFrontend::handleExistingActiveNodes(const NodeIdSet& new_inactive_places
 
 void DsgFrontend::enforcePlaceConnectivity(const NodeIdSet& latest_places,
                                            const NodeIdSet& new_inactive_places) {
-  std::cout << "Running enforcePlaceConnectivity..." << std::endl;
+  // std::cout << "Running enforcePlaceConnectivity..." << std::endl;
 
   //check connection conditions
   bool no_place_within_footprint = false;
