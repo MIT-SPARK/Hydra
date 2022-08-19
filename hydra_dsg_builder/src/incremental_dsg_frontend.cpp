@@ -350,7 +350,7 @@ void DsgFrontend::runPlaces() {
       std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
 
       // find node ids that are valid, but outside active place window
-      NodeIdSet new_inactive_places;
+      //NodeIdSet new_inactive_places;
       for (const auto& prev : previous_active_places_) {
         if (latest_places.count(prev)) {
           continue;
@@ -373,14 +373,14 @@ void DsgFrontend::runPlaces() {
 
         //todo(jared): config not being loaded
         if(config_.enforce_place_connectivity) {
-          new_inactive_places.insert(prev);
+          //new_inactive_places.insert(prev);
         }
       }
 
       dsg_->last_update_time = curr_message->header.stamp.toNSec();
 
       if(config_.enforce_place_connectivity) {
-        enforcePlaceConnectivity(latest_places, new_inactive_places);
+        //enforcePlaceConnectivity(latest_places, new_inactive_places);
       }
     }  // end graph update critical section
 
