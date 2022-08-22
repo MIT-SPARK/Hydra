@@ -102,7 +102,7 @@ Marker makeBoundingBoxMarker(const std_msgs::Header& header,
   marker.color = makeColorMsg(node.attributes<SemanticNodeAttributes>().color,
                               config.bounding_box_alpha);
 
-  BoundingBox bounding_box = node.attributes<ObjectNodeAttributes>().bounding_box;
+  BoundingBox bounding_box = node.attributes<SemanticNodeAttributes>().bounding_box;
 
   Eigen::Quaternionf world_q_center =
       bounding_box.type == BoundingBox::Type::AABB

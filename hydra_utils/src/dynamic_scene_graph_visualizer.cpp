@@ -565,7 +565,7 @@ void DynamicSceneGraphVisualizer::drawLayer(const std_msgs::Header& header,
 
     if (config.use_bounding_box) {
       try {
-        node.attributes<ObjectNodeAttributes>();
+        node.attributes<SemanticNodeAttributes>();
       } catch (const std::bad_cast&) {
         continue;
       }
