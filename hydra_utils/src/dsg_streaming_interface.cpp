@@ -90,9 +90,10 @@ void DsgReceiver::handleUpdate(const hydra_msgs::DsgUpdate::ConstPtr& msg) {
       spark_dsg::updateGraph(*graph_, msg->layer_contents, true);
     }
     has_update_ = true;
-  } catch (const std::exception&) {
-    ROS_FATAL_STREAM("Received invalid message!");
+  } catch (const std::exception& e) {
+    ROS_FATAL_STREAM("Received invalid message: " << e.what());
     ros::shutdown();
+    return;
   }
 
   if (mesh_) {

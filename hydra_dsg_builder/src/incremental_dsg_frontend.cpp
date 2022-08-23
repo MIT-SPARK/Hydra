@@ -499,9 +499,11 @@ void DsgFrontend::addAgentPlaceEdges() {
 void DsgFrontend::updatePlaceMeshMapping() {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
   const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
-  const auto& mesh_mappings = mesh_frontend_.getVoxbloxMsgToGraphMapping();
+  const auto& graph_mappings = mesh_frontend_.getVoxbloxMsgToGraphMapping();
+  const auto& mesh_mappings = mesh_frontend_.getVoxbloxMsgToMeshMapping();
 
-  size_t num_invalid = 0;
+  size_t num_deform_invalid = 0;
+  size_t num_mesh_invalid = 0;
   size_t num_processed = 0;
   size_t num_vertices_processed = 0;
   for (const auto& id_node_pair : places.nodes()) {
@@ -519,6 +521,10 @@ void DsgFrontend::updatePlaceMeshMapping() {
     // reset connections (and mark inactive to avoid processing outside active window)
     attrs.pcl_mesh_connections.clear();
     attrs.pcl_mesh_connections.reserve(attrs.voxblox_mesh_connections.size());
+    attrs.mesh_vertex_labels.clear();
+    attrs.mesh_vertex_labels.reserve(attrs.voxblox_mesh_connections.size());
+    attrs.deformation_connections.clear();
+    attrs.deformation_connections.reserve(attrs.voxblox_mesh_connections.size());
 
     for (const auto& connection : attrs.voxblox_mesh_connections) {
       voxblox::BlockIndex index =
@@ -526,26 +532,42 @@ void DsgFrontend::updatePlaceMeshMapping() {
 
       ++num_vertices_processed;
       if (!mesh_mappings.count(index)) {
-        num_invalid++;
         continue;
+      }
+
+      const auto& conn_idx = connection.vertex;
+
+      const auto& graph_mapping = graph_mappings.at(index);
+      if (!graph_mapping.count(conn_idx)) {
+        num_deform_invalid++;
+      } else {
+        attrs.deformation_connections.push_back(graph_mapping.at(conn_idx));
       }
 
       const auto& vertex_mapping = mesh_mappings.at(index);
-      if (!vertex_mapping.count(connection.vertex)) {
-        num_invalid++;
+      if (!vertex_mapping.count(conn_idx)) {
+        num_mesh_invalid++;
         continue;
       }
 
-      attrs.pcl_mesh_connections.push_back(vertex_mapping.at(connection.vertex));
+      const auto vertex_idx = vertex_mapping.at(conn_idx);
+      const auto label = segmenter_->getVertexLabel(vertex_idx);
+      if (!label) {
+        continue;
+      }
+
+      attrs.pcl_mesh_connections.push_back(vertex_idx);
+      attrs.mesh_vertex_labels.push_back(*label);
     }
-  }
 
-  VLOG(2) << "[DSG Frontend] Mesh-Remapping: " << num_processed << " places, "
-          << num_vertices_processed << " vertices";
+    VLOG(2) << "[DSG Frontend] Mesh-Remapping: " << num_processed << " places, "
+            << num_vertices_processed << " vertices";
 
-  if (num_invalid) {
-    VLOG(2) << "[DSG Backend] Place-Mesh Update: " << num_invalid
-            << " invalid connections";
+    if (num_deform_invalid || num_mesh_invalid) {
+      VLOG(2) << "[DSG Backend] Place-Mesh Update: " << num_deform_invalid
+              << " invalid deformation graph connections, " << num_mesh_invalid
+              << " invalid mesh connections";
+    }
   }
 }
 
