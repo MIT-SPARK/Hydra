@@ -439,7 +439,7 @@ void DsgBackend::addPlacesToDeformationGraph() {
       place_node_poses.push_back(gtsam::Pose3(gtsam::Rot3(), attrs.position));
 
       if (mst_info.leaves.count(node.id)) {
-        place_node_valences.push_back(attrs.pcl_mesh_connections);
+        place_node_valences.push_back(attrs.deformation_connections);
       } else {
         place_node_valences.push_back(std::vector<size_t>{});
       }
