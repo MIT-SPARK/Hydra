@@ -55,9 +55,10 @@ add_library(
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
 target_link_libraries(
   ${PROJECT_NAME}
-  ${catkin_LIBRARIES}
-  teaserpp::teaser_registration
-  spark_dsg::spark_dsg
+  PUBLIC ${catkin_LIBRARIES}
+         teaserpp::teaser_registration
+         spark_dsg::spark_dsg
+         gtsam
 )
 
 if(CATKIN_ENABLE_TESTING)
