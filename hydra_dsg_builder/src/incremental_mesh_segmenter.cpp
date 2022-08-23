@@ -300,21 +300,28 @@ std::set<NodeId> MeshSegmenter::archiveOldObjects(const DynamicSceneGraph& graph
   return archived;
 }
 
+std::optional<uint8_t> MeshSegmenter::getVertexLabel(size_t index) const {
+  if (index >= full_mesh_vertices_->size()) {
+    return std::nullopt;
+  }
+
+  const auto& point = full_mesh_vertices_->at(index);
+  const HashableColor color(point.r, point.g, point.b, 255);
+  return semantic_config_.semantic_label_to_color_->getSemanticLabelFromColor(color);
+}
+
 LabelIndices MeshSegmenter::getLabelIndices(const std::vector<size_t>& indices) const {
   LabelIndices label_indices;
 
   std::set<uint8_t> seen_labels;
   for (const auto idx : indices) {
-    if (idx >= full_mesh_vertices_->size()) {
-      LOG(ERROR) << "Invalid indice: " << idx << "(out of "
-                 << full_mesh_vertices_->size() << ")";
+    const auto label_opt = getVertexLabel(idx);
+    if (!label_opt) {
+      LOG(ERROR) << "bad index " << idx << "(of " << full_mesh_vertices_->size() << ")";
       continue;
     }
-    const pcl::PointXYZRGBA& point = full_mesh_vertices_->at(idx);
-    const HashableColor color(point.r, point.g, point.b, 255);
 
-    const uint8_t label =
-        semantic_config_.semantic_label_to_color_->getSemanticLabelFromColor(color);
+    const auto label = *label_opt;
     seen_labels.insert(label);
 
     if (!object_labels_.count(label)) {
