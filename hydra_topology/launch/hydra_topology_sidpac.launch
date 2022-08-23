@@ -11,6 +11,7 @@
     <arg name="depth_topic" default="azure/depth_to_rgb/image_raw"/>
     <arg name="pointcloud_topic" default="semantic_pointcloud"/>
 
+    <arg name="model_name" default="hrnetv2_360_640_v12"/>
     <arg name="dataset_name" default="ade150_config"/>
 
     <include file="$(find hydra_utils)/launch/includes/rgbd_to_pointcloud.xml" pass_all_args="true"
