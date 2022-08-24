@@ -116,7 +116,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void updateFromSharedState();
 
-  virtual bool updatePrivateDsg();
+  virtual bool updatePrivateDsg(bool force_update = false);
 
   virtual void updateDsgMesh(bool force_mesh_update = false);
 

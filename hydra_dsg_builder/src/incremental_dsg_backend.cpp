@@ -210,10 +210,10 @@ void DsgBackend::save(const std::string& output_path) {
   }
 }
 
-bool DsgBackend::updatePrivateDsg() {
+bool DsgBackend::updatePrivateDsg(bool force_update) {
   std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
   bool have_frontend_updates = shared_dsg_->updated;
-  if (have_frontend_updates) {
+  if (have_frontend_updates || force_update) {
     {  // start joint critical section
       std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
       private_dsg_->graph->mergeGraph(*shared_dsg_->graph,
