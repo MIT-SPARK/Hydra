@@ -33,68 +33,54 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/incremental_room_finder.h"
-#include "hydra_dsg_builder/incremental_types.h"
+#include "hydra_topology/configs.h"
 
-#include <gtsam/nonlinear/Values.h>
+#include <hydra_utils/display_utils.h>
+#include <kimera_semantics/semantic_integrator_base.h>
+#include <kimera_semantics/semantic_voxel.h>
 
 namespace hydra {
+namespace topology {
 
-struct UpdateInfo {
-  const gtsam::Values* places_values = nullptr;
-  const gtsam::Values* pgmo_values = nullptr;
-  bool loop_closure_detected = false;
-  uint64_t timestamp_ns = 0;
-  bool allow_node_merging = false;
+struct TopologyModuleConfig {
+  float voxel_size = 0.1;
+  int voxels_per_side = 16;
+  bool show_stats = true;
+  bool clear_distant_blocks = true;
+  double dense_representation_radius_m = 5.0;
 };
 
-using LayerUpdateFunc =
-    std::function<std::map<NodeId, NodeId>(incremental::SharedDsgInfo&,
-                                           const UpdateInfo&)>;
+using SemanticIntegratorConfig = kimera::SemanticIntegratorBase::SemanticConfig;
+using TsdfIntegratorConfig = voxblox::TsdfIntegratorBase::Config;
 
-namespace dsg_updates {
+class TopologyModule {
+ public:
+  TopologyModule(const TopologyModuleConfig& config,
+                 const GvdIntegratorConfig& gvd_config,
+                 const TsdfIntegratorConfig& tsdf_config,
+                 const SemanticIntegratorConfig& semantic_config);
 
-struct UpdateObjectsFunctor {
-  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
-                                const UpdateInfo& info) const;
+  void update(const voxblox::Transformation& T_G_C,
+              const voxblox::Pointcloud& pointcloud,
+              const voxblox::Colors& colors,
+              bool full_update);
 
-  std::set<NodeId> archived_object_ids;
+  void showStats() const;
+
+ protected:
+  TopologyModuleConfig config_;
+  GvdIntegratorConfig gvd_config_;
+  TsdfIntegratorConfig tsdf_config_;
+  SemanticIntegratorConfig semantic_config_;
+
+  Layer<TsdfVoxel>::Ptr tsdf_layer_;
+  Layer<kimera::SemanticVoxel>::Ptr semantic_layer_;
+  Layer<GvdVoxel>::Ptr gvd_layer_;
+  MeshLayer::Ptr mesh_layer_;
+
+  std::unique_ptr<voxblox::TsdfIntegratorBase> tsdf_integrator_;
+  std::unique_ptr<GvdIntegrator> gvd_integrator_;
 };
 
-struct UpdatePlacesFunctor {
-  UpdatePlacesFunctor(double pos_threshold, double distance_tolerance)
-      : pos_threshold_m(pos_threshold), distance_tolerance_m(distance_tolerance) {}
-
-  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
-                                const UpdateInfo& info) const;
-
-  double pos_threshold_m;
-  double distance_tolerance_m;
-};
-
-struct UpdateRoomsFunctor {
-  UpdateRoomsFunctor(const incremental::RoomFinder::Config& config);
-
-  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
-                                const UpdateInfo& info) const;
-
-  std::unique_ptr<incremental::RoomFinder> room_finder;
-};
-
-struct UpdateBuildingsFunctor {
-  UpdateBuildingsFunctor(const SemanticNodeAttributes::ColorVector& color,
-                         SemanticNodeAttributes::Label label);
-
-  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
-                                const UpdateInfo& info) const;
-
-  SemanticNodeAttributes::ColorVector building_color;
-  SemanticNodeAttributes::Label building_semantic_label;
-};
-
-std::map<NodeId, NodeId> updateAgents(incremental::SharedDsgInfo& graph,
-                                      const UpdateInfo& info);
-
-}  // namespace dsg_updates
-
+}  // namespace topology
 }  // namespace hydra

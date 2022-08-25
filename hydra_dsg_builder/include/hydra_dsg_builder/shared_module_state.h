@@ -33,68 +33,42 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/incremental_room_finder.h"
 #include "hydra_dsg_builder/incremental_types.h"
 
-#include <gtsam/nonlinear/Values.h>
+#include <hydra_utils/dsg_types.h>
+#include <kimera_pgmo/utils/CommonStructs.h>
+#include <pose_graph_tools/PoseGraph.h>
+#include <ros/time.h>
+
+#include <atomic>
+#include <list>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <vector>
 
 namespace hydra {
+namespace incremental {
 
-struct UpdateInfo {
-  const gtsam::Values* places_values = nullptr;
-  const gtsam::Values* pgmo_values = nullptr;
-  bool loop_closure_detected = false;
-  uint64_t timestamp_ns = 0;
-  bool allow_node_merging = false;
+struct SharedModuleState {
+  using Ptr = std::shared_ptr<SharedModuleState>;
+
+  NodeIdSet latest_places;
+  NodeIdSet archived_places;
+  std::set<NodeId> archived_objects;
+
+  std::mutex mesh_mutex;
+  bool have_new_mesh;
+  std::shared_ptr<pcl::PolygonMesh> latest_mesh;
+  std::shared_ptr<std::vector<ros::Time>> mesh_vertex_stamps;
+  std::shared_ptr<std::vector<int>> mesh_vertex_graph_indices;
+  std::list<pose_graph_tools::PoseGraph::ConstPtr> deformation_graphs;
+
+  std::map<NodeId, size_t> agent_key_map;
+
+  std::mutex lcd_mutex;
+  std::queue<lcd::DsgRegistrationSolution> loop_closures;
 };
 
-using LayerUpdateFunc =
-    std::function<std::map<NodeId, NodeId>(incremental::SharedDsgInfo&,
-                                           const UpdateInfo&)>;
-
-namespace dsg_updates {
-
-struct UpdateObjectsFunctor {
-  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
-                                const UpdateInfo& info) const;
-
-  std::set<NodeId> archived_object_ids;
-};
-
-struct UpdatePlacesFunctor {
-  UpdatePlacesFunctor(double pos_threshold, double distance_tolerance)
-      : pos_threshold_m(pos_threshold), distance_tolerance_m(distance_tolerance) {}
-
-  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
-                                const UpdateInfo& info) const;
-
-  double pos_threshold_m;
-  double distance_tolerance_m;
-};
-
-struct UpdateRoomsFunctor {
-  UpdateRoomsFunctor(const incremental::RoomFinder::Config& config);
-
-  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
-                                const UpdateInfo& info) const;
-
-  std::unique_ptr<incremental::RoomFinder> room_finder;
-};
-
-struct UpdateBuildingsFunctor {
-  UpdateBuildingsFunctor(const SemanticNodeAttributes::ColorVector& color,
-                         SemanticNodeAttributes::Label label);
-
-  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
-                                const UpdateInfo& info) const;
-
-  SemanticNodeAttributes::ColorVector building_color;
-  SemanticNodeAttributes::Label building_semantic_label;
-};
-
-std::map<NodeId, NodeId> updateAgents(incremental::SharedDsgInfo& graph,
-                                      const UpdateInfo& info);
-
-}  // namespace dsg_updates
-
+}  // namespace incremental
 }  // namespace hydra

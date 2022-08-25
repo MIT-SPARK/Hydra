@@ -36,6 +36,7 @@
 #include <gtsam/geometry/Pose3.h>
 #include <hydra_utils/dsg_types.h>
 #include <kimera_pgmo/utils/CommonStructs.h>
+#include <ros/time.h>
 
 #include <atomic>
 #include <map>
@@ -76,22 +77,12 @@ struct SharedDsgInfo {
     }
 
     graph.reset(new DynamicSceneGraph(layer_ids, mesh_layer_id));
-    latest_places.reset(new NodeIdSet);
   }
 
   std::mutex mutex;
   std::atomic<bool> updated;
   uint64_t last_update_time;
   DynamicSceneGraph::Ptr graph;
-  std::shared_ptr<NodeIdSet> latest_places;
-
-  std::map<NodeId, size_t> agent_key_map;
-  NodeIdSet archived_places;
-
-  std::mutex lcd_mutex;
-  std::queue<lcd::DsgRegistrationSolution> loop_closures;
-
-  std::set<NodeId> archived_objects;
 };
 
 struct DsgBackendStatus {

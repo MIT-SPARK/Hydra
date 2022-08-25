@@ -21,7 +21,7 @@
   </include>
 
   <node pkg="hydra_utils" type="hydra_visualizer_node" name="hydra_visualizer_node"
-        output="screen"
+        output="log"
         required="true"
         args="-alsologtostderr -colorlogtostderr -v=$(arg verbosity)">
     <param name="visualizer_ns" value="$(arg visualizer_ns)"/>
@@ -37,6 +37,6 @@
     <remap from="~dsg_mesh_updates" to="$(arg dsg_mesh_topic)"/>
   </node>
 
-  <node name="rviz" pkg="rviz" type="rviz" output="screen" if="$(arg start_rviz)" args="-d $(arg rviz_path)"/>
+  <node name="rviz" pkg="rviz" type="rviz" output="log" if="$(arg start_rviz)" args="-d $(arg rviz_path)"/>
 
 </launch>

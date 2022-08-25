@@ -118,6 +118,21 @@ bool readRosParam(const ros::NodeHandle& nh,
   return true;
 }
 
+template <typename T,
+          typename std::enable_if<std::is_integral<T>::value, bool>::type = true>
+bool readRosParam(const ros::NodeHandle& nh,
+                  const std::string& name,
+                  std::set<T>& value) {
+  std::vector<T> placeholders;
+  if (!readRosParam(nh, name, placeholders)) {
+    return false;
+  }
+
+  value.clear();
+  value.insert(placeholders.begin(), placeholders.end());
+  return true;
+}
+
 // adl indirection
 struct read_ros_param_fn {
   template <typename T>

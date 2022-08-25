@@ -36,6 +36,7 @@
 #include "hydra_dsg_builder/dsg_lcd_detector.h"
 #include "hydra_dsg_builder/lcd_module_config.h"
 #include "hydra_dsg_builder/lcd_visualizer.h"
+#include "hydra_dsg_builder/shared_module_state.h"
 
 #include <geometry_msgs/TransformStamped.h>
 #include <ros/callback_queue.h>
@@ -53,13 +54,17 @@ namespace incremental {
 
 class DsgLcd {
  public:
-  DsgLcd(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg);
+  DsgLcd(const ros::NodeHandle& nh,
+         const SharedDsgInfo::Ptr& dsg,
+         const SharedModuleState::Ptr& state);
 
   virtual ~DsgLcd();
 
   void start();
 
   void stop();
+
+  void save(const std::string& output_path);
 
  private:
   void handleDbowMsg(const pose_graph_tools::BowQuery::ConstPtr& msg);
@@ -76,6 +81,7 @@ class DsgLcd {
 
   DsgLcdModuleConfig config_;
   SharedDsgInfo::Ptr dsg_;
+  SharedModuleState::Ptr state_;
 
   std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> lcd_queue_;
   std::unique_ptr<std::thread> lcd_thread_;

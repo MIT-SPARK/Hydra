@@ -33,68 +33,51 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/incremental_room_finder.h"
-#include "hydra_dsg_builder/incremental_types.h"
-
-#include <gtsam/nonlinear/Values.h>
+#include <chrono>
+#include <condition_variable>
+#include <memory>
+#include <mutex>
+#include <queue>
 
 namespace hydra {
 
-struct UpdateInfo {
-  const gtsam::Values* places_values = nullptr;
-  const gtsam::Values* pgmo_values = nullptr;
-  bool loop_closure_detected = false;
-  uint64_t timestamp_ns = 0;
-  bool allow_node_merging = false;
+template <typename T>
+struct InputQueue {
+  using Ptr = std::shared_ptr<InputQueue<T>>;
+  std::queue<T> queue;
+  mutable std::mutex mutex;
+  mutable std::condition_variable cv;
+
+  bool empty() const {
+    std::unique_lock<std::mutex> lock(mutex);
+    return queue.empty();
+  }
+
+  const T& front() const {
+    std::unique_lock<std::mutex> lock(mutex);
+    return queue.front();
+  }
+
+  bool poll(int wait_time_us = 1000) const {
+    std::chrono::microseconds wait_duration(wait_time_us);
+    std::unique_lock<std::mutex> lock(mutex);
+    return cv.wait_for(lock, wait_duration, [&] { return !queue.empty(); });
+  }
+
+  void push(const T& input) {
+    {
+      std::unique_lock<std::mutex> lock(mutex);
+      queue.push(input);
+    }
+    cv.notify_all();
+  }
+
+  T pop() {
+    std::unique_lock<std::mutex> lock(mutex);
+    auto value = queue.front();
+    queue.pop();
+    return value;
+  }
 };
-
-using LayerUpdateFunc =
-    std::function<std::map<NodeId, NodeId>(incremental::SharedDsgInfo&,
-                                           const UpdateInfo&)>;
-
-namespace dsg_updates {
-
-struct UpdateObjectsFunctor {
-  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
-                                const UpdateInfo& info) const;
-
-  std::set<NodeId> archived_object_ids;
-};
-
-struct UpdatePlacesFunctor {
-  UpdatePlacesFunctor(double pos_threshold, double distance_tolerance)
-      : pos_threshold_m(pos_threshold), distance_tolerance_m(distance_tolerance) {}
-
-  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
-                                const UpdateInfo& info) const;
-
-  double pos_threshold_m;
-  double distance_tolerance_m;
-};
-
-struct UpdateRoomsFunctor {
-  UpdateRoomsFunctor(const incremental::RoomFinder::Config& config);
-
-  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
-                                const UpdateInfo& info) const;
-
-  std::unique_ptr<incremental::RoomFinder> room_finder;
-};
-
-struct UpdateBuildingsFunctor {
-  UpdateBuildingsFunctor(const SemanticNodeAttributes::ColorVector& color,
-                         SemanticNodeAttributes::Label label);
-
-  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
-                                const UpdateInfo& info) const;
-
-  SemanticNodeAttributes::ColorVector building_color;
-  SemanticNodeAttributes::Label building_semantic_label;
-};
-
-std::map<NodeId, NodeId> updateAgents(incremental::SharedDsgInfo& graph,
-                                      const UpdateInfo& info);
-
-}  // namespace dsg_updates
 
 }  // namespace hydra

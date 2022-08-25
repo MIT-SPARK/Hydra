@@ -32,69 +32,61 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include "hydra_dsg_builder/incremental_room_finder.h"
-#include "hydra_dsg_builder/incremental_types.h"
-
-#include <gtsam/nonlinear/Values.h>
+#include "hydra_dsg_builder/node_utilities.h"
 
 namespace hydra {
 
-struct UpdateInfo {
-  const gtsam::Values* places_values = nullptr;
-  const gtsam::Values* pgmo_values = nullptr;
-  bool loop_closure_detected = false;
-  uint64_t timestamp_ns = 0;
-  bool allow_node_merging = false;
-};
+ExitMode getExitMode(const ros::NodeHandle& nh) {
+  std::string exit_mode_str = "NORMAL";
+  nh.getParam("exit_mode", exit_mode_str);
 
-using LayerUpdateFunc =
-    std::function<std::map<NodeId, NodeId>(incremental::SharedDsgInfo&,
-                                           const UpdateInfo&)>;
+  if (exit_mode_str == "CLOCK") {
+    return ExitMode::CLOCK;
+  } else if (exit_mode_str == "SERVICE") {
+    return ExitMode::SERVICE;
+  } else if (exit_mode_str == "NORMAL") {
+    return ExitMode::NORMAL;
+  } else {
+    ROS_WARN_STREAM("Unrecognized option: " << exit_mode_str
+                                            << ". Defaulting to NORMAL");
+    return ExitMode::NORMAL;
+  }
+}
 
-namespace dsg_updates {
+void spinWhileClockPresent() {
+  ros::WallRate r(50);
+  ROS_INFO("Waiting for bag to start");
+  while (ros::ok() && !haveClock()) {
+    ros::spinOnce();
+    r.sleep();
+  }
 
-struct UpdateObjectsFunctor {
-  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
-                                const UpdateInfo& info) const;
+  ROS_INFO("Running...");
+  while (ros::ok() && haveClock()) {
+    ros::spinOnce();
+    r.sleep();
+  }
 
-  std::set<NodeId> archived_object_ids;
-};
+  ros::spinOnce();  // make sure all the callbacks are processed
+  ROS_WARN("Exiting!");
+}
 
-struct UpdatePlacesFunctor {
-  UpdatePlacesFunctor(double pos_threshold, double distance_tolerance)
-      : pos_threshold_m(pos_threshold), distance_tolerance_m(distance_tolerance) {}
+void spinUntilExitRequested() {
+  ServiceFunctor functor;
 
-  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
-                                const UpdateInfo& info) const;
+  ros::NodeHandle nh("~");
+  ros::ServiceServer service =
+      nh.advertiseService("shutdown", &ServiceFunctor::callback, &functor);
 
-  double pos_threshold_m;
-  double distance_tolerance_m;
-};
+  ros::WallRate r(50);
+  ROS_INFO("Running...");
+  while (ros::ok() && !functor.should_exit) {
+    ros::spinOnce();
+    r.sleep();
+  }
 
-struct UpdateRoomsFunctor {
-  UpdateRoomsFunctor(const incremental::RoomFinder::Config& config);
-
-  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
-                                const UpdateInfo& info) const;
-
-  std::unique_ptr<incremental::RoomFinder> room_finder;
-};
-
-struct UpdateBuildingsFunctor {
-  UpdateBuildingsFunctor(const SemanticNodeAttributes::ColorVector& color,
-                         SemanticNodeAttributes::Label label);
-
-  std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
-                                const UpdateInfo& info) const;
-
-  SemanticNodeAttributes::ColorVector building_color;
-  SemanticNodeAttributes::Label building_semantic_label;
-};
-
-std::map<NodeId, NodeId> updateAgents(incremental::SharedDsgInfo& graph,
-                                      const UpdateInfo& info);
-
-}  // namespace dsg_updates
+  ros::spinOnce();  // make sure all the callbacks are processed
+  ROS_WARN("Exiting!");
+}
 
 }  // namespace hydra
