@@ -33,70 +33,34 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/dsg_lcd_detector.h"
-#include "hydra_dsg_builder/lcd_module_config.h"
-#include "hydra_dsg_builder/lcd_visualizer.h"
-#include "hydra_dsg_builder/shared_module_state.h"
-
-#include <geometry_msgs/TransformStamped.h>
-#include <ros/callback_queue.h>
 #include <ros/ros.h>
-#include <tf2_ros/transform_listener.h>
-
-#include <pose_graph_tools/BowQuery.h>
-#include <pose_graph_tools/BowQueries.h>
-
-#include <memory>
-#include <mutex>
-#include <thread>
+#include <ros/topic_manager.h>
+#include <hydra_utils/dsg_types.h>
+#include <std_srvs/Empty.h>
 
 namespace hydra {
-namespace incremental {
 
-class DsgLcd {
- public:
-  DsgLcd(const ros::NodeHandle& nh,
-         const SharedDsgInfo::Ptr& dsg,
-         const SharedModuleState::Ptr& state);
+enum class ExitMode { CLOCK, SERVICE, NORMAL };
 
-  virtual ~DsgLcd();
+struct ServiceFunctor {
+  ServiceFunctor() : should_exit(false) {}
 
-  void start();
+  bool callback(std_srvs::Empty::Request&, std_srvs::Empty::Response&) {
+    should_exit = true;
+    return true;
+  }
 
-  void stop();
-
-  void save(const std::string& output_path);
-
- private:
-  void handleDbowMsg(const pose_graph_tools::BowQueries::ConstPtr& msg);
-
-  void runLcd();
-
-  void assignBowVectors();
-
-  std::optional<NodeId> getLatestAgentId();
-
- private:
-  ros::NodeHandle nh_;
-  std::atomic<bool> should_shutdown_{false};
-
-  DsgLcdModuleConfig config_;
-  SharedDsgInfo::Ptr dsg_;
-  SharedModuleState::Ptr state_;
-
-  std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> lcd_queue_;
-  std::unique_ptr<std::thread> lcd_thread_;
-  std::unique_ptr<lcd::DsgLcdDetector> lcd_detector_;
-  std::unique_ptr<lcd::LcdVisualizer> lcd_visualizer_;
-  std::unique_ptr<ros::CallbackQueue> visualizer_queue_;
-  DynamicSceneGraph::Ptr lcd_graph_;
-  // TODO(nathan) replace with struct passed in through constructor
-  char robot_prefix_;
-
-  ros::Subscriber bow_sub_;
-  std::list<pose_graph_tools::BowQuery::ConstPtr> bow_messages_;
-  std::list<NodeId> potential_lcd_root_nodes_;
+  bool should_exit;
 };
 
-}  // namespace incremental
+inline bool haveClock() {
+  return ros::TopicManager::instance()->getNumPublishers("/clock");
+}
+
+ExitMode getExitMode(const ros::NodeHandle& nh);
+
+void spinWhileClockPresent();
+
+void spinUntilExitRequested();
+
 }  // namespace hydra

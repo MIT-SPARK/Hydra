@@ -78,6 +78,13 @@ class YamlParserImpl {
     value = node_.as<T>();
   }
 
+  template <typename T>
+  void parseImpl(std::set<T>& value) const {
+    std::vector<T> placeholder = node_.as<std::vector<T>>();
+    value.clear();
+    value.insert(placeholder.begin(), placeholder.end());
+  }
+
   void parseImpl(uint8_t& value) const;
 
   YAML::Node node_;

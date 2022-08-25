@@ -37,6 +37,7 @@
 #include "hydra_dsg_builder/dsg_update_functions.h"
 #include "hydra_dsg_builder/incremental_room_finder.h"
 #include "hydra_dsg_builder/incremental_types.h"
+#include "hydra_dsg_builder/shared_module_state.h"
 
 #include <hydra_utils/dsg_streaming_interface.h>
 #include <kimera_pgmo/KimeraPgmoInterface.h>
@@ -68,7 +69,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   DsgBackend(const ros::NodeHandle nh,
              const SharedDsgInfo::Ptr& dsg,
-             const SharedDsgInfo::Ptr& backend_dsg);
+             const SharedDsgInfo::Ptr& backend_dsg,
+             const SharedModuleState::Ptr& state);
 
   virtual ~DsgBackend();
 
@@ -86,6 +88,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   void stop();
 
   void start();
+
+  void save(const std::string& output_path);
 
   inline void setUpdateFuncs(const std::list<LayerUpdateFunc>& update_funcs) {
     dsg_update_funcs_ = update_funcs;
@@ -109,6 +113,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
     callUpdateFunctions();
     private_dsg_->updated = true;
   }
+
+  void updateFromSharedState();
 
   bool updatePrivateDsg();
 
@@ -143,14 +149,6 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
                            const gtsam::Values& pgmo_values = gtsam::Values(),
                            bool new_loop_closure = false);
 
-  ActiveNodeSet getNodesForRoomDetection(const NodeIdSet& latest_places);
-
-  void storeUnlabeledPlaces(const ActiveNodeSet active_nodes);
-
-  void updateRoomsNodes();
-
-  void updateBuildingNode();
-
   void logStatus(bool init = false) const;
 
   bool addInternalLCDToDeformationGraph();
@@ -174,24 +172,26 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   SharedDsgInfo::Ptr shared_dsg_;
   SharedDsgInfo::Ptr private_dsg_;
+  SharedModuleState::Ptr state_;
+
   IsolatedSceneGraphLayer shared_places_copy_;
   std::map<NodeId, NodeId> merged_nodes_;
   std::map<NodeId, std::set<NodeId>> merged_nodes_parents_;
-  std::set<NodeId> archived_object_ids_;
 
   std::atomic<uint64_t> last_timestamp_;
 
   ros::ServiceServer save_mesh_srv_;
   ros::ServiceServer save_traj_srv_;
 
-  NodeIdSet unlabeled_place_nodes_;
-  std::unique_ptr<RoomFinder> room_finder_;
-
   DsgBackendStatus status_;
 
   std::list<LayerUpdateFunc> dsg_update_funcs_;
+  std::unique_ptr<dsg_updates::UpdateObjectsFunctor> update_objects_functor_;
+  std::unique_ptr<dsg_updates::UpdatePlacesFunctor> update_places_functor_;
+  std::unique_ptr<dsg_updates::UpdateRoomsFunctor> update_rooms_functor_;
+  std::unique_ptr<dsg_updates::UpdateBuildingsFunctor> update_buildings_functor_;
 
-  std::vector<int> mesh_vertex_graph_inds_;
+  std::shared_ptr<std::vector<int>> mesh_vertex_graph_inds_;
 
   PoseGraphQueue deformation_graph_updates_;
   PoseGraphQueue pose_graph_updates_;
@@ -215,8 +215,10 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   kimera_pgmo::Path trajectory_;
   std::vector<ros::Time> timestamps_;
   std::queue<size_t> unconnected_nodes_;
-  kimera_pgmo::KimeraPgmoMesh::ConstPtr latest_mesh_;
-  std::vector<ros::Time> mesh_vertex_stamps_;
+  kimera_pgmo::KimeraPgmoMesh::ConstPtr latest_mesh_msg_;
+  std::shared_ptr<pcl::PolygonMesh> latest_mesh_;
+
+  std::shared_ptr<std::vector<ros::Time>> mesh_vertex_stamps_;
 
   ros::Subscriber full_mesh_sub_;
   ros::Subscriber deformation_graph_sub_;

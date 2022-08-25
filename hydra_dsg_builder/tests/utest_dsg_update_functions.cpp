@@ -42,6 +42,7 @@ namespace hydra {
 
 using MeshVertices = DynamicSceneGraph::MeshVertices;
 using MeshFaces = DynamicSceneGraph::MeshFaces;
+using incremental::SharedDsgInfo;
 
 #define MAKE_POINT(cloud, x_val, y_val, z_val) \
   {                                            \
@@ -53,8 +54,18 @@ using MeshFaces = DynamicSceneGraph::MeshFaces;
   }                                            \
   static_assert(true, "")
 
+SharedDsgInfo::Ptr makeSharedDsg() {
+  const LayerId mesh_layer_id = 1;
+  const std::map<LayerId, char> layer_id_map{{DsgLayers::OBJECTS, 'o'},
+                                             {DsgLayers::PLACES, 'p'},
+                                             {DsgLayers::ROOMS, 'r'},
+                                             {DsgLayers::BUILDINGS, 'b'}};
+  return SharedDsgInfo::Ptr(new SharedDsgInfo(layer_id_map, mesh_layer_id));
+}
+
 TEST(DsgInterpolationTests, ObjectUpdate) {
-  DynamicSceneGraph graph;
+  auto dsg = makeSharedDsg();
+  auto& graph = *dsg->graph;
   ObjectNodeAttributes::Ptr attrs(new ObjectNodeAttributes);
   attrs->position << 1.0, 2.0, 3.0;
   attrs->bounding_box.type = BoundingBox::Type::AABB;
@@ -62,8 +73,9 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
   attrs->bounding_box.max << 1.0f, 2.0f, 3.0f;
   graph.emplaceNode(DsgLayers::OBJECTS, 0, std::move(attrs));
 
-  gtsam::Values values;
-  dsg_updates::updateObjects(graph, values, values, false);
+  const UpdateInfo info{nullptr, nullptr, false, 0, false};
+  dsg_updates::UpdateObjectsFunctor functor;
+  functor.call(*dsg, info);
 
   const ObjectNodeAttributes& result =
       graph.getNode(0)->get().attributes<ObjectNodeAttributes>();
@@ -90,7 +102,7 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
   graph.insertMeshEdge(0, 0);
   graph.insertMeshEdge(0, 1);
 
-  dsg_updates::updateObjects(graph, values, values, false);
+  functor.call(*dsg, info);
 
   {
     // valid mesh: things should change
@@ -106,7 +118,8 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
 }
 
 TEST(DsgInterpolationTests, ObjectUpdateMerge) {
-  DynamicSceneGraph graph;
+  auto dsg = makeSharedDsg();
+  auto& graph = *dsg->graph;
   ObjectNodeAttributes::Ptr attrs0(new ObjectNodeAttributes);
   attrs0->position << 1.0, 2.0, 3.0;
   attrs0->bounding_box.type = BoundingBox::Type::AABB;
@@ -122,8 +135,9 @@ TEST(DsgInterpolationTests, ObjectUpdateMerge) {
   graph.emplaceNode(DsgLayers::OBJECTS, 0, std::move(attrs0));
   graph.emplaceNode(DsgLayers::OBJECTS, 1, std::move(attrs1));
 
-  gtsam::Values values;
-  dsg_updates::updateObjects(graph, values, values, true);
+  const UpdateInfo info{nullptr, nullptr, false, 0, true};
+  dsg_updates::UpdateObjectsFunctor functor;
+  functor.call(*dsg, info);
 
   const ObjectNodeAttributes& result0 =
       graph.getNode(0)->get().attributes<ObjectNodeAttributes>();
@@ -163,7 +177,7 @@ TEST(DsgInterpolationTests, ObjectUpdateMerge) {
   graph.insertMeshEdge(1, 0);
   graph.insertMeshEdge(1, 1);
 
-  dsg_updates::updateObjects(graph, values, values, true);
+  auto merged_nodes = functor.call(*dsg, info);
 
   {
     // valid mesh: things should change
@@ -176,67 +190,46 @@ TEST(DsgInterpolationTests, ObjectUpdateMerge) {
     Eigen::Vector3f expected_max(1.0, 2.0, 3.0);
     EXPECT_NEAR(0.0, (expected_max - result0.bounding_box.max).norm(), 1.0e-7);
 
-    EXPECT_FALSE(graph.hasNode(1));
+    EXPECT_TRUE(merged_nodes.count(1) > 0);
   }
 }
 
 TEST(DsgInterpolationTests, BuildingUpdate) {
-  DynamicSceneGraph graph;
+  auto dsg = makeSharedDsg();
+  auto& graph = *dsg->graph;
   graph.emplaceNode(DsgLayers::BUILDINGS,
-                    0,
+                    "B0"_id,
                     std::make_unique<NodeAttributes>(Eigen::Vector3d(1.0, 2.0, 3.0)));
 
-  graph.emplaceNode(DsgLayers::BUILDINGS,
-                    1,
-                    std::make_unique<NodeAttributes>(Eigen::Vector3d(4.0, 5.0, 6.0)));
+  graph.emplaceNode(DsgLayers::ROOMS,
+                    3,
+                    std::make_unique<NodeAttributes>(Eigen::Vector3d(-1.0, 0.0, 1.0)));
+  graph.emplaceNode(DsgLayers::ROOMS,
+                    4,
+                    std::make_unique<NodeAttributes>(Eigen::Vector3d(-1.0, 0.0, 1.0)));
+  graph.emplaceNode(DsgLayers::ROOMS,
+                    5,
+                    std::make_unique<NodeAttributes>(Eigen::Vector3d(-1.0, 0.0, 1.0)));
 
-  graph.emplaceNode(DsgLayers::BUILDINGS,
-                    2,
-                    std::make_unique<NodeAttributes>(Eigen::Vector3d(4.0, 5.0, 6.0)));
+  graph.insertEdge("B0"_id, 3);
+  graph.insertEdge("B0"_id, 4);
+  graph.insertEdge("B0"_id, 5);
 
-  graph.emplaceNode(
-      2, 3, std::make_unique<NodeAttributes>(Eigen::Vector3d(-1.0, 0.0, 1.0)));
-  graph.emplaceNode(
-      2, 4, std::make_unique<NodeAttributes>(Eigen::Vector3d(-1.0, 0.0, 1.0)));
-  graph.emplaceNode(
-      2, 5, std::make_unique<NodeAttributes>(Eigen::Vector3d(-1.0, 0.0, 1.0)));
-  graph.emplaceNode(
-      2, 6, std::make_unique<NodeAttributes>(Eigen::Vector3d(-1.0, 0.5, 1.0)));
-  graph.emplaceNode(
-      2, 7, std::make_unique<NodeAttributes>(Eigen::Vector3d(0.0, 0.0, 0.0)));
-  graph.emplaceNode(
-      2, 8, std::make_unique<NodeAttributes>(Eigen::Vector3d(1.0, -0.5, -1.0)));
-
-  graph.insertEdge(0, 3);
-  graph.insertEdge(0, 4);
-  graph.insertEdge(0, 5);
-  graph.insertEdge(1, 6);
-  graph.insertEdge(1, 7);
-  graph.insertEdge(1, 8);
-
-  graph.insertEdge(0, 1);
-  graph.insertEdge(0, 2);
-  graph.insertEdge(1, 2);
-
-  gtsam::Values values;
-  dsg_updates::updateBuildings(graph, values, values, false);
+  const UpdateInfo info{nullptr, nullptr, false, 0, false};
+  dsg_updates::UpdateBuildingsFunctor functor(
+      SemanticNodeAttributes::ColorVector::Zero(), 0);
+  functor.call(*dsg, info);
 
   Eigen::Vector3d first_expected(-1.0, 0.0, 1.0);
-  Eigen::Vector3d first_result = graph.getPosition(0);
+  Eigen::Vector3d first_result = graph.getPosition("B0"_id);
   EXPECT_NEAR(0.0, (first_expected - first_result).norm(), 1.0e-7);
-
-  Eigen::Vector3d second_expected(0.0, 0.0, 0.0);
-  Eigen::Vector3d second_result = graph.getPosition(1);
-  EXPECT_NEAR(0.0, (second_expected - second_result).norm(), 1.0e-7);
-
-  Eigen::Vector3d third_expected(4.0, 5.0, 6.0);
-  Eigen::Vector3d third_result = graph.getPosition(2);
-  EXPECT_NEAR(0.0, (third_expected - third_result).norm(), 1.0e-7);
 }
 
 TEST(DsgInterpolationTests, PlaceUpdate) {
   const LayerId place_layer = DsgLayers::PLACES;
-  DynamicSceneGraph graph;
+  auto dsg = makeSharedDsg();
+  auto& graph = *dsg->graph;
+
   auto attrs1 = std::make_unique<PlaceNodeAttributes>(0.0, 0.0);
   attrs1->position = Eigen::Vector3d(1.0, 2.0, 3.0);
   graph.emplaceNode(place_layer, NodeSymbol('p', 0), std::move(attrs1));
@@ -256,8 +249,9 @@ TEST(DsgInterpolationTests, PlaceUpdate) {
   values.insert(NodeSymbol('p', 5),
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
-  gtsam::Values pgmo_values;
-  dsg_updates::updatePlaces(graph, values, pgmo_values, false, 0.0, 0.0);
+  const UpdateInfo info{&values, nullptr, true, 0, false};
+  dsg_updates::UpdatePlacesFunctor functor(0.4, 0.3);
+  functor.call(*dsg, info);
 
   {  // first key exists: new value
     Eigen::Vector3d expected(4.0, 5.0, 6.0);
@@ -280,7 +274,9 @@ TEST(DsgInterpolationTests, PlaceUpdate) {
 
 TEST(DsgInterpolationTests, PlaceUpdateMerge) {
   const LayerId place_layer = DsgLayers::PLACES;
-  DynamicSceneGraph graph;
+  auto dsg = makeSharedDsg();
+  auto& graph = *dsg->graph;
+
   PlaceNodeAttributes::Ptr attrs0(new PlaceNodeAttributes);
   attrs0->position << 1.0, 2.0, 3.0;
   attrs0->distance = 1.0;
@@ -306,28 +302,30 @@ TEST(DsgInterpolationTests, PlaceUpdateMerge) {
   values.insert(NodeSymbol('p', 6),
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
-  gtsam::Values pgmo_values;
-  dsg_updates::updatePlaces(graph, values, pgmo_values, true, 0.4, 0.3);
+  const UpdateInfo info{&values, nullptr, true, 0, true};
+  dsg_updates::UpdatePlacesFunctor functor(0.4, 0.3);
+  auto merged_nodes = functor.call(*dsg, info);
 
-  // {  // first key exists: new value
-  //   Eigen::Vector3d expected(4.0, 5.0, 6.0);
-  //   Eigen::Vector3d result = graph.getPosition(NodeSymbol('p', 0));
-  //   EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
-  // }
+  {  // first key exists: new value
+    Eigen::Vector3d expected(4.0, 5.0, 6.0);
+    Eigen::Vector3d result = graph.getPosition(NodeSymbol('p', 0));
+    EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
+  }
 
-  // {  // non-zero key exists: new value
-  //   Eigen::Vector3d expected(7.0, 8.0, 9.0);
-  //   Eigen::Vector3d result = graph.getPosition(NodeSymbol('p', 5));
-  //   EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
-  // }
+  {  // non-zero key exists: new value
+    Eigen::Vector3d expected(7.0, 8.0, 9.0);
+    Eigen::Vector3d result = graph.getPosition(NodeSymbol('p', 5));
+    EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
+  }
 
-  // // node p6 merged with node p5
-  // EXPECT_FALSE(graph.hasNode(NodeSymbol('p', 6)));
+  // node p6 proposed for merge with node p5
+  EXPECT_TRUE(merged_nodes.count(NodeSymbol('p', 6)) > 0);
 }
 
 TEST(DsgInterpolationTests, AgentUpdate) {
   const LayerId agent_layer = DsgLayers::AGENTS;
-  DynamicSceneGraph graph;
+  auto dsg = makeSharedDsg();
+  auto& graph = *dsg->graph;
   {
     NodeAttributes::Ptr attrs =
         std::make_unique<AgentNodeAttributes>(Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0),
@@ -362,8 +360,8 @@ TEST(DsgInterpolationTests, AgentUpdate) {
       NodeSymbol('b', 5),
       gtsam::Pose3(gtsam::Rot3(0.0, 0.0, 1.0, 0.0), gtsam::Point3(7.0, 8.0, 9.0)));
 
-  gtsam::Values places_values;
-  dsg_updates::updateAgents(graph, places_values, agent_values, false);
+  const UpdateInfo info{nullptr, &agent_values, false, 0, false};
+  dsg_updates::updateAgents(*dsg, info);
 
   {  // external_key == node_id and in values
     const auto& attrs = graph.getDynamicNode(NodeSymbol('a', 0))
