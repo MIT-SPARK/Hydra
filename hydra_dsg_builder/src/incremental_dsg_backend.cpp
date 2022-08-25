@@ -273,12 +273,9 @@ void DsgBackend::updateFromSharedState() {
 
 void DsgBackend::startPgmo() {
   if (config_.use_mesh_subscribers) {
-    full_mesh_sub_ =
-        nh_.subscribe("pgmo/full_mesh", 1, &DsgBackend::fullMeshCallback, this);
-    deformation_graph_sub_ = nh_.subscribe("pgmo/mesh_graph_incremental",
-                                           1000,
-                                           &DsgBackend::deformationGraphCallback,
-                                           this);
+    full_mesh_sub_ = nh_.subscribe("full_mesh", 1, &DsgBackend::fullMeshCallback, this);
+    deformation_graph_sub_ = nh_.subscribe(
+        "mesh_graph_incremental", 1000, &DsgBackend::deformationGraphCallback, this);
   }
 
   pose_graph_sub_ = nh_.subscribe(
@@ -701,19 +698,29 @@ void DsgBackend::updateMergedNodes(const std::map<NodeId, NodeId>& new_merges) {
   }
 }
 
-void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,
-                                     const gtsam::Values& pgmo_values,
-                                     bool new_loop_closure) {
+void DsgBackend::callUpdateFunctions(
+    const gtsam::Values& places_values,
+    const gtsam::Values& pgmo_values,
+    bool new_loop_closure,
+    const std::map<LayerId, std::map<NodeId, NodeId>>& given_merges) {
+  bool enable_node_merging = config_.enable_node_merging;
+  if (given_merges.size() > 0) {
+    enable_node_merging = false;
+  }
   const UpdateInfo info{&places_values,
                         &pgmo_values,
                         new_loop_closure,
                         last_timestamp_,
-                        config_.enable_node_merging};
+                        enable_node_merging};
 
   ScopedTimer spin_timer("backend/update_layers", last_timestamp_);
   for (const auto& update_func : dsg_update_funcs_) {
     auto merged_nodes = update_func(*private_dsg_, info);
     updateMergedNodes(merged_nodes);
+  }
+
+  for (const auto& layer_merges : given_merges) {
+    updateMergedNodes(layer_merges.second);
   }
 }
 

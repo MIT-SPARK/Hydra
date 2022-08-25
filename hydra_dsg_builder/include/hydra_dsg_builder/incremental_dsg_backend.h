@@ -145,9 +145,11 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   virtual void addPlacesToDeformationGraph();
 
-  virtual void callUpdateFunctions(const gtsam::Values& places_values = gtsam::Values(),
-                                   const gtsam::Values& pgmo_values = gtsam::Values(),
-                                   bool new_loop_closure = false);
+  virtual void callUpdateFunctions(
+      const gtsam::Values& places_values = gtsam::Values(),
+      const gtsam::Values& pgmo_values = gtsam::Values(),
+      bool new_loop_closure = false,
+      const std::map<LayerId, std::map<NodeId, NodeId>>& given_merges = {});
 
   void logStatus(bool init = false) const;
 
