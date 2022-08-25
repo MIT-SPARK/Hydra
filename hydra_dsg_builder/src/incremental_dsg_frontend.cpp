@@ -88,7 +88,6 @@ DsgFrontend::DsgFrontend(const DsgFrontendConfig& config,
       [this](const FrontendInput& input) { this->updatePoseGraph(input); });
   input_callbacks_.push_back(
       [this](const FrontendInput& input) { this->updatePlaces(input); });
-  dsg_sender_.reset(new hydra::DsgSender(ros::NodeHandle(nh_, "frontend")));
 }
 
 DsgFrontend::~DsgFrontend() { stop(); }
@@ -152,14 +151,6 @@ void DsgFrontend::spin() {
     }
     dsg_->last_update_time = msg.timestamp_ns;
     dsg_->updated = true;
-    ros::Time stamp;
-    stamp.fromNSec(last_places_timestamp_);
-    {  // start dsg critical section
-      std::unique_lock<std::mutex> lock(dsg_->mutex);
-      dsg_sender_->sendGraph(*dsg_->graph, stamp);
-    }
-  }
-}
 
     if (config_.should_log) {
       // mutex not required because nothing is modifying the graph

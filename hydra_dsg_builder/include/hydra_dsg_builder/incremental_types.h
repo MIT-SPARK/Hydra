@@ -94,6 +94,7 @@ struct SharedDsgInfo {
   std::atomic<bool> updated;
   uint64_t last_update_time;
   DynamicSceneGraph::Ptr graph;
+  std::map<char, LayerId> prefix_layer_map;
 };
 
 struct DsgBackendStatus {

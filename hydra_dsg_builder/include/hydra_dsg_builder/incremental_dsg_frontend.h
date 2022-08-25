@@ -118,8 +118,6 @@ class DsgFrontend {
   std::unique_ptr<MeshSegmenter> segmenter_;
   SceneGraphLogger frontend_graph_logger_;
 
-  std::unique_ptr<hydra::DsgSender> dsg_sender_;
-
   std::unique_ptr<NearestNodeFinder> places_nn_finder_;
   NodeIdSet unlabeled_place_nodes_;
   NodeIdSet previous_active_places_;

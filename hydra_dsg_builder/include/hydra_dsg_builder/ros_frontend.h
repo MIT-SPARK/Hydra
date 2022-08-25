@@ -36,6 +36,7 @@
 #include "hydra_dsg_builder/incremental_dsg_frontend.h"
 
 #include <hydra_utils/semantic_ros_publishers.h>
+#include <kimera_pgmo/MeshFrontend.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/approximate_time.h>
 #include <message_filters/synchronizer.h>
@@ -122,6 +123,8 @@ struct ROSFrontend : public DsgFrontend {
 
   ros::Publisher active_vertices_pub_;
   std::unique_ptr<ObjectCloudPub> segmented_vertices_pub_;
+  std::unique_ptr<hydra::DsgSender> dsg_sender_;
+  std::unique_ptr<kimera_pgmo::MeshFrontendPublisher> mesh_frontend_pub_;
 };
 
 }  // namespace hydra
