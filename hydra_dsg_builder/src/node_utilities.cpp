@@ -32,71 +32,61 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include "hydra_dsg_builder/dsg_lcd_detector.h"
-#include "hydra_dsg_builder/lcd_module_config.h"
-#include "hydra_dsg_builder/lcd_visualizer.h"
-#include "hydra_dsg_builder/shared_module_state.h"
-
-#include <geometry_msgs/TransformStamped.h>
-#include <ros/callback_queue.h>
-#include <ros/ros.h>
-#include <tf2_ros/transform_listener.h>
-
-#include <pose_graph_tools/BowQuery.h>
-#include <pose_graph_tools/BowQueries.h>
-
-#include <memory>
-#include <mutex>
-#include <thread>
+#include "hydra_dsg_builder/node_utilities.h"
 
 namespace hydra {
-namespace incremental {
 
-class DsgLcd {
- public:
-  DsgLcd(const ros::NodeHandle& nh,
-         const SharedDsgInfo::Ptr& dsg,
-         const SharedModuleState::Ptr& state);
+ExitMode getExitMode(const ros::NodeHandle& nh) {
+  std::string exit_mode_str = "NORMAL";
+  nh.getParam("exit_mode", exit_mode_str);
 
-  virtual ~DsgLcd();
+  if (exit_mode_str == "CLOCK") {
+    return ExitMode::CLOCK;
+  } else if (exit_mode_str == "SERVICE") {
+    return ExitMode::SERVICE;
+  } else if (exit_mode_str == "NORMAL") {
+    return ExitMode::NORMAL;
+  } else {
+    ROS_WARN_STREAM("Unrecognized option: " << exit_mode_str
+                                            << ". Defaulting to NORMAL");
+    return ExitMode::NORMAL;
+  }
+}
 
-  void start();
+void spinWhileClockPresent() {
+  ros::WallRate r(50);
+  ROS_INFO("Waiting for bag to start");
+  while (ros::ok() && !haveClock()) {
+    ros::spinOnce();
+    r.sleep();
+  }
 
-  void stop();
+  ROS_INFO("Running...");
+  while (ros::ok() && haveClock()) {
+    ros::spinOnce();
+    r.sleep();
+  }
 
-  void save(const std::string& output_path);
+  ros::spinOnce();  // make sure all the callbacks are processed
+  ROS_WARN("Exiting!");
+}
 
- private:
-  void handleDbowMsg(const pose_graph_tools::BowQueries::ConstPtr& msg);
+void spinUntilExitRequested() {
+  ServiceFunctor functor;
 
-  void runLcd();
+  ros::NodeHandle nh("~");
+  ros::ServiceServer service =
+      nh.advertiseService("shutdown", &ServiceFunctor::callback, &functor);
 
-  void assignBowVectors();
+  ros::WallRate r(50);
+  ROS_INFO("Running...");
+  while (ros::ok() && !functor.should_exit) {
+    ros::spinOnce();
+    r.sleep();
+  }
 
-  std::optional<NodeId> getLatestAgentId();
+  ros::spinOnce();  // make sure all the callbacks are processed
+  ROS_WARN("Exiting!");
+}
 
- private:
-  ros::NodeHandle nh_;
-  std::atomic<bool> should_shutdown_{false};
-
-  DsgLcdModuleConfig config_;
-  SharedDsgInfo::Ptr dsg_;
-  SharedModuleState::Ptr state_;
-
-  std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> lcd_queue_;
-  std::unique_ptr<std::thread> lcd_thread_;
-  std::unique_ptr<lcd::DsgLcdDetector> lcd_detector_;
-  std::unique_ptr<lcd::LcdVisualizer> lcd_visualizer_;
-  std::unique_ptr<ros::CallbackQueue> visualizer_queue_;
-  DynamicSceneGraph::Ptr lcd_graph_;
-  // TODO(nathan) replace with struct passed in through constructor
-  char robot_prefix_;
-
-  ros::Subscriber bow_sub_;
-  std::list<pose_graph_tools::BowQuery::ConstPtr> bow_messages_;
-  std::list<NodeId> potential_lcd_root_nodes_;
-};
-
-}  // namespace incremental
 }  // namespace hydra

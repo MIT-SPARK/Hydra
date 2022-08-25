@@ -59,6 +59,7 @@ struct FakeConfig {
   TestEnum type = TestEnum::RED;
   Eigen::Matrix<uint8_t, 3, 1> vec = Eigen::Matrix<uint8_t, 3, 1>::Zero();
   std::map<TestEnum, bool> enable_map{{TestEnum::RED, true}, {TestEnum::GREEN, false}};
+  std::set<int> unique_values{1, 2, 3};
 };
 
 struct FakeConfig2 {
@@ -97,6 +98,7 @@ void visit_config(const Visitor& v, FakeConfig& config) {
   v.visit("type", config.type);
   v.visit("vec", config.vec);
   v.visit("enable_map", config.enable_map, MapConverter());
+  v.visit("unique_values", config.unique_values);
 }
 
 template <typename Visitor>
@@ -205,7 +207,7 @@ TEST(ConfigParser, RosName) {
 TEST(ConfigParsing, RosChildren) {
   config_parser::RosParserImpl parser(ros::NodeHandle("/plain_test_config"));
   auto children = parser.children();
-  EXPECT_EQ(children.size(), 11u);
+  EXPECT_EQ(children.size(), 12u);
 
   auto value_parser = parser.child("value_map");
   auto value_children = value_parser.children();
@@ -220,7 +222,7 @@ TEST(ConfigParsing, YamlChildren) {
   const std::string filepath = get_test_path() + "test_config.yaml";
   config_parser::YamlParserImpl parser(filepath);
   auto children = parser.children();
-  EXPECT_EQ(children.size(), 11u);
+  EXPECT_EQ(children.size(), 12u);
 
   auto value_parser = parser.child("value_map");
   auto value_children = value_parser.children();
@@ -257,6 +259,9 @@ TEST(ConfigParsing, ParseSingleStructYaml) {
   std::map<TestEnum, bool> expected_enable_map{{TestEnum::BLUE, 0},
                                                {TestEnum::GREEN, 1}};
   EXPECT_EQ(config.enable_map, expected_enable_map);
+
+  std::set<int> expected_unique_values{4, 5};
+  EXPECT_EQ(config.unique_values, expected_unique_values);
 }
 
 TEST(ConfigParsing, ParseSingleStructRos) {
@@ -284,6 +289,9 @@ TEST(ConfigParsing, ParseSingleStructRos) {
   std::map<TestEnum, bool> expected_enable_map{{TestEnum::BLUE, 0},
                                                {TestEnum::GREEN, 1}};
   EXPECT_EQ(config.enable_map, expected_enable_map);
+
+  std::set<int> expected_unique_values{4, 5};
+  EXPECT_EQ(config.unique_values, expected_unique_values);
 }
 
 TEST(ConfigParsing, ParseNestedStructYaml) {
@@ -345,6 +353,7 @@ TEST(ConfigParsing, OutputSingleConfig) {
 - type: RED
 - vec: [0, 0, 0]
 - enable_map: {GREEN: 0, RED: 1}
+- unique_values: [1, 2, 3]
 )out";
 
   EXPECT_EQ(expected, ss.str()) << "config:" << std::endl << ss.str();
@@ -369,6 +378,7 @@ TEST(ConfigParsing, OutputNestedConfig) {
   - type: RED
   - vec: [0, 0, 0]
   - enable_map: {GREEN: 0, RED: 1}
+  - unique_values: [1, 2, 3]
 - msg: world
 )out";
 

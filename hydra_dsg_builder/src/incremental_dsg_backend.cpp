@@ -66,11 +66,13 @@ void DsgBackend::setSolverParams() {
 
 DsgBackend::DsgBackend(const ros::NodeHandle nh,
                        const SharedDsgInfo::Ptr& dsg,
-                       const SharedDsgInfo::Ptr& backend_dsg)
+                       const SharedDsgInfo::Ptr& backend_dsg,
+                       const SharedModuleState::Ptr& state)
     : KimeraPgmoInterface(),
       nh_(nh),
       shared_dsg_(dsg),
       private_dsg_(backend_dsg),
+      state_(state),
       shared_places_copy_(DsgLayers::PLACES),
       robot_id_(0) {
   config_ = load_config<DsgBackendConfig>(nh_);
@@ -84,56 +86,49 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
   robot_prefix_ = kimera_pgmo::robot_id_to_prefix.at(robot_id_);
   robot_vertex_prefix_ = kimera_pgmo::robot_id_to_vertex_prefix.at(robot_id_);
 
+  update_objects_functor_.reset(new dsg_updates::UpdateObjectsFunctor());
+  update_places_functor_.reset(new dsg_updates::UpdatePlacesFunctor(
+      config_.places_merge_pos_threshold_m, config_.places_merge_distance_tolerance_m));
+  update_buildings_functor_.reset(new dsg_updates::UpdateBuildingsFunctor(
+      config_.building_color, config_.building_semantic_label));
+
+  dsg_update_funcs_.push_back(&dsg_updates::updateAgents);
+  dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdateObjectsFunctor::call,
+                                        update_objects_functor_.get(),
+                                        std::placeholders::_1,
+                                        std::placeholders::_2));
+  dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdatePlacesFunctor::call,
+                                        update_places_functor_.get(),
+                                        std::placeholders::_1,
+                                        std::placeholders::_2));
+
   if (config_.enable_rooms) {
-    room_finder_.reset(new RoomFinder(config_.room_finder));
+    update_rooms_functor_.reset(
+        new dsg_updates::UpdateRoomsFunctor(config_.room_finder));
+    dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdateRoomsFunctor::call,
+                                          update_rooms_functor_.get(),
+                                          std::placeholders::_1,
+                                          std::placeholders::_2));
   }
 
-  dsg_update_funcs_.push_back([&](auto& graph,
-                                  const auto& place_values,
-                                  const auto& pgmo_values,
-                                  bool allow_merging,
-                                  bool new_loop_closure) -> auto{
-    return dsg_updates::updateAgents(graph, place_values, pgmo_values, allow_merging);
-  });
-  dsg_update_funcs_.push_back([&](auto& graph,
-                                  const auto& place_values,
-                                  const auto& pgmo_values,
-                                  bool allow_merging,
-                                  bool new_loop_closure) -> auto{
-    return dsg_updates::updateObjects(graph,
-                                      place_values,
-                                      pgmo_values,
-                                      allow_merging,
-                                      new_loop_closure,
-                                      last_timestamp_,
-                                      archived_object_ids_);
-  });
-  dsg_update_funcs_.push_back([&](auto& graph,
-                                  const auto& place_values,
-                                  const auto& pgmo_values,
-                                  bool allow_merging,
-                                  bool new_loop_closure) -> auto{
-    return dsg_updates::updatePlaces(graph,
-                                     place_values,
-                                     pgmo_values,
-                                     allow_merging,
-                                     config_.places_merge_pos_threshold_m,
-                                     config_.places_merge_distance_tolerance_m,
-                                     last_timestamp_);
-  });
+  dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdateBuildingsFunctor::call,
+                                        update_buildings_functor_.get(),
+                                        std::placeholders::_1,
+                                        std::placeholders::_2));
 
   deformation_graph_->setForceRecalculate(!config_.pgmo.gnc_fix_prev_inliers);
   deformation_graph_->storeOnlyNoOptimization();
 
   if (config_.should_log) {
-    backend_graph_logger_.setOutputPath(config_.log_path + "/backend");
-    ROS_INFO("Logging backend graph to %s", (config_.log_path + "/backend").c_str());
+    const std::string log_path = config_.log_path + "/backend";
+    backend_graph_logger_.setOutputPath(log_path);
+    LOG(INFO) << "[Hydra Backend] logging to " << log_path;
     backend_graph_logger_.setLayerName(DsgLayers::OBJECTS, "objects");
     backend_graph_logger_.setLayerName(DsgLayers::PLACES, "places");
     backend_graph_logger_.setLayerName(DsgLayers::ROOMS, "rooms");
     backend_graph_logger_.setLayerName(DsgLayers::BUILDINGS, "buildings");
   } else {
-    ROS_ERROR("DSG Backend logging disabled. ");
+    LOG(INFO) << "[Hydra Backend] logging disabled.";
   }
 
   last_timestamp_ = 0;
@@ -141,25 +136,76 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
 }
 
 void DsgBackend::stop() {
-  LOG(INFO) << "[DSG Backend] stopping!";
   should_shutdown_ = true;
 
-  VLOG(2) << " [DSG Backend] joining optimizer thread";
   if (optimizer_thread_) {
+    VLOG(2) << "[Hydra Backend] joining optimizer thread and stopping";
     optimizer_thread_->join();
     optimizer_thread_.reset();
+    VLOG(2) << "[Hydra Backend] stopped!";
   }
-  VLOG(2) << " [DSG Backend] joined optimizer thread";
 }
 
 DsgBackend::~DsgBackend() {
-  LOG(INFO) << " [DSG Backend] destructor called!";
+  LOG(INFO) << "[Hydra Backend] destructor called!";
   stop();
 }
 
 void DsgBackend::start() {
   startPgmo();
-  LOG(INFO) << " [DSG Backend] started!";
+  LOG(INFO) << "[Hydra Backend] started!";
+}
+
+std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol key) {
+  NodeSymbol node(key.chr(), key.index());
+  if (!graph.hasNode(node)) {
+    LOG(ERROR) << "Missing node << " << node.getLabel() << "when logging loop closure";
+    LOG(ERROR) << "Num dynamic nodes: " << graph.numDynamicNodes();
+    return std::nullopt;
+  }
+
+  return graph.getDynamicNode(node).value().get().timestamp.count();
+}
+
+void DsgBackend::save(const std::string& output_path) {
+  private_dsg_->graph->save(output_path + "/dsg.json", false);
+  private_dsg_->graph->save(output_path + "/dsg_with_mesh.json");
+
+  if (deformation_graph_->hasPrefixPoses(robot_prefix_)) {
+    Path optimized_path = getOptimizedTrajectory(robot_id_);
+    std::string csv_name = config_.pgmo.log_path + std::string("/traj_pgmo.csv");
+    saveTrajectory(optimized_path, timestamps_, csv_name);
+  }
+
+  if (!private_dsg_->graph->isMeshEmpty()) {
+    kimera_pgmo::WriteMeshWithStampsToPly(output_path + "/mesh.ply",
+                                          private_dsg_->graph->getMesh(),
+                                          *mesh_vertex_stamps_);
+  }
+
+  const std::string output_csv = output_path + "/loop_closures.csv";
+  std::ofstream output_file;
+  output_file.open(output_csv);
+
+  output_file << "time_from_ns,time_to_ns,x,y,z,qw,qx,qy,qz,type,level" << std::endl;
+  for (const auto& loop_closure : loop_closures_) {
+    // pose = src.between(dest) or to_T_from
+    auto time_from = getTimeNs(*private_dsg_->graph, loop_closure.dest);
+    auto time_to = getTimeNs(*private_dsg_->graph, loop_closure.src);
+    if (!time_from || !time_to) {
+      continue;
+    }
+
+    const gtsam::Point3 pos = loop_closure.src_T_dest.translation();
+    const gtsam::Quaternion quat = loop_closure.src_T_dest.rotation().toQuaternion();
+
+    output_file << *time_from << "," << *time_to << ",";
+    output_file << pos.x() << "," << pos.y() << "," << pos.z() << ",";
+    output_file << quat.w() << ", " << quat.x() << "," << quat.y() << "," << quat.z()
+                << ",";
+    output_file << (loop_closure.dsg ? 1 : 0) << "," << loop_closure.level;
+    output_file << std::endl;
+  }
 }
 
 bool DsgBackend::updatePrivateDsg() {
@@ -174,13 +220,10 @@ bool DsgBackend::updatePrivateDsg() {
                                       true,
                                       &config_.merge_update_map,
                                       config_.merge_update_dynamic);
-      *private_dsg_->latest_places = *shared_dsg_->latest_places;
 
-      private_dsg_->archived_objects = shared_dsg_->archived_objects;
-
-      if (shared_dsg_->archived_objects.size() > 0) {
+      if (state_->archived_objects.size() > 0) {
         // clear out the shared_dsg set of archived objects and transfer to private
-        archived_object_ids_.merge(shared_dsg_->archived_objects);
+        update_objects_functor_->archived_object_ids.merge(state_->archived_objects);
       }
 
       if (shared_dsg_->graph->hasLayer(DsgLayers::PLACES)) {
@@ -204,11 +247,37 @@ bool DsgBackend::updatePrivateDsg() {
   return have_frontend_updates;
 }
 
+void DsgBackend::updateFromSharedState() {
+  {  // start critical section
+    std::unique_lock<std::mutex> lock(state_->mesh_mutex);
+    if (state_->have_new_mesh) {
+      // latch the pointer so that frontend can copy a new one without
+      // getting tied up waiting for the mesh interpolation
+      latest_mesh_ = state_->latest_mesh;
+      mesh_vertex_stamps_ = state_->mesh_vertex_stamps;
+      mesh_vertex_graph_inds_ = state_->mesh_vertex_graph_indices;
+      state_->have_new_mesh = false;
+      have_new_mesh_ = true;
+    }
+
+    for (const auto& msg : state_->deformation_graphs) {
+      deformation_graph_updates_.push(msg);
+      last_timestamp_ = msg->header.stamp.toNSec();
+    }
+    state_->deformation_graphs.clear();
+  }  // end critical section
+}
+
 void DsgBackend::startPgmo() {
-  full_mesh_sub_ =
-      nh_.subscribe("pgmo/full_mesh", 1, &DsgBackend::fullMeshCallback, this);
-  deformation_graph_sub_ = nh_.subscribe(
-      "pgmo/mesh_graph_incremental", 1000, &DsgBackend::deformationGraphCallback, this);
+  if (config_.use_mesh_subscribers) {
+    full_mesh_sub_ =
+        nh_.subscribe("pgmo/full_mesh", 1, &DsgBackend::fullMeshCallback, this);
+    deformation_graph_sub_ = nh_.subscribe("pgmo/mesh_graph_incremental",
+                                           1000,
+                                           &DsgBackend::deformationGraphCallback,
+                                           this);
+  }
+
   pose_graph_sub_ = nh_.subscribe(
       "pose_graph_incremental", 10000, &DsgBackend::poseGraphCallback, this);
   // TODO(yun) with lower queue size we drop msgs, esp with permissive dsg lcd
@@ -278,7 +347,12 @@ bool DsgBackend::readPgmoUpdates() {
   while ((msg = popDeformationGraphQueue()) != nullptr) {
     status_.new_graph_factors_ += msg->edges.size();
     status_.new_factors_ += msg->edges.size();
-    processIncrementalMeshGraph(msg, timestamps_, &unconnected_nodes_);
+    try {
+      processIncrementalMeshGraph(msg, timestamps_, &unconnected_nodes_);
+    } catch (const gtsam::ValuesKeyDoesNotExist& e) {
+      LOG(ERROR) << *msg;
+      throw std::logic_error(e.what());
+    }
     have_updates = true;
   }
 
@@ -299,6 +373,10 @@ void DsgBackend::runPgmo() {
     status_.reset();
     ScopedTimer spin_timer("backend/spin", last_timestamp_);
     const size_t prev_loop_closures = num_loop_closures_;
+
+    if (!config_.use_mesh_subscribers) {
+      updateFromSharedState();
+    }
 
     if (readPgmoUpdates()) {
       have_graph_updates_ = true;
@@ -362,7 +440,7 @@ void DsgBackend::runPgmo() {
 
 void DsgBackend::fullMeshCallback(const KimeraPgmoMesh::ConstPtr& msg) {
   std::unique_lock<std::mutex> lock(pgmo_mutex_);
-  latest_mesh_ = msg;
+  latest_mesh_msg_ = msg;
   have_new_mesh_ = true;
 }
 
@@ -473,10 +551,10 @@ bool DsgBackend::addInternalLCDToDeformationGraph() {
   std::list<LoopClosureLog> to_process;
 
   {  // start critical section
-    std::unique_lock<std::mutex> lock(shared_dsg_->lcd_mutex);
-    while (!shared_dsg_->loop_closures.empty()) {
-      auto result = shared_dsg_->loop_closures.front();
-      shared_dsg_->loop_closures.pop();
+    std::unique_lock<std::mutex> lock(state_->lcd_mutex);
+    while (!state_->loop_closures.empty()) {
+      auto result = state_->loop_closures.front();
+      state_->loop_closures.pop();
 
       // TODO(nathan) this is kinda ugly, we can probably grab the GTSAM symbol in the
       // frontend and pass it with the result
@@ -503,8 +581,11 @@ bool DsgBackend::addInternalLCDToDeformationGraph() {
 
   bool added_new_loop_closure = false;
   for (const auto& lc : to_process) {
-    deformation_graph_->addNewBetween(
-        lc.src, lc.dest, lc.src_T_dest, gtsam::Pose3(), lc_variance_);
+    deformation_graph_->addNewBetween(lc.src,
+                                      lc.dest,
+                                      lc.src_T_dest,
+                                      gtsam::Pose3(),
+                                      KimeraPgmoInterface::config_.lc_variance);
     added_new_loop_closure = true;
     num_loop_closures_++;
 
@@ -527,21 +608,20 @@ void DsgBackend::updateDsgMesh(bool force_mesh_update) {
   }
 
   timer.reset(new ScopedTimer("backend/mesh_update", last_timestamp_));
-  auto input_mesh = kimera_pgmo::PgmoMeshMsgToPolygonMesh(
-      *latest_mesh_, &mesh_vertex_stamps_, &mesh_vertex_graph_inds_);
   have_new_mesh_ = false;
 
-  if (input_mesh.cloud.height * input_mesh.cloud.width == 0) {
+  if (latest_mesh_->cloud.height * latest_mesh_->cloud.width == 0) {
     return;
   }
-  VLOG(3) << "Deforming mesh with " << mesh_vertex_stamps_.size() << " vertices";
+  VLOG(3) << "Deforming mesh with " << mesh_vertex_stamps_->size() << " vertices";
 
-  auto opt_mesh = deformation_graph_->deformMesh(input_mesh,
-                                                 mesh_vertex_stamps_,
-                                                 mesh_vertex_graph_inds_,
-                                                 robot_vertex_prefix_,
-                                                 num_interp_pts_,
-                                                 interp_horizon_);
+  auto opt_mesh =
+      deformation_graph_->deformMesh(*latest_mesh_,
+                                     *mesh_vertex_stamps_,
+                                     *mesh_vertex_graph_inds_,
+                                     robot_vertex_prefix_,
+                                     KimeraPgmoInterface::config_.num_interp_pts,
+                                     KimeraPgmoInterface::config_.interp_horizon);
   {
     // start private dsg critical section
     std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
@@ -581,6 +661,16 @@ void DsgBackend::optimize(bool new_loop_closure) {
 }
 
 void DsgBackend::updateMergedNodes(const std::map<NodeId, NodeId>& new_merges) {
+  if (new_merges.size() > 0) {
+    VLOG(1) << "In DSG update, found " << new_merges.size()
+            << " pairs of overlapping nodes. Merging...";
+    for (const auto& node_pair : new_merges) {
+      private_dsg_->graph->mergeNodes(node_pair.first, node_pair.second);
+      VLOG(3) << "merging " << NodeSymbol(node_pair.first).getLabel() << " -> "
+              << NodeSymbol(node_pair.second).getLabel();
+    }
+  }
+
   for (const auto& id_node_pair : new_merges) {
     auto iter = merged_nodes_parents_.find(id_node_pair.second);
     if (iter == merged_nodes_parents_.end()) {
@@ -608,105 +698,16 @@ void DsgBackend::updateMergedNodes(const std::map<NodeId, NodeId>& new_merges) {
 void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,
                                      const gtsam::Values& pgmo_values,
                                      bool new_loop_closure) {
+  const UpdateInfo info{&places_values,
+                        &pgmo_values,
+                        new_loop_closure,
+                        last_timestamp_,
+                        config_.enable_node_merging};
+
   ScopedTimer spin_timer("backend/update_layers", last_timestamp_);
-  {  // start private dsg critical section
-    std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
-    for (const auto& update_func : dsg_update_funcs_) {
-      auto merged_nodes = update_func(*private_dsg_->graph,
-                                      places_values,
-                                      pgmo_values,
-                                      config_.enable_node_merging,
-                                      new_loop_closure);
-      updateMergedNodes(merged_nodes);
-    }
-  }  // end private dsg critical section
-  updateRoomsNodes();
-  updateBuildingNode();
-}
-
-ActiveNodeSet DsgBackend::getNodesForRoomDetection(const NodeIdSet& latest_places) {
-  std::unordered_set<NodeId> active_places(latest_places.begin(), latest_places.end());
-  // TODO(nathan) grab this from a set of active rooms
-  const auto& rooms = private_dsg_->graph->getLayer(DsgLayers::ROOMS);
-  for (const auto& id_node_pair : rooms.nodes()) {
-    active_places.insert(id_node_pair.second->children().begin(),
-                         id_node_pair.second->children().end());
-  }
-
-  // TODO(nathan) this is threadsafe as long as places and rooms are on the same thread
-  const auto& places = private_dsg_->graph->getLayer(DsgLayers::PLACES);
-  for (const auto& node_id : unlabeled_place_nodes_) {
-    if (!places.hasNode(node_id)) {
-      continue;
-    }
-
-    active_places.insert(node_id);
-  }
-
-  return active_places;
-}
-
-void DsgBackend::storeUnlabeledPlaces(const ActiveNodeSet active_nodes) {
-  const auto& places = private_dsg_->graph->getLayer(DsgLayers::PLACES);
-
-  unlabeled_place_nodes_.clear();
-  for (const auto& node_id : active_nodes) {
-    if (!places.hasNode(node_id)) {
-      continue;
-    }
-
-    if (places.getNode(node_id)->get().hasParent()) {
-      continue;
-    }
-
-    unlabeled_place_nodes_.insert(node_id);
-  }
-}
-
-void DsgBackend::updateRoomsNodes() {
-  if (!room_finder_) {
-    return;
-  }
-
-  ScopedTimer timer("backend/room_detection", last_timestamp_, true, 1, false);
-  ActiveNodeSet active_nodes = getNodesForRoomDetection(*private_dsg_->latest_places);
-  VLOG(3) << "Detecting rooms for " << active_nodes.size() << " nodes";
-  room_finder_->findRooms(*private_dsg_, active_nodes);
-  storeUnlabeledPlaces(active_nodes);
-}
-
-void DsgBackend::updateBuildingNode() {
-  const NodeSymbol node_id('B', 0);
-  std::unique_lock<std::mutex> lock(private_dsg_->mutex);
-  const auto& rooms = private_dsg_->graph->getLayer(DsgLayers::ROOMS);
-
-  if (!rooms.numNodes()) {
-    if (private_dsg_->graph->hasNode(node_id)) {
-      private_dsg_->graph->removeNode(node_id);
-    }
-
-    return;
-  }
-
-  Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
-  for (const auto& id_node_pair : rooms.nodes()) {
-    centroid += id_node_pair.second->attributes().position;
-  }
-  centroid /= rooms.numNodes();
-
-  if (!private_dsg_->graph->hasNode(node_id)) {
-    SemanticNodeAttributes::Ptr attrs(new SemanticNodeAttributes());
-    attrs->position = centroid;
-    attrs->color = config_.building_color;
-    attrs->semantic_label = config_.building_semantic_label;
-    attrs->name = node_id.getLabel();
-    private_dsg_->graph->emplaceNode(DsgLayers::BUILDINGS, node_id, std::move(attrs));
-  } else {
-    private_dsg_->graph->getNode(node_id)->get().attributes().position = centroid;
-  }
-
-  for (const auto& id_node_pair : rooms.nodes()) {
-    private_dsg_->graph->insertEdge(node_id, id_node_pair.first);
+  for (const auto& update_func : dsg_update_funcs_) {
+    auto merged_nodes = update_func(*private_dsg_, info);
+    updateMergedNodes(merged_nodes);
   }
 }
 
@@ -714,7 +715,7 @@ void DsgBackend::logStatus(bool init) const {
   std::ofstream file;
   std::string filename = config_.pgmo.log_path + std::string("/dsg_pgmo_status.csv");
   if (init) {
-    ROS_INFO("DSG Backend logging PGMO status output to %s", filename.c_str());
+    LOG(INFO) << "[Hydra Backend] logging PGMO status output to " << filename;
     file.open(filename);
     // file format
     file << "total_lc,new_lc,total_factors,total_values,new_factors,new_graph_"
@@ -754,12 +755,13 @@ void DsgBackend::visualizeDeformationGraphEdges() const {
 void DsgBackend::loadState(const std::string& state_path,
                            const std::string& dgrf_path) {
   pcl::PolygonMeshPtr mesh(new pcl::PolygonMesh());
+  mesh_vertex_stamps_.reset(new std::vector<ros::Time>());
   kimera_pgmo::ReadMeshWithStampsFromPly(
-      state_path + "/mesh.ply", mesh, &mesh_vertex_stamps_);
+      state_path + "/mesh.ply", mesh, mesh_vertex_stamps_.get());
 
-  latest_mesh_.reset(
+  latest_mesh_msg_.reset(
       new kimera_pgmo::KimeraPgmoMesh(kimera_pgmo::PolygonMeshToPgmoMeshMsg(
-          robot_id_, *mesh, mesh_vertex_stamps_, "world")));
+          robot_id_, *mesh, *mesh_vertex_stamps_, "world")));
   have_new_mesh_ = true;
 
   loadDeformationGraphFromFile(dgrf_path);

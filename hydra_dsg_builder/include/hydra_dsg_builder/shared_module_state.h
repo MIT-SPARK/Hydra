@@ -33,69 +33,41 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/dsg_lcd_detector.h"
-#include "hydra_dsg_builder/lcd_module_config.h"
-#include "hydra_dsg_builder/lcd_visualizer.h"
-#include "hydra_dsg_builder/shared_module_state.h"
+#include "hydra_dsg_builder/incremental_types.h"
 
-#include <geometry_msgs/TransformStamped.h>
-#include <ros/callback_queue.h>
-#include <ros/ros.h>
-#include <tf2_ros/transform_listener.h>
+#include <hydra_utils/dsg_types.h>
+#include <kimera_pgmo/utils/CommonStructs.h>
+#include <pose_graph_tools/PoseGraph.h>
+#include <ros/time.h>
 
-#include <pose_graph_tools/BowQuery.h>
-#include <pose_graph_tools/BowQueries.h>
-
+#include <atomic>
+#include <list>
+#include <map>
 #include <memory>
 #include <mutex>
-#include <thread>
+#include <vector>
 
 namespace hydra {
 namespace incremental {
 
-class DsgLcd {
- public:
-  DsgLcd(const ros::NodeHandle& nh,
-         const SharedDsgInfo::Ptr& dsg,
-         const SharedModuleState::Ptr& state);
+struct SharedModuleState {
+  using Ptr = std::shared_ptr<SharedModuleState>;
 
-  virtual ~DsgLcd();
+  NodeIdSet latest_places;
+  NodeIdSet archived_places;
+  std::set<NodeId> archived_objects;
 
-  void start();
+  std::mutex mesh_mutex;
+  bool have_new_mesh;
+  std::shared_ptr<pcl::PolygonMesh> latest_mesh;
+  std::shared_ptr<std::vector<ros::Time>> mesh_vertex_stamps;
+  std::shared_ptr<std::vector<int>> mesh_vertex_graph_indices;
+  std::list<pose_graph_tools::PoseGraph::ConstPtr> deformation_graphs;
 
-  void stop();
+  std::map<NodeId, size_t> agent_key_map;
 
-  void save(const std::string& output_path);
-
- private:
-  void handleDbowMsg(const pose_graph_tools::BowQueries::ConstPtr& msg);
-
-  void runLcd();
-
-  void assignBowVectors();
-
-  std::optional<NodeId> getLatestAgentId();
-
- private:
-  ros::NodeHandle nh_;
-  std::atomic<bool> should_shutdown_{false};
-
-  DsgLcdModuleConfig config_;
-  SharedDsgInfo::Ptr dsg_;
-  SharedModuleState::Ptr state_;
-
-  std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> lcd_queue_;
-  std::unique_ptr<std::thread> lcd_thread_;
-  std::unique_ptr<lcd::DsgLcdDetector> lcd_detector_;
-  std::unique_ptr<lcd::LcdVisualizer> lcd_visualizer_;
-  std::unique_ptr<ros::CallbackQueue> visualizer_queue_;
-  DynamicSceneGraph::Ptr lcd_graph_;
-  // TODO(nathan) replace with struct passed in through constructor
-  char robot_prefix_;
-
-  ros::Subscriber bow_sub_;
-  std::list<pose_graph_tools::BowQuery::ConstPtr> bow_messages_;
-  std::list<NodeId> potential_lcd_root_nodes_;
+  std::mutex lcd_mutex;
+  std::queue<lcd::DsgRegistrationSolution> loop_closures;
 };
 
 }  // namespace incremental

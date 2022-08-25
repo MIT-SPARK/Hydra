@@ -38,6 +38,7 @@
 #include <map>
 #include <ostream>
 #include <vector>
+#include <set>
 
 namespace config_parser {
 
@@ -78,6 +79,22 @@ constexpr const auto& displayParam = detail::static_const<detail::display_param_
 // make sure vector operator is present in the right namespace
 template <typename T>
 std::ostream& operator<<(std::ostream& out, const std::vector<T>& values) {
+  out << "[";
+  auto iter = values.begin();
+  while (iter != values.end()) {
+    out << *iter;
+    ++iter;
+    if (iter != values.end()) {
+      out << ", ";
+    }
+  }
+  out << "]";
+  return out;
+}
+
+// make sure vector operator is present in the right namespace
+template <typename T>
+std::ostream& operator<<(std::ostream& out, const std::set<T>& values) {
   out << "[";
   auto iter = values.begin();
   while (iter != values.end()) {

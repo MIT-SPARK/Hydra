@@ -33,70 +33,51 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/dsg_lcd_detector.h"
-#include "hydra_dsg_builder/lcd_module_config.h"
-#include "hydra_dsg_builder/lcd_visualizer.h"
-#include "hydra_dsg_builder/shared_module_state.h"
-
-#include <geometry_msgs/TransformStamped.h>
-#include <ros/callback_queue.h>
-#include <ros/ros.h>
-#include <tf2_ros/transform_listener.h>
-
-#include <pose_graph_tools/BowQuery.h>
-#include <pose_graph_tools/BowQueries.h>
-
+#include <chrono>
+#include <condition_variable>
 #include <memory>
 #include <mutex>
-#include <thread>
+#include <queue>
 
 namespace hydra {
-namespace incremental {
 
-class DsgLcd {
- public:
-  DsgLcd(const ros::NodeHandle& nh,
-         const SharedDsgInfo::Ptr& dsg,
-         const SharedModuleState::Ptr& state);
+template <typename T>
+struct InputQueue {
+  using Ptr = std::shared_ptr<InputQueue<T>>;
+  std::queue<T> queue;
+  mutable std::mutex mutex;
+  mutable std::condition_variable cv;
 
-  virtual ~DsgLcd();
+  bool empty() const {
+    std::unique_lock<std::mutex> lock(mutex);
+    return queue.empty();
+  }
 
-  void start();
+  const T& front() const {
+    std::unique_lock<std::mutex> lock(mutex);
+    return queue.front();
+  }
 
-  void stop();
+  bool poll(int wait_time_us = 1000) const {
+    std::chrono::microseconds wait_duration(wait_time_us);
+    std::unique_lock<std::mutex> lock(mutex);
+    return cv.wait_for(lock, wait_duration, [&] { return !queue.empty(); });
+  }
 
-  void save(const std::string& output_path);
+  void push(const T& input) {
+    {
+      std::unique_lock<std::mutex> lock(mutex);
+      queue.push(input);
+    }
+    cv.notify_all();
+  }
 
- private:
-  void handleDbowMsg(const pose_graph_tools::BowQueries::ConstPtr& msg);
-
-  void runLcd();
-
-  void assignBowVectors();
-
-  std::optional<NodeId> getLatestAgentId();
-
- private:
-  ros::NodeHandle nh_;
-  std::atomic<bool> should_shutdown_{false};
-
-  DsgLcdModuleConfig config_;
-  SharedDsgInfo::Ptr dsg_;
-  SharedModuleState::Ptr state_;
-
-  std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> lcd_queue_;
-  std::unique_ptr<std::thread> lcd_thread_;
-  std::unique_ptr<lcd::DsgLcdDetector> lcd_detector_;
-  std::unique_ptr<lcd::LcdVisualizer> lcd_visualizer_;
-  std::unique_ptr<ros::CallbackQueue> visualizer_queue_;
-  DynamicSceneGraph::Ptr lcd_graph_;
-  // TODO(nathan) replace with struct passed in through constructor
-  char robot_prefix_;
-
-  ros::Subscriber bow_sub_;
-  std::list<pose_graph_tools::BowQuery::ConstPtr> bow_messages_;
-  std::list<NodeId> potential_lcd_root_nodes_;
+  T pop() {
+    std::unique_lock<std::mutex> lock(mutex);
+    auto value = queue.front();
+    queue.pop();
+    return value;
+  }
 };
 
-}  // namespace incremental
 }  // namespace hydra

@@ -44,8 +44,10 @@ namespace incremental {
 using hydra::timing::ScopedTimer;
 using lcd::LayerRegistrationConfig;
 
-DsgLcd::DsgLcd(const ros::NodeHandle& nh, const SharedDsgInfo::Ptr& dsg)
-    : nh_(nh), dsg_(dsg), lcd_graph_(new DynamicSceneGraph()) {
+DsgLcd::DsgLcd(const ros::NodeHandle& nh,
+               const SharedDsgInfo::Ptr& dsg,
+               const SharedModuleState::Ptr& state)
+    : nh_(nh), dsg_(dsg), state_(state), lcd_graph_(new DynamicSceneGraph()) {
   // TODO(nathan) rethink
   int robot_id = 0;
   nh_.getParam("robot_id", robot_id);
@@ -97,6 +99,8 @@ void DsgLcd::start() {
   LOG(INFO) << "[DSG LCD] LCD started!";
 }
 
+void DsgLcd::save(const std::string& output_path) {}
+
 std::optional<NodeId> DsgLcd::getLatestAgentId() {
   if (lcd_queue_.empty()) {
     return std::nullopt;
@@ -144,9 +148,9 @@ void DsgLcd::runLcd() {
       lcd_graph_->mergeGraph(*dsg_->graph);
 
       potential_lcd_root_nodes_.insert(potential_lcd_root_nodes_.end(),
-                                       dsg_->archived_places.begin(),
-                                       dsg_->archived_places.end());
-      dsg_->archived_places.clear();
+                                       state_->archived_places.begin(),
+                                       state_->archived_places.end());
+      state_->archived_places.clear();
     }  // end critical section
 
     if (lcd_graph_->getLayer(DsgLayers::PLACES).numNodes() == 0) {
@@ -203,9 +207,9 @@ void DsgLcd::runLcd() {
 
     {  // start lcd critical section
       // TODO(nathan) double check logic here
-      std::unique_lock<std::mutex> lcd_lock(dsg_->lcd_mutex);
+      std::unique_lock<std::mutex> lcd_lock(state_->lcd_mutex);
       for (const auto& result : results) {
-        dsg_->loop_closures.push(result);
+        state_->loop_closures.push(result);
         LOG(WARNING) << "Found valid loop-closure: "
                      << NodeSymbol(result.from_node).getLabel() << " -> "
                      << NodeSymbol(result.to_node).getLabel();
@@ -229,8 +233,9 @@ void DsgLcd::assignBowVectors() {
     const auto& msg = *iter;
     char prefix = kimera_pgmo::robot_id_to_prefix.at(msg->robot_id);
     NodeSymbol pgmo_key(prefix, msg->pose_id);
-    if (dsg_->agent_key_map.count(pgmo_key)) {
-      const auto& node = agents.getNodeByIndex(dsg_->agent_key_map.at(pgmo_key))->get();
+    if (state_->agent_key_map.count(pgmo_key)) {
+      const auto& node =
+          agents.getNodeByIndex(state_->agent_key_map.at(pgmo_key))->get();
       lcd_queue_.push(node.id);
 
       AgentNodeAttributes& attrs = node.attributes<AgentNodeAttributes>();
