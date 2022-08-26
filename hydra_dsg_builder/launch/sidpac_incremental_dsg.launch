@@ -18,11 +18,6 @@
     <arg name="rviz_dir" default="$(find hydra_dsg_builder)/rviz"/>
     <arg name="rviz_file" default="sidpac.rviz"/>
 
-    <include if="$(arg use_gt_frame)" file="$(find hydra_utils)/launch/gt_pose/sidpac_gt_pose.launch">
-        <arg name="path_to_csv" value="$(arg gt_path_csv)"/>
-        <arg name="sensor_frame" value="$(arg sensor_frame)"/>
-    </include>
-
     <include file="$(find hydra_topology)/launch/hydra_topology_sidpac.launch" pass_all_args="true">
         <arg name="semantic_color_path" value="$(arg semantic_map_path)"/>
         <arg name="config_dir" value="$(find hydra_topology)/config"/>
