@@ -199,9 +199,12 @@ void ReconstructionModule::addMeshToOutput(const BlockIndexList& archived_blocks
   auto& active_mesh = const_cast<hydra_msgs::ActiveMesh&>(*output.mesh);
   active_mesh.header.stamp.fromNSec(timestamp_ns);
   // TODO(nathan) selectable color mode?
-  generateVoxbloxMeshMsg(mesh_, voxblox::ColorMode::kColor, &active_mesh.mesh);
+  generateVoxbloxMeshMsg(mesh_.get(),
+                         voxblox::ColorMode::kColor,
+                         &active_mesh.mesh,
+                         active_mesh.header.stamp);
   active_mesh.mesh.header.frame_id = config_.world_frame;
-  active_mesh.mesh.header.stamp.fromNSec(timestamp_ns);
+  active_mesh.mesh.header.stamp = active_mesh.header.stamp;
 
   auto iter = active_mesh.mesh.mesh_blocks.begin();
   while (iter != active_mesh.mesh.mesh_blocks.end()) {
