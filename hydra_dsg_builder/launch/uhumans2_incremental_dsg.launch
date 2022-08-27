@@ -3,10 +3,19 @@
     <arg name="config_dir" default="$(find hydra_dsg_builder)/config/uhumans2"/>
     <arg name="dsg_output_dir" default="$(find hydra_dsg_builder)/output/uhumans2"/>
     <arg name="dsg_output_prefix" default="office"/>
-    <arg name="typology_dir" default="$(find hydra_dsg_builder)/config/uhumans2"/>
-    <arg name="typology_config" default="uhumans2_office_typology.yaml"/>
-    <arg name="semantic_map_dir" default="$(find kimera_semantics_ros)/cfg"/>
-    <arg name="semantic_map_file" default="tesse_multiscene_office1_segmentation_mapping.csv"/>
+    <arg name="typology_dir" default="$(find hydra_dsg_builder)/config"/>
+    <arg name="typology_config" default="uhumans2/uhumans2_office_typology.yaml"/>
+
+    <arg name="use_gt_semantics" default="true"/>
+    <arg name="dataset_name" default="ade150_config" unless="$(arg use_gt_semantics)"/>
+    <arg name="semantic_map_dir" default="$(find kimera_semantics_ros)/cfg"
+         if="$(arg use_gt_semantics)"/>
+    <arg name="semantic_map_dir" default="$(find semantic_recolor)/config/colors"
+         unless="$(arg use_gt_semantics)"/>
+    <arg name="semantic_map_file" default="tesse_multiscene_office1_segmentation_mapping.csv"
+         if="$(arg use_gt_semantics)"/>
+    <arg name="semantic_map_file" default="$(arg dataset_name).csv"
+         unless="$(arg use_gt_semantics)"/>
     <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
 
     <arg name="use_gt_frame" default="true"/>

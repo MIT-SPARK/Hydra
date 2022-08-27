@@ -16,10 +16,18 @@
          default="$(find semantic_recolor)/config/colors/ade150_config.csv"
          unless="$(arg use_gt_semantics)"/>
 
-    <arg name="rgb_info_topic" default="/tesse/seg_cam/camera_info" if="$(arg use_semantics)"/>
-    <arg name="rgb_info_topic" default="/tesse/left_cam/camera_info" unless="$(arg use_semantics)"/>
-    <arg name="rgb_topic" default="/tesse/seg_cam/rgb/image_raw" if="$(arg use_semantics)"/>
-    <arg name="rgb_topic" default="/tesse/left_cam/rgb/image_raw" unless="$(arg use_semantics)"/>
+    <!-- camera info -->
+    <arg name="rgb_info_topic" default="/tesse/seg_cam/camera_info"
+         if="$(arg use_gt_semantics)"/>
+    <arg name="rgb_info_topic" default="/tesse/left_cam/camera_info"
+         unless="$(arg use_gt_semantics)"/>
+
+    <!-- rgb image -->
+    <arg name="rgb_topic" default="/tesse/seg_cam/rgb/image_raw"
+         if="$(arg use_gt_semantics)"/>
+    <arg name="rgb_topic" default="/tesse/left_cam/rgb/image_raw"
+         unless="$(arg use_gt_semantics)"/>
+
     <arg name="depth_topic" default="/tesse/depth_cam/mono/image_raw"/>
 
     <arg name="pointcloud_topic" value="/semantic_pointcloud" if="$(arg use_semantics)"/>

@@ -59,16 +59,10 @@ Visualization Manager:
           Name: Scene Graph (Static)
           Namespaces:
             interlayer_edges_3_2: true
-            interlayer_edges_4_3: true
-            interlayer_edges_5_4: true
             layer_bounding_boxes_2: true
             layer_edges_3: true
-            layer_edges_4: true
-            layer_labels_5: true
             layer_nodes_2: true
             layer_nodes_3: true
-            layer_nodes_4: true
-            layer_nodes_5: true
             mesh_object_connections: true
           Queue Size: 100
           Value: true
@@ -77,7 +71,9 @@ Visualization Manager:
           Marker Topic: /hydra_dsg_visualizer/dynamic_layers_viz
           Name: Scene Graph (Dynamic)
           Namespaces:
-            {}
+            "dynamic_edges_\x00": true
+            "dynamic_label_\x00": true
+            "dynamic_nodes_\x00": true
           Queue Size: 100
           Value: true
       Enabled: true
@@ -137,6 +133,14 @@ Visualization Manager:
       Transport Hint: raw
       Unreliable: false
       Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /hydra_topology_node/gvd_viz
+      Name: Marker
+      Namespaces:
+        gvd_visualizer: true
+      Queue Size: 100
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -165,7 +169,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 17.623416900634766
+      Distance: 24.759632110595703
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
