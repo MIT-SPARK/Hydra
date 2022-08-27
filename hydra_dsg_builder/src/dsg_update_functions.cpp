@@ -388,7 +388,7 @@ std::map<NodeId, NodeId> UpdateBuildingsFunctor::call(SharedDsgInfo& dsg,
 }
 
 std::map<NodeId, NodeId> updateAgents(SharedDsgInfo& dsg, const UpdateInfo& info) {
-  if (!info.pgmo_values || info.pgmo_values->size() == 0) {
+  if (!info.complete_agent_values || info.complete_agent_values->size() == 0) {
     return {};
   }
 
@@ -403,12 +403,13 @@ std::map<NodeId, NodeId> updateAgents(SharedDsgInfo& dsg, const UpdateInfo& info
 
     for (const auto& node : prefix_layer_pair.second->nodes()) {
       auto& attrs = node->attributes<AgentNodeAttributes>();
-      if (!info.pgmo_values->exists(attrs.external_key)) {
+      if (!info.complete_agent_values->exists(attrs.external_key)) {
         missing_nodes.insert(node->id);
         continue;
       }
 
-      gtsam::Pose3 agent_pose = info.pgmo_values->at<gtsam::Pose3>(attrs.external_key);
+      gtsam::Pose3 agent_pose =
+          info.complete_agent_values->at<gtsam::Pose3>(attrs.external_key);
       attrs.position = agent_pose.translation();
       attrs.world_R_body = Eigen::Quaterniond(agent_pose.rotation().matrix());
     }

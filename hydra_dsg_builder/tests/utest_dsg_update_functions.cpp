@@ -360,7 +360,7 @@ TEST(DsgInterpolationTests, AgentUpdate) {
       NodeSymbol('b', 5),
       gtsam::Pose3(gtsam::Rot3(0.0, 0.0, 1.0, 0.0), gtsam::Point3(7.0, 8.0, 9.0)));
 
-  const UpdateInfo info{nullptr, &agent_values, false, 0, false};
+  const UpdateInfo info{nullptr, nullptr, false, 0, false, &agent_values};
   dsg_updates::updateAgents(*dsg, info);
 
   {  // external_key == node_id and in values

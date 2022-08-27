@@ -584,11 +584,24 @@ bool DsgBackend::addInternalLCDToDeformationGraph() {
 
   bool added_new_loop_closure = false;
   for (const auto& lc : to_process) {
-    deformation_graph_->addNewBetween(lc.src,
-                                      lc.dest,
-                                      lc.src_T_dest,
-                                      gtsam::Pose3(),
-                                      KimeraPgmoInterface::config_.lc_variance);
+    if (!KimeraPgmoInterface::config_.b_enable_sparsify) {
+      deformation_graph_->addNewBetween(lc.src,
+                                        lc.dest,
+                                        lc.src_T_dest,
+                                        gtsam::Pose3(),
+                                        KimeraPgmoInterface::config_.lc_variance);
+    } else {
+      gtsam::Key sparse_src = full_sparse_frame_map_.at(lc.src);
+      gtsam::Key sparse_dest = full_sparse_frame_map_.at(lc.dest);
+      gtsam::Pose3 sparse_src_T_sparse_dest =
+          sparse_frames_.at(sparse_src).keyed_transforms.at(lc.src) * lc.src_T_dest *
+          sparse_frames_.at(sparse_dest).keyed_transforms.at(lc.dest).inverse();
+      deformation_graph_->addNewBetween(sparse_src,
+                                        sparse_dest,
+                                        sparse_src_T_sparse_dest,
+                                        gtsam::Pose3(),
+                                        KimeraPgmoInterface::config_.lc_variance);
+    }
     added_new_loop_closure = true;
     num_loop_closures_++;
 
@@ -707,11 +720,27 @@ void DsgBackend::callUpdateFunctions(
   if (given_merges.size() > 0) {
     enable_node_merging = false;
   }
+  gtsam::Values complete_agent_values;
+  if (!KimeraPgmoInterface::config_.b_enable_sparsify) {
+    complete_agent_values = pgmo_values;
+  } else {
+    for (const auto& agent_sparse_key : full_sparse_frame_map_) {
+      if (!pgmo_values.exists(agent_sparse_key.second)) {
+        continue;
+      }
+      gtsam::Pose3 agent_pose =
+          pgmo_values.at<gtsam::Pose3>(agent_sparse_key.second)
+              .compose(sparse_frames_.at(agent_sparse_key.second)
+                           .keyed_transforms.at(agent_sparse_key.first));
+      complete_agent_values.insert(agent_sparse_key.first, agent_pose);
+    }
+  }
   const UpdateInfo info{&places_values,
                         &pgmo_values,
                         new_loop_closure,
                         last_timestamp_,
-                        enable_node_merging};
+                        enable_node_merging,
+                        &complete_agent_values};
 
   ScopedTimer spin_timer("backend/update_layers", last_timestamp_);
   for (const auto& update_func : dsg_update_funcs_) {

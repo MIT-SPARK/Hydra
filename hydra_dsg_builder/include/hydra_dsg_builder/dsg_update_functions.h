@@ -46,6 +46,7 @@ struct UpdateInfo {
   bool loop_closure_detected = false;
   uint64_t timestamp_ns = 0;
   bool allow_node_merging = false;
+  const gtsam::Values* complete_agent_values = nullptr;
 };
 
 using LayerUpdateFunc =
