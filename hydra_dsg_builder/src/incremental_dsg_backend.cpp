@@ -435,6 +435,7 @@ void DsgBackend::runPgmo() {
   callUpdateFunctions();
   // TODO(Yun) Technically not strictly a g2o
   deformation_graph_->save(config_.pgmo.log_path + "/deformation_graph.dgrf");
+  savePoseGraphSparseMapping(config_.pgmo.log_path + "/sparsification_mapping.txt");
 }
 
 void DsgBackend::fullMeshCallback(const KimeraPgmoMesh::ConstPtr& msg) {
@@ -584,7 +585,7 @@ bool DsgBackend::addInternalLCDToDeformationGraph() {
 
   bool added_new_loop_closure = false;
   for (const auto& lc : to_process) {
-    if (!KimeraPgmoInterface::config_.b_enable_sparsify) {
+    if (full_sparse_frame_map_.size() == 0) {
       deformation_graph_->addNewBetween(lc.src,
                                         lc.dest,
                                         lc.src_T_dest,
@@ -721,7 +722,7 @@ void DsgBackend::callUpdateFunctions(
     enable_node_merging = false;
   }
   gtsam::Values complete_agent_values;
-  if (!KimeraPgmoInterface::config_.b_enable_sparsify) {
+  if (full_sparse_frame_map_.size() == 0) {
     complete_agent_values = pgmo_values;
   } else {
     for (const auto& agent_sparse_key : full_sparse_frame_map_) {
