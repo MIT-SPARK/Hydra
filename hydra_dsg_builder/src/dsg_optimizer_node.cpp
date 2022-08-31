@@ -64,8 +64,6 @@ struct DsgOptimizer {
     frontend_dsg->graph = frontend_dsg->graph->load(dsg_filepath);
     frontend_dsg->updated = true;
 
-    auto& places = frontend_dsg->graph->getLayer(DsgLayers::PLACES);
-
     do_optimize();
 
     optimize_service =

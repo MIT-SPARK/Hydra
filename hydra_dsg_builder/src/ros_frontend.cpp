@@ -58,7 +58,8 @@ ROSFrontend::ROSFrontend(const ros::NodeHandle& nh,
   sync_->registerCallback(boost::bind(&ROSFrontend::inputCallback, this, _1, _2));
 
   tf_listener_.reset(new tf2_ros::TransformListener(buffer_));
-  dsg_sender_.reset(new hydra::DsgSender(ros::NodeHandle(nh_, "frontend")));
+  dsg_sender_.reset(
+      new hydra::DsgSender(ros::NodeHandle(nh_, "frontend"), "frontend/publish_dsg"));
   mesh_frontend_pub_.reset(new kimera_pgmo::MeshFrontendPublisher(nh_));
   mesh_frontend_.addOutputCallback(
       std::bind(&kimera_pgmo::MeshFrontendPublisher::publishOutput,

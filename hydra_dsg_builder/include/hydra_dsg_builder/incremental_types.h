@@ -97,6 +97,7 @@ struct SharedDsgInfo {
   std::map<char, LayerId> prefix_layer_map;
 };
 
+// TODO(nathan) switch code style
 struct DsgBackendStatus {
   size_t total_loop_closures_;
   size_t new_loop_closures_;
@@ -105,6 +106,7 @@ struct DsgBackendStatus {
   size_t new_factors_;
   size_t new_graph_factors_;
   size_t trajectory_len_;
+  size_t num_merges_undone_;
 
   void reset() {
     total_loop_closures_ = 0;
@@ -114,6 +116,7 @@ struct DsgBackendStatus {
     new_factors_ = 0;
     new_graph_factors_ = 0;
     trajectory_len_ = 0;
+    num_merges_undone_ = 0;
   }
 };
 

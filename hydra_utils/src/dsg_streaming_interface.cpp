@@ -42,12 +42,14 @@
 
 namespace hydra {
 
-DsgSender::DsgSender(const ros::NodeHandle& nh) : nh_(nh) {
+DsgSender::DsgSender(const ros::NodeHandle& nh,
+                     const std::string& timer_name)
+    : nh_(nh), timer_name_(timer_name) {
   pub_ = nh_.advertise<hydra_msgs::DsgUpdate>("dsg", 1);
 }
 
 void DsgSender::sendGraph(DynamicSceneGraph& graph, const ros::Time& stamp) const {
-  timing::ScopedTimer timer("publish_dsg", stamp.toNSec());
+  timing::ScopedTimer timer(timer_name_, stamp.toNSec());
   if (!pub_.getNumSubscribers()) {
     return;
   }

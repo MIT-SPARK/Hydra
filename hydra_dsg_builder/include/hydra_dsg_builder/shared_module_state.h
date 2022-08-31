@@ -55,7 +55,6 @@ struct SharedModuleState {
 
   NodeIdSet latest_places;
   NodeIdSet archived_places;
-  std::set<NodeId> archived_objects;
 
   std::mutex mesh_mutex;
   bool have_new_mesh;

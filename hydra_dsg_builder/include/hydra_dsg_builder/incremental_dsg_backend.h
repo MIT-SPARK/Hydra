@@ -38,6 +38,7 @@
 #include "hydra_dsg_builder/incremental_room_finder.h"
 #include "hydra_dsg_builder/incremental_types.h"
 #include "hydra_dsg_builder/shared_module_state.h"
+#include "hydra_dsg_builder/merge_handler.h"
 
 #include <hydra_utils/dsg_streaming_interface.h>
 #include <kimera_pgmo/KimeraPgmoInterface.h>
@@ -177,9 +178,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   SharedModuleState::Ptr state_;
 
   IsolatedSceneGraphLayer shared_places_copy_;
-  std::map<NodeId, NodeId> merged_nodes_;
   std::map<LayerId, dsg_updates::NodeMergeLog> proposed_node_merges_;
-  std::map<NodeId, std::set<NodeId>> merged_nodes_parents_;
+  std::unique_ptr<MergeHandler> merge_handler_;
 
   std::atomic<uint64_t> last_timestamp_;
 
@@ -189,8 +189,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   DsgBackendStatus status_;
 
   std::list<LayerUpdateFunc> dsg_update_funcs_;
-  std::unique_ptr<dsg_updates::UpdateObjectsFunctor> update_objects_functor_;
-  std::unique_ptr<dsg_updates::UpdatePlacesFunctor> update_places_functor_;
+  std::shared_ptr<dsg_updates::UpdateObjectsFunctor> update_objects_functor_;
+  std::shared_ptr<dsg_updates::UpdatePlacesFunctor> update_places_functor_;
   std::unique_ptr<dsg_updates::UpdateRoomsFunctor> update_rooms_functor_;
   std::unique_ptr<dsg_updates::UpdateBuildingsFunctor> update_buildings_functor_;
 
