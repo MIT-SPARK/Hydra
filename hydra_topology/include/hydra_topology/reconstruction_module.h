@@ -87,6 +87,8 @@ class ReconstructionModule {
   // public for external use
   void spinOnce(const ReconstructionInput& input);
 
+  void addOutputCallback(const OutputCallback& callback);
+
  protected:
   voxblox::BlockIndexList update(const voxblox::Transformation& T_G_C,
                                  const voxblox::Pointcloud& pointcloud,

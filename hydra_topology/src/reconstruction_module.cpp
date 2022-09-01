@@ -173,6 +173,10 @@ void ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
   output_.reset(new ReconstructionOutput());
 }
 
+void ReconstructionModule::addOutputCallback(const OutputCallback& callback) {
+  output_callbacks_.push_back(callback);
+}
+
 void ReconstructionModule::addPlacesToOutput(ReconstructionOutput& output,
                                              size_t timestamp_ns) {
   output.places.reset(new hydra_msgs::ActiveLayer());

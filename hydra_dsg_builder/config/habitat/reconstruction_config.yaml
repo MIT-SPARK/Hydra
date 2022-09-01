@@ -4,6 +4,7 @@ voxels_per_side: 16
 show_stats: False
 clear_distant_blocks: true
 dense_representation_radius_m: 8.0
+num_poses_per_update: 5
 world_frame: "world"
 robot_frame: "base_link"
 gvd:
