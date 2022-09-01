@@ -66,6 +66,7 @@ ReconstructionModule::ReconstructionModule(const RobotPrefixConfig& prefix,
       num_poses_received_(0) {
   config_.semantics.semantic_label_to_color_.reset(
       new kimera::SemanticLabel2Color(config_.semantic_label_file));
+  VLOG(3) << "Reconstruction config: " << std::endl << config_;
 
   queue_.reset(new ReconstructionInputQueue());
 
