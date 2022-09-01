@@ -132,6 +132,10 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   void updateMergedNodes(const std::map<NodeId, NodeId>& new_merges);
 
  protected:
+  void addLoopClosure(const gtsam::Key& src,
+                      const gtsam::Key& dest,
+                      const gtsam::Pose3& src_T_dest);
+
   void setSolverParams();
 
   void fullMeshCallback(const kimera_pgmo::KimeraPgmoMesh::ConstPtr& msg);

@@ -588,24 +588,7 @@ bool DsgBackend::addInternalLCDToDeformationGraph() {
 
   bool added_new_loop_closure = false;
   for (const auto& lc : to_process) {
-    if (full_sparse_frame_map_.size() == 0) {
-      deformation_graph_->addNewBetween(lc.src,
-                                        lc.dest,
-                                        lc.src_T_dest,
-                                        gtsam::Pose3(),
-                                        KimeraPgmoInterface::config_.lc_variance);
-    } else {
-      gtsam::Key sparse_src = full_sparse_frame_map_.at(lc.src);
-      gtsam::Key sparse_dest = full_sparse_frame_map_.at(lc.dest);
-      gtsam::Pose3 sparse_src_T_sparse_dest =
-          sparse_frames_.at(sparse_src).keyed_transforms.at(lc.src) * lc.src_T_dest *
-          sparse_frames_.at(sparse_dest).keyed_transforms.at(lc.dest).inverse();
-      deformation_graph_->addNewBetween(sparse_src,
-                                        sparse_dest,
-                                        sparse_src_T_sparse_dest,
-                                        gtsam::Pose3(),
-                                        KimeraPgmoInterface::config_.lc_variance);
-    }
+    addLoopClosure(lc.src, lc.dest, lc.src_T_dest);
     added_new_loop_closure = true;
     num_loop_closures_++;
 
@@ -613,6 +596,37 @@ bool DsgBackend::addInternalLCDToDeformationGraph() {
   }
 
   return added_new_loop_closure;
+}
+
+void DsgBackend::addLoopClosure(const gtsam::Key& src,
+                                const gtsam::Key& dest,
+                                const gtsam::Pose3& src_T_dest) {
+  if (full_sparse_frame_map_.size() == 0 ||
+      !KimeraPgmoInterface::config_.b_enable_sparsify) {
+    deformation_graph_->addNewBetween(src,
+                                      dest,
+                                      src_T_dest,
+                                      gtsam::Pose3(),
+                                      KimeraPgmoInterface::config_.lc_variance);
+  } else {
+    if (!full_sparse_frame_map_.count(src) || !full_sparse_frame_map_.count(dest)) {
+      // TODO(yun) this happened a few times when loop closure found for node that has
+      // not yet been received
+      LOG(ERROR)
+          << "Attempted to add loop closure with node not yet processed by PGMO.\n";
+      return;
+    }
+    gtsam::Key sparse_src = full_sparse_frame_map_.at(src);
+    gtsam::Key sparse_dest = full_sparse_frame_map_.at(dest);
+    gtsam::Pose3 sparse_src_T_sparse_dest =
+        sparse_frames_.at(sparse_src).keyed_transforms.at(src) * src_T_dest *
+        sparse_frames_.at(sparse_dest).keyed_transforms.at(dest).inverse();
+    deformation_graph_->addNewBetween(sparse_src,
+                                      sparse_dest,
+                                      sparse_src_T_sparse_dest,
+                                      gtsam::Pose3(),
+                                      KimeraPgmoInterface::config_.lc_variance);
+  }
 }
 
 void DsgBackend::updateDsgMesh(bool force_mesh_update) {
