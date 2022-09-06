@@ -96,10 +96,10 @@ void NearestNodeFinder::find(const Eigen::Vector3d& position,
                              size_t num_to_find,
                              bool skip_first,
                              const NearestNodeFinder::Callback& callback) {
-  std::vector<size_t> nn_indices(num_to_find);
-  std::vector<double> distances(num_to_find);
+  const size_t limit = skip_first ? num_to_find + 1 : num_to_find;
+  std::vector<size_t> nn_indices(limit);
+  std::vector<double> distances(limit);
 
-  size_t limit = skip_first ? num_to_find + 1 : num_to_find;
   size_t num_found = internals_->kdtree->knnSearch(
       position.data(), limit, nn_indices.data(), distances.data());
 
