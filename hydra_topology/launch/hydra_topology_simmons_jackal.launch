@@ -28,6 +28,7 @@
 
     <include file="$(find semantic_recolor)/launch/semantic_recolor_pointcloud.launch" pass_all_args="true"
         if="$(arg use_semantics)">
+        <arg name="model_name" default="mobilenetv2_360_640"/>
         <arg name="rgb_image_transport" value="compressed"/>
     </include>
 
