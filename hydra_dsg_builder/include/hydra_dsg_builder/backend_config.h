@@ -81,7 +81,8 @@ struct DsgBackendConfig {
     // covariance
     double place_mesh_variance;
     double place_edge_variance;
-    double merge_edge_variance;
+    double place_merge_variance;
+    double object_merge_variance;
     // rpgo
     bool gnc_fix_prev_inliers = true;
     KimeraRPGO::Verbosity rpgo_verbosity = KimeraRPGO::Verbosity::UPDATE;
@@ -170,7 +171,8 @@ void visit_config(const Visitor& v, DsgBackendConfig::PgmoConfig& config) {
   auto covar_handle = v["covariance"];
   covar_handle.visit("place_mesh", config.place_mesh_variance);
   covar_handle.visit("place_edge", config.place_edge_variance);
-  covar_handle.visit("merge_edge", config.merge_edge_variance);
+  covar_handle.visit("place_merge", config.place_merge_variance);
+  covar_handle.visit("object_merge", config.object_merge_variance);
   auto rpgo_handle = v["rpgo"];
   rpgo_handle.visit("gnc_fix_prev_inliers", config.gnc_fix_prev_inliers);
   rpgo_handle.visit("verbosity", config.rpgo_verbosity);
