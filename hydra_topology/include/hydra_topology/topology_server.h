@@ -73,9 +73,11 @@ class TopologyServer {
       std_msgs::Time msg;
       msg.data = BaseTsdfServerType::last_msg_time_ptcloud_;
       time_pub.publish(msg);
+      last_input_time = BaseTsdfServerType::last_msg_time_ptcloud_;
     }
 
     bool has_pose;
+    ros::Time last_input_time;
     voxblox::Transformation T_G_C_last;
     ros::Publisher time_pub;
 
@@ -101,9 +103,14 @@ class TopologyServer {
 
     layer_pub_ = nh_.advertise<hydra_msgs::ActiveLayer>("active_layer", 2, false);
 
-    update_timer_ = nh_.createTimer(
-        ros::Duration(config_.update_period_s),
-        [&](const ros::TimerEvent& event) { runUpdate(event.current_real); });
+    update_timer_ = nh_.createTimer(ros::Duration(config_.update_period_s),
+                                    [this](const ros::TimerEvent& event) {
+                                      if (config_.use_last_update_time) {
+                                        runUpdate(tsdf_server_->last_input_time);
+                                      } else {
+                                        runUpdate(event.current_real);
+                                      }
+                                    });
   }
 
   void spin() const { ros::spin(); }

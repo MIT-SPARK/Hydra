@@ -74,6 +74,7 @@ struct TopologyServerConfig {
   bool clear_distant_blocks = true;
   double dense_representation_radius_m = 5.0;
   bool publish_archived = true;
+  bool use_last_update_time = true;
 
   voxblox::ColorMode mesh_color_mode = voxblox::ColorMode::kLambertColor;
   std::string world_frame = "world";
@@ -136,6 +137,7 @@ void visit_config(const Visitor& v, TopologyServerConfig& config) {
   v.visit("publish_archived", config.publish_archived);
   v.visit("mesh_color_mode", config.mesh_color_mode);
   v.visit("world_frame", config.world_frame);
+  v.visit("use_last_update_time", config.use_last_update_time);
 }
 
 }  // namespace topology
