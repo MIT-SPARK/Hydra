@@ -76,7 +76,7 @@ struct SharedDsgInfo {
   using Ptr = std::shared_ptr<SharedDsgInfo>;
 
   SharedDsgInfo(const std::map<LayerId, char>& layer_id_map, LayerId mesh_layer_id)
-      : updated(false) {
+      : updated(false), last_update_time(0) {
     DynamicSceneGraph::LayerIds layer_ids;
     for (const auto& id_key_pair : layer_id_map) {
       CHECK(id_key_pair.first != mesh_layer_id)

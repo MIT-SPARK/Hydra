@@ -122,10 +122,10 @@ void ROSFrontend::inputCallback(const PlacesLayerMsg::ConstPtr& places,
 
   queue_->push(input);
 
-  ros::Time stamp;
-  stamp.fromNSec(input.timestamp_ns);
   {  // start dsg critical section
     std::unique_lock<std::mutex> lock(dsg_->mutex);
+    ros::Time stamp;
+    stamp.fromNSec(dsg_->last_update_time);
     dsg_sender_->sendGraph(*dsg_->graph, stamp);
   }
 }
