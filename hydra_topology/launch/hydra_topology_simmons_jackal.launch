@@ -1,4 +1,5 @@
 <launch>
+    <arg name="robot_name" default="sparkal" />
     <arg name="sim_time_required" default="true"/>
     <param name="use_sim_time" value="$(arg sim_time_required)"/>
 
@@ -17,10 +18,10 @@
         <arg name="sensor_frame" value="$(arg sensor_frame)"/>
     </include>
 
-    <arg name="rgb_info_topic" default="/sparkal1/forward/color/camera_info"/>
-    <arg name="rgb_topic" default="/sparkal1/forward/color/image_raw"/>
-    <arg name="depth_topic" default="/sparkal1/forward/depth/image_rect_raw"/>
-    <arg name="depth_info_topic" default="/sparkal1/forward/depth/camera_info"/>
+    <arg name="rgb_info_topic" default="/$(arg robot_name)/forward/color/camera_info"/>
+    <arg name="rgb_topic" default="/$(arg robot_name)/forward/color/image_raw"/>
+    <arg name="depth_topic" default="/$(arg robot_name)/forward/depth/image_rect_raw"/>
+    <arg name="depth_info_topic" default="/$(arg robot_name)/forward/depth/camera_info"/>
     <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
 
     <include file="$(find hydra_utils)/launch/includes/rgbd_to_pointcloud.xml" pass_all_args="true"

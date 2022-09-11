@@ -1,8 +1,10 @@
 <launch>
+    <arg name="sim_time_required" default="true"/>
     <arg name="robot_id" default="0"/>
+    <arg name="robot_name" default="sparkal"/>
     <arg name="config_dir" default="$(find hydra_dsg_builder)/config/simmons_jackal"/>
     <arg name="dsg_output_dir" default="$(find hydra_dsg_builder)/output/simmons_jackal"/>
-    <arg name="dsg_output_prefix" default="floor1_3"/>
+    <arg name="dsg_output_prefix" default="simmons_6"/>
     <arg name="typology_dir" default="$(find hydra_dsg_builder)/config/simmons_jackal"/>
     <arg name="typology_config" default="simmons_jackal_typology.yaml"/>
     <arg name="dataset_name" default="ade150_config"/>
@@ -14,17 +16,19 @@
     <arg name="debug" default="false"/>
     <arg name="start_visualizer" default="true"/>
 
-    <arg name="enable_dsg_lcd" default="false"/>
+    <arg name="enable_dsg_lcd" default="true"/>
 
     <arg name="use_gt_frame" default="false"/>
     <arg name="gt_path_csv" default="/dev/null"/>
     <arg name="use_oriented_bounding_boxes" default="true"/>
     <arg name="sensor_frame" default="left_cam"/>
+    <arg name="world_frame" default="world"/>
 
     <arg name="rviz_dir" default="$(find hydra_dsg_builder)/rviz"/>
     <arg name="rviz_file" default="sidpac.rviz"/>
 
     <include file="$(find hydra_topology)/launch/hydra_topology_simmons_jackal.launch" pass_all_args="true">
+        <arg name="robot_name" value="$(arg robot_name)"/>
         <arg name="semantic_color_path" value="$(arg semantic_map_path)"/>
         <arg name="config_dir" value="$(find hydra_topology)/config"/>
         <arg name="default" value="false"/>
