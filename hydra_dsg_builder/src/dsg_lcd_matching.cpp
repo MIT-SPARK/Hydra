@@ -222,6 +222,11 @@ LayerSearchResults searchLeafDescriptors(const Descriptor& descriptor,
     const DescriptorCache& leaf_cache = leaf_cache_map.at(valid_id);
 
     for (const auto& id_desc_pair : leaf_cache) {
+      bool same_robot = true;
+      if (NodeSymbol(id_desc_pair.first).category() !=
+          NodeSymbol(query_id).category()) {
+        same_robot = false;
+      }
       if (id_desc_pair.first == query_id) {
         continue;  // disallow self matches even if they probably can't happen
       }
@@ -229,7 +234,7 @@ LayerSearchResults searchLeafDescriptors(const Descriptor& descriptor,
       const Descriptor& other_descriptor = *id_desc_pair.second;
       std::chrono::duration<double> diff_s =
           descriptor.timestamp - other_descriptor.timestamp;
-      if (diff_s.count() < match_config.min_time_separation_s) {
+      if (same_robot && diff_s.count() < match_config.min_time_separation_s) {
         continue;
       }
 
