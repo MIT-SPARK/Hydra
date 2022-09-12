@@ -22,7 +22,7 @@
     <arg name="rgb_topic" default="/$(arg robot_name)/forward/color/image_raw"/>
     <arg name="depth_topic" default="/$(arg robot_name)/forward/depth/image_rect_raw"/>
     <arg name="depth_info_topic" default="/$(arg robot_name)/forward/depth/camera_info"/>
-    <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
+    <arg name="pointcloud_topic" default="/$(arg robot_name)/semantic_pointcloud"/>
 
     <include file="$(find hydra_utils)/launch/includes/rgbd_to_pointcloud.xml" pass_all_args="true"
              unless="$(arg use_semantics)"/>
