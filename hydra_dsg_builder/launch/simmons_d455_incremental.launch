@@ -21,7 +21,9 @@
     <arg name="use_gt_frame" default="false"/>
     <arg name="gt_path_csv" default="/dev/null"/>
     <arg name="use_oriented_bounding_boxes" default="true"/>
-    <arg name="sensor_frame" default="left_cam"/>
+    <arg name="sensor_frame" default="forward_depth_optical_frame" if="$(arg use_gt_frame)"/>
+    <arg name="sensor_frame" default="left_cam" unless="$(arg use_gt_frame)"/>
+
     <arg name="world_frame" default="world"/>
 
     <arg name="rviz_dir" default="$(find hydra_dsg_builder)/rviz"/>
