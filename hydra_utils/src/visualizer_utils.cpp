@@ -395,13 +395,13 @@ MarkerArray makeGraphEdgeMarkers(const std_msgs::Header& header,
         edge_color = target.attributes<SemanticNodeAttributes>().color;
       }
     } else {
-      edge_color = NodeColor::Zero();
+      edge_color = 255 * NodeColor::Ones();
     }
 
     marker.colors.push_back(
-        makeColorMsg(edge_color, configs.at(source.layer).intralayer_edge_alpha));
+        makeColorMsg(edge_color, configs.at(source.layer).interlayer_edge_alpha));
     marker.colors.push_back(
-        makeColorMsg(edge_color, configs.at(source.layer).intralayer_edge_alpha));
+        makeColorMsg(edge_color, configs.at(source.layer).interlayer_edge_alpha));
   }
 
   for (const auto& id_marker_pair : layer_markers) {

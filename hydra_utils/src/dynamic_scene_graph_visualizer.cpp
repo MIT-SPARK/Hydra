@@ -560,7 +560,7 @@ void DynamicSceneGraphVisualizer::drawLayer(const std_msgs::Header& header,
 
   const std::string edge_ns = getLayerEdgeNamespace(layer.id);
   Marker edges = makeLayerEdgeMarkers(
-      header, config, layer, viz_config, NodeColor::Zero(), edge_ns);
+      header, config, layer, viz_config, 255 * NodeColor::Ones(), edge_ns);
   addMultiMarkerIfValid(edges, msg);
 
   const std::string label_ns = getLayerLabelNamespace(layer.id);
