@@ -31,7 +31,7 @@
     <param name="visualizer_ns" value="$(arg visualizer_ns)"/>
     <param name="load_graph" value="false"/>
 
-    <param name="mesh_plugin_type" value="PGMO"/>
+    <param name="mesh_plugin_type" value="VOXBLOX"/>
     <param name="scene_graph_filepath" value=""/>
     <param name="visualizer_ns" value="$(arg visualizer_ns)"/>
     <param name="mesh_plugin_ns" value="dsg_mesh"/>
