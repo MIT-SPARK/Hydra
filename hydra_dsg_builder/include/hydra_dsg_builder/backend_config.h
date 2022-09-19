@@ -193,7 +193,9 @@ template <typename Visitor>
 void visit_config(const Visitor& v, DsgBackendConfig& config) {
   // TODO(nathan) replace with single param (derive should_log from log_path)
   v.visit("should_log", config.should_log);
-  v.visit("log_path", config.log_path);
+  if (config.should_log) {
+    v.visit("log_path", config.log_path);
+  }
   v.visit("visualize_place_factors", config.visualize_place_factors);
   v.visit("building_color", config.building_color);
   v.visit("building_semantic_label", config.building_semantic_label);
@@ -224,7 +226,9 @@ template <typename Visitor>
 void visit_config(const Visitor& v, DsgBackendConfig::PgmoConfig& config) {
   // TODO(nathan) replace with single param (derive should_log from log_path)
   v.visit("should_log", config.should_log);
-  v.visit("log_path", config.log_path);
+  if (config.should_log) {
+    v.visit("log_path", config.log_path);
+  }
   auto covar_handle = v["covariance"];
   covar_handle.visit("place_mesh", config.place_mesh_variance);
   covar_handle.visit("place_edge", config.place_edge_variance);
