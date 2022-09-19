@@ -108,6 +108,9 @@ void MergeHandler::clearRemovedNodes(const DynamicSceneGraph& graph) {
     }
 
     const auto parent = iter->second;
+    if (!merged_nodes_parents_.count(parent)) {
+      continue;
+    }
     CHECK(merged_nodes_parents_.count(parent)) << NodeSymbol(parent).getLabel();
     auto& parent_set = merged_nodes_parents_.find(parent)->second;
 
