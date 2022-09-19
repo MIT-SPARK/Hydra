@@ -87,7 +87,6 @@ void visit_config(const Visitor& v, TsdfIntegratorBase::Config& config) {
   v.visit("start_voxel_subsampling_factor", config.start_voxel_subsampling_factor);
   v.visit("max_consecutive_ray_collisions", config.max_consecutive_ray_collisions);
   v.visit("clear_checks_every_n_frames", config.clear_checks_every_n_frames);
-  v.visit("max_integration_time_s", config.max_integration_time_s);
 }
 
 }  // namespace voxblox
