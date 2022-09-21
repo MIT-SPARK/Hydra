@@ -544,7 +544,7 @@ void DynamicSceneGraphVisualizer::drawLayer(const std_msgs::Header& header,
                                 [&](const SceneGraphNode& node) -> NodeColor {
                                   auto parent = node.getParent();
                                   if (!parent) {
-                                    return NodeColor::Zero();
+                                    return 255 * NodeColor::Ones();
                                   }
 
                                   return scene_graph_->getNode(*parent)
