@@ -108,6 +108,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   virtual bool registerCallbacks(const ros::NodeHandle&) override { return true; }
 
+  using KimeraPgmoInterface::setVerboseFlag;
+
  protected:
   virtual const pcl::PolygonMesh* getLatestMesh();
 
