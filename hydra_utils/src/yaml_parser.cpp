@@ -53,7 +53,7 @@ YamlParserImpl YamlParserImpl::child(const std::string& child_name) const {
   return YamlParserImpl(node_[child_name], new_name);
 }
 
-void YamlParserImpl::parseImpl(uint8_t& value) const { value = node_.as<uint16_t>(); }
+bool YamlParserImpl::parseImpl(uint8_t& value) const { value = node_.as<uint16_t>(); return true; }
 
 std::vector<std::string> YamlParserImpl::children() const {
   if (!node_.IsMap()) {
