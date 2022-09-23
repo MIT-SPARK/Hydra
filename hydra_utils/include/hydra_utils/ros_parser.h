@@ -172,7 +172,7 @@ class RosParserImpl {
   inline std::string name() const { return nh_.resolveName(name_); }
 
   template <typename T>
-  bool parse(T& value) const {
+  bool parse(T& value, const Logger*) const {
     return ::config_parser::readRosParam(nh_, name_, value);
   }
 

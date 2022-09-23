@@ -61,31 +61,65 @@ class YamlParserImpl {
   inline std::string name() const { return name_; }
 
   template <typename T>
-  bool parse(T& value) const {
+  bool parse(T& value, const Logger* logger) const {
     if (!node_) {
       return false;
     }
 
-    parseImpl(value);
-    return true;
+    try {
+      return parseImpl(value);
+    } catch (const std::exception& e) {
+      if (logger) {
+        std::stringstream ss;
+        ss << "failed to parse " << name_ << ": " << e.what();
+        logger->log_invalid(ss.str());
+      }
+      return false;
+    }
   }
 
  private:
   YamlParserImpl(const YAML::Node& node, const std::string& name);
 
   template <typename T>
-  void parseImpl(T& value) const {
+  bool parseImpl(T& value) const {
     value = node_.as<T>();
+    return true;
   }
 
   template <typename T>
-  void parseImpl(std::set<T>& value) const {
+  bool parseImpl(std::vector<T>& value) const {
+    if (!node_.IsSequence()) {
+      return false;
+    }
+
+    value = node_.as<std::vector<T>>();
+    return true;
+  }
+
+  template <typename T>
+  bool parseImpl(std::set<T>& value) const {
+    if (!node_.IsSequence()) {
+      return false;
+    }
+
     std::vector<T> placeholder = node_.as<std::vector<T>>();
     value.clear();
     value.insert(placeholder.begin(), placeholder.end());
+    return true;
   }
 
-  void parseImpl(uint8_t& value) const;
+  template <typename K, typename V>
+  bool parseImpl(std::map<K, V>& value) const {
+    if (!node_.IsMap()) {
+      return false;
+    }
+
+    value = node_.as<std::map<K, V>>();
+    return true;
+  }
+
+  bool parseImpl(uint8_t& value) const;
 
   YAML::Node node_;
   std::string name_;

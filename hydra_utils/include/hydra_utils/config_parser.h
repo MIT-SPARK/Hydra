@@ -36,6 +36,7 @@
 #include "hydra_utils/config_visitor.h"
 #include "hydra_utils/ostream_formatter.h"
 
+#include <iostream>
 #include <memory>
 #include <sstream>
 #include <vector>
@@ -46,6 +47,10 @@ struct Logger {
   using Ptr = std::shared_ptr<Logger>;
 
   virtual void log_missing(const std::string& message) const = 0;
+
+  virtual void log_invalid(const std::string& message) const {
+    std::cerr << "[Parsing Error]: " << message << std::endl;
+  }
 };
 
 template <typename Impl>
@@ -83,7 +88,7 @@ class Parser {
 
   template <typename T>
   void parse(T& value) const {
-    const bool found = impl_->parse(value);
+    const bool found = impl_->parse(value, logger_.get());
     if (logger_ && !found) {
       std::stringstream ss;
       ss << "missing param " << impl_->name() << ". defaulting to ";
