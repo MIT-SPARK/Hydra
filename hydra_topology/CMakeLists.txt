@@ -76,6 +76,7 @@ add_library(
   src/gvd_voxel.cpp
   src/nearest_neighbor_utilities.cpp
   src/ros_reconstruction.cpp
+  src/reconstruction_config.cpp
   src/reconstruction_module.cpp
   src/topology_server_visualizer.cpp
   src/update_statistics.cpp

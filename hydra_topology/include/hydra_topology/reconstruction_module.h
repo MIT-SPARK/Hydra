@@ -114,6 +114,8 @@ class ReconstructionModule {
   pose_graph_tools::PoseGraph makePoseGraph(size_t timestamp_ns,
                                             const Eigen::Affine3d& curr_pose);
 
+  voxblox::Transformation getCameraPose(const ReconstructionInput& msg) const;
+
  protected:
   RobotPrefixConfig prefix_;
   ReconstructionConfig config_;

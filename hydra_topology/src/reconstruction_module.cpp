@@ -126,6 +126,17 @@ bool ReconstructionModule::spinOnce() {
   return true;
 }
 
+voxblox::Transformation ReconstructionModule::getCameraPose(
+    const ReconstructionInput& msg) const {
+  voxblox::Transformation body_T_camera(config_.body_R_camera.cast<float>(),
+                                        config_.body_t_camera.cast<float>());
+  voxblox::Transformation world_T_body(msg.world_R_body.cast<float>(),
+                                       msg.world_t_body.cast<float>());
+
+  const auto result = world_T_body * body_T_camera;
+  return result;
+}
+
 void ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
   if (!msg.pointcloud || !msg.pointcloud_colors) {
     LOG(ERROR) << "received invalid pointcloud in input!";
@@ -145,11 +156,9 @@ void ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
   prev_time_ = msg.timestamp_ns;
   ++num_poses_received_;
 
-  // TODO(nathan) handle body camera transform
   const bool do_full_update = (num_poses_received_ % config_.num_poses_per_update == 0);
-  voxblox::Transformation world_T_body(msg.world_R_body.cast<float>(),
-                                       msg.world_t_body.cast<float>());
-  const auto archived_blocks = update(world_T_body,
+  const auto world_T_camera = getCameraPose(msg);
+  const auto archived_blocks = update(world_T_camera,
                                       *msg.pointcloud,
                                       *msg.pointcloud_colors,
                                       msg.timestamp_ns,

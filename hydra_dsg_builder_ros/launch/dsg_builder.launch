@@ -98,9 +98,7 @@
         <param name="objects/bounding_box_type" value="AABB" unless="$(arg use_oriented_bounding_boxes)"/>
         <param name="pgmo/robot_id" value="$(arg robot_id)"/>
 
-        <remap from="~voxblox_mesh" to="hydra_topology_node/active_mesh"/>
-        <remap from="~active_places" to="hydra_topology_node/active_layer"/>
-        <remap from="~pose_graph_incremental" to="kimera_vio_ros/pose_graph_incremental"
+        <remap from="~pose_graph" to="kimera_vio_ros/pose_graph_incremental"
                unless="$(arg use_gt_frame)"/>
         <remap from="~/bow_vectors" to="kimera_vio_ros/bow_query"/>
         <remap from="frame_registration" to="kimera_vio_ros/kimera_vio_ros_node/register_lcd_frames"/>

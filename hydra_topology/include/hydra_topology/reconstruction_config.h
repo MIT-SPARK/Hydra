@@ -94,6 +94,12 @@ void visit_config(const Visitor& v, TsdfIntegratorBase::Config& config) {
 namespace hydra {
 
 struct ReconstructionConfig {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  ReconstructionConfig()
+      : body_R_camera(Eigen::Quaterniond::Identity()),
+        body_t_camera(Eigen::Vector3d::Zero()) {}
+
   std::string semantic_label_file;
   float voxel_size = 0.1;
   int voxels_per_side = 16;
@@ -106,6 +112,16 @@ struct ReconstructionConfig {
   topology::GvdIntegratorConfig gvd;
   voxblox::TsdfIntegratorBase::Config tsdf;
   kimera::SemanticIntegratorBase::SemanticConfig semantics;
+  Eigen::Quaterniond body_R_camera;
+  Eigen::Vector3d body_t_camera;
+};
+
+struct QuaternionConverter {
+  QuaternionConverter() = default;
+
+  Eigen::Quaterniond to(const std::map<std::string, double>& other) const;
+
+  std::map<std::string, double> from(const Eigen::Quaterniond& other) const;
 };
 
 template <typename Visitor>
@@ -122,6 +138,8 @@ void visit_config(const Visitor& v, ReconstructionConfig& config) {
   v.visit("gvd", config.gvd);
   v.visit("tsdf", config.tsdf);
   v.visit("semantics", config.semantics);
+  v.visit("body_R_camera", config.body_R_camera, QuaternionConverter());
+  v.visit("body_t_camera", config.body_t_camera);
 }
 
 }  // namespace hydra
