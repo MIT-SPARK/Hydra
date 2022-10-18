@@ -103,17 +103,17 @@ struct HydraRosPipeline {
       frontend = std::make_shared<RosFrontend>(nh, prefix, frontend_dsg, shared_state);
     }
 
+    const auto backend_config = load_config<DsgBackendConfig>(nh);
     if (config_.use_ros_backend) {
       backend = std::make_shared<RosBackend>(
           nh, prefix, frontend_dsg, backend_dsg, shared_state);
     } else {
-      const auto backend_config = load_config<DsgBackendConfig>(nh);
       const auto pgmo_config = load_config<kimera_pgmo::KimeraPgmoConfig>(nh, "pgmo");
       backend = std::make_shared<DsgBackend>(
           prefix, backend_config, pgmo_config, frontend_dsg, backend_dsg, shared_state);
     }
 
-    backend_visualizer = std::make_shared<RosBackendVisualizer>(nh);
+    backend_visualizer = std::make_shared<RosBackendVisualizer>(nh, backend_config);
     backend->addOutputCallback(std::bind(&RosBackendVisualizer::publishOutputs,
                                          backend_visualizer.get(),
                                          std::placeholders::_1,

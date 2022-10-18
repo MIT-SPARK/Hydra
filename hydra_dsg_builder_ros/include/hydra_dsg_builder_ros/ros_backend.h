@@ -90,7 +90,7 @@ class RosBackend : public DsgBackend {
 
 class RosBackendVisualizer {
  public:
-  explicit RosBackendVisualizer(const ros::NodeHandle& nh);
+  RosBackendVisualizer(const ros::NodeHandle& nh, const DsgBackendConfig& config);
 
   ~RosBackendVisualizer() = default;
 
@@ -109,12 +109,14 @@ class RosBackendVisualizer {
 
  protected:
   ros::NodeHandle nh_;
+  DsgBackendConfig config_;
+
   ros::Publisher mesh_mesh_edges_pub_;
   ros::Publisher pose_mesh_edges_pub_;
   ros::Publisher pose_graph_pub_;
   ros::Publisher mesh_pub_;
 
-  // TODO(nathan) zmq interface
+  std::unique_ptr<spark_dsg::ZmqSender> zmq_sender_;
   std::unique_ptr<DsgSender> dsg_sender_;
 };
 

@@ -98,6 +98,11 @@ DsgBackend::DsgBackend(const RobotPrefixConfig& prefix,
   } else {
     LOG(INFO) << "[Hydra Backend] logging disabled.";
   }
+
+  if (config_.use_zmq_interface) {
+    zmq_receiver_.reset(
+        new spark_dsg::ZmqReceiver(config_.zmq_recv_url, config_.zmq_num_threads));
+  }
 }
 
 DsgBackend::~DsgBackend() {
@@ -107,6 +112,10 @@ DsgBackend::~DsgBackend() {
 
 void DsgBackend::start() {
   spin_thread_.reset(new std::thread(&DsgBackend::spin, this));
+
+  if (config_.use_zmq_interface) {
+    zmq_thread_.reset(new std::thread(&DsgBackend::runZmqUpdates, this));
+  }
   LOG(INFO) << "[Hydra Backend] started!";
 }
 
@@ -117,6 +126,13 @@ void DsgBackend::stop() {
     VLOG(2) << "[Hydra Backend] joining optimizer thread and stopping";
     spin_thread_->join();
     spin_thread_.reset();
+    VLOG(2) << "[Hydra Backend] stopped!";
+  }
+
+  if (zmq_thread_) {
+    VLOG(2) << "[Hydra Backend] joining zmq thread and stopping";
+    zmq_thread_->join();
+    zmq_thread_.reset();
     VLOG(2) << "[Hydra Backend] stopped!";
   }
 }
@@ -507,6 +523,40 @@ void DsgBackend::addLoopClosure(const gtsam::Key& src,
   }
 }
 
+void DsgBackend::runZmqUpdates() {
+  while (!should_shutdown_) {
+    if (!zmq_receiver_->recv(config_.poll_time_ms)) {
+      continue;
+    }
+
+    std::unique_lock<std::mutex> lock(private_dsg_->mutex);
+    auto update_graph = zmq_receiver_->graph();
+    if (!update_graph) {
+      LOG(ERROR) << "zmq receiver graph is invalid";
+      continue;
+    }
+
+    const auto& rooms = update_graph->getLayer(DsgLayers::ROOMS);
+    for (const auto& id_node_pair : rooms.nodes()) {
+      const auto new_name =
+          id_node_pair.second->attributes<SemanticNodeAttributes>().name;
+      room_name_map_[id_node_pair.first] = new_name;
+
+      auto node_opt = private_dsg_->graph->getNode(id_node_pair.first);
+      if (!node_opt) {
+        VLOG(1) << "received update for node "
+                << NodeSymbol(id_node_pair.first).getLabel()
+                << " but node no longer exists";
+        continue;
+      }
+
+      VLOG(2) << "assiging name " << new_name << " to "
+              << NodeSymbol(id_node_pair.first).getLabel();
+      node_opt->get().attributes<SemanticNodeAttributes>().name = new_name;
+    }
+  }
+}
+
 void DsgBackend::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
   if (!force_mesh_update && !have_new_mesh_) {
     return;
@@ -602,6 +652,17 @@ void DsgBackend::callUpdateFunctions(size_t timestamp_ns,
 
   for (const auto& layer_merges : given_merges) {
     merge_handler_->updateMerges(layer_merges.second, *private_dsg_->graph);
+  }
+
+  std::unique_lock<std::mutex> lock(private_dsg_->mutex);
+  const auto& rooms = private_dsg_->graph->getLayer(DsgLayers::ROOMS);
+  for (auto& id_node_pair : rooms.nodes()) {
+    const auto iter = room_name_map_.find(id_node_pair.first);
+    if (iter == room_name_map_.end()) {
+      continue;
+    }
+
+    id_node_pair.second->attributes<SemanticNodeAttributes>().name = iter->second;
   }
 }
 
