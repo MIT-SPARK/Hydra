@@ -43,6 +43,7 @@
 #include <hydra_utils/robot_prefix_config.h>
 #include <kimera_pgmo/KimeraPgmoInterface.h>
 #include <spark_dsg/scene_graph_logger.h>
+#include <spark_dsg/zmq_interface.h>
 
 #include <map>
 #include <memory>
@@ -142,6 +143,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
       bool new_loop_closure = false,
       const std::map<LayerId, std::map<NodeId, NodeId>>& given_merges = {});
 
+  void runZmqUpdates();
+
   void updateMergedNodes(const std::map<NodeId, NodeId>& new_merges);
 
   void logStatus(bool init = false) const;
@@ -185,6 +188,10 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   std::unique_ptr<pcl::PolygonMesh> optimized_mesh_;
 
   std::list<OutputCallback> output_callbacks_;
+
+  std::map<NodeId, std::string> room_name_map_;
+  std::unique_ptr<std::thread> zmq_thread_;
+  std::unique_ptr<spark_dsg::ZmqReceiver> zmq_receiver_;
 };
 
 }  // namespace incremental

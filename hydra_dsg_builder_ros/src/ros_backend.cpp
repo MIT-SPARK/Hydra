@@ -36,7 +36,6 @@
 
 #include <hydra_utils/ros_utilities.h>
 
-
 namespace hydra {
 
 using kimera_pgmo::DeformationGraph;
@@ -99,7 +98,9 @@ const pcl::PolygonMesh* RosBackend::getLatestMesh() {
   return latest_mesh_.get();
 }
 
-RosBackendVisualizer::RosBackendVisualizer(const ros::NodeHandle& nh) : nh_(nh) {
+RosBackendVisualizer::RosBackendVisualizer(const ros::NodeHandle& nh,
+                                           const DsgBackendConfig& config)
+    : nh_(nh), config_(config) {
   mesh_mesh_edges_pub_ =
       nh_.advertise<Marker>("pgmo/deformation_graph_mesh_mesh", 10, false);
   pose_mesh_edges_pub_ =
@@ -108,6 +109,10 @@ RosBackendVisualizer::RosBackendVisualizer(const ros::NodeHandle& nh) : nh_(nh) 
   pose_graph_pub_ = nh_.advertise<PoseGraph>("pgmo/pose_graph", 10, false);
 
   dsg_sender_.reset(new hydra::DsgSender(nh_));
+  if (config_.use_zmq_interface) {
+    zmq_sender_.reset(
+        new spark_dsg::ZmqSender(config_.zmq_send_url, config_.zmq_num_threads));
+  }
 }
 
 void RosBackendVisualizer::publishOutputs(const DynamicSceneGraph& graph,
@@ -116,7 +121,12 @@ void RosBackendVisualizer::publishOutputs(const DynamicSceneGraph& graph,
                                           size_t timestamp_ns) const {
   ros::Time stamp;
   stamp.fromNSec(timestamp_ns);
+
+  // TODO(nathan) consider serializing to bytes before sending
   dsg_sender_->sendGraph(graph, stamp);
+  if (config_.use_zmq_interface) {
+    zmq_sender_->send(graph);
+  }
 
   if (mesh_pub_.getNumSubscribers() > 0) {
     publishMesh(mesh, timestamp_ns);
