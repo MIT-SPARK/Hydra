@@ -147,7 +147,7 @@ Marker makeTextMarker(const std_msgs::Header& header,
   marker.type = Marker::TEXT_VIEW_FACING;
   marker.action = Marker::ADD;
   marker.lifetime = ros::Duration(0);
-  marker.text = NodeSymbol(node.id).getLabel();
+  marker.text = node.attributes<SemanticNodeAttributes>().name;
   marker.scale.z = config.label_scale;
   marker.color = makeColorMsg(NodeColor::Zero());
 

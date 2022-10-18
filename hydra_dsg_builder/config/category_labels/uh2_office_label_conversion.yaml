@@ -1,0 +1,56 @@
+---
+object_labels:
+  0: Unknown
+  1: Thing
+  2: Furniture
+  3: Floor
+  4: Ceiling
+  5: Seating
+  6: Seating
+  7: Seating
+  8: Unknown
+  9: Storage
+  10: Thing
+  11: Light
+  12: Wall_Decoration
+  13: Plant
+  14: Wall_Decoration
+  16: Furniture
+  17: Thing
+  18: Thing
+  19: Door
+  20: Unknown
+room_labels:
+  - bathroom
+  - bedroom
+  - closet
+  - dining_room
+  - lobby
+  - family_room
+  - garage
+  - hallway
+  - library
+  - laundry_room
+  - kitchen
+  - living_room
+  - conference_auditorium
+  - lounge
+  - office
+  - porch
+  - game_room
+  - staircase
+  - bathroom
+  - utility_room
+  - television_room
+  - gym
+  - yard
+  - balcony
+  - bar
+  - classroom
+  - dining_room
+  - spa
+  - None
+building_labels:
+  - house
+  - office_building
+  - resort

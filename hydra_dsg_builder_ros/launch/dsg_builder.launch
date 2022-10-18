@@ -15,6 +15,7 @@
     <arg name="use_oriented_bounding_boxes" default="false"/>
     <arg name="exit_mode" default="NORMAL"/>
     <arg name="start_visualizer" default="true"/>
+    <arg name="use_zmq_interface" default="false"/>
 
     <arg name="enable_dsg_lcd" default="false"/>
     <arg name="lcd_use_bow_vectors" default="true"/>
@@ -91,6 +92,7 @@
 
         <param name="dsg/optimize_on_lc" value="$(arg optimize_on_lc)"/>
         <param name="dsg/enable_merge_undos" value="$(arg enable_merge_undos)"/>
+        <param name="dsg/use_zmq_interface" value="$(arg use_zmq_interface)"/>
         <param name="lcd/log_registration_problem" value="$(arg log_registration)"/>
         <param name="pgmo/log_path" value="$(arg pgmo_log_path)"/>
         <param name="pgmo/should_log" value="$(arg pgmo_should_log)"/>
