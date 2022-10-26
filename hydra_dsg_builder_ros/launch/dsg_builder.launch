@@ -7,7 +7,6 @@
     <arg name="typology_config"/>
     <arg name="semantic_map_dir"/>
     <arg name="semantic_map_file"/>
-    <arg name="semantic_map_path"/>
     <arg name="sensor_frame"/>
     <arg name="world_frame" default="world"/>
 
@@ -16,6 +15,9 @@
     <arg name="exit_mode" default="NORMAL"/>
     <arg name="start_visualizer" default="true"/>
     <arg name="use_zmq_interface" default="false"/>
+
+    <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
+    <arg name="typology_path" default="$(arg typology_dir)/$(arg typology_config)"/>
 
     <arg name="enable_dsg_lcd" default="false"/>
     <arg name="lcd_use_bow_vectors" default="true"/>
@@ -51,9 +53,6 @@
     <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
     <arg name="ros_output" value="log" if="$(arg glog_to_file)"/>
 
-    <include if="$(arg start_visualizer)" file="$(find hydra_utils)/launch/hydra_streaming_visualizer.launch" pass_all_args="true">
-    </include>
-
     <node pkg="hydra_dsg_builder_ros" type="hydra_dsg_builder_ros_node"
           name="incremental_dsg_builder_node"
           launch-prefix="$(arg launch_prefix)"
@@ -63,7 +62,7 @@
         <env name="OMP_NUM_THREADS" value="12"/>
         <env name="TERM" value="xterm-256color"/>
 
-        <rosparam file="$(arg typology_dir)/$(arg typology_config)"/>
+        <rosparam file="$(arg typology_path)"/>
         <rosparam file="$(arg config_dir)/dsg_frontend_config.yaml"/>
         <rosparam file="$(arg config_dir)/dsg_backend_config.yaml"/>
         <rosparam file="$(arg config_dir)/dsg_lcd_config.yaml"/>
@@ -107,10 +106,14 @@
         <remap from="~pointcloud" to="$(arg pointcloud_topic)" if="$(arg do_reconstruction)"/>
     </node>
 
-    <include file="$(find pose_graph_tools)/launch/posegraph_view.launch">
-        <arg name="frame_id"      value="$(arg world_frame)" />
-        <arg name="graph_topic"   value="pose_graph" />
-        <arg name="ns"            value="incremental_dsg_builder_node/pgmo"/>
-    </include>
+    <group if="$(arg start_visualizer)">
+        <include file="$(find hydra_utils)/launch/hydra_streaming_visualizer.launch" pass_all_args="true"/>
+
+        <include file="$(find pose_graph_tools)/launch/posegraph_view.launch">
+            <arg name="frame_id"      value="$(arg world_frame)" />
+            <arg name="graph_topic"   value="incremental_dsg_builder_node/pgmo/pose_graph" />
+            <arg name="ns"            value="incremental_dsg_builder_node/pgmo"/>
+        </include>
+    </group>
 
 </launch>
