@@ -75,6 +75,7 @@ RosReconstruction::RosReconstruction(const ros::NodeHandle& nh,
     pcl_sub_ = nh_.subscribe<Pointcloud>(
         "pointcloud", 5, &RosReconstruction::pclCallback, this);
     tf_listener_.reset(new tf2_ros::TransformListener(buffer_));
+    pointcloud_thread_.reset(new std::thread(&RosReconstruction::pointcloudSpin, this));
   }
 
   if (!ros_config_.enable_output_queue && !output_queue) {
@@ -94,6 +95,17 @@ RosReconstruction::RosReconstruction(const ros::NodeHandle& nh,
       [this](const ReconstructionModule&, const ReconstructionOutput& output) {
         this->visualize(output);
       });
+}
+
+RosReconstruction::~RosReconstruction() {
+  stop();
+
+  if (pointcloud_thread_) {
+    VLOG(2) << "[Hydra Reconstruction] stopping pointcloud input thread";
+    pointcloud_thread_->join();
+    pointcloud_thread_.reset();
+    VLOG(2) << "[Hydra Reconstruction] stopped pointcloud input thread";
+  }
 }
 
 void RosReconstruction::inputCallback(const RosPointcloud::ConstPtr& cloud,
@@ -121,8 +133,8 @@ void RosReconstruction::inputCallback(const RosPointcloud::ConstPtr& cloud,
 }
 
 void RosReconstruction::pclCallback(const RosPointcloud::ConstPtr& cloud) {
-  ros::Time curr_time;
   // pcl timestamps are in microseconds
+  ros::Time curr_time;
   curr_time.fromNSec(cloud->header.stamp * 1000);
   if (num_poses_received_ > 0) {
     ros::Time prev_time;
@@ -132,29 +144,58 @@ void RosReconstruction::pclCallback(const RosPointcloud::ConstPtr& cloud) {
     }
   }
 
-  // TODO(nathan) make this lookup better
-  geometry_msgs::TransformStamped transform;
-  try {
-    transform =
-        buffer_.lookupTransform(config_.world_frame, config_.robot_frame, curr_time);
-  } catch (const tf2::TransformException& ex) {
-    ROS_WARN_STREAM(ex.what());
-    return;
+  // TODO(nathan) consider setting prev_time_ here?
+  pointcloud_queue_.push(cloud);
+}
+
+void RosReconstruction::pointcloudSpin() {
+  while (!should_shutdown_) {
+    bool has_data = pointcloud_queue_.poll();
+    if (!has_data) {
+      continue;
+    }
+
+    const auto cloud = pointcloud_queue_.pop();
+
+    ros::Time curr_time;
+    curr_time.fromNSec(cloud->header.stamp * 1000);
+
+    std::string err_str;
+    while (!buffer_.canTransform(config_.world_frame,
+                                 config_.robot_frame,
+                                 curr_time,
+                                 ros::Duration(ros_config_.tf_wait_duration_s),
+                                 &err_str)) {
+      ROS_WARN_STREAM_THROTTLE(0.5,
+                               "Failed to get tf from "
+                                   << config_.robot_frame << " to "
+                                   << config_.world_frame << " @ " << curr_time.toNSec()
+                                   << " [ns]. Reason: " << err_str);
+    }
+
+    geometry_msgs::TransformStamped transform;
+    try {
+      transform =
+          buffer_.lookupTransform(config_.world_frame, config_.robot_frame, curr_time);
+    } catch (const tf2::TransformException& ex) {
+      ROS_WARN_STREAM(ex.what());
+      return;
+    }
+
+    ReconstructionInput::Ptr input(new ReconstructionInput());
+    input->timestamp_ns = curr_time.toNSec();
+
+    input->pointcloud.reset(new voxblox::Pointcloud());
+    input->pointcloud_colors.reset(new voxblox::Colors());
+    voxblox::convertPointcloud(
+        *cloud, nullptr, input->pointcloud.get(), input->pointcloud_colors.get());
+
+    geometry_msgs::Pose curr_pose = tfToPose(transform.transform);
+    tf2::convert(curr_pose.position, input->world_t_body);
+    tf2::convert(curr_pose.orientation, input->world_R_body);
+
+    queue_->push(input);
   }
-
-  ReconstructionInput::Ptr input(new ReconstructionInput());
-  input->timestamp_ns = curr_time.toNSec();
-
-  input->pointcloud.reset(new voxblox::Pointcloud());
-  input->pointcloud_colors.reset(new voxblox::Colors());
-  voxblox::convertPointcloud(
-      *cloud, nullptr, input->pointcloud.get(), input->pointcloud_colors.get());
-
-  geometry_msgs::Pose curr_pose = tfToPose(transform.transform);
-  tf2::convert(curr_pose.position, input->world_t_body);
-  tf2::convert(curr_pose.orientation, input->world_R_body);
-
-  queue_->push(input);
 }
 
 void RosReconstruction::visualize(const ReconstructionOutput& output) {

@@ -56,6 +56,7 @@ struct RosReconstructionConfig {
   bool publish_mesh = false;
   bool enable_output_queue = false;
   double pointcloud_separation_s = 0.1;
+  double tf_wait_duration_s = 0.1;
 };
 
 template <typename Visitor>
@@ -65,6 +66,7 @@ void visit_config(const Visitor& v, RosReconstructionConfig& config) {
   v.visit("publish_reconstruction_mesh", config.publish_mesh);
   v.visit("enable_reconstruction_output_queue", config.enable_output_queue);
   v.visit("pointcloud_separation_s", config.pointcloud_separation_s);
+  v.visit("tf_wait_duration_s", config.tf_wait_duration_s);
 }
 
 class RosReconstruction : public ReconstructionModule {
@@ -72,12 +74,13 @@ class RosReconstruction : public ReconstructionModule {
   using Pointcloud = pcl::PointCloud<pcl::PointXYZRGB>;
   using Policy = message_filters::sync_policies::ApproximateTime<Pointcloud, PoseGraph>;
   using Sync = message_filters::Synchronizer<Policy>;
+  using PointcloudQueue = InputQueue<Pointcloud::ConstPtr>;
 
   RosReconstruction(const ros::NodeHandle& nh,
                     const RobotPrefixConfig& prefix,
                     const OutputQueue::Ptr& output_queue = nullptr);
 
-  virtual ~RosReconstruction() = default;
+  virtual ~RosReconstruction();
 
   void inputCallback(const Pointcloud::ConstPtr& cloud,
                      const PoseGraph::ConstPtr& pose_graph);
@@ -85,6 +88,8 @@ class RosReconstruction : public ReconstructionModule {
   void pclCallback(const Pointcloud::ConstPtr& cloud);
 
  protected:
+  void pointcloudSpin();
+
   void visualize(const ReconstructionOutput& output);
 
   ros::NodeHandle nh_;
@@ -99,6 +104,8 @@ class RosReconstruction : public ReconstructionModule {
   ros::Subscriber pcl_sub_;
   tf2_ros::Buffer buffer_;
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
+  PointcloudQueue pointcloud_queue_;
+  std::unique_ptr<std::thread> pointcloud_thread_;
 
   // visualizer
   std::unique_ptr<topology::TopologyServerVisualizer> visualizer_;
