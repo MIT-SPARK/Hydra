@@ -15,8 +15,8 @@
     <arg name="pointcloud_topic" value="semantic_pointcloud"/>
 
     <arg name="use_gt_frame" default="true"/>
-    <arg name="sensor_frame" value="left_cam_kimera" unless="$(arg use_gt_frame)"/>
-    <arg name="sensor_frame" value="left_cam" if="$(arg use_gt_frame)"/>
+    <arg name="sensor_frame" value="base_link_kimera" unless="$(arg use_gt_frame)"/>
+    <arg name="sensor_frame" value="base_link_gt" if="$(arg use_gt_frame)"/>
 
     <include file="$(find hydra_utils)/launch/data_sources/uhumans2_pointcloud.launch" pass_all_args="true"/>
 

@@ -166,6 +166,10 @@ void RosReconstruction::pointcloudSpin() {
                                  curr_time,
                                  ros::Duration(ros_config_.tf_wait_duration_s),
                                  &err_str)) {
+      if (should_shutdown_) {
+        return;
+      }
+
       ROS_WARN_STREAM_THROTTLE(0.5,
                                "Failed to get tf from "
                                    << config_.robot_frame << " to "
