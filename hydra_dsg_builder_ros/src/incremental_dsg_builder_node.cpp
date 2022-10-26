@@ -96,7 +96,6 @@ struct HydraRosPipeline {
       const auto frontend_config = load_config<DsgFrontendConfig>(nh);
       frontend = std::make_shared<DsgFrontend>(
           prefix, frontend_config, frontend_dsg, shared_state);
-
       reconstruction =
           std::make_shared<RosReconstruction>(nh, prefix, frontend->getQueue());
     } else {
@@ -123,6 +122,7 @@ struct HydraRosPipeline {
 
     if (config_.enable_lcd) {
       const auto lcd_config = load_config<DsgLcdModuleConfig>(nh, "");
+      shared_state->lcd_queue.reset(new InputQueue<LcdInput::Ptr>());
       lcd.reset(new DsgLcd(prefix, lcd_config, frontend_dsg, shared_state));
     }
   }
@@ -131,8 +131,15 @@ struct HydraRosPipeline {
     if (reconstruction) {
       reconstruction->start();
     }
-    frontend->start();
-    backend->start();
+
+    if (frontend) {
+      frontend->start();
+    }
+
+    if (backend) {
+      backend->start();
+    }
+
     if (lcd) {
       lcd->start();
     }
@@ -142,11 +149,18 @@ struct HydraRosPipeline {
     if (reconstruction) {
       reconstruction->stop();
     }
-    frontend->stop();
+
+    if (frontend) {
+      frontend->stop();
+    }
+
     if (lcd) {
       lcd->stop();
     }
-    backend->stop();
+
+    if (backend) {
+      backend->stop();
+    }
   }
 
   void save(const std::string& output_path) {
@@ -154,8 +168,15 @@ struct HydraRosPipeline {
       if (reconstruction) {
         reconstruction->save(output_path + "/topology/");
       }
-      frontend->save(output_path + "/frontend/");
-      backend->save(output_path + "/backend/");
+
+      if (frontend) {
+        frontend->save(output_path + "/frontend/");
+      }
+
+      if (backend) {
+        backend->save(output_path + "/backend/");
+      }
+
       if (lcd) {
         lcd->save(output_path + "/lcd/");
       }
@@ -190,6 +211,7 @@ int main(int argc, char* argv[]) {
   std::string dsg_output_path = "";
   nh.getParam("log_path", dsg_output_path);
 
+  nh.getParam("timing_disabled", ElapsedTimeRecorder::instance().timing_disabled);
   nh.getParam("disable_timer_output", ElapsedTimeRecorder::instance().disable_output);
 
   bool log_timing_incrementally = false;

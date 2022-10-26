@@ -47,6 +47,9 @@ struct InputQueue {
   std::queue<T> queue;
   mutable std::mutex mutex;
   mutable std::condition_variable cv;
+  size_t max_size;
+
+  InputQueue() : max_size(0) {}
 
   bool empty() const {
     std::unique_lock<std::mutex> lock(mutex);
@@ -64,12 +67,19 @@ struct InputQueue {
     return cv.wait_for(lock, wait_duration, [&] { return !queue.empty(); });
   }
 
-  void push(const T& input) {
+  bool push(const T& input) {
+    bool added = false;
     {
       std::unique_lock<std::mutex> lock(mutex);
-      queue.push(input);
+      if (!max_size || queue.size() < max_size) {
+        queue.push(input);
+        added = true;
+      }
     }
+
     cv.notify_all();
+
+    return added;
   }
 
   T pop() {
@@ -77,6 +87,11 @@ struct InputQueue {
     auto value = queue.front();
     queue.pop();
     return value;
+  }
+
+  size_t size() const {
+    std::unique_lock<std::mutex> lock(mutex);
+    return queue.size();
   }
 };
 

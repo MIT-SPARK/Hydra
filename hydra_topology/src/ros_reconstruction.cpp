@@ -66,15 +66,16 @@ RosReconstruction::RosReconstruction(const ros::NodeHandle& nh,
       nh_(nh) {
   ros_config_ = load_config<RosReconstructionConfig>(nh);
   if (ros_config_.use_pose_graph) {
-    pcl_sync_sub_.reset(new Subscriber<RosPointcloud>(nh_, "pointcloud", 5));
-    pose_graph_sub_.reset(new Subscriber<PoseGraph>(nh_, "pose_graph", 5));
-    sync_.reset(new Sync(Policy(10), *pcl_sync_sub_, *pose_graph_sub_));
+    pcl_sync_sub_.reset(new Subscriber<RosPointcloud>(nh_, "pointcloud", 10));
+    pose_graph_sub_.reset(new Subscriber<PoseGraph>(nh_, "pose_graph", 10));
+    sync_.reset(new Sync(Policy(30), *pcl_sync_sub_, *pose_graph_sub_));
     sync_->registerCallback(
         boost::bind(&RosReconstruction::inputCallback, this, _1, _2));
   } else {
     pcl_sub_ = nh_.subscribe<Pointcloud>(
-        "pointcloud", 5, &RosReconstruction::pclCallback, this);
+        "pointcloud", 10, &RosReconstruction::pclCallback, this);
     tf_listener_.reset(new tf2_ros::TransformListener(buffer_));
+    pointcloud_thread_.reset(new std::thread(&RosReconstruction::pointcloudSpin, this));
   }
 
   if (!ros_config_.enable_output_queue && !output_queue) {
@@ -96,6 +97,19 @@ RosReconstruction::RosReconstruction(const ros::NodeHandle& nh,
       });
 }
 
+RosReconstruction::~RosReconstruction() {
+  stop();
+
+  if (pointcloud_thread_) {
+    VLOG(2) << "[Hydra Reconstruction] stopping pointcloud input thread";
+    pointcloud_thread_->join();
+    pointcloud_thread_.reset();
+    VLOG(2) << "[Hydra Reconstruction] stopped pointcloud input thread";
+  }
+
+  VLOG(2) << "[Hydra Reconstruction] pointcloud queue: " << pointcloud_queue_.size();
+}
+
 void RosReconstruction::inputCallback(const RosPointcloud::ConstPtr& cloud,
                                       const PoseGraph::ConstPtr& pose_graph) {
   if (pose_graph->nodes.empty()) {
@@ -104,8 +118,10 @@ void RosReconstruction::inputCallback(const RosPointcloud::ConstPtr& cloud,
   }
 
   ReconstructionInput::Ptr input(new ReconstructionInput());
-  input->timestamp_ns = cloud->header.stamp;
+  input->timestamp_ns = cloud->header.stamp * 1000;
   input->pose_graph = pose_graph;
+  VLOG(1) << "Got ROS input @ " << input->timestamp_ns << " [ns] (pose graph @ "
+          << pose_graph->header.stamp.toNSec() << " [ns])";
 
   input->pointcloud.reset(new voxblox::Pointcloud());
   input->pointcloud_colors.reset(new voxblox::Colors());
@@ -121,40 +137,76 @@ void RosReconstruction::inputCallback(const RosPointcloud::ConstPtr& cloud,
 }
 
 void RosReconstruction::pclCallback(const RosPointcloud::ConstPtr& cloud) {
-  ros::Time curr_time;
   // pcl timestamps are in microseconds
+  ros::Time curr_time;
   curr_time.fromNSec(cloud->header.stamp * 1000);
   if (num_poses_received_ > 0) {
-    ros::Time prev_time;
-    prev_time.fromNSec(prev_time_);
-    if ((curr_time - prev_time).toSec() < ros_config_.pointcloud_separation_s) {
+    if (last_time_received_ && ((curr_time - *last_time_received_).toSec() <
+                                ros_config_.pointcloud_separation_s)) {
       return;
     }
+
+    last_time_received_.reset(new ros::Time(curr_time));
   }
 
-  // TODO(nathan) make this lookup better
-  geometry_msgs::TransformStamped transform;
-  try {
-    transform =
-        buffer_.lookupTransform(config_.world_frame, config_.robot_frame, curr_time);
-  } catch (const tf2::TransformException& ex) {
-    ROS_WARN_STREAM(ex.what());
-    return;
+  VLOG(1) << "Got ROS input @ " << curr_time.toNSec() << " [ns]";
+
+  // TODO(nathan) consider setting prev_time_ here?
+  pointcloud_queue_.push(cloud);
+}
+
+void RosReconstruction::pointcloudSpin() {
+  while (!should_shutdown_) {
+    bool has_data = pointcloud_queue_.poll();
+    if (!has_data) {
+      continue;
+    }
+
+    const auto cloud = pointcloud_queue_.pop();
+
+    ros::Time curr_time;
+    curr_time.fromNSec(cloud->header.stamp * 1000);
+
+    std::string err_str;
+    while (!buffer_.canTransform(config_.world_frame,
+                                 config_.robot_frame,
+                                 curr_time,
+                                 ros::Duration(ros_config_.tf_wait_duration_s),
+                                 &err_str)) {
+      if (should_shutdown_) {
+        return;
+      }
+
+      ROS_WARN_STREAM_THROTTLE(0.5,
+                               "Failed to get tf from "
+                                   << config_.robot_frame << " to "
+                                   << config_.world_frame << " @ " << curr_time.toNSec()
+                                   << " [ns]. Reason: " << err_str);
+    }
+
+    geometry_msgs::TransformStamped transform;
+    try {
+      transform =
+          buffer_.lookupTransform(config_.world_frame, config_.robot_frame, curr_time);
+    } catch (const tf2::TransformException& ex) {
+      ROS_WARN_STREAM(ex.what());
+      return;
+    }
+
+    ReconstructionInput::Ptr input(new ReconstructionInput());
+    input->timestamp_ns = curr_time.toNSec();
+
+    input->pointcloud.reset(new voxblox::Pointcloud());
+    input->pointcloud_colors.reset(new voxblox::Colors());
+    voxblox::convertPointcloud(
+        *cloud, nullptr, input->pointcloud.get(), input->pointcloud_colors.get());
+
+    geometry_msgs::Pose curr_pose = tfToPose(transform.transform);
+    tf2::convert(curr_pose.position, input->world_t_body);
+    tf2::convert(curr_pose.orientation, input->world_R_body);
+
+    queue_->push(input);
   }
-
-  ReconstructionInput::Ptr input(new ReconstructionInput());
-  input->timestamp_ns = curr_time.toNSec();
-
-  input->pointcloud.reset(new voxblox::Pointcloud());
-  input->pointcloud_colors.reset(new voxblox::Colors());
-  voxblox::convertPointcloud(
-      *cloud, nullptr, input->pointcloud.get(), input->pointcloud_colors.get());
-
-  geometry_msgs::Pose curr_pose = tfToPose(transform.transform);
-  tf2::convert(curr_pose.position, input->world_t_body);
-  tf2::convert(curr_pose.orientation, input->world_R_body);
-
-  queue_->push(input);
 }
 
 void RosReconstruction::visualize(const ReconstructionOutput& output) {

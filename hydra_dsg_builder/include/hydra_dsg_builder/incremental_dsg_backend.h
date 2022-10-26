@@ -63,7 +63,6 @@ struct LoopClosureLog {
 class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
  public:
   using Ptr = std::shared_ptr<DsgBackend>;
-  using BackendInputQueue = InputQueue<BackendInput>;
   using OutputCallback = std::function<void(const DynamicSceneGraph&,
                                             const pcl::PolygonMesh&,
                                             const kimera_pgmo::DeformationGraph&,

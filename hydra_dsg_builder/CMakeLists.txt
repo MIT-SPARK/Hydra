@@ -44,6 +44,7 @@ add_library(
   src/dsg_lcd_detector.cpp
   src/dsg_lcd_registration.cpp
   src/dsg_update_functions.cpp
+  src/hydra_config.cpp
   src/incremental_dsg_backend.cpp
   src/incremental_dsg_frontend.cpp
   src/incremental_dsg_lcd.cpp
@@ -51,6 +52,7 @@ add_library(
   src/incremental_room_finder.cpp
   src/merge_handler.cpp
   src/minimum_spanning_tree.cpp
+  src/shared_module_state.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
 target_link_libraries(

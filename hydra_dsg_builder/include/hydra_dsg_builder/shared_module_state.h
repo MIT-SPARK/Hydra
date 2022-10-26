@@ -70,6 +70,10 @@ struct BackendInput {
 struct SharedModuleState {
   using Ptr = std::shared_ptr<SharedModuleState>;
 
+  SharedModuleState();
+
+  ~SharedModuleState();
+
   NodeIdSet latest_places;
 
   mutable std::mutex mesh_mutex;
@@ -81,7 +85,7 @@ struct SharedModuleState {
 
   InputQueue<pose_graph_tools::BowQuery::ConstPtr> visual_lcd_queue;
   InputQueue<BackendInput::Ptr> backend_queue;
-  InputQueue<LcdInput::Ptr> lcd_queue;
+  InputQueue<LcdInput::Ptr>::Ptr lcd_queue;
   InputQueue<lcd::DsgRegistrationSolution> backend_lcd_queue;
 };
 

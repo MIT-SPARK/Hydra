@@ -32,63 +32,23 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include "hydra_dsg_builder/dsg_lcd_detector.h"
-#include "hydra_dsg_builder/incremental_types.h"
-#include "hydra_dsg_builder/lcd_module_config.h"
-#include "hydra_dsg_builder/shared_module_state.h"
-
-#include <hydra_utils/robot_prefix_config.h>
-
-#include <memory>
-#include <thread>
+#include "hydra_dsg_builder/hydra_config.h"
 
 namespace hydra {
-namespace incremental {
 
-class DsgLcd {
- public:
-  DsgLcd(const RobotPrefixConfig& prefix,
-         const DsgLcdModuleConfig& config,
-         const SharedDsgInfo::Ptr& dsg,
-         const SharedModuleState::Ptr& state);
+decltype(HydraConfig::instance_) HydraConfig::instance_;
 
-  virtual ~DsgLcd();
+std::ostream& operator<<(std::ostream& out, const HydraConfig& config) {
+  out << "{force_shutdown: " << std::boolalpha << config.force_shutdown() << "}";
+  return out;
+}
 
-  void start();
+HydraConfig::HydraConfig() : force_shutdown_(false) {}
 
-  void stop();
+bool HydraConfig::force_shutdown() const { return force_shutdown_; }
 
-  void save(const std::string& output_path);
+void HydraConfig::set_force_shutdown(bool force_shutdown) {
+  force_shutdown_ = force_shutdown;
+}
 
-  void spin();
-
-  bool spinOnce(bool force_update);
-
- protected:
-  void spinOnceImpl(bool force_update);
-
-  size_t processFrontendOutput();
-
-  NodeIdSet getPlacesToCache(const Eigen::Vector3d& agent_pos);
-
-  std::optional<NodeId> getQueryAgentId(size_t timestamp_ns);
-
- protected:
-  std::atomic<bool> should_shutdown_{false};
-  std::unique_ptr<std::thread> spin_thread_;
-
-  RobotPrefixConfig prefix_;
-  DsgLcdModuleConfig config_;
-  SharedDsgInfo::Ptr dsg_;
-  SharedModuleState::Ptr state_;
-
-  std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> agent_queue_;
-  std::list<NodeId> potential_lcd_root_nodes_;
-
-  std::unique_ptr<lcd::DsgLcdDetector> lcd_detector_;
-  DynamicSceneGraph::Ptr lcd_graph_;
-};
-
-}  // namespace incremental
 }  // namespace hydra

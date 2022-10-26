@@ -33,62 +33,34 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/dsg_lcd_detector.h"
-#include "hydra_dsg_builder/incremental_types.h"
-#include "hydra_dsg_builder/lcd_module_config.h"
-#include "hydra_dsg_builder/shared_module_state.h"
-
-#include <hydra_utils/robot_prefix_config.h>
-
+#include <atomic>
 #include <memory>
-#include <thread>
+#include <iostream>
 
 namespace hydra {
-namespace incremental {
 
-class DsgLcd {
+class HydraConfig {
  public:
-  DsgLcd(const RobotPrefixConfig& prefix,
-         const DsgLcdModuleConfig& config,
-         const SharedDsgInfo::Ptr& dsg,
-         const SharedModuleState::Ptr& state);
+  static HydraConfig& instance() {
+    if (!instance_) {
+      instance_.reset(new HydraConfig());
+    }
+    return *instance_;
+  }
 
-  virtual ~DsgLcd();
+  bool force_shutdown() const;
 
-  void start();
+  void set_force_shutdown(bool force_shutdown);
 
-  void stop();
+ private:
+  HydraConfig();
 
-  void save(const std::string& output_path);
+  static std::unique_ptr<HydraConfig> instance_;
 
-  void spin();
-
-  bool spinOnce(bool force_update);
-
- protected:
-  void spinOnceImpl(bool force_update);
-
-  size_t processFrontendOutput();
-
-  NodeIdSet getPlacesToCache(const Eigen::Vector3d& agent_pos);
-
-  std::optional<NodeId> getQueryAgentId(size_t timestamp_ns);
-
- protected:
-  std::atomic<bool> should_shutdown_{false};
-  std::unique_ptr<std::thread> spin_thread_;
-
-  RobotPrefixConfig prefix_;
-  DsgLcdModuleConfig config_;
-  SharedDsgInfo::Ptr dsg_;
-  SharedModuleState::Ptr state_;
-
-  std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> agent_queue_;
-  std::list<NodeId> potential_lcd_root_nodes_;
-
-  std::unique_ptr<lcd::DsgLcdDetector> lcd_detector_;
-  DynamicSceneGraph::Ptr lcd_graph_;
+  // TODO(nathan) consider moving robot id and logging here
+  std::atomic<bool> force_shutdown_;
 };
 
-}  // namespace incremental
+std::ostream& operator<<(std::ostream& out, const HydraConfig& config);
+
 }  // namespace hydra

@@ -9,7 +9,7 @@
 
     <arg name="pointcloud_topic" value="semantic_pointcloud"/>
     <arg name="use_gt_frame" default="true"/>
-    <arg name="sensor_frame" default="left_cam"/>
+    <arg name="sensor_frame" default="base_link"/>
 
     <include file="$(find hydra_utils)/launch/data_sources/sidpac_pointcloud.launch" pass_all_args="true"/>
 
