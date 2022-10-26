@@ -7,14 +7,8 @@
 
     <node pkg="hydra_utils" type="csv_to_tf" name="csv_to_tf">
         <param name="parent_frame" value="world"/>
-        <param name="child_frame" value="base_link_pgo"/>
+        <param name="child_frame" value="$(arg sensor_frame)"/>
         <param name="trajectory_file" value="$(arg path_to_csv)"/>
-    </node>
-
-    <node pkg="tf2_ros" type="static_transform_publisher" name="base_pgo_to_cam"
-          args="0.00012095 -0.0008438 0.00026236
-                0.489216945549 -0.497966285936 -0.499874528495 0.512661503821
-                base_link_pgo $(arg sensor_frame)">
     </node>
 
 </launch>

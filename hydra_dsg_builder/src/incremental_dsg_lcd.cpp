@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder/incremental_dsg_lcd.h"
+#include "hydra_dsg_builder/hydra_config.h"
 
 #include <glog/logging.h>
 #include <hydra_utils/timing_utilities.h>
@@ -78,8 +79,19 @@ void DsgLcd::stop() {
 void DsgLcd::save(const std::string&) {}
 
 void DsgLcd::spin() {
-  while (!should_shutdown_) {
-    bool has_data = state_->lcd_queue.poll();
+  if (!state_->lcd_queue) {
+    LOG(ERROR) << "LCD queue required to run LCD";
+    return;
+  }
+
+  bool should_shutdown = false;
+  while (!should_shutdown) {
+    bool has_data = state_->lcd_queue->poll();
+    if (HydraConfig::instance().force_shutdown() || !has_data) {
+      // copy over shutdown request
+      should_shutdown = should_shutdown_;
+    }
+
     if (!has_data) {
       continue;
     }
@@ -97,12 +109,17 @@ void DsgLcd::spin() {
 }
 
 bool DsgLcd::spinOnce(bool force_update) {
-  bool has_data = state_->lcd_queue.poll();
+  if (!state_->lcd_queue) {
+    LOG(ERROR) << "LCD queue required to run LCD";
+    return false;
+  }
+
+  bool has_data = state_->lcd_queue->poll();
   if (!has_data) {
     return false;
   }
 
-  spinOnce(force_update);
+  spinOnceImpl(force_update);
   return true;
 }
 
@@ -111,7 +128,6 @@ void DsgLcd::spinOnceImpl(bool force_update) {
 
   {  // start critical section
     std::unique_lock<std::mutex> lock(dsg_->mutex);
-    // TODO(nathan) add config option to force update anyways
     if (!force_update && timestamp_ns < dsg_->last_update_time) {
       return;
     }
@@ -131,8 +147,6 @@ void DsgLcd::spinOnceImpl(bool force_update) {
 
     auto time = lcd_graph_->getDynamicNode(*query_agent).value().get().timestamp;
     auto results = lcd_detector_->detect(*lcd_graph_, *query_agent, time.count());
-    query_agent = getQueryAgentId(timestamp_ns);
-
     for (const auto& result : results) {
       // TODO(nathan) consider augmenting with gtsam key
       state_->backend_lcd_queue.push(result);
@@ -140,11 +154,15 @@ void DsgLcd::spinOnceImpl(bool force_update) {
                    << NodeSymbol(result.from_node).getLabel() << " -> "
                    << NodeSymbol(result.to_node).getLabel();
     }
+
+    // if should_shutdown_ is true and agent/place parent invariant is broken, this
+    // will exit early
+    query_agent = getQueryAgentId(timestamp_ns);
   }
 }
 
 size_t DsgLcd::processFrontendOutput() {
-  const auto& msg = state_->lcd_queue.front();
+  const auto& msg = state_->lcd_queue->front();
   potential_lcd_root_nodes_.insert(potential_lcd_root_nodes_.end(),
                                    msg->archived_places.begin(),
                                    msg->archived_places.end());
@@ -154,7 +172,7 @@ size_t DsgLcd::processFrontendOutput() {
   }
 
   size_t timestamp_ns = msg->timestamp_ns;
-  state_->lcd_queue.pop();
+  state_->lcd_queue->pop();
   return timestamp_ns;
 }
 

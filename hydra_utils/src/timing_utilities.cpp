@@ -54,7 +54,7 @@ std::ostream& operator<<(std::ostream& out, const ElapsedStatistics& stats) {
 }
 
 ElapsedTimeRecorder::ElapsedTimeRecorder()
-    : disable_output(true), log_incrementally_(false) {
+    : timing_disabled(false), disable_output(true), log_incrementally_(false) {
   mutex_.reset(new std::mutex());
 }
 
@@ -263,9 +263,14 @@ ScopedTimer::ScopedTimer(const std::string& name,
       verbosity_(verbosity),
       elapsed_only_(elapsed_only),
       verbosity_disables_(verbosity_disables) {
+  if (ElapsedTimeRecorder::instance().timing_disabled) {
+    return;
+  }
+
   if (verbosity_disables_ and !VLOG_IS_ON(verbosity_)) {
     return;
   }
+
   ElapsedTimeRecorder::instance().start(name_, timestamp);
 }
 
@@ -273,6 +278,10 @@ ScopedTimer::ScopedTimer(const std::string& name, uint64_t timestamp)
     : ScopedTimer(name, timestamp, false, 1, true, false) {}
 
 ScopedTimer::~ScopedTimer() {
+  if (ElapsedTimeRecorder::instance().timing_disabled) {
+    return;
+  }
+
   if (verbosity_disables_ and !VLOG_IS_ON(verbosity_)) {
     return;
   }

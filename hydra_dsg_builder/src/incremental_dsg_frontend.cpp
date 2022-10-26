@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder/incremental_dsg_frontend.h"
+#include "hydra_dsg_builder/hydra_config.h"
 
 #include <hydra_utils/timing_utilities.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
@@ -107,6 +108,8 @@ void DsgFrontend::stop() {
     spin_thread_.reset();
     VLOG(2) << "[Hydra Frontend] stopped!";
   }
+
+  VLOG(2) << "[Hydra Frontend]: " << queue_->size() << " messages left";
 }
 
 void DsgFrontend::save(const std::string& output_path) {
@@ -128,8 +131,14 @@ void DsgFrontend::save(const std::string& output_path) {
 }
 
 void DsgFrontend::spin() {
-  while (!should_shutdown_) {
+  bool should_shutdown = false;
+  while (!should_shutdown) {
     bool has_data = queue_->poll();
+    if (HydraConfig::instance().force_shutdown() || !has_data) {
+      // copy over shutdown request
+      should_shutdown = should_shutdown_;
+    }
+
     if (!has_data) {
       continue;
     }
@@ -175,8 +184,10 @@ void DsgFrontend::spinOnce(const ReconstructionOutput& msg) {
     updatePlaceMeshMapping();
   }
 
-  // TODO(nathan) only push if running
-  state_->lcd_queue.push(lcd_input_);
+  if (state_->lcd_queue) {
+    state_->lcd_queue->push(lcd_input_);
+  }
+
   state_->backend_queue.push(backend_input_);
 
   dsg_->last_update_time = msg.timestamp_ns;
@@ -342,6 +353,8 @@ void DsgFrontend::updatePoseGraph(const ReconstructionOutput& input) {
       NodeSymbol pgmo_key(prefix_.key, node.key);
 
       const std::chrono::nanoseconds stamp(node.header.stamp.toNSec());
+      VLOG(5) << "Adding agent " << agents.nodes().size() << " @ " << stamp.count()
+              << " [ns] for layer " << agents.prefix.str();
       auto attrs = std::make_unique<AgentNodeAttributes>(rotation, position, pgmo_key);
       if (!dsg_->graph->emplaceNode(
               agents.id, agents.prefix, stamp, std::move(attrs))) {
