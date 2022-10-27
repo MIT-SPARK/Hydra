@@ -40,6 +40,7 @@
 #include <hydra_utils/timing_utilities.h>
 #include <pcl/common/centroid.h>
 #include <pcl/point_types.h>
+#include <spark_dsg/bounding_box_extraction.h>
 
 namespace hydra {
 namespace dsg_updates {
@@ -142,7 +143,7 @@ std::map<NodeId, NodeId> UpdateObjectsFunctor::call(SharedDsgInfo& dsg,
     pcl::IndicesPtr indices;
     indices.reset(new std::vector<int>(connections.begin(), connections.end()));
 
-    attrs.bounding_box = BoundingBox::extract(mesh, attrs.bounding_box.type, indices);
+    attrs.bounding_box = bounding_box::extract(mesh, attrs.bounding_box.type, indices);
 
     Centroid centroid;
     for (const auto& idx : *indices) {
