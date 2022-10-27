@@ -35,6 +35,7 @@
 #include "hydra_dsg_builder/incremental_mesh_segmenter.h"
 
 #include <pcl/segmentation/extract_clusters.h>
+#include <spark_dsg/bounding_box_extraction.h>
 
 #include <glog/logging.h>
 
@@ -354,7 +355,7 @@ void MeshSegmenter::updateObjectInGraph(DynamicSceneGraph& graph,
     graph.insertMeshEdge(node.id, idx, true);
   }
 
-  auto new_box = BoundingBox::extract(cluster.cloud, config_.bounding_box_type);
+  auto new_box = bounding_box::extract(cluster.cloud, config_.bounding_box_type);
   ObjectNodeAttributes& attrs = node.attributes<ObjectNodeAttributes>();
   if (attrs.bounding_box.volume() >= new_box.volume()) {
     // TODO(nathan) merge object vertices
@@ -383,7 +384,7 @@ void MeshSegmenter::addObjectToGraph(DynamicSceneGraph& graph,
   ObjectNodeAttributes::Ptr attrs = std::make_unique<ObjectNodeAttributes>();
   attrs->semantic_label = label;
   attrs->name = NodeSymbol(next_node_id_).getLabel();
-  attrs->bounding_box = BoundingBox::extract(cluster.cloud, config_.bounding_box_type);
+  attrs->bounding_box = bounding_box::extract(cluster.cloud, config_.bounding_box_type);
 
   const pcl::PointXYZRGBA& point = cluster.cloud->at(0);
   attrs->color << point.r, point.g, point.b;
