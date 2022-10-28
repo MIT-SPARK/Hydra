@@ -99,6 +99,8 @@ void ReconstructionModule::stop() {
     spin_thread_.reset();
     VLOG(2) << "[Hydra Reconstruction] stopped!";
   }
+
+  VLOG(2) << "[Hydra Reconstruction]: " << queue_->size() << " messages left";
 }
 
 void ReconstructionModule::save(const std::string&) {}
@@ -142,6 +144,9 @@ void ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
     LOG(ERROR) << "received invalid pointcloud in input!";
     return;
   }
+
+  VLOG(2) << "[Hydra Reconstruction]: Processing msg @ " << msg.timestamp_ns;
+  VLOG(2) << "[Hydra Reconstruction]: " << queue_->size() << " messages left";
 
   Eigen::Affine3d curr_pose(Eigen::Translation3d(msg.world_t_body) * msg.world_R_body);
   if (!msg.pose_graph && num_poses_received_ != 0) {

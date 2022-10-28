@@ -107,6 +107,8 @@ void DsgFrontend::stop() {
     spin_thread_.reset();
     VLOG(2) << "[Hydra Frontend] stopped!";
   }
+
+  VLOG(2) << "[Hydra Frontend]: " << queue_->size() << " messages left";
 }
 
 void DsgFrontend::save(const std::string& output_path) {

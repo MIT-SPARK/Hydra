@@ -135,6 +135,8 @@ void DsgBackend::stop() {
     zmq_thread_.reset();
     VLOG(2) << "[Hydra Backend] stopped!";
   }
+
+  VLOG(2) << "[Hydra Backend]: " << state_->backend_queue.size() << " messages left";
 }
 
 void DsgBackend::save(const std::string& output_path) {

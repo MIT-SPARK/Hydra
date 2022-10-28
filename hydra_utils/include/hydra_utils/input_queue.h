@@ -78,6 +78,11 @@ struct InputQueue {
     queue.pop();
     return value;
   }
+
+  size_t size() const {
+    std::unique_lock<std::mutex> lock(mutex);
+    return queue.size();
+  }
 };
 
 }  // namespace hydra
