@@ -123,6 +123,7 @@ struct HydraRosPipeline {
 
     if (config_.enable_lcd) {
       const auto lcd_config = load_config<DsgLcdModuleConfig>(nh, "");
+      shared_state->lcd_queue.reset(new InputQueue<LcdInput::Ptr>());
       lcd.reset(new DsgLcd(prefix, lcd_config, frontend_dsg, shared_state));
     }
   }
@@ -190,6 +191,7 @@ int main(int argc, char* argv[]) {
   std::string dsg_output_path = "";
   nh.getParam("log_path", dsg_output_path);
 
+  nh.getParam("timing_disabled", ElapsedTimeRecorder::instance().timing_disabled);
   nh.getParam("disable_timer_output", ElapsedTimeRecorder::instance().disable_output);
 
   bool log_timing_incrementally = false;

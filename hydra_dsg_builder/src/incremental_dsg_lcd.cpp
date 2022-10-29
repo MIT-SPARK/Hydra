@@ -78,8 +78,13 @@ void DsgLcd::stop() {
 void DsgLcd::save(const std::string&) {}
 
 void DsgLcd::spin() {
+  if (!state_->lcd_queue) {
+    LOG(ERROR) << "LCD queue required to run LCD";
+    return;
+  }
+
   while (!should_shutdown_) {
-    bool has_data = state_->lcd_queue.poll();
+    bool has_data = state_->lcd_queue->poll();
     if (!has_data) {
       continue;
     }
@@ -97,7 +102,12 @@ void DsgLcd::spin() {
 }
 
 bool DsgLcd::spinOnce(bool force_update) {
-  bool has_data = state_->lcd_queue.poll();
+  if (!state_->lcd_queue) {
+    LOG(ERROR) << "LCD queue required to run LCD";
+    return false;
+  }
+
+  bool has_data = state_->lcd_queue->poll();
   if (!has_data) {
     return false;
   }
@@ -144,7 +154,7 @@ void DsgLcd::spinOnceImpl(bool force_update) {
 }
 
 size_t DsgLcd::processFrontendOutput() {
-  const auto& msg = state_->lcd_queue.front();
+  const auto& msg = state_->lcd_queue->front();
   potential_lcd_root_nodes_.insert(potential_lcd_root_nodes_.end(),
                                    msg->archived_places.begin(),
                                    msg->archived_places.end());
@@ -154,7 +164,7 @@ size_t DsgLcd::processFrontendOutput() {
   }
 
   size_t timestamp_ns = msg->timestamp_ns;
-  state_->lcd_queue.pop();
+  state_->lcd_queue->pop();
   return timestamp_ns;
 }
 

@@ -82,6 +82,8 @@ class ElapsedTimeRecorder {
 
   void setupIncrementalLogging(const std::string& output_folder);
 
+  bool timing_disabled;
+
   bool disable_output;
 
  private:

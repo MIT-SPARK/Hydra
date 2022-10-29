@@ -51,6 +51,7 @@ add_library(
   src/incremental_room_finder.cpp
   src/merge_handler.cpp
   src/minimum_spanning_tree.cpp
+  src/shared_module_state.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
 target_link_libraries(

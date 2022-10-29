@@ -177,8 +177,10 @@ void DsgFrontend::spinOnce(const ReconstructionOutput& msg) {
     updatePlaceMeshMapping();
   }
 
-  // TODO(nathan) only push if running
-  state_->lcd_queue.push(lcd_input_);
+  if (state_->lcd_queue) {
+    state_->lcd_queue->push(lcd_input_);
+  }
+
   state_->backend_queue.push(backend_input_);
 
   dsg_->last_update_time = msg.timestamp_ns;
