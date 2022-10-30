@@ -69,6 +69,7 @@ ReconstructionModule::ReconstructionModule(const RobotPrefixConfig& prefix,
   VLOG(3) << "Reconstruction config: " << std::endl << config_;
 
   queue_.reset(new ReconstructionInputQueue());
+  queue_->max_size = config_.max_input_queue_size;
 
   tsdf_.reset(new Layer<TsdfVoxel>(config_.voxel_size, config_.voxels_per_side));
   semantics_.reset(
