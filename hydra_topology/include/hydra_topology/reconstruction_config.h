@@ -109,6 +109,7 @@ struct ReconstructionConfig {
   std::string world_frame = "world";
   std::string robot_frame = "base_link";
   size_t num_poses_per_update = 1;
+  size_t max_input_queue_size = 0;
   topology::GvdIntegratorConfig gvd;
   voxblox::TsdfIntegratorBase::Config tsdf;
   kimera::SemanticIntegratorBase::SemanticConfig semantics;
@@ -135,6 +136,7 @@ void visit_config(const Visitor& v, ReconstructionConfig& config) {
   v.visit("world_frame", config.world_frame);
   v.visit("robot_frame", config.robot_frame);
   v.visit("num_poses_per_update", config.num_poses_per_update);
+  v.visit("max_input_queue_size", config.max_input_queue_size);
   v.visit("gvd", config.gvd);
   v.visit("tsdf", config.tsdf);
   v.visit("semantics", config.semantics);
