@@ -100,7 +100,12 @@ void ReconstructionModule::stop() {
     VLOG(2) << "[Hydra Reconstruction] stopped!";
   }
 
-  VLOG(2) << "[Hydra Reconstruction]: " << queue_->size() << " messages left";
+  VLOG(2) << "[Hydra Reconstruction] input queue: " << queue_->size();
+  if (output_queue_) {
+    VLOG(2) << "[Hydra Reconstruction] output queue: " << output_queue_->size();
+  } else {
+    VLOG(2) << "[Hydra Reconstruction] output queue: n/a";
+  }
 }
 
 void ReconstructionModule::save(const std::string&) {}
@@ -251,11 +256,14 @@ void ReconstructionModule::addMeshToOutput(const BlockIndexList& archived_blocks
 void ReconstructionModule::showStats() const {
   const std::string tsdf_memory_str =
       hydra_utils::getHumanReadableMemoryString(tsdf_->getMemorySize());
+  const std::string semantic_memory_str =
+      hydra_utils::getHumanReadableMemoryString(semantics_->getMemorySize());
   const std::string gvd_memory_str =
       hydra_utils::getHumanReadableMemoryString(gvd_->getMemorySize());
   const std::string mesh_memory_str =
       hydra_utils::getHumanReadableMemoryString(mesh_->getMemorySize());
-  LOG(INFO) << "Memory used: [TSDF=" << tsdf_memory_str << ", GVD=" << gvd_memory_str
+  LOG(INFO) << "Memory used: [TSDF=" << tsdf_memory_str
+            << ", Semantics=" << semantic_memory_str << ", GVD=" << gvd_memory_str
             << ", Mesh= " << mesh_memory_str << "]";
 }
 
@@ -280,6 +288,9 @@ BlockIndexList ReconstructionModule::update(const voxblox::Transformation& T_G_C
   if (config_.clear_distant_blocks) {
     archived_blocks = gvd_integrator_->removeDistantBlocks(
         T_G_C.getPosition(), config_.dense_representation_radius_m);
+    for (const auto& index : archived_blocks) {
+      semantics_->removeBlock(index);
+    }
 
     mesh_->clearDistantMesh(T_G_C.getPosition(), config_.dense_representation_radius_m);
   }

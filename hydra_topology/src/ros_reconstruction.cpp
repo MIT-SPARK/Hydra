@@ -106,6 +106,8 @@ RosReconstruction::~RosReconstruction() {
     pointcloud_thread_.reset();
     VLOG(2) << "[Hydra Reconstruction] stopped pointcloud input thread";
   }
+
+  VLOG(2) << "[Hydra Reconstruction] pointcloud queue: " << pointcloud_queue_.size();
 }
 
 void RosReconstruction::inputCallback(const RosPointcloud::ConstPtr& cloud,

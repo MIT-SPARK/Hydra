@@ -96,7 +96,6 @@ struct HydraRosPipeline {
       const auto frontend_config = load_config<DsgFrontendConfig>(nh);
       frontend = std::make_shared<DsgFrontend>(
           prefix, frontend_config, frontend_dsg, shared_state);
-
       reconstruction =
           std::make_shared<RosReconstruction>(nh, prefix, frontend->getQueue());
     } else {
@@ -132,8 +131,15 @@ struct HydraRosPipeline {
     if (reconstruction) {
       reconstruction->start();
     }
-    frontend->start();
-    backend->start();
+
+    if (frontend) {
+      frontend->start();
+    }
+
+    if (backend) {
+      backend->start();
+    }
+
     if (lcd) {
       lcd->start();
     }
@@ -143,11 +149,18 @@ struct HydraRosPipeline {
     if (reconstruction) {
       reconstruction->stop();
     }
-    frontend->stop();
+
+    if (frontend) {
+      frontend->stop();
+    }
+
     if (lcd) {
       lcd->stop();
     }
-    backend->stop();
+
+    if (backend) {
+      backend->stop();
+    }
   }
 
   void save(const std::string& output_path) {
@@ -155,8 +168,15 @@ struct HydraRosPipeline {
       if (reconstruction) {
         reconstruction->save(output_path + "/topology/");
       }
-      frontend->save(output_path + "/frontend/");
-      backend->save(output_path + "/backend/");
+
+      if (frontend) {
+        frontend->save(output_path + "/frontend/");
+      }
+
+      if (backend) {
+        backend->save(output_path + "/backend/");
+      }
+
       if (lcd) {
         lcd->save(output_path + "/lcd/");
       }

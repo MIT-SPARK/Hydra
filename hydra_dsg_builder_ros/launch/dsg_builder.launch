@@ -47,7 +47,7 @@
     <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
 
     <arg name="log_timing_incrementally" default="false"/>
-    <arg name="show_topology_stats" default="false"/>
+    <arg name="show_topology_stats" default="true"/>
     <arg name="dsg_path" default="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
     <arg name="pgmo_log_path" value="$(arg dsg_path)/pgmo"/>
     <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
@@ -82,6 +82,7 @@
         <param name="log_path" value="$(arg dsg_path)"/>
         <param name="log_timing_incrementally" value="$(arg log_timing_incrementally)"/>
         <param name="disable_timer_output" value="true"/>
+        <param name="timing_disabled" value="false"/>
         <param name="visualize_dsg_lcd" value="$(arg enable_lcd_viz)"/>
         <param name="semantic_label_file" value="$(arg semantic_map_path)"/>
         <param name="robot_id" value="$(arg robot_id)"/>
