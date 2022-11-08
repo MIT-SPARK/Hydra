@@ -346,6 +346,8 @@ void DsgFrontend::updatePoseGraph(const ReconstructionOutput& input) {
       NodeSymbol pgmo_key(prefix_.key, node.key);
 
       const std::chrono::nanoseconds stamp(node.header.stamp.toNSec());
+      VLOG(5) << "Adding agent " << agents.nodes().size() << " @ " << stamp.count()
+              << " [ns] for layer " << agents.prefix.str();
       auto attrs = std::make_unique<AgentNodeAttributes>(rotation, position, pgmo_key);
       if (!dsg_->graph->emplaceNode(
               agents.id, agents.prefix, stamp, std::move(attrs))) {

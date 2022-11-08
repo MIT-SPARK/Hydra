@@ -106,6 +106,7 @@ class RosReconstruction : public ReconstructionModule {
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
   PointcloudQueue pointcloud_queue_;
   std::unique_ptr<std::thread> pointcloud_thread_;
+  std::unique_ptr<ros::Time> last_time_received_;
 
   // visualizer
   std::unique_ptr<topology::TopologyServerVisualizer> visualizer_;

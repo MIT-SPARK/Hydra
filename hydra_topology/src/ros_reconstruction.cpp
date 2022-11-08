@@ -66,14 +66,14 @@ RosReconstruction::RosReconstruction(const ros::NodeHandle& nh,
       nh_(nh) {
   ros_config_ = load_config<RosReconstructionConfig>(nh);
   if (ros_config_.use_pose_graph) {
-    pcl_sync_sub_.reset(new Subscriber<RosPointcloud>(nh_, "pointcloud", 5));
-    pose_graph_sub_.reset(new Subscriber<PoseGraph>(nh_, "pose_graph", 5));
-    sync_.reset(new Sync(Policy(10), *pcl_sync_sub_, *pose_graph_sub_));
+    pcl_sync_sub_.reset(new Subscriber<RosPointcloud>(nh_, "pointcloud", 10));
+    pose_graph_sub_.reset(new Subscriber<PoseGraph>(nh_, "pose_graph", 10));
+    sync_.reset(new Sync(Policy(30), *pcl_sync_sub_, *pose_graph_sub_));
     sync_->registerCallback(
         boost::bind(&RosReconstruction::inputCallback, this, _1, _2));
   } else {
     pcl_sub_ = nh_.subscribe<Pointcloud>(
-        "pointcloud", 5, &RosReconstruction::pclCallback, this);
+        "pointcloud", 10, &RosReconstruction::pclCallback, this);
     tf_listener_.reset(new tf2_ros::TransformListener(buffer_));
     pointcloud_thread_.reset(new std::thread(&RosReconstruction::pointcloudSpin, this));
   }
@@ -118,8 +118,10 @@ void RosReconstruction::inputCallback(const RosPointcloud::ConstPtr& cloud,
   }
 
   ReconstructionInput::Ptr input(new ReconstructionInput());
-  input->timestamp_ns = cloud->header.stamp;
+  input->timestamp_ns = cloud->header.stamp * 1000;
   input->pose_graph = pose_graph;
+  VLOG(1) << "Got ROS input @ " << input->timestamp_ns << " [ns] (pose graph @ "
+          << pose_graph->header.stamp.toNSec() << " [ns])";
 
   input->pointcloud.reset(new voxblox::Pointcloud());
   input->pointcloud_colors.reset(new voxblox::Colors());
@@ -139,12 +141,15 @@ void RosReconstruction::pclCallback(const RosPointcloud::ConstPtr& cloud) {
   ros::Time curr_time;
   curr_time.fromNSec(cloud->header.stamp * 1000);
   if (num_poses_received_ > 0) {
-    ros::Time prev_time;
-    prev_time.fromNSec(prev_time_);
-    if ((curr_time - prev_time).toSec() < ros_config_.pointcloud_separation_s) {
+    if (last_time_received_ && ((curr_time - *last_time_received_).toSec() <
+                                ros_config_.pointcloud_separation_s)) {
       return;
     }
+
+    last_time_received_.reset(new ros::Time(curr_time));
   }
+
+  VLOG(1) << "Got ROS input @ " << curr_time.toNSec() << " [ns]";
 
   // TODO(nathan) consider setting prev_time_ here?
   pointcloud_queue_.push(cloud);
