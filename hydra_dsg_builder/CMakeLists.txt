@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(BUILD_WITH_COVERAGE "Build core library with GCC --coverage option" ON)
+option(HYDRA_GNN "build GNN interface" ON)
 
 find_package(Boost REQUIRED COMPONENTS timer)
 find_package(spark_dsg REQUIRED)
@@ -38,6 +39,10 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME} gtsam
 )
+
+if(HYDRA_GNN)
+  add_subdirectory(src/gnn)
+endif()
 
 add_library(
   ${PROJECT_NAME}
@@ -72,6 +77,10 @@ if(BUILD_WITH_COVERAGE)
   target_compile_options(${PROJECT_NAME} PRIVATE --coverage)
   # TODO(nathan) once we have newer cmake, target link options
   target_link_libraries(${PROJECT_NAME} PRIVATE --coverage)
+endif()
+
+if(HYDRA_GNN)
+  target_link_libraries(${PROJECT_NAME} PUBLIC ${PROJECT_NAME}_gnn)
 endif()
 
 if(CATKIN_ENABLE_TESTING)
