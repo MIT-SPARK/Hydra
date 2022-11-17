@@ -553,14 +553,16 @@ Marker makeDynamicCentroidMarkers(const std_msgs::Header& header,
                                   const DynamicSceneGraphLayer& layer,
                                   const VisualizerConfig& visualizer_config,
                                   const NodeColor& color,
-                                  const std::string& ns) {
+                                  const std::string& ns,
+                                  size_t marker_id) {
   return makeDynamicCentroidMarkers(header,
                                     config,
                                     layer,
                                     config.z_offset_scale,
                                     visualizer_config,
                                     ns,
-                                    [&](const auto&) -> NodeColor { return color; });
+                                    [&](const auto&) -> NodeColor { return color; },
+                                    marker_id);
 }
 
 Marker makeDynamicCentroidMarkers(const std_msgs::Header& header,
@@ -569,13 +571,14 @@ Marker makeDynamicCentroidMarkers(const std_msgs::Header& header,
                                   double layer_offset_scale,
                                   const VisualizerConfig& visualizer_config,
                                   const std::string& ns,
-                                  const ColorFunction& color_func) {
+                                  const ColorFunction& color_func,
+                                  size_t marker_id) {
   Marker marker;
   marker.header = header;
   marker.type = config.node_use_sphere ? Marker::SPHERE_LIST : Marker::CUBE_LIST;
   marker.action = visualization_msgs::Marker::ADD;
   marker.ns = ns;
-  marker.id = 0;
+  marker.id = marker_id;
 
   marker.scale.x = config.node_scale;
   marker.scale.y = config.node_scale;
@@ -600,12 +603,13 @@ Marker makeDynamicEdgeMarkers(const std_msgs::Header& header,
                               const DynamicSceneGraphLayer& layer,
                               const VisualizerConfig& visualizer_config,
                               const NodeColor& color,
-                              const std::string& ns) {
+                              const std::string& ns,
+                              size_t marker_id) {
   Marker marker;
   marker.header = header;
   marker.type = Marker::LINE_LIST;
   marker.ns = ns;
-  marker.id = 0;
+  marker.id = marker_id;
 
   marker.action = Marker::ADD;
   marker.scale.x = config.edge_scale;
@@ -631,12 +635,13 @@ Marker makeDynamicLabelMarker(const std_msgs::Header& header,
                               const DynamicLayerConfig& config,
                               const DynamicSceneGraphLayer& layer,
                               const VisualizerConfig& visualizer_config,
-                              const std::string& ns) {
+                              const std::string& ns,
+                              size_t marker_id) {
   Marker marker;
   marker.header = header;
   marker.type = Marker::TEXT_VIEW_FACING;
   marker.ns = ns;
-  marker.id = 0;
+  marker.id = marker_id;
   marker.action = Marker::ADD;
   marker.lifetime = ros::Duration(0);
   marker.text = std::to_string(layer.id) + ":" + layer.prefix.str();

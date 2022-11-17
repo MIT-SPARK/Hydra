@@ -9,6 +9,7 @@
     <arg name="semantic_map_file"/>
     <arg name="semantic_map_path"/>
     <arg name="sensor_frame"/>
+    <arg name="world_frame" default="world"/>
 
     <arg name="use_gt_frame" default="true"/>
     <arg name="use_oriented_bounding_boxes" default="false"/>
@@ -18,13 +19,14 @@
     <arg name="enable_dsg_lcd" default="false"/>
     <arg name="enable_lcd_viz" default="false"/>
     <arg name="optimize_on_lc" default="true"/>
+    <arg name="enable_merge_undos" default="false"/>
 
     <arg name="dsg_should_log" default="true" />
     <arg name="pgmo_should_log" default="true"/>
     <arg name="log_registration" default="false"/>
 
     <arg name="debug" default="false"/>
-    <arg name="launch_prefix" value="gdb --args" if="$(arg debug)"/>
+    <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
     <arg name="launch_prefix" value="" unless="$(arg debug)"/>
 
     <arg name="min_glog_level" default="3"/>
@@ -75,20 +77,23 @@
         <param name="semantic_label_file" value="$(arg semantic_map_path)"/>
         <param name="robot_id" value="$(arg robot_id)"/>
         <param name="sensor_frame" value="$(arg sensor_frame)"/>
+        <param name="world_frame" value="$(arg world_frame)"/>
 
         <param name="dsg/optimize_on_lc" value="$(arg optimize_on_lc)"/>
+        <param name="dsg/enable_merge_undos" value="$(arg enable_merge_undos)"/>
         <param name="lcd/log_registration_problem" value="$(arg log_registration)"/>
         <param name="pgmo/log_path" value="$(arg pgmo_log_path)"/>
         <param name="pgmo/should_log" value="$(arg pgmo_should_log)"/>
         <param name="objects/bounding_box_type" value="RAABB" if="$(arg use_oriented_bounding_boxes)"/>
         <param name="objects/bounding_box_type" value="AABB" unless="$(arg use_oriented_bounding_boxes)"/>
+        <param name="pgmo/robot_id" value="$(arg robot_id)"/>
 
-        <remap from="~voxblox_mesh" to="/hydra_topology_node/active_mesh"/>
-        <remap from="~active_places" to="/hydra_topology_node/active_layer"/>
-        <remap from="~pose_graph_incremental" to="/kimera_vio_ros/pose_graph_incremental"
+        <remap from="~voxblox_mesh" to="hydra_topology_node/active_mesh"/>
+        <remap from="~active_places" to="hydra_topology_node/active_layer"/>
+        <remap from="~pose_graph_incremental" to="kimera_vio_ros/pose_graph_incremental"
                unless="$(arg use_gt_frame)"/>
-        <remap from="~/bow_vectors" to="/kimera_vio_ros/bow_query"/>
-        <remap from="frame_registration" to="/kimera_vio_ros/kimera_vio_ros_node/register_lcd_frames"/>
+        <remap from="~/bow_vectors" to="kimera_vio_ros/bow_query"/>
+        <remap from="frame_registration" to="kimera_vio_ros/kimera_vio_ros_node/register_lcd_frames"/>
     </node>
 
     <node pkg="hydra_utils" type="pose_graph_publisher_node"
@@ -98,7 +103,7 @@
           output="log">
           <param name="use_pointcloud_time" value="true"/>
           <param name="keyframe_period_s" value="0.2"/>
-          <param name="world_frame" value="world"/>
+          <param name="world_frame" value="$(arg world_frame)"/>
           <param name="robot_frame" value="$(arg sensor_frame)"/>
           <param name="robot_id" value="$(arg robot_id)"/>
           <remap from="~pose_graph" to="/incremental_dsg_builder_node/pose_graph_incremental"/>
@@ -106,8 +111,8 @@
     </node>
 
     <include file="$(find pose_graph_tools)/launch/posegraph_view.launch">
-        <arg name="frame_id"      value="world" />
-        <arg name="graph_topic"   value="/incremental_dsg_builder_node/pgmo/pose_graph" />
+        <arg name="frame_id"      value="$(arg world_frame)" />
+        <arg name="graph_topic"   value="pose_graph" />
         <arg name="ns"            value="incremental_dsg_builder_node/pgmo"/>
     </include>
 

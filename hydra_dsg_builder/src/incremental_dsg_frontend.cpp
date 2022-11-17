@@ -149,7 +149,6 @@ void DsgFrontend::spin() {
       ScopedTimer timer("frontend/place_mesh_mapping", msg.timestamp_ns);
       updatePlaceMeshMapping();
     }
-
     dsg_->last_update_time = msg.timestamp_ns;
     dsg_->updated = true;
 
@@ -216,8 +215,7 @@ void DsgFrontend::updateMeshAndObjects(const FrontendInput& input) {
   {  // start dsg critical section
     ScopedTimer timer("frontend/object_graph_update", input.timestamp_ns);
     std::unique_lock<std::mutex> lock(dsg_->mutex);
-    state_->archived_objects =
-        segmenter_->updateGraph(*dsg_->graph, object_clusters, input.timestamp_ns);
+    segmenter_->updateGraph(*dsg_->graph, object_clusters, input.timestamp_ns);
     addPlaceObjectEdges(input.timestamp_ns);
   }  // end dsg critical section
 }
@@ -232,7 +230,7 @@ void DsgFrontend::updatePlaces(const FrontendInput& input) {
   NodeIdSet active_nodes;
   for (const auto& id_node_pair : temp_layer.nodes()) {
     active_nodes.insert(id_node_pair.first);
-    auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
+    auto& attrs = id_node_pair.second->attributes();
     attrs.is_active = true;
     attrs.last_update_time_ns = input.timestamp_ns;
   }
@@ -353,11 +351,7 @@ void DsgFrontend::archivePlaces(const NodeIdSet active_places) {
 
       // mark archived places as inactive
       if (dsg_->graph->hasNode(prev)) {
-        dsg_->graph->getNode(prev)
-            .value()
-            .get()
-            .attributes<PlaceNodeAttributes>()
-            .is_active = false;
+        dsg_->graph->getNode(prev)->get().attributes().is_active = false;
       }
 
       state_->archived_places.insert(prev);
@@ -504,8 +498,8 @@ void DsgFrontend::updatePlaceMeshMapping() {
 
   if (num_deform_invalid || num_mesh_invalid) {
     VLOG(2) << "[Hydra Frontend] Place-Mesh Update: " << num_deform_invalid
-              << " invalid deformation graph connections, " << num_mesh_invalid
-              << " invalid mesh connections";
+            << " invalid deformation graph connections, " << num_mesh_invalid
+            << " invalid mesh connections";
   }
 }
 

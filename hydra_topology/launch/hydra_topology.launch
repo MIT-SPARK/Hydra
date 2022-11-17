@@ -3,6 +3,7 @@
 
     <arg name="config"/>
     <arg name="sensor_frame"/>
+    <arg name="world_frame" default="world"/>
     <arg name="semantic_config" if="$(arg use_semantics)"/>
     <arg name="semantic_color_path" if="$(arg use_semantics)"/>
     <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
@@ -43,6 +44,7 @@
           required="true">
         <remap from="pointcloud" to="$(arg pointcloud_topic)"/>
         <param name="sensor_frame" value="$(arg sensor_frame)"/>
+        <param name="world_frame" value="$(arg world_frame)"/>
         <param name="publish_pointclouds" value="false"/>
         <param name="verbose" value="false"/>
         <param name="log_path" value="$(arg dsg_path)"/>

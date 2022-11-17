@@ -37,6 +37,7 @@
 #include "hydra_dsg_builder/incremental_types.h"
 
 #include <gtsam/nonlinear/Values.h>
+#include <hydra_topology/nearest_neighbor_utilities.h>
 
 namespace hydra {
 
@@ -46,6 +47,7 @@ struct UpdateInfo {
   bool loop_closure_detected = false;
   uint64_t timestamp_ns = 0;
   bool allow_node_merging = false;
+  const gtsam::Values* complete_agent_values = nullptr;
 };
 
 using LayerUpdateFunc =
@@ -55,10 +57,29 @@ using LayerUpdateFunc =
 namespace dsg_updates {
 
 struct UpdateObjectsFunctor {
+  using MeshVertices = DynamicSceneGraph::MeshVertices;
+
   std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
                                 const UpdateInfo& info) const;
 
-  std::set<NodeId> archived_object_ids;
+  void makeNodeFinders(const SceneGraphLayer& layer) const;
+
+  void updateObject(const MeshVertices::Ptr& mesh,
+                    const std::vector<size_t>& mesh_connections,
+                    NodeId node,
+                    ObjectNodeAttributes& attrs) const;
+
+  std::optional<NodeId> proposeObjectMerge(const SceneGraphLayer& layer,
+                                           const ObjectNodeAttributes& attrs,
+                                           bool skip_first) const;
+
+  bool shouldMerge(const ObjectNodeAttributes& from_attrs,
+                   const ObjectNodeAttributes& to_attrs) const;
+
+  size_t num_merges_to_consider = 1;
+  bool use_active_flag = true;
+  mutable std::map<SemanticLabel, std::unique_ptr<topology::NearestNodeFinder>>
+      node_finders;
 };
 
 struct UpdatePlacesFunctor {
@@ -68,8 +89,28 @@ struct UpdatePlacesFunctor {
   std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
                                 const UpdateInfo& info) const;
 
+  void makeNodeFinder(const SceneGraphLayer& layer) const;
+
+  void updatePlace(const gtsam::Values& places_values,
+                   NodeId node_id,
+                   PlaceNodeAttributes& attrs) const;
+
+  std::optional<NodeId> proposePlaceMerge(const SceneGraphLayer& layer,
+                                          NodeId node_id,
+                                          const PlaceNodeAttributes& attrs,
+                                          bool skip_first) const;
+
+  bool shouldMerge(const PlaceNodeAttributes& from_attrs,
+                   const PlaceNodeAttributes& to_attrs) const;
+
+  void filterMissing(DynamicSceneGraph& graph,
+                     const std::list<NodeId> missing_nodes) const;
+
+  size_t num_merges_to_consider = 1;
+  bool use_active_flag = true;
   double pos_threshold_m;
   double distance_tolerance_m;
+  mutable std::unique_ptr<topology::NearestNodeFinder> node_finder;
 };
 
 struct UpdateRoomsFunctor {

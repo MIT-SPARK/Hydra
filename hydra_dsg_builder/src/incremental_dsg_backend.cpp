@@ -43,6 +43,7 @@
 namespace hydra {
 namespace incremental {
 
+using hydra::dsg_updates::NodeMergeLog;
 using hydra::timing::ScopedTimer;
 using kimera_pgmo::DeformationGraph;
 using kimera_pgmo::DeformationGraphPtr;
@@ -50,6 +51,7 @@ using kimera_pgmo::KimeraPgmoInterface;
 using kimera_pgmo::KimeraPgmoMesh;
 using kimera_pgmo::Path;
 using pose_graph_tools::PoseGraph;
+using LayerMerges = std::map<LayerId, std::map<NodeId, NodeId>>;
 
 void DsgBackend::setSolverParams() {
   KimeraRPGO::RobustSolverParams params = deformation_graph_->getParams();
@@ -70,6 +72,7 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
                        const SharedModuleState::Ptr& state)
     : KimeraPgmoInterface(),
       nh_(nh),
+      have_new_mesh_(false),
       shared_dsg_(dsg),
       private_dsg_(backend_dsg),
       state_(state),
@@ -91,6 +94,9 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
       config_.places_merge_pos_threshold_m, config_.places_merge_distance_tolerance_m));
   update_buildings_functor_.reset(new dsg_updates::UpdateBuildingsFunctor(
       config_.building_color, config_.building_semantic_label));
+
+  merge_handler_.reset(new MergeHandler(
+      update_objects_functor_, update_places_functor_, config_.enable_merge_undos));
 
   dsg_update_funcs_.push_back(&dsg_updates::updateAgents);
   dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdateObjectsFunctor::call,
@@ -132,7 +138,7 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
   }
 
   last_timestamp_ = 0;
-  dsg_sender_.reset(new hydra::DsgSender(nh_));
+  dsg_sender_.reset(new hydra::DsgSender(nh_, "backend/publish_dsg"));
 }
 
 void DsgBackend::stop() {
@@ -208,23 +214,23 @@ void DsgBackend::save(const std::string& output_path) {
   }
 }
 
-bool DsgBackend::updatePrivateDsg() {
+bool DsgBackend::updatePrivateDsg(bool force_update) {
   std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
   bool have_frontend_updates = shared_dsg_->updated;
-  if (have_frontend_updates) {
+  if (have_frontend_updates || force_update) {
     {  // start joint critical section
       std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
       private_dsg_->graph->mergeGraph(*shared_dsg_->graph,
-                                      merged_nodes_,
+                                      merge_handler_->mergedNodes(),
+                                      true,
                                       false,
                                       true,
                                       &config_.merge_update_map,
                                       config_.merge_update_dynamic);
 
-      if (state_->archived_objects.size() > 0) {
-        // clear out the shared_dsg set of archived objects and transfer to private
-        update_objects_functor_->archived_object_ids.merge(state_->archived_objects);
-      }
+      // update merge book-keeping and optionally update merged node
+      // connections and attributes
+      merge_handler_->updateFromUnmergedGraph(*shared_dsg_->graph);
 
       if (shared_dsg_->graph->hasLayer(DsgLayers::PLACES)) {
         // TODO(nathan) simplify
@@ -270,12 +276,9 @@ void DsgBackend::updateFromSharedState() {
 
 void DsgBackend::startPgmo() {
   if (config_.use_mesh_subscribers) {
-    full_mesh_sub_ =
-        nh_.subscribe("pgmo/full_mesh", 1, &DsgBackend::fullMeshCallback, this);
-    deformation_graph_sub_ = nh_.subscribe("pgmo/mesh_graph_incremental",
-                                           1000,
-                                           &DsgBackend::deformationGraphCallback,
-                                           this);
+    full_mesh_sub_ = nh_.subscribe("full_mesh", 1, &DsgBackend::fullMeshCallback, this);
+    deformation_graph_sub_ = nh_.subscribe(
+        "mesh_graph_incremental", 1000, &DsgBackend::deformationGraphCallback, this);
   }
 
   pose_graph_sub_ = nh_.subscribe(
@@ -397,10 +400,9 @@ void DsgBackend::runPgmo() {
 
     bool have_dsg_updates = false;
     bool was_updated = false;
+    have_dsg_updates = updatePrivateDsg();
     {  // start pgmo mesh critical section
       std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
-      have_dsg_updates = updatePrivateDsg();
-
       if (config_.optimize_on_lc && have_graph_updates_ && have_loopclosures_) {
         optimize(status_.new_loop_closures_ > 0);
         was_updated = true;
@@ -436,6 +438,7 @@ void DsgBackend::runPgmo() {
   callUpdateFunctions();
   // TODO(Yun) Technically not strictly a g2o
   deformation_graph_->save(config_.pgmo.log_path + "/deformation_graph.dgrf");
+  savePoseGraphSparseMapping(config_.pgmo.log_path + "/sparsification_mapping.txt");
 }
 
 void DsgBackend::fullMeshCallback(const KimeraPgmoMesh::ConstPtr& msg) {
@@ -446,13 +449,17 @@ void DsgBackend::fullMeshCallback(const KimeraPgmoMesh::ConstPtr& msg) {
 
 void DsgBackend::deformationGraphCallback(const PoseGraph::ConstPtr& msg) {
   std::unique_lock<std::mutex> lock(pgmo_mutex_);
-  deformation_graph_updates_.push(msg);
+  if (msg->nodes.size() > 0 && msg->edges.size() > 0) {
+    deformation_graph_updates_.push(msg);
+  }
   last_timestamp_ = msg->header.stamp.toNSec();
 }
 
 void DsgBackend::poseGraphCallback(const PoseGraph::ConstPtr& msg) {
   std::unique_lock<std::mutex> lock(pgmo_mutex_);
-  pose_graph_updates_.push(msg);
+  if (msg->nodes.size() > 0 && msg->edges.size() > 0) {
+    pose_graph_updates_.push(msg);
+  }
 }
 
 bool DsgBackend::saveMeshCallback(std_srvs::Empty::Request&,
@@ -581,11 +588,7 @@ bool DsgBackend::addInternalLCDToDeformationGraph() {
 
   bool added_new_loop_closure = false;
   for (const auto& lc : to_process) {
-    deformation_graph_->addNewBetween(lc.src,
-                                      lc.dest,
-                                      lc.src_T_dest,
-                                      gtsam::Pose3(),
-                                      KimeraPgmoInterface::config_.lc_variance);
+    addLoopClosure(lc.src, lc.dest, lc.src_T_dest);
     added_new_loop_closure = true;
     num_loop_closures_++;
 
@@ -593,6 +596,37 @@ bool DsgBackend::addInternalLCDToDeformationGraph() {
   }
 
   return added_new_loop_closure;
+}
+
+void DsgBackend::addLoopClosure(const gtsam::Key& src,
+                                const gtsam::Key& dest,
+                                const gtsam::Pose3& src_T_dest) {
+  if (full_sparse_frame_map_.size() == 0 ||
+      !KimeraPgmoInterface::config_.b_enable_sparsify) {
+    deformation_graph_->addNewBetween(src,
+                                      dest,
+                                      src_T_dest,
+                                      gtsam::Pose3(),
+                                      KimeraPgmoInterface::config_.lc_variance);
+  } else {
+    if (!full_sparse_frame_map_.count(src) || !full_sparse_frame_map_.count(dest)) {
+      // TODO(yun) this happened a few times when loop closure found for node that has
+      // not yet been received
+      LOG(ERROR)
+          << "Attempted to add loop closure with node not yet processed by PGMO.\n";
+      return;
+    }
+    gtsam::Key sparse_src = full_sparse_frame_map_.at(src);
+    gtsam::Key sparse_dest = full_sparse_frame_map_.at(dest);
+    gtsam::Pose3 sparse_src_T_sparse_dest =
+        sparse_frames_.at(sparse_src).keyed_transforms.at(src) * src_T_dest *
+        sparse_frames_.at(sparse_dest).keyed_transforms.at(dest).inverse();
+    deformation_graph_->addNewBetween(sparse_src,
+                                      sparse_dest,
+                                      sparse_src_T_sparse_dest,
+                                      gtsam::Pose3(),
+                                      KimeraPgmoInterface::config_.lc_variance);
+  }
 }
 
 void DsgBackend::updateDsgMesh(bool force_mesh_update) {
@@ -660,54 +694,51 @@ void DsgBackend::optimize(bool new_loop_closure) {
   }
 }
 
-void DsgBackend::updateMergedNodes(const std::map<NodeId, NodeId>& new_merges) {
-  if (new_merges.size() > 0) {
-    VLOG(1) << "In DSG update, found " << new_merges.size()
-            << " pairs of overlapping nodes. Merging...";
-    for (const auto& node_pair : new_merges) {
-      private_dsg_->graph->mergeNodes(node_pair.first, node_pair.second);
-      VLOG(3) << "merging " << NodeSymbol(node_pair.first).getLabel() << " -> "
-              << NodeSymbol(node_pair.second).getLabel();
-    }
-  }
-
-  for (const auto& id_node_pair : new_merges) {
-    auto iter = merged_nodes_parents_.find(id_node_pair.second);
-    if (iter == merged_nodes_parents_.end()) {
-      iter =
-          merged_nodes_parents_.emplace(id_node_pair.second, std::set<NodeId>()).first;
-    }
-
-    iter->second.insert(id_node_pair.first);
-    merged_nodes_[id_node_pair.first] = id_node_pair.second;
-
-    auto old_iter = merged_nodes_parents_.find(id_node_pair.first);
-    if (old_iter == merged_nodes_parents_.end()) {
-      continue;
-    }
-
-    for (const auto child : old_iter->second) {
-      merged_nodes_[child] = id_node_pair.second;
-      iter->second.insert(child);
-    }
-
-    merged_nodes_parents_.erase(iter);
-  }
-}
-
 void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,
                                      const gtsam::Values& pgmo_values,
-                                     bool new_loop_closure) {
+                                     bool new_loop_closure,
+                                     const LayerMerges& given_merges) {
+  bool enable_node_merging = config_.enable_node_merging;
+  if (given_merges.size() > 0) {
+    enable_node_merging = false;
+  }
+
+  gtsam::Values complete_agent_values;
+  if (full_sparse_frame_map_.size() == 0) {
+    complete_agent_values = pgmo_values;
+  } else {
+    for (const auto& agent_sparse_key : full_sparse_frame_map_) {
+      if (!pgmo_values.exists(agent_sparse_key.second)) {
+        continue;
+      }
+      gtsam::Pose3 agent_pose =
+          pgmo_values.at<gtsam::Pose3>(agent_sparse_key.second)
+              .compose(sparse_frames_.at(agent_sparse_key.second)
+                           .keyed_transforms.at(agent_sparse_key.first));
+      complete_agent_values.insert(agent_sparse_key.first, agent_pose);
+    }
+  }
+
   const UpdateInfo info{&places_values,
                         &pgmo_values,
                         new_loop_closure,
                         last_timestamp_,
-                        config_.enable_node_merging};
+                        enable_node_merging,
+                        &complete_agent_values};
+
+  if (config_.enable_merge_undos) {
+    status_.num_merges_undone_ =
+        merge_handler_->checkAndUndo(*private_dsg_->graph, info);
+  }
 
   ScopedTimer spin_timer("backend/update_layers", last_timestamp_);
   for (const auto& update_func : dsg_update_funcs_) {
     auto merged_nodes = update_func(*private_dsg_, info);
-    updateMergedNodes(merged_nodes);
+    merge_handler_->updateMerges(merged_nodes, *private_dsg_->graph);
+  }
+
+  for (const auto& layer_merges : given_merges) {
+    merge_handler_->updateMerges(layer_merges.second, *private_dsg_->graph);
   }
 }
 
@@ -719,7 +750,8 @@ void DsgBackend::logStatus(bool init) const {
     file.open(filename);
     // file format
     file << "total_lc,new_lc,total_factors,total_values,new_factors,new_graph_"
-            "factors,trajectory_len,run_time,optimize_time,mesh_update_time\n";
+            "factors,trajectory_len,run_time,optimize_time,mesh_update_time,num_merges_"
+            "undone\n";
     file.close();
     return;
   }
@@ -733,7 +765,8 @@ void DsgBackend::logStatus(bool init) const {
        << status_.trajectory_len_ << ","
        << timer.getLastElapsed("backend/spin").value_or(nan) << ","
        << timer.getLastElapsed("backend/optimization").value_or(nan) << ","
-       << timer.getLastElapsed("backend/mesh_update").value_or(nan) << std::endl;
+       << timer.getLastElapsed("backend/mesh_update").value_or(nan) << ","
+       << status_.num_merges_undone_ << std::endl;
   file.close();
   return;
 }
