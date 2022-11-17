@@ -119,7 +119,7 @@ bool DsgLcd::spinOnce(bool force_update) {
     return false;
   }
 
-  spinOnce(force_update);
+  spinOnceImpl(force_update);
   return true;
 }
 

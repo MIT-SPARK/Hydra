@@ -63,7 +63,7 @@ class DsgLcd {
 
   void spin();
 
-  void spinOnce(bool force_update);
+  bool spinOnce(bool force_update);
 
  protected:
   void spinOnceImpl(bool force_update);
