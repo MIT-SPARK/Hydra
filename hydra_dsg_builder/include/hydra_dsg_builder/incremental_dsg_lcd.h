@@ -67,7 +67,7 @@ class DsgLcd {
 
   void save(const std::string& output_path);
 
- private:
+ protected:
   void handleDbowMsg(const pose_graph_tools::BowQueries::ConstPtr& msg);
 
   void runLcd();
@@ -76,7 +76,7 @@ class DsgLcd {
 
   std::optional<NodeId> getLatestAgentId();
 
- private:
+ protected:
   ros::NodeHandle nh_;
   std::atomic<bool> should_shutdown_{false};
 

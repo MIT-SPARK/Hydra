@@ -220,12 +220,15 @@ std::set<NodeId> MeshSegmenter::archiveOldObjects(const DynamicSceneGraph& graph
     for (const auto& object_node : active_objects_.at(label)) {
       if (!graph.hasNode(object_node)) {
         removed_nodes.push_back(object_node);
+        continue;
       }
 
-      if (latest_timestamp - active_object_timestamps_.at(object_node) >
-          static_cast<uint64_t>(config_.active_horizon_s * 1e9)) {
+      const uint64_t diff_ns =
+          latest_timestamp - active_object_timestamps_.at(object_node);
+      if (diff_ns > static_cast<uint64_t>(config_.active_horizon_s * 1e9)) {
         removed_nodes.push_back(object_node);
         archived.insert(object_node);
+        graph.getNode(object_node)->get().attributes().is_active = false;
       }
     }
 
@@ -234,6 +237,7 @@ std::set<NodeId> MeshSegmenter::archiveOldObjects(const DynamicSceneGraph& graph
       active_object_timestamps_.erase(node_id);
     }
   }
+
   return archived;
 }
 
@@ -369,6 +373,8 @@ void MeshSegmenter::updateObjectInGraph(DynamicSceneGraph& graph,
   cluster.centroid.get(centroid);
   attrs.position << centroid.x, centroid.y, centroid.z;
   attrs.bounding_box = new_box;
+  // not technically needed, but...
+  attrs.is_active = true;
 }
 
 void MeshSegmenter::addObjectToGraph(DynamicSceneGraph& graph,
@@ -392,6 +398,7 @@ void MeshSegmenter::addObjectToGraph(DynamicSceneGraph& graph,
   pcl::PointXYZ centroid;
   cluster.centroid.get(centroid);
   attrs->position << centroid.x, centroid.y, centroid.z;
+  attrs->is_active = true;
 
   graph.emplaceNode(DsgLayers::OBJECTS, next_node_id_, std::move(attrs));
 

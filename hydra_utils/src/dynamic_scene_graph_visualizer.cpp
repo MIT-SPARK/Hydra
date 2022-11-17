@@ -190,15 +190,26 @@ void DynamicSceneGraphVisualizer::drawDynamicLayer(const std_msgs::Header& heade
                                                    const DynamicSceneGraphLayer& layer,
                                                    const DynamicLayerConfig& config,
                                                    const VisualizerConfig& viz_config,
+                                                   size_t viz_idx,
                                                    MarkerArray& msg) {
   const std::string node_ns = getDynamicNodeNamespace(layer.prefix);
-  Marker nodes = makeDynamicCentroidMarkers(
-      header, config, layer, viz_config, getNodeColor(config, layer.prefix), node_ns);
+  Marker nodes = makeDynamicCentroidMarkers(header,
+                                            config,
+                                            layer,
+                                            viz_config,
+                                            getNodeColor(config, layer.prefix),
+                                            node_ns,
+                                            viz_idx);
   addMultiMarkerIfValid(nodes, msg);
 
   const std::string edge_ns = getDynamicEdgeNamespace(layer.prefix);
-  Marker edges = makeDynamicEdgeMarkers(
-      header, config, layer, viz_config, getEdgeColor(config, layer.prefix), edge_ns);
+  Marker edges = makeDynamicEdgeMarkers(header,
+                                        config,
+                                        layer,
+                                        viz_config,
+                                        getEdgeColor(config, layer.prefix),
+                                        edge_ns,
+                                        viz_idx);
   addMultiMarkerIfValid(edges, msg);
 
   if (layer.numNodes() == 0) {
@@ -207,7 +218,8 @@ void DynamicSceneGraphVisualizer::drawDynamicLayer(const std_msgs::Header& heade
   }
 
   const std::string label_ns = getDynamicLabelNamespace(layer.prefix);
-  Marker label = makeDynamicLabelMarker(header, config, layer, viz_config, label_ns);
+  Marker label =
+      makeDynamicLabelMarker(header, config, layer, viz_config, label_ns, viz_idx);
   msg.markers.push_back(label);
   published_dynamic_labels_.insert(label_ns);
 }
@@ -248,6 +260,7 @@ void DynamicSceneGraphVisualizer::drawDynamicLayers(const std_msgs::Header& head
 
     const DynamicLayerConfig& config = getConfig(layer_id);
 
+    size_t viz_layer_idx = 0;
     for (const auto& prefix_layer_pair : id_layer_map_pair.second) {
       if (!config.visualize) {
         deleteDynamicLayer(header, prefix_layer_pair.first, msg);
@@ -255,7 +268,8 @@ void DynamicSceneGraphVisualizer::drawDynamicLayers(const std_msgs::Header& head
       }
 
       const DynamicSceneGraphLayer& layer = *prefix_layer_pair.second;
-      drawDynamicLayer(header, layer, config, viz_config, msg);
+      drawDynamicLayer(header, layer, config, viz_config, viz_layer_idx, msg);
+      viz_layer_idx++;
     }
   }
 }

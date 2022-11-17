@@ -43,13 +43,15 @@ namespace hydra {
 
 class DsgSender {
  public:
-  explicit DsgSender(const ros::NodeHandle& nh);
+  explicit DsgSender(const ros::NodeHandle& nh,
+                     const std::string& timer_name = "publish_dsg");
 
   void sendGraph(DynamicSceneGraph& graph, const ros::Time& stamp) const;
 
  private:
   ros::NodeHandle nh_;
   ros::Publisher pub_;
+  std::string timer_name_;
 };
 
 class DsgReceiver {

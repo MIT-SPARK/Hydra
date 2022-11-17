@@ -538,6 +538,11 @@ std::optional<size_t> getMedianComponentSize(const std::vector<size_t>& values) 
     }
   }
 
+  if (max_index == 0) {
+    VLOG(1) << "Component sequence is monotonically decreasing!";
+    max_index = values.size();
+  }
+
   std::vector<size_t> valid_values(values.begin(), values.begin() + max_index + 1);
   std::sort(valid_values.begin(), valid_values.end());
   const size_t median_idx =
@@ -549,7 +554,7 @@ std::optional<size_t> getMedianComponentSize(const std::vector<size_t>& values) 
     }
   }
 
-  // should never be reached
+  LOG(ERROR) << "Failed to find a value equal to the median!";
   return std::nullopt;
 }
 

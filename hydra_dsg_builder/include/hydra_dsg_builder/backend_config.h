@@ -81,6 +81,8 @@ struct DsgBackendConfig {
     // covariance
     double place_mesh_variance;
     double place_edge_variance;
+    double place_merge_variance;
+    double object_merge_variance;
     // rpgo
     bool gnc_fix_prev_inliers = true;
     KimeraRPGO::Verbosity rpgo_verbosity = KimeraRPGO::Verbosity::UPDATE;
@@ -100,6 +102,9 @@ struct DsgBackendConfig {
   bool merge_update_dynamic = true;
   double places_merge_pos_threshold_m = 0.4;
   double places_merge_distance_tolerance_m = 0.3;
+  bool enable_merge_undos = false;
+  bool use_active_flag_for_updates = true;
+  size_t num_neighbors_to_find_for_merge = 1;
 };
 
 struct EnableMapConverter {
@@ -152,6 +157,10 @@ void visit_config(const Visitor& v, DsgBackendConfig& config) {
   dsg_handle.visit("places_merge_distance_tolerance_m",
                    config.places_merge_distance_tolerance_m);
   dsg_handle.visit("use_mesh_subscribers", config.use_mesh_subscribers);
+  dsg_handle.visit("enable_merge_undos", config.enable_merge_undos);
+  dsg_handle.visit("use_active_flag_for_updates", config.use_active_flag_for_updates);
+  dsg_handle.visit("num_neighbors_to_find_for_merge",
+                   config.num_neighbors_to_find_for_merge);
 }
 
 template <typename Visitor>
@@ -162,6 +171,8 @@ void visit_config(const Visitor& v, DsgBackendConfig::PgmoConfig& config) {
   auto covar_handle = v["covariance"];
   covar_handle.visit("place_mesh", config.place_mesh_variance);
   covar_handle.visit("place_edge", config.place_edge_variance);
+  covar_handle.visit("place_merge", config.place_merge_variance);
+  covar_handle.visit("object_merge", config.object_merge_variance);
   auto rpgo_handle = v["rpgo"];
   rpgo_handle.visit("gnc_fix_prev_inliers", config.gnc_fix_prev_inliers);
   rpgo_handle.visit("verbosity", config.rpgo_verbosity);
