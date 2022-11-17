@@ -71,6 +71,7 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
   attrs->bounding_box.type = BoundingBox::Type::AABB;
   attrs->bounding_box.min << 1.0f, 2.0f, 3.0f;
   attrs->bounding_box.max << 1.0f, 2.0f, 3.0f;
+  attrs->is_active = true;
   graph.emplaceNode(DsgLayers::OBJECTS, 0, std::move(attrs));
 
   const UpdateInfo info{nullptr, nullptr, false, 0, false};
@@ -126,16 +127,18 @@ TEST(DsgInterpolationTests, ObjectUpdateMerge) {
   attrs0->bounding_box.min << 1.0f, 2.0f, 3.0f;
   attrs0->bounding_box.max << 1.0f, 2.0f, 3.0f;
   attrs0->semantic_label = 1u;
+  attrs0->is_active = false;
   ObjectNodeAttributes::Ptr attrs1(new ObjectNodeAttributes);
   attrs1->position << 2.0, 3.0, 4.0;
   attrs1->bounding_box.type = BoundingBox::Type::AABB;
   attrs1->bounding_box.min << 2.0f, 3.0f, 4.0f;
   attrs1->bounding_box.max << 2.0f, 3.0f, 4.0f;
   attrs1->semantic_label = 1u;
+  attrs1->is_active = true;
   graph.emplaceNode(DsgLayers::OBJECTS, 0, std::move(attrs0));
   graph.emplaceNode(DsgLayers::OBJECTS, 1, std::move(attrs1));
 
-  const UpdateInfo info{nullptr, nullptr, false, 0, true};
+  const UpdateInfo info{nullptr, nullptr, true, 0, true};
   dsg_updates::UpdateObjectsFunctor functor;
   functor.call(*dsg, info);
 
@@ -190,7 +193,8 @@ TEST(DsgInterpolationTests, ObjectUpdateMerge) {
     Eigen::Vector3f expected_max(1.0, 2.0, 3.0);
     EXPECT_NEAR(0.0, (expected_max - result0.bounding_box.max).norm(), 1.0e-7);
 
-    EXPECT_TRUE(merged_nodes.count(1) > 0);
+    std::map<NodeId, NodeId> expected{{1, 0}};
+    EXPECT_EQ(merged_nodes, expected);
   }
 }
 
@@ -288,7 +292,7 @@ TEST(DsgInterpolationTests, PlaceUpdateMerge) {
   PlaceNodeAttributes::Ptr attrs6(new PlaceNodeAttributes);
   attrs6->position << 1.0, 2.0, 3.0;
   attrs6->distance = 1.0;
-  attrs6->is_active = false;
+  attrs6->is_active = true;
 
   graph.emplaceNode(place_layer, NodeSymbol('p', 0), std::move(attrs0));
   graph.emplaceNode(place_layer, NodeSymbol('p', 5), std::move(attrs5));
@@ -312,14 +316,15 @@ TEST(DsgInterpolationTests, PlaceUpdateMerge) {
     EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
   }
 
-  {  // non-zero key exists: new value
+  {  // merge target key exists: new value
     Eigen::Vector3d expected(7.0, 8.0, 9.0);
     Eigen::Vector3d result = graph.getPosition(NodeSymbol('p', 5));
     EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
   }
 
   // node p6 proposed for merge with node p5
-  EXPECT_TRUE(merged_nodes.count(NodeSymbol('p', 6)) > 0);
+  std::map<NodeId, NodeId> expected{{"p6"_id, "p5"_id}};
+  EXPECT_EQ(merged_nodes, expected);
 }
 
 TEST(DsgInterpolationTests, AgentUpdate) {
@@ -360,7 +365,7 @@ TEST(DsgInterpolationTests, AgentUpdate) {
       NodeSymbol('b', 5),
       gtsam::Pose3(gtsam::Rot3(0.0, 0.0, 1.0, 0.0), gtsam::Point3(7.0, 8.0, 9.0)));
 
-  const UpdateInfo info{nullptr, &agent_values, false, 0, false};
+  const UpdateInfo info{nullptr, nullptr, false, 0, false, &agent_values};
   dsg_updates::updateAgents(*dsg, info);
 
   {  // external_key == node_id and in values

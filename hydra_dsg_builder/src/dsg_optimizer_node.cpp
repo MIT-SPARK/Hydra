@@ -45,11 +45,12 @@ namespace incremental {
 
 struct DsgOptimizer {
   DsgOptimizer(const ros::NodeHandle& node_handle)
-      : nh(node_handle), reset_backend(false) {
+      : nh(node_handle), reset_backend(false), dsg_output_path("") {
     CHECK(nh.getParam("dsg_filepath", dsg_filepath)) << "missing dsg_filepath!";
     CHECK(nh.getParam("dgrf_filepath", dgrf_filepath)) << "missing dgrf_filepath!";
     CHECK(nh.getParam("frontend_filepath", frontend_filepath))
         << "missing frontend_state_filepath";
+    nh.getParam("log_path", dsg_output_path);
 
     const LayerId mesh_layer_id = 1;
     const std::map<LayerId, char>& layer_id_map{{DsgLayers::OBJECTS, 'o'},
@@ -60,22 +61,8 @@ struct DsgOptimizer {
     frontend_dsg = std::make_shared<SharedDsgInfo>(layer_id_map, mesh_layer_id);
     backend_dsg = std::make_shared<SharedDsgInfo>(layer_id_map, mesh_layer_id);
 
-    frontend_dsg->graph->load(dsg_filepath);
+    frontend_dsg->graph = frontend_dsg->graph->load(dsg_filepath);
     frontend_dsg->updated = true;
-
-    ros::NodeHandle vnh("/hydra_dsg_visualizer");
-    visualizer.reset(new DynamicSceneGraphVisualizer(vnh, getDefaultLayerIds()));
-
-    bool use_voxblox_mesh_plugin;
-    nh.param<bool>("use_voxblox_mesh_plugin", use_voxblox_mesh_plugin, false);
-    if (use_voxblox_mesh_plugin) {
-      visualizer->addPlugin(std::make_shared<VoxbloxMeshPlugin>(vnh, "dsg_mesh"));
-    } else {
-      visualizer->addPlugin(std::make_shared<PgmoMeshPlugin>(vnh, "dsg_mesh"));
-    }
-
-    visualizer->setGraph(frontend_dsg->graph);
-    visualizer->redraw();
 
     do_optimize();
 
@@ -96,16 +83,10 @@ struct DsgOptimizer {
     backend->loadState(frontend_filepath, dgrf_filepath);
     LOG(ERROR) << "Loaded backend state!";
 
-    backend->updateDsgMesh();
-
     frontend_dsg->updated = true;
     backend->updatePrivateDsg();
 
     backend->optimize();
-
-    visualizer->setGraph(backend_dsg->graph);
-    visualizer->redraw();
-
     backend->visualizePoseGraph();
     backend->visualizeDeformationGraphEdges();
   }
@@ -120,6 +101,13 @@ struct DsgOptimizer {
       r.sleep();
       ros::spinOnce();
     }
+
+    if (!dsg_output_path.empty()) {
+      LOG(INFO) << "[DSG Node] Saving scene graph and other stats and logs to "
+                << dsg_output_path;
+      backend_dsg->graph->save(dsg_output_path + "/backend/dsg.json", false);
+      backend_dsg->graph->save(dsg_output_path + "/backend/dsg_with_mesh.json");
+    }
   }
 
   ros::NodeHandle nh;
@@ -128,6 +116,7 @@ struct DsgOptimizer {
   std::string dsg_filepath;
   std::string frontend_filepath;
   std::string dgrf_filepath;
+  std::string dsg_output_path;
 
   SharedDsgInfo::Ptr frontend_dsg;
   SharedDsgInfo::Ptr backend_dsg;

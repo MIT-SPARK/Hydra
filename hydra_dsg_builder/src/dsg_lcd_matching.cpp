@@ -137,9 +137,10 @@ LayerSearchResults searchDescriptors(
     const Descriptor& other_descriptor = *descriptors.at(valid_id);
     std::chrono::duration<double> diff_s =
         descriptor.timestamp - other_descriptor.timestamp;
-    VLOG(10) << "diff: " << diff_s.count()
-             << " (threshold: " << match_config.min_time_separation_s << ")";
-    if (diff_s.count() < match_config.min_time_separation_s) {
+    if (NodeSymbol(query_id).category() == NodeSymbol(valid_id).category() &&
+        diff_s.count() < match_config.min_time_separation_s) {
+      VLOG(10) << "diff: " << diff_s.count()
+               << " (threshold: " << match_config.min_time_separation_s << ")";
       ++num_inside_horizon;
       continue;
     }
@@ -214,13 +215,17 @@ LayerSearchResults searchLeafDescriptors(const Descriptor& descriptor,
                                          const DescriptorCacheMap& leaf_cache_map,
                                          NodeId query_id) {
   float best_score = 0.0f;
-  NodeId best_node = 0;  // gets overwritten on valid match
-  NodeId best_root = 0;  // gets overwritten on valid match
-  bool found_match = false;
+  std::vector<std::pair<std::pair<NodeId, NodeId>, float>> new_valid_match_scores;
+  std::set<NodeId> new_valid_matches;
   for (const auto& valid_id : valid_matches) {
     const DescriptorCache& leaf_cache = leaf_cache_map.at(valid_id);
 
     for (const auto& id_desc_pair : leaf_cache) {
+      bool same_robot = true;
+      if (NodeSymbol(id_desc_pair.first).category() !=
+          NodeSymbol(query_id).category()) {
+        same_robot = false;
+      }
       if (id_desc_pair.first == query_id) {
         continue;  // disallow self matches even if they probably can't happen
       }
@@ -228,7 +233,7 @@ LayerSearchResults searchLeafDescriptors(const Descriptor& descriptor,
       const Descriptor& other_descriptor = *id_desc_pair.second;
       std::chrono::duration<double> diff_s =
           descriptor.timestamp - other_descriptor.timestamp;
-      if (diff_s.count() < match_config.min_time_separation_s) {
+      if (same_robot && diff_s.count() < match_config.min_time_separation_s) {
         continue;
       }
 
@@ -237,23 +242,42 @@ LayerSearchResults searchLeafDescriptors(const Descriptor& descriptor,
 
       if (curr_score > best_score) {
         best_score = curr_score;
-        best_node = id_desc_pair.first;
-        best_root = other_descriptor.root_node;
-        found_match = true;
+      }
+
+      if (curr_score > match_config.min_score) {
+        new_valid_matches.insert(id_desc_pair.first);
+        new_valid_match_scores.push_back(
+            {{id_desc_pair.first, other_descriptor.root_node}, curr_score});
       }
     }
   }
 
-  if (!found_match) {
-    return {{}, {}, descriptor.nodes, {}, descriptor.root_node, {}};
+  std::sort(new_valid_match_scores.begin(),
+            new_valid_match_scores.end(),
+            [](const std::pair<std::pair<NodeId, NodeId>, float>& a,
+               const std::pair<std::pair<NodeId, NodeId>, float>& b) {
+              return a.second > b.second;
+            });
+  std::vector<std::set<NodeId>> match_nodes;
+  std::vector<NodeId> matches;
+  std::vector<float> match_scores;
+  for (const auto& id_id_score : new_valid_match_scores) {
+    if (id_id_score.second > best_score * match_config.min_score_ratio) {
+      match_nodes.push_back({id_id_score.first.first});
+      matches.push_back(id_id_score.first.second);
+      match_scores.push_back(id_id_score.second);
+    }
+    if (matches.size() == match_config.max_registration_matches) {
+      break;
+    }
   }
 
-  return {{best_score},
-          {best_node},
+  return {match_scores,
+          new_valid_matches,
           descriptor.nodes,
-          {{best_node}},
+          match_nodes,
           descriptor.root_node,
-          {best_root}};
+          matches};
 }
 
 }  // namespace lcd

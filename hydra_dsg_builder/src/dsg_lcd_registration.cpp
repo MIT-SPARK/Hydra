@@ -240,6 +240,11 @@ DsgRegistrationSolution DsgAgentSolver::solve(const DynamicSceneGraph& dsg,
   const NodeId query_id = *match.query_nodes.begin();
   const NodeId match_id = *match.match_nodes.begin();
 
+  if (!dsg.hasNode(query_id) || !dsg.hasNode(match_id)) {
+    LOG(ERROR) << "Query or match node does not exist in graph!";
+    return {};
+  }
+
   uint64_t timestamp;
   pose_graph_tools::LcdFrameRegistration msg;
   msg.request.query_robot = getRobotIdFromNode(dsg, query_id);

@@ -43,6 +43,7 @@
 #include <hydra_msgs/ActiveMesh.h>
 #include <hydra_topology/nearest_neighbor_utilities.h>
 #include <kimera_pgmo/MeshFrontendInterface.h>
+#include <hydra_utils/dsg_streaming_interface.h>
 #include <pose_graph_tools/PoseGraph.h>
 #include <spark_dsg/scene_graph_logger.h>
 

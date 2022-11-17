@@ -56,6 +56,7 @@ add_library(
   src/incremental_mesh_segmenter.cpp
   src/incremental_room_finder.cpp
   src/lcd_visualizer.cpp
+  src/merge_handler.cpp
   src/minimum_spanning_tree.cpp
   src/node_utilities.cpp
   src/ros_frontend.cpp
@@ -86,6 +87,7 @@ if(CATKIN_ENABLE_TESTING)
     tests/utest_dsg_lcd_module.cpp
     tests/utest_dsg_update_functions.cpp
     tests/utest_incremental_room_finder.cpp
+    tests/utest_merge_handler.cpp
     tests/utest_minimum_spanning_tree.cpp
   )
   target_link_libraries(utest_${PROJECT_NAME} ${PROJECT_NAME})

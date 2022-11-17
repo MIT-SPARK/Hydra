@@ -38,6 +38,7 @@
 #include "hydra_dsg_builder/incremental_room_finder.h"
 #include "hydra_dsg_builder/incremental_types.h"
 #include "hydra_dsg_builder/shared_module_state.h"
+#include "hydra_dsg_builder/merge_handler.h"
 
 #include <hydra_utils/dsg_streaming_interface.h>
 #include <kimera_pgmo/KimeraPgmoInterface.h>
@@ -116,13 +117,13 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void updateFromSharedState();
 
-  bool updatePrivateDsg();
+  virtual bool updatePrivateDsg(bool force_update = false);
 
-  void updateDsgMesh(bool force_mesh_update = false);
+  virtual void updateDsgMesh(bool force_mesh_update = false);
 
-  void optimize(bool new_loop_closure = false);
+  virtual void optimize(bool new_loop_closure = false);
 
-  void visualizePoseGraph() const;
+  virtual void visualizePoseGraph() const;
 
   void visualizeDeformationGraphEdges() const;
 
@@ -131,6 +132,10 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   void updateMergedNodes(const std::map<NodeId, NodeId>& new_merges);
 
  protected:
+  void addLoopClosure(const gtsam::Key& src,
+                      const gtsam::Key& dest,
+                      const gtsam::Pose3& src_T_dest);
+
   void setSolverParams();
 
   void fullMeshCallback(const kimera_pgmo::KimeraPgmoMesh::ConstPtr& msg);
@@ -143,19 +148,21 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void runPgmo();
 
-  void addPlacesToDeformationGraph();
+  virtual void addPlacesToDeformationGraph();
 
-  void callUpdateFunctions(const gtsam::Values& places_values = gtsam::Values(),
-                           const gtsam::Values& pgmo_values = gtsam::Values(),
-                           bool new_loop_closure = false);
+  virtual void callUpdateFunctions(
+      const gtsam::Values& places_values = gtsam::Values(),
+      const gtsam::Values& pgmo_values = gtsam::Values(),
+      bool new_loop_closure = false,
+      const std::map<LayerId, std::map<NodeId, NodeId>>& given_merges = {});
 
   void logStatus(bool init = false) const;
 
-  bool addInternalLCDToDeformationGraph();
+  virtual bool addInternalLCDToDeformationGraph();
 
   void logIncrementalLoopClosures(const pose_graph_tools::PoseGraph& msg);
 
-  bool readPgmoUpdates();
+  virtual bool readPgmoUpdates();
 
   pose_graph_tools::PoseGraph::ConstPtr popDeformationGraphQueue();
 
@@ -175,8 +182,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   SharedModuleState::Ptr state_;
 
   IsolatedSceneGraphLayer shared_places_copy_;
-  std::map<NodeId, NodeId> merged_nodes_;
-  std::map<NodeId, std::set<NodeId>> merged_nodes_parents_;
+  std::map<LayerId, dsg_updates::NodeMergeLog> proposed_node_merges_;
+  std::unique_ptr<MergeHandler> merge_handler_;
 
   std::atomic<uint64_t> last_timestamp_;
 
@@ -186,8 +193,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   DsgBackendStatus status_;
 
   std::list<LayerUpdateFunc> dsg_update_funcs_;
-  std::unique_ptr<dsg_updates::UpdateObjectsFunctor> update_objects_functor_;
-  std::unique_ptr<dsg_updates::UpdatePlacesFunctor> update_places_functor_;
+  std::shared_ptr<dsg_updates::UpdateObjectsFunctor> update_objects_functor_;
+  std::shared_ptr<dsg_updates::UpdatePlacesFunctor> update_places_functor_;
   std::unique_ptr<dsg_updates::UpdateRoomsFunctor> update_rooms_functor_;
   std::unique_ptr<dsg_updates::UpdateBuildingsFunctor> update_buildings_functor_;
 
@@ -203,6 +210,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   ros::Publisher viz_pose_mesh_edges_pub_;
   ros::Publisher pose_graph_pub_;
   ros::Publisher opt_mesh_pub_;
+  std::unique_ptr<hydra::DsgSender> dsg_sender_;
 
   SceneGraphLogger backend_graph_logger_;
   std::list<LoopClosureLog> loop_closures_;
@@ -223,7 +231,6 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   ros::Subscriber full_mesh_sub_;
   ros::Subscriber deformation_graph_sub_;
   ros::Subscriber pose_graph_sub_;
-  std::unique_ptr<hydra::DsgSender> dsg_sender_;
 };
 
 }  // namespace incremental

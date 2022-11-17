@@ -5,19 +5,23 @@
 
     <arg name="use_semantics" default="true"/>
     <arg name="sensor_frame" default="left_cam"/>
+    <arg name="glog_to_file" default="false"/>
 
-    <arg name="rgb_info_topic" default="/azure/rgb/camera_info"/>
-    <arg name="rgb_topic" default="/azure/rgb/image_raw"/>
-    <arg name="depth_topic" default="/azure/depth_to_rgb/image_raw"/>
-    <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
+    <arg name="rgb_info_topic" default="azure/rgb/camera_info"/>
+    <arg name="rgb_topic" default="azure/rgb/image_raw"/>
+    <arg name="depth_topic" default="azure/depth_to_rgb/image_raw"/>
+    <arg name="pointcloud_topic" default="semantic_pointcloud"/>
 
+    <arg name="model_name" default="hrnetv2_360_640_v12"/>
     <arg name="dataset_name" default="ade150_config"/>
 
     <include file="$(find hydra_utils)/launch/includes/rgbd_to_pointcloud.xml" pass_all_args="true"
              unless="$(arg use_semantics)"/>
 
     <include file="$(find semantic_recolor)/launch/semantic_recolor_pointcloud.launch" pass_all_args="true"
-             if="$(arg use_semantics)"/>
+             if="$(arg use_semantics)">
+        <arg name="verbose" value="$(eval not arg('glog_to_file'))"/>
+    </include>
 
     <include file="$(find hydra_topology)/launch/hydra_topology.launch" pass_all_args="true">
         <arg name="config" value="sidpac_topology_config.yaml"/>
