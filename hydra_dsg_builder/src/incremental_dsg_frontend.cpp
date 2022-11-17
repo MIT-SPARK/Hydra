@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder/incremental_dsg_frontend.h"
+#include "hydra_dsg_builder/hydra_config.h"
 
 #include <hydra_utils/timing_utilities.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
@@ -130,8 +131,14 @@ void DsgFrontend::save(const std::string& output_path) {
 }
 
 void DsgFrontend::spin() {
-  while (!should_shutdown_) {
+  bool should_shutdown = false;
+  while (!should_shutdown) {
     bool has_data = queue_->poll();
+    if (HydraConfig::instance().force_shutdown() || !has_data) {
+      // copy over shutdown request
+      should_shutdown = should_shutdown_;
+    }
+
     if (!has_data) {
       continue;
     }

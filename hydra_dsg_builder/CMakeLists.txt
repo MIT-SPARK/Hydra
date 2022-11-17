@@ -44,6 +44,7 @@ add_library(
   src/dsg_lcd_detector.cpp
   src/dsg_lcd_registration.cpp
   src/dsg_update_functions.cpp
+  src/hydra_config.cpp
   src/incremental_dsg_backend.cpp
   src/incremental_dsg_frontend.cpp
   src/incremental_dsg_lcd.cpp

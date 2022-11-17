@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder/incremental_dsg_backend.h"
 #include "hydra_dsg_builder/minimum_spanning_tree.h"
+#include "hydra_dsg_builder/hydra_config.h"
 
 #include <glog/logging.h>
 #include <hydra_utils/timing_utilities.h>
@@ -185,16 +186,20 @@ void DsgBackend::save(const std::string& output_path) {
 
 
 void DsgBackend::spin() {
-  while (!should_shutdown_) {
+  bool should_shutdown = false;
+  while (!should_shutdown) {
     bool has_data = state_->backend_queue.poll();
+    if (HydraConfig::instance().force_shutdown() || !has_data) {
+      // copy over shutdown request
+      should_shutdown = should_shutdown_;
+    }
+
     if (!has_data) {
       continue;
     }
 
     spinOnce(*state_->backend_queue.front(), false);
     state_->backend_queue.pop();
-
-    // TODO(nathan) don't exit if there are still messages in the queue
   }
 }
 
