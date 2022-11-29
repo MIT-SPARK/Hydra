@@ -24,6 +24,7 @@
 
     <include file="$(find hydra_topology)/launch/hydra_topology.launch" pass_all_args="true">
         <arg name="config" value="$(find hydra_topology)/config/uhumans2_topology_config.yaml"/>
+        <arg name="extrinsics" value="$(find hydra_topology)/config/extrinsics/uhumans2.yaml"/>
         <arg name="dsg_output_prefix" value="uhumans2"/>
         <arg name="rviz_file" value="uhumans2.rviz"/>
         <arg name="use_pose_graph" value="$(eval not arg('use_gt_frame'))"/>

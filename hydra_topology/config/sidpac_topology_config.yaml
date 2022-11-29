@@ -1,13 +1,10 @@
 ---
-world_frame: world
 clear_distant_blocks: true
 dense_representation_radius_m: 8.0
 voxels_per_side: 16
 voxel_size: 0.1
 num_poses_per_update: 5
 pointcloud_separation_s: 0.1
-body_t_camera: [0.00012, -0.00084, 0.00026]
-body_R_camera: {w: 0.5126615, x: 0.48921694, y: -0.49796629, z: -0.49987453}
 gvd:
   max_distance_m: 4.5
   min_distance_m: 0.2

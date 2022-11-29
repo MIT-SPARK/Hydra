@@ -112,7 +112,7 @@ Make sure to decompress the rosbag (`rosbag decompress path/to/bagfile`) before 
 
 To start Hydra:
 ```
-roslaunch hydra_dsg_builder uhumans2_incremental_dsg.launch start_visualizer:=true
+roslaunch hydra_dsg_builder_ros uhumans2.launch start_visualizer:=true
 ```
 
 Then, start the rosbag in a separate terminal:
@@ -143,7 +143,8 @@ roslaunch kimera_vio_ros kimera_vio_ros kimera_vio_ros_uhumans2.launch online:=t
 and in a separate terminal, run:
 
 ```
-roslaunch hydra_dsg_builder uhumans2_incremental_dsg.launch \
+# in separate terminal
+roslaunch hydra_dsg_builder_ros uhumans2.launch \
      start_visualizer:=true \
      use_gt_frame:=false
 ```
@@ -161,7 +162,7 @@ roslaunch kimera_vio_ros kimera_vio_ros kimera_vio_ros_uhumans2.launch online:=t
 and in a separate terminal, run the same command for Hydra:
 
 ```
-roslaunch hydra_dsg_builder uhumans2_incremental_dsg.launch \
+roslaunch hydra_dsg_builder uhumans2.launch \
      start_visualizer:=true \
      use_gt_frame:=false
 ```
@@ -181,7 +182,7 @@ roslaunch kimera_vio_ros kimera_vio_ros kimera_vio_ros_uhumans2.launch online:=t
 and in a separate terminal, run the same command for Hydra:
 
 ```
-roslaunch hydra_dsg_builder uhumans2_incremental_dsg.launch \
+roslaunch hydra_dsg_builder_ros uhumans2.launch \
      start_visualizer:=true \
      use_gt_frame:=false \
      enable_dsg_lcd:=true

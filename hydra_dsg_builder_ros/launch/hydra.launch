@@ -32,6 +32,7 @@
 
     <arg name="do_reconstruction" default="true"/>
     <arg name="reconstruction_config" if="$(arg do_reconstruction)"/>
+    <arg name="extrinsics" if="$(arg do_reconstruction)"/>
     <arg name="pointcloud_topic" if="$(arg do_reconstruction)"/>
     <arg name="use_ros_backend" default="false"/>
 
@@ -67,6 +68,7 @@
         <rosparam file="$(arg config_dir)/dsg_backend_config.yaml"/>
         <rosparam file="$(arg config_dir)/dsg_lcd_config.yaml"/>
         <rosparam file="$(arg reconstruction_config)" if="$(arg do_reconstruction)"/>
+        <rosparam file="$(arg extrinsics)" if="$(arg do_reconstruction)"/>
 
         <param name="use_pose_graph" value="$(eval not arg('use_gt_frame'))"/>
         <param name="do_reconstruction" value="$(arg do_reconstruction)"/>
