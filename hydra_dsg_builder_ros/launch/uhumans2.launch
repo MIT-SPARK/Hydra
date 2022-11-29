@@ -20,12 +20,13 @@
 
     <include file="$(find hydra_utils)/launch/data_sources/uhumans2_pointcloud.launch" pass_all_args="true"/>
 
-    <include file="$(find hydra_dsg_builder_ros)/launch/dsg_builder.launch" pass_all_args="true">
+    <include file="$(find hydra_dsg_builder_ros)/launch/hydra.launch" pass_all_args="true">
         <arg name="robot_id" default="0"/>
         <arg name="config_dir" default="$(find hydra_dsg_builder)/config/uhumans2"/>
         <arg name="dsg_output_dir" default="$(find hydra_dsg_builder)/output/uhumans2"/>
         <arg name="dsg_output_prefix" default="office"/>
         <arg name="reconstruction_config" default="$(find hydra_topology)/config/uhumans2_topology_config.yaml"/>
+        <arg name="extrinsics" default="$(find hydra_topology)/config/extrinsics/uhumans2.yaml"/>
         <arg name="rviz_dir" default="$(find hydra_dsg_builder_ros)/rviz"/>
         <arg name="rviz_file" default="uhumans2.rviz"/>
         <arg name="use_oriented_bounding_boxes" default="false"/>

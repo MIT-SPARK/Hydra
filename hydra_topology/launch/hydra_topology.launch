@@ -2,6 +2,7 @@
     <arg name="use_semantics" default="true"/>
 
     <arg name="config"/>
+    <arg name="extrinsics"/>
     <arg name="sensor_frame"/>
     <arg name="world_frame" default="world"/>
     <arg name="use_pose_graph"/>
@@ -43,13 +44,14 @@
           output="$(arg ros_output)"
           required="true">
         <env name="TERM" value="xterm-256color" if="$(arg force_term_info)"/>
+        <!-- params -->
+        <rosparam command="load" file="$(arg graph_viz_config_file)"/>
+        <rosparam command="load" file="$(arg extrinsics)"/>
+        <rosparam command="load" file="$(arg config)"/>
         <!-- input data -->
         <remap from="~pointcloud" to="$(arg pointcloud_topic)"/>
         <param name="robot_frame" value="$(arg sensor_frame)"/>
         <param name="world_frame" value="$(arg world_frame)"/>
-        <!-- params -->
-        <rosparam command="load" file="$(arg graph_viz_config_file)"/>
-        <rosparam command="load" file="$(arg config)"/>
         <!-- general config -->
         <param name="log_path" value="$(arg dsg_path)"/>
         <param name="log_timing_incrementally" value="$(arg log_timing_incrementally)"/>

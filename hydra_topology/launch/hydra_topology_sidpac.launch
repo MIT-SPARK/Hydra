@@ -22,6 +22,7 @@
 
     <include file="$(find hydra_topology)/launch/hydra_topology.launch" pass_all_args="true">
         <arg name="config" value="$(find hydra_topology)/config/sidpac_topology_config.yaml"/>
+        <arg name="extrinsics" value="$(find hydra_topology)/config/extrinsics/sidpac.yaml"/>
         <arg name="dsg_output_prefix" value="sidpac"/>
         <arg name="rviz_file" value="sidpac.rviz"/>
         <arg name="use_pose_graph" value="$(eval not arg('use_gt_frame'))"/>

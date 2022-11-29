@@ -13,12 +13,13 @@
 
     <include file="$(find hydra_utils)/launch/data_sources/sidpac_pointcloud.launch" pass_all_args="true"/>
 
-    <include file="$(find hydra_dsg_builder_ros)/launch/dsg_builder.launch" pass_all_args="true">
+    <include file="$(find hydra_dsg_builder_ros)/launch/hydra.launch" pass_all_args="true">
         <arg name="robot_id" default="0"/>
         <arg name="config_dir" default="$(find hydra_dsg_builder)/config/sidpac"/>
         <arg name="dsg_output_dir" default="$(find hydra_dsg_builder)/output/sidpac"/>
         <arg name="dsg_output_prefix" default="floor1_3"/>
         <arg name="reconstruction_config" default="$(find hydra_topology)/config/sidpac_topology_config.yaml"/>
+        <arg name="extrinsics" default="$(find hydra_topology)/config/extrinsics/sidpac.yaml"/>
         <arg name="rviz_dir" default="$(find hydra_dsg_builder_ros)/rviz"/>
         <arg name="rviz_file" default="sidpac.rviz"/>
         <arg name="use_oriented_bounding_boxes" default="true"/>
