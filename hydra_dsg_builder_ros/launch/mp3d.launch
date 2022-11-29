@@ -29,6 +29,6 @@
         <arg name="debug" value="false"/>
     </include>
 
-    <include file="$(find hydra_dsg_builder_ros)/launch/dsg_builder.launch" pass_all_args="true"/>
+    <include file="$(find hydra_dsg_builder_ros)/launch/hydra.launch" pass_all_args="true"/>
 
 </launch>

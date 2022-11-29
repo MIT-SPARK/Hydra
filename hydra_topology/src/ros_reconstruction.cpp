@@ -66,12 +66,14 @@ RosReconstruction::RosReconstruction(const ros::NodeHandle& nh,
       nh_(nh) {
   ros_config_ = load_config<RosReconstructionConfig>(nh);
   if (ros_config_.use_pose_graph) {
+    LOG(WARNING) << "Using pose graph input!";
     pcl_sync_sub_.reset(new Subscriber<RosPointcloud>(nh_, "pointcloud", 10));
     pose_graph_sub_.reset(new Subscriber<PoseGraph>(nh_, "pose_graph", 10));
     sync_.reset(new Sync(Policy(30), *pcl_sync_sub_, *pose_graph_sub_));
     sync_->registerCallback(
         boost::bind(&RosReconstruction::inputCallback, this, _1, _2));
   } else {
+    LOG(WARNING) << "Using pointcloud and TF as input!";
     pcl_sub_ = nh_.subscribe<Pointcloud>(
         "pointcloud", 10, &RosReconstruction::pclCallback, this);
     tf_listener_.reset(new tf2_ros::TransformListener(buffer_));
@@ -167,21 +169,34 @@ void RosReconstruction::pointcloudSpin() {
     ros::Time curr_time;
     curr_time.fromNSec(cloud->header.stamp * 1000);
 
+    ros::WallRate tf_wait_rate(1.0 / ros_config_.tf_wait_duration_s);
+
+    // note that this is okay in a separate thread from the callback queue because tf2
+    // is threadsafe
+    bool have_transform = false;
     std::string err_str;
-    while (!buffer_.canTransform(config_.world_frame,
-                                 config_.robot_frame,
-                                 curr_time,
-                                 ros::Duration(ros_config_.tf_wait_duration_s),
-                                 &err_str)) {
+    for (size_t i = 0; i < 5; ++i) {
+      if (buffer_.canTransform(config_.world_frame,
+                               config_.robot_frame,
+                               curr_time,
+                               ros::Duration(0),
+                               &err_str)) {
+        have_transform = true;
+        break;
+      }
+
       if (should_shutdown_) {
         return;
       }
 
-      ROS_WARN_STREAM_THROTTLE(0.5,
-                               "Failed to get tf from "
-                                   << config_.robot_frame << " to "
-                                   << config_.world_frame << " @ " << curr_time.toNSec()
-                                   << " [ns]. Reason: " << err_str);
+      tf_wait_rate.sleep();
+    }
+
+    if (!have_transform) {
+      ROS_WARN_STREAM("Failed to get tf from "
+                      << config_.robot_frame << " to " << config_.world_frame << " @ "
+                      << curr_time.toNSec() << " [ns]. Reason: " << err_str);
+      continue;
     }
 
     geometry_msgs::TransformStamped transform;
@@ -189,6 +204,8 @@ void RosReconstruction::pointcloudSpin() {
       transform =
           buffer_.lookupTransform(config_.world_frame, config_.robot_frame, curr_time);
     } catch (const tf2::TransformException& ex) {
+      LOG(ERROR) << "Failed to look up: " << config_.world_frame << " to "
+                 << config_.robot_frame;
       ROS_WARN_STREAM(ex.what());
       return;
     }

@@ -95,7 +95,7 @@ Make sure to decompress the rosbag (`rosbag decompress path/to/bagfile`) before 
 
 To start Hydra:
 ```
-roslaunch hydra_dsg_builder uhumans2_incremental_dsg.launch start_visualizer:=true
+roslaunch hydra_dsg_builder_ros uhumans2.launch start_visualizer:=true
 ```
 
 Then, start the rosbag in a separate terminal:
@@ -121,12 +121,12 @@ To run Hydra using Kimera:
 roslaunch kimera_vio_ros kimera_vio_ros kimera_vio_ros_uhumans2.launch
 
 # in separate terminal
-roslaunch hydra_dsg_builder uhumans2_incremental_dsg.launch \
+roslaunch hydra_dsg_builder_ros uhumans2.launch \
      start_visualizer:=true \
      use_gt_frame:=false
 ```
 
-To achieve the best results with Kimera-VIO, you should run the rosbag for about half a second, pause to wait for the LCD vocabulary to load, and then unpause the rosbag.
+To achieve the best results with Kimera-VIO, you should wait a few seconds for the LCD vocabulary to load after starting the launch files.
 
 ### Using a Semantic Segmentation Network
 
