@@ -49,6 +49,7 @@
 
 #include <memory>
 #include <mutex>
+#include <thread>
 
 namespace hydra {
 namespace incremental {
