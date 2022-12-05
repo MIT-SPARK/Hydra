@@ -94,6 +94,16 @@ struct DsgLcdModuleConfig {
   double descriptor_creation_horizon_m = 10.0;
 };
 
+template <typename Visitor>
+void visit_config(const Visitor& v, SubgraphConfig& config) {
+  v.visit("fixed_radius", config.fixed_radius);
+  v.visit("max_radius_m", config.max_radius_m);
+  if (!config.fixed_radius) {
+    v.visit("min_radius_m", config.min_radius_m);
+    v.visit("min_nodes", config.min_nodes);
+  }
+}
+
 namespace lcd {
 
 template <typename Visitor>
@@ -123,6 +133,14 @@ void visit_config(const Visitor& v, HistogramConfig<T>& config) {
 }
 
 template <typename Visitor>
+void visit_config(const Visitor& v, GnnLcdConfig& config) {
+  v.visit("label_embeddings_file", config.label_embeddings_file);
+  v.visit("object_connection_radius_m", config.object_connection_radius_m);
+  v.visit("object_model_path", config.object_model_path);
+  v.visit("places_model_path", config.places_model_path);
+}
+
+template <typename Visitor>
 void visit_config(const Visitor& v, DsgLcdDetectorConfig& config) {
   v.visit("search_configs", config.search_configs);
   auto v_search = v["search_configs"];
@@ -130,13 +148,18 @@ void visit_config(const Visitor& v, DsgLcdDetectorConfig& config) {
   v.visit("registration_configs", config.registration_configs);
   v.visit("teaser", config.teaser_config);
   v.visit("enable_agent_registration", config.enable_agent_registration);
-  v.visit("object_radius_m", config.object_radius_m);
+  v.visit("object_extraction", config.object_extraction);
+  v.visit("places_extraction", config.places_extraction);
   v.visit("num_semantic_classes", config.num_semantic_classes);
-  v.visit("place_radius_m", config.place_radius_m);
   v.visit("place_histogram_config", config.place_histogram_config);
   if (config_parser::is_parser<Visitor>()) {
     config.agent_search_config.min_registration_score =
         config.agent_search_config.min_score;
+  }
+
+  v.visit("use_gnn_descriptors", config.use_gnn_descriptors);
+  if (config.use_gnn_descriptors) {
+    v.visit("gnn_lcd", config.gnn_lcd);
   }
 }
 
@@ -169,6 +192,7 @@ void visit_config(const Visitor& v, teaser::RobustRegistrationSolver::Params& co
 }  // namespace teaser
 
 DECLARE_CONFIG_OSTREAM_OPERATOR(teaser, RobustRegistrationSolver::Params)
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, SubgraphConfig)
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra::lcd, HistogramConfig<double>)
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra::lcd, LayerRegistrationConfig)
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra::lcd, DescriptorMatchConfig)

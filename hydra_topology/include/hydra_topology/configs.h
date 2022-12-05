@@ -58,11 +58,19 @@ DECLARE_CONFIG_ENUM(hydra::topology,
 
 namespace voxblox {
 
+struct ThreadNumConverter {
+  // set threads to hardware_concurrency if -1 provided
+  int to(const int& other) const;
+
+  // pass-through config value
+  int from(const int& other) const;
+};
+
 template <typename Visitor>
 void visit_config(const Visitor& v, MeshIntegratorConfig& config) {
   v.visit("use_color", config.use_color);
   v.visit("min_weight", config.min_weight);
-  v.visit("integrator_threads", config.integrator_threads);
+  v.visit("integrator_threads", config.integrator_threads, ThreadNumConverter());
 }
 
 }  // namespace voxblox

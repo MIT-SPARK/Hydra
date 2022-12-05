@@ -39,7 +39,9 @@
 namespace hydra {
 namespace lcd {
 
-const DynamicSceneGraphNode& makeDefaultAgentNode(DynamicSceneGraph& graph) {
+namespace {
+
+inline const DynamicSceneGraphNode& makeDefaultAgentNode(DynamicSceneGraph& graph) {
   using namespace std::chrono_literals;
   Eigen::Quaterniond q = Eigen::Quaterniond::Identity();
   Eigen::Vector3d t = Eigen::Vector3d::Zero();
@@ -47,15 +49,17 @@ const DynamicSceneGraphNode& makeDefaultAgentNode(DynamicSceneGraph& graph) {
   return graph.getDynamicNode(NodeSymbol('a', 0)).value();
 }
 
-void emplacePlaceNode(DynamicSceneGraph& graph,
-                      const Eigen::Vector3d& pos,
-                      double distance,
-                      size_t& next_index) {
+inline void emplacePlaceNode(DynamicSceneGraph& graph,
+                             const Eigen::Vector3d& pos,
+                             double distance,
+                             size_t& next_index) {
   auto attrs = std::make_unique<PlaceNodeAttributes>(distance, 0);
   attrs->position = pos;
   graph.emplaceNode(DsgLayers::PLACES, NodeSymbol('p', next_index), std::move(attrs));
   ++next_index;
 }
+
+}  // namespace
 
 TEST(DsgLcdDescriptorTests, TestAgentDescriptor) {
   DynamicSceneGraph graph;

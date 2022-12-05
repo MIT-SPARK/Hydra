@@ -8,6 +8,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(BUILD_WITH_COVERAGE "Build core library with GCC --coverage option" ON)
 option(HYDRA_GNN "build GNN interface" ON)
+if(HYDRA_GNN)
+  set(HYDRA_USE_GNN_CXX_VALUE 1)
+else()
+  set(HYDRA_USE_GNN_CXX_VALUE 0)
+endif()
+configure_file(hydra_build_config.h.in ${CMAKE_CURRENT_BINARY_DIR}/hydra_build_config.h)
 
 find_package(Boost REQUIRED COMPONENTS timer)
 find_package(spark_dsg REQUIRED)
@@ -64,13 +70,19 @@ add_library(
   src/merge_handler.cpp
   src/minimum_spanning_tree.cpp
   src/shared_module_state.cpp
+  src/subgraph_extraction.cpp
 )
-target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
+target_include_directories(
+  ${PROJECT_NAME}
+  PUBLIC include ${catkin_INCLUDE_DIRS}
+  PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
+)
 target_link_libraries(
   ${PROJECT_NAME}
   PUBLIC ${catkin_LIBRARIES}
          teaserpp::teaser_registration
          spark_dsg::spark_dsg
+         yaml-cpp
          gtsam
 )
 if(BUILD_WITH_COVERAGE)
@@ -80,6 +92,9 @@ if(BUILD_WITH_COVERAGE)
 endif()
 
 if(HYDRA_GNN)
+  target_sources(
+    ${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/lcd_gnn_descriptors.cpp
+  )
   target_link_libraries(${PROJECT_NAME} PUBLIC ${PROJECT_NAME}_gnn)
 endif()
 
@@ -98,10 +113,21 @@ if(CATKIN_ENABLE_TESTING)
     tests/utest_graph_filtration.cpp
     tests/utest_merge_handler.cpp
     tests/utest_minimum_spanning_tree.cpp
+    tests/utest_subgraph_extraction.cpp
     tests/utest_room_helpers.cpp
     tests/utest_room_finder.cpp
   )
   target_link_libraries(utest_${PROJECT_NAME} ${PROJECT_NAME} yaml-cpp)
+
+  if(HYDRA_GNN)
+    target_sources(
+      utest_${PROJECT_NAME}
+      PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tests/utest_lcd_gnn_descriptors.cpp
+    )
+    target_link_libraries(utest_${PROJECT_NAME} ${PROJECT_NAME}_gnn)
+  endif()
+
+  target_link_libraries(utest_${PROJECT_NAME} ${PROJECT_NAME})
 endif()
 
 # TODO(nathan) handle install

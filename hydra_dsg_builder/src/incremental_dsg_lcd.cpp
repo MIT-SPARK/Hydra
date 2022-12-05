@@ -167,6 +167,7 @@ size_t DsgLcd::processFrontendOutput() {
                                    msg->archived_places.begin(),
                                    msg->archived_places.end());
 
+  VLOG(5) << "Adding nodes: " << displayNodeSymbolContainer(msg->new_agent_nodes);
   for (const auto& node : msg->new_agent_nodes) {
     agent_queue_.push(node);
   }

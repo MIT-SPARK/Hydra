@@ -73,7 +73,10 @@ void visit_config(const Visitor& v, KimeraPgmoConfig& config) {
   v.visit("num_interp_pts", config.num_interp_pts);
   v.visit("interp_horizon", config.interp_horizon);
   v.visit("add_initial_prior", config.b_add_initial_prior);
-  v.visit("output_prefix", config.log_path);
+  if (!config_parser::is_parser<Visitor>()) {
+    // this gets populated elsewhere
+    v.visit("output_prefix", config.log_path);
+  }
 
   auto covar_handle = v["covariance"];
   covar_handle.visit("odom", config.odom_variance);
@@ -152,7 +155,7 @@ struct DsgBackendConfig {
   std::string zmq_recv_url = "tcp://127.0.0.1:8002";
   bool use_zmq_interface = false;
   size_t zmq_num_threads = 2;
-  size_t poll_time_ms = 10;
+  size_t zmq_poll_time_ms = 10;
 };
 
 struct EnableMapConverter {
@@ -214,7 +217,7 @@ void visit_config(const Visitor& v, DsgBackendConfig& config) {
   dsg_handle.visit("zmq_recv_url", config.zmq_recv_url);
   dsg_handle.visit("use_zmq_interface", config.use_zmq_interface);
   dsg_handle.visit("zmq_num_threads", config.zmq_num_threads);
-  dsg_handle.visit("poll_time_ms", config.poll_time_ms);
+  dsg_handle.visit("zmq_poll_time_ms", config.zmq_poll_time_ms);
 }
 
 template <typename Visitor>

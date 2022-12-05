@@ -75,7 +75,7 @@ DsgFrontend::DsgFrontend(const RobotPrefixConfig& prefix,
       new MeshSegmenter(config_.object_config, dsg_->graph->getMeshVertices()));
 
   if (config_.should_log) {
-    LOG(INFO) << "[Hydra Frontend] logging to " << (config_.log_path + "/frontend");
+    VLOG(1) << "[Hydra Frontend] logging to " << (config_.log_path + "/frontend");
     frontend_graph_logger_.setOutputPath(config_.log_path + "/frontend");
     frontend_graph_logger_.setLayerName(DsgLayers::OBJECTS, "objects");
     frontend_graph_logger_.setLayerName(DsgLayers::PLACES, "places");
@@ -409,7 +409,8 @@ void DsgFrontend::updatePoseGraph(const ReconstructionOutput& input) {
 }
 
 void DsgFrontend::assignBowVectors(const DynamicLayer& agents) {
-  lcd_input_->new_agent_nodes.clear();
+  // TODO(nathan) take care of synchronization better
+  // lcd_input_->new_agent_nodes.clear();
 
   // add bow messages received since last spin
   while (!state_->visual_lcd_queue.empty()) {
@@ -435,7 +436,7 @@ void DsgFrontend::assignBowVectors(const DynamicLayer& agents) {
     }
 
     const auto& node = agents.getNodeByIndex(agent_index->second)->get();
-    lcd_input_->new_agent_nodes.push_back(node.id);
+    // lcd_input_->new_agent_nodes.push_back(node.id);
 
     auto& attrs = node.attributes<AgentNodeAttributes>();
     attrs.dbow_ids = Eigen::Map<const AgentNodeAttributes::BowIdVector>(

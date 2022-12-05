@@ -33,12 +33,39 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder/dsg_lcd_detector.h"
+#include "hydra_build_config.h"
+#if defined(HYDRA_USE_GNN) && HYDRA_USE_GNN
+#include "hydra_dsg_builder/lcd_gnn_descriptors.h"
+#endif
 
 #include <glog/logging.h>
 #include <hydra_utils/timing_utilities.h>
 
 namespace hydra {
 namespace lcd {
+
+#if defined(HYDRA_USE_GNN) && HYDRA_USE_GNN
+void configureDescriptorFactories(lcd::DsgLcdDetector& detector,
+                                  const DsgLcdDetectorConfig& config) {
+  const auto embeddings = loadLabelEmbeddings(config.gnn_lcd.label_embeddings_file);
+
+  DsgLcdDetector::FactoryMap factories;
+  factories.emplace(
+      DsgLayers::OBJECTS,
+      std::make_unique<ObjectGnnDescriptor>(config.gnn_lcd.object_model_path,
+                                            config.object_extraction,
+                                            config.gnn_lcd.object_connection_radius_m,
+                                            embeddings));
+  factories.emplace(DsgLayers::PLACES,
+                    std::make_unique<PlaceGnnDescriptor>(
+                        config.gnn_lcd.places_model_path, config.places_extraction));
+  detector.setDescriptorFactories(std::move(factories));
+}
+#else
+void configureDescriptorFactories(lcd::DsgLcdDetector&, const DsgLcdDetectorConfig&) {
+  LOG(ERROR) << "Unable to initialize GNN descriptors: not built with -DHYDRA_GNN=ON";
+}
+#endif
 
 using DsgNode = DynamicSceneGraphNode;
 using hydra::timing::ScopedTimer;
@@ -48,13 +75,79 @@ DsgLcdDetector::DsgLcdDetector(const DsgLcdDetectorConfig& config) : config_(con
     cache_map_[id_func_pair.first] = DescriptorCache();
   }
 
-  layer_factories_.emplace(DsgLayers::OBJECTS,
-                           std::make_unique<ObjectDescriptorFactory>(
-                               config_.object_radius_m, config_.num_semantic_classes));
-  layer_factories_.emplace(DsgLayers::PLACES,
-                           std::make_unique<PlaceDescriptorFactory>(
-                               config_.place_radius_m, config_.place_histogram_config));
+  makeDefaultDescriptorFactories();
+  if (config_.use_gnn_descriptors) {
+    configureDescriptorFactories(*this, config_);
+  }
+
+  resetLayerAssignments();
+}
+
+void DsgLcdDetector::setDescriptorFactories(FactoryMap&& factories) {
+  layer_factories_ = std::move(factories);
+  resetLayerAssignments();
+}
+
+void DsgLcdDetector::setRegistrationSolver(size_t level,
+                                           DsgRegistrationSolver::Ptr&& solver) {
+  if (level == 0 && !config_.enable_agent_registration) {
+    return;
+  }
+
+  registration_solvers_[level] = std::move(solver);
+}
+
+size_t DsgLcdDetector::numDescriptors() const {
+  size_t num_descriptors = 0;
+  for (const auto& id_cache_pair : cache_map_) {
+    num_descriptors += id_cache_pair.second.size();
+  }
+  return num_descriptors + numAgentDescriptors();
+}
+
+size_t DsgLcdDetector::numGraphDescriptors(LayerId layer) const {
+  if (!cache_map_.count(layer)) {
+    return 0;
+  }
+
+  return cache_map_.at(layer).size();
+}
+
+size_t DsgLcdDetector::numAgentDescriptors() const {
+  size_t count = 0;
+  for (const auto& id_cache_pair : leaf_cache_) {
+    count += id_cache_pair.second.size();
+  }
+  return count;
+}
+
+const std::map<size_t, LayerSearchResults>& DsgLcdDetector::getLatestMatches() const {
+  return matches_;
+}
+
+const std::map<LayerId, size_t>& DsgLcdDetector::getLayerRemapping() const {
+  return layer_to_internal_index_;
+}
+
+const DescriptorCache& DsgLcdDetector::getDescriptorCache(LayerId layer) {
+  return cache_map_.at(layer);
+}
+
+void DsgLcdDetector::makeDefaultDescriptorFactories() {
+  layer_factories_.emplace(
+      DsgLayers::OBJECTS,
+      std::make_unique<ObjectDescriptorFactory>(config_.object_extraction,
+                                                config_.num_semantic_classes));
+  layer_factories_.emplace(
+      DsgLayers::PLACES,
+      std::make_unique<PlaceDescriptorFactory>(config_.places_extraction,
+                                               config_.place_histogram_config));
   agent_factory_ = std::make_unique<AgentDescriptorFactory>();
+}
+
+void DsgLcdDetector::resetLayerAssignments() {
+  // TODO(nathan) this is messy
+  registration_solvers_.clear();
 
   size_t internal_idx = 1;  // agent is 0
   for (const auto& id_config_pair : config_.search_configs) {
@@ -76,10 +169,6 @@ DsgLcdDetector::DsgLcdDetector(const DsgLcdDetectorConfig& config) : config_(con
                                         layer, iter->second, config_.teaser_config));
     }
 
-    // if (validation_funcs.count(layer_config.layer)) {
-    // validation_funcs_[internal_idx] = validation_funcs.at(layer_config.layer);
-    //}
-
     internal_idx++;
   }
 
@@ -87,16 +176,7 @@ DsgLcdDetector::DsgLcdDetector(const DsgLcdDetectorConfig& config) : config_(con
   max_internal_index_ = internal_idx;
   root_layer_ = internal_index_to_layer_.at(internal_idx - 1);
 
-  match_config_map_[0] = config.agent_search_config;
-}
-
-void DsgLcdDetector::setRegistrationSolver(size_t level,
-                                           DsgRegistrationSolver::Ptr&& solver) {
-  if (level == 0 && !config_.enable_agent_registration) {
-    return;
-  }
-
-  registration_solvers_[level] = std::move(solver);
+  match_config_map_[0] = config_.agent_search_config;
 }
 
 bool DsgLcdDetector::addNewDescriptors(const DynamicSceneGraph& graph,

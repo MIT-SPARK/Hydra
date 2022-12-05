@@ -62,8 +62,9 @@ Descriptor::Ptr AgentDescriptorFactory::construct(const Dsg& graph,
   return descriptor;
 }
 
-ObjectDescriptorFactory::ObjectDescriptorFactory(double radius, size_t num_classes)
-    : radius(radius), num_classes(num_classes) {}
+ObjectDescriptorFactory::ObjectDescriptorFactory(const SubgraphConfig& config,
+                                                 size_t num_classes)
+    : config(config), num_classes(num_classes) {}
 
 Descriptor::Ptr ObjectDescriptorFactory::construct(const Dsg& graph,
                                                    const DsgNode& agent_node) const {
@@ -81,61 +82,27 @@ Descriptor::Ptr ObjectDescriptorFactory::construct(const Dsg& graph,
   descriptor->root_node = *parent;
   descriptor->timestamp = agent_node.timestamp;
   descriptor->root_position = root_position;
+  descriptor->nodes = getSubgraphNodes(config, graph, *parent, false);
 
-  const auto& places = graph.getLayer(DsgLayers::PLACES);
-  std::deque<NodeId> frontier{*parent};
-  std::unordered_set<NodeId> visited{*parent};
-  graph_utilities::breadthFirstSearch(
-      places,
-      frontier,
-      visited,
-      [&](const auto& curr_node) {
-        for (const auto& child : curr_node.children()) {
-          if (graph.isDynamic(child)) {
-            continue;
-          }
+  for (const auto node : descriptor->nodes) {
+    const auto attrs = graph.getNode(node)->get().attributes<SemanticNodeAttributes>();
+    const size_t label = attrs.semantic_label;
+    if (label > static_cast<size_t>(descriptor->values.rows())) {
+      LOG(ERROR) << "label " << static_cast<int>(label) << " for node "
+                 << NodeSymbol(node).getLabel() << " exceeds max label "
+                 << descriptor->values.rows();
+      continue;
+    }
 
-          const SceneGraphNode& child_node = graph.getNode(child).value();
-          if ((root_position - child_node.attributes().position).norm() < radius) {
-            return true;
-          }
-        }
-
-        return (root_position - curr_node.attributes().position).norm() < radius;
-      },
-      [](const auto&) { return true; },
-      [&](const SceneGraphLayer& layer, NodeId node_id) {
-        const SceneGraphNode& node = layer.getNode(node_id).value();
-        for (const auto& child : node.children()) {
-          if (graph.isDynamic(child)) {
-            continue;
-          }
-
-          const SceneGraphNode& child_node = graph.getNode(child).value();
-          if ((root_position - child_node.attributes().position).norm() >= radius) {
-            continue;
-          }
-
-          const size_t label =
-              child_node.attributes<SemanticNodeAttributes>().semantic_label;
-          if (label > static_cast<size_t>(descriptor->values.rows())) {
-            LOG(WARNING) << "label " << label << " for node "
-                         << NodeSymbol(child).getLabel() << " exceeds max label "
-                         << descriptor->values.rows();
-            continue;
-          }
-
-          descriptor->values(label) += 1.0f;
-          descriptor->nodes.insert(child);
-        }
-      });
+    descriptor->values(label) += 1.0f;
+  }
 
   return descriptor;
 }
 
-PlaceDescriptorFactory::PlaceDescriptorFactory(double radius,
-                                               const HistogramConfig<double>& config)
-    : radius(radius), config(config) {}
+PlaceDescriptorFactory::PlaceDescriptorFactory(const SubgraphConfig& config,
+                                               const HistogramConfig<double>& histogram)
+    : config(config), histogram(histogram) {}
 
 Descriptor::Ptr PlaceDescriptorFactory::construct(const Dsg& graph,
                                                   const DsgNode& agent_node) const {
@@ -149,27 +116,17 @@ Descriptor::Ptr PlaceDescriptorFactory::construct(const Dsg& graph,
 
   auto descriptor = std::make_unique<Descriptor>();
   descriptor->normalized = false;
-  descriptor->values = decltype(descriptor->values)::Zero(config.bins, 1);
+  descriptor->values = decltype(descriptor->values)::Zero(histogram.bins, 1);
   descriptor->root_node = *parent;
   descriptor->timestamp = agent_node.timestamp;
   descriptor->root_position = root_position;
+  descriptor->nodes = getSubgraphNodes(config, graph, *parent, true);
 
   const auto& places = graph.getLayer(DsgLayers::PLACES);
-  std::deque<NodeId> frontier{*parent};
-  std::unordered_set<NodeId> visited{*parent};
-  graph_utilities::breadthFirstSearch(
-      places,
-      frontier,
-      visited,
-      [&](const auto& curr_node) {
-        return (root_position - curr_node.attributes().position).norm() < radius;
-      },
-      [](const auto&) { return true; },
-      [&](const SceneGraphLayer& l, NodeId n) {
-        const auto& attr = l.getNode(n).value().get().attributes<PlaceNodeAttributes>();
-        descriptor->values(config.getBin(attr.distance)) += 1.0f;
-        descriptor->nodes.insert(n);
-      });
+  for (const auto node : descriptor->nodes) {
+    const auto& attrs = places.getNode(node)->get().attributes<PlaceNodeAttributes>();
+    descriptor->values(histogram.getBin(attrs.distance)) += 1.0f;
+  }
 
   return descriptor;
 }

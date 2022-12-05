@@ -40,6 +40,13 @@
 namespace hydra {
 namespace lcd {
 
+struct GnnLcdConfig {
+  std::string label_embeddings_file;
+  double object_connection_radius_m;
+  std::string object_model_path;
+  std::string places_model_path;
+};
+
 struct DsgLcdDetectorConfig {
   std::map<LayerId, DescriptorMatchConfig> search_configs;
   DescriptorMatchConfig agent_search_config;
@@ -48,15 +55,22 @@ struct DsgLcdDetectorConfig {
   TeaserParams teaser_config;
   bool enable_agent_registration = true;
 
-  double object_radius_m = 5.0;
+  SubgraphConfig object_extraction{5.0};
+  SubgraphConfig places_extraction{5.0};
+
   size_t num_semantic_classes = 20;
-  double place_radius_m = 5.0;
   HistogramConfig<double> place_histogram_config{0.5, 2.5, 30};
+  bool use_gnn_descriptors = false;
+  GnnLcdConfig gnn_lcd;
 };
 
 class DsgLcdDetector {
  public:
+  using FactoryMap = std::map<LayerId, DescriptorFactory::Ptr>;
+
   explicit DsgLcdDetector(const DsgLcdDetectorConfig& config);
+
+  void setDescriptorFactories(FactoryMap&& factories);
 
   void setRegistrationSolver(size_t level, DsgRegistrationSolver::Ptr&& solver);
 
@@ -68,43 +82,23 @@ class DsgLcdDetector {
                                               NodeId latest_agent_id,
                                               uint64_t timestamp = 0);
 
-  inline size_t numDescriptors() const {
-    size_t num_descriptors = 0;
-    for (const auto& id_cache_pair : cache_map_) {
-      num_descriptors += id_cache_pair.second.size();
-    }
-    return num_descriptors + numAgentDescriptors();
-  }
+  size_t numDescriptors() const;
 
-  inline size_t numGraphDescriptors(LayerId layer) const {
-    if (!cache_map_.count(layer)) {
-      return 0;
-    }
+  size_t numGraphDescriptors(LayerId layer) const;
 
-    return cache_map_.at(layer).size();
-  }
+  size_t numAgentDescriptors() const;
 
-  inline size_t numAgentDescriptors() const {
-    size_t count = 0;
-    for (const auto& id_cache_pair : leaf_cache_) {
-      count += id_cache_pair.second.size();
-    }
-    return count;
-  }
+  const std::map<size_t, LayerSearchResults>& getLatestMatches() const;
 
-  inline const std::map<size_t, LayerSearchResults>& getLatestMatches() const {
-    return matches_;
-  }
+  const std::map<LayerId, size_t>& getLayerRemapping() const;
 
-  inline const std::map<LayerId, size_t>& getLayerRemapping() const {
-    return layer_to_internal_index_;
-  }
+  const DescriptorCache& getDescriptorCache(LayerId layer);
 
-  inline const DescriptorCache& getDescriptorCache(LayerId layer) {
-    return cache_map_.at(layer);
-  }
+ protected:
+  void makeDefaultDescriptorFactories();
 
- private:
+  void resetLayerAssignments();
+
   bool addNewDescriptors(const DynamicSceneGraph& graph,
                          const DynamicSceneGraphNode& agent_node);
 
@@ -116,7 +110,7 @@ class DsgLcdDetector {
 
   DsgLcdDetectorConfig config_;
   DescriptorFactory::Ptr agent_factory_;
-  std::map<LayerId, DescriptorFactory::Ptr> layer_factories_;
+  FactoryMap layer_factories_;
 
   LayerId root_layer_;
   size_t max_internal_index_;

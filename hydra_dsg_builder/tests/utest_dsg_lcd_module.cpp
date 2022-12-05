@@ -49,8 +49,8 @@ struct DsgLcdDetectorTests : public ::testing::Test {
   virtual void SetUp() override {
     dsg.reset(new DynamicSceneGraph());
 
-    config.object_radius_m = 5.0;
-    config.place_radius_m = 5.0;
+    config.object_extraction = SubgraphConfig(5.0);
+    config.places_extraction = SubgraphConfig(5.0);
     config.num_semantic_classes = 20;
     config.place_histogram_config = HistogramConfig<double>(0.5, 2.5, 30);
     config.agent_search_config = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
