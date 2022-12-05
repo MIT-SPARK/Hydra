@@ -39,6 +39,11 @@
 
 #include <glog/logging.h>
 
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, LogConfig);
+namespace hydra {
+DECLARE_STRUCT_NAME(LogConfig);
+} // namespace hydra
+
 int main(int argc, char* argv[]) {
   ros::init(argc, argv, "hydra_topology_node");
 

@@ -33,6 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include "hydra_dsg_builder/subgraph_extraction.h"
+
 #include <hydra_utils/dsg_types.h>
 
 namespace hydra {
@@ -68,12 +70,12 @@ struct AgentDescriptorFactory : DescriptorFactory {
 };
 
 struct ObjectDescriptorFactory : DescriptorFactory {
-  ObjectDescriptorFactory(double radius, size_t num_classes);
+  ObjectDescriptorFactory(const SubgraphConfig& config, size_t num_classes);
 
   Descriptor::Ptr construct(const DynamicSceneGraph& graph,
                             const DynamicSceneGraphNode& agent_node) const override;
 
-  const double radius;
+  const SubgraphConfig config;
   const size_t num_classes;
 };
 
@@ -100,13 +102,14 @@ struct HistogramConfig {
 };
 
 struct PlaceDescriptorFactory : DescriptorFactory {
-  PlaceDescriptorFactory(double radius, const HistogramConfig<double>& config);
+  PlaceDescriptorFactory(const SubgraphConfig& config,
+                         const HistogramConfig<double>& histogram);
 
   Descriptor::Ptr construct(const DynamicSceneGraph& graph,
                             const DynamicSceneGraphNode& agent_node) const override;
 
-  const double radius;
-  const HistogramConfig<double> config;
+  const SubgraphConfig config;
+  const HistogramConfig<double> histogram;
 };
 
 }  // namespace lcd

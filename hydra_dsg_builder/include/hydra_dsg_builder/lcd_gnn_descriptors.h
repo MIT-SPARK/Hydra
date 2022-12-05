@@ -32,37 +32,51 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_topology/reconstruction_config.h"
-
-namespace voxblox {
-
-int ThreadNumConverter::to(const int& other) const {
-  if (other <= 0) {
-    return std::thread::hardware_concurrency();
-  }
-  return other;
-}
-
-int ThreadNumConverter::from(const int& other) const { return other; }
-
-}  // namespace voxblox
+#pragma once
+#include "hydra_dsg_builder/dsg_lcd_descriptors.h"
+#include "hydra_dsg_builder/gnn/gnn_interface.h"
 
 namespace hydra {
+namespace lcd {
 
-Eigen::Quaterniond QuaternionConverter::to(
-    const std::map<std::string, double>& other) const {
-  if (!other.count("w") || !other.count("x") || !other.count("y") ||
-      !other.count("z")) {
-    std::cerr << "Encountered invalid quaternion representation!" << std::endl;
-    return Eigen::Quaterniond::Identity();
-  }
+struct ObjectGnnDescriptor : DescriptorFactory {
+  using LabelEmbeddings = std::map<uint8_t, Eigen::VectorXf>;
 
-  return Eigen::Quaterniond(other.at("w"), other.at("x"), other.at("y"), other.at("z"));
-}
+  ObjectGnnDescriptor(const std::string& model_path,
+                      const SubgraphConfig& config,
+                      double max_edge_distance_m,
+                      const LabelEmbeddings& label_embeddings);
 
-std::map<std::string, double> QuaternionConverter::from(
-    const Eigen::Quaterniond& other) const {
-  return {{"w", other.w()}, {"x", other.x()}, {"y", other.y()}, {"z", other.z()}};
-}
+  gnn::TensorMap makeInput(const DynamicSceneGraph& graph,
+                           const std::set<NodeId>& nodes) const;
 
+  Descriptor::Ptr construct(const DynamicSceneGraph& graph,
+                            const DynamicSceneGraphNode& agent_node) const override;
+
+ protected:
+  const SubgraphConfig config_;
+  std::unique_ptr<gnn::GnnInterface> model_;
+
+  double max_edge_distance_m_;
+  size_t label_embedding_size_;
+  std::map<uint8_t, Eigen::VectorXf> label_embeddings_;
+};
+
+struct PlaceGnnDescriptor : DescriptorFactory {
+  PlaceGnnDescriptor(const std::string& model_path, const SubgraphConfig& config);
+
+  gnn::TensorMap makeInput(const DynamicSceneGraph& graph,
+                           const std::set<NodeId>& nodes) const;
+
+  Descriptor::Ptr construct(const DynamicSceneGraph& graph,
+                            const DynamicSceneGraphNode& agent_node) const override;
+
+ protected:
+  const SubgraphConfig config_;
+  std::unique_ptr<gnn::GnnInterface> model_;
+};
+
+ObjectGnnDescriptor::LabelEmbeddings loadLabelEmbeddings(const std::string& filename);
+
+}  // namespace lcd
 }  // namespace hydra

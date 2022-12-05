@@ -32,37 +32,25 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_topology/reconstruction_config.h"
-
-namespace voxblox {
-
-int ThreadNumConverter::to(const int& other) const {
-  if (other <= 0) {
-    return std::thread::hardware_concurrency();
-  }
-  return other;
-}
-
-int ThreadNumConverter::from(const int& other) const { return other; }
-
-}  // namespace voxblox
+#pragma once
+#include <hydra_utils/dsg_types.h>
 
 namespace hydra {
 
-Eigen::Quaterniond QuaternionConverter::to(
-    const std::map<std::string, double>& other) const {
-  if (!other.count("w") || !other.count("x") || !other.count("y") ||
-      !other.count("z")) {
-    std::cerr << "Encountered invalid quaternion representation!" << std::endl;
-    return Eigen::Quaterniond::Identity();
-  }
+struct SubgraphConfig {
+  bool fixed_radius = true;
+  double max_radius_m;
+  double min_radius_m;
+  size_t min_nodes;
 
-  return Eigen::Quaterniond(other.at("w"), other.at("x"), other.at("y"), other.at("z"));
-}
+  SubgraphConfig(double radius_m);
 
-std::map<std::string, double> QuaternionConverter::from(
-    const Eigen::Quaterniond& other) const {
-  return {{"w", other.w()}, {"x", other.x()}, {"y", other.y()}, {"z", other.z()}};
-}
+  SubgraphConfig();
+};
+
+std::set<NodeId> getSubgraphNodes(const SubgraphConfig& config,
+                                  const DynamicSceneGraph& graph,
+                                  NodeId root_node,
+                                  bool is_places);
 
 }  // namespace hydra

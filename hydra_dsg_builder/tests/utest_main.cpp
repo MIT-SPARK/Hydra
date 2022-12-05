@@ -44,6 +44,7 @@ int main(int argc, char** argv) {
   FLAGS_logtostderr = true;
   FLAGS_alsologtostderr = true;
   FLAGS_colorlogtostderr = true;
+  FLAGS_minloglevel = 1;
 
   return RUN_ALL_TESTS();
 }

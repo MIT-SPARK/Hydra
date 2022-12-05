@@ -81,7 +81,7 @@ void visit_config(const Visitor& v, TsdfIntegratorBase::Config& config) {
   v.visit("allow_clear", config.allow_clear);
   v.visit("use_weight_dropoff", config.use_weight_dropoff);
   v.visit("use_sparsity_compensation_factor", config.use_sparsity_compensation_factor);
-  v.visit("integrator_threads", config.integrator_threads);
+  v.visit("integrator_threads", config.integrator_threads, ThreadNumConverter());
   v.visit("integration_order_mode", config.integration_order_mode);
   v.visit("enable_anti_grazing", config.enable_anti_grazing);
   v.visit("start_voxel_subsampling_factor", config.start_voxel_subsampling_factor);

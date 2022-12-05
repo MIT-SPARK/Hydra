@@ -16,16 +16,24 @@
     <arg name="start_visualizer" default="true"/>
     <arg name="start_logger" default="true"/>
     <arg name="use_zmq_interface" default="false"/>
+    <arg name="zmq_send_url" default="tcp://127.0.0.1:8001"/>
+    <arg name="zmq_recv_url" default="tcp://127.0.0.1:8002"/>
 
     <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
     <arg name="typology_path" default="$(arg typology_dir)/$(arg typology_config)"/>
 
-    <arg name="enable_dsg_lcd" default="false"/>
-    <arg name="lcd_use_bow_vectors" default="true"/>
-    <arg name="enable_lcd_viz" default="false"/>
     <arg name="optimize_on_lc" default="true"/>
     <arg name="enable_merge_undos" default="false"/>
     <arg name="visualize_reconstruction" default="false"/>
+    <arg name="lcd_use_bow_vectors" default="true"/>
+    <arg name="enable_dsg_lcd" default="false"/>
+    <arg name="use_gnn_descriptors" default="false"/>
+    <arg name="lcd_gnn_object_model" default="$(find hydra_dsg_builder)/models/lcd/objects_gnn.onnx"/>
+    <arg name="lcd_gnn_places_model" default="$(find hydra_dsg_builder)/models/lcd/places_gnn.onnx"/>
+    <arg name="lcd_gnn_label_embeddings" if="$(arg use_gnn_descriptors)"/>
+
+    <arg name="visualize_reconstruction" default="true"/>
+    <arg name="enable_lcd_viz" default="false"/>
 
     <arg name="dsg_should_log" default="true" />
     <arg name="pgmo_should_log" default="true"/>
@@ -87,8 +95,6 @@
         <param name="enable_reconstruction_output_queue" value="true"/>
         <param name="use_ros_backend" value="$(arg use_ros_backend)"/>
         <param name="dsg/use_mesh_subscribers" value="$(arg use_ros_backend)"/>
-        <param name="enable_lcd" value="$(arg enable_dsg_lcd)"/>
-        <param name="lcd_use_bow_vectors" value="$(arg lcd_use_bow_vectors)"/>
         <param name="exit_mode" value="$(arg exit_mode)"/>
         <param name="should_log" value="$(arg dsg_should_log)"/>
         <param name="log_path" value="$(arg dsg_path)"/>
@@ -103,15 +109,27 @@
         <param name="show_stats" value="$(arg show_topology_stats)"/>
         <param name="validate_vertices" value="$(arg validate_vertices)"/>
 
-        <param name="dsg/optimize_on_lc" value="$(arg optimize_on_lc)"/>
-        <param name="dsg/enable_merge_undos" value="$(arg enable_merge_undos)"/>
         <param name="dsg/use_zmq_interface" value="$(arg use_zmq_interface)"/>
-        <param name="lcd/log_registration_problem" value="$(arg log_registration)"/>
+        <param name="dsg/zmq_send_url" value="$(arg zmq_send_url)"/>
+        <param name="dsg/zmq_recv_url" value="$(arg zmq_recv_url)"/>
+        <param name="dsg/zmq_num_threads" value="2"/>
+        <param name="dsg/zmq_poll_time_ms" value="10"/>
         <param name="pgmo/log_path" value="$(arg pgmo_log_path)"/>
         <param name="pgmo/should_log" value="$(arg pgmo_should_log)"/>
         <param name="objects/bounding_box_type" value="RAABB" if="$(arg use_oriented_bounding_boxes)"/>
         <param name="objects/bounding_box_type" value="AABB" unless="$(arg use_oriented_bounding_boxes)"/>
         <param name="pgmo/robot_id" value="$(arg robot_id)"/>
+
+        <param name="enable_lcd" value="$(arg enable_dsg_lcd)"/>
+        <param name="lcd_use_bow_vectors" value="$(arg lcd_use_bow_vectors)"/>
+        <param name="dsg/optimize_on_lc" value="$(arg optimize_on_lc)"/>
+        <param name="dsg/enable_merge_undos" value="$(arg enable_merge_undos)"/>
+        <param name="lcd/log_registration_problem" value="$(arg log_registration)"/>
+        <param name="lcd/use_gnn_descriptors" value="$(arg use_gnn_descriptors)"/>
+        <param name="lcd/gnn_lcd/object_model_path" value="$(arg lcd_gnn_object_model)"/>
+        <param name="lcd/gnn_lcd/places_model_path" value="$(arg lcd_gnn_places_model)"/>
+        <param name="lcd/gnn_lcd/label_embeddings_file" value="$(arg lcd_gnn_label_embeddings)"
+               if="$(arg use_gnn_descriptors)"/>
 
         <remap from="~pose_graph" to="kimera_vio_ros/pose_graph_incremental"
                unless="$(arg use_gt_frame)"/>
