@@ -45,12 +45,37 @@ struct HydraParamLogger : config_parser::Logger {
   }
 };
 
+template <typename T>
+struct ConfigStructName {
+  static std::string get() { return "Unknown Config"; }
+};
+
 template <typename Config>
 Config load_config(const ros::NodeHandle& nh,
                    const std::string& ns = "",
-                   bool verbose = true) {
+                   bool verbose = true,
+                   int dump_verbosity = 5) {
   auto logger = std::make_shared<HydraParamLogger>();
-  return config_parser::load_from_ros_nh<Config>(nh, ns, verbose ? logger : nullptr);
+  auto config =
+      config_parser::load_from_ros_nh<Config>(nh, ns, verbose ? logger : nullptr);
+
+  if (verbose) {
+    const auto name = ConfigStructName<Config>::get();
+    std::string filler(name.size(), '=');
+    VLOG(dump_verbosity) << std::endl
+                         << std::endl
+                         << name << std::endl
+                         << filler << std::endl
+                         << config;
+  }
+
+  return config;
 }
 
 }  // namespace hydra
+
+#define DECLARE_STRUCT_NAME(name)              \
+  template <>                                  \
+  struct ConfigStructName<name> {              \
+    static std::string get() { return #name; } \
+  }

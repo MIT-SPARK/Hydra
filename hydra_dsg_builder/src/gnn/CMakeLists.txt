@@ -1,34 +1,24 @@
-find_package(CUDA REQUIRED)
-
-include(ExternalProject)
-
-# TODO(nathan) architecture dependent URL with cross-compiled version
-set(ORT_URL
-    "https://github.com/microsoft/onnxruntime/releases/download/v1.13.1/onnxruntime-linux-x64-gpu-1.13.1.tgz"
+configure_file(cmake/ort.CMakeLists.txt.in ort-download/CMakeLists.txt)
+execute_process(
+  COMMAND "${CMAKE_COMMAND}" -G "${CMAKE_GENERATOR}" .
+  WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/ort-download"
+  #OUTPUT_QUIET
+)
+execute_process(
+  COMMAND "${CMAKE_COMMAND}" --build .
+  WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/ort-download"
+  #OUTPUT_QUIET
 )
 
-ExternalProject_Add(
-  ort
-  URL ${ORT_URL}
-  CONFIGURE_COMMAND ""
-  BUILD_COMMAND ""
-  INSTALL_COMMAND ""
+add_library(ort::ort IMPORTED INTERFACE)
+set_property(
+  TARGET ort::ort PROPERTY INTERFACE_INCLUDE_DIRECTORIES
+                           "${CMAKE_CURRENT_BINARY_DIR}/ort-src/include"
 )
-
-# TODO(nathan) consider namespacing
-ExternalProject_Get_Property(ort SOURCE_DIR)
-
-if(NOT TARGET ort::ort)
-  add_library(ort::ort IMPORTED INTERFACE)
-  set_property(
-    TARGET ort::ort PROPERTY INTERFACE_INCLUDE_DIRECTORIES "${SOURCE_DIR}/include"
-  )
-  set_property(
-    TARGET ort::ort PROPERTY INTERFACE_LINK_LIBRARIES
-                             "${SOURCE_DIR}/lib/libonnxruntime.so"
-  )
-  add_dependencies(ort::ort ort)
-endif()
+set_property(
+  TARGET ort::ort PROPERTY INTERFACE_LINK_LIBRARIES
+                           "${CMAKE_CURRENT_BINARY_DIR}/ort-src/lib/libonnxruntime.so"
+)
 
 # TODO(nathan) handle glog better (i.e. don't require catkin)
 add_library(${PROJECT_NAME}_gnn gnn_interface.cpp ort_utilities.cpp tensor.cpp)

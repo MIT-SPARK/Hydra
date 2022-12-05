@@ -93,13 +93,13 @@ DsgBackend::DsgBackend(const RobotPrefixConfig& prefix,
   if (config_.should_log) {
     const std::string log_path = config_.log_path + "/backend";
     backend_graph_logger_.setOutputPath(log_path);
-    LOG(INFO) << "[Hydra Backend] logging to " << log_path;
+    VLOG(1) << "[Hydra Backend] logging to " << log_path;
     backend_graph_logger_.setLayerName(DsgLayers::OBJECTS, "objects");
     backend_graph_logger_.setLayerName(DsgLayers::PLACES, "places");
     backend_graph_logger_.setLayerName(DsgLayers::ROOMS, "rooms");
     backend_graph_logger_.setLayerName(DsgLayers::BUILDINGS, "buildings");
   } else {
-    LOG(INFO) << "[Hydra Backend] logging disabled.";
+    VLOG(1) << "[Hydra Backend] logging disabled.";
   }
 
   if (config_.use_zmq_interface) {
@@ -109,7 +109,7 @@ DsgBackend::DsgBackend(const RobotPrefixConfig& prefix,
 }
 
 DsgBackend::~DsgBackend() {
-  LOG(INFO) << "[Hydra Backend] destructor called!";
+  VLOG(1) << "[Hydra Backend] destructor called!";
   stop();
 }
 
@@ -537,7 +537,7 @@ void DsgBackend::addLoopClosure(const gtsam::Key& src,
 
 void DsgBackend::runZmqUpdates() {
   while (!should_shutdown_) {
-    if (!zmq_receiver_->recv(config_.poll_time_ms)) {
+    if (!zmq_receiver_->recv(config_.zmq_poll_time_ms)) {
       continue;
     }
 

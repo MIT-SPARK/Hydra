@@ -63,6 +63,8 @@ using namespace hydra::timing;
   }
 */
 
+namespace hydra {
+
 struct HydraRosConfig {
   bool enable_lcd = false;
   bool use_ros_backend = false;
@@ -80,10 +82,22 @@ void visit_config(const Visitor& v, HydraRosConfig& config) {
   v.visit("frontend_mesh_separation_s", config.frontend_mesh_separation_s);
 }
 
+}  // namespace hydra
+
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, HydraRosConfig)
+
+namespace hydra {
+DECLARE_STRUCT_NAME(HydraRosConfig);
+DECLARE_STRUCT_NAME(DsgFrontendConfig);
+DECLARE_STRUCT_NAME(DsgBackendConfig);
+DECLARE_STRUCT_NAME(kimera_pgmo::KimeraPgmoConfig);
+DECLARE_STRUCT_NAME(DsgLcdModuleConfig);
+}  // namespace hydra
+
 struct HydraRosPipeline {
   explicit HydraRosPipeline(const ros::NodeHandle& nh, int robot_id = 0)
       : prefix(robot_id) {
-    config_ = load_config<HydraRosConfig>(nh);
+    config_ = load_config<hydra::HydraRosConfig>(nh);
 
     // TODO(nathan) parse and use at some point
     const LayerId mesh_layer_id = 1;
@@ -203,7 +217,7 @@ struct HydraRosPipeline {
     dsg_sender_->sendGraph(graph, stamp);
   }
 
-  HydraRosConfig config_;
+  hydra::HydraRosConfig config_;
   RobotPrefixConfig prefix;
   SharedDsgInfo::Ptr frontend_dsg;
   SharedDsgInfo::Ptr backend_dsg;

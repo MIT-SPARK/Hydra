@@ -44,6 +44,9 @@
 
 namespace hydra {
 
+DECLARE_STRUCT_NAME(RosReconstructionConfig);
+DECLARE_STRUCT_NAME(ReconstructionConfig);
+
 using message_filters::Subscriber;
 using pose_graph_tools::PoseGraph;
 using pose_graph_tools::PoseGraphEdge;

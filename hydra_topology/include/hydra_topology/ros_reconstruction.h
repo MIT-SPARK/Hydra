@@ -49,8 +49,6 @@
 
 namespace hydra {
 
-using pose_graph_tools::PoseGraph;
-
 struct RosReconstructionConfig {
   bool use_pose_graph = true;
   bool visualize_reconstruction = true;
@@ -71,6 +69,14 @@ void visit_config(const Visitor& v, RosReconstructionConfig& config) {
   v.visit("pointcloud_separation_s", config.pointcloud_separation_s);
   v.visit("tf_wait_duration_s", config.tf_wait_duration_s);
 }
+
+}  // namespace hydra
+
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, RosReconstructionConfig);
+
+namespace hydra {
+
+using pose_graph_tools::PoseGraph;
 
 class RosReconstruction : public ReconstructionModule {
  public:

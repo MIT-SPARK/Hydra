@@ -388,7 +388,7 @@ TEST(DsgLcdMatchingTests, SearchLeafDescriptorsAllValid) {
       searchLeafDescriptors(*query, config, valid_matches, descriptors, 10);
   ASSERT_GT(results.score.size(), 0u);
   EXPECT_EQ(1.0f, results.score[0]);
-  std::set<NodeId> expected_matches{1};
+  std::set<NodeId> expected_matches{1, 2, 3, 4};
   EXPECT_EQ(expected_matches, results.valid_matches);
 
   EXPECT_TRUE(results.query_nodes.empty());
