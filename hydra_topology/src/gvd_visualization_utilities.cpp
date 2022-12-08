@@ -40,9 +40,27 @@
 #include <random>
 
 using visualization_msgs::Marker;
+using visualization_msgs::MarkerArray;
 
 namespace hydra {
 namespace topology {
+
+MarkerGroupPub::MarkerGroupPub(const ros::NodeHandle& nh) : nh_(nh) {}
+
+void MarkerGroupPub::publish(const std::string& name, const Marker& marker) const {
+  MarkerArray msg;
+  msg.markers.push_back(marker);
+  publish(name, msg);
+}
+
+void MarkerGroupPub::publish(const std::string& name, const MarkerArray& marker) const {
+  auto iter = pubs_.find(name);
+  if (iter == pubs_.end()) {
+    iter = pubs_.emplace(name, nh_.advertise<MarkerArray>(name, 1, true)).first;
+  }
+
+  iter->second.publish(marker);
+}
 
 double computeRatio(double min, double max, double value) {
   double ratio = (value - min) / (max - min);
@@ -108,6 +126,112 @@ Marker makeGvdMarker(const GvdVisualizerConfig& config,
       marker.points.push_back(marker_pos);
 
       double ratio = getRatio(config, voxel);
+      NodeColor color = dsg_utils::interpolateColorMap(colors, ratio);
+
+      std_msgs::ColorRGBA color_msg = dsg_utils::makeColorMsg(color, config.gvd_alpha);
+      marker.colors.push_back(color_msg);
+    }
+  }
+
+  return marker;
+}
+
+Marker makeErrorMarker(const GvdVisualizerConfig& config,
+                       const ColormapConfig& colors,
+                       const Layer<GvdVoxel>& lhs,
+                       const Layer<GvdVoxel>& rhs,
+                       double threshold) {
+  Marker marker;
+  marker.type = Marker::CUBE_LIST;
+  marker.action = Marker::ADD;
+  marker.id = 0;
+  marker.ns = "error_locations";
+
+  Eigen::Vector3d identity_pos = Eigen::Vector3d::Zero();
+  tf2::convert(identity_pos, marker.pose.position);
+  tf2::convert(Eigen::Quaterniond::Identity(), marker.pose.orientation);
+
+  marker.scale.x = lhs.voxel_size();
+  marker.scale.y = lhs.voxel_size();
+  marker.scale.z = lhs.voxel_size();
+
+  BlockIndexList blocks;
+  lhs.getAllAllocatedBlocks(&blocks);
+
+  for (const auto& idx : blocks) {
+    if (!rhs.hasBlock(idx)) {
+      continue;
+    }
+
+    const auto& lhs_block = lhs.getBlockByIndex(idx);
+    const auto& rhs_block = rhs.getBlockByIndex(idx);
+
+    for (size_t i = 0; i < lhs_block.num_voxels(); ++i) {
+      const auto& lvoxel = lhs_block.getVoxelByLinearIndex(i);
+      const auto& rvoxel = rhs_block.getVoxelByLinearIndex(i);
+
+      if (!lvoxel.observed || !rvoxel.observed) {
+        continue;
+      }
+
+      const double error = std::abs(lvoxel.distance - rvoxel.distance);
+      if (error <= threshold) {
+        continue;
+      }
+
+      double ratio = computeRatio(0, 10, error);
+      NodeColor color = dsg_utils::interpolateColorMap(colors, ratio);
+
+      Eigen::Vector3d voxel_pos =
+          lhs_block.computeCoordinatesFromLinearIndex(i).cast<double>();
+      geometry_msgs::Point marker_pos;
+      tf2::convert(voxel_pos, marker_pos);
+      marker.points.push_back(marker_pos);
+
+      std_msgs::ColorRGBA color_msg = dsg_utils::makeColorMsg(color, config.gvd_alpha);
+      marker.colors.push_back(color_msg);
+    }
+  }
+
+  return marker;
+}
+
+
+Marker makeSurfaceVoxelMarker(const GvdVisualizerConfig& config,
+                              const ColormapConfig& colors,
+                              const Layer<GvdVoxel>& layer) {
+  BlockIndexList blocks;
+  layer.getAllAllocatedBlocks(&blocks);
+
+  Marker marker;
+  marker.type = Marker::CUBE_LIST;
+  marker.action = Marker::ADD;
+  marker.id = 0;
+  marker.ns = "surface_markers";
+
+  Eigen::Vector3d identity_pos = Eigen::Vector3d::Zero();
+  tf2::convert(identity_pos, marker.pose.position);
+  tf2::convert(Eigen::Quaterniond::Identity(), marker.pose.orientation);
+
+  marker.scale.x = layer.voxel_size();
+  marker.scale.y = layer.voxel_size();
+  marker.scale.z = layer.voxel_size();
+
+  for (const auto& idx : blocks) {
+    const auto& block = layer.getBlockByIndex(idx);
+    for (size_t i = 0; i < block.num_voxels(); ++i) {
+      const auto& voxel = block.getVoxelByLinearIndex(i);
+      if (!voxel.on_surface) {
+        continue;
+      }
+
+      Eigen::Vector3d voxel_pos =
+          block.computeCoordinatesFromLinearIndex(i).cast<double>();
+      geometry_msgs::Point marker_pos;
+      tf2::convert(voxel_pos, marker_pos);
+      marker.points.push_back(marker_pos);
+
+      double ratio = computeRatio(-0.4, 0.4, voxel.distance);
       NodeColor color = dsg_utils::interpolateColorMap(colors, ratio);
 
       std_msgs::ColorRGBA color_msg = dsg_utils::makeColorMsg(color, config.gvd_alpha);

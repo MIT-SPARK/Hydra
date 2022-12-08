@@ -40,11 +40,26 @@
 #include <hydra_topology/GvdVisualizerConfig.h>
 #include <hydra_utils/visualizer_types.h>
 #include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 
 namespace hydra {
 namespace topology {
 
 using hydra_topology::GvdVisualizerConfig;
+
+class MarkerGroupPub {
+ public:
+  explicit MarkerGroupPub(const ros::NodeHandle& nh);
+
+  void publish(const std::string& name, const visualization_msgs::Marker& marker) const;
+
+  void publish(const std::string& name,
+               const visualization_msgs::MarkerArray& marker) const;
+
+ private:
+  mutable ros::NodeHandle nh_;
+  mutable std::map<std::string, ros::Publisher> pubs_;
+};
 
 enum class GvdVisualizationMode : int {
   DEFAULT = hydra_topology::GvdVisualizer_DEFAULT,
@@ -52,17 +67,21 @@ enum class GvdVisualizationMode : int {
   BASIS_POINTS = hydra_topology::GvdVisualizer_BASIS_POINTS,
 };
 
-enum class VisualizationType : int {
-  NONE = hydra_topology::GvdVisualizer_NONE,
-  ESDF_WITH_SLICE = hydra_topology::GvdVisualizer_ESDF_SLICE,
-  GVD = hydra_topology::GvdVisualizer_GVD,
-};
-
 GvdVisualizationMode getModeFromString(const std::string& mode);
 
 visualization_msgs::Marker makeGvdMarker(const GvdVisualizerConfig& config,
                                          const ColormapConfig& colors,
                                          const Layer<GvdVoxel>& layer);
+
+visualization_msgs::Marker makeSurfaceVoxelMarker(const GvdVisualizerConfig& config,
+                                                  const ColormapConfig& colors,
+                                                  const Layer<GvdVoxel>& layer);
+
+visualization_msgs::Marker makeErrorMarker(const GvdVisualizerConfig& config,
+                                           const ColormapConfig& colors,
+                                           const Layer<GvdVoxel>& lhs,
+                                           const Layer<GvdVoxel>& rhs,
+                                           double threshold);
 
 visualization_msgs::Marker makeEsdfMarker(const GvdVisualizerConfig& config,
                                           const ColormapConfig& colors,

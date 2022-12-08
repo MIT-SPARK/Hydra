@@ -208,6 +208,8 @@ void VoxelAwareMeshIntegrator::extractMeshInsideBlock(const TsdfBlock& block,
   DCHECK(next_mesh_index != nullptr);
   DCHECK(mesh != nullptr);
 
+  VLOG(15) << "[mesh] processing interior voxel: " << index.transpose();
+
   const BlockIndex block_index = block.block_index();
   GvdBlock::Ptr gvd_block = gvd_layer_->getBlockPtrByIndex(block_index);
   DCHECK(gvd_block != nullptr);
@@ -249,6 +251,8 @@ void VoxelAwareMeshIntegrator::extractMeshOnBorder(const TsdfBlock& block,
                                                    Mesh* mesh) {
   DCHECK(next_mesh_index != nullptr);
   DCHECK(mesh != nullptr);
+
+  VLOG(15) << "[mesh] processing exterior voxel: " << index.transpose();
 
   const BlockIndex block_index = block.block_index();
   GvdBlock::Ptr gvd_block = gvd_layer_->getBlockPtrByIndex(block_index);

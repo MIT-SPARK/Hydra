@@ -137,7 +137,6 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
     }
   }
 
-  VLOG(1) << "Result: " << result;
   GvdResult expected(4, 8);
   // clang-format off
   expected.distances << 0.00, 1.00, 2.00, 2.00, 2.24, 2.83, 3.61, 4.42,
@@ -148,6 +147,9 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
   expected.is_voronoi = Eigen::MatrixXd::Zero(4, 8);
   expected.is_voronoi(0, 2) = 1.0;
   expected.is_voronoi(1, 2) = 1.0;
+
+  VLOG(1) << "Result: " << result;
+  VLOG(1) << "Expected: " << expected;
 
   for (int r = 0; r < expected.is_voronoi.rows(); ++r) {
     for (int c = 0; c < expected.is_voronoi.cols(); ++c) {
@@ -198,6 +200,7 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
   }
 
   VLOG(1) << "Result: " << result;
+  VLOG(1) << "Expected: " << expected;
 }
 
 TEST_F(TestFixture2d, NegativeIntegrationCorrect) {
@@ -283,7 +286,7 @@ TEST_F(SingleBlockTestFixture, PlaneCorrect) {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {
         const bool is_edge = (x == 0);
-        setTsdfVoxel(x, y, z, is_edge ? 0.0 : truncation_distance);
+        setTsdfVoxel(x, y, z, is_edge ? -0.05 : truncation_distance);
       }
     }
   }
@@ -295,7 +298,9 @@ TEST_F(SingleBlockTestFixture, PlaneCorrect) {
       for (int z = 0; z < voxels_per_side; ++z) {
         const auto& voxel = getGvdVoxel(x, y, z);
 
-        double expected_distance = x * truncation_distance;
+        // TODO(nathan) this might change if we incorporate the tsdf distance for parent
+        // voxels into the calculation, though this is tricky
+        double expected_distance = x == 0 ? -0.05 : x * voxel_size;
 
         EXPECT_NEAR(expected_distance, voxel.distance, 1.0e-6);
         EXPECT_TRUE(voxel.on_surface || voxel.has_parent);
@@ -312,7 +317,7 @@ TEST_F(SingleBlockTestFixture, LCorrect) {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {
         const bool is_edge = (x == 0) || (y == 0);
-        setTsdfVoxel(x, y, z, is_edge ? 0.0 : truncation_distance);
+        setTsdfVoxel(x, y, z, is_edge ? -0.05 : truncation_distance);
       }
     }
   }
@@ -324,7 +329,8 @@ TEST_F(SingleBlockTestFixture, LCorrect) {
       for (int z = 0; z < voxels_per_side; ++z) {
         const auto& voxel = getGvdVoxel(x, y, z);
 
-        double expected_distance = std::min(x, y) * truncation_distance;
+        const bool is_edge = (x == 0) || (y == 0);
+        double expected_distance = is_edge ? -0.05 : std::min(x, y) * voxel_size;
 
         EXPECT_NEAR(expected_distance, voxel.distance, 1.0e-6);
         EXPECT_TRUE(!isVoronoi(voxel) || !voxel.fixed);
@@ -344,7 +350,7 @@ TEST_F(LargeSingleBlockTestFixture, LCorrect) {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {
         const bool is_edge = (x == 0) || (y == 0);
-        setTsdfVoxel(x, y, z, is_edge ? 0.0 : truncation_distance);
+        setTsdfVoxel(x, y, z, is_edge ? -0.05 : truncation_distance);
       }
     }
   }
@@ -356,7 +362,8 @@ TEST_F(LargeSingleBlockTestFixture, LCorrect) {
       for (int z = 0; z < voxels_per_side; ++z) {
         const auto& voxel = getGvdVoxel(x, y, z);
 
-        double expected_distance = std::min(x, y) * truncation_distance;
+        const bool is_edge = (x == 0) || (y == 0);
+        double expected_distance = is_edge ? -0.05 : std::min(x, y) * voxel_size;
 
         EXPECT_NEAR(expected_distance, voxel.distance, 1.0e-6);
         EXPECT_TRUE(!isVoronoi(voxel) || !voxel.fixed);
@@ -379,7 +386,9 @@ TEST_F(SingleBlockTestFixture, CornerCorrect) {
       for (int z = 0; z < voxels_per_side; ++z) {
         const auto& voxel = getGvdVoxel(x, y, z);
 
-        double expected_distance = std::min(x, std::min(y, z)) * truncation_distance;
+        const bool is_edge = (x == 0) || (y == 0) || (z == 0);
+        double expected_distance =
+            is_edge ? -0.05 : std::min(x, std::min(y, z)) * voxel_size;
 
         EXPECT_NEAR(expected_distance, voxel.distance, 1.0e-6);
         EXPECT_TRUE(!isVoronoi(voxel) || !voxel.fixed);
@@ -459,6 +468,51 @@ TEST_F(ParentTestFixture, ParentsCorrect) {
 TEST(TestVoxelSize, DISABLED_ShowVoxelSize) {
   LOG(INFO) << "GVD voxel size: " << sizeof(GvdVoxel) << " bytes";
   SUCCEED();
+}
+
+TEST_F(SingleBlockTestFixture, RaiseCorrectForSurface) {
+  gvd_config.min_diff_m = 0.03;
+  GvdIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
+  for (int x = 0; x < voxels_per_side; ++x) {
+    for (int y = 0; y < voxels_per_side; ++y) {
+      for (int z = 0; z < voxels_per_side; ++z) {
+        const bool is_edge = x == 0;
+        setTsdfVoxel(x, y, z, is_edge ? -0.05 : truncation_distance);
+      }
+    }
+  }
+
+  gvd_integrator.updateFromTsdfLayer(0, true);
+
+  // trigger a lower wavefront
+  setTsdfVoxel(0, 2, 0, -0.01);
+  // flip value to be raised
+  setTsdfVoxel(0, 2, 2, -0.09);
+
+  gvd_integrator.updateFromTsdfLayer(0, true, true, true);
+
+  {  // temporary scope
+    const auto& voxel = getGvdVoxel(0, 2, 2);
+    EXPECT_TRUE(voxel.on_surface);
+  }
+
+  for (int x = 0; x < voxels_per_side; ++x) {
+    for (int y = 0; y < voxels_per_side; ++y) {
+      for (int z = 0; z < voxels_per_side; ++z) {
+        const auto& voxel = getGvdVoxel(x, y, z);
+        const auto& tvoxel = getTsdfVoxel(x, y, z);
+
+        const bool is_edge = x == 0;
+        double expected_distance = is_edge ? tvoxel.distance : x * voxel_size;
+
+        EXPECT_NEAR(expected_distance, voxel.distance, 1.0e-6)
+            << " @ [" << x << ", " << y << ", " << z << "]";
+        EXPECT_TRUE(!isVoronoi(voxel) || !voxel.fixed);
+        EXPECT_TRUE(voxel.on_surface || voxel.has_parent);
+        EXPECT_FALSE(isVoronoi(voxel));
+      }
+    }
+  }
 }
 
 }  // namespace topology
