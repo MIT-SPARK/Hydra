@@ -65,6 +65,8 @@ class DsgLcd {
 
   bool spinOnce(bool force_update);
 
+  lcd::DsgLcdDetector& getDetector() const;
+
  protected:
   void spinOnceImpl(bool force_update);
 

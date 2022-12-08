@@ -50,7 +50,6 @@ RosFrontend::RosFrontend(const ros::NodeHandle& nh,
 
   pose_graph_sub_ = nh_.subscribe(
       "pose_graph_incremental", 100, &RosFrontend::poseGraphCallback, this);
-  bow_sub_ = nh_.subscribe("bow_vectors", 100, &RosFrontend::bowCallback, this);
 
   mesh_sub_.reset(new Subscriber<ActiveMesh>(nh_, "voxblox_mesh", 5));
   places_sub_.reset(new Subscriber<ActiveLayer>(nh_, "active_places", 5));
@@ -133,10 +132,6 @@ void RosFrontend::inputCallback(const ActiveLayer::ConstPtr& places,
 
 void RosFrontend::poseGraphCallback(const PoseGraph::ConstPtr& pose_graph) {
   pose_graph_queue_.push_back(pose_graph);
-}
-
-void RosFrontend::bowCallback(const BowQuery::ConstPtr& msg) {
-  state_->visual_lcd_queue.push(msg);
 }
 
 void RosFrontend::publishActiveVertices(const MeshVertexCloud& vertices,

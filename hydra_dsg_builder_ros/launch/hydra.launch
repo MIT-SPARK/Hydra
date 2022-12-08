@@ -15,40 +15,34 @@
     <arg name="exit_mode" default="NORMAL"/>
     <arg name="start_visualizer" default="true"/>
     <arg name="start_logger" default="true"/>
+    <arg name="optimize_on_lc" default="true"/>
+    <arg name="enable_merge_undos" default="false"/>
+    <arg name="visualize_reconstruction" default="false"/>
+    <arg name="enable_frontend_output" default="true"/>
+    <arg name="enable_lcd_viz" default="false"/>
+    <arg name="do_reconstruction" default="true"/>
+    <arg name="use_ros_backend" default="false"/>
+    <arg name="validate_vertices" default="false"/>
+
     <arg name="use_zmq_interface" default="false"/>
     <arg name="zmq_send_url" default="tcp://127.0.0.1:8001"/>
     <arg name="zmq_recv_url" default="tcp://127.0.0.1:8002"/>
 
     <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
     <arg name="typology_path" default="$(arg typology_dir)/$(arg typology_config)"/>
+    <arg name="reconstruction_config" if="$(arg do_reconstruction)"/>
+    <arg name="extrinsics" if="$(arg do_reconstruction)"/>
+    <arg name="pointcloud_topic" if="$(arg do_reconstruction)"/>
+    <arg name="graph_viz_config_dir" default="$(find hydra_topology)/config"/>
+    <arg name="graph_viz_config" default="graph_visualization_config.yaml"/>
+    <arg name="graph_viz_config_file" value="$(arg graph_viz_config_dir)/$(arg graph_viz_config)"/>
 
-    <arg name="optimize_on_lc" default="true"/>
-    <arg name="enable_merge_undos" default="false"/>
-    <arg name="visualize_reconstruction" default="false"/>
     <arg name="lcd_use_bow_vectors" default="true"/>
     <arg name="enable_dsg_lcd" default="false"/>
     <arg name="use_gnn_descriptors" default="false"/>
     <arg name="lcd_gnn_object_model" default="$(find hydra_dsg_builder)/models/lcd/objects_gnn.onnx"/>
     <arg name="lcd_gnn_places_model" default="$(find hydra_dsg_builder)/models/lcd/places_gnn.onnx"/>
     <arg name="lcd_gnn_label_embeddings" if="$(arg use_gnn_descriptors)"/>
-
-    <arg name="visualize_reconstruction" default="true"/>
-    <arg name="enable_lcd_viz" default="false"/>
-
-    <arg name="dsg_should_log" default="true" />
-    <arg name="pgmo_should_log" default="true"/>
-    <arg name="log_registration" default="false"/>
-
-    <arg name="do_reconstruction" default="true"/>
-    <arg name="reconstruction_config" if="$(arg do_reconstruction)"/>
-    <arg name="extrinsics" if="$(arg do_reconstruction)"/>
-    <arg name="pointcloud_topic" if="$(arg do_reconstruction)"/>
-    <arg name="use_ros_backend" default="false"/>
-    <arg name="validate_vertices" default="false"/>
-
-    <arg name="graph_viz_config_dir" default="$(find hydra_topology)/config"/>
-    <arg name="graph_viz_config" default="graph_visualization_config.yaml"/>
-    <arg name="graph_viz_config_file" value="$(arg graph_viz_config_dir)/$(arg graph_viz_config)"/>
 
     <arg name="debug" default="false"/>
     <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
@@ -61,6 +55,9 @@
     <arg name="glog_file_args" value="--logtostderr=0 --log_dir=$(arg glog_dir)" if="$(arg glog_to_file)"/>
     <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
 
+    <arg name="dsg_should_log" default="true" />
+    <arg name="pgmo_should_log" default="true"/>
+    <arg name="log_registration" default="false"/>
     <arg name="log_timing_incrementally" default="false"/>
     <arg name="show_topology_stats" default="false"/>
     <arg name="dsg_path" default="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
@@ -92,7 +89,9 @@
         <param name="use_pose_graph" value="$(eval not arg('use_gt_frame'))"/>
         <param name="do_reconstruction" value="$(arg do_reconstruction)"/>
         <param name="min_mesh_separation_s" value="0.5"/>
+        <param name="frontend_mesh_separation_s" value="0.5"/>
         <param name="enable_reconstruction_output_queue" value="true"/>
+        <param name="enable_frontend_output" value="$(arg enable_frontend_output)"/>
         <param name="use_ros_backend" value="$(arg use_ros_backend)"/>
         <param name="dsg/use_mesh_subscribers" value="$(arg use_ros_backend)"/>
         <param name="exit_mode" value="$(arg exit_mode)"/>

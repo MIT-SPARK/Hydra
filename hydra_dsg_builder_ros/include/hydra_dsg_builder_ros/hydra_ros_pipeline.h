@@ -32,39 +32,52 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_dsg_builder_ros/hydra_ros_pipeline.h"
-#include "hydra_dsg_builder_ros/node_utilities.h"
+#pragma once
+#include "hydra_dsg_builder_ros/ros_backend.h"
+#include "hydra_dsg_builder_ros/ros_frontend.h"
 
-#include <hydra_utils/ros_utilities.h>
-#include <hydra_utils/timing_utilities.h>
+#include <hydra_dsg_builder/incremental_dsg_lcd.h>
+#include <hydra_topology/ros_reconstruction.h>
 
-using hydra::timing::ElapsedTimeRecorder;
+namespace hydra {
 
-int main(int argc, char* argv[]) {
-  ros::init(argc, argv, "incremental_dsg_builder_node");
+struct HydraRosConfig {
+  bool enable_lcd = false;
+  bool use_ros_backend = false;
+  bool do_reconstruction = true;
+  bool enable_frontend_output = true;
+  double frontend_mesh_separation_s = 0.0;
+};
 
-  FLAGS_minloglevel = 3;
-  FLAGS_logtostderr = 1;
-  FLAGS_colorlogtostderr = 1;
+struct HydraRosPipeline {
+  explicit HydraRosPipeline(const ros::NodeHandle& nh, int robot_id = 0);
 
-  google::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
-  google::InstallFailureSignalHandler();
+  void start();
 
-  ros::NodeHandle nh("~");
-  const auto dsg_output_path = hydra::configureTimers(nh);
+  void stop();
 
-  int robot_id = 0;
-  nh.getParam("robot_id", robot_id);
+  void save(const std::string& output_path);
 
-  hydra::HydraRosPipeline hydra(nh, robot_id);
-  hydra.start();
+  void bowCallback(const pose_graph_tools::BowQuery::ConstPtr& msg);
 
-  hydra::spinAndWait(nh);
+  void sendFrontendGraph(const DynamicSceneGraph& graph, uint64_t timestamp_ns);
 
-  hydra.stop();
-  hydra.save(dsg_output_path);
+  ros::NodeHandle nh;
 
-  hydra::saveTimingInformation(dsg_output_path);
-  return 0;
-}
+  HydraRosConfig config;
+  RobotPrefixConfig prefix;
+  SharedDsgInfo::Ptr frontend_dsg;
+  SharedDsgInfo::Ptr backend_dsg;
+  SharedModuleState::Ptr shared_state;
+
+  std::shared_ptr<ReconstructionModule> reconstruction;
+  std::shared_ptr<DsgFrontend> frontend;
+  std::shared_ptr<DsgBackend> backend;
+  std::shared_ptr<RosBackendVisualizer> backend_visualizer;
+  std::shared_ptr<incremental::DsgLcd> lcd;
+
+  std::unique_ptr<DsgSender> dsg_sender;
+  ros::Subscriber bow_sub;
+};
+
+}  // namespace hydra

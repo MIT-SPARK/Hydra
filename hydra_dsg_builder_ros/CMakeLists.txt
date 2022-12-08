@@ -36,6 +36,7 @@ catkin_package(
 
 add_library(
   ${PROJECT_NAME}
+  src/hydra_ros_pipeline.cpp
   src/lcd_visualizer.cpp
   src/node_utilities.cpp
   src/ros_backend.cpp

@@ -1,3 +1,4 @@
+---
 # general options
 layer_z_step: 4.5  # unit separation between layers
 # ratio of where the split from a single edge to the multiple edges to the mesh occurs.
@@ -16,9 +17,9 @@ places_colormap_min_distance: 0.0
 places_colormap_max_distance: 3.0
 
 places_colormap:
-    min_hue: 0.0
-    max_hue: 0.5
-    min_saturation: 0.9
-    max_saturation: 0.8
-    min_luminance: 0.6
-    max_luminance: 0.85
+  min_hue: 0.0
+  max_hue: 0.5
+  min_saturation: 0.9
+  max_saturation: 0.8
+  min_luminance: 0.6
+  max_luminance: 0.85

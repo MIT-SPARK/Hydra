@@ -53,7 +53,6 @@ using incremental::DsgFrontend;
 using incremental::MeshSegmenter;
 using incremental::SharedDsgInfo;
 using incremental::SharedModuleState;
-using pose_graph_tools::BowQuery;
 using pose_graph_tools::PoseGraph;
 
 using ObjectCloudPub = SemanticRosPublishers<uint8_t, MeshSegmenter::MeshVertexCloud>;
@@ -96,8 +95,6 @@ struct RosFrontend : public DsgFrontend {
 
   void poseGraphCallback(const PoseGraph::ConstPtr& pose_graph);
 
-  void bowCallback(const BowQuery::ConstPtr& msg);
-
   void publishActiveVertices(const MeshSegmenter::MeshVertexCloud& vertices,
                              const MeshSegmenter::IndicesVector& indices,
                              const MeshSegmenter::LabelIndices&) const;
@@ -119,7 +116,6 @@ struct RosFrontend : public DsgFrontend {
   std::unique_ptr<message_filters::Subscriber<ActiveMesh>> mesh_sub_;
   std::unique_ptr<Sync> sync_;
 
-  ros::Subscriber bow_sub_;
   ros::Subscriber pose_graph_sub_;
 
   tf2_ros::Buffer buffer_;

@@ -1,29 +1,30 @@
+---
 dynamic_semantic_labels: [20]
 objects:
-    labels: [5, 6, 7, 10, 12, 13, 18]
+  labels: [5, 6, 7, 10, 12, 13, 18]
 structure_labels: [0, 3, 4, 9, 11, 14, 19]
 stuff_labels: [0, 1, 2, 3, 4, 8, 9, 11, 14, 15, 16, 17, 19]
 walls_labels: [12, 19]
 floor_labels: [1, 2, 7]
 label_names:
-    - {label: 0, name: unknown}
-    - {label: 1, name: air_vent}
-    - {label: 2, name: books}
-    - {label: 3, name: floor}
-    - {label: 4, name: ceiling_light}
-    - {label: 5, name: chair}
-    - {label: 6, name: bench}
-    - {label: 7, name: couch}
-    - {label: 8, name: stairs}
-    - {label: 9, name: cabinet}
-    - {label: 10, name: fan_papers_keyboard_laptop_mouse}
-    - {label: 11, name: lamp}
-    - {label: 12, name: painting}
-    - {label: 13, name: plant}
-    - {label: 14, name: sign}
-    - {label: 15, name: stairs}
-    - {label: 16, name: desk}
-    - {label: 17, name: cubicle}
-    - {label: 18, name: trashcan}
-    - {label: 19, name: wall}
-    - {label: 20, name: human}
+  - {label: 0, name: unknown}
+  - {label: 1, name: air_vent}
+  - {label: 2, name: books}
+  - {label: 3, name: floor}
+  - {label: 4, name: ceiling_light}
+  - {label: 5, name: chair}
+  - {label: 6, name: bench}
+  - {label: 7, name: couch}
+  - {label: 8, name: stairs}
+  - {label: 9, name: cabinet}
+  - {label: 10, name: fan_papers_keyboard_laptop_mouse}
+  - {label: 11, name: lamp}
+  - {label: 12, name: painting}
+  - {label: 13, name: plant}
+  - {label: 14, name: sign}
+  - {label: 15, name: stairs}
+  - {label: 16, name: desk}
+  - {label: 17, name: cubicle}
+  - {label: 18, name: trashcan}
+  - {label: 19, name: wall}
+  - {label: 20, name: human}
