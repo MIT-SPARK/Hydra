@@ -261,12 +261,21 @@ LayerSearchResults searchLeafDescriptors(const Descriptor& descriptor,
   std::vector<std::set<NodeId>> match_nodes;
   std::vector<NodeId> matches;
   std::vector<float> match_scores;
+
+  size_t match_index = 0;
   for (const auto& id_id_score : new_valid_match_scores) {
-    if (id_id_score.second > best_score * match_config.min_score_ratio) {
-      match_nodes.push_back({id_id_score.first.first});
-      matches.push_back(id_id_score.first.second);
-      match_scores.push_back(id_id_score.second);
+    bool passes_ratio = match_index == 0 ||
+                        id_id_score.second >= best_score * match_config.min_score_ratio;
+    ++match_index;
+
+    if (!passes_ratio) {
+      continue;
     }
+
+    match_nodes.push_back({id_id_score.first.first});
+    matches.push_back(id_id_score.first.second);
+    match_scores.push_back(id_id_score.second);
+
     if (matches.size() == match_config.max_registration_matches) {
       break;
     }
