@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder/dsg_lcd_detector.h"
 
+#include <glog/logging.h>
 #include <hydra_utils/timing_utilities.h>
 
 namespace hydra {
@@ -289,9 +290,14 @@ std::vector<DsgRegistrationSolution> DsgLcdDetector::detect(
   VLOG(2) << "LCD results for node " << NodeSymbol(agent_id).getLabel() << " against "
           << numDescriptors() / 2 << " roots";
   for (const auto& id_match_pair : matches_) {
+    const auto& scores = id_match_pair.second.score;
+    const auto best_score = std::max_element(scores.begin(), scores.end());
     VLOG(2) << " - index " << id_match_pair.first << ": "
             << id_match_pair.second.valid_matches.size() << " valid matches, "
-            << id_match_pair.second.match_root.size() << " registration matches";
+            << id_match_pair.second.match_root.size()
+            << " registration matches (best score "
+            << (best_score != scores.end() ? std::to_string(*best_score) : "n/a") << ")";
+
     for (size_t i = 0; i < id_match_pair.second.match_root.size(); ++i) {
       VLOG(2) << "   - #" << i
               << ": query=" << NodeSymbol(id_match_pair.second.query_root).getLabel()
