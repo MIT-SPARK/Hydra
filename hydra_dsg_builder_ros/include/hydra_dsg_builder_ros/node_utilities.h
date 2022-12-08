@@ -33,9 +33,9 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <hydra_utils/dsg_types.h>
 #include <ros/ros.h>
 #include <ros/topic_manager.h>
-#include <hydra_utils/dsg_types.h>
 #include <std_srvs/Empty.h>
 
 namespace hydra {
@@ -62,5 +62,11 @@ ExitMode getExitMode(const ros::NodeHandle& nh);
 void spinWhileClockPresent();
 
 void spinUntilExitRequested();
+
+std::string configureTimers(const ros::NodeHandle& nh);
+
+void saveTimingInformation(const std::string& output_path);
+
+void spinAndWait(const ros::NodeHandle& nh);
 
 }  // namespace hydra

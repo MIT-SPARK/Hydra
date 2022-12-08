@@ -1,6 +1,7 @@
+---
 dynamic_semantic_labels: []
 objects:
-    labels: [7, 8, 10, 13, 14, 16, 18, 19, 20]
+  labels: [7, 8, 10, 13, 14, 16, 18, 19, 20]
 structure_labels: [4, 5, 6, 9, 12, 15, 17]
 walls_labels: [1, 11]
 floor_labels: [2, 3]

@@ -15,7 +15,6 @@ gvd:
   num_buckets: 20
   multi_queue: false
   extract_graph: true
-  mesh_only: false
   voronoi_config:
     mode: L1_THEN_ANGLE
     min_distance_m: 0.40
