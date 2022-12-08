@@ -42,6 +42,7 @@ add_library(
   src/ros_frontend.cpp
   src/ros_lcd_registration.cpp
   src/visualizer_plugins.cpp
+  src/hydra_ros_pipeline.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
 target_link_libraries(

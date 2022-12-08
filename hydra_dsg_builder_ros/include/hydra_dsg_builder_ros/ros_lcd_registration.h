@@ -36,17 +36,15 @@
 #include <hydra_dsg_builder/dsg_lcd_registration.h>
 
 namespace hydra {
-namespace lcd {
 
-struct DsgAgentSolver : DsgRegistrationSolver {
+struct DsgAgentSolver : lcd::DsgRegistrationSolver {
   DsgAgentSolver() = default;
 
   virtual ~DsgAgentSolver() = default;
 
-  DsgRegistrationSolution solve(const DynamicSceneGraph& dsg,
-                                const DsgRegistrationInput& match,
-                                NodeId query_agent_id) const override;
+  lcd::DsgRegistrationSolution solve(const DynamicSceneGraph& dsg,
+                                     const lcd::DsgRegistrationInput& match,
+                                     NodeId query_agent_id) const override;
 };
 
-}  // namespace lcd
 }  // namespace hydra

@@ -41,9 +41,10 @@
 #include <tf2_eigen/tf2_eigen.h>
 
 namespace hydra {
-namespace lcd {
 
 using hydra::timing::ScopedTimer;
+using lcd::DsgRegistrationInput;
+using lcd::DsgRegistrationSolution;
 
 inline size_t getRobotIdFromNode(const DynamicSceneGraph& graph, NodeId node_id) {
   const auto& attrs =
@@ -116,5 +117,4 @@ DsgRegistrationSolution DsgAgentSolver::solve(const DynamicSceneGraph& dsg,
           -1};
 }
 
-}  // namespace lcd
 }  // namespace hydra

@@ -123,6 +123,10 @@ bool DsgLcd::spinOnce(bool force_update) {
   return true;
 }
 
+lcd::DsgLcdDetector& DsgLcd::getDetector() const {
+  return *lcd_detector_;
+}
+
 void DsgLcd::spinOnceImpl(bool force_update) {
   const size_t timestamp_ns = processFrontendOutput();
 

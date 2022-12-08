@@ -34,7 +34,12 @@
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder_ros/node_utilities.h"
 
+#include <hydra_utils/timing_utilities.h>
+#include <glog/logging.h>
+
 namespace hydra {
+
+using timing::ElapsedTimeRecorder;
 
 ExitMode getExitMode(const ros::NodeHandle& nh) {
   std::string exit_mode_str = "NORMAL";
@@ -87,6 +92,50 @@ void spinUntilExitRequested() {
 
   ros::spinOnce();  // make sure all the callbacks are processed
   ROS_WARN("Exiting!");
+}
+
+std::string configureTimers(const ros::NodeHandle& nh) {
+  std::string dsg_output_path = "";
+  nh.getParam("log_path", dsg_output_path);
+
+  nh.getParam("timing_disabled", ElapsedTimeRecorder::instance().timing_disabled);
+  nh.getParam("disable_timer_output", ElapsedTimeRecorder::instance().disable_output);
+
+  bool log_timing_incrementally = false;
+  nh.getParam("log_timing_incrementally", log_timing_incrementally);
+  if (log_timing_incrementally && dsg_output_path != "") {
+    ElapsedTimeRecorder::instance().setupIncrementalLogging(dsg_output_path);
+  }
+
+  return dsg_output_path;
+}
+
+void spinAndWait(const ros::NodeHandle& nh) {
+  const auto exit_mode = getExitMode(nh);
+  switch (exit_mode) {
+    case ExitMode::CLOCK:
+      spinWhileClockPresent();
+      break;
+    case ExitMode::SERVICE:
+      spinUntilExitRequested();
+      break;
+    case ExitMode::NORMAL:
+    default:
+      ros::spin();
+      break;
+  }
+}
+
+void saveTimingInformation(const std::string& dsg_output_path) {
+  if (dsg_output_path.empty()) {
+    return;
+  }
+
+  LOG(INFO) << "[DSG Node] saving timing information to " << dsg_output_path;
+  const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
+  timer.logAllElapsed(dsg_output_path);
+  timer.logStats(dsg_output_path);
+  LOG(INFO) << "[DSG Node] Saved timing information to " << dsg_output_path;
 }
 
 }  // namespace hydra
