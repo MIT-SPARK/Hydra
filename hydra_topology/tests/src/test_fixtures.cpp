@@ -149,6 +149,17 @@ const GvdVoxel& SingleBlockTestFixture::getGvdVoxel(int x, int y, int z) {
   return gvd_block->getVoxelByVoxelIndex(v_index);
 }
 
+const TsdfVoxel& SingleBlockTestFixture::getTsdfVoxel(int x, int y, int z) {
+  CHECK_LT(x, voxels_per_side);
+  CHECK_LT(y, voxels_per_side);
+  CHECK_LT(z, voxels_per_side);
+
+  VoxelIndex v_index;
+  v_index << x, y, z;
+
+  return tsdf_block->getVoxelByVoxelIndex(v_index);
+}
+
 void SingleBlockTestFixture::SetUp() {
   gvd_config.min_distance_m = truncation_distance;
   gvd_config.max_distance_m = 10.0;
@@ -166,7 +177,7 @@ void SingleBlockTestFixture::SetUp() {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {
         const bool is_edge = (x == 0) || (y == 0) || (z == 0);
-        setTsdfVoxel(x, y, z, is_edge ? 0.0 : truncation_distance);
+        setTsdfVoxel(x, y, z, is_edge ? -0.05 : truncation_distance);
       }
     }
   }

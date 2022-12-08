@@ -88,6 +88,14 @@ Visualization Manager:
       Value: true
     - Class: rviz/MarkerArray
       Enabled: true
+      Marker Topic: /hydra_topology_node/gvd_viz
+      Name: GVD
+      Namespaces:
+        gvd_visualizer: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
       Marker Topic: /hydra_topology_node/graph_viz
       Name: Places
       Namespaces:
@@ -99,22 +107,6 @@ Visualization Manager:
       Enabled: false
       Marker Topic: /hydra_topology_node/graph_label_viz
       Name: Places (Labels)
-      Namespaces:
-        {}
-      Queue Size: 100
-      Value: false
-    - Class: rviz/Marker
-      Enabled: true
-      Marker Topic: /hydra_topology_node/gvd_viz
-      Name: GVD
-      Namespaces:
-        gvd_visualizer: true
-      Queue Size: 100
-      Value: true
-    - Class: rviz/Marker
-      Enabled: false
-      Marker Topic: /hydra_topology_node/gvd_edge_viz
-      Name: GVD (Edges Debugging)
       Namespaces:
         {}
       Queue Size: 100
@@ -152,14 +144,6 @@ Visualization Manager:
       Name: Mesh
       Topic: /hydra_topology_node/mesh_viz
       Unreliable: false
-      Value: true
-    - Class: rviz/Marker
-      Enabled: true
-      Marker Topic: /hydra_topology_node/voxel_block_viz
-      Name: Active Window Bounds
-      Namespaces:
-        topology_server_blocks: true
-      Queue Size: 100
       Value: true
     - Class: rviz/Image
       Enabled: true
@@ -225,25 +209,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 35.615909576416016
+      Distance: 32.47098159790039
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -8.093053817749023
-        Y: 23.87651252746582
-        Z: 2.537261724472046
+        X: -3.6097676753997803
+        Y: 23.651647567749023
+        Z: -0.2755281925201416
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7053980231285095
+      Pitch: 0.7203983068466187
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 1.0353977680206299
+      Yaw: 2.838507890701294
     Saved: ~
 Window Geometry:
   Depth:

@@ -21,6 +21,7 @@ find_package(
              voxblox_ros
 )
 find_package(Boost REQUIRED COMPONENTS filesystem)
+find_package(yaml-cpp REQUIRED)
 
 generate_dynamic_reconfigure_options(cfg/GvdVisualizer.cfg)
 
@@ -69,12 +70,14 @@ add_library(
   src/graph_extractor_types.cpp
   src/graph_extraction_utilities.cpp
   src/gvd_integrator.cpp
+  src/gvd_parent_tracker.cpp
   src/gvd_utilities.cpp
   src/gvd_visualization_utilities.cpp
   src/gvd_voxel.cpp
   src/nearest_neighbor_utilities.cpp
   src/topology_module.cpp
   src/topology_server_visualizer.cpp
+  src/update_statistics.cpp
   src/voxel_aware_marching_cubes.cpp
   src/voxel_aware_mesh_integrator.cpp
 )
@@ -90,6 +93,9 @@ target_link_libraries(${PROJECT_NAME}_node PUBLIC ${PROJECT_NAME} Boost::boost)
 add_dependencies(
   ${PROJECT_NAME}_node ${catkin_EXPORTED_TARGETS} ${${PROJECT_NAME}_EXPORTED_TARGETS}
 )
+
+add_executable(gvd_validator src/gvd_validator.cpp)
+target_link_libraries(gvd_validator PUBLIC ${PROJECT_NAME} yaml-cpp)
 
 if(CATKIN_ENABLE_TESTING)
   catkin_add_gtest(
