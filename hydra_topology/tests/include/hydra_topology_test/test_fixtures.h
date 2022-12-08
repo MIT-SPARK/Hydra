@@ -91,6 +91,8 @@ class SingleBlockTestFixture : public ::testing::Test {
 
   void setTsdfVoxel(int x, int y, int z, float distance, float weight = 0.1f);
 
+  const TsdfVoxel& getTsdfVoxel(int x, int y, int z);
+
   const GvdVoxel& getGvdVoxel(int x, int y, int z);
 
   float voxel_size = 0.1f;

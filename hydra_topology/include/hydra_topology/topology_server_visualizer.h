@@ -82,6 +82,8 @@ class TopologyServerVisualizer {
                  const Layer<GvdVoxel>& gvd,
                  const Layer<TsdfVoxel>& tsdf);
 
+  void visualizeError(const Layer<GvdVoxel>& lhs, const Layer<GvdVoxel>& rhs, double threshold);
+
  private:
   void visualizeGraph(const SceneGraphLayer& graph);
 
@@ -112,12 +114,7 @@ class TopologyServerVisualizer {
 
  private:
   ros::NodeHandle nh_;
-
-  ros::Publisher gvd_viz_pub_;
-  ros::Publisher graph_viz_pub_;
-  ros::Publisher label_viz_pub_;
-  ros::Publisher gvd_edge_viz_pub_;
-  ros::Publisher block_viz_pub_;
+  std::unique_ptr<MarkerGroupPub> pubs_;
 
   TopologyVisualizerConfig config_;
   std::set<int> previous_labels_;

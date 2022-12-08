@@ -1,0 +1,22 @@
+<launch>
+    <arg name="bag_file"/>
+    <arg name="config_file" default="$(find hydra_topology)/config/validator/uh2.yaml"/>
+    <arg name="rviz_file" default="$(find hydra_topology)/rviz/validator.rviz"/>
+    <arg name="verbosity" default="1"/>
+    <arg name="max_updates" default="0"/>
+    <arg name="run_visualizer" default="true"/>
+
+    <node name="gvd_validator" type="gvd_validator" pkg="hydra_topology"
+          output="screen"
+          required="$(eval not arg('run_visualizer'))"
+          args="$(arg bag_file) --config=$(arg config_file)
+                                -v=$(arg verbosity)
+                                --max-updates=$(arg max_updates)">
+        <env name="TERM" value="xterm-256color"/>
+    </node>
+
+    <group if="$(arg run_visualizer)">
+        <node name="rviz" type="rviz" pkg="rviz" args="-d $(arg rviz_file)"/>
+    </group>
+
+</launch>

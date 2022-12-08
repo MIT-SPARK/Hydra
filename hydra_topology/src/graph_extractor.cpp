@@ -632,11 +632,13 @@ void GraphExtractor::splitEdges(const GvdLayer& layer) {
   clearNewConnections(true);
 
   if (reached_max_iters && config_.max_edge_split_iterations > 0) {
-    LOG_FIRST_N(WARNING, 1)
-        << "[Graph Extractor] Splitting edges during graph-extraction reached "
-           "the maximum number of "
-           "iterations. Extracted graph edges may not match GVD edges. Consider "
-           "increasing maximum edge splitting iterations";
+    if (VLOG_IS_ON(1)) {
+      LOG_FIRST_N(WARNING, 1)
+          << "[Graph Extractor] Splitting edges during graph-extraction reached "
+             "the maximum number of "
+             "iterations. Extracted graph edges may not match GVD edges. Consider "
+             "increasing maximum edge splitting iterations";
+    }
   }
 }
 

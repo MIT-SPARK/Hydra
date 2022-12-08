@@ -34,8 +34,11 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include "hydra_topology/graph_extractor.h"
+#include "hydra_topology/gvd_integrator_config.h"
+#include "hydra_topology/gvd_parent_tracker.h"
 #include "hydra_topology/gvd_utilities.h"
 #include "hydra_topology/gvd_voxel.h"
+#include "hydra_topology/update_statistics.h"
 #include "hydra_topology/voxblox_types.h"
 #include "hydra_topology/voxel_aware_mesh_integrator.h"
 
@@ -43,40 +46,6 @@
 
 namespace hydra {
 namespace topology {
-
-struct GvdIntegratorConfig {
-  FloatingPoint max_distance_m = 2.0;
-  FloatingPoint min_distance_m = 0.2;
-  FloatingPoint min_diff_m = 1.0e-3;
-  FloatingPoint min_weight = 1.0e-6;
-  int num_buckets = 20;
-  bool multi_queue = false;
-  bool positive_distance_only = true;
-  bool parent_derived_distance = true;
-  uint8_t min_basis_for_extraction = 3;
-  VoronoiCheckConfig voronoi_config;
-  voxblox::MeshIntegratorConfig mesh_integrator_config;
-  GraphExtractorConfig graph_extractor_config;
-  bool extract_graph = true;
-  bool mesh_only = false;
-};
-
-/**
- * @brief Tracking statistics for what the integrator did
- */
-struct UpdateStatistics {
-  size_t number_lowered_voxels;
-  size_t number_raised_voxels;
-  size_t number_new_voxels;
-  size_t number_raise_updates;
-  size_t number_voronoi_found;
-  size_t number_lower_skipped;
-  size_t number_lower_updated;
-  size_t number_fixed_no_parent;
-  size_t number_force_lowered;
-
-  void clear();
-};
 
 /**
  * An ESDF and GVD integrator based on https://arxiv.org/abs/1611.03631
@@ -106,6 +75,13 @@ class GvdIntegrator {
   BlockIndexList removeDistantBlocks(const voxblox::Point& center, double max_distance);
 
  protected:
+  enum class PushType {
+    NEW,
+    LOWER,
+    RAISE,
+    BOTH,
+  };
+
   void processTsdfBlock(const Block<TsdfVoxel>& block, const BlockIndex& index);
 
   void processRaiseSet();
@@ -140,32 +116,29 @@ class GvdIntegrator {
 
   void raiseVoxel(GvdVoxel& voxel, const GlobalIndex& voxel_index);
 
-  uint8_t updateGvdParentMap(const GlobalIndex& voxel_index, const GvdVoxel& neighbor);
-
   void updateNearestParent(const GvdVoxel& voxel,
                            const GlobalIndex& voxel_index,
                            const GvdVoxel& neighbor,
                            const GlobalIndex& parent);
 
-  void removeVoronoiFromGvdParentMap(const GlobalIndex& voxel_index);
-
   void updateGvdVoxel(const GlobalIndex& voxel_index, GvdVoxel& voxel, GvdVoxel& other);
 
   void clearGvdVoxel(const GlobalIndex& index, GvdVoxel& voxel);
 
-  void updateVertexMapping();
+  void pushToQueue(const GlobalIndex& index, GvdVoxel& voxel, PushType action);
 
-  void markNewGvdParent(const GlobalIndex& parent);
+  GlobalIndex popFromLower();
+
+  GlobalIndex popFromRaise();
+
+  void setDefaultDistance(GvdVoxel& voxel, double signed_distance);
+
+  bool isTsdfFixed(const TsdfVoxel& voxel);
+
+  bool voxelHasDistance(const GvdVoxel& voxel);
 
  protected:
   std::unique_ptr<VoxelAwareMeshIntegrator> mesh_integrator_;
-
-  enum class PushType {
-    NEW,
-    LOWER,
-    RAISE,
-    BOTH,
-  };
 
   UpdateStatistics update_stats_;
 
@@ -174,85 +147,13 @@ class GvdIntegrator {
   Layer<GvdVoxel>::Ptr gvd_layer_;
   MeshLayer::Ptr mesh_layer_;
 
-  GvdParentMap gvd_parents_;
-  GvdVertexMap gvd_parent_vertices_;
-
   GraphExtractor::Ptr graph_extractor_;
+  GvdParentTracker parent_tracker_;
 
   BucketQueue<GlobalIndex> lower_;
-
   AlignedQueue<GlobalIndex> raise_;
 
   FloatingPoint voxel_size_;
-
- protected:
-  inline void pushToQueue(const GlobalIndex& index, GvdVoxel& voxel, PushType action) {
-    switch (action) {
-      case PushType::NEW:
-        voxel.in_queue = true;
-        lower_.push(index, voxel.distance);
-        update_stats_.number_new_voxels++;
-        break;
-      case PushType::LOWER:
-        voxel.in_queue = true;
-        lower_.push(index, voxel.distance);
-        update_stats_.number_lowered_voxels++;
-        break;
-      case PushType::RAISE:
-        raise_.push(index);
-        update_stats_.number_raised_voxels++;
-        break;
-      case PushType::BOTH:
-        voxel.in_queue = true;
-        lower_.push(index, voxel.distance);
-        raise_.push(index);
-        update_stats_.number_raised_voxels++;
-        break;
-      default:
-        LOG(FATAL) << "Invalid push type!";
-        break;
-    }
-  }
-
-  inline GlobalIndex popFromLower() {
-    GlobalIndex index = lower_.front();
-    lower_.pop();
-    return index;
-  }
-
-  inline GlobalIndex popFromRaise() {
-    GlobalIndex index = raise_.front();
-    raise_.pop();
-    return index;
-  }
-
-  inline void setDefaultDistance(GvdVoxel& voxel, double signed_distance) {
-    voxel.distance = std::copysign(config_.max_distance_m, signed_distance);
-  }
-
-  inline bool isTsdfFixed(const TsdfVoxel& voxel) {
-    return std::abs(voxel.distance) < config_.min_distance_m;
-  }
-
-  inline bool voxelHasDistance(const GvdVoxel& voxel) {
-    if (!voxel.observed) {
-      return false;
-    }
-
-    if (voxel.distance >= config_.max_distance_m) {
-      return false;
-    }
-
-    if (config_.positive_distance_only && voxel.distance < 0.0) {
-      return false;
-    }
-
-    if (voxel.distance <= -config_.max_distance_m) {
-      return false;
-    }
-
-    return true;
-  }
 };
 
 }  // namespace topology
