@@ -48,6 +48,20 @@ visualization_msgs::Marker makeDeleteMarker(const std_msgs::Header& header,
                                             size_t id,
                                             const std::string& ns);
 
+visualization_msgs::Marker makeLayerWireframeBoundingBoxes(
+    const std_msgs::Header& header,
+    const LayerConfig& config,
+    const SceneGraphLayer& layer,
+    const VisualizerConfig& visualizer_config,
+    const std::string& ns);
+
+visualization_msgs::Marker makeEdgesToBoundingBoxes(
+    const std_msgs::Header& header,
+    const LayerConfig& config,
+    const SceneGraphLayer& layer,
+    const VisualizerConfig& visualizer_config,
+    const std::string& ns);
+
 visualization_msgs::Marker makeBoundingBoxMarker(
     const std_msgs::Header& header,
     const LayerConfig& config,

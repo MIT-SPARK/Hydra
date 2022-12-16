@@ -43,7 +43,6 @@ struct NodeInfo {
 
   LayerId layer;
   NodeAttributes::Ptr attrs;
-  std::vector<size_t> mesh_connections;
   bool is_active;
   bool need_backend_update = false;
   std::vector<NodeId> neighbors;
@@ -57,8 +56,7 @@ class MergeHandler {
 
   MergeHandler(const std::shared_ptr<ObjectUpdater>& object_updater,
                const std::shared_ptr<PlaceUpdater> place_updater,
-               bool undo_allowed,
-               bool allow_invalid_mesh_edge = false);
+               bool undo_allowed);
 
   void updateFromUnmergedGraph(const DynamicSceneGraph& graph);
 
@@ -78,12 +76,9 @@ class MergeHandler {
  protected:
   void clearRemovedNodes(const DynamicSceneGraph& graph);
 
-  void updateNodeEntry(const DynamicSceneGraph& graph,
-                       const SceneGraphNode& node,
-                       NodeInfo& entry);
+  void updateNodeEntry(const SceneGraphNode& node, NodeInfo& entry);
 
-  void addNodeToCache(const DynamicSceneGraph& graph,
-                      const SceneGraphNode& node,
+  void addNodeToCache(const SceneGraphNode& node,
                       std::map<NodeId, NodeInfo::Ptr>& cache,
                       bool check_if_present);
 
@@ -109,7 +104,6 @@ class MergeHandler {
   std::shared_ptr<ObjectUpdater> object_updater_;
   std::shared_ptr<PlaceUpdater> place_updater_;
   bool undo_allowed_;
-  bool allow_invalid_mesh_edge_;
 };
 
 }  // namespace incremental

@@ -85,30 +85,22 @@ void RosBackend::poseGraphCallback(const PoseGraph::ConstPtr& msg) {
   pose_graph_queue_.push_back(msg);
 }
 
-const pcl::PolygonMesh* RosBackend::getLatestMesh() {
-  if (!latest_mesh_msg_) {
-    return nullptr;
-  }
-
-  latest_mesh_.reset(new pcl::PolygonMesh());
-  mesh_vertex_stamps_.reset(new std::vector<ros::Time>());
-  mesh_vertex_graph_inds_.reset(new std::vector<int>());
-  *latest_mesh_ = kimera_pgmo::PgmoMeshMsgToPolygonMesh(
-      *latest_mesh_msg_, mesh_vertex_stamps_.get(), mesh_vertex_graph_inds_.get());
-  return latest_mesh_.get();
-}
+// TODO(nathan) copy mesh message into MeshStruct
 
 RosBackendVisualizer::RosBackendVisualizer(const ros::NodeHandle& nh,
-                                           const DsgBackendConfig& config)
-    : nh_(nh), config_(config) {
+                                           const DsgBackendConfig& config,
+                                           const RobotPrefixConfig& prefix)
+    : nh_(nh), config_(config), prefix_(prefix) {
   mesh_mesh_edges_pub_ =
       nh_.advertise<Marker>("pgmo/deformation_graph_mesh_mesh", 10, false);
   pose_mesh_edges_pub_ =
       nh_.advertise<Marker>("pgmo/deformation_graph_pose_mesh", 10, false);
-  mesh_pub_ = nh_.advertise<TriangleMeshStamped>("pgmo/optimized_mesh", 1, false);
   pose_graph_pub_ = nh_.advertise<PoseGraph>("pgmo/pose_graph", 10, false);
 
-  dsg_sender_.reset(new hydra::DsgSender(nh_));
+  double min_mesh_separation_s = 0.0;
+  nh_.getParam("min_mesh_separation_s", min_mesh_separation_s);
+
+  dsg_sender_.reset(new hydra::DsgSender(nh_, "backend", true, min_mesh_separation_s));
   if (config_.use_zmq_interface) {
     zmq_sender_.reset(
         new spark_dsg::ZmqSender(config_.zmq_send_url, config_.zmq_num_threads));
@@ -116,7 +108,6 @@ RosBackendVisualizer::RosBackendVisualizer(const ros::NodeHandle& nh,
 }
 
 void RosBackendVisualizer::publishOutputs(const DynamicSceneGraph& graph,
-                                          const pcl::PolygonMesh& mesh,
                                           const DeformationGraph& dgraph,
                                           size_t timestamp_ns) const {
   ros::Time stamp;
@@ -124,17 +115,14 @@ void RosBackendVisualizer::publishOutputs(const DynamicSceneGraph& graph,
 
   // TODO(nathan) consider serializing to bytes before sending
   dsg_sender_->sendGraph(graph, stamp);
+
   if (config_.use_zmq_interface) {
     zmq_sender_->send(graph);
   }
 
-  if (mesh_pub_.getNumSubscribers() > 0) {
-    publishMesh(mesh, timestamp_ns);
+  if (pose_graph_pub_.getNumSubscribers() > 0) {
+    publishPoseGraph(graph, dgraph);
   }
-
-  // if (pose_graph_pub_.getNumSubscribers() > 0) {
-  // publishPoseGraph(dgraph);
-  //}
 
   if (mesh_mesh_edges_pub_.getNumSubscribers() > 0 ||
       pose_mesh_edges_pub_.getNumSubscribers() > 0) {
@@ -142,22 +130,19 @@ void RosBackendVisualizer::publishOutputs(const DynamicSceneGraph& graph,
   }
 }
 
-void RosBackendVisualizer::publishMesh(const pcl::PolygonMesh& mesh,
-                                       size_t timestamp_ns) const {
-  if (mesh.cloud.height * mesh.cloud.width == 0) {
-    return;
+void RosBackendVisualizer::publishPoseGraph(const DynamicSceneGraph& graph,
+                                            const DeformationGraph& dgraph) const {
+  const auto& agent = graph.getLayer(DsgLayers::AGENTS, prefix_.key);
+
+  std::map<size_t, std::vector<ros::Time>> id_timestamps;
+  id_timestamps[prefix_.id] = std::vector<ros::Time>();
+  auto& times = id_timestamps[prefix_.id];
+  for (const auto& node : agent.nodes()) {
+    ros::Time curr_stamp;
+    curr_stamp.fromNSec(node->timestamp.count());
+    times.push_back(curr_stamp);
   }
 
-  mesh_msgs::TriangleMeshStamped msg;
-  msg.header.stamp.fromNSec(timestamp_ns);
-  msg.mesh = kimera_pgmo::PolygonMeshToTriangleMeshMsg(mesh);
-  mesh_pub_.publish(msg);
-}
-
-void RosBackendVisualizer::publishPoseGraph(const DeformationGraph& dgraph) const {
-  // TODO(nathan) grab from somewhere else
-  std::map<size_t, std::vector<ros::Time>> id_timestamps;
-  // id_timestamps[prefix_.id] = timestamps_;
   const auto& pose_graph = dgraph.getPoseGraph(id_timestamps);
   pose_graph_pub_.publish(*pose_graph);
 }

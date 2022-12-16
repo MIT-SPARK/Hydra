@@ -88,6 +88,158 @@ Marker makeDeleteMarker(const std_msgs::Header& header,
   return marker;
 }
 
+geometry_msgs::Point getPointFromMatrix(const Eigen::MatrixXf& matrix, int col) {
+  geometry_msgs::Point point;
+  point.x = matrix(0, col);
+  point.y = matrix(1, col);
+  point.z = matrix(2, col);
+  return point;
+}
+
+void fillCornersFromBbox(const BoundingBox& bbox, Eigen::MatrixXf& corners) {
+  const Eigen::Vector3f dims = bbox.max - bbox.min;
+
+  corners.block<3, 1>(0, 0) = bbox.min;
+  for (int c = 1; c < corners.cols(); ++c) {
+    // x: lsb, y: second lsb, z: third lsb
+    Eigen::Vector3f offset;
+    offset(0) = ((c & 0x01) != 0) ? dims(0) : 0.0f;
+    offset(1) = ((c & 0x02) != 0) ? dims(1) : 0.0f;
+    offset(2) = ((c & 0x04) != 0) ? dims(2) : 0.0f;
+    corners.block<3, 1>(0, c) = bbox.min + offset;
+  }
+
+  if (bbox.type != BoundingBox::Type::AABB) {
+    corners = (bbox.world_R_center * corners).eval();
+    for (int c = 0; c < corners.cols(); ++c) {
+      corners.block<3, 1>(0, c) += bbox.world_P_center;
+    }
+  }
+}
+
+void addWireframeToMarker(const Eigen::MatrixXf& corners,
+                          const std_msgs::ColorRGBA& color,
+                          Marker& marker) {
+  for (int c = 0; c < corners.cols(); ++c) {
+    // edges are 1-bit pertubations
+    int x_neighbor = c | 0x01;
+    int y_neighbor = c | 0x02;
+    int z_neighbor = c | 0x04;
+    if (c != x_neighbor) {
+      marker.points.push_back(getPointFromMatrix(corners, c));
+      marker.colors.push_back(color);
+      marker.points.push_back(getPointFromMatrix(corners, x_neighbor));
+      marker.colors.push_back(color);
+    }
+    if (c != y_neighbor) {
+      marker.points.push_back(getPointFromMatrix(corners, c));
+      marker.colors.push_back(color);
+      marker.points.push_back(getPointFromMatrix(corners, y_neighbor));
+      marker.colors.push_back(color);
+    }
+    if (c != z_neighbor) {
+      marker.points.push_back(getPointFromMatrix(corners, c));
+      marker.colors.push_back(color);
+      marker.points.push_back(getPointFromMatrix(corners, z_neighbor));
+      marker.colors.push_back(color);
+    }
+  }
+}
+
+void addEdgesToCorners(const Eigen::MatrixXf& corners,
+                       const geometry_msgs::Point& node_centroid,
+                       const std_msgs::ColorRGBA& color,
+                       Marker& marker) {
+  for (size_t i = 0; i < 8; ++i) {
+    marker.colors.push_back(color);
+  }
+
+  // top box corners are 4, 5, 6, 7
+  marker.points.push_back(node_centroid);
+  marker.points.push_back(getPointFromMatrix(corners, 4));
+  marker.points.push_back(node_centroid);
+  marker.points.push_back(getPointFromMatrix(corners, 5));
+  marker.points.push_back(node_centroid);
+  marker.points.push_back(getPointFromMatrix(corners, 6));
+  marker.points.push_back(node_centroid);
+  marker.points.push_back(getPointFromMatrix(corners, 7));
+}
+
+Marker makeEdgesToBoundingBoxes(const std_msgs::Header& header,
+                                const LayerConfig& config,
+                                const SceneGraphLayer& layer,
+                                const VisualizerConfig& visualizer_config,
+                                const std::string& ns) {
+  Marker marker;
+  marker.header = header;
+  marker.type = Marker::LINE_LIST;
+  marker.action = visualization_msgs::Marker::ADD;
+  marker.id = 0;
+  marker.ns = ns;
+  marker.scale.x = config.bbox_wireframe_edge_scale;
+
+  fillPoseWithIdentity(marker.pose);
+
+  marker.points.reserve(8 * layer.numNodes());
+  marker.colors.reserve(8 * layer.numNodes());
+
+  Eigen::MatrixXf corners(3, 8);
+  for (const auto& id_node_pair : layer.nodes()) {
+    const auto& attrs = id_node_pair.second->attributes<SemanticNodeAttributes>();
+    const auto color = makeColorMsg(attrs.color, config.bounding_box_alpha);
+    fillCornersFromBbox(attrs.bounding_box, corners);
+
+    geometry_msgs::Point node_centroid;
+    tf2::convert(attrs.position, node_centroid);
+    node_centroid.z += getZOffset(config, visualizer_config);
+
+    geometry_msgs::Point center_point;
+    tf2::convert(attrs.position, center_point);
+    center_point.z +=
+        visualizer_config.mesh_edge_break_ratio * getZOffset(config, visualizer_config);
+
+    marker.points.push_back(node_centroid);
+    marker.colors.push_back(color);
+    marker.points.push_back(center_point);
+    marker.colors.push_back(color);
+
+    addEdgesToCorners(corners, center_point, color, marker);
+  }
+
+  return marker;
+}
+
+Marker makeLayerWireframeBoundingBoxes(const std_msgs::Header& header,
+                                       const LayerConfig& config,
+                                       const SceneGraphLayer& layer,
+                                       const VisualizerConfig& visualizer_config,
+                                       const std::string& ns) {
+  Marker marker;
+  marker.header = header;
+  marker.type = Marker::LINE_LIST;
+  marker.action = visualization_msgs::Marker::ADD;
+  marker.id = 0;
+  marker.ns = ns;
+  marker.scale.x = config.bbox_wireframe_scale;
+
+  fillPoseWithIdentity(marker.pose);
+  marker.pose.position.z +=
+      config.collapse_bounding_box ? 0.0 : getZOffset(config, visualizer_config);
+
+  marker.points.reserve(12 * layer.numNodes());
+  marker.colors.reserve(12 * layer.numNodes());
+
+  Eigen::MatrixXf corners(3, 8);
+  for (const auto& id_node_pair : layer.nodes()) {
+    const auto& attrs = id_node_pair.second->attributes<SemanticNodeAttributes>();
+    const auto color = makeColorMsg(attrs.color, config.bounding_box_alpha);
+    fillCornersFromBbox(attrs.bounding_box, corners);
+    addWireframeToMarker(corners, color, marker);
+  }
+
+  return marker;
+}
+
 Marker makeBoundingBoxMarker(const std_msgs::Header& header,
                              const LayerConfig& config,
                              const Node& node,
@@ -428,12 +580,11 @@ Marker makeMeshEdgesMarker(const std_msgs::Header& header,
 
   for (const auto& id_node_pair : layer.nodes()) {
     const Node& node = *id_node_pair.second;
-    auto mesh_edge_indices = graph.getMeshConnectionIndices(node.id);
+    const auto& attrs = node.attributes<ObjectNodeAttributes>();
+    const auto& mesh_edge_indices = attrs.mesh_connections;
     if (mesh_edge_indices.empty()) {
       continue;
     }
-
-    SemanticNodeAttributes attrs = node.attributes<SemanticNodeAttributes>();
 
     geometry_msgs::Point center_point;
     tf2::convert(attrs.position, center_point);
@@ -457,10 +608,14 @@ Marker makeMeshEdgesMarker(const std_msgs::Header& header,
           makeColorMsg(NodeColor::Zero(), config.interlayer_edge_alpha));
     }
 
-    for (size_t i = 0; i < mesh_edge_indices.size();
-         i += config.interlayer_edge_insertion_skip + 1) {
-      std::optional<Eigen::Vector3d> vertex_pos =
-          graph.getMeshPosition(mesh_edge_indices[i]);
+    size_t i = 0;
+    for (const auto idx : mesh_edge_indices) {
+      ++i;
+      if ((i - 1) % (config.interlayer_edge_insertion_skip + 1) != 0) {
+        continue;
+      }
+
+      std::optional<Eigen::Vector3d> vertex_pos = graph.getMeshPosition(idx);
       if (!vertex_pos) {
         continue;
       }

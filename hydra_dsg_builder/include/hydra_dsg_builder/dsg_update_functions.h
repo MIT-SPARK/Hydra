@@ -65,7 +65,6 @@ struct UpdateObjectsFunctor {
   void makeNodeFinders(const SceneGraphLayer& layer) const;
 
   void updateObject(const MeshVertices::Ptr& mesh,
-                    const std::vector<size_t>& mesh_connections,
                     NodeId node,
                     ObjectNodeAttributes& attrs) const;
 

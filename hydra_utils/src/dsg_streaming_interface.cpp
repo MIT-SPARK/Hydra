@@ -43,22 +43,55 @@
 namespace hydra {
 
 DsgSender::DsgSender(const ros::NodeHandle& nh,
-                     const std::string& timer_name)
-    : nh_(nh), timer_name_(timer_name) {
+                     const std::string& timer_name,
+                     bool publish_mesh,
+                     double min_mesh_separation_s)
+    : nh_(nh),
+      timer_name_(timer_name),
+      publish_mesh_(publish_mesh),
+      min_mesh_separation_s_(min_mesh_separation_s) {
   pub_ = nh_.advertise<hydra_msgs::DsgUpdate>("dsg", 1);
+  if (publish_mesh_) {
+    mesh_pub_ = nh_.advertise<mesh_msgs::TriangleMeshStamped>("dsg_mesh", 1, false);
+  }
 }
 
-void DsgSender::sendGraph(const DynamicSceneGraph& graph, const ros::Time& stamp) const {
-  timing::ScopedTimer timer(timer_name_, stamp.toNSec());
-  if (!pub_.getNumSubscribers()) {
+void DsgSender::sendGraph(const DynamicSceneGraph& graph,
+                          const ros::Time& stamp) const {
+  const uint64_t timestamp_ns = stamp.toNSec();
+  timing::ScopedTimer timer(timer_name_, timestamp_ns);
+
+  if (pub_.getNumSubscribers()) {
+    hydra_msgs::DsgUpdate msg;
+    msg.header.stamp = stamp;
+    spark_dsg::writeGraph(graph, msg.layer_contents);
+    msg.full_update = true;
+    pub_.publish(msg);
+  }
+
+  if (!publish_mesh_ || !mesh_pub_.getNumSubscribers()) {
     return;
   }
 
-  hydra_msgs::DsgUpdate msg;
-  msg.header.stamp = stamp;
-  spark_dsg::writeGraph(graph, msg.layer_contents);
-  msg.full_update = true;
-  pub_.publish(msg);
+  if (graph.isMeshEmpty()) {
+    return;
+  }
+
+  if (last_mesh_time_ns_) {
+    std::chrono::nanoseconds diff_ns(timestamp_ns - *last_mesh_time_ns_);
+    std::chrono::duration<double> diff_s = diff_ns;
+    if (diff_s.count() < min_mesh_separation_s_) {
+      return;
+    }
+  }
+
+  last_mesh_time_ns_ = timestamp_ns;
+
+  mesh_msgs::TriangleMeshStamped msg;
+  msg.header.stamp.fromNSec(timestamp_ns);
+  msg.mesh = kimera_pgmo::PolygonMeshToTriangleMeshMsg(*graph.getMeshVertices(),
+                                                       *graph.getMeshFaces());
+  mesh_pub_.publish(msg);
 }
 
 DsgReceiver::DsgReceiver(const ros::NodeHandle& nh)

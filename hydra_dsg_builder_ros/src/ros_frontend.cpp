@@ -140,7 +140,7 @@ void RosFrontend::bowCallback(const BowQuery::ConstPtr& msg) {
 }
 
 void RosFrontend::publishActiveVertices(const MeshVertexCloud& vertices,
-                                        const std::vector<size_t>& indices,
+                                        const MeshSegmenter::IndicesVector& indices,
                                         const LabelIndices&) const {
   MeshVertexCloud::Ptr active_cloud(new MeshVertexCloud());
   active_cloud->reserve(indices.size());
@@ -154,12 +154,12 @@ void RosFrontend::publishActiveVertices(const MeshVertexCloud& vertices,
 }
 
 void RosFrontend::publishObjectClouds(const MeshVertexCloud& vertices,
-                                      const std::vector<size_t>&,
+                                      const MeshSegmenter::IndicesVector&,
                                       const LabelIndices& label_indices) const {
   for (const auto& label_index_pair : label_indices) {
     MeshVertexCloud label_cloud;
-    label_cloud.reserve(label_index_pair.second.size());
-    for (const auto idx : label_index_pair.second) {
+    label_cloud.reserve(label_index_pair.second->size());
+    for (const auto idx : *label_index_pair.second) {
       label_cloud.push_back(vertices.at(idx));
     }
 
