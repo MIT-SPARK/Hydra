@@ -83,6 +83,7 @@ struct DsgFrontendConfig {
   bool lcd_use_bow_vectors = true;
   kimera_pgmo::MeshFrontendConfig pgmo_config;
   MeshSegmenterConfig object_config;
+  bool validate_vertices = true;
 };
 
 struct LabelConverter {
@@ -137,6 +138,7 @@ void visit_config(const Visitor& v, DsgFrontendConfig& config) {
   v.visit("lcd_use_bow_vectors", config.lcd_use_bow_vectors);
   v.visit("pgmo", config.pgmo_config);
   v.visit("objects", config.object_config);
+  v.visit("validate_vertices", config.validate_vertices);
 }
 
 }  // namespace incremental

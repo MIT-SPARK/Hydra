@@ -65,9 +65,6 @@ void setBoundingBox(DynamicSceneGraph& graph,
   max_point.y = max.y();
   max_point.z = max.z();
 
-  graph.insertMeshEdge(node_id, index);
-  graph.insertMeshEdge(node_id, index + 1);
-
   if (!update_node) {
     return;
   }
@@ -315,8 +312,6 @@ TEST(MergeHandlerTests, TestUndoMergeObjects) {
 
   EXPECT_EQ(handler.mergedNodes(), proposed_merges);
   EXPECT_EQ(graph.numNodes(false), 1u);
-  std::vector<size_t> merged_connections{2, 3, 4, 5};
-  EXPECT_EQ(graph.getMeshConnectionIndices("O1"_id), merged_connections);
 
   gtsam::Values values;
   UpdateInfo info{&values, nullptr, false, 0, false};
@@ -332,11 +327,6 @@ TEST(MergeHandlerTests, TestUndoMergeObjects) {
   EXPECT_NEAR(0.0, (expected_pos1 - graph.getPosition("O1"_id)).norm(), 1.0e-6);
   Eigen::Vector3d expected_pos2(2.5, 2.5, 2.5);
   EXPECT_NEAR(0.0, (expected_pos2 - graph.getPosition("O2"_id)).norm(), 1.0e-6);
-
-  std::vector<size_t> connections_1{2, 3};
-  EXPECT_EQ(graph.getMeshConnectionIndices("O1"_id), connections_1);
-  std::vector<size_t> connections_2{4, 5};
-  EXPECT_EQ(graph.getMeshConnectionIndices("O2"_id), connections_2);
 }
 
 // check that updating from unmerged grabs the right siblings and attributes

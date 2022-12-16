@@ -176,6 +176,10 @@ class DynamicSceneGraphVisualizer {
     return bbox_ns_prefix_ + std::to_string(layer);
   }
 
+  inline std::string getLayerBboxEdgeNamespace(LayerId layer) const {
+    return bbox_ns_prefix_ + "edges_" + std::to_string(layer);
+  }
+
  private:
   const DynamicLayerConfig& getConfig(LayerId layer);
 
@@ -221,8 +225,6 @@ class DynamicSceneGraphVisualizer {
   std::set<std::string> published_multimarkers_;
   std::map<LayerId, std::set<NodeId>> prev_labels_;
   std::map<LayerId, std::set<NodeId>> curr_labels_;
-  std::map<LayerId, std::set<NodeId>> prev_bboxes_;
-  std::map<LayerId, std::set<NodeId>> curr_bboxes_;
 
   std::map<LayerId, LayerConfigManager::Ptr> layer_configs_;
   VisualizerConfigManager::Ptr visualizer_config_;

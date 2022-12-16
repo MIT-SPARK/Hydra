@@ -64,7 +64,6 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
  public:
   using Ptr = std::shared_ptr<DsgBackend>;
   using OutputCallback = std::function<void(const DynamicSceneGraph&,
-                                            const pcl::PolygonMesh&,
                                             const kimera_pgmo::DeformationGraph&,
                                             size_t timestamp_ns)>;
 
@@ -111,8 +110,6 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   using KimeraPgmoInterface::setVerboseFlag;
 
  protected:
-  virtual const pcl::PolygonMesh* getLatestMesh();
-
   void setSolverParams();
 
   void setDefaultUpdateFunctions();
@@ -124,8 +121,6 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   void updateFactorGraph(const BackendInput& input);
 
   bool updateFromLcdQueue();
-
-  void updateFromSharedState(size_t timestamp_ns);
 
   virtual bool updatePrivateDsg(size_t timestamp_ns, bool force_update = true);
 
@@ -156,6 +151,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   bool have_loopclosures_{false};
   bool have_new_loopclosures_{false};
   bool have_new_mesh_{false};
+  size_t prev_num_archived_vertices_{0};
+  size_t num_archived_vertices_{0};
 
   RobotPrefixConfig prefix_;
   DsgBackendConfig config_;
@@ -166,6 +163,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   std::map<LayerId, dsg_updates::NodeMergeLog> proposed_node_merges_;
   std::unique_ptr<MergeHandler> merge_handler_;
   SharedModuleState::Ptr state_;
+  std::vector<ros::Time> mesh_timestamps_;
+  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr original_vertices_;
 
   std::list<LayerUpdateFunc> dsg_update_funcs_;
   std::shared_ptr<dsg_updates::UpdateObjectsFunctor> update_objects_functor_;
@@ -180,11 +179,6 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   kimera_pgmo::Path trajectory_;
   std::vector<ros::Time> timestamps_;
   std::queue<size_t> unconnected_nodes_;
-  // TODO(nathan) consider making mutable
-  std::shared_ptr<pcl::PolygonMesh> latest_mesh_;
-  std::shared_ptr<std::vector<ros::Time>> mesh_vertex_stamps_;
-  std::shared_ptr<std::vector<int>> mesh_vertex_graph_inds_;
-  std::unique_ptr<pcl::PolygonMesh> optimized_mesh_;
 
   std::list<OutputCallback> output_callbacks_;
 

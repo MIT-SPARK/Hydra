@@ -95,9 +95,9 @@ void UpdateObjectsFunctor::makeNodeFinders(const SceneGraphLayer& layer) const {
 }
 
 void UpdateObjectsFunctor::updateObject(const MeshVertices::Ptr& mesh,
-                                        const std::vector<size_t>& connections,
                                         NodeId node,
                                         ObjectNodeAttributes& attrs) const {
+  const auto& connections = attrs.mesh_connections;
   if (connections.empty()) {
     VLOG(2) << "Found empty object node " << NodeSymbol(node).getLabel();
     return;
@@ -198,8 +198,7 @@ std::map<NodeId, NodeId> UpdateObjectsFunctor::call(SharedDsgInfo& dsg,
     }
 
     ++active;
-    std::vector<size_t> connections = graph.getMeshConnectionIndices(node_id);
-    updateObject(mesh, connections, node_id, attrs);
+    updateObject(mesh, node_id, attrs);
 
     if (!info.allow_node_merging) {
       continue;

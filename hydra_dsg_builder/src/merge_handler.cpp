@@ -53,12 +53,10 @@ void fillConnections(const SceneGraphNode& node, std::vector<NodeId>& connection
 
 MergeHandler::MergeHandler(const std::shared_ptr<ObjectUpdater>& object_updater,
                            const std::shared_ptr<PlaceUpdater> place_updater,
-                           bool undo_allowed,
-                           bool allow_invalid_mesh_edge)
+                           bool undo_allowed)
     : object_updater_(object_updater),
       place_updater_(place_updater),
-      undo_allowed_(undo_allowed),
-      allow_invalid_mesh_edge_(allow_invalid_mesh_edge) {
+      undo_allowed_(undo_allowed) {
   if (undo_allowed_ && (!object_updater_ || !place_updater_)) {
     LOG(ERROR) << "[Hydra Backend] Invalid node updaters when updating node caches";
     throw std::runtime_error("place and object update functors required!");
@@ -87,7 +85,7 @@ void MergeHandler::updateFromUnmergedGraph(const DynamicSceneGraph& graph) {
     // and connections
     const auto node_id = id_entry_pair.first;
     const SceneGraphNode& node = graph.getNode(node_id).value();
-    updateNodeEntry(graph, node, entry);
+    updateNodeEntry(node, entry);
     // make sure we grab the latest backend version of the attributes
     // before finally caching the attributes of the node
     entry.need_backend_update = true;
@@ -210,8 +208,8 @@ void MergeHandler::updateMerges(const std::map<NodeId, NodeId>& new_merges,
     merged_nodes_[from] = to;
 
     if (undo_allowed_) {
-      addNodeToCache(graph, graph.getNode(from).value(), merged_nodes_cache_, false);
-      addNodeToCache(graph, graph.getNode(to).value(), parent_nodes_cache_, true);
+      addNodeToCache(graph.getNode(from).value(), merged_nodes_cache_, false);
+      addNodeToCache(graph.getNode(to).value(), parent_nodes_cache_, true);
     }
 
     VLOG(3) << "[Hydra Backend] Merging " << NodeSymbol(from).getLabel() << " -> "
@@ -239,20 +237,14 @@ void MergeHandler::reset() {
   merged_nodes_parents_.clear();
 }
 
-void MergeHandler::updateNodeEntry(const DynamicSceneGraph& graph,
-                                   const SceneGraphNode& node,
-                                   NodeInfo& entry) {
+void MergeHandler::updateNodeEntry(const SceneGraphNode& node, NodeInfo& entry) {
   entry.layer = node.layer;
   entry.attrs = node.attributes().clone();
   entry.is_active = node.attributes().is_active;
-  if (node.layer == DsgLayers::OBJECTS) {
-    entry.mesh_connections = graph.getMeshConnectionIndices(node.id);
-  }
   fillConnections(node, entry.neighbors);
 }
 
-void MergeHandler::addNodeToCache(const DynamicSceneGraph& graph,
-                                  const SceneGraphNode& node,
+void MergeHandler::addNodeToCache(const SceneGraphNode& node,
                                   std::map<NodeId, NodeInfo::Ptr>& cache,
                                   bool check_if_present) {
   if (node.layer != DsgLayers::OBJECTS && node.layer != DsgLayers::PLACES) {
@@ -265,7 +257,7 @@ void MergeHandler::addNodeToCache(const DynamicSceneGraph& graph,
 
   // TODO(nathan) dynamic layers might be a problem here
   auto ret = cache.emplace(node.id, std::make_unique<NodeInfo>());
-  updateNodeEntry(graph, node, *ret.first->second);
+  updateNodeEntry(node, *ret.first->second);
 }
 
 void MergeHandler::updateCacheEntryFromInfo(const MeshVertices::Ptr& mesh,
@@ -283,7 +275,7 @@ void MergeHandler::updateCacheEntryFromInfo(const MeshVertices::Ptr& mesh,
     place_updater_->updatePlace(*info.places_values, node, place_attrs);
   } else {
     auto& object_attrs = dynamic_cast<ObjectAttrs&>(*entry.attrs);
-    object_updater_->updateObject(mesh, entry.mesh_connections, node, object_attrs);
+    object_updater_->updateObject(mesh, node, object_attrs);
   }
 }
 
@@ -315,16 +307,9 @@ void MergeHandler::updateInfoCaches(const DynamicSceneGraph& graph,
   }
 }
 
-void addEdgesFromEntry(DynamicSceneGraph& graph,
-                       NodeId node_id,
-                       NodeInfo& node_entry,
-                       bool allow_invalid_mesh_edge) {
+void addEdgesFromEntry(DynamicSceneGraph& graph, NodeId node_id, NodeInfo& node_entry) {
   for (const auto& target : node_entry.neighbors) {
     graph.insertEdge(node_id, target);
-  }
-
-  for (const auto& mesh_target : node_entry.mesh_connections) {
-    graph.insertMeshEdge(node_id, mesh_target, allow_invalid_mesh_edge);
   }
 }
 
@@ -396,7 +381,7 @@ void MergeHandler::undoMerge(DynamicSceneGraph& graph,
   for (auto& id_entry_pair : entries) {
     const auto node_id = id_entry_pair.first;
     auto& entry = *id_entry_pair.second;
-    addEdgesFromEntry(graph, node_id, entry, allow_invalid_mesh_edge_);
+    addEdgesFromEntry(graph, node_id, entry);
   }
 
   // pass submerges on

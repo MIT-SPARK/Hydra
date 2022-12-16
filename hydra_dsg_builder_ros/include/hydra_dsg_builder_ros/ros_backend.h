@@ -67,8 +67,6 @@ class RosBackend : public DsgBackend {
   void poseGraphCallback(const pose_graph_tools::PoseGraph::ConstPtr& msg);
 
  protected:
-  virtual const pcl::PolygonMesh* getLatestMesh() override;
-
   void publishOutputs(const pcl::PolygonMesh& mesh, size_t timestamp_ns) const;
 
   void publishDeformationGraphViz() const;
@@ -90,19 +88,19 @@ class RosBackend : public DsgBackend {
 
 class RosBackendVisualizer {
  public:
-  RosBackendVisualizer(const ros::NodeHandle& nh, const DsgBackendConfig& config);
+  RosBackendVisualizer(const ros::NodeHandle& nh,
+                       const DsgBackendConfig& config,
+                       const RobotPrefixConfig& prefix);
 
   ~RosBackendVisualizer() = default;
 
   void publishOutputs(const DynamicSceneGraph& graph,
-                      const pcl::PolygonMesh& mesh,
                       const kimera_pgmo::DeformationGraph& dgraph,
                       size_t timestamp_ns) const;
 
  protected:
-  virtual void publishMesh(const pcl::PolygonMesh& mesh, size_t timestamp_ns) const;
-
-  virtual void publishPoseGraph(const kimera_pgmo::DeformationGraph& dgraph) const;
+  virtual void publishPoseGraph(const DynamicSceneGraph& graph,
+                                const kimera_pgmo::DeformationGraph& dgraph) const;
 
   virtual void publishDeformationGraphViz(const kimera_pgmo::DeformationGraph& dgraph,
                                           size_t timestamp_ns) const;
@@ -110,11 +108,11 @@ class RosBackendVisualizer {
  protected:
   ros::NodeHandle nh_;
   DsgBackendConfig config_;
+  RobotPrefixConfig prefix_;
 
   ros::Publisher mesh_mesh_edges_pub_;
   ros::Publisher pose_mesh_edges_pub_;
   ros::Publisher pose_graph_pub_;
-  ros::Publisher mesh_pub_;
 
   std::unique_ptr<spark_dsg::ZmqSender> zmq_sender_;
   std::unique_ptr<DsgSender> dsg_sender_;

@@ -67,6 +67,8 @@ struct HydraRosConfig {
   bool enable_lcd = false;
   bool use_ros_backend = false;
   bool do_reconstruction = true;
+  bool enable_frontend_output = true;
+  double frontend_mesh_separation_s = 0.0;
 };
 
 template <typename Visitor>
@@ -74,6 +76,8 @@ void visit_config(const Visitor& v, HydraRosConfig& config) {
   v.visit("enable_lcd", config.enable_lcd);
   v.visit("use_ros_backend", config.use_ros_backend);
   v.visit("do_reconstruction", config.do_reconstruction);
+  v.visit("enable_frontend_output", config.enable_frontend_output);
+  v.visit("frontend_mesh_separation_s", config.frontend_mesh_separation_s);
 }
 
 struct HydraRosPipeline {
@@ -102,6 +106,16 @@ struct HydraRosPipeline {
       frontend = std::make_shared<RosFrontend>(nh, prefix, frontend_dsg, shared_state);
     }
 
+    if (config_.enable_frontend_output) {
+      ros::NodeHandle frontend_nh(nh, "frontend");
+      dsg_sender_.reset(new DsgSender(
+          frontend_nh, "frontend", true, config_.frontend_mesh_separation_s));
+      frontend->addOutputCallback(std::bind(&HydraRosPipeline::sendFrontendGraph,
+                                            this,
+                                            std::placeholders::_1,
+                                            std::placeholders::_2));
+    }
+
     const auto backend_config = load_config<DsgBackendConfig>(nh);
     if (config_.use_ros_backend) {
       backend = std::make_shared<RosBackend>(
@@ -112,13 +126,13 @@ struct HydraRosPipeline {
           prefix, backend_config, pgmo_config, frontend_dsg, backend_dsg, shared_state);
     }
 
-    backend_visualizer = std::make_shared<RosBackendVisualizer>(nh, backend_config);
+    backend_visualizer =
+        std::make_shared<RosBackendVisualizer>(nh, backend_config, prefix);
     backend->addOutputCallback(std::bind(&RosBackendVisualizer::publishOutputs,
                                          backend_visualizer.get(),
                                          std::placeholders::_1,
                                          std::placeholders::_2,
-                                         std::placeholders::_3,
-                                         std::placeholders::_4));
+                                         std::placeholders::_3));
 
     if (config_.enable_lcd) {
       const auto lcd_config = load_config<DsgLcdModuleConfig>(nh, "");
@@ -183,6 +197,12 @@ struct HydraRosPipeline {
     }
   }
 
+  void sendFrontendGraph(const DynamicSceneGraph& graph, uint64_t timestamp_ns) {
+    ros::Time stamp;
+    stamp.fromNSec(timestamp_ns);
+    dsg_sender_->sendGraph(graph, stamp);
+  }
+
   HydraRosConfig config_;
   RobotPrefixConfig prefix;
   SharedDsgInfo::Ptr frontend_dsg;
@@ -194,6 +214,7 @@ struct HydraRosPipeline {
   std::shared_ptr<DsgBackend> backend;
   std::shared_ptr<RosBackendVisualizer> backend_visualizer;
   std::shared_ptr<DsgLcd> lcd;
+  std::unique_ptr<DsgSender> dsg_sender_;
 };
 
 int main(int argc, char* argv[]) {
