@@ -36,6 +36,7 @@
 #include <hydra_utils/dsg_types.h>
 #include <kimera_semantics/color.h>
 #include <pcl/common/centroid.h>
+#include <pcl/pcl_base.h>
 #include <pcl/point_types.h>
 
 #include <memory>
@@ -65,19 +66,20 @@ struct MeshSegmenterConfig {
 
 class MeshSegmenter {
  public:
-  using LabelIndices = std::map<uint8_t, std::vector<size_t>>;
+  using IndicesVector = pcl::IndicesPtr::element_type;
+  using LabelIndices = std::map<uint8_t, pcl::IndicesPtr>;
   using MeshVertexCloud = Cluster::CloudT;
   using Clusters = std::vector<Cluster>;
   using LabelClusters = std::map<uint8_t, Clusters>;
   using CallbackFunc = std::function<void(const MeshVertexCloud& cloud,
-                                          const std::vector<size_t>& indices,
+                                          const IndicesVector& indices,
                                           const LabelIndices& label_indices)>;
 
   MeshSegmenter(const MeshSegmenterConfig& config,
                 const MeshVertexCloud::Ptr& active_vertices);
 
   LabelClusters detect(const kimera::SemanticLabel2Color& label_map,
-                       const std::vector<size_t>& active_indices,
+                       const pcl::IndicesPtr& frontend_indices,
                        const std::optional<Eigen::Vector3d>& pos);
 
   inline std::unordered_set<NodeId> getObjectsToCheckForPlaces() const {
@@ -98,25 +100,21 @@ class MeshSegmenter {
   }
 
  private:
-  std::vector<size_t> getActiveIndices(const std::vector<size_t>& indices,
-                                       const std::optional<Eigen::Vector3d>& pos) const;
-
   Clusters findClusters(const MeshVertexCloud::Ptr& cloud,
-                        const std::vector<size_t>& indices) const;
+                        const pcl::IndicesPtr& indices) const;
 
   std::set<NodeId> archiveOldObjects(const DynamicSceneGraph& graph,
                                      uint64_t latest_timestamp);
 
   LabelIndices getLabelIndices(const kimera::SemanticLabel2Color& label_map,
-                               const std::vector<size_t>& indices) const;
+                               const IndicesVector& indices) const;
 
   void addObjectToGraph(DynamicSceneGraph& graph,
                         const Cluster& cluster,
                         uint8_t label,
                         uint64_t timestamp);
 
-  void updateObjectInGraph(DynamicSceneGraph& graph,
-                           const Cluster& cluster,
+  void updateObjectInGraph(const Cluster& cluster,
                            const SceneGraphNode& node,
                            uint64_t timestamp);
 

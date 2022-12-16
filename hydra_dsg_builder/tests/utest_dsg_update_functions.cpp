@@ -78,7 +78,7 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
   dsg_updates::UpdateObjectsFunctor functor;
   functor.call(*dsg, info);
 
-  const ObjectNodeAttributes& result =
+  ObjectNodeAttributes& result =
       graph.getNode(0)->get().attributes<ObjectNodeAttributes>();
 
   {
@@ -100,8 +100,8 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
   std::shared_ptr<MeshFaces> faces(new MeshFaces());
   graph.setMesh(cloud, faces);
 
-  graph.insertMeshEdge(0, 0);
-  graph.insertMeshEdge(0, 1);
+  result.mesh_connections.push_back(0);
+  result.mesh_connections.push_back(1);
 
   functor.call(*dsg, info);
 
@@ -142,9 +142,9 @@ TEST(DsgInterpolationTests, ObjectUpdateMerge) {
   dsg_updates::UpdateObjectsFunctor functor;
   functor.call(*dsg, info);
 
-  const ObjectNodeAttributes& result0 =
+  ObjectNodeAttributes& result0 =
       graph.getNode(0)->get().attributes<ObjectNodeAttributes>();
-  const ObjectNodeAttributes& result1 =
+  ObjectNodeAttributes& result1 =
       graph.getNode(1)->get().attributes<ObjectNodeAttributes>();
 
   {
@@ -172,14 +172,11 @@ TEST(DsgInterpolationTests, ObjectUpdateMerge) {
   MAKE_POINT(cloud, -1.0, -2.0, -3.0);
   MAKE_POINT(cloud, 1.0, 2.0, 3.0);
 
+  result0.mesh_connections = {0, 1};
+  result1.mesh_connections = {0, 1};
+
   std::shared_ptr<MeshFaces> faces(new MeshFaces());
   graph.setMesh(cloud, faces);
-
-  graph.insertMeshEdge(0, 0);
-  graph.insertMeshEdge(0, 1);
-  graph.insertMeshEdge(1, 0);
-  graph.insertMeshEdge(1, 1);
-
   auto merged_nodes = functor.call(*dsg, info);
 
   {

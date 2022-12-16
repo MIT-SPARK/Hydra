@@ -67,15 +67,12 @@ DsgFrontend::DsgFrontend(const RobotPrefixConfig& prefix,
   dsg_->graph->initMesh();
   dsg_->graph->createDynamicLayer(DsgLayers::AGENTS, prefix_.key);
 
+  const auto mesh_resolution = config_.pgmo_config.mesh_resolution;
+  mesh_compression_.reset(new kimera_pgmo::DeltaCompression(mesh_resolution));
+
   CHECK(mesh_frontend_.initialize(config_.pgmo_config));
-  mesh_frontend_.addOutputCallback([&](const auto& frontend, const std_msgs::Header) {
-    if (backend_input_) {
-      backend_input_->deformation_graph.reset(
-          new PoseGraph(frontend.getLastProcessedMeshGraph()));
-    }
-  });
   segmenter_.reset(
-      new MeshSegmenter(config_.object_config, mesh_frontend_.getFullMeshVertices()));
+      new MeshSegmenter(config_.object_config, dsg_->graph->getMeshVertices()));
 
   if (config_.should_log) {
     LOG(INFO) << "[Hydra Frontend] logging to " << (config_.log_path + "/frontend");
@@ -86,6 +83,8 @@ DsgFrontend::DsgFrontend(const RobotPrefixConfig& prefix,
 
   input_callbacks_.push_back(
       std::bind(&DsgFrontend::updateMeshAndObjects, this, std::placeholders::_1));
+  input_callbacks_.push_back(
+      std::bind(&DsgFrontend::updateDeformationGraph, this, std::placeholders::_1));
   input_callbacks_.push_back(
       std::bind(&DsgFrontend::updatePoseGraph, this, std::placeholders::_1));
   input_callbacks_.push_back(
@@ -116,18 +115,11 @@ void DsgFrontend::save(const std::string& output_path) {
   dsg_->graph->save(output_path + "/dsg.json", false);
   dsg_->graph->save(output_path + "/dsg_with_mesh.json");
 
-  pcl::PolygonMesh mesh;
-  mesh.polygons = mesh_frontend_.getFullMeshFaces();
-
-  const auto vertices = mesh_frontend_.getFullMeshVertices();
-  if (mesh.polygons.empty() || vertices->empty()) {
-    return;
+  if (!dsg_->graph->isMeshEmpty()) {
+    pcl::PolygonMesh mesh = dsg_->graph->getMesh();
+    kimera_pgmo::WriteMeshWithStampsToPly(
+        output_path + "/mesh.ply", mesh, mesh_timestamps_);
   }
-
-  pcl::toPCLPointCloud2(*vertices, mesh.cloud);
-
-  kimera_pgmo::WriteMeshWithStampsToPly(
-      output_path + "/mesh.ply", mesh, mesh_frontend_.getFullMeshTimes());
 }
 
 void DsgFrontend::spin() {
@@ -159,6 +151,10 @@ bool DsgFrontend::spinOnce() {
   return true;
 }
 
+void DsgFrontend::addOutputCallback(const OutputCallback& callback) {
+  output_callbacks_.push_back(callback);
+}
+
 void DsgFrontend::spinOnce(const ReconstructionOutput& msg) {
   VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg.timestamp_ns << " [ns]";
   ScopedTimer timer("frontend/spin", msg.timestamp_ns);
@@ -169,6 +165,15 @@ void DsgFrontend::spinOnce(const ReconstructionOutput& msg) {
 
   lcd_input_.reset(new LcdInput);
   lcd_input_->timestamp_ns = msg.timestamp_ns;
+
+  // TODO(nathan) this might potentially starve the backend and LCD
+  // We want to make sure that the backend and LCD catch the scene graph when:
+  // - last_update_time_ns is still set to the last packet sent time
+  // - some threads have done work
+  // - the newest output has not been pushed yet
+  // so we set the last update time before modifying anything!
+  dsg_->last_update_time = msg.timestamp_ns;
+  dsg_->updated = true;
 
   std::list<std::thread> threads;
   for (const auto& callback : input_callbacks_) {
@@ -181,7 +186,7 @@ void DsgFrontend::spinOnce(const ReconstructionOutput& msg) {
 
   {
     ScopedTimer timer("frontend/place_mesh_mapping", msg.timestamp_ns);
-    updatePlaceMeshMapping();
+    updatePlaceMeshMapping(msg);
   }
 
   if (state_->lcd_queue) {
@@ -190,34 +195,53 @@ void DsgFrontend::spinOnce(const ReconstructionOutput& msg) {
 
   state_->backend_queue.push(backend_input_);
 
-  dsg_->last_update_time = msg.timestamp_ns;
-  dsg_->updated = true;
-
   if (config_.should_log) {
     // mutex not required because nothing is modifying the graph
     frontend_graph_logger_.logGraph(dsg_->graph);
+  }
+
+  for (const auto& callback : output_callbacks_) {
+    callback(*dsg_->graph, msg.timestamp_ns);
   }
 }
 
 void DsgFrontend::updateMeshAndObjects(const ReconstructionOutput& input) {
   {  // start timing scope
-    ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
-    mesh_frontend_.voxbloxCallback(input.mesh->mesh);
-    mesh_frontend_.clearArchivedMeshFull(input.mesh->archived_blocks);
+    ScopedTimer timer("frontend/mesh_archive", input.timestamp_ns, true, 1, false);
+    voxblox::BlockIndexList to_archive;
+    for (const auto block : input.mesh->archived_blocks.mesh_blocks) {
+      to_archive.push_back({static_cast<int>(block.index[0]),
+                            static_cast<int>(block.index[1]),
+                            static_cast<int>(block.index[2])});
+    }
+
+    mesh_compression_->clearArchivedBlocks(to_archive);
   }  // end timing scope
 
-  // we copy the mesh state separately to avoid slowing down the mesh segmentation
-  std::thread copy_thread(&DsgFrontend::copyMesh, this, input.timestamp_ns);
+  kimera_pgmo::MeshDelta::Ptr mesh_update;
+  {
+    ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
+    mesh_remapping_.reset(new kimera_pgmo::VoxbloxIndexMapping());
+    mesh_update = mesh_compression_->update(
+        input.mesh->mesh, input.timestamp_ns, mesh_remapping_.get());
+  }  // end timing scope
+
+  {  // start timing scope
+    // TODO(nathan) we should probably have a mutex before modifying the mesh, but
+    // nothing else uses it at the moment
+    ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
+    mesh_update->updateMesh(*dsg_->graph->getMeshVertices(),
+                            mesh_timestamps_,
+                            *dsg_->graph->getMeshFaces());
+    invalidateMeshEdges(*mesh_update);
+  }  // end timing scope
 
   LabelClusters object_clusters;
-
   {  // timing scope
     ScopedTimer timer("frontend/object_detection", input.timestamp_ns, true, 1, false);
-    invalidateMeshEdges();
-    // add latest position somehow
-    object_clusters = segmenter_->detect(*label_map_,
-                                         mesh_frontend_.getActiveFullMeshVertices(),
-                                         input.current_position);
+    // TODO(nathan) fix this
+    object_clusters = segmenter_->detect(
+        *label_map_, mesh_update->getActiveIndices(), input.current_position);
   }
 
   {  // start dsg critical section
@@ -225,53 +249,22 @@ void DsgFrontend::updateMeshAndObjects(const ReconstructionOutput& input) {
     std::unique_lock<std::mutex> lock(dsg_->mutex);
     segmenter_->updateGraph(*dsg_->graph, object_clusters, input.timestamp_ns);
     addPlaceObjectEdges(input.timestamp_ns);
-
   }  // end dsg critical section
 
-  copy_thread.join();
+  backend_input_->mesh_update = mesh_update;
 }
 
-void DsgFrontend::copyMesh(size_t timestamp_ns) {
-  // TODO(nathan) conditionally disable this for hydra multi
-  ScopedTimer t1("frontend/copy_mesh", timestamp_ns);
-  std::unique_lock<std::mutex> lock(state_->mesh_mutex);
-  state_->latest_mesh.reset(new pcl::PolygonMesh());
-
+void DsgFrontend::updateDeformationGraph(const ReconstructionOutput& input) {
   {  // start timing scope
-    ScopedTimer t2("frontend/copy_mesh_faces", timestamp_ns);
-    state_->latest_mesh->polygons = mesh_frontend_.getFullMeshFaces();
+    ScopedTimer timer(
+        "frontend/dgraph_compresssion", input.timestamp_ns, true, 1, false);
+    mesh_frontend_.processVoxbloxMeshGraph(input.mesh->mesh);
   }  // end timing scope
 
-  {  // start timing scope
-    ScopedTimer t2("frontend/copy_invalid_indices", timestamp_ns);
-    state_->invalid_indices.reset(
-        new std::vector<size_t>(mesh_frontend_.getInvalidIndices().begin(),
-                                mesh_frontend_.getInvalidIndices().end()));
-  }  // end timing scope
-
-  const auto vertices = mesh_frontend_.getFullMeshVertices();
-  {  // start timing scope
-    ScopedTimer t3("frontend/copy_mesh_vertices", timestamp_ns);
-    if (!vertices->empty()) {
-      pcl::toPCLPointCloud2(*vertices, state_->latest_mesh->cloud);
-    }
-  }  // end timing scope
-
-  ScopedTimer t4("frontend/copy_mesh_info", timestamp_ns);
-  state_->mesh_vertex_stamps.reset(
-      new std::vector<ros::Time>(mesh_frontend_.getFullMeshTimes()));
-
-  state_->mesh_vertex_graph_indices.reset(new std::vector<int>(vertices->size(), -1));
-  state_->mesh_vertex_graph_indices->resize(vertices->size());
-  const auto& index_mapping = mesh_frontend_.getFullMeshToGraphMapping();
-  for (size_t i = 0; i < vertices->size(); ++i) {
-    const auto iter = index_mapping.find(i);
-    if (iter != index_mapping.end()) {
-      state_->mesh_vertex_graph_indices->push_back(iter->second);
-    }
+  if (backend_input_) {
+    backend_input_->deformation_graph.reset(
+        new PoseGraph(mesh_frontend_.getLastProcessedMeshGraph()));
   }
-
-  state_->have_new_mesh = true;
 }
 
 void DsgFrontend::updatePlaces(const ReconstructionOutput& input) {
@@ -417,27 +410,37 @@ void DsgFrontend::assignBowVectors(const DynamicLayer& agents) {
           << " bow vectors unassigned";
 }
 
-void DsgFrontend::invalidateMeshEdges() {
-  const auto& invalid_indices = mesh_frontend_.getInvalidIndices();
-  {  // start dsg critical section
-    std::unique_lock<std::mutex> lock(dsg_->mutex);
-    for (const auto& idx : invalid_indices) {
-      dsg_->graph->invalidateMeshVertex(idx);
-    }
+void DsgFrontend::invalidateMeshEdges(const kimera_pgmo::MeshDelta& delta) {
+  std::unique_lock<std::mutex> lock(dsg_->mutex);
 
-    std::vector<NodeId> objects_to_delete;
-    const auto& objects = dsg_->graph->getLayer(DsgLayers::OBJECTS);
-    for (const auto& id_node_pair : objects.nodes()) {
-      auto connections = dsg_->graph->getMeshConnectionIndices(id_node_pair.first);
-      if (connections.size() < config_.min_object_vertices) {
-        objects_to_delete.push_back(id_node_pair.first);
+  std::vector<NodeId> objects_to_delete;
+  const auto& objects = dsg_->graph->getLayer(DsgLayers::OBJECTS);
+  for (const auto& id_node_pair : objects.nodes()) {
+    auto& attrs = id_node_pair.second->attributes<ObjectNodeAttributes>();
+
+    auto iter = attrs.mesh_connections.begin();
+    while (iter != attrs.mesh_connections.end()) {
+      if (delta.deleted_indices.count(*iter)) {
+        iter = attrs.mesh_connections.erase(iter);
+        continue;
       }
+
+      auto map_iter = delta.prev_to_curr.find(*iter);
+      if (map_iter != delta.prev_to_curr.end()) {
+        *iter = map_iter->second;
+      }
+
+      ++iter;
     }
 
-    for (const auto& node : objects_to_delete) {
-      dsg_->graph->removeNode(node);
+    if (attrs.mesh_connections.size() < config_.min_object_vertices) {
+      objects_to_delete.push_back(id_node_pair.first);
     }
-  }  // end dsg critical section
+  }
+
+  for (const auto& node : objects_to_delete) {
+    dsg_->graph->removeNode(node);
+  }
 }
 
 void DsgFrontend::archivePlaces(const NodeIdSet active_places) {
@@ -533,16 +536,94 @@ void DsgFrontend::addPlaceAgentEdges(uint64_t timestamp_ns) {
   deleted_agent_edge_indices_.clear();
 }
 
-void DsgFrontend::updatePlaceMeshMapping() {
+size_t remapConnections(const kimera_pgmo::VoxbloxIndexMapping& remapping,
+                        const voxblox::IndexSet& archived_blocks,
+                        const std::vector<NearestVertexInfo>& connections,
+                        std::vector<size_t>& indices) {
+  size_t num_invalid = 0;
+  for (const auto& connection : connections) {
+    voxblox::BlockIndex idx = Eigen::Map<const voxblox::BlockIndex>(connection.block);
+    if (archived_blocks.count(idx)) {
+      continue;
+    }
+
+    const auto iter = remapping.find(idx);
+    if (iter == remapping.end()) {
+      num_invalid++;
+      continue;
+    }
+
+    const auto viter = iter->second.find(connection.vertex);
+    if (viter == iter->second.end()) {
+      num_invalid++;
+    } else {
+      indices.push_back(viter->second);
+    }
+  }
+  return num_invalid;
+}
+
+using MeshIndexMap = voxblox::AnyIndexHashMapType<size_t>::type;
+
+size_t getPlaceSemanticLabels(const voxblox_msgs::Mesh& mesh,
+                              const voxblox::IndexSet& archived_blocks,
+                              const MeshIndexMap& block_index_map,
+                              const kimera::SemanticLabel2Color& label_map,
+                              PlaceNodeAttributes& attrs) {
+  size_t num_invalid = 0;
+  for (const auto& connection : attrs.voxblox_mesh_connections) {
+    voxblox::BlockIndex idx = Eigen::Map<const voxblox::BlockIndex>(connection.block);
+    if (archived_blocks.count(idx)) {
+      continue;
+    }
+
+    auto iter = block_index_map.find(idx);
+    if (iter == block_index_map.end()) {
+      num_invalid++;
+      continue;
+    }
+
+    const auto& block = mesh.mesh_blocks[iter->second];
+    if (connection.vertex > block.r.size()) {
+      num_invalid++;
+      continue;
+    }
+
+    const kimera::HashableColor color(block.r[connection.vertex],
+                                      block.g[connection.vertex],
+                                      block.b[connection.vertex],
+                                      255);
+    attrs.mesh_vertex_labels.push_back(label_map.getSemanticLabelFromColor(color));
+  }
+
+  return num_invalid;
+}
+
+void DsgFrontend::updatePlaceMeshMapping(const ReconstructionOutput& input) {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
   const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
-  const auto& graph_mappings = mesh_frontend_.getVoxbloxMsgToGraphMapping();
-  const auto& mesh_mappings = mesh_frontend_.getVoxbloxMsgToMeshMapping();
+  const auto& graph_mapping = mesh_frontend_.getVoxbloxMsgToGraphMapping();
 
+  MeshIndexMap block_index_map;
+  size_t count = 0;
+  for (const auto& block : input.mesh->mesh.mesh_blocks) {
+    voxblox::BlockIndex idx;
+    idx << block.index[0], block.index[1], block.index[2];
+    block_index_map[idx] = count;
+    ++count;
+  }
+
+  voxblox::IndexSet archived_blocks;
+  for (const auto& block : input.mesh->archived_blocks.mesh_blocks) {
+    voxblox::BlockIndex idx;
+    idx << block.index[0], block.index[1], block.index[2];
+    archived_blocks.insert(idx);
+  }
+
+  size_t num_missing = 0;
   size_t num_deform_invalid = 0;
   size_t num_mesh_invalid = 0;
-  size_t num_processed = 0;
-  size_t num_vertices_processed = 0;
+  size_t num_semantic_invalid = 0;
   for (const auto& id_node_pair : places.nodes()) {
     auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
     if (!attrs.is_active) {
@@ -550,61 +631,34 @@ void DsgFrontend::updatePlaceMeshMapping() {
     }
 
     if (attrs.voxblox_mesh_connections.empty()) {
+      ++num_missing;
       continue;
     }
 
-    ++num_processed;
-
-    // reset connections (and mark inactive to avoid processing outside active window)
-    attrs.pcl_mesh_connections.clear();
-    attrs.pcl_mesh_connections.reserve(attrs.voxblox_mesh_connections.size());
-    attrs.mesh_vertex_labels.clear();
-    attrs.mesh_vertex_labels.reserve(attrs.voxblox_mesh_connections.size());
+    // reset connections
     attrs.deformation_connections.clear();
-    attrs.deformation_connections.reserve(attrs.voxblox_mesh_connections.size());
-
-    for (const auto& connection : attrs.voxblox_mesh_connections) {
-      voxblox::BlockIndex index =
-          Eigen::Map<const voxblox::BlockIndex>(connection.block);
-
-      ++num_vertices_processed;
-      if (!mesh_mappings.count(index)) {
-        continue;
-      }
-
-      const auto& conn_idx = connection.vertex;
-
-      const auto& graph_mapping = graph_mappings.at(index);
-      if (!graph_mapping.count(conn_idx)) {
-        num_deform_invalid++;
-      } else {
-        attrs.deformation_connections.push_back(graph_mapping.at(conn_idx));
-      }
-
-      const auto& vertex_mapping = mesh_mappings.at(index);
-      if (!vertex_mapping.count(conn_idx)) {
-        num_mesh_invalid++;
-        continue;
-      }
-
-      const auto vertex_idx = vertex_mapping.at(conn_idx);
-      const auto label = segmenter_->getVertexLabel(*label_map_, vertex_idx);
-      if (!label) {
-        continue;
-      }
-
-      attrs.pcl_mesh_connections.push_back(vertex_idx);
-      attrs.mesh_vertex_labels.push_back(*label);
+    attrs.pcl_mesh_connections.clear();
+    attrs.mesh_vertex_labels.clear();
+    num_deform_invalid += remapConnections(graph_mapping,
+                                           archived_blocks,
+                                           attrs.voxblox_mesh_connections,
+                                           attrs.deformation_connections);
+    if (mesh_remapping_) {
+      num_mesh_invalid += remapConnections(*mesh_remapping_,
+                                           archived_blocks,
+                                           attrs.voxblox_mesh_connections,
+                                           attrs.pcl_mesh_connections);
     }
+
+    num_semantic_invalid += getPlaceSemanticLabels(
+        input.mesh->mesh, archived_blocks, block_index_map, *label_map_, attrs);
   }
 
-  VLOG(2) << "[Hydra Frontend] Mesh-Remapping: " << num_processed << " places, "
-          << num_vertices_processed << " vertices";
-
-  if (num_deform_invalid || num_mesh_invalid) {
-    VLOG(2) << "[Hydra Frontend] Place-Mesh Update: " << num_deform_invalid
-            << " invalid deformation graph connections, " << num_mesh_invalid
-            << " invalid mesh connections";
+  if (config_.validate_vertices) {
+    CHECK_EQ(num_deform_invalid, 0u);
+    CHECK_EQ(num_mesh_invalid, 0u);
+    CHECK_EQ(num_missing, 0u);
+    CHECK_EQ(num_semantic_invalid, 0u);
   }
 }
 

@@ -39,19 +39,28 @@
 #include <mesh_msgs/TriangleMeshStamped.h>
 #include <ros/ros.h>
 
+#include <optional>
+
 namespace hydra {
 
 class DsgSender {
  public:
   explicit DsgSender(const ros::NodeHandle& nh,
-                     const std::string& timer_name = "publish_dsg");
+                     const std::string& timer_name = "publish_dsg",
+                     bool publish_mesh = false,
+                     double min_mesh_separation_s = 0.0);
 
   void sendGraph(const DynamicSceneGraph& graph, const ros::Time& stamp) const;
 
  private:
   ros::NodeHandle nh_;
   ros::Publisher pub_;
+  ros::Publisher mesh_pub_;
+  mutable std::optional<uint64_t> last_mesh_time_ns_;
+
   std::string timer_name_;
+  bool publish_mesh_;
+  double min_mesh_separation_s_;
 };
 
 class DsgReceiver {

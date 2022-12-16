@@ -34,8 +34,8 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <hydra_dsg_builder/incremental_dsg_frontend.h>
-#include <hydra_utils/semantic_ros_publishers.h>
 #include <hydra_utils/dsg_streaming_interface.h>
+#include <hydra_utils/semantic_ros_publishers.h>
 #include <kimera_pgmo/MeshFrontend.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/approximate_time.h>
@@ -99,11 +99,11 @@ struct RosFrontend : public DsgFrontend {
   void bowCallback(const BowQuery::ConstPtr& msg);
 
   void publishActiveVertices(const MeshSegmenter::MeshVertexCloud& vertices,
-                             const std::vector<size_t>& indices,
+                             const MeshSegmenter::IndicesVector& indices,
                              const MeshSegmenter::LabelIndices&) const;
 
   void publishObjectClouds(const MeshSegmenter::MeshVertexCloud& vertices,
-                           const std::vector<size_t>&,
+                           const MeshSegmenter::IndicesVector&,
                            const MeshSegmenter::LabelIndices& label_indices) const;
 
   std::optional<Eigen::Vector3d> getLatestPosition() const;

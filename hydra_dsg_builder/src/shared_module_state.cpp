@@ -39,7 +39,7 @@
 namespace hydra {
 namespace incremental {
 
-SharedModuleState::SharedModuleState() : have_new_mesh(false) {}
+SharedModuleState::SharedModuleState() {}
 
 SharedModuleState::~SharedModuleState() {
   VLOG(2) << "visual_lcd_queue: " << visual_lcd_queue.size();

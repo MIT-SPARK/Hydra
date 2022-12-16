@@ -81,8 +81,6 @@ DynamicSceneGraphVisualizer::DynamicSceneGraphVisualizer(
   for (const auto& id : layer_ids) {
     prev_labels_[id] = {};
     curr_labels_[id] = {};
-    prev_bboxes_[id] = {};
-    curr_bboxes_[id] = {};
   }
 
   dynamic_layers_viz_pub_ = nh_.advertise<MarkerArray>("dynamic_layers_viz", 1, true);
@@ -284,9 +282,7 @@ void DynamicSceneGraphVisualizer::resetImpl(const std_msgs::Header& header,
   for (const auto& id_layer_pair : scene_graph_->layers()) {
     const LayerId layer_id = id_layer_pair.first;
     const std::string label_ns = getLayerLabelNamespace(layer_id);
-    const std::string bbox_ns = getLayerBboxNamespace(layer_id);
     clearPrevMarkers(header, {}, label_ns, prev_labels_.at(layer_id), msg);
-    clearPrevMarkers(header, {}, bbox_ns, prev_bboxes_.at(layer_id), msg);
   }
 
   for (auto& label_set : prev_labels_) {
@@ -294,12 +290,6 @@ void DynamicSceneGraphVisualizer::resetImpl(const std_msgs::Header& header,
   }
   for (auto& label_set : curr_labels_) {
     label_set.second.clear();
-  }
-  for (auto& bbox_set : prev_bboxes_) {
-    bbox_set.second.clear();
-  }
-  for (auto& bbox_set : curr_bboxes_) {
-    bbox_set.second.clear();
   }
 
   // vanilla scene graph also makes delete markers for dynamic layers, so we duplicate
@@ -339,7 +329,9 @@ void DynamicSceneGraphVisualizer::redrawImpl(const std_msgs::Header& header,
     }
   }
 
-  drawLayerMeshEdges(header, mesh_edge_source_layer_, mesh_edge_ns_, msg);
+  if (visualizer_config_->get().draw_mesh_edges) {
+    drawLayerMeshEdges(header, mesh_edge_source_layer_, mesh_edge_ns_, msg);
+  }
 
   std::map<LayerId, LayerConfig> all_configs;
   for (const auto& id_manager_pair : layer_configs_) {
@@ -505,6 +497,7 @@ void DynamicSceneGraphVisualizer::deleteLayer(const std_msgs::Header& header,
                                               MarkerArray& msg) {
   deleteMultiMarker(header, getLayerNodeNamespace(layer.id), msg);
   deleteMultiMarker(header, getLayerEdgeNamespace(layer.id), msg);
+  deleteMultiMarker(header, getLayerBboxNamespace(layer.id), msg);
 
   const std::string label_ns = getLayerLabelNamespace(layer.id);
   for (const auto& node : prev_labels_.at(layer.id)) {
@@ -512,13 +505,6 @@ void DynamicSceneGraphVisualizer::deleteLayer(const std_msgs::Header& header,
     msg.markers.push_back(marker);
   }
   prev_labels_.at(layer.id).clear();
-
-  const std::string bbox_ns = getLayerBboxNamespace(layer.id);
-  for (const auto& node : prev_bboxes_.at(layer.id)) {
-    Marker marker = makeDeleteMarker(header, node, bbox_ns);
-    msg.markers.push_back(marker);
-  }
-  prev_bboxes_.at(layer.id).clear();
 }
 
 void DynamicSceneGraphVisualizer::drawLayer(const std_msgs::Header& header,
@@ -564,10 +550,8 @@ void DynamicSceneGraphVisualizer::drawLayer(const std_msgs::Header& header,
   addMultiMarkerIfValid(edges, msg);
 
   const std::string label_ns = getLayerLabelNamespace(layer.id);
-  const std::string bbox_ns = getLayerBboxNamespace(layer.id);
 
   curr_labels_.at(layer.id).clear();
-  curr_bboxes_.at(layer.id).clear();
   for (const auto& id_node_pair : layer.nodes()) {
     const Node& node = *id_node_pair.second;
 
@@ -576,24 +560,29 @@ void DynamicSceneGraphVisualizer::drawLayer(const std_msgs::Header& header,
       msg.markers.push_back(label);
       curr_labels_.at(layer.id).insert(node.id);
     }
-
-    if (config.use_bounding_box) {
-      try {
-        node.attributes<SemanticNodeAttributes>();
-      } catch (const std::bad_cast&) {
-        continue;
-      }
-
-      Marker bbox = makeBoundingBoxMarker(header, config, node, viz_config, bbox_ns);
-      msg.markers.push_back(bbox);
-      curr_bboxes_.at(layer.id).insert(node.id);
-    }
   }
 
   clearPrevMarkers(
       header, curr_labels_.at(layer.id), label_ns, prev_labels_.at(layer.id), msg);
-  clearPrevMarkers(
-      header, curr_bboxes_.at(layer.id), bbox_ns, prev_bboxes_.at(layer.id), msg);
+
+  if (config.use_bounding_box) {
+    const std::string bbox_ns = getLayerBboxNamespace(layer.id);
+    const std::string bbox_edge_ns = getLayerBboxEdgeNamespace(layer.id);
+    try {
+      Marker bbox =
+          makeLayerWireframeBoundingBoxes(header, config, layer, viz_config, bbox_ns);
+      addMultiMarkerIfValid(bbox, msg);
+
+      if (config.collapse_bounding_box) {
+        Marker bbox_edges =
+            makeEdgesToBoundingBoxes(header, config, layer, viz_config, bbox_edge_ns);
+        addMultiMarkerIfValid(bbox_edges, msg);
+      }
+    } catch (const std::bad_cast&) {
+      // TODO(nathan) consider warning
+      return;
+    }
+  }
 }
 
 void DynamicSceneGraphVisualizer::drawLayerMeshEdges(const std_msgs::Header& header,

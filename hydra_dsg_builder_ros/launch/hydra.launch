@@ -35,6 +35,7 @@
     <arg name="extrinsics" if="$(arg do_reconstruction)"/>
     <arg name="pointcloud_topic" if="$(arg do_reconstruction)"/>
     <arg name="use_ros_backend" default="false"/>
+    <arg name="validate_vertices" default="false"/>
 
     <arg name="debug" default="false"/>
     <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
@@ -73,6 +74,7 @@
         <param name="use_pose_graph" value="$(eval not arg('use_gt_frame'))"/>
         <param name="do_reconstruction" value="$(arg do_reconstruction)"/>
         <param name="visualize_reconstruction" value="$(arg visualize_reconstruction)"/>
+        <param name="min_mesh_separation_s" value="0.5"/>
         <param name="enable_reconstruction_output_queue" value="true"/>
         <param name="publish_reconstruction_mesh" value="$(arg visualize_reconstruction)"/>
         <param name="use_ros_backend" value="$(arg use_ros_backend)"/>
@@ -91,6 +93,7 @@
         <param name="world_frame" value="$(arg world_frame)"/>
         <param name="robot_frame" value="$(arg sensor_frame)"/>
         <param name="show_stats" value="$(arg show_topology_stats)"/>
+        <param name="validate_vertices" value="$(arg validate_vertices)"/>
 
         <param name="dsg/optimize_on_lc" value="$(arg optimize_on_lc)"/>
         <param name="dsg/enable_merge_undos" value="$(arg enable_merge_undos)"/>
@@ -114,7 +117,7 @@
 
         <include file="$(find pose_graph_tools)/launch/posegraph_view.launch">
             <arg name="frame_id"      value="$(arg world_frame)" />
-            <arg name="graph_topic"   value="incremental_dsg_builder_node/pgmo/pose_graph" />
+            <arg name="graph_topic"   value="pose_graph" />
             <arg name="ns"            value="incremental_dsg_builder_node/pgmo"/>
         </include>
     </group>

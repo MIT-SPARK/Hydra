@@ -150,7 +150,6 @@ struct DsgBackendConfig {
   bool add_places_to_deformation_graph = true;
   bool optimize_on_lc = true;
   bool enable_node_merging = true;
-  bool call_update_periodically = true;
   bool use_mesh_subscribers = false;
   std::map<LayerId, bool> merge_update_map{{DsgLayers::OBJECTS, false},
                                            {DsgLayers::PLACES, true},
@@ -214,7 +213,6 @@ void visit_config(const Visitor& v, DsgBackendConfig& config) {
                    config.add_places_to_deformation_graph);
   dsg_handle.visit("optimize_on_lc", config.optimize_on_lc);
   dsg_handle.visit("enable_node_merging", config.enable_node_merging);
-  dsg_handle.visit("call_update_periodically", config.call_update_periodically);
   dsg_handle.visit("merge_update_map", config.merge_update_map, EnableMapConverter());
   dsg_handle.visit("merge_update_dynamic", config.merge_update_dynamic);
   dsg_handle.visit("places_merge_pos_threshold_m", config.places_merge_pos_threshold_m);

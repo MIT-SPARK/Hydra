@@ -33,13 +33,14 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder/incremental_dsg_backend.h"
-#include "hydra_dsg_builder/minimum_spanning_tree.h"
-#include "hydra_dsg_builder/hydra_config.h"
 
 #include <glog/logging.h>
 #include <hydra_utils/timing_utilities.h>
 #include <pcl/search/kdtree.h>
 #include <voxblox/core/block_hash.h>
+
+#include "hydra_dsg_builder/hydra_config.h"
+#include "hydra_dsg_builder/minimum_spanning_tree.h"
 
 namespace hydra {
 namespace incremental {
@@ -83,7 +84,8 @@ DsgBackend::DsgBackend(const RobotPrefixConfig& prefix,
     throw std::runtime_error("invalid pgmo config");
   }
 
-  optimized_mesh_.reset(new pcl::PolygonMesh());
+  private_dsg_->graph->initMesh();
+  original_vertices_.reset(new pcl::PointCloud<pcl::PointXYZRGBA>());
   setDefaultUpdateFunctions();
   deformation_graph_->setForceRecalculate(!config_.pgmo.gnc_fix_prev_inliers);
   deformation_graph_->storeOnlyNoOptimization();
@@ -154,9 +156,8 @@ void DsgBackend::save(const std::string& output_path) {
   }
 
   if (!private_dsg_->graph->isMeshEmpty()) {
-    kimera_pgmo::WriteMeshWithStampsToPly(output_path + "/mesh.ply",
-                                          private_dsg_->graph->getMesh(),
-                                          *mesh_vertex_stamps_);
+    kimera_pgmo::WriteMeshWithStampsToPly(
+        output_path + "/mesh.ply", private_dsg_->graph->getMesh(), mesh_timestamps_);
   }
 
   const std::string output_csv = output_path + "/loop_closures.csv";
@@ -183,7 +184,6 @@ void DsgBackend::save(const std::string& output_path) {
     output_file << std::endl;
   }
 }
-
 
 void DsgBackend::spin() {
   bool should_shutdown = false;
@@ -222,6 +222,20 @@ void DsgBackend::spinOnce(const BackendInput& input, bool force_update) {
   updateFromLcdQueue();
   status_.total_loop_closures_ = num_loop_closures_;
 
+  if (!config_.use_mesh_subscribers) {
+    {  // start timing scope
+      ScopedTimer timer("backend/copy_mesh_delta", input.timestamp_ns);
+      input.mesh_update->updateMesh(*private_dsg_->graph->getMeshVertices(),
+                                    mesh_timestamps_,
+                                    *private_dsg_->graph->getMeshFaces());
+      input.mesh_update->updateVertices(*original_vertices_);
+      // we use this to make sure that deformation only happens for vertices that are
+      // still active
+      num_archived_vertices_ = input.mesh_update->getTotalArchivedVertices();
+      have_new_mesh_ = true;
+    }  // end timing scope
+  }
+
   if (!updatePrivateDsg(input.timestamp_ns, force_update)) {
     // we only read from the frontend dsg if we've processed all the
     // factor graph update packets (as long as force_update is false)
@@ -230,14 +244,9 @@ void DsgBackend::spinOnce(const BackendInput& input, bool force_update) {
     return;
   }
 
-  if (!config_.use_mesh_subscribers) {
-    // copy latest mesh if we getting it directly from the frontend
-    updateFromSharedState(input.timestamp_ns);
-  }
-
   if (config_.optimize_on_lc && have_loopclosures_) {
     optimize(input.timestamp_ns);
-  } else if (config_.call_update_periodically) {
+  } else {
     updateDsgMesh(input.timestamp_ns);
     callUpdateFunctions(input.timestamp_ns);
   }
@@ -247,19 +256,19 @@ void DsgBackend::spinOnce(const BackendInput& input, bool force_update) {
   }
 
   for (const auto& cb_func : output_callbacks_) {
-    cb_func(*private_dsg_->graph,
-            *optimized_mesh_,
-            *deformation_graph_,
-            input.timestamp_ns);
+    cb_func(*private_dsg_->graph, *deformation_graph_, input.timestamp_ns);
   }
 }
 
 void DsgBackend::loadState(const std::string& state_path,
                            const std::string& dgrf_path) {
-  latest_mesh_.reset(new pcl::PolygonMesh());
-  mesh_vertex_stamps_.reset(new std::vector<ros::Time>());
-  kimera_pgmo::ReadMeshWithStampsFromPly(
-      state_path + "/mesh.ply", *latest_mesh_, mesh_vertex_stamps_.get());
+  const std::string mesh_path = state_path + "/mesh.ply";
+
+  pcl::PolygonMesh mesh;
+  kimera_pgmo::ReadMeshWithStampsFromPly(mesh_path, mesh, &mesh_timestamps_);
+  *private_dsg_->graph->getMeshFaces() = mesh.polygons;
+  pcl::fromPCLPointCloud2(mesh.cloud, *private_dsg_->graph->getMeshVertices());
+
   have_new_mesh_ = true;
 
   loadDeformationGraphFromFile(dgrf_path);
@@ -317,7 +326,6 @@ void DsgBackend::setDefaultUpdateFunctions() {
                                         std::placeholders::_1,
                                         std::placeholders::_2));
 }
-
 
 void DsgBackend::updateFactorGraph(const BackendInput& input) {
   ScopedTimer timer("backend/process_factors", input.timestamp_ns);
@@ -397,6 +405,21 @@ bool DsgBackend::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
     // connections and attributes
     merge_handler_->updateFromUnmergedGraph(*shared_dsg_->graph);
 
+    const auto& objects = shared_dsg_->graph->getLayer(DsgLayers::OBJECTS);
+    for (const auto& id_node_pair : objects.nodes()) {
+      const auto node_opt = private_dsg_->graph->getNode(id_node_pair.first);
+      if (!node_opt) {
+        continue;
+      }
+
+      // TODO(nathan) we might need to think about checking the is_active flag here, but
+      // no guarantee that mesh vertice aren't remapped under an inactive object node
+
+      const auto& attrs = id_node_pair.second->attributes<ObjectNodeAttributes>();
+      auto& private_attrs = node_opt->get().attributes<ObjectNodeAttributes>();
+      private_attrs.mesh_connections = attrs.mesh_connections;
+    }
+
     if (shared_dsg_->graph->hasLayer(DsgLayers::PLACES)) {
       // TODO(nathan) simplify
       const auto& places = shared_dsg_->graph->getLayer(DsgLayers::PLACES);
@@ -414,22 +437,6 @@ bool DsgBackend::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
   }
 
   return true;
-}
-
-void DsgBackend::updateFromSharedState(size_t timestamp_ns) {
-  std::unique_lock<std::mutex> lock(state_->mesh_mutex);
-  ScopedTimer timer("backend/update_from_shared", timestamp_ns);
-  if (state_->have_new_mesh) {
-    // latch the pointer so that frontend can copy a new one without
-    // getting tied up waiting for the mesh interpolation
-    latest_mesh_ = state_->latest_mesh;
-    mesh_vertex_stamps_ = state_->mesh_vertex_stamps;
-    mesh_vertex_graph_inds_ = state_->mesh_vertex_graph_indices;
-    update_objects_functor_->invalid_indices.reset(new std::set<size_t>(
-        state_->invalid_indices->begin(), state_->invalid_indices->end()));
-    state_->have_new_mesh = false;
-    have_new_mesh_ = true;
-  }
 }
 
 void DsgBackend::addPlacesToDeformationGraph(size_t timestamp_ns) {
@@ -496,8 +503,6 @@ void DsgBackend::addPlacesToDeformationGraph(size_t timestamp_ns) {
     deformation_graph_->addNewTempEdges(mst_edges, config_.pgmo.place_edge_variance);
   }  // end timing scope
 }
-
-const pcl::PolygonMesh* DsgBackend::getLatestMesh() { return latest_mesh_.get(); }
 
 void DsgBackend::addLoopClosure(const gtsam::Key& src,
                                 const gtsam::Key& dest,
@@ -569,28 +574,30 @@ void DsgBackend::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
     return;
   }
 
-  auto mesh = getLatestMesh();
-  if (!mesh || mesh->cloud.height * mesh->cloud.width == 0) {
+  have_new_mesh_ = false;
+  if (private_dsg_->graph->isMeshEmpty()) {
     return;
   }
-  have_new_mesh_ = false;
 
-  ScopedTimer timer("backend/mesh_update", timestamp_ns);
-  VLOG(3) << "Deforming mesh with " << mesh_vertex_stamps_->size() << " vertices";
-
-  // TODO(nathan) check if copying happening
-  optimized_mesh_.reset(new pcl::PolygonMesh(
-      deformation_graph_->deformMesh(*latest_mesh_,
-                                     *mesh_vertex_stamps_,
-                                     *mesh_vertex_graph_inds_,
-                                     prefix_.vertex_key,
-                                     KimeraPgmoInterface::config_.num_interp_pts,
-                                     KimeraPgmoInterface::config_.interp_horizon)));
-  {
-    // start private dsg critical section
-    std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
-    private_dsg_->graph->setMeshDirectly(*optimized_mesh_);
+  if (!force_mesh_update && !have_loopclosures_) {
+    // we don't need to deform the mesh if we haven't found any loop closures yet
+    // note that the first time we get a loop closure, we will deform the entire mesh
+    // and cache the number of archived vertices and their values then
+    return;
   }
+
+  ScopedTimer timer("backend/mesh_deformation", timestamp_ns);
+  VLOG(3) << "Deforming mesh with " << mesh_timestamps_.size() << " vertices";
+  deformation_graph_->deformPoints(*private_dsg_->graph->getMeshVertices(),
+                                   *original_vertices_,
+                                   mesh_timestamps_,
+                                   prefix_.vertex_key,
+                                   deformation_graph_->getGtsamValues(),
+                                   KimeraPgmoInterface::config_.num_interp_pts,
+                                   KimeraPgmoInterface::config_.interp_horizon,
+                                   nullptr,
+                                   prev_num_archived_vertices_);
+  prev_num_archived_vertices_ = num_archived_vertices_;
 }
 
 void DsgBackend::optimize(size_t timestamp_ns) {
@@ -605,10 +612,10 @@ void DsgBackend::optimize(size_t timestamp_ns) {
 
   updateDsgMesh(timestamp_ns, true);
 
-  gtsam::Values pgmo_values = deformation_graph_->getGtsamValues();
-  gtsam::Values places_values = deformation_graph_->getGtsamTempValues();
-
-  callUpdateFunctions(timestamp_ns, places_values, pgmo_values, have_new_loopclosures_);
+  callUpdateFunctions(timestamp_ns,
+                      deformation_graph_->getGtsamTempValues(),
+                      deformation_graph_->getGtsamValues(),
+                      have_new_loopclosures_);
   have_new_loopclosures_ = false;
 }
 
@@ -633,8 +640,10 @@ void DsgBackend::callUpdateFunctions(size_t timestamp_ns,
         continue;
       }
 
-      const auto& sparse_T_dense = sparse_frames_.at(sparse_key).keyed_transforms.at(dense_key);
-      gtsam::Pose3 agent_pose = pgmo_values.at<gtsam::Pose3>(sparse_key).compose(sparse_T_dense);
+      const auto& sparse_T_dense =
+          sparse_frames_.at(sparse_key).keyed_transforms.at(dense_key);
+      gtsam::Pose3 agent_pose =
+          pgmo_values.at<gtsam::Pose3>(sparse_key).compose(sparse_T_dense);
       complete_agent_values.insert(dense_key, agent_pose);
     }
   }

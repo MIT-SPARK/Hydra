@@ -43,6 +43,7 @@
 #include <hydra_utils/input_queue.h>
 #include <hydra_utils/robot_prefix_config.h>
 #include <kimera_pgmo/MeshFrontendInterface.h>
+#include <kimera_pgmo/compression/DeltaCompression.h>
 #include <spark_dsg/scene_graph_logger.h>
 
 #include <memory>
@@ -58,6 +59,7 @@ class DsgFrontend {
  public:
   using FrontendInputQueue = InputQueue<ReconstructionOutput::Ptr>;
   using InputCallback = std::function<void(const ReconstructionOutput&)>;
+  using OutputCallback = std::function<void(const DynamicSceneGraph& graph, uint64_t)>;
   using DynamicLayer = DynamicSceneGraphLayer;
 
   DsgFrontend(const RobotPrefixConfig& prefix,
@@ -79,10 +81,14 @@ class DsgFrontend {
 
   inline FrontendInputQueue::Ptr getQueue() const { return queue_; }
 
+  void addOutputCallback(const OutputCallback& callback);
+
  protected:
   void spinOnce(const ReconstructionOutput& input);
 
   void updateMeshAndObjects(const ReconstructionOutput& input);
+
+  void updateDeformationGraph(const ReconstructionOutput& input);
 
   void updatePlaces(const ReconstructionOutput& input);
 
@@ -91,9 +97,7 @@ class DsgFrontend {
  protected:
   void archivePlaces(const NodeIdSet active_places);
 
-  void invalidateMeshEdges();
-
-  void copyMesh(size_t timestamp_ns);
+  void invalidateMeshEdges(const kimera_pgmo::MeshDelta& delta);
 
   void addPlaceObjectEdges(uint64_t timestamp_ns,
                            NodeIdSet* extra_objects_to_check = nullptr);
@@ -102,7 +106,7 @@ class DsgFrontend {
 
   void assignBowVectors(const DynamicLayer& agents);
 
-  void updatePlaceMeshMapping();
+  void updatePlaceMeshMapping(const ReconstructionOutput& input);
 
  protected:
   std::atomic<bool> should_shutdown_{false};
@@ -117,8 +121,12 @@ class DsgFrontend {
   std::unique_ptr<kimera::SemanticLabel2Color> label_map_;
   SharedDsgInfo::Ptr dsg_;
   SharedModuleState::Ptr state_;
+  std::vector<ros::Time> mesh_timestamps_;
 
   kimera_pgmo::MeshFrontendInterface mesh_frontend_;
+  std::unique_ptr<kimera_pgmo::DeltaCompression> mesh_compression_;
+  std::shared_ptr<kimera_pgmo::VoxbloxIndexMapping> mesh_remapping_;
+
   std::unique_ptr<MeshSegmenter> segmenter_;
   SceneGraphLogger frontend_graph_logger_;
 
@@ -131,6 +139,7 @@ class DsgFrontend {
   std::list<pose_graph_tools::BowQuery::ConstPtr> cached_bow_messages_;
 
   std::vector<InputCallback> input_callbacks_;
+  std::vector<OutputCallback> output_callbacks_;
 };
 
 }  // namespace incremental
