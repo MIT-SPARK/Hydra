@@ -33,9 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/config_utils.h"
 #include "hydra_dsg_builder/incremental_mesh_segmenter.h"
 
+#include <hydra_utils/config.h>
+#include <hydra_utils/eigen_config_types.h>
 #include <kimera_pgmo/MeshFrontendInterface.h>
 
 namespace spark_dsg {
@@ -55,11 +56,12 @@ namespace kimera_pgmo {
 
 template <typename Visitor>
 void visit_config(const Visitor& v, kimera_pgmo::MeshFrontendConfig& config) {
-  v.visit("robot_id", config.robot_id);
   v.visit("horizon", config.time_horizon);
   v.visit("track_mesh_graph_mapping", config.b_track_mesh_graph_mapping);
-  v.visit("log_path", config.log_path);
   v.visit("should_log", config.log_output);
+  if (config.log_output) {
+    v.visit("log_path", config.log_path);
+  }
   v.visit("full_compression_method", config.full_compression_method);
   v.visit("graph_compression_method", config.graph_compression_method);
   v.visit("d_graph_resolution", config.d_graph_resolution);
@@ -78,8 +80,27 @@ struct DsgFrontendConfig {
   size_t min_object_vertices = 20;
   bool prune_mesh_indices = false;
   std::string semantic_label_file;
+  bool lcd_use_bow_vectors = true;
   kimera_pgmo::MeshFrontendConfig pgmo_config;
   MeshSegmenterConfig object_config;
+};
+
+struct LabelConverter {
+  std::vector<int> from(const std::set<uint8_t>& input) const {
+    std::vector<int> to_return;
+    for (const auto& label : input) {
+      to_return.push_back(static_cast<int>(label));
+    }
+    return to_return;
+  }
+
+  std::set<uint8_t> to(const std::vector<int>& input) const {
+    std::set<uint8_t> to_return;
+    for (const auto& label : input) {
+      to_return.insert(static_cast<uint8_t>(label));
+    }
+    return to_return;
+  }
 };
 
 template <typename Visitor>
@@ -100,17 +121,20 @@ void visit_config(const Visitor& v, MeshSegmenterConfig& config) {
   v.visit("min_cluster_size", config.min_cluster_size);
   v.visit("max_cluster_size", config.max_cluster_size);
   v.visit("bounding_box_type", config.bounding_box_type);
-  v.visit("labels", config.labels);
+  v.visit("labels", config.labels, LabelConverter());
 }
 
 template <typename Visitor>
 void visit_config(const Visitor& v, DsgFrontendConfig& config) {
   // TODO(nathan) replace with single param (derive should_log from log_path)
   v.visit("should_log", config.should_log);
-  v.visit("log_path", config.log_path);
+  if (config.should_log) {
+    v.visit("log_path", config.log_path);
+  }
   v.visit("min_object_vertices", config.min_object_vertices);
   v.visit("prune_mesh_indices", config.prune_mesh_indices);
   v.visit("semantic_label_file", config.semantic_label_file);
+  v.visit("lcd_use_bow_vectors", config.lcd_use_bow_vectors);
   v.visit("pgmo", config.pgmo_config);
   v.visit("objects", config.object_config);
 }

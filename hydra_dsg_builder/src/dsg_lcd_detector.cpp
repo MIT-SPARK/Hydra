@@ -88,9 +88,15 @@ DsgLcdDetector::DsgLcdDetector(const DsgLcdDetectorConfig& config) : config_(con
   root_layer_ = internal_index_to_layer_.at(internal_idx - 1);
 
   match_config_map_[0] = config.agent_search_config;
-  if (config_.enable_agent_registration) {
-    registration_solvers_.emplace(0, std::make_unique<DsgAgentSolver>());
+}
+
+void DsgLcdDetector::setRegistrationSolver(size_t level,
+                                           DsgRegistrationSolver::Ptr&& solver) {
+  if (level == 0 && !config_.enable_agent_registration) {
+    return;
   }
+
+  registration_solvers_[level] = std::move(solver);
 }
 
 bool DsgLcdDetector::addNewDescriptors(const DynamicSceneGraph& graph,

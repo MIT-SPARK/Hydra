@@ -1,0 +1,6 @@
+*.swp
+*.idea
+*.ccls*
+*.vscode/
+*.ipynb_checkpoints/
+*.ipynb

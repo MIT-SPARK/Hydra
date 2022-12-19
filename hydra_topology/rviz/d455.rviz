@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /Grid1
       Splitter Ratio: 0.5
     Tree Height: 186
   - Class: rviz/Selection
@@ -47,7 +48,7 @@ Visualization Manager:
       Offset:
         X: 0
         Y: 0
-        Z: 0
+        Z: -1
       Plane: XY
       Plane Cell Count: 1000
       Reference Frame: <Fixed Frame>
@@ -88,7 +89,7 @@ Visualization Manager:
     - Class: voxblox_rviz_plugin/VoxbloxMesh
       Enabled: true
       Name: Mesh
-      Topic: /hydra_topology_node/mesh_viz
+      Topic: /hydra_topology_node/mesh
       Unreliable: false
       Value: true
     - Class: rviz/Marker
@@ -163,7 +164,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 14.049280166625977
+      Distance: 21.729537963867188
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -178,10 +179,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.8853979110717773
+      Pitch: 1.1253979206085205
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 1.2003977298736572
+      Yaw: 0.7503988742828369
     Saved: ~
 Window Geometry:
   Depth:

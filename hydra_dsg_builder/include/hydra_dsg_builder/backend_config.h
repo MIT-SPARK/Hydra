@@ -33,10 +33,12 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/config_utils.h"
 #include "hydra_dsg_builder/incremental_room_finder.h"
 
 #include <KimeraRPGO/SolverParams.h>
+#include <hydra_utils/config.h>
+#include <hydra_utils/eigen_config_types.h>
+#include <kimera_pgmo/KimeraPgmoInterface.h>
 #include <voxblox_ros/mesh_vis.h>
 
 namespace hydra {
@@ -59,7 +61,62 @@ DECLARE_CONFIG_ENUM(KimeraRPGO,
                     {Verbosity::QUIET, "QUIET"},
                     {Verbosity::VERBOSE, "VERBOSE"})
 
+DECLARE_CONFIG_ENUM(kimera_pgmo,
+                    RunMode,
+                    {RunMode::FULL, "FULL"},
+                    {RunMode::MESH, "MESH"},
+                    {RunMode::DPGMO, "DPGMO"})
+
 DECLARE_CONFIG_ENUM(KimeraRPGO, Solver, {Solver::LM, "LM"}, {Solver::GN, "GN"})
+
+namespace kimera_pgmo {
+
+template <typename Visitor>
+void visit_config(const Visitor& v, KimeraPgmoConfig& config) {
+  if (!config_parser::is_parser<Visitor>()) {
+    v.visit("run_mode", config.mode);
+  } else {
+    int mode = 0;
+    v.visit("run_mode", mode);
+    config.mode = static_cast<RunMode>(mode);
+  }
+
+  v.visit("use_msg_time", config.use_msg_time);
+  v.visit("embed_trajectory_delta_t", config.embed_delta_t);
+  v.visit("num_interp_pts", config.num_interp_pts);
+  v.visit("interp_horizon", config.interp_horizon);
+  v.visit("add_initial_prior", config.b_add_initial_prior);
+  v.visit("output_prefix", config.log_path);
+
+  auto covar_handle = v["covariance"];
+  covar_handle.visit("odom", config.odom_variance);
+  covar_handle.visit("loop_close", config.lc_variance);
+  covar_handle.visit("prior", config.prior_variance);
+  covar_handle.visit("mesh_mesh", config.mesh_edge_variance);
+  covar_handle.visit("pose_mesh", config.pose_mesh_variance);
+
+  auto rpgo_handle = v["rpgo"];
+  rpgo_handle.visit("odom_trans_threshold", config.odom_trans_threshold);
+  rpgo_handle.visit("odom_rot_threshold", config.odom_rot_threshold);
+  rpgo_handle.visit("pcm_trans_threshold", config.pcm_trans_threshold);
+  rpgo_handle.visit("pcm_rot_threshold", config.pcm_rot_threshold);
+  rpgo_handle.visit("gnc_alpha", config.gnc_alpha);
+  rpgo_handle.visit("gnc_max_iterations", config.gnc_max_it);
+  rpgo_handle.visit("gnc_mu_step", config.gnc_mu_step);
+  rpgo_handle.visit("gnc_cost_tolerance", config.gnc_cost_tol);
+  rpgo_handle.visit("gnc_weight_tolerance", config.gnc_weight_tol);
+  rpgo_handle.visit("gnc_fix_prev_inliers", config.gnc_fix_prev_inliers);
+  rpgo_handle.visit("lm_diagonal_damping", config.lm_diagonal_damping);
+
+  if (!config_parser::is_parser<Visitor>()) {
+    v.visit("valid", config.valid);
+  } else {
+    // TODO(nathan) might want to track actual validity
+    config.valid = true;
+  }
+}
+
+}  // namespace kimera_pgmo
 
 namespace hydra {
 namespace incremental {
@@ -136,7 +193,9 @@ template <typename Visitor>
 void visit_config(const Visitor& v, DsgBackendConfig& config) {
   // TODO(nathan) replace with single param (derive should_log from log_path)
   v.visit("should_log", config.should_log);
-  v.visit("log_path", config.log_path);
+  if (config.should_log) {
+    v.visit("log_path", config.log_path);
+  }
   v.visit("visualize_place_factors", config.visualize_place_factors);
   v.visit("building_color", config.building_color);
   v.visit("building_semantic_label", config.building_semantic_label);
@@ -167,7 +226,9 @@ template <typename Visitor>
 void visit_config(const Visitor& v, DsgBackendConfig::PgmoConfig& config) {
   // TODO(nathan) replace with single param (derive should_log from log_path)
   v.visit("should_log", config.should_log);
-  v.visit("log_path", config.log_path);
+  if (config.should_log) {
+    v.visit("log_path", config.log_path);
+  }
   auto covar_handle = v["covariance"];
   covar_handle.visit("place_mesh", config.place_mesh_variance);
   covar_handle.visit("place_edge", config.place_edge_variance);
@@ -210,3 +271,4 @@ void visit_config(const Visitor& v, RoomFinder::Config& config) {
 
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra::incremental, RoomFinder::Config)
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra::incremental, DsgBackendConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(kimera_pgmo, KimeraPgmoConfig)

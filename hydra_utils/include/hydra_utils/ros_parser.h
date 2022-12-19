@@ -49,10 +49,11 @@ bool readRosParam(const ros::NodeHandle& nh, const std::string& name, T& value) 
 }
 
 template <typename T,
+          typename Alloc = std::allocator<T>,
           typename std::enable_if<is_base_ros_param<T>::value, bool>::type = true>
 bool readRosParam(const ros::NodeHandle& nh,
                   const std::string& name,
-                  std::vector<T>& value) {
+                  std::vector<T, Alloc>& value) {
   return nh.getParam(name, value);
 }
 
@@ -98,12 +99,13 @@ bool readRosParam(const ros::NodeHandle& nh, const std::string& name, T& value) 
 }
 
 template <typename T,
+          typename Alloc = std::allocator<T>,
           typename std::enable_if<std::conjunction<std::negation<is_base_ros_param<T>>,
                                                    std::is_integral<T>>::value,
                                   bool>::type = true>
 bool readRosParam(const ros::NodeHandle& nh,
                   const std::string& name,
-                  std::vector<T>& value) {
+                  std::vector<T, Alloc>& value) {
   std::vector<int> placeholders;
   if (!nh.getParam(name, placeholders)) {
     return false;

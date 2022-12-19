@@ -35,8 +35,6 @@
 #pragma once
 #include <gtsam/geometry/Pose3.h>
 #include <hydra_utils/dsg_types.h>
-#include <kimera_pgmo/utils/CommonStructs.h>
-#include <ros/time.h>
 
 #include <atomic>
 #include <map>
@@ -79,9 +77,9 @@ struct SharedDsgInfo {
       : updated(false), last_update_time(0) {
     DynamicSceneGraph::LayerIds layer_ids;
     for (const auto& id_key_pair : layer_id_map) {
-      CHECK(id_key_pair.first != mesh_layer_id)
-          << "Found duplicate layer id " << id_key_pair.first
-          << " with mesh: " << mesh_layer_id;
+      if (id_key_pair.first == mesh_layer_id) {
+        throw std::runtime_error("layer id duplicated with mesh id");
+      }
 
       layer_ids.push_back(id_key_pair.first);
       prefix_layer_map[id_key_pair.second] = id_key_pair.first;
@@ -90,6 +88,12 @@ struct SharedDsgInfo {
     graph.reset(new DynamicSceneGraph(layer_ids, mesh_layer_id));
   }
 
+  // mutexes are considered ordered (for avoiding deadlock):
+  // 1. SharedDsgInfo::mutex (lcd)
+  // 2. SharedDsgInfo::mutex (backend)
+  // 3. SharedDsgInfo::mutex (frontend)
+  // 4. SharedModuleState::mesh_mutex
+  // When acquiring two mutexes, always acquire the lowest mutex first
   std::mutex mutex;
   std::atomic<bool> updated;
   uint64_t last_update_time;

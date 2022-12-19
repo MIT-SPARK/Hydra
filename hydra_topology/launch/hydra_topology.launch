@@ -4,25 +4,20 @@
     <arg name="config"/>
     <arg name="sensor_frame"/>
     <arg name="world_frame" default="world"/>
-    <arg name="semantic_config" if="$(arg use_semantics)"/>
-    <arg name="semantic_color_path" if="$(arg use_semantics)"/>
+    <arg name="use_pose_graph"/>
     <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
-    <arg name="config_dir" default="$(find hydra_topology)/config"/>
-
-    <arg name="voxel_size" default="0.10"/>
-    <arg name="max_ray_length_m" default="4.5"/>
-    <arg name="update_period_s" default="0.5"/>
-    <arg name="publish_archived" default="true"/>
+    <arg name="semantic_map_path" if="$(arg use_semantics)"/>
 
     <arg name="graph_viz_config_dir" default="$(find hydra_topology)/config"/>
     <arg name="graph_viz_config" default="graph_visualization_config.yaml"/>
     <arg name="graph_viz_config_file" value="$(arg graph_viz_config_dir)/$(arg graph_viz_config)"/>
 
     <arg name="debug" default="false"/>
+    <arg name="force_term_info" default="true"/>
     <arg name="launch-prefix" default="gdb --args" if="$(arg debug)"/>
     <arg name="launch-prefix" default="" unless="$(arg debug)"/>
 
-    <arg name="min_glog_level" default="3"/>
+    <arg name="min_glog_level" default="0"/>
     <arg name="verbosity" default="0"/>
     <arg name="glog_to_file" default="false"/>
     <arg name="glog_dir" default="$(find hydra_topology)/glogs"/>
@@ -33,7 +28,12 @@
     <arg name="show_stats" default="$(arg glog_to_file)"/>
     <arg name="log_timing_incrementally" default="false"/>
 
-    <arg name="dsg_output_dir"/>
+    <arg name="start_rviz" default="false"/>
+    <arg name="rviz_dir" default="$(find hydra_topology)/rviz"/>
+    <arg name="rviz_file" if="$(arg start_rviz)"/>
+    <arg name="rviz_path" default="$(arg rviz_dir)/$(arg rviz_file)"/>
+
+    <arg name="dsg_output_dir" default="$(find hydra_topology)/output"/>
     <arg name="dsg_output_prefix"/>
     <arg name="dsg_path" default="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
 
@@ -42,28 +42,25 @@
           launch-prefix="$(arg launch-prefix)"
           output="$(arg ros_output)"
           required="true">
-        <remap from="pointcloud" to="$(arg pointcloud_topic)"/>
-        <param name="sensor_frame" value="$(arg sensor_frame)"/>
+        <env name="TERM" value="xterm-256color" if="$(arg force_term_info)"/>
+        <!-- input data -->
+        <remap from="~pointcloud" to="$(arg pointcloud_topic)"/>
+        <param name="robot_frame" value="$(arg sensor_frame)"/>
         <param name="world_frame" value="$(arg world_frame)"/>
-        <param name="publish_pointclouds" value="false"/>
-        <param name="verbose" value="false"/>
+        <!-- params -->
+        <rosparam command="load" file="$(arg graph_viz_config_file)"/>
+        <rosparam command="load" file="$(arg config)"/>
+        <!-- general config -->
         <param name="log_path" value="$(arg dsg_path)"/>
         <param name="log_timing_incrementally" value="$(arg log_timing_incrementally)"/>
-        <param name="mesh_only" value="false"/>
-
-        <param name="use_semantic_tsdf_server" value="$(arg use_semantics)"/>
-        <rosparam command="load" file="$(arg graph_viz_config_file)"/>
-        <rosparam command="load" file="$(arg config_dir)/$(arg config)"/>
-
-        <rosparam command="load" file="$(arg config_dir)/$(arg semantic_config)" if="$(arg use_semantics)"/>
-        <param name="semantic_label_2_color_csv_filepath" value="$(arg semantic_color_path)" if="$(arg use_semantics)"/>
-
+        <param name="semantic_label_file" value="$(arg semantic_map_path)" if="$(arg use_semantics)"/>
         <param name="show_stats" value="$(arg show_stats)"/>
-        <param name="tsdf_voxel_size" value="$(arg voxel_size)"/>
-        <param name="max_ray_length_m" value="$(arg max_ray_length_m)"/>
-        <param name="max_distance_m" value="$(arg max_ray_length_m)"/>
-        <param name="update_period_s" value="$(arg update_period_s)"/>
-        <param name="publish_archived" value="$(arg publish_archived)"/>
+        <param name="publish_reconstruction_mesh" value="true"/>
+        <param name="enable_reconstruction_output_queue" value="false"/>
+        <param name="visualize_reconstruction" value="true"/>
+        <param name="use_pose_graph" value="$(arg use_pose_graph)"/>
     </node>
+
+    <node name="rviz" pkg="rviz" type="rviz" output="log" if="$(arg start_rviz)" args="-d $(arg rviz_path)"/>
 
 </launch>

@@ -8,10 +8,11 @@ pgmo:
 objects:
     prefix: 'O'
     active_horizon_s: 10.0
-    active_index_horizon_m: 5.0
-    min_object_vertices: 20
+    active_index_horizon_m: 6.0 # TODO(nathan) make closer to uhumans2
     min_cluster_size: 25
     max_cluster_size: 100000
     cluster_tolerance: 0.25
+min_object_vertices: 20
+prune_mesh_indices: true
 enable_active_mesh_pub: false
 enable_segmented_mesh_pub: false

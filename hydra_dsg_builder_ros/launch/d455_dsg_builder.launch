@@ -1,0 +1,26 @@
+<launch>
+   <arg name="sim_time_required" default="true"/>
+   <param name="use_sim_time" value="$(arg sim_time_required)"/>
+
+   <arg name="semantic_map_dir" default="$(find semantic_recolor)/config/colors"/>
+   <arg name="semantic_map_file" default="ade150_config.csv"/>
+   <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
+   <arg name="pointcloud_topic" value="/semantic_pointcloud"/>
+   <arg name="use_gt_frame" default="true"/>
+   <arg name="sensor_frame" default="left_cam"/>
+
+   <include file="$(find hydra_utils)/launch/data_sources/d455_pointcloud.launch" pass_all_args="true"/>
+
+   <include file="$(find hydra_dsg_builder_ros)/launch/dsg_builder.launch" pass_all_args="true">
+        <arg name="robot_id" default="0"/>
+        <arg name="config_dir" default="$(find hydra_dsg_builder)/config/d455"/>
+        <arg name="dsg_output_dir" default="$(find hydra_dsg_builder)/output"/>
+        <arg name="dsg_output_prefix" default="d455"/>
+        <arg name="reconstruction_config" default="$(find hydra_topology)/config/d455_topology_config.yaml"/>
+        <arg name="rviz_dir" default="$(find hydra_dsg_builder_ros)/rviz"/>
+        <arg name="rviz_file" default="d455.rviz"/>
+        <arg name="use_oriented_bounding_boxes" value="true"/>
+        <arg name="typology_dir" default="$(find hydra_dsg_builder)/config/d455"/>
+        <arg name="typology_config" default="d455_typology.yaml"/>
+    </include>
+</launch>

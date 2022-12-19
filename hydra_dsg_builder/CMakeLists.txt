@@ -13,12 +13,9 @@ find_package(
   COMPONENTS hydra_topology
              kimera_pgmo
              kimera_semantics
-             kimera_semantics_ros
-             roscpp
              std_msgs
              tf2_eigen
              voxblox
-             voxblox_ros
 )
 
 find_package(teaserpp REQUIRED)
@@ -32,15 +29,12 @@ catkin_package(
   hydra_topology
   kimera_pgmo
   kimera_semantics
-  kimera_semantics_ros
-  roscpp
   std_msgs
   tf2_eigen
   voxblox
-  voxblox_ros
   DEPENDS spark_dsg
   INCLUDE_DIRS include
-  LIBRARIES ${PROJECT_NAME}
+  LIBRARIES ${PROJECT_NAME} gtsam
 )
 
 add_library(
@@ -55,27 +49,17 @@ add_library(
   src/incremental_dsg_lcd.cpp
   src/incremental_mesh_segmenter.cpp
   src/incremental_room_finder.cpp
-  src/lcd_visualizer.cpp
   src/merge_handler.cpp
   src/minimum_spanning_tree.cpp
-  src/node_utilities.cpp
-  src/ros_frontend.cpp
-  src/visualizer_plugins.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
 target_link_libraries(
   ${PROJECT_NAME}
-  ${catkin_LIBRARIES}
-  gtsam
-  teaserpp::teaser_registration
-  spark_dsg::spark_dsg
+  PUBLIC ${catkin_LIBRARIES}
+         teaserpp::teaser_registration
+         spark_dsg::spark_dsg
+         gtsam
 )
-
-add_executable(${PROJECT_NAME}_incremental_node src/incremental_dsg_builder_node.cpp)
-target_link_libraries(${PROJECT_NAME}_incremental_node ${PROJECT_NAME})
-
-add_executable(dsg_optimizer_node src/dsg_optimizer_node.cpp)
-target_link_libraries(dsg_optimizer_node ${PROJECT_NAME})
 
 if(CATKIN_ENABLE_TESTING)
   catkin_add_gtest(

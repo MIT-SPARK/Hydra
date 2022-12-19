@@ -26,7 +26,7 @@
         <arg name="dsg_mesh_topic" default="dsg_optimizer_node/pgmo/optimized_mesh"/>
     </include>
 
-    <node pkg="hydra_dsg_builder" type="dsg_optimizer_node" name="dsg_optimizer_node"
+    <node pkg="hydra_dsg_builder_ros" type="dsg_optimizer_node" name="dsg_optimizer_node"
           launch-prefix="$(arg launch_prefix)"
           args="--minloglevel=$(arg min_glog_level) -v=$(arg verbosity)"
           required="true"

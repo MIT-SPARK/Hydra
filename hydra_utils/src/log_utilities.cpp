@@ -32,24 +32,83 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <hydra_utils/config.h>
-#include <hydra_utils/eigen_config_types.h>
+#include "hydra_utils/log_utilities.h"
+#include "hydra_utils/timing_utilities.h"
 
 #include <glog/logging.h>
+#include <boost/filesystem.hpp>
+
+namespace fs = boost::filesystem;
 
 namespace hydra {
 
-struct DsgParamLogger : config_parser::Logger {
-  inline void log_missing(const std::string& message) const override {
-    LOG(INFO) << message;
-  }
-};
+using hydra::timing::ElapsedTimeRecorder;
 
-template <typename Config>
-Config load_config(const ros::NodeHandle& nh, const std::string& ns = "") {
-  auto logger = std::make_shared<DsgParamLogger>();
-  return config_parser::load_from_ros_nh<Config>(nh, ns, logger);
+inline bool makeDir(const fs::path& path) {
+  if (fs::exists(path)) {
+    return true;
+  }
+
+  boost::system::error_code code;
+  return fs::create_directory(path, code);
 }
+
+bool setupLogs(const std::string& log_dir, bool make_topology, bool make_dsg) {
+  fs::path log_path(log_dir);
+  const auto topology_path = log_path / "topology";
+  const auto frontend_path = log_path / "frontend";
+  const auto backend_path = log_path / "backend";
+  const auto lcd_path = log_path / "lcd";
+
+  if (!makeDir(log_path)) {
+    LOG(WARNING) << "Failed to make dir: " << log_path;
+    return false;
+  }
+
+  if (make_topology && !makeDir(topology_path)) {
+    LOG(WARNING) << "Failed to make dir: " << topology_path;
+    return false;
+  }
+
+  if (!make_dsg) {
+    return true;
+  }
+
+  bool valid = makeDir(frontend_path) && makeDir(backend_path) && makeDir(lcd_path);
+  if (!valid) {
+    LOG(WARNING) << "Failed to make one of: " << std::endl
+                 << " - " << frontend_path << std::endl
+                 << " - " << backend_path << std::endl
+                 << " - " << lcd_path;
+  }
+
+  return valid;
+}
+
+LogSetup::LogSetup(const LogConfig& conf) : valid(false), config(conf) {
+  if (config.log_dir == "") {
+    return;
+  }
+
+  valid = setupLogs(config.log_dir, config.make_topology_logs, config.make_dsg_logs);
+  if (!valid) {
+    LOG(WARNING) << "Logging disabled";
+    return;
+  }
+
+  if (config.log_timing_incrementally) {
+    ElapsedTimeRecorder::instance().setupIncrementalLogging(config.log_dir);
+  }
+}
+
+LogSetup::~LogSetup() {
+  if (valid) {
+    const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
+    timer.logAllElapsed(config.log_dir);
+    timer.logStats(config.log_dir + "/" + config.timing_stats_name);
+  }
+}
+
+std::string LogSetup::getLogDir() const { return valid ? config.log_dir : ""; }
 
 }  // namespace hydra

@@ -48,7 +48,7 @@ DsgSender::DsgSender(const ros::NodeHandle& nh,
   pub_ = nh_.advertise<hydra_msgs::DsgUpdate>("dsg", 1);
 }
 
-void DsgSender::sendGraph(DynamicSceneGraph& graph, const ros::Time& stamp) const {
+void DsgSender::sendGraph(const DynamicSceneGraph& graph, const ros::Time& stamp) const {
   timing::ScopedTimer timer(timer_name_, stamp.toNSec());
   if (!pub_.getNumSubscribers()) {
     return;
