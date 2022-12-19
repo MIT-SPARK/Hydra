@@ -96,6 +96,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
     dsg_update_funcs_ = update_funcs;
   }
 
+  inline void triggerBackendDsgReset() { reset_backend_dsg_ = true; }
+
   bool saveTrajectoryCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
   std::list<LoopClosureLog> getLoopClosures() {
@@ -148,6 +150,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void runPgmo();
 
+  void resetBackendDsg();
+
   virtual void addPlacesToDeformationGraph();
 
   virtual void callUpdateFunctions(
@@ -174,6 +178,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   std::atomic<bool> have_loopclosures_{false};
   std::atomic<bool> have_graph_updates_{false};
   bool have_new_mesh_{false};
+  bool reset_backend_dsg_{false};
 
   DsgBackendConfig config_;
 
