@@ -18,6 +18,7 @@ find_package(
              tf2_eigen
              tf2_ros
              visualization_msgs
+             glog_catkin
 )
 find_package(GTSAM REQUIRED)
 find_package(spark_dsg REQUIRED)
@@ -25,15 +26,6 @@ find_package(Eigen3 REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(cv_bridge REQUIRED)
-
-# TODO(nathan) clean up
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(
-  glog
-  REQUIRED
-  IMPORTED_TARGET
-  libglog
-)
 
 generate_dynamic_reconfigure_options(
   cfg/Colormap.cfg
@@ -64,10 +56,12 @@ add_library(
   src/colormap_utils.cpp
   src/display_utils.cpp
   src/dsg_streaming_interface.cpp
-  src/ros_parser.cpp
-  src/timing_utilities.cpp
   src/dsg_mesh_plugins.cpp
   src/dynamic_scene_graph_visualizer.cpp
+  src/log_utilities.cpp
+  src/ros_parser.cpp
+  src/robot_prefix_config.cpp
+  src/timing_utilities.cpp
   src/visualizer_utils.cpp
   src/yaml_parser.cpp
 )
@@ -79,7 +73,7 @@ target_include_directories(
 target_link_libraries(
   ${PROJECT_NAME}
   PUBLIC yaml-cpp ${catkin_LIBRARIES} spark_dsg::spark_dsg
-  PRIVATE PkgConfig::glog ${OpenCV_LIBRARIES}
+  PRIVATE ${OpenCV_LIBRARIES} gtsam
 )
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
 
@@ -89,10 +83,6 @@ target_link_libraries(hydra_visualizer_node ${PROJECT_NAME})
 add_executable(rotate_tf_node src/rotate_tf_node.cpp)
 target_link_libraries(rotate_tf_node ${catkin_LIBRARIES})
 target_include_directories(rotate_tf_node PUBLIC ${catkin_INCLUDE_DIRS})
-
-add_executable(pose_graph_publisher_node src/pose_graph_publisher_node.cpp)
-target_include_directories(pose_graph_publisher_node PUBLIC ${catkin_INCLUDE_DIRS})
-target_link_libraries(pose_graph_publisher_node ${catkin_LIBRARIES} gtsam)
 
 add_library(${PROJECT_NAME}_nodelet src/mask_nodelet.cpp)
 target_include_directories(
@@ -117,7 +107,6 @@ endif()
 
 install(
   TARGETS ${PROJECT_NAME}
-          pose_graph_publisher_node
           ${PROJECT_NAME}_nodelet
           hydra_visualizer_node
           rotate_tf_node

@@ -33,8 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/config_utils.h"
 #include "hydra_dsg_builder/dsg_lcd_detector.h"
+
+#include <hydra_utils/config.h>
+#include <hydra_utils/eigen_config_types.h>
 
 namespace teaser {
 

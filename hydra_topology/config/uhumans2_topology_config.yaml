@@ -1,50 +1,66 @@
-min_distance_m: 0.2
-use_freespace_pointcloud: false
-tsdf_voxels_per_side: 16
-voxel_carving_enabled: true
-mesh_color_mode: "color"
-use_const_weight: false
-use_tf_transforms: true
-method: "fast"
-enable_icp: false
-# topology server config
 world_frame: "world"
 clear_distant_blocks: true
 dense_representation_radius_m: 8.0
-# gvd integration and graph extraction
-min_diff_m: 1.0e-3
-min_weight: 1.0e-6
-positive_distance_only: true
-parent_derived_distance: true
-min_basis_for_extraction: 2
-num_buckets: 20
-multi_queue: false
-extract_graph: true
-voronoi_config:
-    mode: "L1_THEN_ANGLE"
-    min_distance_m: 0.40
-    parent_l1_separation: 12
-    parent_cos_angle_separation: 0.0
-graph_extractor:
-    min_extra_basis: 2
-    min_vertex_basis: 4
-    merge_new_nodes: true
-    node_merge_distance_m: 0.3
-    edge_splitting_merge_nodes: true
-    max_edge_split_iterations: 5
-    max_edge_deviation: 4
-    add_freespace_edges: true
-    freespace_active_neighborhood_hops: 1
-    freespace_edge_num_neighbors: 3
-    freespace_edge_min_clearance_m: 0.2
-    add_component_connection_edges: true
-    connected_component_window: 10
-    connected_component_hops: 2
-    component_nodes_to_check: 50
-    component_nearest_neighbors: 1
-    component_max_edge_length_m: 5.0
-    component_min_clearance_m: 0.5
-    remove_isolated_nodes: true
-mesh_integrator_config:
-    use_color: true
-    min_weight: 0.0001
+voxels_per_side: 16
+voxel_size: 0.1
+num_poses_per_update: 10
+pointcloud_separation_s: 0.1
+gvd:
+    max_distance_m: 4.5
+    min_distance_m: 0.2
+    min_diff_m: 1.0e-3
+    min_weight: 1.0e-6
+    positive_distance_only: true
+    parent_derived_distance: true
+    min_basis_for_extraction: 2
+    num_buckets: 20
+    multi_queue: false
+    extract_graph: true
+    mesh_only: false
+    voronoi_config:
+        mode: "L1_THEN_ANGLE"
+        min_distance_m: 0.40
+        parent_l1_separation: 12
+        parent_cos_angle_separation: 0.0
+    graph_extractor:
+        min_extra_basis: 2
+        min_vertex_basis: 4
+        merge_new_nodes: true
+        node_merge_distance_m: 0.3
+        edge_splitting_merge_nodes: true
+        max_edge_split_iterations: 5
+        max_edge_deviation: 4
+        add_freespace_edges: true
+        freespace_active_neighborhood_hops: 1
+        freespace_edge_num_neighbors: 3
+        freespace_edge_min_clearance_m: 0.2
+        add_component_connection_edges: true
+        connected_component_window: 10
+        connected_component_hops: 2
+        component_nodes_to_check: 50
+        component_nearest_neighbors: 1
+        component_max_edge_length_m: 5.0
+        component_min_clearance_m: 0.5
+        remove_isolated_nodes: true
+    mesh_integrator_config:
+        use_color: true
+        min_weight: 0.0001
+tsdf:
+    voxel_carving_enabled: true
+    use_const_weight: false
+    default_truncation_distance: 0.2
+    max_weight: 10000
+    min_ray_length_m: 0.1
+    max_ray_length_m: 4.5
+    allow_clear: true
+    use_weight_dropoff: true
+    use_sparsity_compensation_factor: false
+    integration_order_mode: "mixed"
+    enable_anti_grazing: false
+    start_voxel_subsampling_factor: 2
+    max_consecutive_ray_collisions: 2
+    clear_checks_every_n_frames: 1
+semantics:
+    semantic_measurement_probability: 0.9
+    color_mode: "semantic"
+    dynamic_labels: []

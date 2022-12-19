@@ -34,20 +34,13 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include "hydra_dsg_builder/dsg_lcd_detector.h"
+#include "hydra_dsg_builder/incremental_types.h"
 #include "hydra_dsg_builder/lcd_module_config.h"
-#include "hydra_dsg_builder/lcd_visualizer.h"
 #include "hydra_dsg_builder/shared_module_state.h"
 
-#include <geometry_msgs/TransformStamped.h>
-#include <ros/callback_queue.h>
-#include <ros/ros.h>
-#include <tf2_ros/transform_listener.h>
-
-#include <pose_graph_tools/BowQuery.h>
-#include <pose_graph_tools/BowQueries.h>
+#include <hydra_utils/robot_prefix_config.h>
 
 #include <memory>
-#include <mutex>
 #include <thread>
 
 namespace hydra {
@@ -55,7 +48,8 @@ namespace incremental {
 
 class DsgLcd {
  public:
-  DsgLcd(const ros::NodeHandle& nh,
+  DsgLcd(const RobotPrefixConfig& prefix,
+         const DsgLcdModuleConfig& config,
          const SharedDsgInfo::Ptr& dsg,
          const SharedModuleState::Ptr& state);
 
@@ -67,35 +61,33 @@ class DsgLcd {
 
   void save(const std::string& output_path);
 
- protected:
-  void handleDbowMsg(const pose_graph_tools::BowQueries::ConstPtr& msg);
+  void spin();
 
-  void runLcd();
-
-  void assignBowVectors();
-
-  std::optional<NodeId> getLatestAgentId();
+  void spinOnce(bool force_update);
 
  protected:
-  ros::NodeHandle nh_;
+  void spinOnceImpl(bool force_update);
+
+  size_t processFrontendOutput();
+
+  NodeIdSet getPlacesToCache(const Eigen::Vector3d& agent_pos);
+
+  std::optional<NodeId> getQueryAgentId(size_t timestamp_ns);
+
+ protected:
   std::atomic<bool> should_shutdown_{false};
+  std::unique_ptr<std::thread> spin_thread_;
 
+  RobotPrefixConfig prefix_;
   DsgLcdModuleConfig config_;
   SharedDsgInfo::Ptr dsg_;
   SharedModuleState::Ptr state_;
 
-  std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> lcd_queue_;
-  std::unique_ptr<std::thread> lcd_thread_;
-  std::unique_ptr<lcd::DsgLcdDetector> lcd_detector_;
-  std::unique_ptr<lcd::LcdVisualizer> lcd_visualizer_;
-  std::unique_ptr<ros::CallbackQueue> visualizer_queue_;
-  DynamicSceneGraph::Ptr lcd_graph_;
-  // TODO(nathan) replace with struct passed in through constructor
-  char robot_prefix_;
-
-  ros::Subscriber bow_sub_;
-  std::list<pose_graph_tools::BowQuery::ConstPtr> bow_messages_;
+  std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> agent_queue_;
   std::list<NodeId> potential_lcd_root_nodes_;
+
+  std::unique_ptr<lcd::DsgLcdDetector> lcd_detector_;
+  DynamicSceneGraph::Ptr lcd_graph_;
 };
 
 }  // namespace incremental

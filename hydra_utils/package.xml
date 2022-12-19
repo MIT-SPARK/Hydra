@@ -24,6 +24,7 @@
   <depend>tf2_eigen</depend>
   <depend>visualization_msgs</depend>
   <depend>tf2_ros</depend>
+  <depend>glog_catkin</depend>
   <exec_depend>image_proc</exec_depend>
   <exec_depend>depth_image_proc</exec_depend>
   <exec_depend>rviz</exec_depend>

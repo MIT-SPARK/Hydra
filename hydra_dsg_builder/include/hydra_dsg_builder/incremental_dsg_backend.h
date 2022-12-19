@@ -37,19 +37,15 @@
 #include "hydra_dsg_builder/dsg_update_functions.h"
 #include "hydra_dsg_builder/incremental_room_finder.h"
 #include "hydra_dsg_builder/incremental_types.h"
-#include "hydra_dsg_builder/shared_module_state.h"
 #include "hydra_dsg_builder/merge_handler.h"
+#include "hydra_dsg_builder/shared_module_state.h"
 
-#include <hydra_utils/dsg_streaming_interface.h>
+#include <hydra_utils/robot_prefix_config.h>
 #include <kimera_pgmo/KimeraPgmoInterface.h>
 #include <spark_dsg/scene_graph_logger.h>
 
-#include <ros/callback_queue.h>
-#include <ros/ros.h>
-
 #include <map>
 #include <memory>
-#include <mutex>
 #include <thread>
 
 namespace hydra {
@@ -66,9 +62,15 @@ struct LoopClosureLog {
 class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
  public:
   using Ptr = std::shared_ptr<DsgBackend>;
-  using PoseGraphQueue = std::queue<pose_graph_tools::PoseGraph::ConstPtr>;
+  using BackendInputQueue = InputQueue<BackendInput>;
+  using OutputCallback = std::function<void(const DynamicSceneGraph&,
+                                            const pcl::PolygonMesh&,
+                                            const kimera_pgmo::DeformationGraph&,
+                                            size_t timestamp_ns)>;
 
-  DsgBackend(const ros::NodeHandle nh,
+  DsgBackend(const RobotPrefixConfig& prefix,
+             const DsgBackendConfig& config,
+             const kimera_pgmo::KimeraPgmoConfig& pgmo_config,
              const SharedDsgInfo::Ptr& dsg,
              const SharedDsgInfo::Ptr& backend_dsg,
              const SharedModuleState::Ptr& state);
@@ -79,118 +81,89 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   DsgBackend& operator=(const DsgBackend& other) = delete;
 
-  // TODO(nathan) consider deferring subscription and stuff here
+  void start();
+
+  void stop();
+
+  void save(const std::string& output_path);
+
+  void spin();
+
+  bool spinOnce(bool force_update = true);
+
+  // used by dsg_optimizer
+  void spinOnce(const BackendInput& input, bool force_update = true);
+
+  void loadState(const std::string& state_path, const std::string& dgrf_path);
+
+  void setUpdateFuncs(const std::list<LayerUpdateFunc>& update_funcs);
+
+  inline void addOutputCallback(const OutputCallback& callback_func) {
+    output_callbacks_.push_back(callback_func);
+  }
+
   virtual bool initialize(const ros::NodeHandle&) override { return true; }
 
   virtual bool createPublishers(const ros::NodeHandle&) override { return true; }
 
   virtual bool registerCallbacks(const ros::NodeHandle&) override { return true; }
 
-  void stop();
-
-  void start();
-
-  void save(const std::string& output_path);
-
-  inline void setUpdateFuncs(const std::list<LayerUpdateFunc>& update_funcs) {
-    dsg_update_funcs_ = update_funcs;
-  }
-
-  bool saveTrajectoryCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
-
-  std::list<LoopClosureLog> getLoopClosures() {
-    std::list<LoopClosureLog> to_return;
-    {  // start pgmo critical section
-      std::unique_lock<std::mutex> lock(pgmo_mutex_);
-      to_return = loop_closures_;
-    }  // end pgmo critical section
-    return to_return;
-  }
-
-  void loadState(const std::string& state_path, const std::string& dgrf_path);
-
-  void forceUpdate() {
-    updateDsgMesh();
-    callUpdateFunctions();
-    private_dsg_->updated = true;
-  }
-
-  void updateFromSharedState();
-
-  virtual bool updatePrivateDsg(bool force_update = false);
-
-  virtual void updateDsgMesh(bool force_mesh_update = false);
-
-  virtual void optimize(bool new_loop_closure = false);
-
-  virtual void visualizePoseGraph() const;
-
-  void visualizeDeformationGraphEdges() const;
-
-  void startPgmo();
-
-  void updateMergedNodes(const std::map<NodeId, NodeId>& new_merges);
+  using KimeraPgmoInterface::setVerboseFlag;
 
  protected:
+  virtual const pcl::PolygonMesh* getLatestMesh();
+
+  void setSolverParams();
+
+  void setDefaultUpdateFunctions();
+
   void addLoopClosure(const gtsam::Key& src,
                       const gtsam::Key& dest,
                       const gtsam::Pose3& src_T_dest);
 
-  void setSolverParams();
+  void updateFactorGraph(const BackendInput& input);
 
-  void fullMeshCallback(const kimera_pgmo::KimeraPgmoMesh::ConstPtr& msg);
+  bool updateFromLcdQueue();
 
-  void deformationGraphCallback(const pose_graph_tools::PoseGraph::ConstPtr& msg);
+  void updateFromSharedState(size_t timestamp_ns);
 
-  void poseGraphCallback(const pose_graph_tools::PoseGraph::ConstPtr& msg);
+  virtual bool updatePrivateDsg(size_t timestamp_ns, bool force_update = true);
 
-  bool saveMeshCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+  virtual void addPlacesToDeformationGraph(size_t timestamp_ns);
 
-  void runPgmo();
+  virtual void optimize(size_t timestamp_ns);
 
-  virtual void addPlacesToDeformationGraph();
+  virtual void updateDsgMesh(size_t timestamp_ns, bool force_mesh_update = false);
 
   virtual void callUpdateFunctions(
+      size_t timestamp_ns,
       const gtsam::Values& places_values = gtsam::Values(),
       const gtsam::Values& pgmo_values = gtsam::Values(),
       bool new_loop_closure = false,
       const std::map<LayerId, std::map<NodeId, NodeId>>& given_merges = {});
 
-  void logStatus(bool init = false) const;
+  void updateMergedNodes(const std::map<NodeId, NodeId>& new_merges);
 
-  virtual bool addInternalLCDToDeformationGraph();
+  void logStatus(bool init = false) const;
 
   void logIncrementalLoopClosures(const pose_graph_tools::PoseGraph& msg);
 
-  virtual bool readPgmoUpdates();
-
-  pose_graph_tools::PoseGraph::ConstPtr popDeformationGraphQueue();
-
-  pose_graph_tools::PoseGraph::ConstPtr popAgentGraphQueue();
-
  protected:
-  ros::NodeHandle nh_;
+  std::unique_ptr<std::thread> spin_thread_;
   std::atomic<bool> should_shutdown_{false};
-  std::atomic<bool> have_loopclosures_{false};
-  std::atomic<bool> have_graph_updates_{false};
+  bool have_loopclosures_{false};
+  bool have_new_loopclosures_{false};
   bool have_new_mesh_{false};
 
+  RobotPrefixConfig prefix_;
   DsgBackendConfig config_;
 
   SharedDsgInfo::Ptr shared_dsg_;
   SharedDsgInfo::Ptr private_dsg_;
-  SharedModuleState::Ptr state_;
-
   IsolatedSceneGraphLayer shared_places_copy_;
   std::map<LayerId, dsg_updates::NodeMergeLog> proposed_node_merges_;
   std::unique_ptr<MergeHandler> merge_handler_;
-
-  std::atomic<uint64_t> last_timestamp_;
-
-  ros::ServiceServer save_mesh_srv_;
-  ros::ServiceServer save_traj_srv_;
-
-  DsgBackendStatus status_;
+  SharedModuleState::Ptr state_;
 
   std::list<LayerUpdateFunc> dsg_update_funcs_;
   std::shared_ptr<dsg_updates::UpdateObjectsFunctor> update_objects_functor_;
@@ -198,39 +171,20 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   std::unique_ptr<dsg_updates::UpdateRoomsFunctor> update_rooms_functor_;
   std::unique_ptr<dsg_updates::UpdateBuildingsFunctor> update_buildings_functor_;
 
-  std::shared_ptr<std::vector<int>> mesh_vertex_graph_inds_;
-
-  PoseGraphQueue deformation_graph_updates_;
-  PoseGraphQueue pose_graph_updates_;
-
-  std::mutex pgmo_mutex_;
-  std::unique_ptr<std::thread> optimizer_thread_;
-
-  ros::Publisher viz_mesh_mesh_edges_pub_;
-  ros::Publisher viz_pose_mesh_edges_pub_;
-  ros::Publisher pose_graph_pub_;
-  ros::Publisher opt_mesh_pub_;
-  std::unique_ptr<hydra::DsgSender> dsg_sender_;
-
+  DsgBackendStatus status_;
   SceneGraphLogger backend_graph_logger_;
   std::list<LoopClosureLog> loop_closures_;
-
- private:
-  int robot_id_;
-  char robot_prefix_;
-  char robot_vertex_prefix_;
 
   kimera_pgmo::Path trajectory_;
   std::vector<ros::Time> timestamps_;
   std::queue<size_t> unconnected_nodes_;
-  kimera_pgmo::KimeraPgmoMesh::ConstPtr latest_mesh_msg_;
+  // TODO(nathan) consider making mutable
   std::shared_ptr<pcl::PolygonMesh> latest_mesh_;
-
   std::shared_ptr<std::vector<ros::Time>> mesh_vertex_stamps_;
+  std::shared_ptr<std::vector<int>> mesh_vertex_graph_inds_;
+  std::unique_ptr<pcl::PolygonMesh> optimized_mesh_;
 
-  ros::Subscriber full_mesh_sub_;
-  ros::Subscriber deformation_graph_sub_;
-  ros::Subscriber pose_graph_sub_;
+  std::list<OutputCallback> output_callbacks_;
 };
 
 }  // namespace incremental

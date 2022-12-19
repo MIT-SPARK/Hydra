@@ -37,8 +37,8 @@
 
 #include <map>
 #include <ostream>
-#include <vector>
 #include <set>
+#include <vector>
 
 namespace config_parser {
 
@@ -77,8 +77,8 @@ constexpr const auto& displayParam = detail::static_const<detail::display_param_
 }  // namespace
 
 // make sure vector operator is present in the right namespace
-template <typename T>
-std::ostream& operator<<(std::ostream& out, const std::vector<T>& values) {
+template <typename T, typename Alloc = std::allocator<T>>
+std::ostream& operator<<(std::ostream& out, const std::vector<T, Alloc>& values) {
   out << "[";
   auto iter = values.begin();
   while (iter != values.end()) {

@@ -32,61 +32,24 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_dsg_builder/node_utilities.h"
+#include "hydra_topology/reconstruction_config.h"
 
 namespace hydra {
 
-ExitMode getExitMode(const ros::NodeHandle& nh) {
-  std::string exit_mode_str = "NORMAL";
-  nh.getParam("exit_mode", exit_mode_str);
-
-  if (exit_mode_str == "CLOCK") {
-    return ExitMode::CLOCK;
-  } else if (exit_mode_str == "SERVICE") {
-    return ExitMode::SERVICE;
-  } else if (exit_mode_str == "NORMAL") {
-    return ExitMode::NORMAL;
-  } else {
-    ROS_WARN_STREAM("Unrecognized option: " << exit_mode_str
-                                            << ". Defaulting to NORMAL");
-    return ExitMode::NORMAL;
+Eigen::Quaterniond QuaternionConverter::to(
+    const std::map<std::string, double>& other) const {
+  if (!other.count("w") || !other.count("x") || !other.count("y") ||
+      !other.count("z")) {
+    std::cerr << "Encountered invalid quaternion representation!" << std::endl;
+    return Eigen::Quaterniond::Identity();
   }
+
+  return Eigen::Quaterniond(other.at("w"), other.at("x"), other.at("y"), other.at("z"));
 }
 
-void spinWhileClockPresent() {
-  ros::WallRate r(50);
-  ROS_INFO("Waiting for bag to start");
-  while (ros::ok() && !haveClock()) {
-    ros::spinOnce();
-    r.sleep();
-  }
-
-  ROS_INFO("Running...");
-  while (ros::ok() && haveClock()) {
-    ros::spinOnce();
-    r.sleep();
-  }
-
-  ros::spinOnce();  // make sure all the callbacks are processed
-  ROS_WARN("Exiting!");
-}
-
-void spinUntilExitRequested() {
-  ServiceFunctor functor;
-
-  ros::NodeHandle nh("~");
-  ros::ServiceServer service =
-      nh.advertiseService("shutdown", &ServiceFunctor::callback, &functor);
-
-  ros::WallRate r(50);
-  ROS_INFO("Running...");
-  while (ros::ok() && !functor.should_exit) {
-    ros::spinOnce();
-    r.sleep();
-  }
-
-  ros::spinOnce();  // make sure all the callbacks are processed
-  ROS_WARN("Exiting!");
+std::map<std::string, double> QuaternionConverter::from(
+    const Eigen::Quaterniond& other) const {
+  return {{"w", other.w()}, {"x", other.x()}, {"y", other.y()}, {"z", other.z()}};
 }
 
 }  // namespace hydra

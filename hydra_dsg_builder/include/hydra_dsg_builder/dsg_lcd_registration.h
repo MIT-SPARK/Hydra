@@ -38,6 +38,9 @@
 
 #include <gtsam/geometry/Pose3.h>
 #include <teaser/registration.h>
+#include <glog/logging.h>
+
+#include <mutex>
 
 namespace hydra {
 namespace lcd {
@@ -86,16 +89,6 @@ struct DsgTeaserSolver : DsgRegistrationSolver {
   std::string log_prefix;
   // registration call mutates the solver
   mutable teaser::RobustRegistrationSolver solver;
-};
-
-struct DsgAgentSolver : DsgRegistrationSolver {
-  DsgAgentSolver() = default;
-
-  virtual ~DsgAgentSolver() = default;
-
-  DsgRegistrationSolution solve(const DynamicSceneGraph& dsg,
-                                const DsgRegistrationInput& match,
-                                NodeId query_agent_id) const override;
 };
 
 using CorrespondenceFunc =

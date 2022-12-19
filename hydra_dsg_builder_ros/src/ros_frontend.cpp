@@ -32,30 +32,30 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_dsg_builder/ros_frontend.h"
+#include "hydra_dsg_builder_ros/ros_frontend.h"
+
+#include <hydra_utils/ros_utilities.h>
 
 namespace hydra {
 
 using message_filters::Subscriber;
 
-ROSFrontend::ROSFrontend(const ros::NodeHandle& nh,
+RosFrontend::RosFrontend(const ros::NodeHandle& nh,
+                         const RobotPrefixConfig& prefix,
                          const SharedDsgInfo::Ptr& dsg,
-                         const SharedModuleState::Ptr& state,
-                         int robot_id)
-    : DsgFrontend(load_config<incremental::DsgFrontendConfig>(nh),
-                  dsg,
-                  state,
-                  robot_id),
+                         const SharedModuleState::Ptr& state)
+    : DsgFrontend(prefix, load_config<incremental::DsgFrontendConfig>(nh), dsg, state),
       nh_(nh) {
   ros_config_ = load_config<ROSFrontendConfig>(nh);
 
   pose_graph_sub_ = nh_.subscribe(
-      "pose_graph_incremental", 100, &ROSFrontend::poseGraphCallback, this);
+      "pose_graph_incremental", 100, &RosFrontend::poseGraphCallback, this);
+  bow_sub_ = nh_.subscribe("bow_vectors", 100, &RosFrontend::bowCallback, this);
 
   mesh_sub_.reset(new Subscriber<ActiveMesh>(nh_, "voxblox_mesh", 5));
-  places_sub_.reset(new Subscriber<PlacesLayerMsg>(nh_, "active_places", 5));
+  places_sub_.reset(new Subscriber<ActiveLayer>(nh_, "active_places", 5));
   sync_.reset(new Sync(Policy(10), *places_sub_, *mesh_sub_));
-  sync_->registerCallback(boost::bind(&ROSFrontend::inputCallback, this, _1, _2));
+  sync_->registerCallback(boost::bind(&RosFrontend::inputCallback, this, _1, _2));
 
   tf_listener_.reset(new tf2_ros::TransformListener(buffer_));
   dsg_sender_.reset(
@@ -83,13 +83,13 @@ ROSFrontend::ROSFrontend(const ros::NodeHandle& nh,
   }
 }
 
-ROSFrontend::~ROSFrontend() { segmented_vertices_pub_.reset(); }
+RosFrontend::~RosFrontend() { segmented_vertices_pub_.reset(); }
 
-void ROSFrontend::inputCallback(const PlacesLayerMsg::ConstPtr& places,
+void RosFrontend::inputCallback(const ActiveLayer::ConstPtr& places,
                                 const ActiveMesh::ConstPtr& mesh) {
   VLOG(5) << "Received input @ " << places->header.stamp.toNSec() << " [ns]";
 
-  incremental::FrontendInput input;
+  ReconstructionOutput::Ptr input(new ReconstructionOutput());
 
   if (ros_config_.use_posegraph_pos && !pose_graph_queue_.empty()) {
     const auto latest_position = getLatestPosition();
@@ -98,7 +98,7 @@ void ROSFrontend::inputCallback(const PlacesLayerMsg::ConstPtr& places,
       return;
     }
 
-    input.current_position = *latest_position;
+    input->current_position = *latest_position;
   } else {
     if (ros_config_.use_posegraph_pos) {
       ROS_WARN_STREAM("Falling back to using tf for latest pos");
@@ -110,14 +110,15 @@ void ROSFrontend::inputCallback(const PlacesLayerMsg::ConstPtr& places,
       return;
     }
 
-    input.current_position = *latest_position;
+    input->current_position = *latest_position;
   }
 
-  input.places = places;
-  input.mesh = mesh;
-  input.timestamp_ns = places->header.stamp.toNSec();
+  input->places = places;
+  input->mesh = mesh;
+  input->timestamp_ns = places->header.stamp.toNSec();
 
-  input.pose_graphs = pose_graph_queue_;
+  // send all cached messages to frontend
+  input->pose_graphs = pose_graph_queue_;
   pose_graph_queue_.clear();
 
   queue_->push(input);
@@ -130,11 +131,15 @@ void ROSFrontend::inputCallback(const PlacesLayerMsg::ConstPtr& places,
   }
 }
 
-void ROSFrontend::poseGraphCallback(const PoseGraph::ConstPtr& pose_graph) {
+void RosFrontend::poseGraphCallback(const PoseGraph::ConstPtr& pose_graph) {
   pose_graph_queue_.push_back(pose_graph);
 }
 
-void ROSFrontend::publishActiveVertices(const MeshVertexCloud& vertices,
+void RosFrontend::bowCallback(const BowQuery::ConstPtr& msg) {
+  state_->visual_lcd_queue.push(msg);
+}
+
+void RosFrontend::publishActiveVertices(const MeshVertexCloud& vertices,
                                         const std::vector<size_t>& indices,
                                         const LabelIndices&) const {
   MeshVertexCloud::Ptr active_cloud(new MeshVertexCloud());
@@ -148,7 +153,7 @@ void ROSFrontend::publishActiveVertices(const MeshVertexCloud& vertices,
   active_vertices_pub_.publish(active_cloud);
 }
 
-void ROSFrontend::publishObjectClouds(const MeshVertexCloud& vertices,
+void RosFrontend::publishObjectClouds(const MeshVertexCloud& vertices,
                                       const std::vector<size_t>&,
                                       const LabelIndices& label_indices) const {
   for (const auto& label_index_pair : label_indices) {
@@ -164,7 +169,7 @@ void ROSFrontend::publishObjectClouds(const MeshVertexCloud& vertices,
   }
 }
 
-std::optional<Eigen::Vector3d> ROSFrontend::getLatestPosition() const {
+std::optional<Eigen::Vector3d> RosFrontend::getLatestPosition() const {
   const auto& msg = pose_graph_queue_.back();
   if (msg->nodes.empty()) {
     return std::nullopt;
@@ -174,7 +179,7 @@ std::optional<Eigen::Vector3d> ROSFrontend::getLatestPosition() const {
   return Eigen::Vector3d(pose.position.x, pose.position.y, pose.position.z);
 }
 
-std::optional<Eigen::Vector3d> ROSFrontend::getLatestPositionTf(
+std::optional<Eigen::Vector3d> RosFrontend::getLatestPositionTf(
     const ros::Time& time_to_use) const {
   geometry_msgs::TransformStamped transform;
   try {

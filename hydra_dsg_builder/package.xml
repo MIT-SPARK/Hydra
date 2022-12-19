@@ -15,14 +15,11 @@
   <depend>hydra_topology</depend>
   <depend>kimera_pgmo</depend>
   <depend>kimera_semantics</depend>
-  <depend>kimera_semantics_ros</depend>
-  <depend>roscpp</depend>
   <depend>spark_dsg</depend>
   <depend>std_msgs</depend>
   <depend>teaserpp</depend>
   <depend>tf2_eigen</depend>
   <depend>voxblox</depend>
-  <depend>voxblox_ros</depend>
 
   <export>
   </export>
