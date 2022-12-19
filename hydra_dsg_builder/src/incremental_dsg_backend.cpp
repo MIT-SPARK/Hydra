@@ -476,6 +476,27 @@ bool DsgBackend::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
       const auto node_opt = private_dsg_->graph->getNode(id_node_pair.first);
       if (!node_opt) {
         continue;
+    status_.trajectory_len_ = trajectory_.size();
+    status_.total_factors_ = deformation_graph_->getGtsamFactors().size();
+    status_.total_values_ = deformation_graph_->getGtsamValues().size();
+
+    bool have_dsg_updates = false;
+    if (reset_backend_dsg_) {
+      resetBackendDsg();
+    }
+
+    bool was_updated = false;
+    have_dsg_updates = updatePrivateDsg(reset_backend_dsg_);
+    reset_backend_dsg_ = false;
+    {  // start pgmo mesh critical section
+      std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
+      if (config_.optimize_on_lc && have_graph_updates_ && have_loopclosures_) {
+        optimize(status_.new_loop_closures_ > 0);
+        was_updated = true;
+      } else if (config_.call_update_periodically && have_dsg_updates) {
+        updateDsgMesh();
+        callUpdateFunctions();
+        was_updated = true;
       }
 
       // TODO(nathan) we might need to think about checking the is_active flag here, but
@@ -704,6 +725,18 @@ void DsgBackend::optimize(size_t timestamp_ns) {
                       deformation_graph_->getGtsamValues(),
                       have_new_loopclosures_);
   have_new_loopclosures_ = false;
+}
+
+void DsgBackend::resetBackendDsg() {
+  ScopedTimer timer("backend/reset_dsg", last_timestamp_, true, 0, false);
+  merge_handler_->reset();
+  proposed_node_merges_.clear();
+  {
+    std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
+    // First reset private graph
+    private_dsg_->graph->clear();
+  }
+  updatePrivateDsg(true);
 }
 
 void DsgBackend::callUpdateFunctions(size_t timestamp_ns,
