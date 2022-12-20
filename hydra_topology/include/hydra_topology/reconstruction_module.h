@@ -33,17 +33,17 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_topology/reconstruction_config.h"
-#include "hydra_topology/reconstruction_output.h"
-
 #include <hydra_topology/configs.h>
 #include <hydra_utils/display_utils.h>
 #include <hydra_utils/input_queue.h>
 #include <hydra_utils/robot_prefix_config.h>
 #include <kimera_semantics/semantic_voxel.h>
-#include <Eigen/Geometry>
 
+#include <Eigen/Geometry>
 #include <memory>
+
+#include "hydra_topology/reconstruction_config.h"
+#include "hydra_topology/reconstruction_output.h"
 
 namespace hydra {
 
@@ -63,6 +63,7 @@ struct ReconstructionInput {
 class ReconstructionModule {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
   using ReconstructionInputQueue = InputQueue<ReconstructionInput::Ptr>;
   using OutputQueue = InputQueue<ReconstructionOutput::Ptr>;
   using OutputCallback =
@@ -88,6 +89,9 @@ class ReconstructionModule {
   void spinOnce(const ReconstructionInput& input);
 
   void addOutputCallback(const OutputCallback& callback);
+
+  // takes in a 3xN matrix
+  std::vector<bool> inFreespace(const PositionMatrix& positions, double freespace_distance_m) const;
 
  protected:
   voxblox::BlockIndexList update(const voxblox::Transformation& T_G_C,
@@ -117,6 +121,8 @@ class ReconstructionModule {
   voxblox::Transformation getCameraPose(const ReconstructionInput& msg) const;
 
  protected:
+  mutable std::mutex gvd_mutex_;
+
   RobotPrefixConfig prefix_;
   ReconstructionConfig config_;
 

@@ -198,6 +198,27 @@ void ReconstructionModule::addOutputCallback(const OutputCallback& callback) {
   output_callbacks_.push_back(callback);
 }
 
+std::vector<bool> ReconstructionModule::inFreespace(const PositionMatrix& positions,
+                                                    double freespace_distance_m) const {
+  if (positions.cols() < 1) {
+    return {};
+  }
+
+  std::vector<bool> flags(positions.cols(), false);
+  // starting lock on tsdf update
+  std::unique_lock<std::mutex> lock(gvd_mutex_);
+  for (int i = 0; i < positions.cols(); ++i) {
+    const auto* voxel = gvd_->getVoxelPtrByCoordinates(positions.col(i).cast<float>());
+    if (!voxel) {
+      continue;
+    }
+
+    flags[i] = voxel->observed && voxel->distance > freespace_distance_m;
+  }
+
+  return flags;
+}
+
 void ReconstructionModule::addPlacesToOutput(ReconstructionOutput& output,
                                              size_t timestamp_ns) {
   output.places.reset(new hydra_msgs::ActiveLayer());
@@ -284,17 +305,22 @@ BlockIndexList ReconstructionModule::update(const voxblox::Transformation& T_G_C
     return archived_blocks;
   }
 
-  gvd_integrator_->updateFromTsdfLayer(timestamp_ns, true);
+  {  // start critical section
+    // TODO(nathan) this might be nice to do a different way
+    std::unique_lock<std::mutex> lock(gvd_mutex_);
+    gvd_integrator_->updateFromTsdfLayer(timestamp_ns, true);
 
-  if (config_.clear_distant_blocks) {
-    archived_blocks = gvd_integrator_->removeDistantBlocks(
-        T_G_C.getPosition(), config_.dense_representation_radius_m);
-    for (const auto& index : archived_blocks) {
-      semantics_->removeBlock(index);
+    if (config_.clear_distant_blocks) {
+      archived_blocks = gvd_integrator_->removeDistantBlocks(
+          T_G_C.getPosition(), config_.dense_representation_radius_m);
+      for (const auto& index : archived_blocks) {
+        semantics_->removeBlock(index);
+      }
+
+      mesh_->clearDistantMesh(T_G_C.getPosition(),
+                              config_.dense_representation_radius_m);
     }
-
-    mesh_->clearDistantMesh(T_G_C.getPosition(), config_.dense_representation_radius_m);
-  }
+  }  // end critical section
 
   if (config_.show_stats) {
     showStats();
