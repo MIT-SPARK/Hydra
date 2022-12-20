@@ -10,7 +10,7 @@ add_message_files(
   DsgUpdate.msg
 )
 
-add_service_files(FILES GetDsg.srv)
+add_service_files(FILES GetDsg.srv QueryFreespace.srv)
 
 generate_messages(DEPENDENCIES std_msgs voxblox_msgs)
 
