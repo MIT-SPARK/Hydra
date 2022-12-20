@@ -33,10 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_topology/reconstruction_module.h"
-#include "hydra_topology/topology_server_visualizer.h"
-
 #include <geometry_msgs/Pose.h>
+#include <hydra_msgs/QueryFreespace.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/approximate_time.h>
 #include <message_filters/synchronizer.h>
@@ -45,6 +43,9 @@
 #include <pose_graph_tools/PoseGraph.h>
 #include <ros/ros.h>
 #include <tf2_ros/transform_listener.h>
+
+#include "hydra_topology/reconstruction_module.h"
+#include "hydra_topology/topology_server_visualizer.h"
 
 namespace hydra {
 
@@ -86,6 +87,9 @@ class RosReconstruction : public ReconstructionModule {
                      const PoseGraph::ConstPtr& pose_graph);
 
   void pclCallback(const Pointcloud::ConstPtr& cloud);
+
+  bool handleFreespaceSrv(hydra_msgs::QueryFreespace::Request& req,
+                          hydra_msgs::QueryFreespace::Response& res);
 
  protected:
   void pointcloudSpin();
