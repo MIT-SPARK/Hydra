@@ -118,6 +118,9 @@ RosReconstruction::RosReconstruction(const ros::NodeHandle& nh,
     mesh_pub_ = nh_.advertise<voxblox_msgs::Mesh>("mesh", 10);
   }
 
+  freespace_server_ = nh_.advertiseService(
+      "query_freespace", &RosReconstruction::handleFreespaceSrv, this);
+
   output_callbacks_.push_back(
       [this](const ReconstructionModule&, const ReconstructionOutput& output) {
         this->visualize(output);

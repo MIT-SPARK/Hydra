@@ -115,6 +115,9 @@ class RosReconstruction : public ReconstructionModule {
   // visualizer
   std::unique_ptr<topology::TopologyServerVisualizer> visualizer_;
   ros::Publisher mesh_pub_;
+
+  // freespace query
+  ros::ServiceServer freespace_server_;
 };
 
 }  // namespace hydra
