@@ -11,6 +11,7 @@
     <arg name="semantic_map_dir" default="$(find semantic_recolor)/config/colors"/>
     <arg name="semantic_map_file" default="$(arg dataset_name).csv"/>
     <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
+    <arg name="use_oneformer" default="true"/>
 
     <arg name="exit_mode" default="NORMAL"/>
     <arg name="debug" default="false"/>
@@ -34,6 +35,7 @@
         <arg name="semantic_color_path" value="$(arg semantic_map_path)"/>
         <arg name="config_dir" value="$(find hydra_topology)/config"/>
         <arg name="default" value="false"/>
+        <arg name="use_bag_semantics" value="$(arg use_oneformer)"/>
     </include>
 
     <include file="$(find hydra_dsg_builder)/launch/dsg_builder.launch" pass_all_args="true"/>
