@@ -43,6 +43,7 @@
 #include <ros/ros.h>
 #include <tf2_ros/transform_listener.h>
 
+#include <pose_graph_tools/BowQueries.h>
 #include <pose_graph_tools/BowQuery.h>
 
 #include <memory>
@@ -67,7 +68,7 @@ class DsgLcd {
   void save(const std::string& output_path);
 
  protected:
-  void handleDbowMsg(const pose_graph_tools::BowQuery::ConstPtr& msg);
+  void handleDbowMsg(const pose_graph_tools::BowQueries::ConstPtr& msg);
 
   void runLcd();
 
@@ -93,7 +94,7 @@ class DsgLcd {
   char robot_prefix_;
 
   ros::Subscriber bow_sub_;
-  std::list<pose_graph_tools::BowQuery::ConstPtr> bow_messages_;
+  std::list<pose_graph_tools::BowQuery> bow_messages_;
   std::list<NodeId> potential_lcd_root_nodes_;
 };
 

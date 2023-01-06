@@ -74,9 +74,11 @@ void DsgLcd::stop() {
 
 DsgLcd::~DsgLcd() { stop(); }
 
-void DsgLcd::handleDbowMsg(const pose_graph_tools::BowQuery::ConstPtr& msg) {
+void DsgLcd::handleDbowMsg(const pose_graph_tools::BowQueries::ConstPtr& msg) {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
-  bow_messages_.push_back(msg);
+  for (const auto& bow_msg : msg->queries) {
+    bow_messages_.push_back(bow_msg);
+  }
 }
 
 void DsgLcd::start() {
@@ -228,8 +230,8 @@ void DsgLcd::assignBowVectors() {
   while (iter != bow_messages_.end()) {
     // TODO(nathan) implicit assumption that gtsam symbol and dsg node symbol are same
     const auto& msg = *iter;
-    char prefix = kimera_pgmo::robot_id_to_prefix.at(msg->robot_id);
-    NodeSymbol pgmo_key(prefix, msg->pose_id);
+    char prefix = kimera_pgmo::robot_id_to_prefix.at(msg.robot_id);
+    NodeSymbol pgmo_key(prefix, msg.pose_id);
     if (state_->agent_key_map.count(pgmo_key)) {
       const auto& node =
           agents.getNodeByIndex(state_->agent_key_map.at(pgmo_key))->get();
@@ -237,9 +239,9 @@ void DsgLcd::assignBowVectors() {
 
       AgentNodeAttributes& attrs = node.attributes<AgentNodeAttributes>();
       attrs.dbow_ids = Eigen::Map<const AgentNodeAttributes::BowIdVector>(
-          msg->bow_vector.word_ids.data(), msg->bow_vector.word_ids.size());
+          msg.bow_vector.word_ids.data(), msg.bow_vector.word_ids.size());
       attrs.dbow_values = Eigen::Map<const Eigen::VectorXf>(
-          msg->bow_vector.word_values.data(), msg->bow_vector.word_values.size());
+          msg.bow_vector.word_values.data(), msg.bow_vector.word_values.size());
 
       iter = bow_messages_.erase(iter);
     } else {
