@@ -324,6 +324,7 @@ std::set<NodeId> MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
       }
     }
 
+    // TODO(nathan) this entire section is wrong, fix
     auto to_check = active_objects_[label_clusters.first];
     for (const auto& node_id : to_check) {
       if (!graph.hasNode(node_id)) {

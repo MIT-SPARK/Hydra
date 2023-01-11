@@ -33,19 +33,21 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_topology/graph_extractor.h"
-#include "hydra_topology/gvd_voxel.h"
-#include "hydra_topology/voxblox_types.h"
-
 #include <hydra_topology/GvdVisualizerConfig.h>
 #include <hydra_utils/visualizer_types.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
+#include "hydra_topology/compression_graph_extractor.h"
+#include "hydra_topology/gvd_graph.h"
+#include "hydra_topology/gvd_voxel.h"
+#include "hydra_topology/voxblox_types.h"
+
 namespace hydra {
 namespace topology {
 
 using hydra_topology::GvdVisualizerConfig;
+using CompressedNodeMap = std::unordered_map<uint64_t, CompressedNode>;
 
 class MarkerGroupPub {
  public:
@@ -87,15 +89,27 @@ visualization_msgs::Marker makeEsdfMarker(const GvdVisualizerConfig& config,
                                           const ColormapConfig& colors,
                                           const Layer<GvdVoxel>& layer);
 
-visualization_msgs::Marker makeGvdEdgeMarker(
-    const Layer<GvdVoxel>& layer,
-    const GraphExtractor::EdgeInfoMap& edge_info_map,
-    const GraphExtractor::NodeIdRootMap& id_root_index_map);
-
 visualization_msgs::Marker makeBlocksMarker(const Layer<TsdfVoxel>& layer,
                                             double scale);
 
 visualization_msgs::Marker makeBlocksMarker(const Layer<GvdVoxel>& layer, double scale);
+
+visualization_msgs::Marker makeMeshBlocksMarker(const MeshLayer& layer, double scale);
+
+visualization_msgs::MarkerArray makeGvdGraphMarkers(const GvdGraph& graph,
+                                                    const GvdVisualizerConfig& config,
+                                                    const ColormapConfig& colors,
+                                                    const std::string& ns,
+                                                    size_t marker_id = 0);
+
+visualization_msgs::MarkerArray showGvdClusters(
+    const GvdGraph& graph,
+    const CompressedNodeMap& clusters,
+    const std::unordered_map<uint64_t, uint64_t>& remapping,
+    const GvdVisualizerConfig& config,
+    const ColormapConfig& colors,
+    const std::string& ns,
+    size_t marker_id = 0);
 
 }  // namespace topology
 }  // namespace hydra

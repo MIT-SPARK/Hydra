@@ -33,15 +33,15 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_topology/configs.h"
-#include "hydra_topology/gvd_visualization_utilities.h"
-
+#include <dynamic_reconfigure/server.h>
+#include <hydra_topology/GvdVisualizerConfig.h>
 #include <hydra_utils/config.h>
 #include <hydra_utils/visualizer_types.h>
 #include <hydra_utils/visualizer_utils.h>
 
-#include <dynamic_reconfigure/server.h>
-#include <hydra_topology/GvdVisualizerConfig.h>
+#include "hydra_topology/compression_graph_extractor.h"
+#include "hydra_topology/configs.h"
+#include "hydra_topology/gvd_visualization_utilities.h"
 
 namespace hydra {
 namespace topology {
@@ -77,24 +77,35 @@ class TopologyServerVisualizer {
 
   virtual ~TopologyServerVisualizer() = default;
 
-  void visualize(const GraphExtractor& extractor,
-                 const SceneGraphLayer& graph,
+  void visualize(const SceneGraphLayer& graph,
+                 const GvdGraph& gvd_graph,
                  const Layer<GvdVoxel>& gvd,
-                 const Layer<TsdfVoxel>& tsdf);
+                 const Layer<TsdfVoxel>& tsdf,
+                 uint64_t timestamp_ns,
+                 const MeshLayer* mesh = nullptr);
 
-  void visualizeError(const Layer<GvdVoxel>& lhs, const Layer<GvdVoxel>& rhs, double threshold);
+  void visualizeError(const Layer<GvdVoxel>& lhs,
+                      const Layer<GvdVoxel>& rhs,
+                      double threshold,
+                      uint64_t timestamp_ns);
+
+  void visualizeExtractor(uint64_t timestamp_ns,
+                          const CompressionGraphExtractor& extractor);
 
  private:
-  void visualizeGraph(const SceneGraphLayer& graph);
+  void visualizeGraph(const std_msgs::Header& header, const SceneGraphLayer& graph);
 
-  void visualizeGvd(const Layer<GvdVoxel>& gvd) const;
+  void visualizeGvd(const std_msgs::Header& header, const Layer<GvdVoxel>& gvd) const;
 
-  void visualizeGvdEdges(const GraphExtractor& extractor,
-                         const Layer<GvdVoxel>& gvd) const;
+  void visualizeGvdGraph(const std_msgs::Header& header,
+                         const GvdGraph& gvd_graph) const;
 
-  void visualizeBlocks(const Layer<GvdVoxel>& gvd, const Layer<TsdfVoxel>& tsdf) const;
+  void visualizeBlocks(const std_msgs::Header& header,
+                       const Layer<GvdVoxel>& gvd,
+                       const Layer<TsdfVoxel>& tsdf,
+                       const MeshLayer* mesh) const;
 
-  void publishGraphLabels(const SceneGraphLayer& graph);
+  void publishGraphLabels(const std_msgs::Header& header, const SceneGraphLayer& graph);
 
   void gvdConfigCb(GvdVisualizerConfig& config, uint32_t level);
 
@@ -108,7 +119,8 @@ class TopologyServerVisualizer {
   void startRqtServer(const std::string& config_ns,
                       std::unique_ptr<dynamic_reconfigure::Server<Config>>& server,
                       const Callback& callback) {
-    server.reset(new dynamic_reconfigure::Server<Config>(ros::NodeHandle(config_ns)));
+    ros::NodeHandle config_nh(nh_, config_ns);
+    server.reset(new dynamic_reconfigure::Server<Config>(config_nh));
     server->setCallback(boost::bind(callback, this, _1, _2));
   }
 
@@ -118,6 +130,9 @@ class TopologyServerVisualizer {
 
   TopologyVisualizerConfig config_;
   std::set<int> previous_labels_;
+
+  mutable bool published_gvd_graph_;
+  mutable bool published_gvd_clusters_;
 
   std::unique_ptr<dynamic_reconfigure::Server<GvdVisualizerConfig>> gvd_config_server_;
   std::unique_ptr<dynamic_reconfigure::Server<LayerConfig>> graph_config_server_;

@@ -33,19 +33,23 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_topology/graph_extractor.h"
+#include <utility>
+
+#include "hydra_topology/graph_extractor_interface.h"
 #include "hydra_topology/gvd_integrator_config.h"
 #include "hydra_topology/gvd_parent_tracker.h"
 #include "hydra_topology/gvd_utilities.h"
 #include "hydra_topology/gvd_voxel.h"
 #include "hydra_topology/update_statistics.h"
 #include "hydra_topology/voxblox_types.h"
-#include "hydra_topology/voxel_aware_mesh_integrator.h"
-
-#include <utility>
 
 namespace hydra {
 namespace topology {
+
+struct OpenQueueEntry {
+  GlobalIndex index;
+  GvdVoxel* voxel;
+};
 
 /**
  * An ESDF and GVD integrator based on https://arxiv.org/abs/1611.03631
@@ -55,105 +59,87 @@ class GvdIntegrator {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   GvdIntegrator(const GvdIntegratorConfig& config,
-                Layer<TsdfVoxel>* tsdf_layer,
-                const Layer<GvdVoxel>::Ptr& gvd_layer,
-                const MeshLayer::Ptr& mesh_layer);
+                const Layer<GvdVoxel>::Ptr& gvd_layer);
 
   virtual ~GvdIntegrator() = default;
 
-  void updateFromTsdfLayer(uint64_t timestamp_ns,
-                           bool clear_updated_flag,
-                           bool clear_surface_flag = true,
-                           bool use_all_blocks = false);
+  const SceneGraphLayer& getGraph() const;
 
-  inline const SceneGraphLayer& getGraph() const {
-    return graph_extractor_->getGraph();
-  }
+  const GvdGraph& getGvdGraph() const;
 
-  inline GraphExtractor& getGraphExtractor() const { return *graph_extractor_; }
+  GraphExtractorInterface& getGraphExtractor() const;
 
-  BlockIndexList removeDistantBlocks(const voxblox::Point& center, double max_distance);
+  void updateFromTsdf(uint64_t timestamp_ns,
+                      Layer<TsdfVoxel>& tsdf,
+                      const MeshLayer& mesh,
+                      bool clear_updated_flag,
+                      bool use_all_blocks = false);
+
+  void updateGvd(uint64_t timestamp_ns);
+
+  void archiveBlocks(const BlockIndexList& blocks);
+
+  // TODO(nathan) test this
+  static bool setFixedParent(const Layer<GvdVoxel>& layer,
+                             const GvdNeighborhood::IndexMatrix& neighbor_indices,
+                             GvdVoxel& voxel);
 
  protected:
-  enum class PushType {
-    NEW,
-    LOWER,
-    RAISE,
-    BOTH,
-  };
+  // GVD membership
+  void updateGvdVoxel(const GlobalIndex& voxel_index, GvdVoxel& voxel, GvdVoxel& other);
 
-  void processTsdfBlock(const Block<TsdfVoxel>& block, const BlockIndex& index);
-
-  void processRaiseSet();
-
-  void processLowerSet();
-
-  void updateFromTsdfBlocks(const BlockIndexList& tsdf_blocks);
-
-  bool updateVoxelFromNeighbors(const GlobalIndex& index, GvdVoxel& voxel);
-
-  bool processNeighbor(GvdVoxel& voxel,
-                       const GlobalIndex& voxel_idx,
-                       FloatingPoint neighbor_distance,
-                       const GlobalIndex& neighbor_idx,
-                       GvdVoxel& neighbor);
+  void clearGvdVoxel(const GlobalIndex& index, GvdVoxel& voxel);
 
   void updateVoronoiQueue(GvdVoxel& curr_voxel,
                           const GlobalIndex& curr_pos,
                           GvdVoxel& neighbor_voxel,
                           const GlobalIndex& neighbor_pos);
 
-  void updateUnobservedGvdVoxel(const TsdfVoxel& tsdf_voxel,
-                                const GlobalIndex& index,
-                                GvdVoxel& gvd_voxel);
+  // TSDF propagation
+  void processTsdfBlock(const Block<TsdfVoxel>& block,
+                        const MeshLayer& mesh,
+                        const BlockIndex& index);
 
-  void updateObservedGvdVoxel(const TsdfVoxel& tsdf_voxel,
-                              const GlobalIndex& index,
-                              GvdVoxel& gvd_voxel);
+  void updateUnobservedVoxel(const TsdfVoxel& tsdf_voxel,
+                             const GlobalIndex& index,
+                             GvdVoxel& gvd_voxel);
 
-  void setFixedParent(const GvdNeighborhood::IndexMatrix& neighbor_indices,
-                      GvdVoxel& voxel);
+  void updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
+                           const GlobalIndex& index,
+                           GvdVoxel& gvd_voxel);
 
-  void raiseVoxel(GvdVoxel& voxel, const GlobalIndex& voxel_index);
+  // ESDF integration
+  void pushToQueue(const GlobalIndex& index, GvdVoxel& voxel);
 
-  void updateNearestParent(const GvdVoxel& voxel,
-                           const GlobalIndex& voxel_index,
-                           const GvdVoxel& neighbor,
-                           const GlobalIndex& parent);
+  void raiseVoxel(const GlobalIndex& index, GvdVoxel& voxel);
 
-  void updateGvdVoxel(const GlobalIndex& voxel_index, GvdVoxel& voxel, GvdVoxel& other);
+  void lowerVoxel(const GlobalIndex& index, GvdVoxel& voxel);
 
-  void clearGvdVoxel(const GlobalIndex& index, GvdVoxel& voxel);
+  void processOpenQueue();
 
-  void pushToQueue(const GlobalIndex& index, GvdVoxel& voxel, PushType action);
-
-  GlobalIndex popFromLower();
-
-  GlobalIndex popFromRaise();
-
-  void setDefaultDistance(GvdVoxel& voxel, double signed_distance);
-
+  // Helpers
   bool isTsdfFixed(const TsdfVoxel& voxel);
 
-  bool voxelHasDistance(const GvdVoxel& voxel);
+  voxblox::Point getParentPosition(const GlobalIndex& index,
+                                   const GvdVoxel& voxel) const;
+
+  voxblox::Point getPosition(const GlobalIndex& index) const;
 
  protected:
-  std::unique_ptr<VoxelAwareMeshIntegrator> mesh_integrator_;
-
   UpdateStatistics update_stats_;
 
+  const double default_distance_;
   GvdIntegratorConfig config_;
-  Layer<TsdfVoxel>* tsdf_layer_;
   Layer<GvdVoxel>::Ptr gvd_layer_;
-  MeshLayer::Ptr mesh_layer_;
 
-  GraphExtractor::Ptr graph_extractor_;
+  GraphExtractorInterface::Ptr graph_extractor_;
   GvdParentTracker parent_tracker_;
+  GvdNeighborhood::IndexMatrix neighbor_indices_;
 
-  BucketQueue<GlobalIndex> lower_;
-  AlignedQueue<GlobalIndex> raise_;
+  BucketQueue<OpenQueueEntry> open_;
 
   FloatingPoint voxel_size_;
+  FloatingPoint min_integration_distance_m_;
 };
 
 }  // namespace topology

@@ -646,6 +646,99 @@ Marker makeMeshEdgesMarker(const std_msgs::Header& header,
   return marker;
 }
 
+MarkerArray makeGvdWireframe(const std_msgs::Header& header,
+                             const LayerConfig& config,
+                             const VisualizerConfig& visualizer_config,
+                             const SceneGraphLayer& layer,
+                             const std::string& ns,
+                             const ColormapConfig& colors,
+                             size_t marker_id) {
+  return makeGvdWireframe(
+      header,
+      config,
+      layer,
+      ns,
+      [&](const SceneGraphNode& node) {
+        return getDistanceColor(
+            visualizer_config, colors, node.attributes<PlaceNodeAttributes>().distance);
+      },
+      marker_id);
+}
+
+MarkerArray makeGvdWireframe(const std_msgs::Header& header,
+                             const LayerConfig& config,
+                             const SceneGraphLayer& layer,
+                             const std::string& ns,
+                             const ColorFunction& color_func,
+                             size_t marker_id) {
+  MarkerArray marker;
+  {  // scope to make handling stuff a little easier
+    Marker edges;
+    edges.header = header;
+    edges.type = Marker::LINE_LIST;
+    edges.id = marker_id;
+    edges.ns = ns + "_edges";
+    edges.action = Marker::ADD;
+    edges.scale.x = config.intralayer_edge_scale;
+    fillPoseWithIdentity(edges.pose);
+
+    Marker nodes;
+    nodes.header = header;
+    nodes.type = Marker::SPHERE_LIST;
+    nodes.id = marker_id;
+    nodes.ns = ns + "_nodes";
+    nodes.action = Marker::ADD;
+    nodes.scale.x = config.intralayer_edge_scale;
+    nodes.scale.y = config.intralayer_edge_scale;
+    nodes.scale.z = config.intralayer_edge_scale;
+    fillPoseWithIdentity(nodes.pose);
+
+    marker.markers.push_back(nodes);
+    marker.markers.push_back(edges);
+  }
+  auto& nodes = marker.markers[0];
+  auto& edges = marker.markers[1];
+
+  if (layer.nodes().empty()) {
+    marker.markers.clear();
+    return marker;
+  }
+
+  for (const auto& id_node_pair : layer.nodes()) {
+    geometry_msgs::Point node_centroid;
+    tf2::convert(id_node_pair.second->attributes().position, node_centroid);
+    nodes.points.push_back(node_centroid);
+
+    NodeColor desired_color = color_func(*id_node_pair.second);
+    nodes.colors.push_back(makeColorMsg(desired_color, config.marker_alpha));
+  }
+
+  if (layer.edges().empty()) {
+    marker.markers.resize(1);
+    return marker;
+  }
+
+  for (const auto& id_edge_pair : layer.edges()) {
+    // TODO(nathan) filter by node symbol category
+    const auto& edge = id_edge_pair.second;
+    const SceneGraphNode& source_node = layer.getNode(edge.source).value();
+    const SceneGraphNode& target_node = layer.getNode(edge.target).value();
+
+    geometry_msgs::Point source;
+    tf2::convert(source_node.attributes().position, source);
+    edges.points.push_back(source);
+
+    geometry_msgs::Point target;
+    tf2::convert(target_node.attributes().position, target);
+    edges.points.push_back(target);
+
+    edges.colors.push_back(makeColorMsg(color_func(source_node), config.marker_alpha));
+    edges.colors.push_back(makeColorMsg(color_func(target_node), config.marker_alpha));
+  }
+
+  return marker;
+}
+
 Marker makeLayerEdgeMarkers(const std_msgs::Header& header,
                             const LayerConfig& config,
                             const SceneGraphLayer& layer,

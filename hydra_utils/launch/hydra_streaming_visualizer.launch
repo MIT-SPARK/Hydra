@@ -22,6 +22,7 @@
       <arg name="viz_config_dir" value="$(arg viz_config_dir)"/>
       <arg name="visualizer_ns" value="$(arg visualizer_ns)"/>
       <arg name="world_frame" default="$(arg world_frame)"/>
+      <arg name="color_places_by_distance" default="$(arg show_frontend)"/>
   </include>
 
   <node pkg="hydra_utils" type="hydra_visualizer_node" name="hydra_visualizer_node"

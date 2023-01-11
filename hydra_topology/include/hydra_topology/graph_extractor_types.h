@@ -80,5 +80,9 @@ struct PseudoEdgeInfo {
   voxblox::AlignedVector<GlobalIndex> indices;
 };
 
+std::ostream& operator<<(std::ostream& out, const VoxelGraphInfo& info);
+
+std::ostream& operator<<(std::ostream& out, const EdgeInfo& info);
+
 }  // namespace topology
 }  // namespace hydra

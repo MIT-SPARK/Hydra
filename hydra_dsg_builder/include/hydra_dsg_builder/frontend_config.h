@@ -84,6 +84,8 @@ struct DsgFrontendConfig {
   kimera_pgmo::MeshFrontendConfig pgmo_config;
   MeshSegmenterConfig object_config;
   bool validate_vertices = true;
+  bool filter_places = true;
+  size_t min_places_component_size = 3;
 };
 
 struct LabelConverter {
@@ -139,6 +141,8 @@ void visit_config(const Visitor& v, DsgFrontendConfig& config) {
   v.visit("pgmo", config.pgmo_config);
   v.visit("objects", config.object_config);
   v.visit("validate_vertices", config.validate_vertices);
+  v.visit("filter_places", config.filter_places);
+  v.visit("min_places_component_size", config.min_places_component_size);
 }
 
 }  // namespace incremental

@@ -2,7 +2,7 @@
 z_offset_scale: 2.5
 visualize: true
 # nodes
-marker_scale: 0.3
+marker_scale: 0.2
 marker_alpha: 0.9
 use_sphere_marker: true
 use_label: false
@@ -17,7 +17,7 @@ interlayer_edge_scale: 0.08
 interlayer_edge_alpha: 0.4
 interlayer_edge_use_color: true
 interlayer_edge_insertion_skip: 0
-intralayer_edge_scale: 0.04
+intralayer_edge_scale: 0.01
 intralayer_edge_alpha: 0.7
 intralayer_edge_use_color: false
 intralayer_edge_insertion_skip: 0

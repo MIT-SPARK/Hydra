@@ -113,6 +113,22 @@ visualization_msgs::Marker makeMeshEdgesMarker(
     const SceneGraphLayer& layer,
     const std::string& ns);
 
+visualization_msgs::MarkerArray makeGvdWireframe(
+    const std_msgs::Header& header,
+    const LayerConfig& config,
+    const VisualizerConfig& visualizer_config,
+    const SceneGraphLayer& layer,
+    const std::string& ns,
+    const ColormapConfig& colors,
+    size_t marker_id = 0);
+
+visualization_msgs::MarkerArray makeGvdWireframe(const std_msgs::Header& header,
+                                                 const LayerConfig& config,
+                                                 const SceneGraphLayer& gvd,
+                                                 const std::string& ns,
+                                                 const ColorFunction& color_func,
+                                                 size_t marker_id = 0);
+
 visualization_msgs::Marker makeLayerEdgeMarkers(
     const std_msgs::Header& header,
     const LayerConfig& config,

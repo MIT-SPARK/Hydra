@@ -48,8 +48,8 @@
 
 #include <Eigen/Dense>
 
+#include "hydra_topology/combo_integrator.h"
 #include "hydra_topology/configs.h"
-#include "hydra_topology/gvd_integrator.h"
 #include "hydra_topology/topology_server_visualizer.h"
 
 DEFINE_string(config, "", "gvd integrator yaml config");
@@ -61,7 +61,7 @@ DEFINE_double(voxel_size, 0.1, "voxel size");
 using config_parser::ConfigVisitor;
 using config_parser::YamlParser;
 using config_parser::YamlParserImpl;
-using hydra::topology::GvdIntegrator;
+using hydra::topology::ComboIntegrator;
 using hydra::topology::GvdVoxel;
 using hydra::topology::TopologyServerVisualizer;
 using sensor_msgs::Image;
@@ -75,6 +75,7 @@ using voxblox::TsdfVoxel;
 using Policy = message_filters::sync_policies::ApproximateTime<Image, Image>;
 using TimeSync = message_filters::Synchronizer<Policy>;
 using TsdfConfig = voxblox::TsdfIntegratorBase::Config;
+using MeshConfig = voxblox::MeshIntegratorConfig;
 using GvdConfig = hydra::topology::GvdIntegratorConfig;
 
 struct ComparisonResult {
@@ -88,7 +89,6 @@ struct ComparisonResult {
   size_t num_parent_different = 0;
   size_t num_basis_different = 0;
   size_t num_surface_different = 0;
-  size_t num_vparent_different = 0;
   double min_error = std::numeric_limits<double>::infinity();
   double max_error = 0.0;
 };
@@ -104,7 +104,6 @@ std::ostream& operator<<(std::ostream& out, const ComparisonResult& r) {
              << "  - parent: " << r.num_parent_different << std::endl
              << "  - basis: " << r.num_basis_different << std::endl
              << "  - surface: " << r.num_surface_different << std::endl
-             << "  - voronoi parent: " << r.num_vparent_different << std::endl
              << "  - error: [" << r.min_error << ", " << r.max_error << "]";
 }
 
@@ -168,8 +167,6 @@ ComparisonResult compareLayers(const Layer<GvdVoxel>& lhs, const Layer<GvdVoxel>
           (lhs_voxel.num_extra_basis != rhs_voxel.num_extra_basis) ? 1 : 0;
       results.num_surface_different +=
           (lhs_voxel.on_surface != rhs_voxel.on_surface) ? 1 : 0;
-      results.num_vparent_different +=
-          (lhs_voxel.is_voronoi_parent != rhs_voxel.is_voronoi_parent) ? 1 : 0;
 
       double error = std::abs(lhs_voxel.distance - rhs_voxel.distance);
       results.min_error = std::min(results.min_error, error);
@@ -242,10 +239,12 @@ struct GvdValidator {
   } intrinsics;
 
   GvdValidator(const TsdfConfig& tsdf_config,
+               const MeshConfig& mesh_config,
                const GvdConfig& gvd_config,
                double voxel_size,
                int voxels_per_side)
       : gvd_config(gvd_config),
+        mesh_config(mesh_config),
         voxel_size(voxel_size),
         voxels_per_side(voxels_per_side) {
     // roughly 3000 hours: should be enough to store all the tfs
@@ -261,7 +260,8 @@ struct GvdValidator {
 
     gvd.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
     mesh.reset(new MeshLayer(tsdf->block_size()));
-    gvd_integrator.reset(new GvdIntegrator(gvd_config, tsdf.get(), gvd, mesh));
+    gvd_integrator.reset(
+        new ComboIntegrator(gvd_config, tsdf.get(), gvd, mesh, &mesh_config));
   }
 
   void addTfsFromBag(const rosbag::Bag& bag) {
@@ -363,20 +363,18 @@ struct GvdValidator {
     VLOG(2) << "====================================================================";
     VLOG(2) << "Starting Incremental Update";
     VLOG(2) << "====================================================================";
-    gvd_integrator->updateFromTsdfLayer(
-        rgb_msg->header.stamp.toNSec(), true, true, true);
+    gvd_integrator->update(rgb_msg->header.stamp.toNSec(), true, true);
 
     full_gvd.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
     full_mesh.reset(new MeshLayer(tsdf->block_size()));
     full_gvd_integrator.reset(
-        new GvdIntegrator(gvd_config, tsdf.get(), full_gvd, full_mesh));
+        new ComboIntegrator(gvd_config, tsdf.get(), full_gvd, full_mesh, &mesh_config));
 
     VLOG(2) << "";
     VLOG(2) << "====================================================================";
     VLOG(2) << "Running Full Update" << std::endl;
     VLOG(2) << "====================================================================";
-    full_gvd_integrator->updateFromTsdfLayer(
-        rgb_msg->header.stamp.toNSec(), false, true, true);
+    full_gvd_integrator->update(rgb_msg->header.stamp.toNSec(), false, true);
 
     auto result = compareLayers(*gvd, *full_gvd);
 
@@ -387,10 +385,14 @@ struct GvdValidator {
               << result;
 
     if (visualizer) {
-      visualizer->visualize(
-          gvd_integrator->getGraphExtractor(), gvd_integrator->getGraph(), *gvd, *tsdf);
+      const uint64_t timestamp_ns = rgb_msg->header.stamp.toNSec();
+      visualizer->visualize(gvd_integrator->getGraph(),
+                            gvd_integrator->getGvdGraph(),
+                            *gvd,
+                            *tsdf,
+                            timestamp_ns);
 
-      visualizer->visualizeError(*gvd, *full_gvd, 0.0);
+      visualizer->visualizeError(*gvd, *full_gvd, 0.0, timestamp_ns);
 
       voxblox_msgs::Mesh mesh_msg;
       generateVoxbloxMeshMsg(mesh, voxblox::ColorMode::kLambertColor, &mesh_msg);
@@ -402,10 +404,12 @@ struct GvdValidator {
     }
 
     if (full_visualizer) {
-      full_visualizer->visualize(full_gvd_integrator->getGraphExtractor(),
-                                 full_gvd_integrator->getGraph(),
+      const uint64_t timestamp_ns = rgb_msg->header.stamp.toNSec();
+      full_visualizer->visualize(full_gvd_integrator->getGraph(),
+                                 full_gvd_integrator->getGvdGraph(),
                                  *full_gvd,
-                                 *tsdf);
+                                 *tsdf,
+                                 timestamp_ns);
       ros::spinOnce();
     }
   }
@@ -474,6 +478,7 @@ struct GvdValidator {
   }
 
   GvdConfig gvd_config;
+  MeshConfig mesh_config;
   double voxel_size;
   int voxels_per_side;
 
@@ -485,12 +490,12 @@ struct GvdValidator {
 
   Layer<GvdVoxel>::Ptr gvd;
   MeshLayer::Ptr mesh;
-  std::unique_ptr<GvdIntegrator> gvd_integrator;
+  std::unique_ptr<ComboIntegrator> gvd_integrator;
   std::unique_ptr<TopologyServerVisualizer> visualizer;
 
   Layer<GvdVoxel>::Ptr full_gvd;
   MeshLayer::Ptr full_mesh;
-  std::unique_ptr<GvdIntegrator> full_gvd_integrator;
+  std::unique_ptr<ComboIntegrator> full_gvd_integrator;
   std::unique_ptr<TopologyServerVisualizer> full_visualizer;
 
   ros::Publisher mesh_pub;
@@ -530,15 +535,19 @@ int main(int argc, char** argv) {
   TsdfConfig tsdf_config;
   ConfigVisitor<TsdfConfig>::visit_config(parser, tsdf_config);
 
+  MeshConfig mesh_config;
+  ConfigVisitor<MeshConfig>::visit_config(parser, mesh_config);
+
   GvdConfig gvd_config;
   ConfigVisitor<GvdConfig>::visit_config(parser, gvd_config);
 
   VLOG(1) << "BagConfig:" << std::endl << config;
   VLOG(1) << "TsdfConfig:" << std::endl << tsdf_config;
+  VLOG(1) << "MeshConfig:" << std::endl << mesh_config;
   VLOG(1) << "GvdConfig:" << std::endl << gvd_config;
 
   GvdValidator validator(
-      tsdf_config, gvd_config, FLAGS_voxel_size, FLAGS_voxels_per_side);
+      tsdf_config, mesh_config, gvd_config, FLAGS_voxel_size, FLAGS_voxels_per_side);
   validator.mesh_pub = nh.advertise<voxblox_msgs::Mesh>("mesh_viz", 1, true);
   validator.intrinsics.fx = config.intrinsics.at(0);
   validator.intrinsics.fy = config.intrinsics.at(1);

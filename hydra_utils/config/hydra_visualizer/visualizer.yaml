@@ -13,12 +13,12 @@ color_places_by_distance: false
 # minimum distance to clip to for places colormap
 places_colormap_min_distance: 0.0
 # maximum distance to clip to for places colormap
-places_colormap_max_distance: 1.5
+places_colormap_max_distance: 3.0
 
 places_colormap:
     min_hue: 0.0
-    max_hue: 0.15
-    min_saturation: 0.6
+    max_hue: 0.5
+    min_saturation: 0.9
     max_saturation: 0.8
-    min_luminance: 0.5
-    max_luminance: 0.8
+    min_luminance: 0.6
+    max_luminance: 0.85

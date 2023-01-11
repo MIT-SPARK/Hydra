@@ -32,79 +32,65 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <chrono>
-#include <condition_variable>
-#include <memory>
-#include <mutex>
-#include <queue>
+#include "hydra_topology/gvd_graph.h"
 
 namespace hydra {
+namespace topology {
 
-template <typename T>
-struct InputQueue {
-  using Ptr = std::shared_ptr<InputQueue<T>>;
-  std::queue<T> queue;
-  mutable std::mutex mutex;
-  mutable std::condition_variable cv;
-  size_t max_size;
+GvdGraph::GvdGraph() : next_id_(0) {}
 
-  InputQueue() : max_size(0) {}
+bool GvdGraph::empty() const { return nodes_.empty(); }
 
-  bool empty() const {
-    std::unique_lock<std::mutex> lock(mutex);
-    return queue.empty();
+uint64_t GvdGraph::addNode(const Eigen::Vector3d& position, const GlobalIndex& index) {
+  // position can't change ever (so we only ever set it when adding)
+  GvdMemberInfo info;
+  info.position = position;
+  info.index = index;
+
+  const auto next_id = getNextId();
+  nodes_.emplace(next_id, info);
+  return next_id;
+}
+
+void GvdGraph::removeNode(uint64_t node) {
+  auto iter = nodes_.find(node);
+  if (iter == nodes_.end()) {
+    return;
   }
 
-  const T& front() const {
-    std::unique_lock<std::mutex> lock(mutex);
-    return queue.front();
+  for (const auto sibling_id : iter->second.siblings) {
+    nodes_.at(sibling_id).siblings.erase(node);
   }
 
-  /**
-   * @brief wait for the queue to have data
-   */
-  bool poll(int wait_time_us = 1000) const {
-    std::chrono::microseconds wait_duration(wait_time_us);
-    std::unique_lock<std::mutex> lock(mutex);
-    return cv.wait_for(lock, wait_duration, [&] { return !queue.empty(); });
+  id_queue_.push_back(node);
+  nodes_.erase(iter);
+}
+
+const GvdMemberInfo* GvdGraph::getNode(uint64_t node) const {
+  return const_cast<GvdGraph*>(this)->getNode(node);
+}
+
+GvdMemberInfo* GvdGraph::getNode(uint64_t node) {
+  // TODO(nathan) make this not throw out-of-range
+  return &nodes_.at(node);
+}
+
+const GvdGraph::Nodes& GvdGraph::nodes() const { return nodes_; }
+
+uint64_t GvdGraph::getNextId() {
+  uint64_t new_id;
+  if (id_queue_.empty()) {
+    new_id = next_id_;
+    next_id_++;
+  } else {
+    new_id = id_queue_.front();
+    id_queue_.pop_front();
   }
 
-  /**
-   * @brief wait for the queue to not have any data
-   */
-  bool block(int wait_time_us = 1000) const {
-    std::chrono::microseconds wait_duration(wait_time_us);
-    std::unique_lock<std::mutex> lock(mutex);
-    return cv.wait_for(lock, wait_duration, [&] { return queue.empty(); });
-  }
+  return new_id;
+}
 
-  bool push(const T& input) {
-    bool added = false;
-    {
-      std::unique_lock<std::mutex> lock(mutex);
-      if (!max_size || queue.size() < max_size) {
-        queue.push(input);
-        added = true;
-      }
-    }
+bool GvdGraph::hasNode(uint64_t node) const { return nodes_.count(node) > 0; }
 
-    cv.notify_all();
-
-    return added;
-  }
-
-  T pop() {
-    std::unique_lock<std::mutex> lock(mutex);
-    auto value = queue.front();
-    queue.pop();
-    return value;
-  }
-
-  size_t size() const {
-    std::unique_lock<std::mutex> lock(mutex);
-    return queue.size();
-  }
-};
-
+}  // namespace topology
 }  // namespace hydra
