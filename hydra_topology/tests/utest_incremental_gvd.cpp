@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra_topology/gvd_integrator.h>
+#include <hydra_topology/combo_integrator.h>
 #include <hydra_topology/gvd_utilities.h>
 
 #include "hydra_topology_test/test_fixtures.h"
@@ -120,13 +120,13 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
   gvd_config.min_diff_m = 0.0;
   gvd_config.min_distance_m = voxel_size;
   gvd_config.max_distance_m = 50.0;
-  gvd_config.parent_derived_distance = true;
   gvd_config.voronoi_config.min_distance_m = 1.0;
   gvd_config.voronoi_config.parent_l1_separation = 2.0;
   gvd_config.extract_graph = false;
 
-  GvdIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
-  gvd_integrator.updateFromTsdfLayer(0, false, false);
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
+  gvd_integrator.updateFromTsdf(0, *tsdf_layer, *mesh_layer, false);
+  gvd_integrator.updateGvd(0);
 
   GvdResult result(4, 8);
   for (int x = 0; x < voxels_per_side; ++x) {
@@ -139,7 +139,7 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
 
   GvdResult expected(4, 8);
   // clang-format off
-  expected.distances << 0.00, 1.00, 2.00, 2.00, 2.24, 2.83, 3.61, 4.42,
+  expected.distances << 0.00, 1.00, 2.00, 2.00, 2.24, 2.83, 3.61, 4.47,
                         0.00, 1.00, 1.41, 1.00, 1.41, 2.24, 3.16, 4.12,
                         0.00, 1.00, 1.00, 0.00, 1.00, 2.00, 3.00, 4.00,
                         0.00, 1.00, 1.41, 1.00, 1.41, 2.24, 3.16, 4.12;
@@ -155,7 +155,7 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
     for (int c = 0; c < expected.is_voronoi.cols(); ++c) {
       EXPECT_EQ(expected.is_voronoi(r, c), result.is_voronoi(r, c))
           << " @ (" << r << ", " << c << ")";
-      EXPECT_NEAR(expected.distances(r, c), result.distances(r, c), 1.0e-1)
+      EXPECT_NEAR(expected.distances(r, c), result.distances(r, c), 1.0e-2)
           << " @ (" << r << ", " << c << ")";
     }
   }
@@ -165,7 +165,14 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
   // raise the middle obstacle and lower one on the side
   setTsdfVoxel(3, 2, 10.0);
   setTsdfVoxel(7, 2, 0.0);
-  gvd_integrator.updateFromTsdfLayer(0, true, false);
+  // reset surface flags for previous surfaces
+  setSurfaceVoxel(0, 0);
+  setSurfaceVoxel(0, 1);
+  setSurfaceVoxel(0, 2);
+  setSurfaceVoxel(0, 3);
+
+  gvd_integrator.updateFromTsdf(0, *tsdf_layer, *mesh_layer, false);
+  gvd_integrator.updateGvd(0);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < 4; ++y) {
@@ -238,14 +245,13 @@ TEST_F(TestFixture2d, NegativeIntegrationCorrect) {
   gvd_config.min_diff_m = 0.0;
   gvd_config.min_distance_m = voxel_size;
   gvd_config.max_distance_m = 50.0;
-  gvd_config.parent_derived_distance = true;
   gvd_config.voronoi_config.min_distance_m = 1.0;
   gvd_config.voronoi_config.parent_l1_separation = 2.0;
   gvd_config.positive_distance_only = false;
   gvd_config.extract_graph = false;
 
-  GvdIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
-  gvd_integrator.updateFromTsdfLayer(0, false, false);
+  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
+  gvd_integrator.update(0, false);
 
   GvdResult result(voxels_per_side, voxels_per_side);
   for (int x = 0; x < voxels_per_side; ++x) {
@@ -281,7 +287,7 @@ TEST_F(TestFixture2d, NegativeIntegrationCorrect) {
 }
 
 TEST_F(SingleBlockTestFixture, PlaneCorrect) {
-  GvdIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
+  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {
@@ -291,7 +297,7 @@ TEST_F(SingleBlockTestFixture, PlaneCorrect) {
     }
   }
 
-  gvd_integrator.updateFromTsdfLayer(0, true);
+  gvd_integrator.update(0, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -312,7 +318,7 @@ TEST_F(SingleBlockTestFixture, PlaneCorrect) {
 }
 
 TEST_F(SingleBlockTestFixture, LCorrect) {
-  GvdIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
+  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {
@@ -322,7 +328,7 @@ TEST_F(SingleBlockTestFixture, LCorrect) {
     }
   }
 
-  gvd_integrator.updateFromTsdfLayer(0, true);
+  gvd_integrator.update(0, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -345,7 +351,7 @@ TEST_F(SingleBlockTestFixture, LCorrect) {
 }
 
 TEST_F(LargeSingleBlockTestFixture, LCorrect) {
-  GvdIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
+  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {
@@ -355,7 +361,7 @@ TEST_F(LargeSingleBlockTestFixture, LCorrect) {
     }
   }
 
-  gvd_integrator.updateFromTsdfLayer(0, true);
+  gvd_integrator.update(0, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -378,8 +384,8 @@ TEST_F(LargeSingleBlockTestFixture, LCorrect) {
 }
 
 TEST_F(SingleBlockTestFixture, CornerCorrect) {
-  GvdIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
-  gvd_integrator.updateFromTsdfLayer(0, true);
+  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
+  gvd_integrator.update(0, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -404,8 +410,8 @@ TEST_F(SingleBlockTestFixture, CornerCorrect) {
 }
 
 TEST_F(ParentTestFixture, ParentsCorrect) {
-  GvdIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
-  gvd_integrator.updateFromTsdfLayer(0, true);
+  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
+  gvd_integrator.update(0, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -465,14 +471,9 @@ TEST_F(ParentTestFixture, ParentsCorrect) {
   }
 }
 
-TEST(TestVoxelSize, DISABLED_ShowVoxelSize) {
-  LOG(INFO) << "GVD voxel size: " << sizeof(GvdVoxel) << " bytes";
-  SUCCEED();
-}
-
 TEST_F(SingleBlockTestFixture, RaiseCorrectForSurface) {
   gvd_config.min_diff_m = 0.03;
-  GvdIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
+  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {
@@ -482,14 +483,14 @@ TEST_F(SingleBlockTestFixture, RaiseCorrectForSurface) {
     }
   }
 
-  gvd_integrator.updateFromTsdfLayer(0, true);
+  gvd_integrator.update(0, true);
 
   // trigger a lower wavefront
   setTsdfVoxel(0, 2, 0, -0.01);
   // flip value to be raised
   setTsdfVoxel(0, 2, 2, -0.09);
 
-  gvd_integrator.updateFromTsdfLayer(0, true, true, true);
+  gvd_integrator.update(0, true, true);
 
   {  // temporary scope
     const auto& voxel = getGvdVoxel(0, 2, 2);

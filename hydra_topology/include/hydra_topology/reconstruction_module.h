@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <hydra_topology/configs.h>
+#include <hydra_topology/gvd_voxel.h>
 #include <hydra_utils/display_utils.h>
 #include <hydra_utils/input_queue.h>
 #include <hydra_utils/robot_prefix_config.h>
@@ -47,11 +48,17 @@
 
 namespace hydra {
 
+namespace topology {
+// forward declare to avoid include
+class GvdIntegrator;
+class VoxelAwareMeshIntegrator;
+}  // namespace topology
+
 struct ReconstructionInput {
   using Ptr = std::shared_ptr<ReconstructionInput>;
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  size_t timestamp_ns;
+  uint64_t timestamp_ns;
   pose_graph_tools::PoseGraph::ConstPtr pose_graph;
   Eigen::Vector3d world_t_body;
   Eigen::Quaterniond world_R_body;
@@ -59,7 +66,6 @@ struct ReconstructionInput {
   std::unique_ptr<voxblox::Colors> pointcloud_colors;
 };
 
-// TODO(nathan) consider moving to shared module state
 class ReconstructionModule {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -91,36 +97,37 @@ class ReconstructionModule {
   void addOutputCallback(const OutputCallback& callback);
 
   // takes in a 3xN matrix
-  std::vector<bool> inFreespace(const PositionMatrix& positions, double freespace_distance_m) const;
+  std::vector<bool> inFreespace(const PositionMatrix& positions,
+                                double freespace_distance_m) const;
 
  protected:
-  voxblox::BlockIndexList update(const voxblox::Transformation& T_G_C,
-                                 const voxblox::Pointcloud& pointcloud,
-                                 const voxblox::Colors& colors,
-                                 size_t timestamp_ns,
-                                 bool full_update);
+  void update(const ReconstructionInput& msg, bool full_update);
+
+  void updateGvd();
 
   void showStats() const;
 
-  void addMeshToOutput(const voxblox::BlockIndexList& archived_blocks,
-                       ReconstructionOutput& output,
-                       size_t timestamp_ns);
+  void addMeshToOutput(ReconstructionOutput& output,
+                       const voxblox::BlockIndexList& archived_blocks);
 
-  void addPlacesToOutput(ReconstructionOutput& output, size_t timestamp_ns);
+  void addPlacesToOutput(ReconstructionOutput& output);
 
   void fillPoseGraphNode(pose_graph_tools::PoseGraphNode& node,
-                         size_t stamp,
+                         uint64_t stamp,
                          const Eigen::Affine3d& pose,
                          size_t index) const;
 
   void makePoseGraphEdge(pose_graph_tools::PoseGraph& graph) const;
 
-  pose_graph_tools::PoseGraph makePoseGraph(size_t timestamp_ns,
+  pose_graph_tools::PoseGraph makePoseGraph(uint64_t timestamp_ns,
                                             const Eigen::Affine3d& curr_pose);
 
   voxblox::Transformation getCameraPose(const ReconstructionInput& msg) const;
 
+  voxblox::BlockIndexList findBlocksToArchive(const voxblox::Point& center) const;
+
  protected:
+  mutable std::mutex tsdf_mutex_;
   mutable std::mutex gvd_mutex_;
 
   RobotPrefixConfig prefix_;
@@ -128,9 +135,11 @@ class ReconstructionModule {
 
   std::atomic<bool> should_shutdown_{false};
   ReconstructionInputQueue::Ptr queue_;
+  OutputQueue gvd_queue_;
   std::unique_ptr<std::thread> spin_thread_;
+  std::unique_ptr<std::thread> gvd_thread_;
 
-  ReconstructionOutput::Ptr output_;
+  std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs_;
   OutputQueue::Ptr output_queue_;
 
   voxblox::Layer<voxblox::TsdfVoxel>::Ptr tsdf_;
@@ -139,9 +148,10 @@ class ReconstructionModule {
   voxblox::MeshLayer::Ptr mesh_;
 
   std::unique_ptr<voxblox::TsdfIntegratorBase> tsdf_integrator_;
+  std::unique_ptr<topology::VoxelAwareMeshIntegrator> mesh_integrator_;
   std::unique_ptr<topology::GvdIntegrator> gvd_integrator_;
 
-  size_t prev_time_;
+  uint64_t prev_time_;
   size_t num_poses_received_;
   Eigen::Affine3d prev_pose_;
 

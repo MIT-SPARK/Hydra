@@ -32,30 +32,67 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_topology/graph_extractor.h"
-#include "hydra_topology/gvd_utilities.h"
-#include "hydra_topology/voxblox_types.h"
-#include "hydra_topology/voxel_aware_mesh_integrator.h"
+#pragma once
+#include "hydra_topology/graph_extractor_config.h"
 
 namespace hydra {
 namespace topology {
 
+enum class ParentUniquenessMode {
+  ANGLE,
+  L1_DISTANCE,
+  L1_THEN_ANGLE,
+};
+
+}  // namespace topology
+}  // namespace hydra
+
+namespace hydra {
+namespace topology {
+
+struct VoronoiCheckConfig {
+  ParentUniquenessMode mode = ParentUniquenessMode::L1_THEN_ANGLE;
+  double min_distance_m = 0.2;
+  double parent_l1_separation = 3.0;
+  double parent_cos_angle_separation = 0.5;
+};
+
 struct GvdIntegratorConfig {
-  FloatingPoint max_distance_m = 2.0;
-  FloatingPoint min_distance_m = 0.2;
-  FloatingPoint min_diff_m = 1.0e-3;
-  FloatingPoint min_weight = 1.0e-6;
+  float max_distance_m = 2.0f;
+  float min_distance_m = 0.2f;
+  float min_diff_m = 1.0e-3f;
+  float min_weight = 1.0e-6f;
   int num_buckets = 20;
   bool multi_queue = false;
   bool positive_distance_only = true;
-  bool parent_derived_distance = true;
   uint8_t min_basis_for_extraction = 3;
   VoronoiCheckConfig voronoi_config;
-  voxblox::MeshIntegratorConfig mesh_integrator_config;
-  GraphExtractorConfig graph_extractor_config;
   bool extract_graph = true;
-  bool mesh_only = false;
+  GraphExtractorConfig graph_extractor;
 };
+
+template <typename Visitor>
+void visit_config(const Visitor& v, VoronoiCheckConfig& config) {
+  v.visit("mode", config.mode);
+  v.visit("min_distance_m", config.min_distance_m);
+  v.visit("parent_l1_separation", config.parent_l1_separation);
+  v.visit("parent_cos_angle_separation", config.parent_cos_angle_separation);
+}
+
+template <typename Visitor>
+void visit_config(const Visitor& v, GvdIntegratorConfig& config) {
+  v.visit("max_distance_m", config.max_distance_m);
+  v.visit("min_distance_m", config.min_distance_m);
+  v.visit("min_diff_m", config.min_diff_m);
+  v.visit("min_weight", config.min_weight);
+  v.visit("num_buckets", config.num_buckets);
+  v.visit("multi_queue", config.multi_queue);
+  v.visit("positive_distance_only", config.positive_distance_only);
+  v.visit("min_basis_for_extraction", config.min_basis_for_extraction);
+  v.visit("voronoi_config", config.voronoi_config);
+  v.visit("extract_graph", config.extract_graph);
+  v.visit("graph_extractor", config.graph_extractor);
+}
 
 }  // namespace topology
 }  // namespace hydra

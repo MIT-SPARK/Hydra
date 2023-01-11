@@ -33,78 +33,58 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <chrono>
-#include <condition_variable>
-#include <memory>
-#include <mutex>
-#include <queue>
+#include <utility>
+
+#include "hydra_topology/gvd_integrator.h"
+#include "hydra_topology/voxel_aware_mesh_integrator.h"
 
 namespace hydra {
+namespace topology {
 
-template <typename T>
-struct InputQueue {
-  using Ptr = std::shared_ptr<InputQueue<T>>;
-  std::queue<T> queue;
-  mutable std::mutex mutex;
-  mutable std::condition_variable cv;
-  size_t max_size;
+class ComboIntegrator {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  InputQueue() : max_size(0) {}
-
-  bool empty() const {
-    std::unique_lock<std::mutex> lock(mutex);
-    return queue.empty();
+  ComboIntegrator(const GvdIntegratorConfig& gvd_config,
+                  Layer<TsdfVoxel>* tsdf_layer,
+                  const Layer<GvdVoxel>::Ptr& gvd_layer,
+                  const MeshLayer::Ptr& mesh_layer,
+                  const voxblox::MeshIntegratorConfig* mesh_config = nullptr)
+      : tsdf_(tsdf_layer), mesh_(mesh_layer) {
+    mesh_integrator = std::make_unique<VoxelAwareMeshIntegrator>(
+        mesh_config ? *mesh_config : voxblox::MeshIntegratorConfig(),
+        tsdf_layer,
+        gvd_layer.get(),
+        mesh_layer.get());
+    gvd_integrator = std::make_unique<GvdIntegrator>(gvd_config, gvd_layer);
   }
 
-  const T& front() const {
-    std::unique_lock<std::mutex> lock(mutex);
-    return queue.front();
+  virtual ~ComboIntegrator() = default;
+
+  inline const SceneGraphLayer& getGraph() const { return gvd_integrator->getGraph(); }
+
+  inline const GvdGraph& getGvdGraph() const { return gvd_integrator->getGvdGraph(); }
+
+  inline GraphExtractorInterface& getGraphExtractor() const {
+    return gvd_integrator->getGraphExtractor();
   }
 
-  /**
-   * @brief wait for the queue to have data
-   */
-  bool poll(int wait_time_us = 1000) const {
-    std::chrono::microseconds wait_duration(wait_time_us);
-    std::unique_lock<std::mutex> lock(mutex);
-    return cv.wait_for(lock, wait_duration, [&] { return !queue.empty(); });
+  inline void update(uint64_t timestamp_ns,
+                     bool clear_updated_flag,
+                     bool use_all_blocks = false) {
+    mesh_integrator->generateMesh(!use_all_blocks, clear_updated_flag);
+    gvd_integrator->updateFromTsdf(
+        timestamp_ns, *tsdf_, *mesh_, clear_updated_flag, use_all_blocks);
+    gvd_integrator->updateGvd(timestamp_ns);
   }
 
-  /**
-   * @brief wait for the queue to not have any data
-   */
-  bool block(int wait_time_us = 1000) const {
-    std::chrono::microseconds wait_duration(wait_time_us);
-    std::unique_lock<std::mutex> lock(mutex);
-    return cv.wait_for(lock, wait_duration, [&] { return queue.empty(); });
-  }
+  std::unique_ptr<VoxelAwareMeshIntegrator> mesh_integrator;
+  std::unique_ptr<GvdIntegrator> gvd_integrator;
 
-  bool push(const T& input) {
-    bool added = false;
-    {
-      std::unique_lock<std::mutex> lock(mutex);
-      if (!max_size || queue.size() < max_size) {
-        queue.push(input);
-        added = true;
-      }
-    }
-
-    cv.notify_all();
-
-    return added;
-  }
-
-  T pop() {
-    std::unique_lock<std::mutex> lock(mutex);
-    auto value = queue.front();
-    queue.pop();
-    return value;
-  }
-
-  size_t size() const {
-    std::unique_lock<std::mutex> lock(mutex);
-    return queue.size();
-  }
+ protected:
+  Layer<TsdfVoxel>* tsdf_;
+  MeshLayer::Ptr mesh_;
 };
 
+}  // namespace topology
 }  // namespace hydra

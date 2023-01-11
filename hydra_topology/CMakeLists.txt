@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+option(HYDRA_USE_COVERAGE "Build with GCOV enabled" OFF)
+
 find_package(spark_dsg REQUIRED)
 find_package(
   catkin REQUIRED
@@ -66,11 +68,15 @@ catkin_package(
 
 add_library(
   ${PROJECT_NAME}
-  src/graph_extractor.cpp
+  src/compression_graph_extractor.cpp
+  src/floodfill_graph_extractor.cpp
+  src/graph_extractor_interface.cpp
   src/graph_extractor_types.cpp
-  src/graph_extraction_utilities.cpp
+  src/graph_extractor_utilities.cpp
+  src/gvd_graph.cpp
   src/gvd_integrator.cpp
   src/gvd_parent_tracker.cpp
+  src/gvd_thinning.cpp
   src/gvd_utilities.cpp
   src/gvd_visualization_utilities.cpp
   src/gvd_voxel.cpp
@@ -89,6 +95,14 @@ target_link_libraries(
   PRIVATE nanoflann::nanoflann
 )
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
+if(HYDRA_USE_COVERAGE)
+  target_compile_options(${PROJECT_NAME} PRIVATE --coverage)
+  # TODO(nathan) once we have newer cmake, target link options
+  target_link_libraries(${PROJECT_NAME} PRIVATE --coverage)
+endif()
+add_dependencies(
+  ${PROJECT_NAME} ${catkin_EXPORTED_TARGETS} ${${PROJECT_NAME}_EXPORTED_TARGETS}
+)
 
 add_executable(${PROJECT_NAME}_node src/hydra_topology_node.cpp)
 target_link_libraries(${PROJECT_NAME}_node PUBLIC ${PROJECT_NAME} Boost::boost)
@@ -104,16 +118,17 @@ if(CATKIN_ENABLE_TESTING)
     utest_${PROJECT_NAME}
     tests/utest_main.cpp
     tests/src/test_fixtures.cpp
+    tests/utest_compression_graph_extractor.cpp
     tests/utest_esdf.cpp
-    tests/utest_esdf_helpers.cpp
-    tests/utest_graph_extraction_utilities.cpp
-    tests/utest_graph_extractor.cpp
+    tests/utest_floodfill_graph_extractor.cpp
+    tests/utest_graph_extractor_utilities.cpp
+    tests/utest_gvd_thinning.cpp
     tests/utest_gvd_utilities.cpp
+    tests/utest_incremental_gvd.cpp
+    tests/utest_incremental_integration.cpp
     tests/utest_marching_cubes.cpp
     tests/utest_nearest_neighbor_utilities.cpp
     tests/utest_pose_graph.cpp
-    tests/utest_incremental_gvd.cpp
-    tests/utest_incremental_integration.cpp
   )
   target_include_directories(
     utest_${PROJECT_NAME} PUBLIC tests/include ${catkin_INCLUDE_DIRS}

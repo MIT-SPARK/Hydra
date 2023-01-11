@@ -33,12 +33,12 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_topology/gvd_parent_tracker.h"
+#include "hydra_topology/gvd_utilities.h"
 
 namespace hydra {
 namespace topology {
 
 uint8_t GvdParentTracker::updateGvdParentMap(const Layer<GvdVoxel>& layer,
-                                             const MeshLayer& mesh,
                                              const VoronoiCheckConfig& config,
                                              const GlobalIndex& voxel_index,
                                              const GvdVoxel& neighbor) {
@@ -58,12 +58,11 @@ uint8_t GvdParentTracker::updateGvdParentMap(const Layer<GvdVoxel>& layer,
 
   // parent is unique enough
   parents[voxel_index].insert(neighbor_parent);
-  markNewGvdParent(layer, mesh, neighbor_parent);
+  markNewGvdParent(layer, neighbor_parent);
   return curr_extra_basis + 1;
 }
 
 void GvdParentTracker::markNewGvdParent(const Layer<GvdVoxel>& layer,
-                                        const MeshLayer& mesh,
                                         const GlobalIndex& parent) {
   if (parent_vertices.count(parent)) {
     // make sure the parent vertex map stays alive for this gvd member
@@ -79,18 +78,10 @@ void GvdParentTracker::markNewGvdParent(const Layer<GvdVoxel>& layer,
   }
 
   GvdVertexInfo info;
-  info.vertex = parent_voxel->block_vertex_index;
   info.ref_count = 1;
+  info.vertex = parent_voxel->block_vertex_index;
   std::memcpy(info.block, parent_voxel->mesh_block, sizeof(info.block));
-
-  BlockIndex block_index = Eigen::Map<const BlockIndex>(parent_voxel->mesh_block);
-  const auto& mesh_block = mesh.getMeshByIndex(block_index);
-  if (info.vertex < mesh_block.vertices.size()) {
-    voxblox::Point vertex_pos = mesh_block.vertices.at(info.vertex);
-    info.pos[0] = vertex_pos(0);
-    info.pos[1] = vertex_pos(1);
-    info.pos[2] = vertex_pos(2);
-  }
+  std::memcpy(info.pos, parent_voxel->parent_pos, sizeof(info.pos));
 
   parent_vertices[parent] = info;
 }
@@ -110,8 +101,7 @@ void GvdParentTracker::removeVoronoiFromGvdParentMap(const GlobalIndex& voxel_in
   }
 }
 
-void GvdParentTracker::updateVertexMapping(const Layer<GvdVoxel>& layer,
-                                           const MeshLayer& mesh) {
+void GvdParentTracker::updateVertexMapping(const Layer<GvdVoxel>& layer) {
   auto iter = parent_vertices.begin();
   while (iter != parent_vertices.end()) {
     if (!iter->second.ref_count) {
@@ -131,23 +121,8 @@ void GvdParentTracker::updateVertexMapping(const Layer<GvdVoxel>& layer,
     }
 
     iter->second.vertex = voxel->block_vertex_index;
-
-    const BlockIndex block_index = Eigen::Map<const BlockIndex>(voxel->mesh_block);
-    Eigen::Map<BlockIndex>(iter->second.block) = block_index;
-
-    const auto& mesh_block = mesh.getMeshByIndex(block_index);
-    if (voxel->block_vertex_index >= mesh_block.vertices.size()) {
-      LOG(ERROR) << "Invalid vertex: " << voxel->block_vertex_index
-                 << " >= " << mesh_block.vertices.size();
-      iter = parent_vertices.erase(iter);
-      continue;
-    }
-
-    voxblox::Point vertex_pos = mesh_block.vertices.at(iter->second.vertex);
-    iter->second.pos[0] = vertex_pos(0);
-    iter->second.pos[1] = vertex_pos(1);
-    iter->second.pos[2] = vertex_pos(2);
-
+    std::memcpy(iter->second.block, voxel->mesh_block, sizeof(iter->second.block));
+    std::memcpy(iter->second.pos, voxel->parent_pos, sizeof(iter->second.pos));
     ++iter;
   }
 }

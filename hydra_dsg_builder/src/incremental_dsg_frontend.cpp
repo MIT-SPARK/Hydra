@@ -267,6 +267,49 @@ void DsgFrontend::updateDeformationGraph(const ReconstructionOutput& input) {
   }
 }
 
+void DsgFrontend::filterPlaces(const SceneGraphLayer& places,
+                               NodeIdSet& objects_to_check,
+                               NodeIdSet& active_places) {
+  const auto components = graph_utilities::getConnectedComponents(
+      places,
+      [](const SceneGraphNode& node) { return node.attributes().is_active; },
+      [&](const SceneGraphEdge& edge) {
+        const auto source_active =
+            places.getNode(edge.source)->get().attributes().is_active;
+        const auto target_active =
+            places.getNode(edge.target)->get().attributes().is_active;
+        return source_active && target_active;
+      });
+
+  for (const auto& component : components) {
+    if (component.size() >= config_.min_places_component_size) {
+      continue;
+    }
+
+    for (const auto to_delete : component) {
+      deletePlaceNode(to_delete, objects_to_check);
+      active_places.erase(to_delete);
+    }
+  }
+}
+
+void DsgFrontend::deletePlaceNode(NodeId node_id, NodeIdSet& objects_to_check) {
+  const auto to_check = dsg_->graph->getNode(node_id);
+  if (!to_check) {
+    return;
+  }
+
+  for (const auto& child : to_check->get().children()) {
+    if (!dsg_->graph->isDynamic(child)) {
+      objects_to_check.insert(child);
+    } else {
+      deleted_agent_edge_indices_.insert(child);
+    }
+  }
+
+  dsg_->graph->removeNode(node_id);
+}
+
 void DsgFrontend::updatePlaces(const ReconstructionOutput& input) {
   ScopedTimer timer("frontend/update_places", input.timestamp_ns, true, 2, false);
   SceneGraphLayer temp_layer(DsgLayers::PLACES);
@@ -282,29 +325,26 @@ void DsgFrontend::updatePlaces(const ReconstructionOutput& input) {
     attrs.last_update_time_ns = input.timestamp_ns;
   }
 
-  const auto& objects = dsg_->graph->getLayer(DsgLayers::OBJECTS);
   const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
 
-  NodeIdSet objects_to_check;
   {  // start graph update critical section
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
+
+    NodeIdSet objects_to_check;
     for (const auto& node_id : input.places->deleted_nodes) {
-      if (dsg_->graph->hasNode(node_id)) {
-        const SceneGraphNode& to_check = dsg_->graph->getNode(node_id).value();
-        for (const auto& child : to_check.children()) {
-          // TODO(nathan) this isn't very robust
-          if (objects.hasNode(child)) {
-            objects_to_check.insert(child);
-          } else {
-            deleted_agent_edge_indices_.insert(child);
-          }
-        }
-      }
-      dsg_->graph->removeNode(node_id);
+      deletePlaceNode(node_id, objects_to_check);
     }
 
-    // TODO(nathan) figure out reindexing (for more logical node ids)
+    const auto& deleted_edges = input.places->deleted_edges;
+    for (size_t i = 0; i < deleted_edges.size(); i += 2) {
+      dsg_->graph->removeEdge(deleted_edges.at(i), deleted_edges.at(i + 1));
+    }
+
     dsg_->graph->updateFromLayer(temp_layer, std::move(edges));
+
+    if (config_.filter_places) {
+      filterPlaces(places, objects_to_check, active_nodes);
+    }
 
     places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
 

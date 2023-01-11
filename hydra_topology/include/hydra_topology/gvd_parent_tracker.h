@@ -33,27 +33,27 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_topology/gvd_utilities.h"
+#include "hydra_topology/gvd_voxel.h"
 
 #include <memory>
 
 namespace hydra {
 namespace topology {
 
+// forward declare to avoid header
+struct VoronoiCheckConfig;
+
 struct GvdParentTracker {
   uint8_t updateGvdParentMap(const Layer<GvdVoxel>& layer,
-                             const MeshLayer& mesh,
                              const VoronoiCheckConfig& config,
                              const GlobalIndex& voxel_index,
                              const GvdVoxel& neighbor);
 
-  void markNewGvdParent(const Layer<GvdVoxel>& layer,
-                        const MeshLayer& mesh,
-                        const GlobalIndex& parent);
+  void markNewGvdParent(const Layer<GvdVoxel>& layer, const GlobalIndex& parent);
 
   void removeVoronoiFromGvdParentMap(const GlobalIndex& voxel_index);
 
-  void updateVertexMapping(const Layer<GvdVoxel>& layer, const MeshLayer& mesh);
+  void updateVertexMapping(const Layer<GvdVoxel>& layer);
 
   GvdParentMap parents;
   GvdVertexMap parent_vertices;

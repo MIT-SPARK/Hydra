@@ -40,6 +40,8 @@
 #include <tf2_eigen/tf2_eigen.h>
 #include <voxblox_ros/conversions.h>
 
+#include "hydra_topology/gvd_integrator.h"
+
 namespace hydra {
 
 using message_filters::Subscriber;
@@ -47,6 +49,7 @@ using pose_graph_tools::PoseGraph;
 using pose_graph_tools::PoseGraphEdge;
 using pose_graph_tools::PoseGraphNode;
 using RosPointcloud = RosReconstruction::Pointcloud;
+using topology::CompressionGraphExtractor;
 
 inline geometry_msgs::Pose tfToPose(const geometry_msgs::Transform& transform) {
   geometry_msgs::Pose pose;
@@ -111,7 +114,8 @@ RosReconstruction::RosReconstruction(const ros::NodeHandle& nh,
   }
 
   if (ros_config_.visualize_reconstruction) {
-    visualizer_.reset(new topology::TopologyServerVisualizer("~"));
+    visualizer_.reset(
+        new topology::TopologyServerVisualizer(ros_config_.topology_visualizer_ns));
   }
 
   if (ros_config_.publish_mesh) {
@@ -260,10 +264,17 @@ void RosReconstruction::visualize(const ReconstructionOutput& output) {
   }
 
   if (visualizer_) {
-    visualizer_->visualize(gvd_integrator_->getGraphExtractor(),
-                           gvd_integrator_->getGraph(),
+    visualizer_->visualize(gvd_integrator_->getGraph(),
+                           gvd_integrator_->getGvdGraph(),
                            *gvd_,
-                           *tsdf_);
+                           *tsdf_,
+                           output.timestamp_ns,
+                           mesh_.get());
+    if (config_.gvd.graph_extractor.use_compression_extractor) {
+      visualizer_->visualizeExtractor(output.timestamp_ns,
+                                      dynamic_cast<CompressionGraphExtractor&>(
+                                          gvd_integrator_->getGraphExtractor()));
+    }
   }
 }
 

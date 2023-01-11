@@ -34,8 +34,12 @@
  * -------------------------------------------------------------------------- */
 #include "hydra_topology/reconstruction_module.h"
 
+#include <hydra_utils/timing_utilities.h>
 #include <kimera_semantics/semantic_tsdf_integrator_factory.h>
 #include <tf2_eigen/tf2_eigen.h>
+
+#include "hydra_topology/gvd_integrator.h"
+#include "hydra_topology/voxel_aware_mesh_integrator.h"
 
 namespace hydra {
 
@@ -44,8 +48,10 @@ using kimera::SemanticVoxel;
 using pose_graph_tools::PoseGraph;
 using pose_graph_tools::PoseGraphEdge;
 using pose_graph_tools::PoseGraphNode;
+using timing::ScopedTimer;
 using topology::GvdIntegrator;
 using topology::GvdVoxel;
+using MeshIntegrator = topology::VoxelAwareMeshIntegrator;
 using voxblox::BlockIndexList;
 using voxblox::Layer;
 using voxblox::MeshLayer;
@@ -74,20 +80,22 @@ ReconstructionModule::ReconstructionModule(const RobotPrefixConfig& prefix,
   tsdf_.reset(new Layer<TsdfVoxel>(config_.voxel_size, config_.voxels_per_side));
   semantics_.reset(
       new Layer<SemanticVoxel>(config_.voxel_size, config_.voxels_per_side));
+
   gvd_.reset(new Layer<GvdVoxel>(config_.voxel_size, config_.voxels_per_side));
   mesh_.reset(new MeshLayer(tsdf_->block_size()));
 
   tsdf_integrator_ = SemanticTsdfIntegratorFactory::create(
       "fast", config_.tsdf, config_.semantics, tsdf_.get(), semantics_.get());
-  gvd_integrator_.reset(new GvdIntegrator(config_.gvd, tsdf_.get(), gvd_, mesh_));
-
-  output_.reset(new ReconstructionOutput());
+  mesh_integrator_.reset(
+      new MeshIntegrator(config_.mesh, tsdf_.get(), gvd_.get(), mesh_.get()));
+  gvd_integrator_.reset(new GvdIntegrator(config_.gvd, gvd_));
 }
 
 ReconstructionModule::~ReconstructionModule() { stop(); }
 
 void ReconstructionModule::start() {
   spin_thread_.reset(new std::thread(&ReconstructionModule::spin, this));
+  gvd_thread_.reset(new std::thread(&ReconstructionModule::updateGvd, this));
   LOG(INFO) << "[Hydra Reconstruction] started!";
 }
 
@@ -101,6 +109,13 @@ void ReconstructionModule::stop() {
     VLOG(2) << "[Hydra Reconstruction] stopped!";
   }
 
+  if (gvd_thread_) {
+    VLOG(2) << "[Hydra Reconstruction] stopping gvd thread!";
+    gvd_thread_->join();
+    gvd_thread_.reset();
+    VLOG(2) << "[Hydra Reconstruction] gvd thread stopped!";
+  }
+
   VLOG(2) << "[Hydra Reconstruction] input queue: " << queue_->size();
   if (output_queue_) {
     VLOG(2) << "[Hydra Reconstruction] output queue: " << output_queue_->size();
@@ -109,9 +124,26 @@ void ReconstructionModule::stop() {
   }
 }
 
-void ReconstructionModule::save(const std::string&) {}
+void ReconstructionModule::save(const std::string& output_path) {
+  const auto& original_places = gvd_integrator_->getGraph();
+  auto places = original_places.clone();
+
+  std::unique_ptr<DynamicSceneGraph::Edges> edges(new DynamicSceneGraph::Edges());
+  for (const auto& id_edge_pair : places->edges()) {
+    edges->emplace(std::piecewise_construct,
+                   std::forward_as_tuple(id_edge_pair.first),
+                   std::forward_as_tuple(id_edge_pair.second.source,
+                                         id_edge_pair.second.target,
+                                         id_edge_pair.second.info->clone()));
+  }
+
+  DynamicSceneGraph::Ptr graph(new DynamicSceneGraph());
+  graph->updateFromLayer(*places, std::move(edges));
+  graph->save(output_path + "/places.json", false);
+}
 
 void ReconstructionModule::spin() {
+  // TODO(nathan) fix shutdown logic
   while (!should_shutdown_) {
     bool has_data = queue_->poll();
     if (!has_data) {
@@ -145,55 +177,6 @@ voxblox::Transformation ReconstructionModule::getCameraPose(
   return result;
 }
 
-void ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
-  if (!msg.pointcloud || !msg.pointcloud_colors) {
-    LOG(ERROR) << "received invalid pointcloud in input!";
-    return;
-  }
-
-  VLOG(2) << "[Hydra Reconstruction]: Processing msg @ " << msg.timestamp_ns;
-  VLOG(2) << "[Hydra Reconstruction]: " << queue_->size() << " messages left";
-
-  Eigen::Affine3d curr_pose(Eigen::Translation3d(msg.world_t_body) * msg.world_R_body);
-  if (!msg.pose_graph && num_poses_received_ != 0) {
-    PoseGraph::ConstPtr pose_graph(
-        new PoseGraph(makePoseGraph(msg.timestamp_ns, curr_pose)));
-    output_->pose_graphs.push_back(pose_graph);
-  } else if (msg.pose_graph) {
-    output_->pose_graphs.push_back(msg.pose_graph);
-  }
-
-  prev_pose_ = curr_pose;
-  prev_time_ = msg.timestamp_ns;
-  ++num_poses_received_;
-
-  const bool do_full_update = (num_poses_received_ % config_.num_poses_per_update == 0);
-  const auto world_T_camera = getCameraPose(msg);
-  const auto archived_blocks = update(world_T_camera,
-                                      *msg.pointcloud,
-                                      *msg.pointcloud_colors,
-                                      msg.timestamp_ns,
-                                      do_full_update);
-  if (!do_full_update) {
-    return;
-  }
-
-  output_->timestamp_ns = msg.timestamp_ns;
-  output_->current_position = msg.world_t_body;
-  addPlacesToOutput(*output_, msg.timestamp_ns);
-  addMeshToOutput(archived_blocks, *output_, msg.timestamp_ns);
-
-  if (output_queue_) {
-    output_queue_->push(output_);
-  }
-
-  for (const auto& callback : output_callbacks_) {
-    callback(*this, *output_);
-  }
-
-  output_.reset(new ReconstructionOutput());
-}
-
 void ReconstructionModule::addOutputCallback(const OutputCallback& callback) {
   output_callbacks_.push_back(callback);
 }
@@ -219,118 +202,133 @@ std::vector<bool> ReconstructionModule::inFreespace(const PositionMatrix& positi
   return flags;
 }
 
-void ReconstructionModule::addPlacesToOutput(ReconstructionOutput& output,
-                                             size_t timestamp_ns) {
-  output.places.reset(new hydra_msgs::ActiveLayer());
-  auto& places = const_cast<hydra_msgs::ActiveLayer&>(*output.places);
-  places.header.stamp.fromNSec(timestamp_ns);
-  places.header.frame_id = config_.world_frame;
-  // non-const, as clearDeletedNodes modifies internal state
-  auto& extractor = gvd_integrator_->getGraphExtractor();
-  std::unordered_set<NodeId> active_nodes = extractor.getActiveNodes();
-  std::unordered_set<NodeId> removed_nodes = extractor.getDeletedNodes();
-  extractor.clearDeletedNodes();
-  places.layer_contents = extractor.getGraph().serializeLayer(active_nodes);
-  places.deleted_nodes.insert(
-      places.deleted_nodes.begin(), removed_nodes.begin(), removed_nodes.end());
+void ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
+  if (!msg.pointcloud || !msg.pointcloud_colors) {
+    LOG(ERROR) << "received invalid pointcloud in input!";
+    return;
+  }
 
-  VLOG(5) << "[Hydra Reconstruction] exporting active: " << active_nodes.size()
-          << " and deleted: " << removed_nodes.size() << "nodes";
+  ScopedTimer timer("topology/spin", msg.timestamp_ns);
+  VLOG(2) << "[Hydra Reconstruction]: Processing msg @ " << msg.timestamp_ns;
+  VLOG(2) << "[Hydra Reconstruction]: " << queue_->size() << " messages left";
+
+  // TODO(nathan) might want to return if we don't have a pose graph
+  Eigen::Affine3d curr_pose(Eigen::Translation3d(msg.world_t_body) * msg.world_R_body);
+  if (!msg.pose_graph && num_poses_received_ != 0) {
+    PoseGraph::ConstPtr pose_graph(
+        new PoseGraph(makePoseGraph(msg.timestamp_ns, curr_pose)));
+    pose_graphs_.push_back(pose_graph);
+  } else if (msg.pose_graph) {
+    pose_graphs_.push_back(msg.pose_graph);
+  }
+
+  prev_pose_ = curr_pose;
+  prev_time_ = msg.timestamp_ns;
+  ++num_poses_received_;
+
+  const bool do_full_update = (num_poses_received_ % config_.num_poses_per_update == 0);
+  update(msg, do_full_update);
 }
 
-void ReconstructionModule::addMeshToOutput(const BlockIndexList& archived_blocks,
-                                           ReconstructionOutput& output,
-                                           size_t timestamp_ns) {
-  output.mesh.reset(new hydra_msgs::ActiveMesh());
-  auto& active_mesh = const_cast<hydra_msgs::ActiveMesh&>(*output.mesh);
-  active_mesh.header.stamp.fromNSec(timestamp_ns);
-  // TODO(nathan) selectable color mode?
-  generateVoxbloxMeshMsg(mesh_.get(),
-                         voxblox::ColorMode::kColor,
-                         &active_mesh.mesh,
-                         active_mesh.header.stamp);
-  active_mesh.mesh.header.frame_id = config_.world_frame;
-  active_mesh.mesh.header.stamp = active_mesh.header.stamp;
+void ReconstructionModule::update(const ReconstructionInput& msg, bool full_update) {
+  std::unique_lock<std::mutex> lock(tsdf_mutex_);
+  const auto world_T_camera = getCameraPose(msg);
 
-  auto iter = active_mesh.mesh.mesh_blocks.begin();
-  while (iter != active_mesh.mesh.mesh_blocks.end()) {
-    // we can't just check if the message is empty (it's valid for an observed and
-    // active block to be empty), so we have to check if the GVD layer has pruned the
-    // corresponding block yet)
-    voxblox::BlockIndex idx(iter->index[0], iter->index[1], iter->index[2]);
-    if (!gvd_->hasBlock(idx)) {
-      iter = active_mesh.mesh.mesh_blocks.erase(iter);
+  {  // timing scope
+    ScopedTimer timer("topology/tsdf", msg.timestamp_ns);
+    tsdf_integrator_->integratePointCloud(
+        world_T_camera, *msg.pointcloud, *msg.pointcloud_colors, false);
+  }  // timing scope
+
+  if (!tsdf_ || tsdf_->getNumberOfAllocatedBlocks() == 0) {
+    return;
+  }
+
+  {  // timing scope
+    ScopedTimer timer("topology/mesh", msg.timestamp_ns);
+    mesh_integrator_->generateMesh(true, true);
+  }  // timing scope
+
+  if (!full_update) {
+    return;
+  }
+
+  auto output = std::make_shared<ReconstructionOutput>();
+  output->timestamp_ns = msg.timestamp_ns;
+  output->current_position = msg.world_t_body;
+  output->pose_graphs = pose_graphs_;
+  pose_graphs_.clear();
+
+  gvd_queue_.push(output);
+}
+
+void ReconstructionModule::updateGvd() {
+  // TODO(nathan) fix shutdown logic
+  while (!should_shutdown_) {
+    if (!gvd_queue_.poll()) {
       continue;
     }
 
-    ++iter;
-  }
+    std::unique_ptr<ScopedTimer> timer;
+    ReconstructionOutput::Ptr msg;
+    BlockIndexList archived_blocks;
+    {  // start critical section
+      std::unique_lock<std::mutex> lock(tsdf_mutex_);
 
-  for (const auto& block_idx : archived_blocks) {
-    voxblox_msgs::MeshBlock block;
-    block.index[0] = block_idx.x();
-    block.index[1] = block_idx.y();
-    block.index[2] = block_idx.z();
-    active_mesh.archived_blocks.mesh_blocks.push_back(block);
-  }
-}
-
-void ReconstructionModule::showStats() const {
-  const std::string tsdf_memory_str =
-      hydra_utils::getHumanReadableMemoryString(tsdf_->getMemorySize());
-  const std::string semantic_memory_str =
-      hydra_utils::getHumanReadableMemoryString(semantics_->getMemorySize());
-  const std::string gvd_memory_str =
-      hydra_utils::getHumanReadableMemoryString(gvd_->getMemorySize());
-  const std::string mesh_memory_str =
-      hydra_utils::getHumanReadableMemoryString(mesh_->getMemorySize());
-  LOG(INFO) << "Memory used: [TSDF=" << tsdf_memory_str
-            << ", Semantics=" << semantic_memory_str << ", GVD=" << gvd_memory_str
-            << ", Mesh= " << mesh_memory_str << "]";
-}
-
-BlockIndexList ReconstructionModule::update(const voxblox::Transformation& T_G_C,
-                                            const voxblox::Pointcloud& pointcloud,
-                                            const voxblox::Colors& colors,
-                                            size_t timestamp_ns,
-                                            bool full_update) {
-  BlockIndexList archived_blocks;
-  tsdf_integrator_->integratePointCloud(T_G_C, pointcloud, colors, false);
-
-  if (!tsdf_ || tsdf_->getNumberOfAllocatedBlocks() == 0) {
-    return archived_blocks;
-  }
-
-  if (!full_update) {
-    return archived_blocks;
-  }
-
-  {  // start critical section
-    // TODO(nathan) this might be nice to do a different way
-    std::unique_lock<std::mutex> lock(gvd_mutex_);
-    gvd_integrator_->updateFromTsdfLayer(timestamp_ns, true);
-
-    if (config_.clear_distant_blocks) {
-      archived_blocks = gvd_integrator_->removeDistantBlocks(
-          T_G_C.getPosition(), config_.dense_representation_radius_m);
-      for (const auto& index : archived_blocks) {
-        semantics_->removeBlock(index);
+      std::list<PoseGraph::ConstPtr> pose_graphs;
+      // this is awkward, but we want to make sure we use the latest available timestamp
+      while (gvd_queue_.size() > 1) {
+        // TODO(nathan) cache pose graphs
+        const auto& curr_graphs = gvd_queue_.front()->pose_graphs;
+        pose_graphs.insert(pose_graphs.end(), curr_graphs.begin(), curr_graphs.end());
+        gvd_queue_.pop();
       }
 
-      mesh_->clearDistantMesh(T_G_C.getPosition(),
-                              config_.dense_representation_radius_m);
+      msg = gvd_queue_.front();
+      msg->pose_graphs.insert(
+          msg->pose_graphs.begin(), pose_graphs.begin(), pose_graphs.end());
+      timer.reset(new ScopedTimer("topology/spin_gvd", msg->timestamp_ns));
+      gvd_integrator_->updateFromTsdf(msg->timestamp_ns, *tsdf_, *mesh_, true);
+
+      if (config_.clear_distant_blocks) {
+        archived_blocks = findBlocksToArchive(msg->current_position.cast<float>());
+        gvd_integrator_->archiveBlocks(archived_blocks);
+        for (const auto& index : archived_blocks) {
+          semantics_->removeBlock(index);
+          tsdf_->removeBlock(index);
+          mesh_->removeMesh(index);
+        }
+      }
+
+      addMeshToOutput(*msg, archived_blocks);
+    }  // end critical section
+
+    {  // start critical section
+      // TODO(nathan) this critical section is broken
+      std::unique_lock<std::mutex> lock(gvd_mutex_);
+      gvd_integrator_->updateGvd(msg->timestamp_ns);
+    }  // end critical section
+
+    if (config_.show_stats) {
+      showStats();
     }
-  }  // end critical section
 
-  if (config_.show_stats) {
-    showStats();
+    addPlacesToOutput(*msg);
+
+    if (output_queue_) {
+      output_queue_->push(msg);
+    }
+
+    for (const auto& callback : output_callbacks_) {
+      callback(*this, *msg);
+    }
+
+    gvd_queue_.pop();
   }
-
-  return archived_blocks;
 }
 
 void ReconstructionModule::fillPoseGraphNode(PoseGraphNode& node,
-                                             size_t timestamp_ns,
+                                             uint64_t timestamp_ns,
                                              const Eigen::Affine3d& pose,
                                              size_t index) const {
   node.header.stamp.fromNSec(timestamp_ns);
@@ -357,7 +355,7 @@ void ReconstructionModule::makePoseGraphEdge(PoseGraph& graph) const {
   graph.edges.push_back(edge);
 }
 
-PoseGraph ReconstructionModule::makePoseGraph(size_t timestamp_ns,
+PoseGraph ReconstructionModule::makePoseGraph(uint64_t timestamp_ns,
                                               const Eigen::Affine3d& curr_pose) {
   PoseGraph pose_graph;
   pose_graph.header.stamp.fromNSec(timestamp_ns);
@@ -373,6 +371,99 @@ PoseGraph ReconstructionModule::makePoseGraph(size_t timestamp_ns,
 
   makePoseGraphEdge(pose_graph);
   return pose_graph;
+}
+
+void ReconstructionModule::addPlacesToOutput(ReconstructionOutput& output) {
+  output.places.reset(new hydra_msgs::ActiveLayer());
+  auto& places = const_cast<hydra_msgs::ActiveLayer&>(*output.places);
+  places.header.stamp.fromNSec(output.timestamp_ns);
+  places.header.frame_id = config_.world_frame;
+  // non-const, as clearDeletedNodes modifies internal state
+  auto& extractor = gvd_integrator_->getGraphExtractor();
+  std::unordered_set<NodeId> active_nodes = extractor.getActiveNodes();
+  const auto& removed_nodes = extractor.getDeletedNodes();
+  const auto& removed_edges = extractor.getDeletedEdges();
+
+  places.layer_contents = extractor.getGraph().serializeLayer(active_nodes);
+  places.deleted_nodes.insert(
+      places.deleted_nodes.begin(), removed_nodes.begin(), removed_nodes.end());
+  places.deleted_edges.insert(
+      places.deleted_edges.begin(), removed_edges.begin(), removed_edges.end());
+  extractor.clearDeleted();
+
+  VLOG(5) << "[Hydra Reconstruction] exporting active: " << active_nodes.size()
+          << " and deleted: " << removed_nodes.size() << "nodes";
+}
+
+void ReconstructionModule::addMeshToOutput(ReconstructionOutput& output,
+                                           const BlockIndexList& archived_blocks) {
+  output.mesh.reset(new hydra_msgs::ActiveMesh());
+  auto& active_mesh = const_cast<hydra_msgs::ActiveMesh&>(*output.mesh);
+  active_mesh.header.stamp.fromNSec(output.timestamp_ns);
+  // TODO(nathan) selectable color mode?
+  generateVoxbloxMeshMsg(mesh_.get(),
+                         voxblox::ColorMode::kColor,
+                         &active_mesh.mesh,
+                         active_mesh.header.stamp);
+  active_mesh.mesh.header.frame_id = config_.world_frame;
+  active_mesh.mesh.header.stamp = active_mesh.header.stamp;
+
+  const voxblox::IndexSet archived_set(archived_blocks.begin(), archived_blocks.end());
+
+  auto iter = active_mesh.mesh.mesh_blocks.begin();
+  while (iter != active_mesh.mesh.mesh_blocks.end()) {
+    voxblox::BlockIndex idx(iter->index[0], iter->index[1], iter->index[2]);
+
+    // we can't just check if the message is empty (it's valid for an observed and
+    // active block to be empty), so we have to check if the GVD layer has pruned the
+    // corresponding block yet)
+    if (archived_set.count(idx)) {
+      iter = active_mesh.mesh.mesh_blocks.erase(iter);
+      continue;
+    }
+    ++iter;
+  }
+
+  for (const auto& block_idx : archived_blocks) {
+    voxblox_msgs::MeshBlock block;
+    block.index[0] = block_idx.x();
+    block.index[1] = block_idx.y();
+    block.index[2] = block_idx.z();
+    active_mesh.archived_blocks.mesh_blocks.push_back(block);
+  }
+}
+
+void ReconstructionModule::showStats() const {
+  const std::string tsdf_memory_str =
+      hydra_utils::getHumanReadableMemoryString(tsdf_->getMemorySize());
+  const std::string semantic_memory_str =
+      hydra_utils::getHumanReadableMemoryString(semantics_->getMemorySize());
+  const std::string gvd_memory_str =
+      hydra_utils::getHumanReadableMemoryString(gvd_->getMemorySize());
+  const std::string mesh_memory_str =
+      hydra_utils::getHumanReadableMemoryString(mesh_->getMemorySize());
+  LOG(INFO) << "Memory used: [TSDF=" << tsdf_memory_str
+            << ", Semantics=" << semantic_memory_str << ", GVD=" << gvd_memory_str
+            << ", Mesh= " << mesh_memory_str << "]";
+}
+
+BlockIndexList ReconstructionModule::findBlocksToArchive(
+    const voxblox::Point& center) const {
+  BlockIndexList blocks;
+  tsdf_->getAllAllocatedBlocks(&blocks);
+
+  BlockIndexList to_archive;
+  for (const auto& idx : blocks) {
+    auto block = gvd_->getBlockPtrByIndex(idx);
+    if ((center - block->origin()).norm() < config_.dense_representation_radius_m) {
+      continue;
+    }
+
+    // TODO(nathan) filter by update flag?
+    to_archive.push_back(idx);
+  }
+
+  return to_archive;
 }
 
 }  // namespace hydra

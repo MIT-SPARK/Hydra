@@ -54,6 +54,7 @@ using pose_graph_tools::PoseGraph;
 struct RosReconstructionConfig {
   bool use_pose_graph = true;
   bool visualize_reconstruction = true;
+  std::string topology_visualizer_ns = "~";
   bool publish_mesh = false;
   bool enable_output_queue = false;
   double pointcloud_separation_s = 0.1;
@@ -64,6 +65,7 @@ template <typename Visitor>
 void visit_config(const Visitor& v, RosReconstructionConfig& config) {
   v.visit("use_pose_graph", config.use_pose_graph);
   v.visit("visualize_reconstruction", config.visualize_reconstruction);
+  v.visit("topology_visualizer_ns", config.topology_visualizer_ns);
   v.visit("publish_reconstruction_mesh", config.publish_mesh);
   v.visit("enable_reconstruction_output_queue", config.enable_output_queue);
   v.visit("pointcloud_separation_s", config.pointcloud_separation_s);

@@ -105,6 +105,7 @@ struct ReconstructionConfig {
   int voxels_per_side = 16;
   bool show_stats = true;
   bool clear_distant_blocks = true;
+  bool mesh_only = false;
   double dense_representation_radius_m = 5.0;
   std::string world_frame = "world";
   std::string robot_frame = "base_link";
@@ -113,6 +114,7 @@ struct ReconstructionConfig {
   topology::GvdIntegratorConfig gvd;
   voxblox::TsdfIntegratorBase::Config tsdf;
   kimera::SemanticIntegratorBase::SemanticConfig semantics;
+  voxblox::MeshIntegratorConfig mesh;
   Eigen::Quaterniond body_R_camera;
   Eigen::Vector3d body_t_camera;
 };
@@ -132,6 +134,7 @@ void visit_config(const Visitor& v, ReconstructionConfig& config) {
   v.visit("voxels_per_side", config.voxels_per_side);
   v.visit("show_stats", config.show_stats);
   v.visit("clear_distant_blocks", config.clear_distant_blocks);
+  v.visit("mesh_only", config.mesh_only);
   v.visit("dense_representation_radius_m", config.dense_representation_radius_m);
   v.visit("world_frame", config.world_frame);
   v.visit("robot_frame", config.robot_frame);
@@ -140,6 +143,7 @@ void visit_config(const Visitor& v, ReconstructionConfig& config) {
   v.visit("gvd", config.gvd);
   v.visit("tsdf", config.tsdf);
   v.visit("semantics", config.semantics);
+  v.visit("mesh", config.mesh);
   v.visit("body_R_camera", config.body_R_camera, QuaternionConverter());
   v.visit("body_t_camera", config.body_t_camera);
 }

@@ -33,78 +33,56 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <chrono>
-#include <condition_variable>
+#include "hydra_topology/voxblox_types.h"
+
+#include <Eigen/Dense>
+#include <cstdint>
+#include <list>
 #include <memory>
-#include <mutex>
-#include <queue>
+#include <set>
+#include <unordered_map>
 
 namespace hydra {
+namespace topology {
 
-template <typename T>
-struct InputQueue {
-  using Ptr = std::shared_ptr<InputQueue<T>>;
-  std::queue<T> queue;
-  mutable std::mutex mutex;
-  mutable std::condition_variable cv;
-  size_t max_size;
-
-  InputQueue() : max_size(0) {}
-
-  bool empty() const {
-    std::unique_lock<std::mutex> lock(mutex);
-    return queue.empty();
-  }
-
-  const T& front() const {
-    std::unique_lock<std::mutex> lock(mutex);
-    return queue.front();
-  }
-
-  /**
-   * @brief wait for the queue to have data
-   */
-  bool poll(int wait_time_us = 1000) const {
-    std::chrono::microseconds wait_duration(wait_time_us);
-    std::unique_lock<std::mutex> lock(mutex);
-    return cv.wait_for(lock, wait_duration, [&] { return !queue.empty(); });
-  }
-
-  /**
-   * @brief wait for the queue to not have any data
-   */
-  bool block(int wait_time_us = 1000) const {
-    std::chrono::microseconds wait_duration(wait_time_us);
-    std::unique_lock<std::mutex> lock(mutex);
-    return cv.wait_for(lock, wait_duration, [&] { return queue.empty(); });
-  }
-
-  bool push(const T& input) {
-    bool added = false;
-    {
-      std::unique_lock<std::mutex> lock(mutex);
-      if (!max_size || queue.size() < max_size) {
-        queue.push(input);
-        added = true;
-      }
-    }
-
-    cv.notify_all();
-
-    return added;
-  }
-
-  T pop() {
-    std::unique_lock<std::mutex> lock(mutex);
-    auto value = queue.front();
-    queue.pop();
-    return value;
-  }
-
-  size_t size() const {
-    std::unique_lock<std::mutex> lock(mutex);
-    return queue.size();
-  }
+struct GvdMemberInfo {
+  double distance;
+  uint8_t num_basis_points;
+  Eigen::Vector3d position;
+  GlobalIndex index;
+  std::set<uint64_t> siblings;
 };
 
+class GvdGraph {
+ public:
+  using Ptr = std::shared_ptr<GvdGraph>;
+  using Nodes = std::unordered_map<uint64_t, GvdMemberInfo>;
+
+  GvdGraph();
+
+  bool empty() const;
+
+  uint64_t addNode(const Eigen::Vector3d& position, const GlobalIndex& index);
+
+  void removeNode(uint64_t node);
+
+  GvdMemberInfo* getNode(uint64_t node);
+
+  const GvdMemberInfo* getNode(uint64_t node) const;
+
+  const Nodes& nodes() const;
+
+  bool hasNode(uint64_t) const;
+
+ protected:
+  uint64_t getNextId();
+
+ protected:
+  uint64_t next_id_;
+  std::list<uint64_t> id_queue_;
+
+  Nodes nodes_;
+};
+
+}  // namespace topology
 }  // namespace hydra

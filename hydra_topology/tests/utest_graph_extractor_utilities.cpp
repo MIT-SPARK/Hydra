@@ -36,7 +36,7 @@
 
 #include <gtest/gtest.h>
 
-#include <hydra_topology/graph_extraction_utilities.h>
+#include <hydra_topology/graph_extractor_utilities.h>
 #include <hydra_topology/voxblox_types.h>
 
 namespace hydra {

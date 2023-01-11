@@ -33,78 +33,15 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <chrono>
-#include <condition_variable>
-#include <memory>
-#include <mutex>
-#include <queue>
+#include <bitset>
+#include <cstdint>
 
 namespace hydra {
+namespace topology {
 
-template <typename T>
-struct InputQueue {
-  using Ptr = std::shared_ptr<InputQueue<T>>;
-  std::queue<T> queue;
-  mutable std::mutex mutex;
-  mutable std::condition_variable cv;
-  size_t max_size;
+bool noEulerChange(const std::bitset<26>& neighborhood);
 
-  InputQueue() : max_size(0) {}
+bool isSimplePoint(const std::bitset<26>& neighborhood);
 
-  bool empty() const {
-    std::unique_lock<std::mutex> lock(mutex);
-    return queue.empty();
-  }
-
-  const T& front() const {
-    std::unique_lock<std::mutex> lock(mutex);
-    return queue.front();
-  }
-
-  /**
-   * @brief wait for the queue to have data
-   */
-  bool poll(int wait_time_us = 1000) const {
-    std::chrono::microseconds wait_duration(wait_time_us);
-    std::unique_lock<std::mutex> lock(mutex);
-    return cv.wait_for(lock, wait_duration, [&] { return !queue.empty(); });
-  }
-
-  /**
-   * @brief wait for the queue to not have any data
-   */
-  bool block(int wait_time_us = 1000) const {
-    std::chrono::microseconds wait_duration(wait_time_us);
-    std::unique_lock<std::mutex> lock(mutex);
-    return cv.wait_for(lock, wait_duration, [&] { return queue.empty(); });
-  }
-
-  bool push(const T& input) {
-    bool added = false;
-    {
-      std::unique_lock<std::mutex> lock(mutex);
-      if (!max_size || queue.size() < max_size) {
-        queue.push(input);
-        added = true;
-      }
-    }
-
-    cv.notify_all();
-
-    return added;
-  }
-
-  T pop() {
-    std::unique_lock<std::mutex> lock(mutex);
-    auto value = queue.front();
-    queue.pop();
-    return value;
-  }
-
-  size_t size() const {
-    std::unique_lock<std::mutex> lock(mutex);
-    return queue.size();
-  }
-};
-
+}  // namespace topology
 }  // namespace hydra

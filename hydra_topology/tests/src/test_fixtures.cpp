@@ -188,8 +188,8 @@ void SingleBlockExtractionTestFixture::SetUp() {
   setBlockState();
 
   gvd_integrator.reset(
-      new GvdIntegrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer));
-  gvd_integrator->updateFromTsdfLayer(0, true);
+      new ComboIntegrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer));
+  gvd_integrator->update(0, true);
 }
 
 void SingleBlockExtractionTestFixture::setBlockState() {}
@@ -197,6 +197,18 @@ void SingleBlockExtractionTestFixture::setBlockState() {}
 void LargeSingleBlockTestFixture::SetUp() {
   voxels_per_side = 8;
   SingleBlockTestFixture::SetUp();
+}
+
+void TestFixture2d::setSurfaceVoxel(int x, int y) {
+  VoxelIndex v_index;
+  v_index << x, y, 0;
+
+  auto& gvd_voxel = gvd_block->getVoxelByVoxelIndex(v_index);
+  gvd_voxel.on_surface = true;
+  gvd_voxel.block_vertex_index = 0;
+  gvd_voxel.mesh_block[0] = 0;
+  gvd_voxel.mesh_block[1] = 0;
+  gvd_voxel.mesh_block[2] = 0;
 }
 
 void TestFixture2d::setTsdfVoxel(int x, int y, float distance, float weight) {
@@ -240,6 +252,9 @@ void TestFixture2d::SetUp() {
   BlockIndex block_index = BlockIndex::Zero();
   tsdf_block = tsdf_layer->allocateBlockPtrByIndex(block_index);
   gvd_block = gvd_layer->allocateBlockPtrByIndex(block_index);
+  // we need this to be allocated so we can avoid doing mesh integration
+  auto mesh_block = mesh_layer->allocateMeshPtrByIndex(block_index);
+  mesh_block->resize(1);
   tsdf_block->updated().set();
 
   for (int x = 0; x < voxels_per_side; ++x) {

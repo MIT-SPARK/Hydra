@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_topology/nearest_neighbor_utilities.h"
-#include "hydra_topology/graph_extraction_utilities.h"
+#include "hydra_topology/graph_extractor_utilities.h"
 
 #include <nanoflann.hpp>
 

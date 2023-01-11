@@ -32,79 +32,79 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <chrono>
-#include <condition_variable>
-#include <memory>
-#include <mutex>
-#include <queue>
+#include <gtest/gtest.h>
+#include <hydra_topology/gvd_thinning.h>
 
 namespace hydra {
+namespace topology {
 
-template <typename T>
-struct InputQueue {
-  using Ptr = std::shared_ptr<InputQueue<T>>;
-  std::queue<T> queue;
-  mutable std::mutex mutex;
-  mutable std::condition_variable cv;
-  size_t max_size;
-
-  InputQueue() : max_size(0) {}
-
-  bool empty() const {
-    std::unique_lock<std::mutex> lock(mutex);
-    return queue.empty();
-  }
-
-  const T& front() const {
-    std::unique_lock<std::mutex> lock(mutex);
-    return queue.front();
-  }
-
-  /**
-   * @brief wait for the queue to have data
-   */
-  bool poll(int wait_time_us = 1000) const {
-    std::chrono::microseconds wait_duration(wait_time_us);
-    std::unique_lock<std::mutex> lock(mutex);
-    return cv.wait_for(lock, wait_duration, [&] { return !queue.empty(); });
-  }
-
-  /**
-   * @brief wait for the queue to not have any data
-   */
-  bool block(int wait_time_us = 1000) const {
-    std::chrono::microseconds wait_duration(wait_time_us);
-    std::unique_lock<std::mutex> lock(mutex);
-    return cv.wait_for(lock, wait_duration, [&] { return queue.empty(); });
-  }
-
-  bool push(const T& input) {
-    bool added = false;
-    {
-      std::unique_lock<std::mutex> lock(mutex);
-      if (!max_size || queue.size() < max_size) {
-        queue.push(input);
-        added = true;
-      }
-    }
-
-    cv.notify_all();
-
-    return added;
-  }
-
-  T pop() {
-    std::unique_lock<std::mutex> lock(mutex);
-    auto value = queue.front();
-    queue.pop();
-    return value;
-  }
-
-  size_t size() const {
-    std::unique_lock<std::mutex> lock(mutex);
-    return queue.size();
-  }
+struct InputOutputPair {
+  std::bitset<26> neighborhood;
+  bool no_euler_change;
+  bool is_simple_point;
 };
 
+const InputOutputPair THINNING_TEST_CASES[] = {
+    {0b000'000'000'000'00'000'000'000'000, false, true},
+    {0b000'000'000'111'11'100'000'000'011, false, true},
+    //{0b000'010'000'000'00'000'010'101'010, true, false},
+};
+
+std::ostream& operator<<(std::ostream& out, const InputOutputPair& pair) {
+  out << std::endl
+      << std::boolalpha << "simple: " << pair.is_simple_point
+      << ", no euler delta: " << pair.no_euler_change;
+  for (size_t z = 0; z < 3; ++z) {
+    out << std::endl << "[";
+    for (size_t r = 0; r < 3; ++r) {
+      out << "[";
+      for (size_t c = 0; c < 3; ++c) {
+        size_t index = 9 * z + 3 * r + c;
+        if (index == 13) {
+          out << "x, ";
+          continue;
+        }
+
+        if (index > 13) {
+          index -= 1;
+        }
+
+        out << (pair.neighborhood[index] ? "1" : "0");
+        if (c != 2) {
+          out << ", ";
+        } else {
+          out << "]";
+        }
+      }
+      if (r != 2) {
+        out << ", ";
+      } else {
+        out << "]";
+      }
+    }
+  }
+  return out;
+}
+
+struct GvdThinningFixture : public testing::TestWithParam<InputOutputPair> {
+  GvdThinningFixture() = default;
+
+  virtual ~GvdThinningFixture() = default;
+};
+
+TEST_P(GvdThinningFixture, EulerChangeCorrect) {
+  const auto test_pair = GetParam();
+  EXPECT_EQ(test_pair.no_euler_change, noEulerChange(test_pair.neighborhood));
+}
+
+TEST_P(GvdThinningFixture, SimplePointCorrect) {
+  const auto test_pair = GetParam();
+  EXPECT_EQ(test_pair.is_simple_point, isSimplePoint(test_pair.neighborhood));
+}
+
+INSTANTIATE_TEST_CASE_P(GvdThinning,
+                        GvdThinningFixture,
+                        testing::ValuesIn(THINNING_TEST_CASES));
+
+}  // namespace topology
 }  // namespace hydra

@@ -34,13 +34,17 @@
  * -------------------------------------------------------------------------- */
 #include "hydra_topology/topology_server_visualizer.h"
 
+#include <hydra_utils/timing_utilities.h>
+
 namespace hydra {
 namespace topology {
 
+using timing::ScopedTimer;
 using visualization_msgs::Marker;
 using visualization_msgs::MarkerArray;
 
-TopologyServerVisualizer::TopologyServerVisualizer(const std::string& ns) : nh_(ns) {
+TopologyServerVisualizer::TopologyServerVisualizer(const std::string& ns)
+    : nh_(ns), published_gvd_graph_(false) {
   pubs_.reset(new MarkerGroupPub(nh_));
 
   config_ = config_parser::load_from_ros_nh<TopologyVisualizerConfig>(nh_);
@@ -50,25 +54,68 @@ TopologyServerVisualizer::TopologyServerVisualizer(const std::string& ns) : nh_(
   setupConfigServers();
 }
 
-void TopologyServerVisualizer::visualize(const GraphExtractor& extractor,
-                                         const SceneGraphLayer& graph,
+void TopologyServerVisualizer::visualize(const SceneGraphLayer& graph,
+                                         const GvdGraph& gvd_graph,
                                          const Layer<GvdVoxel>& gvd,
-                                         const Layer<TsdfVoxel>& tsdf) {
-  visualizeGraph(graph);
-  visualizeGvd(gvd);
-  visualizeGvdEdges(extractor, gvd);
+                                         const Layer<TsdfVoxel>& tsdf,
+                                         uint64_t timestamp_ns,
+                                         const MeshLayer* mesh) {
+  ScopedTimer timer("topology/topology_visualizer", timestamp_ns);
+
+  std_msgs::Header header;
+  header.frame_id = config_.world_frame;
+  header.stamp.fromNSec(timestamp_ns);
+
+  visualizeGraph(header, graph);
+  visualizeGvdGraph(header, gvd_graph);
+  visualizeGvd(header, gvd);
   if (config_.show_block_outlines) {
-    visualizeBlocks(gvd, tsdf);
+    visualizeBlocks(header, gvd, tsdf, mesh);
   }
+}
+
+void TopologyServerVisualizer::visualizeExtractor(
+    uint64_t timestamp_ns,
+    const CompressionGraphExtractor& extractor) {
+  std_msgs::Header header;
+  header.frame_id = config_.world_frame;
+  header.stamp.fromNSec(timestamp_ns);
+
+  const std::string ns = "gvd_cluster_graph";
+
+  MarkerArray markers;
+  if (extractor.getGvdGraph().empty() && published_gvd_clusters_) {
+    published_gvd_graph_ = false;
+    markers.markers.push_back(makeDeleteMarker(header, 0, ns + "_nodes"));
+    markers.markers.push_back(makeDeleteMarker(header, 0, ns + "_edges"));
+    pubs_->publish("gvd_cluster_viz", markers);
+    return;
+  }
+
+  markers = showGvdClusters(extractor.getGvdGraph(),
+                            extractor.getCompressedNodeInfo(),
+                            extractor.getCompressedRemapping(),
+                            config_.gvd,
+                            config_.colormap,
+                            ns);
+
+  if (markers.markers.empty()) {
+    return;
+  }
+
+  markers.markers.at(0).header = header;
+  markers.markers.at(1).header = header;
+  published_gvd_clusters_ = true;
+  pubs_->publish("gvd_cluster_viz", markers);
 }
 
 void TopologyServerVisualizer::visualizeError(const Layer<GvdVoxel>& lhs,
                                               const Layer<GvdVoxel>& rhs,
-                                              double threshold) {
+                                              double threshold,
+                                              uint64_t timestamp_ns) {
   Marker msg = makeErrorMarker(config_.gvd, config_.colormap, lhs, rhs, threshold);
   msg.header.frame_id = config_.world_frame;
-  msg.header.stamp = ros::Time::now();
-  msg.ns = "error_marker";
+  msg.header.stamp.fromNSec(timestamp_ns);
 
   if (msg.points.size()) {
     pubs_->publish("error_viz", msg);
@@ -77,15 +124,12 @@ void TopologyServerVisualizer::visualizeError(const Layer<GvdVoxel>& lhs,
   }
 }
 
-void TopologyServerVisualizer::visualizeGraph(const SceneGraphLayer& graph) {
+void TopologyServerVisualizer::visualizeGraph(const std_msgs::Header& header,
+                                              const SceneGraphLayer& graph) {
   if (graph.nodes().empty()) {
     LOG(INFO) << "visualizing empty graph!";
     return;
   }
-
-  std_msgs::Header header;
-  header.stamp = ros::Time::now();
-  header.frame_id = config_.world_frame;
 
   MarkerArray markers;
 
@@ -123,14 +167,38 @@ void TopologyServerVisualizer::visualizeGraph(const SceneGraphLayer& graph) {
     markers.markers.push_back(edge_marker);
   }
 
-  publishGraphLabels(graph);
+  publishGraphLabels(header, graph);
   pubs_->publish("graph_viz", markers);
 }
 
-void TopologyServerVisualizer::visualizeGvd(const Layer<GvdVoxel>& gvd) const {
+void TopologyServerVisualizer::visualizeGvdGraph(const std_msgs::Header& header,
+                                                 const GvdGraph& graph) const {
+  const std::string ns = config_.topology_marker_ns + "_gvd_graph";
+
+  MarkerArray markers;
+  if (graph.empty() && published_gvd_graph_) {
+    published_gvd_graph_ = false;
+    markers.markers.push_back(makeDeleteMarker(header, 0, ns + "_nodes"));
+    markers.markers.push_back(makeDeleteMarker(header, 0, ns + "_edges"));
+    pubs_->publish("gvd_graph_viz", markers);
+    return;
+  }
+
+  markers = makeGvdGraphMarkers(graph, config_.gvd, config_.colormap, ns);
+  if (markers.markers.empty()) {
+    return;
+  }
+
+  markers.markers.at(0).header = header;
+  markers.markers.at(1).header = header;
+  published_gvd_graph_ = true;
+  pubs_->publish("gvd_graph_viz", markers);
+}
+
+void TopologyServerVisualizer::visualizeGvd(const std_msgs::Header& header,
+                                            const Layer<GvdVoxel>& gvd) const {
   Marker esdf_msg = makeEsdfMarker(config_.gvd, config_.colormap, gvd);
-  esdf_msg.header.frame_id = config_.world_frame;
-  esdf_msg.header.stamp = ros::Time::now();
+  esdf_msg.header = header;
   esdf_msg.ns = "gvd_visualizer";
 
   if (esdf_msg.points.size()) {
@@ -140,8 +208,7 @@ void TopologyServerVisualizer::visualizeGvd(const Layer<GvdVoxel>& gvd) const {
   }
 
   Marker gvd_msg = makeGvdMarker(config_.gvd, config_.colormap, gvd);
-  gvd_msg.header.frame_id = config_.world_frame;
-  gvd_msg.header.stamp = ros::Time::now();
+  gvd_msg.header = header;
   gvd_msg.ns = "gvd_visualizer";
 
   if (gvd_msg.points.size()) {
@@ -151,8 +218,7 @@ void TopologyServerVisualizer::visualizeGvd(const Layer<GvdVoxel>& gvd) const {
   }
 
   Marker surface_msg = makeSurfaceVoxelMarker(config_.gvd, config_.colormap, gvd);
-  surface_msg.header.frame_id = config_.world_frame;
-  surface_msg.header.stamp = ros::Time::now();
+  surface_msg.header = header;
   surface_msg.ns = "gvd_visualizer";
 
   if (surface_msg.points.size()) {
@@ -162,8 +228,10 @@ void TopologyServerVisualizer::visualizeGvd(const Layer<GvdVoxel>& gvd) const {
   }
 }
 
-void TopologyServerVisualizer::visualizeBlocks(const Layer<GvdVoxel>& gvd,
-                                               const Layer<TsdfVoxel>& tsdf) const {
+void TopologyServerVisualizer::visualizeBlocks(const std_msgs::Header& header,
+                                               const Layer<GvdVoxel>& gvd,
+                                               const Layer<TsdfVoxel>& tsdf,
+                                               const MeshLayer* mesh) const {
   Marker msg;
   if (config_.use_gvd_block_outlines) {
     msg = makeBlocksMarker(gvd, config_.outline_scale);
@@ -171,28 +239,24 @@ void TopologyServerVisualizer::visualizeBlocks(const Layer<GvdVoxel>& gvd,
     msg = makeBlocksMarker(tsdf, config_.outline_scale);
   }
 
-  msg.header.frame_id = config_.world_frame;
-  msg.header.stamp = ros::Time::now();
+  msg.header = header;
   msg.ns = "topology_server_blocks";
   pubs_->publish("voxel_block_viz", msg);
+
+  if (mesh) {
+    Marker mesh_msg = makeMeshBlocksMarker(*mesh, config_.outline_scale);
+    mesh_msg.header = header;
+    msg.ns = "topology_server_mesh_blocks";
+    pubs_->publish("mesh_block_viz", mesh_msg);
+  }
 }
 
-void TopologyServerVisualizer::visualizeGvdEdges(const GraphExtractor& graph,
-                                                 const Layer<GvdVoxel>& gvd) const {
-  auto msg = makeGvdEdgeMarker(gvd, graph.getGvdEdgeInfo(), graph.getNodeRootMap());
-  msg.header.frame_id = config_.world_frame;
-  msg.header.stamp = ros::Time::now();
-  pubs_->publish("gvd_edge_viz", msg);
-}
-
-void TopologyServerVisualizer::publishGraphLabels(const SceneGraphLayer& graph) {
+void TopologyServerVisualizer::publishGraphLabels(const std_msgs::Header& header,
+                                                  const SceneGraphLayer& graph) {
   if (!config_.graph_layer.use_label) {
     return;
   }
 
-  std_msgs::Header header;
-  header.stamp = ros::Time::now();
-  header.frame_id = config_.world_frame;
   const std::string label_ns = config_.topology_marker_ns + "_labels";
 
   MarkerArray labels;
@@ -245,14 +309,14 @@ void TopologyServerVisualizer::gvdConfigCb(GvdVisualizerConfig& config, uint32_t
 
 void TopologyServerVisualizer::setupConfigServers() {
   startRqtServer(
-      "~/gvd_visualizer", gvd_config_server_, &TopologyServerVisualizer::gvdConfigCb);
+      "gvd_visualizer", gvd_config_server_, &TopologyServerVisualizer::gvdConfigCb);
 
-  startRqtServer("~/graph_visualizer",
+  startRqtServer("graph_visualizer",
                  graph_config_server_,
                  &TopologyServerVisualizer::graphConfigCb);
 
   startRqtServer(
-      "~/visualizer_colormap", colormap_server_, &TopologyServerVisualizer::colormapCb);
+      "visualizer_colormap", colormap_server_, &TopologyServerVisualizer::colormapCb);
 }
 
 }  // namespace topology

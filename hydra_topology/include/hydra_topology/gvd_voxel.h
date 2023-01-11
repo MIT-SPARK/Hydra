@@ -33,9 +33,9 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_topology/voxblox_types.h"
-
 #include <iostream>
+
+#include "hydra_topology/voxblox_types.h"
 
 namespace hydra {
 namespace topology {
@@ -43,32 +43,74 @@ namespace topology {
 // TODO(nathan) packed?
 struct GvdVoxel {
   float distance;
+  // TODO(nathan) consider bitset instead
   bool observed = false;
   bool fixed = false;
   bool in_queue = false;
-
+  bool to_raise = false;
+  bool is_negative = false;
+  bool on_surface = false;
   bool has_parent = false;
+
+  uint8_t num_extra_basis = 0;
+
   GlobalIndex::Scalar parent[3];
   // required for removing blocks (parents leave a dangling reference otherwise)
   voxblox::Point::Scalar parent_pos[3];
 
-  uint8_t num_extra_basis = 0;
-
-  bool on_surface = false;
   // TODO(nathan) leave this unitialized
   size_t block_vertex_index = 123456789;
   int32_t mesh_block[3];
-
-  bool is_voronoi_parent = false;
-  GlobalIndex::Scalar nearest_voronoi[3];
-  GlobalIndex::Scalar nearest_voronoi_distance;
 };
 
 std::ostream& operator<<(std::ostream& out, const GvdVoxel& voxel);
 
+inline void resetVoronoi(GvdVoxel& voxel) { voxel.num_extra_basis = 0; }
+
+inline bool isVoronoi(const GvdVoxel& voxel) { return voxel.num_extra_basis != 0; }
+
+inline void setSdfParent(GvdVoxel& voxel,
+                         const GvdVoxel& ancestor,
+                         const GlobalIndex& ancestor_index,
+                         const voxblox::Point& ancestor_pos) {
+  voxel.has_parent = true;
+  if (ancestor.has_parent) {
+    std::memcpy(voxel.parent, ancestor.parent, sizeof(voxel.parent));
+    std::memcpy(voxel.parent_pos, ancestor.parent_pos, sizeof(voxel.parent_pos));
+  } else {
+    Eigen::Map<GlobalIndex>(voxel.parent) = ancestor_index;
+    Eigen::Map<voxblox::Point>(voxel.parent_pos) = ancestor_pos;
+  }
+}
+
+// TODO(nathan) should probably be resetSdfParent
+inline void resetParent(GvdVoxel& voxel) { voxel.has_parent = false; }
+
+inline void setDefaultDistance(GvdVoxel& voxel, const double default_distance) {
+  // TODO(nathan) there's probably a better way to do this
+  voxel.distance = std::copysign(default_distance, voxel.is_negative ? -1.0 : 1.0);
+}
+
+inline void setRaiseStatus(GvdVoxel& voxel, const double default_distance) {
+  resetParent(voxel);
+  voxel.to_raise = true;
+
+  if (voxel.fixed) {
+    return;
+  }
+
+  setDefaultDistance(voxel, default_distance);
+}
+
+inline void setGvdSurfaceVoxel(GvdVoxel& voxel) {
+  voxel.on_surface = true;
+  resetParent(voxel);
+}
+
+// TODO(nathan) consider moving this
 struct GvdVertexInfo {
   size_t vertex;
-  double pos[3];
+  float pos[3];
   int32_t block[3];
   size_t ref_count = 0;
 };

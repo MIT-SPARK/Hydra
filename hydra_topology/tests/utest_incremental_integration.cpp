@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
+#include <hydra_topology/combo_integrator.h>
 #include <hydra_topology/gvd_integrator.h>
 #include <ros/package.h>
 #include <voxblox/integrator/tsdf_integrator.h>
@@ -66,9 +67,9 @@ class IncrementalIntegrationTestFixture : public ::testing::Test {
   Layer<GvdVoxel>::Ptr getBatchGvd() {
     MeshLayer::Ptr mesh(new MeshLayer(voxel_size * voxels_per_side));
     Layer<GvdVoxel>::Ptr gvd(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
-    GvdIntegrator integrator(gvd_config, tsdf_layer.get(), gvd, mesh);
+    ComboIntegrator integrator(gvd_config, tsdf_layer.get(), gvd, mesh);
 
-    integrator.updateFromTsdfLayer(0, false, true, true);
+    integrator.update(0, false, true);
 
     return gvd;
   }
@@ -140,12 +141,12 @@ class IncrementalIntegrationTestFixture : public ::testing::Test {
 };
 
 TEST_F(IncrementalIntegrationTestFixture, DISABLED_TestBatchSame) {
-  GvdIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
+  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
 
   for (size_t i = 0; i < num_poses; ++i) {
     integrateTsdf(i);
 
-    gvd_integrator.updateFromTsdfLayer(0, true);
+    gvd_integrator.update(0, true);
     auto batch_layer = getBatchGvd();
 
     LayerComparisonResult result =

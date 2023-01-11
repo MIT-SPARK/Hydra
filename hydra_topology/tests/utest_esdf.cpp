@@ -37,6 +37,7 @@
 
 #include <gtest/gtest.h>
 
+#include <hydra_topology/combo_integrator.h>
 #include <hydra_topology/gvd_integrator.h>
 #include <voxblox/integrator/esdf_integrator.h>
 #include <voxblox/utils/evaluation_utils.h>
@@ -86,13 +87,13 @@ TEST_F(EsdfTestFixture, TestEsdfSame) {
   GvdIntegratorConfig gvd_config = gvdConfigFromEsdfConfig(esdf_config);
   Layer<GvdVoxel>::Ptr gvd_layer(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
   MeshLayer::Ptr mesh_layer(new MeshLayer(voxel_size * voxels_per_side));
-  GvdIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
+  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
 
   for (size_t i = 0; i < num_poses; ++i) {
     updateTsdfIntegrator(tsdf_integrator, i);
 
     // we need to keep the updated flags for the second integrator
-    gvd_integrator.updateFromTsdfLayer(0, false);
+    gvd_integrator.update(0, false);
     original_integrator.updateFromTsdfLayer(true);
 
     LayerComparisonResult result =
