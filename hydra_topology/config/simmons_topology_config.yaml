@@ -11,7 +11,6 @@ gvd:
     min_diff_m: 1.0e-3
     min_weight: 1.0e-6
     positive_distance_only: true
-    parent_derived_distance: true
     min_basis_for_extraction: 2
     num_buckets: 20
     multi_queue: false
@@ -42,9 +41,9 @@ gvd:
         component_max_edge_length_m: 5.0
         component_min_clearance_m: 0.05
         remove_isolated_nodes: true
-    mesh_integrator_config:
-        use_color: true
-        min_weight: 0.0001
+mesh:
+    use_color: true
+    min_weight: 0.0001
 tsdf:
     voxel_carving_enabled: true
     use_const_weight: false

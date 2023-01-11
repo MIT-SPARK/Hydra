@@ -24,7 +24,7 @@
     <arg name="enable_lcd_viz" default="false"/>
     <arg name="optimize_on_lc" default="true"/>
     <arg name="enable_merge_undos" default="false"/>
-    <arg name="visualize_reconstruction" default="true"/>
+    <arg name="visualize_reconstruction" default="false"/>
 
     <arg name="dsg_should_log" default="true" />
     <arg name="pgmo_should_log" default="true"/>
@@ -36,6 +36,10 @@
     <arg name="pointcloud_topic" if="$(arg do_reconstruction)"/>
     <arg name="use_ros_backend" default="false"/>
     <arg name="validate_vertices" default="false"/>
+
+    <arg name="graph_viz_config_dir" default="$(find hydra_topology)/config"/>
+    <arg name="graph_viz_config" default="graph_visualization_config.yaml"/>
+    <arg name="graph_viz_config_file" value="$(arg graph_viz_config_dir)/$(arg graph_viz_config)"/>
 
     <arg name="debug" default="false"/>
     <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
@@ -49,7 +53,7 @@
     <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
 
     <arg name="log_timing_incrementally" default="false"/>
-    <arg name="show_topology_stats" default="true"/>
+    <arg name="show_topology_stats" default="false"/>
     <arg name="dsg_path" default="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
     <arg name="pgmo_log_path" value="$(arg dsg_path)/pgmo"/>
     <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
@@ -71,12 +75,15 @@
         <rosparam file="$(arg reconstruction_config)" if="$(arg do_reconstruction)"/>
         <rosparam file="$(arg extrinsics)" if="$(arg do_reconstruction)"/>
 
+        <param name="topology_visualizer_ns" value="~/topology_visualizer"/>
+        <param name="visualize_reconstruction" value="$(arg visualize_reconstruction)"/>
+        <param name="publish_reconstruction_mesh" value="$(arg visualize_reconstruction)"/>
+        <rosparam file="$(arg graph_viz_config_file)" ns="topology_visualizer"/>
+
         <param name="use_pose_graph" value="$(eval not arg('use_gt_frame'))"/>
         <param name="do_reconstruction" value="$(arg do_reconstruction)"/>
-        <param name="visualize_reconstruction" value="$(arg visualize_reconstruction)"/>
         <param name="min_mesh_separation_s" value="0.5"/>
         <param name="enable_reconstruction_output_queue" value="true"/>
-        <param name="publish_reconstruction_mesh" value="$(arg visualize_reconstruction)"/>
         <param name="use_ros_backend" value="$(arg use_ros_backend)"/>
         <param name="dsg/use_mesh_subscribers" value="$(arg use_ros_backend)"/>
         <param name="enable_lcd" value="$(arg enable_dsg_lcd)"/>

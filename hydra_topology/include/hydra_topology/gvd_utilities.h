@@ -33,65 +33,27 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include "hydra_topology/gvd_integrator_config.h"
 #include "hydra_topology/gvd_voxel.h"
 #include "hydra_topology/voxblox_types.h"
 
 namespace hydra {
 namespace topology {
 
-inline void resetVoronoi(GvdVoxel& voxel) { voxel.num_extra_basis = 0; }
-
-inline bool isVoronoi(const GvdVoxel& voxel) { return voxel.num_extra_basis != 0; }
-
-inline void setSdfParent(GvdVoxel& voxel,
-                         const GvdVoxel& ancestor,
-                         const GlobalIndex& ancestor_index,
-                         const voxblox::Point& ancestor_pos) {
-  voxel.has_parent = true;
-  if (ancestor.has_parent) {
-    std::memcpy(voxel.parent, ancestor.parent, sizeof(voxel.parent));
-    std::memcpy(voxel.parent_pos, ancestor.parent_pos, sizeof(voxel.parent_pos));
-  } else {
-    Eigen::Map<GlobalIndex>(voxel.parent) = ancestor_index;
-    Eigen::Map<voxblox::Point>(voxel.parent_pos) = ancestor_pos;
-  }
-}
-
-// TODO(nathan) should probably be resetSdfParent
-inline void resetGvdParent(GvdVoxel& voxel) { voxel.has_parent = false; }
-
-inline void setGvdSurfaceVoxel(GvdVoxel& voxel) {
-  voxel.on_surface = true;
-  resetGvdParent(voxel);
-}
-
 struct DistancePotential {
   bool is_lower;
   double distance;
 };
-
-DistancePotential getLowerDistance(FloatingPoint v_dist,
-                                   FloatingPoint n_dist,
-                                   FloatingPoint distance,
-                                   FloatingPoint min_diff_m = 0.0f);
 
 struct VoronoiCondition {
   bool neighbor_is_voronoi{false};
   bool current_is_voronoi{false};
 };
 
-enum class ParentUniquenessMode {
-  ANGLE,
-  L1_DISTANCE,
-  L1_THEN_ANGLE,
-};
-
-struct VoronoiCheckConfig {
-  ParentUniquenessMode mode = ParentUniquenessMode::L1_THEN_ANGLE;
-  double min_distance_m = 0.2;
-  double parent_l1_separation = 3.0;
-  double parent_cos_angle_separation = 0.5;
-};
+DistancePotential getLowerDistance(FloatingPoint v_dist,
+                                   FloatingPoint n_dist,
+                                   FloatingPoint distance,
+                                   FloatingPoint min_diff_m = 0.0f);
 
 VoronoiCondition checkVoronoi(const VoronoiCheckConfig& config,
                               const GvdVoxel& current,

@@ -33,7 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-
 #include <hydra_topology/gvd_utilities.h>
 
 namespace hydra {
@@ -145,13 +144,13 @@ TEST(GvdUtilities, ressetGvdParent) {
   // invariant of new voxels
   EXPECT_FALSE(current.voxel.has_parent);
   // resetting can't assign a new parent
-  resetGvdParent(current.voxel);
+  resetParent(current.voxel);
   EXPECT_FALSE(current.voxel.has_parent);
 
   current = makeGvdVoxel(1, 2, 3, 4.0, 5, 6, 7);
   EXPECT_TRUE(current.voxel.has_parent);
   // resetting should clear a previous parent
-  resetGvdParent(current.voxel);
+  resetParent(current.voxel);
   EXPECT_FALSE(current.voxel.has_parent);
 }
 

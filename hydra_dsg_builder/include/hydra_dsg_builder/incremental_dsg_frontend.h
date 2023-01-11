@@ -95,6 +95,12 @@ class DsgFrontend {
   void updatePoseGraph(const ReconstructionOutput& input);
 
  protected:
+  void filterPlaces(const SceneGraphLayer& places,
+                    NodeIdSet& objects_to_check,
+                    NodeIdSet& active_places);
+
+  void deletePlaceNode(NodeId node_id, NodeIdSet& objects_to_check);
+
   void archivePlaces(const NodeIdSet active_places);
 
   void invalidateMeshEdges(const kimera_pgmo::MeshDelta& delta);

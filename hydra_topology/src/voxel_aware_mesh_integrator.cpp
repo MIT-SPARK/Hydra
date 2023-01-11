@@ -89,9 +89,6 @@ void VoxelAwareMeshIntegrator::launchThreads(const BlockIndexList& blocks,
 
 void VoxelAwareMeshIntegrator::generateMesh(bool only_mesh_updated_blocks,
                                             bool clear_updated_flag) {
-  CHECK(!clear_updated_flag || (sdf_layer_mutable_ != nullptr))
-      << "integrator isn't mutable";
-
   BlockIndexList blocks;
   if (only_mesh_updated_blocks) {
     sdf_layer_const_->getAllUpdatedBlocks(voxblox::Update::kMesh, &blocks);
@@ -101,6 +98,14 @@ void VoxelAwareMeshIntegrator::generateMesh(bool only_mesh_updated_blocks,
 
   for (const BlockIndex& block_index : blocks) {
     mesh_layer_->allocateMeshPtrByIndex(block_index);
+
+    // also allocate gvd blocks
+    auto gvd_block = gvd_layer_->allocateBlockPtrByIndex(block_index);
+
+    // we need to reset these so that marching cubes can assign them correctly
+    for (size_t idx = 0u; idx < gvd_block->num_voxels(); ++idx) {
+      gvd_block->getVoxelByLinearIndex(idx).on_surface = false;
+    }
   }
 
   launchThreads(blocks, true);

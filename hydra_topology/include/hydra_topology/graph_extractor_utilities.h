@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include "hydra_topology/graph_extractor_config.h"
 #include "hydra_topology/gvd_voxel.h"
 #include "hydra_topology/voxblox_types.h"
 
@@ -43,6 +44,9 @@
 
 namespace hydra {
 namespace topology {
+
+using EdgeInfoMap = std::map<EdgeKey, EdgeAttributes::Ptr>;
+using NodeIndexMap = std::unordered_map<NodeId, GlobalIndex>;
 
 std::bitset<27> convertRowMajorFlags(std::bitset<27> flags_row_major);
 
@@ -103,19 +107,29 @@ struct CornerFinder {
 voxblox::AlignedVector<GlobalIndex> makeBresenhamLine(const GlobalIndex& start,
                                                       const GlobalIndex& end);
 
-double getNeighborhoodOverlap(const SceneGraphLayer& graph,
-                              std::unordered_set<NodeId> neighborhood,
-                              NodeId other_node,
-                              size_t num_hops);
+EdgeAttributes::Ptr getOverlapEdgeInfo(const SceneGraphLayer& graph,
+                                       NodeId node,
+                                       NodeId neighbor,
+                                       double min_edge_clearance_m);
 
-inline double getNodeGvdDistance(const SceneGraphLayer& graph, NodeId node) {
-  return graph.getNode(node).value().get().attributes<PlaceNodeAttributes>().distance;
-}
+EdgeAttributes::Ptr getFreespaceEdgeInfo(const SceneGraphLayer& graph,
+                                         const Layer<GvdVoxel>& gvd,
+                                         const NodeIndexMap& node_index_map,
+                                         NodeId node,
+                                         NodeId other,
+                                         double min_edge_clearance_m);
 
-void addFreespaceEdge(SceneGraphLayer& graph,
-                      NodeId node,
-                      NodeId neighbor,
-                      double min_clearance);
+void findOverlapEdges(const OverlapEdgeConfig& config,
+                      const SceneGraphLayer& graph,
+                      const std::unordered_set<NodeId> active_nodes,
+                      EdgeInfoMap& proposed_edges);
+
+void findFreespaceEdges(const FreespaceEdgeConfig& config,
+                        const SceneGraphLayer& graph,
+                        const Layer<GvdVoxel>& gvd,
+                        const std::unordered_set<NodeId>& nodes,
+                        const NodeIndexMap& node_index_map,
+                        EdgeInfoMap& proposed_edges);
 
 }  // namespace topology
 }  // namespace hydra

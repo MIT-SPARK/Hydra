@@ -196,7 +196,6 @@ Marker makeErrorMarker(const GvdVisualizerConfig& config,
   return marker;
 }
 
-
 Marker makeSurfaceVoxelMarker(const GvdVisualizerConfig& config,
                               const ColormapConfig& colors,
                               const Layer<GvdVoxel>& layer) {
@@ -299,90 +298,6 @@ Marker makeEsdfMarker(const GvdVisualizerConfig& config,
   return marker;
 }
 
-Marker makeGvdEdgeMarker(const Layer<GvdVoxel>& layer,
-                         const GraphExtractor::EdgeInfoMap& edge_info_map,
-                         const GraphExtractor::NodeIdRootMap& id_root_index_map) {
-  const double alpha = 0.8;
-  Marker marker;
-  marker.type = Marker::CUBE_LIST;
-  marker.action = Marker::ADD;
-  marker.id = 0;
-  marker.ns = "gvd_edge_markers";
-
-  Eigen::Vector3d identity_pos = Eigen::Vector3d::Zero();
-  tf2::convert(identity_pos, marker.pose.position);
-  tf2::convert(Eigen::Quaterniond::Identity(), marker.pose.orientation);
-
-  marker.scale.x = layer.voxel_size();
-  marker.scale.y = layer.voxel_size();
-  marker.scale.z = layer.voxel_size();
-
-  for (const auto& id_index_pair : id_root_index_map) {
-    Eigen::Vector3d voxel_pos = getVoxelPosition(layer, id_index_pair.second);
-
-    geometry_msgs::Point marker_pos;
-    tf2::convert(voxel_pos, marker_pos);
-    marker.points.push_back(marker_pos);
-    marker.colors.push_back(dsg_utils::makeColorMsg(NodeColor::Zero(), alpha));
-  }
-
-  size_t next_color_id = 0;
-  std::map<size_t, size_t> edge_color_map;
-  for (const auto& id_edge_pair : edge_info_map) {
-    std::set<size_t> neighbor_colors;
-    for (auto other_edge : id_edge_pair.second.connections) {
-      if (!edge_color_map.count(other_edge)) {
-        continue;
-      }
-
-      neighbor_colors.insert(edge_color_map.at(other_edge));
-    }
-
-    bool found_color = false;
-    for (size_t i = 0; i < next_color_id; ++i) {
-      if (neighbor_colors.count(i)) {
-        continue;
-      }
-
-      found_color = true;
-      edge_color_map[id_edge_pair.first] = i;
-      break;
-    }
-
-    if (found_color) {
-      continue;
-    }
-
-    edge_color_map[id_edge_pair.first] = next_color_id;
-    next_color_id++;
-  }
-
-  std::vector<double> hues;
-  for (size_t i = 0; i < next_color_id; ++i) {
-    hues.push_back(static_cast<double>(i) / static_cast<double>(next_color_id));
-  }
-  std::random_device rd;
-  std::mt19937 g(rd());
-  std::shuffle(hues.begin(), hues.end(), g);
-
-  for (const auto& id_edge_pair : edge_info_map) {
-    NodeColor color = dsg_utils::getRgbFromHls(
-        hues.at(edge_color_map.at(id_edge_pair.first)), 0.7, 0.9);
-    for (const auto& index : id_edge_pair.second.indices) {
-      Eigen::Vector3d voxel_pos = getVoxelPosition(layer, index);
-
-      geometry_msgs::Point marker_pos;
-      tf2::convert(voxel_pos, marker_pos);
-      marker.points.push_back(marker_pos);
-
-      // TODO(nathan) get color
-      marker.colors.push_back(dsg_utils::makeColorMsg(color, alpha));
-    }
-  }
-
-  return marker;
-}
-
 inline Eigen::Vector3d getOffset(double side_length,
                                  bool x_high,
                                  bool y_high,
@@ -461,12 +376,278 @@ Marker makeBlocksMarkerImpl(const LayerType& layer, double scale) {
   return marker;
 }
 
+Marker makeMeshBlocksMarker(const MeshLayer& layer, double scale) {
+  Marker marker;
+  marker.type = Marker::LINE_LIST;
+  marker.action = Marker::ADD;
+  marker.id = 0;
+  marker.scale.x = scale;
+  marker.scale.y = scale;
+  marker.scale.z = scale;
+
+  Eigen::Vector3d identity_pos = Eigen::Vector3d::Zero();
+  tf2::convert(identity_pos, marker.pose.position);
+  tf2::convert(Eigen::Quaterniond::Identity(), marker.pose.orientation);
+
+  BlockIndexList blocks;
+  layer.getAllAllocatedMeshes(&blocks);
+
+  std_msgs::ColorRGBA good;
+  good.r = 0.2;
+  good.g = 1.0;
+  good.b = 0.2;
+  good.a = 0.8;
+
+  std_msgs::ColorRGBA bad;
+  bad.r = 1.0;
+  bad.g = 0.2;
+  bad.b = 0.2;
+  bad.a = 0.8;
+
+  for (const auto& idx : blocks) {
+    const auto block = layer.getMeshPtrByIndex(idx);
+    Eigen::Vector3f block_pos = block->origin;
+    fillMarkerFromBlock(marker, block_pos.cast<double>(), block->block_size);
+
+    while (marker.colors.size() < marker.points.size()) {
+      marker.colors.push_back(block->vertices.size() != 0 ? good : bad);
+    }
+  }
+
+  return marker;
+}
+
 Marker makeBlocksMarker(const Layer<TsdfVoxel>& layer, double scale) {
   return makeBlocksMarkerImpl(layer, scale);
 }
 
 Marker makeBlocksMarker(const Layer<GvdVoxel>& layer, double scale) {
   return makeBlocksMarkerImpl(layer, scale);
+}
+
+std_msgs::ColorRGBA makeGvdColor(const GvdVisualizerConfig& config,
+                                 const ColormapConfig& colors,
+                                 double distance) {
+  double ratio =
+      computeRatio(config.gvd_min_distance, config.gvd_max_distance, distance);
+  NodeColor color = dsg_utils::interpolateColorMap(colors, ratio);
+  return dsg_utils::makeColorMsg(color, config.gvd_alpha);
+}
+
+using EdgeMap = std::unordered_map<uint64_t, std::unordered_set<uint64_t>>;
+
+std::unordered_set<uint64_t>& getNodeSet(EdgeMap& edge_map, uint64_t node) {
+  auto iter = edge_map.find(node);
+  if (iter == edge_map.end()) {
+    iter = edge_map.emplace(node, std::unordered_set<uint64_t>()).first;
+  }
+  return iter->second;
+}
+
+MarkerArray makeGvdGraphMarkers(const GvdGraph& graph,
+                                const GvdVisualizerConfig& config,
+                                const ColormapConfig& colors,
+                                const std::string& ns,
+                                size_t marker_id) {
+  MarkerArray marker;
+  if (graph.empty()) {
+    return marker;
+  }
+
+  const Eigen::Vector3d p_identity = Eigen::Vector3d::Zero();
+  const Eigen::Quaterniond q_identity = Eigen::Quaterniond::Identity();
+  {  // scope to make handling stuff a little easier
+    Marker nodes;
+    nodes.type = Marker::SPHERE_LIST;
+    nodes.id = marker_id;
+    nodes.ns = ns + "_nodes";
+    nodes.action = Marker::ADD;
+    nodes.scale.x = config.gvd_graph_scale;
+    nodes.scale.y = config.gvd_graph_scale;
+    nodes.scale.z = config.gvd_graph_scale;
+    tf2::convert(p_identity, nodes.pose.position);
+    tf2::convert(q_identity, nodes.pose.orientation);
+    marker.markers.push_back(nodes);
+  }
+
+  {  // scope to make handling stuff a little easier
+    Marker edges;
+    edges.type = Marker::LINE_LIST;
+    edges.id = marker_id;
+    edges.ns = ns + "_edges";
+    edges.action = Marker::ADD;
+    edges.scale.x = config.gvd_graph_scale;
+    tf2::convert(p_identity, edges.pose.position);
+    tf2::convert(q_identity, edges.pose.orientation);
+    marker.markers.push_back(edges);
+  }
+
+  auto& nodes = marker.markers[0];
+  auto& edges = marker.markers[1];
+
+  EdgeMap seen_edges;
+  for (const auto& id_node_pair : graph.nodes()) {
+    geometry_msgs::Point node_centroid;
+    tf2::convert(id_node_pair.second.position, node_centroid);
+    nodes.points.push_back(node_centroid);
+    nodes.colors.push_back(makeGvdColor(config, colors, id_node_pair.second.distance));
+
+    auto& curr_seen = getNodeSet(seen_edges, id_node_pair.first);
+    for (const auto sibling : id_node_pair.second.siblings) {
+      if (curr_seen.count(sibling)) {
+        continue;
+      }
+
+      curr_seen.insert(sibling);
+      getNodeSet(seen_edges, sibling).insert(id_node_pair.first);
+
+      edges.points.push_back(nodes.points.back());
+      edges.colors.push_back(nodes.colors.back());
+
+      const auto& other = *graph.getNode(sibling);
+      geometry_msgs::Point neighbor_centroid;
+      tf2::convert(other.position, neighbor_centroid);
+      edges.points.push_back(neighbor_centroid);
+      edges.colors.push_back(makeGvdColor(config, colors, other.distance));
+    }
+  }
+
+  return marker;
+}
+
+size_t fillColors(const CompressedNodeMap& clusters,
+                  std::map<uint64_t, size_t>& colors) {
+  for (const auto& id_node_pair : clusters) {
+    size_t max_color = 0;
+    std::set<size_t> seen_colors;
+    for (const auto sibling : id_node_pair.second.siblings) {
+      const auto iter = colors.find(sibling);
+      if (iter == colors.end()) {
+        continue;
+      }
+
+      seen_colors.insert(iter->second);
+      if (iter->second > max_color) {
+        max_color = iter->second;
+      }
+    }
+
+    if (seen_colors.empty()) {
+      colors[id_node_pair.first] = 0;
+      continue;
+    }
+
+    bool found_color = false;
+    for (size_t i = 0; i < max_color; ++i) {
+      if (!seen_colors.count(i)) {
+        colors[id_node_pair.first] = i;
+        found_color = true;
+        break;
+      }
+    }
+
+    if (found_color) {
+      continue;
+    }
+
+    colors[id_node_pair.first] = max_color + 1;
+  }
+
+  size_t num_colors = 0;
+  for (const auto& id_color_pair : colors) {
+    if (id_color_pair.second > num_colors) {
+      num_colors = id_color_pair.second;
+    }
+  }
+
+  return num_colors + 1;
+}
+
+MarkerArray showGvdClusters(const GvdGraph& graph,
+                            const CompressedNodeMap& clusters,
+                            const std::unordered_map<uint64_t, uint64_t>& remapping,
+                            const GvdVisualizerConfig& config,
+                            const ColormapConfig& colormap,
+                            const std::string& ns,
+                            size_t marker_id) {
+  MarkerArray marker;
+  if (graph.empty()) {
+    return marker;
+  }
+
+  const Eigen::Vector3d p_identity = Eigen::Vector3d::Zero();
+  const Eigen::Quaterniond q_identity = Eigen::Quaterniond::Identity();
+  {  // scope to make handling stuff a little easier
+    Marker nodes;
+    nodes.type = Marker::SPHERE_LIST;
+    nodes.id = marker_id;
+    nodes.ns = ns + "_nodes";
+    nodes.action = Marker::ADD;
+    nodes.scale.x = config.gvd_graph_scale;
+    nodes.scale.y = config.gvd_graph_scale;
+    nodes.scale.z = config.gvd_graph_scale;
+    tf2::convert(p_identity, nodes.pose.position);
+    tf2::convert(q_identity, nodes.pose.orientation);
+    marker.markers.push_back(nodes);
+  }
+
+  {  // scope to make handling stuff a little easier
+    Marker edges;
+    edges.type = Marker::LINE_LIST;
+    edges.id = marker_id;
+    edges.ns = ns + "_edges";
+    edges.action = Marker::ADD;
+    edges.scale.x = config.gvd_graph_scale;
+    tf2::convert(p_identity, edges.pose.position);
+    tf2::convert(q_identity, edges.pose.orientation);
+    marker.markers.push_back(edges);
+  }
+
+  auto& nodes = marker.markers[0];
+  auto& edges = marker.markers[1];
+
+  std::map<uint64_t, size_t> color_mapping;
+  const size_t num_colors = fillColors(clusters, color_mapping);
+  std::vector<std_msgs::ColorRGBA> colors;
+  for (size_t i = 0; i < num_colors; ++i) {
+    const double ratio = static_cast<double>(i) / static_cast<double>(num_colors);
+    const auto color = dsg_utils::interpolateColorMap(colormap, ratio);
+    colors.push_back(dsg_utils::makeColorMsg(color, config.gvd_alpha));
+  }
+
+  EdgeMap seen_edges;
+  for (const auto& id_node_pair : graph.nodes()) {
+    geometry_msgs::Point node_centroid;
+    tf2::convert(id_node_pair.second.position, node_centroid);
+    nodes.points.push_back(node_centroid);
+    const auto cluster_id = remapping.at(id_node_pair.first);
+    const auto& cluster_color = colors.at(color_mapping.at(cluster_id));
+    nodes.colors.push_back(cluster_color);
+
+    auto& curr_seen = getNodeSet(seen_edges, id_node_pair.first);
+    for (const auto sibling : id_node_pair.second.siblings) {
+      if (curr_seen.count(sibling)) {
+        continue;
+      }
+
+      curr_seen.insert(sibling);
+      getNodeSet(seen_edges, sibling).insert(id_node_pair.first);
+
+      edges.points.push_back(nodes.points.back());
+      edges.colors.push_back(nodes.colors.back());
+
+      const auto& other = *graph.getNode(sibling);
+      geometry_msgs::Point neighbor_centroid;
+      tf2::convert(other.position, neighbor_centroid);
+      edges.points.push_back(neighbor_centroid);
+
+      const auto& neighbor_cluster = remapping.at(sibling);
+      const auto& neighbor_color = colors.at(color_mapping.at(neighbor_cluster));
+      edges.colors.push_back(neighbor_color);
+    }
+  }
+
+  return marker;
 }
 
 }  // namespace topology

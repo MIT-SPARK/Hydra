@@ -32,7 +32,8 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_topology/graph_extraction_utilities.h"
+#include "hydra_topology/graph_extractor_utilities.h"
+#include "hydra_topology/nearest_neighbor_utilities.h"
 
 namespace hydra {
 namespace topology {
@@ -40,6 +41,34 @@ namespace topology {
 using voxblox::Connectivity;
 using Neighborhood26Connected = Neighborhood<Connectivity::kTwentySix>;
 using IndexOffsets26Connected = Neighborhood<Connectivity::kTwentySix>::IndexOffsets;
+using Components = std::vector<std::vector<NodeId>>;
+
+namespace {
+
+inline bool isValidPoint(const GvdVoxel* voxel, uint8_t min_extra_basis) {
+  if (!voxel) {
+    return false;
+  }
+  return voxel->num_extra_basis >= min_extra_basis;
+}
+
+inline double getNodeGvdDistance(const SceneGraphLayer& graph, NodeId node) {
+  return graph.getNode(node).value().get().attributes<PlaceNodeAttributes>().distance;
+}
+
+void sortComponents(const SceneGraphLayer& graph, Components& to_sort) {
+  for (auto& c : to_sort) {
+    std::sort(c.begin(), c.end(), [&](const NodeId& lhs, const NodeId& rhs) {
+      return getNodeGvdDistance(graph, lhs) > getNodeGvdDistance(graph, rhs);
+    });
+  }
+
+  std::sort(to_sort.begin(), to_sort.end(), [](const auto& lhs, const auto& rhs) {
+    return lhs.size() > rhs.size();
+  });
+}
+
+}  // namespace
 
 std::bitset<27> convertRowMajorFlags(std::bitset<27> flags_row_major) {
   std::bitset<27> flags_neighborhood{0};
@@ -58,17 +87,6 @@ std::bitset<27> convertRowMajorFlags(std::bitset<27> flags_row_major) {
   flags_neighborhood.set(26, flags_row_major[13]);
   return flags_neighborhood;
 }
-
-namespace {
-
-inline bool isValidPoint(const GvdVoxel* voxel, uint8_t min_extra_basis) {
-  if (!voxel) {
-    return false;
-  }
-  return voxel->num_extra_basis >= min_extra_basis;
-}
-
-}  // namespace
 
 std::bitset<27> extractNeighborhoodFlags(const Layer<GvdVoxel>& layer,
                                          const GlobalIndex& index,
@@ -223,36 +241,16 @@ voxblox::AlignedVector<GlobalIndex> makeBresenhamLine(const GlobalIndex& start,
   return line_points;
 }
 
-// TODO(nathan) consider removing
-double getNeighborhoodOverlap(const SceneGraphLayer& graph,
-                              std::unordered_set<NodeId> neighborhood,
-                              NodeId other_node,
-                              size_t num_hops) {
-  std::unordered_set<NodeId> other_neighborhood =
-      graph.getNeighborhood(other_node, num_hops);
-
-  size_t num_same = 0;
-  for (const auto neighbor : neighborhood) {
-    if (other_neighborhood.count(neighbor)) {
-      num_same++;
-    }
-  }
-
-  size_t union_cardinality = neighborhood.size() + other_neighborhood.size() - num_same;
-
-  return static_cast<double>(num_same) / static_cast<double>(union_cardinality);
-}
-
-void addFreespaceEdge(SceneGraphLayer& graph,
-                      NodeId node,
-                      NodeId neighbor,
-                      double min_clearance) {
+EdgeAttributes::Ptr getOverlapEdgeInfo(const SceneGraphLayer& graph,
+                                       NodeId node,
+                                       NodeId neighbor,
+                                       double min_clearance) {
   if (node == neighbor) {
-    return;
+    return nullptr;
   }
 
   if (graph.hasEdge(node, neighbor)) {
-    return;
+    return nullptr;
   }
 
   const double r1 = getNodeGvdDistance(graph, node);
@@ -260,14 +258,12 @@ void addFreespaceEdge(SceneGraphLayer& graph,
   const double d = (graph.getPosition(node) - graph.getPosition(neighbor)).norm();
 
   if (d >= r1 + r2) {
-    return;
+    return nullptr;
   }
 
   if (d <= r1 || d <= r2) {
     // intersection is inside one node's sphere
-    graph.insertEdge(
-        node, neighbor, std::make_unique<EdgeAttributes>(std::min(r1, r2)));
-    return;
+    return std::make_unique<EdgeAttributes>(std::min(r1, r2));
   }
 
   // see https://mathworld.wolfram.com/Sphere-SphereIntersection.html
@@ -275,11 +271,118 @@ void addFreespaceEdge(SceneGraphLayer& graph,
       std::sqrt(4 * std::pow(d, 2) * std::pow(r1, 2) -
                 std::pow(std::pow(d, 2) - std::pow(r2, 2) + std::pow(r1, 2), 2)) /
       (2 * d);
-  if (clearance >= min_clearance) {
-    return;
+  if (clearance < min_clearance) {
+    return nullptr;
   }
 
-  graph.insertEdge(node, neighbor, std::make_unique<EdgeAttributes>(clearance));
+  return std::make_unique<EdgeAttributes>(clearance);
+}
+
+EdgeAttributes::Ptr getFreespaceEdgeInfo(const SceneGraphLayer& graph,
+                                         const Layer<GvdVoxel>& gvd,
+                                         const NodeIndexMap& node_index_map,
+                                         NodeId node,
+                                         NodeId other,
+                                         double min_clearance_m) {
+  if (graph.hasEdge(node, other)) {
+    return nullptr;
+  }
+
+  const GlobalIndex source = node_index_map.at(node);
+  const GlobalIndex target = node_index_map.at(other);
+  const auto path = makeBresenhamLine(source, target);
+  if (path.empty()) {
+    return nullptr;
+  }
+
+  const double source_dist =
+      graph.getNode(node)->get().attributes<PlaceNodeAttributes>().distance;
+  const double target_dist =
+      graph.getNode(other)->get().attributes<PlaceNodeAttributes>().distance;
+  double min_weight = std::min(source_dist, target_dist);
+
+  for (const auto& index : path) {
+    const GvdVoxel* voxel = gvd.getVoxelPtrByGlobalIndex(index);
+    if (!voxel || !voxel->observed || voxel->distance <= min_clearance_m) {
+      return nullptr;
+    }
+
+    if (voxel->distance < min_weight) {
+      min_weight = voxel->distance;
+    }
+  }
+
+  return std::make_unique<EdgeAttributes>(min_weight);
+}
+
+void findOverlapEdges(const OverlapEdgeConfig& config,
+                      const SceneGraphLayer& graph,
+                      const std::unordered_set<NodeId> active_nodes,
+                      EdgeInfoMap& proposed_edges) {
+  NearestNodeFinder node_finder(graph, active_nodes);
+  for (const auto node : active_nodes) {
+    // TODO(nathan) consider deleting edges
+    node_finder.find(graph.getPosition(node),
+                     config.num_neighbors_to_check,
+                     true,
+                     [&](NodeId other, size_t, double) {
+                       auto info = getOverlapEdgeInfo(
+                           graph, node, other, config.min_clearance_m);
+                       if (info) {
+                         proposed_edges.emplace(EdgeKey(node, other), std::move(info));
+                       }
+                     });
+  }
+}
+
+void findFreespaceEdges(const FreespaceEdgeConfig& config,
+                        const SceneGraphLayer& graph,
+                        const Layer<GvdVoxel>& gvd,
+                        const std::unordered_set<NodeId>& nodes,
+                        const NodeIndexMap& indices,
+                        EdgeInfoMap& proposed_edges) {
+  auto components = graph_utilities::getConnectedComponents(graph, nodes);
+  if (components.size() <= 1) {
+    return;  // nothing to do
+  }
+
+  sortComponents(graph, components);
+  std::vector<NodeId> first_component = components.front();
+
+  for (size_t i = 1; i < components.size(); ++i) {
+    const auto& component = components[i];
+    NearestNodeFinder node_finder(graph, first_component);
+
+    bool inserted_edge = false;
+    for (size_t j = 0; j < config.num_nodes_to_check; ++j) {
+      if (j >= component.size()) {
+        break;
+      }
+
+      const NodeId node = component[j];
+      node_finder.find(graph.getPosition(node),
+                       config.num_neighbors_to_find,
+                       false,
+                       [&](NodeId other, size_t, double distance) {
+                         if (distance > config.max_length_m) {
+                           return;
+                         }
+                         auto info = getFreespaceEdgeInfo(
+                             graph, gvd, indices, node, other, config.min_clearance_m);
+                         inserted_edge |= info != nullptr;
+
+                         if (info) {
+                           proposed_edges.emplace(EdgeKey(node, other),
+                                                  std::move(info));
+                         }
+                       });
+    }
+
+    if (inserted_edge) {
+      // merge components if an edge was inserted
+      first_component.insert(first_component.end(), component.begin(), component.end());
+    }
+  }
 }
 
 }  // namespace topology

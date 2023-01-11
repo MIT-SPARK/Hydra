@@ -32,37 +32,39 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-//#include "hydra_topology_test/test_fixtures.h"
-
 #include <gtest/gtest.h>
 
-#include <hydra_topology/graph_extractor.h>
+#include <hydra_topology/floodfill_graph_extractor.h>
 
 namespace hydra {
 namespace topology {
 
 using NodeSet = std::unordered_set<NodeId>;
 
-class TestGraphExtractor : public GraphExtractor {
+namespace {
+
+class TestGraphExtractor : public FloodfillGraphExtractor {
  public:
-  explicit TestGraphExtractor(const GraphExtractorConfig& config)
-      : GraphExtractor(config) {}
+  explicit TestGraphExtractor(const FloodfillExtractorConfig& config)
+      : FloodfillGraphExtractor(config) {}
 
   ~TestGraphExtractor() = default;
 
-  using GraphExtractor::addEdgeToGraph;
-  using GraphExtractor::addNeighborToFrontier;
-  using GraphExtractor::addPlaceToGraph;
+  using FloodfillGraphExtractor::addEdgeToGraph;
+  using FloodfillGraphExtractor::addNeighborToFrontier;
+  using FloodfillGraphExtractor::addNewPlaceNode;
 
-  using GraphExtractor::connected_edges_;
-  using GraphExtractor::edge_info_map_;
-  using GraphExtractor::edge_split_queue_;
-  using GraphExtractor::index_graph_info_map_;
-  using GraphExtractor::next_edge_id_;
-  using GraphExtractor::node_edge_id_map_;
-  using GraphExtractor::node_id_index_map_;
-  using GraphExtractor::node_id_root_map_;
+  using FloodfillGraphExtractor::connected_edges_;
+  using FloodfillGraphExtractor::edge_info_map_;
+  using FloodfillGraphExtractor::edge_split_queue_;
+  using FloodfillGraphExtractor::index_graph_info_map_;
+  using FloodfillGraphExtractor::next_edge_id_;
+  using FloodfillGraphExtractor::node_child_map_;
+  using FloodfillGraphExtractor::node_edge_id_map_;
+  using GraphExtractorInterface::node_index_map_;
 };
+
+}  // namespace
 
 struct VoxelIndexPair {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -70,10 +72,10 @@ struct VoxelIndexPair {
   GlobalIndex index;
 };
 
-class GraphExtractorTestFixture : public ::testing::Test {
+class FloodfillGraphExtractorTestFixture : public ::testing::Test {
  public:
-  GraphExtractorTestFixture() = default;
-  virtual ~GraphExtractorTestFixture() = default;
+  FloodfillGraphExtractorTestFixture() = default;
+  virtual ~FloodfillGraphExtractorTestFixture() = default;
 
   virtual void SetUp() override {
     layer.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
@@ -105,7 +107,11 @@ class GraphExtractorTestFixture : public ::testing::Test {
     return to_return;
   }
 
-  void makeLine(GraphExtractor& extractor, size_t r1, size_t c1, size_t r2, size_t c2) {
+  void makeLine(FloodfillGraphExtractor& extractor,
+                size_t r1,
+                size_t c1,
+                size_t r2,
+                size_t c2) {
     GlobalIndex start(r1, c1, 0);
     GlobalIndex end(r2, c2, 0);
     voxblox::AlignedVector<GlobalIndex> points = makeBresenhamLine(start, end);
@@ -115,7 +121,7 @@ class GraphExtractorTestFixture : public ::testing::Test {
     }
   }
 
-  virtual void setupTestEnvironment(GraphExtractor& extractor) {
+  virtual void setupTestEnvironment(FloodfillGraphExtractor& extractor) {
     for (size_t r = 0; r < 20; ++r) {
       for (size_t c = 0; c < 50; ++c) {
         // set up a 2d grid of non-GVD points
@@ -134,20 +140,20 @@ class GraphExtractorTestFixture : public ::testing::Test {
     // lines are not start / end inclusive
     extractor.pushGvdIndex(makeVoxelAndIndex(0.0, 2, 6, 22, 0).index);
 
-    extractor.extract(*layer);
+    extractor.extract(*layer, 0);
   }
 
   int voxels_per_side = 16;
   float voxel_size = 0.1;
   std::unique_ptr<Layer<GvdVoxel>> layer;
-  GraphExtractorConfig config;
+  FloodfillExtractorConfig config;
 };
 
-TEST_F(GraphExtractorTestFixture, AddAndRemovePlace) {
+TEST_F(FloodfillGraphExtractorTestFixture, AddAndRemovePlace) {
   TestGraphExtractor extractor(config);
 
   VoxelIndexPair test_info = makeVoxelAndIndex(5.0, 6, 1, 2, 3);
-  extractor.addPlaceToGraph(*layer, test_info.voxel, test_info.index);
+  extractor.addNewPlaceNode(*layer, test_info.voxel, test_info.index);
 
   const SceneGraphLayer& graph = extractor.getGraph();
   EXPECT_EQ(1u, graph.nodes().size());
@@ -159,21 +165,21 @@ TEST_F(GraphExtractorTestFixture, AddAndRemovePlace) {
 
   EXPECT_EQ(1u, extractor.index_graph_info_map_.size());
   EXPECT_EQ(1u, extractor.node_edge_id_map_.size());
-  EXPECT_EQ(1u, extractor.node_id_index_map_.size());
+  EXPECT_EQ(1u, extractor.node_child_map_.size());
 
   extractor.clearGvdIndex(test_info.index);
   EXPECT_EQ(0u, graph.nodes().size());
   EXPECT_FALSE(graph.hasNode(NodeSymbol('p', 0)));
   EXPECT_EQ(0u, extractor.index_graph_info_map_.size());
   EXPECT_EQ(0u, extractor.node_edge_id_map_.size());
-  EXPECT_EQ(0u, extractor.node_id_index_map_.size());
+  EXPECT_EQ(0u, extractor.node_child_map_.size());
 }
 
-TEST_F(GraphExtractorTestFixture, ExpandFrontier) {
+TEST_F(FloodfillGraphExtractorTestFixture, ExpandFrontier) {
   TestGraphExtractor extractor(config);
 
   VoxelIndexPair test_info = makeVoxelAndIndex(5.0, 6, 1, 2, 3);
-  extractor.addPlaceToGraph(*layer, test_info.voxel, test_info.index);
+  extractor.addNewPlaceNode(*layer, test_info.voxel, test_info.index);
 
   VoxelIndexPair neighbor = makeVoxelAndIndex(5.0, 6, 1, 2, 4);
 
@@ -183,9 +189,9 @@ TEST_F(GraphExtractorTestFixture, ExpandFrontier) {
   ASSERT_EQ(1u, extractor.index_graph_info_map_.count(neighbor.index));
   EXPECT_FALSE(extractor.index_graph_info_map_.at(neighbor.index).is_node);
 
-  EXPECT_EQ(1u, extractor.node_id_index_map_.size());
-  ASSERT_EQ(1u, extractor.node_id_index_map_.count(NodeSymbol('p', 0)));
-  EXPECT_EQ(1u, extractor.node_id_index_map_.at(NodeSymbol('p', 0)).size());
+  EXPECT_EQ(1u, extractor.node_child_map_.size());
+  ASSERT_EQ(1u, extractor.node_child_map_.count(NodeSymbol('p', 0)));
+  EXPECT_EQ(1u, extractor.node_child_map_.at(NodeSymbol('p', 0)).size());
 
   EXPECT_EQ(1u, extractor.next_edge_id_);
   ASSERT_EQ(1u, extractor.node_edge_id_map_.count(NodeSymbol('p', 0)));
@@ -194,14 +200,14 @@ TEST_F(GraphExtractorTestFixture, ExpandFrontier) {
   EXPECT_EQ(1u, extractor.edge_info_map_.count(0));
 }
 
-TEST_F(GraphExtractorTestFixture, AddEdgeMapsCorrect) {
+TEST_F(FloodfillGraphExtractorTestFixture, AddEdgeMapsCorrect) {
   TestGraphExtractor extractor(config);
 
   VoxelIndexPair first_node = makeVoxelAndIndex(0.2, 3, 1, 2, 3);
-  extractor.addPlaceToGraph(*layer, first_node.voxel, first_node.index);
+  extractor.addNewPlaceNode(*layer, first_node.voxel, first_node.index);
 
   VoxelIndexPair second_node = makeVoxelAndIndex(0.2, 3, 1, 2, 10);
-  extractor.addPlaceToGraph(*layer, second_node.voxel, second_node.index);
+  extractor.addNewPlaceNode(*layer, second_node.voxel, second_node.index);
 
   VoxelGraphInfo curr_info(NodeSymbol('p', 0), false);
   VoxelIndexPair good_neighbor = makeVoxelAndIndex(0.0, 0, 1, 2, 8);
@@ -224,7 +230,7 @@ TEST_F(GraphExtractorTestFixture, AddEdgeMapsCorrect) {
   EXPECT_EQ(0u, extractor.edge_split_queue_.size());
 }
 
-TEST_F(GraphExtractorTestFixture, SimpleExtractionCorrect) {
+TEST_F(FloodfillGraphExtractorTestFixture, SimpleExtractionCorrect) {
   TestGraphExtractor extractor(config);
   setupTestEnvironment(extractor);
 
@@ -233,18 +239,18 @@ TEST_F(GraphExtractorTestFixture, SimpleExtractionCorrect) {
   for (size_t i = 0; i < graph.nodes().size(); ++i) {
     NodeId node = NodeSymbol('p', i);
     ASSERT_TRUE(graph.hasNode(node));
-    ASSERT_TRUE(extractor.node_id_root_map_.count(node));
+    ASSERT_TRUE(extractor.node_index_map_.count(node));
   }
 
   // row major ordering
-  EXPECT_EQ(GlobalIndex(3, 25, 0), extractor.node_id_root_map_.at(NodeSymbol('p', 0)));
-  EXPECT_EQ(GlobalIndex(6, 4, 0), extractor.node_id_root_map_.at(NodeSymbol('p', 1)));
-  EXPECT_EQ(GlobalIndex(9, 25, 0), extractor.node_id_root_map_.at(NodeSymbol('p', 2)));
+  EXPECT_EQ(GlobalIndex(3, 25, 0), extractor.node_index_map_.at(NodeSymbol('p', 0)));
+  EXPECT_EQ(GlobalIndex(6, 4, 0), extractor.node_index_map_.at(NodeSymbol('p', 1)));
+  EXPECT_EQ(GlobalIndex(9, 25, 0), extractor.node_index_map_.at(NodeSymbol('p', 2)));
 
   EXPECT_EQ(2u, graph.edges().size());
 }
 
-TEST_F(GraphExtractorTestFixture, SimpleExtractionWithSplitting) {
+TEST_F(FloodfillGraphExtractorTestFixture, SimpleExtractionWithSplitting) {
   config.max_edge_split_iterations = 5;
 
   TestGraphExtractor extractor(config);
@@ -256,13 +262,13 @@ TEST_F(GraphExtractorTestFixture, SimpleExtractionWithSplitting) {
   for (size_t i = 0; i < graph.nodes().size(); ++i) {
     NodeId node = NodeSymbol('p', i);
     ASSERT_TRUE(graph.hasNode(node));
-    ASSERT_TRUE(extractor.node_id_root_map_.count(node));
+    ASSERT_TRUE(extractor.node_index_map_.count(node));
   }
 
   EXPECT_EQ(4u, graph.edges().size());
 }
 
-TEST_F(GraphExtractorTestFixture, SimpleExtractionWithNodeMerging) {
+TEST_F(FloodfillGraphExtractorTestFixture, SimpleExtractionWithNodeMerging) {
   config.max_edge_split_iterations = 5;
   config.merge_new_nodes = true;
   config.edge_splitting_merge_nodes = true;
@@ -279,46 +285,10 @@ TEST_F(GraphExtractorTestFixture, SimpleExtractionWithNodeMerging) {
   for (size_t i = 1; i < 4; ++i) {
     NodeId node = NodeSymbol('p', i);
     EXPECT_TRUE(graph.hasNode(node)) << "missing " << NodeSymbol('p', i).getLabel();
-    EXPECT_TRUE(extractor.node_id_root_map_.count(node));
+    EXPECT_TRUE(extractor.node_index_map_.count(node));
   }
 
   EXPECT_EQ(3u, graph.edges().size());
-}
-
-TEST(GraphExtractor, GetNeighborhoodOverlapCorrect) {
-  IsolatedSceneGraphLayer graph(1);
-  graph.emplaceNode(0, std::make_unique<NodeAttributes>());
-  graph.emplaceNode(1, std::make_unique<NodeAttributes>());
-  graph.emplaceNode(2, std::make_unique<NodeAttributes>());
-  graph.emplaceNode(3, std::make_unique<NodeAttributes>());
-  graph.emplaceNode(4, std::make_unique<NodeAttributes>());
-  graph.emplaceNode(5, std::make_unique<NodeAttributes>());
-  graph.emplaceNode(6, std::make_unique<NodeAttributes>());
-  // first clique
-  graph.insertEdge(0, 1);
-  graph.insertEdge(0, 2);
-  graph.insertEdge(0, 3);
-  graph.insertEdge(1, 2);
-  graph.insertEdge(1, 3);
-  // second clique
-  graph.insertEdge(4, 5);
-  graph.insertEdge(4, 6);
-  graph.insertEdge(5, 6);
-
-  {  // isolated subgraphs -> 0 similarity
-    NodeSet first_neighborhood = graph.getNeighborhood(0);
-    EXPECT_NEAR(0.0, getNeighborhoodOverlap(graph, first_neighborhood, 4, 1), 1.0e-9);
-  }
-
-  {  // same node -> 1.0 similarity
-    NodeSet first_neighborhood = graph.getNeighborhood(0);
-    EXPECT_NEAR(1.0, getNeighborhoodOverlap(graph, first_neighborhood, 0, 1), 1.0e-9);
-  }
-
-  {  // same clique -> 1.0 similarity
-    NodeSet first_neighborhood = graph.getNeighborhood(0);
-    EXPECT_NEAR(1.0, getNeighborhoodOverlap(graph, first_neighborhood, 1, 1), 1.0e-9);
-  }
 }
 
 }  // namespace topology

@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <gtest/gtest.h>
-#include <hydra_topology/gvd_integrator.h>
+#include <hydra_topology/combo_integrator.h>
 #include <hydra_topology/voxblox_types.h>
 #include <voxblox/integrator/tsdf_integrator.h>
 #include <voxblox/simulation/simulation_world.h>
@@ -123,7 +123,7 @@ class SingleBlockExtractionTestFixture : public SingleBlockTestFixture {
 
   virtual void SetUp() override;
 
-  std::unique_ptr<GvdIntegrator> gvd_integrator;
+  std::unique_ptr<ComboIntegrator> gvd_integrator;
 
  protected:
   virtual void setBlockState();
@@ -135,6 +135,8 @@ class TestFixture2d : public ::testing::Test {
   virtual ~TestFixture2d() = default;
 
   virtual void SetUp() override;
+
+  void setSurfaceVoxel(int x, int y);
 
   void setTsdfVoxel(int x, int y, float distance, float weight = 0.1f);
 

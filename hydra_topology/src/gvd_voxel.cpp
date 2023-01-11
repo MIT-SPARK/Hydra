@@ -39,11 +39,12 @@ namespace topology {
 
 std::ostream& operator<<(std::ostream& out, const GvdVoxel& voxel) {
   out << "GvdVoxel<flags=";
-  out << (voxel.observed ? 'y' : 'n');
-  out << (voxel.on_surface ? 'y' : 'n');
-  out << (voxel.fixed ? 'y' : 'n');
-  out << (voxel.in_queue ? 'y' : 'n');
-  out << (voxel.is_voronoi_parent ? 'y' : 'n');
+  out << (voxel.observed ? "o" : "-");
+  out << (voxel.on_surface ? "s" : "-");
+  out << (voxel.fixed ? "f" : "-");
+  out << (voxel.in_queue ? "q" : "-");
+  out << (voxel.to_raise ? "r" : "-");
+  out << (voxel.is_negative ? "n" : "-");
   out << ", distance=" << voxel.distance << " -> ";
   if (voxel.has_parent) {
     out << Eigen::Map<const GlobalIndex>(voxel.parent).transpose();
@@ -55,10 +56,6 @@ std::ostream& operator<<(std::ostream& out, const GvdVoxel& voxel) {
     out << "y (" << static_cast<int>(voxel.num_extra_basis) << ")";
   } else {
     out << "n";
-  }
-  if (voxel.is_voronoi_parent) {
-    out << ", nearest_voronoi="
-        << Eigen::Map<const GlobalIndex>(voxel.nearest_voronoi).transpose();
   }
   out << ">";
   return out;

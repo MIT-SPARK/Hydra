@@ -53,5 +53,23 @@ bool operator<(const EdgeSplitSeed& lhs, const EdgeSplitSeed& rhs) {
   return lhs.distance_to_edge < rhs.distance_to_edge;
 }
 
+std::ostream& operator<<(std::ostream& out, const VoxelGraphInfo& info) {
+  if (info.is_node) {
+    out << "node " << NodeSymbol(info.id).getLabel();
+  } else {
+    out << "edge " << info.edge_id;
+  }
+
+  return out;
+}
+
+std::ostream& operator<<(std::ostream& out, const EdgeInfo& info) {
+  out << "source: " << NodeSymbol(info.id).getLabel() << ", id: " << info.id
+      << ", size: " << info.indices.size()
+      << ", connections: " << info.connections.size()
+      << ", node connections: " << info.node_connections.size();
+  return out;
+}
+
 }  // namespace topology
 }  // namespace hydra

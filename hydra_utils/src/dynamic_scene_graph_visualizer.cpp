@@ -33,10 +33,11 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_utils/dynamic_scene_graph_visualizer.h"
-#include "hydra_utils/colormap_utils.h"
-#include "hydra_utils/visualizer_utils.h"
 
 #include <tf2_eigen/tf2_eigen.h>
+
+#include "hydra_utils/colormap_utils.h"
+#include "hydra_utils/visualizer_utils.h"
 
 namespace hydra {
 
@@ -514,11 +515,21 @@ void DynamicSceneGraphVisualizer::drawLayer(const std_msgs::Header& header,
   const auto& viz_config = visualizer_config_->get();
   const std::string node_ns = getLayerNodeNamespace(layer.id);
 
-  const bool color_by_distance = layer.id == DsgLayers::PLACES &&
-                                 visualizer_config_->get().color_places_by_distance;
+  const bool color_by_distance =
+      layer.id == DsgLayers::PLACES && viz_config.color_places_by_distance;
 
   Marker nodes;
-  if (color_by_distance) {
+  if (viz_config.color_nodes_by_active_flag) {
+    nodes = makeCentroidMarkers(
+        header,
+        config,
+        layer,
+        viz_config,
+        node_ns,
+        [&](const SceneGraphNode& node) -> NodeColor {
+          return node.attributes().is_active ? NodeColor(0, 255, 0) : NodeColor::Zero();
+        });
+  } else if (color_by_distance) {
     nodes = makeCentroidMarkers(
         header, config, layer, viz_config, node_ns, places_colormap_->get());
   } else if (layer.id == DsgLayers::PLACES) {
