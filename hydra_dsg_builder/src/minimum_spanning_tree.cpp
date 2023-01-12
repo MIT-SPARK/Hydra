@@ -37,12 +37,23 @@
 
 namespace hydra {
 
+DisjointSet::DisjointSet() {}
+
 // implementation mainly from: https://en.wikipedia.org/wiki/Disjoint-set_data_structure
 DisjointSet::DisjointSet(const SceneGraphLayer& layer) {
   for (const auto& id_node_pair : layer.nodes()) {
-    parents[id_node_pair.first] = id_node_pair.first;
-    sizes[id_node_pair.first] = 1;
+    addSet(id_node_pair.first);
   }
+}
+
+bool DisjointSet::addSet(NodeId node) {
+  if (parents.count(node)) {
+    return false;
+  }
+
+  parents[node] = node;
+  sizes[node] = 1;
+  return true;
 }
 
 NodeId DisjointSet::findSet(NodeId node) const {
@@ -57,11 +68,12 @@ NodeId DisjointSet::findSet(NodeId node) const {
   return parent;
 }
 
+bool DisjointSet::hasSet(NodeId node) const { return parents.count(node); }
+
 bool DisjointSet::doUnion(NodeId lhs, NodeId rhs) {
   NodeId lhs_set = findSet(lhs);
   NodeId rhs_set = findSet(rhs);
 
-  // technically don't need this
   if (lhs_set == rhs_set) {
     return false;
   }
@@ -72,6 +84,7 @@ bool DisjointSet::doUnion(NodeId lhs, NodeId rhs) {
 
   parents[rhs_set] = lhs_set;
   sizes[lhs_set] = sizes[lhs_set] + sizes[rhs_set];
+  sizes.erase(rhs_set); // |sizes| = number of components
   return true;
 }
 

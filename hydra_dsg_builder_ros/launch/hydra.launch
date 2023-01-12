@@ -14,6 +14,7 @@
     <arg name="use_oriented_bounding_boxes" default="false"/>
     <arg name="exit_mode" default="NORMAL"/>
     <arg name="start_visualizer" default="true"/>
+    <arg name="start_logger" default="true"/>
     <arg name="use_zmq_interface" default="false"/>
 
     <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
@@ -128,5 +129,9 @@
             <arg name="ns"            value="incremental_dsg_builder_node/pgmo"/>
         </include>
     </group>
+
+    <include if="$(arg start_logger)" file="$(find hydra_utils)/launch/scene_graph_logger.launch" pass_all_args="true">
+        <arg name="output_path" value="$(arg dsg_path)"/>
+    </include>
 
 </launch>

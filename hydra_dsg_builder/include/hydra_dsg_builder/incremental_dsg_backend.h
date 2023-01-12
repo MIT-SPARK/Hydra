@@ -35,7 +35,6 @@
 #pragma once
 #include "hydra_dsg_builder/backend_config.h"
 #include "hydra_dsg_builder/dsg_update_functions.h"
-#include "hydra_dsg_builder/incremental_room_finder.h"
 #include "hydra_dsg_builder/incremental_types.h"
 #include "hydra_dsg_builder/merge_handler.h"
 #include "hydra_dsg_builder/shared_module_state.h"

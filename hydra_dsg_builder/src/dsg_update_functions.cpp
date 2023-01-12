@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder/dsg_update_functions.h"
+#include "hydra_dsg_builder/room_finder.h"
 
 #include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
@@ -361,8 +362,36 @@ std::map<NodeId, NodeId> UpdatePlacesFunctor::call(SharedDsgInfo& dsg,
   return nodes_to_merge;
 }
 
-UpdateRoomsFunctor::UpdateRoomsFunctor(const incremental::RoomFinder::Config& config)
-    : room_finder(new incremental::RoomFinder(config)) {}
+UpdateRoomsFunctor::UpdateRoomsFunctor(const RoomFinderConfig& config)
+    : room_finder(new RoomFinder(config)) {}
+
+UpdateRoomsFunctor::~UpdateRoomsFunctor() {}
+
+void UpdateRoomsFunctor::rewriteRooms(const SceneGraphLayer* new_rooms,
+                                      DynamicSceneGraph& graph) const {
+  std::vector<NodeId> to_remove;
+  const auto& prev_rooms = graph.getLayer(DsgLayers::ROOMS);
+  for (const auto& id_node_pair : prev_rooms.nodes()) {
+    to_remove.push_back(id_node_pair.first);
+  }
+
+  for (const auto node_id : to_remove) {
+    graph.removeNode(node_id);
+  }
+
+  if (!new_rooms) {
+    return;
+  }
+
+  for (auto&& [id, node] : new_rooms->nodes()) {
+    graph.emplaceNode(DsgLayers::ROOMS, id, node->attributes().clone());
+  }
+
+  for (const auto& id_edge_pair : new_rooms->edges()) {
+    const auto& edge = id_edge_pair.second;
+    graph.insertEdge(edge.source, edge.target, edge.info->clone());
+  }
+}
 
 std::map<NodeId, NodeId> UpdateRoomsFunctor::call(SharedDsgInfo& dsg,
                                                   const UpdateInfo& info) const {
@@ -370,20 +399,22 @@ std::map<NodeId, NodeId> UpdateRoomsFunctor::call(SharedDsgInfo& dsg,
     return {};
   }
 
-  ScopedTimer timer("backend/room_detection", info.timestamp_ns, true, 1, false);
-
-  // TODO(nathan) this is kinda clunky
-  std::unordered_set<NodeId> place_ids;
-  {  // start critical section
+  SceneGraphLayer::Ptr places_clone;
+  {  // start dsg critical section
     std::unique_lock<std::mutex> lock(dsg.mutex);
-    const auto& places = dsg.graph->getLayer(DsgLayers::PLACES);
-    for (const auto& id_node_pair : places.nodes()) {
-      place_ids.insert(id_node_pair.first);
-    }
-  }  // end critical section
+    ScopedTimer timer("backend/clone_places", info.timestamp_ns, true, 1, false);
+    places_clone = dsg.graph->getLayer(DsgLayers::PLACES).clone();
+  }  // end dsg critical section
 
-  VLOG(3) << "Detecting rooms for " << place_ids.size() << " nodes";
-  room_finder->findRooms(dsg, place_ids);
+  ScopedTimer timer("backend/room_detection", info.timestamp_ns, true, 1, false);
+  // TODO(nathan) pass in timestamp?
+  auto rooms = room_finder->findRooms(*places_clone);
+
+  {  // start dsg critical section
+    std::unique_lock<std::mutex> lock(dsg.mutex);
+    rewriteRooms(rooms.get(), *dsg.graph);
+    room_finder->addRoomPlaceEdges(*dsg.graph);
+  }  // end dsg critical section
 
   return {};
 }

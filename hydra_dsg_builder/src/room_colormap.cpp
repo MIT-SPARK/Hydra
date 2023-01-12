@@ -32,49 +32,18 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <hydra_utils/dsg_types.h>
+#include "hydra_dsg_builder/room_colormap.h"
+
+#include <voxblox/core/color.h>
 
 namespace hydra {
 
-struct MinimalEdge {
-  NodeId source;
-  NodeId target;
-  double distance;
-
-  MinimalEdge() = default;
-
-  MinimalEdge(NodeId source, NodeId target, double distance)
-      : source(source), target(target), distance(distance) {}
-
-  inline bool operator>(const MinimalEdge& other) const {
-    return distance > other.distance;
-  }
-};
-
-struct DisjointSet {
-  DisjointSet();
-
-  explicit DisjointSet(const SceneGraphLayer& layer);
-
-  bool addSet(NodeId node);
-
-  bool hasSet(NodeId node) const;
-
-  NodeId findSet(NodeId node) const;
-
-  bool doUnion(NodeId lhs, NodeId rhs);
-
-  std::unordered_map<NodeId, NodeId> parents;
-  std::unordered_map<NodeId, size_t> sizes;
-};
-
-struct MinimumSpanningTreeInfo {
-  std::vector<MinimalEdge> edges;
-  std::unordered_set<NodeId> leaves;
-  std::unordered_map<NodeId, size_t> counts;
-};
-
-MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer);
+// TODO(nathan) read in qualitative cmap
+SemanticNodeAttributes::ColorVector getRoomColor(const NodeId& room_id) {
+  const static std::vector<double> taps{
+      0.0, 0.1, 0.8, 0.35, 0.55, 0.9, 0.05, 0.7, 0.2, 0.65};
+  const auto color = voxblox::rainbowColorMap(taps.at(room_id % taps.size()));
+  return SemanticNodeAttributes::ColorVector(color.r, color.g, color.b);
+}
 
 }  // namespace hydra

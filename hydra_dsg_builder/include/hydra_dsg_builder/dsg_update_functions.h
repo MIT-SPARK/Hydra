@@ -33,13 +33,15 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/incremental_room_finder.h"
 #include "hydra_dsg_builder/incremental_types.h"
 
 #include <gtsam/nonlinear/Values.h>
 #include <hydra_topology/nearest_neighbor_utilities.h>
 
 namespace hydra {
+
+class RoomFinder;
+struct RoomFinderConfig;
 
 struct UpdateInfo {
   const gtsam::Values* places_values = nullptr;
@@ -114,12 +116,16 @@ struct UpdatePlacesFunctor {
 };
 
 struct UpdateRoomsFunctor {
-  UpdateRoomsFunctor(const incremental::RoomFinder::Config& config);
+  UpdateRoomsFunctor(const RoomFinderConfig& config);
+
+  ~UpdateRoomsFunctor();
 
   std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
                                 const UpdateInfo& info) const;
 
-  std::unique_ptr<incremental::RoomFinder> room_finder;
+  void rewriteRooms(const SceneGraphLayer* new_rooms, DynamicSceneGraph& graph) const;
+
+  std::unique_ptr<RoomFinder> room_finder;
 };
 
 struct UpdateBuildingsFunctor {

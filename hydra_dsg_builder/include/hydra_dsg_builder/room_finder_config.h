@@ -33,48 +33,54 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <hydra_utils/dsg_types.h>
+#include <hydra_utils/config.h>
 
 namespace hydra {
 
-struct MinimalEdge {
-  NodeId source;
-  NodeId target;
-  double distance;
+enum class RoomClusterMode { MODULARITY, NONE };
+}  // namespace hydra
 
-  MinimalEdge() = default;
+DECLARE_CONFIG_ENUM(hydra,
+                    RoomClusterMode,
+                    {RoomClusterMode::MODULARITY, "MODULARITY"},
+                    {RoomClusterMode::NONE, "NONE"})
 
-  MinimalEdge(NodeId source, NodeId target, double distance)
-      : source(source), target(target), distance(distance) {}
+namespace hydra {
 
-  inline bool operator>(const MinimalEdge& other) const {
-    return distance > other.distance;
+struct RoomFinderConfig {
+  char room_prefix = 'R';
+  double min_dilation_m = 0.1;
+  double max_dilation_m = 0.7;
+  size_t min_component_size = 15;
+  size_t min_room_size = 10;
+  RoomClusterMode clustering_mode = RoomClusterMode::MODULARITY;
+  double max_modularity_iters = 5;
+  double modularity_gamma = 1.0;
+  double dilation_diff_threshold_m = 1.0e-4;
+};
+
+template <typename Visitor>
+void visit_config(const Visitor& v, RoomFinderConfig& config) {
+  v.visit("min_dilation_m", config.min_dilation_m);
+  v.visit("max_dilation_m", config.max_dilation_m);
+  v.visit("min_component_size", config.min_component_size);
+  v.visit("min_room_size", config.min_room_size);
+  v.visit("max_modularity_iters", config.max_modularity_iters);
+  v.visit("modularity_gamma", config.modularity_gamma);
+  v.visit("clustering_mode", config.clustering_mode);
+  v.visit("dilation_diff_threshold_m", config.dilation_diff_threshold_m);
+
+  std::string prefix_string;
+  if (!config_parser::is_parser<Visitor>()) {
+    prefix_string.push_back(config.room_prefix);
   }
-};
 
-struct DisjointSet {
-  DisjointSet();
-
-  explicit DisjointSet(const SceneGraphLayer& layer);
-
-  bool addSet(NodeId node);
-
-  bool hasSet(NodeId node) const;
-
-  NodeId findSet(NodeId node) const;
-
-  bool doUnion(NodeId lhs, NodeId rhs);
-
-  std::unordered_map<NodeId, NodeId> parents;
-  std::unordered_map<NodeId, size_t> sizes;
-};
-
-struct MinimumSpanningTreeInfo {
-  std::vector<MinimalEdge> edges;
-  std::unordered_set<NodeId> leaves;
-  std::unordered_map<NodeId, size_t> counts;
-};
-
-MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer);
+  v.visit("room_prefix", prefix_string);
+  if (config_parser::is_parser<Visitor>()) {
+    config.room_prefix = prefix_string[0];
+  }
+}
 
 }  // namespace hydra
+
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, RoomFinderConfig)
