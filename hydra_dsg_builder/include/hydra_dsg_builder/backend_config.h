@@ -33,27 +33,14 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/incremental_room_finder.h"
-
 #include <KimeraRPGO/SolverParams.h>
 #include <hydra_utils/config.h>
+#include <hydra_utils/dsg_types.h>
 #include <hydra_utils/eigen_config_types.h>
 #include <kimera_pgmo/KimeraPgmoInterface.h>
 #include <voxblox_ros/mesh_vis.h>
 
-namespace hydra {
-namespace incremental {
-
-using RoomClusterModeEnum = RoomFinder::Config::ClusterMode;
-
-}  // namespace incremental
-}  // namespace hydra
-
-DECLARE_CONFIG_ENUM(hydra::incremental,
-                    RoomClusterModeEnum,
-                    {RoomClusterModeEnum::SPECTRAL, "SPECTRAL"},
-                    {RoomClusterModeEnum::MODULARITY, "MODULARITY"},
-                    {RoomClusterModeEnum::NONE, "NONE"})
+#include "hydra_dsg_builder/room_finder_config.h"
 
 DECLARE_CONFIG_ENUM(KimeraRPGO,
                     Verbosity,
@@ -130,7 +117,7 @@ struct DsgBackendConfig {
   SemanticNodeAttributes::Label building_semantic_label = 22u;
 
   bool enable_rooms = true;
-  RoomFinder::Config room_finder;
+  RoomFinderConfig room_finder;
 
   struct PgmoConfig {
     bool should_log = true;
@@ -248,35 +235,8 @@ void visit_config(const Visitor& v, DsgBackendConfig::PgmoConfig& config) {
   rpgo_handle.visit("solver", config.rpgo_solver);
 }
 
-template <typename Visitor>
-void visit_config(const Visitor& v, RoomFinder::Config& config) {
-  v.visit("min_dilation_m", config.min_dilation_m);
-  v.visit("max_dilation_m", config.max_dilation_m);
-  v.visit("num_steps", config.num_steps);
-  v.visit("min_component_size", config.min_component_size);
-  v.visit("room_semantic_label", config.room_semantic_label);
-  v.visit("max_kmeans_iters", config.max_kmeans_iters);
-  v.visit("room_vote_min_overlap", config.room_vote_min_overlap);
-  v.visit("min_room_size", config.min_room_size);
-  v.visit("max_modularity_iters", config.max_modularity_iters);
-  v.visit("modularity_gamma", config.modularity_gamma);
-  v.visit("use_previous_rooms", config.use_previous_rooms);
-  v.visit("clustering_mode", config.clustering_mode);
-
-  std::string prefix_string;
-  if (!config_parser::is_parser<Visitor>()) {
-    prefix_string.push_back(config.room_prefix);
-  }
-
-  v.visit("room_prefix", prefix_string);
-  if (config_parser::is_parser<Visitor>()) {
-    config.room_prefix = prefix_string[0];
-  }
-}
-
 }  // namespace incremental
 }  // namespace hydra
 
-DECLARE_CONFIG_OSTREAM_OPERATOR(hydra::incremental, RoomFinder::Config)
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra::incremental, DsgBackendConfig)
 DECLARE_CONFIG_OSTREAM_OPERATOR(kimera_pgmo, KimeraPgmoConfig)
