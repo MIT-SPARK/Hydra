@@ -80,6 +80,9 @@ add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
 add_executable(hydra_visualizer_node src/hydra_visualizer_node.cpp)
 target_link_libraries(hydra_visualizer_node ${PROJECT_NAME})
 
+add_executable(scene_graph_logger_node src/scene_graph_logger_node.cpp)
+target_link_libraries(scene_graph_logger_node ${PROJECT_NAME})
+
 add_executable(rotate_tf_node src/rotate_tf_node.cpp)
 target_link_libraries(rotate_tf_node ${catkin_LIBRARIES})
 target_include_directories(rotate_tf_node PUBLIC ${catkin_INCLUDE_DIRS})

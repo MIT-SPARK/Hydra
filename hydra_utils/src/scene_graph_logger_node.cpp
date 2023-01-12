@@ -32,49 +32,67 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <hydra_utils/dsg_types.h>
+#include "hydra_utils/dsg_streaming_interface.h"
+
+#include <ros/ros.h>
+
+#include <iomanip>
 
 namespace hydra {
 
-struct MinimalEdge {
-  NodeId source;
-  NodeId target;
-  double distance;
+struct SceneGraphLoggerNode {
+  SceneGraphLoggerNode(const ros::NodeHandle& nh)
+      : nh_(nh), curr_count_(0), curr_output_count_(0), output_every_num_(1) {
+    receiver_.reset(new DsgReceiver(nh_));
+    if (!nh_.getParam("output_path", output_path_)) {
+      ROS_FATAL("Failed to get output path parameter");
+      throw std::runtime_error("failed to get output path");
+    }
 
-  MinimalEdge() = default;
-
-  MinimalEdge(NodeId source, NodeId target, double distance)
-      : source(source), target(target), distance(distance) {}
-
-  inline bool operator>(const MinimalEdge& other) const {
-    return distance > other.distance;
+    nh_.getParam("output_every_num", output_every_num_);
   }
+
+  void spin() {
+    ros::Rate r(10);
+    while (ros::ok()) {
+      ros::spinOnce();
+
+      if (!receiver_->updated()) {
+        r.sleep();
+        continue;
+      }
+
+      receiver_->clearUpdated();
+      ++curr_count_;
+      if (output_every_num_ == 1 || curr_count_ % output_every_num_ != 1) {
+        continue;
+      }
+
+      std::stringstream ss;
+      ss << output_path_ << "/dsg_" << std::setfill('0') << std::setw(6)
+         << curr_output_count_;
+      ss << ".json";
+      receiver_->graph()->save(ss.str(), false);
+      ++curr_output_count_;
+    }
+  }
+
+  ros::NodeHandle nh_;
+  size_t curr_count_;
+  size_t curr_output_count_;
+  int output_every_num_;
+  std::string output_path_;
+  std::unique_ptr<DsgReceiver> receiver_;
 };
-
-struct DisjointSet {
-  DisjointSet();
-
-  explicit DisjointSet(const SceneGraphLayer& layer);
-
-  bool addSet(NodeId node);
-
-  bool hasSet(NodeId node) const;
-
-  NodeId findSet(NodeId node) const;
-
-  bool doUnion(NodeId lhs, NodeId rhs);
-
-  std::unordered_map<NodeId, NodeId> parents;
-  std::unordered_map<NodeId, size_t> sizes;
-};
-
-struct MinimumSpanningTreeInfo {
-  std::vector<MinimalEdge> edges;
-  std::unordered_set<NodeId> leaves;
-  std::unordered_map<NodeId, size_t> counts;
-};
-
-MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer);
 
 }  // namespace hydra
+
+int main(int argc, char** argv) {
+  ros::init(argc, argv, "dsg_visualizer_node");
+
+  ros::NodeHandle nh("~");
+  hydra::SceneGraphLoggerNode node(nh);
+  node.spin();
+
+  return 0;
+}

@@ -32,49 +32,41 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <hydra_utils/dsg_types.h>
+#include <hydra_dsg_builder/room_finder_config.h>
+
+#include <gtest/gtest.h>
+#include <yaml-cpp/yaml.h>
+#include <glog/logging.h>
 
 namespace hydra {
 
-struct MinimalEdge {
-  NodeId source;
-  NodeId target;
-  double distance;
+using namespace config_parser;
 
-  MinimalEdge() = default;
+TEST(DsgBuilderConfigTests, RoomFinderConfig) {
+  const auto node = YAML::Load(R"yaml(
+      room_prefix: r
+      min_dilation_m: 0.2
+      max_dilation_m: 0.8
+      min_component_size: 10
+      min_room_size: 5
+      clustering_mode: NONE
+      max_modularity_iters: 1
+      modularity_gamma: 5.0
+  )yaml");
 
-  MinimalEdge(NodeId source, NodeId target, double distance)
-      : source(source), target(target), distance(distance) {}
+  RoomFinderConfig config;
+  YamlParser parser(std::make_unique<YamlParserImpl>(node));
+  visit_config(parser, config);
+  EXPECT_EQ(config.room_prefix, 'r');
+  EXPECT_NEAR(config.min_dilation_m, 0.2, 1.0e-9);
+  EXPECT_NEAR(config.max_dilation_m, 0.8, 1.0e-9);
+  EXPECT_EQ(config.min_component_size, 10u);
+  EXPECT_EQ(config.min_room_size, 5u);
+  EXPECT_EQ(config.clustering_mode, RoomClusterMode::NONE);
+  EXPECT_EQ(config.max_modularity_iters, 1u);
+  EXPECT_NEAR(config.modularity_gamma, 5.0, 1.0e-9);
 
-  inline bool operator>(const MinimalEdge& other) const {
-    return distance > other.distance;
-  }
-};
-
-struct DisjointSet {
-  DisjointSet();
-
-  explicit DisjointSet(const SceneGraphLayer& layer);
-
-  bool addSet(NodeId node);
-
-  bool hasSet(NodeId node) const;
-
-  NodeId findSet(NodeId node) const;
-
-  bool doUnion(NodeId lhs, NodeId rhs);
-
-  std::unordered_map<NodeId, NodeId> parents;
-  std::unordered_map<NodeId, size_t> sizes;
-};
-
-struct MinimumSpanningTreeInfo {
-  std::vector<MinimalEdge> edges;
-  std::unordered_set<NodeId> leaves;
-  std::unordered_map<NodeId, size_t> counts;
-};
-
-MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer);
+  VLOG(1) << config;
+}
 
 }  // namespace hydra

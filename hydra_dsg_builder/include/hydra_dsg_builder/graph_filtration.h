@@ -37,44 +37,36 @@
 
 namespace hydra {
 
-struct MinimalEdge {
-  NodeId source;
-  NodeId target;
+struct FiltrationInfo {
   double distance;
-
-  MinimalEdge() = default;
-
-  MinimalEdge(NodeId source, NodeId target, double distance)
-      : source(source), target(target), distance(distance) {}
-
-  inline bool operator>(const MinimalEdge& other) const {
-    return distance > other.distance;
-  }
+  size_t num_components;
 };
 
-struct DisjointSet {
-  DisjointSet();
+using Filtration = std::vector<FiltrationInfo>;
+using ComponentSizeMap = std::unordered_map<NodeId, size_t>;
+using ComponentCallback = std::function<size_t(const ComponentSizeMap&)>;
 
-  explicit DisjointSet(const SceneGraphLayer& layer);
+std::ostream& operator<<(std::ostream& out, const FiltrationInfo& info);
 
-  bool addSet(NodeId node);
+std::ostream& operator<<(std::ostream& out, const Filtration& info);
 
-  bool hasSet(NodeId node) const;
+Filtration getGraphFiltration(const SceneGraphLayer& layer,
+                              double diff_threshold_m = 1.0e-4);
 
-  NodeId findSet(NodeId node) const;
+Filtration getGraphFiltration(const SceneGraphLayer& layer,
+                              size_t min_component_size,
+                              double diff_threshold_m = 1.0e-4);
 
-  bool doUnion(NodeId lhs, NodeId rhs);
+Filtration getGraphFiltration(const SceneGraphLayer& layer,
+                              double diff_threshold_m,
+                              const ComponentCallback& count_components);
 
-  std::unordered_map<NodeId, NodeId> parents;
-  std::unordered_map<NodeId, size_t> sizes;
-};
+std::pair<size_t, size_t> getTrimmedFiltration(const Filtration& old_filtration,
+                                               double min_dilation_m,
+                                               double max_dilation_m);
 
-struct MinimumSpanningTreeInfo {
-  std::vector<MinimalEdge> edges;
-  std::unordered_set<NodeId> leaves;
-  std::unordered_map<NodeId, size_t> counts;
-};
-
-MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer);
+std::optional<FiltrationInfo> getLongestSequence(const Filtration& values,
+                                                 size_t start_index,
+                                                 size_t end_index);
 
 }  // namespace hydra

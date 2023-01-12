@@ -35,46 +35,16 @@
 #pragma once
 #include <hydra_utils/dsg_types.h>
 
+#include <unordered_set>
+
 namespace hydra {
 
-struct MinimalEdge {
-  NodeId source;
-  NodeId target;
-  double distance;
+Eigen::Vector3d getRoomPosition(const SceneGraphLayer& places,
+                                const std::unordered_set<NodeId>& cluster);
 
-  MinimalEdge() = default;
-
-  MinimalEdge(NodeId source, NodeId target, double distance)
-      : source(source), target(target), distance(distance) {}
-
-  inline bool operator>(const MinimalEdge& other) const {
-    return distance > other.distance;
-  }
-};
-
-struct DisjointSet {
-  DisjointSet();
-
-  explicit DisjointSet(const SceneGraphLayer& layer);
-
-  bool addSet(NodeId node);
-
-  bool hasSet(NodeId node) const;
-
-  NodeId findSet(NodeId node) const;
-
-  bool doUnion(NodeId lhs, NodeId rhs);
-
-  std::unordered_map<NodeId, NodeId> parents;
-  std::unordered_map<NodeId, size_t> sizes;
-};
-
-struct MinimumSpanningTreeInfo {
-  std::vector<MinimalEdge> edges;
-  std::unordered_set<NodeId> leaves;
-  std::unordered_map<NodeId, size_t> counts;
-};
-
-MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer);
+void addEdgesToRoomLayer(const SceneGraphLayer& places,
+                         const std::map<NodeId, size_t>& labels,
+                         const std::map<size_t, NodeId> label_to_room_map,
+                         SceneGraphLayer& rooms);
 
 }  // namespace hydra

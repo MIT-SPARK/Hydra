@@ -42,19 +42,11 @@ building_color: [169, 8, 194]
 visualize_place_factors: false
 enable_rooms: true
 room_finder:
-    min_dilation_m: 0.43
-    max_dilation_m: 1.2
-    num_steps: 10
-    min_component_size: 10
-    room_vote_min_overlap: 0.1
-    min_room_size: 1
-    max_kmeans_iters: 5
-    do_spectral_clustering: true
-    use_sparse_eigen_decomp: true
-    sparse_decomp_tolerance: 1.0e-2
+    min_dilation_m: 0.4
+    max_dilation_m: 2.5
+    min_component_size: 4
+    min_room_size: 5
     max_modularity_iters: 5
     modularity_gamma: 1.0
     clustering_mode: "MODULARITY"
-    room_semantic_label: 21
-    use_previous_rooms: false
     room_prefix: 'R'
