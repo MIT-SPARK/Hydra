@@ -77,7 +77,8 @@ DsgBackend::DsgBackend(const ros::NodeHandle nh,
       private_dsg_(backend_dsg),
       state_(state),
       shared_places_copy_(DsgLayers::PLACES),
-      robot_id_(0) {
+      robot_id_(0),
+      reset_backend_dsg_(false) {
   config_ = load_config<DsgBackendConfig>(nh_);
 
   nh_.getParam("robot_id", robot_id_);
@@ -401,11 +402,13 @@ void DsgBackend::runPgmo() {
     bool have_dsg_updates = false;
     if (reset_backend_dsg_) {
       resetBackendDsg();
+      have_dsg_updates = true;
+      have_graph_updates_ = true;
+    } else {
+      have_dsg_updates = updatePrivateDsg();
     }
 
     bool was_updated = false;
-    have_dsg_updates = updatePrivateDsg(reset_backend_dsg_);
-    reset_backend_dsg_ = false;
     {  // start pgmo mesh critical section
       std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
       if (config_.optimize_on_lc && have_graph_updates_ && have_loopclosures_) {
@@ -709,6 +712,8 @@ void DsgBackend::resetBackendDsg() {
     private_dsg_->graph->clear();
   }
   updatePrivateDsg(true);
+  deformation_graph_->setRecalculateVertices();
+  reset_backend_dsg_ = false;
 }
 
 void DsgBackend::callUpdateFunctions(const gtsam::Values& places_values,

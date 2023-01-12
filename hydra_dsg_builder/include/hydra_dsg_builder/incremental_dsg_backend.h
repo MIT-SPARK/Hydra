@@ -150,7 +150,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void runPgmo();
 
-  void resetBackendDsg();
+  virtual void resetBackendDsg();
 
   virtual void addPlacesToDeformationGraph();
 

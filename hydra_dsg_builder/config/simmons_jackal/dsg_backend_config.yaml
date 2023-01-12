@@ -22,7 +22,7 @@ pgmo:
         pcm_trans_threshold: -1
         pcm_rot_threshold: -1
         lm_diagonal_damping: true
-        gnc_alpha: 0.99
+        gnc_alpha: 0.999999
         gnc_max_iterations: 100
         gnc_mu_step: 1.6
         gnc_cost_tolerance: 1.0e-05
