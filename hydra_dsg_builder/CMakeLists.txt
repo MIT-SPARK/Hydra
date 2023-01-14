@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(BUILD_WITH_COVERAGE "Build core library with GCC --coverage option" ON)
+option(HYDRA_USE_COVERAGE "Build core library with GCC --coverage option" ON)
 option(HYDRA_GNN "build GNN interface" ON)
 if(HYDRA_GNN)
   set(HYDRA_USE_GNN_CXX_VALUE 1)
