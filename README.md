@@ -76,7 +76,7 @@ mkdir -p catkin_ws/src
 cd catkin_ws
 catkin init
 catkin config -DCMAKE_BUILD_TYPE=Release -DGTSAM_TANGENT_PREINTEGRATION=OFF \
-              -DGTSAM_BUILD_WITH_MARCH_NATIVE=OFF -DOPENGV_BUILD_WITH_MARCH_NATIVE=OFF
+              -DGTSAM_BUILD_WITH_MARCH_NATIVE=OFF
 catkin config --blacklist hdf5_map_io mesh_msgs_hdf5 label_manager mesh_tools \
                           rviz_map_plugin minkindr_python
 

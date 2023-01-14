@@ -44,7 +44,7 @@ namespace {
 
 class TestGraphExtractor : public CompressionGraphExtractor {
  public:
-  explicit TestGraphExtractor(const CompressionExtractorConfig& config)
+  explicit TestGraphExtractor(const GraphExtractorConfig& config)
       : CompressionGraphExtractor(config) {}
 
   ~TestGraphExtractor() = default;
@@ -103,7 +103,7 @@ class CompressionGraphExtractorTestFixture : public ::testing::Test {
 };
 
 TEST_F(CompressionGraphExtractorTestFixture, TestUpdateNode) {
-  CompressionExtractorConfig config;
+  GraphExtractorConfig config;
   TestGraphExtractor extractor(config);
   const auto& gvd = extractor.getGvdGraph();
 
@@ -146,7 +146,7 @@ TEST_F(CompressionGraphExtractorTestFixture, TestUpdateNode) {
 }
 
 TEST_F(CompressionGraphExtractorTestFixture, testUpdateGraph) {
-  CompressionExtractorConfig config;
+  GraphExtractorConfig config;
   TestGraphExtractor extractor(config);
   const auto& gvd = extractor.getGvdGraph();
 
@@ -228,7 +228,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testUpdateGraph) {
 }
 
 TEST_F(CompressionGraphExtractorTestFixture, testAttributeAssignmentOneToOne) {
-  CompressionExtractorConfig config;
+  GraphExtractorConfig config;
   TestGraphExtractor extractor(config);
   const auto& gvd = extractor.getGvdGraph();
 
@@ -290,8 +290,8 @@ TEST_F(CompressionGraphExtractorTestFixture, testAttributeAssignmentOneToOne) {
 }
 
 TEST_F(CompressionGraphExtractorTestFixture, testAttributeAssignmentManyToOne) {
-  CompressionExtractorConfig config;
-  config.compression_distance_m = 3.0;
+  GraphExtractorConfig config;
+  config.compression.compression_distance_m = 3.0;
   TestGraphExtractor extractor(config);
   const auto& gvd = extractor.getGvdGraph();
 
@@ -344,8 +344,8 @@ TEST_F(CompressionGraphExtractorTestFixture, testAttributeAssignmentManyToOne) {
 
 // show that isolated voxels deletion gets propagated to compressed graph
 TEST_F(CompressionGraphExtractorTestFixture, testSingleVoxelDeletion) {
-  CompressionExtractorConfig config;
-  config.compression_distance_m = 3.0;
+  GraphExtractorConfig config;
+  config.compression.compression_distance_m = 3.0;
   TestGraphExtractor extractor(config);
   const auto& gvd = extractor.getGvdGraph();
   const auto& places = extractor.getGraph();
@@ -401,8 +401,8 @@ TEST_F(CompressionGraphExtractorTestFixture, testSingleVoxelDeletion) {
 }
 
 TEST_F(CompressionGraphExtractorTestFixture, testVoxelDeletion) {
-  CompressionExtractorConfig config;
-  config.compression_distance_m = 3.0;
+  GraphExtractorConfig config;
+  config.compression.compression_distance_m = 3.0;
   TestGraphExtractor extractor(config);
   const auto& gvd = extractor.getGvdGraph();
   const auto& places = extractor.getGraph();
@@ -493,8 +493,8 @@ TEST_F(CompressionGraphExtractorTestFixture, testVoxelDeletion) {
 }
 
 TEST_F(CompressionGraphExtractorTestFixture, testVoxelArchival) {
-  CompressionExtractorConfig config;
-  config.compression_distance_m = 3.0;
+  GraphExtractorConfig config;
+  config.compression.compression_distance_m = 3.0;
   TestGraphExtractor extractor(config);
   const auto& gvd = extractor.getGvdGraph();
   const auto& places = extractor.getGraph();
@@ -565,8 +565,8 @@ TEST_F(CompressionGraphExtractorTestFixture, testVoxelArchival) {
 }
 
 TEST_F(CompressionGraphExtractorTestFixture, testArchiveAndDelete) {
-  CompressionExtractorConfig config;
-  config.compression_distance_m = 3.0;
+  GraphExtractorConfig config;
+  config.compression.compression_distance_m = 3.0;
   TestGraphExtractor extractor(config);
   const auto& gvd = extractor.getGvdGraph();
   const auto& places = extractor.getGraph();
@@ -625,8 +625,8 @@ TEST_F(CompressionGraphExtractorTestFixture, testArchiveAndDelete) {
 }
 
 TEST_F(CompressionGraphExtractorTestFixture, testUniformGvd) {
-  CompressionExtractorConfig config;
-  config.compression_distance_m = 0.5;
+  GraphExtractorConfig config;
+  config.compression.compression_distance_m = 0.5;
   CompressionGraphExtractor extractor(config);
 
   const auto& gvd = extractor.getGvdGraph();
