@@ -341,7 +341,7 @@ void findFreespaceEdges(const FreespaceEdgeConfig& config,
                         const std::unordered_set<NodeId>& nodes,
                         const NodeIndexMap& indices,
                         EdgeInfoMap& proposed_edges) {
-  auto components = graph_utilities::getConnectedComponents(graph, nodes);
+  auto components = graph_utilities::getConnectedComponents(graph, nodes, true);
   if (components.size() <= 1) {
     return;  // nothing to do
   }
