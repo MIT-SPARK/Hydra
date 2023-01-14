@@ -105,7 +105,6 @@ struct ReconstructionConfig {
   int voxels_per_side = 16;
   bool show_stats = true;
   bool clear_distant_blocks = true;
-  bool mesh_only = false;
   double dense_representation_radius_m = 5.0;
   std::string world_frame = "world";
   std::string robot_frame = "base_link";
@@ -134,7 +133,6 @@ void visit_config(const Visitor& v, ReconstructionConfig& config) {
   v.visit("voxels_per_side", config.voxels_per_side);
   v.visit("show_stats", config.show_stats);
   v.visit("clear_distant_blocks", config.clear_distant_blocks);
-  v.visit("mesh_only", config.mesh_only);
   v.visit("dense_representation_radius_m", config.dense_representation_radius_m);
   v.visit("world_frame", config.world_frame);
   v.visit("robot_frame", config.robot_frame);

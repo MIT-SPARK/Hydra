@@ -64,11 +64,11 @@ add_library(
   src/incremental_dsg_frontend.cpp
   src/incremental_dsg_lcd.cpp
   src/incremental_mesh_segmenter.cpp
+  src/merge_handler.cpp
+  src/minimum_spanning_tree.cpp
   src/room_colormap.cpp
   src/room_finder.cpp
   src/room_helpers.cpp
-  src/merge_handler.cpp
-  src/minimum_spanning_tree.cpp
   src/shared_module_state.cpp
   src/subgraph_extraction.cpp
 )
@@ -113,9 +113,9 @@ if(CATKIN_ENABLE_TESTING)
     tests/utest_graph_filtration.cpp
     tests/utest_merge_handler.cpp
     tests/utest_minimum_spanning_tree.cpp
-    tests/utest_subgraph_extraction.cpp
     tests/utest_room_helpers.cpp
     tests/utest_room_finder.cpp
+    tests/utest_subgraph_extraction.cpp
   )
   target_link_libraries(utest_${PROJECT_NAME} ${PROJECT_NAME} yaml-cpp)
 

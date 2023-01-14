@@ -36,13 +36,13 @@ catkin_package(
 
 add_library(
   ${PROJECT_NAME}
+  src/hydra_ros_pipeline.cpp
   src/lcd_visualizer.cpp
   src/node_utilities.cpp
   src/ros_backend.cpp
   src/ros_frontend.cpp
   src/ros_lcd_registration.cpp
   src/visualizer_plugins.cpp
-  src/hydra_ros_pipeline.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
 target_link_libraries(

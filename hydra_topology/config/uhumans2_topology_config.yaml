@@ -17,7 +17,6 @@ gvd:
   num_buckets: 20
   multi_queue: false
   extract_graph: true
-  mesh_only: false
   voronoi_config:
     mode: L1_THEN_ANGLE
     min_distance_m: 0.30
@@ -46,7 +45,7 @@ gvd:
     freespace_edges:
       num_nodes_to_check: 5
       num_neighbors_to_find: 1
-      max_edge_length_m: 2.0
+      max_length_m: 2.0
       min_clearance_m: 0.8
 mesh:
   use_color: true

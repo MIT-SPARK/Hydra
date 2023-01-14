@@ -109,7 +109,8 @@ HydraRosPipeline::HydraRosPipeline(const ros::NodeHandle& node_handle, int robot
         prefix, backend_config, pgmo_config, frontend_dsg, backend_dsg, shared_state);
   }
 
-  backend_visualizer = std::make_shared<RosBackendVisualizer>(nh, backend_config);
+  backend_visualizer =
+      std::make_shared<RosBackendVisualizer>(nh, backend_config, prefix);
   backend->addOutputCallback(std::bind(&RosBackendVisualizer::publishOutputs,
                                        backend_visualizer.get(),
                                        std::placeholders::_1,
