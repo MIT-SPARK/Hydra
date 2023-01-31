@@ -37,7 +37,9 @@
 
     <include file="$(find hydra_topology)/launch/hydra_topology.launch" pass_all_args="true">
         <arg name="config" value="simmons_topology_config.yaml"/>
-        <arg name="semantic_config" default="ade150_semantic_config.yaml"/>
-        <arg name="semantic_color_path" default="$(find semantic_recolor)/config/colors/ade150_config.csv"/>
+        <arg name="semantic_config" value="ade150_semantic_config.yaml"/>
+        <arg name="semantic_color_path" value="$(find semantic_recolor)/config/colors/ade150_config.csv"/>
+        <arg name="voxel_size" value="0.20"/>
+        <arg name="max_ray_length_m" default="3.0"/>
     </include>
 </launch>
