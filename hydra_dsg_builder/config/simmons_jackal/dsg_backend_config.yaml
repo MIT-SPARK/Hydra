@@ -21,12 +21,12 @@ pgmo:
     trans_node_dist: 1.0
     rot_node_dist: 1.2
     rpgo:
-        odom_trans_threshold: 0.01
-        odom_rot_threshold: 0.005
+        odom_trans_threshold: 0.05
+        odom_rot_threshold: 0.01
         pcm_trans_threshold: -1
         pcm_rot_threshold: -1
         lm_diagonal_damping: true
-        gnc_alpha: 0.999999
+        gnc_alpha: 0.99
         gnc_max_iterations: 100
         gnc_mu_step: 1.6
         gnc_cost_tolerance: 1.0e-05
@@ -39,8 +39,8 @@ pgmo:
         odom: 1.0e-02
         loop_close: 5.0e-02
         prior: 1.0e-02
-        mesh_mesh: 1.0
-        pose_mesh: 1.0
+        mesh_mesh: 1.0e-02
+        pose_mesh: 1.0e-02
         place_mesh: 10.0
         place_edge: 10.0
         merge_edge: 0.1
