@@ -13,7 +13,7 @@
 - git:
     local-name: kimera_vio
     uri: git@github.mit.edu:SPARK/Kimera-VIO.git
-    version: feature/rgbd_pipeline
+    version: master
 - git:
     local-name: kimera_vio_ros
     uri: git@github.mit.edu:SPARK/Kimera-VIO-ROS.git
