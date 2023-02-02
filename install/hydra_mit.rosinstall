@@ -28,9 +28,7 @@
 - git:
     local-name: spark_dsg
     uri: git@github.mit.edu:SPARK/Spark-DSG.git
-- git:
-    local-name: hydra
-    uri: git@github.mit.edu:SPARK/Hydra.git
+    version: develop
 - git:
     local-name: kimera_semantics
     uri: git@github.mit.edu:SPARK/Kimera-Semantics.git
