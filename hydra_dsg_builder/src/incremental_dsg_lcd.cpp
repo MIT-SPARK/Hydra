@@ -123,9 +123,7 @@ bool DsgLcd::spinOnce(bool force_update) {
   return true;
 }
 
-lcd::DsgLcdDetector& DsgLcd::getDetector() const {
-  return *lcd_detector_;
-}
+lcd::DsgLcdDetector& DsgLcd::getDetector() const { return *lcd_detector_; }
 
 void DsgLcd::spinOnceImpl(bool force_update) {
   const size_t timestamp_ns = processFrontendOutput();
@@ -185,6 +183,12 @@ NodeIdSet DsgLcd::getPlacesToCache(const Eigen::Vector3d& agent_pos) {
   NodeIdSet to_cache;
   auto iter = potential_lcd_root_nodes_.begin();
   while (iter != potential_lcd_root_nodes_.end()) {
+    if (lcd_graph_->hasNode(*iter)) {
+      VLOG(5) << "Deleted place " << *iter << " found in LCD queue";
+      iter = potential_lcd_root_nodes_.erase(iter);
+      continue;
+    }
+
     const Eigen::Vector3d pos = lcd_graph_->getPosition(*iter);
     if ((agent_pos - pos).norm() < config_.descriptor_creation_horizon_m) {
       ++iter;
