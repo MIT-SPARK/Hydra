@@ -41,6 +41,16 @@ bool operator==(const FiltrationInfo& lhs, const FiltrationInfo& rhs) {
   return lhs.distance == rhs.distance && lhs.num_components == rhs.num_components;
 }
 
+bool operator==(const ComponentLifetime& lhs, const ComponentLifetime& rhs) {
+  // lazy equality check for doubles
+  return std::abs(lhs.start - rhs.start) < 1.0e-6 &&
+         std::abs(lhs.end - rhs.end) < 1.0e-6;
+}
+
+std::ostream& operator<<(std::ostream& out, const ComponentLifetime& c) {
+  return out << "[" << c.start << ", " << c.end << "]";
+}
+
 Filtration makeFiltration(const std::vector<size_t>& components) {
   double distance = 1.0;
   Filtration filtration;
@@ -145,6 +155,56 @@ TEST(GraphFiltrationTests, TestDelayedEdgeBothNodes) {
   EXPECT_EQ(expected, result);
 }
 
+TEST(GraphFiltrationTests, TestEdgesFiltrationOnly) {
+  IsolatedSceneGraphLayer layer(1);
+  addNode(layer, 0, 1.0);
+  addNode(layer, 1, 2.0);
+  addNode(layer, 2, 3.0);
+  addNode(layer, 3, 4.0);
+  addEdge(layer, 0, 1, 0.4);
+  addEdge(layer, 1, 2, 0.5);
+  addEdge(layer, 2, 3, 0.6);
+
+  BarcodeTracker tracker;
+  const auto result = getGraphFiltration(
+      layer,
+      tracker,
+      1.0e-4,
+      [](const DisjointSet& components) { return components.sizes.size(); },
+      false);
+  Filtration expected{{0.4, 1}, {0.5, 2}, {0.6, 3}};
+  EXPECT_EQ(expected, result);
+}
+
+TEST(GraphFiltrationTests, TestBarcodeFiltration) {
+  IsolatedSceneGraphLayer layer(1);
+  addNode(layer, 0, 1.0);
+  addNode(layer, 1, 2.0);
+  addNode(layer, 2, 3.0);
+  addNode(layer, 3, 4.0);
+  addEdge(layer, 0, 1, 0.4);
+  addEdge(layer, 1, 2, 0.5);
+  addEdge(layer, 2, 3, 0.6);
+
+  BarcodeTracker tracker;
+  const auto result = getGraphFiltration(
+      layer,
+      tracker,
+      1.0e-4,
+      [](const DisjointSet& components) { return components.sizes.size(); },
+      false);
+  Filtration expected{{0.4, 1}, {0.5, 2}, {0.6, 3}};
+  EXPECT_EQ(expected, result);
+
+  std::unordered_map<NodeId, ComponentLifetime> expected_barcodes{
+      {0, {0.4, 1.0}},
+      {1, {0.5, 2.0}},
+      {2, {0.6, 3.0}},
+      {3, {0.0, 4.0}},
+  };
+  EXPECT_EQ(expected_barcodes, tracker.barcodes);
+}
+
 TEST(GraphFiltrationTests, TestLongestSequence) {
   {  // empty values -> no best index
     Filtration values;
@@ -231,6 +291,66 @@ TEST(GraphFiltrationTests, TestOutputOperators) {
     std::stringstream ss;
     ss << filtration;
     EXPECT_EQ(ss.str(), "[{d=1.5, s=1}, {d=2.5, s=2}]");
+  }
+}
+
+TEST(GraphFiltrationTests, TestLongestLifetimeDilation) {
+  {  // empty input -> no output
+    Filtration filtration;
+    LifetimeMap lifetimes;
+    const auto result = getLongestLifetimeDilation(filtration, lifetimes, 0.1, 0, 5);
+    EXPECT_FALSE(result);
+  }
+
+  {  // non-empty input -> correct output
+    Filtration filtration{{0.1, 1}, {0.2, 2}, {0.3, 3}, {0.4, 4}, {0.5, 5}};
+    LifetimeMap lifetimes{{0, {-50, 0.15}},
+                          {1, {0.1, 0.4}},
+                          {2, {0.1, 0.4}},
+                          {3, {0.4, 0.9}},
+                          {4, {0.4, 0.9}}};
+    const auto result = getLongestLifetimeDilation(filtration, lifetimes, 0.1, 1, 5);
+    ASSERT_TRUE(result);
+    EXPECT_NEAR(result->distance, 0.2, 1.0e-9);
+    EXPECT_EQ(result->num_components, 2u);
+  }
+}
+
+Filtration makePlateauFiltration(const std::vector<size_t>& y_values) {
+  Filtration filtration;
+  for (size_t i = 0; i < y_values.size(); ++i) {
+    filtration.push_back({0.1 * (i + 1), y_values[i]});
+  }
+  return filtration;
+}
+
+TEST(GraphFiltrationTests, TestBestPlateau) {
+  {  // empty input -> no output
+    Filtration filtration;
+    const auto result = getBestPlateau(filtration, 0.1, 0, 5);
+    EXPECT_FALSE(result);
+  }
+
+  const auto filtration = makePlateauFiltration({1, 1, 1, 1, 2, 2, 3, 2});
+  {  // test case 1: low enough ratio that second plateau gets selected
+    const auto result = getBestPlateau(filtration, 0.1, 0, filtration.size());
+    ASSERT_TRUE(result);
+    EXPECT_NEAR(result->distance, 0.5, 1.0e-9);
+    EXPECT_EQ(result->num_components, 2u);
+  }
+
+  {  // test case 2: longest plateau only
+    const auto result = getBestPlateau(filtration, 0.4, 0, filtration.size());
+    ASSERT_TRUE(result);
+    EXPECT_NEAR(result->distance, 0.1, 1.0e-9);
+    EXPECT_EQ(result->num_components, 1u);
+  }
+
+  {  // test case 3: max number of components with 0.0
+    const auto result = getBestPlateau(filtration, 0.0, 0, filtration.size());
+    ASSERT_TRUE(result);
+    EXPECT_NEAR(result->distance, 0.7, 1.0e-9);
+    EXPECT_EQ(result->num_components, 3u);
   }
 }
 

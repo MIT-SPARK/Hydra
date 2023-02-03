@@ -41,6 +41,7 @@
 
 #include "hydra_dsg_builder/hydra_config.h"
 #include "hydra_dsg_builder/minimum_spanning_tree.h"
+#include "hydra_dsg_builder/room_finder.h"
 
 namespace hydra {
 namespace incremental {
@@ -315,6 +316,8 @@ void DsgBackend::setDefaultUpdateFunctions() {
   if (config_.enable_rooms) {
     update_rooms_functor_.reset(
         new dsg_updates::UpdateRoomsFunctor(config_.room_finder));
+    update_rooms_functor_->room_finder->enableLogging(config_.log_path +
+                                                      "/room_filtrations");
     dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdateRoomsFunctor::call,
                                           update_rooms_functor_.get(),
                                           std::placeholders::_1,

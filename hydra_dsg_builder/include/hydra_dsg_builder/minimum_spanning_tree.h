@@ -52,23 +52,6 @@ struct MinimalEdge {
   }
 };
 
-struct DisjointSet {
-  DisjointSet();
-
-  explicit DisjointSet(const SceneGraphLayer& layer);
-
-  bool addSet(NodeId node);
-
-  bool hasSet(NodeId node) const;
-
-  NodeId findSet(NodeId node) const;
-
-  bool doUnion(NodeId lhs, NodeId rhs);
-
-  std::unordered_map<NodeId, NodeId> parents;
-  std::unordered_map<NodeId, size_t> sizes;
-};
-
 struct MinimumSpanningTreeInfo {
   std::vector<MinimalEdge> edges;
   std::unordered_set<NodeId> leaves;

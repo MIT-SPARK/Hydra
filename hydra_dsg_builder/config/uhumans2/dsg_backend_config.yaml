@@ -7,8 +7,8 @@ dsg:
   num_neighbors_to_find_for_merge: 1
   rpgo_verbosity: update
   rpgo_solver: LM
-  places_merge_pos_threshold_m: 0.4
-  places_merge_distance_tolerance_m: 0.3
+  places_merge_pos_threshold_m: 0.3
+  places_merge_distance_tolerance_m: 0.2
   merge_update_dynamic: true
   merge_update_map: {BUILDINGS: 0, ROOMS: 0, PLACES: 1, OBJECTS: 0}
 pgmo:
@@ -50,12 +50,19 @@ building_color: [169, 8, 194]
 visualize_place_factors: false
 enable_rooms: true
 room_finder:
-  min_dilation_m: 0.45
-  max_dilation_m: 2.5
-  min_component_size: 4
-  min_room_size: 5
+  min_dilation_m: 0.5
+  max_dilation_m: 1.2
+  min_window_size: 0.2
+  clip_dilation_window_to_max: false
+  min_component_size: 10
+  min_room_size: 10
+  dilation_threshold_mode: PLATEAU
+  min_lifetime_length_m: 0.1
+  plateau_ratio: 0.25
+  clustering_mode: NEIGHBORS
   max_modularity_iters: 5
   modularity_gamma: 1.0
-  clustering_mode: MODULARITY
   room_prefix: R
-  dilation_diff_threshold_m: 0.0001
+  dilation_diff_threshold_m: -1.0
+  log_filtrations: false
+  log_place_graphs: false

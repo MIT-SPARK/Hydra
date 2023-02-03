@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(HYDRA_USE_COVERAGE "Build core library with GCC --coverage option" ON)
+option(HYDRA_USE_COVERAGE "Build core library with GCC --coverage option" OFF)
 option(HYDRA_GNN "build GNN interface" ON)
 if(HYDRA_GNN)
   set(HYDRA_USE_GNN_CXX_VALUE 1)
@@ -52,6 +52,7 @@ endif()
 
 add_library(
   ${PROJECT_NAME}
+  src/disjoint_set.cpp
   src/dsg_lcd_descriptors.cpp
   src/dsg_lcd_matching.cpp
   src/dsg_lcd_detector.cpp
@@ -85,7 +86,7 @@ target_link_libraries(
          yaml-cpp
          gtsam
 )
-if(BUILD_WITH_COVERAGE)
+if(HYDRA_USE_COVERAGE)
   target_compile_options(${PROJECT_NAME} PRIVATE --coverage)
   # TODO(nathan) once we have newer cmake, target link options
   target_link_libraries(${PROJECT_NAME} PRIVATE --coverage)

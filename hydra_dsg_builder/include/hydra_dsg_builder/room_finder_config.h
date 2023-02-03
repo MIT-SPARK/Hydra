@@ -37,13 +37,24 @@
 
 namespace hydra {
 
-enum class RoomClusterMode { MODULARITY, NONE };
+enum class RoomClusterMode { MODULARITY, MODULARITY_DISTANCE, NEIGHBORS, NONE };
+
+enum class DilationThresholdMode { REPEATED, LONGEST_LIFETIME, PLATEAU };
+
 }  // namespace hydra
 
 DECLARE_CONFIG_ENUM(hydra,
                     RoomClusterMode,
                     {RoomClusterMode::MODULARITY, "MODULARITY"},
+                    {RoomClusterMode::MODULARITY, "MODULARITY_DISTANCE"},
+                    {RoomClusterMode::NEIGHBORS, "NEIGHBORS"},
                     {RoomClusterMode::NONE, "NONE"})
+
+DECLARE_CONFIG_ENUM(hydra,
+                    DilationThresholdMode,
+                    {DilationThresholdMode::REPEATED, "REPEATED"},
+                    {DilationThresholdMode::LONGEST_LIFETIME, "LONGEST_LIFETIME"},
+                    {DilationThresholdMode::PLATEAU, "PLATEAU"})
 
 namespace hydra {
 
@@ -51,24 +62,38 @@ struct RoomFinderConfig {
   char room_prefix = 'R';
   double min_dilation_m = 0.1;
   double max_dilation_m = 0.7;
+  double min_window_size = 0.2;
+  bool clip_dilation_window_to_max = false;
   size_t min_component_size = 15;
   size_t min_room_size = 10;
-  RoomClusterMode clustering_mode = RoomClusterMode::MODULARITY;
+  DilationThresholdMode dilation_threshold_mode = DilationThresholdMode::REPEATED;
+  double min_lifetime_length_m = 0.1;
+  double plateau_ratio = 0.5;
+  RoomClusterMode clustering_mode = RoomClusterMode::NEIGHBORS;
   double max_modularity_iters = 5;
   double modularity_gamma = 1.0;
   double dilation_diff_threshold_m = 1.0e-4;
+  bool log_filtrations = false;
+  bool log_place_graphs = false;
 };
 
 template <typename Visitor>
 void visit_config(const Visitor& v, RoomFinderConfig& config) {
   v.visit("min_dilation_m", config.min_dilation_m);
   v.visit("max_dilation_m", config.max_dilation_m);
+  v.visit("min_window_size", config.min_window_size);
+  v.visit("clip_dilation_window_to_max", config.clip_dilation_window_to_max);
   v.visit("min_component_size", config.min_component_size);
   v.visit("min_room_size", config.min_room_size);
+  v.visit("dilation_threshold_mode", config.dilation_threshold_mode);
+  v.visit("min_lifetime_length_m", config.min_lifetime_length_m);
+  v.visit("plateau_ratio", config.plateau_ratio);
   v.visit("max_modularity_iters", config.max_modularity_iters);
   v.visit("modularity_gamma", config.modularity_gamma);
   v.visit("clustering_mode", config.clustering_mode);
   v.visit("dilation_diff_threshold_m", config.dilation_diff_threshold_m);
+  v.visit("log_filtrations", config.log_filtrations);
+  v.visit("log_place_graphs", config.log_place_graphs);
 
   std::string prefix_string;
   if (!config_parser::is_parser<Visitor>()) {
