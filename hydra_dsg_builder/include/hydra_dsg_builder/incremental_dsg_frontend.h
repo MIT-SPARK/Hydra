@@ -97,7 +97,8 @@ class DsgFrontend {
  protected:
   void filterPlaces(const SceneGraphLayer& places,
                     NodeIdSet& objects_to_check,
-                    NodeIdSet& active_places);
+                    NodeIdSet& active_places,
+                    const NodeIdSet& active_neighborhood);
 
   void deletePlaceNode(NodeId node_id, NodeIdSet& objects_to_check);
 

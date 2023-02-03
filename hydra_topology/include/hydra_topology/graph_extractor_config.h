@@ -56,6 +56,8 @@ struct CompressionExtractorConfig {
   double compression_distance_m = 0.5;
   //! Validate graph properties
   bool validate_graph = false;
+  //! Minimum distance for a GVD node to be considered for compression
+  double min_node_distance_m = 0.3;
   //! Minimum distance for a edge to be valid
   double min_edge_distance_m = 0.4;
   //! Distance to consider a merge at
@@ -118,6 +120,7 @@ template <typename Visitor>
 void visit_config(const Visitor& v, CompressionExtractorConfig& config) {
   v.visit("compression_distance_m", config.compression_distance_m);
   v.visit("validate_graph", config.validate_graph);
+  v.visit("min_node_distance_m", config.min_node_distance_m);
   v.visit("min_edge_distance_m", config.min_edge_distance_m);
   v.visit("node_merge_distance_m", config.node_merge_distance_m);
   v.visit("merge_new_nodes", config.merge_nearby_nodes);

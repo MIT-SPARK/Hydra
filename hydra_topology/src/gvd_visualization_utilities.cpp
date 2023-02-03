@@ -47,19 +47,29 @@ namespace topology {
 
 MarkerGroupPub::MarkerGroupPub(const ros::NodeHandle& nh) : nh_(nh) {}
 
-void MarkerGroupPub::publish(const std::string& name, const Marker& marker) const {
-  MarkerArray msg;
-  msg.markers.push_back(marker);
-  publish(name, msg);
+void MarkerGroupPub::publish(const std::string& name,
+                             const MarkerCallback& func) const {
+  publish(name, [&func](MarkerArray& msg) {
+    Marker marker;
+    msg.markers.push_back(marker);
+    return func(msg.markers.back());
+  });
 }
 
-void MarkerGroupPub::publish(const std::string& name, const MarkerArray& marker) const {
+void MarkerGroupPub::publish(const std::string& name, const ArrayCallback& func) const {
   auto iter = pubs_.find(name);
   if (iter == pubs_.end()) {
     iter = pubs_.emplace(name, nh_.advertise<MarkerArray>(name, 1, true)).first;
   }
 
-  iter->second.publish(marker);
+  if (!iter->second.getNumSubscribers()) {
+    return;  // avoid doing computation if we don't need to publish
+  }
+
+  MarkerArray msg;
+  if (func(msg)) {
+    iter->second.publish(msg);
+  }
 }
 
 double computeRatio(double min, double max, double value) {
@@ -620,9 +630,14 @@ MarkerArray showGvdClusters(const GvdGraph& graph,
     geometry_msgs::Point node_centroid;
     tf2::convert(id_node_pair.second.position, node_centroid);
     nodes.points.push_back(node_centroid);
-    const auto cluster_id = remapping.at(id_node_pair.first);
-    const auto& cluster_color = colors.at(color_mapping.at(cluster_id));
-    nodes.colors.push_back(cluster_color);
+    if (remapping.count(id_node_pair.first)) {
+      const auto cluster_id = remapping.at(id_node_pair.first);
+      const auto& cluster_color = colors.at(color_mapping.at(cluster_id));
+      nodes.colors.push_back(cluster_color);
+    } else {
+      nodes.colors.push_back(
+          dsg_utils::makeColorMsg(NodeColor(0, 0, 0), config.gvd_alpha));
+    }
 
     auto& curr_seen = getNodeSet(seen_edges, id_node_pair.first);
     for (const auto sibling : id_node_pair.second.siblings) {
@@ -641,9 +656,14 @@ MarkerArray showGvdClusters(const GvdGraph& graph,
       tf2::convert(other.position, neighbor_centroid);
       edges.points.push_back(neighbor_centroid);
 
-      const auto& neighbor_cluster = remapping.at(sibling);
-      const auto& neighbor_color = colors.at(color_mapping.at(neighbor_cluster));
-      edges.colors.push_back(neighbor_color);
+      if (remapping.count(sibling)) {
+        const auto& neighbor_cluster = remapping.at(sibling);
+        const auto& neighbor_color = colors.at(color_mapping.at(neighbor_cluster));
+        edges.colors.push_back(neighbor_color);
+      } else {
+        edges.colors.push_back(
+            dsg_utils::makeColorMsg(NodeColor(0, 0, 0), config.gvd_alpha));
+      }
     }
   }
 

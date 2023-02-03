@@ -32,19 +32,31 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <gflags/gflags.h>
-#include <glog/logging.h>
-#include <gtest/gtest.h>
+#pragma once
+#include <hydra_utils/dsg_types.h>
 
-int main(int argc, char** argv) {
-  FLAGS_logtostderr = true;
-  FLAGS_alsologtostderr = true;
-  FLAGS_colorlogtostderr = true;
-  FLAGS_minloglevel = 1;
+#include <optional>
 
-  ::testing::InitGoogleTest(&argc, argv);
-  google::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
+namespace hydra {
 
-  return RUN_ALL_TESTS();
-}
+struct DisjointSet {
+  DisjointSet();
+
+  explicit DisjointSet(const SceneGraphLayer& layer);
+
+  virtual ~DisjointSet() = default;
+
+  bool hasSet(NodeId node) const;
+
+  NodeId findSet(NodeId node) const;
+
+  bool addSet(NodeId node);
+
+  std::optional<NodeId> doUnion(NodeId lhs, NodeId rhs, bool rhs_better = false);
+
+  std::unordered_set<NodeId> roots;
+  std::unordered_map<NodeId, NodeId> parents;
+  std::unordered_map<NodeId, size_t> sizes;
+};
+
+}  // namespace hydra

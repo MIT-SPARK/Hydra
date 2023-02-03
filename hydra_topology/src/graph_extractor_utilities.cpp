@@ -249,10 +249,6 @@ EdgeAttributes::Ptr getOverlapEdgeInfo(const SceneGraphLayer& graph,
     return nullptr;
   }
 
-  if (graph.hasEdge(node, neighbor)) {
-    return nullptr;
-  }
-
   const double r1 = getNodeGvdDistance(graph, node);
   const double r2 = getNodeGvdDistance(graph, neighbor);
   const double d = (graph.getPosition(node) - graph.getPosition(neighbor)).norm();
@@ -262,8 +258,14 @@ EdgeAttributes::Ptr getOverlapEdgeInfo(const SceneGraphLayer& graph,
   }
 
   if (d <= r1 || d <= r2) {
+    const double clearance = std::min(r1, r2);
+    if (clearance < min_clearance) {
+      // mostly for debugging
+      return nullptr;
+    }
+
     // intersection is inside one node's sphere
-    return std::make_unique<EdgeAttributes>(std::min(r1, r2));
+    return std::make_unique<EdgeAttributes>(clearance);
   }
 
   // see https://mathworld.wolfram.com/Sphere-SphereIntersection.html
@@ -284,10 +286,6 @@ EdgeAttributes::Ptr getFreespaceEdgeInfo(const SceneGraphLayer& graph,
                                          NodeId node,
                                          NodeId other,
                                          double min_clearance_m) {
-  if (graph.hasEdge(node, other)) {
-    return nullptr;
-  }
-
   const GlobalIndex source = node_index_map.at(node);
   const GlobalIndex target = node_index_map.at(other);
   const auto path = makeBresenhamLine(source, target);
@@ -326,6 +324,10 @@ void findOverlapEdges(const OverlapEdgeConfig& config,
                      config.num_neighbors_to_check,
                      true,
                      [&](NodeId other, size_t, double) {
+                       if (graph.hasEdge(node, other)) {
+                         return;
+                       }
+
                        auto info = getOverlapEdgeInfo(
                            graph, node, other, config.min_clearance_m);
                        if (info) {
@@ -367,6 +369,11 @@ void findFreespaceEdges(const FreespaceEdgeConfig& config,
                          if (distance > config.max_length_m) {
                            return;
                          }
+
+                         if (graph.hasEdge(node, other)) {
+                           return;
+                         }
+
                          auto info = getFreespaceEdgeInfo(
                              graph, gvd, indices, node, other, config.min_clearance_m);
                          inserted_edge |= info != nullptr;

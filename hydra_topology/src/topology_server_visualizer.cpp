@@ -81,47 +81,50 @@ void TopologyServerVisualizer::visualizeExtractor(
   header.frame_id = config_.world_frame;
   header.stamp.fromNSec(timestamp_ns);
 
-  const std::string ns = "gvd_cluster_graph";
-
   MarkerArray markers;
-  if (extractor.getGvdGraph().empty() && published_gvd_clusters_) {
-    published_gvd_graph_ = false;
-    markers.markers.push_back(makeDeleteMarker(header, 0, ns + "_nodes"));
-    markers.markers.push_back(makeDeleteMarker(header, 0, ns + "_edges"));
-    pubs_->publish("gvd_cluster_viz", markers);
-    return;
-  }
+  pubs_->publish("gvd_cluster_viz", [&](MarkerArray& markers) {
+    const std::string ns = "gvd_cluster_graph";
+    if (extractor.getGvdGraph().empty() && published_gvd_clusters_) {
+      published_gvd_graph_ = false;
+      markers.markers.push_back(makeDeleteMarker(header, 0, ns + "_nodes"));
+      markers.markers.push_back(makeDeleteMarker(header, 0, ns + "_edges"));
+      return true;
+    }
 
-  markers = showGvdClusters(extractor.getGvdGraph(),
-                            extractor.getCompressedNodeInfo(),
-                            extractor.getCompressedRemapping(),
-                            config_.gvd,
-                            config_.colormap,
-                            ns);
+    markers = showGvdClusters(extractor.getGvdGraph(),
+                              extractor.getCompressedNodeInfo(),
+                              extractor.getCompressedRemapping(),
+                              config_.gvd,
+                              config_.colormap,
+                              ns);
 
-  if (markers.markers.empty()) {
-    return;
-  }
+    if (markers.markers.empty()) {
+      return false;
+    }
 
-  markers.markers.at(0).header = header;
-  markers.markers.at(1).header = header;
-  published_gvd_clusters_ = true;
-  pubs_->publish("gvd_cluster_viz", markers);
+    markers.markers.at(0).header = header;
+    markers.markers.at(1).header = header;
+    published_gvd_clusters_ = true;
+    return true;
+  });
 }
 
 void TopologyServerVisualizer::visualizeError(const Layer<GvdVoxel>& lhs,
                                               const Layer<GvdVoxel>& rhs,
                                               double threshold,
                                               uint64_t timestamp_ns) {
-  Marker msg = makeErrorMarker(config_.gvd, config_.colormap, lhs, rhs, threshold);
-  msg.header.frame_id = config_.world_frame;
-  msg.header.stamp.fromNSec(timestamp_ns);
+  pubs_->publish("error_viz", [&](Marker& msg) {
+    msg = makeErrorMarker(config_.gvd, config_.colormap, lhs, rhs, threshold);
+    msg.header.frame_id = config_.world_frame;
+    msg.header.stamp.fromNSec(timestamp_ns);
 
-  if (msg.points.size()) {
-    pubs_->publish("error_viz", msg);
-  } else {
-    LOG(INFO) << "no voxels with error above threshold";
-  }
+    if (msg.points.size()) {
+      return true;
+    } else {
+      LOG(INFO) << "no voxels with error above threshold";
+      return false;
+    }
+  });
 }
 
 void TopologyServerVisualizer::visualizeGraph(const std_msgs::Header& header,
@@ -131,123 +134,116 @@ void TopologyServerVisualizer::visualizeGraph(const std_msgs::Header& header,
     return;
   }
 
-  MarkerArray markers;
-
-  Marker node_marker;
-
-  const std::string node_ns = config_.topology_marker_ns + "_nodes";
-  if (config_.gvd.color_nearest_vertices) {
-    node_marker = makeCentroidMarkers(
-        header,
-        config_.graph_layer,
-        graph,
-        config_.graph,
-        node_ns,
-        [](const SceneGraphNode& node) {
-          if (node.attributes<PlaceNodeAttributes>().voxblox_mesh_connections.empty()) {
-            return NodeColor(0, 0, 0);
-          } else {
-            return NodeColor(0, 255, 0);
-          }
-        });
-  } else {
-    node_marker = makeCentroidMarkers(
+  pubs_->publish("graph_viz", [&](MarkerArray& markers) {
+    const std::string node_ns = config_.topology_marker_ns + "_nodes";
+    Marker node_marker = makeCentroidMarkers(
         header, config_.graph_layer, graph, config_.graph, node_ns, config_.colormap);
-  }
+    markers.markers.push_back(node_marker);
 
-  markers.markers.push_back(node_marker);
+    if (!graph.edges().empty()) {
+      Marker edge_marker = makeLayerEdgeMarkers(header,
+                                                config_.graph_layer,
+                                                graph,
+                                                config_.graph,
+                                                NodeColor::Zero(),
+                                                config_.topology_marker_ns + "_edges");
+      markers.markers.push_back(edge_marker);
+    }
 
-  if (!graph.edges().empty()) {
-    Marker edge_marker = makeLayerEdgeMarkers(header,
-                                              config_.graph_layer,
-                                              graph,
-                                              config_.graph,
-                                              NodeColor::Zero(),
-                                              config_.topology_marker_ns + "_edges");
-    markers.markers.push_back(edge_marker);
-  }
+    return true;
+  });
 
   publishGraphLabels(header, graph);
-  pubs_->publish("graph_viz", markers);
 }
 
 void TopologyServerVisualizer::visualizeGvdGraph(const std_msgs::Header& header,
                                                  const GvdGraph& graph) const {
-  const std::string ns = config_.topology_marker_ns + "_gvd_graph";
+  pubs_->publish("gvd_graph_viz", [&](MarkerArray& markers) {
+    const std::string ns = config_.topology_marker_ns + "_gvd_graph";
+    if (graph.empty() && published_gvd_graph_) {
+      published_gvd_graph_ = false;
+      markers.markers.push_back(makeDeleteMarker(header, 0, ns + "_nodes"));
+      markers.markers.push_back(makeDeleteMarker(header, 0, ns + "_edges"));
+      return true;
+    }
 
-  MarkerArray markers;
-  if (graph.empty() && published_gvd_graph_) {
-    published_gvd_graph_ = false;
-    markers.markers.push_back(makeDeleteMarker(header, 0, ns + "_nodes"));
-    markers.markers.push_back(makeDeleteMarker(header, 0, ns + "_edges"));
-    pubs_->publish("gvd_graph_viz", markers);
-    return;
-  }
+    markers = makeGvdGraphMarkers(graph, config_.gvd, config_.colormap, ns);
+    if (markers.markers.empty()) {
+      return false;
+    }
 
-  markers = makeGvdGraphMarkers(graph, config_.gvd, config_.colormap, ns);
-  if (markers.markers.empty()) {
-    return;
-  }
-
-  markers.markers.at(0).header = header;
-  markers.markers.at(1).header = header;
-  published_gvd_graph_ = true;
-  pubs_->publish("gvd_graph_viz", markers);
+    markers.markers.at(0).header = header;
+    markers.markers.at(1).header = header;
+    published_gvd_graph_ = true;
+    return true;
+  });
 }
 
 void TopologyServerVisualizer::visualizeGvd(const std_msgs::Header& header,
                                             const Layer<GvdVoxel>& gvd) const {
-  Marker esdf_msg = makeEsdfMarker(config_.gvd, config_.colormap, gvd);
-  esdf_msg.header = header;
-  esdf_msg.ns = "gvd_visualizer";
+  pubs_->publish("esdf_viz", [&](Marker& msg) {
+    msg = makeEsdfMarker(config_.gvd, config_.colormap, gvd);
+    msg.header = header;
+    msg.ns = "gvd_visualizer";
 
-  if (esdf_msg.points.size()) {
-    pubs_->publish("esdf_viz", esdf_msg);
-  } else {
-    LOG(INFO) << "visualizing empty ESDF slice";
-  }
+    if (msg.points.size()) {
+      return true;
+    } else {
+      LOG(INFO) << "visualizing empty ESDF slice";
+      return false;
+    }
+  });
 
-  Marker gvd_msg = makeGvdMarker(config_.gvd, config_.colormap, gvd);
-  gvd_msg.header = header;
-  gvd_msg.ns = "gvd_visualizer";
+  pubs_->publish("gvd_viz", [&](Marker& msg) {
+    msg = makeGvdMarker(config_.gvd, config_.colormap, gvd);
+    msg.header = header;
+    msg.ns = "gvd_visualizer";
 
-  if (gvd_msg.points.size()) {
-    pubs_->publish("gvd_viz", gvd_msg);
-  } else {
-    LOG(INFO) << "visualizing empty GVD slice";
-  }
+    if (msg.points.size()) {
+      return true;
+    } else {
+      LOG(INFO) << "visualizing empty GVD slice";
+      return false;
+    }
+  });
 
-  Marker surface_msg = makeSurfaceVoxelMarker(config_.gvd, config_.colormap, gvd);
-  surface_msg.header = header;
-  surface_msg.ns = "gvd_visualizer";
+  pubs_->publish("surface_viz", [&](Marker& msg) {
+    msg = makeSurfaceVoxelMarker(config_.gvd, config_.colormap, gvd);
+    msg.header = header;
+    msg.ns = "gvd_visualizer";
 
-  if (surface_msg.points.size()) {
-    pubs_->publish("surface_viz", surface_msg);
-  } else {
-    LOG(INFO) << "visualizing empty surface slice";
-  }
+    if (msg.points.size()) {
+      return true;
+    } else {
+      LOG(INFO) << "visualizing empty surface slice";
+      return false;
+    }
+  });
 }
 
 void TopologyServerVisualizer::visualizeBlocks(const std_msgs::Header& header,
                                                const Layer<GvdVoxel>& gvd,
                                                const Layer<TsdfVoxel>& tsdf,
                                                const MeshLayer* mesh) const {
-  Marker msg;
-  if (config_.use_gvd_block_outlines) {
-    msg = makeBlocksMarker(gvd, config_.outline_scale);
-  } else {
-    msg = makeBlocksMarker(tsdf, config_.outline_scale);
-  }
+  pubs_->publish("voxel_block_viz", [&](Marker& msg) {
+    if (config_.use_gvd_block_outlines) {
+      msg = makeBlocksMarker(gvd, config_.outline_scale);
+    } else {
+      msg = makeBlocksMarker(tsdf, config_.outline_scale);
+    }
 
-  msg.header = header;
-  msg.ns = "topology_server_blocks";
-  pubs_->publish("voxel_block_viz", msg);
+    msg.header = header;
+    msg.ns = "topology_server_blocks";
+    return true;
+  });
 
   if (mesh) {
-    Marker mesh_msg = makeMeshBlocksMarker(*mesh, config_.outline_scale);
-    mesh_msg.header = header;
-    msg.ns = "topology_server_mesh_blocks";
-    pubs_->publish("mesh_block_viz", mesh_msg);
+    pubs_->publish("mesh_block_viz", [&](Marker& msg) {
+      msg = makeMeshBlocksMarker(*mesh, config_.outline_scale);
+      msg.header = header;
+      msg.ns = "topology_server_mesh_blocks";
+      return true;
+    });
   }
 }
 
@@ -289,8 +285,16 @@ void TopologyServerVisualizer::publishGraphLabels(const std_msgs::Header& header
     delete_markers.markers.push_back(delete_label);
   }
 
-  pubs_->publish("graph_label_viz", delete_markers);
-  pubs_->publish("graph_label_viz", labels);
+  // there's not really a clean way to delay computation on either of these markers, so
+  // we just assign the messages in the callbacks
+  pubs_->publish("graph_label_viz", [&](MarkerArray& msg) {
+    msg = delete_markers;
+    return true;
+  });
+  pubs_->publish("graph_label_viz", [&](MarkerArray& msg) {
+    msg = labels;
+    return true;
+  });
 }
 
 void TopologyServerVisualizer::graphConfigCb(LayerConfig& config, uint32_t) {

@@ -14,7 +14,7 @@
     <arg name="use_oriented_bounding_boxes" default="false"/>
     <arg name="exit_mode" default="NORMAL"/>
     <arg name="start_visualizer" default="true"/>
-    <arg name="start_logger" default="true"/>
+    <arg name="start_logger" default="false"/>
     <arg name="optimize_on_lc" default="true"/>
     <arg name="enable_merge_undos" default="false"/>
     <arg name="visualize_reconstruction" default="false"/>

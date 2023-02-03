@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_topology/compression_graph_extractor.h"
+#include "hydra_topology/configs.h"
 
 #include <glog/stl_logging.h>
 #include <hydra_utils/timing_utilities.h>
@@ -172,6 +173,8 @@ void CompressedNode::merge(CompressedNode& other, CompressedNodeMap& nodes) {
 
 CompressionGraphExtractor::CompressionGraphExtractor(const GraphExtractorConfig& config)
     : GraphExtractorInterface(config), config_(config.compression), next_id_(0) {
+  LOG(ERROR) << "Overall config: " << std::endl << GraphExtractorInterface::config_;
+  LOG(ERROR) << "Compression Config: " << std::endl << config_;
   compression_factor_ = 1.0 / config_.compression_distance_m;
 }
 
@@ -469,7 +472,9 @@ void CompressionGraphExtractor::updateGvdGraph(const IndexVoxelQueue& update_inf
       continue;  // isolated voxel
     }
 
-    compressNode(iter->second, info);
+    if (info.distance >= config_.min_node_distance_m) {
+      compressNode(iter->second, info);
+    }
   }
 
   for (const auto& delete_info : to_delete) {
@@ -747,6 +752,7 @@ void CompressionGraphExtractor::updateCompressedEdges(const GvdLayer& layer) {
 
       auto attrs = makeEdgeInfo(layer, graph_id, sibling_graph_id);
       if (attrs->weight < config_.min_edge_distance_m) {
+        removeGraphEdge(graph_id, sibling_id);
         continue;
       }
 

@@ -51,12 +51,14 @@ using CompressedNodeMap = std::unordered_map<uint64_t, CompressedNode>;
 
 class MarkerGroupPub {
  public:
+  using MarkerCallback = std::function<bool(visualization_msgs::Marker& marker)>;
+  using ArrayCallback = std::function<bool(visualization_msgs::MarkerArray& marker)>;
+
   explicit MarkerGroupPub(const ros::NodeHandle& nh);
 
-  void publish(const std::string& name, const visualization_msgs::Marker& marker) const;
+  void publish(const std::string& name, const MarkerCallback& marker) const;
 
-  void publish(const std::string& name,
-               const visualization_msgs::MarkerArray& marker) const;
+  void publish(const std::string& name, const ArrayCallback& marker) const;
 
  private:
   mutable ros::NodeHandle nh_;
