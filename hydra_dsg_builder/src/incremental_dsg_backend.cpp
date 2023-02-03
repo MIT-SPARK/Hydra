@@ -480,11 +480,13 @@ bool DsgBackend::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
     status_.total_factors_ = deformation_graph_->getGtsamFactors().size();
     status_.total_values_ = deformation_graph_->getGtsamValues().size();
 
+    bool reset_optimize = false;
     bool have_dsg_updates = false;
     if (reset_backend_dsg_) {
       resetBackendDsg();
       have_dsg_updates = true;
       have_graph_updates_ = true;
+      reset_optimize = true;
     } else {
       have_dsg_updates = updatePrivateDsg();
     }
@@ -493,7 +495,7 @@ bool DsgBackend::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
     {  // start pgmo mesh critical section
       std::unique_lock<std::mutex> pgmo_lock(pgmo_mutex_);
       if (config_.optimize_on_lc && have_graph_updates_ && have_loopclosures_) {
-        optimize(status_.new_loop_closures_ > 0);
+        optimize(status_.new_loop_closures_ > 0 || reset_optimize);
         was_updated = true;
       } else if (config_.call_update_periodically && have_dsg_updates) {
         updateDsgMesh();
