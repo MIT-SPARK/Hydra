@@ -38,6 +38,7 @@
 namespace hydra {
 
 using InitialClusters = std::vector<std::vector<NodeId>>;
+using EdgeWeightFunc = std::function<double(const SceneGraphLayer&, NodeId, NodeId)>;
 
 struct ClusterResults {
   using Cluster = std::unordered_set<NodeId>;
@@ -57,5 +58,14 @@ ClusterResults clusterGraphByModularity(const SceneGraphLayer& layer,
                                         const InitialClusters& initial_clusters,
                                         size_t max_iters = 5,
                                         double gamma = 1.0);
+
+ClusterResults clusterGraphByModularity(const SceneGraphLayer& layer,
+                                        const InitialClusters& initial_clusters,
+                                        const EdgeWeightFunc& edge_weight_func,
+                                        size_t max_iters = 5,
+                                        double gamma = 1.0);
+
+ClusterResults clusterGraphByNeighbors(const SceneGraphLayer& layer,
+                                       const InitialClusters& initial_clusters);
 
 }  // namespace hydra

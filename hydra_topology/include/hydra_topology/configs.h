@@ -78,4 +78,6 @@ void visit_config(const Visitor& v, MeshIntegratorConfig& config) {
 DECLARE_CONFIG_OSTREAM_OPERATOR(voxblox, MeshIntegratorConfig)
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra::topology, VoronoiCheckConfig)
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra::topology, FloodfillExtractorConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra::topology, CompressionExtractorConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra::topology, GraphExtractorConfig)
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra::topology, GvdIntegratorConfig)

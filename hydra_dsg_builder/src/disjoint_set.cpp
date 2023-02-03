@@ -32,19 +32,68 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <gflags/gflags.h>
+#include "hydra_dsg_builder/disjoint_set.h"
+
 #include <glog/logging.h>
-#include <gtest/gtest.h>
 
-int main(int argc, char** argv) {
-  FLAGS_logtostderr = true;
-  FLAGS_alsologtostderr = true;
-  FLAGS_colorlogtostderr = true;
-  FLAGS_minloglevel = 1;
+namespace hydra {
 
-  ::testing::InitGoogleTest(&argc, argv);
-  google::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
+DisjointSet::DisjointSet() {}
 
-  return RUN_ALL_TESTS();
+// implementation mainly from: https://en.wikipedia.org/wiki/Disjoint-set_data_structure
+DisjointSet::DisjointSet(const SceneGraphLayer& layer) {
+  for (const auto& id_node_pair : layer.nodes()) {
+    addSet(id_node_pair.first);
+  }
 }
+
+bool DisjointSet::addSet(NodeId node) {
+  if (parents.count(node)) {
+    return false;
+  }
+
+  roots.insert(node);
+  parents[node] = node;
+  sizes[node] = 1;
+  return true;
+}
+
+NodeId DisjointSet::findSet(NodeId node) const {
+  NodeId parent = node;
+
+  NodeId curr_node;
+  do {
+    curr_node = parent;
+    parent = parents.at(curr_node);
+  } while (parent != curr_node);
+
+  return parent;
+}
+
+bool DisjointSet::hasSet(NodeId node) const { return parents.count(node); }
+
+std::optional<NodeId> DisjointSet::doUnion(NodeId lhs, NodeId rhs, bool rhs_better) {
+  NodeId lhs_set = findSet(lhs);
+  NodeId rhs_set = findSet(rhs);
+
+  if (lhs_set == rhs_set) {
+    return std::nullopt;
+  }
+
+  const auto lhs_size = sizes.at(lhs_set);
+  const auto rhs_size = sizes.at(rhs_set);
+  if (lhs_size < rhs_size) {
+    std::swap(lhs_set, rhs_set);
+  } else if (lhs_size == rhs_size && rhs_better) {
+    // allow external stable ordering information
+    std::swap(lhs_set, rhs_set);
+  }
+
+  parents[rhs_set] = lhs_set;
+  sizes[lhs_set] = sizes[lhs_set] + sizes[rhs_set];
+  sizes.erase(rhs_set);  // |sizes| = number of components
+  roots.erase(rhs_set);
+  return rhs_set;
+}
+
+}  // namespace hydra

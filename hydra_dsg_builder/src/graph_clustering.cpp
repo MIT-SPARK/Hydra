@@ -34,6 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder/graph_clustering.h"
 
+#include <queue>
+
 namespace hydra {
 
 void ClusterResults::clear() {
@@ -62,15 +64,30 @@ ClusterResults clusterGraphByModularity(const SceneGraphLayer& layer,
                                         const InitialClusters& initial_clusters,
                                         size_t max_iters,
                                         double gamma) {
+  return clusterGraphByModularity(
+      layer,
+      initial_clusters,
+      [](const SceneGraphLayer& G, NodeId n1, const NodeId n2) {
+        return G.getEdge(n1, n2)->get().info->weight;
+      },
+      max_iters,
+      gamma);
+}
+
+ClusterResults clusterGraphByModularity(const SceneGraphLayer& layer,
+                                        const InitialClusters& initial_clusters,
+                                        const EdgeWeightFunc& edge_weight_func,
+                                        size_t max_iters,
+                                        double gamma) {
   std::map<NodeId, double> degrees;
   std::map<NodeId, std::map<NodeId, double>> neighbors;
   for (const auto& id_node_pair : layer.nodes()) {
     double degree = 0.0;
     neighbors[id_node_pair.first] = std::map<NodeId, double>();
     for (const auto& sibling : id_node_pair.second->siblings()) {
-      // TODO(nathan) lambda function
-      double edge_weight =
-          layer.getEdge(id_node_pair.first, sibling)->get().info->weight;
+      double edge_weight = edge_weight_func(layer, id_node_pair.first, sibling);
+      // we should probably assert that this isn't happening, but it should be pretty
+      // feasbile to not return negative weights
       edge_weight = edge_weight < 0.0 ? 0.0 : edge_weight;
       degree += edge_weight;
       neighbors[id_node_pair.first][sibling] = edge_weight;
@@ -165,6 +182,74 @@ ClusterResults clusterGraphByModularity(const SceneGraphLayer& layer,
   }
 
   return {clusters, labels, iter, true};
+}
+
+struct EdgeInfo {
+  NodeId id;
+  size_t label;
+  double distance;
+
+  bool operator<(const EdgeInfo& other) const { return distance < other.distance; }
+};
+
+ClusterResults clusterGraphByNeighbors(const SceneGraphLayer& layer,
+                                       const InitialClusters& initial_clusters) {
+  std::map<NodeId, size_t> labels;
+  for (size_t i = 0; i < initial_clusters.size(); ++i) {
+    const auto& component = initial_clusters[i];
+    for (const auto& node_id : component) {
+      labels[node_id] = i;
+    }
+  }
+
+  // populate frontier from all room boundaries
+  std::priority_queue<EdgeInfo> frontier;
+  for (auto&& [id, node] : layer.nodes()) {
+    if (labels.count(id)) {
+      continue;
+    }
+
+    for (const auto sibling : node->siblings()) {
+      auto iter = labels.find(sibling);
+      if (iter == labels.end()) {
+        continue;
+      }
+
+      frontier.push({id, iter->second, layer.getEdge(id, sibling)->get().info->weight});
+    }
+  }
+
+  while (!frontier.empty()) {
+    const auto candidate = frontier.top();
+    frontier.pop();
+
+    if (labels.count(candidate.id)) {
+      continue;
+    }
+
+    labels[candidate.id] = candidate.label;
+    const SceneGraphNode& node = layer.getNode(candidate.id).value();
+    for (const auto sibling : node.siblings()) {
+      if (labels.count(sibling)) {
+        continue;
+      }
+
+      frontier.push({sibling,
+                     candidate.label,
+                     layer.getEdge(candidate.id, sibling)->get().info->weight});
+    }
+  }
+
+  std::map<size_t, std::unordered_set<NodeId>> clusters;
+  for (const auto& node_cluster_pair : labels) {
+    if (!clusters.count(node_cluster_pair.second)) {
+      clusters[node_cluster_pair.second] = std::unordered_set<NodeId>();
+    }
+
+    clusters[node_cluster_pair.second].insert(node_cluster_pair.first);
+  }
+
+  return {clusters, labels, 0, true};
 }
 
 }  // namespace hydra

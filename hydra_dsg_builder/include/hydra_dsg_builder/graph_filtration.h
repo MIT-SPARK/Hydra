@@ -35,6 +35,8 @@
 #pragma once
 #include <hydra_utils/dsg_types.h>
 
+#include "hydra_dsg_builder/disjoint_set.h"
+
 namespace hydra {
 
 struct FiltrationInfo {
@@ -42,9 +44,34 @@ struct FiltrationInfo {
   size_t num_components;
 };
 
+struct ComponentLifetime {
+  double start;
+  double end;
+};
+
+using LifetimeMap = std::unordered_map<NodeId, ComponentLifetime>;
+
+struct BarcodeTracker : public DisjointSet {
+  BarcodeTracker();
+
+  explicit BarcodeTracker(size_t min_component_size);
+
+  virtual ~BarcodeTracker() = default;
+
+  void addNode(NodeId node, double distance);
+
+  bool doUnion(DisjointSet& components,
+               const std::unordered_map<NodeId, double>& node_distances,
+               NodeId node,
+               NodeId rhs,
+               double distance);
+
+  size_t min_component_size;
+  LifetimeMap barcodes;
+};
+
 using Filtration = std::vector<FiltrationInfo>;
-using ComponentSizeMap = std::unordered_map<NodeId, size_t>;
-using ComponentCallback = std::function<size_t(const ComponentSizeMap&)>;
+using ComponentCallback = std::function<size_t(const DisjointSet&)>;
 
 std::ostream& operator<<(std::ostream& out, const FiltrationInfo& info);
 
@@ -58,15 +85,29 @@ Filtration getGraphFiltration(const SceneGraphLayer& layer,
                               double diff_threshold_m = 1.0e-4);
 
 Filtration getGraphFiltration(const SceneGraphLayer& layer,
+                              BarcodeTracker& tracker,
                               double diff_threshold_m,
-                              const ComponentCallback& count_components);
+                              const ComponentCallback& count_components,
+                              bool include_nodes = true);
 
 std::pair<size_t, size_t> getTrimmedFiltration(const Filtration& old_filtration,
                                                double min_dilation_m,
-                                               double max_dilation_m);
+                                               double max_dilation_m,
+                                               bool clip_to_max = true);
 
 std::optional<FiltrationInfo> getLongestSequence(const Filtration& values,
                                                  size_t start_index,
                                                  size_t end_index);
+
+std::optional<FiltrationInfo> getLongestLifetimeDilation(const Filtration& values,
+                                                         const LifetimeMap& lifetimes,
+                                                         double min_component_lifetime,
+                                                         size_t start_index,
+                                                         size_t end_index);
+
+std::optional<FiltrationInfo> getBestPlateau(const Filtration& values,
+                                             double ratio,
+                                             size_t start_index,
+                                             size_t end_index);
 
 }  // namespace hydra

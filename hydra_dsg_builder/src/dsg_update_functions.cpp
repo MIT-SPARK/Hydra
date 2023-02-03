@@ -33,7 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder/dsg_update_functions.h"
-#include "hydra_dsg_builder/room_finder.h"
 
 #include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
@@ -41,6 +40,8 @@
 #include <pcl/common/centroid.h>
 #include <pcl/point_types.h>
 #include <spark_dsg/bounding_box_extraction.h>
+
+#include "hydra_dsg_builder/room_finder.h"
 
 namespace hydra {
 namespace dsg_updates {

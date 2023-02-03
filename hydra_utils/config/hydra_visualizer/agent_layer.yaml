@@ -14,4 +14,4 @@ label_scale: 0.8
 color_offset: 3
 interlayer_edge_insertion_skip: 10
 visualize_interlayer_edges: false
-z_offset_scale: 1.5
+z_offset_scale: 0.0

@@ -39,18 +39,28 @@
 #include <hydra_utils/dsg_types.h>
 
 #include <unordered_set>
+#include <fstream>
 
 namespace hydra {
+
+struct GraphInfo {
+  size_t offset;
+  size_t size;
+  size_t num_nodes;
+  size_t num_edges;
+};
 
 class RoomFinder {
  public:
   explicit RoomFinder(const RoomFinderConfig& config);
 
-  virtual ~RoomFinder() = default;
+  virtual ~RoomFinder();
 
   SceneGraphLayer::Ptr findRooms(const SceneGraphLayer& places);
 
   void addRoomPlaceEdges(DynamicSceneGraph& graph) const;
+
+  void enableLogging(const std::string& log_path);
 
  protected:
   InitialClusters getBestComponents(const SceneGraphLayer& places) const;
@@ -60,6 +70,11 @@ class RoomFinder {
   RoomFinderConfig config_;
   ClusterResults last_results_;
   std::map<size_t, NodeId> cluster_room_map_;
+  mutable bool logged_once_ = false;
+  std::unique_ptr<std::ofstream> log_file_;
+  std::unique_ptr<std::ofstream> graph_log_file_;
+  mutable std::vector<GraphInfo> graph_entries_;
+  mutable size_t graph_offset_ = 0;
 };
 
 }  // namespace hydra

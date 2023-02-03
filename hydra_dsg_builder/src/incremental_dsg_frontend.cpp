@@ -269,17 +269,17 @@ void DsgFrontend::updateDeformationGraph(const ReconstructionOutput& input) {
 
 void DsgFrontend::filterPlaces(const SceneGraphLayer& places,
                                NodeIdSet& objects_to_check,
-                               NodeIdSet& active_places) {
+                               NodeIdSet& active_places,
+                               const NodeIdSet& active_neighborhood) {
+  // we grab connected components using the subgraph of all active places and all
+  // archived places that used to be a neighbor with an active place so that we don't
+  // miss disconnected components that comprised of archived nodes and formed when an
+  // active node or edge is removed. Limiting the connected component search to be
+  // within N hops of the subgraph, where N is the min allowable component size ensures
+  // that we don't search the entire places subgraph, but still preserve archived places
+  // that connect to a component of at least size N
   const auto components = graph_utilities::getConnectedComponents(
-      places,
-      [](const SceneGraphNode& node) { return node.attributes().is_active; },
-      [&](const SceneGraphEdge& edge) {
-        const auto source_active =
-            places.getNode(edge.source)->get().attributes().is_active;
-        const auto target_active =
-            places.getNode(edge.target)->get().attributes().is_active;
-        return source_active && target_active;
-      });
+      places, config_.min_places_component_size, active_neighborhood);
 
   for (const auto& component : components) {
     if (component.size() >= config_.min_places_component_size) {
@@ -318,8 +318,10 @@ void DsgFrontend::updatePlaces(const ReconstructionOutput& input) {
           << edges->size() << " edges from hydra_topology";
 
   NodeIdSet active_nodes;
+  NodeIdSet active_neighborhood;
   for (const auto& id_node_pair : temp_layer.nodes()) {
     active_nodes.insert(id_node_pair.first);
+    active_neighborhood.insert(id_node_pair.first);
     auto& attrs = id_node_pair.second->attributes();
     attrs.is_active = true;
     attrs.last_update_time_ns = input.timestamp_ns;
@@ -332,18 +334,35 @@ void DsgFrontend::updatePlaces(const ReconstructionOutput& input) {
 
     NodeIdSet objects_to_check;
     for (const auto& node_id : input.places->deleted_nodes) {
+      const auto node = dsg_->graph->getNode(node_id);
+      if (node) {
+        const auto& siblings = node->get().siblings();
+        active_neighborhood.insert(siblings.begin(), siblings.end());
+      }
       deletePlaceNode(node_id, objects_to_check);
     }
 
     const auto& deleted_edges = input.places->deleted_edges;
     for (size_t i = 0; i < deleted_edges.size(); i += 2) {
-      dsg_->graph->removeEdge(deleted_edges.at(i), deleted_edges.at(i + 1));
+      const auto n1 = deleted_edges.at(i);
+      const auto n2 = deleted_edges.at(i + 1);
+      active_neighborhood.insert(n1);
+      active_neighborhood.insert(n2);
+      dsg_->graph->removeEdge(n1, n2);
     }
 
     dsg_->graph->updateFromLayer(temp_layer, std::move(edges));
 
     if (config_.filter_places) {
-      filterPlaces(places, objects_to_check, active_nodes);
+      auto iter = active_neighborhood.begin();
+      while (iter != active_neighborhood.end()) {
+        if (places.hasNode(*iter)) {
+          ++iter;
+        } else {
+          iter = active_neighborhood.erase(iter);
+        }
+      }
+      filterPlaces(places, objects_to_check, active_nodes, active_neighborhood);
     }
 
     places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
@@ -494,15 +513,13 @@ void DsgFrontend::archivePlaces(const NodeIdSet active_places) {
         continue;
       }
 
-      if (!dsg_->graph->hasNode(prev)) {
+      const auto has_prev_node = dsg_->graph->getNode(prev);
+      if (!has_prev_node) {
         continue;
       }
 
-      // mark archived places as inactive
-      if (dsg_->graph->hasNode(prev)) {
-        dsg_->graph->getNode(prev)->get().attributes().is_active = false;
-      }
-
+      const SceneGraphNode& prev_node = has_prev_node.value();
+      prev_node.attributes().is_active = false;
       lcd_input_->archived_places.insert(prev);
     }
 

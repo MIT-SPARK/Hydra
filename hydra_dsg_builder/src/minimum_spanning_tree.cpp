@@ -33,60 +33,11 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder/minimum_spanning_tree.h"
+#include "hydra_dsg_builder/disjoint_set.h"
+
 #include <glog/logging.h>
 
 namespace hydra {
-
-DisjointSet::DisjointSet() {}
-
-// implementation mainly from: https://en.wikipedia.org/wiki/Disjoint-set_data_structure
-DisjointSet::DisjointSet(const SceneGraphLayer& layer) {
-  for (const auto& id_node_pair : layer.nodes()) {
-    addSet(id_node_pair.first);
-  }
-}
-
-bool DisjointSet::addSet(NodeId node) {
-  if (parents.count(node)) {
-    return false;
-  }
-
-  parents[node] = node;
-  sizes[node] = 1;
-  return true;
-}
-
-NodeId DisjointSet::findSet(NodeId node) const {
-  NodeId parent = node;
-
-  NodeId curr_node;
-  do {
-    curr_node = parent;
-    parent = parents.at(curr_node);
-  } while (parent != curr_node);
-
-  return parent;
-}
-
-bool DisjointSet::hasSet(NodeId node) const { return parents.count(node); }
-
-bool DisjointSet::doUnion(NodeId lhs, NodeId rhs) {
-  NodeId lhs_set = findSet(lhs);
-  NodeId rhs_set = findSet(rhs);
-
-  if (lhs_set == rhs_set) {
-    return false;
-  }
-
-  if (sizes.at(lhs_set) < sizes.at(rhs_set)) {
-    std::swap(lhs_set, rhs_set);
-  }
-
-  parents[rhs_set] = lhs_set;
-  sizes[lhs_set] = sizes[lhs_set] + sizes[rhs_set];
-  sizes.erase(rhs_set); // |sizes| = number of components
-  return true;
-}
 
 // implementation mainly from: https://en.wikipedia.org/wiki/Kruskal%27s_algorithm
 MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer) {
