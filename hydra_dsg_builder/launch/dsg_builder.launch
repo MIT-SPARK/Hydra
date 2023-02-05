@@ -84,6 +84,7 @@
         <param name="lcd/log_registration_problem" value="$(arg log_registration)"/>
         <param name="pgmo/log_path" value="$(arg pgmo_log_path)"/>
         <param name="pgmo/should_log" value="$(arg pgmo_should_log)"/>
+        <param name="pgmo/output_prefix" value="$(arg pgmo_log_path)"/>
         <param name="objects/bounding_box_type" value="RAABB" if="$(arg use_oriented_bounding_boxes)"/>
         <param name="objects/bounding_box_type" value="AABB" unless="$(arg use_oriented_bounding_boxes)"/>
         <param name="pgmo/robot_id" value="$(arg robot_id)"/>
