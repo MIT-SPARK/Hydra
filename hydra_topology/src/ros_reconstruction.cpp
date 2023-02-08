@@ -157,7 +157,7 @@ void RosReconstruction::inputCallback(const RosPointcloud::ConstPtr& cloud,
   ReconstructionInput::Ptr input(new ReconstructionInput());
   input->timestamp_ns = cloud->header.stamp * 1000;
   input->pose_graph = pose_graph;
-  VLOG(1) << "Got ROS input @ " << input->timestamp_ns << " [ns] (pose graph @ "
+  VLOG(1) << "[Hydra Reconstruction] Got ROS input @ " << input->timestamp_ns << " [ns] (pose graph @ "
           << pose_graph->header.stamp.toNSec() << " [ns])";
 
   input->pointcloud.reset(new voxblox::Pointcloud());
@@ -186,7 +186,7 @@ void RosReconstruction::pclCallback(const RosPointcloud::ConstPtr& cloud) {
     last_time_received_.reset(new ros::Time(curr_time));
   }
 
-  VLOG(1) << "Got ROS input @ " << curr_time.toNSec() << " [ns]";
+  VLOG(1) << "[Hydra Reconstruction] Got ROS input @ " << curr_time.toNSec() << " [ns]";
 
   // TODO(nathan) consider setting prev_time_ here?
   pointcloud_queue_.push(cloud);

@@ -33,14 +33,15 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/dsg_lcd_matching.h"
-#include "hydra_dsg_builder/incremental_types.h"
-
+#include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
 #include <teaser/registration.h>
-#include <glog/logging.h>
 
 #include <mutex>
+
+#include "hydra_dsg_builder/dsg_lcd_matching.h"
+#include "hydra_dsg_builder/subgraph_extraction.h"
+#include "hydra_dsg_builder/incremental_types.h"
 
 namespace hydra {
 namespace lcd {
@@ -51,6 +52,8 @@ struct LayerRegistrationConfig {
   bool log_registration_problem = false;
   bool use_pairwise_registration = false;
   std::string registration_output_path = "";
+  bool recreate_subgraph = false;
+  SubgraphConfig subgraph_extraction;
 };
 
 struct DsgRegistrationInput {
@@ -96,8 +99,8 @@ using CorrespondenceFunc =
 
 template <typename NodeSet = std::list<NodeId>>
 struct LayerRegistrationProblem {
-  NodeSet src_nodes;
-  NodeSet dest_nodes;
+  mutable NodeSet src_nodes;
+  mutable NodeSet dest_nodes;
   SceneGraphLayer* dest_layer = nullptr;
   std::mutex* src_mutex = nullptr;
   std::mutex* dest_mutex = nullptr;
@@ -111,6 +114,21 @@ struct LayerRegistrationSolution {
   gtsam::Pose3 dest_T_src;
   std::vector<std::pair<NodeId, NodeId>> inliers;
 };
+
+template <typename NodeSet>
+std::list<NodeId> pruneSet(const SceneGraphLayer& layer, NodeSet& nodes) {
+  std::list<NodeId> pruned;
+  auto iter = nodes.begin();
+  while (iter != nodes.end()) {
+    if (layer.hasNode(*iter)) {
+      ++iter;
+    } else {
+      pruned.push_back(*iter);
+      iter = nodes.erase(iter);
+    }
+  }
+  return pruned;
+}
 
 template <typename NodeSet>
 LayerRegistrationSolution registerDsgLayer(
@@ -131,23 +149,27 @@ LayerRegistrationSolution registerDsgLayer(
   }
 
   const SceneGraphLayer& dest = problem.dest_layer ? *problem.dest_layer : src;
+
+  const auto src_pruned = pruneSet(src, problem.src_nodes);
+  if (!src_pruned.empty()) {
+    VLOG(3) << "[DSG LCD] Found invalid source nodes in registration: "
+            << displayNodeSymbolContainer(src_pruned);
+  }
+
+  const auto dest_pruned = pruneSet(dest, problem.dest_nodes);
+  if (!dest_pruned.empty()) {
+    VLOG(3) << "[DSG LCD] Found invalid destination nodes in registration: "
+            << displayNodeSymbolContainer(dest_pruned);
+  }
+
   for (const auto& src_id : problem.src_nodes) {
     auto src_node_opt = src.getNode(src_id);
-    if (!src_node_opt) {
-      VLOG(1) << "[DSG LCD]: Missing source node " << NodeSymbol(src_id).getLabel()
-              << " from graph during registration";
-      continue;
-    }
-
+    CHECK(src_node_opt);
     const SceneGraphNode& src_node = *src_node_opt;
 
     for (const auto& dest_id : problem.dest_nodes) {
       auto dest_node_opt = dest.getNode(dest_id);
-      if (!dest_node_opt) {
-        VLOG(1) << "[DSG LCD]: Missing destination node "
-                << NodeSymbol(dest_id).getLabel() << " from graph during registration";
-        continue;
-      }
+      CHECK(dest_node_opt);
       const SceneGraphNode& dest_node = *dest_node_opt;
 
       if (correspondence_func(src_node, dest_node)) {
@@ -178,13 +200,14 @@ LayerRegistrationSolution registerDsgLayer(
     return {};
   }
 
-  VLOG(3) << "=======================================================";
-  VLOG(3) << "Source: " << std::endl << src_points;
-  VLOG(3) << "Dest: " << std::endl << dest_points;
+  VLOG(20) << "=======================================================";
+  VLOG(20) << "Source: " << std::endl << src_points;
+  VLOG(20) << "Dest: " << std::endl << dest_points;
 
-  VLOG(1) << "Registering layer " << src.id << " with " << correspondences.size()
-          << " correspondences out of " << problem.src_nodes.size() << " source and "
-          << problem.dest_nodes.size() << " destination nodes";
+  VLOG(1) << "[DSG LCD] Registering layer " << src.id << " with "
+          << correspondences.size() << " correspondences out of "
+          << problem.src_nodes.size() << " source and " << problem.dest_nodes.size()
+          << " destination nodes";
 
   auto params = solver.getParams();
   solver.reset(params);
@@ -200,8 +223,8 @@ LayerRegistrationSolution registerDsgLayer(
 
   auto inliers = solver.getInlierMaxClique();
   if (inliers.size() < config.min_inliers) {
-    VLOG(2) << "not enough inliers for registration at layer " << src.id << ": "
-            << inliers.size() << " / " << config.min_inliers;
+    VLOG(2) << "[DSG LCD] Not enough inliers for registration at layer " << src.id
+            << ": " << inliers.size() << " / " << config.min_inliers;
     return {};
   }
 

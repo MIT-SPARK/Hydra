@@ -72,7 +72,6 @@ ReconstructionModule::ReconstructionModule(const RobotPrefixConfig& prefix,
       num_poses_received_(0) {
   config_.semantics.semantic_label_to_color_.reset(
       new kimera::SemanticLabel2Color(config_.semantic_label_file));
-  VLOG(3) << "Reconstruction config: " << std::endl << config_;
 
   queue_.reset(new ReconstructionInputQueue());
   queue_->max_size = config_.max_input_queue_size;
@@ -204,13 +203,13 @@ std::vector<bool> ReconstructionModule::inFreespace(const PositionMatrix& positi
 
 void ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
   if (!msg.pointcloud || !msg.pointcloud_colors) {
-    LOG(ERROR) << "received invalid pointcloud in input!";
+    LOG(ERROR) << "[Hydra Reconstruction] received invalid pointcloud in input!";
     return;
   }
 
   ScopedTimer timer("topology/spin", msg.timestamp_ns);
   VLOG(2) << "[Hydra Reconstruction]: Processing msg @ " << msg.timestamp_ns;
-  VLOG(2) << "[Hydra Reconstruction]: " << queue_->size() << " messages left";
+  VLOG(2) << "[Hydra Reconstruction]: " << queue_->size() << " message(s) left";
 
   // TODO(nathan) might want to return if we don't have a pose graph
   Eigen::Affine3d curr_pose(Eigen::Translation3d(msg.world_t_body) * msg.world_R_body);
@@ -391,8 +390,8 @@ void ReconstructionModule::addPlacesToOutput(ReconstructionOutput& output) {
       places.deleted_edges.begin(), removed_edges.begin(), removed_edges.end());
   extractor.clearDeleted();
 
-  VLOG(5) << "[Hydra Reconstruction] exporting active: " << active_nodes.size()
-          << " and deleted: " << removed_nodes.size() << "nodes";
+  VLOG(5) << "[Hydra Reconstruction] exporting " << active_nodes.size()
+          << " active and " << removed_nodes.size() << " deleted nodes";
 }
 
 void ReconstructionModule::addMeshToOutput(ReconstructionOutput& output,

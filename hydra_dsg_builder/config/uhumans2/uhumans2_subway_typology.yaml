@@ -6,3 +6,18 @@ structure_labels: [0, 3, 4, 9, 11, 14, 19]
 stuff_labels: [0, 1, 2, 3, 4, 6, 9, 11, 12, 13, 14, 15, 16, 17, 19]
 walls_labels: [12, 19]
 floor_labels: [3]
+label_names:
+  - {label: 0, name: unknown}
+  - {label: 1, name: vending_machine}
+  - {label: 3, name: floor}
+  - {label: 4, name: ceiling}
+  - {label: 6, name: unknown}
+  - {label: 7, name: bench}
+  - {label: 8, name: train}
+  - {label: 10, name: phone}
+  - {label: 11, name: lamp}
+  - {label: 14, name: sign}
+  - {label: 15, name: stairs}
+  - {label: 18, name: trashcan}
+  - {label: 19, name: wall}
+  - {label: 20, name: human}

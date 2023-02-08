@@ -64,7 +64,7 @@ struct UpdateObjectsFunctor {
   std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
                                 const UpdateInfo& info) const;
 
-  void makeNodeFinders(const SceneGraphLayer& layer) const;
+  size_t makeNodeFinders(const SceneGraphLayer& layer) const;
 
   void updateObject(const MeshVertices::Ptr& mesh,
                     NodeId node,
@@ -91,7 +91,7 @@ struct UpdatePlacesFunctor {
   std::map<NodeId, NodeId> call(incremental::SharedDsgInfo& dsg,
                                 const UpdateInfo& info) const;
 
-  void makeNodeFinder(const SceneGraphLayer& layer) const;
+  size_t makeNodeFinder(const SceneGraphLayer& layer) const;
 
   void updatePlace(const gtsam::Values& places_values,
                    NodeId node_id,

@@ -543,8 +543,8 @@ std::optional<FiltrationInfo> getBestPlateau(const Filtration& values,
   CHECK(!lifetimes.empty());
   const double max_lifetime = *std::max_element(lifetimes.begin(), lifetimes.end());
   const double threshold = ratio * max_lifetime;
-  VLOG(1) << "Max lifetime: " << max_lifetime << ", Ratio: " << ratio
-           << ", Threshold: " << threshold;
+  VLOG(5) << "[Room Finder] Max lifetime: " << max_lifetime << ", Ratio: " << ratio
+          << ", Threshold: " << threshold;
 
   size_t best_sequence = 0;
   size_t best_components = 0;

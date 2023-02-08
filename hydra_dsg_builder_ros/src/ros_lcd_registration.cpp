@@ -40,6 +40,8 @@
 #include <ros/service.h>
 #include <tf2_eigen/tf2_eigen.h>
 
+#include <iomanip>
+
 namespace hydra {
 
 using hydra::timing::ScopedTimer;
@@ -59,6 +61,15 @@ inline size_t getFrameIdFromNode(const DynamicSceneGraph& graph, NodeId node_id)
   return NodeSymbol(attrs.external_key).categoryId();
 }
 
+std::string getPoseRepr(const Eigen::Quaterniond& q, const Eigen::Vector3d& v) {
+  const Eigen::IOFormat format(3, Eigen::DontAlignCols, ", ", ", ", "", "", "[", "]");
+
+  std::stringstream ss;
+  ss << std::fixed << std::setprecision(3) << "R={w: " << q.w() << ", x: " << q.x()
+     << ", y: " << q.y() << ", z: " << q.z() << "}, t=" << v.format(format);
+  return ss.str();
+}
+
 DsgRegistrationSolution DsgAgentSolver::solve(const DynamicSceneGraph& dsg,
                                               const DsgRegistrationInput& match,
                                               NodeId) const {
@@ -67,7 +78,7 @@ DsgRegistrationSolution DsgAgentSolver::solve(const DynamicSceneGraph& dsg,
   }
 
   if (!ros::service::exists("frame_registration", true)) {
-    LOG(ERROR) << "Frame registration service missing!";
+    LOG(ERROR) << "[Hydra LCD] Frame registration service missing!";
     return {};
   }
 
@@ -95,12 +106,14 @@ DsgRegistrationSolution DsgAgentSolver::solve(const DynamicSceneGraph& dsg,
     return {};
   }
 
-  VLOG(3) << "Visual Registration Request: " << msg.request;
-  VLOG(3) << "Visual Registration Response: " << msg.response;
+  VLOG(3) << "Visual registration request: query={robot: " << msg.request.query_robot
+          << ", frame: " << msg.request.query
+          << "}, match={robot: " << msg.request.match_robot
+          << ", frame: " << msg.request.match;
 
   if (!msg.response.valid) {
-    LOG(INFO) << "registration failed: " << NodeSymbol(query_id).getLabel() << " -> "
-              << NodeSymbol(match_id).getLabel();
+    VLOG(1) << "Visual registration failed: " << NodeSymbol(query_id).getLabel()
+            << " -> " << NodeSymbol(match_id).getLabel();
     return {};
   }
 
@@ -108,8 +121,9 @@ DsgRegistrationSolution DsgAgentSolver::solve(const DynamicSceneGraph& dsg,
   Eigen::Vector3d match_t_query;
   tf2::convert(msg.response.match_T_query.orientation, match_q_query);
   tf2::convert(msg.response.match_T_query.position, match_t_query);
-  LOG(INFO) << "registration worked " << NodeSymbol(query_id).getLabel() << " -> "
-            << NodeSymbol(match_id).getLabel();
+  const Eigen::IOFormat format(3, Eigen::DontAlignCols, ", ", ", ", "", "", "[", "]");
+  VLOG(3) << "Visual registration succeded: "
+          << getPoseRepr(match_q_query, match_t_query);
   return {true,
           query_id,
           match_id,

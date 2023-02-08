@@ -141,7 +141,8 @@ Descriptor::Ptr ObjectGnnDescriptor::construct(const Dsg& graph,
   descriptor->timestamp = agent_node.timestamp;
 
   if (descriptor->nodes.empty()) {
-    return nullptr;
+    descriptor->is_null = true;
+    return descriptor;
   }
 
   const auto input = makeInput(graph, descriptor->nodes);

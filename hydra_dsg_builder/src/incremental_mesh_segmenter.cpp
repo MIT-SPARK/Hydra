@@ -34,10 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder/incremental_mesh_segmenter.h"
 
+#include <glog/logging.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <spark_dsg/bounding_box_extraction.h>
-
-#include <glog/logging.h>
 
 namespace hydra {
 namespace incremental {
@@ -159,8 +158,8 @@ pcl::IndicesPtr getActiveIndices(const pcl::IndicesPtr& indices,
     }
   }
 
-  VLOG(1) << "active indices: " << indices->size()
-          << " used: " << active_indices->size();
+  VLOG(1) << "[Mesh Segmenter] Active mesh indices: " << indices->size()
+          << " (used: " << active_indices->size() << ")";
   return active_indices;
 }
 
@@ -186,7 +185,6 @@ LabelClusters MeshSegmenter::detect(const SemanticLabel2Color& label_map,
     return label_clusters;
   }
 
-  VLOG(3) << "[Mesh Segmenter] Detecting clusters for labels";
   for (const auto label : config_.labels) {
     if (!label_indices.count(label)) {
       continue;
@@ -198,7 +196,7 @@ LabelClusters MeshSegmenter::detect(const SemanticLabel2Color& label_map,
 
     const auto clusters = findClusters(full_mesh_vertices_, label_indices.at(label));
 
-    VLOG(3) << "[Mesh Segmenter]  - Found " << clusters.size() << " clusters of label "
+    VLOG(3) << "[Mesh Segmenter]  - Found " << clusters.size() << " cluster(s) of label "
             << static_cast<int>(label);
     label_clusters.insert({label, clusters});
   }

@@ -45,6 +45,7 @@ struct Descriptor {
   Eigen::Matrix<uint32_t, Eigen::Dynamic, 1> words;
   Eigen::VectorXf values;
   bool normalized = false;
+  bool is_null = false;
   std::set<NodeId> nodes;
   NodeId root_node;
   Eigen::Vector3d root_position;

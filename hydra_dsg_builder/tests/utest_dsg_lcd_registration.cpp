@@ -295,6 +295,29 @@ TEST_F(DsgRegistrationTests, TestFullObjectRegistration) {
   EXPECT_NEAR(0.0, err, 1.0e-3);
 }
 
+TEST_F(DsgRegistrationTests, TestFullObjectRegistrationWithSubgraphExtraction) {
+  DsgRegistrationInput match;
+  for (int i = 0; i < src_points.cols(); ++i) {
+    match.query_nodes.insert(NodeSymbol('O', i + src_points.cols()));
+    match.match_nodes.insert(NodeSymbol('O', i));
+  }
+
+  match.query_root = NodeSymbol('p', src_points.cols());
+  match.match_root = NodeSymbol('p', 0);
+
+  teaser::RobustRegistrationSolver::Params params;
+  reg_config.use_pairwise_registration = false;
+  DsgTeaserSolver solver(DsgLayers::OBJECTS, reg_config, params);
+
+  auto result = solver.solve(*dsg, match, NodeSymbol('a', 1));
+  EXPECT_TRUE(result.valid);
+  EXPECT_EQ(NodeSymbol('a', 1), result.from_node);
+  EXPECT_EQ(NodeSymbol('a', 0), result.to_node);
+
+  double err = gtsam::Pose3::Logmap(to_T_from.between(result.to_T_from)).norm();
+  EXPECT_NEAR(0.0, err, 1.0e-3);
+}
+
 TEST_F(DsgRegistrationTests, DISABLED_TestFullPlaceRegistration) {
   DsgRegistrationInput match;
   for (int i = 0; i < src_points.cols(); ++i) {
@@ -307,6 +330,11 @@ TEST_F(DsgRegistrationTests, DISABLED_TestFullPlaceRegistration) {
 
   teaser::RobustRegistrationSolver::Params params;
   reg_config.use_pairwise_registration = true;
+  reg_config.recreate_subgraph = true;
+  // no connection between subgraphs, so large radius should get all nodes in the
+  // original sets
+  reg_config.subgraph_extraction.fixed_radius = true;
+  reg_config.subgraph_extraction.max_radius_m = 500.0;
   DsgTeaserSolver solver(DsgLayers::PLACES, reg_config, params);
 
   auto result = solver.solve(*dsg, match, NodeSymbol('a', 1));
@@ -316,6 +344,10 @@ TEST_F(DsgRegistrationTests, DISABLED_TestFullPlaceRegistration) {
 
   double err = gtsam::Pose3::Logmap(to_T_from.between(result.to_T_from)).norm();
   EXPECT_NEAR(0.0, err, 1.0e-3);
+
+  solver.config.subgraph_extraction.max_radius_m = -1;
+  auto invalid_result = solver.solve(*dsg, match, NodeSymbol('a', 1));
+  EXPECT_FALSE(invalid_result.valid);
 }
 
 TEST_F(LayerRegistrationTests, TestRepeatedRegistration) {

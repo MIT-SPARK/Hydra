@@ -66,7 +66,7 @@ void filterPlace(DynamicSceneGraph& graph,
   return;
 }
 
-void UpdateObjectsFunctor::makeNodeFinders(const SceneGraphLayer& layer) const {
+size_t UpdateObjectsFunctor::makeNodeFinders(const SceneGraphLayer& layer) const {
   std::map<SemanticLabel, std::unordered_set<NodeId>> label_node_map;
   size_t archived = 0;
   for (const auto& id_node_pair : layer.nodes()) {
@@ -93,7 +93,7 @@ void UpdateObjectsFunctor::makeNodeFinders(const SceneGraphLayer& layer) const {
         std::make_unique<NearestNodeFinder>(layer, label_ids_pair.second));
   }
 
-  VLOG(5) << "[Hydra Backend] Using " << archived << " archived objects for update";
+  return archived;
 }
 
 void UpdateObjectsFunctor::updateObject(const MeshVertices::Ptr& mesh,
@@ -186,7 +186,7 @@ std::map<NodeId, NodeId> UpdateObjectsFunctor::call(SharedDsgInfo& dsg,
   const auto& layer = graph.getLayer(DsgLayers::OBJECTS);
   MeshVertices::Ptr mesh = graph.getMeshVertices();
 
-  makeNodeFinders(layer);
+  const size_t archived = makeNodeFinders(layer);
 
   size_t active = 0;
   std::map<NodeId, NodeId> nodes_to_merge;
@@ -217,12 +217,12 @@ std::map<NodeId, NodeId> UpdateObjectsFunctor::call(SharedDsgInfo& dsg,
     }
   }
 
-  VLOG(5) << "[Hydra Backend] Using " << active << " active objects for update";
-
+  VLOG(5) << "[Hydra Backend] Object update: " << archived << " archived and " << active
+          << " active";
   return nodes_to_merge;
 }
 
-void UpdatePlacesFunctor::makeNodeFinder(const SceneGraphLayer& layer) const {
+size_t UpdatePlacesFunctor::makeNodeFinder(const SceneGraphLayer& layer) const {
   std::unordered_set<NodeId> layer_nodes;
   for (const auto& id_node_pair : layer.nodes()) {
     if (!id_node_pair.second->attributes().is_active) {
@@ -230,13 +230,12 @@ void UpdatePlacesFunctor::makeNodeFinder(const SceneGraphLayer& layer) const {
     }
   }
 
-  VLOG(5) << "[Hydra Backend] Using " << layer_nodes.size()
-          << " archived places for update";
   if (layer_nodes.empty()) {
-    return;
+    return layer_nodes.size();
   }
 
   node_finder = std::make_unique<NearestNodeFinder>(layer, layer_nodes);
+  return layer_nodes.size();
 }
 
 void UpdatePlacesFunctor::updatePlace(const gtsam::Values& places_values,
@@ -324,8 +323,7 @@ std::map<NodeId, NodeId> UpdatePlacesFunctor::call(SharedDsgInfo& dsg,
 
   const auto& layer = graph.getLayer(DsgLayers::PLACES);
   const auto& places_values = *info.places_values;
-
-  makeNodeFinder(layer);
+  const size_t archived = makeNodeFinder(layer);
 
   std::list<NodeId> missing_nodes;
   std::map<NodeId, NodeId> nodes_to_merge;
@@ -357,8 +355,9 @@ std::map<NodeId, NodeId> UpdatePlacesFunctor::call(SharedDsgInfo& dsg,
       nodes_to_merge[node_id] = *to_merge;
     }
   }
-  VLOG(5) << "[Hydra Backend] Using " << num_active << " active places during update";
 
+  VLOG(5) << "[Hydra Backend] Places update: " << archived << " archived and "
+          << num_active << " active";
   filterMissing(graph, missing_nodes);
   return nodes_to_merge;
 }
