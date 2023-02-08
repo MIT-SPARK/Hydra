@@ -125,6 +125,8 @@ LayerSearchResults searchDescriptors(
   size_t num_same_parent = 0;
   size_t num_inside_horizon = 0;
   size_t num_low_score = 0;
+  size_t num_null = 0;
+  size_t num_default_match = 0;
 
   VLOG(10) << "--------------------------------------------------";
 
@@ -134,7 +136,13 @@ LayerSearchResults searchDescriptors(
       continue;
     }
 
-    const Descriptor& other_descriptor = *descriptors.at(valid_id);
+    const auto& other_ptr = descriptors.at(valid_id);
+    if (!other_ptr) {
+      num_null++;
+      continue;
+    }
+
+    const Descriptor& other_descriptor = *other_ptr;
     std::chrono::duration<double> diff_s =
         descriptor.timestamp - other_descriptor.timestamp;
     if (NodeSymbol(query_id).category() == NodeSymbol(valid_id).category() &&
@@ -142,6 +150,13 @@ LayerSearchResults searchDescriptors(
       VLOG(10) << "diff: " << diff_s.count()
                << " (threshold: " << match_config.min_time_separation_s << ")";
       ++num_inside_horizon;
+      continue;
+    }
+
+    if (descriptor.is_null || other_descriptor.is_null) {
+      ++num_default_match;
+      new_valid_matches.insert(valid_id);
+      new_valid_match_scores.push_back({valid_id, -1.0});
       continue;
     }
 
@@ -161,8 +176,10 @@ LayerSearchResults searchDescriptors(
 
   // TODO(nathan) add layer id in again or handle stats better
   VLOG(1) << "matching "
-          << " -> shared: " << num_same_parent << ", horizon: " << num_inside_horizon
-          << ", low: " << num_low_score << ", valid: " << new_valid_match_scores.size();
+          << " -> shared: " << num_same_parent << ", null: " << num_null
+          << ", horizon: " << num_inside_horizon << ", low: " << num_low_score
+          << ", default: " << num_default_match
+          << ", valid: " << new_valid_match_scores.size();
 
   std::sort(new_valid_match_scores.begin(),
             new_valid_match_scores.end(),

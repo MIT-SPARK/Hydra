@@ -112,6 +112,10 @@ void visit_config(const Visitor& v, LayerRegistrationConfig& config) {
   v.visit("min_inliers", config.min_inliers);
   v.visit("log_registration_problem", config.log_registration_problem);
   v.visit("registration_output_path", config.registration_output_path);
+  v.visit("recreate_subgraph", config.recreate_subgraph);
+  if (config.recreate_subgraph) {
+    v.visit("subgraph_extraction", config.subgraph_extraction);
+  }
 }
 
 template <typename Visitor>

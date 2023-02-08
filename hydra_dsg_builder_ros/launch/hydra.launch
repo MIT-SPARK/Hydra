@@ -40,8 +40,8 @@
     <arg name="lcd_use_bow_vectors" default="true"/>
     <arg name="enable_dsg_lcd" default="false"/>
     <arg name="use_gnn_descriptors" default="false"/>
-    <arg name="lcd_gnn_object_model" default="$(find hydra_dsg_builder)/models/lcd/objects_gnn.onnx"/>
-    <arg name="lcd_gnn_places_model" default="$(find hydra_dsg_builder)/models/lcd/places_gnn.onnx"/>
+    <arg name="lcd_gnn_object_model" default="$(find hydra_dsg_builder)/models/lcd/object_gnn.onnx"/>
+    <arg name="lcd_gnn_places_model" default="$(find hydra_dsg_builder)/models/lcd/place_gnn.onnx"/>
     <arg name="lcd_gnn_label_embeddings" if="$(arg use_gnn_descriptors)"/>
 
     <arg name="debug" default="false"/>
@@ -65,6 +65,14 @@
     <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
     <arg name="ros_output" value="log" if="$(arg glog_to_file)"/>
 
+
+    <arg name="frontend_config_path" default="$(arg config_dir)/dsg_frontend_config.yaml"/>
+    <arg name="backend_config_path" default="$(arg config_dir)/dsg_backend_config.yaml"/>
+    <arg name="lcd_config_path" default="$(arg config_dir)/dsg_lcd_config.yaml"
+         unless="$(arg use_gnn_descriptors)"/>
+    <arg name="lcd_config_path" default="$(arg config_dir)/dsg_gnn_lcd_config.yaml"
+         if="$(arg use_gnn_descriptors)"/>
+
     <node pkg="hydra_dsg_builder_ros" type="hydra_dsg_builder_ros_node"
           name="incremental_dsg_builder_node"
           launch-prefix="$(arg launch_prefix)"
@@ -75,9 +83,9 @@
         <env name="TERM" value="xterm-256color"/>
 
         <rosparam file="$(arg typology_path)"/>
-        <rosparam file="$(arg config_dir)/dsg_frontend_config.yaml"/>
-        <rosparam file="$(arg config_dir)/dsg_backend_config.yaml"/>
-        <rosparam file="$(arg config_dir)/dsg_lcd_config.yaml"/>
+        <rosparam file="$(arg frontend_config_path)"/>
+        <rosparam file="$(arg backend_config_path)"/>
+        <rosparam file="$(arg lcd_config_path)"/>
         <rosparam file="$(arg reconstruction_config)" if="$(arg do_reconstruction)"/>
         <rosparam file="$(arg extrinsics)" if="$(arg do_reconstruction)"/>
 

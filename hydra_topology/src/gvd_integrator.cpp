@@ -104,9 +104,7 @@ void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
     tsdf.getAllUpdatedBlocks(voxblox::Update::kEsdf, &blocks);
   }
 
-  VLOG(3) << "[GVD update]: propagating TSDF";
-  VLOG(1) << "[GVD update]: Using " << blocks.size() << " TSDF blocks";
-
+  VLOG(1) << "[GVD update] Propagating TSDF using " << blocks.size() << " TSDF blocks";
   ScopedTimer timer("topology/propagate_tsdf", timestamp_ns);
   update_stats_.clear();
 
@@ -127,14 +125,14 @@ void GvdIntegrator::updateGvd(uint64_t timestamp_ns) {
   // TODO(nathan) this depends on marching cubes being called beforehand...
   ScopedTimer timer("topology/overall_update", timestamp_ns);
 
-  VLOG(3) << "[GVD update]: processing open queue";
+  VLOG(3) << "[GVD update] Processing open queue";
   {  // timing scope
     ScopedTimer timer("topology/open_queue", timestamp_ns);
     processOpenQueue();
   }  // timing scope
 
   if (config_.extract_graph) {
-    VLOG(3) << "[GVD update]: starting graph extraction";
+    VLOG(3) << "[GVD update] Starting graph extraction";
     ScopedTimer timer("topology/graph_extractor", timestamp_ns);
     parent_tracker_.updateVertexMapping(*gvd_layer_);
     graph_extractor_->extract(*gvd_layer_, timestamp_ns);
@@ -142,7 +140,7 @@ void GvdIntegrator::updateGvd(uint64_t timestamp_ns) {
         *gvd_layer_, parent_tracker_.parents, parent_tracker_.parent_vertices);
   }
 
-  VLOG(2) << "[GVD update]: " << std::endl << update_stats_;
+  VLOG(2) << "[GVD update]" << std::endl << update_stats_;
 }
 
 void GvdIntegrator::archiveBlocks(const BlockIndexList& blocks) {
@@ -508,7 +506,7 @@ void GvdIntegrator::lowerVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
     // processLowerSet
     if (!setFixedParent(*gvd_layer_, neighbor_indices_, voxel)) {
       update_stats_.number_fixed_no_parent++;
-      VLOG(5) << "[GVD Update]: Unable to set parent for fixed layer voxel: " << voxel;
+      VLOG(5) << "[GVD Update] Unable to set parent for fixed voxel: " << voxel;
     } else {
       VLOG(10) << "set new parent: " << voxel << " @ " << index.transpose();
     }

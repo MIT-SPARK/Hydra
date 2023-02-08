@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder/dsg_lcd_detector.h"
+
 #include "hydra_build_config.h"
 #if defined(HYDRA_USE_GNN) && HYDRA_USE_GNN
 #include "hydra_dsg_builder/lcd_gnn_descriptors.h"
@@ -41,8 +42,31 @@
 #include <glog/logging.h>
 #include <hydra_utils/timing_utilities.h>
 
+#include <fstream>
+
 namespace hydra {
 namespace lcd {
+
+template <typename Scalar>
+std::string showVector(const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& vector,
+                       int precision = 3,
+                       int max_size = 8,
+                       int num_to_show = 3) {
+  std::stringstream ss;
+  if (vector.rows() <= max_size) {
+    const Eigen::IOFormat format(
+        precision, Eigen::DontAlignCols, ", ", ", ", "", "", "[", "]");
+    ss << vector.format(format);
+    return ss.str();
+  }
+
+  const Eigen::IOFormat format(
+      precision, Eigen::DontAlignCols, ", ", ", ", "", "", "", "");
+
+  ss << "[" << vector.head(num_to_show).format(format) << ", ..., "
+     << vector.tail(num_to_show).format(format) << "]";
+  return ss.str();
+}
 
 #if defined(HYDRA_USE_GNN) && HYDRA_USE_GNN
 void configureDescriptorFactories(lcd::DsgLcdDetector& detector,
@@ -131,6 +155,42 @@ const std::map<LayerId, size_t>& DsgLcdDetector::getLayerRemapping() const {
 
 const DescriptorCache& DsgLcdDetector::getDescriptorCache(LayerId layer) {
   return cache_map_.at(layer);
+}
+
+void DsgLcdDetector::dumpDescriptors(const std::string& log_path) const {
+  const Eigen::IOFormat format(
+      Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", ", ", "", "", "[", "]");
+  std::ofstream fout(log_path + "/descriptors.yaml");
+  fout << "---" << std::endl;
+  fout << "layers:";
+  if (cache_map_.empty()) {
+    fout << " []" << std::endl;
+    return;
+  }
+
+  fout << std::endl;
+  for (const auto& id_cache_pair : cache_map_) {
+    fout << "  - layer_id: " << id_cache_pair.first << std::endl;
+    if (id_cache_pair.second.empty()) {
+      fout << "  layer_descriptors: []" << std::endl;
+      continue;
+    }
+
+    fout << "    layer_descriptors:" << std::endl;
+    for (const auto& root_descriptor_pair : id_cache_pair.second) {
+      if (!root_descriptor_pair.second) {
+        continue;
+      }
+
+      if (root_descriptor_pair.second->is_null) {
+        continue;
+      }
+
+      fout << "      - {root: " << root_descriptor_pair.first
+           << ", values: " << root_descriptor_pair.second->values.format(format) << "}"
+           << std::endl;
+    }
+  }
 }
 
 void DsgLcdDetector::makeDefaultDescriptorFactories() {
@@ -270,15 +330,6 @@ std::vector<DsgRegistrationSolution> DsgLcdDetector::registerAndVerify(
         break;
       }
 
-      if (idx == 0) {
-        NodeId query_node = *match.query_nodes.begin();
-        NodeId match_node = *match.match_nodes[i].begin();
-        VLOG(3) << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!";
-        VLOG(3) << "Found Match! " << NodeSymbol(query_node).getLabel() << " -> "
-                << NodeSymbol(match_node).getLabel();
-        VLOG(3) << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!";
-      }
-
       DsgRegistrationInput registration_input = {match.query_nodes,
                                                  match.match_nodes[i],
                                                  match.query_root,
@@ -341,8 +392,7 @@ std::vector<DsgRegistrationSolution> DsgLcdDetector::detect(
     const LayerId layer = internal_index_to_layer_.at(idx);
     auto descriptor = layer_factories_[layer]->construct(dsg, latest_node);
     if (descriptor) {
-      VLOG(2) << "level " << idx << ": " << std::endl
-              << "    " << descriptor->values.transpose();
+      VLOG(2) << "level " << idx << ": " << showVector(descriptor->values, 3, 20, 9);
       matches_[idx] = searchDescriptors(*descriptor,
                                         config,
                                         prev_valid_roots,
@@ -372,7 +422,7 @@ std::vector<DsgRegistrationSolution> DsgLcdDetector::detect(
     return {};
   }
 
-  VLOG(2) << "===========================================================";
+  VLOG(2) << "-----------------------------------------------------------";
   VLOG(2) << "LCD results for node " << NodeSymbol(agent_id).getLabel() << " against "
           << numDescriptors() / 2 << " roots";
   for (const auto& id_match_pair : matches_) {
@@ -382,7 +432,8 @@ std::vector<DsgRegistrationSolution> DsgLcdDetector::detect(
             << id_match_pair.second.valid_matches.size() << " valid matches, "
             << id_match_pair.second.match_root.size()
             << " registration matches (best score "
-            << (best_score != scores.end() ? std::to_string(*best_score) : "n/a") << ")";
+            << (best_score != scores.end() ? std::to_string(*best_score) : "n/a")
+            << ")";
 
     for (size_t i = 0; i < id_match_pair.second.match_root.size(); ++i) {
       VLOG(2) << "   - #" << i
@@ -391,9 +442,12 @@ std::vector<DsgRegistrationSolution> DsgLcdDetector::detect(
               << " -> " << id_match_pair.second.score[i];
     }
   }
-  VLOG(2) << "===========================================================";
 
-  return registerAndVerify(dsg, matches_, agent_id, timestamp);
+  VLOG(2) << "-----------------------------------------------------------";
+  const auto results = registerAndVerify(dsg, matches_, agent_id, timestamp);
+  VLOG(2) << "************************************************************";
+
+  return results;
 }
 
 }  // namespace lcd

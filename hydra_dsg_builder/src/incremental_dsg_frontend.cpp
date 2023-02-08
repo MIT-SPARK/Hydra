@@ -33,15 +33,15 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder/incremental_dsg_frontend.h"
-#include "hydra_dsg_builder/hydra_config.h"
 
+#include <glog/logging.h>
 #include <hydra_utils/timing_utilities.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
 #include <tf2_eigen/tf2_eigen.h>
 
-#include <glog/logging.h>
-
 #include <fstream>
+
+#include "hydra_dsg_builder/hydra_config.h"
 
 namespace hydra {
 namespace incremental {
@@ -314,8 +314,8 @@ void DsgFrontend::updatePlaces(const ReconstructionOutput& input) {
   ScopedTimer timer("frontend/update_places", input.timestamp_ns, true, 2, false);
   SceneGraphLayer temp_layer(DsgLayers::PLACES);
   auto edges = temp_layer.deserializeLayer(input.places->layer_contents);
-  VLOG(3) << "[Places] Received " << temp_layer.numNodes() << " nodes and "
-          << edges->size() << " edges from hydra_topology";
+  VLOG(3) << "[Hydra Frontend] Received " << temp_layer.numNodes()
+          << " place nodes and " << edges->size() << " edges from hydra_topology";
 
   NodeIdSet active_nodes;
   NodeIdSet active_neighborhood;
@@ -373,9 +373,6 @@ void DsgFrontend::updatePlaces(const ReconstructionOutput& input) {
     state_->latest_places = active_nodes;
   }  // end graph update critical section
 
-  VLOG(3) << "[Places] " << places.numNodes() << " nodes, " << places.numEdges()
-          << " edges";
-
   archivePlaces(active_nodes);
   previous_active_places_ = active_nodes;
 }
@@ -405,12 +402,13 @@ void DsgFrontend::updatePoseGraph(const ReconstructionOutput& input) {
       NodeSymbol pgmo_key(prefix_.key, node.key);
 
       const std::chrono::nanoseconds stamp(node.header.stamp.toNSec());
-      VLOG(5) << "Adding agent " << agents.nodes().size() << " @ " << stamp.count()
-              << " [ns] for layer " << agents.prefix.str();
+      VLOG(5) << "[Hydra Frontend] Adding agent " << agents.nodes().size() << " @ "
+              << stamp.count() << " [ns] for layer " << agents.prefix.str();
       auto attrs = std::make_unique<AgentNodeAttributes>(rotation, position, pgmo_key);
       if (!dsg_->graph->emplaceNode(
               agents.id, agents.prefix, stamp, std::move(attrs))) {
-        VLOG(1) << "repeated timestamp " << stamp.count() << "[ns] found";
+        VLOG(1) << "[Hydra Frontend] repeated timestamp " << stamp.count()
+                << "[ns] found";
         continue;
       }
 
@@ -442,7 +440,7 @@ void DsgFrontend::assignBowVectors(const DynamicLayer& agents) {
   while (iter != cached_bow_messages_.end()) {
     const auto& msg = *iter;
     if (static_cast<int>(msg->robot_id) != prefix_.id) {
-      VLOG(1) << "rejected bow message from robot " << msg->robot_id;
+      VLOG(1) << "[Hydra Frontend] rejected bow message from robot " << msg->robot_id;
       iter = cached_bow_messages_.erase(iter);
     }
 
@@ -455,6 +453,8 @@ void DsgFrontend::assignBowVectors(const DynamicLayer& agents) {
     }
 
     const auto& node = agents.getNodeByIndex(agent_index->second)->get();
+    VLOG(5) << "[Hydra Frontend] assigned bow vector of " << pgmo_key.getLabel()
+            << " to dsg node " << NodeSymbol(node.id).getLabel();
     // lcd_input_->new_agent_nodes.push_back(node.id);
 
     auto& attrs = node.attributes<AgentNodeAttributes>();
@@ -466,8 +466,9 @@ void DsgFrontend::assignBowVectors(const DynamicLayer& agents) {
     iter = cached_bow_messages_.erase(iter);
   }
 
-  VLOG(3) << "[Hydra Frontend] " << cached_bow_messages_.size() << " of " << prior_size
-          << " bow vectors unassigned";
+  size_t num_assigned = prior_size - cached_bow_messages_.size();
+  VLOG(3) << "[Hydra Frontend] assigned " << num_assigned << " bow vectors of "
+          << prior_size << " original";
 }
 
 void DsgFrontend::invalidateMeshEdges(const kimera_pgmo::MeshDelta& delta) {

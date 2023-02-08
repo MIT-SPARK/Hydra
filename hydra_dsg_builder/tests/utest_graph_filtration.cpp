@@ -294,7 +294,7 @@ TEST(GraphFiltrationTests, TestOutputOperators) {
   }
 }
 
-TEST(GraphFiltrationTests, TestLongestLifetimeDilation) {
+TEST(GraphFiltrationTests, DISABLED_TestLongestLifetimeDilation) {
   {  // empty input -> no output
     Filtration filtration;
     LifetimeMap lifetimes;

@@ -35,7 +35,9 @@
 #include "hydra_dsg_builder/dsg_lcd_registration.h"
 
 #include <hydra_utils/timing_utilities.h>
+
 #include <fstream>
+#include <iomanip>
 
 namespace hydra {
 namespace lcd {
@@ -92,6 +94,18 @@ AgentNodePose getQueryPose(const DynamicSceneGraph& graph, NodeId query_agent_id
           query_agent_id};
 }
 
+std::string getPoseRepr(const gtsam::Pose3& pose,
+                        int translation_precision = 4,
+                        int rotation_precision = 4) {
+  const Eigen::IOFormat format(
+      translation_precision, Eigen::DontAlignCols, ", ", ", ", "", "", "[", "]");
+  std::stringstream ss;
+  ss << std::setprecision(rotation_precision) << std::fixed
+     << "<R=" << pose.rotation().toQuaternion()
+     << ", t=" << pose.translation().format(format) << ">";
+  return ss.str();
+}
+
 DsgRegistrationSolution getFullSolutionFromLayer(
     const DynamicSceneGraph& graph,
     const LayerRegistrationSolution& solution,
@@ -108,22 +122,15 @@ DsgRegistrationSolution getFullSolutionFromLayer(
     return {};
   }
 
-  VLOG(3) << "=================================================";
-  VLOG(3) << "world_T_from:";
-  VLOG(3) << from_pose_info.world_T_body;
-  VLOG(3) << "";
-  VLOG(3) << "world_T_to:";
-  VLOG(3) << to_pose_info.world_T_body;
-  VLOG(3) << "";
-  VLOG(3) << "dest_T_src:";
-  VLOG(3) << solution.dest_T_src;
-  VLOG(3) << "";
-
   gtsam::Pose3 to_T_from = to_pose_info.world_T_body.inverse() * solution.dest_T_src *
                            from_pose_info.world_T_body;
-  VLOG(3) << "to_T_from:";
-  VLOG(3) << to_T_from;
-  VLOG(3) << "";
+
+  VLOG(3) << "[DSG_LCD] Solution of " << NodeSymbol(query_agent_id).getLabel() << " -> "
+          << NodeSymbol(to_pose_info.id).getLabel() << ":";
+  VLOG(3) << "  - world_T_from: " << getPoseRepr(from_pose_info.world_T_body);
+  VLOG(3) << "  - world_T_to:   " << getPoseRepr(to_pose_info.world_T_body);
+  VLOG(3) << "  - dest_T_src:   " << getPoseRepr(solution.dest_T_src);
+  VLOG(3) << "  - to_T_from:    " << getPoseRepr(to_T_from);
 
   return {true, from_pose_info.id, to_pose_info.id, to_T_from, -1};
 }
@@ -178,13 +185,21 @@ DsgRegistrationSolution DsgTeaserSolver::solve(const DynamicSceneGraph& dsg,
       dsg.getDynamicNode(query_agent_id).value().get().timestamp.count();
   ScopedTimer timer(timer_prefix, timestamp, true, 2, false);
 
-  if (match.query_nodes.size() <= 3 || match.match_nodes.size() <= 3) {
-    return {};
+  LayerRegistrationProblem<std::set<NodeId>> problem;
+  if (config.recreate_subgraph) {
+    const bool is_places = layer_id == DsgLayers::PLACES;
+    problem.src_nodes =
+        getSubgraphNodes(config.subgraph_extraction, dsg, match.query_root, is_places);
+    problem.dest_nodes =
+        getSubgraphNodes(config.subgraph_extraction, dsg, match.match_root, is_places);
+  } else {
+    problem.src_nodes = match.query_nodes;
+    problem.dest_nodes = match.match_nodes;
   }
 
-  LayerRegistrationProblem<std::set<NodeId>> problem;
-  problem.src_nodes = match.query_nodes;
-  problem.dest_nodes = match.match_nodes;
+  if (problem.src_nodes.size() <= 3 || problem.dest_nodes.size() <= 3) {
+    return {};
+  }
 
   const auto& layer = dsg.getLayer(layer_id);
   LayerRegistrationSolution solution;

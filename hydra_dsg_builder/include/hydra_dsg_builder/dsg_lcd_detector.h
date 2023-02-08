@@ -94,6 +94,8 @@ class DsgLcdDetector {
 
   const DescriptorCache& getDescriptorCache(LayerId layer);
 
+  void dumpDescriptors(const std::string& log_path) const;
+
  protected:
   void makeDefaultDescriptorFactories();
 
