@@ -98,10 +98,7 @@ void logFiltration(std::ostream& fout,
   fout << "]},";
 }
 
-RoomFinder::RoomFinder(const RoomFinderConfig& config) : config_(config) {
-  LOG(ERROR) << "Room Finder Config: " << std::endl
-             << const_cast<RoomFinderConfig&>(config);
-}
+RoomFinder::RoomFinder(const RoomFinderConfig& config) : config_(config) {}
 
 RoomFinder::~RoomFinder() {
   if (log_file_) {
@@ -187,7 +184,7 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
     const double window_size =
         filtration[window.second].distance - filtration[window.first].distance;
     if (window_size < config_.min_window_size) {
-      VLOG(1) << "[RoomFinder] bad window bounds: [" << config_.min_dilation_m << ", "
+      VLOG(1) << "[RoomFinder] Bad window bounds: [" << config_.min_dilation_m << ", "
               << config_.max_dilation_m << "],  window: [" << window.first << ", "
               << window.second << "]"
               << " with size: " << window_size;
@@ -197,7 +194,7 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
     }
   }
 
-  VLOG(1) << "[RoomFinder] bounds: [" << config_.min_dilation_m << ", "
+  VLOG(1) << "[RoomFinder] Bounds: [" << config_.min_dilation_m << ", "
           << config_.max_dilation_m << "],  window: [" << window.first << ", "
           << window.second << "]";
 

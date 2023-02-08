@@ -33,11 +33,12 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder/incremental_dsg_lcd.h"
-#include "hydra_dsg_builder/hydra_config.h"
 
 #include <glog/logging.h>
 #include <hydra_utils/timing_utilities.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
+
+#include "hydra_dsg_builder/hydra_config.h"
 
 namespace hydra {
 namespace incremental {
@@ -76,7 +77,10 @@ void DsgLcd::stop() {
   }
 }
 
-void DsgLcd::save(const std::string&) {}
+void DsgLcd::save(const std::string& log_path) {
+  lcd_detector_->dumpDescriptors(log_path);
+  lcd_graph_->save(log_path + "/dsg.json", false);
+}
 
 void DsgLcd::spin() {
   if (!state_->lcd_queue) {
@@ -136,6 +140,8 @@ void DsgLcd::spinOnceImpl(bool force_update) {
 
     ScopedTimer spin_timer("lcd/merge_graph", timestamp_ns);
     lcd_graph_->mergeGraph(*dsg_->graph);
+    CHECK_EQ(lcd_graph_->numNodes(false), dsg_->graph->numNodes(false));
+    CHECK_EQ(lcd_graph_->numEdges(false), dsg_->graph->numEdges(false));
   }  // end critical section
 
   auto query_agent = getQueryAgentId(timestamp_ns);
@@ -144,6 +150,8 @@ void DsgLcd::spinOnceImpl(bool force_update) {
     const auto to_cache = getPlacesToCache(query_pos);
 
     if (!to_cache.empty()) {
+      VLOG(5) << "[Hydra LCD] Constructing descriptors for "
+              << displayNodeSymbolContainer(to_cache);
       lcd_detector_->updateDescriptorCache(*lcd_graph_, to_cache, timestamp_ns);
     }
 
@@ -152,7 +160,7 @@ void DsgLcd::spinOnceImpl(bool force_update) {
     for (const auto& result : results) {
       // TODO(nathan) consider augmenting with gtsam key
       state_->backend_lcd_queue.push(result);
-      LOG(WARNING) << "Found valid loop-closure: "
+      LOG(WARNING) << "[Hydra LCD] Found valid loop-closure: "
                    << NodeSymbol(result.from_node).getLabel() << " -> "
                    << NodeSymbol(result.to_node).getLabel();
     }
@@ -169,7 +177,8 @@ size_t DsgLcd::processFrontendOutput() {
                                    msg->archived_places.begin(),
                                    msg->archived_places.end());
 
-  VLOG(5) << "Adding nodes: " << displayNodeSymbolContainer(msg->new_agent_nodes);
+  VLOG(5) << "[Hydra LCD] Adding nodes: "
+          << displayNodeSymbolContainer(msg->new_agent_nodes);
   for (const auto& node : msg->new_agent_nodes) {
     agent_queue_.push(node);
   }
@@ -183,8 +192,9 @@ NodeIdSet DsgLcd::getPlacesToCache(const Eigen::Vector3d& agent_pos) {
   NodeIdSet to_cache;
   auto iter = potential_lcd_root_nodes_.begin();
   while (iter != potential_lcd_root_nodes_.end()) {
-    if (lcd_graph_->hasNode(*iter)) {
-      VLOG(5) << "Deleted place " << *iter << " found in LCD queue";
+    if (!lcd_graph_->hasNode(*iter)) {
+      VLOG(5) << "[Hydra LCD] Deleted place " << NodeSymbol(*iter).getLabel()
+              << " found in LCD queue";
       iter = potential_lcd_root_nodes_.erase(iter);
       continue;
     }

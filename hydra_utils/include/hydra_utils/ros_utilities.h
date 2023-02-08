@@ -61,10 +61,8 @@ Config load_config(const ros::NodeHandle& nh,
 
   if (verbose) {
     const auto name = ConfigStructName<Config>::get();
-    std::string filler(name.size(), '=');
-    VLOG(dump_verbosity) << std::endl
-                         << std::endl
-                         << name << std::endl
+    std::string filler(name.size() + 50, '=');
+    VLOG(dump_verbosity) << name << std::endl
                          << filler << std::endl
                          << config;
   }

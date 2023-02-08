@@ -1,13 +1,13 @@
 ---
 lcd_visualizer_ns: /dsg/lcd_visualizer
 lcd_agent_horizon_s: 3.5
-descriptor_creation_horizon_m: 15.0
+descriptor_creation_horizon_m: 8.0
 lcd:
   enable_agent_registration: true
   place_histogram_config: {min: 0.5, max: 2.5, bins: 30}
   num_semantic_classes: 20
-  object_extraction: {fixed_radius: true, max_radius_m: 13.0}
-  places_extraction: {fixed_radius: true, max_radius_m: 13.0}
+  object_extraction: {fixed_radius: false, max_radius_m: 5.0, min_radius_m: 3.0, min_nodes: 10}
+  places_extraction: {fixed_radius: false, max_radius_m: 5.0, min_radius_m: 3.0, min_nodes: 10}
   gnn_lcd:
     object_connection_radius_m: 3.0
   registration_configs:
@@ -16,7 +16,8 @@ lcd:
       min_inliers: 5
       log_registration_problem: false
       registration_output_path: ''
-      recreate_subgraph: false
+      recreate_subgraph: true
+      subgraph_extraction: {fixed_radius: true, max_radius_m: 15.0}
   search_configs:
     agent:
       min_time_separation_s: 25.0
@@ -27,18 +28,18 @@ lcd:
       min_match_separation_m: 0.0
       type: L1
     objects:
-      min_time_separation_s: 100.0
-      min_score: 0.3
-      min_registration_score: 0.85
-      max_registration_matches: 5
-      min_score_ratio: 0.7
+      min_time_separation_s: 25.0
+      min_score: 0.80
+      min_registration_score: 0.95
+      max_registration_matches: 2
+      min_score_ratio: 0.95
       min_match_separation_m: 5.0
       type: L1
     places:
-      min_time_separation_s: 100.0
-      min_score: 0.3
+      min_time_separation_s: 25.0
+      min_score: 0.8
       min_registration_score: 1.5
-      max_registration_matches: 5
+      max_registration_matches: 2
       min_score_ratio: 0.7
       min_match_separation_m: 5.0
       type: L1
