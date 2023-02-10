@@ -134,11 +134,17 @@ LayerSearchResults searchDescriptors(
       continue;
     }
 
+    bool same_robot = true;
+    for (const auto& valid_id_leaf : root_leaf_map.at(valid_id)) {
+      if (NodeSymbol(valid_id_leaf).category() != NodeSymbol(query_id).category()) {
+        same_robot = false;
+      }
+    }
+
     const Descriptor& other_descriptor = *descriptors.at(valid_id);
     std::chrono::duration<double> diff_s =
         descriptor.timestamp - other_descriptor.timestamp;
-    if (NodeSymbol(query_id).category() == NodeSymbol(valid_id).category() &&
-        diff_s.count() < match_config.min_time_separation_s) {
+    if (same_robot && diff_s.count() < match_config.min_time_separation_s) {
       VLOG(10) << "diff: " << diff_s.count()
                << " (threshold: " << match_config.min_time_separation_s << ")";
       ++num_inside_horizon;
