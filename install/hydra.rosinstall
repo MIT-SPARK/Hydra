@@ -16,7 +16,7 @@
 - git:
     local-name: gtsam
     uri: git@github.com:borglab/gtsam.git
-    version: develop
+    version: 4.2a9
 - git:
     local-name: kimera_pgmo
     uri: git@github.com:MIT-SPARK/Kimera-PGMO.git
