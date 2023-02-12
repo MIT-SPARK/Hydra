@@ -13,6 +13,9 @@
     <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
     <arg name="use_oneformer" default="true"/>
 
+    <arg name="use_lidar" default="false"/>
+    <arg name="use_semantics" default="true"/>
+
     <arg name="exit_mode" default="NORMAL"/>
     <arg name="debug" default="false"/>
     <arg name="start_visualizer" default="true"/>

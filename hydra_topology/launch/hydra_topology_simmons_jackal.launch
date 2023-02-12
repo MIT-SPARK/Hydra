@@ -13,6 +13,8 @@
     <arg name="publish_archived" default="true"/>
     <arg name="throttle_semantics" default="false"/>
 
+    <arg name="use_lidar" default="false"/>
+
     <arg name="enable_rectification" default="true"/>
 
     <include file="$(find hydra_utils)/launch/gt_pose/d455_gt_pose.launch" if="$(arg use_gt_poses)">
@@ -24,7 +26,8 @@
     <arg name="rgb_topic" default="/$(arg robot_name)/oneformer/image_raw" if="$(arg use_bag_semantics)"/>
     <arg name="depth_topic" default="/$(arg robot_name)/forward/depth/image_rect_raw"/>
     <arg name="depth_info_topic" default="/$(arg robot_name)/forward/depth/camera_info"/>
-    <arg name="pointcloud_topic" default="/$(arg robot_name)/semantic_pointcloud"/>
+    <arg name="pointcloud_topic" default="/$(arg robot_name)/semantic_pointcloud" unless="$(arg use_lidar)"/>
+    <arg name="pointcloud_topic" default="/$(arg robot_name)/lidar_points" if="$(arg use_lidar)"/>
 
     <include file="$(find hydra_utils)/launch/includes/rgbd_to_pointcloud.xml" pass_all_args="true"
              if="$(eval arg('use_bag_semantics') or not arg('use_semantics'))"/>
@@ -36,7 +39,8 @@
     </include>
 
     <include file="$(find hydra_topology)/launch/hydra_topology.launch" pass_all_args="true">
-        <arg name="config" value="simmons_topology_config.yaml"/>
+        <arg name="config" value="simmons_topology_config.yaml" unless="$(arg use_lidar)"/>
+        <arg name="config" value="simmons_lidar_topology_config.yaml" if="$(arg use_lidar)"/>
         <arg name="semantic_config" value="ade150_semantic_config.yaml"/>
         <arg name="semantic_color_path" value="$(find semantic_recolor)/config/colors/ade150_config.csv"/>
         <arg name="voxel_size" value="0.20"/>
