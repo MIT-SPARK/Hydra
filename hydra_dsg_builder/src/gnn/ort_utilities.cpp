@@ -205,6 +205,7 @@ Tensor FieldInfo::getTensor() const {
 
 Tensor FieldInfo::getDynamicTensor(const std::vector<size_t>& dims_to_read,
                                    const std::vector<int64_t>& output_dims) const {
+  size_t dynamic_index = 0;
   std::vector<int64_t> new_dims;
   for (size_t i = 0; i < dims.size(); ++i) {
     if (dims[i] != -1) {
@@ -212,13 +213,14 @@ Tensor FieldInfo::getDynamicTensor(const std::vector<size_t>& dims_to_read,
       continue;
     }
 
-    if (i >= dims_to_read.size()) {
+    if (dynamic_index >= dims_to_read.size()) {
       std::stringstream ss;
       ss << "dynamic size required for axis " << i << " for field " << name;
       throw std::invalid_argument(ss.str());
     }
 
-    const auto output_index = dims_to_read[i];
+    const auto output_index = dims_to_read[dynamic_index];
+    ++dynamic_index;
     if (output_index >= output_dims.size()) {
       std::stringstream ss;
       ss << "output dimensions missing index " << output_index << " for field " << name;

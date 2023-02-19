@@ -91,8 +91,10 @@ class ReconstructionModule {
 
   bool spinOnce();
 
+  void updateGvd();
+
   // public for external use
-  void spinOnce(const ReconstructionInput& input);
+  bool spinOnce(const ReconstructionInput& input);
 
   void addOutputCallback(const OutputCallback& callback);
 
@@ -103,7 +105,7 @@ class ReconstructionModule {
  protected:
   void update(const ReconstructionInput& msg, bool full_update);
 
-  void updateGvd();
+  void updateGvdSpin();
 
   void showStats() const;
 

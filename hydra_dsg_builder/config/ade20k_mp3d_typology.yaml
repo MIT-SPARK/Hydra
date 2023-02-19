@@ -1,0 +1,45 @@
+---
+dynamic_semantic_labels: []
+objects:
+  labels: [3, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 18, 19, 20, 21, 22, 23, 25, 27,
+    28, 30, 31, 32, 33, 34, 35, 36, 37]
+label_names:
+  - {label: 0, name: void}
+  - {label: 1, name: wall}
+  - {label: 2, name: floor}
+  - {label: 3, name: chair}
+  - {label: 4, name: door}
+  - {label: 5, name: table}
+  - {label: 6, name: picture}
+  - {label: 7, name: cabinet}
+  - {label: 8, name: cushion}
+  - {label: 9, name: window}
+  - {label: 10, name: sofa}
+  - {label: 11, name: bed}
+  - {label: 12, name: curtain}
+  - {label: 13, name: chest of drawers}
+  - {label: 14, name: plant}
+  - {label: 15, name: sink}
+  - {label: 16, name: stairs}
+  - {label: 17, name: ceiling}
+  - {label: 18, name: toilet}
+  - {label: 19, name: stool}
+  - {label: 20, name: towel}
+  - {label: 21, name: mirror}
+  - {label: 22, name: tv_monitor}
+  - {label: 23, name: shower}
+  - {label: 24, name: column}
+  - {label: 25, name: bathtub}
+  - {label: 26, name: counter}
+  - {label: 27, name: fireplace}
+  - {label: 28, name: lighting}
+  - {label: 29, name: railing}
+  - {label: 30, name: shelving}
+  - {label: 31, name: blinds}
+  - {label: 32, name: seating}
+  - {label: 33, name: board_panel}
+  - {label: 34, name: furniture}
+  - {label: 35, name: appliances}
+  - {label: 36, name: clothes}
+  - {label: 37, name: objects}
+  - {label: 38, name: misc}

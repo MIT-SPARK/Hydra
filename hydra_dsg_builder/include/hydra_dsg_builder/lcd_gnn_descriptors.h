@@ -45,7 +45,8 @@ struct ObjectGnnDescriptor : DescriptorFactory {
   ObjectGnnDescriptor(const std::string& model_path,
                       const SubgraphConfig& config,
                       double max_edge_distance_m,
-                      const LabelEmbeddings& label_embeddings);
+                      const LabelEmbeddings& label_embeddings,
+                      bool use_pos_in_feature = true);
 
   gnn::TensorMap makeInput(const DynamicSceneGraph& graph,
                            const std::set<NodeId>& nodes) const;
@@ -60,10 +61,13 @@ struct ObjectGnnDescriptor : DescriptorFactory {
   double max_edge_distance_m_;
   size_t label_embedding_size_;
   std::map<uint8_t, Eigen::VectorXf> label_embeddings_;
+  const bool use_pos_in_feature_;
 };
 
 struct PlaceGnnDescriptor : DescriptorFactory {
-  PlaceGnnDescriptor(const std::string& model_path, const SubgraphConfig& config);
+  PlaceGnnDescriptor(const std::string& model_path,
+                     const SubgraphConfig& config,
+                     bool use_pos_in_feature = true);
 
   gnn::TensorMap makeInput(const DynamicSceneGraph& graph,
                            const std::set<NodeId>& nodes) const;
@@ -73,6 +77,7 @@ struct PlaceGnnDescriptor : DescriptorFactory {
 
  protected:
   const SubgraphConfig config_;
+  const bool use_pos_in_feature_;
   std::unique_ptr<gnn::GnnInterface> model_;
 };
 

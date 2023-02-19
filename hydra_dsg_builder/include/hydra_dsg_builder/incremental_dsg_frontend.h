@@ -83,6 +83,8 @@ class DsgFrontend {
 
   void addOutputCallback(const OutputCallback& callback);
 
+  size_t maxSemanticLabel() const;
+
  protected:
   void spinOnce(const ReconstructionOutput& input);
 

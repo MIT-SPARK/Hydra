@@ -155,6 +155,8 @@ void DsgFrontend::addOutputCallback(const OutputCallback& callback) {
   output_callbacks_.push_back(callback);
 }
 
+size_t DsgFrontend::maxSemanticLabel() const { return label_map_->getNumLabels(); }
+
 void DsgFrontend::spinOnce(const ReconstructionOutput& msg) {
   VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg.timestamp_ns << " [ns]";
   ScopedTimer timer("frontend/spin", msg.timestamp_ns);

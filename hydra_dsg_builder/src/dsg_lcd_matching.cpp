@@ -142,11 +142,13 @@ LayerSearchResults searchDescriptors(
       continue;
     }
 
+    const bool same_robot = NodeSymbol(query_id).category() ==
+                            NodeSymbol(*root_leaf_map.at(valid_id).begin()).category();
+
     const Descriptor& other_descriptor = *other_ptr;
     std::chrono::duration<double> diff_s =
         descriptor.timestamp - other_descriptor.timestamp;
-    if (NodeSymbol(query_id).category() == NodeSymbol(valid_id).category() &&
-        diff_s.count() < match_config.min_time_separation_s) {
+    if (same_robot && diff_s.count() < match_config.min_time_separation_s) {
       VLOG(10) << "diff: " << diff_s.count()
                << " (threshold: " << match_config.min_time_separation_s << ")";
       ++num_inside_horizon;

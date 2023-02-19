@@ -94,7 +94,7 @@ ReconstructionModule::~ReconstructionModule() { stop(); }
 
 void ReconstructionModule::start() {
   spin_thread_.reset(new std::thread(&ReconstructionModule::spin, this));
-  gvd_thread_.reset(new std::thread(&ReconstructionModule::updateGvd, this));
+  gvd_thread_.reset(new std::thread(&ReconstructionModule::updateGvdSpin, this));
   LOG(INFO) << "[Hydra Reconstruction] started!";
 }
 
@@ -201,10 +201,10 @@ std::vector<bool> ReconstructionModule::inFreespace(const PositionMatrix& positi
   return flags;
 }
 
-void ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
+bool ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
   if (!msg.pointcloud || !msg.pointcloud_colors) {
     LOG(ERROR) << "[Hydra Reconstruction] received invalid pointcloud in input!";
-    return;
+    return false;
   }
 
   ScopedTimer timer("topology/spin", msg.timestamp_ns);
@@ -227,6 +227,7 @@ void ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
 
   const bool do_full_update = (num_poses_received_ % config_.num_poses_per_update == 0);
   update(msg, do_full_update);
+  return do_full_update;
 }
 
 void ReconstructionModule::update(const ReconstructionInput& msg, bool full_update) {
@@ -256,74 +257,82 @@ void ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
   output->timestamp_ns = msg.timestamp_ns;
   output->current_position = msg.world_t_body;
   output->pose_graphs = pose_graphs_;
+  VLOG(5) << "[Hydra Reconstruction] Current queued pose graphs: "
+          << pose_graphs_.size();
   pose_graphs_.clear();
 
   gvd_queue_.push(output);
 }
 
-void ReconstructionModule::updateGvd() {
+void ReconstructionModule::updateGvdSpin() {
   // TODO(nathan) fix shutdown logic
   while (!should_shutdown_) {
     if (!gvd_queue_.poll()) {
       continue;
     }
 
-    std::unique_ptr<ScopedTimer> timer;
-    ReconstructionOutput::Ptr msg;
-    BlockIndexList archived_blocks;
-    {  // start critical section
-      std::unique_lock<std::mutex> lock(tsdf_mutex_);
-
-      std::list<PoseGraph::ConstPtr> pose_graphs;
-      // this is awkward, but we want to make sure we use the latest available timestamp
-      while (gvd_queue_.size() > 1) {
-        // TODO(nathan) cache pose graphs
-        const auto& curr_graphs = gvd_queue_.front()->pose_graphs;
-        pose_graphs.insert(pose_graphs.end(), curr_graphs.begin(), curr_graphs.end());
-        gvd_queue_.pop();
-      }
-
-      msg = gvd_queue_.front();
-      msg->pose_graphs.insert(
-          msg->pose_graphs.begin(), pose_graphs.begin(), pose_graphs.end());
-      timer.reset(new ScopedTimer("topology/spin_gvd", msg->timestamp_ns));
-      gvd_integrator_->updateFromTsdf(msg->timestamp_ns, *tsdf_, *mesh_, true);
-
-      if (config_.clear_distant_blocks) {
-        archived_blocks = findBlocksToArchive(msg->current_position.cast<float>());
-        gvd_integrator_->archiveBlocks(archived_blocks);
-        for (const auto& index : archived_blocks) {
-          semantics_->removeBlock(index);
-          tsdf_->removeBlock(index);
-          mesh_->removeMesh(index);
-        }
-      }
-
-      addMeshToOutput(*msg, archived_blocks);
-    }  // end critical section
-
-    {  // start critical section
-      // TODO(nathan) this critical section is broken
-      std::unique_lock<std::mutex> lock(gvd_mutex_);
-      gvd_integrator_->updateGvd(msg->timestamp_ns);
-    }  // end critical section
-
-    if (config_.show_stats) {
-      showStats();
-    }
-
-    addPlacesToOutput(*msg);
-
-    if (output_queue_) {
-      output_queue_->push(msg);
-    }
-
-    for (const auto& callback : output_callbacks_) {
-      callback(*this, *msg);
-    }
-
-    gvd_queue_.pop();
+    updateGvd();
   }
+}
+
+void ReconstructionModule::updateGvd() {
+  std::unique_ptr<ScopedTimer> timer;
+  ReconstructionOutput::Ptr msg;
+  BlockIndexList archived_blocks;
+  {  // start critical section
+    std::unique_lock<std::mutex> lock(tsdf_mutex_);
+
+    std::list<PoseGraph::ConstPtr> pose_graphs;
+    // this is awkward, but we want to make sure we use the latest available timestamp
+    while (gvd_queue_.size() > 1) {
+      // TODO(nathan) cache pose graphs
+      const auto& curr_graphs = gvd_queue_.front()->pose_graphs;
+      pose_graphs.insert(pose_graphs.end(), curr_graphs.begin(), curr_graphs.end());
+      gvd_queue_.pop();
+    }
+
+    msg = gvd_queue_.front();
+    msg->pose_graphs.insert(
+        msg->pose_graphs.begin(), pose_graphs.begin(), pose_graphs.end());
+    timer.reset(new ScopedTimer("topology/spin_gvd", msg->timestamp_ns));
+    gvd_integrator_->updateFromTsdf(msg->timestamp_ns, *tsdf_, *mesh_, true);
+
+    if (config_.clear_distant_blocks) {
+      archived_blocks = findBlocksToArchive(msg->current_position.cast<float>());
+      gvd_integrator_->archiveBlocks(archived_blocks);
+      for (const auto& index : archived_blocks) {
+        semantics_->removeBlock(index);
+        tsdf_->removeBlock(index);
+        mesh_->removeMesh(index);
+      }
+    }
+
+    addMeshToOutput(*msg, archived_blocks);
+  }  // end critical section
+
+  {  // start critical section
+    // TODO(nathan) this critical section is broken
+    std::unique_lock<std::mutex> lock(gvd_mutex_);
+    gvd_integrator_->updateGvd(msg->timestamp_ns);
+  }  // end critical section
+
+  if (config_.show_stats) {
+    showStats();
+  }
+
+  addPlacesToOutput(*msg);
+
+  if (output_queue_) {
+    VLOG(5) << "[Hydra Reconstruction] Exporting " << msg->pose_graphs.size()
+            << " pose graphs";
+    output_queue_->push(msg);
+  }
+
+  for (const auto& callback : output_callbacks_) {
+    callback(*this, *msg);
+  }
+
+  gvd_queue_.pop();
 }
 
 void ReconstructionModule::fillPoseGraphNode(PoseGraphNode& node,

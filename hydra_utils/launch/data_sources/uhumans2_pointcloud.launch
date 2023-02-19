@@ -5,10 +5,12 @@
     <arg name="use_semantics" default="true"/>
     <arg name="use_gt_semantics" default="true"/>
 
-    <arg name="rgb_info_topic" default="/tesse/seg_cam/camera_info" if="$(arg use_semantics)"/>
-    <arg name="rgb_info_topic" default="/tesse/left_cam/camera_info" unless="$(arg use_semantics)"/>
-    <arg name="rgb_topic" default="/tesse/seg_cam/rgb/image_raw" if="$(arg use_semantics)"/>
-    <arg name="rgb_topic" default="/tesse/left_cam/rgb/image_raw" unless="$(arg use_semantics)"/>
+    <arg name="use_label_image" default="$(eval arg('use_gt_semantics') and arg('use_semantics'))"/>
+
+    <arg name="rgb_info_topic" default="/tesse/seg_cam/camera_info" if="$(arg use_label_image)"/>
+    <arg name="rgb_info_topic" default="/tesse/left_cam/camera_info" unless="$(arg use_label_image)"/>
+    <arg name="rgb_topic" default="/tesse/seg_cam/rgb/image_raw" if="$(arg use_label_image)"/>
+    <arg name="rgb_topic" default="/tesse/left_cam/rgb/image_raw" unless="$(arg use_label_image)"/>
     <arg name="depth_topic" default="/tesse/depth_cam/mono/image_raw"/>
 
     <arg name="use_static_tfs" default="true"/>

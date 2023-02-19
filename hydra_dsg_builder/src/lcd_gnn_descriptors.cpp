@@ -48,10 +48,12 @@ using DsgNode = DynamicSceneGraphNode;
 ObjectGnnDescriptor::ObjectGnnDescriptor(const std::string& model_path,
                                          const SubgraphConfig& config,
                                          double max_edge_distance_m,
-                                         const LabelEmbeddings& label_embeddings)
+                                         const LabelEmbeddings& label_embeddings,
+                                         bool use_pos_in_feature)
     : config_(config),
       max_edge_distance_m_(max_edge_distance_m),
-      label_embeddings_(label_embeddings) {
+      label_embeddings_(label_embeddings),
+      use_pos_in_feature_(use_pos_in_feature) {
   if (label_embeddings_.empty()) {
     throw std::runtime_error("non-empty label embeddings required");
   }
@@ -73,23 +75,38 @@ ObjectGnnDescriptor::ObjectGnnDescriptor(const std::string& model_path,
 
 gnn::TensorMap ObjectGnnDescriptor::makeInput(const DynamicSceneGraph& graph,
                                               const std::set<NodeId>& nodes) const {
-  const size_t feature_size = label_embedding_size_ + 6;
+  const size_t feature_size = label_embedding_size_ + (use_pos_in_feature_ ? 6 : 3);
   gnn::Tensor x(nodes.size(), feature_size, gnn::Tensor::Type::FLOAT32);
   auto x_map = x.map<float>();
+
+  gnn::Tensor pos;
+  if (!use_pos_in_feature_) {
+    pos = gnn::Tensor(nodes.size(), 3, gnn::Tensor::Type::FLOAT32);
+  }
+  auto pos_map = pos.map<float>();
 
   size_t index = 0;
   std::map<NodeId, size_t> index_mapping;
   for (const auto node : nodes) {
     const auto& attrs = graph.getNode(node)->get().attributes<SemanticNodeAttributes>();
-    x_map.block(index, 0, 1, 3) = attrs.position.cast<float>().transpose();
-    x_map.block(index, 3, 1, 3) =
+
+    size_t start_idx = 0;
+    if (use_pos_in_feature_) {
+      start_idx = 3;
+      x_map.block(index, 0, 1, 3) = attrs.position.cast<float>().transpose();
+    } else {
+      pos_map.block(index, 0, 1, 3) = attrs.position.cast<float>().transpose();
+    }
+
+    x_map.block(index, start_idx, 1, 3) =
         (attrs.bounding_box.max - attrs.bounding_box.min).transpose();
 
     auto iter = label_embeddings_.find(attrs.semantic_label);
     if (iter != label_embeddings_.end()) {
-      x_map.block(index, 6, 1, label_embedding_size_) = iter->second.transpose();
+      x_map.block(index, start_idx + 3, 1, label_embedding_size_) =
+          iter->second.transpose();
     } else {
-      x_map.block(index, 6, 1, label_embedding_size_).setZero();
+      x_map.block(index, start_idx + 3, 1, label_embedding_size_).setZero();
     }
 
     index_mapping[node] = index;
@@ -123,7 +140,11 @@ gnn::TensorMap ObjectGnnDescriptor::makeInput(const DynamicSceneGraph& graph,
     ++edge_idx;
   }
 
-  return {{"x", x}, {"edge_index", edge_index}};
+  if (use_pos_in_feature_) {
+    return {{"x", x}, {"edge_index", edge_index}};
+  } else {
+    return {{"x", x}, {"edge_index", edge_index}, {"pos", pos}};
+  }
 }
 
 Descriptor::Ptr ObjectGnnDescriptor::construct(const Dsg& graph,
@@ -145,32 +166,53 @@ Descriptor::Ptr ObjectGnnDescriptor::construct(const Dsg& graph,
     return descriptor;
   }
 
-  const auto input = makeInput(graph, descriptor->nodes);
-  auto output = (*model_)(input.at("x"), input.at("edge_index"));
+  auto input = makeInput(graph, descriptor->nodes);
+  VLOG(20) << "Inputs:";
+  VLOG(20) << "  - x: " << std::endl << input.at("x").map<float>();
+  VLOG(20) << "  - edge_index: " << std::endl << input.at("edge_index").map<int64_t>();
+  if (!use_pos_in_feature_) {
+    VLOG(20) << "  - pos: " << std::endl << input.at("pos").map<float>();
+  }
+
+  auto output = (*model_)(input).at("output");
+  VLOG(20) << "--------------------------------------";
+  VLOG(20) << "Output type: " << output;
+  VLOG(20) << "Output:" << std::endl << output.map<float>();
   descriptor->values = output.map<float>().transpose();
   return descriptor;
 }
 
 PlaceGnnDescriptor::PlaceGnnDescriptor(const std::string& model_path,
-                                       const SubgraphConfig& config)
-    : config_(config) {
+                                       const SubgraphConfig& config,
+                                       bool use_pos_in_feature)
+    : config_(config), use_pos_in_feature_(use_pos_in_feature) {
   model_.reset(new gnn::GnnInterface(model_path));
 }
 
 gnn::TensorMap PlaceGnnDescriptor::makeInput(const DynamicSceneGraph& graph,
                                              const std::set<NodeId>& nodes) const {
-  gnn::Tensor x(nodes.size(), 5, gnn::Tensor::Type::FLOAT32);
+  gnn::Tensor x(nodes.size(), use_pos_in_feature_ ? 5 : 2, gnn::Tensor::Type::FLOAT32);
   auto x_map = x.map<float>();
+
+  gnn::Tensor pos;
+  if (!use_pos_in_feature_) {
+    pos = gnn::Tensor(nodes.size(), 3, gnn::Tensor::Type::FLOAT32);
+  }
+  auto pos_map = pos.map<float>();
 
   size_t index = 0;
   std::map<NodeId, size_t> index_mapping;
   for (const auto node : nodes) {
     const auto& attrs = graph.getNode(node)->get().attributes<PlaceNodeAttributes>();
-    x_map(index, 0) = attrs.position(0);
-    x_map(index, 1) = attrs.position(1);
-    x_map(index, 2) = attrs.position(2);
-    x_map(index, 3) = attrs.distance;
-    x_map(index, 4) = static_cast<float>(attrs.num_basis_points);
+    if (use_pos_in_feature_) {
+      x_map.block(index, 0, 1, 3) = attrs.position.cast<float>().transpose();
+      x_map(index, 3) = attrs.distance;
+      x_map(index, 4) = static_cast<float>(attrs.num_basis_points);
+    } else {
+      pos_map.block(index, 0, 1, 3) = attrs.position.cast<float>().transpose();
+      x_map(index, 0) = attrs.distance;
+      x_map(index, 1) = static_cast<float>(attrs.num_basis_points);
+    }
     index_mapping[node] = index;
     ++index;
   }
@@ -197,7 +239,11 @@ gnn::TensorMap PlaceGnnDescriptor::makeInput(const DynamicSceneGraph& graph,
     ++edge_idx;
   }
 
-  return {{"x", x}, {"edge_index", edge_index}};
+  if (use_pos_in_feature_) {
+    return {{"x", x}, {"edge_index", edge_index}};
+  } else {
+    return {{"x", x}, {"edge_index", edge_index}, {"pos", pos}};
+  }
 }
 
 Descriptor::Ptr PlaceGnnDescriptor::construct(const Dsg& graph,
@@ -218,8 +264,18 @@ Descriptor::Ptr PlaceGnnDescriptor::construct(const Dsg& graph,
     return nullptr;
   }
 
-  const auto input = makeInput(graph, descriptor->nodes);
-  auto output = (*model_)(input.at("x"), input.at("edge_index"));
+  auto input = makeInput(graph, descriptor->nodes);
+  VLOG(20) << "Inputs:";
+  VLOG(20) << "  - x: " << std::endl << input.at("x").map<float>();
+  VLOG(20) << "  - edge_index: " << std::endl << input.at("edge_index").map<int64_t>();
+  if (!use_pos_in_feature_) {
+    VLOG(20) << "  - pos: " << std::endl << input.at("pos").map<float>();
+  }
+
+  auto output = (*model_)(input).at("output");
+  VLOG(20) << "--------------------------------------";
+  VLOG(20) << "Output type: " << output;
+  VLOG(20) << "Output:" << std::endl << output.map<float>();
   descriptor->values = output.map<float>().transpose();
   return descriptor;
 }
