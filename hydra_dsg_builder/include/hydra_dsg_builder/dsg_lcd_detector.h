@@ -45,6 +45,8 @@ struct GnnLcdConfig {
   double object_connection_radius_m;
   std::string object_model_path;
   std::string places_model_path;
+  bool places_pos_in_feature = false;
+  bool objects_pos_in_feature = false;
 };
 
 struct DsgLcdDetectorConfig {

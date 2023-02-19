@@ -330,6 +330,33 @@ void DsgBackend::setDefaultUpdateFunctions() {
                                         std::placeholders::_2));
 }
 
+std::string logPoseGraphConnections(const pose_graph_tools::PoseGraph& msg) {
+  std::stringstream ss;
+  ss << "nodes: [";
+  auto iter = msg.nodes.begin();
+  while (iter != msg.nodes.end()) {
+    ss << "{r=" << iter->robot_id << ", k=" << iter->key << "}";
+    ++iter;
+    if (iter != msg.nodes.end()) {
+      ss << ", ";
+    }
+  }
+
+  ss << "], edges: [";
+  auto eiter = msg.edges.begin();
+  while (eiter != msg.edges.end()) {
+    ss << eiter->robot_from << "(" << eiter->key_from << ") -> " << eiter->robot_to
+       << "(" << eiter->key_to << ")";
+    ++eiter;
+    if (eiter != msg.edges.end()) {
+      ss << ", ";
+    }
+  }
+  ss << "]";
+
+  return ss.str();
+}
+
 void DsgBackend::updateFactorGraph(const BackendInput& input) {
   ScopedTimer timer("backend/process_factors", input.timestamp_ns);
   const size_t prev_loop_closures = num_loop_closures_;
@@ -347,6 +374,9 @@ void DsgBackend::updateFactorGraph(const BackendInput& input) {
 
   for (const auto& msg : input.pose_graphs) {
     status_.new_factors_ += msg->edges.size();
+
+    VLOG(5) << "[Hydra Backend] Adding pose graph message: "
+            << logPoseGraphConnections(*msg);
     processIncrementalPoseGraph(msg, &trajectory_, &unconnected_nodes_, &timestamps_);
     logIncrementalLoopClosures(*msg);
   }
@@ -374,7 +404,11 @@ bool DsgBackend::updateFromLcdQueue() {
     // connects frames "to -> from" (i.e. src = to, dest = from, pose = to_T_from)
     LoopClosureLog lc{
         result.to_node, result.from_node, result.to_T_from, true, result.level};
-    addLoopClosure(lc.src, lc.dest, lc.src_T_dest);
+    addLoopClosure(lc.src,
+                   lc.dest,
+                   lc.src_T_dest,
+                   (result.level ? KimeraPgmoInterface::config_.lc_variance
+                                 : config_.pgmo.sg_loop_closure_variance));
 
     loop_closures_.push_back(lc);
 
@@ -509,14 +543,11 @@ void DsgBackend::addPlacesToDeformationGraph(size_t timestamp_ns) {
 
 void DsgBackend::addLoopClosure(const gtsam::Key& src,
                                 const gtsam::Key& dest,
-                                const gtsam::Pose3& src_T_dest) {
+                                const gtsam::Pose3& src_T_dest,
+                                double variance) {
   if (full_sparse_frame_map_.size() == 0 ||
       !KimeraPgmoInterface::config_.b_enable_sparsify) {
-    deformation_graph_->addNewBetween(src,
-                                      dest,
-                                      src_T_dest,
-                                      gtsam::Pose3(),
-                                      KimeraPgmoInterface::config_.lc_variance);
+    deformation_graph_->addNewBetween(src, dest, src_T_dest, gtsam::Pose3(), variance);
   } else {
     if (!full_sparse_frame_map_.count(src) || !full_sparse_frame_map_.count(dest)) {
       // TODO(yun) this happened a few times when loop closure found for node that has
@@ -530,11 +561,8 @@ void DsgBackend::addLoopClosure(const gtsam::Key& src,
     gtsam::Pose3 sparse_src_T_sparse_dest =
         sparse_frames_.at(sparse_src).keyed_transforms.at(src) * src_T_dest *
         sparse_frames_.at(sparse_dest).keyed_transforms.at(dest).inverse();
-    deformation_graph_->addNewBetween(sparse_src,
-                                      sparse_dest,
-                                      sparse_src_T_sparse_dest,
-                                      gtsam::Pose3(),
-                                      KimeraPgmoInterface::config_.lc_variance);
+    deformation_graph_->addNewBetween(
+        sparse_src, sparse_dest, sparse_src_T_sparse_dest, gtsam::Pose3(), variance);
   }
 }
 

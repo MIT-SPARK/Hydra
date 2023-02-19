@@ -24,6 +24,9 @@
     <arg name="use_ros_backend" default="false"/>
     <arg name="validate_vertices" default="false"/>
 
+    <arg name="place_edge_variance" default="1.0e-02"/>
+    <arg name="sg_lcd_variance" default="1.0e-01"/>
+
     <arg name="use_zmq_interface" default="false"/>
     <arg name="zmq_send_url" default="tcp://127.0.0.1:8001"/>
     <arg name="zmq_recv_url" default="tcp://127.0.0.1:8002"/>
@@ -64,7 +67,6 @@
     <arg name="pgmo_log_path" value="$(arg dsg_path)/pgmo"/>
     <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
     <arg name="ros_output" value="log" if="$(arg glog_to_file)"/>
-
 
     <arg name="frontend_config_path" default="$(arg config_dir)/dsg_frontend_config.yaml"/>
     <arg name="backend_config_path" default="$(arg config_dir)/dsg_backend_config.yaml"/>
@@ -126,6 +128,8 @@
         <param name="objects/bounding_box_type" value="RAABB" if="$(arg use_oriented_bounding_boxes)"/>
         <param name="objects/bounding_box_type" value="AABB" unless="$(arg use_oriented_bounding_boxes)"/>
         <param name="pgmo/robot_id" value="$(arg robot_id)"/>
+        <param name="pgmo/covariance/sg_loop_close" value="$(arg sg_lcd_variance)"/>
+        <param name="pgmo/covariance/place_edge" value="$(arg place_edge_variance)"/>
 
         <param name="enable_lcd" value="$(arg enable_dsg_lcd)"/>
         <param name="lcd_use_bow_vectors" value="$(arg lcd_use_bow_vectors)"/>

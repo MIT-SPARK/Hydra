@@ -67,7 +67,6 @@ add_library(
   src/incremental_mesh_segmenter.cpp
   src/merge_handler.cpp
   src/minimum_spanning_tree.cpp
-  src/room_colormap.cpp
   src/room_finder.cpp
   src/room_helpers.cpp
   src/shared_module_state.cpp

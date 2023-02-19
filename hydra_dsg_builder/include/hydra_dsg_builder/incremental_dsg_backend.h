@@ -115,7 +115,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void addLoopClosure(const gtsam::Key& src,
                       const gtsam::Key& dest,
-                      const gtsam::Pose3& src_T_dest);
+                      const gtsam::Pose3& src_T_dest,
+                      double variance);
 
   void updateFactorGraph(const BackendInput& input);
 

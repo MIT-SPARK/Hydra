@@ -118,7 +118,10 @@ HydraRosPipeline::HydraRosPipeline(const ros::NodeHandle& node_handle, int robot
                                        std::placeholders::_3));
 
   if (config.enable_lcd) {
-    const auto lcd_config = load_config<DsgLcdModuleConfig>(nh, "");
+    auto lcd_config = load_config<DsgLcdModuleConfig>(nh, "");
+    lcd_config.detector.num_semantic_classes = frontend->maxSemanticLabel();
+    VLOG(1) << "Number of classes for LCD: "
+            << lcd_config.detector.num_semantic_classes;
     shared_state->lcd_queue.reset(new InputQueue<LcdInput::Ptr>());
     lcd.reset(new DsgLcd(prefix, lcd_config, frontend_dsg, shared_state));
 

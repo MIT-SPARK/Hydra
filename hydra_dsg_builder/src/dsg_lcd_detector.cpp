@@ -79,10 +79,13 @@ void configureDescriptorFactories(lcd::DsgLcdDetector& detector,
       std::make_unique<ObjectGnnDescriptor>(config.gnn_lcd.object_model_path,
                                             config.object_extraction,
                                             config.gnn_lcd.object_connection_radius_m,
-                                            embeddings));
-  factories.emplace(DsgLayers::PLACES,
-                    std::make_unique<PlaceGnnDescriptor>(
-                        config.gnn_lcd.places_model_path, config.places_extraction));
+                                            embeddings,
+                                            config.gnn_lcd.objects_pos_in_feature));
+  factories.emplace(
+      DsgLayers::PLACES,
+      std::make_unique<PlaceGnnDescriptor>(config.gnn_lcd.places_model_path,
+                                           config.places_extraction,
+                                           config.gnn_lcd.places_pos_in_feature));
   detector.setDescriptorFactories(std::move(factories));
 }
 #else

@@ -8,8 +8,6 @@ lcd:
   num_semantic_classes: 20
   object_extraction: {fixed_radius: true, max_radius_m: 13.0}
   places_extraction: {fixed_radius: true, max_radius_m: 13.0}
-  gnn_lcd:
-    object_connection_radius_m: 3.0
   registration_configs:
     objects:
       min_correspondences: 5
@@ -27,7 +25,7 @@ lcd:
       min_match_separation_m: 0.0
       type: L1
     objects:
-      min_time_separation_s: 100.0
+      min_time_separation_s: 25.0
       min_score: 0.3
       min_registration_score: 0.85
       max_registration_matches: 5
@@ -35,7 +33,7 @@ lcd:
       min_match_separation_m: 5.0
       type: L1
     places:
-      min_time_separation_s: 100.0
+      min_time_separation_s: 25.0
       min_score: 0.3
       min_registration_score: 1.5
       max_registration_matches: 5

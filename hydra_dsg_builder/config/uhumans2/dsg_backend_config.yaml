@@ -10,7 +10,7 @@ dsg:
   places_merge_pos_threshold_m: 0.3
   places_merge_distance_tolerance_m: 0.2
   merge_update_dynamic: true
-  merge_update_map: {BUILDINGS: 0, ROOMS: 0, PLACES: 1, OBJECTS: 0}
+  merge_update_map: {BUILDINGS: false, ROOMS: false, PLACES: true, OBJECTS: false}
 pgmo:
   run_mode: 0    # kimera_pgmo run mode FULL (required)
   use_msg_time: true
@@ -26,7 +26,7 @@ pgmo:
     pcm_trans_threshold: -1
     pcm_rot_threshold: -1
     lm_diagonal_damping: true
-    gnc_alpha: 0.99
+    gnc_alpha: 0.9
     gnc_max_iterations: 100
     gnc_mu_step: 1.6
     gnc_cost_tolerance: 1.0e-05
@@ -38,11 +38,12 @@ pgmo:
   covariance:
     odom: 1.0e-02
     loop_close: 5.0e-02
+    sg_loop_close: 1.0e-01
     prior: 1.0e-02
     mesh_mesh: 1.0e-02
     pose_mesh: 1.0e-02
-    place_mesh: 10.0
-    place_edge: 10.0
+    place_mesh: 1.0e-02
+    place_edge: 1.0e-02
     place_merge: 10.0
     object_merge: 10.0
 building_semantic_label: 22

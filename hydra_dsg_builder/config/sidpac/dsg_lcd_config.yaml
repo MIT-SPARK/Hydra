@@ -1,22 +1,20 @@
 ---
 lcd_visualizer_ns: /dsg/lcd_visualizer
 lcd_agent_horizon_s: 3.5
-descriptor_creation_horizon_m: 17.0
+descriptor_creation_horizon_m: 15.0
 lcd:
   enable_agent_registration: true
-  object_radius_m: 15.0
+  place_histogram_config: {min: 0.5, max: 2.5, bins: 30}
   num_semantic_classes: 20
-  place_radius_m: 15.0
-  place_histogram_config:
-    min: 0.5
-    max: 2.5
-    bins: 30
+  object_extraction: {fixed_radius: true, max_radius_m: 13.0}
+  places_extraction: {fixed_radius: true, max_radius_m: 13.0}
   registration_configs:
     objects:
       min_correspondences: 5
       min_inliers: 5
       log_registration_problem: false
       registration_output_path: ''
+      recreate_subgraph: false
   search_configs:
     agent:
       min_time_separation_s: 150.0
@@ -51,3 +49,4 @@ lcd:
     rotation_cost_threshold: 1.0e-6
     kcore_heuristic_threshold: 0.5
     inlier_selection_mode: PMC_EXACT
+    max_clique_time_limit: 3600
