@@ -32,9 +32,9 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <hydra_dsg_builder/lcd_gnn_descriptors.h>
-
+#include <glog/logging.h>
 #include <gtest/gtest.h>
+#include <hydra_dsg_builder/lcd_gnn_descriptors.h>
 #include <ros/package.h>
 
 namespace hydra {
@@ -82,7 +82,7 @@ std::string getResourcePath(const std::string& name) {
 
 TEST(GnnLcdTests, testEmptyDescriptor) {
   SubgraphConfig config;
-  PlaceGnnDescriptor factory(getResourcePath("places_lcd.onnx"), config);
+  PlaceGnnDescriptor factory(getResourcePath("places.onnx"), config);
 
   DynamicSceneGraph graph;
   const auto& root_node = makeDefaultAgentNode(graph);
@@ -95,7 +95,7 @@ TEST(GnnLcdTests, testPlacesTensors) {
   config.max_radius_m = 5.0;
   config.min_radius_m = 2.0;
   config.min_nodes = 10;
-  PlaceGnnDescriptor factory(getResourcePath("places_lcd.onnx"), config);
+  PlaceGnnDescriptor factory(getResourcePath("places.onnx"), config);
 
   size_t node_idx = 0;
   DynamicSceneGraph graph;
@@ -142,9 +142,8 @@ TEST(GnnLcdTests, testObjectTensors) {
   Eigen::VectorXf fake_embedding(2);
   fake_embedding << 1.0, 2.0;
 
-  // we just use the places model as a placeholder
   ObjectGnnDescriptor factory(
-      getResourcePath("places_lcd.onnx"), config, 0.1, {{0, fake_embedding}});
+      getResourcePath("objects.onnx"), config, 0.1, {{0, fake_embedding}});
 
   size_t node_idx = 0;
   DynamicSceneGraph graph;
@@ -181,35 +180,6 @@ TEST(GnnLcdTests, testObjectTensors) {
       << tensors.at("edge_index").map<int64_t>();
 }
 
-TEST(GnnLcdTests, testPlacesDescriptor) {
-  SubgraphConfig config;
-  config.max_radius_m = 5.0;
-  config.min_radius_m = 2.0;
-  config.min_nodes = 10;
-  PlaceGnnDescriptor factory(getResourcePath("places_lcd.onnx"), config);
-
-  DynamicSceneGraph graph;
-  const auto& root_node = makeDefaultAgentNode(graph);
-
-  size_t node_idx = 0;
-  emplacePlaceNode(graph, Eigen::Vector3d(0.1, 0.0, 0.0), 0.1, 1, node_idx);
-  emplacePlaceNode(graph, Eigen::Vector3d(0.1, 0.0, 0.0), 0.1, 2, node_idx);
-  emplacePlaceNode(graph, Eigen::Vector3d(0.1, 0.0, 0.0), 0.1, 3, node_idx);
-  emplacePlaceNode(graph, Eigen::Vector3d(0.1, 0.0, 0.0), 0.1, 4, node_idx);
-  emplacePlaceNode(graph, Eigen::Vector3d(0.1, 0.0, 0.0), 0.1, 5, node_idx);
-  graph.insertEdge("p0"_id, "a0"_id);
-  graph.insertEdge("p0"_id, "p1"_id);
-  graph.insertEdge("p1"_id, "p2"_id);
-  graph.insertEdge("p2"_id, "p3"_id);
-  graph.insertEdge("p3"_id, "p4"_id);
-
-  const auto descriptor = factory.construct(graph, root_node);
-  ASSERT_TRUE(descriptor != nullptr);
-  EXPECT_EQ(descriptor->values.size(), 64);
-  std::set<NodeId> expected_nodes{"p0"_id, "p1"_id, "p2"_id, "p3"_id, "p4"_id};
-  EXPECT_EQ(descriptor->nodes, expected_nodes);
-}
-
 TEST(GnnLcdTests, testLoadEmbeddings) {
   const auto embeddings = loadLabelEmbeddings(getResourcePath("test_embeddings.yaml"));
 
@@ -237,6 +207,186 @@ TEST(GnnLcdTests, testLoadEmbeddings) {
 
   std::set<int> expected_labels{0, 3};
   EXPECT_EQ(expected_labels, found_labels);
+}
+
+TEST(GnnLcdTests, testPlacesDescriptor) {
+  SubgraphConfig config;
+  config.max_radius_m = 5.0;
+  config.min_radius_m = 2.0;
+  config.min_nodes = 10;
+  PlaceGnnDescriptor factory(getResourcePath("places.onnx"), config);
+
+  DynamicSceneGraph graph;
+  const auto& root_node = makeDefaultAgentNode(graph);
+
+  size_t node_idx = 0;
+  emplacePlaceNode(graph, Eigen::Vector3d(1.0, 1.0, 1.0), 1.0, 1, node_idx);
+  emplacePlaceNode(graph, Eigen::Vector3d(1.0, 1.0, 1.0), 1.0, 1, node_idx);
+  emplacePlaceNode(graph, Eigen::Vector3d(1.0, 1.0, 1.0), 1.0, 1, node_idx);
+  emplacePlaceNode(graph, Eigen::Vector3d(1.0, 1.0, 1.0), 1.0, 1, node_idx);
+  emplacePlaceNode(graph, Eigen::Vector3d(1.0, 1.0, 1.0), 1.0, 1, node_idx);
+  graph.insertEdge("p0"_id, "a0"_id);
+  graph.insertEdge("p0"_id, "p1"_id);
+  graph.insertEdge("p1"_id, "p2"_id);
+  graph.insertEdge("p2"_id, "p3"_id);
+  graph.insertEdge("p3"_id, "p4"_id);
+  graph.insertEdge("p4"_id, "p0"_id);
+
+  const auto descriptor = factory.construct(graph, root_node);
+  ASSERT_TRUE(descriptor != nullptr);
+  std::set<NodeId> expected_nodes{"p0"_id, "p1"_id, "p2"_id, "p3"_id, "p4"_id};
+  EXPECT_EQ(descriptor->nodes, expected_nodes);
+
+  ASSERT_EQ(descriptor->values.size(), 5);
+
+  Eigen::VectorXf expected(5);
+  expected << 5, 5, 5, 5, 5;
+  EXPECT_NEAR((descriptor->values - expected).norm(), 0.0, 1.0e-5);
+}
+
+TEST(GnnLcdTests, testObjectDescriptor) {
+  SubgraphConfig config;
+  config.max_radius_m = 5.0;
+  config.min_radius_m = 2.0;
+  config.min_nodes = 10;
+
+  Eigen::VectorXf fake_embedding(2);
+  fake_embedding << 1.0, 1.0;
+
+  ObjectGnnDescriptor factory(
+      getResourcePath("objects.onnx"), config, 0.1, {{0, fake_embedding}});
+
+  size_t node_idx = 0;
+  DynamicSceneGraph graph;
+  const auto& root_node = makeDefaultAgentNode(graph);
+
+  emplacePlaceNode(graph, Eigen::Vector3d(1.0, 1.0, 1.0), 1.0, 1, node_idx);
+  emplacePlaceNode(graph, Eigen::Vector3d(1.0, 1.0, 1.0), 1.0, 1, node_idx);
+  emplacePlaceNode(graph, Eigen::Vector3d(1.0, 1.0, 1.0), 1.0, 1, node_idx);
+  emplacePlaceNode(graph, Eigen::Vector3d(1.0, 1.0, 1.0), 1.0, 1, node_idx);
+  emplacePlaceNode(graph, Eigen::Vector3d(1.0, 1.0, 1.0), 1.0, 1, node_idx);
+  graph.insertEdge("p0"_id, "a0"_id);
+  graph.insertEdge("p0"_id, "p1"_id);
+  graph.insertEdge("p1"_id, "p2"_id);
+  graph.insertEdge("p2"_id, "p3"_id);
+  graph.insertEdge("p3"_id, "p4"_id);
+  graph.insertEdge("p4"_id, "p0"_id);
+
+  node_idx = 0;
+  emplaceObjectNode(
+      graph, Eigen::Vector3d(1.0, 1.0, 1.0), Eigen::Vector3f(1.0, 1.0, 1.0), node_idx);
+  emplaceObjectNode(
+      graph, Eigen::Vector3d(1.0, 1.0, 1.0), Eigen::Vector3f(1.0, 1.0, 1.0), node_idx);
+  emplaceObjectNode(
+      graph, Eigen::Vector3d(1.0, 1.0, 1.0), Eigen::Vector3f(1.0, 1.0, 1.0), node_idx);
+  graph.insertEdge("p0"_id, "o0"_id);
+  graph.insertEdge("p0"_id, "o1"_id);
+  graph.insertEdge("p1"_id, "o2"_id);
+
+  const auto descriptor = factory.construct(graph, root_node);
+  ASSERT_TRUE(descriptor != nullptr);
+  ASSERT_TRUE(!descriptor->is_null);
+  std::set<NodeId> expected_nodes{"o0"_id, "o1"_id, "o2"_id};
+  EXPECT_EQ(descriptor->nodes, expected_nodes);
+
+  ASSERT_EQ(descriptor->values.size(), 8);
+
+  Eigen::VectorXf expected(8);
+  expected << 3, 3, 3, 3, 3, 3, 3, 3;
+  EXPECT_NEAR((descriptor->values - expected).norm(), 0.0, 1.0e-5);
+}
+
+TEST(GnnLcdTests, testPlacesPosDescriptor) {
+  SubgraphConfig config;
+  config.max_radius_m = 5.0;
+  config.min_radius_m = 2.0;
+  config.min_nodes = 10;
+  PlaceGnnDescriptor factory(getResourcePath("places_pos.onnx"), config, false);
+
+  DynamicSceneGraph graph;
+  const auto& root_node = makeDefaultAgentNode(graph);
+
+  size_t node_idx = 0;
+  // non-uniform edge weights
+  emplacePlaceNode(graph, Eigen::Vector3d(0.0, 0.0, 0.0), 1.0, 2, node_idx);
+  emplacePlaceNode(graph, Eigen::Vector3d(2.0, 0.0, 0.0), 1.0, 2, node_idx);
+  emplacePlaceNode(graph, Eigen::Vector3d(3.0, 0.0, 0.0), 1.0, 2, node_idx);
+  emplacePlaceNode(graph, Eigen::Vector3d(4.0, 0.0, 0.0), 1.0, 2, node_idx);
+  emplacePlaceNode(graph, Eigen::Vector3d(3.0, 0.0, 0.0), 1.0, 2, node_idx);
+  emplacePlaceNode(graph, Eigen::Vector3d(2.0, 0.0, 0.0), 1.0, 2, node_idx);
+  graph.insertEdge("p0"_id, "a0"_id);
+  graph.insertEdge("p0"_id, "p1"_id);
+  graph.insertEdge("p1"_id, "p2"_id);
+  graph.insertEdge("p2"_id, "p3"_id);
+  graph.insertEdge("p3"_id, "p4"_id);
+  graph.insertEdge("p4"_id, "p5"_id);
+  graph.insertEdge("p5"_id, "p0"_id);
+
+  const auto descriptor = factory.construct(graph, root_node);
+  ASSERT_TRUE(descriptor != nullptr);
+  std::set<NodeId> expected_nodes{"p0"_id, "p1"_id, "p2"_id, "p3"_id, "p4"_id, "p5"_id};
+  EXPECT_EQ(descriptor->nodes, expected_nodes);
+
+  ASSERT_EQ(descriptor->values.size(), 2);
+
+  Eigen::VectorXf expected(2);
+  expected << 5.9769, 11.95398;
+  EXPECT_NEAR((descriptor->values - expected).norm(), 0.0, 1.0e-3);
+}
+
+TEST(GnnLcdTests, testObjectPosDescriptor) {
+  SubgraphConfig config;
+  config.max_radius_m = 5.0;
+  config.min_radius_m = 2.0;
+  config.min_nodes = 10;
+
+  Eigen::VectorXf fake_embedding(2);
+  fake_embedding << 4.0, 5.0;
+
+  ObjectGnnDescriptor factory(
+      getResourcePath("objects_pos.onnx"), config, 1.6, {{0, fake_embedding}}, false);
+
+  DynamicSceneGraph graph;
+  const auto& root_node = makeDefaultAgentNode(graph);
+
+  size_t node_idx = 0;
+  emplacePlaceNode(graph, Eigen::Vector3d(1.0, 1.0, 1.0), 1.0, 1, node_idx);
+  graph.insertEdge("p0"_id, "a0"_id);
+
+  node_idx = 0;
+  emplaceObjectNode(
+      graph, Eigen::Vector3d(0.5, 0.0, 0.0), Eigen::Vector3f(1.0, 2.0, 3.0), node_idx);
+  emplaceObjectNode(
+      graph, Eigen::Vector3d(2.0, 0.0, 0.0), Eigen::Vector3f(1.0, 2.0, 3.0), node_idx);
+  emplaceObjectNode(
+      graph, Eigen::Vector3d(3.0, 0.0, 0.0), Eigen::Vector3f(1.0, 2.0, 3.0), node_idx);
+  emplaceObjectNode(
+      graph, Eigen::Vector3d(4.0, 0.0, 0.0), Eigen::Vector3f(1.0, 2.0, 3.0), node_idx);
+  emplaceObjectNode(
+      graph, Eigen::Vector3d(3.0, 0.0, 0.0), Eigen::Vector3f(1.0, 2.0, 3.0), node_idx);
+  emplaceObjectNode(
+      graph, Eigen::Vector3d(2.0, 0.0, 0.0), Eigen::Vector3f(1.0, 2.0, 3.0), node_idx);
+  graph.insertEdge("p0"_id, "o0"_id);
+  graph.insertEdge("p0"_id, "o1"_id);
+  graph.insertEdge("p0"_id, "o2"_id);
+  graph.insertEdge("p0"_id, "o3"_id);
+  graph.insertEdge("p0"_id, "o4"_id);
+  graph.insertEdge("p0"_id, "o5"_id);
+
+  const auto descriptor = factory.construct(graph, root_node);
+  ASSERT_TRUE(descriptor != nullptr);
+  ASSERT_TRUE(!descriptor->is_null);
+  std::set<NodeId> expected_nodes{"o0"_id, "o1"_id, "o2"_id, "o3"_id, "o4"_id, "o5"_id};
+  EXPECT_EQ(descriptor->nodes, expected_nodes);
+
+  ASSERT_EQ(descriptor->values.size(), 5);
+
+  // this is annoying to compute because we no longer have a linear graph
+  const double weight_sum = 5.98231;
+  Eigen::VectorXf expected(5);
+  expected << 1 * weight_sum, 2 * weight_sum, 3 * weight_sum, 4 * weight_sum,
+      5 * weight_sum;
+  EXPECT_NEAR((descriptor->values - expected).norm(), 0.0, 1.0e-5);
 }
 
 }  // namespace lcd

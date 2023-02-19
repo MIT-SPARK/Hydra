@@ -142,6 +142,8 @@ void visit_config(const Visitor& v, GnnLcdConfig& config) {
   v.visit("object_connection_radius_m", config.object_connection_radius_m);
   v.visit("object_model_path", config.object_model_path);
   v.visit("places_model_path", config.places_model_path);
+  v.visit("objects_pos_in_feature", config.objects_pos_in_feature);
+  v.visit("places_pos_in_feature", config.places_pos_in_feature);
 }
 
 template <typename Visitor>
@@ -154,11 +156,12 @@ void visit_config(const Visitor& v, DsgLcdDetectorConfig& config) {
   v.visit("enable_agent_registration", config.enable_agent_registration);
   v.visit("object_extraction", config.object_extraction);
   v.visit("places_extraction", config.places_extraction);
-  v.visit("num_semantic_classes", config.num_semantic_classes);
   v.visit("place_histogram_config", config.place_histogram_config);
   if (config_parser::is_parser<Visitor>()) {
     config.agent_search_config.min_registration_score =
         config.agent_search_config.min_score;
+  } else {
+    v.visit("num_semantic_classes", config.num_semantic_classes);
   }
 
   v.visit("use_gnn_descriptors", config.use_gnn_descriptors);

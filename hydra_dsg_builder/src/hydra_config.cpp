@@ -43,12 +43,35 @@ std::ostream& operator<<(std::ostream& out, const HydraConfig& config) {
   return out;
 }
 
-HydraConfig::HydraConfig() : force_shutdown_(false) {}
+HydraConfig::HydraConfig() : force_shutdown_(false) {
+  colormap_ = {
+      {166, 206, 227},
+      {31, 120, 180},
+      {178, 223, 138},
+      {51, 160, 44},
+      {251, 154, 153},
+      {227, 26, 28},
+      {253, 191, 111},
+      {255, 127, 0},
+      {202, 178, 214},
+      {106, 61, 154},
+      {255, 255, 153},
+      {177, 89, 40},
+  };
+}
 
 bool HydraConfig::force_shutdown() const { return force_shutdown_; }
 
-void HydraConfig::set_force_shutdown(bool force_shutdown) {
+void HydraConfig::setForceShutdown(bool force_shutdown) {
   force_shutdown_ = force_shutdown;
+}
+
+void HydraConfig::setColorMap(const std::vector<ColorArray>& colormap) {
+  colormap_ = colormap;
+}
+
+const HydraConfig::ColorArray& HydraConfig::getRoomColor(size_t index) const {
+  return colormap_.at(index % colormap_.size());
 }
 
 }  // namespace hydra

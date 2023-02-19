@@ -10,6 +10,8 @@ lcd:
   places_extraction: {fixed_radius: false, max_radius_m: 5.0, min_radius_m: 3.0, min_nodes: 10}
   gnn_lcd:
     object_connection_radius_m: 3.0
+    objects_pos_in_feature: false
+    places_pos_in_feature: false
   registration_configs:
     objects:
       min_correspondences: 5

@@ -15,3 +15,7 @@ objects:
   cluster_tolerance: 0.25
 min_object_vertices: 40
 prune_mesh_indices: true
+filter_places: true
+min_places_component_size: 3
+enable_active_mesh_pub: false
+enable_segmented_mesh_pub: false

@@ -33,14 +33,18 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <array>
 #include <atomic>
-#include <memory>
 #include <iostream>
+#include <memory>
+#include <vector>
 
 namespace hydra {
 
 class HydraConfig {
  public:
+  using ColorArray = std::array<uint8_t, 3>;
+
   static HydraConfig& instance() {
     if (!instance_) {
       instance_.reset(new HydraConfig());
@@ -50,7 +54,11 @@ class HydraConfig {
 
   bool force_shutdown() const;
 
-  void set_force_shutdown(bool force_shutdown);
+  void setForceShutdown(bool force_shutdown);
+
+  void setColorMap(const std::vector<ColorArray>& colormap);
+
+  const ColorArray& getRoomColor(size_t index) const;
 
  private:
   HydraConfig();
@@ -59,6 +67,8 @@ class HydraConfig {
 
   // TODO(nathan) consider moving robot id and logging here
   std::atomic<bool> force_shutdown_;
+
+  std::vector<ColorArray> colormap_;
 };
 
 std::ostream& operator<<(std::ostream& out, const HydraConfig& config);
