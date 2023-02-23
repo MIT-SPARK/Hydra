@@ -27,6 +27,7 @@
         <arg name="config" value="sidpac_topology_config.yaml"/>
         <arg name="semantic_config" default="ade150_semantic_config.yaml"/>
         <arg name="semantic_color_path" default="$(find semantic_recolor)/config/colors/$(arg dataset_name).csv"/>
+        <arg name="voxel_size" value="0.20"/>
     </include>
 
 </launch>

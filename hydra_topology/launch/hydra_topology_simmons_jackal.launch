@@ -43,7 +43,9 @@
         <arg name="config" value="simmons_lidar_topology_config.yaml" if="$(arg use_lidar)"/>
         <arg name="semantic_config" value="ade150_semantic_config.yaml"/>
         <arg name="semantic_color_path" value="$(find semantic_recolor)/config/colors/ade150_config.csv"/>
-        <arg name="voxel_size" value="0.20"/>
-        <arg name="max_ray_length_m" default="3.0"/>
+        <arg name="voxel_size" value="0.20" unless="$(arg use_lidar)"/>
+        <arg name="voxel_size" value="0.50" if="$(arg use_lidar)"/>
+        <arg name="max_ray_length_m" value="3.0" unless="$(arg use_lidar)"/>
+        <arg name="max_ray_length_m" value="5.0" if="$(arg use_lidar)"/>
     </include>
 </launch>
