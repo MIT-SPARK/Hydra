@@ -1,0 +1,4 @@
+---
+world_frame: world
+body_t_camera: [0.0, 0.0, 0.0]
+body_R_camera: {w: 1.0, x: 0.0, y: 0.0, z: 0.0}
