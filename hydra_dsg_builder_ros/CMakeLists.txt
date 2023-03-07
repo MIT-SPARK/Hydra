@@ -53,7 +53,7 @@ target_link_libraries(
 )
 
 add_executable(${PROJECT_NAME}_node src/incremental_dsg_builder_node.cpp)
-target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME})
+target_link_libraries(${PROJECT_NAME}_node PUBLIC ${PROJECT_NAME})
 
 add_executable(dsg_optimizer_node src/dsg_optimizer_node.cpp)
 target_link_libraries(dsg_optimizer_node ${PROJECT_NAME})

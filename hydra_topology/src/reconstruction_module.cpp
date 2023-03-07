@@ -51,6 +51,7 @@ using pose_graph_tools::PoseGraphNode;
 using timing::ScopedTimer;
 using topology::GvdIntegrator;
 using topology::GvdVoxel;
+using topology::VertexVoxel;
 using MeshIntegrator = topology::VoxelAwareMeshIntegrator;
 using voxblox::BlockIndexList;
 using voxblox::Layer;
@@ -81,12 +82,13 @@ ReconstructionModule::ReconstructionModule(const RobotPrefixConfig& prefix,
       new Layer<SemanticVoxel>(config_.voxel_size, config_.voxels_per_side));
 
   gvd_.reset(new Layer<GvdVoxel>(config_.voxel_size, config_.voxels_per_side));
+  vertices_.reset(new Layer<VertexVoxel>(config_.voxel_size, config_.voxels_per_side));
   mesh_.reset(new MeshLayer(tsdf_->block_size()));
 
   tsdf_integrator_ = SemanticTsdfIntegratorFactory::create(
       "fast", config_.tsdf, config_.semantics, tsdf_.get(), semantics_.get());
   mesh_integrator_.reset(
-      new MeshIntegrator(config_.mesh, tsdf_.get(), gvd_.get(), mesh_.get()));
+      new MeshIntegrator(config_.mesh, tsdf_.get(), vertices_, mesh_.get()));
   gvd_integrator_.reset(new GvdIntegrator(config_.gvd, gvd_));
 }
 
@@ -295,11 +297,11 @@ void ReconstructionModule::updateGvd() {
     msg->pose_graphs.insert(
         msg->pose_graphs.begin(), pose_graphs.begin(), pose_graphs.end());
     timer.reset(new ScopedTimer("topology/spin_gvd", msg->timestamp_ns));
-    gvd_integrator_->updateFromTsdf(msg->timestamp_ns, *tsdf_, *mesh_, true);
+    gvd_integrator_->updateFromTsdf(
+        msg->timestamp_ns, *tsdf_, *vertices_, *mesh_, true);
 
     if (config_.clear_distant_blocks) {
       archived_blocks = findBlocksToArchive(msg->current_position.cast<float>());
-      gvd_integrator_->archiveBlocks(archived_blocks);
       for (const auto& index : archived_blocks) {
         semantics_->removeBlock(index);
         tsdf_->removeBlock(index);
@@ -314,6 +316,7 @@ void ReconstructionModule::updateGvd() {
     // TODO(nathan) this critical section is broken
     std::unique_lock<std::mutex> lock(gvd_mutex_);
     gvd_integrator_->updateGvd(msg->timestamp_ns);
+    gvd_integrator_->archiveBlocks(archived_blocks);
   }  // end critical section
 
   if (config_.show_stats) {
@@ -392,11 +395,46 @@ void ReconstructionModule::addPlacesToOutput(ReconstructionOutput& output) {
   const auto& removed_nodes = extractor.getDeletedNodes();
   const auto& removed_edges = extractor.getDeletedEdges();
 
-  places.layer_contents = extractor.getGraph().serializeLayer(active_nodes);
+  const auto& graph = extractor.getGraph();
+  std::list<NodeId> invalid_nodes;
+  for (const auto& active_id : active_nodes) {
+    const auto& node = graph.getNode(active_id);
+    const auto& attrs = node->get().attributes<PlaceNodeAttributes>();
+    if (std::isnan(attrs.distance)) {
+      invalid_nodes.push_back(active_id);
+      continue;
+    }
+
+    if (attrs.position.hasNaN()) {
+      invalid_nodes.push_back(active_id);
+      continue;
+    }
+
+    for (const auto& info : attrs.voxblox_mesh_connections) {
+      if (std::isnan(info.voxel_pos[0]) || std::isnan(info.voxel_pos[1]) ||
+          std::isnan(info.voxel_pos[2])) {
+        invalid_nodes.push_back(active_id);
+        continue;
+      }
+    }
+  }
+
   places.deleted_nodes.insert(
       places.deleted_nodes.begin(), removed_nodes.begin(), removed_nodes.end());
   places.deleted_edges.insert(
       places.deleted_edges.begin(), removed_edges.begin(), removed_edges.end());
+
+  if (!invalid_nodes.empty()) {
+    LOG(ERROR) << "Nodes found with invalid attributes: "
+               << displayNodeSymbolContainer(invalid_nodes);
+    for (const auto& invalid_id : invalid_nodes) {
+      active_nodes.erase(invalid_id);
+      // TODO(nathan) think about this some more
+      places.deleted_nodes.push_back(invalid_id);
+    }
+  }
+
+  places.layer_contents = extractor.getGraph().serializeLayer(active_nodes);
   extractor.clearDeleted();
 
   VLOG(5) << "[Hydra Reconstruction] exporting " << active_nodes.size()

@@ -125,7 +125,7 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
   gvd_config.extract_graph = false;
 
   GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
-  gvd_integrator.updateFromTsdf(0, *tsdf_layer, *mesh_layer, false);
+  gvd_integrator.updateFromTsdf(0, *tsdf_layer, *vertex_layer, *mesh_layer, false);
   gvd_integrator.updateGvd(0);
 
   GvdResult result(4, 8);
@@ -171,7 +171,7 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
   setSurfaceVoxel(0, 2);
   setSurfaceVoxel(0, 3);
 
-  gvd_integrator.updateFromTsdf(0, *tsdf_layer, *mesh_layer, false);
+  gvd_integrator.updateFromTsdf(0, *tsdf_layer, *vertex_layer, *mesh_layer, false);
   gvd_integrator.updateGvd(0);
 
   for (int x = 0; x < voxels_per_side; ++x) {
@@ -250,8 +250,9 @@ TEST_F(TestFixture2d, NegativeIntegrationCorrect) {
   gvd_config.positive_distance_only = false;
   gvd_config.extract_graph = false;
 
-  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
-  gvd_integrator.update(0, false);
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
+  gvd_integrator.updateFromTsdf(0, *tsdf_layer, *vertex_layer, *mesh_layer, false);
+  gvd_integrator.updateGvd(0);
 
   GvdResult result(voxels_per_side, voxels_per_side);
   for (int x = 0; x < voxels_per_side; ++x) {

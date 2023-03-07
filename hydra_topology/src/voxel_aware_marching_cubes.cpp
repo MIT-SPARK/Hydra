@@ -36,6 +36,7 @@
 // Government is authorized to reproduce and distribute reprints for Government
 // purposes notwithstanding any copyright notation herein.
 #include "hydra_topology/voxel_aware_marching_cubes.h"
+
 #include "hydra_topology/gvd_utilities.h"
 
 namespace hydra {
@@ -48,8 +49,7 @@ static constexpr FloatingPoint kMinSdfDifference = 1e-6;
 void interpolateEdges(const PointMatrix& vertex_coords,
                       const SdfMatrix& vertex_sdf,
                       EdgeIndexMatrix& edge_coords,
-                      std::vector<uint8_t>& edge_status,
-                      const std::vector<GvdVoxel*>& gvd_voxels) {
+                      std::vector<uint8_t>& edge_status) {
   // we use the first two bits to denote status
   edge_status = std::vector<uint8_t>(12, 0);
   for (size_t i = 0; i < 12; ++i) {
@@ -76,16 +76,10 @@ void interpolateEdges(const PointMatrix& vertex_coords,
       edge_coords.col(i) = Point(0.5f * (vertex0 + vertex1));
       VLOG(15) << "- t=n/a"
                << ", v0=" << vertex0.transpose() << ", v1=" << vertex0.transpose()
-               << ", coord: " << edge_coords.col(i);
+               << ", coord: " << edge_coords.col(i).transpose();
 
-      if (gvd_voxels[edge0]) {
-        edge_status[i] |= 0x01;
-      }
-
-      if (gvd_voxels[edge1]) {
-        edge_status[i] |= 0x02;
-      }
-
+      edge_status[i] |= 0x01;
+      edge_status[i] |= 0x02;
       continue;
     }
 
@@ -93,13 +87,14 @@ void interpolateEdges(const PointMatrix& vertex_coords,
     const float t = sdf0 / sdf_diff;
     edge_coords.col(i) = Point(vertex0 + t * (vertex1 - vertex0));
     VLOG(15) << "- t=" << t << ", v0=" << vertex0.transpose()
-             << ", v1=" << vertex0.transpose() << ", coord: " << edge_coords.col(i);
+             << ", v1=" << vertex0.transpose()
+             << ", coord: " << edge_coords.col(i).transpose();
 
-    if (gvd_voxels[edge0] && std::abs(t) <= 0.5) {
+    if (std::abs(t) <= 0.5) {
       edge_status[i] |= 0x01;
     }
 
-    if (gvd_voxels[edge1] && std::abs(t) >= 0.5) {
+    if (std::abs(t) >= 0.5) {
       edge_status[i] |= 0x02;
     }
   }
@@ -126,21 +121,24 @@ inline void updateVoxels(const BlockIndex& block,
                          int edge_coord,
                          VertexIndex new_vertex_index,
                          const std::vector<uint8_t>& status,
-                         const std::vector<GvdVoxel*>& gvd_voxels,
-                         const std::vector<bool>& voxels_in_block) {
+                         const std::vector<VertexVoxel*>& vertex_voxels) {
   const int* pairs = voxblox::MarchingCubes::kEdgeIndexPairs[edge_coord];
   const uint8_t curr_status = status[edge_coord];
 
-  GvdVoxel* first_voxel = gvd_voxels[pairs[0]];
-  if (first_voxel && voxels_in_block[pairs[0]] && (curr_status & 0x01)) {
-    setGvdSurfaceVoxel(*first_voxel);
+  if (VLOG_IS_ON(15) && (curr_status & 0x01 || curr_status & 0x02)) {
+    VLOG(15) << "vertex added: " << new_vertex_index << " @ " << showIndex(block);
+  }
+
+  auto* first_voxel = vertex_voxels[pairs[0]];
+  if (first_voxel && (curr_status & 0x01)) {
+    first_voxel->on_surface = true;
     first_voxel->block_vertex_index = new_vertex_index;
     std::memcpy(first_voxel->mesh_block, block.data(), sizeof(first_voxel->mesh_block));
   }
 
-  GvdVoxel* second_voxel = gvd_voxels[pairs[1]];
-  if (second_voxel && voxels_in_block[pairs[1]] && (curr_status & 0x02)) {
-    setGvdSurfaceVoxel(*second_voxel);
+  auto* second_voxel = vertex_voxels[pairs[1]];
+  if (second_voxel && (curr_status & 0x02)) {
+    second_voxel->on_surface = true;
     second_voxel->block_vertex_index = new_vertex_index;
     std::memcpy(
         second_voxel->mesh_block, block.data(), sizeof(second_voxel->mesh_block));
@@ -152,8 +150,7 @@ void VoxelAwareMarchingCubes::meshCube(const BlockIndex& block,
                                        const SdfMatrix& vertex_sdf,
                                        VertexIndex* next_index,
                                        Mesh* mesh,
-                                       const std::vector<GvdVoxel*>& gvd_voxels,
-                                       const std::vector<bool>& voxels_in_block) {
+                                       const std::vector<VertexVoxel*>& voxels) {
   // TODO(nathan) references
   DCHECK(next_index != nullptr);
   DCHECK(mesh != nullptr);
@@ -167,9 +164,8 @@ void VoxelAwareMarchingCubes::meshCube(const BlockIndex& block,
   }
 
   EdgeIndexMatrix edge_vertex_coordinates;
-  std::vector<uint8_t> edge_status;
-  interpolateEdges(
-      vertex_coords, vertex_sdf, edge_vertex_coordinates, edge_status, gvd_voxels);
+  std::vector<uint8_t> status;
+  interpolateEdges(vertex_coords, vertex_sdf, edge_vertex_coordinates, status);
 
   const int* table_row = kTriangleTable[index];
 
@@ -193,24 +189,9 @@ void VoxelAwareMarchingCubes::meshCube(const BlockIndex& block,
 
     // mark voxels with a nearest vertex. overwriting is okay (as remapping downstream
     // tracks which vertices are the same)
-    updateVoxels(block,
-                 table_row[table_col + 2],
-                 *next_index,
-                 edge_status,
-                 gvd_voxels,
-                 voxels_in_block);
-    updateVoxels(block,
-                 table_row[table_col + 1],
-                 *next_index + 1,
-                 edge_status,
-                 gvd_voxels,
-                 voxels_in_block);
-    updateVoxels(block,
-                 table_row[table_col],
-                 *next_index + 2,
-                 edge_status,
-                 gvd_voxels,
-                 voxels_in_block);
+    updateVoxels(block, table_row[table_col + 2], *next_index, status, voxels);
+    updateVoxels(block, table_row[table_col + 1], *next_index + 1, status, voxels);
+    updateVoxels(block, table_row[table_col], *next_index + 2, status, voxels);
 
     *next_index += 3;
     table_col += 3;

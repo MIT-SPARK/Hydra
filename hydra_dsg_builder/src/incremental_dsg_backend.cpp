@@ -245,6 +245,32 @@ void DsgBackend::spinOnce(const BackendInput& input, bool force_update) {
     return;
   }
 
+  if (have_loopclosures_) {
+    double avg_distance = 0.0;
+    size_t num_valid = 0;
+    const auto& place_values = deformation_graph_->getGtsamTempValues();
+    for (const auto& id_node_pair :
+         private_dsg_->graph->getLayer(DsgLayers::PLACES).nodes()) {
+      const auto node_id = id_node_pair.first;
+      if (!place_values.exists(node_id)) {
+        continue;
+      }
+
+      const auto& attrs = id_node_pair.second->attributes();
+      const double dist =
+          (attrs.position - place_values.at<gtsam::Pose3>(node_id).translation())
+              .norm();
+      avg_distance += dist;
+      num_valid++;
+    }
+    if (num_valid) {
+      avg_distance /= num_valid;
+    }
+
+    LOG(ERROR) << "Average distance: " << avg_distance << ", Num valid: " << num_valid
+               << " / " << private_dsg_->graph->getLayer(DsgLayers::PLACES).numNodes();
+  }
+
   if (config_.optimize_on_lc && have_loopclosures_) {
     optimize(input.timestamp_ns);
   } else {
@@ -424,7 +450,10 @@ bool DsgBackend::updateFromLcdQueue() {
 
 bool DsgBackend::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
   std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
-  {  // start joint critical section
+  {                   // start joint critical section
+    cachePlacePos();  // save place positions before grabbing new attributes from
+                      // frontend
+
     std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
     if (!force_update && shared_dsg_->last_update_time > timestamp_ns) {
       return false;
@@ -467,13 +496,40 @@ bool DsgBackend::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
         shared_places_copy_.removeNode(place_id);
       }
     }
-  }  // end joint critical section
+
+    updatePlacePosFromCache();  // copy optimized positions back
+  }                             // end joint critical section
 
   if (config_.should_log) {
     backend_graph_logger_.logGraph(private_dsg_->graph);
   }
 
   return true;
+}
+
+void DsgBackend::cachePlacePos() {
+  place_pos_cache_.clear();
+  const auto& places = private_dsg_->graph->getLayer(DsgLayers::PLACES);
+  for (const auto& id_node_pair : places.nodes()) {
+    const auto& attributes = id_node_pair.second->attributes();
+    if (attributes.is_active) {
+      continue;
+    }
+
+    place_pos_cache_.emplace(id_node_pair.first, attributes.position);
+  }
+}
+
+void DsgBackend::updatePlacePosFromCache() {
+  const auto& places = private_dsg_->graph->getLayer(DsgLayers::PLACES);
+  for (const auto& id_node_pair : places.nodes()) {
+    auto iter = place_pos_cache_.find(id_node_pair.first);
+    if (iter == place_pos_cache_.end()) {
+      continue;
+    }
+
+    id_node_pair.second->attributes().position = iter->second;
+  }
 }
 
 void DsgBackend::addPlacesToDeformationGraph(size_t timestamp_ns) {

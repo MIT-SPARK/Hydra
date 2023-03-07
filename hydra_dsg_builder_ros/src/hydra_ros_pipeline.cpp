@@ -33,8 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_dsg_builder_ros/hydra_ros_pipeline.h"
-#include "hydra_dsg_builder_ros/ros_lcd_registration.h"
 
+#include "hydra_dsg_builder_ros/ros_lcd_registration.h"
 #include "hydra_utils/ros_utilities.h"
 
 namespace hydra {
@@ -132,8 +132,11 @@ HydraRosPipeline::HydraRosPipeline(const ros::NodeHandle& node_handle, int robot
   }
 }
 
-void HydraRosPipeline::bowCallback(const pose_graph_tools::BowQuery::ConstPtr& msg) {
-  shared_state->visual_lcd_queue.push(msg);
+void HydraRosPipeline::bowCallback(const pose_graph_tools::BowQueries::ConstPtr& msg) {
+  for (const auto& query : msg->queries) {
+    shared_state->visual_lcd_queue.push(
+        pose_graph_tools::BowQuery::ConstPtr(new pose_graph_tools::BowQuery(query)));
+  }
 }
 
 void HydraRosPipeline::start() {

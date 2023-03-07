@@ -43,7 +43,7 @@ pgmo:
     mesh_mesh: 1.0e-02
     pose_mesh: 1.0e-02
     place_mesh: 1.0e-02
-    place_edge: 1.0e-02
+    place_edge: 10.0
     place_merge: 10.0
     object_merge: 10.0
 building_semantic_label: 22
@@ -59,7 +59,7 @@ room_finder:
   min_room_size: 10
   dilation_threshold_mode: PLATEAU
   min_lifetime_length_m: 0.1
-  plateau_ratio: 0.25
+  plateau_ratio: 0.15
   clustering_mode: NEIGHBORS
   max_modularity_iters: 5
   modularity_gamma: 1.0

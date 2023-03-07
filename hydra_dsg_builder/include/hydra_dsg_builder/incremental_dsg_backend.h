@@ -145,6 +145,10 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   void logIncrementalLoopClosures(const pose_graph_tools::PoseGraph& msg);
 
+  void cachePlacePos();
+
+  void updatePlacePosFromCache();
+
  protected:
   std::unique_ptr<std::thread> spin_thread_;
   std::atomic<bool> should_shutdown_{false};
@@ -156,6 +160,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   RobotPrefixConfig prefix_;
   DsgBackendConfig config_;
+
+  std::unordered_map<NodeId, Eigen::Vector3d> place_pos_cache_;
 
   SharedDsgInfo::Ptr shared_dsg_;
   SharedDsgInfo::Ptr private_dsg_;

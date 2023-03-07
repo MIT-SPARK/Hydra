@@ -53,8 +53,8 @@ class EsdfTestFixture : public ::testing::Test {
 
   size_t num_angles = 20;
   size_t num_poses = 1;
-  size_t pose_radius = 6.0;
-  size_t pose_height = 2.0;
+  double pose_radius = 6.0;
+  double pose_height = 2.0;
   double camera_pitch = 0.1;
 
   int depth_camera_width = 320;
@@ -148,11 +148,13 @@ class TestFixture2d : public ::testing::Test {
 
   Layer<TsdfVoxel>::Ptr tsdf_layer;
   Layer<GvdVoxel>::Ptr gvd_layer;
+  Layer<VertexVoxel>::Ptr vertex_layer;
   MeshLayer::Ptr mesh_layer;
 
   GvdIntegratorConfig gvd_config;
   voxblox::Block<voxblox::TsdfVoxel>::Ptr tsdf_block;
   voxblox::Block<GvdVoxel>::Ptr gvd_block;
+  voxblox::Block<VertexVoxel>::Ptr vertex_block;
 };
 
 }  // namespace test_helpers

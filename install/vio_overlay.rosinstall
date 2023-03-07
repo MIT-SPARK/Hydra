@@ -17,8 +17,8 @@
 - git:
     local-name: kimera_vio_ros
     uri: git@github.mit.edu:SPARK/Kimera-VIO-ROS.git
-    version: feature/rgbd_pipeline
+    version: master
 - git:
     local-name: hydra_vio_configs
     uri: git@github.mit.edu:SPARK/hydra_vio_configs.git
-    version: master
+    version: main

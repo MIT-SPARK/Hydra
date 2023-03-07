@@ -38,6 +38,7 @@
 
 #include <hydra_dsg_builder/incremental_dsg_lcd.h>
 #include <hydra_topology/ros_reconstruction.h>
+#include <pose_graph_tools/BowQueries.h>
 
 namespace hydra {
 
@@ -58,7 +59,7 @@ struct HydraRosPipeline {
 
   void save(const std::string& output_path);
 
-  void bowCallback(const pose_graph_tools::BowQuery::ConstPtr& msg);
+  void bowCallback(const pose_graph_tools::BowQueries::ConstPtr& msg);
 
   void sendFrontendGraph(const DynamicSceneGraph& graph, uint64_t timestamp_ns);
 

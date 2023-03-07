@@ -51,10 +51,12 @@ class ComboIntegrator {
                   const MeshLayer::Ptr& mesh_layer,
                   const voxblox::MeshIntegratorConfig* mesh_config = nullptr)
       : tsdf_(tsdf_layer), mesh_(mesh_layer) {
+    vertices_.reset(
+        new Layer<VertexVoxel>(gvd_layer->voxel_size(), gvd_layer->voxels_per_side()));
     mesh_integrator = std::make_unique<VoxelAwareMeshIntegrator>(
         mesh_config ? *mesh_config : voxblox::MeshIntegratorConfig(),
         tsdf_layer,
-        gvd_layer.get(),
+        vertices_,
         mesh_layer.get());
     gvd_integrator = std::make_unique<GvdIntegrator>(gvd_config, gvd_layer);
   }
@@ -74,7 +76,7 @@ class ComboIntegrator {
                      bool use_all_blocks = false) {
     mesh_integrator->generateMesh(!use_all_blocks, clear_updated_flag);
     gvd_integrator->updateFromTsdf(
-        timestamp_ns, *tsdf_, *mesh_, clear_updated_flag, use_all_blocks);
+        timestamp_ns, *tsdf_, *vertices_, *mesh_, clear_updated_flag, use_all_blocks);
     gvd_integrator->updateGvd(timestamp_ns);
   }
 
@@ -84,6 +86,7 @@ class ComboIntegrator {
  protected:
   Layer<TsdfVoxel>* tsdf_;
   MeshLayer::Ptr mesh_;
+  Layer<VertexVoxel>::Ptr vertices_;
 };
 
 }  // namespace topology
