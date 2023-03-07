@@ -46,6 +46,8 @@ namespace config_parser {
 struct Logger {
   using Ptr = std::shared_ptr<Logger>;
 
+  virtual ~Logger() = default;
+
   virtual void log_missing(const std::string& message) const = 0;
 
   virtual void log_invalid(const std::string& message) const {

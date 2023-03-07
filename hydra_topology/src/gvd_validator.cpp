@@ -111,7 +111,7 @@ size_t getMissingBlocks(const Layer<GvdVoxel>& layer,
                         const BlockIndexList blocks,
                         const Layer<GvdVoxel>& other_layer) {
   size_t num_missing = 0;
-  for (const auto idx : blocks) {
+  for (const auto& idx : blocks) {
     if (other_layer.hasBlock(idx)) {
       continue;
     }
@@ -137,7 +137,7 @@ ComparisonResult compareLayers(const Layer<GvdVoxel>& lhs, const Layer<GvdVoxel>
   results.num_missing_lhs = getMissingBlocks(rhs, rhs_blocks, lhs);
   results.num_missing_rhs = getMissingBlocks(lhs, lhs_blocks, rhs);
 
-  for (const auto idx : lhs_blocks) {
+  for (const auto& idx : lhs_blocks) {
     if (!rhs.hasBlock(idx)) {
       continue;
     }

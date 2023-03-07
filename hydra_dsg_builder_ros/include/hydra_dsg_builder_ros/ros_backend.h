@@ -92,7 +92,7 @@ class RosBackendVisualizer {
                        const DsgBackendConfig& config,
                        const RobotPrefixConfig& prefix);
 
-  ~RosBackendVisualizer() = default;
+  virtual ~RosBackendVisualizer() = default;
 
   void publishOutputs(const DynamicSceneGraph& graph,
                       const kimera_pgmo::DeformationGraph& dgraph,

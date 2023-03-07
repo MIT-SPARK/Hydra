@@ -33,12 +33,12 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_utils/config_formatter.h"
-
 #include <map>
 #include <ostream>
 #include <set>
 #include <vector>
+
+#include "hydra_utils/config_formatter.h"
 
 namespace config_parser {
 
@@ -59,6 +59,48 @@ inline void displayParam<bool>(std::ostream& out, const bool& value) {
   out << (value ? "true" : "false");
 }
 
+template <typename T, typename Alloc = std::allocator<T>>
+inline void displayParam(std::ostream& out, const std::vector<T, Alloc>& values) {
+  out << "[";
+  auto iter = values.begin();
+  while (iter != values.end()) {
+    out << *iter;
+    ++iter;
+    if (iter != values.end()) {
+      out << ", ";
+    }
+  }
+  out << "]";
+}
+
+template <typename T>
+inline void displayParam(std::ostream& out, const std::set<T>& values) {
+  out << "[";
+  auto iter = values.begin();
+  while (iter != values.end()) {
+    out << *iter;
+    ++iter;
+    if (iter != values.end()) {
+      out << ", ";
+    }
+  }
+  out << "]";
+}
+
+template <typename K, typename V>
+inline void displayParam(std::ostream& out, const std::map<K, V>& values) {
+  out << "{";
+  auto iter = values.begin();
+  while (iter != values.end()) {
+    out << iter->first << ": " << iter->second;
+    ++iter;
+    if (iter != values.end()) {
+      out << ", ";
+    }
+  }
+  out << "}";
+}
+
 // adl indirection
 struct display_param_fn {
   template <typename T>
@@ -75,53 +117,6 @@ namespace {
 constexpr const auto& displayParam = detail::static_const<detail::display_param_fn>;
 
 }  // namespace
-
-// make sure vector operator is present in the right namespace
-template <typename T, typename Alloc = std::allocator<T>>
-std::ostream& operator<<(std::ostream& out, const std::vector<T, Alloc>& values) {
-  out << "[";
-  auto iter = values.begin();
-  while (iter != values.end()) {
-    out << *iter;
-    ++iter;
-    if (iter != values.end()) {
-      out << ", ";
-    }
-  }
-  out << "]";
-  return out;
-}
-
-// make sure vector operator is present in the right namespace
-template <typename T>
-std::ostream& operator<<(std::ostream& out, const std::set<T>& values) {
-  out << "[";
-  auto iter = values.begin();
-  while (iter != values.end()) {
-    out << *iter;
-    ++iter;
-    if (iter != values.end()) {
-      out << ", ";
-    }
-  }
-  out << "]";
-  return out;
-}
-
-template <typename K, typename V>
-std::ostream& operator<<(std::ostream& out, const std::map<K, V>& values) {
-  out << "{";
-  auto iter = values.begin();
-  while (iter != values.end()) {
-    out << iter->first << ": " << iter->second;
-    ++iter;
-    if (iter != values.end()) {
-      out << ", ";
-    }
-  }
-  out << "}";
-  return out;
-}
 
 class OstreamFormatImpl {
  public:

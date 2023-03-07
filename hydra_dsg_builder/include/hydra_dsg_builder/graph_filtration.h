@@ -108,6 +108,7 @@ std::optional<FiltrationInfo> getLongestLifetimeDilation(const Filtration& value
 std::optional<FiltrationInfo> getBestPlateau(const Filtration& values,
                                              double ratio,
                                              size_t start_index,
-                                             size_t end_index);
+                                             size_t end_index,
+                                             bool use_threshold = false);
 
 }  // namespace hydra

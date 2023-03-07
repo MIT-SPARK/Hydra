@@ -39,7 +39,12 @@ namespace hydra {
 
 enum class RoomClusterMode { MODULARITY, MODULARITY_DISTANCE, NEIGHBORS, NONE };
 
-enum class DilationThresholdMode { REPEATED, LONGEST_LIFETIME, PLATEAU };
+enum class DilationThresholdMode {
+  REPEATED,
+  LONGEST_LIFETIME,
+  PLATEAU,
+  PLATEAU_THRESHOLD
+};
 
 }  // namespace hydra
 
@@ -54,7 +59,8 @@ DECLARE_CONFIG_ENUM(hydra,
                     DilationThresholdMode,
                     {DilationThresholdMode::REPEATED, "REPEATED"},
                     {DilationThresholdMode::LONGEST_LIFETIME, "LONGEST_LIFETIME"},
-                    {DilationThresholdMode::PLATEAU, "PLATEAU"})
+                    {DilationThresholdMode::PLATEAU, "PLATEAU"},
+                    {DilationThresholdMode::PLATEAU_THRESHOLD, "PLATEAU_THRESHOLD"})
 
 namespace hydra {
 

@@ -211,7 +211,7 @@ void DsgFrontend::updateMeshAndObjects(const ReconstructionOutput& input) {
   {  // start timing scope
     ScopedTimer timer("frontend/mesh_archive", input.timestamp_ns, true, 1, false);
     voxblox::BlockIndexList to_archive;
-    for (const auto block : input.mesh->archived_blocks.mesh_blocks) {
+    for (const auto& block : input.mesh->archived_blocks.mesh_blocks) {
       to_archive.push_back({static_cast<int>(block.index[0]),
                             static_cast<int>(block.index[1]),
                             static_cast<int>(block.index[2])});
@@ -405,7 +405,8 @@ void DsgFrontend::updatePoseGraph(const ReconstructionOutput& input) {
 
       const std::chrono::nanoseconds stamp(node.header.stamp.toNSec());
       VLOG(5) << "[Hydra Frontend] Adding agent " << agents.nodes().size() << " @ "
-              << stamp.count() << " [ns] for layer " << agents.prefix.str();
+              << stamp.count() << " [ns] for layer " << agents.prefix.str()
+              << " (key: " << node.key << ")";
       auto attrs = std::make_unique<AgentNodeAttributes>(rotation, position, pgmo_key);
       if (!dsg_->graph->emplaceNode(
               agents.id, agents.prefix, stamp, std::move(attrs))) {

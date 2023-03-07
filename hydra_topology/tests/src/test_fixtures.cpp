@@ -203,12 +203,12 @@ void TestFixture2d::setSurfaceVoxel(int x, int y) {
   VoxelIndex v_index;
   v_index << x, y, 0;
 
-  auto& gvd_voxel = gvd_block->getVoxelByVoxelIndex(v_index);
-  gvd_voxel.on_surface = true;
-  gvd_voxel.block_vertex_index = 0;
-  gvd_voxel.mesh_block[0] = 0;
-  gvd_voxel.mesh_block[1] = 0;
-  gvd_voxel.mesh_block[2] = 0;
+  auto& voxel = vertex_block->getVoxelByVoxelIndex(v_index);
+  voxel.on_surface = true;
+  voxel.block_vertex_index = 0;
+  voxel.mesh_block[0] = 0;
+  voxel.mesh_block[1] = 0;
+  voxel.mesh_block[2] = 0;
 }
 
 void TestFixture2d::setTsdfVoxel(int x, int y, float distance, float weight) {
@@ -222,15 +222,15 @@ void TestFixture2d::setTsdfVoxel(int x, int y, float distance, float weight) {
   voxel.distance = distance;
   voxel.weight = weight;
 
-  auto& gvd_voxel = gvd_block->getVoxelByVoxelIndex(v_index);
+  auto& vertex_voxel = vertex_block->getVoxelByVoxelIndex(v_index);
   if (distance == 0.0) {
-    setGvdSurfaceVoxel(gvd_voxel);
-    gvd_voxel.block_vertex_index = 0;
-    gvd_voxel.mesh_block[0] = 0;
-    gvd_voxel.mesh_block[1] = 0;
-    gvd_voxel.mesh_block[2] = 0;
+    vertex_voxel.on_surface = true;
+    vertex_voxel.block_vertex_index = 0;
+    vertex_voxel.mesh_block[0] = 0;
+    vertex_voxel.mesh_block[1] = 0;
+    vertex_voxel.mesh_block[2] = 0;
   } else {
-    gvd_voxel.on_surface = false;
+    vertex_voxel.on_surface = false;
   }
 }
 
@@ -247,11 +247,13 @@ const GvdVoxel& TestFixture2d::getGvdVoxel(int x, int y) {
 void TestFixture2d::SetUp() {
   tsdf_layer.reset(new Layer<TsdfVoxel>(voxel_size, voxels_per_side));
   gvd_layer.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
+  vertex_layer.reset(new Layer<VertexVoxel>(voxel_size, voxels_per_side));
   mesh_layer.reset(new MeshLayer(voxel_size * voxels_per_side));
 
   BlockIndex block_index = BlockIndex::Zero();
   tsdf_block = tsdf_layer->allocateBlockPtrByIndex(block_index);
   gvd_block = gvd_layer->allocateBlockPtrByIndex(block_index);
+  vertex_block = vertex_layer->allocateBlockPtrByIndex(block_index);
   // we need this to be allocated so we can avoid doing mesh integration
   auto mesh_block = mesh_layer->allocateMeshPtrByIndex(block_index);
   mesh_block->resize(1);

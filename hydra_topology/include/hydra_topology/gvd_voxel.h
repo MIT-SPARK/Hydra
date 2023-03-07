@@ -40,6 +40,12 @@
 namespace hydra {
 namespace topology {
 
+struct VertexVoxel {
+  bool on_surface = false;
+  size_t block_vertex_index;
+  int32_t mesh_block[3];
+};
+
 // TODO(nathan) packed?
 struct GvdVoxel {
   float distance;
@@ -58,8 +64,7 @@ struct GvdVoxel {
   // required for removing blocks (parents leave a dangling reference otherwise)
   voxblox::Point::Scalar parent_pos[3];
 
-  // TODO(nathan) leave this unitialized
-  size_t block_vertex_index = 123456789;
+  size_t block_vertex_index;
   int32_t mesh_block[3];
 };
 
@@ -134,6 +139,15 @@ inline Eigen::Matrix<Scalar, 3, 1> getVoxelPosition(const Layer<GvdVoxel>& layer
   return layer.getBlockByIndex(block_idx)
       .computeCoordinatesFromVoxelIndex(voxel_idx)
       .cast<Scalar>();
+}
+
+template <typename Scalar>
+std::string showIndex(const Eigen::Matrix<Scalar, 3, 1>& vector) {
+  std::stringstream ss;
+  const Eigen::IOFormat format(
+      Eigen::FullPrecision, Eigen::DontAlignCols, ", ", ", ", "", "", "[", "]");
+  ss << vector.format(format);
+  return ss.str();
 }
 
 }  // namespace topology

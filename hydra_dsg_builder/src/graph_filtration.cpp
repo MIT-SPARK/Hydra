@@ -501,7 +501,8 @@ std::optional<FiltrationInfo> getLongestLifetimeDilation(const Filtration& value
 std::optional<FiltrationInfo> getBestPlateau(const Filtration& values,
                                              double ratio,
                                              size_t start_index,
-                                             size_t end_index) {
+                                             size_t end_index,
+                                             bool use_threshold) {
   if (start_index >= values.size()) {
     return std::nullopt;
   }
@@ -542,7 +543,7 @@ std::optional<FiltrationInfo> getBestPlateau(const Filtration& values,
 
   CHECK(!lifetimes.empty());
   const double max_lifetime = *std::max_element(lifetimes.begin(), lifetimes.end());
-  const double threshold = ratio * max_lifetime;
+  const double threshold = use_threshold ? ratio : ratio * max_lifetime;
   VLOG(5) << "[Room Finder] Max lifetime: " << max_lifetime << ", Ratio: " << ratio
           << ", Threshold: " << threshold;
 
