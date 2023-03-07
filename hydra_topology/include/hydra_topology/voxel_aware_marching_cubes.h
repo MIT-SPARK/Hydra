@@ -33,10 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <voxblox/mesh/marching_cubes.h>
+
 #include "hydra_topology/gvd_voxel.h"
 #include "hydra_topology/voxblox_types.h"
-
-#include <voxblox/mesh/marching_cubes.h>
 
 namespace hydra {
 namespace topology {
@@ -48,8 +48,7 @@ using EdgeIndexMatrix = Eigen::Matrix<FloatingPoint, 3, 12>;
 void interpolateEdges(const PointMatrix& vertex_coords,
                       const SdfMatrix& vertex_sdf,
                       EdgeIndexMatrix& edge_coords,
-                      std::vector<uint8_t>& edge_status,
-                      const std::vector<GvdVoxel*>& gvd_voxels);
+                      std::vector<uint8_t>& edge_status);
 
 /**
  * Performs the marching cubes algorithm to generate a mesh layer from a TSDF.
@@ -67,8 +66,7 @@ class VoxelAwareMarchingCubes : voxblox::MarchingCubes {
                        const SdfMatrix& vertex_sdf,
                        VertexIndex* next_index,
                        Mesh* mesh,
-                       const std::vector<GvdVoxel*>& gvd_voxels,
-                       const std::vector<bool>& voxels_in_block);
+                       const std::vector<VertexVoxel*>& vertex_voxels);
 };
 
 }  // namespace topology

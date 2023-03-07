@@ -1,0 +1,9 @@
+dsg:
+  zmq_num_threads: 2
+  zmq_poll_time_ms: 10
+min_mesh_separation_s: 0.5
+frontend_mesh_separation_s: 0.5
+topology_visualizer_ns: "~/topology_visualizer"
+enable_reconstruction_output_queue: true
+disable_timer_output: true
+timing_disabled: false

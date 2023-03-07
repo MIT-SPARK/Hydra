@@ -74,7 +74,7 @@ size_t getMissingBlocks(const voxblox::Layer<LhsVoxel>& layer,
                         const voxblox::BlockIndexList blocks,
                         const voxblox::Layer<RhsVoxel>& other_layer) {
   size_t num_missing = 0;
-  for (const auto idx : blocks) {
+  for (const auto& idx : blocks) {
     if (other_layer.hasBlock(idx)) {
       continue;
     }
@@ -113,7 +113,7 @@ LayerComparisonResult compareLayers(const voxblox::Layer<LhsVoxel>& lhs,
   results.num_missing_lhs = getMissingBlocks(rhs, rhs_blocks, lhs);
   results.num_missing_rhs = getMissingBlocks(lhs, lhs_blocks, rhs);
 
-  for (const auto idx : lhs_blocks) {
+  for (const auto& idx : lhs_blocks) {
     if (!rhs.hasBlock(idx)) {
       continue;
     }

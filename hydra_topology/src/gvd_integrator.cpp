@@ -94,6 +94,7 @@ GraphExtractorInterface& GvdIntegrator::getGraphExtractor() const {
 
 void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
                                    Layer<TsdfVoxel>& tsdf,
+                                   const Layer<VertexVoxel>& vertices,
                                    const MeshLayer& mesh,
                                    bool clear_updated_flag,
                                    bool use_all_blocks) {
@@ -109,7 +110,8 @@ void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
   update_stats_.clear();
 
   for (const BlockIndex& idx : blocks) {
-    processTsdfBlock(tsdf.getBlockByIndex(idx), mesh, idx);
+    propagateSurface(idx, mesh, vertices);
+    processTsdfBlock(tsdf.getBlockByIndex(idx), idx);
   }
 
   if (!clear_updated_flag) {
@@ -131,10 +133,11 @@ void GvdIntegrator::updateGvd(uint64_t timestamp_ns) {
     processOpenQueue();
   }  // timing scope
 
+  parent_tracker_.updateVertexMapping(*gvd_layer_);
+
   if (config_.extract_graph) {
     VLOG(3) << "[GVD update] Starting graph extraction";
     ScopedTimer timer("topology/graph_extractor", timestamp_ns);
-    parent_tracker_.updateVertexMapping(*gvd_layer_);
     graph_extractor_->extract(*gvd_layer_, timestamp_ns);
     graph_extractor_->assignMeshVertices(
         *gvd_layer_, parent_tracker_.parents, parent_tracker_.parent_vertices);
@@ -163,6 +166,7 @@ void GvdIntegrator::archiveBlocks(const BlockIndexList& blocks) {
       parent_tracker_.removeVoronoiFromGvdParentMap(global_index);
     }
 
+    VLOG(5) << "Removing block: " << idx.transpose();
     gvd_layer_->removeBlock(idx);
   }
 }
@@ -270,8 +274,45 @@ void GvdIntegrator::updateVoronoiQueue(GvdVoxel& voxel,
 /* TSDF Propagation */
 /****************************************************************************************/
 
-void GvdIntegrator::processTsdfBlock(const Block<TsdfVoxel>& tsdf_block,
+void GvdIntegrator::propagateSurface(const BlockIndex& block_index,
                                      const MeshLayer& mesh,
+                                     const Layer<VertexVoxel>& vertices) {
+  const auto& vertex_block = vertices.getBlockByIndex(block_index);
+  auto gvd_block = gvd_layer_->allocateBlockPtrByIndex(block_index);
+
+  for (size_t idx = 0u; idx < vertex_block.num_voxels(); ++idx) {
+    const auto& vertex_voxel = vertex_block.getVoxelByLinearIndex(idx);
+    auto& gvd_voxel = gvd_block->getVoxelByLinearIndex(idx);
+
+    // latches surface status from mesh integrator
+    gvd_voxel.on_surface = vertex_voxel.on_surface;
+    if (!gvd_voxel.on_surface) {
+      continue;
+    }
+
+    resetParent(gvd_voxel);  // surface voxels don't have parents
+
+    const auto vertex_idx = vertex_voxel.block_vertex_index;
+    BlockIndex mesh_block_index = Eigen::Map<const BlockIndex>(vertex_voxel.mesh_block);
+    const auto mesh_block = mesh.getMeshPtrByIndex(mesh_block_index);
+    CHECK(mesh_block) << "bad mesh index: " << showIndex(mesh_block_index)
+                      << " (block: " << showIndex(block_index) << ")";
+    CHECK_LT(vertex_idx, mesh_block->vertices.size())
+        << "gvd block: " << block_index.transpose()
+        << " mesh index: " << mesh_block_index.transpose();
+
+    const auto& pos = mesh_block->vertices.at(vertex_idx);
+    gvd_voxel.parent_pos[0] = pos.x();
+    gvd_voxel.parent_pos[1] = pos.y();
+    gvd_voxel.parent_pos[2] = pos.z();
+
+    std::memcpy(
+        gvd_voxel.mesh_block, vertex_voxel.mesh_block, sizeof(gvd_voxel.mesh_block));
+    gvd_voxel.block_vertex_index = vertex_idx;
+  }
+}
+
+void GvdIntegrator::processTsdfBlock(const Block<TsdfVoxel>& tsdf_block,
                                      const BlockIndex& block_index) {
   // Allocate the same block in the ESDF layer.
   auto gvd_block = gvd_layer_->getBlockPtrByIndex(block_index);
@@ -295,19 +336,6 @@ void GvdIntegrator::processTsdfBlock(const Block<TsdfVoxel>& tsdf_block,
     } else {
       updateObservedVoxel(tsdf_voxel, global_index, gvd_voxel);
     }
-
-    if (!gvd_voxel.on_surface) {
-      continue;
-    }
-
-    BlockIndex block_index = Eigen::Map<const BlockIndex>(gvd_voxel.mesh_block);
-    const auto& mesh_block = mesh.getMeshPtrByIndex(block_index);
-
-    CHECK_LT(gvd_voxel.block_vertex_index, mesh_block->vertices.size());
-    const auto& pos = mesh_block->vertices.at(gvd_voxel.block_vertex_index);
-    gvd_voxel.parent_pos[0] = pos.x();
-    gvd_voxel.parent_pos[1] = pos.y();
-    gvd_voxel.parent_pos[2] = pos.z();
   }
 }
 
@@ -507,6 +535,7 @@ void GvdIntegrator::lowerVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
     if (!setFixedParent(*gvd_layer_, neighbor_indices_, voxel)) {
       update_stats_.number_fixed_no_parent++;
       VLOG(5) << "[GVD Update] Unable to set parent for fixed voxel: " << voxel;
+      return;
     } else {
       VLOG(10) << "set new parent: " << voxel << " @ " << index.transpose();
     }

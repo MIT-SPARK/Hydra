@@ -71,6 +71,7 @@ class GvdIntegrator {
 
   void updateFromTsdf(uint64_t timestamp_ns,
                       Layer<TsdfVoxel>& tsdf,
+                      const Layer<VertexVoxel>& vertices,
                       const MeshLayer& mesh,
                       bool clear_updated_flag,
                       bool use_all_blocks = false);
@@ -96,9 +97,11 @@ class GvdIntegrator {
                           const GlobalIndex& neighbor_pos);
 
   // TSDF propagation
-  void processTsdfBlock(const Block<TsdfVoxel>& block,
+  void propagateSurface(const BlockIndex& block_index,
                         const MeshLayer& mesh,
-                        const BlockIndex& index);
+                        const Layer<VertexVoxel>& vertices);
+
+  void processTsdfBlock(const Block<TsdfVoxel>& block, const BlockIndex& index);
 
   void updateUnobservedVoxel(const TsdfVoxel& tsdf_voxel,
                              const GlobalIndex& index,

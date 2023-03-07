@@ -40,14 +40,6 @@ namespace hydra {
 
 namespace {
 
-inline const DynamicSceneGraphNode& makeDefaultAgentNode(DynamicSceneGraph& graph) {
-  using namespace std::chrono_literals;
-  Eigen::Quaterniond q = Eigen::Quaterniond::Identity();
-  Eigen::Vector3d t = Eigen::Vector3d::Zero();
-  graph.emplaceNode(2, 'a', 10ns, std::make_unique<AgentNodeAttributes>(q, t, 0));
-  return graph.getDynamicNode(NodeSymbol('a', 0)).value();
-}
-
 inline void emplacePlaceNode(DynamicSceneGraph& graph,
                              const Eigen::Vector3d& pos,
                              double distance,

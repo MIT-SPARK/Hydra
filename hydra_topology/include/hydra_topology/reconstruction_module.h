@@ -147,6 +147,7 @@ class ReconstructionModule {
   voxblox::Layer<voxblox::TsdfVoxel>::Ptr tsdf_;
   voxblox::Layer<kimera::SemanticVoxel>::Ptr semantics_;
   voxblox::Layer<topology::GvdVoxel>::Ptr gvd_;
+  voxblox::Layer<topology::VertexVoxel>::Ptr vertices_;
   voxblox::MeshLayer::Ptr mesh_;
 
   std::unique_ptr<voxblox::TsdfIntegratorBase> tsdf_integrator_;

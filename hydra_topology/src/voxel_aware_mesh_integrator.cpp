@@ -37,11 +37,13 @@
 // Government is authorized to reproduce and distribute reprints for Government
 // purposes notwithstanding any copyright notation herein.
 #include "hydra_topology/voxel_aware_mesh_integrator.h"
-#include "hydra_topology/voxel_aware_marching_cubes.h"
 
 #include <glog/logging.h>
-
 #include <voxblox/utils/meshing_utils.h>
+
+#include <iomanip>
+
+#include "hydra_topology/voxel_aware_marching_cubes.h"
 
 namespace hydra {
 namespace topology {
@@ -54,15 +56,16 @@ namespace vutils = voxblox::utils;
 
 using TsdfLayer = Layer<TsdfVoxel>;
 using TsdfBlock = Block<TsdfVoxel>;
-using GvdLayer = Layer<GvdVoxel>;
+using VertexLayer = Layer<VertexVoxel>;
 using GvdBlock = Block<GvdVoxel>;
 
 VoxelAwareMeshIntegrator::VoxelAwareMeshIntegrator(const MeshIntegratorConfig& config,
                                                    TsdfLayer* sdf_layer,
-                                                   GvdLayer* gvd_layer,
+                                                   const VertexLayer::Ptr& vertex_layer,
                                                    MeshLayer* mesh_layer)
-    : MeshIntegrator<TsdfVoxel>(config, sdf_layer, mesh_layer), gvd_layer_(gvd_layer) {
-  DCHECK(gvd_layer != nullptr);
+    : MeshIntegrator<TsdfVoxel>(config, sdf_layer, mesh_layer),
+      vertex_layer_(vertex_layer) {
+  DCHECK(vertex_layer_ != nullptr);
   cube_coord_offsets_ = cube_index_offsets_.cast<FloatingPoint>() * voxel_size_;
 }
 
@@ -97,19 +100,30 @@ void VoxelAwareMeshIntegrator::generateMesh(bool only_mesh_updated_blocks,
   }
 
   for (const BlockIndex& block_index : blocks) {
-    mesh_layer_->allocateMeshPtrByIndex(block_index);
+    auto mesh = mesh_layer_->allocateMeshPtrByIndex(block_index);
+    mesh->clear();
 
     // also allocate gvd blocks
-    auto gvd_block = gvd_layer_->allocateBlockPtrByIndex(block_index);
+    auto vertex_block = vertex_layer_->allocateBlockPtrByIndex(block_index);
 
     // we need to reset these so that marching cubes can assign them correctly
-    for (size_t idx = 0u; idx < gvd_block->num_voxels(); ++idx) {
-      gvd_block->getVoxelByLinearIndex(idx).on_surface = false;
+    for (size_t idx = 0u; idx < vertex_block->num_voxels(); ++idx) {
+      vertex_block->getVoxelByLinearIndex(idx).on_surface = false;
     }
   }
 
+  // interior then exterior, but order shouldn't matter
   launchThreads(blocks, true);
   launchThreads(blocks, false);
+
+  if (VLOG_IS_ON(10)) {
+    VLOG(10) << "Updated blocks:";
+    for (const auto& idx : blocks) {
+      const auto& block = mesh_layer_->getMeshByIndex(idx);
+      VLOG(10) << "  - " << std::setw(4) << std::setfill(' ') << block.vertices.size()
+               << " vertices @ " << showIndex(idx);
+    }
+  }
 
   if (clear_updated_flag) {
     for (const auto& block_idx : blocks) {
@@ -140,8 +154,8 @@ void VoxelAwareMeshIntegrator::processExterior(const BlockIndexList& blocks,
 }
 
 void VoxelAwareMeshIntegrator::updateBlockInterior(const BlockIndex& block_index) {
+  VLOG(10) << "Extracting interior for block: " << showIndex(block_index);
   auto mesh = mesh_layer_->getMeshPtrByIndex(block_index);
-  mesh->clear();
   auto block = sdf_layer_const_->getBlockPtrByIndex(block_index);
   DCHECK(block) << "invalid SDF block for mesh";
 
@@ -161,6 +175,7 @@ void VoxelAwareMeshIntegrator::updateBlockInterior(const BlockIndex& block_index
 }
 
 void VoxelAwareMeshIntegrator::updateBlockExterior(const BlockIndex& block_index) {
+  VLOG(10) << "Extracting exterior for block: " << showIndex(block_index);
   auto mesh = mesh_layer_->getMeshPtrByIndex(block_index);
   auto block = sdf_layer_const_->getBlockPtrByIndex(block_index);
 
@@ -205,134 +220,102 @@ void VoxelAwareMeshIntegrator::updateBlockExterior(const BlockIndex& block_index
   mesh->updated = true;
 }
 
+BlockIndex VoxelAwareMeshIntegrator::getNeighborBlockIndex(const BlockIndex& block_idx,
+                                                           VoxelIndex& corner_index) {
+  BlockIndex block_offset = BlockIndex::Zero();
+  for (unsigned int j = 0u; j < 3u; j++) {
+    if (corner_index(j) < 0) {
+      block_offset(j) = -1;
+      corner_index(j) = corner_index(j) + voxels_per_side_;
+    } else if (corner_index(j) >= static_cast<IndexElement>(voxels_per_side_)) {
+      block_offset(j) = 1;
+      corner_index(j) = corner_index(j) - voxels_per_side_;
+    }
+  }
+
+  return block_idx + block_offset;
+}
+
 void VoxelAwareMeshIntegrator::extractMeshInsideBlock(const TsdfBlock& block,
                                                       const VoxelIndex& index,
-                                                      const Point& coords,
-                                                      VertexIndex* next_mesh_index,
+                                                      const Point& point,
+                                                      VertexIndex* new_mesh_idx,
                                                       Mesh* mesh) {
-  DCHECK(next_mesh_index != nullptr);
+  DCHECK(new_mesh_idx != nullptr);
   DCHECK(mesh != nullptr);
 
   VLOG(15) << "[mesh] processing interior voxel: " << index.transpose();
 
-  const BlockIndex block_index = block.block_index();
-  GvdBlock::Ptr gvd_block = gvd_layer_->getBlockPtrByIndex(block_index);
-  DCHECK(gvd_block != nullptr);
+  const BlockIndex block_idx = block.block_index();
+  auto vertex_block = vertex_layer_->getBlockPtrByIndex(block_idx);
+  DCHECK(vertex_block != nullptr);
 
-  PointMatrix corner_coords;
-  SdfMatrix corner_sdf;
-  std::vector<GvdVoxel*> gvd_voxels(8, nullptr);
-  bool all_neighbors_observed = true;
-
+  SdfMatrix sdf;
+  PointMatrix coords;
+  std::vector<VertexVoxel*> voxels(8, nullptr);
   for (int i = 0; i < 8; ++i) {
     VoxelIndex corner_index = index + cube_index_offsets_.col(i);
-    const TsdfVoxel& voxel = block.getVoxelByVoxelIndex(corner_index);
-
-    if (!vutils::getSdfIfValid(voxel, config_.min_weight, &(corner_sdf(i)))) {
-      all_neighbors_observed = false;
-      break;
+    const auto& voxel = block.getVoxelByVoxelIndex(corner_index);
+    if (!vutils::getSdfIfValid(voxel, config_.min_weight, &(sdf(i)))) {
+      return;
     }
 
-    corner_coords.col(i) = coords + cube_coord_offsets_.col(i);
-    gvd_voxels[i] = &gvd_block->getVoxelByVoxelIndex(corner_index);
+    coords.col(i) = point + cube_coord_offsets_.col(i);
+    voxels[i] = &vertex_block->getVoxelByVoxelIndex(corner_index);
   }
 
-  if (all_neighbors_observed) {
-    std::vector<bool> voxels_in_block(8, true);
-    VoxelAwareMarchingCubes::meshCube(block_index,
-                                      corner_coords,
-                                      corner_sdf,
-                                      next_mesh_index,
-                                      mesh,
-                                      gvd_voxels,
-                                      voxels_in_block);
-  }
+  VoxelAwareMarchingCubes::meshCube(block_idx, coords, sdf, new_mesh_idx, mesh, voxels);
 }
 
 void VoxelAwareMeshIntegrator::extractMeshOnBorder(const TsdfBlock& block,
                                                    const VoxelIndex& index,
-                                                   const Point& coords,
-                                                   VertexIndex* next_mesh_index,
+                                                   const Point& point,
+                                                   VertexIndex* new_mesh_idx,
                                                    Mesh* mesh) {
-  DCHECK(next_mesh_index != nullptr);
+  DCHECK(new_mesh_idx != nullptr);
   DCHECK(mesh != nullptr);
 
   VLOG(15) << "[mesh] processing exterior voxel: " << index.transpose();
 
-  const BlockIndex block_index = block.block_index();
-  GvdBlock::Ptr gvd_block = gvd_layer_->getBlockPtrByIndex(block_index);
-  DCHECK(gvd_block != nullptr);
+  const BlockIndex block_idx = block.block_index();
+  auto vertex_block = vertex_layer_->getBlockPtrByIndex(block_idx);
+  DCHECK(vertex_block != nullptr);
 
-  PointMatrix corner_coords;
-  SdfMatrix corner_sdf;
-  std::vector<GvdVoxel*> gvd_voxels(8, nullptr);
-
-  bool all_neighbors_observed = true;
-
-  std::vector<bool> voxels_in_block(8);
+  SdfMatrix sdf;
+  PointMatrix coords;
+  std::vector<VertexVoxel*> voxels(8, nullptr);
   for (int i = 0; i < 8; ++i) {
     VoxelIndex corner_index = index + cube_index_offsets_.col(i);
 
+    const TsdfVoxel* voxel;
     if (block.isValidVoxelIndex(corner_index)) {
-      voxels_in_block[i] = true;
-      const TsdfVoxel& voxel = block.getVoxelByVoxelIndex(corner_index);
-
-      if (!vutils::getSdfIfValid(voxel, config_.min_weight, &(corner_sdf(i)))) {
-        all_neighbors_observed = false;
-        break;
-      }
-
-      corner_coords.col(i) = coords + cube_coord_offsets_.col(i);
-      gvd_voxels[i] = &gvd_block->getVoxelByVoxelIndex(corner_index);
+      voxel = &block.getVoxelByVoxelIndex(corner_index);
+      voxels[i] = &vertex_block->getVoxelByVoxelIndex(corner_index);
     } else {
-      voxels_in_block[i] = false;
-      // We have to access a different block.
-      BlockIndex block_offset = BlockIndex::Zero();
-
-      for (unsigned int j = 0u; j < 3u; j++) {
-        if (corner_index(j) < 0) {
-          block_offset(j) = -1;
-          corner_index(j) = corner_index(j) + voxels_per_side_;
-        } else if (corner_index(j) >= static_cast<IndexElement>(voxels_per_side_)) {
-          block_offset(j) = 1;
-          corner_index(j) = corner_index(j) - voxels_per_side_;
-        }
+      // we have to access a different block
+      const auto neighbor_idx = getNeighborBlockIndex(block_idx, corner_index);
+      if (!sdf_layer_const_->hasBlock(neighbor_idx)) {
+        return;
       }
 
-      BlockIndex neighbor_index = block.block_index() + block_offset;
+      const auto& neighbor_block = sdf_layer_const_->getBlockByIndex(neighbor_idx);
+      CHECK(neighbor_block.isValidVoxelIndex(corner_index));
 
-      if (sdf_layer_const_->hasBlock(neighbor_index)) {
-        const Block<TsdfVoxel>& neighbor_block =
-            sdf_layer_const_->getBlockByIndex(neighbor_index);
-
-        CHECK(neighbor_block.isValidVoxelIndex(corner_index));
-        const TsdfVoxel& voxel = neighbor_block.getVoxelByVoxelIndex(corner_index);
-        GvdBlock::Ptr neighbor_gvd_block =
-            gvd_layer_->getBlockPtrByIndex(neighbor_index);
-        gvd_voxels[i] = &neighbor_gvd_block->getVoxelByVoxelIndex(corner_index);
-
-        if (!vutils::getSdfIfValid(voxel, config_.min_weight, &(corner_sdf(i)))) {
-          all_neighbors_observed = false;
-          break;
-        }
-
-        corner_coords.col(i) = coords + cube_coord_offsets_.col(i);
-      } else {
-        all_neighbors_observed = false;
-        break;
-      }
+      voxel = &neighbor_block.getVoxelByVoxelIndex(corner_index);
+      // // we can't ensure that neighboring blocks stay in sync with the current mesh
+      // // easily, so we don't track nearest surfaces to neighboring blocks for now
+      // auto neighbor_vertex_block = vertex_layer_->getBlockPtrByIndex(neighbor_idx);
+      // voxels[i] = &neighbor_vertex_block->getVoxelByVoxelIndex(corner_index);
     }
+
+    if (!vutils::getSdfIfValid(*voxel, config_.min_weight, &(sdf(i)))) {
+      return;
+    }
+
+    coords.col(i) = point + cube_coord_offsets_.col(i);
   }
 
-  if (all_neighbors_observed) {
-    VoxelAwareMarchingCubes::meshCube(block_index,
-                                      corner_coords,
-                                      corner_sdf,
-                                      next_mesh_index,
-                                      mesh,
-                                      gvd_voxels,
-                                      voxels_in_block);
-  }
+  VoxelAwareMarchingCubes::meshCube(block_idx, coords, sdf, new_mesh_idx, mesh, voxels);
 }
 
 }  // namespace topology

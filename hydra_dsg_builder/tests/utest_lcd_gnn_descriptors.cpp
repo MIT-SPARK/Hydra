@@ -191,7 +191,7 @@ TEST(GnnLcdTests, testLoadEmbeddings) {
   expected_embeddings[3] << 5.0, 6.0, 7.0;
 
   std::set<int> found_labels;
-  for (const auto label_vec_pair : embeddings) {
+  for (const auto& label_vec_pair : embeddings) {
     found_labels.insert(label_vec_pair.first);
     const bool has_label = expected_embeddings.count(label_vec_pair.first);
     EXPECT_TRUE(has_label) << "missing: " << static_cast<int>(label_vec_pair.first);

@@ -32,15 +32,14 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_topology_test/layer_utils.h"
-#include "hydra_topology_test/test_fixtures.h"
-
 #include <gtest/gtest.h>
-
 #include <hydra_topology/combo_integrator.h>
 #include <hydra_topology/gvd_integrator.h>
 #include <voxblox/integrator/esdf_integrator.h>
 #include <voxblox/utils/evaluation_utils.h>
+
+#include "hydra_topology_test/layer_utils.h"
+#include "hydra_topology_test/test_fixtures.h"
 
 namespace hydra {
 namespace topology {
@@ -84,10 +83,13 @@ TEST_F(EsdfTestFixture, TestEsdfSame) {
   Layer<EsdfVoxel> original_layer(voxel_size, voxels_per_side);
   EsdfIntegrator original_integrator(esdf_config, tsdf_layer.get(), &original_layer);
 
+  MeshIntegratorConfig mesh_config;
+  mesh_config.integrator_threads = 1;
   GvdIntegratorConfig gvd_config = gvdConfigFromEsdfConfig(esdf_config);
   Layer<GvdVoxel>::Ptr gvd_layer(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
   MeshLayer::Ptr mesh_layer(new MeshLayer(voxel_size * voxels_per_side));
-  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
+  ComboIntegrator gvd_integrator(
+      gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer, &mesh_config);
 
   for (size_t i = 0; i < num_poses; ++i) {
     updateTsdfIntegrator(tsdf_integrator, i);

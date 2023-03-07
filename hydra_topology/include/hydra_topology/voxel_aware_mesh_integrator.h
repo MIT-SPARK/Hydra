@@ -33,10 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <voxblox/mesh/mesh_integrator.h>
+
 #include "hydra_topology/gvd_voxel.h"
 #include "hydra_topology/voxblox_types.h"
-
-#include <voxblox/mesh/mesh_integrator.h>
 
 namespace hydra {
 namespace topology {
@@ -47,7 +47,7 @@ class VoxelAwareMeshIntegrator : public voxblox::MeshIntegrator<TsdfVoxel> {
 
   VoxelAwareMeshIntegrator(const voxblox::MeshIntegratorConfig& config,
                            Layer<TsdfVoxel>* sdf_layer,
-                           Layer<GvdVoxel>* gvd_layer,
+                           const Layer<VertexVoxel>::Ptr& vertex_layer,
                            MeshLayer* mesh_layer);
 
   virtual ~VoxelAwareMeshIntegrator() = default;
@@ -77,8 +77,11 @@ class VoxelAwareMeshIntegrator : public voxblox::MeshIntegrator<TsdfVoxel> {
 
   void launchThreads(const BlockIndexList& blocks, bool interior_pass);
 
+  BlockIndex getNeighborBlockIndex(const BlockIndex& block_idx,
+                                   VoxelIndex& corner_index);
+
  protected:
-  Layer<GvdVoxel>* gvd_layer_;
+  Layer<VertexVoxel>::Ptr vertex_layer_;
 
   Eigen::Matrix<FloatingPoint, 3, 8> cube_coord_offsets_;
 };

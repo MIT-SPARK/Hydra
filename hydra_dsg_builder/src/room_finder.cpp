@@ -63,7 +63,7 @@ void fillIndexQueue(const SceneGraphLayer& places,
                     const Clusters& clusters,
                     IndexTimePairQueue& queue,
                     size_t min_room_size) {
-  for (const auto id_cluster_pair : clusters) {
+  for (const auto& id_cluster_pair : clusters) {
     if (id_cluster_pair.second.size() < min_room_size) {
       continue;
     }
@@ -155,20 +155,20 @@ void RoomFinder::enableLogging(const std::string& log_path) {
 
 InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) const {
   BarcodeTracker tracker(config_.min_component_size);
-  const auto filtration = getGraphFiltration(
-      places,
-      tracker,
-      config_.dilation_diff_threshold_m,
-      [this](const DisjointSet& components) -> size_t {
-        size_t num_components = 0;
-        for (const auto id_size_pair : components.sizes) {
-          if (id_size_pair.second >= config_.min_component_size) {
-            ++num_components;
-          }
-        }
-        return num_components;
-      },
-      false);
+  const auto filtration =
+      getGraphFiltration(places,
+                         tracker,
+                         config_.dilation_diff_threshold_m,
+                         [this](const DisjointSet& components) -> size_t {
+                           size_t num_components = 0;
+                           for (const auto id_size_pair : components.sizes) {
+                             if (id_size_pair.second >= config_.min_component_size) {
+                               ++num_components;
+                             }
+                           }
+                           return num_components;
+                         },
+                         false);
 
   VLOG(10) << "[RoomFinder] Filtration: " << filtration;
 
@@ -211,9 +211,16 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
                                              window.second);
       break;
     case DilationThresholdMode::PLATEAU:
+    case DilationThresholdMode::PLATEAU_THRESHOLD:
     default:
+      const bool use_threshold =
+          config_.dilation_threshold_mode == DilationThresholdMode::PLATEAU_THRESHOLD;
       candidate = getBestPlateau(
-          filtration, config_.plateau_ratio, window.first, window.second);
+          filtration,
+          use_threshold ? config_.min_lifetime_length_m : config_.plateau_ratio,
+          window.first,
+          window.second,
+          use_threshold);
       break;
   }
 

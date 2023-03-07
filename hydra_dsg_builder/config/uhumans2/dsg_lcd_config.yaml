@@ -27,7 +27,7 @@ lcd:
     objects:
       min_time_separation_s: 25.0
       min_score: 0.3
-      min_registration_score: 0.85
+      min_registration_score: 0.92
       max_registration_matches: 5
       min_score_ratio: 0.7
       min_match_separation_m: 5.0
@@ -42,7 +42,7 @@ lcd:
       type: L1
   teaser:
     estimate_scaling: false
-    noise_bound: 0.10
+    noise_bound: 0.075
     cbar2: 1.0
     rotation_gnc_factor: 1.4
     rotation_max_iterations: 100
