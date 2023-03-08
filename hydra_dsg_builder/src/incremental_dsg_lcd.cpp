@@ -72,9 +72,12 @@ void DsgLcd::stop() {
 
 DsgLcd::~DsgLcd() { stop(); }
 
-void DsgLcd::handleDbowMsg(const pose_graph_tools::BowQuery::ConstPtr& msg) {
+void DsgLcd::handleDbowMsg(const pose_graph_tools::BowQueries::ConstPtr& msg) {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
-  bow_messages_.push_back(msg);
+  for (const auto& query : msg->queries) {
+    bow_messages_.push_back(
+        pose_graph_tools::BowQuery::ConstPtr(new pose_graph_tools::BowQuery(query)));
+  }
 }
 
 void DsgLcd::start() {

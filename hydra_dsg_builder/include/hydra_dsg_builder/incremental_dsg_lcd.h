@@ -43,6 +43,7 @@
 #include <tf2_ros/transform_listener.h>
 
 #include <pose_graph_tools/BowQuery.h>
+#include <pose_graph_tools/BowQueries.h>
 
 #include <memory>
 #include <mutex>
@@ -62,7 +63,7 @@ class DsgLcd {
   void stop();
 
  private:
-  void handleDbowMsg(const pose_graph_tools::BowQuery::ConstPtr& msg);
+  void handleDbowMsg(const pose_graph_tools::BowQueries::ConstPtr& msg);
 
   void runLcd();
 

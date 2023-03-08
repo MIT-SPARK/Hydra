@@ -47,7 +47,7 @@
 - git:
     local-name: pose_graph_tools
     uri: git@github.com:MIT-SPARK/pose_graph_tools.git
-    version: feature/hydra
+    version: master
 - git:
     local-name: teaser_plusplus
     uri: git@github.com:MIT-SPARK/TEASER-plusplus.git
