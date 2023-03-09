@@ -4,7 +4,7 @@
 
     <arg name="use_semantics" default="true"/>
     <arg name="use_gt_frame" default="true"/>
-    <arg name="sensor_frame" default="left_cam"/>
+    <arg name="sensor_frame" default="base_link"/>
 
     <arg name="rgb_info_topic" default="/azure/rgb/camera_info"/>
     <arg name="rgb_topic" default="/azure/rgb/image_raw"/>
