@@ -63,6 +63,13 @@ inline geometry_msgs::Pose tfToPose(const geometry_msgs::Transform& transform) {
   return pose;
 }
 
+std::string showQuaternion(const Eigen::Quaterniond& q) {
+  std::stringstream ss;
+  ss << "{w: " << q.w() << ", x: " << q.x() << ", y: " << q.y() << ", z: " << q.z()
+     << "}";
+  return ss.str();
+}
+
 bool RosReconstruction::handleFreespaceSrv(hydra_msgs::QueryFreespace::Request& req,
                                            hydra_msgs::QueryFreespace::Response& res) {
   if (req.x.size() != req.y.size() || req.x.size() != req.z.size()) {
@@ -96,6 +103,24 @@ RosReconstruction::RosReconstruction(const ros::NodeHandle& nh,
           output_queue ? output_queue : std::make_shared<OutputQueue>()),
       nh_(nh) {
   ros_config_ = load_config<RosReconstructionConfig>(nh);
+
+  if (!ros_config_.kimera_extrinsics_file.empty()) {
+    const auto node = YAML::LoadFile(ros_config_.kimera_extrinsics_file);
+    const auto elements = node["T_BS"]["data"].as<std::vector<double>>();
+    CHECK_EQ(elements.size(), 16u) << "Invalid transform!";
+    Eigen::Matrix4d body_T_camera;
+    for (size_t r = 0; r < 4; r++) {
+      for (size_t c = 0; c < 4; c++) {
+        body_T_camera(r, c) = elements.at(4 * r + c);
+      }
+    }
+    config_.body_R_camera = Eigen::Quaterniond(body_T_camera.block<3, 3>(0, 0));
+    config_.body_t_camera = body_T_camera.block<3, 1>(0, 3);
+    LOG(WARNING) << "Loaded extrinsics from Kimera: R="
+                 << showQuaternion(config_.body_R_camera)
+                 << ", t=" << config_.body_t_camera.transpose();
+  }
+
   if (ros_config_.use_pose_graph) {
     LOG(WARNING) << "Using pose graph input!";
     pcl_sync_sub_.reset(new Subscriber<RosPointcloud>(nh_, "pointcloud", 10));
@@ -157,8 +182,8 @@ void RosReconstruction::inputCallback(const RosPointcloud::ConstPtr& cloud,
   ReconstructionInput::Ptr input(new ReconstructionInput());
   input->timestamp_ns = cloud->header.stamp * 1000;
   input->pose_graph = pose_graph;
-  VLOG(1) << "[Hydra Reconstruction] Got ROS input @ " << input->timestamp_ns << " [ns] (pose graph @ "
-          << pose_graph->header.stamp.toNSec() << " [ns])";
+  VLOG(1) << "[Hydra Reconstruction] Got ROS input @ " << input->timestamp_ns
+          << " [ns] (pose graph @ " << pose_graph->header.stamp.toNSec() << " [ns])";
 
   input->pointcloud.reset(new voxblox::Pointcloud());
   input->pointcloud_colors.reset(new voxblox::Colors());

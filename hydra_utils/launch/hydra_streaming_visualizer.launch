@@ -7,8 +7,7 @@
   <arg name="dsg_mesh_topic" default="incremental_dsg_builder_node/frontend/dsg_mesh" if="$(arg show_frontend)"/>
   <arg name="color_places_by_distance" default="$(arg show_frontend)"/>
   <arg name="mesh_plugin_type" default="PGMO"/>
-
-  <arg name="world_frame" value="world"/>
+  <arg name="world_frame" default="world"/>
 
   <arg name="viz_config_dir" default="$(find hydra_utils)/config/hydra_visualizer"/>
   <arg name="visualizer_ns" default="/hydra_dsg_visualizer"/>
@@ -23,8 +22,8 @@
   <include file="$(find hydra_utils)/launch/includes/hydra_visualizer_params.xml">
       <arg name="viz_config_dir" value="$(arg viz_config_dir)"/>
       <arg name="visualizer_ns" value="$(arg visualizer_ns)"/>
-      <arg name="world_frame" default="$(arg world_frame)"/>
       <arg name="color_places_by_distance" default="$(arg color_places_by_distance)"/>
+      <arg name="world_frame" value="$(arg world_frame)"/>
   </include>
 
   <node pkg="hydra_utils" type="hydra_visualizer_node" name="hydra_visualizer_node"

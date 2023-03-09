@@ -1,0 +1,55 @@
+<launch>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_0" args="0.0 -0.0 -0.0 0.0 0.0 0.0 1.0 sparkal2/forward_link sparkal2/forward_depth_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_1" args="0.0 -0.0 -0.0 -0.5 0.5 -0.5 0.5 sparkal2/forward_depth_frame sparkal2/forward_depth_optical_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_2" args="-0.000455740839243 -0.0593315064907 5.93284821662e-05 -0.000356028409442 -0.00185856397729 0.00199700682424 0.999996185303 sparkal2/forward_link sparkal2/forward_color_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_3" args="0.0 -0.0 -0.0 -0.5 0.5 -0.5 0.5 sparkal2/forward_color_frame sparkal2/forward_color_optical_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_4" args="0.0 -0.0 -0.0 0.0 0.0 0.0 1.0 sparkal2/forward_link sparkal2/forward_infra1_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_5" args="0.0 -0.0 -0.0 -0.5 0.5 -0.5 0.5 sparkal2/forward_infra1_frame sparkal2/forward_infra1_optical_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_6" args="0.0 -0.0949602872133 -0.0 0.0 0.0 0.0 1.0 sparkal2/forward_link sparkal2/forward_infra2_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_7" args="0.0 -0.0 -0.0 -0.5 0.5 -0.5 0.5 sparkal2/forward_infra2_frame sparkal2/forward_infra2_optical_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_8" args="-0.0160199999809 -0.0302200000733 0.00740000000224 0.0 0.0 0.0 1.0 sparkal2/forward_link sparkal2/forward_gyro_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_9" args="0.0 -0.0 -0.0 -0.5 0.5 -0.5 0.5 sparkal2/forward_gyro_frame sparkal2/forward_imu_optical_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_10" args="-0.0160199999809 -0.0302200000733 0.00740000000224 0.0 0.0 0.0 1.0 sparkal2/forward_link sparkal2/forward_accel_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_11" args="0.0 -0.0 -0.0 -0.5 0.5 -0.5 0.5 sparkal2/forward_accel_frame sparkal2/forward_accel_optical_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_12" args="0.0 0.0 0.0 0.0 0.0 0.0 1.0 sparkal2/base sparkal2/base_link"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_13" args="0.15 0.02 0.4 0.0 0.0499791692707 0.0 0.998750260395 sparkal2/base sparkal2/forward_link"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_14" args="0.0 0.0 0.3 0.0 0.0 0.0 1.0 sparkal2/base sparkal2/velodyne"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_15" args="0.0 0.0 0.0 0.0 0.0 0.0 1.0 sparkal2/base_link sparkal2/chassis_link"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_16" args="0.0 0.0 0.0 0.0 0.0 0.0 1.0 sparkal2/chassis_link sparkal2/front_fender_link"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_17" args="0.12 0.0 0.0 0.0 0.0 0.0 1.0 sparkal2/mid_mount sparkal2/front_mount"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_18" args="0.0 0.0 0.0 0.0 0.0 0.0 1.0 sparkal2/chassis_link sparkal2/imu_link"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_19" args="0.0 0.0 0.184 0.0 0.0 0.0 1.0 sparkal2/chassis_link sparkal2/mid_mount"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_20" args="-0.18 0.126 0.1815 0.0 0.0 0.0 1.0 sparkal2/chassis_link sparkal2/navsat_link"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_21" args="0.0 0.0 0.0 0.0 0.0 1.0 -1.03411553555e-13 sparkal2/chassis_link sparkal2/rear_fender_link"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_22" args="-0.12 0.0 0.0 0.0 0.0 0.0 1.0 sparkal2/mid_mount sparkal2/rear_mount"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_23" args="0.0 0.0 0.1 0.0 0.0 0.0 1.0 sparkal2/mid_mount sparkal2/velodyne_base_link"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_24" args="0.0 0.0 0.0377 0.0 0.0 0.0 1.0 sparkal2/velodyne_base_link sparkal2/velodyne"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_25" args="0.0 0.0 0.0 0.0 0.0 0.0 1.0 sparkal2/mid_mount sparkal2/vlp16_mount_link"/>
+
+</launch>

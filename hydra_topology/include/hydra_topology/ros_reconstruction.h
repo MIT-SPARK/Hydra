@@ -57,6 +57,7 @@ struct RosReconstructionConfig {
   bool enable_output_queue = false;
   double pointcloud_separation_s = 0.1;
   double tf_wait_duration_s = 0.1;
+  std::string kimera_extrinsics_file = "";
 };
 
 template <typename Visitor>
@@ -68,6 +69,7 @@ void visit_config(const Visitor& v, RosReconstructionConfig& config) {
   v.visit("enable_reconstruction_output_queue", config.enable_output_queue);
   v.visit("pointcloud_separation_s", config.pointcloud_separation_s);
   v.visit("tf_wait_duration_s", config.tf_wait_duration_s);
+  v.visit("kimera_extrinsics_file", config.kimera_extrinsics_file);
 }
 
 }  // namespace hydra

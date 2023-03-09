@@ -2,4 +2,5 @@
 !backend
 !pgmo
 !lcd
+!topology
 !**/.gitignore

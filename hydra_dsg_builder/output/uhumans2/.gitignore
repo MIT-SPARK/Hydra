@@ -1,4 +1,6 @@
-!apartment
-!office
-!subway
+!backend
+!frontend
+!pgmo
+!lcd
+!topology
 !**/.gitignore

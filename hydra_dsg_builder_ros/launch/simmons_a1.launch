@@ -7,22 +7,28 @@
     <arg name="semantic_map_file" default="$(arg dataset_name).csv"/>
     <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
 
-    <arg name="pointcloud_topic" value="semantic_pointcloud"/>
-    <arg name="use_gt_frame" default="false"/>
-    <arg name="sensor_frame" default="base_link"/>
+    <arg name="robot_name" default="a1"/>
 
-    <include file="$(find hydra_utils)/launch/data_sources/sidpac_pointcloud.launch" pass_all_args="true"/>
+    <arg name="pointcloud_topic" value="/semantic_pointcloud"/>
+    <arg name="use_gt_frame" default="false"/>
+    <arg name="sensor_frame" default="base" if="$(arg use_gt_frame)"/>
+    <arg name="sensor_frame" default="base_link" unless="$(arg use_gt_frame)"/>
+    <arg name="world_frame" default="world"/>
+
+    <include file="$(find hydra_utils)/launch/data_sources/a1_pointcloud.launch"
+             pass_all_args="true"/>
 
     <include file="$(find hydra_dsg_builder_ros)/launch/hydra.launch" pass_all_args="true">
         <arg name="robot_id" default="0"/>
-        <arg name="config_dir" default="$(find hydra_dsg_builder)/config/sidpac"/>
-        <arg name="dsg_output_prefix" default="sidpac"/>
-        <arg name="reconstruction_config" default="$(find hydra_topology)/config/sidpac_topology_config.yaml"/>
-        <arg name="extrinsics" default="$(find hydra_topology)/config/extrinsics/sidpac.yaml"/>
+        <arg name="config_dir" default="$(find hydra_dsg_builder)/config/simmons_a1"/>
+        <arg name="reconstruction_config" default="$(find hydra_topology)/config/simmons_topology_config.yaml"/>
+        <arg name="use_kimera_extrinsics" value="true"/>
+        <arg name="extrinsics" default="$(find hydra_vio_configs)/config/robots/a1_center_external/LeftCameraParams.yaml"/>
         <arg name="rviz_dir" default="$(find hydra_dsg_builder_ros)/rviz"/>
-        <arg name="rviz_file" default="sidpac.rviz"/>
+        <arg name="rviz_file" default="simmons.rviz"/>
         <arg name="use_oriented_bounding_boxes" default="true"/>
         <arg name="typology_dir" default="$(find hydra_dsg_builder)/config/"/>
         <arg name="typology_config" default="ade20k_mp3d_typology.yaml"/>
     </include>
+
 </launch>
