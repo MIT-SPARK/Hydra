@@ -1,0 +1,5 @@
+<launch>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_0" args="0.0 -0.0 -0.0 0.0 0.0 0.0 1.0 sparkal1/forward_link sparkal1/forward_depth_frame"/>
+
+</launch>

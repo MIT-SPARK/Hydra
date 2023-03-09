@@ -1,14 +1,15 @@
 <launch>
     <arg name="robot_id"/>
     <arg name="config_dir"/>
-    <arg name="dsg_output_dir"/>
-    <arg name="dsg_output_prefix"/>
     <arg name="typology_dir"/>
     <arg name="typology_config"/>
     <arg name="semantic_map_dir"/>
     <arg name="semantic_map_file"/>
     <arg name="sensor_frame"/>
     <arg name="world_frame" default="world"/>
+
+    <arg name="dsg_output_dir" default="$(find hydra_dsg_builder)/output/"/>
+    <arg name="dsg_output_prefix" default="default"/>
 
     <arg name="use_gt_frame" default="true"/>
     <arg name="use_oriented_bounding_boxes" default="false"/>
@@ -36,11 +37,13 @@
     <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
     <arg name="typology_path" default="$(arg typology_dir)/$(arg typology_config)"/>
     <arg name="reconstruction_config" if="$(arg do_reconstruction)"/>
-    <arg name="extrinsics" if="$(arg do_reconstruction)"/>
     <arg name="pointcloud_topic" if="$(arg do_reconstruction)"/>
     <arg name="graph_viz_config_dir" default="$(find hydra_topology)/config"/>
     <arg name="graph_viz_config" default="graph_visualization_config.yaml"/>
     <arg name="graph_viz_config_file" value="$(arg graph_viz_config_dir)/$(arg graph_viz_config)"/>
+
+    <arg name="use_kimera_extrinsics" default="false"/>
+    <arg name="extrinsics" if="$(arg do_reconstruction)"/>
 
     <arg name="lcd_use_bow_vectors" default="true"/>
     <arg name="enable_dsg_lcd" default="false"/>
@@ -91,8 +94,11 @@
         <rosparam file="$(arg backend_config_path)"/>
         <rosparam file="$(arg lcd_config_path)"/>
         <rosparam file="$(arg reconstruction_config)" if="$(arg do_reconstruction)"/>
-        <rosparam file="$(arg extrinsics)" if="$(arg do_reconstruction)"/>
+        <rosparam file="$(arg extrinsics)" if="$(eval arg('do_reconstruction') and not arg('use_kimera_extrinsics'))"/>
         <rosparam file="$(arg ros_params_file)"/>
+
+        <param name="kimera_extrinsics_file" value="$(arg extrinsics)"
+               if="$(eval arg('do_reconstruction') and arg('use_kimera_extrinsics'))"/>
 
         <param name="visualize_reconstruction" value="$(arg visualize_reconstruction)"/>
         <param name="publish_reconstruction_mesh" value="$(arg visualize_reconstruction)"/>
