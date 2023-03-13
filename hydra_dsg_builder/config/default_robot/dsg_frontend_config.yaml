@@ -1,6 +1,6 @@
 ---
 pgmo:
-  horizon: 15.0
+  horizon: 100.0
   track_mesh_graph_mapping: true
   full_compression_method: 2    # voxel clearing
   graph_compression_method: 1    # voxblox
@@ -10,10 +10,10 @@ objects:
   prefix: O
   active_horizon_s: 10.0
   active_index_horizon_m: 7.0
-  min_cluster_size: 40
+  min_cluster_size: 25
   max_cluster_size: 100000
-  cluster_tolerance: 0.25
-min_object_vertices: 40
+  cluster_tolerance: 0.18
+min_object_vertices: 20
 prune_mesh_indices: true
 filter_places: true
 min_places_component_size: 3

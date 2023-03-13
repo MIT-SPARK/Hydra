@@ -17,7 +17,9 @@
     <arg name="world_frame" default="world"/>
 
     <include file="$(find hydra_utils)/launch/data_sources/$(arg robot_name)_pointcloud.launch"
-             pass_all_args="true"/>
+             pass_all_args="true">
+        <arg name="use_compressed_transport" value="false"/>
+    </include>
 
     <include file="$(find hydra_dsg_builder_ros)/launch/hydra.launch" pass_all_args="true">
         <arg name="robot_id" default="0"/>

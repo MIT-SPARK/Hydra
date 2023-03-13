@@ -25,7 +25,7 @@
         <arg name="use_kimera_extrinsics" value="true"/>
         <arg name="extrinsics" default="$(find hydra_vio_configs)/config/robots/a1_center_external/LeftCameraParams.yaml"/>
         <arg name="rviz_dir" default="$(find hydra_dsg_builder_ros)/rviz"/>
-        <arg name="rviz_file" default="simmons.rviz"/>
+        <arg name="rviz_file" default="a1.rviz"/>
         <arg name="use_oriented_bounding_boxes" default="true"/>
         <arg name="typology_dir" default="$(find hydra_dsg_builder)/config/"/>
         <arg name="typology_config" default="ade20k_mp3d_typology.yaml"/>

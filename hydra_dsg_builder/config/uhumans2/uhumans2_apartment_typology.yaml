@@ -11,7 +11,7 @@ label_names:
   - {label: 1, name: appliance}
   - {label: 2, name: books}
   - {label: 3, name: floor}
-  - {label: 4, name: ceiling_light}
+  - {label: 4, name: ceiling}
   - {label: 5, name: chair}
   - {label: 6, name: vase}
   - {label: 7, name: couch}
@@ -19,11 +19,12 @@ label_names:
   - {label: 9, name: furniture}
   - {label: 10, name: computer}
   - {label: 11, name: lamp}
+  - {label: 12, name: painting}
   - {label: 13, name: plant}
   - {label: 14, name: bed}
   - {label: 15, name: stairs}
-  - {label: 16, name: desk}
-  - {label: 17, name: cubicle}
+  - {label: 16, name: table}
+  - {label: 17, name: screens}
   - {label: 18, name: trashcan}
   - {label: 19, name: wall}
   - {label: 20, name: human}

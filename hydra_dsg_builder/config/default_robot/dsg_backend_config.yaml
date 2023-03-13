@@ -7,8 +7,8 @@ dsg:
   num_neighbors_to_find_for_merge: 1
   rpgo_verbosity: update
   rpgo_solver: LM
-  places_merge_pos_threshold_m: 0.3
-  places_merge_distance_tolerance_m: 0.2
+  places_merge_pos_threshold_m: 0.35
+  places_merge_distance_tolerance_m: 0.25
   merge_update_dynamic: true
   merge_update_map: {BUILDINGS: false, ROOMS: false, PLACES: true, OBJECTS: false}
 pgmo:
@@ -17,7 +17,7 @@ pgmo:
   embed_trajectory_delta_t: 5.0
   num_interp_pts: 3
   interp_horizon: 10.0
-  enable_sparsify: false
+  enable_sparsify: true
   trans_node_dist: 1.0
   rot_node_dist: 1.2
   rpgo:
@@ -26,7 +26,7 @@ pgmo:
     pcm_trans_threshold: -1
     pcm_rot_threshold: -1
     lm_diagonal_damping: true
-    gnc_alpha: 0.9
+    gnc_alpha: 0.99
     gnc_max_iterations: 100
     gnc_mu_step: 1.6
     gnc_cost_tolerance: 1.0e-05
@@ -40,9 +40,9 @@ pgmo:
     loop_close: 5.0e-02
     sg_loop_close: 1.0e-01
     prior: 1.0e-02
-    mesh_mesh: 1.0e-02
-    pose_mesh: 1.0e-02
-    place_mesh: 1.0e-02
+    mesh_mesh: 1.0e-01
+    pose_mesh: 1.0e-01
+    place_mesh: 1.0e-01
     place_edge: 10.0
     place_merge: 10.0
     object_merge: 10.0
@@ -59,7 +59,7 @@ room_finder:
   min_room_size: 10
   dilation_threshold_mode: PLATEAU
   min_lifetime_length_m: 0.1
-  plateau_ratio: 0.15
+  plateau_ratio: 0.25
   clustering_mode: NEIGHBORS
   max_modularity_iters: 5
   modularity_gamma: 1.0

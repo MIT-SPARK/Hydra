@@ -40,9 +40,9 @@ pgmo:
     loop_close: 5.0e-02
     sg_loop_close: 1.0e-01
     prior: 1.0e-02
-    mesh_mesh: 1.0e-02
-    pose_mesh: 1.0e-02
-    place_mesh: 1.0e-2
+    mesh_mesh: 1.0e-01
+    pose_mesh: 1.0e-01
+    place_mesh: 1.0e-01
     place_edge: 10.0
     place_merge: 10.0
     object_merge: 10.0

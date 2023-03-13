@@ -488,9 +488,12 @@ void ReconstructionModule::showStats() const {
       hydra_utils::getHumanReadableMemoryString(gvd_->getMemorySize());
   const std::string mesh_memory_str =
       hydra_utils::getHumanReadableMemoryString(mesh_->getMemorySize());
+  const size_t total =
+      tsdf_->getMemorySize() + semantics_->getMemorySize() + gvd_->getMemorySize();
   LOG(INFO) << "Memory used: [TSDF=" << tsdf_memory_str
             << ", Semantics=" << semantic_memory_str << ", GVD=" << gvd_memory_str
-            << ", Mesh= " << mesh_memory_str << "]";
+            << ", Mesh= " << mesh_memory_str
+            << ", Total=" << hydra_utils::getHumanReadableMemoryString(total) << "]";
 }
 
 BlockIndexList ReconstructionModule::findBlocksToArchive(

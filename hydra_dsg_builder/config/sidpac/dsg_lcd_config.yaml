@@ -17,24 +17,24 @@ lcd:
       recreate_subgraph: false
   search_configs:
     agent:
-      min_time_separation_s: 150.0
-      min_score: 0.039
-      min_registration_score: 0.039        # this gets overriden
-      max_registration_matches: 1
-      min_score_ratio: 1.0
+      min_time_separation_s: 25.0
+      min_score: 0.040
+      min_registration_score: 0.01        # this gets overriden
+      max_registration_matches: 2
+      min_score_ratio: 0.95
       min_match_separation_m: 0.0
       type: L1
     objects:
-      min_time_separation_s: 150.0
+      min_time_separation_s: 25.0
       min_score: 0.3
       min_registration_score: 0.93
-      max_registration_matches: 5
-      min_score_ratio: 0.7
+      max_registration_matches: 2
+      min_score_ratio: 0.9
       min_match_separation_m: 5.0
       type: L1
     places:
-      min_time_separation_s: 150.0
-      min_score: 0.5
+      min_time_separation_s: 25.0
+      min_score: 0.2
       min_registration_score: 1.5
       max_registration_matches: 5
       min_score_ratio: 0.7
@@ -42,7 +42,7 @@ lcd:
       type: L1
   teaser:
     estimate_scaling: false
-    noise_bound: 0.10
+    noise_bound: 0.100
     cbar2: 1.0
     rotation_gnc_factor: 1.4
     rotation_max_iterations: 100
