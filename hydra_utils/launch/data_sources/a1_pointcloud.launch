@@ -10,7 +10,7 @@
     <arg name="rgb_info_topic" default="/cam_d455/color/camera_info"/>
     <arg name="rgb_topic" default="/cam_d455/color/image_raw"/>
     <arg name="depth_topic" default="/cam_d455/depth/image_rect_raw"/>
-    <arg name="depth_info_topic" default="/cam_d455/forward/depth/camera_info"/>
+    <arg name="depth_info_topic" default="/cam_d455/depth/camera_info"/>
     <arg name="pointcloud_topic" default="/semantic_pointcloud"/>
 
     <arg name="enable_rectification" default="true"/>
