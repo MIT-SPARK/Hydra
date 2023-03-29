@@ -107,6 +107,8 @@ class TopologyServerVisualizer {
 
   void publishGraphLabels(const std_msgs::Header& header, const SceneGraphLayer& graph);
 
+  void publishFreespace(const std_msgs::Header& header, const SceneGraphLayer& graph);
+
   void gvdConfigCb(GvdVisualizerConfig& config, uint32_t level);
 
   void graphConfigCb(LayerConfig& config, uint32_t level);
@@ -130,6 +132,7 @@ class TopologyServerVisualizer {
 
   TopologyVisualizerConfig config_;
   std::set<int> previous_labels_;
+  size_t previous_spheres_;
 
   mutable bool published_gvd_graph_;
   mutable bool published_gvd_clusters_;

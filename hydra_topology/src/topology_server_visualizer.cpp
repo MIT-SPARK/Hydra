@@ -44,7 +44,7 @@ using visualization_msgs::Marker;
 using visualization_msgs::MarkerArray;
 
 TopologyServerVisualizer::TopologyServerVisualizer(const std::string& ns)
-    : nh_(ns), published_gvd_graph_(false) {
+    : nh_(ns), previous_spheres_(0), published_gvd_graph_(false) {
   pubs_.reset(new MarkerGroupPub(nh_));
 
   config_ = config_parser::load_from_ros_nh<TopologyVisualizerConfig>(nh_);
@@ -153,6 +153,7 @@ void TopologyServerVisualizer::visualizeGraph(const std_msgs::Header& header,
     return true;
   });
 
+  publishFreespace(header, graph);
   publishGraphLabels(header, graph);
 }
 
@@ -245,6 +246,63 @@ void TopologyServerVisualizer::visualizeBlocks(const std_msgs::Header& header,
       return true;
     });
   }
+}
+
+void TopologyServerVisualizer::publishFreespace(const std_msgs::Header& header,
+                                                const SceneGraphLayer& graph) {
+  const std::string label_ns = config_.topology_marker_ns + "_freespace";
+
+  MarkerArray spheres = makePlaceSpheres(header, graph, label_ns, 0.15);
+
+  MarkerArray delete_markers;
+  for (size_t id = 0; id < previous_spheres_; ++id) {
+    Marker delete_label;
+    delete_label.action = Marker::DELETE;
+    delete_label.id = id;
+    delete_label.ns = label_ns;
+    delete_markers.markers.push_back(delete_label);
+  }
+  previous_spheres_ = spheres.markers.size();
+
+  // there's not really a clean way to delay computation on either of these markers, so
+  // we just assign the messages in the callbacks
+  pubs_->publish("freespace_viz", [&](MarkerArray& msg) {
+    msg = delete_markers;
+    return true;
+  });
+  pubs_->publish("freespace_viz", [&](MarkerArray& msg) {
+    msg = spheres;
+    return true;
+  });
+
+  pubs_->publish("freespace_graph_viz", [&](MarkerArray& markers) {
+    const std::string node_ns = config_.topology_marker_ns + "_freespace_nodes";
+    auto freespace_conf = config_.graph_layer;
+    freespace_conf.use_sphere_marker = false;
+    freespace_conf.marker_scale = 0.08;
+    freespace_conf.marker_alpha = 0.5;
+    Marker node_marker =
+        makeCentroidMarkers(header,
+                            freespace_conf,
+                            graph,
+                            config_.graph,
+                            node_ns,
+                            [](const auto&) { return NodeColor::Zero(); });
+    markers.markers.push_back(node_marker);
+
+    if (!graph.edges().empty()) {
+      Marker edge_marker =
+          makeLayerEdgeMarkers(header,
+                               config_.graph_layer,
+                               graph,
+                               config_.graph,
+                               NodeColor::Zero(),
+                               config_.topology_marker_ns + "_freespace_edges");
+      markers.markers.push_back(edge_marker);
+    }
+
+    return true;
+  });
 }
 
 void TopologyServerVisualizer::publishGraphLabels(const std_msgs::Header& header,
