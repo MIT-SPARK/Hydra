@@ -113,5 +113,10 @@ visualization_msgs::MarkerArray showGvdClusters(
     const std::string& ns,
     size_t marker_id = 0);
 
+visualization_msgs::MarkerArray makePlaceSpheres(const std_msgs::Header& header,
+                                                 const SceneGraphLayer& layer,
+                                                 const std::string& ns,
+                                                 double alpha = 0.1);
+
 }  // namespace topology
 }  // namespace hydra

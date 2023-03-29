@@ -1,0 +1,17 @@
+---
+visualize: false
+num_colors: 5
+saturation: 0.9
+luminance: 0.7
+edge_sl_ratio: 0.6
+node_scale: 0.2
+node_alpha: 0.9
+node_use_sphere: true
+edge_scale: 0.05
+edge_alpha: 0.9
+label_height: 0.9
+label_scale: 0.8
+color_offset: 3
+interlayer_edge_insertion_skip: 10
+visualize_interlayer_edges: false
+z_offset_scale: 0.0

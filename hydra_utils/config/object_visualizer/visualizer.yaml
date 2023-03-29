@@ -1,0 +1,25 @@
+---
+# general options
+layer_z_step: 4.0  # unit separation between layers
+# ratio of where the split from a single edge to the multiple edges to the mesh occurs.
+# 0 -> at the height of the mesh
+# 1 -> at the height of the object layer
+mesh_edge_break_ratio: 0.5
+# where to draw the mesh (0.0 is recommended)
+mesh_layer_offset: 0.0
+# whether or not to apply offsets to each of the layers
+collapse_layers: false
+# color places by their distance to the nearest obstalce
+color_places_by_distance: false
+# minimum distance to clip to for places colormap
+places_colormap_min_distance: 0.0
+# maximum distance to clip to for places colormap
+places_colormap_max_distance: 3.0
+
+places_colormap:
+  min_hue: 0.0
+  max_hue: 0.5
+  min_saturation: 0.9
+  max_saturation: 0.8
+  min_luminance: 0.6
+  max_luminance: 0.85

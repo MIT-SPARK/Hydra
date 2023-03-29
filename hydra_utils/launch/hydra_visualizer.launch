@@ -6,7 +6,10 @@
   <arg name="scene_graph_dir" default="$(find hydra_dsg_builder)/output"/>
   <arg name="scene_graph_path" value="$(arg scene_graph_dir)/$(arg scene_graph)"/>
 
-  <arg name="viz_config_dir" default="$(find hydra_utils)/config/hydra_visualizer"/>
+  <arg name="viz_config_path" default="$(find hydra_utils)/config"/>
+  <arg name="viz_config_name" default="hydra_visualizer"/>
+  <arg name="viz_config_dir" default="$(arg viz_config_path)/$(arg viz_config_name)"/>
+
   <arg name="visualizer_ns" value="/hydra_visualizer"/>
   <arg name="include_rviz" default="true"/>
 
