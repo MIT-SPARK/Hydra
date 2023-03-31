@@ -50,7 +50,7 @@
     <arg name="use_gnn_descriptors" default="false"/>
     <arg name="lcd_gnn_object_model" default="$(find hydra_dsg_builder)/models/lcd/object_gnn.onnx"/>
     <arg name="lcd_gnn_places_model" default="$(find hydra_dsg_builder)/models/lcd/place_gnn.onnx"/>
-    <arg name="lcd_gnn_label_embeddings" if="$(arg use_gnn_descriptors)"/>
+    <arg name="lcd_gnn_label_embeddings" default="" if="$(arg use_gnn_descriptors)"/>
 
     <arg name="debug" default="false"/>
     <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
