@@ -71,7 +71,16 @@ std::string showVector(const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& vector,
 #if defined(HYDRA_USE_GNN) && HYDRA_USE_GNN
 void configureDescriptorFactories(lcd::DsgLcdDetector& detector,
                                   const DsgLcdDetectorConfig& config) {
-  const auto embeddings = loadLabelEmbeddings(config.gnn_lcd.label_embeddings_file);
+  ObjectGnnDescriptor::LabelEmbeddings embeddings;
+  if (config.gnn_lcd.use_onehot_encoding) {
+    for (size_t i = 0; i < config.gnn_lcd.onehot_encoding_dim; ++i) {
+      Eigen::VectorXf vec = Eigen::VectorXf::Zero(config.gnn_lcd.onehot_encoding_dim);
+      vec(i) = 1.0f;
+      embeddings[static_cast<uint8_t>(i)] = vec;
+    }
+  } else {
+    embeddings = loadLabelEmbeddings(config.gnn_lcd.label_embeddings_file);
+  }
 
   DsgLcdDetector::FactoryMap factories;
   factories.emplace(

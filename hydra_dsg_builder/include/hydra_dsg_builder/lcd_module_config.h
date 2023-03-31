@@ -33,10 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder/dsg_lcd_detector.h"
-
 #include <hydra_utils/config.h>
 #include <hydra_utils/eigen_config_types.h>
+
+#include "hydra_dsg_builder/dsg_lcd_detector.h"
 
 namespace teaser {
 
@@ -138,7 +138,11 @@ void visit_config(const Visitor& v, HistogramConfig<T>& config) {
 
 template <typename Visitor>
 void visit_config(const Visitor& v, GnnLcdConfig& config) {
-  v.visit("label_embeddings_file", config.label_embeddings_file);
+  v.visit("use_onehot_encoding", config.use_onehot_encoding);
+  v.visit("onehot_encoding_dim", config.onehot_encoding_dim);
+  if (!config.use_onehot_encoding) {
+    v.visit("label_embeddings_file", config.label_embeddings_file);
+  }
   v.visit("object_connection_radius_m", config.object_connection_radius_m);
   v.visit("object_model_path", config.object_model_path);
   v.visit("places_model_path", config.places_model_path);
