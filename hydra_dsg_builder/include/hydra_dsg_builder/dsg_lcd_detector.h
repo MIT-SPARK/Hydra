@@ -41,6 +41,8 @@ namespace hydra {
 namespace lcd {
 
 struct GnnLcdConfig {
+  bool use_onehot_encoding = true;
+  size_t onehot_encoding_dim = 39;
   std::string label_embeddings_file;
   double object_connection_radius_m;
   std::string object_model_path;

@@ -31,6 +31,5 @@
         <arg name="use_oriented_bounding_boxes" default="false"/>
         <arg name="typology_dir" default="$(find hydra_dsg_builder)/config/uhumans2"/>
         <arg name="typology_config" default="uhumans2_office_typology.yaml"/>
-        <arg name="lcd_gnn_label_embeddings" default="$(find hydra_dsg_builder)/config/uhumans2/office_lcd_embeddings.yaml"/>
     </include>
 </launch>
