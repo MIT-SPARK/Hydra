@@ -134,9 +134,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   virtual void updateDsgMesh(size_t timestamp_ns, bool force_mesh_update = false);
 
-  virtual void resetBackendDsg();
-
-  virtual void addPlacesToDeformationGraph();
+  virtual void resetBackendDsg(size_t timestamp_ns);
 
   virtual void callUpdateFunctions(
       size_t timestamp_ns,

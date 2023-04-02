@@ -68,7 +68,6 @@ void visit_config(const Visitor& v, KimeraPgmoConfig& config) {
     config.mode = static_cast<RunMode>(mode);
   }
 
-  v.visit("use_msg_time", config.use_msg_time);
   v.visit("embed_trajectory_delta_t", config.embed_delta_t);
   v.visit("num_interp_pts", config.num_interp_pts);
   v.visit("interp_horizon", config.interp_horizon);
