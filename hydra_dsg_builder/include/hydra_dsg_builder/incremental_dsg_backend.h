@@ -122,9 +122,9 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
                       const gtsam::Pose3& src_T_dest,
                       double variance);
 
-  void updateFactorGraph(const BackendInput& input);
+  virtual void updateFactorGraph(const BackendInput& input);
 
-  bool updateFromLcdQueue();
+  virtual bool updateFromLcdQueue();
 
   virtual bool updatePrivateDsg(size_t timestamp_ns, bool force_update = true);
 
