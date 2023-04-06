@@ -78,6 +78,7 @@ struct HydraRosPipeline {
   std::shared_ptr<incremental::DsgLcd> lcd;
 
   std::unique_ptr<DsgSender> dsg_sender;
+  std::unique_ptr<kimera_pgmo::MeshFrontendPublisher> mesh_frontend_pub;
   ros::Subscriber bow_sub;
 };
 

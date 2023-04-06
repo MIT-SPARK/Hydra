@@ -97,6 +97,12 @@ HydraRosPipeline::HydraRosPipeline(const ros::NodeHandle& node_handle, int robot
                                           this,
                                           std::placeholders::_1,
                                           std::placeholders::_2));
+    mesh_frontend_pub.reset(new kimera_pgmo::MeshFrontendPublisher(nh));
+    frontend->addMeshFrontendOutputCallback(
+        std::bind(&kimera_pgmo::MeshFrontendPublisher::publishOutput,
+                  mesh_frontend_pub.get(),
+                  std::placeholders::_1,
+                  std::placeholders::_2));
   }
 
   const auto backend_config = load_config<DsgBackendConfig>(nh);

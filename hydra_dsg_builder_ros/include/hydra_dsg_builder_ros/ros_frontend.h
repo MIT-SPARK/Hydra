@@ -123,8 +123,6 @@ struct RosFrontend : public DsgFrontend {
 
   ros::Publisher active_vertices_pub_;
   std::unique_ptr<ObjectCloudPub> segmented_vertices_pub_;
-  std::unique_ptr<hydra::DsgSender> dsg_sender_;
-  std::unique_ptr<kimera_pgmo::MeshFrontendPublisher> mesh_frontend_pub_;
 };
 
 }  // namespace hydra
