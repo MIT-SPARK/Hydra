@@ -198,6 +198,12 @@ DsgRegistrationSolution DsgTeaserSolver::solve(const DynamicSceneGraph& dsg,
   }
 
   if (problem.src_nodes.size() <= 3 || problem.dest_nodes.size() <= 3) {
+    if (problem.src_nodes.empty()) {
+      LOG(ERROR) << "Invalid query: " << NodeSymbol(match.query_root).getLabel();
+    } else {
+      LOG(ERROR) << "Invalid match: " << NodeSymbol(match.match_root).getLabel();
+    }
+
     return {};
   }
 

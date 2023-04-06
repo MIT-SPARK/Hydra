@@ -47,7 +47,6 @@ namespace hydra {
 DECLARE_STRUCT_NAME(RosReconstructionConfig);
 DECLARE_STRUCT_NAME(ReconstructionConfig);
 
-using message_filters::Subscriber;
 using pose_graph_tools::PoseGraph;
 using pose_graph_tools::PoseGraphEdge;
 using pose_graph_tools::PoseGraphNode;
@@ -121,20 +120,13 @@ RosReconstruction::RosReconstruction(const ros::NodeHandle& nh,
                  << ", t=" << config_.body_t_camera.transpose();
   }
 
-  if (ros_config_.use_pose_graph) {
-    LOG(WARNING) << "Using pose graph input!";
-    pcl_sync_sub_.reset(new Subscriber<RosPointcloud>(nh_, "pointcloud", 10));
-    pose_graph_sub_.reset(new Subscriber<PoseGraph>(nh_, "pose_graph", 10));
-    sync_.reset(new Sync(Policy(30), *pcl_sync_sub_, *pose_graph_sub_));
-    sync_->registerCallback(
-        boost::bind(&RosReconstruction::inputCallback, this, _1, _2));
-  } else {
-    LOG(WARNING) << "Using pointcloud and TF as input!";
-    pcl_sub_ = nh_.subscribe<Pointcloud>(
-        "pointcloud", 10, &RosReconstruction::pclCallback, this);
-    tf_listener_.reset(new tf2_ros::TransformListener(buffer_));
-    pointcloud_thread_.reset(new std::thread(&RosReconstruction::pointcloudSpin, this));
-  }
+  LOG(WARNING) << "Using pointcloud and TF as input!";
+  pcl_sub_ = nh_.subscribe<Pointcloud>(
+      "pointcloud", 10, &RosReconstruction::handlePointcloud, this);
+  pose_graph_sub_ =
+      nh_.subscribe("pose_graph", 1000, &RosReconstruction::handlePoseGraph, this);
+  tf_listener_.reset(new tf2_ros::TransformListener(buffer_));
+  pointcloud_thread_.reset(new std::thread(&RosReconstruction::pointcloudSpin, this));
 
   if (!ros_config_.enable_output_queue && !output_queue) {
     // reset output queue so we don't waste memory with queued packets
@@ -172,33 +164,7 @@ RosReconstruction::~RosReconstruction() {
   VLOG(2) << "[Hydra Reconstruction] pointcloud queue: " << pointcloud_queue_.size();
 }
 
-void RosReconstruction::inputCallback(const RosPointcloud::ConstPtr& cloud,
-                                      const PoseGraph::ConstPtr& pose_graph) {
-  if (pose_graph->nodes.empty()) {
-    ROS_ERROR("Received empty pose graph!");
-    return;
-  }
-
-  ReconstructionInput::Ptr input(new ReconstructionInput());
-  input->timestamp_ns = cloud->header.stamp * 1000;
-  input->pose_graph = pose_graph;
-  VLOG(1) << "[Hydra Reconstruction] Got ROS input @ " << input->timestamp_ns
-          << " [ns] (pose graph @ " << pose_graph->header.stamp.toNSec() << " [ns])";
-
-  input->pointcloud.reset(new voxblox::Pointcloud());
-  input->pointcloud_colors.reset(new voxblox::Colors());
-  voxblox::convertPointcloud(
-      *cloud, nullptr, input->pointcloud.get(), input->pointcloud_colors.get());
-
-  // TODO(nathan) this assumes that the pose graph message time stamps are
-  // well formed (i.e. the header stamp matches the last pose stamp)
-  tf2::convert(pose_graph->nodes.back().pose.position, input->world_t_body);
-  tf2::convert(pose_graph->nodes.back().pose.orientation, input->world_R_body);
-
-  queue_->push(input);
-}
-
-void RosReconstruction::pclCallback(const RosPointcloud::ConstPtr& cloud) {
+void RosReconstruction::handlePointcloud(const RosPointcloud::ConstPtr& cloud) {
   // pcl timestamps are in microseconds
   ros::Time curr_time;
   curr_time.fromNSec(cloud->header.stamp * 1000);
@@ -215,6 +181,16 @@ void RosReconstruction::pclCallback(const RosPointcloud::ConstPtr& cloud) {
 
   // TODO(nathan) consider setting prev_time_ here?
   pointcloud_queue_.push(cloud);
+}
+
+void RosReconstruction::handlePoseGraph(const PoseGraph::ConstPtr& pose_graph) {
+  if (pose_graph->nodes.empty()) {
+    ROS_ERROR("Received empty pose graph!");
+    return;
+  }
+
+  std::unique_lock<std::mutex> lock(pose_graph_mutex_);
+  pose_graphs_.push_back(pose_graph);
 }
 
 void RosReconstruction::pointcloudSpin() {
@@ -281,6 +257,12 @@ void RosReconstruction::pointcloudSpin() {
     geometry_msgs::Pose curr_pose = tfToPose(transform.transform);
     tf2::convert(curr_pose.position, input->world_t_body);
     tf2::convert(curr_pose.orientation, input->world_R_body);
+
+    {  // start pose graph critical section
+      std::unique_lock<std::mutex> lock(pose_graph_mutex_);
+      input->pose_graphs = pose_graphs_;
+      pose_graphs_.clear();
+    }  // end pose graph critical section
 
     queue_->push(input);
   }

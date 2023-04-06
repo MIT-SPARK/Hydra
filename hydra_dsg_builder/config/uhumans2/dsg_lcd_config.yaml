@@ -27,7 +27,7 @@ lcd:
     objects:
       min_time_separation_s: 25.0
       min_score: 0.3
-      min_registration_score: 0.93
+      min_registration_score: 0.90
       max_registration_matches: 2
       min_score_ratio: 0.9
       min_match_separation_m: 5.0

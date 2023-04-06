@@ -104,7 +104,7 @@
         <param name="publish_reconstruction_mesh" value="$(arg visualize_reconstruction)"/>
         <rosparam file="$(arg graph_viz_config_file)" ns="topology_visualizer"/>
 
-        <param name="use_pose_graph" value="$(eval not arg('use_gt_frame'))"/>
+        <param name="make_pose_graph" value="$(arg use_gt_frame)"/>
         <param name="do_reconstruction" value="$(arg do_reconstruction)"/>
         <param name="enable_frontend_output" value="$(arg enable_frontend_output)"/>
         <param name="use_ros_backend" value="$(arg use_ros_backend)"/>
