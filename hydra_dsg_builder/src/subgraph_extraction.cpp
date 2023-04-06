@@ -148,7 +148,14 @@ std::set<NodeId> getSubgraphNodes(const SubgraphConfig& config,
                                   const DynamicSceneGraph& graph,
                                   NodeId root_node,
                                   bool is_places) {
-  const auto origin = graph.getPosition(root_node);
+  Eigen::Vector3d origin;
+  try {
+    origin = graph.getPosition(root_node);
+  } catch (const std::out_of_range& e) {
+    LOG(ERROR) << "Invalid root node " << NodeSymbol(root_node).getLabel() << ": "
+               << e.what();
+    return {};
+  }
 
   std::set<NodeId> found;
   if (is_places) {

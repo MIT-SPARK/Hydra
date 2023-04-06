@@ -59,7 +59,7 @@ struct ReconstructionInput {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   uint64_t timestamp_ns;
-  pose_graph_tools::PoseGraph::ConstPtr pose_graph;
+  std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
   Eigen::Vector3d world_t_body;
   Eigen::Quaterniond world_R_body;
   std::unique_ptr<voxblox::Pointcloud> pointcloud;

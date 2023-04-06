@@ -17,7 +17,7 @@ label_names:
   - {label: 10, name: sofa}
   - {label: 11, name: bed}
   - {label: 12, name: curtain}
-  - {label: 13, name: chest of drawers}
+  - {label: 13, name: chest_of_drawers}
   - {label: 14, name: plant}
   - {label: 15, name: sink}
   - {label: 16, name: stairs}
