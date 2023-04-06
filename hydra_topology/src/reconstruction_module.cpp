@@ -213,14 +213,14 @@ bool ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
   VLOG(2) << "[Hydra Reconstruction]: Processing msg @ " << msg.timestamp_ns;
   VLOG(2) << "[Hydra Reconstruction]: " << queue_->size() << " message(s) left";
 
-  // TODO(nathan) might want to return if we don't have a pose graph
   Eigen::Affine3d curr_pose(Eigen::Translation3d(msg.world_t_body) * msg.world_R_body);
-  if (!msg.pose_graph && num_poses_received_ != 0) {
+  if (config_.make_pose_graph && num_poses_received_ > 0) {
     PoseGraph::ConstPtr pose_graph(
         new PoseGraph(makePoseGraph(msg.timestamp_ns, curr_pose)));
     pose_graphs_.push_back(pose_graph);
-  } else if (msg.pose_graph) {
-    pose_graphs_.push_back(msg.pose_graph);
+  } else {
+    pose_graphs_.insert(
+        pose_graphs_.end(), msg.pose_graphs.begin(), msg.pose_graphs.end());
   }
 
   prev_pose_ = curr_pose;

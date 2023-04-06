@@ -35,9 +35,6 @@
 #pragma once
 #include <geometry_msgs/Pose.h>
 #include <hydra_msgs/QueryFreespace.h>
-#include <message_filters/subscriber.h>
-#include <message_filters/sync_policies/approximate_time.h>
-#include <message_filters/synchronizer.h>
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
 #include <pose_graph_tools/PoseGraph.h>
@@ -50,7 +47,6 @@
 namespace hydra {
 
 struct RosReconstructionConfig {
-  bool use_pose_graph = true;
   bool visualize_reconstruction = true;
   std::string topology_visualizer_ns = "~";
   bool publish_mesh = false;
@@ -62,7 +58,6 @@ struct RosReconstructionConfig {
 
 template <typename Visitor>
 void visit_config(const Visitor& v, RosReconstructionConfig& config) {
-  v.visit("use_pose_graph", config.use_pose_graph);
   v.visit("visualize_reconstruction", config.visualize_reconstruction);
   v.visit("topology_visualizer_ns", config.topology_visualizer_ns);
   v.visit("publish_reconstruction_mesh", config.publish_mesh);
@@ -83,8 +78,6 @@ using pose_graph_tools::PoseGraph;
 class RosReconstruction : public ReconstructionModule {
  public:
   using Pointcloud = pcl::PointCloud<pcl::PointXYZRGB>;
-  using Policy = message_filters::sync_policies::ApproximateTime<Pointcloud, PoseGraph>;
-  using Sync = message_filters::Synchronizer<Policy>;
   using PointcloudQueue = InputQueue<Pointcloud::ConstPtr>;
 
   RosReconstruction(const ros::NodeHandle& nh,
@@ -93,10 +86,9 @@ class RosReconstruction : public ReconstructionModule {
 
   virtual ~RosReconstruction();
 
-  void inputCallback(const Pointcloud::ConstPtr& cloud,
-                     const PoseGraph::ConstPtr& pose_graph);
+  void handlePointcloud(const Pointcloud::ConstPtr& cloud);
 
-  void pclCallback(const Pointcloud::ConstPtr& cloud);
+  void handlePoseGraph(const PoseGraph::ConstPtr& pose_graph);
 
   bool handleFreespaceSrv(hydra_msgs::QueryFreespace::Request& req,
                           hydra_msgs::QueryFreespace::Response& res);
@@ -109,18 +101,16 @@ class RosReconstruction : public ReconstructionModule {
   ros::NodeHandle nh_;
   RosReconstructionConfig ros_config_;
 
-  // synchronized receive with pose graph
-  std::unique_ptr<message_filters::Subscriber<Pointcloud>> pcl_sync_sub_;
-  std::unique_ptr<message_filters::Subscriber<PoseGraph>> pose_graph_sub_;
-  std::unique_ptr<Sync> sync_;
-
   // unsynchronzied receive via tf
   ros::Subscriber pcl_sub_;
+  ros::Subscriber pose_graph_sub_;
   tf2_ros::Buffer buffer_;
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
   PointcloudQueue pointcloud_queue_;
   std::unique_ptr<std::thread> pointcloud_thread_;
   std::unique_ptr<ros::Time> last_time_received_;
+  std::mutex pose_graph_mutex_;
+  std::list<PoseGraph::ConstPtr> pose_graphs_;
 
   // visualizer
   std::unique_ptr<topology::TopologyServerVisualizer> visualizer_;
