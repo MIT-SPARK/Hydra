@@ -7,8 +7,8 @@ marker_scale: 0.6
 marker_alpha: 0.8
 use_sphere_marker: false
 use_label: true
-label_height: 1.0
-label_scale: 0.75
+label_height: 1.25
+label_scale: 1.0
 use_bounding_box: false
 bounding_box_alpha: 0.5
 collapse_bounding_box: false
@@ -17,7 +17,7 @@ use_edge_source: true
 interlayer_edge_scale: 0.08
 interlayer_edge_alpha: 0.4
 interlayer_edge_use_color: true
-interlayer_edge_insertion_skip: 1
+interlayer_edge_insertion_skip: 3
 intralayer_edge_scale: 0.1
 intralayer_edge_alpha: 0.8
 intralayer_edge_use_color: false
