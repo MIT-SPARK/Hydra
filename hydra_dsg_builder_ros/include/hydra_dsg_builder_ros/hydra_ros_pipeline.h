@@ -37,6 +37,7 @@
 #include "hydra_dsg_builder_ros/ros_frontend.h"
 
 #include <hydra_dsg_builder/incremental_dsg_lcd.h>
+#include <hydra_dsg_builder/shared_module_state.h>
 #include <hydra_topology/ros_reconstruction.h>
 #include <pose_graph_tools/BowQueries.h>
 
@@ -61,6 +62,10 @@ struct HydraRosPipeline {
 
   void bowCallback(const pose_graph_tools::BowQueries::ConstPtr& msg);
 
+  void sendFrontendOutput(const DynamicSceneGraph& graph,
+                          const incremental::BackendInput& backend_input,
+                          uint64_t timestamp_ns);
+
   void sendFrontendGraph(const DynamicSceneGraph& graph, uint64_t timestamp_ns);
 
   ros::NodeHandle nh;
@@ -78,7 +83,8 @@ struct HydraRosPipeline {
   std::shared_ptr<incremental::DsgLcd> lcd;
 
   std::unique_ptr<DsgSender> dsg_sender;
-  std::unique_ptr<kimera_pgmo::MeshFrontendPublisher> mesh_frontend_pub;
+  ros::Publisher mesh_graph_pub;
+  ros::Publisher mesh_update_pub;
   ros::Subscriber bow_sub;
 };
 

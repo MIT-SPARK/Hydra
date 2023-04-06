@@ -161,6 +161,12 @@ void DsgFrontend::spinOnce(const ReconstructionOutput& msg) {
   VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg.timestamp_ns << " [ns]";
   ScopedTimer timer("frontend/spin", msg.timestamp_ns);
 
+  if (dsg_->graph && backend_input_) {
+    for (const auto& callback : output_callbacks_) {
+      callback(*dsg_->graph, *backend_input_, msg.timestamp_ns);
+    }
+  }
+
   backend_input_.reset(new BackendInput());
   backend_input_->pose_graphs = msg.pose_graphs;
   backend_input_->timestamp_ns = msg.timestamp_ns;
@@ -200,10 +206,6 @@ void DsgFrontend::spinOnce(const ReconstructionOutput& msg) {
   if (config_.should_log) {
     // mutex not required because nothing is modifying the graph
     frontend_graph_logger_.logGraph(dsg_->graph);
-  }
-
-  for (const auto& callback : output_callbacks_) {
-    callback(*dsg_->graph, msg.timestamp_ns);
   }
 }
 

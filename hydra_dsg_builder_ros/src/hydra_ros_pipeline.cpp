@@ -93,16 +93,15 @@ HydraRosPipeline::HydraRosPipeline(const ros::NodeHandle& node_handle, int robot
     ros::NodeHandle frontend_nh(nh, "frontend");
     dsg_sender.reset(new DsgSender(
         frontend_nh, "frontend", true, config.frontend_mesh_separation_s));
-    frontend->addOutputCallback(std::bind(&HydraRosPipeline::sendFrontendGraph,
+    mesh_graph_pub =
+        nh.advertise<pose_graph_tools::PoseGraph>("mesh_graph_incremental", 100, true);
+    mesh_update_pub =
+        nh.advertise<kimera_pgmo::KimeraPgmoMeshDelta>("full_mesh_update", 100, true);
+    frontend->addOutputCallback(std::bind(&HydraRosPipeline::sendFrontendOutput,
                                           this,
                                           std::placeholders::_1,
-                                          std::placeholders::_2));
-    mesh_frontend_pub.reset(new kimera_pgmo::MeshFrontendPublisher(nh));
-    frontend->addMeshFrontendOutputCallback(
-        std::bind(&kimera_pgmo::MeshFrontendPublisher::publishOutput,
-                  mesh_frontend_pub.get(),
-                  std::placeholders::_1,
-                  std::placeholders::_2));
+                                          std::placeholders::_2,
+                                          std::placeholders::_3));
   }
 
   const auto backend_config = load_config<DsgBackendConfig>(nh);
@@ -199,6 +198,21 @@ void HydraRosPipeline::save(const std::string& output_path) {
       lcd->save(output_path + "/lcd/");
     }
   }
+}
+
+void HydraRosPipeline::sendFrontendOutput(
+    const DynamicSceneGraph& graph,
+    const incremental::BackendInput& backend_input,
+    uint64_t timestamp_ns) {
+  if (backend_input.deformation_graph) {
+    mesh_graph_pub.publish(*backend_input.deformation_graph);
+  }
+
+  if (backend_input.mesh_update) {
+    mesh_update_pub.publish(backend_input.mesh_update->toRosMsg());
+  }
+
+  sendFrontendGraph(graph, timestamp_ns);
 }
 
 void HydraRosPipeline::sendFrontendGraph(const DynamicSceneGraph& graph,

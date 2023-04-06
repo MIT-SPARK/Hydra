@@ -59,10 +59,9 @@ class DsgFrontend {
  public:
   using FrontendInputQueue = InputQueue<ReconstructionOutput::Ptr>;
   using InputCallback = std::function<void(const ReconstructionOutput&)>;
-  using OutputCallback = std::function<void(const DynamicSceneGraph& graph, uint64_t)>;
-  using MeshFrontendOutputCallback =
-      std::function<void(const kimera_pgmo::MeshFrontendInterface&,
-                         const std_msgs::Header&)>;
+  using OutputCallback = std::function<void(const DynamicSceneGraph& graph,
+                                            const BackendInput& backend_input,
+                                            uint64_t)>;
   using DynamicLayer = DynamicSceneGraphLayer;
 
   DsgFrontend(const RobotPrefixConfig& prefix,
@@ -85,10 +84,6 @@ class DsgFrontend {
   inline FrontendInputQueue::Ptr getQueue() const { return queue_; }
 
   void addOutputCallback(const OutputCallback& callback);
-
-  void addMeshFrontendOutputCallback(const MeshFrontendOutputCallback& callback) {
-    mesh_frontend_.addOutputCallback(callback);
-  }
 
   size_t maxSemanticLabel() const;
 
