@@ -39,5 +39,6 @@
           if="$(arg record_bag)"
           args="-O $(arg dsg_path)/hydra_output.bag /incremental_dsg_builder_node/dsg /incremental_dsg_builder_node/dsg_mesh $(arg extra_bag_topics)"/>
 
+    <node pkg="tf2_ros" type="static_transform_publisher" name="kimera_link" args="0 0 0 0 0 0 1 base_link cam_d455_link"/>
 
 </launch>
