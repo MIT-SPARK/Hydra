@@ -185,6 +185,10 @@ struct VisualizerNode {
         ros::spinOnce();
 
         if (receiver_ && receiver_->updated()) {
+          if (!receiver_->graph()) {
+            r.sleep();
+            continue;
+          }
           if (!graph_set) {
             visualizer_->setGraph(receiver_->graph());
             graph_set = true;
