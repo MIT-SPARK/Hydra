@@ -54,6 +54,7 @@ struct RosReconstructionConfig {
   double pointcloud_separation_s = 0.1;
   double tf_wait_duration_s = 0.1;
   std::string kimera_extrinsics_file = "";
+  double tf_buffer_size_s = 30.0;
 };
 
 template <typename Visitor>
@@ -65,6 +66,7 @@ void visit_config(const Visitor& v, RosReconstructionConfig& config) {
   v.visit("pointcloud_separation_s", config.pointcloud_separation_s);
   v.visit("tf_wait_duration_s", config.tf_wait_duration_s);
   v.visit("kimera_extrinsics_file", config.kimera_extrinsics_file);
+  v.visit("tf_buffer_size_s", config.tf_buffer_size_s);
 }
 
 }  // namespace hydra
@@ -104,7 +106,8 @@ class RosReconstruction : public ReconstructionModule {
   // unsynchronzied receive via tf
   ros::Subscriber pcl_sub_;
   ros::Subscriber pose_graph_sub_;
-  tf2_ros::Buffer buffer_;
+  // tf2_ros::Buffer buffer_;
+  std::unique_ptr<tf2_ros::Buffer> buffer_;
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
   PointcloudQueue pointcloud_queue_;
   std::unique_ptr<std::thread> pointcloud_thread_;

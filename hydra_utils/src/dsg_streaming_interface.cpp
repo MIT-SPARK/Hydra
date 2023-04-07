@@ -89,6 +89,7 @@ void DsgSender::sendGraph(const DynamicSceneGraph& graph,
 
   mesh_msgs::TriangleMeshStamped msg;
   msg.header.stamp.fromNSec(timestamp_ns);
+  msg.header.frame_id="world";
   msg.mesh = kimera_pgmo::PolygonMeshToTriangleMeshMsg(*graph.getMeshVertices(),
                                                        *graph.getMeshFaces());
   mesh_pub_.publish(msg);
