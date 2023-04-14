@@ -34,14 +34,14 @@ lcd:
     objects:
       min_time_separation_s: 25.0
       min_score: 0.3
-      min_registration_score: 0.925
+      min_registration_score: 0.95
       max_registration_matches: 2
       min_score_ratio: 0.95
       min_match_separation_m: 5.0
       type: L1
     places:
       min_time_separation_s: 25.0
-      min_score: 0.2
+      min_score: 0.5
       min_registration_score: 1.5
       max_registration_matches: 2
       min_score_ratio: 0.7
