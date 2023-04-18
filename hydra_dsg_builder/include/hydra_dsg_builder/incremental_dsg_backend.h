@@ -126,6 +126,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   virtual bool updateFromLcdQueue();
 
+  virtual void copyMeshDelta(const BackendInput& input);
+
   virtual bool updatePrivateDsg(size_t timestamp_ns, bool force_update = true);
 
   virtual void addPlacesToDeformationGraph(size_t timestamp_ns);
