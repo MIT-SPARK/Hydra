@@ -209,7 +209,7 @@ void HydraRosPipeline::sendFrontendOutput(
   }
 
   if (backend_input.mesh_update) {
-    mesh_update_pub.publish(backend_input.mesh_update->toRosMsg());
+    mesh_update_pub.publish(backend_input.mesh_update->toRosMsg(timestamp_ns));
   }
 
   sendFrontendGraph(graph, timestamp_ns);
