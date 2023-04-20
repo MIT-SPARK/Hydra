@@ -217,6 +217,7 @@ void DsgFrontend::updateMeshAndObjects(const ReconstructionOutput& input) {
                             static_cast<int>(block.index[2])});
     }
 
+    VLOG(5) << "[Hydra Frontend] Clearing " << to_archive.size() << " blocks from mesh";
     mesh_compression_->clearArchivedBlocks(to_archive);
   }  // end timing scope
 
@@ -224,6 +225,8 @@ void DsgFrontend::updateMeshAndObjects(const ReconstructionOutput& input) {
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
     mesh_remapping_.reset(new kimera_pgmo::VoxbloxIndexMapping());
+    VLOG(5) << "[Hydra Frontend] Updating mesh with"
+            << input.mesh->mesh.mesh_blocks.size() << " blocks";
     mesh_update = mesh_compression_->update(
         input.mesh->mesh, input.timestamp_ns, mesh_remapping_.get());
   }  // end timing scope

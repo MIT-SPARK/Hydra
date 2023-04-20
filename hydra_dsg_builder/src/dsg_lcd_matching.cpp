@@ -127,6 +127,7 @@ LayerSearchResults searchDescriptors(
   size_t num_low_score = 0;
   size_t num_null = 0;
   size_t num_default_match = 0;
+  size_t num_shared_nodes = 0;
 
   VLOG(10) << "--------------------------------------------------";
 
@@ -144,6 +145,11 @@ LayerSearchResults searchDescriptors(
 
     const bool same_robot = NodeSymbol(query_id).category() ==
                             NodeSymbol(*root_leaf_map.at(valid_id).begin()).category();
+    if (!same_robot) {
+      const auto child = NodeSymbol(*root_leaf_map.at(valid_id).begin());
+      LOG(WARNING) << "Found different robot: query " << NodeSymbol(query_id).getLabel()
+                   << ", putative: " << child.getLabel();
+    }
 
     const Descriptor& other_descriptor = *other_ptr;
     std::chrono::duration<double> diff_s =
@@ -159,6 +165,18 @@ LayerSearchResults searchDescriptors(
       ++num_default_match;
       new_valid_matches.insert(valid_id);
       new_valid_match_scores.push_back({valid_id, -1.0});
+      continue;
+    }
+
+    size_t curr_shared = 0;
+    for (const auto& id : descriptor.nodes) {
+      if (other_descriptor.nodes.count(id)) {
+        ++curr_shared;
+      }
+    }
+
+    if (curr_shared > 0) {
+      ++num_shared_nodes;
       continue;
     }
 
@@ -180,7 +198,7 @@ LayerSearchResults searchDescriptors(
   VLOG(1) << "matching "
           << " -> shared: " << num_same_parent << ", null: " << num_null
           << ", horizon: " << num_inside_horizon << ", low: " << num_low_score
-          << ", default: " << num_default_match
+          << ", default: " << num_default_match << ", shared: " << num_shared_nodes
           << ", valid: " << new_valid_match_scores.size();
 
   std::sort(new_valid_match_scores.begin(),
@@ -218,6 +236,10 @@ LayerSearchResults searchDescriptors(
     if (matches.size() == match_config.max_registration_matches) {
       break;
     }
+  }
+
+  if (match_scores.empty()) {
+    match_scores.push_back(best_score);
   }
 
   return {match_scores,

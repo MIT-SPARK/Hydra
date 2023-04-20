@@ -207,6 +207,19 @@ DsgRegistrationSolution DsgTeaserSolver::solve(const DynamicSceneGraph& dsg,
     return {};
   }
 
+  size_t num_same = 0;
+  for (const auto& qnode : problem.src_nodes) {
+    if (problem.dest_nodes.count(qnode)) {
+      num_same++;
+    }
+  }
+
+  if (num_same >= config.max_same_nodes) {
+    VLOG(2) << "Rejecting registration: " << num_same << " / " << config.max_same_nodes
+            << " shared nodes";
+    return {};
+  }
+
   const auto& layer = dsg.getLayer(layer_id);
   LayerRegistrationSolution solution;
   if (config.use_pairwise_registration) {

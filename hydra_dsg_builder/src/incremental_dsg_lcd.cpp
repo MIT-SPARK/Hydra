@@ -173,6 +173,9 @@ void DsgLcd::spinOnceImpl(bool force_update) {
 
 size_t DsgLcd::processFrontendOutput() {
   const auto& msg = state_->lcd_queue->front();
+  VLOG(5) << "[Hydra LCD] Received archived places: "
+          << displayNodeSymbolContainer(msg->archived_places);
+
   potential_lcd_root_nodes_.insert(potential_lcd_root_nodes_.end(),
                                    msg->archived_places.begin(),
                                    msg->archived_places.end());
@@ -192,18 +195,21 @@ NodeIdSet DsgLcd::getPlacesToCache(const Eigen::Vector3d& agent_pos) {
   NodeIdSet to_cache;
   auto iter = potential_lcd_root_nodes_.begin();
   while (iter != potential_lcd_root_nodes_.end()) {
-    if (!lcd_graph_->hasNode(*iter)) {
+    auto node_opt = lcd_graph_->getNode(*iter);
+    if (!node_opt) {
       VLOG(5) << "[Hydra LCD] Deleted place " << NodeSymbol(*iter).getLabel()
               << " found in LCD queue";
       iter = potential_lcd_root_nodes_.erase(iter);
       continue;
     }
 
-    const Eigen::Vector3d pos = lcd_graph_->getPosition(*iter);
-    if ((agent_pos - pos).norm() < config_.descriptor_creation_horizon_m) {
+    const auto& attrs = node_opt->get().attributes();
+    if ((agent_pos - attrs.position).norm() < config_.descriptor_creation_horizon_m) {
       ++iter;
       continue;
     }
+
+    CHECK(!attrs.is_active) << "Found active node: " << NodeSymbol(*iter).getLabel();
 
     to_cache.insert(*iter);
     iter = potential_lcd_root_nodes_.erase(iter);
