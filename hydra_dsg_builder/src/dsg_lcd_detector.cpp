@@ -342,6 +342,11 @@ std::vector<DsgRegistrationSolution> DsgLcdDetector::registerAndVerify(
         break;
       }
 
+      const auto root = match.match_root.at(i);
+      CHECK(dsg.hasNode(root)) << "Invalid match root: " << NodeSymbol(root).getLabel();
+      CHECK(dsg.hasNode(match.query_root))
+          << "Invalid query root: " << NodeSymbol(match.query_root).getLabel();
+
       DsgRegistrationInput registration_input = {match.query_nodes,
                                                  match.match_nodes[i],
                                                  match.query_root,

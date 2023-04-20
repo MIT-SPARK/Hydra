@@ -110,6 +110,7 @@ template <typename Visitor>
 void visit_config(const Visitor& v, LayerRegistrationConfig& config) {
   v.visit("min_correspondences", config.min_correspondences);
   v.visit("min_inliers", config.min_inliers);
+  v.visit("max_same_nodes", config.max_same_nodes);
   v.visit("log_registration_problem", config.log_registration_problem);
   v.visit("registration_output_path", config.registration_output_path);
   v.visit("recreate_subgraph", config.recreate_subgraph);

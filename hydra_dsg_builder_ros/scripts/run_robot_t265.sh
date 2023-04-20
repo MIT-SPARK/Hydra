@@ -29,4 +29,4 @@ mkdir -p $1/topology
 # Make Log Directory
 mkdir -p $1/logs
 
-roslaunch hydra_dsg_builder_ros hydra_robot.launch dsg_path:="$1" glog_to_file:=true glog_dir:="$1/logs" verbosity:=2 record_bag:=true exit_mode:=SERVICE enable_dsg_lcd:=true use_zmq_interface:=true
+roslaunch hydra_dsg_builder_ros hydra_robot_t265.launch dsg_path:="$1" glog_to_file:=true glog_dir:="$1/logs" verbosity:=2 record_bag:=true exit_mode:=SERVICE enable_dsg_lcd:=true use_zmq_interface:=true

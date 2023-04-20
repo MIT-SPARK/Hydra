@@ -49,6 +49,7 @@ namespace lcd {
 struct LayerRegistrationConfig {
   size_t min_correspondences = 5;
   size_t min_inliers = 5;
+  size_t max_same_nodes = 2;
   bool log_registration_problem = false;
   bool use_pairwise_registration = false;
   std::string registration_output_path = "";
