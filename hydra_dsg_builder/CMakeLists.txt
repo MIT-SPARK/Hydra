@@ -109,6 +109,7 @@ if(CATKIN_ENABLE_TESTING)
     tests/utest_dsg_lcd_matching.cpp
     tests/utest_dsg_lcd_module.cpp
     tests/utest_dsg_update_functions.cpp
+    tests/utest_frontend.cpp
     tests/utest_graph_clustering.cpp
     tests/utest_graph_filtration.cpp
     tests/utest_merge_handler.cpp

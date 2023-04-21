@@ -8,7 +8,7 @@ max_input_queue_size: 5
 pointcloud_separation_s: 0.2
 tf_wait_duration_s: 0.1
 gvd:
-  max_distance_m: 4.5
+  max_distance_m: 3.5
   min_distance_m: 0.2
   min_diff_m: 0.1
   min_weight: 1.0e-6
@@ -59,7 +59,7 @@ tsdf:
   default_truncation_distance: 0.2
   max_weight: 10000
   min_ray_length_m: 0.1
-  max_ray_length_m: 4.5
+  max_ray_length_m: 3.5
   allow_clear: true
   use_weight_dropoff: true
   use_sparsity_compensation_factor: false
