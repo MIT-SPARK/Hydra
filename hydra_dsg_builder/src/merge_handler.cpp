@@ -228,6 +228,8 @@ void MergeHandler::updateMerges(const std::map<NodeId, NodeId>& new_merges,
 
     merged_nodes_parents_.erase(old_iter);
   }
+
+  // consider updating here?
 }
 
 void MergeHandler::reset() {

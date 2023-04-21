@@ -196,8 +196,8 @@ LabelClusters MeshSegmenter::detect(const SemanticLabel2Color& label_map,
 
     const auto clusters = findClusters(full_mesh_vertices_, label_indices.at(label));
 
-    VLOG(3) << "[Mesh Segmenter]  - Found " << clusters.size() << " cluster(s) of label "
-            << static_cast<int>(label);
+    VLOG(3) << "[Mesh Segmenter]  - Found " << clusters.size()
+            << " cluster(s) of label " << static_cast<int>(label);
     label_clusters.insert({label, clusters});
   }
 
@@ -322,44 +322,7 @@ std::set<NodeId> MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
       }
     }
 
-    // TODO(nathan) this entire section is wrong, fix
-    auto to_check = active_objects_[label_clusters.first];
-    for (const auto& node_id : to_check) {
-      if (!graph.hasNode(node_id)) {
-        continue;
-      }
-
-      const auto& node =
-          graph.getNode(node_id).value().get().attributes<SemanticNodeAttributes>();
-
-      for (const auto& other_id : to_check) {
-        if (node_id == other_id) {
-          continue;
-        }
-
-        if (!graph.hasNode(other_id)) {
-          continue;
-        }
-
-        const auto& other =
-            graph.getNode(other_id).value().get().attributes<SemanticNodeAttributes>();
-
-        if (node.bounding_box.isInside(other.position) ||
-            other.bounding_box.isInside(node.position)) {
-          if (node.bounding_box.volume() >= other.bounding_box.volume()) {
-            graph.removeNode(other_id);
-            active_objects_[label_clusters.first].erase(other_id);
-            active_object_timestamps_.erase(other_id);
-            objects_to_check_for_places_.erase(other_id);
-          } else {
-            graph.removeNode(node_id);
-            active_objects_[label_clusters.first].erase(node_id);
-            active_object_timestamps_.erase(node_id);
-            objects_to_check_for_places_.erase(node_id);
-          }
-        }
-      }
-    }
+    // TODO(nathan) maybe think about trying to merge overlapping objects here?
   }
 
   return archived;

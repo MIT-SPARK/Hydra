@@ -103,6 +103,8 @@ RosReconstruction::RosReconstruction(const ros::NodeHandle& nh,
       nh_(nh) {
   ros_config_ = load_config<RosReconstructionConfig>(nh);
 
+  buffer_.reset(new tf2_ros::Buffer(ros::Duration(ros_config_.tf_buffer_size_s)));
+
   if (!ros_config_.kimera_extrinsics_file.empty()) {
     const auto node = YAML::LoadFile(ros_config_.kimera_extrinsics_file);
     const auto elements = node["T_BS"]["data"].as<std::vector<double>>();
@@ -125,7 +127,7 @@ RosReconstruction::RosReconstruction(const ros::NodeHandle& nh,
       "pointcloud", 10, &RosReconstruction::handlePointcloud, this);
   pose_graph_sub_ =
       nh_.subscribe("pose_graph", 1000, &RosReconstruction::handlePoseGraph, this);
-  tf_listener_.reset(new tf2_ros::TransformListener(buffer_));
+  tf_listener_.reset(new tf2_ros::TransformListener(*buffer_));
   pointcloud_thread_.reset(new std::thread(&RosReconstruction::pointcloudSpin, this));
 
   if (!ros_config_.enable_output_queue && !output_queue) {
@@ -168,6 +170,8 @@ void RosReconstruction::handlePointcloud(const RosPointcloud::ConstPtr& cloud) {
   // pcl timestamps are in microseconds
   ros::Time curr_time;
   curr_time.fromNSec(cloud->header.stamp * 1000);
+
+  VLOG(1) << "[Hydra Reconstruction] Got raw pointcloud input @ " << curr_time.toNSec() << " [ns]";
   if (num_poses_received_ > 0) {
     if (last_time_received_ && ((curr_time - *last_time_received_).toSec() <
                                 ros_config_.pointcloud_separation_s)) {
@@ -205,6 +209,8 @@ void RosReconstruction::pointcloudSpin() {
     ros::Time curr_time;
     curr_time.fromNSec(cloud->header.stamp * 1000);
 
+    VLOG(1) << "[Hydra Reconstruction] popped pointcloud input @ " << curr_time.toNSec() << " [ns]";
+
     ros::WallRate tf_wait_rate(1.0 / ros_config_.tf_wait_duration_s);
 
     // note that this is okay in a separate thread from the callback queue because tf2
@@ -212,7 +218,7 @@ void RosReconstruction::pointcloudSpin() {
     bool have_transform = false;
     std::string err_str;
     for (size_t i = 0; i < 5; ++i) {
-      if (buffer_.canTransform(config_.world_frame,
+      if (buffer_->canTransform(config_.world_frame,
                                config_.robot_frame,
                                curr_time,
                                ros::Duration(0),
@@ -238,7 +244,7 @@ void RosReconstruction::pointcloudSpin() {
     geometry_msgs::TransformStamped transform;
     try {
       transform =
-          buffer_.lookupTransform(config_.world_frame, config_.robot_frame, curr_time);
+          buffer_->lookupTransform(config_.world_frame, config_.robot_frame, curr_time);
     } catch (const tf2::TransformException& ex) {
       LOG(ERROR) << "Failed to look up: " << config_.world_frame << " to "
                  << config_.robot_frame;

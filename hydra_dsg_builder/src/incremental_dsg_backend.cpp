@@ -484,6 +484,7 @@ bool DsgBackend::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
       const auto& attrs = id_node_pair.second->attributes<ObjectNodeAttributes>();
       auto& private_attrs = node_opt->get().attributes<ObjectNodeAttributes>();
       private_attrs.mesh_connections = attrs.mesh_connections;
+      private_attrs.is_active = attrs.is_active;
     }
 
     if (shared_dsg_->graph->hasLayer(DsgLayers::PLACES)) {

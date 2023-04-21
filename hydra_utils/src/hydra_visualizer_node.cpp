@@ -32,16 +32,17 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
+#include <glog/logging.h>
+#include <ros/ros.h>
+#include <std_srvs/Empty.h>
+
+#include <fstream>
+
 #include "hydra_utils/config.h"
 #include "hydra_utils/dsg_mesh_plugins.h"
 #include "hydra_utils/dsg_streaming_interface.h"
 #include "hydra_utils/dynamic_scene_graph_visualizer.h"
 #include "hydra_utils/timing_utilities.h"
-
-#include <glog/logging.h>
-#include <ros/ros.h>
-
-#include <fstream>
 
 using DsgVisualizer = hydra::DynamicSceneGraphVisualizer;
 using hydra::PgmoMeshPlugin;
@@ -174,6 +175,11 @@ struct VisualizerNode {
     visualizer_->setGraph(dsg);
   }
 
+  bool handleService(std_srvs::Empty::Request&, std_srvs::Empty::Response&) {
+    loadGraph();
+    return true;
+  }
+
   void spin() {
     ROS_DEBUG("Visualizer running");
 
@@ -185,6 +191,10 @@ struct VisualizerNode {
         ros::spinOnce();
 
         if (receiver_ && receiver_->updated()) {
+          if (!receiver_->graph()) {
+            r.sleep();
+            continue;
+          }
           if (!graph_set) {
             visualizer_->setGraph(receiver_->graph());
             graph_set = true;
@@ -199,6 +209,8 @@ struct VisualizerNode {
         r.sleep();
       }
     } else {
+      reload_service_ =
+          nh_.advertiseService("reload", &VisualizerNode::handleService, this);
       visualizer_->start();
       ros::spin();
     }
@@ -209,6 +221,7 @@ struct VisualizerNode {
   std::unique_ptr<DsgReceiver> receiver_;
   NodeConfig config_;
   std::unique_ptr<std::ofstream> size_log_file_;
+  ros::ServiceServer reload_service_;
 };
 
 }  // namespace hydra

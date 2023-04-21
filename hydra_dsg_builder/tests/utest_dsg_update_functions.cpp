@@ -32,11 +32,9 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <hydra_dsg_builder/dsg_update_functions.h>
-
-#include <gtsam/geometry/Pose3.h>
-
 #include <gtest/gtest.h>
+#include <gtsam/geometry/Pose3.h>
+#include <hydra_dsg_builder/dsg_update_functions.h>
 
 namespace hydra {
 
@@ -54,7 +52,9 @@ using incremental::SharedDsgInfo;
   }                                            \
   static_assert(true, "")
 
-SharedDsgInfo::Ptr makeSharedDsg() {
+namespace {
+
+inline SharedDsgInfo::Ptr makeSharedDsg() {
   const LayerId mesh_layer_id = 1;
   const std::map<LayerId, char> layer_id_map{{DsgLayers::OBJECTS, 'o'},
                                              {DsgLayers::PLACES, 'p'},
@@ -62,6 +62,8 @@ SharedDsgInfo::Ptr makeSharedDsg() {
                                              {DsgLayers::BUILDINGS, 'b'}};
   return SharedDsgInfo::Ptr(new SharedDsgInfo(layer_id_map, mesh_layer_id));
 }
+
+}  // namespace
 
 TEST(DsgInterpolationTests, ObjectUpdate) {
   auto dsg = makeSharedDsg();
@@ -118,7 +120,7 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
   }
 }
 
-TEST(DsgInterpolationTests, ObjectUpdateMerge) {
+TEST(DsgInterpolationTests, ObjectUpdateMergeLC) {
   auto dsg = makeSharedDsg();
   auto& graph = *dsg->graph;
   ObjectNodeAttributes::Ptr attrs0(new ObjectNodeAttributes);
@@ -190,6 +192,45 @@ TEST(DsgInterpolationTests, ObjectUpdateMerge) {
     Eigen::Vector3f expected_max(1.0, 2.0, 3.0);
     EXPECT_NEAR(0.0, (expected_max - result0.bounding_box.max).norm(), 1.0e-7);
 
+    std::map<NodeId, NodeId> expected{{1, 0}};
+    EXPECT_EQ(merged_nodes, expected);
+  }
+}
+
+TEST(DsgInterpolationTests, ObjectUpdateMergeNoLC) {
+  auto dsg = makeSharedDsg();
+  auto& graph = *dsg->graph;
+  ObjectNodeAttributes::Ptr attrs0(new ObjectNodeAttributes);
+  attrs0->position << 1.0, 2.0, 3.0;
+  attrs0->bounding_box.type = BoundingBox::Type::AABB;
+  attrs0->bounding_box.min << 1.0f, 2.0f, 3.0f;
+  attrs0->bounding_box.max << 1.0f, 2.0f, 3.0f;
+  attrs0->semantic_label = 1u;
+  attrs0->mesh_connections = {0, 1};
+  attrs0->is_active = false;
+  ObjectNodeAttributes::Ptr attrs1(new ObjectNodeAttributes);
+  attrs1->position << 2.0, 3.0, 4.0;
+  attrs1->bounding_box.type = BoundingBox::Type::AABB;
+  attrs1->bounding_box.min << 2.0f, 3.0f, 4.0f;
+  attrs1->bounding_box.max << 2.0f, 3.0f, 4.0f;
+  attrs1->semantic_label = 1u;
+  attrs1->mesh_connections = {0, 1};
+  attrs1->is_active = true;
+  graph.emplaceNode(DsgLayers::OBJECTS, 0, std::move(attrs0));
+  graph.emplaceNode(DsgLayers::OBJECTS, 1, std::move(attrs1));
+
+  MeshVertices::Ptr cloud(new MeshVertices);
+  MAKE_POINT(cloud, -1.0, -2.0, -3.0);
+  MAKE_POINT(cloud, 1.0, 2.0, 3.0);
+
+  std::shared_ptr<MeshFaces> faces(new MeshFaces());
+  graph.setMesh(cloud, faces);
+
+  const UpdateInfo info{nullptr, nullptr, false, 0, true};
+  dsg_updates::UpdateObjectsFunctor functor;
+  auto merged_nodes = functor.call(*dsg, info);
+
+  {
     std::map<NodeId, NodeId> expected{{1, 0}};
     EXPECT_EQ(merged_nodes, expected);
   }

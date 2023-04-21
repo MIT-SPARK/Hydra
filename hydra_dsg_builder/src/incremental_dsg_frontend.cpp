@@ -571,6 +571,7 @@ void DsgFrontend::addPlaceAgentEdges(uint64_t timestamp_ns) {
     return;  // haven't received places yet
   }
 
+  std::set<NodeId> to_find;
   for (const auto& pair : dsg_->graph->dynamicLayersOfType(DsgLayers::AGENTS)) {
     const LayerPrefix prefix = pair.first;
     const auto& layer = *pair.second;
@@ -580,22 +581,38 @@ void DsgFrontend::addPlaceAgentEdges(uint64_t timestamp_ns) {
     }
 
     for (size_t i = last_agent_edge_index_[prefix]; i < layer.numNodes(); ++i) {
+      bool found = false;
       places_nn_finder_->find(
           layer.getPositionByIndex(i), 1, false, [&](NodeId place_id, size_t, double) {
             CHECK(dsg_->graph->insertEdge(place_id, prefix.makeId(i)));
+            found = true;
           });
+      if (!found) {
+        to_find.insert(prefix.makeId(i));
+      }
     }
+
     last_agent_edge_index_[prefix] = layer.numNodes();
   }
 
   for (const auto& node : deleted_agent_edge_indices_) {
     const Eigen::Vector3d pos = dsg_->graph->getPosition(node);
+
+    bool found = false;
     places_nn_finder_->find(pos, 1, false, [&](NodeId place_id, size_t, double) {
       CHECK(dsg_->graph->insertEdge(place_id, node));
+      found = true;
     });
+
+    if (!found) {
+      to_find.insert(node);
+    }
   }
 
   deleted_agent_edge_indices_.clear();
+  deleted_agent_edge_indices_ = to_find;
+  VLOG(5) << "Pending agents: "
+          << displayNodeSymbolContainer(deleted_agent_edge_indices_);
 }
 
 size_t remapConnections(const kimera_pgmo::VoxbloxIndexMapping& remapping,
