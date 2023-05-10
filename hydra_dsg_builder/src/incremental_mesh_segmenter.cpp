@@ -338,8 +338,8 @@ void MeshSegmenter::updateObjectInGraph(const Cluster& cluster,
 
   pcl::IndicesPtr indices(new std::vector<int>(attrs.mesh_connections.begin(),
                                                attrs.mesh_connections.end()));
-  auto new_box =
-      bounding_box::extract(full_mesh_vertices_, config_.bounding_box_type, indices);
+  auto new_box = bounding_box::extract(
+      full_mesh_vertices_, config_.bounding_box_type, indices, config_.angle_step);
   objects_to_check_for_places_.insert(node.id);
 
   // TODO(nathan) this is not ideal, but...
@@ -361,7 +361,8 @@ void MeshSegmenter::addObjectToGraph(DynamicSceneGraph& graph,
   ObjectNodeAttributes::Ptr attrs = std::make_unique<ObjectNodeAttributes>();
   attrs->semantic_label = label;
   attrs->name = NodeSymbol(next_node_id_).getLabel();
-  attrs->bounding_box = bounding_box::extract(cluster.cloud, config_.bounding_box_type);
+  attrs->bounding_box = bounding_box::extract(
+      cluster.cloud, config_.bounding_box_type, nullptr, config_.angle_step);
   attrs->mesh_connections.insert(attrs->mesh_connections.begin(),
                                  cluster.indices.indices.begin(),
                                  cluster.indices.indices.end());

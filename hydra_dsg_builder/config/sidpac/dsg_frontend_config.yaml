@@ -1,4 +1,5 @@
 ---
+angle_step: 30.0
 pgmo:
   horizon: 100.0
   track_mesh_graph_mapping: true

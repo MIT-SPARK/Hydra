@@ -321,6 +321,7 @@ void DsgBackend::setSolverParams() {
 
 void DsgBackend::setDefaultUpdateFunctions() {
   update_objects_functor_.reset(new dsg_updates::UpdateObjectsFunctor());
+  update_objects_functor_->angle_step = config_.angle_step;
   update_places_functor_.reset(new dsg_updates::UpdatePlacesFunctor(
       config_.places_merge_pos_threshold_m, config_.places_merge_distance_tolerance_m));
   update_buildings_functor_.reset(new dsg_updates::UpdateBuildingsFunctor(

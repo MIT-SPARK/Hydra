@@ -140,6 +140,7 @@ void visit_config(const Visitor& v, DsgFrontendConfig& config) {
   v.visit("lcd_use_bow_vectors", config.lcd_use_bow_vectors);
   v.visit("pgmo", config.pgmo_config);
   v.visit("objects", config.object_config);
+  v.visit("angle_step", config.object_config.angle_step);
   v.visit("validate_vertices", config.validate_vertices);
   v.visit("filter_places", config.filter_places);
   v.visit("min_places_component_size", config.min_places_component_size);

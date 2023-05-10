@@ -147,6 +147,7 @@ struct DsgBackendConfig {
                                            {DsgLayers::ROOMS, false},
                                            {DsgLayers::BUILDINGS, false}};
   bool merge_update_dynamic = true;
+  float angle_step = 10.0f;
   double places_merge_pos_threshold_m = 0.4;
   double places_merge_distance_tolerance_m = 0.3;
   bool enable_merge_undos = false;
@@ -195,6 +196,7 @@ void visit_config(const Visitor& v, DsgBackendConfig& config) {
   v.visit("building_color", config.building_color);
   v.visit("building_semantic_label", config.building_semantic_label);
   v.visit("enable_rooms", config.enable_rooms);
+  v.visit("angle_step", config.angle_step);
   v.visit("room_finder", config.room_finder);
 
   v.visit("pgmo", config.pgmo);

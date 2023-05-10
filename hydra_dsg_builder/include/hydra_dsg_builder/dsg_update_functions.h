@@ -77,6 +77,7 @@ struct UpdateObjectsFunctor {
   bool shouldMerge(const ObjectNodeAttributes& from_attrs,
                    const ObjectNodeAttributes& to_attrs) const;
 
+  float angle_step = 10.0f;
   size_t num_merges_to_consider = 1;
   bool use_active_flag = true;
   std::shared_ptr<std::set<size_t>> invalid_indices;
