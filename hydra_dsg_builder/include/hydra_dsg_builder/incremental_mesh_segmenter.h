@@ -60,6 +60,7 @@ struct MeshSegmenterConfig {
   double cluster_tolerance = 0.25;
   size_t min_cluster_size = 40;
   size_t max_cluster_size = 100000;
+  float angle_step = 10.0f;
   BoundingBox::Type bounding_box_type = BoundingBox::Type::AABB;
   std::set<uint8_t> labels;
 };

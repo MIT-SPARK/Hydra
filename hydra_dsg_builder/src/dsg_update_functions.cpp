@@ -117,7 +117,7 @@ void UpdateObjectsFunctor::updateObject(const MeshVertices::Ptr& mesh,
     indices.reset(new std::vector<int>(connections.begin(), connections.end()));
   }
 
-  attrs.bounding_box = bounding_box::extract(mesh, attrs.bounding_box.type, indices);
+  attrs.bounding_box = bounding_box::extract(mesh, attrs.bounding_box.type, indices, angle_step);
 
   Centroid centroid;
   for (const auto& idx : *indices) {
