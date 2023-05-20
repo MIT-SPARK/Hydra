@@ -17,6 +17,23 @@ This repository contains code to incrementally build 3D Dynamic Scene Graphs (DS
 }
 ```
 
+**Update (05/20/23):** We recently authored the following paper ["Foundations of Spatial Perception for Robotics: Hierarchical Representations and Real-time Systems"](https://arxiv.org/abs/2305.07154).
+Associated updates to Hydra from this paper will be released soon (*current target 06/09/23*).
+We also plan to release additional code, most notably for training the room classification networks and GNN-based descriptors as described in the above paper.
+This will likely take slightly longer (and is likely to be in a different repository, which will be linked to).
+In the meantime, if you find our new paper relevant for your work, please consider also citing this paper.
+A bibtex entry is provided below:
+```
+@article{hughes2023foundations,
+         title={Foundations of Spatial Perception for Robotics: Hierarchical Representations and Real-time Systems},
+         author={Nathan Hughes and Yun Chang and Siyi Hu and Rajat Talak and Rumaisa Abdulhai and Jared Strader and Luca Carlone},
+         year={2023},
+         eprint={2305.07154},
+         archivePrefix={arXiv},
+         primaryClass={cs.RO}
+}
+```
+
 ### Acknowledgements and Disclaimer
 
 **Acknowledgements:** This work was partially funded by the AIA CRA FA8750-19-2-1000, ARL DCIST CRA W911NF-17-2-0181, and ONR RAIDER N00014-18-1-2828.
