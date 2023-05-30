@@ -75,6 +75,13 @@ visualization_msgs::Marker makeTextMarker(const std_msgs::Header& header,
                                           const VisualizerConfig& visualizer_config,
                                           const std::string& ns);
 
+visualization_msgs::Marker makeTextMarkerNoHeight(
+    const std_msgs::Header& header,
+    const LayerConfig& config,
+    const SceneGraphNode& node,
+    const VisualizerConfig& visualizer_config,
+    const std::string& ns);
+
 visualization_msgs::Marker makeCentroidMarkers(
     const std_msgs::Header& header,
     const LayerConfig& config,

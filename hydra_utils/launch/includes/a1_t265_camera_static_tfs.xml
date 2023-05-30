@@ -1,0 +1,39 @@
+<launch>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_0" args="0.0 -0.0 -0.0 0.0 0.0 0.0 1.0 cam_d455_link cam_d455_depth_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_1" args="0.0 -0.0 -0.0 -0.5 0.4999999999999999 -0.5 0.5000000000000001 cam_d455_depth_frame cam_d455_depth_optical_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_2" args="-0.0002813368628267199 -0.059279922395944595 -3.9372611354338005e-05 4.3593594455160065e-05 0.00020654933177866042 0.002206892240792513 0.9999975562095642 cam_d455_link cam_d455_color_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_3" args="0.0 -0.0 -0.0 -0.5 0.4999999999999999 -0.5 0.5000000000000001 cam_d455_color_frame cam_d455_color_optical_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_4" args="-0.016019999980926514 -0.030220000073313713 0.007400000002235174 0.0 0.0 0.0 1.0 cam_d455_link cam_d455_gyro_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_5" args="0.0 -0.0 -0.0 -0.5 0.4999999999999999 -0.5 0.5000000000000001 cam_d455_gyro_frame cam_d455_imu_optical_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_6" args="-0.016019999980926514 -0.030220000073313713 0.007400000002235174 0.0 0.0 0.0 1.0 cam_d455_link cam_d455_accel_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_7" args="0.0 -0.0 -0.0 -0.5 0.4999999999999999 -0.5 0.5000000000000001 cam_d455_accel_frame cam_d455_accel_optical_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_8" args="9.436560503672808e-05 0.021378569304943085 -7.563530380139127e-05 2.220446049250313e-16 0.0 1.0 0.0 cam_t265_link cam_t265_gyro_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_9" args="0.0 -0.0 -0.0 0.5 -0.4999999999999999 -0.5 0.5000000000000001 cam_t265_gyro_frame cam_t265_imu_optical_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_10" args="9.436560503672808e-05 0.021378569304943085 -7.563530380139127e-05 2.220446049250313e-16 0.0 1.0 0.0 cam_t265_link cam_t265_accel_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_11" args="0.0 -0.0 -0.0 0.5 -0.4999999999999999 -0.5 0.5000000000000001 cam_t265_accel_frame cam_t265_accel_optical_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_12" args="0.0 -0.0 -0.0 -0.0 -0.0 -0.0 1.0 cam_t265_pose_frame cam_t265_link"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_13" args="9.436560503672808e-05 0.021378569304943085 -7.563530380139127e-05 2.220446049250313e-16 0.0 1.0 0.0 cam_t265_link cam_t265_gyro_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_14" args="0.0 -0.0 -0.0 0.5 -0.4999999999999999 -0.5 0.5000000000000001 cam_t265_gyro_frame cam_t265_imu_optical_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_15" args="9.436560503672808e-05 0.021378569304943085 -7.563530380139127e-05 2.220446049250313e-16 0.0 1.0 0.0 cam_t265_link cam_t265_accel_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_16" args="0.0 -0.0 -0.0 0.5 -0.4999999999999999 -0.5 0.5000000000000001 cam_t265_accel_frame cam_t265_accel_optical_frame"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="bag_static_tf_17" args="0.0 -0.0 -0.0 -0.0 -0.0 -0.0 1.0 cam_t265_pose_frame cam_t265_link"/>
+
+</launch>

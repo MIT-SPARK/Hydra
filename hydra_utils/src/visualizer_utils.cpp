@@ -310,6 +310,29 @@ Marker makeTextMarker(const std_msgs::Header& header,
   return marker;
 }
 
+Marker makeTextMarkerNoHeight(const std_msgs::Header& header,
+                              const LayerConfig& config,
+                              const Node& node,
+                              const VisualizerConfig& visualizer_config,
+                              const std::string& ns) {
+  Marker marker;
+  marker.header = header;
+  marker.ns = ns;
+  marker.id = node.id;
+  marker.type = Marker::TEXT_VIEW_FACING;
+  marker.action = Marker::ADD;
+  marker.lifetime = ros::Duration(0);
+  marker.text = node.attributes<SemanticNodeAttributes>().name;
+  marker.scale.z = config.label_scale;
+  marker.color = makeColorMsg(NodeColor::Zero());
+
+  fillPoseWithIdentity(marker.pose);
+  tf2::convert(node.attributes().position, marker.pose.position);
+  marker.pose.position.z += config.label_height;
+
+  return marker;
+}
+
 Marker makeCentroidMarkers(const std_msgs::Header& header,
                            const LayerConfig& config,
                            const SceneGraphLayer& layer,
@@ -892,7 +915,7 @@ Marker makeDynamicLabelMarker(const std_msgs::Header& header,
   marker.id = marker_id;
   marker.action = Marker::ADD;
   marker.lifetime = ros::Duration(0);
-  marker.text = std::to_string(layer.id) + ":" + layer.prefix.str();
+  marker.text = "Agent";  // std::to_string(layer.id) + ":" + layer.prefix.str();
   marker.scale.z = config.label_scale;
   marker.color = makeColorMsg(NodeColor::Zero());
 

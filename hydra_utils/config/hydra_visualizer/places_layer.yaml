@@ -1,6 +1,6 @@
 ---
 # general
-z_offset_scale: 2.5
+z_offset_scale: 3.0
 visualize: true
 # nodes
 marker_scale: 0.2
@@ -19,6 +19,6 @@ interlayer_edge_alpha: 0.4
 interlayer_edge_use_color: true
 interlayer_edge_insertion_skip: 0
 intralayer_edge_scale: 0.01
-intralayer_edge_alpha: 0.7
+intralayer_edge_alpha: 0.5
 intralayer_edge_use_color: false
 intralayer_edge_insertion_skip: 0

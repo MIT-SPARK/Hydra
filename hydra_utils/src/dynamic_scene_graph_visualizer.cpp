@@ -573,9 +573,6 @@ void DynamicSceneGraphVisualizer::drawLayer(const std_msgs::Header& header,
     }
   }
 
-  clearPrevMarkers(
-      header, curr_labels_.at(layer.id), label_ns, prev_labels_.at(layer.id), msg);
-
   if (config.use_bounding_box) {
     const std::string bbox_ns = getLayerBboxNamespace(layer.id);
     const std::string bbox_edge_ns = getLayerBboxEdgeNamespace(layer.id);
@@ -593,7 +590,17 @@ void DynamicSceneGraphVisualizer::drawLayer(const std_msgs::Header& header,
       // TODO(nathan) consider warning
       return;
     }
+    for (const auto& id_node_pair : layer.nodes()) {
+      const Node& node = *id_node_pair.second;
+
+      Marker label = makeTextMarkerNoHeight(header, config, node, viz_config, label_ns);
+      msg.markers.push_back(label);
+      curr_labels_.at(layer.id).insert(node.id);
+    }
   }
+
+  clearPrevMarkers(
+      header, curr_labels_.at(layer.id), label_ns, prev_labels_.at(layer.id), msg);
 }
 
 void DynamicSceneGraphVisualizer::drawLayerMeshEdges(const std_msgs::Header& header,

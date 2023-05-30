@@ -1,5 +1,5 @@
 <launch>
-    <arg name="sim_time_required" default="true"/>
+    <arg name="sim_time_required" default="false"/>
     <param name="use_sim_time" value="$(arg sim_time_required)"/>
 
     <arg name="use_gt_semantics" default="true"/>
@@ -28,6 +28,7 @@
         <arg name="extrinsics" default="$(find hydra_topology)/config/extrinsics/uhumans2.yaml"/>
         <arg name="rviz_dir" default="$(find hydra_dsg_builder_ros)/rviz"/>
         <arg name="rviz_file" default="uhumans2.rviz"/>
+        <arg name="rviz_file_td" default="uhumans2_topdown.rviz"/>
         <arg name="use_oriented_bounding_boxes" default="false"/>
         <arg name="typology_dir" default="$(find hydra_dsg_builder)/config/uhumans2"/>
         <arg name="typology_config" default="uhumans2_office_typology.yaml"/>
