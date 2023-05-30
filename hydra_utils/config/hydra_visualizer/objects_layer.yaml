@@ -11,7 +11,8 @@ label_height: 0.5
 label_scale: 0.45
 use_bounding_box: true
 bounding_box_alpha: 0.9
-bbox_wireframe_scale: 0.08
+bbox_wireframe_scale: 0.05
+bbox_wireframe_edge_scale: 0.05
 collapse_bounding_box: true
 # edge
 use_edge_source: true

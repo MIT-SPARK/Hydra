@@ -1,6 +1,6 @@
 ---
 # general options
-layer_z_step: 4.5  # unit separation between layers
+layer_z_step: 5.5  # unit separation between layers
 # ratio of where the split from a single edge to the multiple edges to the mesh occurs.
 # 0 -> at the height of the mesh
 # 1 -> at the height of the object layer

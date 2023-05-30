@@ -437,11 +437,28 @@ Marker makeBlocksMarker(const Layer<GvdVoxel>& layer, double scale) {
 
 std_msgs::ColorRGBA makeGvdColor(const GvdVisualizerConfig& config,
                                  const ColormapConfig& colors,
-                                 double distance) {
-  double ratio =
-      computeRatio(config.gvd_min_distance, config.gvd_max_distance, distance);
+                                 double distance,
+                                 uint8_t num_basis_points) {
+  double ratio;
+  double alpha;
+  double alpha_diff = config.gvd_alpha - config.gvd_min_alpha;
+  switch (static_cast<GvdVisualizationMode>(config.gvd_mode)) {
+    case GvdVisualizationMode::BASIS_POINTS:
+      ratio = computeRatio(static_cast<double>(config.min_num_basis),
+                           static_cast<double>(config.max_num_basis),
+                           static_cast<double>(num_basis_points));
+      alpha = config.gvd_min_alpha + ratio * alpha_diff;
+      break;
+    case GvdVisualizationMode::DISTANCE:
+    case GvdVisualizationMode::DEFAULT:
+    default:
+      ratio = computeRatio(config.gvd_min_distance, config.gvd_max_distance, distance);
+      alpha = config.gvd_alpha;
+      break;
+  }
+
   NodeColor color = dsg_utils::interpolateColorMap(colors, ratio);
-  return dsg_utils::makeColorMsg(color, config.gvd_alpha);
+  return dsg_utils::makeColorMsg(color, alpha);
 }
 
 using EdgeMap = std::unordered_map<uint64_t, std::unordered_set<uint64_t>>;
@@ -500,7 +517,10 @@ MarkerArray makeGvdGraphMarkers(const GvdGraph& graph,
     geometry_msgs::Point node_centroid;
     tf2::convert(id_node_pair.second.position, node_centroid);
     nodes.points.push_back(node_centroid);
-    nodes.colors.push_back(makeGvdColor(config, colors, id_node_pair.second.distance));
+    nodes.colors.push_back(makeGvdColor(config,
+                                        colors,
+                                        id_node_pair.second.distance,
+                                        id_node_pair.second.num_basis_points));
 
     auto& curr_seen = getNodeSet(seen_edges, id_node_pair.first);
     for (const auto sibling : id_node_pair.second.siblings) {
@@ -518,7 +538,8 @@ MarkerArray makeGvdGraphMarkers(const GvdGraph& graph,
       geometry_msgs::Point neighbor_centroid;
       tf2::convert(other.position, neighbor_centroid);
       edges.points.push_back(neighbor_centroid);
-      edges.colors.push_back(makeGvdColor(config, colors, other.distance));
+      edges.colors.push_back(
+          makeGvdColor(config, colors, other.distance, other.num_basis_points));
     }
   }
 
@@ -686,9 +707,9 @@ MarkerArray makePlaceSpheres(const std_msgs::Header& header,
     marker.id = id;
     marker.ns = ns;
 
-    marker.scale.x = attrs.distance;
-    marker.scale.y = attrs.distance;
-    marker.scale.z = attrs.distance;
+    marker.scale.x = 2 * attrs.distance;
+    marker.scale.y = 2 * attrs.distance;
+    marker.scale.z = 2 * attrs.distance;
     marker.pose.orientation.w = 1.0;
     marker.pose.orientation.x = 0.0;
     marker.pose.orientation.y = 0.0;
