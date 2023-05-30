@@ -90,7 +90,7 @@ void RosBackend::poseGraphCallback(const PoseGraph::ConstPtr& msg) {
 RosBackendVisualizer::RosBackendVisualizer(const ros::NodeHandle& nh,
                                            const DsgBackendConfig& config,
                                            const RobotPrefixConfig& prefix)
-    : nh_(nh), config_(config), prefix_(prefix) {
+    : nh_(nh), config_(config), prefix_(prefix), last_zmq_pub_time_(0) {
   mesh_mesh_edges_pub_ =
       nh_.advertise<Marker>("pgmo/deformation_graph_mesh_mesh", 10, false);
   pose_mesh_edges_pub_ =
@@ -109,15 +109,16 @@ RosBackendVisualizer::RosBackendVisualizer(const ros::NodeHandle& nh,
 
 void RosBackendVisualizer::publishOutputs(const DynamicSceneGraph& graph,
                                           const DeformationGraph& dgraph,
-                                          size_t timestamp_ns) const {
+                                          size_t timestamp_ns) {
   ros::Time stamp;
   stamp.fromNSec(timestamp_ns);
 
   // TODO(nathan) consider serializing to bytes before sending
   dsg_sender_->sendGraph(graph, stamp);
 
-  if (config_.use_zmq_interface) {
+  if (config_.use_zmq_interface && timestamp_ns - last_zmq_pub_time_ > 9000000000) {
     zmq_sender_->send(graph);
+    last_zmq_pub_time_ = timestamp_ns;
   }
 
   if (pose_graph_pub_.getNumSubscribers() > 0) {

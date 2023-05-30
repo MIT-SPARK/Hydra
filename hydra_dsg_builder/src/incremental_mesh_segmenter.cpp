@@ -358,11 +358,38 @@ void MeshSegmenter::addObjectToGraph(DynamicSceneGraph& graph,
     return;
   }
 
+  std::unordered_map<SemanticLabel, std::string> label_string{
+      {0, "void"},        {1, "wall"},
+      {2, "floor"},       {3, "chair"},
+      {4, "door"},        {5, "table"},
+      {6, "picture"},     {7, "cabinet"},
+      {8, "cushion"},     {9, "window"},
+      {10, "sofa"},       {11, "bed"},
+      {12, "curtain"},    {13, "chest_of_drawers"},
+      {14, "plant"},      {15, "sink"},
+      {16, "stairs"},     {17, "ceiling"},
+      {18, "toilet"},     {19, "stool"},
+      {20, "towel"},      {21, "mirror"},
+      {22, "tv_monitor"}, {23, "shower"},
+      {24, "column"},     {25, "bathtub"},
+      {26, "counter"},    {27, "fireplace"},
+      {28, "lighting"},   {29, "railing"},
+      {30, "shelving"},   {31, "blinds"},
+      {32, "seating"},    {33, "board_panel"},
+      {34, "furniture"},  {35, "appliances"},
+      {36, "clothes"},    {37, "objects"},
+      {38, "misc"}};
+
   ObjectNodeAttributes::Ptr attrs = std::make_unique<ObjectNodeAttributes>();
   attrs->semantic_label = label;
   attrs->name = NodeSymbol(next_node_id_).getLabel();
   attrs->bounding_box = bounding_box::extract(
       cluster.cloud, config_.bounding_box_type, nullptr, config_.angle_step);
+  if (label_string.count(label)) {
+    attrs->name = label_string[label];
+  } else {
+    LOG(ERROR) << "Missing semantic label: " << std::to_string(label);
+  }
   attrs->mesh_connections.insert(attrs->mesh_connections.begin(),
                                  cluster.indices.indices.begin(),
                                  cluster.indices.indices.end());

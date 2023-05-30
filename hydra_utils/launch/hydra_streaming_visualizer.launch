@@ -17,6 +17,11 @@
   <arg name="rviz_file" default="hydra_streaming_visualizer.rviz"/>
   <arg name="rviz_path" default="$(arg rviz_dir)/$(arg rviz_file)"/>
 
+  <arg name="run_topdown_rviz" default="false"/>
+  <arg name="rviz_topdown_dir" default="$(find hydra_utils)/rviz"/>
+  <arg name="rviz_file_topdown" default="hydra_streaming_visualizer_topdown.rviz"/>
+  <arg name="rviz_path_topdown" default="$(arg rviz_topdown_dir)/$(arg rviz_file_topdown)"/>
+
   <arg name="verbosity" default="0"/>
 
   <include file="$(find hydra_utils)/launch/includes/hydra_visualizer_params.xml">
@@ -44,5 +49,7 @@
   </node>
 
   <node name="rviz" pkg="rviz" type="rviz" output="log" if="$(arg start_rviz)" args="-d $(arg rviz_path)"/>
+
+  <node name="rviz_topdown" pkg="rviz" type="rviz" output="log" if="$(arg run_topdown_rviz)" args="-d $(arg rviz_path_topdown)"/>
 
 </launch>

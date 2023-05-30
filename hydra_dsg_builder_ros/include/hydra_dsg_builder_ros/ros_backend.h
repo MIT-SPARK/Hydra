@@ -96,7 +96,7 @@ class RosBackendVisualizer {
 
   void publishOutputs(const DynamicSceneGraph& graph,
                       const kimera_pgmo::DeformationGraph& dgraph,
-                      size_t timestamp_ns) const;
+                      size_t timestamp_ns);
 
  protected:
   virtual void publishPoseGraph(const DynamicSceneGraph& graph,
@@ -113,6 +113,9 @@ class RosBackendVisualizer {
   ros::Publisher mesh_mesh_edges_pub_;
   ros::Publisher pose_mesh_edges_pub_;
   ros::Publisher pose_graph_pub_;
+
+  // Hack for temporary removal of label flickering
+  size_t last_zmq_pub_time_;
 
   std::unique_ptr<spark_dsg::ZmqSender> zmq_sender_;
   std::unique_ptr<DsgSender> dsg_sender_;

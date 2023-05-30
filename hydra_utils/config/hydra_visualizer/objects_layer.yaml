@@ -1,6 +1,6 @@
 ---
 # generic
-z_offset_scale: 1.5
+z_offset_scale: 2.0
 visualize: true
 # node
 marker_scale: 0.40
@@ -8,7 +8,7 @@ marker_alpha: 0.6
 use_sphere_marker: false
 use_label: false
 label_height: 0.5
-label_scale: 0.25
+label_scale: 0.45
 use_bounding_box: true
 bounding_box_alpha: 0.9
 bbox_wireframe_scale: 0.08

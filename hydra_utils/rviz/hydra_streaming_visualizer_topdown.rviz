@@ -6,7 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
       Splitter Ratio: 0.5
-    Tree Height: 80
+    Tree Height: 363
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -22,10 +22,9 @@ Panels:
     Name: Views
     Splitter Ratio: 0.5
   - Class: rviz/Time
-    Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: Semantics
+    SyncSource: ""
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -51,6 +50,58 @@ Visualization Manager:
       Plane Cell Count: 1000
       Reference Frame: <Fixed Frame>
       Value: false
+    - Class: rviz/TF
+      Enabled: true
+      Filter (blacklist): ""
+      Filter (whitelist): ""
+      Frame Timeout: 15
+      Frames:
+        All Enabled: true
+        base_link:
+          Value: true
+        camera_accel_frame:
+          Value: true
+        camera_accel_optical_frame:
+          Value: true
+        camera_gyro_frame:
+          Value: true
+        camera_imu_optical_frame:
+          Value: true
+        camera_link:
+          Value: true
+        camera_odom_frame:
+          Value: true
+        camera_pose_frame:
+          Value: true
+        left_cam:
+          Value: true
+        map:
+          Value: true
+        world:
+          Value: true
+      Marker Alpha: 1
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Tree:
+        camera_odom_frame:
+          camera_pose_frame:
+            camera_link:
+              camera_accel_frame:
+                camera_accel_optical_frame:
+                  {}
+              camera_gyro_frame:
+                camera_imu_optical_frame:
+                  {}
+        map:
+          world:
+            base_link:
+              left_cam:
+                {}
+      Update Interval: 0
+      Value: true
     - Class: rviz/Group
       Displays:
         - Class: rviz/MarkerArray
@@ -63,6 +114,7 @@ Visualization Manager:
             layer_bounding_boxes_2: true
             layer_bounding_boxes_edges_2: true
             layer_edges_3: true
+            layer_edges_4: true
             layer_labels_2: true
             layer_labels_4: true
             layer_nodes_2: true
@@ -102,42 +154,6 @@ Visualization Manager:
         Wireframe Color: 0; 0; 0
       Topic: /hydra_dsg_visualizer/dsg_mesh/pgmo
       Value: true
-    - Class: rviz/Image
-      Enabled: true
-      Image Topic: /semantic/image_raw
-      Max Value: 1
-      Median window: 5
-      Min Value: 0
-      Name: Semantics
-      Normalize Range: true
-      Queue Size: 2
-      Transport Hint: raw
-      Unreliable: false
-      Value: true
-    - Class: rviz/Image
-      Enabled: true
-      Image Topic: /azure/rgb/image_raw
-      Max Value: 1
-      Median window: 5
-      Min Value: 0
-      Name: RGB
-      Normalize Range: true
-      Queue Size: 2
-      Transport Hint: raw
-      Unreliable: false
-      Value: true
-    - Class: rviz/Image
-      Enabled: false
-      Image Topic: /azure/depth_to_rgb/image_raw
-      Max Value: 1
-      Median window: 300
-      Min Value: 0
-      Name: Depth
-      Normalize Range: true
-      Queue Size: 2
-      Transport Hint: raw
-      Unreliable: false
-      Value: false
   Enabled: true
   Global Options:
     Background Color: 255; 255; 255
@@ -165,41 +181,29 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Class: rviz/Orbit
-      Distance: 35.61590576171875
+      Angle: 1.4799994230270386
+      Class: rviz/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
-      Focal Point:
-        X: -6.252310276031494
-        Y: -5.647854328155518
-        Z: 6.616474151611328
-      Focal Shape Fixed Size: true
-      Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.14539863169193268
+      Scale: 43.006595611572266
       Target Frame: <Fixed Frame>
-      Value: Orbit (rviz)
-      Yaw: 1.300398826599121
+      X: -2.711778402328491
+      Y: 15.237112045288086
     Saved: ~
 Window Geometry:
-  Depth:
-    collapsed: false
   Displays:
-    collapsed: false
-  Height: 1016
-  Hide Left Dock: false
+    collapsed: true
+  Height: 1043
+  Hide Left Dock: true
   Hide Right Dock: true
-  QMainWindow State: 000000ff00000000fd000000040000000000000210000003a2fc020000000bfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073000000003b000000d9000000c700fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000001200530065006d0061006e0074006900630073010000003b0000018b0000001600fffffffb0000000600520047004201000001cc000002110000001600fffffffb0000000a004400650070007400680000000304000000930000001600ffffff000000010000010f0000056bfc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d0000056b000000a000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007800000004afc0100000002fb0000000800540069006d00650000000000000007800000024400fffffffb0000000800540069006d006501000000000000045000000000000000000000056a000003a200000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
-  RGB:
-    collapsed: false
+  QMainWindow State: 000000ff00000000fd00000004000000000000015600000359fc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073000000003e00000359000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261000000010000010f000003b9fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d000003b9000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007800000003efc0100000002fb0000000800540069006d00650000000000000007800000041800fffffffb0000000800540069006d0065010000000000000450000000000000000000000780000003b900000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
-    collapsed: false
-  Semantics:
     collapsed: false
   Time:
     collapsed: false
@@ -208,5 +212,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 1920
-  X: 0
-  Y: 27
+  X: 1920
+  Y: 0

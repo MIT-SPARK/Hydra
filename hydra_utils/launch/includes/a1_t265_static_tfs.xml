@@ -15,4 +15,6 @@
     <node pkg="tf2_ros" type="static_transform_publisher" name="cam_d455_link_to_left_cam"
           args="0 0 0 0 0 0 1 cam_d455_link left_cam"/>
 
+    <include file="$(find hydra_utils)/launch/includes/a1_t265_camera_static_tfs.xml"/>
+
 </launch>
