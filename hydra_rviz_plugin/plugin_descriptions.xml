@@ -1,0 +1,10 @@
+<library path="lib/libhydra_rviz_plugin">
+    <class name="hydra/SceneGraph" type="hydra::SceneGraphDisplay" base_class_type="rviz::Display">
+        <description>
+            Display 3D scene graph from hydra_msgs::DsgUpdate
+        </description>
+        <message_type>
+            hydra_msgs/DsgUpdate
+        </message_type>
+    </class>
+</library>

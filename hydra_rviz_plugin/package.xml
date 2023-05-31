@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>hydra_rviz_plugin</name>
+  <version>1.0.0</version>
+  <description>hydra rviz display for scene graphs</description>
+
+  <author email="na26933@mit.edu">Nathan Hughes</author>
+  <author email="yunchang@mit.edu">Yun Chang</author>
+  <maintainer email="na26933@mit.edu">Nathan Hughes</maintainer>
+
+  <license>BSD</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>rviz</depend>
+  <depend>hydra_msgs</depend>
+  <depend>spark_dsg</depend>
+
+  <export>
+      <rviz plugin="${prefix}/plugin_descriptions.xml"/>
+  </export>
+
+</package>
