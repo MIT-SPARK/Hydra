@@ -56,7 +56,6 @@ add_library(
   src/colormap_utils.cpp
   src/display_utils.cpp
   src/dsg_streaming_interface.cpp
-  src/dsg_mesh_plugins.cpp
   src/dynamic_scene_graph_visualizer.cpp
   src/log_utilities.cpp
   src/ros_parser.cpp
@@ -77,15 +76,8 @@ target_link_libraries(
 )
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
 
-add_executable(hydra_visualizer_node src/hydra_visualizer_node.cpp)
-target_link_libraries(hydra_visualizer_node ${PROJECT_NAME})
-
 add_executable(scene_graph_logger_node src/scene_graph_logger_node.cpp)
 target_link_libraries(scene_graph_logger_node ${PROJECT_NAME})
-
-add_executable(rotate_tf_node src/rotate_tf_node.cpp)
-target_link_libraries(rotate_tf_node ${catkin_LIBRARIES})
-target_include_directories(rotate_tf_node PUBLIC ${catkin_INCLUDE_DIRS})
 
 add_library(${PROJECT_NAME}_nodelet src/mask_nodelet.cpp)
 target_include_directories(
@@ -111,8 +103,6 @@ endif()
 install(
   TARGETS ${PROJECT_NAME}
           ${PROJECT_NAME}_nodelet
-          hydra_visualizer_node
-          rotate_tf_node
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}

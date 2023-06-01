@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #include <hydra_dsg_builder/incremental_dsg_backend.h>
 #include <hydra_dsg_builder/incremental_dsg_frontend.h>
-#include <hydra_utils/dsg_mesh_plugins.h>
 #include <hydra_utils/dynamic_scene_graph_visualizer.h>
 #include <hydra_utils/ros_utilities.h>
 #include <kimera_pgmo/DeformationGraph.h>
