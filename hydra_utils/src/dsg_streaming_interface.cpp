@@ -33,12 +33,13 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_utils/dsg_streaming_interface.h"
-#include "hydra_utils/display_utils.h"
-#include "hydra_utils/dsg_types.h"
-#include "hydra_utils/timing_utilities.h"
 
 #include <kimera_pgmo/utils/CommonFunctions.h>
 #include <spark_dsg/graph_binary_serialization.h>
+
+#include "hydra_utils/display_utils.h"
+#include "hydra_utils/dsg_types.h"
+#include "hydra_utils/timing_utilities.h"
 
 namespace hydra {
 
@@ -64,6 +65,7 @@ void DsgSender::sendGraph(const DynamicSceneGraph& graph,
   if (pub_.getNumSubscribers()) {
     hydra_msgs::DsgUpdate msg;
     msg.header.stamp = stamp;
+    msg.header.frame_id = "world";
     spark_dsg::writeGraph(graph, msg.layer_contents);
     msg.full_update = true;
     pub_.publish(msg);
@@ -89,7 +91,7 @@ void DsgSender::sendGraph(const DynamicSceneGraph& graph,
 
   mesh_msgs::TriangleMeshStamped msg;
   msg.header.stamp.fromNSec(timestamp_ns);
-  msg.header.frame_id="world";
+  msg.header.frame_id = "world";
   msg.mesh = kimera_pgmo::PolygonMeshToTriangleMeshMsg(*graph.getMeshVertices(),
                                                        *graph.getMeshFaces());
   mesh_pub_.publish(msg);
