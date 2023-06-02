@@ -89,7 +89,6 @@ DsgBackend::DsgBackend(const RobotPrefixConfig& prefix,
   original_vertices_.reset(new pcl::PointCloud<pcl::PointXYZRGBA>());
   setDefaultUpdateFunctions();
   deformation_graph_->setForceRecalculate(!config_.pgmo.gnc_fix_prev_inliers);
-  deformation_graph_->storeOnlyNoOptimization();
 
   if (config_.should_log) {
     const std::string log_path = config_.log_path + "/backend";
@@ -224,17 +223,7 @@ void DsgBackend::spinOnce(const BackendInput& input, bool force_update) {
   status_.total_loop_closures_ = num_loop_closures_;
 
   if (!config_.use_mesh_subscribers) {
-    {  // start timing scope
-      ScopedTimer timer("backend/copy_mesh_delta", input.timestamp_ns);
-      input.mesh_update->updateMesh(*private_dsg_->graph->getMeshVertices(),
-                                    mesh_timestamps_,
-                                    *private_dsg_->graph->getMeshFaces());
-      input.mesh_update->updateVertices(*original_vertices_);
-      // we use this to make sure that deformation only happens for vertices that are
-      // still active
-      num_archived_vertices_ = input.mesh_update->getTotalArchivedVertices();
-      have_new_mesh_ = true;
-    }  // end timing scope
+    copyMeshDelta(input);
   }
 
   if (!updatePrivateDsg(input.timestamp_ns, force_update)) {
@@ -447,6 +436,18 @@ bool DsgBackend::updateFromLcdQueue() {
   }
 
   return added_new_loop_closure;
+}
+
+void DsgBackend::copyMeshDelta(const BackendInput& input) {
+  ScopedTimer timer("backend/copy_mesh_delta", input.timestamp_ns);
+  input.mesh_update->updateMesh(*private_dsg_->graph->getMeshVertices(),
+                                mesh_timestamps_,
+                                *private_dsg_->graph->getMeshFaces());
+  input.mesh_update->updateVertices(*original_vertices_);
+  // we use this to make sure that deformation only happens for vertices that are
+  // still active
+  num_archived_vertices_ = input.mesh_update->getTotalArchivedVertices();
+  have_new_mesh_ = true;
 }
 
 bool DsgBackend::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
@@ -706,6 +707,20 @@ void DsgBackend::optimize(size_t timestamp_ns) {
                       deformation_graph_->getGtsamValues(),
                       have_new_loopclosures_);
   have_new_loopclosures_ = false;
+}
+
+void DsgBackend::resetBackendDsg(size_t timestamp_ns) {
+  ScopedTimer timer("backend/reset_dsg", timestamp_ns, true, 0, false);
+  merge_handler_->reset();
+  proposed_node_merges_.clear();
+  {
+    std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
+    // First reset private graph
+    private_dsg_->graph->clear();
+  }
+  updatePrivateDsg(true);
+  deformation_graph_->setRecalculateVertices();
+  reset_backend_dsg_ = false;
 }
 
 void DsgBackend::callUpdateFunctions(size_t timestamp_ns,

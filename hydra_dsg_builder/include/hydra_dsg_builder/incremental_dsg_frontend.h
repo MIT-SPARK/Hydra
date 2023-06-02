@@ -59,7 +59,9 @@ class DsgFrontend {
  public:
   using FrontendInputQueue = InputQueue<ReconstructionOutput::Ptr>;
   using InputCallback = std::function<void(const ReconstructionOutput&)>;
-  using OutputCallback = std::function<void(const DynamicSceneGraph& graph, uint64_t)>;
+  using OutputCallback = std::function<void(const DynamicSceneGraph& graph,
+                                            const BackendInput& backend_input,
+                                            uint64_t)>;
   using DynamicLayer = DynamicSceneGraphLayer;
 
   DsgFrontend(const RobotPrefixConfig& prefix,
