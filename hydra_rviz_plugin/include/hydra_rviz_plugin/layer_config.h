@@ -1,4 +1,5 @@
 #pragma once
+#include <iostream>
 
 namespace hydra {
 
@@ -21,4 +22,6 @@ struct LayerConfig {
   // TODO(nathan) color mode
 };
 
-}
+std::ostream& operator<<(std::ostream& out, const LayerConfig& conf);
+
+}  // namespace hydra

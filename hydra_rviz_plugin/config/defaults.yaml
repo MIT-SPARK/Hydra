@@ -1,7 +1,7 @@
 ---
 layers:
   - id: 2
-    z_offset_scale: 2.0
+    offset_scale: 2.0
     visualize: true
     node_scale: 0.40
     node_alpha: 0.6
@@ -16,7 +16,7 @@ layers:
     edge_scale: 0.03
     edge_alpha: 0.6
   - id: 3
-    z_offset_scale: 3.0
+    offset_scale: 3.0
     visualize: true
     node_scale: 0.2
     node_alpha: 0.9
@@ -28,7 +28,7 @@ layers:
     edge_scale: 0.01
     edge_alpha: 0.5
   - id: 4
-    z_offset_scale: 4.2
+    offset_scale: 4.2
     visualize: true
     node_scale: 0.6
     node_alpha: 0.8
@@ -40,7 +40,7 @@ layers:
     edge_scale: 0.1
     edge_alpha: 0.2
   - id: 5
-    z_offset_scale: 5.5
+    offset_scale: 5.5
     visualize: true
     node_scale: 1.0
     node_alpha: 1.0

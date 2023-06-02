@@ -8,9 +8,22 @@
 
 #include "hydra_rviz_plugin/layer_config.h"
 
+namespace rviz {
+class BoolProperty;
+class FloatProperty;
+}  // namespace rviz
+
 namespace hydra {
 
 class LayerVisual;
+struct Pose;
+
+struct LayerContainer {
+  LayerContainer() = default;
+
+  std::unique_ptr<LayerVisual> visual;
+  LayerConfig config;
+};
 
 class SceneGraphDisplay : public rviz::MessageFilterDisplay<hydra_msgs::DsgUpdate> {
   Q_OBJECT
@@ -24,12 +37,26 @@ class SceneGraphDisplay : public rviz::MessageFilterDisplay<hydra_msgs::DsgUpdat
 
   virtual void reset();
 
+ private Q_SLOTS:
+  void updateProperties();
+
  private:
   void processMessage(const hydra_msgs::DsgUpdate::ConstPtr& msg);
 
+  void initLayers();
+
+  void readDefaults();
+
+  void setLayerPoses();
+
   spark_dsg::DynamicSceneGraph::Ptr graph_;
   std::map<spark_dsg::LayerId, LayerConfig> default_configs_;
-  std::map<spark_dsg::LayerId, std::unique_ptr<LayerVisual>> layer_visuals_;
+  std::map<spark_dsg::LayerId, LayerContainer> layers_;
+
+  std::unique_ptr<rviz::BoolProperty> collapse_layers_;
+  std::unique_ptr<rviz::FloatProperty> layer_height_;
+
+  std::unique_ptr<Pose> last_pose_;
 };
 
 }  // namespace hydra

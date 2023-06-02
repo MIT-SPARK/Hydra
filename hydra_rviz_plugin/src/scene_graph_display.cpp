@@ -1,6 +1,8 @@
 #include "hydra_rviz_plugin/scene_graph_display.h"
 
 #include <ros/package.h>
+#include <rviz/properties/bool_property.h>
+#include <rviz/properties/float_property.h>
 #include <spark_dsg/graph_binary_serialization.h>
 #include <yaml-cpp/yaml.h>
 
@@ -8,9 +10,33 @@
 
 namespace hydra {
 
-SceneGraphDisplay::SceneGraphDisplay() {}
+struct Pose {
+  Pose(const Ogre::Quaternion& rot, const Ogre::Vector3& pos) : rot(rot), pos(pos) {}
+
+  Ogre::Quaternion rot;
+  Ogre::Vector3 pos;
+};
+
+SceneGraphDisplay::SceneGraphDisplay() {
+  collapse_layers_ =
+      std::make_unique<rviz::BoolProperty>("Collapse Layers",
+                                           false,
+                                           "Draw layers without any z offset",
+                                           this,
+                                           SLOT(updateProperties()));
+  layer_height_ = std::make_unique<rviz::FloatProperty>("Layer Height",
+                                                        5.0,
+                                                        "Nominal height between layers",
+                                                        this,
+                                                        SLOT(updateProperties()));
+}
 
 SceneGraphDisplay::~SceneGraphDisplay() {}
+
+void SceneGraphDisplay::onInitialize() {
+  rviz::MessageFilterDisplay<hydra_msgs::DsgUpdate>::onInitialize();
+  readDefaults();
+}
 
 #define PARSE_FIELD(yaml_node, config, name)                    \
   if (yaml_node[#name]) {                                       \
@@ -18,9 +44,7 @@ SceneGraphDisplay::~SceneGraphDisplay() {}
   }                                                             \
   static_assert(true, "")
 
-void SceneGraphDisplay::onInitialize() {
-  rviz::MessageFilterDisplay<hydra_msgs::DsgUpdate>::onInitialize();
-
+void SceneGraphDisplay::readDefaults() {
   std::string default_file =
       ros::package::getPath("hydra_rviz_plugin") + "/config/defaults.yaml";
   auto node = YAML::LoadFile(default_file);
@@ -43,6 +67,7 @@ void SceneGraphDisplay::onInitialize() {
       PARSE_FIELD(lc, config, edge_scale);
       PARSE_FIELD(lc, config, edge_alpha);
       default_configs_[id] = config;
+      ROS_DEBUG_STREAM("parsed layer " << id << ": " << config);
     }
   }
 }
@@ -51,7 +76,54 @@ void SceneGraphDisplay::onInitialize() {
 
 void SceneGraphDisplay::reset() {
   rviz::MessageFilterDisplay<hydra_msgs::DsgUpdate>::reset();
-  layer_visuals_.clear();
+  layers_.clear();
+}
+
+void SceneGraphDisplay::updateProperties() {
+  if (!last_pose_) {
+    return;
+  }
+
+  setLayerPoses();
+}
+
+void SceneGraphDisplay::initLayers() {
+  for (const auto layer : graph_->layer_ids) {
+    auto iter = layers_.find(layer);
+    if (iter != layers_.end()) {
+      continue;
+    }
+
+    iter = layers_.emplace(layer, LayerContainer()).first;
+    iter->second.visual =
+        std::make_unique<LayerVisual>(context_->getSceneManager(), scene_node_);
+
+    auto citer = default_configs_.find(layer);
+    if (citer == default_configs_.end()) {
+      continue;
+    }
+
+    iter->second.config = citer->second;
+  }
+}
+
+void SceneGraphDisplay::setLayerPoses() {
+  if (!last_pose_) {
+    return;
+  }
+
+  for (auto& id_layer_pair : layers_) {
+    auto& layer = id_layer_pair.second;
+
+    Ogre::Vector3 layer_pos(
+        0.0f,
+        0.0f,
+        collapse_layers_->getBool()
+            ? 0.0
+            : layer.config.offset_scale * layer_height_->getFloat());
+    layer_pos = last_pose_->rot * layer_pos + last_pose_->pos;
+    layer.visual->setPose(last_pose_->rot, layer_pos);
+  }
 }
 
 void SceneGraphDisplay::processMessage(const hydra_msgs::DsgUpdate::ConstPtr& msg) {
@@ -65,6 +137,8 @@ void SceneGraphDisplay::processMessage(const hydra_msgs::DsgUpdate::ConstPtr& ms
     return;
   }
 
+  last_pose_ = std::make_unique<Pose>(rot, pos);
+
   try {
     if (!graph_) {
       graph_ = spark_dsg::readGraph(msg->layer_contents);
@@ -72,24 +146,17 @@ void SceneGraphDisplay::processMessage(const hydra_msgs::DsgUpdate::ConstPtr& ms
       spark_dsg::updateGraph(*graph_, msg->layer_contents, true);
     }
   } catch (const std::exception& e) {
+    // TODO(nathan) log to plugin
     ROS_ERROR_STREAM("Received invalid message: " << e.what());
     return;
   }
 
-  for (const auto layer : graph_->layer_ids) {
-    auto iter = layer_visuals_.find(layer);
-    if (iter == layer_visuals_.end()) {
-      auto visual =
-          std::make_unique<LayerVisual>(context_->getSceneManager(), scene_node_);
-      iter = layer_visuals_.emplace(layer, std::move(visual)).first;
-    }
+  initLayers();
+  setLayerPoses();
 
-    auto citer = default_configs_.find(layer);
-    if (citer != default_configs_.end()) {
-      iter->second->config = citer->second;
-    }
-
-    iter->second->setMessage(graph_->getLayer(layer));
+  for (auto& id_layer_pair : layers_) {
+    auto& layer = id_layer_pair.second;
+    layer.visual->setMessage(layer.config, graph_->getLayer(id_layer_pair.first));
   }
 }
 

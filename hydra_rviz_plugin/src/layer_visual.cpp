@@ -7,6 +7,8 @@
 #include <rviz/ogre_helpers/point_cloud.h>
 #include <spark_dsg/dynamic_scene_graph.h>
 
+#include "hydra_rviz_plugin/layer_config.h"
+
 namespace hydra {
 
 using spark_dsg::SceneGraphNode;
@@ -19,12 +21,13 @@ LayerVisual::LayerVisual(Ogre::SceneManager* const manager,
 
 LayerVisual::~LayerVisual() { manager_->destroySceneNode(node_); }
 
-void LayerVisual::setPose(const Ogre::Vector3& pos, const Ogre::Quaternion& rot) {
+void LayerVisual::setPose(const Ogre::Quaternion& rot, const Ogre::Vector3& pos) {
   node_->setPosition(pos);
   node_->setOrientation(rot);
 }
 
-void LayerVisual::makeNodes(const spark_dsg::SceneGraphLayer& layer) {
+void LayerVisual::makeNodes(const LayerConfig& config,
+                            const spark_dsg::SceneGraphLayer& layer) {
   if (!graph_nodes_) {
     graph_nodes_ = std::make_unique<rviz::PointCloud>();
     node_->attachObject(graph_nodes_.get());
@@ -57,7 +60,8 @@ inline Ogre::Vector3 eigen_to_ogre(const Eigen::Vector3d& v) {
       static_cast<float>(v.x()), static_cast<float>(v.y()), static_cast<float>(v.z())};
 }
 
-void LayerVisual::makeEdges(const spark_dsg::SceneGraphLayer& layer) {
+void LayerVisual::makeEdges(const LayerConfig& config,
+                            const spark_dsg::SceneGraphLayer& layer) {
   if (!graph_edges_) {
     graph_edges_ = std::make_unique<rviz::BillboardLine>(manager_, node_);
   }
@@ -89,10 +93,11 @@ void LayerVisual::makeEdges(const spark_dsg::SceneGraphLayer& layer) {
   }
 }
 
-void LayerVisual::setMessage(const spark_dsg::SceneGraphLayer& layer) {
+void LayerVisual::setMessage(const LayerConfig& config,
+                             const spark_dsg::SceneGraphLayer& layer) {
   node_->setVisible(true);
-  makeNodes(layer);
-  makeEdges(layer);
+  makeNodes(config, layer);
+  makeEdges(config, layer);
 }
 
 }  // namespace hydra

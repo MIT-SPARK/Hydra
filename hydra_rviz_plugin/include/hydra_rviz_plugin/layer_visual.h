@@ -1,8 +1,6 @@
 #pragma once
 #include <memory>
 
-#include "hydra_rviz_plugin/layer_config.h"
-
 namespace Ogre {
 
 class SceneManager;
@@ -27,21 +25,21 @@ class SceneGraphLayer;
 
 namespace hydra {
 
+struct LayerConfig;
+
 class LayerVisual {
  public:
   LayerVisual(Ogre::SceneManager* const manager, Ogre::SceneNode* const parent);
 
   virtual ~LayerVisual();
 
-  void setMessage(const spark_dsg::SceneGraphLayer& msg);
+  void setMessage(const LayerConfig& config, const spark_dsg::SceneGraphLayer& msg);
 
-  void setPose(const Ogre::Vector3& pos, const Ogre::Quaternion& rot);
+  void setPose(const Ogre::Quaternion& rot, const Ogre::Vector3& pos);
 
-  void makeNodes(const spark_dsg::SceneGraphLayer& layer);
+  void makeNodes(const LayerConfig& config, const spark_dsg::SceneGraphLayer& layer);
 
-  void makeEdges(const spark_dsg::SceneGraphLayer& layer);
-
-  LayerConfig config;
+  void makeEdges(const LayerConfig& config, const spark_dsg::SceneGraphLayer& layer);
 
  private:
   Ogre::SceneManager* const manager_;
