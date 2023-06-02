@@ -1,4 +1,7 @@
+#pragma once
 #include <memory>
+
+#include "hydra_rviz_plugin/layer_config.h"
 
 namespace Ogre {
 
@@ -20,13 +23,13 @@ namespace spark_dsg {
 
 class SceneGraphLayer;
 
-}
+}  // namespace spark_dsg
 
 namespace hydra {
 
 class LayerVisual {
  public:
-  LayerVisual(Ogre::SceneManager* manager, Ogre::SceneNode* parent);
+  LayerVisual(Ogre::SceneManager* const manager, Ogre::SceneNode* const parent);
 
   virtual ~LayerVisual();
 
@@ -38,8 +41,10 @@ class LayerVisual {
 
   void makeEdges(const spark_dsg::SceneGraphLayer& layer);
 
+  LayerConfig config;
+
  private:
-  Ogre::SceneManager* manager_;
+  Ogre::SceneManager* const manager_;
   Ogre::SceneNode* node_;
 
   std::unique_ptr<rviz::PointCloud> graph_nodes_;

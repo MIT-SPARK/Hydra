@@ -1,6 +1,8 @@
 #include "hydra_rviz_plugin/scene_graph_display.h"
 
+#include <ros/package.h>
 #include <spark_dsg/graph_binary_serialization.h>
+#include <yaml-cpp/yaml.h>
 
 #include "hydra_rviz_plugin/layer_visual.h"
 
@@ -10,9 +12,42 @@ SceneGraphDisplay::SceneGraphDisplay() {}
 
 SceneGraphDisplay::~SceneGraphDisplay() {}
 
+#define PARSE_FIELD(yaml_node, config, name)                    \
+  if (yaml_node[#name]) {                                       \
+    config.name = yaml_node[#name].as<decltype(config.name)>(); \
+  }                                                             \
+  static_assert(true, "")
+
 void SceneGraphDisplay::onInitialize() {
   rviz::MessageFilterDisplay<hydra_msgs::DsgUpdate>::onInitialize();
+
+  std::string default_file =
+      ros::package::getPath("hydra_rviz_plugin") + "/config/defaults.yaml";
+  auto node = YAML::LoadFile(default_file);
+  if (node["layers"]) {
+    for (const auto& lc : node["layers"]) {
+      const auto id = lc["id"].as<spark_dsg::LayerId>();
+      LayerConfig config;
+      PARSE_FIELD(lc, config, offset_scale);
+      PARSE_FIELD(lc, config, visualize);
+      PARSE_FIELD(lc, config, node_scale);
+      PARSE_FIELD(lc, config, node_alpha);
+      PARSE_FIELD(lc, config, use_spheres);
+      PARSE_FIELD(lc, config, use_label);
+      PARSE_FIELD(lc, config, label_height_ratio);
+      PARSE_FIELD(lc, config, label_scale);
+      PARSE_FIELD(lc, config, use_bounding_box);
+      PARSE_FIELD(lc, config, collapse_bounding_box);
+      PARSE_FIELD(lc, config, bounding_box_scale);
+      PARSE_FIELD(lc, config, bounding_box_alpha);
+      PARSE_FIELD(lc, config, edge_scale);
+      PARSE_FIELD(lc, config, edge_alpha);
+      default_configs_[id] = config;
+    }
+  }
 }
+
+#undef PARSE_FIELD
 
 void SceneGraphDisplay::reset() {
   rviz::MessageFilterDisplay<hydra_msgs::DsgUpdate>::reset();
@@ -47,6 +82,11 @@ void SceneGraphDisplay::processMessage(const hydra_msgs::DsgUpdate::ConstPtr& ms
       auto visual =
           std::make_unique<LayerVisual>(context_->getSceneManager(), scene_node_);
       iter = layer_visuals_.emplace(layer, std::move(visual)).first;
+    }
+
+    auto citer = default_configs_.find(layer);
+    if (citer != default_configs_.end()) {
+      iter->second->config = citer->second;
     }
 
     iter->second->setMessage(graph_->getLayer(layer));

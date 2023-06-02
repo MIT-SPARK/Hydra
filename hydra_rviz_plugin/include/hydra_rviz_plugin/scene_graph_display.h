@@ -6,6 +6,8 @@
 #include <map>
 #include <memory>
 
+#include "hydra_rviz_plugin/layer_config.h"
+
 namespace hydra {
 
 class LayerVisual;
@@ -26,6 +28,7 @@ class SceneGraphDisplay : public rviz::MessageFilterDisplay<hydra_msgs::DsgUpdat
   void processMessage(const hydra_msgs::DsgUpdate::ConstPtr& msg);
 
   spark_dsg::DynamicSceneGraph::Ptr graph_;
+  std::map<spark_dsg::LayerId, LayerConfig> default_configs_;
   std::map<spark_dsg::LayerId, std::unique_ptr<LayerVisual>> layer_visuals_;
 };
 

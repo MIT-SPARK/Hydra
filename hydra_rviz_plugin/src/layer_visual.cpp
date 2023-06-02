@@ -11,7 +11,8 @@ namespace hydra {
 
 using spark_dsg::SceneGraphNode;
 
-LayerVisual::LayerVisual(Ogre::SceneManager* manager, Ogre::SceneNode* parent)
+LayerVisual::LayerVisual(Ogre::SceneManager* const manager,
+                         Ogre::SceneNode* const parent)
     : manager_(manager) {
   node_ = parent->createChildSceneNode();
 }
@@ -29,8 +30,10 @@ void LayerVisual::makeNodes(const spark_dsg::SceneGraphLayer& layer) {
     node_->attachObject(graph_nodes_.get());
   }
 
-  graph_nodes_->setRenderMode(rviz::PointCloud::RM_SPHERES);
-  graph_nodes_->setDimensions(0.1, 0.1, 0.1);
+  graph_nodes_->setRenderMode(config.use_spheres ? rviz::PointCloud::RM_SPHERES
+                                                 : rviz::PointCloud::RM_BOXES);
+  const auto dim = config.node_scale;
+  graph_nodes_->setDimensions(dim, dim, dim);
   graph_nodes_->clear();
 
   std::vector<rviz::PointCloud::Point> points(layer.numNodes());
@@ -42,7 +45,7 @@ void LayerVisual::makeNodes(const spark_dsg::SceneGraphLayer& layer) {
     point.position.x = attrs.position.x();
     point.position.y = attrs.position.y();
     point.position.z = attrs.position.z();
-    point.setColor(1, 0, 0, 1);
+    point.setColor(1, 0, 0, config.node_alpha);
     ++point_index;
   }
 
@@ -59,9 +62,9 @@ void LayerVisual::makeEdges(const spark_dsg::SceneGraphLayer& layer) {
     graph_edges_ = std::make_unique<rviz::BillboardLine>(manager_, node_);
   }
 
-  graph_edges_->setColor(0, 0, 0, 1);
+  graph_edges_->setColor(0, 0, 0, config.edge_alpha);
   graph_edges_->clear();
-  graph_edges_->setLineWidth(0.1);
+  graph_edges_->setLineWidth(config.edge_scale);
   graph_edges_->setMaxPointsPerLine(2 * layer.numEdges());
 
   std::vector<rviz::PointCloud::Point> points(layer.numNodes());
@@ -70,7 +73,7 @@ void LayerVisual::makeEdges(const spark_dsg::SceneGraphLayer& layer) {
   color.r = 0;
   color.g = 0;
   color.b = 0;
-  color.a = 1;
+  color.a = config.edge_alpha;
 
   for (const auto& id_edge_pair : layer.edges()) {
     const SceneGraphNode& source = *layer.getNode(id_edge_pair.second.source);

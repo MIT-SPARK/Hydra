@@ -1,0 +1,53 @@
+---
+layers:
+  - id: 2
+    z_offset_scale: 2.0
+    visualize: true
+    node_scale: 0.40
+    node_alpha: 0.6
+    use_sphere_marker: false
+    use_label: false
+    label_height_ratio: 1.1
+    label_scale: 0.45
+    use_bounding_box: true
+    bounding_box_alpha: 0.9
+    bounding_box_scale: 0.05
+    collapse_bounding_box: true
+    edge_scale: 0.03
+    edge_alpha: 0.6
+  - id: 3
+    z_offset_scale: 3.0
+    visualize: true
+    node_scale: 0.2
+    node_alpha: 0.9
+    use_sphere_marker: true
+    use_label: false
+    label_height_ratio: 1.0
+    label_scale: 0.5
+    use_bounding_box: false
+    edge_scale: 0.01
+    edge_alpha: 0.5
+  - id: 4
+    z_offset_scale: 4.2
+    visualize: true
+    node_scale: 0.6
+    node_alpha: 0.8
+    use_sphere_marker: false
+    use_label: true
+    label_height_ratio: 1.25
+    label_scale: 1.0
+    use_bounding_box: false
+    edge_scale: 0.1
+    edge_alpha: 0.2
+  - id: 5
+    z_offset_scale: 5.5
+    visualize: true
+    node_scale: 1.0
+    node_alpha: 1.0
+    use_sphere_marker: false
+    use_label: true
+    label_height: 1.5
+    label_scale: 1.25
+    use_bounding_box: false
+    edge_scale: 0.05
+    edge_alpha: 1.0

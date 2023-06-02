@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(catkin REQUIRED COMPONENTS rviz hydra_msgs)
+find_package(yaml-cpp REQUIRED)
 find_package(spark_dsg REQUIRED)
 find_package(
   Qt5
@@ -35,9 +36,8 @@ set_target_properties(${PROJECT_NAME} PROPERTIES AUTOMOC TRUE)
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})
 target_link_libraries(
   ${PROJECT_NAME}
-  ${catkin_LIBRARIES}
-  spark_dsg::spark_dsg
-  Qt5::Widgets
+  PUBLIC ${catkin_LIBRARIES} spark_dsg::spark_dsg Qt5::Widgets
+  PRIVATE yaml-cpp
 )
 
 # TODO(nathan) handle install
