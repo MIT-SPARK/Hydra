@@ -29,9 +29,6 @@
     local-name: spark_dsg
     uri: git@github.com:MIT-SPARK/Spark-DSG.git
 - git:
-    local-name: hydra
-    uri: git@github.com:MIT-SPARK/Hydra.git
-- git:
     local-name: kimera_semantics
     uri: git@github.com:MIT-SPARK/Kimera-Semantics.git
     version: feature/noetic_fixes

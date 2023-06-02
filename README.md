@@ -42,23 +42,16 @@ A bibtex entry is provided below:
 
 ### General Requirements
 
-Hydra has been tested on the following systems:
+Hydra has been tested on Ubuntu 20.04 and ROS Noetic
 
-- Ubuntu 18.04 and ROS Melodic
-- Ubuntu 20.04 and ROS Noetic (*recommended*)
+:warning: Ubuntu 18.04 and ROS Melodic are no longer actively tested
 
 You can follow the instructions [here](http://wiki.ros.org/ROS/Installation) to install ROS if you haven't already.
-
 Then, make sure you have some general requirements:
-
-For melodic:
-```
-sudo apt install python-rosdep python-catkin-tools python3-vcstool
-```
-
-For noetic:
 ```
 sudo apt install python3-rosdep python3-catkin-tools python3-vcstool
+
+# for melodic: sudo apt install python-rosdep python-catkin-tools python3-vcstool
 ```
 
 Finally, if you haven't set up rosdep yet:
@@ -77,8 +70,8 @@ cd catkin_ws
 catkin init
 catkin config -DCMAKE_BUILD_TYPE=Release -DGTSAM_TANGENT_PREINTEGRATION=OFF \
               -DGTSAM_BUILD_WITH_MARCH_NATIVE=OFF
-catkin config --blacklist hdf5_map_io mesh_msgs_hdf5 label_manager mesh_tools \
-                          rviz_map_plugin minkindr_python
+catkin config --skiplist hdf5_map_io mesh_msgs_hdf5 label_manager mesh_tools \
+                         rviz_map_plugin minkindr_python
 
 cd src
 git clone git@github.com:MIT-SPARK/Hydra.git hydra
