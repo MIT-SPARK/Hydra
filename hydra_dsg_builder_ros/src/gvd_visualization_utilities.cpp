@@ -32,18 +32,71 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_topology/gvd_visualization_utilities.h"
+#include "hydra_dsg_builder_ros/gvd_visualization_utilities.h"
 
-#include <hydra_utils/colormap_utils.h>
+#include <std_msgs/ColorRGBA.h>
 #include <tf2_eigen/tf2_eigen.h>
 
+#include <algorithm>
+#include <opencv2/imgproc.hpp>
 #include <random>
+
+namespace hydra {
 
 using visualization_msgs::Marker;
 using visualization_msgs::MarkerArray;
 
-namespace hydra {
-namespace topology {
+using voxblox::BlockIndexList;
+using voxblox::FloatingPoint;
+
+namespace {
+
+inline std_msgs::ColorRGBA makeColorMsg(const NodeColor& color, double alpha) {
+  std_msgs::ColorRGBA msg;
+  msg.r = static_cast<double>(color(0)) / 255.0;
+  msg.g = static_cast<double>(color(1)) / 255.0;
+  msg.b = static_cast<double>(color(2)) / 255.0;
+  msg.a = alpha;
+  return msg;
+}
+
+inline std_msgs::ColorRGBA makeColorMsg(uint8_t red,
+                                        uint8_t green,
+                                        uint8_t blue,
+                                        double alpha) {
+  std_msgs::ColorRGBA msg;
+  msg.r = static_cast<double>(red) / 255.0;
+  msg.g = static_cast<double>(green) / 255.0;
+  msg.b = static_cast<double>(blue) / 255.0;
+  msg.a = alpha;
+  return msg;
+}
+
+inline double lerp(double min, double max, double ratio) {
+  return (max - min) * ratio + min;
+}
+
+inline NodeColor interpolateColorMap(const Colormap& cmap, double ratio) {
+  // override ratio input to be in [0, 1]
+  ratio = std::clamp(ratio, 0.0, 1.0);
+
+  cv::Mat hls_value(1, 1, CV_32FC3);
+  // hue is in degrees, not [0, 1]
+  hls_value.at<float>(0) = lerp(cmap.min_hue, cmap.max_hue, ratio) * 360.0;
+  hls_value.at<float>(1) = lerp(cmap.min_luminance, cmap.max_luminance, ratio);
+  hls_value.at<float>(2) = lerp(cmap.min_saturation, cmap.max_saturation, ratio);
+
+  cv::Mat bgr;
+  cv::cvtColor(hls_value, bgr, cv::COLOR_HLS2BGR);
+
+  NodeColor color;
+  color(0, 0) = static_cast<uint8_t>(255 * bgr.at<float>(2));
+  color(1, 0) = static_cast<uint8_t>(255 * bgr.at<float>(1));
+  color(2, 0) = static_cast<uint8_t>(255 * bgr.at<float>(0));
+  return color;
+}
+
+}  // namespace
 
 MarkerGroupPub::MarkerGroupPub(const ros::NodeHandle& nh) : nh_(nh) {}
 
@@ -102,7 +155,7 @@ double getRatio(const GvdVisualizerConfig& config, const GvdVoxel& voxel) {
 }
 
 Marker makeGvdMarker(const GvdVisualizerConfig& config,
-                     const ColormapConfig& colors,
+                     const Colormap& colors,
                      const Layer<GvdVoxel>& layer) {
   BlockIndexList blocks;
   layer.getAllAllocatedBlocks(&blocks);
@@ -136,9 +189,9 @@ Marker makeGvdMarker(const GvdVisualizerConfig& config,
       marker.points.push_back(marker_pos);
 
       double ratio = getRatio(config, voxel);
-      NodeColor color = dsg_utils::interpolateColorMap(colors, ratio);
+      auto color = interpolateColorMap(colors, ratio);
 
-      std_msgs::ColorRGBA color_msg = dsg_utils::makeColorMsg(color, config.gvd_alpha);
+      std_msgs::ColorRGBA color_msg = makeColorMsg(color, config.gvd_alpha);
       marker.colors.push_back(color_msg);
     }
   }
@@ -147,7 +200,7 @@ Marker makeGvdMarker(const GvdVisualizerConfig& config,
 }
 
 Marker makeErrorMarker(const GvdVisualizerConfig& config,
-                       const ColormapConfig& colors,
+                       const Colormap& colors,
                        const Layer<GvdVoxel>& lhs,
                        const Layer<GvdVoxel>& rhs,
                        double threshold) {
@@ -190,7 +243,7 @@ Marker makeErrorMarker(const GvdVisualizerConfig& config,
       }
 
       double ratio = computeRatio(0, 10, error);
-      NodeColor color = dsg_utils::interpolateColorMap(colors, ratio);
+      auto color = interpolateColorMap(colors, ratio);
 
       Eigen::Vector3d voxel_pos =
           lhs_block.computeCoordinatesFromLinearIndex(i).cast<double>();
@@ -198,7 +251,7 @@ Marker makeErrorMarker(const GvdVisualizerConfig& config,
       tf2::convert(voxel_pos, marker_pos);
       marker.points.push_back(marker_pos);
 
-      std_msgs::ColorRGBA color_msg = dsg_utils::makeColorMsg(color, config.gvd_alpha);
+      std_msgs::ColorRGBA color_msg = makeColorMsg(color, config.gvd_alpha);
       marker.colors.push_back(color_msg);
     }
   }
@@ -207,7 +260,7 @@ Marker makeErrorMarker(const GvdVisualizerConfig& config,
 }
 
 Marker makeSurfaceVoxelMarker(const GvdVisualizerConfig& config,
-                              const ColormapConfig& colors,
+                              const Colormap& colors,
                               const Layer<GvdVoxel>& layer) {
   BlockIndexList blocks;
   layer.getAllAllocatedBlocks(&blocks);
@@ -241,9 +294,9 @@ Marker makeSurfaceVoxelMarker(const GvdVisualizerConfig& config,
       marker.points.push_back(marker_pos);
 
       double ratio = computeRatio(-0.4, 0.4, voxel.distance);
-      NodeColor color = dsg_utils::interpolateColorMap(colors, ratio);
+      auto color = interpolateColorMap(colors, ratio);
 
-      std_msgs::ColorRGBA color_msg = dsg_utils::makeColorMsg(color, config.gvd_alpha);
+      std_msgs::ColorRGBA color_msg = makeColorMsg(color, config.gvd_alpha);
       marker.colors.push_back(color_msg);
     }
   }
@@ -252,7 +305,7 @@ Marker makeSurfaceVoxelMarker(const GvdVisualizerConfig& config,
 }
 
 Marker makeEsdfMarker(const GvdVisualizerConfig& config,
-                      const ColormapConfig& colors,
+                      const Colormap& colors,
                       const Layer<GvdVoxel>& layer) {
   BlockIndexList blocks;
   layer.getAllAllocatedBlocks(&blocks);
@@ -298,9 +351,9 @@ Marker makeEsdfMarker(const GvdVisualizerConfig& config,
 
       double ratio = computeRatio(
           config.esdf_min_distance, config.esdf_max_distance, voxel.distance);
-      NodeColor color = dsg_utils::interpolateColorMap(colors, ratio);
+      auto color = interpolateColorMap(colors, ratio);
 
-      std_msgs::ColorRGBA color_msg = dsg_utils::makeColorMsg(color, config.esdf_alpha);
+      std_msgs::ColorRGBA color_msg = makeColorMsg(color, config.esdf_alpha);
       marker.colors.push_back(color_msg);
     }
   }
@@ -436,7 +489,7 @@ Marker makeBlocksMarker(const Layer<GvdVoxel>& layer, double scale) {
 }
 
 std_msgs::ColorRGBA makeGvdColor(const GvdVisualizerConfig& config,
-                                 const ColormapConfig& colors,
+                                 const Colormap& colors,
                                  double distance,
                                  uint8_t num_basis_points) {
   double ratio;
@@ -457,8 +510,8 @@ std_msgs::ColorRGBA makeGvdColor(const GvdVisualizerConfig& config,
       break;
   }
 
-  NodeColor color = dsg_utils::interpolateColorMap(colors, ratio);
-  return dsg_utils::makeColorMsg(color, alpha);
+  auto color = interpolateColorMap(colors, ratio);
+  return makeColorMsg(color, alpha);
 }
 
 using EdgeMap = std::unordered_map<uint64_t, std::unordered_set<uint64_t>>;
@@ -473,7 +526,7 @@ std::unordered_set<uint64_t>& getNodeSet(EdgeMap& edge_map, uint64_t node) {
 
 MarkerArray makeGvdGraphMarkers(const GvdGraph& graph,
                                 const GvdVisualizerConfig& config,
-                                const ColormapConfig& colors,
+                                const Colormap& colors,
                                 const std::string& ns,
                                 size_t marker_id) {
   MarkerArray marker;
@@ -598,7 +651,7 @@ MarkerArray showGvdClusters(const GvdGraph& graph,
                             const CompressedNodeMap& clusters,
                             const std::unordered_map<uint64_t, uint64_t>& remapping,
                             const GvdVisualizerConfig& config,
-                            const ColormapConfig& colormap,
+                            const Colormap& colormap,
                             const std::string& ns,
                             size_t marker_id) {
   MarkerArray marker;
@@ -642,8 +695,8 @@ MarkerArray showGvdClusters(const GvdGraph& graph,
   std::vector<std_msgs::ColorRGBA> colors;
   for (size_t i = 0; i < num_colors; ++i) {
     const double ratio = static_cast<double>(i) / static_cast<double>(num_colors);
-    const auto color = dsg_utils::interpolateColorMap(colormap, ratio);
-    colors.push_back(dsg_utils::makeColorMsg(color, config.gvd_alpha));
+    const auto color = interpolateColorMap(colormap, ratio);
+    colors.push_back(makeColorMsg(color, config.gvd_alpha));
   }
 
   EdgeMap seen_edges;
@@ -656,8 +709,8 @@ MarkerArray showGvdClusters(const GvdGraph& graph,
       const auto& cluster_color = colors.at(color_mapping.at(cluster_id));
       nodes.colors.push_back(cluster_color);
     } else {
-      nodes.colors.push_back(
-          dsg_utils::makeColorMsg(NodeColor(0, 0, 0), config.gvd_alpha));
+      std_msgs::ColorRGBA color_msg = makeColorMsg(0, 0, 0, config.gvd_alpha);
+      nodes.colors.push_back(color_msg);
     }
 
     auto& curr_seen = getNodeSet(seen_edges, id_node_pair.first);
@@ -682,8 +735,7 @@ MarkerArray showGvdClusters(const GvdGraph& graph,
         const auto& neighbor_color = colors.at(color_mapping.at(neighbor_cluster));
         edges.colors.push_back(neighbor_color);
       } else {
-        edges.colors.push_back(
-            dsg_utils::makeColorMsg(NodeColor(0, 0, 0), config.gvd_alpha));
+        edges.colors.push_back(makeColorMsg(NodeColor(0, 0, 0), config.gvd_alpha));
       }
     }
   }
@@ -717,7 +769,7 @@ MarkerArray makePlaceSpheres(const std_msgs::Header& header,
     tf2::convert(id_node_pair.second->attributes().position, marker.pose.position);
 
     NodeColor desired_color(255, 0, 0);
-    marker.color = dsg_utils::makeColorMsg(desired_color, alpha);
+    marker.color = makeColorMsg(desired_color, alpha);
     spheres.markers.push_back(marker);
     ++id;
   }
@@ -725,5 +777,4 @@ MarkerArray makePlaceSpheres(const std_msgs::Header& header,
   return spheres;
 }
 
-}  // namespace topology
 }  // namespace hydra

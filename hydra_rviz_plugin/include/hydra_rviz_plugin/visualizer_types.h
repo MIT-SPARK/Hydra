@@ -46,7 +46,6 @@ using LayerConfig = hydra_utils::LayerVisualizerConfig;
 using DynamicLayerConfig = hydra_utils::DynamicLayerVisualizerConfig;
 using VisualizerConfig = hydra_utils::VisualizerConfig;
 using ColormapConfig = hydra_utils::ColormapConfig;
-using NodeColor = SemanticNodeAttributes::ColorVector;
 
 inline double getZOffset(double z_offset_scale,
                          const VisualizerConfig& visualizer_config) {

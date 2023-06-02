@@ -32,15 +32,14 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra_topology/ros_reconstruction.h"
+#include "hydra_dsg_builder_ros/ros_reconstruction.h"
 
 #include <geometry_msgs/TransformStamped.h>
 #include <hydra_msgs/QueryFreespace.h>
+#include <hydra_topology/gvd_integrator.h>
 #include <hydra_utils/ros_utilities.h>
 #include <tf2_eigen/tf2_eigen.h>
 #include <voxblox_ros/conversions.h>
-
-#include "hydra_topology/gvd_integrator.h"
 
 namespace hydra {
 
@@ -136,8 +135,7 @@ RosReconstruction::RosReconstruction(const ros::NodeHandle& nh,
   }
 
   if (ros_config_.visualize_reconstruction) {
-    visualizer_.reset(
-        new topology::TopologyServerVisualizer(ros_config_.topology_visualizer_ns));
+    visualizer_.reset(new TopologyServerVisualizer(ros_config_.topology_visualizer_ns));
   }
 
   if (ros_config_.publish_mesh) {
@@ -171,7 +169,8 @@ void RosReconstruction::handlePointcloud(const RosPointcloud::ConstPtr& cloud) {
   ros::Time curr_time;
   curr_time.fromNSec(cloud->header.stamp * 1000);
 
-  VLOG(1) << "[Hydra Reconstruction] Got raw pointcloud input @ " << curr_time.toNSec() << " [ns]";
+  VLOG(1) << "[Hydra Reconstruction] Got raw pointcloud input @ " << curr_time.toNSec()
+          << " [ns]";
   if (num_poses_received_ > 0) {
     if (last_time_received_ && ((curr_time - *last_time_received_).toSec() <
                                 ros_config_.pointcloud_separation_s)) {
@@ -209,7 +208,8 @@ void RosReconstruction::pointcloudSpin() {
     ros::Time curr_time;
     curr_time.fromNSec(cloud->header.stamp * 1000);
 
-    VLOG(1) << "[Hydra Reconstruction] popped pointcloud input @ " << curr_time.toNSec() << " [ns]";
+    VLOG(1) << "[Hydra Reconstruction] popped pointcloud input @ " << curr_time.toNSec()
+            << " [ns]";
 
     ros::WallRate tf_wait_rate(1.0 / ros_config_.tf_wait_duration_s);
 
@@ -219,10 +219,10 @@ void RosReconstruction::pointcloudSpin() {
     std::string err_str;
     for (size_t i = 0; i < 5; ++i) {
       if (buffer_->canTransform(config_.world_frame,
-                               config_.robot_frame,
-                               curr_time,
-                               ros::Duration(0),
-                               &err_str)) {
+                                config_.robot_frame,
+                                curr_time,
+                                ros::Duration(0),
+                                &err_str)) {
         have_transform = true;
         break;
       }

@@ -32,65 +32,40 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include "hydra_dsg_builder/dsg_lcd_detector.h"
+#include <glog/logging.h>
+#include <hydra_utils/log_utilities.h>
+#include <hydra_utils/ros_utilities.h>
 
-#include <hydra_utils/dynamic_scene_graph_visualizer.h>
-#include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
+#include "hydra_dsg_builder_ros/ros_reconstruction.h"
 
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, LogConfig);
 namespace hydra {
-namespace lcd {
-
-using visualization_msgs::Marker;
-using visualization_msgs::MarkerArray;
-
-class LcdVisualizer : public DynamicSceneGraphVisualizer {
- public:
-  using DynamicLayerConfigManager = ConfigManager<DynamicLayerConfig>;
-
-  static DynamicSceneGraph::LayerIds getDefaultLayerIds() {
-    return {DsgLayers::OBJECTS, DsgLayers::PLACES};
-  }
-
-  LcdVisualizer(const ros::NodeHandle& nh, double radius);
-
-  void setLcdDetector(DsgLcdDetector* detector);
-
- protected:
-  virtual void redrawImpl(const std_msgs::Header& header, MarkerArray& msg) override;
-
-  virtual void drawLayer(const std_msgs::Header& header,
-                         const SceneGraphLayer& layer,
-                         const LayerConfig& config,
-                         MarkerArray& msg) override;
-
-  virtual void drawLayerMeshEdges(const std_msgs::Header& header,
-                                  LayerId layer_id,
-                                  const std::string& ns,
-                                  MarkerArray& msg) override;
-
-  void drawAgent(const std_msgs::Header& header, MarkerArray& msg);
-
-  std::optional<NodeId> getQueryNode() const;
-
-  std::vector<NodeId> getMatchRoots(LayerId layer) const;
-
-  std::set<NodeId> getMatchedNodes(LayerId layer) const;
-
-  std::set<NodeId> getValidNodes(LayerId layer) const;
-
- private:
-  DsgLcdDetector* lcd_detector_;
-
-  double radius_;
-
-  DynamicLayerConfigManager::Ptr agent_config_;
-  NodeColor invalid_match_color_;
-  NodeColor valid_match_color_;
-  NodeColor default_graph_color_;
-  NodeColor query_color_;
-};
-
-}  // namespace lcd
+DECLARE_STRUCT_NAME(LogConfig);
 }  // namespace hydra
+
+int main(int argc, char* argv[]) {
+  ros::init(argc, argv, "hydra_topology_node");
+
+  FLAGS_minloglevel = 3;
+  FLAGS_logtostderr = 1;
+  FLAGS_colorlogtostderr = 1;
+
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  google::InitGoogleLogging(argv[0]);
+
+  ros::NodeHandle nh("~");
+
+  const auto log_config = hydra::load_config<hydra::LogConfig>(nh, "", false);
+  hydra::LogSetup logs(log_config);
+
+  const hydra::RobotPrefixConfig prefix(nh.param<int>("robot_id", 0));
+  hydra::RosReconstruction module(nh, prefix);
+  module.start();
+
+  ros::spin();
+
+  module.stop();
+  module.save(logs.getLogDir());
+
+  return 0;
+}

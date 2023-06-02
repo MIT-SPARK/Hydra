@@ -33,13 +33,13 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra_dsg_builder_ros/ros_backend.h"
-#include "hydra_dsg_builder_ros/ros_frontend.h"
-
 #include <hydra_dsg_builder/incremental_dsg_lcd.h>
 #include <hydra_dsg_builder/shared_module_state.h>
-#include <hydra_topology/ros_reconstruction.h>
 #include <pose_graph_tools/BowQueries.h>
+
+#include "hydra_dsg_builder_ros/ros_backend.h"
+#include "hydra_dsg_builder_ros/ros_frontend.h"
+#include "hydra_dsg_builder_ros/ros_reconstruction.h"
 
 namespace hydra {
 

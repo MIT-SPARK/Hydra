@@ -35,6 +35,8 @@
 #include <cv_bridge/cv_bridge.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <hydra_topology/combo_integrator.h>
+#include <hydra_topology/configs.h>
 #include <hydra_utils/config.h>
 #include <message_filters/sync_policies/approximate_time.h>
 #include <rosbag/bag.h>
@@ -48,9 +50,7 @@
 
 #include <Eigen/Dense>
 
-#include "hydra_topology/combo_integrator.h"
-#include "hydra_topology/configs.h"
-#include "hydra_topology/topology_server_visualizer.h"
+#include "hydra_dsg_builder_ros/topology_server_visualizer.h"
 
 DEFINE_string(config, "", "gvd integrator yaml config");
 DEFINE_string(output_path, "", "output directory");
@@ -61,9 +61,9 @@ DEFINE_double(voxel_size, 0.1, "voxel size");
 using config_parser::ConfigVisitor;
 using config_parser::YamlParser;
 using config_parser::YamlParserImpl;
+using hydra::TopologyServerVisualizer;
 using hydra::topology::ComboIntegrator;
 using hydra::topology::GvdVoxel;
-using hydra::topology::TopologyServerVisualizer;
 using sensor_msgs::Image;
 using voxblox::BlockIndexList;
 using voxblox::Layer;

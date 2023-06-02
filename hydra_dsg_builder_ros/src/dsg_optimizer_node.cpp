@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #include <hydra_dsg_builder/incremental_dsg_backend.h>
 #include <hydra_dsg_builder/incremental_dsg_frontend.h>
-#include <hydra_utils/dynamic_scene_graph_visualizer.h>
 #include <hydra_utils/ros_utilities.h>
 #include <kimera_pgmo/DeformationGraph.h>
 
@@ -89,8 +88,7 @@ struct DsgOptimizer {
     input.deformation_graph.reset(new pose_graph_tools::PoseGraph());
     backend->spinOnce(input, true);
 
-    visualizer->setGraph(backend_dsg->graph);
-    visualizer->redraw();
+    // TODO(nathan) add graph publisher
 
     // backend->visualizePoseGraph();
     // backend->visualizeDeformationGraphEdges();
@@ -128,7 +126,6 @@ struct DsgOptimizer {
   SharedDsgInfo::Ptr backend_dsg;
 
   DsgBackend::Ptr backend;
-  std::unique_ptr<DynamicSceneGraphVisualizer> visualizer;
 
   ros::ServiceServer optimize_service;
 };

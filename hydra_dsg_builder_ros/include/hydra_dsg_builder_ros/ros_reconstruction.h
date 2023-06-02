@@ -35,14 +35,14 @@
 #pragma once
 #include <geometry_msgs/Pose.h>
 #include <hydra_msgs/QueryFreespace.h>
+#include <hydra_topology/reconstruction_module.h>
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
 #include <pose_graph_tools/PoseGraph.h>
 #include <ros/ros.h>
 #include <tf2_ros/transform_listener.h>
 
-#include "hydra_topology/reconstruction_module.h"
-#include "hydra_topology/topology_server_visualizer.h"
+#include "hydra_dsg_builder_ros/topology_server_visualizer.h"
 
 namespace hydra {
 
@@ -116,7 +116,7 @@ class RosReconstruction : public ReconstructionModule {
   std::list<PoseGraph::ConstPtr> pose_graphs_;
 
   // visualizer
-  std::unique_ptr<topology::TopologyServerVisualizer> visualizer_;
+  std::unique_ptr<TopologyServerVisualizer> visualizer_;
   ros::Publisher mesh_pub_;
 
   // freespace query

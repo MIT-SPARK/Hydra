@@ -35,7 +35,6 @@
 #pragma once
 #include <hydra_dsg_builder/incremental_dsg_frontend.h>
 #include <hydra_utils/dsg_streaming_interface.h>
-#include <hydra_utils/semantic_ros_publishers.h>
 #include <kimera_pgmo/MeshFrontend.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/approximate_time.h>
@@ -44,6 +43,8 @@
 #include <pcl_ros/point_cloud.h>
 #include <ros/ros.h>
 #include <tf2_ros/transform_listener.h>
+
+#include "hydra_dsg_builder_ros/semantic_ros_publishers.h"
 
 namespace hydra {
 

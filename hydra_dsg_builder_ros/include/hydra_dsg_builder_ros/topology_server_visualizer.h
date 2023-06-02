@@ -34,19 +34,16 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <dynamic_reconfigure/server.h>
-#include <hydra_topology/GvdVisualizerConfig.h>
+#include <hydra_topology/compression_graph_extractor.h>
+#include <hydra_topology/configs.h>
 #include <hydra_utils/config.h>
-#include <hydra_utils/visualizer_types.h>
-#include <hydra_utils/visualizer_utils.h>
 
-#include "hydra_topology/compression_graph_extractor.h"
-#include "hydra_topology/configs.h"
-#include "hydra_topology/gvd_visualization_utilities.h"
+#include "hydra_dsg_builder_ros/GvdVisualizerConfig.h"
+#include "hydra_dsg_builder_ros/gvd_visualization_utilities.h"
 
 namespace hydra {
-namespace topology {
 
-using hydra_topology::GvdVisualizerConfig;
+using hydra_dsg_builder_ros::GvdVisualizerConfig;
 using RqtMutexPtr = std::unique_ptr<boost::recursive_mutex>;
 
 struct TopologyVisualizerConfig {
@@ -56,10 +53,8 @@ struct TopologyVisualizerConfig {
   bool use_gvd_block_outlines = false;
   double outline_scale = 0.01;
 
-  ColormapConfig colormap;
   GvdVisualizerConfig gvd;
-  VisualizerConfig graph;
-  LayerConfig graph_layer;
+  Colormap colormap;
 };
 
 template <typename Visitor>
@@ -111,12 +106,6 @@ class TopologyServerVisualizer {
 
   void gvdConfigCb(GvdVisualizerConfig& config, uint32_t level);
 
-  void graphConfigCb(LayerConfig& config, uint32_t level);
-
-  void colormapCb(ColormapConfig& config, uint32_t level);
-
-  void setupConfigServers();
-
   template <typename Config, typename Callback>
   void startRqtServer(const std::string& config_ns,
                       std::unique_ptr<dynamic_reconfigure::Server<Config>>& server,
@@ -138,11 +127,8 @@ class TopologyServerVisualizer {
   mutable bool published_gvd_clusters_;
 
   std::unique_ptr<dynamic_reconfigure::Server<GvdVisualizerConfig>> gvd_config_server_;
-  std::unique_ptr<dynamic_reconfigure::Server<LayerConfig>> graph_config_server_;
-  std::unique_ptr<dynamic_reconfigure::Server<ColormapConfig>> colormap_server_;
 };
 
-}  // namespace topology
 }  // namespace hydra
 
-DECLARE_CONFIG_OSTREAM_OPERATOR(hydra::topology, TopologyVisualizerConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, TopologyVisualizerConfig)

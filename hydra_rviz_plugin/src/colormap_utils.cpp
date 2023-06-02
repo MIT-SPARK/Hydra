@@ -44,15 +44,6 @@ inline double lerp(double min, double max, double ratio) {
   return (max - min) * ratio + min;
 }
 
-std_msgs::ColorRGBA makeColorMsg(const NodeColor& color, double alpha) {
-  std_msgs::ColorRGBA msg;
-  msg.r = static_cast<double>(color(0)) / 255.0;
-  msg.g = static_cast<double>(color(1)) / 255.0;
-  msg.b = static_cast<double>(color(2)) / 255.0;
-  msg.a = alpha;
-  return msg;
-}
-
 NodeColor getRgbFromHls(double hue, double luminance, double saturation) {
   // make sure we clip the inputs to the expected range
   hue = std::clamp(hue, 0.0, 1.0);

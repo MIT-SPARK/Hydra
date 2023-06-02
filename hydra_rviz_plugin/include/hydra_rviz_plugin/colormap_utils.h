@@ -35,12 +35,8 @@
 #pragma once
 #include "hydra_utils/visualizer_types.h"
 
-#include <std_msgs/ColorRGBA.h>
-
 namespace hydra {
 namespace dsg_utils {
-
-std_msgs::ColorRGBA makeColorMsg(const NodeColor& color, double alpha = 1.0);
 
 NodeColor getRgbFromHls(double hue, double luminance, double saturation);
 

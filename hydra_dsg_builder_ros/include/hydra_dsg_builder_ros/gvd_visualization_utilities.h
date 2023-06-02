@@ -33,21 +33,38 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <hydra_topology/GvdVisualizerConfig.h>
-#include <hydra_utils/visualizer_types.h>
+#include <hydra_topology/compression_graph_extractor.h>
+#include <hydra_topology/gvd_graph.h>
+#include <hydra_topology/gvd_voxel.h>
+#include <hydra_topology/voxblox_types.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
-#include "hydra_topology/compression_graph_extractor.h"
-#include "hydra_topology/gvd_graph.h"
-#include "hydra_topology/gvd_voxel.h"
-#include "hydra_topology/voxblox_types.h"
+#include "hydra_dsg_builder_ros/GvdVisualizerConfig.h"
 
 namespace hydra {
-namespace topology {
 
-using hydra_topology::GvdVisualizerConfig;
+using topology::CompressedNode;
+using topology::CompressionGraphExtractor;
+using topology::GvdGraph;
+using topology::GvdVoxel;
+using voxblox::Layer;
+using voxblox::MeshLayer;
+using voxblox::TsdfVoxel;
+
+using NodeColor = SemanticNodeAttributes::ColorVector;
+
+using hydra_dsg_builder_ros::GvdVisualizerConfig;
 using CompressedNodeMap = std::unordered_map<uint64_t, CompressedNode>;
+
+struct Colormap {
+  double min_hue = 0.0;
+  double max_hue = 1.0;
+  double min_luminance = 1.0;
+  double max_luminance = 1.0;
+  double min_saturation = 1.0;
+  double max_saturation = 1.0;
+};
 
 class MarkerGroupPub {
  public:
@@ -66,41 +83,42 @@ class MarkerGroupPub {
 };
 
 enum class GvdVisualizationMode : int {
-  DEFAULT = hydra_topology::GvdVisualizer_DEFAULT,
-  DISTANCE = hydra_topology::GvdVisualizer_DISTANCE,
-  BASIS_POINTS = hydra_topology::GvdVisualizer_BASIS_POINTS,
+  DEFAULT = hydra_dsg_builder_ros::GvdVisualizer_DEFAULT,
+  DISTANCE = hydra_dsg_builder_ros::GvdVisualizer_DISTANCE,
+  BASIS_POINTS = hydra_dsg_builder_ros::GvdVisualizer_BASIS_POINTS,
 };
 
 GvdVisualizationMode getModeFromString(const std::string& mode);
 
 visualization_msgs::Marker makeGvdMarker(const GvdVisualizerConfig& config,
-                                         const ColormapConfig& colors,
+                                         const Colormap& colors,
                                          const Layer<GvdVoxel>& layer);
 
 visualization_msgs::Marker makeSurfaceVoxelMarker(const GvdVisualizerConfig& config,
-                                                  const ColormapConfig& colors,
+                                                  const Colormap& colors,
                                                   const Layer<GvdVoxel>& layer);
 
 visualization_msgs::Marker makeErrorMarker(const GvdVisualizerConfig& config,
-                                           const ColormapConfig& colors,
+                                           const Colormap& colors,
                                            const Layer<GvdVoxel>& lhs,
                                            const Layer<GvdVoxel>& rhs,
                                            double threshold);
 
 visualization_msgs::Marker makeEsdfMarker(const GvdVisualizerConfig& config,
-                                          const ColormapConfig& colors,
+                                          const Colormap& colors,
                                           const Layer<GvdVoxel>& layer);
 
-visualization_msgs::Marker makeBlocksMarker(const Layer<TsdfVoxel>& layer,
+visualization_msgs::Marker makeBlocksMarker(const voxblox::Layer<TsdfVoxel>& layer,
                                             double scale);
 
 visualization_msgs::Marker makeBlocksMarker(const Layer<GvdVoxel>& layer, double scale);
 
-visualization_msgs::Marker makeMeshBlocksMarker(const MeshLayer& layer, double scale);
+visualization_msgs::Marker makeMeshBlocksMarker(const voxblox::MeshLayer& layer,
+                                                double scale);
 
-visualization_msgs::MarkerArray makeGvdGraphMarkers(const GvdGraph& graph,
+visualization_msgs::MarkerArray makeGvdGraphMarkers(const topology::GvdGraph& graph,
                                                     const GvdVisualizerConfig& config,
-                                                    const ColormapConfig& colors,
+                                                    const Colormap& colors,
                                                     const std::string& ns,
                                                     size_t marker_id = 0);
 
@@ -109,7 +127,7 @@ visualization_msgs::MarkerArray showGvdClusters(
     const CompressedNodeMap& clusters,
     const std::unordered_map<uint64_t, uint64_t>& remapping,
     const GvdVisualizerConfig& config,
-    const ColormapConfig& colors,
+    const Colormap& colors,
     const std::string& ns,
     size_t marker_id = 0);
 
@@ -118,5 +136,4 @@ visualization_msgs::MarkerArray makePlaceSpheres(const std_msgs::Header& header,
                                                  const std::string& ns,
                                                  double alpha = 0.1);
 
-}  // namespace topology
 }  // namespace hydra

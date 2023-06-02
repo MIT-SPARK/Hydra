@@ -11,21 +11,15 @@ option(HYDRA_USE_COVERAGE "Build with GCOV enabled" OFF)
 find_package(spark_dsg REQUIRED)
 find_package(
   catkin REQUIRED
-  COMPONENTS dynamic_reconfigure
-             hydra_utils
+  COMPONENTS hydra_utils
              hydra_msgs
-             kimera_semantics_ros
-             pcl_ros
-             roscpp
+             kimera_semantics
              tf2_eigen
-             tf2_ros
              voxblox
              voxblox_ros
 )
 find_package(Boost REQUIRED COMPONENTS filesystem)
 find_package(yaml-cpp REQUIRED)
-
-generate_dynamic_reconfigure_options(cfg/GvdVisualizer.cfg)
 
 configure_file(cmake/nanoflann.CMakeLists.txt.in nanoflann-download/CMakeLists.txt)
 execute_process(
@@ -51,14 +45,10 @@ add_subdirectory(${CMAKE_BINARY_DIR}/nanoflann-src ${CMAKE_BINARY_DIR}/nanoflann
 
 catkin_package(
   CATKIN_DEPENDS
-  dynamic_reconfigure
   hydra_utils
   hydra_msgs
-  kimera_semantics_ros
-  pcl_ros
-  roscpp
+  kimera_semantics
   tf2_eigen
-  tf2_ros
   voxblox
   voxblox_ros
   DEPENDS spark_dsg
@@ -78,13 +68,10 @@ add_library(
   src/gvd_parent_tracker.cpp
   src/gvd_thinning.cpp
   src/gvd_utilities.cpp
-  src/gvd_visualization_utilities.cpp
   src/gvd_voxel.cpp
   src/nearest_neighbor_utilities.cpp
-  src/ros_reconstruction.cpp
   src/reconstruction_config.cpp
   src/reconstruction_module.cpp
-  src/topology_server_visualizer.cpp
   src/update_statistics.cpp
   src/voxel_aware_marching_cubes.cpp
   src/voxel_aware_mesh_integrator.cpp
@@ -103,15 +90,6 @@ endif()
 add_dependencies(
   ${PROJECT_NAME} ${catkin_EXPORTED_TARGETS} ${${PROJECT_NAME}_EXPORTED_TARGETS}
 )
-
-add_executable(${PROJECT_NAME}_node src/hydra_topology_node.cpp)
-target_link_libraries(${PROJECT_NAME}_node PUBLIC ${PROJECT_NAME} Boost::boost)
-add_dependencies(
-  ${PROJECT_NAME}_node ${catkin_EXPORTED_TARGETS} ${${PROJECT_NAME}_EXPORTED_TARGETS}
-)
-
-add_executable(gvd_validator src/gvd_validator.cpp)
-target_link_libraries(gvd_validator PUBLIC ${PROJECT_NAME} yaml-cpp)
 
 if(CATKIN_ENABLE_TESTING)
   catkin_add_gtest(
@@ -137,7 +115,7 @@ if(CATKIN_ENABLE_TESTING)
 endif()
 
 install(
-  TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_node
+  TARGETS ${PROJECT_NAME}
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}

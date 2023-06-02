@@ -11,13 +11,16 @@
   <license>BSD</license>
 
   <buildtool_depend>catkin</buildtool_depend>
+  <depend>dynamic_reconfigure</depend>
   <depend>hydra_topology</depend>
   <depend>hydra_dsg_builder</depend>
   <depend>kimera_semantics_ros</depend>
+  <depend>pcl_ros</depend>
   <depend>roscpp</depend>
   <depend>spark_dsg</depend>
   <depend>std_msgs</depend>
   <depend>tf2_eigen</depend>
+  <depend>tf2_ros</depend>
   <depend>voxblox_ros</depend>
 
   <export>
