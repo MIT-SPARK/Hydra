@@ -8,8 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(
   catkin REQUIRED
-  COMPONENTS dynamic_reconfigure
-             geometry_msgs
+  COMPONENTS geometry_msgs
              image_transport
              kimera_pgmo
              nodelet
@@ -17,26 +16,16 @@ find_package(
              roscpp
              tf2_eigen
              tf2_ros
-             visualization_msgs
              glog_catkin
 )
-find_package(GTSAM REQUIRED)
 find_package(spark_dsg REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(cv_bridge REQUIRED)
 
-generate_dynamic_reconfigure_options(
-  cfg/Colormap.cfg
-  cfg/DynamicLayerVisualizer.cfg
-  cfg/LayerVisualizer.cfg
-  cfg/Visualizer.cfg
-)
-
 catkin_package(
   CATKIN_DEPENDS
-  dynamic_reconfigure
   geometry_msgs
   image_transport
   kimera_pgmo
@@ -45,7 +34,6 @@ catkin_package(
   roscpp
   tf2_eigen
   tf2_ros
-  visualization_msgs
   DEPENDS
   INCLUDE_DIRS include ${EIGEN3_INCLUDE_DIRS}
   LIBRARIES ${PROJECT_NAME}
@@ -53,15 +41,12 @@ catkin_package(
 
 add_library(
   ${PROJECT_NAME}
-  src/colormap_utils.cpp
   src/display_utils.cpp
   src/dsg_streaming_interface.cpp
-  src/dynamic_scene_graph_visualizer.cpp
   src/log_utilities.cpp
   src/ros_parser.cpp
   src/robot_prefix_config.cpp
   src/timing_utilities.cpp
-  src/visualizer_utils.cpp
   src/yaml_parser.cpp
 )
 target_include_directories(
@@ -72,9 +57,8 @@ target_include_directories(
 target_link_libraries(
   ${PROJECT_NAME}
   PUBLIC yaml-cpp ${catkin_LIBRARIES} spark_dsg::spark_dsg
-  PRIVATE ${OpenCV_LIBRARIES} gtsam
+  PRIVATE ${OpenCV_LIBRARIES}
 )
-add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
 
 add_executable(scene_graph_logger_node src/scene_graph_logger_node.cpp)
 target_link_libraries(scene_graph_logger_node ${PROJECT_NAME})

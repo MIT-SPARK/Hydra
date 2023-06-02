@@ -12,9 +12,7 @@
 
   <buildtool_depend>catkin</buildtool_depend>
   <depend>roscpp</depend>
-  <depend>dynamic_reconfigure</depend>
   <depend>geometry_msgs</depend>
-  <depend>gtsam</depend>
   <depend>cv_bridge</depend>
   <depend>nodelet</depend>
   <depend>image_transport</depend>
@@ -22,7 +20,6 @@
   <depend>pose_graph_tools</depend>
   <depend>spark_dsg</depend>
   <depend>tf2_eigen</depend>
-  <depend>visualization_msgs</depend>
   <depend>tf2_ros</depend>
   <depend>glog_catkin</depend>
   <exec_depend>image_proc</exec_depend>
