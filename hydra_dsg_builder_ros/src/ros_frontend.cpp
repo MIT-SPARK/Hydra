@@ -57,14 +57,6 @@ RosFrontend::RosFrontend(const ros::NodeHandle& nh,
   sync_->registerCallback(boost::bind(&RosFrontend::inputCallback, this, _1, _2));
 
   tf_listener_.reset(new tf2_ros::TransformListener(buffer_));
-  dsg_sender_.reset(
-      new hydra::DsgSender(ros::NodeHandle(nh_, "frontend"), "frontend/publish_dsg"));
-  mesh_frontend_pub_.reset(new kimera_pgmo::MeshFrontendPublisher(nh_));
-  mesh_frontend_.addOutputCallback(
-      std::bind(&kimera_pgmo::MeshFrontendPublisher::publishOutput,
-                mesh_frontend_pub_.get(),
-                std::placeholders::_1,
-                std::placeholders::_2));
 
   if (ros_config_.enable_active_mesh_pub) {
     active_vertices_pub_ = nh_.advertise<MeshVertexCloud>("active_vertices", 1, true);
@@ -121,13 +113,6 @@ void RosFrontend::inputCallback(const ActiveLayer::ConstPtr& places,
   pose_graph_queue_.clear();
 
   queue_->push(input);
-
-  {  // start dsg critical section
-    std::unique_lock<std::mutex> lock(dsg_->mutex);
-    ros::Time stamp;
-    stamp.fromNSec(dsg_->last_update_time);
-    dsg_sender_->sendGraph(*dsg_->graph, stamp);
-  }
 }
 
 void RosFrontend::poseGraphCallback(const PoseGraph::ConstPtr& pose_graph) {

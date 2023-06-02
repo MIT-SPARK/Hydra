@@ -61,6 +61,11 @@ struct InputQueue {
     return queue.front();
   }
 
+  const T& back() const {
+    std::unique_lock<std::mutex> lock(mutex);
+    return queue.back();
+  }
+
   /**
    * @brief wait for the queue to have data
    */

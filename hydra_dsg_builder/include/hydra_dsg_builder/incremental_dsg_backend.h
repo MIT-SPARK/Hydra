@@ -89,6 +89,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
 
   bool spinOnce(bool force_update = true);
 
+  inline void triggerBackendDsgReset() { reset_backend_dsg_ = true; }
+
   // used by dsg_optimizer
   void spinOnce(const BackendInput& input, bool force_update = true);
 
@@ -118,9 +120,11 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
                       const gtsam::Pose3& src_T_dest,
                       double variance);
 
-  void updateFactorGraph(const BackendInput& input);
+  virtual void updateFactorGraph(const BackendInput& input);
 
-  bool updateFromLcdQueue();
+  virtual bool updateFromLcdQueue();
+
+  virtual void copyMeshDelta(const BackendInput& input);
 
   virtual bool updatePrivateDsg(size_t timestamp_ns, bool force_update = true);
 
@@ -129,6 +133,8 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   virtual void optimize(size_t timestamp_ns);
 
   virtual void updateDsgMesh(size_t timestamp_ns, bool force_mesh_update = false);
+
+  virtual void resetBackendDsg(size_t timestamp_ns);
 
   virtual void callUpdateFunctions(
       size_t timestamp_ns,
@@ -157,6 +163,7 @@ class DsgBackend : public kimera_pgmo::KimeraPgmoInterface {
   bool have_new_mesh_{false};
   size_t prev_num_archived_vertices_{0};
   size_t num_archived_vertices_{0};
+  bool reset_backend_dsg_{false};
 
   RobotPrefixConfig prefix_;
   DsgBackendConfig config_;

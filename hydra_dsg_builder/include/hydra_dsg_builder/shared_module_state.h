@@ -37,8 +37,9 @@
 
 #include <hydra_utils/dsg_types.h>
 #include <hydra_utils/input_queue.h>
-#include <kimera_pgmo/utils/CommonStructs.h>
+#include <hydra_utils/robot_prefix_config.h>
 #include <kimera_pgmo/MeshDelta.h>
+#include <kimera_pgmo/utils/CommonStructs.h>
 #include <pose_graph_tools/BowQuery.h>
 #include <pose_graph_tools/PoseGraph.h>
 #include <ros/time.h>
@@ -63,6 +64,7 @@ struct LcdInput {
 struct BackendInput {
   using Ptr = std::shared_ptr<BackendInput>;
 
+  RobotPrefixConfig prefix;
   uint64_t timestamp_ns;
   pose_graph_tools::PoseGraph::ConstPtr deformation_graph;
   std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
