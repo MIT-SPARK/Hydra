@@ -38,7 +38,7 @@
     <arg name="typology_path" default="$(arg typology_dir)/$(arg typology_config)"/>
     <arg name="reconstruction_config" if="$(arg do_reconstruction)"/>
     <arg name="pointcloud_topic" if="$(arg do_reconstruction)"/>
-    <arg name="graph_viz_config_dir" default="$(find hydra_topology)/config"/>
+    <arg name="graph_viz_config_dir" default="$(find hydra_dsg_builder_ros)/config"/>
     <arg name="graph_viz_config" default="graph_visualization_config.yaml"/>
     <arg name="graph_viz_config_file" value="$(arg graph_viz_config_dir)/$(arg graph_viz_config)"/>
 
