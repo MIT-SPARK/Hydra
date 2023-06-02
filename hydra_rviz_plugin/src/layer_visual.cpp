@@ -27,7 +27,8 @@ void LayerVisual::setPose(const Ogre::Quaternion& rot, const Ogre::Vector3& pos)
 }
 
 void LayerVisual::makeNodes(const LayerConfig& config,
-                            const spark_dsg::SceneGraphLayer& layer) {
+                            const spark_dsg::SceneGraphLayer& layer,
+                            const ColorCallback& color_callback) {
   if (!graph_nodes_) {
     graph_nodes_ = std::make_unique<rviz::PointCloud>();
     node_->attachObject(graph_nodes_.get());
@@ -41,6 +42,7 @@ void LayerVisual::makeNodes(const LayerConfig& config,
 
   std::vector<rviz::PointCloud::Point> points(layer.numNodes());
 
+  std::array<float, 3> color{0.0f, 0.0f, 0.0f};
   size_t point_index = 0;
   for (const auto& id_node_pair : layer.nodes()) {
     const auto& attrs = id_node_pair.second->attributes();
@@ -48,12 +50,17 @@ void LayerVisual::makeNodes(const LayerConfig& config,
     point.position.x = attrs.position.x();
     point.position.y = attrs.position.y();
     point.position.z = attrs.position.z();
-    point.setColor(1, 0, 0, config.node_alpha);
+
+    if (color_callback) {
+      color_callback(*id_node_pair.second, color);
+    }
+
+    point.setColor(color[0], color[1], color[2], config.node_alpha);
     ++point_index;
   }
 
   graph_nodes_->addPoints(&points.front(), points.size());
-}
+}  // namespace hydra
 
 inline Ogre::Vector3 eigen_to_ogre(const Eigen::Vector3d& v) {
   return {
@@ -94,9 +101,10 @@ void LayerVisual::makeEdges(const LayerConfig& config,
 }
 
 void LayerVisual::setMessage(const LayerConfig& config,
-                             const spark_dsg::SceneGraphLayer& layer) {
+                             const spark_dsg::SceneGraphLayer& layer,
+                             const ColorCallback& color_callback) {
   node_->setVisible(true);
-  makeNodes(config, layer);
+  makeNodes(config, layer, color_callback);
   makeEdges(config, layer);
 }
 

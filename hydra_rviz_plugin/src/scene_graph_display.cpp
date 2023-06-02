@@ -6,9 +6,13 @@
 #include <spark_dsg/graph_binary_serialization.h>
 #include <yaml-cpp/yaml.h>
 
+#include "hydra_rviz_plugin/colormap.h"
 #include "hydra_rviz_plugin/layer_visual.h"
 
 namespace hydra {
+
+using spark_dsg::NodeSymbol;
+using spark_dsg::SceneGraphNode;
 
 struct Pose {
   Pose(const Ogre::Quaternion& rot, const Ogre::Vector3& pos) : rot(rot), pos(pos) {}
@@ -126,6 +130,13 @@ void SceneGraphDisplay::setLayerPoses() {
   }
 }
 
+void roomColorCallback(const SceneGraphNode& node, std::array<float, 3>& color) {
+  static const auto colormap = Colormap::RoomDefault();
+  color = colormap(NodeSymbol(node.id).categoryId());
+}
+
+void noColorCallback(const SceneGraphNode&, std::array<float, 3>&) {}
+
 void SceneGraphDisplay::processMessage(const hydra_msgs::DsgUpdate::ConstPtr& msg) {
   Ogre::Quaternion rot;
   Ogre::Vector3 pos;
@@ -156,7 +167,11 @@ void SceneGraphDisplay::processMessage(const hydra_msgs::DsgUpdate::ConstPtr& ms
 
   for (auto& id_layer_pair : layers_) {
     auto& layer = id_layer_pair.second;
-    layer.visual->setMessage(layer.config, graph_->getLayer(id_layer_pair.first));
+    layer.visual->setMessage(layer.config,
+                             graph_->getLayer(id_layer_pair.first),
+                             id_layer_pair.first == spark_dsg::DsgLayers::ROOMS
+                                 ? &roomColorCallback
+                                 : &noColorCallback);
   }
 }
 

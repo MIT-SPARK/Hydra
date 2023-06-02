@@ -43,7 +43,6 @@ namespace hydra {
 
 class HydraConfig {
  public:
-  using ColorArray = std::array<uint8_t, 3>;
 
   static HydraConfig& instance() {
     if (!instance_) {
@@ -56,10 +55,6 @@ class HydraConfig {
 
   void setForceShutdown(bool force_shutdown);
 
-  void setColorMap(const std::vector<ColorArray>& colormap);
-
-  const ColorArray& getRoomColor(size_t index) const;
-
  private:
   HydraConfig();
 
@@ -67,8 +62,6 @@ class HydraConfig {
 
   // TODO(nathan) consider moving robot id and logging here
   std::atomic<bool> force_shutdown_;
-
-  std::vector<ColorArray> colormap_;
 };
 
 std::ostream& operator<<(std::ostream& out, const HydraConfig& config);

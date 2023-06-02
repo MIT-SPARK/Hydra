@@ -41,7 +41,6 @@
 #include <queue>
 
 #include "hydra_dsg_builder/graph_filtration.h"
-#include "hydra_dsg_builder/hydra_config.h"
 #include "hydra_dsg_builder/room_helpers.h"
 
 namespace hydra {
@@ -327,8 +326,6 @@ SceneGraphLayer::Ptr RoomFinder::makeRoomLayer(const SceneGraphLayer& places) {
     // TODO(nathan) define unknown label somewhere
     attrs->semantic_label = 0;
     attrs->name = room_id.getLabel();
-    auto color = HydraConfig::instance().getRoomColor(room_id.categoryId());
-    attrs->color = Eigen::Map<SemanticNodeAttributes::ColorVector>(color.data());
     attrs->position = getRoomPosition(places, cluster);
 
     rooms->emplaceNode(room_id, std::move(attrs));

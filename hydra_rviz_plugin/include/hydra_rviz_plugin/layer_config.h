@@ -19,6 +19,12 @@ struct LayerConfig {
   double edge_scale = 0.1;
   double edge_alpha = 0.6;
 
+  enum class ColorMode : int {
+    SINGLE_COLOR,
+    COLORMAP,
+    PARENT_COLOR,
+  } color_mode = ColorMode::SINGLE_COLOR;
+
   // TODO(nathan) color mode
 };
 
