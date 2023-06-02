@@ -29,7 +29,7 @@ catkin_package(
 # n.b. headers are required for moc to work correctly
 add_library(
   ${PROJECT_NAME} include/hydra_rviz_plugin/scene_graph_display.h
-                  src/scene_graph_display.cpp src/scene_graph_visual.cpp
+                  src/scene_graph_display.cpp src/layer_visual.cpp
 )
 set_target_properties(${PROJECT_NAME} PROPERTIES AUTOMOC TRUE)
 target_include_directories(${PROJECT_NAME} PUBLIC include ${catkin_INCLUDE_DIRS})

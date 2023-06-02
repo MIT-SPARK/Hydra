@@ -18,20 +18,19 @@ class BillboardLine;
 
 namespace spark_dsg {
 
-class DynamicSceneGraph;
 class SceneGraphLayer;
 
 }
 
 namespace hydra {
 
-class SceneGraphVisual {
+class LayerVisual {
  public:
-  SceneGraphVisual(Ogre::SceneManager* manager, Ogre::SceneNode* parent);
+  LayerVisual(Ogre::SceneManager* manager, Ogre::SceneNode* parent);
 
-  virtual ~SceneGraphVisual();
+  virtual ~LayerVisual();
 
-  void setMessage(const spark_dsg::DynamicSceneGraph& msg);
+  void setMessage(const spark_dsg::SceneGraphLayer& msg);
 
   void setPose(const Ogre::Vector3& pos, const Ogre::Quaternion& rot);
 

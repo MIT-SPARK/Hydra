@@ -2,11 +2,9 @@
 
 #include <spark_dsg/graph_binary_serialization.h>
 
-#include "hydra_rviz_plugin/scene_graph_visual.h"
+#include "hydra_rviz_plugin/layer_visual.h"
 
 namespace hydra {
-
-using SGViz = SceneGraphVisual;
 
 SceneGraphDisplay::SceneGraphDisplay() {}
 
@@ -18,7 +16,7 @@ void SceneGraphDisplay::onInitialize() {
 
 void SceneGraphDisplay::reset() {
   rviz::MessageFilterDisplay<hydra_msgs::DsgUpdate>::reset();
-  visual_.reset();
+  layer_visuals_.clear();
 }
 
 void SceneGraphDisplay::processMessage(const hydra_msgs::DsgUpdate::ConstPtr& msg) {
@@ -43,11 +41,16 @@ void SceneGraphDisplay::processMessage(const hydra_msgs::DsgUpdate::ConstPtr& ms
     return;
   }
 
-  if (!visual_) {
-    visual_ = std::make_unique<SGViz>(context_->getSceneManager(), scene_node_);
-  }
+  for (const auto layer : graph_->layer_ids) {
+    auto iter = layer_visuals_.find(layer);
+    if (iter == layer_visuals_.end()) {
+      auto visual =
+          std::make_unique<LayerVisual>(context_->getSceneManager(), scene_node_);
+      iter = layer_visuals_.emplace(layer, std::move(visual)).first;
+    }
 
-  visual_->setMessage(*graph_);
+    iter->second->setMessage(graph_->getLayer(layer));
+  }
 }
 
 }  // namespace hydra

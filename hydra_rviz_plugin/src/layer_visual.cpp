@@ -1,4 +1,4 @@
-#include "hydra_rviz_plugin/scene_graph_visual.h"
+#include "hydra_rviz_plugin/layer_visual.h"
 
 #include <OGRE/OgreSceneManager.h>
 #include <OGRE/OgreSceneNode.h>
@@ -11,19 +11,19 @@ namespace hydra {
 
 using spark_dsg::SceneGraphNode;
 
-SceneGraphVisual::SceneGraphVisual(Ogre::SceneManager* manager, Ogre::SceneNode* parent)
+LayerVisual::LayerVisual(Ogre::SceneManager* manager, Ogre::SceneNode* parent)
     : manager_(manager) {
   node_ = parent->createChildSceneNode();
 }
 
-SceneGraphVisual::~SceneGraphVisual() { manager_->destroySceneNode(node_); }
+LayerVisual::~LayerVisual() { manager_->destroySceneNode(node_); }
 
-void SceneGraphVisual::setPose(const Ogre::Vector3& pos, const Ogre::Quaternion& rot) {
+void LayerVisual::setPose(const Ogre::Vector3& pos, const Ogre::Quaternion& rot) {
   node_->setPosition(pos);
   node_->setOrientation(rot);
 }
 
-void SceneGraphVisual::makeNodes(const spark_dsg::SceneGraphLayer& layer) {
+void LayerVisual::makeNodes(const spark_dsg::SceneGraphLayer& layer) {
   if (!graph_nodes_) {
     graph_nodes_ = std::make_unique<rviz::PointCloud>();
     node_->attachObject(graph_nodes_.get());
@@ -54,7 +54,7 @@ inline Ogre::Vector3 eigen_to_ogre(const Eigen::Vector3d& v) {
       static_cast<float>(v.x()), static_cast<float>(v.y()), static_cast<float>(v.z())};
 }
 
-void SceneGraphVisual::makeEdges(const spark_dsg::SceneGraphLayer& layer) {
+void LayerVisual::makeEdges(const spark_dsg::SceneGraphLayer& layer) {
   if (!graph_edges_) {
     graph_edges_ = std::make_unique<rviz::BillboardLine>(manager_, node_);
   }
@@ -86,12 +86,10 @@ void SceneGraphVisual::makeEdges(const spark_dsg::SceneGraphLayer& layer) {
   }
 }
 
-void SceneGraphVisual::setMessage(const spark_dsg::DynamicSceneGraph& graph) {
+void LayerVisual::setMessage(const spark_dsg::SceneGraphLayer& layer) {
   node_->setVisible(true);
-
-  const auto& places = graph.getLayer(spark_dsg::DsgLayers::PLACES);
-  makeNodes(places);
-  makeEdges(places);
+  makeNodes(layer);
+  makeEdges(layer);
 }
 
 }  // namespace hydra
