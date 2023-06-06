@@ -6,6 +6,7 @@
 #include <map>
 #include <memory>
 
+#include "hydra_rviz_plugin/common.h"
 #include "hydra_rviz_plugin/layer_config.h"
 
 namespace rviz {
@@ -16,13 +17,16 @@ class FloatProperty;
 namespace hydra {
 
 class LayerVisual;
+class BoundingBoxVisual;
 struct Pose;
 
 struct LayerContainer {
   LayerContainer() = default;
 
   std::unique_ptr<LayerVisual> visual;
+  std::unique_ptr<BoundingBoxVisual> bbox_visual;
   LayerConfig config;
+  ColorFunctor::Ptr node_color_callback;
 };
 
 class SceneGraphDisplay : public rviz::MessageFilterDisplay<hydra_msgs::DsgUpdate> {
@@ -44,6 +48,8 @@ class SceneGraphDisplay : public rviz::MessageFilterDisplay<hydra_msgs::DsgUpdat
   void processMessage(const hydra_msgs::DsgUpdate::ConstPtr& msg);
 
   void initLayers();
+
+  void assignColorFunctions();
 
   void readDefaults();
 

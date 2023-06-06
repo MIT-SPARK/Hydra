@@ -1,5 +1,7 @@
 #include "hydra_rviz_plugin/layer_config.h"
 
+#include <algorithm>
+
 namespace hydra {
 
 std::ostream& operator<<(std::ostream& out, const LayerConfig& conf) {
@@ -16,6 +18,23 @@ std::ostream& operator<<(std::ostream& out, const LayerConfig& conf) {
       << ", edge_scale: " << conf.edge_scale << ", edge_alpha: " << conf.edge_alpha
       << "}";
   return out;
+}
+
+LayerConfig::ColorMode stringToColorMode(const std::string& input) {
+  std::string result = input;
+  std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) {
+    return std::toupper(c);
+  });
+
+  if (result == "SINGLE_COLOR") {
+    return LayerConfig::ColorMode::SINGLE_COLOR;
+  } else if (result == "COLORMAP") {
+    return LayerConfig::ColorMode::COLORMAP;
+  } else if (result == "PARENT_COLOR") {
+    return LayerConfig::ColorMode::PARENT_COLOR;
+  } else {
+    return LayerConfig::ColorMode::NONE;
+  }
 }
 
 }  // namespace hydra

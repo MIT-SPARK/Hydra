@@ -6,6 +6,8 @@
 #include <spark_dsg/graph_binary_serialization.h>
 #include <yaml-cpp/yaml.h>
 
+#include "hydra_rviz_plugin/bounding_box_visual.h"
+#include "hydra_rviz_plugin/color_functions.h"
 #include "hydra_rviz_plugin/colormap.h"
 #include "hydra_rviz_plugin/layer_visual.h"
 
@@ -70,6 +72,13 @@ void SceneGraphDisplay::readDefaults() {
       PARSE_FIELD(lc, config, bounding_box_alpha);
       PARSE_FIELD(lc, config, edge_scale);
       PARSE_FIELD(lc, config, edge_alpha);
+      PARSE_FIELD(lc, config, label_colormap);
+
+      std::string color_mode = "none";
+      if (lc["color_mode"]) {
+        color_mode = lc["color_mode"].as<std::string>();
+      }
+      config.color_mode = stringToColorMode(color_mode);
       default_configs_[id] = config;
       ROS_DEBUG_STREAM("parsed layer " << id << ": " << config);
     }
@@ -127,15 +136,47 @@ void SceneGraphDisplay::setLayerPoses() {
             : layer.config.offset_scale * layer_height_->getFloat());
     layer_pos = last_pose_->rot * layer_pos + last_pose_->pos;
     layer.visual->setPose(last_pose_->rot, layer_pos);
+
+    if (!layer.config.use_bounding_box) {
+      layer.bbox_visual.reset();
+      continue;
+    }
+
+    if (!layer.bbox_visual) {
+      layer.bbox_visual =
+          std::make_unique<BoundingBoxVisual>(context_->getSceneManager(), scene_node_);
+    }
+
+    layer.bbox_visual->setPose(
+        last_pose_->rot,
+        layer.config.collapse_bounding_box ? last_pose_->pos : layer_pos);
   }
 }
 
-void roomColorCallback(const SceneGraphNode& node, std::array<float, 3>& color) {
-  static const auto colormap = Colormap::RoomDefault();
-  color = colormap(NodeSymbol(node.id).categoryId());
-}
+void SceneGraphDisplay::assignColorFunctions() {
+  static const auto layer_colormap = Colormap::SingleColor();
 
-void noColorCallback(const SceneGraphNode&, std::array<float, 3>&) {}
+  for (auto& id_layer_pair : layers_) {
+    auto& layer = id_layer_pair.second;
+    switch (layer.config.color_mode) {
+      case LayerConfig::ColorMode::COLORMAP:
+        layer.node_color_callback = std::make_unique<ColormapFunctor>(
+            Colormap::Default(), layer.config.label_colormap);
+        break;
+      case LayerConfig::ColorMode::PARENT_COLOR:
+        layer.node_color_callback = std::make_unique<ParentColorFunctor>(
+            Colormap::Default(), graph_, layer.config.label_colormap);
+        break;
+      case LayerConfig::ColorMode::SINGLE_COLOR:
+        layer.node_color_callback =
+            std::make_unique<SingleColorFunctor>(layer_colormap(id_layer_pair.first));
+        break;
+      default:
+        layer.node_color_callback.reset(nullptr);
+        break;
+    }
+  }
+}
 
 void SceneGraphDisplay::processMessage(const hydra_msgs::DsgUpdate::ConstPtr& msg) {
   Ogre::Quaternion rot;
@@ -164,14 +205,19 @@ void SceneGraphDisplay::processMessage(const hydra_msgs::DsgUpdate::ConstPtr& ms
 
   initLayers();
   setLayerPoses();
+  assignColorFunctions();
 
   for (auto& id_layer_pair : layers_) {
     auto& layer = id_layer_pair.second;
     layer.visual->setMessage(layer.config,
                              graph_->getLayer(id_layer_pair.first),
-                             id_layer_pair.first == spark_dsg::DsgLayers::ROOMS
-                                 ? &roomColorCallback
-                                 : &noColorCallback);
+                             layer.node_color_callback.get());
+
+    if (layer.config.use_bounding_box && layer.bbox_visual) {
+      layer.bbox_visual->setMessage(layer.config,
+                                    graph_->getLayer(id_layer_pair.first),
+                                    layer.node_color_callback.get());
+    }
   }
 }
 

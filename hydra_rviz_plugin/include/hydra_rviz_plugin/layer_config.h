@@ -23,10 +23,12 @@ struct LayerConfig {
     SINGLE_COLOR,
     COLORMAP,
     PARENT_COLOR,
+    NONE,
   } color_mode = ColorMode::SINGLE_COLOR;
-
-  // TODO(nathan) color mode
+  bool label_colormap = false;
 };
+
+LayerConfig::ColorMode stringToColorMode(const std::string& input);
 
 std::ostream& operator<<(std::ostream& out, const LayerConfig& conf);
 

@@ -15,6 +15,8 @@ layers:
     collapse_bounding_box: true
     edge_scale: 0.03
     edge_alpha: 0.6
+    color_mode: colormap
+    label_colormap: true
   - id: 3
     offset_scale: 3.0
     visualize: true
@@ -27,6 +29,8 @@ layers:
     use_bounding_box: false
     edge_scale: 0.01
     edge_alpha: 0.5
+    color_mode: parent_color
+    label_colormap: false
   - id: 4
     offset_scale: 4.2
     visualize: true
@@ -39,6 +43,8 @@ layers:
     use_bounding_box: false
     edge_scale: 0.1
     edge_alpha: 0.2
+    color_mode: colormap
+    label_colormap: false
   - id: 5
     offset_scale: 5.5
     visualize: true
@@ -51,3 +57,4 @@ layers:
     use_bounding_box: false
     edge_scale: 0.05
     edge_alpha: 1.0
+    color_mode: single_color

@@ -10,7 +10,9 @@ class Colormap {
 
   const ColorArray& operator()(size_t index) const;
 
-  static Colormap RoomDefault();
+  static Colormap Default();
+
+  static Colormap SingleColor();
 
   Colormap(const std::vector<ColorArray>& colors);
 

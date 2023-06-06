@@ -2,7 +2,6 @@
 
 #include <OGRE/OgreSceneManager.h>
 #include <OGRE/OgreSceneNode.h>
-#include <ros/ros.h>
 #include <rviz/ogre_helpers/billboard_line.h>
 #include <rviz/ogre_helpers/point_cloud.h>
 #include <spark_dsg/dynamic_scene_graph.h>
@@ -12,6 +11,15 @@
 namespace hydra {
 
 using spark_dsg::SceneGraphNode;
+
+namespace {
+
+inline Ogre::Vector3 eigen_to_ogre(const Eigen::Vector3d& v) {
+  return {
+      static_cast<float>(v.x()), static_cast<float>(v.y()), static_cast<float>(v.z())};
+}
+
+}  // namespace
 
 LayerVisual::LayerVisual(Ogre::SceneManager* const manager,
                          Ogre::SceneNode* const parent)
@@ -28,7 +36,7 @@ void LayerVisual::setPose(const Ogre::Quaternion& rot, const Ogre::Vector3& pos)
 
 void LayerVisual::makeNodes(const LayerConfig& config,
                             const spark_dsg::SceneGraphLayer& layer,
-                            const ColorCallback& color_callback) {
+                            ColorFunctor* const color_callback) {
   if (!graph_nodes_) {
     graph_nodes_ = std::make_unique<rviz::PointCloud>();
     node_->attachObject(graph_nodes_.get());
@@ -52,7 +60,7 @@ void LayerVisual::makeNodes(const LayerConfig& config,
     point.position.z = attrs.position.z();
 
     if (color_callback) {
-      color_callback(*id_node_pair.second, color);
+      color_callback->call(*id_node_pair.second, color);
     }
 
     point.setColor(color[0], color[1], color[2], config.node_alpha);
@@ -60,11 +68,6 @@ void LayerVisual::makeNodes(const LayerConfig& config,
   }
 
   graph_nodes_->addPoints(&points.front(), points.size());
-}  // namespace hydra
-
-inline Ogre::Vector3 eigen_to_ogre(const Eigen::Vector3d& v) {
-  return {
-      static_cast<float>(v.x()), static_cast<float>(v.y()), static_cast<float>(v.z())};
 }
 
 void LayerVisual::makeEdges(const LayerConfig& config,
@@ -76,7 +79,8 @@ void LayerVisual::makeEdges(const LayerConfig& config,
   graph_edges_->setColor(0, 0, 0, config.edge_alpha);
   graph_edges_->clear();
   graph_edges_->setLineWidth(config.edge_scale);
-  graph_edges_->setMaxPointsPerLine(2 * layer.numEdges());
+  graph_edges_->setMaxPointsPerLine(2);
+  graph_edges_->setNumLines(layer.numEdges());
 
   std::vector<rviz::PointCloud::Point> points(layer.numNodes());
 
@@ -86,6 +90,7 @@ void LayerVisual::makeEdges(const LayerConfig& config,
   color.b = 0;
   color.a = config.edge_alpha;
 
+  bool is_first = true;
   for (const auto& id_edge_pair : layer.edges()) {
     const SceneGraphNode& source = *layer.getNode(id_edge_pair.second.source);
     const auto& source_attrs = source.attributes();
@@ -95,6 +100,10 @@ void LayerVisual::makeEdges(const LayerConfig& config,
     const Ogre::Vector3 source_pos = eigen_to_ogre(source_attrs.position);
     const Ogre::Vector3 target_pos = eigen_to_ogre(target_attrs.position);
 
+    if (!is_first) {
+      graph_edges_->newLine();
+    }
+    is_first = false;
     graph_edges_->addPoint(source_pos, color);
     graph_edges_->addPoint(target_pos, color);
   }
@@ -102,7 +111,7 @@ void LayerVisual::makeEdges(const LayerConfig& config,
 
 void LayerVisual::setMessage(const LayerConfig& config,
                              const spark_dsg::SceneGraphLayer& layer,
-                             const ColorCallback& color_callback) {
+                             ColorFunctor* const color_callback) {
   node_->setVisible(true);
   makeNodes(config, layer, color_callback);
   makeEdges(config, layer);

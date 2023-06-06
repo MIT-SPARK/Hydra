@@ -33,11 +33,59 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra_utils/visualizer_utils.h"
-#include "hydra_utils/colormap_utils.h"
 
 #include <tf2_eigen/tf2_eigen.h>
 
+#include <algorithm>
+#include <opencv2/imgproc.hpp>
+
 namespace hydra {
+
+inline double lerp(double min, double max, double ratio) {
+  return (max - min) * ratio + min;
+}
+
+NodeColor getRgbFromHls(double hue, double luminance, double saturation) {
+  // make sure we clip the inputs to the expected range
+  hue = std::clamp(hue, 0.0, 1.0);
+  luminance = std::clamp(luminance, 0.0, 1.0);
+  saturation = std::clamp(saturation, 0.0, 1.0);
+
+  cv::Mat hls_value(1, 1, CV_32FC3);
+  // hue is in degrees, not [0, 1]
+  hls_value.at<float>(0) = hue * 360.0;
+  hls_value.at<float>(1) = luminance;
+  hls_value.at<float>(2) = saturation;
+
+  cv::Mat bgr;
+  cv::cvtColor(hls_value, bgr, cv::COLOR_HLS2BGR);
+
+  NodeColor color;
+  color(0, 0) = static_cast<uint8_t>(255 * bgr.at<float>(2));
+  color(1, 0) = static_cast<uint8_t>(255 * bgr.at<float>(1));
+  color(2, 0) = static_cast<uint8_t>(255 * bgr.at<float>(0));
+  return color;
+}
+
+NodeColor interpolateColorMap(const ColormapConfig& config, double ratio) {
+  // override ratio input to be in [0, 1]
+  ratio = std::clamp(ratio, 0.0, 1.0);
+
+  cv::Mat hls_value(1, 1, CV_32FC3);
+  // hue is in degrees, not [0, 1]
+  hls_value.at<float>(0) = lerp(config.min_hue, config.max_hue, ratio) * 360.0;
+  hls_value.at<float>(1) = lerp(config.min_luminance, config.max_luminance, ratio);
+  hls_value.at<float>(2) = lerp(config.min_saturation, config.max_saturation, ratio);
+
+  cv::Mat bgr;
+  cv::cvtColor(hls_value, bgr, cv::COLOR_HLS2BGR);
+
+  NodeColor color;
+  color(0, 0) = static_cast<uint8_t>(255 * bgr.at<float>(2));
+  color(1, 0) = static_cast<uint8_t>(255 * bgr.at<float>(1));
+  color(2, 0) = static_cast<uint8_t>(255 * bgr.at<float>(0));
+  return color;
+}
 
 using visualization_msgs::Marker;
 using visualization_msgs::MarkerArray;
@@ -69,223 +117,7 @@ inline NodeColor getDistanceColor(const VisualizerConfig& config,
   return dsg_utils::interpolateColorMap(colors, ratio);
 }
 
-inline void fillPoseWithIdentity(geometry_msgs::Pose& pose) {
-  Eigen::Vector3d identity_pos = Eigen::Vector3d::Zero();
-  tf2::convert(identity_pos, pose.position);
-  tf2::convert(Eigen::Quaterniond::Identity(), pose.orientation);
-}
-
 }  // namespace
-
-Marker makeDeleteMarker(const std_msgs::Header& header,
-                        size_t id,
-                        const std::string& ns) {
-  Marker marker;
-  marker.header = header;
-  marker.action = Marker::DELETE;
-  marker.id = id;
-  marker.ns = ns;
-  return marker;
-}
-
-geometry_msgs::Point getPointFromMatrix(const Eigen::MatrixXf& matrix, int col) {
-  geometry_msgs::Point point;
-  point.x = matrix(0, col);
-  point.y = matrix(1, col);
-  point.z = matrix(2, col);
-  return point;
-}
-
-void fillCornersFromBbox(const BoundingBox& bbox, Eigen::MatrixXf& corners) {
-  const Eigen::Vector3f dims = bbox.max - bbox.min;
-
-  corners.block<3, 1>(0, 0) = bbox.min;
-  for (int c = 1; c < corners.cols(); ++c) {
-    // x: lsb, y: second lsb, z: third lsb
-    Eigen::Vector3f offset;
-    offset(0) = ((c & 0x01) != 0) ? dims(0) : 0.0f;
-    offset(1) = ((c & 0x02) != 0) ? dims(1) : 0.0f;
-    offset(2) = ((c & 0x04) != 0) ? dims(2) : 0.0f;
-    corners.block<3, 1>(0, c) = bbox.min + offset;
-  }
-
-  if (bbox.type != BoundingBox::Type::AABB) {
-    corners = (bbox.world_R_center * corners).eval();
-    for (int c = 0; c < corners.cols(); ++c) {
-      corners.block<3, 1>(0, c) += bbox.world_P_center;
-    }
-  }
-}
-
-void addWireframeToMarker(const Eigen::MatrixXf& corners,
-                          const std_msgs::ColorRGBA& color,
-                          Marker& marker) {
-  for (int c = 0; c < corners.cols(); ++c) {
-    // edges are 1-bit pertubations
-    int x_neighbor = c | 0x01;
-    int y_neighbor = c | 0x02;
-    int z_neighbor = c | 0x04;
-    if (c != x_neighbor) {
-      marker.points.push_back(getPointFromMatrix(corners, c));
-      marker.colors.push_back(color);
-      marker.points.push_back(getPointFromMatrix(corners, x_neighbor));
-      marker.colors.push_back(color);
-    }
-    if (c != y_neighbor) {
-      marker.points.push_back(getPointFromMatrix(corners, c));
-      marker.colors.push_back(color);
-      marker.points.push_back(getPointFromMatrix(corners, y_neighbor));
-      marker.colors.push_back(color);
-    }
-    if (c != z_neighbor) {
-      marker.points.push_back(getPointFromMatrix(corners, c));
-      marker.colors.push_back(color);
-      marker.points.push_back(getPointFromMatrix(corners, z_neighbor));
-      marker.colors.push_back(color);
-    }
-  }
-}
-
-void addEdgesToCorners(const Eigen::MatrixXf& corners,
-                       const geometry_msgs::Point& node_centroid,
-                       const std_msgs::ColorRGBA& color,
-                       Marker& marker) {
-  for (size_t i = 0; i < 8; ++i) {
-    marker.colors.push_back(color);
-  }
-
-  // top box corners are 4, 5, 6, 7
-  marker.points.push_back(node_centroid);
-  marker.points.push_back(getPointFromMatrix(corners, 4));
-  marker.points.push_back(node_centroid);
-  marker.points.push_back(getPointFromMatrix(corners, 5));
-  marker.points.push_back(node_centroid);
-  marker.points.push_back(getPointFromMatrix(corners, 6));
-  marker.points.push_back(node_centroid);
-  marker.points.push_back(getPointFromMatrix(corners, 7));
-}
-
-Marker makeEdgesToBoundingBoxes(const std_msgs::Header& header,
-                                const LayerConfig& config,
-                                const SceneGraphLayer& layer,
-                                const VisualizerConfig& visualizer_config,
-                                const std::string& ns) {
-  Marker marker;
-  marker.header = header;
-  marker.type = Marker::LINE_LIST;
-  marker.action = visualization_msgs::Marker::ADD;
-  marker.id = 0;
-  marker.ns = ns;
-  marker.scale.x = config.bbox_wireframe_edge_scale;
-
-  fillPoseWithIdentity(marker.pose);
-
-  marker.points.reserve(8 * layer.numNodes());
-  marker.colors.reserve(8 * layer.numNodes());
-
-  Eigen::MatrixXf corners(3, 8);
-  for (const auto& id_node_pair : layer.nodes()) {
-    const auto& attrs = id_node_pair.second->attributes<SemanticNodeAttributes>();
-    const auto color = makeColorMsg(attrs.color, config.bounding_box_alpha);
-    fillCornersFromBbox(attrs.bounding_box, corners);
-
-    geometry_msgs::Point node_centroid;
-    tf2::convert(attrs.position, node_centroid);
-    node_centroid.z += getZOffset(config, visualizer_config);
-
-    geometry_msgs::Point center_point;
-    tf2::convert(attrs.position, center_point);
-    center_point.z +=
-        visualizer_config.mesh_edge_break_ratio * getZOffset(config, visualizer_config);
-
-    marker.points.push_back(node_centroid);
-    marker.colors.push_back(color);
-    marker.points.push_back(center_point);
-    marker.colors.push_back(color);
-
-    addEdgesToCorners(corners, center_point, color, marker);
-  }
-
-  return marker;
-}
-
-Marker makeLayerWireframeBoundingBoxes(const std_msgs::Header& header,
-                                       const LayerConfig& config,
-                                       const SceneGraphLayer& layer,
-                                       const VisualizerConfig& visualizer_config,
-                                       const std::string& ns) {
-  Marker marker;
-  marker.header = header;
-  marker.type = Marker::LINE_LIST;
-  marker.action = visualization_msgs::Marker::ADD;
-  marker.id = 0;
-  marker.ns = ns;
-  marker.scale.x = config.bbox_wireframe_scale;
-
-  fillPoseWithIdentity(marker.pose);
-  marker.pose.position.z +=
-      config.collapse_bounding_box ? 0.0 : getZOffset(config, visualizer_config);
-
-  marker.points.reserve(12 * layer.numNodes());
-  marker.colors.reserve(12 * layer.numNodes());
-
-  Eigen::MatrixXf corners(3, 8);
-  for (const auto& id_node_pair : layer.nodes()) {
-    const auto& attrs = id_node_pair.second->attributes<SemanticNodeAttributes>();
-    const auto color = makeColorMsg(attrs.color, config.bounding_box_alpha);
-    fillCornersFromBbox(attrs.bounding_box, corners);
-    addWireframeToMarker(corners, color, marker);
-  }
-
-  return marker;
-}
-
-Marker makeBoundingBoxMarker(const std_msgs::Header& header,
-                             const LayerConfig& config,
-                             const Node& node,
-                             const VisualizerConfig& visualizer_config,
-                             const std::string& ns) {
-  Marker marker;
-  marker.header = header;
-  marker.type = Marker::CUBE;
-  marker.action = Marker::ADD;
-  marker.id = node.id;
-  marker.ns = ns;
-  marker.color = makeColorMsg(node.attributes<SemanticNodeAttributes>().color,
-                              config.bounding_box_alpha);
-
-  BoundingBox bounding_box = node.attributes<SemanticNodeAttributes>().bounding_box;
-
-  Eigen::Quaternionf world_q_center =
-      bounding_box.type == BoundingBox::Type::AABB
-          ? Eigen::Quaternionf::Identity()
-          : Eigen::Quaternionf(bounding_box.world_R_center);
-
-  switch (bounding_box.type) {
-    case BoundingBox::Type::OBB:
-      marker.pose.position =
-          tf2::toMsg(bounding_box.world_P_center.cast<double>().eval());
-      tf2::convert(world_q_center.cast<double>(), marker.pose.orientation);
-      marker.pose.position.z +=
-          config.collapse_bounding_box ? 0.0 : getZOffset(config, visualizer_config);
-      break;
-    case BoundingBox::Type::AABB:
-    case BoundingBox::Type::RAABB:
-      marker.pose.position =
-          tf2::toMsg(bounding_box.world_P_center.cast<double>().eval());
-      tf2::convert(world_q_center.cast<double>(), marker.pose.orientation);
-      marker.pose.position.z +=
-          config.collapse_bounding_box ? 0.0 : getZOffset(config, visualizer_config);
-      break;
-    default:
-      ROS_ERROR("Invalid bounding box encountered!");
-      break;
-  }
-
-  tf2::toMsg((bounding_box.max - bounding_box.min).cast<double>().eval(), marker.scale);
-
-  return marker;
-}
 
 Marker makeTextMarker(const std_msgs::Header& header,
                       const LayerConfig& config,
@@ -332,92 +164,6 @@ Marker makeTextMarkerNoHeight(const std_msgs::Header& header,
 
   return marker;
 }
-
-Marker makeCentroidMarkers(const std_msgs::Header& header,
-                           const LayerConfig& config,
-                           const SceneGraphLayer& layer,
-                           const VisualizerConfig& visualizer_config,
-                           const std::string& ns) {
-  return makeCentroidMarkers(header,
-                             config,
-                             layer,
-                             visualizer_config,
-                             ns,
-                             [&](const SceneGraphNode& node) -> NodeColor {
-                               try {
-                                 return node.attributes<SemanticNodeAttributes>().color;
-                               } catch (const std::bad_cast&) {
-                                 return NodeColor::Zero();
-                               }
-                             });
-}
-
-Marker makeCentroidMarkers(const std_msgs::Header& header,
-                           const LayerConfig& config,
-                           const SceneGraphLayer& layer,
-                           const VisualizerConfig& visualizer_config,
-                           const std::string& ns,
-                           const ColormapConfig& colors) {
-  return makeCentroidMarkers(
-      header, config, layer, visualizer_config, ns, [&](const SceneGraphNode& node) {
-        return getDistanceColor(
-            visualizer_config, colors, node.attributes<PlaceNodeAttributes>().distance);
-      });
-}
-
-Marker makeCentroidMarkers(const std_msgs::Header& header,
-                           const LayerConfig& config,
-                           const SceneGraphLayer& layer,
-                           const VisualizerConfig& visualizer_config,
-                           const std::string& ns,
-                           const ColorFunction& color_func) {
-  Marker marker;
-  marker.header = header;
-  marker.type = config.use_sphere_marker ? Marker::SPHERE_LIST : Marker::CUBE_LIST;
-  marker.action = visualization_msgs::Marker::ADD;
-  marker.id = 0;
-  marker.ns = ns;
-
-  marker.scale.x = config.marker_scale;
-  marker.scale.y = config.marker_scale;
-  marker.scale.z = config.marker_scale;
-
-  fillPoseWithIdentity(marker.pose);
-
-  marker.points.reserve(layer.numNodes());
-  marker.colors.reserve(layer.numNodes());
-  for (const auto& id_node_pair : layer.nodes()) {
-    geometry_msgs::Point node_centroid;
-    tf2::convert(id_node_pair.second->attributes().position, node_centroid);
-    node_centroid.z += getZOffset(config, visualizer_config);
-    marker.points.push_back(node_centroid);
-
-    NodeColor desired_color = color_func(*id_node_pair.second);
-    marker.colors.push_back(makeColorMsg(desired_color, config.marker_alpha));
-  }
-
-  return marker;
-}
-
-namespace {
-
-inline Marker makeNewEdgeList(const std_msgs::Header& header,
-                              const LayerConfig& config,
-                              const std::string& ns_prefix,
-                              LayerId source,
-                              LayerId target) {
-  Marker marker;
-  marker.header = header;
-  marker.type = Marker::LINE_LIST;
-  marker.action = Marker::ADD;
-  marker.id = 0;
-  marker.ns = ns_prefix + std::to_string(source) + "_" + std::to_string(target);
-  marker.scale.x = config.interlayer_edge_scale;
-  fillPoseWithIdentity(marker.pose);
-  return marker;
-}
-
-}  // namespace
 
 bool shouldVisualize(const DynamicSceneGraph& graph,
                      const SceneGraphNode& node,
@@ -585,240 +331,6 @@ MarkerArray makeGraphEdgeMarkers(const std_msgs::Header& header,
   return layer_edges;
 }
 
-Marker makeMeshEdgesMarker(const std_msgs::Header& header,
-                           const LayerConfig& config,
-                           const VisualizerConfig& visualizer_config,
-                           const DynamicSceneGraph& graph,
-                           const SceneGraphLayer& layer,
-                           const std::string& ns) {
-  Marker marker;
-  marker.header = header;
-  marker.type = Marker::LINE_LIST;
-  marker.action = Marker::ADD;
-  marker.id = 0;
-  marker.ns = ns;
-
-  marker.scale.x = config.interlayer_edge_scale;
-  fillPoseWithIdentity(marker.pose);
-
-  for (const auto& id_node_pair : layer.nodes()) {
-    const Node& node = *id_node_pair.second;
-    const auto& attrs = node.attributes<ObjectNodeAttributes>();
-    const auto& mesh_edge_indices = attrs.mesh_connections;
-    if (mesh_edge_indices.empty()) {
-      continue;
-    }
-
-    geometry_msgs::Point center_point;
-    tf2::convert(attrs.position, center_point);
-    center_point.z +=
-        visualizer_config.mesh_edge_break_ratio * getZOffset(config, visualizer_config);
-
-    geometry_msgs::Point centroid_location;
-    tf2::convert(attrs.position, centroid_location);
-    centroid_location.z += getZOffset(config, visualizer_config);
-
-    // make first edge
-    marker.points.push_back(centroid_location);
-    marker.points.push_back(center_point);
-    if (config.interlayer_edge_use_color) {
-      marker.colors.push_back(makeColorMsg(attrs.color, config.interlayer_edge_alpha));
-      marker.colors.push_back(makeColorMsg(attrs.color, config.interlayer_edge_alpha));
-    } else {
-      marker.colors.push_back(
-          makeColorMsg(NodeColor::Zero(), config.interlayer_edge_alpha));
-      marker.colors.push_back(
-          makeColorMsg(NodeColor::Zero(), config.interlayer_edge_alpha));
-    }
-
-    size_t i = 0;
-    for (const auto idx : mesh_edge_indices) {
-      ++i;
-      if ((i - 1) % (config.interlayer_edge_insertion_skip + 1) != 0) {
-        continue;
-      }
-
-      std::optional<Eigen::Vector3d> vertex_pos = graph.getMeshPosition(idx);
-      if (!vertex_pos) {
-        continue;
-      }
-
-      geometry_msgs::Point vertex;
-      tf2::convert(*vertex_pos, vertex);
-      if (!visualizer_config.collapse_layers) {
-        vertex.z += visualizer_config.mesh_layer_offset;
-      }
-
-      marker.points.push_back(center_point);
-      marker.points.push_back(vertex);
-
-      if (config.interlayer_edge_use_color) {
-        marker.colors.push_back(
-            makeColorMsg(attrs.color, config.interlayer_edge_alpha));
-        marker.colors.push_back(
-            makeColorMsg(attrs.color, config.interlayer_edge_alpha));
-      } else {
-        marker.colors.push_back(
-            makeColorMsg(NodeColor::Zero(), config.interlayer_edge_alpha));
-        marker.colors.push_back(
-            makeColorMsg(NodeColor::Zero(), config.interlayer_edge_alpha));
-      }
-    }
-  }
-
-  return marker;
-}
-
-MarkerArray makeGvdWireframe(const std_msgs::Header& header,
-                             const LayerConfig& config,
-                             const VisualizerConfig& visualizer_config,
-                             const SceneGraphLayer& layer,
-                             const std::string& ns,
-                             const ColormapConfig& colors,
-                             size_t marker_id) {
-  return makeGvdWireframe(
-      header,
-      config,
-      layer,
-      ns,
-      [&](const SceneGraphNode& node) {
-        return getDistanceColor(
-            visualizer_config, colors, node.attributes<PlaceNodeAttributes>().distance);
-      },
-      marker_id);
-}
-
-MarkerArray makeGvdWireframe(const std_msgs::Header& header,
-                             const LayerConfig& config,
-                             const SceneGraphLayer& layer,
-                             const std::string& ns,
-                             const ColorFunction& color_func,
-                             size_t marker_id) {
-  MarkerArray marker;
-  {  // scope to make handling stuff a little easier
-    Marker edges;
-    edges.header = header;
-    edges.type = Marker::LINE_LIST;
-    edges.id = marker_id;
-    edges.ns = ns + "_edges";
-    edges.action = Marker::ADD;
-    edges.scale.x = config.intralayer_edge_scale;
-    fillPoseWithIdentity(edges.pose);
-
-    Marker nodes;
-    nodes.header = header;
-    nodes.type = Marker::SPHERE_LIST;
-    nodes.id = marker_id;
-    nodes.ns = ns + "_nodes";
-    nodes.action = Marker::ADD;
-    nodes.scale.x = config.intralayer_edge_scale;
-    nodes.scale.y = config.intralayer_edge_scale;
-    nodes.scale.z = config.intralayer_edge_scale;
-    fillPoseWithIdentity(nodes.pose);
-
-    marker.markers.push_back(nodes);
-    marker.markers.push_back(edges);
-  }
-  auto& nodes = marker.markers[0];
-  auto& edges = marker.markers[1];
-
-  if (layer.nodes().empty()) {
-    marker.markers.clear();
-    return marker;
-  }
-
-  for (const auto& id_node_pair : layer.nodes()) {
-    geometry_msgs::Point node_centroid;
-    tf2::convert(id_node_pair.second->attributes().position, node_centroid);
-    nodes.points.push_back(node_centroid);
-
-    NodeColor desired_color = color_func(*id_node_pair.second);
-    nodes.colors.push_back(makeColorMsg(desired_color, config.marker_alpha));
-  }
-
-  if (layer.edges().empty()) {
-    marker.markers.resize(1);
-    return marker;
-  }
-
-  for (const auto& id_edge_pair : layer.edges()) {
-    // TODO(nathan) filter by node symbol category
-    const auto& edge = id_edge_pair.second;
-    const SceneGraphNode& source_node = layer.getNode(edge.source).value();
-    const SceneGraphNode& target_node = layer.getNode(edge.target).value();
-
-    geometry_msgs::Point source;
-    tf2::convert(source_node.attributes().position, source);
-    edges.points.push_back(source);
-
-    geometry_msgs::Point target;
-    tf2::convert(target_node.attributes().position, target);
-    edges.points.push_back(target);
-
-    edges.colors.push_back(makeColorMsg(color_func(source_node), config.marker_alpha));
-    edges.colors.push_back(makeColorMsg(color_func(target_node), config.marker_alpha));
-  }
-
-  return marker;
-}
-
-Marker makeLayerEdgeMarkers(const std_msgs::Header& header,
-                            const LayerConfig& config,
-                            const SceneGraphLayer& layer,
-                            const VisualizerConfig& visualizer_config,
-                            const NodeColor& color,
-                            const std::string& ns) {
-  return makeLayerEdgeMarkers(
-      header,
-      config,
-      layer,
-      visualizer_config,
-      ns,
-      [&](const SceneGraphNode&, const SceneGraphNode&, bool) { return color; });
-}
-
-Marker makeLayerEdgeMarkers(const std_msgs::Header& header,
-                            const LayerConfig& config,
-                            const SceneGraphLayer& layer,
-                            const VisualizerConfig& visualizer_config,
-                            const std::string& ns,
-                            const EdgeColorFunction& color_func) {
-  Marker marker;
-  marker.header = header;
-  marker.type = Marker::LINE_LIST;
-  marker.id = 0;
-  marker.ns = ns;
-
-  marker.action = Marker::ADD;
-  marker.scale.x = config.intralayer_edge_scale;
-  fillPoseWithIdentity(marker.pose);
-
-  auto edge_iter = layer.edges().begin();
-  while (edge_iter != layer.edges().end()) {
-    const SceneGraphNode& source_node = layer.getNode(edge_iter->second.source).value();
-    const SceneGraphNode& target_node = layer.getNode(edge_iter->second.target).value();
-
-    geometry_msgs::Point source;
-    tf2::convert(source_node.attributes().position, source);
-    source.z += getZOffset(config, visualizer_config);
-    marker.points.push_back(source);
-
-    geometry_msgs::Point target;
-    tf2::convert(target_node.attributes().position, target);
-    target.z += getZOffset(config, visualizer_config);
-    marker.points.push_back(target);
-
-    marker.colors.push_back(makeColorMsg(color_func(source_node, target_node, true),
-                                         config.intralayer_edge_alpha));
-    marker.colors.push_back(makeColorMsg(color_func(source_node, target_node, false),
-                                         config.intralayer_edge_alpha));
-
-    std::advance(edge_iter, config.intralayer_edge_insertion_skip + 1);
-  }
-
-  return marker;
-}
-
 Marker makeDynamicCentroidMarkers(const std_msgs::Header& header,
                                   const DynamicLayerConfig& config,
                                   const DynamicSceneGraphLayer& layer,
@@ -826,14 +338,15 @@ Marker makeDynamicCentroidMarkers(const std_msgs::Header& header,
                                   const NodeColor& color,
                                   const std::string& ns,
                                   size_t marker_id) {
-  return makeDynamicCentroidMarkers(header,
-                                    config,
-                                    layer,
-                                    config.z_offset_scale,
-                                    visualizer_config,
-                                    ns,
-                                    [&](const auto&) -> NodeColor { return color; },
-                                    marker_id);
+  return makeDynamicCentroidMarkers(
+      header,
+      config,
+      layer,
+      config.z_offset_scale,
+      visualizer_config,
+      ns,
+      [&](const auto&) -> NodeColor { return color; },
+      marker_id);
 }
 
 Marker makeDynamicCentroidMarkers(const std_msgs::Header& header,

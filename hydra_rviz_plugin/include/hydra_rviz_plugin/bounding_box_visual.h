@@ -15,7 +15,6 @@ class Quaternion;
 
 namespace rviz {
 
-class PointCloud;
 class BillboardLine;
 
 }  // namespace rviz
@@ -24,30 +23,23 @@ namespace hydra {
 
 struct LayerConfig;
 
-class LayerVisual {
+class BoundingBoxVisual {
  public:
-  LayerVisual(Ogre::SceneManager* const manager, Ogre::SceneNode* const parent);
+  BoundingBoxVisual(Ogre::SceneManager* const manager, Ogre::SceneNode* const parent);
 
-  virtual ~LayerVisual();
+  virtual ~BoundingBoxVisual();
 
   void setMessage(const LayerConfig& config,
-                  const spark_dsg::SceneGraphLayer& msg,
+                  const spark_dsg::SceneGraphLayer& layer,
                   ColorFunctor* const color_callback);
 
   void setPose(const Ogre::Quaternion& rot, const Ogre::Vector3& pos);
-
-  void makeNodes(const LayerConfig& config,
-                 const spark_dsg::SceneGraphLayer& layer,
-                 ColorFunctor* const color_callback);
-
-  void makeEdges(const LayerConfig& config, const spark_dsg::SceneGraphLayer& layer);
 
  private:
   Ogre::SceneManager* const manager_;
   Ogre::SceneNode* node_;
 
-  std::unique_ptr<rviz::PointCloud> graph_nodes_;
-  std::unique_ptr<rviz::BillboardLine> graph_edges_;
+  std::unique_ptr<rviz::BillboardLine> boxes_;
 };
 
 }  // namespace hydra

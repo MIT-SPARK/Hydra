@@ -35,18 +35,11 @@
 #pragma once
 #include "hydra_utils/visualizer_types.h"
 
-#include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
-
 namespace hydra {
 
 using ColorFunction = std::function<NodeColor(const SceneGraphNode&)>;
 using EdgeColorFunction =
     std::function<NodeColor(const SceneGraphNode&, const SceneGraphNode&, bool)>;
-
-visualization_msgs::Marker makeDeleteMarker(const std_msgs::Header& header,
-                                            size_t id,
-                                            const std::string& ns);
 
 visualization_msgs::Marker makeLayerWireframeBoundingBoxes(
     const std_msgs::Header& header,
@@ -82,75 +75,12 @@ visualization_msgs::Marker makeTextMarkerNoHeight(
     const VisualizerConfig& visualizer_config,
     const std::string& ns);
 
-visualization_msgs::Marker makeCentroidMarkers(
-    const std_msgs::Header& header,
-    const LayerConfig& config,
-    const SceneGraphLayer& layer,
-    const VisualizerConfig& visualizer_config,
-    const std::string& ns);
-
-visualization_msgs::Marker makeCentroidMarkers(
-    const std_msgs::Header& header,
-    const LayerConfig& config,
-    const SceneGraphLayer& layer,
-    const VisualizerConfig& visualizer_config,
-    const std::string& ns,
-    const ColormapConfig& colors);
-
-visualization_msgs::Marker makeCentroidMarkers(
-    const std_msgs::Header& header,
-    const LayerConfig& config,
-    const SceneGraphLayer& layer,
-    const VisualizerConfig& visualizer_config,
-    const std::string& ns,
-    const ColorFunction& color_func);
-
 visualization_msgs::MarkerArray makeGraphEdgeMarkers(
     const std_msgs::Header& header,
     const DynamicSceneGraph& scene_graph,
     const std::map<LayerId, LayerConfig>& configs,
     const VisualizerConfig& visualizer_config,
     const std::string& ns);
-
-visualization_msgs::Marker makeMeshEdgesMarker(
-    const std_msgs::Header& header,
-    const LayerConfig& config,
-    const VisualizerConfig& visualizer_config,
-    const DynamicSceneGraph& graph,
-    const SceneGraphLayer& layer,
-    const std::string& ns);
-
-visualization_msgs::MarkerArray makeGvdWireframe(
-    const std_msgs::Header& header,
-    const LayerConfig& config,
-    const VisualizerConfig& visualizer_config,
-    const SceneGraphLayer& layer,
-    const std::string& ns,
-    const ColormapConfig& colors,
-    size_t marker_id = 0);
-
-visualization_msgs::MarkerArray makeGvdWireframe(const std_msgs::Header& header,
-                                                 const LayerConfig& config,
-                                                 const SceneGraphLayer& gvd,
-                                                 const std::string& ns,
-                                                 const ColorFunction& color_func,
-                                                 size_t marker_id = 0);
-
-visualization_msgs::Marker makeLayerEdgeMarkers(
-    const std_msgs::Header& header,
-    const LayerConfig& config,
-    const SceneGraphLayer& layer,
-    const VisualizerConfig& visualizer_config,
-    const NodeColor& color,
-    const std::string& ns);
-
-visualization_msgs::Marker makeLayerEdgeMarkers(
-    const std_msgs::Header& header,
-    const LayerConfig& config,
-    const SceneGraphLayer& layer,
-    const VisualizerConfig& visualizer_config,
-    const std::string& ns,
-    const EdgeColorFunction& color_func);
 
 visualization_msgs::Marker makeDynamicCentroidMarkers(
     const std_msgs::Header& header,

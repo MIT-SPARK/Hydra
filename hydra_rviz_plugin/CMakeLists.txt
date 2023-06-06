@@ -30,7 +30,9 @@ catkin_package(
 # n.b. headers are required for moc to work correctly
 add_library(
   ${PROJECT_NAME}
+  src/bounding_box_visual.cpp
   src/colormap.cpp
+  src/color_functions.cpp
   src/layer_config.cpp
   src/layer_visual.cpp
   include/hydra_rviz_plugin/scene_graph_display.h
