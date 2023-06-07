@@ -37,31 +37,6 @@
 
 namespace hydra {
 
-using ColorFunction = std::function<NodeColor(const SceneGraphNode&)>;
-using EdgeColorFunction =
-    std::function<NodeColor(const SceneGraphNode&, const SceneGraphNode&, bool)>;
-
-visualization_msgs::Marker makeLayerWireframeBoundingBoxes(
-    const std_msgs::Header& header,
-    const LayerConfig& config,
-    const SceneGraphLayer& layer,
-    const VisualizerConfig& visualizer_config,
-    const std::string& ns);
-
-visualization_msgs::Marker makeEdgesToBoundingBoxes(
-    const std_msgs::Header& header,
-    const LayerConfig& config,
-    const SceneGraphLayer& layer,
-    const VisualizerConfig& visualizer_config,
-    const std::string& ns);
-
-visualization_msgs::Marker makeBoundingBoxMarker(
-    const std_msgs::Header& header,
-    const LayerConfig& config,
-    const SceneGraphNode& node,
-    const VisualizerConfig& visualizer_config,
-    const std::string& ns);
-
 visualization_msgs::Marker makeTextMarker(const std_msgs::Header& header,
                                           const LayerConfig& config,
                                           const SceneGraphNode& node,
@@ -72,13 +47,6 @@ visualization_msgs::Marker makeTextMarkerNoHeight(
     const std_msgs::Header& header,
     const LayerConfig& config,
     const SceneGraphNode& node,
-    const VisualizerConfig& visualizer_config,
-    const std::string& ns);
-
-visualization_msgs::MarkerArray makeGraphEdgeMarkers(
-    const std_msgs::Header& header,
-    const DynamicSceneGraph& scene_graph,
-    const std::map<LayerId, LayerConfig>& configs,
     const VisualizerConfig& visualizer_config,
     const std::string& ns);
 

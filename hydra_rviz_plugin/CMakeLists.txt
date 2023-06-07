@@ -34,6 +34,7 @@ add_library(
   src/colormap.cpp
   src/color_functions.cpp
   src/common.cpp
+  src/interlayer_edge_visual.cpp
   src/layer_config.cpp
   src/layer_visual.cpp
   include/hydra_rviz_plugin/scene_graph_display.h

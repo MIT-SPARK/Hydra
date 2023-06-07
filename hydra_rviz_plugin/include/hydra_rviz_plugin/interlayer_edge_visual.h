@@ -1,0 +1,44 @@
+#pragma once
+#include <functional>
+#include <memory>
+
+#include "hydra_rviz_plugin/common.h"
+
+namespace Ogre {
+
+class SceneManager;
+class SceneNode;
+
+}  // namespace Ogre
+
+namespace rviz {
+
+class BillboardLine;
+
+}  // namespace rviz
+
+namespace hydra {
+
+struct LayerConfig;
+
+class InterlayerEdgeVisual {
+ public:
+  InterlayerEdgeVisual(Ogre::SceneManager* const manager,
+                       Ogre::SceneNode* const parent);
+
+  virtual ~InterlayerEdgeVisual();
+
+  void setMessage(const LayerConfig& config,
+                  const spark_dsg::SceneGraphLayer& layer,
+                  ColorFunctor* const color_callback);
+
+  void setPose(const Pose& pose);
+
+ private:
+  Ogre::SceneManager* const manager_;
+  Ogre::SceneNode* node_;
+
+  std::unique_ptr<rviz::BillboardLine> edges_;
+};
+
+}  // namespace hydra
