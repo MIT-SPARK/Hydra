@@ -34,6 +34,8 @@ add_library(
   src/colormap.cpp
   src/color_functions.cpp
   src/common.cpp
+  src/dynamic_layer_config.cpp
+  src/dynamic_layer_visual.cpp
   src/edge_config.cpp
   src/interlayer_edge_visual.cpp
   src/layer_config.cpp

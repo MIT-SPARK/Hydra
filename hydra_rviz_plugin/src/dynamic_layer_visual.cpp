@@ -1,4 +1,4 @@
-#include "hydra_rviz_plugin/layer_visual.h"
+#include "hydra_rviz_plugin/dynamic_layer_visual.h"
 
 #include <OGRE/OgreSceneManager.h>
 #include <OGRE/OgreSceneNode.h>
@@ -6,10 +6,11 @@
 #include <rviz/ogre_helpers/point_cloud.h>
 #include <spark_dsg/dynamic_scene_graph.h>
 
-#include "hydra_rviz_plugin/layer_config.h"
+#include "hydra_rviz_plugin/dynamic_layer_config.h"
 
 namespace hydra {
 
+using spark_dsg::DynamicSceneGraphLayer;
 using spark_dsg::SceneGraphNode;
 
 namespace {
@@ -21,22 +22,22 @@ inline Ogre::Vector3 eigen_to_ogre(const Eigen::Vector3d& v) {
 
 }  // namespace
 
-LayerVisual::LayerVisual(Ogre::SceneManager* const manager,
-                         Ogre::SceneNode* const parent)
+DynamicLayerVisual::DynamicLayerVisual(Ogre::SceneManager* const manager,
+                                       Ogre::SceneNode* const parent)
     : manager_(manager) {
   node_ = parent->createChildSceneNode();
 }
 
-LayerVisual::~LayerVisual() { manager_->destroySceneNode(node_); }
+DynamicLayerVisual::~DynamicLayerVisual() { manager_->destroySceneNode(node_); }
 
-void LayerVisual::setPose(const Pose& pose) {
+void DynamicLayerVisual::setPose(const Pose& pose) {
   node_->setPosition(pose.pos);
   node_->setOrientation(pose.rot);
 }
 
-void LayerVisual::makeNodes(const LayerConfig& config,
-                            const spark_dsg::SceneGraphLayer& layer,
-                            ColorFunctor* const color_callback) {
+void DynamicLayerVisual::makeNodes(const DynamicLayerConfig& config,
+                                   const DynamicSceneGraphLayer& layer,
+                                   ColorFunctor* const color_callback) {
   if (!graph_nodes_) {
     graph_nodes_ = std::make_unique<rviz::PointCloud>();
     node_->attachObject(graph_nodes_.get());
@@ -51,15 +52,19 @@ void LayerVisual::makeNodes(const LayerConfig& config,
   std::vector<rviz::PointCloud::Point> points(layer.numNodes());
 
   size_t point_index = 0;
-  for (const auto& id_node_pair : layer.nodes()) {
-    const auto& attrs = id_node_pair.second->attributes();
+  for (const auto& node : layer.nodes()) {
+    if (!node) {
+      continue;
+    }
+
+    const auto& attrs = node->attributes();
     auto& point = points[point_index];
     point.position.x = attrs.position.x();
     point.position.y = attrs.position.y();
     point.position.z = attrs.position.z();
 
     if (color_callback) {
-      color_callback->call(*id_node_pair.second, point.color);
+      color_callback->call(*node, point.color);
     } else {
       point.color.r = 0.0f;
       point.color.g = 0.0f;
@@ -72,8 +77,8 @@ void LayerVisual::makeNodes(const LayerConfig& config,
   graph_nodes_->addPoints(&points.front(), points.size());
 }
 
-void LayerVisual::makeEdges(const LayerConfig& config,
-                            const spark_dsg::SceneGraphLayer& layer) {
+void DynamicLayerVisual::makeEdges(const DynamicLayerConfig& config,
+                                   const DynamicSceneGraphLayer& layer) {
   if (!graph_edges_) {
     graph_edges_ = std::make_unique<rviz::BillboardLine>(manager_, node_);
   }
@@ -111,9 +116,9 @@ void LayerVisual::makeEdges(const LayerConfig& config,
   }
 }
 
-void LayerVisual::setMessage(const LayerConfig& config,
-                             const spark_dsg::SceneGraphLayer& layer,
-                             ColorFunctor* const color_callback) {
+void DynamicLayerVisual::setMessage(const DynamicLayerConfig& config,
+                                    const DynamicSceneGraphLayer& layer,
+                                    ColorFunctor* const color_callback) {
   node_->setVisible(true);
   makeNodes(config, layer, color_callback);
   makeEdges(config, layer);

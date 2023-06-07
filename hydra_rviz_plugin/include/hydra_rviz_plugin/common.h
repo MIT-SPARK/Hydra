@@ -10,6 +10,7 @@
 namespace spark_dsg {
 
 class SceneGraphLayer;
+class DynamicSceneGraphLayer;
 
 }  // namespace spark_dsg
 
