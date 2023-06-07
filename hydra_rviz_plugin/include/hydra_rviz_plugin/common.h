@@ -1,4 +1,5 @@
 #pragma once
+#include <OGRE/OgreColourValue.h>
 #include <OGRE/OgreQuaternion.h>
 #include <OGRE/OgreSphere.h>
 #include <spark_dsg/scene_graph_node.h>
@@ -14,14 +15,16 @@ class SceneGraphLayer;
 
 namespace hydra {
 
+using spark_dsg::LayerId;
+
 struct ColorFunctor {
   using Ptr = std::unique_ptr<ColorFunctor>;
 
   virtual void call(const spark_dsg::SceneGraphNode& node,
-                    std::array<float, 3>& color) = 0;
+                    Ogre::ColourValue& color) = 0;
 
   inline void operator()(const spark_dsg::SceneGraphNode& node,
-                         std::array<float, 3>& color) {
+                         Ogre::ColourValue& color) {
     call(node, color);
   }
 };
@@ -44,5 +47,18 @@ struct Pose {
   Ogre::Quaternion rot;
   Ogre::Vector3 pos;
 };
+
+struct LayerPair {
+  LayerPair(LayerId layer1, LayerId layer2);
+
+  bool operator==(const LayerPair& other) const;
+
+  bool operator<(const LayerPair& other) const;
+
+  LayerId child;
+  LayerId parent;
+};
+
+std::ostream& operator<<(std::ostream& out, const LayerPair& pair);
 
 }  // namespace hydra

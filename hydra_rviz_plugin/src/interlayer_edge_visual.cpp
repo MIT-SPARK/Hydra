@@ -6,41 +6,24 @@
 #include <rviz/ogre_helpers/billboard_line.h>
 #include <spark_dsg/dynamic_scene_graph.h>
 
+#include "hydra_rviz_plugin/edge_config.h"
 #include "hydra_rviz_plugin/layer_config.h"
+#include "hydra_rviz_plugin/scene_graph_display.h"
 
 namespace hydra {
 
 using spark_dsg::DynamicSceneGraph;
 using spark_dsg::SceneGraphNode;
 
-struct Edge {
-  Ogre::Vector3 start;
-  Ogre::Vector3 end;
-  Ogre::ColourValue color;
-  std::optional<Ogre::ColourValue> end_color;
-};
-
-struct EdgeContainer {
-  std::map<LayerId, std::map<LayerId, std::vector<Edge>>> edges;
-};
+using ContainerMap = std::map<LayerId, LayerContainer>;
+using EdgeConfigMap = std::map<LayerPair, EdgeConfig>;
+using EdgeContainer = std::map<LayerPair, std::vector<Edge>>;
 
 namespace {
 
-inline Ogre::Vector3 eigen_to_ogre(const Eigen::Vector3f& v) {
-  return {v.x(), v.y(), v.z()};
-}
-
-inline void pushSegment(rviz::BillboardLine& line,
-                        const Ogre::Vector3 start,
-                        const Ogre::Vector3& end,
-                        const Ogre::ColourValue& color,
-                        bool& is_first) {
-  if (!is_first) {
-    line.newLine();
-  }
-  is_first = false;
-  line.addPoint(start, color);
-  line.addPoint(end, color);
+inline Ogre::Vector3 eigen_to_ogre(const Eigen::Vector3d& v) {
+  const Eigen::Vector3f v_f = v.cast<float>();
+  return {v_f.x(), v_f.y(), v_f.z()};
 }
 
 }  // namespace
@@ -58,90 +41,110 @@ void InterlayerEdgeVisual::setPose(const Pose& pose) {
   node_->setOrientation(pose.rot);
 }
 
-void InterlayerEdgeVisual::makeEdges(LayerId source,
-                                     LayerId target,
-                                     const std::vector<Edge>& edges) {
-  if (!edges_) {
-    edges_ = std::make_unique<rviz::BillboardLine>(manager_, node_);
-  }
+void InterlayerEdgeVisual::fillEdgeContainers(const DynamicSceneGraph& graph,
+                                              const ContainerMap& layers,
+                                              const EdgeConfigMap& configs,
+                                              EdgeContainer& edges) {
+  std::map<LayerPair, size_t> num_since_last_insertion;
+  for (const auto& edge : graph.interlayer_edges()) {
+    const auto& source = graph.getNode(edge.second.source)->get();
+    const auto& target = graph.getNode(edge.second.target)->get();
+    const LayerPair layer_pair(source.layer, target.layer);
+    const auto& parent_layer = layers.at(layer_pair.parent);
+    const auto& child_layer = layers.at(layer_pair.child);
 
-  edges_->setColor(0, 0, 0, 1);
-  edges_->clear();
+    auto citer = configs.find(layer_pair);
+    if (citer == configs.end()) {
+      continue;
+    }
+    const auto& config = citer->second;
 
-  if (!layer.numNodes()) {
-    return;
-  }
-
-  edges_->setLineWidth(config.bounding_box_scale);
-  edges_->setMaxPointsPerLine(2);
-  edges_->setNumLines(edges.size());
-
-  auto iter = edges.begin();
-  while (iter != edges.end()) {
-    if (iter != edges.begin()) {
-      edges_->newLine();
+    if (!parent_layer.config.visualize && !child_layer.config.visualize) {
+      continue;
     }
 
-    edges_->addPoint(iter->start, iter->color);
-    edges_->addPoint(iter->end, iter->end_color.value_or(iter->color));
+    size_t num_between_insertions = configs.at(layer_pair).insertion_skip;
+
+    auto iter = edges.find(layer_pair);
+    if (iter == edges.end()) {
+      iter = edges.emplace(layer_pair, std::vector<Edge>()).first;
+      num_since_last_insertion[layer_pair] = num_between_insertions;
+    }
+
+    if (num_since_last_insertion[layer_pair] >= num_between_insertions) {
+      num_since_last_insertion[layer_pair] = 0;
+    } else {
+      num_since_last_insertion[layer_pair]++;
+      continue;
+    }
+
+    Edge new_edge;
+    new_edge.start = eigen_to_ogre(source.attributes().position);
+    new_edge.end = eigen_to_ogre(target.attributes().position);
+    switch (config.color_mode) {
+      case EdgeConfig::ColorMode::PARENT:
+        break;
+      case EdgeConfig::ColorMode::CHILD:
+        break;
+      case EdgeConfig::ColorMode::NONE:
+      default:
+        new_edge.color.r = 0.0;
+        new_edge.color.g = 0.0;
+        new_edge.color.b = 0.0;
+        new_edge.color.a = config.edge_alpha;
+        break;
+    }
+  }
+}
+
+void InterlayerEdgeVisual::resetEdges(const EdgeContainer& edges) {
+  auto iter = edges_.begin();
+  while (iter != edges_.end()) {
+    if (!edges.count(iter->first)) {
+      iter = edges_.erase(iter);
+    }
     ++iter;
   }
 }
 
-void InterlayerEdgeVisual::setMessage(const LayerConfig& config,
-                                      const spark_dsg::SceneGraphLayer& layer,
-                                      ColorFunctor* const color_callback) {
-  node_->setVisible(true);
+void InterlayerEdgeVisual::makeEdges(const std::vector<Edge>& edges,
+                                     const EdgeConfig& config,
+                                     rviz::BillboardLine& edge_visual) {
+  edge_visual.setColor(0, 0, 0, config.edge_alpha);
+  edge_visual.clear();
+  edge_visual.setLineWidth(config.edge_scale);
+  edge_visual.setMaxPointsPerLine(2);
+  edge_visual.setNumLines(edges.size());
 
-  EdgeContainer edges;
-  fillEdgeContainers(graph, ..., edges);
-
-  for (auto&& [source, targets] : edges) {
-    for (auto&& [target, target_edges] : targets) {
+  auto iter = edges.begin();
+  while (iter != edges.end()) {
+    if (iter != edges.begin()) {
+      edge_visual.newLine();
     }
+
+    edge_visual.addPoint(iter->start, iter->color);
+    edge_visual.addPoint(iter->end, iter->end_color.value_or(iter->color));
+    ++iter;
   }
 }
 
-void InterlayerEdgeVisual::fillEdgeContainers(const DynamicSceneGraph& graph,
-                                              EdgeContainer& edges) {
-  for (const auto& edge : graph.interlayer_edges()) {
-    const auto& source = graph.getNode(edge.second.source)->get();
-    const auto& target = graph.getNode(edge.second.target)->get();
+void InterlayerEdgeVisual::setMessage(const spark_dsg::DynamicSceneGraph& graph,
+                                      const std::map<LayerId, LayerContainer>& layers,
+                                      const std::map<LayerPair, EdgeConfig>& configs) {
+  node_->setVisible(true);
 
-    if (!configs.count(source.layer) || !configs.count(target.layer)) {
-      continue;
+  EdgeContainer edges;
+  fillEdgeContainers(graph, layers, configs, edges);
+
+  for (auto&& [layer_pair, edge_list] : edges) {
+    auto iter = edges_.find(layer_pair);
+    if (iter == edges_.end()) {
+      auto visual = std::make_unique<rviz::BillboardLine>(manager_, node_);
+      iter = edges_.emplace(layer_pair, std::move(visual)).first;
     }
 
-    if (!configs.at(source.layer).visualize) {
-      continue;
-    }
-
-    if (!configs.at(target.layer).visualize) {
-      continue;
-    }
-
-    size_t num_between_insertions =
-        configs.at(source.layer).interlayer_edge_insertion_skip;
-
-    // parent is always source
-    if (layer_markers.count(source.layer) == 0) {
-      layer_markers[source.layer] = makeNewEdgeList(
-          header, configs.at(source.layer), ns_prefix, source.layer, target.layer);
-      // make sure we always draw at least one edge
-      num_since_last_insertion[source.layer] = num_between_insertions;
-    }
-
-    if (num_since_last_insertion[source.layer] >= num_between_insertions) {
-      num_since_last_insertion[source.layer] = 0;
-    } else {
-      num_since_last_insertion[source.layer]++;
-      continue;
-    }
-
-    Edge edge;
-    edge.start = source.attributes().position;
-    edge.end = target.attributes().position;
-    // TODO(nathan): color
+    auto& edge_visual = *iter->second;
+    makeEdges(edge_list, configs.at(layer_pair), edge_visual);
   }
 }
 

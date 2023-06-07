@@ -60,10 +60,13 @@ void LayerVisual::makeNodes(const LayerConfig& config,
     point.position.z = attrs.position.z();
 
     if (color_callback) {
-      color_callback->call(*id_node_pair.second, color);
+      color_callback->call(*id_node_pair.second, point.color);
+    } else {
+      point.color.r = 0.0f;
+      point.color.g = 0.0f;
+      point.color.b = 0.0f;
     }
-
-    point.setColor(color[0], color[1], color[2], config.node_alpha);
+    point.color.a = config.node_alpha;
     ++point_index;
   }
 

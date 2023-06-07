@@ -75,15 +75,11 @@ void BoundingBoxVisual::setMessage(const LayerConfig& config,
 
   bool is_first_line = true;
   std::vector<Ogre::Vector3> corners(8);
-  std::array<float, 3> rgb_color{0.0f, 0.0f, 0.0f};
   for (const auto& id_node_pair : layer.nodes()) {
     const auto& attrs = id_node_pair.second->attributes<SemanticNodeAttributes>();
     if (color_callback) {
-      color_callback->call(*id_node_pair.second, rgb_color);
+      color_callback->call(*id_node_pair.second, color);
     }
-    color.r = rgb_color[0];
-    color.g = rgb_color[1];
-    color.b = rgb_color[2];
 
     const auto& bbox = attrs.bounding_box;
     const Eigen::Vector3f dims = bbox.max - bbox.min;

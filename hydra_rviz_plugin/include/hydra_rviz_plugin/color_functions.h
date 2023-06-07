@@ -10,7 +10,7 @@ struct ColormapFunctor : public ColorFunctor {
   ColormapFunctor(const Colormap& colormap, bool use_label);
 
   virtual void call(const spark_dsg::SceneGraphNode& node,
-                    std::array<float, 3>& color) override;
+                    Ogre::ColourValue& color) override;
 
   Colormap colormap_;
   bool use_label_;
@@ -22,7 +22,7 @@ struct ParentColorFunctor : public ColorFunctor {
                      bool use_label);
 
   virtual void call(const spark_dsg::SceneGraphNode& node,
-                    std::array<float, 3>& color) override;
+                    Ogre::ColourValue& color) override;
 
   ColormapFunctor functor_;
   spark_dsg::DynamicSceneGraph::Ptr graph_;
@@ -32,7 +32,7 @@ struct SingleColorFunctor : public ColorFunctor {
   explicit SingleColorFunctor(const std::array<float, 3>& color);
 
   virtual void call(const spark_dsg::SceneGraphNode& node,
-                    std::array<float, 3>& color) override;
+                    Ogre::ColourValue& color) override;
 
   std::array<float, 3> color_;
 };
