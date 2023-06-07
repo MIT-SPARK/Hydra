@@ -50,7 +50,8 @@ void BoundingBoxVisual::setPose(const Pose& pose) {
 
 void BoundingBoxVisual::setMessage(const LayerConfig& config,
                                    const spark_dsg::SceneGraphLayer& layer,
-                                   ColorFunctor* const color_callback) {
+                                   ColorFunctor* const color_callback,
+                                   const Pose& offset) {
   node_->setVisible(true);
   if (!boxes_) {
     boxes_ = std::make_unique<rviz::BillboardLine>(manager_, node_);
@@ -65,7 +66,12 @@ void BoundingBoxVisual::setMessage(const LayerConfig& config,
 
   boxes_->setLineWidth(config.bounding_box_scale);
   boxes_->setMaxPointsPerLine(2);
-  boxes_->setNumLines(12 * layer.numNodes());
+
+  if (config.collapse_bounding_box) {
+    boxes_->setNumLines(17 * layer.numNodes());
+  } else {
+    boxes_->setNumLines(12 * layer.numNodes());
+  }
 
   Ogre::ColourValue color;
   color.r = 0;
@@ -113,6 +119,18 @@ void BoundingBoxVisual::setMessage(const LayerConfig& config,
         pushSegment(*boxes_, corners[c], corners[z_neighbor], color, is_first_line);
       }
     }
+
+    if (!config.collapse_bounding_box) {
+      continue;
+    }
+
+    auto node_pos = eigen_to_ogre(attrs.position.cast<float>()) + offset.pos;
+    auto centroid = (corners[4] + corners[5] + corners[6] + corners[7]) / 4.0f;
+    pushSegment(*boxes_, centroid, corners[4], color, is_first_line);
+    pushSegment(*boxes_, centroid, corners[5], color, is_first_line);
+    pushSegment(*boxes_, centroid, corners[6], color, is_first_line);
+    pushSegment(*boxes_, centroid, corners[7], color, is_first_line);
+    pushSegment(*boxes_, centroid, node_pos, color, is_first_line);
   }
 }
 

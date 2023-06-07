@@ -105,7 +105,7 @@ void SceneGraphDisplay::readDefaults() {
       EdgeConfig config;
       parseEdgeConfig(ec, config);
       default_edge_configs_[layer_pair] = config;
-      ROS_WARN_STREAM("parsed edge config " << layer_pair << ": " << config);
+      ROS_DEBUG_STREAM("parsed edge config " << layer_pair << ": " << config);
     }
   }
 }
@@ -247,7 +247,8 @@ void SceneGraphDisplay::updateLayerVisuals() {
     if (layer.config.use_bounding_box && layer.bbox_visual) {
       layer.bbox_visual->setMessage(layer.config,
                                     graph_->getLayer(id_layer_pair.first),
-                                    layer.node_color_callback.get());
+                                    layer.node_color_callback.get(),
+                                    layer.offset);
     }
   }
 }

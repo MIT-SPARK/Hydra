@@ -29,7 +29,8 @@ class BoundingBoxVisual {
 
   void setMessage(const LayerConfig& config,
                   const spark_dsg::SceneGraphLayer& layer,
-                  ColorFunctor* const color_callback);
+                  ColorFunctor* const color_callback,
+                  const Pose& offset);
 
   void setPose(const Pose& pose);
 
