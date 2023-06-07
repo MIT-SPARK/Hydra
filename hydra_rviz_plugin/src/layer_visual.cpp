@@ -29,9 +29,9 @@ LayerVisual::LayerVisual(Ogre::SceneManager* const manager,
 
 LayerVisual::~LayerVisual() { manager_->destroySceneNode(node_); }
 
-void LayerVisual::setPose(const Ogre::Quaternion& rot, const Ogre::Vector3& pos) {
-  node_->setPosition(pos);
-  node_->setOrientation(rot);
+void LayerVisual::setPose(const Pose& pose) {
+  node_->setPosition(pose.pos);
+  node_->setOrientation(pose.rot);
 }
 
 void LayerVisual::makeNodes(const LayerConfig& config,

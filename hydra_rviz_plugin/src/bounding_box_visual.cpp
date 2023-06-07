@@ -43,9 +43,9 @@ BoundingBoxVisual::BoundingBoxVisual(Ogre::SceneManager* const manager,
 
 BoundingBoxVisual::~BoundingBoxVisual() { manager_->destroySceneNode(node_); }
 
-void BoundingBoxVisual::setPose(const Ogre::Quaternion& rot, const Ogre::Vector3& pos) {
-  node_->setPosition(pos);
-  node_->setOrientation(rot);
+void BoundingBoxVisual::setPose(const Pose& pose) {
+  node_->setPosition(pose.pos);
+  node_->setOrientation(pose.rot);
 }
 
 void BoundingBoxVisual::setMessage(const LayerConfig& config,

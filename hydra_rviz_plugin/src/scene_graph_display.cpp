@@ -16,13 +16,6 @@ namespace hydra {
 using spark_dsg::NodeSymbol;
 using spark_dsg::SceneGraphNode;
 
-struct Pose {
-  Pose(const Ogre::Quaternion& rot, const Ogre::Vector3& pos) : rot(rot), pos(pos) {}
-
-  Ogre::Quaternion rot;
-  Ogre::Vector3 pos;
-};
-
 SceneGraphDisplay::SceneGraphDisplay() {
   collapse_layers_ =
       std::make_unique<rviz::BoolProperty>("Collapse Layers",
@@ -125,17 +118,20 @@ void SceneGraphDisplay::setLayerPoses() {
     return;
   }
 
+  const bool collapse_layers = collapse_layers_->getBool();
+  const float layer_height = layer_height_->getFloat();
+
   for (auto& id_layer_pair : layers_) {
     auto& layer = id_layer_pair.second;
 
-    Ogre::Vector3 layer_pos(
-        0.0f,
-        0.0f,
-        collapse_layers_->getBool()
-            ? 0.0
-            : layer.config.offset_scale * layer_height_->getFloat());
-    layer_pos = last_pose_->rot * layer_pos + last_pose_->pos;
-    layer.visual->setPose(last_pose_->rot, layer_pos);
+    if (collapse_layers) {
+      layer.pose = *last_pose_;
+    } else {
+      const auto offset = Pose::ZOffset(layer.config.offset_scale * layer_height);
+      layer.pose = (*last_pose_) * offset;
+    }
+
+    layer.visual->setPose(layer.pose);
 
     if (!layer.config.use_bounding_box) {
       layer.bbox_visual.reset();
@@ -147,9 +143,8 @@ void SceneGraphDisplay::setLayerPoses() {
           std::make_unique<BoundingBoxVisual>(context_->getSceneManager(), scene_node_);
     }
 
-    layer.bbox_visual->setPose(
-        last_pose_->rot,
-        layer.config.collapse_bounding_box ? last_pose_->pos : layer_pos);
+    layer.bbox_visual->setPose(layer.config.collapse_bounding_box ? *last_pose_
+                                                                  : layer.pose);
   }
 }
 

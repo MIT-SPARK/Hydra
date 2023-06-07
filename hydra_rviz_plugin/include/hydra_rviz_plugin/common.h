@@ -1,4 +1,6 @@
 #pragma once
+#include <OGRE/OgreQuaternion.h>
+#include <OGRE/OgreSphere.h>
 #include <spark_dsg/scene_graph_node.h>
 
 #include <functional>
@@ -22,6 +24,25 @@ struct ColorFunctor {
                          std::array<float, 3>& color) {
     call(node, color);
   }
+};
+
+struct Pose {
+  Pose(const Ogre::Quaternion& rot, const Ogre::Vector3& pos);
+
+  Pose(const Ogre::Vector3& pos);
+
+  Pose();
+
+  static Pose XOffset(float offset);
+
+  static Pose YOffset(float offset);
+
+  static Pose ZOffset(float offset);
+
+  Pose operator*(const Pose& rhs);
+
+  Ogre::Quaternion rot;
+  Ogre::Vector3 pos;
 };
 
 }  // namespace hydra

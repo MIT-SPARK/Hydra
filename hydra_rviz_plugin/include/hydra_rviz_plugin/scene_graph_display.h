@@ -27,6 +27,7 @@ struct LayerContainer {
   std::unique_ptr<BoundingBoxVisual> bbox_visual;
   LayerConfig config;
   ColorFunctor::Ptr node_color_callback;
+  Pose pose;
 };
 
 class SceneGraphDisplay : public rviz::MessageFilterDisplay<hydra_msgs::DsgUpdate> {

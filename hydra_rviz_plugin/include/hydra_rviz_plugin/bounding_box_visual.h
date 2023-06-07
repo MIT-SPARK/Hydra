@@ -8,8 +8,6 @@ namespace Ogre {
 
 class SceneManager;
 class SceneNode;
-class Vector3;
-class Quaternion;
 
 }  // namespace Ogre
 
@@ -33,7 +31,7 @@ class BoundingBoxVisual {
                   const spark_dsg::SceneGraphLayer& layer,
                   ColorFunctor* const color_callback);
 
-  void setPose(const Ogre::Quaternion& rot, const Ogre::Vector3& pos);
+  void setPose(const Pose& pose);
 
  private:
   Ogre::SceneManager* const manager_;
