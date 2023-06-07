@@ -18,7 +18,8 @@ namespace hydra {
 
 class LayerVisual;
 class BoundingBoxVisual;
-struct Pose;
+class InterlayerEdgeVisual;
+struct EdgeConfig;
 
 struct LayerContainer {
   LayerContainer() = default;
@@ -28,6 +29,7 @@ struct LayerContainer {
   LayerConfig config;
   ColorFunctor::Ptr node_color_callback;
   Pose pose;
+  Pose offset;
 };
 
 class SceneGraphDisplay : public rviz::MessageFilterDisplay<hydra_msgs::DsgUpdate> {
@@ -48,6 +50,10 @@ class SceneGraphDisplay : public rviz::MessageFilterDisplay<hydra_msgs::DsgUpdat
  private:
   void processMessage(const hydra_msgs::DsgUpdate::ConstPtr& msg);
 
+  bool readGraph(const hydra_msgs::DsgUpdate::ConstPtr& msg);
+
+  bool readPose(const hydra_msgs::DsgUpdate::ConstPtr& msg);
+
   void initLayers();
 
   void assignColorFunctions();
@@ -56,9 +62,17 @@ class SceneGraphDisplay : public rviz::MessageFilterDisplay<hydra_msgs::DsgUpdat
 
   void setLayerPoses();
 
+  void updateLayerVisuals();
+
+  void updateInterlayerEdgeVisual();
+
   spark_dsg::DynamicSceneGraph::Ptr graph_;
   std::map<spark_dsg::LayerId, LayerConfig> default_configs_;
   std::map<spark_dsg::LayerId, LayerContainer> layers_;
+
+  std::unique_ptr<InterlayerEdgeVisual> interlayer_edges_;
+  std::map<LayerPair, EdgeConfig> default_edge_configs_;
+  std::map<LayerPair, EdgeConfig> edge_configs_;
 
   std::unique_ptr<rviz::BoolProperty> collapse_layers_;
   std::unique_ptr<rviz::FloatProperty> layer_height_;

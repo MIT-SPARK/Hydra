@@ -4,10 +4,27 @@
 
 namespace hydra {
 
+std::ostream& operator<<(std::ostream& out, EdgeConfig::ColorMode mode) {
+  switch (mode) {
+    case EdgeConfig::ColorMode::PARENT:
+      out << "PARENT";
+      break;
+    case EdgeConfig::ColorMode::CHILD:
+      out << "CHILD";
+      break;
+    case EdgeConfig::ColorMode::NONE:
+    default:
+      out << "NONE";
+      break;
+  }
+  return out;
+}
+
 std::ostream& operator<<(std::ostream& out, const EdgeConfig& conf) {
   out << std::boolalpha << "{insertion_skip: " << conf.insertion_skip
       << ", visualize: " << conf.visualize << ", edge_scale: " << conf.edge_scale
-      << ", edge_alpha: " << conf.edge_alpha << "}";
+      << ", edge_alpha: " << conf.edge_alpha << ", color_mode: " << conf.color_mode
+      << "}";
   return out;
 }
 

@@ -9,6 +9,8 @@
 #include "hydra_rviz_plugin/bounding_box_visual.h"
 #include "hydra_rviz_plugin/color_functions.h"
 #include "hydra_rviz_plugin/colormap.h"
+#include "hydra_rviz_plugin/edge_config.h"
+#include "hydra_rviz_plugin/interlayer_edge_visual.h"
 #include "hydra_rviz_plugin/layer_visual.h"
 
 namespace hydra {
@@ -43,6 +45,43 @@ void SceneGraphDisplay::onInitialize() {
   }                                                             \
   static_assert(true, "")
 
+void parseLayerConfig(const YAML::Node& node, LayerConfig& config) {
+  PARSE_FIELD(node, config, offset_scale);
+  PARSE_FIELD(node, config, visualize);
+  PARSE_FIELD(node, config, node_scale);
+  PARSE_FIELD(node, config, node_alpha);
+  PARSE_FIELD(node, config, use_spheres);
+  PARSE_FIELD(node, config, use_label);
+  PARSE_FIELD(node, config, label_height_ratio);
+  PARSE_FIELD(node, config, label_scale);
+  PARSE_FIELD(node, config, use_bounding_box);
+  PARSE_FIELD(node, config, collapse_bounding_box);
+  PARSE_FIELD(node, config, bounding_box_scale);
+  PARSE_FIELD(node, config, bounding_box_alpha);
+  PARSE_FIELD(node, config, edge_scale);
+  PARSE_FIELD(node, config, edge_alpha);
+  PARSE_FIELD(node, config, label_colormap);
+
+  std::string color_mode = "none";
+  if (node["color_mode"]) {
+    color_mode = node["color_mode"].as<std::string>();
+  }
+  config.color_mode = stringToColorMode(color_mode);
+}
+
+void parseEdgeConfig(const YAML::Node& node, EdgeConfig& config) {
+  PARSE_FIELD(node, config, insertion_skip);
+  PARSE_FIELD(node, config, visualize);
+  PARSE_FIELD(node, config, edge_scale);
+  PARSE_FIELD(node, config, edge_alpha);
+
+  std::string color_mode = "none";
+  if (node["color_mode"]) {
+    color_mode = node["color_mode"].as<std::string>();
+  }
+  config.color_mode = stringToEdgeColorMode(color_mode);
+}
+
 void SceneGraphDisplay::readDefaults() {
   std::string default_file =
       ros::package::getPath("hydra_rviz_plugin") + "/config/defaults.yaml";
@@ -51,29 +90,22 @@ void SceneGraphDisplay::readDefaults() {
     for (const auto& lc : node["layers"]) {
       const auto id = lc["id"].as<spark_dsg::LayerId>();
       LayerConfig config;
-      PARSE_FIELD(lc, config, offset_scale);
-      PARSE_FIELD(lc, config, visualize);
-      PARSE_FIELD(lc, config, node_scale);
-      PARSE_FIELD(lc, config, node_alpha);
-      PARSE_FIELD(lc, config, use_spheres);
-      PARSE_FIELD(lc, config, use_label);
-      PARSE_FIELD(lc, config, label_height_ratio);
-      PARSE_FIELD(lc, config, label_scale);
-      PARSE_FIELD(lc, config, use_bounding_box);
-      PARSE_FIELD(lc, config, collapse_bounding_box);
-      PARSE_FIELD(lc, config, bounding_box_scale);
-      PARSE_FIELD(lc, config, bounding_box_alpha);
-      PARSE_FIELD(lc, config, edge_scale);
-      PARSE_FIELD(lc, config, edge_alpha);
-      PARSE_FIELD(lc, config, label_colormap);
-
-      std::string color_mode = "none";
-      if (lc["color_mode"]) {
-        color_mode = lc["color_mode"].as<std::string>();
-      }
-      config.color_mode = stringToColorMode(color_mode);
+      parseLayerConfig(lc, config);
       default_configs_[id] = config;
       ROS_DEBUG_STREAM("parsed layer " << id << ": " << config);
+    }
+  }
+
+  if (node["edges"]) {
+    for (const auto& ec : node["edges"]) {
+      const auto from = ec["from"].as<spark_dsg::LayerId>();
+      const auto to = ec["to"].as<spark_dsg::LayerId>();
+      const LayerPair layer_pair(from, to);
+
+      EdgeConfig config;
+      parseEdgeConfig(ec, config);
+      default_edge_configs_[layer_pair] = config;
+      ROS_WARN_STREAM("parsed edge config " << layer_pair << ": " << config);
     }
   }
 }
@@ -125,10 +157,11 @@ void SceneGraphDisplay::setLayerPoses() {
     auto& layer = id_layer_pair.second;
 
     if (collapse_layers) {
+      layer.offset = Pose();
       layer.pose = *last_pose_;
     } else {
-      const auto offset = Pose::ZOffset(layer.config.offset_scale * layer_height);
-      layer.pose = (*last_pose_) * offset;
+      layer.offset = Pose::ZOffset(layer.config.offset_scale * layer_height);
+      layer.pose = (*last_pose_) * layer.offset;
     }
 
     layer.visual->setPose(layer.pose);
@@ -173,19 +206,7 @@ void SceneGraphDisplay::assignColorFunctions() {
   }
 }
 
-void SceneGraphDisplay::processMessage(const hydra_msgs::DsgUpdate::ConstPtr& msg) {
-  Ogre::Quaternion rot;
-  Ogre::Vector3 pos;
-  auto fmanager = context_->getFrameManager();
-  if (!fmanager->getTransform(msg->header.frame_id, msg->header.stamp, pos, rot)) {
-    ROS_DEBUG("Error transforming from frame '%s' to frame '%s'",
-              msg->header.frame_id.c_str(),
-              qPrintable(fixed_frame_));
-    return;
-  }
-
-  last_pose_ = std::make_unique<Pose>(rot, pos);
-
+bool SceneGraphDisplay::readGraph(const hydra_msgs::DsgUpdate::ConstPtr& msg) {
   try {
     if (!graph_) {
       graph_ = spark_dsg::readGraph(msg->layer_contents);
@@ -195,13 +216,28 @@ void SceneGraphDisplay::processMessage(const hydra_msgs::DsgUpdate::ConstPtr& ms
   } catch (const std::exception& e) {
     // TODO(nathan) log to plugin
     ROS_ERROR_STREAM("Received invalid message: " << e.what());
-    return;
+    return false;
   }
 
-  initLayers();
-  setLayerPoses();
-  assignColorFunctions();
+  return true;
+}
 
+bool SceneGraphDisplay::readPose(const hydra_msgs::DsgUpdate::ConstPtr& msg) {
+  Ogre::Quaternion rot;
+  Ogre::Vector3 pos;
+  auto fmanager = context_->getFrameManager();
+  if (!fmanager->getTransform(msg->header.frame_id, msg->header.stamp, pos, rot)) {
+    ROS_DEBUG("Error transforming from frame '%s' to frame '%s'",
+              msg->header.frame_id.c_str(),
+              qPrintable(fixed_frame_));
+    return false;
+  }
+
+  last_pose_ = std::make_unique<Pose>(rot, pos);
+  return true;
+}
+
+void SceneGraphDisplay::updateLayerVisuals() {
   for (auto& id_layer_pair : layers_) {
     auto& layer = id_layer_pair.second;
     layer.visual->setMessage(layer.config,
@@ -214,6 +250,50 @@ void SceneGraphDisplay::processMessage(const hydra_msgs::DsgUpdate::ConstPtr& ms
                                     layer.node_color_callback.get());
     }
   }
+}
+
+void SceneGraphDisplay::updateInterlayerEdgeVisual() {
+  if (!interlayer_edges_) {
+    interlayer_edges_ = std::make_unique<InterlayerEdgeVisual>(
+        context_->getSceneManager(), scene_node_);
+  }
+
+  for (const auto& id_edge_pair : graph_->interlayer_edges()) {
+    const auto& source = graph_->getNode(id_edge_pair.second.source)->get();
+    const auto& target = graph_->getNode(id_edge_pair.second.target)->get();
+    const LayerPair layer_pair(source.layer, target.layer);
+    auto citer = edge_configs_.find(layer_pair);
+    if (citer != edge_configs_.end()) {
+      continue;
+    }
+
+    auto diter = default_edge_configs_.find(layer_pair);
+    if (diter != default_edge_configs_.end()) {
+      edge_configs_[layer_pair] = diter->second;
+    } else {
+      edge_configs_[layer_pair] = EdgeConfig();
+    }
+  }
+
+  interlayer_edges_->setPose(*last_pose_);
+  interlayer_edges_->setMessage(*graph_, layers_, edge_configs_);
+}
+
+void SceneGraphDisplay::processMessage(const hydra_msgs::DsgUpdate::ConstPtr& msg) {
+  if (!readGraph(msg)) {
+    return;
+  }
+
+  if (!readPose(msg)) {
+    return;
+  }
+
+  initLayers();
+  setLayerPoses();
+  assignColorFunctions();
+
+  updateLayerVisuals();
+  updateInterlayerEdgeVisual();
 }
 
 }  // namespace hydra

@@ -26,6 +26,19 @@ inline Ogre::Vector3 eigen_to_ogre(const Eigen::Vector3d& v) {
   return {v_f.x(), v_f.y(), v_f.z()};
 }
 
+inline void applyLayerColor(const LayerContainer& layer,
+                            const SceneGraphNode& node,
+                            Ogre::ColourValue& color) {
+  if (!layer.node_color_callback) {
+    color.r = 0.0f;
+    color.g = 0.0f;
+    color.b = 0.0f;
+    return;
+  }
+
+  layer.node_color_callback->call(node, color);
+}
+
 }  // namespace
 
 InterlayerEdgeVisual::InterlayerEdgeVisual(Ogre::SceneManager* const manager,
@@ -52,6 +65,12 @@ void InterlayerEdgeVisual::fillEdgeContainers(const DynamicSceneGraph& graph,
     const LayerPair layer_pair(source.layer, target.layer);
     const auto& parent_layer = layers.at(layer_pair.parent);
     const auto& child_layer = layers.at(layer_pair.child);
+    const auto& parent = (source.layer == layer_pair.parent) ? source : target;
+    const auto& child = (source.layer == layer_pair.child) ? source : target;
+    const auto& source_offset =
+        (source.layer == layer_pair.parent) ? parent_layer.offset : child_layer.offset;
+    const auto& target_offset =
+        (target.layer == layer_pair.parent) ? parent_layer.offset : child_layer.offset;
 
     auto citer = configs.find(layer_pair);
     if (citer == configs.end()) {
@@ -79,12 +98,14 @@ void InterlayerEdgeVisual::fillEdgeContainers(const DynamicSceneGraph& graph,
     }
 
     Edge new_edge;
-    new_edge.start = eigen_to_ogre(source.attributes().position);
-    new_edge.end = eigen_to_ogre(target.attributes().position);
+    new_edge.start = eigen_to_ogre(source.attributes().position) + source_offset.pos;
+    new_edge.end = eigen_to_ogre(target.attributes().position) + target_offset.pos;
     switch (config.color_mode) {
       case EdgeConfig::ColorMode::PARENT:
+        applyLayerColor(parent_layer, parent, new_edge.color);
         break;
       case EdgeConfig::ColorMode::CHILD:
+        applyLayerColor(child_layer, child, new_edge.color);
         break;
       case EdgeConfig::ColorMode::NONE:
       default:
@@ -94,6 +115,8 @@ void InterlayerEdgeVisual::fillEdgeContainers(const DynamicSceneGraph& graph,
         new_edge.color.a = config.edge_alpha;
         break;
     }
+
+    iter->second.push_back(new_edge);
   }
 }
 

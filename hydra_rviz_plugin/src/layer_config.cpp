@@ -4,6 +4,25 @@
 
 namespace hydra {
 
+std::ostream& operator<<(std::ostream& out, LayerConfig::ColorMode mode) {
+  switch (mode) {
+    case LayerConfig::ColorMode::SINGLE_COLOR:
+      out << "SINGLE_COLOR";
+      break;
+    case LayerConfig::ColorMode::COLORMAP:
+      out << "COLORMAP";
+      break;
+    case LayerConfig::ColorMode::PARENT_COLOR:
+      out << "PARENT_COLOR";
+      break;
+    case LayerConfig::ColorMode::NONE:
+    default:
+      out << "NONE";
+      break;
+  }
+  return out;
+}
+
 std::ostream& operator<<(std::ostream& out, const LayerConfig& conf) {
   out << std::boolalpha << "{offset_scale: " << conf.offset_scale
       << ", visualize: " << conf.visualize << ", node_scale: " << conf.node_scale
@@ -16,7 +35,7 @@ std::ostream& operator<<(std::ostream& out, const LayerConfig& conf) {
       << ", bounding_box_scale: " << conf.bounding_box_scale
       << ", bounding_box_alpha: " << conf.bounding_box_alpha
       << ", edge_scale: " << conf.edge_scale << ", edge_alpha: " << conf.edge_alpha
-      << "}";
+      << ", color_mode: " << conf.color_mode << "}";
   return out;
 }
 

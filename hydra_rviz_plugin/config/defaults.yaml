@@ -42,7 +42,7 @@ layers:
     label_scale: 1.0
     use_bounding_box: false
     edge_scale: 0.1
-    edge_alpha: 0.2
+    edge_alpha: 0.6
     color_mode: colormap
     label_colormap: false
   - id: 5
@@ -58,3 +58,19 @@ layers:
     edge_scale: 0.05
     edge_alpha: 1.0
     color_mode: single_color
+edges:
+    - from: 3
+      to: 2
+      edge_scale: 0.02
+      edge_alpha: 0.6
+      color_mode: child
+    - from: 4
+      to: 3
+      edge_scale: 0.02
+      edge_alpha: 0.6
+      color_mode: parent
+    - from: 5
+      to: 4
+      edge_scale: 0.02
+      edge_alpha: 0.6
+      color_mode: none
