@@ -4,7 +4,21 @@ namespace hydra {
 
 namespace {
 
-void convertColors(std::vector<std::array<uint8_t, 3>>& from,
+void convertHexColors(const std::vector<uint32_t>& from,
+                      std::vector<std::array<float, 3>>& to) {
+  for (const auto hex_value : from) {
+    std::array<float, 3> new_color;
+    uint8_t red = (0xff0000 & hex_value) >> 16;
+    uint8_t green = (0xff00 & hex_value) >> 8;
+    uint8_t blue = (0xff & hex_value);
+    new_color[0] = static_cast<float>(red) / 255.0;
+    new_color[1] = static_cast<float>(green) / 255.0;
+    new_color[2] = static_cast<float>(blue) / 255.0;
+    to.push_back(new_color);
+  }
+}
+
+void convertColors(const std::vector<std::array<uint8_t, 3>>& from,
                    std::vector<std::array<float, 3>>& to) {
   for (const auto& color : from) {
     std::array<float, 3> new_color;
@@ -44,14 +58,10 @@ Colormap Colormap::Default() {
 }
 
 Colormap Colormap::SingleColor() {
-  // TODO(nathan) pick something better
-  std::vector<std::array<uint8_t, 3>> colors({
-      {255, 0, 0},
-      {0, 255, 0},
-      {255, 0, 0},
-  });
+  std::vector<uint32_t> colors{
+      0x8dd3c7, 0xffffb3, 0xbebada, 0xfb8072, 0x80b1d3, 0xfdb462, 0xb3de69};
   std::vector<ColorArray> float_colors;
-  convertColors(colors, float_colors);
+  convertHexColors(colors, float_colors);
   return Colormap(float_colors);
 }
 

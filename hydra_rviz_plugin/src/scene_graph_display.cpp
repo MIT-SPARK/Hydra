@@ -253,6 +253,15 @@ void SceneGraphDisplay::updateLayerVisuals() {
   }
 }
 
+void SceneGraphDisplay::updateDynamicLayerVisuals() {
+  for (auto& id_layer_pair : layers_) {
+    auto& layer = id_layer_pair.second;
+    layer.visual->setMessage(layer.config,
+                             graph_->getLayer(id_layer_pair.first),
+                             layer.node_color_callback.get());
+  }
+}
+
 void SceneGraphDisplay::updateInterlayerEdgeVisual() {
   if (!interlayer_edges_) {
     interlayer_edges_ = std::make_unique<InterlayerEdgeVisual>(
@@ -294,6 +303,7 @@ void SceneGraphDisplay::processMessage(const hydra_msgs::DsgUpdate::ConstPtr& ms
   assignColorFunctions();
 
   updateLayerVisuals();
+  updateDynamicLayerVisuals();
   updateInterlayerEdgeVisual();
 }
 
