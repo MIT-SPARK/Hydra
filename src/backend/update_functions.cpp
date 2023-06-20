@@ -64,19 +64,6 @@ void filterPlace(DynamicSceneGraph& graph,
   return;
 }
 
-template <typename Derived, typename Func>
-bool dispatchMergeCheck(const NodeAttributes* lhs,
-                        const NodeAttributes* rhs,
-                        const Func& func) {
-  const auto d_lhs = dynamic_cast<const Derived*>(lhs);
-  const auto d_rhs = dynamic_cast<const Derived*>(rhs);
-  if (!d_lhs || !d_rhs) {
-    return false;
-  }
-
-  return func(*d_lhs, *d_rhs);
-}
-
 UpdateObjectsFunctor::UpdateObjectsFunctor() : UpdateObjectsFunctor(10.0f) {}
 
 UpdateObjectsFunctor::UpdateObjectsFunctor(float step) : angle_step(step) {}

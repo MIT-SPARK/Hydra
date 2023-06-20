@@ -52,7 +52,8 @@
 namespace hydra {
 
 using hydra::timing::ScopedTimer;
-using pose_graph_tools::PoseGraph;
+using pose_graph_tools_msgs::PoseGraph;
+
 using LabelClusters = MeshSegmenter::LabelClusters;
 
 FrontendModule::FrontendModule(const FrontendConfig& config,
@@ -145,6 +146,7 @@ void FrontendModule::stop() {
 }
 
 void FrontendModule::save(const LogSetup& log_setup) {
+  std::lock_guard<std::mutex> lock(mutex_);
   const auto output_path = log_setup.getLogDir("frontend");
   dsg_->graph->save(output_path + "/dsg.json", false);
   dsg_->graph->save(output_path + "/dsg_with_mesh.json");
@@ -220,6 +222,7 @@ void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
   }
 
   VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg.timestamp_ns << " [ns]";
+  std::lock_guard<std::mutex> lock(mutex_);
   ScopedTimer timer("frontend/spin", msg.timestamp_ns);
 
   if (dsg_->graph && backend_input_) {

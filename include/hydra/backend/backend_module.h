@@ -39,6 +39,7 @@
 
 #include <map>
 #include <memory>
+#include <mutex>
 #include <thread>
 
 #include "hydra/backend/backend_config.h"
@@ -98,7 +99,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   inline void triggerBackendDsgReset() { reset_backend_dsg_ = true; }
 
   // used by dsg_optimizer
-  void spinOnce(const BackendInput& input, bool force_update = true);
+  virtual void spinOnce(const BackendInput& input, bool force_update = true);
 
   void loadState(const std::string& state_path, const std::string& dgrf_path);
 
@@ -143,7 +144,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   virtual void addPlacesToDeformationGraph(size_t timestamp_ns);
 
-  virtual void updateAgentNodeMeasurements(const pose_graph_tools::PoseGraph& meas);
+  virtual void updateAgentNodeMeasurements(
+      const pose_graph_tools_msgs::PoseGraph& meas);
 
   virtual void optimize(size_t timestamp_ns);
 
@@ -164,7 +166,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   void logStatus(bool init = false) const;
 
-  void logIncrementalLoopClosures(const pose_graph_tools::PoseGraph& msg);
+  void logIncrementalLoopClosures(const pose_graph_tools_msgs::PoseGraph& msg);
 
   void cachePlacePos();
 
@@ -211,6 +213,9 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   std::map<NodeId, std::string> room_name_map_;
   std::unique_ptr<std::thread> zmq_thread_;
   std::unique_ptr<spark_dsg::ZmqReceiver> zmq_receiver_;
+
+  // TODO(lschmid): This mutex currently simply locks all data for manipulation.
+  std::mutex mutex_;
 
   inline static const auto registration_ =
       config::RegistrationWithConfig<BackendModule,

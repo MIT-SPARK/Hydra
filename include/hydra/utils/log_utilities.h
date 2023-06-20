@@ -48,6 +48,10 @@ struct LogConfig {
   std::string timing_stats_name = "timing_stats.csv";
   std::string timing_suffix = "_timing_raw.csv";
 
+  // If true log all timers into a single directory, replacing '/' with '_' in the
+  // names. If false create separate directories for separators '/' (default).
+  bool log_raw_timers_to_single_dir = false;
+
   static LogConfig fromString(const std::string& output_path) {
     LogConfig config;
     config.log_dir = output_path;

@@ -81,6 +81,8 @@ class ElapsedTimeRecorder {
 
   void logAllElapsed(const LogSetup& log_config) const;
 
+  std::string getPrintableStats() const;
+
   void logStats(const std::string& stat_filepath) const;
 
   void setupIncrementalLogging(const LogSetup::Ptr& log_config);
@@ -88,6 +90,8 @@ class ElapsedTimeRecorder {
   bool timing_disabled;
 
   bool disable_output;
+
+  bool log_to_same_folder = false;
 
  private:
   using TimeList = std::list<std::chrono::nanoseconds>;
@@ -124,8 +128,14 @@ class ScopedTimer {
 
   ~ScopedTimer();
 
+  void start();
+  void stop();
+  void reset(const std::string& name);
+  void reset(const std::string& name, uint64_t timestamp);
+
  private:
   std::string name_;
+  uint64_t timestamp_;
   bool verbose_;
   int verbosity_;
   bool elapsed_only_;

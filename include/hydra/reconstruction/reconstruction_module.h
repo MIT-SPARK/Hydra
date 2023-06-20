@@ -108,7 +108,7 @@ class ReconstructionModule : public Module {
   std::unique_ptr<std::thread> spin_thread_;
   size_t num_poses_received_;
 
-  pose_graph_tools::PoseGraph agent_node_measurements_;
+  pose_graph_tools_msgs::PoseGraph agent_node_measurements_;
   PoseGraphTracker::Ptr pose_graph_tracker_;
   ReconstructionOutput::Ptr pending_output_;
   OutputQueue::Ptr output_queue_;

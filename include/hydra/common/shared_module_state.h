@@ -35,8 +35,8 @@
 #pragma once
 #include <kimera_pgmo/MeshDelta.h>
 #include <kimera_pgmo/utils/CommonStructs.h>
-#include <pose_graph_tools/BowQuery.h>
-#include <pose_graph_tools/PoseGraph.h>
+#include <pose_graph_tools_msgs/BowQuery.h>
+#include <pose_graph_tools_msgs/PoseGraph.h>
 
 #include <list>
 #include <map>
@@ -65,9 +65,9 @@ struct BackendInput {
 
   RobotPrefixConfig prefix;
   uint64_t timestamp_ns;
-  pose_graph_tools::PoseGraph::ConstPtr deformation_graph;
-  std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
-  pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements;
+  pose_graph_tools_msgs::PoseGraph::ConstPtr deformation_graph;
+  std::list<pose_graph_tools_msgs::PoseGraph::ConstPtr> pose_graphs;
+  pose_graph_tools_msgs::PoseGraph::ConstPtr agent_node_measurements;
   kimera_pgmo::MeshDelta::Ptr mesh_update;
 };
 
@@ -80,7 +80,7 @@ struct SharedModuleState {
 
   NodeIdSet latest_places;
 
-  InputQueue<pose_graph_tools::BowQuery::ConstPtr> visual_lcd_queue;
+  InputQueue<pose_graph_tools_msgs::BowQuery::ConstPtr> visual_lcd_queue;
   InputQueue<BackendInput::Ptr> backend_queue;
   InputQueue<LcdInput::Ptr>::Ptr lcd_queue;
   InputQueue<lcd::RegistrationSolution> backend_lcd_queue;

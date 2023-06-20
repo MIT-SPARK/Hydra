@@ -42,6 +42,7 @@
 #include <fstream>
 #include <iostream>
 #include <numeric>
+#include <sstream>
 
 #include "hydra/utils/log_utilities.h"
 
@@ -194,6 +195,19 @@ ElapsedStatistics ElapsedTimeRecorder::getStats(const std::string& name) const {
           durations.size()};
 }
 
+std::string ElapsedTimeRecorder::getPrintableStats() const {
+  std::string result;
+  for (const auto& str_timer_pair : elapsed_) {
+    const ElapsedStatistics& stats = getStats(str_timer_pair.first);
+    std::stringstream ss;
+    ss << str_timer_pair.first << ": " << stats.mean_s << " +/- " << stats.min_s
+       << "s [" << stats.max_s << ", " << stats.stddev_s << "] ("
+       << stats.num_measurements << " calls).\n";
+    result += ss.str();
+  }
+  return result;
+};
+
 void ElapsedTimeRecorder::logElapsed(const std::string& name,
                                      const LogSetup& log_setup) const {
   VLOG(5) << "Saving timer '" << name << "'";
@@ -201,6 +215,10 @@ void ElapsedTimeRecorder::logElapsed(const std::string& name,
   const auto output_csv = log_setup.getTimerFilepath(name);
   std::ofstream output_file;
   output_file.open(output_csv);
+  if (!output_file.is_open()) {
+    LOG(ERROR) << "Could not open file " << output_csv << " for writing";
+    return;
+  }
 
   TimeList durations;
   TimeStamps stamps;
@@ -208,7 +226,6 @@ void ElapsedTimeRecorder::logElapsed(const std::string& name,
     std::unique_lock<std::mutex> lock(mutex_);
 
     if (!elapsed_.count(name)) {
-      output_file.close();
       return;
     }
 
@@ -227,7 +244,7 @@ void ElapsedTimeRecorder::logElapsed(const std::string& name,
     std::chrono::duration<double> elapsed_s = *d_it;
     ss << *s_it << "," << elapsed_s.count() << "\n";
   }
-
+  
   output_file << ss.str();
   output_file.close();
   VLOG(5) << "Saved timer '" << name << "'";
@@ -284,10 +301,20 @@ ScopedTimer::ScopedTimer(const std::string& name,
                          bool elapsed_only,
                          bool verbosity_disables)
     : name_(name),
+      timestamp_(timestamp),
       verbose_(verbose),
       verbosity_(verbosity),
       elapsed_only_(elapsed_only),
       verbosity_disables_(verbosity_disables) {
+  start();
+}
+
+ScopedTimer::ScopedTimer(const std::string& name, uint64_t timestamp)
+    : ScopedTimer(name, timestamp, false, 1, true, false) {}
+
+ScopedTimer::~ScopedTimer() { stop(); }
+
+void ScopedTimer::start() {
   if (ElapsedTimeRecorder::instance().timing_disabled) {
     return;
   }
@@ -296,13 +323,10 @@ ScopedTimer::ScopedTimer(const std::string& name,
     return;
   }
 
-  ElapsedTimeRecorder::instance().start(name_, timestamp);
+  ElapsedTimeRecorder::instance().start(name_, timestamp_);
 }
 
-ScopedTimer::ScopedTimer(const std::string& name, uint64_t timestamp)
-    : ScopedTimer(name, timestamp, false, 1, true, false) {}
-
-ScopedTimer::~ScopedTimer() {
+void ScopedTimer::stop() {
   if (ElapsedTimeRecorder::instance().timing_disabled) {
     return;
   }
@@ -332,6 +356,19 @@ ScopedTimer::~ScopedTimer() {
     VLOG(verbosity_) << "{Timer " << name_
                      << "}: " << ElapsedTimeRecorder::instance().getStats(name_);
   }
+}
+
+void ScopedTimer::reset(const std::string& name) {
+  stop();
+  name_ = name;
+  start();
+}
+
+void ScopedTimer::reset(const std::string& name, uint64_t timestamp) {
+  stop();
+  name_ = name;
+  timestamp_ = timestamp;
+  start();
 }
 
 }  // namespace timing

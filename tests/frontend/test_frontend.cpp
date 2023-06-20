@@ -39,8 +39,8 @@
 
 namespace hydra {
 
-using pose_graph_tools::PoseGraph;
-using pose_graph_tools::PoseGraphNode;
+using pose_graph_tools_msgs::PoseGraph;
+using pose_graph_tools_msgs::PoseGraphNode;
 
 namespace {
 

@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
+
 namespace hydra {
 
 struct RobotPrefixConfig {
@@ -45,5 +46,7 @@ struct RobotPrefixConfig {
   char key;
   char vertex_key;
 };
+
+void declare_config(RobotPrefixConfig& config);
 
 }  // namespace hydra

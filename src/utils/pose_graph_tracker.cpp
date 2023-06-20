@@ -44,7 +44,7 @@
 
 namespace hydra {
 
-using pose_graph_tools::PoseGraph;
+using pose_graph_tools_msgs::PoseGraph;
 
 struct StampedPose {
   uint64_t stamp;
@@ -71,7 +71,7 @@ void addEdge(PoseGraph& graph, const Eigen::Isometry3d& body_i_T_body_j) {
   edge.key_to = curr_node.key;
   edge.robot_from = prev_node.robot_id;
   edge.robot_to = curr_node.robot_id;
-  edge.type = pose_graph_tools::PoseGraphEdge::ODOM;
+  edge.type = pose_graph_tools_msgs::PoseGraphEdge::ODOM;
   tf2::convert(body_i_T_body_j, edge.pose);
 }
 

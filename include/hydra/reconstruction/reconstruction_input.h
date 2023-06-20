@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <pose_graph_tools/PoseGraph.h>
+#include <pose_graph_tools_msgs/PoseGraph.h>
 
 #include <Eigen/Geometry>
 #include <cstdint>
@@ -50,8 +50,8 @@ struct ReconstructionInput {
   using Ptr = std::shared_ptr<ReconstructionInput>;
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   uint64_t timestamp_ns;
-  std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
-  pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements;
+  std::list<pose_graph_tools_msgs::PoseGraph::ConstPtr> pose_graphs;
+  pose_graph_tools_msgs::PoseGraph::ConstPtr agent_node_measurements;
   Eigen::Vector3d world_t_body;
   Eigen::Quaterniond world_R_body;
   SensorInputPacket::Ptr sensor_input;

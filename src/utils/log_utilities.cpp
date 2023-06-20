@@ -59,6 +59,7 @@ void declare_config(LogConfig& config) {
   field(config.log_timing_incrementally, "log_timing_incrementally");
   field(config.timing_stats_name, "timing_stats_name");
   field(config.timing_suffix, "timing_suffix");
+  field(config.log_raw_timers_to_single_dir, "log_raw_timers_to_single_dir");
 }
 
 LogSetup::LogSetup(const LogConfig& conf) : valid_(false), config_(conf) {
@@ -119,6 +120,16 @@ std::string LogSetup::getTimerFilepath(const std::string& timer_name) const {
   }
 
   const auto log_dir = fs::path(config_.log_dir);
+
+  std::string used_name = timer_name;
+  // If requested, replace all '/' with '_' to avoid creating a directory.
+  if (config_.log_raw_timers_to_single_dir) {
+    for (char& c : used_name) {
+      if (c == '/') {
+        c = '_';
+      }
+    }
+  }
 
   const auto timer_path = fs::path(timer_name);
   const auto timer_ns = timer_path.parent_path();

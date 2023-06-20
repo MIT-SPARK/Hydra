@@ -44,7 +44,7 @@
 
 namespace hydra {
 
-using pose_graph_tools::PoseGraph;
+using pose_graph_tools_msgs::PoseGraph;
 using timing::ScopedTimer;
 using voxblox::BlockIndexList;
 using voxblox::Layer;

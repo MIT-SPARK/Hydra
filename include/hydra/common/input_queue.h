@@ -110,6 +110,11 @@ struct InputQueue {
     std::unique_lock<std::mutex> lock(mutex);
     return queue.size();
   }
+
+  void clear() {
+    std::unique_lock<std::mutex> lock(mutex);
+    queue = {};
+  }
 };
 
 }  // namespace hydra

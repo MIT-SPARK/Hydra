@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <pose_graph_tools/PoseGraph.h>
+#include <pose_graph_tools_msgs/PoseGraph.h>
 #include <voxblox/core/layer.h>
 #include <voxblox/mesh/mesh_layer.h>
 
@@ -54,8 +54,8 @@ struct ReconstructionOutput {
   voxblox::Layer<voxblox::TsdfVoxel>::Ptr tsdf;
   voxblox::Layer<VertexVoxel>::Ptr occupied;
   voxblox::BlockIndexList archived_blocks;
-  std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
-  pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements;
+  std::list<pose_graph_tools_msgs::PoseGraph::ConstPtr> pose_graphs;
+  pose_graph_tools_msgs::PoseGraph::ConstPtr agent_node_measurements;
   Eigen::Vector3d current_position;
 };
 

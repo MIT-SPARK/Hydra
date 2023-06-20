@@ -88,7 +88,7 @@ class FrontendModule : public Module {
 
   std::string printInfo() const override;
 
-  void spin();
+  virtual void spin();
 
   bool spinOnce();
 
@@ -162,11 +162,14 @@ class FrontendModule : public Module {
   std::map<NodeId, size_t> agent_key_map_;
   std::map<LayerPrefix, size_t> last_agent_edge_index_;
   std::map<LayerPrefix, std::set<size_t>> active_agent_nodes_;
-  std::list<pose_graph_tools::BowQuery::ConstPtr> cached_bow_messages_;
+  std::list<pose_graph_tools_msgs::BowQuery::ConstPtr> cached_bow_messages_;
 
   std::vector<InputCallback> input_callbacks_;
   std::vector<InputCallback> post_mesh_callbacks_;
   std::vector<OutputCallback> output_callbacks_;
+
+   // TODO(lschmid): This mutex currently simply locks all data for manipulation.
+  std::mutex mutex_;
 
   inline static const auto registration_ =
       config::RegistrationWithConfig<FrontendModule,

@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <pose_graph_tools/PoseGraph.h>
+#include <pose_graph_tools_msgs/PoseGraph.h>
 
 #include <Eigen/Geometry>
 #include <memory>
@@ -62,7 +62,7 @@ class PoseGraphTracker {
 
  protected:
   const Config config_;
-  std::list<pose_graph_tools::PoseGraph::ConstPtr> graphs_;
+  std::list<pose_graph_tools_msgs::PoseGraph::ConstPtr> graphs_;
 
   uint64_t prev_time_;
   size_t num_poses_received_;

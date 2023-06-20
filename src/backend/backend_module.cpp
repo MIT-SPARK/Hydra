@@ -54,7 +54,7 @@ using kimera_pgmo::DeformationGraph;
 using kimera_pgmo::DeformationGraphPtr;
 using kimera_pgmo::KimeraPgmoInterface;
 using kimera_pgmo::KimeraPgmoMesh;
-using pose_graph_tools::PoseGraph;
+using pose_graph_tools_msgs::PoseGraph;
 using LayerMerges = std::map<LayerId, std::map<NodeId, NodeId>>;
 
 std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol key) {
@@ -85,6 +85,8 @@ BackendModule::BackendModule(const BackendConfig& config,
   if (!KimeraPgmoInterface::initializeFromConfig()) {
     throw std::runtime_error("invalid pgmo config");
   }
+
+  setSolverParams();
 
   private_dsg_->graph->initMesh(true);
   original_vertices_.reset(new pcl::PointCloud<pcl::PointXYZRGBA>());
@@ -147,6 +149,7 @@ void BackendModule::stop() {
 }
 
 void BackendModule::save(const LogSetup& log_setup) {
+  std::lock_guard<std::mutex> lock(mutex_);
   const auto backend_path = log_setup.getLogDir("backend");
   const auto pgmo_path = log_setup.getLogDir("backend/pgmo");
   private_dsg_->graph->save(backend_path + "/dsg.json", false);
@@ -257,6 +260,7 @@ void BackendModule::logPlaceDistance() {
 void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
   ScopedTimer spin_timer("backend/spin", input.timestamp_ns);
   status_.reset();
+  std::lock_guard<std::mutex> lock(mutex_);
 
   updateFactorGraph(input);
   updateFromLcdQueue();
@@ -377,7 +381,7 @@ void BackendModule::setupDefaultFunctors() {
   setUpdateFuncs();
 }
 
-std::string logPoseGraphConnections(const pose_graph_tools::PoseGraph& msg) {
+std::string logPoseGraphConnections(const pose_graph_tools_msgs::PoseGraph& msg) {
   std::stringstream ss;
   ss << "nodes: [";
   auto iter = msg.nodes.begin();
@@ -639,7 +643,7 @@ void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
     for (const auto& edge : mst_info.edges) {
       gtsam::Pose3 source(gtsam::Rot3(), shared_places_copy_.getPosition(edge.source));
       gtsam::Pose3 target(gtsam::Rot3(), shared_places_copy_.getPosition(edge.target));
-      pose_graph_tools::PoseGraphEdge mst_e;
+      pose_graph_tools_msgs::PoseGraphEdge mst_e;
       mst_e.key_from = edge.source;
       mst_e.key_to = edge.target;
       mst_e.pose = kimera_pgmo::GtsamToRos(source.between(target));
@@ -709,6 +713,7 @@ void BackendModule::runZmqUpdates() {
 }
 
 void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
+  deformation_graph_->update();
   if (!force_mesh_update && !have_new_mesh_) {
     return;
   }
@@ -741,7 +746,7 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
 }
 
 void BackendModule::updateAgentNodeMeasurements(
-    const pose_graph_tools::PoseGraph& meas) {
+    const pose_graph_tools_msgs::PoseGraph& meas) {
   deformation_graph_->removePriorsWithPrefix(
       HydraConfig::instance().getRobotPrefix().key);
   std::vector<std::pair<gtsam::Key, gtsam::Pose3>> agent_measurements;
@@ -876,7 +881,7 @@ void BackendModule::logStatus(bool init) const {
 
 void BackendModule::logIncrementalLoopClosures(const PoseGraph& msg) {
   for (const auto& edge : msg.edges) {
-    if (edge.type != pose_graph_tools::PoseGraphEdge::LOOPCLOSE) {
+    if (edge.type != pose_graph_tools_msgs::PoseGraphEdge::LOOPCLOSE) {
       continue;
     }
 
