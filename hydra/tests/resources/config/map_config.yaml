@@ -1,0 +1,10 @@
+---
+configs:
+  config_a:
+    a: -3
+    b: 5.2
+    c: hello
+  config_b:
+    a: 5
+    b: -1.2
+    c: other

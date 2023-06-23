@@ -1,0 +1,24 @@
+<launch>
+    <arg name="sim_time_required" default="true"/>
+    <param name="use_sim_time" value="$(arg sim_time_required)"/>
+
+    <arg name="use_semantics" default="true"/>
+    <arg name="use_gt_semantics" default="true"/>
+
+    <arg name="use_label_image" default="$(eval arg('use_gt_semantics') and arg('use_semantics'))"/>
+
+    <arg name="rgb_info_topic" default="/tesse/seg_cam/camera_info" if="$(arg use_label_image)"/>
+    <arg name="rgb_info_topic" default="/tesse/left_cam/camera_info" unless="$(arg use_label_image)"/>
+    <arg name="rgb_topic" default="/tesse/seg_cam/rgb/image_raw" if="$(arg use_label_image)"/>
+    <arg name="rgb_topic" default="/tesse/left_cam/rgb/image_raw" unless="$(arg use_label_image)"/>
+    <arg name="depth_topic" default="/tesse/depth_cam/mono/image_raw"/>
+
+    <arg name="use_static_tfs" default="true"/>
+    <include file="$(find hydra_ros)/launch/utils/includes/uhumans2_static_tfs.xml" if="$(arg use_static_tfs)"/>
+
+    <include file="$(find hydra_ros)/launch/utils/includes/rgbd_to_pointcloud.xml" pass_all_args="true"
+             if="$(eval arg('use_gt_semantics') or not arg('use_semantics'))"/>
+
+    <include file="$(find semantic_recolor)/launch/semantic_recolor_pointcloud.launch" pass_all_args="true"
+             if="$(eval arg('use_semantics') and not arg('use_gt_semantics'))"/>
+</launch>

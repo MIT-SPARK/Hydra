@@ -1,0 +1,37 @@
+<launch>
+    <arg name="sim_time_required" default="true"/>
+    <param name="use_sim_time" value="$(arg sim_time_required)"/>
+
+    <arg name="dataset_name" default="ade150_mp3d_config"/>
+    <arg name="semantic_map_dir" default="$(find semantic_recolor)/config/colors"/>
+    <arg name="semantic_map_file" default="$(arg dataset_name).csv"/>
+    <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
+
+    <arg name="robot_name" default="a1"/>
+
+    <arg name="pointcloud_topic" value="/semantic_pointcloud"/>
+    <arg name="use_gt_frame" default="false"/>
+    <arg name="sensor_frame" default="base" if="$(arg use_gt_frame)"/>
+    <arg name="sensor_frame" default="base_link" unless="$(arg use_gt_frame)"/>
+    <arg name="world_frame" default="world"/>
+
+    <include file="$(find hydra_ros)/launch/utils/data_sources/a1_pointcloud.launch"
+             pass_all_args="true"/>
+
+    <include file="$(find hydra_ros)/launch/hydra.launch" pass_all_args="true">
+        <arg name="robot_id" default="0"/>
+        <arg name="config_dir" default="$(find hydra)/config/simmons_a1"/>
+        <arg name="reconstruction_config" default="$(find hydra)/config/simmons_topology_config.yaml"/>
+        <arg name="use_kimera_extrinsics" value="true"/>
+        <arg name="extrinsics" default="$(find hydra_vio_configs)/config/robots/a1_center_external/LeftCameraParams.yaml"/>
+        <arg name="rviz_dir" default="$(find hydra_ros)/rviz"/>
+        <arg name="rviz_file" default="a1.rviz"/>
+        <arg name="rviz_file_td" default="a1_topdown.rviz"/>
+        <arg name="use_oriented_bounding_boxes" default="true"/>
+        <arg name="typology_dir" default="$(find hydra)/config/"/>
+        <arg name="typology_config" default="ade20k_mp3d_typology.yaml"/>
+    </include>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="kimera_link" args="0 0 0 0 0 0 1 base_link cam_d455_link"/>
+
+</launch>

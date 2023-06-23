@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="ISO-8859-15"?>
+<launch>
+  <arg name="output_path"/>
+  <arg name="output_every_num" default="5"/>
+  <arg name="dsg_topic" default="/hydra_ros_node/dsg"/>
+  <arg name="dsg_mesh_topic" default="/hydra_ros_node/pgmo/optimized_mesh"/>
+
+  <node pkg="hydra_ros" type="scene_graph_logger_node" name="scene_graph_logger_node"
+        output="log">
+    <param name="output_path" value="$(arg output_path)"/>
+    <param name="output_every_num" value="$(arg output_every_num)"/>
+
+    <remap from="~dsg" to="$(arg dsg_topic)"/>
+    <remap from="~dsg_mesh_updates" to="$(arg dsg_mesh_topic)"/>
+  </node>
+
+</launch>

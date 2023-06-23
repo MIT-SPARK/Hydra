@@ -1,0 +1,36 @@
+<launch>
+    <arg name="sim_time_required" default="true"/>
+    <param name="use_sim_time" value="$(arg sim_time_required)"/>
+
+    <arg name="robot_name"/>
+
+    <arg name="use_compressed_transport" default="true"/>
+    <arg name="use_prerecorded_semantics" default="false"/>
+    <arg name="use_semantics" default="true"/>
+    <arg name="use_gt_frame" default="false"/>
+    <arg name="sensor_frame" default="$(arg robot_name)/base"/>
+
+    <arg name="rgb_info_topic" default="/$(arg robot_name)/forward/color/camera_info"/>
+    <arg name="rgb_topic" default="/$(arg robot_name)/forward/color/image_raw"/>
+    <arg name="depth_topic" default="/$(arg robot_name)/forward/depth/image_rect_raw"/>
+    <arg name="depth_info_topic" default="/$(arg robot_name)/forward/depth/camera_info"/>
+    <arg name="pointcloud_topic" default="/$(arg robot_name)/semantic_pointcloud"/>
+
+    <arg name="enable_rectification" default="true"/>
+
+    <arg name="need_compressed"
+         value="$(eval arg('use_compressed_transport') and not arg('use_prerecorded_semantics'))"/>
+
+    <include file="$(find hydra_ros)/launch/utils/gt_pose/robot_gt_pose.launch" pass_all_args="true"
+             if="$(arg use_gt_frame)"/>
+
+    <include file="$(find hydra_ros)/launch/utils/includes/rgbd_to_pointcloud.xml" pass_all_args="true"
+        unless="$(arg use_semantics)"/>
+
+    <include file="$(find semantic_recolor)/launch/semantic_recolor_pointcloud.launch" pass_all_args="true"
+             if="$(arg use_semantics)">
+        <arg name="verbose" value="false"/>
+        <arg name="rgb_image_transport" value="compressed" if="$(arg need_compressed)"/>
+        <arg name="rgb_image_transport" value="raw" unless="$(arg need_compressed)"/>
+    </include>
+</launch>

@@ -1,0 +1,12 @@
+<launch>
+    <arg name="odom_topic" default="/camera/odom/sample"/>
+    <arg name="odom_frame" default="t265_odom"/>
+    <arg name="required" default="true"/>
+
+    <node pkg="hydra_ros" type="odom_to_tf" name="odom_to_tf" output="screen" required="$(arg required)">
+        <param name="parent_frame" value="world"/>
+        <param name="child_frame" value="$(arg odom_frame)"/>
+        <remap from="odom" to="$(arg odom_topic)"/>
+    </node>
+
+</launch>

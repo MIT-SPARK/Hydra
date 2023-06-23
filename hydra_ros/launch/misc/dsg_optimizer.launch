@@ -1,0 +1,52 @@
+<launch>
+    <arg name="dsg_dir" default="$(find hydra)/output/sidpac/sidpac_f1_3"/>
+    <arg name="dsg_name" value="frontend/dsg_with_mesh.json"/>
+    <arg name="frontend_path" value="frontend"/>
+    <arg name="dgrf_name" value="pgmo/deformation_graph.dgrf"/>
+
+    <arg name="dsg_output_dir" default="$(find hydra)/output/sidpac"/>
+    <arg name="dsg_output_prefix" default="floor1_3"/>
+
+    <arg name="start_visualizer" default="true"/>
+
+    <arg name="debug" default="false"/>
+    <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
+    <arg name="launch_prefix" value="" unless="$(arg debug)"/>
+
+    <arg name="min_glog_level" default="0"/>
+    <arg name="verbosity" default="0"/>
+
+    <arg name="dsg_should_log" default="true" />
+    <arg name="pgmo_should_log" default="true"/>
+    <arg name="dsg_path" default="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
+    <arg name="pgmo_log_path" value="$(arg dsg_path)/pgmo"/>
+
+    <include if="$(arg start_visualizer)" file="$(find hydra_ros)/launch/utils/hydra_streaming_visualizer.launch" pass_all_args="true">
+        <arg name="dsg_topic" default="dsg_optimizer_node/dsg"/>
+        <arg name="dsg_mesh_topic" default="dsg_optimizer_node/pgmo/optimized_mesh"/>
+    </include>
+
+    <node pkg="hydra_ros" type="dsg_optimizer_node" name="dsg_optimizer_node"
+          launch-prefix="$(arg launch_prefix)"
+          args="--minloglevel=$(arg min_glog_level) -v=$(arg verbosity)"
+          required="true"
+          output="screen">
+        <env name="TERM" value="xterm-256color"/>
+        <rosparam file="$(find hydra)/config/sidpac/dsg_backend_config.yaml"/>
+        <param name="pgmo/log_path" value="$(arg pgmo_log_path)"/>
+        <param name="pgmo/should_log" value="$(arg pgmo_should_log)"/>
+        <param name="should_log" value="$(arg dsg_should_log)"/>
+        <param name="log_path" value="$(arg dsg_path)"/>
+
+        <param name="dsg_filepath" value="$(arg dsg_dir)/$(arg dsg_name)"/>
+        <param name="dgrf_filepath" value="$(arg dsg_dir)/$(arg dgrf_name)"/>
+        <param name="frontend_filepath" value="$(arg dsg_dir)/$(arg frontend_path)"/>
+    </node>
+
+    <include file="$(find pose_graph_tools)/launch/posegraph_view.launch" >
+        <arg name="frame_id"      value="world" />
+        <arg name="graph_topic"   value="/dsg_optimizer_node/pgmo/pose_graph" />
+        <arg name="ns"            value="dsg_optimizer_node/pgmo"/>
+    </include>
+
+</launch>

@@ -1,0 +1,166 @@
+<launch>
+    <arg name="robot_id"/>
+    <arg name="config_dir"/>
+    <arg name="typology_dir"/>
+    <arg name="typology_config"/>
+    <arg name="semantic_map_dir"/>
+    <arg name="semantic_map_file"/>
+    <arg name="sensor_frame"/>
+    <arg name="world_frame" default="world"/>
+
+    <arg name="dsg_output_dir" default="$(find hydra)/output/"/>
+    <arg name="dsg_output_prefix" default="default"/>
+
+    <arg name="use_gt_frame" default="true"/>
+    <arg name="use_oriented_bounding_boxes" default="false"/>
+    <arg name="exit_mode" default="NORMAL"/>
+    <arg name="start_visualizer" default="true"/>
+    <arg name="start_logger" default="false"/>
+    <arg name="optimize_on_lc" default="true"/>
+    <arg name="enable_merge_undos" default="false"/>
+    <arg name="visualize_reconstruction" default="false"/>
+    <arg name="enable_frontend_output" default="true"/>
+    <arg name="enable_lcd_viz" default="false"/>
+    <arg name="do_reconstruction" default="true"/>
+    <arg name="use_ros_backend" default="false"/>
+    <arg name="validate_vertices" default="false"/>
+
+    <arg name="param_overrides_file" default="$(find hydra_ros)/config/overrides.yaml"/>
+    <arg name="ros_params_file" default="$(find hydra_ros)/config/ros_params.yaml"/>
+
+    <arg name="use_zmq_interface" default="false"/>
+    <arg name="zmq_send_url" default="tcp://127.0.0.1:8001"/>
+    <arg name="zmq_recv_url" default="tcp://127.0.0.1:8002"/>
+
+    <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
+    <arg name="typology_path" default="$(arg typology_dir)/$(arg typology_config)"/>
+    <arg name="reconstruction_config" if="$(arg do_reconstruction)"/>
+    <arg name="pointcloud_topic" if="$(arg do_reconstruction)"/>
+    <arg name="graph_viz_config_dir" default="$(find hydra_ros)/config"/>
+    <arg name="graph_viz_config" default="graph_visualization_config.yaml"/>
+    <arg name="graph_viz_config_file" value="$(arg graph_viz_config_dir)/$(arg graph_viz_config)"/>
+
+    <arg name="use_kimera_extrinsics" default="false"/>
+    <arg name="extrinsics" if="$(arg do_reconstruction)"/>
+
+    <arg name="lcd_use_bow_vectors" default="true"/>
+    <arg name="enable_dsg_lcd" default="false"/>
+    <arg name="use_gnn_descriptors" default="false"/>
+    <arg name="lcd_gnn_object_model" default="$(find hydra)/models/lcd/object_gnn.onnx"/>
+    <arg name="lcd_gnn_places_model" default="$(find hydra)/models/lcd/place_gnn.onnx"/>
+    <arg name="lcd_gnn_label_embeddings" default="" if="$(arg use_gnn_descriptors)"/>
+
+    <arg name="debug" default="false"/>
+    <arg name="launch_prefix" value="gdb -ex run --args" if="$(arg debug)"/>
+    <arg name="launch_prefix" value="" unless="$(arg debug)"/>
+
+    <arg name="min_glog_level" default="0"/>
+    <arg name="verbosity" default="0"/>
+    <arg name="glog_to_file" default="false"/>
+    <arg name="glog_dir" if="$(arg glog_to_file)"/>
+    <arg name="glog_file_args" value="--logtostderr=0 --log_dir=$(arg glog_dir)" if="$(arg glog_to_file)"/>
+    <arg name="glog_file_args" value="" unless="$(arg glog_to_file)"/>
+
+    <arg name="dsg_should_log" default="true" />
+    <arg name="pgmo_should_log" default="true"/>
+    <arg name="log_registration" default="false"/>
+    <arg name="log_timing_incrementally" default="false"/>
+    <arg name="show_topology_stats" default="false"/>
+    <arg name="dsg_path" default="$(arg dsg_output_dir)/$(arg dsg_output_prefix)"/>
+    <arg name="pgmo_log_path" value="$(arg dsg_path)/pgmo"/>
+    <arg name="ros_output" value="screen" unless="$(arg glog_to_file)"/>
+    <arg name="ros_output" value="log" if="$(arg glog_to_file)"/>
+
+    <arg name="frontend_config_path" default="$(arg config_dir)/dsg_frontend_config.yaml"/>
+    <arg name="backend_config_path" default="$(arg config_dir)/dsg_backend_config.yaml"/>
+    <arg name="lcd_config_path" default="$(arg config_dir)/dsg_lcd_config.yaml"
+         unless="$(arg use_gnn_descriptors)"/>
+    <arg name="lcd_config_path" default="$(arg config_dir)/dsg_gnn_lcd_config.yaml"
+         if="$(arg use_gnn_descriptors)"/>
+
+    <node pkg="hydra_ros" type="hydra_ros_node"
+          name="hydra_ros_node"
+          launch-prefix="$(arg launch_prefix)"
+          args="--minloglevel=$(arg min_glog_level) -v=$(arg verbosity) $(arg glog_file_args)"
+          required="true"
+          output="$(arg ros_output)">
+        <env name="OMP_NUM_THREADS" value="12"/>
+        <env name="TERM" value="xterm-256color"/>
+
+        <rosparam file="$(arg typology_path)"/>
+        <rosparam file="$(arg frontend_config_path)"/>
+        <rosparam file="$(arg backend_config_path)"/>
+        <rosparam file="$(arg lcd_config_path)"/>
+        <rosparam file="$(arg reconstruction_config)" if="$(arg do_reconstruction)"/>
+        <rosparam file="$(arg extrinsics)" if="$(eval arg('do_reconstruction') and not arg('use_kimera_extrinsics'))"/>
+        <rosparam file="$(arg ros_params_file)"/>
+
+        <param name="kimera_extrinsics_file" value="$(arg extrinsics)"
+               if="$(eval arg('do_reconstruction') and arg('use_kimera_extrinsics'))"/>
+
+        <param name="visualize_reconstruction" value="$(arg visualize_reconstruction)"/>
+        <param name="publish_reconstruction_mesh" value="$(arg visualize_reconstruction)"/>
+        <rosparam file="$(arg graph_viz_config_file)" ns="topology_visualizer"/>
+
+        <param name="make_pose_graph" value="$(arg use_gt_frame)"/>
+        <param name="do_reconstruction" value="$(arg do_reconstruction)"/>
+        <param name="enable_frontend_output" value="$(arg enable_frontend_output)"/>
+        <param name="use_ros_backend" value="$(arg use_ros_backend)"/>
+        <param name="dsg/use_mesh_subscribers" value="$(arg use_ros_backend)"/>
+        <param name="exit_mode" value="$(arg exit_mode)"/>
+        <param name="should_log" value="$(arg dsg_should_log)"/>
+        <param name="log_path" value="$(arg dsg_path)"/>
+        <param name="log_timing_incrementally" value="$(arg log_timing_incrementally)"/>
+        <param name="visualize_dsg_lcd" value="$(arg enable_lcd_viz)"/>
+        <param name="semantic_label_file" value="$(arg semantic_map_path)"/>
+        <param name="robot_id" value="$(arg robot_id)"/>
+        <param name="world_frame" value="$(arg world_frame)"/>
+        <param name="robot_frame" value="$(arg sensor_frame)"/>
+        <param name="show_stats" value="$(arg show_topology_stats)"/>
+        <param name="validate_vertices" value="$(arg validate_vertices)"/>
+
+        <param name="dsg/use_zmq_interface" value="$(arg use_zmq_interface)"/>
+        <param name="dsg/zmq_send_url" value="$(arg zmq_send_url)"/>
+        <param name="dsg/zmq_recv_url" value="$(arg zmq_recv_url)"/>
+        <param name="pgmo/log_path" value="$(arg pgmo_log_path)"/>
+        <param name="pgmo/should_log" value="$(arg pgmo_should_log)"/>
+        <param name="objects/bounding_box_type" value="RAABB" if="$(arg use_oriented_bounding_boxes)"/>
+        <param name="objects/bounding_box_type" value="AABB" unless="$(arg use_oriented_bounding_boxes)"/>
+        <param name="pgmo/robot_id" value="$(arg robot_id)"/>
+
+        <param name="enable_lcd" value="$(arg enable_dsg_lcd)"/>
+        <param name="lcd_use_bow_vectors" value="$(arg lcd_use_bow_vectors)"/>
+        <param name="dsg/optimize_on_lc" value="$(arg optimize_on_lc)"/>
+        <param name="dsg/enable_merge_undos" value="$(arg enable_merge_undos)"/>
+        <param name="lcd/log_registration_problem" value="$(arg log_registration)"/>
+        <param name="lcd/use_gnn_descriptors" value="$(arg use_gnn_descriptors)"/>
+        <param name="lcd/gnn_lcd/object_model_path" value="$(arg lcd_gnn_object_model)"/>
+        <param name="lcd/gnn_lcd/places_model_path" value="$(arg lcd_gnn_places_model)"/>
+        <param name="lcd/gnn_lcd/label_embeddings_file" value="$(arg lcd_gnn_label_embeddings)"
+               if="$(arg use_gnn_descriptors)"/>
+
+        <remap from="~pose_graph" to="kimera_vio_ros/pose_graph_incremental"
+               unless="$(arg use_gt_frame)"/>
+        <remap from="~/bow_vectors" to="kimera_vio_ros/bow_query"/>
+        <remap from="frame_registration" to="kimera_vio_ros/kimera_vio_ros_node/register_lcd_frames"/>
+        <remap from="~pointcloud" to="$(arg pointcloud_topic)" if="$(arg do_reconstruction)"/>
+
+        <!-- goes last to make sure params actually override -->
+        <rosparam file="$(arg param_overrides_file)"/>
+    </node>
+
+    <group if="$(arg start_visualizer)">
+        <include file="$(find hydra_ros)/launch/utils/hydra_streaming_visualizer.launch" pass_all_args="true"/>
+
+        <include file="$(find pose_graph_tools)/launch/posegraph_view.launch">
+            <arg name="frame_id"      value="$(arg world_frame)" />
+            <arg name="graph_topic"   value="pose_graph" />
+            <arg name="ns"            value="hydra_ros_node/pgmo"/>
+        </include>
+    </group>
+
+    <include if="$(arg start_logger)" file="$(find hydra_ros)/launch/utils/scene_graph_logger.launch" pass_all_args="true">
+        <arg name="output_path" value="$(arg dsg_path)"/>
+    </include>
+
+</launch>

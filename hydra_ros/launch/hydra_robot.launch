@@ -1,0 +1,44 @@
+<launch>
+    <arg name="sim_time_required" value="false"/>
+    <arg name="start_visualizer" value="false"/>
+
+    <arg name="dataset_name" default="ade150_mp3d_config"/>
+    <arg name="semantic_map_dir" default="$(find semantic_recolor)/config/colors"/>
+    <arg name="semantic_map_file" default="$(arg dataset_name).csv"/>
+    <arg name="semantic_map_path" default="$(arg semantic_map_dir)/$(arg semantic_map_file)"/>
+
+    <arg name="robot_name" default="a1"/>
+    <arg name="kimera_name" default="a1_center_external"/>
+
+    <arg name="pointcloud_topic" value="/semantic_pointcloud"/>
+    <arg name="use_gt_frame" default="false"/>
+    <arg name="load_static_tfs" default="false"/>
+    <arg name="sensor_frame" default="base_link"/>
+    <arg name="world_frame" default="world"/>
+
+    <arg name="record_bag" default="false"/>
+    <arg name="extra_bag_topics" default=""/>
+
+    <include file="$(find hydra_ros)/launch/utils/data_sources/$(arg robot_name)_pointcloud.launch"
+             pass_all_args="true">
+        <arg name="use_compressed_transport" default="false"/>
+    </include>
+
+    <include file="$(find hydra_ros)/launch/hydra.launch" pass_all_args="true">
+        <arg name="robot_id" default="0"/>
+        <arg name="config_dir" default="$(find hydra)/config/default_robot"/>
+        <arg name="reconstruction_config" default="$(find hydra)/config/default_topology_config.yaml"/>
+        <arg name="use_kimera_extrinsics" value="true"/>
+        <arg name="extrinsics" default="$(find hydra_vio_configs)/config/robots/$(arg kimera_name)/LeftCameraParams.yaml"/>
+        <arg name="use_oriented_bounding_boxes" default="true"/>
+        <arg name="typology_dir" default="$(find hydra)/config/"/>
+        <arg name="typology_config" default="ade20k_mp3d_typology.yaml"/>
+    </include>
+
+    <node name="scene_graph_recorder" type="record" pkg="rosbag"
+          if="$(arg record_bag)"
+          args="-O $(arg dsg_path)/hydra_output.bag /hydra_ros_node/dsg /hydra_ros_node/dsg_mesh $(arg extra_bag_topics)"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="kimera_link" args="0 0 0 0 0 0 1 base_link cam_d455_link"/>
+
+</launch>

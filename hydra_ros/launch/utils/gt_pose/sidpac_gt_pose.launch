@@ -1,0 +1,14 @@
+<launch>
+
+    <arg name="sim_time_required" default="true"/>
+    <param name="use_sim_time" value="$(arg sim_time_required)"/>
+    <arg name="path_to_csv"/>
+    <arg name="sensor_frame" default="left_cam"/>
+
+    <node pkg="hydra_ros" type="csv_to_tf" name="csv_to_tf">
+        <param name="parent_frame" value="world"/>
+        <param name="child_frame" value="$(arg sensor_frame)"/>
+        <param name="trajectory_file" value="$(arg path_to_csv)"/>
+    </node>
+
+</launch>

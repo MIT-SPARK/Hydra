@@ -202,12 +202,9 @@ Finally, build your workspace:
 catkin build
 ```
 
-### Components
+### Config Library
 
-See the following for more information:
-  - [hydra_dsg_builder](hydra_dsg_builder/README.md)
-  - [hydra_topology](hydra_topology/README.md)
-  - [hydra_utils](hydra_utils/README.md)
+Hydra has a wrapper around config parsing that is documented [here](doc/config_parsing.md).
 
 ### Filing Issues
 

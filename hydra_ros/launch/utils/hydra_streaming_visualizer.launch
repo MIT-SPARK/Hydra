@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="ISO-8859-15"?>
+<launch>
+  <arg name="show_frontend" default="false"/>
+  <arg name="dsg_topic" default="hydra_ros_node/dsg" unless="$(arg show_frontend)"/>
+  <arg name="dsg_mesh_topic" default="hydra_ros_node/dsg_mesh" unless="$(arg show_frontend)"/>
+  <arg name="dsg_topic" default="hydra_ros_node/frontend/dsg" if="$(arg show_frontend)"/>
+  <arg name="dsg_mesh_topic" default="hydra_ros_node/frontend/dsg_mesh" if="$(arg show_frontend)"/>
+  <arg name="color_places_by_distance" default="$(arg show_frontend)"/>
+  <arg name="mesh_plugin_type" default="PGMO"/>
+  <arg name="world_frame" default="world"/>
+
+  <arg name="viz_config_dir" default="$(find hydra_ros)/config/hydra_visualizer"/>
+  <arg name="visualizer_ns" default="/hydra_dsg_visualizer"/>
+
+  <arg name="start_rviz" default="true"/>
+  <arg name="rviz_dir" default="$(find hydra_ros)/rviz"/>
+  <arg name="rviz_file" default="hydra_streaming_visualizer.rviz"/>
+  <arg name="rviz_path" default="$(arg rviz_dir)/$(arg rviz_file)"/>
+
+  <arg name="run_topdown_rviz" default="false"/>
+  <arg name="rviz_topdown_dir" default="$(find hydra_ros)/rviz"/>
+  <arg name="rviz_file_topdown" default="hydra_streaming_visualizer_topdown.rviz"/>
+  <arg name="rviz_path_topdown" default="$(arg rviz_topdown_dir)/$(arg rviz_file_topdown)"/>
+
+  <arg name="verbosity" default="0"/>
+
+  <include file="$(find hydra_ros)/launch/utils/includes/hydra_visualizer_params.xml">
+      <arg name="viz_config_dir" value="$(arg viz_config_dir)"/>
+      <arg name="visualizer_ns" value="$(arg visualizer_ns)"/>
+      <arg name="color_places_by_distance" default="$(arg color_places_by_distance)"/>
+      <arg name="world_frame" value="$(arg world_frame)"/>
+  </include>
+
+  <node pkg="hydra_ros" type="hydra_visualizer_node" name="hydra_visualizer_node"
+        output="log"
+        required="true"
+        args="-alsologtostderr -colorlogtostderr -v=$(arg verbosity)">
+    <param name="visualizer_ns" value="$(arg visualizer_ns)"/>
+    <param name="load_graph" value="false"/>
+
+    <param name="mesh_plugin_type" value="$(arg mesh_plugin_type)"/>
+    <param name="scene_graph_filepath" value=""/>
+    <param name="visualizer_ns" value="$(arg visualizer_ns)"/>
+    <param name="mesh_plugin_ns" value="dsg_mesh"/>
+    <param name="output_path" value=""/>
+
+    <remap from="~dsg" to="$(arg dsg_topic)"/>
+    <remap from="~dsg_mesh_updates" to="$(arg dsg_mesh_topic)"/>
+  </node>
+
+  <node name="rviz" pkg="rviz" type="rviz" output="log" if="$(arg start_rviz)" args="-d $(arg rviz_path)"/>
+
+  <node name="rviz_topdown" pkg="rviz" type="rviz" output="log" if="$(arg run_topdown_rviz)" args="-d $(arg rviz_path_topdown)"/>
+
+</launch>

@@ -1,0 +1,91 @@
+find_package(
+  catkin REQUIRED
+  COMPONENTS dynamic_reconfigure
+             geometry_msgs
+             image_transport
+             kimera_pgmo
+             nodelet
+             pose_graph_tools
+             roscpp
+             tf2_eigen
+             tf2_ros
+             visualization_msgs
+             glog_catkin
+)
+find_package(OpenCV REQUIRED)
+find_package(cv_bridge REQUIRED)
+
+catkin_package(
+  CATKIN_DEPENDS
+  dynamic_reconfigure
+  geometry_msgs
+  image_transport
+  kimera_pgmo
+  nodelet
+  pose_graph_tools
+  roscpp
+  tf2_eigen
+  tf2_ros
+  visualization_msgs
+  DEPENDS
+  INCLUDE_DIRS include ${EIGEN3_INCLUDE_DIRS}
+  LIBRARIES ${PROJECT_NAME}
+)
+
+target_include_directories(
+  ${PROJECT_NAME}
+  PUBLIC include ${catkin_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS}
+  PRIVATE ${OpenCV_INCLUDE_DIRS}
+)
+target_link_libraries(
+  ${PROJECT_NAME}
+  PUBLIC yaml-cpp ${catkin_LIBRARIES} spark_dsg::spark_dsg
+  PRIVATE ${OpenCV_LIBRARIES} gtsam
+)
+add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
+
+add_executable(hydra_visualizer_node src/hydra_visualizer_node.cpp)
+target_link_libraries(hydra_visualizer_node ${PROJECT_NAME})
+
+add_executable(scene_graph_logger_node src/scene_graph_logger_node.cpp)
+target_link_libraries(scene_graph_logger_node ${PROJECT_NAME})
+
+add_executable(rotate_tf_node src/rotate_tf_node.cpp)
+target_link_libraries(rotate_tf_node ${catkin_LIBRARIES})
+target_include_directories(rotate_tf_node PUBLIC ${catkin_INCLUDE_DIRS})
+
+add_library(${PROJECT_NAME}_nodelet src/mask_nodelet.cpp)
+target_include_directories(
+  ${PROJECT_NAME}_nodelet PUBLIC ${catkin_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS}
+                                 ${cv_bridge_INCLUDE_DIRS}
+)
+target_link_libraries(
+  ${PROJECT_NAME}_nodelet
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${cv_bridge_LIBRARIES}
+)
+
+install(
+  TARGETS ${PROJECT_NAME}
+          ${PROJECT_NAME}_nodelet
+          hydra_visualizer_node
+          rotate_tf_node
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
+)
+
+install(DIRECTORY include/${PROJECT_NAME}/
+        DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+)
+
+install(DIRECTORY launch/ DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch)
+
+catkin_install_python(
+  PROGRAMS
+  nodes/csv_to_tf
+  nodes/odom_to_tf
+  DESTINATION
+  ${CATKIN_PACKAGE_BIN_DESTINATION}
+)

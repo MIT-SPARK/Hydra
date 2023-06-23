@@ -1,0 +1,20 @@
+<launch>
+    <arg name="sim_time_required" default="true"/>
+    <param name="use_sim_time" value="$(arg sim_time_required)"/>
+
+    <arg name="path_to_csv"/>
+    <arg name="robot_name"/>
+    <arg name="load_static_tfs" default="true"/>
+
+    <arg name="parent_frame" default="$(arg robot_name)/map"/>
+    <arg name="sensor_frame" default="$(arg robot_name)/base"/>
+
+    <include file="$(find hydra_ros)/launch/utils/includes/$(arg robot_name)_static_tfs.xml" if="$(arg load_static_tfs)"/>
+
+    <node pkg="hydra_ros" type="csv_to_tf" name="csv_to_tf">
+        <param name="parent_frame" value="$(arg parent_frame)"/>
+        <param name="child_frame" value="$(arg sensor_frame)"/>
+        <param name="trajectory_file" value="$(arg path_to_csv)"/>
+    </node>
+
+</launch>

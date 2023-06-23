@@ -1,0 +1,20 @@
+<launch>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="fake_tf3"
+          args="0 0 0 0 0 0 1 world cam_t265_odom_frame"/>
+
+    <!-- calibration parameters for d455#2 with serial: 114122250655, payload front/back -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="t265_imu_to_kalibr_optical"
+          args="0.02216565 0.01795623 -0.21828447
+                0.9999320589420063 -0.008628001195529594 0.004334249473494838 0.006530518690349069
+                cam_t265_imu_optical_frame cam_d455_kalibr"/>
+
+   <node pkg="tf2_ros" type="static_transform_publisher" name="kalibr_optical_to_cam_d455_link"
+          args="0 0 0 0 0 0 1 cam_d455_kalibr cam_d455_link"/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="cam_d455_link_to_left_cam"
+          args="0 0 0 0 0 0 1 cam_d455_link left_cam"/>
+
+    <include file="$(find hydra_ros)/launch/utils/includes/a1_t265_camera_static_tfs.xml"/>
+
+</launch>

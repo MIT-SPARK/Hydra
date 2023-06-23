@@ -1,0 +1,15 @@
+cmake_minimum_required(VERSION 3.1)
+project(ort-download NONE)
+
+# TODO(nathan) architecture dependent URL with cross-compiled version
+include(ExternalProject)
+ExternalProject_Add(
+  ort
+  URL https://github.com/microsoft/onnxruntime/releases/download/v1.13.1/onnxruntime-linux-x64-gpu-1.13.1.tgz
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/ort-src"
+  BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/ort-build"
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND ""
+  INSTALL_COMMAND ""
+  TEST_COMMAND ""
+)

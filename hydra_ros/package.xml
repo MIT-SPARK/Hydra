@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>hydra_ros</name>
+  <version>1.0.0</version>
+  <description>hydra ros nodes</description>
+
+  <author email="na26933@mit.edu">Nathan Hughes</author>
+  <author email="yunchang@mit.edu">Yun Chang</author>
+  <maintainer email="na26933@mit.edu">Nathan Hughes</maintainer>
+
+  <license>BSD</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>roscpp</depend>
+  <depend>dynamic_reconfigure</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>hydra_msgs</depend>
+  <depend>pcl_ros</depend>
+  <depend>tf2_eigen</depend>
+  <depend>tf2_ros</depend>
+  <depend>cv_bridge</depend>
+  <depend>nodelet</depend>
+  <depend>image_transport</depend>
+  <depend>glog_catkin</depend>
+
+  <depend>gtsam</depend>
+  <depend>spark_dsg</depend>
+  <depend>pose_graph_tools</depend>
+  <depend>kimera_pgmo</depend>
+  <depend>kimera_semantics_ros</depend>
+  <depend>voxblox_ros</depend>
+  <depend>hydra</depend>
+
+  <exec_depend>image_proc</exec_depend>
+  <exec_depend>depth_image_proc</exec_depend>
+  <exec_depend>rviz</exec_depend>
+
+  <export>
+      <nodelet plugin="${prefix}/nodelet_plugins.xml"/>
+  </export>
+
+</package>

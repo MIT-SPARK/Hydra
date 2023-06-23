@@ -1,0 +1,15 @@
+<launch>
+    <rosparam command="load"
+              file="$(find hydra_ros)/tests/resources/test_config.yaml"
+              ns="/plain_test_config"/>
+
+    <rosparam command="load"
+              file="$(find hydra_ros)/tests/resources/nested_test_config.yaml"
+              ns="/nested_test_config"/>
+
+    <rosparam command="load"
+              file="$(find hydra_ros)/tests/resources/map_config.yaml"
+              ns="/map_test_config"/>
+
+    <test pkg="hydra_ros" type="test_hydra_ros" test-name="test_hydra_ros"/>
+</launch>

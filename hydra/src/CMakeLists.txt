@@ -1,0 +1,53 @@
+  target_sources(
+    ${PROJECT_NAME}
+    PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/backend/backend_module.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/backend/merge_handler.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/backend/update_functions.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/common/hydra_config.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/common/robot_prefix_config.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/common/shared_module_state.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/config/yaml_parser.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/frontend/frontend_module.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/frontend/mesh_segmenter.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/loop_closure/descriptor_matching.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/loop_closure/detector.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/loop_closure/loop_closure_module.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/loop_closure/registration.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/loop_closure/scene_graph_descriptors.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/loop_closure/subgraph_extraction.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/places/compression_graph_extractor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/places/floodfill_graph_extractor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/places/graph_extractor_interface.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/places/graph_extractor_types.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/places/graph_extractor_utilities.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/places/gvd_graph.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/places/gvd_integrator.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/places/gvd_parent_tracker.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/places/gvd_thinning.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/places/gvd_utilities.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/places/gvd_voxel.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/places/nearest_voxel_utilities.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/places/update_statistics.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/reconstruction/reconstruction_config.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/reconstruction/reconstruction_module.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/reconstruction/voxel_aware_marching_cubes.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/reconstruction/voxel_aware_mesh_integrator.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/rooms/graph_clustering.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/rooms/graph_filtration.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/rooms/room_finder.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/rooms/room_utilities.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/utils/disjoint_set.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/utils/display_utilities.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/utils/log_utilities.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/utils/minimum_spanning_tree.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/utils/nearest_neighbor_utilities.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/utils/timing_utilities.cpp
+  )
+
+if(HYDRA_GNN)
+  target_sources(
+    ${PROJECT_NAME}
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/loop_closure/gnn_descriptors.cpp
+  )
+endif(HYDRA_GNN)

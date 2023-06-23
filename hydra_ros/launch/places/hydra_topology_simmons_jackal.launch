@@ -1,0 +1,26 @@
+<launch>
+    <arg name="sim_time_required" default="true"/>
+    <param name="use_sim_time" value="$(arg sim_time_required)"/>
+
+    <arg name="start_rviz" default="true"/>
+
+    <arg name="use_semantics" default="true"/>
+
+    <arg name="robot_name" default="sparkal"/>
+    <arg name="model_name" default="hrnetv2_360_640_v12"/>
+    <arg name="dataset_name" default="ade150_config"/>
+    <arg name="semantic_map_path" default="$(find semantic_recolor)/config/colors/$(arg dataset_name).csv"/>
+    <arg name="pointcloud_topic" default="semantic_pointcloud"/>
+    <arg name="use_gt_frame" default="true"/>
+    <arg name="sensor_frame" default="left_cam"/>
+
+    <include file="$(find hydra_ros)/launch/utils/data_sources/simmons_jackal_pointcloud.launch" pass_all_args="true"/>
+
+    <include file="$(find hydra_ros)/launch/places/hydra_topology.launch" pass_all_args="true">
+        <arg name="config" value="$(find hydra)/config/d455_topology_config.yaml"/>
+        <arg name="extrinsics" value="$(find hydra)/config/extrinsics/$(arg robot_name).yaml"/>
+        <arg name="dsg_output_prefix" value="simmons"/>
+        <arg name="rviz_file" value="sidpac.rviz"/>
+        <arg name="use_pose_graph" value="$(eval not arg('use_gt_frame'))"/>
+    </include>
+</launch>
