@@ -20,7 +20,7 @@
 - git:
     local-name: kimera_pgmo
     uri: git@github.com:MIT-SPARK/Kimera-PGMO.git
-    version: v0.0.1
+    version: master
 - git:
     local-name: kimera_rpgo
     uri: git@github.com:MIT-SPARK/Kimera-RPGO.git
@@ -28,7 +28,6 @@
 - git:
     local-name: spark_dsg
     uri: git@github.com:MIT-SPARK/Spark-DSG.git
-    version: v1.0.0
 - git:
     local-name: hydra
     uri: git@github.com:MIT-SPARK/Hydra.git
