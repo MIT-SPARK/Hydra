@@ -18,6 +18,10 @@
     uri: git@github.com:borglab/gtsam.git
     version: 4.2a9
 - git:
+    local-name: hydra_ros
+    uri: git@github.mit.edu:SPARK/Hydra-ROS.git
+    version: main
+- git:
     local-name: kimera_pgmo
     uri: git@github.mit.edu:SPARK/Kimera-PGMO.git
     version: develop

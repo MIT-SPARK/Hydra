@@ -18,6 +18,9 @@
     uri: git@github.com:borglab/gtsam.git
     version: 4.2a9
 - git:
+    local-name: hydra_ros
+    uri: git@github.com:MIT-SPARK/Hydra-ROS.git
+- git:
     local-name: kimera_pgmo
     uri: git@github.com:MIT-SPARK/Kimera-PGMO.git
     version: master
@@ -31,7 +34,7 @@
 - git:
     local-name: kimera_semantics
     uri: git@github.com:MIT-SPARK/Kimera-Semantics.git
-    version: feature/noetic_fixes
+    version: develop
 - git:
     local-name: mesh_tools
     uri: git@github.com:yunzc/mesh_tools.git
