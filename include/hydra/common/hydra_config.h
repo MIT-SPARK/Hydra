@@ -36,6 +36,7 @@
 #include <array>
 #include <atomic>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <vector>
 
@@ -44,6 +45,7 @@ namespace hydra {
 class HydraConfig {
  public:
   using ColorArray = std::array<uint8_t, 3>;
+  using LabelNameMap = std::map<uint8_t, std::string>;
 
   static HydraConfig& instance() {
     if (!instance_) {
@@ -60,6 +62,10 @@ class HydraConfig {
 
   const ColorArray& getRoomColor(size_t index) const;
 
+  const LabelNameMap& getLabelToNameMap() const;
+
+  void setLabelToNameMap(const LabelNameMap& name_map);
+
  private:
   HydraConfig();
 
@@ -69,6 +75,7 @@ class HydraConfig {
   std::atomic<bool> force_shutdown_;
 
   std::vector<ColorArray> colormap_;
+  std::map<uint8_t, std::string> label_to_name_map_;
 };
 
 std::ostream& operator<<(std::ostream& out, const HydraConfig& config);

@@ -74,4 +74,12 @@ const HydraConfig::ColorArray& HydraConfig::getRoomColor(size_t index) const {
   return colormap_.at(index % colormap_.size());
 }
 
+void HydraConfig::setLabelToNameMap(const HydraConfig::LabelNameMap& name_map) {
+  label_to_name_map_ = name_map;
+}
+
+const HydraConfig::LabelNameMap& HydraConfig::getLabelToNameMap() const {
+  return label_to_name_map_;
+}
+
 }  // namespace hydra
