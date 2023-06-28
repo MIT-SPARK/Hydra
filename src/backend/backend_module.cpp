@@ -461,9 +461,6 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
 
     private_dsg_->graph->mergeGraph(*shared_dsg_->graph,
                                     merge_handler_->mergedNodes(),
-                                    true,
-                                    false,
-                                    true,
                                     &config_.merge_update_map,
                                     config_.merge_update_dynamic);
 
