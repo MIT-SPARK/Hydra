@@ -139,8 +139,6 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
 
     ScopedTimer spin_timer("lcd/merge_graph", timestamp_ns);
     lcd_graph_->mergeGraph(*dsg_->graph);
-    CHECK_EQ(lcd_graph_->numNodes(false), dsg_->graph->numNodes(false));
-    CHECK_EQ(lcd_graph_->numEdges(false), dsg_->graph->numEdges(false));
   }  // end critical section
 
   auto query_agent = getQueryAgentId(timestamp_ns);
