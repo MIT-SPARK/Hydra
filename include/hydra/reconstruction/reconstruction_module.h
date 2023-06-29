@@ -45,6 +45,7 @@
 #include "hydra/reconstruction/configs.h"
 #include "hydra/reconstruction/reconstruction_config.h"
 #include "hydra/reconstruction/reconstruction_output.h"
+#include "hydra/utils/log_utilities.h"
 
 namespace hydra {
 
@@ -86,7 +87,7 @@ class ReconstructionModule {
 
   void stop();
 
-  void save(const std::string& output_path);
+  void save(const LogSetup& log_setup);
 
   void spin();
 

@@ -54,7 +54,8 @@ using LabelClusters = MeshSegmenter::LabelClusters;
 FrontendModule::FrontendModule(const RobotPrefixConfig& prefix,
                                const FrontendConfig& config,
                                const SharedDsgInfo::Ptr& dsg,
-                               const SharedModuleState::Ptr& state)
+                               const SharedModuleState::Ptr& state,
+                               const LogSetup::Ptr& logs)
     : queue_(std::make_shared<FrontendInputQueue>()),
       prefix_(prefix),
       config_(config),
@@ -70,16 +71,24 @@ FrontendModule::FrontendModule(const RobotPrefixConfig& prefix,
   const auto mesh_resolution = config_.pgmo_config.mesh_resolution;
   mesh_compression_.reset(new kimera_pgmo::DeltaCompression(mesh_resolution));
 
+  if (logs && logs->valid()) {
+    logs_ = logs;
+
+    const auto frontend_dir = logs->getLogDir("frontend");
+    VLOG(1) << "[Hydra Frontend] logging to " << frontend_dir;
+    frontend_graph_logger_.setOutputPath(frontend_dir);
+    frontend_graph_logger_.setLayerName(DsgLayers::OBJECTS, "objects");
+    frontend_graph_logger_.setLayerName(DsgLayers::PLACES, "places");
+
+    config_.pgmo_config.log_output = true;
+    config_.pgmo_config.log_path = logs->getLogDir("frontend/pgmo");
+  } else {
+    config_.pgmo_config.log_output = false;
+  }
+
   CHECK(mesh_frontend_.initialize(config_.pgmo_config));
   segmenter_.reset(
       new MeshSegmenter(config_.object_config, dsg_->graph->getMeshVertices()));
-
-  if (config_.should_log) {
-    VLOG(1) << "[Hydra Frontend] logging to " << (config_.log_path + "/frontend");
-    frontend_graph_logger_.setOutputPath(config_.log_path + "/frontend");
-    frontend_graph_logger_.setLayerName(DsgLayers::OBJECTS, "objects");
-    frontend_graph_logger_.setLayerName(DsgLayers::PLACES, "places");
-  }
 
   input_callbacks_.push_back(
       std::bind(&FrontendModule::updateMeshAndObjects, this, std::placeholders::_1));
@@ -111,7 +120,8 @@ void FrontendModule::stop() {
   VLOG(2) << "[Hydra Frontend]: " << queue_->size() << " messages left";
 }
 
-void FrontendModule::save(const std::string& output_path) {
+void FrontendModule::save(const LogSetup& log_setup) {
+  const auto output_path = log_setup.getLogDir("frontend");
   dsg_->graph->save(output_path + "/dsg.json", false);
   dsg_->graph->save(output_path + "/dsg_with_mesh.json");
 
@@ -203,7 +213,7 @@ void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
 
   state_->backend_queue.push(backend_input_);
 
-  if (config_.should_log) {
+  if (logs_) {
     // mutex not required because nothing is modifying the graph
     frontend_graph_logger_.logGraph(dsg_->graph);
   }

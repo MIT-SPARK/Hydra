@@ -47,6 +47,7 @@
 #include "hydra/common/common.h"
 #include "hydra/common/robot_prefix_config.h"
 #include "hydra/common/shared_module_state.h"
+#include "hydra/utils/log_utilities.h"
 
 namespace hydra {
 
@@ -70,7 +71,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface {
                 const kimera_pgmo::KimeraPgmoConfig& pgmo_config,
                 const SharedDsgInfo::Ptr& dsg,
                 const SharedDsgInfo::Ptr& backend_dsg,
-                const SharedModuleState::Ptr& state);
+                const SharedModuleState::Ptr& state,
+                const LogSetup::Ptr& logs = nullptr);
 
   virtual ~BackendModule();
 
@@ -82,7 +84,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface {
 
   void stop();
 
-  void save(const std::string& output_path);
+  void save(const LogSetup& log_setup);
 
   void spin();
 
@@ -186,6 +188,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface {
 
   BackendModuleStatus status_;
   SceneGraphLogger backend_graph_logger_;
+  LogSetup::Ptr logs_;
   std::list<LoopClosureLog> loop_closures_;
 
   kimera_pgmo::Path trajectory_;

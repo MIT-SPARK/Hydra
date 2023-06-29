@@ -33,7 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/reconstruction/vertex_voxel.h>
 #include <hydra/reconstruction/voxel_aware_marching_cubes.h>
 
 #include <set>
@@ -41,6 +40,7 @@
 namespace hydra {
 
 using voxblox::BlockIndex;
+using places::VertexVoxel;
 
 static constexpr float TEST_TOLERANCE = 1.0e-6f;
 

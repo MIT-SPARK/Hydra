@@ -127,7 +127,7 @@ void ReconstructionModule::stop() {
   }
 }
 
-void ReconstructionModule::save(const std::string& output_path) {
+void ReconstructionModule::save(const LogSetup& log_setup) {
   const auto& original_places = gvd_integrator_->getGraph();
   auto places = original_places.clone();
 
@@ -142,7 +142,7 @@ void ReconstructionModule::save(const std::string& output_path) {
 
   DynamicSceneGraph::Ptr graph(new DynamicSceneGraph());
   graph->updateFromLayer(*places, std::move(edges));
-  graph->save(output_path + "/places.json", false);
+  graph->save(log_setup.getLogDir("topology") + "/places.json", false);
 }
 
 void ReconstructionModule::spin() {
