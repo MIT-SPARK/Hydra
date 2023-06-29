@@ -36,81 +36,101 @@
 
 #include <glog/logging.h>
 
+#if defined(HYDRA_USE_STANDARD_FS) && HYDRA_USE_STANDARD_FS
+namespace fs = std::filesystem;
+#else
 #include <boost/filesystem.hpp>
-
-#include "hydra/utils/timing_utilities.h"
-
 namespace fs = boost::filesystem;
+#endif
 
 namespace hydra {
 
-using hydra::timing::ElapsedTimeRecorder;
-
-inline bool makeDir(const fs::path& path) {
+inline bool makeDirs(const fs::path& path) {
   if (fs::exists(path)) {
     return true;
   }
 
+#if defined(HYDRA_USE_STANDARD_FS) && HYDRA_USE_STANDARD_FS
+  std::error_code code;
+#else
   boost::system::error_code code;
-  return fs::create_directory(path, code);
+#endif
+  return fs::create_directories(path, code);
 }
 
-bool setupLogs(const std::string& log_dir, bool make_topology, bool make_dsg) {
-  fs::path log_path(log_dir);
-  const auto topology_path = log_path / "topology";
-  const auto frontend_path = log_path / "frontend";
-  const auto backend_path = log_path / "backend";
-  const auto lcd_path = log_path / "lcd";
-
-  if (!makeDir(log_path)) {
-    LOG(WARNING) << "Failed to make dir: " << log_path;
-    return false;
-  }
-
-  if (make_topology && !makeDir(topology_path)) {
-    LOG(WARNING) << "Failed to make dir: " << topology_path;
-    return false;
-  }
-
-  if (!make_dsg) {
-    return true;
-  }
-
-  bool valid = makeDir(frontend_path) && makeDir(backend_path) && makeDir(lcd_path);
-  if (!valid) {
-    LOG(WARNING) << "Failed to make one of: " << std::endl
-                 << " - " << frontend_path << std::endl
-                 << " - " << backend_path << std::endl
-                 << " - " << lcd_path;
-  }
-
-  return valid;
-}
-
-LogSetup::LogSetup(const LogConfig& conf) : valid(false), config(conf) {
-  if (config.log_dir == "") {
+LogSetup::LogSetup(const LogConfig& conf) : valid_(false), config_(conf) {
+  if (config_.log_dir == "") {
     return;
   }
 
-  valid = setupLogs(config.log_dir, config.make_topology_logs, config.make_dsg_logs);
-  if (!valid) {
-    LOG(WARNING) << "Logging disabled";
+  fs::path log_path(config_.log_dir);
+  if (!makeDirs(log_path)) {
+    LOG(WARNING) << "Failed to make dir: " << log_path << ". logging Disabled!";
     return;
   }
 
-  if (config.log_timing_incrementally) {
-    ElapsedTimeRecorder::instance().setupIncrementalLogging(config.log_dir);
-  }
+  valid_ = true;
 }
 
 LogSetup::~LogSetup() {
-  if (valid) {
-    const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
-    timer.logAllElapsed(config.log_dir);
-    timer.logStats(config.log_dir + "/" + config.timing_stats_name);
+  if (!valid_) {
+    return;
+  }
+
+  for (const auto& func : callbacks_) {
+    func(*this);
   }
 }
 
-std::string LogSetup::getLogDir() const { return valid ? config.log_dir : ""; }
+std::string LogSetup::getLogDir() const { return valid_ ? config_.log_dir : ""; }
+
+std::string LogSetup::getLogDir(const std::string& log_namespace) const {
+  if (!valid_) {
+    return "";
+  }
+
+  auto ns_path = fs::path(config_.log_dir) / log_namespace;
+  if (!namespaces_.count(log_namespace)) {
+    makeDirs(ns_path);
+    namespaces_.insert(log_namespace);
+  }
+
+  return ns_path.string();
+}
+
+std::string LogSetup::getTimerFilepath() const {
+  if (!valid_) {
+    throw std::runtime_error("logging not configured, unable to get timer filepath");
+  }
+
+  const auto log_dir = fs::path(config_.log_dir);
+  return (log_dir / config_.timing_stats_name).lexically_normal().string();
+}
+
+std::string LogSetup::getTimerFilepath(const std::string& timer_name) const {
+  if (!valid_) {
+    throw std::runtime_error("unable to save timer: " + timer_name);
+  }
+
+  const auto log_dir = fs::path(config_.log_dir);
+
+  const auto timer_path = fs::path(timer_name);
+  const auto timer_ns = timer_path.parent_path();
+  const auto filename = timer_path.stem().string() + config_.timing_suffix;
+  if (timer_ns.empty()) {
+    return (log_dir / filename).lexically_normal().string();
+  }
+
+  fs::path full_path(getLogDir(timer_ns.string()));
+  return (full_path / filename).lexically_normal().string();
+}
+
+bool LogSetup::valid() const { return valid_; }
+
+const LogConfig& LogSetup::config() const { return config_; }
+
+void LogSetup::registerExitCallback(const std::function<void(const LogSetup&)>& func) {
+  callbacks_.push_back(func);
+}
 
 }  // namespace hydra

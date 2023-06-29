@@ -41,6 +41,7 @@
 #include "hydra/common/shared_module_state.h"
 #include "hydra/loop_closure/detector.h"
 #include "hydra/loop_closure/loop_closure_config.h"
+#include "hydra/utils/log_utilities.h"
 
 namespace hydra {
 
@@ -57,7 +58,7 @@ class LoopClosureModule {
 
   void stop();
 
-  void save(const std::string& output_path);
+  void save(const LogSetup& log_setup);
 
   void spin();
 

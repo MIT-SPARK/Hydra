@@ -48,6 +48,7 @@
 #include "hydra/frontend/frontend_config.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/reconstruction/reconstruction_output.h"
+#include "hydra/utils/log_utilities.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra {
@@ -63,7 +64,8 @@ class FrontendModule {
   FrontendModule(const RobotPrefixConfig& prefix,
                  const FrontendConfig& config,
                  const SharedDsgInfo::Ptr& dsg,
-                 const SharedModuleState::Ptr& state);
+                 const SharedModuleState::Ptr& state,
+                 const LogSetup::Ptr& logs = nullptr);
 
   virtual ~FrontendModule();
 
@@ -71,7 +73,7 @@ class FrontendModule {
 
   void stop();
 
-  void save(const std::string& output_path);
+  void save(const LogSetup& log_setup);
 
   void spin();
 
@@ -136,6 +138,7 @@ class FrontendModule {
 
   std::unique_ptr<MeshSegmenter> segmenter_;
   SceneGraphLogger frontend_graph_logger_;
+  LogSetup::Ptr logs_;
 
   std::unique_ptr<NearestNodeFinder> places_nn_finder_;
   NodeIdSet unlabeled_place_nodes_;

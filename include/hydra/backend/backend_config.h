@@ -109,9 +109,6 @@ void visit_config(const Visitor& v, KimeraPgmoConfig& config) {
 namespace hydra {
 
 struct BackendConfig {
-  bool should_log = true;
-  std::string log_path;
-
   bool visualize_place_factors = true;
   SemanticNodeAttributes::ColorVector building_color{169, 8, 194};  // purple
   SemanticNodeAttributes::Label building_semantic_label = 22u;
@@ -120,8 +117,6 @@ struct BackendConfig {
   RoomFinderConfig room_finder;
 
   struct PgmoConfig {
-    bool should_log = true;
-    std::string log_path;
     // covariance
     double place_mesh_variance;
     double place_edge_variance;
@@ -184,11 +179,6 @@ struct EnableMapConverter {
 
 template <typename Visitor>
 void visit_config(const Visitor& v, BackendConfig& config) {
-  // TODO(nathan) replace with single param (derive should_log from log_path)
-  v.visit("should_log", config.should_log);
-  if (config.should_log) {
-    v.visit("log_path", config.log_path);
-  }
   v.visit("visualize_place_factors", config.visualize_place_factors);
   v.visit("building_color", config.building_color);
   v.visit("building_semantic_label", config.building_semantic_label);
@@ -222,11 +212,6 @@ void visit_config(const Visitor& v, BackendConfig& config) {
 
 template <typename Visitor>
 void visit_config(const Visitor& v, BackendConfig::PgmoConfig& config) {
-  // TODO(nathan) replace with single param (derive should_log from log_path)
-  v.visit("should_log", config.should_log);
-  if (config.should_log) {
-    v.visit("log_path", config.log_path);
-  }
   auto covar_handle = v["covariance"];
   covar_handle.visit("place_mesh", config.place_mesh_variance);
   covar_handle.visit("place_edge", config.place_edge_variance);

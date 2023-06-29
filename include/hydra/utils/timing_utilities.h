@@ -41,7 +41,10 @@
 #include <optional>
 #include <string>
 
+#include "hydra/utils/log_utilities.h"
+
 namespace hydra {
+
 namespace timing {
 
 struct ElapsedStatistics {
@@ -74,13 +77,13 @@ class ElapsedTimeRecorder {
 
   ElapsedStatistics getStats(const std::string& timer_name) const;
 
-  void logElapsed(const std::string& name, const std::string& output_folder) const;
+  void logElapsed(const std::string& name, const LogSetup& log_config) const;
 
-  void logAllElapsed(const std::string& output_folder) const;
+  void logAllElapsed(const LogSetup& log_config) const;
 
-  void logStats(const std::string& output_folder) const;
+  void logStats(const std::string& stat_filepath) const;
 
-  void setupIncrementalLogging(const std::string& output_folder);
+  void setupIncrementalLogging(const LogSetup::Ptr& log_config);
 
   bool timing_disabled;
 
@@ -104,7 +107,7 @@ class ElapsedTimeRecorder {
   std::unique_ptr<std::mutex> mutex_;
 
   bool log_incrementally_;
-  std::string output_path_;
+  LogSetup::Ptr log_setup_;
   std::map<std::string, std::shared_ptr<std::ofstream>> files_;
 };
 

@@ -55,7 +55,6 @@ inline SharedDsgInfo::Ptr makeSharedDsg() {
 
 inline FrontendConfig getDefaultConfig() {
   FrontendConfig to_return;
-  to_return.should_log = false;
   to_return.filter_places = false;
   to_return.validate_vertices = false;
 

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.10)
 project(hydra)
 
 add_compile_options(-Wall -Wextra)
@@ -6,13 +6,25 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Filesystem.cmake)
+has_std_filesystem(HYDRA_USE_STANDARD_FS)
+
 option(HYDRA_USE_COVERAGE "Build core library with GCC --coverage option" OFF)
 option(HYDRA_GNN "build GNN interface" ON)
+
+# TODO(nathan) clean this up
 if(HYDRA_GNN)
   set(HYDRA_USE_GNN_CXX_VALUE 1)
 else()
   set(HYDRA_USE_GNN_CXX_VALUE 0)
 endif()
+
+if(${HYDRA_USE_STANDARD_FS})
+  set(HYDRA_USE_STANDARD_FS_CXX_VALUE 1)
+else()
+  set(HYDRA_USE_STANDARD_FS_CXX_VALUE 0)
+endif()
+
 configure_file(hydra_build_config.h.in ${CMAKE_CURRENT_BINARY_DIR}/hydra_build_config.h)
 
 find_package(Boost REQUIRED COMPONENTS timer)
@@ -80,6 +92,17 @@ target_link_libraries(
          gtsam
   PRIVATE nanoflann::nanoflann ${PCL_LIBRARIES}
 )
+if(HYDRA_USE_STANDARD_FS)
+  target_link_libraries(${PROJECT_NAME} PRIVATE stdc++fs)
+else()
+  find_package(
+    Boost
+    COMPONENTS filesystem
+    REQUIRED
+  )
+  target_link_libraries(${PROJECT_NAME} PRIVATE Boost::filesystem)
+endif(HYDRA_USE_STANDARD_FS)
+
 add_subdirectory(src)
 
 if(HYDRA_GNN)

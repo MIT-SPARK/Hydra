@@ -69,7 +69,8 @@ BackendModule::BackendModule(const RobotPrefixConfig& prefix,
                              const kimera_pgmo::KimeraPgmoConfig& pgmo_config,
                              const SharedDsgInfo::Ptr& dsg,
                              const SharedDsgInfo::Ptr& backend_dsg,
-                             const SharedModuleState::Ptr& state)
+                             const SharedModuleState::Ptr& state,
+                             const LogSetup::Ptr& logs)
     : KimeraPgmoInterface(),
       prefix_(prefix),
       config_(config),
@@ -88,8 +89,10 @@ BackendModule::BackendModule(const RobotPrefixConfig& prefix,
   setDefaultUpdateFunctions();
   deformation_graph_->setForceRecalculate(!config_.pgmo.gnc_fix_prev_inliers);
 
-  if (config_.should_log) {
-    const std::string log_path = config_.log_path + "/backend";
+  if (logs && logs->valid()) {
+    logs_ = logs;
+
+    const auto log_path = logs->getLogDir("backend");
     backend_graph_logger_.setOutputPath(log_path);
     VLOG(1) << "[Hydra Backend] logging to " << log_path;
     backend_graph_logger_.setLayerName(DsgLayers::OBJECTS, "objects");
@@ -140,25 +143,27 @@ void BackendModule::stop() {
   VLOG(2) << "[Hydra Backend]: " << state_->backend_queue.size() << " messages left";
 }
 
-void BackendModule::save(const std::string& output_path) {
-  private_dsg_->graph->save(output_path + "/dsg.json", false);
-  private_dsg_->graph->save(output_path + "/dsg_with_mesh.json");
+void BackendModule::save(const LogSetup& log_setup) {
+  const auto backend_path = log_setup.getLogDir("backend");
+  const auto pgmo_path = log_setup.getLogDir("backend/pgmo");
+  private_dsg_->graph->save(backend_path + "/dsg.json", false);
+  private_dsg_->graph->save(backend_path + "/dsg_with_mesh.json");
   // TODO(Yun) Technically not strictly a g2o
-  deformation_graph_->save(config_.pgmo.log_path + "/deformation_graph.dgrf");
-  savePoseGraphSparseMapping(config_.pgmo.log_path + "/sparsification_mapping.txt");
+  deformation_graph_->save(pgmo_path + "/deformation_graph.dgrf");
+  savePoseGraphSparseMapping(pgmo_path + "/sparsification_mapping.txt");
 
   if (deformation_graph_->hasPrefixPoses(prefix_.key)) {
     const auto optimized_path = getOptimizedTrajectory(prefix_.id);
-    std::string csv_name = config_.pgmo.log_path + std::string("/traj_pgmo.csv");
+    std::string csv_name = pgmo_path + "/traj_pgmo.csv";
     saveTrajectory(optimized_path, timestamps_, csv_name);
   }
 
   if (!private_dsg_->graph->isMeshEmpty()) {
     kimera_pgmo::WriteMeshWithStampsToPly(
-        output_path + "/mesh.ply", private_dsg_->graph->getMesh(), mesh_timestamps_);
+        backend_path + "/mesh.ply", private_dsg_->graph->getMesh(), mesh_timestamps_);
   }
 
-  const std::string output_csv = output_path + "/loop_closures.csv";
+  const std::string output_csv = backend_path + "/loop_closures.csv";
   std::ofstream output_file;
   output_file.open(output_csv);
 
@@ -265,7 +270,7 @@ void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
     callUpdateFunctions(input.timestamp_ns);
   }
 
-  if (config_.pgmo.should_log) {
+  if (logs_) {
     logStatus();
   }
 
@@ -298,8 +303,8 @@ void BackendModule::setSolverParams() {
   KimeraRPGO::RobustSolverParams params = deformation_graph_->getParams();
   params.verbosity = config_.pgmo.rpgo_verbosity;
   params.solver = config_.pgmo.rpgo_solver;
-  if (config_.pgmo.should_log) {
-    params.logOutput(config_.pgmo.log_path);
+  if (logs_) {
+    params.logOutput(logs_->getLogDir("backend/pgmo"));
     logStatus(true);
   }
   deformation_graph_->setParams(params);
@@ -330,8 +335,10 @@ void BackendModule::setDefaultUpdateFunctions() {
   if (config_.enable_rooms) {
     update_rooms_functor_.reset(
         new dsg_updates::UpdateRoomsFunctor(config_.room_finder));
-    update_rooms_functor_->room_finder->enableLogging(config_.log_path +
-                                                      "/room_filtrations");
+    if (logs_) {
+      const auto log_path = logs_->getLogDir("backend/room_filtrations");
+      update_rooms_functor_->room_finder->enableLogging(log_path);
+    }
     dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdateRoomsFunctor::call,
                                           update_rooms_functor_.get(),
                                           std::placeholders::_1,
@@ -498,7 +505,7 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
     updatePlacePosFromCache();  // copy optimized positions back
   }                             // end joint critical section
 
-  if (config_.should_log) {
+  if (logs_) {
     backend_graph_logger_.logGraph(private_dsg_->graph);
   }
 
@@ -782,8 +789,13 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
 }
 
 void BackendModule::logStatus(bool init) const {
+  if (!logs_) {
+    return;
+  }
+
+  const auto filename = logs_->getLogDir("backend/pgmo") + "/dsg_pgmo_status.csv";
+
   std::ofstream file;
-  std::string filename = config_.pgmo.log_path + std::string("/dsg_pgmo_status.csv");
   if (init) {
     LOG(INFO) << "[Hydra Backend] logging PGMO status output to " << filename;
     file.open(filename);

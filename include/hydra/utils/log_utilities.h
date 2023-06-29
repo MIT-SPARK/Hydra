@@ -34,40 +34,59 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
+#include <functional>
+#include <list>
+#include <set>
 #include <string>
+#include <memory>
 
 namespace hydra {
 
 struct LogConfig {
   std::string log_dir = "";
-  bool make_topology_logs = true;
-  bool make_dsg_logs = true;
   bool log_timing_incrementally = false;
   std::string timing_stats_name = "timing_stats.csv";
+  std::string timing_suffix = "_timing_raw.csv";
 };
 
 template <typename Visitor>
 void visit_config(const Visitor& v, LogConfig& config) {
   v.visit("log_path", config.log_dir);
-  v.visit("make_topology_logs", config.make_topology_logs);
-  v.visit("make_dsg_logs", config.make_dsg_logs);
   v.visit("log_timing_incrementally", config.log_timing_incrementally);
   v.visit("timing_stats_name", config.timing_stats_name);
+  v.visit("timing_suffix", config.timing_suffix);
 }
 
-bool setupLogs(const std::string& log_dir,
-               bool make_topology = true,
-               bool make_dsg = true);
+class LogSetup {
+ public:
+  using Ptr = std::shared_ptr<LogSetup>;
 
-struct LogSetup {
   explicit LogSetup(const LogConfig& config);
 
   ~LogSetup();
 
+  void init();
+
   std::string getLogDir() const;
 
-  bool valid;
-  LogConfig config;
+  std::string getLogDir(const std::string& log_namespace) const;
+
+  std::string getTimerFilepath() const;
+
+  std::string getTimerFilepath(const std::string& timer_name) const;
+
+  bool valid() const;
+
+  const LogConfig& config() const;
+
+  void registerExitCallback(const std::function<void(const LogSetup&)>& func);
+
+ private:
+  bool valid_;
+  LogConfig config_;
+  mutable std::set<std::string> namespaces_;
+
+  std::list<std::function<void(const LogSetup&)>> callbacks_;
 };
 
 }  // namespace hydra

@@ -58,10 +58,6 @@ template <typename Visitor>
 void visit_config(const Visitor& v, kimera_pgmo::MeshFrontendConfig& config) {
   v.visit("horizon", config.time_horizon);
   v.visit("track_mesh_graph_mapping", config.b_track_mesh_graph_mapping);
-  v.visit("should_log", config.log_output);
-  if (config.log_output) {
-    v.visit("log_path", config.log_path);
-  }
   v.visit("full_compression_method", config.full_compression_method);
   v.visit("graph_compression_method", config.graph_compression_method);
   v.visit("d_graph_resolution", config.d_graph_resolution);
@@ -74,8 +70,6 @@ namespace hydra {
 
 struct FrontendConfig {
   // TODO(nathan) consider unifying log path with backend
-  bool should_log = true;
-  std::string log_path;
   size_t min_object_vertices = 20;
   bool prune_mesh_indices = false;
   std::string semantic_label_file;
@@ -128,11 +122,6 @@ void visit_config(const Visitor& v, MeshSegmenterConfig& config) {
 
 template <typename Visitor>
 void visit_config(const Visitor& v, FrontendConfig& config) {
-  // TODO(nathan) replace with single param (derive should_log from log_path)
-  v.visit("should_log", config.should_log);
-  if (config.should_log) {
-    v.visit("log_path", config.log_path);
-  }
   v.visit("min_object_vertices", config.min_object_vertices);
   v.visit("prune_mesh_indices", config.prune_mesh_indices);
   v.visit("semantic_label_file", config.semantic_label_file);

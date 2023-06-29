@@ -42,6 +42,8 @@
 #include <iostream>
 #include <numeric>
 
+#include "hydra/utils/log_utilities.h"
+
 namespace hydra {
 namespace timing {
 
@@ -116,7 +118,7 @@ void ElapsedTimeRecorder::stop(const std::string& timer_name) {
 
   auto iter = files_.find(timer_name);
   if (iter == files_.end()) {
-    const std::string fname = output_path_ + "/" + timer_name + "_timing_raw.csv";
+    const auto fname = log_setup_->getTimerFilepath(timer_name);
     auto file_ptr = std::make_shared<std::ofstream>(fname);
     iter = files_.emplace(std::make_pair(timer_name, file_ptr)).first;
   }
@@ -194,10 +196,11 @@ ElapsedStatistics ElapsedTimeRecorder::getStats(const std::string& name) const {
 }
 
 void ElapsedTimeRecorder::logElapsed(const std::string& name,
-                                     const std::string& output_folder) const {
-  const std::string output_csv = output_folder + "/" + name + "_timing_raw.csv";
+                                     const LogSetup& log_setup) const {
+  const auto output_csv = log_setup.getTimerFilepath(name);
   std::ofstream output_file;
   output_file.open(output_csv);
+
   TimeList durations;
   TimeStamps stamps;
   {  // start critical section
@@ -211,6 +214,7 @@ void ElapsedTimeRecorder::logElapsed(const std::string& name,
     durations = elapsed_.at(name);
     stamps = stamps_.at(name);
   }  // end critical section
+
   output_file << "timestamp(ns),elapsed(s)\n";
   TimeList::iterator d_it = durations.begin();
   TimeStamps::iterator s_it = stamps.begin();
@@ -221,19 +225,23 @@ void ElapsedTimeRecorder::logElapsed(const std::string& name,
   output_file.close();
 }
 
-void ElapsedTimeRecorder::setupIncrementalLogging(const std::string& output_folder) {
-  log_incrementally_ = true;
-  output_path_ = output_folder;
+void ElapsedTimeRecorder::setupIncrementalLogging(const LogSetup::Ptr& log_setup) {
+  if (log_setup and log_setup->valid()) {
+    log_incrementally_ = true;
+    log_setup_ = log_setup;
+  } else {
+    LOG(WARNING) << "unable to configure incremental timer logging";
+  }
 }
 
-void ElapsedTimeRecorder::logAllElapsed(const std::string& output_folder) const {
+void ElapsedTimeRecorder::logAllElapsed(const LogSetup& log_setup) const {
   if (log_incrementally_) {
     return;
   }
 
   for (const auto& str_timer_pair : elapsed_) {
     VLOG(1) << "Saving " << str_timer_pair.first;
-    logElapsed(str_timer_pair.first, output_folder);
+    logElapsed(str_timer_pair.first, log_setup);
     VLOG(1) << "Saved " << str_timer_pair.first;
   }
 }
