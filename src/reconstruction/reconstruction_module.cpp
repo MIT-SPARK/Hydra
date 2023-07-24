@@ -36,6 +36,7 @@
 
 #include <kimera_semantics/semantic_tsdf_integrator_factory.h>
 #include <tf2_eigen/tf2_eigen.h>
+#include <yaml-cpp/yaml.h>
 
 #include "hydra/places/gvd_integrator.h"
 #include "hydra/reconstruction/voxel_aware_mesh_integrator.h"
@@ -64,6 +65,37 @@ inline Eigen::Affine3d getPose(const geometry_msgs::Pose& pose) {
   Eigen::Affine3d world_T_body;
   tf2::convert(pose, world_T_body);
   return world_T_body;
+}
+
+std::string showQuaternion(const Eigen::Quaterniond& q) {
+  std::stringstream ss;
+  ss << "{w: " << q.w() << ", x: " << q.x() << ", y: " << q.y() << ", z: " << q.z()
+     << "}";
+  return ss.str();
+}
+
+bool loadExtrinsicsFromKimera(ReconstructionConfig& config,
+                              const std::string& filename) {
+  const auto node = YAML::LoadFile(filename);
+  const auto elements = node["T_BS"]["data"].as<std::vector<double>>();
+  if (elements.size() != 16u) {
+    LOG(ERROR) << "Invalid transform matrix";
+    return false;
+  }
+
+  Eigen::Matrix4d body_T_camera;
+  for (size_t r = 0; r < 4; r++) {
+    for (size_t c = 0; c < 4; c++) {
+      body_T_camera(r, c) = elements.at(4 * r + c);
+    }
+  }
+
+  config.body_R_camera = Eigen::Quaterniond(body_T_camera.block<3, 3>(0, 0));
+  config.body_t_camera = body_T_camera.block<3, 1>(0, 3);
+  LOG(INFO) << "Loaded extrinsics from Kimera: R="
+            << showQuaternion(config.body_R_camera)
+            << ", t=" << config.body_t_camera.transpose();
+  return true;
 }
 
 ReconstructionModule::ReconstructionModule(const RobotPrefixConfig& prefix,
