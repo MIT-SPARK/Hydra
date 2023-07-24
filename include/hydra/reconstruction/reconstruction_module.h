@@ -56,6 +56,9 @@ class GvdIntegrator;
 
 class VoxelAwareMeshIntegrator;
 
+bool loadExtrinsicsFromKimera(ReconstructionConfig& config,
+                              const std::string& filename);
+
 struct ReconstructionInput {
   using Ptr = std::shared_ptr<ReconstructionInput>;
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
