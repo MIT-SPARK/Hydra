@@ -33,61 +33,61 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <utility>
-
-#include "hydra/places/gvd_integrator.h"
-#include "hydra/reconstruction/mesh_integrator.h"
+#include "hydra/common/dsg_types.h"
+#include "hydra/config/config.h"
 
 namespace hydra {
-namespace places {
 
-class ComboIntegrator {
- public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
-  ComboIntegrator(const GvdIntegratorConfig& gvd_config,
-                  const Layer<TsdfVoxel>::Ptr& tsdf_layer,
-                  const Layer<GvdVoxel>::Ptr& gvd_layer,
-                  const SemanticMeshLayer::Ptr& mesh_layer,
-                  const MeshIntegratorConfig* mesh_config = nullptr)
-      : tsdf_(tsdf_layer), mesh_(mesh_layer) {
-    vertices_.reset(
-        new Layer<VertexVoxel>(gvd_layer->voxel_size(), gvd_layer->voxels_per_side()));
-    mesh_integrator = std::make_unique<MeshIntegrator>(
-        mesh_config ? *mesh_config : MeshIntegratorConfig(),
-        tsdf_layer,
-        vertices_,
-        mesh_layer);
-    gvd_integrator = std::make_unique<GvdIntegrator>(gvd_config, gvd_layer);
-  }
-
-  virtual ~ComboIntegrator() = default;
-
-  inline const SceneGraphLayer& getGraph() const { return gvd_integrator->getGraph(); }
-
-  inline const GvdGraph& getGvdGraph() const { return gvd_integrator->getGvdGraph(); }
-
-  inline GraphExtractorInterface& getGraphExtractor() const {
-    return gvd_integrator->getGraphExtractor();
-  }
-
-  inline void update(uint64_t timestamp_ns,
-                     bool clear_updated_flag,
-                     bool use_all_blocks = false) {
-    mesh_integrator->generateMesh(!use_all_blocks, clear_updated_flag);
-    gvd_integrator->updateFromTsdf(
-        timestamp_ns, *tsdf_, *vertices_, *mesh_, clear_updated_flag, use_all_blocks);
-    gvd_integrator->updateGvd(timestamp_ns);
-  }
-
-  std::unique_ptr<MeshIntegrator> mesh_integrator;
-  std::unique_ptr<GvdIntegrator> gvd_integrator;
-
- protected:
-  Layer<TsdfVoxel>::Ptr tsdf_;
-  SemanticMeshLayer::Ptr mesh_;
-  Layer<VertexVoxel>::Ptr vertices_;
+struct MeshSegmenterConfig {
+  char prefix = 'O';
+  double active_horizon_s = 10.0;
+  double active_index_horizon_m = 7.0;
+  double cluster_tolerance = 0.25;
+  size_t min_cluster_size = 40;
+  size_t max_cluster_size = 100000;
+  float angle_step = 10.0f;
+  BoundingBox::Type bounding_box_type = BoundingBox::Type::AABB;
+  std::set<uint32_t> labels;
 };
 
-}  // namespace places
 }  // namespace hydra
+
+namespace spark_dsg {
+
+using BoundingBoxType = BoundingBox::Type;
+
+}  // namespace spark_dsg
+
+DECLARE_CONFIG_ENUM(spark_dsg,
+                    BoundingBoxType,
+                    {BoundingBoxType::INVALID, "INVALID"},
+                    {BoundingBoxType::AABB, "AABB"},
+                    {BoundingBoxType::OBB, "OBB"},
+                    {BoundingBoxType::RAABB, "RAABB"});
+
+namespace hydra {
+
+template <typename Visitor>
+void visit_config(const Visitor& v, MeshSegmenterConfig& config) {
+  std::string prefix_string;
+  if (!config_parser::is_parser<Visitor>()) {
+    prefix_string.push_back(config.prefix);
+  }
+
+  v.visit("prefix", prefix_string);
+  if (config_parser::is_parser<Visitor>()) {
+    config.prefix = prefix_string.at(0);
+  }
+
+  v.visit("active_horizon_s", config.active_horizon_s);
+  v.visit("active_index_horizon_m", config.active_index_horizon_m);
+  v.visit("cluster_tolerance", config.cluster_tolerance);
+  v.visit("min_cluster_size", config.min_cluster_size);
+  v.visit("max_cluster_size", config.max_cluster_size);
+  v.visit("bounding_box_type", config.bounding_box_type);
+  v.visit("labels", config.labels);
+}
+
+}  // namespace hydra
+
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, MeshSegmenterConfig)

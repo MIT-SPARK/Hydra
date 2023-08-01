@@ -47,6 +47,10 @@
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/utils/log_utilities.h"
 
+namespace kimera {
+class SemanticIntegratorBase;
+}
+
 namespace hydra {
 
 namespace places {
@@ -54,7 +58,7 @@ namespace places {
 class GvdIntegrator;
 }  // namespace places
 
-class VoxelAwareMeshIntegrator;
+class MeshIntegrator;
 
 bool loadExtrinsicsFromKimera(ReconstructionConfig& config,
                               const std::string& filename);
@@ -67,8 +71,9 @@ struct ReconstructionInput {
   std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
   Eigen::Vector3d world_t_body;
   Eigen::Quaterniond world_R_body;
-  std::unique_ptr<voxblox::Pointcloud> pointcloud;
-  std::unique_ptr<voxblox::Colors> pointcloud_colors;
+  voxblox::Pointcloud pointcloud;
+  voxblox::Colors pointcloud_colors;
+  std::vector<uint32_t> pointcloud_labels;
 };
 
 class ReconstructionModule {
@@ -138,7 +143,7 @@ class ReconstructionModule {
   mutable std::mutex gvd_mutex_;
 
   RobotPrefixConfig prefix_;
-  ReconstructionConfig config_;
+  const ReconstructionConfig config_;
 
   std::atomic<bool> should_shutdown_{false};
   ReconstructionInputQueue::Ptr queue_;
@@ -153,10 +158,10 @@ class ReconstructionModule {
   voxblox::Layer<kimera::SemanticVoxel>::Ptr semantics_;
   voxblox::Layer<places::GvdVoxel>::Ptr gvd_;
   voxblox::Layer<places::VertexVoxel>::Ptr vertices_;
-  voxblox::MeshLayer::Ptr mesh_;
+  SemanticMeshLayer::Ptr mesh_;
 
-  std::unique_ptr<voxblox::TsdfIntegratorBase> tsdf_integrator_;
-  std::unique_ptr<VoxelAwareMeshIntegrator> mesh_integrator_;
+  std::unique_ptr<kimera::SemanticIntegratorBase> tsdf_integrator_;
+  std::unique_ptr<MeshIntegrator> mesh_integrator_;
   std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
 
   uint64_t prev_time_;

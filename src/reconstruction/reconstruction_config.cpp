@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/reconstruction/reconstruction_config.h"
 
-namespace voxblox {
+namespace hydra {
 
 int ThreadNumConverter::to(const int& other) const {
   if (other <= 0) {
@@ -44,10 +44,6 @@ int ThreadNumConverter::to(const int& other) const {
 }
 
 int ThreadNumConverter::from(const int& other) const { return other; }
-
-}  // namespace voxblox
-
-namespace hydra {
 
 Eigen::Quaterniond QuaternionConverter::to(
     const std::map<std::string, double>& other) const {

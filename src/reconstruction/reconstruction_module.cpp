@@ -34,18 +34,19 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/reconstruction/reconstruction_module.h"
 
-#include <kimera_semantics/semantic_tsdf_integrator_factory.h>
+#include <kimera_semantics/semantic_tsdf_integrator_fast.h>
 #include <tf2_eigen/tf2_eigen.h>
 #include <yaml-cpp/yaml.h>
 
+#include "hydra/common/hydra_config.h"
 #include "hydra/places/gvd_integrator.h"
-#include "hydra/reconstruction/voxel_aware_mesh_integrator.h"
+#include "hydra/reconstruction/mesh_integrator.h"
 #include "hydra/utils/display_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
 
-using kimera::SemanticTsdfIntegratorFactory;
+using kimera::SemanticConfig;
 using kimera::SemanticVoxel;
 using places::GvdIntegrator;
 using places::GvdVoxel;
@@ -58,8 +59,6 @@ using voxblox::BlockIndexList;
 using voxblox::Layer;
 using voxblox::MeshLayer;
 using voxblox::TsdfVoxel;
-
-using MeshIntegrator = VoxelAwareMeshIntegrator;
 
 inline Eigen::Affine3d getPose(const geometry_msgs::Pose& pose) {
   Eigen::Affine3d world_T_body;
@@ -98,6 +97,18 @@ bool loadExtrinsicsFromKimera(ReconstructionConfig& config,
   return true;
 }
 
+SemanticConfig createSemanticConfig(const ReconstructionConfig& config) {
+  SemanticConfig new_config;
+  new_config.measurement_probability = config.semantic_measurement_probability;
+
+  const auto& label_space = HydraConfig::instance().getLabelSpaceConfig();
+  new_config.dynamic_labels = label_space.dynamic_labels;
+  new_config.invalid_labels = label_space.invalid_labels;
+  new_config.desired_number_labels = HydraConfig::instance().getTotalLabels();
+  new_config.color_mode = kimera::ColorMode::kColor;  // disable overwriting rgb
+  return new_config;
+}
+
 ReconstructionModule::ReconstructionModule(const RobotPrefixConfig& prefix,
                                            const ReconstructionConfig& config,
                                            const OutputQueue::Ptr& output_queue)
@@ -105,24 +116,22 @@ ReconstructionModule::ReconstructionModule(const RobotPrefixConfig& prefix,
       config_(config),
       output_queue_(output_queue),
       num_poses_received_(0) {
-  config_.semantics.semantic_label_to_color_.reset(
-      new kimera::SemanticLabel2Color(config_.semantic_label_file));
-
   queue_.reset(new ReconstructionInputQueue());
   queue_->max_size = config_.max_input_queue_size;
 
-  tsdf_.reset(new Layer<TsdfVoxel>(config_.voxel_size, config_.voxels_per_side));
-  semantics_.reset(
-      new Layer<SemanticVoxel>(config_.voxel_size, config_.voxels_per_side));
+  const auto voxel_size = config_.voxel_size;
+  const auto voxels_per_side = config_.voxels_per_side;
+  tsdf_.reset(new Layer<TsdfVoxel>(voxel_size, voxels_per_side));
+  semantics_.reset(new Layer<SemanticVoxel>(voxel_size, voxels_per_side));
+  gvd_.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
+  vertices_.reset(new Layer<VertexVoxel>(voxel_size, voxels_per_side));
+  mesh_.reset(new SemanticMeshLayer(tsdf_->block_size()));
 
-  gvd_.reset(new Layer<GvdVoxel>(config_.voxel_size, config_.voxels_per_side));
-  vertices_.reset(new Layer<VertexVoxel>(config_.voxel_size, config_.voxels_per_side));
-  mesh_.reset(new MeshLayer(tsdf_->block_size()));
-
-  tsdf_integrator_ = SemanticTsdfIntegratorFactory::create(
-      "fast", config_.tsdf, config_.semantics, tsdf_.get(), semantics_.get());
+  const auto semantic_config = createSemanticConfig(config_);
+  tsdf_integrator_ = std::make_unique<kimera::FastSemanticTsdfIntegrator>(
+      config_.tsdf, semantic_config, tsdf_.get(), semantics_.get());
   mesh_integrator_.reset(
-      new MeshIntegrator(config_.mesh, tsdf_.get(), vertices_, mesh_.get()));
+      new MeshIntegrator(config_.mesh, tsdf_, vertices_, mesh_, semantics_));
   gvd_integrator_.reset(new GvdIntegrator(config_.gvd, gvd_));
 }
 
@@ -238,7 +247,8 @@ std::vector<bool> ReconstructionModule::inFreespace(const PositionMatrix& positi
 }
 
 bool ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
-  if (!msg.pointcloud || !msg.pointcloud_colors) {
+  if (msg.pointcloud.empty() || msg.pointcloud_colors.empty() ||
+      msg.pointcloud_labels.empty()) {
     LOG(ERROR) << "[Hydra Reconstruction] received invalid pointcloud in input!";
     return false;
   }
@@ -272,8 +282,11 @@ void ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
 
   {  // timing scope
     ScopedTimer timer("places/tsdf", msg.timestamp_ns);
-    tsdf_integrator_->integratePointCloud(
-        world_T_camera, *msg.pointcloud, *msg.pointcloud_colors, false);
+    tsdf_integrator_->integratePointCloud(world_T_camera,
+                                          msg.pointcloud,
+                                          msg.pointcloud_colors,
+                                          msg.pointcloud_labels,
+                                          false);
   }  // timing scope
 
   if (!tsdf_ || tsdf_->getNumberOfAllocatedBlocks() == 0) {
@@ -318,28 +331,27 @@ void ReconstructionModule::updateGvd() {
   {  // start critical section
     std::unique_lock<std::mutex> lock(tsdf_mutex_);
 
-    std::list<PoseGraph::ConstPtr> pose_graphs;
+    std::list<PoseGraph::ConstPtr> graphs;
     // this is awkward, but we want to make sure we use the latest available timestamp
     while (gvd_queue_.size() > 1) {
       // TODO(nathan) cache pose graphs
       const auto& curr_graphs = gvd_queue_.front()->pose_graphs;
-      pose_graphs.insert(pose_graphs.end(), curr_graphs.begin(), curr_graphs.end());
+      graphs.insert(graphs.end(), curr_graphs.begin(), curr_graphs.end());
       gvd_queue_.pop();
     }
 
     msg = gvd_queue_.front();
-    msg->pose_graphs.insert(
-        msg->pose_graphs.begin(), pose_graphs.begin(), pose_graphs.end());
-    timer.reset(new ScopedTimer("places/spin_gvd", msg->timestamp_ns));
-    gvd_integrator_->updateFromTsdf(
-        msg->timestamp_ns, *tsdf_, *vertices_, *mesh_, true);
+    const auto timestamp_ns = msg->timestamp_ns;
+    msg->pose_graphs.insert(msg->pose_graphs.begin(), graphs.begin(), graphs.end());
+    timer.reset(new ScopedTimer("places/spin_gvd", timestamp_ns));
+    gvd_integrator_->updateFromTsdf(timestamp_ns, *tsdf_, *vertices_, *mesh_, true);
 
     if (config_.clear_distant_blocks) {
       archived_blocks = findBlocksToArchive(msg->current_position.cast<float>());
       for (const auto& index : archived_blocks) {
         semantics_->removeBlock(index);
         tsdf_->removeBlock(index);
-        mesh_->removeMesh(index);
+        mesh_->removeBlock(index);
       }
     }
 
@@ -466,21 +478,7 @@ void ReconstructionModule::addPlacesToOutput(ReconstructionOutput& output) {
     }
   }
 
-  std::set<spark_dsg::EdgeKey> edges;
-  for (const auto& node_id : active_nodes) {
-    const auto& node = graph.getNode(node_id)->get();
-    places.active_attributes.emplace(node_id, node.attributes().clone());
-    for (const auto& sibling : node.siblings()) {
-      spark_dsg::EdgeKey key(node_id, sibling);
-      if (edges.count(key)) {
-        continue;
-      }
-
-      edges.insert(key);
-      places.edges.emplace_back(
-          node_id, sibling, graph.getEdge(node_id, sibling)->get().info->clone());
-    }
-  }
+  places.fillFromGraph(graph, active_nodes);
   extractor.clearDeleted();
 
   VLOG(5) << "[Hydra Reconstruction] exporting " << active_nodes.size()
@@ -490,28 +488,7 @@ void ReconstructionModule::addPlacesToOutput(ReconstructionOutput& output) {
 void ReconstructionModule::addMeshToOutput(ReconstructionOutput& output,
                                            const BlockIndexList& archived_blocks) {
   output.archived_blocks.insert(archived_blocks.begin(), archived_blocks.end());
-
-  output.mesh.reset(new voxblox::MeshLayer(mesh_->block_size()));
-  auto& active_mesh = *output.mesh;
-
-  voxblox::BlockIndexList mesh_indices;
-  mesh_->getAllUpdatedMeshes(&mesh_indices);
-  for (const auto& block_index : mesh_indices) {
-    if (output.archived_blocks.count(block_index)) {
-      continue;
-    }
-
-    auto block = active_mesh.allocateNewBlock(block_index);
-    *block = *(mesh_->getMeshPtrByIndex(block_index));
-  }
-
-  // TODO(nathan) maybe only do this for archived blocks?
-  for (const auto& block_index : mesh_indices) {
-    auto block = mesh_->getMeshPtrByIndex(block_index);
-    if (!block->hasVertices()) {
-      mesh_->removeMesh(block_index);
-    }
-  }
+  output.mesh = mesh_->getActiveMesh(output.archived_blocks);
 }
 
 void ReconstructionModule::showStats() const {

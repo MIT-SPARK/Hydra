@@ -95,7 +95,7 @@ GraphExtractorInterface& GvdIntegrator::getGraphExtractor() const {
 void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
                                    Layer<TsdfVoxel>& tsdf,
                                    const Layer<VertexVoxel>& vertices,
-                                   const MeshLayer& mesh,
+                                   const SemanticMeshLayer& mesh,
                                    bool clear_updated_flag,
                                    bool use_all_blocks) {
   BlockIndexList blocks;
@@ -275,7 +275,7 @@ void GvdIntegrator::updateVoronoiQueue(GvdVoxel& voxel,
 /****************************************************************************************/
 
 void GvdIntegrator::propagateSurface(const BlockIndex& block_index,
-                                     const MeshLayer& mesh,
+                                     const SemanticMeshLayer& mesh,
                                      const Layer<VertexVoxel>& vertices) {
   const auto& vertex_block = vertices.getBlockByIndex(block_index);
   auto gvd_block = gvd_layer_->allocateBlockPtrByIndex(block_index);
@@ -294,7 +294,9 @@ void GvdIntegrator::propagateSurface(const BlockIndex& block_index,
 
     const auto vertex_idx = vertex_voxel.block_vertex_index;
     BlockIndex mesh_block_index = Eigen::Map<const BlockIndex>(vertex_voxel.mesh_block);
-    const auto mesh_block = mesh.getMeshPtrByIndex(mesh_block_index);
+    const auto mesh_block = mesh.getMeshBlock(mesh_block_index);
+    const auto semantics_block = mesh.getSemanticBlock(mesh_block_index);
+
     CHECK(mesh_block) << "bad mesh index: " << showIndex(mesh_block_index)
                       << " (block: " << showIndex(block_index) << ")";
     CHECK_LT(vertex_idx, mesh_block->vertices.size())
@@ -305,6 +307,13 @@ void GvdIntegrator::propagateSurface(const BlockIndex& block_index,
     gvd_voxel.parent_pos[0] = pos.x();
     gvd_voxel.parent_pos[1] = pos.y();
     gvd_voxel.parent_pos[2] = pos.z();
+
+    if (semantics_block) {
+      CHECK_LT(vertex_idx, semantics_block->size())
+          << "gvd block: " << block_index.transpose()
+          << " mesh index: " << mesh_block_index.transpose();
+      gvd_voxel.mesh_label = semantics_block->at(vertex_idx);
+    }
 
     std::memcpy(
         gvd_voxel.mesh_block, vertex_voxel.mesh_block, sizeof(gvd_voxel.mesh_block));

@@ -163,7 +163,7 @@ void SingleBlockTestFixture::SetUp() {
 
   tsdf_layer.reset(new Layer<TsdfVoxel>(voxel_size, voxels_per_side));
   gvd_layer.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
-  mesh_layer.reset(new MeshLayer(voxel_size * voxels_per_side));
+  mesh_layer.reset(new SemanticMeshLayer(voxel_size * voxels_per_side));
 
   BlockIndex block_index = BlockIndex::Zero();
   tsdf_block = tsdf_layer->allocateBlockPtrByIndex(block_index);
@@ -185,7 +185,7 @@ void SingleBlockExtractionTestFixture::SetUp() {
   setBlockState();
 
   gvd_integrator.reset(
-      new ComboIntegrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer));
+      new ComboIntegrator(gvd_config, tsdf_layer, gvd_layer, mesh_layer));
   gvd_integrator->update(0, true);
 }
 
@@ -245,14 +245,14 @@ void TestFixture2d::SetUp() {
   tsdf_layer.reset(new Layer<TsdfVoxel>(voxel_size, voxels_per_side));
   gvd_layer.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
   vertex_layer.reset(new Layer<VertexVoxel>(voxel_size, voxels_per_side));
-  mesh_layer.reset(new MeshLayer(voxel_size * voxels_per_side));
+  mesh_layer.reset(new SemanticMeshLayer(voxel_size * voxels_per_side));
 
   BlockIndex block_index = BlockIndex::Zero();
   tsdf_block = tsdf_layer->allocateBlockPtrByIndex(block_index);
   gvd_block = gvd_layer->allocateBlockPtrByIndex(block_index);
   vertex_block = vertex_layer->allocateBlockPtrByIndex(block_index);
   // we need this to be allocated so we can avoid doing mesh integration
-  auto mesh_block = mesh_layer->allocateMeshPtrByIndex(block_index);
+  auto mesh_block = mesh_layer->allocateBlock(block_index, false);
   mesh_block->resize(1);
   tsdf_block->updated().set();
 

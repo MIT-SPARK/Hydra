@@ -33,18 +33,18 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/reconstruction/voxel_aware_marching_cubes.h>
+#include <hydra/reconstruction/marching_cubes.h>
 
 #include <set>
 
 namespace hydra {
 
-using voxblox::BlockIndex;
 using places::VertexVoxel;
+using voxblox::BlockIndex;
 
 static constexpr float TEST_TOLERANCE = 1.0e-6f;
 
-TEST(VoxelAwareMarchingCubes, EdgeInterpolation) {
+TEST(MarchingCubes, EdgeInterpolation) {
   PointMatrix vertex_coordinates = PointMatrix::Zero();
   SdfMatrix sdf_values;
 
@@ -93,7 +93,7 @@ TEST(VoxelAwareMarchingCubes, EdgeInterpolation) {
       << "8: " << edge_coords.col(8).transpose();
 }
 
-TEST(VoxelAwareMarchingCubes, CubeMeshingNearestVertexIndexCorrect) {
+TEST(MarchingCubes, CubeMeshingNearestVertexIndexCorrect) {
   voxblox::Mesh mesh;
   PointMatrix vertex_coordinates = PointMatrix::Zero();
   SdfMatrix sdf_values;
@@ -115,7 +115,7 @@ TEST(VoxelAwareMarchingCubes, CubeMeshingNearestVertexIndexCorrect) {
   vertex_coordinates.col(4) << 1.0, 1.0, 1.0;
 
   BlockIndex block = BlockIndex::Zero();
-  VoxelAwareMarchingCubes::meshCube(
+  MarchingCubes::meshCube(
       block, vertex_coordinates, sdf_values, &next_index, &mesh, gvd_voxels);
   EXPECT_EQ(3u, next_index);
 

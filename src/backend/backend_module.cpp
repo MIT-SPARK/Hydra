@@ -84,7 +84,7 @@ BackendModule::BackendModule(const RobotPrefixConfig& prefix,
     throw std::runtime_error("invalid pgmo config");
   }
 
-  private_dsg_->graph->initMesh();
+  private_dsg_->graph->initMesh(true);
   original_vertices_.reset(new pcl::PointCloud<pcl::PointXYZRGBA>());
   setDefaultUpdateFunctions();
   deformation_graph_->setForceRecalculate(!config_.pgmo.gnc_fix_prev_inliers);
@@ -447,7 +447,8 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
   ScopedTimer timer("backend/copy_mesh_delta", input.timestamp_ns);
   input.mesh_update->updateMesh(*private_dsg_->graph->getMeshVertices(),
                                 mesh_timestamps_,
-                                *private_dsg_->graph->getMeshFaces());
+                                *private_dsg_->graph->getMeshFaces(),
+                                private_dsg_->graph->getMeshLabels().get());
   input.mesh_update->updateVertices(*original_vertices_);
   // we use this to make sure that deformation only happens for vertices that are
   // still active

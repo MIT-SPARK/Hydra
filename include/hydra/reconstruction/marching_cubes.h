@@ -33,61 +33,33 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <utility>
+#include <voxblox/mesh/mesh.h>
 
-#include "hydra/places/gvd_integrator.h"
-#include "hydra/reconstruction/mesh_integrator.h"
+#include "hydra/places/vertex_voxel.h"
 
 namespace hydra {
-namespace places {
 
-class ComboIntegrator {
+using PointMatrix = Eigen::Matrix<voxblox::FloatingPoint, 3, 8>;
+using SdfMatrix = Eigen::Matrix<voxblox::FloatingPoint, 8, 1>;
+using EdgeIndexMatrix = Eigen::Matrix<voxblox::FloatingPoint, 3, 12>;
+
+void interpolateEdges(const PointMatrix& vertex_coords,
+                      const SdfMatrix& vertex_sdf,
+                      EdgeIndexMatrix& edge_coords,
+                      std::vector<uint8_t>& edge_status);
+
+class MarchingCubes {
  public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  MarchingCubes();
 
-  ComboIntegrator(const GvdIntegratorConfig& gvd_config,
-                  const Layer<TsdfVoxel>::Ptr& tsdf_layer,
-                  const Layer<GvdVoxel>::Ptr& gvd_layer,
-                  const SemanticMeshLayer::Ptr& mesh_layer,
-                  const MeshIntegratorConfig* mesh_config = nullptr)
-      : tsdf_(tsdf_layer), mesh_(mesh_layer) {
-    vertices_.reset(
-        new Layer<VertexVoxel>(gvd_layer->voxel_size(), gvd_layer->voxels_per_side()));
-    mesh_integrator = std::make_unique<MeshIntegrator>(
-        mesh_config ? *mesh_config : MeshIntegratorConfig(),
-        tsdf_layer,
-        vertices_,
-        mesh_layer);
-    gvd_integrator = std::make_unique<GvdIntegrator>(gvd_config, gvd_layer);
-  }
+  virtual ~MarchingCubes() = default;
 
-  virtual ~ComboIntegrator() = default;
-
-  inline const SceneGraphLayer& getGraph() const { return gvd_integrator->getGraph(); }
-
-  inline const GvdGraph& getGvdGraph() const { return gvd_integrator->getGvdGraph(); }
-
-  inline GraphExtractorInterface& getGraphExtractor() const {
-    return gvd_integrator->getGraphExtractor();
-  }
-
-  inline void update(uint64_t timestamp_ns,
-                     bool clear_updated_flag,
-                     bool use_all_blocks = false) {
-    mesh_integrator->generateMesh(!use_all_blocks, clear_updated_flag);
-    gvd_integrator->updateFromTsdf(
-        timestamp_ns, *tsdf_, *vertices_, *mesh_, clear_updated_flag, use_all_blocks);
-    gvd_integrator->updateGvd(timestamp_ns);
-  }
-
-  std::unique_ptr<MeshIntegrator> mesh_integrator;
-  std::unique_ptr<GvdIntegrator> gvd_integrator;
-
- protected:
-  Layer<TsdfVoxel>::Ptr tsdf_;
-  SemanticMeshLayer::Ptr mesh_;
-  Layer<VertexVoxel>::Ptr vertices_;
+  static void meshCube(const voxblox::BlockIndex& block,
+                       const PointMatrix& vertex_coords,
+                       const SdfMatrix& vertex_sdf,
+                       voxblox::VertexIndex* next_index,
+                       voxblox::Mesh* mesh,
+                       const std::vector<places::VertexVoxel*>& vertex_voxels);
 };
 
-}  // namespace places
 }  // namespace hydra

@@ -59,15 +59,15 @@ class IncrementalIntegrationTestFixture : public ::testing::Test {
   void SetUp() override {
     tsdf_layer.reset(new Layer<TsdfVoxel>(voxel_size, voxels_per_side));
     gvd_layer.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
-    mesh_layer.reset(new MeshLayer(voxel_size * voxels_per_side));
+    mesh_layer.reset(new SemanticMeshLayer(voxel_size * voxels_per_side));
 
     tsdf_integrator.reset(new FastTsdfIntegrator(tsdf_config, tsdf_layer.get()));
   }
 
   Layer<GvdVoxel>::Ptr getBatchGvd() {
-    MeshLayer::Ptr mesh(new MeshLayer(voxel_size * voxels_per_side));
+    SemanticMeshLayer::Ptr mesh(new SemanticMeshLayer(voxel_size * voxels_per_side));
     Layer<GvdVoxel>::Ptr gvd(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
-    ComboIntegrator integrator(gvd_config, tsdf_layer.get(), gvd, mesh);
+    ComboIntegrator integrator(gvd_config, tsdf_layer, gvd, mesh);
 
     integrator.update(0, false, true);
 
@@ -133,14 +133,14 @@ class IncrementalIntegrationTestFixture : public ::testing::Test {
   Layer<TsdfVoxel>::Ptr tsdf_layer;
 
   Layer<GvdVoxel>::Ptr gvd_layer;
-  MeshLayer::Ptr mesh_layer;
+  SemanticMeshLayer::Ptr mesh_layer;
 
   Layer<GvdVoxel>::Ptr batch_gvd_layer;
   std::unique_ptr<FastTsdfIntegrator> tsdf_integrator;
 };
 
 TEST_F(IncrementalIntegrationTestFixture, DISABLED_TestBatchSame) {
-  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer.get(), gvd_layer, mesh_layer);
+  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer, gvd_layer, mesh_layer);
 
   for (size_t i = 0; i < num_poses; ++i) {
     integrateTsdf(i);

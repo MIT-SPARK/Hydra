@@ -40,6 +40,12 @@
 #include <memory>
 #include <vector>
 
+#include "hydra/common/label_space_config.h"
+
+namespace kimera {
+class SemanticColorMap;
+}
+
 namespace hydra {
 
 class HydraConfig {
@@ -47,24 +53,34 @@ class HydraConfig {
   using ColorArray = std::array<uint8_t, 3>;
   using LabelNameMap = std::map<uint8_t, std::string>;
 
-  static HydraConfig& instance() {
-    if (!instance_) {
-      instance_.reset(new HydraConfig());
-    }
-    return *instance_;
-  }
+  static HydraConfig& instance();
 
   bool force_shutdown() const;
 
   void setForceShutdown(bool force_shutdown);
 
-  void setColorMap(const std::vector<ColorArray>& colormap);
+  void setRoomColorMap(const std::vector<ColorArray>& colormap);
 
   const ColorArray& getRoomColor(size_t index) const;
 
   const LabelNameMap& getLabelToNameMap() const;
 
   void setLabelToNameMap(const LabelNameMap& name_map);
+
+  void setLabelSpaceConfig(const LabelSpaceConfig& config);
+
+  const LabelSpaceConfig& getLabelSpaceConfig() const;
+
+  size_t getTotalLabels() const;
+
+  // this intentionally returns a shared ptr to be threadsafe
+  std::shared_ptr<kimera::SemanticColorMap> setRandomColormap();
+
+  // this intentionally returns a shared ptr to be threadsafe
+  std::shared_ptr<kimera::SemanticColorMap> getSemanticColorMap() const;
+
+  // this invalidates any instances (mostly intended for testing)
+  static void reset();
 
  private:
   HydraConfig();
@@ -74,8 +90,11 @@ class HydraConfig {
   // TODO(nathan) consider moving robot id and logging here
   std::atomic<bool> force_shutdown_;
 
-  std::vector<ColorArray> colormap_;
+  std::vector<ColorArray> room_colormap_;
+
+  LabelSpaceConfig label_space_;
   std::map<uint8_t, std::string> label_to_name_map_;
+  std::shared_ptr<kimera::SemanticColorMap> label_colormap_;
 };
 
 std::ostream& operator<<(std::ostream& out, const HydraConfig& config);

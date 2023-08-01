@@ -83,8 +83,6 @@ class FrontendModule {
 
   void addOutputCallback(const OutputCallback& callback);
 
-  size_t maxSemanticLabel() const;
-
  protected:
   void spinOnce(const ReconstructionOutput& input);
 
@@ -127,7 +125,6 @@ class FrontendModule {
 
   RobotPrefixConfig prefix_;
   FrontendConfig config_;
-  std::unique_ptr<kimera::SemanticLabel2Color> label_map_;
   SharedDsgInfo::Ptr dsg_;
   SharedModuleState::Ptr state_;
   std::vector<ros::Time> mesh_timestamps_;
