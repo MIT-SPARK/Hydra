@@ -36,7 +36,6 @@
 
 #include <glog/logging.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
-#include <kimera_pgmo/utils/VoxbloxMeshInterface.h>
 #include <tf2_eigen/tf2_eigen.h>
 
 #include <fstream>
@@ -62,10 +61,8 @@ FrontendModule::FrontendModule(const RobotPrefixConfig& prefix,
       dsg_(dsg),
       state_(state) {
   config_.pgmo_config.robot_id = prefix_.id;
-  label_map_.reset(new kimera::SemanticLabel2Color(config_.semantic_label_file));
 
-  // add placeholder mesh to allow mesh edges to be added
-  dsg_->graph->initMesh();
+  dsg_->graph->initMesh(true);
   dsg_->graph->createDynamicLayer(DsgLayers::AGENTS, prefix_.key);
 
   const auto mesh_resolution = config_.pgmo_config.mesh_resolution;
@@ -87,8 +84,9 @@ FrontendModule::FrontendModule(const RobotPrefixConfig& prefix,
   }
 
   CHECK(mesh_frontend_.initialize(config_.pgmo_config));
-  segmenter_.reset(
-      new MeshSegmenter(config_.object_config, dsg_->graph->getMeshVertices()));
+  segmenter_.reset(new MeshSegmenter(config_.object_config,
+                                     dsg_->graph->getMeshVertices(),
+                                     dsg_->graph->getMeshLabels()));
 
   input_callbacks_.push_back(
       std::bind(&FrontendModule::updateMeshAndObjects, this, std::placeholders::_1));
@@ -165,8 +163,6 @@ void FrontendModule::addOutputCallback(const OutputCallback& callback) {
   output_callbacks_.push_back(callback);
 }
 
-size_t FrontendModule::maxSemanticLabel() const { return label_map_->getNumLabels(); }
-
 void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
   VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg.timestamp_ns << " [ns]";
   ScopedTimer timer("frontend/spin", msg.timestamp_ns);
@@ -233,9 +229,9 @@ void FrontendModule::updateMeshAndObjects(const ReconstructionOutput& input) {
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
     mesh_remapping_.reset(new kimera_pgmo::VoxbloxIndexMapping());
-    VLOG(5) << "[Hydra Frontend] Updating mesh with"
-            << input.mesh->getNumberOfAllocatedMeshes() << " blocks";
-    kimera_pgmo::VoxbloxMeshInterface interface(input.mesh);
+    VLOG(5) << "[Hydra Frontend] Updating mesh with" << input.mesh->numBlocks()
+            << " blocks";
+    auto interface = input.mesh->getMeshInterface();
     mesh_update =
         mesh_compression_->update(interface, input.timestamp_ns, mesh_remapping_.get());
   }  // end timing scope
@@ -246,7 +242,8 @@ void FrontendModule::updateMeshAndObjects(const ReconstructionOutput& input) {
     ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
     mesh_update->updateMesh(*dsg_->graph->getMeshVertices(),
                             mesh_timestamps_,
-                            *dsg_->graph->getMeshFaces());
+                            *dsg_->graph->getMeshFaces(),
+                            dsg_->graph->getMeshLabels().get());
     invalidateMeshEdges(*mesh_update);
   }  // end timing scope
 
@@ -254,8 +251,8 @@ void FrontendModule::updateMeshAndObjects(const ReconstructionOutput& input) {
   {  // timing scope
     ScopedTimer timer("frontend/object_detection", input.timestamp_ns, true, 1, false);
     // TODO(nathan) fix this
-    object_clusters = segmenter_->detect(
-        *label_map_, mesh_update->getActiveIndices(), input.current_position);
+    object_clusters =
+        segmenter_->detect(mesh_update->getActiveIndices(), input.current_position);
   }
 
   {  // start dsg critical section
@@ -274,7 +271,8 @@ void FrontendModule::updateDeformationGraph(const ReconstructionOutput& input) {
         "frontend/dgraph_compresssion", input.timestamp_ns, true, 1, false);
     const auto time_ns = std::chrono::nanoseconds(input.timestamp_ns);
     double time_s = std::chrono::duration_cast<std::chrono::seconds>(time_ns).count();
-    mesh_frontend_.processVoxbloxMeshLayerGraph(input.mesh, time_s);
+    auto interface = input.mesh->getMeshInterface();
+    mesh_frontend_.processMeshGraph(interface, time_s);
   }  // end timing scope
 
   if (backend_input_) {
@@ -662,43 +660,13 @@ size_t remapConnections(const kimera_pgmo::VoxbloxIndexMapping& remapping,
 
 using MeshIndexMap = voxblox::AnyIndexHashMapType<size_t>::type;
 
-size_t getPlaceSemanticLabels(const voxblox::MeshLayer& mesh,
-                              const voxblox::IndexSet& archived_blocks,
-                              const voxblox::IndexSet& allocated_blocks,
-                              const kimera::SemanticLabel2Color& label_map,
-                              PlaceNodeAttributes& attrs) {
-  size_t num_invalid = 0;
-  for (const auto& connection : attrs.voxblox_mesh_connections) {
-    voxblox::BlockIndex idx = Eigen::Map<const voxblox::BlockIndex>(connection.block);
-    if (archived_blocks.count(idx)) {
-      continue;
-    }
-
-    if (!allocated_blocks.count(idx)) {
-      num_invalid++;
-      continue;
-    }
-
-    const auto& block = mesh.getMeshPtrByIndex(idx);
-    if (connection.vertex > block->size()) {
-      num_invalid++;
-      continue;
-    }
-
-    const kimera::HashableColor color(block->colors.at(connection.vertex));
-    attrs.mesh_vertex_labels.push_back(label_map.getSemanticLabelFromColor(color));
-  }
-
-  return num_invalid;
-}
-
 void FrontendModule::updatePlaceMeshMapping(const ReconstructionOutput& input) {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
   const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
   const auto& graph_mapping = mesh_frontend_.getVoxbloxMsgToGraphMapping();
 
   voxblox::BlockIndexList allocated_list;
-  input.mesh->getAllAllocatedMeshes(&allocated_list);
+  input.mesh->getAllocatedBlockIndices(allocated_list);
 
   voxblox::IndexSet allocated(allocated_list.begin(), allocated_list.end());
 
@@ -731,9 +699,6 @@ void FrontendModule::updatePlaceMeshMapping(const ReconstructionOutput& input) {
                                            attrs.voxblox_mesh_connections,
                                            attrs.pcl_mesh_connections);
     }
-
-    num_semantic_invalid += getPlaceSemanticLabels(
-        *input.mesh, input.archived_blocks, allocated, *label_map_, attrs);
   }
 
   if (config_.validate_vertices) {

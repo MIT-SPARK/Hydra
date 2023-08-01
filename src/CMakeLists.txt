@@ -1,6 +1,6 @@
   target_sources(
     ${PROJECT_NAME}
-    PUBLIC
+    PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/backend/backend_module.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/backend/merge_handler.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/backend/update_functions.cpp
@@ -29,10 +29,12 @@
   ${CMAKE_CURRENT_SOURCE_DIR}/places/gvd_voxel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/places/nearest_voxel_utilities.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/places/update_statistics.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/reconstruction/marching_cubes.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/reconstruction/mesh_integrator.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/reconstruction/reconstruction_config.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/reconstruction/reconstruction_module.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/reconstruction/voxel_aware_marching_cubes.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/reconstruction/voxel_aware_mesh_integrator.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/reconstruction/reconstruction_output.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/reconstruction/semantic_mesh_layer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/rooms/graph_clustering.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/rooms/graph_filtration.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/rooms/room_finder.cpp
@@ -48,6 +50,6 @@
 if(HYDRA_GNN)
   target_sources(
     ${PROJECT_NAME}
-    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/loop_closure/gnn_descriptors.cpp
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/loop_closure/gnn_descriptors.cpp
   )
 endif(HYDRA_GNN)

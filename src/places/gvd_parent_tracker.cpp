@@ -124,6 +124,7 @@ void GvdParentTracker::updateVertexMapping(const Layer<GvdVoxel>& layer) {
     iter->second.vertex = voxel->block_vertex_index;
     std::memcpy(iter->second.block, voxel->mesh_block, sizeof(iter->second.block));
     std::memcpy(iter->second.pos, voxel->parent_pos, sizeof(iter->second.pos));
+    iter->second.label = voxel->mesh_label;
     ++iter;
   }
 }

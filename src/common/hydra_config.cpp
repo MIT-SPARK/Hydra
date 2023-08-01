@@ -34,9 +34,19 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/common/hydra_config.h"
 
+#include <kimera_semantics/color.h>
+
 namespace hydra {
 
+using ColorMapPtr = std::shared_ptr<kimera::SemanticColorMap>;
 decltype(HydraConfig::instance_) HydraConfig::instance_;
+
+HydraConfig& HydraConfig::instance() {
+  if (!instance_) {
+    instance_.reset(new HydraConfig());
+  }
+  return *instance_;
+}
 
 std::ostream& operator<<(std::ostream& out, const HydraConfig& config) {
   out << "{force_shutdown: " << std::boolalpha << config.force_shutdown() << "}";
@@ -44,7 +54,7 @@ std::ostream& operator<<(std::ostream& out, const HydraConfig& config) {
 }
 
 HydraConfig::HydraConfig() : force_shutdown_(false) {
-  colormap_ = {
+  room_colormap_ = {
       {166, 206, 227},
       {31, 120, 180},
       {178, 223, 138},
@@ -58,6 +68,8 @@ HydraConfig::HydraConfig() : force_shutdown_(false) {
       {255, 255, 153},
       {177, 89, 40},
   };
+
+  label_colormap_.reset(new kimera::SemanticColorMap());
 }
 
 bool HydraConfig::force_shutdown() const { return force_shutdown_; }
@@ -66,12 +78,12 @@ void HydraConfig::setForceShutdown(bool force_shutdown) {
   force_shutdown_ = force_shutdown;
 }
 
-void HydraConfig::setColorMap(const std::vector<ColorArray>& colormap) {
-  colormap_ = colormap;
+void HydraConfig::setRoomColorMap(const std::vector<ColorArray>& colormap) {
+  room_colormap_ = colormap;
 }
 
 const HydraConfig::ColorArray& HydraConfig::getRoomColor(size_t index) const {
-  return colormap_.at(index % colormap_.size());
+  return room_colormap_.at(index % room_colormap_.size());
 }
 
 void HydraConfig::setLabelToNameMap(const HydraConfig::LabelNameMap& name_map) {
@@ -81,5 +93,34 @@ void HydraConfig::setLabelToNameMap(const HydraConfig::LabelNameMap& name_map) {
 const HydraConfig::LabelNameMap& HydraConfig::getLabelToNameMap() const {
   return label_to_name_map_;
 }
+
+void HydraConfig::setLabelSpaceConfig(const LabelSpaceConfig& config) {
+  label_space_ = config;
+  if (!label_space_.colormap_filepath.empty()) {
+    label_colormap_ =
+        kimera::SemanticColorMap::fromFile(label_space_.colormap_filepath);
+  } else {
+    label_colormap_ = kimera::SemanticColorMap::randomColors(label_space_.total_labels);
+  }
+
+  if (label_colormap_) {
+    VLOG(1) << "Loaded label space colors:" << std::endl << *label_colormap_;
+  }
+}
+
+ColorMapPtr HydraConfig::setRandomColormap() {
+  label_colormap_ = kimera::SemanticColorMap::randomColors(label_space_.total_labels);
+  return label_colormap_;
+}
+
+const LabelSpaceConfig& HydraConfig::getLabelSpaceConfig() const {
+  return label_space_;
+}
+
+size_t HydraConfig::getTotalLabels() const { return label_space_.total_labels; }
+
+ColorMapPtr HydraConfig::getSemanticColorMap() const { return label_colormap_; }
+
+void HydraConfig::reset() { instance_.reset(new HydraConfig()); }
 
 }  // namespace hydra

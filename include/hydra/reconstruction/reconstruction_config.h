@@ -33,40 +33,11 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <kimera_semantics/semantic_integrator_base.h>
 #include <voxblox/integrator/tsdf_integrator.h>
 
 #include "hydra/config/config.h"
 #include "hydra/config/eigen_config_types.h"
 #include "hydra/reconstruction/configs.h"
-
-DECLARE_CONFIG_ENUM(kimera,
-                    ColorMode,
-                    {ColorMode::kColor, "color"},
-                    {ColorMode::kSemantic, "semantic"},
-                    {ColorMode::kSemanticProbability, "semantic_probability"});
-
-namespace kimera {
-
-template <typename T>
-struct AlignedConverter {
-  voxblox::AlignedVector<T> to(const std::vector<T>& other) const {
-    return voxblox::AlignedVector<T>(other.begin(), other.end());
-  }
-
-  std::vector<T> from(const voxblox::AlignedVector<T>& other) const {
-    return std::vector<T>(other.begin(), other.end());
-  }
-};
-
-template <typename Visitor>
-void visit_config(const Visitor& v, SemanticIntegratorBase::SemanticConfig& config) {
-  v.visit("semantic_measurement_probability", config.semantic_measurement_probability_);
-  v.visit("color_mode", config.color_mode);
-  v.visit("dynamic_labels", config.dynamic_labels_, AlignedConverter<SemanticLabel>());
-}
-
-}  // namespace kimera
 
 namespace voxblox {
 
@@ -81,7 +52,7 @@ void visit_config(const Visitor& v, TsdfIntegratorBase::Config& config) {
   v.visit("allow_clear", config.allow_clear);
   v.visit("use_weight_dropoff", config.use_weight_dropoff);
   v.visit("use_sparsity_compensation_factor", config.use_sparsity_compensation_factor);
-  v.visit("integrator_threads", config.integrator_threads, ThreadNumConverter());
+  v.visit("integrator_threads", config.integrator_threads, hydra::ThreadNumConverter());
   v.visit("integration_order_mode", config.integration_order_mode);
   v.visit("enable_anti_grazing", config.enable_anti_grazing);
   v.visit("start_voxel_subsampling_factor", config.start_voxel_subsampling_factor);
@@ -100,7 +71,6 @@ struct ReconstructionConfig {
       : body_R_camera(Eigen::Quaterniond::Identity()),
         body_t_camera(Eigen::Vector3d::Zero()) {}
 
-  std::string semantic_label_file;
   float voxel_size = 0.1;
   int voxels_per_side = 16;
   bool show_stats = true;
@@ -111,10 +81,11 @@ struct ReconstructionConfig {
   size_t num_poses_per_update = 1;
   size_t max_input_queue_size = 0;
   bool make_pose_graph = false;
+  float semantic_measurement_probability = 0.9;
+
   places::GvdIntegratorConfig gvd;
   voxblox::TsdfIntegratorBase::Config tsdf;
-  kimera::SemanticIntegratorBase::SemanticConfig semantics;
-  voxblox::MeshIntegratorConfig mesh;
+  MeshIntegratorConfig mesh;
   Eigen::Quaterniond body_R_camera;
   Eigen::Vector3d body_t_camera;
 };
@@ -129,7 +100,6 @@ struct QuaternionConverter {
 
 template <typename Visitor>
 void visit_config(const Visitor& v, ReconstructionConfig& config) {
-  v.visit("semantic_label_file", config.semantic_label_file);
   v.visit("voxel_size", config.voxel_size);
   v.visit("voxels_per_side", config.voxels_per_side);
   v.visit("show_stats", config.show_stats);
@@ -140,9 +110,10 @@ void visit_config(const Visitor& v, ReconstructionConfig& config) {
   v.visit("num_poses_per_update", config.num_poses_per_update);
   v.visit("max_input_queue_size", config.max_input_queue_size);
   v.visit("make_pose_graph", config.make_pose_graph);
+  v.visit("semantic_measurement_probability", config.semantic_measurement_probability);
+
   v.visit("gvd", config.gvd);
   v.visit("tsdf", config.tsdf);
-  v.visit("semantics", config.semantics);
   v.visit("mesh", config.mesh);
   v.visit("body_R_camera", config.body_R_camera, QuaternionConverter());
   v.visit("body_t_camera", config.body_t_camera);
@@ -151,5 +122,4 @@ void visit_config(const Visitor& v, ReconstructionConfig& config) {
 }  // namespace hydra
 
 DECLARE_CONFIG_OSTREAM_OPERATOR(voxblox, TsdfIntegratorBase::Config)
-DECLARE_CONFIG_OSTREAM_OPERATOR(kimera, SemanticIntegratorBase::SemanticConfig)
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, ReconstructionConfig)

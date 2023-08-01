@@ -41,8 +41,9 @@
 #include "hydra/places/gvd_utilities.h"
 #include "hydra/places/gvd_voxel.h"
 #include "hydra/places/update_statistics.h"
-#include "hydra/places/voxblox_types.h"
 #include "hydra/places/vertex_voxel.h"
+#include "hydra/places/voxblox_types.h"
+#include "hydra/reconstruction/semantic_mesh_layer.h"
 
 namespace hydra {
 namespace places {
@@ -73,7 +74,7 @@ class GvdIntegrator {
   void updateFromTsdf(uint64_t timestamp_ns,
                       Layer<TsdfVoxel>& tsdf,
                       const Layer<VertexVoxel>& vertices,
-                      const MeshLayer& mesh,
+                      const SemanticMeshLayer& mesh,
                       bool clear_updated_flag,
                       bool use_all_blocks = false);
 
@@ -99,7 +100,7 @@ class GvdIntegrator {
 
   // TSDF propagation
   void propagateSurface(const BlockIndex& block_index,
-                        const MeshLayer& mesh,
+                        const SemanticMeshLayer& mesh,
                         const Layer<VertexVoxel>& vertices);
 
   void processTsdfBlock(const Block<TsdfVoxel>& block, const BlockIndex& index);

@@ -101,7 +101,7 @@ class SingleBlockTestFixture : public ::testing::Test {
 
   Layer<TsdfVoxel>::Ptr tsdf_layer;
   Layer<GvdVoxel>::Ptr gvd_layer;
-  MeshLayer::Ptr mesh_layer;
+  SemanticMeshLayer::Ptr mesh_layer;
 
   GvdIntegratorConfig gvd_config;
   voxblox::Block<voxblox::TsdfVoxel>::Ptr tsdf_block;
@@ -149,7 +149,7 @@ class TestFixture2d : public ::testing::Test {
   Layer<TsdfVoxel>::Ptr tsdf_layer;
   Layer<GvdVoxel>::Ptr gvd_layer;
   Layer<VertexVoxel>::Ptr vertex_layer;
-  MeshLayer::Ptr mesh_layer;
+  SemanticMeshLayer::Ptr mesh_layer;
 
   GvdIntegratorConfig gvd_config;
   voxblox::Block<voxblox::TsdfVoxel>::Ptr tsdf_block;

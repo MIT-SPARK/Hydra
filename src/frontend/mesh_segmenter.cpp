@@ -37,13 +37,12 @@
 #include <glog/logging.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <spark_dsg/bounding_box_extraction.h>
+#include <kimera_semantics/color.h>
 
 #include "hydra/common/hydra_config.h"
 
 namespace hydra {
 
-using kimera::HashableColor;
-using kimera::SemanticLabel2Color;
 using Clusters = MeshSegmenter::Clusters;
 using LabelClusters = MeshSegmenter::LabelClusters;
 using LabelIndices = MeshSegmenter::LabelIndices;
@@ -62,24 +61,20 @@ void mergeList(std::list<size_t>& lhs, const std::vector<int>& rhs) {
   }
 }
 
-std::ostream& operator<<(std::ostream& out, const std::set<uint8_t>& labels) {
-  out << "[";
+template <typename T>
+std::string printLabels(const std::set<T>& labels) {
+  std::stringstream ss;
+  ss << "[";
   auto iter = labels.begin();
   while (iter != labels.end()) {
-    out << static_cast<int>(*iter);
+    ss << static_cast<uint64_t>(*iter);
     ++iter;
     if (iter != labels.end()) {
-      out << ", ";
+      ss << ", ";
     }
   }
-  out << "]";
-  return out;
-}
-
-std::ostream& operator<<(std::ostream& out, const HashableColor& color) {
-  return out << "[" << static_cast<int>(color.r) << ", " << static_cast<int>(color.g)
-             << ", " << static_cast<int>(color.b) << ", " << static_cast<int>(color.a)
-             << "]";
+  ss << "]";
+  return ss.str();
 }
 
 inline bool objectsMatch(const Cluster& cluster, const SceneGraphNode& node) {
@@ -93,9 +88,14 @@ inline bool objectsMatch(const Cluster& cluster, const SceneGraphNode& node) {
 }
 
 MeshSegmenter::MeshSegmenter(const MeshSegmenterConfig& config,
-                             const MeshVertexCloud::Ptr& vertices)
-    : full_mesh_vertices_(vertices), config_(config), next_node_id_(config.prefix, 0) {
-  VLOG(1) << "[Hydra Frontend] Detecting objects for labels: " << config.labels;
+                             const MeshVertexCloud::Ptr& vertices,
+                             const std::shared_ptr<std::vector<uint32_t>>& mesh_labels)
+    : full_mesh_vertices_(vertices),
+      full_mesh_labels_(mesh_labels),
+      config_(config),
+      next_node_id_(config.prefix, 0) {
+  VLOG(1) << "[Hydra Frontend] Detecting objects for labels: "
+          << printLabels(config.labels);
   for (const auto& label : config.labels) {
     active_objects_[label] = std::set<NodeId>();
   }
@@ -164,8 +164,7 @@ pcl::IndicesPtr getActiveIndices(const pcl::IndicesPtr& indices,
   return active_indices;
 }
 
-LabelClusters MeshSegmenter::detect(const SemanticLabel2Color& label_map,
-                                    const pcl::IndicesPtr& frontend_indices,
+LabelClusters MeshSegmenter::detect(const pcl::IndicesPtr& frontend_indices,
                                     const std::optional<Eigen::Vector3d>& pos) {
   const auto active_indices = getActiveIndices(
       frontend_indices, pos, *full_mesh_vertices_, config_.active_index_horizon_m);
@@ -177,7 +176,7 @@ LabelClusters MeshSegmenter::detect(const SemanticLabel2Color& label_map,
     return label_clusters;
   }
 
-  LabelIndices label_indices = getLabelIndices(label_map, *active_indices);
+  LabelIndices label_indices = getLabelIndices(*active_indices);
   if (label_indices.empty()) {
     VLOG(3) << "[Mesh Segmenter] No vertices found matching desired labels";
     for (const auto& callback_func : callback_funcs_) {
@@ -257,30 +256,17 @@ std::set<NodeId> MeshSegmenter::archiveOldObjects(const DynamicSceneGraph& graph
   return archived;
 }
 
-std::optional<uint8_t> MeshSegmenter::getVertexLabel(
-    const SemanticLabel2Color& label_map, size_t index) const {
-  if (index >= full_mesh_vertices_->size()) {
-    return std::nullopt;
-  }
-
-  const auto& point = full_mesh_vertices_->at(index);
-  const HashableColor color(point.r, point.g, point.b, 255);
-  return label_map.getSemanticLabelFromColor(color);
-}
-
-LabelIndices MeshSegmenter::getLabelIndices(const SemanticLabel2Color& label_map,
-                                            const IndicesVector& indices) const {
+LabelIndices MeshSegmenter::getLabelIndices(const IndicesVector& indices) const {
   LabelIndices label_indices;
 
-  std::set<uint8_t> seen_labels;
+  std::set<uint32_t> seen_labels;
   for (const auto idx : indices) {
-    const auto label_opt = getVertexLabel(label_map, idx);
-    if (!label_opt) {
-      LOG(ERROR) << "bad index " << idx << "(of " << full_mesh_vertices_->size() << ")";
+    if (static_cast<size_t>(idx) >= full_mesh_labels_->size()) {
+      LOG(ERROR) << "bad index " << idx << "(of " << full_mesh_labels_->size() << ")";
       continue;
     }
 
-    const auto label = *label_opt;
+    const auto label = full_mesh_labels_->at(idx);
     seen_labels.insert(label);
 
     if (!config_.labels.count(label)) {
@@ -294,7 +280,7 @@ LabelIndices MeshSegmenter::getLabelIndices(const SemanticLabel2Color& label_map
     label_indices[label]->push_back(idx);
   }
 
-  VLOG(3) << "[Mesh Segmenter] Seen labels: " << seen_labels;
+  VLOG(3) << "[Mesh Segmenter] Seen labels: " << printLabels(seen_labels);
 
   return label_indices;
 }
@@ -350,7 +336,7 @@ void MeshSegmenter::updateObjectInGraph(const Cluster& cluster,
 
 void MeshSegmenter::addObjectToGraph(DynamicSceneGraph& graph,
                                      const Cluster& cluster,
-                                     uint8_t label,
+                                     uint32_t label,
                                      uint64_t timestamp) {
   if (cluster.cloud->empty()) {
     LOG(ERROR) << "Encountered empty cluster with label" << static_cast<int>(label)
@@ -376,8 +362,14 @@ void MeshSegmenter::addObjectToGraph(DynamicSceneGraph& graph,
                                  cluster.indices.indices.begin(),
                                  cluster.indices.indices.end());
 
-  const pcl::PointXYZRGBA& point = cluster.cloud->at(0);
-  attrs->color << point.r, point.g, point.b;
+  auto label_map = HydraConfig::instance().getSemanticColorMap();
+  if (!label_map || !label_map->isValid()) {
+    label_map = HydraConfig::instance().setRandomColormap();
+    CHECK(label_map != nullptr);
+  }
+
+  const auto color = label_map->getColorFromLabel(label);
+  attrs->color << color.r, color.g, color.b;
 
   pcl::PointXYZ centroid;
   cluster.centroid.get(centroid);

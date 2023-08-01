@@ -36,18 +36,19 @@
 // implied, of the United States Air Force or the U.S. Government. The U.S.
 // Government is authorized to reproduce and distribute reprints for Government
 // purposes notwithstanding any copyright notation herein.
-#include "hydra/reconstruction/voxel_aware_mesh_integrator.h"
+#include "hydra/reconstruction/mesh_integrator.h"
 
 #include <glog/logging.h>
 #include <voxblox/utils/meshing_utils.h>
 
 #include <iomanip>
 
+#include "hydra/reconstruction/marching_cubes.h"
 #include "hydra/reconstruction/voxblox_utilities.h"
-#include "hydra/reconstruction/voxel_aware_marching_cubes.h"
 
 namespace hydra {
 
+using kimera::SemanticVoxel;
 using places::VertexVoxel;
 using voxblox::Block;
 using voxblox::BlockIndex;
@@ -56,8 +57,6 @@ using voxblox::FloatingPoint;
 using voxblox::IndexElement;
 using voxblox::Layer;
 using voxblox::Mesh;
-using voxblox::MeshIntegratorConfig;
-using voxblox::MeshLayer;
 using voxblox::MixedThreadSafeIndex;
 using voxblox::Point;
 using voxblox::ThreadSafeIndex;
@@ -69,19 +68,35 @@ namespace vutils = voxblox::utils;
 using TsdfLayer = Layer<TsdfVoxel>;
 using TsdfBlock = Block<TsdfVoxel>;
 using VertexLayer = Layer<VertexVoxel>;
+using SemanticLayer = Layer<SemanticVoxel>;
 
-VoxelAwareMeshIntegrator::VoxelAwareMeshIntegrator(const MeshIntegratorConfig& config,
-                                                   TsdfLayer* sdf_layer,
-                                                   const VertexLayer::Ptr& vertex_layer,
-                                                   MeshLayer* mesh_layer)
-    : MeshIntegrator<TsdfVoxel>(config, sdf_layer, mesh_layer),
-      vertex_layer_(vertex_layer) {
+MeshIntegrator::MeshIntegrator(const MeshIntegratorConfig& config,
+                               const TsdfLayer::Ptr& sdf_layer,
+                               const VertexLayer::Ptr& vertex_layer,
+                               const SemanticMeshLayer::Ptr& mesh_layer,
+                               const SemanticLayer::Ptr& semantic_layer)
+    : config_(config),
+      sdf_layer_(sdf_layer),
+      mesh_layer_(mesh_layer),
+      vertex_layer_(vertex_layer),
+      semantic_layer_(semantic_layer) {
+  DCHECK(sdf_layer_ != nullptr);
+  DCHECK(mesh_layer_ != nullptr);
   DCHECK(vertex_layer_ != nullptr);
+
+  voxel_size_ = sdf_layer_->voxel_size();
+  block_size_ = sdf_layer_->block_size();
+  voxels_per_side_ = sdf_layer_->voxels_per_side();
+
+  // clang-format off
+  cube_index_offsets_ << 0, 1, 1, 0, 0, 1, 1, 0,
+                         0, 0, 1, 1, 0, 0, 1, 1,
+                         0, 0, 0, 0, 1, 1, 1, 1;
+  // clang-format on
   cube_coord_offsets_ = cube_index_offsets_.cast<FloatingPoint>() * voxel_size_;
 }
 
-void VoxelAwareMeshIntegrator::launchThreads(const BlockIndexList& blocks,
-                                             bool interior_pass) {
+void MeshIntegrator::launchThreads(const BlockIndexList& blocks, bool interior_pass) {
   std::unique_ptr<ThreadSafeIndex> index_getter(
       new MixedThreadSafeIndex(blocks.size()));
 
@@ -89,10 +104,10 @@ void VoxelAwareMeshIntegrator::launchThreads(const BlockIndexList& blocks,
   for (size_t i = 0; i < config_.integrator_threads; ++i) {
     if (interior_pass) {
       threads.emplace_back(
-          &VoxelAwareMeshIntegrator::processInterior, this, blocks, index_getter.get());
+          &MeshIntegrator::processInterior, this, blocks, index_getter.get());
     } else {
       threads.emplace_back(
-          &VoxelAwareMeshIntegrator::processExterior, this, blocks, index_getter.get());
+          &MeshIntegrator::processExterior, this, blocks, index_getter.get());
     }
   }
 
@@ -101,17 +116,17 @@ void VoxelAwareMeshIntegrator::launchThreads(const BlockIndexList& blocks,
   }
 }
 
-void VoxelAwareMeshIntegrator::generateMesh(bool only_mesh_updated_blocks,
-                                            bool clear_updated_flag) {
+void MeshIntegrator::generateMesh(bool only_mesh_updated_blocks,
+                                  bool clear_updated_flag) {
   BlockIndexList blocks;
   if (only_mesh_updated_blocks) {
-    sdf_layer_const_->getAllUpdatedBlocks(voxblox::Update::kMesh, &blocks);
+    sdf_layer_->getAllUpdatedBlocks(voxblox::Update::kMesh, &blocks);
   } else {
-    sdf_layer_const_->getAllAllocatedBlocks(&blocks);
+    sdf_layer_->getAllAllocatedBlocks(&blocks);
   }
 
   for (const BlockIndex& block_index : blocks) {
-    auto mesh = mesh_layer_->allocateMeshPtrByIndex(block_index);
+    auto mesh = mesh_layer_->allocateBlock(block_index, semantic_layer_ != nullptr);
     mesh->clear();
 
     // also allocate gvd blocks
@@ -130,22 +145,68 @@ void VoxelAwareMeshIntegrator::generateMesh(bool only_mesh_updated_blocks,
   if (VLOG_IS_ON(10)) {
     VLOG(10) << "Updated blocks:";
     for (const auto& idx : blocks) {
-      const auto& block = mesh_layer_->getMeshByIndex(idx);
-      VLOG(10) << "  - " << std::setw(4) << std::setfill(' ') << block.vertices.size()
+      const auto& block = mesh_layer_->getMeshBlock(idx);
+      VLOG(10) << "  - " << std::setw(4) << std::setfill(' ') << block->vertices.size()
                << " vertices @ " << showIndex(idx);
     }
   }
 
   if (clear_updated_flag) {
     for (const auto& block_idx : blocks) {
-      auto block = sdf_layer_mutable_->getBlockPtrByIndex(block_idx);
+      auto block = sdf_layer_->getBlockPtrByIndex(block_idx);
       block->updated().reset(voxblox::Update::kMesh);
     }
   }
 }
 
-void VoxelAwareMeshIntegrator::processInterior(const BlockIndexList& blocks,
-                                               ThreadSafeIndex* index_getter) {
+void MeshIntegrator::updateMeshColor(const Block<TsdfVoxel>& block,
+                                     Mesh* mesh,
+                                     const BlockIndex& index) {
+  DCHECK(mesh != nullptr);
+  // TODO(nathan) this is very ugly; we should just grab this info from marching
+  // cubes...
+
+  mesh->colors.clear();
+  mesh->colors.resize(mesh->indices.size());
+
+  std::vector<uint32_t>* mesh_semantics_block = nullptr;
+  if (semantic_layer_) {
+    mesh_semantics_block = mesh_layer_->getSemanticBlock(index);
+    mesh_semantics_block->resize(mesh->indices.size());
+  }
+
+  const TsdfVoxel* voxel = nullptr;
+  const SemanticVoxel* semantic_voxel = nullptr;
+  // Use nearest-neighbor search.
+  for (size_t i = 0; i < mesh->vertices.size(); i++) {
+    const auto& vertex = mesh->vertices[i];
+    const auto voxel_index = block.computeVoxelIndexFromCoordinates(vertex);
+
+    if (block.isValidVoxelIndex(voxel_index)) {
+      voxel = &block.getVoxelByVoxelIndex(voxel_index);
+      if (semantic_layer_) {
+        const auto semantic_block = semantic_layer_->getBlockPtrByIndex(index);
+        semantic_voxel = &semantic_block->getVoxelByVoxelIndex(voxel_index);
+      }
+    } else {
+      const auto neighbor_block = sdf_layer_->getBlockPtrByCoordinates(vertex);
+      voxel = &neighbor_block->getVoxelByCoordinates(vertex);
+      if (semantic_layer_) {
+        const auto semantic_block = semantic_layer_->getBlockPtrByCoordinates(vertex);
+        semantic_voxel = &semantic_block->getVoxelByCoordinates(vertex);
+      }
+    }
+
+    DCHECK(voxel != nullptr);
+    vutils::getColorIfValid(*voxel, config_.min_weight, &(mesh->colors[i]));
+    if (semantic_voxel) {
+      mesh_semantics_block->at(i) = semantic_voxel->semantic_label;
+    }
+  }
+}
+
+void MeshIntegrator::processInterior(const BlockIndexList& blocks,
+                                     ThreadSafeIndex* index_getter) {
   DCHECK(index_getter != nullptr);
 
   size_t list_idx;
@@ -154,8 +215,8 @@ void VoxelAwareMeshIntegrator::processInterior(const BlockIndexList& blocks,
   }
 }
 
-void VoxelAwareMeshIntegrator::processExterior(const BlockIndexList& blocks,
-                                               ThreadSafeIndex* index_getter) {
+void MeshIntegrator::processExterior(const BlockIndexList& blocks,
+                                     ThreadSafeIndex* index_getter) {
   DCHECK(index_getter != nullptr);
 
   size_t list_idx;
@@ -164,10 +225,10 @@ void VoxelAwareMeshIntegrator::processExterior(const BlockIndexList& blocks,
   }
 }
 
-void VoxelAwareMeshIntegrator::updateBlockInterior(const BlockIndex& block_index) {
+void MeshIntegrator::updateBlockInterior(const BlockIndex& block_index) {
   VLOG(10) << "Extracting interior for block: " << showIndex(block_index);
-  auto mesh = mesh_layer_->getMeshPtrByIndex(block_index);
-  auto block = sdf_layer_const_->getBlockPtrByIndex(block_index);
+  auto mesh = mesh_layer_->getMeshBlock(block_index);
+  auto block = sdf_layer_->getBlockPtrByIndex(block_index);
   DCHECK(block) << "invalid SDF block for mesh";
 
   IndexElement vps = block->voxels_per_side();
@@ -185,10 +246,10 @@ void VoxelAwareMeshIntegrator::updateBlockInterior(const BlockIndex& block_index
   }
 }
 
-void VoxelAwareMeshIntegrator::updateBlockExterior(const BlockIndex& block_index) {
+void MeshIntegrator::updateBlockExterior(const BlockIndex& block_index) {
   VLOG(10) << "Extracting exterior for block: " << showIndex(block_index);
-  auto mesh = mesh_layer_->getMeshPtrByIndex(block_index);
-  auto block = sdf_layer_const_->getBlockPtrByIndex(block_index);
+  auto mesh = mesh_layer_->getMeshBlock(block_index);
+  auto block = sdf_layer_->getBlockPtrByIndex(block_index);
 
   IndexElement vps = block->voxels_per_side();
   VertexIndex next_mesh_index = mesh->size();
@@ -224,15 +285,12 @@ void VoxelAwareMeshIntegrator::updateBlockExterior(const BlockIndex& block_index
     }
   }
 
-  if (config_.use_color) {
-    updateMeshColor(*block, mesh.get());
-  }
-
+  updateMeshColor(*block, mesh.get(), block_index);
   mesh->updated = true;
 }
 
-BlockIndex VoxelAwareMeshIntegrator::getNeighborBlockIndex(const BlockIndex& block_idx,
-                                                           VoxelIndex& corner_index) {
+BlockIndex MeshIntegrator::getNeighborBlockIndex(const BlockIndex& block_idx,
+                                                 VoxelIndex& corner_index) {
   BlockIndex block_offset = BlockIndex::Zero();
   for (unsigned int j = 0u; j < 3u; j++) {
     if (corner_index(j) < 0) {
@@ -247,11 +305,11 @@ BlockIndex VoxelAwareMeshIntegrator::getNeighborBlockIndex(const BlockIndex& blo
   return block_idx + block_offset;
 }
 
-void VoxelAwareMeshIntegrator::extractMeshInsideBlock(const TsdfBlock& block,
-                                                      const VoxelIndex& index,
-                                                      const Point& point,
-                                                      VertexIndex* new_mesh_idx,
-                                                      Mesh* mesh) {
+void MeshIntegrator::extractMeshInsideBlock(const TsdfBlock& block,
+                                            const VoxelIndex& index,
+                                            const Point& point,
+                                            VertexIndex* new_mesh_idx,
+                                            Mesh* mesh) {
   DCHECK(new_mesh_idx != nullptr);
   DCHECK(mesh != nullptr);
 
@@ -275,14 +333,14 @@ void VoxelAwareMeshIntegrator::extractMeshInsideBlock(const TsdfBlock& block,
     voxels[i] = &vertex_block->getVoxelByVoxelIndex(corner_index);
   }
 
-  VoxelAwareMarchingCubes::meshCube(block_idx, coords, sdf, new_mesh_idx, mesh, voxels);
+  ::hydra::MarchingCubes::meshCube(block_idx, coords, sdf, new_mesh_idx, mesh, voxels);
 }
 
-void VoxelAwareMeshIntegrator::extractMeshOnBorder(const TsdfBlock& block,
-                                                   const VoxelIndex& index,
-                                                   const Point& point,
-                                                   VertexIndex* new_mesh_idx,
-                                                   Mesh* mesh) {
+void MeshIntegrator::extractMeshOnBorder(const TsdfBlock& block,
+                                         const VoxelIndex& index,
+                                         const Point& point,
+                                         VertexIndex* new_mesh_idx,
+                                         Mesh* mesh) {
   DCHECK(new_mesh_idx != nullptr);
   DCHECK(mesh != nullptr);
 
@@ -305,11 +363,11 @@ void VoxelAwareMeshIntegrator::extractMeshOnBorder(const TsdfBlock& block,
     } else {
       // we have to access a different block
       const auto neighbor_idx = getNeighborBlockIndex(block_idx, corner_index);
-      if (!sdf_layer_const_->hasBlock(neighbor_idx)) {
+      if (!sdf_layer_->hasBlock(neighbor_idx)) {
         return;
       }
 
-      const auto& neighbor_block = sdf_layer_const_->getBlockByIndex(neighbor_idx);
+      const auto& neighbor_block = sdf_layer_->getBlockByIndex(neighbor_idx);
       CHECK(neighbor_block.isValidVoxelIndex(corner_index));
 
       voxel = &neighbor_block.getVoxelByVoxelIndex(corner_index);
@@ -326,7 +384,7 @@ void VoxelAwareMeshIntegrator::extractMeshOnBorder(const TsdfBlock& block,
     coords.col(i) = point + cube_coord_offsets_.col(i);
   }
 
-  VoxelAwareMarchingCubes::meshCube(block_idx, coords, sdf, new_mesh_idx, mesh, voxels);
+  ::hydra::MarchingCubes::meshCube(block_idx, coords, sdf, new_mesh_idx, mesh, voxels);
 }
 
 }  // namespace hydra

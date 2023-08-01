@@ -1,0 +1,64 @@
+---
+semantic_measurement_probability: 0.9
+total_semantic_labels: 37
+dynamic_labels: [35, 36]
+invalid_labels: [0]
+objects:
+  labels:
+    - 2
+    - 7
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+label_names:
+  - {label: 0, name: Unknown}
+  - {label: 1, name: Sky}
+  - {label: 2, name: Tree}
+  - {label: 3, name: Water}
+  - {label: 4, name: Ground}
+  - {label: 5, name: Sidewalk}
+  - {label: 6, name: Road}
+  - {label: 7, name: Vehicle}
+  - {label: 8, name: Building}
+  - {label: 9, name: Signal}
+  - {label: 10, name: Rock}
+  - {label: 11, name: Fence}
+  - {label: 12, name: Boat}
+  - {label: 13, name: Sign}
+  - {label: 14, name: Slope}
+  - {label: 15, name: Bridge}
+  - {label: 16, name: Wall}
+  - {label: 17, name: Floor}
+  - {label: 18, name: Ceiling}
+  - {label: 19, name: Door}
+  - {label: 20, name: Stairs}
+  - {label: 21, name: Structure}
+  - {label: 22, name: Window}
+  - {label: 23, name: Shelf}
+  - {label: 24, name: Plant}
+  - {label: 25, name: Bed}
+  - {label: 26, name: Storage}
+  - {label: 27, name: Table}
+  - {label: 28, name: Chair}
+  - {label: 29, name: Wall_Decoration}
+  - {label: 30, name: Couch}
+  - {label: 31, name: Light}
+  - {label: 32, name: Appliance}
+  - {label: 33, name: Thing}
+  - {label: 34, name: Deformable}
+  - {label: 35, name: Dynamic_NonHuman}
+  - {label: 36, name: Human}

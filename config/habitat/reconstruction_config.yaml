@@ -70,7 +70,3 @@ tsdf:
   max_consecutive_ray_collisions: 2
   clear_checks_every_n_frames: 1
   integrator_threads: -1
-semantics:
-  semantic_measurement_probability: 0.9
-  color_mode: semantic
-  dynamic_labels: []

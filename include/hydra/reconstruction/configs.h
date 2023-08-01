@@ -33,12 +33,12 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <voxblox/mesh/mesh_integrator.h>
 
 #include <sstream>
 
 #include "hydra/config/config.h"
 #include "hydra/places/gvd_integrator_config.h"
+#include "hydra/reconstruction/mesh_integrator_config.h"
 
 DECLARE_CONFIG_ENUM(hydra::places,
                     ParentUniquenessMode,
@@ -46,7 +46,7 @@ DECLARE_CONFIG_ENUM(hydra::places,
                     {ParentUniquenessMode::L1_DISTANCE, "L1_DISTANCE"},
                     {ParentUniquenessMode::L1_THEN_ANGLE, "L1_THEN_ANGLE"});
 
-namespace voxblox {
+namespace hydra {
 
 struct ThreadNumConverter {
   // set threads to hardware_concurrency if -1 provided
@@ -58,14 +58,13 @@ struct ThreadNumConverter {
 
 template <typename Visitor>
 void visit_config(const Visitor& v, MeshIntegratorConfig& config) {
-  v.visit("use_color", config.use_color);
   v.visit("min_weight", config.min_weight);
   v.visit("integrator_threads", config.integrator_threads, ThreadNumConverter());
 }
 
-}  // namespace voxblox
+}  // namespace hydra
 
-DECLARE_CONFIG_OSTREAM_OPERATOR(voxblox, MeshIntegratorConfig)
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, MeshIntegratorConfig)
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra::places, VoronoiCheckConfig)
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra::places, FloodfillExtractorConfig)
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra::places, CompressionExtractorConfig)

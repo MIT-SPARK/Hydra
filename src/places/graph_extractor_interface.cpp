@@ -51,6 +51,16 @@ void GraphExtractorInterface::pushGvdIndex(const GlobalIndex& index) {
   modified_voxel_queue_.push(index);
 }
 
+void fillInfoFromParent(NearestVertexInfo& info, const GvdVertexInfo& parent_info) {
+  std::memcpy(info.block, parent_info.block, sizeof(info.block));
+  // float to double conversion prevents memcpy
+  info.voxel_pos[0] = parent_info.pos[0];
+  info.voxel_pos[1] = parent_info.pos[1];
+  info.voxel_pos[2] = parent_info.pos[2];
+  info.vertex = parent_info.vertex;
+  info.label = parent_info.label;
+}
+
 void GraphExtractorInterface::assignMeshVertices(const GvdLayer& gvd,
                                                  const GvdParentMap& parents,
                                                  const GvdVertexMap& parent_vertices) {
@@ -71,14 +81,8 @@ void GraphExtractorInterface::assignMeshVertices(const GvdLayer& gvd,
 
     auto iter = parent_vertices.find(curr_parent);
     if (iter != parent_vertices.end()) {
-      const auto& parent_info = iter->second;
       NearestVertexInfo info;
-      std::memcpy(info.block, parent_info.block, sizeof(info.block));
-      // float to double conversion prevents memcpy
-      info.voxel_pos[0] = parent_info.pos[0];
-      info.voxel_pos[1] = parent_info.pos[1];
-      info.voxel_pos[2] = parent_info.pos[2];
-      info.vertex = parent_info.vertex;
+      fillInfoFromParent(info, iter->second);
       attrs.voxblox_mesh_connections.push_back(info);
     }
 
@@ -89,14 +93,8 @@ void GraphExtractorInterface::assignMeshVertices(const GvdLayer& gvd,
         continue;
       }
 
-      const auto& parent_info = parent_vertices.at(parent);
       NearestVertexInfo info;
-      std::memcpy(info.block, parent_info.block, sizeof(info.block));
-      // float to double conversion prevents memcpy
-      info.voxel_pos[0] = parent_info.pos[0];
-      info.voxel_pos[1] = parent_info.pos[1];
-      info.voxel_pos[2] = parent_info.pos[2];
-      info.vertex = parent_info.vertex;
+      fillInfoFromParent(info, parent_vertices.at(parent));
       attrs.voxblox_mesh_connections.push_back(info);
     }
   }

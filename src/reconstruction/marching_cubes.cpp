@@ -35,7 +35,9 @@
 // implied, of the United States Air Force or the U.S. Government. The U.S.
 // Government is authorized to reproduce and distribute reprints for Government
 // purposes notwithstanding any copyright notation herein.
-#include "hydra/reconstruction/voxel_aware_marching_cubes.h"
+#include "hydra/reconstruction/marching_cubes.h"
+
+#include <voxblox/mesh/marching_cubes.h>
 
 #include "hydra/reconstruction/voxblox_utilities.h"
 
@@ -104,7 +106,7 @@ void interpolateEdges(const PointMatrix& vertex_coords,
   }
 }
 
-VoxelAwareMarchingCubes::VoxelAwareMarchingCubes() : voxblox::MarchingCubes() {}
+MarchingCubes::MarchingCubes() {}
 
 inline int calculateVertexConfig(const SdfMatrix& vertex_sdf) {
   // voxblox / open-chisel version doesn't handle zeroed SDF values correctly
@@ -126,7 +128,7 @@ inline void updateVoxels(const BlockIndex& block,
                          VertexIndex new_vertex_index,
                          const std::vector<uint8_t>& status,
                          const std::vector<VertexVoxel*>& vertex_voxels) {
-  const int* pairs = voxblox::MarchingCubes::kEdgeIndexPairs[edge_coord];
+  const int* pairs = ::voxblox::MarchingCubes::kEdgeIndexPairs[edge_coord];
   const uint8_t curr_status = status[edge_coord];
 
   if (VLOG_IS_ON(15) && (curr_status & 0x01 || curr_status & 0x02)) {
@@ -149,12 +151,12 @@ inline void updateVoxels(const BlockIndex& block,
   }
 }
 
-void VoxelAwareMarchingCubes::meshCube(const BlockIndex& block,
-                                       const PointMatrix& vertex_coords,
-                                       const SdfMatrix& vertex_sdf,
-                                       VertexIndex* next_index,
-                                       Mesh* mesh,
-                                       const std::vector<VertexVoxel*>& voxels) {
+void MarchingCubes::meshCube(const BlockIndex& block,
+                             const PointMatrix& vertex_coords,
+                             const SdfMatrix& vertex_sdf,
+                             VertexIndex* next_index,
+                             Mesh* mesh,
+                             const std::vector<VertexVoxel*>& voxels) {
   // TODO(nathan) references
   DCHECK(next_index != nullptr);
   DCHECK(mesh != nullptr);
@@ -171,7 +173,7 @@ void VoxelAwareMarchingCubes::meshCube(const BlockIndex& block,
   std::vector<uint8_t> status;
   interpolateEdges(vertex_coords, vertex_sdf, edge_vertex_coordinates, status);
 
-  const int* table_row = kTriangleTable[index];
+  const int* table_row = ::voxblox::MarchingCubes::kTriangleTable[index];
 
   int table_col = 0;
   while (table_row[table_col] != -1) {

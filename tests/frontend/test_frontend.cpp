@@ -57,16 +57,14 @@ inline FrontendConfig getDefaultConfig() {
   FrontendConfig to_return;
   to_return.filter_places = false;
   to_return.validate_vertices = false;
-
-  to_return.semantic_label_file = hydra::test::get_default_semantic_map();
   return to_return;
 }
 
-ReconstructionOutput::Ptr getMsg() {
+ReconstructionOutput::Ptr getMsg(voxblox::FloatingPoint block_size = 1.5f) {
   auto msg = std::make_shared<ReconstructionOutput>();
   msg->timestamp_ns = 0;
-  msg->places.reset(new hydra_msgs::ActiveLayer());
-  msg->mesh.reset(new hydra_msgs::ActiveMesh());
+  msg->places.reset(new ActiveLayerInfo());
+  msg->mesh.reset(new SemanticMeshLayer(block_size));
   msg->current_position = Eigen::Vector3d::Zero();
   return msg;
 }
@@ -97,17 +95,14 @@ void addPoseGraph(ReconstructionOutput& msg,
 }
 
 void addPlaces(ReconstructionOutput& output, const SceneGraphLayer& graph) {
-  output.places.reset(new hydra_msgs::ActiveLayer());
-  auto& places = const_cast<hydra_msgs::ActiveLayer&>(*output.places);
-  places.header.stamp.fromNSec(output.timestamp_ns);
-  places.header.frame_id = "world";
+  output.places.reset(new ActiveLayerInfo());
 
   std::unordered_set<NodeId> active_nodes;
   for (const auto& id_node_pair : graph.nodes()) {
     active_nodes.insert(id_node_pair.first);
   }
 
-  places.layer_contents = graph.serializeLayer(active_nodes);
+  output.places->fillFromGraph(graph, active_nodes);
 }
 
 void addPlaceNode(IsolatedSceneGraphLayer& graph,

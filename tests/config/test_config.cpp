@@ -62,6 +62,10 @@ struct FakeConfig2 {
   std::string msg = "world";
 };
 
+struct FakeConfig3 : public FakeConfig {
+  std::string msg = "world";
+};
+
 struct BarConfig {
   int a = 1;
   float b = 2.0f;
@@ -99,6 +103,13 @@ void visit_config(const Visitor& v, FakeConfig& config) {
 template <typename Visitor>
 void visit_config(const Visitor& v, FakeConfig2& config) {
   v.visit("fake_config", config.fake_config);
+  v.visit("msg", config.msg);
+}
+
+template <typename Visitor>
+void visit_config(const Visitor& v, FakeConfig3& config) {
+  auto base_handle = v["fake_config"];
+  config_parser::ConfigVisitor<FakeConfig>::visit_base(base_handle, config);
   v.visit("msg", config.msg);
 }
 
@@ -157,6 +168,7 @@ struct ConfigVisitor<std::map<std::string, hydra::BarConfig>> {
 
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, FakeConfig)
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, FakeConfig2)
+DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, FakeConfig3)
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, BarConfig)
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, BarMapConfig)
 
@@ -260,6 +272,27 @@ TEST(ConfigParsing, ParseNestedStructYaml) {
   EXPECT_EQ(config.fake_config.enable_map, expected_enable_map);
 }
 
+TEST(ConfigParsing, ParseInheritedStructYaml) {
+  const std::string filepath =
+      test::get_resource_path("config/nested_test_config.yaml");
+  auto config = config_parser::load_from_yaml<FakeConfig3>(filepath);
+
+  EXPECT_EQ(config.foo, 10.0f);
+  EXPECT_EQ(config.bar, 5.0);
+  EXPECT_EQ(config.a, -3);
+  EXPECT_EQ(static_cast<int>(config.b), 1);
+  EXPECT_EQ(config.c, 2);
+
+  std::vector<int> expected_values{1, 2, 3};
+  EXPECT_EQ(config.values, expected_values);
+  EXPECT_EQ(config.msg, "again");
+
+  // make sure conversion respects the default
+  std::map<TestEnum, bool> expected_enable_map{{TestEnum::RED, 1},
+                                               {TestEnum::GREEN, 0}};
+  EXPECT_EQ(config.enable_map, expected_enable_map);
+}
+
 TEST(ConfigParsing, OutputSingleConfig) {
   FakeConfig config;
   std::stringstream ss;
@@ -309,6 +342,33 @@ TEST(ConfigParsing, OutputNestedConfig) {
 
   EXPECT_EQ(expected, ss.str()) << "config:" << std::endl << ss.str();
 }
+
+TEST(ConfigParsing, OutputInheritedConfig) {
+  FakeConfig3 config;
+  std::stringstream ss;
+  // endl to make expected easier to write
+  ss << std::endl << config;
+
+  std::string expected = R"out(
+- fake_config:
+  - foo: 5
+  - bar: 10
+  - a: 1
+  - b: 2
+  - c: -3
+  - msg: hello
+  - values: [1, 2, 3]
+  - value_map: {1: 2, 3: 4}
+  - type: RED
+  - vec: [0, 0, 0]
+  - enable_map: {GREEN: 0, RED: 1}
+  - unique_values: [1, 2, 3]
+- msg: world
+)out";
+
+  EXPECT_EQ(expected, ss.str()) << "config:" << std::endl << ss.str();
+}
+
 
 TEST(ConfigParsing, ParseMapStructYaml) {
   const std::string filepath = test::get_resource_path("config/map_config.yaml");

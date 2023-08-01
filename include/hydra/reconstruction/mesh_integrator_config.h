@@ -33,38 +33,13 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <voxblox/mesh/marching_cubes.h>
-
-#include "hydra/places/vertex_voxel.h"
+#include <thread>
 
 namespace hydra {
 
-using PointMatrix = Eigen::Matrix<voxblox::FloatingPoint, 3, 8>;
-using SdfMatrix = Eigen::Matrix<voxblox::FloatingPoint, 8, 1>;
-using EdgeIndexMatrix = Eigen::Matrix<voxblox::FloatingPoint, 3, 12>;
-
-void interpolateEdges(const PointMatrix& vertex_coords,
-                      const SdfMatrix& vertex_sdf,
-                      EdgeIndexMatrix& edge_coords,
-                      std::vector<uint8_t>& edge_status);
-
-/**
- * Performs the marching cubes algorithm to generate a mesh layer from a TSDF.
- * Implementation taken from Open Chisel
- * https://github.com/personalrobotics/OpenChisel
- */
-class VoxelAwareMarchingCubes : voxblox::MarchingCubes {
- public:
-  VoxelAwareMarchingCubes();
-
-  virtual ~VoxelAwareMarchingCubes() = default;
-
-  static void meshCube(const voxblox::BlockIndex& block,
-                       const PointMatrix& vertex_coords,
-                       const SdfMatrix& vertex_sdf,
-                       voxblox::VertexIndex* next_index,
-                       voxblox::Mesh* mesh,
-                       const std::vector<places::VertexVoxel*>& vertex_voxels);
+struct MeshIntegratorConfig {
+  float min_weight = 1.0e-4;
+  size_t integrator_threads = std::thread::hardware_concurrency();
 };
 
 }  // namespace hydra

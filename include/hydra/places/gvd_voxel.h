@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <iostream>
+#include <optional>
 
 #include "hydra/places/voxblox_types.h"
 
@@ -60,6 +61,7 @@ struct GvdVoxel {
 
   size_t block_vertex_index;
   int32_t mesh_block[3];
+  std::optional<uint32_t> mesh_label;
 };
 
 std::ostream& operator<<(std::ostream& out, const GvdVoxel& voxel);
@@ -106,11 +108,11 @@ inline void setGvdSurfaceVoxel(GvdVoxel& voxel) {
   resetParent(voxel);
 }
 
-// TODO(nathan) consider moving this
 struct GvdVertexInfo {
   size_t vertex;
   float pos[3];
   int32_t block[3];
+  std::optional<uint32_t> label;
   size_t ref_count = 0;
 };
 

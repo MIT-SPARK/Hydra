@@ -37,20 +37,7 @@
 
 #include "hydra/config/config.h"
 #include "hydra/config/eigen_config_types.h"
-#include "hydra/frontend/mesh_segmenter.h"
-
-namespace spark_dsg {
-
-using BoundingBoxType = BoundingBox::Type;
-
-}  // namespace spark_dsg
-
-DECLARE_CONFIG_ENUM(spark_dsg,
-                    BoundingBoxType,
-                    {BoundingBoxType::INVALID, "INVALID"},
-                    {BoundingBoxType::AABB, "AABB"},
-                    {BoundingBoxType::OBB, "OBB"},
-                    {BoundingBoxType::RAABB, "RAABB"});
+#include "hydra/frontend/mesh_segmenter_config.h"
 
 namespace kimera_pgmo {
 
@@ -69,10 +56,8 @@ void visit_config(const Visitor& v, kimera_pgmo::MeshFrontendConfig& config) {
 namespace hydra {
 
 struct FrontendConfig {
-  // TODO(nathan) consider unifying log path with backend
   size_t min_object_vertices = 20;
   bool prune_mesh_indices = false;
-  std::string semantic_label_file;
   bool lcd_use_bow_vectors = true;
   kimera_pgmo::MeshFrontendConfig pgmo_config;
   MeshSegmenterConfig object_config;
@@ -81,50 +66,10 @@ struct FrontendConfig {
   size_t min_places_component_size = 3;
 };
 
-struct LabelConverter {
-  std::vector<int> from(const std::set<uint8_t>& input) const {
-    std::vector<int> to_return;
-    for (const auto& label : input) {
-      to_return.push_back(static_cast<int>(label));
-    }
-    return to_return;
-  }
-
-  std::set<uint8_t> to(const std::vector<int>& input) const {
-    std::set<uint8_t> to_return;
-    for (const auto& label : input) {
-      to_return.insert(static_cast<uint8_t>(label));
-    }
-    return to_return;
-  }
-};
-
-template <typename Visitor>
-void visit_config(const Visitor& v, MeshSegmenterConfig& config) {
-  std::string prefix_string;
-  if (!config_parser::is_parser<Visitor>()) {
-    prefix_string.push_back(config.prefix);
-  }
-
-  v.visit("prefix", prefix_string);
-  if (config_parser::is_parser<Visitor>()) {
-    config.prefix = prefix_string.at(0);
-  }
-
-  v.visit("active_horizon_s", config.active_horizon_s);
-  v.visit("active_index_horizon_m", config.active_index_horizon_m);
-  v.visit("cluster_tolerance", config.cluster_tolerance);
-  v.visit("min_cluster_size", config.min_cluster_size);
-  v.visit("max_cluster_size", config.max_cluster_size);
-  v.visit("bounding_box_type", config.bounding_box_type);
-  v.visit("labels", config.labels, LabelConverter());
-}
-
 template <typename Visitor>
 void visit_config(const Visitor& v, FrontendConfig& config) {
   v.visit("min_object_vertices", config.min_object_vertices);
   v.visit("prune_mesh_indices", config.prune_mesh_indices);
-  v.visit("semantic_label_file", config.semantic_label_file);
   v.visit("lcd_use_bow_vectors", config.lcd_use_bow_vectors);
   v.visit("pgmo", config.pgmo_config);
   v.visit("objects", config.object_config);
@@ -137,5 +82,4 @@ void visit_config(const Visitor& v, FrontendConfig& config) {
 }  // namespace hydra
 
 DECLARE_CONFIG_OSTREAM_OPERATOR(kimera_pgmo, MeshFrontendConfig)
-DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, MeshSegmenterConfig)
 DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, FrontendConfig)

@@ -32,62 +32,28 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <utility>
-
-#include "hydra/places/gvd_integrator.h"
-#include "hydra/reconstruction/mesh_integrator.h"
+#include "hydra/reconstruction/reconstruction_output.h"
 
 namespace hydra {
-namespace places {
 
-class ComboIntegrator {
- public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+void ActiveLayerInfo::fillFromGraph(const SceneGraphLayer& graph,
+                                    const std::unordered_set<NodeId>& active_nodes) {
+  std::set<spark_dsg::EdgeKey> seen_edges;
+  for (const auto& node_id : active_nodes) {
+    const auto& node = graph.getNode(node_id)->get();
+    active_attributes.emplace(node_id, node.attributes().clone());
 
-  ComboIntegrator(const GvdIntegratorConfig& gvd_config,
-                  const Layer<TsdfVoxel>::Ptr& tsdf_layer,
-                  const Layer<GvdVoxel>::Ptr& gvd_layer,
-                  const SemanticMeshLayer::Ptr& mesh_layer,
-                  const MeshIntegratorConfig* mesh_config = nullptr)
-      : tsdf_(tsdf_layer), mesh_(mesh_layer) {
-    vertices_.reset(
-        new Layer<VertexVoxel>(gvd_layer->voxel_size(), gvd_layer->voxels_per_side()));
-    mesh_integrator = std::make_unique<MeshIntegrator>(
-        mesh_config ? *mesh_config : MeshIntegratorConfig(),
-        tsdf_layer,
-        vertices_,
-        mesh_layer);
-    gvd_integrator = std::make_unique<GvdIntegrator>(gvd_config, gvd_layer);
+    for (const auto& sibling : node.siblings()) {
+      spark_dsg::EdgeKey key(node_id, sibling);
+      if (seen_edges.count(key)) {
+        continue;
+      }
+
+      seen_edges.insert(key);
+      edges.emplace_back(
+          node_id, sibling, graph.getEdge(node_id, sibling)->get().info->clone());
+    }
   }
+}
 
-  virtual ~ComboIntegrator() = default;
-
-  inline const SceneGraphLayer& getGraph() const { return gvd_integrator->getGraph(); }
-
-  inline const GvdGraph& getGvdGraph() const { return gvd_integrator->getGvdGraph(); }
-
-  inline GraphExtractorInterface& getGraphExtractor() const {
-    return gvd_integrator->getGraphExtractor();
-  }
-
-  inline void update(uint64_t timestamp_ns,
-                     bool clear_updated_flag,
-                     bool use_all_blocks = false) {
-    mesh_integrator->generateMesh(!use_all_blocks, clear_updated_flag);
-    gvd_integrator->updateFromTsdf(
-        timestamp_ns, *tsdf_, *vertices_, *mesh_, clear_updated_flag, use_all_blocks);
-    gvd_integrator->updateGvd(timestamp_ns);
-  }
-
-  std::unique_ptr<MeshIntegrator> mesh_integrator;
-  std::unique_ptr<GvdIntegrator> gvd_integrator;
-
- protected:
-  Layer<TsdfVoxel>::Ptr tsdf_;
-  SemanticMeshLayer::Ptr mesh_;
-  Layer<VertexVoxel>::Ptr vertices_;
-};
-
-}  // namespace places
 }  // namespace hydra

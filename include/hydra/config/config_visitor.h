@@ -103,6 +103,12 @@ struct ConfigVisitor {
 
     return ::config_parser::visit_config(visitor, value);
   }
+
+  template <typename V, typename D>
+  static void visit_base(const V& visitor, D& value) {
+    ValueType& derived_value = static_cast<ValueType&>(value);
+    ConfigVisitor<ValueType>::visit_config(visitor, derived_value);
+  }
 };
 
 }  // namespace config_parser
