@@ -10,7 +10,8 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Filesystem.cmake)
 has_std_filesystem(HYDRA_USE_STANDARD_FS)
 
 option(HYDRA_USE_COVERAGE "Build core library with GCC --coverage option" OFF)
-option(HYDRA_GNN "build GNN interface" ON)
+option(HYDRA_GNN "Build GNN interface" ON)
+option(HYDRA_ENABLE_EVAL "Build evaluation code" ON)
 
 # TODO(nathan) clean this up
 if(HYDRA_GNN)
@@ -101,23 +102,27 @@ else()
     REQUIRED
   )
   target_link_libraries(${PROJECT_NAME} PRIVATE Boost::filesystem)
-endif(HYDRA_USE_STANDARD_FS)
+endif()
 
 add_subdirectory(src)
 
 if(HYDRA_GNN)
   add_subdirectory(src/gnn)
   target_link_libraries(${PROJECT_NAME} PUBLIC ${PROJECT_NAME}_gnn)
-endif(HYDRA_GNN)
+endif()
 
 if(HYDRA_USE_COVERAGE)
   target_compile_options(${PROJECT_NAME} PRIVATE --coverage)
   # TODO(nathan) once we have newer cmake, target link options
   target_link_libraries(${PROJECT_NAME} PRIVATE --coverage)
-endif(HYDRA_USE_COVERAGE)
+endif()
+
+if(HYDRA_ENABLE_EVAL)
+  add_subdirectory(eval)
+endif()
 
 if(CATKIN_ENABLE_TESTING)
   add_subdirectory(tests)
-endif(CATKIN_ENABLE_TESTING)
+endif()
 
 # TODO(nathan) handle install

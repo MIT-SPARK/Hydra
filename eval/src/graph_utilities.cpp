@@ -32,44 +32,67 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <voxblox/mesh/mesh_layer.h>
-#include <kimera_pgmo/utils/VoxbloxMeshInterface.h>
+#include "hydra/eval/graph_utilities.h"
 
-#include <memory>
+#include <glog/logging.h>
 
-namespace hydra {
+namespace hydra::eval {
 
-class SemanticMeshLayer {
- public:
-  using Ptr = std::shared_ptr<SemanticMeshLayer>;
-  using SemanticMeshMap = voxblox::AnyIndexHashMapType<std::vector<uint32_t>>::type;
+DynamicSceneGraph::Ptr mergeGraphs(const std::vector<DynamicSceneGraph::Ptr>& graphs) {
+  DynamicSceneGraph::Ptr to_return(new DynamicSceneGraph());
 
-  explicit SemanticMeshLayer(voxblox::FloatingPoint block_size);
+  size_t num_nodes_expected = 0;
+  size_t num_edges_expected = 0;
 
-  voxblox::Mesh::Ptr allocateBlock(const voxblox::BlockIndex& index, bool use_semantics);
+  std::map<LayerId, size_t> layer_counts;
+  layer_counts[DsgLayers::OBJECTS] = 0;
+  layer_counts[DsgLayers::PLACES] = 0;
+  layer_counts[DsgLayers::ROOMS] = 0;
+  layer_counts[DsgLayers::BUILDINGS] = 0;
 
-  void removeBlock(const voxblox::BlockIndex& index);
+  for (const auto& graph_ptr : graphs) {
+    const auto& graph = *graph_ptr;
+    num_nodes_expected += graph.numStaticNodes();
+    num_edges_expected += graph.numStaticEdges();
 
-  voxblox::Mesh::Ptr getMeshBlock(const voxblox::BlockIndex& index) const;
+    std::map<NodeId, NodeId> node_id_map;
+    for (const auto& id_layer_pair : graph.layers()) {
+      const auto layer = id_layer_pair.first;
+      auto& curr_count = layer_counts.at(layer);
 
-  std::vector<uint32_t>* getSemanticBlock(const voxblox::BlockIndex& index) const;
+      for (const auto& id_node_pair : id_layer_pair.second->nodes()) {
+        NodeSymbol prev_id(id_node_pair.first);
+        NodeSymbol new_id(prev_id.category(), curr_count);
+        ++curr_count;
 
-  void getAllocatedBlockIndices(voxblox::BlockIndexList& allocated) const;
+        node_id_map[prev_id] = new_id;
+        to_return->emplaceNode(
+            layer, new_id, id_node_pair.second->attributes().clone());
+      }
+    }
 
-  size_t numBlocks() const;
+    // intralayer edges
+    for (const auto& id_layer_pair : graph.layers()) {
+      for (const auto& id_edge_pair : id_layer_pair.second->edges()) {
+        const auto& edge = id_edge_pair.second;
+        const auto source_id = node_id_map.at(edge.source);
+        const auto target_id = node_id_map.at(edge.target);
+        to_return->insertEdge(source_id, target_id, edge.info->clone());
+      }
+    }
 
-  size_t getMemorySize() const;
+    // interlayer edges
+    for (const auto& id_edge_pair : graph.interlayer_edges()) {
+      const auto& edge = id_edge_pair.second;
+      const auto source_id = node_id_map.at(edge.source);
+      const auto target_id = node_id_map.at(edge.target);
+      to_return->insertEdge(source_id, target_id, edge.info->clone());
+    }
+  }
 
-  SemanticMeshLayer::Ptr getActiveMesh(const voxblox::IndexSet& archived_blocks);
+  CHECK_EQ(to_return->numStaticNodes(), num_nodes_expected);
+  CHECK_EQ(to_return->numStaticEdges(), num_edges_expected);
+  return to_return;
+}
 
-  voxblox::MeshLayer::Ptr getVoxbloxMesh() const;
-
-  kimera_pgmo::SemanticVoxbloxMeshInterface getMeshInterface() const;
-
- protected:
-  voxblox::MeshLayer::Ptr mesh_;
-  std::shared_ptr<SemanticMeshMap> semantics_;
-};
-
-}  // namespace hydra
+}  // namespace hydra::eval

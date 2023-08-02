@@ -32,44 +32,49 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <voxblox/mesh/mesh_layer.h>
-#include <kimera_pgmo/utils/VoxbloxMeshInterface.h>
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 
-#include <memory>
+#include "hydra/eval/room_evaluator.h"
 
-namespace hydra {
+DEFINE_string(tsdf_file, "", "tsdf file to read");
+DEFINE_string(bbox_file, "", "bounding box config file");
+DEFINE_string(dsg_file, "", "dsg file to read");
 
-class SemanticMeshLayer {
- public:
-  using Ptr = std::shared_ptr<SemanticMeshLayer>;
-  using SemanticMeshMap = voxblox::AnyIndexHashMapType<std::vector<uint32_t>>::type;
+using namespace spark_dsg;
 
-  explicit SemanticMeshLayer(voxblox::FloatingPoint block_size);
+int main(int argc, char* argv[]) {
+  FLAGS_minloglevel = 0;
+  FLAGS_logtostderr = 1;
+  FLAGS_colorlogtostderr = 1;
 
-  voxblox::Mesh::Ptr allocateBlock(const voxblox::BlockIndex& index, bool use_semantics);
+  google::SetUsageMessage("utility for comparing visualizing room bounding boxes");
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  google::InitGoogleLogging(argv[0]);
 
-  void removeBlock(const voxblox::BlockIndex& index);
+  if (FLAGS_tsdf_file == "") {
+    LOG(FATAL) << "TSDF file is required!";
+  }
 
-  voxblox::Mesh::Ptr getMeshBlock(const voxblox::BlockIndex& index) const;
+  if (FLAGS_bbox_file == "") {
+    LOG(FATAL) << "Bounding box file is required!";
+  }
 
-  std::vector<uint32_t>* getSemanticBlock(const voxblox::BlockIndex& index) const;
+  if (FLAGS_dsg_file == "") {
+    LOG(FATAL) << "DSG file is required!";
+  }
 
-  void getAllocatedBlockIndices(voxblox::BlockIndexList& allocated) const;
+  auto evaluator =
+      hydra::eval::RoomEvaluator::fromFile(FLAGS_bbox_file, FLAGS_tsdf_file);
+  if (!evaluator) {
+    LOG(FATAL) << "Unable to construct room evaluator.";
+  }
 
-  size_t numBlocks() const;
+  const auto metrics = evaluator->eval(FLAGS_dsg_file);
+  if (!metrics.valid()) {
+    LOG(FATAL) << "Unable to evaluate invalid graph!";
+  }
 
-  size_t getMemorySize() const;
-
-  SemanticMeshLayer::Ptr getActiveMesh(const voxblox::IndexSet& archived_blocks);
-
-  voxblox::MeshLayer::Ptr getVoxbloxMesh() const;
-
-  kimera_pgmo::SemanticVoxbloxMeshInterface getMeshInterface() const;
-
- protected:
-  voxblox::MeshLayer::Ptr mesh_;
-  std::shared_ptr<SemanticMeshMap> semantics_;
-};
-
-}  // namespace hydra
+  VLOG(1) << metrics;
+  return 0;
+}
