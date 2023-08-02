@@ -33,43 +33,47 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <voxblox/mesh/mesh_layer.h>
-#include <kimera_pgmo/utils/VoxbloxMeshInterface.h>
+#include <voxblox/core/layer.h>
+#include <voxblox/core/voxel.h>
 
+#include <list>
+#include <map>
 #include <memory>
+#include <string>
 
-namespace hydra {
+#include "hydra/eval/room_io.h"
+#include "hydra/eval/room_metrics.h"
 
-class SemanticMeshLayer {
+namespace hydra::eval {
+
+class RoomEvaluator {
  public:
-  using Ptr = std::shared_ptr<SemanticMeshLayer>;
-  using SemanticMeshMap = voxblox::AnyIndexHashMapType<std::vector<uint32_t>>::type;
+  using Ptr = std::unique_ptr<RoomEvaluator>;
 
-  explicit SemanticMeshLayer(voxblox::FloatingPoint block_size);
+  RoomEvaluator(const RoomGeometry& rooms,
+                const voxblox::Layer<voxblox::TsdfVoxel>::Ptr& tsdf,
+                float min_weight = 1.0e-6f,
+                float min_distance = 0.0f);
 
-  voxblox::Mesh::Ptr allocateBlock(const voxblox::BlockIndex& index, bool use_semantics);
+  void computeRoomIndices(float min_weight, float min_distance);
 
-  void removeBlock(const voxblox::BlockIndex& index);
+  const RoomIndices& getRoomIndices() const;
 
-  voxblox::Mesh::Ptr getMeshBlock(const voxblox::BlockIndex& index) const;
+  void computeDsgIndices(const DynamicSceneGraph& graph, RoomIndices& indices) const;
 
-  std::vector<uint32_t>* getSemanticBlock(const voxblox::BlockIndex& index) const;
+  RoomMetrics eval(const std::string& graph_filepath) const;
 
-  void getAllocatedBlockIndices(voxblox::BlockIndexList& allocated) const;
+ public:
+  static RoomEvaluator::Ptr fromFile(const std::string& room_filepath,
+                                     const std::string& tsdf_filepath);
 
-  size_t numBlocks() const;
+ private:
+  std::array<int64_t, 3> lookupGlobalIndex(const voxblox::BlockIndex& block_idx,
+                                           const voxblox::VoxelIndex& voxel_idx) const;
 
-  size_t getMemorySize() const;
-
-  SemanticMeshLayer::Ptr getActiveMesh(const voxblox::IndexSet& archived_blocks);
-
-  voxblox::MeshLayer::Ptr getVoxbloxMesh() const;
-
-  kimera_pgmo::SemanticVoxbloxMeshInterface getMeshInterface() const;
-
- protected:
-  voxblox::MeshLayer::Ptr mesh_;
-  std::shared_ptr<SemanticMeshMap> semantics_;
+  RoomGeometry rooms_;
+  voxblox::Layer<voxblox::TsdfVoxel>::Ptr tsdf_;
+  RoomIndices room_indices_;
 };
 
-}  // namespace hydra
+}  // namespace hydra::eval

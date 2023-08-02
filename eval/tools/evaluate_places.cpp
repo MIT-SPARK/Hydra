@@ -32,44 +32,47 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <voxblox/mesh/mesh_layer.h>
-#include <kimera_pgmo/utils/VoxbloxMeshInterface.h>
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 
-#include <memory>
+#include "hydra/eval/place_evaluator.h"
 
-namespace hydra {
+DEFINE_double(max_distance_m, 4.5, "max distance");
+DEFINE_string(tsdf_file, "", "tsdf file to read");
+DEFINE_string(dsg_file, "", "dsg file to read");
+DEFINE_string(gvd_config, "", "gvd integrator config");
 
-class SemanticMeshLayer {
- public:
-  using Ptr = std::shared_ptr<SemanticMeshLayer>;
-  using SemanticMeshMap = voxblox::AnyIndexHashMapType<std::vector<uint32_t>>::type;
+int main(int argc, char* argv[]) {
+  FLAGS_minloglevel = 3;
+  FLAGS_logtostderr = 1;
+  FLAGS_colorlogtostderr = 1;
 
-  explicit SemanticMeshLayer(voxblox::FloatingPoint block_size);
+  google::SetUsageMessage("utility for comparing places graph to TSDF");
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  google::InitGoogleLogging(argv[0]);
 
-  voxblox::Mesh::Ptr allocateBlock(const voxblox::BlockIndex& index, bool use_semantics);
+  if (FLAGS_tsdf_file == "") {
+    LOG(FATAL) << "TSDF file is required!";
+  }
 
-  void removeBlock(const voxblox::BlockIndex& index);
+  if (FLAGS_gvd_config == "") {
+    LOG(FATAL) << "GVD config is required!";
+  }
 
-  voxblox::Mesh::Ptr getMeshBlock(const voxblox::BlockIndex& index) const;
+  if (FLAGS_dsg_file == "") {
+    LOG(FATAL) << "DSG file is required!";
+  }
 
-  std::vector<uint32_t>* getSemanticBlock(const voxblox::BlockIndex& index) const;
+  auto evaluator =
+      hydra::eval::PlaceEvaluator::fromFile(FLAGS_gvd_config, FLAGS_tsdf_file);
+  if (!evaluator) {
+    LOG(FATAL) << "Unable to construct place evaluator.";
+  }
 
-  void getAllocatedBlockIndices(voxblox::BlockIndexList& allocated) const;
+  const auto metrics = evaluator->eval(FLAGS_dsg_file);
+  if (!metrics.is_valid) {
+    LOG(FATAL) << "Unable to evaluate invalid graph!";
+  }
 
-  size_t numBlocks() const;
-
-  size_t getMemorySize() const;
-
-  SemanticMeshLayer::Ptr getActiveMesh(const voxblox::IndexSet& archived_blocks);
-
-  voxblox::MeshLayer::Ptr getVoxbloxMesh() const;
-
-  kimera_pgmo::SemanticVoxbloxMeshInterface getMeshInterface() const;
-
- protected:
-  voxblox::MeshLayer::Ptr mesh_;
-  std::shared_ptr<SemanticMeshMap> semantics_;
-};
-
-}  // namespace hydra
+  return 0;
+}

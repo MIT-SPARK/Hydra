@@ -32,44 +32,65 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <voxblox/mesh/mesh_layer.h>
-#include <kimera_pgmo/utils/VoxbloxMeshInterface.h>
+#include "hydra/eval/place_evaluator.h"
 
-#include <memory>
+#include <glog/logging.h>
+#include <voxblox/io/layer_io.h>
 
-namespace hydra {
+#include "hydra/reconstruction/configs.h"
 
-class SemanticMeshLayer {
- public:
-  using Ptr = std::shared_ptr<SemanticMeshLayer>;
-  using SemanticMeshMap = voxblox::AnyIndexHashMapType<std::vector<uint32_t>>::type;
+namespace hydra::eval {
 
-  explicit SemanticMeshLayer(voxblox::FloatingPoint block_size);
+using places::ComboIntegrator;
+using places::GvdIntegratorConfig;
+using places::GvdVoxel;
+using voxblox::Layer;
+using voxblox::TsdfVoxel;
 
-  voxblox::Mesh::Ptr allocateBlock(const voxblox::BlockIndex& index, bool use_semantics);
+PlaceEvaluator::PlaceEvaluator(const GvdIntegratorConfig& config,
+                               const Layer<TsdfVoxel>::Ptr& tsdf)
+    : tsdf_(CHECK_NOTNULL(tsdf)) {
+  gvd_.reset(new Layer<GvdVoxel>(tsdf_->voxel_size(), tsdf_->voxels_per_side()));
+  mesh_.reset(new SemanticMeshLayer(tsdf_->block_size()));
+  computeGroundTruth(config);
+}
 
-  void removeBlock(const voxblox::BlockIndex& index);
+void PlaceEvaluator::computeGroundTruth(const GvdIntegratorConfig& config) {
+  config_ = config;
+  config_.extract_graph = true;
 
-  voxblox::Mesh::Ptr getMeshBlock(const voxblox::BlockIndex& index) const;
+  VLOG(1) << "using GVD config:" << std::endl << config_;
+  ComboIntegrator integrator(config_, tsdf_, gvd_, mesh_);
+  integrator.update(0, false, true);
+}
 
-  std::vector<uint32_t>* getSemanticBlock(const voxblox::BlockIndex& index) const;
+PlaceEvaluator::Ptr PlaceEvaluator::fromFile(const std::string& config_filepath,
+                                             const std::string& tsdf_filepath,
+                                             std::optional<double> max_distance_m) {
+  auto config = config_parser::load_from_yaml<GvdIntegratorConfig>(config_filepath);
+  if (max_distance_m) {
+    config.max_distance_m = *max_distance_m;
+  }
 
-  void getAllocatedBlockIndices(voxblox::BlockIndexList& allocated) const;
+  Layer<TsdfVoxel>::Ptr tsdf;
+  if (!voxblox::io::LoadLayer<TsdfVoxel>(tsdf_filepath, &tsdf)) {
+    LOG(ERROR) << "Failed to load TSDF from: " << tsdf_filepath;
+    return nullptr;
+  }
 
-  size_t numBlocks() const;
+  return std::make_unique<PlaceEvaluator>(config, tsdf);
+}
 
-  size_t getMemorySize() const;
+PlaceMetrics PlaceEvaluator::eval(const std::string& graph_filepath) const {
+  const auto graph = DynamicSceneGraph::load(graph_filepath);
+  if (!graph->hasLayer(DsgLayers::PLACES)) {
+    LOG(ERROR) << "Graph file: " << graph_filepath << " does not have places";
+    return {};
+  }
 
-  SemanticMeshLayer::Ptr getActiveMesh(const voxblox::IndexSet& archived_blocks);
+  const auto& places = graph->getLayer(DsgLayers::PLACES);
+  LOG(INFO) << "Place Nodes: " << places.nodes().size();
+  return scorePlaces(places, *gvd_, config_.min_basis_for_extraction);
+}
 
-  voxblox::MeshLayer::Ptr getVoxbloxMesh() const;
-
-  kimera_pgmo::SemanticVoxbloxMeshInterface getMeshInterface() const;
-
- protected:
-  voxblox::MeshLayer::Ptr mesh_;
-  std::shared_ptr<SemanticMeshMap> semantics_;
-};
-
-}  // namespace hydra
+}  // namespace hydra::eval

@@ -32,44 +32,28 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <voxblox/mesh/mesh_layer.h>
-#include <kimera_pgmo/utils/VoxbloxMeshInterface.h>
+#include <spark_dsg/dynamic_scene_graph.h>
 
-#include <memory>
+#include <iostream>
 
-namespace hydra {
+#include "hydra/eval/graph_utilities.h"
 
-class SemanticMeshLayer {
- public:
-  using Ptr = std::shared_ptr<SemanticMeshLayer>;
-  using SemanticMeshMap = voxblox::AnyIndexHashMapType<std::vector<uint32_t>>::type;
+int main(int argc, char* argv[]) {
+  if (argc < 2) {
+    std::cerr << "missing output file! usage: merge_graphs output_file [input_file1...]"
+              << std::endl;
+    return 1;
+  }
 
-  explicit SemanticMeshLayer(voxblox::FloatingPoint block_size);
+  std::vector<spark_dsg::DynamicSceneGraph::Ptr> input_graphs;
+  for (int i = 2; i < argc; ++i) {
+    const std::string filename(argv[i]);
+    std::cout << "Merging " << filename << std::endl;
+    input_graphs.push_back(spark_dsg::DynamicSceneGraph::load(filename));
+  }
 
-  voxblox::Mesh::Ptr allocateBlock(const voxblox::BlockIndex& index, bool use_semantics);
-
-  void removeBlock(const voxblox::BlockIndex& index);
-
-  voxblox::Mesh::Ptr getMeshBlock(const voxblox::BlockIndex& index) const;
-
-  std::vector<uint32_t>* getSemanticBlock(const voxblox::BlockIndex& index) const;
-
-  void getAllocatedBlockIndices(voxblox::BlockIndexList& allocated) const;
-
-  size_t numBlocks() const;
-
-  size_t getMemorySize() const;
-
-  SemanticMeshLayer::Ptr getActiveMesh(const voxblox::IndexSet& archived_blocks);
-
-  voxblox::MeshLayer::Ptr getVoxbloxMesh() const;
-
-  kimera_pgmo::SemanticVoxbloxMeshInterface getMeshInterface() const;
-
- protected:
-  voxblox::MeshLayer::Ptr mesh_;
-  std::shared_ptr<SemanticMeshMap> semantics_;
-};
-
-}  // namespace hydra
+  const std::string output_path(argv[1]);
+  auto output_graph = hydra::eval::mergeGraphs(input_graphs);
+  output_graph->save(output_path);
+  return 0;
+}
