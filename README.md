@@ -140,9 +140,3 @@ Finally, build your workspace:
 ```
 catkin build
 ```
-
-### Config Library
-
-Hydra has a wrapper around config parsing that is documented [here](doc/config_parsing.md).
-
-

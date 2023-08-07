@@ -33,7 +33,9 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/config/config.h"
+#include <set>
+#include <string>
+#include <cstdint>
 
 namespace hydra {
 
@@ -44,14 +46,6 @@ struct LabelSpaceConfig {
   std::set<uint32_t> invalid_labels;
 };
 
-template <typename Visitor>
-void visit_config(const Visitor& v, LabelSpaceConfig& config) {
-  v.visit("total_semantic_labels", config.total_labels);
-  v.visit("semantic_colormap_file", config.colormap_filepath);
-  v.visit("dynamic_labels", config.dynamic_labels);
-  v.visit("invalid_labels", config.invalid_labels);
-}
+void declare_config(LabelSpaceConfig& conf);
 
 }  // namespace hydra
-
-DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, LabelSpaceConfig)

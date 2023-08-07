@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/factory.h>
 #include <kimera_pgmo/MeshFrontendInterface.h>
 #include <kimera_pgmo/compression/DeltaCompression.h>
 #include <spark_dsg/scene_graph_logger.h>
@@ -43,6 +44,7 @@
 
 #include "hydra/common/common.h"
 #include "hydra/common/input_queue.h"
+#include "hydra/common/module.h"
 #include "hydra/common/robot_prefix_config.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/frontend/frontend_config.h"
@@ -53,27 +55,30 @@
 
 namespace hydra {
 
-class FrontendModule {
+class FrontendModule : public Module {
  public:
+  using Ptr = std::shared_ptr<FrontendModule>;
   using FrontendInputQueue = InputQueue<ReconstructionOutput::Ptr>;
   using InputCallback = std::function<void(const ReconstructionOutput&)>;
   using OutputCallback = std::function<void(
       const DynamicSceneGraph& graph, const BackendInput& backend_input, uint64_t)>;
   using DynamicLayer = DynamicSceneGraphLayer;
 
-  FrontendModule(const RobotPrefixConfig& prefix,
-                 const FrontendConfig& config,
+  FrontendModule(const FrontendConfig& config,
+                 const RobotPrefixConfig& prefix,
                  const SharedDsgInfo::Ptr& dsg,
                  const SharedModuleState::Ptr& state,
                  const LogSetup::Ptr& logs = nullptr);
 
   virtual ~FrontendModule();
 
-  void start();
+  void start() override;
 
-  void stop();
+  void stop() override;
 
-  void save(const LogSetup& log_setup);
+  void save(const LogSetup& log_setup) override;
+
+  std::string printInfo() const override;
 
   void spin();
 
@@ -116,6 +121,8 @@ class FrontendModule {
   void updatePlaceMeshMapping(const ReconstructionOutput& input);
 
  protected:
+  const FrontendConfig config_;
+
   std::atomic<bool> should_shutdown_{false};
   std::unique_ptr<std::thread> spin_thread_;
   FrontendInputQueue::Ptr queue_;
@@ -124,7 +131,6 @@ class FrontendModule {
   BackendInput::Ptr backend_input_;
 
   RobotPrefixConfig prefix_;
-  FrontendConfig config_;
   SharedDsgInfo::Ptr dsg_;
   SharedModuleState::Ptr state_;
   std::vector<ros::Time> mesh_timestamps_;
@@ -147,6 +153,15 @@ class FrontendModule {
 
   std::vector<InputCallback> input_callbacks_;
   std::vector<OutputCallback> output_callbacks_;
+
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<FrontendModule,
+                                     FrontendModule,
+                                     FrontendConfig,
+                                     RobotPrefixConfig,
+                                     SharedDsgInfo::Ptr,
+                                     SharedModuleState::Ptr,
+                                     LogSetup::Ptr>("FrontendModule");
 };
 
 }  // namespace hydra

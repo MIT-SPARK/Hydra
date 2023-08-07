@@ -61,15 +61,10 @@ class GvdIntegrator {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   GvdIntegrator(const GvdIntegratorConfig& config,
-                const Layer<GvdVoxel>::Ptr& gvd_layer);
+                const Layer<GvdVoxel>::Ptr& gvd_layer,
+                const GraphExtractorInterface::Ptr& graph_extractor);
 
   virtual ~GvdIntegrator() = default;
-
-  const SceneGraphLayer& getGraph() const;
-
-  const GvdGraph& getGvdGraph() const;
-
-  GraphExtractorInterface& getGraphExtractor() const;
 
   void updateFromTsdf(uint64_t timestamp_ns,
                       Layer<TsdfVoxel>& tsdf,

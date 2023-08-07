@@ -38,7 +38,6 @@
 
 #include "hydra/places/graph_extractor_utilities.h"
 #include "hydra/places/nearest_voxel_utilities.h"
-#include "hydra/reconstruction/configs.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -171,8 +170,9 @@ void CompressedNode::merge(CompressedNode& other, CompressedNodeMap& nodes) {
   }
 }
 
-CompressionGraphExtractor::CompressionGraphExtractor(const GraphExtractorConfig& config)
-    : GraphExtractorInterface(config), config_(config.compression), next_id_(0) {
+CompressionGraphExtractor::CompressionGraphExtractor(
+    const CompressionExtractorConfig& config)
+    : GraphExtractorInterface(config), config_(config), next_id_(0) {
   compression_factor_ = 1.0 / config_.compression_distance_m;
 }
 

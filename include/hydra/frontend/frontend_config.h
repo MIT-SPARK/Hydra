@@ -35,23 +35,7 @@
 #pragma once
 #include <kimera_pgmo/MeshFrontendInterface.h>
 
-#include "hydra/config/config.h"
-#include "hydra/config/eigen_config_types.h"
 #include "hydra/frontend/mesh_segmenter_config.h"
-
-namespace kimera_pgmo {
-
-template <typename Visitor>
-void visit_config(const Visitor& v, kimera_pgmo::MeshFrontendConfig& config) {
-  v.visit("horizon", config.time_horizon);
-  v.visit("track_mesh_graph_mapping", config.b_track_mesh_graph_mapping);
-  v.visit("full_compression_method", config.full_compression_method);
-  v.visit("graph_compression_method", config.graph_compression_method);
-  v.visit("d_graph_resolution", config.d_graph_resolution);
-  v.visit("output_mesh_resolution", config.mesh_resolution);
-}
-
-}  // namespace kimera_pgmo
 
 namespace hydra {
 
@@ -66,20 +50,12 @@ struct FrontendConfig {
   size_t min_places_component_size = 3;
 };
 
-template <typename Visitor>
-void visit_config(const Visitor& v, FrontendConfig& config) {
-  v.visit("min_object_vertices", config.min_object_vertices);
-  v.visit("prune_mesh_indices", config.prune_mesh_indices);
-  v.visit("lcd_use_bow_vectors", config.lcd_use_bow_vectors);
-  v.visit("pgmo", config.pgmo_config);
-  v.visit("objects", config.object_config);
-  v.visit("angle_step", config.object_config.angle_step);
-  v.visit("validate_vertices", config.validate_vertices);
-  v.visit("filter_places", config.filter_places);
-  v.visit("min_places_component_size", config.min_places_component_size);
-}
+void declare_config(FrontendConfig& conf);
 
 }  // namespace hydra
 
-DECLARE_CONFIG_OSTREAM_OPERATOR(kimera_pgmo, MeshFrontendConfig)
-DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, FrontendConfig)
+namespace kimera_pgmo {
+
+void declare_config(kimera_pgmo::MeshFrontendConfig& conf);
+
+}  // namespace kimera_pgmo

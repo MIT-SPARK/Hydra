@@ -121,7 +121,7 @@ TEST(FrontendModuleTests, TestAgentEdges) {
   auto config = getDefaultConfig();
   auto dsg = makeSharedDsg();
   auto state = std::make_shared<SharedModuleState>();
-  auto frontend = std::make_shared<FrontendModule>(prefix, config, dsg, state);
+  auto frontend = std::make_shared<FrontendModule>(config, prefix, dsg, state);
   auto queue = frontend->getQueue();
 
   IsolatedSceneGraphLayer places(2);

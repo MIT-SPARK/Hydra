@@ -106,23 +106,27 @@ void configureDescriptorFactories(lcd::LcdDetector&, const LcdDetectorConfig&) {
 
 using DsgNode = DynamicSceneGraphNode;
 using hydra::timing::ScopedTimer;
+using SearchConfigMap = std::map<LayerId, DescriptorMatchConfig>;
+using RegConfigMap = std::map<LayerId, LayerRegistrationConfig>;
 
 LcdDetector::LcdDetector(const LcdDetectorConfig& config) : config_(config) {
-  for (const auto& id_func_pair : layer_factories_) {
-    cache_map_[id_func_pair.first] = DescriptorCache();
-  }
-
   makeDefaultDescriptorFactories();
   if (config_.use_gnn_descriptors) {
     configureDescriptorFactories(*this, config_);
   }
 
-  resetLayerAssignments();
+  const SearchConfigMap search_configs{{DsgLayers::OBJECTS, config_.objects.matching},
+                                       {DsgLayers::PLACES, config_.places.matching}};
+  const RegConfigMap reg_configs{{DsgLayers::OBJECTS, config_.objects.registration}};
+  resetLayerAssignments(search_configs, reg_configs);
 }
 
 void LcdDetector::setDescriptorFactories(FactoryMap&& factories) {
   layer_factories_ = std::move(factories);
-  resetLayerAssignments();
+  const SearchConfigMap search_configs{{DsgLayers::OBJECTS, config_.objects.matching},
+                                       {DsgLayers::PLACES, config_.places.matching}};
+  const RegConfigMap reg_configs{{DsgLayers::OBJECTS, config_.objects.registration}};
+  resetLayerAssignments(search_configs, reg_configs);
 }
 
 void LcdDetector::setRegistrationSolver(size_t level,
@@ -218,25 +222,23 @@ void LcdDetector::makeDefaultDescriptorFactories() {
   agent_factory_ = std::make_unique<AgentDescriptorFactory>();
 }
 
-void LcdDetector::resetLayerAssignments() {
+void LcdDetector::resetLayerAssignments(const SearchConfigMap& search_configs,
+                                        const RegConfigMap& registration_configs) {
   // TODO(nathan) this is messy
   registration_solvers_.clear();
 
   size_t internal_idx = 1;  // agent is 0
-  for (const auto& id_config_pair : config_.search_configs) {
-    const LayerId layer = id_config_pair.first;
-
+  for (auto&& [layer, layer_config] : search_configs) {
     if (!layer_factories_.count(layer)) {
       continue;
     }
 
-    const auto& layer_config = id_config_pair.second;
     layer_to_internal_index_[layer] = internal_idx;
     internal_index_to_layer_[internal_idx] = layer;
     match_config_map_[internal_idx] = layer_config;
 
-    auto iter = config_.registration_configs.find(layer);
-    if (iter != config_.registration_configs.end()) {
+    auto iter = registration_configs.find(layer);
+    if (iter != registration_configs.end()) {
       registration_solvers_.emplace(internal_idx,
                                     std::make_unique<DsgTeaserSolver>(
                                         layer, iter->second, config_.teaser_config));
@@ -246,10 +248,19 @@ void LcdDetector::resetLayerAssignments() {
   }
 
   // TODO(nathan) make root layer requirements explicit
-  max_internal_index_ = internal_idx;
-  root_layer_ = internal_index_to_layer_.at(internal_idx - 1);
+  if (internal_idx == 1) {
+    LOG(ERROR) << "No DSG descriptor configs found";
+  } else {
+    max_internal_index_ = internal_idx;
+    root_layer_ = internal_index_to_layer_.at(internal_idx - 1);
+  }
 
   match_config_map_[0] = config_.agent_search_config;
+
+  cache_map_.clear();
+  for (const auto& id_func_pair : layer_factories_) {
+    cache_map_[id_func_pair.first] = DescriptorCache();
+  }
 }
 
 bool LcdDetector::addNewDescriptors(const DynamicSceneGraph& graph,
@@ -313,14 +324,14 @@ void LcdDetector::updateDescriptorCache(
   }
 }
 
-std::vector<DsgRegistrationSolution> LcdDetector::registerAndVerify(
+std::vector<RegistrationSolution> LcdDetector::registerAndVerify(
     const DynamicSceneGraph& dsg,
     const std::map<size_t, LayerSearchResults>& matches,
     NodeId agent_id,
     uint64_t timestamp) const {
   ScopedTimer timer("lcd/register", timestamp, true, 2, false);
 
-  DsgRegistrationSolution registration_result;
+  RegistrationSolution registration_result;
 
   size_t idx;
   for (idx = 0; idx < max_internal_index_; ++idx) {
@@ -382,7 +393,7 @@ std::vector<DsgRegistrationSolution> LcdDetector::registerAndVerify(
   /*}*/
   /*}*/
 
-  std::vector<DsgRegistrationSolution> results;
+  std::vector<RegistrationSolution> results;
   if (registration_result.valid) {
     results.push_back(registration_result);
   }
@@ -390,9 +401,9 @@ std::vector<DsgRegistrationSolution> LcdDetector::registerAndVerify(
   return results;
 }
 
-std::vector<DsgRegistrationSolution> LcdDetector::detect(const DynamicSceneGraph& dsg,
-                                                         NodeId agent_id,
-                                                         uint64_t timestamp) {
+std::vector<RegistrationSolution> LcdDetector::detect(const DynamicSceneGraph& dsg,
+                                                      NodeId agent_id,
+                                                      uint64_t timestamp) {
   ScopedTimer timer("lcd/detect", timestamp, true, 2, false);
   std::set<NodeId> prev_valid_roots;
   for (const auto& id_desc_pair : cache_map_[root_layer_]) {

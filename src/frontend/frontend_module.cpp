@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/frontend/frontend_module.h"
 
+#include <config_utilities/printing.h>
 #include <glog/logging.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
 #include <tf2_eigen/tf2_eigen.h>
@@ -50,22 +51,25 @@ using pose_graph_tools::PoseGraph;
 
 using LabelClusters = MeshSegmenter::LabelClusters;
 
-FrontendModule::FrontendModule(const RobotPrefixConfig& prefix,
-                               const FrontendConfig& config,
+FrontendModule::FrontendModule(const FrontendConfig& config,
+                               const RobotPrefixConfig& prefix,
                                const SharedDsgInfo::Ptr& dsg,
                                const SharedModuleState::Ptr& state,
                                const LogSetup::Ptr& logs)
-    : queue_(std::make_shared<FrontendInputQueue>()),
+    : config_(config),
+      queue_(std::make_shared<FrontendInputQueue>()),
       prefix_(prefix),
-      config_(config),
       dsg_(dsg),
       state_(state) {
-  config_.pgmo_config.robot_id = prefix_.id;
+  kimera_pgmo::MeshFrontendConfig pgmo_config = config_.pgmo_config;
+  pgmo_config.robot_id = prefix_.id;
 
+  CHECK(dsg_ != nullptr);
+  CHECK(dsg_->graph != nullptr);
   dsg_->graph->initMesh(true);
   dsg_->graph->createDynamicLayer(DsgLayers::AGENTS, prefix_.key);
 
-  const auto mesh_resolution = config_.pgmo_config.mesh_resolution;
+  const auto mesh_resolution = pgmo_config.mesh_resolution;
   mesh_compression_.reset(new kimera_pgmo::DeltaCompression(mesh_resolution));
 
   if (logs && logs->valid()) {
@@ -77,13 +81,13 @@ FrontendModule::FrontendModule(const RobotPrefixConfig& prefix,
     frontend_graph_logger_.setLayerName(DsgLayers::OBJECTS, "objects");
     frontend_graph_logger_.setLayerName(DsgLayers::PLACES, "places");
 
-    config_.pgmo_config.log_output = true;
-    config_.pgmo_config.log_path = logs->getLogDir("frontend/pgmo");
+    pgmo_config.log_output = true;
+    pgmo_config.log_path = logs->getLogDir("frontend/pgmo");
   } else {
-    config_.pgmo_config.log_output = false;
+    pgmo_config.log_output = false;
   }
 
-  CHECK(mesh_frontend_.initialize(config_.pgmo_config));
+  CHECK(mesh_frontend_.initialize(pgmo_config));
   segmenter_.reset(new MeshSegmenter(config_.object_config,
                                      dsg_->graph->getMeshVertices(),
                                      dsg_->graph->getMeshLabels()));
@@ -128,6 +132,12 @@ void FrontendModule::save(const LogSetup& log_setup) {
     kimera_pgmo::WriteMeshWithStampsToPly(
         output_path + "/mesh.ply", mesh, mesh_timestamps_);
   }
+}
+
+std::string FrontendModule::printInfo() const {
+  std::stringstream ss;
+  ss << config::toString(config_);
+  return ss.str();
 }
 
 void FrontendModule::spin() {

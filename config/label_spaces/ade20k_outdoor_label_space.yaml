@@ -3,27 +3,28 @@ semantic_measurement_probability: 0.9
 total_semantic_labels: 37
 dynamic_labels: [35, 36]
 invalid_labels: [0]
-objects:
-  labels:
-    - 2
-    - 7
-    - 9
-    - 10
-    - 11
-    - 12
-    - 13
-    - 23
-    - 24
-    - 25
-    - 26
-    - 27
-    - 28
-    - 29
-    - 30
-    - 31
-    - 32
-    - 33
-    - 34
+frontend:
+  objects:
+    labels:
+      - 2
+      - 7
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 23
+      - 24
+      - 25
+      - 26
+      - 27
+      - 28
+      - 29
+      - 30
+      - 31
+      - 32
+      - 33
+      - 34
 label_names:
   - {label: 0, name: Unknown}
   - {label: 1, name: Sky}

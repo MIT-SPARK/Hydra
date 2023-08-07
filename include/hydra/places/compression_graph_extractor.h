@@ -33,6 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/factory.h>
+
 #include <queue>
 
 #include "hydra/places/graph_extractor_interface.h"
@@ -79,7 +81,7 @@ class CompressionGraphExtractor : public GraphExtractorInterface {
   using IndexIdMap = voxblox::LongIndexHashMapType<uint64_t>::type;
   using IndexCompressedIdMap = voxblox::LongIndexHashMapType<std::set<uint64_t>>::type;
 
-  explicit CompressionGraphExtractor(const GraphExtractorConfig& config);
+  explicit CompressionGraphExtractor(const CompressionExtractorConfig& config);
 
   virtual ~CompressionGraphExtractor();
 
@@ -161,6 +163,12 @@ class CompressionGraphExtractor : public GraphExtractorInterface {
   std::unordered_map<uint64_t, uint64_t> compressed_remapping_;
 
   std::unordered_set<NodeId> archived_node_ids_;
+
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<GraphExtractorInterface,
+                                     CompressionGraphExtractor,
+                                     CompressionExtractorConfig>(
+          "CompressionGraphExtractor");
 };
 
 }  // namespace places

@@ -56,8 +56,12 @@ using timing::ScopedTimer;
 using EdgeNeighborhood = Neighborhood<voxblox::Connectivity::kTwentySix>;
 
 GvdIntegrator::GvdIntegrator(const GvdIntegratorConfig& config,
-                             const Layer<GvdVoxel>::Ptr& gvd_layer)
-    : default_distance_(config.max_distance_m), config_(config), gvd_layer_(gvd_layer) {
+                             const Layer<GvdVoxel>::Ptr& gvd_layer,
+                             const GraphExtractorInterface::Ptr& graph_extractor)
+    : default_distance_(config.max_distance_m),
+      config_(config),
+      gvd_layer_(gvd_layer),
+      graph_extractor_(graph_extractor) {
   // TODO(nathan) we could consider an exception here
   CHECK(gvd_layer_);
 
@@ -72,24 +76,6 @@ GvdIntegrator::GvdIntegrator(const GvdIntegratorConfig& config,
   // distance (i.e. within half a voxel)
   const size_t num_buckets = 4 * config_.max_distance_m / voxel_size_;
   open_.setNumBuckets(num_buckets, config_.max_distance_m);
-
-  if (config_.graph_extractor.use_compression_extractor) {
-    graph_extractor_.reset(new CompressionGraphExtractor(config_.graph_extractor));
-  } else {
-    graph_extractor_.reset(new FloodfillGraphExtractor(config_.graph_extractor));
-  }
-}
-
-const SceneGraphLayer& GvdIntegrator::getGraph() const {
-  return graph_extractor_->getGraph();
-}
-
-const GvdGraph& GvdIntegrator::getGvdGraph() const {
-  return graph_extractor_->getGvdGraph();
-}
-
-GraphExtractorInterface& GvdIntegrator::getGraphExtractor() const {
-  return *graph_extractor_;
 }
 
 void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
@@ -135,7 +121,7 @@ void GvdIntegrator::updateGvd(uint64_t timestamp_ns) {
 
   parent_tracker_.updateVertexMapping(*gvd_layer_);
 
-  if (config_.extract_graph) {
+  if (graph_extractor_) {
     VLOG(3) << "[GVD update] Starting graph extraction";
     ScopedTimer timer("places/graph_extractor", timestamp_ns);
     graph_extractor_->extract(*gvd_layer_, timestamp_ns);
@@ -161,7 +147,9 @@ void GvdIntegrator::archiveBlocks(const BlockIndexList& blocks) {
               idx,
               block->computeVoxelIndexFromLinearIndex(v),
               gvd_layer_->voxels_per_side());
-      graph_extractor_->removeDistantIndex(global_index);
+      if (graph_extractor_) {
+        graph_extractor_->removeDistantIndex(global_index);
+      }
 
       parent_tracker_.removeVoronoiFromGvdParentMap(global_index);
     }
@@ -243,7 +231,9 @@ void GvdIntegrator::updateGvdVoxel(const GlobalIndex& voxel_index,
 void GvdIntegrator::clearGvdVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
   if (voxel.num_extra_basis) {
     // TODO(nathan) rethink how clearing voxels from graph extractor works
-    graph_extractor_->clearGvdIndex(index);
+    if (graph_extractor_) {
+      graph_extractor_->clearGvdIndex(index);
+    }
     parent_tracker_.removeVoronoiFromGvdParentMap(index);
   }
 

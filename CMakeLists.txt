@@ -33,7 +33,7 @@ find_package(spark_dsg REQUIRED)
 find_package(teaserpp REQUIRED)
 find_package(GTSAM REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(yaml-cpp REQUIRED)
+find_package(config_utilities REQUIRED)
 find_package(
   catkin REQUIRED
   COMPONENTS kimera_pgmo
@@ -73,7 +73,7 @@ catkin_package(
   kimera_semantics
   tf2_eigen
   voxblox
-  DEPENDS spark_dsg YAML_CPP
+  DEPENDS spark_dsg config_utilities
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME} gtsam
 )
@@ -88,6 +88,7 @@ target_link_libraries(
   ${PROJECT_NAME}
   PUBLIC ${catkin_LIBRARIES}
          teaserpp::teaser_registration
+         config_utilities::config_utilities
          spark_dsg::spark_dsg
          yaml-cpp
          gtsam
@@ -105,7 +106,6 @@ else()
 endif()
 
 add_subdirectory(src)
-
 if(HYDRA_GNN)
   add_subdirectory(src/gnn)
   target_link_libraries(${PROJECT_NAME} PUBLIC ${PROJECT_NAME}_gnn)

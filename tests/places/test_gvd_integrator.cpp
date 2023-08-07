@@ -122,9 +122,9 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
   gvd_config.max_distance_m = 50.0;
   gvd_config.voronoi_config.min_distance_m = 1.0;
   gvd_config.voronoi_config.parent_l1_separation = 2.0;
-  gvd_config.extract_graph = false;
 
-  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
+  // no graph extractor disables places extraction
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer, nullptr);
   gvd_integrator.updateFromTsdf(0, *tsdf_layer, *vertex_layer, *mesh_layer, false);
   gvd_integrator.updateGvd(0);
 
@@ -248,9 +248,9 @@ TEST_F(TestFixture2d, NegativeIntegrationCorrect) {
   gvd_config.voronoi_config.min_distance_m = 1.0;
   gvd_config.voronoi_config.parent_l1_separation = 2.0;
   gvd_config.positive_distance_only = false;
-  gvd_config.extract_graph = false;
 
-  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
+  // no graph extractor disables places extraction
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer, nullptr);
   gvd_integrator.updateFromTsdf(0, *tsdf_layer, *vertex_layer, *mesh_layer, false);
   gvd_integrator.updateGvd(0);
 

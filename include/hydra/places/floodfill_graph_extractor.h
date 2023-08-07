@@ -33,6 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/factory.h>
+
 #include <queue>
 
 #include "hydra/places/graph_extractor_interface.h"
@@ -54,7 +56,7 @@ class FloodfillGraphExtractor : public GraphExtractorInterface {
   using EdgeSplitQueue =
       std::priority_queue<EdgeSplitSeed, voxblox::AlignedVector<EdgeSplitSeed>>;
 
-  explicit FloodfillGraphExtractor(const GraphExtractorConfig& config);
+  explicit FloodfillGraphExtractor(const FloodfillExtractorConfig& config);
 
   virtual ~FloodfillGraphExtractor();
 
@@ -126,6 +128,12 @@ class FloodfillGraphExtractor : public GraphExtractorInterface {
   // TODO(nathan) rename these
   std::map<size_t, std::set<size_t>> checked_edges_;
   std::set<size_t> connected_edges_;
+
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<GraphExtractorInterface,
+                                     FloodfillGraphExtractor,
+                                     FloodfillExtractorConfig>(
+          "FloodfillGraphExtractor");
 };
 
 }  // namespace places
