@@ -2,6 +2,9 @@
     local-name: catkin_simple
     uri: git@github.com:catkin/catkin_simple.git
 - git:
+    local-name: config_utilities
+    uri: git@github.mit.edu:SPARK/config_utilities.git
+- git:
     local-name: eigen_catkin
     uri: git@github.com:ethz-asl/eigen_catkin.git
 - git:
