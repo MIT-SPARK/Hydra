@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/config/config.h"
+#include <string>
 
 namespace hydra {
 
@@ -45,24 +45,6 @@ enum class DilationThresholdMode {
   PLATEAU,
   PLATEAU_THRESHOLD
 };
-
-}  // namespace hydra
-
-DECLARE_CONFIG_ENUM(hydra,
-                    RoomClusterMode,
-                    {RoomClusterMode::MODULARITY, "MODULARITY"},
-                    {RoomClusterMode::MODULARITY, "MODULARITY_DISTANCE"},
-                    {RoomClusterMode::NEIGHBORS, "NEIGHBORS"},
-                    {RoomClusterMode::NONE, "NONE"})
-
-DECLARE_CONFIG_ENUM(hydra,
-                    DilationThresholdMode,
-                    {DilationThresholdMode::REPEATED, "REPEATED"},
-                    {DilationThresholdMode::LONGEST_LIFETIME, "LONGEST_LIFETIME"},
-                    {DilationThresholdMode::PLATEAU, "PLATEAU"},
-                    {DilationThresholdMode::PLATEAU_THRESHOLD, "PLATEAU_THRESHOLD"})
-
-namespace hydra {
 
 struct RoomFinderConfig {
   char room_prefix = 'R';
@@ -83,35 +65,6 @@ struct RoomFinderConfig {
   bool log_place_graphs = false;
 };
 
-template <typename Visitor>
-void visit_config(const Visitor& v, RoomFinderConfig& config) {
-  v.visit("min_dilation_m", config.min_dilation_m);
-  v.visit("max_dilation_m", config.max_dilation_m);
-  v.visit("min_window_size", config.min_window_size);
-  v.visit("clip_dilation_window_to_max", config.clip_dilation_window_to_max);
-  v.visit("min_component_size", config.min_component_size);
-  v.visit("min_room_size", config.min_room_size);
-  v.visit("dilation_threshold_mode", config.dilation_threshold_mode);
-  v.visit("min_lifetime_length_m", config.min_lifetime_length_m);
-  v.visit("plateau_ratio", config.plateau_ratio);
-  v.visit("max_modularity_iters", config.max_modularity_iters);
-  v.visit("modularity_gamma", config.modularity_gamma);
-  v.visit("clustering_mode", config.clustering_mode);
-  v.visit("dilation_diff_threshold_m", config.dilation_diff_threshold_m);
-  v.visit("log_filtrations", config.log_filtrations);
-  v.visit("log_place_graphs", config.log_place_graphs);
-
-  std::string prefix_string;
-  if (!config_parser::is_parser<Visitor>()) {
-    prefix_string.push_back(config.room_prefix);
-  }
-
-  v.visit("room_prefix", prefix_string);
-  if (config_parser::is_parser<Visitor>()) {
-    config.room_prefix = prefix_string[0];
-  }
-}
+void declare_config(RoomFinderConfig& config);
 
 }  // namespace hydra
-
-DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, RoomFinderConfig)

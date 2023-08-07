@@ -18,6 +18,7 @@
   <depend>teaserpp</depend>
   <depend>tf2_eigen</depend>
   <depend>voxblox</depend>
+  <depend>config_utilities</depend>
 
   <export>
   </export>

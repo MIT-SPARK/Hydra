@@ -49,13 +49,7 @@ struct LogConfig {
   std::string timing_suffix = "_timing_raw.csv";
 };
 
-template <typename Visitor>
-void visit_config(const Visitor& v, LogConfig& config) {
-  v.visit("log_path", config.log_dir);
-  v.visit("log_timing_incrementally", config.log_timing_incrementally);
-  v.visit("timing_stats_name", config.timing_stats_name);
-  v.visit("timing_suffix", config.timing_suffix);
-}
+void declare_config(LogConfig& config);
 
 class LogSetup {
  public:

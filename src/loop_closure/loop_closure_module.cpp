@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/loop_closure/loop_closure_module.h"
 
+#include <config_utilities/printing.h>
 #include <glog/logging.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
 
@@ -80,6 +81,12 @@ void LoopClosureModule::save(const LogSetup& log_setup) {
   const auto log_path = log_setup.getLogDir("lcd");
   lcd_detector_->dumpDescriptors(log_path);
   lcd_graph_->save(log_path + "/dsg.json", false);
+}
+
+std::string LoopClosureModule::printInfo() const {
+  std::stringstream ss;
+  ss << std::endl << config::toString(config_);
+  return ss.str();
 }
 
 void LoopClosureModule::spin() {

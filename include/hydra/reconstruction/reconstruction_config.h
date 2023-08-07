@@ -33,34 +33,12 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/virtual_config.h>
 #include <voxblox/integrator/tsdf_integrator.h>
 
-#include "hydra/config/config.h"
-#include "hydra/config/eigen_config_types.h"
-#include "hydra/reconstruction/configs.h"
-
-namespace voxblox {
-
-template <typename Visitor>
-void visit_config(const Visitor& v, TsdfIntegratorBase::Config& config) {
-  v.visit("default_truncation_distance", config.default_truncation_distance);
-  v.visit("max_weight", config.max_weight);
-  v.visit("voxel_carving_enabled", config.voxel_carving_enabled);
-  v.visit("min_ray_length_m", config.min_ray_length_m);
-  v.visit("max_ray_length_m", config.max_ray_length_m);
-  v.visit("use_const_weight", config.use_const_weight);
-  v.visit("allow_clear", config.allow_clear);
-  v.visit("use_weight_dropoff", config.use_weight_dropoff);
-  v.visit("use_sparsity_compensation_factor", config.use_sparsity_compensation_factor);
-  v.visit("integrator_threads", config.integrator_threads, hydra::ThreadNumConverter());
-  v.visit("integration_order_mode", config.integration_order_mode);
-  v.visit("enable_anti_grazing", config.enable_anti_grazing);
-  v.visit("start_voxel_subsampling_factor", config.start_voxel_subsampling_factor);
-  v.visit("max_consecutive_ray_collisions", config.max_consecutive_ray_collisions);
-  v.visit("clear_checks_every_n_frames", config.clear_checks_every_n_frames);
-}
-
-}  // namespace voxblox
+#include "hydra/places/graph_extractor_interface.h"
+#include "hydra/places/gvd_integrator_config.h"
+#include "hydra/reconstruction/mesh_integrator_config.h"
 
 namespace hydra {
 
@@ -84,42 +62,19 @@ struct ReconstructionConfig {
   float semantic_measurement_probability = 0.9;
 
   places::GvdIntegratorConfig gvd;
+  config::VirtualConfig<places::GraphExtractorInterface> graph_extractor;
   voxblox::TsdfIntegratorBase::Config tsdf;
   MeshIntegratorConfig mesh;
   Eigen::Quaterniond body_R_camera;
   Eigen::Vector3d body_t_camera;
 };
 
-struct QuaternionConverter {
-  QuaternionConverter() = default;
-
-  Eigen::Quaterniond to(const std::map<std::string, double>& other) const;
-
-  std::map<std::string, double> from(const Eigen::Quaterniond& other) const;
-};
-
-template <typename Visitor>
-void visit_config(const Visitor& v, ReconstructionConfig& config) {
-  v.visit("voxel_size", config.voxel_size);
-  v.visit("voxels_per_side", config.voxels_per_side);
-  v.visit("show_stats", config.show_stats);
-  v.visit("clear_distant_blocks", config.clear_distant_blocks);
-  v.visit("dense_representation_radius_m", config.dense_representation_radius_m);
-  v.visit("world_frame", config.world_frame);
-  v.visit("robot_frame", config.robot_frame);
-  v.visit("num_poses_per_update", config.num_poses_per_update);
-  v.visit("max_input_queue_size", config.max_input_queue_size);
-  v.visit("make_pose_graph", config.make_pose_graph);
-  v.visit("semantic_measurement_probability", config.semantic_measurement_probability);
-
-  v.visit("gvd", config.gvd);
-  v.visit("tsdf", config.tsdf);
-  v.visit("mesh", config.mesh);
-  v.visit("body_R_camera", config.body_R_camera, QuaternionConverter());
-  v.visit("body_t_camera", config.body_t_camera);
-}
+void declare_config(ReconstructionConfig& conf);
 
 }  // namespace hydra
 
-DECLARE_CONFIG_OSTREAM_OPERATOR(voxblox, TsdfIntegratorBase::Config)
-DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, ReconstructionConfig)
+namespace voxblox {
+
+void declare_config(TsdfIntegratorBase::Config& conf);
+
+}  // namespace voxblox

@@ -59,6 +59,15 @@ using PoseFactor = gtsam::BetweenFactor<gtsam::Pose3>;
 using PriorFactor = gtsam::PriorFactor<gtsam::Pose3>;
 using ManualLCFactor = gtsam::RangeFactor<gtsam::Pose3, gtsam::Pose3, double>;
 
+#if GTSAM_VERSION_MAJOR <= 4 && GTSAM_VERSION_MINOR < 3
+using GtsamJacobianType = boost::optional<gtsam::Matrix&>;
+#define JACOBIAN_DEFAULT \
+  {}
+#else
+using GtsamJacobianType = gtsam::OptionalMatrixType;
+#define JACOBIAN_DEFAULT nullptr
+#endif
+
 class Pose3Bounds : public gtsam::BoundingConstraint1<gtsam::Pose3> {
  public:
   using shared_ptr = boost::shared_ptr<Pose3Bounds>;
@@ -71,7 +80,7 @@ class Pose3Bounds : public gtsam::BoundingConstraint1<gtsam::Pose3> {
         mu_(mu) {}
 
   double value(const gtsam::Pose3& x,
-               boost::optional<gtsam::Matrix&> H = boost::none) const override {
+               GtsamJacobianType H = JACOBIAN_DEFAULT) const override {
     if (H) {
       gtsam::Matrix D =
           gtsam::Matrix::Zero(1, gtsam::traits<gtsam::Pose3>::GetDimension(x));

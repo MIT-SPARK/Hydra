@@ -33,9 +33,9 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/factory.h>
 #include <kimera_pgmo/KimeraPgmoInterface.h>
 #include <spark_dsg/scene_graph_logger.h>
-#include <spark_dsg/zmq_interface.h>
 
 #include <map>
 #include <memory>
@@ -45,9 +45,14 @@
 #include "hydra/backend/merge_handler.h"
 #include "hydra/backend/update_functions.h"
 #include "hydra/common/common.h"
+#include "hydra/common/module.h"
 #include "hydra/common/robot_prefix_config.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/utils/log_utilities.h"
+
+namespace spark_dsg {
+class ZmqReceiver;
+}  // namespace spark_dsg
 
 namespace hydra {
 
@@ -59,16 +64,15 @@ struct LoopClosureLog {
   int64_t level;
 };
 
-class BackendModule : public kimera_pgmo::KimeraPgmoInterface {
+class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
  public:
   using Ptr = std::shared_ptr<BackendModule>;
   using OutputCallback = std::function<void(const DynamicSceneGraph&,
                                             const kimera_pgmo::DeformationGraph&,
                                             size_t timestamp_ns)>;
 
-  BackendModule(const RobotPrefixConfig& prefix,
-                const BackendConfig& config,
-                const kimera_pgmo::KimeraPgmoConfig& pgmo_config,
+  BackendModule(const BackendConfig& config,
+                const RobotPrefixConfig& prefix,
                 const SharedDsgInfo::Ptr& dsg,
                 const SharedDsgInfo::Ptr& backend_dsg,
                 const SharedModuleState::Ptr& state,
@@ -80,11 +84,13 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface {
 
   BackendModule& operator=(const BackendModule& other) = delete;
 
-  void start();
+  void start() override;
 
-  void stop();
+  void stop() override;
 
-  void save(const LogSetup& log_setup);
+  void save(const LogSetup& log_setup) override;
+
+  std::string printInfo() const override;
 
   void spin();
 
@@ -110,6 +116,9 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface {
   virtual bool registerCallbacks(const ros::NodeHandle&) override { return true; }
 
   using KimeraPgmoInterface::setVerboseFlag;
+
+  // TODO(nathan) handle this better
+  inline const BackendConfig& config() const { return config_; }
 
  protected:
   void setSolverParams();
@@ -157,6 +166,9 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface {
   void updatePlacePosFromCache();
 
  protected:
+  const BackendConfig config_;
+  RobotPrefixConfig prefix_;
+
   std::unique_ptr<std::thread> spin_thread_;
   std::atomic<bool> should_shutdown_{false};
   bool have_loopclosures_{false};
@@ -165,9 +177,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface {
   size_t prev_num_archived_vertices_{0};
   size_t num_archived_vertices_{0};
   bool reset_backend_dsg_{false};
-
-  RobotPrefixConfig prefix_;
-  BackendConfig config_;
 
   std::unordered_map<NodeId, Eigen::Vector3d> place_pos_cache_;
 
@@ -200,6 +209,16 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface {
   std::map<NodeId, std::string> room_name_map_;
   std::unique_ptr<std::thread> zmq_thread_;
   std::unique_ptr<spark_dsg::ZmqReceiver> zmq_receiver_;
+
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<BackendModule,
+                                     BackendModule,
+                                     BackendConfig,
+                                     RobotPrefixConfig,
+                                     SharedDsgInfo::Ptr,
+                                     SharedDsgInfo::Ptr,
+                                     SharedModuleState::Ptr,
+                                     LogSetup::Ptr>("BackendModule");
 };
 
 }  // namespace hydra

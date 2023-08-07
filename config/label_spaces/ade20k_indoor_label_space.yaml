@@ -23,19 +23,20 @@ label_names:
   - {label: 18, name: Deformable}
   - {label: 19, name: Dynamic_NonHuman}
   - {label: 20, name: Human}
-objects:
-  labels:
-    - 7
-    - 8
-    - 9
-    - 10
-    - 11
-    - 12
-    - 13
-    - 14
-    - 15
-    - 16
-    - 17
-    - 18
+frontend:
+  objects:
+    labels:
+      - 7
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 17
+      - 18
 semantic_measurement_probability: 0.9
 total_semantic_labels: 21

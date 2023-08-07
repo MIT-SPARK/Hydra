@@ -34,31 +34,61 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/reconstruction/reconstruction_config.h"
 
+#include <config_utilities/config.h>
+#include <config_utilities/types/conversions.h>
+#include <config_utilities/types/eigen_matrix.h>
+
+#include "hydra/common/config_utilities.h"
+
 namespace hydra {
 
-int ThreadNumConverter::to(const int& other) const {
-  if (other <= 0) {
-    return std::thread::hardware_concurrency();
-  }
-  return other;
-}
+void declare_config(ReconstructionConfig& conf) {
+  using namespace config;
+  name("ReconstructionConfig");
+  field(conf.voxel_size, "voxel_size");
+  field(conf.voxels_per_side, "voxels_per_side");
+  field(conf.show_stats, "show_stats");
+  field(conf.clear_distant_blocks, "clear_distant_blocks");
+  field(conf.dense_representation_radius_m, "dense_representation_radius_m");
+  field(conf.world_frame, "world_frame");
+  field(conf.robot_frame, "robot_frame");
+  field(conf.num_poses_per_update, "num_poses_per_update");
+  field(conf.max_input_queue_size, "max_input_queue_size");
+  field(conf.make_pose_graph, "make_pose_graph");
+  field(conf.semantic_measurement_probability, "semantic_measurement_probability");
 
-int ThreadNumConverter::from(const int& other) const { return other; }
+  field(conf.gvd, "gvd");
+  conf.graph_extractor.setOptional();
+  field(conf.graph_extractor, "graph_extractor");
+  field(conf.tsdf, "tsdf");
+  field(conf.mesh, "mesh");
 
-Eigen::Quaterniond QuaternionConverter::to(
-    const std::map<std::string, double>& other) const {
-  if (!other.count("w") || !other.count("x") || !other.count("y") ||
-      !other.count("z")) {
-    std::cerr << "Encountered invalid quaternion representation!" << std::endl;
-    return Eigen::Quaterniond::Identity();
-  }
-
-  return Eigen::Quaterniond(other.at("w"), other.at("x"), other.at("y"), other.at("z"));
-}
-
-std::map<std::string, double> QuaternionConverter::from(
-    const Eigen::Quaterniond& other) const {
-  return {{"w", other.w()}, {"x", other.x()}, {"y", other.y()}, {"z", other.z()}};
+  field<QuaternionConverter>(conf.body_R_camera, "body_R_camera");
+  field(conf.body_t_camera, "body_t_camera");
 }
 
 }  // namespace hydra
+
+namespace voxblox {
+
+void declare_config(TsdfIntegratorBase::Config& conf) {
+  using namespace config;
+  name("TsdfIntegratorBase::Config");
+  field(conf.default_truncation_distance, "default_truncation_distance");
+  field(conf.max_weight, "max_weight");
+  field(conf.voxel_carving_enabled, "voxel_carving_enabled");
+  field(conf.min_ray_length_m, "min_ray_length_m");
+  field(conf.max_ray_length_m, "max_ray_length_m");
+  field(conf.use_const_weight, "use_const_weight");
+  field(conf.allow_clear, "allow_clear");
+  field(conf.use_weight_dropoff, "use_weight_dropoff");
+  field(conf.use_sparsity_compensation_factor, "use_sparsity_compensation_factor");
+  field<ThreadNumConversion>(conf.integrator_threads, "integrator_threads");
+  field(conf.integration_order_mode, "integration_order_mode");
+  field(conf.enable_anti_grazing, "enable_anti_grazing");
+  field(conf.start_voxel_subsampling_factor, "start_voxel_subsampling_factor");
+  field(conf.max_consecutive_ray_collisions, "max_consecutive_ray_collisions");
+  field(conf.clear_checks_every_n_frames, "clear_checks_every_n_frames");
+}
+
+}  // namespace voxblox

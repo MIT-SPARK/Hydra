@@ -41,6 +41,7 @@
 
 #include "hydra/common/common.h"
 #include "hydra/loop_closure/descriptor_matching.h"
+#include "hydra/loop_closure/registration_solution.h"
 #include "hydra/loop_closure/subgraph_extraction.h"
 
 namespace hydra {
@@ -69,9 +70,9 @@ struct DsgRegistrationSolver {
 
   virtual ~DsgRegistrationSolver() = default;
 
-  virtual DsgRegistrationSolution solve(const DynamicSceneGraph& dsg,
-                                        const DsgRegistrationInput& match,
-                                        NodeId query_agent_id) const = 0;
+  virtual RegistrationSolution solve(const DynamicSceneGraph& dsg,
+                                     const DsgRegistrationInput& match,
+                                     NodeId query_agent_id) const = 0;
 };
 
 using TeaserParams = teaser::RobustRegistrationSolver::Params;
@@ -83,9 +84,9 @@ struct DsgTeaserSolver : DsgRegistrationSolver {
 
   virtual ~DsgTeaserSolver() = default;
 
-  DsgRegistrationSolution solve(const DynamicSceneGraph& dsg,
-                                const DsgRegistrationInput& match,
-                                NodeId query_agent_id) const override;
+  RegistrationSolution solve(const DynamicSceneGraph& dsg,
+                             const DsgRegistrationInput& match,
+                             NodeId query_agent_id) const override;
 
   LayerId layer_id;
   LayerRegistrationConfig config;

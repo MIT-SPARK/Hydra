@@ -33,61 +33,41 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/virtual_config.h>
+
 #include <utility>
 
 #include "hydra/places/gvd_integrator.h"
 #include "hydra/reconstruction/mesh_integrator.h"
 
 namespace hydra {
-namespace places {
 
 class ComboIntegrator {
  public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  using GraphExtractorConfig = config::VirtualConfig<places::GraphExtractorInterface>;
 
-  ComboIntegrator(const GvdIntegratorConfig& gvd_config,
-                  const Layer<TsdfVoxel>::Ptr& tsdf_layer,
-                  const Layer<GvdVoxel>::Ptr& gvd_layer,
+  ComboIntegrator(const places::GvdIntegratorConfig& gvd_config,
+                  const voxblox::Layer<voxblox::TsdfVoxel>::Ptr& tsdf_layer,
+                  const voxblox::Layer<places::GvdVoxel>::Ptr& gvd_layer,
                   const SemanticMeshLayer::Ptr& mesh_layer,
-                  const MeshIntegratorConfig* mesh_config = nullptr)
-      : tsdf_(tsdf_layer), mesh_(mesh_layer) {
-    vertices_.reset(
-        new Layer<VertexVoxel>(gvd_layer->voxel_size(), gvd_layer->voxels_per_side()));
-    mesh_integrator = std::make_unique<MeshIntegrator>(
-        mesh_config ? *mesh_config : MeshIntegratorConfig(),
-        tsdf_layer,
-        vertices_,
-        mesh_layer);
-    gvd_integrator = std::make_unique<GvdIntegrator>(gvd_config, gvd_layer);
-  }
+                  const MeshIntegratorConfig* mesh_config = nullptr,
+                  const GraphExtractorConfig& graph_config = {});
 
-  virtual ~ComboIntegrator() = default;
+  virtual ~ComboIntegrator();
 
-  inline const SceneGraphLayer& getGraph() const { return gvd_integrator->getGraph(); }
+  void update(uint64_t timestamp_ns,
+              bool clear_updated_flag,
+              bool use_all_blocks = false);
 
-  inline const GvdGraph& getGvdGraph() const { return gvd_integrator->getGvdGraph(); }
-
-  inline GraphExtractorInterface& getGraphExtractor() const {
-    return gvd_integrator->getGraphExtractor();
-  }
-
-  inline void update(uint64_t timestamp_ns,
-                     bool clear_updated_flag,
-                     bool use_all_blocks = false) {
-    mesh_integrator->generateMesh(!use_all_blocks, clear_updated_flag);
-    gvd_integrator->updateFromTsdf(
-        timestamp_ns, *tsdf_, *vertices_, *mesh_, clear_updated_flag, use_all_blocks);
-    gvd_integrator->updateGvd(timestamp_ns);
-  }
-
+ public:
   std::unique_ptr<MeshIntegrator> mesh_integrator;
-  std::unique_ptr<GvdIntegrator> gvd_integrator;
+  std::unique_ptr<places::GvdIntegrator> gvd_integrator;
+  places::GraphExtractorInterface::Ptr graph_extractor;
 
  protected:
-  Layer<TsdfVoxel>::Ptr tsdf_;
+  voxblox::Layer<voxblox::TsdfVoxel>::Ptr tsdf_;
   SemanticMeshLayer::Ptr mesh_;
-  Layer<VertexVoxel>::Ptr vertices_;
+  voxblox::Layer<places::VertexVoxel>::Ptr vertices_;
 };
 
-}  // namespace places
 }  // namespace hydra

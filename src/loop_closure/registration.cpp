@@ -105,11 +105,10 @@ std::string getPoseRepr(const gtsam::Pose3& pose,
   return ss.str();
 }
 
-DsgRegistrationSolution getFullSolutionFromLayer(
-    const DynamicSceneGraph& graph,
-    const LayerRegistrationSolution& solution,
-    NodeId query_agent_id,
-    NodeId match_root) {
+RegistrationSolution getFullSolutionFromLayer(const DynamicSceneGraph& graph,
+                                              const LayerRegistrationSolution& solution,
+                                              NodeId query_agent_id,
+                                              NodeId match_root) {
   if (!solution.valid || solution.inliers.empty()) {
     return {};
   }
@@ -131,7 +130,12 @@ DsgRegistrationSolution getFullSolutionFromLayer(
   VLOG(3) << "  - dest_T_src:   " << getPoseRepr(solution.dest_T_src);
   VLOG(3) << "  - to_T_from:    " << getPoseRepr(to_T_from);
 
-  return {true, from_pose_info.id, to_pose_info.id, to_T_from, -1};
+  return {true,
+          from_pose_info.id,
+          to_pose_info.id,
+          to_T_from.translation(),
+          to_T_from.rotation().toQuaternion(),
+          -1};
 }
 
 void logRegistrationProblem(const std::string& path_prefix,
@@ -176,9 +180,9 @@ DsgTeaserSolver::DsgTeaserSolver(LayerId layer_id,
   log_prefix = config.registration_output_path + "/" + layer_str + "_registration_";
 }
 
-DsgRegistrationSolution DsgTeaserSolver::solve(const DynamicSceneGraph& dsg,
-                                               const DsgRegistrationInput& match,
-                                               NodeId query_agent_id) const {
+RegistrationSolution DsgTeaserSolver::solve(const DynamicSceneGraph& dsg,
+                                            const DsgRegistrationInput& match,
+                                            NodeId query_agent_id) const {
   // TODO(nathan) helper function in dsg
   const uint64_t timestamp =
       dsg.getDynamicNode(query_agent_id).value().get().timestamp.count();

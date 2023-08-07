@@ -33,8 +33,9 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <set>
+
 #include "hydra/common/dsg_types.h"
-#include "hydra/config/config.h"
 
 namespace hydra {
 
@@ -50,44 +51,6 @@ struct MeshSegmenterConfig {
   std::set<uint32_t> labels;
 };
 
-}  // namespace hydra
-
-namespace spark_dsg {
-
-using BoundingBoxType = BoundingBox::Type;
-
-}  // namespace spark_dsg
-
-DECLARE_CONFIG_ENUM(spark_dsg,
-                    BoundingBoxType,
-                    {BoundingBoxType::INVALID, "INVALID"},
-                    {BoundingBoxType::AABB, "AABB"},
-                    {BoundingBoxType::OBB, "OBB"},
-                    {BoundingBoxType::RAABB, "RAABB"});
-
-namespace hydra {
-
-template <typename Visitor>
-void visit_config(const Visitor& v, MeshSegmenterConfig& config) {
-  std::string prefix_string;
-  if (!config_parser::is_parser<Visitor>()) {
-    prefix_string.push_back(config.prefix);
-  }
-
-  v.visit("prefix", prefix_string);
-  if (config_parser::is_parser<Visitor>()) {
-    config.prefix = prefix_string.at(0);
-  }
-
-  v.visit("active_horizon_s", config.active_horizon_s);
-  v.visit("active_index_horizon_m", config.active_index_horizon_m);
-  v.visit("cluster_tolerance", config.cluster_tolerance);
-  v.visit("min_cluster_size", config.min_cluster_size);
-  v.visit("max_cluster_size", config.max_cluster_size);
-  v.visit("bounding_box_type", config.bounding_box_type);
-  v.visit("labels", config.labels);
-}
+void declare_config(MeshSegmenterConfig& conf);
 
 }  // namespace hydra
-
-DECLARE_CONFIG_OSTREAM_OPERATOR(hydra, MeshSegmenterConfig)

@@ -34,14 +34,13 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/eval/place_evaluator.h"
 
+#include <config_utilities/parsing/yaml.h>
+#include <config_utilities/printing.h>
 #include <glog/logging.h>
 #include <voxblox/io/layer_io.h>
 
-#include "hydra/reconstruction/configs.h"
-
 namespace hydra::eval {
 
-using places::ComboIntegrator;
 using places::GvdIntegratorConfig;
 using places::GvdVoxel;
 using voxblox::Layer;
@@ -57,7 +56,6 @@ PlaceEvaluator::PlaceEvaluator(const GvdIntegratorConfig& config,
 
 void PlaceEvaluator::computeGroundTruth(const GvdIntegratorConfig& config) {
   config_ = config;
-  config_.extract_graph = true;
 
   VLOG(1) << "using GVD config:" << std::endl << config_;
   ComboIntegrator integrator(config_, tsdf_, gvd_, mesh_);
@@ -67,7 +65,7 @@ void PlaceEvaluator::computeGroundTruth(const GvdIntegratorConfig& config) {
 PlaceEvaluator::Ptr PlaceEvaluator::fromFile(const std::string& config_filepath,
                                              const std::string& tsdf_filepath,
                                              std::optional<double> max_distance_m) {
-  auto config = config_parser::load_from_yaml<GvdIntegratorConfig>(config_filepath);
+  auto config = config::fromYamlFile<GvdIntegratorConfig>(config_filepath);
   if (max_distance_m) {
     config.max_distance_m = *max_distance_m;
   }

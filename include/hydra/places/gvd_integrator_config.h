@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/places/graph_extractor_config.h"
+#include <cstdint>
 
 namespace hydra {
 namespace places {
@@ -43,12 +43,6 @@ enum class ParentUniquenessMode {
   L1_DISTANCE,
   L1_THEN_ANGLE,
 };
-
-}  // namespace places
-}  // namespace hydra
-
-namespace hydra {
-namespace places {
 
 struct VoronoiCheckConfig {
   ParentUniquenessMode mode = ParentUniquenessMode::L1_THEN_ANGLE;
@@ -67,32 +61,11 @@ struct GvdIntegratorConfig {
   bool positive_distance_only = true;
   uint8_t min_basis_for_extraction = 3;
   VoronoiCheckConfig voronoi_config;
-  bool extract_graph = true;
-  GraphExtractorConfig graph_extractor;
 };
 
-template <typename Visitor>
-void visit_config(const Visitor& v, VoronoiCheckConfig& config) {
-  v.visit("mode", config.mode);
-  v.visit("min_distance_m", config.min_distance_m);
-  v.visit("parent_l1_separation", config.parent_l1_separation);
-  v.visit("parent_cos_angle_separation", config.parent_cos_angle_separation);
-}
+void declare_config(VoronoiCheckConfig& conf);
 
-template <typename Visitor>
-void visit_config(const Visitor& v, GvdIntegratorConfig& config) {
-  v.visit("max_distance_m", config.max_distance_m);
-  v.visit("min_distance_m", config.min_distance_m);
-  v.visit("min_diff_m", config.min_diff_m);
-  v.visit("min_weight", config.min_weight);
-  v.visit("num_buckets", config.num_buckets);
-  v.visit("multi_queue", config.multi_queue);
-  v.visit("positive_distance_only", config.positive_distance_only);
-  v.visit("min_basis_for_extraction", config.min_basis_for_extraction);
-  v.visit("voronoi_config", config.voronoi_config);
-  v.visit("extract_graph", config.extract_graph);
-  v.visit("graph_extractor", config.graph_extractor);
-}
+void declare_config(GvdIntegratorConfig& conf);
 
 }  // namespace places
 }  // namespace hydra

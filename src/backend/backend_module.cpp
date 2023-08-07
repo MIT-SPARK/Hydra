@@ -34,8 +34,12 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/backend/backend_module.h"
 
+#include <config_utilities/config.h>
+#include <config_utilities/printing.h>
+#include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <pcl/search/kdtree.h>
+#include <spark_dsg/zmq_interface.h>
 #include <voxblox/core/block_hash.h>
 
 #include "hydra/common/hydra_config.h"
@@ -64,21 +68,21 @@ std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol 
   return graph.getDynamicNode(node).value().get().timestamp.count();
 }
 
-BackendModule::BackendModule(const RobotPrefixConfig& prefix,
-                             const BackendConfig& config,
-                             const kimera_pgmo::KimeraPgmoConfig& pgmo_config,
+BackendModule::BackendModule(const BackendConfig& config,
+                             const RobotPrefixConfig& prefix,
                              const SharedDsgInfo::Ptr& dsg,
                              const SharedDsgInfo::Ptr& backend_dsg,
                              const SharedModuleState::Ptr& state,
                              const LogSetup::Ptr& logs)
     : KimeraPgmoInterface(),
-      prefix_(prefix),
       config_(config),
+      prefix_(prefix),
       shared_dsg_(dsg),
       private_dsg_(backend_dsg),
       shared_places_copy_(DsgLayers::PLACES),
       state_(state) {
-  KimeraPgmoInterface::config_ = pgmo_config;
+  KimeraPgmoInterface::config_ = config.pgmo;
+  KimeraPgmoInterface::config_.valid = config::isValid(config.pgmo);
 
   if (!KimeraPgmoInterface::initializeFromConfig()) {
     throw std::runtime_error("invalid pgmo config");
@@ -186,6 +190,12 @@ void BackendModule::save(const LogSetup& log_setup) {
     output_file << (loop_closure.dsg ? 1 : 0) << "," << loop_closure.level;
     output_file << std::endl;
   }
+}
+
+std::string BackendModule::printInfo() const {
+  std::stringstream ss;
+  ss << config::toString(config_);
+  return ss.str();
 }
 
 void BackendModule::spin() {
@@ -423,8 +433,8 @@ bool BackendModule::updateFromLcdQueue() {
 
     // note that pose graph convention is pose = src.between(dest) where the edge
     // connects frames "to -> from" (i.e. src = to, dest = from, pose = to_T_from)
-    LoopClosureLog lc{
-        result.to_node, result.from_node, result.to_T_from, true, result.level};
+    const gtsam::Pose3 to_T_from(gtsam::Rot3(result.to_R_from), result.to_p_from);
+    LoopClosureLog lc{result.to_node, result.from_node, to_T_from, true, result.level};
     addLoopClosure(lc.src,
                    lc.dest,
                    lc.src_T_dest,

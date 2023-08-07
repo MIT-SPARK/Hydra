@@ -44,7 +44,7 @@ namespace {
 
 class TestGraphExtractor : public FloodfillGraphExtractor {
  public:
-  explicit TestGraphExtractor(const GraphExtractorConfig& config)
+  explicit TestGraphExtractor(const FloodfillExtractorConfig& config)
       : FloodfillGraphExtractor(config) {}
 
   ~TestGraphExtractor() = default;
@@ -79,9 +79,9 @@ class FloodfillGraphExtractorTestFixture : public ::testing::Test {
   virtual void SetUp() override {
     layer.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
     // disable "advanced options" to start
-    config.floodfill.max_edge_split_iterations = 0;
-    config.floodfill.merge_new_nodes = false;
-    config.floodfill.edge_splitting_merge_nodes = false;
+    config.max_edge_split_iterations = 0;
+    config.merge_new_nodes = false;
+    config.edge_splitting_merge_nodes = false;
     config.add_freespace_edges = false;
     config.add_overlap_edges = false;
   }
@@ -142,7 +142,7 @@ class FloodfillGraphExtractorTestFixture : public ::testing::Test {
   int voxels_per_side = 16;
   float voxel_size = 0.1;
   std::unique_ptr<Layer<GvdVoxel>> layer;
-  GraphExtractorConfig config;
+  FloodfillExtractorConfig config;
 };
 
 TEST_F(FloodfillGraphExtractorTestFixture, AddAndRemovePlace) {
@@ -247,7 +247,7 @@ TEST_F(FloodfillGraphExtractorTestFixture, SimpleExtractionCorrect) {
 }
 
 TEST_F(FloodfillGraphExtractorTestFixture, SimpleExtractionWithSplitting) {
-  config.floodfill.max_edge_split_iterations = 5;
+  config.max_edge_split_iterations = 5;
 
   TestGraphExtractor extractor(config);
   setupTestEnvironment(extractor);
@@ -265,10 +265,10 @@ TEST_F(FloodfillGraphExtractorTestFixture, SimpleExtractionWithSplitting) {
 }
 
 TEST_F(FloodfillGraphExtractorTestFixture, SimpleExtractionWithNodeMerging) {
-  config.floodfill.max_edge_split_iterations = 5;
-  config.floodfill.merge_new_nodes = true;
-  config.floodfill.edge_splitting_merge_nodes = true;
-  config.floodfill.node_merge_distance_m = 0.15;
+  config.max_edge_split_iterations = 5;
+  config.merge_new_nodes = true;
+  config.edge_splitting_merge_nodes = true;
+  config.node_merge_distance_m = 0.15;
 
   TestGraphExtractor extractor(config);
   setupTestEnvironment(extractor);

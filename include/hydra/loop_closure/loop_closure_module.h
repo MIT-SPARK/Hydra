@@ -37,6 +37,7 @@
 #include <thread>
 
 #include "hydra/common/common.h"
+#include "hydra/common/module.h"
 #include "hydra/common/robot_prefix_config.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/loop_closure/detector.h"
@@ -45,7 +46,7 @@
 
 namespace hydra {
 
-class LoopClosureModule {
+class LoopClosureModule : public Module {
  public:
   LoopClosureModule(const RobotPrefixConfig& prefix,
                     const LoopClosureConfig& config,
@@ -54,11 +55,13 @@ class LoopClosureModule {
 
   virtual ~LoopClosureModule();
 
-  void start();
+  void start() override;
 
-  void stop();
+  void stop() override;
 
-  void save(const LogSetup& log_setup);
+  void save(const LogSetup& log_setup) override;
+
+  std::string printInfo() const override;
 
   void spin();
 

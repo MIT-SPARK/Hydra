@@ -43,8 +43,8 @@ namespace places {
 using GvdLayer = FloodfillGraphExtractor::GvdLayer;
 using GlobalIndexVector = voxblox::AlignedVector<GlobalIndex>;
 
-FloodfillGraphExtractor::FloodfillGraphExtractor(const GraphExtractorConfig& config)
-    : GraphExtractorInterface(config), config_(config.floodfill), next_edge_id_(0) {}
+FloodfillGraphExtractor::FloodfillGraphExtractor(const FloodfillExtractorConfig& config)
+    : GraphExtractorInterface(config), config_(config), next_edge_id_(0) {}
 
 FloodfillGraphExtractor::~FloodfillGraphExtractor() = default;
 

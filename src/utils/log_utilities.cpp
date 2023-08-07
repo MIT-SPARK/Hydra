@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/utils/log_utilities.h"
 
+#include <config_utilities/config.h>
 #include <glog/logging.h>
 
 #if defined(HYDRA_USE_STANDARD_FS) && HYDRA_USE_STANDARD_FS
@@ -56,6 +57,15 @@ inline bool makeDirs(const fs::path& path) {
   boost::system::error_code code;
 #endif
   return fs::create_directories(path, code);
+}
+
+void declare_config(LogConfig& config) {
+  using namespace config;
+  name("LogConfig");
+  field(config.log_dir, "log_path");
+  field(config.log_timing_incrementally, "log_timing_incrementally");
+  field(config.timing_stats_name, "timing_stats_name");
+  field(config.timing_suffix, "timing_suffix");
 }
 
 LogSetup::LogSetup(const LogConfig& conf) : valid_(false), config_(conf) {

@@ -49,6 +49,7 @@
 #include "hydra/common/dsg_types.h"
 #include "hydra/common/input_queue.h"
 #include "hydra/common/robot_prefix_config.h"
+#include "hydra/loop_closure/registration_solution.h"
 
 namespace hydra {
 
@@ -82,7 +83,7 @@ struct SharedModuleState {
   InputQueue<pose_graph_tools::BowQuery::ConstPtr> visual_lcd_queue;
   InputQueue<BackendInput::Ptr> backend_queue;
   InputQueue<LcdInput::Ptr>::Ptr lcd_queue;
-  InputQueue<lcd::DsgRegistrationSolution> backend_lcd_queue;
+  InputQueue<lcd::RegistrationSolution> backend_lcd_queue;
 };
 
 }  // namespace hydra

@@ -83,6 +83,8 @@ template <typename T>
 struct HistogramConfig {
   HistogramConfig(T min, T max, size_t bins) : min(min), max(max), bins(bins) {}
 
+  HistogramConfig() : HistogramConfig(0, 0, 1) {}
+
   T min;
   T max;
   size_t bins;

@@ -33,16 +33,17 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/factory.h>
 #include <kimera_semantics/semantic_voxel.h>
 
 #include <Eigen/Geometry>
 #include <memory>
 
 #include "hydra/common/input_queue.h"
+#include "hydra/common/module.h"
 #include "hydra/common/robot_prefix_config.h"
 #include "hydra/places/gvd_voxel.h"
 #include "hydra/places/vertex_voxel.h"
-#include "hydra/reconstruction/configs.h"
 #include "hydra/reconstruction/reconstruction_config.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/utils/log_utilities.h"
@@ -56,6 +57,7 @@ namespace hydra {
 namespace places {
 // forward declare to avoid include
 class GvdIntegrator;
+class GraphExtractorInterface;
 }  // namespace places
 
 class MeshIntegrator;
@@ -76,26 +78,30 @@ struct ReconstructionInput {
   std::vector<uint32_t> pointcloud_labels;
 };
 
-class ReconstructionModule {
+class ReconstructionModule : public Module {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  using Ptr = std::shared_ptr<ReconstructionModule>;
   using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
   using ReconstructionInputQueue = InputQueue<ReconstructionInput::Ptr>;
   using OutputQueue = InputQueue<ReconstructionOutput::Ptr>;
-  using OutputCallback =
-      std::function<void(const ReconstructionModule&, const ReconstructionOutput&)>;
+  using OutputCallback = std::function<void(const ReconstructionOutput&,
+                                            const voxblox::Layer<places::GvdVoxel>&,
+                                            const places::GraphExtractorInterface*)>;
 
-  ReconstructionModule(const RobotPrefixConfig& prefix,
-                       const ReconstructionConfig& config,
+  ReconstructionModule(const ReconstructionConfig& config,
+                       const RobotPrefixConfig& prefix,
                        const OutputQueue::Ptr& output_queue);
 
   virtual ~ReconstructionModule();
 
-  void start();
+  void start() override;
 
-  void stop();
+  void stop() override;
 
-  void save(const LogSetup& log_setup);
+  void save(const LogSetup& log_setup) override;
+
+  std::string printInfo() const override;
 
   void spin();
 
@@ -139,11 +145,12 @@ class ReconstructionModule {
   voxblox::BlockIndexList findBlocksToArchive(const voxblox::Point& center) const;
 
  protected:
+  const ReconstructionConfig config_;
+
   mutable std::mutex tsdf_mutex_;
   mutable std::mutex gvd_mutex_;
 
   RobotPrefixConfig prefix_;
-  const ReconstructionConfig config_;
 
   std::atomic<bool> should_shutdown_{false};
   ReconstructionInputQueue::Ptr queue_;
@@ -162,6 +169,7 @@ class ReconstructionModule {
 
   std::unique_ptr<kimera::SemanticIntegratorBase> tsdf_integrator_;
   std::unique_ptr<MeshIntegrator> mesh_integrator_;
+  std::shared_ptr<places::GraphExtractorInterface> graph_extractor_;
   std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
 
   uint64_t prev_time_;
@@ -169,6 +177,13 @@ class ReconstructionModule {
   Eigen::Affine3d prev_pose_;
 
   std::list<OutputCallback> output_callbacks_;
+
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<ReconstructionModule,
+                                     ReconstructionModule,
+                                     ReconstructionConfig,
+                                     const RobotPrefixConfig&,
+                                     const OutputQueue::Ptr&>("ReconstructionModule");
 };
 
 }  // namespace hydra

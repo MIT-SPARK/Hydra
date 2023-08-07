@@ -3,9 +3,37 @@ total_semantic_labels: 42
 semantic_measurement_probability: 0.6
 dynamic_labels: []
 invalid_labels: []
-objects:
-  labels: [3, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 18, 19, 20, 21, 22, 23, 25, 27,
-    28, 31, 32, 34, 35, 36, 37, 38, 39]
+frontend:
+  objects:
+    labels:
+      - 3
+      - 5
+      - 6
+      - 7
+      - 8
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 18
+      - 19
+      - 20
+      - 21
+      - 22
+      - 23
+      - 25
+      - 27
+      - 28
+      - 31
+      - 32
+      - 34
+      - 35
+      - 36
+      - 37
+      - 38
+      - 39
 label_names:
   - {label: 0, name: void}
   - {label: 1, name: wall}

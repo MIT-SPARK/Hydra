@@ -100,7 +100,7 @@ void MeshIntegrator::launchThreads(const BlockIndexList& blocks, bool interior_p
       new MixedThreadSafeIndex(blocks.size()));
 
   std::list<std::thread> threads;
-  for (size_t i = 0; i < config_.integrator_threads; ++i) {
+  for (int i = 0; i < config_.integrator_threads; ++i) {
     if (interior_pass) {
       threads.emplace_back(
           &MeshIntegrator::processInterior, this, blocks, index_getter.get());

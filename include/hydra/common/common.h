@@ -44,44 +44,19 @@
 
 namespace hydra {
 
-namespace lcd {
-
-struct DsgRegistrationSolution {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  bool valid = false;
-  NodeId from_node;
-  NodeId to_node;
-  gtsam::Pose3 to_T_from;
-  int64_t level;
-};
-
-}  // namespace lcd
-
+// TODO(nathan) drop explicit gtsam pose here
 struct NodeMergeInfo {
   NodeId to_node;
   gtsam::Pose3 from_T_to;
 };
 
-typedef std::unordered_map<NodeId, NodeMergeInfo> NodeMergeLog;
-typedef std::unordered_set<NodeId> NodeIdSet;
+using NodeMergeLog = std::unordered_map<NodeId, NodeMergeInfo>;
+using NodeIdSet = std::unordered_set<NodeId>;
 
 struct SharedDsgInfo {
   using Ptr = std::shared_ptr<SharedDsgInfo>;
 
-  SharedDsgInfo(const std::map<LayerId, char>& layer_id_map, LayerId mesh_layer_id)
-      : updated(false), last_update_time(0) {
-    DynamicSceneGraph::LayerIds layer_ids;
-    for (const auto& id_key_pair : layer_id_map) {
-      if (id_key_pair.first == mesh_layer_id) {
-        throw std::runtime_error("layer id duplicated with mesh id");
-      }
-
-      layer_ids.push_back(id_key_pair.first);
-      prefix_layer_map[id_key_pair.second] = id_key_pair.first;
-    }
-
-    graph.reset(new DynamicSceneGraph(layer_ids, mesh_layer_id));
-  }
+  SharedDsgInfo(const std::map<LayerId, char>& layer_id_map, LayerId mesh_layer_id);
 
   // mutexes are considered ordered (for avoiding deadlock):
   // 1. SharedDsgInfo::mutex (lcd)
@@ -107,16 +82,7 @@ struct BackendModuleStatus {
   size_t trajectory_len_;
   size_t num_merges_undone_;
 
-  void reset() {
-    total_loop_closures_ = 0;
-    new_loop_closures_ = 0;
-    total_factors_ = 0;
-    total_values_ = 0;
-    new_factors_ = 0;
-    new_graph_factors_ = 0;
-    trajectory_len_ = 0;
-    num_merges_undone_ = 0;
-  }
+  void reset();
 };
 
 }  // namespace hydra

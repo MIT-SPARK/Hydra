@@ -5,7 +5,6 @@ catkin_add_gtest(
   src/place_fixtures.cpp
   backend/test_merge_handler.cpp
   backend/test_update_functions.cpp
-  config/test_config.cpp
   frontend/test_frontend.cpp
   loop_closure/test_descriptor_matching.cpp
   loop_closure/test_detector.cpp
@@ -25,7 +24,6 @@ catkin_add_gtest(
   rooms/test_graph_clustering.cpp
   rooms/test_graph_filtration.cpp
   rooms/test_room_finder.cpp
-  rooms/test_room_finder_config.cpp
   rooms/test_room_utilities.cpp
   utils/test_minimum_spanning_tree.cpp
   utils/test_nearest_neighbor_utilities.cpp

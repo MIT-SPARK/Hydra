@@ -51,13 +51,19 @@ struct GnnLcdConfig {
   bool objects_pos_in_feature = false;
 };
 
-struct LcdDetectorConfig {
-  std::map<LayerId, DescriptorMatchConfig> search_configs;
-  DescriptorMatchConfig agent_search_config;
+struct LayerLcdConfig {
+  DescriptorMatchConfig matching;
+  LayerRegistrationConfig registration;
+};
 
-  std::map<LayerId, LayerRegistrationConfig> registration_configs;
+struct LcdDetectorConfig {
   TeaserParams teaser_config;
   bool enable_agent_registration = true;
+  DescriptorMatchConfig agent_search_config;
+
+  // TODO(nathan) refactor this
+  LayerLcdConfig objects;
+  LayerLcdConfig places;
 
   SubgraphConfig object_extraction{5.0};
   SubgraphConfig places_extraction{5.0};
@@ -71,6 +77,7 @@ struct LcdDetectorConfig {
 class LcdDetector {
  public:
   using FactoryMap = std::map<LayerId, DescriptorFactory::Ptr>;
+  using SearchResultMap = std::map<size_t, LayerSearchResults>;
 
   explicit LcdDetector(const LcdDetectorConfig& config);
 
@@ -82,9 +89,9 @@ class LcdDetector {
                              const std::unordered_set<NodeId>& archived_places,
                              uint64_t timestamp = 0);
 
-  std::vector<DsgRegistrationSolution> detect(const DynamicSceneGraph& dsg,
-                                              NodeId latest_agent_id,
-                                              uint64_t timestamp = 0);
+  std::vector<RegistrationSolution> detect(const DynamicSceneGraph& dsg,
+                                           NodeId latest_agent_id,
+                                           uint64_t timestamp = 0);
 
   size_t numDescriptors() const;
 
@@ -92,7 +99,7 @@ class LcdDetector {
 
   size_t numAgentDescriptors() const;
 
-  const std::map<size_t, LayerSearchResults>& getLatestMatches() const;
+  const SearchResultMap& getLatestMatches() const;
 
   const std::map<LayerId, size_t>& getLayerRemapping() const;
 
@@ -103,16 +110,17 @@ class LcdDetector {
  protected:
   void makeDefaultDescriptorFactories();
 
-  void resetLayerAssignments();
+  void resetLayerAssignments(
+      const std::map<LayerId, DescriptorMatchConfig>& match_configs,
+      const std::map<LayerId, LayerRegistrationConfig>& reg_configs);
 
   bool addNewDescriptors(const DynamicSceneGraph& graph,
                          const DynamicSceneGraphNode& agent_node);
 
-  std::vector<DsgRegistrationSolution> registerAndVerify(
-      const DynamicSceneGraph& dsg,
-      const std::map<size_t, LayerSearchResults>& matches,
-      NodeId agent_node,
-      uint64_t timestamp = 0) const;
+  std::vector<RegistrationSolution> registerAndVerify(const DynamicSceneGraph& dsg,
+                                                      const SearchResultMap& matches,
+                                                      NodeId agent_node,
+                                                      uint64_t timestamp = 0) const;
 
   LcdDetectorConfig config_;
   DescriptorFactory::Ptr agent_factory_;

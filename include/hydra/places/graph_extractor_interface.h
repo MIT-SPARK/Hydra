@@ -44,11 +44,11 @@ namespace places {
 
 class GraphExtractorInterface {
  public:
-  using Ptr = std::unique_ptr<GraphExtractorInterface>;
+  using Ptr = std::shared_ptr<GraphExtractorInterface>;
   using NodeIndexMap = std::unordered_map<NodeId, GlobalIndex>;
   using GvdLayer = Layer<GvdVoxel>;
 
-  GraphExtractorInterface(const GraphExtractorConfig& config);
+  explicit GraphExtractorInterface(const GraphExtractorConfig& config);
 
   virtual ~GraphExtractorInterface();
 
@@ -103,7 +103,7 @@ class GraphExtractorInterface {
   void updateHeuristicEdges(const GvdLayer& layer);
 
  protected:
-  GraphExtractorConfig config_;
+  const GraphExtractorConfig config_;
   NodeSymbol next_node_id_;
   GvdGraph::Ptr gvd_;
 

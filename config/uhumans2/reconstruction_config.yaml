@@ -22,35 +22,34 @@ gvd:
     min_distance_m: 0.30
     parent_l1_separation: 20
     parent_cos_angle_separation: 0.2
-  graph_extractor:
-    use_compression_extractor: true
-    # compresssion extractor
-    compression_distance_m: 1.0
-    min_node_distance_m: 0.4
-    min_edge_distance_m: 0.3
-    validate_graph: false
-    add_heuristic_edges: false
-    # floodfill extractor
-    node_merge_distance_m: 0.5
-    min_extra_basis: 2
-    min_vertex_basis: 4
-    merge_new_nodes: true
-    edge_splitting_merge_nodes: true
-    max_edge_split_iterations: 5
-    max_edge_deviation: 4
-    # heurisitic edges
-    add_overlap_edges: true
-    overlap_edges:
-      num_neighbors_to_check: 4
-      min_clearance_m: 0.4
-    add_freespace_edges: true
-    freespace_edges:
-      num_nodes_to_check: 5
-      num_neighbors_to_find: 1
-      max_length_m: 2.0
-      min_clearance_m: 0.5
+graph_extractor:
+  type: CompressionGraphExtractor
+  # compresssion extractor
+  compression_distance_m: 1.0
+  min_node_distance_m: 0.4
+  min_edge_distance_m: 0.3
+  validate_graph: false
+  add_heuristic_edges: false
+  # floodfill extractor
+  node_merge_distance_m: 0.5
+  min_extra_basis: 2
+  min_vertex_basis: 4
+  merge_new_nodes: true
+  edge_splitting_merge_nodes: true
+  max_edge_split_iterations: 5
+  max_edge_deviation: 4
+  # heurisitic edges
+  add_overlap_edges: true
+  overlap_edges:
+    num_neighbors_to_check: 4
+    min_clearance_m: 0.4
+  add_freespace_edges: true
+  freespace_edges:
+    num_nodes_to_check: 5
+    num_neighbors_to_find: 1
+    max_length_m: 2.0
+    min_clearance_m: 0.5
 mesh:
-  use_color: true
   min_weight: 0.0001
   integrator_threads: -1
 tsdf:

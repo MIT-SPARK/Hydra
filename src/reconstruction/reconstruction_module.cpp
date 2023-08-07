@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/reconstruction/reconstruction_module.h"
 
+#include <config_utilities/printing.h>
 #include <kimera_semantics/semantic_tsdf_integrator_fast.h>
 #include <tf2_eigen/tf2_eigen.h>
 #include <yaml-cpp/yaml.h>
@@ -109,11 +110,11 @@ SemanticConfig createSemanticConfig(const ReconstructionConfig& config) {
   return new_config;
 }
 
-ReconstructionModule::ReconstructionModule(const RobotPrefixConfig& prefix,
-                                           const ReconstructionConfig& config,
+ReconstructionModule::ReconstructionModule(const ReconstructionConfig& config,
+                                           const RobotPrefixConfig& prefix,
                                            const OutputQueue::Ptr& output_queue)
-    : prefix_(prefix),
-      config_(config),
+    : config_(config),
+      prefix_(prefix),
       output_queue_(output_queue),
       num_poses_received_(0) {
   queue_.reset(new ReconstructionInputQueue());
@@ -132,7 +133,13 @@ ReconstructionModule::ReconstructionModule(const RobotPrefixConfig& prefix,
       config_.tsdf, semantic_config, tsdf_.get(), semantics_.get());
   mesh_integrator_.reset(
       new MeshIntegrator(config_.mesh, tsdf_, vertices_, mesh_, semantics_));
-  gvd_integrator_.reset(new GvdIntegrator(config_.gvd, gvd_));
+
+  if (!config_.graph_extractor) {
+    LOG(WARNING) << "Places graph extraction disabled";
+  }
+
+  graph_extractor_ = config_.graph_extractor.create();
+  gvd_integrator_.reset(new GvdIntegrator(config_.gvd, gvd_, graph_extractor_));
 }
 
 ReconstructionModule::~ReconstructionModule() { stop(); }
@@ -169,21 +176,29 @@ void ReconstructionModule::stop() {
 }
 
 void ReconstructionModule::save(const LogSetup& log_setup) {
-  const auto& original_places = gvd_integrator_->getGraph();
-  auto places = original_places.clone();
+  if (graph_extractor_) {
+    const auto& original_places = graph_extractor_->getGraph();
+    auto places = original_places.clone();
 
-  std::unique_ptr<DynamicSceneGraph::Edges> edges(new DynamicSceneGraph::Edges());
-  for (const auto& id_edge_pair : places->edges()) {
-    edges->emplace(std::piecewise_construct,
-                   std::forward_as_tuple(id_edge_pair.first),
-                   std::forward_as_tuple(id_edge_pair.second.source,
-                                         id_edge_pair.second.target,
-                                         id_edge_pair.second.info->clone()));
+    std::unique_ptr<DynamicSceneGraph::Edges> edges(new DynamicSceneGraph::Edges());
+    for (const auto& id_edge_pair : places->edges()) {
+      edges->emplace(std::piecewise_construct,
+                     std::forward_as_tuple(id_edge_pair.first),
+                     std::forward_as_tuple(id_edge_pair.second.source,
+                                           id_edge_pair.second.target,
+                                           id_edge_pair.second.info->clone()));
+    }
+
+    DynamicSceneGraph::Ptr graph(new DynamicSceneGraph());
+    graph->updateFromLayer(*places, std::move(edges));
+    graph->save(log_setup.getLogDir("topology") + "/places.json", false);
   }
+}
 
-  DynamicSceneGraph::Ptr graph(new DynamicSceneGraph());
-  graph->updateFromLayer(*places, std::move(edges));
-  graph->save(log_setup.getLogDir("topology") + "/places.json", false);
+std::string ReconstructionModule::printInfo() const {
+  std::stringstream ss;
+  ss << std::endl << config::toString(config_);
+  return ss.str();
 }
 
 void ReconstructionModule::spin() {
@@ -378,7 +393,7 @@ void ReconstructionModule::updateGvd() {
   }
 
   for (const auto& callback : output_callbacks_) {
-    callback(*this, *msg);
+    callback(*msg, *gvd_, graph_extractor_.get());
   }
 
   gvd_queue_.pop();
@@ -434,12 +449,11 @@ void ReconstructionModule::addPlacesToOutput(ReconstructionOutput& output) {
   output.places.reset(new ActiveLayerInfo());
   auto& places = *output.places;
   // non-const, as clearDeletedNodes modifies internal state
-  auto& extractor = gvd_integrator_->getGraphExtractor();
-  std::unordered_set<NodeId> active_nodes = extractor.getActiveNodes();
-  const auto& removed_nodes = extractor.getDeletedNodes();
-  const auto& removed_edges = extractor.getDeletedEdges();
+  std::unordered_set<NodeId> active_nodes = graph_extractor_->getActiveNodes();
+  const auto& removed_nodes = graph_extractor_->getDeletedNodes();
+  const auto& removed_edges = graph_extractor_->getDeletedEdges();
 
-  const auto& graph = extractor.getGraph();
+  const auto& graph = graph_extractor_->getGraph();
   std::list<NodeId> invalid_nodes;
   for (const auto& active_id : active_nodes) {
     const auto& node = graph.getNode(active_id);
@@ -479,7 +493,7 @@ void ReconstructionModule::addPlacesToOutput(ReconstructionOutput& output) {
   }
 
   places.fillFromGraph(graph, active_nodes);
-  extractor.clearDeleted();
+  graph_extractor_->clearDeleted();
 
   VLOG(5) << "[Hydra Reconstruction] exporting " << active_nodes.size()
           << " active and " << removed_nodes.size() << " deleted nodes";

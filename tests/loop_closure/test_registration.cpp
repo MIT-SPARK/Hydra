@@ -38,6 +38,12 @@
 namespace hydra {
 namespace lcd {
 
+double getPoseDistance(const gtsam::Pose3& expected,
+                       const RegistrationSolution& solution) {
+  const gtsam::Pose3 result(gtsam::Rot3(solution.to_R_from), solution.to_p_from);
+  return gtsam::Pose3::Logmap(expected.between(result)).norm();
+}
+
 struct LayerRegistrationTests : public ::testing::Test {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -287,9 +293,7 @@ TEST_F(GraphRegistrationTests, TestFullObjectRegistration) {
   EXPECT_TRUE(result.valid);
   EXPECT_EQ(NodeSymbol('a', 1), result.from_node);
   EXPECT_EQ(NodeSymbol('a', 0), result.to_node);
-
-  double err = gtsam::Pose3::Logmap(to_T_from.between(result.to_T_from)).norm();
-  EXPECT_NEAR(0.0, err, 1.0e-3);
+  EXPECT_NEAR(0.0, getPoseDistance(to_T_from, result), 1.0e-3);
 }
 
 TEST_F(GraphRegistrationTests, TestFullObjectRegistrationWithSubgraphExtraction) {
@@ -310,9 +314,7 @@ TEST_F(GraphRegistrationTests, TestFullObjectRegistrationWithSubgraphExtraction)
   EXPECT_TRUE(result.valid);
   EXPECT_EQ(NodeSymbol('a', 1), result.from_node);
   EXPECT_EQ(NodeSymbol('a', 0), result.to_node);
-
-  double err = gtsam::Pose3::Logmap(to_T_from.between(result.to_T_from)).norm();
-  EXPECT_NEAR(0.0, err, 1.0e-3);
+  EXPECT_NEAR(0.0, getPoseDistance(to_T_from, result), 1.0e-3);
 }
 
 TEST_F(GraphRegistrationTests, DISABLED_TestFullPlaceRegistration) {
@@ -338,9 +340,7 @@ TEST_F(GraphRegistrationTests, DISABLED_TestFullPlaceRegistration) {
   EXPECT_TRUE(result.valid);
   EXPECT_EQ(NodeSymbol('a', 1), result.from_node);
   EXPECT_EQ(NodeSymbol('a', 0), result.to_node);
-
-  double err = gtsam::Pose3::Logmap(to_T_from.between(result.to_T_from)).norm();
-  EXPECT_NEAR(0.0, err, 1.0e-3);
+  EXPECT_NEAR(0.0, getPoseDistance(to_T_from, result), 1.0e-3);
 
   solver.config.subgraph_extraction.max_radius_m = -1;
   auto invalid_result = solver.solve(*dsg, match, NodeSymbol('a', 1));

@@ -51,8 +51,8 @@ struct LcdDetectorTests : public ::testing::Test {
     config.num_semantic_classes = 20;
     config.place_histogram_config = HistogramConfig<double>(0.5, 2.5, 30);
     config.agent_search_config = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
-    config.search_configs[DsgLayers::OBJECTS] = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
-    config.search_configs[DsgLayers::PLACES] = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
+    config.objects.matching = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
+    config.places.matching = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
   }
 
   LcdDetectorConfig config;
@@ -144,8 +144,7 @@ TEST_F(LcdDetectorTests, TestEmptySearch) {
   LcdDetector module(config);
   std::unordered_set<NodeId> active_places{1};
 
-  std::vector<DsgRegistrationSolution> results =
-      module.detect(*dsg, NodeSymbol('a', 0));
+  const auto results = module.detect(*dsg, NodeSymbol('a', 0));
   EXPECT_EQ(0u, results.size());
 }
 
@@ -174,8 +173,7 @@ TEST_F(LcdDetectorTests, TestNonEmptySearch) {
   EXPECT_EQ(1u, module.numGraphDescriptors(DsgLayers::OBJECTS));
   EXPECT_EQ(2u, module.numAgentDescriptors());
 
-  std::vector<DsgRegistrationSolution> results =
-      module.detect(*dsg, NodeSymbol('a', 0));
+  const auto results = module.detect(*dsg, NodeSymbol('a', 0));
   EXPECT_EQ(0u, results.size());
 }
 

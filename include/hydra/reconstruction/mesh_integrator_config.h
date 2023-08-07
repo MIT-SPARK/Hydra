@@ -39,7 +39,9 @@ namespace hydra {
 
 struct MeshIntegratorConfig {
   float min_weight = 1.0e-4;
-  size_t integrator_threads = std::thread::hardware_concurrency();
+  int integrator_threads = std::thread::hardware_concurrency();
 };
+
+void declare_config(MeshIntegratorConfig& config);
 
 }  // namespace hydra
