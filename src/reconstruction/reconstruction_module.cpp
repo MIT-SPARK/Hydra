@@ -240,6 +240,10 @@ void ReconstructionModule::addOutputCallback(const OutputCallback& callback) {
   output_callbacks_.push_back(callback);
 }
 
+void ReconstructionModule::addVisualizationCallback(const VizCallback& callback) {
+  visualization_callbacks_.push_back(callback);
+}
+
 std::vector<bool> ReconstructionModule::inFreespace(const PositionMatrix& positions,
                                                     double freespace_distance_m) const {
   if (positions.cols() < 1) {
@@ -378,6 +382,10 @@ void ReconstructionModule::updateGvd() {
     std::unique_lock<std::mutex> lock(gvd_mutex_);
     gvd_integrator_->updateGvd(msg->timestamp_ns);
     gvd_integrator_->archiveBlocks(archived_blocks);
+
+    for (const auto& callback : visualization_callbacks_) {
+      callback(msg->timestamp_ns, *gvd_, graph_extractor_.get());
+    }
   }  // end critical section
 
   if (config_.show_stats) {
@@ -393,7 +401,7 @@ void ReconstructionModule::updateGvd() {
   }
 
   for (const auto& callback : output_callbacks_) {
-    callback(*msg, *gvd_, graph_extractor_.get());
+    callback(*msg);
   }
 
   gvd_queue_.pop();
