@@ -85,9 +85,10 @@ class ReconstructionModule : public Module {
   using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
   using ReconstructionInputQueue = InputQueue<ReconstructionInput::Ptr>;
   using OutputQueue = InputQueue<ReconstructionOutput::Ptr>;
-  using OutputCallback = std::function<void(const ReconstructionOutput&,
-                                            const voxblox::Layer<places::GvdVoxel>&,
-                                            const places::GraphExtractorInterface*)>;
+  using OutputCallback = std::function<void(const ReconstructionOutput&)>;
+  using VizCallback = std::function<void(uint64_t,
+                                         const voxblox::Layer<places::GvdVoxel>&,
+                                         const places::GraphExtractorInterface*)>;
 
   ReconstructionModule(const ReconstructionConfig& config,
                        const RobotPrefixConfig& prefix,
@@ -113,6 +114,8 @@ class ReconstructionModule : public Module {
   bool spinOnce(const ReconstructionInput& input);
 
   void addOutputCallback(const OutputCallback& callback);
+
+  void addVisualizationCallback(const VizCallback& callback);
 
   // takes in a 3xN matrix
   std::vector<bool> inFreespace(const PositionMatrix& positions,
@@ -177,6 +180,7 @@ class ReconstructionModule : public Module {
   Eigen::Affine3d prev_pose_;
 
   std::list<OutputCallback> output_callbacks_;
+  std::list<VizCallback> visualization_callbacks_;
 
   inline static const auto registration_ =
       config::RegistrationWithConfig<ReconstructionModule,
