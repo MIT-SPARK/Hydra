@@ -118,10 +118,11 @@ void declare_config(BackendConfig& config) {
   name("BackendConfig");
   field(config.angle_step, "angle_step");
   field(config.visualize_place_factors, "visualize_place_factors");
-  field(config.building_color, "building_color");
-  field(config.building_semantic_label, "building_semantic_label");
   field(config.enable_rooms, "enable_rooms");
   field(config.room_finder, "room_finder");
+  field(config.enable_buildings, "enable_buildings");
+  field(config.building_color, "building_color");
+  field(config.building_semantic_label, "building_semantic_label");
   field(config.pgmo, "pgmo");
 
   enter_namespace("dsg");

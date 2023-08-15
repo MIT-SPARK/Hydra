@@ -79,7 +79,6 @@ BackendModule::BackendModule(const BackendConfig& config,
       prefix_(prefix),
       shared_dsg_(dsg),
       private_dsg_(backend_dsg),
-      shared_places_copy_(DsgLayers::PLACES),
       state_(state) {
   KimeraPgmoInterface::config_ = config.pgmo;
   KimeraPgmoInterface::config_.valid = config::isValid(config.pgmo);
@@ -227,6 +226,31 @@ bool BackendModule::spinOnce(bool force_update) {
   return true;
 }
 
+void BackendModule::logPlaceDistance() {
+  double avg_distance = 0.0;
+  size_t num_valid = 0;
+  const auto& place_values = deformation_graph_->getGtsamTempValues();
+  for (const auto& id_node_pair :
+       private_dsg_->graph->getLayer(DsgLayers::PLACES).nodes()) {
+    const auto node_id = id_node_pair.first;
+    if (!place_values.exists(node_id)) {
+      continue;
+    }
+
+    const auto& attrs = id_node_pair.second->attributes();
+    const double dist =
+        (attrs.position - place_values.at<gtsam::Pose3>(node_id).translation()).norm();
+    avg_distance += dist;
+    num_valid++;
+  }
+  if (num_valid) {
+    avg_distance /= num_valid;
+  }
+
+  LOG(ERROR) << "Average distance: " << avg_distance << ", Num valid: " << num_valid
+             << " / " << private_dsg_->graph->getLayer(DsgLayers::PLACES).numNodes();
+}
+
 void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
   ScopedTimer spin_timer("backend/spin", input.timestamp_ns);
   status_.reset();
@@ -247,30 +271,8 @@ void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
     return;
   }
 
-  if (have_loopclosures_) {
-    double avg_distance = 0.0;
-    size_t num_valid = 0;
-    const auto& place_values = deformation_graph_->getGtsamTempValues();
-    for (const auto& id_node_pair :
-         private_dsg_->graph->getLayer(DsgLayers::PLACES).nodes()) {
-      const auto node_id = id_node_pair.first;
-      if (!place_values.exists(node_id)) {
-        continue;
-      }
-
-      const auto& attrs = id_node_pair.second->attributes();
-      const double dist =
-          (attrs.position - place_values.at<gtsam::Pose3>(node_id).translation())
-              .norm();
-      avg_distance += dist;
-      num_valid++;
-    }
-    if (num_valid) {
-      avg_distance /= num_valid;
-    }
-
-    LOG(ERROR) << "Average distance: " << avg_distance << ", Num valid: " << num_valid
-               << " / " << private_dsg_->graph->getLayer(DsgLayers::PLACES).numNodes();
+  if (have_loopclosures_ && VLOG_IS_ON(1)) {
+    logPlaceDistance();
   }
 
   if (config_.optimize_on_lc && have_loopclosures_) {
@@ -322,26 +324,26 @@ void BackendModule::setSolverParams() {
 }
 
 void BackendModule::setDefaultUpdateFunctions() {
+  // agent layer
+  dsg_update_funcs_.push_back(&dsg_updates::updateAgents);
+
+  // object layer
   update_objects_functor_.reset(new dsg_updates::UpdateObjectsFunctor());
   update_objects_functor_->angle_step = config_.angle_step;
-  update_places_functor_.reset(new dsg_updates::UpdatePlacesFunctor(
-      config_.places_merge_pos_threshold_m, config_.places_merge_distance_tolerance_m));
-  update_buildings_functor_.reset(new dsg_updates::UpdateBuildingsFunctor(
-      config_.building_color, config_.building_semantic_label));
-
-  merge_handler_.reset(new MergeHandler(
-      update_objects_functor_, update_places_functor_, config_.enable_merge_undos));
-
-  dsg_update_funcs_.push_back(&dsg_updates::updateAgents);
   dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdateObjectsFunctor::call,
                                         update_objects_functor_.get(),
                                         std::placeholders::_1,
                                         std::placeholders::_2));
+
+  // places layer
+  update_places_functor_.reset(new dsg_updates::UpdatePlacesFunctor(
+      config_.places_merge_pos_threshold_m, config_.places_merge_distance_tolerance_m));
   dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdatePlacesFunctor::call,
                                         update_places_functor_.get(),
                                         std::placeholders::_1,
                                         std::placeholders::_2));
 
+  // room layer
   if (config_.enable_rooms) {
     update_rooms_functor_.reset(
         new dsg_updates::UpdateRoomsFunctor(config_.room_finder));
@@ -355,10 +357,18 @@ void BackendModule::setDefaultUpdateFunctions() {
                                           std::placeholders::_2));
   }
 
-  dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdateBuildingsFunctor::call,
-                                        update_buildings_functor_.get(),
-                                        std::placeholders::_1,
-                                        std::placeholders::_2));
+  /// building layer
+  if (config_.enable_buildings) {
+    update_buildings_functor_.reset(new dsg_updates::UpdateBuildingsFunctor(
+        config_.building_color, config_.building_semantic_label));
+    dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdateBuildingsFunctor::call,
+                                          update_buildings_functor_.get(),
+                                          std::placeholders::_1,
+                                          std::placeholders::_2));
+  }
+
+  merge_handler_.reset(new MergeHandler(
+      update_objects_functor_, update_places_functor_, config_.enable_merge_undos));
 }
 
 std::string logPoseGraphConnections(const pose_graph_tools::PoseGraph& msg) {
@@ -505,12 +515,8 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
     if (shared_dsg_->graph->hasLayer(DsgLayers::PLACES)) {
       // TODO(nathan) simplify
       const auto& places = shared_dsg_->graph->getLayer(DsgLayers::PLACES);
-      shared_places_copy_.mergeLayer(places, {});
-      std::vector<NodeId> removed_place_nodes;
-      places.getRemovedNodes(removed_place_nodes);
-      for (const auto& place_id : removed_place_nodes) {
-        shared_places_copy_.removeNode(place_id);
-      }
+      shared_places_copy_ = places.clone(
+          [](const auto& node) { return NodeSymbol(node.id).category() == 'p'; });
     }
 
     updatePlacePosFromCache();  // copy optimized positions back
@@ -549,7 +555,7 @@ void BackendModule::updatePlacePosFromCache() {
 }
 
 void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
-  if (shared_places_copy_.nodes().empty()) {
+  if (!shared_places_copy_ || shared_places_copy_->nodes().empty()) {
     LOG(WARNING) << "Attempting to add places to deformation graph without places";
     return;
   }
@@ -561,7 +567,7 @@ void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
   MinimumSpanningTreeInfo mst_info;
   {  // start timing scope
     ScopedTimer mst_timer("backend/places_mst", timestamp_ns);
-    mst_info = getMinimumSpanningEdges(shared_places_copy_);
+    mst_info = getMinimumSpanningEdges(*shared_places_copy_);
   }  // end timing scope
 
   {  // start timing scope
@@ -571,7 +577,7 @@ void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
     std::vector<gtsam::Pose3> place_node_poses;
     std::vector<std::vector<size_t>> place_node_valences;
 
-    for (const auto& id_node_pair : shared_places_copy_.nodes()) {
+    for (const auto& id_node_pair : shared_places_copy_->nodes()) {
       const auto& node = *id_node_pair.second;
       const auto& attrs = node.attributes<PlaceNodeAttributes>();
 
@@ -601,8 +607,8 @@ void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
     ScopedTimer between_timer("backend/add_places_between", timestamp_ns);
     PoseGraph mst_edges;
     for (const auto& edge : mst_info.edges) {
-      gtsam::Pose3 source(gtsam::Rot3(), shared_places_copy_.getPosition(edge.source));
-      gtsam::Pose3 target(gtsam::Rot3(), shared_places_copy_.getPosition(edge.target));
+      gtsam::Pose3 source(gtsam::Rot3(), shared_places_copy_->getPosition(edge.source));
+      gtsam::Pose3 target(gtsam::Rot3(), shared_places_copy_->getPosition(edge.target));
       pose_graph_tools::PoseGraphEdge mst_e;
       mst_e.key_from = edge.source;
       mst_e.key_to = edge.target;

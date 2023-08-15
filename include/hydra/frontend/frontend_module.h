@@ -89,9 +89,13 @@ class FrontendModule : public Module {
   void addOutputCallback(const OutputCallback& callback);
 
  protected:
+  virtual void initCallbacks();
+
   void spinOnce(const ReconstructionOutput& input);
 
-  void updateMeshAndObjects(const ReconstructionOutput& input);
+  void updateMesh(const ReconstructionOutput& input);
+
+  void detectObjects(const ReconstructionOutput& input);
 
   void updateDeformationGraph(const ReconstructionOutput& input);
 
@@ -134,6 +138,7 @@ class FrontendModule : public Module {
   SharedDsgInfo::Ptr dsg_;
   SharedModuleState::Ptr state_;
   std::vector<ros::Time> mesh_timestamps_;
+  kimera_pgmo::MeshDelta::Ptr last_mesh_update_;
 
   kimera_pgmo::MeshFrontendInterface mesh_frontend_;
   std::unique_ptr<kimera_pgmo::DeltaCompression> mesh_compression_;
@@ -152,6 +157,7 @@ class FrontendModule : public Module {
   std::list<pose_graph_tools::BowQuery::ConstPtr> cached_bow_messages_;
 
   std::vector<InputCallback> input_callbacks_;
+  std::vector<InputCallback> post_mesh_callbacks_;
   std::vector<OutputCallback> output_callbacks_;
 
   inline static const auto registration_ =

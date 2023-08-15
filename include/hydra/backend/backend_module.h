@@ -121,6 +121,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   inline const BackendConfig& config() const { return config_; }
 
  protected:
+  void logPlaceDistance();
+
   void setSolverParams();
 
   void setDefaultUpdateFunctions();
@@ -182,7 +184,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   SharedDsgInfo::Ptr shared_dsg_;
   SharedDsgInfo::Ptr private_dsg_;
-  IsolatedSceneGraphLayer shared_places_copy_;
+  SceneGraphLayer::Ptr shared_places_copy_;
   std::map<LayerId, NodeMergeLog> proposed_node_merges_;
   std::unique_ptr<MergeHandler> merge_handler_;
   SharedModuleState::Ptr state_;

@@ -51,6 +51,18 @@ using pose_graph_tools::PoseGraph;
 
 using LabelClusters = MeshSegmenter::LabelClusters;
 
+template <typename Func, typename... Args>
+void launchCallbacks(const std::vector<Func>& callbacks, Args... args) {
+  std::list<std::thread> threads;
+  for (const auto& callback : callbacks) {
+    threads.emplace_back(callback, args...);
+  }
+
+  for (auto& thread : threads) {
+    thread.join();
+  }
+}
+
 FrontendModule::FrontendModule(const FrontendConfig& config,
                                const RobotPrefixConfig& prefix,
                                const SharedDsgInfo::Ptr& dsg,
@@ -91,20 +103,28 @@ FrontendModule::FrontendModule(const FrontendConfig& config,
   segmenter_.reset(new MeshSegmenter(config_.object_config,
                                      dsg_->graph->getMeshVertices(),
                                      dsg_->graph->getMeshLabels()));
+}
 
+FrontendModule::~FrontendModule() { stop(); }
+
+void FrontendModule::initCallbacks() {
+  input_callbacks_.clear();
   input_callbacks_.push_back(
-      std::bind(&FrontendModule::updateMeshAndObjects, this, std::placeholders::_1));
+      std::bind(&FrontendModule::updateMesh, this, std::placeholders::_1));
   input_callbacks_.push_back(
       std::bind(&FrontendModule::updateDeformationGraph, this, std::placeholders::_1));
   input_callbacks_.push_back(
       std::bind(&FrontendModule::updatePoseGraph, this, std::placeholders::_1));
   input_callbacks_.push_back(
       std::bind(&FrontendModule::updatePlaces, this, std::placeholders::_1));
+
+  post_mesh_callbacks_.clear();
+  post_mesh_callbacks_.push_back(
+      std::bind(&FrontendModule::detectObjects, this, std::placeholders::_1));
 }
 
-FrontendModule::~FrontendModule() { stop(); }
-
 void FrontendModule::start() {
+  initCallbacks();
   spin_thread_.reset(new std::thread(&FrontendModule::spin, this));
   LOG(INFO) << "[Hydra Frontend] started!";
 }
@@ -199,25 +219,14 @@ void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
   dsg_->last_update_time = msg.timestamp_ns;
   dsg_->updated = true;
 
-  std::list<std::thread> threads;
-  for (const auto& callback : input_callbacks_) {
-    threads.emplace_back(callback, msg);
-  }
+  launchCallbacks(input_callbacks_, msg);
+  backend_input_->mesh_update = last_mesh_update_;
+  updatePlaceMeshMapping(msg);
 
-  for (auto& thread : threads) {
-    thread.join();
-  }
-
-  {
-    ScopedTimer timer("frontend/place_mesh_mapping", msg.timestamp_ns);
-    updatePlaceMeshMapping(msg);
-  }
-
+  state_->backend_queue.push(backend_input_);
   if (state_->lcd_queue) {
     state_->lcd_queue->push(lcd_input_);
   }
-
-  state_->backend_queue.push(backend_input_);
 
   if (logs_) {
     // mutex not required because nothing is modifying the graph
@@ -225,7 +234,7 @@ void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
   }
 }
 
-void FrontendModule::updateMeshAndObjects(const ReconstructionOutput& input) {
+void FrontendModule::updateMesh(const ReconstructionOutput& input) {
   {  // start timing scope
     ScopedTimer timer("frontend/mesh_archive", input.timestamp_ns, true, 1, false);
     voxblox::BlockIndexList to_archive;
@@ -235,14 +244,13 @@ void FrontendModule::updateMeshAndObjects(const ReconstructionOutput& input) {
     mesh_compression_->clearArchivedBlocks(to_archive);
   }  // end timing scope
 
-  kimera_pgmo::MeshDelta::Ptr mesh_update;
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
     mesh_remapping_.reset(new kimera_pgmo::VoxbloxIndexMapping());
     VLOG(5) << "[Hydra Frontend] Updating mesh with" << input.mesh->numBlocks()
             << " blocks";
     auto interface = input.mesh->getMeshInterface();
-    mesh_update =
+    last_mesh_update_ =
         mesh_compression_->update(interface, input.timestamp_ns, mesh_remapping_.get());
   }  // end timing scope
 
@@ -250,19 +258,27 @@ void FrontendModule::updateMeshAndObjects(const ReconstructionOutput& input) {
     // TODO(nathan) we should probably have a mutex before modifying the mesh, but
     // nothing else uses it at the moment
     ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
-    mesh_update->updateMesh(*dsg_->graph->getMeshVertices(),
-                            mesh_timestamps_,
-                            *dsg_->graph->getMeshFaces(),
-                            dsg_->graph->getMeshLabels().get());
-    invalidateMeshEdges(*mesh_update);
+    last_mesh_update_->updateMesh(*dsg_->graph->getMeshVertices(),
+                                  mesh_timestamps_,
+                                  *dsg_->graph->getMeshFaces(),
+                                  dsg_->graph->getMeshLabels().get());
+    invalidateMeshEdges(*last_mesh_update_);
   }  // end timing scope
+
+  launchCallbacks(post_mesh_callbacks_, input);
+}
+
+void FrontendModule::detectObjects(const ReconstructionOutput& input) {
+  if (!last_mesh_update_) {
+    LOG(ERROR) << "Cannot detect objects without valid mesh";
+    return;
+  }
 
   LabelClusters object_clusters;
   {  // timing scope
     ScopedTimer timer("frontend/object_detection", input.timestamp_ns, true, 1, false);
-    // TODO(nathan) fix this
-    object_clusters =
-        segmenter_->detect(mesh_update->getActiveIndices(), input.current_position);
+    object_clusters = segmenter_->detect(last_mesh_update_->getActiveIndices(),
+                                         input.current_position);
   }
 
   {  // start dsg critical section
@@ -271,8 +287,6 @@ void FrontendModule::updateMeshAndObjects(const ReconstructionOutput& input) {
     segmenter_->updateGraph(*dsg_->graph, object_clusters, input.timestamp_ns);
     addPlaceObjectEdges(input.timestamp_ns);
   }  // end dsg critical section
-
-  backend_input_->mesh_update = mesh_update;
 }
 
 void FrontendModule::updateDeformationGraph(const ReconstructionOutput& input) {
@@ -299,9 +313,9 @@ void FrontendModule::filterPlaces(const SceneGraphLayer& places,
   // archived places that used to be a neighbor with an active place so that we don't
   // miss disconnected components that comprised of archived nodes and formed when an
   // active node or edge is removed. Limiting the connected component search to be
-  // within N hops of the subgraph, where N is the min allowable component size ensures
-  // that we don't search the entire places subgraph, but still preserve archived places
-  // that connect to a component of at least size N
+  // within N hops of the subgraph, where N is the min allowable component size
+  // ensures that we don't search the entire places subgraph, but still preserve
+  // archived places that connect to a component of at least size N
   const auto components = graph_utilities::getConnectedComponents(
       places, config_.min_places_component_size, active_neighborhood);
 
@@ -426,7 +440,8 @@ void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
       tf2::convert(node.pose.orientation, rotation);
 
       // TODO(nathan) implicit assumption that pgmo ids are sequential starting at 0
-      // TODO(nathan) implicit assumption that gtsam symbol and dsg node symbol are same
+      // TODO(nathan) implicit assumption that gtsam symbol and dsg node symbol are
+      // same
       NodeSymbol pgmo_key(prefix_.key, node.key);
 
       const std::chrono::nanoseconds stamp(node.header.stamp.toNSec());
@@ -671,6 +686,7 @@ size_t remapConnections(const kimera_pgmo::VoxbloxIndexMapping& remapping,
 using MeshIndexMap = voxblox::AnyIndexHashMapType<size_t>::type;
 
 void FrontendModule::updatePlaceMeshMapping(const ReconstructionOutput& input) {
+  ScopedTimer timer("frontend/place_mesh_mapping", input.timestamp_ns);
   std::unique_lock<std::mutex> lock(dsg_->mutex);
   const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
   const auto& graph_mapping = mesh_frontend_.getVoxbloxMsgToGraphMapping();

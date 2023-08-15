@@ -58,11 +58,13 @@ struct HydraPgmoConfig : public kimera_pgmo::KimeraPgmoConfig {
 struct BackendConfig {
   float angle_step = 10.0f;
   bool visualize_place_factors = true;
-  SemanticNodeAttributes::ColorVector building_color{169, 8, 194};  // purple
-  SemanticNodeAttributes::Label building_semantic_label = 22u;
 
   bool enable_rooms = true;
   RoomFinderConfig room_finder;
+
+  bool enable_buildings = true;
+  SemanticNodeAttributes::ColorVector building_color{169, 8, 194};  // purple
+  SemanticNodeAttributes::Label building_semantic_label = 22u;
 
   HydraPgmoConfig pgmo;
 

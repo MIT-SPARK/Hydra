@@ -206,7 +206,7 @@ std::map<NodeId, NodeId> UpdateObjectsFunctor::call(SharedDsgInfo& dsg,
     }
 
     // we only skip the first proposed object if the considered object is a potential
-    // merge target. this happens if and onlf if:
+    // merge target. this happens if and only if:
     // - the object is an archived object and a loop closure is being processed
     // - we are not paying attention to the active flag
     const bool skip_first = !use_active_flag || !attrs.is_active;
@@ -328,7 +328,11 @@ std::map<NodeId, NodeId> UpdatePlacesFunctor::call(SharedDsgInfo& dsg,
   std::map<NodeId, NodeId> nodes_to_merge;
   size_t num_active = 0;
   for (const auto& id_node_pair : layer.nodes()) {
-    const auto node_id = id_node_pair.first;
+    const NodeSymbol node_id(id_node_pair.first);
+    if (node_id.category() != 'p') {
+      continue;
+    }
+
     auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
     if (!attrs.is_active && !info.loop_closure_detected) {
       continue;
@@ -402,7 +406,9 @@ std::map<NodeId, NodeId> UpdateRoomsFunctor::call(SharedDsgInfo& dsg,
   {  // start dsg critical section
     std::unique_lock<std::mutex> lock(dsg.mutex);
     ScopedTimer timer("backend/clone_places", info.timestamp_ns, true, 1, false);
-    places_clone = dsg.graph->getLayer(DsgLayers::PLACES).clone();
+    places_clone = dsg.graph->getLayer(DsgLayers::PLACES).clone([](const auto& node) {
+      return NodeSymbol(node.id).category() == 'p';
+    });
   }  // end dsg critical section
 
   ScopedTimer timer("backend/room_detection", info.timestamp_ns, true, 1, false);
