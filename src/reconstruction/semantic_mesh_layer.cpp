@@ -84,7 +84,25 @@ size_t SemanticMeshLayer::numBlocks() const {
 
 size_t SemanticMeshLayer::getMemorySize() const { return mesh_->getMemorySize(); }
 
-SemanticMeshLayer::Ptr SemanticMeshLayer::getActiveMesh(const BlockIndexList& archived) {
+SemanticMeshLayer::Ptr SemanticMeshLayer::clone() {
+  auto new_mesh = std::make_shared<SemanticMeshLayer>(mesh_->block_size());
+  BlockIndexList all_indices;
+  mesh_->getAllAllocatedBlocks(&all_indices);
+  for (const auto& block_index : mesh_indices) {
+    auto block = new_mesh->mesh_->allocateNewBlock(block_index);
+    *block = *(mesh_->getMeshPtrByIndex(block_index));
+
+    auto iter = semantics_->find(block_index);
+    if (iter != semantics_->end()) {
+      new_mesh->semantics_->emplace(iter->first, iter->second);
+    }
+  }
+
+  return new_mesh;
+}
+
+SemanticMeshLayer::Ptr SemanticMeshLayer::getActiveMesh(
+    const BlockIndexList& archived) {
   auto active_mesh = std::make_shared<SemanticMeshLayer>(mesh_->block_size());
 
   const IndexSet archived_set(archived.begin(), archived.end());

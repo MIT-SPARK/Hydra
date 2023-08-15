@@ -266,8 +266,9 @@ void ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
           << pose_graphs_.size();
   pose_graphs_.clear();
 
-  // gvd_integrator_->updateFromTsdf(timestamp_ns, *tsdf_, *vertices_, *mesh_, true);
-  // add layers to output
+  // note that this is pre-archival
+  output->tsdf.reset(new Layer<TsdfVoxel>(*tsdf_));
+  output->occupied.reset(new Layer<VertexVoxel>(*vertices_));
 
   BlockIndexList archived_blocks;
   if (config_.clear_distant_blocks) {
