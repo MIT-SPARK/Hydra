@@ -61,7 +61,7 @@ class SemanticMeshLayer {
 
   size_t getMemorySize() const;
 
-  SemanticMeshLayer::Ptr getActiveMesh(const voxblox::IndexSet& archived_blocks);
+  SemanticMeshLayer::Ptr getActiveMesh(const voxblox::BlockIndexList& archived_blocks);
 
   voxblox::MeshLayer::Ptr getVoxbloxMesh() const;
 

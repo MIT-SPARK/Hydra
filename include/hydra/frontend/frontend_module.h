@@ -49,11 +49,19 @@
 #include "hydra/common/shared_module_state.h"
 #include "hydra/frontend/frontend_config.h"
 #include "hydra/frontend/mesh_segmenter.h"
+#include "hydra/places/gvd_voxel.h"
+#include "hydra/places/vertex_voxel.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/utils/log_utilities.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra {
+
+namespace places {
+// forward declare to avoid include
+class GvdIntegrator;
+class GraphExtractorInterface;
+}  // namespace places
 
 class FrontendModule : public Module {
  public:
@@ -63,6 +71,10 @@ class FrontendModule : public Module {
   using OutputCallback = std::function<void(
       const DynamicSceneGraph& graph, const BackendInput& backend_input, uint64_t)>;
   using DynamicLayer = DynamicSceneGraphLayer;
+  using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
+  using PlaceVizCallback = std::function<void(uint64_t,
+                                              const voxblox::Layer<places::GvdVoxel>&,
+                                              const places::GraphExtractorInterface*)>;
 
   FrontendModule(const FrontendConfig& config,
                  const RobotPrefixConfig& prefix,
@@ -88,7 +100,17 @@ class FrontendModule : public Module {
 
   void addOutputCallback(const OutputCallback& callback);
 
+  void addPlaceVisualizationCallback(const PlaceVizCallback& callback);
+
+  // takes in a 3xN matrix
+  std::vector<bool> inFreespace(const PositionMatrix& positions,
+                                double freespace_distance_m) const;
+
  protected:
+  void updateGvdSpin();
+
+  void updateGvd();
+
   virtual void initCallbacks();
 
   void spinOnce(const ReconstructionOutput& input);
@@ -102,6 +124,8 @@ class FrontendModule : public Module {
   void updatePlaces(const ReconstructionOutput& input);
 
   void updatePoseGraph(const ReconstructionOutput& input);
+
+  void extractPlaces(const ReconstructionOutput& input);
 
  protected:
   void filterPlaces(const SceneGraphLayer& places,
@@ -127,6 +151,7 @@ class FrontendModule : public Module {
  protected:
   const FrontendConfig config_;
 
+  mutable std::mutex gvd_mutex_;
   std::atomic<bool> should_shutdown_{false};
   std::unique_ptr<std::thread> spin_thread_;
   FrontendInputQueue::Ptr queue_;
@@ -144,6 +169,10 @@ class FrontendModule : public Module {
   std::unique_ptr<kimera_pgmo::DeltaCompression> mesh_compression_;
   std::shared_ptr<kimera_pgmo::VoxbloxIndexMapping> mesh_remapping_;
 
+  voxblox::Layer<places::GvdVoxel>::Ptr gvd_;
+  std::shared_ptr<places::GraphExtractorInterface> graph_extractor_;
+  std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
+
   std::unique_ptr<MeshSegmenter> segmenter_;
   SceneGraphLogger frontend_graph_logger_;
   LogSetup::Ptr logs_;
@@ -159,6 +188,7 @@ class FrontendModule : public Module {
   std::vector<InputCallback> input_callbacks_;
   std::vector<InputCallback> post_mesh_callbacks_;
   std::vector<OutputCallback> output_callbacks_;
+  std::vector<PlaceVizCallback> places_visualization_callbacks_;
 
   inline static const auto registration_ =
       config::RegistrationWithConfig<FrontendModule,

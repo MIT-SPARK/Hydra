@@ -57,9 +57,6 @@ void declare_config(ReconstructionConfig& conf) {
   field(conf.make_pose_graph, "make_pose_graph");
   field(conf.semantic_measurement_probability, "semantic_measurement_probability");
 
-  field(conf.gvd, "gvd");
-  conf.graph_extractor.setOptional();
-  field(conf.graph_extractor, "graph_extractor");
   field(conf.tsdf, "tsdf");
   field(conf.mesh, "mesh");
 

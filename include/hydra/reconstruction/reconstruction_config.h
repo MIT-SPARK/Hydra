@@ -33,11 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/virtual_config.h>
 #include <voxblox/integrator/tsdf_integrator.h>
 
-#include "hydra/places/graph_extractor_interface.h"
-#include "hydra/places/gvd_integrator_config.h"
 #include "hydra/reconstruction/mesh_integrator_config.h"
 
 namespace hydra {
@@ -61,8 +58,6 @@ struct ReconstructionConfig {
   bool make_pose_graph = false;
   float semantic_measurement_probability = 0.9;
 
-  places::GvdIntegratorConfig gvd;
-  config::VirtualConfig<places::GraphExtractorInterface> graph_extractor;
   voxblox::TsdfIntegratorBase::Config tsdf;
   MeshIntegratorConfig mesh;
   Eigen::Quaterniond body_R_camera;

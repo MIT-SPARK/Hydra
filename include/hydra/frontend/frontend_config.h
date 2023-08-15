@@ -33,9 +33,12 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/virtual_config.h>
 #include <kimera_pgmo/MeshFrontendInterface.h>
 
 #include "hydra/frontend/mesh_segmenter_config.h"
+#include "hydra/places/graph_extractor_interface.h"
+#include "hydra/places/gvd_integrator_config.h"
 
 namespace hydra {
 
@@ -48,6 +51,8 @@ struct FrontendConfig {
   bool validate_vertices = true;
   bool filter_places = true;
   size_t min_places_component_size = 3;
+  places::GvdIntegratorConfig gvd;
+  config::VirtualConfig<places::GraphExtractorInterface> graph_extractor;
 };
 
 void declare_config(FrontendConfig& conf);
