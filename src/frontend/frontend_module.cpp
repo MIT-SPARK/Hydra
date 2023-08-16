@@ -36,80 +36,22 @@
 
 #include <config_utilities/printing.h>
 #include <glog/logging.h>
+#include <kimera_pgmo/compression/DeltaCompression.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
 #include <tf2_eigen/tf2_eigen.h>
 
 #include <fstream>
 
 #include "hydra/common/hydra_config.h"
-#include "hydra/places/gvd_integrator.h"
+#include "hydra/frontend/gvd_place_extractor.h"
+#include "hydra/frontend/mesh_segmenter.h"
+#include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
 
 using hydra::timing::ScopedTimer;
-using places::GvdIntegrator;
-using places::GvdVoxel;
 using pose_graph_tools::PoseGraph;
-using voxblox::Layer;
-
-/*
-void ReconstructionModule::addPlacesToOutput(ReconstructionOutput& output) {
-  output.places.reset(new ActiveLayerInfo());
-  auto& places = *output.places;
-  // non-const, as clearDeletedNodes modifies internal state
-  std::unordered_set<NodeId> active_nodes = graph_extractor_->getActiveNodes();
-  const auto& removed_nodes = graph_extractor_->getDeletedNodes();
-  const auto& removed_edges = graph_extractor_->getDeletedEdges();
-
-  const auto& graph = graph_extractor_->getGraph();
-  std::list<NodeId> invalid_nodes;
-  for (const auto& active_id : active_nodes) {
-    const auto& node = graph.getNode(active_id);
-    const auto& attrs = node->get().attributes<PlaceNodeAttributes>();
-    if (std::isnan(attrs.distance)) {
-      invalid_nodes.push_back(active_id);
-      continue;
-    }
-
-    if (attrs.position.hasNaN()) {
-      invalid_nodes.push_back(active_id);
-      continue;
-    }
-
-    for (const auto& info : attrs.voxblox_mesh_connections) {
-      if (std::isnan(info.voxel_pos[0]) || std::isnan(info.voxel_pos[1]) ||
-          std::isnan(info.voxel_pos[2])) {
-        invalid_nodes.push_back(active_id);
-        continue;
-      }
-    }
-  }
-
-  places.deleted_nodes.insert(
-      places.deleted_nodes.begin(), removed_nodes.begin(), removed_nodes.end());
-  places.deleted_edges.insert(
-      places.deleted_edges.begin(), removed_edges.begin(), removed_edges.end());
-
-  if (!invalid_nodes.empty()) {
-    LOG(ERROR) << "Nodes found with invalid attributes: "
-               << displayNodeSymbolContainer(invalid_nodes);
-    for (const auto& invalid_id : invalid_nodes) {
-      active_nodes.erase(invalid_id);
-      // TODO(nathan) think about this some more
-      places.deleted_nodes.push_back(invalid_id);
-    }
-  }
-
-  places.fillFromGraph(graph, active_nodes);
-  graph_extractor_->clearDeleted();
-
-  VLOG(5) << "[Hydra Reconstruction] exporting " << active_nodes.size()
-          << " active and " << removed_nodes.size() << " deleted nodes";
-}
-
-*/
-
 using LabelClusters = MeshSegmenter::LabelClusters;
 
 template <typename Func, typename... Args>
@@ -165,10 +107,10 @@ FrontendModule::FrontendModule(const FrontendConfig& config,
                                      dsg_->graph->getMeshVertices(),
                                      dsg_->graph->getMeshLabels()));
 
-  graph_extractor_ = config_.graph_extractor.create();
-  if (!config_.graph_extractor) {
-    LOG(WARNING) << "Places graph extraction disabled";
-  }
+  place_extractor_.reset(new GvdPlaceExtractor(config_.graph_extractor,
+                                               config.gvd,
+                                               config.min_places_component_size,
+                                               config.filter_places));
 }
 
 FrontendModule::~FrontendModule() { stop(); }
@@ -181,12 +123,16 @@ void FrontendModule::initCallbacks() {
       std::bind(&FrontendModule::updateDeformationGraph, this, std::placeholders::_1));
   input_callbacks_.push_back(
       std::bind(&FrontendModule::updatePoseGraph, this, std::placeholders::_1));
-  input_callbacks_.push_back(
-      std::bind(&FrontendModule::updatePlaces, this, std::placeholders::_1));
+
+  if (place_extractor_) {
+    // TODO(nathan) make this better
+    input_callbacks_.push_back(
+        std::bind(&FrontendModule::updatePlaces, this, std::placeholders::_1));
+  }
 
   post_mesh_callbacks_.clear();
   post_mesh_callbacks_.push_back(
-      std::bind(&FrontendModule::detectObjects, this, std::placeholders::_1));
+      std::bind(&FrontendModule::updateObjects, this, std::placeholders::_1));
 }
 
 void FrontendModule::start() {
@@ -219,22 +165,8 @@ void FrontendModule::save(const LogSetup& log_setup) {
         output_path + "/mesh.ply", mesh, mesh_timestamps_);
   }
 
-  if (graph_extractor_) {
-    const auto& original_places = graph_extractor_->getGraph();
-    auto places = original_places.clone();
-
-    std::unique_ptr<DynamicSceneGraph::Edges> edges(new DynamicSceneGraph::Edges());
-    for (const auto& id_edge_pair : places->edges()) {
-      edges->emplace(std::piecewise_construct,
-                     std::forward_as_tuple(id_edge_pair.first),
-                     std::forward_as_tuple(id_edge_pair.second.source,
-                                           id_edge_pair.second.target,
-                                           id_edge_pair.second.info->clone()));
-    }
-
-    DynamicSceneGraph::Ptr graph(new DynamicSceneGraph());
-    graph->updateFromLayer(*places, std::move(edges));
-    graph->save(output_path + "/places.json", false);
+  if (place_extractor_) {
+    place_extractor_->save(log_setup);
   }
 }
 
@@ -278,28 +210,18 @@ void FrontendModule::addOutputCallback(const OutputCallback& callback) {
 }
 
 void FrontendModule::addPlaceVisualizationCallback(const PlaceVizCallback& cb) {
-  places_visualization_callbacks_.push_back(cb);
+  if (place_extractor_) {
+    place_extractor_->addVisualizationCallback(cb);
+  }
 }
 
 std::vector<bool> FrontendModule::inFreespace(const PositionMatrix& positions,
                                               double freespace_distance_m) const {
-  if (positions.cols() < 1) {
-    return {};
+  if (!place_extractor_) {
+    return std::vector<bool>(positions.cols(), false);
   }
 
-  std::vector<bool> flags(positions.cols(), false);
-  // starting lock on tsdf update
-  std::unique_lock<std::mutex> lock(gvd_mutex_);
-  for (int i = 0; i < positions.cols(); ++i) {
-    const auto* voxel = gvd_->getVoxelPtrByCoordinates(positions.col(i).cast<float>());
-    if (!voxel) {
-      continue;
-    }
-
-    flags[i] = voxel->observed && voxel->distance > freespace_distance_m;
-  }
-
-  return flags;
+  return place_extractor_->inFreespace(positions, freespace_distance_m);
 }
 
 void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
@@ -329,9 +251,11 @@ void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
   dsg_->updated = true;
 
   launchCallbacks(input_callbacks_, msg);
-  backend_input_->mesh_update = last_mesh_update_;
-  updatePlaceMeshMapping(msg);
+  if (place_extractor_) {
+    updatePlaceMeshMapping(msg);
+  }
 
+  backend_input_->mesh_update = last_mesh_update_;
   state_->backend_queue.push(backend_input_);
   if (state_->lcd_queue) {
     state_->lcd_queue->push(lcd_input_);
@@ -377,7 +301,7 @@ void FrontendModule::updateMesh(const ReconstructionOutput& input) {
   launchCallbacks(post_mesh_callbacks_, input);
 }
 
-void FrontendModule::detectObjects(const ReconstructionOutput& input) {
+void FrontendModule::updateObjects(const ReconstructionOutput& input) {
   if (!last_mesh_update_) {
     LOG(ERROR) << "Cannot detect objects without valid mesh";
     return;
@@ -414,141 +338,22 @@ void FrontendModule::updateDeformationGraph(const ReconstructionOutput& input) {
   }
 }
 
-void FrontendModule::filterPlaces(const SceneGraphLayer& places,
-                                  NodeIdSet& objects_to_check,
-                                  NodeIdSet& active_places,
-                                  const NodeIdSet& active_neighborhood) {
-  // we grab connected components using the subgraph of all active places and all
-  // archived places that used to be a neighbor with an active place so that we don't
-  // miss disconnected components that comprised of archived nodes and formed when an
-  // active node or edge is removed. Limiting the connected component search to be
-  // within N hops of the subgraph, where N is the min allowable component size
-  // ensures that we don't search the entire places subgraph, but still preserve
-  // archived places that connect to a component of at least size N
-  const auto components = graph_utilities::getConnectedComponents(
-      places, config_.min_places_component_size, active_neighborhood);
-
-  for (const auto& component : components) {
-    if (component.size() >= config_.min_places_component_size) {
-      continue;
-    }
-
-    for (const auto to_delete : component) {
-      deletePlaceNode(to_delete, objects_to_check);
-      active_places.erase(to_delete);
-    }
-  }
-}
-
-void FrontendModule::deletePlaceNode(NodeId node_id, NodeIdSet& objects_to_check) {
-  const auto to_check = dsg_->graph->getNode(node_id);
-  if (!to_check) {
-    return;
-  }
-
-  for (const auto& child : to_check->get().children()) {
-    if (!dsg_->graph->isDynamic(child)) {
-      objects_to_check.insert(child);
-    } else {
-      deleted_agent_edge_indices_.insert(child);
-    }
-  }
-
-  dsg_->graph->removeNode(node_id);
-}
-
-void FrontendModule::extractPlaces(const ReconstructionOutput& msg) {
-  if (!msg.tsdf || !msg.mesh || !msg.occupied) {
-    LOG(ERROR) << "Cannot extract places from invalid input";
-    return;
-  }
-
-  if (!gvd_) {
-    gvd_.reset(
-        new Layer<GvdVoxel>(msg.tsdf->voxel_size(), msg.tsdf->voxels_per_side()));
-    gvd_integrator_.reset(new GvdIntegrator(config_.gvd, gvd_, graph_extractor_));
-  }
-
-  {  // start critical section
-    std::unique_lock<std::mutex> lock(gvd_mutex_);
-    ScopedTimer timer("places/gvd", msg.timestamp_ns);
-    gvd_integrator_->updateFromTsdf(
-        msg.timestamp_ns, *msg.tsdf, *msg.occupied, *msg.mesh, true);
-    gvd_integrator_->updateGvd(msg.timestamp_ns);
-    gvd_integrator_->archiveBlocks(msg.archived_blocks);
-  }  // end critical section
-
-  for (const auto& callback : places_visualization_callbacks_) {
-    callback(msg.timestamp_ns, *gvd_, graph_extractor_.get());
-  }
-
-  // TODO(nathan) do the other place stuff
-}
-
 void FrontendModule::updatePlaces(const ReconstructionOutput& input) {
-  ScopedTimer timer("frontend/update_places", input.timestamp_ns, true, 2, false);
-  VLOG(3) << "[Hydra Frontend] Received " << input.places->active_attributes.size()
-          << " place nodes and " << input.places->edges.size()
-          << " edges from hydra_places";
+  if (!place_extractor_) {
+    return;
+  }
 
   NodeIdSet active_nodes;
-  NodeIdSet active_neighborhood;
-  for (const auto& id_attr_pair : input.places->active_attributes) {
-    active_nodes.insert(id_attr_pair.first);
-    active_neighborhood.insert(id_attr_pair.first);
-    id_attr_pair.second->is_active = true;
-    id_attr_pair.second->last_update_time_ns = input.timestamp_ns;
-  }
-
-  const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
-
-  {  // start graph update critical section
+  place_extractor_->detect(input);
+  {  // start graph critical section
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
+    place_extractor_->updateGraph(input.timestamp_ns, *dsg_->graph);
 
-    NodeIdSet objects_to_check;
-    for (const auto& node_id : input.places->deleted_nodes) {
-      const auto node = dsg_->graph->getNode(node_id);
-      if (node) {
-        const auto& siblings = node->get().siblings();
-        active_neighborhood.insert(siblings.begin(), siblings.end());
-      }
-      deletePlaceNode(node_id, objects_to_check);
-    }
-
-    const auto& deleted_edges = input.places->deleted_edges;
-    for (size_t i = 0; i < deleted_edges.size(); i += 2) {
-      const auto n1 = deleted_edges.at(i);
-      const auto n2 = deleted_edges.at(i + 1);
-      active_neighborhood.insert(n1);
-      active_neighborhood.insert(n2);
-      dsg_->graph->removeEdge(n1, n2);
-    }
-
-    for (auto&& [node, attrs] : input.places->active_attributes) {
-      dsg_->graph->addOrUpdateNode(DsgLayers::PLACES, node, attrs->clone());
-    }
-
-    for (auto& edge : input.places->edges) {
-      dsg_->graph->addOrUpdateEdge(edge.source, edge.target, edge.info->clone());
-    }
-
-    if (config_.filter_places) {
-      auto iter = active_neighborhood.begin();
-      while (iter != active_neighborhood.end()) {
-        if (places.hasNode(*iter)) {
-          ++iter;
-        } else {
-          iter = active_neighborhood.erase(iter);
-        }
-      }
-      filterPlaces(places, objects_to_check, active_nodes, active_neighborhood);
-    }
-
+    active_nodes = place_extractor_->getActiveNodes();
+    const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
     places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
-
     addPlaceAgentEdges(input.timestamp_ns);
-    addPlaceObjectEdges(input.timestamp_ns, &objects_to_check);
-
+    addPlaceObjectEdges(input.timestamp_ns);
     state_->latest_places = active_nodes;
   }  // end graph update critical section
 
@@ -822,6 +627,7 @@ size_t remapConnections(const kimera_pgmo::VoxbloxIndexMapping& remapping,
 
 using MeshIndexMap = voxblox::AnyIndexHashMapType<size_t>::type;
 
+// TODO(nathan) maybe move this somewhere else...
 void FrontendModule::updatePlaceMeshMapping(const ReconstructionOutput& input) {
   ScopedTimer timer("frontend/place_mesh_mapping", input.timestamp_ns);
   std::unique_lock<std::mutex> lock(dsg_->mutex);
@@ -832,7 +638,8 @@ void FrontendModule::updatePlaceMeshMapping(const ReconstructionOutput& input) {
   input.mesh->getAllocatedBlockIndices(allocated_list);
 
   voxblox::IndexSet allocated(allocated_list.begin(), allocated_list.end());
-  voxblox::IndexSet archived(input.archived_blocks.begin(), input.archived_blocks.end());
+  voxblox::IndexSet archived(input.archived_blocks.begin(),
+                             input.archived_blocks.end());
 
   size_t num_missing = 0;
   size_t num_deform_invalid = 0;

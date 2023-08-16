@@ -261,29 +261,25 @@ void ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
   auto output = std::make_shared<ReconstructionOutput>();
   output->timestamp_ns = msg.timestamp_ns;
   output->current_position = msg.world_t_body;
+  // note that this is pre-archival
+  output->tsdf.reset(new Layer<TsdfVoxel>(*tsdf_));
+  output->occupied.reset(new Layer<VertexVoxel>(*vertices_));
+  output->mesh = mesh_->clone();
+  // move and clear cached pose graphs
   output->pose_graphs = pose_graphs_;
   VLOG(5) << "[Hydra Reconstruction] Current queued pose graphs: "
           << pose_graphs_.size();
   pose_graphs_.clear();
 
-  // note that this is pre-archival
-  output->tsdf.reset(new Layer<TsdfVoxel>(*tsdf_));
-  output->occupied.reset(new Layer<VertexVoxel>(*vertices_));
-
-  BlockIndexList archived_blocks;
   if (config_.clear_distant_blocks) {
-    archived_blocks = findBlocksToArchive(msg.world_t_body.cast<float>());
-    for (const auto& index : archived_blocks) {
+    output->archived_blocks = findBlocksToArchive(msg.world_t_body.cast<float>());
+    for (const auto& index : output->archived_blocks) {
       semantics_->removeBlock(index);
       tsdf_->removeBlock(index);
       mesh_->removeBlock(index);
       vertices_->removeBlock(index);
     }
   }
-
-  output->archived_blocks = archived_blocks;
-  output->mesh = mesh_->getActiveMesh(output->archived_blocks);
-  // TODO(nathan) fill out the rest of the message
 
   if (config_.show_stats) {
     showStats();

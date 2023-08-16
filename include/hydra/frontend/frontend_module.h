@@ -35,7 +35,6 @@
 #pragma once
 #include <config_utilities/factory.h>
 #include <kimera_pgmo/MeshFrontendInterface.h>
-#include <kimera_pgmo/compression/DeltaCompression.h>
 #include <spark_dsg/scene_graph_logger.h>
 
 #include <memory>
@@ -48,20 +47,18 @@
 #include "hydra/common/robot_prefix_config.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/frontend/frontend_config.h"
-#include "hydra/frontend/mesh_segmenter.h"
-#include "hydra/places/gvd_voxel.h"
-#include "hydra/places/vertex_voxel.h"
+#include "hydra/frontend/place_extractor_interface.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/utils/log_utilities.h"
-#include "hydra/utils/nearest_neighbor_utilities.h"
+
+namespace kimera_pgmo {
+class DeltaCompression;
+}  // namespace kimera_pgmo
 
 namespace hydra {
 
-namespace places {
-// forward declare to avoid include
-class GvdIntegrator;
-class GraphExtractorInterface;
-}  // namespace places
+class NearestNodeFinder;
+class MeshSegmenter;
 
 class FrontendModule : public Module {
  public:
@@ -107,44 +104,32 @@ class FrontendModule : public Module {
                                 double freespace_distance_m) const;
 
  protected:
-  void updateGvdSpin();
-
-  void updateGvd();
-
   virtual void initCallbacks();
 
-  void spinOnce(const ReconstructionOutput& input);
-
-  void updateMesh(const ReconstructionOutput& input);
-
-  void detectObjects(const ReconstructionOutput& input);
-
-  void updateDeformationGraph(const ReconstructionOutput& input);
-
-  void updatePlaces(const ReconstructionOutput& input);
-
-  void updatePoseGraph(const ReconstructionOutput& input);
-
-  void extractPlaces(const ReconstructionOutput& input);
+  void spinOnce(const ReconstructionOutput& msg);
 
  protected:
-  void filterPlaces(const SceneGraphLayer& places,
-                    NodeIdSet& objects_to_check,
-                    NodeIdSet& active_places,
-                    const NodeIdSet& active_neighborhood);
+  void updateMesh(const ReconstructionOutput& msg);
 
-  void deletePlaceNode(NodeId node_id, NodeIdSet& objects_to_check);
+  void updateObjects(const ReconstructionOutput& msg);
 
-  void archivePlaces(const NodeIdSet active_places);
+  void updatePlaces(const ReconstructionOutput& msg);
+
+  void updateDeformationGraph(const ReconstructionOutput& msg);
+
+  void updatePoseGraph(const ReconstructionOutput& msg);
+
+ protected:
+  void assignBowVectors(const DynamicLayer& agents);
 
   void invalidateMeshEdges(const kimera_pgmo::MeshDelta& delta);
+
+  void archivePlaces(const NodeIdSet active_places);
 
   void addPlaceObjectEdges(uint64_t timestamp_ns,
                            NodeIdSet* extra_objects_to_check = nullptr);
 
   void addPlaceAgentEdges(uint64_t timestamp_ns);
-
-  void assignBowVectors(const DynamicLayer& agents);
 
   void updatePlaceMeshMapping(const ReconstructionOutput& input);
 
@@ -169,11 +154,8 @@ class FrontendModule : public Module {
   std::unique_ptr<kimera_pgmo::DeltaCompression> mesh_compression_;
   std::shared_ptr<kimera_pgmo::VoxbloxIndexMapping> mesh_remapping_;
 
-  voxblox::Layer<places::GvdVoxel>::Ptr gvd_;
-  std::shared_ptr<places::GraphExtractorInterface> graph_extractor_;
-  std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
-
   std::unique_ptr<MeshSegmenter> segmenter_;
+  std::unique_ptr<PlaceExtractorInterface> place_extractor_;
   SceneGraphLogger frontend_graph_logger_;
   LogSetup::Ptr logs_;
 
@@ -188,7 +170,6 @@ class FrontendModule : public Module {
   std::vector<InputCallback> input_callbacks_;
   std::vector<InputCallback> post_mesh_callbacks_;
   std::vector<OutputCallback> output_callbacks_;
-  std::vector<PlaceVizCallback> places_visualization_callbacks_;
 
   inline static const auto registration_ =
       config::RegistrationWithConfig<FrontendModule,

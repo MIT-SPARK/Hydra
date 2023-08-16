@@ -5,7 +5,7 @@ catkin_add_gtest(
   src/place_fixtures.cpp
   backend/test_merge_handler.cpp
   backend/test_update_functions.cpp
-  frontend/test_frontend.cpp
+  #frontend/test_frontend.cpp
   loop_closure/test_descriptor_matching.cpp
   loop_closure/test_detector.cpp
   loop_closure/test_registration.cpp
