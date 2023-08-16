@@ -126,8 +126,7 @@ class FrontendModule : public Module {
 
   void archivePlaces(const NodeIdSet active_places);
 
-  void addPlaceObjectEdges(uint64_t timestamp_ns,
-                           NodeIdSet* extra_objects_to_check = nullptr);
+  void addPlaceObjectEdges(uint64_t timestamp_ns);
 
   void addPlaceAgentEdges(uint64_t timestamp_ns);
 

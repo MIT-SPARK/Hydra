@@ -102,10 +102,9 @@ SemanticMeshLayer::Ptr SemanticMeshLayer::clone() const {
 }
 
 SemanticMeshLayer::Ptr SemanticMeshLayer::getActiveMesh(
-    const BlockIndexList& archived) {
-  auto active_mesh = std::make_shared<SemanticMeshLayer>(mesh_->block_size());
-
+    const BlockIndexList& archived) const {
   const IndexSet archived_set(archived.begin(), archived.end());
+  auto active_mesh = std::make_shared<SemanticMeshLayer>(mesh_->block_size());
 
   BlockIndexList mesh_indices;
   mesh_->getAllUpdatedMeshes(&mesh_indices);
@@ -123,7 +122,12 @@ SemanticMeshLayer::Ptr SemanticMeshLayer::getActiveMesh(
     }
   }
 
-  // TODO(nathan) maybe only do this for archived blocks?
+  return active_mesh;
+}
+
+void SemanticMeshLayer::pruneEmpty() {
+  BlockIndexList mesh_indices;
+  mesh_->getAllUpdatedMeshes(&mesh_indices);
   for (const auto& block_index : mesh_indices) {
     auto block = mesh_->getMeshPtrByIndex(block_index);
     if (!block->hasVertices()) {
@@ -131,8 +135,6 @@ SemanticMeshLayer::Ptr SemanticMeshLayer::getActiveMesh(
       semantics_->erase(block_index);
     }
   }
-
-  return active_mesh;
 }
 
 voxblox::MeshLayer::Ptr SemanticMeshLayer::getVoxbloxMesh() const { return mesh_; }

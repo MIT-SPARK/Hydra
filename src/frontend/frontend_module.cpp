@@ -280,9 +280,10 @@ void FrontendModule::updateMesh(const ReconstructionOutput& input) {
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
     mesh_remapping_.reset(new kimera_pgmo::VoxbloxIndexMapping());
-    VLOG(5) << "[Hydra Frontend] Updating mesh with" << input.mesh->numBlocks()
-            << " blocks";
-    auto interface = input.mesh->getMeshInterface();
+    auto mesh = input.mesh->getActiveMesh(input.archived_blocks);
+
+    VLOG(5) << "[Hydra Frontend] Updating mesh with" << mesh->numBlocks() << " blocks";
+    auto interface = mesh->getMeshInterface();
     last_mesh_update_ =
         mesh_compression_->update(interface, input.timestamp_ns, mesh_remapping_.get());
   }  // end timing scope
@@ -307,17 +308,16 @@ void FrontendModule::updateObjects(const ReconstructionOutput& input) {
     return;
   }
 
-  LabelClusters object_clusters;
-  {  // timing scope
-    ScopedTimer timer("frontend/object_detection", input.timestamp_ns, true, 1, false);
-    object_clusters = segmenter_->detect(last_mesh_update_->getActiveIndices(),
-                                         input.current_position);
-  }
+  const auto clusters = segmenter_->detect(input.timestamp_ns,
+                                           last_mesh_update_->getActiveIndices(),
+                                           input.current_position);
 
   {  // start dsg critical section
-    ScopedTimer timer("frontend/object_graph_update", input.timestamp_ns);
     std::unique_lock<std::mutex> lock(dsg_->mutex);
-    segmenter_->updateGraph(*dsg_->graph, object_clusters, input.timestamp_ns);
+    segmenter_->updateGraph(input.timestamp_ns,
+                            clusters,
+                            last_mesh_update_->getTotalArchivedVertices(),
+                            *dsg_->graph);
     addPlaceObjectEdges(input.timestamp_ns);
   }  // end dsg critical section
 }
@@ -513,20 +513,13 @@ void FrontendModule::archivePlaces(const NodeIdSet active_places) {
   }  // end graph update critical section
 }
 
-void FrontendModule::addPlaceObjectEdges(uint64_t timestamp_ns,
-                                         NodeIdSet* extra_objects_to_check) {
+void FrontendModule::addPlaceObjectEdges(uint64_t timestamp_ns) {
   ScopedTimer timer("frontend/place_object_edges", timestamp_ns);
   if (!places_nn_finder_) {
     return;  // haven't received places yet
   }
 
-  NodeIdSet objects_to_check = segmenter_->getObjectsToCheckForPlaces();
-  if (extra_objects_to_check) {
-    objects_to_check.insert(extra_objects_to_check->begin(),
-                            extra_objects_to_check->end());
-  }
-
-  for (const auto& object_id : objects_to_check) {
+  for (const auto& object_id : segmenter_->getActiveNodes()) {
     const auto object_opt = dsg_->graph->getNode(object_id);
     if (!object_opt) {
       continue;
@@ -544,8 +537,6 @@ void FrontendModule::addPlaceObjectEdges(uint64_t timestamp_ns,
           dsg_->graph->insertEdge(place_id, object_id);
         });
   }
-
-  segmenter_->pruneObjectsToCheckForPlaces(*dsg_->graph);
 }
 
 void FrontendModule::addPlaceAgentEdges(uint64_t timestamp_ns) {

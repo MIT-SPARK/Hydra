@@ -44,6 +44,8 @@ void declare_config(MeshSegmenterConfig& config) {
   using namespace config;
   name("MeshSegmenterConfig");
   field<CharConversion>(config.prefix, "prefix");
+  // TODO(nathan) string to number conversion
+  field(config.layer_id, "layer_id");
   field(config.active_horizon_s, "active_horizon_s");
   field(config.active_index_horizon_m, "active_index_horizon_m");
   field(config.cluster_tolerance, "cluster_tolerance");
@@ -56,6 +58,7 @@ void declare_config(MeshSegmenterConfig& config) {
               {spark_dsg::BoundingBox::Type::OBB, "OBB"},
               {spark_dsg::BoundingBox::Type::RAABB, "RAABB"}});
   field(config.labels, "labels");
+  field(config.timer_namespace, "timer_namespace");
 }
 
 }  // namespace hydra

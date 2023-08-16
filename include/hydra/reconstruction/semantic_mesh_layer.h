@@ -33,8 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <voxblox/mesh/mesh_layer.h>
 #include <kimera_pgmo/utils/VoxbloxMeshInterface.h>
+#include <voxblox/mesh/mesh_layer.h>
 
 #include <memory>
 
@@ -47,7 +47,8 @@ class SemanticMeshLayer {
 
   explicit SemanticMeshLayer(voxblox::FloatingPoint block_size);
 
-  voxblox::Mesh::Ptr allocateBlock(const voxblox::BlockIndex& index, bool use_semantics);
+  voxblox::Mesh::Ptr allocateBlock(const voxblox::BlockIndex& index,
+                                   bool use_semantics);
 
   void removeBlock(const voxblox::BlockIndex& index);
 
@@ -63,7 +64,10 @@ class SemanticMeshLayer {
 
   SemanticMeshLayer::Ptr clone() const;
 
-  SemanticMeshLayer::Ptr getActiveMesh(const voxblox::BlockIndexList& archived_blocks);
+  SemanticMeshLayer::Ptr getActiveMesh(
+      const voxblox::BlockIndexList& archived_blocks) const;
+
+  void pruneEmpty();
 
   voxblox::MeshLayer::Ptr getVoxbloxMesh() const;
 
