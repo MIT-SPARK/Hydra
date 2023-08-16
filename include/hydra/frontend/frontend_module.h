@@ -162,8 +162,8 @@ class FrontendModule : public Module {
   NodeIdSet unlabeled_place_nodes_;
   NodeIdSet previous_active_places_;
   std::map<NodeId, size_t> agent_key_map_;
-  std::set<NodeId> deleted_agent_edge_indices_;
   std::map<LayerPrefix, size_t> last_agent_edge_index_;
+  std::map<LayerPrefix, std::set<size_t>> active_agent_nodes_;
   std::list<pose_graph_tools::BowQuery::ConstPtr> cached_bow_messages_;
 
   std::vector<InputCallback> input_callbacks_;

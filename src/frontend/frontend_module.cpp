@@ -545,48 +545,53 @@ void FrontendModule::addPlaceAgentEdges(uint64_t timestamp_ns) {
     return;  // haven't received places yet
   }
 
-  std::set<NodeId> to_find;
   for (const auto& pair : dsg_->graph->dynamicLayersOfType(DsgLayers::AGENTS)) {
     const LayerPrefix prefix = pair.first;
     const auto& layer = *pair.second;
 
     if (!last_agent_edge_index_.count(prefix)) {
       last_agent_edge_index_[prefix] = 0;
+      active_agent_nodes_[prefix] = {};
     }
 
+    auto& curr_active = active_agent_nodes_[prefix];
     for (size_t i = last_agent_edge_index_[prefix]; i < layer.numNodes(); ++i) {
-      bool found = false;
-      places_nn_finder_->find(
-          layer.getPositionByIndex(i), 1, false, [&](NodeId place_id, size_t, double) {
-            CHECK(dsg_->graph->insertEdge(place_id, prefix.makeId(i)));
-            found = true;
-          });
-      if (!found) {
-        to_find.insert(prefix.makeId(i));
+      curr_active.insert(i);
+    }
+
+    auto iter = curr_active.begin();
+    while (iter != curr_active.end()) {
+      const auto& node = layer.getNodeByIndex(*iter)->get();
+      const auto prev_parent = node.getParent();
+      if (prev_parent) {
+        dsg_->graph->removeEdge(node.id, *prev_parent);
       }
+
+      bool found = false;
+      NodeId parent = 0;
+      places_nn_finder_->find(
+          node.attributes().position, 1, false, [&](NodeId place_id, size_t, double) {
+            CHECK(dsg_->graph->insertEdge(place_id, prefix.makeId(*iter)));
+            found = true;
+            parent = place_id;
+          });
+
+      if (!found) {
+        ++iter;
+        continue;
+      }
+
+      const auto& parent_attrs = dsg_->graph->getNode(parent)->get().attributes();
+      if (!parent_attrs.is_active) {
+        iter = curr_active.erase(iter);
+        continue;
+      }
+
+      ++iter;
     }
 
     last_agent_edge_index_[prefix] = layer.numNodes();
   }
-
-  for (const auto& node : deleted_agent_edge_indices_) {
-    const Eigen::Vector3d pos = dsg_->graph->getPosition(node);
-
-    bool found = false;
-    places_nn_finder_->find(pos, 1, false, [&](NodeId place_id, size_t, double) {
-      CHECK(dsg_->graph->insertEdge(place_id, node));
-      found = true;
-    });
-
-    if (!found) {
-      to_find.insert(node);
-    }
-  }
-
-  deleted_agent_edge_indices_.clear();
-  deleted_agent_edge_indices_ = to_find;
-  VLOG(5) << "Pending agents: "
-          << displayNodeSymbolContainer(deleted_agent_edge_indices_);
 }
 
 size_t remapConnections(const kimera_pgmo::VoxbloxIndexMapping& remapping,
