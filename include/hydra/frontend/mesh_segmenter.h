@@ -100,7 +100,7 @@ class MeshSegmenter {
                          const SceneGraphNode& node,
                          uint64_t timestamp);
 
-  void mergeActiveNodes(uint32_t label);
+  void mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label);
 
  private:
   MeshVertexCloud::Ptr full_mesh_vertices_;

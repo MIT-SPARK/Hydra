@@ -51,7 +51,8 @@ using IndicesVector = MeshSegmenter::IndicesVector;
 using OptPosition = std::optional<Eigen::Vector3d>;
 using timing::ScopedTimer;
 
-void mergeList(std::list<size_t>& lhs, const std::vector<int>& rhs) {
+template <typename LList, typename RList>
+void mergeList(LList& lhs, const RList& rhs) {
   std::unordered_set<size_t> seen(lhs.begin(), lhs.end());
   for (const auto idx : rhs) {
     if (seen.count(idx)) {
@@ -303,28 +304,61 @@ void MeshSegmenter::updateGraph(uint64_t timestamp_ns,
         addNodeToGraph(graph, cluster, label, timestamp_ns);
       }
 
-      mergeActiveNodes(label);
+      mergeActiveNodes(graph, label);
     }
   }
 }
 
-void MeshSegmenter::mergeActiveNodes(uint32_t label) {
-  /*  std::map<NodeId, NodeId> proposed_merges;*/
-  /*const auto& curr_active = active_nodes_.at(label);*/
-  /*for (const auto& lhs_node_id : curr_active) {*/
-  /*const auto& lhs_node = graph.getNode(lhs_node_id)->get();*/
+void MeshSegmenter::mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label) {
+  std::set<NodeId> merged_nodes;
 
-  /*for (const auto& rhs_node_id : curr_active) {*/
-  /*if (lhs_node_id == rhs_node_id) {*/
-  /*continue;*/
-  /*}*/
+  auto& curr_active = active_nodes_.at(label);
+  for (const auto& node_id : curr_active) {
+    if (merged_nodes.count(node_id)) {
+      continue;
+    }
+    const auto& node = graph.getNode(node_id)->get();
 
-  /*const auto& rhs_node = graph.getNode(lhs_node_id)->get();*/
-  /*if (nodesMatch(lhs_node, rhs_node) || nodesMatch(rhs_node, lhs_node)) {*/
-  /*proposed_merges[lhs_node_id] = rhs_node_id;*/
-  /*}*/
-  /*}*/
-  /*  }*/
+    std::list<NodeId> to_merge;
+    for (const auto& other_id : curr_active) {
+      if (node_id == other_id) {
+        continue;
+      }
+
+      if (merged_nodes.count(other_id)) {
+        continue;
+      }
+
+      const auto& other = graph.getNode(other_id)->get();
+      if (nodesMatch(node, other) || nodesMatch(other, node)) {
+        to_merge.push_back(other_id);
+      }
+    }
+
+    auto& attrs = node.attributes<ObjectNodeAttributes>();
+    for (const auto& other_id : to_merge) {
+      const auto& other = graph.getNode(other_id)->get();
+      auto& other_attrs = other.attributes<ObjectNodeAttributes>();
+      mergeList(attrs.mesh_connections, other_attrs.mesh_connections);
+      graph.removeNode(other_id);
+      merged_nodes.insert(other_id);
+    }
+
+    if (!to_merge.empty()) {
+      pcl::IndicesPtr indices(new std::vector<int>(attrs.mesh_connections.begin(),
+                                                   attrs.mesh_connections.end()));
+      auto new_box = bounding_box::extract(
+          full_mesh_vertices_, config_.bounding_box_type, indices, config_.angle_step);
+
+      // TODO(nathan) this is not ideal, but...
+      attrs.position << new_box.world_P_center.cast<double>();
+      attrs.bounding_box = new_box;
+    }
+  }
+
+  for (const auto& node_id : merged_nodes) {
+    curr_active.erase(node_id);
+  }
 }
 
 std::unordered_set<NodeId> MeshSegmenter::getActiveNodes() const {
