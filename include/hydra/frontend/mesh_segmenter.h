@@ -100,6 +100,8 @@ class MeshSegmenter {
                          const SceneGraphNode& node,
                          uint64_t timestamp);
 
+  void mergeActiveNodes(uint32_t label);
+
  private:
   MeshVertexCloud::Ptr full_mesh_vertices_;
   std::shared_ptr<std::vector<uint32_t>> full_mesh_labels_;

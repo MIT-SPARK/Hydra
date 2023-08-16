@@ -79,6 +79,11 @@ std::string printLabels(const std::set<T>& labels) {
   return ss.str();
 }
 
+inline bool nodesMatch(const SceneGraphNode& lhs_node, const SceneGraphNode& rhs_node) {
+  return lhs_node.attributes<SemanticNodeAttributes>().bounding_box.isInside(
+      rhs_node.attributes().position);
+}
+
 inline bool nodesMatch(const Cluster& cluster, const SceneGraphNode& node) {
   pcl::PointXYZ centroid;
   cluster.centroid.get(centroid);
@@ -281,11 +286,11 @@ void MeshSegmenter::updateGraph(uint64_t timestamp_ns,
   ScopedTimer timer(config_.timer_namespace + "_graph_update", timestamp_ns);
   archiveOldNodes(graph, num_archived_vertices);
 
-  for (const auto& label_clusters : clusters) {
-    for (const auto& cluster : label_clusters.second) {
+  for (auto&& [label, clusters_for_label] : clusters) {
+    for (const auto& cluster : clusters_for_label) {
       bool matches_prev_node = false;
       std::vector<NodeId> nodes_not_in_graph;
-      for (const auto& prev_node_id : active_nodes_.at(label_clusters.first)) {
+      for (const auto& prev_node_id : active_nodes_.at(label)) {
         const SceneGraphNode& prev_node = graph.getNode(prev_node_id).value();
         if (nodesMatch(cluster, prev_node)) {
           updateNodeInGraph(cluster, prev_node, timestamp_ns);
@@ -295,12 +300,31 @@ void MeshSegmenter::updateGraph(uint64_t timestamp_ns,
       }
 
       if (!matches_prev_node) {
-        addNodeToGraph(graph, cluster, label_clusters.first, timestamp_ns);
+        addNodeToGraph(graph, cluster, label, timestamp_ns);
       }
-    }
 
-    // TODO(nathan) maybe think about trying to merge overlapping nodes here?
+      mergeActiveNodes(label);
+    }
   }
+}
+
+void MeshSegmenter::mergeActiveNodes(uint32_t label) {
+  /*  std::map<NodeId, NodeId> proposed_merges;*/
+  /*const auto& curr_active = active_nodes_.at(label);*/
+  /*for (const auto& lhs_node_id : curr_active) {*/
+  /*const auto& lhs_node = graph.getNode(lhs_node_id)->get();*/
+
+  /*for (const auto& rhs_node_id : curr_active) {*/
+  /*if (lhs_node_id == rhs_node_id) {*/
+  /*continue;*/
+  /*}*/
+
+  /*const auto& rhs_node = graph.getNode(lhs_node_id)->get();*/
+  /*if (nodesMatch(lhs_node, rhs_node) || nodesMatch(rhs_node, lhs_node)) {*/
+  /*proposed_merges[lhs_node_id] = rhs_node_id;*/
+  /*}*/
+  /*}*/
+  /*  }*/
 }
 
 std::unordered_set<NodeId> MeshSegmenter::getActiveNodes() const {
