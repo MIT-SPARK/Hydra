@@ -135,6 +135,10 @@ void GvdIntegrator::updateGvd(uint64_t timestamp_ns) {
 void GvdIntegrator::archiveBlocks(const BlockIndexList& blocks) {
   for (const auto& idx : blocks) {
     Block<GvdVoxel>::Ptr block = gvd_layer_->getBlockPtrByIndex(idx);
+    if (!block) {
+      LOG(WARNING) << "[GVD update] Archiving unknown block " << idx.transpose();
+      continue;
+    }
 
     for (size_t v = 0; v < block->num_voxels(); ++v) {
       const GvdVoxel& voxel = block->getVoxelByLinearIndex(v);

@@ -233,6 +233,32 @@ bool ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
   return do_full_update;
 }
 
+template <typename Voxel>
+typename Layer<Voxel>::Ptr cloneLayer(const Layer<Voxel>& layer) {
+  typename Layer<Voxel>::Ptr to_return(
+      new Layer<Voxel>(layer.voxel_size(), layer.voxels_per_side()));
+
+  BlockIndexList blocks;
+  layer.getAllAllocatedBlocks(&blocks);
+  for (const auto& idx : blocks) {
+    auto block = layer.getBlockPtrByIndex(idx);
+    if (!block) {
+      continue;
+    }
+
+    auto new_block = to_return->allocateBlockPtrByIndex(idx);
+    for (size_t i = 0; i < block->num_voxels(); ++i) {
+      new_block->getVoxelByLinearIndex(i) = block->getVoxelByLinearIndex(i);
+    }
+
+    new_block->updated() = block->updated();
+    new_block->has_data() = block->has_data();
+    // copy other block attributes...
+  }
+
+  return to_return;
+}
+
 void ReconstructionModule::update(const ReconstructionInput& msg, bool full_update) {
   const auto world_T_camera = getCameraPose(msg);
 
@@ -262,8 +288,8 @@ void ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
   output->timestamp_ns = msg.timestamp_ns;
   output->current_position = msg.world_t_body;
   // note that this is pre-archival
-  output->tsdf.reset(new Layer<TsdfVoxel>(*tsdf_));
-  output->occupied.reset(new Layer<VertexVoxel>(*vertices_));
+  output->tsdf = cloneLayer(*tsdf_);
+  output->occupied = cloneLayer(*vertices_);
   output->mesh = mesh_->clone();
   // move and clear cached pose graphs
   output->pose_graphs = pose_graphs_;
