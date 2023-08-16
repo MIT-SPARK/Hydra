@@ -103,17 +103,7 @@ void UpdateObjectsFunctor::updateObject(const MeshVertices::Ptr& mesh,
     return;
   }
 
-  pcl::IndicesPtr indices;
-  if (invalid_indices) {
-    indices.reset(new std::vector<int>());
-    for (const auto idx : connections) {
-      if (!invalid_indices->count(idx)) {
-        indices->push_back(idx);
-      }
-    }
-  } else {
-    indices.reset(new std::vector<int>(connections.begin(), connections.end()));
-  }
+  pcl::IndicesPtr indices(new std::vector<int>(connections.begin(), connections.end()));
 
   attrs.bounding_box =
       bounding_box::extract(mesh, attrs.bounding_box.type, indices, angle_step);
@@ -503,6 +493,146 @@ std::map<NodeId, NodeId> updateAgents(SharedDsgInfo& dsg, const UpdateInfo& info
   }
 
   return {};
+}
+
+size_t Update2DPlacesFunctor::makeNodeFinders(const SceneGraphLayer& layer) const {
+  std::map<SemanticLabel, std::unordered_set<NodeId>> label_node_map;
+  size_t archived = 0;
+  for (const auto& id_node_pair : layer.nodes()) {
+    auto& attrs = id_node_pair.second->attributes<SemanticNodeAttributes>();
+
+    if (use_active_flag && attrs.is_active) {
+      continue;
+    }
+
+    ++archived;
+    auto iter = label_node_map.find(attrs.semantic_label);
+    if (iter == label_node_map.end()) {
+      iter = label_node_map.insert({attrs.semantic_label, {}}).first;
+    }
+
+    iter->second.insert(id_node_pair.first);
+  }
+
+  // creating nodefinders
+  node_finders.clear();
+  for (const auto& label_ids_pair : label_node_map) {
+    node_finders.emplace(
+        label_ids_pair.first,
+        std::make_unique<NearestNodeFinder>(layer, label_ids_pair.second));
+  }
+
+  return archived;
+}
+
+void Update2DPlacesFunctor::updateNode(const MeshVertices::Ptr& mesh,
+                                       NodeId node,
+                                       Place2dNodeAttributes& attrs) const {
+  const auto& connections = attrs.pcl_mesh_connections;
+  if (connections.empty()) {
+    LOG(ERROR) << "Found empty place2d node " << NodeSymbol(node).getLabel();
+    return;
+  }
+
+  pcl::IndicesPtr indices(new std::vector<int>(connections.begin(), connections.end()));
+
+  Centroid centroid;
+  for (const auto& idx : *indices) {
+    const auto& point = mesh->at(idx);
+    if (std::isnan(point.x) || std::isnan(point.y) || std::isnan(point.z)) {
+      VLOG(4) << "found nan at index: " << idx << " with point: [" << point.x << ", "
+              << point.y << ", " << point.z << "]";
+      continue;
+    }
+
+    centroid.add(pcl::PointXYZ(point.x, point.y, point.z));
+  }
+
+  if (!centroid.getSize()) {
+    VLOG(2) << "Invalid centroid for 2D place " << NodeSymbol(node).getLabel();
+    return;
+  }
+
+  pcl::PointXYZ pcl_pos;
+  centroid.get(pcl_pos);
+  attrs.position << pcl_pos.x, pcl_pos.y, pcl_pos.z;
+}
+
+bool Update2DPlacesFunctor::shouldMerge(const Place2dNodeAttributes& from_attrs,
+                                        const Place2dNodeAttributes& to_attrs) const {
+  return false;
+}
+
+std::optional<NodeId> Update2DPlacesFunctor::proposeMerge(
+    const SceneGraphLayer& layer,
+    const Place2dNodeAttributes& from_attrs,
+    bool skip_first) const {
+  const auto iter = node_finders.find(from_attrs.semantic_label);
+  if (iter == node_finders.end()) {
+    return std::nullopt;
+  }
+
+  std::list<NodeId> candidates;
+  (*iter).second->find(from_attrs.position,
+                       num_merges_to_consider,
+                       skip_first,
+                       [&candidates](NodeId object_id, size_t, double) {
+                         candidates.push_back(object_id);
+                       });
+
+  for (const auto& id : candidates) {
+    const auto& to_attrs = layer.getNode(id)->get().attributes<Place2dNodeAttributes>();
+    if (shouldMerge(from_attrs, to_attrs)) {
+      return id;
+    }
+  }
+
+  return std::nullopt;
+}
+
+std::map<NodeId, NodeId> Update2DPlacesFunctor::call(SharedDsgInfo& dsg,
+                                                     const UpdateInfo& info) const {
+  ScopedTimer spin_timer("backend/update_2d_places", info.timestamp_ns);
+  std::unique_lock<std::mutex> lock(dsg.mutex);
+  const auto& graph = *dsg.graph;
+  if (!graph.hasLayer(layer_id_)) {
+    return {};
+  }
+
+  const auto& layer = graph.getLayer(layer_id_);
+  const size_t archived = makeNodeFinders(layer);
+  MeshVertices::Ptr mesh = graph.getMeshVertices();
+
+  size_t active = 0;
+  std::map<NodeId, NodeId> nodes_to_merge;
+  for (auto&& [node_id, node] : layer.nodes()) {
+    auto& attrs = node->attributes<Place2dNodeAttributes>();
+    if (!info.loop_closure_detected && !attrs.is_active && use_active_flag) {
+      // skip the node if it is archived, there was no loop closure and we've okayed
+      // skipping non-active nodes
+      continue;
+    }
+
+    ++active;
+    updateNode(mesh, node_id, attrs);
+    if (!info.allow_node_merging) {
+      continue;
+    }
+
+    // we only skip the first proposed object if the considered object is a potential
+    // merge target. this happens if and only if:
+    // - the object is an archived object and a loop closure is being processed
+    // - we are not paying attention to the active flag
+    const bool skip_first = !use_active_flag || !attrs.is_active;
+    const auto to_merge = proposeMerge(layer, attrs, skip_first);
+    if (to_merge) {
+      nodes_to_merge[node_id] = *to_merge;
+    }
+  }
+
+  VLOG(5) << "[Hydra Backend] 2D Place update: " << archived << " archived and "
+          << active << " active";
+  return nodes_to_merge;
 }
 
 }  // namespace dsg_updates

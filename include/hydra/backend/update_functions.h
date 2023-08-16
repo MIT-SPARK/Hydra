@@ -78,7 +78,6 @@ struct UpdateObjectsFunctor {
   float angle_step = 10.0f;
   size_t num_merges_to_consider = 1;
   bool use_active_flag = true;
-  std::shared_ptr<std::set<size_t>> invalid_indices;
   mutable std::map<SemanticLabel, std::unique_ptr<NearestNodeFinder>> node_finders;
 };
 
@@ -136,6 +135,31 @@ struct UpdateBuildingsFunctor {
 
 std::map<NodeId, NodeId> updateAgents(SharedDsgInfo& graph, const UpdateInfo& info);
 
-}  // namespace dsg_updates
+struct Update2DPlacesFunctor {
+  using MeshVertices = DynamicSceneGraph::MeshVertices;
 
+  std::map<NodeId, NodeId> call(SharedDsgInfo& dsg, const UpdateInfo& info) const;
+
+  size_t makeNodeFinders(const SceneGraphLayer& layer) const;
+
+  void updateNode(const MeshVertices::Ptr& mesh,
+                  NodeId node,
+                  Place2dNodeAttributes& attrs) const;
+
+  std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
+                                     const Place2dNodeAttributes& attrs,
+                                     bool skip_first) const;
+
+  bool shouldMerge(const Place2dNodeAttributes& from_attrs,
+                   const Place2dNodeAttributes& to_attrs) const;
+
+  size_t num_merges_to_consider = 1;
+  bool use_active_flag = true;
+  mutable std::map<SemanticLabel, std::unique_ptr<NearestNodeFinder>> node_finders;
+
+ private:
+  const LayerId layer_id_ = DsgLayers::MESH_PLACES;
+};
+
+}  // namespace dsg_updates
 }  // namespace hydra
