@@ -135,6 +135,10 @@ void FrontendModule::initCallbacks() {
   post_mesh_callbacks_.push_back(
       std::bind(&FrontendModule::updateObjects, this, std::placeholders::_1));
 
+  if (!place_extractor_) {
+    return;
+  }
+
   if (!config_.use_outdoor_places) {
     input_callbacks_.push_back(
         std::bind(&FrontendModule::updatePlaces, this, std::placeholders::_1));
@@ -260,7 +264,7 @@ void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
   dsg_->updated = true;
 
   launchCallbacks(input_callbacks_, msg);
-  if (!config_.use_outdoor_places) {
+  if (place_extractor_ && !config_.use_outdoor_places) {
     updatePlaceMeshMapping(msg);
   }
 
