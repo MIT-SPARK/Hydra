@@ -6,7 +6,7 @@ invalid_labels: []
 frontend:
   objects:
     labels:
-      - 4
+      #- 4  # tree (too large as an object)
       - 7
       - 10
       - 15
