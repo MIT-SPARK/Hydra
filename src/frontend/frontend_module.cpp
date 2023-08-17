@@ -295,7 +295,7 @@ void FrontendModule::updateMesh(const ReconstructionOutput& input) {
     mesh_remapping_.reset(new kimera_pgmo::VoxbloxIndexMapping());
     auto mesh = input.mesh->getActiveMesh(input.archived_blocks);
 
-    VLOG(5) << "[Hydra Frontend] Updating mesh with" << mesh->numBlocks() << " blocks";
+    VLOG(5) << "[Hydra Frontend] Updating mesh with " << mesh->numBlocks() << " blocks";
     auto interface = mesh->getMeshInterface();
     last_mesh_update_ =
         mesh_compression_->update(interface, input.timestamp_ns, mesh_remapping_.get());

@@ -322,6 +322,13 @@ void ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
   for (const auto& callback : output_callbacks_) {
     callback(*output);
   }
+
+  BlockIndexList blocks;
+  tsdf_->getAllUpdatedBlocks(voxblox::Update::kEsdf, &blocks);
+  for (const auto& idx : blocks) {
+    tsdf_->getBlockByIndex(idx).updated().reset(voxblox::Update::kEsdf);
+    mesh_->getMeshBlock(idx)->updated = false;
+  }
 }
 
 void ReconstructionModule::fillPoseGraphNode(PoseGraphNode& node,
