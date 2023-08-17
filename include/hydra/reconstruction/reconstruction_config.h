@@ -57,6 +57,7 @@ struct ReconstructionConfig {
   size_t max_input_queue_size = 0;
   bool make_pose_graph = false;
   float semantic_measurement_probability = 0.9;
+  bool copy_dense_representations = true;
 
   voxblox::TsdfIntegratorBase::Config tsdf;
   MeshIntegratorConfig mesh;

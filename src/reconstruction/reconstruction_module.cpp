@@ -288,8 +288,10 @@ void ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
   output->timestamp_ns = msg.timestamp_ns;
   output->current_position = msg.world_t_body;
   // note that this is pre-archival
-  output->tsdf = cloneLayer(*tsdf_);
-  output->occupied = cloneLayer(*vertices_);
+  if (config_.copy_dense_representations) {
+    output->tsdf = cloneLayer(*tsdf_);
+    output->occupied = cloneLayer(*vertices_);
+  }
   output->mesh = mesh_->clone();
   // move and clear cached pose graphs
   output->pose_graphs = pose_graphs_;

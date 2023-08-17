@@ -56,6 +56,7 @@ void declare_config(ReconstructionConfig& conf) {
   field(conf.max_input_queue_size, "max_input_queue_size");
   field(conf.make_pose_graph, "make_pose_graph");
   field(conf.semantic_measurement_probability, "semantic_measurement_probability");
+  field(conf.copy_dense_representations, "copy_dense_representations");
 
   field(conf.tsdf, "tsdf");
   field(conf.mesh, "mesh");
