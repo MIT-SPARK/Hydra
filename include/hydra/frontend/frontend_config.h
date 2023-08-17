@@ -37,6 +37,7 @@
 #include <kimera_pgmo/MeshFrontendInterface.h>
 
 #include "hydra/frontend/mesh_segmenter_config.h"
+#include "hydra/frontend/place_2d_segmenter_config.h"
 #include "hydra/places/graph_extractor_interface.h"
 #include "hydra/places/gvd_integrator_config.h"
 
@@ -48,6 +49,8 @@ struct FrontendConfig {
   bool lcd_use_bow_vectors = true;
   kimera_pgmo::MeshFrontendConfig pgmo_config;
   MeshSegmenterConfig object_config;
+  Place2dSegmenterConfig place_config;
+  bool use_outdoor_places = false;
   bool validate_vertices = true;
   bool filter_places = true;
   size_t min_places_component_size = 3;

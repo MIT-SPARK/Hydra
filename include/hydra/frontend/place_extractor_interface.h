@@ -33,6 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <kimera_pgmo/MeshDelta.h>
+#include <pcl/pcl_base.h>
+#include <pcl/point_types.h>
+
 #include "hydra/common/common.h"
 #include "hydra/places/gvd_voxel.h"
 #include "hydra/places/vertex_voxel.h"
@@ -59,9 +63,13 @@ class PlaceExtractorInterface {
 
   virtual void save(const LogSetup& /* logs */) const {}
 
-  virtual void detect(const ReconstructionOutput& msg) = 0;
+  virtual void detect(const ReconstructionOutput& msg,
+                      const kimera_pgmo::MeshDelta::Ptr& mesh_delta,
+                      const DynamicSceneGraph& graph) = 0;
 
-  virtual void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) = 0;
+  virtual void updateGraph(uint64_t timestamp_ns,
+                           const ReconstructionOutput& msg,
+                           DynamicSceneGraph& graph) = 0;
 
   virtual NodeIdSet getActiveNodes() const = 0;
 

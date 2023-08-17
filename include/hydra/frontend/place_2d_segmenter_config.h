@@ -32,48 +32,28 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/frontend/frontend_config.h"
+#pragma once
+#include <set>
 
-#include <config_utilities/config.h>
-
-namespace kimera_pgmo {
-
-void declare_config(kimera_pgmo::MeshFrontendConfig& conf) {
-  using namespace config;
-  name("MeshFrontendConfig");
-  field(conf.time_horizon, "horizon");
-  field(conf.b_track_mesh_graph_mapping, "track_mesh_graph_mapping");
-  field(conf.full_compression_method, "full_compression_method");
-  field(conf.graph_compression_method, "graph_compression_method");
-  field(conf.d_graph_resolution, "d_graph_resolution");
-  field(conf.mesh_resolution, "output_mesh_resolution");
-}
-
-}  // namespace kimera_pgmo
+#include "hydra/common/dsg_types.h"
 
 namespace hydra {
 
-void declare_config(FrontendConfig& conf) {
-  using namespace config;
-  name("FrontendConfig");
-  field(conf.min_object_vertices, "min_object_vertices");
-  field(conf.prune_mesh_indices, "prune_mesh_indices");
-  field(conf.lcd_use_bow_vectors, "lcd_use_bow_vectors");
-  field(conf.pgmo_config, "pgmo");
-  field(conf.object_config, "objects");
-  field(conf.object_config.angle_step, "angle_step");
-  field(conf.validate_vertices, "validate_vertices");
-  field(conf.filter_places, "filter_places");
-  field(conf.min_places_component_size, "min_places_component_size");
+struct Place2dSegmenterConfig {
+  char prefix = 'P';
+  double place_memory_radius_m = 27.0;
+  double active_place_radius_m = 7.0;
+  double mesh_active_window_m = 20.0;
+  double cluster_tolerance = 1;
+  size_t min_cluster_size = 600;
+  size_t max_cluster_size = 100000;
+  double min_final_place_size = 3;
+  size_t min_final_place_points = 1000;
+  float angle_step = 10.0f;
+  BoundingBox::Type bounding_box_type = BoundingBox::Type::AABB;
+  std::set<uint32_t> labels;
+};
 
-  field(conf.use_outdoor_places, "use_outdoor_places");
-  if (conf.use_outdoor_places) {
-    field(conf.place_config, "places2d");
-  } else {
-    field(conf.gvd, "gvd");
-    conf.graph_extractor.setOptional();
-    field(conf.graph_extractor, "graph_extractor");
-  }
-}
+void declare_config(Place2dSegmenterConfig& conf);
 
 }  // namespace hydra

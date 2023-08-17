@@ -47,6 +47,7 @@
 #include "hydra/common/robot_prefix_config.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/frontend/frontend_config.h"
+#include "hydra/frontend/place_2d_segmenter.h"
 #include "hydra/frontend/place_extractor_interface.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/utils/log_utilities.h"
@@ -155,6 +156,7 @@ class FrontendModule : public Module {
 
   std::unique_ptr<MeshSegmenter> segmenter_;
   std::unique_ptr<PlaceExtractorInterface> place_extractor_;
+  std::unique_ptr<Place2dSegmenter> place_segmenter_;
   SceneGraphLogger frontend_graph_logger_;
   LogSetup::Ptr logs_;
 

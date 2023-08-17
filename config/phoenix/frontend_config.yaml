@@ -13,6 +13,16 @@ objects:
   min_cluster_size: 25
   max_cluster_size: 100000
   cluster_tolerance: 0.18
+places2d:
+  prefix: P
+  place_memory_radius_m: 30
+  active_place_radius_m: 16.0
+  mesh_active_window_m: 20.0
+  cluster_tolerance: 1
+  min_cluster_size: 100
+  max_cluster_size: 100000
+  min_final_place_size: 7
+  min_final_place_points: 10
 min_object_vertices: 20
 prune_mesh_indices: true
 filter_places: true

@@ -36,9 +36,9 @@
 
 #include <functional>
 #include <list>
+#include <memory>
 #include <set>
 #include <string>
-#include <memory>
 
 namespace hydra {
 

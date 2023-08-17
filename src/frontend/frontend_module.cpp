@@ -53,6 +53,7 @@ namespace hydra {
 using hydra::timing::ScopedTimer;
 using pose_graph_tools::PoseGraph;
 using LabelClusters = MeshSegmenter::LabelClusters;
+using LabelPlaces = Place2dSegmenter::LabelPlaces;
 
 template <typename Func, typename... Args>
 void launchCallbacks(const std::vector<Func>& callbacks, Args... args) {
@@ -107,10 +108,16 @@ FrontendModule::FrontendModule(const FrontendConfig& config,
                                      dsg_->graph->getMeshVertices(),
                                      dsg_->graph->getMeshLabels()));
 
-  place_extractor_.reset(new GvdPlaceExtractor(config_.graph_extractor,
-                                               config.gvd,
-                                               config.min_places_component_size,
-                                               config.filter_places));
+  if (!config_.use_outdoor_places) {
+    place_extractor_.reset(new GvdPlaceExtractor(config_.graph_extractor,
+                                                 config.gvd,
+                                                 config.min_places_component_size,
+                                                 config.filter_places));
+  } else {
+    place_extractor_.reset(new Place2dSegmenter(config_.place_config,
+                                                dsg_->graph->getMeshVertices(),
+                                                dsg_->graph->getMeshLabels()));
+  }
 }
 
 FrontendModule::~FrontendModule() { stop(); }
@@ -124,15 +131,17 @@ void FrontendModule::initCallbacks() {
   input_callbacks_.push_back(
       std::bind(&FrontendModule::updatePoseGraph, this, std::placeholders::_1));
 
-  if (place_extractor_) {
-    // TODO(nathan) make this better
-    input_callbacks_.push_back(
-        std::bind(&FrontendModule::updatePlaces, this, std::placeholders::_1));
-  }
-
   post_mesh_callbacks_.clear();
   post_mesh_callbacks_.push_back(
       std::bind(&FrontendModule::updateObjects, this, std::placeholders::_1));
+
+  if (!config_.use_outdoor_places) {
+    input_callbacks_.push_back(
+        std::bind(&FrontendModule::updatePlaces, this, std::placeholders::_1));
+  } else {
+    post_mesh_callbacks_.push_back(
+        std::bind(&FrontendModule::updatePlaces, this, std::placeholders::_1));
+  }
 }
 
 void FrontendModule::start() {
@@ -251,7 +260,7 @@ void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
   dsg_->updated = true;
 
   launchCallbacks(input_callbacks_, msg);
-  if (place_extractor_) {
+  if (!config_.use_outdoor_places) {
     updatePlaceMeshMapping(msg);
   }
 
@@ -343,11 +352,18 @@ void FrontendModule::updatePlaces(const ReconstructionOutput& input) {
     return;
   }
 
+  if (config_.use_outdoor_places) {
+    if (!last_mesh_update_) {
+      LOG(ERROR) << "Cannot detect objects without valid mesh";
+      return;
+    }
+  }
+
   NodeIdSet active_nodes;
-  place_extractor_->detect(input);
+  place_extractor_->detect(input, last_mesh_update_, *dsg_->graph);
   {  // start graph critical section
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-    place_extractor_->updateGraph(input.timestamp_ns, *dsg_->graph);
+    place_extractor_->updateGraph(input.timestamp_ns, input, *dsg_->graph);
 
     active_nodes = place_extractor_->getActiveNodes();
     const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);

@@ -33,9 +33,9 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <cstdint>
 #include <set>
 #include <string>
-#include <cstdint>
 
 namespace hydra {
 

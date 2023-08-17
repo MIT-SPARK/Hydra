@@ -32,48 +32,33 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/frontend/frontend_config.h"
+#include "hydra/frontend/place_2d_segmenter_config.h"
 
 #include <config_utilities/config.h>
-
-namespace kimera_pgmo {
-
-void declare_config(kimera_pgmo::MeshFrontendConfig& conf) {
-  using namespace config;
-  name("MeshFrontendConfig");
-  field(conf.time_horizon, "horizon");
-  field(conf.b_track_mesh_graph_mapping, "track_mesh_graph_mapping");
-  field(conf.full_compression_method, "full_compression_method");
-  field(conf.graph_compression_method, "graph_compression_method");
-  field(conf.d_graph_resolution, "d_graph_resolution");
-  field(conf.mesh_resolution, "output_mesh_resolution");
-}
-
-}  // namespace kimera_pgmo
+#include <config_utilities/types/conversions.h>
+#include <config_utilities/types/enum.h>
 
 namespace hydra {
 
-void declare_config(FrontendConfig& conf) {
+void declare_config(Place2dSegmenterConfig& config) {
   using namespace config;
-  name("FrontendConfig");
-  field(conf.min_object_vertices, "min_object_vertices");
-  field(conf.prune_mesh_indices, "prune_mesh_indices");
-  field(conf.lcd_use_bow_vectors, "lcd_use_bow_vectors");
-  field(conf.pgmo_config, "pgmo");
-  field(conf.object_config, "objects");
-  field(conf.object_config.angle_step, "angle_step");
-  field(conf.validate_vertices, "validate_vertices");
-  field(conf.filter_places, "filter_places");
-  field(conf.min_places_component_size, "min_places_component_size");
-
-  field(conf.use_outdoor_places, "use_outdoor_places");
-  if (conf.use_outdoor_places) {
-    field(conf.place_config, "places2d");
-  } else {
-    field(conf.gvd, "gvd");
-    conf.graph_extractor.setOptional();
-    field(conf.graph_extractor, "graph_extractor");
-  }
+  name("Place2dSegmenterConfig");
+  field<CharConversion>(config.prefix, "prefix");
+  field(config.place_memory_radius_m, "place_memory_radius_m");
+  field(config.active_place_radius_m, "active_place_radius_m");
+  field(config.mesh_active_window_m, "mesh_active_window_m");
+  field(config.cluster_tolerance, "cluster_tolerance");
+  field(config.min_cluster_size, "min_cluster_size");
+  field(config.max_cluster_size, "max_cluster_size");
+  field(config.min_final_place_size, "min_final_place_size");
+  field(config.min_final_place_points, "min_final_place_points");
+  enum_field(config.bounding_box_type,
+             "bounding_box_type",
+             {{spark_dsg::BoundingBox::Type::INVALID, "INVALID"},
+              {spark_dsg::BoundingBox::Type::AABB, "AABB"},
+              {spark_dsg::BoundingBox::Type::OBB, "OBB"},
+              {spark_dsg::BoundingBox::Type::RAABB, "RAABB"}});
+  field(config.labels, "labels");
 }
 
 }  // namespace hydra

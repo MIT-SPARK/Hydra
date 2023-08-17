@@ -33,6 +33,7 @@ find_package(spark_dsg REQUIRED)
 find_package(teaserpp REQUIRED)
 find_package(GTSAM REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(OpenCV REQUIRED)
 find_package(config_utilities REQUIRED)
 find_package(
   catkin REQUIRED
@@ -82,7 +83,7 @@ add_library(${PROJECT_NAME})
 target_include_directories(
   ${PROJECT_NAME}
   PUBLIC include ${catkin_INCLUDE_DIRS}
-  PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${PCL_INCLUDE_DIRS}
+  PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${PCL_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS}
 )
 target_link_libraries(
   ${PROJECT_NAME}
@@ -92,7 +93,7 @@ target_link_libraries(
          spark_dsg::spark_dsg
          yaml-cpp
          gtsam
-  PRIVATE nanoflann::nanoflann ${PCL_LIBRARIES}
+  PRIVATE nanoflann::nanoflann ${PCL_LIBRARIES} ${OpenCV_LIBS}
 )
 if(HYDRA_USE_STANDARD_FS)
   target_link_libraries(${PROJECT_NAME} PRIVATE stdc++fs)

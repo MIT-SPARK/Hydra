@@ -1,0 +1,22 @@
+---
+total_semantic_labels: 10
+semantic_measurement_probability: 0.9
+dynamic_labels: [10]
+invalid_labels: []
+frontend:
+  objects:
+    labels: []
+  places2d:
+    labels: [0,1,2,3,4,5,6,7,8,9]
+label_names:
+  - {label: 0, name: unknown0}
+  - {label: 1, name: unknown1}
+  - {label: 2, name: unknown2}
+  - {label: 3, name: unknown3}
+  - {label: 4, name: unknown4}
+  - {label: 5, name: unknown5}
+  - {label: 6, name: unknown6}
+  - {label: 7, name: unknown7}
+  - {label: 8, name: unknown8}
+  - {label: 9, name: unknown9}
+
