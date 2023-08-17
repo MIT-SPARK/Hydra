@@ -91,6 +91,27 @@ frontend:
       - 147
       - 148
       - 149
+  places2d:
+    labels:
+      - 3
+      - 6
+      - 9
+      - 11
+      - 13
+      - 21
+      - 29
+      - 46
+      - 52
+      - 53
+      - 54
+      - 59
+      - 60
+      - 61
+      - 68
+      - 91
+      - 94
+      - 101
+      - 140
 label_names:
   - {label: 0, name: wall}
   - {label: 1, name: building}

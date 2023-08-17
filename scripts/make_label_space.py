@@ -39,6 +39,7 @@ import yaml
 HELP_TEXT = """n: normal (default)
 o: object
 d: dynamic
+s: surface
 x: invalid
 ?: help """
 
@@ -84,7 +85,7 @@ def _format_list(name, values, collapse=True, **kwargs):
 
 def _get_choice(class_name):
     prompt_kwargs = {
-        "type": click.Choice(["n", "o", "d", "x", "?"]),
+        "type": click.Choice(["n", "o", "d", "s", "x", "?"]),
         "show_choices": True,
         "prompt_suffix": " >>> ",
         "default": "n",
@@ -120,6 +121,7 @@ def main(label_grouping_file, measurement_probability, name, output_dir):
         config = yaml.load(fin.read(), Loader=yaml.SafeLoader)
 
     invalid_labels = []
+    surface_labels = []
     dynamic_labels = []
     object_labels = []
     output_names = []
@@ -132,6 +134,8 @@ def main(label_grouping_file, measurement_probability, name, output_dir):
             object_labels.append(class_id)
         if value == "d":
             dynamic_labels.append(class_id)
+        if value == "s":
+            surface_labels.append(class_id)
         if value == "x":
             invalid_labels.append(class_id)
 
@@ -143,8 +147,11 @@ def main(label_grouping_file, measurement_probability, name, output_dir):
         fout.write(yaml.dump({"total_semantic_labels": len(config["groups"])}))
         fout.write(_format_list("dynamic_labels", dynamic_labels))
         fout.write(_format_list("invalid_labels", invalid_labels))
-        fout.write("objects:\n")
-        fout.write(_format_list("labels", object_labels, indent=2))
+        fout.write("frontend:\n")
+        fout.write("  objects:\n")
+        fout.write(_format_list("labels", object_labels, indent=4))
+        fout.write("  places2d:\n")
+        fout.write(_format_list("labels", surface_labels, indent=4))
         fout.write("label_names:\n")
         for name in output_names:
             fout.write("  - " + yaml.dump(name, default_flow_style=True))
