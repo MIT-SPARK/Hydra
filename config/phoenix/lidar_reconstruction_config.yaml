@@ -1,15 +1,15 @@
 ---
 clear_distant_blocks: true
-dense_representation_radius_m: 20.0
+dense_representation_radius_m: 15.0
 voxels_per_side: 16
-voxel_size: 0.3
+voxel_size: 0.1
 num_poses_per_update: 1
 max_input_queue_size: 0
 pointcloud_separation_s: 0.2
 tf_wait_duration_s: 0.1
 gvd:
-  max_distance_m: 15.0
-  min_distance_m: 0.5
+  max_distance_m: 10.0
+  min_distance_m: 0.3
   min_diff_m: 0.1
   min_weight: 1.0e-6
   positive_distance_only: true
@@ -55,10 +55,10 @@ mesh:
 tsdf:
   voxel_carving_enabled: true
   use_const_weight: false
-  default_truncation_distance: 0.5
+  default_truncation_distance: 0.3
   max_weight: 10000
   min_ray_length_m: 0.1
-  max_ray_length_m: 15.0
+  max_ray_length_m: 10.0
   allow_clear: true
   use_weight_dropoff: true
   use_sparsity_compensation_factor: false
