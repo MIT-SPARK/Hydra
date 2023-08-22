@@ -50,7 +50,7 @@ void declare_config(ReconstructionConfig& conf) {
   field(conf.show_stats, "show_stats");
   field(conf.clear_distant_blocks, "clear_distant_blocks");
   field(conf.dense_representation_radius_m, "dense_representation_radius_m");
-  field(conf.world_frame, "world_frame");
+  field(conf.odom_frame, "odom_frame");
   field(conf.robot_frame, "robot_frame");
   field(conf.num_poses_per_update, "num_poses_per_update");
   field(conf.max_input_queue_size, "max_input_queue_size");

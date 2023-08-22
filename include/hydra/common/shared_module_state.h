@@ -68,6 +68,7 @@ struct BackendInput {
   uint64_t timestamp_ns;
   pose_graph_tools::PoseGraph::ConstPtr deformation_graph;
   std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
+  pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements;
   kimera_pgmo::MeshDelta::Ptr mesh_update;
 };
 

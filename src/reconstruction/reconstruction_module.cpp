@@ -224,6 +224,10 @@ bool ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
         pose_graphs_.end(), msg.pose_graphs.begin(), msg.pose_graphs.end());
   }
 
+  if (msg.agent_node_measurements) {
+    agent_node_measurements_ = *msg.agent_node_measurements;
+  }
+
   prev_pose_ = curr_pose;
   prev_time_ = msg.timestamp_ns;
   ++num_poses_received_;
@@ -295,6 +299,11 @@ void ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
   output->mesh = mesh_->clone();
   // move and clear cached pose graphs
   output->pose_graphs = pose_graphs_;
+  if (agent_node_measurements_.nodes.size() > 0) {
+    output->agent_node_measurements.reset(new PoseGraph(agent_node_measurements_));
+    agent_node_measurements_ = PoseGraph();
+  }
+
   VLOG(5) << "[Hydra Reconstruction] Current queued pose graphs: "
           << pose_graphs_.size();
   pose_graphs_.clear();
@@ -336,7 +345,7 @@ void ReconstructionModule::fillPoseGraphNode(PoseGraphNode& node,
                                              const Eigen::Affine3d& pose,
                                              size_t index) const {
   node.header.stamp.fromNSec(timestamp_ns);
-  node.header.frame_id = config_.world_frame;
+  node.header.frame_id = config_.odom_frame;
   node.robot_id = prefix_.id;
   node.key = index;
   tf2::convert(pose, node.pose);
@@ -345,7 +354,7 @@ void ReconstructionModule::fillPoseGraphNode(PoseGraphNode& node,
 void ReconstructionModule::makePoseGraphEdge(PoseGraph& graph) const {
   PoseGraphEdge edge;
   edge.header.stamp = graph.nodes.back().header.stamp;
-  edge.header.frame_id = config_.world_frame;
+  edge.header.frame_id = config_.odom_frame;
   edge.key_from = graph.nodes.front().key;
   edge.key_to = graph.nodes.back().key;
   edge.robot_from = prefix_.id;
@@ -363,7 +372,7 @@ PoseGraph ReconstructionModule::makePoseGraph(uint64_t timestamp_ns,
                                               const Eigen::Affine3d& curr_pose) {
   PoseGraph pose_graph;
   pose_graph.header.stamp.fromNSec(timestamp_ns);
-  pose_graph.header.frame_id = config_.world_frame;
+  pose_graph.header.frame_id = config_.odom_frame;
 
   pose_graph.nodes.push_back(PoseGraphNode());
   fillPoseGraphNode(
