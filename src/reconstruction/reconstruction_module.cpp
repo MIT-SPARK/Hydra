@@ -238,29 +238,66 @@ bool ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
 }
 
 template <typename Voxel>
-typename Layer<Voxel>::Ptr cloneLayer(const Layer<Voxel>& layer) {
-  typename Layer<Voxel>::Ptr to_return(
-      new Layer<Voxel>(layer.voxel_size(), layer.voxels_per_side()));
+void mergeLayer(const Layer<Voxel>& layer_in, typename Layer<Voxel>::Ptr& layer_out) {
+  if (!layer_out) {
+    layer_out.reset(
+        new Layer<Voxel>(layer_in.voxel_size(), layer_in.voxels_per_side()));
+  }
 
   BlockIndexList blocks;
-  layer.getAllAllocatedBlocks(&blocks);
+  layer_in.getAllAllocatedBlocks(&blocks);
   for (const auto& idx : blocks) {
-    auto block = layer.getBlockPtrByIndex(idx);
+    auto block = layer_in.getBlockPtrByIndex(idx);
     if (!block) {
       continue;
     }
 
-    auto new_block = to_return->allocateBlockPtrByIndex(idx);
+    auto new_block = layer_out->allocateBlockPtrByIndex(idx);
     for (size_t i = 0; i < block->num_voxels(); ++i) {
       new_block->getVoxelByLinearIndex(i) = block->getVoxelByLinearIndex(i);
     }
 
-    new_block->updated() = block->updated();
+    new_block->updated() |= block->updated();
     new_block->has_data() = block->has_data();
     // copy other block attributes...
   }
+}
 
-  return to_return;
+void ReconstructionModule::fillOutput(const ReconstructionInput& input,
+                                      ReconstructionOutput& output) {
+  output.timestamp_ns = input.timestamp_ns;
+  output.current_position = input.world_t_body;
+  if (agent_node_measurements_.nodes.size() > 0) {
+    output.agent_node_measurements.reset(new PoseGraph(agent_node_measurements_));
+    agent_node_measurements_ = PoseGraph();
+  }
+
+  // note that this is pre-archival
+  if (config_.copy_dense_representations) {
+    mergeLayer(*tsdf_, output.tsdf);
+    mergeLayer(*vertices_, output.occupied);
+  }
+
+  mesh_->merge(output.mesh);
+
+  // move and clear cached pose graphs
+  VLOG(5) << "[Hydra Reconstruction] Current queued pose graphs: "
+          << pose_graphs_.size();
+  output.pose_graphs.insert(
+      output.pose_graphs.end(), pose_graphs_.begin(), pose_graphs_.end());
+  pose_graphs_.clear();
+
+  if (config_.clear_distant_blocks) {
+    const auto to_archive = findBlocksToArchive(input.world_t_body.cast<float>());
+    output.archived_blocks.insert(
+        output.archived_blocks.end(), to_archive.begin(), to_archive.end());
+    for (const auto& index : to_archive) {
+      semantics_->removeBlock(index);
+      tsdf_->removeBlock(index);
+      mesh_->removeBlock(index);
+      vertices_->removeBlock(index);
+    }
+  }
 }
 
 void ReconstructionModule::update(const ReconstructionInput& msg, bool full_update) {
@@ -288,44 +325,40 @@ void ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
     return;
   }
 
-  auto output = std::make_shared<ReconstructionOutput>();
-  output->timestamp_ns = msg.timestamp_ns;
-  output->current_position = msg.world_t_body;
-  // note that this is pre-archival
-  if (config_.copy_dense_representations) {
-    output->tsdf = cloneLayer(*tsdf_);
-    output->occupied = cloneLayer(*vertices_);
-  }
-  output->mesh = mesh_->clone();
-  // move and clear cached pose graphs
-  output->pose_graphs = pose_graphs_;
-  if (agent_node_measurements_.nodes.size() > 0) {
-    output->agent_node_measurements.reset(new PoseGraph(agent_node_measurements_));
-    agent_node_measurements_ = PoseGraph();
-  }
-
-  VLOG(5) << "[Hydra Reconstruction] Current queued pose graphs: "
-          << pose_graphs_.size();
-  pose_graphs_.clear();
-
-  if (config_.clear_distant_blocks) {
-    output->archived_blocks = findBlocksToArchive(msg.world_t_body.cast<float>());
-    for (const auto& index : output->archived_blocks) {
-      semantics_->removeBlock(index);
-      tsdf_->removeBlock(index);
-      mesh_->removeBlock(index);
-      vertices_->removeBlock(index);
-    }
-  }
-
   if (config_.show_stats) {
     showStats();
   }
 
-  if (output_queue_) {
-    VLOG(5) << "[Hydra Reconstruction] Exporting " << output->pose_graphs.size()
-            << " pose graphs";
+  bool is_pending = false;
+  ReconstructionOutput::Ptr output;
+  if (!output_queue_) {
+    output = std::make_shared<ReconstructionOutput>();
+  } else {
+    // this is janky, but avoid pushing updates to queue if there's already stuff there
+    const auto curr_size = output_queue_->size();
+    if (curr_size >= 1) {
+      if (!pending_output_) {
+        pending_output_ = std::make_shared<ReconstructionOutput>();
+      }
+      output = pending_output_;
+      is_pending = true;
+    } else {
+      output =
+          pending_output_ ? pending_output_ : std::make_shared<ReconstructionOutput>();
+      pending_output_.reset();
+    }
+  }
+
+  fillOutput(msg, *output);
+
+  VLOG(5) << "[Hydra Reconstruction] Exporting " << output->pose_graphs.size()
+          << " pose graphs";
+
+  if (!is_pending) {
     output_queue_->push(output);
+  } else {
+    LOG(WARNING)
+        << "[Hydra Reconstruction] Merging pending updates because frontend is slow!";
   }
 
   for (const auto& callback : output_callbacks_) {

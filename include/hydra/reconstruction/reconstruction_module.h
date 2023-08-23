@@ -121,6 +121,8 @@ class ReconstructionModule : public Module {
 
   voxblox::BlockIndexList findBlocksToArchive(const voxblox::Point& center) const;
 
+  void fillOutput(const ReconstructionInput& input, ReconstructionOutput& output);
+
  protected:
   const ReconstructionConfig config_;
   RobotPrefixConfig prefix_;
@@ -131,6 +133,7 @@ class ReconstructionModule : public Module {
 
   std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs_;
   pose_graph_tools::PoseGraph agent_node_measurements_;
+  ReconstructionOutput::Ptr pending_output_;
   OutputQueue::Ptr output_queue_;
 
   voxblox::Layer<voxblox::TsdfVoxel>::Ptr tsdf_;

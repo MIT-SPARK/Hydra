@@ -101,6 +101,29 @@ SemanticMeshLayer::Ptr SemanticMeshLayer::clone() const {
   return new_mesh;
 }
 
+void SemanticMeshLayer::merge(SemanticMeshLayer::Ptr& other) const {
+  if (!other) {
+    other.reset(new SemanticMeshLayer(mesh_->block_size()));
+  }
+
+  BlockIndexList all_indices;
+  mesh_->getAllAllocatedMeshes(&all_indices);
+  for (const auto& block_index : all_indices) {
+    auto block = other->mesh_->allocateNewBlock(block_index);
+    *block = *(mesh_->getMeshPtrByIndex(block_index));
+
+    auto iter = semantics_->find(block_index);
+    if (iter != semantics_->end()) {
+      auto oiter = other->semantics_->find(block_index);
+      if (oiter != other->semantics_->end()) {
+        oiter->second = iter->second;
+      } else {
+        other->semantics_->emplace(iter->first, iter->second);
+      }
+    }
+  }
+}
+
 SemanticMeshLayer::Ptr SemanticMeshLayer::getActiveMesh(
     const BlockIndexList& archived) const {
   const IndexSet archived_set(archived.begin(), archived.end());
