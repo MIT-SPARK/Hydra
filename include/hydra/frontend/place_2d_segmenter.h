@@ -54,15 +54,35 @@ struct Place2d {
   pcl::PointIndices indices;
   pcl::PointIndices boundary_indices;
   std::vector<Eigen::Vector3d> boundary;
+  Eigen::Matrix<float, 2, 2> ellipse_matrix_compress;
+  Eigen::Matrix<float, 2, 2> ellipse_matrix_expand;
+  Eigen::Vector2d ellipse_centroid;
+  Eigen::Vector2d cut_plane;
+  bool can_split;
 };
 
+void addPlaceRectInfo(
+    const std::vector<Place2d::PointT, Eigen::aligned_allocator<pcl::PointXYZRGBA>>&
+        points,
+    Place2d& place);
+void addPlaceBoundaryInfo(
+    const std::vector<Place2d::PointT, Eigen::aligned_allocator<pcl::PointXYZRGBA>>&
+        points,
+    Place2d& place);
+std::pair<Place2d, Place2d> splitPlace(
+    const std::vector<Place2d::PointT, Eigen::aligned_allocator<pcl::PointXYZRGBA>>&
+        points,
+    const Place2d& place);
+
 std::vector<Place2d> decomposePlaces(const Place2d::CloudT::Ptr cloud,
-                                     const std::vector<Place2d>& places,
+                                     const std::vector<Place2d>& initial_places,
                                      double min_size,
                                      size_t min_points);
-std::vector<std::vector<size_t>> decomposePlace(
-    const std::vector<cv::Point2f>& cloud_pts,
-    const std::vector<size_t>& indices,
+
+std::vector<Place2d> decomposePlace(
+    const std::vector<Place2d::PointT, Eigen::aligned_allocator<pcl::PointXYZRGBA>>&
+        cloud_pts,
+    const Place2d& place,
     const double min_size,
     const size_t min_points);
 
@@ -96,6 +116,10 @@ class Place2dSegmenter : public PlaceExtractorInterface {
   }
 
  private:
+  bool shouldImpurityCauseSplit(const Place2d& place, const Place2d& impurity);
+  bool shouldAddPlaceConnection(const Place2dNodeAttributes& attrs1,
+                                const Place2dNodeAttributes& attrs2,
+                                EdgeAttributes& edge_weight);
   Places findPlaces(const MeshVertexCloud::Ptr& cloud,
                     const pcl::IndicesPtr& indices) const;
 

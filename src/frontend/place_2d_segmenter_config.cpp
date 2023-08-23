@@ -50,8 +50,11 @@ void declare_config(Place2dSegmenterConfig& config) {
   field(config.cluster_tolerance, "cluster_tolerance");
   field(config.min_cluster_size, "min_cluster_size");
   field(config.max_cluster_size, "max_cluster_size");
-  field(config.min_final_place_size, "min_final_place_size");
+  field(config.pure_final_place_size, "pure_final_place_size");
+  field(config.impure_final_place_size, "impure_final_place_size");
   field(config.min_final_place_points, "min_final_place_points");
+  field(config.place_overlap_threshold, "place_overlap_threshold");
+  field(config.enable_place_purity, "enable_place_purity");
   enum_field(config.bounding_box_type,
              "bounding_box_type",
              {{spark_dsg::BoundingBox::Type::INVALID, "INVALID"},
@@ -59,6 +62,7 @@ void declare_config(Place2dSegmenterConfig& config) {
               {spark_dsg::BoundingBox::Type::OBB, "OBB"},
               {spark_dsg::BoundingBox::Type::RAABB, "RAABB"}});
   field(config.labels, "labels");
+  field(config.impurity_labels, "impurity_labels");
 }
 
 }  // namespace hydra

@@ -47,11 +47,16 @@ struct Place2dSegmenterConfig {
   double cluster_tolerance = 1;
   size_t min_cluster_size = 600;
   size_t max_cluster_size = 100000;
-  double min_final_place_size = 3;
+  double pure_final_place_size = 3;
+  double impure_final_place_size = 3;
   size_t min_final_place_points = 1000;
+  double place_overlap_threshold = 0.1;
+  double place_max_neighbor_z_diff = 0.5;
+  bool enable_place_purity = true;
   float angle_step = 10.0f;
   BoundingBox::Type bounding_box_type = BoundingBox::Type::AABB;
   std::set<uint32_t> labels;
+  std::set<uint32_t> impurity_labels;
 };
 
 void declare_config(Place2dSegmenterConfig& conf);

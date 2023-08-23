@@ -40,6 +40,7 @@
 #include <spark_dsg/bounding_box_extraction.h>
 
 #include "hydra/common/hydra_config.h"
+#include "hydra/frontend/place_2d_ellipsoid_math.h"
 
 namespace hydra {
 
@@ -113,6 +114,7 @@ Places Place2dSegmenter::findPlaces(const MeshVertexCloud::Ptr& cloud,
   places.resize(cluster_indices.size());
   for (size_t k = 0; k < places.size(); ++k) {
     places.at(k).indices = cluster_indices.at(k);
+    addPlaceRectInfo(cloud->points, places.at(k));
   }
 
   return places;
@@ -182,70 +184,55 @@ pcl::IndicesPtr getActivePlaceIndices(
 }
 
 std::vector<Place2d> decomposePlaces(const Place2d::CloudT::Ptr cloud,
-                                     const std::vector<Place2d>& places,
+                                     const std::vector<Place2d>& initial_places,
                                      double min_size,
                                      size_t min_points) {
   std::vector<Place2d> final_places;
-  for (auto p : places) {
-    // Turn the point cloud points in this place into cv::Point2f
-    std::vector<cv::Point2f> cv_points;
-    std::vector<size_t> local_to_global_index;
-    std::vector<size_t> place_indices(p.indices.indices.size());
-    std::iota(std::begin(place_indices), std::end(place_indices), 0);
-    for (int ix : p.indices.indices) {
-      local_to_global_index.push_back(ix);
-      cv::Point2f xy = {cloud->points[ix].x, cloud->points[ix].y};
-      cv_points.push_back(xy);
-    }
-
+  for (auto p : initial_places) {
     // Recursively decompose initial place into smaller places
-    std::vector<std::vector<size_t>> sub_places =
-        decomposePlace(cv_points, place_indices, min_size, min_points);
+    std::vector<Place2d> sub_places =
+        decomposePlace(cloud->points, p, min_size, min_points);
 
-    for (std::vector<size_t> sp : sub_places) {
-      // save information about each final place
-      std::vector<cv::Point2f> region_pts;
-      std::vector<size_t> region_to_local;
-      Place2d sub_place_2d;
-      for (size_t i : sp) {
-        region_to_local.push_back(i);
-        region_pts.push_back(cv_points.at(i));
-        sub_place_2d.indices.indices.push_back(local_to_global_index.at(i));
-        const auto& cp = cloud->at(local_to_global_index.at(i));
-        sub_place_2d.centroid.add(pcl::PointXYZ(cp.x, cp.y, cp.z));
-      }
-
-      // compute convex hull for each place
-      std::vector<int> ch;
-      cv::convexHull(region_pts, ch);
-      for (int pix : ch) {
-        size_t cloud_ix = local_to_global_index.at(region_to_local.at(pix));
-        Place2d::PointT p = cloud->at(cloud_ix);
-        Eigen::Vector3d v = {p.x, p.y, p.z};
-        sub_place_2d.boundary.push_back(v);
-        sub_place_2d.boundary_indices.indices.push_back(cloud_ix);
-      }
-      final_places.push_back(sub_place_2d);
+    for (Place2d sp : sub_places) {
+      addPlaceBoundaryInfo(cloud->points, sp);
+      final_places.push_back(sp);
     }
   }
+
   return final_places;
 }
 
-std::vector<std::vector<size_t>> decomposePlace(
-    const std::vector<cv::Point2f>& cloud_pts,
-    const std::vector<size_t>& indices,
-    const double min_size,
-    const size_t min_points) {
-  // Base case: if there are too few points, return region
-  if (indices.size() < min_points) {
-    std::vector<std::vector<size_t>> indices_wrapped = {indices};
-    return indices_wrapped;
+void addPlaceBoundaryInfo(
+    const std::vector<Place2d::PointT, Eigen::aligned_allocator<pcl::PointXYZRGBA>>&
+        points,
+    Place2d& place) {
+  std::vector<cv::Point2f> region_pts;
+  std::vector<size_t> region_to_cloud_index;
+  for (size_t i : place.indices.indices) {
+    region_to_cloud_index.push_back(i);
+    region_pts.push_back(cv::Point2f(points[i].x, points[i].y));
+    place.centroid.add(pcl::PointXYZ(points[i].x, points[i].y, points[i].z));
   }
 
-  // Compute min area rectangle to get general "shape" of points
+  // compute convex hull for each place
+  std::vector<int> ch;
+  cv::convexHull(region_pts, ch);
+  for (int pix : ch) {
+    size_t cloud_ix = region_to_cloud_index.at(pix);
+    Place2d::PointT p = points[cloud_ix];
+    Eigen::Vector3d v = {p.x, p.y, p.z};
+    place.boundary.push_back(v);
+    place.boundary_indices.indices.push_back(cloud_ix);
+  }
+}
+
+void addPlaceRectInfo(
+    const std::vector<Place2d::PointT, Eigen::aligned_allocator<pcl::PointXYZRGBA>>&
+        points,
+    Place2d& place) {
   std::vector<cv::Point2f> region;
-  for (size_t i : indices) {
-    region.push_back(cloud_pts.at(i));
+  for (size_t i : place.indices.indices) {
+    region.push_back(cv::Point2f(points[i].x, points[i].y));
   }
 
   cv::RotatedRect box = cv::minAreaRect(region);
@@ -254,48 +241,80 @@ std::vector<std::vector<size_t>> decomposePlace(
   box.points(box_pts);
 
   // Get rays along two sides of bounding box
-  cv::Point2f base_pt = box_pts[0];
   cv::Point2f e1_ray = box_pts[1] - box_pts[0];
   cv::Point2f e2_ray = box_pts[3] - box_pts[0];
 
-  cv::Point2f long_ray;
-  cv::Point2f short_ray;
-  if (cv::norm(e1_ray) > cv::norm(e2_ray)) {
-    long_ray = e1_ray;
-    short_ray = e2_ray;
-  } else {
-    long_ray = e2_ray;
-    short_ray = e1_ray;
-  }
+  cv::Point2f long_ray = cv::norm(e1_ray) > cv::norm(e2_ray) ? e1_ray : e2_ray;
 
-  if (cv::norm(long_ray) > min_size) {
-    std::vector<size_t> indices_1;
-    std::vector<size_t> indices_2;
+  cv::Point2f box_center = (box_pts[0] + box_pts[1] + box_pts[2] + box_pts[3]) / 4;
+  place.ellipse_centroid(0) = box_center.x;
+  place.ellipse_centroid(1) = box_center.y;
 
-    // Split points perpendicular to long axis of bounding box
-    cv::Point2f cut_origin = base_pt + long_ray / 2 - short_ray;
-    for (size_t ix = 0; ix < region.size(); ++ix) {
-      cv::Point2f pt = region[ix];
-      double side = (pt - cut_origin).dot(long_ray);
-      if (side >= 0) {
-        indices_1.push_back(indices[ix]);
-      }
-      if (side <= 0) {
-        indices_2.push_back(indices[ix]);
-      }
+  Eigen::Matrix<float, 2, 2> m;
+  m(0, 0) = sqrt(2) *
+            (e1_ray.x / 2);  // TODO(aaron): make sqrt(2) user-defined scaling parameter
+  m(1, 0) = sqrt(2) * (e1_ray.y / 2);
+  m(0, 1) = sqrt(2) * (e2_ray.x / 2);
+  m(1, 1) = sqrt(2) * (e2_ray.y / 2);
+
+  place.ellipse_matrix_expand = m;
+  Eigen::Matrix<float, 2, 2> minv = m.inverse();
+  place.ellipse_matrix_compress = minv.transpose() * minv;
+
+  place.cut_plane(0) = long_ray.x;
+  place.cut_plane(1) = long_ray.y;
+}
+
+std::pair<Place2d, Place2d> splitPlace(
+    const std::vector<Place2d::PointT, Eigen::aligned_allocator<pcl::PointXYZRGBA>>&
+        points,
+    const Place2d& place) {
+  Place2d new_place_1;
+  Place2d new_place_2;
+
+  for (size_t i : place.indices.indices) {
+    Eigen::Vector2d pt(points[i].x, points[i].y);
+    double side = (pt - place.ellipse_centroid).dot(place.cut_plane);
+    if (side >= 0) {
+      new_place_1.indices.indices.push_back(i);
     }
-
-    std::vector<std::vector<size_t>> descendants1 =
-        decomposePlace(cloud_pts, indices_1, min_size, min_points);
-    std::vector<std::vector<size_t>> descendants2 =
-        decomposePlace(cloud_pts, indices_2, min_size, min_points);
-    descendants1.insert(descendants1.end(), descendants2.begin(), descendants2.end());
-    return descendants1;
-  } else {
-    // Base Case: if region is small enough, don't split further
-    std::vector<std::vector<size_t>> indices_wrapped = {indices};
-    return indices_wrapped;
+    if (side <= 0) {
+      new_place_2.indices.indices.push_back(i);
+    }
   }
+
+  addPlaceRectInfo(points, new_place_1);
+  addPlaceRectInfo(points, new_place_2);
+
+  return std::pair(new_place_1, new_place_2);
+}
+
+std::vector<Place2d> decomposePlace(
+    const std::vector<Place2d::PointT, Eigen::aligned_allocator<pcl::PointXYZRGBA>>&
+        cloud_pts,
+    const Place2d& place,
+    const double min_size,
+    const size_t min_points) {
+  std::pair<Place2d, Place2d> children = splitPlace(cloud_pts, place);
+
+  std::vector<Place2d> descendants;
+  if (children.first.indices.indices.size() > min_points &&
+      children.first.cut_plane.norm() > min_size) {
+    descendants = decomposePlace(cloud_pts, children.first, min_size, min_points);
+  } else {
+    descendants.push_back(children.first);
+  }
+
+  if (children.second.indices.indices.size() > min_points &&
+      children.second.cut_plane.norm() > min_size) {
+    std::vector<Place2d> temp =
+        decomposePlace(cloud_pts, children.second, min_size, min_points);
+    descendants.insert(descendants.end(), temp.begin(), temp.end());
+  } else {
+    descendants.push_back(children.second);
+  }
+
+  return descendants;
 }
 
 NodeIdSet Place2dSegmenter::getActiveNodes() const {
@@ -304,6 +323,15 @@ NodeIdSet Place2dSegmenter::getActiveNodes() const {
     all_active_nodes.insert(kv.second.begin(), kv.second.end());
   }
   return all_active_nodes;
+}
+
+bool canSplit(const Place2d& p, const Place2dSegmenterConfig& cfg) {
+  if (p.indices.indices.size() > cfg.min_final_place_points &&
+      p.cut_plane.norm() > cfg.impure_final_place_size) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
 void Place2dSegmenter::detect(const ReconstructionOutput& msg,
@@ -355,12 +383,72 @@ void Place2dSegmenter::detect(const ReconstructionOutput& msg,
             << " initial places";
     std::vector<Place2d> final_places = decomposePlaces(full_mesh_vertices_,
                                                         initial_places,
-                                                        config_.min_final_place_size,
+                                                        config_.pure_final_place_size,
                                                         config_.min_final_place_points);
 
     VLOG(1) << "[Places 2d Segmenter]  - Found " << final_places.size()
             << " final places of label " << static_cast<int>(label);
     label_places.insert({label, final_places});
+  }
+
+  if (config_.enable_place_purity) {
+    bool more_places_to_split = true;
+    while (more_places_to_split) {
+      LOG(WARNING) << "[Places 2d Segmenter] starting split loop ";
+
+      more_places_to_split = false;
+      // for each semantic class, check "incompatible" semantic classes. for each impure
+      // place, split it. here we repeatedly check all places, but it's possible to make
+      // this faster by only checking "neighbor" places and being smarter about tracking
+      // which splits can cause other places to need re-checking
+      for (const auto place_label : config_.labels) {
+        LOG(WARNING) << "[Places 2d Segmenter] analyzing label:  " << place_label;
+        if (label_places.count(place_label) == 0) continue;
+        std::vector<Place2d> updated_places;
+        updated_places.clear();
+        for (Place2d p : label_places.at(place_label)) {
+          // !!! Need to push p to updated places????
+          if (!p.can_split) {
+            updated_places.push_back(p);
+            continue;
+          }
+          if (!canSplit(p, config_)) {
+            p.can_split = false;
+            updated_places.push_back(p);
+            continue;
+          }
+
+          LOG(WARNING) << "[Places 2d Segmenter] place with size: "
+                       << p.cut_plane.norm();
+          bool already_split = false;
+          for (const auto impurity_label : config_.impurity_labels) {
+            if (label_places.count(impurity_label) == 0) continue;
+            if (place_label == impurity_label) {
+              // reasonable to assume that there's no reason to split a place that only
+              // intersects with its own type, even if it's an impurity
+              continue;
+            }
+            for (Place2d ip : label_places.at(impurity_label)) {
+              if (shouldImpurityCauseSplit(p, ip)) {
+                std::pair<Place2d, Place2d> split_places =
+                    splitPlace(full_mesh_vertices_->points, p);
+                LOG(WARNING) << "[Places 2d Segmenter] split place!";
+                updated_places.push_back(split_places.first);
+                updated_places.push_back(split_places.second);
+                already_split = true;
+                more_places_to_split = true;
+                break;
+              }
+            }
+            if (already_split) break;
+          }
+          if (!already_split) {
+            updated_places.push_back(p);
+          }
+        }
+        label_places[place_label] = updated_places;
+      }
+    }
   }
 
   for (const auto& callback_func : callback_funcs_) {
@@ -397,6 +485,48 @@ LabelIndices Place2dSegmenter::getLabelIndices(const IndicesVector& indices) con
   VLOG(3) << "[Places 2d Segmenter] Seen labels: " << printLabels(seen_labels);
 
   return label_indices;
+}
+
+bool Place2dSegmenter::shouldImpurityCauseSplit(const Place2d& place,
+                                                const Place2d& impurity) {
+  // Currently we check for impurities with the same transverse logic as for adding
+  // edges between places, but it would probably be better to do something volume-based
+  Eigen::Vector2f ec1 = place.ellipse_centroid.head(2).cast<float>();
+  Eigen::Vector2f ec2 = impurity.ellipse_centroid.head(2).cast<float>();
+  double overlap_distance = get_ellipsoid_transverse_overlap_distance(
+      place.ellipse_matrix_compress, ec1, impurity.ellipse_matrix_compress, ec2);
+  double centroid_height_offset =
+      std::abs(place.ellipse_centroid(2) - impurity.ellipse_centroid(2));
+  // if (overlap_distance > config_.place_overlap_threshold && centroid_height_offset <
+  // config_.place_max_neighbor_z_diff) {
+  if (overlap_distance > 0 &&
+      centroid_height_offset < config_.place_max_neighbor_z_diff) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+bool Place2dSegmenter::shouldAddPlaceConnection(const Place2dNodeAttributes& attrs1,
+                                                const Place2dNodeAttributes& attrs2,
+                                                EdgeAttributes& edge_attrs) {
+  Eigen::Vector3f ec1 = attrs1.ellipse_centroid;
+  Eigen::Matrix<float, 2, 2> em1 = attrs1.ellipse_matrix_compress;
+
+  Eigen::Vector3f ec2 = attrs2.ellipse_centroid;
+  Eigen::Matrix<float, 2, 2> em2 = attrs2.ellipse_matrix_compress;
+
+  double overlap_distance =
+      get_ellipsoid_transverse_overlap_distance(em1, ec1.head(2), em2, ec2.head(2));
+  double centroid_height_offset = std::abs(ec1(2) - ec2(2));
+  edge_attrs.weight = overlap_distance;
+  edge_attrs.weighted = true;
+  if (overlap_distance > config_.place_overlap_threshold &&
+      centroid_height_offset < config_.place_max_neighbor_z_diff) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
 void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
@@ -457,14 +587,18 @@ void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
   }
 
   for (NodeSymbol ns1 : full_nodes) {
-    auto c1 = graph.getNode(ns1)->get().attributes().position;
+    Place2dNodeAttributes attrs1 =
+        graph.getNode(ns1)->get().attributes<Place2dNodeAttributes>();
+
     for (NodeSymbol ns2 : full_nodes) {
       if (ns1 == ns2) {
         continue;
       }
-      auto c2 = graph.getNode(ns2)->get().attributes().position;
-      if ((c1 - c2).norm() < (config_.min_final_place_size * 1.3)) {
-        graph.insertEdge(ns1, ns2);
+      Place2dNodeAttributes attrs2 =
+          graph.getNode(ns2)->get().attributes<Place2dNodeAttributes>();
+      EdgeAttributes ea;
+      if (shouldAddPlaceConnection(attrs1, attrs2, ea)) {
+        graph.insertEdge(ns1, ns2, ea.clone());
       }
     }
   }
@@ -484,12 +618,24 @@ NodeSymbol Place2dSegmenter::addPlaceToGraph(DynamicSceneGraph& graph,
   }
 
   Place2dNodeAttributes::Ptr attrs = std::make_unique<Place2dNodeAttributes>();
+
+  pcl::PointXYZ centroid;
+  place.centroid.get(centroid);
+  attrs->position << centroid.x, centroid.y, centroid.z;
+  attrs->is_active = true;
+
   attrs->semantic_label = label;
   attrs->name = NodeSymbol(next_node_id_).getLabel();
   attrs->boundary = place.boundary;
   attrs->pcl_boundary_connections.insert(attrs->pcl_boundary_connections.begin(),
                                          place.boundary_indices.indices.begin(),
                                          place.boundary_indices.indices.end());
+  attrs->ellipse_matrix_compress = place.ellipse_matrix_compress;
+  attrs->ellipse_matrix_expand = place.ellipse_matrix_expand;
+  attrs->ellipse_centroid(0) = place.ellipse_centroid(0);
+  attrs->ellipse_centroid(1) = place.ellipse_centroid(1);
+  attrs->ellipse_centroid(2) = centroid.z;
+
   // TODO(aaron): figure out bounding box
   // attrs->bounding_box = bounding_box::extract(
   //    place.cloud, config_.bounding_box_type, nullptr, config_.angle_step);
@@ -514,11 +660,6 @@ NodeSymbol Place2dSegmenter::addPlaceToGraph(DynamicSceneGraph& graph,
 
   const auto color = label_map->getColorFromLabel(label);
   attrs->color << color.r, color.g, color.b;
-
-  pcl::PointXYZ centroid;
-  place.centroid.get(centroid);
-  attrs->position << centroid.x, centroid.y, centroid.z;
-  attrs->is_active = true;
 
   graph.emplaceNode(DsgLayers::MESH_PLACES, next_node_id_, std::move(attrs));
 
