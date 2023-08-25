@@ -51,6 +51,7 @@ void declare_config(Place2dSegmenterConfig& config) {
   field(config.impure_final_place_size, "impure_final_place_size");
   field(config.min_final_place_points, "min_final_place_points");
   field(config.place_overlap_threshold, "place_overlap_threshold");
+  field(config.place_max_neighbor_z_diff, "place_max_neighbor_z_diff");
   field(config.enable_place_purity, "enable_place_purity");
   enum_field(config.bounding_box_type,
              "bounding_box_type",
