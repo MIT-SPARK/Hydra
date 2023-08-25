@@ -44,9 +44,6 @@ void declare_config(Place2dSegmenterConfig& config) {
   using namespace config;
   name("Place2dSegmenterConfig");
   field<CharConversion>(config.prefix, "prefix");
-  field(config.place_memory_radius_m, "place_memory_radius_m");
-  field(config.active_place_radius_m, "active_place_radius_m");
-  field(config.mesh_active_window_m, "mesh_active_window_m");
   field(config.cluster_tolerance, "cluster_tolerance");
   field(config.min_cluster_size, "min_cluster_size");
   field(config.max_cluster_size, "max_cluster_size");

@@ -128,8 +128,6 @@ pcl::IndicesPtr getActivePlaceIndices(
     const DynamicSceneGraph& graph,
     const OptPosition& pos,
     const pcl::PointCloud<pcl::PointXYZRGBA>& mesh,
-    const double mesh_active_horizon,
-    const double place_active_horizon,
     size_t& num_archived_vertices) {
   pcl::IndicesPtr active_indices;
   active_indices.reset(new IndicesVector());
@@ -144,7 +142,6 @@ pcl::IndicesPtr getActivePlaceIndices(
   }
 
   VLOG(1) << "[Places 2d Segmenter] n original active indices: " << indices->size();
-  const Eigen::Vector3d root_pos = *pos;
   std::unordered_set<size_t> frozen_indices;
   for (auto kv : active_places) {
     std::set<NodeId> nodes = kv.second;
@@ -184,8 +181,7 @@ pcl::IndicesPtr getActivePlaceIndices(
   for (const size_t idx : *indices) {
     const auto& p = mesh.at(idx);
     const Eigen::Vector3d vertex_pos(p.x, p.y, p.z);
-    if ((vertex_pos - root_pos).norm() < mesh_active_horizon &&
-        !frozen_indices.count(idx)) {
+    if (!frozen_indices.count(idx)) {
       active_indices->push_back(idx);
     }
   }
@@ -374,8 +370,6 @@ void Place2dSegmenter::detect(const ReconstructionOutput& msg,
                                                     graph,
                                                     pos,
                                                     *full_mesh_vertices_,
-                                                    config_.mesh_active_window_m,
-                                                    config_.active_place_radius_m,
                                                     num_archived_vertices_);
 
   LabelPlaces label_places;
