@@ -52,6 +52,8 @@ struct Place2d {
   using CentroidT = pcl::CentroidPoint<pcl::PointXYZ>;
   CentroidT centroid;
   pcl::PointIndices indices;
+  size_t min_mesh_index;
+  size_t max_mesh_index;
   pcl::PointIndices boundary_indices;
   std::vector<Eigen::Vector3d> boundary;
   Eigen::Matrix<float, 2, 2> ellipse_matrix_compress;
@@ -145,6 +147,7 @@ class Place2dSegmenter : public PlaceExtractorInterface {
   Place2dSegmenterConfig config_;
   NodeSymbol next_node_id_;
 
+  size_t num_archived_vertices_;
   std::map<uint32_t, std::set<NodeId>> active_places_;
   std::map<NodeId, uint64_t> active_place_timestamps_;
   std::vector<CallbackFunc> callback_funcs_;
