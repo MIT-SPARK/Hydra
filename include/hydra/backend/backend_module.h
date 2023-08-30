@@ -105,6 +105,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   void setUpdateFuncs(const std::list<LayerUpdateFunc>& update_funcs);
 
+  void setDefaultUpdateFunctions(bool use_outdoor_places = false);
+
   inline void addOutputCallback(const OutputCallback& callback_func) {
     output_callbacks_.push_back(callback_func);
   }
@@ -124,8 +126,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   void logPlaceDistance();
 
   void setSolverParams();
-
-  void setDefaultUpdateFunctions();
 
   void addLoopClosure(const gtsam::Key& src,
                       const gtsam::Key& dest,
@@ -196,6 +196,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   std::list<LayerUpdateFunc> dsg_update_funcs_;
   std::shared_ptr<dsg_updates::UpdateObjectsFunctor> update_objects_functor_;
   std::shared_ptr<dsg_updates::UpdatePlacesFunctor> update_places_functor_;
+  std::shared_ptr<dsg_updates::Update2DPlacesFunctor> update_2d_places_functor_;
   std::unique_ptr<dsg_updates::UpdateRoomsFunctor> update_rooms_functor_;
   std::unique_ptr<dsg_updates::UpdateBuildingsFunctor> update_buildings_functor_;
 

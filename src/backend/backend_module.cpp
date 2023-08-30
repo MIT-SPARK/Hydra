@@ -323,7 +323,8 @@ void BackendModule::setSolverParams() {
   setVerboseFlag(false);
 }
 
-void BackendModule::setDefaultUpdateFunctions() {
+void BackendModule::setDefaultUpdateFunctions(bool use_outdoor_places) {
+  dsg_update_funcs_.clear();
   // agent layer
   dsg_update_funcs_.push_back(&dsg_updates::updateAgents);
 
@@ -335,13 +336,23 @@ void BackendModule::setDefaultUpdateFunctions() {
                                         std::placeholders::_1,
                                         std::placeholders::_2));
 
-  // places layer
-  update_places_functor_.reset(new dsg_updates::UpdatePlacesFunctor(
-      config_.places_merge_pos_threshold_m, config_.places_merge_distance_tolerance_m));
-  dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdatePlacesFunctor::call,
-                                        update_places_functor_.get(),
-                                        std::placeholders::_1,
-                                        std::placeholders::_2));
+  if (!use_outdoor_places) {
+    // places layer
+    update_places_functor_.reset(new dsg_updates::UpdatePlacesFunctor(
+        config_.places_merge_pos_threshold_m,
+        config_.places_merge_distance_tolerance_m));
+    dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdatePlacesFunctor::call,
+                                          update_places_functor_.get(),
+                                          std::placeholders::_1,
+                                          std::placeholders::_2));
+  } else {
+    // outdoor places layer
+    update_2d_places_functor_.reset(new dsg_updates::Update2DPlacesFunctor());
+    dsg_update_funcs_.push_back(std::bind(&dsg_updates::Update2DPlacesFunctor::call,
+                                          update_2d_places_functor_.get(),
+                                          std::placeholders::_1,
+                                          std::placeholders::_2));
+  }
 
   // room layer
   if (config_.enable_rooms) {

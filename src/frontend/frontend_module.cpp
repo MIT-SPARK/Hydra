@@ -108,6 +108,10 @@ FrontendModule::FrontendModule(const FrontendConfig& config,
                                      dsg_->graph->getMeshVertices(),
                                      dsg_->graph->getMeshLabels()));
 
+  if (!config_.enable_places) {
+    return;
+  }
+
   if (!config_.use_outdoor_places) {
     place_extractor_.reset(new GvdPlaceExtractor(config_.graph_extractor,
                                                  config.gvd,
@@ -298,7 +302,8 @@ void FrontendModule::updateMesh(const ReconstructionOutput& input) {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
     mesh_remapping_.reset(new kimera_pgmo::VoxbloxIndexMapping());
     auto mesh = input.mesh->getActiveMesh(input.archived_blocks);
-
+    LOG(WARNING) << "[Hydra Frontend] Received mesh with " << input.mesh->numVertices()
+                 << " vertices, " << input.mesh->numVertices(true) << " active";
     VLOG(5) << "[Hydra Frontend] Updating mesh with " << mesh->numBlocks() << " blocks";
     auto interface = mesh->getMeshInterface();
     last_mesh_update_ =

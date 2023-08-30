@@ -147,6 +147,8 @@ class Place2dSegmenter : public PlaceExtractorInterface {
   Place2dSegmenterConfig config_;
   NodeSymbol next_node_id_;
 
+  std::list<NodeId> nodes_to_remove_;
+
   size_t num_archived_vertices_;
   std::map<uint32_t, std::set<NodeId>> active_places_;
   std::map<NodeId, uint64_t> active_place_timestamps_;

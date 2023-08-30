@@ -128,7 +128,8 @@ pcl::IndicesPtr getActivePlaceIndices(
     const DynamicSceneGraph& graph,
     const OptPosition& pos,
     const pcl::PointCloud<pcl::PointXYZRGBA>& mesh,
-    size_t& num_archived_vertices) {
+    size_t& num_archived_vertices,
+    std::list<NodeId>& empty_nodes) {
   pcl::IndicesPtr active_indices;
   active_indices.reset(new IndicesVector());
   active_indices->reserve(indices->size());
@@ -164,13 +165,37 @@ pcl::IndicesPtr getActivePlaceIndices(
         max_index = std::max(max_index, *iter);
         ++iter;
       }
-
       attrs.pcl_min_index = min_index;
       attrs.pcl_max_index = max_index;
+
+      const auto prev_boundary = attrs.boundary;
+      const auto prev_boundary_connections = attrs.pcl_boundary_connections;
+      attrs.boundary.clear();
+      attrs.pcl_boundary_connections.clear();
+      for (size_t i = 0; i < prev_boundary.size(); ++i) {
+        if (delta.deleted_indices.count(prev_boundary_connections.at(i))) {
+          continue;
+        }
+
+        auto map_iter = delta.prev_to_curr.find(prev_boundary_connections.at(i));
+        if (map_iter != delta.prev_to_curr.end()) {
+          attrs.boundary.push_back(prev_boundary.at(i));
+          attrs.pcl_boundary_connections.push_back(map_iter->second);
+        } else {
+          attrs.boundary.push_back(prev_boundary.at(i));
+          attrs.pcl_boundary_connections.push_back(prev_boundary_connections.at(i));
+        }
+      }
+
       if (attrs.pcl_min_index < num_archived_vertices) {
         // ^ this means that the place contains an archived vertex
         for (size_t i : attrs.pcl_mesh_connections) {
           frozen_indices.insert(i);
+        }
+      }
+      if (!attrs.is_active) {
+        if (attrs.pcl_mesh_connections.size() == 0 || attrs.boundary.size() < 3) {
+          empty_nodes.push_back(nid);
         }
       }
     }
@@ -370,7 +395,8 @@ void Place2dSegmenter::detect(const ReconstructionOutput& msg,
                                                     graph,
                                                     pos,
                                                     *full_mesh_vertices_,
-                                                    num_archived_vertices_);
+                                                    num_archived_vertices_,
+                                                    nodes_to_remove_);
 
   LabelPlaces label_places;
 
@@ -555,6 +581,12 @@ bool Place2dSegmenter::shouldAddPlaceConnection(const Place2dNodeAttributes& att
 void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
                                    const ReconstructionOutput& msg,
                                    DynamicSceneGraph& graph) {
+  // Remove old empty nodes
+  for (const auto& nid : nodes_to_remove_) {
+    graph.removeNode(nid);
+  }
+  nodes_to_remove_.clear();
+
   std::optional<Eigen::Vector3d> pos = msg.current_position;
   VLOG(1) << "[Places 2d Segmenter] updateGraph";
   std::map<uint32_t, std::set<NodeId>> new_active_places;
@@ -570,6 +602,11 @@ void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
       for (NodeId nid : nodes) {
         Place2dNodeAttributes& attrs =
             graph.getNode(nid)->get().attributes<Place2dNodeAttributes>();
+        if (attrs.pcl_mesh_connections.size() == 0 || attrs.boundary.size() < 3) {
+          // Remove dangling places
+          graph.removeNode(nid);
+          continue;
+        }
         if (attrs.pcl_max_index < num_archived_vertices_) {
           // all mesh vertices in this place have been archived, so we can forget about
           // it.

@@ -50,6 +50,7 @@ struct FrontendConfig {
   kimera_pgmo::MeshFrontendConfig pgmo_config;
   MeshSegmenterConfig object_config;
   Place2dSegmenterConfig place_config;
+  bool enable_places = true;
   bool use_outdoor_places = false;
   bool validate_vertices = true;
   bool filter_places = true;

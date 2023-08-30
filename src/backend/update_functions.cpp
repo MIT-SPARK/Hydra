@@ -556,6 +556,11 @@ void Update2DPlacesFunctor::updateNode(const MeshVertices::Ptr& mesh,
   pcl::PointXYZ pcl_pos;
   centroid.get(pcl_pos);
   attrs.position << pcl_pos.x, pcl_pos.y, pcl_pos.z;
+
+  for (size_t i = 0; i < attrs.boundary.size(); ++i) {
+    const auto& point = mesh->at(attrs.pcl_boundary_connections.at(i));
+    attrs.boundary[i] << point.x, point.y, point.z;
+  }
 }
 
 bool Update2DPlacesFunctor::shouldMerge(const Place2dNodeAttributes& from_attrs,
