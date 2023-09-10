@@ -171,7 +171,7 @@ label_names:
   - {label: 55, name: case}
   - {label: 56, name: pool}
   - {label: 57, name: pillow}
-  - {label: 58, name: screen}
+  - {label: 58, name: screen_door}
   - {label: 59, name: stairway}
   - {label: 60, name: river}
   - {label: 61, name: bridge}
@@ -263,3 +263,154 @@ label_names:
   - {label: 147, name: glass}
   - {label: 148, name: clock}
   - {label: 149, name: flag}
+label_names_descriptive:
+  - {label: 0, name: a wall}
+  - {label: 1, name: a building}
+  - {label: 2, name: the sky}
+  - {label: 3, name: a floor}
+  - {label: 4, name: a tree}
+  - {label: 5, name: a ceiling}
+  - {label: 6, name: a road}
+  - {label: 7, name: a bed}
+  - {label: 8, name: a windowpane}
+  - {label: 9, name: grass}
+  - {label: 10, name: a cabinet}
+  - {label: 11, name: a sidewalk}
+  - {label: 12, name: a person}
+  - {label: 13, name: ground}
+  - {label: 14, name: a door}
+  - {label: 15, name: a table}
+  - {label: 16, name: a mountain}
+  - {label: 17, name: plant life}
+  - {label: 18, name: a curtain}
+  - {label: 19, name: a chair}
+  - {label: 20, name: a car}
+  - {label: 21, name: water}
+  - {label: 22, name: a painting}
+  - {label: 23, name: a sofa}
+  - {label: 24, name: a shelf}
+  - {label: 25, name: a house}
+  - {label: 26, name: a sea}
+  - {label: 27, name: a mirror}
+  - {label: 28, name: a rug}
+  - {label: 29, name: a field}
+  - {label: 30, name: an armchair}
+  - {label: 31, name: a seat}
+  - {label: 32, name: a fence}
+  - {label: 33, name: a desk}
+  - {label: 34, name: a rock}
+  - {label: 35, name: a wardrobe}
+  - {label: 36, name: a lamp}
+  - {label: 37, name: a bathtub}
+  - {label: 38, name: a railing}
+  - {label: 39, name: a cushion}
+  - {label: 40, name: a base}
+  - {label: 41, name: a box}
+  - {label: 42, name: a column}
+  - {label: 43, name: a signboard}
+  - {label: 44, name: a chest}
+  - {label: 45, name: a counter}
+  - {label: 46, name: sand}
+  - {label: 47, name: a sink}
+  - {label: 48, name: a skyscraper}
+  - {label: 49, name: a fireplace}
+  - {label: 50, name: a refrigerator}
+  - {label: 51, name: a grandstand}
+  - {label: 52, name: a path}
+  - {label: 53, name: stairs}
+  - {label: 54, name: a runway}
+  - {label: 55, name: a case}
+  - {label: 56, name: a pool}
+  - {label: 57, name: a pillow}
+  - {label: 58, name: a screen door}
+  - {label: 59, name: a stairway}
+  - {label: 60, name: a river}
+  - {label: 61, name: a bridge}
+  - {label: 62, name: a bookcase}
+  - {label: 63, name: a blind}
+  - {label: 64, name: coffee}
+  - {label: 65, name: a toilet}
+  - {label: 66, name: flower}
+  - {label: 67, name: a book}
+  - {label: 68, name: a hill}
+  - {label: 69, name: a bench}
+  - {label: 70, name: a countertop}
+  - {label: 71, name: a stove}
+  - {label: 72, name: a palm tree}
+  - {label: 73, name: a kitchen island}
+  - {label: 74, name: a computer}
+  - {label: 75, name: a swivel chair}
+  - {label: 76, name: a boat}
+  - {label: 77, name: a bar}
+  - {label: 78, name: an arcade}
+  - {label: 79, name: a hovel}
+  - {label: 80, name: a bus}
+  - {label: 81, name: a towel}
+  - {label: 82, name: a light}
+  - {label: 83, name: a truck}
+  - {label: 84, name: a tower}
+  - {label: 85, name: a chandelier}
+  - {label: 86, name: an awning}
+  - {label: 87, name: a streetlight}
+  - {label: 88, name: a booth}
+  - {label: 89, name: a television}
+  - {label: 90, name: an airplane}
+  - {label: 91, name: dirt}
+  - {label: 92, name: apparel}
+  - {label: 93, name: a pole}
+  - {label: 94, name: land}
+  - {label: 95, name: a bannister}
+  - {label: 96, name: an escalator}
+  - {label: 97, name: an ottoman}
+  - {label: 98, name: a bottle}
+  - {label: 99, name: a buffet}
+  - {label: 100, name: a poster}
+  - {label: 101, name: a stage}
+  - {label: 102, name: a van}
+  - {label: 103, name: a ship}
+  - {label: 104, name: a fountain}
+  - {label: 105, name: a conveyer}
+  - {label: 106, name: a canopy}
+  - {label: 107, name: a washer}
+  - {label: 108, name: a plaything}
+  - {label: 109, name: a swimming pool}
+  - {label: 110, name: a stool}
+  - {label: 111, name: a barrel}
+  - {label: 112, name: a basket}
+  - {label: 113, name: a waterfall}
+  - {label: 114, name: a tent}
+  - {label: 115, name: a bag}
+  - {label: 116, name: a minibike}
+  - {label: 117, name: a cradle}
+  - {label: 118, name: an oven}
+  - {label: 119, name: a ball}
+  - {label: 120, name: food}
+  - {label: 121, name: a step}
+  - {label: 122, name: a storage tank}
+  - {label: 123, name: a marque}
+  - {label: 124, name: a microwave}
+  - {label: 125, name: a pot}
+  - {label: 126, name: an animal}
+  - {label: 127, name: a bicycle}
+  - {label: 128, name: a lake}
+  - {label: 129, name: a dishwasher}
+  - {label: 130, name: a projection screen}
+  - {label: 131, name: a blanket}
+  - {label: 132, name: a sculpture}
+  - {label: 133, name: an exhaust hood}
+  - {label: 134, name: a sconce}
+  - {label: 135, name: a vase}
+  - {label: 136, name: a traffic signal}
+  - {label: 137, name: a tray}
+  - {label: 138, name: a trashcan}
+  - {label: 139, name: a fan}
+  - {label: 140, name: a pier}
+  - {label: 141, name: a crt screen}
+  - {label: 142, name: plate}
+  - {label: 143, name: a monitoring device}
+  - {label: 144, name: a bulletin board}
+  - {label: 145, name: shower}
+  - {label: 146, name: radiator}
+  - {label: 147, name: a drinking glass}
+  - {label: 148, name: a clock}
+  - {label: 149, name: a flag}

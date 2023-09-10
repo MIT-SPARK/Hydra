@@ -76,3 +76,40 @@ label_names:
   - {label: 36, name: clothes}
   - {label: 37, name: objects}
   - {label: 38, name: misc}
+label_names_descriptive:
+  - {label: 1, name: a wall}
+  - {label: 2, name: a floor}
+  - {label: 3, name: a chair}
+  - {label: 4, name: a door}
+  - {label: 5, name: a table}
+  - {label: 6, name: a picture}
+  - {label: 7, name: a cabinet}
+  - {label: 8, name: a cushion}
+  - {label: 9, name: a window}
+  - {label: 10, name: a sofa}
+  - {label: 11, name: a bed}
+  - {label: 12, name: a curtain}
+  - {label: 13, name: a chest of drawers}
+  - {label: 14, name: a plant}
+  - {label: 15, name: a sink}
+  - {label: 16, name: a set of stairs}
+  - {label: 17, name: a ceiling}
+  - {label: 18, name: a toilet}
+  - {label: 19, name: a stool for sitting}
+  - {label: 20, name: a towel}
+  - {label: 21, name: a mirror}
+  - {label: 22, name: a television}
+  - {label: 23, name: a shower}
+  - {label: 24, name: a column}
+  - {label: 25, name: a bathtub}
+  - {label: 26, name: a countertop}
+  - {label: 27, name: a fireplace}
+  - {label: 28, name: lighting}
+  - {label: 29, name: a railing}
+  - {label: 30, name: a set of shelves}
+  - {label: 31, name: window blinds}
+  - {label: 32, name: seating for a group of people}
+  - {label: 33, name: a whiteboard}
+  - {label: 34, name: an odd piece of furniture}
+  - {label: 35, name: an appliance}
+  - {label: 36, name: an article of clothing}
