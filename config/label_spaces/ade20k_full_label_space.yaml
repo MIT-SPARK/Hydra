@@ -265,12 +265,12 @@ label_names:
   - {label: 149, name: flag}
 label_names_descriptive:
   - {label: 0, name: a wall}
-  - {label: 1, name: a building}
+  - {label: 1, name: a part of a building}
   - {label: 2, name: the sky}
   - {label: 3, name: a floor}
   - {label: 4, name: a tree}
   - {label: 5, name: a ceiling}
-  - {label: 6, name: a road}
+  - {label: 6, name: a part of a road}
   - {label: 7, name: a bed}
   - {label: 8, name: a windowpane}
   - {label: 9, name: grass}
@@ -293,7 +293,7 @@ label_names_descriptive:
   - {label: 26, name: a sea}
   - {label: 27, name: a mirror}
   - {label: 28, name: a rug}
-  - {label: 29, name: a field}
+  - {label: 29, name: a part of a field}
   - {label: 30, name: an armchair}
   - {label: 31, name: a seat}
   - {label: 32, name: a fence}
