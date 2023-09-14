@@ -1,0 +1,99 @@
+---
+semantic_measurement_probability: 0.9
+total_semantic_labels: 46
+dynamic_labels: [1, 5, 24, 25, 26, 27, 28, 30, 31, 32, 33, 43]
+invalid_labels: [0, 1, 2, 3, 4, 5, 23, 45]
+label_names:
+  - {label: 0, name: unlabeled}
+  - {label: 1, name: ego_vehicle}
+  - {label: 2, name: rectification}
+  - {label: 3, name: out}
+  - {label: 4, name: static}
+  - {label: 5, name: dynamic}
+  - {label: 6, name: ground}
+  - {label: 7, name: road}
+  - {label: 8, name: sidewalk}
+  - {label: 9, name: parking}
+  - {label: 10, name: rail}
+  - {label: 11, name: building}
+  - {label: 12, name: wall}
+  - {label: 13, name: fence}
+  - {label: 14, name: guard}
+  - {label: 15, name: bridge}
+  - {label: 16, name: tunnel}
+  - {label: 17, name: pole}
+  - {label: 18, name: polegroup}
+  - {label: 19, name: traffic_light}
+  - {label: 20, name: traffic_sign}
+  - {label: 21, name: vegetation}
+  - {label: 22, name: terrain}
+  - {label: 23, name: sky}
+  - {label: 24, name: person}
+  - {label: 25, name: rider}
+  - {label: 26, name: car}
+  - {label: 27, name: truck}
+  - {label: 28, name: bus}
+  - {label: 29, name: caravan}
+  - {label: 30, name: trailer}
+  - {label: 31, name: train}
+  - {label: 32, name: motorcycle}
+  - {label: 33, name: bicycle}
+  - {label: 34, name: garage}
+  - {label: 35, name: gate}
+  - {label: 36, name: stop}
+  - {label: 37, name: smallpole}
+  - {label: 38, name: lamp}
+  - {label: 39, name: trash}
+  - {label: 40, name: vending}
+  - {label: 41, name: box}
+  - {label: 42, name: construction}
+  - {label: 43, name: vehicle}
+  - {label: 44, name: object}
+  - {label: 45, name: license}
+label_names_descriptive:
+  - {label: 0, name: unknown}
+  - {label: 1, name: an ego vehicle}
+  - {label: 2, name: a rectification border}
+  - {label: 3, name: out of region of interest}
+  - {label: 4, name: a static object}
+  - {label: 5, name: a dynamic object}
+  - {label: 6, name: the ground}
+  - {label: 7, name: a part of a road}
+  - {label: 8, name: a sidewalk}
+  - {label: 9, name: a parking space}
+  - {label: 10, name: a railroad track}
+  - {label: 11, name: a building}
+  - {label: 12, name: a wall}
+  - {label: 13, name: a fence}
+  - {label: 14, name: a guard rail}
+  - {label: 15, name: a bridge}
+  - {label: 16, name: a tunnel}
+  - {label: 17, name: a pole}
+  - {label: 18, name: a group of poles}
+  - {label: 19, name: a traffic light}
+  - {label: 20, name: a traffic sign}
+  - {label: 21, name: vegetation}
+  - {label: 22, name: terrain}
+  - {label: 23, name: the sky}
+  - {label: 24, name: a person}
+  - {label: 25, name: a rider}
+  - {label: 26, name: a car}
+  - {label: 27, name: a truck}
+  - {label: 28, name: a bus}
+  - {label: 29, name: a caravan}
+  - {label: 30, name: a trailer}
+  - {label: 31, name: a train}
+  - {label: 32, name: a motorcycle}
+  - {label: 33, name: a bicycle}
+  - {label: 34, name: a garage}
+  - {label: 35, name: a gate}
+  - {label: 36, name: a stop}
+  - {label: 37, name: a small pole}
+  - {label: 38, name: a lamp}
+  - {label: 39, name: a trash can}
+  - {label: 40, name: a vending machine}
+  - {label: 41, name: a box}
+  - {label: 42, name: construction}
+  - {label: 43, name: an unknown vehicle}
+  - {label: 44, name: an unknown object}
+  - {label: 45, name: a license plate}
