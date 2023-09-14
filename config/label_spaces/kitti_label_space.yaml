@@ -3,6 +3,7 @@ semantic_measurement_probability: 0.9
 total_semantic_labels: 46
 dynamic_labels: [1, 5, 24, 25, 26, 27, 28, 30, 31, 32, 33, 43]
 invalid_labels: [0, 1, 2, 3, 4, 5, 23, 45]
+invalid_labels_for_ontology: [0, 1, 2, 3, 4, 5, 23, 45]
 label_names:
   - {label: 0, name: unlabeled}
   - {label: 1, name: ego_vehicle}
@@ -22,7 +23,7 @@ label_names:
   - {label: 15, name: bridge}
   - {label: 16, name: tunnel}
   - {label: 17, name: pole}
-  - {label: 18, name: polegroup}
+  - {label: 18, name: pole_group}
   - {label: 19, name: traffic_light}
   - {label: 20, name: traffic_sign}
   - {label: 21, name: vegetation}
@@ -41,7 +42,7 @@ label_names:
   - {label: 34, name: garage}
   - {label: 35, name: gate}
   - {label: 36, name: stop}
-  - {label: 37, name: smallpole}
+  - {label: 37, name: small_pole}
   - {label: 38, name: lamp}
   - {label: 39, name: trash}
   - {label: 40, name: vending}
