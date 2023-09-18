@@ -423,6 +423,13 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
     logIncrementalLoopClosures(*msg);
   }
 
+  if (input.agent_node_measurements) {
+    updateAgentNodeMeasurements(*input.agent_node_measurements);
+    // Think of it as "implicit" loop closures
+    have_loopclosures_ = true;
+    have_new_loopclosures_ = true;
+  }
+
   if (num_loop_closures_ > prev_loop_closures) {
     LOG(WARNING) << "New loop closures detected!";
     have_new_loopclosures_ = true;
@@ -712,6 +719,16 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
                                    nullptr,
                                    prev_num_archived_vertices_);
   prev_num_archived_vertices_ = num_archived_vertices_;
+}
+
+void BackendModule::updateAgentNodeMeasurements(
+    const pose_graph_tools::PoseGraph& meas) {
+  std::vector<std::pair<gtsam::Key, gtsam::Pose3>> agent_measurements;
+  for (const auto& node : meas.nodes) {
+    agent_measurements.push_back(
+        {gtsam::Symbol(prefix_.key, node.key), kimera_pgmo::RosToGtsam(node.pose)});
+  }
+  deformation_graph_->addNodeMeasurements(agent_measurements);
 }
 
 void BackendModule::optimize(size_t timestamp_ns) {

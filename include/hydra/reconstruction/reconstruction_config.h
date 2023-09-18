@@ -51,7 +51,7 @@ struct ReconstructionConfig {
   bool show_stats = true;
   bool clear_distant_blocks = true;
   double dense_representation_radius_m = 5.0;
-  std::string world_frame = "world";
+  std::string odom_frame = "odom";
   std::string robot_frame = "base_link";
   size_t num_poses_per_update = 1;
   size_t max_input_queue_size = 0;

@@ -237,6 +237,10 @@ void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
 
   backend_input_.reset(new BackendInput());
   backend_input_->pose_graphs = msg.pose_graphs;
+  if (msg.agent_node_measurements) {
+    backend_input_->agent_node_measurements.reset(
+        new PoseGraph(*msg.agent_node_measurements));
+  }
   backend_input_->timestamp_ns = msg.timestamp_ns;
 
   lcd_input_.reset(new LcdInput);

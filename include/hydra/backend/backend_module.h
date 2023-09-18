@@ -142,6 +142,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   virtual void addPlacesToDeformationGraph(size_t timestamp_ns);
 
+  virtual void updateAgentNodeMeasurements(const pose_graph_tools::PoseGraph& meas);
+
   virtual void optimize(size_t timestamp_ns);
 
   virtual void updateDsgMesh(size_t timestamp_ns, bool force_mesh_update = false);

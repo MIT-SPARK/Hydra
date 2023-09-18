@@ -63,6 +63,7 @@ struct ReconstructionInput {
 
   uint64_t timestamp_ns;
   std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
+  pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements;
   Eigen::Vector3d world_t_body;
   Eigen::Quaterniond world_R_body;
   voxblox::Pointcloud pointcloud;
@@ -131,6 +132,7 @@ class ReconstructionModule : public Module {
   std::unique_ptr<std::thread> spin_thread_;
 
   std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs_;
+  pose_graph_tools::PoseGraph agent_node_measurements_;
   ReconstructionOutput::Ptr pending_output_;
   OutputQueue::Ptr output_queue_;
 
