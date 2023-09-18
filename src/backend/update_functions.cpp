@@ -206,7 +206,7 @@ std::map<NodeId, NodeId> UpdateObjectsFunctor::call(SharedDsgInfo& dsg,
     }
 
     // we only skip the first proposed object if the considered object is a potential
-    // merge target. this happens if and onlf if:
+    // merge target. this happens if and only if:
     // - the object is an archived object and a loop closure is being processed
     // - we are not paying attention to the active flag
     const bool skip_first = !use_active_flag || !attrs.is_active;

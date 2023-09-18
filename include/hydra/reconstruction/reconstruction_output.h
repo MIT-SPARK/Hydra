@@ -40,29 +40,19 @@
 #include <cstdint>
 #include <memory>
 
-#include "hydra/common/dsg_types.h"
+#include "hydra/places/vertex_voxel.h"
 #include "hydra/reconstruction/semantic_mesh_layer.h"
 
 namespace hydra {
-
-struct ActiveLayerInfo {
-  using Ptr = std::shared_ptr<ActiveLayerInfo>;
-  std::map<NodeId, NodeAttributes::Ptr> active_attributes;
-  std::list<SceneGraphEdge> edges;
-  std::vector<NodeId> deleted_nodes;
-  std::vector<NodeId> deleted_edges;
-
-  void fillFromGraph(const SceneGraphLayer& layer,
-                     const std::unordered_set<NodeId>& active_nodes);
-};
 
 struct ReconstructionOutput {
   using Ptr = std::shared_ptr<ReconstructionOutput>;
 
   uint64_t timestamp_ns;
-  ActiveLayerInfo::Ptr places;
   SemanticMeshLayer::Ptr mesh;
-  voxblox::IndexSet archived_blocks;
+  voxblox::Layer<voxblox::TsdfVoxel>::Ptr tsdf;
+  voxblox::Layer<places::VertexVoxel>::Ptr occupied;
+  voxblox::BlockIndexList archived_blocks;
   std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
   Eigen::Vector3d current_position;
 };

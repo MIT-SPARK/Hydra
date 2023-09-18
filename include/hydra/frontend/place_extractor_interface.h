@@ -33,70 +33,50 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <KimeraRPGO/SolverParams.h>
-#include <kimera_pgmo/KimeraPgmoInterface.h>
-
-#include "hydra/common/dsg_types.h"
-#include "hydra/rooms/room_finder_config.h"
+#include "hydra/common/common.h"
+#include "hydra/places/gvd_voxel.h"
+#include "hydra/places/vertex_voxel.h"
+#include "hydra/reconstruction/reconstruction_output.h"
+#include "hydra/utils/log_utilities.h"
 
 namespace hydra {
 
-// supplementary pgmo config
-struct HydraPgmoConfig : public kimera_pgmo::KimeraPgmoConfig {
-  // covariance
-  double place_mesh_variance;
-  double place_edge_variance;
-  double place_merge_variance;
-  double object_merge_variance;
-  double sg_loop_closure_variance;
-  // rpgo
-  bool gnc_fix_prev_inliers = true;
-  KimeraRPGO::Verbosity rpgo_verbosity = KimeraRPGO::Verbosity::UPDATE;
-  KimeraRPGO::Solver rpgo_solver = KimeraRPGO::Solver::LM;
+namespace places {
+// forward declare to avoid include
+class GraphExtractorInterface;
+}  // namespace places
+
+class PlaceExtractorInterface {
+ public:
+  using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
+  using VizCallback = std::function<void(uint64_t,
+                                         const voxblox::Layer<places::GvdVoxel>&,
+                                         const places::GraphExtractorInterface*)>;
+
+  PlaceExtractorInterface() {}
+
+  virtual ~PlaceExtractorInterface() = default;
+
+  virtual void save(const LogSetup& /* logs */) const {}
+
+  virtual void detect(const ReconstructionOutput& msg) = 0;
+
+  virtual void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) = 0;
+
+  virtual NodeIdSet getActiveNodes() const = 0;
+
+  virtual void addVisualizationCallback(const VizCallback& callback) {
+    visualization_callbacks_.push_back(callback);
+  }
+
+  // takes in a 3xN matrix
+  virtual std::vector<bool> inFreespace(const PositionMatrix& /* positions */,
+                                        double /* freespace_distance_m */) const {
+    return {};
+  }
+
+ protected:
+  std::vector<VizCallback> visualization_callbacks_;
 };
-
-struct BackendConfig {
-  float angle_step = 10.0f;
-  bool visualize_place_factors = true;
-
-  bool enable_rooms = true;
-  RoomFinderConfig room_finder;
-
-  bool enable_buildings = true;
-  SemanticNodeAttributes::ColorVector building_color{169, 8, 194};  // purple
-  SemanticNodeAttributes::Label building_semantic_label = 22u;
-
-  HydraPgmoConfig pgmo;
-
-  // dsg
-  bool add_places_to_deformation_graph = true;
-  bool optimize_on_lc = true;
-  bool enable_node_merging = true;
-  bool use_mesh_subscribers = false;
-  std::map<LayerId, bool> merge_update_map{{DsgLayers::OBJECTS, false},
-                                           {DsgLayers::PLACES, true},
-                                           {DsgLayers::ROOMS, false},
-                                           {DsgLayers::BUILDINGS, false}};
-  bool merge_update_dynamic = true;
-  double places_merge_pos_threshold_m = 0.4;
-  double places_merge_distance_tolerance_m = 0.3;
-  bool enable_merge_undos = false;
-  bool use_active_flag_for_updates = true;
-  size_t num_neighbors_to_find_for_merge = 1;
-  std::string zmq_send_url = "tcp://127.0.0.1:8001";
-  std::string zmq_recv_url = "tcp://127.0.0.1:8002";
-  bool use_zmq_interface = false;
-  size_t zmq_num_threads = 2;
-  size_t zmq_poll_time_ms = 10;
-};
-
-void declare_config(HydraPgmoConfig& conf);
-void declare_config(BackendConfig& conf);
 
 }  // namespace hydra
-
-namespace kimera_pgmo {
-
-void declare_config(KimeraPgmoConfig& conf);
-
-}  // namespace kimera_pgmo

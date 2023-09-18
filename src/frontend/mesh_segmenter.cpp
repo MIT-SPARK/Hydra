@@ -35,11 +35,12 @@
 #include "hydra/frontend/mesh_segmenter.h"
 
 #include <glog/logging.h>
+#include <kimera_semantics/color.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <spark_dsg/bounding_box_extraction.h>
-#include <kimera_semantics/color.h>
 
 #include "hydra/common/hydra_config.h"
+#include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
 
@@ -48,8 +49,10 @@ using LabelClusters = MeshSegmenter::LabelClusters;
 using LabelIndices = MeshSegmenter::LabelIndices;
 using IndicesVector = MeshSegmenter::IndicesVector;
 using OptPosition = std::optional<Eigen::Vector3d>;
+using timing::ScopedTimer;
 
-void mergeList(std::list<size_t>& lhs, const std::vector<int>& rhs) {
+template <typename LList, typename RList>
+void mergeList(LList& lhs, const RList& rhs) {
   std::unordered_set<size_t> seen(lhs.begin(), lhs.end());
   for (const auto idx : rhs) {
     if (seen.count(idx)) {
@@ -77,14 +80,19 @@ std::string printLabels(const std::set<T>& labels) {
   return ss.str();
 }
 
-inline bool objectsMatch(const Cluster& cluster, const SceneGraphNode& node) {
+inline bool nodesMatch(const SceneGraphNode& lhs_node, const SceneGraphNode& rhs_node) {
+  return lhs_node.attributes<SemanticNodeAttributes>().bounding_box.isInside(
+      rhs_node.attributes().position);
+}
+
+inline bool nodesMatch(const Cluster& cluster, const SceneGraphNode& node) {
   pcl::PointXYZ centroid;
   cluster.centroid.get(centroid);
 
   Eigen::Vector3f point;
   point << centroid.x, centroid.y, centroid.z;
 
-  return node.attributes<ObjectNodeAttributes>().bounding_box.isInside(point);
+  return node.attributes<SemanticNodeAttributes>().bounding_box.isInside(point);
 }
 
 MeshSegmenter::MeshSegmenter(const MeshSegmenterConfig& config,
@@ -94,10 +102,10 @@ MeshSegmenter::MeshSegmenter(const MeshSegmenterConfig& config,
       full_mesh_labels_(mesh_labels),
       config_(config),
       next_node_id_(config.prefix, 0) {
-  VLOG(1) << "[Hydra Frontend] Detecting objects for labels: "
+  VLOG(1) << "[Mesh Segmenter] Detecting nodes for labels: "
           << printLabels(config.labels);
   for (const auto& label : config.labels) {
-    active_objects_[label] = std::set<NodeId>();
+    active_nodes_[label] = std::set<NodeId>();
   }
 }
 
@@ -125,11 +133,11 @@ Clusters MeshSegmenter::findClusters(const MeshVertexCloud::Ptr& cloud,
     clusters.at(k).indices = cluster_indices.at(k);
     clusters.at(k).cloud.reset(new MeshVertexCloud());
 
-    const auto& object_indices = cluster_indices.at(k).indices;
-    clusters.at(k).cloud->resize(object_indices.size());
+    const auto& curr_indices = cluster_indices.at(k).indices;
+    clusters.at(k).cloud->resize(curr_indices.size());
 
-    for (size_t i = 0; i < object_indices.size(); ++i) {
-      const auto& cp = cloud->at(object_indices.at(i));
+    for (size_t i = 0; i < curr_indices.size(); ++i) {
+      const auto& cp = cloud->at(curr_indices.at(i));
       clusters.at(k).cloud->at(i) = cp;
       clusters.at(k).centroid.add(pcl::PointXYZ(cp.x, cp.y, cp.z));
     }
@@ -164,8 +172,11 @@ pcl::IndicesPtr getActiveIndices(const pcl::IndicesPtr& indices,
   return active_indices;
 }
 
-LabelClusters MeshSegmenter::detect(const pcl::IndicesPtr& frontend_indices,
+LabelClusters MeshSegmenter::detect(uint64_t timestamp_ns,
+                                    const pcl::IndicesPtr& frontend_indices,
                                     const std::optional<Eigen::Vector3d>& pos) {
+  const auto timer_name = config_.timer_namespace + "_detection";
+  ScopedTimer timer(timer_name, timestamp_ns, true, 1, false);
   const auto active_indices = getActiveIndices(
       frontend_indices, pos, *full_mesh_vertices_, config_.active_index_horizon_m);
 
@@ -208,52 +219,36 @@ LabelClusters MeshSegmenter::detect(const pcl::IndicesPtr& frontend_indices,
   return label_clusters;
 }
 
-void MeshSegmenter::pruneObjectsToCheckForPlaces(const DynamicSceneGraph& graph) {
-  std::list<NodeId> to_remove;
-  for (const auto& object_id : objects_to_check_for_places_) {
-    if (!graph.hasNode(object_id)) {
-      LOG(ERROR) << "Missing node " << NodeSymbol(object_id).getLabel();
-      to_remove.push_back(object_id);
-      continue;
-    }
-
-    if (graph.getNode(object_id).value().get().hasParent()) {
-      to_remove.push_back(object_id);
-    }
-  }
-
-  for (const auto& node_id : to_remove) {
-    objects_to_check_for_places_.erase(node_id);
-  }
-}
-
-std::set<NodeId> MeshSegmenter::archiveOldObjects(const DynamicSceneGraph& graph,
-                                                  uint64_t latest_timestamp) {
-  std::set<NodeId> archived = {};
+void MeshSegmenter::archiveOldNodes(const DynamicSceneGraph& graph,
+                                    size_t num_archived_vertices) {
+  std::set<NodeId> archived;
   for (const auto& label : config_.labels) {
     std::list<NodeId> removed_nodes;
-    for (const auto& object_node : active_objects_.at(label)) {
-      if (!graph.hasNode(object_node)) {
-        removed_nodes.push_back(object_node);
+    for (const auto& node_id : active_nodes_.at(label)) {
+      if (!graph.hasNode(node_id)) {
+        removed_nodes.push_back(node_id);
         continue;
       }
 
-      const uint64_t diff_ns =
-          latest_timestamp - active_object_timestamps_.at(object_node);
-      if (diff_ns > static_cast<uint64_t>(config_.active_horizon_s * 1e9)) {
-        removed_nodes.push_back(object_node);
-        archived.insert(object_node);
-        graph.getNode(object_node)->get().attributes().is_active = false;
+      auto& attrs = graph.getNode(node_id)->get().attributes<ObjectNodeAttributes>();
+      bool is_active = false;
+      for (const auto index : attrs.mesh_connections) {
+        if (index >= num_archived_vertices) {
+          is_active = true;
+          break;
+        }
+      }
+
+      attrs.is_active = is_active;
+      if (!attrs.is_active) {
+        removed_nodes.push_back(node_id);
       }
     }
 
     for (const auto& node_id : removed_nodes) {
-      active_objects_[label].erase(node_id);
-      active_object_timestamps_.erase(node_id);
+      active_nodes_[label].erase(node_id);
     }
   }
-
-  return archived;
 }
 
 LabelIndices MeshSegmenter::getLabelIndices(const IndicesVector& indices) const {
@@ -285,66 +280,124 @@ LabelIndices MeshSegmenter::getLabelIndices(const IndicesVector& indices) const 
   return label_indices;
 }
 
-std::set<NodeId> MeshSegmenter::updateGraph(DynamicSceneGraph& graph,
-                                            const LabelClusters& clusters,
-                                            uint64_t timestamp) {
-  std::set<NodeId> archived = archiveOldObjects(graph, timestamp);
+void MeshSegmenter::updateGraph(uint64_t timestamp_ns,
+                                const LabelClusters& clusters,
+                                size_t num_archived_vertices,
+                                DynamicSceneGraph& graph) {
+  ScopedTimer timer(config_.timer_namespace + "_graph_update", timestamp_ns);
+  archiveOldNodes(graph, num_archived_vertices);
 
-  for (const auto& label_clusters : clusters) {
-    for (const auto& cluster : label_clusters.second) {
-      bool matches_prev_object = false;
+  for (auto&& [label, clusters_for_label] : clusters) {
+    for (const auto& cluster : clusters_for_label) {
+      bool matches_prev_node = false;
       std::vector<NodeId> nodes_not_in_graph;
-      for (const auto& prev_node_id : active_objects_.at(label_clusters.first)) {
+      for (const auto& prev_node_id : active_nodes_.at(label)) {
         const SceneGraphNode& prev_node = graph.getNode(prev_node_id).value();
-        if (objectsMatch(cluster, prev_node)) {
-          updateObjectInGraph(cluster, prev_node, timestamp);
-          matches_prev_object = true;
+        if (nodesMatch(cluster, prev_node)) {
+          updateNodeInGraph(cluster, prev_node, timestamp_ns);
+          matches_prev_node = true;
           break;
         }
       }
 
-      if (!matches_prev_object) {
-        addObjectToGraph(graph, cluster, label_clusters.first, timestamp);
+      if (!matches_prev_node) {
+        addNodeToGraph(graph, cluster, label, timestamp_ns);
+      }
+
+      mergeActiveNodes(graph, label);
+    }
+  }
+}
+
+void MeshSegmenter::mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label) {
+  std::set<NodeId> merged_nodes;
+
+  auto& curr_active = active_nodes_.at(label);
+  for (const auto& node_id : curr_active) {
+    if (merged_nodes.count(node_id)) {
+      continue;
+    }
+    const auto& node = graph.getNode(node_id)->get();
+
+    std::list<NodeId> to_merge;
+    for (const auto& other_id : curr_active) {
+      if (node_id == other_id) {
+        continue;
+      }
+
+      if (merged_nodes.count(other_id)) {
+        continue;
+      }
+
+      const auto& other = graph.getNode(other_id)->get();
+      if (nodesMatch(node, other) || nodesMatch(other, node)) {
+        to_merge.push_back(other_id);
       }
     }
 
-    // TODO(nathan) maybe think about trying to merge overlapping objects here?
+    auto& attrs = node.attributes<ObjectNodeAttributes>();
+    for (const auto& other_id : to_merge) {
+      const auto& other = graph.getNode(other_id)->get();
+      auto& other_attrs = other.attributes<ObjectNodeAttributes>();
+      mergeList(attrs.mesh_connections, other_attrs.mesh_connections);
+      graph.removeNode(other_id);
+      merged_nodes.insert(other_id);
+    }
+
+    if (!to_merge.empty()) {
+      pcl::IndicesPtr indices(new std::vector<int>(attrs.mesh_connections.begin(),
+                                                   attrs.mesh_connections.end()));
+      auto new_box = bounding_box::extract(
+          full_mesh_vertices_, config_.bounding_box_type, indices, config_.angle_step);
+
+      // TODO(nathan) this is not ideal, but...
+      attrs.position << new_box.world_P_center.cast<double>();
+      attrs.bounding_box = new_box;
+    }
   }
 
-  return archived;
+  for (const auto& node_id : merged_nodes) {
+    curr_active.erase(node_id);
+  }
 }
 
-void MeshSegmenter::updateObjectInGraph(const Cluster& cluster,
-                                        const SceneGraphNode& node,
-                                        uint64_t timestamp) {
-  active_object_timestamps_.at(node.id) = timestamp;
+std::unordered_set<NodeId> MeshSegmenter::getActiveNodes() const {
+  std::unordered_set<NodeId> active_nodes;
+  for (const auto& label_nodes_pair : active_nodes_) {
+    active_nodes.insert(label_nodes_pair.second.begin(), label_nodes_pair.second.end());
+  }
+  return active_nodes;
+}
 
-  ObjectNodeAttributes& attrs = node.attributes<ObjectNodeAttributes>();
+void MeshSegmenter::updateNodeInGraph(const Cluster& cluster,
+                                      const SceneGraphNode& node,
+                                      uint64_t timestamp) {
+  auto& attrs = node.attributes<ObjectNodeAttributes>();
   mergeList(attrs.mesh_connections, cluster.indices.indices);
 
   pcl::IndicesPtr indices(new std::vector<int>(attrs.mesh_connections.begin(),
                                                attrs.mesh_connections.end()));
   auto new_box = bounding_box::extract(
       full_mesh_vertices_, config_.bounding_box_type, indices, config_.angle_step);
-  objects_to_check_for_places_.insert(node.id);
 
   // TODO(nathan) this is not ideal, but...
   attrs.position << new_box.world_P_center.cast<double>();
   attrs.bounding_box = new_box;
+  attrs.last_update_time_ns = timestamp;
   attrs.is_active = true;
 }
 
-void MeshSegmenter::addObjectToGraph(DynamicSceneGraph& graph,
-                                     const Cluster& cluster,
-                                     uint32_t label,
-                                     uint64_t timestamp) {
+void MeshSegmenter::addNodeToGraph(DynamicSceneGraph& graph,
+                                   const Cluster& cluster,
+                                   uint32_t label,
+                                   uint64_t timestamp) {
   if (cluster.cloud->empty()) {
     LOG(ERROR) << "Encountered empty cluster with label" << static_cast<int>(label)
                << " @ " << timestamp << "[ns]";
     return;
   }
 
-  ObjectNodeAttributes::Ptr attrs = std::make_unique<ObjectNodeAttributes>();
+  auto attrs = std::make_unique<ObjectNodeAttributes>();
   attrs->semantic_label = label;
   attrs->name = NodeSymbol(next_node_id_).getLabel();
   attrs->bounding_box = bounding_box::extract(
@@ -374,14 +427,11 @@ void MeshSegmenter::addObjectToGraph(DynamicSceneGraph& graph,
   pcl::PointXYZ centroid;
   cluster.centroid.get(centroid);
   attrs->position << centroid.x, centroid.y, centroid.z;
+  attrs->last_update_time_ns = timestamp;
   attrs->is_active = true;
 
-  graph.emplaceNode(DsgLayers::OBJECTS, next_node_id_, std::move(attrs));
-
-  active_objects_.at(label).insert(next_node_id_);
-  active_object_timestamps_[next_node_id_] = timestamp;
-  objects_to_check_for_places_.insert(next_node_id_);
-
+  graph.emplaceNode(config_.layer_id, next_node_id_, std::move(attrs));
+  active_nodes_.at(label).insert(next_node_id_);
   ++next_node_id_;
 }
 

@@ -42,8 +42,6 @@
 #include "hydra/common/input_queue.h"
 #include "hydra/common/module.h"
 #include "hydra/common/robot_prefix_config.h"
-#include "hydra/places/gvd_voxel.h"
-#include "hydra/places/vertex_voxel.h"
 #include "hydra/reconstruction/reconstruction_config.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/utils/log_utilities.h"
@@ -53,12 +51,6 @@ class SemanticIntegratorBase;
 }
 
 namespace hydra {
-
-namespace places {
-// forward declare to avoid include
-class GvdIntegrator;
-class GraphExtractorInterface;
-}  // namespace places
 
 class MeshIntegrator;
 
@@ -82,13 +74,9 @@ class ReconstructionModule : public Module {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   using Ptr = std::shared_ptr<ReconstructionModule>;
-  using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
   using ReconstructionInputQueue = InputQueue<ReconstructionInput::Ptr>;
   using OutputQueue = InputQueue<ReconstructionOutput::Ptr>;
   using OutputCallback = std::function<void(const ReconstructionOutput&)>;
-  using VizCallback = std::function<void(uint64_t,
-                                         const voxblox::Layer<places::GvdVoxel>&,
-                                         const places::GraphExtractorInterface*)>;
 
   ReconstructionModule(const ReconstructionConfig& config,
                        const RobotPrefixConfig& prefix,
@@ -108,30 +96,15 @@ class ReconstructionModule : public Module {
 
   bool spinOnce();
 
-  void updateGvd();
-
   // public for external use
   bool spinOnce(const ReconstructionInput& input);
 
   void addOutputCallback(const OutputCallback& callback);
 
-  void addVisualizationCallback(const VizCallback& callback);
-
-  // takes in a 3xN matrix
-  std::vector<bool> inFreespace(const PositionMatrix& positions,
-                                double freespace_distance_m) const;
-
  protected:
   void update(const ReconstructionInput& msg, bool full_update);
 
-  void updateGvdSpin();
-
   void showStats() const;
-
-  void addMeshToOutput(ReconstructionOutput& output,
-                       const voxblox::BlockIndexList& archived_blocks);
-
-  void addPlacesToOutput(ReconstructionOutput& output);
 
   void fillPoseGraphNode(pose_graph_tools::PoseGraphNode& node,
                          uint64_t stamp,
@@ -147,40 +120,33 @@ class ReconstructionModule : public Module {
 
   voxblox::BlockIndexList findBlocksToArchive(const voxblox::Point& center) const;
 
+  void fillOutput(const ReconstructionInput& input, ReconstructionOutput& output);
+
  protected:
   const ReconstructionConfig config_;
-
-  mutable std::mutex tsdf_mutex_;
-  mutable std::mutex gvd_mutex_;
-
   RobotPrefixConfig prefix_;
 
   std::atomic<bool> should_shutdown_{false};
   ReconstructionInputQueue::Ptr queue_;
-  OutputQueue gvd_queue_;
   std::unique_ptr<std::thread> spin_thread_;
-  std::unique_ptr<std::thread> gvd_thread_;
 
   std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs_;
+  ReconstructionOutput::Ptr pending_output_;
   OutputQueue::Ptr output_queue_;
 
   voxblox::Layer<voxblox::TsdfVoxel>::Ptr tsdf_;
   voxblox::Layer<kimera::SemanticVoxel>::Ptr semantics_;
-  voxblox::Layer<places::GvdVoxel>::Ptr gvd_;
   voxblox::Layer<places::VertexVoxel>::Ptr vertices_;
   SemanticMeshLayer::Ptr mesh_;
 
   std::unique_ptr<kimera::SemanticIntegratorBase> tsdf_integrator_;
   std::unique_ptr<MeshIntegrator> mesh_integrator_;
-  std::shared_ptr<places::GraphExtractorInterface> graph_extractor_;
-  std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
 
   uint64_t prev_time_;
   size_t num_poses_received_;
   Eigen::Affine3d prev_pose_;
 
   std::list<OutputCallback> output_callbacks_;
-  std::list<VizCallback> visualization_callbacks_;
 
   inline static const auto registration_ =
       config::RegistrationWithConfig<ReconstructionModule,

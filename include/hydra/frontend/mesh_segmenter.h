@@ -68,19 +68,16 @@ class MeshSegmenter {
                 const MeshVertexCloud::Ptr& active_vertices,
                 const std::shared_ptr<std::vector<uint32_t>>& labels);
 
-  LabelClusters detect(const pcl::IndicesPtr& frontend_indices,
+  LabelClusters detect(uint64_t timestamp_ns,
+                       const pcl::IndicesPtr& frontend_indices,
                        const std::optional<Eigen::Vector3d>& pos);
 
-  inline std::unordered_set<NodeId> getObjectsToCheckForPlaces() const {
-    return objects_to_check_for_places_;
-  }
+  void updateGraph(uint64_t timestamp,
+                   const LabelClusters& clusters,
+                   size_t num_archived_vertices,
+                   DynamicSceneGraph& graph);
 
-  void pruneObjectsToCheckForPlaces(const DynamicSceneGraph& graph);
-
-
-  std::set<NodeId> updateGraph(DynamicSceneGraph& graph,
-                               const LabelClusters& clusters,
-                               uint64_t timestamp);
+  std::unordered_set<NodeId> getActiveNodes() const;
 
   inline void addVisualizationCallback(const CallbackFunc& func) {
     callback_funcs_.push_back(func);
@@ -90,19 +87,20 @@ class MeshSegmenter {
   Clusters findClusters(const MeshVertexCloud::Ptr& cloud,
                         const pcl::IndicesPtr& indices) const;
 
-  std::set<NodeId> archiveOldObjects(const DynamicSceneGraph& graph,
-                                     uint64_t latest_timestamp);
+  void archiveOldNodes(const DynamicSceneGraph& graph, size_t num_archived_vertices);
 
   LabelIndices getLabelIndices(const IndicesVector& indices) const;
 
-  void addObjectToGraph(DynamicSceneGraph& graph,
-                        const Cluster& cluster,
-                        uint32_t label,
-                        uint64_t timestamp);
+  void addNodeToGraph(DynamicSceneGraph& graph,
+                      const Cluster& cluster,
+                      uint32_t label,
+                      uint64_t timestamp);
 
-  void updateObjectInGraph(const Cluster& cluster,
-                           const SceneGraphNode& node,
-                           uint64_t timestamp);
+  void updateNodeInGraph(const Cluster& cluster,
+                         const SceneGraphNode& node,
+                         uint64_t timestamp);
+
+  void mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label);
 
  private:
   MeshVertexCloud::Ptr full_mesh_vertices_;
@@ -111,9 +109,7 @@ class MeshSegmenter {
   MeshSegmenterConfig config_;
   NodeSymbol next_node_id_;
 
-  std::map<uint32_t, std::set<NodeId>> active_objects_;
-  std::map<NodeId, uint64_t> active_object_timestamps_;
-  std::unordered_set<NodeId> objects_to_check_for_places_;
+  std::map<uint32_t, std::set<NodeId>> active_nodes_;
   std::vector<CallbackFunc> callback_funcs_;
 };
 

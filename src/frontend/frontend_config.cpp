@@ -38,33 +38,37 @@
 
 namespace kimera_pgmo {
 
-void declare_config(kimera_pgmo::MeshFrontendConfig& config) {
+void declare_config(kimera_pgmo::MeshFrontendConfig& conf) {
   using namespace config;
   name("MeshFrontendConfig");
-  field(config.time_horizon, "horizon");
-  field(config.b_track_mesh_graph_mapping, "track_mesh_graph_mapping");
-  field(config.full_compression_method, "full_compression_method");
-  field(config.graph_compression_method, "graph_compression_method");
-  field(config.d_graph_resolution, "d_graph_resolution");
-  field(config.mesh_resolution, "output_mesh_resolution");
+  field(conf.time_horizon, "horizon");
+  field(conf.b_track_mesh_graph_mapping, "track_mesh_graph_mapping");
+  field(conf.full_compression_method, "full_compression_method");
+  field(conf.graph_compression_method, "graph_compression_method");
+  field(conf.d_graph_resolution, "d_graph_resolution");
+  field(conf.mesh_resolution, "output_mesh_resolution");
 }
 
 }  // namespace kimera_pgmo
 
 namespace hydra {
 
-void declare_config(FrontendConfig& config) {
+void declare_config(FrontendConfig& conf) {
   using namespace config;
   name("FrontendConfig");
-  field(config.min_object_vertices, "min_object_vertices");
-  field(config.prune_mesh_indices, "prune_mesh_indices");
-  field(config.lcd_use_bow_vectors, "lcd_use_bow_vectors");
-  field(config.pgmo_config, "pgmo");
-  field(config.object_config, "objects");
-  field(config.object_config.angle_step, "angle_step");
-  field(config.validate_vertices, "validate_vertices");
-  field(config.filter_places, "filter_places");
-  field(config.min_places_component_size, "min_places_component_size");
+  field(conf.min_object_vertices, "min_object_vertices");
+  field(conf.prune_mesh_indices, "prune_mesh_indices");
+  field(conf.lcd_use_bow_vectors, "lcd_use_bow_vectors");
+  field(conf.pgmo_config, "pgmo");
+  field(conf.object_config, "objects");
+  field(conf.object_config.angle_step, "angle_step");
+  field(conf.validate_vertices, "validate_vertices");
+  field(conf.filter_places, "filter_places");
+  field(conf.min_places_component_size, "min_places_component_size");
+
+  field(conf.gvd, "gvd");
+  conf.graph_extractor.setOptional();
+  field(conf.graph_extractor, "graph_extractor");
 }
 
 }  // namespace hydra

@@ -121,6 +121,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   inline const BackendConfig& config() const { return config_; }
 
  protected:
+  void logPlaceDistance();
+
   void setSolverParams();
 
   void setDefaultUpdateFunctions();

@@ -35,7 +35,6 @@
 #pragma once
 #include <config_utilities/factory.h>
 #include <kimera_pgmo/MeshFrontendInterface.h>
-#include <kimera_pgmo/compression/DeltaCompression.h>
 #include <spark_dsg/scene_graph_logger.h>
 
 #include <memory>
@@ -48,12 +47,18 @@
 #include "hydra/common/robot_prefix_config.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/frontend/frontend_config.h"
-#include "hydra/frontend/mesh_segmenter.h"
+#include "hydra/frontend/place_extractor_interface.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/utils/log_utilities.h"
-#include "hydra/utils/nearest_neighbor_utilities.h"
+
+namespace kimera_pgmo {
+class DeltaCompression;
+}  // namespace kimera_pgmo
 
 namespace hydra {
+
+class NearestNodeFinder;
+class MeshSegmenter;
 
 class FrontendModule : public Module {
  public:
@@ -63,6 +68,10 @@ class FrontendModule : public Module {
   using OutputCallback = std::function<void(
       const DynamicSceneGraph& graph, const BackendInput& backend_input, uint64_t)>;
   using DynamicLayer = DynamicSceneGraphLayer;
+  using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
+  using PlaceVizCallback = std::function<void(uint64_t,
+                                              const voxblox::Layer<places::GvdVoxel>&,
+                                              const places::GraphExtractorInterface*)>;
 
   FrontendModule(const FrontendConfig& config,
                  const RobotPrefixConfig& prefix,
@@ -88,41 +97,45 @@ class FrontendModule : public Module {
 
   void addOutputCallback(const OutputCallback& callback);
 
- protected:
-  void spinOnce(const ReconstructionOutput& input);
+  void addPlaceVisualizationCallback(const PlaceVizCallback& callback);
 
-  void updateMeshAndObjects(const ReconstructionOutput& input);
-
-  void updateDeformationGraph(const ReconstructionOutput& input);
-
-  void updatePlaces(const ReconstructionOutput& input);
-
-  void updatePoseGraph(const ReconstructionOutput& input);
+  // takes in a 3xN matrix
+  std::vector<bool> inFreespace(const PositionMatrix& positions,
+                                double freespace_distance_m) const;
 
  protected:
-  void filterPlaces(const SceneGraphLayer& places,
-                    NodeIdSet& objects_to_check,
-                    NodeIdSet& active_places,
-                    const NodeIdSet& active_neighborhood);
+  virtual void initCallbacks();
 
-  void deletePlaceNode(NodeId node_id, NodeIdSet& objects_to_check);
+  void spinOnce(const ReconstructionOutput& msg);
 
-  void archivePlaces(const NodeIdSet active_places);
+ protected:
+  void updateMesh(const ReconstructionOutput& msg);
+
+  void updateObjects(const ReconstructionOutput& msg);
+
+  void updatePlaces(const ReconstructionOutput& msg);
+
+  void updateDeformationGraph(const ReconstructionOutput& msg);
+
+  void updatePoseGraph(const ReconstructionOutput& msg);
+
+ protected:
+  void assignBowVectors(const DynamicLayer& agents);
 
   void invalidateMeshEdges(const kimera_pgmo::MeshDelta& delta);
 
-  void addPlaceObjectEdges(uint64_t timestamp_ns,
-                           NodeIdSet* extra_objects_to_check = nullptr);
+  void archivePlaces(const NodeIdSet active_places);
+
+  void addPlaceObjectEdges(uint64_t timestamp_ns);
 
   void addPlaceAgentEdges(uint64_t timestamp_ns);
-
-  void assignBowVectors(const DynamicLayer& agents);
 
   void updatePlaceMeshMapping(const ReconstructionOutput& input);
 
  protected:
   const FrontendConfig config_;
 
+  mutable std::mutex gvd_mutex_;
   std::atomic<bool> should_shutdown_{false};
   std::unique_ptr<std::thread> spin_thread_;
   FrontendInputQueue::Ptr queue_;
@@ -134,12 +147,14 @@ class FrontendModule : public Module {
   SharedDsgInfo::Ptr dsg_;
   SharedModuleState::Ptr state_;
   std::vector<ros::Time> mesh_timestamps_;
+  kimera_pgmo::MeshDelta::Ptr last_mesh_update_;
 
   kimera_pgmo::MeshFrontendInterface mesh_frontend_;
   std::unique_ptr<kimera_pgmo::DeltaCompression> mesh_compression_;
   std::shared_ptr<kimera_pgmo::VoxbloxIndexMapping> mesh_remapping_;
 
   std::unique_ptr<MeshSegmenter> segmenter_;
+  std::unique_ptr<PlaceExtractorInterface> place_extractor_;
   SceneGraphLogger frontend_graph_logger_;
   LogSetup::Ptr logs_;
 
@@ -147,11 +162,12 @@ class FrontendModule : public Module {
   NodeIdSet unlabeled_place_nodes_;
   NodeIdSet previous_active_places_;
   std::map<NodeId, size_t> agent_key_map_;
-  std::set<NodeId> deleted_agent_edge_indices_;
   std::map<LayerPrefix, size_t> last_agent_edge_index_;
+  std::map<LayerPrefix, std::set<size_t>> active_agent_nodes_;
   std::list<pose_graph_tools::BowQuery::ConstPtr> cached_bow_messages_;
 
   std::vector<InputCallback> input_callbacks_;
+  std::vector<InputCallback> post_mesh_callbacks_;
   std::vector<OutputCallback> output_callbacks_;
 
   inline static const auto registration_ =

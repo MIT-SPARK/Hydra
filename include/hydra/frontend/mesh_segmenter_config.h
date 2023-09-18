@@ -41,6 +41,7 @@ namespace hydra {
 
 struct MeshSegmenterConfig {
   char prefix = 'O';
+  LayerId layer_id = DsgLayers::OBJECTS;
   double active_horizon_s = 10.0;
   double active_index_horizon_m = 7.0;
   double cluster_tolerance = 0.25;
@@ -49,6 +50,7 @@ struct MeshSegmenterConfig {
   float angle_step = 10.0f;
   BoundingBox::Type bounding_box_type = BoundingBox::Type::AABB;
   std::set<uint32_t> labels;
+  std::string timer_namespace = "frontend/objects";
 };
 
 void declare_config(MeshSegmenterConfig& conf);

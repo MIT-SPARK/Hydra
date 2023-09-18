@@ -84,13 +84,55 @@ size_t SemanticMeshLayer::numBlocks() const {
 
 size_t SemanticMeshLayer::getMemorySize() const { return mesh_->getMemorySize(); }
 
-SemanticMeshLayer::Ptr SemanticMeshLayer::getActiveMesh(const IndexSet& archived) {
+SemanticMeshLayer::Ptr SemanticMeshLayer::clone() const {
+  auto new_mesh = std::make_shared<SemanticMeshLayer>(mesh_->block_size());
+  BlockIndexList all_indices;
+  mesh_->getAllAllocatedMeshes(&all_indices);
+  for (const auto& block_index : all_indices) {
+    auto block = new_mesh->mesh_->allocateNewBlock(block_index);
+    *block = *(mesh_->getMeshPtrByIndex(block_index));
+
+    auto iter = semantics_->find(block_index);
+    if (iter != semantics_->end()) {
+      new_mesh->semantics_->emplace(iter->first, iter->second);
+    }
+  }
+
+  return new_mesh;
+}
+
+void SemanticMeshLayer::merge(SemanticMeshLayer::Ptr& other) const {
+  if (!other) {
+    other.reset(new SemanticMeshLayer(mesh_->block_size()));
+  }
+
+  BlockIndexList all_indices;
+  mesh_->getAllAllocatedMeshes(&all_indices);
+  for (const auto& block_index : all_indices) {
+    auto block = other->mesh_->allocateNewBlock(block_index);
+    *block = *(mesh_->getMeshPtrByIndex(block_index));
+
+    auto iter = semantics_->find(block_index);
+    if (iter != semantics_->end()) {
+      auto oiter = other->semantics_->find(block_index);
+      if (oiter != other->semantics_->end()) {
+        oiter->second = iter->second;
+      } else {
+        other->semantics_->emplace(iter->first, iter->second);
+      }
+    }
+  }
+}
+
+SemanticMeshLayer::Ptr SemanticMeshLayer::getActiveMesh(
+    const BlockIndexList& archived) const {
+  const IndexSet archived_set(archived.begin(), archived.end());
   auto active_mesh = std::make_shared<SemanticMeshLayer>(mesh_->block_size());
 
   BlockIndexList mesh_indices;
   mesh_->getAllUpdatedMeshes(&mesh_indices);
   for (const auto& block_index : mesh_indices) {
-    if (archived.count(block_index)) {
+    if (archived_set.count(block_index)) {
       continue;
     }
 
@@ -103,7 +145,12 @@ SemanticMeshLayer::Ptr SemanticMeshLayer::getActiveMesh(const IndexSet& archived
     }
   }
 
-  // TODO(nathan) maybe only do this for archived blocks?
+  return active_mesh;
+}
+
+void SemanticMeshLayer::pruneEmpty() {
+  BlockIndexList mesh_indices;
+  mesh_->getAllUpdatedMeshes(&mesh_indices);
   for (const auto& block_index : mesh_indices) {
     auto block = mesh_->getMeshPtrByIndex(block_index);
     if (!block->hasVertices()) {
@@ -111,8 +158,6 @@ SemanticMeshLayer::Ptr SemanticMeshLayer::getActiveMesh(const IndexSet& archived
       semantics_->erase(block_index);
     }
   }
-
-  return active_mesh;
 }
 
 voxblox::MeshLayer::Ptr SemanticMeshLayer::getVoxbloxMesh() const { return mesh_; }

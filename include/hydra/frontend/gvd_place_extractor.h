@@ -32,28 +32,60 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
+#pragma once
+#include <config_utilities/virtual_config.h>
+
+#include <memory>
+
+#include "hydra/common/common.h"
+#include "hydra/frontend/place_extractor_interface.h"
+#include "hydra/places/gvd_integrator_config.h"
+#include "hydra/places/gvd_voxel.h"
+#include "hydra/places/vertex_voxel.h"
 #include "hydra/reconstruction/reconstruction_output.h"
+#include "hydra/utils/log_utilities.h"
 
 namespace hydra {
 
-void ActiveLayerInfo::fillFromGraph(const SceneGraphLayer& graph,
-                                    const std::unordered_set<NodeId>& active_nodes) {
-  std::set<spark_dsg::EdgeKey> seen_edges;
-  for (const auto& node_id : active_nodes) {
-    const auto& node = graph.getNode(node_id)->get();
-    active_attributes.emplace(node_id, node.attributes().clone());
+namespace places {
+// forward declare to avoid include
+class GvdIntegrator;
+}  // namespace places
 
-    for (const auto& sibling : node.siblings()) {
-      spark_dsg::EdgeKey key(node_id, sibling);
-      if (seen_edges.count(key)) {
-        continue;
-      }
+class GvdPlaceExtractor : public PlaceExtractorInterface {
+ public:
+  using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
+  using ExtractorConfig = config::VirtualConfig<places::GraphExtractorInterface>;
 
-      seen_edges.insert(key);
-      edges.emplace_back(
-          node_id, sibling, graph.getEdge(node_id, sibling)->get().info->clone());
-    }
-  }
-}
+  GvdPlaceExtractor(const ExtractorConfig& graph_config,
+                    const places::GvdIntegratorConfig& gvd_config,
+                    size_t min_component_size,
+                    bool filter_places);
+
+  virtual ~GvdPlaceExtractor();
+
+  void save(const LogSetup& logs) const override;
+
+  NodeIdSet getActiveNodes() const override;
+
+  // takes in a 3xN matrix
+  std::vector<bool> inFreespace(const PositionMatrix& positions,
+                                double freespace_distance_m) const override;
+
+  void detect(const ReconstructionOutput& msg) override;
+
+  void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) override;
+
+ protected:
+  const places::GvdIntegratorConfig gvd_config_;
+  const size_t min_component_size_;
+  const bool filter_places_;
+
+  mutable std::mutex gvd_mutex_;
+  voxblox::Layer<places::GvdVoxel>::Ptr gvd_;
+  std::shared_ptr<places::GraphExtractorInterface> graph_extractor_;
+  std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
+  NodeIdSet active_nodes_;
+};
 
 }  // namespace hydra

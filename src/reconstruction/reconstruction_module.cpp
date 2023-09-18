@@ -40,7 +40,6 @@
 #include <yaml-cpp/yaml.h>
 
 #include "hydra/common/hydra_config.h"
-#include "hydra/places/gvd_integrator.h"
 #include "hydra/reconstruction/mesh_integrator.h"
 #include "hydra/utils/display_utilities.h"
 #include "hydra/utils/timing_utilities.h"
@@ -49,8 +48,6 @@ namespace hydra {
 
 using kimera::SemanticConfig;
 using kimera::SemanticVoxel;
-using places::GvdIntegrator;
-using places::GvdVoxel;
 using places::VertexVoxel;
 using pose_graph_tools::PoseGraph;
 using pose_graph_tools::PoseGraphEdge;
@@ -124,7 +121,6 @@ ReconstructionModule::ReconstructionModule(const ReconstructionConfig& config,
   const auto voxels_per_side = config_.voxels_per_side;
   tsdf_.reset(new Layer<TsdfVoxel>(voxel_size, voxels_per_side));
   semantics_.reset(new Layer<SemanticVoxel>(voxel_size, voxels_per_side));
-  gvd_.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
   vertices_.reset(new Layer<VertexVoxel>(voxel_size, voxels_per_side));
   mesh_.reset(new SemanticMeshLayer(tsdf_->block_size()));
 
@@ -133,20 +129,12 @@ ReconstructionModule::ReconstructionModule(const ReconstructionConfig& config,
       config_.tsdf, semantic_config, tsdf_.get(), semantics_.get());
   mesh_integrator_.reset(
       new MeshIntegrator(config_.mesh, tsdf_, vertices_, mesh_, semantics_));
-
-  if (!config_.graph_extractor) {
-    LOG(WARNING) << "Places graph extraction disabled";
-  }
-
-  graph_extractor_ = config_.graph_extractor.create();
-  gvd_integrator_.reset(new GvdIntegrator(config_.gvd, gvd_, graph_extractor_));
 }
 
 ReconstructionModule::~ReconstructionModule() { stop(); }
 
 void ReconstructionModule::start() {
   spin_thread_.reset(new std::thread(&ReconstructionModule::spin, this));
-  gvd_thread_.reset(new std::thread(&ReconstructionModule::updateGvdSpin, this));
   LOG(INFO) << "[Hydra Reconstruction] started!";
 }
 
@@ -160,13 +148,6 @@ void ReconstructionModule::stop() {
     VLOG(2) << "[Hydra Reconstruction] stopped!";
   }
 
-  if (gvd_thread_) {
-    VLOG(2) << "[Hydra Reconstruction] stopping gvd thread!";
-    gvd_thread_->join();
-    gvd_thread_.reset();
-    VLOG(2) << "[Hydra Reconstruction] gvd thread stopped!";
-  }
-
   VLOG(2) << "[Hydra Reconstruction] input queue: " << queue_->size();
   if (output_queue_) {
     VLOG(2) << "[Hydra Reconstruction] output queue: " << output_queue_->size();
@@ -175,25 +156,7 @@ void ReconstructionModule::stop() {
   }
 }
 
-void ReconstructionModule::save(const LogSetup& log_setup) {
-  if (graph_extractor_) {
-    const auto& original_places = graph_extractor_->getGraph();
-    auto places = original_places.clone();
-
-    std::unique_ptr<DynamicSceneGraph::Edges> edges(new DynamicSceneGraph::Edges());
-    for (const auto& id_edge_pair : places->edges()) {
-      edges->emplace(std::piecewise_construct,
-                     std::forward_as_tuple(id_edge_pair.first),
-                     std::forward_as_tuple(id_edge_pair.second.source,
-                                           id_edge_pair.second.target,
-                                           id_edge_pair.second.info->clone()));
-    }
-
-    DynamicSceneGraph::Ptr graph(new DynamicSceneGraph());
-    graph->updateFromLayer(*places, std::move(edges));
-    graph->save(log_setup.getLogDir("topology") + "/places.json", false);
-  }
-}
+void ReconstructionModule::save(const LogSetup&) {}
 
 std::string ReconstructionModule::printInfo() const {
   std::stringstream ss;
@@ -240,31 +203,6 @@ void ReconstructionModule::addOutputCallback(const OutputCallback& callback) {
   output_callbacks_.push_back(callback);
 }
 
-void ReconstructionModule::addVisualizationCallback(const VizCallback& callback) {
-  visualization_callbacks_.push_back(callback);
-}
-
-std::vector<bool> ReconstructionModule::inFreespace(const PositionMatrix& positions,
-                                                    double freespace_distance_m) const {
-  if (positions.cols() < 1) {
-    return {};
-  }
-
-  std::vector<bool> flags(positions.cols(), false);
-  // starting lock on tsdf update
-  std::unique_lock<std::mutex> lock(gvd_mutex_);
-  for (int i = 0; i < positions.cols(); ++i) {
-    const auto* voxel = gvd_->getVoxelPtrByCoordinates(positions.col(i).cast<float>());
-    if (!voxel) {
-      continue;
-    }
-
-    flags[i] = voxel->observed && voxel->distance > freespace_distance_m;
-  }
-
-  return flags;
-}
-
 bool ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
   if (msg.pointcloud.empty() || msg.pointcloud_colors.empty() ||
       msg.pointcloud_labels.empty()) {
@@ -295,8 +233,66 @@ bool ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
   return do_full_update;
 }
 
+template <typename Voxel>
+void mergeLayer(const Layer<Voxel>& layer_in, typename Layer<Voxel>::Ptr& layer_out) {
+  if (!layer_out) {
+    layer_out.reset(
+        new Layer<Voxel>(layer_in.voxel_size(), layer_in.voxels_per_side()));
+  }
+
+  BlockIndexList blocks;
+  layer_in.getAllAllocatedBlocks(&blocks);
+  for (const auto& idx : blocks) {
+    auto block = layer_in.getBlockPtrByIndex(idx);
+    if (!block) {
+      continue;
+    }
+
+    auto new_block = layer_out->allocateBlockPtrByIndex(idx);
+    for (size_t i = 0; i < block->num_voxels(); ++i) {
+      new_block->getVoxelByLinearIndex(i) = block->getVoxelByLinearIndex(i);
+    }
+
+    new_block->updated() |= block->updated();
+    new_block->has_data() = block->has_data();
+    // copy other block attributes...
+  }
+}
+
+void ReconstructionModule::fillOutput(const ReconstructionInput& input,
+                                      ReconstructionOutput& output) {
+  output.timestamp_ns = input.timestamp_ns;
+  output.current_position = input.world_t_body;
+
+  // note that this is pre-archival
+  if (config_.copy_dense_representations) {
+    mergeLayer(*tsdf_, output.tsdf);
+    mergeLayer(*vertices_, output.occupied);
+  }
+
+  mesh_->merge(output.mesh);
+
+  // move and clear cached pose graphs
+  VLOG(5) << "[Hydra Reconstruction] Current queued pose graphs: "
+          << pose_graphs_.size();
+  output.pose_graphs.insert(
+      output.pose_graphs.end(), pose_graphs_.begin(), pose_graphs_.end());
+  pose_graphs_.clear();
+
+  if (config_.clear_distant_blocks) {
+    const auto to_archive = findBlocksToArchive(input.world_t_body.cast<float>());
+    output.archived_blocks.insert(
+        output.archived_blocks.end(), to_archive.begin(), to_archive.end());
+    for (const auto& index : to_archive) {
+      semantics_->removeBlock(index);
+      tsdf_->removeBlock(index);
+      mesh_->removeBlock(index);
+      vertices_->removeBlock(index);
+    }
+  }
+}
+
 void ReconstructionModule::update(const ReconstructionInput& msg, bool full_update) {
-  std::unique_lock<std::mutex> lock(tsdf_mutex_);
   const auto world_T_camera = getCameraPose(msg);
 
   {  // timing scope
@@ -321,90 +317,52 @@ void ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
     return;
   }
 
-  auto output = std::make_shared<ReconstructionOutput>();
-  output->timestamp_ns = msg.timestamp_ns;
-  output->current_position = msg.world_t_body;
-  output->pose_graphs = pose_graphs_;
-  VLOG(5) << "[Hydra Reconstruction] Current queued pose graphs: "
-          << pose_graphs_.size();
-  pose_graphs_.clear();
-
-  gvd_queue_.push(output);
-}
-
-void ReconstructionModule::updateGvdSpin() {
-  // TODO(nathan) fix shutdown logic
-  while (!should_shutdown_) {
-    if (!gvd_queue_.poll()) {
-      continue;
-    }
-
-    updateGvd();
-  }
-}
-
-void ReconstructionModule::updateGvd() {
-  std::unique_ptr<ScopedTimer> timer;
-  ReconstructionOutput::Ptr msg;
-  BlockIndexList archived_blocks;
-  {  // start critical section
-    std::unique_lock<std::mutex> lock(tsdf_mutex_);
-
-    std::list<PoseGraph::ConstPtr> graphs;
-    // this is awkward, but we want to make sure we use the latest available timestamp
-    while (gvd_queue_.size() > 1) {
-      // TODO(nathan) cache pose graphs
-      const auto& curr_graphs = gvd_queue_.front()->pose_graphs;
-      graphs.insert(graphs.end(), curr_graphs.begin(), curr_graphs.end());
-      gvd_queue_.pop();
-    }
-
-    msg = gvd_queue_.front();
-    const auto timestamp_ns = msg->timestamp_ns;
-    msg->pose_graphs.insert(msg->pose_graphs.begin(), graphs.begin(), graphs.end());
-    timer.reset(new ScopedTimer("places/spin_gvd", timestamp_ns));
-    gvd_integrator_->updateFromTsdf(timestamp_ns, *tsdf_, *vertices_, *mesh_, true);
-
-    if (config_.clear_distant_blocks) {
-      archived_blocks = findBlocksToArchive(msg->current_position.cast<float>());
-      for (const auto& index : archived_blocks) {
-        semantics_->removeBlock(index);
-        tsdf_->removeBlock(index);
-        mesh_->removeBlock(index);
-      }
-    }
-
-    addMeshToOutput(*msg, archived_blocks);
-  }  // end critical section
-
-  {  // start critical section
-    // TODO(nathan) this critical section is broken
-    std::unique_lock<std::mutex> lock(gvd_mutex_);
-    gvd_integrator_->updateGvd(msg->timestamp_ns);
-    gvd_integrator_->archiveBlocks(archived_blocks);
-
-    for (const auto& callback : visualization_callbacks_) {
-      callback(msg->timestamp_ns, *gvd_, graph_extractor_.get());
-    }
-  }  // end critical section
-
   if (config_.show_stats) {
     showStats();
   }
 
-  addPlacesToOutput(*msg);
+  bool is_pending = false;
+  ReconstructionOutput::Ptr output;
+  if (!output_queue_) {
+    output = std::make_shared<ReconstructionOutput>();
+  } else {
+    // this is janky, but avoid pushing updates to queue if there's already stuff there
+    const auto curr_size = output_queue_->size();
+    if (curr_size >= 1) {
+      if (!pending_output_) {
+        pending_output_ = std::make_shared<ReconstructionOutput>();
+      }
+      output = pending_output_;
+      is_pending = true;
+    } else {
+      output =
+          pending_output_ ? pending_output_ : std::make_shared<ReconstructionOutput>();
+      pending_output_.reset();
+    }
+  }
 
-  if (output_queue_) {
-    VLOG(5) << "[Hydra Reconstruction] Exporting " << msg->pose_graphs.size()
-            << " pose graphs";
-    output_queue_->push(msg);
+  fillOutput(msg, *output);
+
+  VLOG(5) << "[Hydra Reconstruction] Exporting " << output->pose_graphs.size()
+          << " pose graphs";
+
+  if (!is_pending) {
+    output_queue_->push(output);
+  } else {
+    LOG(WARNING)
+        << "[Hydra Reconstruction] Merging pending updates because frontend is slow!";
   }
 
   for (const auto& callback : output_callbacks_) {
-    callback(*msg);
+    callback(*output);
   }
 
-  gvd_queue_.pop();
+  BlockIndexList blocks;
+  tsdf_->getAllUpdatedBlocks(voxblox::Update::kEsdf, &blocks);
+  for (const auto& idx : blocks) {
+    tsdf_->getBlockByIndex(idx).updated().reset(voxblox::Update::kEsdf);
+    mesh_->getMeshBlock(idx)->updated = false;
+  }
 }
 
 void ReconstructionModule::fillPoseGraphNode(PoseGraphNode& node,
@@ -453,81 +411,24 @@ PoseGraph ReconstructionModule::makePoseGraph(uint64_t timestamp_ns,
   return pose_graph;
 }
 
-void ReconstructionModule::addPlacesToOutput(ReconstructionOutput& output) {
-  output.places.reset(new ActiveLayerInfo());
-  auto& places = *output.places;
-  // non-const, as clearDeletedNodes modifies internal state
-  std::unordered_set<NodeId> active_nodes = graph_extractor_->getActiveNodes();
-  const auto& removed_nodes = graph_extractor_->getDeletedNodes();
-  const auto& removed_edges = graph_extractor_->getDeletedEdges();
-
-  const auto& graph = graph_extractor_->getGraph();
-  std::list<NodeId> invalid_nodes;
-  for (const auto& active_id : active_nodes) {
-    const auto& node = graph.getNode(active_id);
-    const auto& attrs = node->get().attributes<PlaceNodeAttributes>();
-    if (std::isnan(attrs.distance)) {
-      invalid_nodes.push_back(active_id);
-      continue;
-    }
-
-    if (attrs.position.hasNaN()) {
-      invalid_nodes.push_back(active_id);
-      continue;
-    }
-
-    for (const auto& info : attrs.voxblox_mesh_connections) {
-      if (std::isnan(info.voxel_pos[0]) || std::isnan(info.voxel_pos[1]) ||
-          std::isnan(info.voxel_pos[2])) {
-        invalid_nodes.push_back(active_id);
-        continue;
-      }
-    }
-  }
-
-  places.deleted_nodes.insert(
-      places.deleted_nodes.begin(), removed_nodes.begin(), removed_nodes.end());
-  places.deleted_edges.insert(
-      places.deleted_edges.begin(), removed_edges.begin(), removed_edges.end());
-
-  if (!invalid_nodes.empty()) {
-    LOG(ERROR) << "Nodes found with invalid attributes: "
-               << displayNodeSymbolContainer(invalid_nodes);
-    for (const auto& invalid_id : invalid_nodes) {
-      active_nodes.erase(invalid_id);
-      // TODO(nathan) think about this some more
-      places.deleted_nodes.push_back(invalid_id);
-    }
-  }
-
-  places.fillFromGraph(graph, active_nodes);
-  graph_extractor_->clearDeleted();
-
-  VLOG(5) << "[Hydra Reconstruction] exporting " << active_nodes.size()
-          << " active and " << removed_nodes.size() << " deleted nodes";
-}
-
-void ReconstructionModule::addMeshToOutput(ReconstructionOutput& output,
-                                           const BlockIndexList& archived_blocks) {
-  output.archived_blocks.insert(archived_blocks.begin(), archived_blocks.end());
-  output.mesh = mesh_->getActiveMesh(output.archived_blocks);
-}
-
 void ReconstructionModule::showStats() const {
-  const std::string tsdf_memory_str =
-      getHumanReadableMemoryString(tsdf_->getMemorySize());
-  const std::string semantic_memory_str =
-      getHumanReadableMemoryString(semantics_->getMemorySize());
-  const std::string gvd_memory_str =
-      getHumanReadableMemoryString(gvd_->getMemorySize());
-  const std::string mesh_memory_str =
-      getHumanReadableMemoryString(mesh_->getMemorySize());
-  const size_t total =
-      tsdf_->getMemorySize() + semantics_->getMemorySize() + gvd_->getMemorySize();
-  LOG(INFO) << "Memory used: [TSDF=" << tsdf_memory_str
-            << ", Semantics=" << semantic_memory_str << ", GVD=" << gvd_memory_str
-            << ", Mesh= " << mesh_memory_str
-            << ", Total=" << getHumanReadableMemoryString(total) << "]";
+  std::stringstream ss;
+  const auto tsdf_size = tsdf_->getMemorySize();
+  ss << "TSDF: " << getHumanReadableMemoryString(tsdf_size);
+
+  const auto semantic_size = semantics_->getMemorySize();
+  ss << ", SEMANTICS: " << getHumanReadableMemoryString(semantic_size);
+
+  const auto occ_size = vertices_->getMemorySize();
+  ss << ", OCCUPANCY: " << getHumanReadableMemoryString(occ_size);
+
+  const auto mesh_size = mesh_->getMemorySize();
+  ss << ", MESH: " << getHumanReadableMemoryString(mesh_size);
+
+  const auto total_size = tsdf_size + semantic_size + occ_size + mesh_size;
+  ss << ", TOTAL: " << getHumanReadableMemoryString(total_size);
+
+  LOG(INFO) << "Memory used: {" << ss.str() << "}";
 }
 
 BlockIndexList ReconstructionModule::findBlocksToArchive(
@@ -537,7 +438,7 @@ BlockIndexList ReconstructionModule::findBlocksToArchive(
 
   BlockIndexList to_archive;
   for (const auto& idx : blocks) {
-    auto block = gvd_->getBlockPtrByIndex(idx);
+    auto block = tsdf_->getBlockPtrByIndex(idx);
     if ((center - block->origin()).norm() < config_.dense_representation_radius_m) {
       continue;
     }
