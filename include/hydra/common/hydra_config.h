@@ -107,6 +107,8 @@ class HydraConfig {
   // this invalidates any instances (mostly intended for testing)
   static void reset();
 
+  inline bool frozen() const { return frozen_; }
+
   void setForceShutdown(bool force_shutdown);
 
   bool force_shutdown() const;

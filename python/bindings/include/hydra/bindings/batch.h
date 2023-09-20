@@ -33,60 +33,28 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <voxblox/core/common.h>
-
-#include "hydra/reconstruction/mesh_integrator_config.h"
-
-namespace voxblox {
-class ThreadSafeIndex;
-}  // namespace voxblox
+#include <hydra/common/batch_pipeline.h>
+#include <pybind11/pybind11.h>
 
 namespace hydra {
 
-class VolumetricMap;
+namespace python {
 
-class MeshIntegrator {
+class PythonConfig;
+
+class PythonBatchPipeline : public BatchPipeline {
  public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  PythonBatchPipeline(const PipelineConfig& config, int robot_id = 0);
 
-  explicit MeshIntegrator(const MeshIntegratorConfig& config);
+  virtual ~PythonBatchPipeline();
 
-  virtual ~MeshIntegrator() = default;
-
-  virtual void generateMesh(VolumetricMap& map,
-                            bool only_mesh_updated_blocks,
-                            bool clear_updated_flag) const;
-
-  void allocateBlocks(const voxblox::BlockIndexList& blocks, VolumetricMap& map) const;
-
-  void showUpdateInfo(const VolumetricMap& map,
-                      const voxblox::BlockIndexList& blocks,
-                      int verbosity) const;
-
-  void launchThreads(const voxblox::BlockIndexList& blocks,
-                     bool interior_pass,
-                     VolumetricMap& map) const;
-
-  void processInterior(const voxblox::BlockIndexList& blocks,
-                       VolumetricMap* map,
-                       voxblox::ThreadSafeIndex* index_getter) const;
-
-  void processExterior(const voxblox::BlockIndexList& blocks,
-                       VolumetricMap* map,
-                       voxblox::ThreadSafeIndex* index_getter) const;
-
-  virtual void meshBlockInterior(const voxblox::BlockIndex& block_index,
-                                 const voxblox::VoxelIndex& voxel_index,
-                                 VolumetricMap& map) const;
-
-  virtual void meshBlockExterior(const voxblox::BlockIndex& block_index,
-                                 const voxblox::VoxelIndex& voxel_index,
-                                 VolumetricMap& map) const;
-
- protected:
-  const MeshIntegratorConfig config_;
-  Eigen::Matrix<int, 3, 8> cube_index_offsets_;
-  mutable Eigen::Matrix<float, 3, 8> cube_coord_offsets_;
+  DynamicSceneGraph::Ptr construct(const PythonConfig& config,
+                                   VolumetricMap& map) const;
 };
 
+namespace batch {
+void addBindings(pybind11::module_& m);
+}
+
+}  // namespace python
 }  // namespace hydra

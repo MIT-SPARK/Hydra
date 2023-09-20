@@ -49,17 +49,6 @@ using timing::ScopedTimer;
 using voxblox::BlockIndexList;
 using voxblox::Layer;
 
-template <typename Voxel>
-void mergeLayer(const Layer<Voxel>& layer_in,
-                typename Layer<Voxel>::Ptr& layer_out,
-                bool overwrite_updated = false) {
-  if (!layer_out) {
-    layer_out.reset(
-        new Layer<Voxel>(layer_in.voxel_size(), layer_in.voxels_per_side()));
-  }
-  mergeLayer(layer_in, *layer_out, overwrite_updated);
-}
-
 ReconstructionModule::ReconstructionModule(const ReconstructionConfig& config,
                                            const OutputQueue::Ptr& output_queue)
     : config_(config::checkValid(config)),
@@ -253,7 +242,7 @@ bool ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
 
   auto&& [output, is_pending] = getNextOutputMessage();
   fillOutput(msg, *output);
-  if (!is_pending) {
+  if (output_queue_ && !is_pending) {
     output_queue_->push(output);
   } else {
     VLOG(1)

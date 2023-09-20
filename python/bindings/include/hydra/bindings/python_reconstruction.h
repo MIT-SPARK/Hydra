@@ -32,61 +32,45 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <voxblox/core/common.h>
+#include <memory>
+#include <thread>
 
-#include "hydra/reconstruction/mesh_integrator_config.h"
-
-namespace voxblox {
-class ThreadSafeIndex;
-}  // namespace voxblox
+namespace pybind11 {
+class module_;
+}
 
 namespace hydra {
 
-class VolumetricMap;
+class ReconstructionModule;
+class ReconstructionInput;
+class PipelineConfig;
 
-class MeshIntegrator {
+namespace python {
+
+class PythonConfig;
+class MeshUpdater;
+
+class PythonReconstruction {
  public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  PythonReconstruction(const PipelineConfig& hydra_config, const PythonConfig& config);
 
-  explicit MeshIntegrator(const MeshIntegratorConfig& config);
+  virtual ~PythonReconstruction();
 
-  virtual ~MeshIntegrator() = default;
+  bool step(const ReconstructionInput& input);
 
-  virtual void generateMesh(VolumetricMap& map,
-                            bool only_mesh_updated_blocks,
-                            bool clear_updated_flag) const;
+  void save();
 
-  void allocateBlocks(const voxblox::BlockIndexList& blocks, VolumetricMap& map) const;
-
-  void showUpdateInfo(const VolumetricMap& map,
-                      const voxblox::BlockIndexList& blocks,
-                      int verbosity) const;
-
-  void launchThreads(const voxblox::BlockIndexList& blocks,
-                     bool interior_pass,
-                     VolumetricMap& map) const;
-
-  void processInterior(const voxblox::BlockIndexList& blocks,
-                       VolumetricMap* map,
-                       voxblox::ThreadSafeIndex* index_getter) const;
-
-  void processExterior(const voxblox::BlockIndexList& blocks,
-                       VolumetricMap* map,
-                       voxblox::ThreadSafeIndex* index_getter) const;
-
-  virtual void meshBlockInterior(const voxblox::BlockIndex& block_index,
-                                 const voxblox::VoxelIndex& voxel_index,
-                                 VolumetricMap& map) const;
-
-  virtual void meshBlockExterior(const voxblox::BlockIndex& block_index,
-                                 const voxblox::VoxelIndex& voxel_index,
-                                 VolumetricMap& map) const;
+  void stop();
 
  protected:
-  const MeshIntegratorConfig config_;
-  Eigen::Matrix<int, 3, 8> cube_index_offsets_;
-  mutable Eigen::Matrix<float, 3, 8> cube_coord_offsets_;
+  std::shared_ptr<ReconstructionModule> module_;
+  std::unique_ptr<MeshUpdater> mesh_updater_;
+  std::unique_ptr<std::thread> mesh_thread_;
 };
 
+namespace python_reconstruction {
+void addBindings(pybind11::module_& m);
+}
+
+}  // namespace python
 }  // namespace hydra

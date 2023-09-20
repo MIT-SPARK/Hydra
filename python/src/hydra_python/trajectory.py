@@ -108,6 +108,50 @@ class Trajectory:
         return cls(times, poses)
 
     @classmethod
+    def rotate(
+        cls,
+        pos,
+        body_R_camera=None,
+        reinterp_distance=0.2,
+        reinterp_angle=0.2,
+        start_time_s=0.0,
+        dt=0.2,
+    ):
+        """Construct a trajectory from a list of positions."""
+        b_R_c = np.eye(3) if body_R_camera is None else body_R_camera
+
+        pose_start = _pose_from_components(pos, 0, b_R_c)
+        pose_half = _pose_from_components(pos, np.pi, b_R_c)
+        pose_end = _pose_from_components(pos, 2 * np.pi, b_R_c)
+        num_intermediate = int(np.ceil(np.pi / reinterp_angle) - 1)
+
+        poses = []
+        poses.append(pose_start)
+
+        for i in range(num_intermediate):
+            # we want slerp ratio to be 0 at start (0)
+            # and 1 at end (num_intermediate)
+            ratio = (i + 1) / (num_intermediate + 1)
+            poses.append(_interp_pose(pose_start, pose_half, ratio))
+
+        poses.append(pose_half)
+
+        for i in range(num_intermediate):
+            # we want slerp ratio to be 0 at start (0)
+            # and 1 at end (num_intermediate)
+            ratio = (i + 1) / (num_intermediate + 1)
+            poses.append(_interp_pose(pose_half, pose_end, ratio))
+
+        poses.append(pose_end)
+        poses = np.array(poses)
+        # print(poses[:, :3])
+        # print(poses[:, 3:])
+
+        times_s = dt * np.arange(poses.shape[0]) + start_time_s
+        times_ns = (1.0e9 * times_s).astype(np.uint64)
+        return cls(times_ns, poses)
+
+    @classmethod
     def from_positions(
         cls,
         positions,
@@ -154,6 +198,7 @@ class Trajectory:
         return cls(times_ns, poses)
 
     def save(self, filename):
+        """Save the trajectory to the csv."""
         filepath = pathlib.Path(filename).expanduser().absolute()
         with filepath.open("w") as fout:
             writer = csv.writer(fout)
@@ -173,10 +218,12 @@ class Trajectory:
                 )
 
     def __iter__(self):
+        """Get an iterator over a trajectory."""
         self._index = 0
         return self
 
     def __next__(self):
+        """Get the next pose in the trajectory."""
         if self._index >= self._times.size:
             raise StopIteration
 
@@ -187,7 +234,18 @@ class Trajectory:
             self._poses[self._index - 1, 3:],
         )
 
+    def __iadd__(self, other):
+        """Extend a trajectory."""
+        offset = 0
+        if self._times.shape[0] > 0:
+            offset = self._times[-1]
+
+        self._times = np.hstack((self._times, other._times[1:] + offset))
+        self._poses = np.vstack((self._poses, other._poses[1:, :]))
+        return self
+
     def __len__(self):
+        """Get the number of poses in the trajectory."""
         return self._times.size
 
     def get_path_length(self):

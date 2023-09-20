@@ -85,6 +85,17 @@ void mergeLayer(const voxblox::Layer<Voxel>& layer_in,
   }
 }
 
+template <typename Voxel>
+void mergeLayer(const voxblox::Layer<Voxel>& layer_in,
+                typename voxblox::Layer<Voxel>::Ptr& layer_out,
+                bool overwrite_updated = false) {
+  if (!layer_out) {
+    layer_out.reset(
+        new voxblox::Layer<Voxel>(layer_in.voxel_size(), layer_in.voxels_per_side()));
+  }
+  mergeLayer(layer_in, *layer_out, overwrite_updated);
+}
+
 class VolumetricMap {
  public:
   using TsdfLayer = voxblox::Layer<voxblox::TsdfVoxel>;
@@ -95,7 +106,7 @@ class VolumetricMap {
     /// Voxel size.
     float voxel_size = 0.1f;
     /// Number of voxels per block side.
-    int voxels_per_side = 16;
+    int voxels_per_side = 16;  // TODO(nathan) fix int
     /// TSDF truncation distance.
     float truncation_distance = 0.3f;
   };
@@ -144,10 +155,14 @@ class VolumetricMap {
 
   virtual std::string printStats() const;
 
+  void save(const std::string& filepath) const;
+
   static std::unique_ptr<VolumetricMap> fromTsdf(const TsdfLayer& tsdf,
                                                  double truncation_distance_m,
                                                  bool with_semantics = false,
                                                  bool with_occupancy = false);
+
+  static std::unique_ptr<VolumetricMap> load(const std::string& filepath);
 
  public:
   const Config config;

@@ -47,7 +47,88 @@
 // purposes notwithstanding any copyright notation herein.
 #include "hydra/reconstruction/volumetric_map.h"
 
+#include <config_utilities/parsing/yaml.h>
+#include <voxblox/io/layer_io.h>
+
 #include "hydra/utils/display_utilities.h"
+
+namespace voxblox {
+
+using hydra::SemanticVoxel;
+
+template <>
+std::string getVoxelType<SemanticVoxel>() {
+  return "semantic_voxel";
+}
+
+template <>
+void mergeVoxelAIntoVoxelB(const SemanticVoxel& a, SemanticVoxel* b) {
+  if (!b) {
+    return;
+  }
+
+  if (a.empty) {
+    return;
+  }
+
+  if (b->empty || b->semantic_likelihoods.rows() != a.semantic_likelihoods.rows()) {
+    *b = a;
+  }
+
+  b->semantic_likelihoods += a.semantic_likelihoods;
+  b->semantic_likelihoods.maxCoeff(&b->semantic_label);
+}
+
+template <>
+void Block<SemanticVoxel>::serializeToIntegers(std::vector<uint32_t>* data) const {
+  if (!data) {
+    return;
+  }
+
+  // TODO(nathan) this is broken if endianness changes, but so is the rest of voxblox
+  for (size_t i = 0; i < num_voxels_; ++i) {
+    const auto& voxel = voxels_[i];
+    data->push_back(voxel.semantic_label);
+    if (voxel.empty) {
+      data->push_back(0);
+    } else {
+      const uint32_t num_probs = voxel.semantic_likelihoods.rows();
+      data->push_back(num_probs);
+      // this is ugly, but less ugly than a bunch of deference reinterpret casts...
+      const auto prev_size = data->size();
+      data->resize(prev_size + num_probs);
+      auto data_ptr = data->data() + prev_size;
+      std::memcpy(data_ptr, voxel.semantic_likelihoods.data(), num_probs);
+    }
+  }
+}
+
+template <>
+void Block<SemanticVoxel>::deserializeFromIntegers(const std::vector<uint32_t>& data) {
+  size_t data_idx = 0;
+  for (size_t i = 0; i < num_voxels_; ++i) {
+    CHECK_LT(data_idx, data.size()) << "invalid serialization";
+    auto& voxel = voxels_[i];
+    voxel.semantic_label = data[data_idx];
+    ++data_idx;
+
+    const uint32_t num_probs = data[data_idx];
+    ++data_idx;
+    if (!num_probs) {
+      voxel.empty = true;
+      continue;
+    }
+
+    voxel.empty = false;
+    CHECK_LE(data_idx + num_probs, data.size()) << " invalid serialization";
+    voxel.semantic_likelihoods.resize(num_probs);
+    const auto data_ptr = data.data() + data_idx;
+    std::memcpy(voxel.semantic_likelihoods.data(), data_ptr, num_probs);
+    data_idx += num_probs;
+  }
+}
+
+}  // namespace voxblox
 
 namespace hydra {
 
@@ -93,18 +174,56 @@ void VolumetricMap::removeBlock(const voxblox::BlockIndex& block_index) {
   }
 }
 
-std::unique_ptr<VolumetricMap> VolumetricMap::fromTsdf(const TsdfLayer& tsdf,
-                                                       double truncation_distance_m,
-                                                       bool with_semantics,
-                                                       bool with_occupancy) {
-  VolumetricMap::Config config;
-  config.voxel_size = tsdf.voxel_size();
-  config.voxels_per_side = tsdf.voxels_per_side();
-  config.truncation_distance = truncation_distance_m;
-  auto to_return =
-      std::make_unique<VolumetricMap>(config, with_semantics, with_occupancy);
-  mergeLayer(tsdf, to_return->getTsdfLayer());
-  return to_return;
+void VolumetricMap::save(const std::string& filepath) const {
+  // TODO(nathan) consider hdf5 or something...
+  YAML::Node config_node;
+  config_node["map"] = config::toYaml(config);
+  config_node["has_semantics"] = hasSemantics();
+  config_node["has_occupancy"] = hasOccupancy();
+  std::ofstream config_file(filepath + ".yaml");
+  config_file << config_node;
+
+  std::string map_path = filepath + ".vxblx";
+  voxblox::io::SaveLayer(tsdf_layer_, map_path);
+  if (semantic_layer_) {
+    voxblox::io::SaveLayer(*semantic_layer_, map_path, false);
+  }
+}
+
+std::unique_ptr<VolumetricMap> VolumetricMap::load(const std::string& filepath) {
+  std::string map_path = filepath + ".vxblx";
+  TsdfLayer::Ptr tsdf;
+  if (!voxblox::io::LoadLayer<voxblox::TsdfVoxel>(map_path, true, &tsdf) || !tsdf) {
+    return nullptr;
+  }
+
+  const auto cpath = filepath + ".yaml";
+  const auto config = config::fromYamlFile<VolumetricMap::Config>(cpath, "map");
+  if (std::abs(config.voxel_size - tsdf->voxel_size()) > 1.0e-5) {
+    LOG(ERROR) << "TSDF voxel size does not match config voxel size";
+    return nullptr;
+  }
+
+  if (static_cast<size_t>(config.voxels_per_side) != tsdf->voxels_per_side()) {
+    LOG(ERROR) << "TSDF vps does not match config vps";
+    return nullptr;
+  }
+
+  const auto node = YAML::LoadFile(cpath);
+  bool use_semantics = false;
+  if (node["has_semantics"] and node["has_semantics"].as<bool>()) {
+    use_semantics = true;
+  }
+
+  bool use_occupancy;
+  if (node["has_occupancy"] and node["has_occupancy"].as<bool>()) {
+    use_occupancy = true;
+  }
+
+  auto map = std::make_unique<VolumetricMap>(config, use_semantics, use_occupancy);
+  mergeLayer(*tsdf, map->tsdf_layer_, true);
+  voxblox::io::LoadLayer<SemanticVoxel>(map_path, true, &map->semantic_layer_);
+  return map;
 }
 
 std::string VolumetricMap::printStats() const {
@@ -131,6 +250,20 @@ std::string VolumetricMap::printStats() const {
   ss << ", TOTAL: " << getHumanReadableMemoryString(total_size);
 
   return ss.str();
+}
+
+std::unique_ptr<VolumetricMap> VolumetricMap::fromTsdf(const TsdfLayer& tsdf,
+                                                       double truncation_distance_m,
+                                                       bool with_semantics,
+                                                       bool with_occupancy) {
+  VolumetricMap::Config config;
+  config.voxel_size = tsdf.voxel_size();
+  config.voxels_per_side = tsdf.voxels_per_side();
+  config.truncation_distance = truncation_distance_m;
+  auto to_return =
+      std::make_unique<VolumetricMap>(config, with_semantics, with_occupancy);
+  mergeLayer(tsdf, to_return->getTsdfLayer());
+  return to_return;
 }
 
 }  // namespace hydra

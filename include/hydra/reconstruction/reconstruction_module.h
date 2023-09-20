@@ -88,6 +88,8 @@ class ReconstructionModule : public Module {
 
   void addVisualizationCallback(const VizCallback& callback);
 
+  inline const VolumetricMap* getMap() const { return map_.get(); }
+
  protected:
   bool update(const ReconstructionInput& msg, bool full_update);
 

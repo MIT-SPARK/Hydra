@@ -17,6 +17,7 @@ FetchContent_MakeAvailable(pybind11)
 
 pybind11_add_module(
   _hydra_bindings
+  bindings/src/batch.cpp
   bindings/src/bindings.cpp
   bindings/src/color_parser.cpp
   bindings/src/config_bindings.cpp
@@ -26,6 +27,7 @@ pybind11_add_module(
   bindings/src/label_parser.cpp
   bindings/src/python_config.cpp
   bindings/src/python_image.cpp
+  bindings/src/python_reconstruction.cpp
   bindings/src/python_sensor_input.cpp
 )
 target_link_libraries(_hydra_bindings PRIVATE hydra)

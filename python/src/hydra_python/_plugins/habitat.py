@@ -236,8 +236,8 @@ class HabitatInterface:
         inflation_radius=0.1,
         threshold=1.0e-3,
         seed=None,
-        z_offset=0.5,
-        add_reverse=True,
+        z_offset=1.0,
+        add_reverse=False,
         max_room_distance=5.0,
         **kwargs,
     ):
@@ -278,29 +278,42 @@ class HabitatInterface:
 
             node_sequence.append(best_node)
 
+        if len(node_sequence) <= 1:
+            return None
+
         if seed is not None:
             random.seed(seed)
 
         random.shuffle(node_sequence)
+        if add_reverse:
+            node_sequence = node_sequence + node_sequence[::-1]
 
-        path = []
+        b_R_c = np.array([[0, 0, 1], [-1, 0, 0], [0, -1, 0]])
+        first_pos_habitat = G.nodes[node_sequence[0]]["pos"]
+        first_pos_cam = _camera_point_from_habitat(first_pos_habitat, z_offset=z_offset)
+
+        traj = hydra.Trajectory.rotate(first_pos_cam, body_R_camera=b_R_c, **kwargs)
         for i in range(len(node_sequence) - 1):
             start = node_sequence[i]
             end = node_sequence[i + 1]
             nodes = nx.shortest_path(G, source=start, target=end, weight="weight")
-            path += nodes[:-1]
+            if len(nodes) <= 1:
+                continue
 
-        if add_reverse:
-            path = path + path[::-1]
+            pos_habitat = [G.nodes[x]["pos"] for x in nodes]
+            pos_cam = [
+                _camera_point_from_habitat(p, z_offset=z_offset) for p in pos_habitat
+            ]
+            new_traj = hydra.Trajectory.from_positions(
+                np.array(pos_cam), body_R_camera=b_R_c, **kwargs
+            )
 
-        pos_habitat = [G.nodes[x]["pos"] for x in path]
-        pos_cam = [
-            _camera_point_from_habitat(p, z_offset=z_offset) for p in pos_habitat
-        ]
-        b_R_c = np.array([[0, 0, 1], [-1, 0, 0], [0, -1, 0]])
-        return hydra.Trajectory.from_positions(
-            np.array(pos_cam), body_R_camera=b_R_c, **kwargs
-        )
+            traj += new_traj
+            traj += hydra.Trajectory.rotate(
+                np.array(pos_cam[-1]), body_R_camera=b_R_c, **kwargs
+            )
+
+        return traj
 
     def get_random_trajectory(
         self,

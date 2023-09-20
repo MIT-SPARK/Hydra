@@ -1,8 +1,8 @@
 ---
 dsg:
   add_places_to_deformation_graph: true
-  places_merge_pos_threshold_m: 0.4
-  places_merge_distance_tolerance_m: 0.4
+  places_merge_pos_threshold_m: 1.0
+  places_merge_distance_tolerance_m: 0.5
   merge_update_dynamic: true
   merge_update_map: {BUILDINGS: false, ROOMS: false, PLACES: true, OBJECTS: false}
 pgmo:

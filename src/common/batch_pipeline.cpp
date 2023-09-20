@@ -32,61 +32,63 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <voxblox/core/common.h>
+#include "hydra/common/batch_pipeline.h"
 
-#include "hydra/reconstruction/mesh_integrator_config.h"
+#include <glog/logging.h>
+#include <glog/stl_logging.h>
 
-namespace voxblox {
-class ThreadSafeIndex;
-}  // namespace voxblox
+#include "hydra/backend/update_functions.h"
+#include "hydra/common/shared_module_state.h"
+#include "hydra/reconstruction/mesh_integrator.h"
 
 namespace hydra {
 
-class VolumetricMap;
+using VFrontendConfig = config::VirtualConfig<FrontendModule>;
 
-class MeshIntegrator {
- public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+BatchPipeline::BatchPipeline(const PipelineConfig& config, int robot_id) {
+  HydraConfig::init(config, robot_id, true);
+}
 
-  explicit MeshIntegrator(const MeshIntegratorConfig& config);
+BatchPipeline::~BatchPipeline() {}
 
-  virtual ~MeshIntegrator() = default;
+DynamicSceneGraph::Ptr BatchPipeline::construct(
+    const VFrontendConfig& frontend_config,
+    VolumetricMap& map,
+    const RoomFinderConfig* room_config) const {
+  if (!map.hasOccupancy() || !map.hasSemantics()) {
+    return nullptr;
+  }
 
-  virtual void generateMesh(VolumetricMap& map,
-                            bool only_mesh_updated_blocks,
-                            bool clear_updated_flag) const;
+  MeshIntegratorConfig mesh_config;
+  MeshIntegrator integrator(mesh_config);
+  integrator.generateMesh(map, false, false);
 
-  void allocateBlocks(const voxblox::BlockIndexList& blocks, VolumetricMap& map) const;
+  auto dsg = HydraConfig::instance().createSharedDsg();
+  auto state = std::make_shared<SharedModuleState>();
+  auto module = frontend_config.create(dsg, state, LogSetup::Ptr());
+  const auto queue = module->getQueue();
 
-  void showUpdateInfo(const VolumetricMap& map,
-                      const voxblox::BlockIndexList& blocks,
-                      int verbosity) const;
+  auto msg = std::make_shared<ReconstructionOutput>();
+  map.getMeshLayer().merge(msg->mesh);
+  mergeLayer(map.getTsdfLayer(), msg->tsdf);
+  mergeLayer(*map.getOccupancyLayer(), msg->occupied);
+  queue->push(msg);
 
-  void launchThreads(const voxblox::BlockIndexList& blocks,
-                     bool interior_pass,
-                     VolumetricMap& map) const;
+  if (!module->spinOnce()) {
+    return nullptr;
+  }
 
-  void processInterior(const voxblox::BlockIndexList& blocks,
-                       VolumetricMap* map,
-                       voxblox::ThreadSafeIndex* index_getter) const;
+  if (room_config) {
+    dsg_updates::UpdateRoomsFunctor functor(*room_config);
+    UpdateInfo info;
+    functor.call(*dsg, info);
 
-  void processExterior(const voxblox::BlockIndexList& blocks,
-                       VolumetricMap* map,
-                       voxblox::ThreadSafeIndex* index_getter) const;
+    Eigen::Matrix<uint8_t, 3, 1> bcolor(0, 0, 0);
+    dsg_updates::UpdateBuildingsFunctor bfunctor(bcolor, -1);
+    bfunctor.call(*dsg, info);
+  }
 
-  virtual void meshBlockInterior(const voxblox::BlockIndex& block_index,
-                                 const voxblox::VoxelIndex& voxel_index,
-                                 VolumetricMap& map) const;
-
-  virtual void meshBlockExterior(const voxblox::BlockIndex& block_index,
-                                 const voxblox::VoxelIndex& voxel_index,
-                                 VolumetricMap& map) const;
-
- protected:
-  const MeshIntegratorConfig config_;
-  Eigen::Matrix<int, 3, 8> cube_index_offsets_;
-  mutable Eigen::Matrix<float, 3, 8> cube_coord_offsets_;
-};
+  return dsg->graph;
+}
 
 }  // namespace hydra

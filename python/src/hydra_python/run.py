@@ -28,7 +28,13 @@ class ImageVisualizer:
             self._view.setImage(image, **kwargs)
 
 
-def _take_step(pipeline, data, pose, segmenter, image_viz, visualizer):
+def hydra_output_callback(pipeline, visualizer):
+    """Show graph."""
+    if visualizer:
+        visualizer.update_graph(pipeline.graph)
+
+
+def _take_step(pipeline, data, pose, segmenter, image_viz):
     timestamp, world_t_body, q_wxyz = pose
     q_xyzw = np.roll(q_wxyz, -1)
 
@@ -43,9 +49,6 @@ def _take_step(pipeline, data, pose, segmenter, image_viz, visualizer):
 
     pipeline.step(timestamp, world_t_body, q_wxyz, data.depth, labels, data.rgb)
 
-    if visualizer:
-        visualizer.update_graph(pipeline.graph)
-
 
 def run(
     pipeline,
@@ -55,6 +58,7 @@ def run(
     visualizer=None,
     show_images=False,
     show_progress=True,
+    step_callback=hydra_output_callback,
 ):
     """Do stuff."""
     image_viz = ImageVisualizer() if show_images else None
@@ -62,7 +66,11 @@ def run(
     if show_progress:
         with click.progressbar(pose_source) as bar:
             for pose in bar:
-                _take_step(pipeline, data, pose, segmenter, image_viz, visualizer)
+                _take_step(pipeline, data, pose, segmenter, image_viz)
+                if step_callback:
+                    step_callback(pipeline, visualizer)
     else:
         for pose in pose_source:
-            _take_step(pipeline, data, pose, segmenter, image_viz, visualizer)
+            _take_step(pipeline, data, pose, segmenter, image_viz)
+            if step_callback:
+                step_callback(pipeline, visualizer)

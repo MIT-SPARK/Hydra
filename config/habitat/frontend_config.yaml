@@ -38,17 +38,17 @@ graph_extractor:
   compression_distance_m: 1.0
   validate_graph: false
   min_node_distance_m: 0.4
-  min_edge_distance_m: 0.3
+  min_edge_distance_m: 0.2
   node_merge_distance_m: 0.5
     # heurisitic edges
-  add_heuristic_edges: false
-  add_overlap_edges: true
+  add_heuristic_edges: true
+  add_overlap_edges: false
   overlap_edges:
     num_neighbors_to_check: 4
     min_clearance_m: 0.4
   add_freespace_edges: true
   freespace_edges:
-    num_nodes_to_check: 5
-    num_neighbors_to_find: 1
+    num_nodes_to_check: 10
+    num_neighbors_to_find: 2
     max_length_m: 2.0
-    min_clearance_m: 0.5
+    min_clearance_m: 0.2

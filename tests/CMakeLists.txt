@@ -52,6 +52,7 @@ add_executable(
   reconstruction/test_semantic_integrator.cpp
   reconstruction/test_sensor.cpp
   reconstruction/test_sensor_utilities.cpp
+  reconstruction/test_volumetric_map.cpp
   rooms/test_graph_clustering.cpp
   rooms/test_graph_filtration.cpp
   rooms/test_room_finder.cpp

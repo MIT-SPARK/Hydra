@@ -32,63 +32,66 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <pybind11/pybind11.h>
-
 #include "hydra/bindings/batch.h"
-#include "hydra/bindings/config_bindings.h"
+
+#include <config_utilities/config.h>
+#include <config_utilities/formatting/asl.h>
+#include <config_utilities/logging/log_to_glog.h>
+#include <config_utilities/parsing/yaml.h>
+#include <config_utilities/validation.h>
+#include <hydra/common/hydra_config.h>
+#include <pybind11/stl.h>
+#include <pybind11/stl/filesystem.h>
+
 #include "hydra/bindings/glog_utilities.h"
-#include "hydra/bindings/hydra_python_pipeline.h"
 #include "hydra/bindings/python_config.h"
-#include "hydra/bindings/python_image.h"
-#include "hydra/bindings/python_sensor_input.h"
-#include "hydra/bindings/python_reconstruction.h"
 
+namespace hydra::python {
 
-namespace py = pybind11;
-using namespace py::literals;
+PythonBatchPipeline::PythonBatchPipeline(const PipelineConfig& config, int robot_id)
+    : BatchPipeline(config, robot_id) {
+  if (!HydraConfig::instance().frozen()) {
+    HydraConfig::init(config, robot_id, true);
+  }
 
-PYBIND11_MODULE(_hydra_bindings, m) {
-  py::module_::import("spark_dsg");
-  py::options options;
-
-  ::hydra::python::batch::addBindings(m);
-  ::hydra::python::config_bindings::addBindings(m);
-  ::hydra::python::glog_utilities::addBindings(m);
-  ::hydra::python::hydra_python_pipeline::addBindings(m);
-  ::hydra::python::python_config::addBindings(m);
-  ::hydra::python::python_image::addBindings(m);
-  ::hydra::python::python_sensor_input::addBindings(m);
-  ::hydra::python::python_reconstruction::addBindings(m);
-
-  py::class_<Eigen::Quaterniond>(m, "Quaterniond")
-      .def(py::init([]() { return Eigen::Quaterniond::Identity(); }))
-      .def(py::init([](double w, double x, double y, double z) {
-             return Eigen::Quaterniond(w, x, y, z);
-           }),
-           "w"_a,
-           "x"_a,
-           "y"_a,
-           "z"_a)
-      .def(py::init([](const Eigen::Vector4d& coefficients) {
-        return Eigen::Quaterniond(
-            coefficients(0), coefficients(1), coefficients(2), coefficients(3));
-      }))
-      .def_property("w",
-                    py::overload_cast<>(&Eigen::Quaterniond::w, py::const_),
-                    [](Eigen::Quaterniond& q, double w) { q.w() = w; })
-      .def_property("x",
-                    py::overload_cast<>(&Eigen::Quaterniond::x, py::const_),
-                    [](Eigen::Quaterniond& q, double x) { q.x() = x; })
-      .def_property("y",
-                    py::overload_cast<>(&Eigen::Quaterniond::y, py::const_),
-                    [](Eigen::Quaterniond& q, double y) { q.y() = y; })
-      .def_property("z",
-                    py::overload_cast<>(&Eigen::Quaterniond::z, py::const_),
-                    [](Eigen::Quaterniond& q, double z) { q.z() = z; })
-      .def("__repr__", [](const Eigen::Quaterniond& q) {
-        std::stringstream ss;
-        ss << "Quaterniond<w=" << q.w() << ", x=" << q.x() << ", y=" << q.y()
-           << ", z=" << q.z() << ">";
-        return ss.str();
-      });
+  GlogSingleton::instance().setLogLevel(0, 0, false);
+  // config::Settings().setLogger("glog");
+  config::Settings().print_width = 100;
+  config::Settings().print_indent = 45;
 }
+
+PythonBatchPipeline::~PythonBatchPipeline() {}
+
+DynamicSceneGraph::Ptr PythonBatchPipeline::construct(const PythonConfig& config,
+                                                      VolumetricMap& map) const {
+  const auto node = config.toYaml();
+  const auto frontend_config =
+      config::fromYaml<config::VirtualConfig<FrontendModule>>(node, "frontend");
+  const auto room_config = config::fromYaml<RoomFinderConfig>(node, "backend/room_finder");
+  //LOG(INFO) << "Using frontend config: " << std::endl << config::toString(frontend_config);
+  //LOG(INFO) << "Using room config: " << std::endl << config::toString(room_config);
+  return BatchPipeline::construct(frontend_config, map, &room_config);
+}
+
+namespace batch {
+
+using namespace pybind11::literals;
+namespace py = pybind11;
+
+void addBindings(pybind11::module_& m) {
+  py::class_<VolumetricMap>(m, "VolumetricMap")
+      .def_static(
+          "load",
+          [](const std::string& filepath) { return VolumetricMap::load(filepath); })
+      .def_static("load", [](const std::filesystem::path& filepath) {
+        return VolumetricMap::load(filepath.string());
+      });
+
+  py::class_<PythonBatchPipeline>(m, "BatchPipeline")
+      .def(py::init<const PipelineConfig&, int>(), "config"_a, "robot_id"_a = 0)
+      .def("construct", &PythonBatchPipeline::construct);
+}
+
+}  // namespace batch
+
+};  // namespace hydra::python

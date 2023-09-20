@@ -33,60 +33,25 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <voxblox/core/common.h>
+#include <config_utilities/virtual_config.h>
 
-#include "hydra/reconstruction/mesh_integrator_config.h"
-
-namespace voxblox {
-class ThreadSafeIndex;
-}  // namespace voxblox
+#include "hydra/common/hydra_config.h"
+#include "hydra/frontend/frontend_module.h"
+#include "hydra/reconstruction/volumetric_map.h"
+#include "hydra/rooms/room_finder_config.h"
 
 namespace hydra {
 
-class VolumetricMap;
-
-class MeshIntegrator {
+class BatchPipeline {
  public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  BatchPipeline(const PipelineConfig& config, int robot_id = 0);
 
-  explicit MeshIntegrator(const MeshIntegratorConfig& config);
+  virtual ~BatchPipeline();
 
-  virtual ~MeshIntegrator() = default;
-
-  virtual void generateMesh(VolumetricMap& map,
-                            bool only_mesh_updated_blocks,
-                            bool clear_updated_flag) const;
-
-  void allocateBlocks(const voxblox::BlockIndexList& blocks, VolumetricMap& map) const;
-
-  void showUpdateInfo(const VolumetricMap& map,
-                      const voxblox::BlockIndexList& blocks,
-                      int verbosity) const;
-
-  void launchThreads(const voxblox::BlockIndexList& blocks,
-                     bool interior_pass,
-                     VolumetricMap& map) const;
-
-  void processInterior(const voxblox::BlockIndexList& blocks,
-                       VolumetricMap* map,
-                       voxblox::ThreadSafeIndex* index_getter) const;
-
-  void processExterior(const voxblox::BlockIndexList& blocks,
-                       VolumetricMap* map,
-                       voxblox::ThreadSafeIndex* index_getter) const;
-
-  virtual void meshBlockInterior(const voxblox::BlockIndex& block_index,
-                                 const voxblox::VoxelIndex& voxel_index,
-                                 VolumetricMap& map) const;
-
-  virtual void meshBlockExterior(const voxblox::BlockIndex& block_index,
-                                 const voxblox::VoxelIndex& voxel_index,
-                                 VolumetricMap& map) const;
-
- protected:
-  const MeshIntegratorConfig config_;
-  Eigen::Matrix<int, 3, 8> cube_index_offsets_;
-  mutable Eigen::Matrix<float, 3, 8> cube_coord_offsets_;
+  DynamicSceneGraph::Ptr construct(
+      const config::VirtualConfig<FrontendModule>& frontend_config,
+      VolumetricMap& map,
+      const RoomFinderConfig* room_config = nullptr) const;
 };
 
 }  // namespace hydra

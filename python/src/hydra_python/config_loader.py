@@ -127,3 +127,69 @@ def load_configs(
     configs.add_yaml(yaml.dump(overrides))
 
     return configs
+
+
+def load_reconstruction_configs(
+    dataset_name: str,
+    camera_info: Dict[str, Any],
+    labelspace_name: str = "ade20k_mp3d",
+    voxel_size: float = 0.1,
+    voxels_per_side: int = 16,
+    truncation_distance: float = 0.3,
+    reconstruction_verbosity: int = 1,
+    visualize_mesh: bool = False,
+    zmq_url: str = "tcp://127.0.0.1:8001",
+):
+    """
+    Load various configs to configure a reconstruction pipeline.
+
+    dataset_name: Dataset name to load config from
+    camera_info: Config dictionary for camera
+    labelspace_name: Labelspace name to use
+
+    Returns:
+        (Optional[PythonConfig]) Pipline config or none if invalid
+    """
+    config_path = get_config_path()
+    dataset_config = config_path / dataset_name / "reconstruction_config.yaml"
+    if not dataset_config.exists():
+        click.secho(f"invalid dataset config: {dataset_config}", fg="red")
+        return None
+
+    labelspace_path = (
+        config_path / "label_spaces" / f"{labelspace_name}_label_space.yaml"
+    )
+    if not labelspace_path.exists():
+        click.secho(f"invalid labelspace path: {labelspace_path}", fg="red")
+        return None
+
+    configs = PythonConfig()
+    configs.add_file(dataset_config)
+    configs.add_file(labelspace_path)
+
+    pipeline = {
+        "zmq_url": zmq_url,
+        "visualize_mesh": visualize_mesh,
+        "verbosity": reconstruction_verbosity,
+        "type": "ReconstructionModule",
+        "clear_distant_blocks": False,
+        "copy_dense_representations": False,
+        "show_stats": False,
+        "pose_graphs": {"make_pose_graph": False},
+        "sensor": {
+            "type": "camera",
+            "min_range": 0.1,
+            "max_range": 5.0,
+            "extrinsics": {"type": "identity"},
+        },
+        "reconstruction": {
+            "map": {
+                "voxel_size": voxel_size,
+                "voxels_per_side": voxels_per_side,
+                "truncation_distance": truncation_distance,
+            }
+        },
+    }
+    pipeline["sensor"].update(camera_info)
+    configs.add_yaml(yaml.dump(pipeline))
+    return configs

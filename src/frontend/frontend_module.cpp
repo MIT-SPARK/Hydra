@@ -317,9 +317,8 @@ void FrontendModule::updateObjects(const ReconstructionOutput& input) {
     return;
   }
 
-  const auto clusters = segmenter_->detect(input.timestamp_ns,
-                                           last_mesh_update_->getActiveIndices(),
-                                           input.current_position);
+  const auto clusters = segmenter_->detect(
+      input.timestamp_ns, last_mesh_update_->getActiveIndices(), std::nullopt);
 
   {  // start dsg critical section
     std::unique_lock<std::mutex> lock(dsg_->mutex);
