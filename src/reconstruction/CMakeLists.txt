@@ -1,10 +1,21 @@
 target_sources(
   ${PROJECT_NAME}
-  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/combo_integrator.cpp
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/camera.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/combo_integrator.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/frame_data.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/lidar.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/marching_cubes.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/mesh_integrator.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/mesh_integrator_config.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/projection_interpolators.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/projective_integrator.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/projective_integrator_config.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/reconstruction_config.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/reconstruction_module.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/semantic_mesh_layer.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/semantic_integrator.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/sensor.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/sensor_input_packet.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/sensor_utilities.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/volumetric_map.cpp
 )

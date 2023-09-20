@@ -44,7 +44,6 @@
 #include "hydra/common/common.h"
 #include "hydra/common/input_queue.h"
 #include "hydra/common/module.h"
-#include "hydra/common/robot_prefix_config.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/frontend/frontend_config.h"
 #include "hydra/frontend/place_extractor_interface.h"
@@ -74,7 +73,6 @@ class FrontendModule : public Module {
                                               const places::GraphExtractorInterface*)>;
 
   FrontendModule(const FrontendConfig& config,
-                 const RobotPrefixConfig& prefix,
                  const SharedDsgInfo::Ptr& dsg,
                  const SharedModuleState::Ptr& state,
                  const LogSetup::Ptr& logs = nullptr);
@@ -143,7 +141,6 @@ class FrontendModule : public Module {
   LcdInput::Ptr lcd_input_;
   BackendInput::Ptr backend_input_;
 
-  RobotPrefixConfig prefix_;
   SharedDsgInfo::Ptr dsg_;
   SharedModuleState::Ptr state_;
   std::vector<ros::Time> mesh_timestamps_;
@@ -174,7 +171,6 @@ class FrontendModule : public Module {
       config::RegistrationWithConfig<FrontendModule,
                                      FrontendModule,
                                      FrontendConfig,
-                                     RobotPrefixConfig,
                                      SharedDsgInfo::Ptr,
                                      SharedModuleState::Ptr,
                                      LogSetup::Ptr>("FrontendModule");

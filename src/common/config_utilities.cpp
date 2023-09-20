@@ -49,6 +49,7 @@ void QuaternionConverter::fromIntermediate(const DoubleMap& other,
   if (!other.count("w") || !other.count("x") || !other.count("y") ||
       !other.count("z")) {
     error = "Encountered invalid quaternion representation!";
+    return;
   }
 
   value =

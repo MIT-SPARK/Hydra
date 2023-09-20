@@ -33,80 +33,60 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <kimera_semantics/semantic_voxel.h>
-#include <voxblox/core/layer.h>
-#include <voxblox/core/voxel.h>
-#include <voxblox/integrator/integrator_utils.h>
-#include <voxblox/mesh/mesh_layer.h>
+#include <voxblox/core/common.h>
 
-#include <thread>
-
-#include "hydra/places/vertex_voxel.h"
 #include "hydra/reconstruction/mesh_integrator_config.h"
-#include "hydra/reconstruction/semantic_mesh_layer.h"
+
+namespace voxblox {
+class ThreadSafeIndex;
+}  // namespace voxblox
 
 namespace hydra {
+
+class VolumetricMap;
 
 class MeshIntegrator {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  MeshIntegrator(
-      const MeshIntegratorConfig& config,
-      const voxblox::Layer<voxblox::TsdfVoxel>::Ptr& sdf_layer,
-      const voxblox::Layer<places::VertexVoxel>::Ptr& vertex_layer,
-      const SemanticMeshLayer::Ptr& mesh_layer,
-      const voxblox::Layer<kimera::SemanticVoxel>::Ptr& semantic_layer = nullptr);
+  MeshIntegrator(const MeshIntegratorConfig& config);
 
   virtual ~MeshIntegrator() = default;
 
-  virtual void generateMesh(bool only_mesh_updated_blocks, bool clear_updated_flag);
+  virtual void generateMesh(VolumetricMap& map,
+                            bool only_mesh_updated_blocks,
+                            bool clear_updated_flag) const;
 
-  virtual void extractMeshInsideBlock(const voxblox::Block<voxblox::TsdfVoxel>& block,
-                                      const voxblox::VoxelIndex& index,
-                                      const voxblox::Point& coords,
-                                      voxblox::VertexIndex* next_mesh_index,
-                                      voxblox::Mesh* mesh);
+  void allocateBlocks(const voxblox::BlockIndexList& blocks, VolumetricMap& map) const;
 
-  virtual void extractMeshOnBorder(const voxblox::Block<voxblox::TsdfVoxel>& block,
-                                   const voxblox::VoxelIndex& index,
-                                   const voxblox::Point& coords,
-                                   voxblox::VertexIndex* next_mesh_index,
-                                   voxblox::Mesh* mesh);
+  void showUpdateInfo(const VolumetricMap& map,
+                      const voxblox::BlockIndexList& blocks,
+                      int verbosity) const;
+
+  void launchThreads(const voxblox::BlockIndexList& blocks,
+                     bool interior_pass,
+                     VolumetricMap& map) const;
 
   void processInterior(const voxblox::BlockIndexList& blocks,
-                       voxblox::ThreadSafeIndex* index_getter);
+                       VolumetricMap* map,
+                       voxblox::ThreadSafeIndex* index_getter) const;
 
   void processExterior(const voxblox::BlockIndexList& blocks,
-                       voxblox::ThreadSafeIndex* index_getter);
+                       VolumetricMap* map,
+                       voxblox::ThreadSafeIndex* index_getter) const;
 
-  void updateBlockInterior(const voxblox::BlockIndex& block_index);
+  virtual void meshBlockInterior(const voxblox::BlockIndex& block_index,
+                                 const voxblox::VoxelIndex& voxel_index,
+                                 VolumetricMap& map) const;
 
-  void updateBlockExterior(const voxblox::BlockIndex& block_index);
-
-  void launchThreads(const voxblox::BlockIndexList& blocks, bool interior_pass);
-
-  voxblox::BlockIndex getNeighborBlockIndex(const voxblox::BlockIndex& block_idx,
-                                            voxblox::VoxelIndex& corner_index);
-
-  void updateMeshColor(const voxblox::Block<voxblox::TsdfVoxel>& block,
-                       voxblox::Mesh* mesh,
-                       const voxblox::BlockIndex& index);
+  virtual void meshBlockExterior(const voxblox::BlockIndex& block_index,
+                                 const voxblox::VoxelIndex& voxel_index,
+                                 VolumetricMap& map) const;
 
  protected:
-  MeshIntegratorConfig config_;
-
-  voxblox::Layer<voxblox::TsdfVoxel>::Ptr sdf_layer_;
-  SemanticMeshLayer::Ptr mesh_layer_;
-  voxblox::Layer<places::VertexVoxel>::Ptr vertex_layer_;
-  voxblox::Layer<kimera::SemanticVoxel>::Ptr semantic_layer_;
-
-  voxblox::FloatingPoint voxel_size_;
-  size_t voxels_per_side_;
-  voxblox::FloatingPoint block_size_;
-
+  const MeshIntegratorConfig config_;
   Eigen::Matrix<int, 3, 8> cube_index_offsets_;
-  Eigen::Matrix<voxblox::FloatingPoint, 3, 8> cube_coord_offsets_;
+  mutable Eigen::Matrix<float, 3, 8> cube_coord_offsets_;
 };
 
 }  // namespace hydra

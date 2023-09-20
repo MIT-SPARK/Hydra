@@ -37,19 +37,63 @@
 
 #include <queue>
 
+#include "hydra/common/dsg_types.h"
 #include "hydra/places/graph_extractor_interface.h"
-#include "hydra/places/graph_extractor_types.h"
 #include "hydra/places/graph_extractor_utilities.h"
+#include "hydra/places/voxblox_types.h"
 
 namespace hydra {
 namespace places {
+
+struct VoxelGraphInfo {
+  // TODO(nathan) consider copy constructor-eqsue cleanup of extract edges
+  VoxelGraphInfo();
+  VoxelGraphInfo(NodeId id, bool is_from_split);
+
+  NodeId id;
+  bool is_node;
+  bool is_split_node;
+  size_t edge_id;
+};
+
+struct EdgeInfo {
+  EdgeInfo() = default;
+
+  EdgeInfo(size_t id, NodeId source);
+
+  size_t id;
+  NodeId source;
+  voxblox::LongIndexSet indices;
+  std::set<NodeId> node_connections;
+  std::set<size_t> connections;
+};
+
+struct EdgeSplitSeed {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  EdgeSplitSeed(const GlobalIndex& index, double distance_to_edge, size_t edge_id);
+
+  GlobalIndex index;
+  double distance_to_edge;
+  size_t edge_id;
+};
+
+bool operator<(const EdgeSplitSeed& lhs, const EdgeSplitSeed& rhs);
+
+struct PseudoEdgeInfo {
+  std::vector<NodeId> nodes;
+  voxblox::AlignedVector<GlobalIndex> indices;
+};
+
+std::ostream& operator<<(std::ostream& out, const VoxelGraphInfo& info);
+
+std::ostream& operator<<(std::ostream& out, const EdgeInfo& info);
 
 class FloodfillGraphExtractor : public GraphExtractorInterface {
  public:
   using Ptr = std::unique_ptr<FloodfillGraphExtractor>;
   using GvdLayer = Layer<GvdVoxel>;
 
-  // TODO(nathan) may need aligned allocator
   using NodeChildMap = std::unordered_map<NodeId, voxblox::LongIndexSet>;
   using IndexGraphInfoMap = voxblox::LongIndexHashMapType<VoxelGraphInfo>::type;
   using EdgeInfoMap = std::unordered_map<size_t, EdgeInfo>;

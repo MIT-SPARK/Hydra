@@ -39,6 +39,7 @@
 
 #include "hydra/places/gvd_integrator.h"
 #include "hydra/reconstruction/mesh_integrator.h"
+#include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
 
@@ -47,15 +48,14 @@ class ComboIntegrator {
   using GraphExtractorConfig = config::VirtualConfig<places::GraphExtractorInterface>;
 
   ComboIntegrator(const places::GvdIntegratorConfig& gvd_config,
-                  const voxblox::Layer<voxblox::TsdfVoxel>::Ptr& tsdf_layer,
                   const voxblox::Layer<places::GvdVoxel>::Ptr& gvd_layer,
-                  const SemanticMeshLayer::Ptr& mesh_layer,
                   const MeshIntegratorConfig* mesh_config = nullptr,
                   const GraphExtractorConfig& graph_config = {});
 
   virtual ~ComboIntegrator();
 
   void update(uint64_t timestamp_ns,
+              VolumetricMap& map,
               bool clear_updated_flag,
               bool use_all_blocks = false);
 
@@ -63,11 +63,6 @@ class ComboIntegrator {
   std::unique_ptr<MeshIntegrator> mesh_integrator;
   std::unique_ptr<places::GvdIntegrator> gvd_integrator;
   places::GraphExtractorInterface::Ptr graph_extractor;
-
- protected:
-  voxblox::Layer<voxblox::TsdfVoxel>::Ptr tsdf_;
-  SemanticMeshLayer::Ptr mesh_;
-  voxblox::Layer<places::VertexVoxel>::Ptr vertices_;
 };
 
 }  // namespace hydra

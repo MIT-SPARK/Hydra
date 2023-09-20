@@ -71,8 +71,13 @@ TEST_F(EsdfTestFixture, DISABLED_TestEsdfSame) {
   const int voxels_per_side = 16;
 
   TsdfIntegratorBase::Config tsdf_config;
-  Layer<TsdfVoxel>::Ptr tsdf_layer(new Layer<TsdfVoxel>(voxel_size, voxels_per_side));
-  FastTsdfIntegrator tsdf_integrator(tsdf_config, tsdf_layer.get());
+  VolumetricMap::Config map_config;
+  map_config.voxel_size = voxel_size;
+  map_config.voxels_per_side = voxels_per_side;
+  map_config.truncation_distance = tsdf_config.default_truncation_distance;
+  VolumetricMap map(map_config, false, true);
+
+  FastTsdfIntegrator tsdf_integrator(tsdf_config, &map.getTsdfLayer());
 
   EsdfIntegrator::Config esdf_config;
   esdf_config.min_distance_m = tsdf_config.default_truncation_distance;
@@ -81,22 +86,19 @@ TEST_F(EsdfTestFixture, DISABLED_TestEsdfSame) {
   esdf_config.default_distance_m = esdf_config.max_distance_m;
 
   Layer<EsdfVoxel> original_layer(voxel_size, voxels_per_side);
-  EsdfIntegrator original_integrator(esdf_config, tsdf_layer.get(), &original_layer);
+  EsdfIntegrator original_integrator(esdf_config, &map.getTsdfLayer(), &original_layer);
 
   MeshIntegratorConfig mesh_config;
   mesh_config.integrator_threads = 1;
   GvdIntegratorConfig gvd_config = gvdConfigFromEsdfConfig(esdf_config);
   Layer<GvdVoxel>::Ptr gvd_layer(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
-  SemanticMeshLayer::Ptr mesh_layer(
-      new SemanticMeshLayer(voxel_size * voxels_per_side));
-  ComboIntegrator gvd_integrator(
-      gvd_config, tsdf_layer, gvd_layer, mesh_layer, &mesh_config);
+  ComboIntegrator gvd_integrator(gvd_config, gvd_layer, &mesh_config);
 
   for (size_t i = 0; i < num_poses; ++i) {
     updateTsdfIntegrator(tsdf_integrator, i);
 
     // we need to keep the updated flags for the second integrator
-    gvd_integrator.update(0, false);
+    gvd_integrator.update(0, map, false);
     original_integrator.updateFromTsdfLayer(true);
 
     LayerComparisonResult result =

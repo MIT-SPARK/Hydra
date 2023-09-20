@@ -33,17 +33,42 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <cstddef>
-#include <cstdint>
+#include <pose_graph_tools/PoseGraph.h>
+
+#include <Eigen/Geometry>
+#include <memory>
 
 namespace hydra {
-namespace places {
 
-struct VertexVoxel {
-  bool on_surface = false;
-  size_t block_vertex_index;
-  int32_t mesh_block[3];
+struct ReconstructionInput;
+struct ReconstructionOutput;
+
+class PoseGraphTracker {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  using Ptr = std::unique_ptr<PoseGraphTracker>;
+
+  struct Config {
+    bool make_pose_graph = false;
+  };
+
+  explicit PoseGraphTracker(const Config& config);
+
+  ~PoseGraphTracker() = default;
+
+  void update(const ReconstructionInput& msg);
+
+  void fillPoseGraphs(ReconstructionOutput& output);
+
+ protected:
+  const Config config_;
+  std::list<pose_graph_tools::PoseGraph::ConstPtr> graphs_;
+
+  uint64_t prev_time_;
+  size_t num_poses_received_;
+  Eigen::Isometry3d prev_pose_;
 };
 
-}  // namespace places
+void declare_config(PoseGraphTracker::Config& config);
+
 }  // namespace hydra

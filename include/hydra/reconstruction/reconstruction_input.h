@@ -32,44 +32,49 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/places/graph_extractor_types.h"
+#pragma once
+#include <pose_graph_tools/PoseGraph.h>
+
+#include <Eigen/Geometry>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <opencv2/core/mat.hpp>
+#include <vector>
+
+#include "hydra/reconstruction/sensor_input_packet.h"
 
 namespace hydra {
-namespace places {
 
-VoxelGraphInfo::VoxelGraphInfo() : is_node(false), is_split_node(false) {}
+struct ReconstructionInput {
+  using Ptr = std::shared_ptr<ReconstructionInput>;
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  uint64_t timestamp_ns;
+  std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
+  pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements;
+  Eigen::Vector3d world_t_body;
+  Eigen::Quaterniond world_R_body;
+  SensorInputPacket::Ptr sensor_input;
 
-VoxelGraphInfo::VoxelGraphInfo(NodeId id, bool is_from_split)
-    : id(id), is_node(true), is_split_node(is_from_split) {}
+ public:
+  ReconstructionInput() = default;
 
-EdgeInfo::EdgeInfo(size_t id, NodeId source) : id(id), source(source) {}
+  virtual ~ReconstructionInput() = default;
 
-EdgeSplitSeed::EdgeSplitSeed(const GlobalIndex& index,
-                             double distance_to_edge,
-                             size_t edge_id)
-    : index(index), distance_to_edge(distance_to_edge), edge_id(edge_id) {}
+  bool fillFrameData(FrameData& data) const {
+    if (!sensor_input) {
+      return false;
+    }
 
-bool operator<(const EdgeSplitSeed& lhs, const EdgeSplitSeed& rhs) {
-  return lhs.distance_to_edge < rhs.distance_to_edge;
-}
-
-std::ostream& operator<<(std::ostream& out, const VoxelGraphInfo& info) {
-  if (info.is_node) {
-    out << "node " << NodeSymbol(info.id).getLabel();
-  } else {
-    out << "edge " << info.edge_id;
+    data.timestamp_ns = timestamp_ns;
+    data.world_T_body = world_T_body();
+    return sensor_input->fillFrameData(data);
   }
 
-  return out;
-}
+  template <typename T = double>
+  Eigen::Transform<T, 3, Eigen::Isometry> world_T_body() const {
+    return Eigen::Translation<T, 3>(world_t_body.cast<T>()) * world_R_body.cast<T>();
+  }
+};
 
-std::ostream& operator<<(std::ostream& out, const EdgeInfo& info) {
-  out << "source: " << NodeSymbol(info.id).getLabel() << ", id: " << info.id
-      << ", size: " << info.indices.size()
-      << ", connections: " << info.connections.size()
-      << ", node connections: " << info.node_connections.size();
-  return out;
-}
-
-}  // namespace places
 }  // namespace hydra

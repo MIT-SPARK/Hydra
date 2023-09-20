@@ -34,24 +34,16 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/reconstruction/combo_integrator.h"
 
+#include <glog/logging.h>
+
 namespace hydra {
 
-using voxblox::Layer;
-
 ComboIntegrator::ComboIntegrator(const places::GvdIntegratorConfig& gvd_config,
-                                 const Layer<voxblox::TsdfVoxel>::Ptr& tsdf_layer,
-                                 const Layer<places::GvdVoxel>::Ptr& gvd_layer,
-                                 const SemanticMeshLayer::Ptr& mesh_layer,
+                                 const voxblox::Layer<places::GvdVoxel>::Ptr& gvd_layer,
                                  const MeshIntegratorConfig* mesh_config,
-                                 const GraphExtractorConfig& graph_config)
-    : tsdf_(tsdf_layer), mesh_(mesh_layer) {
-  vertices_.reset(new Layer<places::VertexVoxel>(gvd_layer->voxel_size(),
-                                                 gvd_layer->voxels_per_side()));
+                                 const GraphExtractorConfig& graph_config) {
   mesh_integrator = std::make_unique<MeshIntegrator>(
-      mesh_config ? *mesh_config : MeshIntegratorConfig(),
-      tsdf_layer,
-      vertices_,
-      mesh_layer);
+      mesh_config ? *mesh_config : MeshIntegratorConfig());
   graph_extractor = graph_config.create();
   gvd_integrator =
       std::make_unique<places::GvdIntegrator>(gvd_config, gvd_layer, graph_extractor);
@@ -60,11 +52,16 @@ ComboIntegrator::ComboIntegrator(const places::GvdIntegratorConfig& gvd_config,
 ComboIntegrator::~ComboIntegrator() = default;
 
 void ComboIntegrator::update(uint64_t timestamp_ns,
+                             VolumetricMap& map,
                              bool clear_updated_flag,
                              bool use_all_blocks) {
-  mesh_integrator->generateMesh(!use_all_blocks, clear_updated_flag);
-  gvd_integrator->updateFromTsdf(
-      timestamp_ns, *tsdf_, *vertices_, *mesh_, clear_updated_flag, use_all_blocks);
+  mesh_integrator->generateMesh(map, !use_all_blocks, clear_updated_flag);
+  gvd_integrator->updateFromTsdf(timestamp_ns,
+                                 map.getTsdfLayer(),
+                                 *CHECK_NOTNULL(map.getOccupancyLayer()),
+                                 map.getMeshLayer(),
+                                 clear_updated_flag,
+                                 use_all_blocks);
   gvd_integrator->updateGvd(timestamp_ns);
 }
 

@@ -4,7 +4,6 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/floodfill_graph_extractor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/graph_extractor_config.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/graph_extractor_interface.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/graph_extractor_types.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/graph_extractor_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/gvd_graph.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/gvd_integrator.cpp

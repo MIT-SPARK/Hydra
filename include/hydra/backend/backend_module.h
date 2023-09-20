@@ -46,7 +46,6 @@
 #include "hydra/backend/update_functions.h"
 #include "hydra/common/common.h"
 #include "hydra/common/module.h"
-#include "hydra/common/robot_prefix_config.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/utils/log_utilities.h"
 
@@ -72,7 +71,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
                                             size_t timestamp_ns)>;
 
   BackendModule(const BackendConfig& config,
-                const RobotPrefixConfig& prefix,
                 const SharedDsgInfo::Ptr& dsg,
                 const SharedDsgInfo::Ptr& backend_dsg,
                 const SharedModuleState::Ptr& state,
@@ -171,7 +169,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
  protected:
   const BackendConfig config_;
-  RobotPrefixConfig prefix_;
 
   std::unique_ptr<std::thread> spin_thread_;
   std::atomic<bool> should_shutdown_{false};
@@ -218,7 +215,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
       config::RegistrationWithConfig<BackendModule,
                                      BackendModule,
                                      BackendConfig,
-                                     RobotPrefixConfig,
                                      SharedDsgInfo::Ptr,
                                      SharedDsgInfo::Ptr,
                                      SharedModuleState::Ptr,

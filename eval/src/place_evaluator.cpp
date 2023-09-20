@@ -58,8 +58,10 @@ void PlaceEvaluator::computeGroundTruth(const GvdIntegratorConfig& config) {
   config_ = config;
 
   VLOG(1) << "using GVD config:" << std::endl << config_;
-  ComboIntegrator integrator(config_, tsdf_, gvd_, mesh_);
-  integrator.update(0, false, true);
+  ComboIntegrator integrator(config_, gvd_);
+  // enable occupancy (required for gvd) but not semantics
+  auto map = VolumetricMap::fromTsdf(*tsdf_, 0.3, false, true);
+  integrator.update(0, *CHECK_NOTNULL(map), false, true);
 }
 
 PlaceEvaluator::Ptr PlaceEvaluator::fromFile(const std::string& config_filepath,

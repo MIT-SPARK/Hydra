@@ -11,14 +11,15 @@
   <license>BSD</license>
 
   <buildtool_depend>catkin</buildtool_depend>
+  <depend>config_utilities</depend>
+  <depend>eigen</depend>
   <depend>gtsam</depend>
-  <depend>kimera_pgmo</depend>
-  <depend>kimera_semantics</depend>
+  <depend>libopencv-dev</depend>
   <depend>spark_dsg</depend>
   <depend>teaserpp</depend>
+  <depend>kimera_pgmo</depend>
   <depend>tf2_eigen</depend>
   <depend>voxblox</depend>
-  <depend>config_utilities</depend>
 
   <export>
   </export>

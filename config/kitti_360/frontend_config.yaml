@@ -1,24 +1,25 @@
 ---
 pgmo:
-  horizon: 100.0
+  horizon: 15.0
   track_mesh_graph_mapping: true
-  full_compression_method: 2    # voxel clearing
-  graph_compression_method: 1    # voxblox
+  full_compression_method: 2  # voxel clearing
+  graph_compression_method: 1  # voxblox
   d_graph_resolution: 2.5
-  output_mesh_resolution: 0.02
+  output_mesh_resolution: 0.005
 objects:
   prefix: O
-  active_horizon_s: 10.0
-  active_index_horizon_m: 7.0    # TODO(nathan) check
-  min_cluster_size: 25
+  active_index_horizon_m: 7.0
+  min_cluster_size: 40
   max_cluster_size: 100000
   cluster_tolerance: 0.25
-min_object_vertices: 20
+min_object_vertices: 40
 prune_mesh_indices: true
+filter_places: true
+min_places_component_size: 3
 enable_active_mesh_pub: false
 enable_segmented_mesh_pub: false
 gvd:
-  max_distance_m: 3.5
+  max_distance_m: 4.5
   min_distance_m: 0.2
   min_diff_m: 0.1
   min_weight: 1.0e-6
@@ -34,13 +35,13 @@ gvd:
     parent_cos_angle_separation: 0.2
 graph_extractor:
   type: CompressionGraphExtractor
-  # compresssion extractor
+      # compresssion extractor
   compression_distance_m: 1.0
   min_node_distance_m: 0.4
   min_edge_distance_m: 0.3
   validate_graph: false
   add_heuristic_edges: false
-  # floodfill extractor
+      # floodfill extractor
   node_merge_distance_m: 0.5
   min_extra_basis: 2
   min_vertex_basis: 4
@@ -48,7 +49,7 @@ graph_extractor:
   edge_splitting_merge_nodes: true
   max_edge_split_iterations: 5
   max_edge_deviation: 4
-  # heurisitic edges
+      # heurisitic edges
   add_overlap_edges: true
   overlap_edges:
     num_neighbors_to_check: 4

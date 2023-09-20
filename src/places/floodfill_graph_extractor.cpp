@@ -43,6 +43,40 @@ namespace places {
 using GvdLayer = FloodfillGraphExtractor::GvdLayer;
 using GlobalIndexVector = voxblox::AlignedVector<GlobalIndex>;
 
+VoxelGraphInfo::VoxelGraphInfo() : is_node(false), is_split_node(false) {}
+
+VoxelGraphInfo::VoxelGraphInfo(NodeId id, bool is_from_split)
+    : id(id), is_node(true), is_split_node(is_from_split) {}
+
+EdgeInfo::EdgeInfo(size_t id, NodeId source) : id(id), source(source) {}
+
+EdgeSplitSeed::EdgeSplitSeed(const GlobalIndex& index,
+                             double distance_to_edge,
+                             size_t edge_id)
+    : index(index), distance_to_edge(distance_to_edge), edge_id(edge_id) {}
+
+bool operator<(const EdgeSplitSeed& lhs, const EdgeSplitSeed& rhs) {
+  return lhs.distance_to_edge < rhs.distance_to_edge;
+}
+
+std::ostream& operator<<(std::ostream& out, const VoxelGraphInfo& info) {
+  if (info.is_node) {
+    out << "node " << NodeSymbol(info.id).getLabel();
+  } else {
+    out << "edge " << info.edge_id;
+  }
+
+  return out;
+}
+
+std::ostream& operator<<(std::ostream& out, const EdgeInfo& info) {
+  out << "source: " << NodeSymbol(info.id).getLabel() << ", id: " << info.id
+      << ", size: " << info.indices.size()
+      << ", connections: " << info.connections.size()
+      << ", node connections: " << info.node_connections.size();
+  return out;
+}
+
 FloodfillGraphExtractor::FloodfillGraphExtractor(const FloodfillExtractorConfig& config)
     : GraphExtractorInterface(config), config_(config), next_edge_id_(0) {}
 

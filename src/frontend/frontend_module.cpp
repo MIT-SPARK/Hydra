@@ -39,6 +39,7 @@
 #include <kimera_pgmo/compression/DeltaCompression.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
 #include <tf2_eigen/tf2_eigen.h>
+#include <config_utilities/validation.h>
 
 #include <fstream>
 
@@ -67,22 +68,21 @@ void launchCallbacks(const std::vector<Func>& callbacks, Args... args) {
 }
 
 FrontendModule::FrontendModule(const FrontendConfig& config,
-                               const RobotPrefixConfig& prefix,
                                const SharedDsgInfo::Ptr& dsg,
                                const SharedModuleState::Ptr& state,
                                const LogSetup::Ptr& logs)
-    : config_(config),
+    : config_(config::checkValid(config)),
       queue_(std::make_shared<FrontendInputQueue>()),
-      prefix_(prefix),
       dsg_(dsg),
       state_(state) {
   kimera_pgmo::MeshFrontendConfig pgmo_config = config_.pgmo_config;
-  pgmo_config.robot_id = prefix_.id;
+  const auto& prefix = HydraConfig::instance().getRobotPrefix();
+  pgmo_config.robot_id = prefix.id;
 
   CHECK(dsg_ != nullptr);
   CHECK(dsg_->graph != nullptr);
   dsg_->graph->initMesh(true);
-  dsg_->graph->createDynamicLayer(DsgLayers::AGENTS, prefix_.key);
+  dsg_->graph->createDynamicLayer(DsgLayers::AGENTS, prefix.key);
 
   const auto mesh_resolution = pgmo_config.mesh_resolution;
   mesh_compression_.reset(new kimera_pgmo::DeltaCompression(mesh_resolution));
@@ -368,7 +368,8 @@ void FrontendModule::updatePlaces(const ReconstructionOutput& input) {
 
 void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
-  const auto& agents = dsg_->graph->getLayer(DsgLayers::AGENTS, prefix_.key);
+  const auto& prefix = HydraConfig::instance().getRobotPrefix();
+  const auto& agents = dsg_->graph->getLayer(DsgLayers::AGENTS, prefix.key);
 
   lcd_input_->new_agent_nodes.clear();
   for (const auto& pose_graph : input.pose_graphs) {
@@ -389,7 +390,7 @@ void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
       // TODO(nathan) implicit assumption that pgmo ids are sequential starting at 0
       // TODO(nathan) implicit assumption that gtsam symbol and dsg node symbol are
       // same
-      NodeSymbol pgmo_key(prefix_.key, node.key);
+      NodeSymbol pgmo_key(prefix.key, node.key);
 
       const std::chrono::nanoseconds stamp(node.header.stamp.toNSec());
       VLOG(5) << "[Hydra Frontend] Adding agent " << agents.nodes().size() << " @ "
@@ -417,6 +418,7 @@ void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
 }
 
 void FrontendModule::assignBowVectors(const DynamicLayer& agents) {
+  const auto& prefix = HydraConfig::instance().getRobotPrefix();
   // TODO(nathan) take care of synchronization better
   // lcd_input_->new_agent_nodes.clear();
 
@@ -430,12 +432,12 @@ void FrontendModule::assignBowVectors(const DynamicLayer& agents) {
   auto iter = cached_bow_messages_.begin();
   while (iter != cached_bow_messages_.end()) {
     const auto& msg = *iter;
-    if (static_cast<int>(msg->robot_id) != prefix_.id) {
+    if (static_cast<int>(msg->robot_id) != prefix.id) {
       VLOG(1) << "[Hydra Frontend] rejected bow message from robot " << msg->robot_id;
       iter = cached_bow_messages_.erase(iter);
     }
 
-    const NodeSymbol pgmo_key(prefix_.key, msg->pose_id);
+    const NodeSymbol pgmo_key(prefix.key, msg->pose_id);
 
     auto agent_index = agent_key_map_.find(pgmo_key);
     if (agent_index == agent_key_map_.end()) {

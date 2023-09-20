@@ -33,9 +33,22 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
+#include <hydra/utils/disjoint_set.h>
 #include <hydra/utils/minimum_spanning_tree.h>
 
 namespace hydra {
+
+// most for coverage
+TEST(DisjointSet, TestSameCluster) {
+  DisjointSet set;
+  set.addSet(0);
+  set.addSet(1);
+  auto result = set.doUnion(0, 1);
+  ASSERT_TRUE(result);
+  EXPECT_EQ(result.value(), 1u);
+  auto retry_result = set.doUnion(0, 1);
+  EXPECT_FALSE(retry_result);
+}
 
 TEST(MinimumSpanningTreeTests, TestSingleChain) {
   IsolatedSceneGraphLayer layer(1);

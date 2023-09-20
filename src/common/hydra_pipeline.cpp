@@ -36,10 +36,13 @@
 
 #include <config_utilities/settings.h>
 
+#include "hydra/common/hydra_config.h"
+
 namespace hydra {
 
 HydraPipeline::HydraPipeline(int robot_id, const LogSetup::Ptr& log_setup)
-    : prefix_(robot_id), log_setup_(log_setup) {
+    : log_setup_(log_setup) {
+  HydraConfig::instance().setRobotId(robot_id);
   // TODO(nathan) parse label space config
   // TODO(nathan) parse and use at some point
   const LayerId mesh_layer_id = 1;

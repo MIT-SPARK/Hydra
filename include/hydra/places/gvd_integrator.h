@@ -41,9 +41,9 @@
 #include "hydra/places/gvd_utilities.h"
 #include "hydra/places/gvd_voxel.h"
 #include "hydra/places/update_statistics.h"
-#include "hydra/places/vertex_voxel.h"
 #include "hydra/places/voxblox_types.h"
 #include "hydra/reconstruction/semantic_mesh_layer.h"
+#include "hydra/reconstruction/vertex_voxel.h"
 
 namespace hydra {
 namespace places {

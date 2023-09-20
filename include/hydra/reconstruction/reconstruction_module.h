@@ -34,42 +34,23 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <config_utilities/factory.h>
-#include <kimera_semantics/semantic_voxel.h>
 
 #include <Eigen/Geometry>
 #include <memory>
 
 #include "hydra/common/input_queue.h"
 #include "hydra/common/module.h"
-#include "hydra/common/robot_prefix_config.h"
 #include "hydra/reconstruction/reconstruction_config.h"
+#include "hydra/reconstruction/reconstruction_input.h"
 #include "hydra/reconstruction/reconstruction_output.h"
+#include "hydra/reconstruction/volumetric_map.h"
 #include "hydra/utils/log_utilities.h"
-
-namespace kimera {
-class SemanticIntegratorBase;
-}
+#include "hydra/utils/pose_graph_tracker.h"
 
 namespace hydra {
 
+class ProjectiveIntegrator;
 class MeshIntegrator;
-
-bool loadExtrinsicsFromKimera(ReconstructionConfig& config,
-                              const std::string& filename);
-
-struct ReconstructionInput {
-  using Ptr = std::shared_ptr<ReconstructionInput>;
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
-  uint64_t timestamp_ns;
-  std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
-  pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements;
-  Eigen::Vector3d world_t_body;
-  Eigen::Quaterniond world_R_body;
-  voxblox::Pointcloud pointcloud;
-  voxblox::Colors pointcloud_colors;
-  std::vector<uint32_t> pointcloud_labels;
-};
 
 class ReconstructionModule : public Module {
  public:
@@ -78,9 +59,12 @@ class ReconstructionModule : public Module {
   using ReconstructionInputQueue = InputQueue<ReconstructionInput::Ptr>;
   using OutputQueue = InputQueue<ReconstructionOutput::Ptr>;
   using OutputCallback = std::function<void(const ReconstructionOutput&)>;
+  using OutputMsgStatus = std::pair<ReconstructionOutput::Ptr, bool>;
+  using VizCallback = std::function<void(uint64_t timestamp,
+                                         const Eigen::Isometry3d&,
+                                         const voxblox::Layer<voxblox::TsdfVoxel>&)>;
 
   ReconstructionModule(const ReconstructionConfig& config,
-                       const RobotPrefixConfig& prefix,
                        const OutputQueue::Ptr& output_queue);
 
   virtual ~ReconstructionModule();
@@ -102,60 +86,43 @@ class ReconstructionModule : public Module {
 
   void addOutputCallback(const OutputCallback& callback);
 
+  void addVisualizationCallback(const VizCallback& callback);
+
  protected:
   void update(const ReconstructionInput& msg, bool full_update);
 
-  void showStats() const;
-
-  void fillPoseGraphNode(pose_graph_tools::PoseGraphNode& node,
-                         uint64_t stamp,
-                         const Eigen::Affine3d& pose,
-                         size_t index) const;
-
-  void makePoseGraphEdge(pose_graph_tools::PoseGraph& graph) const;
-
-  pose_graph_tools::PoseGraph makePoseGraph(uint64_t timestamp_ns,
-                                            const Eigen::Affine3d& curr_pose);
-
-  voxblox::Transformation getCameraPose(const ReconstructionInput& msg) const;
-
-  voxblox::BlockIndexList findBlocksToArchive(const voxblox::Point& center) const;
+  voxblox::BlockIndexList findBlocksToArchive(const Eigen::Vector3f& center) const;
 
   void fillOutput(const ReconstructionInput& input, ReconstructionOutput& output);
 
+  OutputMsgStatus getNextOutputMessage();
+
  protected:
   const ReconstructionConfig config_;
-  RobotPrefixConfig prefix_;
+  const std::unique_ptr<Sensor> sensor_;
 
   std::atomic<bool> should_shutdown_{false};
   ReconstructionInputQueue::Ptr queue_;
   std::unique_ptr<std::thread> spin_thread_;
+  size_t num_poses_received_;
 
-  std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs_;
   pose_graph_tools::PoseGraph agent_node_measurements_;
+  PoseGraphTracker::Ptr pose_graph_tracker_;
   ReconstructionOutput::Ptr pending_output_;
   OutputQueue::Ptr output_queue_;
 
-  voxblox::Layer<voxblox::TsdfVoxel>::Ptr tsdf_;
-  voxblox::Layer<kimera::SemanticVoxel>::Ptr semantics_;
-  voxblox::Layer<places::VertexVoxel>::Ptr vertices_;
-  SemanticMeshLayer::Ptr mesh_;
-
-  std::unique_ptr<kimera::SemanticIntegratorBase> tsdf_integrator_;
+  std::unique_ptr<VolumetricMap> map_;
+  std::unique_ptr<ProjectiveIntegrator> tsdf_integrator_;
   std::unique_ptr<MeshIntegrator> mesh_integrator_;
 
-  uint64_t prev_time_;
-  size_t num_poses_received_;
-  Eigen::Affine3d prev_pose_;
-
   std::list<OutputCallback> output_callbacks_;
+  std::list<VizCallback> visualization_callbacks_;
 
   inline static const auto registration_ =
       config::RegistrationWithConfig<ReconstructionModule,
                                      ReconstructionModule,
                                      ReconstructionConfig,
-                                     const RobotPrefixConfig&,
-                                     const OutputQueue::Ptr&>("ReconstructionModule");
+                                     OutputQueue::Ptr>("ReconstructionModule");
 };
 
 }  // namespace hydra

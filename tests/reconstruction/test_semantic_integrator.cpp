@@ -32,56 +32,60 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include "hydra/common/dsg_types.h"
-#include "hydra/places/voxblox_types.h"
+#include <gtest/gtest.h>
+#include <hydra/common/hydra_config.h>
+#include <hydra/reconstruction/semantic_integrator.h>
 
 namespace hydra {
-namespace places {
 
-struct VoxelGraphInfo {
-  // TODO(nathan) consider copy constructor-eqsue cleanup of extract edges
-  VoxelGraphInfo();
-  VoxelGraphInfo(NodeId id, bool is_from_split);
-
-  NodeId id;
-  bool is_node;
-  bool is_split_node;
-  size_t edge_id;
+namespace {
+struct ConfigGuard {
+  ~ConfigGuard() { HydraConfig::instance().reset(); }
 };
+}  // namespace
 
-struct EdgeInfo {
-  EdgeInfo() = default;
+std::unique_ptr<SemanticIntegrator> createIntegrator(
+    size_t num_labels,
+    const std::set<uint32_t>& dynamic_labels = {},
+    const std::set<uint32_t>& invalid_labels = {},
+    double label_confidence = 0.9) {
+  LabelSpaceConfig label_config;
+  label_config.total_labels = num_labels;
+  label_config.dynamic_labels = dynamic_labels;
+  label_config.invalid_labels = invalid_labels;
+  HydraConfig::instance().setLabelSpaceConfig(label_config);
 
-  EdgeInfo(size_t id, NodeId source);
+  MLESemanticIntegrator::Config config;
+  config.label_confidence = label_confidence;
+  return std::make_unique<MLESemanticIntegrator>(config);
+}
 
-  size_t id;
-  NodeId source;
-  voxblox::LongIndexSet indices;
-  std::set<NodeId> node_connections;
-  std::set<size_t> connections;
-};
+TEST(SemanticIntegrator, MLEValidLabelCorrect) {
+  ConfigGuard guard;
+  const auto integrator = createIntegrator(5, {1}, {4});
+  EXPECT_FALSE(integrator->isValidLabel(1));
+  EXPECT_FALSE(integrator->isValidLabel(4));
+  EXPECT_FALSE(integrator->isValidLabel(5));
+  EXPECT_TRUE(integrator->isValidLabel(0));
+  EXPECT_TRUE(integrator->isValidLabel(2));
+}
 
-struct EdgeSplitSeed {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+TEST(SemanticIntegrator, MLEIntegrationCorrect) {
+  ConfigGuard guard;
+  const auto integrator = createIntegrator(5, {}, {}, 0.8);
+  SemanticVoxel voxel;
+  EXPECT_TRUE(voxel.empty);
+  integrator->updateLikelihoods(2, voxel);
+  EXPECT_FALSE(voxel.empty);
+  ASSERT_EQ(voxel.semantic_likelihoods.size(), 5);
+  EXPECT_GT(voxel.semantic_likelihoods(2), voxel.semantic_likelihoods(0));
+  EXPECT_GT(voxel.semantic_likelihoods(2), voxel.semantic_likelihoods(1));
+  EXPECT_GT(voxel.semantic_likelihoods(2), voxel.semantic_likelihoods(3));
+  EXPECT_GT(voxel.semantic_likelihoods(2), voxel.semantic_likelihoods(4));
+  Eigen::VectorXf expected = Eigen::VectorXf::Zero(5);
+  expected << 0.04, 0.04, 0.16, 0.04, 0.04;
+  Eigen::VectorXf result_prob = voxel.semantic_likelihoods.array().exp();
+  EXPECT_TRUE(result_prob.isApprox(expected));
+}
 
-  EdgeSplitSeed(const GlobalIndex& index, double distance_to_edge, size_t edge_id);
-
-  GlobalIndex index;
-  double distance_to_edge;
-  size_t edge_id;
-};
-
-bool operator<(const EdgeSplitSeed& lhs, const EdgeSplitSeed& rhs);
-
-struct PseudoEdgeInfo {
-  std::vector<NodeId> nodes;
-  voxblox::AlignedVector<GlobalIndex> indices;
-};
-
-std::ostream& operator<<(std::ostream& out, const VoxelGraphInfo& info);
-
-std::ostream& operator<<(std::ostream& out, const EdgeInfo& info);
-
-}  // namespace places
 }  // namespace hydra

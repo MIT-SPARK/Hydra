@@ -117,11 +117,10 @@ void addPlaceNode(IsolatedSceneGraphLayer& graph,
 }  // namespace
 
 TEST(FrontendModuleTests, TestAgentEdges) {
-  auto prefix = RobotPrefixConfig(0);
   auto config = getDefaultConfig();
   auto dsg = makeSharedDsg();
   auto state = std::make_shared<SharedModuleState>();
-  auto frontend = std::make_shared<FrontendModule>(config, prefix, dsg, state);
+  auto frontend = std::make_shared<FrontendModule>(config, dsg, state);
   auto queue = frontend->getQueue();
 
   IsolatedSceneGraphLayer places(2);

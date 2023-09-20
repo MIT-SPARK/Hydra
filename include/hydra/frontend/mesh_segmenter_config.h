@@ -42,7 +42,6 @@ namespace hydra {
 struct MeshSegmenterConfig {
   char prefix = 'O';
   LayerId layer_id = DsgLayers::OBJECTS;
-  double active_horizon_s = 10.0;
   double active_index_horizon_m = 7.0;
   double cluster_tolerance = 0.25;
   size_t min_cluster_size = 40;

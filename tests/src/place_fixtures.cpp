@@ -161,12 +161,15 @@ void SingleBlockTestFixture::SetUp() {
   gvd_config.min_distance_m = truncation_distance;
   gvd_config.max_distance_m = 10.0;
 
-  tsdf_layer.reset(new Layer<TsdfVoxel>(voxel_size, voxels_per_side));
+  VolumetricMap::Config map_config;
+  map_config.voxel_size = voxel_size;
+  map_config.voxels_per_side = voxels_per_side;
+  map_config.truncation_distance = truncation_distance;
+  map = std::make_unique<VolumetricMap>(map_config, false, true);
   gvd_layer.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
-  mesh_layer.reset(new SemanticMeshLayer(voxel_size * voxels_per_side));
 
   BlockIndex block_index = BlockIndex::Zero();
-  tsdf_block = tsdf_layer->allocateBlockPtrByIndex(block_index);
+  tsdf_block = map->getTsdfLayer().allocateBlockPtrByIndex(block_index);
   gvd_block = gvd_layer->allocateBlockPtrByIndex(block_index);
   tsdf_block->updated().set();
 
@@ -184,9 +187,8 @@ void SingleBlockExtractionTestFixture::SetUp() {
   SingleBlockTestFixture::SetUp();
   setBlockState();
 
-  gvd_integrator.reset(
-      new ComboIntegrator(gvd_config, tsdf_layer, gvd_layer, mesh_layer));
-  gvd_integrator->update(0, true);
+  gvd_integrator.reset(new ComboIntegrator(gvd_config, gvd_layer));
+  gvd_integrator->update(0, *map, true);
 }
 
 void SingleBlockExtractionTestFixture::setBlockState() {}

@@ -39,37 +39,53 @@
 
 namespace hydra {
 
-using places::VertexVoxel;
 using voxblox::BlockIndex;
 
 static constexpr float TEST_TOLERANCE = 1.0e-6f;
 
-TEST(MarchingCubes, EdgeInterpolation) {
-  PointMatrix vertex_coordinates = PointMatrix::Zero();
-  SdfMatrix sdf_values;
+using PointMatrix = Eigen::Matrix<float, 3, 8>;
+using SdfMatrix = std::array<float, 8>;
 
+void fillPointsFromMatrices(const PointMatrix& pos,
+                            const SdfMatrix& sdf,
+                            MarchingCubes::SdfPoints& points) {
+  for (size_t i = 0; i < 8; ++i) {
+    points[i].pos = pos.col(i);
+    points[i].distance = sdf[i];
+    points[i].weight = 1.0;
+  }
+}
+
+TEST(MarchingCubes, EdgeInterpolation) {
   // add zero-crossings at just the bottom right? corner
-  sdf_values << -1.0, 1.0, 10.0, 2.0, 3.0, 10.0, 10.0, 10.0;
+  SdfMatrix sdf_values{-1.0, 1.0, 10.0, 2.0, 3.0, 10.0, 10.0, 10.0};
 
   // make vertices for everything that should be used for interpolation
+  PointMatrix vertex_coordinates = PointMatrix::Zero();
   vertex_coordinates.col(0) << -1.0, -1.0, -1.0;
   vertex_coordinates.col(1) << 1.0, 1.0, 1.0;
   vertex_coordinates.col(3) << 1.0, 1.0, 1.0;
   vertex_coordinates.col(4) << 1.0, 1.0, 1.0;
 
-  EdgeIndexMatrix edge_coords = EdgeIndexMatrix::Zero();
-  std::vector<uint8_t> edge_status;
-  interpolateEdges(vertex_coordinates, sdf_values, edge_coords, edge_status);
+  MarchingCubes::SdfPoints sdf_points;
+  fillPointsFromMatrices(vertex_coordinates, sdf_values, sdf_points);
+  MarchingCubes::EdgePoints edge_coords;
+  for (size_t i = 0; i < edge_coords.size(); ++i) {
+    edge_coords[i].pos.setZero();
+  }
+
+  MarchingCubes::EdgeStatus edge_status;
+  MarchingCubes::interpolateEdges(sdf_points, edge_coords, edge_status);
 
   std::set<int> valid_edges{0, 3, 8};
-  for (int i = 0; i < edge_coords.cols(); ++i) {
+  for (size_t i = 0; i < edge_coords.size(); ++i) {
     if (valid_edges.count(i)) {
       continue;
     }
 
     EXPECT_EQ(0u, edge_status[i]);
-    EXPECT_EQ(0.0f, edge_coords.col(i).norm())
-        << "i: " << edge_coords.col(i).transpose();
+    EXPECT_EQ(0.0f, edge_coords[i].pos.norm())
+        << "i: " << edge_coords[i].pos.transpose();
   }
 
   // see kEdgeIndexPairs for edge index to voxel index mapping
@@ -79,45 +95,45 @@ TEST(MarchingCubes, EdgeInterpolation) {
 
   Eigen::Vector3f expected_edge0;
   expected_edge0 << 0.0f, 0.0f, 0.0f;
-  EXPECT_NEAR(0.0f, (expected_edge0 - edge_coords.col(0)).norm(), TEST_TOLERANCE)
-      << "0: " << edge_coords.col(0).transpose();
+  const auto& result0 = edge_coords[0].pos;
+  EXPECT_NEAR(0.0f, (expected_edge0 - result0).norm(), TEST_TOLERANCE)
+      << "0: " << result0.transpose();
 
   Eigen::Vector3f expected_edge3;
   expected_edge3 << -1.0f / 3.0f, -1.0f / 3.0f, -1.0f / 3.0f;
-  EXPECT_NEAR(0.0f, (expected_edge3 - edge_coords.col(3)).norm(), TEST_TOLERANCE)
-      << "3: " << edge_coords.col(3).transpose();
+  const auto& result3 = edge_coords[3].pos;
+  EXPECT_NEAR(0.0f, (expected_edge3 - result3).norm(), TEST_TOLERANCE)
+      << "3: " << result3.transpose();
 
   Eigen::Vector3f expected_edge8;
   expected_edge8 << -1.0f / 2.0f, -1.0f / 2.0f, -1.0f / 2.0f;
-  EXPECT_NEAR(0.0f, (expected_edge8 - edge_coords.col(8)).norm(), TEST_TOLERANCE)
-      << "8: " << edge_coords.col(8).transpose();
+  const auto& result8 = edge_coords[8].pos;
+  EXPECT_NEAR(0.0f, (expected_edge8 - result8).norm(), TEST_TOLERANCE)
+      << "8: " << result8.transpose();
 }
 
 TEST(MarchingCubes, CubeMeshingNearestVertexIndexCorrect) {
-  voxblox::Mesh mesh;
-  PointMatrix vertex_coordinates = PointMatrix::Zero();
-  SdfMatrix sdf_values;
-  voxblox::VertexIndex next_index = 0;
-
-  VertexVoxel actual_voxels[8];
-  std::vector<VertexVoxel*> gvd_voxels(8, nullptr);
-  for (size_t i = 0; i < gvd_voxels.size(); ++i) {
-    gvd_voxels[i] = &(actual_voxels[i]);
-  }
-
   // add zero-crossings at just the bottom right? corner
-  sdf_values << -1.0, 1.0, 10.0, 2.0, 3.0, 10.0, 10.0, 10.0;
+  SdfMatrix sdf_values{-1.0, 1.0, 10.0, 2.0, 3.0, 10.0, 10.0, 10.0};
 
   // make vertices for everything that should be used for interpolation
+  PointMatrix vertex_coordinates = PointMatrix::Zero();
   vertex_coordinates.col(0) << -1.0, -1.0, -1.0;
   vertex_coordinates.col(1) << 1.0, 1.0, 1.0;
   vertex_coordinates.col(3) << 1.0, 1.0, 1.0;
   vertex_coordinates.col(4) << 1.0, 1.0, 1.0;
 
+  MarchingCubes::SdfPoints sdf_points;
+  fillPointsFromMatrices(vertex_coordinates, sdf_values, sdf_points);
+  VertexVoxel actual_voxels[8];
+  for (size_t i = 0; i < 8; ++i) {
+    sdf_points[i].vertex_voxel = &(actual_voxels[i]);
+  }
+
+  voxblox::Mesh mesh;
   BlockIndex block = BlockIndex::Zero();
-  MarchingCubes::meshCube(
-      block, vertex_coordinates, sdf_values, &next_index, &mesh, gvd_voxels);
-  EXPECT_EQ(3u, next_index);
+  MarchingCubes::meshCube(block, sdf_points, mesh);
+  EXPECT_EQ(3u, mesh.size());
 
   EXPECT_TRUE(actual_voxels[0].on_surface);
   EXPECT_TRUE(actual_voxels[1].on_surface);

@@ -1,5 +1,4 @@
 ---
-world_frame: world
 body_R_camera:
   w: 0.9999471104570863
   x: 0.005958345141369824

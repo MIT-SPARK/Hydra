@@ -34,14 +34,15 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <pose_graph_tools/PoseGraph.h>
+#include <voxblox/core/layer.h>
 #include <voxblox/mesh/mesh_layer.h>
 
 #include <Eigen/Dense>
 #include <cstdint>
 #include <memory>
 
-#include "hydra/places/vertex_voxel.h"
 #include "hydra/reconstruction/semantic_mesh_layer.h"
+#include "hydra/reconstruction/vertex_voxel.h"
 
 namespace hydra {
 
@@ -51,7 +52,7 @@ struct ReconstructionOutput {
   uint64_t timestamp_ns;
   SemanticMeshLayer::Ptr mesh;
   voxblox::Layer<voxblox::TsdfVoxel>::Ptr tsdf;
-  voxblox::Layer<places::VertexVoxel>::Ptr occupied;
+  voxblox::Layer<VertexVoxel>::Ptr occupied;
   voxblox::BlockIndexList archived_blocks;
   std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
   pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements;

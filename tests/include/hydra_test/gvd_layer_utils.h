@@ -158,12 +158,10 @@ LayerComparisonResult compareLayers(const voxblox::Layer<LhsVoxel>& lhs,
 }
 
 inline bool gvdEsdfVoxelsSame(const GvdVoxel& lhs, const voxblox::EsdfVoxel& rhs) {
-  // TODO(nathan) consider comparing parent to esdf parent direction
   return lhs.distance == rhs.distance && lhs.fixed == rhs.fixed;
 }
 
 inline bool gvdVoxelsSame(const GvdVoxel& lhs, const GvdVoxel& rhs) {
-  // TODO(nathan) consider comparing parent to esdf parent direction
   return lhs.distance == rhs.distance && lhs.fixed == rhs.fixed;
 }
 

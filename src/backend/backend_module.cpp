@@ -69,14 +69,12 @@ std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol 
 }
 
 BackendModule::BackendModule(const BackendConfig& config,
-                             const RobotPrefixConfig& prefix,
                              const SharedDsgInfo::Ptr& dsg,
                              const SharedDsgInfo::Ptr& backend_dsg,
                              const SharedModuleState::Ptr& state,
                              const LogSetup::Ptr& logs)
     : KimeraPgmoInterface(),
-      config_(config),
-      prefix_(prefix),
+      config_(config::checkValid(config)),
       shared_dsg_(dsg),
       private_dsg_(backend_dsg),
       shared_places_copy_(DsgLayers::PLACES),
@@ -156,8 +154,9 @@ void BackendModule::save(const LogSetup& log_setup) {
   deformation_graph_->save(pgmo_path + "/deformation_graph.dgrf");
   savePoseGraphSparseMapping(pgmo_path + "/sparsification_mapping.txt");
 
-  if (deformation_graph_->hasPrefixPoses(prefix_.key)) {
-    const auto optimized_path = getOptimizedTrajectory(prefix_.id);
+  const auto& prefix = HydraConfig::instance().getRobotPrefix();
+  if (deformation_graph_->hasPrefixPoses(prefix.key)) {
+    const auto optimized_path = getOptimizedTrajectory(prefix.id);
     std::string csv_name = pgmo_path + "/traj_pgmo.csv";
     saveTrajectory(optimized_path, timestamps_, csv_name);
   }
@@ -573,6 +572,7 @@ void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
   }
 
   ScopedTimer timer("backend/add_places", timestamp_ns);
+  const auto& prefix = HydraConfig::instance().getRobotPrefix();
 
   deformation_graph_->clearTemporaryStructures();
 
@@ -610,7 +610,7 @@ void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
     deformation_graph_->addNewTempNodesValences(place_nodes,
                                                 place_node_poses,
                                                 place_node_valences,
-                                                prefix_.vertex_key,
+                                                prefix.vertex_key,
                                                 false,
                                                 config_.pgmo.place_mesh_variance);
   }  // end timing scope
@@ -712,7 +712,7 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
   deformation_graph_->deformPoints(*private_dsg_->graph->getMeshVertices(),
                                    *original_vertices_,
                                    mesh_timestamps_,
-                                   prefix_.vertex_key,
+                                   HydraConfig::instance().getRobotPrefix().vertex_key,
                                    deformation_graph_->getGtsamValues(),
                                    KimeraPgmoInterface::config_.num_interp_pts,
                                    KimeraPgmoInterface::config_.interp_horizon,
@@ -726,7 +726,8 @@ void BackendModule::updateAgentNodeMeasurements(
   std::vector<std::pair<gtsam::Key, gtsam::Pose3>> agent_measurements;
   for (const auto& node : meas.nodes) {
     agent_measurements.push_back(
-        {gtsam::Symbol(prefix_.key, node.key), kimera_pgmo::RosToGtsam(node.pose)});
+        {gtsam::Symbol(HydraConfig::instance().getRobotPrefix().key, node.key),
+         kimera_pgmo::RosToGtsam(node.pose)});
   }
   deformation_graph_->addNodeMeasurements(agent_measurements);
 }
@@ -867,9 +868,10 @@ void BackendModule::logIncrementalLoopClosures(const PoseGraph& msg) {
       continue;
     }
 
+    const auto& prefix = HydraConfig::instance().getRobotPrefix();
     gtsam::Pose3 pose = kimera_pgmo::RosToGtsam(edge.pose);
-    const gtsam::Symbol src_key(prefix_.key, edge.key_from);
-    const gtsam::Symbol dest_key(prefix_.key, edge.key_to);
+    const gtsam::Symbol src_key(prefix.key, edge.key_from);
+    const gtsam::Symbol dest_key(prefix.key, edge.key_to);
     // note that pose graph convention is pose = src.between(dest) where the edge
     // connects frames "to -> from" (i.e. src = to, dest = from, pose = to_T_from)
     loop_closures_.push_back({src_key, dest_key, pose, false, 0});

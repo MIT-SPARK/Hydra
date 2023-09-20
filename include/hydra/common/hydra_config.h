@@ -41,13 +41,24 @@
 #include <vector>
 
 #include "hydra/common/label_space_config.h"
-
-namespace kimera {
-class SemanticColorMap;
-}
+#include "hydra/common/robot_prefix_config.h"
+// TODO(nathan) bad....
+#include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
 
+// TODO(nathan) don't forward declare and use color array instead
+struct SemanticColorMap;
+
+struct FrameConfig {
+  std::string robot = "base_link";
+  std::string odom = "odom";
+  std::string map = "map";
+};
+
+void declare_config(FrameConfig& conf);
+
+// TODO(nathan) decrease amount of functions...
 class HydraConfig {
  public:
   using ColorArray = std::array<uint8_t, 3>;
@@ -58,6 +69,18 @@ class HydraConfig {
   bool force_shutdown() const;
 
   void setForceShutdown(bool force_shutdown);
+
+  void setFrames(const FrameConfig& frames);
+
+  const FrameConfig& getFrames() const;
+
+  void setRobotId(int robot_id);
+
+  const RobotPrefixConfig& getRobotPrefix() const;
+
+  void setMapConfig(const VolumetricMap::Config& config);
+
+  const VolumetricMap::Config& getMapConfig() const;
 
   void setRoomColorMap(const std::vector<ColorArray>& colormap);
 
@@ -74,10 +97,10 @@ class HydraConfig {
   size_t getTotalLabels() const;
 
   // this intentionally returns a shared ptr to be threadsafe
-  std::shared_ptr<kimera::SemanticColorMap> setRandomColormap();
+  std::shared_ptr<SemanticColorMap> setRandomColormap();
 
   // this intentionally returns a shared ptr to be threadsafe
-  std::shared_ptr<kimera::SemanticColorMap> getSemanticColorMap() const;
+  std::shared_ptr<SemanticColorMap> getSemanticColorMap() const;
 
   // this invalidates any instances (mostly intended for testing)
   static void reset();
@@ -87,14 +110,16 @@ class HydraConfig {
 
   static std::unique_ptr<HydraConfig> instance_;
 
-  // TODO(nathan) consider moving robot id and logging here
+  // TODO(nathan) consider moving logging here
   std::atomic<bool> force_shutdown_;
-
-  std::vector<ColorArray> room_colormap_;
+  RobotPrefixConfig robot_prefix_;
+  VolumetricMap::Config map_config_;
+  FrameConfig frames_;
 
   LabelSpaceConfig label_space_;
   std::map<uint8_t, std::string> label_to_name_map_;
-  std::shared_ptr<kimera::SemanticColorMap> label_colormap_;
+  std::shared_ptr<SemanticColorMap> label_colormap_;
+  std::vector<ColorArray> room_colormap_;
 };
 
 std::ostream& operator<<(std::ostream& out, const HydraConfig& config);

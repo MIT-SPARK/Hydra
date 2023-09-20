@@ -36,10 +36,6 @@
     uri: git@github.mit.edu:SPARK/Spark-DSG.git
     version: main
 - git:
-    local-name: kimera_semantics
-    uri: git@github.mit.edu:SPARK/Kimera-Semantics.git
-    version: feature/noetic_fixes
-- git:
     local-name: mesh_tools
     uri: git@github.com:yunzc/mesh_tools.git
 - git:

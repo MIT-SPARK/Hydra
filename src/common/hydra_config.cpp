@@ -34,12 +34,24 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/common/hydra_config.h"
 
-#include <kimera_semantics/color.h>
+#include <config_utilities/config.h>
+#include <config_utilities/printing.h>
+#include <config_utilities/validation.h>
+
+#include "hydra/common/semantic_color_map.h"
 
 namespace hydra {
 
-using ColorMapPtr = std::shared_ptr<kimera::SemanticColorMap>;
+using ColorMapPtr = std::shared_ptr<SemanticColorMap>;
 decltype(HydraConfig::instance_) HydraConfig::instance_;
+
+void declare_config(FrameConfig& frames) {
+  using namespace config;
+  name("FrameConfig");
+  field(frames.robot, "robot_frame");
+  field(frames.odom, "odom_frame");
+  field(frames.map, "map_frame");
+}
 
 HydraConfig& HydraConfig::instance() {
   if (!instance_) {
@@ -69,7 +81,7 @@ HydraConfig::HydraConfig() : force_shutdown_(false) {
       {177, 89, 40},
   };
 
-  label_colormap_.reset(new kimera::SemanticColorMap());
+  label_colormap_.reset(new SemanticColorMap());
 }
 
 bool HydraConfig::force_shutdown() const { return force_shutdown_; }
@@ -77,6 +89,23 @@ bool HydraConfig::force_shutdown() const { return force_shutdown_; }
 void HydraConfig::setForceShutdown(bool force_shutdown) {
   force_shutdown_ = force_shutdown;
 }
+
+void HydraConfig::setFrames(const FrameConfig& frames) { frames_ = frames; }
+
+const FrameConfig& HydraConfig::getFrames() const { return frames_; }
+
+void HydraConfig::setRobotId(int robot_id) {
+  robot_prefix_ = RobotPrefixConfig(robot_id);
+}
+
+const RobotPrefixConfig& HydraConfig::getRobotPrefix() const { return robot_prefix_; }
+
+void HydraConfig::setMapConfig(const VolumetricMap::Config& config) {
+  map_config_ = config::checkValid(config);
+  LOG(INFO) << "[Hydra] Set map config: " << std::endl << config::toString(config);
+}
+
+const VolumetricMap::Config& HydraConfig::getMapConfig() const { return map_config_; }
 
 void HydraConfig::setRoomColorMap(const std::vector<ColorArray>& colormap) {
   room_colormap_ = colormap;
@@ -95,12 +124,11 @@ const HydraConfig::LabelNameMap& HydraConfig::getLabelToNameMap() const {
 }
 
 void HydraConfig::setLabelSpaceConfig(const LabelSpaceConfig& config) {
-  label_space_ = config;
+  label_space_ = config::checkValid(config);
   if (!label_space_.colormap_filepath.empty()) {
-    label_colormap_ =
-        kimera::SemanticColorMap::fromFile(label_space_.colormap_filepath);
+    label_colormap_ = SemanticColorMap::fromCsv(label_space_.colormap_filepath);
   } else {
-    label_colormap_ = kimera::SemanticColorMap::randomColors(label_space_.total_labels);
+    label_colormap_ = SemanticColorMap::randomColors(label_space_.total_labels);
   }
 
   if (label_colormap_) {
@@ -109,7 +137,7 @@ void HydraConfig::setLabelSpaceConfig(const LabelSpaceConfig& config) {
 }
 
 ColorMapPtr HydraConfig::setRandomColormap() {
-  label_colormap_ = kimera::SemanticColorMap::randomColors(label_space_.total_labels);
+  label_colormap_ = SemanticColorMap::randomColors(label_space_.total_labels);
   return label_colormap_;
 }
 

@@ -45,48 +45,18 @@ namespace hydra {
 void declare_config(ReconstructionConfig& conf) {
   using namespace config;
   name("ReconstructionConfig");
-  field(conf.voxel_size, "voxel_size");
-  field(conf.voxels_per_side, "voxels_per_side");
   field(conf.show_stats, "show_stats");
+  field(conf.stats_verbosity, "stats_verbosity");
   field(conf.clear_distant_blocks, "clear_distant_blocks");
   field(conf.dense_representation_radius_m, "dense_representation_radius_m");
-  field(conf.odom_frame, "odom_frame");
-  field(conf.robot_frame, "robot_frame");
   field(conf.num_poses_per_update, "num_poses_per_update");
   field(conf.max_input_queue_size, "max_input_queue_size");
-  field(conf.make_pose_graph, "make_pose_graph");
-  field(conf.semantic_measurement_probability, "semantic_measurement_probability");
   field(conf.copy_dense_representations, "copy_dense_representations");
-
+  field(conf.semantic_measurement_probability, "semantic_measurement_probability");
   field(conf.tsdf, "tsdf");
   field(conf.mesh, "mesh");
-
-  field<QuaternionConverter>(conf.body_R_camera, "body_R_camera");
-  field(conf.body_t_camera, "body_t_camera");
+  field(conf.sensor, "sensor");
+  field(conf.pose_graphs, "pose_graphs");
 }
 
 }  // namespace hydra
-
-namespace voxblox {
-
-void declare_config(TsdfIntegratorBase::Config& conf) {
-  using namespace config;
-  name("TsdfIntegratorBase::Config");
-  field(conf.default_truncation_distance, "default_truncation_distance");
-  field(conf.max_weight, "max_weight");
-  field(conf.voxel_carving_enabled, "voxel_carving_enabled");
-  field(conf.min_ray_length_m, "min_ray_length_m");
-  field(conf.max_ray_length_m, "max_ray_length_m");
-  field(conf.use_const_weight, "use_const_weight");
-  field(conf.allow_clear, "allow_clear");
-  field(conf.use_weight_dropoff, "use_weight_dropoff");
-  field(conf.use_sparsity_compensation_factor, "use_sparsity_compensation_factor");
-  field<ThreadNumConversion>(conf.integrator_threads, "integrator_threads");
-  field(conf.integration_order_mode, "integration_order_mode");
-  field(conf.enable_anti_grazing, "enable_anti_grazing");
-  field(conf.start_voxel_subsampling_factor, "start_voxel_subsampling_factor");
-  field(conf.max_consecutive_ray_collisions, "max_consecutive_ray_collisions");
-  field(conf.clear_checks_every_n_frames, "clear_checks_every_n_frames");
-}
-
-}  // namespace voxblox

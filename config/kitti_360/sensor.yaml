@@ -1,0 +1,12 @@
+---
+type: lidar
+min_range: 0.1
+max_range: 20.0
+is_asymmetric: true
+horizontal_resolution: 0.16  # true resolution 0.08
+vertical_resolution: 0.8  # true resolution 0.41875
+horizontal_fov: 360.0
+vertical_fov: 26.8
+vertical_fov_top: 2.0
+extrinsics:
+  type: ros

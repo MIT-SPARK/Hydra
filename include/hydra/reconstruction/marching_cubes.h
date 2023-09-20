@@ -35,31 +35,42 @@
 #pragma once
 #include <voxblox/mesh/mesh.h>
 
-#include "hydra/places/vertex_voxel.h"
+#include <Eigen/Dense>
+#include <array>
+#include <iostream>
+#include <optional>
+
+#include "hydra/reconstruction/vertex_voxel.h"
 
 namespace hydra {
 
-using PointMatrix = Eigen::Matrix<voxblox::FloatingPoint, 3, 8>;
-using SdfMatrix = Eigen::Matrix<voxblox::FloatingPoint, 8, 1>;
-using EdgeIndexMatrix = Eigen::Matrix<voxblox::FloatingPoint, 3, 12>;
+struct SdfPoint {
+  float distance;
+  float weight;
+  Eigen::Vector3f pos;
+  voxblox::Color color;
+  std::optional<uint32_t> label;
+  VertexVoxel* vertex_voxel = nullptr;
+};
 
-void interpolateEdges(const PointMatrix& vertex_coords,
-                      const SdfMatrix& vertex_sdf,
-                      EdgeIndexMatrix& edge_coords,
-                      std::vector<uint8_t>& edge_status);
+std::ostream& operator<<(std::ostream& out, const SdfPoint& point);
 
 class MarchingCubes {
  public:
-  MarchingCubes();
+  using EdgePoints = std::array<SdfPoint, 12>;
+  using EdgeStatus = std::array<uint8_t, 12>;
+  using SdfPoints = std::array<SdfPoint, 8>;
 
-  virtual ~MarchingCubes() = default;
+  static void interpolateEdges(const SdfPoints& points,
+                               EdgePoints& edge_points,
+                               EdgeStatus& edge_status,
+                               float min_sdf_difference = 1.0e-6);
 
   static void meshCube(const voxblox::BlockIndex& block,
-                       const PointMatrix& vertex_coords,
-                       const SdfMatrix& vertex_sdf,
-                       voxblox::VertexIndex* next_index,
-                       voxblox::Mesh* mesh,
-                       const std::vector<places::VertexVoxel*>& vertex_voxels);
+                       const SdfPoints& points,
+                       voxblox::Mesh& mesh,
+                       std::vector<uint32_t>* mesh_labels = nullptr,
+                       bool compute_normals = true);
 };
 
 }  // namespace hydra

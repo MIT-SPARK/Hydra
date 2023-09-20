@@ -52,7 +52,6 @@ class HydraPipeline {
   virtual void save(const LogSetup& logs);
 
  protected:
-  RobotPrefixConfig prefix_;
   SharedDsgInfo::Ptr frontend_dsg_;
   SharedDsgInfo::Ptr backend_dsg_;
   SharedModuleState::Ptr shared_state_;

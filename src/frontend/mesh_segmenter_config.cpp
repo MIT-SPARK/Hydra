@@ -46,7 +46,6 @@ void declare_config(MeshSegmenterConfig& config) {
   field<CharConversion>(config.prefix, "prefix");
   // TODO(nathan) string to number conversion
   field(config.layer_id, "layer_id");
-  field(config.active_horizon_s, "active_horizon_s");
   field(config.active_index_horizon_m, "active_index_horizon_m");
   field(config.cluster_tolerance, "cluster_tolerance");
   field(config.min_cluster_size, "min_cluster_size");

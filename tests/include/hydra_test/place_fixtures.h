@@ -36,6 +36,7 @@
 #include <gtest/gtest.h>
 #include <hydra/places/voxblox_types.h>
 #include <hydra/reconstruction/combo_integrator.h>
+#include <hydra/reconstruction/volumetric_map.h>
 #include <voxblox/integrator/tsdf_integrator.h>
 #include <voxblox/simulation/simulation_world.h>
 
@@ -85,6 +86,7 @@ class GvdTestFixture : public EsdfTestFixture {
 class SingleBlockTestFixture : public ::testing::Test {
  public:
   SingleBlockTestFixture() = default;
+
   virtual ~SingleBlockTestFixture() = default;
 
   virtual void SetUp() override;
@@ -99,9 +101,8 @@ class SingleBlockTestFixture : public ::testing::Test {
   int voxels_per_side = 4;
   double truncation_distance = 0.1;
 
-  Layer<TsdfVoxel>::Ptr tsdf_layer;
+  std::unique_ptr<VolumetricMap> map;
   Layer<GvdVoxel>::Ptr gvd_layer;
-  SemanticMeshLayer::Ptr mesh_layer;
 
   GvdIntegratorConfig gvd_config;
   voxblox::Block<voxblox::TsdfVoxel>::Ptr tsdf_block;
@@ -111,6 +112,7 @@ class SingleBlockTestFixture : public ::testing::Test {
 class LargeSingleBlockTestFixture : public SingleBlockTestFixture {
  public:
   LargeSingleBlockTestFixture() = default;
+
   virtual ~LargeSingleBlockTestFixture() = default;
 
   virtual void SetUp() override;
@@ -119,6 +121,7 @@ class LargeSingleBlockTestFixture : public SingleBlockTestFixture {
 class SingleBlockExtractionTestFixture : public SingleBlockTestFixture {
  public:
   SingleBlockExtractionTestFixture() = default;
+
   virtual ~SingleBlockExtractionTestFixture() = default;
 
   virtual void SetUp() override;
@@ -132,6 +135,7 @@ class SingleBlockExtractionTestFixture : public SingleBlockTestFixture {
 class TestFixture2d : public ::testing::Test {
  public:
   TestFixture2d() = default;
+
   virtual ~TestFixture2d() = default;
 
   virtual void SetUp() override;

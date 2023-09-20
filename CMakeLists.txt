@@ -29,18 +29,13 @@ endif()
 configure_file(hydra_build_config.h.in ${CMAKE_CURRENT_BINARY_DIR}/hydra_build_config.h)
 
 find_package(Boost REQUIRED COMPONENTS timer)
+find_package(config_utilities REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(GTSAM REQUIRED)
+find_package(OpenCV REQUIRED)
 find_package(spark_dsg REQUIRED)
 find_package(teaserpp REQUIRED)
-find_package(GTSAM REQUIRED)
-find_package(Eigen3 REQUIRED)
-find_package(config_utilities REQUIRED)
-find_package(
-  catkin REQUIRED
-  COMPONENTS kimera_pgmo
-             kimera_semantics
-             tf2_eigen
-             voxblox
-)
+find_package(catkin REQUIRED COMPONENTS kimera_pgmo tf2_eigen voxblox)
 
 set(PCL_FIND_QUIETLY TRUE)
 find_package(PCL REQUIRED COMPONENTS common)
@@ -67,13 +62,13 @@ set(NANOFLANN_BUILD_TESTS
 )
 add_subdirectory(${CMAKE_BINARY_DIR}/nanoflann-src ${CMAKE_BINARY_DIR}/nanoflann-build)
 
+# TODO(nathan) figure out teaser
 catkin_package(
   CATKIN_DEPENDS
   kimera_pgmo
-  kimera_semantics
   tf2_eigen
   voxblox
-  DEPENDS spark_dsg config_utilities
+  DEPENDS spark_dsg config_utilities OpenCV
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME} gtsam
 )
@@ -81,16 +76,16 @@ catkin_package(
 add_library(${PROJECT_NAME})
 target_include_directories(
   ${PROJECT_NAME}
-  PUBLIC include ${catkin_INCLUDE_DIRS}
+  PUBLIC include ${catkin_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS}
   PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${PCL_INCLUDE_DIRS}
 )
 target_link_libraries(
   ${PROJECT_NAME}
   PUBLIC ${catkin_LIBRARIES}
+         ${OpenCV_LIBRARIES}
          teaserpp::teaser_registration
          config_utilities::config_utilities
          spark_dsg::spark_dsg
-         yaml-cpp
          gtsam
   PRIVATE nanoflann::nanoflann ${PCL_LIBRARIES}
 )

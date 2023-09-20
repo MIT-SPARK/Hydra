@@ -33,44 +33,31 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <voxblox/integrator/tsdf_integrator.h>
+#include <config_utilities/virtual_config.h>
 
 #include "hydra/reconstruction/mesh_integrator_config.h"
+#include "hydra/reconstruction/projective_integrator_config.h"
+#include "hydra/reconstruction/sensor.h"
+#include "hydra/utils/pose_graph_tracker.h"
 
 namespace hydra {
 
 struct ReconstructionConfig {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
-  ReconstructionConfig()
-      : body_R_camera(Eigen::Quaterniond::Identity()),
-        body_t_camera(Eigen::Vector3d::Zero()) {}
-
-  float voxel_size = 0.1;
-  int voxels_per_side = 16;
   bool show_stats = true;
+  int stats_verbosity = 2;
   bool clear_distant_blocks = true;
   double dense_representation_radius_m = 5.0;
-  std::string odom_frame = "odom";
-  std::string robot_frame = "base_link";
   size_t num_poses_per_update = 1;
   size_t max_input_queue_size = 0;
-  bool make_pose_graph = false;
-  float semantic_measurement_probability = 0.9;
   bool copy_dense_representations = true;
+  float semantic_measurement_probability = 0.9;
 
-  voxblox::TsdfIntegratorBase::Config tsdf;
+  ProjectiveIntegratorConfig tsdf;
   MeshIntegratorConfig mesh;
-  Eigen::Quaterniond body_R_camera;
-  Eigen::Vector3d body_t_camera;
+  config::VirtualConfig<Sensor> sensor;
+  PoseGraphTracker::Config pose_graphs;
 };
 
 void declare_config(ReconstructionConfig& conf);
 
 }  // namespace hydra
-
-namespace voxblox {
-
-void declare_config(TsdfIntegratorBase::Config& conf);
-
-}  // namespace voxblox

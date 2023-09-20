@@ -44,4 +44,4 @@ box,64,64,128,255,41
 unknown construction,102,0,0,255,42
 unknown vehicle,51,0,51,255,43
 unknown object,32,32,32,255,44
-license plate,0,0,142,255,-1
+license plate,255,255,255,255,-1

@@ -5,7 +5,8 @@ catkin_add_gtest(
   src/place_fixtures.cpp
   backend/test_merge_handler.cpp
   backend/test_update_functions.cpp
-  #frontend/test_frontend.cpp
+  common/test_config_utilities.cpp
+  # frontend/test_frontend.cpp
   loop_closure/test_descriptor_matching.cpp
   loop_closure/test_detector.cpp
   loop_closure/test_registration.cpp
@@ -19,14 +20,20 @@ catkin_add_gtest(
   places/test_gvd_integrator.cpp
   places/test_gvd_thinning.cpp
   places/test_gvd_utilities.cpp
+  reconstruction/test_camera.cpp
+  reconstruction/test_lidar.cpp
   reconstruction/test_marching_cubes.cpp
   reconstruction/test_reconstruction_module.cpp
+  reconstruction/test_semantic_integrator.cpp
+  reconstruction/test_sensor.cpp
+  reconstruction/test_sensor_utilities.cpp
   rooms/test_graph_clustering.cpp
   rooms/test_graph_filtration.cpp
   rooms/test_room_finder.cpp
   rooms/test_room_utilities.cpp
   utils/test_minimum_spanning_tree.cpp
   utils/test_nearest_neighbor_utilities.cpp
+  utils/test_pose_graph_tracker.cpp
   utils/test_timing_utilities.cpp
 )
 target_include_directories(test_${PROJECT_NAME} PUBLIC include)

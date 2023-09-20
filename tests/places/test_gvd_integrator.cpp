@@ -288,7 +288,7 @@ TEST_F(TestFixture2d, NegativeIntegrationCorrect) {
 }
 
 TEST_F(SingleBlockTestFixture, PlaneCorrect) {
-  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer, gvd_layer, mesh_layer);
+  ComboIntegrator gvd_integrator(gvd_config, gvd_layer);
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {
@@ -298,7 +298,7 @@ TEST_F(SingleBlockTestFixture, PlaneCorrect) {
     }
   }
 
-  gvd_integrator.update(0, true);
+  gvd_integrator.update(0, *map, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -319,7 +319,7 @@ TEST_F(SingleBlockTestFixture, PlaneCorrect) {
 }
 
 TEST_F(SingleBlockTestFixture, LCorrect) {
-  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer, gvd_layer, mesh_layer);
+  ComboIntegrator gvd_integrator(gvd_config, gvd_layer);
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {
@@ -329,7 +329,7 @@ TEST_F(SingleBlockTestFixture, LCorrect) {
     }
   }
 
-  gvd_integrator.update(0, true);
+  gvd_integrator.update(0, *map, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -352,7 +352,7 @@ TEST_F(SingleBlockTestFixture, LCorrect) {
 }
 
 TEST_F(LargeSingleBlockTestFixture, LCorrect) {
-  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer, gvd_layer, mesh_layer);
+  ComboIntegrator gvd_integrator(gvd_config, gvd_layer);
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {
@@ -362,7 +362,7 @@ TEST_F(LargeSingleBlockTestFixture, LCorrect) {
     }
   }
 
-  gvd_integrator.update(0, true);
+  gvd_integrator.update(0, *map, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -385,8 +385,8 @@ TEST_F(LargeSingleBlockTestFixture, LCorrect) {
 }
 
 TEST_F(SingleBlockTestFixture, CornerCorrect) {
-  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer, gvd_layer, mesh_layer);
-  gvd_integrator.update(0, true);
+  ComboIntegrator gvd_integrator(gvd_config, gvd_layer);
+  gvd_integrator.update(0, *map, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -411,8 +411,8 @@ TEST_F(SingleBlockTestFixture, CornerCorrect) {
 }
 
 TEST_F(ParentTestFixture, ParentsCorrect) {
-  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer, gvd_layer, mesh_layer);
-  gvd_integrator.update(0, true);
+  ComboIntegrator gvd_integrator(gvd_config, gvd_layer);
+  gvd_integrator.update(0, *map, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -474,7 +474,7 @@ TEST_F(ParentTestFixture, ParentsCorrect) {
 
 TEST_F(SingleBlockTestFixture, RaiseCorrectForSurface) {
   gvd_config.min_diff_m = 0.03;
-  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer, gvd_layer, mesh_layer);
+  ComboIntegrator gvd_integrator(gvd_config, gvd_layer);
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {
@@ -484,14 +484,14 @@ TEST_F(SingleBlockTestFixture, RaiseCorrectForSurface) {
     }
   }
 
-  gvd_integrator.update(0, true);
+  gvd_integrator.update(0, *map, true);
 
   // trigger a lower wavefront
   setTsdfVoxel(0, 2, 0, -0.01);
   // flip value to be raised
   setTsdfVoxel(0, 2, 2, -0.09);
 
-  gvd_integrator.update(0, true, true);
+  gvd_integrator.update(0, *map, true, true);
 
   {  // temporary scope
     const auto& voxel = getGvdVoxel(0, 2, 2);

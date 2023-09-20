@@ -35,7 +35,8 @@
 #include <gtest/gtest.h>
 #include <hydra/places/gvd_integrator.h>
 #include <hydra/reconstruction/combo_integrator.h>
-#include <voxblox/integrator/tsdf_integrator.h>
+#include <hydra/reconstruction/projective_integrator.h>
+#include <hydra/reconstruction/volumetric_map.h>
 #include <voxblox/utils/evaluation_utils.h>
 
 #include "hydra_test/gvd_layer_utils.h"
@@ -57,20 +58,21 @@ class IncrementalIntegrationTestFixture : public ::testing::Test {
   virtual ~IncrementalIntegrationTestFixture() = default;
 
   void SetUp() override {
-    tsdf_layer.reset(new Layer<TsdfVoxel>(voxel_size, voxels_per_side));
+    VolumetricMap::Config map_config;
+    map_config.voxel_size = voxel_size;
+    map_config.voxels_per_side = voxels_per_side;
+    map_config.truncation_distance = truncation_distance;
+    map.reset(new VolumetricMap(map_config, false, true));
     gvd_layer.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
-    mesh_layer.reset(new SemanticMeshLayer(voxel_size * voxels_per_side));
-
-    tsdf_integrator.reset(new FastTsdfIntegrator(tsdf_config, tsdf_layer.get()));
+    // TODO(nathan) make tsdf integrator
   }
 
   Layer<GvdVoxel>::Ptr getBatchGvd() {
-    SemanticMeshLayer::Ptr mesh(new SemanticMeshLayer(voxel_size * voxels_per_side));
+    auto batch_map =
+        VolumetricMap::fromTsdf(map->getTsdfLayer(), truncation_distance, false, true);
     Layer<GvdVoxel>::Ptr gvd(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
-    ComboIntegrator integrator(gvd_config, tsdf_layer, gvd, mesh);
-
-    integrator.update(0, false, true);
-
+    ComboIntegrator integrator(gvd_config, gvd);
+    integrator.update(0, *batch_map, false, true);
     return gvd;
   }
 
@@ -121,31 +123,29 @@ class IncrementalIntegrationTestFixture : public ::testing::Test {
     std::cout << "Using " << cloud.size() << " points" << std::endl;
 
     Transformation identity;
-    tsdf_integrator->integratePointCloud(identity, cloud, colors);
+    // tsdf_integrator->integratePointCloud(identity, cloud, colors);
   }
 
   float voxel_size = 0.1;
   int voxels_per_side = 16;
+  float truncation_distance = 0.3;
   size_t num_poses = 10;
   GvdIntegratorConfig gvd_config;
-  TsdfIntegratorBase::Config tsdf_config;
+  ProjectiveIntegratorConfig tsdf_config;
+  std::unique_ptr<ProjectiveIntegrator> tsdf_integrator;
 
-  Layer<TsdfVoxel>::Ptr tsdf_layer;
-
+  std::unique_ptr<VolumetricMap> map;
   Layer<GvdVoxel>::Ptr gvd_layer;
-  SemanticMeshLayer::Ptr mesh_layer;
-
   Layer<GvdVoxel>::Ptr batch_gvd_layer;
-  std::unique_ptr<FastTsdfIntegrator> tsdf_integrator;
 };
 
 TEST_F(IncrementalIntegrationTestFixture, DISABLED_TestBatchSame) {
-  ComboIntegrator gvd_integrator(gvd_config, tsdf_layer, gvd_layer, mesh_layer);
+  ComboIntegrator gvd_integrator(gvd_config, gvd_layer);
 
   for (size_t i = 0; i < num_poses; ++i) {
     integrateTsdf(i);
 
-    gvd_integrator.update(0, true);
+    gvd_integrator.update(0, *map, true);
     auto batch_layer = getBatchGvd();
 
     LayerComparisonResult result =

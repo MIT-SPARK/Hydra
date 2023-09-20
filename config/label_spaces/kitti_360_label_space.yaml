@@ -1,0 +1,56 @@
+---
+total_semantic_labels: 45
+semantic_measurement_probability: 0.9
+dynamic_labels: [5, 24, 25]
+invalid_labels: [1, 2, 3, 23]
+frontend:
+  objects:
+    labels: [17, 19, 20, 26, 27, 28, 29, 30, 31, 32, 33, 36, 37, 38, 39, 40, 41]
+  places2d:
+    labels: [6, 7, 8, 9, 10, 15, 21, 22]
+label_names:
+  - {label: 0, name: unlabeled}
+  - {label: 1, name: ego vehicle}
+  - {label: 2, name: rectification border}
+  - {label: 3, name: out of roi}
+  - {label: 4, name: static}
+  - {label: 5, name: dynamic}
+  - {label: 6, name: ground}
+  - {label: 7, name: road}
+  - {label: 8, name: sidewalk}
+  - {label: 9, name: parking}
+  - {label: 10, name: rail track}
+  - {label: 11, name: building}
+  - {label: 12, name: wall}
+  - {label: 13, name: fence}
+  - {label: 14, name: guard rail}
+  - {label: 15, name: bridge}
+  - {label: 16, name: tunnel}
+  - {label: 17, name: pole}
+  - {label: 18, name: polegroup}
+  - {label: 19, name: traffic light}
+  - {label: 20, name: traffic sign}
+  - {label: 21, name: vegetation}
+  - {label: 22, name: terrain}
+  - {label: 23, name: sky}
+  - {label: 24, name: person}
+  - {label: 25, name: rider}
+  - {label: 26, name: car}
+  - {label: 27, name: truck}
+  - {label: 28, name: bus}
+  - {label: 29, name: caravan}
+  - {label: 30, name: trailer}
+  - {label: 31, name: train}
+  - {label: 32, name: motorcycle}
+  - {label: 33, name: bicycle}
+  - {label: 34, name: garage}
+  - {label: 35, name: gate}
+  - {label: 36, name: stop}
+  - {label: 37, name: smallpole}
+  - {label: 38, name: lamp}
+  - {label: 39, name: trash bin}
+  - {label: 40, name: vending machine}
+  - {label: 41, name: box}
+  - {label: 42, name: unknown construction}
+  - {label: 43, name: unknown vehicle}
+  - {label: 44, name: unknown object}

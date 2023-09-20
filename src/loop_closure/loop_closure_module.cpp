@@ -46,15 +46,10 @@ namespace hydra {
 using hydra::timing::ScopedTimer;
 using lcd::LayerRegistrationConfig;
 
-LoopClosureModule::LoopClosureModule(const RobotPrefixConfig& prefix,
-                                     const LoopClosureConfig& config,
+LoopClosureModule::LoopClosureModule(const LoopClosureConfig& config,
                                      const SharedDsgInfo::Ptr& dsg,
                                      const SharedModuleState::Ptr& state)
-    : prefix_(prefix),
-      config_(config),
-      dsg_(dsg),
-      state_(state),
-      lcd_graph_(new DynamicSceneGraph()) {
+    : config_(config), dsg_(dsg), state_(state), lcd_graph_(new DynamicSceneGraph()) {
   lcd_detector_.reset(new lcd::LcdDetector(config_.detector));
 }
 

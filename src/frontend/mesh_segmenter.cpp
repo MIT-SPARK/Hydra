@@ -35,11 +35,11 @@
 #include "hydra/frontend/mesh_segmenter.h"
 
 #include <glog/logging.h>
-#include <kimera_semantics/color.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <spark_dsg/bounding_box_extraction.h>
 
 #include "hydra/common/hydra_config.h"
+#include "hydra/common/semantic_color_map.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
