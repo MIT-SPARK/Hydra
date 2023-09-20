@@ -31,14 +31,16 @@ target_link_libraries(gt_trajectory_optimizer ${PROJECT_NAME}_eval KimeraRPGO)
 add_executable(merge_graphs tools/merge_graphs.cpp)
 target_link_libraries(merge_graphs ${PROJECT_NAME}_eval)
 
-install(
-  TARGETS ${PROJECT_NAME}_eval
-          compute_filtrations
-          evaluate_places
-          evaluate_rooms
-          gt_trajectory_optimizer
-          merge_graphs
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
-)
+if(${HYDRA_ENABLE_ROS_INSTALL_LAYOUT})
+  install(
+    TARGETS ${PROJECT_NAME}_eval
+            compute_filtrations
+            evaluate_places
+            evaluate_rooms
+            gt_trajectory_optimizer
+            merge_graphs
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME}
+  )
+endif()

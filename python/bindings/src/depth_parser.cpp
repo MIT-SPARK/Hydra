@@ -32,35 +32,57 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/common/common.h"
+#include "hydra/bindings/depth_parser.h"
 
-namespace hydra {
+#include <glog/logging.h>
 
-SharedDsgInfo::SharedDsgInfo(const std::map<LayerId, char>& layer_id_map,
-                             LayerId mesh_layer_id)
-    : updated(false), last_update_time(0) {
-  DynamicSceneGraph::LayerIds layer_ids;
-  for (const auto& id_key_pair : layer_id_map) {
-    if (id_key_pair.first == mesh_layer_id) {
-      throw std::runtime_error("layer id duplicated with mesh id");
-    }
+namespace py = pybind11;
 
-    layer_ids.push_back(id_key_pair.first);
-    prefix_layer_map[id_key_pair.second] = id_key_pair.first;
+namespace hydra::python {
+
+template <typename T>
+struct DepthParserImpl : DepthParser {
+  float read(const PythonImage& img, size_t row, size_t col) const override;
+};
+
+template <>
+float DepthParserImpl<float>::read(const PythonImage& img,
+                                   size_t row,
+                                   size_t col) const {
+  float value;
+  std::memcpy(&value, img.ptr(row, col), sizeof(value));
+  return value;
+}
+
+template <>
+float DepthParserImpl<uint16_t>::read(const PythonImage& img,
+                                      size_t row,
+                                      size_t col) const {
+  uint16_t value;
+  std::memcpy(&value, img.ptr(row, col), sizeof(value));
+  if (value == 0) {
+    return std::numeric_limits<float>::quiet_NaN();
   }
 
-  graph.reset(new DynamicSceneGraph(layer_ids, mesh_layer_id));
+  return 1.0e-3f * value;
 }
 
-void BackendModuleStatus::reset() {
-  total_loop_closures_ = 0;
-  new_loop_closures_ = 0;
-  total_factors_ = 0;
-  total_values_ = 0;
-  new_factors_ = 0;
-  new_graph_factors_ = 0;
-  trajectory_len_ = 0;
-  num_merges_undone_ = 0;
+DepthParser::Ptr DepthParser::create(const PythonImage& img) {
+  CHECK(img) << "invalid image";
+  if (img.channels() != 1) {
+    LOG(ERROR) << "only single channel depth images supported";
+    return nullptr;
+  }
+
+  const auto& img_format = img.format();
+  if (img_format == py::format_descriptor<float>::format()) {
+    return std::make_unique<DepthParserImpl<float>>();
+  } else if (img_format == py::format_descriptor<uint16_t>::format()) {
+    return std::make_unique<DepthParserImpl<uint16_t>>();
+  } else {
+    LOG(ERROR) << "invalid depth format: " << img_format;
+    return nullptr;
+  }
 }
 
-}  // namespace hydra
+}  // namespace hydra::python

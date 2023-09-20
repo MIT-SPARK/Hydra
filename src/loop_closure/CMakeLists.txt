@@ -9,8 +9,8 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/subgraph_extraction.cpp
 )
 
-if(HYDRA_GNN)
+if(HYDRA_ENABLE_GNN)
   target_sources(
     ${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/gnn_descriptors.cpp
   )
-endif(HYDRA_GNN)
+endif(HYDRA_ENABLE_GNN)

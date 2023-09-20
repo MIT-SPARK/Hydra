@@ -44,6 +44,7 @@
 #include "hydra/common/common.h"
 #include "hydra/common/input_queue.h"
 #include "hydra/common/module.h"
+#include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/frontend/frontend_config.h"
 #include "hydra/frontend/place_extractor_interface.h"
@@ -133,6 +134,7 @@ class FrontendModule : public Module {
  protected:
   const FrontendConfig config_;
 
+  bool initialized_ = false;
   mutable std::mutex gvd_mutex_;
   std::atomic<bool> should_shutdown_{false};
   std::unique_ptr<std::thread> spin_thread_;

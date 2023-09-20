@@ -36,6 +36,7 @@
 #include <gtsam/nonlinear/Values.h>
 
 #include "hydra/common/common.h"
+#include "hydra/common/shared_dsg_info.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra {
@@ -137,5 +138,4 @@ struct UpdateBuildingsFunctor {
 std::map<NodeId, NodeId> updateAgents(SharedDsgInfo& graph, const UpdateInfo& info);
 
 }  // namespace dsg_updates
-
 }  // namespace hydra

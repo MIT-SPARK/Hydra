@@ -35,11 +35,11 @@
 #include "hydra/frontend/frontend_module.h"
 
 #include <config_utilities/printing.h>
+#include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <kimera_pgmo/compression/DeltaCompression.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
 #include <tf2_eigen/tf2_eigen.h>
-#include <config_utilities/validation.h>
 
 #include <fstream>
 
@@ -116,6 +116,7 @@ FrontendModule::FrontendModule(const FrontendConfig& config,
 FrontendModule::~FrontendModule() { stop(); }
 
 void FrontendModule::initCallbacks() {
+  initialized_ = true;
   input_callbacks_.clear();
   input_callbacks_.push_back(
       std::bind(&FrontendModule::updateMesh, this, std::placeholders::_1));
@@ -226,6 +227,10 @@ std::vector<bool> FrontendModule::inFreespace(const PositionMatrix& positions,
 }
 
 void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
+  if (!initialized_) {
+    initCallbacks();
+  }
+
   VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg.timestamp_ns << " [ns]";
   ScopedTimer timer("frontend/spin", msg.timestamp_ns);
 
@@ -286,7 +291,8 @@ void FrontendModule::updateMesh(const ReconstructionOutput& input) {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
     mesh_remapping_.reset(new kimera_pgmo::VoxbloxIndexMapping());
     auto mesh = input.mesh->getActiveMesh(input.archived_blocks);
-
+    VLOG(1) << "[Hydra Frontend] Received mesh with " << input.mesh->numVertices()
+            << " vertices, " << input.mesh->numVertices(true) << " active";
     VLOG(5) << "[Hydra Frontend] Updating mesh with " << mesh->numBlocks() << " blocks";
     auto interface = mesh->getMeshInterface();
     last_mesh_update_ =

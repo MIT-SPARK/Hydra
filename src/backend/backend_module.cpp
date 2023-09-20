@@ -90,6 +90,7 @@ BackendModule::BackendModule(const BackendConfig& config,
   original_vertices_.reset(new pcl::PointCloud<pcl::PointXYZRGBA>());
   setDefaultUpdateFunctions();
   deformation_graph_->setForceRecalculate(!config_.pgmo.gnc_fix_prev_inliers);
+  setSolverParams();
 
   if (logs && logs->valid()) {
     logs_ = logs;
@@ -402,6 +403,11 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
   ScopedTimer timer("backend/process_factors", input.timestamp_ns);
   const size_t prev_loop_closures = num_loop_closures_;
 
+  if (!input.deformation_graph) {
+    LOG(WARNING) << "[Hydra Backend] Received invalid deformation graph";
+    return;
+  }
+
   status_.new_graph_factors_ = input.deformation_graph->edges.size();
   status_.new_factors_ += input.deformation_graph->edges.size();
 
@@ -472,6 +478,11 @@ bool BackendModule::updateFromLcdQueue() {
 
 void BackendModule::copyMeshDelta(const BackendInput& input) {
   ScopedTimer timer("backend/copy_mesh_delta", input.timestamp_ns);
+  if (!input.mesh_update) {
+    LOG(WARNING) << "[Hydra Backend] invalid mesh update!";
+    return;
+  }
+
   input.mesh_update->updateMesh(*private_dsg_->graph->getMeshVertices(),
                                 mesh_timestamps_,
                                 *private_dsg_->graph->getMeshFaces(),

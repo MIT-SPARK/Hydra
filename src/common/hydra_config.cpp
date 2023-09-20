@@ -39,11 +39,49 @@
 #include <config_utilities/validation.h>
 
 #include "hydra/common/semantic_color_map.h"
+#include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
 
 using ColorMapPtr = std::shared_ptr<SemanticColorMap>;
+using timing::ElapsedTimeRecorder;
+
 decltype(HydraConfig::instance_) HydraConfig::instance_;
+
+struct LabelNameConversion {
+  using YamlList = std::vector<std::map<std::string, std::string>>;
+  using SourceMap = std::map<uint32_t, std::string>;
+
+  static YamlList toIntermediate(const SourceMap& other, std::string&) {
+    YamlList to_return;
+    for (const auto& kv_pair : other) {
+      std::map<std::string, std::string> value_map{
+          {"label", std::to_string(kv_pair.first)}, {"name", kv_pair.second}};
+      to_return.push_back(value_map);
+    }
+
+    return to_return;
+  }
+
+  static void fromIntermediate(const YamlList& other,
+                               SourceMap& value,
+                               std::string& error) {
+    value.clear();
+    for (const auto& value_map : other) {
+      if (!value_map.count("name")) {
+        error = "invalid format! missing key 'name'";
+        break;
+      }
+
+      if (!value_map.count("label")) {
+        error = "invalid format! missing key 'label'";
+        break;
+      }
+
+      value[std::stoi(value_map.at("label"))] = value_map.at("name");
+    }
+  }
+};
 
 void declare_config(FrameConfig& frames) {
   using namespace config;
@@ -53,82 +91,78 @@ void declare_config(FrameConfig& frames) {
   field(frames.map, "map_frame");
 }
 
-HydraConfig& HydraConfig::instance() {
-  if (!instance_) {
-    instance_.reset(new HydraConfig());
-  }
-  return *instance_;
+void declare_config(PipelineConfig& conf) {
+  using namespace config;
+  name("PipelineConfig");
+  field(conf.enable_reconstruction, "enable_reconstruction");
+  field(conf.enable_lcd, "enable_lcd");
+  field(conf.map, "reconstruction/map");
+  field<LabelNameConversion>(conf.label_names, "label_names");
+  field(conf.room_colors, "room_colors");
+  // the following subconfigs should not be namespaced
+  field(conf.logs, "logs", false);
+  field(conf.frames, "frames", false);
+  field(conf.label_space, "label_space", false);
 }
 
-std::ostream& operator<<(std::ostream& out, const HydraConfig& config) {
-  out << "{force_shutdown: " << std::boolalpha << config.force_shutdown() << "}";
-  return out;
+void saveTimingInformation(const LogSetup& log_config) {
+  if (!log_config.valid()) {
+    return;
+  }
+
+  LOG(INFO) << "[Hydra] saving timing information to " << log_config.getLogDir();
+  const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
+  timer.logAllElapsed(log_config);
+  timer.logStats(log_config.getTimerFilepath());
+  LOG(INFO) << "[Hydra] saved timing information";
 }
 
 HydraConfig::HydraConfig() : force_shutdown_(false) {
-  room_colormap_ = {
-      {166, 206, 227},
-      {31, 120, 180},
-      {178, 223, 138},
-      {51, 160, 44},
-      {251, 154, 153},
-      {227, 26, 28},
-      {253, 191, 111},
-      {255, 127, 0},
-      {202, 178, 214},
-      {106, 61, 154},
-      {255, 255, 153},
-      {177, 89, 40},
-  };
-
   label_colormap_.reset(new SemanticColorMap());
 }
 
-bool HydraConfig::force_shutdown() const { return force_shutdown_; }
+void HydraConfig::configureTimers() {
+  ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
+  timer.timing_disabled = config_.timing_disabled;
+  timer.disable_output = config_.disable_timer_output;
+  if (timer.timing_disabled) {
+    return;
+  }
 
-void HydraConfig::setForceShutdown(bool force_shutdown) {
-  force_shutdown_ = force_shutdown;
+  if (!logs_ || !logs_->valid()) {
+    return;
+  }
+
+  if (logs_->config().log_timing_incrementally) {
+    timer.setupIncrementalLogging(logs_);
+  }
 }
 
-void HydraConfig::setFrames(const FrameConfig& frames) { frames_ = frames; }
+void HydraConfig::checkFrozen() const {
+  if (!frozen_) {
+    LOG(ERROR) << "HydraConfig is not frozen! Call init with freeze set to 'true' "
+                  "before using config";
+    throw std::runtime_error("config not frozen");
+  }
+}
 
-const FrameConfig& HydraConfig::getFrames() const { return frames_; }
-
-void HydraConfig::setRobotId(int robot_id) {
+void HydraConfig::initFromConfig(const PipelineConfig& config, int robot_id) {
+  config_ = config::checkValid(config);
   robot_prefix_ = RobotPrefixConfig(robot_id);
-}
+  logs_ = std::make_shared<LogSetup>(config_.logs);
+  configureTimers();
 
-const RobotPrefixConfig& HydraConfig::getRobotPrefix() const { return robot_prefix_; }
+  if (!config_.label_space.colormap.empty()) {
+    SemanticColorMap::ColorToLabelMap new_colors;
+    for (auto&& [id, color] : config_.label_space.colormap) {
+      new_colors[voxblox::Color(color[0], color[1], color[2], 255)] = id;
+    }
 
-void HydraConfig::setMapConfig(const VolumetricMap::Config& config) {
-  map_config_ = config::checkValid(config);
-  LOG(INFO) << "[Hydra] Set map config: " << std::endl << config::toString(config);
-}
-
-const VolumetricMap::Config& HydraConfig::getMapConfig() const { return map_config_; }
-
-void HydraConfig::setRoomColorMap(const std::vector<ColorArray>& colormap) {
-  room_colormap_ = colormap;
-}
-
-const HydraConfig::ColorArray& HydraConfig::getRoomColor(size_t index) const {
-  return room_colormap_.at(index % room_colormap_.size());
-}
-
-void HydraConfig::setLabelToNameMap(const HydraConfig::LabelNameMap& name_map) {
-  label_to_name_map_ = name_map;
-}
-
-const HydraConfig::LabelNameMap& HydraConfig::getLabelToNameMap() const {
-  return label_to_name_map_;
-}
-
-void HydraConfig::setLabelSpaceConfig(const LabelSpaceConfig& config) {
-  label_space_ = config::checkValid(config);
-  if (!label_space_.colormap_filepath.empty()) {
-    label_colormap_ = SemanticColorMap::fromCsv(label_space_.colormap_filepath);
+    label_colormap_.reset(new SemanticColorMap(new_colors));
+  } else if (!config_.label_space.colormap_filepath.empty()) {
+    label_colormap_ = SemanticColorMap::fromCsv(config_.label_space.colormap_filepath);
   } else {
-    label_colormap_ = SemanticColorMap::randomColors(label_space_.total_labels);
+    label_colormap_ = SemanticColorMap::randomColors(config_.label_space.total_labels);
   }
 
   if (label_colormap_) {
@@ -136,19 +170,108 @@ void HydraConfig::setLabelSpaceConfig(const LabelSpaceConfig& config) {
   }
 }
 
+HydraConfig& HydraConfig::instance() {
+  if (!instance_) {
+    instance_.reset(new HydraConfig());
+  }
+  return *instance_;
+}
+
+HydraConfig& HydraConfig::init(const PipelineConfig& config,
+                               int robot_id,
+                               bool freeze) {
+  auto& curr = instance();
+  if (curr.frozen_) {
+    LOG(ERROR) << "Failed to initialize HydraConfig as config was already frozen";
+    throw std::runtime_error("hydra global config is frozen");
+  }
+
+  curr.initFromConfig(config, robot_id);
+  // TODO(nathan) print?
+  curr.frozen_ = freeze;
+  return curr;
+}
+
+void HydraConfig::reset() { instance_.reset(new HydraConfig()); }
+
+void HydraConfig::exit() {
+  auto& curr = instance();
+
+  // save timing information to avoid destructor weirdness with singletons
+  if (curr.logs_) {
+    saveTimingInformation(*curr.logs_);
+    curr.logs_.reset();
+  }
+
+  // TODO(nathan) see if anything else needs to be saved;
+}
+
+void HydraConfig::setForceShutdown(bool force_shutdown) {
+  force_shutdown_ = force_shutdown;
+}
+
 ColorMapPtr HydraConfig::setRandomColormap() {
-  label_colormap_ = SemanticColorMap::randomColors(label_space_.total_labels);
+  label_colormap_ = SemanticColorMap::randomColors(config_.label_space.total_labels);
   return label_colormap_;
 }
 
-const LabelSpaceConfig& HydraConfig::getLabelSpaceConfig() const {
-  return label_space_;
+bool HydraConfig::force_shutdown() const { return force_shutdown_; }
+
+const PipelineConfig& HydraConfig::getConfig() const {
+  checkFrozen();
+  return config_;
 }
 
-size_t HydraConfig::getTotalLabels() const { return label_space_.total_labels; }
+const FrameConfig& HydraConfig::getFrames() const {
+  checkFrozen();
+  return config_.frames;
+}
+
+const RobotPrefixConfig& HydraConfig::getRobotPrefix() const {
+  checkFrozen();
+  return robot_prefix_;
+}
+
+const LogSetup::Ptr& HydraConfig::getLogs() const {
+  checkFrozen();
+  return logs_;
+}
+
+const VolumetricMap::Config& HydraConfig::getMapConfig() const {
+  checkFrozen();
+  return config_.map;
+}
+
+const ColorArray& HydraConfig::getRoomColor(size_t index) const {
+  checkFrozen();
+  return config_.room_colors.at(index % config_.room_colors.size());
+}
+
+const std::map<uint32_t, std::string>& HydraConfig::getLabelToNameMap() const {
+  checkFrozen();
+  return config_.label_names;
+}
+
+const LabelSpaceConfig& HydraConfig::getLabelSpaceConfig() const {
+  checkFrozen();
+  return config_.label_space;
+}
+
+size_t HydraConfig::getTotalLabels() const {
+  checkFrozen();
+  return config_.label_space.total_labels;
+}
+
+SharedDsgInfo::Ptr HydraConfig::createSharedDsg() const {
+  checkFrozen();
+  return std::make_shared<SharedDsgInfo>(config_.layer_id_map, config_.mesh_layer_id);
+}
 
 ColorMapPtr HydraConfig::getSemanticColorMap() const { return label_colormap_; }
 
-void HydraConfig::reset() { instance_.reset(new HydraConfig()); }
+std::ostream& operator<<(std::ostream& out, const HydraConfig& config) {
+  out << config::toString(config.getConfig());
+  return out;
+}
 
 }  // namespace hydra

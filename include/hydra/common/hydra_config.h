@@ -42,10 +42,14 @@
 
 #include "hydra/common/label_space_config.h"
 #include "hydra/common/robot_prefix_config.h"
+#include "hydra/common/shared_dsg_info.h"
+#include "hydra/utils/log_utilities.h"
 // TODO(nathan) bad....
 #include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
+
+using ColorArray = std::array<uint8_t, 3>;
 
 // TODO(nathan) don't forward declare and use color array instead
 struct SemanticColorMap;
@@ -56,45 +60,76 @@ struct FrameConfig {
   std::string map = "map";
 };
 
-void declare_config(FrameConfig& conf);
+struct PipelineConfig {
+  bool enable_reconstruction = true;
+  bool enable_lcd = false;
+  bool timing_disabled = false;
+  bool disable_timer_output = true;
+  LayerId mesh_layer_id = 1;
+  std::map<LayerId, char> layer_id_map{{DsgLayers::OBJECTS, 'o'},
+                                       {DsgLayers::PLACES, 'p'},
+                                       {DsgLayers::ROOMS, 'r'},
+                                       {DsgLayers::BUILDINGS, 'b'}};
+  LogConfig logs;
+  FrameConfig frames;
+  VolumetricMap::Config map;
+  LabelSpaceConfig label_space;
+  std::map<uint32_t, std::string> label_names;
+  std::vector<ColorArray> room_colors{
+      {166, 206, 227},
+      {31, 120, 180},
+      {178, 223, 138},
+      {51, 160, 44},
+      {251, 154, 153},
+      {227, 26, 28},
+      {253, 191, 111},
+      {255, 127, 0},
+      {202, 178, 214},
+      {106, 61, 154},
+      {255, 255, 153},
+      {177, 89, 40},
+  };
+};
 
-// TODO(nathan) decrease amount of functions...
+void declare_config(FrameConfig& conf);
+void declare_config(PipelineConfig& conf);
+
 class HydraConfig {
  public:
-  using ColorArray = std::array<uint8_t, 3>;
-  using LabelNameMap = std::map<uint8_t, std::string>;
-
   static HydraConfig& instance();
 
-  bool force_shutdown() const;
+  static HydraConfig& init(const PipelineConfig& config,
+                           int robot_id = 0,
+                           bool freeze = true);
+
+  static void exit();
+
+  // this invalidates any instances (mostly intended for testing)
+  static void reset();
 
   void setForceShutdown(bool force_shutdown);
 
-  void setFrames(const FrameConfig& frames);
+  bool force_shutdown() const;
+
+  const PipelineConfig& getConfig() const;
 
   const FrameConfig& getFrames() const;
 
-  void setRobotId(int robot_id);
-
   const RobotPrefixConfig& getRobotPrefix() const;
 
-  void setMapConfig(const VolumetricMap::Config& config);
+  const LogSetup::Ptr& getLogs() const;
 
   const VolumetricMap::Config& getMapConfig() const;
 
-  void setRoomColorMap(const std::vector<ColorArray>& colormap);
-
   const ColorArray& getRoomColor(size_t index) const;
 
-  const LabelNameMap& getLabelToNameMap() const;
-
-  void setLabelToNameMap(const LabelNameMap& name_map);
-
-  void setLabelSpaceConfig(const LabelSpaceConfig& config);
+  const std::map<uint32_t, std::string>& getLabelToNameMap() const;
 
   const LabelSpaceConfig& getLabelSpaceConfig() const;
 
   size_t getTotalLabels() const;
+
+  SharedDsgInfo::Ptr createSharedDsg() const;
 
   // this intentionally returns a shared ptr to be threadsafe
   std::shared_ptr<SemanticColorMap> setRandomColormap();
@@ -102,24 +137,24 @@ class HydraConfig {
   // this intentionally returns a shared ptr to be threadsafe
   std::shared_ptr<SemanticColorMap> getSemanticColorMap() const;
 
-  // this invalidates any instances (mostly intended for testing)
-  static void reset();
-
  private:
   HydraConfig();
 
+  void configureTimers();
+
+  void initFromConfig(const PipelineConfig& config, int robot_id);
+
+  void checkFrozen() const;
+
+ private:
   static std::unique_ptr<HydraConfig> instance_;
-
-  // TODO(nathan) consider moving logging here
+  bool frozen_ = false;
+  PipelineConfig config_;
   std::atomic<bool> force_shutdown_;
-  RobotPrefixConfig robot_prefix_;
-  VolumetricMap::Config map_config_;
-  FrameConfig frames_;
 
-  LabelSpaceConfig label_space_;
-  std::map<uint8_t, std::string> label_to_name_map_;
+  RobotPrefixConfig robot_prefix_;
+  LogSetup::Ptr logs_;
   std::shared_ptr<SemanticColorMap> label_colormap_;
-  std::vector<ColorArray> room_colormap_;
 };
 
 std::ostream& operator<<(std::ostream& out, const HydraConfig& config);

@@ -68,6 +68,9 @@ SensorExtrinsics::SensorExtrinsics(const Eigen::Quaterniond& _body_R_sensor,
                                    const Eigen::Vector3d& _body_p_sensor)
     : body_R_sensor(_body_R_sensor), body_p_sensor(_body_p_sensor) {}
 
+IdentitySensorExtrinsics::IdentitySensorExtrinsics(const Config&)
+    : SensorExtrinsics() {}
+
 ParamSensorExtrinsics::ParamSensorExtrinsics(const Config& config)
     : SensorExtrinsics(config.body_R_sensor, config.body_p_sensor) {}
 
@@ -95,6 +98,11 @@ Sensor::Sensor(const Config& config)
   const Eigen::Isometry3d sensor_body_pose = body_T_sensor();
   VLOG(1) << "Parsed sensor with extrinsics: " << std::endl
           << sensor_body_pose.matrix();
+}
+
+void declare_config(IdentitySensorExtrinsics::Config&) {
+  using namespace config;
+  name("IdentitySensorExtrinsics");
 }
 
 void declare_config(ParamSensorExtrinsics::Config& conf) {

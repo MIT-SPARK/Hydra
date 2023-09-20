@@ -1,0 +1,20 @@
+@PACKAGE_INIT@
+include(CMakeFindDependencyMacro)
+
+get_filename_component(hydra_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+
+find_dependency(config_utilities REQUIRED)
+find_dependency(Eigen3 REQUIRED)
+find_dependency(GTSAM REQUIRED)
+find_dependency(OpenCV REQUIRED)
+find_dependency(spark_dsg REQUIRED)
+find_dependency(teaserpp REQUIRED)
+find_dependency(kimera_pgmo REQUIRED)
+find_dependency(voxblox REQUIRED)
+
+if(NOT TARGET hydra::hydra)
+  include("${hydra_CMAKE_DIR}/hydraTargets.cmake")
+endif()
+
+set(hydra_LIBRARIES hydra::hydra)
+check_required_components(hydra)

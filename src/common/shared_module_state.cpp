@@ -51,4 +51,15 @@ SharedModuleState::~SharedModuleState() {
   VLOG(2) << "backend_lcd_queue: " << backend_lcd_queue.size();
 }
 
+void BackendModuleStatus::reset() {
+  total_loop_closures_ = 0;
+  new_loop_closures_ = 0;
+  total_factors_ = 0;
+  total_values_ = 0;
+  new_factors_ = 0;
+  new_graph_factors_ = 0;
+  trajectory_len_ = 0;
+  num_merges_undone_ = 0;
+}
+
 }  // namespace hydra

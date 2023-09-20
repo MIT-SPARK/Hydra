@@ -70,7 +70,8 @@ using GtsamJacobianType = gtsam::OptionalMatrixType;
 
 class Pose3Bounds : public gtsam::BoundingConstraint1<gtsam::Pose3> {
  public:
-  using shared_ptr = boost::shared_ptr<Pose3Bounds>;
+  using shared_ptr = gtsam::NonlinearFactor::shared_ptr;
+
   Pose3Bounds(
       gtsam::Key key, size_t idx, double threshold, bool is_greater, double mu = 1000.0)
       : gtsam::BoundingConstraint1<gtsam::Pose3>(key, threshold, is_greater, mu),
@@ -90,7 +91,7 @@ class Pose3Bounds : public gtsam::BoundingConstraint1<gtsam::Pose3> {
     return x.translation()(idx_);
   }
 
-  gtsam::NonlinearFactor::shared_ptr clone() const override {
+  shared_ptr clone() const override {
     return shared_ptr(new Pose3Bounds(front(), idx_, threshold_, is_greater_, mu_));
   }
 

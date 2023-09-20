@@ -33,7 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/common/common.h"
 #include "hydra/utils/log_utilities.h"
 
 namespace hydra {

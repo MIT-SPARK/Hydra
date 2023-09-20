@@ -36,29 +36,21 @@
 
 #include <config_utilities/settings.h>
 
-#include "hydra/common/hydra_config.h"
-
 namespace hydra {
 
-HydraPipeline::HydraPipeline(int robot_id, const LogSetup::Ptr& log_setup)
-    : log_setup_(log_setup) {
-  HydraConfig::instance().setRobotId(robot_id);
-  // TODO(nathan) parse label space config
-  // TODO(nathan) parse and use at some point
-  const LayerId mesh_layer_id = 1;
-  const std::map<LayerId, char> layer_id_map{{DsgLayers::OBJECTS, 'o'},
-                                             {DsgLayers::PLACES, 'p'},
-                                             {DsgLayers::ROOMS, 'r'},
-                                             {DsgLayers::BUILDINGS, 'b'}};
-
-  frontend_dsg_.reset(new SharedDsgInfo(layer_id_map, mesh_layer_id));
-  backend_dsg_.reset(new SharedDsgInfo(layer_id_map, mesh_layer_id));
+HydraPipeline::HydraPipeline(const PipelineConfig& pipeline_config,
+                             int robot_id,
+                             int config_verbosity)
+    : config_verbosity_(config_verbosity) {
+  const auto& config = HydraConfig::init(pipeline_config, robot_id, true);
+  frontend_dsg_ = config.createSharedDsg();
+  backend_dsg_ = config.createSharedDsg();
   shared_state_.reset(new SharedModuleState());
 }
 
 HydraPipeline::~HydraPipeline() {}
 
-void HydraPipeline::start() {
+void HydraPipeline::showModuleInfo() const {
   const auto print_width = config::Settings().print_width;
   for (auto&& [name, module] : modules_) {
     std::stringstream ss;
@@ -77,9 +69,12 @@ void HydraPipeline::start() {
     }
     ss << std::string(print_width, '*') << std::endl;
 
-    VLOG(1) << std::endl << ss.str();
+    VLOG(config_verbosity_) << std::endl << ss.str();
   }
+}
 
+void HydraPipeline::start() {
+  showModuleInfo();
   for (auto&& [name, module] : modules_) {
     if (!module) {
       LOG(FATAL) << "Found unitialized module: " << name;
@@ -101,8 +96,9 @@ void HydraPipeline::stop() {
   }
 }
 
-void HydraPipeline::save(const LogSetup& logs) {
-  if (!logs.valid()) {
+void HydraPipeline::save() {
+  const auto& logs = HydraConfig::instance().getLogs();
+  if (!logs || !logs->valid()) {
     return;
   }
 
@@ -112,7 +108,7 @@ void HydraPipeline::save(const LogSetup& logs) {
       continue;
     }
 
-    module->save(logs);
+    module->save(*logs);
   }
 }
 

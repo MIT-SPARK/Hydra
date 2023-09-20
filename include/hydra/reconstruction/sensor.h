@@ -74,6 +74,18 @@ struct SensorExtrinsics {
   Eigen::Vector3d body_p_sensor;
 };
 
+struct IdentitySensorExtrinsics : public SensorExtrinsics {
+  struct Config {};
+
+  explicit IdentitySensorExtrinsics(const Config& config);
+
+ private:
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<SensorExtrinsics,
+                                     IdentitySensorExtrinsics,
+                                     Config>("identity");
+};
+
 struct ParamSensorExtrinsics : public SensorExtrinsics {
   struct Config {
     Eigen::Quaterniond body_R_sensor = Eigen::Quaterniond::Identity();
@@ -194,6 +206,7 @@ class Sensor {
   const std::unique_ptr<SensorExtrinsics> extrinsics_;
 };
 
+void declare_config(IdentitySensorExtrinsics::Config& config);
 void declare_config(ParamSensorExtrinsics::Config& config);
 void declare_config(KimeraSensorExtrinsics::Config& config);
 void declare_config(Sensor::Config& config);

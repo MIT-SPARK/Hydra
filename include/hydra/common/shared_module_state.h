@@ -87,4 +87,18 @@ struct SharedModuleState {
   InputQueue<lcd::RegistrationSolution> backend_lcd_queue;
 };
 
+// TODO(nathan) switch code style
+struct BackendModuleStatus {
+  size_t total_loop_closures_;
+  size_t new_loop_closures_;
+  size_t total_factors_;
+  size_t total_values_;
+  size_t new_factors_;
+  size_t new_graph_factors_;
+  size_t trajectory_len_;
+  size_t num_merges_undone_;
+
+  void reset();
+};
+
 }  // namespace hydra

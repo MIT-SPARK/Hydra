@@ -17,7 +17,7 @@ label_names:
   - {label: 7, name: couch}
   - {label: 8, name: stairs}
   - {label: 9, name: cabinet}
-  - {label: 10, name: fan_papers_keyboard_laptop_mouse}
+  - {label: 10, name: computer}
   - {label: 11, name: lamp}
   - {label: 12, name: painting}
   - {label: 13, name: plant}

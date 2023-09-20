@@ -38,6 +38,7 @@
 
 namespace hydra {
 
+// TODO(nathan) move to fixture
 namespace {
 struct ConfigGuard {
   ~ConfigGuard() { HydraConfig::instance().reset(); }
@@ -49,11 +50,11 @@ std::unique_ptr<SemanticIntegrator> createIntegrator(
     const std::set<uint32_t>& dynamic_labels = {},
     const std::set<uint32_t>& invalid_labels = {},
     double label_confidence = 0.9) {
-  LabelSpaceConfig label_config;
-  label_config.total_labels = num_labels;
-  label_config.dynamic_labels = dynamic_labels;
-  label_config.invalid_labels = invalid_labels;
-  HydraConfig::instance().setLabelSpaceConfig(label_config);
+  PipelineConfig pipeline_config;
+  pipeline_config.label_space.total_labels = num_labels;
+  pipeline_config.label_space.dynamic_labels = dynamic_labels;
+  pipeline_config.label_space.invalid_labels = invalid_labels;
+  HydraConfig::init(pipeline_config);
 
   MLESemanticIntegrator::Config config;
   config.label_confidence = label_confidence;

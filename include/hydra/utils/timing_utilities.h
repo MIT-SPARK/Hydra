@@ -104,7 +104,7 @@ class ElapsedTimeRecorder {
   TimeStamp start_stamps_;
   std::map<std::string, TimeList> elapsed_;
   std::map<std::string, TimeStamps> stamps_;
-  std::unique_ptr<std::mutex> mutex_;
+  mutable std::mutex mutex_;
 
   bool log_incrementally_;
   LogSetup::Ptr log_setup_;

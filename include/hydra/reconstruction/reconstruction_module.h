@@ -89,7 +89,7 @@ class ReconstructionModule : public Module {
   void addVisualizationCallback(const VizCallback& callback);
 
  protected:
-  void update(const ReconstructionInput& msg, bool full_update);
+  bool update(const ReconstructionInput& msg, bool full_update);
 
   voxblox::BlockIndexList findBlocksToArchive(const Eigen::Vector3f& center) const;
 

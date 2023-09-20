@@ -37,7 +37,7 @@
 #include <hydra/utils/timing_utilities.h>
 #include <yaml-cpp/yaml.h>
 
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <fstream>
 
 DEFINE_double(dilation_threshold, 1.0e-4, "dilation threshold");
@@ -50,8 +50,6 @@ using hydra::getGraphFiltration;
 using spark_dsg::DsgLayers;
 using spark_dsg::DynamicSceneGraph;
 using spark_dsg::NodeId;
-
-// TODO(nathan) fix boost filesystem
 
 int main(int argc, char* argv[]) {
   FLAGS_minloglevel = 0;
@@ -83,8 +81,8 @@ int main(int argc, char* argv[]) {
     LOG(INFO) << "Parsing: " << filename << "...";
     CHECK(!filename.empty());
 
-    const boost::filesystem::path filepath(filename);
-    filepaths[index] = boost::filesystem::canonical(filepath).string();
+    const std::filesystem::path filepath(filename);
+    filepaths[index] = std::filesystem::canonical(filepath).string();
     results[index] = std::list<std::pair<double, size_t>>();
     const auto graph = DynamicSceneGraph::load(filename);
     const auto& places = graph->getLayer(DsgLayers::PLACES);

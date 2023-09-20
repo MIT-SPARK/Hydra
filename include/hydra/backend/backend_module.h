@@ -46,6 +46,7 @@
 #include "hydra/backend/update_functions.h"
 #include "hydra/common/common.h"
 #include "hydra/common/module.h"
+#include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/utils/log_utilities.h"
 

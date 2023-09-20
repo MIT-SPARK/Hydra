@@ -47,7 +47,14 @@ struct LogConfig {
   bool log_timing_incrementally = false;
   std::string timing_stats_name = "timing_stats.csv";
   std::string timing_suffix = "_timing_raw.csv";
+
+  static LogConfig fromString(const std::string& output_path) {
+    LogConfig config;
+    config.log_dir = output_path;
+    return config;
+  }
 };
+
 
 void declare_config(LogConfig& config);
 
@@ -56,6 +63,8 @@ class LogSetup {
   using Ptr = std::shared_ptr<LogSetup>;
 
   explicit LogSetup(const LogConfig& config);
+
+  explicit LogSetup(const std::string& output_path);
 
   ~LogSetup();
 

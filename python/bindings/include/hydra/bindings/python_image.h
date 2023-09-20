@@ -32,18 +32,59 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <gflags/gflags.h>
-#include <glog/logging.h>
-#include <gtest/gtest.h>
+#pragma once
+#include <pybind11/pybind11.h>
 
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  google::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
+#include <opencv2/core/mat.hpp>
 
-  FLAGS_logtostderr = true;
-  FLAGS_alsologtostderr = true;
-  FLAGS_colorlogtostderr = true;
+namespace hydra::python {
 
-  return RUN_ALL_TESTS();
-}
+class PythonImage {
+ public:
+  PythonImage();
+
+  PythonImage(const pybind11::buffer& img);
+
+  operator bool() const { return valid_; }
+
+  size_t rows() const { return rows_; }
+
+  size_t cols() const { return cols_; }
+
+  size_t channels() const { return channels_; }
+
+  const uint8_t* ptr(size_t row, size_t col) const {
+    return reinterpret_cast<const uint8_t*>(img_.ptr) + row * row_stride_ +
+           col * col_stride_;
+  }
+
+  const uint8_t* ptr(size_t row, size_t col, size_t channel) const {
+    const auto pixel_ptr = ptr(row, col);
+    // note that this works even if the image is single-channel
+    return pixel_ptr + channel * channel_stride_;
+  }
+
+  const std::string& format() const { return img_.format; }
+
+ protected:
+  const pybind11::buffer_info img_;
+  bool valid_;
+  size_t rows_;
+  size_t row_stride_;
+  size_t cols_;
+  size_t col_stride_;
+  size_t channels_;
+  size_t channel_stride_;
+};
+
+cv::Mat getLabelImage(const PythonImage& img);
+
+cv::Mat getColorImage(const PythonImage& img);
+
+cv::Mat getDepthImage(const PythonImage& img);
+
+namespace python_image {
+void addBindings(pybind11::module_& module);
+}  // namespace python_image
+
+}  // namespace hydra::python

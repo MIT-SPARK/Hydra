@@ -10,7 +10,7 @@
 
   <license>BSD</license>
 
-  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>cmake</buildtool_depend>
   <depend>config_utilities</depend>
   <depend>eigen</depend>
   <depend>gtsam</depend>
@@ -22,6 +22,7 @@
   <depend>voxblox</depend>
 
   <export>
+      <build_type>cmake</build_type>
   </export>
 
 </package>

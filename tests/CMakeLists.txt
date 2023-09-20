@@ -1,4 +1,29 @@
-catkin_add_gtest(
+# catkin forwards gtest, but eventually we won't have catkin dependencies
+if(NOT TARGET gtest)
+  include(FetchContent)
+  FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG v1.13.0
+  )
+
+  FetchContent_GetProperties(googletest)
+  if(NOT googletest_POPULATED)
+    FetchContent_Populate(googletest)
+    set(BUILD_SHARED_LIBS_THIS ${BUILD_SHARED_LIBS})
+    set(BUILD_SHARED_LIBS
+        OFF
+        CACHE INTERNAL "Build static libraries"
+    )
+    add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR} EXCLUDE_FROM_ALL)
+    set(BUILD_SHARED_LIBS
+        ${BUILD_SHARED_LIBS_THIS}
+        CACHE BOOL "Build shared libraries"
+    )
+  endif()
+endif()
+
+add_executable(
   test_${PROJECT_NAME}
   main.cpp
   src/resources.cpp
@@ -37,12 +62,19 @@ catkin_add_gtest(
   utils/test_timing_utilities.cpp
 )
 target_include_directories(test_${PROJECT_NAME} PUBLIC include)
-target_link_libraries(test_${PROJECT_NAME} ${PROJECT_NAME})
+target_link_libraries(test_${PROJECT_NAME} ${PROJECT_NAME} GTest::gtest_main)
 
-if(HYDRA_GNN)
+if(HYDRA_ENABLE_GNN)
   target_sources(
     test_${PROJECT_NAME}
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/loop_closure/test_gnn_descriptors.cpp
+           ${CMAKE_CURRENT_SOURCE_DIR}/gnn/test_gnn_interface.cpp
+           ${CMAKE_CURRENT_SOURCE_DIR}/gnn/test_tensor.cpp
   )
-  target_link_libraries(test_${PROJECT_NAME} ${PROJECT_NAME}_gnn)
+endif()
+
+if(${HYDRA_ENABLE_ROS_INSTALL_LAYOUT})
+  install(TARGETS test_${PROJECT_NAME}
+          RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME}
+  )
 endif()

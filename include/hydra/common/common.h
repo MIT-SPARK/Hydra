@@ -53,36 +53,4 @@ struct NodeMergeInfo {
 using NodeMergeLog = std::unordered_map<NodeId, NodeMergeInfo>;
 using NodeIdSet = std::unordered_set<NodeId>;
 
-struct SharedDsgInfo {
-  using Ptr = std::shared_ptr<SharedDsgInfo>;
-
-  SharedDsgInfo(const std::map<LayerId, char>& layer_id_map, LayerId mesh_layer_id);
-
-  // mutexes are considered ordered (for avoiding deadlock):
-  // 1. SharedDsgInfo::mutex (lcd)
-  // 2. SharedDsgInfo::mutex (backend)
-  // 3. SharedDsgInfo::mutex (frontend)
-  // 4. SharedModuleState::mesh_mutex
-  // When acquiring two mutexes, always acquire the lowest mutex first
-  std::mutex mutex;
-  std::atomic<bool> updated;
-  uint64_t last_update_time;
-  DynamicSceneGraph::Ptr graph;
-  std::map<char, LayerId> prefix_layer_map;
-};
-
-// TODO(nathan) switch code style
-struct BackendModuleStatus {
-  size_t total_loop_closures_;
-  size_t new_loop_closures_;
-  size_t total_factors_;
-  size_t total_values_;
-  size_t new_factors_;
-  size_t new_graph_factors_;
-  size_t trajectory_len_;
-  size_t num_merges_undone_;
-
-  void reset();
-};
-
 }  // namespace hydra

@@ -33,15 +33,17 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include "hydra/common/hydra_config.h"
 #include "hydra/common/module.h"
 #include "hydra/common/shared_module_state.h"
-#include "hydra/utils/log_utilities.h"
 
 namespace hydra {
 
 class HydraPipeline {
  public:
-  HydraPipeline(int robot_id = 0, const LogSetup::Ptr& log_setup = nullptr);
+  HydraPipeline(const PipelineConfig& config,
+                int robot_id = 0,
+                int config_verbosity = 1);
 
   virtual ~HydraPipeline();
 
@@ -49,14 +51,16 @@ class HydraPipeline {
 
   virtual void stop();
 
-  virtual void save(const LogSetup& logs);
+  virtual void save();
 
  protected:
+  void showModuleInfo() const;
+
+ protected:
+  int config_verbosity_;
   SharedDsgInfo::Ptr frontend_dsg_;
   SharedDsgInfo::Ptr backend_dsg_;
   SharedModuleState::Ptr shared_state_;
-
-  LogSetup::Ptr log_setup_;
   std::map<std::string, Module::Ptr> modules_;
 };
 

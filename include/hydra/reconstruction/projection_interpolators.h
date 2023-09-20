@@ -131,8 +131,8 @@ class InterpolatorNearest : public ProjectionInterpolator {
                     const InterpolationWeights& weights) const override;
 
  private:
-  static config::Registration<ProjectionInterpolator, InterpolatorNearest>
-      registration_;
+  inline static const auto registration_ =
+      config::Registration<ProjectionInterpolator, InterpolatorNearest>("nearest");
 };
 
 /**
@@ -154,8 +154,8 @@ class InterpolatorBilinear : public ProjectionInterpolator {
                     const InterpolationWeights& weights) const override;
 
  private:
-  static config::Registration<ProjectionInterpolator, InterpolatorBilinear>
-      registration_;
+  inline static const auto registration_ =
+      config::Registration<ProjectionInterpolator, InterpolatorBilinear>("bilinear");
 };
 
 /**
@@ -180,8 +180,8 @@ class InterpolatorAdaptive : public InterpolatorBilinear {
                     const InterpolationWeights& weights) const override;
 
  private:
-  static config::Registration<ProjectionInterpolator, InterpolatorAdaptive>
-      registration_;
+  inline static const auto registration_ =
+      config::Registration<ProjectionInterpolator, InterpolatorAdaptive>("adaptive");
   const int u_offset_[4] = {0, 0, 1, 1};
   const int v_offset_[4] = {0, 1, 0, 1};
 };

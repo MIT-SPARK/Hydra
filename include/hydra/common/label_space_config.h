@@ -33,6 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <array>
+#include <map>
 #include <set>
 #include <string>
 #include <cstdint>
@@ -44,6 +46,7 @@ struct LabelSpaceConfig {
   std::string colormap_filepath = "";
   std::set<uint32_t> dynamic_labels;
   std::set<uint32_t> invalid_labels;
+  std::map<uint32_t, std::array<uint8_t, 3>> colormap;
 };
 
 void declare_config(LabelSpaceConfig& conf);

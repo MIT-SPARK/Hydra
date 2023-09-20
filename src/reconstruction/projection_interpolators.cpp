@@ -55,15 +55,6 @@ namespace hydra {
 
 using voxblox::Color;
 
-config::Registration<ProjectionInterpolator, InterpolatorNearest>
-    InterpolatorNearest::registration_("nearest");
-
-config::Registration<ProjectionInterpolator, InterpolatorBilinear>
-    InterpolatorBilinear::registration_("bilinear");
-
-config::Registration<ProjectionInterpolator, InterpolatorAdaptive>
-    InterpolatorAdaptive::registration_("adaptive");
-
 InterpolationWeights InterpolatorNearest::computeWeights(float u,
                                                          float v,
                                                          const cv::Mat& img) const {

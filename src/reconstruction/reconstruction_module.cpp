@@ -127,9 +127,9 @@ bool ReconstructionModule::spinOnce() {
     return false;
   }
 
-  spinOnce(*queue_->front());
+  const auto success = spinOnce(*queue_->front());
   queue_->pop();
-  return true;
+  return success;
 }
 
 void ReconstructionModule::addOutputCallback(const OutputCallback& callback) {
@@ -210,22 +210,23 @@ ReconstructionModule::OutputMsgStatus ReconstructionModule::getNextOutputMessage
   return {std::make_shared<ReconstructionOutput>(), false};
 }
 
-void ReconstructionModule::update(const ReconstructionInput& msg, bool full_update) {
+bool ReconstructionModule::update(const ReconstructionInput& msg, bool full_update) {
   VLOG(1) << "[Hydra Reconstruction] starting " << ((full_update) ? "full" : "partial")
           << " update @ " << msg.timestamp_ns << " [ns]";
   FrameData data;
   if (!msg.fillFrameData(data)) {
     LOG(ERROR) << "[Hydra Reconstruction] unable to construct valid input packet!";
-    return;
+    return false;
   }
 
   if (!data.normalizeData()) {
     LOG(ERROR) << "[Hydra Reconstruction] unable to convert all data";
+    return false;
   }
 
   if (!sensor_->finalizeRepresentations(data)) {
     LOG(ERROR) << "[Hydra Reconstruction] unable to compute inputs for integration";
-    return;
+    return false;
   }
 
   {  // timing scope
@@ -234,7 +235,7 @@ void ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
   }  // timing scope
 
   if (map_->getTsdfLayer().getNumberOfAllocatedBlocks() == 0) {
-    return;
+    return false;
   }
 
   {  // timing scope
@@ -243,7 +244,7 @@ void ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
   }  // timing scope
 
   if (!full_update) {
-    return;
+    return false;
   }
 
   if (config_.show_stats) {
@@ -277,6 +278,8 @@ void ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
     tsdf.getBlockByIndex(idx).updated().reset(voxblox::Update::kEsdf);
     mesh.getMeshBlock(idx)->updated = false;
   }
+
+  return true;
 }
 
 // TODO(nathan) push to map?

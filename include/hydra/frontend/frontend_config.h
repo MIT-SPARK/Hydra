@@ -48,7 +48,7 @@ struct FrontendConfig {
   bool lcd_use_bow_vectors = true;
   kimera_pgmo::MeshFrontendConfig pgmo_config;
   MeshSegmenterConfig object_config;
-  bool validate_vertices = true;
+  bool validate_vertices = false;
   bool filter_places = true;
   size_t min_places_component_size = 3;
   places::GvdIntegratorConfig gvd;

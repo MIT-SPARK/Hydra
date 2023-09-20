@@ -1,0 +1,11 @@
+[build-system]
+requires = [
+    "setuptools>=42",
+    "wheel",
+    "cmake>=3.14",
+    "ninja",
+    "catkin_pkg",
+    "empy",
+    "catkin @ git+https://github.com/ros/catkin.git@noetic-devel"
+]
+build-backend = "setuptools.build_meta"

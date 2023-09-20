@@ -33,9 +33,17 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
+#include <hydra/common/hydra_config.h>
 #include <hydra/rooms/room_finder.h>
 
 namespace hydra {
+
+// TODO(nathan) move to fixture
+namespace {
+struct ConfigGuard {
+  ~ConfigGuard() { HydraConfig::instance().reset(); }
+};
+}  // namespace
 
 class TestableRoomFinder : public RoomFinder {
  public:
@@ -108,6 +116,10 @@ TEST(RoomFinderTests, TestRoomPlaceEdges) {
 }
 
 TEST(RoomFinderTests, TestMakeRoomLayer) {
+  ConfigGuard guard;
+  PipelineConfig pipeline_config;
+  HydraConfig::init(pipeline_config);
+
   IsolatedSceneGraphLayer places(DsgLayers::PLACES);
   addNode(places, 0, 3);
   addNode(places, 1, 4);

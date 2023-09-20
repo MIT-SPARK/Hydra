@@ -37,12 +37,9 @@
 #include <config_utilities/config.h>
 #include <glog/logging.h>
 
-#if defined(HYDRA_USE_STANDARD_FS) && HYDRA_USE_STANDARD_FS
+#include <filesystem>
+
 namespace fs = std::filesystem;
-#else
-#include <boost/filesystem.hpp>
-namespace fs = boost::filesystem;
-#endif
 
 namespace hydra {
 
@@ -51,11 +48,7 @@ inline bool makeDirs(const fs::path& path) {
     return true;
   }
 
-#if defined(HYDRA_USE_STANDARD_FS) && HYDRA_USE_STANDARD_FS
   std::error_code code;
-#else
-  boost::system::error_code code;
-#endif
   return fs::create_directories(path, code);
 }
 
@@ -81,6 +74,9 @@ LogSetup::LogSetup(const LogConfig& conf) : valid_(false), config_(conf) {
 
   valid_ = true;
 }
+
+LogSetup::LogSetup(const std::string& output_path)
+    : LogSetup(LogConfig::fromString(output_path)) {}
 
 LogSetup::~LogSetup() {
   if (!valid_) {

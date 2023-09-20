@@ -35,6 +35,7 @@
 #include "hydra/utils/timing_utilities.h"
 
 #include <glog/logging.h>
+#include <glog/stl_logging.h>
 
 #include <algorithm>
 #include <cmath>
@@ -56,15 +57,13 @@ std::ostream& operator<<(std::ostream& out, const ElapsedStatistics& stats) {
 }
 
 ElapsedTimeRecorder::ElapsedTimeRecorder()
-    : timing_disabled(false), disable_output(true), log_incrementally_(false) {
-  mutex_.reset(new std::mutex());
-}
+    : timing_disabled(false), disable_output(true), log_incrementally_(false) {}
 
 void ElapsedTimeRecorder::start(const std::string& timer_name,
                                 const uint64_t& timestamp) {
   bool have_start_already = false;
   {  // start critical section
-    std::unique_lock<std::mutex> lock(*mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
     if (starts_.count(timer_name)) {
       have_start_already = true;
     } else {
@@ -88,7 +87,7 @@ void ElapsedTimeRecorder::stop(const std::string& timer_name) {
 
   bool no_start_present = false;
   {  // start critical section
-    std::unique_lock<std::mutex> lock(*mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
 
     if (!starts_.count(timer_name)) {
       no_start_present = true;
@@ -135,7 +134,7 @@ std::optional<double> ElapsedTimeRecorder::getLastElapsed(
   std::optional<std::chrono::nanoseconds> elapsed_ns = std::nullopt;
 
   {  // start critical section
-    std::unique_lock<std::mutex> lock(*mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
     if (elapsed_.count(name)) {
       elapsed_ns = elapsed_.at(name).back();
     }
@@ -152,7 +151,7 @@ std::optional<double> ElapsedTimeRecorder::getLastElapsed(
 ElapsedStatistics ElapsedTimeRecorder::getStats(const std::string& name) const {
   TimeList durations;
   {  // start critical section
-    std::unique_lock<std::mutex> lock(*mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
 
     if (!elapsed_.count(name)) {
       return {0.0, 0.0, 0.0, 0.0, 0.0, 0};
@@ -197,6 +196,8 @@ ElapsedStatistics ElapsedTimeRecorder::getStats(const std::string& name) const {
 
 void ElapsedTimeRecorder::logElapsed(const std::string& name,
                                      const LogSetup& log_setup) const {
+  VLOG(5) << "Saving timer '" << name << "'";
+
   const auto output_csv = log_setup.getTimerFilepath(name);
   std::ofstream output_file;
   output_file.open(output_csv);
@@ -204,7 +205,7 @@ void ElapsedTimeRecorder::logElapsed(const std::string& name,
   TimeList durations;
   TimeStamps stamps;
   {  // start critical section
-    std::unique_lock<std::mutex> lock(*mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
 
     if (!elapsed_.count(name)) {
       output_file.close();
@@ -215,14 +216,21 @@ void ElapsedTimeRecorder::logElapsed(const std::string& name,
     stamps = stamps_.at(name);
   }  // end critical section
 
-  output_file << "timestamp(ns),elapsed(s)\n";
-  TimeList::iterator d_it = durations.begin();
-  TimeStamps::iterator s_it = stamps.begin();
+  VLOG(1) << "Writing " << durations.size() << " measurements for timer '" << name
+          << "' to '" << output_csv << "'";
+
+  std::stringstream ss;
+  ss << "timestamp(ns),elapsed(s)\n";
+  auto d_it = durations.begin();
+  auto s_it = stamps.begin();
   for (; d_it != durations.end() && s_it != stamps.end(); ++d_it, ++s_it) {
     std::chrono::duration<double> elapsed_s = *d_it;
-    output_file << *s_it << "," << elapsed_s.count() << std::endl;
+    ss << *s_it << "," << elapsed_s.count() << "\n";
   }
+
+  output_file << ss.str();
   output_file.close();
+  VLOG(5) << "Saved timer '" << name << "'";
 }
 
 void ElapsedTimeRecorder::setupIncrementalLogging(const LogSetup::Ptr& log_setup) {
@@ -239,10 +247,19 @@ void ElapsedTimeRecorder::logAllElapsed(const LogSetup& log_setup) const {
     return;
   }
 
-  for (const auto& str_timer_pair : elapsed_) {
-    VLOG(1) << "Saving " << str_timer_pair.first;
-    logElapsed(str_timer_pair.first, log_setup);
-    VLOG(1) << "Saved " << str_timer_pair.first;
+  std::list<std::string> all_timers;
+  VLOG(5) << "Getting timer names...";
+  {  // start critical region
+    std::unique_lock<std::mutex> lock(mutex_);
+    for (const auto& str_timer_pair : elapsed_) {
+      all_timers.push_back(str_timer_pair.first);
+    }
+  }  // end critical region
+
+  VLOG(5) << "Saving timers: [" << all_timers << "]";
+
+  for (const auto& name : all_timers) {
+    logElapsed(name, log_setup);
   }
 }
 

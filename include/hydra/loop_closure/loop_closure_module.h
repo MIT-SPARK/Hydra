@@ -38,6 +38,7 @@
 
 #include "hydra/common/common.h"
 #include "hydra/common/module.h"
+#include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/loop_closure/detector.h"
 #include "hydra/loop_closure/loop_closure_config.h"

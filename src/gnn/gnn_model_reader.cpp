@@ -51,7 +51,6 @@ int main(int argc, char* argv[]) {
   FLAGS_logtostderr = 1;
   FLAGS_colorlogtostderr = 1;
 
-  google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
 
