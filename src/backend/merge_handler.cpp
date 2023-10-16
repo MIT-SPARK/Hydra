@@ -40,6 +40,7 @@ namespace hydra {
 
 using PlaceAttrs = PlaceNodeAttributes;
 using ObjectAttrs = ObjectNodeAttributes;
+using LayerFunctorMap = std::map<LayerId, dsg_updates::UpdateFunctor::Ptr>;
 
 // TODO(nathan) this seems useful for spark_dsg
 void fillConnections(const SceneGraphNode& node, std::vector<NodeId>& connections) {
@@ -52,18 +53,8 @@ void fillConnections(const SceneGraphNode& node, std::vector<NodeId>& connection
   }
 }
 
-MergeHandler::MergeHandler(const std::shared_ptr<ObjectUpdater>& object_updater,
-                           const std::shared_ptr<PlaceUpdater> place_updater,
-                           bool undo_allowed)
-    : object_updater_(object_updater),
-      place_updater_(place_updater),
-      undo_allowed_(undo_allowed) {
-  if (undo_allowed_ && (!object_updater_ || !place_updater_)) {
-    LOG(ERROR) << "[Hydra Backend] Invalid node updaters when updating node caches";
-    throw std::runtime_error("place and object update functors required!");
-    return;
-  }
-
+MergeHandler::MergeHandler(const LayerFunctorMap& functors, bool undo_allowed)
+    : undo_allowed_(undo_allowed), layer_functors_(functors) {
   if (undo_allowed_) {
     LOG(INFO) << "[Hydra Backend] Undoing merges enabled!";
   }
@@ -91,6 +82,15 @@ void MergeHandler::updateFromUnmergedGraph(const DynamicSceneGraph& graph) {
     // before finally caching the attributes of the node
     entry.need_backend_update = true;
   }
+}
+
+dsg_updates::UpdateFunctor::Hooks MergeHandler::getLayerHooks(LayerId layer) const {
+  auto iter = layer_functors_.find(layer);
+  if (iter == layer_functors_.end()) {
+    return {};
+  }
+
+  return iter->second->hooks();
 }
 
 void MergeHandler::clearRemovedNodes(const DynamicSceneGraph& graph) {
@@ -208,13 +208,19 @@ void MergeHandler::updateMerges(const std::map<NodeId, NodeId>& new_merges,
     iter->second.insert(from);
     merged_nodes_[from] = to;
 
+    const auto& result_node = graph.getNode(to).value().get();
     if (undo_allowed_) {
       addNodeToCache(graph.getNode(from).value(), merged_nodes_cache_, false);
-      addNodeToCache(graph.getNode(to).value(), parent_nodes_cache_, true);
+      addNodeToCache(result_node, parent_nodes_cache_, true);
     }
 
     VLOG(3) << "[Hydra Backend] Merging " << NodeSymbol(from).getLabel() << " -> "
             << NodeSymbol(to).getLabel();
+    const auto hooks = getLayerHooks(result_node.layer);
+    if (hooks.merge) {
+      hooks.merge(graph, from, to);
+    }
+
     graph.mergeNodes(from, to);
 
     auto old_iter = merged_nodes_parents_.find(from);
@@ -267,18 +273,9 @@ void MergeHandler::updateCacheEntryFromInfo(const MeshVertices::Ptr& mesh,
                                             const UpdateInfo& info,
                                             NodeId node,
                                             NodeInfo& entry) {
-  if (entry.layer == DsgLayers::PLACES) {
-    if (!info.places_values->exists(node)) {
-      VLOG(5) << "[Hydra Backend] missing merged place " << NodeSymbol(node).getLabel()
-              << " from places factors.";
-      return;
-    }
-
-    auto& place_attrs = dynamic_cast<PlaceAttrs&>(*entry.attrs);
-    place_updater_->updatePlace(*info.places_values, node, place_attrs);
-  } else {
-    auto& object_attrs = dynamic_cast<ObjectAttrs&>(*entry.attrs);
-    object_updater_->updateObject(mesh, node, object_attrs);
+  auto hooks = getLayerHooks(entry.layer);
+  if (hooks.node_update) {
+    hooks.node_update(info, mesh, node, entry.attrs.get());
   }
 }
 
@@ -393,15 +390,12 @@ void MergeHandler::undoMerge(DynamicSceneGraph& graph,
 
 bool MergeHandler::shouldUndo(const NodeInfo& from_info,
                               const NodeInfo& to_info) const {
-  if (from_info.layer == DsgLayers::PLACES) {
-    return !place_updater_->shouldMerge(
-        dynamic_cast<const PlaceAttrs&>(*from_info.attrs),
-        dynamic_cast<const PlaceAttrs&>(*to_info.attrs));
-  } else {
-    return !object_updater_->shouldMerge(
-        dynamic_cast<const ObjectAttrs&>(*from_info.attrs),
-        dynamic_cast<const ObjectAttrs&>(*to_info.attrs));
+  auto hooks = getLayerHooks(from_info.layer);
+  if (!hooks.should_merge) {
+    return false;
   }
+
+  return !hooks.should_merge(from_info.attrs.get(), to_info.attrs.get());
 }
 
 }  // namespace hydra

@@ -64,6 +64,52 @@ void filterPlace(DynamicSceneGraph& graph,
   return;
 }
 
+template <typename Derived, typename Func>
+bool dispatchMergeCheck(const NodeAttributes* lhs,
+                        const NodeAttributes* rhs,
+                        const Func& func) {
+  const auto d_lhs = dynamic_cast<const Derived*>(lhs);
+  const auto d_rhs = dynamic_cast<const Derived*>(rhs);
+  if (!d_lhs || !d_rhs) {
+    return false;
+  }
+
+  return func(*d_lhs, *d_rhs);
+}
+
+UpdateObjectsFunctor::UpdateObjectsFunctor() : UpdateObjectsFunctor(10.0f) {}
+
+UpdateObjectsFunctor::UpdateObjectsFunctor(float step) : angle_step(step) {}
+
+UpdateFunctor::Hooks UpdateObjectsFunctor::hooks() const {
+  auto my_hooks = UpdateFunctor::hooks();
+  my_hooks.merge = [this](const DynamicSceneGraph& graph, NodeId from, NodeId to) {
+    mergeAttributes(graph, from, to);
+  };
+  my_hooks.should_merge = [this](const NodeAttributes* lhs, const NodeAttributes* rhs) {
+    return dispatchMergeCheck<ObjectNodeAttributes>(
+        lhs,
+        rhs,
+        std::bind(&UpdateObjectsFunctor::shouldMerge,
+                  this,
+                  std::placeholders::_1,
+                  std::placeholders::_2));
+  };
+  my_hooks.node_update = [this](const UpdateInfo&,
+                                const MeshVertices::Ptr mesh,
+                                NodeId node,
+                                NodeAttributes* attrs) {
+    auto oattrs = dynamic_cast<ObjectNodeAttributes*>(attrs);
+    if (!oattrs || !mesh) {
+      return;
+    }
+
+    updateObject(mesh, node, *oattrs);
+  };
+
+  return my_hooks;
+}
+
 size_t UpdateObjectsFunctor::makeNodeFinders(const SceneGraphLayer& layer) const {
   std::map<SemanticLabel, std::unordered_set<NodeId>> label_node_map;
   size_t archived = 0;
@@ -173,8 +219,7 @@ std::optional<NodeId> UpdateObjectsFunctor::proposeObjectMerge(
   return std::nullopt;
 }
 
-std::map<NodeId, NodeId> UpdateObjectsFunctor::call(SharedDsgInfo& dsg,
-                                                    const UpdateInfo& info) const {
+MergeMap UpdateObjectsFunctor::call(SharedDsgInfo& dsg, const UpdateInfo& info) const {
   ScopedTimer spin_timer("backend/update_objects", info.timestamp_ns);
   std::unique_lock<std::mutex> lock(dsg.mutex);
   const auto& graph = *dsg.graph;
@@ -221,6 +266,68 @@ std::map<NodeId, NodeId> UpdateObjectsFunctor::call(SharedDsgInfo& dsg,
   return nodes_to_merge;
 }
 
+void UpdateObjectsFunctor::mergeAttributes(const DynamicSceneGraph& graph,
+                                           NodeId from,
+                                           NodeId to) const {
+  if (!allow_connection_merging) {
+    return;
+  }
+
+  const auto from_node = graph.getNode(from);
+  if (!from_node) {
+    return;
+  }
+
+  const auto to_node = graph.getNode(to);
+  if (!to_node) {
+    return;
+  }
+
+  const auto& from_attrs = from_node->get().attributes<ObjectNodeAttributes>();
+  auto& to_attrs = to_node->get().attributes<ObjectNodeAttributes>();
+  // sort and merge
+  std::vector<size_t> to_indices(to_attrs.mesh_connections.begin(),
+                                 to_attrs.mesh_connections.end());
+  std::vector<size_t> from_indices(from_attrs.mesh_connections.begin(),
+                                   from_attrs.mesh_connections.end());
+  to_attrs.mesh_connections.clear();
+  std::sort(to_indices.begin(), to_indices.end());
+  std::sort(from_indices.begin(), from_indices.end());
+  std::set_union(to_indices.begin(),
+                 to_indices.end(),
+                 from_indices.begin(),
+                 from_indices.end(),
+                 std::back_inserter(to_attrs.mesh_connections));
+
+  auto mesh = graph.getMeshVertices();
+  updateObject(mesh, to, to_attrs);
+}
+
+UpdateFunctor::Hooks UpdatePlacesFunctor::hooks() const {
+  auto my_hooks = UpdateFunctor::hooks();
+  my_hooks.should_merge = [this](const NodeAttributes* lhs, const NodeAttributes* rhs) {
+    return dispatchMergeCheck<PlaceNodeAttributes>(
+        lhs,
+        rhs,
+        std::bind(&UpdatePlacesFunctor::shouldMerge,
+                  this,
+                  std::placeholders::_1,
+                  std::placeholders::_2));
+  };
+  my_hooks.node_update = [this](const UpdateInfo& info,
+                                const MeshVertices::Ptr,
+                                NodeId node,
+                                NodeAttributes* attrs) {
+    if (!attrs || !info.places_values) {
+      return;
+    }
+
+    updatePlace(*info.places_values, node, *attrs);
+  };
+
+  return my_hooks;
+}
+
 size_t UpdatePlacesFunctor::makeNodeFinder(const SceneGraphLayer& layer) const {
   std::unordered_set<NodeId> layer_nodes;
   for (const auto& id_node_pair : layer.nodes()) {
@@ -237,10 +344,16 @@ size_t UpdatePlacesFunctor::makeNodeFinder(const SceneGraphLayer& layer) const {
   return layer_nodes.size();
 }
 
-void UpdatePlacesFunctor::updatePlace(const gtsam::Values& places_values,
-                                      NodeId node_id,
-                                      PlaceNodeAttributes& attrs) const {
-  attrs.position = places_values.at<gtsam::Pose3>(node_id).translation();
+void UpdatePlacesFunctor::updatePlace(const gtsam::Values& values,
+                                      NodeId node,
+                                      NodeAttributes& attrs) const {
+  if (!values.exists(node)) {
+    VLOG(5) << "[Hydra Backend] missing place " << NodeSymbol(node).getLabel()
+            << " from places factors.";
+    return;
+  }
+
+  attrs.position = values.at<gtsam::Pose3>(node).translation();
   // TODO(nathan) consider updating distance via parents + deformation graph
 }
 

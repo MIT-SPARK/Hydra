@@ -102,8 +102,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   void loadState(const std::string& state_path, const std::string& dgrf_path);
 
-  void setUpdateFuncs(const std::list<LayerUpdateFunc>& update_funcs);
-
   inline void addOutputCallback(const OutputCallback& callback_func) {
     output_callbacks_.push_back(callback_func);
   }
@@ -119,17 +117,21 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   // TODO(nathan) handle this better
   inline const BackendConfig& config() const { return config_; }
 
+  void setUpdateFunctor(LayerId layer, const dsg_updates::UpdateFunctor::Ptr& functor);
+
  protected:
+  void setUpdateFuncs();
+
   void logPlaceDistance();
 
   void setSolverParams();
-
-  void setDefaultUpdateFunctions();
 
   void addLoopClosure(const gtsam::Key& src,
                       const gtsam::Key& dest,
                       const gtsam::Pose3& src_T_dest,
                       double variance);
+
+  virtual void setupDefaultFunctors();
 
   virtual void updateFactorGraph(const BackendInput& input);
 
@@ -168,6 +170,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   void updatePlacePosFromCache();
 
+  void labelRooms(const UpdateInfo& info, SharedDsgInfo* dsg);
+
  protected:
   const BackendConfig config_;
 
@@ -192,10 +196,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   pcl::PointCloud<pcl::PointXYZRGBA>::Ptr original_vertices_;
 
   std::list<LayerUpdateFunc> dsg_update_funcs_;
-  std::shared_ptr<dsg_updates::UpdateObjectsFunctor> update_objects_functor_;
-  std::shared_ptr<dsg_updates::UpdatePlacesFunctor> update_places_functor_;
-  std::unique_ptr<dsg_updates::UpdateRoomsFunctor> update_rooms_functor_;
-  std::unique_ptr<dsg_updates::UpdateBuildingsFunctor> update_buildings_functor_;
+  std::list<LayerCleanupFunc> dsg_post_update_funcs_;
+  std::map<LayerId, dsg_updates::UpdateFunctor::Ptr> layer_functors_;
 
   BackendModuleStatus status_;
   SceneGraphLogger backend_graph_logger_;

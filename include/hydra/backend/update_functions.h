@@ -53,15 +53,48 @@ struct UpdateInfo {
   const gtsam::Values* complete_agent_values = nullptr;
 };
 
-using LayerUpdateFunc =
-    std::function<std::map<NodeId, NodeId>(SharedDsgInfo&, const UpdateInfo&)>;
+using MergeMap = std::map<NodeId, NodeId>;
+using MeshVertices = DynamicSceneGraph::MeshVertices;
+using LayerUpdateFunc = std::function<MergeMap(SharedDsgInfo&, const UpdateInfo&)>;
+using LayerCleanupFunc = std::function<void(const UpdateInfo&, SharedDsgInfo*)>;
+using NodeMergeFunc = std::function<void(const DynamicSceneGraph&, NodeId, NodeId)>;
+using MergeValidFunc =
+    std::function<bool(const NodeAttributes*, const NodeAttributes*)>;
+using NodeUpdateFunc = std::function<void(
+    const UpdateInfo&, const MeshVertices::Ptr, NodeId, NodeAttributes*)>;
 
 namespace dsg_updates {
 
-struct UpdateObjectsFunctor {
-  using MeshVertices = DynamicSceneGraph::MeshVertices;
+struct UpdateFunctor {
+  using Ptr = std::shared_ptr<UpdateFunctor>;
 
-  std::map<NodeId, NodeId> call(SharedDsgInfo& dsg, const UpdateInfo& info) const;
+  struct Hooks {
+    LayerUpdateFunc update;
+    LayerCleanupFunc cleanup;
+    MergeValidFunc should_merge;
+    NodeMergeFunc merge;
+    NodeUpdateFunc node_update;
+  };
+
+  virtual MergeMap call(SharedDsgInfo& dsg, const UpdateInfo& info) const = 0;
+
+  virtual Hooks hooks() const {
+    Hooks my_hooks;
+    my_hooks.update = [this](SharedDsgInfo& dsg, const UpdateInfo& info) {
+      return call(dsg, info);
+    };
+    return my_hooks;
+  }
+};
+
+struct UpdateObjectsFunctor : public UpdateFunctor {
+  UpdateObjectsFunctor();
+
+  explicit UpdateObjectsFunctor(float angle_step);
+
+  Hooks hooks() const override;
+
+  MergeMap call(SharedDsgInfo& dsg, const UpdateInfo& info) const override;
 
   size_t makeNodeFinders(const SceneGraphLayer& layer) const;
 
@@ -73,27 +106,30 @@ struct UpdateObjectsFunctor {
                                            const ObjectNodeAttributes& attrs,
                                            bool skip_first) const;
 
+  void mergeAttributes(const DynamicSceneGraph& layer, NodeId from, NodeId to) const;
+
   bool shouldMerge(const ObjectNodeAttributes& from_attrs,
                    const ObjectNodeAttributes& to_attrs) const;
 
-  float angle_step = 10.0f;
+  float angle_step;
   size_t num_merges_to_consider = 1;
   bool use_active_flag = true;
+  bool allow_connection_merging = false;
   std::shared_ptr<std::set<size_t>> invalid_indices;
   mutable std::map<SemanticLabel, std::unique_ptr<NearestNodeFinder>> node_finders;
 };
 
-struct UpdatePlacesFunctor {
+struct UpdatePlacesFunctor : public UpdateFunctor {
   UpdatePlacesFunctor(double pos_threshold, double distance_tolerance)
       : pos_threshold_m(pos_threshold), distance_tolerance_m(distance_tolerance) {}
 
-  std::map<NodeId, NodeId> call(SharedDsgInfo& dsg, const UpdateInfo& info) const;
+  Hooks hooks() const override;
+
+  MergeMap call(SharedDsgInfo& dsg, const UpdateInfo& info) const override;
 
   size_t makeNodeFinder(const SceneGraphLayer& layer) const;
 
-  void updatePlace(const gtsam::Values& places_values,
-                   NodeId node_id,
-                   PlaceNodeAttributes& attrs) const;
+  void updatePlace(const gtsam::Values& values, NodeId node, NodeAttributes& attrs) const;
 
   std::optional<NodeId> proposePlaceMerge(const SceneGraphLayer& layer,
                                           NodeId node_id,
@@ -113,29 +149,29 @@ struct UpdatePlacesFunctor {
   mutable std::unique_ptr<NearestNodeFinder> node_finder;
 };
 
-struct UpdateRoomsFunctor {
+struct UpdateRoomsFunctor : public UpdateFunctor {
   UpdateRoomsFunctor(const RoomFinderConfig& config);
 
   ~UpdateRoomsFunctor();
 
-  std::map<NodeId, NodeId> call(SharedDsgInfo& dsg, const UpdateInfo& info) const;
+  MergeMap call(SharedDsgInfo& dsg, const UpdateInfo& info) const override;
 
   void rewriteRooms(const SceneGraphLayer* new_rooms, DynamicSceneGraph& graph) const;
 
   std::unique_ptr<RoomFinder> room_finder;
 };
 
-struct UpdateBuildingsFunctor {
+struct UpdateBuildingsFunctor : public UpdateFunctor {
   UpdateBuildingsFunctor(const SemanticNodeAttributes::ColorVector& color,
                          SemanticNodeAttributes::Label label);
 
-  std::map<NodeId, NodeId> call(SharedDsgInfo& dsg, const UpdateInfo& info) const;
+  MergeMap call(SharedDsgInfo& dsg, const UpdateInfo& info) const override;
 
   SemanticNodeAttributes::ColorVector building_color;
   SemanticNodeAttributes::Label building_semantic_label;
 };
 
-std::map<NodeId, NodeId> updateAgents(SharedDsgInfo& graph, const UpdateInfo& info);
+MergeMap updateAgents(SharedDsgInfo& graph, const UpdateInfo& info);
 
 }  // namespace dsg_updates
 }  // namespace hydra

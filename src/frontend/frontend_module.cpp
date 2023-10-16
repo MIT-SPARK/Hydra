@@ -55,18 +55,6 @@ using hydra::timing::ScopedTimer;
 using pose_graph_tools::PoseGraph;
 using LabelClusters = MeshSegmenter::LabelClusters;
 
-template <typename Func, typename... Args>
-void launchCallbacks(const std::vector<Func>& callbacks, Args... args) {
-  std::list<std::thread> threads;
-  for (const auto& callback : callbacks) {
-    threads.emplace_back(callback, args...);
-  }
-
-  for (auto& thread : threads) {
-    thread.join();
-  }
-}
-
 FrontendModule::FrontendModule(const FrontendConfig& config,
                                const SharedDsgInfo::Ptr& dsg,
                                const SharedModuleState::Ptr& state,

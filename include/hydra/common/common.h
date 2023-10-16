@@ -36,9 +36,11 @@
 #include <gtsam/geometry/Pose3.h>
 
 #include <atomic>
+#include <list>
 #include <map>
 #include <memory>
 #include <mutex>
+#include <thread>
 
 #include "hydra/common/dsg_types.h"
 
@@ -52,5 +54,17 @@ struct NodeMergeInfo {
 
 using NodeMergeLog = std::unordered_map<NodeId, NodeMergeInfo>;
 using NodeIdSet = std::unordered_set<NodeId>;
+
+template <typename Funcs, typename... Args>
+void launchCallbacks(const Funcs& callbacks, Args... args) {
+  std::list<std::thread> threads;
+  for (const auto& callback : callbacks) {
+    threads.emplace_back(callback, args...);
+  }
+
+  for (auto& thread : threads) {
+    thread.join();
+  }
+}
 
 }  // namespace hydra

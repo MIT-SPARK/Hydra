@@ -88,13 +88,11 @@ BackendModule::BackendModule(const BackendConfig& config,
 
   private_dsg_->graph->initMesh(true);
   original_vertices_.reset(new pcl::PointCloud<pcl::PointXYZRGBA>());
-  setDefaultUpdateFunctions();
   deformation_graph_->setForceRecalculate(!config_.pgmo.gnc_fix_prev_inliers);
   setSolverParams();
 
   if (logs && logs->valid()) {
     logs_ = logs;
-
     const auto log_path = logs->getLogDir("backend");
     backend_graph_logger_.setOutputPath(log_path);
     VLOG(1) << "[Hydra Backend] logging to " << log_path;
@@ -105,6 +103,8 @@ BackendModule::BackendModule(const BackendConfig& config,
   } else {
     VLOG(1) << "[Hydra Backend] logging disabled.";
   }
+
+  setupDefaultFunctors();
 
   if (config_.use_zmq_interface) {
     zmq_receiver_.reset(
@@ -308,8 +308,32 @@ void BackendModule::loadState(const std::string& state_path,
                << " vertices for deformation graph";
 }
 
-void BackendModule::setUpdateFuncs(const std::list<LayerUpdateFunc>& update_funcs) {
-  dsg_update_funcs_ = update_funcs;
+void BackendModule::setUpdateFunctor(LayerId layer,
+                                     const dsg_updates::UpdateFunctor::Ptr& functor) {
+  layer_functors_[layer] = functor;
+  setUpdateFuncs();
+}
+
+void BackendModule::setUpdateFuncs() {
+  dsg_update_funcs_.clear();
+  dsg_post_update_funcs_.clear();
+
+  dsg_update_funcs_.push_back(&dsg_updates::updateAgents);
+  for (auto&& [layer, functor] : layer_functors_) {
+    if (!functor) {
+      VLOG(5) << "Skipping invalid functor for layer: " << layer;
+      continue;
+    }
+
+    VLOG(5) << "Registering update function for layer: " << layer;
+    const auto hooks = functor->hooks();
+    dsg_update_funcs_.push_back(hooks.update);
+    if (hooks.cleanup) {
+      dsg_post_update_funcs_.push_back(hooks.cleanup);
+    }
+  }
+
+  merge_handler_.reset(new MergeHandler(layer_functors_, config_.enable_merge_undos));
 }
 
 void BackendModule::setSolverParams() {
@@ -324,52 +348,30 @@ void BackendModule::setSolverParams() {
   setVerboseFlag(false);
 }
 
-void BackendModule::setDefaultUpdateFunctions() {
-  // agent layer
-  dsg_update_funcs_.push_back(&dsg_updates::updateAgents);
+void BackendModule::setupDefaultFunctors() {
+  using namespace dsg_updates;
+  layer_functors_[DsgLayers::OBJECTS] =
+      std::make_shared<UpdateObjectsFunctor>(config_.angle_step);
 
-  // object layer
-  update_objects_functor_.reset(new dsg_updates::UpdateObjectsFunctor());
-  update_objects_functor_->angle_step = config_.angle_step;
-  dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdateObjectsFunctor::call,
-                                        update_objects_functor_.get(),
-                                        std::placeholders::_1,
-                                        std::placeholders::_2));
+  layer_functors_[DsgLayers::PLACES] = std::make_shared<UpdatePlacesFunctor>(
+      config_.places_merge_pos_threshold_m, config_.places_merge_distance_tolerance_m);
 
-  // places layer
-  update_places_functor_.reset(new dsg_updates::UpdatePlacesFunctor(
-      config_.places_merge_pos_threshold_m, config_.places_merge_distance_tolerance_m));
-  dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdatePlacesFunctor::call,
-                                        update_places_functor_.get(),
-                                        std::placeholders::_1,
-                                        std::placeholders::_2));
-
-  // room layer
   if (config_.enable_rooms) {
-    update_rooms_functor_.reset(
-        new dsg_updates::UpdateRoomsFunctor(config_.room_finder));
+    auto room_functor = std::make_shared<UpdateRoomsFunctor>(config_.room_finder);
     if (logs_) {
       const auto log_path = logs_->getLogDir("backend/room_filtrations");
-      update_rooms_functor_->room_finder->enableLogging(log_path);
+      room_functor->room_finder->enableLogging(log_path);
     }
-    dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdateRoomsFunctor::call,
-                                          update_rooms_functor_.get(),
-                                          std::placeholders::_1,
-                                          std::placeholders::_2));
+
+    layer_functors_[DsgLayers::ROOMS] = room_functor;
   }
 
-  /// building layer
   if (config_.enable_buildings) {
-    update_buildings_functor_.reset(new dsg_updates::UpdateBuildingsFunctor(
-        config_.building_color, config_.building_semantic_label));
-    dsg_update_funcs_.push_back(std::bind(&dsg_updates::UpdateBuildingsFunctor::call,
-                                          update_buildings_functor_.get(),
-                                          std::placeholders::_1,
-                                          std::placeholders::_2));
+    layer_functors_[DsgLayers::BUILDINGS] = std::make_shared<UpdateBuildingsFunctor>(
+        config_.building_color, config_.building_semantic_label);
   }
 
-  merge_handler_.reset(new MergeHandler(
-      update_objects_functor_, update_places_functor_, config_.enable_merge_undos));
+  setUpdateFuncs();
 }
 
 std::string logPoseGraphConnections(const pose_graph_tools::PoseGraph& msg) {
@@ -521,8 +523,9 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
         continue;
       }
 
-      // TODO(nathan) we might need to think about checking the is_active flag here, but
-      // no guarantee that mesh vertice aren't remapped under an inactive object node
+      // TODO(nathan) we might need to think about checking the is_active flag here,
+      // but no guarantee that mesh vertice aren't remapped under an inactive object
+      // node
 
       const auto& attrs = id_node_pair.second->attributes<ObjectNodeAttributes>();
       auto& private_attrs = node_opt->get().attributes<ObjectNodeAttributes>();
@@ -827,16 +830,7 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
     merge_handler_->updateMerges(layer_merges.second, *private_dsg_->graph);
   }
 
-  std::unique_lock<std::mutex> lock(private_dsg_->mutex);
-  const auto& rooms = private_dsg_->graph->getLayer(DsgLayers::ROOMS);
-  for (auto& id_node_pair : rooms.nodes()) {
-    const auto iter = room_name_map_.find(id_node_pair.first);
-    if (iter == room_name_map_.end()) {
-      continue;
-    }
-
-    id_node_pair.second->attributes<SemanticNodeAttributes>().name = iter->second;
-  }
+  launchCallbacks(dsg_post_update_funcs_, info, private_dsg_.get());
 }
 
 void BackendModule::logStatus(bool init) const {
@@ -852,7 +846,8 @@ void BackendModule::logStatus(bool init) const {
     file.open(filename);
     // file format
     file << "total_lc,new_lc,total_factors,total_values,new_factors,new_graph_"
-            "factors,trajectory_len,run_time,optimize_time,mesh_update_time,num_merges_"
+            "factors,trajectory_len,run_time,optimize_time,mesh_update_time,num_"
+            "merges_"
             "undone\n";
     file.close();
     return;
@@ -886,6 +881,23 @@ void BackendModule::logIncrementalLoopClosures(const PoseGraph& msg) {
     // note that pose graph convention is pose = src.between(dest) where the edge
     // connects frames "to -> from" (i.e. src = to, dest = from, pose = to_T_from)
     loop_closures_.push_back({src_key, dest_key, pose, false, 0});
+  }
+}
+
+void BackendModule::labelRooms(const UpdateInfo&, SharedDsgInfo* dsg) {
+  if (!dsg) {
+    return;
+  }
+
+  std::unique_lock<std::mutex> lock(dsg->mutex);
+  const auto& rooms = dsg->graph->getLayer(DsgLayers::ROOMS);
+  for (auto& id_node_pair : rooms.nodes()) {
+    const auto iter = room_name_map_.find(id_node_pair.first);
+    if (iter == room_name_map_.end()) {
+      continue;
+    }
+
+    id_node_pair.second->attributes<SemanticNodeAttributes>().name = iter->second;
   }
 }
 

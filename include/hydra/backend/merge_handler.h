@@ -49,12 +49,9 @@ struct NodeInfo {
 
 class MergeHandler {
  public:
-  using ObjectUpdater = dsg_updates::UpdateObjectsFunctor;
-  using PlaceUpdater = dsg_updates::UpdatePlacesFunctor;
   using MeshVertices = DynamicSceneGraph::MeshVertices;
 
-  MergeHandler(const std::shared_ptr<ObjectUpdater>& object_updater,
-               const std::shared_ptr<PlaceUpdater> place_updater,
+  MergeHandler(const std::map<LayerId, dsg_updates::UpdateFunctor::Ptr>& functors,
                bool undo_allowed);
 
   void updateFromUnmergedGraph(const DynamicSceneGraph& graph);
@@ -73,6 +70,8 @@ class MergeHandler {
   }
 
  protected:
+  dsg_updates::UpdateFunctor::Hooks getLayerHooks(LayerId layer) const;
+
   void clearRemovedNodes(const DynamicSceneGraph& graph);
 
   void updateNodeEntry(const SceneGraphNode& node, NodeInfo& entry);
@@ -95,14 +94,13 @@ class MergeHandler {
                  NodeId from_node,
                  NodeId to_node);
 
+  bool undo_allowed_;
+  std::map<LayerId, std::shared_ptr<dsg_updates::UpdateFunctor>> layer_functors_;
+
   std::map<NodeId, NodeInfo::Ptr> merged_nodes_cache_;
   std::map<NodeId, NodeInfo::Ptr> parent_nodes_cache_;
   std::map<NodeId, NodeId> merged_nodes_;
   std::map<NodeId, std::set<NodeId>> merged_nodes_parents_;
-
-  std::shared_ptr<ObjectUpdater> object_updater_;
-  std::shared_ptr<PlaceUpdater> place_updater_;
-  bool undo_allowed_;
 };
 
 }  // namespace hydra

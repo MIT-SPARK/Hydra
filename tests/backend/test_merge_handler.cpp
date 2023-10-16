@@ -41,6 +41,7 @@ using ObjectAttrs = ObjectNodeAttributes;
 using PlaceAttrs = PlaceNodeAttributes;
 using dsg_updates::UpdateObjectsFunctor;
 using dsg_updates::UpdatePlacesFunctor;
+using LayerFunctorMap = std::map<LayerId, dsg_updates::UpdateFunctor::Ptr>;
 
 void setBoundingBox(DynamicSceneGraph& graph,
                     NodeId node_id,
@@ -82,7 +83,7 @@ TEST(MergeHandlerTests, TestValidMergeNoUndo) {
   std::map<NodeId, NodeId> proposed_merges{{"O1"_id, "O2"_id}};
 
   // object / place updaters only needed for undoing merges
-  MergeHandler handler(nullptr, nullptr, false);
+  MergeHandler handler({}, false);
   handler.updateMerges(proposed_merges, graph);
 
   EXPECT_EQ(handler.mergedNodes(), proposed_merges);
@@ -103,7 +104,7 @@ TEST(MergeHandlerTests, TestOpposingMergeNoUndo) {
   std::map<NodeId, NodeId> proposed_merges{{"O1"_id, "O2"_id}, {"O2"_id, "O1"_id}};
 
   // object / place updaters only needed for undoing merges
-  MergeHandler handler(nullptr, nullptr, false);
+  MergeHandler handler({}, false);
   handler.updateMerges(proposed_merges, graph);
 
   // handler iterates through proposed merges in reverse
@@ -128,7 +129,7 @@ TEST(MergeHandlerTests, TestChainedMergeNoUndo) {
   std::map<NodeId, NodeId> proposed_merges{{"O2"_id, "O1"_id}, {"O3"_id, "O2"_id}};
 
   // object / place updaters only needed for undoing merges
-  MergeHandler handler(nullptr, nullptr, false);
+  MergeHandler handler({}, false);
   handler.updateMerges(proposed_merges, graph);
 
   std::map<NodeId, NodeId> expected_merges{{"O2"_id, "O1"_id}, {"O3"_id, "O1"_id}};
@@ -153,7 +154,7 @@ TEST(MergeHandlerTests, TestMergedTargetNoUndo) {
   std::map<NodeId, NodeId> proposed_merges{{"O1"_id, "O2"_id}, {"O2"_id, "O3"_id}};
 
   // object / place updaters only needed for undoing merges
-  MergeHandler handler(nullptr, nullptr, false);
+  MergeHandler handler({}, false);
   handler.updateMerges(proposed_merges, graph);
 
   std::map<NodeId, NodeId> expected_merges{{"O1"_id, "O3"_id}, {"O2"_id, "O3"_id}};
@@ -183,7 +184,7 @@ TEST(MergeHandlerTests, TestRemovedNodesNoUndo) {
       {"O2"_id, "O1"_id}, {"O3"_id, "O2"_id}, {"O4"_id, "O5"_id}};
 
   // object / place updaters only needed for undoing merges
-  MergeHandler handler(nullptr, nullptr, false);
+  MergeHandler handler({}, false);
   handler.updateMerges(proposed_merges, graph);
 
   {  // variable scope
@@ -214,9 +215,10 @@ TEST(MergeHandlerTests, TestValidMergeUndo) {
 
   std::map<NodeId, NodeId> proposed_merges{{"O1"_id, "O2"_id}};
 
-  auto object_functor = std::make_shared<UpdateObjectsFunctor>();
-  auto places_functor = std::make_shared<UpdatePlacesFunctor>(0.5, 0.1);
-  MergeHandler handler(object_functor, places_functor, true);
+  LayerFunctorMap functors;
+  functors[DsgLayers::OBJECTS] = std::make_shared<UpdateObjectsFunctor>();
+  functors[DsgLayers::PLACES] = std::make_shared<UpdatePlacesFunctor>(0.5, 0.1);
+  MergeHandler handler(functors, true);
   handler.updateMerges(proposed_merges, graph);
 
   EXPECT_EQ(handler.mergedNodes(), proposed_merges);
@@ -249,9 +251,11 @@ TEST(MergeHandlerTests, TestUndoMergePlaces) {
 
   std::map<NodeId, NodeId> proposed_merges{{"p2"_id, "p1"_id}, {"p5"_id, "p1"_id}};
 
-  auto object_functor = std::make_shared<UpdateObjectsFunctor>();
-  auto places_functor = std::make_shared<UpdatePlacesFunctor>(0.5, 0.1);
-  MergeHandler handler(object_functor, places_functor, true);
+  LayerFunctorMap functors;
+  functors[DsgLayers::OBJECTS] = std::make_shared<UpdateObjectsFunctor>();
+  functors[DsgLayers::PLACES] = std::make_shared<UpdatePlacesFunctor>(0.5, 0.1);
+
+  MergeHandler handler(functors, true);
   handler.updateMerges(proposed_merges, graph);
 
   EXPECT_EQ(handler.mergedNodes(), proposed_merges);
@@ -303,9 +307,12 @@ TEST(MergeHandlerTests, TestUndoMergeObjects) {
 
   std::map<NodeId, NodeId> proposed_merges{{"O2"_id, "O1"_id}};
 
-  auto object_functor = std::make_shared<UpdateObjectsFunctor>();
-  auto places_functor = std::make_shared<UpdatePlacesFunctor>(0.5, 0.1);
-  MergeHandler handler(object_functor, places_functor, true);
+
+  LayerFunctorMap functors;
+  functors[DsgLayers::OBJECTS] = std::make_shared<UpdateObjectsFunctor>();
+  functors[DsgLayers::PLACES] = std::make_shared<UpdatePlacesFunctor>(0.5, 0.1);
+
+  MergeHandler handler(functors, true);
   handler.updateMerges(proposed_merges, graph);
 
   EXPECT_EQ(handler.mergedNodes(), proposed_merges);
@@ -363,10 +370,11 @@ TEST(MergeHandlerTests, TestUpdateFromUnmergedWithUndo) {
   std::map<NodeId, NodeId> proposed_merges{
       {"p2"_id, "p1"_id}, {"p5"_id, "p1"_id}, {"p6"_id, "p1"_id}, {"p7"_id, "p4"_id}};
 
-  auto object_functor = std::make_shared<UpdateObjectsFunctor>();
-  auto places_functor = std::make_shared<UpdatePlacesFunctor>(0.5, 0.1);
-  MergeHandler handler(object_functor, places_functor, true);
+  LayerFunctorMap functors;
+  functors[DsgLayers::OBJECTS] = std::make_shared<UpdateObjectsFunctor>();
+  functors[DsgLayers::PLACES] = std::make_shared<UpdatePlacesFunctor>(0.5, 0.1);
 
+  MergeHandler handler(functors, true);
   handler.updateMerges(proposed_merges, graph);
   EXPECT_EQ(handler.mergedNodes(), proposed_merges);
 
@@ -403,10 +411,11 @@ TEST(MergeHandlerTests, TestUndoWithNewMerge) {
 
   std::map<NodeId, NodeId> proposed_merges{{"p2"_id, "p1"_id}, {"p3"_id, "p1"_id}};
 
-  auto object_functor = std::make_shared<UpdateObjectsFunctor>();
-  auto places_functor = std::make_shared<UpdatePlacesFunctor>(0.5, 0.1);
-  MergeHandler handler(object_functor, places_functor, true);
+  LayerFunctorMap functors;
+  functors[DsgLayers::OBJECTS] = std::make_shared<UpdateObjectsFunctor>();
+  functors[DsgLayers::PLACES] = std::make_shared<UpdatePlacesFunctor>(0.5, 0.1);
 
+  MergeHandler handler(functors, true);
   handler.updateMerges(proposed_merges, graph);
   EXPECT_EQ(handler.mergedNodes(), proposed_merges);
 
@@ -434,10 +443,11 @@ TEST(MergeHandlerTests, TestUndoWithValidMerge) {
 
   std::map<NodeId, NodeId> proposed_merges{{"p2"_id, "p1"_id}};
 
-  auto object_functor = std::make_shared<UpdateObjectsFunctor>();
-  auto places_functor = std::make_shared<UpdatePlacesFunctor>(0.5, 0.1);
-  MergeHandler handler(object_functor, places_functor, true);
+  LayerFunctorMap functors;
+  functors[DsgLayers::OBJECTS] = std::make_shared<UpdateObjectsFunctor>();
+  functors[DsgLayers::PLACES] = std::make_shared<UpdatePlacesFunctor>(0.5, 0.1);
 
+  MergeHandler handler(functors, true);
   handler.updateMerges(proposed_merges, graph);
   EXPECT_EQ(handler.mergedNodes(), proposed_merges);
 
@@ -463,26 +473,17 @@ TEST(MergeHandlerTests, TestReset) {
 
   std::map<NodeId, NodeId> proposed_merges{{"p2"_id, "p1"_id}};
 
-  auto object_functor = std::make_shared<UpdateObjectsFunctor>();
-  auto places_functor = std::make_shared<UpdatePlacesFunctor>(0.5, 0.1);
-  MergeHandler handler(object_functor, places_functor, true);
+  LayerFunctorMap functors;
+  functors[DsgLayers::OBJECTS] = std::make_shared<UpdateObjectsFunctor>();
+  functors[DsgLayers::PLACES] = std::make_shared<UpdatePlacesFunctor>(0.5, 0.1);
 
+  MergeHandler handler(functors, true);
   handler.updateMerges(proposed_merges, graph);
   EXPECT_EQ(handler.mergedNodes(), proposed_merges);
 
   handler.reset();
   EXPECT_TRUE(handler.mergedNodes().empty());
   EXPECT_TRUE(handler.mergeParentNodes().empty());
-}
-
-// check that we need valid update functors (for coverage)
-TEST(MergeHandlerTests, TestInvalidUpdaters) {
-  try {
-    MergeHandler handler(nullptr, nullptr, true);
-    FAIL();
-  } catch (const std::runtime_error&) {
-    SUCCEED();
-  }
 }
 
 }  // namespace hydra
