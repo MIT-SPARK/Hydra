@@ -40,9 +40,8 @@
 #include "hydra/bindings/hydra_python_pipeline.h"
 #include "hydra/bindings/python_config.h"
 #include "hydra/bindings/python_image.h"
-#include "hydra/bindings/python_sensor_input.h"
 #include "hydra/bindings/python_reconstruction.h"
-
+#include "hydra/bindings/python_sensor_input.h"
 
 namespace py = pybind11;
 using namespace py::literals;

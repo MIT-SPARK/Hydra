@@ -36,9 +36,9 @@
 
 #include <functional>
 #include <list>
+#include <memory>
 #include <set>
 #include <string>
-#include <memory>
 
 namespace hydra {
 
@@ -54,7 +54,6 @@ struct LogConfig {
     return config;
   }
 };
-
 
 void declare_config(LogConfig& config);
 

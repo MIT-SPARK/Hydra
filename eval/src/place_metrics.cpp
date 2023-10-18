@@ -34,16 +34,16 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/eval/place_metrics.h"
 
-#include <nanoflann.hpp>
-
 #include <glog/logging.h>
+
+#include <nanoflann.hpp>
 
 namespace hydra::eval {
 
-using voxblox::Layer;
-using places::GvdVoxel;
 using nanoflann::KDTreeSingleIndexAdaptor;
 using nanoflann::L2_Simple_Adaptor;
+using places::GvdVoxel;
+using voxblox::Layer;
 
 void fillGvdPositions(const Layer<GvdVoxel>& layer,
                       size_t min_gvd_basis,

@@ -9,6 +9,7 @@ class OnnxSegmenter:
         try:
             import torchvision
             import onnxruntime as ort
+
             self._initialized = True
         except ImportError:
             self._initialized = False

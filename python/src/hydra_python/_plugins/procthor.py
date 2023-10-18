@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import ai2thor
 import ai2thor.controller
+
 # import ai2thor.platform
 import prior
 

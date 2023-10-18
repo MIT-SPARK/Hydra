@@ -33,9 +33,9 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/utils/pose_graph_tracker.h>
 #include <hydra/reconstruction/reconstruction_input.h>
 #include <hydra/reconstruction/reconstruction_output.h>
+#include <hydra/utils/pose_graph_tracker.h>
 
 namespace hydra {
 

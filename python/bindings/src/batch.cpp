@@ -67,9 +67,11 @@ DynamicSceneGraph::Ptr PythonBatchPipeline::construct(const PythonConfig& config
   const auto node = config.toYaml();
   const auto frontend_config =
       config::fromYaml<config::VirtualConfig<FrontendModule>>(node, "frontend");
-  const auto room_config = config::fromYaml<RoomFinderConfig>(node, "backend/room_finder");
-  //LOG(INFO) << "Using frontend config: " << std::endl << config::toString(frontend_config);
-  //LOG(INFO) << "Using room config: " << std::endl << config::toString(room_config);
+  const auto room_config =
+      config::fromYaml<RoomFinderConfig>(node, "backend/room_finder");
+  // LOG(INFO) << "Using frontend config: " << std::endl <<
+  // config::toString(frontend_config); LOG(INFO) << "Using room config: " << std::endl
+  // << config::toString(room_config);
   return BatchPipeline::construct(frontend_config, map, &room_config);
 }
 

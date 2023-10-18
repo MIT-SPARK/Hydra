@@ -129,7 +129,9 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
 
   size_t makeNodeFinder(const SceneGraphLayer& layer) const;
 
-  void updatePlace(const gtsam::Values& values, NodeId node, NodeAttributes& attrs) const;
+  void updatePlace(const gtsam::Values& values,
+                   NodeId node,
+                   NodeAttributes& attrs) const;
 
   std::optional<NodeId> proposePlaceMerge(const SceneGraphLayer& layer,
                                           NodeId node_id,

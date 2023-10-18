@@ -34,9 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/common/semantic_color_map.h"
 
-#include <voxblox/core/color.h>
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
+#include <voxblox/core/color.h>
 
 #include <fstream>
 #include <iostream>

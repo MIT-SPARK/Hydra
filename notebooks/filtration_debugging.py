@@ -22,6 +22,7 @@ import pathlib
 import spark_dsg as dsg
 import spark_dsg.networkx
 import networkx as nx
+
 # %matplotlib notebook
 
 sns.set()
@@ -44,7 +45,9 @@ def draw_places(G):
         colors.append(attrs["distance"])
 
     fig, ax = plt.subplots()
-    nx.draw_networkx(places_nx, pos=pos, node_color=colors, with_labels=False, node_size=10, ax=ax)
+    nx.draw_networkx(
+        places_nx, pos=pos, node_color=colors, with_labels=False, node_size=10, ax=ax
+    )
     return fig, ax
 
 
@@ -52,15 +55,15 @@ def find_threshold(distance_lifetimes, min_dist=0.5, max_dist=1.5, min_lifetime=
     valid_lifetimes = []
     for lifetime in distance_lifetimes:
         if lifetime[1] < min_dist:
-            continue # disallow components that disappear too fast
-            
+            continue  # disallow components that disappear too fast
+
         if lifetime[0] > max_dist:
-            continue # disallow components that start too late
-            
+            continue  # disallow components that start too late
+
         time_valid = lifetime[1] - lifetime[0]
         if time_valid > min_lifetime:
             valid_lifetimes.append(lifetime)
-            
+
     return valid_lifetimes
 
 
@@ -101,8 +104,10 @@ def draw_components(G, dilation_distance, min_size):
 
         node_colors.append(colors[best_color])
 
-    fig, ax = plt.subplots()    
-    nx.draw_networkx(places_nx, pos=pos, node_color=node_colors, with_labels=False, node_size=10)
+    fig, ax = plt.subplots()
+    nx.draw_networkx(
+        places_nx, pos=pos, node_color=node_colors, with_labels=False, node_size=10
+    )
     return fig, ax
 
 
@@ -124,8 +129,8 @@ for i, lifetime in enumerate(barcodes):
 
 min_dist = np.amin(points)
 max_dist = np.amax(points)
-    
-dsg_path = results['filepaths'][INPUT_INDEX][1]
+
+dsg_path = results["filepaths"][INPUT_INDEX][1]
 
 G = dsg.DynamicSceneGraph.load(dsg_path)
 places = G.get_layer(dsg.DsgLayers.PLACES)
@@ -153,7 +158,14 @@ ax[1].fill(
 )
 ax[1].vlines(DIST, DIST, max_dist, colors="k", linestyle="--")
 ax[1].hlines(DIST, min_dist, DIST, colors="k", linestyle="--")
-ax[1].scatter(points[:, 0], points[:, 1], color=color, marker="o", facecolors="none", s=20*np.ones(points.shape[0]))
+ax[1].scatter(
+    points[:, 0],
+    points[:, 1],
+    color=color,
+    marker="o",
+    facecolors="none",
+    s=20 * np.ones(points.shape[0]),
+)
 ax[1].set_xlabel("Birth [m]")
 ax[1].set_ylabel("Death [m]")
 fig.set_size_inches([9.5, 5])
@@ -169,6 +181,10 @@ plt.show()
 new_lifetimes = find_threshold(barcodes)
 
 fig, ax = plt.subplots()
-ax.hlines(np.arange(len(new_lifetimes)), [x[0] for x in new_lifetimes], [x[1] for x in new_lifetimes])
+ax.hlines(
+    np.arange(len(new_lifetimes)),
+    [x[0] for x in new_lifetimes],
+    [x[1] for x in new_lifetimes],
+)
 fig.set_size_inches([8, 5])
 plt.show()

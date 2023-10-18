@@ -307,7 +307,6 @@ TEST(MergeHandlerTests, TestUndoMergeObjects) {
 
   std::map<NodeId, NodeId> proposed_merges{{"O2"_id, "O1"_id}};
 
-
   LayerFunctorMap functors;
   functors[DsgLayers::OBJECTS] = std::make_shared<UpdateObjectsFunctor>();
   functors[DsgLayers::PLACES] = std::make_shared<UpdatePlacesFunctor>(0.5, 0.1);

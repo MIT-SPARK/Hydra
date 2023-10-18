@@ -26,19 +26,20 @@ def parse_float(num_string):
     if hyphen_pos == -1:
         return float(num_string)
     return float(num_string[hyphen_pos:])
-    
-    
+
+
 def parse_array(array_string):
     rows = [x.split(" ") for x in array_string.split("\n") if x != ""]
     rows = [[parse_float(x) for x in row] for row in rows]
     return np.array(rows)
+
 
 def solve_problem(match):
     src = parse_array(first_problem.group(1))
     dest = parse_array(first_problem.group(2))
     print(f"source: {src}")
     print(f"dest: {dest}")
-    
+
     params = teaser.RobustRegistrationSolver.Params()
     params.estimate_scaling = False
     params.rotation_estimation_algorithm = (
@@ -50,10 +51,10 @@ def solve_problem(match):
     # params.rotation_max_iterations = 100
     # params.rotation_cost_threshold = 1e-12
     print(f"params: {params}")
-    
+
     solver = teaser.RobustRegistrationSolver(params)
     # solver.solve(src, dest)
-    
+
     solution = solver.getSolution()
     if solution.valid:
         print(f"solution:", solution)
@@ -71,7 +72,9 @@ with log_path.open("r") as fin:
     contents = fin.read()
 
 # %%
-problem_finder = re.compile(r"Source: $(.*?)^I1201.*Dest: $(.*?)^I1201", flags=re.DOTALL | re.MULTILINE)
+problem_finder = re.compile(
+    r"Source: $(.*?)^I1201.*Dest: $(.*?)^I1201", flags=re.DOTALL | re.MULTILINE
+)
 first_problem = problem_finder.search(contents)
 
 # %%
