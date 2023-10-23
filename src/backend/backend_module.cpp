@@ -737,6 +737,8 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
 
 void BackendModule::updateAgentNodeMeasurements(
     const pose_graph_tools::PoseGraph& meas) {
+  deformation_graph_->removePriorsWithPrefix(
+      HydraConfig::instance().getRobotPrefix().key);
   std::vector<std::pair<gtsam::Key, gtsam::Pose3>> agent_measurements;
   for (const auto& node : meas.nodes) {
     agent_measurements.push_back(
