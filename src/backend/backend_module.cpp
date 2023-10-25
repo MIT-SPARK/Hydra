@@ -507,10 +507,11 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
       return false;
     }
 
-    private_dsg_->graph->mergeGraph(*shared_dsg_->graph,
-                                    merge_handler_->mergedNodes(),
-                                    &config_.merge_update_map,
-                                    config_.merge_update_dynamic);
+    GraphMergeConfig merge_config;
+    merge_config.previous_merges = &merge_handler_->mergedNodes();
+    merge_config.update_layer_attributes = &config_.merge_update_map;
+    merge_config.update_dynamic_attributes = config_.merge_update_dynamic;
+    private_dsg_->graph->mergeGraph(*shared_dsg_->graph, merge_config);
 
     // update merge book-keeping and optionally update merged node
     // connections and attributes
