@@ -115,7 +115,7 @@ struct MeshUpdater {
   std::atomic<bool> should_shutdown = false;
   kimera_pgmo::DeltaCompression compression;
   std::shared_ptr<spark_dsg::DynamicSceneGraph> graph;
-  std::vector<ros::Time> mesh_timestamps;
+  std::vector<uint64_t> mesh_timestamps;
   ReconstructionModule::OutputQueue::Ptr queue;
   ZmqSender zmq_sender;
 };
