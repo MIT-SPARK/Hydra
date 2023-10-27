@@ -152,7 +152,7 @@ void FrontendModule::save(const LogSetup& log_setup) {
   if (!dsg_->graph->isMeshEmpty()) {
     pcl::PolygonMesh mesh = dsg_->graph->getMesh();
     kimera_pgmo::WriteMeshWithStampsToPly(
-        output_path + "/mesh.ply", mesh, mesh_timestamps_);
+        output_path + "/mesh.ply", mesh, *dsg_->graph->getMeshStamps());
   }
 
   if (place_extractor_) {
@@ -290,7 +290,7 @@ void FrontendModule::updateMesh(const ReconstructionOutput& input) {
     // nothing else uses it at the moment
     ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
     last_mesh_update_->updateMesh(*dsg_->graph->getMeshVertices(),
-                                  mesh_timestamps_,
+                                  *dsg_->graph->getMeshStamps(),
                                   *dsg_->graph->getMeshFaces(),
                                   dsg_->graph->getMeshLabels().get());
     invalidateMeshEdges(*last_mesh_update_);

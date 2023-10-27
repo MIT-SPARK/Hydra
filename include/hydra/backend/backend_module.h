@@ -189,10 +189,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   SharedDsgInfo::Ptr shared_dsg_;
   SharedDsgInfo::Ptr private_dsg_;
   IsolatedSceneGraphLayer shared_places_copy_;
-  std::map<LayerId, NodeMergeLog> proposed_node_merges_;
   std::unique_ptr<MergeHandler> merge_handler_;
   SharedModuleState::Ptr state_;
-  std::vector<ros::Time> mesh_timestamps_;
   pcl::PointCloud<pcl::PointXYZRGBA>::Ptr original_vertices_;
 
   std::list<LayerUpdateFunc> dsg_update_funcs_;
@@ -205,7 +203,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   std::list<LoopClosureLog> loop_closures_;
 
   kimera_pgmo::Path trajectory_;
-  std::vector<ros::Time> timestamps_;
+  std::vector<size_t> timestamps_;
   std::queue<size_t> unconnected_nodes_;
 
   std::list<OutputCallback> output_callbacks_;

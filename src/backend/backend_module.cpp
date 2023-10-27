@@ -151,8 +151,6 @@ void BackendModule::save(const LogSetup& log_setup) {
   const auto pgmo_path = log_setup.getLogDir("backend/pgmo");
   private_dsg_->graph->save(backend_path + "/dsg.json", false);
   private_dsg_->graph->save(backend_path + "/dsg_with_mesh.json");
-  // TODO(Yun) Technically not strictly a g2o
-  deformation_graph_->save(pgmo_path + "/deformation_graph.dgrf");
   savePoseGraphSparseMapping(pgmo_path + "/sparsification_mapping.txt");
 
   const auto& prefix = HydraConfig::instance().getRobotPrefix();
@@ -163,9 +161,13 @@ void BackendModule::save(const LogSetup& log_setup) {
   }
 
   if (!private_dsg_->graph->isMeshEmpty()) {
-    kimera_pgmo::WriteMeshWithStampsToPly(
-        backend_path + "/mesh.ply", private_dsg_->graph->getMesh(), mesh_timestamps_);
+    kimera_pgmo::WriteMeshWithStampsToPly(backend_path + "/mesh.ply",
+                                          private_dsg_->graph->getMesh(),
+                                          *private_dsg_->graph->getMeshStamps());
   }
+
+  deformation_graph_->update();  // Update before saving
+  deformation_graph_->save(pgmo_path + "/deformation_graph.dgrf");
 
   const std::string output_csv = backend_path + "/loop_closures.csv";
   std::ofstream output_file;
@@ -297,7 +299,8 @@ void BackendModule::loadState(const std::string& state_path,
   const std::string mesh_path = state_path + "/mesh.ply";
 
   pcl::PolygonMesh mesh;
-  kimera_pgmo::ReadMeshWithStampsFromPly(mesh_path, mesh, &mesh_timestamps_);
+  kimera_pgmo::ReadMeshWithStampsFromPly(
+      mesh_path, mesh, private_dsg_->graph->getMeshStamps().get());
   *private_dsg_->graph->getMeshFaces() = mesh.polygons;
   pcl::fromPCLPointCloud2(mesh.cloud, *private_dsg_->graph->getMeshVertices());
 
@@ -486,7 +489,7 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
   }
 
   input.mesh_update->updateMesh(*private_dsg_->graph->getMeshVertices(),
-                                mesh_timestamps_,
+                                *private_dsg_->graph->getMeshStamps(),
                                 *private_dsg_->graph->getMeshFaces(),
                                 private_dsg_->graph->getMeshLabels().get());
   input.mesh_update->updateVertices(*original_vertices_);
@@ -723,10 +726,11 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
   }
 
   ScopedTimer timer("backend/mesh_deformation", timestamp_ns);
-  VLOG(3) << "Deforming mesh with " << mesh_timestamps_.size() << " vertices";
+  VLOG(3) << "Deforming mesh with " << private_dsg_->graph->getMeshVertices()->size()
+          << " vertices";
   deformation_graph_->deformPoints(*private_dsg_->graph->getMeshVertices(),
                                    *original_vertices_,
-                                   mesh_timestamps_,
+                                   *private_dsg_->graph->getMeshStamps(),
                                    HydraConfig::instance().getRobotPrefix().vertex_key,
                                    deformation_graph_->getGtsamValues(),
                                    KimeraPgmoInterface::config_.num_interp_pts,
@@ -771,7 +775,6 @@ void BackendModule::optimize(size_t timestamp_ns) {
 void BackendModule::resetBackendDsg(size_t timestamp_ns) {
   ScopedTimer timer("backend/reset_dsg", timestamp_ns, true, 0, false);
   merge_handler_->reset();
-  proposed_node_merges_.clear();
   {
     std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
     // First reset private graph

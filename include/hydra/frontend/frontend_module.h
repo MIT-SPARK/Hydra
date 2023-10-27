@@ -145,7 +145,6 @@ class FrontendModule : public Module {
 
   SharedDsgInfo::Ptr dsg_;
   SharedModuleState::Ptr state_;
-  std::vector<ros::Time> mesh_timestamps_;
   kimera_pgmo::MeshDelta::Ptr last_mesh_update_;
 
   kimera_pgmo::MeshFrontendInterface mesh_frontend_;
