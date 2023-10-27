@@ -58,6 +58,11 @@ struct MinimumSpanningTreeInfo {
   std::unordered_map<NodeId, size_t> counts;
 };
 
+using EdgeFilter = std::function<bool(const SceneGraphLayer&, const SceneGraphEdge&)>;
+
 MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer);
+
+MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer,
+                                                const EdgeFilter& func);
 
 }  // namespace hydra

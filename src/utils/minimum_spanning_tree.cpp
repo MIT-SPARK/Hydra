@@ -40,12 +40,22 @@
 
 namespace hydra {
 
-// implementation mainly from: https://en.wikipedia.org/wiki/Kruskal%27s_algorithm
 MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer) {
+  EdgeFilter filter;
+  return getMinimumSpanningEdges(layer, filter);
+}
+
+// implementation mainly from: https://en.wikipedia.org/wiki/Kruskal%27s_algorithm
+MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer,
+                                                const EdgeFilter& filter) {
   std::vector<MinimalEdge> sorted_edges;
   sorted_edges.reserve(layer.edges().size());
   for (const auto& id_edge_pair : layer.edges()) {
     const auto& edge = id_edge_pair.second;
+    if (filter && !filter(layer, edge)) {
+      continue;
+    }
+
     sorted_edges.emplace_back(
         edge.source,
         edge.target,
