@@ -37,7 +37,6 @@
 #include <kimera_pgmo/utils/CommonStructs.h>
 #include <pose_graph_tools/BowQuery.h>
 #include <pose_graph_tools/PoseGraph.h>
-#include <ros/time.h>
 
 #include <list>
 #include <map>
