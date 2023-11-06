@@ -57,6 +57,11 @@ class NearestNodeFinder {
             bool skip_first,
             const Callback& callback);
 
+  size_t findRadius(const Eigen::Vector3d& position,
+                    double radius_m,
+                    bool skip_first,
+                    const Callback& callback);
+
  private:
   struct Detail;
 

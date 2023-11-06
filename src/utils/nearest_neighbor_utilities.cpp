@@ -109,4 +109,25 @@ void NearestNodeFinder::find(const Eigen::Vector3d& position,
   }
 }
 
+size_t NearestNodeFinder::findRadius(const Eigen::Vector3d& position,
+                                     double radius,
+                                     bool skip_first,
+                                     const NearestNodeFinder::Callback& callback) {
+  std::vector<nanoflann::ResultItem<size_t, double>> neighbors;
+  size_t num_found = internals_->kdtree->radiusSearch(
+      position.data(), radius, neighbors, nanoflann::SearchParameters());
+
+  size_t i = skip_first ? 1 : 0;
+  for (; i < num_found; ++i) {
+    const auto idx = neighbors[i].first;
+    callback(internals_->adaptor.nodes[idx], idx, neighbors[i].second);
+  }
+
+  if (num_found == 0) {
+    return num_found;
+  } else {
+    return num_found - (skip_first ? 1 : 0);
+  }
+}
+
 }  // namespace hydra
