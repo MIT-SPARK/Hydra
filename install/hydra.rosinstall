@@ -1,57 +1,54 @@
 - git:
-    local-name: catkin_simple
-    uri: git@github.com:catkin/catkin_simple.git
-- git:
     local-name: eigen_catkin
-    uri: git@github.com:ethz-asl/eigen_catkin.git
+    uri: https://github.com/ethz-asl/eigen_catkin.git
 - git:
     local-name: eigen_checks
-    uri: git@github.com:ethz-asl/eigen_checks.git
+    uri: https://github.com/ethz-asl/eigen_checks.git
 - git:
     local-name: gflags_catkin
-    uri: git@github.com:ethz-asl/gflags_catkin.git
+    uri: https://github.com/ethz-asl/gflags_catkin.git
 - git:
     local-name: glog_catkin
-    uri: git@github.com:ethz-asl/glog_catkin.git
+    uri: https://github.com/ethz-asl/glog_catkin.git
 - git:
     local-name: gtsam
-    uri: git@github.com:borglab/gtsam.git
+    uri: https://github.com/borglab/gtsam.git
     version: develop
 - git:
     local-name: kimera_pgmo
-    uri: git@github.com:MIT-SPARK/Kimera-PGMO.git
+    uri: https://github.com/MIT-SPARK/Kimera-PGMO.git
     version: master
 - git:
     local-name: kimera_rpgo
-    uri: git@github.com:MIT-SPARK/Kimera-RPGO.git
+    uri: https://github.com/MIT-SPARK/Kimera-RPGO.git
     version: master
 - git:
     local-name: spark_dsg
-    uri: git@github.com:MIT-SPARK/Spark-DSG.git
+    uri: https://github.com/MIT-SPARK/Spark-DSG.git
 - git:
     local-name: hydra
-    uri: git@github.com:MIT-SPARK/Hydra.git
+    uri: https://github.com/MIT-SPARK/Hydra.git
 - git:
     local-name: kimera_semantics
-    uri: git@github.com:MIT-SPARK/Kimera-Semantics.git
+    uri: https://github.com/MIT-SPARK/Kimera-Semantics.git
     version: feature/noetic_fixes
 - git:
     local-name: mesh_tools
-    uri: git@github.com:yunzc/mesh_tools.git
+    uri: https://github.com/yunzc/mesh_tools.git
 - git:
     local-name: minkindr
-    uri: git@github.com:ethz-asl/minkindr.git
+    uri: https://github.com/ethz-asl/minkindr.git
 - git:
     local-name: minkindr_ros
-    uri: git@github.com:ethz-asl/minkindr_ros.git
+    uri: https://github.com/ethz-asl/minkindr_ros.git
 - git:
     local-name: pose_graph_tools
-    uri: git@github.com:MIT-SPARK/pose_graph_tools.git
+    uri: https://github.com/MIT-SPARK/pose_graph_tools.git
     version: feature/hydra
 - git:
     local-name: teaser_plusplus
-    uri: git@github.com:MIT-SPARK/TEASER-plusplus.git
+    uri: https://github.com/MIT-SPARK/TEASER-plusplus.git
 - git:
     local-name: voxblox
-    uri: git@github.com:MIT-SPARK/voxblox.git
+    uri: https://github.com/MIT-SPARK/voxblox.git
     version: feature/hydra
