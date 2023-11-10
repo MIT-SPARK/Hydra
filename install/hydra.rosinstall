@@ -1,4 +1,5 @@
-
+- git:
+    local-name: catkin_simple
 
 - git:
     local-name: eigen_catkin
