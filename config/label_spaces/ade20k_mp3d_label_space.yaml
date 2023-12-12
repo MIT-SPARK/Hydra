@@ -1,6 +1,6 @@
 ---
-total_semantic_labels: 39
 semantic_measurement_probability: 0.6
+total_semantic_labels: 39
 dynamic_labels: []
 invalid_labels: []
 frontend:
@@ -36,41 +36,41 @@ frontend:
       - 37
 label_names:
   - {label: 0, name: void}
-  - {label: 1, name: wall}
-  - {label: 2, name: floor}
-  - {label: 3, name: chair}
-  - {label: 4, name: door}
-  - {label: 5, name: table}
-  - {label: 6, name: picture}
-  - {label: 7, name: cabinet}
-  - {label: 8, name: cushion}
-  - {label: 9, name: window}
-  - {label: 10, name: sofa}
-  - {label: 11, name: bed}
-  - {label: 12, name: curtain}
-  - {label: 13, name: chest_of_drawers}
-  - {label: 14, name: plant}
-  - {label: 15, name: sink}
-  - {label: 16, name: stairs}
-  - {label: 17, name: ceiling}
-  - {label: 18, name: toilet}
-  - {label: 19, name: stool}
-  - {label: 20, name: towel}
-  - {label: 21, name: mirror}
-  - {label: 22, name: tv_monitor}
-  - {label: 23, name: shower}
-  - {label: 24, name: column}
-  - {label: 25, name: bathtub}
-  - {label: 26, name: counter}
-  - {label: 27, name: fireplace}
-  - {label: 28, name: lighting}
-  - {label: 29, name: railing}
-  - {label: 30, name: shelving}
-  - {label: 31, name: blinds}
-  - {label: 32, name: seating}
-  - {label: 33, name: board_panel}
-  - {label: 34, name: furniture}
-  - {label: 35, name: appliances}
-  - {label: 36, name: clothes}
+  - {label: 1, name: wall, name_descriptive: a wall}
+  - {label: 2, name: floor, name_descriptive: a floor}
+  - {label: 3, name: chair, name_descriptive: a chair}
+  - {label: 4, name: door, name_descriptive: a door}
+  - {label: 5, name: table, name_descriptive: a table}
+  - {label: 6, name: picture, name_descriptive: a picture}
+  - {label: 7, name: cabinet, name_descriptive: a cabinet}
+  - {label: 8, name: cushion, name_descriptive: a cushion}
+  - {label: 9, name: window, name_descriptive: a window}
+  - {label: 10, name: sofa, name_descriptive: a sofa}
+  - {label: 11, name: bed, name_descriptive: a bed}
+  - {label: 12, name: curtain, name_descriptive: a curtain}
+  - {label: 13, name: chest_of_drawers, name_descriptive: a chest of drawers}
+  - {label: 14, name: plant, name_descriptive: a plant}
+  - {label: 15, name: sink, name_descriptive: a sink}
+  - {label: 16, name: stairs, name_descriptive: a set of stairs}
+  - {label: 17, name: ceiling, name_descriptive: a ceiling}
+  - {label: 18, name: toilet, name_descriptive: a toilet}
+  - {label: 19, name: stool, name_descriptive: a stool for sitting}
+  - {label: 20, name: towel, name_descriptive: a towel}
+  - {label: 21, name: mirror, name_descriptive: a mirror}
+  - {label: 22, name: tv_monitor, name_descriptive: a television}
+  - {label: 23, name: shower, name_descriptive: a shower}
+  - {label: 24, name: column, name_descriptive: a column}
+  - {label: 25, name: bathtub, name_descriptive: a bathtub}
+  - {label: 26, name: counter, name_descriptive: a countertop}
+  - {label: 27, name: fireplace, name_descriptive: a fireplace}
+  - {label: 28, name: lighting, name_descriptive: lighting}
+  - {label: 29, name: railing, name_descriptive: a railing}
+  - {label: 30, name: shelving, name_descriptive: a set of shelves}
+  - {label: 31, name: blinds, name_descriptive: window blinds}
+  - {label: 32, name: seating, name_descriptive: seating for a group of people}
+  - {label: 33, name: board_panel, name_descriptive: a whiteboard}
+  - {label: 34, name: furniture, name_descriptive: an odd piece of furniture}
+  - {label: 35, name: appliances, name_descriptive: an appliance}
+  - {label: 36, name: clothes, name_descriptive: an article of clothing}
   - {label: 37, name: objects}
   - {label: 38, name: misc}
