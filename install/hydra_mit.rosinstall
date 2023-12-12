@@ -3,7 +3,7 @@
     uri: git@github.com:catkin/catkin_simple.git
 - git:
     local-name: config_utilities
-    uri: git@github.mit.edu:SPARK/config_utilities.git
+    uri: git@github.com:MIT-SPARK/config_utilities.git
 - git:
     local-name: eigen_catkin
     uri: git@github.com:ethz-asl/eigen_catkin.git
@@ -23,10 +23,11 @@
 - git:
     local-name: hydra_ros
     uri: git@github.mit.edu:SPARK/Hydra-ROS.git
+    version: develop
 - git:
     local-name: kimera_pgmo
     uri: git@github.mit.edu:SPARK/Kimera-PGMO.git
-    version: master
+    version: develop
 - git:
     local-name: kimera_rpgo
     uri: git@github.com:MIT-SPARK/Kimera-RPGO.git
@@ -34,7 +35,7 @@
 - git:
     local-name: spark_dsg
     uri: git@github.mit.edu:SPARK/Spark-DSG.git
-    version: main
+    version: develop
 - git:
     local-name: mesh_tools
     uri: git@github.com:yunzc/mesh_tools.git
@@ -46,7 +47,8 @@
     uri: git@github.com:ethz-asl/minkindr_ros.git
 - git:
     local-name: pose_graph_tools
-    uri: git@github.com:MIT-SPARK/pose_graph_tools.git
+    uri: git@github.mit.edu:SPARK/pose_graph_tools.git
+    version: develop
 - git:
     local-name: teaser_plusplus
     uri: git@github.com:MIT-SPARK/TEASER-plusplus.git
