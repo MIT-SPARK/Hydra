@@ -16,7 +16,7 @@
 - git:
     local-name: gtsam
     uri: git@github.com:borglab/gtsam.git
-    version: 4.2a9
+    version: 4.2
 - git:
     local-name: hydra_ros
     uri: git@github.mit.edu:SPARK/Hydra-ROS.git
@@ -24,7 +24,7 @@
 - git:
     local-name: kimera_pgmo
     uri: git@github.mit.edu:SPARK/Kimera-PGMO.git
-    version: develop
+    version: master
 - git:
     local-name: kimera_rpgo
     uri: git@github.com:MIT-SPARK/Kimera-RPGO.git
@@ -32,11 +32,11 @@
 - git:
     local-name: spark_dsg
     uri: git@github.mit.edu:SPARK/Spark-DSG.git
-    version: develop
+    version: main
 - git:
     local-name: kimera_semantics
     uri: git@github.mit.edu:SPARK/Kimera-Semantics.git
-    version: develop
+    version: feature/noetic_fixes
 - git:
     local-name: mesh_tools
     uri: git@github.com:yunzc/mesh_tools.git

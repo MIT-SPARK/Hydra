@@ -16,7 +16,7 @@
 - git:
     local-name: gtsam
     uri: git@github.com:borglab/gtsam.git
-    version: 4.2a9
+    version: 4.2
 - git:
     local-name: hydra_ros
     uri: git@github.com:MIT-SPARK/Hydra-ROS.git
