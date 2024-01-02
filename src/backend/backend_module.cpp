@@ -713,7 +713,7 @@ void BackendModule::runZmqUpdates() {
 }
 
 void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
-  deformation_graph_->update();
+  //deformation_graph_->update();
   if (!force_mesh_update && !have_new_mesh_) {
     return;
   }
