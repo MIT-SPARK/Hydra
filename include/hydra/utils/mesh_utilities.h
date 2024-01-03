@@ -32,45 +32,20 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <memory>
-#include <thread>
+#pragma once
+#include <optional>
+#include <vector>
 
-namespace pybind11 {
-class module_;
-}
+#include "hydra/common/dsg_types.h"
 
 namespace hydra {
 
-class ReconstructionModule;
-class ReconstructionInput;
-class PipelineConfig;
+bool updateNodeCentroid(const spark_dsg::Mesh& mesh,
+                        const std::vector<size_t>& indices,
+                        NodeAttributes& attrs);
 
-namespace python {
-
-class PythonConfig;
-struct MeshUpdater;
-
-class PythonReconstruction {
- public:
-  PythonReconstruction(const PipelineConfig& hydra_config, const PythonConfig& config);
-
-  virtual ~PythonReconstruction();
-
-  bool step(const ReconstructionInput& input);
-
-  void save();
-
-  void stop();
-
- protected:
-  std::shared_ptr<ReconstructionModule> module_;
-  std::unique_ptr<MeshUpdater> mesh_updater_;
-  std::unique_ptr<std::thread> mesh_thread_;
-};
-
-namespace python_reconstruction {
-void addBindings(pybind11::module_& m);
-}
-
-}  // namespace python
+bool updateObjectGeometry(const spark_dsg::Mesh& mesh,
+                          ObjectNodeAttributes& attrs,
+                          const std::vector<size_t>* indices = nullptr,
+                          std::optional<BoundingBox::Type> type = std::nullopt);
 }  // namespace hydra

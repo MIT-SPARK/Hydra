@@ -32,45 +32,53 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <memory>
-#include <thread>
+#include "hydra/utils/mesh_utilities.h"
 
-namespace pybind11 {
-class module_;
-}
+#include <spark_dsg/bounding_box_extraction.h>
 
 namespace hydra {
 
-class ReconstructionModule;
-class ReconstructionInput;
-class PipelineConfig;
+bool updateNodeCentroid(const spark_dsg::Mesh& mesh,
+                        const std::vector<size_t>& indices,
+                        NodeAttributes& attrs) {
+  size_t num_valid = 0;
+  Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+  for (const auto idx : indices) {
+    const auto pos = mesh.pos(idx).cast<double>();
+    if (!pos.array().isFinite().all()) {
+      continue;
+    }
 
-namespace python {
+    centroid += pos;
+    ++num_valid;
+  }
 
-class PythonConfig;
-struct MeshUpdater;
+  if (!num_valid) {
+    return false;
+  }
 
-class PythonReconstruction {
- public:
-  PythonReconstruction(const PipelineConfig& hydra_config, const PythonConfig& config);
-
-  virtual ~PythonReconstruction();
-
-  bool step(const ReconstructionInput& input);
-
-  void save();
-
-  void stop();
-
- protected:
-  std::shared_ptr<ReconstructionModule> module_;
-  std::unique_ptr<MeshUpdater> mesh_updater_;
-  std::unique_ptr<std::thread> mesh_thread_;
-};
-
-namespace python_reconstruction {
-void addBindings(pybind11::module_& m);
+  attrs.position = centroid / num_valid;
+  return true;
 }
 
-}  // namespace python
+bool updateObjectGeometry(const spark_dsg::Mesh& mesh,
+                          ObjectNodeAttributes& attrs,
+                          const std::vector<size_t>* indices,
+                          std::optional<BoundingBox::Type> type) {
+  std::vector<size_t> mesh_connections;
+  if (!indices) {
+    mesh_connections.assign(attrs.mesh_connections.begin(),
+                            attrs.mesh_connections.end());
+  }
+
+  const spark_dsg::MeshAdaptor adaptor(mesh, indices ? indices : &mesh_connections);
+  attrs.bounding_box =
+      bounding_box::extract(adaptor, type.value_or(attrs.bounding_box.type));
+  if (indices) {
+    return updateNodeCentroid(mesh, *indices, attrs);
+  } else {
+    return updateNodeCentroid(mesh, mesh_connections, attrs);
+  }
+}
+
 }  // namespace hydra

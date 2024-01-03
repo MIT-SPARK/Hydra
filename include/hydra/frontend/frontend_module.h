@@ -72,6 +72,10 @@ class FrontendModule : public Module {
   using PlaceVizCallback = std::function<void(uint64_t,
                                               const voxblox::Layer<places::GvdVoxel>&,
                                               const places::GraphExtractorInterface*)>;
+  using ObjectVizCallback =
+      std::function<void(const kimera_pgmo::MeshDelta&,
+                         const std::vector<size_t>&,
+                         const std::map<uint32_t, std::vector<size_t>>&)>;
 
   FrontendModule(const FrontendConfig& config,
                  const SharedDsgInfo::Ptr& dsg,
@@ -95,6 +99,8 @@ class FrontendModule : public Module {
   inline FrontendInputQueue::Ptr getQueue() const { return queue_; }
 
   void addOutputCallback(const OutputCallback& callback);
+
+  void addObjectVisualizationCallback(const ObjectVizCallback& callback);
 
   void addPlaceVisualizationCallback(const PlaceVizCallback& callback);
 
@@ -168,7 +174,7 @@ class FrontendModule : public Module {
   std::vector<InputCallback> post_mesh_callbacks_;
   std::vector<OutputCallback> output_callbacks_;
 
-   // TODO(lschmid): This mutex currently simply locks all data for manipulation.
+  // TODO(lschmid): This mutex currently simply locks all data for manipulation.
   std::mutex mutex_;
 
   inline static const auto registration_ =

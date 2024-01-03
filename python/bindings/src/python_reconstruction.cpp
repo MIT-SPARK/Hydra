@@ -48,6 +48,7 @@
 #include <pybind11/stl/filesystem.h>
 #include <pybind11/stl_bind.h>
 #include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/pgmo_mesh_traits.h>
 #include <spark_dsg/zmq_interface.h>
 
 #include "hydra/bindings/glog_utilities.h"
@@ -77,7 +78,7 @@ struct MeshUpdater {
         queue(new ReconstructionModule::OutputQueue()),
         zmq_sender(url, 2) {
     graph.reset(new DynamicSceneGraph(DynamicSceneGraph::LayerIds{2, 3, 4, 5}, 1));
-    graph->initMesh(true);
+    graph->setMesh(std::make_shared<Mesh>());
   }
 
   void spin() {
@@ -104,10 +105,7 @@ struct MeshUpdater {
 
     auto interface = mesh->getMeshInterface();
     const auto delta = compression.update(interface, msg->timestamp_ns);
-    delta->updateMesh(*graph->getMeshVertices(),
-                      mesh_timestamps,
-                      *graph->getMeshFaces(),
-                      graph->getMeshLabels().get());
+    delta->updateMesh(*graph->mesh());
     zmq_sender.send(*graph, true);
   }
 
@@ -173,13 +171,17 @@ void PythonReconstruction::save() {
   }
 
   stop();
-  if (!mesh_updater_ || mesh_updater_->graph->isMeshEmpty()) {
+
+  if (!mesh_updater_) {
     return;
   }
 
-  pcl::PolygonMesh mesh = mesh_updater_->graph->getMesh();
-  kimera_pgmo::WriteMeshWithStampsToPly(
-      logs->getLogDir() + "/mesh.ply", mesh, mesh_updater_->mesh_timestamps);
+  auto mesh = mesh_updater_->graph->mesh();
+  if (!mesh || mesh->empty()) {
+    return;
+  }
+
+  kimera_pgmo::WriteMesh(logs->getLogDir() + "/mesh.ply", *mesh);
 }
 
 namespace python_reconstruction {

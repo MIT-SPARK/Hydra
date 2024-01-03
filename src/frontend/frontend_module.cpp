@@ -39,6 +39,7 @@
 #include <glog/logging.h>
 #include <kimera_pgmo/compression/DeltaCompression.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
+#include <spark_dsg/pgmo_mesh_traits.h>
 #include <tf2_eigen/tf2_eigen.h>
 
 #include <fstream>
@@ -70,7 +71,7 @@ FrontendModule::FrontendModule(const FrontendConfig& config,
 
   CHECK(dsg_ != nullptr);
   CHECK(dsg_->graph != nullptr);
-  dsg_->graph->initMesh(true);
+  dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>());
   dsg_->graph->createDynamicLayer(DsgLayers::AGENTS, prefix.key);
 
   const auto mesh_resolution = pgmo_config.mesh_resolution;
@@ -92,10 +93,7 @@ FrontendModule::FrontendModule(const FrontendConfig& config,
   }
 
   CHECK(mesh_frontend_.initialize(pgmo_config));
-  segmenter_.reset(new MeshSegmenter(config_.object_config,
-                                     dsg_->graph->getMeshVertices(),
-                                     dsg_->graph->getMeshLabels()));
-
+  segmenter_.reset(new MeshSegmenter(config_.object_config));
   place_extractor_.reset(new GvdPlaceExtractor(config_.graph_extractor,
                                                config.gvd,
                                                config.min_places_component_size,
@@ -151,10 +149,9 @@ void FrontendModule::save(const LogSetup& log_setup) {
   dsg_->graph->save(output_path + "/dsg.json", false);
   dsg_->graph->save(output_path + "/dsg_with_mesh.json");
 
-  if (!dsg_->graph->isMeshEmpty()) {
-    pcl::PolygonMesh mesh = dsg_->graph->getMesh();
-    kimera_pgmo::WriteMeshWithStampsToPly(
-        output_path + "/mesh.ply", mesh, *dsg_->graph->getMeshStamps());
+  const auto mesh = dsg_->graph->mesh();
+  if (mesh && !mesh->empty()) {
+    kimera_pgmo::WriteMesh(output_path + "/mesh.ply", *mesh);
   }
 
   if (place_extractor_) {
@@ -199,6 +196,12 @@ bool FrontendModule::spinOnce() {
 
 void FrontendModule::addOutputCallback(const OutputCallback& callback) {
   output_callbacks_.push_back(callback);
+}
+
+void FrontendModule::addObjectVisualizationCallback(const ObjectVizCallback& cb) {
+  if (segmenter_) {
+    segmenter_->addVisualizationCallback(cb);
+  }
 }
 
 void FrontendModule::addPlaceVisualizationCallback(const PlaceVizCallback& cb) {
@@ -292,10 +295,7 @@ void FrontendModule::updateMesh(const ReconstructionOutput& input) {
     // TODO(nathan) we should probably have a mutex before modifying the mesh, but
     // nothing else uses it at the moment
     ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
-    last_mesh_update_->updateMesh(*dsg_->graph->getMeshVertices(),
-                                  *dsg_->graph->getMeshStamps(),
-                                  *dsg_->graph->getMeshFaces(),
-                                  dsg_->graph->getMeshLabels().get());
+    last_mesh_update_->updateMesh(*dsg_->graph->mesh());
     invalidateMeshEdges(*last_mesh_update_);
   }  // end timing scope
 
@@ -308,8 +308,8 @@ void FrontendModule::updateObjects(const ReconstructionOutput& input) {
     return;
   }
 
-  const auto clusters = segmenter_->detect(
-      input.timestamp_ns, last_mesh_update_->getActiveIndices(), std::nullopt);
+  const auto clusters =
+      segmenter_->detect(input.timestamp_ns, *last_mesh_update_, std::nullopt);
 
   {  // start dsg critical section
     std::unique_lock<std::mutex> lock(dsg_->mutex);

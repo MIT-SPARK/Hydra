@@ -46,8 +46,6 @@
 namespace hydra {
 namespace places {
 
-using namespace voxblox;
-
 using test::compareLayers;
 using test::LayerComparisonResult;
 
@@ -107,22 +105,22 @@ class IncrementalIntegrationTestFixture : public ::testing::Test {
 
     std::cout << "Loaded " << points.size() << " points" << std::endl;
 
-    Pointcloud cloud;
-    Colors colors;
+    voxblox::Pointcloud cloud;
+    voxblox::Colors colors;
     for (const auto& point : points) {
       if (point.size() != 6) {
         continue;
       }
 
-      cloud.push_back(Point(point[0], point[1], point[2]));
-      colors.push_back(Color(static_cast<uint8_t>(point[3]),
-                             static_cast<uint8_t>(point[4]),
-                             static_cast<uint8_t>(point[5])));
+      cloud.push_back(voxblox::Point(point[0], point[1], point[2]));
+      colors.push_back(voxblox::Color(static_cast<uint8_t>(point[3]),
+                                      static_cast<uint8_t>(point[4]),
+                                      static_cast<uint8_t>(point[5])));
     }
 
     std::cout << "Using " << cloud.size() << " points" << std::endl;
 
-    Transformation identity;
+    voxblox::Transformation identity;
     // tsdf_integrator->integratePointCloud(identity, cloud, colors);
   }
 

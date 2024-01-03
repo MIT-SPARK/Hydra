@@ -153,7 +153,6 @@ bool ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
 void ReconstructionModule::fillOutput(const ReconstructionInput& input,
                                       ReconstructionOutput& output) {
   output.timestamp_ns = input.timestamp_ns;
-  output.current_position = input.world_t_body;
   pose_graph_tracker_->fillPoseGraphs(output);
   if (agent_node_measurements_.nodes.size() > 0) {
     output.agent_node_measurements.reset(new PoseGraph(agent_node_measurements_));

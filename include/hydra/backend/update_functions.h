@@ -54,14 +54,13 @@ struct UpdateInfo {
 };
 
 using MergeMap = std::map<NodeId, NodeId>;
-using MeshVertices = DynamicSceneGraph::MeshVertices;
 using LayerUpdateFunc = std::function<MergeMap(SharedDsgInfo&, const UpdateInfo&)>;
 using LayerCleanupFunc = std::function<void(const UpdateInfo&, SharedDsgInfo*)>;
 using NodeMergeFunc = std::function<void(const DynamicSceneGraph&, NodeId, NodeId)>;
 using MergeValidFunc =
     std::function<bool(const NodeAttributes*, const NodeAttributes*)>;
 using NodeUpdateFunc = std::function<void(
-    const UpdateInfo&, const MeshVertices::Ptr, NodeId, NodeAttributes*)>;
+    const UpdateInfo&, const spark_dsg::Mesh::Ptr, NodeId, NodeAttributes*)>;
 
 namespace dsg_updates {
 
@@ -90,15 +89,13 @@ struct UpdateFunctor {
 struct UpdateObjectsFunctor : public UpdateFunctor {
   UpdateObjectsFunctor();
 
-  explicit UpdateObjectsFunctor(float angle_step);
-
   Hooks hooks() const override;
 
   MergeMap call(SharedDsgInfo& dsg, const UpdateInfo& info) const override;
 
   size_t makeNodeFinders(const SceneGraphLayer& layer) const;
 
-  void updateObject(const MeshVertices::Ptr& mesh,
+  void updateObject(const spark_dsg::Mesh::Ptr& mesh,
                     NodeId node,
                     ObjectNodeAttributes& attrs) const;
 
@@ -111,7 +108,6 @@ struct UpdateObjectsFunctor : public UpdateFunctor {
   bool shouldMerge(const ObjectNodeAttributes& from_attrs,
                    const ObjectNodeAttributes& to_attrs) const;
 
-  float angle_step;
   size_t num_merges_to_consider = 1;
   bool use_active_flag = true;
   bool allow_connection_merging = false;

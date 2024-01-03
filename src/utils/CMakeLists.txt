@@ -3,6 +3,7 @@ target_sources(
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/disjoint_set.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/display_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/log_utilities.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/mesh_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/minimum_spanning_tree.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/nearest_neighbor_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/pose_graph_tracker.cpp

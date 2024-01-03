@@ -212,3 +212,5 @@ pyrightconfig.json
 *.idea
 *.ccls*
 *.vscode/
+
+compile_commands.json

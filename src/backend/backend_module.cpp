@@ -38,7 +38,9 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <kimera_pgmo/utils/MeshIO.h>
 #include <pcl/search/kdtree.h>
+#include <spark_dsg/pgmo_mesh_traits.h>
 #include <spark_dsg/zmq_interface.h>
 #include <voxblox/core/block_hash.h>
 
@@ -88,8 +90,8 @@ BackendModule::BackendModule(const BackendConfig& config,
 
   setSolverParams();
 
-  private_dsg_->graph->initMesh(true);
-  original_vertices_.reset(new pcl::PointCloud<pcl::PointXYZRGBA>());
+  private_dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>());
+  original_vertices_.reset(new pcl::PointCloud<pcl::PointXYZ>());
   deformation_graph_->setForceRecalculate(!config_.pgmo.gnc_fix_prev_inliers);
   setSolverParams();
 
@@ -163,10 +165,10 @@ void BackendModule::save(const LogSetup& log_setup) {
     saveTrajectory(optimized_path, timestamps_, csv_name);
   }
 
-  if (!private_dsg_->graph->isMeshEmpty()) {
-    kimera_pgmo::WriteMeshWithStampsToPly(backend_path + "/mesh.ply",
-                                          private_dsg_->graph->getMesh(),
-                                          *private_dsg_->graph->getMeshStamps());
+  const auto mesh = private_dsg_->graph->mesh();
+  if (mesh && !mesh->empty()) {
+    // mesh implements vertex and face traits
+    kimera_pgmo::WriteMesh(backend_path + "/mesh.ply", *mesh, *mesh);
   }
 
   deformation_graph_->update();  // Update before saving
@@ -302,12 +304,9 @@ void BackendModule::loadState(const std::string& state_path,
                               const std::string& dgrf_path) {
   const std::string mesh_path = state_path + "/mesh.ply";
 
-  pcl::PolygonMesh mesh;
-  kimera_pgmo::ReadMeshWithStampsFromPly(
-      mesh_path, mesh, private_dsg_->graph->getMeshStamps().get());
-  *private_dsg_->graph->getMeshFaces() = mesh.polygons;
-  pcl::fromPCLPointCloud2(mesh.cloud, *private_dsg_->graph->getMeshVertices());
-
+  auto mesh = std::make_shared<spark_dsg::Mesh>();
+  kimera_pgmo::ReadMesh(mesh_path, *mesh);
+  private_dsg_->graph->setMesh(mesh);
   have_new_mesh_ = true;
 
   loadDeformationGraphFromFile(dgrf_path);
@@ -357,8 +356,7 @@ void BackendModule::setSolverParams() {
 
 void BackendModule::setupDefaultFunctors() {
   using namespace dsg_updates;
-  layer_functors_[DsgLayers::OBJECTS] =
-      std::make_shared<UpdateObjectsFunctor>(config_.angle_step);
+  layer_functors_[DsgLayers::OBJECTS] = std::make_shared<UpdateObjectsFunctor>();
 
   layer_functors_[DsgLayers::PLACES] = std::make_shared<UpdatePlacesFunctor>(
       config_.places_merge_pos_threshold_m, config_.places_merge_distance_tolerance_m);
@@ -492,11 +490,10 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
     return;
   }
 
-  input.mesh_update->updateMesh(*private_dsg_->graph->getMeshVertices(),
-                                *private_dsg_->graph->getMeshStamps(),
-                                *private_dsg_->graph->getMeshFaces(),
-                                private_dsg_->graph->getMeshLabels().get());
-  input.mesh_update->updateVertices(*original_vertices_);
+  input.mesh_update->updateMesh(*private_dsg_->graph->mesh());
+  kimera_pgmo::StampedCloud<pcl::PointXYZ> cloud_out{*original_vertices_,
+                                                     vertex_stamps_};
+  input.mesh_update->updateVertices(cloud_out);
   // we use this to make sure that deformation only happens for vertices that are
   // still active
   num_archived_vertices_ = input.mesh_update->getTotalArchivedVertices();
@@ -719,7 +716,8 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
   }
 
   have_new_mesh_ = false;
-  if (private_dsg_->graph->isMeshEmpty()) {
+  auto mesh = private_dsg_->graph->mesh();
+  if (!mesh || mesh->empty()) {
     return;
   }
 
@@ -731,11 +729,12 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
   }
 
   ScopedTimer timer("backend/mesh_deformation", timestamp_ns);
-  VLOG(3) << "Deforming mesh with " << private_dsg_->graph->getMeshVertices()->size()
-          << " vertices";
-  deformation_graph_->deformPoints(*private_dsg_->graph->getMeshVertices(),
-                                   *original_vertices_,
-                                   *private_dsg_->graph->getMeshStamps(),
+  VLOG(3) << "Deforming mesh with " << mesh->numVertices() << " vertices";
+
+  kimera_pgmo::ConstStampedCloud<pcl::PointXYZ> cloud_in{*original_vertices_,
+                                                         vertex_stamps_};
+  deformation_graph_->deformPoints(*private_dsg_->graph->mesh(),
+                                   cloud_in,
                                    HydraConfig::instance().getRobotPrefix().vertex_key,
                                    deformation_graph_->getGtsamValues(),
                                    KimeraPgmoInterface::config_.num_interp_pts,

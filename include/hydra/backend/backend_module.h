@@ -193,7 +193,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   IsolatedSceneGraphLayer shared_places_copy_;
   std::unique_ptr<MergeHandler> merge_handler_;
   SharedModuleState::Ptr state_;
-  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr original_vertices_;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr original_vertices_;
+  std::vector<uint64_t> vertex_stamps_;
 
   std::list<LayerUpdateFunc> dsg_update_funcs_;
   std::list<LayerCleanupFunc> dsg_post_update_funcs_;

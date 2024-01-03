@@ -35,20 +35,20 @@
 #include "hydra/frontend/mesh_segmenter.h"
 
 #include <glog/logging.h>
+#include <kimera_pgmo/MeshDelta.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <spark_dsg/bounding_box_extraction.h>
 
 #include "hydra/common/hydra_config.h"
 #include "hydra/common/semantic_color_map.h"
+#include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
 
 using Clusters = MeshSegmenter::Clusters;
 using LabelClusters = MeshSegmenter::LabelClusters;
-using LabelIndices = MeshSegmenter::LabelIndices;
-using IndicesVector = MeshSegmenter::IndicesVector;
-using OptPosition = std::optional<Eigen::Vector3d>;
+using KdTreeT = pcl::search::KdTree<pcl::PointXYZRGBA>;
 using timing::ScopedTimer;
 
 template <typename LList, typename RList>
@@ -86,43 +86,88 @@ inline bool nodesMatch(const SceneGraphNode& lhs_node, const SceneGraphNode& rhs
 }
 
 inline bool nodesMatch(const Cluster& cluster, const SceneGraphNode& node) {
-  pcl::PointXYZ centroid;
-  cluster.centroid.get(centroid);
-
-  Eigen::Vector3f point;
-  point << centroid.x, centroid.y, centroid.z;
-
-  return node.attributes<SemanticNodeAttributes>().bounding_box.isInside(point);
+  return node.attributes<SemanticNodeAttributes>().bounding_box.isInside(
+      cluster.centroid);
 }
 
-MeshSegmenter::MeshSegmenter(const MeshSegmenterConfig& config,
-                             const MeshVertexCloud::Ptr& vertices,
-                             const std::shared_ptr<std::vector<uint32_t>>& mesh_labels)
-    : full_mesh_vertices_(vertices),
-      full_mesh_labels_(mesh_labels),
-      config_(config),
-      next_node_id_(config.prefix, 0) {
-  VLOG(1) << "[Mesh Segmenter] Detecting nodes for labels: "
-          << printLabels(config.labels);
-  for (const auto& label : config.labels) {
-    active_nodes_[label] = std::set<NodeId>();
+std::vector<size_t> getActiveIndices(const kimera_pgmo::MeshDelta& delta,
+                                     const std::optional<Eigen::Vector3d>& pos,
+                                     double horizon_m) {
+  const auto indices = delta.getActiveIndices();
+
+  std::vector<size_t> active;
+  active.reserve(indices->size());
+  if (!pos) {
+    for (const auto& idx : *indices) {
+      active.push_back(idx - delta.vertex_start);
+    }
+
+    return active;
   }
+
+  const Eigen::Vector3d root_pos = *pos;
+  for (const size_t idx : *indices) {
+    const auto delta_idx = delta.getLocalIndex(idx);
+    ;
+    const auto& p = delta.vertex_updates->at(delta_idx);
+    const Eigen::Vector3d vertex_pos(p.x, p.y, p.z);
+    if ((vertex_pos - root_pos).norm() < horizon_m) {
+      active.push_back(delta_idx);
+    }
+  }
+
+  VLOG(1) << "[Mesh Segmenter] Active indices: " << indices->size()
+          << " (used: " << active.size() << ")";
+  return active;
 }
 
-using KdTreeT = pcl::search::KdTree<pcl::PointXYZRGBA>;
+LabelIndices getLabelIndices(const MeshSegmenterConfig& config,
+                             const kimera_pgmo::MeshDelta& delta,
+                             const std::vector<size_t>& indices) {
+  CHECK(delta.hasSemantics());
+  const auto& labels = delta.semantic_updates;
 
-Clusters MeshSegmenter::findClusters(const MeshVertexCloud::Ptr& cloud,
-                                     const pcl::IndicesPtr& cloud_indices) const {
+  LabelIndices label_indices;
+  std::set<uint32_t> seen_labels;
+  for (const auto idx : indices) {
+    if (static_cast<size_t>(idx) >= labels.size()) {
+      LOG(ERROR) << "bad index " << idx << "(of " << labels.size() << ")";
+      continue;
+    }
+
+    const auto label = labels[idx];
+    seen_labels.insert(label);
+    if (!config.labels.count(label)) {
+      continue;
+    }
+
+    auto iter = label_indices.find(label);
+    if (iter == label_indices.end()) {
+      iter = label_indices.emplace(label, std::vector<size_t>()).first;
+    }
+
+    iter->second.push_back(idx);
+  }
+
+  VLOG(3) << "[Mesh Segmenter] Seen labels: " << printLabels(seen_labels);
+  return label_indices;
+}
+
+Clusters findClusters(const MeshSegmenterConfig& config,
+                      const kimera_pgmo::MeshDelta& delta,
+                      const std::vector<size_t>& indices) {
+  pcl::IndicesPtr pcl_indices(new pcl::Indices(indices.begin(), indices.end()));
+
   KdTreeT::Ptr tree(new KdTreeT());
-  tree->setInputCloud(cloud, cloud_indices);
+  tree->setInputCloud(delta.vertex_updates, pcl_indices);
 
-  pcl::EuclideanClusterExtraction<Cluster::PointT> estimator;
-  estimator.setClusterTolerance(config_.cluster_tolerance);
-  estimator.setMinClusterSize(config_.min_cluster_size);
-  estimator.setMaxClusterSize(config_.max_cluster_size);
+  pcl::EuclideanClusterExtraction<pcl::PointXYZRGBA> estimator;
+  estimator.setClusterTolerance(config.cluster_tolerance);
+  estimator.setMinClusterSize(config.min_cluster_size);
+  estimator.setMaxClusterSize(config.max_cluster_size);
   estimator.setSearchMethod(tree);
-  estimator.setInputCloud(cloud);
-  estimator.setIndices(cloud_indices);
+  estimator.setInputCloud(delta.vertex_updates);
+  estimator.setIndices(pcl_indices);
 
   std::vector<pcl::PointIndices> cluster_indices;
   estimator.extract(cluster_indices);
@@ -130,68 +175,52 @@ Clusters MeshSegmenter::findClusters(const MeshVertexCloud::Ptr& cloud,
   Clusters clusters;
   clusters.resize(cluster_indices.size());
   for (size_t k = 0; k < clusters.size(); ++k) {
-    clusters.at(k).indices = cluster_indices.at(k);
-    clusters.at(k).cloud.reset(new MeshVertexCloud());
-
+    auto& cluster = clusters.at(k);
     const auto& curr_indices = cluster_indices.at(k).indices;
-    clusters.at(k).cloud->resize(curr_indices.size());
+    for (const auto local_idx : curr_indices) {
+      cluster.indices.push_back(delta.getGlobalIndex(local_idx));
 
-    for (size_t i = 0; i < curr_indices.size(); ++i) {
-      const auto& cp = cloud->at(curr_indices.at(i));
-      clusters.at(k).cloud->at(i) = cp;
-      clusters.at(k).centroid.add(pcl::PointXYZ(cp.x, cp.y, cp.z));
+      const auto& p = delta.vertex_updates->at(local_idx);
+      const Eigen::Vector3d pos(p.x, p.y, p.z);
+      cluster.centroid += pos;
+    }
+
+    if (curr_indices.size()) {
+      cluster.centroid /= curr_indices.size();
     }
   }
 
   return clusters;
 }
 
-pcl::IndicesPtr getActiveIndices(const pcl::IndicesPtr& indices,
-                                 const OptPosition& pos,
-                                 const pcl::PointCloud<pcl::PointXYZRGBA>& mesh,
-                                 double horizon_m) {
-  pcl::IndicesPtr active_indices;
-  if (!pos) {
-    active_indices = indices;
-  } else {
-    active_indices.reset(new IndicesVector());
-    active_indices->reserve(indices->size());
-
-    const Eigen::Vector3d root_pos = *pos;
-    for (const size_t idx : *indices) {
-      const auto& p = mesh.at(idx);
-      const Eigen::Vector3d vertex_pos(p.x, p.y, p.z);
-      if ((vertex_pos - root_pos).norm() < horizon_m) {
-        active_indices->push_back(idx);
-      }
-    }
+MeshSegmenter::MeshSegmenter(const MeshSegmenterConfig& config)
+    : config_(config), next_node_id_(config.prefix, 0) {
+  VLOG(1) << "[Mesh Segmenter] Detecting nodes for labels: "
+          << printLabels(config.labels);
+  for (const auto& label : config.labels) {
+    active_nodes_[label] = std::set<NodeId>();
   }
-
-  VLOG(1) << "[Mesh Segmenter] Active mesh indices: " << indices->size()
-          << " (used: " << active_indices->size() << ")";
-  return active_indices;
 }
 
 LabelClusters MeshSegmenter::detect(uint64_t timestamp_ns,
-                                    const pcl::IndicesPtr& frontend_indices,
+                                    const kimera_pgmo::MeshDelta& delta,
                                     const std::optional<Eigen::Vector3d>& pos) {
   const auto timer_name = config_.timer_namespace + "_detection";
   ScopedTimer timer(timer_name, timestamp_ns, true, 1, false);
-  const auto active_indices = getActiveIndices(
-      frontend_indices, pos, *full_mesh_vertices_, config_.active_index_horizon_m);
+
+  const auto indices = getActiveIndices(delta, pos, config_.active_index_horizon_m);
 
   LabelClusters label_clusters;
-
-  if (active_indices->empty()) {
+  if (indices.empty()) {
     VLOG(3) << "[Mesh Segmenter] No active indices in mesh";
     return label_clusters;
   }
 
-  LabelIndices label_indices = getLabelIndices(*active_indices);
+  const auto label_indices = getLabelIndices(config_, delta, indices);
   if (label_indices.empty()) {
     VLOG(3) << "[Mesh Segmenter] No vertices found matching desired labels";
     for (const auto& callback_func : callback_funcs_) {
-      callback_func(*full_mesh_vertices_, *active_indices, label_indices);
+      callback_func(delta, indices, label_indices);
     }
     return label_clusters;
   }
@@ -201,11 +230,11 @@ LabelClusters MeshSegmenter::detect(uint64_t timestamp_ns,
       continue;
     }
 
-    if (label_indices.at(label)->size() < config_.min_cluster_size) {
+    if (label_indices.at(label).size() < config_.min_cluster_size) {
       continue;
     }
 
-    const auto clusters = findClusters(full_mesh_vertices_, label_indices.at(label));
+    const auto clusters = findClusters(config_, delta, label_indices.at(label));
 
     VLOG(3) << "[Mesh Segmenter]  - Found " << clusters.size()
             << " cluster(s) of label " << static_cast<int>(label);
@@ -213,7 +242,7 @@ LabelClusters MeshSegmenter::detect(uint64_t timestamp_ns,
   }
 
   for (const auto& callback_func : callback_funcs_) {
-    callback_func(*full_mesh_vertices_, *active_indices, label_indices);
+    callback_func(delta, indices, label_indices);
   }
 
   return label_clusters;
@@ -251,35 +280,6 @@ void MeshSegmenter::archiveOldNodes(const DynamicSceneGraph& graph,
   }
 }
 
-LabelIndices MeshSegmenter::getLabelIndices(const IndicesVector& indices) const {
-  LabelIndices label_indices;
-
-  std::set<uint32_t> seen_labels;
-  for (const auto idx : indices) {
-    if (static_cast<size_t>(idx) >= full_mesh_labels_->size()) {
-      LOG(ERROR) << "bad index " << idx << "(of " << full_mesh_labels_->size() << ")";
-      continue;
-    }
-
-    const auto label = full_mesh_labels_->at(idx);
-    seen_labels.insert(label);
-
-    if (!config_.labels.count(label)) {
-      continue;
-    }
-
-    if (!label_indices.count(label)) {
-      label_indices[label] = pcl::IndicesPtr(new IndicesVector());
-    }
-
-    label_indices[label]->push_back(idx);
-  }
-
-  VLOG(3) << "[Mesh Segmenter] Seen labels: " << printLabels(seen_labels);
-
-  return label_indices;
-}
-
 void MeshSegmenter::updateGraph(uint64_t timestamp_ns,
                                 const LabelClusters& clusters,
                                 size_t num_archived_vertices,
@@ -294,7 +294,7 @@ void MeshSegmenter::updateGraph(uint64_t timestamp_ns,
       for (const auto& prev_node_id : active_nodes_.at(label)) {
         const SceneGraphNode& prev_node = graph.getNode(prev_node_id).value();
         if (nodesMatch(cluster, prev_node)) {
-          updateNodeInGraph(cluster, prev_node, timestamp_ns);
+          updateNodeInGraph(graph, cluster, prev_node, timestamp_ns);
           matches_prev_node = true;
           break;
         }
@@ -345,14 +345,7 @@ void MeshSegmenter::mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label) {
     }
 
     if (!to_merge.empty()) {
-      pcl::IndicesPtr indices(new std::vector<int>(attrs.mesh_connections.begin(),
-                                                   attrs.mesh_connections.end()));
-      auto new_box = bounding_box::extract(
-          full_mesh_vertices_, config_.bounding_box_type, indices, config_.angle_step);
-
-      // TODO(nathan) this is not ideal, but...
-      attrs.position << new_box.world_P_center.cast<double>();
-      attrs.bounding_box = new_box;
+      updateObjectGeometry(*graph.mesh(), attrs);
     }
   }
 
@@ -369,40 +362,33 @@ std::unordered_set<NodeId> MeshSegmenter::getActiveNodes() const {
   return active_nodes;
 }
 
-void MeshSegmenter::updateNodeInGraph(const Cluster& cluster,
+void MeshSegmenter::updateNodeInGraph(DynamicSceneGraph& graph,
+                                      const Cluster& cluster,
                                       const SceneGraphNode& node,
                                       uint64_t timestamp) {
   auto& attrs = node.attributes<ObjectNodeAttributes>();
-  mergeList(attrs.mesh_connections, cluster.indices.indices);
-
-  pcl::IndicesPtr indices(new std::vector<int>(attrs.mesh_connections.begin(),
-                                               attrs.mesh_connections.end()));
-  auto new_box = bounding_box::extract(
-      full_mesh_vertices_, config_.bounding_box_type, indices, config_.angle_step);
-
-  // TODO(nathan) this is not ideal, but...
-  attrs.position << new_box.world_P_center.cast<double>();
-  attrs.bounding_box = new_box;
   attrs.last_update_time_ns = timestamp;
   attrs.is_active = true;
+
+  mergeList(attrs.mesh_connections, cluster.indices);
+  updateObjectGeometry(*graph.mesh(), attrs);
 }
 
 void MeshSegmenter::addNodeToGraph(DynamicSceneGraph& graph,
                                    const Cluster& cluster,
                                    uint32_t label,
                                    uint64_t timestamp) {
-  if (cluster.cloud->empty()) {
+  if (cluster.indices.empty()) {
     LOG(ERROR) << "Encountered empty cluster with label" << static_cast<int>(label)
                << " @ " << timestamp << "[ns]";
     return;
   }
 
   auto attrs = std::make_unique<ObjectNodeAttributes>();
+  attrs->last_update_time_ns = timestamp;
+  attrs->is_active = true;
   attrs->semantic_label = label;
   attrs->name = NodeSymbol(next_node_id_).getLabel();
-  attrs->bounding_box = bounding_box::extract(
-      cluster.cloud, config_.bounding_box_type, nullptr, config_.angle_step);
-
   const auto& label_to_name = HydraConfig::instance().getLabelToNameMap();
   auto iter = label_to_name.find(label);
   if (iter != label_to_name.end()) {
@@ -411,9 +397,8 @@ void MeshSegmenter::addNodeToGraph(DynamicSceneGraph& graph,
     VLOG(1) << "Missing semantic label from map: " << std::to_string(label);
   }
 
-  attrs->mesh_connections.insert(attrs->mesh_connections.begin(),
-                                 cluster.indices.indices.begin(),
-                                 cluster.indices.indices.end());
+  attrs->mesh_connections.insert(
+      attrs->mesh_connections.begin(), cluster.indices.begin(), cluster.indices.end());
 
   auto label_map = HydraConfig::instance().getSemanticColorMap();
   if (!label_map || !label_map->isValid()) {
@@ -424,11 +409,7 @@ void MeshSegmenter::addNodeToGraph(DynamicSceneGraph& graph,
   const auto color = label_map->getColorFromLabel(label);
   attrs->color << color.r, color.g, color.b;
 
-  pcl::PointXYZ centroid;
-  cluster.centroid.get(centroid);
-  attrs->position << centroid.x, centroid.y, centroid.z;
-  attrs->last_update_time_ns = timestamp;
-  attrs->is_active = true;
+  updateObjectGeometry(*graph.mesh(), *attrs, nullptr, config_.bounding_box_type);
 
   graph.emplaceNode(config_.layer_id, next_node_id_, std::move(attrs));
   active_nodes_.at(label).insert(next_node_id_);

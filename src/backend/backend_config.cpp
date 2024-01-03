@@ -116,7 +116,6 @@ void declare_config(HydraPgmoConfig& config) {
 void declare_config(BackendConfig& config) {
   using namespace config;
   name("BackendConfig");
-  field(config.angle_step, "angle_step");
   field(config.visualize_place_factors, "visualize_place_factors");
   field(config.enable_rooms, "enable_rooms");
   field(config.room_finder, "room_finder");

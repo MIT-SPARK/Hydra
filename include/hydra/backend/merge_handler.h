@@ -49,8 +49,6 @@ struct NodeInfo {
 
 class MergeHandler {
  public:
-  using MeshVertices = DynamicSceneGraph::MeshVertices;
-
   MergeHandler(const std::map<LayerId, dsg_updates::UpdateFunctor::Ptr>& functors,
                bool undo_allowed);
 
@@ -80,7 +78,7 @@ class MergeHandler {
                       std::map<NodeId, NodeInfo::Ptr>& cache,
                       bool check_if_present);
 
-  void updateCacheEntryFromInfo(const MeshVertices::Ptr& mesh,
+  void updateCacheEntryFromInfo(const spark_dsg::Mesh::Ptr& mesh,
                                 const UpdateInfo& info,
                                 NodeId node,
                                 NodeInfo& entry);

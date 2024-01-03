@@ -38,19 +38,6 @@
 
 namespace hydra {
 
-using MeshVertices = DynamicSceneGraph::MeshVertices;
-using MeshFaces = DynamicSceneGraph::MeshFaces;
-
-#define MAKE_POINT(cloud, x_val, y_val, z_val) \
-  {                                            \
-    pcl::PointXYZRGBA point;                   \
-    point.x = x_val;                           \
-    point.y = y_val;                           \
-    point.z = z_val;                           \
-    cloud->push_back(point);                   \
-  }                                            \
-  static_assert(true, "")
-
 namespace {
 
 inline SharedDsgInfo::Ptr makeSharedDsg() {
@@ -94,12 +81,11 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
     EXPECT_NEAR(0.0, (expected_max - result.bounding_box.max).norm(), 1.0e-7);
   }
 
-  MeshVertices::Ptr cloud(new MeshVertices);
-  MAKE_POINT(cloud, -1.0, -2.0, -3.0);
-  MAKE_POINT(cloud, 1.0, 2.0, 3.0);
-
-  std::shared_ptr<MeshFaces> faces(new MeshFaces());
-  graph.setMesh(cloud, faces);
+  auto mesh = std::make_shared<Mesh>();
+  mesh->resizeVertices(2);
+  mesh->setPos(0, Mesh::Pos(-1.0, -2.0, -3.0));
+  mesh->setPos(1, Mesh::Pos(1.0, 2.0, 3.0));
+  graph.setMesh(mesh);
 
   result.mesh_connections.push_back(0);
   result.mesh_connections.push_back(1);
@@ -169,15 +155,15 @@ TEST(DsgInterpolationTests, ObjectUpdateMergeLC) {
     EXPECT_NEAR(0.0, (expected_max1 - result1.bounding_box.max).norm(), 1.0e-7);
   }
 
-  MeshVertices::Ptr cloud(new MeshVertices);
-  MAKE_POINT(cloud, -1.0, -2.0, -3.0);
-  MAKE_POINT(cloud, 1.0, 2.0, 3.0);
+  auto mesh = std::make_shared<Mesh>();
+  mesh->resizeVertices(2);
+  mesh->setPos(0, Mesh::Pos(-1.0, -2.0, -3.0));
+  mesh->setPos(1, Mesh::Pos(1.0, 2.0, 3.0));
+  graph.setMesh(mesh);
 
   result0.mesh_connections = {0, 1};
   result1.mesh_connections = {0, 1};
 
-  std::shared_ptr<MeshFaces> faces(new MeshFaces());
-  graph.setMesh(cloud, faces);
   auto merged_nodes = functor.call(*dsg, info);
 
   {
@@ -218,12 +204,11 @@ TEST(DsgInterpolationTests, ObjectUpdateMergeNoLC) {
   graph.emplaceNode(DsgLayers::OBJECTS, 0, std::move(attrs0));
   graph.emplaceNode(DsgLayers::OBJECTS, 1, std::move(attrs1));
 
-  MeshVertices::Ptr cloud(new MeshVertices);
-  MAKE_POINT(cloud, -1.0, -2.0, -3.0);
-  MAKE_POINT(cloud, 1.0, 2.0, 3.0);
-
-  std::shared_ptr<MeshFaces> faces(new MeshFaces());
-  graph.setMesh(cloud, faces);
+  auto mesh = std::make_shared<Mesh>();
+  mesh->resizeVertices(2);
+  mesh->setPos(0, Mesh::Pos(-1.0, -2.0, -3.0));
+  mesh->setPos(1, Mesh::Pos(1.0, 2.0, 3.0));
+  graph.setMesh(mesh);
 
   const UpdateInfo info{nullptr, nullptr, false, 0, true};
   dsg_updates::UpdateObjectsFunctor functor;

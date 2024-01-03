@@ -33,43 +33,36 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <pcl/common/centroid.h>
-#include <pcl/pcl_base.h>
-#include <pcl/point_types.h>
-
 #include <memory>
 
 #include "hydra/common/dsg_types.h"
 #include "hydra/frontend/mesh_segmenter_config.h"
 
+namespace kimera_pgmo {
+class MeshDelta;
+}  // namespace kimera_pgmo
+
 namespace hydra {
 
 struct Cluster {
-  using PointT = pcl::PointXYZRGBA;
-  using CloudT = pcl::PointCloud<PointT>;
-  using CentroidT = pcl::CentroidPoint<pcl::PointXYZ>;
-  CentroidT centroid;
-  CloudT::Ptr cloud;
-  pcl::PointIndices indices;
+  Eigen::Vector3d centroid;
+  std::vector<size_t> indices;
 };
+
+using LabelIndices = std::map<uint32_t, std::vector<size_t>>;
 
 class MeshSegmenter {
  public:
-  using IndicesVector = pcl::IndicesPtr::element_type;
-  using LabelIndices = std::map<uint32_t, pcl::IndicesPtr>;
-  using MeshVertexCloud = Cluster::CloudT;
   using Clusters = std::vector<Cluster>;
   using LabelClusters = std::map<uint32_t, Clusters>;
-  using CallbackFunc = std::function<void(const MeshVertexCloud& cloud,
-                                          const IndicesVector& indices,
+  using CallbackFunc = std::function<void(const kimera_pgmo::MeshDelta& cloud,
+                                          const std::vector<size_t>& indices,
                                           const LabelIndices& label_indices)>;
 
-  MeshSegmenter(const MeshSegmenterConfig& config,
-                const MeshVertexCloud::Ptr& active_vertices,
-                const std::shared_ptr<std::vector<uint32_t>>& labels);
+  explicit MeshSegmenter(const MeshSegmenterConfig& config);
 
   LabelClusters detect(uint64_t timestamp_ns,
-                       const pcl::IndicesPtr& frontend_indices,
+                       const kimera_pgmo::MeshDelta& active,
                        const std::optional<Eigen::Vector3d>& pos);
 
   void updateGraph(uint64_t timestamp,
@@ -84,28 +77,21 @@ class MeshSegmenter {
   }
 
  private:
-  Clusters findClusters(const MeshVertexCloud::Ptr& cloud,
-                        const pcl::IndicesPtr& indices) const;
-
   void archiveOldNodes(const DynamicSceneGraph& graph, size_t num_archived_vertices);
-
-  LabelIndices getLabelIndices(const IndicesVector& indices) const;
 
   void addNodeToGraph(DynamicSceneGraph& graph,
                       const Cluster& cluster,
                       uint32_t label,
                       uint64_t timestamp);
 
-  void updateNodeInGraph(const Cluster& cluster,
+  void updateNodeInGraph(DynamicSceneGraph& graph,
+                         const Cluster& cluster,
                          const SceneGraphNode& node,
                          uint64_t timestamp);
 
   void mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label);
 
  private:
-  MeshVertexCloud::Ptr full_mesh_vertices_;
-  std::shared_ptr<std::vector<uint32_t>> full_mesh_labels_;
-
   MeshSegmenterConfig config_;
   NodeSymbol next_node_id_;
 

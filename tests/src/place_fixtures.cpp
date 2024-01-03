@@ -40,24 +40,22 @@
 #include <voxblox/integrator/tsdf_integrator.h>
 #include <voxblox/simulation/simulation_world.h>
 
-using namespace voxblox;
-
 namespace hydra {
 namespace places {
 namespace test {
 
 void EsdfTestFixture::SetUp() { setupWorld(); }
 
-void EsdfTestFixture::updateTsdfIntegrator(TsdfIntegratorBase& integrator,
+void EsdfTestFixture::updateTsdfIntegrator(voxblox::TsdfIntegratorBase& integrator,
                                            size_t index) {
-  Transformation world_T_camera = getPose(index);
+  voxblox::Transformation world_T_camera = getPose(index);
   VLOG(10) << "world_T_camera: " << std::endl << world_T_camera;
 
   Eigen::Vector2i resolution;
   resolution << depth_camera_width, depth_camera_height;
 
-  Colors colors;
-  Pointcloud camera_pointcloud;
+  voxblox::Colors colors;
+  voxblox::Pointcloud camera_pointcloud;
   world.getPointcloudFromTransform(world_T_camera,
                                    resolution,
                                    depth_camera_fov,
@@ -67,35 +65,39 @@ void EsdfTestFixture::updateTsdfIntegrator(TsdfIntegratorBase& integrator,
 
   VLOG(10) << "camera pointcloud: " << camera_pointcloud.size() << " points";
 
-  Pointcloud world_pointcloud;
-  transformPointcloud(world_T_camera.inverse(), camera_pointcloud, &world_pointcloud);
+  voxblox::Pointcloud world_pointcloud;
+  voxblox::transformPointcloud(
+      world_T_camera.inverse(), camera_pointcloud, &world_pointcloud);
   VLOG(10) << "world pointcloud: " << world_pointcloud.size() << " points";
 
   integrator.integratePointCloud(world_T_camera, world_pointcloud, colors);
 }
 
-Point EsdfTestFixture::getCenter() const { return Point(0.0, 0.0, 2.0); }
+voxblox::Point EsdfTestFixture::getCenter() const {
+  return voxblox::Point(0.0, 0.0, 2.0);
+}
 
 void EsdfTestFixture::setupWorld() {
-  world.setBounds(Point(-5.0, -5.0, -1.0), Point(5.0, 5.0, 6.0));
-  world.addObject(std::make_unique<Cylinder>(getCenter(), 2.0, 4.0, Color::Red()));
+  world.setBounds(voxblox::Point(-5.0, -5.0, -1.0), voxblox::Point(5.0, 5.0, 6.0));
+  world.addObject(std::make_unique<voxblox::Cylinder>(
+      getCenter(), 2.0, 4.0, voxblox::Color::Red()));
   world.addGroundLevel(0.0);
 }
 
-Transformation EsdfTestFixture::getPose(size_t index) const {
+voxblox::Transformation EsdfTestFixture::getPose(size_t index) const {
   double angle =
       2.0 * M_PI * (static_cast<double>(index) / static_cast<double>(num_angles));
-  Point position(
+  voxblox::Point position(
       pose_radius * std::sin(angle), pose_radius * std::cos(angle), pose_height);
 
-  Point direction = getCenter() - position;
+  voxblox::Point direction = getCenter() - position;
   double yaw = std::atan2(direction.y(), direction.x());
 
-  Quaternion rotation =
-      Quaternion(Eigen::AngleAxis<float>(yaw, Point::UnitZ()) *
-                 Eigen::AngleAxis<float>(camera_pitch, Point::UnitY()));
+  voxblox::Quaternion rotation = voxblox::Quaternion(
+      Eigen::AngleAxis<float>(yaw, voxblox::Point::UnitZ()) *
+      Eigen::AngleAxis<float>(camera_pitch, voxblox::Point::UnitY()));
 
-  return Transformation(rotation, position);
+  return voxblox::Transformation(rotation, position);
 }
 
 GvdTestFixture::GvdTestFixture() : EsdfTestFixture() {
@@ -110,14 +112,15 @@ GvdTestFixture::GvdTestFixture() : EsdfTestFixture() {
   depth_camera_height = 320;
 }
 
-Transformation GvdTestFixture::getPose(size_t) const {
+voxblox::Transformation GvdTestFixture::getPose(size_t) const {
   return EsdfTestFixture::getPose(0);
 }
 
 void GvdTestFixture::setupWorld() {
-  world.setBounds(Point(-5.0, -5.0, -1.0), Point(5.0, 5.0, 6.0));
-  world.addObject(
-      std::make_unique<Cube>(Point(0.0, 0.0, 0.0), Point(1.0, 1.0, 2.0), Color::Red()));
+  world.setBounds(voxblox::Point(-5.0, -5.0, -1.0), voxblox::Point(5.0, 5.0, 6.0));
+  world.addObject(std::make_unique<voxblox::Cube>(voxblox::Point(0.0, 0.0, 0.0),
+                                                  voxblox::Point(1.0, 1.0, 2.0),
+                                                  voxblox::Color::Red()));
   world.addGroundLevel(0.0);
 }
 

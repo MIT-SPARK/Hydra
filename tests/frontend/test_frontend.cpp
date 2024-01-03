@@ -65,7 +65,6 @@ ReconstructionOutput::Ptr getMsg(voxblox::FloatingPoint block_size = 1.5f) {
   msg->timestamp_ns = 0;
   msg->places.reset(new ActiveLayerInfo());
   msg->mesh.reset(new SemanticMeshLayer(block_size));
-  msg->current_position = Eigen::Vector3d::Zero();
   return msg;
 }
 

@@ -269,7 +269,7 @@ void MergeHandler::addNodeToCache(const SceneGraphNode& node,
   updateNodeEntry(node, *ret.first->second);
 }
 
-void MergeHandler::updateCacheEntryFromInfo(const MeshVertices::Ptr& mesh,
+void MergeHandler::updateCacheEntryFromInfo(const spark_dsg::Mesh::Ptr& mesh,
                                             const UpdateInfo& info,
                                             NodeId node,
                                             NodeInfo& entry) {
@@ -281,7 +281,7 @@ void MergeHandler::updateCacheEntryFromInfo(const MeshVertices::Ptr& mesh,
 
 void MergeHandler::updateInfoCaches(const DynamicSceneGraph& graph,
                                     const UpdateInfo& info) {
-  const auto mesh = graph.getMeshVertices();
+  const auto mesh = graph.mesh();
   if (!mesh || !info.places_values) {
     LOG(ERROR) << "[Hydra Backend] Invalid mesh or places values";
     return;
@@ -346,7 +346,7 @@ void MergeHandler::undoMerge(DynamicSceneGraph& graph,
 
     if (!info.loop_closure_detected && !entry->is_active) {
       LOG(WARNING) << "Updating archived: " << NodeSymbol(child).getLabel();
-      updateCacheEntryFromInfo(graph.getMeshVertices(), info, child, *entry);
+      updateCacheEntryFromInfo(graph.mesh(), info, child, *entry);
     }
 
     entries.emplace(child, std::move(entry));

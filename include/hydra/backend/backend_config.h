@@ -56,7 +56,6 @@ struct HydraPgmoConfig : public kimera_pgmo::KimeraPgmoConfig {
 };
 
 struct BackendConfig {
-  float angle_step = 10.0f;
   bool visualize_place_factors = true;
 
   bool enable_rooms = true;

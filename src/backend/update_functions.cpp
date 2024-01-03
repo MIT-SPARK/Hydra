@@ -36,11 +36,9 @@
 
 #include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
-#include <pcl/common/centroid.h>
-#include <pcl/point_types.h>
-#include <spark_dsg/bounding_box_extraction.h>
 
 #include "hydra/rooms/room_finder.h"
+#include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -48,7 +46,6 @@ namespace dsg_updates {
 
 using timing::ScopedTimer;
 using Node = SceneGraphNode;
-using Centroid = pcl::CentroidPoint<pcl::PointXYZ>;
 using NodeColor = SemanticNodeAttributes::ColorVector;
 using SemanticLabel = SemanticNodeAttributes::Label;
 
@@ -64,9 +61,7 @@ void filterPlace(DynamicSceneGraph& graph,
   return;
 }
 
-UpdateObjectsFunctor::UpdateObjectsFunctor() : UpdateObjectsFunctor(10.0f) {}
-
-UpdateObjectsFunctor::UpdateObjectsFunctor(float step) : angle_step(step) {}
+UpdateObjectsFunctor::UpdateObjectsFunctor() {}
 
 UpdateFunctor::Hooks UpdateObjectsFunctor::hooks() const {
   auto my_hooks = UpdateFunctor::hooks();
@@ -83,7 +78,7 @@ UpdateFunctor::Hooks UpdateObjectsFunctor::hooks() const {
                   std::placeholders::_2));
   };
   my_hooks.node_update = [this](const UpdateInfo&,
-                                const MeshVertices::Ptr mesh,
+                                const spark_dsg::Mesh::Ptr mesh,
                                 NodeId node,
                                 NodeAttributes* attrs) {
     auto oattrs = dynamic_cast<ObjectNodeAttributes*>(attrs);
@@ -127,7 +122,7 @@ size_t UpdateObjectsFunctor::makeNodeFinders(const SceneGraphLayer& layer) const
   return archived;
 }
 
-void UpdateObjectsFunctor::updateObject(const MeshVertices::Ptr& mesh,
+void UpdateObjectsFunctor::updateObject(const spark_dsg::Mesh::Ptr& mesh,
                                         NodeId node,
                                         ObjectNodeAttributes& attrs) const {
   const auto& connections = attrs.mesh_connections;
@@ -136,41 +131,20 @@ void UpdateObjectsFunctor::updateObject(const MeshVertices::Ptr& mesh,
     return;
   }
 
-  pcl::IndicesPtr indices;
+  std::vector<size_t> indices;
   if (invalid_indices) {
-    indices.reset(new std::vector<int>());
     for (const auto idx : connections) {
       if (!invalid_indices->count(idx)) {
-        indices->push_back(idx);
+        indices.push_back(idx);
       }
     }
   } else {
-    indices.reset(new std::vector<int>(connections.begin(), connections.end()));
+    indices.assign(connections.begin(), connections.end());
   }
 
-  attrs.bounding_box =
-      bounding_box::extract(mesh, attrs.bounding_box.type, indices, angle_step);
-
-  Centroid centroid;
-  for (const auto& idx : *indices) {
-    const auto& point = mesh->at(idx);
-    if (std::isnan(point.x) || std::isnan(point.y) || std::isnan(point.z)) {
-      VLOG(4) << "found nan at index: " << idx << " with point: [" << point.x << ", "
-              << point.y << ", " << point.z << "]";
-      continue;
-    }
-
-    centroid.add(pcl::PointXYZ(point.x, point.y, point.z));
-  }
-
-  if (!centroid.getSize()) {
+  if (!updateObjectGeometry(*mesh, attrs, &indices)) {
     VLOG(2) << "Invalid centroid for object " << NodeSymbol(node).getLabel();
-    return;
   }
-
-  pcl::PointXYZ pcl_pos;
-  centroid.get(pcl_pos);
-  attrs.position << pcl_pos.x, pcl_pos.y, pcl_pos.z;
 }
 
 bool UpdateObjectsFunctor::shouldMerge(const ObjectNodeAttributes& from_attrs,
@@ -215,7 +189,7 @@ MergeMap UpdateObjectsFunctor::call(SharedDsgInfo& dsg, const UpdateInfo& info) 
   }
 
   const auto& layer = graph.getLayer(DsgLayers::OBJECTS);
-  MeshVertices::Ptr mesh = graph.getMeshVertices();
+  const auto mesh = graph.mesh();
 
   const size_t archived = makeNodeFinders(layer);
 
@@ -286,7 +260,7 @@ void UpdateObjectsFunctor::mergeAttributes(const DynamicSceneGraph& graph,
                  from_indices.end(),
                  std::back_inserter(to_attrs.mesh_connections));
 
-  auto mesh = graph.getMeshVertices();
+  auto mesh = graph.mesh();
   updateObject(mesh, to, to_attrs);
 }
 
@@ -302,7 +276,7 @@ UpdateFunctor::Hooks UpdatePlacesFunctor::hooks() const {
                   std::placeholders::_2));
   };
   my_hooks.node_update = [this](const UpdateInfo& info,
-                                const MeshVertices::Ptr,
+                                const spark_dsg::Mesh::Ptr,
                                 NodeId node,
                                 NodeAttributes* attrs) {
     if (!attrs || !info.places_values) {

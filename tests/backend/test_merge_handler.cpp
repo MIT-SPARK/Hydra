@@ -48,21 +48,14 @@ void setBoundingBox(DynamicSceneGraph& graph,
                     const Eigen::Vector3f& min,
                     const Eigen::Vector3f& max,
                     bool update_node) {
-  auto vertices = graph.getMeshVertices();
+  auto mesh = graph.mesh();
   size_t index = 2 * NodeSymbol(node_id).categoryId();
-  if (vertices->size() < index + 2) {
-    vertices->resize(index + 2);
+  if (mesh->numVertices() < index + 2) {
+    mesh->resizeVertices(index + 2);
   }
 
-  auto& min_point = vertices->at(index);
-  min_point.x = min.x();
-  min_point.y = min.y();
-  min_point.z = min.z();
-
-  auto& max_point = vertices->at(index + 1);
-  max_point.x = max.x();
-  max_point.y = max.y();
-  max_point.z = max.z();
+  mesh->setPos(index, min);
+  mesh->setPos(index, max);
 
   if (!update_node) {
     return;
@@ -247,7 +240,7 @@ TEST(MergeHandlerTests, TestUndoMergePlaces) {
   graph.insertEdge("p2"_id, "p4"_id);
   graph.insertEdge("r1"_id, "p1"_id);
   graph.insertEdge("r2"_id, "p2"_id);
-  graph.initMesh();
+  graph.setMesh(std::make_shared<Mesh>());
 
   std::map<NodeId, NodeId> proposed_merges{{"p2"_id, "p1"_id}, {"p5"_id, "p1"_id}};
 
@@ -292,7 +285,7 @@ TEST(MergeHandlerTests, TestUndoMergeObjects) {
   graph.emplaceNode(DsgLayers::OBJECTS, "O2"_id, std::make_unique<ObjectAttrs>());
   graph.getNode("O1"_id)->get().attributes().is_active = false;
   graph.getNode("O2"_id)->get().attributes().is_active = true;
-  graph.initMesh();
+  graph.setMesh(std::make_shared<Mesh>());
 
   setBoundingBox(graph,
                  "O1"_id,
@@ -355,7 +348,7 @@ TEST(MergeHandlerTests, TestUpdateFromUnmergedWithUndo) {
   graph.insertEdge("p6"_id, "p4"_id);
   graph.insertEdge("r1"_id, "p1"_id);
   graph.insertEdge("r2"_id, "p2"_id);
-  graph.initMesh();
+  graph.setMesh(std::make_shared<Mesh>());
 
   // missing p5 for merge
   DynamicSceneGraph fgraph;
@@ -406,7 +399,7 @@ TEST(MergeHandlerTests, TestUndoWithNewMerge) {
   graph.emplaceNode(DsgLayers::PLACES, "p1"_id, std::make_unique<PlaceAttrs>(1.0, 2));
   graph.emplaceNode(DsgLayers::PLACES, "p2"_id, std::make_unique<PlaceAttrs>(1.0, 2));
   graph.emplaceNode(DsgLayers::PLACES, "p3"_id, std::make_unique<PlaceAttrs>(1.0, 2));
-  graph.initMesh();
+  graph.setMesh(std::make_shared<Mesh>());
 
   std::map<NodeId, NodeId> proposed_merges{{"p2"_id, "p1"_id}, {"p3"_id, "p1"_id}};
 
@@ -438,7 +431,7 @@ TEST(MergeHandlerTests, TestUndoWithValidMerge) {
   DynamicSceneGraph graph;
   graph.emplaceNode(DsgLayers::PLACES, "p1"_id, std::make_unique<PlaceAttrs>(1.0, 2));
   graph.emplaceNode(DsgLayers::PLACES, "p2"_id, std::make_unique<PlaceAttrs>(1.0, 2));
-  graph.initMesh();
+  graph.setMesh(std::make_shared<Mesh>());
 
   std::map<NodeId, NodeId> proposed_merges{{"p2"_id, "p1"_id}};
 
@@ -468,7 +461,7 @@ TEST(MergeHandlerTests, TestReset) {
   DynamicSceneGraph graph;
   graph.emplaceNode(DsgLayers::PLACES, "p1"_id, std::make_unique<PlaceAttrs>(1.0, 2));
   graph.emplaceNode(DsgLayers::PLACES, "p2"_id, std::make_unique<PlaceAttrs>(1.0, 2));
-  graph.initMesh();
+  graph.setMesh(std::make_shared<Mesh>());
 
   std::map<NodeId, NodeId> proposed_merges{{"p2"_id, "p1"_id}};
 
