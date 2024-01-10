@@ -24,12 +24,12 @@ find_package(spark_dsg REQUIRED)
 find_package(teaserpp REQUIRED)
 find_package(kimera_pgmo REQUIRED)
 find_package(voxblox REQUIRED)
+# TODO(nathan) go back to PCL_FIND_QUIETLY
+set(PCL_FIND_QUIETLY FALSE)
+find_package(PCL REQUIRED COMPONENTS common kdtree search segmentation)
 
 # private dependencies TODO(nathan) push to pose_graph_tools
 find_package(tf2_eigen REQUIRED)
-# TODO(nathan) figure out warning w.r.t. spark-dsg
-set(PCL_FIND_QUIETLY FALSE)
-find_package(PCL REQUIRED COMPONENTS common kdtree)
 
 include(GNUInstallDirs)
 include(HydraBuildConfig)
@@ -43,7 +43,8 @@ target_include_directories(
          ${OpenCV_INCLUDE_DIRS}
          ${kimera_pgmo_INCLUDE_DIRS}
          ${voxblox_INCLUDE_DIRS}
-  PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${PCL_INCLUDE_DIRS} ${tf2_eigen_INCLUE_DIRS}
+         ${PCL_INCLUDE_DIRS}
+  PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${tf2_eigen_INCLUE_DIRS}
 )
 target_link_libraries(
   ${PROJECT_NAME}
@@ -54,7 +55,8 @@ target_link_libraries(
          gtsam
          ${kimera_pgmo_LIBRARIES}
          ${voxblox_LIBRARIES}
-  PRIVATE nanoflann::nanoflann ${PCL_LIBRARIES} ${tf2_eigen_LIBRARIES}
+         ${PCL_LIBRARIES}
+  PRIVATE nanoflann::nanoflann ${tf2_eigen_LIBRARIES}
 )
 set_property(TARGET ${PROJECT_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)
 add_library(hydra::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
