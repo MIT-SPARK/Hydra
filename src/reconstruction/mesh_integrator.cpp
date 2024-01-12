@@ -339,7 +339,9 @@ void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
     const SemanticVoxel* semantic_voxel = nullptr;
     if (block->isValidVoxelIndex(c_idx)) {
       voxel = &block->getVoxelByVoxelIndex(c_idx);
-      point.vertex_voxel = &vertex_block->getVoxelByVoxelIndex(c_idx);
+      if (vertex_block) {
+        point.vertex_voxel = &vertex_block->getVoxelByVoxelIndex(c_idx);
+      }
       if (semantics) {
         semantic_voxel = &semantics->getVoxelByVoxelIndex(c_idx);
       }

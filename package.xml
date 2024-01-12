@@ -20,9 +20,12 @@
   <depend>kimera_pgmo</depend>
   <depend>tf2_eigen</depend>
   <depend>voxblox</depend>
+  <depend>pose_graph_tools</depend>
+  <depend>pose_graph_tools_ros</depend>
+  <depend>pose_graph_tools_msgs</depend>
 
   <export>
-      <build_type>cmake</build_type>
+    <build_type>cmake</build_type>
   </export>
 
 </package>

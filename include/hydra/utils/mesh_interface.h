@@ -33,29 +33,17 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <pose_graph_tools/pose_graph.h>
-#include <voxblox/core/layer.h>
-#include <voxblox/mesh/mesh_layer.h>
 
-#include <Eigen/Dense>
-#include <cstdint>
-#include <memory>
+#include <kimera_pgmo/utils/VoxbloxMeshInterface.h>
 
 #include "hydra/reconstruction/semantic_mesh_layer.h"
-#include "hydra/reconstruction/vertex_voxel.h"
 
 namespace hydra {
 
-struct ReconstructionOutput {
-  using Ptr = std::shared_ptr<ReconstructionOutput>;
-
-  uint64_t timestamp_ns;
-  SemanticMeshLayer::Ptr mesh;
-  voxblox::Layer<voxblox::TsdfVoxel>::Ptr tsdf;
-  voxblox::Layer<VertexVoxel>::Ptr occupied;
-  voxblox::BlockIndexList archived_blocks;
-  std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
-  pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements;
-};
+inline kimera_pgmo::SemanticVoxbloxMeshInterface getMeshInterface(
+    const SemanticMeshLayer& mesh_layer) {
+  return kimera_pgmo::SemanticVoxbloxMeshInterface(mesh_layer.mesh_,
+                                                   mesh_layer.semantics_);
+}
 
 }  // namespace hydra

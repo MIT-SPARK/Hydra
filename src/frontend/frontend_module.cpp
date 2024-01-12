@@ -41,12 +41,14 @@
 #include <kimera_pgmo/utils/CommonFunctions.h>
 #include <spark_dsg/pgmo_mesh_traits.h>
 #include <tf2_eigen/tf2_eigen.h>
+#include <pose_graph_tools_ros/conversions.h>
 
 #include <fstream>
 
 #include "hydra/common/hydra_config.h"
 #include "hydra/frontend/gvd_place_extractor.h"
 #include "hydra/frontend/mesh_segmenter.h"
+#include "hydra/utils/mesh_interface.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -235,10 +237,14 @@ void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
   }
 
   backend_input_.reset(new BackendInput());
-  backend_input_->pose_graphs = msg.pose_graphs;
+  for (const auto& graph : msg.pose_graphs) {
+    backend_input_->pose_graphs.push_back(
+        boost::make_shared<pose_graph_tools_msgs::PoseGraph>(
+            pose_graph_tools::toMsg(*graph)));
+  }
   if (msg.agent_node_measurements) {
     backend_input_->agent_node_measurements.reset(
-        new PoseGraph(*msg.agent_node_measurements));
+        new PoseGraph(pose_graph_tools::toMsg(*msg.agent_node_measurements)));
   }
   backend_input_->timestamp_ns = msg.timestamp_ns;
 
@@ -286,7 +292,7 @@ void FrontendModule::updateMesh(const ReconstructionOutput& input) {
     mesh_remapping_.reset(new kimera_pgmo::VoxbloxIndexMapping());
     auto mesh = input.mesh->getActiveMesh(input.archived_blocks);
     VLOG(5) << "[Hydra Frontend] Updating mesh with " << mesh->numBlocks() << " blocks";
-    auto interface = mesh->getMeshInterface();
+    auto interface = getMeshInterface(*mesh);
     last_mesh_update_ =
         mesh_compression_->update(interface, input.timestamp_ns, mesh_remapping_.get());
   }  // end timing scope
@@ -327,7 +333,7 @@ void FrontendModule::updateDeformationGraph(const ReconstructionOutput& input) {
         "frontend/dgraph_compresssion", input.timestamp_ns, true, 1, false);
     const auto time_ns = std::chrono::nanoseconds(input.timestamp_ns);
     double time_s = std::chrono::duration_cast<std::chrono::seconds>(time_ns).count();
-    auto interface = input.mesh->getMeshInterface();
+    auto interface = getMeshInterface(*input.mesh);
     mesh_frontend_.processMeshGraph(interface, time_s);
   }  // end timing scope
 
@@ -376,17 +382,15 @@ void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
         continue;
       }
 
-      Eigen::Vector3d position;
-      tf2::convert(node.pose.position, position);
-      Eigen::Quaterniond rotation;
-      tf2::convert(node.pose.orientation, rotation);
+      Eigen::Vector3d position = node.pose.translation();
+      Eigen::Quaterniond rotation(node.pose.linear());
 
       // TODO(nathan) implicit assumption that pgmo ids are sequential starting at 0
       // TODO(nathan) implicit assumption that gtsam symbol and dsg node symbol are
       // same
       NodeSymbol pgmo_key(prefix.key, node.key);
 
-      const std::chrono::nanoseconds stamp(node.header.stamp.toNSec());
+      const std::chrono::nanoseconds stamp(node.stamp_ns);
       VLOG(5) << "[Hydra Frontend] Adding agent " << agents.nodes().size() << " @ "
               << stamp.count() << " [ns] for layer " << agents.prefix.str()
               << " (key: " << node.key << ")";

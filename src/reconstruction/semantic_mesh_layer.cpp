@@ -162,8 +162,4 @@ void SemanticMeshLayer::pruneEmpty() {
 
 voxblox::MeshLayer::Ptr SemanticMeshLayer::getVoxbloxMesh() const { return mesh_; }
 
-kimera_pgmo::SemanticVoxbloxMeshInterface SemanticMeshLayer::getMeshInterface() const {
-  return kimera_pgmo::SemanticVoxbloxMeshInterface(mesh_, semantics_);
-}
-
 }  // namespace hydra

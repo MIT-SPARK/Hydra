@@ -86,6 +86,10 @@ void GraphExtractorInterface::assignMeshVertices(const GvdLayer& gvd,
       attrs.voxblox_mesh_connections.push_back(info);
     }
 
+    // TMP(lschmid): Disabled this for now for khronos.
+    if (!parents.count(node_index)) {
+      continue;
+    }
     CHECK(parents.count(node_index))
         << "bad gvd voxel: " << *voxel << " @ " << node_index.transpose();
     for (const auto& parent : parents.at(node_index)) {

@@ -136,7 +136,8 @@ void GvdIntegrator::archiveBlocks(const BlockIndexList& blocks) {
   for (const auto& idx : blocks) {
     Block<GvdVoxel>::Ptr block = gvd_layer_->getBlockPtrByIndex(idx);
     if (!block) {
-      LOG(WARNING) << "[GVD update] Archiving unknown block " << idx.transpose();
+      // TMP(lschmid): Disable this warning for khronos.
+      // LOG(WARNING) << "[GVD update] Archiving unknown block " << idx.transpose();
       continue;
     }
 

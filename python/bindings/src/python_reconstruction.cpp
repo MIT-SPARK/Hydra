@@ -55,6 +55,7 @@
 #include "hydra/bindings/python_config.h"
 #include "hydra/bindings/python_image.h"
 #include "hydra/bindings/python_sensor_input.h"
+#include "hydra/utils/mesh_interface.h"
 
 namespace hydra::python {
 
@@ -103,7 +104,7 @@ struct MeshUpdater {
       return;
     }
 
-    auto interface = mesh->getMeshInterface();
+    auto interface = getMeshInterface(*mesh);
     const auto delta = compression.update(interface, msg->timestamp_ns);
     delta->updateMesh(*graph->mesh());
     zmq_sender.send(*graph, true);

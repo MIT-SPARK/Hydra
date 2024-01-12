@@ -36,6 +36,7 @@
 
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
+#include <pose_graph_tools_ros/conversions.h>
 
 #include "hydra/common/hydra_config.h"
 #include "hydra/reconstruction/mesh_integrator.h"
@@ -155,7 +156,8 @@ void ReconstructionModule::fillOutput(const ReconstructionInput& input,
   output.timestamp_ns = input.timestamp_ns;
   pose_graph_tracker_->fillPoseGraphs(output);
   if (agent_node_measurements_.nodes.size() > 0) {
-    output.agent_node_measurements.reset(new PoseGraph(agent_node_measurements_));
+    output.agent_node_measurements.reset(new pose_graph_tools::PoseGraph(
+        pose_graph_tools::fromMsg(agent_node_measurements_)));
     agent_node_measurements_ = PoseGraph();
   }
 

@@ -33,10 +33,13 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <kimera_pgmo/utils/VoxbloxMeshInterface.h>
 #include <voxblox/mesh/mesh_layer.h>
 
 #include <memory>
+
+namespace kimera_pgmo {
+class SemanticVoxbloxMeshInterface;
+}  // namespace kimera_pgmo
 
 namespace hydra {
 
@@ -73,9 +76,10 @@ class SemanticMeshLayer {
 
   voxblox::MeshLayer::Ptr getVoxbloxMesh() const;
 
-  kimera_pgmo::SemanticVoxbloxMeshInterface getMeshInterface() const;
-
  protected:
+  friend kimera_pgmo::SemanticVoxbloxMeshInterface getMeshInterface(
+      const SemanticMeshLayer& mesh_layer);
+      
   voxblox::MeshLayer::Ptr mesh_;
   std::shared_ptr<SemanticMeshMap> semantics_;
 };

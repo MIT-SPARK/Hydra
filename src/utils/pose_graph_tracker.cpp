@@ -36,6 +36,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
+#include <pose_graph_tools_ros/conversions.h>
 #include <tf2_eigen/tf2_eigen.h>
 
 #include "hydra/common/hydra_config.h"
@@ -116,7 +117,12 @@ void PoseGraphTracker::update(const ReconstructionInput& msg) {
 
 void PoseGraphTracker::fillPoseGraphs(ReconstructionOutput& msg) {
   VLOG(10) << "[PoseGraph Tracker] queued pose graphs: " << graphs_.size();
-  msg.pose_graphs.insert(msg.pose_graphs.end(), graphs_.begin(), graphs_.end());
+  for (const auto& graph : graphs_) {
+    msg.pose_graphs.emplace_back(std::make_shared<pose_graph_tools::PoseGraph>(
+        pose_graph_tools::fromMsg(*graph)));
+  }
+  msg.pose_graphs.insert(
+      msg.pose_graphs.end(), msg.pose_graphs.begin(), msg.pose_graphs.end());
   graphs_.clear();
 }
 

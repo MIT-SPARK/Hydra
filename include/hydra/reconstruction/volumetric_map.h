@@ -167,7 +167,7 @@ class VolumetricMap {
  public:
   const Config config;
 
- private:
+ protected:
   TsdfLayer tsdf_layer_;
   SemanticMeshLayer mesh_layer_;
   SemanticLayer::Ptr semantic_layer_;
