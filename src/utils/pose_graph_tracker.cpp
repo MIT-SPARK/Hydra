@@ -121,8 +121,7 @@ void PoseGraphTracker::fillPoseGraphs(ReconstructionOutput& msg) {
     msg.pose_graphs.emplace_back(std::make_shared<pose_graph_tools::PoseGraph>(
         pose_graph_tools::fromMsg(*graph)));
   }
-  msg.pose_graphs.insert(
-      msg.pose_graphs.end(), msg.pose_graphs.begin(), msg.pose_graphs.end());
+
   graphs_.clear();
 }
 
