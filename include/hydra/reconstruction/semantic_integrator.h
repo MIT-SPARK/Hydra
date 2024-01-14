@@ -42,6 +42,8 @@
 namespace hydra {
 
 struct SemanticIntegrator {
+  virtual ~SemanticIntegrator() = default;
+
   /**
    * @brief Check whether the point should be integrated based on the label
    * Note: this discards points that should not be contained in the map, e.g., dynamic

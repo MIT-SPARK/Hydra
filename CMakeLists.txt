@@ -19,16 +19,15 @@ option(BUILD_SHARED_LIBS "Build shared libs" ON)
 find_package(config_utilities REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(GTSAM REQUIRED)
-find_package(OpenCV REQUIRED)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc)
 find_package(spark_dsg REQUIRED)
 find_package(teaserpp REQUIRED)
 find_package(kimera_pgmo REQUIRED)
 find_package(voxblox REQUIRED)
-# TODO(nathan) go back to PCL_FIND_QUIETLY
-set(PCL_FIND_QUIETLY FALSE)
-find_package(PCL REQUIRED COMPONENTS common kdtree search segmentation)
 
-# private dependencies TODO(nathan) push to pose_graph_tools
+# we turn off PCL precompile internally to get around having vtk linked
+find_package(PCL REQUIRED COMPONENTS common)
+# TODO(nathan) push to pose_graph_tools
 find_package(tf2_eigen REQUIRED)
 
 include(GNUInstallDirs)
@@ -43,8 +42,7 @@ target_include_directories(
          ${OpenCV_INCLUDE_DIRS}
          ${kimera_pgmo_INCLUDE_DIRS}
          ${voxblox_INCLUDE_DIRS}
-         ${PCL_INCLUDE_DIRS}
-  PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${tf2_eigen_INCLUE_DIRS}
+  PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${tf2_eigen_INCLUE_DIRS} ${PCL_INCLUDE_DIRS}
 )
 target_link_libraries(
   ${PROJECT_NAME}
@@ -55,8 +53,7 @@ target_link_libraries(
          gtsam
          ${kimera_pgmo_LIBRARIES}
          ${voxblox_LIBRARIES}
-         ${PCL_LIBRARIES}
-  PRIVATE nanoflann::nanoflann ${tf2_eigen_LIBRARIES}
+  PRIVATE nanoflann::nanoflann ${tf2_eigen_LIBRARIES} ${PCL_LIBRARIES}
 )
 set_property(TARGET ${PROJECT_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)
 add_library(hydra::${PROJECT_NAME} ALIAS ${PROJECT_NAME})

@@ -83,7 +83,8 @@ bool blockIsInViewFrustum(const Sensor& sensor,
                           const Eigen::Isometry3f& T_C_B) {
   const auto block_size = block.block_size();
   const auto block_diag_half = std::sqrt(3.0f) * block_size / 2.0f;
-  return blockIsInViewFrustum(block.block_index(), T_C_B, block_size, block_diag_half);
+  return blockIsInViewFrustum(
+      sensor, block.block_index(), T_C_B, block_size, block_diag_half);
 }
 
 /**

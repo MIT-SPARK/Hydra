@@ -37,7 +37,7 @@
 #include <config_utilities/config_utilities.h>
 #include <glog/logging.h>
 
-#include <opencv2/highgui.hpp>
+#include <opencv2/core.hpp>
 #include <unordered_map>
 #include <vector>
 

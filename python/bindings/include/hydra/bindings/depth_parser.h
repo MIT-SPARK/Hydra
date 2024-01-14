@@ -42,6 +42,8 @@ struct DepthParser {
   using Element = float;
   inline static constexpr int MatType = CV_32FC1;
 
+  virtual ~DepthParser() = default;
+
   virtual float read(const PythonImage& img, size_t row, size_t col) const = 0;
 
   static Ptr create(const PythonImage& img);

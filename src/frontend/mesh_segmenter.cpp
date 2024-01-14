@@ -36,7 +36,9 @@
 
 #include <glog/logging.h>
 #include <kimera_pgmo/MeshDelta.h>
+#define PCL_NO_PRECOMPILE
 #include <pcl/segmentation/extract_clusters.h>
+#undef PCL_NO_PRECOMPILE
 #include <spark_dsg/bounding_box_extraction.h>
 
 #include "hydra/common/hydra_config.h"

@@ -42,9 +42,11 @@ struct ColorParser {
   using Element = cv::Vec3b;
   inline static constexpr int MatType = CV_8UC3;
 
-  static Ptr create(const PythonImage& img);
+  virtual ~ColorParser() = default;
 
   virtual cv::Vec3b read(const PythonImage& img, size_t row, size_t col) const = 0;
+
+  static Ptr create(const PythonImage& img);
 };
 
 }  // namespace hydra::python

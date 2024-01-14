@@ -42,6 +42,8 @@ struct SensorInputPacket {
 
   explicit SensorInputPacket(uint64_t stamp) : timestamp_ns(stamp) {}
 
+  virtual ~SensorInputPacket() = default;
+
   virtual bool fillFrameData(FrameData& msg) const = 0;
 
  public:

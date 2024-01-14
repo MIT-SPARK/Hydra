@@ -42,8 +42,8 @@ class module_;
 namespace hydra {
 
 class ReconstructionModule;
-class ReconstructionInput;
-class PipelineConfig;
+struct ReconstructionInput;
+struct PipelineConfig;
 
 namespace python {
 

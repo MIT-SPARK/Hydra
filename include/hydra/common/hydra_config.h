@@ -52,7 +52,7 @@ namespace hydra {
 using ColorArray = std::array<uint8_t, 3>;
 
 // TODO(nathan) don't forward declare and use color array instead
-struct SemanticColorMap;
+class SemanticColorMap;
 
 struct FrameConfig {
   std::string robot = "base_link";

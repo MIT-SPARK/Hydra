@@ -54,7 +54,7 @@
 
 namespace hydra {
 
-class FrameData;
+struct FrameData;
 
 struct SensorExtrinsics {
   SensorExtrinsics();

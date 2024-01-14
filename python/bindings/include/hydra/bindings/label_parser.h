@@ -42,6 +42,8 @@ struct LabelParser {
   using Element = int32_t;
   inline static constexpr int MatType = CV_32SC1;
 
+  virtual ~LabelParser() = default;
+
   virtual int32_t read(const PythonImage& img, size_t row, size_t col) const = 0;
 
   static Ptr create(const PythonImage& img);

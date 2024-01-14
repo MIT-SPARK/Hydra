@@ -73,6 +73,8 @@ struct InterpolationWeights {
  */
 class ProjectionInterpolator {
  public:
+  virtual ~ProjectionInterpolator() = default;
+
   /**
    * @brief Computes the weight of neighboring pixels for a query point. This method
    * assumes that u and v are fully within the bounds of the range image, which is not

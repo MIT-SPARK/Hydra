@@ -142,8 +142,7 @@ void GvdPlaceExtractor::detect(const ReconstructionOutput& msg) {
   }
 }
 
-template <template <typename> typename Set>
-void filterInvalidNodes(const SceneGraphLayer& graph, Set<NodeId>& active_nodes) {
+void filterInvalidNodes(const SceneGraphLayer& graph, NodeIdSet& active_nodes) {
   std::list<NodeId> invalid_nodes;
   for (const NodeId active_id : active_nodes) {
     const auto& node = graph.getNode(active_id);

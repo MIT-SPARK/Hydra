@@ -75,6 +75,8 @@ struct UpdateFunctor {
     NodeUpdateFunc node_update;
   };
 
+  virtual ~UpdateFunctor() = default;
+
   virtual MergeMap call(SharedDsgInfo& dsg, const UpdateInfo& info) const = 0;
 
   virtual Hooks hooks() const {

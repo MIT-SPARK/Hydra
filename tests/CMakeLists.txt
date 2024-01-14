@@ -23,6 +23,8 @@ if(NOT TARGET gtest)
   endif()
 endif()
 
+configure_file(hydra_test_config.h.in hydra_test_config.h)
+
 add_executable(
   test_${PROJECT_NAME}
   main.cpp
@@ -62,7 +64,11 @@ add_executable(
   utils/test_pose_graph_tracker.cpp
   utils/test_timing_utilities.cpp
 )
-target_include_directories(test_${PROJECT_NAME} PUBLIC include)
+target_include_directories(
+  test_${PROJECT_NAME}
+  PUBLIC include
+  PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
+)
 target_link_libraries(test_${PROJECT_NAME} ${PROJECT_NAME} GTest::gtest_main)
 
 if(HYDRA_ENABLE_GNN)

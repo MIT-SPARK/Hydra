@@ -34,14 +34,13 @@
  * -------------------------------------------------------------------------- */
 #include "hydra_test/resources.h"
 
-#include <ros/package.h>
+#include "hydra_test_config.h"
 
-namespace hydra {
-namespace test {
+namespace hydra::test {
 
-std::string get_resource_path() {
-  return ros::package::getPath("hydra") + "/tests/resources/";
-}
+std::string get_package_path() { return HYDRA_PACKAGE_PATH; }
+
+std::string get_resource_path() { return get_package_path() + "/tests/resources/"; }
 
 std::string get_resource_path(const std::string& name) {
   return get_resource_path() + name;
@@ -51,5 +50,4 @@ std::string get_default_semantic_map() {
   return get_resource_path("test_semantic_map.csv");
 }
 
-}  // namespace test
-}  // namespace hydra
+}  // namespace hydra::test

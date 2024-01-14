@@ -41,7 +41,6 @@
 #include <gtsam/slam/BoundingConstraint.h>
 #include <gtsam/slam/dataset.h>
 #include <kimera_pgmo/DeformationGraph.h>
-#include <ros/package.h>
 #include <spark_dsg/dynamic_scene_graph.h>
 #include <yaml-cpp/yaml.h>
 
@@ -370,8 +369,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  std::string config_path =
-      ros::package::getPath("hydra_dsg_builder") + "/config/" + FLAGS_config_file;
+  std::string config_path(FLAGS_config_file);
   YAML::Node config = YAML::LoadFile(config_path);
 
   RobustSolverParams params;
