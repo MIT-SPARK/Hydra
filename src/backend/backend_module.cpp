@@ -490,7 +490,25 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
     return;
   }
 
+  // TODO(lschmid): Adds maintenance of khronos first_seen_stamps. This should
+  // definitively go into pgmo or similar, but I reallt couldn't force myself to read up
+  // on and change all pgmo interfaces...
+  const std::vector<uint64_t> prev_dsg_first_seen_stamps =
+      private_dsg_->graph->mesh()->first_seen_stamps;
   input.mesh_update->updateMesh(*private_dsg_->graph->mesh());
+  std::vector<uint64_t>& dsg_first_seen_stamps =
+      private_dsg_->graph->mesh()->first_seen_stamps;
+
+  // Fill new values.
+  for (size_t i : input.mesh_update->new_indices) {
+    dsg_first_seen_stamps[i] = input.timestamp_ns;
+  }
+
+  // // Adjust the stamps of the vertices that were updated.
+  for (const auto& [prev, curr] : input.mesh_update->prev_to_curr) {
+    dsg_first_seen_stamps[curr] = prev_dsg_first_seen_stamps[prev];
+  }
+
   kimera_pgmo::StampedCloud<pcl::PointXYZ> cloud_out{*original_vertices_,
                                                      vertex_stamps_};
   input.mesh_update->updateVertices(cloud_out);
@@ -710,7 +728,7 @@ void BackendModule::runZmqUpdates() {
 }
 
 void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
-  //deformation_graph_->update();
+  // deformation_graph_->update();
   if (!force_mesh_update && !have_new_mesh_) {
     return;
   }
