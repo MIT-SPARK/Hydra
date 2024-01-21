@@ -45,6 +45,7 @@
 #include <iomanip>
 #include <thread>
 
+#include "hydra/common/common.h"
 #include "hydra/reconstruction/marching_cubes.h"
 #include "hydra/reconstruction/volumetric_map.h"
 #include "hydra/reconstruction/voxblox_utilities.h"
@@ -113,7 +114,7 @@ void MeshIntegrator::showUpdateInfo(const VolumetricMap& map,
        << " vertices @ " << showIndex(idx);
   }
 
-  VLOG(10) << ss.str();
+  VLOG(VLEVEL_DEBUG) << ss.str();
 }
 
 void MeshIntegrator::generateMesh(VolumetricMap& map,
@@ -181,7 +182,7 @@ void MeshIntegrator::processInterior(const BlockIndexList& blocks,
   size_t list_idx;
   while (index_getter->getNextIndex(&list_idx)) {
     const auto& block_index = blocks.at(list_idx);
-    VLOG(10) << "Extracting interior for block: " << showIndex(block_index);
+    VLOG(VLEVEL_DEBUG) << "Extracting interior for block: " << showIndex(block_index);
 
     VoxelIndex v_idx;
     const int limit = map->voxels_per_side() - 1;
@@ -204,7 +205,7 @@ void MeshIntegrator::processExterior(const BlockIndexList& blocks,
   size_t list_idx;
   while (index_getter->getNextIndex(&list_idx)) {
     const auto& block_index = blocks.at(list_idx);
-    VLOG(10) << "Extracting exterior for block: " << showIndex(block_index);
+    VLOG(VLEVEL_DEBUG) << "Extracting exterior for block: " << showIndex(block_index);
     const auto vps = map->voxels_per_side();
     VoxelIndex v_idx;
 
@@ -251,7 +252,7 @@ voxblox::Block<Voxel>* maybeGetBlockPtr(Layer<Voxel>* layer, const BlockIndex& i
 void MeshIntegrator::meshBlockInterior(const BlockIndex& block_index,
                                        const VoxelIndex& index,
                                        VolumetricMap& map) const {
-  VLOG(15) << "[mesh] processing interior voxel: " << index.transpose();
+  VLOG(VLEVEL_EXTRA) << "[mesh] processing interior voxel: " << index.transpose();
   auto mesh = map.getMeshLayer().getMeshBlock(block_index);
   auto block = map.getTsdfLayer().getBlockPtrByIndex(block_index);
   if (!block || !mesh) {
@@ -314,7 +315,7 @@ BlockIndex getNeighborIndex(const BlockIndex& block_idx,
 void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
                                        const VoxelIndex& index,
                                        VolumetricMap& map) const {
-  VLOG(15) << "[mesh] processing exterior voxel: " << index.transpose();
+  VLOG(VLEVEL_EXTRA) << "[mesh] processing exterior voxel: " << index.transpose();
   auto mesh = map.getMeshLayer().getMeshBlock(block_index);
   auto block = map.getTsdfLayer().getBlockPtrByIndex(block_index);
   if (!block || !mesh) {

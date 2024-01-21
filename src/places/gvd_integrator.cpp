@@ -43,6 +43,7 @@
 // purposes notwithstanding any copyright notation herein.
 #include "hydra/places/gvd_integrator.h"
 
+#include "hydra/common/common.h"
 #include "hydra/places/compression_graph_extractor.h"
 #include "hydra/places/floodfill_graph_extractor.h"
 #include "hydra/places/gvd_utilities.h"
@@ -78,6 +79,30 @@ GvdIntegrator::GvdIntegrator(const GvdIntegratorConfig& config,
   open_.setNumBuckets(num_buckets, config_.max_distance_m);
 }
 
+void GvdIntegrator::updateFromMap(uint64_t timestamp_ns,
+                                  const VolumetricMap& map,
+                                  bool use_all_blocks) {
+  const auto& tsdf = map.getTsdfLayer();
+  BlockIndexList blocks;
+  if (use_all_blocks) {
+    tsdf.getAllAllocatedBlocks(&blocks);
+  } else {
+    tsdf.getAllUpdatedBlocks(voxblox::Update::kEsdf, &blocks);
+  }
+
+  VLOG(VLEVEL_TRACE) << "[GVD update] Propagating TSDF using " << blocks.size()
+                     << " TSDF blocks";
+  ScopedTimer timer("places/propagate_tsdf", timestamp_ns);
+  update_stats_.clear();
+
+  const auto& mesh = map.getMeshLayer();
+  const auto& occupied = *CHECK_NOTNULL(map.getOccupancyLayer());
+  for (const BlockIndex& idx : blocks) {
+    propagateSurface(idx, mesh, occupied);
+    processTsdfBlock(tsdf.getBlockByIndex(idx), idx);
+  }
+}
+
 void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
                                    Layer<TsdfVoxel>& tsdf,
                                    const Layer<VertexVoxel>& vertices,
@@ -91,7 +116,8 @@ void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
     tsdf.getAllUpdatedBlocks(voxblox::Update::kEsdf, &blocks);
   }
 
-  VLOG(1) << "[GVD update] Propagating TSDF using " << blocks.size() << " TSDF blocks";
+  VLOG(VLEVEL_TRACE) << "[GVD update] Propagating TSDF using " << blocks.size()
+                     << " TSDF blocks";
   ScopedTimer timer("places/propagate_tsdf", timestamp_ns);
   update_stats_.clear();
 
@@ -113,7 +139,7 @@ void GvdIntegrator::updateGvd(uint64_t timestamp_ns) {
   // TODO(nathan) this depends on marching cubes being called beforehand...
   ScopedTimer timer("places/overall_update", timestamp_ns);
 
-  VLOG(3) << "[GVD update] Processing open queue";
+  VLOG(VLEVEL_TRACE) << "[GVD update] Processing open queue";
   {  // timing scope
     ScopedTimer timer("places/open_queue", timestamp_ns);
     processOpenQueue();
@@ -122,14 +148,14 @@ void GvdIntegrator::updateGvd(uint64_t timestamp_ns) {
   parent_tracker_.updateVertexMapping(*gvd_layer_);
 
   if (graph_extractor_) {
-    VLOG(3) << "[GVD update] Starting graph extraction";
+    VLOG(VLEVEL_TRACE) << "[GVD update] Starting graph extraction";
     ScopedTimer timer("places/graph_extractor", timestamp_ns);
     graph_extractor_->extract(*gvd_layer_, timestamp_ns);
     graph_extractor_->assignMeshVertices(
         *gvd_layer_, parent_tracker_.parents, parent_tracker_.parent_vertices);
   }
 
-  VLOG(2) << "[GVD update]" << std::endl << update_stats_;
+  VLOG(VLEVEL_TRACE) << "[GVD update]" << std::endl << update_stats_;
 }
 
 void GvdIntegrator::archiveBlocks(const BlockIndexList& blocks) {
@@ -159,7 +185,7 @@ void GvdIntegrator::archiveBlocks(const BlockIndexList& blocks) {
       parent_tracker_.removeVoronoiFromGvdParentMap(global_index);
     }
 
-    VLOG(5) << "Removing block: " << idx.transpose();
+    VLOG(VLEVEL_FILE) << "Removing block: " << idx.transpose();
     gvd_layer_->removeBlock(idx);
   }
 }
@@ -285,15 +311,18 @@ void GvdIntegrator::propagateSurface(const BlockIndex& block_index,
       continue;
     }
 
-    resetParent(gvd_voxel);  // surface voxels don't have parents
-
     const auto vertex_idx = vertex_voxel.block_vertex_index;
     BlockIndex mesh_block_index = Eigen::Map<const BlockIndex>(vertex_voxel.mesh_block);
     const auto mesh_block = mesh.getMeshBlock(mesh_block_index);
     const auto semantics_block = mesh.getSemanticBlock(mesh_block_index);
+    if (!mesh_block) {
+      LOG_FIRST_N(ERROR, 5) << "bad mesh index: " << showIndex(mesh_block_index)
+                            << " (block: " << showIndex(block_index) << ")";
+      continue;
+    }
 
-    CHECK(mesh_block) << "bad mesh index: " << showIndex(mesh_block_index)
-                      << " (block: " << showIndex(block_index) << ")";
+    resetParent(gvd_voxel);  // surface voxels don't have parents
+
     CHECK_LT(vertex_idx, mesh_block->vertices.size())
         << "gvd block: " << block_index.transpose()
         << " mesh index: " << mesh_block_index.transpose();
@@ -346,8 +375,8 @@ void GvdIntegrator::processTsdfBlock(const Block<TsdfVoxel>& tsdf_block,
 void GvdIntegrator::updateUnobservedVoxel(const TsdfVoxel& tsdf_voxel,
                                           const GlobalIndex& index,
                                           GvdVoxel& gvd_voxel) {
-  VLOG(10) << "[gvd] updating unobserved @ " << index.transpose()
-           << " (d=" << tsdf_voxel.distance << ")";
+  VLOG(VLEVEL_DEBUG) << "[gvd] updating unobserved @ " << index.transpose()
+                     << " (d=" << tsdf_voxel.distance << ")";
   gvd_voxel.observed = true;
   gvd_voxel.is_negative = tsdf_voxel.distance < 0.0;
   update_stats_.number_new_voxels++;
@@ -356,14 +385,14 @@ void GvdIntegrator::updateUnobservedVoxel(const TsdfVoxel& tsdf_voxel,
   if (is_fixed) {
     gvd_voxel.distance = tsdf_voxel.distance;
     gvd_voxel.fixed = true;
-    VLOG(10) << "[gvd] voxel @ " << index.transpose()
-             << " pushed to queue as fixed voxel!";
+    VLOG(VLEVEL_DEBUG) << "[gvd] voxel @ " << index.transpose()
+                       << " pushed to queue as fixed voxel!";
     pushToQueue(index, gvd_voxel);
     return;
   }
 
   if (!is_fixed && gvd_voxel.on_surface) {
-    VLOG(10) << "[gvd] flipping invalid surface @ " << index.transpose();
+    VLOG(VLEVEL_DEBUG) << "[gvd] flipping invalid surface @ " << index.transpose();
     // Flip surface flag if voxel marked as containing a surface, but outside the
     // trunction distance. This shouldn't happen if the tsdf is smooth, but doesn't
     // appear that this is always the case
@@ -372,8 +401,8 @@ void GvdIntegrator::updateUnobservedVoxel(const TsdfVoxel& tsdf_voxel,
   }
 
   setDefaultDistance(gvd_voxel, default_distance_);
-  VLOG(10) << "[gvd] voxel @ " << index.transpose() << " set to default of "
-           << gvd_voxel.distance;
+  VLOG(VLEVEL_DEBUG) << "[gvd] voxel @ " << index.transpose() << " set to default of "
+                     << gvd_voxel.distance;
   gvd_voxel.fixed = false;
   // TODO(nathan) pretty sure that we don't need to enqueue here, but should think
   // carefully about Lau version
@@ -382,15 +411,16 @@ void GvdIntegrator::updateUnobservedVoxel(const TsdfVoxel& tsdf_voxel,
 void GvdIntegrator::updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
                                         const GlobalIndex& index,
                                         GvdVoxel& gvd_voxel) {
-  VLOG(10) << "[gvd] updating observed @ " << index.transpose()
-           << " (d=" << tsdf_voxel.distance << ", gd=" << gvd_voxel.distance << ")";
+  VLOG(VLEVEL_DEBUG) << "[gvd] updating observed @ " << index.transpose()
+                     << " (d=" << tsdf_voxel.distance << ", gd=" << gvd_voxel.distance
+                     << ")";
 
   // we can use this to check more intelligently for flipped voxels later
   gvd_voxel.is_negative = tsdf_voxel.distance < 0.0;
   const bool is_fixed = isTsdfFixed(tsdf_voxel);
 
   if (!gvd_voxel.on_surface && !gvd_voxel.has_parent) {
-    VLOG(10) << "[gvd] raising potential previous surface voxel";
+    VLOG(VLEVEL_DEBUG) << "[gvd] raising potential previous surface voxel";
     // raise any "cleared" voxels (equivalent to removeObstacle in Lau et al.)
     pushToQueue(index, gvd_voxel);
     gvd_voxel.fixed = is_fixed;
@@ -400,7 +430,7 @@ void GvdIntegrator::updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
 
   if (is_fixed && !gvd_voxel.fixed) {
     // flipping to fixed will always result in a smaller distance value
-    VLOG(10) << "[gvd] new fixed voxel @ " << index.transpose();
+    VLOG(VLEVEL_DEBUG) << "[gvd] new fixed voxel @ " << index.transpose();
     gvd_voxel.fixed = true;
     // okay to rewire fixed parents
     resetParent(gvd_voxel);
@@ -412,7 +442,7 @@ void GvdIntegrator::updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
 
   if (is_fixed) {
     if (std::abs(tsdf_voxel.distance - gvd_voxel.distance) <= config_.min_diff_m) {
-      VLOG(10) << "[gvd] no change @ " << index.transpose();
+      VLOG(VLEVEL_DEBUG) << "[gvd] no change @ " << index.transpose();
       return;  // hysterisis to avoid re-integrating near surfaces
     }
 
@@ -427,9 +457,9 @@ void GvdIntegrator::updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
     // the fixed layer (when not on a surface) can also raise voxels
     gvd_voxel.to_raise = !is_tsdf_lower;
 
-    VLOG(10) << "[gvd] |d| =" << d_t << ", |gd| =" << d_g;
-    VLOG(10) << "[gvd] fixed @ " << index.transpose() << ", lower: " << std::boolalpha
-             << is_tsdf_lower;
+    VLOG(VLEVEL_DEBUG) << "[gvd] |d| =" << d_t << ", |gd| =" << d_g;
+    VLOG(VLEVEL_DEBUG) << "[gvd] fixed @ " << index.transpose()
+                       << ", lower: " << std::boolalpha << is_tsdf_lower;
     return;
   }
 
@@ -444,7 +474,8 @@ void GvdIntegrator::updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
     gvd_voxel.fixed = false;
     pushToQueue(index, gvd_voxel);  // push uses distance and needs to come before raise
     setRaiseStatus(gvd_voxel, default_distance_);
-    VLOG(10) << "[gvd] raising previously fixed voxel @ " << index.transpose();
+    VLOG(VLEVEL_DEBUG) << "[gvd] raising previously fixed voxel @ "
+                       << index.transpose();
     return;
   }
 
@@ -452,7 +483,7 @@ void GvdIntegrator::updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
     return;  // no need to update if the signs match
   }
 
-  VLOG(10) << "[gvd] raising flipped voxel @ " << index.transpose();
+  VLOG(VLEVEL_DEBUG) << "[gvd] raising flipped voxel @ " << index.transpose();
   // TODO(nathan) add to tracked statistics
   // we raise any voxel where the sign flips
   pushToQueue(index, gvd_voxel);  // push uses distance and needs to come before raise
@@ -477,9 +508,9 @@ void GvdIntegrator::raiseVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
     GvdVoxel* neighbor = gvd_layer_->getVoxelPtrByGlobalIndex(neighbor_index);
 
     if (neighbor && neighbor->observed) {
-      VLOG(10) << "[gvd] checking neighbor " << *neighbor << " @ "
-               << neighbor_index.transpose() << " during raise for "
-               << index.transpose();
+      VLOG(VLEVEL_DEBUG) << "[gvd] checking neighbor " << *neighbor << " @ "
+                         << neighbor_index.transpose() << " during raise for "
+                         << index.transpose();
     }
 
     if (neighbor == nullptr || !neighbor->observed || neighbor->to_raise ||
@@ -496,8 +527,8 @@ void GvdIntegrator::raiseVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
     // starts a lower wavefront at the end of raising (see Lau et al. 33)
     // or continues propagating raise wavefront
     pushToQueue(neighbor_index, *neighbor);
-    VLOG(10) << "[gvd] pushing neighbor " << *neighbor << " @ "
-             << neighbor_index.transpose() << " to queue";
+    VLOG(VLEVEL_DEBUG) << "[gvd] pushing neighbor " << *neighbor << " @ "
+                       << neighbor_index.transpose() << " to queue";
 
     // Lau et al. 34: check to see if the parent of the neighbor still exists
     // as long as the bucket resolution is the same or less than the voxel resolution,
@@ -508,8 +539,8 @@ void GvdIntegrator::raiseVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
     const GlobalIndex neighbor_parent = Eigen::Map<const GlobalIndex>(neighbor->parent);
     GvdVoxel* parent_ptr = gvd_layer_->getVoxelPtrByGlobalIndex(neighbor_parent);
     if (parent_ptr) {
-      VLOG(10) << "[gvd] parent: " << *parent_ptr << " @ "
-               << neighbor_parent.transpose();
+      VLOG(VLEVEL_DEBUG) << "[gvd] parent: " << *parent_ptr << " @ "
+                         << neighbor_parent.transpose();
     }
 
     if (!parent_ptr || parent_ptr->on_surface) {
@@ -518,14 +549,14 @@ void GvdIntegrator::raiseVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
       continue;
     }
 
-    VLOG(10) << "[gvd] raising neighbor " << neighbor_index.transpose();
+    VLOG(VLEVEL_DEBUG) << "[gvd] raising neighbor " << neighbor_index.transpose();
     setRaiseStatus(*neighbor, default_distance_);
   }
 
   // TODO(nathan) make sure we handle raise criteria appropriately earlier
   update_stats_.number_raise_updates++;
   voxel.to_raise = false;
-  VLOG(10) << "after raise: " << voxel << " @ " << index.transpose();
+  VLOG(VLEVEL_DEBUG) << "after raise: " << voxel << " @ " << index.transpose();
 }
 
 void GvdIntegrator::lowerVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
@@ -538,10 +569,11 @@ void GvdIntegrator::lowerVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
     // processLowerSet
     if (!setFixedParent(*gvd_layer_, neighbor_indices_, voxel)) {
       update_stats_.number_fixed_no_parent++;
-      VLOG(5) << "[GVD Update] Unable to set parent for fixed voxel: " << voxel;
+      VLOG(VLEVEL_FILE) << "[GVD Update] Unable to set parent for fixed voxel: "
+                        << voxel;
       return;
     } else {
-      VLOG(10) << "set new parent: " << voxel << " @ " << index.transpose();
+      VLOG(VLEVEL_DEBUG) << "set new parent: " << voxel << " @ " << index.transpose();
     }
   }
 
@@ -588,9 +620,9 @@ void GvdIntegrator::lowerVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
       candidate.is_lower = true;
     }
 
-    VLOG(10) << "[gvd] candidate: " << candidate.distance << " for " << *neighbor
-             << " @ " << neighbor_index.transpose() << " (for " << index.transpose()
-             << ")";
+    VLOG(VLEVEL_DEBUG) << "[gvd] candidate: " << candidate.distance << " for "
+                       << *neighbor << " @ " << neighbor_index.transpose() << " (for "
+                       << index.transpose() << ")";
 
     // TODO(nathan) this used to be before calling lower, not for each neighbor. Both
     // seem correct, but this is closer to the Lau et al. paper
@@ -612,17 +644,17 @@ void GvdIntegrator::lowerVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
 
     neighbor->distance = candidate.distance;
     setSdfParent(*neighbor, voxel, index, p_v);
-    VLOG(10) << "pushing neighbor " << *neighbor << " @ " << neighbor_index.transpose()
-             << " to queue";
+    VLOG(VLEVEL_DEBUG) << "pushing neighbor " << *neighbor << " @ "
+                       << neighbor_index.transpose() << " to queue";
     pushToQueue(neighbor_index, *neighbor);
   }
 }
 
 // updateDistanceMap in "B. Lau et al., Efficient grid-based .. (2013)"
 void GvdIntegrator::processOpenQueue() {
-  VLOG(10) << "***************************************************";
-  VLOG(10) << "* Processing Open Queue                           *";
-  VLOG(10) << "***************************************************";
+  VLOG(VLEVEL_DEBUG) << "***************************************************";
+  VLOG(VLEVEL_DEBUG) << "* Processing Open Queue                           *";
+  VLOG(VLEVEL_DEBUG) << "***************************************************";
   while (!open_.empty()) {
     // TODO(nathan) potentially add telemetry
     auto entry = open_.front();
@@ -637,8 +669,8 @@ void GvdIntegrator::processOpenQueue() {
     GvdVoxel& voxel = *entry.voxel;
     const GlobalIndex& index = entry.index;
 
-    VLOG(10) << "-----------------------";
-    VLOG(10) << "processing " << voxel << " @ " << index.transpose();
+    VLOG(VLEVEL_DEBUG) << "-----------------------";
+    VLOG(VLEVEL_DEBUG) << "processing " << voxel << " @ " << index.transpose();
 
     if (voxel.to_raise) {
       voxel.to_raise = false;
@@ -652,7 +684,7 @@ void GvdIntegrator::processOpenQueue() {
     // (i.e., fixed voxels that still need an assigned parent)
     if ((!voxel.has_parent && !voxel.fixed) || !voxel.observed) {
       update_stats_.number_lower_skipped++;
-      VLOG(10) << "skipped";
+      VLOG(VLEVEL_DEBUG) << "skipped";
       continue;
     }
 

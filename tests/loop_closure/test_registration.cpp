@@ -32,8 +32,9 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
+#include <glog/logging.h>
 #include <gtest/gtest.h>
-#include <hydra/loop_closure/registration.h>
+#include <hydra/loop_closure/teaser_registration.h>
 
 namespace hydra {
 namespace lcd {
@@ -71,7 +72,7 @@ struct LayerRegistrationTests : public ::testing::Test {
       dest_attrs->position = dest_points.col(i);
       dest_layer->emplaceNode(i, std::move(dest_attrs));
 
-      node_ids.push_back(i);
+      node_ids.insert(i);
     }
   }
 
@@ -81,7 +82,7 @@ struct LayerRegistrationTests : public ::testing::Test {
   Eigen::Matrix3d dest_R_src;
   Eigen::Vector3d dest_t_src;
 
-  std::list<NodeId> node_ids;
+  std::set<NodeId> node_ids;
   std::unique_ptr<IsolatedSceneGraphLayer> src_layer;
   std::unique_ptr<IsolatedSceneGraphLayer> dest_layer;
 
@@ -276,7 +277,7 @@ TEST_F(LayerRegistrationTests, TestSemanticRegistration) {
 }
 
 TEST_F(GraphRegistrationTests, TestFullObjectRegistration) {
-  DsgRegistrationInput match;
+  GraphRegistrationInput match;
   for (int i = 0; i < src_points.cols(); ++i) {
     match.query_nodes.insert(NodeSymbol('O', i + src_points.cols()));
     match.match_nodes.insert(NodeSymbol('O', i));
@@ -285,9 +286,9 @@ TEST_F(GraphRegistrationTests, TestFullObjectRegistration) {
   match.query_root = NodeSymbol('p', src_points.cols());
   match.match_root = NodeSymbol('p', 0);
 
-  teaser::RobustRegistrationSolver::Params params;
-  reg_config.use_pairwise_registration = false;
-  DsgTeaserSolver solver(DsgLayers::OBJECTS, reg_config, params);
+  GraphTeaserSolver::Config config;
+  config.use_pairwise_registration = false;
+  GraphTeaserSolver solver(config, DsgLayers::OBJECTS);
 
   auto result = solver.solve(*dsg, match, NodeSymbol('a', 1));
   EXPECT_TRUE(result.valid);
@@ -297,7 +298,7 @@ TEST_F(GraphRegistrationTests, TestFullObjectRegistration) {
 }
 
 TEST_F(GraphRegistrationTests, TestFullObjectRegistrationWithSubgraphExtraction) {
-  DsgRegistrationInput match;
+  GraphRegistrationInput match;
   for (int i = 0; i < src_points.cols(); ++i) {
     match.query_nodes.insert(NodeSymbol('O', i + src_points.cols()));
     match.match_nodes.insert(NodeSymbol('O', i));
@@ -306,9 +307,9 @@ TEST_F(GraphRegistrationTests, TestFullObjectRegistrationWithSubgraphExtraction)
   match.query_root = NodeSymbol('p', src_points.cols());
   match.match_root = NodeSymbol('p', 0);
 
-  teaser::RobustRegistrationSolver::Params params;
-  reg_config.use_pairwise_registration = false;
-  DsgTeaserSolver solver(DsgLayers::OBJECTS, reg_config, params);
+  GraphTeaserSolver::Config config;
+  config.use_pairwise_registration = false;
+  GraphTeaserSolver solver(config, DsgLayers::OBJECTS);
 
   auto result = solver.solve(*dsg, match, NodeSymbol('a', 1));
   EXPECT_TRUE(result.valid);
@@ -318,7 +319,7 @@ TEST_F(GraphRegistrationTests, TestFullObjectRegistrationWithSubgraphExtraction)
 }
 
 TEST_F(GraphRegistrationTests, DISABLED_TestFullPlaceRegistration) {
-  DsgRegistrationInput match;
+  GraphRegistrationInput match;
   for (int i = 0; i < src_points.cols(); ++i) {
     match.query_nodes.insert(NodeSymbol('p', i + src_points.cols()));
     match.match_nodes.insert(NodeSymbol('p', i));
@@ -327,24 +328,20 @@ TEST_F(GraphRegistrationTests, DISABLED_TestFullPlaceRegistration) {
   match.query_root = NodeSymbol('p', src_points.cols());
   match.match_root = NodeSymbol('p', 0);
 
-  teaser::RobustRegistrationSolver::Params params;
-  reg_config.use_pairwise_registration = true;
-  reg_config.recreate_subgraph = true;
+  GraphTeaserSolver::Config config;
+  config.use_pairwise_registration = true;
+  config.recreate_subgraph = true;
   // no connection between subgraphs, so large radius should get all nodes in the
   // original sets
-  reg_config.subgraph_extraction.fixed_radius = true;
-  reg_config.subgraph_extraction.max_radius_m = 500.0;
-  DsgTeaserSolver solver(DsgLayers::PLACES, reg_config, params);
+  config.subgraph_extraction.fixed_radius = true;
+  config.subgraph_extraction.max_radius_m = 500.0;
+  GraphTeaserSolver solver(config, DsgLayers::PLACES);
 
   auto result = solver.solve(*dsg, match, NodeSymbol('a', 1));
   EXPECT_TRUE(result.valid);
   EXPECT_EQ(NodeSymbol('a', 1), result.from_node);
   EXPECT_EQ(NodeSymbol('a', 0), result.to_node);
   EXPECT_NEAR(0.0, getPoseDistance(to_T_from, result), 1.0e-3);
-
-  solver.config.subgraph_extraction.max_radius_m = -1;
-  auto invalid_result = solver.solve(*dsg, match, NodeSymbol('a', 1));
-  EXPECT_FALSE(invalid_result.valid);
 }
 
 TEST_F(LayerRegistrationTests, TestRepeatedRegistration) {
@@ -368,9 +365,9 @@ TEST_F(LayerRegistrationTests, TestRepeatedRegistration) {
 
   ASSERT_TRUE(solution.valid);
 
-  std::list<NodeId> partial_list;
+  std::set<NodeId> partial_list;
   for (size_t i = 0; i < 10; ++i) {
-    partial_list.push_back(i);
+    partial_list.insert(i);
   }
 
   LayerRegistrationProblem problem2;

@@ -51,12 +51,14 @@ struct FrameData {
   cv::Mat depth_image;
   cv::Mat label_image;
   cv::Mat range_image;
-  cv::Mat points;
+  cv::Mat vertex_map;
   bool points_in_world_frame = false;
   float min_range = 0.0f;
   float max_range = std::numeric_limits<float>::infinity();
 
  public:
+  virtual ~FrameData() = default;
+
   /**
    * @brief check that we have enough data to round out the rest of the information
    */
@@ -66,6 +68,8 @@ struct FrameData {
    * @brief make sure that all the images are of the right type
    */
   virtual bool normalizeData();
+
+  virtual bool normalizeDepth();
 
   template <typename T = double>
   Eigen::Transform<T, 3, Eigen::Isometry> getSensorPose(const Sensor& sensor) const {

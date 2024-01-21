@@ -1,7 +1,0 @@
----
-frontend:
-  type: FrontendModule
-backend:
-  type: BackendModule
-reconstruction:
-  type: ReconstructionModule

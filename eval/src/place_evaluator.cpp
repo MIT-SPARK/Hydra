@@ -39,6 +39,8 @@
 #include <glog/logging.h>
 #include <voxblox/io/layer_io.h>
 
+#include "hydra/common/common.h"
+
 namespace hydra::eval {
 
 using places::GvdIntegratorConfig;
@@ -57,7 +59,7 @@ PlaceEvaluator::PlaceEvaluator(const GvdIntegratorConfig& config,
 void PlaceEvaluator::computeGroundTruth(const GvdIntegratorConfig& config) {
   config_ = config;
 
-  VLOG(1) << "using GVD config:" << std::endl << config_;
+  VLOG(VLEVEL_INFO) << "using GVD config:" << std::endl << config_;
   ComboIntegrator integrator(config_, gvd_);
   // enable occupancy (required for gvd) but not semantics
   auto map = VolumetricMap::fromTsdf(*tsdf_, 0.3, false, true);

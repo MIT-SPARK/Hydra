@@ -2,6 +2,7 @@ target_sources(
   ${PROJECT_NAME}
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/camera.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/combo_integrator.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/data_receiver.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/frame_data.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/lidar.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/marching_cubes.cpp
@@ -12,6 +13,7 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/projective_integrator_config.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/reconstruction_config.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/reconstruction_module.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/reconstruction_output.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/semantic_mesh_layer.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/semantic_integrator.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/sensor.cpp

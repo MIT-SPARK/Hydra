@@ -35,6 +35,7 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include "hydra/common/common.h"
 #include "hydra/eval/room_evaluator.h"
 
 DEFINE_string(tsdf_file, "", "tsdf file to read");
@@ -75,6 +76,6 @@ int main(int argc, char* argv[]) {
     LOG(FATAL) << "Unable to evaluate invalid graph!";
   }
 
-  VLOG(1) << metrics;
+  VLOG(VLEVEL_INFO) << metrics;
   return 0;
 }

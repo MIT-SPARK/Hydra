@@ -73,7 +73,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
                                             size_t timestamp_ns)>;
 
   BackendModule(const BackendConfig& config,
-                const SharedDsgInfo::Ptr& dsg,
                 const SharedDsgInfo::Ptr& backend_dsg,
                 const SharedModuleState::Ptr& state,
                 const LogSetup::Ptr& logs = nullptr);
@@ -188,7 +187,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   std::unordered_map<NodeId, Eigen::Vector3d> place_pos_cache_;
 
-  SharedDsgInfo::Ptr shared_dsg_;
   SharedDsgInfo::Ptr private_dsg_;
   IsolatedSceneGraphLayer shared_places_copy_;
   std::unique_ptr<MergeHandler> merge_handler_;
@@ -222,7 +220,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
       config::RegistrationWithConfig<BackendModule,
                                      BackendModule,
                                      BackendConfig,
-                                     SharedDsgInfo::Ptr,
                                      SharedDsgInfo::Ptr,
                                      SharedModuleState::Ptr,
                                      LogSetup::Ptr>("BackendModule");

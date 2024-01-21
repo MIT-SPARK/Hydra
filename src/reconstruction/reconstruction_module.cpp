@@ -38,6 +38,7 @@
 #include <config_utilities/validation.h>
 #include <pose_graph_tools_ros/conversions.h>
 
+#include "hydra/common/common.h"
 #include "hydra/common/hydra_config.h"
 #include "hydra/reconstruction/mesh_integrator.h"
 #include "hydra/reconstruction/projective_integrator.h"
@@ -45,24 +46,21 @@
 
 namespace hydra {
 
-using pose_graph_tools_msgs::PoseGraph;
 using timing::ScopedTimer;
 using voxblox::BlockIndexList;
 using voxblox::Layer;
 
 ReconstructionModule::ReconstructionModule(const ReconstructionConfig& config,
                                            const OutputQueue::Ptr& output_queue)
-    : config_(config::checkValid(config)),
-      sensor_(config_.sensor.create()),
+    : config(config::checkValid(config)),
       num_poses_received_(0),
-      pose_graph_tracker_(new PoseGraphTracker(config.pose_graphs)),
       output_queue_(output_queue) {
   queue_.reset(new ReconstructionInputQueue());
-  queue_->max_size = config_.max_input_queue_size;
+  queue_->max_size = config.max_input_queue_size;
 
   map_.reset(new VolumetricMap(HydraConfig::instance().getMapConfig(), true, true));
-  tsdf_integrator_ = std::make_unique<ProjectiveIntegrator>(config_.tsdf);
-  mesh_integrator_ = std::make_unique<MeshIntegrator>(config_.mesh);
+  tsdf_integrator_ = std::make_unique<ProjectiveIntegrator>(config.tsdf);
+  mesh_integrator_ = std::make_unique<MeshIntegrator>(config.mesh);
 }
 
 ReconstructionModule::~ReconstructionModule() { stop(); }
@@ -76,17 +74,18 @@ void ReconstructionModule::stop() {
   should_shutdown_ = true;
 
   if (spin_thread_) {
-    VLOG(2) << "[Hydra Reconstruction] stopping reconstruction!";
+    VLOG(VLEVEL_TRACE) << "[Hydra Reconstruction] stopping reconstruction!";
     spin_thread_->join();
     spin_thread_.reset();
-    VLOG(2) << "[Hydra Reconstruction] stopped!";
+    VLOG(VLEVEL_TRACE) << "[Hydra Reconstruction] stopped!";
   }
 
-  VLOG(2) << "[Hydra Reconstruction] input queue: " << queue_->size();
+  VLOG(VLEVEL_TRACE) << "[Hydra Reconstruction] input queue: " << queue_->size();
   if (output_queue_) {
-    VLOG(2) << "[Hydra Reconstruction] output queue: " << output_queue_->size();
+    VLOG(VLEVEL_TRACE) << "[Hydra Reconstruction] output queue: "
+                       << output_queue_->size();
   } else {
-    VLOG(2) << "[Hydra Reconstruction] output queue: n/a";
+    VLOG(VLEVEL_TRACE) << "[Hydra Reconstruction] output queue: n/a";
   }
 }
 
@@ -94,7 +93,7 @@ void ReconstructionModule::save(const LogSetup&) {}
 
 std::string ReconstructionModule::printInfo() const {
   std::stringstream ss;
-  ss << std::endl << config::toString(config_);
+  ss << std::endl << config::toString(config);
   return ss.str();
 }
 
@@ -137,91 +136,52 @@ bool ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
   }
 
   ScopedTimer timer("places/spin", msg.timestamp_ns);
-  VLOG(2) << "[Hydra Reconstruction]: Processing msg @ " << msg.timestamp_ns;
-  VLOG(2) << "[Hydra Reconstruction]: " << queue_->size() << " message(s) left";
-
-  pose_graph_tracker_->update(msg);
-  if (msg.agent_node_measurements) {
-    agent_node_measurements_ = *msg.agent_node_measurements;
-  }
+  VLOG(VLEVEL_TRACE) << "[Hydra Reconstruction]: Processing msg @ " << msg.timestamp_ns;
+  VLOG(VLEVEL_TRACE) << "[Hydra Reconstruction]: " << queue_->size()
+                     << " message(s) left";
 
   ++num_poses_received_;
-  const bool do_full_update = (num_poses_received_ % config_.num_poses_per_update == 0);
+  const bool do_full_update = (num_poses_received_ % config.num_poses_per_update == 0);
   update(msg, do_full_update);
   return do_full_update;
 }
 
-void ReconstructionModule::fillOutput(const ReconstructionInput& input,
-                                      ReconstructionOutput& output) {
-  output.timestamp_ns = input.timestamp_ns;
-  pose_graph_tracker_->fillPoseGraphs(output);
-  if (agent_node_measurements_.nodes.size() > 0) {
-    output.agent_node_measurements.reset(new pose_graph_tools::PoseGraph(
-        pose_graph_tools::fromMsg(agent_node_measurements_)));
-    agent_node_measurements_ = PoseGraph();
+void ReconstructionModule::fillOutput(ReconstructionOutput& msg) {
+  msg.setMap(*map_);
+
+  if (!config.clear_distant_blocks) {
+    return;
   }
 
-  // note that this is pre-archival
-  map_->getMeshLayer().merge(output.mesh);
-  if (config_.copy_dense_representations) {
-    mergeLayer(map_->getTsdfLayer(), output.tsdf);
-    mergeLayer(*map_->getOccupancyLayer(), output.occupied);
-  }
-
-  if (config_.clear_distant_blocks) {
-    const auto to_archive = findBlocksToArchive(input.world_t_body.cast<float>());
-    output.archived_blocks.insert(
-        output.archived_blocks.end(), to_archive.begin(), to_archive.end());
-    map_->removeBlocks(to_archive);
-  }
-}
-
-ReconstructionModule::OutputMsgStatus ReconstructionModule::getNextOutputMessage() {
-  if (!output_queue_) {
-    return {std::make_shared<ReconstructionOutput>(), false};
-  }
-
-  // this is janky, but avoid pushing updates to queue if there's already stuff there
-  const auto curr_size = output_queue_->size();
-  if (curr_size >= 1) {
-    if (!pending_output_) {
-      pending_output_ = std::make_shared<ReconstructionOutput>();
-    }
-
-    return {pending_output_, true};
-  }
-
-  if (pending_output_) {
-    auto to_return = pending_output_;
-    pending_output_.reset();
-    return {to_return, false};
-  }
-
-  return {std::make_shared<ReconstructionOutput>(), false};
+  const auto indices = findBlocksToArchive(msg.world_t_body.cast<float>());
+  msg.archived_blocks.insert(msg.archived_blocks.end(), indices.begin(), indices.end());
+  map_->removeBlocks(indices);
 }
 
 bool ReconstructionModule::update(const ReconstructionInput& msg, bool full_update) {
-  VLOG(1) << "[Hydra Reconstruction] starting " << ((full_update) ? "full" : "partial")
-          << " update @ " << msg.timestamp_ns << " [ns]";
-  FrameData data;
-  if (!msg.fillFrameData(data)) {
+  VLOG(VLEVEL_TRACE) << "[Hydra Reconstruction] starting "
+                     << ((full_update) ? "full" : "partial") << " update @ "
+                     << msg.timestamp_ns << " [ns]";
+  CHECK(msg.sensor);
+  auto data = std::make_shared<FrameData>();
+  if (!msg.fillFrameData(*data)) {
     LOG(ERROR) << "[Hydra Reconstruction] unable to construct valid input packet!";
     return false;
   }
 
-  if (!data.normalizeData()) {
+  if (!data->normalizeData()) {
     LOG(ERROR) << "[Hydra Reconstruction] unable to convert all data";
     return false;
   }
 
-  if (!sensor_->finalizeRepresentations(data)) {
+  if (!msg.sensor->finalizeRepresentations(*data)) {
     LOG(ERROR) << "[Hydra Reconstruction] unable to compute inputs for integration";
     return false;
   }
 
   {  // timing scope
     ScopedTimer timer("places/tsdf", msg.timestamp_ns);
-    tsdf_integrator_->updateMap(*sensor_, data, *map_);
+    tsdf_integrator_->updateMap(*msg.sensor, *data, *map_);
   }  // timing scope
 
   if (map_->getTsdfLayer().getNumberOfAllocatedBlocks() == 0) {
@@ -237,27 +197,24 @@ bool ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
     return false;
   }
 
-  if (config_.show_stats) {
-    VLOG(config_.stats_verbosity) << "Memory used: {" << map_->printStats() << "}";
+  if (config.show_stats) {
+    VLOG(config.stats_verbosity) << "Memory used: {" << map_->printStats() << "}";
   }
 
-  auto&& [output, is_pending] = getNextOutputMessage();
-  fillOutput(msg, *output);
-  if (output_queue_ && !is_pending) {
-    output_queue_->push(output);
-  } else {
-    VLOG(1)
-        << "[Hydra Reconstruction] Merging pending updates because frontend is slow!";
-  }
+  auto output = ReconstructionOutput::fromInput(msg);
+  output->sensor_data = data;
+  fillOutput(*output);
 
-  VLOG(5) << "[Hydra Reconstruction] Exported " << output->pose_graphs.size()
-          << " pose graphs";
   for (const auto& callback : output_callbacks_) {
     callback(*output);
   }
 
+  if (output_queue_) {
+    output_queue_->push(output);
+  }
+
   for (const auto& callback : visualization_callbacks_) {
-    callback(msg.timestamp_ns, data.getSensorPose(*sensor_), map_->getTsdfLayer());
+    callback(msg.timestamp_ns, data->getSensorPose(*msg.sensor), map_->getTsdfLayer());
   }
 
   auto& tsdf = map_->getTsdfLayer();
@@ -282,7 +239,7 @@ BlockIndexList ReconstructionModule::findBlocksToArchive(
   BlockIndexList to_archive;
   for (const auto& idx : blocks) {
     auto block = tsdf.getBlockPtrByIndex(idx);
-    if ((center - block->origin()).norm() < config_.dense_representation_radius_m) {
+    if ((center - block->origin()).norm() < config.dense_representation_radius_m) {
       continue;
     }
 

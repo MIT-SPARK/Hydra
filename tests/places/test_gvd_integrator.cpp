@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
+#include <hydra/common/common.h>
 #include <hydra/places/gvd_utilities.h>
 #include <hydra/reconstruction/combo_integrator.h>
 
@@ -148,8 +149,8 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
   expected.is_voronoi(0, 2) = 1.0;
   expected.is_voronoi(1, 2) = 1.0;
 
-  VLOG(1) << "Result: " << result;
-  VLOG(1) << "Expected: " << expected;
+  VLOG(VLEVEL_INFO) << "Result: " << result;
+  VLOG(VLEVEL_INFO) << "Expected: " << expected;
 
   for (int r = 0; r < expected.is_voronoi.rows(); ++r) {
     for (int c = 0; c < expected.is_voronoi.cols(); ++c) {
@@ -160,7 +161,7 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
     }
   }
 
-  VLOG(1) << "Perturbing GVD: (3, 2) -> 10.0, (7, 2) -> 0.0";
+  VLOG(VLEVEL_INFO) << "Perturbing GVD: (3, 2) -> 10.0, (7, 2) -> 0.0";
 
   // raise the middle obstacle and lower one on the side
   setTsdfVoxel(3, 2, 10.0);
@@ -206,8 +207,8 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
     }
   }
 
-  VLOG(1) << "Result: " << result;
-  VLOG(1) << "Expected: " << expected;
+  VLOG(VLEVEL_INFO) << "Result: " << result;
+  VLOG(VLEVEL_INFO) << "Expected: " << expected;
 }
 
 TEST_F(TestFixture2d, NegativeIntegrationCorrect) {
@@ -263,7 +264,7 @@ TEST_F(TestFixture2d, NegativeIntegrationCorrect) {
     }
   }
 
-  VLOG(1) << "Result: " << result;
+  VLOG(VLEVEL_INFO) << "Result: " << result;
   GvdResult expected(8, 8);
   // clang-format off
   expected.distances << -2.83, -2.24, -2.00, -2.00, -2.00, -2.00, -2.24, -2.83,

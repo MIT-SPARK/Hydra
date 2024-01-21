@@ -38,6 +38,7 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 
+#include "hydra/common/common.h"
 #include "hydra/common/semantic_color_map.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -166,7 +167,7 @@ void HydraConfig::initFromConfig(const PipelineConfig& config, int robot_id) {
   }
 
   if (label_colormap_) {
-    VLOG(1) << "Loaded label space colors:" << std::endl << *label_colormap_;
+    VLOG(VLEVEL_TRACE) << "Loaded label space colors:" << std::endl << *label_colormap_;
   }
 }
 

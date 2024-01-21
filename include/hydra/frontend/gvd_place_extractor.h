@@ -41,7 +41,6 @@
 #include "hydra/frontend/place_extractor_interface.h"
 #include "hydra/places/gvd_integrator_config.h"
 #include "hydra/places/gvd_voxel.h"
-#include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/utils/log_utilities.h"
 
 namespace hydra {
@@ -72,6 +71,10 @@ class GvdPlaceExtractor : public PlaceExtractorInterface {
                                 double freespace_distance_m) const override;
 
   void detect(const ReconstructionOutput& msg) override;
+
+  void detect(uint64_t timestamp_ns,
+              const VolumetricMap& map,
+              const voxblox::BlockIndexList& archived_blocks) override;
 
   void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) override;
 

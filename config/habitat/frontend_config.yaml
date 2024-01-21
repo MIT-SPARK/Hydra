@@ -1,4 +1,5 @@
 ---
+type: FrontendModule
 pgmo:
   horizon: 15.0
   track_mesh_graph_mapping: true

@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/frontend/gvd_place_extractor.h"
 
+#include "hydra/common/common.h"
 #include "hydra/common/hydra_config.h"
 #include "hydra/places/graph_extractor_interface.h"
 #include "hydra/places/gvd_integrator.h"
@@ -116,30 +117,35 @@ std::vector<bool> GvdPlaceExtractor::inFreespace(const PositionMatrix& positions
   return flags;
 }
 
-void GvdPlaceExtractor::detect(const ReconstructionOutput& msg) {
-  if (!msg.tsdf || !msg.mesh || !msg.occupied) {
+void GvdPlaceExtractor::detect(uint64_t timestamp_ns,
+                               const VolumetricMap& map,
+                               const voxblox::BlockIndexList& archived_blocks) {
+  if (!map.getOccupancyLayer()) {
     LOG(ERROR) << "Cannot extract places from invalid input";
     return;
   }
 
+  auto& tsdf = map.getTsdfLayer();
   if (!gvd_) {
-    gvd_.reset(
-        new Layer<GvdVoxel>(msg.tsdf->voxel_size(), msg.tsdf->voxels_per_side()));
+    gvd_.reset(new Layer<GvdVoxel>(tsdf.voxel_size(), tsdf.voxels_per_side()));
     gvd_integrator_.reset(new GvdIntegrator(gvd_config_, gvd_, graph_extractor_));
   }
 
   {  // start critical section
     std::unique_lock<std::mutex> lock(gvd_mutex_);
-    ScopedTimer timer("places/gvd", msg.timestamp_ns);
-    gvd_integrator_->updateFromTsdf(
-        msg.timestamp_ns, *msg.tsdf, *msg.occupied, *msg.mesh, true);
-    gvd_integrator_->updateGvd(msg.timestamp_ns);
-    gvd_integrator_->archiveBlocks(msg.archived_blocks);
+    ScopedTimer timer("places/gvd", timestamp_ns);
+    gvd_integrator_->updateFromMap(timestamp_ns, map);
+    gvd_integrator_->updateGvd(timestamp_ns);
+    gvd_integrator_->archiveBlocks(archived_blocks);
   }  // end critical section
 
   for (const auto& callback : visualization_callbacks_) {
-    callback(msg.timestamp_ns, *gvd_, graph_extractor_.get());
+    callback(timestamp_ns, *gvd_, graph_extractor_.get());
   }
+}
+
+void GvdPlaceExtractor::detect(const ReconstructionOutput& msg) {
+  detect(msg.timestamp_ns, msg.map(), msg.archived_blocks);
 }
 
 void filterInvalidNodes(const SceneGraphLayer& graph, NodeIdSet& active_nodes) {
@@ -184,8 +190,8 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& gr
   active_nodes_ = graph_extractor_->getActiveNodes();
   const auto& places = graph_extractor_->getGraph();
   filterInvalidNodes(places, active_nodes_);
-  VLOG(3) << "[Hydra Frontend] Considering " << active_nodes_.size()
-          << " input place nodes ";
+  VLOG(VLEVEL_TRACE) << "[Hydra Frontend] Considering " << active_nodes_.size()
+                     << " input place nodes ";
 
   NodeIdSet active_neighborhood = active_nodes_;
   for (const auto& node_id : graph_extractor_->getDeletedNodes()) {

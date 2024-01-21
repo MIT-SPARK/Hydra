@@ -33,43 +33,55 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/reconstruction/reconstruction_input.h>
+#include <hydra/common/shared_module_state.h>
 #include <hydra/reconstruction/reconstruction_output.h>
 #include <hydra/utils/pose_graph_tracker.h>
 
+#include "hydra_test/config_guard.h"
+
 namespace hydra {
 
-TEST(PoseGraphTracker, EmptyGraphsCorrect) {
+TEST(PoseGraphTracker, GraphBuildingCorrect) {
+  test::ConfigGuard guard;
+
   PoseGraphTracker::Config config;
-  config.make_pose_graph = false;
   PoseGraphTracker tracker(config);
 
-  ReconstructionInput msg;
-  ReconstructionOutput result;
+  ReconstructionOutput msg;
+  msg.timestamp_ns = 10;
 
-  // no input pose graphs -> no output pose graphs
   tracker.update(msg);
-  tracker.fillPoseGraphs(result);
-  EXPECT_EQ(result.pose_graphs.size(), 0u);
+  {  // not enough poses for an edge: no pose graphs
+    BackendInput result;
+    tracker.fillPoseGraphs(result, {0u});
+    EXPECT_EQ(result.pose_graphs.size(), 0u);
+  }
 
-  // two input pose graphs -> two output pose graphs
-  msg.pose_graphs.push_back(nullptr);
-  msg.pose_graphs.push_back(nullptr);
   tracker.update(msg);
-  tracker.fillPoseGraphs(result);
-  EXPECT_EQ(result.pose_graphs.size(), 2u);
+  {  // two input poses: single edge
+    BackendInput result;
+    tracker.fillPoseGraphs(result, {0u, 1u});
+    EXPECT_EQ(result.pose_graphs.size(), 1u);
+  }
 
-  // no input pose graphs -> no change in output
-  msg.pose_graphs.clear();
   tracker.update(msg);
-  tracker.fillPoseGraphs(result);
-  EXPECT_EQ(result.pose_graphs.size(), 2u);
+  {  // three input poses: two edges
+    BackendInput result;
+    tracker.fillPoseGraphs(result, {0u, 1u, 2u});
+    EXPECT_EQ(result.pose_graphs.size(), 2u);
+  }
 
-  // one input pose graph -> three total graphs
-  msg.pose_graphs.push_back(nullptr);
-  tracker.update(msg);
-  tracker.fillPoseGraphs(result);
-  EXPECT_EQ(result.pose_graphs.size(), 3u);
+  {  // three input poses, but drop first: two edges
+    BackendInput result;
+    tracker.fillPoseGraphs(result, {1u, 2u});
+    EXPECT_EQ(result.pose_graphs.size(), 2u);
+  }
+
+  {  // three input poses, but only newest: one edge
+    BackendInput result;
+    tracker.fillPoseGraphs(result, {2u});
+    EXPECT_EQ(result.pose_graphs.size(), 1u);
+  }
 }
 
 }  // namespace hydra

@@ -32,24 +32,33 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/loop_closure/registration.h"
+#include "hydra/loop_closure/teaser_registration.h"
+
+#include <config_utilities/config.h>
+#include <config_utilities/validation.h>
+#include <glog/logging.h>
 
 #include <fstream>
 #include <iomanip>
 
+#include "hydra/common/common.h"
+#include "hydra/utils/display_utilities.h"
+#include "hydra/utils/teaser_params.h"
 #include "hydra/utils/timing_utilities.h"
 
-namespace hydra {
-namespace lcd {
+namespace hydra::lcd {
+
+using hydra::timing::ScopedTimer;
+
+using DsgNode = DynamicSceneGraphNode;
+using Solution = LayerRegistrationSolution;
+using Problem = LayerRegistrationProblem;
 
 inline std::ostream& operator<<(std::ostream& out, const gtsam::Quaternion& q) {
   out << "{w: " << q.w() << ", x: " << q.x() << ", y: " << q.y() << ", z: " << q.z()
       << "}";
   return out;
 }
-
-using DsgNode = DynamicSceneGraphNode;
-using hydra::timing::ScopedTimer;
 
 struct AgentNodePose {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -123,12 +132,13 @@ RegistrationSolution getFullSolutionFromLayer(const DynamicSceneGraph& graph,
   gtsam::Pose3 to_T_from = to_pose_info.world_T_body.inverse() * solution.dest_T_src *
                            from_pose_info.world_T_body;
 
-  VLOG(3) << "[DSG_LCD] Solution of " << NodeSymbol(query_agent_id).getLabel() << " -> "
-          << NodeSymbol(to_pose_info.id).getLabel() << ":";
-  VLOG(3) << "  - world_T_from: " << getPoseRepr(from_pose_info.world_T_body);
-  VLOG(3) << "  - world_T_to:   " << getPoseRepr(to_pose_info.world_T_body);
-  VLOG(3) << "  - dest_T_src:   " << getPoseRepr(solution.dest_T_src);
-  VLOG(3) << "  - to_T_from:    " << getPoseRepr(to_T_from);
+  VLOG(VLEVEL_TRACE) << "[Hydra LCD] Solution of " << printNodeId(query_agent_id)
+                     << " -> " << printNodeId(to_pose_info.id) << ":";
+  VLOG(VLEVEL_TRACE) << "  - world_T_from: "
+                     << getPoseRepr(from_pose_info.world_T_body);
+  VLOG(VLEVEL_TRACE) << "  - world_T_to:   " << getPoseRepr(to_pose_info.world_T_body);
+  VLOG(VLEVEL_TRACE) << "  - dest_T_src:   " << getPoseRepr(solution.dest_T_src);
+  VLOG(VLEVEL_TRACE) << "  - to_T_from:    " << getPoseRepr(to_T_from);
 
   return {true,
           from_pose_info.id,
@@ -141,7 +151,7 @@ RegistrationSolution getFullSolutionFromLayer(const DynamicSceneGraph& graph,
 void logRegistrationProblem(const std::string& path_prefix,
                             const DynamicSceneGraph& dsg,
                             const LayerRegistrationSolution& solution,
-                            const DsgRegistrationInput& match,
+                            const GraphRegistrationInput& match,
                             NodeId query_agent_id) {
   static size_t registration_index = 0;
   std::stringstream ss;
@@ -171,24 +181,40 @@ void logRegistrationProblem(const std::string& path_prefix,
   // TODO(nathan) output position data
 }
 
-DsgTeaserSolver::DsgTeaserSolver(LayerId layer_id,
-                                 const LayerRegistrationConfig& config,
-                                 const TeaserParams& params)
-    : layer_id(layer_id), config(config), solver(params) {
-  const std::string layer_str = DsgLayers::LayerIdToString(layer_id);
-  timer_prefix = "lcd/" + layer_str + "_registration";
-  log_prefix = config.registration_output_path + "/" + layer_str + "_registration_";
+void declare_config(GraphTeaserSolver::Config& config) {
+  using namespace config;
+  name("GraphTeaserSolver::Config");
+  base<LayerRegistrationConfig>(config);
+  field(config.timer_prefix, "timer_prefix");
+  field(config.log_prefix, "log_prefix");
+  field(config.teaser, "teaser");
 }
 
-RegistrationSolution DsgTeaserSolver::solve(const DynamicSceneGraph& dsg,
-                                            const DsgRegistrationInput& match,
-                                            NodeId query_agent_id) const {
-  // TODO(nathan) helper function in dsg
+GraphTeaserSolver::GraphTeaserSolver(const Config& config, LayerId layer_id)
+    : config(config::checkValid(config)), layer_id(layer_id), solver(config.teaser) {
+  const std::string layer_str = DsgLayers::LayerIdToString(layer_id);
+  if (config.timer_prefix.empty()) {
+    timer_prefix = "lcd/" + layer_str + "_registration";
+  } else {
+    timer_prefix = config.timer_prefix;
+  }
+
+  // TODO(nathan) log setup
+  if (config.log_prefix.empty()) {
+    log_prefix = config.registration_output_path + "/" + layer_str + "_registration_";
+  } else {
+    log_prefix = config.log_prefix;
+  }
+}
+
+RegistrationSolution GraphTeaserSolver::solve(const DynamicSceneGraph& dsg,
+                                              const GraphRegistrationInput& match,
+                                              NodeId query_agent_id) const {
   const uint64_t timestamp =
       dsg.getDynamicNode(query_agent_id).value().get().timestamp.count();
   ScopedTimer timer(timer_prefix, timestamp, true, 2, false);
 
-  LayerRegistrationProblem<std::set<NodeId>> problem;
+  LayerRegistrationProblem problem;
   if (config.recreate_subgraph) {
     const bool is_places = layer_id == DsgLayers::PLACES;
     problem.src_nodes =
@@ -202,9 +228,9 @@ RegistrationSolution DsgTeaserSolver::solve(const DynamicSceneGraph& dsg,
 
   if (problem.src_nodes.size() <= 3 || problem.dest_nodes.size() <= 3) {
     if (problem.src_nodes.empty()) {
-      LOG(ERROR) << "Invalid query: " << NodeSymbol(match.query_root).getLabel();
+      LOG(ERROR) << "Invalid query: " << printNodeId(match.query_root);
     } else {
-      LOG(ERROR) << "Invalid match: " << NodeSymbol(match.match_root).getLabel();
+      LOG(ERROR) << "Invalid match: " << printNodeId(match.match_root);
     }
 
     return {};
@@ -218,8 +244,8 @@ RegistrationSolution DsgTeaserSolver::solve(const DynamicSceneGraph& dsg,
   }
 
   if (num_same >= config.max_same_nodes) {
-    VLOG(2) << "Rejecting registration: " << num_same << " / " << config.max_same_nodes
-            << " shared nodes";
+    VLOG(VLEVEL_TRACE) << "[Hydra LCD] Rejecting registration: " << num_same << " / "
+                       << config.max_same_nodes << " shared nodes";
     return {};
   }
 
@@ -238,5 +264,151 @@ RegistrationSolution DsgTeaserSolver::solve(const DynamicSceneGraph& dsg,
   return getFullSolutionFromLayer(dsg, solution, query_agent_id, match.match_root);
 }
 
-}  // namespace lcd
-}  // namespace hydra
+template <typename NodeSet>
+std::list<NodeId> pruneSet(const SceneGraphLayer& layer, NodeSet& nodes) {
+  std::list<NodeId> pruned;
+  auto iter = nodes.begin();
+  while (iter != nodes.end()) {
+    if (layer.hasNode(*iter)) {
+      ++iter;
+    } else {
+      pruned.push_back(*iter);
+      iter = nodes.erase(iter);
+    }
+  }
+  return pruned;
+}
+
+Solution registerDsgLayer(const LayerRegistrationConfig& config,
+                          teaser::RobustRegistrationSolver& solver,
+                          const Problem& problem,
+                          const SceneGraphLayer& src,
+                          const CorrespondenceFunc& correspondence_func) {
+  std::vector<std::pair<NodeId, NodeId>> correspondences;
+  correspondences.reserve(problem.src_nodes.size() * problem.dest_nodes.size());
+
+  if (problem.src_mutex) {
+    problem.src_mutex->lock();
+  }
+
+  if (problem.dest_mutex) {
+    problem.dest_mutex->lock();
+  }
+
+  const auto& dest = problem.dest_layer ? *problem.dest_layer : src;
+
+  const auto src_pruned = pruneSet(src, problem.src_nodes);
+  if (!src_pruned.empty()) {
+    VLOG(VLEVEL_TRACE) << "[Hydra LCD] Found invalid source nodes in registration: "
+                       << displayNodeSymbolContainer(src_pruned);
+  }
+
+  const auto dest_pruned = pruneSet(dest, problem.dest_nodes);
+  if (!dest_pruned.empty()) {
+    VLOG(VLEVEL_TRACE)
+        << "[Hydra LCD] Found invalid destination nodes in registration: "
+        << displayNodeSymbolContainer(dest_pruned);
+  }
+
+  for (const auto& src_id : problem.src_nodes) {
+    auto src_node_opt = src.getNode(src_id);
+    CHECK(src_node_opt);
+    const SceneGraphNode& src_node = *src_node_opt;
+
+    for (const auto& dest_id : problem.dest_nodes) {
+      auto dest_node_opt = dest.getNode(dest_id);
+      CHECK(dest_node_opt);
+      const SceneGraphNode& dest_node = *dest_node_opt;
+
+      if (correspondence_func(src_node, dest_node)) {
+        correspondences.emplace_back(src_id, dest_id);
+      }
+    }
+  }
+
+  if (problem.src_mutex) {
+    problem.src_mutex->unlock();
+  }
+
+  if (problem.dest_mutex) {
+    problem.dest_mutex->unlock();
+  }
+
+  Eigen::Matrix<double, 3, Eigen::Dynamic> src_points(3, correspondences.size());
+  Eigen::Matrix<double, 3, Eigen::Dynamic> dest_points(3, correspondences.size());
+  for (size_t i = 0; i < correspondences.size(); ++i) {
+    const auto correspondence = correspondences[i];
+    src_points.col(i) = src.getPosition(correspondence.first);
+    dest_points.col(i) = dest.getPosition(correspondence.second);
+  }
+
+  if (correspondences.size() < config.min_correspondences) {
+    VLOG(VLEVEL_TRACE) << "not enough correspondences for registration at layer "
+                       << src.id << ": " << correspondences.size() << " / "
+                       << config.min_correspondences;
+    return {};
+  }
+
+  VLOG(VLEVEL_ALL) << "=======================================================";
+  VLOG(VLEVEL_ALL) << "Source: " << std::endl << src_points;
+  VLOG(VLEVEL_ALL) << "Dest: " << std::endl << dest_points;
+
+  VLOG(VLEVEL_INFO) << "[Hydra LCD] Registering layer " << src.id << " with "
+                    << correspondences.size() << " correspondences out of "
+                    << problem.src_nodes.size() << " source and "
+                    << problem.dest_nodes.size() << " destination nodes";
+
+  auto params = solver.getParams();
+  solver.reset(params);
+
+  teaser::RegistrationSolution result = solver.solve(src_points, dest_points);
+  if (!result.valid) {
+    return {};
+  }
+
+  const auto min_nodes = std::min(problem.src_nodes.size(), problem.dest_nodes.size());
+  std::vector<std::pair<NodeId, NodeId>> valid_correspondences;
+  valid_correspondences.reserve(min_nodes);
+
+  auto inliers = solver.getInlierMaxClique();
+  if (inliers.size() < config.min_inliers) {
+    VLOG(VLEVEL_TRACE) << "[Hydra LCD] Not enough inliers for registration at layer "
+                       << src.id << ": " << inliers.size() << " / "
+                       << config.min_inliers;
+    return {};
+  }
+
+  for (const auto& index : inliers) {
+    CHECK_LT(static_cast<size_t>(index), correspondences.size());
+    valid_correspondences.push_back(correspondences.at(index));
+  }
+
+  return {true,
+          gtsam::Pose3(gtsam::Rot3(result.rotation), result.translation),
+          valid_correspondences};
+}
+
+Solution registerDsgLayerPairwise(const LayerRegistrationConfig& config,
+                                  teaser::RobustRegistrationSolver& solver,
+                                  const Problem& problem,
+                                  const SceneGraphLayer& src) {
+  return registerDsgLayer(
+      config, solver, problem, src, [](const auto&, const auto&) { return true; });
+}
+
+Solution registerDsgLayerSemantic(const LayerRegistrationConfig& config,
+                                  teaser::RobustRegistrationSolver& solver,
+                                  const Problem& problem,
+                                  const SceneGraphLayer& src) {
+  return registerDsgLayer(
+      config,
+      solver,
+      problem,
+      src,
+      [](const SceneGraphNode& src_node, const SceneGraphNode& dest_node) {
+        return src_node.attributes<SemanticNodeAttributes>().semantic_label ==
+               dest_node.attributes<SemanticNodeAttributes>().semantic_label;
+      });
+}
+
+}  // namespace hydra::lcd

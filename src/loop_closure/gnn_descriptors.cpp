@@ -34,53 +34,112 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/loop_closure/gnn_descriptors.h"
 
+#include <config_utilities/config.h>
+#include <config_utilities/types/path.h>
+#include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <yaml-cpp/yaml.h>
 
 #include <deque>
 
-namespace hydra {
-namespace lcd {
+#include "hydra/common/common.h"
+
+namespace hydra::lcd {
 
 using Dsg = DynamicSceneGraph;
 using DsgNode = DynamicSceneGraphNode;
+using ObjectGnnFactory = ObjectGnnDescriptorFactory;
+using PlaceGnnFactory = PlaceGnnDescriptorFactory;
 
-ObjectGnnDescriptor::ObjectGnnDescriptor(const std::string& model_path,
-                                         const SubgraphConfig& config,
-                                         double max_edge_distance_m,
-                                         const LabelEmbeddings& label_embeddings,
-                                         bool use_pos_in_feature)
-    : config_(config),
-      max_edge_distance_m_(max_edge_distance_m),
-      label_embeddings_(label_embeddings),
-      use_pos_in_feature_(use_pos_in_feature) {
-  if (label_embeddings_.empty()) {
-    throw std::runtime_error("non-empty label embeddings required");
-  }
-
-  label_embedding_size_ = label_embeddings_.begin()->second.size();
-  for (const auto& label_embedding_pair : label_embeddings_) {
-    if (label_embedding_pair.second.size() != static_cast<int>(label_embedding_size_)) {
-      std::stringstream ss;
-      ss << "label embedding does not agree for label "
-         << static_cast<int>(label_embedding_pair.first) << " with size "
-         << label_embedding_pair.second.size() << " (detected size "
-         << label_embedding_size_ << ")";
-      throw std::runtime_error(ss.str());
+bool LabelEmbeddings::valid() const {
+  for (auto&& [label, embedding] : embeddings) {
+    if (embedding.size() != static_cast<int>(embedding_size)) {
+      LOG(ERROR) << "label embedding does not agree for label "
+                 << static_cast<int>(label) << " with size " << embedding.size()
+                 << " (detected size " << embedding_size << ")";
+      return false;
     }
   }
-
-  model_.reset(new gnn::GnnInterface(model_path));
+  return true;
 }
 
-gnn::TensorMap ObjectGnnDescriptor::makeInput(const DynamicSceneGraph& graph,
-                                              const std::set<NodeId>& nodes) const {
-  const size_t feature_size = label_embedding_size_ + (use_pos_in_feature_ ? 6 : 3);
+OneHotLabelEmbeddings::OneHotLabelEmbeddings(const Config& config)
+    : config(config::checkValid(config)) {}
+
+void OneHotLabelEmbeddings::init() {
+  for (size_t i = 0; i < config.encoding_dim; ++i) {
+    Eigen::VectorXf vec = Eigen::VectorXf::Zero(config.encoding_dim);
+    vec(i) = 1.0f;
+    embeddings[static_cast<uint8_t>(i)] = vec;
+  }
+}
+
+void declare_config(OneHotLabelEmbeddings::Config& config) {
+  using namespace config;
+  name("OneHotLabelEmbeddings::Config");
+  field(config.encoding_dim, "encoding_dim");
+  check(config.encoding_dim, GT, 0, "encoding_dim");
+}
+
+LabelEmbeddingsFromFile::LabelEmbeddingsFromFile(const Config& config)
+    : config(config::checkValid(config)) {}
+
+void LabelEmbeddingsFromFile::init() {
+  const auto filename = config.embedding_path.string();
+  VLOG(VLEVEL_FILE) << "Reading embeddings from: '" << filename << "'";
+
+  YAML::Node root = YAML::LoadFile(filename);
+  if (!root["embeddings"]) {
+    LOG(ERROR) << "file " << filename << " did not contain embeddings field";
+    return;
+  }
+
+  for (const auto embedding : root["embeddings"]) {
+    if (!embedding["label"]) {
+      LOG(WARNING) << "embedding did not contain label! skipping...";
+      continue;
+    }
+
+    if (!embedding["values"]) {
+      LOG(WARNING) << "embedding did not contain values! skipping...";
+      continue;
+    }
+
+    const auto label = embedding["label"].as<int>();
+    const auto vec = embedding["values"].as<std::vector<float>>();
+    auto iter = embeddings.emplace(label, Eigen::VectorXf(vec.size())).first;
+    for (size_t i = 0; i < vec.size(); ++i) {
+      iter->second(i) = vec[i];
+    }
+  }
+}
+
+void declare_config(LabelEmbeddingsFromFile::Config& config) {
+  using namespace config;
+  name("LabelEmbeddingsFromFile::Config");
+  field<Path>(config.embedding_path, "embedding_path");
+  check<Path::Exists>(config.embedding_path, "embedding_path");
+}
+
+ObjectGnnFactory::ObjectGnnDescriptorFactory(const Config& config)
+    : config(config::checkValid(config)) {
+  label_embeddings_ = config.embeddings.create();
+  CHECK(label_embeddings_) << "Label embeddings required!";
+  label_embeddings_->init();
+  CHECK(!label_embeddings_->empty()) << "Label embeddings empty";
+  CHECK(label_embeddings_->valid()) << "Label embeddings invalid";
+  model_.reset(new gnn::GnnInterface(config.model_path.string()));
+}
+
+gnn::TensorMap ObjectGnnFactory::makeInput(const DynamicSceneGraph& graph,
+                                           const std::set<NodeId>& nodes) const {
+  const auto embedding_size = label_embeddings_->embedding_size;
+  const size_t feature_size = embedding_size + (config.use_pos_in_feature ? 6 : 3);
   gnn::Tensor x(nodes.size(), feature_size, gnn::Tensor::Type::FLOAT32);
   auto x_map = x.map<float>();
 
   gnn::Tensor pos;
-  if (!use_pos_in_feature_) {
+  if (!config.use_pos_in_feature) {
     pos = gnn::Tensor(nodes.size(), 3, gnn::Tensor::Type::FLOAT32);
   }
   auto pos_map = pos.map<float>();
@@ -91,7 +150,7 @@ gnn::TensorMap ObjectGnnDescriptor::makeInput(const DynamicSceneGraph& graph,
     const auto& attrs = graph.getNode(node)->get().attributes<SemanticNodeAttributes>();
 
     size_t start_idx = 0;
-    if (use_pos_in_feature_) {
+    if (config.use_pos_in_feature) {
       start_idx = 3;
       x_map.block(index, 0, 1, 3) = attrs.position.cast<float>().transpose();
     } else {
@@ -101,12 +160,11 @@ gnn::TensorMap ObjectGnnDescriptor::makeInput(const DynamicSceneGraph& graph,
     x_map.block(index, start_idx, 1, 3) =
         (attrs.bounding_box.max - attrs.bounding_box.min).transpose();
 
-    auto iter = label_embeddings_.find(attrs.semantic_label);
-    if (iter != label_embeddings_.end()) {
-      x_map.block(index, start_idx + 3, 1, label_embedding_size_) =
-          iter->second.transpose();
+    auto iter = label_embeddings_->embeddings.find(attrs.semantic_label);
+    if (iter != label_embeddings_->embeddings.end()) {
+      x_map.block(index, start_idx + 3, 1, embedding_size) = iter->second.transpose();
     } else {
-      x_map.block(index, start_idx + 3, 1, label_embedding_size_).setZero();
+      x_map.block(index, start_idx + 3, 1, embedding_size).setZero();
     }
 
     index_mapping[node] = index;
@@ -122,7 +180,7 @@ gnn::TensorMap ObjectGnnDescriptor::makeInput(const DynamicSceneGraph& graph,
       }
 
       const auto target_position = graph.getPosition(target);
-      if ((source_position - target_position).norm() > max_edge_distance_m_) {
+      if ((source_position - target_position).norm() > config.max_edge_distance_m) {
         continue;
       }
 
@@ -140,15 +198,15 @@ gnn::TensorMap ObjectGnnDescriptor::makeInput(const DynamicSceneGraph& graph,
     ++edge_idx;
   }
 
-  if (use_pos_in_feature_) {
+  if (config.use_pos_in_feature) {
     return {{"x", x}, {"edge_index", edge_index}};
   } else {
     return {{"x", x}, {"edge_index", edge_index}, {"pos", pos}};
   }
 }
 
-Descriptor::Ptr ObjectGnnDescriptor::construct(const Dsg& graph,
-                                               const DsgNode& agent_node) const {
+Descriptor::Ptr ObjectGnnFactory::construct(const Dsg& graph,
+                                            const DsgNode& agent_node) const {
   auto parent = agent_node.getParent();
   if (!parent) {
     return nullptr;
@@ -156,7 +214,7 @@ Descriptor::Ptr ObjectGnnDescriptor::construct(const Dsg& graph,
 
   auto descriptor = std::make_unique<Descriptor>();
   descriptor->normalized = false;
-  descriptor->nodes = getSubgraphNodes(config_, graph, *parent, false);
+  descriptor->nodes = getSubgraphNodes(config.subgraph, graph, *parent, false);
   descriptor->root_node = *parent;
   descriptor->root_position = graph.getPosition(*parent);
   descriptor->timestamp = agent_node.timestamp;
@@ -167,35 +225,47 @@ Descriptor::Ptr ObjectGnnDescriptor::construct(const Dsg& graph,
   }
 
   auto input = makeInput(graph, descriptor->nodes);
-  VLOG(20) << "Inputs:";
-  VLOG(20) << "  - x: " << std::endl << input.at("x").map<float>();
-  VLOG(20) << "  - edge_index: " << std::endl << input.at("edge_index").map<int64_t>();
-  if (!use_pos_in_feature_) {
-    VLOG(20) << "  - pos: " << std::endl << input.at("pos").map<float>();
+  VLOG(VLEVEL_ALL) << "Inputs:";
+  VLOG(VLEVEL_ALL) << "  - x: " << std::endl << input.at("x").map<float>();
+  VLOG(VLEVEL_ALL) << "  - edge_index: " << std::endl
+                   << input.at("edge_index").map<int64_t>();
+  if (!config.use_pos_in_feature) {
+    VLOG(VLEVEL_ALL) << "  - pos: " << std::endl << input.at("pos").map<float>();
   }
 
   auto output = (*model_)(input).at("output");
-  VLOG(20) << "--------------------------------------";
-  VLOG(20) << "Output type: " << output;
-  VLOG(20) << "Output:" << std::endl << output.map<float>();
+  VLOG(VLEVEL_ALL) << "--------------------------------------";
+  VLOG(VLEVEL_ALL) << "Output type: " << output;
+  VLOG(VLEVEL_ALL) << "Output:" << std::endl << output.map<float>();
   descriptor->values = output.map<float>().transpose();
   return descriptor;
 }
 
-PlaceGnnDescriptor::PlaceGnnDescriptor(const std::string& model_path,
-                                       const SubgraphConfig& config,
-                                       bool use_pos_in_feature)
-    : config_(config), use_pos_in_feature_(use_pos_in_feature) {
-  model_.reset(new gnn::GnnInterface(model_path));
+void declare_config(ObjectGnnDescriptorFactory::Config& config) {
+  using namespace config;
+  name("ObjectGnnDescriptorFactory::Config");
+  field<Path>(config.model_path, "model_path");
+  field(config.subgraph, "subgraph");
+  field(config.max_edge_distance_m, "max_edge_distance_m");
+  field(config.embeddings, "embeddings");
+  field(config.use_pos_in_feature, "use_pos_in_feature");
+  check<Path::Exists>(config.model_path, "model_path");
+  check(config.max_edge_distance_m, GT, 0.0, "max_edge_distance_m positive");
 }
 
-gnn::TensorMap PlaceGnnDescriptor::makeInput(const DynamicSceneGraph& graph,
-                                             const std::set<NodeId>& nodes) const {
-  gnn::Tensor x(nodes.size(), use_pos_in_feature_ ? 5 : 2, gnn::Tensor::Type::FLOAT32);
+PlaceGnnFactory::PlaceGnnDescriptorFactory(const Config& config)
+    : config(config::checkValid(config)) {
+  model_.reset(new gnn::GnnInterface(config.model_path.string()));
+}
+
+gnn::TensorMap PlaceGnnFactory::makeInput(const DynamicSceneGraph& graph,
+                                          const std::set<NodeId>& nodes) const {
+  gnn::Tensor x(
+      nodes.size(), config.use_pos_in_feature ? 5 : 2, gnn::Tensor::Type::FLOAT32);
   auto x_map = x.map<float>();
 
   gnn::Tensor pos;
-  if (!use_pos_in_feature_) {
+  if (!config.use_pos_in_feature) {
     pos = gnn::Tensor(nodes.size(), 3, gnn::Tensor::Type::FLOAT32);
   }
   auto pos_map = pos.map<float>();
@@ -204,7 +274,7 @@ gnn::TensorMap PlaceGnnDescriptor::makeInput(const DynamicSceneGraph& graph,
   std::map<NodeId, size_t> index_mapping;
   for (const auto node : nodes) {
     const auto& attrs = graph.getNode(node)->get().attributes<PlaceNodeAttributes>();
-    if (use_pos_in_feature_) {
+    if (config.use_pos_in_feature) {
       x_map.block(index, 0, 1, 3) = attrs.position.cast<float>().transpose();
       x_map(index, 3) = attrs.distance;
       x_map(index, 4) = static_cast<float>(attrs.num_basis_points);
@@ -239,15 +309,15 @@ gnn::TensorMap PlaceGnnDescriptor::makeInput(const DynamicSceneGraph& graph,
     ++edge_idx;
   }
 
-  if (use_pos_in_feature_) {
+  if (config.use_pos_in_feature) {
     return {{"x", x}, {"edge_index", edge_index}};
   } else {
     return {{"x", x}, {"edge_index", edge_index}, {"pos", pos}};
   }
 }
 
-Descriptor::Ptr PlaceGnnDescriptor::construct(const Dsg& graph,
-                                              const DsgNode& agent_node) const {
+Descriptor::Ptr PlaceGnnFactory::construct(const Dsg& graph,
+                                           const DsgNode& agent_node) const {
   auto parent = agent_node.getParent();
   if (!parent) {
     return nullptr;
@@ -255,7 +325,7 @@ Descriptor::Ptr PlaceGnnDescriptor::construct(const Dsg& graph,
 
   auto descriptor = std::make_unique<Descriptor>();
   descriptor->normalized = false;
-  descriptor->nodes = getSubgraphNodes(config_, graph, *parent, true);
+  descriptor->nodes = getSubgraphNodes(config.subgraph, graph, *parent, true);
   descriptor->root_node = *parent;
   descriptor->root_position = graph.getPosition(*parent);
   descriptor->timestamp = agent_node.timestamp;
@@ -265,52 +335,29 @@ Descriptor::Ptr PlaceGnnDescriptor::construct(const Dsg& graph,
   }
 
   auto input = makeInput(graph, descriptor->nodes);
-  VLOG(20) << "Inputs:";
-  VLOG(20) << "  - x: " << std::endl << input.at("x").map<float>();
-  VLOG(20) << "  - edge_index: " << std::endl << input.at("edge_index").map<int64_t>();
-  if (!use_pos_in_feature_) {
-    VLOG(20) << "  - pos: " << std::endl << input.at("pos").map<float>();
+  VLOG(VLEVEL_ALL) << "Inputs:";
+  VLOG(VLEVEL_ALL) << "  - x: " << std::endl << input.at("x").map<float>();
+  VLOG(VLEVEL_ALL) << "  - edge_index: " << std::endl
+                   << input.at("edge_index").map<int64_t>();
+  if (!config.use_pos_in_feature) {
+    VLOG(VLEVEL_ALL) << "  - pos: " << std::endl << input.at("pos").map<float>();
   }
 
   auto output = (*model_)(input).at("output");
-  VLOG(20) << "--------------------------------------";
-  VLOG(20) << "Output type: " << output;
-  VLOG(20) << "Output:" << std::endl << output.map<float>();
+  VLOG(VLEVEL_ALL) << "--------------------------------------";
+  VLOG(VLEVEL_ALL) << "Output type: " << output;
+  VLOG(VLEVEL_ALL) << "Output:" << std::endl << output.map<float>();
   descriptor->values = output.map<float>().transpose();
   return descriptor;
 }
 
-ObjectGnnDescriptor::LabelEmbeddings loadLabelEmbeddings(const std::string& filename) {
-  ObjectGnnDescriptor::LabelEmbeddings embeddings;
-  VLOG(5) << "Reading embeddings from: " << filename;
-
-  YAML::Node root = YAML::LoadFile(filename);
-  if (!root["embeddings"]) {
-    LOG(ERROR) << "file " << filename << " did not contain embeddings field";
-    return embeddings;
-  }
-
-  for (const auto embedding : root["embeddings"]) {
-    if (!embedding["label"]) {
-      LOG(WARNING) << "embedding did not contain label! skipping...";
-      continue;
-    }
-
-    if (!embedding["values"]) {
-      LOG(WARNING) << "embedding did not contain values! skipping...";
-      continue;
-    }
-
-    const auto label = embedding["label"].as<int>();
-    const auto vec = embedding["values"].as<std::vector<float>>();
-    auto iter = embeddings.emplace(label, Eigen::VectorXf(vec.size())).first;
-    for (size_t i = 0; i < vec.size(); ++i) {
-      iter->second(i) = vec[i];
-    }
-  }
-
-  return embeddings;
+void declare_config(PlaceGnnDescriptorFactory::Config& config) {
+  using namespace config;
+  name("PlaceGnnDescriptorFactory::Config");
+  field<Path>(config.model_path, "model_path");
+  field(config.subgraph, "subgraph");
+  field(config.use_pos_in_feature, "use_pos_in_feature");
+  check<Path::Exists>(config.model_path, "model_path");
 }
 
-}  // namespace lcd
-}  // namespace hydra
+}  // namespace hydra::lcd

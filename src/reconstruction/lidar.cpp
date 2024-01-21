@@ -41,6 +41,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "hydra/common/common.h"
 #include "hydra/reconstruction/sensor_utilities.h"
 
 namespace hydra {
@@ -117,26 +118,30 @@ float Lidar::computeRayDensity(float voxel_size, float depth) const {
   return virtual_fx * virtual_fy * voxel_density * voxel_density;
 }
 
-bool Lidar::finalizeRepresentations(FrameData& input) const {
-  if (input.points.empty()) {
+bool Lidar::finalizeRepresentations(FrameData& input, bool force_world_frame) const {
+  if (input.vertex_map.empty()) {
     LOG(ERROR) << "pointcloud required to finalize data!";
     return false;
   }
 
   // TODO(nathan) check that input is normalized
 
-  if (input.points.size() != input.label_image.size()) {
+  if (input.vertex_map.size() != input.label_image.size()) {
     LOG(ERROR) << "label input size does not match pointcloud!";
     return false;
   }
 
-  if (!input.color_image.empty() && input.points.size() != input.color_image.size()) {
+  if (!input.color_image.empty() &&
+      input.vertex_map.size() != input.color_image.size()) {
     LOG(ERROR) << "color input size does not match pointcloud!";
     return false;
   }
 
   // TODO(nathan) detect structured
   // TODO(nathan) think about structured points
+
+  CHECK(force_world_frame);
+  // TODO(nathan) implement transform
 
   const auto sensor_T_world = input.getSensorPose<float>(*this).inverse();
   input.min_range = std::numeric_limits<float>::max();
@@ -151,11 +156,11 @@ bool Lidar::finalizeRepresentations(FrameData& input) const {
     color = 0;
   }
 
-  auto point_iter = input.points.begin<cv::Vec3f>();
+  auto point_iter = input.vertex_map.begin<cv::Vec3f>();
   auto label_iter = input.label_image.begin<int32_t>();
   size_t num_invalid = 0;
   size_t color_index = 0;
-  while (point_iter != input.points.end<cv::Vec3f>()) {
+  while (point_iter != input.vertex_map.end<cv::Vec3f>()) {
     int u, v;
     const auto& p = *point_iter;
     Eigen::Vector3f p_C(p[0], p[1], p[2]);
@@ -186,10 +191,10 @@ bool Lidar::finalizeRepresentations(FrameData& input) const {
     ++color_index;
   }
 
-  size_t total_lidar = input.points.rows * input.points.cols;
+  size_t total_lidar = input.vertex_map.rows * input.vertex_map.cols;
   double percent_invalid = static_cast<double>(num_invalid) / total_lidar;
-  VLOG(5) << "Converted lidar points! invalid: " << num_invalid << " / " << total_lidar
-          << " (percent: " << percent_invalid << ")";
+  VLOG(VLEVEL_FILE) << "Converted lidar points! invalid: " << num_invalid << " / "
+                    << total_lidar << " (percent: " << percent_invalid << ")";
   input.label_image = labels;
   input.color_image = color;
   return true;

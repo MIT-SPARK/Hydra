@@ -78,7 +78,8 @@ class Lidar : public Sensor {
   /**
    * @brief Compute range image from pointcloud
    */
-  bool finalizeRepresentations(FrameData& input) const override;
+  bool finalizeRepresentations(FrameData& input,
+                               bool force_world_frame = false) const override;
 
   bool projectPointToImagePlane(const Eigen::Vector3f& p_C,
                                 float& u,

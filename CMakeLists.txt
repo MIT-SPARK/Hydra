@@ -13,13 +13,14 @@ option(HYDRA_ENABLE_EVAL "Build evaluation code" ON)
 option(HYDRA_ENABLE_GNN "Build GNN interface" OFF)
 option(HYDRA_ENABLE_PYTHON "Build Hydra python bindings" OFF)
 option(HYDRA_ENABLE_TESTS "Build Hydra unit tests" OFF)
+option(HYDRA_DOWNLOAD_VOCAB "Download DBoW2 Vocabulary" ON)
 option(HYDRA_ENABLE_ROS_INSTALL_LAYOUT "Install binaries to ROS location" ON)
 option(BUILD_SHARED_LIBS "Build shared libs" ON)
 
 find_package(config_utilities REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(GTSAM REQUIRED)
-find_package(OpenCV REQUIRED COMPONENTS core imgproc)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs)
 find_package(spark_dsg REQUIRED)
 find_package(teaserpp REQUIRED)
 find_package(kimera_pgmo REQUIRED)
@@ -47,14 +48,15 @@ target_include_directories(
 )
 target_link_libraries(
   ${PROJECT_NAME}
-  PUBLIC ${OpenCV_LIBRARIES}
-         teaserpp::teaser_registration
-         config_utilities::config_utilities
-         spark_dsg::spark_dsg
+  PUBLIC config_utilities::config_utilities
+         Eigen3::Eigen
          gtsam
+         spark_dsg::spark_dsg
+         teaserpp::teaser_registration
          ${kimera_pgmo_LIBRARIES}
+         ${OpenCV_LIBRARIES}
          ${voxblox_LIBRARIES}
-  PRIVATE nanoflann::nanoflann ${tf2_eigen_LIBRARIES} ${PCL_LIBRARIES}
+  PRIVATE DBoW2::DBoW2 nanoflann::nanoflann ${tf2_eigen_LIBRARIES} ${PCL_LIBRARIES}
 )
 set_property(TARGET ${PROJECT_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)
 add_library(hydra::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
@@ -79,7 +81,30 @@ if(HYDRA_ENABLE_PYTHON)
 endif()
 
 if(HYDRA_ENABLE_TESTS)
+  enable_testing()
   add_subdirectory(tests)
+endif()
+
+if(HYDRA_DOWNLOAD_VOCAB)
+  #TODO(nathan) come up with better solution
+  set(VOCAB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/models/vocabulary")
+  if(NOT EXISTS ${VOCAB_DIR}/ORBVoc.yml)
+    file(DOWNLOAD http://www.dropbox.com/s/lyo0qgbdxn6eg6o/ORBvoc.zip?dl=1
+         ${VOCAB_DIR}/ORBvoc.zip SHOW_PROGRESS STATUS download_okay TIMEOUT 60
+    )
+    if(download_okay)
+      execute_process(
+        COMMAND ${CMAKE_COMMAND} -E tar xzf ${VOCAB_DIR}/ORBvoc.zip
+        WORKING_DIRECTORY ${VOCAB_DIR}
+      )
+      execute_process(
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${VOCAB_DIR}/ORBvoc ${VOCAB_DIR}
+      )
+      execute_process(COMMAND ${CMAKE_COMMAND} -E remove_directory ${VOCAB_DIR}/ORBvoc)
+    else()
+      message(STATUS "Failed to download vocabulary file. Please download manually.")
+    endif()
+  endif()
 endif()
 
 include(HydraInstall)

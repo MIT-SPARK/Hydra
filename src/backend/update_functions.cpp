@@ -127,7 +127,7 @@ void UpdateObjectsFunctor::updateObject(const spark_dsg::Mesh::Ptr& mesh,
                                         ObjectNodeAttributes& attrs) const {
   const auto& connections = attrs.mesh_connections;
   if (connections.empty()) {
-    VLOG(2) << "Found empty object node " << NodeSymbol(node).getLabel();
+    VLOG(VLEVEL_TRACE) << "Found empty object node " << NodeSymbol(node).getLabel();
     return;
   }
 
@@ -143,7 +143,7 @@ void UpdateObjectsFunctor::updateObject(const spark_dsg::Mesh::Ptr& mesh,
   }
 
   if (!updateObjectGeometry(*mesh, attrs, &indices)) {
-    VLOG(2) << "Invalid centroid for object " << NodeSymbol(node).getLabel();
+    VLOG(VLEVEL_TRACE) << "Invalid centroid for object " << NodeSymbol(node).getLabel();
   }
 }
 
@@ -222,8 +222,8 @@ MergeMap UpdateObjectsFunctor::call(SharedDsgInfo& dsg, const UpdateInfo& info) 
     }
   }
 
-  VLOG(5) << "[Hydra Backend] Object update: " << archived << " archived and " << active
-          << " active";
+  VLOG(VLEVEL_TRACE) << "[Hydra Backend] Object update: " << archived
+                     << " archived and " << active << " active";
   return nodes_to_merge;
 }
 
@@ -311,8 +311,8 @@ void UpdatePlacesFunctor::updatePlace(const gtsam::Values& values,
                                       NodeId node,
                                       NodeAttributes& attrs) const {
   if (!values.exists(node)) {
-    VLOG(5) << "[Hydra Backend] missing place " << NodeSymbol(node).getLabel()
-            << " from places factors.";
+    VLOG(VLEVEL_FILE) << "[Hydra Backend] missing place " << NodeSymbol(node).getLabel()
+                      << " from places factors.";
     return;
   }
 
@@ -366,8 +366,8 @@ void UpdatePlacesFunctor::filterMissing(DynamicSceneGraph& graph,
     return;
   }
 
-  VLOG(6) << "[Places Layer]: could not update "
-          << displayNodeSymbolContainer(missing_nodes);
+  VLOG(VLEVEL_FILE) << "[Places Layer]: could not update "
+                    << displayNodeSymbolContainer(missing_nodes);
 
   for (const auto& node_id : missing_nodes) {
     if (!graph.hasNode(node_id)) {
@@ -376,7 +376,8 @@ void UpdatePlacesFunctor::filterMissing(DynamicSceneGraph& graph,
 
     const Node& node = graph.getNode(node_id).value();
     if (!node.attributes().is_active && !node.hasSiblings()) {
-      VLOG(2) << "[Places Layer]: removing node " << NodeSymbol(node_id).getLabel();
+      VLOG(VLEVEL_TRACE) << "[Places Layer]: removing node "
+                         << NodeSymbol(node_id).getLabel();
       graph.removeNode(node_id);
     }
   }
@@ -431,8 +432,8 @@ std::map<NodeId, NodeId> UpdatePlacesFunctor::call(SharedDsgInfo& dsg,
     }
   }
 
-  VLOG(5) << "[Hydra Backend] Places update: " << archived << " archived and "
-          << num_active << " active";
+  VLOG(VLEVEL_TRACE) << "[Hydra Backend] Places update: " << archived
+                     << " archived and " << num_active << " active";
   filterMissing(graph, missing_nodes);
   return nodes_to_merge;
 }

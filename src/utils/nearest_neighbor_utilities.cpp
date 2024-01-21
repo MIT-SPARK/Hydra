@@ -38,6 +38,8 @@
 
 #include <nanoflann.hpp>
 
+#include "hydra/common/common.h"
+
 namespace hydra {
 
 using nanoflann::KDTreeSingleIndexAdaptor;
@@ -86,7 +88,7 @@ NearestNodeFinder::NearestNodeFinder(const SceneGraphLayer& layer,
 NearestNodeFinder::NearestNodeFinder(const SceneGraphLayer& layer,
                                      const std::unordered_set<NodeId>& nodes) {
   std::vector<NodeId> node_vector(nodes.begin(), nodes.end());
-  VLOG(10) << "Making node finder with " << nodes.size() << " nodes";
+  VLOG(VLEVEL_DEBUG) << "Making node finder with " << nodes.size() << " nodes";
   internals_.reset(new Detail(layer, node_vector));
 }
 

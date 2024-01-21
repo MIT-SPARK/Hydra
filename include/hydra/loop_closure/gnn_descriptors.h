@@ -33,20 +33,82 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/virtual_config.h>
+
+#include <filesystem>
+
 #include "hydra/gnn/gnn_interface.h"
-#include "hydra/loop_closure/scene_graph_descriptors.h"
+#include "hydra/loop_closure/graph_descriptor_factory.h"
+#include "hydra/loop_closure/subgraph_extraction.h"
 
-namespace hydra {
-namespace lcd {
+namespace hydra::lcd {
 
-struct ObjectGnnDescriptor : DescriptorFactory {
-  using LabelEmbeddings = std::map<uint8_t, Eigen::VectorXf>;
+struct LabelEmbeddings {
+  using Ptr = std::shared_ptr<LabelEmbeddings>;
 
-  ObjectGnnDescriptor(const std::string& model_path,
-                      const SubgraphConfig& config,
-                      double max_edge_distance_m,
-                      const LabelEmbeddings& label_embeddings,
-                      bool use_pos_in_feature = true);
+  std::map<uint8_t, Eigen::VectorXf> embeddings;
+  size_t embedding_size = 0;
+
+  virtual ~LabelEmbeddings() {}
+
+  bool valid() const;
+
+  inline bool empty() const { return embedding_size == 0; }
+
+  inline operator bool() const { return !empty() && valid(); }
+
+  virtual void init() = 0;
+};
+
+struct OneHotLabelEmbeddings : LabelEmbeddings {
+  struct Config {
+    size_t encoding_dim = 0;
+  };
+
+  explicit OneHotLabelEmbeddings(const Config& config);
+
+  void init() override;
+
+  const Config config;
+
+ private:
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<LabelEmbeddings, OneHotLabelEmbeddings, Config>(
+          "OneHotLabelEmbeddings");
+};
+
+void declare_config(OneHotLabelEmbeddings::Config& config);
+
+struct LabelEmbeddingsFromFile : LabelEmbeddings {
+  struct Config {
+    std::filesystem::path embedding_path;
+  };
+
+  explicit LabelEmbeddingsFromFile(const Config& config);
+
+  void init() override;
+
+  const Config config;
+
+ private:
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<LabelEmbeddings, LabelEmbeddingsFromFile, Config>(
+          "LabelEmbeddingsFromFile");
+};
+
+void declare_config(LabelEmbeddingsFromFile::Config& config);
+
+class ObjectGnnDescriptorFactory : GraphDescriptorFactory {
+ public:
+  struct Config {
+    std::filesystem::path model_path;
+    SubgraphConfig subgraph;
+    double max_edge_distance_m = 5.0;
+    config::VirtualConfig<LabelEmbeddings> embeddings;
+    bool use_pos_in_feature = false;
+  };
+
+  explicit ObjectGnnDescriptorFactory(const Config& config);
 
   gnn::TensorMap makeInput(const DynamicSceneGraph& graph,
                            const std::set<NodeId>& nodes) const;
@@ -54,20 +116,30 @@ struct ObjectGnnDescriptor : DescriptorFactory {
   Descriptor::Ptr construct(const DynamicSceneGraph& graph,
                             const DynamicSceneGraphNode& agent_node) const override;
 
- protected:
-  const SubgraphConfig config_;
-  std::unique_ptr<gnn::GnnInterface> model_;
+ public:
+  const Config config;
 
-  double max_edge_distance_m_;
-  size_t label_embedding_size_;
-  std::map<uint8_t, Eigen::VectorXf> label_embeddings_;
-  const bool use_pos_in_feature_;
+ protected:
+  std::unique_ptr<gnn::GnnInterface> model_;
+  LabelEmbeddings::Ptr label_embeddings_;
+
+ private:
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<GraphDescriptorFactory,
+                                     ObjectGnnDescriptorFactory,
+                                     Config>("ObjectGnnDescriptor");
 };
 
-struct PlaceGnnDescriptor : DescriptorFactory {
-  PlaceGnnDescriptor(const std::string& model_path,
-                     const SubgraphConfig& config,
-                     bool use_pos_in_feature = true);
+void declare_config(ObjectGnnDescriptorFactory::Config& config);
+
+struct PlaceGnnDescriptorFactory : GraphDescriptorFactory {
+  struct Config {
+    std::filesystem::path model_path;
+    SubgraphConfig subgraph;
+    bool use_pos_in_feature = false;
+  };
+
+  explicit PlaceGnnDescriptorFactory(const Config& config);
 
   gnn::TensorMap makeInput(const DynamicSceneGraph& graph,
                            const std::set<NodeId>& nodes) const;
@@ -75,13 +147,19 @@ struct PlaceGnnDescriptor : DescriptorFactory {
   Descriptor::Ptr construct(const DynamicSceneGraph& graph,
                             const DynamicSceneGraphNode& agent_node) const override;
 
+ public:
+  const Config config;
+
  protected:
-  const SubgraphConfig config_;
-  const bool use_pos_in_feature_;
   std::unique_ptr<gnn::GnnInterface> model_;
+
+ private:
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<GraphDescriptorFactory,
+                                     PlaceGnnDescriptorFactory,
+                                     Config>("PlaceGnnDescriptor");
 };
 
-ObjectGnnDescriptor::LabelEmbeddings loadLabelEmbeddings(const std::string& filename);
+void declare_config(PlaceGnnDescriptorFactory::Config& config);
 
-}  // namespace lcd
-}  // namespace hydra
+}  // namespace hydra::lcd

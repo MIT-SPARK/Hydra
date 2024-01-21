@@ -48,6 +48,8 @@ struct SubgraphConfig {
   SubgraphConfig();
 };
 
+void declare_config(SubgraphConfig& conf);
+
 std::set<NodeId> getSubgraphNodes(const SubgraphConfig& config,
                                   const DynamicSceneGraph& graph,
                                   NodeId root_node,

@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/floodfill_graph_extractor.h"
 
+#include "hydra/common/common.h"
 #include "hydra/places/graph_extractor_utilities.h"
 #include "hydra/places/nearest_voxel_utilities.h"
 
@@ -356,8 +357,8 @@ void FloodfillGraphExtractor::findNewVertices(const GvdLayer& layer) {
     // TODO(nathan) slightly duplicated with neighbor flag extraction
     const GvdVoxel* voxel = layer.getVoxelPtrByGlobalIndex(index);
     if (voxel == nullptr) {
-      VLOG(1) << "[Graph Extraction] Invalid index: " << index.transpose()
-              << " found in modified queue";
+      VLOG(VLEVEL_TRACE) << "[Graph Extraction] Invalid index: " << index.transpose()
+                         << " found in modified queue";
       continue;
     }
 

@@ -34,9 +34,36 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/loop_closure/detector.h>
+#include <hydra/reconstruction/camera.h>
+
+#include "hydra_test/config_guard.h"
 
 namespace hydra {
 namespace lcd {
+
+struct FakeAgentFactory : public SensorDescriptorFactory {
+  struct Config : public SensorDescriptorFactory::Config {};
+  explicit FakeAgentFactory(const Config& config) : SensorDescriptorFactory(config) {}
+  virtual ~FakeAgentFactory() = default;
+
+ protected:
+  Descriptor::Ptr describe(const Sensor&,
+                           const DynamicSceneGraphNode&,
+                           const FrameData&,
+                           const SensorFeatures*) const override {
+    return std::make_unique<Descriptor>();
+  }
+
+ private:
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<SensorDescriptorFactory, FakeAgentFactory, Config>(
+          "FakeAgent");
+};
+
+void declare_config(FakeAgentFactory::Config&) {
+  using namespace config;
+  name("FakeAgentFactory");
+}
 
 struct LcdDetectorTests : public ::testing::Test {
   LcdDetectorTests() = default;
@@ -46,17 +73,44 @@ struct LcdDetectorTests : public ::testing::Test {
   virtual void SetUp() override {
     dsg.reset(new DynamicSceneGraph());
 
-    config.object_extraction = SubgraphConfig(5.0);
-    config.places_extraction = SubgraphConfig(5.0);
-    config.num_semantic_classes = 20;
-    config.place_histogram_config = HistogramConfig<double>(0.5, 2.5, 30);
-    config.agent_search_config = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
-    config.objects.matching = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
-    config.places.matching = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
+    Camera::Config cam_config;
+    cam_config.min_range = 0.1;
+    cam_config.max_range = 5.0;
+    cam_config.width = 100;
+    cam_config.height = 100;
+    cam_config.fx = 1.0;
+    cam_config.fy = 1.0;
+    cam_config.cx = 0.5;
+    cam_config.cy = 0.5;
+    cam_config.extrinsics = config::VirtualConfig<SensorExtrinsics>(
+        IdentitySensorExtrinsics::Config(), "identity");
+    sensor = std::make_shared<Camera>(cam_config);
+
+    config.agent_config.descriptors = config::VirtualConfig<SensorDescriptorFactory>(
+        FakeAgentFactory::Config(), "FakeAgent");
+    config.agent_config.matching = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
+
+    ObjectGraphDescriptorFactory::Config object_factory_config{{5.0}};
+    PlaceGraphDescriptorFactory::Config place_factory_config{{5.0}, {0.5, 2.5, 30}};
+
+    LayerLcdConfig object_config;
+    object_config.layer = DsgLayers::OBJECTS;
+    object_config.matching = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
+    object_config.descriptors = config::VirtualConfig<GraphDescriptorFactory>(
+        object_factory_config, "ObjectGraphDescriptor");
+    config.graph_configs.push_back(object_config);
+
+    LayerLcdConfig place_config;
+    place_config.layer = DsgLayers::PLACES;
+    place_config.matching = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
+    place_config.descriptors = config::VirtualConfig<GraphDescriptorFactory>(
+        place_factory_config, "PlaceGraphDescriptor");
+    config.graph_configs.push_back(place_config);
   }
 
   LcdDetectorConfig config;
   DynamicSceneGraph::Ptr dsg;
+  std::shared_ptr<Sensor> sensor;
 };
 
 TEST_F(LcdDetectorTests, TestEmptyUpdate) {
@@ -109,6 +163,7 @@ TEST_F(LcdDetectorTests, TestNoDynamicChildren) {
 
 TEST_F(LcdDetectorTests, TestActualChildren) {
   using namespace std::chrono_literals;
+  const auto guard = test::ConfigGuard::FixedLabels(5);
   dsg->emplaceNode(DsgLayers::PLACES, 1, std::make_unique<PlaceNodeAttributes>());
   dsg->emplaceNode(DsgLayers::OBJECTS, 2, std::make_unique<ObjectNodeAttributes>());
   dsg->emplaceNode(DsgLayers::AGENTS,
@@ -126,6 +181,10 @@ TEST_F(LcdDetectorTests, TestActualChildren) {
   dsg->insertEdge(1, NodeSymbol('a', 1));
 
   LcdDetector module(config);
+  module.addSensorDescriptor(*sensor, *dsg, NodeSymbol('a', 0), {});
+  module.addSensorDescriptor(*sensor, *dsg, NodeSymbol('a', 1), {});
+  EXPECT_EQ(0u, module.numAgentDescriptors());
+
   std::unordered_set<NodeId> active_places{1};
   module.updateDescriptorCache(*dsg, active_places);
   EXPECT_EQ(1u, module.numGraphDescriptors(DsgLayers::PLACES));
@@ -150,6 +209,7 @@ TEST_F(LcdDetectorTests, TestEmptySearch) {
 
 TEST_F(LcdDetectorTests, TestNonEmptySearch) {
   using namespace std::chrono_literals;
+  const auto guard = test::ConfigGuard::FixedLabels(5);
   dsg->emplaceNode(DsgLayers::PLACES, 1, std::make_unique<PlaceNodeAttributes>());
   dsg->emplaceNode(DsgLayers::OBJECTS, 2, std::make_unique<ObjectNodeAttributes>());
   dsg->emplaceNode(DsgLayers::AGENTS,
@@ -167,6 +227,9 @@ TEST_F(LcdDetectorTests, TestNonEmptySearch) {
   dsg->insertEdge(1, NodeSymbol('a', 1));
 
   LcdDetector module(config);
+  module.addSensorDescriptor(*sensor, *dsg, NodeSymbol('a', 0), {});
+  module.addSensorDescriptor(*sensor, *dsg, NodeSymbol('a', 1), {});
+
   std::unordered_set<NodeId> active_places{1};
   module.updateDescriptorCache(*dsg, active_places);
   EXPECT_EQ(1u, module.numGraphDescriptors(DsgLayers::PLACES));

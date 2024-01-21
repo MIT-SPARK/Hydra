@@ -39,6 +39,7 @@
 
 #include <voxblox/mesh/marching_cubes.h>
 
+#include "hydra/common/common.h"
 #include "hydra/reconstruction/voxblox_utilities.h"
 
 namespace hydra {
@@ -114,9 +115,10 @@ void MarchingCubes::interpolateEdges(const SdfPoints& points,
       edge_point.color = interpColor(point0, point1, 0.5);
       edge_point.label = interpLabel(point0, point1, 0.5);
 
-      VLOG(15) << "- t=n/a"
-               << ", v0=" << point0.pos.transpose() << ", v1=" << point1.pos.transpose()
-               << ", coord: " << edge_point.pos.transpose();
+      VLOG(VLEVEL_EXTRA) << "- t=n/a"
+                         << ", v0=" << point0.pos.transpose()
+                         << ", v1=" << point1.pos.transpose()
+                         << ", coord: " << edge_point.pos.transpose();
 
       edge_status[i] |= 0x01;
       edge_status[i] |= 0x02;
@@ -129,9 +131,9 @@ void MarchingCubes::interpolateEdges(const SdfPoints& points,
     edge_point.color = interpColor(point0, point1, t);
     edge_point.label = interpLabel(point0, point1, t);
 
-    VLOG(15) << "- t=" << t << ", v0=" << point0.pos.transpose()
-             << ", v1=" << point1.pos.transpose()
-             << ", coord: " << edge_point.pos.transpose();
+    VLOG(VLEVEL_EXTRA) << "- t=" << t << ", v0=" << point0.pos.transpose()
+                       << ", v1=" << point1.pos.transpose()
+                       << ", coord: " << edge_point.pos.transpose();
 
     if (std::abs(t) <= 0.5) {
       edge_status[i] |= 0x01;
@@ -169,8 +171,9 @@ inline void updateVoxels(const BlockIndex& block,
   const int* pairs = ::voxblox::MarchingCubes::kEdgeIndexPairs[edge_coord];
   const uint8_t curr_status = status[edge_coord];
 
-  if (VLOG_IS_ON(15) && (curr_status & 0x01 || curr_status & 0x02)) {
-    VLOG(15) << "vertex added: " << new_vertex_index << " @ " << showIndex(block);
+  if (VLOG_IS_ON(VLEVEL_EXTRA) && (curr_status & 0x01 || curr_status & 0x02)) {
+    VLOG(VLEVEL_EXTRA) << "vertex added: " << new_vertex_index << " @ "
+                       << showIndex(block);
   }
 
   auto* first_voxel = points[pairs[0]].vertex_voxel;
@@ -194,15 +197,15 @@ void MarchingCubes::meshCube(const BlockIndex& block,
                              Mesh& mesh,
                              std::vector<uint32_t>* mesh_labels,
                              bool compute_normals) {
-  if (VLOG_IS_ON(15)) {
-    VLOG(15) << "[mesh] points: ";
+  if (VLOG_IS_ON(VLEVEL_EXTRA)) {
+    VLOG(VLEVEL_EXTRA) << "[mesh] points: ";
     for (size_t i = 0; i < 8; ++i) {
-      VLOG(15) << " - " << i << ": " << points[i];
+      VLOG(VLEVEL_EXTRA) << " - " << i << ": " << points[i];
     }
   }
 
   const int index = calculateVertexConfig(points);
-  VLOG(15) << "[mesh] vertex sdf index: " << index;
+  VLOG(VLEVEL_EXTRA) << "[mesh] vertex sdf index: " << index;
 
   if (index == 0) {
     return;  // no surface crossing in sdf cube

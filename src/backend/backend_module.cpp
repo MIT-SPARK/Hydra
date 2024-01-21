@@ -71,13 +71,11 @@ std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol 
 
 BackendModule::BackendModule(const BackendConfig& config,
                              const SharedDsgInfo::Ptr& dsg,
-                             const SharedDsgInfo::Ptr& backend_dsg,
                              const SharedModuleState::Ptr& state,
                              const LogSetup::Ptr& logs)
     : KimeraPgmoInterface(),
       config_(config::checkValid(config)),
-      shared_dsg_(dsg),
-      private_dsg_(backend_dsg),
+      private_dsg_(dsg),
       shared_places_copy_(DsgLayers::PLACES),
       state_(state) {
   KimeraPgmoInterface::config_ = config.pgmo;
@@ -98,13 +96,13 @@ BackendModule::BackendModule(const BackendConfig& config,
     logs_ = logs;
     const auto log_path = logs->getLogDir("backend");
     backend_graph_logger_.setOutputPath(log_path);
-    VLOG(1) << "[Hydra Backend] logging to " << log_path;
+    VLOG(VLEVEL_INFO) << "[Hydra Backend] logging to " << log_path;
     backend_graph_logger_.setLayerName(DsgLayers::OBJECTS, "objects");
     backend_graph_logger_.setLayerName(DsgLayers::PLACES, "places");
     backend_graph_logger_.setLayerName(DsgLayers::ROOMS, "rooms");
     backend_graph_logger_.setLayerName(DsgLayers::BUILDINGS, "buildings");
   } else {
-    VLOG(1) << "[Hydra Backend] logging disabled.";
+    VLOG(VLEVEL_INFO) << "[Hydra Backend] logging disabled.";
   }
 
   setupDefaultFunctors();
@@ -115,10 +113,7 @@ BackendModule::BackendModule(const BackendConfig& config,
   }
 }
 
-BackendModule::~BackendModule() {
-  VLOG(1) << "[Hydra Backend] destructor called!";
-  stop();
-}
+BackendModule::~BackendModule() { stop(); }
 
 void BackendModule::start() {
   spin_thread_.reset(new std::thread(&BackendModule::spin, this));
@@ -133,20 +128,21 @@ void BackendModule::stop() {
   should_shutdown_ = true;
 
   if (spin_thread_) {
-    VLOG(2) << "[Hydra Backend] joining optimizer thread and stopping";
+    VLOG(VLEVEL_TRACE) << "[Hydra Backend] joining optimizer thread and stopping";
     spin_thread_->join();
     spin_thread_.reset();
-    VLOG(2) << "[Hydra Backend] stopped!";
+    VLOG(VLEVEL_TRACE) << "[Hydra Backend] stopped!";
   }
 
   if (zmq_thread_) {
-    VLOG(2) << "[Hydra Backend] joining zmq thread and stopping";
+    VLOG(VLEVEL_TRACE) << "[Hydra Backend] joining zmq thread and stopping";
     zmq_thread_->join();
     zmq_thread_.reset();
-    VLOG(2) << "[Hydra Backend] stopped!";
+    VLOG(VLEVEL_TRACE) << "[Hydra Backend] stopped!";
   }
 
-  VLOG(2) << "[Hydra Backend]: " << state_->backend_queue.size() << " messages left";
+  VLOG(VLEVEL_TRACE) << "[Hydra Backend]: " << state_->backend_queue.size()
+                     << " messages left";
 }
 
 void BackendModule::save(const LogSetup& log_setup) {
@@ -259,26 +255,32 @@ void BackendModule::logPlaceDistance() {
 }
 
 void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
-  ScopedTimer spin_timer("backend/spin", input.timestamp_ns);
   status_.reset();
   std::lock_guard<std::mutex> lock(mutex_);
 
+  auto update_timer =
+      std::make_unique<ScopedTimer>("backend/update", input.timestamp_ns);
   updateFactorGraph(input);
   updateFromLcdQueue();
-  status_.total_loop_closures_ = num_loop_closures_;
+  status_.total_loop_closures = num_loop_closures_;
 
   if (!config_.use_mesh_subscribers) {
     copyMeshDelta(input);
   }
 
   if (!updatePrivateDsg(input.timestamp_ns, force_update)) {
+    VLOG(VLEVEL_TRACE) << "Backend skipping input @ " << input.timestamp_ns << " [ns]";
     // we only read from the frontend dsg if we've processed all the
     // factor graph update packets (as long as force_update is false)
     // we still log the status for each received frontend packet
     logStatus();
+    update_timer.reset();  // mark update from dsg finished
     return;
   }
 
+  update_timer.reset();  // mark update from dsg finished
+
+  ScopedTimer spin_timer("backend/spin", input.timestamp_ns);
   if (have_loopclosures_ && VLOG_IS_ON(1)) {
     logPlaceDistance();
   }
@@ -326,11 +328,11 @@ void BackendModule::setUpdateFuncs() {
   dsg_update_funcs_.push_back(&dsg_updates::updateAgents);
   for (auto&& [layer, functor] : layer_functors_) {
     if (!functor) {
-      VLOG(5) << "Skipping invalid functor for layer: " << layer;
+      VLOG(VLEVEL_FILE) << "Skipping invalid functor for layer: " << layer;
       continue;
     }
 
-    VLOG(5) << "Registering update function for layer: " << layer;
+    VLOG(VLEVEL_FILE) << "Registering update function for layer: " << layer;
     const auto hooks = functor->hooks();
     dsg_update_funcs_.push_back(hooks.update);
     if (hooks.cleanup) {
@@ -414,8 +416,8 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
     return;
   }
 
-  status_.new_graph_factors_ = input.deformation_graph->edges.size();
-  status_.new_factors_ += input.deformation_graph->edges.size();
+  status_.new_graph_factors = input.deformation_graph->edges.size();
+  status_.new_factors += input.deformation_graph->edges.size();
 
   try {
     processIncrementalMeshGraph(
@@ -426,10 +428,10 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
   }
 
   for (const auto& msg : input.pose_graphs) {
-    status_.new_factors_ += msg->edges.size();
+    status_.new_factors += msg->edges.size();
 
-    VLOG(5) << "[Hydra Backend] Adding pose graph message: "
-            << logPoseGraphConnections(*msg);
+    VLOG(VLEVEL_FILE) << "[Hydra Backend] Adding pose graph message: "
+                      << logPoseGraphConnections(*msg);
     processIncrementalPoseGraph(msg, &trajectory_, &unconnected_nodes_, &timestamps_);
     logIncrementalLoopClosures(*msg);
   }
@@ -447,12 +449,12 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
   }
 
   if (num_loop_closures_ > 0) {
-    status_.new_loop_closures_ = num_loop_closures_ - prev_loop_closures;
+    status_.new_loop_closures = num_loop_closures_ - prev_loop_closures;
     have_loopclosures_ = true;
   }
-  status_.trajectory_len_ = trajectory_.size();
-  status_.total_factors_ = deformation_graph_->getGtsamFactors().size();
-  status_.total_values_ = deformation_graph_->getGtsamValues().size();
+  status_.trajectory_len = trajectory_.size();
+  status_.total_factors = deformation_graph_->getGtsamFactors().size();
+  status_.total_values = deformation_graph_->getGtsamValues().size();
 }
 
 bool BackendModule::updateFromLcdQueue() {
@@ -476,7 +478,7 @@ bool BackendModule::updateFromLcdQueue() {
     have_loopclosures_ = true;
     have_new_loopclosures_ = true;
     num_loop_closures_++;
-    status_.new_loop_closures_++;
+    status_.new_loop_closures++;
   }
 
   return added_new_loop_closure;
@@ -501,12 +503,14 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
 
 bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
   std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
-  {                   // start joint critical section
+  {  // start joint critical section
+    ScopedTimer timer("backend/read_graph", timestamp_ns);
     cachePlacePos();  // save place positions before grabbing new attributes from
                       // frontend
 
-    std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
-    if (!force_update && shared_dsg_->last_update_time > timestamp_ns) {
+    const auto& shared_dsg = *state_->backend_graph;
+    std::unique_lock<std::mutex> shared_graph_lock(shared_dsg.mutex);
+    if (!force_update && shared_dsg.last_update_time > timestamp_ns) {
       return false;
     }
 
@@ -514,13 +518,13 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
     merge_config.previous_merges = &merge_handler_->mergedNodes();
     merge_config.update_layer_attributes = &config_.merge_update_map;
     merge_config.update_dynamic_attributes = config_.merge_update_dynamic;
-    private_dsg_->graph->mergeGraph(*shared_dsg_->graph, merge_config);
+    private_dsg_->graph->mergeGraph(*shared_dsg.graph, merge_config);
 
     // update merge book-keeping and optionally update merged node
     // connections and attributes
-    merge_handler_->updateFromUnmergedGraph(*shared_dsg_->graph);
+    merge_handler_->updateFromUnmergedGraph(*shared_dsg.graph);
 
-    const auto& objects = shared_dsg_->graph->getLayer(DsgLayers::OBJECTS);
+    const auto& objects = shared_dsg.graph->getLayer(DsgLayers::OBJECTS);
     for (const auto& id_node_pair : objects.nodes()) {
       const auto node_opt = private_dsg_->graph->getNode(id_node_pair.first);
       if (!node_opt) {
@@ -537,9 +541,9 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
       private_attrs.is_active = attrs.is_active;
     }
 
-    if (shared_dsg_->graph->hasLayer(DsgLayers::PLACES)) {
+    if (shared_dsg.graph->hasLayer(DsgLayers::PLACES)) {
       // TODO(nathan) simplify
-      const auto& places = shared_dsg_->graph->getLayer(DsgLayers::PLACES);
+      const auto& places = shared_dsg.graph->getLayer(DsgLayers::PLACES);
       shared_places_copy_.mergeLayer(places, {});
       std::vector<NodeId> removed_place_nodes;
       places.getRemovedNodes(removed_place_nodes);
@@ -695,21 +699,21 @@ void BackendModule::runZmqUpdates() {
 
       auto node_opt = private_dsg_->graph->getNode(id_node_pair.first);
       if (!node_opt) {
-        VLOG(1) << "received update for node "
-                << NodeSymbol(id_node_pair.first).getLabel()
-                << " but node no longer exists";
+        VLOG(VLEVEL_TRACE) << "received update for node "
+                           << NodeSymbol(id_node_pair.first).getLabel()
+                           << " but node no longer exists";
         continue;
       }
 
-      VLOG(2) << "assiging name " << new_name << " to "
-              << NodeSymbol(id_node_pair.first).getLabel();
+      VLOG(VLEVEL_TRACE) << "assiging name " << new_name << " to "
+                         << NodeSymbol(id_node_pair.first).getLabel();
       node_opt->get().attributes<SemanticNodeAttributes>().name = new_name;
     }
   }
 }
 
 void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
-  //deformation_graph_->update();
+  // deformation_graph_->update();
   if (!force_mesh_update && !have_new_mesh_) {
     return;
   }
@@ -728,7 +732,7 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
   }
 
   ScopedTimer timer("backend/mesh_deformation", timestamp_ns);
-  VLOG(3) << "Deforming mesh with " << mesh->numVertices() << " vertices";
+  VLOG(VLEVEL_TRACE) << "Deforming mesh with " << mesh->numVertices() << " vertices";
 
   kimera_pgmo::ConstStampedCloud<pcl::PointXYZ> cloud_in{*original_vertices_,
                                                          vertex_stamps_};
@@ -825,7 +829,7 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
                         &complete_agent_values};
 
   if (config_.enable_merge_undos) {
-    status_.num_merges_undone_ =
+    status_.num_merges_undone =
         merge_handler_->checkAndUndo(*private_dsg_->graph, info);
   }
 
@@ -865,14 +869,14 @@ void BackendModule::logStatus(bool init) const {
   const auto& timer = hydra::timing::ElapsedTimeRecorder::instance();
   const double nan = std::numeric_limits<double>::quiet_NaN();
   file.open(filename, std::ofstream::out | std::ofstream::app);
-  file << status_.total_loop_closures_ << "," << status_.new_loop_closures_ << ","
-       << status_.total_factors_ << "," << status_.total_values_ << ","
-       << status_.new_factors_ << "," << status_.new_graph_factors_ << ","
-       << status_.trajectory_len_ << ","
+  file << status_.total_loop_closures << "," << status_.new_loop_closures << ","
+       << status_.total_factors << "," << status_.total_values << ","
+       << status_.new_factors << "," << status_.new_graph_factors << ","
+       << status_.trajectory_len << ","
        << timer.getLastElapsed("backend/spin").value_or(nan) << ","
        << timer.getLastElapsed("backend/optimization").value_or(nan) << ","
        << timer.getLastElapsed("backend/mesh_update").value_or(nan) << ","
-       << status_.num_merges_undone_ << std::endl;
+       << status_.num_merges_undone << std::endl;
   file.close();
   return;
 }

@@ -49,7 +49,6 @@ namespace hydra {
 class LoopClosureModule : public Module {
  public:
   LoopClosureModule(const LoopClosureConfig& config,
-                    const SharedDsgInfo::Ptr& dsg,
                     const SharedModuleState::Ptr& state);
 
   virtual ~LoopClosureModule();
@@ -78,18 +77,30 @@ class LoopClosureModule : public Module {
   std::optional<NodeId> getQueryAgentId(size_t timestamp_ns);
 
  protected:
+  struct Measurement {
+    NodeId node_id;
+    std::shared_ptr<FrameData> data;
+    Sensor::Ptr sensor;
+  };
+
   std::atomic<bool> should_shutdown_{false};
   std::unique_ptr<std::thread> spin_thread_;
 
   LoopClosureConfig config_;
-  SharedDsgInfo::Ptr dsg_;
   SharedModuleState::Ptr state_;
 
+  std::vector<Measurement> new_measurements_;
   std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> agent_queue_;
   std::list<NodeId> potential_lcd_root_nodes_;
 
   std::unique_ptr<lcd::LcdDetector> lcd_detector_;
   DynamicSceneGraph::Ptr lcd_graph_;
+
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<LoopClosureModule,
+                                     LoopClosureModule,
+                                     LoopClosureConfig,
+                                     SharedModuleState::Ptr>("LoopClosureModule");
 };
 
 }  // namespace hydra

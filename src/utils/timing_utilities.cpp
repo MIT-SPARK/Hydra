@@ -44,6 +44,7 @@
 #include <numeric>
 #include <sstream>
 
+#include "hydra/common/common.h"
 #include "hydra/utils/log_utilities.h"
 
 namespace hydra {
@@ -210,7 +211,7 @@ std::string ElapsedTimeRecorder::getPrintableStats() const {
 
 void ElapsedTimeRecorder::logElapsed(const std::string& name,
                                      const LogSetup& log_setup) const {
-  VLOG(5) << "Saving timer '" << name << "'";
+  VLOG(VLEVEL_FILE) << "Saving timer '" << name << "'";
 
   const auto output_csv = log_setup.getTimerFilepath(name);
   std::ofstream output_file;
@@ -233,8 +234,8 @@ void ElapsedTimeRecorder::logElapsed(const std::string& name,
     stamps = stamps_.at(name);
   }  // end critical section
 
-  VLOG(1) << "Writing " << durations.size() << " measurements for timer '" << name
-          << "' to '" << output_csv << "'";
+  VLOG(VLEVEL_TRACE) << "Writing " << durations.size() << " measurements for timer '"
+                     << name << "' to '" << output_csv << "'";
 
   std::stringstream ss;
   ss << "timestamp(ns),elapsed(s)\n";
@@ -244,10 +245,10 @@ void ElapsedTimeRecorder::logElapsed(const std::string& name,
     std::chrono::duration<double> elapsed_s = *d_it;
     ss << *s_it << "," << elapsed_s.count() << "\n";
   }
-  
+
   output_file << ss.str();
   output_file.close();
-  VLOG(5) << "Saved timer '" << name << "'";
+  VLOG(VLEVEL_FILE) << "Saved timer '" << name << "'";
 }
 
 void ElapsedTimeRecorder::setupIncrementalLogging(const LogSetup::Ptr& log_setup) {
@@ -265,7 +266,7 @@ void ElapsedTimeRecorder::logAllElapsed(const LogSetup& log_setup) const {
   }
 
   std::list<std::string> all_timers;
-  VLOG(5) << "Getting timer names...";
+  VLOG(VLEVEL_FILE) << "Getting timer names...";
   {  // start critical region
     std::unique_lock<std::mutex> lock(mutex_);
     for (const auto& str_timer_pair : elapsed_) {
@@ -273,7 +274,7 @@ void ElapsedTimeRecorder::logAllElapsed(const LogSetup& log_setup) const {
     }
   }  // end critical region
 
-  VLOG(5) << "Saving timers: [" << all_timers << "]";
+  VLOG(VLEVEL_FILE) << "Saving timers: [" << all_timers << "]";
 
   for (const auto& name : all_timers) {
     logElapsed(name, log_setup);

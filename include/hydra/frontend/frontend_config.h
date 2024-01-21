@@ -39,18 +39,19 @@
 #include "hydra/frontend/mesh_segmenter_config.h"
 #include "hydra/places/graph_extractor_interface.h"
 #include "hydra/places/gvd_integrator_config.h"
+#include "hydra/utils/pose_graph_tracker.h"
 
 namespace hydra {
 
 struct FrontendConfig {
   size_t min_object_vertices = 20;
   bool prune_mesh_indices = false;
-  bool lcd_use_bow_vectors = true;
   kimera_pgmo::MeshFrontendConfig pgmo_config;
   MeshSegmenterConfig object_config;
   bool validate_vertices = false;
   bool filter_places = true;
   size_t min_places_component_size = 3;
+  PoseGraphTracker::Config pose_graphs;
   places::GvdIntegratorConfig gvd;
   config::VirtualConfig<places::GraphExtractorInterface> graph_extractor;
 };

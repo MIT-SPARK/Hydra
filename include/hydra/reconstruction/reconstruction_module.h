@@ -45,7 +45,6 @@
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/reconstruction/volumetric_map.h"
 #include "hydra/utils/log_utilities.h"
-#include "hydra/utils/pose_graph_tracker.h"
 
 namespace hydra {
 
@@ -88,29 +87,26 @@ class ReconstructionModule : public Module {
 
   void addVisualizationCallback(const VizCallback& callback);
 
-  inline const VolumetricMap* getMap() const { return map_.get(); }
+  const VolumetricMap* getMap() const { return map_.get(); }
+
+  ReconstructionInputQueue::Ptr queue() const { return queue_; }
 
  protected:
   bool update(const ReconstructionInput& msg, bool full_update);
 
   voxblox::BlockIndexList findBlocksToArchive(const Eigen::Vector3f& center) const;
 
-  void fillOutput(const ReconstructionInput& input, ReconstructionOutput& output);
+  void fillOutput(ReconstructionOutput& output);
 
-  OutputMsgStatus getNextOutputMessage();
+ public:
+  const ReconstructionConfig config;
 
  protected:
-  const ReconstructionConfig config_;
-  const std::unique_ptr<Sensor> sensor_;
-
   std::atomic<bool> should_shutdown_{false};
   ReconstructionInputQueue::Ptr queue_;
   std::unique_ptr<std::thread> spin_thread_;
   size_t num_poses_received_;
 
-  pose_graph_tools_msgs::PoseGraph agent_node_measurements_;
-  PoseGraphTracker::Ptr pose_graph_tracker_;
-  ReconstructionOutput::Ptr pending_output_;
   OutputQueue::Ptr output_queue_;
 
   std::unique_ptr<VolumetricMap> map_;

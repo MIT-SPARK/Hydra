@@ -78,7 +78,7 @@ inline void emplaceObjectNode(DynamicSceneGraph& graph,
 
 TEST(GnnLcdTests, testEmptyDescriptor) {
   SubgraphConfig config;
-  PlaceGnnDescriptor factory(test::get_resource_path("loop_closure/places.onnx"),
+  PlaceGnnDescriptor factory(test::get_resource_path("loop_closure/gnn/places.onnx"),
                              config);
 
   DynamicSceneGraph graph;
@@ -92,7 +92,7 @@ TEST(GnnLcdTests, testPlacesTensors) {
   config.max_radius_m = 5.0;
   config.min_radius_m = 2.0;
   config.min_nodes = 10;
-  PlaceGnnDescriptor factory(test::get_resource_path("loop_closure/places.onnx"),
+  PlaceGnnDescriptor factory(test::get_resource_path("loop_closure/gnn/places.onnx"),
                              config);
 
   size_t node_idx = 0;
@@ -140,7 +140,7 @@ TEST(GnnLcdTests, testObjectTensors) {
   Eigen::VectorXf fake_embedding(2);
   fake_embedding << 1.0, 2.0;
 
-  ObjectGnnDescriptor factory(test::get_resource_path("loop_closure/objects.onnx"),
+  ObjectGnnDescriptor factory(test::get_resource_path("loop_closure/gnn/objects.onnx"),
                               config,
                               0.1,
                               {{0, fake_embedding}});
@@ -181,8 +181,8 @@ TEST(GnnLcdTests, testObjectTensors) {
 }
 
 TEST(GnnLcdTests, testLoadEmbeddings) {
-  const auto embeddings =
-      loadLabelEmbeddings(test::get_resource_path("loop_closure/test_embeddings.yaml"));
+  const auto embeddings = loadLabelEmbeddings(
+      test::get_resource_path("loop_closure/gnn/test_embeddings.yaml"));
 
   ObjectGnnDescriptor::LabelEmbeddings expected_embeddings;
   expected_embeddings[0] = Eigen::VectorXf(4);
@@ -215,7 +215,7 @@ TEST(GnnLcdTests, testPlacesDescriptor) {
   config.max_radius_m = 5.0;
   config.min_radius_m = 2.0;
   config.min_nodes = 10;
-  PlaceGnnDescriptor factory(test::get_resource_path("loop_closure/places.onnx"),
+  PlaceGnnDescriptor factory(test::get_resource_path("loop_closure/gnn/places.onnx"),
                              config);
 
   DynamicSceneGraph graph;
@@ -255,7 +255,7 @@ TEST(GnnLcdTests, testObjectDescriptor) {
   Eigen::VectorXf fake_embedding(2);
   fake_embedding << 1.0, 1.0;
 
-  ObjectGnnDescriptor factory(test::get_resource_path("loop_closure/objects.onnx"),
+  ObjectGnnDescriptor factory(test::get_resource_path("loop_closure/gnn/objects.onnx"),
                               config,
                               0.1,
                               {{0, fake_embedding}});
@@ -306,7 +306,7 @@ TEST(GnnLcdTests, testPlacesPosDescriptor) {
   config.min_radius_m = 2.0;
   config.min_nodes = 10;
   PlaceGnnDescriptor factory(
-      test::get_resource_path("loop_closure/places_pos.onnx"), config, false);
+      test::get_resource_path("loop_closure/gnn/places_pos.onnx"), config, false);
 
   DynamicSceneGraph graph;
   const auto& root_node = makeDefaultAgentNode(graph);
@@ -348,11 +348,12 @@ TEST(GnnLcdTests, testObjectPosDescriptor) {
   Eigen::VectorXf fake_embedding(2);
   fake_embedding << 4.0, 5.0;
 
-  ObjectGnnDescriptor factory(test::get_resource_path("loop_closure/objects_pos.onnx"),
-                              config,
-                              1.6,
-                              {{0, fake_embedding}},
-                              false);
+  ObjectGnnDescriptor factory(
+      test::get_resource_path("loop_closure/gnn/objects_pos.onnx"),
+      config,
+      1.6,
+      {{0, fake_embedding}},
+      false);
 
   DynamicSceneGraph graph;
   const auto& root_node = makeDefaultAgentNode(graph);

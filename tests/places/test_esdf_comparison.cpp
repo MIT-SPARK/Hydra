@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
+#include <hydra/common/common.h>
 #include <hydra/places/gvd_integrator.h>
 #include <hydra/reconstruction/combo_integrator.h>
 #include <voxblox/integrator/esdf_integrator.h>
@@ -117,11 +118,11 @@ TEST_F(EsdfTestFixture, DISABLED_TestEsdfSame) {
 
   LayerComparisonResult voxblox_results =
       compareLayers(original_layer, simulation_esdf, &test::esdfVoxelsSame);
-  VLOG(3) << "Voxblox " << voxblox_results;
+  VLOG(VLEVEL_TRACE) << "Voxblox " << voxblox_results;
 
   LayerComparisonResult gvd_results =
       compareLayers(*gvd_layer, simulation_esdf, &test::gvdEsdfVoxelsSame);
-  VLOG(3) << "GVD " << gvd_results;
+  VLOG(VLEVEL_TRACE) << "GVD " << gvd_results;
 
   EXPECT_LT(gvd_results.rmse, voxblox_results.rmse);
 }

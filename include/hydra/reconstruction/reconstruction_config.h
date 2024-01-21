@@ -37,8 +37,6 @@
 
 #include "hydra/reconstruction/mesh_integrator_config.h"
 #include "hydra/reconstruction/projective_integrator_config.h"
-#include "hydra/reconstruction/sensor.h"
-#include "hydra/utils/pose_graph_tracker.h"
 
 namespace hydra {
 
@@ -49,13 +47,10 @@ struct ReconstructionConfig {
   double dense_representation_radius_m = 5.0;
   size_t num_poses_per_update = 1;
   size_t max_input_queue_size = 0;
-  bool copy_dense_representations = true;
   float semantic_measurement_probability = 0.9;
 
   ProjectiveIntegratorConfig tsdf;
   MeshIntegratorConfig mesh;
-  config::VirtualConfig<Sensor> sensor;
-  PoseGraphTracker::Config pose_graphs;
 };
 
 void declare_config(ReconstructionConfig& conf);

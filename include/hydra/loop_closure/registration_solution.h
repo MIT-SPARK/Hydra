@@ -33,6 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include "hydra/common/dsg_types.h"
+
 #include <Eigen/Geometry>
 #include <cstdint>
 

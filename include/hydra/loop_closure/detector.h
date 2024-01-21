@@ -33,59 +33,53 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/virtual_config.h>
+
 #include "hydra/loop_closure/descriptor_matching.h"
-#include "hydra/loop_closure/registration.h"
-#include "hydra/loop_closure/scene_graph_descriptors.h"
+#include "hydra/loop_closure/graph_descriptor_factory.h"
+#include "hydra/loop_closure/graph_registration.h"
+#include "hydra/loop_closure/sensor_descriptor_factory.h"
+#include "hydra/loop_closure/sensor_registration.h"
 
-namespace hydra {
-namespace lcd {
-
-struct GnnLcdConfig {
-  bool use_onehot_encoding = true;
-  size_t onehot_encoding_dim = 39;
-  std::string label_embeddings_file;
-  double object_connection_radius_m;
-  std::string object_model_path;
-  std::string places_model_path;
-  bool places_pos_in_feature = false;
-  bool objects_pos_in_feature = false;
-};
+namespace hydra::lcd {
 
 struct LayerLcdConfig {
+  LayerId layer;
+  config::VirtualConfig<GraphDescriptorFactory> descriptors;
   DescriptorMatchConfig matching;
-  LayerRegistrationConfig registration;
+  config::VirtualConfig<GraphRegistrationSolver> registration;
 };
+
+void declare_config(LayerLcdConfig& conf);
+
+struct SensorLcdConfig {
+  config::VirtualConfig<SensorDescriptorFactory> descriptors;
+  DescriptorMatchConfig matching;
+  config::VirtualConfig<SensorRegistrationSolver> registration;
+};
+
+void declare_config(SensorLcdConfig& conf);
 
 struct LcdDetectorConfig {
-  TeaserParams teaser_config;
-  bool enable_agent_registration = true;
-  DescriptorMatchConfig agent_search_config;
-
-  // TODO(nathan) refactor this
-  LayerLcdConfig objects;
-  LayerLcdConfig places;
-
-  SubgraphConfig object_extraction{5.0};
-  SubgraphConfig places_extraction{5.0};
-
-  size_t num_semantic_classes = 20;
-  HistogramConfig<double> place_histogram_config{0.5, 2.5, 30};
-  bool use_gnn_descriptors = false;
-  GnnLcdConfig gnn_lcd;
+  SensorLcdConfig agent_config;
+  std::vector<LayerLcdConfig> graph_configs;
 };
+
+void declare_config(LcdDetectorConfig& conf);
 
 class LcdDetector {
  public:
-  using FactoryMap = std::map<LayerId, DescriptorFactory::Ptr>;
+  using FactoryMap = std::map<LayerId, GraphDescriptorFactory::Ptr>;
   using SearchResultMap = std::map<size_t, LayerSearchResults>;
 
   explicit LcdDetector(const LcdDetectorConfig& config);
 
-  void setDescriptorFactories(FactoryMap&& factories);
+  void addSensorDescriptor(const Sensor& sensor,
+                           const DynamicSceneGraph& graph,
+                           const NodeId agent_id,
+                           const FrameData& data);
 
-  void setRegistrationSolver(size_t level, DsgRegistrationSolver::Ptr&& solver);
-
-  void updateDescriptorCache(const DynamicSceneGraph& dsg,
+  void updateDescriptorCache(const DynamicSceneGraph& graph,
                              const std::unordered_set<NodeId>& archived_places,
                              uint64_t timestamp = 0);
 
@@ -107,40 +101,40 @@ class LcdDetector {
 
   void dumpDescriptors(const std::string& log_path) const;
 
+ public:
+  const LcdDetectorConfig config;
+
  protected:
-  void makeDefaultDescriptorFactories();
+  Descriptor* getAgentDescriptor(const DynamicSceneGraphNode& node);
 
-  void resetLayerAssignments(
-      const std::map<LayerId, DescriptorMatchConfig>& match_configs,
-      const std::map<LayerId, LayerRegistrationConfig>& reg_configs);
-
-  bool addNewDescriptors(const DynamicSceneGraph& graph,
-                         const DynamicSceneGraphNode& agent_node);
+  RegistrationSolution registerAgent(const DynamicSceneGraph& graph,
+                                     const LayerSearchResults& match,
+                                     NodeId agent_id,
+                                     uint64_t timestamp) const;
 
   std::vector<RegistrationSolution> registerAndVerify(const DynamicSceneGraph& dsg,
                                                       const SearchResultMap& matches,
                                                       NodeId agent_node,
                                                       uint64_t timestamp = 0) const;
 
-  LcdDetectorConfig config_;
-  DescriptorFactory::Ptr agent_factory_;
+  SensorDescriptorFactory::Ptr agent_factory_;
   FactoryMap layer_factories_;
 
   LayerId root_layer_;
   size_t max_internal_index_;
-  std::map<LayerId, size_t> layer_to_internal_index_;
   std::map<size_t, LayerId> internal_index_to_layer_;
-
   std::map<size_t, DescriptorMatchConfig> match_config_map_;
-  std::map<size_t, DsgRegistrationSolver::Ptr> registration_solvers_;
-  // std::map<size_t, ValidationFunc> validation_funcs_;
+
+  SensorRegistrationSolver::Ptr agent_registration_;
+  std::map<size_t, GraphRegistrationSolver::Ptr> registration_solvers_;
 
   std::map<LayerId, DescriptorCache> cache_map_;
   std::map<NodeId, DescriptorCache> leaf_cache_;
   std::map<NodeId, std::set<NodeId>> root_leaf_map_;
+  std::map<NodeId, Descriptor::Ptr> queued_agent_descriptors_;
+  std::map<NodeId, SensorFeatures::Ptr> agent_features_;
 
   std::map<size_t, LayerSearchResults> matches_;
 };
 
-}  // namespace lcd
-}  // namespace hydra
+}  // namespace hydra::lcd

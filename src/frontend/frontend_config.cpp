@@ -58,13 +58,13 @@ void declare_config(FrontendConfig& conf) {
   name("FrontendConfig");
   field(conf.min_object_vertices, "min_object_vertices");
   field(conf.prune_mesh_indices, "prune_mesh_indices");
-  field(conf.lcd_use_bow_vectors, "lcd_use_bow_vectors");
   field(conf.pgmo_config, "pgmo");
   field(conf.object_config, "objects");
   field(conf.object_config.angle_step, "angle_step");
   field(conf.validate_vertices, "validate_vertices");
   field(conf.filter_places, "filter_places");
   field(conf.min_places_component_size, "min_places_component_size");
+  field(conf.pose_graphs, "pose_graphs");
 
   field(conf.gvd, "gvd");
   conf.graph_extractor.setOptional();

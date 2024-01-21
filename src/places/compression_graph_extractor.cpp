@@ -36,6 +36,7 @@
 
 #include <glog/stl_logging.h>
 
+#include "hydra/common/common.h"
 #include "hydra/places/graph_extractor_utilities.h"
 #include "hydra/places/nearest_voxel_utilities.h"
 #include "hydra/utils/timing_utilities.h"
@@ -264,8 +265,8 @@ void CompressionGraphExtractor::clearCompressionId(uint64_t node_id, bool is_del
   }
 
   compressed_info_map_.erase(node_id);
-  VLOG(10) << (is_delete ? "deleting " : "archiving ") << node_id
-           << " from compressed graph";
+  VLOG(VLEVEL_DEBUG) << (is_delete ? "deleting " : "archiving ") << node_id
+                     << " from compressed graph";
 }
 
 void CompressionGraphExtractor::deleteChildren(const CompressedNode& info) {
@@ -326,8 +327,8 @@ void CompressionGraphExtractor::fillSeenVoxels(const GvdLayer& layer,
     const GvdVoxel* voxel = layer.getVoxelPtrByGlobalIndex(index);
     if (voxel == nullptr) {
       // this should only happen when we encounter voxels from archived blocks
-      VLOG(10) << "[Graph Extraction] Invalid index: " << index.transpose()
-               << " found in extraction input queue";
+      VLOG(VLEVEL_DEBUG) << "[Graph Extraction] Invalid index: " << index.transpose()
+                         << " found in extraction input queue";
       continue;
     }
 

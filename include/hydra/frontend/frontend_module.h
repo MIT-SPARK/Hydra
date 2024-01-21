@@ -50,6 +50,7 @@
 #include "hydra/frontend/place_extractor_interface.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/utils/log_utilities.h"
+#include "hydra/utils/pose_graph_tracker.h"
 
 namespace kimera_pgmo {
 class DeltaCompression;
@@ -64,11 +65,11 @@ class FrontendModule : public Module {
  public:
   using Ptr = std::shared_ptr<FrontendModule>;
   using FrontendInputQueue = InputQueue<ReconstructionOutput::Ptr>;
-  using InputCallback = std::function<void(const ReconstructionOutput&)>;
-  using OutputCallback = std::function<void(
-      const DynamicSceneGraph& graph, const BackendInput& backend_input, uint64_t)>;
   using DynamicLayer = DynamicSceneGraphLayer;
   using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
+  using InputCallback = std::function<void(const ReconstructionOutput&)>;
+  using OutputCallback =
+      std::function<void(const DynamicSceneGraph&, const BackendInput&, uint64_t)>;
   using PlaceVizCallback = std::function<void(uint64_t,
                                               const voxblox::Layer<places::GvdVoxel>&,
                                               const places::GraphExtractorInterface*)>;
@@ -111,9 +112,11 @@ class FrontendModule : public Module {
  protected:
   virtual void initCallbacks();
 
-  void spinOnce(const ReconstructionOutput& msg);
+  void dispatchSpin(ReconstructionOutput::Ptr msg);
 
-  virtual void updateImpl(const ReconstructionOutput& msg);
+  void spinOnce(const ReconstructionOutput::Ptr& msg);
+
+  virtual void updateImpl(const ReconstructionOutput::Ptr& msg);
 
  protected:
   void updateMesh(const ReconstructionOutput& msg);
@@ -127,8 +130,6 @@ class FrontendModule : public Module {
   void updatePoseGraph(const ReconstructionOutput& msg);
 
  protected:
-  void assignBowVectors(const DynamicLayer& agents);
-
   void invalidateMeshEdges(const kimera_pgmo::MeshDelta& delta);
 
   void archivePlaces(const NodeIdSet active_places);
@@ -139,7 +140,16 @@ class FrontendModule : public Module {
 
   void updatePlaceMeshMapping(const ReconstructionOutput& input);
 
+  void processNextInput(const ReconstructionOutput& msg);
+
  protected:
+  using InputPtrCallback = std::function<void(const ReconstructionOutput::Ptr&)>;
+
+  struct SensorDataPair {
+    std::shared_ptr<FrameData> data;
+    Sensor::Ptr sensor;
+  };
+
   const FrontendConfig config_;
 
   bool initialized_ = false;
@@ -147,6 +157,7 @@ class FrontendModule : public Module {
   std::atomic<bool> should_shutdown_{false};
   std::unique_ptr<std::thread> spin_thread_;
   FrontendInputQueue::Ptr queue_;
+  std::atomic<bool> spin_finished_;
 
   LcdInput::Ptr lcd_input_;
   BackendInput::Ptr backend_input_;
@@ -167,12 +178,16 @@ class FrontendModule : public Module {
   std::unique_ptr<NearestNodeFinder> places_nn_finder_;
   NodeIdSet unlabeled_place_nodes_;
   NodeIdSet previous_active_places_;
-  std::map<NodeId, size_t> agent_key_map_;
   std::map<LayerPrefix, size_t> last_agent_edge_index_;
   std::map<LayerPrefix, std::set<size_t>> active_agent_nodes_;
-  std::list<pose_graph_tools_msgs::BowQuery::ConstPtr> cached_bow_messages_;
+  PoseGraphTracker::Ptr pose_graph_tracker_;
+
+  std::mutex sensor_mutex_;
+  std::map<NodeId, SensorDataPair> sensor_cache_;
+  std::map<size_t, Sensor::Ptr> keyframe_sensor_map_;
 
   std::vector<InputCallback> input_callbacks_;
+  std::vector<InputPtrCallback> input_dispatches_;
   std::vector<InputCallback> post_mesh_callbacks_;
   std::vector<OutputCallback> output_callbacks_;
 

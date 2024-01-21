@@ -86,23 +86,19 @@ void HydraPythonPipeline::init(const PythonConfig& config) {
   modules_["backend"] = backend_;
 
   if (HydraConfig::instance().getConfig().enable_lcd) {
-    auto lcd_config = config::fromYaml<LoopClosureConfig>(node);
-    lcd_config.detector.num_semantic_classes = HydraConfig::instance().getTotalLabels();
-    config::checkValid(lcd_config);
-
     shared_state_->lcd_queue.reset(new InputQueue<LcdInput::Ptr>());
-    loop_closure_ =
-        std::make_shared<LoopClosureModule>(lcd_config, frontend_dsg_, shared_state_);
+    loop_closure_ = config::createFromYamlWithNamespace<LoopClosureModule>(
+        node, "loop_closure", frontend_dsg_, shared_state_);
     modules_["lcd"] = loop_closure_;
   }
 
-  showModuleInfo();
+  showModules();
   VLOG(config_verbosity_) << HydraConfig::instance();
 }
 
 void HydraPythonPipeline::start() {
   if (step_mode_only_) {
-    showModuleInfo();
+    showModules();
   } else {
     HydraPipeline::start();
   }

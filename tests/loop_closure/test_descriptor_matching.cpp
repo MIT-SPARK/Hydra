@@ -38,7 +38,7 @@
 namespace hydra {
 namespace lcd {
 
-TEST(LoopClosureModuleMatchingTests, TestCosineDistanceFixedSize) {
+TEST(DescriptorMatchingTests, TestCosineDistanceFixedSize) {
   Descriptor d1;
   d1.values.resize(5, 1);
   d1.values << 1.0f, 2.0f, 3.0f, 4.0f, 5.0f;
@@ -91,7 +91,7 @@ TEST(LoopClosureModuleMatchingTests, TestCosineDistanceFixedSize) {
   }
 }
 
-TEST(LoopClosureModuleMatchingTests, TestCosineDistanceVariableSize) {
+TEST(DescriptorMatchingTests, TestCosineDistanceVariableSize) {
   Descriptor d1;
   d1.values.resize(5, 1);
   d1.words.resize(5, 1);
@@ -122,7 +122,7 @@ TEST(LoopClosureModuleMatchingTests, TestCosineDistanceVariableSize) {
   }
 }
 
-TEST(LoopClosureModuleMatchingTests, TestComputeL1DistanceBow) {
+TEST(DescriptorMatchingTests, TestComputeL1DistanceBow) {
   Descriptor d1;
   d1.values.resize(5, 1);
   d1.words.resize(5, 1);
@@ -163,7 +163,7 @@ TEST(LoopClosureModuleMatchingTests, TestComputeL1DistanceBow) {
   }
 }
 
-TEST(LoopClosureModuleMatchingTests, TestComputeL1DistanceFixed) {
+TEST(DescriptorMatchingTests, TestComputeL1DistanceFixed) {
   Descriptor d1;
   d1.values.resize(5, 1);
   d1.values << 1.0f, 2.0f, 3.0f, 4.0f, 5.0f;
@@ -188,7 +188,7 @@ TEST(LoopClosureModuleMatchingTests, TestComputeL1DistanceFixed) {
   }
 }
 
-TEST(LoopClosureModuleMatchingTests, TestComputeL1DistanceEmpty) {
+TEST(DescriptorMatchingTests, TestComputeL1DistanceEmpty) {
   Descriptor d1;
   d1.values.resize(5, 1);
   d1.values.setZero();
@@ -207,7 +207,7 @@ TEST(LoopClosureModuleMatchingTests, TestComputeL1DistanceEmpty) {
   }
 }
 
-TEST(LoopClosureModuleMatchingTests, TestComputeCosDistanceEmpty) {
+TEST(DescriptorMatchingTests, TestComputeCosDistanceEmpty) {
   Descriptor d1;
   d1.values.resize(5, 1);
   d1.values.setZero();
@@ -243,7 +243,7 @@ void fillDescriptor(Descriptor& descriptor, NodeId root, std::set<NodeId> nodes)
   descriptor.nodes = nodes;
 }
 
-TEST(LoopClosureModuleMatchingTests, SearchDescriptorsNoValid) {
+TEST(DescriptorMatchingTests, SearchDescriptorsNoValid) {
   Descriptor::Ptr query = makeDescriptor(1.0f);
 
   DescriptorMatchConfig config;
@@ -270,7 +270,7 @@ TEST(LoopClosureModuleMatchingTests, SearchDescriptorsNoValid) {
   EXPECT_TRUE(results.match_nodes.empty());
 }
 
-TEST(LoopClosureModuleMatchingTests, SearchDescriptorsValidNoMatches) {
+TEST(DescriptorMatchingTests, SearchDescriptorsValidNoMatches) {
   Descriptor::Ptr query = makeDescriptor(1.0f);
 
   DescriptorMatchConfig config;
@@ -298,7 +298,7 @@ TEST(LoopClosureModuleMatchingTests, SearchDescriptorsValidNoMatches) {
   EXPECT_TRUE(results.match_nodes.empty());
 }
 
-TEST(LoopClosureModuleMatchingTests, SearchDescriptorsValidSomeMatches) {
+TEST(DescriptorMatchingTests, SearchDescriptorsValidSomeMatches) {
   Descriptor::Ptr query = makeDescriptor(1.0f, 0.0f);
   fillDescriptor(*query, 0, {13, 14, 15});
 
@@ -342,7 +342,7 @@ TEST(LoopClosureModuleMatchingTests, SearchDescriptorsValidSomeMatches) {
   EXPECT_EQ(0u, results.query_root);
 }
 
-TEST(LoopClosureModuleMatchingTests, searchLeafDescriptorsNoValid) {
+TEST(DescriptorMatchingTests, searchLeafDescriptorsNoValid) {
   Descriptor::Ptr query = makeDescriptor(1.0f);
 
   DescriptorMatchConfig config;
@@ -366,7 +366,7 @@ TEST(LoopClosureModuleMatchingTests, searchLeafDescriptorsNoValid) {
   EXPECT_TRUE(results.match_nodes.empty());
 }
 
-TEST(LoopClosureModuleMatchingTests, SearchLeafDescriptorsAllValid) {
+TEST(DescriptorMatchingTests, SearchLeafDescriptorsAllValid) {
   Descriptor::Ptr query = makeDescriptor(1.0f);
 
   DescriptorMatchConfig config;
@@ -397,7 +397,7 @@ TEST(LoopClosureModuleMatchingTests, SearchLeafDescriptorsAllValid) {
   EXPECT_EQ(expected_match_nodes, results.match_nodes[0]);
 }
 
-TEST(LoopClosureModuleMatchingTests, SearchLeafDescriptorsTimeSeparation) {
+TEST(DescriptorMatchingTests, SearchLeafDescriptorsTimeSeparation) {
   Descriptor::Ptr query = makeDescriptor(1.0f);
 
   DescriptorMatchConfig config;
@@ -422,7 +422,7 @@ TEST(LoopClosureModuleMatchingTests, SearchLeafDescriptorsTimeSeparation) {
   EXPECT_TRUE(results.match_nodes.empty());
 }
 
-TEST(LoopClosureModuleMatchingTests, SearchLeafDescriptorsMaxRegistrationMatches) {
+TEST(DescriptorMatchingTests, SearchLeafDescriptorsMaxRegistrationMatches) {
   Descriptor::Ptr query = makeDescriptor(1.0f, 0.0f);
   fillDescriptor(*query, 0, {13, 14, 15});
 

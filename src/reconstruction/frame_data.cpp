@@ -56,8 +56,10 @@ bool FrameData::hasData() const {
   // depth image and for the latter it will share the same resolution as the
   // pointcloud...
   return (!color_image.empty() || !label_image.empty()) &&
-         (!depth_image.empty() || !points.empty());
+         (!depth_image.empty() || !vertex_map.empty());
 }
+
+bool FrameData::normalizeDepth() { return convertDepth(); }
 
 bool FrameData::normalizeData() {
   if (!convertDepth()) {
@@ -73,8 +75,9 @@ bool FrameData::normalizeData() {
     return false;
   }
 
-  if (!points.empty() && points.type() != CV_32FC3) {
-    LOG(ERROR) << "pointcloud must be of type CV_32FC3, not " << showTypeInfo(points);
+  if (!vertex_map.empty() && vertex_map.type() != CV_32FC3) {
+    LOG(ERROR) << "pointcloud must be of type CV_32FC3, not "
+               << showTypeInfo(vertex_map);
     return false;
   }
 

@@ -2,34 +2,22 @@
 if(NOT TARGET gtest)
   include(FetchContent)
   FetchContent_Declare(
-    googletest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG v1.13.0
+    googletest GIT_REPOSITORY https://github.com/google/googletest.git GIT_TAG v1.13.0
   )
 
-  FetchContent_GetProperties(googletest)
-  if(NOT googletest_POPULATED)
-    FetchContent_Populate(googletest)
-    set(BUILD_SHARED_LIBS_THIS ${BUILD_SHARED_LIBS})
-    set(BUILD_SHARED_LIBS
-        OFF
-        CACHE INTERNAL "Build static libraries"
-    )
-    add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR} EXCLUDE_FROM_ALL)
-    set(BUILD_SHARED_LIBS
-        ${BUILD_SHARED_LIBS_THIS}
-        CACHE BOOL "Build shared libraries"
-    )
-  endif()
+  populate_content(googletest BUILD_SHARED_LIBS=OFF)
 endif()
 
 configure_file(hydra_test_config.h.in hydra_test_config.h)
+include(GoogleTest)
+enable_testing()
 
 add_executable(
   test_${PROJECT_NAME}
   main.cpp
   src/resources.cpp
   src/place_fixtures.cpp
+  src/visual_lcd_fixtures.cpp
   backend/test_merge_handler.cpp
   backend/test_update_functions.cpp
   common/test_config_utilities.cpp
@@ -39,6 +27,8 @@ add_executable(
   loop_closure/test_registration.cpp
   loop_closure/test_scene_graph_descriptors.cpp
   loop_closure/test_subgraph_extraction.cpp
+  loop_closure/test_visual_descriptors.cpp
+  loop_closure/test_visual_registration.cpp
   places/test_compression_graph_extractor.cpp
   places/test_esdf_comparison.cpp
   places/test_floodfill_graph_extractor.cpp
@@ -70,6 +60,7 @@ target_include_directories(
   PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
 )
 target_link_libraries(test_${PROJECT_NAME} ${PROJECT_NAME} GTest::gtest_main)
+gtest_add_tests(TARGET test_${PROJECT_NAME})
 
 if(HYDRA_ENABLE_GNN)
   target_sources(

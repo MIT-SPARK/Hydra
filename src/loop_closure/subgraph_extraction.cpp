@@ -34,7 +34,10 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/loop_closure/subgraph_extraction.h"
 
+#include <config_utilities/config.h>
 #include <glog/logging.h>
+
+#include "hydra/utils/display_utilities.h"
 
 namespace hydra {
 
@@ -152,8 +155,7 @@ std::set<NodeId> getSubgraphNodes(const SubgraphConfig& config,
   try {
     origin = graph.getPosition(root_node);
   } catch (const std::out_of_range& e) {
-    LOG(ERROR) << "Invalid root node " << NodeSymbol(root_node).getLabel() << ": "
-               << e.what();
+    LOG(ERROR) << "Invalid root node " << printNodeId(root_node) << ": " << e.what();
     return {};
   }
 
@@ -169,6 +171,17 @@ std::set<NodeId> getSubgraphNodes(const SubgraphConfig& config,
   }
 
   return getFilteredNodeSet(config, graph, origin, found);
+}
+
+void declare_config(SubgraphConfig& conf) {
+  using namespace config;
+  name("SubgraphConfig");
+  field(conf.fixed_radius, "fixed_radius");
+  field(conf.max_radius_m, "max_radius_m");
+  if (!conf.fixed_radius) {
+    field(conf.min_radius_m, "min_radius_m");
+    field(conf.min_nodes, "min_nodes");
+  }
 }
 
 }  // namespace hydra

@@ -53,7 +53,7 @@ struct SharedDsgInfo {
   // 3. SharedDsgInfo::mutex (frontend)
   // 4. SharedModuleState::mesh_mutex
   // When acquiring two mutexes, always acquire the lowest mutex first
-  std::mutex mutex;
+  mutable std::mutex mutex;
   std::atomic<bool> updated;
   uint64_t last_update_time;
   DynamicSceneGraph::Ptr graph;

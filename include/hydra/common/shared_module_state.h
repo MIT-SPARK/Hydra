@@ -35,7 +35,6 @@
 #pragma once
 #include <kimera_pgmo/MeshDelta.h>
 #include <kimera_pgmo/utils/CommonStructs.h>
-#include <pose_graph_tools_msgs/BowQuery.h>
 #include <pose_graph_tools_msgs/PoseGraph.h>
 
 #include <list>
@@ -48,7 +47,9 @@
 #include "hydra/common/dsg_types.h"
 #include "hydra/common/input_queue.h"
 #include "hydra/common/robot_prefix_config.h"
+#include "hydra/common/shared_dsg_info.h"
 #include "hydra/loop_closure/registration_solution.h"
+#include "hydra/reconstruction/frame_data.h"
 
 namespace hydra {
 
@@ -58,6 +59,8 @@ struct LcdInput {
   uint64_t timestamp_ns;
   NodeIdSet archived_places;
   std::vector<NodeId> new_agent_nodes;
+  std::vector<std::shared_ptr<FrameData>> new_sensor_data;
+  std::vector<Sensor::Ptr> new_sensors;
 };
 
 struct BackendInput {
@@ -80,22 +83,22 @@ struct SharedModuleState {
 
   NodeIdSet latest_places;
 
-  InputQueue<pose_graph_tools_msgs::BowQuery::ConstPtr> visual_lcd_queue;
   InputQueue<BackendInput::Ptr> backend_queue;
   InputQueue<LcdInput::Ptr>::Ptr lcd_queue;
   InputQueue<lcd::RegistrationSolution> backend_lcd_queue;
+  SharedDsgInfo::Ptr lcd_graph;
+  SharedDsgInfo::Ptr backend_graph;
 };
 
-// TODO(nathan) switch code style
 struct BackendModuleStatus {
-  size_t total_loop_closures_;
-  size_t new_loop_closures_;
-  size_t total_factors_;
-  size_t total_values_;
-  size_t new_factors_;
-  size_t new_graph_factors_;
-  size_t trajectory_len_;
-  size_t num_merges_undone_;
+  size_t total_loop_closures;
+  size_t new_loop_closures;
+  size_t total_factors;
+  size_t total_values;
+  size_t new_factors;
+  size_t new_graph_factors;
+  size_t trajectory_len;
+  size_t num_merges_undone;
 
   void reset();
 };

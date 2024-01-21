@@ -99,7 +99,7 @@ struct MeshUpdater {
       return;
     }
 
-    auto mesh = msg->mesh->getActiveMesh(msg->archived_blocks);
+    auto mesh = msg->map().getMeshLayer().getActiveMesh(msg->archived_blocks);
     if (!mesh) {
       return;
     }

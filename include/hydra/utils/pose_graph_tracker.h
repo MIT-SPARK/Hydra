@@ -38,10 +38,16 @@
 #include <Eigen/Geometry>
 #include <memory>
 
+namespace spark_dsg {
+// forward declare to avoid include
+class DynamicSceneGraph;
+}  // namespace spark_dsg
+
 namespace hydra {
 
-struct ReconstructionInput;
 struct ReconstructionOutput;
+struct BackendInput;
+struct RobotPrefixConfig;
 
 class PoseGraphTracker {
  public:
@@ -50,19 +56,24 @@ class PoseGraphTracker {
 
   struct Config {
     bool make_pose_graph = false;
+    double min_separation_m = 0.0;
   };
 
   explicit PoseGraphTracker(const Config& config);
 
   ~PoseGraphTracker() = default;
 
-  void update(const ReconstructionInput& msg);
+  std::optional<size_t> update(const ReconstructionOutput& msg);
 
-  void fillPoseGraphs(ReconstructionOutput& output);
+  void fillPoseGraphs(BackendInput& output,
+                      const std::vector<uint64_t>& new_nodes) const;
+
+  std::vector<uint64_t> addAgentNodes(spark_dsg::DynamicSceneGraph& graph,
+                                      const RobotPrefixConfig& prefix) const;
 
  protected:
   const Config config_;
-  std::list<pose_graph_tools_msgs::PoseGraph::ConstPtr> graphs_;
+  pose_graph_tools_msgs::PoseGraph graph_;
 
   uint64_t prev_time_;
   size_t num_poses_received_;

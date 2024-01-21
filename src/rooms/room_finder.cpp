@@ -40,6 +40,7 @@
 #include <algorithm>
 #include <queue>
 
+#include "hydra/common/common.h"
 #include "hydra/common/hydra_config.h"
 #include "hydra/rooms/graph_filtration.h"
 #include "hydra/rooms/room_utilities.h"
@@ -170,7 +171,7 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
       },
       false);
 
-  VLOG(10) << "[RoomFinder] Filtration: " << filtration;
+  VLOG(VLEVEL_DEBUG) << "[RoomFinder] Filtration: " << filtration;
 
   auto window = getTrimmedFiltration(filtration,
                                      config_.min_dilation_m,
@@ -184,19 +185,20 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
     const double window_size =
         filtration[window.second].distance - filtration[window.first].distance;
     if (window_size < config_.min_window_size) {
-      VLOG(1) << "[RoomFinder] Bad window bounds: [" << config_.min_dilation_m << ", "
-              << config_.max_dilation_m << "],  window: [" << window.first << ", "
-              << window.second << "]"
-              << " with size: " << window_size;
+      VLOG(VLEVEL_TRACE) << "[RoomFinder] Bad window bounds: ["
+                         << config_.min_dilation_m << ", " << config_.max_dilation_m
+                         << "],  window: [" << window.first << ", " << window.second
+                         << "]"
+                         << " with size: " << window_size;
 
       window = getTrimmedFiltration(
           filtration, config_.min_dilation_m, config_.max_dilation_m, false);
     }
   }
 
-  VLOG(1) << "[RoomFinder] Bounds: [" << config_.min_dilation_m << ", "
-          << config_.max_dilation_m << "],  window: [" << window.first << ", "
-          << window.second << "]";
+  VLOG(VLEVEL_TRACE) << "[RoomFinder] Bounds: [" << config_.min_dilation_m << ", "
+                     << config_.max_dilation_m << "],  window: [" << window.first
+                     << ", " << window.second << "]";
 
   std::optional<FiltrationInfo> candidate = std::nullopt;
   switch (config_.dilation_threshold_mode) {
@@ -229,8 +231,8 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
   }
 
   const auto info = *candidate;
-  VLOG(3) << "[RoomFinder] Best threshold: " << info.distance << " ("
-          << info.num_components << " components)";
+  VLOG(VLEVEL_TRACE) << "[RoomFinder] Best threshold: " << info.distance << " ("
+                     << info.num_components << " components)";
 
   if (log_file_) {
     if (graph_log_file_) {
@@ -265,11 +267,12 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
 }
 
 SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
-  VLOG(3) << "[Room Finder] Detecting rooms for " << places.numNodes() << " nodes";
+  VLOG(VLEVEL_TRACE) << "[Room Finder] Detecting rooms for " << places.numNodes()
+                     << " nodes";
 
   const auto components = getBestComponents(places);
   if (components.empty()) {
-    VLOG(1) << "[Room Finder] No rooms found";
+    VLOG(VLEVEL_TRACE) << "[Room Finder] No rooms found";
     return nullptr;
   }
 

@@ -53,6 +53,7 @@
 #include <utility>
 #include <vector>
 
+#include "hydra/common/common.h"
 #include "hydra/reconstruction/index_getter.h"
 #include "hydra/reconstruction/sensor_utilities.h"
 #include "hydra/utils/timing_utilities.h"
@@ -78,8 +79,11 @@ void ProjectiveIntegrator::updateMap(const Sensor& sensor,
   BlockIndexList block_indices;
   const auto body_T_sensor = data.getSensorPose<float>(sensor);
   if (config_.accurate_visible_blocks) {
-    block_indices = findVisibleBlocks(
-        sensor, body_T_sensor, data.points, map.block_size, map.truncation_distance());
+    block_indices = findVisibleBlocks(sensor,
+                                      body_T_sensor,
+                                      data.vertex_map,
+                                      map.block_size,
+                                      map.truncation_distance());
   } else {
     block_indices = findBlocksInViewFrustum(
         sensor, body_T_sensor, map.block_size, data.min_range, data.max_range);
@@ -193,8 +197,8 @@ void ProjectiveIntegrator::updateMapBlock(const Sensor& sensor,
   }
 
   if (was_updated) {
-    VLOG(10) << "integrator updated block [" << block_index.x() << ", "
-             << block_index.y() << ", " << block_index.z() << "]";
+    VLOG(VLEVEL_DEBUG) << "integrator updated block [" << block_index.x() << ", "
+                       << block_index.y() << ", " << block_index.z() << "]";
     tsdf_block->updated().set();
   }
 }

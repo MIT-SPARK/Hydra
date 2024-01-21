@@ -52,6 +52,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "hydra/common/common.h"
 #include "hydra/reconstruction/sensor_utilities.h"
 
 namespace hydra {
@@ -103,10 +104,10 @@ float Camera::computeRayDensity(float voxel_size, float depth) const {
   return config_.fx * config_.fy * std::pow(voxel_size / depth, 2.f);
 }
 
-bool Camera::finalizeRepresentations(FrameData& input) const {
-  if (!input.points.empty()) {
-    input.range_image =
-        computeRangeImageFromPoints(input.points, &input.min_range, &input.max_range);
+bool Camera::finalizeRepresentations(FrameData& input, bool force_world_frame) const {
+  if (!input.vertex_map.empty()) {
+    input.range_image = computeRangeImageFromPoints(
+        input.vertex_map, &input.min_range, &input.max_range);
     // TODO(nathan) depth image?
     return true;
   }
@@ -115,7 +116,13 @@ bool Camera::finalizeRepresentations(FrameData& input) const {
     return false;
   }
 
-  input.points = computeVertexMap(input.depth_image);
+  const auto world_T_camera = input.getSensorPose<float>(*this);
+  input.vertex_map = computeVertexMap(input.depth_image,
+                                      force_world_frame ? &world_T_camera : nullptr);
+  if (force_world_frame) {
+    input.points_in_world_frame = true;
+  }
+
   input.range_image =
       computeRangeImage(input.depth_image, &input.min_range, &input.max_range);
   return true;
@@ -193,6 +200,10 @@ cv::Mat Camera::computeVertexMap(const cv::Mat& depth_image,
                                 depth * (static_cast<float>(v) - config_.cy) * fy_inv,
                                 depth);
       const auto p_W = T_W_C ? ((*T_W_C) * p_C).eval() : p_C;
+      VLOG(VLEVEL_DETAILED) << "(" << u << ", " << v << "), d=" << depth
+                            << ", fx=" << fx_inv << ", fy=" << fy_inv
+                            << ", cx=" << config_.cx << ", cy=" << config_.cy << " -> "
+                            << p_W.transpose();
       auto& vertex = vertices.at<cv::Vec3f>(v, u);
       vertex[0] = p_W.x();
       vertex[1] = p_W.y();

@@ -49,7 +49,9 @@ struct InputQueue {
   mutable std::condition_variable cv;
   size_t max_size;
 
-  InputQueue() : max_size(0) {}
+  explicit InputQueue(size_t max_size) : max_size(max_size) {}
+
+  InputQueue() : InputQueue(0) {}
 
   bool empty() const {
     std::unique_lock<std::mutex> lock(mutex);

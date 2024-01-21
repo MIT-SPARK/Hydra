@@ -33,7 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
+#include <hydra/common/hydra_config.h>
 #include <hydra/loop_closure/scene_graph_descriptors.h>
+
+#include "hydra_test/config_guard.h"
 
 namespace hydra {
 namespace lcd {
@@ -59,41 +62,6 @@ inline void emplacePlaceNode(DynamicSceneGraph& graph,
 }
 
 }  // namespace
-
-TEST(LoopClosureModuleDescriptorTests, TestAgentDescriptor) {
-  DynamicSceneGraph graph;
-  const DynamicSceneGraphNode& node = makeDefaultAgentNode(graph);
-
-  auto& attrs = node.attributes<AgentNodeAttributes>();
-  attrs.dbow_ids.resize(5, 1);
-  attrs.dbow_ids << 1, 2, 3, 4, 5;
-  attrs.dbow_values.resize(3, 1);
-  attrs.dbow_values << 6.0, 7.0, 8.0;
-
-  AgentDescriptorFactory factory;
-
-  {  // no parent -> no descriptor
-    auto descriptor = factory.construct(graph, node);
-    EXPECT_TRUE(descriptor == nullptr);
-  }
-
-  size_t next_place_index = 0;
-  emplacePlaceNode(graph, Eigen::Vector3d::Zero(), 1.0, next_place_index);
-  graph.insertEdge(NodeSymbol('a', 0), NodeSymbol('p', 0));
-
-  {  // valid parent -> valid descriptor
-    auto descriptor = factory.construct(graph, node);
-    ASSERT_TRUE(descriptor != nullptr);
-    EXPECT_EQ(attrs.dbow_ids, descriptor->words);
-    EXPECT_EQ(attrs.dbow_values, descriptor->values);
-    EXPECT_TRUE(descriptor->normalized);
-
-    EXPECT_EQ(descriptor->root_node, NodeSymbol('p', 0));
-
-    std::set<NodeId> expected_nodes{NodeSymbol('a', 0)};
-    EXPECT_EQ(expected_nodes, descriptor->nodes);
-  }
-}
 
 TEST(LoopClosureModuleDescriptorTests, TestGetBinCorrect) {
   HistogramConfig<double> config(0.0, 1.0, 5);
@@ -134,7 +102,8 @@ TEST(LoopClosureModuleDescriptorTests, TestPlaceDescriptor) {
   emplacePlaceNode(graph, Eigen::Vector3d(1.0, 2.0, 3.0), 0.3, next_node_index);
 
   {  // no parent: empty descriptor
-    PlaceDescriptorFactory factory(1.0, HistogramConfig<double>(0, 1.0, 1));
+    PlaceGraphDescriptorFactory::Config config{{1.0}, {0, 1.0, 1}};
+    PlaceGraphDescriptorFactory factory(config);
     Descriptor::Ptr descriptor = factory.construct(graph, node);
     EXPECT_TRUE(descriptor == nullptr);
   }
@@ -142,7 +111,8 @@ TEST(LoopClosureModuleDescriptorTests, TestPlaceDescriptor) {
   graph.insertEdge(node.id, NodeSymbol('p', 0));
 
   {  // 1 bin: correct count
-    PlaceDescriptorFactory factory(1.0, HistogramConfig<double>(0, 1.0, 1));
+    PlaceGraphDescriptorFactory::Config config{{1.0}, {0, 1.0, 1}};
+    PlaceGraphDescriptorFactory factory(config);
     Descriptor::Ptr descriptor = factory.construct(graph, node);
     ASSERT_TRUE(descriptor != nullptr);
     ASSERT_EQ(1, descriptor->values.rows());
@@ -154,7 +124,8 @@ TEST(LoopClosureModuleDescriptorTests, TestPlaceDescriptor) {
   }
 
   {  // 1 bin + bigger radius: correct count
-    PlaceDescriptorFactory factory(1000.0, HistogramConfig<double>(0, 1.0, 1));
+    PlaceGraphDescriptorFactory::Config config{{1000.0}, {0, 1.0, 1}};
+    PlaceGraphDescriptorFactory factory(config);
     Descriptor::Ptr descriptor = factory.construct(graph, node);
     ASSERT_TRUE(descriptor != nullptr);
     ASSERT_EQ(1, descriptor->values.rows());
@@ -171,7 +142,8 @@ TEST(LoopClosureModuleDescriptorTests, TestPlaceDescriptor) {
   }
 
   {  // 4 bins: one in each
-    PlaceDescriptorFactory factory(1.0, HistogramConfig<double>(0.05, 0.45, 4));
+    PlaceGraphDescriptorFactory::Config config{{1.0}, {0.05, 0.45, 4}};
+    PlaceGraphDescriptorFactory factory(config);
     Descriptor::Ptr descriptor = factory.construct(graph, node);
     ASSERT_TRUE(descriptor != nullptr);
     ASSERT_EQ(4, descriptor->values.rows());
@@ -198,6 +170,11 @@ void emplaceObjectNode(DynamicSceneGraph& graph,
 }
 
 TEST(LoopClosureModuleDescriptorTests, TestObjectDescriptor) {
+  const auto guard = test::ConfigGuard::FixedLabels(5);
+  ASSERT_EQ(HydraConfig::instance().getTotalLabels(), 5u);
+  ObjectGraphDescriptorFactory::Config config{{1.0}};
+  ObjectGraphDescriptorFactory factory(config);
+
   DynamicSceneGraph graph;
   const DynamicSceneGraphNode& node = makeDefaultAgentNode(graph);
 
@@ -220,7 +197,6 @@ TEST(LoopClosureModuleDescriptorTests, TestObjectDescriptor) {
   graph.insertEdge(NodeSymbol('p', 2), NodeSymbol('p', 6));
 
   {  // no parent: empty descriptor
-    ObjectDescriptorFactory factory(1.0, 5);
     Descriptor::Ptr descriptor = factory.construct(graph, node);
     ASSERT_TRUE(descriptor == nullptr);
   }
@@ -228,7 +204,6 @@ TEST(LoopClosureModuleDescriptorTests, TestObjectDescriptor) {
   graph.insertEdge(node.id, NodeSymbol('p', 0));
 
   {  // no objects: zero counts
-    ObjectDescriptorFactory factory(1.0, 5);
     Descriptor::Ptr descriptor = factory.construct(graph, node);
     ASSERT_TRUE(descriptor != nullptr);
     EXPECT_EQ(Eigen::VectorXf::Zero(5), descriptor->values);
@@ -245,7 +220,6 @@ TEST(LoopClosureModuleDescriptorTests, TestObjectDescriptor) {
   graph.insertEdge(NodeSymbol('p', 1), NodeSymbol('o', 2));
 
   {  // some objects: expected counts
-    ObjectDescriptorFactory factory(1.0, 5);
     Descriptor::Ptr descriptor = factory.construct(graph, node);
     ASSERT_TRUE(descriptor != nullptr);
 
@@ -266,7 +240,6 @@ TEST(LoopClosureModuleDescriptorTests, TestObjectDescriptor) {
   graph.insertEdge(NodeSymbol('p', 4), NodeSymbol('o', 4));
 
   {  // boundary conditions: expected counts
-    ObjectDescriptorFactory factory(1.0, 5);
     Descriptor::Ptr descriptor = factory.construct(graph, node);
     ASSERT_TRUE(descriptor != nullptr);
 

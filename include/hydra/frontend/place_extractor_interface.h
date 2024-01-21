@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include "hydra/common/common.h"
+#include "hydra/common/dsg_types.h"
 #include "hydra/places/gvd_voxel.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/utils/log_utilities.h"
@@ -59,6 +60,10 @@ class PlaceExtractorInterface {
   virtual void save(const LogSetup& /* logs */) const {}
 
   virtual void detect(const ReconstructionOutput& msg) = 0;
+
+  virtual void detect(uint64_t timestamp_ns,
+                      const VolumetricMap& map,
+                      const voxblox::BlockIndexList& archived_blocks) = 0;
 
   virtual void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) = 0;
 

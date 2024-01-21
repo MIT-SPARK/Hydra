@@ -1,0 +1,23 @@
+---
+detector:
+  agent:
+    descriptors:
+      type: DBoW
+      detector:
+        type: ORB
+        num_features: 400
+    matching:
+      min_time_separation_s: 25.0
+      min_score: 0.040
+      max_registration_matches: 2
+      min_score_ratio: 0.95
+      min_match_separation_m: 0.0
+      type: L1
+    registration:
+      type: TwoViewTeaserSolver
+      min_correspondences: 50
+      min_inliers: 50
+      lowe_ratio: 0.95
+      teaser:
+        estimate_scaling: false
+        noise_bound: 0.100

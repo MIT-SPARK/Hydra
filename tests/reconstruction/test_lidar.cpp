@@ -77,12 +77,12 @@ TEST(Lidar, FinalizeRepresentationsCorrect) {
   // no points: no ability to make intermediate images
   EXPECT_FALSE(lidar->finalizeRepresentations(msg));
 
-  msg.points = cv::Mat(1, 2, CV_32FC3);
-  auto& v1 = msg.points.at<cv::Vec3f>(0, 0);
+  msg.vertex_map = cv::Mat(1, 2, CV_32FC3);
+  auto& v1 = msg.vertex_map.at<cv::Vec3f>(0, 0);
   v1[0] = 3.0;
   v1[1] = 4.0;
   v1[2] = 0.0;
-  auto& v2 = msg.points.at<cv::Vec3f>(0, 1);
+  auto& v2 = msg.vertex_map.at<cv::Vec3f>(0, 1);
   v2[0] = 1.0;
   v2[1] = 0.0;
   v2[2] = 1.0;
@@ -137,12 +137,12 @@ TEST(Lidar, FinalizeRepresentationsCorrect) {
 TEST(Lidar, FinalizeRepresentationColor) {
   const auto lidar = createLidar(90.0, 180.0, {1.0, 5.0});
   FrameData msg;
-  msg.points = cv::Mat(1, 2, CV_32FC3);
-  auto& v1 = msg.points.at<cv::Vec3f>(0, 0);
+  msg.vertex_map = cv::Mat(1, 2, CV_32FC3);
+  auto& v1 = msg.vertex_map.at<cv::Vec3f>(0, 0);
   v1[0] = 3.0;
   v1[1] = 4.0;
   v1[2] = 0.0;
-  auto& v2 = msg.points.at<cv::Vec3f>(0, 1);
+  auto& v2 = msg.vertex_map.at<cv::Vec3f>(0, 1);
   v2[0] = 1.0;
   v2[1] = 0.0;
   v2[2] = 1.0;

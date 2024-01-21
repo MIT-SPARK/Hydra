@@ -47,6 +47,7 @@
 // purposes notwithstanding any copyright notation herein.
 #include "hydra/reconstruction/volumetric_map.h"
 
+#include <config_utilities/config_utilities.h>
 #include <config_utilities/parsing/yaml.h>
 #include <voxblox/io/layer_io.h>
 
@@ -264,6 +265,42 @@ std::unique_ptr<VolumetricMap> VolumetricMap::fromTsdf(const TsdfLayer& tsdf,
       std::make_unique<VolumetricMap>(config, with_semantics, with_occupancy);
   mergeLayer(tsdf, to_return->getTsdfLayer());
   return to_return;
+}
+
+std::unique_ptr<VolumetricMap> VolumetricMap::clone() const {
+  const auto has_semantics = semantic_layer_ != nullptr;
+  const auto has_occupancy = occupancy_layer_ != nullptr;
+  auto map = std::make_unique<VolumetricMap>(config, has_semantics, has_occupancy);
+  mergeLayer(tsdf_layer_, map->tsdf_layer_);
+  mesh_layer_.merge(map->mesh_layer_);
+
+  if (has_semantics) {
+    mergeLayer(*semantic_layer_, *(map->semantic_layer_));
+  }
+
+  if (has_occupancy) {
+    mergeLayer(*occupancy_layer_, *(map->occupancy_layer_));
+  }
+
+  return map;
+}
+
+void VolumetricMap::updateFrom(const VolumetricMap& other) {
+  const auto has_semantics =
+      semantic_layer_ != nullptr && other.semantic_layer_ != nullptr;
+  const auto has_occupancy =
+      occupancy_layer_ != nullptr && other.occupancy_layer_ != nullptr;
+
+  mergeLayer(other.tsdf_layer_, tsdf_layer_);
+  other.mesh_layer_.merge(mesh_layer_);
+
+  if (has_semantics) {
+    mergeLayer(*other.semantic_layer_, *semantic_layer_);
+  }
+
+  if (has_occupancy) {
+    mergeLayer(*other.occupancy_layer_, *occupancy_layer_);
+  }
 }
 
 }  // namespace hydra

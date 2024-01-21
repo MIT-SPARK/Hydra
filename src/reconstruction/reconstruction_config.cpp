@@ -51,12 +51,9 @@ void declare_config(ReconstructionConfig& conf) {
   field(conf.dense_representation_radius_m, "dense_representation_radius_m");
   field(conf.num_poses_per_update, "num_poses_per_update");
   field(conf.max_input_queue_size, "max_input_queue_size");
-  field(conf.copy_dense_representations, "copy_dense_representations");
   field(conf.semantic_measurement_probability, "semantic_measurement_probability");
   field(conf.tsdf, "tsdf");
   field(conf.mesh, "mesh");
-  field(conf.sensor, "sensor");
-  field(conf.pose_graphs, "pose_graphs");
 }
 
 }  // namespace hydra

@@ -33,51 +33,14 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/config.h>
+#include <config_utilities/factory.h>
+
 #include "hydra/common/dsg_types.h"
+#include "hydra/loop_closure/graph_descriptor_factory.h"
 #include "hydra/loop_closure/subgraph_extraction.h"
 
-namespace hydra {
-namespace lcd {
-
-struct Descriptor {
-  using Ptr = std::unique_ptr<Descriptor>;
-  Eigen::Matrix<uint32_t, Eigen::Dynamic, 1> words;
-  Eigen::VectorXf values;
-  bool normalized = false;
-  bool is_null = false;
-  std::set<NodeId> nodes;
-  NodeId root_node;
-  Eigen::Vector3d root_position;
-  std::chrono::nanoseconds timestamp;
-};
-
-struct DescriptorFactory {
-  using Ptr = std::unique_ptr<DescriptorFactory>;
-
-  virtual ~DescriptorFactory() = default;
-
-  virtual Descriptor::Ptr construct(const DynamicSceneGraph& dsg,
-                                    const DynamicSceneGraphNode& agent_node) const = 0;
-};
-
-struct AgentDescriptorFactory : DescriptorFactory {
-  AgentDescriptorFactory() = default;
-
-  virtual ~AgentDescriptorFactory() = default;
-
-  Descriptor::Ptr construct(const DynamicSceneGraph& graph,
-                            const DynamicSceneGraphNode& agent_node) const override;
-};
-
-struct ObjectDescriptorFactory : DescriptorFactory {
-  ObjectDescriptorFactory(const SubgraphConfig& config, size_t num_classes);
-
-  Descriptor::Ptr construct(const DynamicSceneGraph& graph,
-                            const DynamicSceneGraphNode& agent_node) const override;
-
-  const SubgraphConfig config;
-  const size_t num_classes;
-};
+namespace hydra::lcd {
 
 template <typename T>
 struct HistogramConfig {
@@ -103,16 +66,60 @@ struct HistogramConfig {
   }
 };
 
-struct PlaceDescriptorFactory : DescriptorFactory {
-  PlaceDescriptorFactory(const SubgraphConfig& config,
-                         const HistogramConfig<double>& histogram);
+template <typename T>
+void declare_config(HistogramConfig<T>& conf) {
+  using namespace config;
+  name("HistogramConfig");
+  field(conf.min, "min");
+  field(conf.max, "max");
+  field(conf.bins, "bins");
+}
+
+class ObjectGraphDescriptorFactory : public GraphDescriptorFactory {
+ public:
+  struct Config {
+    SubgraphConfig subgraph{5.0};
+  };
+
+  explicit ObjectGraphDescriptorFactory(const Config& config);
 
   Descriptor::Ptr construct(const DynamicSceneGraph& graph,
                             const DynamicSceneGraphNode& agent_node) const override;
 
-  const SubgraphConfig config;
-  const HistogramConfig<double> histogram;
+ public:
+  const Config config;
+
+ private:
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<GraphDescriptorFactory,
+                                     ObjectGraphDescriptorFactory,
+                                     Config>("ObjectGraphDescriptor");
 };
 
-}  // namespace lcd
-}  // namespace hydra
+void declare_config(ObjectGraphDescriptorFactory::Config& config);
+
+class PlaceGraphDescriptorFactory : public GraphDescriptorFactory {
+ public:
+  struct Config {
+    SubgraphConfig subgraph{5.0};
+    HistogramConfig<double> histogram{0.5, 2.5, 30};
+  };
+
+  explicit PlaceGraphDescriptorFactory(const Config& config);
+
+  Descriptor::Ptr construct(const DynamicSceneGraph& graph,
+                            const DynamicSceneGraphNode& agent_node) const override;
+
+ public:
+  const Config config;
+
+ private:
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<GraphDescriptorFactory,
+                                     PlaceGraphDescriptorFactory,
+                                     Config>("PlaceGraphDescriptor");
+};
+
+void declare_config(PlaceGraphDescriptorFactory::Config& config);
+
+}  // namespace hydra::lcd

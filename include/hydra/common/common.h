@@ -33,27 +33,13 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <gtsam/geometry/Pose3.h>
-
-#include <atomic>
 #include <list>
-#include <map>
-#include <memory>
-#include <mutex>
+#include <unordered_set>
 #include <thread>
-
-#include "hydra/common/dsg_types.h"
 
 namespace hydra {
 
-// TODO(nathan) drop explicit gtsam pose here
-struct NodeMergeInfo {
-  NodeId to_node;
-  gtsam::Pose3 from_T_to;
-};
-
-using NodeMergeLog = std::unordered_map<NodeId, NodeMergeInfo>;
-using NodeIdSet = std::unordered_set<NodeId>;
+using NodeIdSet = std::unordered_set<uint64_t>;
 
 template <typename Funcs, typename... Args>
 void launchCallbacks(const Funcs& callbacks, Args... args) {
@@ -66,5 +52,13 @@ void launchCallbacks(const Funcs& callbacks, Args... args) {
     thread.join();
   }
 }
+
+#define VLEVEL_INFO 1
+#define VLEVEL_TRACE 2
+#define VLEVEL_FILE 5
+#define VLEVEL_DEBUG 10
+#define VLEVEL_EXTRA 15
+#define VLEVEL_ALL 20
+#define VLEVEL_DETAILED 30
 
 }  // namespace hydra

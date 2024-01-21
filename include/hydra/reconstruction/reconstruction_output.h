@@ -33,29 +33,39 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <pose_graph_tools/pose_graph.h>
-#include <voxblox/core/layer.h>
-#include <voxblox/mesh/mesh_layer.h>
-
 #include <Eigen/Dense>
 #include <cstdint>
 #include <memory>
 
-#include "hydra/reconstruction/semantic_mesh_layer.h"
-#include "hydra/reconstruction/vertex_voxel.h"
+#include "hydra/reconstruction/reconstruction_input.h"
+#include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
 
 struct ReconstructionOutput {
   using Ptr = std::shared_ptr<ReconstructionOutput>;
 
+  virtual ~ReconstructionOutput() = default;
+
   uint64_t timestamp_ns;
-  SemanticMeshLayer::Ptr mesh;
-  voxblox::Layer<voxblox::TsdfVoxel>::Ptr tsdf;
-  voxblox::Layer<VertexVoxel>::Ptr occupied;
+  Eigen::Vector3d world_t_body;
+  Eigen::Quaterniond world_R_body;
+  std::shared_ptr<FrameData> sensor_data;
+  Sensor::Ptr sensor;
+
+  const VolumetricMap& map() const;
   voxblox::BlockIndexList archived_blocks;
-  std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
-  pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements;
+
+  void setMap(const VolumetricMap& map);
+  void setMap(const std::shared_ptr<VolumetricMap>& map);
+  std::shared_ptr<VolumetricMap> getMapPointer() const;
+
+  virtual void updateFrom(const ReconstructionOutput& msg, bool clone_map);
+
+  static Ptr fromInput(const ReconstructionInput& input);
+
+ protected:
+  std::shared_ptr<VolumetricMap> map_;
 };
 
 }  // namespace hydra

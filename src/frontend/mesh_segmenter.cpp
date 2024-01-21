@@ -41,6 +41,7 @@
 #undef PCL_NO_PRECOMPILE
 #include <spark_dsg/bounding_box_extraction.h>
 
+#include "hydra/common/common.h"
 #include "hydra/common/hydra_config.h"
 #include "hydra/common/semantic_color_map.h"
 #include "hydra/utils/mesh_utilities.h"
@@ -118,8 +119,8 @@ std::vector<size_t> getActiveIndices(const kimera_pgmo::MeshDelta& delta,
     }
   }
 
-  VLOG(1) << "[Mesh Segmenter] Active indices: " << indices->size()
-          << " (used: " << active.size() << ")";
+  VLOG(VLEVEL_TRACE) << "[Mesh Segmenter] Active indices: " << indices->size()
+                     << " (used: " << active.size() << ")";
   return active;
 }
 
@@ -151,7 +152,7 @@ LabelIndices getLabelIndices(const MeshSegmenterConfig& config,
     iter->second.push_back(idx);
   }
 
-  VLOG(3) << "[Mesh Segmenter] Seen labels: " << printLabels(seen_labels);
+  VLOG(VLEVEL_TRACE) << "[Mesh Segmenter] Seen labels: " << printLabels(seen_labels);
   return label_indices;
 }
 
@@ -197,8 +198,8 @@ Clusters findClusters(const MeshSegmenterConfig& config,
 
 MeshSegmenter::MeshSegmenter(const MeshSegmenterConfig& config)
     : config_(config), next_node_id_(config.prefix, 0) {
-  VLOG(1) << "[Mesh Segmenter] Detecting nodes for labels: "
-          << printLabels(config.labels);
+  VLOG(VLEVEL_TRACE) << "[Mesh Segmenter] Detecting nodes for labels: "
+                     << printLabels(config.labels);
   for (const auto& label : config.labels) {
     active_nodes_[label] = std::set<NodeId>();
   }
@@ -214,13 +215,13 @@ LabelClusters MeshSegmenter::detect(uint64_t timestamp_ns,
 
   LabelClusters label_clusters;
   if (indices.empty()) {
-    VLOG(3) << "[Mesh Segmenter] No active indices in mesh";
+    VLOG(VLEVEL_TRACE) << "[Mesh Segmenter] No active indices in mesh";
     return label_clusters;
   }
 
   const auto label_indices = getLabelIndices(config_, delta, indices);
   if (label_indices.empty()) {
-    VLOG(3) << "[Mesh Segmenter] No vertices found matching desired labels";
+    VLOG(VLEVEL_TRACE) << "[Mesh Segmenter] No vertices found matching desired labels";
     for (const auto& callback_func : callback_funcs_) {
       callback_func(delta, indices, label_indices);
     }
@@ -238,8 +239,8 @@ LabelClusters MeshSegmenter::detect(uint64_t timestamp_ns,
 
     const auto clusters = findClusters(config_, delta, label_indices.at(label));
 
-    VLOG(3) << "[Mesh Segmenter]  - Found " << clusters.size()
-            << " cluster(s) of label " << static_cast<int>(label);
+    VLOG(VLEVEL_TRACE) << "[Mesh Segmenter]  - Found " << clusters.size()
+                       << " cluster(s) of label " << static_cast<int>(label);
     label_clusters.insert({label, clusters});
   }
 
@@ -396,7 +397,7 @@ void MeshSegmenter::addNodeToGraph(DynamicSceneGraph& graph,
   if (iter != label_to_name.end()) {
     attrs->name = iter->second;
   } else {
-    VLOG(1) << "Missing semantic label from map: " << std::to_string(label);
+    VLOG(VLEVEL_TRACE) << "Missing semantic label from map: " << std::to_string(label);
   }
 
   attrs->mesh_connections.insert(

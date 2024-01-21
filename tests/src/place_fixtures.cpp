@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra_test/place_fixtures.h"
 
+#include <hydra/common/common.h>
 #include <hydra/places/gvd_utilities.h>
 #include <voxblox/core/voxel.h>
 #include <voxblox/integrator/esdf_integrator.h>
@@ -49,7 +50,7 @@ void EsdfTestFixture::SetUp() { setupWorld(); }
 void EsdfTestFixture::updateTsdfIntegrator(voxblox::TsdfIntegratorBase& integrator,
                                            size_t index) {
   voxblox::Transformation world_T_camera = getPose(index);
-  VLOG(10) << "world_T_camera: " << std::endl << world_T_camera;
+  VLOG(VLEVEL_DEBUG) << "world_T_camera: " << std::endl << world_T_camera;
 
   Eigen::Vector2i resolution;
   resolution << depth_camera_width, depth_camera_height;
@@ -63,12 +64,12 @@ void EsdfTestFixture::updateTsdfIntegrator(voxblox::TsdfIntegratorBase& integrat
                                    &camera_pointcloud,
                                    &colors);
 
-  VLOG(10) << "camera pointcloud: " << camera_pointcloud.size() << " points";
+  VLOG(VLEVEL_DEBUG) << "camera pointcloud: " << camera_pointcloud.size() << " points";
 
   voxblox::Pointcloud world_pointcloud;
   voxblox::transformPointcloud(
       world_T_camera.inverse(), camera_pointcloud, &world_pointcloud);
-  VLOG(10) << "world pointcloud: " << world_pointcloud.size() << " points";
+  VLOG(VLEVEL_DEBUG) << "world pointcloud: " << world_pointcloud.size() << " points";
 
   integrator.integratePointCloud(world_T_camera, world_pointcloud, colors);
 }

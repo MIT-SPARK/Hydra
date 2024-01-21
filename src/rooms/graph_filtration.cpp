@@ -38,6 +38,8 @@
 
 #include <iomanip>
 
+#include "hydra/common/common.h"
+
 namespace hydra {
 
 BarcodeTracker::BarcodeTracker() : BarcodeTracker(0) {}
@@ -279,7 +281,7 @@ Filtration getGraphFiltration(const SceneGraphLayer& layer,
     const auto x = entries.back();
     entries.pop_back();
 
-    VLOG(10) << "Processing " << x;
+    VLOG(VLEVEL_DEBUG) << "Processing " << x;
 
     bool change_in_components = true;
     if (x.target) {
@@ -302,7 +304,7 @@ Filtration getGraphFiltration(const SceneGraphLayer& layer,
     const auto num_components = count_components(components);
     if (filtration.empty()) {
       filtration.push_front({x.distance, num_components});
-      VLOG(10) << filtration.front();
+      VLOG(VLEVEL_DEBUG) << filtration.front();
       continue;
     }
 
@@ -314,7 +316,7 @@ Filtration getGraphFiltration(const SceneGraphLayer& layer,
       filtration.push_front({x.distance, num_components});
     }
 
-    VLOG(10) << filtration.front();
+    VLOG(VLEVEL_DEBUG) << filtration.front();
   }
 
   return Filtration(filtration.begin(), filtration.end());
@@ -532,34 +534,34 @@ std::optional<FiltrationInfo> getBestPlateau(const Filtration& values,
                         values[start_end_pair.first].distance);
   }
 
-  if (VLOG_IS_ON(30)) {
-    VLOG(30) << "Sequences:";
+  if (VLOG_IS_ON(VLEVEL_ALL)) {
+    VLOG(VLEVEL_ALL) << "Sequences:";
     for (size_t i = 0; i < sequences.size(); ++i) {
-      VLOG(30) << "  - " << i << ": " << seq_values.at(i) << " -> ["
-               << sequences[i].first << ", " << sequences[i].second
-               << "], lifetime=" << lifetimes[i];
+      VLOG(VLEVEL_ALL) << "  - " << i << ": " << seq_values.at(i) << " -> ["
+                       << sequences[i].first << ", " << sequences[i].second
+                       << "], lifetime=" << lifetimes[i];
     }
   }
 
   CHECK(!lifetimes.empty());
   const double max_lifetime = *std::max_element(lifetimes.begin(), lifetimes.end());
   const double threshold = use_threshold ? ratio : ratio * max_lifetime;
-  VLOG(5) << "[Room Finder] Max lifetime: " << max_lifetime << ", Ratio: " << ratio
-          << ", Threshold: " << threshold;
+  VLOG(VLEVEL_FILE) << "[Room Finder] Max lifetime: " << max_lifetime
+                    << ", Ratio: " << ratio << ", Threshold: " << threshold;
 
   size_t best_sequence = 0;
   size_t best_components = 0;
-  VLOG(30) << "Best components:";
+  VLOG(VLEVEL_ALL) << "Best components:";
   for (size_t i = 0; i < lifetimes.size(); ++i) {
     if (lifetimes[i] < threshold) {
-      VLOG(30) << "  - " << i << ": below threshold (" << lifetimes[i] << " < "
-               << threshold << ")";
+      VLOG(VLEVEL_ALL) << "  - " << i << ": below threshold (" << lifetimes[i] << " < "
+                       << threshold << ")";
       continue;
     }
 
     const auto curr_components = values[sequences[i].first].num_components;
-    VLOG(30) << "  - " << i << ": components=" << curr_components
-             << " (best=" << best_components << ")";
+    VLOG(VLEVEL_ALL) << "  - " << i << ": components=" << curr_components
+                     << " (best=" << best_components << ")";
     // TODO(nathan) might want >= instead
     if (curr_components > best_components) {
       best_sequence = i;

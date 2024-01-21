@@ -85,7 +85,8 @@ class Camera : public Sensor {
 
   float computeRayDensity(float voxel_size, float depth) const override;
 
-  bool finalizeRepresentations(FrameData& input) const override;
+  bool finalizeRepresentations(FrameData& input,
+                               bool force_world_frame = false) const override;
 
   bool projectPointToImagePlane(const Eigen::Vector3f& p_C,
                                 float& u,

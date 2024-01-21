@@ -35,10 +35,12 @@
 #include "hydra/loop_closure/loop_closure_module.h"
 
 #include <config_utilities/printing.h>
+#include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
 
 #include "hydra/common/hydra_config.h"
+#include "hydra/utils/display_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -47,9 +49,10 @@ using hydra::timing::ScopedTimer;
 using lcd::LayerRegistrationConfig;
 
 LoopClosureModule::LoopClosureModule(const LoopClosureConfig& config,
-                                     const SharedDsgInfo::Ptr& dsg,
                                      const SharedModuleState::Ptr& state)
-    : config_(config), dsg_(dsg), state_(state), lcd_graph_(new DynamicSceneGraph()) {
+    : config_(config::checkValid(config)),
+      state_(state),
+      lcd_graph_(new DynamicSceneGraph()) {
   lcd_detector_.reset(new lcd::LcdDetector(config_.detector));
 }
 
@@ -57,18 +60,18 @@ LoopClosureModule::~LoopClosureModule() { stop(); }
 
 void LoopClosureModule::start() {
   spin_thread_.reset(new std::thread(&LoopClosureModule::spin, this));
-  LOG(INFO) << "[DSG LCD] LCD started!";
+  LOG(INFO) << "[Hydra LCD] LCD started!";
 }
 
 void LoopClosureModule::stop() {
-  VLOG(2) << "[DSG LCD] stopping lcd!";
+  VLOG(VLEVEL_TRACE) << "[Hydra LCD] stopping lcd!";
 
   should_shutdown_ = true;
   if (spin_thread_) {
-    VLOG(2) << "[DSG LCD] joining thread";
+    VLOG(VLEVEL_TRACE) << "[Hydra LCD] joining thread";
     spin_thread_->join();
     spin_thread_.reset();
-    VLOG(2) << "[DSG LCD] joined thread";
+    VLOG(VLEVEL_TRACE) << "[Hydra LCD] joined thread";
   }
 }
 
@@ -135,14 +138,23 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
   const size_t timestamp_ns = processFrontendOutput();
 
   {  // start critical section
-    std::unique_lock<std::mutex> lock(dsg_->mutex);
-    if (!force_update && timestamp_ns < dsg_->last_update_time) {
+    const auto& shared_dsg = *state_->backend_graph;
+    std::unique_lock<std::mutex> lock(shared_dsg.mutex);
+    if (!force_update && timestamp_ns < shared_dsg.last_update_time) {
       return;
     }
 
     ScopedTimer spin_timer("lcd/merge_graph", timestamp_ns);
-    lcd_graph_->mergeGraph(*dsg_->graph);
+    lcd_graph_->mergeGraph(*shared_dsg.graph);
   }  // end critical section
+
+  VLOG(VLEVEL_TRACE) << "Processing " << new_measurements_.size()
+                     << " new agent nodes for descriptors";
+  for (const auto& m : new_measurements_) {
+    lcd_detector_->addSensorDescriptor(
+        *CHECK_NOTNULL(m.sensor), *lcd_graph_, m.node_id, *CHECK_NOTNULL(m.data));
+  }
+  new_measurements_.clear();
 
   auto query_agent = getQueryAgentId(timestamp_ns);
   while (query_agent) {
@@ -150,8 +162,8 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
     const auto to_cache = getPlacesToCache(query_pos);
 
     if (!to_cache.empty()) {
-      VLOG(5) << "[Hydra LCD] Constructing descriptors for "
-              << displayNodeSymbolContainer(to_cache);
+      VLOG(VLEVEL_FILE) << "[Hydra LCD] Constructing descriptors for "
+                        << displayNodeSymbolContainer(to_cache);
       lcd_detector_->updateDescriptorCache(*lcd_graph_, to_cache, timestamp_ns);
     }
 
@@ -160,9 +172,9 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
     for (const auto& result : results) {
       // TODO(nathan) consider augmenting with gtsam key
       state_->backend_lcd_queue.push(result);
-      LOG(WARNING) << "[Hydra LCD] Found valid loop-closure: "
-                   << NodeSymbol(result.from_node).getLabel() << " -> "
-                   << NodeSymbol(result.to_node).getLabel();
+      LOG(WARNING) << "[Hydra LCD] Found loop-closure: "
+                   << printNodeId(result.from_node) << " -> "
+                   << printNodeId(result.to_node);
     }
 
     // if should_shutdown_ is true and agent/place parent invariant is broken, this
@@ -173,20 +185,26 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
 
 size_t LoopClosureModule::processFrontendOutput() {
   const auto& msg = state_->lcd_queue->front();
-  VLOG(5) << "[Hydra LCD] Received archived places: "
-          << displayNodeSymbolContainer(msg->archived_places);
+  size_t timestamp_ns = msg->timestamp_ns;
+  ScopedTimer timer("lcd/process_frontend_msg", timestamp_ns);
+  VLOG(VLEVEL_FILE) << "[Hydra LCD] Received archived places: "
+                    << displayNodeSymbolContainer(msg->archived_places);
 
   potential_lcd_root_nodes_.insert(potential_lcd_root_nodes_.end(),
                                    msg->archived_places.begin(),
                                    msg->archived_places.end());
 
-  VLOG(5) << "[Hydra LCD] Adding nodes: "
-          << displayNodeSymbolContainer(msg->new_agent_nodes);
-  for (const auto& node : msg->new_agent_nodes) {
+  VLOG(VLEVEL_FILE) << "[Hydra LCD] Adding nodes: "
+                    << displayNodeSymbolContainer(msg->new_agent_nodes);
+
+  CHECK_EQ(msg->new_agent_nodes.size(), msg->new_sensor_data.size());
+  CHECK_EQ(msg->new_agent_nodes.size(), msg->new_sensors.size());
+  for (size_t i = 0; i < msg->new_agent_nodes.size(); ++i) {
+    const auto node = msg->new_agent_nodes[i];
+    new_measurements_.push_back({node, msg->new_sensor_data[i], msg->new_sensors[i]});
     agent_queue_.push(node);
   }
 
-  size_t timestamp_ns = msg->timestamp_ns;
   state_->lcd_queue->pop();
   return timestamp_ns;
 }
@@ -197,8 +215,8 @@ NodeIdSet LoopClosureModule::getPlacesToCache(const Eigen::Vector3d& agent_pos) 
   while (iter != potential_lcd_root_nodes_.end()) {
     auto node_opt = lcd_graph_->getNode(*iter);
     if (!node_opt) {
-      VLOG(5) << "[Hydra LCD] Deleted place " << NodeSymbol(*iter).getLabel()
-              << " found in LCD queue";
+      VLOG(VLEVEL_FILE) << "[Hydra LCD] Deleted place " << printNodeId(*iter)
+                        << " in LCD queue";
       iter = potential_lcd_root_nodes_.erase(iter);
       continue;
     }
@@ -209,7 +227,7 @@ NodeIdSet LoopClosureModule::getPlacesToCache(const Eigen::Vector3d& agent_pos) 
       continue;
     }
 
-    CHECK(!attrs.is_active) << "Found active node: " << NodeSymbol(*iter).getLabel();
+    CHECK(!attrs.is_active) << "Found active node: " << printNodeId(*iter);
 
     to_cache.insert(*iter);
     iter = potential_lcd_root_nodes_.erase(iter);
@@ -227,8 +245,7 @@ std::optional<NodeId> LoopClosureModule::getQueryAgentId(size_t stamp_ns) {
   const auto prev_time = node.timestamp;
 
   if (!node.hasParent()) {
-    LOG(ERROR) << "Found agent node without parent: "
-               << NodeSymbol(agent_queue_.top()).getLabel() << ". Discarding!";
+    LOG(ERROR) << "Found agent without parent: " << printNodeId(agent_queue_.top());
     agent_queue_.pop();
     return std::nullopt;
   }
@@ -241,7 +258,7 @@ std::optional<NodeId> LoopClosureModule::getQueryAgentId(size_t stamp_ns) {
   }
 
   if (should_shutdown_ && (diff_s.count() < config_.lcd_agent_horizon_s)) {
-    LOG(ERROR) << "Forcing pop of node " << NodeSymbol(agent_queue_.top()).getLabel()
+    LOG(ERROR) << "Forcing pop of node " << printNodeId(agent_queue_.top())
                << " from lcd queue due to shutdown: "
                << ", diff: " << diff_s.count() << " / " << config_.lcd_agent_horizon_s;
   }

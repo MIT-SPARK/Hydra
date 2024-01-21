@@ -39,15 +39,16 @@
 #include <glog/logging.h>
 #include <kimera_pgmo/compression/DeltaCompression.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
+#include <pose_graph_tools_ros/conversions.h>
 #include <spark_dsg/pgmo_mesh_traits.h>
 #include <tf2_eigen/tf2_eigen.h>
-#include <pose_graph_tools_ros/conversions.h>
 
 #include <fstream>
 
 #include "hydra/common/hydra_config.h"
 #include "hydra/frontend/gvd_place_extractor.h"
 #include "hydra/frontend/mesh_segmenter.h"
+#include "hydra/utils/display_utilities.h"
 #include "hydra/utils/mesh_interface.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/timing_utilities.h"
@@ -55,7 +56,6 @@
 namespace hydra {
 
 using hydra::timing::ScopedTimer;
-using pose_graph_tools_msgs::PoseGraph;
 
 using LabelClusters = MeshSegmenter::LabelClusters;
 
@@ -66,7 +66,8 @@ FrontendModule::FrontendModule(const FrontendConfig& config,
     : config_(config::checkValid(config)),
       queue_(std::make_shared<FrontendInputQueue>()),
       dsg_(dsg),
-      state_(state) {
+      state_(state),
+      pose_graph_tracker_(new PoseGraphTracker(config.pose_graphs)) {
   kimera_pgmo::MeshFrontendConfig pgmo_config = config_.pgmo_config;
   const auto& prefix = HydraConfig::instance().getRobotPrefix();
   pgmo_config.robot_id = prefix.id;
@@ -83,7 +84,7 @@ FrontendModule::FrontendModule(const FrontendConfig& config,
     logs_ = logs;
 
     const auto frontend_dir = logs->getLogDir("frontend");
-    VLOG(1) << "[Hydra Frontend] logging to " << frontend_dir;
+    VLOG(VLEVEL_INFO) << "[Hydra Frontend] logging to " << frontend_dir;
     frontend_graph_logger_.setOutputPath(frontend_dir);
     frontend_graph_logger_.setLayerName(DsgLayers::OBJECTS, "objects");
     frontend_graph_logger_.setLayerName(DsgLayers::PLACES, "places");
@@ -136,13 +137,13 @@ void FrontendModule::stop() {
   should_shutdown_ = true;
 
   if (spin_thread_) {
-    VLOG(2) << "[Hydra Frontend] stopping frontend!";
+    VLOG(VLEVEL_TRACE) << "[Hydra Frontend] stopping frontend!";
     spin_thread_->join();
     spin_thread_.reset();
-    VLOG(2) << "[Hydra Frontend] stopped!";
+    VLOG(VLEVEL_TRACE) << "[Hydra Frontend] stopped!";
   }
 
-  VLOG(2) << "[Hydra Frontend]: " << queue_->size() << " messages left";
+  VLOG(VLEVEL_TRACE) << "[Hydra Frontend]: " << queue_->size() << " messages left";
 }
 
 void FrontendModule::save(const LogSetup& log_setup) {
@@ -169,7 +170,19 @@ std::string FrontendModule::printInfo() const {
 
 void FrontendModule::spin() {
   bool should_shutdown = false;
+  spin_finished_ = true;
+
+  ReconstructionOutput::Ptr input;
   while (!should_shutdown) {
+    if (input && spin_finished_) {
+      // start a spin to process input independent of this thread of
+      // execution. spin_finished_ will flip to true once the thread terminates
+      spin_finished_ = false;
+      std::thread spin_thread(&FrontendModule::dispatchSpin, this, input);
+      spin_thread.detach();
+      input.reset();
+    }
+
     bool has_data = queue_->poll();
     if (HydraConfig::instance().force_shutdown() || !has_data) {
       // copy over shutdown request
@@ -180,9 +193,40 @@ void FrontendModule::spin() {
       continue;
     }
 
-    spinOnce(*queue_->front());
+    // from this point on, we build an input packet by collating the maps together of
+    // subsequent outputs. This doesn't take effect until multiple packets from the
+    // reconstruction module start arriving between frontend updates
+    if (!input) {
+      input = queue_->front();
+    } else {
+      input->updateFrom(*queue_->front(), false);
+    }
+
+    processNextInput(*queue_->front());
     queue_->pop();
   }
+
+  while (!spin_finished_) {
+    // wait for current spin to finish before shutting down
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+}
+
+void FrontendModule::processNextInput(const ReconstructionOutput& msg) {
+  // start critical section for modifying sensor data
+  std::lock_guard<std::mutex> lock(sensor_mutex_);
+  const auto keyframe_id = pose_graph_tracker_->update(msg);
+  if (!keyframe_id) {
+    return;
+  }
+
+  if (!state_->lcd_queue) {
+    return;
+  }
+
+  const auto& prefix = HydraConfig::instance().getRobotPrefix();
+  const NodeSymbol node_id(prefix.key, *keyframe_id);
+  sensor_cache_[node_id] = {msg.sensor_data, msg.sensor};
 }
 
 bool FrontendModule::spinOnce() {
@@ -191,8 +235,11 @@ bool FrontendModule::spinOnce() {
     return false;
   }
 
-  spinOnce(*queue_->front());
+  ReconstructionOutput::Ptr input = queue_->front();
+  processNextInput(*input);
   queue_->pop();
+
+  spinOnce(input);
   return true;
 }
 
@@ -221,46 +268,61 @@ std::vector<bool> FrontendModule::inFreespace(const PositionMatrix& positions,
   return place_extractor_->inFreespace(positions, freespace_distance_m);
 }
 
-void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
+void FrontendModule::dispatchSpin(ReconstructionOutput::Ptr msg) {
+  spinOnce(msg);
+  spin_finished_ = true;
+}
+
+void FrontendModule::spinOnce(const ReconstructionOutput::Ptr& msg) {
   if (!initialized_) {
     initCallbacks();
   }
 
-  VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg.timestamp_ns << " [ns]";
+  if (input_dispatches_.size() != input_callbacks_.size()) {
+    input_dispatches_.clear();
+    for (size_t i = 0; i < input_callbacks_.size(); ++i) {
+      input_dispatches_.push_back(
+          [this, i](const auto& msg_ptr) { input_callbacks_.at(i)(*msg_ptr); });
+    }
+  }
+
+  VLOG(VLEVEL_FILE) << "[Hydra Frontend] Popped input packet @ " << msg->timestamp_ns
+                    << " [ns]";
   std::lock_guard<std::mutex> lock(mutex_);
-  ScopedTimer timer("frontend/spin", msg.timestamp_ns);
+  ScopedTimer timer("frontend/spin", msg->timestamp_ns);
 
   if (dsg_->graph && backend_input_) {
     for (const auto& callback : output_callbacks_) {
-      callback(*dsg_->graph, *backend_input_, msg.timestamp_ns);
+      callback(*dsg_->graph, *backend_input_, msg->timestamp_ns);
     }
   }
 
   backend_input_.reset(new BackendInput());
-  for (const auto& graph : msg.pose_graphs) {
-    backend_input_->pose_graphs.push_back(
-        boost::make_shared<pose_graph_tools_msgs::PoseGraph>(
-            pose_graph_tools::toMsg(*graph)));
-  }
-  if (msg.agent_node_measurements) {
-    backend_input_->agent_node_measurements.reset(
-        new PoseGraph(pose_graph_tools::toMsg(*msg.agent_node_measurements)));
-  }
-  backend_input_->timestamp_ns = msg.timestamp_ns;
+  backend_input_->timestamp_ns = msg->timestamp_ns;
 
-  lcd_input_.reset(new LcdInput);
-  lcd_input_->timestamp_ns = msg.timestamp_ns;
-
-  // TODO(nathan) this might potentially starve the backend and LCD
-  // We want to make sure that the backend and LCD catch the scene graph when:
-  // - last_update_time_ns is still set to the last packet sent time
-  // - some threads have done work
-  // - the newest output has not been pushed yet
-  // so we set the last update time before modifying anything!
-  dsg_->last_update_time = msg.timestamp_ns;
-  dsg_->updated = true;
+  if (state_->lcd_queue) {
+    lcd_input_.reset(new LcdInput());
+    lcd_input_->timestamp_ns = msg->timestamp_ns;
+  }
 
   updateImpl(msg);
+
+  // TODO(nathan) ideally make the copy lighter-weight
+  // we need to copy over the latest updates to the backend and to LCD
+  // no fancy threading: we just mark the update time and copy all changes in one go
+  {  // start critical section
+    std::unique_lock<std::mutex> lock(state_->backend_graph->mutex);
+    state_->backend_graph->last_update_time = msg->timestamp_ns;
+    state_->backend_graph->graph->mergeGraph(*dsg_->graph);
+  }  // end critical section
+
+  if (state_->lcd_queue) {
+    {  // start critical section
+      std::unique_lock<std::mutex> lock(state_->lcd_graph->mutex);
+      state_->lcd_graph->last_update_time = msg->timestamp_ns;
+      state_->lcd_graph->graph->mergeGraph(*dsg_->graph);
+    }  // end critical section
+  }
 
   backend_input_->mesh_update = last_mesh_update_;
   state_->backend_queue.push(backend_input_);
@@ -274,28 +336,32 @@ void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
   }
 }
 
-void FrontendModule::updateImpl(const ReconstructionOutput& msg) {
-  launchCallbacks(input_callbacks_, msg);
+void FrontendModule::updateImpl(const ReconstructionOutput::Ptr& msg) {
+  launchCallbacks(input_dispatches_, msg);
   if (place_extractor_) {
-    updatePlaceMeshMapping(msg);
+    updatePlaceMeshMapping(*msg);
   }
 }
 
 void FrontendModule::updateMesh(const ReconstructionOutput& input) {
   {  // start timing scope
     ScopedTimer timer("frontend/mesh_archive", input.timestamp_ns, true, 1, false);
-    VLOG(5) << "[Hydra Frontend] Clearing " << input.archived_blocks.size()
-            << " blocks from mesh";
-    mesh_compression_->clearArchivedBlocks(input.archived_blocks);
+    VLOG(VLEVEL_FILE) << "[Hydra Frontend] Clearing " << input.archived_blocks.size()
+                      << " blocks from mesh";
+    if (!input.archived_blocks.empty()) {
+      mesh_compression_->clearArchivedBlocks(input.archived_blocks);
+    }
   }  // end timing scope
 
   // TODO(nathan) prune archived blocks from input?
 
+  const auto& input_mesh = input.map().getMeshLayer();
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
     mesh_remapping_.reset(new kimera_pgmo::VoxbloxIndexMapping());
-    auto mesh = input.mesh->getActiveMesh(input.archived_blocks);
-    VLOG(5) << "[Hydra Frontend] Updating mesh with " << mesh->numBlocks() << " blocks";
+    auto mesh = input_mesh.getActiveMesh(input.archived_blocks);
+    VLOG(VLEVEL_FILE) << "[Hydra Frontend] Updating mesh with " << mesh->numBlocks()
+                      << " blocks";
     auto interface = getMeshInterface(*mesh);
     last_mesh_update_ =
         mesh_compression_->update(interface, input.timestamp_ns, mesh_remapping_.get());
@@ -337,13 +403,13 @@ void FrontendModule::updateDeformationGraph(const ReconstructionOutput& input) {
         "frontend/dgraph_compresssion", input.timestamp_ns, true, 1, false);
     const auto time_ns = std::chrono::nanoseconds(input.timestamp_ns);
     double time_s = std::chrono::duration_cast<std::chrono::seconds>(time_ns).count();
-    auto interface = getMeshInterface(*input.mesh);
+    auto interface = getMeshInterface(input.map().getMeshLayer());
     mesh_frontend_.processMeshGraph(interface, time_s);
   }  // end timing scope
 
   if (backend_input_) {
-    backend_input_->deformation_graph.reset(
-        new PoseGraph(mesh_frontend_.getLastProcessedMeshGraph()));
+    backend_input_->deformation_graph.reset(new pose_graph_tools_msgs::PoseGraph(
+        mesh_frontend_.getLastProcessedMeshGraph()));
   }
 }
 
@@ -372,101 +438,40 @@ void FrontendModule::updatePlaces(const ReconstructionOutput& input) {
 
 void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
+  ScopedTimer timer("frontend/update_posegraph", input.timestamp_ns);
   const auto& prefix = HydraConfig::instance().getRobotPrefix();
-  const auto& agents = dsg_->graph->getLayer(DsgLayers::AGENTS, prefix.key);
 
-  lcd_input_->new_agent_nodes.clear();
-  for (const auto& pose_graph : input.pose_graphs) {
-    if (pose_graph->nodes.empty()) {
-      continue;
-    }
+  std::vector<uint64_t> new_nodes;
+  {  // start pose-graph-tracker critical section
+    // we need to lock here because the pose graph tracker is updated from
+    // reconstruction in a different thread
+    std::lock_guard<std::mutex> lock(sensor_mutex_);
+    new_nodes = pose_graph_tracker_->addAgentNodes(*dsg_->graph, prefix);
+    pose_graph_tracker_->fillPoseGraphs(*backend_input_, new_nodes);
 
-    for (const auto& node : pose_graph->nodes) {
-      if (node.key < agents.numNodes()) {
-        continue;
+    if (lcd_input_) {
+      lcd_input_->new_agent_nodes = new_nodes;
+      for (const auto new_node : new_nodes) {
+        auto iter = sensor_cache_.find(new_node);
+        CHECK(iter != sensor_cache_.end())
+            << "Unable to find sensor data for node " << printNodeId(new_node);
+        lcd_input_->new_sensor_data.push_back(iter->second.data);
+        lcd_input_->new_sensors.push_back(iter->second.sensor);
+        sensor_cache_.erase(iter);
       }
-
-      Eigen::Vector3d position = node.pose.translation();
-      Eigen::Quaterniond rotation(node.pose.linear());
-
-      // TODO(nathan) implicit assumption that pgmo ids are sequential starting at 0
-      // TODO(nathan) implicit assumption that gtsam symbol and dsg node symbol are
-      // same
-      NodeSymbol pgmo_key(prefix.key, node.key);
-
-      const std::chrono::nanoseconds stamp(node.stamp_ns);
-      VLOG(5) << "[Hydra Frontend] Adding agent " << agents.nodes().size() << " @ "
-              << stamp.count() << " [ns] for layer " << agents.prefix.str()
-              << " (key: " << node.key << ")";
-      auto attrs = std::make_unique<AgentNodeAttributes>(rotation, position, pgmo_key);
-      if (!dsg_->graph->emplaceNode(
-              agents.id, agents.prefix, stamp, std::move(attrs))) {
-        VLOG(1) << "[Hydra Frontend] repeated timestamp " << stamp.count()
-                << "[ns] found";
-        continue;
-      }
-
-      // TODO(nathan) save key association for lcd
-      const size_t last_index = agents.nodes().size() - 1;
-      agent_key_map_[pgmo_key] = last_index;
-      lcd_input_->new_agent_nodes.push_back(agents.prefix.makeId(last_index));
     }
-  }
+  }  // end critical section for parsing sensor data
 
+  VLOG(VLEVEL_FILE) << "[Hydra Frontend] Added " << new_nodes.size() << " new nodes @ "
+                    << input.timestamp_ns << " [ns] for prefix '" << prefix.key << "'";
   addPlaceAgentEdges(input.timestamp_ns);
-  if (config_.lcd_use_bow_vectors) {
-    assignBowVectors(agents);
-  }
-}
-
-void FrontendModule::assignBowVectors(const DynamicLayer& agents) {
-  const auto& prefix = HydraConfig::instance().getRobotPrefix();
-  // TODO(nathan) take care of synchronization better
-  // lcd_input_->new_agent_nodes.clear();
-
-  // add bow messages received since last spin
-  while (!state_->visual_lcd_queue.empty()) {
-    cached_bow_messages_.push_back(state_->visual_lcd_queue.pop());
-  }
-
-  const auto prior_size = cached_bow_messages_.size();
-
-  auto iter = cached_bow_messages_.begin();
-  while (iter != cached_bow_messages_.end()) {
-    const auto& msg = *iter;
-    if (static_cast<int>(msg->robot_id) != prefix.id) {
-      VLOG(1) << "[Hydra Frontend] rejected bow message from robot " << msg->robot_id;
-      iter = cached_bow_messages_.erase(iter);
-    }
-
-    const NodeSymbol pgmo_key(prefix.key, msg->pose_id);
-
-    auto agent_index = agent_key_map_.find(pgmo_key);
-    if (agent_index == agent_key_map_.end()) {
-      ++iter;
-      continue;
-    }
-
-    const auto& node = agents.getNodeByIndex(agent_index->second)->get();
-    VLOG(5) << "[Hydra Frontend] assigned bow vector of " << pgmo_key.getLabel()
-            << " to dsg node " << NodeSymbol(node.id).getLabel();
-    // lcd_input_->new_agent_nodes.push_back(node.id);
-
-    auto& attrs = node.attributes<AgentNodeAttributes>();
-    attrs.dbow_ids = Eigen::Map<const AgentNodeAttributes::BowIdVector>(
-        msg->bow_vector.word_ids.data(), msg->bow_vector.word_ids.size());
-    attrs.dbow_values = Eigen::Map<const Eigen::VectorXf>(
-        msg->bow_vector.word_values.data(), msg->bow_vector.word_values.size());
-
-    iter = cached_bow_messages_.erase(iter);
-  }
-
-  size_t num_assigned = prior_size - cached_bow_messages_.size();
-  VLOG(3) << "[Hydra Frontend] assigned " << num_assigned << " bow vectors of "
-          << prior_size << " original";
 }
 
 void FrontendModule::invalidateMeshEdges(const kimera_pgmo::MeshDelta& delta) {
+  if (config_.min_object_vertices == 0) {
+    return;
+  }
+
   std::unique_lock<std::mutex> lock(dsg_->mutex);
 
   std::vector<NodeId> objects_to_delete;
@@ -516,7 +521,9 @@ void FrontendModule::archivePlaces(const NodeIdSet active_places) {
 
       const SceneGraphNode& prev_node = has_prev_node.value();
       prev_node.attributes().is_active = false;
-      lcd_input_->archived_places.insert(prev);
+      if (lcd_input_) {
+        lcd_input_->archived_places.insert(prev);
+      }
     }
 
   }  // end graph update critical section
@@ -640,7 +647,7 @@ void FrontendModule::updatePlaceMeshMapping(const ReconstructionOutput& input) {
   const auto& graph_mapping = mesh_frontend_.getVoxbloxMsgToGraphMapping();
 
   voxblox::BlockIndexList allocated_list;
-  input.mesh->getAllocatedBlockIndices(allocated_list);
+  input.map().getMeshLayer().getAllocatedBlockIndices(allocated_list);
 
   voxblox::IndexSet allocated(allocated_list.begin(), allocated_list.end());
   voxblox::IndexSet archived(input.archived_blocks.begin(),

@@ -118,7 +118,6 @@ def load_configs(
 
     overrides = {
         "frontend": {"objects": {"bounding_box_type": bounding_box_type}},
-        "lcd": {"lcd_use_bow_vectors": False},
         "reconstruction": {
             "show_stats": False,
             "pose_graphs": {"make_pose_graph": True},
@@ -173,7 +172,6 @@ def load_reconstruction_configs(
         "verbosity": reconstruction_verbosity,
         "type": "ReconstructionModule",
         "clear_distant_blocks": False,
-        "copy_dense_representations": False,
         "show_stats": False,
         "pose_graphs": {"make_pose_graph": False},
         "sensor": {
