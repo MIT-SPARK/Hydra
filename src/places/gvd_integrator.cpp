@@ -285,15 +285,18 @@ void GvdIntegrator::propagateSurface(const BlockIndex& block_index,
       continue;
     }
 
-    resetParent(gvd_voxel);  // surface voxels don't have parents
-
     const auto vertex_idx = vertex_voxel.block_vertex_index;
     BlockIndex mesh_block_index = Eigen::Map<const BlockIndex>(vertex_voxel.mesh_block);
     const auto mesh_block = mesh.getMeshBlock(mesh_block_index);
     const auto semantics_block = mesh.getSemanticBlock(mesh_block_index);
+    if (!mesh_block) {
+      LOG_FIRST_N(ERROR, 5) << "bad mesh index: " << showIndex(mesh_block_index)
+                            << " (block: " << showIndex(block_index) << ")";
+      continue;
+    }
 
-    CHECK(mesh_block) << "bad mesh index: " << showIndex(mesh_block_index)
-                      << " (block: " << showIndex(block_index) << ")";
+    resetParent(gvd_voxel);  // surface voxels don't have parents
+
     CHECK_LT(vertex_idx, mesh_block->vertices.size())
         << "gvd block: " << block_index.transpose()
         << " mesh index: " << mesh_block_index.transpose();
