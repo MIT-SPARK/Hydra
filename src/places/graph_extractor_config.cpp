@@ -80,6 +80,7 @@ void declare_config(CompressionExtractorConfig& conf) {
   field(conf.min_edge_distance_m, "min_edge_distance_m");
   field(conf.merge_nearby_nodes, "merge_new_nodes");
   field(conf.add_heuristic_edges, "add_heuristic_edges");
+  field(conf.merge_policy, "merge_policy");
 }
 
 void declare_config(FloodfillExtractorConfig& conf) {

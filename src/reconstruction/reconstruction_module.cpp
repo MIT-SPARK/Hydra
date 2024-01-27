@@ -61,6 +61,7 @@ ReconstructionModule::ReconstructionModule(const ReconstructionConfig& config,
   map_.reset(new VolumetricMap(HydraConfig::instance().getMapConfig(), true, true));
   tsdf_integrator_ = std::make_unique<ProjectiveIntegrator>(config.tsdf);
   mesh_integrator_ = std::make_unique<MeshIntegrator>(config.mesh);
+  footprint_integrator_ = config.robot_footprint.create();
 }
 
 ReconstructionModule::~ReconstructionModule() { stop(); }
@@ -183,6 +184,10 @@ bool ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
     ScopedTimer timer("places/tsdf", msg.timestamp_ns);
     tsdf_integrator_->updateMap(*msg.sensor, *data, *map_);
   }  // timing scope
+
+  if (footprint_integrator_) {
+    footprint_integrator_->addFreespaceFootprint(msg.world_T_body<float>(), *map_);
+  }
 
   if (map_->getTsdfLayer().getNumberOfAllocatedBlocks() == 0) {
     return false;

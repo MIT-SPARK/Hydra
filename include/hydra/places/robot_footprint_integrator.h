@@ -33,68 +33,44 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/virtual_config.h>
+#include <config_utilities/factory.h>
 
+#include <Eigen/Geometry>
 #include <memory>
 
-#include "hydra/common/common.h"
-#include "hydra/frontend/place_extractor_interface.h"
-#include "hydra/places/gvd_integrator_config.h"
-#include "hydra/places/gvd_voxel.h"
-#include "hydra/utils/log_utilities.h"
+#include "hydra/common/dsg_types.h"
+#include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
 
-namespace places {
-// forward declare to avoid include
-class GvdIntegrator;
-}  // namespace places
-
-class GvdPlaceExtractor : public PlaceExtractorInterface {
+class RobotFootprintIntegrator {
  public:
-  using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
-  using ExtractorConfig = config::VirtualConfig<places::GraphExtractorInterface>;
+  using Ptr = std::shared_ptr<RobotFootprintIntegrator>;
 
   struct Config {
-    places::GvdIntegratorConfig gvd;
-    config::VirtualConfig<places::GraphExtractorInterface> graph;
-    size_t min_component_size = 3;
-    bool filter_places = true;
+    Eigen::Vector3f bbox_min = Eigen::Vector3f::Zero();
+    Eigen::Vector3f bbox_max = Eigen::Vector3f::Zero();
+    double tsdf_weight = 1.0e-5;
   };
 
-  explicit GvdPlaceExtractor(const Config& config);
+  RobotFootprintIntegrator(const Config& config);
 
-  virtual ~GvdPlaceExtractor();
+  virtual ~RobotFootprintIntegrator();
 
-  void save(const LogSetup& logs) const override;
+  void addFreespaceFootprint(const Eigen::Isometry3f& world_T_body,
+                             VolumetricMap& map) const;
 
-  NodeIdSet getActiveNodes() const override;
-
-  // takes in a 3xN matrix
-  std::vector<bool> inFreespace(const PositionMatrix& positions,
-                                double freespace_distance_m) const override;
-
-  void detectImpl(uint64_t timestamp_ns,
-                  const Eigen::Isometry3f& world_T_body,
-                  const voxblox::BlockIndexList& archived_blocks,
-                  VolumetricMap& map) override;
-
-  void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) override;
-
+ public:
   const Config config;
-
- protected:
-  mutable std::mutex gvd_mutex_;
-  voxblox::Layer<places::GvdVoxel>::Ptr gvd_;
-  std::shared_ptr<places::GraphExtractorInterface> graph_extractor_;
-  std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
-  NodeIdSet active_nodes_;
+  const BoundingBox bbox;
 
  private:
-  inline static const auto registration_ = config::
-      RegistrationWithConfig<PlaceExtractorInterface, GvdPlaceExtractor, Config>("gvd");
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<RobotFootprintIntegrator,
+                                     RobotFootprintIntegrator,
+                                     Config>("RobotFootprintIntegrator");
 };
 
-void declare_config(GvdPlaceExtractor::Config& config);
+void declare_config(RobotFootprintIntegrator::Config& config);
 
 }  // namespace hydra

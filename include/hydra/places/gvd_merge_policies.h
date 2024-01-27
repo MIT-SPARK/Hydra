@@ -33,68 +33,32 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/virtual_config.h>
+#include <config_utilities/factory.h>
 
-#include <memory>
+#include "hydra/places/gvd_graph.h"
 
-#include "hydra/common/common.h"
-#include "hydra/frontend/place_extractor_interface.h"
-#include "hydra/places/gvd_integrator_config.h"
-#include "hydra/places/gvd_voxel.h"
-#include "hydra/utils/log_utilities.h"
+namespace hydra::places {
 
-namespace hydra {
-
-namespace places {
-// forward declare to avoid include
-class GvdIntegrator;
-}  // namespace places
-
-class GvdPlaceExtractor : public PlaceExtractorInterface {
- public:
-  using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
-  using ExtractorConfig = config::VirtualConfig<places::GraphExtractorInterface>;
-
-  struct Config {
-    places::GvdIntegratorConfig gvd;
-    config::VirtualConfig<places::GraphExtractorInterface> graph;
-    size_t min_component_size = 3;
-    bool filter_places = true;
-  };
-
-  explicit GvdPlaceExtractor(const Config& config);
-
-  virtual ~GvdPlaceExtractor();
-
-  void save(const LogSetup& logs) const override;
-
-  NodeIdSet getActiveNodes() const override;
-
-  // takes in a 3xN matrix
-  std::vector<bool> inFreespace(const PositionMatrix& positions,
-                                double freespace_distance_m) const override;
-
-  void detectImpl(uint64_t timestamp_ns,
-                  const Eigen::Isometry3f& world_T_body,
-                  const voxblox::BlockIndexList& archived_blocks,
-                  VolumetricMap& map) override;
-
-  void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) override;
-
-  const Config config;
-
- protected:
-  mutable std::mutex gvd_mutex_;
-  voxblox::Layer<places::GvdVoxel>::Ptr gvd_;
-  std::shared_ptr<places::GraphExtractorInterface> graph_extractor_;
-  std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
-  NodeIdSet active_nodes_;
-
- private:
-  inline static const auto registration_ = config::
-      RegistrationWithConfig<PlaceExtractorInterface, GvdPlaceExtractor, Config>("gvd");
+struct MergePolicy {
+  /**
+   * \brief compare two gvd nodes to see which is more representativie
+   * \return Returns -1 if right is better, 0 if tie, 1 if left is better
+   */
+  virtual int compare(const GvdMemberInfo& lhs, const GvdMemberInfo& rhs) const = 0;
 };
 
-void declare_config(GvdPlaceExtractor::Config& config);
+struct BasisPointMergePolicy : MergePolicy {
+  int compare(const GvdMemberInfo& lhs, const GvdMemberInfo& rhs) const override;
 
-}  // namespace hydra
+  inline static const auto registration_ =
+      config::Registration<MergePolicy, BasisPointMergePolicy>("basis_points");
+};
+
+struct DistanceMergePolicy : MergePolicy {
+  int compare(const GvdMemberInfo& lhs, const GvdMemberInfo& rhs) const override;
+
+  inline static const auto registration_ =
+      config::Registration<MergePolicy, DistanceMergePolicy>("distance");
+};
+
+}  // namespace hydra::places

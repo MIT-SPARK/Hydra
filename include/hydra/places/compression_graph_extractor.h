@@ -38,6 +38,7 @@
 #include <queue>
 
 #include "hydra/places/graph_extractor_interface.h"
+#include "hydra/places/gvd_merge_policies.h"
 
 namespace hydra {
 namespace places {
@@ -150,6 +151,7 @@ class CompressionGraphExtractor : public GraphExtractorInterface {
   CompressionExtractorConfig config_;
   double compression_factor_;
   IndexIdMap index_id_map_;
+  std::unique_ptr<MergePolicy> merge_policy_;
 
   uint64_t next_id_;
   std::list<uint64_t> id_queue_;

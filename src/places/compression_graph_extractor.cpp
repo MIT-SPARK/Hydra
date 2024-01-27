@@ -173,7 +173,10 @@ void CompressedNode::merge(CompressedNode& other, CompressedNodeMap& nodes) {
 
 CompressionGraphExtractor::CompressionGraphExtractor(
     const CompressionExtractorConfig& config)
-    : GraphExtractorInterface(config), config_(config), next_id_(0) {
+    : GraphExtractorInterface(config),
+      config_(config),
+      merge_policy_(config::create<MergePolicy>(config.merge_policy)),
+      next_id_(0) {
   compression_factor_ = 1.0 / config_.compression_distance_m;
 }
 
@@ -694,9 +697,9 @@ void CompressionGraphExtractor::mergeNearbyNodes() {
       }
 
       // assign merge to the node with the most basis points
-      const bool curr_has_more = gvd1->num_basis_points >= gvd2->num_basis_points;
-      const auto from_node = curr_has_more ? sibling_id : compressed_id;
-      auto to_node = curr_has_more ? compressed_id : sibling_id;
+      const auto lhs_is_better = merge_policy_->compare(*gvd1, *gvd2);
+      const auto from_node = lhs_is_better >= 0 ? sibling_id : compressed_id;
+      auto to_node = lhs_is_better >= 0 ? compressed_id : sibling_id;
 
       auto iter = merges.find(to_node);
       to_node = (iter == merges.end()) ? to_node : iter->second;

@@ -195,6 +195,8 @@ class FrontendModule : public Module {
   std::mutex mutex_;
 
  private:
+  void stopImpl();
+
   inline static const auto registration_ =
       config::RegistrationWithConfig<FrontendModule,
                                      FrontendModule,

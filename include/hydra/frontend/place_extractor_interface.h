@@ -59,11 +59,18 @@ class PlaceExtractorInterface {
 
   virtual void save(const LogSetup& /* logs */) const {}
 
-  virtual void detect(const ReconstructionOutput& msg) = 0;
+  void detect(const ReconstructionOutput& msg) {
+    // TODO(nathan) this is not ideal, as it treats map as non-const
+    detectImpl(msg.timestamp_ns,
+               msg.world_T_body<float>(),
+               msg.archived_blocks,
+               *CHECK_NOTNULL(msg.getMapPointer()));
+  }
 
-  virtual void detect(uint64_t timestamp_ns,
-                      const VolumetricMap& map,
-                      const voxblox::BlockIndexList& archived_blocks) = 0;
+  virtual void detectImpl(uint64_t timestamp_ns,
+                          const Eigen::Isometry3f& world_T_body,
+                          const voxblox::BlockIndexList& archived_blocks,
+                          VolumetricMap& map) = 0;
 
   virtual void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) = 0;
 

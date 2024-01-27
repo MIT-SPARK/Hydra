@@ -32,69 +32,24 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <config_utilities/virtual_config.h>
+#include "hydra/places/gvd_merge_policies.h"
 
-#include <memory>
+namespace hydra::places {
 
-#include "hydra/common/common.h"
-#include "hydra/frontend/place_extractor_interface.h"
-#include "hydra/places/gvd_integrator_config.h"
-#include "hydra/places/gvd_voxel.h"
-#include "hydra/utils/log_utilities.h"
+template <typename T>
+int compareValues(T lhs, T rhs) {
+  // lhs > rhs is 0 if lhs == rhs and 1 if lhs > rhs
+  return (lhs < rhs) ? -1 : (lhs > rhs);
+}
 
-namespace hydra {
+int BasisPointMergePolicy::compare(const GvdMemberInfo& lhs,
+                                   const GvdMemberInfo& rhs) const {
+  return compareValues(lhs.num_basis_points, rhs.num_basis_points);
+}
 
-namespace places {
-// forward declare to avoid include
-class GvdIntegrator;
-}  // namespace places
+int DistanceMergePolicy::compare(const GvdMemberInfo& lhs,
+                                 const GvdMemberInfo& rhs) const {
+  return compareValues(lhs.distance, rhs.distance);
+}
 
-class GvdPlaceExtractor : public PlaceExtractorInterface {
- public:
-  using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
-  using ExtractorConfig = config::VirtualConfig<places::GraphExtractorInterface>;
-
-  struct Config {
-    places::GvdIntegratorConfig gvd;
-    config::VirtualConfig<places::GraphExtractorInterface> graph;
-    size_t min_component_size = 3;
-    bool filter_places = true;
-  };
-
-  explicit GvdPlaceExtractor(const Config& config);
-
-  virtual ~GvdPlaceExtractor();
-
-  void save(const LogSetup& logs) const override;
-
-  NodeIdSet getActiveNodes() const override;
-
-  // takes in a 3xN matrix
-  std::vector<bool> inFreespace(const PositionMatrix& positions,
-                                double freespace_distance_m) const override;
-
-  void detectImpl(uint64_t timestamp_ns,
-                  const Eigen::Isometry3f& world_T_body,
-                  const voxblox::BlockIndexList& archived_blocks,
-                  VolumetricMap& map) override;
-
-  void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) override;
-
-  const Config config;
-
- protected:
-  mutable std::mutex gvd_mutex_;
-  voxblox::Layer<places::GvdVoxel>::Ptr gvd_;
-  std::shared_ptr<places::GraphExtractorInterface> graph_extractor_;
-  std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
-  NodeIdSet active_nodes_;
-
- private:
-  inline static const auto registration_ = config::
-      RegistrationWithConfig<PlaceExtractorInterface, GvdPlaceExtractor, Config>("gvd");
-};
-
-void declare_config(GvdPlaceExtractor::Config& config);
-
-}  // namespace hydra
+}  // namespace hydra::places

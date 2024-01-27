@@ -53,6 +53,11 @@ struct ReconstructionOutput {
   std::shared_ptr<FrameData> sensor_data;
   Sensor::Ptr sensor;
 
+  template <typename T = double>
+  Eigen::Transform<T, 3, Eigen::Isometry> world_T_body() const {
+    return Eigen::Translation<T, 3>(world_t_body.cast<T>()) * world_R_body.cast<T>();
+  }
+
   const VolumetricMap& map() const;
   voxblox::BlockIndexList archived_blocks;
 

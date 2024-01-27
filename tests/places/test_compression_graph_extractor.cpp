@@ -688,5 +688,33 @@ TEST(CompressionNode, testRemoveEdges) {
   EXPECT_EQ(removed_siblings, expected_removed);
 }
 
+TEST(CompressionNode, testMergePolicies) {
+  GvdMemberInfo info1;
+  info1.num_basis_points = 1;
+  info1.distance = 0.3;
+  GvdMemberInfo info2;
+  info2.num_basis_points = 3;
+  info2.distance = 0.1;
+  GvdMemberInfo info3;
+  info3.num_basis_points = 3;
+  info3.distance = 0.3;
+
+  BasisPointMergePolicy basis_policy;
+  EXPECT_EQ(basis_policy.compare(info1, info2), -1);
+  EXPECT_EQ(basis_policy.compare(info1, info3), -1);
+  EXPECT_EQ(basis_policy.compare(info2, info3), 0);
+  EXPECT_EQ(basis_policy.compare(info2, info1), 1);
+  EXPECT_EQ(basis_policy.compare(info3, info1), 1);
+  EXPECT_EQ(basis_policy.compare(info3, info2), 0);
+
+  DistanceMergePolicy distance_policy;
+  EXPECT_EQ(distance_policy.compare(info1, info2), 1);
+  EXPECT_EQ(distance_policy.compare(info1, info3), 0);
+  EXPECT_EQ(distance_policy.compare(info2, info3), -1);
+  EXPECT_EQ(distance_policy.compare(info2, info1), -1);
+  EXPECT_EQ(distance_policy.compare(info3, info1), 0);
+  EXPECT_EQ(distance_policy.compare(info3, info2), 1);
+}
+
 }  // namespace places
 }  // namespace hydra

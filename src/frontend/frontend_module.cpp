@@ -97,13 +97,13 @@ FrontendModule::FrontendModule(const FrontendConfig& config,
 
   CHECK(mesh_frontend_.initialize(pgmo_config));
   segmenter_.reset(new MeshSegmenter(config_.object_config));
-  place_extractor_.reset(new GvdPlaceExtractor(config_.graph_extractor,
-                                               config.gvd,
-                                               config.min_places_component_size,
-                                               config.filter_places));
+  place_extractor_ = config_.places.create();
 }
 
-FrontendModule::~FrontendModule() { stop(); }
+FrontendModule::~FrontendModule() {
+  // intentionally the private implementation to avoid calling virtual method
+  stopImpl();
+}
 
 void FrontendModule::initCallbacks() {
   initialized_ = true;
@@ -133,7 +133,9 @@ void FrontendModule::start() {
   LOG(INFO) << "[Hydra Frontend] started!";
 }
 
-void FrontendModule::stop() {
+void FrontendModule::stop() { stopImpl(); }
+
+void FrontendModule::stopImpl() {
   should_shutdown_ = true;
 
   if (spin_thread_) {

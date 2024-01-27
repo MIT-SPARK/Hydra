@@ -54,6 +54,8 @@ void declare_config(ReconstructionConfig& conf) {
   field(conf.semantic_measurement_probability, "semantic_measurement_probability");
   field(conf.tsdf, "tsdf");
   field(conf.mesh, "mesh");
+  conf.robot_footprint.setOptional();
+  field(conf.robot_footprint, "robot_footprint");
 }
 
 }  // namespace hydra

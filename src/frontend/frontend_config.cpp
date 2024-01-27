@@ -53,22 +53,18 @@ void declare_config(kimera_pgmo::MeshFrontendConfig& conf) {
 
 namespace hydra {
 
-void declare_config(FrontendConfig& conf) {
+void declare_config(FrontendConfig& config) {
   using namespace config;
   name("FrontendConfig");
-  field(conf.min_object_vertices, "min_object_vertices");
-  field(conf.prune_mesh_indices, "prune_mesh_indices");
-  field(conf.pgmo_config, "pgmo");
-  field(conf.object_config, "objects");
-  field(conf.object_config.angle_step, "angle_step");
-  field(conf.validate_vertices, "validate_vertices");
-  field(conf.filter_places, "filter_places");
-  field(conf.min_places_component_size, "min_places_component_size");
-  field(conf.pose_graphs, "pose_graphs");
-
-  field(conf.gvd, "gvd");
-  conf.graph_extractor.setOptional();
-  field(conf.graph_extractor, "graph_extractor");
+  field(config.min_object_vertices, "min_object_vertices");
+  field(config.prune_mesh_indices, "prune_mesh_indices");
+  field(config.pgmo_config, "pgmo");
+  field(config.object_config, "objects");
+  field(config.object_config.angle_step, "angle_step");
+  field(config.validate_vertices, "validate_vertices");
+  field(config.pose_graphs, "pose_graphs");
+  config.places.setOptional();
+  field(config.places, "places");
 }
 
 }  // namespace hydra

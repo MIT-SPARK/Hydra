@@ -34,6 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/frontend/gvd_place_extractor.h"
 
+#include <config_utilities/config.h>
+#include <config_utilities/validation.h>
+
 #include "hydra/common/common.h"
 #include "hydra/common/hydra_config.h"
 #include "hydra/places/graph_extractor_interface.h"
@@ -48,24 +51,27 @@ using places::GvdIntegratorConfig;
 using places::GvdVoxel;
 using voxblox::Layer;
 
-GvdPlaceExtractor::GvdPlaceExtractor(const ExtractorConfig& graph_config,
-                                     const GvdIntegratorConfig& gvd_config,
-                                     size_t min_component_size,
-                                     bool filter_places)
-    : gvd_config_(gvd_config),
-      min_component_size_(min_component_size),
-      filter_places_(filter_places) {
-  graph_extractor_ = graph_config.create();
-  if (!graph_config) {
+void declare_config(GvdPlaceExtractor::Config& config) {
+  using namespace config;
+  name("GvdPlaceExtractor::Config");
+  field(config.gvd, "gvd");
+  config.graph.setOptional();
+  field(config.graph, "graph");
+  field(config.min_component_size, "min_component_size");
+  field(config.filter_places, "filter_places");
+}
+
+GvdPlaceExtractor::GvdPlaceExtractor(const Config& config)
+    : config(config::checkValid(config)), graph_extractor_(config.graph.create()) {
+  if (!graph_extractor_) {
     LOG(ERROR) << "no place graph extraction provided! disabling extraction";
   }
 
   const auto& map_config = HydraConfig::instance().getMapConfig();
-  if (static_cast<float>(gvd_config_.min_distance_m) >=
-      map_config.truncation_distance) {
+  if (static_cast<float>(config.gvd.min_distance_m) >= map_config.truncation_distance) {
     LOG(ERROR)
         << "integrator min distance must be less than truncation distance (currently "
-        << gvd_config_.min_distance_m << " vs. truncation distance "
+        << config.gvd.min_distance_m << " vs. truncation distance "
         << map_config.truncation_distance << ")";
     throw std::runtime_error("invalid integrator min distance");
   }
@@ -117,9 +123,10 @@ std::vector<bool> GvdPlaceExtractor::inFreespace(const PositionMatrix& positions
   return flags;
 }
 
-void GvdPlaceExtractor::detect(uint64_t timestamp_ns,
-                               const VolumetricMap& map,
-                               const voxblox::BlockIndexList& archived_blocks) {
+void GvdPlaceExtractor::detectImpl(uint64_t timestamp_ns,
+                                   const Eigen::Isometry3f&,
+                                   const voxblox::BlockIndexList& archived_blocks,
+                                   VolumetricMap& map) {
   if (!map.getOccupancyLayer()) {
     LOG(ERROR) << "Cannot extract places from invalid input";
     return;
@@ -128,7 +135,7 @@ void GvdPlaceExtractor::detect(uint64_t timestamp_ns,
   auto& tsdf = map.getTsdfLayer();
   if (!gvd_) {
     gvd_.reset(new Layer<GvdVoxel>(tsdf.voxel_size(), tsdf.voxels_per_side()));
-    gvd_integrator_.reset(new GvdIntegrator(gvd_config_, gvd_, graph_extractor_));
+    gvd_integrator_.reset(new GvdIntegrator(config.gvd, gvd_, graph_extractor_));
   }
 
   {  // start critical section
@@ -142,10 +149,6 @@ void GvdPlaceExtractor::detect(uint64_t timestamp_ns,
   for (const auto& callback : visualization_callbacks_) {
     callback(timestamp_ns, *gvd_, graph_extractor_.get());
   }
-}
-
-void GvdPlaceExtractor::detect(const ReconstructionOutput& msg) {
-  detect(msg.timestamp_ns, msg.map(), msg.archived_blocks);
 }
 
 void filterInvalidNodes(const SceneGraphLayer& graph, NodeIdSet& active_nodes) {
@@ -227,7 +230,7 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& gr
     }
   }
 
-  if (filter_places_) {
+  if (config.filter_places) {
     auto iter = active_neighborhood.begin();
     while (iter != active_neighborhood.end()) {
       if (places.hasNode(*iter)) {
@@ -245,11 +248,13 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& gr
     // within N hops of the subgraph, where N is the min allowable component size
     // ensures that we don't search the entire places subgraph, but still preserve
     // archived places that connect to a component of at least size N
-    const auto components = graph_utilities::getConnectedComponents(
-        graph.getLayer(DsgLayers::PLACES), min_component_size_, active_neighborhood);
+    const auto components =
+        graph_utilities::getConnectedComponents(graph.getLayer(DsgLayers::PLACES),
+                                                config.min_component_size,
+                                                active_neighborhood);
 
     for (const auto& component : components) {
-      if (component.size() >= min_component_size_) {
+      if (component.size() >= config.min_component_size) {
         continue;
       }
 
