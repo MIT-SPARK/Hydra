@@ -69,6 +69,9 @@ void declare_config(FrontendConfig& conf) {
   field(conf.gvd, "gvd");
   conf.graph_extractor.setOptional();
   field(conf.graph_extractor, "graph_extractor");
+
+  // TMP
+  field(conf.save_every_n_frames, "save_every_n_frames");
 }
 
 }  // namespace hydra

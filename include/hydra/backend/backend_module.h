@@ -63,8 +63,6 @@ struct LoopClosureLog {
   gtsam::Pose3 src_T_dest;  // src_frame.between(dest_frame)
   bool dsg;
   int64_t level;
-
-  int save_every_n_frames = 100;
 };
 
 class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
@@ -91,6 +89,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   void stop() override;
 
   void save(const LogSetup& log_setup) override;
+
+  void saveKhronos();
 
   std::string printInfo() const override;
 
@@ -219,6 +219,10 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   // TODO(lschmid): This mutex currently simply locks all data for manipulation.
   std::mutex mutex_;
+
+  // TMP
+  int num_maps_saved_ = 0;
+  size_t last_timestamp_ = 0;
 
   inline static const auto registration_ =
       config::RegistrationWithConfig<BackendModule,

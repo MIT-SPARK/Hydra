@@ -44,6 +44,8 @@
 #include <spark_dsg/zmq_interface.h>
 #include <voxblox/core/block_hash.h>
 
+#include <filesystem>
+
 #include "hydra/common/hydra_config.h"
 #include "hydra/rooms/room_finder.h"
 #include "hydra/utils/minimum_spanning_tree.h"
@@ -298,6 +300,21 @@ void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
   for (const auto& cb_func : output_callbacks_) {
     cb_func(*private_dsg_->graph, *deformation_graph_, input.timestamp_ns);
   }
+}
+
+void BackendModule::saveKhronos() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  std::stringstream map_dir;
+  map_dir << "/mnt/c/Users/DerFu/Documents/khronos/data/hydra/tmp/maps/" << std::setw(5)
+          << std::setfill('0') << num_maps_saved_++;
+
+  std::filesystem::create_directories(map_dir.str());
+
+  private_dsg_->graph->save(map_dir.str() + "/dsg_with_mesh", true);
+
+  std::ofstream out_file(map_dir.str() + "/timestamp.txt");
+  out_file << last_timestamp_;
+  out_file.close();
 }
 
 void BackendModule::loadState(const std::string& state_path,
@@ -710,7 +727,7 @@ void BackendModule::runZmqUpdates() {
 }
 
 void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
-  //deformation_graph_->update();
+  // deformation_graph_->update();
   if (!force_mesh_update && !have_new_mesh_) {
     return;
   }
