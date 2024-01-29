@@ -5,7 +5,7 @@ dynamic_labels: [20]
 invalid_labels: []
 frontend:
   objects:
-    labels: [1,4,5,6,7,13,14,15]
+    labels: [2,3,4,8,9,11,15,17]
 label_names:
   - {label: 0, name: unknown}
   - {label: 1, name: air_vent}
@@ -26,5 +26,4 @@ label_names:
   - {label: 16, name: desk}
   - {label: 17, name: cubicle}
   - {label: 18, name: trashcan}
-  - {label: 19, name: wall}
-  - {label: 20, name: human}
+
