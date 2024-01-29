@@ -63,6 +63,8 @@ struct LoopClosureLog {
   gtsam::Pose3 src_T_dest;  // src_frame.between(dest_frame)
   bool dsg;
   int64_t level;
+
+  int save_every_n_frames = 100;
 };
 
 class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {

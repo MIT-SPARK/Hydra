@@ -141,6 +141,9 @@ void declare_config(BackendConfig& config) {
   field(config.use_zmq_interface, "use_zmq_interface");
   field(config.zmq_num_threads, "zmq_num_threads");
   field(config.zmq_poll_time_ms, "zmq_poll_time_ms");
+
+  // TMP
+  field(config.save_every_n_frames, "save_every_n_frames");
 }
 
 }  // namespace hydra
