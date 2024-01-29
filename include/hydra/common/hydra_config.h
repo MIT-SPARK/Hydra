@@ -61,6 +61,8 @@ struct FrameConfig {
 };
 
 struct PipelineConfig {
+    int save_every_n_frames = 100;
+
   bool enable_reconstruction = true;
   bool enable_lcd = false;
   bool timing_disabled = false;

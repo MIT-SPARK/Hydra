@@ -53,8 +53,6 @@ struct FrontendConfig {
   size_t min_places_component_size = 3;
   places::GvdIntegratorConfig gvd;
   config::VirtualConfig<places::GraphExtractorInterface> graph_extractor;
-
-  int save_every_n_frames = 100;
 };
 
 void declare_config(FrontendConfig& conf);

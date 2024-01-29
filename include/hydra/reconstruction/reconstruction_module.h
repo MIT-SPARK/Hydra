@@ -73,6 +73,11 @@ class ReconstructionModule : public Module {
 
   void stop() override;
 
+  // TMP
+  size_t num_poses_since_last_save_ = 0;
+  size_t save_every_n_frames_ = 0;
+  std::function<void()> save_callback_;
+
   void save(const LogSetup& log_setup) override;
 
   std::string printInfo() const override;

@@ -102,6 +102,7 @@ void declare_config(PipelineConfig& conf) {
   // the following subconfigs should not be namespaced
   field(conf.logs, "logs", false);
   field(conf.frames, "frames", false);
+  field(conf.save_every_n_frames, "save_every_n_frames");
   field(conf.label_space, "label_space", false);
 }
 
@@ -151,18 +152,23 @@ void HydraConfig::initFromConfig(const PipelineConfig& config, int robot_id) {
   robot_prefix_ = RobotPrefixConfig(robot_id);
   logs_ = std::make_shared<LogSetup>(config_.logs);
   configureTimers();
+  LOG(WARNING) << "Colormap path: " << config_.label_space.colormap_filepath;
 
   if (!config_.label_space.colormap.empty()) {
     SemanticColorMap::ColorToLabelMap new_colors;
     for (auto&& [id, color] : config_.label_space.colormap) {
       new_colors[voxblox::Color(color[0], color[1], color[2], 255)] = id;
     }
+    LOG(WARNING) << "labelspacve colormap not empty";
 
     label_colormap_.reset(new SemanticColorMap(new_colors));
   } else if (!config_.label_space.colormap_filepath.empty()) {
     label_colormap_ = SemanticColorMap::fromCsv(config_.label_space.colormap_filepath);
+    LOG(WARNING) << "load";
+
   } else {
     label_colormap_ = SemanticColorMap::randomColors(config_.label_space.total_labels);
+    LOG(WARNING) << "random";
   }
 
   if (label_colormap_) {

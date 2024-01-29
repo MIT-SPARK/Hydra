@@ -263,6 +263,7 @@ void BackendModule::logPlaceDistance() {
 
 void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
   ScopedTimer spin_timer("backend/spin", input.timestamp_ns);
+  last_timestamp_ = input.timestamp_ns;
   status_.reset();
   std::lock_guard<std::mutex> lock(mutex_);
 

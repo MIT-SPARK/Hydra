@@ -145,6 +145,13 @@ bool ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
     agent_node_measurements_ = *msg.agent_node_measurements;
   }
 
+  // TMP.
+  num_poses_since_last_save_++;
+  if (num_poses_since_last_save_ >= save_every_n_frames_) {
+    save_callback_();
+    num_poses_since_last_save_ -= save_every_n_frames_;
+  }
+
   ++num_poses_received_;
   const bool do_full_update = (num_poses_received_ % config_.num_poses_per_update == 0);
   update(msg, do_full_update);
