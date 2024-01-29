@@ -76,6 +76,8 @@ class GraphExtractorInterface {
 
   void clearDeleted();
 
+  const NodeIndexMap& getIndexMap() const { return node_index_map_; }
+
  protected:
   NodeId addPlaceToGraph(const GvdLayer& layer,
                          const GvdVoxel& voxel,

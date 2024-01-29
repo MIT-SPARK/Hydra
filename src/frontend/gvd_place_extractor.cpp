@@ -40,6 +40,7 @@
 #include "hydra/common/common.h"
 #include "hydra/common/hydra_config.h"
 #include "hydra/places/graph_extractor_interface.h"
+#include "hydra/places/graph_extractor_utilities.h"
 #include "hydra/places/gvd_integrator.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -59,6 +60,18 @@ void declare_config(GvdPlaceExtractor::Config& config) {
   field(config.graph, "graph");
   field(config.min_component_size, "min_component_size");
   field(config.filter_places, "filter_places");
+  field(config.filter_ground, "filter_ground");
+  field(config.robot_height, "robot_height");
+  field(config.edge_tolerance, "edge_tolerance");
+  field(config.node_tolerance, "node_tolerance");
+  field(config.add_freespace_edges, "add_freespace_edges");
+  if (config.add_freespace_edges) {
+    // TODO(nathan) see why ADL is broken
+    field(config.freespace_config.max_length_m, "max_length_m");
+    field(config.freespace_config.num_nodes_to_check, "num_nodes_to_check");
+    field(config.freespace_config.num_neighbors_to_find, "num_neighbors_to_find");
+    field(config.freespace_config.min_clearance_m, "min_clearance_m");
+  }
 }
 
 GvdPlaceExtractor::GvdPlaceExtractor(const Config& config)
@@ -124,7 +137,7 @@ std::vector<bool> GvdPlaceExtractor::inFreespace(const PositionMatrix& positions
 }
 
 void GvdPlaceExtractor::detectImpl(uint64_t timestamp_ns,
-                                   const Eigen::Isometry3f&,
+                                   const Eigen::Isometry3f& world_T_body,
                                    const voxblox::BlockIndexList& archived_blocks,
                                    VolumetricMap& map) {
   if (!map.getOccupancyLayer()) {
@@ -137,6 +150,8 @@ void GvdPlaceExtractor::detectImpl(uint64_t timestamp_ns,
     gvd_.reset(new Layer<GvdVoxel>(tsdf.voxel_size(), tsdf.voxels_per_side()));
     gvd_integrator_.reset(new GvdIntegrator(config.gvd, gvd_, graph_extractor_));
   }
+
+  latest_pos_ = world_T_body.translation().cast<double>();
 
   {  // start critical section
     std::unique_lock<std::mutex> lock(gvd_mutex_);
@@ -230,42 +245,109 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& gr
     }
   }
 
-  if (config.filter_places) {
-    auto iter = active_neighborhood.begin();
-    while (iter != active_neighborhood.end()) {
-      if (places.hasNode(*iter)) {
-        ++iter;
-        continue;
-      }
+  if (config.filter_ground) {
+    filterGround(graph);
+  }
 
-      iter = active_neighborhood.erase(iter);
+  if (config.filter_places) {
+    filterIsolated(graph, active_neighborhood);
+  }
+
+  graph_extractor_->clearDeleted();
+}
+
+void GvdPlaceExtractor::filterIsolated(DynamicSceneGraph& graph,
+                                       NodeIdSet& active_neighborhood) {
+  const auto& places = graph_extractor_->getGraph();
+
+  auto iter = active_neighborhood.begin();
+  while (iter != active_neighborhood.end()) {
+    if (places.hasNode(*iter)) {
+      ++iter;
+      continue;
     }
 
-    // we grab connected components using the subgraph of all active places and all
-    // archived places that used to be a neighbor with an active place so that we don't
-    // miss disconnected components that comprised of archived nodes and formed when an
-    // active node or edge is removed. Limiting the connected component search to be
-    // within N hops of the subgraph, where N is the min allowable component size
-    // ensures that we don't search the entire places subgraph, but still preserve
-    // archived places that connect to a component of at least size N
-    const auto components =
-        graph_utilities::getConnectedComponents(graph.getLayer(DsgLayers::PLACES),
-                                                config.min_component_size,
-                                                active_neighborhood);
+    iter = active_neighborhood.erase(iter);
+  }
 
-    for (const auto& component : components) {
-      if (component.size() >= config.min_component_size) {
-        continue;
-      }
+  // we grab connected components using the subgraph of all active places and all
+  // archived places that used to be a neighbor with an active place so that we don't
+  // miss disconnected components that comprised of archived nodes and formed when an
+  // active node or edge is removed. Limiting the connected component search to be
+  // within N hops of the subgraph, where N is the min allowable component size
+  // ensures that we don't search the entire places subgraph, but still preserve
+  // archived places that connect to a component of at least size N
+  const auto components =
+      graph_utilities::getConnectedComponents(graph.getLayer(DsgLayers::PLACES),
+                                              config.min_component_size,
+                                              active_neighborhood);
 
-      for (const auto to_delete : component) {
-        graph.removeNode(to_delete);
-        active_nodes_.erase(to_delete);
+  for (const auto& component : components) {
+    if (component.size() >= config.min_component_size) {
+      continue;
+    }
+
+    for (const auto to_delete : component) {
+      graph.removeNode(to_delete);
+      active_nodes_.erase(to_delete);
+    }
+  }
+}
+
+void GvdPlaceExtractor::filterGround(DynamicSceneGraph& graph) {
+  const double max_z = latest_pos_.z() - config.robot_height + config.node_tolerance;
+  std::list<NodeId> invalid_nodes;
+  std::list<EdgeKey> invalid_edges;
+  for (const auto& node_id : active_nodes_) {
+    const auto& node = graph.getNode(node_id)->get();
+    const auto& attrs = node.attributes<PlaceNodeAttributes>();
+    double curr_min_z = attrs.position.z() - attrs.distance;
+    if (curr_min_z > max_z) {
+      // invalid nodes will be removed (and remove all edges), so no need to check edges
+      invalid_nodes.push_back(node_id);
+      continue;
+    }
+
+    for (const auto& sibling : node.siblings()) {
+      // this check should work: each side of the edge will be one of the extreme values
+      // (and each side should be visited once
+      const auto& edge = graph.getEdge(node_id, sibling)->get();
+      double edge_min_z = attrs.position.z() - edge.attributes().weight;
+      if (edge_min_z > max_z) {
+        invalid_edges.push_back(EdgeKey(edge.source, edge.target));
       }
     }
   }
 
-  graph_extractor_->clearDeleted();
+  VLOG(VLEVEL_TRACE) << "Erasing " << invalid_nodes.size() << " nodes and "
+                     << invalid_edges.size() << " edges that do not reach ground-plane";
+  for (const auto node_id : invalid_nodes) {
+    graph.removeNode(node_id);
+    active_nodes_.erase(node_id);
+  }
+
+  for (const auto edge_key : invalid_edges) {
+    graph.removeEdge(edge_key.k1, edge_key.k2);
+  }
+
+  places::EdgeInfoMap new_edges;
+  places::findFreespaceEdges(config.freespace_config,
+                             graph.getLayer(DsgLayers::PLACES),
+                             *gvd_,
+                             active_nodes_,
+                             graph_extractor_->getIndexMap(),
+                             new_edges);
+  for (auto&& [edge_key, attrs] : new_edges) {
+    const auto& source_pos = graph.getPosition(edge_key.k1);
+    const auto& target_pos = graph.getPosition(edge_key.k2);
+    double source_min_z = source_pos.z() - attrs->weight;
+    double target_min_z = target_pos.z() - attrs->weight;
+    if (source_min_z > max_z || target_min_z > max_z) {
+      continue;
+    }
+
+    graph.insertEdge(edge_key.k1, edge_key.k2, std::move(attrs));
+  }
 }
 
 }  // namespace hydra

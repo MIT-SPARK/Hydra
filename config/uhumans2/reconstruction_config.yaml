@@ -14,8 +14,8 @@ tsdf:
   interpolation_method: bilinear
   semantic_integrator:
     type: MLESemanticIntegrator
-robot_footprint:
-  type: RobotFootprintIntegrator
-  bbox_min: [-0.3, -0.3, -0.3]
-  bbox_max: [0.3, 0.3, 0.3]
-  tsdf_weight: 1.0e-4
+# robot_footprint:
+  # type: RobotFootprintIntegrator
+  # bbox_min: [-0.3, -0.3, -0.3]
+  # bbox_max: [0.3, 0.3, 0.3]
+  # tsdf_weight: 1.0e-4

@@ -22,6 +22,7 @@ places:
   type: gvd
   filter_places: true
   min_places_component_size: 3
+  filter_ground: false
   gvd:
     max_distance_m: 4.5
     min_distance_m: 0.2
