@@ -47,6 +47,7 @@
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/frontend/frontend_config.h"
+#include "hydra/frontend/frontier_extractor.h"
 #include "hydra/frontend/place_extractor_interface.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/utils/log_utilities.h"
@@ -118,6 +119,8 @@ class FrontendModule : public Module {
 
   void updateObjects(const ReconstructionOutput& msg);
 
+  void updateFrontiers(const ReconstructionOutput& msg);
+
   void updatePlaces(const ReconstructionOutput& msg);
 
   void updateDeformationGraph(const ReconstructionOutput& msg);
@@ -159,6 +162,7 @@ class FrontendModule : public Module {
 
   std::unique_ptr<MeshSegmenter> segmenter_;
   std::unique_ptr<PlaceExtractorInterface> place_extractor_;
+  std::unique_ptr<FrontierExtractor> frontier_extractor_;
   SceneGraphLogger frontend_graph_logger_;
   LogSetup::Ptr logs_;
 

@@ -39,18 +39,21 @@
 #include <glog/logging.h>
 #include <kimera_pgmo/compression/DeltaCompression.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
+#include <pose_graph_tools_ros/conversions.h>
 #include <spark_dsg/pgmo_mesh_traits.h>
 #include <tf2_eigen/tf2_eigen.h>
-#include <pose_graph_tools_ros/conversions.h>
 
 #include <fstream>
 
 #include "hydra/common/hydra_config.h"
+#include "hydra/frontend/frontier_extractor.h"
 #include "hydra/frontend/gvd_place_extractor.h"
 #include "hydra/frontend/mesh_segmenter.h"
+#include "hydra/reconstruction/voxblox_utilities.h"
 #include "hydra/utils/mesh_interface.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/timing_utilities.h"
+#include "voxblox/core/block.h"
 
 namespace hydra {
 
@@ -100,6 +103,7 @@ FrontendModule::FrontendModule(const FrontendConfig& config,
                                                config.gvd,
                                                config.min_places_component_size,
                                                config.filter_places));
+  frontier_extractor_.reset(new FrontierExtractor());
 }
 
 FrontendModule::~FrontendModule() { stop(); }
@@ -341,6 +345,22 @@ void FrontendModule::updateDeformationGraph(const ReconstructionOutput& input) {
     backend_input_->deformation_graph.reset(
         new PoseGraph(mesh_frontend_.getLastProcessedMeshGraph()));
   }
+}
+
+void FrontendModule::updateFrontiers(const ReconstructionOutput& input) {
+  frontier_extractor_->detectFrontiers(input);
+  {  // start graph critical section
+    std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
+
+    // TODO: combine with the actual places update?
+    NodeIdSet active_nodes = place_extractor_->getActiveNodes();
+    const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
+    places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
+
+    frontier_extractor_->addFrontiers(
+        input.timestamp_ns, *dsg_->graph, *places_nn_finder_);
+
+  }  // end graph update critical section
 }
 
 void FrontendModule::updatePlaces(const ReconstructionOutput& input) {
