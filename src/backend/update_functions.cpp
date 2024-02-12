@@ -290,6 +290,8 @@ UpdateFunctor::Hooks UpdatePlacesFunctor::hooks() const {
 }
 
 size_t UpdatePlacesFunctor::makeNodeFinder(const SceneGraphLayer& layer) const {
+  node_finder.reset();  // clear previous node finder
+
   std::unordered_set<NodeId> layer_nodes;
   for (const auto& id_node_pair : layer.nodes()) {
     if (!id_node_pair.second->attributes().is_active) {

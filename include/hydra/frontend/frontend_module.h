@@ -113,6 +113,8 @@ class FrontendModule : public Module {
 
   void spinOnce(const ReconstructionOutput& msg);
 
+  virtual void updateImpl(const ReconstructionOutput& msg);
+
  protected:
   void updateMesh(const ReconstructionOutput& msg);
 
@@ -177,6 +179,7 @@ class FrontendModule : public Module {
   // TODO(lschmid): This mutex currently simply locks all data for manipulation.
   std::mutex mutex_;
 
+ private:
   inline static const auto registration_ =
       config::RegistrationWithConfig<FrontendModule,
                                      FrontendModule,

@@ -47,11 +47,23 @@ class HydraPipeline {
 
   virtual ~HydraPipeline();
 
+  virtual void init();
+
   virtual void start();
 
   virtual void stop();
 
   virtual void save();
+
+  template <typename Derived = Module>
+  Derived* getModule(const std::string& name) {
+    auto iter = modules_.find(name);
+    if (iter == modules_.end()) {
+      return nullptr;
+    }
+
+    return dynamic_cast<Derived*>(iter->second.get());
+  }
 
  protected:
   void showModuleInfo() const;

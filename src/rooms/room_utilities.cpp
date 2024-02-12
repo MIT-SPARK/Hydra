@@ -115,4 +115,41 @@ void addEdgesToRoomLayer(const SceneGraphLayer& places,
   }
 }
 
+void addEdgesToRoomLayer(DynamicSceneGraph& graph,
+                         const std::set<NodeId>& active_rooms) {
+  for (const auto node_id : active_rooms) {
+    const auto& node = graph.getNode(node_id)->get();
+    const auto room_siblings = node.siblings();
+    for (const auto other : room_siblings) {
+      if (active_rooms.count(other)) {
+        // clean potential edges
+        graph.removeEdge(node_id, other);
+      }
+    }
+
+    for (const auto child_id : node.children()) {
+      if (graph.isDynamic(child_id)) {
+        continue;
+      }
+
+      const auto& child = graph.getNode(child_id)->get();
+      for (const auto& sibling_id : child.siblings()) {
+        const auto& sibling = graph.getNode(sibling_id)->get();
+        const auto parent = sibling.getParent();
+        if (!parent) {
+          continue;
+        }
+
+        if (parent == node_id) {
+          // technically self-edges get rejected, but skipping makes more sense
+          continue;
+        }
+
+        // repeated inserts don't matter
+        graph.insertEdge(node_id, *parent);
+      }
+    }
+  }
+}
+
 }  // namespace hydra

@@ -48,6 +48,8 @@ HydraPipeline::HydraPipeline(const PipelineConfig& pipeline_config,
   shared_state_.reset(new SharedModuleState());
 }
 
+void HydraPipeline::init() {}
+
 HydraPipeline::~HydraPipeline() {}
 
 void HydraPipeline::showModuleInfo() const {

@@ -298,6 +298,41 @@ TEST(DsgInterpolationTests, PlaceUpdate) {
   }
 }
 
+TEST(DsgInterpolationTests, PlaceUpdateNodeFinderBug) {
+  const LayerId place_layer = DsgLayers::PLACES;
+  auto dsg = makeSharedDsg();
+  auto& graph = *dsg->graph;
+
+  auto attrs1 = std::make_unique<PlaceNodeAttributes>(0.0, 0.0);
+  attrs1->position = Eigen::Vector3d(1.0, 2.0, 3.0);
+  graph.emplaceNode(place_layer, NodeSymbol('p', 0), std::move(attrs1));
+
+  auto attrs2 = std::make_unique<PlaceNodeAttributes>(0.0, 0.0);
+  attrs2->position = Eigen::Vector3d(1.0, 2.0, 3.0);
+  graph.emplaceNode(place_layer, NodeSymbol('p', 5), std::move(attrs2));
+
+  auto attrs3 = std::make_unique<PlaceNodeAttributes>(0.0, 0.0);
+  attrs3->position = Eigen::Vector3d(1.0, 2.0, 3.0);
+  attrs3->is_active = true;  // make sure it doesn't get dropped
+  graph.emplaceNode(place_layer, NodeSymbol('p', 6), std::move(attrs3));
+
+  gtsam::Values values;
+  values.insert(NodeSymbol('p', 0),
+                gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(4.0, 5.0, 6.0)));
+  values.insert(NodeSymbol('p', 5),
+                gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
+
+  const UpdateInfo info{&values, nullptr, false, 0, true};
+  dsg_updates::UpdatePlacesFunctor functor(0.4, 0.3);
+  // initialize node finder
+  functor.call(*dsg, info);
+
+  // remove one archived node and unarchive the other
+  graph.removeNode(NodeSymbol('p', 0));
+  graph.getNode(NodeSymbol('p', 5))->get().attributes().is_active = true;
+  functor.call(*dsg, info);
+}
+
 TEST(DsgInterpolationTests, PlaceUpdateMerge) {
   const LayerId place_layer = DsgLayers::PLACES;
   auto dsg = makeSharedDsg();

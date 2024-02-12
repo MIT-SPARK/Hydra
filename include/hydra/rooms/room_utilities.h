@@ -47,4 +47,7 @@ void addEdgesToRoomLayer(const SceneGraphLayer& places,
                          const std::map<size_t, NodeId> label_to_room_map,
                          SceneGraphLayer& rooms);
 
+void addEdgesToRoomLayer(DynamicSceneGraph& graph,
+                         const std::set<NodeId>& active_rooms);
+
 }  // namespace hydra

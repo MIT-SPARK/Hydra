@@ -260,10 +260,7 @@ void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
   dsg_->last_update_time = msg.timestamp_ns;
   dsg_->updated = true;
 
-  launchCallbacks(input_callbacks_, msg);
-  if (place_extractor_) {
-    updatePlaceMeshMapping(msg);
-  }
+  updateImpl(msg);
 
   backend_input_->mesh_update = last_mesh_update_;
   state_->backend_queue.push(backend_input_);
@@ -274,6 +271,13 @@ void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
   if (logs_) {
     // mutex not required because nothing is modifying the graph
     frontend_graph_logger_.logGraph(dsg_->graph);
+  }
+}
+
+void FrontendModule::updateImpl(const ReconstructionOutput& msg) {
+  launchCallbacks(input_callbacks_, msg);
+  if (place_extractor_) {
+    updatePlaceMeshMapping(msg);
   }
 }
 
