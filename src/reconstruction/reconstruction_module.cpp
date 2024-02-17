@@ -41,7 +41,10 @@
 #include "hydra/common/hydra_config.h"
 #include "hydra/reconstruction/mesh_integrator.h"
 #include "hydra/reconstruction/projective_integrator.h"
+#include "hydra/reconstruction/volumetric_map.h"
 #include "hydra/utils/timing_utilities.h"
+#include "voxblox/core/common.h"
+#include "voxblox/core/voxel.h"
 
 namespace hydra {
 
@@ -228,6 +231,54 @@ bool ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
     return false;
   }
 
+  // This is where we implement laplace smoothing
+  std::vector<voxblox::GlobalIndex> indices_to_restore;
+  VolumetricMap::TsdfLayer& m = map_->getTsdfLayer();
+  BlockIndexList smoothing_blocks;
+  m.getAllAllocatedBlocks(&smoothing_blocks);
+
+  int n_iters = 5;
+  int offsets[3] = {-1, 0, 1};
+  for (int iter_count = 0; iter_count < n_iters; ++iter_count) {
+    for (voxblox::BlockIndex bix : smoothing_blocks) {
+      auto block_ptr = m.getBlockPtrByIndex(bix);
+      for (size_t v = 0; v < block_ptr->num_voxels(); ++v) {
+        voxblox::VoxelIndex ind = block_ptr->computeVoxelIndexFromLinearIndex(v);
+        int i = ind.x();
+        int j = ind.y();
+        int k = ind.z();
+        voxblox::TsdfVoxel& voxel = block_ptr->getVoxelByLinearIndex(v);
+        if (voxel.weight >= 1e-6) {
+          continue;
+        }
+        voxblox::GlobalIndex gid = voxblox::getGlobalVoxelIndexFromBlockAndVoxelIndex(
+            bix, ind, block_ptr->voxels_per_side());
+        indices_to_restore.push_back(gid);
+        double accum = 0;
+        int n_neighbors = 0;
+        for (int di : offsets) {
+          for (int dj : offsets) {
+            for (int dk : offsets) {
+              if (di == 0 && dj == 0 && dk == 0) {
+                continue;
+              }
+              if (!block_ptr->isValidVoxelIndex({i + di, j + dj, k + dk})) {
+                continue;
+              }
+              accum +=
+                  1 / sqrt(di * di + dj * dj + dk * dk) *
+                  block_ptr->getVoxelByVoxelIndex({i + di, j + dj, k + dk}).distance;
+              n_neighbors += 1;
+            }
+          }
+        }
+        voxel.distance = accum / n_neighbors;
+        voxel.weight = 1;
+      }
+    }
+  }
+  
+
   {  // timing scope
     ScopedTimer timer("places/mesh", msg.timestamp_ns);
     mesh_integrator_->generateMesh(*map_, true, true);
@@ -267,6 +318,14 @@ bool ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
   for (const auto& idx : blocks) {
     tsdf.getBlockByIndex(idx).updated().reset(voxblox::Update::kEsdf);
     mesh.getMeshBlock(idx)->updated = false;
+  }
+
+  for (voxblox::GlobalIndex gix : indices_to_restore) {
+    voxblox::TsdfVoxel* vp = map_->getTsdfLayer().getVoxelPtrByGlobalIndex(gix);
+    if (vp == nullptr) {
+      continue;
+    }
+    vp->weight = 0;
   }
 
   return true;
