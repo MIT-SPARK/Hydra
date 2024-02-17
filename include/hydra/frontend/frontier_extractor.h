@@ -9,10 +9,12 @@ namespace hydra {
 class FrontierExtractor {
  public:
   FrontierExtractor();
-  void detectFrontiers(const ReconstructionOutput& input);
+  void detectFrontiers(const ReconstructionOutput& input,
+                       DynamicSceneGraph& graph,
+                       NearestNodeFinder& finder);
   void addFrontiers(uint64_t timestamp_ns,
-                    DynamicSceneGraph& graph,
-                    NearestNodeFinder& finder);
+                     DynamicSceneGraph& graph,
+                     NearestNodeFinder& finder);
 
  private:
   NodeSymbol next_node_id_;

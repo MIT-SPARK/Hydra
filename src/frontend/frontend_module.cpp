@@ -128,6 +128,9 @@ void FrontendModule::initCallbacks() {
 
   input_callbacks_.push_back(
       std::bind(&FrontendModule::updatePlaces, this, std::placeholders::_1));
+
+  input_callbacks_.push_back(
+      std::bind(&FrontendModule::updateFrontiers, this, std::placeholders::_1));
 }
 
 void FrontendModule::start() {
@@ -348,15 +351,14 @@ void FrontendModule::updateDeformationGraph(const ReconstructionOutput& input) {
 }
 
 void FrontendModule::updateFrontiers(const ReconstructionOutput& input) {
-  frontier_extractor_->detectFrontiers(input);
   {  // start graph critical section
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
 
-    // TODO: combine with the actual places update?
     NodeIdSet active_nodes = place_extractor_->getActiveNodes();
     const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
     places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
 
+    frontier_extractor_->detectFrontiers(input, *dsg_->graph, *places_nn_finder_);
     frontier_extractor_->addFrontiers(
         input.timestamp_ns, *dsg_->graph, *places_nn_finder_);
 

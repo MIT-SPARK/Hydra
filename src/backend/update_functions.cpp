@@ -36,7 +36,11 @@
 
 #include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph_layer.h>
+#include <spark_dsg/scene_graph_types.h>
 
+#include "hydra/common/hydra_config.h"
 #include "hydra/rooms/room_finder.h"
 #include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/timing_utilities.h"
@@ -435,6 +439,254 @@ std::map<NodeId, NodeId> UpdatePlacesFunctor::call(SharedDsgInfo& dsg,
   return nodes_to_merge;
 }
 
+////////////////////////////////////
+UpdateFunctor::Hooks UpdateFrontiersFunctor::hooks() const {
+  auto my_hooks = UpdateFunctor::hooks();
+  my_hooks.should_merge = [this](const NodeAttributes* lhs, const NodeAttributes* rhs) {
+    return dispatchMergeCheck<FrontierNodeAttributes>(
+        lhs,
+        rhs,
+        std::bind(&UpdateFrontiersFunctor::shouldMerge,
+                  this,
+                  std::placeholders::_1,
+                  std::placeholders::_2));
+  };
+  my_hooks.node_update = [this](const UpdateInfo& info,
+                                const spark_dsg::Mesh::Ptr,
+                                NodeId node,
+                                NodeAttributes* attrs) {
+    if (!attrs || !info.places_values) {
+      return;
+    }
+
+    updateFrontier(*info.places_values, node, *attrs);
+  };
+
+  my_hooks.cleanup = [this](const UpdateInfo&, SharedDsgInfo* dsg) {
+    if (!dsg) {
+      return;
+    }
+
+    std::unique_lock<std::mutex> lock(dsg->mutex);
+    const SceneGraphLayer& places_layer = dsg->graph->getLayer(DsgLayers::PLACES);
+
+    std::unordered_set<NodeId> layer_nodes;
+    for (const auto& id_node_pair : places_layer.nodes()) {
+      if (id_node_pair.second->attributes<PlaceNodeAttributes>().real_place) {
+        layer_nodes.insert(id_node_pair.first);
+      }
+    }
+
+    // if (layer_nodes.empty()) {
+    //  return layer_nodes.size();
+    //}
+    auto place_finder = std::make_unique<NearestNodeFinder>(places_layer, layer_nodes);
+
+    // std::vector<NodeId> nodes_to_remove;
+    std::set<NodeId> nodes_to_remove;
+    for (auto& id_node_pair : places_layer.nodes()) {
+      auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
+      if (attrs.real_place) {
+        continue;
+      }
+      // if (NodeSymbol(id_node_pair.second->id).category() != 'f') {
+      //  continue;
+      //}
+      if (attrs.need_cleanup) {
+        attrs.need_cleanup = false;
+        std::vector<std::pair<Eigen::Vector3d, double>> nearest_places;
+        place_finder->findRadius(
+            attrs.position, 5, false, [&](NodeId pid, size_t, double) {
+              PlaceNodeAttributes pattr = dsg->graph->getNode(pid)
+                                              .value()
+                                              .get()
+                                              .attributes<PlaceNodeAttributes>();
+              nearest_places.push_back({pattr.position, pattr.distance});
+            });
+        for (auto center_rad : nearest_places) {
+          if ((center_rad.first - attrs.position).norm() <= center_rad.second) {
+            nodes_to_remove.insert(id_node_pair.first);
+            break;
+          }
+        }
+      }
+
+      const auto& prefix = HydraConfig::instance().getRobotPrefix();
+      const auto& agents = dsg->graph->getLayer(DsgLayers::AGENTS, prefix.key);
+      NodeSymbol pgmo_key(prefix.key, agents.numNodes() - 1);
+      Eigen::Vector3d agent_pos =
+          dsg->graph->getNode(pgmo_key).value().get().attributes().position;
+      if ((agent_pos - attrs.position).norm() < 5) {
+        nodes_to_remove.insert(id_node_pair.first);
+      }
+    }
+    for (NodeId nid : nodes_to_remove) {
+      dsg->graph->removeNode(nid);
+    }
+  };
+
+  return my_hooks;
+}
+
+size_t UpdateFrontiersFunctor::makeNodeFinder(const SceneGraphLayer& layer) const {
+  std::unordered_set<NodeId> layer_nodes;
+  for (const auto& id_node_pair : layer.nodes()) {
+    auto attrs = id_node_pair.second->attributes<FrontierNodeAttributes>();
+    if (!attrs.is_active && !attrs.real_place) {
+      layer_nodes.insert(id_node_pair.first);
+    }
+  }
+
+  if (layer_nodes.empty()) {
+    return layer_nodes.size();
+  }
+
+  node_finder = std::make_unique<NearestNodeFinder>(layer, layer_nodes);
+  return layer_nodes.size();
+}
+
+void UpdateFrontiersFunctor::updateFrontier(const gtsam::Values& values,
+                                            NodeId node,
+                                            NodeAttributes& attrs) const {
+  LOG(WARNING) << "Called updateFrontier in backend";
+  if (!values.exists(node)) {
+    VLOG(5) << "[Hydra Backend] missing frontier " << NodeSymbol(node).getLabel()
+            << " from frontier factors.";
+    return;
+  }
+
+  attrs.position = values.at<gtsam::Pose3>(node).translation();
+
+  Eigen::Vector3d agent_pos;
+  if ((agent_pos - attrs.position).norm() < 5) {
+  }
+}
+
+std::optional<NodeId> UpdateFrontiersFunctor::proposeFrontierMerge(
+    const SceneGraphLayer& layer,
+    NodeId from_node,
+    const FrontierNodeAttributes& from_attrs,
+    bool skip_first) const {
+  std::list<NodeId> candidates;
+  node_finder->find(from_attrs.position,
+                    num_merges_to_consider,
+                    skip_first,
+                    [&candidates](NodeId place_id, size_t, double) {
+                      candidates.push_back(place_id);
+                    });
+
+  for (const auto& id : candidates) {
+    if (layer.hasEdge(from_node, id)) {
+      continue;  // avoid merging siblings
+    }
+
+    const auto& to_attrs =
+        layer.getNode(id)->get().attributes<FrontierNodeAttributes>();
+    if (shouldMerge(from_attrs, to_attrs)) {
+      return id;
+    }
+  }
+
+  return std::nullopt;
+}
+
+bool UpdateFrontiersFunctor::shouldMerge(const FrontierNodeAttributes& from_attrs,
+                                         const FrontierNodeAttributes& to_attrs) const {
+  return false;  // TODO: figure out how frontiers should be merged
+  // if ((from_attrs.position - to_attrs.position).norm() > pos_threshold_m) {
+  //  return false;
+  //}
+
+  // if (std::abs(from_attrs.distance - to_attrs.distance) > distance_tolerance_m) {
+  //  return false;
+  //}
+
+  // return true;
+}
+
+void UpdateFrontiersFunctor::filterMissing(
+    DynamicSceneGraph& graph, const std::list<NodeId> missing_nodes) const {
+  if (missing_nodes.empty()) {
+    return;
+  }
+
+  VLOG(6) << "[Frontiers/Places Layer]: could not update "
+          << displayNodeSymbolContainer(missing_nodes);
+
+  for (const auto& node_id : missing_nodes) {
+    if (!graph.hasNode(node_id)) {
+      continue;
+    }
+
+    const Node& node = graph.getNode(node_id).value();
+    if (!node.attributes().is_active && !node.hasSiblings()) {
+      VLOG(2) << "[Frontiers/Places Layer]: removing node "
+              << NodeSymbol(node_id).getLabel();
+      graph.removeNode(node_id);
+    }
+  }
+}
+
+std::map<NodeId, NodeId> UpdateFrontiersFunctor::call(SharedDsgInfo& dsg,
+                                                      const UpdateInfo& info) const {
+  ScopedTimer spin_timer("backend/update_frontiers", info.timestamp_ns);
+  std::unique_lock<std::mutex> lock(dsg.mutex);
+  auto& graph = *dsg.graph;
+
+  if (!graph.hasLayer(DsgLayers::PLACES) || !info.places_values) {
+    return {};
+  }
+
+  if (info.places_values->size() == 0 && !info.allow_node_merging) {
+    return {};
+  }
+
+  const auto& layer = graph.getLayer(DsgLayers::PLACES);
+  const auto& places_values = *info.places_values;
+  const size_t archived = makeNodeFinder(layer);
+
+  std::list<NodeId> missing_nodes;
+  std::map<NodeId, NodeId> nodes_to_merge;
+  size_t num_active = 0;
+  for (const auto& id_node_pair : layer.nodes()) {
+    const auto node_id = id_node_pair.first;
+    auto& attrs = id_node_pair.second->attributes<FrontierNodeAttributes>();
+    if (attrs.real_place) {
+      continue;
+    }
+    if (!attrs.is_active && !info.loop_closure_detected) {
+      continue;
+    }
+
+    ++num_active;
+
+    if (!places_values.exists(node_id)) {
+      // this happens for the GT version
+      missing_nodes.push_back(node_id);
+    } else {
+      updateFrontier(places_values, node_id, attrs);
+    }
+
+    if (!info.allow_node_merging || !node_finder) {
+      // avoid looking for merges when disallowed or there are no archived places
+      continue;
+    }
+
+    // we only skip the first proposed place if the considered place is not active
+    const auto to_merge = proposeFrontierMerge(layer, node_id, attrs, !attrs.is_active);
+    if (to_merge) {
+      nodes_to_merge[node_id] = *to_merge;
+    }
+  }
+
+  VLOG(5) << "[Hydra Backend] Frontiers/Places update: " << archived << " archived and "
+          << num_active << " active";
+  filterMissing(graph, missing_nodes);
+  return nodes_to_merge;
+}
+
+///////////////////////////////////
+
 UpdateRoomsFunctor::UpdateRoomsFunctor(const RoomFinderConfig& config)
     : room_finder(new RoomFinder(config)) {}
 
@@ -476,7 +728,9 @@ std::map<NodeId, NodeId> UpdateRoomsFunctor::call(SharedDsgInfo& dsg,
   {  // start dsg critical section
     std::unique_lock<std::mutex> lock(dsg.mutex);
     ScopedTimer timer("backend/clone_places", info.timestamp_ns, true, 1, false);
-    places_clone = dsg.graph->getLayer(DsgLayers::PLACES).clone();
+    places_clone = dsg.graph->getLayer(DsgLayers::PLACES).clone([](const auto& node) {
+      return NodeSymbol(node.id).category() == 'p';
+    });
   }  // end dsg critical section
 
   ScopedTimer timer("backend/room_detection", info.timestamp_ns, true, 1, false);
