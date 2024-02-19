@@ -25,8 +25,9 @@ find_package(teaserpp REQUIRED)
 find_package(kimera_pgmo REQUIRED)
 find_package(voxblox REQUIRED)
 
-# we turn off PCL precompile internally to get around having vtk linked
-find_package(PCL REQUIRED COMPONENTS common)
+# we turn off PCL precompile internally to get around having vtk linked. Note: kdtree is
+# REQUIRED to make sure we link against FLANN (used by euclidean extraction)
+find_package(PCL REQUIRED COMPONENTS common kdtree)
 # TODO(nathan) push to pose_graph_tools
 find_package(tf2_eigen REQUIRED)
 

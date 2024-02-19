@@ -39,7 +39,6 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <kimera_pgmo/utils/MeshIO.h>
-#include <pcl/search/kdtree.h>
 #include <spark_dsg/pgmo_mesh_traits.h>
 #include <spark_dsg/zmq_interface.h>
 #include <voxblox/core/block_hash.h>
