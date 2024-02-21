@@ -146,7 +146,8 @@ void declare_config(VolumetricMap::Config& config) {
 
 VolumetricMap::VolumetricMap(const Config& _config,
                              bool with_semantics,
-                             bool with_occupancy)
+                             bool with_occupancy,
+                             bool with_extrapolation)
     : config(config::checkValid(_config)),
       tsdf_layer_(config.voxel_size, config.voxels_per_side),
       mesh_layer_(tsdf_layer_.block_size()),
@@ -159,6 +160,11 @@ VolumetricMap::VolumetricMap(const Config& _config,
   if (with_occupancy) {
     occupancy_layer_.reset(
         new OccupancyLayer(config.voxel_size, config.voxels_per_side));
+  }
+
+  if (with_extrapolation) {
+    extrapolation_layer_.reset(
+        new ExtrapolationLayer(config.voxel_size, config.voxels_per_side));
   }
 }
 

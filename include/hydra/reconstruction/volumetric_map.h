@@ -101,6 +101,7 @@ class VolumetricMap {
   using TsdfLayer = voxblox::Layer<voxblox::TsdfVoxel>;
   using SemanticLayer = voxblox::Layer<SemanticVoxel>;
   using OccupancyLayer = voxblox::Layer<VertexVoxel>;
+  using ExtrapolationLayer = voxblox::Layer<ExtrapolationVoxel>;
 
   struct Config {
     /// Voxel size.
@@ -113,7 +114,8 @@ class VolumetricMap {
 
   explicit VolumetricMap(const Config& config,
                          bool with_semantics = false,
-                         bool with_occupancy = false);
+                         bool with_occupancy = false,
+                         bool with_extrapolation = false);
 
   virtual ~VolumetricMap() = default;
 
@@ -172,6 +174,7 @@ class VolumetricMap {
   SemanticMeshLayer mesh_layer_;
   SemanticLayer::Ptr semantic_layer_;
   OccupancyLayer::Ptr occupancy_layer_;
+  ExtrapolationLayer::Ptr extrapolation_layer_;
 
  public:
   const float block_size;

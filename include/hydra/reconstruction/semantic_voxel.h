@@ -49,4 +49,14 @@ struct SemanticVoxel {
   bool empty = true;
 };
 
+// Based on the semantic voxel from Kimera-Semantics
+struct ExtrapolationVoxel {
+  //! Current sdf estimate
+  float distance;
+  //! Distance to nearest observed voxel
+  float nearest_distance;
+  //! Current gradient estimate
+  Eigen::Vector3f gradient;
+};
+
 }  // namespace hydra
