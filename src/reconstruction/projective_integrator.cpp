@@ -94,6 +94,7 @@ void ProjectiveIntegrator::updateMap(const Sensor& sensor,
 
       new_blocks.push_back(idx);
       map.getTsdfLayer().allocateBlockPtrByIndex(idx);
+      map.getExtrapolationLayer()->allocateBlockPtrByIndex(idx);
       const auto semantic_layer = map.getSemanticLayer();
       if (semantic_integrator_ && semantic_layer) {
         semantic_layer->allocateBlockPtrByIndex(idx);
@@ -121,6 +122,7 @@ void ProjectiveIntegrator::updateMap(const Sensor& sensor,
     }
 
     map.getTsdfLayer().removeBlock(idx);
+    map.getExtrapolationLayer()->removeBlock(idx);
     const auto semantic_layer = map.getSemanticLayer();
     if (semantic_layer) {
       semantic_layer->removeBlock(idx);

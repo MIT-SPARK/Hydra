@@ -51,6 +51,7 @@ struct SemanticVoxel {
 
 // Based on the semantic voxel from Kimera-Semantics
 struct ExtrapolationVoxel {
+  ExtrapolationVoxel();
   //! Current sdf estimate
   float distance;
   //! Distance to nearest observed voxel

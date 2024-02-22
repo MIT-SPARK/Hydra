@@ -18,4 +18,5 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/sensor_input_packet.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/sensor_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/volumetric_map.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/extrapolation_voxel.cpp
 )

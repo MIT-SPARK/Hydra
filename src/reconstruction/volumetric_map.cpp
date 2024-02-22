@@ -261,13 +261,14 @@ std::string VolumetricMap::printStats() const {
 std::unique_ptr<VolumetricMap> VolumetricMap::fromTsdf(const TsdfLayer& tsdf,
                                                        double truncation_distance_m,
                                                        bool with_semantics,
-                                                       bool with_occupancy) {
+                                                       bool with_occupancy,
+                                                       bool with_extrapolation) {
   VolumetricMap::Config config;
   config.voxel_size = tsdf.voxel_size();
   config.voxels_per_side = tsdf.voxels_per_side();
   config.truncation_distance = truncation_distance_m;
-  auto to_return =
-      std::make_unique<VolumetricMap>(config, with_semantics, with_occupancy);
+  auto to_return = std::make_unique<VolumetricMap>(
+      config, with_semantics, with_occupancy, with_extrapolation);
   mergeLayer(tsdf, to_return->getTsdfLayer());
   return to_return;
 }

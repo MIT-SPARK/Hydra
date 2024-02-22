@@ -123,6 +123,12 @@ class VolumetricMap {
 
   const TsdfLayer& getTsdfLayer() const { return tsdf_layer_; }
 
+  ExtrapolationLayer* getExtrapolationLayer() { return extrapolation_layer_.get(); }
+
+  const ExtrapolationLayer* getExtrapolationLayer() const {
+    return extrapolation_layer_.get();
+  }
+
   SemanticMeshLayer& getMeshLayer() { return mesh_layer_; }
 
   const SemanticMeshLayer& getMeshLayer() const { return mesh_layer_; }
@@ -162,7 +168,8 @@ class VolumetricMap {
   static std::unique_ptr<VolumetricMap> fromTsdf(const TsdfLayer& tsdf,
                                                  double truncation_distance_m,
                                                  bool with_semantics = false,
-                                                 bool with_occupancy = false);
+                                                 bool with_occupancy = false,
+                                                 bool with_extrapolation = false);
 
   static std::unique_ptr<VolumetricMap> load(const std::string& filepath);
 
