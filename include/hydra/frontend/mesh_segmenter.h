@@ -36,7 +36,7 @@
 #include <memory>
 
 #include "hydra/common/dsg_types.h"
-#include "hydra/frontend/mesh_segmenter_config.h"
+#include "hydra/common/output_sink.h"
 
 namespace kimera_pgmo {
 class MeshDelta;
@@ -55,11 +55,26 @@ class MeshSegmenter {
  public:
   using Clusters = std::vector<Cluster>;
   using LabelClusters = std::map<uint32_t, Clusters>;
-  using CallbackFunc = std::function<void(const kimera_pgmo::MeshDelta& cloud,
-                                          const std::vector<size_t>& indices,
-                                          const LabelIndices& label_indices)>;
+  using Sink = OutputSink<uint64_t,
+                          const kimera_pgmo::MeshDelta&,
+                          const std::vector<size_t>&,
+                          const LabelIndices&>;
 
-  explicit MeshSegmenter(const MeshSegmenterConfig& config);
+  struct Config {
+    char prefix = 'O';
+    LayerId layer_id = DsgLayers::OBJECTS;
+    double active_index_horizon_m = 7.0;
+    double cluster_tolerance = 0.25;
+    size_t min_cluster_size = 40;
+    size_t max_cluster_size = 100000;
+    float angle_step = 10.0f;
+    BoundingBox::Type bounding_box_type = BoundingBox::Type::AABB;
+    std::set<uint32_t> labels;
+    std::string timer_namespace = "frontend/objects";
+    std::vector<Sink::Factory> sinks;
+  } const config;
+
+  explicit MeshSegmenter(const Config& config);
 
   LabelClusters detect(uint64_t timestamp_ns,
                        const kimera_pgmo::MeshDelta& active,
@@ -71,10 +86,6 @@ class MeshSegmenter {
                    DynamicSceneGraph& graph);
 
   std::unordered_set<NodeId> getActiveNodes() const;
-
-  inline void addVisualizationCallback(const CallbackFunc& func) {
-    callback_funcs_.push_back(func);
-  }
 
  private:
   void archiveOldNodes(const DynamicSceneGraph& graph, size_t num_archived_vertices);
@@ -92,11 +103,11 @@ class MeshSegmenter {
   void mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label);
 
  private:
-  MeshSegmenterConfig config_;
   NodeSymbol next_node_id_;
-
   std::map<uint32_t, std::set<NodeId>> active_nodes_;
-  std::vector<CallbackFunc> callback_funcs_;
+  Sink::List sinks_;
 };
+
+void declare_config(MeshSegmenter::Config& config);
 
 }  // namespace hydra

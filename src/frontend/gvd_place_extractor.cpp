@@ -72,10 +72,13 @@ void declare_config(GvdPlaceExtractor::Config& config) {
     field(config.freespace_config.num_neighbors_to_find, "num_neighbors_to_find");
     field(config.freespace_config.min_clearance_m, "min_clearance_m");
   }
+  field(config.sinks, "sinks");
 }
 
-GvdPlaceExtractor::GvdPlaceExtractor(const Config& config)
-    : config(config::checkValid(config)), graph_extractor_(config.graph.create()) {
+GvdPlaceExtractor::GvdPlaceExtractor(const Config& c)
+    : config(config::checkValid(c)),
+      graph_extractor_(config.graph.create()),
+      sinks_(Sink::instantiate(config.sinks)) {
   if (!graph_extractor_) {
     LOG(ERROR) << "no place graph extraction provided! disabling extraction";
   }
@@ -161,9 +164,7 @@ void GvdPlaceExtractor::detectImpl(uint64_t timestamp_ns,
     gvd_integrator_->archiveBlocks(archived_blocks);
   }  // end critical section
 
-  for (const auto& callback : visualization_callbacks_) {
-    callback(timestamp_ns, *gvd_, graph_extractor_.get());
-  }
+  Sink::callAll(sinks_, timestamp_ns, world_T_body, *gvd_, graph_extractor_.get());
 }
 
 void filterInvalidNodes(const SceneGraphLayer& graph, NodeIdSet& active_nodes) {

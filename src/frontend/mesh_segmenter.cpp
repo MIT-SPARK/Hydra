@@ -39,6 +39,10 @@
 #define PCL_NO_PRECOMPILE
 #include <pcl/segmentation/extract_clusters.h>
 #undef PCL_NO_PRECOMPILE
+#include <config_utilities/config.h>
+#include <config_utilities/types/conversions.h>
+#include <config_utilities/types/enum.h>
+#include <config_utilities/validation.h>
 #include <spark_dsg/bounding_box_extraction.h>
 
 #include "hydra/common/common.h"
@@ -53,6 +57,27 @@ using Clusters = MeshSegmenter::Clusters;
 using LabelClusters = MeshSegmenter::LabelClusters;
 using KdTreeT = pcl::search::KdTree<pcl::PointXYZRGBA>;
 using timing::ScopedTimer;
+
+void declare_config(MeshSegmenter::Config& config) {
+  using namespace config;
+  name("MeshSegmenterConfig");
+  field<CharConversion>(config.prefix, "prefix");
+  // TODO(nathan) string to number conversion
+  field(config.layer_id, "layer_id");
+  field(config.active_index_horizon_m, "active_index_horizon_m");
+  field(config.cluster_tolerance, "cluster_tolerance");
+  field(config.min_cluster_size, "min_cluster_size");
+  field(config.max_cluster_size, "max_cluster_size");
+  enum_field(config.bounding_box_type,
+             "bounding_box_type",
+             {{spark_dsg::BoundingBox::Type::INVALID, "INVALID"},
+              {spark_dsg::BoundingBox::Type::AABB, "AABB"},
+              {spark_dsg::BoundingBox::Type::OBB, "OBB"},
+              {spark_dsg::BoundingBox::Type::RAABB, "RAABB"}});
+  field(config.labels, "labels");
+  field(config.timer_namespace, "timer_namespace");
+  field(config.sinks, "sinks");
+}
 
 template <typename LList, typename RList>
 void mergeList(LList& lhs, const RList& rhs) {
@@ -111,7 +136,6 @@ std::vector<size_t> getActiveIndices(const kimera_pgmo::MeshDelta& delta,
   const Eigen::Vector3d root_pos = *pos;
   for (const size_t idx : *indices) {
     const auto delta_idx = delta.getLocalIndex(idx);
-    ;
     const auto& p = delta.vertex_updates->at(delta_idx);
     const Eigen::Vector3d vertex_pos(p.x, p.y, p.z);
     if ((vertex_pos - root_pos).norm() < horizon_m) {
@@ -124,7 +148,7 @@ std::vector<size_t> getActiveIndices(const kimera_pgmo::MeshDelta& delta,
   return active;
 }
 
-LabelIndices getLabelIndices(const MeshSegmenterConfig& config,
+LabelIndices getLabelIndices(const MeshSegmenter::Config& config,
                              const kimera_pgmo::MeshDelta& delta,
                              const std::vector<size_t>& indices) {
   CHECK(delta.hasSemantics());
@@ -156,7 +180,7 @@ LabelIndices getLabelIndices(const MeshSegmenterConfig& config,
   return label_indices;
 }
 
-Clusters findClusters(const MeshSegmenterConfig& config,
+Clusters findClusters(const MeshSegmenter::Config& config,
                       const kimera_pgmo::MeshDelta& delta,
                       const std::vector<size_t>& indices) {
   pcl::IndicesPtr pcl_indices(new pcl::Indices(indices.begin(), indices.end()));
@@ -196,8 +220,10 @@ Clusters findClusters(const MeshSegmenterConfig& config,
   return clusters;
 }
 
-MeshSegmenter::MeshSegmenter(const MeshSegmenterConfig& config)
-    : config_(config), next_node_id_(config.prefix, 0) {
+MeshSegmenter::MeshSegmenter(const Config& c)
+    : config(config::checkValid(c)),
+      next_node_id_(config.prefix, 0),
+      sinks_(Sink::instantiate(config.sinks)) {
   VLOG(VLEVEL_TRACE) << "[Mesh Segmenter] Detecting nodes for labels: "
                      << printLabels(config.labels);
   for (const auto& label : config.labels) {
@@ -208,10 +234,10 @@ MeshSegmenter::MeshSegmenter(const MeshSegmenterConfig& config)
 LabelClusters MeshSegmenter::detect(uint64_t timestamp_ns,
                                     const kimera_pgmo::MeshDelta& delta,
                                     const std::optional<Eigen::Vector3d>& pos) {
-  const auto timer_name = config_.timer_namespace + "_detection";
+  const auto timer_name = config.timer_namespace + "_detection";
   ScopedTimer timer(timer_name, timestamp_ns, true, 1, false);
 
-  const auto indices = getActiveIndices(delta, pos, config_.active_index_horizon_m);
+  const auto indices = getActiveIndices(delta, pos, config.active_index_horizon_m);
 
   LabelClusters label_clusters;
   if (indices.empty()) {
@@ -219,42 +245,37 @@ LabelClusters MeshSegmenter::detect(uint64_t timestamp_ns,
     return label_clusters;
   }
 
-  const auto label_indices = getLabelIndices(config_, delta, indices);
+  const auto label_indices = getLabelIndices(config, delta, indices);
   if (label_indices.empty()) {
     VLOG(VLEVEL_TRACE) << "[Mesh Segmenter] No vertices found matching desired labels";
-    for (const auto& callback_func : callback_funcs_) {
-      callback_func(delta, indices, label_indices);
-    }
+    Sink::callAll(sinks_, timestamp_ns, delta, indices, label_indices);
     return label_clusters;
   }
 
-  for (const auto label : config_.labels) {
+  for (const auto label : config.labels) {
     if (!label_indices.count(label)) {
       continue;
     }
 
-    if (label_indices.at(label).size() < config_.min_cluster_size) {
+    if (label_indices.at(label).size() < config.min_cluster_size) {
       continue;
     }
 
-    const auto clusters = findClusters(config_, delta, label_indices.at(label));
+    const auto clusters = findClusters(config, delta, label_indices.at(label));
 
     VLOG(VLEVEL_TRACE) << "[Mesh Segmenter]  - Found " << clusters.size()
                        << " cluster(s) of label " << static_cast<int>(label);
     label_clusters.insert({label, clusters});
   }
 
-  for (const auto& callback_func : callback_funcs_) {
-    callback_func(delta, indices, label_indices);
-  }
-
+  Sink::callAll(sinks_, timestamp_ns, delta, indices, label_indices);
   return label_clusters;
 }
 
 void MeshSegmenter::archiveOldNodes(const DynamicSceneGraph& graph,
                                     size_t num_archived_vertices) {
   std::set<NodeId> archived;
-  for (const auto& label : config_.labels) {
+  for (const auto& label : config.labels) {
     std::list<NodeId> removed_nodes;
     for (const auto& node_id : active_nodes_.at(label)) {
       if (!graph.hasNode(node_id)) {
@@ -287,7 +308,7 @@ void MeshSegmenter::updateGraph(uint64_t timestamp_ns,
                                 const LabelClusters& clusters,
                                 size_t num_archived_vertices,
                                 DynamicSceneGraph& graph) {
-  ScopedTimer timer(config_.timer_namespace + "_graph_update", timestamp_ns);
+  ScopedTimer timer(config.timer_namespace + "_graph_update", timestamp_ns);
   archiveOldNodes(graph, num_archived_vertices);
 
   for (auto&& [label, clusters_for_label] : clusters) {
@@ -412,9 +433,9 @@ void MeshSegmenter::addNodeToGraph(DynamicSceneGraph& graph,
   const auto color = label_map->getColorFromLabel(label);
   attrs->color << color.r, color.g, color.b;
 
-  updateObjectGeometry(*graph.mesh(), *attrs, nullptr, config_.bounding_box_type);
+  updateObjectGeometry(*graph.mesh(), *attrs, nullptr, config.bounding_box_type);
 
-  graph.emplaceNode(config_.layer_id, next_node_id_, std::move(attrs));
+  graph.emplaceNode(config.layer_id, next_node_id_, std::move(attrs));
   active_nodes_.at(label).insert(next_node_id_);
   ++next_node_id_;
 }

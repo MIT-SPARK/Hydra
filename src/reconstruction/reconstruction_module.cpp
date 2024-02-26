@@ -34,7 +34,10 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/reconstruction/reconstruction_module.h"
 
+#include <config_utilities/config.h>
 #include <config_utilities/printing.h>
+#include <config_utilities/types/conversions.h>
+#include <config_utilities/types/eigen_matrix.h>
 #include <config_utilities/validation.h>
 #include <pose_graph_tools_ros/conversions.h>
 
@@ -50,11 +53,29 @@ using timing::ScopedTimer;
 using voxblox::BlockIndexList;
 using voxblox::Layer;
 
-ReconstructionModule::ReconstructionModule(const ReconstructionConfig& config,
-                                           const OutputQueue::Ptr& output_queue)
-    : config(config::checkValid(config)),
+void declare_config(ReconstructionModule::Config& conf) {
+  using namespace config;
+  name("ReconstructionConfig");
+  field(conf.show_stats, "show_stats");
+  field(conf.stats_verbosity, "stats_verbosity");
+  field(conf.clear_distant_blocks, "clear_distant_blocks");
+  field(conf.dense_representation_radius_m, "dense_representation_radius_m");
+  field(conf.num_poses_per_update, "num_poses_per_update");
+  field(conf.max_input_queue_size, "max_input_queue_size");
+  field(conf.semantic_measurement_probability, "semantic_measurement_probability");
+  field(conf.tsdf, "tsdf");
+  field(conf.mesh, "mesh");
+  conf.robot_footprint.setOptional();
+  field(conf.robot_footprint, "robot_footprint");
+  field(conf.sinks, "sinks");
+}
+
+ReconstructionModule::ReconstructionModule(const Config& c,
+                                           const OutputQueue::Ptr& queue)
+    : config(config::checkValid(c)),
       num_poses_received_(0),
-      output_queue_(output_queue) {
+      output_queue_(queue),
+      sinks_(Sink::instantiate(config.sinks)) {
   queue_.reset(new ReconstructionInputQueue());
   queue_->max_size = config.max_input_queue_size;
 
@@ -122,14 +143,6 @@ bool ReconstructionModule::spinOnce() {
   return success;
 }
 
-void ReconstructionModule::addOutputCallback(const OutputCallback& callback) {
-  output_callbacks_.push_back(callback);
-}
-
-void ReconstructionModule::addVisualizationCallback(const VizCallback& callback) {
-  visualization_callbacks_.push_back(callback);
-}
-
 bool ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
   if (!msg.sensor_input) {
     LOG(ERROR) << "[Hydra Reconstruction] received invalid sensor data in input!";
@@ -145,6 +158,12 @@ bool ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
   const bool do_full_update = (num_poses_received_ % config.num_poses_per_update == 0);
   update(msg, do_full_update);
   return do_full_update;
+}
+
+void ReconstructionModule::addSink(const Sink::Ptr& sink) {
+  if (sink) {
+    sinks_.push_back(sink);
+  }
 }
 
 void ReconstructionModule::fillOutput(ReconstructionOutput& msg) {
@@ -210,17 +229,15 @@ bool ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
   output->sensor_data = data;
   fillOutput(*output);
 
-  for (const auto& callback : output_callbacks_) {
-    callback(*output);
-  }
-
   if (output_queue_) {
     output_queue_->push(output);
   }
 
-  for (const auto& callback : visualization_callbacks_) {
-    callback(msg.timestamp_ns, data->getSensorPose(*msg.sensor), map_->getTsdfLayer());
-  }
+  Sink::callAll(sinks_,
+                msg.timestamp_ns,
+                data->getSensorPose(*msg.sensor),
+                map_->getTsdfLayer(),
+                *output);
 
   auto& tsdf = map_->getTsdfLayer();
   auto& mesh = map_->getMeshLayer();

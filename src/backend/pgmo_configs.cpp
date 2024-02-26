@@ -32,13 +32,10 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/backend/backend_config.h"
+#include "hydra/backend/pgmo_configs.h"
 
 #include <config_utilities/config.h>
-#include <config_utilities/types/eigen_matrix.h>
 #include <config_utilities/types/enum.h>
-
-#include "hydra/common/config_utilities.h"
 
 namespace kimera_pgmo {
 
@@ -111,36 +108,6 @@ void declare_config(HydraPgmoConfig& config) {
                "solver",
                {{KimeraRPGO::Solver::LM, "LM"}, {KimeraRPGO::Solver::GN, "GN"}});
   }  // config namespace rpgo
-}
-
-void declare_config(BackendConfig& config) {
-  using namespace config;
-  name("BackendConfig");
-  field(config.visualize_place_factors, "visualize_place_factors");
-  field(config.enable_rooms, "enable_rooms");
-  field(config.room_finder, "room_finder");
-  field(config.enable_buildings, "enable_buildings");
-  field(config.building_color, "building_color");
-  field(config.building_semantic_label, "building_semantic_label");
-  field(config.pgmo, "pgmo");
-
-  enter_namespace("dsg");
-  field(config.add_places_to_deformation_graph, "add_places_to_deformation_graph");
-  field(config.optimize_on_lc, "optimize_on_lc");
-  field(config.enable_node_merging, "enable_node_merging");
-  field<LayerMapConversion<bool>>(config.merge_update_map, "merge_update_map");
-  field(config.merge_update_dynamic, "merge_update_dynamic");
-  field(config.places_merge_pos_threshold_m, "places_merge_pos_threshold_m");
-  field(config.places_merge_distance_tolerance_m, "places_merge_distance_tolerance_m");
-  field(config.use_mesh_subscribers, "use_mesh_subscribers");
-  field(config.enable_merge_undos, "enable_merge_undos");
-  field(config.use_active_flag_for_updates, "use_active_flag_for_updates");
-  field(config.num_neighbors_to_find_for_merge, "num_neighbors_to_find_for_merge");
-  field(config.zmq_send_url, "zmq_send_url");
-  field(config.zmq_recv_url, "zmq_recv_url");
-  field(config.use_zmq_interface, "use_zmq_interface");
-  field(config.zmq_num_threads, "zmq_num_threads");
-  field(config.zmq_poll_time_ms, "zmq_poll_time_ms");
 }
 
 }  // namespace hydra

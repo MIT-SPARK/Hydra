@@ -36,6 +36,8 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
+#include <config_utilities/types/eigen_matrix.h>
+#include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <kimera_pgmo/utils/MeshIO.h>
@@ -43,6 +45,7 @@
 #include <spark_dsg/zmq_interface.h>
 #include <voxblox/core/block_hash.h>
 
+#include "hydra/common/config_utilities.h"
 #include "hydra/common/hydra_config.h"
 #include "hydra/rooms/room_finder.h"
 #include "hydra/utils/minimum_spanning_tree.h"
@@ -58,6 +61,37 @@ using kimera_pgmo::KimeraPgmoMesh;
 using pose_graph_tools_msgs::PoseGraph;
 using LayerMerges = std::map<LayerId, std::map<NodeId, NodeId>>;
 
+void declare_config(BackendModule::Config& config) {
+  using namespace config;
+  name("BackendConfig");
+  field(config.visualize_place_factors, "visualize_place_factors");
+  field(config.enable_rooms, "enable_rooms");
+  field(config.room_finder, "room_finder");
+  field(config.enable_buildings, "enable_buildings");
+  field(config.building_color, "building_color");
+  field(config.building_semantic_label, "building_semantic_label");
+  field(config.pgmo, "pgmo");
+
+  enter_namespace("dsg");
+  field(config.add_places_to_deformation_graph, "add_places_to_deformation_graph");
+  field(config.optimize_on_lc, "optimize_on_lc");
+  field(config.enable_node_merging, "enable_node_merging");
+  field<LayerMapConversion<bool>>(config.merge_update_map, "merge_update_map");
+  field(config.merge_update_dynamic, "merge_update_dynamic");
+  field(config.places_merge_pos_threshold_m, "places_merge_pos_threshold_m");
+  field(config.places_merge_distance_tolerance_m, "places_merge_distance_tolerance_m");
+  field(config.use_mesh_subscribers, "use_mesh_subscribers");
+  field(config.enable_merge_undos, "enable_merge_undos");
+  field(config.use_active_flag_for_updates, "use_active_flag_for_updates");
+  field(config.num_neighbors_to_find_for_merge, "num_neighbors_to_find_for_merge");
+  field(config.zmq_send_url, "zmq_send_url");
+  field(config.zmq_recv_url, "zmq_recv_url");
+  field(config.use_zmq_interface, "use_zmq_interface");
+  field(config.zmq_num_threads, "zmq_num_threads");
+  field(config.zmq_poll_time_ms, "zmq_poll_time_ms");
+  field(config.zmq_send_mesh, "zmq_send_mesh");
+}
+
 std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol key) {
   NodeSymbol node(key.chr(), key.index());
   if (!graph.hasNode(node)) {
@@ -69,12 +103,12 @@ std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol 
   return graph.getDynamicNode(node).value().get().timestamp.count();
 }
 
-BackendModule::BackendModule(const BackendConfig& config,
+BackendModule::BackendModule(const Config& c,
                              const SharedDsgInfo::Ptr& dsg,
                              const SharedModuleState::Ptr& state,
                              const LogSetup::Ptr& logs)
     : KimeraPgmoInterface(),
-      config_(config::checkValid(config)),
+      config(config::checkValid(c)),
       private_dsg_(dsg),
       shared_places_copy_(DsgLayers::PLACES),
       state_(state) {
@@ -89,7 +123,7 @@ BackendModule::BackendModule(const BackendConfig& config,
 
   private_dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>());
   original_vertices_.reset(new pcl::PointCloud<pcl::PointXYZ>());
-  deformation_graph_->setForceRecalculate(!config_.pgmo.gnc_fix_prev_inliers);
+  deformation_graph_->setForceRecalculate(!config.pgmo.gnc_fix_prev_inliers);
   setSolverParams();
 
   if (logs && logs->valid()) {
@@ -107,24 +141,26 @@ BackendModule::BackendModule(const BackendConfig& config,
 
   setupDefaultFunctors();
 
-  if (config_.use_zmq_interface) {
+  if (config.use_zmq_interface) {
     zmq_receiver_.reset(
-        new spark_dsg::ZmqReceiver(config_.zmq_recv_url, config_.zmq_num_threads));
+        new spark_dsg::ZmqReceiver(config.zmq_recv_url, config.zmq_num_threads));
+    zmq_sender_.reset(
+        new spark_dsg::ZmqSender(config.zmq_send_url, config.zmq_num_threads));
   }
 }
 
-BackendModule::~BackendModule() { stop(); }
+BackendModule::~BackendModule() { stopImpl(); }
 
 void BackendModule::start() {
   spin_thread_.reset(new std::thread(&BackendModule::spin, this));
 
-  if (config_.use_zmq_interface) {
+  if (config.use_zmq_interface) {
     zmq_thread_.reset(new std::thread(&BackendModule::runZmqUpdates, this));
   }
   LOG(INFO) << "[Hydra Backend] started!";
 }
 
-void BackendModule::stop() {
+void BackendModule::stopImpl() {
   should_shutdown_ = true;
 
   if (spin_thread_) {
@@ -144,6 +180,8 @@ void BackendModule::stop() {
   VLOG(VLEVEL_TRACE) << "[Hydra Backend]: " << state_->backend_queue.size()
                      << " messages left";
 }
+
+void BackendModule::stop() { stopImpl(); }
 
 void BackendModule::save(const LogSetup& log_setup) {
   std::lock_guard<std::mutex> lock(mutex_);
@@ -196,7 +234,7 @@ void BackendModule::save(const LogSetup& log_setup) {
 
 std::string BackendModule::printInfo() const {
   std::stringstream ss;
-  ss << config::toString(config_);
+  ss << config::toString(config);
   return ss.str();
 }
 
@@ -264,7 +302,7 @@ void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
   updateFromLcdQueue();
   status_.total_loop_closures = num_loop_closures_;
 
-  if (!config_.use_mesh_subscribers) {
+  if (!config.use_mesh_subscribers) {
     copyMeshDelta(input);
   }
 
@@ -285,7 +323,7 @@ void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
     logPlaceDistance();
   }
 
-  if (config_.optimize_on_lc && have_loopclosures_) {
+  if (config.optimize_on_lc && have_loopclosures_) {
     optimize(input.timestamp_ns);
   } else {
     updateDsgMesh(input.timestamp_ns);
@@ -296,9 +334,11 @@ void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
     logStatus();
   }
 
-  for (const auto& cb_func : output_callbacks_) {
-    cb_func(*private_dsg_->graph, *deformation_graph_, input.timestamp_ns);
+  if (zmq_sender_) {
+    zmq_sender_->send(*private_dsg_->graph, config.zmq_send_mesh);
   }
+
+  Sink::callAll(sinks_, input.timestamp_ns, *private_dsg_->graph, *deformation_graph_);
 }
 
 void BackendModule::loadState(const std::string& state_path,
@@ -313,6 +353,12 @@ void BackendModule::loadState(const std::string& state_path,
   loadDeformationGraphFromFile(dgrf_path);
   LOG(WARNING) << "Loaded " << deformation_graph_->getNumVertices()
                << " vertices for deformation graph";
+}
+
+void BackendModule::addSink(const Sink::Ptr& sink) {
+  if (sink) {
+    sinks_.push_back(sink);
+  }
 }
 
 void BackendModule::setUpdateFunctor(LayerId layer,
@@ -340,13 +386,13 @@ void BackendModule::setUpdateFuncs() {
     }
   }
 
-  merge_handler_.reset(new MergeHandler(layer_functors_, config_.enable_merge_undos));
+  merge_handler_.reset(new MergeHandler(layer_functors_, config.enable_merge_undos));
 }
 
 void BackendModule::setSolverParams() {
   KimeraRPGO::RobustSolverParams params = deformation_graph_->getParams();
-  params.verbosity = config_.pgmo.rpgo_verbosity;
-  params.solver = config_.pgmo.rpgo_solver;
+  params.verbosity = config.pgmo.rpgo_verbosity;
+  params.solver = config.pgmo.rpgo_solver;
   if (logs_) {
     params.logOutput(logs_->getLogDir("backend/pgmo"));
     logStatus(true);
@@ -360,10 +406,10 @@ void BackendModule::setupDefaultFunctors() {
   layer_functors_[DsgLayers::OBJECTS] = std::make_shared<UpdateObjectsFunctor>();
 
   layer_functors_[DsgLayers::PLACES] = std::make_shared<UpdatePlacesFunctor>(
-      config_.places_merge_pos_threshold_m, config_.places_merge_distance_tolerance_m);
+      config.places_merge_pos_threshold_m, config.places_merge_distance_tolerance_m);
 
-  if (config_.enable_rooms) {
-    auto room_functor = std::make_shared<UpdateRoomsFunctor>(config_.room_finder);
+  if (config.enable_rooms) {
+    auto room_functor = std::make_shared<UpdateRoomsFunctor>(config.room_finder);
     if (logs_) {
       const auto log_path = logs_->getLogDir("backend/room_filtrations");
       room_functor->room_finder->enableLogging(log_path);
@@ -372,9 +418,9 @@ void BackendModule::setupDefaultFunctors() {
     layer_functors_[DsgLayers::ROOMS] = room_functor;
   }
 
-  if (config_.enable_buildings) {
+  if (config.enable_buildings) {
     layer_functors_[DsgLayers::BUILDINGS] = std::make_shared<UpdateBuildingsFunctor>(
-        config_.building_color, config_.building_semantic_label);
+        config.building_color, config.building_semantic_label);
   }
 
   setUpdateFuncs();
@@ -470,7 +516,7 @@ bool BackendModule::updateFromLcdQueue() {
                    lc.dest,
                    lc.src_T_dest,
                    (result.level ? KimeraPgmoInterface::config_.lc_variance
-                                 : config_.pgmo.sg_loop_closure_variance));
+                                 : config.pgmo.sg_loop_closure_variance));
 
     loop_closures_.push_back(lc);
 
@@ -516,8 +562,8 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
 
     GraphMergeConfig merge_config;
     merge_config.previous_merges = &merge_handler_->mergedNodes();
-    merge_config.update_layer_attributes = &config_.merge_update_map;
-    merge_config.update_dynamic_attributes = config_.merge_update_dynamic;
+    merge_config.update_layer_attributes = &config.merge_update_map;
+    merge_config.update_dynamic_attributes = config.merge_update_dynamic;
     private_dsg_->graph->mergeGraph(*shared_dsg.graph, merge_config);
 
     // update merge book-keeping and optionally update merged node
@@ -634,7 +680,7 @@ void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
                                                 place_node_valences,
                                                 prefix.vertex_key,
                                                 false,
-                                                config_.pgmo.place_mesh_variance);
+                                                config.pgmo.place_mesh_variance);
   }  // end timing scope
 
   {  // start timing scope
@@ -649,7 +695,7 @@ void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
       mst_e.pose = kimera_pgmo::GtsamToRos(source.between(target));
       mst_edges.edges.push_back(mst_e);
     }
-    deformation_graph_->addNewTempEdges(mst_edges, config_.pgmo.place_edge_variance);
+    deformation_graph_->addNewTempEdges(mst_edges, config.pgmo.place_edge_variance);
   }  // end timing scope
 }
 
@@ -680,7 +726,7 @@ void BackendModule::addLoopClosure(const gtsam::Key& src,
 
 void BackendModule::runZmqUpdates() {
   while (!should_shutdown_) {
-    if (!zmq_receiver_->recv(config_.zmq_poll_time_ms)) {
+    if (!zmq_receiver_->recv(config.zmq_poll_time_ms)) {
       continue;
     }
 
@@ -761,7 +807,7 @@ void BackendModule::updateAgentNodeMeasurements(
 }
 
 void BackendModule::optimize(size_t timestamp_ns) {
-  if (config_.add_places_to_deformation_graph) {
+  if (config.add_places_to_deformation_graph) {
     addPlacesToDeformationGraph(timestamp_ns);
   }
 
@@ -797,7 +843,7 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
                                         const gtsam::Values& pgmo_values,
                                         bool new_loop_closure,
                                         const LayerMerges& given_merges) {
-  bool enable_node_merging = config_.enable_node_merging;
+  bool enable_node_merging = config.enable_node_merging;
   if (given_merges.size() > 0) {
     enable_node_merging = false;
   }
@@ -828,7 +874,7 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
                         enable_node_merging,
                         &complete_agent_values};
 
-  if (config_.enable_merge_undos) {
+  if (config.enable_merge_undos) {
     status_.num_merges_undone =
         merge_handler_->checkAndUndo(*private_dsg_->graph, info);
   }

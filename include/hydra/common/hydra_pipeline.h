@@ -36,6 +36,8 @@
 #include "hydra/common/hydra_config.h"
 #include "hydra/common/module.h"
 #include "hydra/common/shared_module_state.h"
+// TODO(nathan) remove
+#include <glog/logging.h>
 
 namespace hydra {
 

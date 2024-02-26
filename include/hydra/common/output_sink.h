@@ -32,30 +32,72 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/reconstruction/reconstruction_config.h"
+#pragma once
+#include <config_utilities/virtual_config.h>
 
-#include <config_utilities/config.h>
-#include <config_utilities/types/conversions.h>
-#include <config_utilities/types/eigen_matrix.h>
-
-#include "hydra/common/config_utilities.h"
+#include <list>
+#include <memory>
+#include <string>
 
 namespace hydra {
 
-void declare_config(ReconstructionConfig& conf) {
-  using namespace config;
-  name("ReconstructionConfig");
-  field(conf.show_stats, "show_stats");
-  field(conf.stats_verbosity, "stats_verbosity");
-  field(conf.clear_distant_blocks, "clear_distant_blocks");
-  field(conf.dense_representation_radius_m, "dense_representation_radius_m");
-  field(conf.num_poses_per_update, "num_poses_per_update");
-  field(conf.max_input_queue_size, "max_input_queue_size");
-  field(conf.semantic_measurement_probability, "semantic_measurement_probability");
-  field(conf.tsdf, "tsdf");
-  field(conf.mesh, "mesh");
-  conf.robot_footprint.setOptional();
-  field(conf.robot_footprint, "robot_footprint");
+template <typename... Args>
+struct OutputSink {
+  using Sink = OutputSink<Args...>;
+  using Ptr = std::shared_ptr<Sink>;
+  using Factory = config::VirtualConfig<Sink>;
+  using List = std::list<Ptr>;
+
+  virtual ~OutputSink() = default;
+  virtual void call(Args... args) const = 0;
+  virtual std::string printInfo() const { return ""; }
+
+  static Ptr fromCallback(const std::function<void(Args...)>& callback);
+
+  template <typename T>
+  static Ptr fromMethod(void (T::*callback)(Args...) const, const T* instance);
+
+  static List instantiate(const std::vector<Factory>& configs) {
+    List sinks;
+    for (const auto& config : configs) {
+      if (config) {
+        sinks.push_back(config.create());
+      }
+    }
+    return sinks;
+  }
+
+  static void callAll(const List& sinks, Args... args) {
+    for (const auto& sink : sinks) {
+      if (sink) {
+        sink->call(args...);
+      }
+    }
+  }
+};
+
+template <typename... Args>
+struct FunctionSink : OutputSink<Args...> {
+  FunctionSink(const std::function<void(Args...)>& f) : func(f) {}
+  virtual ~FunctionSink() = default;
+
+  void call(Args... args) const override { func(args...); }
+
+  std::function<void(Args...)> func;
+};
+
+template <typename... Args>
+typename OutputSink<Args...>::Ptr OutputSink<Args...>::fromCallback(
+    const std::function<void(Args...)>& callback) {
+  return std::make_shared<FunctionSink<Args...>>(callback);
+}
+
+template <typename... Args>
+template <typename T>
+typename OutputSink<Args...>::Ptr OutputSink<Args...>::fromMethod(
+    void (T::*callback)(Args...) const, const T* instance) {
+  return std::make_shared<FunctionSink<Args...>>(
+      [&](Args... args) { (instance->*callback)(args...); });
 }
 
 }  // namespace hydra

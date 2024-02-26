@@ -32,39 +32,32 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/frontend/frontend_config.h"
-
-#include <config_utilities/config.h>
-
-namespace kimera_pgmo {
-
-void declare_config(kimera_pgmo::MeshFrontendConfig& conf) {
-  using namespace config;
-  name("MeshFrontendConfig");
-  field(conf.time_horizon, "horizon");
-  field(conf.b_track_mesh_graph_mapping, "track_mesh_graph_mapping");
-  field(conf.full_compression_method, "full_compression_method");
-  field(conf.graph_compression_method, "graph_compression_method");
-  field(conf.d_graph_resolution, "d_graph_resolution");
-  field(conf.mesh_resolution, "output_mesh_resolution");
-}
-
-}  // namespace kimera_pgmo
+#pragma once
+#include <KimeraRPGO/SolverParams.h>
+#include <kimera_pgmo/KimeraPgmoInterface.h>
 
 namespace hydra {
 
-void declare_config(FrontendConfig& config) {
-  using namespace config;
-  name("FrontendConfig");
-  field(config.min_object_vertices, "min_object_vertices");
-  field(config.prune_mesh_indices, "prune_mesh_indices");
-  field(config.pgmo_config, "pgmo");
-  field(config.object_config, "objects");
-  field(config.object_config.angle_step, "angle_step");
-  field(config.validate_vertices, "validate_vertices");
-  field(config.pose_graphs, "pose_graphs");
-  config.places.setOptional();
-  field(config.places, "places");
-}
+// supplementary pgmo config
+struct HydraPgmoConfig : public kimera_pgmo::KimeraPgmoConfig {
+  // covariance
+  double place_mesh_variance;
+  double place_edge_variance;
+  double place_merge_variance;
+  double object_merge_variance;
+  double sg_loop_closure_variance;
+  // rpgo
+  bool gnc_fix_prev_inliers = true;
+  KimeraRPGO::Verbosity rpgo_verbosity = KimeraRPGO::Verbosity::UPDATE;
+  KimeraRPGO::Solver rpgo_solver = KimeraRPGO::Solver::LM;
+};
+
+void declare_config(HydraPgmoConfig& conf);
 
 }  // namespace hydra
+
+namespace kimera_pgmo {
+
+void declare_config(KimeraPgmoConfig& conf);
+
+}  // namespace kimera_pgmo

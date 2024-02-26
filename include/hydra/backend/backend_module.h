@@ -42,17 +42,20 @@
 #include <mutex>
 #include <thread>
 
-#include "hydra/backend/backend_config.h"
 #include "hydra/backend/merge_handler.h"
+#include "hydra/backend/pgmo_configs.h"
 #include "hydra/backend/update_functions.h"
 #include "hydra/common/common.h"
 #include "hydra/common/module.h"
+#include "hydra/common/output_sink.h"
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
+#include "hydra/rooms/room_finder_config.h"
 #include "hydra/utils/log_utilities.h"
 
 namespace spark_dsg {
 class ZmqReceiver;
+class ZmqSender;
 }  // namespace spark_dsg
 
 namespace hydra {
@@ -68,11 +71,43 @@ struct LoopClosureLog {
 class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
  public:
   using Ptr = std::shared_ptr<BackendModule>;
-  using OutputCallback = std::function<void(const DynamicSceneGraph&,
-                                            const kimera_pgmo::DeformationGraph&,
-                                            size_t timestamp_ns)>;
+  using Sink = OutputSink<uint64_t,
+                          const DynamicSceneGraph&,
+                          const kimera_pgmo::DeformationGraph&>;
 
-  BackendModule(const BackendConfig& config,
+  struct Config {
+    bool visualize_place_factors = true;
+    bool enable_rooms = true;
+    RoomFinderConfig room_finder;
+    bool enable_buildings = true;
+    SemanticNodeAttributes::ColorVector building_color{169, 8, 194};  // purple
+    SemanticNodeAttributes::Label building_semantic_label = 22u;
+    HydraPgmoConfig pgmo;
+    // dsg
+    bool add_places_to_deformation_graph = true;
+    bool optimize_on_lc = true;
+    bool enable_node_merging = true;
+    bool use_mesh_subscribers = false;
+    std::map<LayerId, bool> merge_update_map{{DsgLayers::OBJECTS, false},
+                                             {DsgLayers::PLACES, true},
+                                             {DsgLayers::ROOMS, false},
+                                             {DsgLayers::BUILDINGS, false}};
+    bool merge_update_dynamic = true;
+    double places_merge_pos_threshold_m = 0.4;
+    double places_merge_distance_tolerance_m = 0.3;
+    bool enable_merge_undos = false;
+    bool use_active_flag_for_updates = true;
+    size_t num_neighbors_to_find_for_merge = 1;
+    std::string zmq_send_url = "tcp://127.0.0.1:8001";
+    std::string zmq_recv_url = "tcp://127.0.0.1:8002";
+    bool use_zmq_interface = false;
+    size_t zmq_num_threads = 2;
+    size_t zmq_poll_time_ms = 10;
+    bool zmq_send_mesh = true;
+    std::vector<Sink::Factory> sinks;
+  } const config;
+
+  BackendModule(const Config& config,
                 const SharedDsgInfo::Ptr& backend_dsg,
                 const SharedModuleState::Ptr& state,
                 const LogSetup::Ptr& logs = nullptr);
@@ -102,9 +137,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   void loadState(const std::string& state_path, const std::string& dgrf_path);
 
-  inline void addOutputCallback(const OutputCallback& callback_func) {
-    output_callbacks_.push_back(callback_func);
-  }
+  void addSink(const Sink::Ptr& sink);
 
   virtual bool initialize(const ros::NodeHandle&) override { return true; }
 
@@ -113,9 +146,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   virtual bool registerCallbacks(const ros::NodeHandle&) override { return true; }
 
   using KimeraPgmoInterface::setVerboseFlag;
-
-  // TODO(nathan) handle this better
-  inline const BackendConfig& config() const { return config_; }
 
   void setUpdateFunctor(LayerId layer, const dsg_updates::UpdateFunctor::Ptr& functor);
 
@@ -174,7 +204,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   void labelRooms(const UpdateInfo& info, SharedDsgInfo* dsg);
 
  protected:
-  const BackendConfig config_;
+  void stopImpl();
 
   std::unique_ptr<std::thread> spin_thread_;
   std::atomic<bool> should_shutdown_{false};
@@ -207,11 +237,12 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   std::vector<size_t> timestamps_;
   std::queue<size_t> unconnected_nodes_;
 
-  std::list<OutputCallback> output_callbacks_;
+  Sink::List sinks_;
 
   std::map<NodeId, std::string> room_name_map_;
   std::unique_ptr<std::thread> zmq_thread_;
   std::unique_ptr<spark_dsg::ZmqReceiver> zmq_receiver_;
+  std::unique_ptr<spark_dsg::ZmqSender> zmq_sender_;
 
   // TODO(lschmid): This mutex currently simply locks all data for manipulation.
   std::mutex mutex_;
@@ -219,10 +250,12 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   inline static const auto registration_ =
       config::RegistrationWithConfig<BackendModule,
                                      BackendModule,
-                                     BackendConfig,
+                                     Config,
                                      SharedDsgInfo::Ptr,
                                      SharedModuleState::Ptr,
                                      LogSetup::Ptr>("BackendModule");
 };
+
+void declare_config(BackendModule::Config& conf);
 
 }  // namespace hydra
