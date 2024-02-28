@@ -47,6 +47,7 @@
 #include "hydra/rooms/room_finder.h"
 #include "hydra/utils/minimum_spanning_tree.h"
 #include "hydra/utils/timing_utilities.h"
+#include "kimera_pgmo/MeshDelta.h"
 
 namespace hydra {
 
@@ -78,7 +79,6 @@ BackendModule::BackendModule(const BackendConfig& config,
       config_(config::checkValid(config)),
       shared_dsg_(dsg),
       private_dsg_(backend_dsg),
-      shared_places_copy_(DsgLayers::PLACES),
       state_(state) {
   KimeraPgmoInterface::config_ = config.pgmo;
   KimeraPgmoInterface::config_.valid = config::isValid(config.pgmo);
@@ -482,6 +482,72 @@ bool BackendModule::updateFromLcdQueue() {
   return added_new_loop_closure;
 }
 
+void updatePlace2dMesh(Place2dNodeAttributes& attrs,
+                       const kimera_pgmo::MeshDelta& mesh_update,
+                       const size_t num_archived_vertices) {
+  size_t min_index = SIZE_MAX;
+  size_t max_index = 0;
+  auto iter = attrs.pcl_mesh_connections.begin();
+
+  while (iter != attrs.pcl_mesh_connections.end()) {
+    if (mesh_update.deleted_indices.count(iter->idx)) {
+      iter = attrs.pcl_mesh_connections.erase(iter);
+      continue;
+    }
+
+    auto map_iter = mesh_update.prev_to_curr.find(iter->idx);
+    if (map_iter != mesh_update.prev_to_curr.end()) {
+      iter->idx = map_iter->second;
+    }
+    min_index = std::min(min_index, iter->idx);
+    max_index = std::max(max_index, iter->idx);
+    ++iter;
+  }
+  attrs.pcl_min_index = min_index;
+  attrs.pcl_max_index = max_index;
+
+  if (attrs.pcl_max_index < num_archived_vertices) {
+    attrs.has_active_mesh_indices = false;
+  }
+}
+
+void updatePlace2dBoundary(Place2dNodeAttributes& attrs,
+                           const kimera_pgmo::MeshDelta& mesh_update) {
+  const auto prev_boundary = attrs.boundary;
+  const auto prev_boundary_connections = attrs.pcl_boundary_connections;
+  attrs.boundary.clear();
+  attrs.pcl_boundary_connections.clear();
+  for (size_t i = 0; i < prev_boundary.size(); ++i) {
+    if (mesh_update.deleted_indices.count(prev_boundary_connections.at(i).idx)) {
+      continue;
+    }
+
+    auto map_iter = mesh_update.prev_to_curr.find(prev_boundary_connections.at(i).idx);
+    if (map_iter != mesh_update.prev_to_curr.end()) {
+      attrs.boundary.push_back(prev_boundary.at(i));
+      const size_t robot_id = prev_boundary_connections.at(i).robot_id;
+      attrs.pcl_boundary_connections.push_back({robot_id, map_iter->second});
+    } else {
+      attrs.boundary.push_back(prev_boundary.at(i));
+      attrs.pcl_boundary_connections.push_back(prev_boundary_connections.at(i));
+    }
+  }
+}
+
+void updatePlaces2d(SharedDsgInfo::Ptr dsg,
+                    kimera_pgmo::MeshDelta& mesh_update,
+                    size_t num_archived_vertices) {
+  for (auto& id_node_pair : dsg->graph->getLayer(DsgLayers::MESH_PLACES).nodes()) {
+    auto& attrs = id_node_pair.second->attributes<spark_dsg::Place2dNodeAttributes>();
+    if (!attrs.has_active_mesh_indices) {
+      continue;
+    }
+
+    updatePlace2dMesh(attrs, mesh_update, num_archived_vertices);
+    updatePlace2dBoundary(attrs, mesh_update);
+  }
+}
+
 void BackendModule::copyMeshDelta(const BackendInput& input) {
   ScopedTimer timer("backend/copy_mesh_delta", input.timestamp_ns);
   if (!input.mesh_update) {
@@ -496,6 +562,16 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
   // we use this to make sure that deformation only happens for vertices that are
   // still active
   num_archived_vertices_ = input.mesh_update->getTotalArchivedVertices();
+  if (config_.use_2d_places) {
+    try {
+      updatePlaces2d(private_dsg_, *input.mesh_update, num_archived_vertices_);
+    } catch (const std::bad_cast&) {
+      LOG_EVERY_N(ERROR, 50)
+          << "Tried to cast 3D places to 2D places. If you set use_2d_places in the "
+             "frontend config, you must also set it in the backend config.";
+    }
+  }
+
   have_new_mesh_ = true;
 }
 
@@ -511,7 +587,17 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
     }
 
     GraphMergeConfig merge_config;
-    merge_config.previous_merges = &merge_handler_->mergedNodes();
+    auto prev_merges = merge_handler_->mergedNodes();
+    auto iter = prev_merges.begin();
+    while (iter != prev_merges.end()) {
+      NodeSymbol id(iter->first);
+      if (id.category() == 'P' || id.category() == 'S') {
+        iter = prev_merges.erase(iter);
+      } else {
+        ++iter;
+      }
+    }
+    merge_config.previous_merges = &prev_merges;
     merge_config.update_layer_attributes = &config_.merge_update_map;
     merge_config.update_dynamic_attributes = config_.merge_update_dynamic;
     private_dsg_->graph->mergeGraph(*shared_dsg_->graph, merge_config);
@@ -540,12 +626,8 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
     if (shared_dsg_->graph->hasLayer(DsgLayers::PLACES)) {
       // TODO(nathan) simplify
       const auto& places = shared_dsg_->graph->getLayer(DsgLayers::PLACES);
-      shared_places_copy_.mergeLayer(places, {});
-      std::vector<NodeId> removed_place_nodes;
-      places.getRemovedNodes(removed_place_nodes);
-      for (const auto& place_id : removed_place_nodes) {
-        shared_places_copy_.removeNode(place_id);
-      }
+      shared_places_copy_ = places.clone(
+          [](const auto& node) { return NodeSymbol(node.id).category() == 'p'; });
     }
 
     updatePlacePosFromCache();  // copy optimized positions back
@@ -584,7 +666,7 @@ void BackendModule::updatePlacePosFromCache() {
 }
 
 void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
-  if (shared_places_copy_.nodes().empty()) {
+  if (!shared_places_copy_ || shared_places_copy_->nodes().empty()) {
     LOG(WARNING) << "Attempting to add places to deformation graph without places";
     return;
   }
@@ -597,7 +679,7 @@ void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
   MinimumSpanningTreeInfo mst_info;
   {  // start timing scope
     ScopedTimer mst_timer("backend/places_mst", timestamp_ns);
-    mst_info = getMinimumSpanningEdges(shared_places_copy_);
+    mst_info = getMinimumSpanningEdges(*shared_places_copy_);
   }  // end timing scope
 
   {  // start timing scope
@@ -607,7 +689,7 @@ void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
     std::vector<gtsam::Pose3> place_node_poses;
     std::vector<std::vector<size_t>> place_node_valences;
 
-    for (const auto& id_node_pair : shared_places_copy_.nodes()) {
+    for (const auto& id_node_pair : shared_places_copy_->nodes()) {
       const auto& node = *id_node_pair.second;
       const auto& attrs = node.attributes<PlaceNodeAttributes>();
 
@@ -637,8 +719,8 @@ void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
     ScopedTimer between_timer("backend/add_places_between", timestamp_ns);
     PoseGraph mst_edges;
     for (const auto& edge : mst_info.edges) {
-      gtsam::Pose3 source(gtsam::Rot3(), shared_places_copy_.getPosition(edge.source));
-      gtsam::Pose3 target(gtsam::Rot3(), shared_places_copy_.getPosition(edge.target));
+      gtsam::Pose3 source(gtsam::Rot3(), shared_places_copy_->getPosition(edge.source));
+      gtsam::Pose3 target(gtsam::Rot3(), shared_places_copy_->getPosition(edge.target));
       pose_graph_tools_msgs::PoseGraphEdge mst_e;
       mst_e.key_from = edge.source;
       mst_e.key_to = edge.target;
@@ -822,7 +904,8 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
                         new_loop_closure,
                         timestamp_ns,
                         enable_node_merging,
-                        &complete_agent_values};
+                        &complete_agent_values,
+                        num_archived_vertices_};
 
   if (config_.enable_merge_undos) {
     status_.num_merges_undone_ =

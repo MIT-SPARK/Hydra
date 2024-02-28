@@ -116,7 +116,9 @@ std::vector<bool> GvdPlaceExtractor::inFreespace(const PositionMatrix& positions
   return flags;
 }
 
-void GvdPlaceExtractor::detect(const ReconstructionOutput& msg) {
+void GvdPlaceExtractor::detect(const ReconstructionOutput& msg,
+                               const kimera_pgmo::MeshDelta&,
+                               const DynamicSceneGraph&) {
   if (!msg.tsdf || !msg.mesh || !msg.occupied) {
     LOG(ERROR) << "Cannot extract places from invalid input";
     return;
@@ -175,7 +177,9 @@ void filterInvalidNodes(const SceneGraphLayer& graph, NodeIdSet& active_nodes) {
   }
 }
 
-void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) {
+void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns,
+                                    const ReconstructionOutput&,
+                                    DynamicSceneGraph& graph) {
   ScopedTimer timer("frontend/update_gvd_places", timestamp_ns, true, 2, false);
   if (!graph_extractor_) {
     return;

@@ -190,7 +190,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   SharedDsgInfo::Ptr shared_dsg_;
   SharedDsgInfo::Ptr private_dsg_;
-  IsolatedSceneGraphLayer shared_places_copy_;
+  SceneGraphLayer::Ptr shared_places_copy_;
   std::unique_ptr<MergeHandler> merge_handler_;
   SharedModuleState::Ptr state_;
   pcl::PointCloud<pcl::PointXYZ>::Ptr original_vertices_;

@@ -39,6 +39,7 @@ import yaml
 HELP_TEXT = """n: normal (default)
 o: object
 d: dynamic
+s: surface
 x: invalid
 ?: help """
 
@@ -82,20 +83,57 @@ def _format_list(name, values, collapse=True, **kwargs):
     return f"{prefix}: {value_str}"
 
 
-def _get_choice(class_name):
+def _get_choice(class_name, skip_label, prev_choice=None):
     prompt_kwargs = {
-        "type": click.Choice(["n", "o", "d", "x", "?"]),
+        "type": click.Choice(["n", "o", "d", "s", "x", "?"]),
         "show_choices": True,
         "prompt_suffix": " >>> ",
         "default": "n",
     }
 
-    value = click.prompt(f"{class_name}", **prompt_kwargs)
+    if prev_choice in skip_label:
+        click.secho(f"{class_name} →  {prev_choice} (prev)", fg="green")
+        return prev_choice
+
+    prompt_prefix = f"{class_name}"
+    if prev_choice is not None:
+        prompt_prefix += f" <previously: {prev_choice}>"
+        prompt_kwargs["default"] = prev_choice
+
+    value = click.prompt(prompt_prefix, **prompt_kwargs)
     while value == "?":
         click.secho(HELP_TEXT, fg="green")
-        value = click.prompt(f"{class_name}", **prompt_kwargs)
+        value = click.prompt(prompt_prefix, **prompt_kwargs)
 
     return value
+
+
+def _load_prev(output_path):
+    prev_config_map = {}
+    if not output_path.exists():
+        return prev_config_map
+
+    with output_path.open("r") as fin:
+        contents = yaml.load(fin.read(), Loader=yaml.SafeLoader)
+
+    for prev_dynamic in contents.get("dynamic_labels", []):
+        prev_config_map[int(prev_dynamic)] = "d"
+
+    for prev_invalid in contents.get("invalid_labels", []):
+        prev_config_map[int(prev_invalid)] = "x"
+
+    if "frontend" not in contents:
+        return prev_config_map
+
+    prev_objects = contents["frontend"].get("objects", {}).get("labels", [])
+    for prev_object in prev_objects:
+        prev_config_map[int(prev_object)] = "o"
+
+    prev_surfaces = contents["frontend"].get("places2d", {}).get("labels", [])
+    for prev_surface in prev_surfaces:
+        prev_config_map[int(prev_surface)] = "s"
+
+    return prev_config_map
 
 
 @click.command()
@@ -108,7 +146,22 @@ def _get_choice(class_name):
 )
 @click.option("-n", "--name", default=None, help="label space name")
 @click.option("-o", "--output-dir", help="directory to output to")
-def main(label_grouping_file, measurement_probability, name, output_dir):
+@click.option("-f", "--force-overwrite", help="don't load previous labelspace")
+@click.option(
+    "-s",
+    "--skip-label",
+    multiple=True,
+    default=["x", "d", "o"],
+    help="label types to skip on second pass",
+)
+def main(
+    label_grouping_file,
+    measurement_probability,
+    name,
+    output_dir,
+    force_overwrite,
+    skip_label,
+):
     """Parse and export labelspace."""
     label_grouping_file = pathlib.Path(label_grouping_file).expanduser().absolute()
     output_name = _get_output_name(label_grouping_file, name)
@@ -116,10 +169,15 @@ def main(label_grouping_file, measurement_probability, name, output_dir):
     output_path = output_dir / output_name
     click.echo(f"output: {output_path}")
 
+    prev_config = {}
+    if not force_overwrite:
+        prev_config = _load_prev(output_path)
+
     with label_grouping_file.open("r") as fin:
         config = yaml.load(fin.read(), Loader=yaml.SafeLoader)
 
     invalid_labels = []
+    surface_labels = []
     dynamic_labels = []
     object_labels = []
     output_names = []
@@ -127,11 +185,15 @@ def main(label_grouping_file, measurement_probability, name, output_dir):
         class_name = group["name"]
         output_names.append({"label": class_id, "name": class_name})
 
-        value = _get_choice(class_name)
+        value = _get_choice(
+            class_name, skip_label, prev_choice=prev_config.get(class_id)
+        )
         if value == "o":
             object_labels.append(class_id)
         if value == "d":
             dynamic_labels.append(class_id)
+        if value == "s":
+            surface_labels.append(class_id)
         if value == "x":
             invalid_labels.append(class_id)
 
@@ -143,8 +205,11 @@ def main(label_grouping_file, measurement_probability, name, output_dir):
         fout.write(yaml.dump({"total_semantic_labels": len(config["groups"])}))
         fout.write(_format_list("dynamic_labels", dynamic_labels))
         fout.write(_format_list("invalid_labels", invalid_labels))
-        fout.write("objects:\n")
-        fout.write(_format_list("labels", object_labels, indent=2))
+        fout.write("frontend:\n")
+        fout.write("  objects:\n")
+        fout.write(_format_list("labels", object_labels, indent=4))
+        fout.write("  places2d:\n")
+        fout.write(_format_list("labels", surface_labels, indent=4))
         fout.write("label_names:\n")
         for name in output_names:
             fout.write("  - " + yaml.dump(name, default_flow_style=True))

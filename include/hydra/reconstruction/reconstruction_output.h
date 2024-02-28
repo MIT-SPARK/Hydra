@@ -56,6 +56,7 @@ struct ReconstructionOutput {
   voxblox::BlockIndexList archived_blocks;
   std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
   pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements;
+  Eigen::Vector3d current_position;
 };
 
 }  // namespace hydra

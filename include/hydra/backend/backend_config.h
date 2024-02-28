@@ -55,6 +55,22 @@ struct HydraPgmoConfig : public kimera_pgmo::KimeraPgmoConfig {
   KimeraRPGO::Solver rpgo_solver = KimeraRPGO::Solver::LM;
 };
 
+struct Places2dConfig {
+  bool allow_places_merge = true;
+  //! If two places differ by at least this much in z, they won't be merged
+  double merge_max_delta_z = 0.5;
+  //! Minimum number of points to allow splitting place
+  int min_points = 10;
+  //! Minimum size of place for splitting
+  double min_size = 2;
+  //! Amount of overlap between places necessary to add edge
+  double connection_overlap_threshold = 0;
+  //! Maximum difference in z between neighboring places
+  double connection_max_delta_z = 0.5;
+  //! How much to inflate place ellipsoid relative to bounding box
+  double connection_ellipse_scale_factor = 1.0;
+};
+
 struct BackendConfig {
   bool visualize_place_factors = true;
 
@@ -87,8 +103,11 @@ struct BackendConfig {
   bool use_zmq_interface = false;
   size_t zmq_num_threads = 2;
   size_t zmq_poll_time_ms = 10;
+  bool use_2d_places = false;
+  Places2dConfig places2d_config;
 };
 
+void declare_config(Places2dConfig& conf);
 void declare_config(HydraPgmoConfig& conf);
 void declare_config(BackendConfig& conf);
 

@@ -123,6 +123,8 @@ void declare_config(BackendConfig& config) {
   field(config.building_color, "building_color");
   field(config.building_semantic_label, "building_semantic_label");
   field(config.pgmo, "pgmo");
+  field(config.use_2d_places, "use_2d_places");
+  field(config.places2d_config, "places2d_config");
 
   enter_namespace("dsg");
   field(config.add_places_to_deformation_graph, "add_places_to_deformation_graph");
@@ -141,6 +143,18 @@ void declare_config(BackendConfig& config) {
   field(config.use_zmq_interface, "use_zmq_interface");
   field(config.zmq_num_threads, "zmq_num_threads");
   field(config.zmq_poll_time_ms, "zmq_poll_time_ms");
+}
+
+void declare_config(Places2dConfig& config) {
+  using namespace config;
+  name("Places2dConfig");
+  field(config.allow_places_merge, "allow_places_merge");
+  field(config.merge_max_delta_z, "merge_max_delta_z");
+  field(config.min_points, "min_points");
+  field(config.min_size, "min_size");
+  field(config.connection_overlap_threshold, "connection_overlap_threshold");
+  field(config.connection_max_delta_z, "connection_max_delta_z");
+  field(config.connection_ellipse_scale_factor, "connection_ellipse_scale_factor");
 }
 
 }  // namespace hydra

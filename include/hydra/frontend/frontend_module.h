@@ -108,6 +108,8 @@ class FrontendModule : public Module {
   std::vector<bool> inFreespace(const PositionMatrix& positions,
                                 double freespace_distance_m) const;
 
+  const FrontendConfig& config() const { return config_; }
+
  protected:
   virtual void initCallbacks();
 

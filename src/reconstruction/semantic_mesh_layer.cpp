@@ -78,6 +78,23 @@ void SemanticMeshLayer::getAllocatedBlockIndices(BlockIndexList& allocated) cons
   mesh_->getAllAllocatedMeshes(&allocated);
 }
 
+size_t SemanticMeshLayer::numVertices(bool only_active) const {
+  BlockIndexList blocks;
+  if (only_active) {
+    mesh_->getAllUpdatedMeshes(&blocks);
+  } else {
+    mesh_->getAllAllocatedMeshes(&blocks);
+  }
+
+  size_t num_vertices = 0;
+  for (const auto& idx : blocks) {
+    const auto block = mesh_->getMeshPtrByIndex(idx);
+    num_vertices += block->size();
+  }
+
+  return num_vertices;
+}
+
 size_t SemanticMeshLayer::numBlocks() const {
   return mesh_->getNumberOfAllocatedMeshes();
 }

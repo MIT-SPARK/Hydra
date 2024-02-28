@@ -35,6 +35,7 @@
 #pragma once
 #include <gtsam/nonlinear/Values.h>
 
+#include "hydra/backend/backend_config.h"
 #include "hydra/common/common.h"
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
@@ -51,6 +52,7 @@ struct UpdateInfo {
   uint64_t timestamp_ns = 0;
   bool allow_node_merging = false;
   const gtsam::Values* complete_agent_values = nullptr;
+  size_t num_archived_vertices = 0;
 };
 
 using MergeMap = std::map<NodeId, NodeId>;
@@ -172,6 +174,41 @@ struct UpdateBuildingsFunctor : public UpdateFunctor {
 };
 
 MergeMap updateAgents(SharedDsgInfo& graph, const UpdateInfo& info);
+
+struct Update2dPlacesFunctor : public UpdateFunctor {
+  Hooks hooks() const override;
+
+  Update2dPlacesFunctor(const Places2dConfig& config);
+  ~Update2dPlacesFunctor();
+
+  MergeMap call(SharedDsgInfo& dsg, const UpdateInfo& info) const override;
+
+  size_t makeNodeFinders(const SceneGraphLayer& layer) const;
+
+  void mergeAttributes(const DynamicSceneGraph& layer, NodeId from, NodeId to) const;
+
+  void updateNode(const spark_dsg::Mesh::Ptr& mesh,
+                  NodeId node,
+                  Place2dNodeAttributes& attrs) const;
+
+  std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
+                                     const NodeId from_node,
+                                     const size_t num_archived,
+                                     const Place2dNodeAttributes& attrs,
+                                     bool skip_first) const;
+
+  bool shouldMerge(const Place2dNodeAttributes& from_attrs,
+                   const Place2dNodeAttributes& to_attrs) const;
+
+  size_t num_merges_to_consider = 1;
+  bool use_active_flag = true;
+  mutable std::map<SemanticLabel, std::unique_ptr<NearestNodeFinder>> node_finders;
+
+ private:
+  Places2dConfig config_;
+  mutable NodeSymbol next_node_id_ = NodeSymbol('S', 0);
+  const LayerId layer_id_ = DsgLayers::MESH_PLACES;
+};
 
 template <typename Derived, typename Func>
 bool dispatchMergeCheck(const NodeAttributes* lhs,

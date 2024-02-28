@@ -53,3 +53,20 @@ graph_extractor:
     num_neighbors_to_find: 1
     max_length_m: 2.0
     min_clearance_m: 0.5
+
+use_2d_places: false
+places2d:
+  prefix: P
+
+  # Max side length for places without any other overlappig semantic classes
+  pure_final_place_size: 1
+
+  # Params related to place clustering
+  cluster_tolerance: .3
+  min_cluster_size: 50
+  max_cluster_size: 100000
+  min_final_place_points: 10
+
+  # Params related to place edge connections
+  place_max_neighbor_z_diff: .5
+  place_overlap_threshold: 0.0

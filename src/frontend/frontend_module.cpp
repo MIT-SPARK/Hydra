@@ -39,15 +39,16 @@
 #include <glog/logging.h>
 #include <kimera_pgmo/compression/DeltaCompression.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
+#include <pose_graph_tools_ros/conversions.h>
 #include <spark_dsg/pgmo_mesh_traits.h>
 #include <tf2_eigen/tf2_eigen.h>
-#include <pose_graph_tools_ros/conversions.h>
 
 #include <fstream>
 
 #include "hydra/common/hydra_config.h"
 #include "hydra/frontend/gvd_place_extractor.h"
 #include "hydra/frontend/mesh_segmenter.h"
+#include "hydra/frontend/place_2d_segmenter.h"
 #include "hydra/utils/mesh_interface.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/timing_utilities.h"
@@ -58,6 +59,7 @@ using hydra::timing::ScopedTimer;
 using pose_graph_tools_msgs::PoseGraph;
 
 using LabelClusters = MeshSegmenter::LabelClusters;
+using LabelPlaces = Place2dSegmenter::LabelPlaces;
 
 FrontendModule::FrontendModule(const FrontendConfig& config,
                                const SharedDsgInfo::Ptr& dsg,
@@ -96,10 +98,20 @@ FrontendModule::FrontendModule(const FrontendConfig& config,
 
   CHECK(mesh_frontend_.initialize(pgmo_config));
   segmenter_.reset(new MeshSegmenter(config_.object_config));
-  place_extractor_.reset(new GvdPlaceExtractor(config_.graph_extractor,
-                                               config.gvd,
-                                               config.min_places_component_size,
-                                               config.filter_places));
+  if (!config_.enable_places) {
+    return;
+  }
+
+  if (!config_.use_2d_places) {
+    place_extractor_.reset(new GvdPlaceExtractor(config_.graph_extractor,
+                                                 config.gvd,
+                                                 config.min_places_component_size,
+                                                 config.filter_places));
+  } else {
+    place_extractor_.reset(new Place2dSegmenter(config_.place_config,
+                                                &dsg_->graph->mesh()->points,
+                                                &dsg_->graph->mesh()->labels));
+  }
 }
 
 FrontendModule::~FrontendModule() { stop(); }
@@ -122,8 +134,13 @@ void FrontendModule::initCallbacks() {
     return;
   }
 
-  input_callbacks_.push_back(
-      std::bind(&FrontendModule::updatePlaces, this, std::placeholders::_1));
+  if (!config_.use_2d_places) {
+    input_callbacks_.push_back(
+        std::bind(&FrontendModule::updatePlaces, this, std::placeholders::_1));
+  } else {
+    post_mesh_callbacks_.push_back(
+        std::bind(&FrontendModule::updatePlaces, this, std::placeholders::_1));
+  }
 }
 
 void FrontendModule::start() {
@@ -276,7 +293,7 @@ void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
 
 void FrontendModule::updateImpl(const ReconstructionOutput& msg) {
   launchCallbacks(input_callbacks_, msg);
-  if (place_extractor_) {
+  if (place_extractor_ && !config_.use_2d_places) {
     updatePlaceMeshMapping(msg);
   }
 }
@@ -352,11 +369,18 @@ void FrontendModule::updatePlaces(const ReconstructionOutput& input) {
     return;
   }
 
+  if (config_.use_2d_places) {
+    if (!last_mesh_update_) {
+      LOG(ERROR) << "Cannot detect places without valid mesh";
+      return;
+    }
+  }
+
   NodeIdSet active_nodes;
-  place_extractor_->detect(input);
+  place_extractor_->detect(input, *last_mesh_update_, *dsg_->graph);
   {  // start graph critical section
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-    place_extractor_->updateGraph(input.timestamp_ns, *dsg_->graph);
+    place_extractor_->updateGraph(input.timestamp_ns, input, *dsg_->graph);
 
     active_nodes = place_extractor_->getActiveNodes();
     const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
@@ -626,6 +650,23 @@ size_t remapConnections(const kimera_pgmo::VoxbloxIndexMapping& remapping,
     } else {
       indices.push_back(viter->second);
     }
+  }
+  return num_invalid;
+}
+
+using spark_dsg::MeshIndex;
+
+size_t remapConnections(const kimera_pgmo::VoxbloxIndexMapping& remapping,
+                        const voxblox::IndexSet& archived_blocks,
+                        const std::vector<NearestVertexInfo>& connections,
+                        std::vector<MeshIndex>& mindices) {
+  const auto& robot_id = HydraConfig::instance().getRobotPrefix().id;
+  std::vector<size_t> indices;
+  size_t num_invalid =
+      remapConnections(remapping, archived_blocks, connections, indices);
+  mindices.resize(indices.size());
+  for (const auto& ind : indices) {
+    mindices.push_back({robot_id, ind});
   }
   return num_invalid;
 }

@@ -66,9 +66,15 @@ void declare_config(FrontendConfig& conf) {
   field(conf.filter_places, "filter_places");
   field(conf.min_places_component_size, "min_places_component_size");
 
-  field(conf.gvd, "gvd");
-  conf.graph_extractor.setOptional();
-  field(conf.graph_extractor, "graph_extractor");
+  field(conf.enable_places, "enable_places");
+  field(conf.use_2d_places, "use_2d_places");
+  if (conf.use_2d_places) {
+    field(conf.place_config, "places2d");
+  } else {
+    field(conf.gvd, "gvd");
+    conf.graph_extractor.setOptional();
+    field(conf.graph_extractor, "graph_extractor");
+  }
 }
 
 }  // namespace hydra

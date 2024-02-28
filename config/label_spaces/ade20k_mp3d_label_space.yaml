@@ -1,8 +1,8 @@
 ---
-semantic_measurement_probability: 0.6
+semantic_measurement_probability: 0.9
 total_semantic_labels: 39
 dynamic_labels: []
-invalid_labels: []
+invalid_labels: [0]
 frontend:
   objects:
     labels:
@@ -34,6 +34,8 @@ frontend:
       - 35
       - 36
       - 37
+  places2d:
+    labels: [2, 16]
 label_names:
   - {label: 0, name: void}
   - {label: 1, name: wall, name_descriptive: a wall}

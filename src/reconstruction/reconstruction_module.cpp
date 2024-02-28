@@ -243,6 +243,7 @@ bool ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
 
   auto&& [output, is_pending] = getNextOutputMessage();
   fillOutput(msg, *output);
+  output->current_position = msg.world_t_body;
   if (output_queue_ && !is_pending) {
     output_queue_->push(output);
   } else {

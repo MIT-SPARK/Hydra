@@ -71,9 +71,13 @@ class GvdPlaceExtractor : public PlaceExtractorInterface {
   std::vector<bool> inFreespace(const PositionMatrix& positions,
                                 double freespace_distance_m) const override;
 
-  void detect(const ReconstructionOutput& msg) override;
+  void detect(const ReconstructionOutput& msg,
+              const kimera_pgmo::MeshDelta& mesh_delta,
+              const DynamicSceneGraph& graph) override;
 
-  void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) override;
+  void updateGraph(uint64_t timestamp_ns,
+                   const ReconstructionOutput& msg,
+                   DynamicSceneGraph& graph) override;
 
  protected:
   const places::GvdIntegratorConfig gvd_config_;

@@ -61,4 +61,13 @@ graph_extractor:
     num_neighbors_to_find: 1
     max_length_m: 2.0
     min_clearance_m: 0.5
-
+places2d:
+  prefix: P
+  place_memory_radius_m: 15.0
+  active_place_radius_m: 7.0
+  mesh_active_window_m: 8.0
+  cluster_tolerance: 1
+  min_cluster_size: 100
+  max_cluster_size: 100000
+  min_final_place_size: 2
+  min_final_place_points: 10

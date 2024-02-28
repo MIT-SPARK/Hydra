@@ -33,58 +33,26 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <set>
 
-#include "hydra/common/common.h"
-#include "hydra/places/gvd_voxel.h"
-#include "hydra/reconstruction/reconstruction_output.h"
-#include "hydra/utils/log_utilities.h"
-
-namespace kimera_pgmo {
-class MeshDelta;
-}
+#include "hydra/common/dsg_types.h"
 
 namespace hydra {
 
-namespace places {
-// forward declare to avoid include
-class GraphExtractorInterface;
-}  // namespace places
-
-class PlaceExtractorInterface {
- public:
-  using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
-  using VizCallback = std::function<void(uint64_t,
-                                         const voxblox::Layer<places::GvdVoxel>&,
-                                         const places::GraphExtractorInterface*)>;
-
-  PlaceExtractorInterface() {}
-
-  virtual ~PlaceExtractorInterface() = default;
-
-  virtual void save(const LogSetup& /* logs */) const {}
-
-  virtual void detect(const ReconstructionOutput& msg,
-                      const kimera_pgmo::MeshDelta& mesh_delta,
-                      const DynamicSceneGraph& graph) = 0;
-
-  virtual void updateGraph(uint64_t timestamp_ns,
-                           const ReconstructionOutput& msg,
-                           DynamicSceneGraph& graph) = 0;
-
-  virtual NodeIdSet getActiveNodes() const = 0;
-
-  virtual void addVisualizationCallback(const VizCallback& callback) {
-    visualization_callbacks_.push_back(callback);
-  }
-
-  // takes in a 3xN matrix
-  virtual std::vector<bool> inFreespace(const PositionMatrix& /* positions */,
-                                        double /* freespace_distance_m */) const {
-    return {};
-  }
-
- protected:
-  std::vector<VizCallback> visualization_callbacks_;
+struct Place2dSegmenterConfig {
+  char prefix = 'P';
+  double cluster_tolerance = 1;
+  size_t min_cluster_size = 600;
+  size_t max_cluster_size = 100000;
+  double pure_final_place_size = 3;
+  size_t min_final_place_points = 1000;
+  double place_overlap_threshold = 0.1;
+  double place_max_neighbor_z_diff = 0.5;
+  double connection_ellipse_scale_factor = 1;
+  BoundingBox::Type bounding_box_type = BoundingBox::Type::AABB;
+  std::set<uint32_t> labels;
 };
+
+void declare_config(Place2dSegmenterConfig& conf);
 
 }  // namespace hydra

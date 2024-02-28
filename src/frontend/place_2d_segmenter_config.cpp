@@ -32,59 +32,33 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
+#include "hydra/frontend/place_2d_segmenter_config.h"
 
-#include "hydra/common/common.h"
-#include "hydra/places/gvd_voxel.h"
-#include "hydra/reconstruction/reconstruction_output.h"
-#include "hydra/utils/log_utilities.h"
-
-namespace kimera_pgmo {
-class MeshDelta;
-}
+#include <config_utilities/config.h>
+#include <config_utilities/types/conversions.h>
+#include <config_utilities/types/enum.h>
 
 namespace hydra {
 
-namespace places {
-// forward declare to avoid include
-class GraphExtractorInterface;
-}  // namespace places
-
-class PlaceExtractorInterface {
- public:
-  using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
-  using VizCallback = std::function<void(uint64_t,
-                                         const voxblox::Layer<places::GvdVoxel>&,
-                                         const places::GraphExtractorInterface*)>;
-
-  PlaceExtractorInterface() {}
-
-  virtual ~PlaceExtractorInterface() = default;
-
-  virtual void save(const LogSetup& /* logs */) const {}
-
-  virtual void detect(const ReconstructionOutput& msg,
-                      const kimera_pgmo::MeshDelta& mesh_delta,
-                      const DynamicSceneGraph& graph) = 0;
-
-  virtual void updateGraph(uint64_t timestamp_ns,
-                           const ReconstructionOutput& msg,
-                           DynamicSceneGraph& graph) = 0;
-
-  virtual NodeIdSet getActiveNodes() const = 0;
-
-  virtual void addVisualizationCallback(const VizCallback& callback) {
-    visualization_callbacks_.push_back(callback);
-  }
-
-  // takes in a 3xN matrix
-  virtual std::vector<bool> inFreespace(const PositionMatrix& /* positions */,
-                                        double /* freespace_distance_m */) const {
-    return {};
-  }
-
- protected:
-  std::vector<VizCallback> visualization_callbacks_;
-};
+void declare_config(Place2dSegmenterConfig& config) {
+  using namespace config;
+  name("Place2dSegmenterConfig");
+  field<CharConversion>(config.prefix, "prefix");
+  field(config.cluster_tolerance, "cluster_tolerance");
+  field(config.min_cluster_size, "min_cluster_size");
+  field(config.max_cluster_size, "max_cluster_size");
+  field(config.pure_final_place_size, "pure_final_place_size");
+  field(config.min_final_place_points, "min_final_place_points");
+  field(config.place_overlap_threshold, "place_overlap_threshold");
+  field(config.place_max_neighbor_z_diff, "place_max_neighbor_z_diff");
+  field(config.connection_ellipse_scale_factor, "connection_ellipse_scale_factor");
+  enum_field(config.bounding_box_type,
+             "bounding_box_type",
+             {{spark_dsg::BoundingBox::Type::INVALID, "INVALID"},
+              {spark_dsg::BoundingBox::Type::AABB, "AABB"},
+              {spark_dsg::BoundingBox::Type::OBB, "OBB"},
+              {spark_dsg::BoundingBox::Type::RAABB, "RAABB"}});
+  field(config.labels, "labels");
+}
 
 }  // namespace hydra

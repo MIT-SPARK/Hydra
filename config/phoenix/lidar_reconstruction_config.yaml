@@ -3,7 +3,7 @@ map:
     voxels_per_side: 16
     voxel_size: 0.2
     truncation_distance: 0.3
-dense_representation_radius_m: 20.0
+dense_representation_radius_m: 10.0
 mesh:
   min_weight: 0.0001
   integrator_threads: -1

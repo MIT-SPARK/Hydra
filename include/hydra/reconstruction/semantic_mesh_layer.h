@@ -61,6 +61,8 @@ class SemanticMeshLayer {
 
   void getAllocatedBlockIndices(voxblox::BlockIndexList& allocated) const;
 
+  size_t numVertices(bool only_active = false) const;
+
   size_t numBlocks() const;
 
   size_t getMemorySize() const;

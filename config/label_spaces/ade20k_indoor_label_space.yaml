@@ -1,6 +1,25 @@
 ---
+semantic_measurement_probability: 0.9
+total_semantic_labels: 21
 dynamic_labels: [19, 20]
 invalid_labels: [0]
+frontend:
+  objects:
+    labels:
+      - 7
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 17
+      - 18
+  places2d:
+    labels: [2, 5]
 label_names:
   - {label: 0, name: Unknown}
   - {label: 1, name: Wall}
@@ -23,20 +42,3 @@ label_names:
   - {label: 18, name: Deformable}
   - {label: 19, name: Dynamic_NonHuman}
   - {label: 20, name: Human}
-frontend:
-  objects:
-    labels:
-      - 7
-      - 8
-      - 9
-      - 10
-      - 11
-      - 12
-      - 13
-      - 14
-      - 15
-      - 16
-      - 17
-      - 18
-semantic_measurement_probability: 0.9
-total_semantic_labels: 21

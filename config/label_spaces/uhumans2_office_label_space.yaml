@@ -6,6 +6,8 @@ invalid_labels: []
 frontend:
   objects:
     labels: [5, 6, 7, 10, 12, 13, 18]
+  places2d:
+    labels: [3, 15]
 label_names:
   - {label: 0, name: unknown}
   - {label: 1, name: air_vent}
