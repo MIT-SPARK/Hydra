@@ -36,20 +36,15 @@
 
 namespace hydra {
 
-SharedDsgInfo::SharedDsgInfo(const std::map<LayerId, char>& layer_id_map,
-                             LayerId mesh_layer_id)
+SharedDsgInfo::SharedDsgInfo(const std::map<LayerId, char>& layer_id_map)
     : updated(false), last_update_time(0) {
   DynamicSceneGraph::LayerIds layer_ids;
   for (const auto& id_key_pair : layer_id_map) {
-    if (id_key_pair.first == mesh_layer_id) {
-      throw std::runtime_error("layer id duplicated with mesh id");
-    }
-
     layer_ids.push_back(id_key_pair.first);
     prefix_layer_map[id_key_pair.second] = id_key_pair.first;
   }
 
-  graph.reset(new DynamicSceneGraph(layer_ids, mesh_layer_id));
+  graph.reset(new DynamicSceneGraph(layer_ids));
 }
 
 }  // namespace hydra

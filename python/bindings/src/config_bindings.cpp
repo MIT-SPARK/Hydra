@@ -88,7 +88,6 @@ void addBindings(pybind11::module_& m) {
       .def_readwrite("enable_lcd", &PipelineConfig::enable_lcd)
       .def_readwrite("timing_disabled", &PipelineConfig::timing_disabled)
       .def_readwrite("disable_timer_output", &PipelineConfig::disable_timer_output)
-      .def_readwrite("mesh_layer_id", &PipelineConfig::mesh_layer_id)
       .def_readwrite("layer_id_map", &PipelineConfig::layer_id_map)
       .def_readwrite("logs", &PipelineConfig::logs)
       .def_readwrite("frames", &PipelineConfig::frames)

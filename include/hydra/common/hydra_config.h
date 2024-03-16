@@ -65,7 +65,6 @@ struct PipelineConfig {
   bool enable_lcd = false;
   bool timing_disabled = false;
   bool disable_timer_output = true;
-  LayerId mesh_layer_id = 1;
   std::map<LayerId, char> layer_id_map{{DsgLayers::OBJECTS, 'o'},
                                        {DsgLayers::PLACES, 'p'},
                                        {DsgLayers::ROOMS, 'r'},
