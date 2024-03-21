@@ -77,7 +77,7 @@ std::string HydraPipeline::getModuleInfo(const std::string& name,
                                          const Module* module) const {
   const auto print_width = config::Settings().print_width;
   std::stringstream ss;
-  ss << makeBanner(name, print_width, '*');
+  ss << makeBanner(name, print_width, '*', true, true);
   if (!module) {
     ss << "UNITIALIZED MODULE!" << std::endl;
   } else {
@@ -92,10 +92,12 @@ std::string HydraPipeline::getModuleInfo(const std::string& name,
 
 void HydraPipeline::showModules() const {
   const auto print_width = config::Settings().print_width;
-  VLOG(config_verbosity_) << std::endl << makeBanner("Modules", print_width, '=');
+  std::stringstream ss;
+  ss << std::endl << makeBanner("Modules", print_width, '=', true, true);
   for (auto&& [name, module] : modules_) {
-    VLOG(config_verbosity_) << std::endl << getModuleInfo(name, module.get());
+    ss << std::endl << getModuleInfo(name, module.get());
   }
+  VLOG(config_verbosity_) << ss.str();
 }
 
 void HydraPipeline::start() {
