@@ -37,11 +37,11 @@
 namespace hydra {
 
 SharedDsgInfo::SharedDsgInfo(const std::map<LayerId, char>& layer_id_map)
-    : updated(false), last_update_time(0) {
+    : updated(false), last_update_time(0), layer_prefix_map(layer_id_map) {
   DynamicSceneGraph::LayerIds layer_ids;
-  for (const auto& id_key_pair : layer_id_map) {
-    layer_ids.push_back(id_key_pair.first);
-    prefix_layer_map[id_key_pair.second] = id_key_pair.first;
+  for (auto&& [layer, prefix] : layer_id_map) {
+    layer_ids.push_back(layer);
+    prefix_layer_map[prefix] = layer;
   }
 
   graph.reset(new DynamicSceneGraph(layer_ids));
