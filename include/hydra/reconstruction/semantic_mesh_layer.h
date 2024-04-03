@@ -81,9 +81,10 @@ class SemanticMeshLayer {
  protected:
   friend kimera_pgmo::SemanticVoxbloxMeshInterface getMeshInterface(
       const SemanticMeshLayer& mesh_layer);
-      
+
   voxblox::MeshLayer::Ptr mesh_;
   std::shared_ptr<SemanticMeshMap> semantics_;
+  voxblox::IndexSet current_blocks_;
 };
 
 }  // namespace hydra

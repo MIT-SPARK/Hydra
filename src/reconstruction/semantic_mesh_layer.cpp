@@ -47,6 +47,7 @@ SemanticMeshLayer::SemanticMeshLayer(FloatingPoint block_size)
 
 voxblox::Mesh::Ptr SemanticMeshLayer::allocateBlock(const BlockIndex& index,
                                                     bool use_semantics) {
+  current_blocks_.insert(index);
   auto to_return = mesh_->allocateMeshPtrByIndex(index);
 
   if (use_semantics) {
@@ -57,11 +58,16 @@ voxblox::Mesh::Ptr SemanticMeshLayer::allocateBlock(const BlockIndex& index,
 }
 
 void SemanticMeshLayer::removeBlock(const BlockIndex& index) {
+  current_blocks_.erase(index);
   mesh_->removeMesh(index);
   semantics_->erase(index);
 }
 
 voxblox::Mesh::Ptr SemanticMeshLayer::getMeshBlock(const BlockIndex& index) const {
+  if (!current_blocks_.count(index)) {
+    return nullptr;
+  }
+
   return mesh_->getMeshPtrByIndex(index);
 }
 
@@ -90,6 +96,7 @@ SemanticMeshLayer::Ptr SemanticMeshLayer::clone() const {
   mesh_->getAllAllocatedMeshes(&all_indices);
   for (const auto& block_index : all_indices) {
     auto block = new_mesh->mesh_->allocateNewBlock(block_index);
+    new_mesh->current_blocks_.insert(block_index);
     *block = *(mesh_->getMeshPtrByIndex(block_index));
 
     auto iter = semantics_->find(block_index);
@@ -114,6 +121,7 @@ void SemanticMeshLayer::merge(SemanticMeshLayer& other) const {
   mesh_->getAllAllocatedMeshes(&all_indices);
   for (const auto& block_index : all_indices) {
     auto block = other.mesh_->allocateNewBlock(block_index);
+    other.current_blocks_.insert(block_index);
     *block = *(mesh_->getMeshPtrByIndex(block_index));
 
     auto iter = semantics_->find(block_index);
@@ -141,6 +149,7 @@ SemanticMeshLayer::Ptr SemanticMeshLayer::getActiveMesh(
     }
 
     auto block = active_mesh->mesh_->allocateNewBlock(block_index);
+    active_mesh->current_blocks_.insert(block_index);
     *block = *(mesh_->getMeshPtrByIndex(block_index));
 
     auto iter = semantics_->find(block_index);
