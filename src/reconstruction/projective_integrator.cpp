@@ -78,8 +78,11 @@ void ProjectiveIntegrator::updateMap(const Sensor& sensor,
   BlockIndexList block_indices;
   const auto body_T_sensor = data.getSensorPose<float>(sensor);
   if (config_.accurate_visible_blocks) {
-    block_indices = findVisibleBlocks(
-        sensor, body_T_sensor, data.points, map.block_size, map.truncation_distance());
+    block_indices = findVisibleBlocks(sensor,
+                                      body_T_sensor,
+                                      data.vertex_map,
+                                      map.block_size,
+                                      map.truncation_distance());
   } else {
     block_indices = findBlocksInViewFrustum(
         sensor, body_T_sensor, map.block_size, data.min_range, data.max_range);

@@ -62,7 +62,7 @@ bool CloudInputPacket::fillFrameData(FrameData& msg) const {
   }
 
   msg.timestamp_ns = timestamp_ns;
-  msg.points = points;
+  msg.vertex_map = points;
   msg.points_in_world_frame = in_world_frame;
   msg.color_image = colors;
   msg.label_image = labels;

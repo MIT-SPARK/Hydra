@@ -52,31 +52,36 @@ void HydraPipeline::init() {}
 
 HydraPipeline::~HydraPipeline() {}
 
-void HydraPipeline::showModuleInfo() const {
+std::string HydraPipeline::getModuleInfo(const std::string& name,
+                                         const Module* module) const {
   const auto print_width = config::Settings().print_width;
-  for (auto&& [name, module] : modules_) {
-    std::stringstream ss;
-    ss << std::string(print_width, '*') << std::endl;
-    const auto name_size = name.size() + 3;
-    const auto spacing = name_size >= print_width ? 0 : print_width - name_size;
-    ss << "* " << name << (spacing ? std::string(spacing, ' ') + "*" : "") << std::endl;
-    ss << std::string(print_width, '*') << std::endl;
-    if (!module) {
-      ss << "UNITIALIZED MODULE!" << std::endl;
-    } else {
-      const auto info = module->printInfo();
-      if (!info.empty()) {
-        ss << info << std::endl;
-      }
+  std::stringstream ss;
+  ss << std::string(print_width, '*') << std::endl;
+  const auto name_size = name.size() + 3;
+  const auto spacing = name_size >= print_width ? 0 : print_width - name_size;
+  ss << "* " << name << (spacing ? std::string(spacing, ' ') + "*" : "") << std::endl;
+  ss << std::string(print_width, '*') << std::endl;
+  if (!module) {
+    ss << "UNITIALIZED MODULE!" << std::endl;
+  } else {
+    const auto info = module->printInfo();
+    if (!info.empty()) {
+      ss << info << std::endl;
     }
-    ss << std::string(print_width, '*') << std::endl;
+  }
+  ss << std::string(print_width, '*') << std::endl;
+  return ss.str();
+}
 
-    VLOG(config_verbosity_) << std::endl << ss.str();
+void HydraPipeline::showModules() const {
+  for (auto&& [name, module] : modules_) {
+    VLOG(config_verbosity_) << std::endl << getModuleInfo(name, module.get());
   }
 }
 
 void HydraPipeline::start() {
-  showModuleInfo();
+  showModules();
+
   for (auto&& [name, module] : modules_) {
     if (!module) {
       LOG(FATAL) << "Found unitialized module: " << name;

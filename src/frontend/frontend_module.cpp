@@ -49,6 +49,7 @@
 #include "hydra/frontend/gvd_place_extractor.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/place_2d_segmenter.h"
+#include "hydra/utils/display_utilities.h"
 #include "hydra/utils/mesh_interface.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/timing_utilities.h"

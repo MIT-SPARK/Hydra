@@ -92,7 +92,7 @@ VoronoiCondition checkVoronoi(const VoronoiCheckConfig& cfg,
   const GlobalIndex::Scalar dist_c_pn = c_pn.dot(c_pn);
   const GlobalIndex::Scalar dist_n_pc = n_pc.dot(n_pc);
 
-  VLOG(10) << "  d_c_pn: " << dist_c_pn << " d_n_pc: " << dist_n_pc;
+  VLOG(15) << "  d_c_pn: " << dist_c_pn << " d_n_pc: " << dist_n_pc;
   result.current_is_voronoi = (dist_c_pn <= dist_n_pc);
   result.neighbor_is_voronoi = (dist_n_pc <= dist_c_pn);
   return result;

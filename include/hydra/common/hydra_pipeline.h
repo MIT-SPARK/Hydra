@@ -66,7 +66,9 @@ class HydraPipeline {
   }
 
  protected:
-  void showModuleInfo() const;
+  void showModules() const;
+
+  std::string getModuleInfo(const std::string& name, const Module* module) const;
 
  protected:
   int config_verbosity_;

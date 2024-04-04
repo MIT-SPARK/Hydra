@@ -115,10 +115,7 @@ BackendModule::BackendModule(const BackendConfig& config,
   }
 }
 
-BackendModule::~BackendModule() {
-  VLOG(1) << "[Hydra Backend] destructor called!";
-  stop();
-}
+BackendModule::~BackendModule() { stop(); }
 
 void BackendModule::start() {
   spin_thread_.reset(new std::thread(&BackendModule::spin, this));
@@ -259,26 +256,32 @@ void BackendModule::logPlaceDistance() {
 }
 
 void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
-  ScopedTimer spin_timer("backend/spin", input.timestamp_ns);
   status_.reset();
   std::lock_guard<std::mutex> lock(mutex_);
 
+  auto update_timer =
+      std::make_unique<ScopedTimer>("backend/update", input.timestamp_ns);
   updateFactorGraph(input);
   updateFromLcdQueue();
-  status_.total_loop_closures_ = num_loop_closures_;
+  status_.total_loop_closures = num_loop_closures_;
 
   if (!config_.use_mesh_subscribers) {
     copyMeshDelta(input);
   }
 
   if (!updatePrivateDsg(input.timestamp_ns, force_update)) {
+    VLOG(2) << "Backend skipping input @ " << input.timestamp_ns << " [ns]";
     // we only read from the frontend dsg if we've processed all the
     // factor graph update packets (as long as force_update is false)
     // we still log the status for each received frontend packet
     logStatus();
+    update_timer.reset();  // mark update from dsg finished
     return;
   }
 
+  update_timer.reset();  // mark update from dsg finished
+
+  ScopedTimer spin_timer("backend/spin", input.timestamp_ns);
   if (have_loopclosures_ && VLOG_IS_ON(1)) {
     logPlaceDistance();
   }
@@ -414,8 +417,8 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
     return;
   }
 
-  status_.new_graph_factors_ = input.deformation_graph->edges.size();
-  status_.new_factors_ += input.deformation_graph->edges.size();
+  status_.new_graph_factors = input.deformation_graph->edges.size();
+  status_.new_factors += input.deformation_graph->edges.size();
 
   try {
     processIncrementalMeshGraph(
@@ -426,7 +429,7 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
   }
 
   for (const auto& msg : input.pose_graphs) {
-    status_.new_factors_ += msg->edges.size();
+    status_.new_factors += msg->edges.size();
 
     VLOG(5) << "[Hydra Backend] Adding pose graph message: "
             << logPoseGraphConnections(*msg);
@@ -447,12 +450,12 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
   }
 
   if (num_loop_closures_ > 0) {
-    status_.new_loop_closures_ = num_loop_closures_ - prev_loop_closures;
+    status_.new_loop_closures = num_loop_closures_ - prev_loop_closures;
     have_loopclosures_ = true;
   }
-  status_.trajectory_len_ = trajectory_.size();
-  status_.total_factors_ = deformation_graph_->getGtsamFactors().size();
-  status_.total_values_ = deformation_graph_->getGtsamValues().size();
+  status_.trajectory_len = trajectory_.size();
+  status_.total_factors = deformation_graph_->getGtsamFactors().size();
+  status_.total_values = deformation_graph_->getGtsamValues().size();
 }
 
 bool BackendModule::updateFromLcdQueue() {
@@ -476,7 +479,7 @@ bool BackendModule::updateFromLcdQueue() {
     have_loopclosures_ = true;
     have_new_loopclosures_ = true;
     num_loop_closures_++;
-    status_.new_loop_closures_++;
+    status_.new_loop_closures++;
   }
 
   return added_new_loop_closure;
@@ -777,7 +780,7 @@ void BackendModule::runZmqUpdates() {
 
       auto node_opt = private_dsg_->graph->getNode(id_node_pair.first);
       if (!node_opt) {
-        VLOG(1) << "received update for node "
+        VLOG(2) << "received update for node "
                 << NodeSymbol(id_node_pair.first).getLabel()
                 << " but node no longer exists";
         continue;
@@ -791,7 +794,7 @@ void BackendModule::runZmqUpdates() {
 }
 
 void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
-  //deformation_graph_->update();
+  // deformation_graph_->update();
   if (!force_mesh_update && !have_new_mesh_) {
     return;
   }
@@ -810,7 +813,7 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
   }
 
   ScopedTimer timer("backend/mesh_deformation", timestamp_ns);
-  VLOG(3) << "Deforming mesh with " << mesh->numVertices() << " vertices";
+  VLOG(2) << "Deforming mesh with " << mesh->numVertices() << " vertices";
 
   kimera_pgmo::ConstStampedCloud<pcl::PointXYZ> cloud_in{*original_vertices_,
                                                          vertex_stamps_};
@@ -908,7 +911,7 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
                         num_archived_vertices_};
 
   if (config_.enable_merge_undos) {
-    status_.num_merges_undone_ =
+    status_.num_merges_undone =
         merge_handler_->checkAndUndo(*private_dsg_->graph, info);
   }
 
@@ -948,14 +951,14 @@ void BackendModule::logStatus(bool init) const {
   const auto& timer = hydra::timing::ElapsedTimeRecorder::instance();
   const double nan = std::numeric_limits<double>::quiet_NaN();
   file.open(filename, std::ofstream::out | std::ofstream::app);
-  file << status_.total_loop_closures_ << "," << status_.new_loop_closures_ << ","
-       << status_.total_factors_ << "," << status_.total_values_ << ","
-       << status_.new_factors_ << "," << status_.new_graph_factors_ << ","
-       << status_.trajectory_len_ << ","
+  file << status_.total_loop_closures << "," << status_.new_loop_closures << ","
+       << status_.total_factors << "," << status_.total_values << ","
+       << status_.new_factors << "," << status_.new_graph_factors << ","
+       << status_.trajectory_len << ","
        << timer.getLastElapsed("backend/spin").value_or(nan) << ","
        << timer.getLastElapsed("backend/optimization").value_or(nan) << ","
        << timer.getLastElapsed("backend/mesh_update").value_or(nan) << ","
-       << status_.num_merges_undone_ << std::endl;
+       << status_.num_merges_undone << std::endl;
   file.close();
   return;
 }

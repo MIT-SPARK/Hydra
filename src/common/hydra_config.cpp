@@ -166,7 +166,7 @@ void HydraConfig::initFromConfig(const PipelineConfig& config, int robot_id) {
   }
 
   if (label_colormap_) {
-    VLOG(1) << "Loaded label space colors:" << std::endl << *label_colormap_;
+    VLOG(2) << "Loaded label space colors:" << std::endl << *label_colormap_;
   }
 }
 

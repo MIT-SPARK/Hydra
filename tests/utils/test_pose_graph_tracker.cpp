@@ -39,6 +39,8 @@
 
 namespace hydra {
 
+using pose_graph_tools_msgs::PoseGraph;
+
 TEST(PoseGraphTracker, EmptyGraphsCorrect) {
   PoseGraphTracker::Config config;
   config.make_pose_graph = false;
@@ -53,8 +55,8 @@ TEST(PoseGraphTracker, EmptyGraphsCorrect) {
   EXPECT_EQ(result.pose_graphs.size(), 0u);
 
   // two input pose graphs -> two output pose graphs
-  msg.pose_graphs.push_back(nullptr);
-  msg.pose_graphs.push_back(nullptr);
+  msg.pose_graphs.push_back(PoseGraph::ConstPtr(new PoseGraph()));
+  msg.pose_graphs.push_back(PoseGraph::ConstPtr(new PoseGraph()));
   tracker.update(msg);
   tracker.fillPoseGraphs(result);
   EXPECT_EQ(result.pose_graphs.size(), 2u);
@@ -66,7 +68,7 @@ TEST(PoseGraphTracker, EmptyGraphsCorrect) {
   EXPECT_EQ(result.pose_graphs.size(), 2u);
 
   // one input pose graph -> three total graphs
-  msg.pose_graphs.push_back(nullptr);
+  msg.pose_graphs.push_back(PoseGraph::ConstPtr(new PoseGraph()));
   tracker.update(msg);
   tracker.fillPoseGraphs(result);
   EXPECT_EQ(result.pose_graphs.size(), 3u);

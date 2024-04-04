@@ -33,6 +33,9 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <spark_dsg/node_symbol.h>
+
+#include <Eigen/Dense>
 #include <cmath>
 #include <iomanip>
 #include <sstream>
@@ -41,5 +44,30 @@
 namespace hydra {
 
 std::string getHumanReadableMemoryString(size_t bytes);
+
+template <typename Scalar>
+std::string showVector(const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& vector,
+                       int precision = 3,
+                       int max_size = 8,
+                       int num_to_show = 3) {
+  std::stringstream ss;
+  if (vector.rows() <= max_size) {
+    const Eigen::IOFormat format(
+        precision, Eigen::DontAlignCols, ", ", ", ", "", "", "[", "]");
+    ss << vector.format(format);
+    return ss.str();
+  }
+
+  const Eigen::IOFormat format(
+      precision, Eigen::DontAlignCols, ", ", ", ", "", "", "", "");
+
+  ss << "[" << vector.head(num_to_show).format(format) << ", ..., "
+     << vector.tail(num_to_show).format(format) << "]";
+  return ss.str();
+}
+
+inline std::string printNodeId(spark_dsg::NodeId id) {
+  return spark_dsg::NodeSymbol(id).getLabel();
+}
 
 }  // namespace hydra

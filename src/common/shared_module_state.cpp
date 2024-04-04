@@ -52,14 +52,14 @@ SharedModuleState::~SharedModuleState() {
 }
 
 void BackendModuleStatus::reset() {
-  total_loop_closures_ = 0;
-  new_loop_closures_ = 0;
-  total_factors_ = 0;
-  total_values_ = 0;
-  new_factors_ = 0;
-  new_graph_factors_ = 0;
-  trajectory_len_ = 0;
-  num_merges_undone_ = 0;
+  total_loop_closures = 0;
+  new_loop_closures = 0;
+  total_factors = 0;
+  total_values = 0;
+  new_factors = 0;
+  new_graph_factors = 0;
+  trajectory_len = 0;
+  num_merges_undone = 0;
 }
 
 }  // namespace hydra

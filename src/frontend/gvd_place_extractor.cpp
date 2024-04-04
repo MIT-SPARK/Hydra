@@ -188,7 +188,7 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns,
   active_nodes_ = graph_extractor_->getActiveNodes();
   const auto& places = graph_extractor_->getGraph();
   filterInvalidNodes(places, active_nodes_);
-  VLOG(3) << "[Hydra Frontend] Considering " << active_nodes_.size()
+  VLOG(2) << "[Hydra Frontend] Considering " << active_nodes_.size()
           << " input place nodes ";
 
   NodeIdSet active_neighborhood = active_nodes_;

@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
+#include <gtsam/geometry/Pose3.h>
 #include <hydra/backend/merge_handler.h>
 
 namespace hydra {

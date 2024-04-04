@@ -184,7 +184,7 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
     const double window_size =
         filtration[window.second].distance - filtration[window.first].distance;
     if (window_size < config_.min_window_size) {
-      VLOG(1) << "[RoomFinder] Bad window bounds: [" << config_.min_dilation_m << ", "
+      VLOG(2) << "[RoomFinder] Bad window bounds: [" << config_.min_dilation_m << ", "
               << config_.max_dilation_m << "],  window: [" << window.first << ", "
               << window.second << "]"
               << " with size: " << window_size;
@@ -194,7 +194,7 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
     }
   }
 
-  VLOG(1) << "[RoomFinder] Bounds: [" << config_.min_dilation_m << ", "
+  VLOG(2) << "[RoomFinder] Bounds: [" << config_.min_dilation_m << ", "
           << config_.max_dilation_m << "],  window: [" << window.first << ", "
           << window.second << "]";
 
@@ -229,7 +229,7 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
   }
 
   const auto info = *candidate;
-  VLOG(3) << "[RoomFinder] Best threshold: " << info.distance << " ("
+  VLOG(2) << "[RoomFinder] Best threshold: " << info.distance << " ("
           << info.num_components << " components)";
 
   if (log_file_) {
@@ -265,11 +265,11 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
 }
 
 SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
-  VLOG(3) << "[Room Finder] Detecting rooms for " << places.numNodes() << " nodes";
+  VLOG(2) << "[Room Finder] Detecting rooms for " << places.numNodes() << " nodes";
 
   const auto components = getBestComponents(places);
   if (components.empty()) {
-    VLOG(1) << "[Room Finder] No rooms found";
+    VLOG(2) << "[Room Finder] No rooms found";
     return nullptr;
   }
 

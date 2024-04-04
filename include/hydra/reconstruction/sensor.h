@@ -121,6 +121,8 @@ struct KimeraSensorExtrinsics : public SensorExtrinsics {
  */
 class Sensor {
  public:
+  using Ptr = std::shared_ptr<Sensor>;
+
   struct Config {
     double min_range = 0.0f;
     double max_range = std::numeric_limits<double>::infinity();
@@ -164,9 +166,11 @@ class Sensor {
    * For lidar, this would compute a range image from the pointcloud
    *
    * @param input Input struct to fill
+   * @param force_world_frame Always convert point cloud to be in the world frame, not the sensor frame
    * @return True if the sensor was able to provide all necessary information
    */
-  virtual bool finalizeRepresentations(FrameData& input) const = 0;
+  virtual bool finalizeRepresentations(FrameData& input,
+                                       bool force_world_frame = false) const = 0;
 
   /**
    * @brief Projects a point in camera frame (C) into the image plane.

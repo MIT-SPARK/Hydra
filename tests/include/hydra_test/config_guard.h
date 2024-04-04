@@ -32,58 +32,26 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <Eigen/Geometry>
-#include <cstdint>
-#include <limits>
-#include <opencv2/core/mat.hpp>
+#include <hydra/common/hydra_config.h>
 
-#include "hydra/reconstruction/sensor.h"
+namespace hydra::test {
 
-namespace hydra {
-
-struct FrameData {
-  uint64_t timestamp_ns;
-  Eigen::Isometry3d world_T_body;
-
-  cv::Mat color_image;
-  bool color_is_bgr = false;
-  cv::Mat depth_image;
-  cv::Mat label_image;
-  cv::Mat range_image;
-  cv::Mat vertex_map;
-  bool points_in_world_frame = false;
-  float min_range = 0.0f;
-  float max_range = std::numeric_limits<float>::infinity();
-
- public:
-  virtual ~FrameData() = default;
-
-  /**
-   * @brief check that we have enough data to round out the rest of the information
-   */
-  virtual bool hasData() const;
-
-  /**
-   * @brief make sure that all the images are of the right type
-   */
-  virtual bool normalizeData();
-
-  virtual bool normalizeDepth();
-
-  template <typename T = double>
-  Eigen::Transform<T, 3, Eigen::Isometry> getSensorPose(const Sensor& sensor) const {
-    return world_T_body.cast<T>() * sensor.body_T_sensor<T>();
+struct ConfigGuard {
+  ConfigGuard(bool init = true) {
+    if (init) {
+      PipelineConfig config;
+      HydraConfig::init(config);
+    }
   }
 
- protected:
-  bool colorToLabels(const cv::Mat& colors);
+  static ConfigGuard FixedLabels(size_t num_labels) {
+    PipelineConfig config;
+    config.label_space.total_labels = num_labels;
+    HydraConfig::init(config);
+    return ConfigGuard(false);
+  }
 
-  bool convertLabels();
-
-  bool convertDepth();
-
-  bool convertColor();
+  ~ConfigGuard() { HydraConfig::instance().reset(); }
 };
 
-}  // namespace hydra
+}  // namespace hydra::test

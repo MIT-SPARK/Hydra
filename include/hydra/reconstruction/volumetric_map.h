@@ -46,8 +46,6 @@
 // Government is authorized to reproduce and distribute reprints for Government
 // purposes notwithstanding any copyright notation herein.
 #pragma once
-
-#include <config_utilities/config_utilities.h>
 #include <voxblox/core/layer.h>
 
 #include "hydra/reconstruction/semantic_mesh_layer.h"
@@ -163,6 +161,10 @@ class VolumetricMap {
                                                  bool with_occupancy = false);
 
   static std::unique_ptr<VolumetricMap> load(const std::string& filepath);
+
+  virtual std::unique_ptr<VolumetricMap> clone() const;
+
+  virtual void updateFrom(const VolumetricMap& other);
 
  public:
   const Config config;

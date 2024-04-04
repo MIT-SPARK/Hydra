@@ -96,13 +96,13 @@ void HydraPythonPipeline::init(const PythonConfig& config) {
     modules_["lcd"] = loop_closure_;
   }
 
-  showModuleInfo();
+  showModules();
   VLOG(config_verbosity_) << HydraConfig::instance();
 }
 
 void HydraPythonPipeline::start() {
   if (step_mode_only_) {
-    showModuleInfo();
+    showModules();
   } else {
     HydraPipeline::start();
   }

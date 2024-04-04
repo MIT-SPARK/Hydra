@@ -64,11 +64,11 @@ class FrontendModule : public Module {
  public:
   using Ptr = std::shared_ptr<FrontendModule>;
   using FrontendInputQueue = InputQueue<ReconstructionOutput::Ptr>;
-  using InputCallback = std::function<void(const ReconstructionOutput&)>;
-  using OutputCallback = std::function<void(
-      const DynamicSceneGraph& graph, const BackendInput& backend_input, uint64_t)>;
   using DynamicLayer = DynamicSceneGraphLayer;
   using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
+  using InputCallback = std::function<void(const ReconstructionOutput&)>;
+  using OutputCallback =
+      std::function<void(const DynamicSceneGraph&, const BackendInput&, uint64_t)>;
   using PlaceVizCallback = std::function<void(uint64_t,
                                               const voxblox::Layer<places::GvdVoxel>&,
                                               const places::GraphExtractorInterface*)>;

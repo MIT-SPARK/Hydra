@@ -532,10 +532,10 @@ std::optional<FiltrationInfo> getBestPlateau(const Filtration& values,
                         values[start_end_pair.first].distance);
   }
 
-  if (VLOG_IS_ON(30)) {
-    VLOG(30) << "Sequences:";
+  if (VLOG_IS_ON(20)) {
+    VLOG(20) << "Sequences:";
     for (size_t i = 0; i < sequences.size(); ++i) {
-      VLOG(30) << "  - " << i << ": " << seq_values.at(i) << " -> ["
+      VLOG(20) << "  - " << i << ": " << seq_values.at(i) << " -> ["
                << sequences[i].first << ", " << sequences[i].second
                << "], lifetime=" << lifetimes[i];
     }
@@ -549,16 +549,16 @@ std::optional<FiltrationInfo> getBestPlateau(const Filtration& values,
 
   size_t best_sequence = 0;
   size_t best_components = 0;
-  VLOG(30) << "Best components:";
+  VLOG(20) << "Best components:";
   for (size_t i = 0; i < lifetimes.size(); ++i) {
     if (lifetimes[i] < threshold) {
-      VLOG(30) << "  - " << i << ": below threshold (" << lifetimes[i] << " < "
+      VLOG(20) << "  - " << i << ": below threshold (" << lifetimes[i] << " < "
                << threshold << ")";
       continue;
     }
 
     const auto curr_components = values[sequences[i].first].num_components;
-    VLOG(30) << "  - " << i << ": components=" << curr_components
+    VLOG(20) << "  - " << i << ": components=" << curr_components
              << " (best=" << best_components << ")";
     // TODO(nathan) might want >= instead
     if (curr_components > best_components) {

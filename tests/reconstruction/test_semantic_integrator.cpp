@@ -36,14 +36,9 @@
 #include <hydra/common/hydra_config.h>
 #include <hydra/reconstruction/semantic_integrator.h>
 
-namespace hydra {
+#include "hydra_test/config_guard.h"
 
-// TODO(nathan) move to fixture
-namespace {
-struct ConfigGuard {
-  ~ConfigGuard() { HydraConfig::instance().reset(); }
-};
-}  // namespace
+namespace hydra {
 
 std::unique_ptr<SemanticIntegrator> createIntegrator(
     size_t num_labels,
@@ -62,7 +57,7 @@ std::unique_ptr<SemanticIntegrator> createIntegrator(
 }
 
 TEST(SemanticIntegrator, MLEValidLabelCorrect) {
-  ConfigGuard guard;
+  test::ConfigGuard guard(false);
   const auto integrator = createIntegrator(5, {1}, {4});
   EXPECT_FALSE(integrator->isValidLabel(1));
   EXPECT_FALSE(integrator->isValidLabel(4));
@@ -72,7 +67,7 @@ TEST(SemanticIntegrator, MLEValidLabelCorrect) {
 }
 
 TEST(SemanticIntegrator, MLEIntegrationCorrect) {
-  ConfigGuard guard;
+  test::ConfigGuard guard(false);
   const auto integrator = createIntegrator(5, {}, {}, 0.8);
   SemanticVoxel voxel;
   EXPECT_TRUE(voxel.empty);

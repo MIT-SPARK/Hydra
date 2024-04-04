@@ -117,11 +117,11 @@ TEST_F(EsdfTestFixture, DISABLED_TestEsdfSame) {
 
   LayerComparisonResult voxblox_results =
       compareLayers(original_layer, simulation_esdf, &test::esdfVoxelsSame);
-  VLOG(3) << "Voxblox " << voxblox_results;
+  VLOG(2) << "Voxblox " << voxblox_results;
 
   LayerComparisonResult gvd_results =
       compareLayers(*gvd_layer, simulation_esdf, &test::gvdEsdfVoxelsSame);
-  VLOG(3) << "GVD " << gvd_results;
+  VLOG(2) << "GVD " << gvd_results;
 
   EXPECT_LT(gvd_results.rmse, voxblox_results.rmse);
 }

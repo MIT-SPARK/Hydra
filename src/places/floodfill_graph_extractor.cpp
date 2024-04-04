@@ -356,7 +356,7 @@ void FloodfillGraphExtractor::findNewVertices(const GvdLayer& layer) {
     // TODO(nathan) slightly duplicated with neighbor flag extraction
     const GvdVoxel* voxel = layer.getVoxelPtrByGlobalIndex(index);
     if (voxel == nullptr) {
-      VLOG(1) << "[Graph Extraction] Invalid index: " << index.transpose()
+      VLOG(2) << "[Graph Extraction] Invalid index: " << index.transpose()
               << " found in modified queue";
       continue;
     }

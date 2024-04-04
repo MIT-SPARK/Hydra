@@ -179,7 +179,7 @@ void MergeHandler::updateMerges(const std::map<NodeId, NodeId>& new_merges,
     return;
   }
 
-  VLOG(1) << "[Hydra Backend] processing " << new_merges.size()
+  VLOG(2) << "[Hydra Backend] processing " << new_merges.size()
           << " proposed node merges";
 
   for (auto miter = new_merges.rbegin(); miter != new_merges.rend(); ++miter) {
@@ -192,7 +192,7 @@ void MergeHandler::updateMerges(const std::map<NodeId, NodeId>& new_merges,
     if (parent != merged_nodes_.end()) {
       if (parent->second == from) {
         // opposed merge: both to -> from and from -> to were in new_merges
-        VLOG(4) << "[Hydra Backend] Dropping proposed merge "
+        VLOG(5) << "[Hydra Backend] Dropping proposed merge "
                 << NodeSymbol(from).getLabel() << " -> " << NodeSymbol(to).getLabel();
         continue;
       }
@@ -214,7 +214,7 @@ void MergeHandler::updateMerges(const std::map<NodeId, NodeId>& new_merges,
       addNodeToCache(result_node, parent_nodes_cache_, true);
     }
 
-    VLOG(3) << "[Hydra Backend] Merging " << NodeSymbol(from).getLabel() << " -> "
+    VLOG(2) << "[Hydra Backend] Merging " << NodeSymbol(from).getLabel() << " -> "
             << NodeSymbol(to).getLabel();
     const auto hooks = getLayerHooks(result_node.layer);
     if (hooks.merge) {
@@ -317,7 +317,7 @@ void MergeHandler::undoMerge(DynamicSceneGraph& graph,
                              const UpdateInfo& info,
                              NodeId from_node,
                              NodeId to_node) {
-  VLOG(1) << "[Hydra Backend] undoing merge: " << NodeSymbol(from_node).getLabel()
+  VLOG(2) << "[Hydra Backend] undoing merge: " << NodeSymbol(from_node).getLabel()
           << " -> " << NodeSymbol(to_node).getLabel();
   // easier to remove than doing book-keeping on the to_node edges
   graph.removeNode(to_node);

@@ -71,6 +71,8 @@ class SemanticMeshLayer {
 
   void merge(SemanticMeshLayer::Ptr& other) const;
 
+  void merge(SemanticMeshLayer& other) const;
+
   SemanticMeshLayer::Ptr getActiveMesh(
       const voxblox::BlockIndexList& archived_blocks) const;
 

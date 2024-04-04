@@ -78,6 +78,29 @@ GvdIntegrator::GvdIntegrator(const GvdIntegratorConfig& config,
   open_.setNumBuckets(num_buckets, config_.max_distance_m);
 }
 
+void GvdIntegrator::updateFromMap(uint64_t timestamp_ns,
+                                  const VolumetricMap& map,
+                                  bool use_all_blocks) {
+  const auto& tsdf = map.getTsdfLayer();
+  BlockIndexList blocks;
+  if (use_all_blocks) {
+    tsdf.getAllAllocatedBlocks(&blocks);
+  } else {
+    tsdf.getAllUpdatedBlocks(voxblox::Update::kEsdf, &blocks);
+  }
+
+  VLOG(2) << "[GVD update] Propagating TSDF using " << blocks.size() << " TSDF blocks";
+  ScopedTimer timer("places/propagate_tsdf", timestamp_ns);
+  update_stats_.clear();
+
+  const auto& mesh = map.getMeshLayer();
+  const auto& occupied = *CHECK_NOTNULL(map.getOccupancyLayer());
+  for (const BlockIndex& idx : blocks) {
+    propagateSurface(idx, mesh, occupied);
+    processTsdfBlock(tsdf.getBlockByIndex(idx), idx);
+  }
+}
+
 void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
                                    Layer<TsdfVoxel>& tsdf,
                                    const Layer<VertexVoxel>& vertices,
@@ -91,7 +114,7 @@ void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
     tsdf.getAllUpdatedBlocks(voxblox::Update::kEsdf, &blocks);
   }
 
-  VLOG(1) << "[GVD update] Propagating TSDF using " << blocks.size() << " TSDF blocks";
+  VLOG(2) << "[GVD update] Propagating TSDF using " << blocks.size() << " TSDF blocks";
   ScopedTimer timer("places/propagate_tsdf", timestamp_ns);
   update_stats_.clear();
 
@@ -113,7 +136,7 @@ void GvdIntegrator::updateGvd(uint64_t timestamp_ns) {
   // TODO(nathan) this depends on marching cubes being called beforehand...
   ScopedTimer timer("places/overall_update", timestamp_ns);
 
-  VLOG(3) << "[GVD update] Processing open queue";
+  VLOG(2) << "[GVD update] Processing open queue";
   {  // timing scope
     ScopedTimer timer("places/open_queue", timestamp_ns);
     processOpenQueue();
@@ -122,7 +145,7 @@ void GvdIntegrator::updateGvd(uint64_t timestamp_ns) {
   parent_tracker_.updateVertexMapping(*gvd_layer_);
 
   if (graph_extractor_) {
-    VLOG(3) << "[GVD update] Starting graph extraction";
+    VLOG(2) << "[GVD update] Starting graph extraction";
     ScopedTimer timer("places/graph_extractor", timestamp_ns);
     graph_extractor_->extract(*gvd_layer_, timestamp_ns);
     graph_extractor_->assignMeshVertices(
@@ -285,15 +308,18 @@ void GvdIntegrator::propagateSurface(const BlockIndex& block_index,
       continue;
     }
 
-    resetParent(gvd_voxel);  // surface voxels don't have parents
-
     const auto vertex_idx = vertex_voxel.block_vertex_index;
     BlockIndex mesh_block_index = Eigen::Map<const BlockIndex>(vertex_voxel.mesh_block);
     const auto mesh_block = mesh.getMeshBlock(mesh_block_index);
     const auto semantics_block = mesh.getSemanticBlock(mesh_block_index);
+    if (!mesh_block) {
+      LOG_FIRST_N(ERROR, 5) << "bad mesh index: " << showIndex(mesh_block_index)
+                            << " (block: " << showIndex(block_index) << ")";
+      continue;
+    }
 
-    CHECK(mesh_block) << "bad mesh index: " << showIndex(mesh_block_index)
-                      << " (block: " << showIndex(block_index) << ")";
+    resetParent(gvd_voxel);  // surface voxels don't have parents
+
     CHECK_LT(vertex_idx, mesh_block->vertices.size())
         << "gvd block: " << block_index.transpose()
         << " mesh index: " << mesh_block_index.transpose();

@@ -120,7 +120,7 @@ bool PythonSensorInput::fillFrameData(FrameData& msg) const {
   }
 
   msg.timestamp_ns = timestamp_ns;
-  msg.points = points;
+  msg.vertex_map = points;
   msg.points_in_world_frame = false;
   msg.color_image = color;
   msg.depth_image = depth;

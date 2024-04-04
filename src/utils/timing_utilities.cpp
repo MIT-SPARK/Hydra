@@ -233,7 +233,7 @@ void ElapsedTimeRecorder::logElapsed(const std::string& name,
     stamps = stamps_.at(name);
   }  // end critical section
 
-  VLOG(1) << "Writing " << durations.size() << " measurements for timer '" << name
+  VLOG(2) << "Writing " << durations.size() << " measurements for timer '" << name
           << "' to '" << output_csv << "'";
 
   std::stringstream ss;
@@ -244,7 +244,7 @@ void ElapsedTimeRecorder::logElapsed(const std::string& name,
     std::chrono::duration<double> elapsed_s = *d_it;
     ss << *s_it << "," << elapsed_s.count() << "\n";
   }
-  
+
   output_file << ss.str();
   output_file.close();
   VLOG(5) << "Saved timer '" << name << "'";

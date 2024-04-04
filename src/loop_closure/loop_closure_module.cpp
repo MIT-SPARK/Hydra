@@ -57,18 +57,18 @@ LoopClosureModule::~LoopClosureModule() { stop(); }
 
 void LoopClosureModule::start() {
   spin_thread_.reset(new std::thread(&LoopClosureModule::spin, this));
-  LOG(INFO) << "[DSG LCD] LCD started!";
+  LOG(INFO) << "[Hydra LCD] LCD started!";
 }
 
 void LoopClosureModule::stop() {
-  VLOG(2) << "[DSG LCD] stopping lcd!";
+  VLOG(2) << "[Hydra LCD] stopping lcd!";
 
   should_shutdown_ = true;
   if (spin_thread_) {
-    VLOG(2) << "[DSG LCD] joining thread";
+    VLOG(2) << "[Hydra LCD] joining thread";
     spin_thread_->join();
     spin_thread_.reset();
-    VLOG(2) << "[DSG LCD] joined thread";
+    VLOG(2) << "[Hydra LCD] joined thread";
   }
 }
 

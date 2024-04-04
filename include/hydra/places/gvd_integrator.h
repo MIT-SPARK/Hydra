@@ -44,6 +44,7 @@
 #include "hydra/places/voxblox_types.h"
 #include "hydra/reconstruction/semantic_mesh_layer.h"
 #include "hydra/reconstruction/vertex_voxel.h"
+#include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
 namespace places {
@@ -65,6 +66,10 @@ class GvdIntegrator {
                 const GraphExtractorInterface::Ptr& graph_extractor);
 
   virtual ~GvdIntegrator() = default;
+
+  void updateFromMap(uint64_t timestamp_ns,
+                     const VolumetricMap& map,
+                     bool use_all_blocks = false);
 
   void updateFromTsdf(uint64_t timestamp_ns,
                       Layer<TsdfVoxel>& tsdf,

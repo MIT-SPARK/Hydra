@@ -229,7 +229,7 @@ MergeMap UpdateObjectsFunctor::call(SharedDsgInfo& dsg, const UpdateInfo& info) 
     }
   }
 
-  VLOG(5) << "[Hydra Backend] Object update: " << archived << " archived and " << active
+  VLOG(2) << "[Hydra Backend] Object update: " << archived << " archived and " << active
           << " active";
   return nodes_to_merge;
 }
@@ -373,7 +373,7 @@ void UpdatePlacesFunctor::filterMissing(DynamicSceneGraph& graph,
     return;
   }
 
-  VLOG(6) << "[Places Layer]: could not update "
+  VLOG(5) << "[Places Layer]: could not update "
           << displayNodeSymbolContainer(missing_nodes);
 
   for (const auto& node_id : missing_nodes) {
@@ -442,7 +442,7 @@ std::map<NodeId, NodeId> UpdatePlacesFunctor::call(SharedDsgInfo& dsg,
     }
   }
 
-  VLOG(5) << "[Hydra Backend] Places update: " << archived << " archived and "
+  VLOG(2) << "[Hydra Backend] Places update: " << archived << " archived and "
           << num_active << " active";
   filterMissing(graph, missing_nodes);
   return nodes_to_merge;
