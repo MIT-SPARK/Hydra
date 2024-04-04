@@ -166,7 +166,7 @@ class Sensor {
    * For lidar, this would compute a range image from the pointcloud
    *
    * @param input Input struct to fill
-   * @param force_world_frame Force world frame
+   * @param force_world_frame Always convert point cloud to be in the world frame, not the sensor frame
    * @return True if the sensor was able to provide all necessary information
    */
   virtual bool finalizeRepresentations(FrameData& input,
