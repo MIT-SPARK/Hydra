@@ -92,12 +92,22 @@ typename OutputSink<Args...>::Ptr OutputSink<Args...>::fromCallback(
   return std::make_shared<FunctionSink<Args...>>(callback);
 }
 
+template <typename T, typename... Args>
+struct MethodSink : OutputSink<Args...> {
+  MethodSink(void (T::*callback)(Args...) const, const T* instance)
+      : callback(callback), instance(instance) {}
+
+  void call(Args... args) const override { (instance->*callback)(args...); }
+
+  void (T::*callback)(Args...) const;
+  const T* instance;
+};
+
 template <typename... Args>
 template <typename T>
 typename OutputSink<Args...>::Ptr OutputSink<Args...>::fromMethod(
     void (T::*callback)(Args...) const, const T* instance) {
-  return std::make_shared<FunctionSink<Args...>>(
-      [&](Args... args) { (instance->*callback)(args...); });
+  return std::make_shared<MethodSink<T, Args...>>(callback, instance);
 }
 
 }  // namespace hydra
