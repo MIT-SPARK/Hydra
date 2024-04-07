@@ -201,11 +201,15 @@ std::string ElapsedTimeRecorder::getPrintableStats() const {
   for (const auto& str_timer_pair : elapsed_) {
     const ElapsedStatistics& stats = getStats(str_timer_pair.first);
     std::stringstream ss;
-    ss << str_timer_pair.first << ": " << stats.mean_s << " +/- " << stats.min_s
-       << "s [" << stats.max_s << ", " << stats.stddev_s << "] ("
-       << stats.num_measurements << " calls).\n";
+    ss << str_timer_pair.first << ": " << stats.mean_s;
+    if (stats.num_measurements > 1) {
+      ss << " +/- " << stats.stddev_s;
+      ss << " [" << stats.min_s << ", " << stats.max_s << "]";
+    }
+    ss << " [s] over " << stats.num_measurements << " call(s).\n";
     result += ss.str();
   }
+
   return result;
 };
 
