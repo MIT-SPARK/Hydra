@@ -123,49 +123,37 @@ std::string showVector(const std::vector<T>& vec) {
   return ss.str();
 }
 
-std::string formatMean(std::optional<double> value) {
-  if (!value) {
-    return "n/a";
+std::string showMatrix(const Eigen::MatrixXd& mat) {
+  std::stringstream ss;
+  ss << "[";
+  for (Eigen::Index r = 0; r < mat.rows(); ++r) {
+    ss << "[";
+    for (Eigen::Index c = 0; c < mat.cols(); ++c) {
+      ss << mat(r, c);
+      if (c < mat.cols() - 1) {
+        ss << ", ";
+      }
+    }
+    ss << "]";
+    if (r < mat.rows() - 1) {
+      ss << ", ";
+    }
   }
-
-  return std::to_string(*value);
-}
-
-std::optional<double> computeMean(const std::vector<double>& vec) {
-  if (vec.empty()) {
-    return std::nullopt;
-  }
-
-  return std::accumulate(vec.begin(), vec.end(), 0.0) / vec.size();
+  ss << "]";
+  return ss.str();
 }
 
 std::ostream& operator<<(std::ostream& out, const RoomMetrics& results) {
-  const auto mean_precision = computeMean(results.precisions);
-  const auto mean_recall = computeMean(results.recalls);
-
-  out << "RoomMetrics:" << std::endl;
-  out << "  - mean precision: " << formatMean(mean_precision) << std::endl;
-  out << "  - total precision: " << results.total_precision << std::endl;
-  out << "  - mean recall: " << formatMean(mean_recall) << std::endl;
-  out << "  - total recall: " << results.total_recall << std::endl;
-  out << "  - precisions: " << showVector(results.precisions) << std::endl;
-  out << "  - recalls: " << showVector(results.recalls) << std::endl;
-  out << "  - gt_sizes: " << showVector(results.gt_sizes) << std::endl;
-  out << "  - est_sizes: " << showVector(results.est_sizes) << std::endl;
-  out << "  - overlaps: " << results.overlaps << std::endl;
+  out << "{";
+  out << "\n  \"total_precision\": " << results.total_precision;
+  out << ",\n  \"total_recall\": " << results.total_recall;
+  out << ",\n  \"precisions\": " << showVector(results.precisions);
+  out << ",\n  \"recalls\": " << showVector(results.recalls);
+  out << ",\n  \"gt_sizes\": " << showVector(results.gt_sizes);
+  out << ",\n  \"est_sizes\": " << showVector(results.est_sizes);
+  out << ",\n  \"overlaps\": " << showMatrix(results.overlaps);
+  out << "\n}";
   return out;
 }
-
-/*
-nlohmann::json json_results = {
-    {"precision", total_precision},
-    {"recall", total_recall},
-    {"mean_precision", mean_precision},
-    {"mean_recall", mean_recall},
-    {"precisions", precisions},
-    {"recalls", recalls},
-};
-std::cout << json_results << std::endl;
-*/
 
 }  // namespace hydra::eval
