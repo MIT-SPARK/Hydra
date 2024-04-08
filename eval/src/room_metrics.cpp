@@ -94,16 +94,21 @@ RoomMetrics scoreRooms(const RoomIndices& gt_rooms, const RoomIndices& est_rooms
 
   // precisions
   const auto max_est_overlaps = results.overlaps.colwise().maxCoeff();
-  CHECK_EQ(max_est_overlaps.rows(), static_cast<int>(results.est_sizes.size()));
+  CHECK_EQ(max_est_overlaps.cols(), static_cast<int>(results.est_sizes.size()));
 
   for (size_t i = 0; i < results.est_sizes.size(); ++i) {
     const auto curr_size = results.est_sizes.at(i);
-    results.recalls.push_back(curr_size ? max_est_overlaps(i) / curr_size : 0.0);
+    results.precisions.push_back(curr_size ? max_est_overlaps(i) / curr_size : 0.0);
   }
+
+  Eigen::IOFormat fmt(6, Eigen::DontAlignCols, ", ", "; ", "", "", "[", "]");
+  VLOG(10) << "GT: " << max_gt_overlaps.format(fmt);
+  VLOG(10) << "EST: " << max_est_overlaps.format(fmt);
 
   const auto total_est_size =
       std::accumulate(results.est_sizes.begin(), results.est_sizes.end(), 0);
-  results.total_recall = total_est_size ? max_est_overlaps.sum() / total_est_size : 0.0;
+  results.total_precision =
+      total_est_size ? max_est_overlaps.sum() / total_est_size : 0.0;
   return results;
 }
 
