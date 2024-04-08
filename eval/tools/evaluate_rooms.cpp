@@ -43,6 +43,7 @@
 DEFINE_string(tsdf_file, "", "tsdf file to read");
 DEFINE_string(bbox_file, "", "bounding box config file");
 DEFINE_string(dsg_file, "", "dsg file to read");
+DEFINE_bool(only_labeled, true, "only compute metrics for labeled voxels");
 
 using namespace spark_dsg;
 
@@ -73,7 +74,9 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  auto evaluator = hydra::eval::RoomEvaluator::fromFile(bbox_path, tsdf_path);
+  hydra::eval::RoomEvaluator::Config config;
+  config.only_labeled = FLAGS_only_labeled;
+  auto evaluator = hydra::eval::RoomEvaluator::fromFile(config, bbox_path, tsdf_path);
   if (!evaluator) {
     LOG(ERROR) << "Unable to construct room evaluator.";
     return 1;
