@@ -61,7 +61,7 @@ bool FrameData::hasData() const {
 
 bool FrameData::normalizeDepth() { return convertDepth(); }
 
-bool FrameData::normalizeData() {
+bool FrameData::normalizeData(bool normalize_labels) {
   if (!convertDepth()) {
     return false;
   }
@@ -71,7 +71,7 @@ bool FrameData::normalizeData() {
   }
 
   // must come after convertColor as it uses color image
-  if (!convertLabels()) {
+  if (normalize_labels && !convertLabels()) {
     return false;
   }
 

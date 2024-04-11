@@ -45,15 +45,14 @@ using voxblox::Layer;
 using voxblox::TsdfVoxel;
 using voxblox::VoxelIndex;
 
-RoomEvaluator::RoomEvaluator(const RoomGeometry& rooms,
-                             const Layer<TsdfVoxel>::Ptr& tsdf,
-                             float min_weight,
-                             float min_distance)
-    : rooms_(rooms), tsdf_(CHECK_NOTNULL(tsdf)) {
-  computeRoomIndices(min_weight, min_distance);
+RoomEvaluator::RoomEvaluator(const Config& config,
+                             const RoomGeometry& rooms,
+                             const Layer<TsdfVoxel>::Ptr& tsdf)
+    : config(config), rooms_(rooms), tsdf_(CHECK_NOTNULL(tsdf)) {
+  computeRoomIndices();
 }
 
-void RoomEvaluator::computeRoomIndices(float min_weight, float min_distance) {
+void RoomEvaluator::computeRoomIndices() {
   for (const auto& room_id : rooms_.getRoomIds()) {
     room_indices_[room_id] = {};
   }
@@ -65,7 +64,7 @@ void RoomEvaluator::computeRoomIndices(float min_weight, float min_distance) {
     const auto block = tsdf_->getBlockPtrByIndex(block_idx);
     for (size_t idx = 0; idx < block->num_voxels(); ++idx) {
       const auto& voxel = block->getVoxelByLinearIndex(idx);
-      if (voxel.weight < min_weight || voxel.distance < min_distance) {
+      if (voxel.weight < config.min_weight || voxel.distance < config.min_distance) {
         continue;
       }
 
@@ -99,7 +98,26 @@ void RoomEvaluator::computeDsgIndices(const DynamicSceneGraph& graph,
       voxblox::utils::getSphereAroundPoint(*tsdf_, pos, attrs.distance, &sphere);
 
       for (auto&& [block_idx, local_indices] : sphere) {
+        const auto block = tsdf_->getBlockPtrByIndex(block_idx);
+        if (!block) {
+          continue;
+        }
+
         for (const auto& voxel_idx : local_indices) {
+          const auto& voxel = block->getVoxelByVoxelIndex(voxel_idx);
+          if (voxel.weight < config.min_weight ||
+              voxel.distance < config.min_distance) {
+            continue;
+          }
+
+          if (config.only_labeled) {
+            const auto pos = block->computeCoordinatesFromVoxelIndex(voxel_idx);
+            const auto room_id = rooms_.findRoomIndex(pos);
+            if (!room_id) {
+              continue;
+            }
+          }
+
           indices[room].insert(lookupGlobalIndex(block_idx, voxel_idx));
         }
       }
@@ -119,7 +137,8 @@ RoomMetrics RoomEvaluator::eval(const std::string& graph_filepath) const {
   return scoreRooms(room_indices_, est_indices);
 }
 
-RoomEvaluator::Ptr RoomEvaluator::fromFile(const std::string& room_filepath,
+RoomEvaluator::Ptr RoomEvaluator::fromFile(const Config& config,
+                                           const std::string& room_filepath,
                                            const std::string& tsdf_filepath) {
   const auto rooms = RoomGeometry::fromFile(room_filepath);
 
@@ -129,7 +148,7 @@ RoomEvaluator::Ptr RoomEvaluator::fromFile(const std::string& room_filepath,
     return nullptr;
   }
 
-  return std::make_unique<RoomEvaluator>(rooms, tsdf);
+  return std::make_unique<RoomEvaluator>(config, rooms, tsdf);
 }
 
 std::array<int64_t, 3> RoomEvaluator::lookupGlobalIndex(const BlockIndex& block,

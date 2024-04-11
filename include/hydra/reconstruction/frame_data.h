@@ -67,7 +67,7 @@ struct FrameData {
   /**
    * @brief make sure that all the images are of the right type
    */
-  virtual bool normalizeData();
+  virtual bool normalizeData(bool normalize_labels = true);
 
   virtual bool normalizeDepth();
 
