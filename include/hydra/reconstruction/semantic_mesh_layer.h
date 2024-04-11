@@ -84,7 +84,6 @@ class SemanticMeshLayer {
 
   voxblox::MeshLayer::Ptr mesh_;
   std::shared_ptr<SemanticMeshMap> semantics_;
-  voxblox::IndexSet current_blocks_;
 };
 
 }  // namespace hydra
