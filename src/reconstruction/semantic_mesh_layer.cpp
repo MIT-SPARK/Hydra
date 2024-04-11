@@ -122,6 +122,8 @@ void SemanticMeshLayer::merge(SemanticMeshLayer::Ptr& other) const {
   if (!other) {
     other.reset(new SemanticMeshLayer(mesh_->block_size()));
   }
+
+  merge(*other);
 }
 
 void SemanticMeshLayer::merge(SemanticMeshLayer& other) const {
