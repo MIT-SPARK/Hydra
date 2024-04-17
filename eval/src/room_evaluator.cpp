@@ -87,6 +87,12 @@ void RoomEvaluator::computeDsgIndices(const DynamicSceneGraph& graph,
                                       RoomIndices& indices) const {
   const auto& rooms = graph.getLayer(DsgLayers::ROOMS);
   for (auto&& [room, room_node] : rooms.nodes()) {
+    if (room_node->children().size() < config.min_room_nodes) {
+      VLOG(5) << "skipping room of size: " << room_node->children().size() << " (vs. "
+              << config.min_room_nodes << ")";
+      continue;
+    }
+
     indices[room] = {};
 
     for (const auto& child : room_node->children()) {

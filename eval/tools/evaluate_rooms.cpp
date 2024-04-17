@@ -43,6 +43,7 @@
 DEFINE_string(tsdf_file, "", "tsdf file to read");
 DEFINE_string(bbox_file, "", "bounding box config file");
 DEFINE_string(dsg_file, "", "dsg file to read");
+DEFINE_int32(min_room_nodes, 0, "minimum number of room nodes for evaluation");
 DEFINE_bool(only_labeled, true, "only compute metrics for labeled voxels");
 
 using namespace spark_dsg;
@@ -76,6 +77,7 @@ int main(int argc, char* argv[]) {
 
   hydra::eval::RoomEvaluator::Config config;
   config.only_labeled = FLAGS_only_labeled;
+  config.min_room_nodes = FLAGS_min_room_nodes;
   auto evaluator = hydra::eval::RoomEvaluator::fromFile(config, bbox_path, tsdf_path);
   if (!evaluator) {
     LOG(ERROR) << "Unable to construct room evaluator.";

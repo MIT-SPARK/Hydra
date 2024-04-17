@@ -54,6 +54,7 @@ class RoomEvaluator {
     bool only_labeled = false;
     float min_weight = 1.0e-6f;
     float min_distance = 0.0f;
+    size_t min_room_nodes = 0;
   } const config;
 
   RoomEvaluator(const Config& config,
