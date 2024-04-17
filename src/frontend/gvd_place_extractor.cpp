@@ -91,6 +91,12 @@ GvdPlaceExtractor::GvdPlaceExtractor(const Config& c)
         << map_config.truncation_distance << ")";
     throw std::runtime_error("invalid integrator min distance");
   }
+
+  size_t sink_idx = 0;
+  for (const auto& sink : sinks_) {
+    VLOG(1) << "Sink " << sink_idx << ": " << (sink ? sink->printInfo() : "n/a");
+    ++sink_idx;
+  }
 }
 
 GvdPlaceExtractor::~GvdPlaceExtractor() {}
