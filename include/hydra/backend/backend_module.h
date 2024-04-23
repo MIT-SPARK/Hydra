@@ -160,6 +160,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
       bool new_loop_closure = false,
       const std::map<LayerId, std::map<NodeId, NodeId>>& given_merges = {});
 
+  virtual void updateObjectMapping(const kimera_pgmo::MeshDelta& delta);
+
   void runZmqUpdates();
 
   void updateMergedNodes(const std::map<NodeId, NodeId>& new_merges);
@@ -175,7 +177,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   void labelRooms(const UpdateInfo& info, SharedDsgInfo* dsg);
 
  protected:
-  const BackendConfig config_;
+  BackendConfig config_;
 
   std::unique_ptr<std::thread> spin_thread_;
   std::atomic<bool> should_shutdown_{false};

@@ -269,6 +269,7 @@ void UpdateObjectsFunctor::mergeAttributes(const DynamicSceneGraph& graph,
 
   auto mesh = graph.mesh();
   updateObject(mesh, to, to_attrs);
+  to_attrs.is_active = true;
 }
 
 UpdateFunctor::Hooks UpdatePlacesFunctor::hooks() const {

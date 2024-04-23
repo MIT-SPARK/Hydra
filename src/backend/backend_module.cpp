@@ -109,6 +109,13 @@ BackendModule::BackendModule(const BackendConfig& config,
 
   setupDefaultFunctors();
 
+  if (config_.merge_update_map.count(DsgLayers::OBJECTS)) {
+    if (config_.merge_update_map.at(DsgLayers::OBJECTS)) {
+      LOG(WARNING) << "Updating object attributes is currently not supported!";
+      config_.merge_update_map.at(DsgLayers::OBJECTS) = false;
+    }
+  }
+
   if (config_.use_zmq_interface) {
     zmq_receiver_.reset(
         new spark_dsg::ZmqReceiver(config_.zmq_recv_url, config_.zmq_num_threads));
@@ -575,7 +582,45 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
     }
   }
 
+  updateObjectMapping(*input.mesh_update);
+
   have_new_mesh_ = true;
+}
+
+void BackendModule::updateObjectMapping(const kimera_pgmo::MeshDelta& delta) {
+  const auto& objects = private_dsg_->graph->getLayer(DsgLayers::OBJECTS);
+  const auto archived_vertices = delta.getTotalArchivedVertices();
+
+  for (const auto& [node_id, node] : objects.nodes()) {
+    auto& attrs = node->attributes<ObjectNodeAttributes>();
+    if (!attrs.is_active) {
+      continue;
+    }
+
+    VLOG(10) << "Updating mesh connections for " << NodeSymbol(node_id);
+
+    bool still_active = false;
+    auto iter = attrs.mesh_connections.begin();
+    while (iter != attrs.mesh_connections.end()) {
+      if (delta.deleted_indices.count(*iter)) {
+        iter = attrs.mesh_connections.erase(iter);
+        continue;
+      }
+
+      auto map_iter = delta.prev_to_curr.find(*iter);
+      if (map_iter != delta.prev_to_curr.end()) {
+        *iter = map_iter->second;
+      }
+
+      if (*iter >= archived_vertices) {
+        still_active = true;
+      }
+
+      ++iter;
+    }
+
+    attrs.is_active = still_active;
+  }
 }
 
 bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
@@ -600,6 +645,7 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
         ++iter;
       }
     }
+
     merge_config.previous_merges = &prev_merges;
     merge_config.update_layer_attributes = &config_.merge_update_map;
     merge_config.update_dynamic_attributes = config_.merge_update_dynamic;
@@ -609,22 +655,7 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
     // connections and attributes
     merge_handler_->updateFromUnmergedGraph(*shared_dsg_->graph);
 
-    const auto& objects = shared_dsg_->graph->getLayer(DsgLayers::OBJECTS);
-    for (const auto& id_node_pair : objects.nodes()) {
-      const auto node_opt = private_dsg_->graph->getNode(id_node_pair.first);
-      if (!node_opt) {
-        continue;
-      }
-
-      // TODO(nathan) we might need to think about checking the is_active flag here,
-      // but no guarantee that mesh vertice aren't remapped under an inactive object
-      // node
-
-      const auto& attrs = id_node_pair.second->attributes<ObjectNodeAttributes>();
-      auto& private_attrs = node_opt->get().attributes<ObjectNodeAttributes>();
-      private_attrs.mesh_connections = attrs.mesh_connections;
-      private_attrs.is_active = attrs.is_active;
-    }
+    // TODO(nathan) handle updating object attributes from frontend
 
     if (shared_dsg_->graph->hasLayer(DsgLayers::PLACES)) {
       // TODO(nathan) simplify
