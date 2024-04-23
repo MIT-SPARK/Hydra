@@ -630,7 +630,7 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
                       // frontend
 
     std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
-    if (!force_update && shared_dsg_->last_update_time > timestamp_ns) {
+    if (!force_update && shared_dsg_->last_update_time != timestamp_ns) {
       return false;
     }
 

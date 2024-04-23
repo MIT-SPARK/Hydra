@@ -153,7 +153,12 @@ bool ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
 
 void ReconstructionModule::fillOutput(const ReconstructionInput& input,
                                       ReconstructionOutput& output) {
-  output.timestamp_ns = input.timestamp_ns;
+  size_t ts = input.timestamp_ns;
+  while (timestamp_cache_.count(ts)) {
+    ++ts;
+  }
+  timestamp_cache_.insert(ts);
+  output.timestamp_ns = ts;
   pose_graph_tracker_->fillPoseGraphs(output);
   if (agent_node_measurements_.nodes.size() > 0) {
     output.agent_node_measurements.reset(new pose_graph_tools::PoseGraph(
