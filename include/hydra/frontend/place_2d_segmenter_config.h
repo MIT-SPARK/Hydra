@@ -40,7 +40,7 @@
 namespace hydra {
 
 struct Place2dSegmenterConfig {
-  char prefix = 'P';
+  char prefix = 'Q';
   double cluster_tolerance = 1;
   size_t min_cluster_size = 600;
   size_t max_cluster_size = 100000;

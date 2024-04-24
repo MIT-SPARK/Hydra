@@ -1018,7 +1018,7 @@ NodeId cleanupPlaces2d(const Places2dConfig& config,
 
   // Get/copy info for places that need cleanup
   std::unique_lock<std::mutex> lock(dsg->mutex);
-  const SceneGraphLayer& places_layer = dsg->graph->getLayer(DsgLayers::PLACES);
+  const SceneGraphLayer& places_layer = dsg->graph->getLayer(DsgLayers::MESH_PLACES);
   getPlace2dAndNeighors(places_layer, place_2ds, node_neighbors);
   lock.unlock();
 

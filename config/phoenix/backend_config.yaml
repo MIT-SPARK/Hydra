@@ -10,7 +10,7 @@ dsg:
   places_merge_pos_threshold_m: 0.35
   places_merge_distance_tolerance_m: 0.25
   merge_update_dynamic: true
-  merge_update_map: {BUILDINGS: false, ROOMS: false, PLACES: true, OBJECTS: false}
+  merge_update_map: {BUILDINGS: false, ROOMS: false, PLACES: true, OBJECTS: false, MESH_PLACES: true}
 pgmo:
   run_mode: 0    # kimera_pgmo run mode FULL (required)
   use_msg_time: true

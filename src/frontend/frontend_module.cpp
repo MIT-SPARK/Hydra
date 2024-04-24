@@ -90,6 +90,7 @@ FrontendModule::FrontendModule(const FrontendConfig& config,
     frontend_graph_logger_.setOutputPath(frontend_dir);
     frontend_graph_logger_.setLayerName(DsgLayers::OBJECTS, "objects");
     frontend_graph_logger_.setLayerName(DsgLayers::PLACES, "places");
+    frontend_graph_logger_.setLayerName(DsgLayers::MESH_PLACES, "places 2d");
 
     pgmo_config.log_output = true;
     pgmo_config.log_path = logs->getLogDir("frontend/pgmo");
@@ -99,19 +100,18 @@ FrontendModule::FrontendModule(const FrontendConfig& config,
 
   CHECK(mesh_frontend_.initialize(pgmo_config));
   segmenter_.reset(new MeshSegmenter(config_.object_config));
-  if (!config_.enable_places) {
-    return;
+
+  if (config_.use_2d_places) {
+    place_2d_extractor_.reset(new Place2dSegmenter(config_.place_config,
+                                                   &dsg_->graph->mesh()->points,
+                                                   &dsg_->graph->mesh()->labels));
   }
 
-  if (!config_.use_2d_places) {
+  if (config_.enable_places) {
     place_extractor_.reset(new GvdPlaceExtractor(config_.graph_extractor,
                                                  config.gvd,
                                                  config.min_places_component_size,
                                                  config.filter_places));
-  } else {
-    place_extractor_.reset(new Place2dSegmenter(config_.place_config,
-                                                &dsg_->graph->mesh()->points,
-                                                &dsg_->graph->mesh()->labels));
   }
 }
 
@@ -131,16 +131,14 @@ void FrontendModule::initCallbacks() {
   post_mesh_callbacks_.push_back(
       std::bind(&FrontendModule::updateObjects, this, std::placeholders::_1));
 
-  if (!place_extractor_) {
-    return;
-  }
-
-  if (!config_.use_2d_places) {
+  if (place_extractor_) {
     input_callbacks_.push_back(
         std::bind(&FrontendModule::updatePlaces, this, std::placeholders::_1));
-  } else {
+  }
+
+  if (place_2d_extractor_) {
     post_mesh_callbacks_.push_back(
-        std::bind(&FrontendModule::updatePlaces, this, std::placeholders::_1));
+        std::bind(&FrontendModule::updatePlaces2d, this, std::placeholders::_1));
   }
 }
 
@@ -294,7 +292,7 @@ void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
 
 void FrontendModule::updateImpl(const ReconstructionOutput& msg) {
   launchCallbacks(input_callbacks_, msg);
-  if (place_extractor_ && !config_.use_2d_places) {
+  if (place_extractor_) {
     updatePlaceMeshMapping(msg);
   }
 }
@@ -370,13 +368,6 @@ void FrontendModule::updatePlaces(const ReconstructionOutput& input) {
     return;
   }
 
-  if (config_.use_2d_places) {
-    if (!last_mesh_update_) {
-      LOG(ERROR) << "Cannot detect places without valid mesh";
-      return;
-    }
-  }
-
   NodeIdSet active_nodes;
   place_extractor_->detect(input, *last_mesh_update_, *dsg_->graph);
   {  // start graph critical section
@@ -393,6 +384,32 @@ void FrontendModule::updatePlaces(const ReconstructionOutput& input) {
 
   archivePlaces(active_nodes);
   previous_active_places_ = active_nodes;
+}
+
+void FrontendModule::updatePlaces2d(const ReconstructionOutput& input) {
+  if (!place_2d_extractor_) {
+    return;
+  }
+
+  if (!last_mesh_update_) {
+    LOG(ERROR) << "Cannot detect places without valid mesh";
+    return;
+  }
+
+  NodeIdSet active_nodes;
+  place_2d_extractor_->detect(input, *last_mesh_update_, *dsg_->graph);
+  {  // start graph critical section
+    std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
+    place_2d_extractor_->updateGraph(input.timestamp_ns, input, *dsg_->graph);
+
+    active_nodes = place_2d_extractor_->getActiveNodes();
+    const auto& places = dsg_->graph->getLayer(DsgLayers::MESH_PLACES);
+    places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
+    state_->latest_places = active_nodes;
+  }  // end graph update critical section
+
+  archivePlaces2d(active_nodes);
+  previous_active_places_2d_ = active_nodes;
 }
 
 void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
@@ -544,6 +561,28 @@ void FrontendModule::archivePlaces(const NodeIdSet active_places) {
       lcd_input_->archived_places.insert(prev);
     }
 
+  }  // end graph update critical section
+}
+
+void FrontendModule::archivePlaces2d(const NodeIdSet active_places) {
+  {  // start graph update critical section
+    std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
+
+    // find node ids that are valid, but outside active place window
+    for (const auto& prev : previous_active_places_2d_) {
+      if (active_places.count(prev)) {
+        continue;
+      }
+
+      const auto has_prev_node = dsg_->graph->getNode(prev);
+      if (!has_prev_node) {
+        continue;
+      }
+
+      const SceneGraphNode& prev_node = has_prev_node.value();
+      prev_node.attributes().is_active = false;
+      // lcd_input_->archived_places.insert(prev); // TODO: Do we want this??
+    }
   }  // end graph update critical section
 }
 

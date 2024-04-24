@@ -54,7 +54,7 @@ graph_extractor:
     max_length_m: 2.0
     min_clearance_m: 0.5
 
-use_2d_places: false
+use_2d_places: true
 places2d:
   prefix: P
 

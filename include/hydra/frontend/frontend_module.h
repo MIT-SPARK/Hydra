@@ -124,6 +124,8 @@ class FrontendModule : public Module {
 
   void updatePlaces(const ReconstructionOutput& msg);
 
+  void updatePlaces2d(const ReconstructionOutput& msg);
+
   void updateDeformationGraph(const ReconstructionOutput& msg);
 
   void updatePoseGraph(const ReconstructionOutput& msg);
@@ -134,6 +136,8 @@ class FrontendModule : public Module {
   void invalidateMeshEdges(const kimera_pgmo::MeshDelta& delta);
 
   void archivePlaces(const NodeIdSet active_places);
+
+  void archivePlaces2d(const NodeIdSet active_places);
 
   void addPlaceObjectEdges(uint64_t timestamp_ns);
 
@@ -163,12 +167,14 @@ class FrontendModule : public Module {
 
   std::unique_ptr<MeshSegmenter> segmenter_;
   std::unique_ptr<PlaceExtractorInterface> place_extractor_;
+  std::unique_ptr<PlaceExtractorInterface> place_2d_extractor_;
   SceneGraphLogger frontend_graph_logger_;
   LogSetup::Ptr logs_;
 
   std::unique_ptr<NearestNodeFinder> places_nn_finder_;
   NodeIdSet unlabeled_place_nodes_;
   NodeIdSet previous_active_places_;
+  NodeIdSet previous_active_places_2d_;
   std::map<NodeId, size_t> agent_key_map_;
   std::map<LayerPrefix, size_t> last_agent_edge_index_;
   std::map<LayerPrefix, std::set<size_t>> active_agent_nodes_;

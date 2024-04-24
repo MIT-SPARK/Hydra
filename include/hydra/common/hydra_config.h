@@ -68,6 +68,7 @@ struct PipelineConfig {
   LayerId mesh_layer_id = 1;
   std::map<LayerId, char> layer_id_map{{DsgLayers::OBJECTS, 'o'},
                                        {DsgLayers::PLACES, 'p'},
+                                       {DsgLayers::MESH_PLACES, 'q'},
                                        {DsgLayers::ROOMS, 'r'},
                                        {DsgLayers::BUILDINGS, 'b'}};
   LogConfig logs;

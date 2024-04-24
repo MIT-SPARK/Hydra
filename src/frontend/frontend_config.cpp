@@ -70,11 +70,10 @@ void declare_config(FrontendConfig& conf) {
   field(conf.use_2d_places, "use_2d_places");
   if (conf.use_2d_places) {
     field(conf.place_config, "places2d");
-  } else {
-    field(conf.gvd, "gvd");
-    conf.graph_extractor.setOptional();
-    field(conf.graph_extractor, "graph_extractor");
   }
+  field(conf.gvd, "gvd");
+  conf.graph_extractor.setOptional();
+  field(conf.graph_extractor, "graph_extractor");
 }
 
 }  // namespace hydra

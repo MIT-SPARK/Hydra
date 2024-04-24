@@ -40,6 +40,7 @@
 #include <glog/logging.h>
 #include <kimera_pgmo/utils/MeshIO.h>
 #include <spark_dsg/pgmo_mesh_traits.h>
+#include <spark_dsg/scene_graph_types.h>
 #include <spark_dsg/zmq_interface.h>
 #include <voxblox/core/block_hash.h>
 
@@ -572,15 +573,7 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
   // we use this to make sure that deformation only happens for vertices that are
   // still active
   num_archived_vertices_ = input.mesh_update->getTotalArchivedVertices();
-  if (config_.use_2d_places) {
-    try {
-      updatePlaces2d(private_dsg_, *input.mesh_update, num_archived_vertices_);
-    } catch (const std::bad_cast&) {
-      LOG_EVERY_N(ERROR, 50)
-          << "Tried to cast 3D places to 2D places. If you set use_2d_places in the "
-             "frontend config, you must also set it in the backend config.";
-    }
-  }
+  updatePlaces2d(private_dsg_, *input.mesh_update, num_archived_vertices_);
 
   updateObjectMapping(*input.mesh_update);
 
@@ -639,7 +632,7 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
     auto iter = prev_merges.begin();
     while (iter != prev_merges.end()) {
       NodeSymbol id(iter->first);
-      if (id.category() == 'P' || id.category() == 'S') {
+      if (id.category() == 'S' || id.category() == 'Q') {
         iter = prev_merges.erase(iter);
       } else {
         ++iter;
