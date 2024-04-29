@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  * Copyright 2022 Massachusetts Institute of Technology.
- * All Rights Reserved
+ * all rights reserved
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -56,8 +56,7 @@ std::unique_ptr<Camera> createCamera(double vfov,
   config.cy = config.height / 2.0f;
   config.fx = config.width / (2.0 * std::tan(hfov * M_PI / 360.0));
   config.fy = config.height / (2.0 * std::tan(vfov * M_PI / 360.0));
-  ParamSensorExtrinsics::Config extrinsics;
-  config.extrinsics = config::VirtualConfig<SensorExtrinsics>(extrinsics, "param");
+  config.extrinsics = ParamSensorExtrinsics::Config();
   return std::make_unique<Camera>(config);
 }
 

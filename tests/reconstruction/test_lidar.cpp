@@ -58,8 +58,7 @@ std::unique_ptr<Lidar> createLidar(double vfov,
   } else {
     config.is_asymmetric = false;
   }
-  ParamSensorExtrinsics::Config extrinsics;
-  config.extrinsics = config::VirtualConfig<SensorExtrinsics>(extrinsics, "param");
+  config.extrinsics = ParamSensorExtrinsics::Config();
   return std::make_unique<Lidar>(config);
 }
 
