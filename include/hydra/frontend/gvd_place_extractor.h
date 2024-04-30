@@ -40,6 +40,7 @@
 #include "hydra/common/common.h"
 #include "hydra/frontend/freespace_places_interface.h"
 #include "hydra/places/gvd_integrator_config.h"
+#include "hydra/places/graph_extractor_config.h"
 #include "hydra/places/gvd_voxel.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/utils/log_utilities.h"
@@ -61,6 +62,12 @@ class GvdPlaceExtractor : public FreespacePlacesInterface {
     config::VirtualConfig<places::GraphExtractorInterface> graph;
     size_t min_component_size = 3;
     bool filter_places = true;
+    bool filter_ground = false;
+    double robot_height = 0.0;
+    double node_tolerance = 1.0;
+    double edge_tolerance = 1.0;
+    bool add_freespace_edges = false;
+    places::FreespaceEdgeConfig freespace_config;
   };
 
   explicit GvdPlaceExtractor(const Config& config);
@@ -79,6 +86,10 @@ class GvdPlaceExtractor : public FreespacePlacesInterface {
 
   void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) override;
 
+  void filterIsolated(DynamicSceneGraph& graph, NodeIdSet& active_neighborhood);
+
+  void filterGround(DynamicSceneGraph& graph);
+
   const Config config;
 
  protected:
@@ -87,6 +98,7 @@ class GvdPlaceExtractor : public FreespacePlacesInterface {
   std::shared_ptr<places::GraphExtractorInterface> graph_extractor_;
   std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
   NodeIdSet active_nodes_;
+  Eigen::Vector3d latest_pos_;
 
  private:
   inline static const auto registration_ =
