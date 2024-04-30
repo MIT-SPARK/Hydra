@@ -264,7 +264,7 @@ size_t HydraConfig::getTotalLabels() const {
 
 SharedDsgInfo::Ptr HydraConfig::createSharedDsg() const {
   checkFrozen();
-  return std::make_shared<SharedDsgInfo>(config_.layer_id_map, config_.mesh_layer_id);
+  return std::make_shared<SharedDsgInfo>(config_.layer_id_map);
 }
 
 ColorMapPtr HydraConfig::getSemanticColorMap() const { return label_colormap_; }

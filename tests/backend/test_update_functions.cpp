@@ -41,12 +41,11 @@ namespace hydra {
 namespace {
 
 inline SharedDsgInfo::Ptr makeSharedDsg() {
-  const LayerId mesh_layer_id = 1;
   const std::map<LayerId, char> layer_id_map{{DsgLayers::OBJECTS, 'o'},
                                              {DsgLayers::PLACES, 'p'},
                                              {DsgLayers::ROOMS, 'r'},
                                              {DsgLayers::BUILDINGS, 'b'}};
-  return SharedDsgInfo::Ptr(new SharedDsgInfo(layer_id_map, mesh_layer_id));
+  return SharedDsgInfo::Ptr(new SharedDsgInfo(layer_id_map));
 }
 
 }  // namespace

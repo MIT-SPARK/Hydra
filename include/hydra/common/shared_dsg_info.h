@@ -45,7 +45,7 @@ namespace hydra {
 struct SharedDsgInfo {
   using Ptr = std::shared_ptr<SharedDsgInfo>;
 
-  SharedDsgInfo(const std::map<LayerId, char>& layer_id_map, LayerId mesh_layer_id);
+  explicit SharedDsgInfo(const std::map<LayerId, char>& layer_id_map);
 
   // mutexes are considered ordered (for avoiding deadlock):
   // 1. SharedDsgInfo::mutex (lcd)
