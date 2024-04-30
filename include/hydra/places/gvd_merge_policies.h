@@ -32,33 +32,33 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/frontend/place_2d_segmenter_config.h"
+#pragma once
+#include <config_utilities/factory.h>
 
-#include <config_utilities/config.h>
-#include <config_utilities/types/conversions.h>
-#include <config_utilities/types/enum.h>
+#include "hydra/places/gvd_graph.h"
 
-namespace hydra {
+namespace hydra::places {
 
-void declare_config(Place2dSegmenterConfig& config) {
-  using namespace config;
-  name("Place2dSegmenterConfig");
-  field<CharConversion>(config.prefix, "prefix");
-  field(config.cluster_tolerance, "cluster_tolerance");
-  field(config.min_cluster_size, "min_cluster_size");
-  field(config.max_cluster_size, "max_cluster_size");
-  field(config.pure_final_place_size, "pure_final_place_size");
-  field(config.min_final_place_points, "min_final_place_points");
-  field(config.place_overlap_threshold, "place_overlap_threshold");
-  field(config.place_max_neighbor_z_diff, "place_max_neighbor_z_diff");
-  field(config.connection_ellipse_scale_factor, "connection_ellipse_scale_factor");
-  enum_field(config.bounding_box_type,
-             "bounding_box_type",
-             {{spark_dsg::BoundingBox::Type::INVALID, "INVALID"},
-              {spark_dsg::BoundingBox::Type::AABB, "AABB"},
-              {spark_dsg::BoundingBox::Type::OBB, "OBB"},
-              {spark_dsg::BoundingBox::Type::RAABB, "RAABB"}});
-  field(config.labels, "labels");
-}
+struct MergePolicy {
+  /**
+   * \brief compare two gvd nodes to see which is more representativie
+   * \return Returns -1 if right is better, 0 if tie, 1 if left is better
+   */
+  virtual int compare(const GvdMemberInfo& lhs, const GvdMemberInfo& rhs) const = 0;
+};
 
-}  // namespace hydra
+struct BasisPointMergePolicy : MergePolicy {
+  int compare(const GvdMemberInfo& lhs, const GvdMemberInfo& rhs) const override;
+
+  inline static const auto registration_ =
+      config::Registration<MergePolicy, BasisPointMergePolicy>("basis_points");
+};
+
+struct DistanceMergePolicy : MergePolicy {
+  int compare(const GvdMemberInfo& lhs, const GvdMemberInfo& rhs) const override;
+
+  inline static const auto registration_ =
+      config::Registration<MergePolicy, DistanceMergePolicy>("distance");
+};
+
+}  // namespace hydra::places

@@ -32,33 +32,37 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/reconstruction/reconstruction_config.h"
+#pragma once
 
-#include <config_utilities/config.h>
-#include <config_utilities/types/conversions.h>
-#include <config_utilities/types/eigen_matrix.h>
+#include "hydra/common/common.h"
+#include "hydra/common/dsg_types.h"
+#include "hydra/places/gvd_voxel.h"
+#include "hydra/reconstruction/reconstruction_output.h"
+#include "hydra/utils/log_utilities.h"
 
-#include "hydra/common/config_utilities.h"
+namespace kimera_pgmo {
+class MeshDelta;
+}
 
 namespace hydra {
 
-void declare_config(ReconstructionConfig& conf) {
-  using namespace config;
-  name("ReconstructionConfig");
-  field(conf.show_stats, "show_stats");
-  field(conf.stats_verbosity, "stats_verbosity");
-  field(conf.clear_distant_blocks, "clear_distant_blocks");
-  field(conf.dense_representation_radius_m, "dense_representation_radius_m");
-  field(conf.num_poses_per_update, "num_poses_per_update");
-  field(conf.max_input_queue_size, "max_input_queue_size");
-  field(conf.copy_dense_representations, "copy_dense_representations");
-  field(conf.semantic_measurement_probability, "semantic_measurement_probability");
-  field(conf.tsdf, "tsdf");
-  field(conf.mesh, "mesh");
-  field(conf.sensor, "sensor");
-  field(conf.pose_graphs, "pose_graphs");
-  conf.robot_footprint.setOptional();
-  field(conf.robot_footprint, "robot_footprint");
-}
+class SurfacePlacesInterface {
+ public:
+  SurfacePlacesInterface() {}
+
+  virtual ~SurfacePlacesInterface() = default;
+
+  virtual void save(const LogSetup& /* logs */) const {}
+
+  virtual void detect(const ReconstructionOutput& msg,
+                      const kimera_pgmo::MeshDelta& mesh_delta,
+                      const DynamicSceneGraph& graph) = 0;
+
+  virtual void updateGraph(uint64_t timestamp_ns,
+                           const ReconstructionOutput& msg,
+                           DynamicSceneGraph& graph) = 0;
+
+  virtual NodeIdSet getActiveNodes() const = 0;
+};
 
 }  // namespace hydra

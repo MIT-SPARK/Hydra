@@ -6,7 +6,7 @@ invalid_labels: [0, 1, 2, 3, 4, 5, 23, 45]
 frontend:
   objects:
     labels: [17, 19, 20, 26, 27, 28, 29, 30, 31, 32, 33, 36, 37, 38, 39, 40, 41]
-  places2d:
+  surface_places:
     labels: [6, 7, 8, 9, 10, 15, 21, 22]
 label_names:
   - {label: 0, name: unlabeled, name_descriptive: unknown}

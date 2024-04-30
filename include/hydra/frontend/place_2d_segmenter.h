@@ -33,20 +33,19 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/factory.h>
 #include <kimera_pgmo/MeshDelta.h>
 #include <pcl/common/centroid.h>
 
 #include <memory>
 
 #include "hydra/common/dsg_types.h"
-#include "hydra/frontend/place_2d_segmenter_config.h"
 #include "hydra/frontend/place_2d_split_logic.h"
-#include "hydra/frontend/place_extractor_interface.h"
-#include "opencv2/imgproc.hpp"
+#include "hydra/frontend/surface_places_interface.h"
 
 namespace hydra {
 
-class Place2dSegmenter : public PlaceExtractorInterface {
+class Place2dSegmenter : public SurfacePlacesInterface {
  public:
   using IndicesVector = pcl::IndicesPtr::element_type;
   using LabelIndices = std::map<uint32_t, pcl::IndicesPtr>;
@@ -57,9 +56,20 @@ class Place2dSegmenter : public PlaceExtractorInterface {
                                           const IndicesVector& indices,
                                           const LabelIndices& label_indices)>;
 
-  Place2dSegmenter(const Place2dSegmenterConfig& config,
-                   const Place2d::CloudT* active_vertices,
-                   const spark_dsg::Mesh::Labels* labels);
+  struct Config {
+    char prefix = 'Q';
+    double cluster_tolerance = 1;
+    size_t min_cluster_size = 600;
+    size_t max_cluster_size = 100000;
+    double pure_final_place_size = 3;
+    size_t min_final_place_points = 1000;
+    double place_overlap_threshold = 0.1;
+    double place_max_neighbor_z_diff = 0.5;
+    double connection_ellipse_scale_factor = 1;
+    std::set<uint32_t> labels;
+  } const config;
+
+  explicit Place2dSegmenter(const Config& config);
 
   void detect(const ReconstructionOutput& msg,
               const kimera_pgmo::MeshDelta& mesh_delta,
@@ -79,14 +89,17 @@ class Place2dSegmenter : public PlaceExtractorInterface {
   bool frontendAddPlaceConnection(const Place2dNodeAttributes& attrs1,
                                   const Place2dNodeAttributes& attrs2,
                                   EdgeAttributes& edge_weight);
-  Places findPlaces(const kimera_pgmo::MeshDelta& delta,
+
+  Places findPlaces(const Mesh::Positions& positions,
+                    const kimera_pgmo::MeshDelta& delta,
                     const pcl::IndicesPtr& indices,
-                    const double connection_ellipse_scale_factor) const;
+                    double connection_ellipse_scale_factor) const;
 
   std::set<NodeId> archiveOldObjects(const DynamicSceneGraph& graph,
                                      uint64_t latest_timestamp);
 
-  LabelIndices getLabelIndices(const IndicesVector& indices) const;
+  LabelIndices getLabelIndices(const Mesh::Labels& labels,
+                               const IndicesVector& indices) const;
 
   NodeSymbol addPlaceToGraph(DynamicSceneGraph& graph,
                              const Place2d& place,
@@ -98,11 +111,8 @@ class Place2dSegmenter : public PlaceExtractorInterface {
                           uint64_t timestamp);
 
  private:
-  const MeshVertexCloud* full_mesh_vertices_;
-  const spark_dsg::Mesh::Labels* full_mesh_labels_;
   LabelPlaces detected_label_places_;
 
-  Place2dSegmenterConfig config_;
   NodeSymbol next_node_id_;
 
   std::list<NodeId> nodes_to_remove_;
@@ -112,6 +122,12 @@ class Place2dSegmenter : public PlaceExtractorInterface {
   std::map<uint32_t, std::set<NodeId>> semiactive_places_;
   std::map<NodeId, uint64_t> active_place_timestamps_;
   std::vector<CallbackFunc> callback_funcs_;
+
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<SurfacePlacesInterface, Place2dSegmenter, Config>(
+          "place_2d");
 };
+
+void declare_config(Place2dSegmenter::Config& config);
 
 }  // namespace hydra

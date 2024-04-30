@@ -47,7 +47,6 @@
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/frontend/frontend_config.h"
-#include "hydra/frontend/place_extractor_interface.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/utils/log_utilities.h"
 
@@ -166,8 +165,8 @@ class FrontendModule : public Module {
   std::shared_ptr<kimera_pgmo::VoxbloxIndexMapping> mesh_remapping_;
 
   std::unique_ptr<MeshSegmenter> segmenter_;
-  std::unique_ptr<PlaceExtractorInterface> place_extractor_;
-  std::unique_ptr<PlaceExtractorInterface> place_2d_extractor_;
+  std::unique_ptr<SurfacePlacesInterface> surface_places_;
+  std::unique_ptr<FreespacePlacesInterface> freespace_places_;
   SceneGraphLogger frontend_graph_logger_;
   LogSetup::Ptr logs_;
 
@@ -188,6 +187,8 @@ class FrontendModule : public Module {
   std::mutex mutex_;
 
  private:
+  void stopImpl();
+
   inline static const auto registration_ =
       config::RegistrationWithConfig<FrontendModule,
                                      FrontendModule,

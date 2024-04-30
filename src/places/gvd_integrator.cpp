@@ -251,7 +251,7 @@ void GvdIntegrator::updateGvdVoxel(const GlobalIndex& voxel_index,
 
   voxel.num_extra_basis = new_basis;
 
-  if (voxel.num_extra_basis == config_.min_basis_for_extraction) {
+  if (graph_extractor_ && voxel.num_extra_basis == config_.min_basis_for_extraction) {
     graph_extractor_->pushGvdIndex(voxel_index);
   }
 }
@@ -320,9 +320,16 @@ void GvdIntegrator::propagateSurface(const BlockIndex& block_index,
 
     resetParent(gvd_voxel);  // surface voxels don't have parents
 
-    CHECK_LT(vertex_idx, mesh_block->vertices.size())
-        << "gvd block: " << block_index.transpose()
-        << " mesh index: " << mesh_block_index.transpose();
+    if (vertex_idx >= mesh_block->vertices.size()) {
+      gvd_voxel.on_surface = false;
+      // TODO(nathan) check why this happens with khronos active window
+      LOG_FIRST_N(ERROR, 10) << "Bad surface voxel @ "
+                             << "gvd block: " << block_index.transpose()
+                             << " mesh index: " << mesh_block_index.transpose()
+                             << " (index: " << vertex_idx
+                             << " >= mesh_size: " << mesh_block->vertices.size();
+      continue;
+    }
 
     const auto& pos = mesh_block->vertices.at(vertex_idx);
     gvd_voxel.parent_pos[0] = pos.x();

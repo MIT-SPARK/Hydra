@@ -38,7 +38,7 @@
 #include <memory>
 
 #include "hydra/common/common.h"
-#include "hydra/frontend/place_extractor_interface.h"
+#include "hydra/frontend/freespace_places_interface.h"
 #include "hydra/places/gvd_integrator_config.h"
 #include "hydra/places/gvd_voxel.h"
 #include "hydra/reconstruction/reconstruction_output.h"
@@ -51,15 +51,19 @@ namespace places {
 class GvdIntegrator;
 }  // namespace places
 
-class GvdPlaceExtractor : public PlaceExtractorInterface {
+class GvdPlaceExtractor : public FreespacePlacesInterface {
  public:
   using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
   using ExtractorConfig = config::VirtualConfig<places::GraphExtractorInterface>;
 
-  GvdPlaceExtractor(const ExtractorConfig& graph_config,
-                    const places::GvdIntegratorConfig& gvd_config,
-                    size_t min_component_size,
-                    bool filter_places);
+  struct Config {
+    places::GvdIntegratorConfig gvd;
+    config::VirtualConfig<places::GraphExtractorInterface> graph;
+    size_t min_component_size = 3;
+    bool filter_places = true;
+  };
+
+  explicit GvdPlaceExtractor(const Config& config);
 
   virtual ~GvdPlaceExtractor();
 
@@ -71,24 +75,26 @@ class GvdPlaceExtractor : public PlaceExtractorInterface {
   std::vector<bool> inFreespace(const PositionMatrix& positions,
                                 double freespace_distance_m) const override;
 
-  void detect(const ReconstructionOutput& msg,
-              const kimera_pgmo::MeshDelta& mesh_delta,
-              const DynamicSceneGraph& graph) override;
+  void detect(const ReconstructionOutput& msg) override;
 
-  void updateGraph(uint64_t timestamp_ns,
-                   const ReconstructionOutput& msg,
-                   DynamicSceneGraph& graph) override;
+  void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) override;
+
+  const Config config;
 
  protected:
-  const places::GvdIntegratorConfig gvd_config_;
-  const size_t min_component_size_;
-  const bool filter_places_;
-
   mutable std::mutex gvd_mutex_;
   voxblox::Layer<places::GvdVoxel>::Ptr gvd_;
   std::shared_ptr<places::GraphExtractorInterface> graph_extractor_;
   std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
   NodeIdSet active_nodes_;
+
+ private:
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<FreespacePlacesInterface,
+                                     GvdPlaceExtractor,
+                                     Config>("gvd");
 };
+
+void declare_config(GvdPlaceExtractor::Config& config);
 
 }  // namespace hydra

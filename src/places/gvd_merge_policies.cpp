@@ -32,33 +32,24 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/reconstruction/reconstruction_config.h"
+#include "hydra/places/gvd_merge_policies.h"
 
-#include <config_utilities/config.h>
-#include <config_utilities/types/conversions.h>
-#include <config_utilities/types/eigen_matrix.h>
+namespace hydra::places {
 
-#include "hydra/common/config_utilities.h"
-
-namespace hydra {
-
-void declare_config(ReconstructionConfig& conf) {
-  using namespace config;
-  name("ReconstructionConfig");
-  field(conf.show_stats, "show_stats");
-  field(conf.stats_verbosity, "stats_verbosity");
-  field(conf.clear_distant_blocks, "clear_distant_blocks");
-  field(conf.dense_representation_radius_m, "dense_representation_radius_m");
-  field(conf.num_poses_per_update, "num_poses_per_update");
-  field(conf.max_input_queue_size, "max_input_queue_size");
-  field(conf.copy_dense_representations, "copy_dense_representations");
-  field(conf.semantic_measurement_probability, "semantic_measurement_probability");
-  field(conf.tsdf, "tsdf");
-  field(conf.mesh, "mesh");
-  field(conf.sensor, "sensor");
-  field(conf.pose_graphs, "pose_graphs");
-  conf.robot_footprint.setOptional();
-  field(conf.robot_footprint, "robot_footprint");
+template <typename T>
+int compareValues(T lhs, T rhs) {
+  // lhs > rhs is 0 if lhs == rhs and 1 if lhs > rhs
+  return (lhs < rhs) ? -1 : (lhs > rhs);
 }
 
-}  // namespace hydra
+int BasisPointMergePolicy::compare(const GvdMemberInfo& lhs,
+                                   const GvdMemberInfo& rhs) const {
+  return compareValues(lhs.num_basis_points, rhs.num_basis_points);
+}
+
+int DistanceMergePolicy::compare(const GvdMemberInfo& lhs,
+                                 const GvdMemberInfo& rhs) const {
+  return compareValues(lhs.distance, rhs.distance);
+}
+
+}  // namespace hydra::places

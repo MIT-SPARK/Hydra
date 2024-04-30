@@ -35,6 +35,7 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
 
+#include "hydra/places/robot_footprint_integrator.h"
 #include "hydra/reconstruction/mesh_integrator_config.h"
 #include "hydra/reconstruction/projective_integrator_config.h"
 #include "hydra/reconstruction/sensor.h"
@@ -56,6 +57,7 @@ struct ReconstructionConfig {
   MeshIntegratorConfig mesh;
   config::VirtualConfig<Sensor> sensor;
   PoseGraphTracker::Config pose_graphs;
+  config::VirtualConfig<RobotFootprintIntegrator> robot_footprint;
 };
 
 void declare_config(ReconstructionConfig& conf);

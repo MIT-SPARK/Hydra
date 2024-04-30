@@ -35,6 +35,7 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 namespace hydra {
 namespace places {
@@ -85,6 +86,8 @@ struct CompressionExtractorConfig : public GraphExtractorConfig {
   bool merge_nearby_nodes = true;
   //! Whether or not to add heuristic edges
   bool add_heuristic_edges = false;
+  //! Merge policy
+  std::string merge_policy = "basis_points";
 };
 
 struct FloodfillExtractorConfig : public GraphExtractorConfig {

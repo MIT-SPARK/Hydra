@@ -33,26 +33,44 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <set>
+#include <config_utilities/factory.h>
+
+#include <Eigen/Geometry>
+#include <memory>
 
 #include "hydra/common/dsg_types.h"
+#include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
 
-struct Place2dSegmenterConfig {
-  char prefix = 'Q';
-  double cluster_tolerance = 1;
-  size_t min_cluster_size = 600;
-  size_t max_cluster_size = 100000;
-  double pure_final_place_size = 3;
-  size_t min_final_place_points = 1000;
-  double place_overlap_threshold = 0.1;
-  double place_max_neighbor_z_diff = 0.5;
-  double connection_ellipse_scale_factor = 1;
-  BoundingBox::Type bounding_box_type = BoundingBox::Type::AABB;
-  std::set<uint32_t> labels;
+class RobotFootprintIntegrator {
+ public:
+  using Ptr = std::shared_ptr<RobotFootprintIntegrator>;
+
+  struct Config {
+    Eigen::Vector3f bbox_min = Eigen::Vector3f::Zero();
+    Eigen::Vector3f bbox_max = Eigen::Vector3f::Zero();
+    double tsdf_weight = 1.0e-5;
+  };
+
+  RobotFootprintIntegrator(const Config& config);
+
+  virtual ~RobotFootprintIntegrator();
+
+  void addFreespaceFootprint(const Eigen::Isometry3f& world_T_body,
+                             VolumetricMap& map) const;
+
+ public:
+  const Config config;
+  const BoundingBox bbox;
+
+ private:
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<RobotFootprintIntegrator,
+                                     RobotFootprintIntegrator,
+                                     Config>("RobotFootprintIntegrator");
 };
 
-void declare_config(Place2dSegmenterConfig& conf);
+void declare_config(RobotFootprintIntegrator::Config& config);
 
 }  // namespace hydra

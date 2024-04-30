@@ -63,6 +63,7 @@ ReconstructionModule::ReconstructionModule(const ReconstructionConfig& config,
   map_.reset(new VolumetricMap(HydraConfig::instance().getMapConfig(), true, true));
   tsdf_integrator_ = std::make_unique<ProjectiveIntegrator>(config_.tsdf);
   mesh_integrator_ = std::make_unique<MeshIntegrator>(config_.mesh);
+  footprint_integrator_ = config_.robot_footprint.create();
 }
 
 ReconstructionModule::~ReconstructionModule() { stop(); }
@@ -229,6 +230,10 @@ bool ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
     tsdf_integrator_->updateMap(*sensor_, data, *map_);
   }  // timing scope
 
+  if (footprint_integrator_) {
+    footprint_integrator_->addFreespaceFootprint(msg.world_T_body<float>(), *map_);
+  }
+
   if (map_->getTsdfLayer().getNumberOfAllocatedBlocks() == 0) {
     return false;
   }
@@ -248,7 +253,8 @@ bool ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
 
   auto&& [output, is_pending] = getNextOutputMessage();
   fillOutput(msg, *output);
-  output->current_position = msg.world_t_body;
+  output->world_t_body = msg.world_t_body;
+  output->world_R_body = msg.world_R_body;
   if (output_queue_ && !is_pending) {
     output_queue_->push(output);
   } else {

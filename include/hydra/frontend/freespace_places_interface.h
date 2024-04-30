@@ -51,26 +51,22 @@ namespace places {
 class GraphExtractorInterface;
 }  // namespace places
 
-class PlaceExtractorInterface {
+class FreespacePlacesInterface {
  public:
   using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
   using VizCallback = std::function<void(uint64_t,
                                          const voxblox::Layer<places::GvdVoxel>&,
                                          const places::GraphExtractorInterface*)>;
 
-  PlaceExtractorInterface() {}
+  FreespacePlacesInterface() {}
 
-  virtual ~PlaceExtractorInterface() = default;
+  virtual ~FreespacePlacesInterface() = default;
 
   virtual void save(const LogSetup& /* logs */) const {}
 
-  virtual void detect(const ReconstructionOutput& msg,
-                      const kimera_pgmo::MeshDelta& mesh_delta,
-                      const DynamicSceneGraph& graph) = 0;
+  virtual void detect(const ReconstructionOutput& msg) = 0;
 
-  virtual void updateGraph(uint64_t timestamp_ns,
-                           const ReconstructionOutput& msg,
-                           DynamicSceneGraph& graph) = 0;
+  virtual void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) = 0;
 
   virtual NodeIdSet getActiveNodes() const = 0;
 

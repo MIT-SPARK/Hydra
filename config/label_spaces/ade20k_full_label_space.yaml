@@ -90,7 +90,7 @@ frontend:
       - 147
       - 148
       - 149
-  places2d:
+  surface_places:
     labels:
       - 3
       - 6

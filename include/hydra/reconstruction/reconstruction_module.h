@@ -117,6 +117,7 @@ class ReconstructionModule : public Module {
   std::unique_ptr<VolumetricMap> map_;
   std::unique_ptr<ProjectiveIntegrator> tsdf_integrator_;
   std::unique_ptr<MeshIntegrator> mesh_integrator_;
+  RobotFootprintIntegrator::Ptr footprint_integrator_;
 
   std::list<OutputCallback> output_callbacks_;
   std::list<VizCallback> visualization_callbacks_;

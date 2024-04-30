@@ -18,7 +18,7 @@ frontend:
       - 16
       - 17
       - 18
-  places2d:
+  surface_places:
     labels: [2, 5]
 label_names:
   - {label: 0, name: Unknown}

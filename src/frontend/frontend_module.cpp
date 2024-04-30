@@ -69,7 +69,9 @@ FrontendModule::FrontendModule(const FrontendConfig& config,
     : config_(config::checkValid(config)),
       queue_(std::make_shared<FrontendInputQueue>()),
       dsg_(dsg),
-      state_(state) {
+      state_(state),
+      surface_places_(config_.surface_places.create()),
+      freespace_places_(config_.freespace_places.create()) {
   kimera_pgmo::MeshFrontendConfig pgmo_config = config_.pgmo_config;
   const auto& prefix = HydraConfig::instance().getRobotPrefix();
   pgmo_config.robot_id = prefix.id;
@@ -100,22 +102,12 @@ FrontendModule::FrontendModule(const FrontendConfig& config,
 
   CHECK(mesh_frontend_.initialize(pgmo_config));
   segmenter_.reset(new MeshSegmenter(config_.object_config));
-
-  if (config_.use_2d_places) {
-    place_2d_extractor_.reset(new Place2dSegmenter(config_.place_config,
-                                                   &dsg_->graph->mesh()->points,
-                                                   &dsg_->graph->mesh()->labels));
-  }
-
-  if (config_.enable_places) {
-    place_extractor_.reset(new GvdPlaceExtractor(config_.graph_extractor,
-                                                 config.gvd,
-                                                 config.min_places_component_size,
-                                                 config.filter_places));
-  }
 }
 
-FrontendModule::~FrontendModule() { stop(); }
+FrontendModule::~FrontendModule() {
+  // intentionally the private implementation to avoid calling virtual method
+  stopImpl();
+}
 
 void FrontendModule::initCallbacks() {
   initialized_ = true;
@@ -126,20 +118,14 @@ void FrontendModule::initCallbacks() {
       std::bind(&FrontendModule::updateDeformationGraph, this, std::placeholders::_1));
   input_callbacks_.push_back(
       std::bind(&FrontendModule::updatePoseGraph, this, std::placeholders::_1));
+  input_callbacks_.push_back(
+      std::bind(&FrontendModule::updatePlaces, this, std::placeholders::_1));
 
   post_mesh_callbacks_.clear();
   post_mesh_callbacks_.push_back(
       std::bind(&FrontendModule::updateObjects, this, std::placeholders::_1));
-
-  if (place_extractor_) {
-    input_callbacks_.push_back(
-        std::bind(&FrontendModule::updatePlaces, this, std::placeholders::_1));
-  }
-
-  if (place_2d_extractor_) {
-    post_mesh_callbacks_.push_back(
-        std::bind(&FrontendModule::updatePlaces2d, this, std::placeholders::_1));
-  }
+  post_mesh_callbacks_.push_back(
+      std::bind(&FrontendModule::updatePlaces2d, this, std::placeholders::_1));
 }
 
 void FrontendModule::start() {
@@ -148,7 +134,9 @@ void FrontendModule::start() {
   LOG(INFO) << "[Hydra Frontend] started!";
 }
 
-void FrontendModule::stop() {
+void FrontendModule::stop() { stopImpl(); }
+
+void FrontendModule::stopImpl() {
   should_shutdown_ = true;
 
   if (spin_thread_) {
@@ -172,8 +160,8 @@ void FrontendModule::save(const LogSetup& log_setup) {
     kimera_pgmo::WriteMesh(output_path + "/mesh.ply", *mesh);
   }
 
-  if (place_extractor_) {
-    place_extractor_->save(log_setup);
+  if (freespace_places_) {
+    freespace_places_->save(log_setup);
   }
 }
 
@@ -223,18 +211,18 @@ void FrontendModule::addObjectVisualizationCallback(const ObjectVizCallback& cb)
 }
 
 void FrontendModule::addPlaceVisualizationCallback(const PlaceVizCallback& cb) {
-  if (place_extractor_) {
-    place_extractor_->addVisualizationCallback(cb);
+  if (freespace_places_) {
+    freespace_places_->addVisualizationCallback(cb);
   }
 }
 
 std::vector<bool> FrontendModule::inFreespace(const PositionMatrix& positions,
                                               double freespace_distance_m) const {
-  if (!place_extractor_) {
+  if (!freespace_places_) {
     return std::vector<bool>(positions.cols(), false);
   }
 
-  return place_extractor_->inFreespace(positions, freespace_distance_m);
+  return freespace_places_->inFreespace(positions, freespace_distance_m);
 }
 
 void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
@@ -292,9 +280,7 @@ void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
 
 void FrontendModule::updateImpl(const ReconstructionOutput& msg) {
   launchCallbacks(input_callbacks_, msg);
-  if (place_extractor_) {
-    updatePlaceMeshMapping(msg);
-  }
+  updatePlaceMeshMapping(msg);
 }
 
 void FrontendModule::updateMesh(const ReconstructionOutput& input) {
@@ -364,17 +350,17 @@ void FrontendModule::updateDeformationGraph(const ReconstructionOutput& input) {
 }
 
 void FrontendModule::updatePlaces(const ReconstructionOutput& input) {
-  if (!place_extractor_) {
+  if (!freespace_places_) {
     return;
   }
 
   NodeIdSet active_nodes;
-  place_extractor_->detect(input, *last_mesh_update_, *dsg_->graph);
+  freespace_places_->detect(input);
   {  // start graph critical section
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-    place_extractor_->updateGraph(input.timestamp_ns, input, *dsg_->graph);
+    freespace_places_->updateGraph(input.timestamp_ns, *dsg_->graph);
 
-    active_nodes = place_extractor_->getActiveNodes();
+    active_nodes = freespace_places_->getActiveNodes();
     const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
     places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
     addPlaceAgentEdges(input.timestamp_ns);
@@ -387,7 +373,7 @@ void FrontendModule::updatePlaces(const ReconstructionOutput& input) {
 }
 
 void FrontendModule::updatePlaces2d(const ReconstructionOutput& input) {
-  if (!place_2d_extractor_) {
+  if (!surface_places_) {
     return;
   }
 
@@ -397,12 +383,12 @@ void FrontendModule::updatePlaces2d(const ReconstructionOutput& input) {
   }
 
   NodeIdSet active_nodes;
-  place_2d_extractor_->detect(input, *last_mesh_update_, *dsg_->graph);
+  surface_places_->detect(input, *last_mesh_update_, *dsg_->graph);
   {  // start graph critical section
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-    place_2d_extractor_->updateGraph(input.timestamp_ns, input, *dsg_->graph);
+    surface_places_->updateGraph(input.timestamp_ns, input, *dsg_->graph);
 
-    active_nodes = place_2d_extractor_->getActiveNodes();
+    active_nodes = surface_places_->getActiveNodes();
     const auto& places = dsg_->graph->getLayer(DsgLayers::MESH_PLACES);
     places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
     state_->latest_places = active_nodes;
@@ -581,7 +567,6 @@ void FrontendModule::archivePlaces2d(const NodeIdSet active_places) {
 
       const SceneGraphNode& prev_node = has_prev_node.value();
       prev_node.attributes().is_active = false;
-      // lcd_input_->archived_places.insert(prev); // TODO: Do we want this??
     }
   }  // end graph update critical section
 }

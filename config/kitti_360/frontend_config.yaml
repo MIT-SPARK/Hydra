@@ -13,43 +13,40 @@ objects:
   max_cluster_size: 100000
   cluster_tolerance: 0.25
 min_object_vertices: 40
-prune_mesh_indices: true
-filter_places: true
-min_places_component_size: 3
-enable_active_mesh_pub: false
-enable_segmented_mesh_pub: false
-gvd:
-  max_distance_m: 5.0
-  min_distance_m: 0.5
-  min_diff_m: 0.1
-  min_weight: 1.0e-6
-  positive_distance_only: true
-  min_basis_for_extraction: 1
-  num_buckets: 20
-  multi_queue: false
-  extract_graph: true
-  voronoi_config:
-    mode: L1_THEN_ANGLE
-    min_distance_m: 0.30
-    parent_l1_separation: 20
-    parent_cos_angle_separation: 0.2
-graph_extractor:
-  type: CompressionGraphExtractor
-  compression_distance_m: 3.0
-  validate_graph: false
-  min_node_distance_m: 0.6
-  min_edge_distance_m: 0.3
-  add_heuristic_edges: false
-  node_merge_distance_m: 1.5
-  add_heuristic_edges: true
-  # heurisitic edges
-  add_overlap_edges: true
-  overlap_edges:
-    num_neighbors_to_check: 4
-    min_clearance_m: 0.4
-  add_freespace_edges: true
-  freespace_edges:
-    num_nodes_to_check: 5
-    num_neighbors_to_find: 1
-    max_length_m: 2.0
-    min_clearance_m: 0.5
+freespace_places:
+  type: gvd
+  gvd:
+    max_distance_m: 5.0
+    min_distance_m: 0.5
+    min_diff_m: 0.1
+    min_weight: 1.0e-6
+    positive_distance_only: true
+    min_basis_for_extraction: 1
+    num_buckets: 20
+    multi_queue: false
+    extract_graph: true
+    voronoi_config:
+      mode: L1_THEN_ANGLE
+      min_distance_m: 0.30
+      parent_l1_separation: 20
+      parent_cos_angle_separation: 0.2
+  graph:
+    type: CompressionGraphExtractor
+    compression_distance_m: 3.0
+    validate_graph: false
+    min_node_distance_m: 0.6
+    min_edge_distance_m: 0.3
+    add_heuristic_edges: false
+    node_merge_distance_m: 1.5
+    add_heuristic_edges: true
+    # heurisitic edges
+    add_overlap_edges: true
+    overlap_edges:
+      num_neighbors_to_check: 4
+      min_clearance_m: 0.4
+    add_freespace_edges: true
+    freespace_edges:
+      num_nodes_to_check: 5
+      num_neighbors_to_find: 1
+      max_length_m: 2.0
+      min_clearance_m: 0.5

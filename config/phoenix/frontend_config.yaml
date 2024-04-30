@@ -13,13 +13,13 @@ objects:
   min_cluster_size: 25
   max_cluster_size: 100000
   cluster_tolerance: 0.18
-places2d:
+surface_places:
   prefix: P
 
   # Max side length for places without any other overlappig semantic classes
   pure_final_place_size: 1
 
-  # This should be at least dense_representation_radius_m, 
+  # This should be at least dense_representation_radius_m,
   # but I don't think there's much downside to having it larger.
   mesh_active_window_m: 15.0
 
@@ -27,7 +27,7 @@ places2d:
   place_memory_radius_m: 30
 
   # active_place_radius_m needs to be at most:
-  # dense_representation_radius_m - 8 * voxel_size * sqrt(2) - pure_final_place_size/2 
+  # dense_representation_radius_m - 8 * voxel_size * sqrt(2) - pure_final_place_size/2
   # or you will end up with some gaps.
   # But, if it is too small (i.e. if you frequently generate new mesh points further than this from the robot),
   # you will end up with extra places on top of each other.
@@ -44,8 +44,3 @@ places2d:
   place_overlap_threshold: 0.0
 
 min_object_vertices: 20
-prune_mesh_indices: true
-filter_places: true
-min_places_component_size: 3
-enable_active_mesh_pub: false
-enable_segmented_mesh_pub: false

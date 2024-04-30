@@ -14,8 +14,3 @@ objects:
   max_cluster_size: 100000
   cluster_tolerance: 0.18
 min_object_vertices: 20
-prune_mesh_indices: true
-filter_places: true
-min_places_component_size: 3
-enable_active_mesh_pub: false
-enable_segmented_mesh_pub: false

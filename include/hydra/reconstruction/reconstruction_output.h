@@ -56,7 +56,13 @@ struct ReconstructionOutput {
   voxblox::BlockIndexList archived_blocks;
   std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
   pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements;
-  Eigen::Vector3d current_position;
+  Eigen::Vector3d world_t_body;
+  Eigen::Quaterniond world_R_body;
+
+  template <typename T = double>
+  Eigen::Transform<T, 3, Eigen::Isometry> world_T_body() const {
+    return Eigen::Translation<T, 3>(world_t_body.cast<T>()) * world_R_body.cast<T>();
+  }
 };
 
 }  // namespace hydra

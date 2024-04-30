@@ -53,27 +53,20 @@ void declare_config(kimera_pgmo::MeshFrontendConfig& conf) {
 
 namespace hydra {
 
-void declare_config(FrontendConfig& conf) {
+void declare_config(FrontendConfig& config) {
   using namespace config;
   name("FrontendConfig");
-  field(conf.min_object_vertices, "min_object_vertices");
-  field(conf.prune_mesh_indices, "prune_mesh_indices");
-  field(conf.lcd_use_bow_vectors, "lcd_use_bow_vectors");
-  field(conf.pgmo_config, "pgmo");
-  field(conf.object_config, "objects");
-  field(conf.object_config.angle_step, "angle_step");
-  field(conf.validate_vertices, "validate_vertices");
-  field(conf.filter_places, "filter_places");
-  field(conf.min_places_component_size, "min_places_component_size");
-
-  field(conf.enable_places, "enable_places");
-  field(conf.use_2d_places, "use_2d_places");
-  if (conf.use_2d_places) {
-    field(conf.place_config, "places2d");
-  }
-  field(conf.gvd, "gvd");
-  conf.graph_extractor.setOptional();
-  field(conf.graph_extractor, "graph_extractor");
+  field(config.min_object_vertices, "min_object_vertices");
+  field(config.lcd_use_bow_vectors, "lcd_use_bow_vectors");
+  field(config.pgmo_config, "pgmo");
+  field(config.object_config, "objects");
+  field(config.validate_vertices, "validate_vertices");
+  // surface (i.e., 2D) places
+  config.surface_places.setOptional();
+  field(config.surface_places, "surface_places");
+  // freespace (i.e., 3D) places
+  config.freespace_places.setOptional();
+  field(config.freespace_places, "freespace_places");
 }
 
 }  // namespace hydra

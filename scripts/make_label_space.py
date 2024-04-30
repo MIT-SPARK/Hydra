@@ -129,7 +129,7 @@ def _load_prev(output_path):
     for prev_object in prev_objects:
         prev_config_map[int(prev_object)] = "o"
 
-    prev_surfaces = contents["frontend"].get("places2d", {}).get("labels", [])
+    prev_surfaces = contents["frontend"].get("surface_places", {}).get("labels", [])
     for prev_surface in prev_surfaces:
         prev_config_map[int(prev_surface)] = "s"
 
@@ -208,7 +208,7 @@ def main(
         fout.write("frontend:\n")
         fout.write("  objects:\n")
         fout.write(_format_list("labels", object_labels, indent=4))
-        fout.write("  places2d:\n")
+        fout.write("  surface_places:\n")
         fout.write(_format_list("labels", surface_labels, indent=4))
         fout.write("label_names:\n")
         for name in output_names:

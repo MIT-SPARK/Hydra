@@ -34,7 +34,7 @@ frontend:
       - 35
       - 36
       - 37
-  places2d:
+  surface_places:
     labels: [2, 16]
 label_names:
   - {label: 0, name: void}
