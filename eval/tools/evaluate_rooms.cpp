@@ -35,11 +35,16 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include <filesystem>
+
+#include "hydra/common/common.h"
 #include "hydra/eval/room_evaluator.h"
 
 DEFINE_string(tsdf_file, "", "tsdf file to read");
 DEFINE_string(bbox_file, "", "bounding box config file");
 DEFINE_string(dsg_file, "", "dsg file to read");
+DEFINE_int32(min_room_nodes, 0, "minimum number of room nodes for evaluation");
+DEFINE_bool(only_labeled, true, "only compute metrics for labeled voxels");
 
 using namespace spark_dsg;
 
@@ -52,29 +57,39 @@ int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
 
-  if (FLAGS_tsdf_file == "") {
-    LOG(FATAL) << "TSDF file is required!";
+  std::filesystem::path tsdf_path(FLAGS_tsdf_file);
+  if (!std::filesystem::exists(tsdf_path)) {
+    LOG(ERROR) << "TSDF file is required!";
+    return 1;
   }
 
-  if (FLAGS_bbox_file == "") {
-    LOG(FATAL) << "Bounding box file is required!";
+  std::filesystem::path bbox_path(FLAGS_bbox_file);
+  if (!std::filesystem::exists(bbox_path)) {
+    LOG(ERROR) << "Bounding box file is required!";
+    return 1;
   }
 
-  if (FLAGS_dsg_file == "") {
-    LOG(FATAL) << "DSG file is required!";
+  std::filesystem::path dsg_path(FLAGS_dsg_file);
+  if (!std::filesystem::exists(dsg_path)) {
+    LOG(ERROR) << "DSG file is required!";
+    return 1;
   }
 
-  auto evaluator =
-      hydra::eval::RoomEvaluator::fromFile(FLAGS_bbox_file, FLAGS_tsdf_file);
+  hydra::eval::RoomEvaluator::Config config;
+  config.only_labeled = FLAGS_only_labeled;
+  config.min_room_nodes = FLAGS_min_room_nodes;
+  auto evaluator = hydra::eval::RoomEvaluator::fromFile(config, bbox_path, tsdf_path);
   if (!evaluator) {
-    LOG(FATAL) << "Unable to construct room evaluator.";
+    LOG(ERROR) << "Unable to construct room evaluator.";
+    return 1;
   }
 
-  const auto metrics = evaluator->eval(FLAGS_dsg_file);
+  const auto metrics = evaluator->eval(dsg_path);
   if (!metrics.valid()) {
-    LOG(FATAL) << "Unable to evaluate invalid graph!";
+    LOG(ERROR) << "Unable to evaluate invalid graph!";
+    return 1;
   }
 
-  VLOG(1) << metrics;
+  std::cout << metrics << std::endl;
   return 0;
 }

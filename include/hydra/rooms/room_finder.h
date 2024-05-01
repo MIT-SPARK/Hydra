@@ -51,6 +51,8 @@ struct GraphInfo {
 
 class RoomFinder {
  public:
+  using ClusterMap = std::map<NodeId, std::vector<NodeId>>;
+
   explicit RoomFinder(const RoomFinderConfig& config);
 
   virtual ~RoomFinder();
@@ -60,6 +62,8 @@ class RoomFinder {
   void addRoomPlaceEdges(DynamicSceneGraph& graph) const;
 
   void enableLogging(const std::string& log_path);
+
+  void fillClusterMap(const SceneGraphLayer& places, ClusterMap& assignments) const;
 
  protected:
   InitialClusters getBestComponents(const SceneGraphLayer& places) const;

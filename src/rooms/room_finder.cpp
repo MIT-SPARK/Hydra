@@ -355,4 +355,30 @@ void RoomFinder::addRoomPlaceEdges(DynamicSceneGraph& graph) const {
   }
 }
 
+void RoomFinder::fillClusterMap(const SceneGraphLayer& places,
+                                ClusterMap& assignments) const {
+  assignments.clear();
+  for (const auto& id_node_pair : places.nodes()) {
+    const auto place_id = id_node_pair.first;
+
+    const auto cluster = last_results_.labels.find(place_id);
+    if (cluster == last_results_.labels.end()) {
+      continue;
+    }
+
+    const auto room = cluster_room_map_.find(cluster->second);
+    if (room == cluster_room_map_.end()) {
+      continue;
+    }
+
+    const auto room_id = room->second;
+    auto assignment = assignments.find(room_id);
+    if (assignment == assignments.end()) {
+      assignment = assignments.emplace(room_id, std::vector<NodeId>()).first;
+    }
+
+    assignment->second.push_back(place_id);
+  }
+}
+
 }  // namespace hydra

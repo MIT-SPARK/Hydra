@@ -50,12 +50,18 @@ class RoomEvaluator {
  public:
   using Ptr = std::unique_ptr<RoomEvaluator>;
 
-  RoomEvaluator(const RoomGeometry& rooms,
-                const voxblox::Layer<voxblox::TsdfVoxel>::Ptr& tsdf,
-                float min_weight = 1.0e-6f,
-                float min_distance = 0.0f);
+  struct Config {
+    bool only_labeled = false;
+    float min_weight = 1.0e-6f;
+    float min_distance = 0.0f;
+    size_t min_room_nodes = 0;
+  } const config;
 
-  void computeRoomIndices(float min_weight, float min_distance);
+  RoomEvaluator(const Config& config,
+                const RoomGeometry& rooms,
+                const voxblox::Layer<voxblox::TsdfVoxel>::Ptr& tsdf);
+
+  void computeRoomIndices();
 
   const RoomIndices& getRoomIndices() const;
 
@@ -64,7 +70,8 @@ class RoomEvaluator {
   RoomMetrics eval(const std::string& graph_filepath) const;
 
  public:
-  static RoomEvaluator::Ptr fromFile(const std::string& room_filepath,
+  static RoomEvaluator::Ptr fromFile(const Config& config,
+                                     const std::string& room_filepath,
                                      const std::string& tsdf_filepath);
 
  private:

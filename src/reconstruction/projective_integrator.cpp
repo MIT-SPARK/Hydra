@@ -283,6 +283,10 @@ void ProjectiveIntegrator::updateVoxel(const FrameData& data,
         voxel.color, prev_weight, color, measurement.weight);
   }
 
+  if (!semantic_integrator_ || !semantic_voxel) {
+    return;
+  }
+
   if (semantic_integrator_->isValidLabel(measurement.label)) {
     semantic_integrator_->updateLikelihoods(measurement.label, *semantic_voxel);
   }
