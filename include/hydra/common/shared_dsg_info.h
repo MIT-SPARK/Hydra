@@ -58,6 +58,7 @@ struct SharedDsgInfo {
   uint64_t last_update_time;
   DynamicSceneGraph::Ptr graph;
   std::map<char, LayerId> prefix_layer_map;
+  std::map<LayerId, char> layer_prefix_map;
 };
 
 }  // namespace hydra
