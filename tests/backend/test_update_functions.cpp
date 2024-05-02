@@ -61,7 +61,7 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
   attrs->is_active = true;
   graph.emplaceNode(DsgLayers::OBJECTS, 0, std::move(attrs));
 
-  const UpdateInfo info{nullptr, nullptr, false, 0, false};
+  UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, false, 0, false});
   dsg_updates::UpdateObjectsFunctor functor;
   functor.call(*dsg, info);
 
@@ -124,7 +124,7 @@ TEST(DsgInterpolationTests, ObjectUpdateMergeLC) {
   graph.emplaceNode(DsgLayers::OBJECTS, 0, std::move(attrs0));
   graph.emplaceNode(DsgLayers::OBJECTS, 1, std::move(attrs1));
 
-  const UpdateInfo info{nullptr, nullptr, true, 0, true};
+  UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, true, 0, true});
   dsg_updates::UpdateObjectsFunctor functor;
   functor.call(*dsg, info);
 
@@ -209,7 +209,7 @@ TEST(DsgInterpolationTests, ObjectUpdateMergeNoLC) {
   mesh->setPos(1, Mesh::Pos(1.0, 2.0, 3.0));
   graph.setMesh(mesh);
 
-  const UpdateInfo info{nullptr, nullptr, false, 0, true};
+  UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, false, 0, true});
   dsg_updates::UpdateObjectsFunctor functor;
   auto merged_nodes = functor.call(*dsg, info);
 
@@ -240,7 +240,7 @@ TEST(DsgInterpolationTests, BuildingUpdate) {
   graph.insertEdge("B0"_id, 4);
   graph.insertEdge("B0"_id, 5);
 
-  const UpdateInfo info{nullptr, nullptr, false, 0, false};
+  UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, false, 0, false});
   dsg_updates::UpdateBuildingsFunctor functor(
       SemanticNodeAttributes::ColorVector::Zero(), 0);
   functor.call(*dsg, info);
@@ -274,7 +274,7 @@ TEST(DsgInterpolationTests, PlaceUpdate) {
   values.insert(NodeSymbol('p', 5),
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
-  const UpdateInfo info{&values, nullptr, true, 0, false};
+  UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, true, 0, false});
   dsg_updates::UpdatePlacesFunctor functor(0.4, 0.3);
   functor.call(*dsg, info);
 
@@ -321,7 +321,7 @@ TEST(DsgInterpolationTests, PlaceUpdateNodeFinderBug) {
   values.insert(NodeSymbol('p', 5),
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
-  const UpdateInfo info{&values, nullptr, false, 0, true};
+  UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, false, 0, true});
   dsg_updates::UpdatePlacesFunctor functor(0.4, 0.3);
   // initialize node finder
   functor.call(*dsg, info);
@@ -362,7 +362,7 @@ TEST(DsgInterpolationTests, PlaceUpdateMerge) {
   values.insert(NodeSymbol('p', 6),
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
-  const UpdateInfo info{&values, nullptr, true, 0, true};
+  UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, true, 0, true});
   dsg_updates::UpdatePlacesFunctor functor(0.4, 0.3);
   auto merged_nodes = functor.call(*dsg, info);
 
@@ -421,7 +421,8 @@ TEST(DsgInterpolationTests, AgentUpdate) {
       NodeSymbol('b', 5),
       gtsam::Pose3(gtsam::Rot3(0.0, 0.0, 1.0, 0.0), gtsam::Point3(7.0, 8.0, 9.0)));
 
-  const UpdateInfo info{nullptr, nullptr, false, 0, false, &agent_values};
+  UpdateInfo::ConstPtr info(
+      new UpdateInfo{nullptr, nullptr, false, 0, false, &agent_values});
   dsg_updates::updateAgents(*dsg, info);
 
   {  // external_key == node_id and in values

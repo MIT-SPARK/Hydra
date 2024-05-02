@@ -46,23 +46,26 @@ class RoomFinder;
 struct RoomFinderConfig;
 
 struct UpdateInfo {
+  using Ptr = std::shared_ptr<UpdateInfo>;
+  using ConstPtr = std::shared_ptr<const UpdateInfo>;
   const gtsam::Values* places_values = nullptr;
   const gtsam::Values* pgmo_values = nullptr;
   bool loop_closure_detected = false;
   uint64_t timestamp_ns = 0;
   bool allow_node_merging = false;
   const gtsam::Values* complete_agent_values = nullptr;
-  size_t num_archived_vertices = 0;
 };
 
 using MergeMap = std::map<NodeId, NodeId>;
-using LayerUpdateFunc = std::function<MergeMap(SharedDsgInfo&, const UpdateInfo&)>;
-using LayerCleanupFunc = std::function<void(const UpdateInfo&, SharedDsgInfo*)>;
+using LayerUpdateFunc =
+    std::function<MergeMap(SharedDsgInfo&, const UpdateInfo::ConstPtr&)>;
+using LayerCleanupFunc =
+    std::function<void(const UpdateInfo::ConstPtr&, SharedDsgInfo*)>;
 using NodeMergeFunc = std::function<void(const DynamicSceneGraph&, NodeId, NodeId)>;
 using MergeValidFunc =
     std::function<bool(const NodeAttributes*, const NodeAttributes*)>;
 using NodeUpdateFunc = std::function<void(
-    const UpdateInfo&, const spark_dsg::Mesh::Ptr, NodeId, NodeAttributes*)>;
+    const UpdateInfo::ConstPtr&, const spark_dsg::Mesh::Ptr, NodeId, NodeAttributes*)>;
 
 namespace dsg_updates {
 
@@ -79,11 +82,11 @@ struct UpdateFunctor {
 
   virtual ~UpdateFunctor() = default;
 
-  virtual MergeMap call(SharedDsgInfo& dsg, const UpdateInfo& info) const = 0;
+  virtual MergeMap call(SharedDsgInfo& dsg, const UpdateInfo::ConstPtr& info) const = 0;
 
   virtual Hooks hooks() const {
     Hooks my_hooks;
-    my_hooks.update = [this](SharedDsgInfo& dsg, const UpdateInfo& info) {
+    my_hooks.update = [this](SharedDsgInfo& dsg, const UpdateInfo::ConstPtr& info) {
       return call(dsg, info);
     };
     return my_hooks;
@@ -95,7 +98,7 @@ struct UpdateObjectsFunctor : public UpdateFunctor {
 
   Hooks hooks() const override;
 
-  MergeMap call(SharedDsgInfo& dsg, const UpdateInfo& info) const override;
+  MergeMap call(SharedDsgInfo& dsg, const UpdateInfo::ConstPtr& info) const override;
 
   size_t makeNodeFinders(const SceneGraphLayer& layer) const;
 
@@ -125,7 +128,7 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
 
   Hooks hooks() const override;
 
-  MergeMap call(SharedDsgInfo& dsg, const UpdateInfo& info) const override;
+  MergeMap call(SharedDsgInfo& dsg, const UpdateInfo::ConstPtr& info) const override;
 
   size_t makeNodeFinder(const SceneGraphLayer& layer) const;
 
@@ -156,7 +159,7 @@ struct UpdateRoomsFunctor : public UpdateFunctor {
 
   ~UpdateRoomsFunctor();
 
-  MergeMap call(SharedDsgInfo& dsg, const UpdateInfo& info) const override;
+  MergeMap call(SharedDsgInfo& dsg, const UpdateInfo::ConstPtr& info) const override;
 
   void rewriteRooms(const SceneGraphLayer* new_rooms, DynamicSceneGraph& graph) const;
 
@@ -167,13 +170,13 @@ struct UpdateBuildingsFunctor : public UpdateFunctor {
   UpdateBuildingsFunctor(const SemanticNodeAttributes::ColorVector& color,
                          SemanticNodeAttributes::Label label);
 
-  MergeMap call(SharedDsgInfo& dsg, const UpdateInfo& info) const override;
+  MergeMap call(SharedDsgInfo& dsg, const UpdateInfo::ConstPtr& info) const override;
 
   SemanticNodeAttributes::ColorVector building_color;
   SemanticNodeAttributes::Label building_semantic_label;
 };
 
-MergeMap updateAgents(SharedDsgInfo& graph, const UpdateInfo& info);
+MergeMap updateAgents(SharedDsgInfo& graph, const UpdateInfo::ConstPtr& info);
 
 struct Update2dPlacesFunctor : public UpdateFunctor {
   Hooks hooks() const override;
@@ -181,7 +184,7 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
   Update2dPlacesFunctor(const Places2dConfig& config);
   ~Update2dPlacesFunctor();
 
-  MergeMap call(SharedDsgInfo& dsg, const UpdateInfo& info) const override;
+  MergeMap call(SharedDsgInfo& dsg, const UpdateInfo::ConstPtr& info) const override;
 
   size_t makeNodeFinders(const SceneGraphLayer& layer) const;
 
@@ -193,7 +196,6 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
 
   std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
                                      const NodeId from_node,
-                                     const size_t num_archived,
                                      const Place2dNodeAttributes& attrs,
                                      bool skip_first) const;
 

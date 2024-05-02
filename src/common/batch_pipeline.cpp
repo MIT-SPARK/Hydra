@@ -80,7 +80,7 @@ DynamicSceneGraph::Ptr BatchPipeline::construct(
 
   if (room_config) {
     dsg_updates::UpdateRoomsFunctor functor(*room_config);
-    UpdateInfo info;
+    UpdateInfo::ConstPtr info(new UpdateInfo);
     functor.call(*dsg, info);
 
     Eigen::Matrix<uint8_t, 3, 1> bcolor(0, 0, 0);

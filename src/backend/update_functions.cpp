@@ -84,7 +84,7 @@ UpdateFunctor::Hooks UpdateObjectsFunctor::hooks() const {
                   std::placeholders::_1,
                   std::placeholders::_2));
   };
-  my_hooks.node_update = [this](const UpdateInfo&,
+  my_hooks.node_update = [this](const UpdateInfo::ConstPtr&,
                                 const spark_dsg::Mesh::Ptr mesh,
                                 NodeId node,
                                 NodeAttributes* attrs) {
@@ -187,8 +187,9 @@ std::optional<NodeId> UpdateObjectsFunctor::proposeObjectMerge(
   return std::nullopt;
 }
 
-MergeMap UpdateObjectsFunctor::call(SharedDsgInfo& dsg, const UpdateInfo& info) const {
-  ScopedTimer spin_timer("backend/update_objects", info.timestamp_ns);
+MergeMap UpdateObjectsFunctor::call(SharedDsgInfo& dsg,
+                                    const UpdateInfo::ConstPtr& info) const {
+  ScopedTimer spin_timer("backend/update_objects", info->timestamp_ns);
   std::unique_lock<std::mutex> lock(dsg.mutex);
   const auto& graph = *dsg.graph;
   if (!graph.hasLayer(DsgLayers::OBJECTS)) {
@@ -205,7 +206,7 @@ MergeMap UpdateObjectsFunctor::call(SharedDsgInfo& dsg, const UpdateInfo& info) 
   for (const auto& id_node_pair : layer.nodes()) {
     const NodeId node_id = id_node_pair.first;
     auto& attrs = id_node_pair.second->attributes<ObjectNodeAttributes>();
-    if (!info.loop_closure_detected && !attrs.is_active && use_active_flag) {
+    if (!info->loop_closure_detected && !attrs.is_active && use_active_flag) {
       // skip the node if it is archived, there was no loop closure and we've okayed
       // skipping non-active nodes
       continue;
@@ -214,7 +215,7 @@ MergeMap UpdateObjectsFunctor::call(SharedDsgInfo& dsg, const UpdateInfo& info) 
     ++active;
     updateObject(mesh, node_id, attrs);
 
-    if (!info.allow_node_merging) {
+    if (!info->allow_node_merging) {
       continue;
     }
 
@@ -283,15 +284,15 @@ UpdateFunctor::Hooks UpdatePlacesFunctor::hooks() const {
                   std::placeholders::_1,
                   std::placeholders::_2));
   };
-  my_hooks.node_update = [this](const UpdateInfo& info,
+  my_hooks.node_update = [this](const UpdateInfo::ConstPtr& info,
                                 const spark_dsg::Mesh::Ptr,
                                 NodeId node,
                                 NodeAttributes* attrs) {
-    if (!attrs || !info.places_values) {
+    if (!attrs || !info->places_values) {
       return;
     }
 
-    updatePlace(*info.places_values, node, *attrs);
+    updatePlace(*info->places_values, node, *attrs);
   };
 
   return my_hooks;
@@ -390,22 +391,22 @@ void UpdatePlacesFunctor::filterMissing(DynamicSceneGraph& graph,
   }
 }
 
-std::map<NodeId, NodeId> UpdatePlacesFunctor::call(SharedDsgInfo& dsg,
-                                                   const UpdateInfo& info) const {
-  ScopedTimer spin_timer("backend/update_places", info.timestamp_ns);
+std::map<NodeId, NodeId> UpdatePlacesFunctor::call(
+    SharedDsgInfo& dsg, const UpdateInfo::ConstPtr& info) const {
+  ScopedTimer spin_timer("backend/update_places", info->timestamp_ns);
   std::unique_lock<std::mutex> lock(dsg.mutex);
   auto& graph = *dsg.graph;
 
-  if (!graph.hasLayer(DsgLayers::PLACES) || !info.places_values) {
+  if (!graph.hasLayer(DsgLayers::PLACES) || !info->places_values) {
     return {};
   }
 
-  if (info.places_values->size() == 0 && !info.allow_node_merging) {
+  if (info->places_values->size() == 0 && !info->allow_node_merging) {
     return {};
   }
 
   const auto& layer = graph.getLayer(DsgLayers::PLACES);
-  const auto& places_values = *info.places_values;
+  const auto& places_values = *info->places_values;
   const size_t archived = makeNodeFinder(layer);
 
   std::list<NodeId> missing_nodes;
@@ -418,7 +419,7 @@ std::map<NodeId, NodeId> UpdatePlacesFunctor::call(SharedDsgInfo& dsg,
     }
 
     auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
-    if (!attrs.is_active && !info.loop_closure_detected) {
+    if (!attrs.is_active && !info->loop_closure_detected) {
       continue;
     }
 
@@ -431,7 +432,7 @@ std::map<NodeId, NodeId> UpdatePlacesFunctor::call(SharedDsgInfo& dsg,
       updatePlace(places_values, node_id, attrs);
     }
 
-    if (!info.allow_node_merging || !node_finder) {
+    if (!info->allow_node_merging || !node_finder) {
       // avoid looking for merges when disallowed or there are no archived places
       continue;
     }
@@ -480,8 +481,8 @@ void UpdateRoomsFunctor::rewriteRooms(const SceneGraphLayer* new_rooms,
   }
 }
 
-std::map<NodeId, NodeId> UpdateRoomsFunctor::call(SharedDsgInfo& dsg,
-                                                  const UpdateInfo& info) const {
+std::map<NodeId, NodeId> UpdateRoomsFunctor::call(
+    SharedDsgInfo& dsg, const UpdateInfo::ConstPtr& info) const {
   if (!room_finder) {
     return {};
   }
@@ -489,13 +490,13 @@ std::map<NodeId, NodeId> UpdateRoomsFunctor::call(SharedDsgInfo& dsg,
   SceneGraphLayer::Ptr places_clone;
   {  // start dsg critical section
     std::unique_lock<std::mutex> lock(dsg.mutex);
-    ScopedTimer timer("backend/clone_places", info.timestamp_ns, true, 1, false);
+    ScopedTimer timer("backend/clone_places", info->timestamp_ns, true, 1, false);
     places_clone = dsg.graph->getLayer(DsgLayers::PLACES).clone([](const auto& node) {
       return NodeSymbol(node.id).category() == 'p';
     });
   }  // end dsg critical section
 
-  ScopedTimer timer("backend/room_detection", info.timestamp_ns, true, 1, false);
+  ScopedTimer timer("backend/room_detection", info->timestamp_ns, true, 1, false);
   // TODO(nathan) pass in timestamp?
   auto rooms = room_finder->findRooms(*places_clone);
 
@@ -512,9 +513,9 @@ UpdateBuildingsFunctor::UpdateBuildingsFunctor(const NodeColor& color,
                                                SemanticLabel label)
     : building_color(color), building_semantic_label(label) {}
 
-std::map<NodeId, NodeId> UpdateBuildingsFunctor::call(SharedDsgInfo& dsg,
-                                                      const UpdateInfo& info) const {
-  ScopedTimer timer("backend/building_detection", info.timestamp_ns, true, 1, false);
+std::map<NodeId, NodeId> UpdateBuildingsFunctor::call(
+    SharedDsgInfo& dsg, const UpdateInfo::ConstPtr& info) const {
+  ScopedTimer timer("backend/building_detection", info->timestamp_ns, true, 1, false);
 
   const NodeSymbol building_id('B', 0);
   std::unique_lock<std::mutex> lock(dsg.mutex);
@@ -552,12 +553,13 @@ std::map<NodeId, NodeId> UpdateBuildingsFunctor::call(SharedDsgInfo& dsg,
   return {};
 }
 
-std::map<NodeId, NodeId> updateAgents(SharedDsgInfo& dsg, const UpdateInfo& info) {
-  if (!info.complete_agent_values || info.complete_agent_values->size() == 0) {
+std::map<NodeId, NodeId> updateAgents(SharedDsgInfo& dsg,
+                                      const UpdateInfo::ConstPtr& info) {
+  if (!info->complete_agent_values || info->complete_agent_values->size() == 0) {
     return {};
   }
 
-  ScopedTimer timer("backend/agent_update", info.timestamp_ns, true, 1, false);
+  ScopedTimer timer("backend/agent_update", info->timestamp_ns, true, 1, false);
   std::unique_lock<std::mutex> lock(dsg.mutex);
   auto& graph = *dsg.graph;
 
@@ -568,13 +570,13 @@ std::map<NodeId, NodeId> updateAgents(SharedDsgInfo& dsg, const UpdateInfo& info
 
     for (const auto& node : prefix_layer_pair.second->nodes()) {
       auto& attrs = node->attributes<AgentNodeAttributes>();
-      if (!info.complete_agent_values->exists(attrs.external_key)) {
+      if (!info->complete_agent_values->exists(attrs.external_key)) {
         missing_nodes.insert(node->id);
         continue;
       }
 
       gtsam::Pose3 agent_pose =
-          info.complete_agent_values->at<gtsam::Pose3>(attrs.external_key);
+          info->complete_agent_values->at<gtsam::Pose3>(attrs.external_key);
       attrs.position = agent_pose.translation();
       attrs.world_R_body = Eigen::Quaterniond(agent_pose.rotation().matrix());
     }
@@ -635,10 +637,10 @@ void Update2dPlacesFunctor::updateNode(const spark_dsg::Mesh::Ptr& mesh,
 
   pcl::CentroidPoint<pcl::PointXYZ> centroid;
   for (const auto& midx : connections) {
-    const auto& point = mesh->pos(midx.idx);
+    const auto& point = mesh->pos(midx);
     if (std::isnan(point.x()) || std::isnan(point.y()) || std::isnan(point.z())) {
-      VLOG(4) << "found nan at index: " << midx.idx << " with point: [" << point.x()
-              << ", " << point.y() << ", " << point.z() << "]";
+      VLOG(4) << "found nan at index: " << midx << " with point: [" << point.x() << ", "
+              << point.y() << ", " << point.z() << "]";
       continue;
     }
 
@@ -655,7 +657,7 @@ void Update2dPlacesFunctor::updateNode(const spark_dsg::Mesh::Ptr& mesh,
   attrs.position << pcl_pos.x, pcl_pos.y, pcl_pos.z;
 
   for (size_t i = 0; i < attrs.boundary.size(); ++i) {
-    const auto& point = mesh->pos(attrs.pcl_boundary_connections.at(i).idx);
+    const auto& point = mesh->pos(attrs.pcl_boundary_connections.at(i));
     attrs.boundary[i] << point.x(), point.y(), point.z();
   }
 }
@@ -677,7 +679,6 @@ bool Update2dPlacesFunctor::shouldMerge(const Place2dNodeAttributes& from_attrs,
 std::optional<NodeId> Update2dPlacesFunctor::proposeMerge(
     const SceneGraphLayer& layer,
     const NodeId from_node,
-    const size_t num_archived,
     const Place2dNodeAttributes& from_attrs,
     bool skip_first) const {
   const auto iter = node_finders.find(from_attrs.semantic_label);
@@ -722,10 +723,10 @@ void Update2dPlacesFunctor::mergeAttributes(const DynamicSceneGraph& graph,
   const auto& from_attrs = from_node->get().attributes<Place2dNodeAttributes>();
   auto& to_attrs = to_node->get().attributes<Place2dNodeAttributes>();
   // sort and merge
-  std::vector<MeshIndex> to_indices(to_attrs.pcl_mesh_connections.begin(),
-                                    to_attrs.pcl_mesh_connections.end());
-  std::vector<MeshIndex> from_indices(from_attrs.pcl_mesh_connections.begin(),
-                                      from_attrs.pcl_mesh_connections.end());
+  std::vector<Place2d::Index> to_indices(to_attrs.pcl_mesh_connections.begin(),
+                                         to_attrs.pcl_mesh_connections.end());
+  std::vector<Place2d::Index> from_indices(from_attrs.pcl_mesh_connections.begin(),
+                                           from_attrs.pcl_mesh_connections.end());
   to_attrs.pcl_mesh_connections.clear();
   std::sort(to_indices.begin(), to_indices.end());
   std::sort(from_indices.begin(), from_indices.end());
@@ -784,8 +785,8 @@ void getNecessaryUpdates(
       size_t min_ix = SIZE_MAX;
       size_t max_ix = 0;
       for (auto midx : id_place_pair.second.indices) {
-        min_ix = std::min(min_ix, midx.idx);
-        max_ix = std::max(max_ix, midx.idx);
+        min_ix = std::min(min_ix, midx);
+        max_ix = std::max(max_ix, midx);
       }
       id_place_pair.second.min_mesh_index = min_ix;
       id_place_pair.second.max_mesh_index = max_ix;
@@ -966,13 +967,13 @@ void reallocateMeshPoints(const std::vector<Place2d::PointT>& points,
   Eigen::Vector2d delta = attrs2.position.head(2) - attrs1.position.head(2);
   Eigen::Vector2d d = attrs1.position.head(2) + delta / 2;
 
-  std::vector<MeshIndex> p1_new_indices;
-  std::vector<MeshIndex> p2_new_indices;
+  std::vector<Place2d::Index> p1_new_indices;
+  std::vector<Place2d::Index> p2_new_indices;
 
   for (auto midx : attrs1.pcl_mesh_connections) {
-    // pcl::PointXYZRGBA pclp = points.at(midx.idx);
+    // pcl::PointXYZRGBA pclp = points.at(midx);
     // Eigen::Vector2d p(pclp.x, pclp.y);
-    Eigen::Vector2d p = points.at(midx.idx).head(2).cast<double>();
+    Eigen::Vector2d p = points.at(midx).head(2).cast<double>();
     if ((p - d).dot(delta) > 0) {
       p2_new_indices.push_back(midx);
     } else {
@@ -980,9 +981,9 @@ void reallocateMeshPoints(const std::vector<Place2d::PointT>& points,
     }
   }
   for (auto midx : attrs2.pcl_mesh_connections) {
-    // pcl::PointXYZRGBA pclp = points.at(midx.idx);
+    // pcl::PointXYZRGBA pclp = points.at(midx);
     // Eigen::Vector2d p(pclp.x, pclp.y);
-    Eigen::Vector2d p = points.at(midx.idx).head(2).cast<double>();
+    Eigen::Vector2d p = points.at(midx).head(2).cast<double>();
     if ((p - d).dot(delta) > 0) {
       p2_new_indices.push_back(midx);
     } else {
@@ -1152,7 +1153,7 @@ UpdateFunctor::Hooks Update2dPlacesFunctor::hooks() const {
                   std::placeholders::_1,
                   std::placeholders::_2));
   };
-  my_hooks.node_update = [this](const UpdateInfo&,
+  my_hooks.node_update = [this](const UpdateInfo::ConstPtr&,
                                 const spark_dsg::Mesh::Ptr mesh,
                                 NodeId node,
                                 NodeAttributes* attrs) {
@@ -1164,15 +1165,16 @@ UpdateFunctor::Hooks Update2dPlacesFunctor::hooks() const {
     updateNode(mesh, node, *oattrs);
   };
 
-  my_hooks.cleanup = [this](const UpdateInfo&, SharedDsgInfo* dsg) {
+  my_hooks.cleanup = [this](const UpdateInfo::ConstPtr&, SharedDsgInfo* dsg) {
     next_node_id_ = cleanupPlaces2d(config_, dsg, next_node_id_);
   };
 
   return my_hooks;
 }
 
-MergeMap Update2dPlacesFunctor::call(SharedDsgInfo& dsg, const UpdateInfo& info) const {
-  ScopedTimer spin_timer("backend/update_2d_places", info.timestamp_ns);
+MergeMap Update2dPlacesFunctor::call(SharedDsgInfo& dsg,
+                                     const UpdateInfo::ConstPtr& info) const {
+  ScopedTimer spin_timer("backend/update_2d_places", info->timestamp_ns);
   std::unique_lock<std::mutex> lock(dsg.mutex);
   const auto& graph = *dsg.graph;
   if (!graph.hasLayer(layer_id_)) {
@@ -1187,7 +1189,7 @@ MergeMap Update2dPlacesFunctor::call(SharedDsgInfo& dsg, const UpdateInfo& info)
   std::map<NodeId, NodeId> nodes_to_merge;
   for (auto&& [node_id, node] : layer.nodes()) {
     auto& attrs = node->attributes<Place2dNodeAttributes>();
-    if (!info.loop_closure_detected && !attrs.is_active && use_active_flag) {
+    if (!info->loop_closure_detected && !attrs.is_active && use_active_flag) {
       // skip the node if it is archived, there was no loop closure and we've okayed
       // skipping non-active nodes
       continue;
@@ -1195,7 +1197,7 @@ MergeMap Update2dPlacesFunctor::call(SharedDsgInfo& dsg, const UpdateInfo& info)
 
     ++active;
     updateNode(mesh, node_id, attrs);
-    if (!info.allow_node_merging || !config_.allow_places_merge) {
+    if (!info->allow_node_merging || !config_.allow_places_merge) {
       continue;
     }
 
@@ -1204,8 +1206,7 @@ MergeMap Update2dPlacesFunctor::call(SharedDsgInfo& dsg, const UpdateInfo& info)
     // - the object is an archived object and a loop closure is being processed
     // - we are not paying attention to the active flag
     const bool skip_first = !use_active_flag || !attrs.is_active;
-    const auto to_merge =
-        proposeMerge(layer, node_id, info.num_archived_vertices, attrs, skip_first);
+    const auto to_merge = proposeMerge(layer, node_id, attrs, skip_first);
     if (to_merge) {
       nodes_to_merge[node_id] = *to_merge;
     }

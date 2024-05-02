@@ -54,7 +54,7 @@ class MergeHandler {
 
   void updateFromUnmergedGraph(const DynamicSceneGraph& graph);
 
-  size_t checkAndUndo(DynamicSceneGraph& graph, const UpdateInfo& info);
+  size_t checkAndUndo(DynamicSceneGraph& graph, const UpdateInfo::ConstPtr& info);
 
   void updateMerges(const std::map<NodeId, NodeId>& new_merges,
                     DynamicSceneGraph& graph);
@@ -79,16 +79,17 @@ class MergeHandler {
                       bool check_if_present);
 
   void updateCacheEntryFromInfo(const spark_dsg::Mesh::Ptr& mesh,
-                                const UpdateInfo& info,
+                                const UpdateInfo::ConstPtr& info,
                                 NodeId node,
                                 NodeInfo& entry);
 
-  void updateInfoCaches(const DynamicSceneGraph& graph, const UpdateInfo& info);
+  void updateInfoCaches(const DynamicSceneGraph& graph,
+                        const UpdateInfo::ConstPtr& info);
 
   bool shouldUndo(const NodeInfo& from_info, const NodeInfo& to_info) const;
 
   void undoMerge(DynamicSceneGraph& graph,
-                 const UpdateInfo& info,
+                 const UpdateInfo::ConstPtr& info,
                  NodeId from_node,
                  NodeId to_node);
 

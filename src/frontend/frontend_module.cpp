@@ -679,23 +679,6 @@ size_t remapConnections(const kimera_pgmo::VoxbloxIndexMapping& remapping,
   return num_invalid;
 }
 
-using spark_dsg::MeshIndex;
-
-size_t remapConnections(const kimera_pgmo::VoxbloxIndexMapping& remapping,
-                        const voxblox::IndexSet& archived_blocks,
-                        const std::vector<NearestVertexInfo>& connections,
-                        std::vector<MeshIndex>& mindices) {
-  const auto& robot_id = HydraConfig::instance().getRobotPrefix().id;
-  std::vector<size_t> indices;
-  size_t num_invalid =
-      remapConnections(remapping, archived_blocks, connections, indices);
-  mindices.resize(indices.size());
-  for (const auto& ind : indices) {
-    mindices.push_back({robot_id, ind});
-  }
-  return num_invalid;
-}
-
 using MeshIndexMap = voxblox::AnyIndexHashMapType<size_t>::type;
 
 // TODO(nathan) maybe move this somewhere else...

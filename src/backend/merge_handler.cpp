@@ -125,7 +125,8 @@ void MergeHandler::clearRemovedNodes(const DynamicSceneGraph& graph) {
   }
 }
 
-size_t MergeHandler::checkAndUndo(DynamicSceneGraph& graph, const UpdateInfo& info) {
+size_t MergeHandler::checkAndUndo(DynamicSceneGraph& graph,
+                                  const UpdateInfo::ConstPtr& info) {
   updateInfoCaches(graph, info);
 
   const size_t num_before = merged_nodes_.size();
@@ -133,7 +134,7 @@ size_t MergeHandler::checkAndUndo(DynamicSceneGraph& graph, const UpdateInfo& in
   std::map<NodeId, NodeId> to_undo;
   for (const auto& id_entry_pair : merged_nodes_cache_) {
     auto& from_entry = *id_entry_pair.second;
-    if (!from_entry.is_active && !info.loop_closure_detected) {
+    if (!from_entry.is_active && !info->loop_closure_detected) {
       continue;
     }
 
@@ -270,7 +271,7 @@ void MergeHandler::addNodeToCache(const SceneGraphNode& node,
 }
 
 void MergeHandler::updateCacheEntryFromInfo(const spark_dsg::Mesh::Ptr& mesh,
-                                            const UpdateInfo& info,
+                                            const UpdateInfo::ConstPtr& info,
                                             NodeId node,
                                             NodeInfo& entry) {
   auto hooks = getLayerHooks(entry.layer);
@@ -280,16 +281,17 @@ void MergeHandler::updateCacheEntryFromInfo(const spark_dsg::Mesh::Ptr& mesh,
 }
 
 void MergeHandler::updateInfoCaches(const DynamicSceneGraph& graph,
-                                    const UpdateInfo& info) {
+                                    const UpdateInfo::ConstPtr& info) {
   const auto mesh = graph.mesh();
-  if (!mesh || !info.places_values) {
+  if (!mesh || !info->places_values) {
     LOG(ERROR) << "[Hydra Backend] Invalid mesh or places values";
     return;
   }
 
   for (const auto& id_entry_pair : merged_nodes_cache_) {
     auto& entry = *id_entry_pair.second;
-    if (!entry.is_active && !info.loop_closure_detected && !entry.need_backend_update) {
+    if (!entry.is_active && !info->loop_closure_detected &&
+        !entry.need_backend_update) {
       continue;
     }
 
@@ -297,7 +299,7 @@ void MergeHandler::updateInfoCaches(const DynamicSceneGraph& graph,
     entry.need_backend_update = false;
   }
 
-  if (!info.loop_closure_detected) {
+  if (!info->loop_closure_detected) {
     return;
   }
 
@@ -314,7 +316,7 @@ void addEdgesFromEntry(DynamicSceneGraph& graph, NodeId node_id, NodeInfo& node_
 }
 
 void MergeHandler::undoMerge(DynamicSceneGraph& graph,
-                             const UpdateInfo& info,
+                             const UpdateInfo::ConstPtr& info,
                              NodeId from_node,
                              NodeId to_node) {
   VLOG(2) << "[Hydra Backend] undoing merge: " << NodeSymbol(from_node).getLabel()
@@ -344,7 +346,7 @@ void MergeHandler::undoMerge(DynamicSceneGraph& graph,
     auto iter = merged_nodes_cache_.find(child);
     auto& entry = iter->second;
 
-    if (!info.loop_closure_detected && !entry->is_active) {
+    if (!info->loop_closure_detected && !entry->is_active) {
       LOG(WARNING) << "Updating archived: " << NodeSymbol(child).getLabel();
       updateCacheEntryFromInfo(graph.mesh(), info, child, *entry);
     }

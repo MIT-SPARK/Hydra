@@ -262,7 +262,7 @@ TEST(MergeHandlerTests, TestUndoMergePlaces) {
   // this gets used through checking all the children
   values.insert("p5"_id, gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(0.0, 0.0, 0.0)));
 
-  UpdateInfo info{&values, nullptr, false, 0, false};
+  UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, false, 0, false});
   handler.checkAndUndo(graph, info);
 
   std::map<NodeId, NodeId> expected_merges{{"p5"_id, "p1"_id}};
@@ -312,7 +312,7 @@ TEST(MergeHandlerTests, TestUndoMergeObjects) {
   EXPECT_EQ(graph.numNodes(false), 1u);
 
   gtsam::Values values;
-  UpdateInfo info{&values, nullptr, false, 0, false};
+  UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, false, 0, false});
   handler.checkAndUndo(graph, info);
 
   EXPECT_TRUE(handler.mergedNodes().empty());
@@ -385,7 +385,7 @@ TEST(MergeHandlerTests, TestUpdateFromUnmergedWithUndo) {
   values.insert("p6"_id, gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(9.0, 10.0, 11.0)));
 
   // we want to make sure the neighbors of p2 disappear, but p6 stays untouched
-  UpdateInfo info{&values, nullptr, true, 0, false};
+  UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, true, 0, false});
   handler.checkAndUndo(graph, info);
 
   EXPECT_TRUE(handler.mergedNodes().empty());
@@ -418,7 +418,7 @@ TEST(MergeHandlerTests, TestUndoWithNewMerge) {
   values.insert("p3"_id, gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
   // p2 should now be merged with p3
-  UpdateInfo info{&values, nullptr, true, 0, false};
+  UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, true, 0, false});
   handler.checkAndUndo(graph, info);
 
   std::map<NodeId, NodeId> expected_merges{{"p3"_id, "p2"_id}};
@@ -449,7 +449,7 @@ TEST(MergeHandlerTests, TestUndoWithValidMerge) {
   values.insert("p2"_id, gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(0.0, 0.0, 0.0)));
 
   // no merges should be undone
-  UpdateInfo info{&values, nullptr, true, 0, false};
+  UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, true, 0, false});
   handler.checkAndUndo(graph, info);
 
   EXPECT_EQ(handler.mergedNodes(), proposed_merges);

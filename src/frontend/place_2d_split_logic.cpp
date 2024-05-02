@@ -9,7 +9,7 @@
 namespace hydra {
 
 void addRectInfo(const Place2d::CloudT& points,
-                 const std::vector<MeshIndex> mindices,
+                 const std::vector<Place2d::Index> mindices,
                  const double connection_ellipse_scale_factor,
                  Eigen::Vector2d& ellipse_centroid,
                  Eigen::Matrix2d& m_expand,
@@ -17,7 +17,7 @@ void addRectInfo(const Place2d::CloudT& points,
                  Eigen::Vector2d& cut_plane) {
   std::vector<cv::Point2f> region;
   for (auto midx : mindices) {
-    region.push_back(cv::Point2f(points[midx.idx].x(), points[midx.idx].y()));
+    region.push_back(cv::Point2f(points[midx].x(), points[midx].y()));
   }
   cv::RotatedRect box = cv::minAreaRect(region);
 
@@ -75,18 +75,17 @@ void addRectInfo(const Place2d::CloudT& points,
 }
 
 void addBoundaryInfo(const Place2d::CloudT& points,
-                     const std::vector<MeshIndex>& mindices,
+                     const std::vector<Place2d::Index>& mindices,
                      Place2d::CentroidT& centroid,
                      std::vector<Eigen::Vector3d>& boundary,
-                     std::vector<MeshIndex>& boundary_mindices) {
+                     std::vector<Place2d::Index>& boundary_mindices) {
   std::vector<cv::Point2f> region_pts;
-  std::vector<MeshIndex> region_to_cloud_index;
+  std::vector<Place2d::Index> region_to_cloud_index;
   centroid = Place2d::CentroidT();
   for (auto midx : mindices) {
     region_to_cloud_index.push_back(midx);
-    region_pts.push_back(cv::Point2f(points[midx.idx].x(), points[midx.idx].y()));
-    centroid.add(pcl::PointXYZ(
-        points[midx.idx].x(), points[midx.idx].y(), points[midx.idx].z()));
+    region_pts.push_back(cv::Point2f(points[midx].x(), points[midx].y()));
+    centroid.add(pcl::PointXYZ(points[midx].x(), points[midx].y(), points[midx].z()));
   }
 
   // compute convex hull for each place
@@ -96,7 +95,7 @@ void addBoundaryInfo(const Place2d::CloudT& points,
   boundary_mindices.clear();
   for (int pix : ch) {
     auto cloud_ix = region_to_cloud_index.at(pix);
-    Place2d::PointT p = points[cloud_ix.idx];
+    Place2d::PointT p = points[cloud_ix];
     Eigen::Vector3d v = {p.x(), p.y(), p.z()};
     boundary.push_back(v);
     boundary_mindices.push_back(cloud_ix);
@@ -133,17 +132,17 @@ std::pair<Place2d, Place2d> splitPlace(const Place2d::CloudT& points,
   size_t max_ix_2 = 0;
 
   for (auto midx : place.indices) {
-    Eigen::Vector2d pt(points[midx.idx].x(), points[midx.idx].y());
+    Eigen::Vector2d pt(points[midx].x(), points[midx].y());
     double side = (pt - place.ellipse_centroid).dot(place.cut_plane);
     if (side >= 0) {
       new_place_1.indices.push_back(midx);
-      min_ix_1 = std::min(min_ix_1, midx.idx);
-      max_ix_1 = std::max(max_ix_1, midx.idx);
+      min_ix_1 = std::min(min_ix_1, midx);
+      max_ix_1 = std::max(max_ix_1, midx);
     }
     if (side <= 0) {
       new_place_2.indices.push_back(midx);
-      min_ix_2 = std::min(min_ix_2, midx.idx);
-      max_ix_2 = std::max(max_ix_2, midx.idx);
+      min_ix_2 = std::min(min_ix_2, midx);
+      max_ix_2 = std::max(max_ix_2, midx);
     }
   }
 

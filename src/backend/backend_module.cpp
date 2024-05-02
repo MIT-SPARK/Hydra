@@ -501,17 +501,17 @@ void updatePlace2dMesh(Place2dNodeAttributes& attrs,
   auto iter = attrs.pcl_mesh_connections.begin();
 
   while (iter != attrs.pcl_mesh_connections.end()) {
-    if (mesh_update.deleted_indices.count(iter->idx)) {
+    if (mesh_update.deleted_indices.count(*iter)) {
       iter = attrs.pcl_mesh_connections.erase(iter);
       continue;
     }
 
-    auto map_iter = mesh_update.prev_to_curr.find(iter->idx);
+    auto map_iter = mesh_update.prev_to_curr.find(*iter);
     if (map_iter != mesh_update.prev_to_curr.end()) {
-      iter->idx = map_iter->second;
+      *iter = map_iter->second;
     }
-    min_index = std::min(min_index, iter->idx);
-    max_index = std::max(max_index, iter->idx);
+    min_index = std::min(min_index, *iter);
+    max_index = std::max(max_index, *iter);
     ++iter;
   }
   attrs.pcl_min_index = min_index;
@@ -529,15 +529,14 @@ void updatePlace2dBoundary(Place2dNodeAttributes& attrs,
   attrs.boundary.clear();
   attrs.pcl_boundary_connections.clear();
   for (size_t i = 0; i < prev_boundary.size(); ++i) {
-    if (mesh_update.deleted_indices.count(prev_boundary_connections.at(i).idx)) {
+    if (mesh_update.deleted_indices.count(prev_boundary_connections.at(i))) {
       continue;
     }
 
-    auto map_iter = mesh_update.prev_to_curr.find(prev_boundary_connections.at(i).idx);
+    auto map_iter = mesh_update.prev_to_curr.find(prev_boundary_connections.at(i));
     if (map_iter != mesh_update.prev_to_curr.end()) {
       attrs.boundary.push_back(prev_boundary.at(i));
-      const size_t robot_id = prev_boundary_connections.at(i).robot_id;
-      attrs.pcl_boundary_connections.push_back({robot_id, map_iter->second});
+      attrs.pcl_boundary_connections.push_back(map_iter->second);
     } else {
       attrs.boundary.push_back(prev_boundary.at(i));
       attrs.pcl_boundary_connections.push_back(prev_boundary_connections.at(i));
@@ -929,13 +928,12 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
     }
   }
 
-  const UpdateInfo info{&places_values,
-                        &pgmo_values,
-                        new_loop_closure,
-                        timestamp_ns,
-                        enable_node_merging,
-                        &complete_agent_values,
-                        num_archived_vertices_};
+  UpdateInfo::ConstPtr info(new UpdateInfo{&places_values,
+                                           &pgmo_values,
+                                           new_loop_closure,
+                                           timestamp_ns,
+                                           enable_node_merging,
+                                           &complete_agent_values});
 
   if (config_.enable_merge_undos) {
     status_.num_merges_undone =

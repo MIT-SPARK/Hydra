@@ -125,8 +125,7 @@ Places Place2dSegmenter::findPlaces(const Mesh::Positions& points,
   const size_t& robot_id = HydraConfig::instance().getRobotPrefix().id;
   for (size_t k = 0; k < places.size(); ++k) {
     for (const auto& ind : cluster_indices.at(k).indices) {
-      places.at(k).indices.push_back(
-          {robot_id, static_cast<size_t>(delta.getGlobalIndex(ind))});
+      places.at(k).indices.push_back(static_cast<size_t>(delta.getGlobalIndex(ind)));
     }
 
     addRectInfo(points, connection_ellipse_scale_factor, places.at(k));
@@ -165,17 +164,17 @@ pcl::IndicesPtr getActivePlaceIndices(
       size_t max_index = 0;
       auto iter = attrs.pcl_mesh_connections.begin();
       while (iter != attrs.pcl_mesh_connections.end()) {
-        if (delta.deleted_indices.count(iter->idx)) {
+        if (delta.deleted_indices.count(*iter)) {
           iter = attrs.pcl_mesh_connections.erase(iter);
           continue;
         }
 
-        auto map_iter = delta.prev_to_curr.find(iter->idx);
+        auto map_iter = delta.prev_to_curr.find(*iter);
         if (map_iter != delta.prev_to_curr.end()) {
-          iter->idx = map_iter->second;
+          *iter = map_iter->second;
         }
-        min_index = std::min(min_index, iter->idx);
-        max_index = std::max(max_index, iter->idx);
+        min_index = std::min(min_index, *iter);
+        max_index = std::max(max_index, *iter);
         ++iter;
       }
       attrs.pcl_min_index = min_index;
@@ -187,15 +186,14 @@ pcl::IndicesPtr getActivePlaceIndices(
       attrs.pcl_boundary_connections.clear();
       const auto& robot_id = HydraConfig::instance().getRobotPrefix().id;
       for (size_t i = 0; i < prev_boundary.size(); ++i) {
-        if (delta.deleted_indices.count(prev_boundary_connections.at(i).idx)) {
+        if (delta.deleted_indices.count(prev_boundary_connections.at(i))) {
           continue;
         }
 
-        auto map_iter = delta.prev_to_curr.find(prev_boundary_connections.at(i).idx);
+        auto map_iter = delta.prev_to_curr.find(prev_boundary_connections.at(i));
         if (map_iter != delta.prev_to_curr.end()) {
           attrs.boundary.push_back(prev_boundary.at(i));
-          attrs.pcl_boundary_connections.push_back(
-              {static_cast<size_t>(robot_id), map_iter->second});
+          attrs.pcl_boundary_connections.push_back(map_iter->second);
         } else {
           attrs.boundary.push_back(prev_boundary.at(i));
           attrs.pcl_boundary_connections.push_back(prev_boundary_connections.at(i));
@@ -205,7 +203,7 @@ pcl::IndicesPtr getActivePlaceIndices(
       if (attrs.pcl_min_index < num_archived_vertices) {
         // ^ this means that the place contains an archived vertex
         for (auto mi : attrs.pcl_mesh_connections) {
-          frozen_indices.insert(mi.idx);
+          frozen_indices.insert(mi);
         }
       }
       if (!attrs.is_active) {

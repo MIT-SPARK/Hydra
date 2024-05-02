@@ -14,7 +14,7 @@ struct Place2d {
   using PointT = spark_dsg::Mesh::Pos;
   using CloudT = spark_dsg::Mesh::Positions;
   using CentroidT = pcl::CentroidPoint<pcl::PointXYZ>;
-  using Index = spark_dsg::MeshIndex;
+  using Index = size_t;
   CentroidT centroid;
   std::vector<Index> indices;
   size_t min_mesh_index;
