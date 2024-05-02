@@ -60,7 +60,7 @@ struct Places2dConfig {
   //! If two places differ by at least this much in z, they won't be merged
   double merge_max_delta_z = 0.5;
   //! Minimum number of points to allow splitting place
-  int min_points = 10;
+  size_t min_points = 10;
   //! Minimum size of place for splitting
   double min_size = 2;
   //! Amount of overlap between places necessary to add edge

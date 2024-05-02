@@ -122,7 +122,6 @@ Places Place2dSegmenter::findPlaces(const Mesh::Positions& points,
 
   Places places;
   places.resize(cluster_indices.size());
-  const size_t& robot_id = HydraConfig::instance().getRobotPrefix().id;
   for (size_t k = 0; k < places.size(); ++k) {
     for (const auto& ind : cluster_indices.at(k).indices) {
       places.at(k).indices.push_back(static_cast<size_t>(delta.getGlobalIndex(ind)));
@@ -184,7 +183,6 @@ pcl::IndicesPtr getActivePlaceIndices(
       const auto prev_boundary_connections = attrs.pcl_boundary_connections;
       attrs.boundary.clear();
       attrs.pcl_boundary_connections.clear();
-      const auto& robot_id = HydraConfig::instance().getRobotPrefix().id;
       for (size_t i = 0; i < prev_boundary.size(); ++i) {
         if (delta.deleted_indices.count(prev_boundary_connections.at(i))) {
           continue;

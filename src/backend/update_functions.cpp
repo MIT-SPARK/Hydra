@@ -759,7 +759,7 @@ void getPlace2dAndNeighors(const SceneGraphLayer& places_layer,
 
 void getNecessaryUpdates(
     const spark_dsg::Mesh& mesh,
-    const int min_points,
+    const size_t min_points,
     const double min_size,
     const double connection_ellipse_scale_factor,
     std::vector<std::pair<NodeId, Place2d>>& place_2ds,
