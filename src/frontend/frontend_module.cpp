@@ -338,7 +338,8 @@ void FrontendModule::updateDeformationGraph(const ReconstructionOutput& input) {
     ScopedTimer timer(
         "frontend/dgraph_compresssion", input.timestamp_ns, true, 1, false);
     const auto time_ns = std::chrono::nanoseconds(input.timestamp_ns);
-    double time_s = std::chrono::duration_cast<std::chrono::seconds>(time_ns).count();
+    double time_s =
+        std::chrono::duration_cast<std::chrono::duration<double>>(time_ns).count();
     auto interface = getMeshInterface(*input.mesh);
     mesh_frontend_.processMeshGraph(interface, time_s);
   }  // end timing scope
