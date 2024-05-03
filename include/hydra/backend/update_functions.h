@@ -35,7 +35,6 @@
 #pragma once
 #include <gtsam/nonlinear/Values.h>
 
-#include "hydra/backend/backend_config.h"
 #include "hydra/common/common.h"
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
@@ -55,6 +54,24 @@ struct UpdateInfo {
   bool allow_node_merging = false;
   const gtsam::Values* complete_agent_values = nullptr;
 };
+
+struct Places2dConfig {
+  bool allow_places_merge = true;
+  //! If two places differ by at least this much in z, they won't be merged
+  double merge_max_delta_z = 0.5;
+  //! Minimum number of points to allow splitting place
+  size_t min_points = 10;
+  //! Minimum size of place for splitting
+  double min_size = 2;
+  //! Amount of overlap between places necessary to add edge
+  double connection_overlap_threshold = 0;
+  //! Maximum difference in z between neighboring places
+  double connection_max_delta_z = 0.5;
+  //! How much to inflate place ellipsoid relative to bounding box
+  double connection_ellipse_scale_factor = 1.0;
+};
+
+void declare_config(Places2dConfig& conf);
 
 using MergeMap = std::map<NodeId, NodeId>;
 using LayerUpdateFunc =

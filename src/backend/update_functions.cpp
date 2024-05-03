@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/backend/update_functions.h"
 
+#include <config_utilities/config.h>
 #include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
 #include <pcl/common/centroid.h>
@@ -49,6 +50,19 @@
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+
+void declare_config(Places2dConfig& config) {
+  using namespace config;
+  name("Places2dConfig");
+  field(config.allow_places_merge, "allow_places_merge");
+  field(config.merge_max_delta_z, "merge_max_delta_z");
+  field(config.min_points, "min_points");
+  field(config.min_size, "min_size");
+  field(config.connection_overlap_threshold, "connection_overlap_threshold");
+  field(config.connection_max_delta_z, "connection_max_delta_z");
+  field(config.connection_ellipse_scale_factor, "connection_ellipse_scale_factor");
+}
+
 namespace dsg_updates {
 
 using timing::ScopedTimer;

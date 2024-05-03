@@ -71,10 +71,13 @@ void declare_config(GvdPlaceExtractor::Config& config) {
     field(config.freespace_config.num_neighbors_to_find, "num_neighbors_to_find");
     field(config.freespace_config.min_clearance_m, "min_clearance_m");
   }
+  field(config.sinks, "sinks");
 }
 
-GvdPlaceExtractor::GvdPlaceExtractor(const Config& config)
-    : config(config::checkValid(config)), graph_extractor_(config.graph.create()) {
+GvdPlaceExtractor::GvdPlaceExtractor(const Config& c)
+    : config(config::checkValid(c)),
+      graph_extractor_(config.graph.create()),
+      sinks_(Sink::instantiate(config.sinks)) {
   if (!graph_extractor_) {
     LOG(ERROR) << "no place graph extraction provided! disabling extraction";
   }
@@ -86,6 +89,12 @@ GvdPlaceExtractor::GvdPlaceExtractor(const Config& config)
         << config.gvd.min_distance_m << " vs. truncation distance "
         << map_config.truncation_distance << ")";
     throw std::runtime_error("invalid integrator min distance");
+  }
+
+  size_t sink_idx = 0;
+  for (const auto& sink : sinks_) {
+    VLOG(1) << "Sink " << sink_idx << ": " << (sink ? sink->printInfo() : "n/a");
+    ++sink_idx;
   }
 }
 
@@ -147,7 +156,8 @@ void GvdPlaceExtractor::detect(const ReconstructionOutput& msg) {
     gvd_integrator_.reset(new GvdIntegrator(config.gvd, gvd_, graph_extractor_));
   }
 
-  latest_pos_ = msg.world_T_body<double>().translation();
+  const Eigen::Isometry3f world_T_body = msg.world_T_body<float>();
+  latest_pos_ = world_T_body.translation().cast<double>();
 
   {  // start critical section
     std::unique_lock<std::mutex> lock(gvd_mutex_);
@@ -158,9 +168,7 @@ void GvdPlaceExtractor::detect(const ReconstructionOutput& msg) {
     gvd_integrator_->archiveBlocks(msg.archived_blocks);
   }  // end critical section
 
-  for (const auto& callback : visualization_callbacks_) {
-    callback(msg.timestamp_ns, *gvd_, graph_extractor_.get());
-  }
+  Sink::callAll(sinks_, msg.timestamp_ns, world_T_body, *gvd_, graph_extractor_.get());
 }
 
 void filterInvalidNodes(const SceneGraphLayer& graph, NodeIdSet& active_nodes) {

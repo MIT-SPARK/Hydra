@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/frontend/frontend_module.h"
 
+#include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
@@ -54,25 +55,55 @@
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
+namespace kimera_pgmo {
+
+void declare_config(kimera_pgmo::MeshFrontendConfig& conf) {
+  using namespace config;
+  name("MeshFrontendConfig");
+  field(conf.time_horizon, "horizon");
+  field(conf.b_track_mesh_graph_mapping, "track_mesh_graph_mapping");
+  field(conf.full_compression_method, "full_compression_method");
+  field(conf.graph_compression_method, "graph_compression_method");
+  field(conf.d_graph_resolution, "d_graph_resolution");
+  field(conf.mesh_resolution, "output_mesh_resolution");
+}
+
+}  // namespace kimera_pgmo
+
 namespace hydra {
 
 using hydra::timing::ScopedTimer;
 using pose_graph_tools_msgs::PoseGraph;
 
-using LabelClusters = MeshSegmenter::LabelClusters;
-using LabelPlaces = Place2dSegmenter::LabelPlaces;
+void declare_config(FrontendModule::Config& config) {
+  using namespace config;
+  name("FrontendModule::Config");
+  field(config.min_object_vertices, "min_object_vertices");
+  field(config.min_object_vertices, "min_object_vertices");
+  field(config.lcd_use_bow_vectors, "lcd_use_bow_vectors");
+  field(config.pgmo_config, "pgmo");
+  field(config.object_config, "objects");
+  field(config.validate_vertices, "validate_vertices");
+  // surface (i.e., 2D) places
+  config.surface_places.setOptional();
+  field(config.surface_places, "surface_places");
+  // freespace (i.e., 3D) places
+  config.freespace_places.setOptional();
+  field(config.freespace_places, "freespace_places");
+}
 
-FrontendModule::FrontendModule(const FrontendConfig& config,
+FrontendModule::FrontendModule(const Config& config,
                                const SharedDsgInfo::Ptr& dsg,
                                const SharedModuleState::Ptr& state,
                                const LogSetup::Ptr& logs)
-    : config_(config::checkValid(config)),
+    : config(config::checkValid(config)),
       queue_(std::make_shared<FrontendInputQueue>()),
       dsg_(dsg),
       state_(state),
-      surface_places_(config_.surface_places.create()),
-      freespace_places_(config_.freespace_places.create()) {
-  kimera_pgmo::MeshFrontendConfig pgmo_config = config_.pgmo_config;
+      surface_places_(config.surface_places.create()),
+      freespace_places_(config.freespace_places.create()),
+      sinks_(Sink::instantiate(config.sinks)) {
+  kimera_pgmo::MeshFrontendConfig pgmo_config = config.pgmo_config;
   const auto& prefix = HydraConfig::instance().getRobotPrefix();
   pgmo_config.robot_id = prefix.id;
 
@@ -101,7 +132,7 @@ FrontendModule::FrontendModule(const FrontendConfig& config,
   }
 
   CHECK(mesh_frontend_.initialize(pgmo_config));
-  segmenter_.reset(new MeshSegmenter(config_.object_config));
+  segmenter_.reset(new MeshSegmenter(config.object_config));
 }
 
 FrontendModule::~FrontendModule() {
@@ -167,7 +198,7 @@ void FrontendModule::save(const LogSetup& log_setup) {
 
 std::string FrontendModule::printInfo() const {
   std::stringstream ss;
-  ss << config::toString(config_);
+  ss << config::toString(config);
   return ss.str();
 }
 
@@ -200,29 +231,10 @@ bool FrontendModule::spinOnce() {
   return true;
 }
 
-void FrontendModule::addOutputCallback(const OutputCallback& callback) {
-  output_callbacks_.push_back(callback);
-}
-
-void FrontendModule::addObjectVisualizationCallback(const ObjectVizCallback& cb) {
-  if (segmenter_) {
-    segmenter_->addVisualizationCallback(cb);
+void FrontendModule::addSink(const Sink::Ptr& sink) {
+  if (sink) {
+    sinks_.push_back(sink);
   }
-}
-
-void FrontendModule::addPlaceVisualizationCallback(const PlaceVizCallback& cb) {
-  if (freespace_places_) {
-    freespace_places_->addVisualizationCallback(cb);
-  }
-}
-
-std::vector<bool> FrontendModule::inFreespace(const PositionMatrix& positions,
-                                              double freespace_distance_m) const {
-  if (!freespace_places_) {
-    return std::vector<bool>(positions.cols(), false);
-  }
-
-  return freespace_places_->inFreespace(positions, freespace_distance_m);
 }
 
 void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
@@ -235,9 +247,7 @@ void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
   ScopedTimer timer("frontend/spin", msg.timestamp_ns);
 
   if (dsg_->graph && backend_input_) {
-    for (const auto& callback : output_callbacks_) {
-      callback(*dsg_->graph, *backend_input_, msg.timestamp_ns);
-    }
+    Sink::callAll(sinks_, msg.timestamp_ns, *dsg_->graph, *backend_input_);
   }
 
   backend_input_.reset(new BackendInput());
@@ -443,7 +453,7 @@ void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
   }
 
   addPlaceAgentEdges(input.timestamp_ns);
-  if (config_.lcd_use_bow_vectors) {
+  if (config.lcd_use_bow_vectors) {
     assignBowVectors(agents);
   }
 }
@@ -496,6 +506,10 @@ void FrontendModule::assignBowVectors(const DynamicLayer& agents) {
 }
 
 void FrontendModule::invalidateMeshEdges(const kimera_pgmo::MeshDelta& delta) {
+  if (config.min_object_vertices == 0) {
+    return;
+  }
+
   std::unique_lock<std::mutex> lock(dsg_->mutex);
 
   std::vector<NodeId> objects_to_delete;
@@ -518,7 +532,7 @@ void FrontendModule::invalidateMeshEdges(const kimera_pgmo::MeshDelta& delta) {
       ++iter;
     }
 
-    if (attrs.mesh_connections.size() < config_.min_object_vertices) {
+    if (attrs.mesh_connections.size() < config.min_object_vertices) {
       objects_to_delete.push_back(id_node_pair.first);
     }
   }
@@ -727,7 +741,7 @@ void FrontendModule::updatePlaceMeshMapping(const ReconstructionOutput& input) {
     }
   }
 
-  if (config_.validate_vertices) {
+  if (config.validate_vertices) {
     CHECK_EQ(num_deform_invalid, 0u);
     CHECK_EQ(num_mesh_invalid, 0u);
     CHECK_EQ(num_missing, 0u);

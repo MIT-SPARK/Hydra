@@ -34,8 +34,9 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <list>
-#include <unordered_set>
+#include <memory>
 #include <thread>
+#include <unordered_set>
 
 namespace hydra {
 

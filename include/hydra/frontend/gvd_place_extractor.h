@@ -38,9 +38,10 @@
 #include <memory>
 
 #include "hydra/common/common.h"
+#include "hydra/common/output_sink.h"
 #include "hydra/frontend/freespace_places_interface.h"
-#include "hydra/places/gvd_integrator_config.h"
 #include "hydra/places/graph_extractor_config.h"
+#include "hydra/places/gvd_integrator_config.h"
 #include "hydra/places/gvd_voxel.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/utils/log_utilities.h"
@@ -50,12 +51,18 @@ namespace hydra {
 namespace places {
 // forward declare to avoid include
 class GvdIntegrator;
+class GraphExtractorInterface;
 }  // namespace places
 
 class GvdPlaceExtractor : public FreespacePlacesInterface {
  public:
   using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
   using ExtractorConfig = config::VirtualConfig<places::GraphExtractorInterface>;
+  using GvdLayer = voxblox::Layer<places::GvdVoxel>;
+  using Sink = OutputSink<uint64_t,
+                          const Eigen::Isometry3f&,
+                          const GvdLayer&,
+                          const places::GraphExtractorInterface*>;
 
   struct Config {
     places::GvdIntegratorConfig gvd;
@@ -68,7 +75,8 @@ class GvdPlaceExtractor : public FreespacePlacesInterface {
     double edge_tolerance = 1.0;
     bool add_freespace_edges = false;
     places::FreespaceEdgeConfig freespace_config;
-  };
+    std::vector<Sink::Factory> sinks;
+  } const config;
 
   explicit GvdPlaceExtractor(const Config& config);
 
@@ -90,15 +98,14 @@ class GvdPlaceExtractor : public FreespacePlacesInterface {
 
   void filterGround(DynamicSceneGraph& graph);
 
-  const Config config;
-
  protected:
   mutable std::mutex gvd_mutex_;
-  voxblox::Layer<places::GvdVoxel>::Ptr gvd_;
+  GvdLayer::Ptr gvd_;
   std::shared_ptr<places::GraphExtractorInterface> graph_extractor_;
   std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
   NodeIdSet active_nodes_;
   Eigen::Vector3d latest_pos_;
+  Sink::List sinks_;
 
  private:
   inline static const auto registration_ =

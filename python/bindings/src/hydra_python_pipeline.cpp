@@ -121,11 +121,6 @@ void HydraPythonPipeline::save() {
   HydraConfig::exit();
 }
 
-std::vector<bool> HydraPythonPipeline::queryFreespace(const PositionMatrix& positions,
-                                                      double freespace_dist_m) const {
-  return frontend_->inFreespace(positions, freespace_dist_m);
-}
-
 bool HydraPythonPipeline::spinOnce(const ReconstructionInput& input) {
   if (!reconstruction_->spinOnce(input)) {
     return false;
@@ -198,10 +193,6 @@ void addBindings(pybind11::module_& m) {
                  timestamp_ns, points, labels, colors);
              return pipeline.spinOnce(*input);
            })
-      .def("query_freespace",
-           &HydraPythonPipeline::queryFreespace,
-           "positions"_a,
-           "freespace_distance_m"_a)
       .def_property_readonly("graph", &HydraPythonPipeline::getSceneGraph);
 }
 

@@ -34,7 +34,10 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/reconstruction/reconstruction_module.h"
 
+#include <config_utilities/config.h>
 #include <config_utilities/printing.h>
+#include <config_utilities/types/conversions.h>
+#include <config_utilities/types/eigen_matrix.h>
 #include <config_utilities/validation.h>
 #include <pose_graph_tools_ros/conversions.h>
 
@@ -50,20 +53,40 @@ using timing::ScopedTimer;
 using voxblox::BlockIndexList;
 using voxblox::Layer;
 
-ReconstructionModule::ReconstructionModule(const ReconstructionConfig& config,
-                                           const OutputQueue::Ptr& output_queue)
-    : config_(config::checkValid(config)),
-      sensor_(config_.sensor.create()),
+void declare_config(ReconstructionModule::Config& conf) {
+  using namespace config;
+  name("ReconstructionConfig");
+  field(conf.show_stats, "show_stats");
+  field(conf.stats_verbosity, "stats_verbosity");
+  field(conf.clear_distant_blocks, "clear_distant_blocks");
+  field(conf.dense_representation_radius_m, "dense_representation_radius_m");
+  field(conf.num_poses_per_update, "num_poses_per_update");
+  field(conf.max_input_queue_size, "max_input_queue_size");
+  field(conf.semantic_measurement_probability, "semantic_measurement_probability");
+  field(conf.tsdf, "tsdf");
+  field(conf.mesh, "mesh");
+  field(conf.sensor, "sensor");
+  field(conf.pose_graphs, "pose_graphs");
+  conf.robot_footprint.setOptional();
+  field(conf.robot_footprint, "robot_footprint");
+  field(conf.sinks, "sinks");
+}
+
+ReconstructionModule::ReconstructionModule(const Config& config,
+                                           const OutputQueue::Ptr& queue)
+    : config(config::checkValid(config)),
+      sensor_(config.sensor.create()),
       num_poses_received_(0),
       pose_graph_tracker_(new PoseGraphTracker(config.pose_graphs)),
-      output_queue_(output_queue) {
+      output_queue_(queue),
+      sinks_(Sink::instantiate(config.sinks)) {
   queue_.reset(new ReconstructionInputQueue());
-  queue_->max_size = config_.max_input_queue_size;
+  queue_->max_size = config.max_input_queue_size;
 
   map_.reset(new VolumetricMap(HydraConfig::instance().getMapConfig(), true, true));
-  tsdf_integrator_ = std::make_unique<ProjectiveIntegrator>(config_.tsdf);
-  mesh_integrator_ = std::make_unique<MeshIntegrator>(config_.mesh);
-  footprint_integrator_ = config_.robot_footprint.create();
+  tsdf_integrator_ = std::make_unique<ProjectiveIntegrator>(config.tsdf);
+  mesh_integrator_ = std::make_unique<MeshIntegrator>(config.mesh);
+  footprint_integrator_ = config.robot_footprint.create();
 }
 
 ReconstructionModule::~ReconstructionModule() { stop(); }
@@ -95,7 +118,7 @@ void ReconstructionModule::save(const LogSetup&) {}
 
 std::string ReconstructionModule::printInfo() const {
   std::stringstream ss;
-  ss << std::endl << config::toString(config_);
+  ss << std::endl << config::toString(config);
   return ss.str();
 }
 
@@ -123,14 +146,6 @@ bool ReconstructionModule::spinOnce() {
   return success;
 }
 
-void ReconstructionModule::addOutputCallback(const OutputCallback& callback) {
-  output_callbacks_.push_back(callback);
-}
-
-void ReconstructionModule::addVisualizationCallback(const VizCallback& callback) {
-  visualization_callbacks_.push_back(callback);
-}
-
 bool ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
   if (!msg.sensor_input) {
     LOG(ERROR) << "[Hydra Reconstruction] received invalid sensor data in input!";
@@ -147,9 +162,15 @@ bool ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
   }
 
   ++num_poses_received_;
-  const bool do_full_update = (num_poses_received_ % config_.num_poses_per_update == 0);
+  const bool do_full_update = (num_poses_received_ % config.num_poses_per_update == 0);
   update(msg, do_full_update);
   return do_full_update;
+}
+
+void ReconstructionModule::addSink(const Sink::Ptr& sink) {
+  if (sink) {
+    sinks_.push_back(sink);
+  }
 }
 
 void ReconstructionModule::fillOutput(const ReconstructionInput& input,
@@ -158,6 +179,7 @@ void ReconstructionModule::fillOutput(const ReconstructionInput& input,
   while (timestamp_cache_.count(ts)) {
     ++ts;
   }
+
   timestamp_cache_.insert(ts);
   output.timestamp_ns = ts;
   pose_graph_tracker_->fillPoseGraphs(output);
@@ -169,12 +191,10 @@ void ReconstructionModule::fillOutput(const ReconstructionInput& input,
 
   // note that this is pre-archival
   map_->getMeshLayer().merge(output.mesh);
-  if (config_.copy_dense_representations) {
-    mergeLayer(map_->getTsdfLayer(), output.tsdf);
-    mergeLayer(*map_->getOccupancyLayer(), output.occupied);
-  }
+  mergeLayer(map_->getTsdfLayer(), output.tsdf);
+  mergeLayer(*map_->getOccupancyLayer(), output.occupied);
 
-  if (config_.clear_distant_blocks) {
+  if (config.clear_distant_blocks) {
     const auto to_archive = findBlocksToArchive(input.world_t_body.cast<float>());
     output.archived_blocks.insert(
         output.archived_blocks.end(), to_archive.begin(), to_archive.end());
@@ -247,8 +267,8 @@ bool ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
     return false;
   }
 
-  if (config_.show_stats) {
-    VLOG(config_.stats_verbosity) << "Memory used: {" << map_->printStats() << "}";
+  if (config.show_stats) {
+    VLOG(config.stats_verbosity) << "Memory used: {" << map_->printStats() << "}";
   }
 
   auto&& [output, is_pending] = getNextOutputMessage();
@@ -264,13 +284,12 @@ bool ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
 
   VLOG(5) << "[Hydra Reconstruction] Exported " << output->pose_graphs.size()
           << " pose graphs";
-  for (const auto& callback : output_callbacks_) {
-    callback(*output);
-  }
 
-  for (const auto& callback : visualization_callbacks_) {
-    callback(msg.timestamp_ns, data.getSensorPose(*sensor_), map_->getTsdfLayer());
-  }
+  Sink::callAll(sinks_,
+                msg.timestamp_ns,
+                data.getSensorPose(*sensor_),
+                map_->getTsdfLayer(),
+                *output);
 
   auto& tsdf = map_->getTsdfLayer();
   auto& mesh = map_->getMeshLayer();
@@ -294,7 +313,7 @@ BlockIndexList ReconstructionModule::findBlocksToArchive(
   BlockIndexList to_archive;
   for (const auto& idx : blocks) {
     auto block = tsdf.getBlockPtrByIndex(idx);
-    if ((center - block->origin()).norm() < config_.dense_representation_radius_m) {
+    if ((center - block->origin()).norm() < config.dense_representation_radius_m) {
       continue;
     }
 

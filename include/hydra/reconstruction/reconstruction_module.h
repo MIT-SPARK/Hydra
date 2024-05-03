@@ -37,12 +37,17 @@
 
 #include <Eigen/Geometry>
 #include <memory>
+#include <thread>
 
 #include "hydra/common/input_queue.h"
 #include "hydra/common/module.h"
-#include "hydra/reconstruction/reconstruction_config.h"
+#include "hydra/common/output_sink.h"
+#include "hydra/places/robot_footprint_integrator.h"
+#include "hydra/reconstruction/mesh_integrator_config.h"
+#include "hydra/reconstruction/projective_integrator_config.h"
 #include "hydra/reconstruction/reconstruction_input.h"
 #include "hydra/reconstruction/reconstruction_output.h"
+#include "hydra/reconstruction/sensor.h"
 #include "hydra/reconstruction/volumetric_map.h"
 #include "hydra/utils/log_utilities.h"
 #include "hydra/utils/pose_graph_tracker.h"
@@ -58,14 +63,29 @@ class ReconstructionModule : public Module {
   using Ptr = std::shared_ptr<ReconstructionModule>;
   using ReconstructionInputQueue = InputQueue<ReconstructionInput::Ptr>;
   using OutputQueue = InputQueue<ReconstructionOutput::Ptr>;
-  using OutputCallback = std::function<void(const ReconstructionOutput&)>;
   using OutputMsgStatus = std::pair<ReconstructionOutput::Ptr, bool>;
-  using VizCallback = std::function<void(uint64_t timestamp,
-                                         const Eigen::Isometry3d&,
-                                         const voxblox::Layer<voxblox::TsdfVoxel>&)>;
+  using Sink = OutputSink<uint64_t,
+                          const Eigen::Isometry3d&,
+                          const voxblox::Layer<voxblox::TsdfVoxel>&,
+                          const ReconstructionOutput&>;
 
-  ReconstructionModule(const ReconstructionConfig& config,
-                       const OutputQueue::Ptr& output_queue);
+  struct Config {
+    bool show_stats = true;
+    int stats_verbosity = 2;
+    bool clear_distant_blocks = true;
+    double dense_representation_radius_m = 5.0;
+    size_t num_poses_per_update = 1;
+    size_t max_input_queue_size = 0;
+    float semantic_measurement_probability = 0.9;
+    ProjectiveIntegratorConfig tsdf;
+    MeshIntegratorConfig mesh;
+    config::VirtualConfig<Sensor> sensor;
+    PoseGraphTracker::Config pose_graphs;
+    config::VirtualConfig<RobotFootprintIntegrator> robot_footprint;
+    std::vector<Sink::Factory> sinks;
+  } const config;
+
+  ReconstructionModule(const Config& config, const OutputQueue::Ptr& output_queue);
 
   virtual ~ReconstructionModule();
 
@@ -84,9 +104,7 @@ class ReconstructionModule : public Module {
   // public for external use
   bool spinOnce(const ReconstructionInput& input);
 
-  void addOutputCallback(const OutputCallback& callback);
-
-  void addVisualizationCallback(const VizCallback& callback);
+  void addSink(const Sink::Ptr& sink);
 
   inline const VolumetricMap* getMap() const { return map_.get(); }
 
@@ -100,7 +118,6 @@ class ReconstructionModule : public Module {
   OutputMsgStatus getNextOutputMessage();
 
  protected:
-  const ReconstructionConfig config_;
   const std::unique_ptr<Sensor> sensor_;
 
   std::atomic<bool> should_shutdown_{false};
@@ -113,20 +130,20 @@ class ReconstructionModule : public Module {
   PoseGraphTracker::Ptr pose_graph_tracker_;
   ReconstructionOutput::Ptr pending_output_;
   OutputQueue::Ptr output_queue_;
+  Sink::List sinks_;
 
   std::unique_ptr<VolumetricMap> map_;
   std::unique_ptr<ProjectiveIntegrator> tsdf_integrator_;
   std::unique_ptr<MeshIntegrator> mesh_integrator_;
   RobotFootprintIntegrator::Ptr footprint_integrator_;
 
-  std::list<OutputCallback> output_callbacks_;
-  std::list<VizCallback> visualization_callbacks_;
-
   inline static const auto registration_ =
       config::RegistrationWithConfig<ReconstructionModule,
                                      ReconstructionModule,
-                                     ReconstructionConfig,
+                                     Config,
                                      OutputQueue::Ptr>("ReconstructionModule");
 };
+
+void declare_config(ReconstructionModule::Config& config);
 
 }  // namespace hydra

@@ -70,9 +70,6 @@ class HydraPythonPipeline : public HydraPipeline {
 
   DynamicSceneGraph::Ptr getSceneGraph() const;
 
-  std::vector<bool> queryFreespace(const PositionMatrix& positions,
-                                   double freespace_distance_m) const;
-
  protected:
   bool step_mode_only_;
   std::shared_ptr<ReconstructionModule> reconstruction_;

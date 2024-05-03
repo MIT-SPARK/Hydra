@@ -37,6 +37,9 @@
 
 namespace hydra {
 
+/**
+ * @brief Core class representing a module that does some work
+ */
 class Module {
  public:
   using Ptr = std::shared_ptr<Module>;

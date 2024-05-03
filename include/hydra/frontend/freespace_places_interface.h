@@ -36,27 +36,14 @@
 
 #include "hydra/common/common.h"
 #include "hydra/common/dsg_types.h"
-#include "hydra/places/gvd_voxel.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/utils/log_utilities.h"
 
-namespace kimera_pgmo {
-class MeshDelta;
-}
-
 namespace hydra {
-
-namespace places {
-// forward declare to avoid include
-class GraphExtractorInterface;
-}  // namespace places
 
 class FreespacePlacesInterface {
  public:
   using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
-  using VizCallback = std::function<void(uint64_t,
-                                         const voxblox::Layer<places::GvdVoxel>&,
-                                         const places::GraphExtractorInterface*)>;
 
   FreespacePlacesInterface() {}
 
@@ -70,18 +57,11 @@ class FreespacePlacesInterface {
 
   virtual NodeIdSet getActiveNodes() const = 0;
 
-  virtual void addVisualizationCallback(const VizCallback& callback) {
-    visualization_callbacks_.push_back(callback);
-  }
-
   // takes in a 3xN matrix
   virtual std::vector<bool> inFreespace(const PositionMatrix& /* positions */,
                                         double /* freespace_distance_m */) const {
     return {};
   }
-
- protected:
-  std::vector<VizCallback> visualization_callbacks_;
 };
 
 }  // namespace hydra

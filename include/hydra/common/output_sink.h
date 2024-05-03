@@ -35,31 +35,79 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
 
-#include "hydra/places/robot_footprint_integrator.h"
-#include "hydra/reconstruction/mesh_integrator_config.h"
-#include "hydra/reconstruction/projective_integrator_config.h"
-#include "hydra/reconstruction/sensor.h"
-#include "hydra/utils/pose_graph_tracker.h"
+#include <list>
+#include <memory>
+#include <string>
 
 namespace hydra {
 
-struct ReconstructionConfig {
-  bool show_stats = true;
-  int stats_verbosity = 2;
-  bool clear_distant_blocks = true;
-  double dense_representation_radius_m = 5.0;
-  size_t num_poses_per_update = 1;
-  size_t max_input_queue_size = 0;
-  bool copy_dense_representations = true;
-  float semantic_measurement_probability = 0.9;
+template <typename... Args>
+struct OutputSink {
+  using Sink = OutputSink<Args...>;
+  using Ptr = std::shared_ptr<Sink>;
+  using Factory = config::VirtualConfig<Sink>;
+  using List = std::list<Ptr>;
 
-  ProjectiveIntegratorConfig tsdf;
-  MeshIntegratorConfig mesh;
-  config::VirtualConfig<Sensor> sensor;
-  PoseGraphTracker::Config pose_graphs;
-  config::VirtualConfig<RobotFootprintIntegrator> robot_footprint;
+  virtual ~OutputSink() = default;
+  virtual void call(Args... args) const = 0;
+  virtual std::string printInfo() const { return ""; }
+
+  static Ptr fromCallback(const std::function<void(Args...)>& callback);
+
+  template <typename T>
+  static Ptr fromMethod(void (T::*callback)(Args...) const, const T* instance);
+
+  static List instantiate(const std::vector<Factory>& configs) {
+    List sinks;
+    for (const auto& config : configs) {
+      if (config) {
+        sinks.push_back(config.create());
+      }
+    }
+    return sinks;
+  }
+
+  static void callAll(const List& sinks, Args... args) {
+    for (const auto& sink : sinks) {
+      if (sink) {
+        sink->call(args...);
+      }
+    }
+  }
 };
 
-void declare_config(ReconstructionConfig& conf);
+template <typename... Args>
+struct FunctionSink : OutputSink<Args...> {
+  FunctionSink(const std::function<void(Args...)>& f) : func(f) {}
+  virtual ~FunctionSink() = default;
+
+  void call(Args... args) const override { func(args...); }
+
+  std::function<void(Args...)> func;
+};
+
+template <typename... Args>
+typename OutputSink<Args...>::Ptr OutputSink<Args...>::fromCallback(
+    const std::function<void(Args...)>& callback) {
+  return std::make_shared<FunctionSink<Args...>>(callback);
+}
+
+template <typename T, typename... Args>
+struct MethodSink : OutputSink<Args...> {
+  MethodSink(void (T::*callback)(Args...) const, const T* instance)
+      : callback(callback), instance(instance) {}
+
+  void call(Args... args) const override { (instance->*callback)(args...); }
+
+  void (T::*callback)(Args...) const;
+  const T* instance;
+};
+
+template <typename... Args>
+template <typename T>
+typename OutputSink<Args...>::Ptr OutputSink<Args...>::fromMethod(
+    void (T::*callback)(Args...) const, const T* instance) {
+  return std::make_shared<MethodSink<T, Args...>>(callback, instance);
+}
 
 }  // namespace hydra

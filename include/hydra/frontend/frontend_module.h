@@ -44,9 +44,12 @@
 #include "hydra/common/common.h"
 #include "hydra/common/input_queue.h"
 #include "hydra/common/module.h"
+#include "hydra/common/output_sink.h"
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
-#include "hydra/frontend/frontend_config.h"
+#include "hydra/frontend/freespace_places_interface.h"
+#include "hydra/frontend/mesh_segmenter.h"
+#include "hydra/frontend/surface_places_interface.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/utils/log_utilities.h"
 
@@ -57,7 +60,6 @@ class DeltaCompression;
 namespace hydra {
 
 class NearestNodeFinder;
-class MeshSegmenter;
 
 class FrontendModule : public Module {
  public:
@@ -66,17 +68,20 @@ class FrontendModule : public Module {
   using DynamicLayer = DynamicSceneGraphLayer;
   using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
   using InputCallback = std::function<void(const ReconstructionOutput&)>;
-  using OutputCallback =
-      std::function<void(const DynamicSceneGraph&, const BackendInput&, uint64_t)>;
-  using PlaceVizCallback = std::function<void(uint64_t,
-                                              const voxblox::Layer<places::GvdVoxel>&,
-                                              const places::GraphExtractorInterface*)>;
-  using ObjectVizCallback =
-      std::function<void(const kimera_pgmo::MeshDelta&,
-                         const std::vector<size_t>&,
-                         const std::map<uint32_t, std::vector<size_t>>&)>;
+  using Sink = OutputSink<uint64_t, const DynamicSceneGraph&, const BackendInput&>;
 
-  FrontendModule(const FrontendConfig& config,
+  struct Config {
+    size_t min_object_vertices = 20;
+    bool lcd_use_bow_vectors = true;
+    kimera_pgmo::MeshFrontendConfig pgmo_config;
+    MeshSegmenter::Config object_config;
+    bool validate_vertices = false;
+    config::VirtualConfig<SurfacePlacesInterface> surface_places;
+    config::VirtualConfig<FreespacePlacesInterface> freespace_places;
+    std::vector<Sink::Factory> sinks;
+  } const config;
+
+  FrontendModule(const Config& config,
                  const SharedDsgInfo::Ptr& dsg,
                  const SharedModuleState::Ptr& state,
                  const LogSetup::Ptr& logs = nullptr);
@@ -97,17 +102,7 @@ class FrontendModule : public Module {
 
   inline FrontendInputQueue::Ptr getQueue() const { return queue_; }
 
-  void addOutputCallback(const OutputCallback& callback);
-
-  void addObjectVisualizationCallback(const ObjectVizCallback& callback);
-
-  void addPlaceVisualizationCallback(const PlaceVizCallback& callback);
-
-  // takes in a 3xN matrix
-  std::vector<bool> inFreespace(const PositionMatrix& positions,
-                                double freespace_distance_m) const;
-
-  const FrontendConfig& config() const { return config_; }
+  void addSink(const Sink::Ptr& sink);
 
  protected:
   virtual void initCallbacks();
@@ -145,8 +140,6 @@ class FrontendModule : public Module {
   void updatePlaceMeshMapping(const ReconstructionOutput& input);
 
  protected:
-  const FrontendConfig config_;
-
   bool initialized_ = false;
   mutable std::mutex gvd_mutex_;
   std::atomic<bool> should_shutdown_{false};
@@ -181,7 +174,7 @@ class FrontendModule : public Module {
 
   std::vector<InputCallback> input_callbacks_;
   std::vector<InputCallback> post_mesh_callbacks_;
-  std::vector<OutputCallback> output_callbacks_;
+  Sink::List sinks_;
 
   // TODO(lschmid): This mutex currently simply locks all data for manipulation.
   std::mutex mutex_;
@@ -192,10 +185,18 @@ class FrontendModule : public Module {
   inline static const auto registration_ =
       config::RegistrationWithConfig<FrontendModule,
                                      FrontendModule,
-                                     FrontendConfig,
+                                     Config,
                                      SharedDsgInfo::Ptr,
                                      SharedModuleState::Ptr,
                                      LogSetup::Ptr>("FrontendModule");
 };
 
+void declare_config(FrontendModule::Config& config);
+
 }  // namespace hydra
+
+namespace kimera_pgmo {
+
+void declare_config(kimera_pgmo::MeshFrontendConfig& conf);
+
+}  // namespace kimera_pgmo

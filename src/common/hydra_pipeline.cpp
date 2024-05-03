@@ -52,15 +52,30 @@ void HydraPipeline::init() {}
 
 HydraPipeline::~HydraPipeline() {}
 
+std::string makeBanner(const std::string& message,
+                       size_t print_width,
+                       char fill,
+                       bool with_header = true,
+                       bool with_footer = false) {
+  std::stringstream ss;
+  if (with_header) {
+    ss << std::string(print_width, fill) << std::endl;
+  }
+  const auto msg_size = message.size() + 3;
+  const auto spacing = msg_size >= print_width ? 0 : print_width - msg_size;
+  ss << fill << " " << message << (spacing ? std::string(spacing, ' ') + fill : "")
+     << std::endl;
+  if (with_footer) {
+    ss << std::string(print_width, fill) << std::endl;
+  }
+  return ss.str();
+}
+
 std::string HydraPipeline::getModuleInfo(const std::string& name,
                                          const Module* module) const {
   const auto print_width = config::Settings().print_width;
   std::stringstream ss;
-  ss << std::string(print_width, '*') << std::endl;
-  const auto name_size = name.size() + 3;
-  const auto spacing = name_size >= print_width ? 0 : print_width - name_size;
-  ss << "* " << name << (spacing ? std::string(spacing, ' ') + "*" : "") << std::endl;
-  ss << std::string(print_width, '*') << std::endl;
+  ss << makeBanner(name, print_width, '*', true, true);
   if (!module) {
     ss << "UNITIALIZED MODULE!" << std::endl;
   } else {
@@ -74,9 +89,13 @@ std::string HydraPipeline::getModuleInfo(const std::string& name,
 }
 
 void HydraPipeline::showModules() const {
+  const auto print_width = config::Settings().print_width;
+  std::stringstream ss;
+  ss << std::endl << makeBanner("Modules", print_width, '=', true, true);
   for (auto&& [name, module] : modules_) {
-    VLOG(config_verbosity_) << std::endl << getModuleInfo(name, module.get());
+    ss << std::endl << getModuleInfo(name, module.get());
   }
+  VLOG(config_verbosity_) << ss.str();
 }
 
 void HydraPipeline::start() {

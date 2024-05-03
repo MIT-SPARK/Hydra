@@ -32,33 +32,32 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/reconstruction/reconstruction_config.h"
-
-#include <config_utilities/config.h>
-#include <config_utilities/types/conversions.h>
-#include <config_utilities/types/eigen_matrix.h>
-
-#include "hydra/common/config_utilities.h"
+#pragma once
+#include <KimeraRPGO/SolverParams.h>
+#include <kimera_pgmo/KimeraPgmoInterface.h>
 
 namespace hydra {
 
-void declare_config(ReconstructionConfig& conf) {
-  using namespace config;
-  name("ReconstructionConfig");
-  field(conf.show_stats, "show_stats");
-  field(conf.stats_verbosity, "stats_verbosity");
-  field(conf.clear_distant_blocks, "clear_distant_blocks");
-  field(conf.dense_representation_radius_m, "dense_representation_radius_m");
-  field(conf.num_poses_per_update, "num_poses_per_update");
-  field(conf.max_input_queue_size, "max_input_queue_size");
-  field(conf.copy_dense_representations, "copy_dense_representations");
-  field(conf.semantic_measurement_probability, "semantic_measurement_probability");
-  field(conf.tsdf, "tsdf");
-  field(conf.mesh, "mesh");
-  field(conf.sensor, "sensor");
-  field(conf.pose_graphs, "pose_graphs");
-  conf.robot_footprint.setOptional();
-  field(conf.robot_footprint, "robot_footprint");
-}
+// supplementary pgmo config
+struct HydraPgmoConfig : public kimera_pgmo::KimeraPgmoConfig {
+  // covariance
+  double place_mesh_variance;
+  double place_edge_variance;
+  double place_merge_variance;
+  double object_merge_variance;
+  double sg_loop_closure_variance;
+  // rpgo
+  bool gnc_fix_prev_inliers = true;
+  KimeraRPGO::Verbosity rpgo_verbosity = KimeraRPGO::Verbosity::UPDATE;
+  KimeraRPGO::Solver rpgo_solver = KimeraRPGO::Solver::LM;
+};
+
+void declare_config(HydraPgmoConfig& conf);
 
 }  // namespace hydra
+
+namespace kimera_pgmo {
+
+void declare_config(KimeraPgmoConfig& conf);
+
+}  // namespace kimera_pgmo
