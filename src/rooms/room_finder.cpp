@@ -234,11 +234,12 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
 
   if (log_file_) {
     if (graph_log_file_) {
-      const auto bson_str = places.toBson();
-      graph_entries_.push_back(
-          {graph_offset_, bson_str.size(), places.numNodes(), places.numEdges()});
-      graph_log_file_->write(bson_str.data(), bson_str.size());
-      graph_offset_ += bson_str.size();
+      LOG(FATAL) << "Not implemented currently";
+      /* const auto bson_str = places.toBson();*/
+      /* graph_entries_.push_back(*/
+      /*{graph_offset_, bson_str.size(), places.numNodes(), places.numEdges()});*/
+      /*graph_log_file_->write(bson_str.data(), bson_str.size());*/
+      /*graph_offset_ += bson_str.size();*/
     }
 
     logFiltration(*log_file_, filtration, window, info.distance);
