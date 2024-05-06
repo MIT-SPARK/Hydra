@@ -1,0 +1,42 @@
+---
+pgmo:
+  horizon: 100.0
+  track_mesh_graph_mapping: true
+  full_compression_method: 2    # voxel clearing
+  graph_compression_method: 1    # voxblox
+  d_graph_resolution: 2.5
+  output_mesh_resolution: 0.005
+objects:
+  prefix: O
+  active_horizon_s: 10.0
+  active_index_horizon_m: 7.0
+  min_cluster_size: 25
+  max_cluster_size: 100000
+  cluster_tolerance: 0.18
+places2d:
+  prefix: P
+
+  # Max side length for places without any other overlappig semantic classes
+  pure_final_place_size: 5
+
+  # Whether to further subdivide places that overlap other semantic classes
+  enable_place_purity: false
+  # Max side length for places with overlapping semantic class
+  impure_final_place_size: 4
+
+  # Params related to place clustering
+  cluster_tolerance: 1
+  min_cluster_size: 50
+  max_cluster_size: 100000
+  min_final_place_points: 10
+
+  # Params related to place edge connections
+  place_max_neighbor_z_diff: 100
+  place_overlap_threshold: 0.0
+
+min_object_vertices: 20
+prune_mesh_indices: true
+filter_places: true
+min_places_component_size: 3
+enable_active_mesh_pub: false
+enable_segmented_mesh_pub: false

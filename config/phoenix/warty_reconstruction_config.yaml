@@ -1,0 +1,70 @@
+---
+clear_distant_blocks: true
+dense_representation_radius_m: 8.0
+voxels_per_side: 16
+voxel_size: 0.1
+num_poses_per_update: 1
+max_input_queue_size: 0
+pointcloud_separation_s: 0.2
+tf_wait_duration_s: 0.1
+gvd:
+  max_distance_m: 4.5
+  min_distance_m: 0.2
+  min_diff_m: 0.1
+  min_weight: 1.0e-6
+  positive_distance_only: true
+  min_basis_for_extraction: 1
+  num_buckets: 20
+  multi_queue: false
+  extract_graph: true
+  voronoi_config:
+    mode: L1_THEN_ANGLE
+    min_distance_m: 0.30
+    parent_l1_separation: 20
+    parent_cos_angle_separation: 0.2
+graph_extractor:
+  type: CompressionGraphExtractor
+  # compresssion extractor
+  compression_distance_m: 1.0
+  min_node_distance_m: 0.4
+  min_edge_distance_m: 0.3
+  validate_graph: false
+  add_heuristic_edges: false
+  # floodfill extractor
+  node_merge_distance_m: 0.5
+  min_extra_basis: 2
+  min_vertex_basis: 4
+  merge_new_nodes: true
+  edge_splitting_merge_nodes: true
+  max_edge_split_iterations: 5
+  max_edge_deviation: 4
+  # heurisitic edges
+  add_overlap_edges: true
+  overlap_edges:
+    num_neighbors_to_check: 4
+    min_clearance_m: 0.4
+  add_freespace_edges: true
+  freespace_edges:
+    num_nodes_to_check: 5
+    num_neighbors_to_find: 1
+    max_length_m: 2.0
+    min_clearance_m: 0.5
+mesh:
+  min_weight: 0.0001
+  integrator_threads: -1
+tsdf:
+  voxel_carving_enabled: true
+  use_const_weight: false
+  default_truncation_distance: 0.2
+  max_weight: 10000
+  min_ray_length_m: 0.1
+  max_ray_length_m: 4.5
+  allow_clear: true
+  use_weight_dropoff: true
+  use_sparsity_compensation_factor: false
+  integration_order_mode: mixed
+  enable_anti_grazing: false
+  start_voxel_subsampling_factor: 2
+  max_consecutive_ray_collisions: 2
+  clear_checks_every_n_frames: 1
+  integrator_threads: -1
