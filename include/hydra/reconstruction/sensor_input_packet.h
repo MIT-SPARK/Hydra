@@ -48,6 +48,7 @@ struct SensorInputPacket {
 
  public:
   const uint64_t timestamp_ns;
+  std::string sensor_frame;
 };
 
 struct ImageInputPacket : public SensorInputPacket {
