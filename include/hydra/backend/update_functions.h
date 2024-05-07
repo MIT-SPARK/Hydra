@@ -171,6 +171,37 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
   mutable std::unique_ptr<NearestNodeFinder> node_finder;
 };
 
+struct UpdateFrontiersFunctor : public UpdateFunctor {
+  UpdateFrontiersFunctor() {}
+
+  Hooks hooks() const override;
+
+  MergeMap call(SharedDsgInfo& dsg, const UpdateInfo::ConstPtr& info) const override;
+
+  size_t makeNodeFinder(const SceneGraphLayer& layer) const;
+
+  void updateFrontier(const gtsam::Values& values,
+                      NodeId node,
+                      NodeAttributes& attrs) const;
+
+  std::optional<NodeId> proposeFrontierMerge(const SceneGraphLayer& layer,
+                                             NodeId node_id,
+                                             const FrontierNodeAttributes& attrs,
+                                             bool skip_first) const;
+
+  bool shouldMerge(const FrontierNodeAttributes& from_attrs,
+                   const FrontierNodeAttributes& to_attrs) const;
+
+  void filterMissing(DynamicSceneGraph& graph,
+                     const std::list<NodeId> missing_nodes) const;
+
+  size_t num_merges_to_consider = 1;
+  bool use_active_flag = true;  // currently this disables any frontier merges I believe
+  double pos_threshold_m;
+  double distance_tolerance_m;
+  mutable std::unique_ptr<NearestNodeFinder> node_finder;
+};
+
 struct UpdateRoomsFunctor : public UpdateFunctor {
   UpdateRoomsFunctor(const RoomFinderConfig& config);
 

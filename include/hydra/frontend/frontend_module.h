@@ -48,6 +48,7 @@
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/frontend/freespace_places_interface.h"
+#include "hydra/frontend/frontier_places_interface.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/surface_places_interface.h"
 #include "hydra/reconstruction/reconstruction_output.h"
@@ -78,6 +79,8 @@ class FrontendModule : public Module {
     bool validate_vertices = false;
     config::VirtualConfig<SurfacePlacesInterface> surface_places;
     config::VirtualConfig<FreespacePlacesInterface> freespace_places;
+    bool use_frontiers = false;
+    config::VirtualConfig<FrontierPlacesInterface> frontier_places;
     std::vector<Sink::Factory> sinks;
   } const config;
 
@@ -115,6 +118,8 @@ class FrontendModule : public Module {
   void updateMesh(const ReconstructionOutput& msg);
 
   void updateObjects(const ReconstructionOutput& msg);
+
+  void updateFrontiers(const ReconstructionOutput& msg);
 
   void updatePlaces(const ReconstructionOutput& msg);
 
@@ -160,6 +165,8 @@ class FrontendModule : public Module {
   std::unique_ptr<MeshSegmenter> segmenter_;
   std::unique_ptr<SurfacePlacesInterface> surface_places_;
   std::unique_ptr<FreespacePlacesInterface> freespace_places_;
+  std::unique_ptr<FrontierPlacesInterface> frontier_places_;
+
   SceneGraphLogger frontend_graph_logger_;
   LogSetup::Ptr logs_;
 

@@ -47,9 +47,11 @@
 #include <fstream>
 
 #include "hydra/common/hydra_config.h"
+#include "hydra/frontend/frontier_extractor.h"
 #include "hydra/frontend/gvd_place_extractor.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/place_2d_segmenter.h"
+#include "hydra/reconstruction/voxblox_utilities.h"
 #include "hydra/utils/display_utilities.h"
 #include "hydra/utils/mesh_interface.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
@@ -90,6 +92,10 @@ void declare_config(FrontendModule::Config& config) {
   // freespace (i.e., 3D) places
   config.freespace_places.setOptional();
   field(config.freespace_places, "freespace_places");
+  // frontier (i.e. 3D, boundary to unknown space) places
+  field(config.use_frontiers, "use_frontiers");
+  config.frontier_places.setOptional();
+  field(config.frontier_places, "frontier_places");
 }
 
 FrontendModule::FrontendModule(const Config& config,
@@ -102,8 +108,13 @@ FrontendModule::FrontendModule(const Config& config,
       state_(state),
       surface_places_(config.surface_places.create()),
       freespace_places_(config.freespace_places.create()),
+      frontier_places_(config.frontier_places.create()),
       sinks_(Sink::instantiate(config.sinks)) {
+  if (!config.use_frontiers) {
+    frontier_places_.reset();
+  }
   kimera_pgmo::MeshFrontendConfig pgmo_config = config.pgmo_config;
+
   const auto& prefix = HydraConfig::instance().getRobotPrefix();
   pgmo_config.robot_id = prefix.id;
 
@@ -151,6 +162,8 @@ void FrontendModule::initCallbacks() {
       std::bind(&FrontendModule::updatePoseGraph, this, std::placeholders::_1));
   input_callbacks_.push_back(
       std::bind(&FrontendModule::updatePlaces, this, std::placeholders::_1));
+  input_callbacks_.push_back(
+      std::bind(&FrontendModule::updateFrontiers, this, std::placeholders::_1));
 
   post_mesh_callbacks_.clear();
   post_mesh_callbacks_.push_back(
@@ -360,6 +373,25 @@ void FrontendModule::updateDeformationGraph(const ReconstructionOutput& input) {
   }
 }
 
+void FrontendModule::updateFrontiers(const ReconstructionOutput& input) {
+  if (!frontier_places_) {
+    return;
+  }
+  frontier_places_->updateRecentBlocks(input.world_t_body, input.tsdf->block_size());
+  {  // start graph critical section
+    std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
+
+    NodeIdSet active_nodes = freespace_places_->getActiveNodes();
+    const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
+    places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
+
+    frontier_places_->detectFrontiers(input, *dsg_->graph, *places_nn_finder_);
+    frontier_places_->addFrontiers(
+        input.timestamp_ns, *dsg_->graph, *places_nn_finder_);
+
+  }  // end graph update critical section
+}
+
 void FrontendModule::updatePlaces(const ReconstructionOutput& input) {
   if (!freespace_places_) {
     return;
@@ -560,6 +592,9 @@ void FrontendModule::archivePlaces(const NodeIdSet active_places) {
       const SceneGraphNode& prev_node = has_prev_node.value();
       prev_node.attributes().is_active = false;
       lcd_input_->archived_places.insert(prev);
+      if (frontier_places_) {
+        frontier_places_->archived_places_.push_back(prev);
+      }
     }
 
   }  // end graph update critical section

@@ -62,3 +62,14 @@ freespace_places:
       min_clearance_m: 0.4
     add_freespace_edges: false
     merge_policy: distance
+use_frontiers: false
+frontier_places:
+    type: "voxel_clustering"
+    cluster_tolerance: 0.3
+    min_cluster_size: 10
+    max_cluster_size: 100000
+    max_place_radius: 5
+    dense_frontiers: false
+    frontier_splitting_threshold: 0.2
+    point_threshold: 10
+    recent_block_distance: 25
