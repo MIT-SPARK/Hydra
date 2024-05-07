@@ -1234,6 +1234,15 @@ void reallocateMeshPoints(const std::vector<Place2d::PointT>& points,
     LOG(ERROR) << "Reallocating mesh points would make empty place. Skippings.";
     return;
   }
+
+  std::sort(p1_new_indices.begin(), p1_new_indices.end());
+  auto last = std::unique(p1_new_indices.begin(), p1_new_indices.end());
+  p1_new_indices.erase(last, p1_new_indices.end());
+
+  std::sort(p2_new_indices.begin(), p2_new_indices.end());
+  last = std::unique(p2_new_indices.begin(), p2_new_indices.end());
+  p2_new_indices.erase(last, p2_new_indices.end());
+
   attrs1.pcl_mesh_connections = p1_new_indices;
   attrs2.pcl_mesh_connections = p2_new_indices;
 
@@ -1303,7 +1312,7 @@ NodeId cleanupPlaces2d(const Places2dConfig& config,
   // active mesh vertices
   for (auto& id_node_pair : places_layer.nodes()) {
     auto& attrs = id_node_pair.second->attributes<Place2dNodeAttributes>();
-    if (attrs.need_cleanup_splitting) {
+    if (attrs.need_cleanup_splitting && !attrs.is_active) {
       bool has_active_neighbor = false;
       for (NodeId nid : id_node_pair.second->siblings()) {
         auto& neighbor_attrs = graph.getNode(nid).attributes<Place2dNodeAttributes>();
@@ -1324,6 +1333,11 @@ NodeId cleanupPlaces2d(const Places2dConfig& config,
         if (search == checked_nodes.end()) {
           checked_nodes.insert({nid, false});
         }
+
+        if (neighbor_attrs.is_active) {
+            continue;
+        }
+
         if (attrs.semantic_label == neighbor_attrs.semantic_label) {
           reallocateMeshPoints(mesh->points, attrs, neighbor_attrs);
         }
@@ -1364,6 +1378,24 @@ NodeId cleanupPlaces2d(const Places2dConfig& config,
       } else {
         graph.insertEdge(id, nid, ea.clone());
       }
+    }
+
+    std::vector<std::pair<NodeId, NodeId>> sibs_edges_to_remove;
+    for (auto& nid : graph.getNode(id).siblings()) {
+      auto neighbor_node = graph.findNode(nid);
+      Place2dNodeAttributes& attrs2 =
+          neighbor_node->attributes<Place2dNodeAttributes>();
+      EdgeAttributes ea;
+      if (!shouldAddPlaceConnection(attrs1,
+                                    attrs2,
+                                    config.connection_overlap_threshold,
+                                    config.connection_max_delta_z,
+                                    ea)) {
+          sibs_edges_to_remove.push_back({id, nid});
+      }
+    }
+    for (auto n1_n2 : sibs_edges_to_remove) {
+        graph.removeEdge(n1_n2.first, n1_n2.second);
     }
 
     if (finalize) {

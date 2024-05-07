@@ -6,6 +6,7 @@ invalid_labels: [0]
 frontend:
   objects:
     labels:
+      - 4
       - 7
       - 8
       - 9
