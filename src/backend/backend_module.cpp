@@ -104,7 +104,7 @@ std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol 
     return std::nullopt;
   }
 
-  return graph.getDynamicNode(node).value().get().timestamp.count();
+  return graph.getNode(node).timestamp.value().count();
 }
 
 BackendModule::BackendModule(const Config& config,
@@ -852,7 +852,7 @@ void BackendModule::runZmqUpdates() {
           id_node_pair.second->attributes<SemanticNodeAttributes>().name;
       room_name_map_[id_node_pair.first] = new_name;
 
-      auto node_opt = private_dsg_->graph->getNode(id_node_pair.first);
+      auto node_opt = private_dsg_->graph->findNode(id_node_pair.first);
       if (!node_opt) {
         VLOG(2) << "received update for node "
                 << NodeSymbol(id_node_pair.first).getLabel()
@@ -862,7 +862,7 @@ void BackendModule::runZmqUpdates() {
 
       VLOG(2) << "assiging name " << new_name << " to "
               << NodeSymbol(id_node_pair.first).getLabel();
-      node_opt->get().attributes<SemanticNodeAttributes>().name = new_name;
+      node_opt->attributes<SemanticNodeAttributes>().name = new_name;
     }
   }
 }

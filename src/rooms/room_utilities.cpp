@@ -54,7 +54,7 @@ Eigen::Vector3d getRoomPosition(const SceneGraphLayer& places,
 
   bool room_in_freespace = false;
   for (const auto& place : cluster) {
-    const auto& attrs = places.getNode(place)->get().attributes<PlaceNodeAttributes>();
+    const auto& attrs = places.getNode(place).attributes<PlaceNodeAttributes>();
     double room_distance = (room_position - attrs.position).norm();
     if (room_distance <= attrs.distance) {
       room_in_freespace = true;
@@ -118,7 +118,7 @@ void addEdgesToRoomLayer(const SceneGraphLayer& places,
 void addEdgesToRoomLayer(DynamicSceneGraph& graph,
                          const std::set<NodeId>& active_rooms) {
   for (const auto node_id : active_rooms) {
-    const auto& node = graph.getNode(node_id)->get();
+    const auto& node = graph.getNode(node_id);
     const auto room_siblings = node.siblings();
     for (const auto other : room_siblings) {
       if (active_rooms.count(other)) {
@@ -132,9 +132,9 @@ void addEdgesToRoomLayer(DynamicSceneGraph& graph,
         continue;
       }
 
-      const auto& child = graph.getNode(child_id)->get();
+      const auto& child = graph.getNode(child_id);
       for (const auto& sibling_id : child.siblings()) {
-        const auto& sibling = graph.getNode(sibling_id)->get();
+        const auto& sibling = graph.getNode(sibling_id);
         const auto parent = sibling.getParent();
         if (!parent) {
           continue;

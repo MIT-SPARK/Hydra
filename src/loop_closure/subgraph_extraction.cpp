@@ -69,7 +69,7 @@ void getObjectsWithinRadius(const DynamicSceneGraph& graph,
       },
       [](const auto&) { return true; },
       [&](const SceneGraphLayer&, NodeId node) {
-        for (const auto& child : graph.getNode(node)->get().children()) {
+        for (const auto& child : graph.getNode(node).children()) {
           if (graph.isDynamic(child)) {
             continue;
           }

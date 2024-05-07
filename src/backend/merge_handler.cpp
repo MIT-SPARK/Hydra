@@ -76,7 +76,7 @@ void MergeHandler::updateFromUnmergedGraph(const DynamicSceneGraph& graph) {
     // of the previously merged node so we copy over current attributes
     // and connections
     const auto node_id = id_entry_pair.first;
-    const SceneGraphNode& node = graph.getNode(node_id).value();
+    const auto& node = graph.getNode(node_id);
     updateNodeEntry(node, entry);
     // make sure we grab the latest backend version of the attributes
     // before finally caching the attributes of the node
@@ -209,9 +209,9 @@ void MergeHandler::updateMerges(const std::map<NodeId, NodeId>& new_merges,
     iter->second.insert(from);
     merged_nodes_[from] = to;
 
-    const auto& result_node = graph.getNode(to).value().get();
+    const auto& result_node = graph.getNode(to);
     if (undo_allowed_) {
-      addNodeToCache(graph.getNode(from).value(), merged_nodes_cache_, false);
+      addNodeToCache(graph.getNode(from), merged_nodes_cache_, false);
       addNodeToCache(result_node, parent_nodes_cache_, true);
     }
 

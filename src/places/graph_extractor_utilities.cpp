@@ -55,7 +55,7 @@ inline bool isValidPoint(const GvdVoxel* voxel, uint8_t min_extra_basis) {
 }
 
 inline double getNodeGvdDistance(const SceneGraphLayer& graph, NodeId node) {
-  return graph.getNode(node).value().get().attributes<PlaceNodeAttributes>().distance;
+  return graph.getNode(node).attributes<PlaceNodeAttributes>().distance;
 }
 
 void sortComponents(const SceneGraphLayer& graph, Components& to_sort) {
@@ -296,9 +296,9 @@ EdgeAttributes::Ptr getFreespaceEdgeInfo(const SceneGraphLayer& graph,
   }
 
   const double source_dist =
-      graph.getNode(node)->get().attributes<PlaceNodeAttributes>().distance;
+      graph.getNode(node).attributes<PlaceNodeAttributes>().distance;
   const double target_dist =
-      graph.getNode(other)->get().attributes<PlaceNodeAttributes>().distance;
+      graph.getNode(other).attributes<PlaceNodeAttributes>().distance;
   double min_weight = std::min(source_dist, target_dist);
 
   for (const auto& index : path) {

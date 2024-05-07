@@ -96,7 +96,7 @@ void RoomEvaluator::computeDsgIndices(const DynamicSceneGraph& graph,
     indices[room] = {};
 
     for (const auto& child : room_node->children()) {
-      const auto& place_node = graph.getNode(child).value().get();
+      const auto& place_node = graph.getNode(child);
       const auto& attrs = place_node.attributes<PlaceNodeAttributes>();
       const voxblox::Point pos = attrs.position.cast<float>();
 

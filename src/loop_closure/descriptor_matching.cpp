@@ -40,7 +40,6 @@ namespace hydra {
 namespace lcd {
 
 using Dsg = DynamicSceneGraph;
-using DsgNode = DynamicSceneGraphNode;
 
 float computeDistanceHist(const Descriptor& lhs,
                           const Descriptor& rhs,

@@ -518,7 +518,7 @@ void FrontendModule::assignBowVectors(const DynamicLayer& agents) {
       continue;
     }
 
-    const auto& node = agents.getNodeByIndex(agent_index->second)->get();
+    const auto& node = agents.getNodeByIndex(agent_index->second);
     VLOG(5) << "[Hydra Frontend] assigned bow vector of " << pgmo_key.getLabel()
             << " to dsg node " << NodeSymbol(node.id).getLabel();
     // lcd_input_->new_agent_nodes.push_back(node.id);
@@ -584,12 +584,12 @@ void FrontendModule::archivePlaces(const NodeIdSet active_places) {
         continue;
       }
 
-      const auto has_prev_node = dsg_->graph->getNode(prev);
+      const auto has_prev_node = dsg_->graph->findNode(prev);
       if (!has_prev_node) {
         continue;
       }
 
-      const SceneGraphNode& prev_node = has_prev_node.value();
+      const auto& prev_node = *has_prev_node;
       prev_node.attributes().is_active = false;
       lcd_input_->archived_places.insert(prev);
       if (frontier_places_) {
@@ -610,12 +610,12 @@ void FrontendModule::archivePlaces2d(const NodeIdSet active_places) {
         continue;
       }
 
-      const auto has_prev_node = dsg_->graph->getNode(prev);
+      const auto has_prev_node = dsg_->graph->findNode(prev);
       if (!has_prev_node) {
         continue;
       }
 
-      const SceneGraphNode& prev_node = has_prev_node.value();
+      const auto& prev_node = *has_prev_node;
       prev_node.attributes().is_active = false;
     }
   }  // end graph update critical section
@@ -628,12 +628,12 @@ void FrontendModule::addPlaceObjectEdges(uint64_t timestamp_ns) {
   }
 
   for (const auto& object_id : segmenter_->getActiveNodes()) {
-    const auto object_opt = dsg_->graph->getNode(object_id);
+    const auto object_opt = dsg_->graph->findNode(object_id);
     if (!object_opt) {
       continue;
     }
 
-    const SceneGraphNode& object_node = *object_opt;
+    const auto& object_node = *object_opt;
     const auto parent_opt = object_node.getParent();
     if (parent_opt) {
       dsg_->graph->removeEdge(object_id, *parent_opt);
@@ -669,7 +669,7 @@ void FrontendModule::addPlaceAgentEdges(uint64_t timestamp_ns) {
 
     auto iter = curr_active.begin();
     while (iter != curr_active.end()) {
-      const auto& node = layer.getNodeByIndex(*iter)->get();
+      const auto& node = layer.getNodeByIndex(*iter);
       const auto prev_parent = node.getParent();
       if (prev_parent) {
         dsg_->graph->removeEdge(node.id, *prev_parent);
@@ -689,7 +689,7 @@ void FrontendModule::addPlaceAgentEdges(uint64_t timestamp_ns) {
         continue;
       }
 
-      const auto& parent_attrs = dsg_->graph->getNode(parent)->get().attributes();
+      const auto& parent_attrs = dsg_->graph->getNode(parent).attributes();
       if (!parent_attrs.is_active) {
         iter = curr_active.erase(iter);
         continue;

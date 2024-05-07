@@ -417,9 +417,8 @@ bool FloodfillGraphExtractor::attemptNodeMerge(const GvdLayer& layer,
     return false;
   }
 
-  const size_t curr_connections = graph.getNode(curr_info.id)->get().siblings().size();
-  const size_t neighbor_connections =
-      graph.getNode(neighbor_info.id)->get().siblings().size();
+  const size_t curr_connections = graph.getNode(curr_info.id).siblings().size();
+  const size_t neighbor_connections = graph.getNode(neighbor_info.id).siblings().size();
 
   if (curr_connections <= neighbor_connections) {
     clearNodeInfo(curr_info.id);

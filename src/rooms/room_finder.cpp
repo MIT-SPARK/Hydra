@@ -70,7 +70,7 @@ void fillIndexQueue(const SceneGraphLayer& places,
 
     uint64_t oldest_time_ns = std::numeric_limits<uint64_t>::max();
     for (const auto& place : id_cluster_pair.second) {
-      const auto& attrs = places.getNode(place)->get().attributes();
+      const auto& attrs = places.getNode(place).attributes();
       if (attrs.last_update_time_ns < oldest_time_ns) {
         oldest_time_ns = attrs.last_update_time_ns;
       }

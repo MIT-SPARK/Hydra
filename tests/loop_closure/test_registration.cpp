@@ -242,8 +242,6 @@ TEST_F(LayerRegistrationTests, TestSemanticRegistration) {
     uint8_t label = (count > (src_layer->numNodes() / 2)) ? 0 : 1;
     id_node_pair.second->attributes<SemanticNodeAttributes>().semantic_label = label;
     dest_layer->getNode(id_node_pair.first)
-        .value()
-        .get()
         .attributes<SemanticNodeAttributes>()
         .semantic_label = label;
     count++;

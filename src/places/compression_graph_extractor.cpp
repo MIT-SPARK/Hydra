@@ -662,7 +662,7 @@ void CompressionGraphExtractor::assignCompressedNodeAttributes() {
       addGraphNode(graph_id);
     }
 
-    auto& attrs = getGraph().getNode(graph_id)->get().attributes<PlaceNodeAttributes>();
+    auto& attrs = getGraph().getNode(graph_id).attributes<PlaceNodeAttributes>();
     attrs.distance = best_member->distance;
     attrs.num_basis_points = best_member->num_basis_points;
     attrs.position = best_member->position;

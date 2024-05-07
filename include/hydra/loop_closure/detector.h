@@ -115,7 +115,7 @@ class LcdDetector {
       const std::map<LayerId, LayerRegistrationConfig>& reg_configs);
 
   bool addNewDescriptors(const DynamicSceneGraph& graph,
-                         const DynamicSceneGraphNode& agent_node);
+                         const SceneGraphNode& agent_node);
 
   std::vector<RegistrationSolution> registerAndVerify(const DynamicSceneGraph& dsg,
                                                       const SearchResultMap& matches,

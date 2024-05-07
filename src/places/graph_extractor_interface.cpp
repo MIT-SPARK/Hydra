@@ -68,7 +68,7 @@ void GraphExtractorInterface::assignMeshVertices(const GvdLayer& gvd,
     const NodeId node_id = id_index_pair.first;
     const GlobalIndex& node_index = id_index_pair.second;
 
-    auto& attrs = graph_->getNode(node_id)->get().attributes<PlaceNodeAttributes>();
+    auto& attrs = graph_->getNode(node_id).attributes<PlaceNodeAttributes>();
     attrs.voxblox_mesh_connections.clear();
 
     const GvdVoxel* voxel = gvd.getVoxelPtrByGlobalIndex(node_index);
@@ -149,9 +149,9 @@ EdgeAttributes::Ptr GraphExtractorInterface::makeEdgeInfo(const GvdLayer& layer,
                                                           NodeId source_id,
                                                           NodeId target_id) const {
   const double source_dist =
-      graph_->getNode(source_id)->get().attributes<PlaceNodeAttributes>().distance;
+      graph_->getNode(source_id).attributes<PlaceNodeAttributes>().distance;
   const double target_dist =
-      graph_->getNode(target_id)->get().attributes<PlaceNodeAttributes>().distance;
+      graph_->getNode(target_id).attributes<PlaceNodeAttributes>().distance;
 
   double min_weight = std::min(source_dist, target_dist);
 
@@ -193,9 +193,9 @@ void GraphExtractorInterface::updateGraphEdge(NodeId source,
                                               NodeId target,
                                               EdgeAttributes::Ptr&& attrs,
                                               bool is_heursitic) {
-  auto prev_edge = graph_->getEdge(source, target);
+  auto prev_edge = graph_->findEdge(source, target);
   if (prev_edge) {
-    *prev_edge->get().info = *attrs;
+    *prev_edge->info = *attrs;
     if (!is_heursitic) {
       // make sure any non-heurstic source of an edge takes precedence
       heuristic_edges_.erase(EdgeKey(source, target));

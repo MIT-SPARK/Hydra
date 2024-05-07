@@ -281,7 +281,7 @@ void MeshSegmenter::archiveOldNodes(const DynamicSceneGraph& graph,
         continue;
       }
 
-      auto& attrs = graph.getNode(node_id)->get().attributes<ObjectNodeAttributes>();
+      auto& attrs = graph.getNode(node_id).attributes<ObjectNodeAttributes>();
       bool is_active = false;
       for (const auto index : attrs.mesh_connections) {
         if (index >= num_archived_vertices) {
@@ -314,7 +314,7 @@ void MeshSegmenter::updateGraph(uint64_t timestamp_ns,
       bool matches_prev_node = false;
       std::vector<NodeId> nodes_not_in_graph;
       for (const auto& prev_node_id : active_nodes_.at(label)) {
-        const SceneGraphNode& prev_node = graph.getNode(prev_node_id).value();
+        const auto& prev_node = graph.getNode(prev_node_id);
         if (nodesMatch(cluster, prev_node)) {
           updateNodeInGraph(graph, cluster, prev_node, timestamp_ns);
           matches_prev_node = true;
@@ -339,7 +339,7 @@ void MeshSegmenter::mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label) {
     if (merged_nodes.count(node_id)) {
       continue;
     }
-    const auto& node = graph.getNode(node_id)->get();
+    const auto& node = graph.getNode(node_id);
 
     std::list<NodeId> to_merge;
     for (const auto& other_id : curr_active) {
@@ -351,7 +351,7 @@ void MeshSegmenter::mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label) {
         continue;
       }
 
-      const auto& other = graph.getNode(other_id)->get();
+      const auto& other = graph.getNode(other_id);
       if (nodesMatch(node, other) || nodesMatch(other, node)) {
         to_merge.push_back(other_id);
       }
@@ -359,7 +359,7 @@ void MeshSegmenter::mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label) {
 
     auto& attrs = node.attributes<ObjectNodeAttributes>();
     for (const auto& other_id : to_merge) {
-      const auto& other = graph.getNode(other_id)->get();
+      const auto& other = graph.getNode(other_id);
       auto& other_attrs = other.attributes<ObjectNodeAttributes>();
       mergeList(attrs.mesh_connections, other_attrs.mesh_connections);
       graph.removeNode(other_id);

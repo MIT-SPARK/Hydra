@@ -158,7 +158,7 @@ pcl::IndicesPtr getActivePlaceIndices(
   for (auto kv : active_places) {
     std::set<NodeId> nodes = kv.second;
     for (NodeId nid : nodes) {
-      auto& attrs = graph.getNode(nid)->get().attributes<Place2dNodeAttributes>();
+      auto& attrs = graph.getNode(nid).attributes<Place2dNodeAttributes>();
       size_t min_index = SIZE_MAX;
       size_t max_index = 0;
       auto iter = attrs.pcl_mesh_connections.begin();
@@ -368,8 +368,7 @@ void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
     for (auto kv : active_places_) {
       std::set<NodeId> nodes = kv.second;
       for (NodeId nid : nodes) {
-        Place2dNodeAttributes& attrs =
-            graph.getNode(nid)->get().attributes<Place2dNodeAttributes>();
+        auto& attrs = graph.getNode(nid).attributes<Place2dNodeAttributes>();
         if (attrs.pcl_mesh_connections.size() == 0 || attrs.boundary.size() < 3) {
           // Remove dangling places
           graph.removeNode(nid);
@@ -412,8 +411,7 @@ void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
   for (auto label_ns : full_nodes) {
     uint32_t label = label_ns.first;
     NodeSymbol ns1 = label_ns.second;
-    Place2dNodeAttributes& attrs1 =
-        graph.getNode(ns1)->get().attributes<Place2dNodeAttributes>();
+    auto& attrs1 = graph.getNode(ns1).attributes<Place2dNodeAttributes>();
 
     bool neighbors_are_fixed = true;
     for (auto label_ns2 : full_nodes) {
@@ -421,8 +419,7 @@ void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
       if (ns1 == ns2) {
         continue;
       }
-      Place2dNodeAttributes attrs2 =
-          graph.getNode(ns2)->get().attributes<Place2dNodeAttributes>();
+      const auto& attrs2 = graph.getNode(ns2).attributes<Place2dNodeAttributes>();
       EdgeAttributes ea;
       if (frontendAddPlaceConnection(attrs1, attrs2, ea)) {
         graph.insertEdge(ns1, ns2, ea.clone());

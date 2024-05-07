@@ -40,12 +40,12 @@ namespace lcd {
 
 namespace {
 
-inline const DynamicSceneGraphNode& makeDefaultAgentNode(DynamicSceneGraph& graph) {
+inline const SceneGraphNode& makeDefaultAgentNode(DynamicSceneGraph& graph) {
   using namespace std::chrono_literals;
   Eigen::Quaterniond q = Eigen::Quaterniond::Identity();
   Eigen::Vector3d t = Eigen::Vector3d::Zero();
   graph.emplaceNode(2, 'a', 10ns, std::make_unique<AgentNodeAttributes>(q, t, 0));
-  return graph.getDynamicNode(NodeSymbol('a', 0)).value();
+  return graph.getNode(NodeSymbol('a', 0));
 }
 
 inline void emplacePlaceNode(DynamicSceneGraph& graph,
@@ -62,7 +62,7 @@ inline void emplacePlaceNode(DynamicSceneGraph& graph,
 
 TEST(LoopClosureModuleDescriptorTests, TestAgentDescriptor) {
   DynamicSceneGraph graph;
-  const DynamicSceneGraphNode& node = makeDefaultAgentNode(graph);
+  const auto& node = makeDefaultAgentNode(graph);
 
   auto& attrs = node.attributes<AgentNodeAttributes>();
   attrs.dbow_ids.resize(5, 1);
@@ -110,7 +110,7 @@ TEST(LoopClosureModuleDescriptorTests, TestGetBinCorrect) {
 
 TEST(LoopClosureModuleDescriptorTests, TestPlaceDescriptor) {
   DynamicSceneGraph graph;
-  const DynamicSceneGraphNode& node = makeDefaultAgentNode(graph);
+  const auto& node = makeDefaultAgentNode(graph);
 
   size_t next_node_index = 0;
   // core measurements
@@ -199,7 +199,7 @@ void emplaceObjectNode(DynamicSceneGraph& graph,
 
 TEST(LoopClosureModuleDescriptorTests, TestObjectDescriptor) {
   DynamicSceneGraph graph;
-  const DynamicSceneGraphNode& node = makeDefaultAgentNode(graph);
+  const auto& node = makeDefaultAgentNode(graph);
 
   size_t next_place_index = 0;
   // core measurements

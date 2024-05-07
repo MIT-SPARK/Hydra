@@ -175,7 +175,7 @@ void filterInvalidNodes(const SceneGraphLayer& graph, NodeIdSet& active_nodes) {
   std::list<NodeId> invalid_nodes;
   for (const NodeId active_id : active_nodes) {
     const auto& node = graph.getNode(active_id);
-    const auto& attrs = node->get().attributes<PlaceNodeAttributes>();
+    const auto& attrs = node.attributes<PlaceNodeAttributes>();
     if (std::isnan(attrs.distance)) {
       invalid_nodes.push_back(active_id);
       continue;
@@ -218,12 +218,12 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& gr
 
   NodeIdSet active_neighborhood = active_nodes_;
   for (const auto& node_id : graph_extractor_->getDeletedNodes()) {
-    const auto node = graph.getNode(node_id);
+    const auto node = graph.findNode(node_id);
     if (!node) {
       continue;
     }
 
-    const auto& siblings = node->get().siblings();
+    const auto& siblings = node->siblings();
     active_neighborhood.insert(siblings.begin(), siblings.end());
     graph.removeNode(node_id);
   }
@@ -238,14 +238,14 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& gr
   }
 
   for (const auto node_id : active_nodes_) {
-    const auto& node = places.getNode(node_id)->get();
+    const auto& node = places.getNode(node_id);
     auto attrs = node.attributes().clone();
     attrs->is_active = true;
     attrs->last_update_time_ns = timestamp_ns;
     graph.addOrUpdateNode(DsgLayers::PLACES, node_id, std::move(attrs));
 
     for (const auto sibling : node.siblings()) {
-      const auto& edge = places.getEdge(node_id, sibling)->get();
+      const auto& edge = places.getEdge(node_id, sibling);
       graph.addOrUpdateEdge(edge.source, edge.target, edge.info->clone());
     }
   }
@@ -304,7 +304,7 @@ void GvdPlaceExtractor::filterGround(DynamicSceneGraph& graph) {
   std::list<NodeId> invalid_nodes;
   std::list<EdgeKey> invalid_edges;
   for (const auto& node_id : active_nodes_) {
-    const auto& node = graph.getNode(node_id)->get();
+    const auto& node = graph.getNode(node_id);
     const auto& attrs = node.attributes<PlaceNodeAttributes>();
     double curr_min_z = attrs.position.z() - attrs.distance;
     if (curr_min_z > max_z) {
@@ -316,7 +316,7 @@ void GvdPlaceExtractor::filterGround(DynamicSceneGraph& graph) {
     for (const auto& sibling : node.siblings()) {
       // this check should work: each side of the edge will be one of the extreme values
       // (and each side should be visited once
-      const auto& edge = graph.getEdge(node_id, sibling)->get();
+      const auto& edge = graph.getEdge(node_id, sibling);
       double edge_min_z = attrs.position.z() - edge.attributes().weight;
       if (edge_min_z > max_z) {
         invalid_edges.push_back(EdgeKey(edge.source, edge.target));

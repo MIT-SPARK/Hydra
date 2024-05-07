@@ -65,8 +65,7 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
   dsg_updates::UpdateObjectsFunctor functor;
   functor.call(*dsg, info);
 
-  ObjectNodeAttributes& result =
-      graph.getNode(0)->get().attributes<ObjectNodeAttributes>();
+  auto& result = graph.getNode(0).attributes<ObjectNodeAttributes>();
 
   {
     // No mesh, so nothing should change
@@ -128,10 +127,8 @@ TEST(DsgInterpolationTests, ObjectUpdateMergeLC) {
   dsg_updates::UpdateObjectsFunctor functor;
   functor.call(*dsg, info);
 
-  ObjectNodeAttributes& result0 =
-      graph.getNode(0)->get().attributes<ObjectNodeAttributes>();
-  ObjectNodeAttributes& result1 =
-      graph.getNode(1)->get().attributes<ObjectNodeAttributes>();
+  auto& result0 = graph.getNode(0).attributes<ObjectNodeAttributes>();
+  auto& result1 = graph.getNode(1).attributes<ObjectNodeAttributes>();
 
   {
     // No mesh, so nothing should change
@@ -328,7 +325,7 @@ TEST(DsgInterpolationTests, PlaceUpdateNodeFinderBug) {
 
   // remove one archived node and unarchive the other
   graph.removeNode(NodeSymbol('p', 0));
-  graph.getNode(NodeSymbol('p', 5))->get().attributes().is_active = true;
+  graph.getNode(NodeSymbol('p', 5)).attributes().is_active = true;
   functor.call(*dsg, info);
 }
 
@@ -426,9 +423,8 @@ TEST(DsgInterpolationTests, AgentUpdate) {
   dsg_updates::updateAgents(*dsg, info);
 
   {  // external_key == node_id and in values
-    const auto& attrs = graph.getDynamicNode(NodeSymbol('a', 0))
-                            ->get()
-                            .attributes<AgentNodeAttributes>();
+    const auto& attrs =
+        graph.getNode(NodeSymbol('a', 0)).attributes<AgentNodeAttributes>();
     Eigen::Vector3d expected_pos(4.0, 5.0, 6.0);
     Eigen::Quaterniond expected_rot(0.0, 1.0, 0.0, 0.0);
     EXPECT_NEAR(0.0, (attrs.position - expected_pos).norm(), 1.0e-7);
@@ -436,9 +432,8 @@ TEST(DsgInterpolationTests, AgentUpdate) {
   }
 
   {  // external_key != node_id, but in values
-    const auto& attrs = graph.getDynamicNode(NodeSymbol('a', 1))
-                            ->get()
-                            .attributes<AgentNodeAttributes>();
+    const auto& attrs =
+        graph.getNode(NodeSymbol('a', 1)).attributes<AgentNodeAttributes>();
     Eigen::Vector3d expected_pos(7.0, 8.0, 9.0);
     Eigen::Quaterniond expected_rot(0.0, 0.0, 1.0, 0.0);
     EXPECT_NEAR(0.0, (attrs.position - expected_pos).norm(), 1.0e-7);
@@ -446,9 +441,8 @@ TEST(DsgInterpolationTests, AgentUpdate) {
   }
 
   {  // missing key in values, so doesn't get updated
-    const auto& attrs = graph.getDynamicNode(NodeSymbol('b', 0))
-                            ->get()
-                            .attributes<AgentNodeAttributes>();
+    const auto& attrs =
+        graph.getNode(NodeSymbol('b', 0)).attributes<AgentNodeAttributes>();
     Eigen::Vector3d expected_pos(1.0, 2.0, 3.0);
     Eigen::Quaterniond expected_rot(1.0, 0.0, 0.0, 0.0);
     EXPECT_NEAR(0.0, (attrs.position - expected_pos).norm(), 1.0e-7);

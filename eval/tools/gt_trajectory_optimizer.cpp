@@ -156,7 +156,7 @@ std::vector<size_t> read_timestamps(const std::string& filepath) {
 
   std::vector<size_t> times_ns;
   for (const auto& node : agents.nodes()) {
-    times_ns.push_back(node->timestamp.count());
+    times_ns.push_back(node->timestamp.value().count());
   }
 
   return times_ns;

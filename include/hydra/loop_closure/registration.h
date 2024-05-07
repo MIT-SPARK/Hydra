@@ -165,14 +165,14 @@ LayerRegistrationSolution registerDsgLayer(
   }
 
   for (const auto& src_id : problem.src_nodes) {
-    auto src_node_opt = src.getNode(src_id);
+    auto src_node_opt = src.findNode(src_id);
     CHECK(src_node_opt);
-    const SceneGraphNode& src_node = *src_node_opt;
+    const auto& src_node = *src_node_opt;
 
     for (const auto& dest_id : problem.dest_nodes) {
-      auto dest_node_opt = dest.getNode(dest_id);
+      auto dest_node_opt = dest.findNode(dest_id);
       CHECK(dest_node_opt);
-      const SceneGraphNode& dest_node = *dest_node_opt;
+      const auto& dest_node = *dest_node_opt;
 
       if (correspondence_func(src_node, dest_node)) {
         correspondences.emplace_back(src_id, dest_id);

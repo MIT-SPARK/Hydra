@@ -57,7 +57,7 @@ struct DescriptorFactory {
   virtual ~DescriptorFactory() = default;
 
   virtual Descriptor::Ptr construct(const DynamicSceneGraph& dsg,
-                                    const DynamicSceneGraphNode& agent_node) const = 0;
+                                    const SceneGraphNode& agent_node) const = 0;
 };
 
 struct AgentDescriptorFactory : DescriptorFactory {
@@ -66,14 +66,14 @@ struct AgentDescriptorFactory : DescriptorFactory {
   virtual ~AgentDescriptorFactory() = default;
 
   Descriptor::Ptr construct(const DynamicSceneGraph& graph,
-                            const DynamicSceneGraphNode& agent_node) const override;
+                            const SceneGraphNode& agent_node) const override;
 };
 
 struct ObjectDescriptorFactory : DescriptorFactory {
   ObjectDescriptorFactory(const SubgraphConfig& config, size_t num_classes);
 
   Descriptor::Ptr construct(const DynamicSceneGraph& graph,
-                            const DynamicSceneGraphNode& agent_node) const override;
+                            const SceneGraphNode& agent_node) const override;
 
   const SubgraphConfig config;
   const size_t num_classes;
@@ -108,7 +108,7 @@ struct PlaceDescriptorFactory : DescriptorFactory {
                          const HistogramConfig<double>& histogram);
 
   Descriptor::Ptr construct(const DynamicSceneGraph& graph,
-                            const DynamicSceneGraphNode& agent_node) const override;
+                            const SceneGraphNode& agent_node) const override;
 
   const SubgraphConfig config;
   const HistogramConfig<double> histogram;

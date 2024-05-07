@@ -155,7 +155,7 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
       lcd_detector_->updateDescriptorCache(*lcd_graph_, to_cache, timestamp_ns);
     }
 
-    auto time = lcd_graph_->getDynamicNode(*query_agent).value().get().timestamp;
+    const auto time = lcd_graph_->getNode(*query_agent).timestamp.value();
     auto results = lcd_detector_->detect(*lcd_graph_, *query_agent, time.count());
     for (const auto& result : results) {
       // TODO(nathan) consider augmenting with gtsam key
@@ -195,7 +195,7 @@ NodeIdSet LoopClosureModule::getPlacesToCache(const Eigen::Vector3d& agent_pos) 
   NodeIdSet to_cache;
   auto iter = potential_lcd_root_nodes_.begin();
   while (iter != potential_lcd_root_nodes_.end()) {
-    auto node_opt = lcd_graph_->getNode(*iter);
+    auto node_opt = lcd_graph_->findNode(*iter);
     if (!node_opt) {
       VLOG(5) << "[Hydra LCD] Deleted place " << NodeSymbol(*iter).getLabel()
               << " found in LCD queue";
@@ -203,7 +203,7 @@ NodeIdSet LoopClosureModule::getPlacesToCache(const Eigen::Vector3d& agent_pos) 
       continue;
     }
 
-    const auto& attrs = node_opt->get().attributes();
+    const auto& attrs = node_opt->attributes();
     if ((agent_pos - attrs.position).norm() < config_.descriptor_creation_horizon_m) {
       ++iter;
       continue;
@@ -223,8 +223,8 @@ std::optional<NodeId> LoopClosureModule::getQueryAgentId(size_t stamp_ns) {
     return std::nullopt;
   }
 
-  const auto& node = lcd_graph_->getDynamicNode(agent_queue_.top())->get();
-  const auto prev_time = node.timestamp;
+  const auto& node = lcd_graph_->getNode(agent_queue_.top());
+  const auto prev_time = node.timestamp.value();
 
   if (!node.hasParent()) {
     LOG(ERROR) << "Found agent node without parent: "

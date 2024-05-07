@@ -166,9 +166,9 @@ void clusterFrontiers(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
 }
 
 template <typename T>
-void checkNeighborAndAddBlock(const size_t i,
-                              const size_t j,
-                              const size_t k,
+void checkNeighborAndAddBlock(const int i,
+                              const int j,
+                              const int k,
                               const voxblox::BlockIndex& block_index,
                               const typename voxblox::Layer<T>::Ptr& layer,
                               std::vector<voxblox::BlockIndex>& blocks_to_skip,
@@ -211,22 +211,21 @@ std::vector<std::pair<Eigen::Vector3d, double>> getPlacesForBlock(
     const Eigen::Vector3f& block_origin,
     NearestNodeFinder& finder,
     const double block_size,
-    const double voxel_size,
+    const float voxel_size,
     const double max_place_radius) {
   std::vector<std::pair<Eigen::Vector3d, double>> center_dists;
   Eigen::Vector3f block_relative_center =
       voxblox::getCenterPointFromGridIndex<Eigen::Vector3f>(
-          {voxel_size / 2, voxel_size / 2, voxel_size / 2}, voxel_size);
+          {voxel_size / 2.0f, voxel_size / 2.0f, voxel_size / 2.0f}, voxel_size);
   Eigen::Vector3f global_block_center = block_origin + block_relative_center;
-  finder.findRadius(
-      global_block_center.cast<double>(),
-      block_size * 1.414 + max_place_radius,
-      false,
-      [&](NodeId pid, size_t, double) {
-        PlaceNodeAttributes pattr =
-            graph.getNode(pid).value().get().attributes<PlaceNodeAttributes>();
-        center_dists.push_back({pattr.position, pattr.distance});
-      });
+  finder.findRadius(global_block_center.cast<double>(),
+                    block_size * 1.414 + max_place_radius,
+                    false,
+                    [&](NodeId pid, size_t, double) {
+                      const auto& pattr =
+                          graph.getNode(pid).attributes<PlaceNodeAttributes>();
+                      center_dists.push_back({pattr.position, pattr.distance});
+                    });
   return center_dists;
 }
 
@@ -319,11 +318,12 @@ void processBlock(NearestNodeFinder& finder,
   // Get all recently-archived places near block
   std::vector<std::pair<Eigen::Vector3d, double>> archived_center_dists;
   for (auto pid : archived_places) {
-    auto node = graph.getNode(pid);
-    if (!node.has_value()) {
+    const auto node = graph.findNode(pid);
+    if (!node) {
       continue;
     }
-    PlaceNodeAttributes pattr = node.value().get().attributes<PlaceNodeAttributes>();
+
+    const auto& pattr = node->attributes<PlaceNodeAttributes>();
     archived_center_dists.push_back({pattr.position, pattr.distance});
   }
 
@@ -405,7 +405,7 @@ void processBlock(NearestNodeFinder& finder,
       // that's inside a place is in an archived place
       archived = archived || (!neighbor_free && neighbor_archived_free);
       Eigen::Vector3f relative_center =
-          voxblox::getCenterPointFromGridIndex<Eigen::Vector3f>({i, j, k}, voxel_size);
+          voxblox::getCenterPointFromGridIndex<Eigen::Vector3i>({i, j, k}, voxel_size);
       Eigen::Vector3f center = block_origin + relative_center;
 
       if (archived) {

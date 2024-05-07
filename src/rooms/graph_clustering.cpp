@@ -68,7 +68,7 @@ ClusterResults clusterGraphByModularity(const SceneGraphLayer& layer,
       layer,
       initial_clusters,
       [](const SceneGraphLayer& G, NodeId n1, const NodeId n2) {
-        return G.getEdge(n1, n2)->get().info->weight;
+        return G.getEdge(n1, n2).info->weight;
       },
       max_iters,
       gamma);
@@ -215,7 +215,7 @@ ClusterResults clusterGraphByNeighbors(const SceneGraphLayer& layer,
         continue;
       }
 
-      frontier.push({id, iter->second, layer.getEdge(id, sibling)->get().info->weight});
+      frontier.push({id, iter->second, layer.getEdge(id, sibling).info->weight});
     }
   }
 
@@ -228,7 +228,7 @@ ClusterResults clusterGraphByNeighbors(const SceneGraphLayer& layer,
     }
 
     labels[candidate.id] = candidate.label;
-    const SceneGraphNode& node = layer.getNode(candidate.id).value();
+    const auto& node = layer.getNode(candidate.id);
     for (const auto sibling : node.siblings()) {
       if (labels.count(sibling)) {
         continue;
@@ -236,7 +236,7 @@ ClusterResults clusterGraphByNeighbors(const SceneGraphLayer& layer,
 
       frontier.push({sibling,
                      candidate.label,
-                     layer.getEdge(candidate.id, sibling)->get().info->weight});
+                     layer.getEdge(candidate.id, sibling).info->weight});
     }
   }
 

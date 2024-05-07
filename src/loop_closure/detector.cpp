@@ -104,7 +104,6 @@ void configureDescriptorFactories(lcd::LcdDetector&, const LcdDetectorConfig&) {
 }
 #endif
 
-using DsgNode = DynamicSceneGraphNode;
 using hydra::timing::ScopedTimer;
 using SearchConfigMap = std::map<LayerId, DescriptorMatchConfig>;
 using RegConfigMap = std::map<LayerId, LayerRegistrationConfig>;
@@ -264,7 +263,7 @@ void LcdDetector::resetLayerAssignments(const SearchConfigMap& search_configs,
 }
 
 bool LcdDetector::addNewDescriptors(const DynamicSceneGraph& graph,
-                                    const DynamicSceneGraphNode& agent_node) {
+                                    const SceneGraphNode& agent_node) {
   auto parent = agent_node.getParent();
   if (!parent) {
     return false;
@@ -309,7 +308,7 @@ void LcdDetector::updateDescriptorCache(
                  // sanity check for now
     }
 
-    const SceneGraphNode& node = dsg.getNode(place_id).value();
+    const auto& node = dsg.getNode(place_id);
 
     for (const auto& child : node.children()) {
       if (dsg.isDynamic(child)) {
@@ -319,7 +318,7 @@ void LcdDetector::updateDescriptorCache(
   }
 
   for (const auto& agent_node : new_agent_nodes) {
-    const DynamicSceneGraphNode& node = dsg.getDynamicNode(agent_node).value();
+    const auto& node = dsg.getNode(agent_node);
     addNewDescriptors(dsg, node);
   }
 }
@@ -410,7 +409,7 @@ std::vector<RegistrationSolution> LcdDetector::detect(const DynamicSceneGraph& d
     prev_valid_roots.insert(id_desc_pair.first);
   }
 
-  const DsgNode& latest_node = dsg.getDynamicNode(agent_id).value();
+  const auto& latest_node = dsg.getNode(agent_id);
   VLOG(2) << "************************************************************";
   VLOG(2) << "LCD Matching: " << NodeSymbol(latest_node.id).getLabel();
 

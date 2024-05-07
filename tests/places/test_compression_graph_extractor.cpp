@@ -256,32 +256,28 @@ TEST_F(CompressionGraphExtractorTestFixture, testAttributeAssignmentOneToOne) {
   ASSERT_TRUE(places.hasNode("p2"_id));
 
   {
-    const auto& attrs =
-        places.getNode("p0"_id)->get().attributes<PlaceNodeAttributes>();
+    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
     EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 0, 1)).norm(), 0.0, 1.0e-9);
     EXPECT_EQ(attrs.distance, 0.1);
     EXPECT_EQ(attrs.num_basis_points, 1u);
   }
 
   {
-    const auto& attrs =
-        places.getNode("p0"_id)->get().attributes<PlaceNodeAttributes>();
+    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
     EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 0, 1)).norm(), 0.0, 1.0e-9);
     EXPECT_EQ(attrs.distance, 0.1);
     EXPECT_EQ(attrs.num_basis_points, 1u);
   }
 
   {
-    const auto& attrs =
-        places.getNode("p1"_id)->get().attributes<PlaceNodeAttributes>();
+    const auto& attrs = places.getNode("p1"_id).attributes<PlaceNodeAttributes>();
     EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 0, 2)).norm(), 0.0, 1.0e-9);
     EXPECT_EQ(attrs.distance, 0.2);
     EXPECT_EQ(attrs.num_basis_points, 2u);
   }
 
   {
-    const auto& attrs =
-        places.getNode("p2"_id)->get().attributes<PlaceNodeAttributes>();
+    const auto& attrs = places.getNode("p2"_id).attributes<PlaceNodeAttributes>();
     EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 1, 0)).norm(), 0.0, 1.0e-9);
     EXPECT_EQ(attrs.distance, 0.4);
     EXPECT_EQ(attrs.num_basis_points, 4u);
@@ -324,8 +320,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testAttributeAssignmentManyToOne) {
   EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
 
   {
-    const auto& attrs =
-        places.getNode("p0"_id)->get().attributes<PlaceNodeAttributes>();
+    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
     EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 1, 0)).norm(), 0.0, 1.0e-9)
         << attrs.position.transpose();
     EXPECT_EQ(attrs.distance, 0.4);
@@ -333,8 +328,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testAttributeAssignmentManyToOne) {
   }
 
   {
-    const auto& attrs =
-        places.getNode("p1"_id)->get().attributes<PlaceNodeAttributes>();
+    const auto& attrs = places.getNode("p1"_id).attributes<PlaceNodeAttributes>();
     EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 0, 4)).norm(), 0.0, 1.0e-9)
         << attrs.position.transpose();
     EXPECT_EQ(attrs.distance, 0.5);
@@ -372,8 +366,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testSingleVoxelDeletion) {
     const Remapping expected_remapping{{0, 0}, {1, 0}, {2, 0}, {3, 0}};
     EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
 
-    const auto& attrs =
-        places.getNode("p0"_id)->get().attributes<PlaceNodeAttributes>();
+    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
     EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 0, 4)).norm(), 0.0, 1.0e-9)
         << attrs.position.transpose();
     EXPECT_EQ(attrs.distance, 0.4);
@@ -392,8 +385,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testSingleVoxelDeletion) {
     const Remapping expected_remapping{{0, 0}, {3, 0}};
     EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
 
-    const auto& attrs =
-        places.getNode("p0"_id)->get().attributes<PlaceNodeAttributes>();
+    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
     EXPECT_NEAR((attrs.position - Eigen::Vector3d(1, 0, 2)).norm(), 0.0, 1.0e-9)
         << attrs.position.transpose();
     EXPECT_EQ(attrs.distance, 0.5);
@@ -433,8 +425,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testVoxelDeletion) {
     EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
 
     ASSERT_TRUE(places.hasNode("p0"_id));
-    const auto& attrs =
-        places.getNode("p0"_id)->get().attributes<PlaceNodeAttributes>();
+    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
     EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 1, 0)).norm(), 0.0, 1.0e-9)
         << attrs.position.transpose();
     EXPECT_EQ(attrs.distance, 0.4);
@@ -452,8 +443,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testVoxelDeletion) {
     EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
 
     ASSERT_TRUE(places.hasNode("p0"_id));
-    const auto& attrs =
-        places.getNode("p0"_id)->get().attributes<PlaceNodeAttributes>();
+    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
     EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 0, 1)).norm(), 0.0, 1.0e-9)
         << attrs.position.transpose();
     EXPECT_EQ(attrs.distance, 0.1);
@@ -485,8 +475,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testVoxelDeletion) {
     EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
 
     ASSERT_TRUE(places.hasNode("p2"_id));
-    const auto& attrs =
-        places.getNode("p2"_id)->get().attributes<PlaceNodeAttributes>();
+    const auto& attrs = places.getNode("p2"_id).attributes<PlaceNodeAttributes>();
     EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 0, 1)).norm(), 0.0, 1.0e-9)
         << attrs.position.transpose();
     EXPECT_EQ(attrs.distance, 0.1);
@@ -525,8 +514,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testVoxelArchival) {
     const Remapping expected_remapping{{0, 0}, {1, 1}, {2, 1}, {3, 0}, {4, 1}};
     EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
 
-    const auto& attrs =
-        places.getNode("p0"_id)->get().attributes<PlaceNodeAttributes>();
+    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
     EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 1, 0)).norm(), 0.0, 1.0e-9)
         << attrs.position.transpose();
     EXPECT_EQ(attrs.distance, 0.4);
@@ -547,8 +535,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testVoxelArchival) {
     const Remapping expected_remapping{{0, 0}, {1, 1}, {2, 1}, {3, 0}, {4, 1}};
     EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
 
-    const auto& attrs =
-        places.getNode("p0"_id)->get().attributes<PlaceNodeAttributes>();
+    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
     EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 0, 1)).norm(), 0.0, 1.0e-9)
         << attrs.position.transpose();
     EXPECT_EQ(attrs.distance, 0.1);
@@ -598,8 +585,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testArchiveAndDelete) {
     const Remapping expected_remapping{{0, 0}, {1, 1}, {2, 1}, {3, 0}, {4, 1}};
     EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
 
-    const auto& attrs =
-        places.getNode("p0"_id)->get().attributes<PlaceNodeAttributes>();
+    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
     EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 1, 0)).norm(), 0.0, 1.0e-9)
         << attrs.position.transpose();
     EXPECT_EQ(attrs.distance, 0.4);
@@ -619,8 +605,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testArchiveAndDelete) {
     const Remapping expected_remapping{{0, 0}, {1, 1}, {2, 1}, {4, 1}};
     EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
 
-    const auto& attrs =
-        places.getNode("p0"_id)->get().attributes<PlaceNodeAttributes>();
+    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
     EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 0, 1)).norm(), 0.0, 1.0e-9)
         << attrs.position.transpose();
     EXPECT_EQ(attrs.distance, 0.1);

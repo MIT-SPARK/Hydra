@@ -48,7 +48,6 @@ inline std::ostream& operator<<(std::ostream& out, const gtsam::Quaternion& q) {
   return out;
 }
 
-using DsgNode = DynamicSceneGraphNode;
 using hydra::timing::ScopedTimer;
 
 struct AgentNodePose {
@@ -63,7 +62,7 @@ AgentNodePose getAgentPose(const DynamicSceneGraph& graph, NodeId root_id) {
     return {};
   }
 
-  const SceneGraphNode& root_node = graph.getNode(root_id).value();
+  const auto& root_node = graph.getNode(root_id);
 
   std::optional<NodeId> child_id = std::nullopt;
   for (const auto& root_child : root_node.children()) {
@@ -79,15 +78,13 @@ AgentNodePose getAgentPose(const DynamicSceneGraph& graph, NodeId root_id) {
 
   CHECK(child_id);
 
-  const auto& attrs =
-      graph.getNode(*child_id).value().get().attributes<AgentNodeAttributes>();
+  const auto& attrs = graph.getNode(*child_id).attributes<AgentNodeAttributes>();
   return {
       true, gtsam::Pose3(gtsam::Rot3(attrs.world_R_body), attrs.position), *child_id};
 }
 
 AgentNodePose getQueryPose(const DynamicSceneGraph& graph, NodeId query_agent_id) {
-  const auto& attrs =
-      graph.getNode(query_agent_id).value().get().attributes<AgentNodeAttributes>();
+  const auto& attrs = graph.getNode(query_agent_id).attributes<AgentNodeAttributes>();
   return {true,
           gtsam::Pose3(gtsam::Rot3(attrs.world_R_body), attrs.position),
           query_agent_id};
@@ -184,8 +181,7 @@ RegistrationSolution DsgTeaserSolver::solve(const DynamicSceneGraph& dsg,
                                             const DsgRegistrationInput& match,
                                             NodeId query_agent_id) const {
   // TODO(nathan) helper function in dsg
-  const uint64_t timestamp =
-      dsg.getDynamicNode(query_agent_id).value().get().timestamp.count();
+  const uint64_t timestamp = dsg.getNode(query_agent_id).timestamp.value().count();
   ScopedTimer timer(timer_prefix, timestamp, true, 2, false);
 
   LayerRegistrationProblem<std::set<NodeId>> problem;

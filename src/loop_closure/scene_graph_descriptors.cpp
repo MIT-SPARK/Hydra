@@ -40,10 +40,9 @@ namespace hydra {
 namespace lcd {
 
 using Dsg = DynamicSceneGraph;
-using DsgNode = DynamicSceneGraphNode;
 
-Descriptor::Ptr AgentDescriptorFactory::construct(const Dsg& graph,
-                                                  const DsgNode& agent_node) const {
+Descriptor::Ptr AgentDescriptorFactory::construct(
+    const Dsg& graph, const SceneGraphNode& agent_node) const {
   auto parent = agent_node.getParent();
   if (!parent) {
     return nullptr;
@@ -56,9 +55,8 @@ Descriptor::Ptr AgentDescriptorFactory::construct(const Dsg& graph,
   descriptor->values = attrs.dbow_values;
   descriptor->root_node = *parent;
   descriptor->nodes.insert(agent_node.id);
-  descriptor->timestamp = agent_node.timestamp;
-  descriptor->root_position =
-      graph.getNode(*parent).value().get().attributes().position;
+  descriptor->timestamp = agent_node.timestamp.value();
+  descriptor->root_position = graph.getNode(*parent).attributes().position;
   return descriptor;
 }
 
@@ -66,26 +64,25 @@ ObjectDescriptorFactory::ObjectDescriptorFactory(const SubgraphConfig& config,
                                                  size_t num_classes)
     : config(config), num_classes(num_classes) {}
 
-Descriptor::Ptr ObjectDescriptorFactory::construct(const Dsg& graph,
-                                                   const DsgNode& agent_node) const {
+Descriptor::Ptr ObjectDescriptorFactory::construct(
+    const Dsg& graph, const SceneGraphNode& agent_node) const {
   auto parent = agent_node.getParent();
   if (!parent) {
     return nullptr;
   }
 
-  const Eigen::Vector3d root_position =
-      graph.getNode(*parent).value().get().attributes().position;
+  const Eigen::Vector3d root_position = graph.getNode(*parent).attributes().position;
 
   auto descriptor = std::make_unique<Descriptor>();
   descriptor->normalized = false;
   descriptor->values = decltype(descriptor->values)::Zero(num_classes, 1);
   descriptor->root_node = *parent;
-  descriptor->timestamp = agent_node.timestamp;
+  descriptor->timestamp = agent_node.timestamp.value();
   descriptor->root_position = root_position;
   descriptor->nodes = getSubgraphNodes(config, graph, *parent, false);
 
   for (const auto node : descriptor->nodes) {
-    const auto attrs = graph.getNode(node)->get().attributes<SemanticNodeAttributes>();
+    const auto attrs = graph.getNode(node).attributes<SemanticNodeAttributes>();
     const size_t label = attrs.semantic_label;
     if (label > static_cast<size_t>(descriptor->values.rows())) {
       LOG(ERROR) << "label " << static_cast<int>(label) << " for node "
@@ -104,27 +101,26 @@ PlaceDescriptorFactory::PlaceDescriptorFactory(const SubgraphConfig& config,
                                                const HistogramConfig<double>& histogram)
     : config(config), histogram(histogram) {}
 
-Descriptor::Ptr PlaceDescriptorFactory::construct(const Dsg& graph,
-                                                  const DsgNode& agent_node) const {
+Descriptor::Ptr PlaceDescriptorFactory::construct(
+    const Dsg& graph, const SceneGraphNode& agent_node) const {
   auto parent = agent_node.getParent();
   if (!parent) {
     return nullptr;
   }
 
-  const Eigen::Vector3d root_position =
-      graph.getNode(*parent).value().get().attributes().position;
+  const Eigen::Vector3d root_position = graph.getNode(*parent).attributes().position;
 
   auto descriptor = std::make_unique<Descriptor>();
   descriptor->normalized = false;
   descriptor->values = decltype(descriptor->values)::Zero(histogram.bins, 1);
   descriptor->root_node = *parent;
-  descriptor->timestamp = agent_node.timestamp;
+  descriptor->timestamp = agent_node.timestamp.value();
   descriptor->root_position = root_position;
   descriptor->nodes = getSubgraphNodes(config, graph, *parent, true);
 
   const auto& places = graph.getLayer(DsgLayers::PLACES);
   for (const auto node : descriptor->nodes) {
-    const auto& attrs = places.getNode(node)->get().attributes<PlaceNodeAttributes>();
+    const auto& attrs = places.getNode(node).attributes<PlaceNodeAttributes>();
     descriptor->values(histogram.getBin(attrs.distance)) += 1.0f;
   }
 

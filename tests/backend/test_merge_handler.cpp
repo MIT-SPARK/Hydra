@@ -62,7 +62,7 @@ void setBoundingBox(DynamicSceneGraph& graph,
     return;
   }
 
-  const SceneGraphNode& node = graph.getNode(node_id).value();
+  const auto& node = graph.getNode(node_id);
   SemanticNodeAttributes& attrs = node.attributes<SemanticNodeAttributes>();
   attrs.position = ((max + min) / 2.0).cast<double>();
   attrs.bounding_box = BoundingBox(min, max);
@@ -233,10 +233,10 @@ TEST(MergeHandlerTests, TestUndoMergePlaces) {
   graph.emplaceNode(DsgLayers::PLACES, "p5"_id, std::make_unique<PlaceAttrs>(1.0, 2));
   graph.emplaceNode(DsgLayers::ROOMS, "r1"_id, std::make_unique<NodeAttributes>());
   graph.emplaceNode(DsgLayers::ROOMS, "r2"_id, std::make_unique<NodeAttributes>());
-  graph.getNode("p1"_id)->get().attributes().position = Eigen::Vector3d::Zero();
-  graph.getNode("p2"_id)->get().attributes().position = Eigen::Vector3d::Zero();
-  graph.getNode("p2"_id)->get().attributes().is_active = true;
-  graph.getNode("p5"_id)->get().attributes().is_active = false;
+  graph.getNode("p1"_id).attributes().position = Eigen::Vector3d::Zero();
+  graph.getNode("p2"_id).attributes().position = Eigen::Vector3d::Zero();
+  graph.getNode("p2"_id).attributes().is_active = true;
+  graph.getNode("p5"_id).attributes().is_active = false;
   graph.insertEdge("p1"_id, "p3"_id);
   graph.insertEdge("p2"_id, "p4"_id);
   graph.insertEdge("r1"_id, "p1"_id);
@@ -284,8 +284,8 @@ TEST(MergeHandlerTests, TestUndoMergeObjects) {
   DynamicSceneGraph graph;
   graph.emplaceNode(DsgLayers::OBJECTS, "O1"_id, std::make_unique<ObjectAttrs>());
   graph.emplaceNode(DsgLayers::OBJECTS, "O2"_id, std::make_unique<ObjectAttrs>());
-  graph.getNode("O1"_id)->get().attributes().is_active = false;
-  graph.getNode("O2"_id)->get().attributes().is_active = true;
+  graph.getNode("O1"_id).attributes().is_active = false;
+  graph.getNode("O2"_id).attributes().is_active = true;
   graph.setMesh(std::make_shared<Mesh>());
 
   setBoundingBox(graph,
@@ -338,12 +338,12 @@ TEST(MergeHandlerTests, TestUpdateFromUnmergedWithUndo) {
   graph.emplaceNode(DsgLayers::PLACES, "p5"_id, std::make_unique<PlaceAttrs>(1.0, 2));
   graph.emplaceNode(DsgLayers::PLACES, "p6"_id, std::make_unique<PlaceAttrs>(1.0, 2));
   graph.emplaceNode(DsgLayers::PLACES, "p7"_id, std::make_unique<PlaceAttrs>(1.0, 2));
-  graph.getNode("p1"_id)->get().attributes().position = Eigen::Vector3d::Zero();
-  graph.getNode("p2"_id)->get().attributes().position = Eigen::Vector3d::Zero();
-  graph.getNode("p2"_id)->get().attributes().is_active = true;
-  graph.getNode("p5"_id)->get().attributes().is_active = false;
-  graph.getNode("p6"_id)->get().attributes().is_active = false;
-  graph.getNode("p7"_id)->get().attributes().is_active = true;
+  graph.getNode("p1"_id).attributes().position = Eigen::Vector3d::Zero();
+  graph.getNode("p2"_id).attributes().position = Eigen::Vector3d::Zero();
+  graph.getNode("p2"_id).attributes().is_active = true;
+  graph.getNode("p5"_id).attributes().is_active = false;
+  graph.getNode("p6"_id).attributes().is_active = false;
+  graph.getNode("p7"_id).attributes().is_active = true;
   graph.insertEdge("p1"_id, "p3"_id);
   graph.insertEdge("p2"_id, "p4"_id);
   graph.insertEdge("p6"_id, "p4"_id);
@@ -358,7 +358,7 @@ TEST(MergeHandlerTests, TestUpdateFromUnmergedWithUndo) {
   fgraph.emplaceNode(DsgLayers::PLACES, "p3"_id, std::make_unique<PlaceAttrs>(1.0, 2));
   fgraph.emplaceNode(DsgLayers::PLACES, "p4"_id, std::make_unique<PlaceAttrs>(1.0, 2));
   fgraph.emplaceNode(DsgLayers::PLACES, "p6"_id, std::make_unique<PlaceAttrs>(1.0, 2));
-  fgraph.getNode("p2"_id)->get().attributes().is_active = true;
+  fgraph.getNode("p2"_id).attributes().is_active = true;
 
   std::map<NodeId, NodeId> proposed_merges{
       {"p2"_id, "p1"_id}, {"p5"_id, "p1"_id}, {"p6"_id, "p1"_id}, {"p7"_id, "p4"_id}};
