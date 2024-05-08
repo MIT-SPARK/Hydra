@@ -69,7 +69,7 @@ HydraPythonPipeline::HydraPythonPipeline(const PipelineConfig& config,
 
 HydraPythonPipeline::~HydraPythonPipeline() {}
 
-void HydraPythonPipeline::init(const PythonConfig& config) {
+void HydraPythonPipeline::initPython(const PythonConfig& config) {
   const auto& logs = HydraConfig::instance().getLogs();
   const auto node = config.toYaml();
   frontend_ = config::createFromYamlWithNamespace<FrontendModule>(
@@ -157,7 +157,7 @@ void addBindings(pybind11::module_& m) {
            "robot_id"_a = 0,
            "config_verbosity"_a = 0,
            "use_step_mode"_a = true)
-      .def("init", &HydraPythonPipeline::init, "config"_a)
+      .def("init", &HydraPythonPipeline::initPython, "config"_a)
       .def("save", &HydraPythonPipeline::save)
       .def("step",
            [](HydraPythonPipeline& pipeline,

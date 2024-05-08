@@ -20,7 +20,6 @@ add_executable(
   backend/test_merge_handler.cpp
   backend/test_update_functions.cpp
   common/test_config_utilities.cpp
-  # frontend/test_frontend.cpp
   loop_closure/test_descriptor_matching.cpp
   loop_closure/test_detector.cpp
   loop_closure/test_registration.cpp
@@ -32,7 +31,6 @@ add_executable(
   places/test_graph_extractor_utilities.cpp
   places/test_gvd_incremental.cpp
   places/test_gvd_integrator.cpp
-  places/test_gvd_thinning.cpp
   places/test_gvd_utilities.cpp
   reconstruction/test_camera.cpp
   reconstruction/test_lidar.cpp

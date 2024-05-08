@@ -40,6 +40,8 @@
 namespace hydra::places {
 
 struct MergePolicy {
+  virtual ~MergePolicy() = default;
+
   /**
    * \brief compare two gvd nodes to see which is more representativie
    * \return Returns -1 if right is better, 0 if tie, 1 if left is better
@@ -48,6 +50,8 @@ struct MergePolicy {
 };
 
 struct BasisPointMergePolicy : MergePolicy {
+  virtual ~BasisPointMergePolicy() = default;
+
   int compare(const GvdMemberInfo& lhs, const GvdMemberInfo& rhs) const override;
 
   inline static const auto registration_ =
@@ -55,6 +59,8 @@ struct BasisPointMergePolicy : MergePolicy {
 };
 
 struct DistanceMergePolicy : MergePolicy {
+  virtual ~DistanceMergePolicy() = default;
+
   int compare(const GvdMemberInfo& lhs, const GvdMemberInfo& rhs) const override;
 
   inline static const auto registration_ =

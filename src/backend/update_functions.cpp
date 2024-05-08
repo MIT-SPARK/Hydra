@@ -487,7 +487,7 @@ UpdateFunctor::Hooks UpdateFrontiersFunctor::hooks() const {
     updateFrontier(*info->places_values, node, *attrs);
   };
 
-  my_hooks.cleanup = [this](const UpdateInfo::ConstPtr&, SharedDsgInfo* dsg) {
+  my_hooks.cleanup = [](const UpdateInfo::ConstPtr&, SharedDsgInfo* dsg) {
     if (!dsg) {
       return;
     }

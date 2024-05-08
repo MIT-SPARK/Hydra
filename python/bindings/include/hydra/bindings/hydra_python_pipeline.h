@@ -58,7 +58,7 @@ class HydraPythonPipeline : public HydraPipeline {
 
   virtual ~HydraPythonPipeline();
 
-  void init(const PythonConfig& config);
+  void initPython(const PythonConfig& config);
 
   void start() override;
 
