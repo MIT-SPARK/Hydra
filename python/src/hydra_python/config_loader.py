@@ -173,7 +173,6 @@ def load_reconstruction_configs(
         "verbosity": reconstruction_verbosity,
         "type": "ReconstructionModule",
         "clear_distant_blocks": False,
-        "copy_dense_representations": False,
         "show_stats": False,
         "pose_graphs": {"make_pose_graph": False},
         "sensor": {

@@ -32,52 +32,84 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
+#include "hydra/common/input_module.h"
+
+#include <config_utilities/config.h>
+#include <config_utilities/printing.h>
+#include <config_utilities/validation.h>
+
+#include "hydra/common/common.h"
 #include "hydra/common/hydra_config.h"
-#include "hydra/common/module.h"
-#include "hydra/common/shared_module_state.h"
 
 namespace hydra {
 
-class HydraPipeline {
- public:
-  HydraPipeline(const PipelineConfig& config,
-                int robot_id = 0,
-                int config_verbosity = 1);
+void declare_config(InputModule::Config& config) {
+  using namespace config;
+  name("InputModule::Config");
+  field(config.receiver, "receiver");
+}
 
-  virtual ~HydraPipeline();
+InputModule::InputModule(const Config& config, const OutputQueue::Ptr& queue)
+    : config(config::checkValid(config)), queue_(queue) {
+  receiver_ = config.receiver.create();
+}
 
-  virtual void init();
+InputModule::~InputModule() { stopImpl(); }
 
-  virtual void start();
+void InputModule::start() {
+  receiver_->init();
+  data_thread_.reset(new std::thread(&InputModule::dataSpin, this));
+  LOG(INFO) << "[Hydra Input] started!";
+}
 
-  virtual void stop();
+void InputModule::stop() { stopImpl(); }
 
-  virtual void save();
+void InputModule::stopImpl() {
+  should_shutdown_ = true;
 
-  template <typename Derived = Module>
-  Derived* getModule(const std::string& name) {
-    auto iter = modules_.find(name);
-    if (iter == modules_.end()) {
-      return nullptr;
-    }
-
-    return dynamic_cast<Derived*>(iter->second.get());
+  if (data_thread_) {
+    VLOG(2) << "[Hydra Input] stopping input thread";
+    data_thread_->join();
+    data_thread_.reset();
+    VLOG(2) << "[Hydra Input] stopped input thread";
   }
 
- protected:
-  void showModules() const;
+  VLOG(2) << "[Hydra Input] remaining in data queue: " << receiver_->queue.size();
+}
 
-  std::string getModuleInfo(const std::string& name, const Module* module) const;
+void InputModule::save(const LogSetup&) {}
 
- protected:
-  int config_verbosity_;
-  SharedDsgInfo::Ptr frontend_dsg_;
-  SharedDsgInfo::Ptr backend_dsg_;
-  SharedModuleState::Ptr shared_state_;
+std::string InputModule::printInfo() const {
+  std::stringstream ss;
+  ss << config::toString(config);
+  return ss.str();
+}
 
-  Module::Ptr input_module_;
-  std::map<std::string, Module::Ptr> modules_;
-};
+void InputModule::dataSpin() {
+  while (!should_shutdown_) {
+    bool has_data = receiver_->queue.poll();
+    if (!has_data) {
+      continue;
+    }
+
+    const auto packet = receiver_->queue.pop();
+    const auto curr_time = packet->timestamp_ns;
+    VLOG(2) << "[Hydra Input] popped input @ " << curr_time << " [ns]";
+
+    const auto odom_T_body = getBodyPose(curr_time);
+    if (!odom_T_body) {
+      LOG(WARNING) << "[Hydra Input] dropping input @ " << curr_time
+                   << " [ns] due to missing pose";
+      continue;
+    }
+
+    ReconstructionInput::Ptr input(new ReconstructionInput());
+    input->timestamp_ns = curr_time;
+    input->sensor_input = packet;
+    input->world_t_body = odom_T_body.target_p_source;
+    input->world_R_body = odom_T_body.target_R_source;
+    queue_->push(input);
+  }
+}
 
 }  // namespace hydra

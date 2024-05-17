@@ -33,51 +33,42 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/common/hydra_config.h"
-#include "hydra/common/module.h"
-#include "hydra/common/shared_module_state.h"
+#include <config_utilities/virtual_config.h>
+
+#include <optional>
+
+#include "hydra/common/input_queue.h"
+#include "hydra/reconstruction/sensor_input_packet.h"
 
 namespace hydra {
 
-class HydraPipeline {
+class DataReceiver {
  public:
-  HydraPipeline(const PipelineConfig& config,
-                int robot_id = 0,
-                int config_verbosity = 1);
+  using DataQueue = InputQueue<SensorInputPacket::Ptr>;
 
-  virtual ~HydraPipeline();
+  struct Config {
+    double input_separation_s = 0.0;
+  };
 
-  virtual void init();
+  explicit DataReceiver(const Config& config);
 
-  virtual void start();
 
-  virtual void stop();
+  virtual ~DataReceiver() = default;
 
-  virtual void save();
+  bool init();
 
-  template <typename Derived = Module>
-  Derived* getModule(const std::string& name) {
-    auto iter = modules_.find(name);
-    if (iter == modules_.end()) {
-      return nullptr;
-    }
-
-    return dynamic_cast<Derived*>(iter->second.get());
-  }
+ public:
+  const Config config;
+  DataQueue queue;
 
  protected:
-  void showModules() const;
+  virtual bool initImpl() = 0;
 
-  std::string getModuleInfo(const std::string& name, const Module* module) const;
+  bool checkInputTimestamp(uint64_t timestamp_ns);
 
- protected:
-  int config_verbosity_;
-  SharedDsgInfo::Ptr frontend_dsg_;
-  SharedDsgInfo::Ptr backend_dsg_;
-  SharedModuleState::Ptr shared_state_;
-
-  Module::Ptr input_module_;
-  std::map<std::string, Module::Ptr> modules_;
+  std::optional<uint64_t> last_time_received_;
 };
+
+void declare_config(DataReceiver::Config& config);
 
 }  // namespace hydra

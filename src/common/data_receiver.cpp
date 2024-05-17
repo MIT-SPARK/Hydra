@@ -32,52 +32,43 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include "hydra/common/hydra_config.h"
-#include "hydra/common/module.h"
-#include "hydra/common/shared_module_state.h"
+#include "hydra/common/data_receiver.h"
+
+#include <config_utilities/config.h>
+#include <config_utilities/validation.h>
+#include <glog/logging.h>
+
+#include <chrono>
+
+#include "hydra/common/common.h"
 
 namespace hydra {
 
-class HydraPipeline {
- public:
-  HydraPipeline(const PipelineConfig& config,
-                int robot_id = 0,
-                int config_verbosity = 1);
+DataReceiver::DataReceiver(const Config& config) : config(config::checkValid(config)) {}
 
-  virtual ~HydraPipeline();
+bool DataReceiver::init() { return initImpl(); }
 
-  virtual void init();
-
-  virtual void start();
-
-  virtual void stop();
-
-  virtual void save();
-
-  template <typename Derived = Module>
-  Derived* getModule(const std::string& name) {
-    auto iter = modules_.find(name);
-    if (iter == modules_.end()) {
-      return nullptr;
+bool DataReceiver::checkInputTimestamp(uint64_t timestamp_ns) {
+  if (last_time_received_) {
+    std::chrono::nanoseconds curr_time_ns(timestamp_ns);
+    std::chrono::nanoseconds last_time_ns(*last_time_received_);
+    std::chrono::duration<double> separation_s = curr_time_ns - last_time_ns;
+    if (separation_s.count() < config.input_separation_s) {
+      VLOG(10) << "[Data Receiver] Dropping input @ " << timestamp_ns
+               << " [ns] with separation of " << separation_s.count() << " [s]";
+      return false;
     }
-
-    return dynamic_cast<Derived*>(iter->second.get());
   }
 
- protected:
-  void showModules() const;
+  last_time_received_ = timestamp_ns;
+  VLOG(5) << "[Data Receiver] Got input @ " << timestamp_ns << " [ns]";
+  return true;
+}
 
-  std::string getModuleInfo(const std::string& name, const Module* module) const;
-
- protected:
-  int config_verbosity_;
-  SharedDsgInfo::Ptr frontend_dsg_;
-  SharedDsgInfo::Ptr backend_dsg_;
-  SharedModuleState::Ptr shared_state_;
-
-  Module::Ptr input_module_;
-  std::map<std::string, Module::Ptr> modules_;
-};
+void declare_config(DataReceiver::Config& config) {
+  using namespace config;
+  name("DataReceiver::Config");
+  field(config.input_separation_s, "input_separation_s");
+}
 
 }  // namespace hydra

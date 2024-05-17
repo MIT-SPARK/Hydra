@@ -108,6 +108,8 @@ class ReconstructionModule : public Module {
 
   inline const VolumetricMap* getMap() const { return map_.get(); }
 
+  inline ReconstructionInputQueue::Ptr queue() const { return queue_; }
+
  protected:
   bool update(const ReconstructionInput& msg, bool full_update);
 

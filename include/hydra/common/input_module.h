@@ -33,51 +33,58 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/common/hydra_config.h"
+#include <config_utilities/virtual_config.h>
+
+#include <thread>
+
+#include "hydra/common/data_receiver.h"
+#include "hydra/common/input_queue.h"
 #include "hydra/common/module.h"
-#include "hydra/common/shared_module_state.h"
+#include "hydra/reconstruction/reconstruction_input.h"
 
 namespace hydra {
 
-class HydraPipeline {
- public:
-  HydraPipeline(const PipelineConfig& config,
-                int robot_id = 0,
-                int config_verbosity = 1);
-
-  virtual ~HydraPipeline();
-
-  virtual void init();
-
-  virtual void start();
-
-  virtual void stop();
-
-  virtual void save();
-
-  template <typename Derived = Module>
-  Derived* getModule(const std::string& name) {
-    auto iter = modules_.find(name);
-    if (iter == modules_.end()) {
-      return nullptr;
-    }
-
-    return dynamic_cast<Derived*>(iter->second.get());
-  }
-
- protected:
-  void showModules() const;
-
-  std::string getModuleInfo(const std::string& name, const Module* module) const;
-
- protected:
-  int config_verbosity_;
-  SharedDsgInfo::Ptr frontend_dsg_;
-  SharedDsgInfo::Ptr backend_dsg_;
-  SharedModuleState::Ptr shared_state_;
-
-  Module::Ptr input_module_;
-  std::map<std::string, Module::Ptr> modules_;
+struct PoseStatus {
+  bool is_valid = false;
+  Eigen::Quaterniond target_R_source;
+  Eigen::Vector3d target_p_source;
+  operator bool() const { return is_valid; }
 };
+
+class InputModule : public Module {
+ public:
+  using OutputQueue = InputQueue<ReconstructionInput::Ptr>;
+  struct Config {
+    config::VirtualConfig<DataReceiver> receiver;
+  } const config;
+
+  InputModule(const Config& config, const OutputQueue::Ptr& output_queue);
+
+  virtual ~InputModule();
+
+  void start() override;
+
+  void stop() override;
+
+  void save(const LogSetup& log_setup) override;
+
+  std::string printInfo() const override;
+
+ protected:
+  void dataSpin();
+
+  void stopImpl();
+
+  virtual PoseStatus getBodyPose(uint64_t timestamp) = 0;
+
+ protected:
+  OutputQueue::Ptr queue_;
+  std::atomic<bool> should_shutdown_{false};
+
+  std::unique_ptr<DataReceiver> receiver_;
+  std::unique_ptr<std::thread> data_thread_;
+};
+
+void declare_config(InputModule::Config& config);
 
 }  // namespace hydra

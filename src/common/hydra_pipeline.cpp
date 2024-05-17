@@ -101,7 +101,12 @@ void HydraPipeline::showModules() const {
 }
 
 void HydraPipeline::start() {
+  VLOG(config_verbosity_) << std::endl << getModuleInfo("input", input_module_.get());
   showModules();
+
+  if (input_module_) {
+    input_module_->start();
+  }
 
   for (auto&& [name, module] : modules_) {
     if (!module) {
@@ -110,6 +115,10 @@ void HydraPipeline::start() {
     }
 
     module->start();
+  }
+
+  if (input_module_) {
+    modules_["input"] = input_module_;
   }
 }
 
