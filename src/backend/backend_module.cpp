@@ -109,13 +109,11 @@ std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol 
 
 BackendModule::BackendModule(const Config& config,
                              const SharedDsgInfo::Ptr& dsg,
-                             const SharedDsgInfo::Ptr& backend_dsg,
                              const SharedModuleState::Ptr& state,
                              const LogSetup::Ptr& logs)
     : KimeraPgmoInterface(),
       config(config::checkValid(config)),
-      shared_dsg_(dsg),
-      private_dsg_(backend_dsg),
+      private_dsg_(dsg),
       state_(state) {
   KimeraPgmoInterface::config_ = config.pgmo;
   KimeraPgmoInterface::config_.valid = config::isValid(config.pgmo);
@@ -668,12 +666,14 @@ void BackendModule::updateObjectMapping(const kimera_pgmo::MeshDelta& delta) {
 
 bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
   std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
-  {                   // start joint critical section
+  {  // start joint critical section
+    ScopedTimer timer("backend/read_graph", timestamp_ns);
     cachePlacePos();  // save place positions before grabbing new attributes from
                       // frontend
 
-    std::unique_lock<std::mutex> shared_graph_lock(shared_dsg_->mutex);
-    if (!force_update && shared_dsg_->last_update_time != timestamp_ns) {
+    const auto& shared_dsg = *state_->backend_graph;
+    std::unique_lock<std::mutex> shared_graph_lock(shared_dsg.mutex);
+    if (!force_update && shared_dsg.last_update_time != timestamp_ns) {
       return false;
     }
 
@@ -692,17 +692,17 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
     merge_config.previous_merges = &prev_merges;
     merge_config.update_layer_attributes = &config.merge_update_map;
     merge_config.update_dynamic_attributes = config.merge_update_dynamic;
-    private_dsg_->graph->mergeGraph(*shared_dsg_->graph, merge_config);
+    private_dsg_->graph->mergeGraph(*shared_dsg.graph, merge_config);
 
     // update merge book-keeping and optionally update merged node
     // connections and attributes
-    merge_handler_->updateFromUnmergedGraph(*shared_dsg_->graph);
+    merge_handler_->updateFromUnmergedGraph(*shared_dsg.graph);
 
     // TODO(nathan) handle updating object attributes from frontend
 
-    if (shared_dsg_->graph->hasLayer(DsgLayers::PLACES)) {
+    if (shared_dsg.graph->hasLayer(DsgLayers::PLACES)) {
       // TODO(nathan) simplify
-      const auto& places = shared_dsg_->graph->getLayer(DsgLayers::PLACES);
+      const auto& places = shared_dsg.graph->getLayer(DsgLayers::PLACES);
       shared_places_copy_ = places.clone(
           [](const auto& node) { return NodeSymbol(node.id).category() == 'p'; });
     }

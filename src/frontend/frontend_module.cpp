@@ -250,6 +250,12 @@ void FrontendModule::addSink(const Sink::Ptr& sink) {
   }
 }
 
+pose_graph_tools_msgs::PoseGraph::ConstPtr toMsgPtr(
+    const pose_graph_tools::PoseGraph& graph) {
+  return pose_graph_tools_msgs::PoseGraph::ConstPtr(
+      new pose_graph_tools_msgs::PoseGraph(pose_graph_tools::toMsg(graph)));
+}
+
 void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
   if (!initialized_) {
     initCallbacks();
@@ -264,30 +270,38 @@ void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
   }
 
   backend_input_.reset(new BackendInput());
-  for (const auto& graph : msg.pose_graphs) {
-    backend_input_->pose_graphs.push_back(
-        boost::make_shared<pose_graph_tools_msgs::PoseGraph>(
-            pose_graph_tools::toMsg(*graph)));
-  }
-  if (msg.agent_node_measurements) {
-    backend_input_->agent_node_measurements.reset(
-        new PoseGraph(pose_graph_tools::toMsg(*msg.agent_node_measurements)));
-  }
   backend_input_->timestamp_ns = msg.timestamp_ns;
+  for (const auto& graph : msg.pose_graphs) {
+    backend_input_->pose_graphs.push_back(toMsgPtr(*graph));
+  }
 
-  lcd_input_.reset(new LcdInput);
-  lcd_input_->timestamp_ns = msg.timestamp_ns;
+  if (msg.agent_node_measurements) {
+    backend_input_->agent_node_measurements = toMsgPtr(*msg.agent_node_measurements);
+  }
 
-  // TODO(nathan) this might potentially starve the backend and LCD
-  // We want to make sure that the backend and LCD catch the scene graph when:
-  // - last_update_time_ns is still set to the last packet sent time
-  // - some threads have done work
-  // - the newest output has not been pushed yet
-  // so we set the last update time before modifying anything!
-  dsg_->last_update_time = msg.timestamp_ns;
-  dsg_->updated = true;
+  if (state_->lcd_queue) {
+    lcd_input_.reset(new LcdInput());
+    lcd_input_->timestamp_ns = msg.timestamp_ns;
+  }
 
   updateImpl(msg);
+
+  // TODO(nathan) ideally make the copy lighter-weight
+  // we need to copy over the latest updates to the backend and to LCD
+  // no fancy threading: we just mark the update time and copy all changes in one go
+  {  // start critical section
+    std::unique_lock<std::mutex> lock(state_->backend_graph->mutex);
+    state_->backend_graph->last_update_time = msg.timestamp_ns;
+    state_->backend_graph->graph->mergeGraph(*dsg_->graph);
+  }  // end critical section
+
+  if (state_->lcd_queue) {
+    {  // start critical section
+      std::unique_lock<std::mutex> lock(state_->lcd_graph->mutex);
+      state_->lcd_graph->last_update_time = msg.timestamp_ns;
+      state_->lcd_graph->graph->mergeGraph(*dsg_->graph);
+    }  // end critical section
+  }
 
   backend_input_->mesh_update = last_mesh_update_;
   state_->backend_queue.push(backend_input_);
@@ -368,8 +382,8 @@ void FrontendModule::updateDeformationGraph(const ReconstructionOutput& input) {
   }  // end timing scope
 
   if (backend_input_) {
-    backend_input_->deformation_graph.reset(
-        new PoseGraph(mesh_frontend_.getLastProcessedMeshGraph()));
+    backend_input_->deformation_graph.reset(new pose_graph_tools_msgs::PoseGraph(
+        mesh_frontend_.getLastProcessedMeshGraph()));
   }
 }
 
@@ -446,7 +460,10 @@ void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
   const auto& prefix = HydraConfig::instance().getRobotPrefix();
   const auto& agents = dsg_->graph->getLayer(DsgLayers::AGENTS, prefix.key);
 
-  lcd_input_->new_agent_nodes.clear();
+  if (lcd_input_) {
+    lcd_input_->new_agent_nodes.clear();
+  }
+
   for (const auto& pose_graph : input.pose_graphs) {
     if (pose_graph->nodes.empty()) {
       continue;
@@ -480,7 +497,9 @@ void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
       // TODO(nathan) save key association for lcd
       const size_t last_index = agents.nodes().size() - 1;
       agent_key_map_[pgmo_key] = last_index;
-      lcd_input_->new_agent_nodes.push_back(agents.prefix.makeId(last_index));
+      if (lcd_input_) {
+        lcd_input_->new_agent_nodes.push_back(agents.prefix.makeId(last_index));
+      }
     }
   }
 
@@ -591,7 +610,10 @@ void FrontendModule::archivePlaces(const NodeIdSet active_places) {
 
       const auto& prev_node = *has_prev_node;
       prev_node.attributes().is_active = false;
-      lcd_input_->archived_places.insert(prev);
+      if (lcd_input_) {
+        lcd_input_->archived_places.insert(prev);
+      }
+
       if (frontier_places_) {
         frontier_places_->archived_places_.push_back(prev);
       }

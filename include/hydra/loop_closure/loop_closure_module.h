@@ -49,7 +49,6 @@ namespace hydra {
 class LoopClosureModule : public Module {
  public:
   LoopClosureModule(const LoopClosureConfig& config,
-                    const SharedDsgInfo::Ptr& dsg,
                     const SharedModuleState::Ptr& state);
 
   virtual ~LoopClosureModule();
@@ -82,7 +81,6 @@ class LoopClosureModule : public Module {
   std::unique_ptr<std::thread> spin_thread_;
 
   LoopClosureConfig config_;
-  SharedDsgInfo::Ptr dsg_;
   SharedModuleState::Ptr state_;
 
   std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> agent_queue_;

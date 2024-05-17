@@ -47,9 +47,8 @@ using hydra::timing::ScopedTimer;
 using lcd::LayerRegistrationConfig;
 
 LoopClosureModule::LoopClosureModule(const LoopClosureConfig& config,
-                                     const SharedDsgInfo::Ptr& dsg,
                                      const SharedModuleState::Ptr& state)
-    : config_(config), dsg_(dsg), state_(state), lcd_graph_(new DynamicSceneGraph()) {
+    : config_(config), state_(state), lcd_graph_(new DynamicSceneGraph()) {
   lcd_detector_.reset(new lcd::LcdDetector(config_.detector));
 }
 
@@ -134,14 +133,15 @@ lcd::LcdDetector& LoopClosureModule::getDetector() const { return *lcd_detector_
 void LoopClosureModule::spinOnceImpl(bool force_update) {
   const size_t timestamp_ns = processFrontendOutput();
 
+  const auto& dsg = *state_->lcd_graph;
   {  // start critical section
-    std::unique_lock<std::mutex> lock(dsg_->mutex);
-    if (!force_update && timestamp_ns < dsg_->last_update_time) {
+    std::unique_lock<std::mutex> lock(dsg.mutex);
+    if (!force_update && timestamp_ns != dsg.last_update_time) {
       return;
     }
 
     ScopedTimer spin_timer("lcd/merge_graph", timestamp_ns);
-    lcd_graph_->mergeGraph(*dsg_->graph);
+    lcd_graph_->mergeGraph(*dsg.graph);
   }  // end critical section
 
   auto query_agent = getQueryAgentId(timestamp_ns);

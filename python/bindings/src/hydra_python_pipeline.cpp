@@ -91,8 +91,7 @@ void HydraPythonPipeline::initPython(const PythonConfig& config) {
     config::checkValid(lcd_config);
 
     shared_state_->lcd_queue.reset(new InputQueue<LcdInput::Ptr>());
-    loop_closure_ =
-        std::make_shared<LoopClosureModule>(lcd_config, frontend_dsg_, shared_state_);
+    loop_closure_ = std::make_shared<LoopClosureModule>(lcd_config, shared_state_);
     modules_["lcd"] = loop_closure_;
   }
 

@@ -46,6 +46,8 @@ HydraPipeline::HydraPipeline(const PipelineConfig& pipeline_config,
   frontend_dsg_ = config.createSharedDsg();
   backend_dsg_ = config.createSharedDsg();
   shared_state_.reset(new SharedModuleState());
+  shared_state_->lcd_graph = config.createSharedDsg();
+  shared_state_->backend_graph = config.createSharedDsg();
 }
 
 void HydraPipeline::init() {}
