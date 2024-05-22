@@ -158,7 +158,7 @@ bool ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
 
   pose_graph_tracker_->update(msg);
   if (msg.agent_node_measurements) {
-    agent_node_measurements_ = *msg.agent_node_measurements;
+    agent_node_measurements_ = msg.agent_node_measurements;
   }
 
   ++num_poses_received_;
@@ -173,81 +173,56 @@ void ReconstructionModule::addSink(const Sink::Ptr& sink) {
   }
 }
 
-void ReconstructionModule::fillOutput(const ReconstructionInput& input,
-                                      ReconstructionOutput& output) {
-  size_t ts = input.timestamp_ns;
+void ReconstructionModule::fillOutput(ReconstructionOutput& msg) {
+  // TODO(nathan) figure out a better way to handle repeated timestamps
+  size_t ts = msg.timestamp_ns;
   while (timestamp_cache_.count(ts)) {
     ++ts;
   }
 
   timestamp_cache_.insert(ts);
-  output.timestamp_ns = ts;
-  pose_graph_tracker_->fillPoseGraphs(output);
-  if (agent_node_measurements_.nodes.size() > 0) {
-    output.agent_node_measurements.reset(new pose_graph_tools::PoseGraph(
-        pose_graph_tools::fromMsg(agent_node_measurements_)));
-    agent_node_measurements_ = PoseGraph();
+  msg.timestamp_ns = ts;
+
+  pose_graph_tracker_->fillPoseGraphs(msg);
+  if (agent_node_measurements_) {
+    msg.agent_node_measurements = agent_node_measurements_;
+    agent_node_measurements_.reset();
   }
 
-  // note that this is pre-archival
-  map_->getMeshLayer().merge(output.mesh);
-  mergeLayer(map_->getTsdfLayer(), output.tsdf);
-  mergeLayer(*map_->getOccupancyLayer(), output.occupied);
+  msg.setMap(*map_);
 
-  if (config.clear_distant_blocks) {
-    const auto to_archive = findBlocksToArchive(input.world_t_body.cast<float>());
-    output.archived_blocks.insert(
-        output.archived_blocks.end(), to_archive.begin(), to_archive.end());
-    map_->removeBlocks(to_archive);
-  }
-}
-
-ReconstructionModule::OutputMsgStatus ReconstructionModule::getNextOutputMessage() {
-  if (!output_queue_) {
-    return {std::make_shared<ReconstructionOutput>(), false};
+  if (!config.clear_distant_blocks) {
+    return;
   }
 
-  // this is janky, but avoid pushing updates to queue if there's already stuff there
-  const auto curr_size = output_queue_->size();
-  if (curr_size >= 1) {
-    if (!pending_output_) {
-      pending_output_ = std::make_shared<ReconstructionOutput>();
-    }
-
-    return {pending_output_, true};
-  }
-
-  if (pending_output_) {
-    auto to_return = pending_output_;
-    pending_output_.reset();
-    return {to_return, false};
-  }
-
-  return {std::make_shared<ReconstructionOutput>(), false};
+  const auto indices = findBlocksToArchive(msg.world_t_body.cast<float>());
+  msg.archived_blocks.insert(msg.archived_blocks.end(), indices.begin(), indices.end());
+  map_->removeBlocks(indices);
 }
 
 bool ReconstructionModule::update(const ReconstructionInput& msg, bool full_update) {
-  VLOG(1) << "[Hydra Reconstruction] starting " << ((full_update) ? "full" : "partial")
+  VLOG(2) << "[Hydra Reconstruction] starting " << ((full_update) ? "full" : "partial")
           << " update @ " << msg.timestamp_ns << " [ns]";
-  FrameData data;
-  if (!msg.fillFrameData(data)) {
+
+  auto data = std::make_shared<FrameData>();
+  if (!msg.fillFrameData(*data)) {
     LOG(ERROR) << "[Hydra Reconstruction] unable to construct valid input packet!";
     return false;
   }
 
-  if (!data.normalizeData()) {
+  if (!data->normalizeData()) {
     LOG(ERROR) << "[Hydra Reconstruction] unable to convert all data";
     return false;
   }
 
-  if (!sensor_->finalizeRepresentations(data)) {
+  if (!sensor_->finalizeRepresentations(*data)) {
     LOG(ERROR) << "[Hydra Reconstruction] unable to compute inputs for integration";
     return false;
   }
 
   {  // timing scope
     ScopedTimer timer("places/tsdf", msg.timestamp_ns);
-    tsdf_integrator_->updateMap(*sensor_, data, *map_);
+    tsdf_integrator_->updateMap(*sensor_, *data, *map_);
   }  // timing scope
 
   if (footprint_integrator_) {
@@ -271,25 +246,19 @@ bool ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
     VLOG(config.stats_verbosity) << "Memory used: {" << map_->printStats() << "}";
   }
 
-  auto&& [output, is_pending] = getNextOutputMessage();
-  fillOutput(msg, *output);
-  output->world_t_body = msg.world_t_body;
-  output->world_R_body = msg.world_R_body;
-  if (output_queue_ && !is_pending) {
-    output_queue_->push(output);
-  } else {
-    VLOG(1)
-        << "[Hydra Reconstruction] Merging pending updates because frontend is slow!";
-  }
-
-  VLOG(5) << "[Hydra Reconstruction] Exported " << output->pose_graphs.size()
-          << " pose graphs";
+  auto output = ReconstructionOutput::fromInput(msg);
+  output->sensor_data = data;
+  fillOutput(*output);
 
   Sink::callAll(sinks_,
                 msg.timestamp_ns,
-                data.getSensorPose(*sensor_),
+                data->getSensorPose(*sensor_),
                 map_->getTsdfLayer(),
                 *output);
+
+  if (output_queue_) {
+    output_queue_->push(output);
+  }
 
   auto& tsdf = map_->getTsdfLayer();
   auto& mesh = map_->getMeshLayer();

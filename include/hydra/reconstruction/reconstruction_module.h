@@ -106,7 +106,9 @@ class ReconstructionModule : public Module {
 
   void addSink(const Sink::Ptr& sink);
 
-  inline const VolumetricMap* getMap() const { return map_.get(); }
+  const VolumetricMap* getMap() const { return map_.get(); }
+
+  ReconstructionInputQueue::Ptr queue() const { return queue_; }
 
   inline ReconstructionInputQueue::Ptr queue() const { return queue_; }
 
@@ -115,9 +117,7 @@ class ReconstructionModule : public Module {
 
   voxblox::BlockIndexList findBlocksToArchive(const Eigen::Vector3f& center) const;
 
-  void fillOutput(const ReconstructionInput& input, ReconstructionOutput& output);
-
-  OutputMsgStatus getNextOutputMessage();
+  void fillOutput(ReconstructionOutput& output);
 
  protected:
   const std::unique_ptr<Sensor> sensor_;
@@ -128,9 +128,9 @@ class ReconstructionModule : public Module {
   size_t num_poses_received_;
   std::set<uint64_t> timestamp_cache_;
 
-  pose_graph_tools_msgs::PoseGraph agent_node_measurements_;
+  pose_graph_tools_msgs::PoseGraph::ConstPtr agent_node_measurements_;
   PoseGraphTracker::Ptr pose_graph_tracker_;
-  ReconstructionOutput::Ptr pending_output_;
+
   OutputQueue::Ptr output_queue_;
   Sink::List sinks_;
 

@@ -217,7 +217,19 @@ std::string FrontendModule::printInfo() const {
 
 void FrontendModule::spin() {
   bool should_shutdown = false;
+  spin_finished_ = true;
+
+  ReconstructionOutput::Ptr input;
   while (!should_shutdown) {
+    if (input && spin_finished_) {
+      // start a spin to process input independent of this thread of
+      // execution. spin_finished_ will flip to true once the thread terminates
+      spin_finished_ = false;
+      std::thread spin_thread(&FrontendModule::dispatchSpin, this, input);
+      spin_thread.detach();
+      input.reset();
+    }
+
     bool has_data = queue_->poll();
     if (HydraConfig::instance().force_shutdown() || !has_data) {
       // copy over shutdown request
@@ -228,9 +240,27 @@ void FrontendModule::spin() {
       continue;
     }
 
-    spinOnce(*queue_->front());
+    // from this point on, we build an input packet by collating the maps together of
+    // subsequent outputs. This doesn't take effect until multiple packets from the
+    // reconstruction module start arriving between frontend updates
+    if (!input) {
+      input = queue_->front();
+    } else {
+      input->updateFrom(*queue_->front(), false);
+    }
+
+    processNextInput(*queue_->front());
     queue_->pop();
   }
+
+  while (!spin_finished_) {
+    // wait for current spin to finish before shutting down
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+}
+
+void FrontendModule::processNextInput(const ReconstructionOutput& /*msg*/) {
+  // TODO(nathan) cache information if required
 }
 
 bool FrontendModule::spinOnce() {
@@ -239,8 +269,11 @@ bool FrontendModule::spinOnce() {
     return false;
   }
 
-  spinOnce(*queue_->front());
+  ReconstructionOutput::Ptr input = queue_->front();
+  processNextInput(*input);
   queue_->pop();
+
+  spinOnce(input);
   return true;
 }
 
@@ -250,38 +283,45 @@ void FrontendModule::addSink(const Sink::Ptr& sink) {
   }
 }
 
-pose_graph_tools_msgs::PoseGraph::ConstPtr toMsgPtr(
-    const pose_graph_tools::PoseGraph& graph) {
-  return pose_graph_tools_msgs::PoseGraph::ConstPtr(
-      new pose_graph_tools_msgs::PoseGraph(pose_graph_tools::toMsg(graph)));
+void FrontendModule::dispatchSpin(ReconstructionOutput::Ptr msg) {
+  spinOnce(msg);
+  spin_finished_ = true;
 }
 
-void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
+void FrontendModule::spinOnce(const ReconstructionOutput::Ptr& msg) {
   if (!initialized_) {
     initCallbacks();
   }
 
-  VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg.timestamp_ns << " [ns]";
+  if (input_dispatches_.size() != input_callbacks_.size()) {
+    input_dispatches_.clear();
+    for (size_t i = 0; i < input_callbacks_.size(); ++i) {
+      input_dispatches_.push_back(
+          [this, i](const auto& msg_ptr) { input_callbacks_.at(i)(*msg_ptr); });
+    }
+  }
+
+  VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg->timestamp_ns << " [ns]";
   std::lock_guard<std::mutex> lock(mutex_);
-  ScopedTimer timer("frontend/spin", msg.timestamp_ns);
+  ScopedTimer timer("frontend/spin", msg->timestamp_ns);
 
   if (dsg_->graph && backend_input_) {
-    Sink::callAll(sinks_, msg.timestamp_ns, *dsg_->graph, *backend_input_);
+    Sink::callAll(sinks_, msg->timestamp_ns, *dsg_->graph, *backend_input_);
   }
 
   backend_input_.reset(new BackendInput());
-  backend_input_->timestamp_ns = msg.timestamp_ns;
-  for (const auto& graph : msg.pose_graphs) {
-    backend_input_->pose_graphs.push_back(toMsgPtr(*graph));
+  backend_input_->timestamp_ns = msg->timestamp_ns;
+  for (const auto& graph : msg->pose_graphs) {
+    backend_input_->pose_graphs.push_back(graph);
   }
 
-  if (msg.agent_node_measurements) {
-    backend_input_->agent_node_measurements = toMsgPtr(*msg.agent_node_measurements);
+  if (msg->agent_node_measurements) {
+    backend_input_->agent_node_measurements = msg->agent_node_measurements;
   }
 
   if (state_->lcd_queue) {
     lcd_input_.reset(new LcdInput());
-    lcd_input_->timestamp_ns = msg.timestamp_ns;
+    lcd_input_->timestamp_ns = msg->timestamp_ns;
   }
 
   updateImpl(msg);
@@ -291,14 +331,14 @@ void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
   // no fancy threading: we just mark the update time and copy all changes in one go
   {  // start critical section
     std::unique_lock<std::mutex> lock(state_->backend_graph->mutex);
-    state_->backend_graph->last_update_time = msg.timestamp_ns;
+    state_->backend_graph->last_update_time = msg->timestamp_ns;
     state_->backend_graph->graph->mergeGraph(*dsg_->graph);
   }  // end critical section
 
   if (state_->lcd_queue) {
     {  // start critical section
       std::unique_lock<std::mutex> lock(state_->lcd_graph->mutex);
-      state_->lcd_graph->last_update_time = msg.timestamp_ns;
+      state_->lcd_graph->last_update_time = msg->timestamp_ns;
       state_->lcd_graph->graph->mergeGraph(*dsg_->graph);
     }  // end critical section
   }
@@ -315,9 +355,9 @@ void FrontendModule::spinOnce(const ReconstructionOutput& msg) {
   }
 }
 
-void FrontendModule::updateImpl(const ReconstructionOutput& msg) {
-  launchCallbacks(input_callbacks_, msg);
-  updatePlaceMeshMapping(msg);
+void FrontendModule::updateImpl(const ReconstructionOutput::Ptr& msg) {
+  launchCallbacks(input_dispatches_, msg);
+  updatePlaceMeshMapping(*msg);
 }
 
 void FrontendModule::updateMesh(const ReconstructionOutput& input) {
@@ -325,15 +365,18 @@ void FrontendModule::updateMesh(const ReconstructionOutput& input) {
     ScopedTimer timer("frontend/mesh_archive", input.timestamp_ns, true, 1, false);
     VLOG(5) << "[Hydra Frontend] Clearing " << input.archived_blocks.size()
             << " blocks from mesh";
-    mesh_compression_->clearArchivedBlocks(input.archived_blocks);
+    if (!input.archived_blocks.empty()) {
+      mesh_compression_->clearArchivedBlocks(input.archived_blocks);
+    }
   }  // end timing scope
 
   // TODO(nathan) prune archived blocks from input?
 
+  const auto& input_mesh = input.map().getMeshLayer();
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
     mesh_remapping_.reset(new kimera_pgmo::VoxbloxIndexMapping());
-    auto mesh = input.mesh->getActiveMesh(input.archived_blocks);
+    auto mesh = input_mesh.getActiveMesh(input.archived_blocks);
     VLOG(5) << "[Hydra Frontend] Updating mesh with " << mesh->numBlocks() << " blocks";
     auto interface = getMeshInterface(*mesh);
     last_mesh_update_ =
@@ -377,7 +420,7 @@ void FrontendModule::updateDeformationGraph(const ReconstructionOutput& input) {
     const auto time_ns = std::chrono::nanoseconds(input.timestamp_ns);
     double time_s =
         std::chrono::duration_cast<std::chrono::duration<double>>(time_ns).count();
-    auto interface = getMeshInterface(*input.mesh);
+    auto interface = getMeshInterface(input.map().getMeshLayer());
     mesh_frontend_.processMeshGraph(interface, time_s);
   }  // end timing scope
 
@@ -391,7 +434,9 @@ void FrontendModule::updateFrontiers(const ReconstructionOutput& input) {
   if (!frontier_places_) {
     return;
   }
-  frontier_places_->updateRecentBlocks(input.world_t_body, input.tsdf->block_size());
+
+  frontier_places_->updateRecentBlocks(input.world_t_body, input.map().block_size);
+
   {  // start graph critical section
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
 
@@ -402,7 +447,6 @@ void FrontendModule::updateFrontiers(const ReconstructionOutput& input) {
     frontier_places_->detectFrontiers(input, *dsg_->graph, *places_nn_finder_);
     frontier_places_->addFrontiers(
         input.timestamp_ns, *dsg_->graph, *places_nn_finder_);
-
   }  // end graph update critical section
 }
 
@@ -457,6 +501,7 @@ void FrontendModule::updatePlaces2d(const ReconstructionOutput& input) {
 
 void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
+  ScopedTimer timer("frontend/update_posegraph", input.timestamp_ns);
   const auto& prefix = HydraConfig::instance().getRobotPrefix();
   const auto& agents = dsg_->graph->getLayer(DsgLayers::AGENTS, prefix.key);
 
@@ -464,12 +509,13 @@ void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
     lcd_input_->new_agent_nodes.clear();
   }
 
-  for (const auto& pose_graph : input.pose_graphs) {
-    if (pose_graph->nodes.empty()) {
+  for (const auto& pose_graph_msg : input.pose_graphs) {
+    if (pose_graph_msg->nodes.empty()) {
       continue;
     }
 
-    for (const auto& node : pose_graph->nodes) {
+    const auto pose_graph = pose_graph_tools::fromMsg(*pose_graph_msg);
+    for (const auto& node : pose_graph.nodes) {
       if (node.key < agents.numNodes()) {
         continue;
       }
@@ -761,7 +807,7 @@ void FrontendModule::updatePlaceMeshMapping(const ReconstructionOutput& input) {
   const auto& graph_mapping = mesh_frontend_.getVoxbloxMsgToGraphMapping();
 
   voxblox::BlockIndexList allocated_list;
-  input.mesh->getAllocatedBlockIndices(allocated_list);
+  input.map().getMeshLayer().getAllocatedBlockIndices(allocated_list);
 
   voxblox::IndexSet allocated(allocated_list.begin(), allocated_list.end());
   voxblox::IndexSet archived(input.archived_blocks.begin(),

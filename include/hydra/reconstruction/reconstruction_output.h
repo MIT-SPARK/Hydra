@@ -33,36 +33,45 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <pose_graph_tools/pose_graph.h>
-#include <voxblox/core/layer.h>
-#include <voxblox/mesh/mesh_layer.h>
-
 #include <Eigen/Dense>
 #include <cstdint>
 #include <memory>
 
-#include "hydra/reconstruction/semantic_mesh_layer.h"
-#include "hydra/reconstruction/vertex_voxel.h"
+#include "hydra/reconstruction/reconstruction_input.h"
+#include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
 
 struct ReconstructionOutput {
   using Ptr = std::shared_ptr<ReconstructionOutput>;
 
+  virtual ~ReconstructionOutput() = default;
+
   uint64_t timestamp_ns;
-  SemanticMeshLayer::Ptr mesh;
-  voxblox::Layer<voxblox::TsdfVoxel>::Ptr tsdf;
-  voxblox::Layer<VertexVoxel>::Ptr occupied;
-  voxblox::BlockIndexList archived_blocks;
-  std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
-  pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements;
   Eigen::Vector3d world_t_body;
   Eigen::Quaterniond world_R_body;
+  std::shared_ptr<FrameData> sensor_data;
+
+  const VolumetricMap& map() const;
+  voxblox::BlockIndexList archived_blocks;
+  std::list<pose_graph_tools_msgs::PoseGraph::ConstPtr> pose_graphs;
+  pose_graph_tools_msgs::PoseGraph::ConstPtr agent_node_measurements;
 
   template <typename T = double>
   Eigen::Transform<T, 3, Eigen::Isometry> world_T_body() const {
     return Eigen::Translation<T, 3>(world_t_body.cast<T>()) * world_R_body.cast<T>();
   }
+
+  void setMap(const VolumetricMap& map);
+  void setMap(const std::shared_ptr<VolumetricMap>& map);
+  std::shared_ptr<VolumetricMap> getMapPointer() const;
+
+  virtual void updateFrom(const ReconstructionOutput& msg, bool clone_map);
+
+  static Ptr fromInput(const ReconstructionInput& input);
+
+ protected:
+  std::shared_ptr<VolumetricMap> map_;
 };
 
 }  // namespace hydra

@@ -118,8 +118,7 @@ void PoseGraphTracker::update(const ReconstructionInput& msg) {
 void PoseGraphTracker::fillPoseGraphs(ReconstructionOutput& msg) {
   VLOG(10) << "[PoseGraph Tracker] queued pose graphs: " << graphs_.size();
   for (const auto& graph : graphs_) {
-    msg.pose_graphs.emplace_back(std::make_shared<pose_graph_tools::PoseGraph>(
-        pose_graph_tools::fromMsg(*graph)));
+    msg.pose_graphs.emplace_back(graph);
   }
 
   graphs_.clear();

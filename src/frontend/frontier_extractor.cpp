@@ -1,19 +1,18 @@
 #include <config_utilities/config_utilities.h>
+#include <spark_dsg/dynamic_scene_graph.h>
 #include <spark_dsg/dynamic_scene_graph_layer.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph_types.h>
 #include <voxblox/core/block.h>
 #include <voxblox/core/common.h>
 #include <voxblox/core/voxel.h>
 
-#include "hydra/common/config_utilities.h"
-// #include "hydra/frontend/frontier_extractor_config.h"
 #define PCL_NO_PRECOMPILE
-#include <hydra/utils/nearest_neighbor_utilities.h>
 #include <pcl/ModelCoefficients.h>
 #include <pcl/common/centroid.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/voxel_grid.h>
-#include <pcl/io/pcd_io.h>
 #include <pcl/pcl_base.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -22,13 +21,13 @@
 #include <pcl/search/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/segmentation/sac_segmentation.h>
-#include <spark_dsg/dynamic_scene_graph.h>
-#include <spark_dsg/node_attributes.h>
-#include <spark_dsg/scene_graph_types.h>
+#undef PCL_NO_PRECOMPILE
 
 #include <queue>
 
+#include "hydra/common/config_utilities.h"
 #include "hydra/frontend/frontier_extractor.h"
+#include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra {
 
@@ -170,14 +169,14 @@ void checkNeighborAndAddBlock(const int i,
                               const int j,
                               const int k,
                               const voxblox::BlockIndex& block_index,
-                              const typename voxblox::Layer<T>::Ptr& layer,
+                              const voxblox::Layer<T>& layer,
                               std::vector<voxblox::BlockIndex>& blocks_to_skip,
                               std::queue<voxblox::BlockIndex>& extra_blocks) {
   voxblox::GlobalIndex gvi = voxblox::getGlobalVoxelIndexFromBlockAndVoxelIndex(
-      block_index, {i, j, k}, layer->voxels_per_side());
+      block_index, {i, j, k}, layer.voxels_per_side());
   voxblox::BlockIndex bix =
-      voxblox::getBlockIndexFromGlobalVoxelIndex(gvi, layer->voxels_per_side_inv());
-  if (!layer->hasBlock(bix)) {
+      voxblox::getBlockIndexFromGlobalVoxelIndex(gvi, layer.voxels_per_side_inv());
+  if (!layer.hasBlock(bix)) {
     auto it = find(blocks_to_skip.begin(), blocks_to_skip.end(), bix);
     if (it == blocks_to_skip.end()) {
       extra_blocks.push(bix);
@@ -307,8 +306,9 @@ void processBlock(NearestNodeFinder& finder,
                   std::queue<voxblox::BlockIndex>& extra_blocks,
                   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
                   pcl::PointCloud<pcl::PointXYZ>::Ptr archived_cloud) {
-  double voxel_size = input.tsdf->voxel_size();
-  double block_size = input.tsdf->block_size();
+  const auto& tsdf = input.map().getTsdfLayer();
+  double voxel_size = tsdf.voxel_size();
+  double block_size = tsdf.block_size();
   // Get all active places near block
   Eigen::Vector3f block_origin =
       voxblox::getOriginPointFromGridIndex(block_index, block_size);
@@ -328,7 +328,7 @@ void processBlock(NearestNodeFinder& finder,
   }
 
   // find all voxels that are inside a place
-  int vps = input.tsdf->voxels_per_side();
+  int vps = tsdf.voxels_per_side();
   size_t voxels_per_block = std::pow(vps, 3);
   std::vector<bool> inside_place;
   inside_place.resize(voxels_per_block);
@@ -347,10 +347,9 @@ void processBlock(NearestNodeFinder& finder,
   // find voxels that are on boundary of unobserved space and space inside a place
   for (size_t v = 0; v < voxels_per_block; ++v) {
     // We only need to check if the voxel has been observed if the block is allocated
-    if (input.tsdf->hasBlock(block_index)) {
-      voxblox::Block<voxblox::TsdfVoxel>::Ptr block =
-          input.tsdf->getBlockPtrByIndex(block_index);
-      const voxblox::TsdfVoxel& voxel = block->getVoxelByLinearIndex(v);
+    if (tsdf.hasBlock(block_index)) {
+      const auto block = tsdf.getBlockPtrByIndex(block_index);
+      const auto& voxel = block->getVoxelByLinearIndex(v);
 
       if (voxel.weight >= 1e-6) {
         continue;
@@ -367,17 +366,17 @@ void processBlock(NearestNodeFinder& finder,
     // blocks
     if (inside_place[v] || inside_archived_place[v]) {
       checkNeighborAndAddBlock<voxblox::TsdfVoxel>(
-          i + 1, j, k, block_index, input.tsdf, skip_add_blocks, extra_blocks);
+          i + 1, j, k, block_index, tsdf, skip_add_blocks, extra_blocks);
       checkNeighborAndAddBlock<voxblox::TsdfVoxel>(
-          i - 1, j, k, block_index, input.tsdf, skip_add_blocks, extra_blocks);
+          i - 1, j, k, block_index, tsdf, skip_add_blocks, extra_blocks);
       checkNeighborAndAddBlock<voxblox::TsdfVoxel>(
-          i, j + 1, k, block_index, input.tsdf, skip_add_blocks, extra_blocks);
+          i, j + 1, k, block_index, tsdf, skip_add_blocks, extra_blocks);
       checkNeighborAndAddBlock<voxblox::TsdfVoxel>(
-          i, j - 1, k, block_index, input.tsdf, skip_add_blocks, extra_blocks);
+          i, j - 1, k, block_index, tsdf, skip_add_blocks, extra_blocks);
       checkNeighborAndAddBlock<voxblox::TsdfVoxel>(
-          i, j, k + 1, block_index, input.tsdf, skip_add_blocks, extra_blocks);
+          i, j, k + 1, block_index, tsdf, skip_add_blocks, extra_blocks);
       checkNeighborAndAddBlock<voxblox::TsdfVoxel>(
-          i, j, k - 1, block_index, input.tsdf, skip_add_blocks, extra_blocks);
+          i, j, k - 1, block_index, tsdf, skip_add_blocks, extra_blocks);
 
       continue;
     }
@@ -477,8 +476,9 @@ void FrontierExtractor::detectFrontiers(const ReconstructionOutput& input,
     recently_archived_blocks_.push_back(b);
   }
 
+  const auto& tsdf = input.map().getTsdfLayer();
   voxblox::BlockIndexList allocated_blocks;
-  input.tsdf->getAllAllocatedBlocks(&allocated_blocks);
+  tsdf.getAllAllocatedBlocks(&allocated_blocks);
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::PointCloud<pcl::PointXYZ>::Ptr archived_cloud(
       new pcl::PointCloud<pcl::PointXYZ>);
@@ -488,7 +488,7 @@ void FrontierExtractor::detectFrontiers(const ReconstructionOutput& input,
   std::vector<voxblox::BlockIndex> processed_extra_blocks;
 
   for (const auto& idx : allocated_blocks) {
-    voxblox::Block<voxblox::TsdfVoxel>::Ptr block = input.tsdf->getBlockPtrByIndex(idx);
+    auto block = tsdf.getBlockPtrByIndex(idx);
 
     processBlock<voxblox::TsdfVoxel>(finder,
                                      block->block_index(),
@@ -524,7 +524,7 @@ void FrontierExtractor::detectFrontiers(const ReconstructionOutput& input,
   }
 
   if (config_.dense_frontiers) {
-    populateDenseFrontiers(cloud, archived_cloud, input.tsdf->voxel_size());
+    populateDenseFrontiers(cloud, archived_cloud, tsdf.voxel_size());
   } else {
     computeSparseFrontiers(cloud, config_, frontiers_);
     computeSparseFrontiers(archived_cloud, config_, archived_frontiers_);

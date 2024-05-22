@@ -110,9 +110,11 @@ class FrontendModule : public Module {
  protected:
   virtual void initCallbacks();
 
-  void spinOnce(const ReconstructionOutput& msg);
+  void dispatchSpin(ReconstructionOutput::Ptr msg);
 
-  virtual void updateImpl(const ReconstructionOutput& msg);
+  void spinOnce(const ReconstructionOutput::Ptr& msg);
+
+  virtual void updateImpl(const ReconstructionOutput::Ptr& msg);
 
  protected:
   void updateMesh(const ReconstructionOutput& msg);
@@ -144,12 +146,17 @@ class FrontendModule : public Module {
 
   void updatePlaceMeshMapping(const ReconstructionOutput& input);
 
+  void processNextInput(const ReconstructionOutput& msg);
+
  protected:
+  using InputPtrCallback = std::function<void(const ReconstructionOutput::Ptr&)>;
+
   bool initialized_ = false;
   mutable std::mutex gvd_mutex_;
   std::atomic<bool> should_shutdown_{false};
   std::unique_ptr<std::thread> spin_thread_;
   FrontendInputQueue::Ptr queue_;
+  std::atomic<bool> spin_finished_;
 
   LcdInput::Ptr lcd_input_;
   BackendInput::Ptr backend_input_;
@@ -180,6 +187,7 @@ class FrontendModule : public Module {
   std::list<pose_graph_tools_msgs::BowQuery::ConstPtr> cached_bow_messages_;
 
   std::vector<InputCallback> input_callbacks_;
+  std::vector<InputPtrCallback> input_dispatches_;
   std::vector<InputCallback> post_mesh_callbacks_;
   Sink::List sinks_;
 

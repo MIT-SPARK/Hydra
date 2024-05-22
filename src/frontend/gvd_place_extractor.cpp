@@ -145,14 +145,15 @@ std::vector<bool> GvdPlaceExtractor::inFreespace(const PositionMatrix& positions
 }
 
 void GvdPlaceExtractor::detect(const ReconstructionOutput& msg) {
-  if (!msg.tsdf || !msg.mesh || !msg.occupied) {
+  const auto& map = msg.map();
+  if (!map.getOccupancyLayer()) {
     LOG(ERROR) << "Cannot extract places from invalid input";
     return;
   }
 
+  auto& tsdf = map.getTsdfLayer();
   if (!gvd_) {
-    gvd_.reset(
-        new Layer<GvdVoxel>(msg.tsdf->voxel_size(), msg.tsdf->voxels_per_side()));
+    gvd_.reset(new Layer<GvdVoxel>(tsdf.voxel_size(), tsdf.voxels_per_side()));
     gvd_integrator_.reset(new GvdIntegrator(config.gvd, gvd_, graph_extractor_));
   }
 
@@ -162,8 +163,7 @@ void GvdPlaceExtractor::detect(const ReconstructionOutput& msg) {
   {  // start critical section
     std::unique_lock<std::mutex> lock(gvd_mutex_);
     ScopedTimer timer("places/gvd", msg.timestamp_ns);
-    gvd_integrator_->updateFromTsdf(
-        msg.timestamp_ns, *msg.tsdf, *msg.occupied, *msg.mesh, true);
+    gvd_integrator_->updateFromMap(msg.timestamp_ns, map);
     gvd_integrator_->updateGvd(msg.timestamp_ns);
     gvd_integrator_->archiveBlocks(msg.archived_blocks);
   }  // end critical section

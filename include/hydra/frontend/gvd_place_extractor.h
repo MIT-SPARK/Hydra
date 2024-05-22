@@ -43,7 +43,6 @@
 #include "hydra/places/graph_extractor_config.h"
 #include "hydra/places/gvd_integrator_config.h"
 #include "hydra/places/gvd_voxel.h"
-#include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/utils/log_utilities.h"
 
 namespace hydra {

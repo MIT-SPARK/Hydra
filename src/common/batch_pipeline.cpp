@@ -68,10 +68,9 @@ DynamicSceneGraph::Ptr BatchPipeline::construct(
   auto module = frontend_config.create(dsg, state, LogSetup::Ptr());
   const auto queue = module->getQueue();
 
+  // TODO(nathan) this is a little sketchy given the lack of pose info
   auto msg = std::make_shared<ReconstructionOutput>();
-  map.getMeshLayer().merge(msg->mesh);
-  mergeLayer(map.getTsdfLayer(), msg->tsdf);
-  mergeLayer(*map.getOccupancyLayer(), msg->occupied);
+  msg->setMap(map);
   queue->push(msg);
 
   if (!module->spinOnce()) {
