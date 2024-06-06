@@ -57,6 +57,9 @@ struct OutputSink {
   template <typename T>
   static Ptr fromMethod(void (T::*callback)(Args...) const, const T* instance);
 
+  template <typename T>
+  static Ptr fromMethod(void (T::*callback)(Args...), T* instance);
+
   static List instantiate(const std::vector<Factory>& configs) {
     List sinks;
     for (const auto& config : configs) {
@@ -108,6 +111,24 @@ template <typename T>
 typename OutputSink<Args...>::Ptr OutputSink<Args...>::fromMethod(
     void (T::*callback)(Args...) const, const T* instance) {
   return std::make_shared<MethodSink<T, Args...>>(callback, instance);
+}
+
+template <typename T, typename... Args>
+struct NonConstMethodSink : OutputSink<Args...> {
+  NonConstMethodSink(void (T::*callback)(Args...), T* instance)
+      : callback(callback), instance(instance) {}
+
+  void call(Args... args) const override { (instance->*callback)(args...); }
+
+  void (T::*callback)(Args...);
+  T* instance;
+};
+
+template <typename... Args>
+template <typename T>
+typename OutputSink<Args...>::Ptr OutputSink<Args...>::fromMethod(
+    void (T::*callback)(Args...), T* instance) {
+  return std::make_shared<NonConstMethodSink<T, Args...>>(callback, instance);
 }
 
 }  // namespace hydra
