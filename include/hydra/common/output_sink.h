@@ -58,7 +58,7 @@ struct OutputSink {
   static Ptr fromMethod(void (T::*callback)(Args...) const, const T* instance);
 
   template <typename T>
-  static Ptr fromNonConstMethod(void (T::*callback)(Args...), T* instance);
+  static Ptr fromMethod(void (T::*callback)(Args...), T* instance);
 
   static List instantiate(const std::vector<Factory>& configs) {
     List sinks;
@@ -126,7 +126,7 @@ struct NonConstMethodSink : OutputSink<Args...> {
 
 template <typename... Args>
 template <typename T>
-typename OutputSink<Args...>::Ptr OutputSink<Args...>::fromNonConstMethod(
+typename OutputSink<Args...>::Ptr OutputSink<Args...>::fromMethod(
     void (T::*callback)(Args...), T* instance) {
   return std::make_shared<NonConstMethodSink<T, Args...>>(callback, instance);
 }
