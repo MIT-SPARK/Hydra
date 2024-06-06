@@ -122,6 +122,10 @@ rosbag play path/to/rosbag --clock
 See [here](https://github.com/MIT-SPARK/Hydra-ROS/blob/main/doc/quickstart.md) for detailed instructions discussing how to run Hydra using ROS.
 These also detail how to use Hydra with [Kimera-VIO](https://github.com/MIT-SPARK/Kimera-VIO.git), including how to build Kimera-VIO alongside Hydra.
 
+### Hydra Python Bindings
+
+See [here](python/README.md) for information
+
 ### Using a Semantic Segmentation Network
 
 :warning: This package is not public (yet)

@@ -41,3 +41,4 @@ from hydra_python.output import *
 from hydra_python.data_interface import *
 from hydra_python.segmentation_colormap import *
 from hydra_python._hydra_bindings import *
+from hydra_python.dataset_logger import *

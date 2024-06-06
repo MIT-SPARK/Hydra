@@ -1,4 +1,5 @@
 """Class that generates a set of poses for the simulator."""
+
 from scipy.spatial.transform import Rotation as Rot
 from scipy.spatial.transform import Slerp
 import spark_dsg as dsg
@@ -228,11 +229,18 @@ class Trajectory:
             raise StopIteration
 
         self._index += 1
-        return (
-            self._times[self._index - 1],
-            self._poses[self._index - 1, :3],
-            self._poses[self._index - 1, 3:],
-        )
+        return self[self._index - 1]
+
+    def __getitem__(self, key):
+        """Get a pose or trajectory subset."""
+        if isinstance(key, slice):
+            return Trajectory(self._times[key], self._poses[key, :])
+        elif isinstance(key, int):
+            key = key if key >= 0 else key + len(self)
+            # lets times handle out of range error (which is lazy)
+            return (self._times[key], self._poses[key, :3], self._poses[key, 3:])
+        else:
+            raise TypeError(f"invalid key: {key}")
 
     def __iadd__(self, other):
         """Extend a trajectory."""

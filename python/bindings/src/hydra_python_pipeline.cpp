@@ -62,7 +62,7 @@ HydraPythonPipeline::HydraPythonPipeline(const PipelineConfig& config,
     : HydraPipeline(config, robot_id, config_verbosity),
       step_mode_only_(step_mode_only) {
   GlogSingleton::instance().setLogLevel(0, 0, false);
-  config::Settings().setLogger("glog");
+  //config::Settings().setLogger("glog");
   config::Settings().print_width = 100;
   config::Settings().print_indent = 45;
 }
