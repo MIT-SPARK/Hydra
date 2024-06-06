@@ -16,6 +16,9 @@ target_link_libraries(
   PRIVATE nanoflann::nanoflann
 )
 
+add_executable(compress_graph tools/compress_graph.cpp)
+target_link_libraries(compress_graph ${PROJECT_NAME}_eval nanoflann::nanoflann)
+
 add_executable(compute_filtrations tools/compute_filtrations.cpp)
 target_link_libraries(compute_filtrations ${PROJECT_NAME}_eval)
 
@@ -34,6 +37,7 @@ target_link_libraries(merge_graphs ${PROJECT_NAME}_eval)
 if(${HYDRA_ENABLE_ROS_INSTALL_LAYOUT})
   install(
     TARGETS ${PROJECT_NAME}_eval
+            compress_graph
             compute_filtrations
             evaluate_places
             evaluate_rooms
