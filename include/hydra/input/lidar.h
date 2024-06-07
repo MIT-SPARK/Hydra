@@ -39,7 +39,7 @@
 #include <vector>
 
 #include "hydra/reconstruction/reconstruction_input.h"
-#include "hydra/reconstruction/sensor.h"
+#include "hydra/input/sensor.h"
 
 namespace hydra {
 

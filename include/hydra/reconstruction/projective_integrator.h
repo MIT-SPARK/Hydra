@@ -56,7 +56,7 @@
 #include "hydra/reconstruction/projection_interpolators.h"
 #include "hydra/reconstruction/projective_integrator_config.h"
 #include "hydra/reconstruction/semantic_integrator.h"
-#include "hydra/reconstruction/sensor.h"
+#include "hydra/input/sensor.h"
 #include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {

@@ -40,7 +40,7 @@
 #include <list>
 #include <memory>
 
-#include "hydra/reconstruction/sensor_input_packet.h"
+#include "hydra/input/sensor_input_packet.h"
 
 namespace hydra {
 

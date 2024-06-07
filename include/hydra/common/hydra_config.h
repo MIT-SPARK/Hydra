@@ -43,7 +43,9 @@
 #include "hydra/common/label_space_config.h"
 #include "hydra/common/robot_prefix_config.h"
 #include "hydra/common/shared_dsg_info.h"
+#include "hydra/input/sensor.h"
 #include "hydra/utils/log_utilities.h"
+
 // TODO(nathan) bad....
 #include "hydra/reconstruction/volumetric_map.h"
 
@@ -139,6 +141,12 @@ class HydraConfig {
   // this intentionally returns a shared ptr to be threadsafe
   std::shared_ptr<SemanticColorMap> getSemanticColorMap() const;
 
+  void setSensors(std::vector<config::VirtualConfig<Sensor>> sensor_configs);
+
+  std::shared_ptr<const Sensor> getSensor(const size_t index) const;
+
+  size_t numSensors() const;
+
  private:
   HydraConfig();
 
@@ -157,6 +165,9 @@ class HydraConfig {
   RobotPrefixConfig robot_prefix_;
   LogSetup::Ptr logs_;
   std::shared_ptr<SemanticColorMap> label_colormap_;
+
+  std::vector<config::VirtualConfig<Sensor>> sensor_configs_;
+  std::vector<std::shared_ptr<const Sensor>> sensors_;
 };
 
 std::ostream& operator<<(std::ostream& out, const HydraConfig& config);

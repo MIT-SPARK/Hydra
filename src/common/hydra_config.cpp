@@ -269,6 +269,27 @@ SharedDsgInfo::Ptr HydraConfig::createSharedDsg() const {
 
 ColorMapPtr HydraConfig::getSemanticColorMap() const { return label_colormap_; }
 
+void HydraConfig::setSensors(std::vector<config::VirtualConfig<Sensor>> sensor_configs) {
+  sensor_configs_ = std::move(sensor_configs);
+  for (const auto& sensor_config : sensor_configs_) {
+    sensors_.emplace_back(sensor_config.create());
+  }
+}
+
+std::shared_ptr<const Sensor> HydraConfig::getSensor(const size_t index) const {
+  checkFrozen();
+  if (index >= sensors_.size()) {
+    LOG(ERROR) << "Sensor index out of bounds: " << index;
+    return nullptr;
+  }
+  return sensors_[index];
+}
+
+size_t HydraConfig::numSensors() const {
+  checkFrozen();
+  return sensors_.size();
+}
+
 std::ostream& operator<<(std::ostream& out, const HydraConfig& config) {
   out << config::toString(config.getConfig());
   return out;

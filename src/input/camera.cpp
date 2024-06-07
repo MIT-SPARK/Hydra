@@ -45,14 +45,14 @@
 // implied, of the United States Air Force or the U.S. Government. The U.S.
 // Government is authorized to reproduce and distribute reprints for Government
 // purposes notwithstanding any copyright notation herein.
-#include "hydra/reconstruction/camera.h"
+#include "hydra/input/camera.h"
 
 #include <config_utilities/config_utilities.h>
 
 #include <unordered_map>
 #include <vector>
 
-#include "hydra/reconstruction/sensor_utilities.h"
+#include "hydra/input/sensor_utilities.h"
 
 namespace hydra {
 

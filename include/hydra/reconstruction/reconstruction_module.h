@@ -47,7 +47,7 @@
 #include "hydra/reconstruction/projective_integrator_config.h"
 #include "hydra/reconstruction/reconstruction_input.h"
 #include "hydra/reconstruction/reconstruction_output.h"
-#include "hydra/reconstruction/sensor.h"
+#include "hydra/input/sensor.h"
 #include "hydra/reconstruction/volumetric_map.h"
 #include "hydra/utils/log_utilities.h"
 #include "hydra/utils/pose_graph_tracker.h"
@@ -79,7 +79,6 @@ class ReconstructionModule : public Module {
     float semantic_measurement_probability = 0.9;
     ProjectiveIntegratorConfig tsdf;
     MeshIntegratorConfig mesh;
-    config::VirtualConfig<Sensor> sensor;
     PoseGraphTracker::Config pose_graphs;
     config::VirtualConfig<RobotFootprintIntegrator> robot_footprint;
     std::vector<Sink::Factory> sinks;
@@ -118,8 +117,6 @@ class ReconstructionModule : public Module {
   void fillOutput(ReconstructionOutput& output);
 
  protected:
-  const std::unique_ptr<Sensor> sensor_;
-
   std::atomic<bool> should_shutdown_{false};
   ReconstructionInputQueue::Ptr queue_;
   std::unique_ptr<std::thread> spin_thread_;

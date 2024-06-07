@@ -35,40 +35,56 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
 
-#include <optional>
+#include <thread>
 
+#include "hydra/input/data_receiver.h"
 #include "hydra/common/input_queue.h"
-#include "hydra/reconstruction/sensor_input_packet.h"
+#include "hydra/common/module.h"
+#include "hydra/reconstruction/reconstruction_input.h"
 
 namespace hydra {
 
-class DataReceiver {
- public:
-  using DataQueue = InputQueue<SensorInputPacket::Ptr>;
-
-  struct Config {
-    double input_separation_s = 0.0;
-  };
-
-  explicit DataReceiver(const Config& config);
-
-
-  virtual ~DataReceiver() = default;
-
-  bool init();
-
- public:
-  const Config config;
-  DataQueue queue;
-
- protected:
-  virtual bool initImpl() = 0;
-
-  bool checkInputTimestamp(uint64_t timestamp_ns);
-
-  std::optional<uint64_t> last_time_received_;
+struct PoseStatus {
+  bool is_valid = false;
+  Eigen::Quaterniond target_R_source;
+  Eigen::Vector3d target_p_source;
+  operator bool() const { return is_valid; }
 };
 
-void declare_config(DataReceiver::Config& config);
+class InputModule : public Module {
+ public:
+  using OutputQueue = InputQueue<ReconstructionInput::Ptr>;
+  struct Config {
+    std::vector<config::VirtualConfig<DataReceiver>> receivers;
+  } const config;
+
+  InputModule(const Config& config, const OutputQueue::Ptr& output_queue);
+
+  virtual ~InputModule();
+
+  void start() override;
+
+  void stop() override;
+
+  void save(const LogSetup& log_setup) override;
+
+  std::string printInfo() const override;
+
+ protected:
+  void dataSpin();
+
+  void stopImpl();
+
+  virtual PoseStatus getBodyPose(uint64_t timestamp) = 0;
+
+ protected:
+  OutputQueue::Ptr queue_;
+  std::atomic<bool> should_shutdown_{false};
+
+  std::vector<std::unique_ptr<DataReceiver>> receivers_;
+  std::unique_ptr<std::thread> data_thread_;
+};
+
+void declare_config(InputModule::Config& config);
 
 }  // namespace hydra

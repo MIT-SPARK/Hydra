@@ -45,7 +45,7 @@
 // implied, of the United States Air Force or the U.S. Government. The U.S.
 // Government is authorized to reproduce and distribute reprints for Government
 // purposes notwithstanding any copyright notation herein.
-#include "hydra/reconstruction/sensor.h"
+#include "hydra/input/sensor.h"
 
 #include <config_utilities/config_utilities.h>
 #include <config_utilities/types/eigen_matrix.h>

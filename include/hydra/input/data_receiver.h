@@ -32,41 +32,45 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/reconstruction/sensor_input_packet.h"
+#pragma once
+#include <config_utilities/virtual_config.h>
 
-#include <glog/logging.h>
+#include <optional>
+
+#include "hydra/common/input_queue.h"
+#include "hydra/input/sensor_input_packet.h"
+#include "hydra/input/sensor.h"
 
 namespace hydra {
 
-ImageInputPacket::ImageInputPacket(uint64_t stamp) : SensorInputPacket(stamp) {}
+class DataReceiver {
+ public:
+  using DataQueue = InputQueue<SensorInputPacket::Ptr>;
 
-bool ImageInputPacket::fillFrameData(FrameData& msg) const {
-  if (depth.empty() || (color.empty() && labels.empty())) {
-    LOG(ERROR) << "Missing required images!!!!";
-    return false;
-  }
+  struct Config {
+    config::VirtualConfig<Sensor> sensor;
+    double input_separation_s = 0.0;
+  };
 
-  msg.timestamp_ns = timestamp_ns;
-  msg.color_image = color;
-  msg.depth_image = depth;
-  msg.label_image = labels;
-  return true;
-}
+  DataReceiver(const Config& config, size_t sensor_id);
+  virtual ~DataReceiver() = default;
 
-CloudInputPacket::CloudInputPacket(uint64_t stamp) : SensorInputPacket(stamp) {}
+  bool init();
 
-bool CloudInputPacket::fillFrameData(FrameData& msg) const {
-  if (points.empty() || (labels.empty() && colors.empty())) {
-    LOG(ERROR) << "Missing required pointcloud!!!!";
-    return false;
-  }
+ public:
+  const Config config;
+  DataQueue queue;
 
-  msg.timestamp_ns = timestamp_ns;
-  msg.vertex_map = points;
-  msg.points_in_world_frame = in_world_frame;
-  msg.color_image = colors;
-  msg.label_image = labels;
-  return true;
-}
+ protected:
+  virtual bool initImpl() = 0;
+
+  bool checkInputTimestamp(uint64_t timestamp_ns);
+
+  std::optional<uint64_t> last_time_received_;
+
+  const size_t sensor_id_;
+};
+
+void declare_config(DataReceiver::Config& config);
 
 }  // namespace hydra

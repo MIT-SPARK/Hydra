@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/common/input_module.h"
+#include "hydra/input/input_module.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
@@ -46,18 +46,28 @@ namespace hydra {
 void declare_config(InputModule::Config& config) {
   using namespace config;
   name("InputModule::Config");
-  field(config.receiver, "receiver");
+  field(config.receivers, "receivers");
+  checkCondition(!config.receivers.empty(), "At least one receiver must be specified");
 }
 
 InputModule::InputModule(const Config& config, const OutputQueue::Ptr& queue)
     : config(config::checkValid(config)), queue_(queue) {
-  receiver_ = config.receiver.create();
+  // Setup the receivers and instatiate their sensors globally.
+  std::vector<config::VirtualConfig<Sensor>> sensor_configs;
+  for (size_t i = 0; i < config.receivers.size(); ++i) {
+    receivers_.emplace_back(config.receivers[i].create(i));
+    sensor_configs.push_back(receivers_.back()->config.sensor);
+  }
+
+  HydraConfig::instance().setSensors(sensor_configs);
 }
 
 InputModule::~InputModule() { stopImpl(); }
 
 void InputModule::start() {
-  receiver_->init();
+  for (auto& receiver : receivers_) {
+    receiver->init();
+  }
   data_thread_.reset(new std::thread(&InputModule::dataSpin, this));
   LOG(INFO) << "[Hydra Input] started!";
 }
@@ -73,8 +83,10 @@ void InputModule::stopImpl() {
     data_thread_.reset();
     VLOG(2) << "[Hydra Input] stopped input thread";
   }
-
-  VLOG(2) << "[Hydra Input] remaining in data queue: " << receiver_->queue.size();
+  for (size_t i = 0; i < receivers_.size(); ++i) {
+    VLOG(2) << "[Hydra Input] remaining in data queue[" << i
+            << "]: " << receivers_[i]->queue.size();
+  }
 }
 
 void InputModule::save(const LogSetup&) {}
@@ -87,28 +99,30 @@ std::string InputModule::printInfo() const {
 
 void InputModule::dataSpin() {
   while (!should_shutdown_) {
-    bool has_data = receiver_->queue.poll();
-    if (!has_data) {
-      continue;
+    for (const auto& receiver : receivers_) {
+      const bool has_data = receiver->queue.poll();
+      if (!has_data) {
+        continue;
+      }
+
+      const auto packet = receiver->queue.pop();
+      const auto curr_time = packet->timestamp_ns;
+      VLOG(2) << "[Hydra Input] popped input @ " << curr_time << " [ns]";
+
+      const auto odom_T_body = getBodyPose(curr_time);
+      if (!odom_T_body) {
+        LOG(WARNING) << "[Hydra Input] dropping input @ " << curr_time
+                     << " [ns] due to missing pose";
+        continue;
+      }
+
+      ReconstructionInput::Ptr input(new ReconstructionInput());
+      input->timestamp_ns = curr_time;
+      input->sensor_input = packet;
+      input->world_t_body = odom_T_body.target_p_source;
+      input->world_R_body = odom_T_body.target_R_source;
+      queue_->push(input);
     }
-
-    const auto packet = receiver_->queue.pop();
-    const auto curr_time = packet->timestamp_ns;
-    VLOG(2) << "[Hydra Input] popped input @ " << curr_time << " [ns]";
-
-    const auto odom_T_body = getBodyPose(curr_time);
-    if (!odom_T_body) {
-      LOG(WARNING) << "[Hydra Input] dropping input @ " << curr_time
-                   << " [ns] due to missing pose";
-      continue;
-    }
-
-    ReconstructionInput::Ptr input(new ReconstructionInput());
-    input->timestamp_ns = curr_time;
-    input->sensor_input = packet;
-    input->world_t_body = odom_T_body.target_p_source;
-    input->world_R_body = odom_T_body.target_R_source;
-    queue_->push(input);
   }
 }
 

@@ -65,7 +65,6 @@ void declare_config(ReconstructionModule::Config& conf) {
   field(conf.semantic_measurement_probability, "semantic_measurement_probability");
   field(conf.tsdf, "tsdf");
   field(conf.mesh, "mesh");
-  field(conf.sensor, "sensor");
   field(conf.pose_graphs, "pose_graphs");
   conf.robot_footprint.setOptional();
   field(conf.robot_footprint, "robot_footprint");
@@ -75,7 +74,6 @@ void declare_config(ReconstructionModule::Config& conf) {
 ReconstructionModule::ReconstructionModule(const Config& config,
                                            const OutputQueue::Ptr& queue)
     : config(config::checkValid(config)),
-      sensor_(config.sensor.create()),
       num_poses_received_(0),
       pose_graph_tracker_(new PoseGraphTracker(config.pose_graphs)),
       output_queue_(queue),
@@ -215,14 +213,15 @@ bool ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
     return false;
   }
 
-  if (!sensor_->finalizeRepresentations(*data)) {
+  const Sensor& sensor = *HydraConfig::instance().getSensor(msg.sensor_input->sensor_id);
+  if (!sensor.finalizeRepresentations(*data)) {
     LOG(ERROR) << "[Hydra Reconstruction] unable to compute inputs for integration";
     return false;
   }
 
   {  // timing scope
     ScopedTimer timer("places/tsdf", msg.timestamp_ns);
-    tsdf_integrator_->updateMap(*sensor_, *data, *map_);
+    tsdf_integrator_->updateMap(sensor, *data, *map_);
   }  // timing scope
 
   if (footprint_integrator_) {
@@ -252,7 +251,7 @@ bool ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
 
   Sink::callAll(sinks_,
                 msg.timestamp_ns,
-                data->getSensorPose(*sensor_),
+                data->getSensorPose(sensor),
                 map_->getTsdfLayer(),
                 *output);
 

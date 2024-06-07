@@ -32,44 +32,45 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include "hydra/reconstruction/frame_data.h"
+#include "hydra/input/data_receiver.h"
+
+#include <config_utilities/config.h>
+#include <config_utilities/validation.h>
+#include <glog/logging.h>
+
+#include <chrono>
+
+#include "hydra/common/common.h"
 
 namespace hydra {
 
-struct SensorInputPacket {
-  using Ptr = std::shared_ptr<SensorInputPacket>;
+DataReceiver::DataReceiver(const Config& config, size_t sensor_id)
+    : config(config::checkValid(config)), sensor_id_(sensor_id) {}
 
-  explicit SensorInputPacket(uint64_t stamp) : timestamp_ns(stamp) {}
+bool DataReceiver::init() { return initImpl(); }
 
-  virtual ~SensorInputPacket() = default;
+bool DataReceiver::checkInputTimestamp(uint64_t timestamp_ns) {
+  if (last_time_received_) {
+    std::chrono::nanoseconds curr_time_ns(timestamp_ns);
+    std::chrono::nanoseconds last_time_ns(*last_time_received_);
+    std::chrono::duration<double> separation_s = curr_time_ns - last_time_ns;
+    if (separation_s.count() < config.input_separation_s) {
+      VLOG(10) << "[Data Receiver] Dropping input @ " << timestamp_ns
+               << " [ns] with separation of " << separation_s.count() << " [s]";
+      return false;
+    }
+  }
 
-  virtual bool fillFrameData(FrameData& msg) const = 0;
+  last_time_received_ = timestamp_ns;
+  VLOG(5) << "[Data Receiver] Got input @ " << timestamp_ns << " [ns]";
+  return true;
+}
 
- public:
-  const uint64_t timestamp_ns;
-  std::string sensor_frame;
-};
-
-struct ImageInputPacket : public SensorInputPacket {
-  explicit ImageInputPacket(uint64_t stamp);
-
-  bool fillFrameData(FrameData& msg) const override;
-
-  cv::Mat color;
-  cv::Mat depth;
-  cv::Mat labels;
-};
-
-struct CloudInputPacket : public SensorInputPacket {
-  explicit CloudInputPacket(uint64_t stamp);
-
-  bool fillFrameData(FrameData& msg) const override;
-
-  bool in_world_frame = false;
-  cv::Mat points;
-  cv::Mat colors;
-  cv::Mat labels;
-};
+void declare_config(DataReceiver::Config& config) {
+  using namespace config;
+  name("DataReceiver::Config");
+  field(config.sensor, "sensor");
+  field(config.input_separation_s, "input_separation_s");
+}
 
 }  // namespace hydra

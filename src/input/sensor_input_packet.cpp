@@ -32,43 +32,43 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/common/data_receiver.h"
+#include "hydra/input/sensor_input_packet.h"
 
-#include <config_utilities/config.h>
-#include <config_utilities/validation.h>
 #include <glog/logging.h>
-
-#include <chrono>
-
-#include "hydra/common/common.h"
 
 namespace hydra {
 
-DataReceiver::DataReceiver(const Config& config) : config(config::checkValid(config)) {}
+ImageInputPacket::ImageInputPacket(uint64_t stamp, size_t sensor_id)
+    : SensorInputPacket(stamp, sensor_id) {}
 
-bool DataReceiver::init() { return initImpl(); }
-
-bool DataReceiver::checkInputTimestamp(uint64_t timestamp_ns) {
-  if (last_time_received_) {
-    std::chrono::nanoseconds curr_time_ns(timestamp_ns);
-    std::chrono::nanoseconds last_time_ns(*last_time_received_);
-    std::chrono::duration<double> separation_s = curr_time_ns - last_time_ns;
-    if (separation_s.count() < config.input_separation_s) {
-      VLOG(10) << "[Data Receiver] Dropping input @ " << timestamp_ns
-               << " [ns] with separation of " << separation_s.count() << " [s]";
-      return false;
-    }
+bool ImageInputPacket::fillFrameData(FrameData& msg) const {
+  if (depth.empty() || (color.empty() && labels.empty())) {
+    LOG(ERROR) << "Missing required images!!!!";
+    return false;
   }
 
-  last_time_received_ = timestamp_ns;
-  VLOG(5) << "[Data Receiver] Got input @ " << timestamp_ns << " [ns]";
+  msg.timestamp_ns = timestamp_ns;
+  msg.color_image = color;
+  msg.depth_image = depth;
+  msg.label_image = labels;
   return true;
 }
 
-void declare_config(DataReceiver::Config& config) {
-  using namespace config;
-  name("DataReceiver::Config");
-  field(config.input_separation_s, "input_separation_s");
+CloudInputPacket::CloudInputPacket(uint64_t stamp, size_t sensor_id)
+    : SensorInputPacket(stamp, sensor_id) {}
+
+bool CloudInputPacket::fillFrameData(FrameData& msg) const {
+  if (points.empty() || (labels.empty() && colors.empty())) {
+    LOG(ERROR) << "Missing required pointcloud!!!!";
+    return false;
+  }
+
+  msg.timestamp_ns = timestamp_ns;
+  msg.vertex_map = points;
+  msg.points_in_world_frame = in_world_frame;
+  msg.color_image = colors;
+  msg.label_image = labels;
+  return true;
 }
 
 }  // namespace hydra

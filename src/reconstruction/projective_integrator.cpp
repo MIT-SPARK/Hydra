@@ -54,7 +54,7 @@
 #include <vector>
 
 #include "hydra/reconstruction/index_getter.h"
-#include "hydra/reconstruction/sensor_utilities.h"
+#include "hydra/input/sensor_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {

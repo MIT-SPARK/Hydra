@@ -33,58 +33,44 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/virtual_config.h>
-
-#include <thread>
-
-#include "hydra/common/data_receiver.h"
-#include "hydra/common/input_queue.h"
-#include "hydra/common/module.h"
-#include "hydra/reconstruction/reconstruction_input.h"
+#include "hydra/reconstruction/frame_data.h"
 
 namespace hydra {
 
-struct PoseStatus {
-  bool is_valid = false;
-  Eigen::Quaterniond target_R_source;
-  Eigen::Vector3d target_p_source;
-  operator bool() const { return is_valid; }
-};
+struct SensorInputPacket {
+  using Ptr = std::shared_ptr<SensorInputPacket>;
 
-class InputModule : public Module {
+  explicit SensorInputPacket(uint64_t stamp, size_t sensor_id) : timestamp_ns(stamp), sensor_id(sensor_id) {}
+
+  virtual ~SensorInputPacket() = default;
+
+  virtual bool fillFrameData(FrameData& msg) const = 0;
+
  public:
-  using OutputQueue = InputQueue<ReconstructionInput::Ptr>;
-  struct Config {
-    config::VirtualConfig<DataReceiver> receiver;
-  } const config;
-
-  InputModule(const Config& config, const OutputQueue::Ptr& output_queue);
-
-  virtual ~InputModule();
-
-  void start() override;
-
-  void stop() override;
-
-  void save(const LogSetup& log_setup) override;
-
-  std::string printInfo() const override;
-
- protected:
-  void dataSpin();
-
-  void stopImpl();
-
-  virtual PoseStatus getBodyPose(uint64_t timestamp) = 0;
-
- protected:
-  OutputQueue::Ptr queue_;
-  std::atomic<bool> should_shutdown_{false};
-
-  std::unique_ptr<DataReceiver> receiver_;
-  std::unique_ptr<std::thread> data_thread_;
+  const uint64_t timestamp_ns;
+  const size_t sensor_id;
+  std::string sensor_frame;
 };
 
-void declare_config(InputModule::Config& config);
+struct ImageInputPacket : public SensorInputPacket {
+  explicit ImageInputPacket(uint64_t stamp, size_t sensor_id);
+
+  bool fillFrameData(FrameData& msg) const override;
+
+  cv::Mat color;
+  cv::Mat depth;
+  cv::Mat labels;
+};
+
+struct CloudInputPacket : public SensorInputPacket {
+  explicit CloudInputPacket(uint64_t stamp, size_t sensor_id);
+
+  bool fillFrameData(FrameData& msg) const override;
+
+  bool in_world_frame = false;
+  cv::Mat points;
+  cv::Mat colors;
+  cv::Mat labels;
+};
 
 }  // namespace hydra

@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/reconstruction/lidar.h"
+#include "hydra/input/lidar.h"
 
 #include <config_utilities/config_utilities.h>
 #include <glog/logging.h>
@@ -41,7 +41,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "hydra/reconstruction/sensor_utilities.h"
+#include "hydra/input/sensor_utilities.h"
 
 namespace hydra {
 

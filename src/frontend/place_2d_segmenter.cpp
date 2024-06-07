@@ -148,12 +148,12 @@ pcl::IndicesPtr getActivePlaceIndices(
   num_archived_vertices = delta.getTotalArchivedVertices();
   if (!pos) {
     active_indices = indices;
-    VLOG(1) << "[Places 2d Segmenter] Active mesh indices: " << indices->size()
+    VLOG(5) << "[Places 2d Segmenter] Active mesh indices: " << indices->size()
             << " (used: " << active_indices->size() << ")";
     return active_indices;
   }
 
-  VLOG(1) << "[Places 2d Segmenter] n original active indices: " << indices->size();
+  VLOG(5) << "[Places 2d Segmenter] n original active indices: " << indices->size();
   std::unordered_set<size_t> frozen_indices;
   for (auto kv : active_places) {
     std::set<NodeId> nodes = kv.second;
@@ -212,16 +212,16 @@ pcl::IndicesPtr getActivePlaceIndices(
     }
   }
 
-  VLOG(1) << "[Places 2d Segmenter] n frozen indices: " << frozen_indices.size();
+  VLOG(5) << "[Places 2d Segmenter] n frozen indices: " << frozen_indices.size();
 
   for (const size_t idx : *indices) {
     if (!frozen_indices.count(idx)) {
       active_indices->push_back(idx);
     }
   }
-  VLOG(1) << "[Places 2d Segmenter] n final active indices: " << active_indices->size();
+  VLOG(5) << "[Places 2d Segmenter] n final active indices: " << active_indices->size();
 
-  VLOG(1) << "[Places 2d Segmenter] Active mesh indices: " << indices->size()
+  VLOG(5) << "[Places 2d Segmenter] Active mesh indices: " << indices->size()
           << " (used: " << active_indices->size() << ")";
   return active_indices;
 }
@@ -239,7 +239,7 @@ void Place2dSegmenter::detect(const ReconstructionOutput& msg,
                               const DynamicSceneGraph& graph) {
   Eigen::Vector3d pos = msg.world_t_body;
 
-  VLOG(1) << "[Places 2d Segmenter] detect called";
+  VLOG(5) << "[Places 2d Segmenter] detect called";
   const auto active_indices = getActivePlaceIndices(mesh_delta.getActiveIndices(),
                                                     active_places_,
                                                     mesh_delta,
@@ -251,7 +251,7 @@ void Place2dSegmenter::detect(const ReconstructionOutput& msg,
   LabelPlaces label_places;
 
   if (active_indices->empty()) {
-    VLOG(1) << "[Places 2d Segmenter] No active indices in mesh";
+    VLOG(5) << "[Places 2d Segmenter] No active indices in mesh";
     detected_label_places_ = label_places;
     return;
   }
@@ -259,7 +259,7 @@ void Place2dSegmenter::detect(const ReconstructionOutput& msg,
   const auto& mesh = *CHECK_NOTNULL(graph.mesh());
   LabelIndices label_indices = getLabelIndices(mesh.labels, *active_indices);
   if (label_indices.empty()) {
-    VLOG(1) << "[Places 2d Segmenter] No vertices found matching desired labels";
+    VLOG(5) << "[Places 2d Segmenter] No vertices found matching desired labels";
     for (const auto& callback_func : callback_funcs_) {
       callback_func(mesh.points, *active_indices, label_indices);
     }
@@ -282,7 +282,7 @@ void Place2dSegmenter::detect(const ReconstructionOutput& msg,
                                            label_indices.at(label),
                                            config.connection_ellipse_scale_factor);
 
-    VLOG(1) << "[Places 2d Segmenter] got " << initial_places.size()
+    VLOG(5) << "[Places 2d Segmenter] got " << initial_places.size()
             << " initial places";
     std::vector<Place2d> final_places =
         decomposePlaces(mesh.points,
@@ -291,7 +291,7 @@ void Place2dSegmenter::detect(const ReconstructionOutput& msg,
                         config.min_final_place_points,
                         config.connection_ellipse_scale_factor);
 
-    VLOG(1) << "[Places 2d Segmenter]  - Found " << final_places.size()
+    VLOG(5) << "[Places 2d Segmenter]  - Found " << final_places.size()
             << " final places of label " << static_cast<int>(label);
     label_places.insert({label, final_places});
   }
@@ -328,7 +328,7 @@ LabelIndices Place2dSegmenter::getLabelIndices(const Mesh::Labels& labels,
     label_indices[label]->push_back(idx);
   }
 
-  VLOG(3) << "[Places 2d Segmenter] Seen labels: " << printLabels(seen_labels);
+  VLOG(5) << "[Places 2d Segmenter] Seen labels: " << printLabels(seen_labels);
   return label_indices;
 }
 
@@ -352,7 +352,7 @@ void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
   nodes_to_remove_.clear();
 
   std::optional<Eigen::Vector3d> pos = msg.world_t_body;
-  VLOG(1) << "[Places 2d Segmenter] updateGraph";
+  VLOG(5) << "[Places 2d Segmenter] updateGraph";
   std::map<uint32_t, std::set<NodeId>> active_places_to_check;
   for (const auto& label : config.labels) {
     active_places_to_check[label] = std::set<NodeId>();

@@ -51,7 +51,7 @@
 
 #include <opencv2/core/mat.hpp>
 
-#include "hydra/reconstruction/sensor.h"
+#include "hydra/input/sensor.h"
 
 namespace hydra {
 
