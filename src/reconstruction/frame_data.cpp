@@ -38,7 +38,7 @@
 
 #include <opencv2/imgproc.hpp>
 
-#include "hydra/common/hydra_config.h"
+#include "hydra/common/global_info.h"
 #include "hydra/common/semantic_color_map.h"
 
 namespace hydra {
@@ -92,7 +92,7 @@ bool FrameData::colorToLabels(const cv::Mat& colors) {
 
   CHECK_EQ(colors.type(), CV_8UC3);
 
-  const auto colormap_ptr = HydraConfig::instance().getSemanticColorMap();
+  const auto colormap_ptr = GlobalInfo::instance().getSemanticColorMap();
   if (!colormap_ptr || !colormap_ptr->isValid()) {
     LOG(ERROR)
         << "label colormap not valid, but required for converting colors to labels!";

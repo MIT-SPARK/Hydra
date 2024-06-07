@@ -40,18 +40,18 @@ struct ConfigGuard {
   ConfigGuard(bool init = true) {
     if (init) {
       PipelineConfig config;
-      HydraConfig::init(config);
+      GlobalInfo::init(config);
     }
   }
 
   static ConfigGuard FixedLabels(size_t num_labels) {
     PipelineConfig config;
     config.label_space.total_labels = num_labels;
-    HydraConfig::init(config);
+    GlobalInfo::init(config);
     return ConfigGuard(false);
   }
 
-  ~ConfigGuard() { HydraConfig::instance().reset(); }
+  ~ConfigGuard() { GlobalInfo::instance().reset(); }
 };
 
 }  // namespace hydra::test

@@ -49,7 +49,7 @@ std::unique_ptr<SemanticIntegrator> createIntegrator(
   pipeline_config.label_space.total_labels = num_labels;
   pipeline_config.label_space.dynamic_labels = dynamic_labels;
   pipeline_config.label_space.invalid_labels = invalid_labels;
-  HydraConfig::init(pipeline_config);
+  GlobalInfo::init(pipeline_config);
 
   MLESemanticIntegrator::Config config;
   config.label_confidence = label_confidence;

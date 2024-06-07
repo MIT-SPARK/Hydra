@@ -40,15 +40,15 @@
 #include <cmath>
 #include <cstdint>
 
-#include "hydra/common/hydra_config.h"
+#include "hydra/common/global_info.h"
 
 namespace hydra {
 
 MLESemanticIntegrator::MLESemanticIntegrator(const Config& config) : config_(config) {
-  total_labels_ = HydraConfig::instance().getTotalLabels();
+  total_labels_ = GlobalInfo::instance().getTotalLabels();
   init_likelihood_ = std::log(1.0f / static_cast<float>(total_labels_));
 
-  const auto label_config = HydraConfig::instance().getLabelSpaceConfig();
+  const auto label_config = GlobalInfo::instance().getLabelSpaceConfig();
   dynamic_labels_ = label_config.dynamic_labels;
   invalid_labels_ = label_config.invalid_labels;
 

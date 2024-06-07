@@ -45,7 +45,7 @@
 #include <config_utilities/validation.h>
 #include <spark_dsg/bounding_box_extraction.h>
 
-#include "hydra/common/hydra_config.h"
+#include "hydra/common/global_info.h"
 #include "hydra/common/semantic_color_map.h"
 #include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/timing_utilities.h"
@@ -411,7 +411,7 @@ void MeshSegmenter::addNodeToGraph(DynamicSceneGraph& graph,
   attrs->is_active = true;
   attrs->semantic_label = label;
   attrs->name = NodeSymbol(next_node_id_).getLabel();
-  const auto& label_to_name = HydraConfig::instance().getLabelToNameMap();
+  const auto& label_to_name = GlobalInfo::instance().getLabelToNameMap();
   auto iter = label_to_name.find(label);
   if (iter != label_to_name.end()) {
     attrs->name = iter->second;
@@ -422,9 +422,9 @@ void MeshSegmenter::addNodeToGraph(DynamicSceneGraph& graph,
   attrs->mesh_connections.insert(
       attrs->mesh_connections.begin(), cluster.indices.begin(), cluster.indices.end());
 
-  auto label_map = HydraConfig::instance().getSemanticColorMap();
+  auto label_map = GlobalInfo::instance().getSemanticColorMap();
   if (!label_map || !label_map->isValid()) {
-    label_map = HydraConfig::instance().setRandomColormap();
+    label_map = GlobalInfo::instance().setRandomColormap();
     CHECK(label_map != nullptr);
   }
 

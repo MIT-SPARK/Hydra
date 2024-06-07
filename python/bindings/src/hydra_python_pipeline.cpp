@@ -70,7 +70,7 @@ HydraPythonPipeline::HydraPythonPipeline(const PipelineConfig& config,
 HydraPythonPipeline::~HydraPythonPipeline() {}
 
 void HydraPythonPipeline::initPython(const PythonConfig& config) {
-  const auto& logs = HydraConfig::instance().getLogs();
+  const auto& logs = GlobalInfo::instance().getLogs();
   const auto node = config.toYaml();
   frontend_ = config::createFromYamlWithNamespace<FrontendModule>(
       node, "frontend", frontend_dsg_, shared_state_, logs);
@@ -85,9 +85,9 @@ void HydraPythonPipeline::initPython(const PythonConfig& config) {
   modules_["frontend"] = frontend_;
   modules_["backend"] = backend_;
 
-  if (HydraConfig::instance().getConfig().enable_lcd) {
+  if (GlobalInfo::instance().getConfig().enable_lcd) {
     auto lcd_config = config::fromYaml<LoopClosureConfig>(node);
-    lcd_config.detector.num_semantic_classes = HydraConfig::instance().getTotalLabels();
+    lcd_config.detector.num_semantic_classes = GlobalInfo::instance().getTotalLabels();
     config::checkValid(lcd_config);
 
     shared_state_->lcd_queue.reset(new InputQueue<LcdInput::Ptr>());
@@ -96,7 +96,7 @@ void HydraPythonPipeline::initPython(const PythonConfig& config) {
   }
 
   showModules();
-  VLOG(config_verbosity_) << HydraConfig::instance();
+  VLOG(config_verbosity_) << GlobalInfo::instance();
 }
 
 void HydraPythonPipeline::start() {
@@ -117,7 +117,7 @@ void HydraPythonPipeline::stop() {
 
 void HydraPythonPipeline::save() {
   HydraPipeline::save();
-  HydraConfig::exit();
+  GlobalInfo::exit();
 }
 
 bool HydraPythonPipeline::spinOnce(const ReconstructionInput& input) {

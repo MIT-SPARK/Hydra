@@ -39,7 +39,7 @@
 #include <config_utilities/validation.h>
 
 #include "hydra/common/common.h"
-#include "hydra/common/hydra_config.h"
+#include "hydra/common/global_info.h"
 
 namespace hydra {
 
@@ -59,7 +59,7 @@ InputModule::InputModule(const Config& config, const OutputQueue::Ptr& queue)
     sensor_configs.push_back(receivers_.back()->config.sensor);
   }
 
-  HydraConfig::instance().setSensors(sensor_configs);
+  GlobalInfo::instance().setSensors(sensor_configs);
 }
 
 InputModule::~InputModule() { stopImpl(); }

@@ -38,7 +38,7 @@
 #include <glog/logging.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
 
-#include "hydra/common/hydra_config.h"
+#include "hydra/common/global_info.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -92,7 +92,7 @@ void LoopClosureModule::spin() {
   bool should_shutdown = false;
   while (!should_shutdown) {
     bool has_data = state_->lcd_queue->poll();
-    if (HydraConfig::instance().force_shutdown() || !has_data) {
+    if (GlobalInfo::instance().force_shutdown() || !has_data) {
       // copy over shutdown request
       should_shutdown = should_shutdown_;
     }

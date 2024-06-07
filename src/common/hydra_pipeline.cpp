@@ -42,7 +42,7 @@ HydraPipeline::HydraPipeline(const PipelineConfig& pipeline_config,
                              int robot_id,
                              int config_verbosity)
     : config_verbosity_(config_verbosity) {
-  const auto& config = HydraConfig::init(pipeline_config, robot_id, true);
+  const auto& config = GlobalInfo::init(pipeline_config, robot_id, true);
   frontend_dsg_ = config.createSharedDsg();
   backend_dsg_ = config.createSharedDsg();
   shared_state_.reset(new SharedModuleState());
@@ -134,7 +134,7 @@ void HydraPipeline::stop() {
 }
 
 void HydraPipeline::save() {
-  const auto& logs = HydraConfig::instance().getLogs();
+  const auto& logs = GlobalInfo::instance().getLogs();
   if (!logs || !logs->valid()) {
     return;
   }

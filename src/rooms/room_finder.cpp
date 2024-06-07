@@ -40,7 +40,7 @@
 #include <algorithm>
 #include <queue>
 
-#include "hydra/common/hydra_config.h"
+#include "hydra/common/global_info.h"
 #include "hydra/rooms/graph_filtration.h"
 #include "hydra/rooms/room_utilities.h"
 
@@ -328,7 +328,7 @@ SceneGraphLayer::Ptr RoomFinder::makeRoomLayer(const SceneGraphLayer& places) {
     // TODO(nathan) define unknown label somewhere
     attrs->semantic_label = 0;
     attrs->name = room_id.getLabel();
-    auto color = HydraConfig::instance().getRoomColor(room_id.categoryId());
+    auto color = GlobalInfo::instance().getRoomColor(room_id.categoryId());
     attrs->color = Eigen::Map<SemanticNodeAttributes::ColorVector>(color.data());
     attrs->position = getRoomPosition(places, cluster);
 

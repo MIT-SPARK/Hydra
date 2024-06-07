@@ -50,8 +50,8 @@ namespace hydra::python {
 
 PythonBatchPipeline::PythonBatchPipeline(const PipelineConfig& config, int robot_id)
     : BatchPipeline(config, robot_id) {
-  if (!HydraConfig::instance().frozen()) {
-    HydraConfig::init(config, robot_id, true);
+  if (!GlobalInfo::instance().frozen()) {
+    GlobalInfo::init(config, robot_id, true);
   }
 
   GlogSingleton::instance().setLogLevel(0, 0, false);

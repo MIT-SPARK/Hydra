@@ -47,7 +47,7 @@
 #include <voxblox/core/block_hash.h>
 
 #include "hydra/common/config_utilities.h"
-#include "hydra/common/hydra_config.h"
+#include "hydra/common/global_info.h"
 #include "hydra/rooms/room_finder.h"
 #include "hydra/utils/minimum_spanning_tree.h"
 #include "hydra/utils/timing_utilities.h"
@@ -200,7 +200,7 @@ void BackendModule::save(const LogSetup& log_setup) {
   private_dsg_->graph->save(backend_path + "/dsg_with_mesh.json");
   savePoseGraphSparseMapping(pgmo_path + "/sparsification_mapping.txt");
 
-  const auto& prefix = HydraConfig::instance().getRobotPrefix();
+  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
   if (deformation_graph_->hasPrefixPoses(prefix.key)) {
     const auto optimized_path = getOptimizedTrajectory(prefix.id);
     std::string csv_name = pgmo_path + "/traj_pgmo.csv";
@@ -251,7 +251,7 @@ void BackendModule::spin() {
   bool should_shutdown = false;
   while (!should_shutdown) {
     bool has_data = state_->backend_queue.poll();
-    if (HydraConfig::instance().force_shutdown() || !has_data) {
+    if (GlobalInfo::instance().force_shutdown() || !has_data) {
       // copy over shutdown request
       should_shutdown = should_shutdown_;
     }
@@ -749,7 +749,7 @@ void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
   }
 
   ScopedTimer timer("backend/add_places", timestamp_ns);
-  const auto& prefix = HydraConfig::instance().getRobotPrefix();
+  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
 
   deformation_graph_->clearTemporaryStructures();
 
@@ -893,7 +893,7 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
                                                          vertex_stamps_};
   deformation_graph_->deformPoints(*private_dsg_->graph->mesh(),
                                    cloud_in,
-                                   HydraConfig::instance().getRobotPrefix().vertex_key,
+                                   GlobalInfo::instance().getRobotPrefix().vertex_key,
                                    deformation_graph_->getGtsamValues(),
                                    KimeraPgmoInterface::config_.num_interp_pts,
                                    KimeraPgmoInterface::config_.interp_horizon,
@@ -905,11 +905,11 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
 void BackendModule::updateAgentNodeMeasurements(
     const pose_graph_tools_msgs::PoseGraph& meas) {
   deformation_graph_->removePriorsWithPrefix(
-      HydraConfig::instance().getRobotPrefix().key);
+      GlobalInfo::instance().getRobotPrefix().key);
   std::vector<std::pair<gtsam::Key, gtsam::Pose3>> agent_measurements;
   for (const auto& node : meas.nodes) {
     agent_measurements.push_back(
-        {gtsam::Symbol(HydraConfig::instance().getRobotPrefix().key, node.key),
+        {gtsam::Symbol(GlobalInfo::instance().getRobotPrefix().key, node.key),
          kimera_pgmo::RosToGtsam(node.pose)});
   }
   deformation_graph_->addNodeMeasurements(agent_measurements);
@@ -1042,7 +1042,7 @@ void BackendModule::logIncrementalLoopClosures(const PoseGraph& msg) {
       continue;
     }
 
-    const auto& prefix = HydraConfig::instance().getRobotPrefix();
+    const auto& prefix = GlobalInfo::instance().getRobotPrefix();
     gtsam::Pose3 pose = kimera_pgmo::RosToGtsam(edge.pose);
     const gtsam::Symbol src_key(prefix.key, edge.key_from);
     const gtsam::Symbol dest_key(prefix.key, edge.key_to);

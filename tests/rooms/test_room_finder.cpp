@@ -41,7 +41,7 @@ namespace hydra {
 // TODO(nathan) move to fixture
 namespace {
 struct ConfigGuard {
-  ~ConfigGuard() { HydraConfig::instance().reset(); }
+  ~ConfigGuard() { GlobalInfo::instance().reset(); }
 };
 }  // namespace
 
@@ -118,7 +118,7 @@ TEST(RoomFinderTests, TestRoomPlaceEdges) {
 TEST(RoomFinderTests, TestMakeRoomLayer) {
   ConfigGuard guard;
   PipelineConfig pipeline_config;
-  HydraConfig::init(pipeline_config);
+  GlobalInfo::init(pipeline_config);
 
   IsolatedSceneGraphLayer places(DsgLayers::PLACES);
   addNode(places, 0, 3);

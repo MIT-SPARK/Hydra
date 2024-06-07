@@ -127,7 +127,7 @@ PythonReconstruction::PythonReconstruction(const PipelineConfig& hydra_config,
   config::Settings().print_indent = 45;
 
   const auto node = config.toYaml();
-  const auto& map_config = HydraConfig::init(hydra_config).getMapConfig();
+  const auto& map_config = GlobalInfo::init(hydra_config).getMapConfig();
   const auto py_config = config::fromYaml<PythonReconstructionConfig>(node);
 
   ReconstructionModule::OutputQueue::Ptr queue;
@@ -142,7 +142,7 @@ PythonReconstruction::PythonReconstruction(const PipelineConfig& hydra_config,
     throw std::runtime_error("could not recreate reconstruction module");
   }
 
-  VLOG(py_config.verbosity) << std::endl << HydraConfig::instance();
+  VLOG(py_config.verbosity) << std::endl << GlobalInfo::instance();
   VLOG(py_config.verbosity) << std::endl << module_->printInfo();
 }
 
@@ -166,7 +166,7 @@ void PythonReconstruction::save() {
     return;
   }
 
-  const auto& logs = HydraConfig::instance().getLogs();
+  const auto& logs = GlobalInfo::instance().getLogs();
   if (logs && logs->valid()) {
     map->save(logs->getLogDir() + "/map");
   }

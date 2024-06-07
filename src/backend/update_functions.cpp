@@ -43,7 +43,7 @@
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph_types.h>
 
-#include "hydra/common/hydra_config.h"
+#include "hydra/common/global_info.h"
 #include "hydra/frontend/place_2d_split_logic.h"
 #include "hydra/rooms/room_finder.h"
 #include "hydra/utils/mesh_utilities.h"
@@ -526,7 +526,7 @@ UpdateFunctor::Hooks UpdateFrontiersFunctor::hooks() const {
         }
       }
 
-      const auto& prefix = HydraConfig::instance().getRobotPrefix();
+      const auto& prefix = GlobalInfo::instance().getRobotPrefix();
       const auto& agents = dsg->graph->getLayer(DsgLayers::AGENTS, prefix.key);
       NodeSymbol pgmo_key(prefix.key, agents.numNodes() - 1);
       Eigen::Vector3d agent_pos = dsg->graph->getNode(pgmo_key).attributes().position;

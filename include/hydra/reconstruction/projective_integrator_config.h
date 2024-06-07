@@ -38,6 +38,7 @@
 #include <string>
 
 #include "hydra/reconstruction/semantic_integrator.h"
+#include "hydra/common/global_info.h"
 
 namespace hydra {
 
@@ -64,7 +65,7 @@ struct ProjectiveIntegratorConfig {
   float max_weight = 1e5;
 
   // Number of threads used to perform integration. Integration is parallelized by block
-  int num_threads = -1;
+  int num_threads = GlobalInfo::instance().getConfig().default_num_threads;
 
   // Which interpolation to use in the image projection [nearest, bilinear, adaptive].
   std::string interp_method = "adaptive";

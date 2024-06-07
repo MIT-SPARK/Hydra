@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/common/hydra_config.h"
+#include "hydra/common/global_info.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
@@ -46,7 +46,7 @@ namespace hydra {
 using ColorMapPtr = std::shared_ptr<SemanticColorMap>;
 using timing::ElapsedTimeRecorder;
 
-decltype(HydraConfig::instance_) HydraConfig::instance_;
+decltype(GlobalInfo::instance_) GlobalInfo::instance_;
 
 struct LabelNameConversion {
   using YamlList = std::vector<std::map<std::string, std::string>>;
@@ -96,6 +96,12 @@ void declare_config(PipelineConfig& conf) {
   name("PipelineConfig");
   field(conf.enable_reconstruction, "enable_reconstruction");
   field(conf.enable_lcd, "enable_lcd");
+  field(conf.enable_places, "enable_places");
+  field(conf.timing_disabled, "timing_disabled");
+  field(conf.disable_timer_output, "disable_timer_output");
+  field(conf.default_verbosity, "default_verbosity");
+  field(conf.default_num_threads, "default_num_threads");
+  field(conf.store_visualization_details, "store_visualization_details");
   field(conf.map, "reconstruction/map");
   field<LabelNameConversion>(conf.label_names, "label_names");
   field(conf.room_colors, "room_colors");
@@ -117,11 +123,11 @@ void saveTimingInformation(const LogSetup& log_config) {
   LOG(INFO) << "[Hydra] saved timing information";
 }
 
-HydraConfig::HydraConfig() : force_shutdown_(false) {
+GlobalInfo::GlobalInfo() : force_shutdown_(false) {
   label_colormap_.reset(new SemanticColorMap());
 }
 
-void HydraConfig::configureTimers() {
+void GlobalInfo::configureTimers() {
   ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
   timer.timing_disabled = config_.timing_disabled;
   timer.disable_output = config_.disable_timer_output;
@@ -138,15 +144,15 @@ void HydraConfig::configureTimers() {
   }
 }
 
-void HydraConfig::checkFrozen() const {
+void GlobalInfo::checkFrozen() const {
   if (!frozen_) {
-    LOG(ERROR) << "HydraConfig is not frozen! Call init with freeze set to 'true' "
+    LOG(ERROR) << "GlobalInfo is not frozen! Call init with freeze set to 'true' "
                   "before using config";
     throw std::runtime_error("config not frozen");
   }
 }
 
-void HydraConfig::initFromConfig(const PipelineConfig& config, int robot_id) {
+void GlobalInfo::initFromConfig(const PipelineConfig& config, int robot_id) {
   config_ = config::checkValid(config);
   robot_prefix_ = RobotPrefixConfig(robot_id);
   logs_ = std::make_shared<LogSetup>(config_.logs);
@@ -170,19 +176,17 @@ void HydraConfig::initFromConfig(const PipelineConfig& config, int robot_id) {
   }
 }
 
-HydraConfig& HydraConfig::instance() {
+GlobalInfo& GlobalInfo::instance() {
   if (!instance_) {
-    instance_.reset(new HydraConfig());
+    instance_.reset(new GlobalInfo());
   }
   return *instance_;
 }
 
-HydraConfig& HydraConfig::init(const PipelineConfig& config,
-                               int robot_id,
-                               bool freeze) {
+GlobalInfo& GlobalInfo::init(const PipelineConfig& config, int robot_id, bool freeze) {
   auto& curr = instance();
   if (curr.frozen_) {
-    LOG(ERROR) << "Failed to initialize HydraConfig as config was already frozen";
+    LOG(ERROR) << "Failed to initialize GlobalInfo as config was already frozen";
     throw std::runtime_error("hydra global config is frozen");
   }
 
@@ -192,9 +196,9 @@ HydraConfig& HydraConfig::init(const PipelineConfig& config,
   return curr;
 }
 
-void HydraConfig::reset() { instance_.reset(new HydraConfig()); }
+void GlobalInfo::reset() { instance_.reset(new GlobalInfo()); }
 
-void HydraConfig::exit() {
+void GlobalInfo::exit() {
   auto& curr = instance();
 
   // save timing information to avoid destructor weirdness with singletons
@@ -206,77 +210,77 @@ void HydraConfig::exit() {
   // TODO(nathan) see if anything else needs to be saved;
 }
 
-void HydraConfig::setForceShutdown(bool force_shutdown) {
+void GlobalInfo::setForceShutdown(bool force_shutdown) {
   force_shutdown_ = force_shutdown;
 }
 
-ColorMapPtr HydraConfig::setRandomColormap() {
+ColorMapPtr GlobalInfo::setRandomColormap() {
   label_colormap_ = SemanticColorMap::randomColors(config_.label_space.total_labels);
   return label_colormap_;
 }
 
-bool HydraConfig::force_shutdown() const { return force_shutdown_; }
+bool GlobalInfo::force_shutdown() const { return force_shutdown_; }
 
-const PipelineConfig& HydraConfig::getConfig() const {
+const PipelineConfig& GlobalInfo::getConfig() const {
   checkFrozen();
   return config_;
 }
 
-const FrameConfig& HydraConfig::getFrames() const {
+const FrameConfig& GlobalInfo::getFrames() const {
   checkFrozen();
   return config_.frames;
 }
 
-const RobotPrefixConfig& HydraConfig::getRobotPrefix() const {
+const RobotPrefixConfig& GlobalInfo::getRobotPrefix() const {
   checkFrozen();
   return robot_prefix_;
 }
 
-const LogSetup::Ptr& HydraConfig::getLogs() const {
+const LogSetup::Ptr& GlobalInfo::getLogs() const {
   checkFrozen();
   return logs_;
 }
 
-const VolumetricMap::Config& HydraConfig::getMapConfig() const {
+const VolumetricMap::Config& GlobalInfo::getMapConfig() const {
   checkFrozen();
   return config_.map;
 }
 
-const ColorArray& HydraConfig::getRoomColor(size_t index) const {
+const ColorArray& GlobalInfo::getRoomColor(size_t index) const {
   checkFrozen();
   return config_.room_colors.at(index % config_.room_colors.size());
 }
 
-const std::map<uint32_t, std::string>& HydraConfig::getLabelToNameMap() const {
+const std::map<uint32_t, std::string>& GlobalInfo::getLabelToNameMap() const {
   checkFrozen();
   return config_.label_names;
 }
 
-const LabelSpaceConfig& HydraConfig::getLabelSpaceConfig() const {
+const LabelSpaceConfig& GlobalInfo::getLabelSpaceConfig() const {
   checkFrozen();
   return config_.label_space;
 }
 
-size_t HydraConfig::getTotalLabels() const {
+size_t GlobalInfo::getTotalLabels() const {
   checkFrozen();
   return config_.label_space.total_labels;
 }
 
-SharedDsgInfo::Ptr HydraConfig::createSharedDsg() const {
+SharedDsgInfo::Ptr GlobalInfo::createSharedDsg() const {
   checkFrozen();
   return std::make_shared<SharedDsgInfo>(config_.layer_id_map);
 }
 
-ColorMapPtr HydraConfig::getSemanticColorMap() const { return label_colormap_; }
+ColorMapPtr GlobalInfo::getSemanticColorMap() const { return label_colormap_; }
 
-void HydraConfig::setSensors(std::vector<config::VirtualConfig<Sensor>> sensor_configs) {
+void GlobalInfo::setSensors(std::vector<config::VirtualConfig<Sensor>> sensor_configs) {
   sensor_configs_ = std::move(sensor_configs);
   for (const auto& sensor_config : sensor_configs_) {
     sensors_.emplace_back(sensor_config.create());
   }
 }
 
-std::shared_ptr<const Sensor> HydraConfig::getSensor(const size_t index) const {
+std::shared_ptr<const Sensor> GlobalInfo::getSensor(const size_t index) const {
   checkFrozen();
   if (index >= sensors_.size()) {
     LOG(ERROR) << "Sensor index out of bounds: " << index;
@@ -285,12 +289,12 @@ std::shared_ptr<const Sensor> HydraConfig::getSensor(const size_t index) const {
   return sensors_[index];
 }
 
-size_t HydraConfig::numSensors() const {
+size_t GlobalInfo::numSensors() const {
   checkFrozen();
   return sensors_.size();
 }
 
-std::ostream& operator<<(std::ostream& out, const HydraConfig& config) {
+std::ostream& operator<<(std::ostream& out, const GlobalInfo& config) {
   out << config::toString(config.getConfig());
   return out;
 }

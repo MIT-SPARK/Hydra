@@ -46,7 +46,7 @@ namespace hydra {
 using VFrontendConfig = config::VirtualConfig<FrontendModule>;
 
 BatchPipeline::BatchPipeline(const PipelineConfig& config, int robot_id) {
-  HydraConfig::init(config, robot_id, true);
+  GlobalInfo::init(config, robot_id, true);
 }
 
 BatchPipeline::~BatchPipeline() {}
@@ -63,7 +63,7 @@ DynamicSceneGraph::Ptr BatchPipeline::construct(
   MeshIntegrator integrator(mesh_config);
   integrator.generateMesh(map, false, false);
 
-  auto dsg = HydraConfig::instance().createSharedDsg();
+  auto dsg = GlobalInfo::instance().createSharedDsg();
   auto state = std::make_shared<SharedModuleState>();
   auto module = frontend_config.create(dsg, state, LogSetup::Ptr());
   const auto queue = module->getQueue();

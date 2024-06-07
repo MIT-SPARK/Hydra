@@ -39,7 +39,7 @@
 #include <pose_graph_tools_ros/conversions.h>
 #include <tf2_eigen/tf2_eigen.h>
 
-#include "hydra/common/hydra_config.h"
+#include "hydra/common/global_info.h"
 #include "hydra/reconstruction/reconstruction_input.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 
@@ -56,7 +56,7 @@ void addNode(PoseGraph& graph, const StampedPose& stamped_pose, size_t index) {
   auto& node = graph.nodes.emplace_back();
   node.header.stamp.fromNSec(stamped_pose.stamp);
   node.header.frame_id = graph.header.frame_id;
-  node.robot_id = HydraConfig::instance().getRobotPrefix().id;
+  node.robot_id = GlobalInfo::instance().getRobotPrefix().id;
   node.key = index;
   tf2::convert(stamped_pose.pose, node.pose);
 }
@@ -104,7 +104,7 @@ void PoseGraphTracker::update(const ReconstructionInput& msg) {
     StampedPose prev_pose_stamped{prev_time_, prev_pose_};
     graphs_.push_back(makePoseGraph(curr_pose_stamped,
                                     prev_pose_stamped,
-                                    HydraConfig::instance().getFrames().odom,
+                                    GlobalInfo::instance().getFrames().odom,
                                     num_poses_received_ - 1));
   } else {
     graphs_.insert(graphs_.end(), msg.pose_graphs.begin(), msg.pose_graphs.end());

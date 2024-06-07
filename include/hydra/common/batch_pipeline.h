@@ -35,7 +35,7 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
 
-#include "hydra/common/hydra_config.h"
+#include "hydra/common/global_info.h"
 #include "hydra/frontend/frontend_module.h"
 #include "hydra/reconstruction/volumetric_map.h"
 #include "hydra/rooms/room_finder_config.h"

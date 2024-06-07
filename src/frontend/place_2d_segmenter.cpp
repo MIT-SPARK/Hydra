@@ -46,7 +46,7 @@
 #undef PCL_NO_PRECOMPILE
 #include <spark_dsg/bounding_box_extraction.h>
 
-#include "hydra/common/hydra_config.h"
+#include "hydra/common/global_info.h"
 #include "hydra/common/semantic_color_map.h"
 #include "hydra/frontend/place_2d_split_logic.h"
 #include "hydra/utils/place_2d_ellipsoid_math.h"
@@ -481,9 +481,9 @@ NodeSymbol Place2dSegmenter::addPlaceToGraph(DynamicSceneGraph& graph,
 
   attrs->need_finish_merge = false;
 
-  auto label_map = HydraConfig::instance().getSemanticColorMap();
+  auto label_map = GlobalInfo::instance().getSemanticColorMap();
   if (!label_map || !label_map->isValid()) {
-    label_map = HydraConfig::instance().setRandomColormap();
+    label_map = GlobalInfo::instance().setRandomColormap();
     CHECK(label_map != nullptr);
   }
 

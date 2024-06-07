@@ -65,8 +65,16 @@ struct FrameConfig {
 struct PipelineConfig {
   bool enable_reconstruction = true;
   bool enable_lcd = false;
+  bool enable_places = true;
   bool timing_disabled = false;
   bool disable_timer_output = true;
+  // Default verbosity to use for other modules. Can be overwritten by other
+  // modules.
+  int default_verbosity = 1;
+  int default_num_threads = -1; // -1 means use all available threads.
+
+  // If true store additional details for the khronos spatio-temporal viualizer.
+  bool store_visualization_details = false;
   std::map<LayerId, char> layer_id_map{{DsgLayers::OBJECTS, 'o'},
                                        {DsgLayers::PLACES, 'p'},
                                        {DsgLayers::MESH_PLACES, 'q'},
@@ -96,11 +104,11 @@ struct PipelineConfig {
 void declare_config(FrameConfig& conf);
 void declare_config(PipelineConfig& conf);
 
-class HydraConfig {
+class GlobalInfo {
  public:
-  static HydraConfig& instance();
+  static GlobalInfo& instance();
 
-  static HydraConfig& init(const PipelineConfig& config,
+  static GlobalInfo& init(const PipelineConfig& config,
                            int robot_id = 0,
                            bool freeze = true);
 
@@ -148,7 +156,7 @@ class HydraConfig {
   size_t numSensors() const;
 
  private:
-  HydraConfig();
+  GlobalInfo();
 
   void configureTimers();
 
@@ -157,7 +165,7 @@ class HydraConfig {
   void checkFrozen() const;
 
  private:
-  static std::unique_ptr<HydraConfig> instance_;
+  static std::unique_ptr<GlobalInfo> instance_;
   bool frozen_ = false;
   PipelineConfig config_;
   std::atomic<bool> force_shutdown_;
@@ -170,6 +178,6 @@ class HydraConfig {
   std::vector<std::shared_ptr<const Sensor>> sensors_;
 };
 
-std::ostream& operator<<(std::ostream& out, const HydraConfig& config);
+std::ostream& operator<<(std::ostream& out, const GlobalInfo& config);
 
 }  // namespace hydra

@@ -46,7 +46,7 @@
 
 #include <fstream>
 
-#include "hydra/common/hydra_config.h"
+#include "hydra/common/global_info.h"
 #include "hydra/frontend/frontier_extractor.h"
 #include "hydra/frontend/gvd_place_extractor.h"
 #include "hydra/frontend/mesh_segmenter.h"
@@ -115,7 +115,7 @@ FrontendModule::FrontendModule(const Config& config,
   }
   kimera_pgmo::MeshFrontendConfig pgmo_config = config.pgmo_config;
 
-  const auto& prefix = HydraConfig::instance().getRobotPrefix();
+  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
   pgmo_config.robot_id = prefix.id;
 
   CHECK(dsg_ != nullptr);
@@ -231,7 +231,7 @@ void FrontendModule::spin() {
     }
 
     bool has_data = queue_->poll();
-    if (HydraConfig::instance().force_shutdown() || !has_data) {
+    if (GlobalInfo::instance().force_shutdown() || !has_data) {
       // copy over shutdown request
       should_shutdown = should_shutdown_;
     }
@@ -502,7 +502,7 @@ void FrontendModule::updatePlaces2d(const ReconstructionOutput& input) {
 void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
   std::unique_lock<std::mutex> lock(dsg_->mutex);
   ScopedTimer timer("frontend/update_posegraph", input.timestamp_ns);
-  const auto& prefix = HydraConfig::instance().getRobotPrefix();
+  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
   const auto& agents = dsg_->graph->getLayer(DsgLayers::AGENTS, prefix.key);
 
   if (lcd_input_) {
@@ -556,7 +556,7 @@ void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
 }
 
 void FrontendModule::assignBowVectors(const DynamicLayer& agents) {
-  const auto& prefix = HydraConfig::instance().getRobotPrefix();
+  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
   // TODO(nathan) take care of synchronization better
   // lcd_input_->new_agent_nodes.clear();
 

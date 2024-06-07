@@ -37,7 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
 
-#include "hydra/common/hydra_config.h"
+#include "hydra/common/global_info.h"
 #include "hydra/places/graph_extractor_interface.h"
 #include "hydra/places/graph_extractor_utilities.h"
 #include "hydra/places/gvd_integrator.h"
@@ -82,7 +82,7 @@ GvdPlaceExtractor::GvdPlaceExtractor(const Config& c)
     LOG(ERROR) << "no place graph extraction provided! disabling extraction";
   }
 
-  const auto& map_config = HydraConfig::instance().getMapConfig();
+  const auto& map_config = GlobalInfo::instance().getMapConfig();
   if (static_cast<float>(config.gvd.min_distance_m) >= map_config.truncation_distance) {
     LOG(ERROR)
         << "integrator min distance must be less than truncation distance (currently "

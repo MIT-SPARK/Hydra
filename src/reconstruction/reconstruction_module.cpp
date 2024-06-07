@@ -41,7 +41,7 @@
 #include <config_utilities/validation.h>
 #include <pose_graph_tools_ros/conversions.h>
 
-#include "hydra/common/hydra_config.h"
+#include "hydra/common/global_info.h"
 #include "hydra/reconstruction/mesh_integrator.h"
 #include "hydra/reconstruction/projective_integrator.h"
 #include "hydra/utils/timing_utilities.h"
@@ -81,7 +81,7 @@ ReconstructionModule::ReconstructionModule(const Config& config,
   queue_.reset(new ReconstructionInputQueue());
   queue_->max_size = config.max_input_queue_size;
 
-  map_.reset(new VolumetricMap(HydraConfig::instance().getMapConfig(), true, true));
+  map_.reset(new VolumetricMap(GlobalInfo::instance().getMapConfig(), true, true));
   tsdf_integrator_ = std::make_unique<ProjectiveIntegrator>(config.tsdf);
   mesh_integrator_ = std::make_unique<MeshIntegrator>(config.mesh);
   footprint_integrator_ = config.robot_footprint.create();
@@ -213,7 +213,7 @@ bool ReconstructionModule::update(const ReconstructionInput& msg, bool full_upda
     return false;
   }
 
-  const Sensor& sensor = *HydraConfig::instance().getSensor(msg.sensor_input->sensor_id);
+  const Sensor& sensor = *GlobalInfo::instance().getSensor(msg.sensor_input->sensor_id);
   if (!sensor.finalizeRepresentations(*data)) {
     LOG(ERROR) << "[Hydra Reconstruction] unable to compute inputs for integration";
     return false;
