@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/reconstruction/sensor_utilities.h>
+#include <hydra/input/sensor_utilities.h>
 
 namespace hydra {
 

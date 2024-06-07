@@ -35,7 +35,7 @@
 #include <config_utilities/config_utilities.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-#include <hydra/reconstruction/camera.h>
+#include <hydra/input/camera.h>
 
 #include <optional>
 #include <set>

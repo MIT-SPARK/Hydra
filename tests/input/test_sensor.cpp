@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/reconstruction/camera.h>
+#include <hydra/input/camera.h>
 
 #include <optional>
 #include <set>

@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <hydra/reconstruction/sensor_input_packet.h>
+#include <hydra/input/sensor_input_packet.h>
 #include <pybind11/pybind11.h>
 
 #include <Eigen/Dense>
@@ -50,12 +50,14 @@ struct PythonSensorInput : public SensorInputPacket {
   PythonSensorInput(uint64_t timestamp_ns,
                     const PythonImage& depth,
                     const PythonImage& labels,
-                    const PythonImage& color);
+                    const PythonImage& color,
+                    size_t sensor_index = 0);
 
   PythonSensorInput(uint64_t timestamp_ns,
                     const PointVec& points,
                     const LabelVec& labels,
-                    const ColorVec& colors);
+                    const ColorVec& colors,
+                    size_t sensor_index = 0);
 
   bool fillFrameData(FrameData& msg) const override;
 

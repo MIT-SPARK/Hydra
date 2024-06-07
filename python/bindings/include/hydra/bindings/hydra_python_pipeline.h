@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include <hydra/common/hydra_pipeline.h>
 #include <hydra/frontend/frontend_module.h>
-#include <hydra/reconstruction/camera.h>
+#include <hydra/input/camera.h>
 #include <pybind11/pybind11.h>
 
 namespace hydra {

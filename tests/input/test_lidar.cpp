@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-#include <hydra/reconstruction/lidar.h>
+#include <hydra/input/lidar.h>
 
 #include <optional>
 #include <set>
