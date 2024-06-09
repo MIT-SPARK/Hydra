@@ -98,8 +98,7 @@ gnn::TensorMap ObjectGnnDescriptor::makeInput(const DynamicSceneGraph& graph,
       pos_map.block(index, 0, 1, 3) = attrs.position.cast<float>().transpose();
     }
 
-    x_map.block(index, start_idx, 1, 3) =
-        (attrs.bounding_box.max - attrs.bounding_box.min).transpose();
+    x_map.block(index, start_idx, 1, 3) = attrs.bounding_box.world_P_center.transpose();
 
     auto iter = label_embeddings_.find(attrs.semantic_label);
     if (iter != label_embeddings_.end()) {

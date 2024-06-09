@@ -64,8 +64,9 @@ void setBoundingBox(DynamicSceneGraph& graph,
 
   const auto& node = graph.getNode(node_id);
   SemanticNodeAttributes& attrs = node.attributes<SemanticNodeAttributes>();
-  attrs.position = ((max + min) / 2.0).cast<double>();
-  attrs.bounding_box = BoundingBox(min, max);
+  const Eigen::Vector3f position = (max + min) / 2.0;
+  attrs.position = position.cast<double>();
+  attrs.bounding_box = BoundingBox(max - min, position);
 }
 
 // test that single merges to valid targets work

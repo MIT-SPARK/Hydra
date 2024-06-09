@@ -71,7 +71,7 @@ struct convert<spark_dsg::BoundingBox> {
   static Node encode(const spark_dsg::BoundingBox& rhs) {
     Node node;
     node["center"] = fromEigen(rhs.world_P_center);
-    node["extents"] = fromEigen(rhs.dimensions());
+    node["extents"] = fromEigen(rhs.dimensions);
     node["rotation"] = fromEigen(Eigen::Quaternionf(rhs.world_R_center));
     return node;
   }
@@ -100,11 +100,8 @@ struct convert<spark_dsg::BoundingBox> {
       return false;
     }
 
-    rhs = spark_dsg::BoundingBox(spark_dsg::BoundingBox::Type::OBB,
-                                 -scale / 2.0f,
-                                 scale / 2.0f,
-                                 pos,
-                                 rot.toRotationMatrix());
+    rhs = spark_dsg::BoundingBox(
+        spark_dsg::BoundingBox::Type::OBB, scale, pos, rot.toRotationMatrix());
     return true;
   }
 };
@@ -138,7 +135,7 @@ bool RoomGeometry::addRoom(size_t room_id, const std::list<BoundingBox>& boxes) 
 std::optional<size_t> RoomGeometry::findRoomIndex(const Eigen::Vector3f& pos) const {
   for (auto&& [room_id, boxes] : rooms_) {
     for (const auto& box : boxes) {
-      if (box.isInside(pos)) {
+      if (box.contains(pos)) {
         return room_id;
       }
     }

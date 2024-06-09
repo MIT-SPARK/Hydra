@@ -71,9 +71,9 @@ bool updateObjectGeometry(const spark_dsg::Mesh& mesh,
                             attrs.mesh_connections.end());
   }
 
-  const spark_dsg::MeshAdaptor adaptor(mesh, indices ? indices : &mesh_connections);
+  const BoundingBox::MeshAdaptor adaptor(mesh, indices ? indices : &mesh_connections);
   attrs.bounding_box =
-      bounding_box::extract(adaptor, type.value_or(attrs.bounding_box.type));
+      BoundingBox(adaptor, type.value_or(attrs.bounding_box.type));
   if (indices) {
     return updateNodeCentroid(mesh, *indices, attrs);
   } else {

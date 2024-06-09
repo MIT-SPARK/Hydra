@@ -68,10 +68,10 @@ struct PipelineConfig {
   bool enable_places = true;
   bool timing_disabled = false;
   bool disable_timer_output = true;
-  // Default verbosity to use for other modules. Can be overwritten by other
-  // modules.
+  
+  // Default settings for other modules. Can be overwritten by other module configs.
   int default_verbosity = 1;
-  int default_num_threads = -1; // -1 means use all available threads.
+  int default_num_threads = -1;  // -1 means use all available threads.
 
   // If true store additional details for the khronos spatio-temporal viualizer.
   bool store_visualization_details = false;
@@ -109,8 +109,8 @@ class GlobalInfo {
   static GlobalInfo& instance();
 
   static GlobalInfo& init(const PipelineConfig& config,
-                           int robot_id = 0,
-                           bool freeze = true);
+                          int robot_id = 0,
+                          bool freeze = true);
 
   static void exit();
 

@@ -33,6 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
+<<<<<<< HEAD
+=======
+#include <hydra/common/global_info.h>
+>>>>>>> update to new bboxes and fix tests
 #include <hydra/rooms/room_finder.h>
 
 #include "hydra_test/config_guard.h"

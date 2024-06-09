@@ -108,12 +108,12 @@ std::string printLabels(const std::set<T>& labels) {
 }
 
 inline bool nodesMatch(const SceneGraphNode& lhs_node, const SceneGraphNode& rhs_node) {
-  return lhs_node.attributes<SemanticNodeAttributes>().bounding_box.isInside(
+  return lhs_node.attributes<SemanticNodeAttributes>().bounding_box.contains(
       rhs_node.attributes().position);
 }
 
 inline bool nodesMatch(const Cluster& cluster, const SceneGraphNode& node) {
-  return node.attributes<SemanticNodeAttributes>().bounding_box.isInside(
+  return node.attributes<SemanticNodeAttributes>().bounding_box.contains(
       cluster.centroid);
 }
 

@@ -56,8 +56,7 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
   ObjectNodeAttributes::Ptr attrs(new ObjectNodeAttributes);
   attrs->position << 1.0, 2.0, 3.0;
   attrs->bounding_box.type = BoundingBox::Type::AABB;
-  attrs->bounding_box.min << 1.0f, 2.0f, 3.0f;
-  attrs->bounding_box.max << 1.0f, 2.0f, 3.0f;
+  attrs->bounding_box.world_P_center << 1.0f, 2.0f, 3.0f;
   attrs->is_active = true;
   graph.emplaceNode(DsgLayers::OBJECTS, 0, std::move(attrs));
 
@@ -69,14 +68,14 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
 
   {
     // No mesh, so nothing should change
-    Eigen::Vector3d expected_pos(1.0, 2.0, 3.0);
+    const Eigen::Vector3d expected_pos(1.0, 2.0, 3.0);
     EXPECT_NEAR(0.0, (expected_pos - result.position).norm(), 1.0e-7);
-
-    Eigen::Vector3f expected_min(1.0, 2.0, 3.0);
-    EXPECT_NEAR(0.0, (expected_min - result.bounding_box.min).norm(), 1.0e-7);
-
-    Eigen::Vector3f expected_max(1.0, 2.0, 3.0);
-    EXPECT_NEAR(0.0, (expected_max - result.bounding_box.max).norm(), 1.0e-7);
+    EXPECT_NEAR(
+        0.0,
+        (expected_pos.cast<float>() - result.bounding_box.world_P_center).norm(),
+        1.0e-7);
+    const Eigen::Vector3f expected_dims(0.0, 0.0, 0.0);
+    EXPECT_NEAR(0.0, (expected_dims - result.bounding_box.dimensions).norm(), 1.0e-7);
   }
 
   auto mesh = std::make_shared<Mesh>();
@@ -92,14 +91,14 @@ TEST(DsgInterpolationTests, ObjectUpdate) {
 
   {
     // valid mesh: things should change
-    Eigen::Vector3d expected_pos(0.0, 0.0, 0.0);
+    const Eigen::Vector3d expected_pos(0.0, 0.0, 0.0);
     EXPECT_NEAR(0.0, (expected_pos - result.position).norm(), 1.0e-7);
-
-    Eigen::Vector3f expected_min(-1.0, -2.0, -3.0);
-    EXPECT_NEAR(0.0, (expected_min - result.bounding_box.min).norm(), 1.0e-7);
-
-    Eigen::Vector3f expected_max(1.0, 2.0, 3.0);
-    EXPECT_NEAR(0.0, (expected_max - result.bounding_box.max).norm(), 1.0e-7);
+    EXPECT_NEAR(
+        0.0,
+        (expected_pos.cast<float>() - result.bounding_box.world_P_center).norm(),
+        1.0e-7);
+    const Eigen::Vector3f expected_dims(2.0, 4.0, 6.0);
+    EXPECT_NEAR(0.0, (expected_dims - result.bounding_box.dimensions).norm(), 1.0e-7);
   }
 }
 
@@ -109,15 +108,13 @@ TEST(DsgInterpolationTests, ObjectUpdateMergeLC) {
   ObjectNodeAttributes::Ptr attrs0(new ObjectNodeAttributes);
   attrs0->position << 1.0, 2.0, 3.0;
   attrs0->bounding_box.type = BoundingBox::Type::AABB;
-  attrs0->bounding_box.min << 1.0f, 2.0f, 3.0f;
-  attrs0->bounding_box.max << 1.0f, 2.0f, 3.0f;
+  attrs0->bounding_box.world_P_center << 1.0f, 2.0f, 3.0f;
   attrs0->semantic_label = 1u;
   attrs0->is_active = false;
   ObjectNodeAttributes::Ptr attrs1(new ObjectNodeAttributes);
   attrs1->position << 2.0, 3.0, 4.0;
   attrs1->bounding_box.type = BoundingBox::Type::AABB;
-  attrs1->bounding_box.min << 2.0f, 3.0f, 4.0f;
-  attrs1->bounding_box.max << 2.0f, 3.0f, 4.0f;
+  attrs1->bounding_box.world_P_center << 2.0f, 3.0f, 4.0f;
   attrs1->semantic_label = 1u;
   attrs1->is_active = true;
   graph.emplaceNode(DsgLayers::OBJECTS, 0, std::move(attrs0));
@@ -134,21 +131,14 @@ TEST(DsgInterpolationTests, ObjectUpdateMergeLC) {
     // No mesh, so nothing should change
     Eigen::Vector3d expected_pos0(1.0, 2.0, 3.0);
     EXPECT_NEAR(0.0, (expected_pos0 - result0.position).norm(), 1.0e-7);
-
-    Eigen::Vector3f expected_min0(1.0, 2.0, 3.0);
-    EXPECT_NEAR(0.0, (expected_min0 - result0.bounding_box.min).norm(), 1.0e-7);
-
-    Eigen::Vector3f expected_max0(1.0, 2.0, 3.0);
-    EXPECT_NEAR(0.0, (expected_max0 - result0.bounding_box.max).norm(), 1.0e-7);
+    EXPECT_NEAR(0.0, (expected_pos0.cast<float>() - result0.bounding_box.world_P_center).norm(), 1.0e-7);
+    Eigen::Vector3f expected_dims(0, 0, 0);
+    EXPECT_NEAR(0.0, (expected_dims - result0.bounding_box.dimensions).norm(), 1.0e-7);
 
     Eigen::Vector3d expected_pos1(2.0, 3.0, 4.0);
     EXPECT_NEAR(0.0, (expected_pos1 - result1.position).norm(), 1.0e-7);
-
-    Eigen::Vector3f expected_min1(2.0, 3.0, 4.0);
-    EXPECT_NEAR(0.0, (expected_min1 - result1.bounding_box.min).norm(), 1.0e-7);
-
-    Eigen::Vector3f expected_max1(2.0, 3.0, 4.0);
-    EXPECT_NEAR(0.0, (expected_max1 - result1.bounding_box.max).norm(), 1.0e-7);
+    EXPECT_NEAR(0.0, (expected_pos1.cast<float>() - result1.bounding_box.world_P_center).norm(), 1.0e-7);
+    EXPECT_NEAR(0.0, (expected_dims - result1.bounding_box.dimensions).norm(), 1.0e-7);
   }
 
   auto mesh = std::make_shared<Mesh>();
@@ -166,12 +156,9 @@ TEST(DsgInterpolationTests, ObjectUpdateMergeLC) {
     // valid mesh: things should change
     Eigen::Vector3d expected_pos(0.0, 0.0, 0.0);
     EXPECT_NEAR(0.0, (expected_pos - result0.position).norm(), 1.0e-7);
-
-    Eigen::Vector3f expected_min(-1.0, -2.0, -3.0);
-    EXPECT_NEAR(0.0, (expected_min - result0.bounding_box.min).norm(), 1.0e-7);
-
-    Eigen::Vector3f expected_max(1.0, 2.0, 3.0);
-    EXPECT_NEAR(0.0, (expected_max - result0.bounding_box.max).norm(), 1.0e-7);
+    EXPECT_NEAR(0.0, (expected_pos.cast<float>() - result0.bounding_box.world_P_center).norm(), 1.0e-7);
+    Eigen::Vector3f expected_max(2.0, 4.0, 6.0);
+    EXPECT_NEAR(0.0, (expected_max - result0.bounding_box.dimensions).norm(), 1.0e-7);
 
     std::map<NodeId, NodeId> expected{{1, 0}};
     EXPECT_EQ(merged_nodes, expected);
@@ -184,16 +171,14 @@ TEST(DsgInterpolationTests, ObjectUpdateMergeNoLC) {
   ObjectNodeAttributes::Ptr attrs0(new ObjectNodeAttributes);
   attrs0->position << 1.0, 2.0, 3.0;
   attrs0->bounding_box.type = BoundingBox::Type::AABB;
-  attrs0->bounding_box.min << 1.0f, 2.0f, 3.0f;
-  attrs0->bounding_box.max << 1.0f, 2.0f, 3.0f;
+  attrs0->bounding_box.world_P_center << 1.0f, 2.0f, 3.0f;
   attrs0->semantic_label = 1u;
   attrs0->mesh_connections = {0, 1};
   attrs0->is_active = false;
   ObjectNodeAttributes::Ptr attrs1(new ObjectNodeAttributes);
   attrs1->position << 2.0, 3.0, 4.0;
   attrs1->bounding_box.type = BoundingBox::Type::AABB;
-  attrs1->bounding_box.min << 2.0f, 3.0f, 4.0f;
-  attrs1->bounding_box.max << 2.0f, 3.0f, 4.0f;
+  attrs1->bounding_box.world_P_center << 2.0f, 3.0f, 4.0f;
   attrs1->semantic_label = 1u;
   attrs1->mesh_connections = {0, 1};
   attrs1->is_active = true;

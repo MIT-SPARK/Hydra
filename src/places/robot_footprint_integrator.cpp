@@ -62,9 +62,10 @@ BlockIndexList getAffectedBlocks(const Eigen::Isometry3f& world_T_body,
   const auto b_size = map.block_size;
   const auto block_diag_half = std::sqrt(3.0f) * b_size / 2.0f;
   const auto margin = Eigen::Vector3f::Constant(block_diag_half);
-  const BoundingBox inflated(bbox.min - margin, bbox.max + margin);
+  BoundingBox inflated = bbox;
+  inflated.dimensions += 2.0f * margin;
 
-  const double max_range = inflated.dimensions().maxCoeff();
+  const double max_range = inflated.dimensions.maxCoeff();
   const int max_steps = std::ceil(max_range / b_size) + 1;
   const auto body_T_world = world_T_body.inverse();
   const auto pos = world_T_body.translation();
@@ -76,7 +77,7 @@ BlockIndexList getAffectedBlocks(const Eigen::Isometry3f& world_T_body,
       for (int z = -max_steps; z <= max_steps; ++z) {
         const Eigen::Vector3f offset(x, y, z);
         const auto p_body = body_T_world * (pos + offset * b_size);
-        if (!inflated.isInside(p_body)) {
+        if (!inflated.contains(p_body)) {
           continue;
         }
 
@@ -113,7 +114,7 @@ void RobotFootprintIntegrator::addFreespaceFootprint(const Eigen::Isometry3f& w_
       const auto p_body = b_T_w * block->computeCoordinatesFromLinearIndex(i);
       // technically we should expand by sqrt(3) * voxel_size, but the more
       // conservative, the better
-      if (!bbox.isInside(p_body)) {
+      if (!bbox.contains(p_body)) {
         continue;  // voxel doesn't intersect with free-space pattern
       }
 

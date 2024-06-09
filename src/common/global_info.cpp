@@ -105,6 +105,7 @@ void declare_config(PipelineConfig& conf) {
   field(conf.map, "reconstruction/map");
   field<LabelNameConversion>(conf.label_names, "label_names");
   field(conf.room_colors, "room_colors");
+
   // the following subconfigs should not be namespaced
   field(conf.logs, "logs", false);
   field(conf.frames, "frames", false);
@@ -222,27 +223,22 @@ ColorMapPtr GlobalInfo::setRandomColormap() {
 bool GlobalInfo::force_shutdown() const { return force_shutdown_; }
 
 const PipelineConfig& GlobalInfo::getConfig() const {
-  checkFrozen();
   return config_;
 }
 
 const FrameConfig& GlobalInfo::getFrames() const {
-  checkFrozen();
   return config_.frames;
 }
 
 const RobotPrefixConfig& GlobalInfo::getRobotPrefix() const {
-  checkFrozen();
   return robot_prefix_;
 }
 
 const LogSetup::Ptr& GlobalInfo::getLogs() const {
-  checkFrozen();
   return logs_;
 }
 
 const VolumetricMap::Config& GlobalInfo::getMapConfig() const {
-  checkFrozen();
   return config_.map;
 }
 

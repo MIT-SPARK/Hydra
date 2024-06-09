@@ -68,7 +68,7 @@ inline void emplaceObjectNode(DynamicSceneGraph& graph,
                               size_t& next_index) {
   auto attrs = std::make_unique<ObjectNodeAttributes>();
   attrs->position = pos;
-  attrs->bounding_box.max = dims;
+  attrs->bounding_box.dimensions = dims;
   attrs->semantic_label = 0;
   graph.emplaceNode(DsgLayers::OBJECTS, NodeSymbol('o', next_index), std::move(attrs));
   ++next_index;

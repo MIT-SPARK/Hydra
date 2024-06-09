@@ -39,7 +39,6 @@
 #include <gtsam/geometry/Pose3.h>
 #include <pcl/common/centroid.h>
 #include <pcl/point_types.h>
-#include <spark_dsg/bounding_box_extraction.h>
 #include <spark_dsg/node_symbol.h>
 #include <spark_dsg/scene_graph_types.h>
 
@@ -170,8 +169,8 @@ void UpdateObjectsFunctor::updateObject(const spark_dsg::Mesh::Ptr& mesh,
 
 bool UpdateObjectsFunctor::shouldMerge(const ObjectNodeAttributes& from_attrs,
                                        const ObjectNodeAttributes& to_attrs) const {
-  return from_attrs.bounding_box.isInside(to_attrs.position) ||
-         to_attrs.bounding_box.isInside(from_attrs.position);
+  return from_attrs.bounding_box.contains(to_attrs.position) ||
+         to_attrs.bounding_box.contains(from_attrs.position);
 }
 
 std::optional<NodeId> UpdateObjectsFunctor::proposeObjectMerge(
