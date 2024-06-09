@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/common/hydra_config.h>
+#include <hydra/common/global_info.h>
 #include <hydra/reconstruction/semantic_integrator.h>
 
 #include "hydra_test/config_guard.h"

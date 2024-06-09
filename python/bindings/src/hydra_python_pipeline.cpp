@@ -40,7 +40,7 @@
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/validation.h>
 #include <hydra/backend/backend_module.h>
-#include <hydra/common/hydra_config.h>
+#include <hydra/common/global_info.h>
 #include <hydra/loop_closure/loop_closure_module.h>
 #include <hydra/reconstruction/reconstruction_module.h>
 #include <pybind11/eigen.h>

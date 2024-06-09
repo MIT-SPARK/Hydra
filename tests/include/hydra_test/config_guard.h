@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <hydra/common/hydra_config.h>
+#include <hydra/common/global_info.h>
 
 namespace hydra::test {
 

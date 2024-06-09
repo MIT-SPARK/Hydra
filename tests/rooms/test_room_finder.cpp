@@ -33,17 +33,11 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/common/hydra_config.h>
 #include <hydra/rooms/room_finder.h>
 
-namespace hydra {
+#include "hydra_test/config_guard.h"
 
-// TODO(nathan) move to fixture
-namespace {
-struct ConfigGuard {
-  ~ConfigGuard() { GlobalInfo::instance().reset(); }
-};
-}  // namespace
+namespace hydra {
 
 class TestableRoomFinder : public RoomFinder {
  public:
@@ -116,7 +110,7 @@ TEST(RoomFinderTests, TestRoomPlaceEdges) {
 }
 
 TEST(RoomFinderTests, TestMakeRoomLayer) {
-  ConfigGuard guard;
+  test::ConfigGuard guard(false);
   PipelineConfig pipeline_config;
   GlobalInfo::init(pipeline_config);
 

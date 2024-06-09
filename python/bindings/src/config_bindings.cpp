@@ -36,7 +36,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/parsing/yaml.h>
-#include <hydra/common/hydra_config.h>
+#include <hydra/common/global_info.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
 
