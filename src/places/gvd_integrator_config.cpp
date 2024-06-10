@@ -37,8 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/enum.h>
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 void declare_config(VoronoiCheckConfig& config) {
   using namespace config;
@@ -62,10 +61,10 @@ void declare_config(GvdIntegratorConfig& config) {
   field(config.min_weight, "min_weight");
   field(config.num_buckets, "num_buckets");
   field(config.multi_queue, "multi_queue");
+  field(config.refine_voxel_pos, "refine_voxel_pos");
   field(config.positive_distance_only, "positive_distance_only");
   field(config.min_basis_for_extraction, "min_basis_for_extraction");
   field(config.voronoi_config, "voronoi_config");
 }
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

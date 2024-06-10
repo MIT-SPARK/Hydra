@@ -47,4 +47,16 @@ SharedDsgInfo::SharedDsgInfo(const std::map<LayerId, char>& layer_id_map)
   graph.reset(new DynamicSceneGraph(layer_ids));
 }
 
+SharedDsgInfo::SharedDsgInfo() {}
+
+SharedDsgInfo::Ptr SharedDsgInfo::clone() const {
+  SharedDsgInfo::Ptr other(new SharedDsgInfo());
+  other->updated = updated.load();
+  other->last_update_time = last_update_time;
+  other->graph = graph->clone();
+  other->prefix_layer_map = prefix_layer_map;
+  other->layer_prefix_map = layer_prefix_map;
+  return other;
+}
+
 }  // namespace hydra

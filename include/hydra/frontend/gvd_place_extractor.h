@@ -43,6 +43,7 @@
 #include "hydra/places/graph_extractor_config.h"
 #include "hydra/places/gvd_integrator_config.h"
 #include "hydra/places/gvd_voxel.h"
+#include "hydra/reconstruction/tsdf_interpolators.h"
 #include "hydra/utils/log_utilities.h"
 
 namespace hydra {
@@ -56,16 +57,15 @@ class GraphExtractorInterface;
 class GvdPlaceExtractor : public FreespacePlacesInterface {
  public:
   using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
-  using ExtractorConfig = config::VirtualConfig<places::GraphExtractorInterface>;
-  using GvdLayer = voxblox::Layer<places::GvdVoxel>;
   using Sink = OutputSink<uint64_t,
                           const Eigen::Isometry3f&,
-                          const GvdLayer&,
+                          const voxblox::Layer<places::GvdVoxel>&,
                           const places::GraphExtractorInterface*>;
 
   struct Config {
     places::GvdIntegratorConfig gvd;
     config::VirtualConfig<places::GraphExtractorInterface> graph;
+    config::VirtualConfig<TsdfInterpolator> tsdf_interpolator;
     size_t min_component_size = 3;
     bool filter_places = true;
     bool filter_ground = false;
@@ -99,9 +99,10 @@ class GvdPlaceExtractor : public FreespacePlacesInterface {
 
  protected:
   mutable std::mutex gvd_mutex_;
-  GvdLayer::Ptr gvd_;
+  voxblox::Layer<places::GvdVoxel>::Ptr gvd_;
   std::shared_ptr<places::GraphExtractorInterface> graph_extractor_;
   std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
+  std::unique_ptr<TsdfInterpolator> tsdf_interpolator_;
   NodeIdSet active_nodes_;
   Eigen::Vector3d latest_pos_;
   Sink::List sinks_;

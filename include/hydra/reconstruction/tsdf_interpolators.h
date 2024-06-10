@@ -33,36 +33,72 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/virtual_config.h>
+#include <config_utilities/factory.h>
+#include <voxblox/core/layer.h>
 
-#include <utility>
-
-#include "hydra/places/gvd_integrator.h"
-#include "hydra/reconstruction/mesh_integrator.h"
-#include "hydra/reconstruction/volumetric_map.h"
+#include <memory>
 
 namespace hydra {
 
-class ComboIntegrator {
- public:
-  using GraphExtractorConfig = config::VirtualConfig<places::GraphExtractorInterface>;
+struct TsdfInterpolator {
+  using TsdfLayer = voxblox::Layer<voxblox::TsdfVoxel>;
+  using BlockIndices = voxblox::BlockIndexList;
 
-  ComboIntegrator(const places::GvdIntegratorConfig& gvd_config,
-                  const voxblox::Layer<places::GvdVoxel>::Ptr& gvd_layer,
-                  const MeshIntegratorConfig* mesh_config = nullptr,
-                  const GraphExtractorConfig& graph_config = {});
+  virtual ~TsdfInterpolator() = default;
 
-  virtual ~ComboIntegrator();
+  virtual std::shared_ptr<TsdfLayer> interpolate(const TsdfLayer& input,
+                                                 const BlockIndices* blocks) const = 0;
 
-  void update(uint64_t timestamp_ns,
-              VolumetricMap& map,
-              bool clear_updated_flag,
-              bool use_all_blocks = false);
-
- public:
-  std::unique_ptr<MeshIntegrator> mesh_integrator;
-  std::unique_ptr<places::GvdIntegrator> gvd_integrator;
-  places::GraphExtractorInterface::Ptr graph_extractor;
+  std::shared_ptr<TsdfLayer> interpolate(const TsdfLayer& input) const {
+    return interpolate(input, nullptr);
+  }
 };
+
+struct TrilinearTsdfInterpolator : public TsdfInterpolator {
+  using TsdfInterpolator::TsdfLayer;
+
+  struct Config {
+    double voxel_resolution_m = 0.2;
+    int voxels_per_side = 16;
+  } const config;
+
+  explicit TrilinearTsdfInterpolator(const Config& config);
+
+  virtual ~TrilinearTsdfInterpolator() = default;
+
+  // note that blocks are disregarded and this is significantly slower than the
+  // downsample method
+  std::shared_ptr<TsdfLayer> interpolate(const TsdfLayer& input,
+                                         const BlockIndices* blocks) const override;
+
+ private:
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<TsdfInterpolator,
+                                     TrilinearTsdfInterpolator,
+                                     TrilinearTsdfInterpolator::Config>("trilinear");
+};
+
+struct DownsampleTsdfInterpolator : public TsdfInterpolator {
+  struct Config {
+    size_t ratio = 2;
+    float tolerance = 1.0e-10;
+  } const config;
+
+  explicit DownsampleTsdfInterpolator(const Config& config);
+
+  virtual ~DownsampleTsdfInterpolator() = default;
+
+  std::shared_ptr<TsdfLayer> interpolate(const TsdfLayer& input,
+                                         const BlockIndices* blocks) const override;
+
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<TsdfInterpolator,
+                                     DownsampleTsdfInterpolator,
+                                     DownsampleTsdfInterpolator::Config>("downsample");
+};
+
+void declare_config(TrilinearTsdfInterpolator::Config& config);
+
+void declare_config(DownsampleTsdfInterpolator::Config& config);
 
 }  // namespace hydra

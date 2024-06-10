@@ -35,9 +35,9 @@
 #include "hydra/places/graph_extractor_interface.h"
 
 #include "hydra/places/graph_extractor_utilities.h"
+#include "hydra/places/gvd_parent_tracker.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 GraphExtractorInterface::GraphExtractorInterface(const GraphExtractorConfig& config)
     : config_(config),
@@ -51,55 +51,44 @@ void GraphExtractorInterface::pushGvdIndex(const GlobalIndex& index) {
   modified_voxel_queue_.push(index);
 }
 
-void fillInfoFromParent(NearestVertexInfo& info, const GvdVertexInfo& parent_info) {
-  std::memcpy(info.block, parent_info.block, sizeof(info.block));
-  // float to double conversion prevents memcpy
+NearestVertexInfo convertInfo(const GvdVertexInfo& parent_info) {
+  NearestVertexInfo info;
   info.voxel_pos[0] = parent_info.pos[0];
   info.voxel_pos[1] = parent_info.pos[1];
   info.voxel_pos[2] = parent_info.pos[2];
-  info.vertex = parent_info.vertex;
-  info.label = parent_info.label;
+  return info;
 }
 
-void GraphExtractorInterface::assignMeshVertices(const GvdLayer& gvd,
-                                                 const GvdParentMap& parents,
-                                                 const GvdVertexMap& parent_vertices) {
-  for (const auto& id_index_pair : node_index_map_) {
-    const NodeId node_id = id_index_pair.first;
-    const GlobalIndex& node_index = id_index_pair.second;
-
+void GraphExtractorInterface::fillParentInfo(const GvdLayer& gvd,
+                                             const GvdParentTracker& tracker) {
+  for (auto&& [node_id, node_index] : node_index_map_) {
     auto& attrs = graph_->getNode(node_id).attributes<PlaceNodeAttributes>();
     attrs.voxblox_mesh_connections.clear();
 
-    const GvdVoxel* voxel = gvd.getVoxelPtrByGlobalIndex(node_index);
+    const auto* voxel = gvd.getVoxelPtrByGlobalIndex(node_index);
     if (!voxel) {
       // the compression-based extractor can have nodes pointing to archived voxels
       continue;
     }
 
-    const GlobalIndex curr_parent = Eigen::Map<const GlobalIndex>(voxel->parent);
-
-    auto iter = parent_vertices.find(curr_parent);
-    if (iter != parent_vertices.end()) {
-      NearestVertexInfo info;
-      fillInfoFromParent(info, iter->second);
-      attrs.voxblox_mesh_connections.push_back(info);
-    }
-
-    // TMP(lschmid): Disabled this for now for khronos.
-    if (!parents.count(node_index)) {
-      continue;
-    }
-    CHECK(parents.count(node_index))
+    CHECK(tracker.parents.count(node_index))
         << "bad gvd voxel: " << *voxel << " @ " << node_index.transpose();
-    for (const auto& parent : parents.at(node_index)) {
-      if (!parent_vertices.count(parent)) {
+
+    // save primary parent first
+    const GlobalIndex curr_parent = Eigen::Map<const GlobalIndex>(voxel->parent);
+    auto iter = tracker.parent_vertices.find(curr_parent);
+    if (iter != tracker.parent_vertices.end()) {
+      attrs.voxblox_mesh_connections.push_back(convertInfo(iter->second));
+    }
+
+    // save all other basis points
+    for (const auto& parent : tracker.parents.at(node_index)) {
+      if (!tracker.parent_vertices.count(parent)) {
         continue;
       }
 
-      NearestVertexInfo info;
-      fillInfoFromParent(info, parent_vertices.at(parent));
-      attrs.voxblox_mesh_connections.push_back(info);
+      const auto& parent_info = tracker.parent_vertices.at(parent);
+      attrs.voxblox_mesh_connections.push_back(convertInfo(parent_info));
     }
   }
 }
@@ -289,5 +278,4 @@ void GraphExtractorInterface::updateHeuristicEdges(const GvdLayer& gvd) {
   }
 }
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

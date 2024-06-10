@@ -33,13 +33,12 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
+#include <hydra/places/gvd_integrator.h>
 #include <hydra/places/gvd_utilities.h>
-#include <hydra/reconstruction/combo_integrator.h>
 
 #include "hydra_test/place_fixtures.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 using test::LargeSingleBlockTestFixture;
 using test::SingleBlockTestFixture;
@@ -125,7 +124,7 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
 
   // no graph extractor disables places extraction
   GvdIntegrator gvd_integrator(gvd_config, gvd_layer, nullptr);
-  gvd_integrator.updateFromTsdf(0, *tsdf_layer, *vertex_layer, *mesh_layer, false);
+  gvd_integrator.updateFromTsdf(0, *tsdf_layer, false);
   gvd_integrator.updateGvd(0);
 
   GvdResult result(4, 8);
@@ -171,7 +170,7 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
   setSurfaceVoxel(0, 2);
   setSurfaceVoxel(0, 3);
 
-  gvd_integrator.updateFromTsdf(0, *tsdf_layer, *vertex_layer, *mesh_layer, false);
+  gvd_integrator.updateFromTsdf(0, *tsdf_layer, false);
   gvd_integrator.updateGvd(0);
 
   for (int x = 0; x < voxels_per_side; ++x) {
@@ -251,7 +250,7 @@ TEST_F(TestFixture2d, NegativeIntegrationCorrect) {
 
   // no graph extractor disables places extraction
   GvdIntegrator gvd_integrator(gvd_config, gvd_layer, nullptr);
-  gvd_integrator.updateFromTsdf(0, *tsdf_layer, *vertex_layer, *mesh_layer, false);
+  gvd_integrator.updateFromTsdf(0, *tsdf_layer, false);
   gvd_integrator.updateGvd(0);
 
   GvdResult result(voxels_per_side, voxels_per_side);
@@ -288,7 +287,7 @@ TEST_F(TestFixture2d, NegativeIntegrationCorrect) {
 }
 
 TEST_F(SingleBlockTestFixture, PlaneCorrect) {
-  ComboIntegrator gvd_integrator(gvd_config, gvd_layer);
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer, nullptr);
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {
@@ -298,7 +297,7 @@ TEST_F(SingleBlockTestFixture, PlaneCorrect) {
     }
   }
 
-  gvd_integrator.update(0, *map, true);
+  test::updateGvd(gvd_integrator, *map, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -319,7 +318,7 @@ TEST_F(SingleBlockTestFixture, PlaneCorrect) {
 }
 
 TEST_F(SingleBlockTestFixture, LCorrect) {
-  ComboIntegrator gvd_integrator(gvd_config, gvd_layer);
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer, nullptr);
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {
@@ -329,7 +328,7 @@ TEST_F(SingleBlockTestFixture, LCorrect) {
     }
   }
 
-  gvd_integrator.update(0, *map, true);
+  test::updateGvd(gvd_integrator, *map, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -352,7 +351,7 @@ TEST_F(SingleBlockTestFixture, LCorrect) {
 }
 
 TEST_F(LargeSingleBlockTestFixture, LCorrect) {
-  ComboIntegrator gvd_integrator(gvd_config, gvd_layer);
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer, nullptr);
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {
@@ -362,7 +361,7 @@ TEST_F(LargeSingleBlockTestFixture, LCorrect) {
     }
   }
 
-  gvd_integrator.update(0, *map, true);
+  test::updateGvd(gvd_integrator, *map, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -385,8 +384,8 @@ TEST_F(LargeSingleBlockTestFixture, LCorrect) {
 }
 
 TEST_F(SingleBlockTestFixture, CornerCorrect) {
-  ComboIntegrator gvd_integrator(gvd_config, gvd_layer);
-  gvd_integrator.update(0, *map, true);
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer, nullptr);
+  test::updateGvd(gvd_integrator, *map, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -411,8 +410,8 @@ TEST_F(SingleBlockTestFixture, CornerCorrect) {
 }
 
 TEST_F(ParentTestFixture, ParentsCorrect) {
-  ComboIntegrator gvd_integrator(gvd_config, gvd_layer);
-  gvd_integrator.update(0, *map, true);
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer, nullptr);
+  test::updateGvd(gvd_integrator, *map, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -474,7 +473,7 @@ TEST_F(ParentTestFixture, ParentsCorrect) {
 
 TEST_F(SingleBlockTestFixture, RaiseCorrectForSurface) {
   gvd_config.min_diff_m = 0.03;
-  ComboIntegrator gvd_integrator(gvd_config, gvd_layer);
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer, nullptr);
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {
@@ -484,14 +483,14 @@ TEST_F(SingleBlockTestFixture, RaiseCorrectForSurface) {
     }
   }
 
-  gvd_integrator.update(0, *map, true);
+  test::updateGvd(gvd_integrator, *map, true);
 
   // trigger a lower wavefront
   setTsdfVoxel(0, 2, 0, -0.01);
   // flip value to be raised
   setTsdfVoxel(0, 2, 2, -0.09);
 
-  gvd_integrator.update(0, *map, true, true);
+  test::updateGvd(gvd_integrator, *map, true, true);
 
   {  // temporary scope
     const auto& voxel = getGvdVoxel(0, 2, 2);
@@ -517,5 +516,4 @@ TEST_F(SingleBlockTestFixture, RaiseCorrectForSurface) {
   }
 }
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

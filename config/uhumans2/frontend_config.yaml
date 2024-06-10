@@ -62,6 +62,9 @@ freespace_places:
       min_clearance_m: 0.4
     add_freespace_edges: false
     merge_policy: distance
+  tsdf_interpolator:
+    type: downsample
+    ratio: 2
 use_frontiers: false
 frontier_places:
     type: "voxel_clustering"

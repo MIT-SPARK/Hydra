@@ -47,6 +47,8 @@ struct SharedDsgInfo {
 
   explicit SharedDsgInfo(const std::map<LayerId, char>& layer_id_map);
 
+  SharedDsgInfo::Ptr clone() const;
+
   // mutexes are considered ordered (for avoiding deadlock):
   // 1. SharedDsgInfo::mutex (lcd)
   // 2. SharedDsgInfo::mutex (backend)
@@ -59,6 +61,9 @@ struct SharedDsgInfo {
   DynamicSceneGraph::Ptr graph;
   std::map<char, LayerId> prefix_layer_map;
   std::map<LayerId, char> layer_prefix_map;
+
+ private:
+  SharedDsgInfo();
 };
 
 }  // namespace hydra

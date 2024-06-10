@@ -76,7 +76,6 @@ class FrontendModule : public Module {
     bool lcd_use_bow_vectors = true;
     kimera_pgmo::MeshFrontendConfig pgmo_config;
     MeshSegmenter::Config object_config;
-    bool validate_vertices = false;
     config::VirtualConfig<SurfacePlacesInterface> surface_places;
     config::VirtualConfig<FreespacePlacesInterface> freespace_places;
     bool use_frontiers = false;
@@ -144,9 +143,9 @@ class FrontendModule : public Module {
 
   void addPlaceAgentEdges(uint64_t timestamp_ns);
 
-  void updatePlaceMeshMapping(const ReconstructionOutput& input);
-
   void processNextInput(const ReconstructionOutput& msg);
+
+  void updatePlaceMeshMapping(const ReconstructionOutput& input);
 
  protected:
   using InputPtrCallback = std::function<void(const ReconstructionOutput::Ptr&)>;

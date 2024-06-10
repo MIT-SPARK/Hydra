@@ -230,6 +230,7 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
   Hooks hooks() const override;
 
   Update2dPlacesFunctor(const Places2dConfig& config);
+
   ~Update2dPlacesFunctor();
 
   MergeMap call(SharedDsgInfo& dsg, const UpdateInfo::ConstPtr& info) const override;

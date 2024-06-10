@@ -85,7 +85,6 @@ void declare_config(FrontendModule::Config& config) {
   field(config.lcd_use_bow_vectors, "lcd_use_bow_vectors");
   field(config.pgmo_config, "pgmo");
   field(config.object_config, "objects");
-  field(config.validate_vertices, "validate_vertices");
   // surface (i.e., 2D) places
   config.surface_places.setOptional();
   field(config.surface_places, "surface_places");
@@ -770,86 +769,38 @@ void FrontendModule::addPlaceAgentEdges(uint64_t timestamp_ns) {
   }
 }
 
-size_t remapConnections(const kimera_pgmo::VoxbloxIndexMapping& remapping,
-                        const voxblox::IndexSet& archived_blocks,
-                        const std::vector<NearestVertexInfo>& connections,
-                        std::vector<size_t>& indices) {
-  size_t num_invalid = 0;
-  for (const auto& connection : connections) {
-    voxblox::BlockIndex idx = Eigen::Map<const voxblox::BlockIndex>(connection.block);
-    if (archived_blocks.count(idx)) {
-      continue;
-    }
-
-    const auto iter = remapping.find(idx);
-    if (iter == remapping.end()) {
-      num_invalid++;
-      continue;
-    }
-
-    const auto viter = iter->second.find(connection.vertex);
-    if (viter == iter->second.end()) {
-      num_invalid++;
-    } else {
-      indices.push_back(viter->second);
-    }
-  }
-  return num_invalid;
-}
-
-using MeshIndexMap = voxblox::AnyIndexHashMapType<size_t>::type;
-
-// TODO(nathan) maybe move this somewhere else...
 void FrontendModule::updatePlaceMeshMapping(const ReconstructionOutput& input) {
   ScopedTimer timer("frontend/place_mesh_mapping", input.timestamp_ns);
   std::unique_lock<std::mutex> lock(dsg_->mutex);
   const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
-  const auto& graph_mapping = mesh_frontend_.getVoxbloxMsgToGraphMapping();
-
-  voxblox::BlockIndexList allocated_list;
-  input.map().getMeshLayer().getAllocatedBlockIndices(allocated_list);
-
-  voxblox::IndexSet allocated(allocated_list.begin(), allocated_list.end());
-  voxblox::IndexSet archived(input.archived_blocks.begin(),
-                             input.archived_blocks.end());
 
   size_t num_missing = 0;
-  size_t num_deform_invalid = 0;
-  size_t num_mesh_invalid = 0;
-  size_t num_semantic_invalid = 0;
   for (const auto& id_node_pair : places.nodes()) {
     auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
+    // TODO(nathan) archive logic should live here if we actually track mesh vertices
     if (!attrs.is_active) {
       continue;
     }
+
+    attrs.deformation_connections.clear();
+    attrs.pcl_mesh_connections.clear();
+    attrs.mesh_vertex_labels.clear();
 
     if (attrs.voxblox_mesh_connections.empty()) {
       ++num_missing;
       continue;
     }
 
-    // reset connections
-    attrs.deformation_connections.clear();
-    attrs.pcl_mesh_connections.clear();
-    attrs.mesh_vertex_labels.clear();
-    num_deform_invalid += remapConnections(graph_mapping,
-                                           archived,
-                                           attrs.voxblox_mesh_connections,
-                                           attrs.deformation_connections);
-    if (mesh_remapping_) {
-      num_mesh_invalid += remapConnections(*mesh_remapping_,
-                                           archived,
-                                           attrs.voxblox_mesh_connections,
-                                           attrs.pcl_mesh_connections);
-    }
+    //for (const auto& vertex : attrs.voxblox_mesh_connections) {
+      //const Eigen::Vector3d pos = Eigen::Map<const Eigen::Vector3d>(vertex.voxel_pos);
+      // TODO(nathan) find nearest deformation graph point and assign
+    //}
+    // TODO(nathan) assign mesh vertices and labels based on deformation points
   }
 
-  if (config.validate_vertices) {
-    CHECK_EQ(num_deform_invalid, 0u);
-    CHECK_EQ(num_mesh_invalid, 0u);
-    CHECK_EQ(num_missing, 0u);
-    CHECK_EQ(num_semantic_invalid, 0u);
-  }
+  LOG_IF(ERROR, num_missing > 0)
+      << "[Frontend] " << num_missing << " places missing basis points @ "
+      << input.timestamp_ns << " [ns]";
 }
 
 }  // namespace hydra

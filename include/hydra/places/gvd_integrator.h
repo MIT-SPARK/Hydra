@@ -42,12 +42,8 @@
 #include "hydra/places/gvd_voxel.h"
 #include "hydra/places/update_statistics.h"
 #include "hydra/places/voxblox_types.h"
-#include "hydra/reconstruction/semantic_mesh_layer.h"
-#include "hydra/reconstruction/vertex_voxel.h"
-#include "hydra/reconstruction/volumetric_map.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 struct OpenQueueEntry {
   GlobalIndex index;
@@ -60,21 +56,17 @@ struct OpenQueueEntry {
 class GvdIntegrator {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  using TsdfLayer = voxblox::Layer<voxblox::TsdfVoxel>;
+  using GvdLayer = voxblox::Layer<GvdVoxel>;
 
   GvdIntegrator(const GvdIntegratorConfig& config,
-                const Layer<GvdVoxel>::Ptr& gvd_layer,
+                const GvdLayer::Ptr& gvd_layer,
                 const GraphExtractorInterface::Ptr& graph_extractor);
 
   virtual ~GvdIntegrator() = default;
 
-  void updateFromMap(uint64_t timestamp_ns,
-                     const VolumetricMap& map,
-                     bool use_all_blocks = false);
-
   void updateFromTsdf(uint64_t timestamp_ns,
-                      Layer<TsdfVoxel>& tsdf,
-                      const Layer<VertexVoxel>& vertices,
-                      const SemanticMeshLayer& mesh,
+                      const TsdfLayer& tsdf,
                       bool clear_updated_flag,
                       bool use_all_blocks = false);
 
@@ -83,7 +75,7 @@ class GvdIntegrator {
   void archiveBlocks(const BlockIndexList& blocks);
 
   // TODO(nathan) test this
-  static bool setFixedParent(const Layer<GvdVoxel>& layer,
+  static bool setFixedParent(const GvdLayer& layer,
                              const GvdNeighborhood::IndexMatrix& neighbor_indices,
                              GvdVoxel& voxel);
 
@@ -99,9 +91,7 @@ class GvdIntegrator {
                           const GlobalIndex& neighbor_pos);
 
   // TSDF propagation
-  void propagateSurface(const BlockIndex& block_index,
-                        const SemanticMeshLayer& mesh,
-                        const Layer<VertexVoxel>& vertices);
+  void propagateSurface(const BlockIndex& block_index, const TsdfLayer& tsdf);
 
   void processTsdfBlock(const Block<TsdfVoxel>& block, const BlockIndex& index);
 
@@ -135,7 +125,7 @@ class GvdIntegrator {
 
   const double default_distance_;
   GvdIntegratorConfig config_;
-  Layer<GvdVoxel>::Ptr gvd_layer_;
+  GvdLayer::Ptr gvd_layer_;
 
   GraphExtractorInterface::Ptr graph_extractor_;
   GvdParentTracker parent_tracker_;
@@ -147,5 +137,4 @@ class GvdIntegrator {
   FloatingPoint min_integration_distance_m_;
 };
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

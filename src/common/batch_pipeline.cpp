@@ -43,7 +43,8 @@
 
 namespace hydra {
 
-using VFrontendConfig = config::VirtualConfig<FrontendModule>;
+using VFConfig = config::VirtualConfig<FrontendModule>;
+using RFConfig = RoomFinderConfig;
 
 BatchPipeline::BatchPipeline(const PipelineConfig& config, int robot_id) {
   GlobalInfo::init(config, robot_id, true);
@@ -51,11 +52,10 @@ BatchPipeline::BatchPipeline(const PipelineConfig& config, int robot_id) {
 
 BatchPipeline::~BatchPipeline() {}
 
-DynamicSceneGraph::Ptr BatchPipeline::construct(
-    const VFrontendConfig& frontend_config,
-    VolumetricMap& map,
-    const RoomFinderConfig* room_config) const {
-  if (!map.hasOccupancy() || !map.hasSemantics()) {
+DynamicSceneGraph::Ptr BatchPipeline::construct(const VFConfig& frontend_config,
+                                                VolumetricMap& map,
+                                                const RFConfig* room_config) const {
+  if (!map.hasSemantics()) {
     return nullptr;
   }
 

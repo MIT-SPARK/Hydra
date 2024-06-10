@@ -44,6 +44,14 @@ namespace hydra {
 namespace places {
 namespace test {
 
+void updateGvd(GvdIntegrator& integrator,
+               const VolumetricMap& map,
+               bool clear_updated,
+               bool use_all_blocks) {
+  integrator.updateFromTsdf(0, map.getTsdfLayer(), clear_updated, use_all_blocks);
+  integrator.updateGvd(0);
+}
+
 void EsdfTestFixture::SetUp() { setupWorld(); }
 
 void EsdfTestFixture::updateTsdfIntegrator(voxblox::TsdfIntegratorBase& integrator,
@@ -168,7 +176,7 @@ void SingleBlockTestFixture::SetUp() {
   map_config.voxel_size = voxel_size;
   map_config.voxels_per_side = voxels_per_side;
   map_config.truncation_distance = truncation_distance;
-  map = std::make_unique<VolumetricMap>(map_config, false, true);
+  map = std::make_unique<VolumetricMap>(map_config, false);
   gvd_layer.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
 
   BlockIndex block_index = BlockIndex::Zero();
@@ -190,8 +198,9 @@ void SingleBlockExtractionTestFixture::SetUp() {
   SingleBlockTestFixture::SetUp();
   setBlockState();
 
-  gvd_integrator.reset(new ComboIntegrator(gvd_config, gvd_layer));
-  gvd_integrator->update(0, *map, true);
+  gvd_integrator.reset(new GvdIntegrator(gvd_config, gvd_layer, nullptr));
+  gvd_integrator->updateFromTsdf(0, map->getTsdfLayer(), true);
+  gvd_integrator->updateGvd(0);
 }
 
 void SingleBlockExtractionTestFixture::setBlockState() {}
@@ -205,12 +214,9 @@ void TestFixture2d::setSurfaceVoxel(int x, int y) {
   VoxelIndex v_index;
   v_index << x, y, 0;
 
-  auto& voxel = vertex_block->getVoxelByVoxelIndex(v_index);
-  voxel.on_surface = true;
-  voxel.block_vertex_index = 0;
-  voxel.mesh_block[0] = 0;
-  voxel.mesh_block[1] = 0;
-  voxel.mesh_block[2] = 0;
+  auto& voxel = tsdf_block->getVoxelByVoxelIndex(v_index);
+  voxel.distance = 0.0;
+  voxel.weight = 1.0;
 }
 
 void TestFixture2d::setTsdfVoxel(int x, int y, float distance, float weight) {
@@ -223,17 +229,6 @@ void TestFixture2d::setTsdfVoxel(int x, int y, float distance, float weight) {
   auto& voxel = tsdf_block->getVoxelByVoxelIndex(v_index);
   voxel.distance = distance;
   voxel.weight = weight;
-
-  auto& vertex_voxel = vertex_block->getVoxelByVoxelIndex(v_index);
-  if (distance == 0.0) {
-    vertex_voxel.on_surface = true;
-    vertex_voxel.block_vertex_index = 0;
-    vertex_voxel.mesh_block[0] = 0;
-    vertex_voxel.mesh_block[1] = 0;
-    vertex_voxel.mesh_block[2] = 0;
-  } else {
-    vertex_voxel.on_surface = false;
-  }
 }
 
 const GvdVoxel& TestFixture2d::getGvdVoxel(int x, int y) {
@@ -249,16 +244,10 @@ const GvdVoxel& TestFixture2d::getGvdVoxel(int x, int y) {
 void TestFixture2d::SetUp() {
   tsdf_layer.reset(new Layer<TsdfVoxel>(voxel_size, voxels_per_side));
   gvd_layer.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
-  vertex_layer.reset(new Layer<VertexVoxel>(voxel_size, voxels_per_side));
-  mesh_layer.reset(new SemanticMeshLayer(voxel_size * voxels_per_side));
 
   BlockIndex block_index = BlockIndex::Zero();
   tsdf_block = tsdf_layer->allocateBlockPtrByIndex(block_index);
   gvd_block = gvd_layer->allocateBlockPtrByIndex(block_index);
-  vertex_block = vertex_layer->allocateBlockPtrByIndex(block_index);
-  // we need this to be allocated so we can avoid doing mesh integration
-  auto mesh_block = mesh_layer->allocateBlock(block_index, false);
-  mesh_block->resize(1);
   tsdf_block->updated().set();
 
   for (int x = 0; x < voxels_per_side; ++x) {

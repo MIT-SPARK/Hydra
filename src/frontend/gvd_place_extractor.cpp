@@ -57,6 +57,8 @@ void declare_config(GvdPlaceExtractor::Config& config) {
   field(config.gvd, "gvd");
   config.graph.setOptional();
   field(config.graph, "graph");
+  config.tsdf_interpolator.setOptional();
+  field(config.tsdf_interpolator, "tsdf_interpolator");
   field(config.min_component_size, "min_component_size");
   field(config.filter_places, "filter_places");
   field(config.filter_ground, "filter_ground");
@@ -80,6 +82,11 @@ GvdPlaceExtractor::GvdPlaceExtractor(const Config& c)
       sinks_(Sink::instantiate(config.sinks)) {
   if (!graph_extractor_) {
     LOG(ERROR) << "no place graph extraction provided! disabling extraction";
+  }
+
+  tsdf_interpolator_ = config.tsdf_interpolator.create();
+  if (tsdf_interpolator_) {
+    LOG(INFO) << "Downsampling TSDF when creating places!";
   }
 
   const auto& map_config = GlobalInfo::instance().getMapConfig();
@@ -145,15 +152,31 @@ std::vector<bool> GvdPlaceExtractor::inFreespace(const PositionMatrix& positions
 }
 
 void GvdPlaceExtractor::detect(const ReconstructionOutput& msg) {
+  ScopedTimer timer("frontend/detect_gvd", msg.timestamp_ns, true, 2, false);
+
   const auto& map = msg.map();
-  if (!map.getOccupancyLayer()) {
-    LOG(ERROR) << "Cannot extract places from invalid input";
-    return;
+  const auto* tsdf = &map.getTsdfLayer();
+  voxblox::Layer<voxblox::TsdfVoxel>::Ptr tsdf_ptr;
+  if (tsdf_interpolator_) {
+    ScopedTimer dtimer("frontend/downsample_tsdf", msg.timestamp_ns, true, 2, false);
+    voxblox::BlockIndexList updated;
+
+    tsdf->getAllUpdatedBlocks(voxblox::Update::kEsdf, &updated);
+    tsdf_ptr = tsdf_interpolator_->interpolate(*tsdf, &updated);
+
+    voxblox::BlockIndexList blocks;
+    tsdf_ptr->getAllAllocatedBlocks(&blocks);
+    for (const auto& idx : blocks) {
+      tsdf_ptr->getBlockByIndex(idx).updated().set();
+    }
+
+    tsdf = tsdf_ptr.get();
   }
 
-  auto& tsdf = map.getTsdfLayer();
   if (!gvd_) {
-    gvd_.reset(new Layer<GvdVoxel>(tsdf.voxel_size(), tsdf.voxels_per_side()));
+    const auto voxel_size = tsdf->voxel_size();
+    const auto vps = tsdf->voxels_per_side();
+    gvd_.reset(new Layer<GvdVoxel>(voxel_size, vps));
     gvd_integrator_.reset(new GvdIntegrator(config.gvd, gvd_, graph_extractor_));
   }
 
@@ -163,7 +186,7 @@ void GvdPlaceExtractor::detect(const ReconstructionOutput& msg) {
   {  // start critical section
     std::unique_lock<std::mutex> lock(gvd_mutex_);
     ScopedTimer timer("places/gvd", msg.timestamp_ns);
-    gvd_integrator_->updateFromMap(msg.timestamp_ns, map);
+    gvd_integrator_->updateFromTsdf(msg.timestamp_ns, *tsdf, true);
     gvd_integrator_->updateGvd(msg.timestamp_ns);
     gvd_integrator_->archiveBlocks(msg.archived_blocks);
   }  // end critical section

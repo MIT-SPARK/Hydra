@@ -50,7 +50,6 @@
 
 #include "hydra/reconstruction/semantic_mesh_layer.h"
 #include "hydra/reconstruction/semantic_voxel.h"
-#include "hydra/reconstruction/vertex_voxel.h"
 
 namespace hydra {
 
@@ -98,7 +97,6 @@ class VolumetricMap {
  public:
   using TsdfLayer = voxblox::Layer<voxblox::TsdfVoxel>;
   using SemanticLayer = voxblox::Layer<SemanticVoxel>;
-  using OccupancyLayer = voxblox::Layer<VertexVoxel>;
 
   struct Config {
     /// Voxel size.
@@ -109,9 +107,7 @@ class VolumetricMap {
     float truncation_distance = 0.3f;
   };
 
-  explicit VolumetricMap(const Config& config,
-                         bool with_semantics = false,
-                         bool with_occupancy = false);
+  explicit VolumetricMap(const Config& config, bool with_semantics = false);
 
   virtual ~VolumetricMap() = default;
 
@@ -128,12 +124,6 @@ class VolumetricMap {
   const SemanticLayer* getSemanticLayer() const { return semantic_layer_.get(); }
 
   bool hasSemantics() const { return semantic_layer_ != nullptr; }
-
-  OccupancyLayer* getOccupancyLayer() { return occupancy_layer_.get(); }
-
-  const OccupancyLayer* getOccupancyLayer() const { return occupancy_layer_.get(); }
-
-  bool hasOccupancy() const { return occupancy_layer_ != nullptr; }
 
   // TODO(nathan) drop these for const members or direct config access?
   float voxel_size() const { return config.voxel_size; }
@@ -157,8 +147,7 @@ class VolumetricMap {
 
   static std::unique_ptr<VolumetricMap> fromTsdf(const TsdfLayer& tsdf,
                                                  double truncation_distance_m,
-                                                 bool with_semantics = false,
-                                                 bool with_occupancy = false);
+                                                 bool with_semantics = false);
 
   static std::unique_ptr<VolumetricMap> load(const std::string& filepath);
 
@@ -173,7 +162,6 @@ class VolumetricMap {
   TsdfLayer tsdf_layer_;
   SemanticMeshLayer mesh_layer_;
   SemanticLayer::Ptr semantic_layer_;
-  OccupancyLayer::Ptr occupancy_layer_;
 
  public:
   const float block_size;

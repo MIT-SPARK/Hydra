@@ -70,8 +70,7 @@ void ReconstructionOutput::updateFrom(const ReconstructionOutput& msg, bool clon
   if (!map_) {
     // make a new map if we don't have one and we are forcing a clone
     const auto has_labels = new_map.getSemanticLayer() != nullptr;
-    const auto has_occupancy = new_map.getOccupancyLayer() != nullptr;
-    map_ = std::make_shared<VolumetricMap>(new_map.config, has_labels, has_occupancy);
+    map_ = std::make_shared<VolumetricMap>(new_map.config, has_labels);
   }
 
   map_->updateFrom(new_map);

@@ -39,6 +39,9 @@
 #include <glog/logging.h>
 #include <voxblox/io/layer_io.h>
 
+#include "hydra/places/gvd_integrator.h"
+#include "hydra/reconstruction/volumetric_map.h"
+
 namespace hydra::eval {
 
 using places::GvdIntegratorConfig;
@@ -50,7 +53,6 @@ PlaceEvaluator::PlaceEvaluator(const GvdIntegratorConfig& config,
                                const Layer<TsdfVoxel>::Ptr& tsdf)
     : tsdf_(CHECK_NOTNULL(tsdf)) {
   gvd_.reset(new Layer<GvdVoxel>(tsdf_->voxel_size(), tsdf_->voxels_per_side()));
-  mesh_.reset(new SemanticMeshLayer(tsdf_->block_size()));
   computeGroundTruth(config);
 }
 
@@ -58,10 +60,11 @@ void PlaceEvaluator::computeGroundTruth(const GvdIntegratorConfig& config) {
   config_ = config;
 
   VLOG(1) << "using GVD config:" << std::endl << config_;
-  ComboIntegrator integrator(config_, gvd_);
-  // enable occupancy (required for gvd) but not semantics
-  auto map = VolumetricMap::fromTsdf(*tsdf_, 0.3, false, true);
-  integrator.update(0, *CHECK_NOTNULL(map), false, true);
+  places::GvdIntegrator integrator(config_, gvd_, nullptr);
+  auto map = VolumetricMap::fromTsdf(*tsdf_, 0.3, false);
+  CHECK(map) << "Invalid map!";
+  integrator.updateFromTsdf(0, map->getTsdfLayer(), false, true);
+  integrator.updateGvd(0);
 }
 
 PlaceEvaluator::Ptr PlaceEvaluator::fromFile(const std::string& config_filepath,

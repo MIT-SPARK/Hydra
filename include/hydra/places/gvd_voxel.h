@@ -38,8 +38,7 @@
 
 #include "hydra/places/voxblox_types.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 // TODO(nathan) packed?
 struct GvdVoxel {
@@ -58,10 +57,6 @@ struct GvdVoxel {
   GlobalIndex::Scalar parent[3];
   // required for removing blocks (parents leave a dangling reference otherwise)
   voxblox::Point::Scalar parent_pos[3];
-
-  size_t block_vertex_index;
-  int32_t mesh_block[3];
-  std::optional<uint32_t> mesh_label;
 };
 
 std::ostream& operator<<(std::ostream& out, const GvdVoxel& voxel);
@@ -108,16 +103,6 @@ inline void setGvdSurfaceVoxel(GvdVoxel& voxel) {
   resetParent(voxel);
 }
 
-struct GvdVertexInfo {
-  size_t vertex;
-  float pos[3];
-  int32_t block[3];
-  std::optional<uint32_t> label;
-  size_t ref_count = 0;
-};
-
-using GvdParentMap = voxblox::LongIndexHashMapType<voxblox::LongIndexSet>::type;
-using GvdVertexMap = voxblox::LongIndexHashMapType<GvdVertexInfo>::type;
 using GvdNeighborhood = Neighborhood<voxblox::Connectivity::kTwentySix>;
 
 template <typename Scalar = double>
@@ -137,5 +122,4 @@ inline Eigen::Matrix<Scalar, 3, 1> getVoxelPosition(const Layer<GvdVoxel>& layer
       .cast<Scalar>();
 }
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

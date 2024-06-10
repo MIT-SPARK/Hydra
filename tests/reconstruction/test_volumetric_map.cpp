@@ -101,7 +101,7 @@ TEST_F(VolumetricMapFixture, SaveLoadEmptyCorrect) {
   config.voxels_per_side = 32;
   config.truncation_distance = 0.5;
 
-  VolumetricMap original(config, true, true);
+  VolumetricMap original(config, true);
   original.save(map_path.string());
 
   auto result = VolumetricMap::load(map_path.string());
@@ -110,7 +110,6 @@ TEST_F(VolumetricMapFixture, SaveLoadEmptyCorrect) {
   EXPECT_EQ(result->config.voxels_per_side, config.voxels_per_side);
   EXPECT_NEAR(result->config.truncation_distance, config.truncation_distance, 1.0e-9);
   EXPECT_TRUE(result->hasSemantics());
-  EXPECT_TRUE(result->hasOccupancy());
 }
 
 TEST_F(VolumetricMapFixture, SaveLoadSemanticsCorrect) {
@@ -121,7 +120,7 @@ TEST_F(VolumetricMapFixture, SaveLoadSemanticsCorrect) {
   config.voxels_per_side = 32;
   config.truncation_distance = 0.5;
 
-  VolumetricMap original(config, true, true);
+  VolumetricMap original(config, true);
   auto semantics = original.getSemanticLayer();
   ASSERT_TRUE(semantics != nullptr);
 
@@ -141,7 +140,6 @@ TEST_F(VolumetricMapFixture, SaveLoadSemanticsCorrect) {
   EXPECT_EQ(result->config.voxels_per_side, config.voxels_per_side);
   EXPECT_NEAR(result->config.truncation_distance, config.truncation_distance, 1.0e-9);
   EXPECT_TRUE(result->hasSemantics());
-  EXPECT_TRUE(result->hasOccupancy());
 
   auto result_semantics = original.getSemanticLayer();
   ASSERT_TRUE(result_semantics != nullptr);

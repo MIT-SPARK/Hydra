@@ -81,7 +81,7 @@ ReconstructionModule::ReconstructionModule(const Config& config,
   queue_.reset(new ReconstructionInputQueue());
   queue_->max_size = config.max_input_queue_size;
 
-  map_.reset(new VolumetricMap(GlobalInfo::instance().getMapConfig(), true, true));
+  map_.reset(new VolumetricMap(GlobalInfo::instance().getMapConfig(), true));
   tsdf_integrator_ = std::make_unique<ProjectiveIntegrator>(config.tsdf);
   mesh_integrator_ = std::make_unique<MeshIntegrator>(config.mesh);
   footprint_integrator_ = config.robot_footprint.create();

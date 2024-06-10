@@ -37,13 +37,20 @@
 
 #include "hydra/places/gvd_voxel.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 // forward declare to avoid header
 struct VoronoiCheckConfig;
 
+struct GvdVertexInfo {
+  float pos[3];
+  size_t ref_count = 0;
+};
+
 struct GvdParentTracker {
+  using GvdParentMap = voxblox::LongIndexHashMapType<voxblox::LongIndexSet>::type;
+  using GvdVertexMap = voxblox::LongIndexHashMapType<GvdVertexInfo>::type;
+
   uint8_t updateGvdParentMap(const Layer<GvdVoxel>& layer,
                              const VoronoiCheckConfig& config,
                              const GlobalIndex& voxel_index,
@@ -59,5 +66,4 @@ struct GvdParentTracker {
   GvdVertexMap parent_vertices;
 };
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

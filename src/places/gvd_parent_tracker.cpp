@@ -71,7 +71,7 @@ void GvdParentTracker::markNewGvdParent(const Layer<GvdVoxel>& layer,
     return;
   }
 
-  const GvdVoxel* parent_voxel = layer.getVoxelPtrByGlobalIndex(parent);
+  const auto* parent_voxel = layer.getVoxelPtrByGlobalIndex(parent);
   if (!parent_voxel || !parent_voxel->on_surface) {
     // we can't do anything for parents that have left the active mesh before being used
     // as a GVD parent, or parents that aren't registered to the mesh
@@ -80,8 +80,6 @@ void GvdParentTracker::markNewGvdParent(const Layer<GvdVoxel>& layer,
 
   GvdVertexInfo info;
   info.ref_count = 1;
-  info.vertex = parent_voxel->block_vertex_index;
-  std::memcpy(info.block, parent_voxel->mesh_block, sizeof(info.block));
   std::memcpy(info.pos, parent_voxel->parent_pos, sizeof(info.pos));
 
   parent_vertices[parent] = info;
@@ -110,7 +108,7 @@ void GvdParentTracker::updateVertexMapping(const Layer<GvdVoxel>& layer) {
       continue;
     }
 
-    const GvdVoxel* voxel = layer.getVoxelPtrByGlobalIndex(iter->first);
+    const auto* voxel = layer.getVoxelPtrByGlobalIndex(iter->first);
     if (!voxel) {
       ++iter;
       continue;
@@ -121,10 +119,7 @@ void GvdParentTracker::updateVertexMapping(const Layer<GvdVoxel>& layer) {
       continue;
     }
 
-    iter->second.vertex = voxel->block_vertex_index;
-    std::memcpy(iter->second.block, voxel->mesh_block, sizeof(iter->second.block));
     std::memcpy(iter->second.pos, voxel->parent_pos, sizeof(iter->second.pos));
-    iter->second.label = voxel->mesh_label;
     ++iter;
   }
 }

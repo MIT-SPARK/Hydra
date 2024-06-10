@@ -39,8 +39,9 @@
 #include "hydra/places/gvd_voxel.h"
 #include "hydra/places/voxblox_types.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
+
+struct GvdParentTracker;
 
 class GraphExtractorInterface {
  public:
@@ -60,9 +61,7 @@ class GraphExtractorInterface {
 
   virtual void extract(const GvdLayer& layer, uint64_t timestamp_ns) = 0;
 
-  void assignMeshVertices(const GvdLayer& gvd,
-                          const GvdParentMap& parents,
-                          const GvdVertexMap& parent_vertices);
+  void fillParentInfo(const GvdLayer& gvd, const GvdParentTracker& parents);
 
   const SceneGraphLayer& getGraph() const;
 
@@ -121,5 +120,4 @@ class GraphExtractorInterface {
   IsolatedSceneGraphLayer::Ptr graph_;
 };
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

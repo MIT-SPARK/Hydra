@@ -138,7 +138,6 @@ pcl::IndicesPtr getActivePlaceIndices(
     const std::map<uint32_t, std::set<NodeId>>& active_places,
     const kimera_pgmo::MeshDelta& delta,
     const DynamicSceneGraph& graph,
-    const OptPosition& pos,
     size_t& num_archived_vertices,
     std::list<NodeId>& empty_nodes) {
   pcl::IndicesPtr active_indices;
@@ -146,20 +145,14 @@ pcl::IndicesPtr getActivePlaceIndices(
   active_indices->reserve(indices->size());
 
   num_archived_vertices = delta.getTotalArchivedVertices();
-  if (!pos) {
-    active_indices = indices;
-    VLOG(5) << "[Places 2d Segmenter] Active mesh indices: " << indices->size()
-            << " (used: " << active_indices->size() << ")";
-    return active_indices;
-  }
 
   VLOG(5) << "[Places 2d Segmenter] n original active indices: " << indices->size();
   std::unordered_set<size_t> frozen_indices;
   for (auto kv : active_places) {
     std::set<NodeId> nodes = kv.second;
-    for (NodeId nid : nodes) {
+    for (auto nid : nodes) {
       auto& attrs = graph.getNode(nid).attributes<Place2dNodeAttributes>();
-      size_t min_index = SIZE_MAX;
+      size_t min_index = std::numeric_limits<size_t>::max();
       size_t max_index = 0;
       auto iter = attrs.pcl_mesh_connections.begin();
       while (iter != attrs.pcl_mesh_connections.end()) {
@@ -172,10 +165,12 @@ pcl::IndicesPtr getActivePlaceIndices(
         if (map_iter != delta.prev_to_curr.end()) {
           *iter = map_iter->second;
         }
+
         min_index = std::min(min_index, *iter);
         max_index = std::max(max_index, *iter);
         ++iter;
       }
+
       attrs.pcl_min_index = min_index;
       attrs.pcl_max_index = max_index;
 
@@ -204,6 +199,7 @@ pcl::IndicesPtr getActivePlaceIndices(
           frozen_indices.insert(mi);
         }
       }
+
       if (!attrs.is_active) {
         if (attrs.pcl_mesh_connections.size() == 0 || attrs.boundary.size() < 3) {
           empty_nodes.push_back(nid);
@@ -219,10 +215,8 @@ pcl::IndicesPtr getActivePlaceIndices(
       active_indices->push_back(idx);
     }
   }
-  VLOG(5) << "[Places 2d Segmenter] n final active indices: " << active_indices->size();
 
-  VLOG(5) << "[Places 2d Segmenter] Active mesh indices: " << indices->size()
-          << " (used: " << active_indices->size() << ")";
+  VLOG(5) << "[Places 2d Segmenter] n final active indices: " << active_indices->size();
   return active_indices;
 }
 
@@ -234,17 +228,14 @@ NodeIdSet Place2dSegmenter::getActiveNodes() const {
   return all_active_nodes;
 }
 
-void Place2dSegmenter::detect(const ReconstructionOutput& msg,
+void Place2dSegmenter::detect(const ReconstructionOutput&,
                               const kimera_pgmo::MeshDelta& mesh_delta,
                               const DynamicSceneGraph& graph) {
-  Eigen::Vector3d pos = msg.world_t_body;
-
   VLOG(5) << "[Places 2d Segmenter] detect called";
   const auto active_indices = getActivePlaceIndices(mesh_delta.getActiveIndices(),
                                                     active_places_,
                                                     mesh_delta,
                                                     graph,
-                                                    pos,
                                                     num_archived_vertices_,
                                                     nodes_to_remove_);
 
@@ -260,10 +251,6 @@ void Place2dSegmenter::detect(const ReconstructionOutput& msg,
   LabelIndices label_indices = getLabelIndices(mesh.labels, *active_indices);
   if (label_indices.empty()) {
     VLOG(5) << "[Places 2d Segmenter] No vertices found matching desired labels";
-    for (const auto& callback_func : callback_funcs_) {
-      callback_func(mesh.points, *active_indices, label_indices);
-    }
-
     detected_label_places_ = label_places;
     return;
   }
@@ -294,10 +281,6 @@ void Place2dSegmenter::detect(const ReconstructionOutput& msg,
     VLOG(5) << "[Places 2d Segmenter]  - Found " << final_places.size()
             << " final places of label " << static_cast<int>(label);
     label_places.insert({label, final_places});
-  }
-
-  for (const auto& callback_func : callback_funcs_) {
-    callback_func(mesh.points, *active_indices, label_indices);
   }
 
   detected_label_places_ = label_places;

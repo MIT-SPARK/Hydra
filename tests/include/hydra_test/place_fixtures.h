@@ -34,8 +34,8 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <gtest/gtest.h>
+#include <hydra/places/gvd_integrator.h>
 #include <hydra/places/voxblox_types.h>
-#include <hydra/reconstruction/combo_integrator.h>
 #include <hydra/reconstruction/volumetric_map.h>
 #include <voxblox/integrator/tsdf_integrator.h>
 #include <voxblox/simulation/simulation_world.h>
@@ -43,6 +43,11 @@
 namespace hydra {
 namespace places {
 namespace test {
+
+void updateGvd(GvdIntegrator& integrator,
+               const VolumetricMap& map,
+               bool clear_updated,
+               bool use_all_blocks = false);
 
 // loosely based on the test fixture in test_sdf_integrators.cc in voxblox
 class EsdfTestFixture : public ::testing::Test {
@@ -126,7 +131,7 @@ class SingleBlockExtractionTestFixture : public SingleBlockTestFixture {
 
   virtual void SetUp() override;
 
-  std::unique_ptr<ComboIntegrator> gvd_integrator;
+  std::unique_ptr<GvdIntegrator> gvd_integrator;
 
  protected:
   virtual void setBlockState();
@@ -152,13 +157,10 @@ class TestFixture2d : public ::testing::Test {
 
   Layer<TsdfVoxel>::Ptr tsdf_layer;
   Layer<GvdVoxel>::Ptr gvd_layer;
-  Layer<VertexVoxel>::Ptr vertex_layer;
-  SemanticMeshLayer::Ptr mesh_layer;
 
   GvdIntegratorConfig gvd_config;
   voxblox::Block<voxblox::TsdfVoxel>::Ptr tsdf_block;
   voxblox::Block<GvdVoxel>::Ptr gvd_block;
-  voxblox::Block<VertexVoxel>::Ptr vertex_block;
 };
 
 }  // namespace test

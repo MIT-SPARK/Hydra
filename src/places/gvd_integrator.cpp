@@ -43,14 +43,13 @@
 // purposes notwithstanding any copyright notation herein.
 #include "hydra/places/gvd_integrator.h"
 
-#include "hydra/places/compression_graph_extractor.h"
-#include "hydra/places/floodfill_graph_extractor.h"
+#include <voxblox/interpolator/interpolator.h>
+
 #include "hydra/places/gvd_utilities.h"
 #include "hydra/reconstruction/voxblox_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 using timing::ScopedTimer;
 using EdgeNeighborhood = Neighborhood<voxblox::Connectivity::kTwentySix>;
@@ -78,33 +77,8 @@ GvdIntegrator::GvdIntegrator(const GvdIntegratorConfig& config,
   open_.setNumBuckets(num_buckets, config_.max_distance_m);
 }
 
-void GvdIntegrator::updateFromMap(uint64_t timestamp_ns,
-                                  const VolumetricMap& map,
-                                  bool use_all_blocks) {
-  const auto& tsdf = map.getTsdfLayer();
-  BlockIndexList blocks;
-  if (use_all_blocks) {
-    tsdf.getAllAllocatedBlocks(&blocks);
-  } else {
-    tsdf.getAllUpdatedBlocks(voxblox::Update::kEsdf, &blocks);
-  }
-
-  VLOG(2) << "[GVD update] Propagating TSDF using " << blocks.size() << " TSDF blocks";
-  ScopedTimer timer("places/propagate_tsdf", timestamp_ns);
-  update_stats_.clear();
-
-  const auto& mesh = map.getMeshLayer();
-  const auto& occupied = *CHECK_NOTNULL(map.getOccupancyLayer());
-  for (const BlockIndex& idx : blocks) {
-    propagateSurface(idx, mesh, occupied);
-    processTsdfBlock(tsdf.getBlockByIndex(idx), idx);
-  }
-}
-
 void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
-                                   Layer<TsdfVoxel>& tsdf,
-                                   const Layer<VertexVoxel>& vertices,
-                                   const SemanticMeshLayer& mesh,
+                                   const TsdfLayer& tsdf,
                                    bool clear_updated_flag,
                                    bool use_all_blocks) {
   BlockIndexList blocks;
@@ -119,7 +93,7 @@ void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
   update_stats_.clear();
 
   for (const BlockIndex& idx : blocks) {
-    propagateSurface(idx, mesh, vertices);
+    propagateSurface(idx, tsdf);
     processTsdfBlock(tsdf.getBlockByIndex(idx), idx);
   }
 
@@ -128,12 +102,13 @@ void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
   }
 
   for (const auto& idx : blocks) {
-    tsdf.getBlockByIndex(idx).updated().reset(voxblox::Update::kEsdf);
+    const_cast<Block<TsdfVoxel>&>(tsdf.getBlockByIndex(idx))
+        .updated()
+        .reset(voxblox::Update::kEsdf);
   }
 }
 
 void GvdIntegrator::updateGvd(uint64_t timestamp_ns) {
-  // TODO(nathan) this depends on marching cubes being called beforehand...
   ScopedTimer timer("places/overall_update", timestamp_ns);
 
   VLOG(2) << "[GVD update] Processing open queue";
@@ -148,8 +123,7 @@ void GvdIntegrator::updateGvd(uint64_t timestamp_ns) {
     VLOG(2) << "[GVD update] Starting graph extraction";
     ScopedTimer timer("places/graph_extractor", timestamp_ns);
     graph_extractor_->extract(*gvd_layer_, timestamp_ns);
-    graph_extractor_->assignMeshVertices(
-        *gvd_layer_, parent_tracker_.parents, parent_tracker_.parent_vertices);
+    graph_extractor_->fillParentInfo(*gvd_layer_, parent_tracker_);
   }
 
   VLOG(2) << "[GVD update]" << std::endl << update_stats_;
@@ -159,8 +133,7 @@ void GvdIntegrator::archiveBlocks(const BlockIndexList& blocks) {
   for (const auto& idx : blocks) {
     Block<GvdVoxel>::Ptr block = gvd_layer_->getBlockPtrByIndex(idx);
     if (!block) {
-      // TMP(lschmid): Disable this warning for khronos.
-      // LOG(WARNING) << "[GVD update] Archiving unknown block " << idx.transpose();
+      VLOG(1) << "[GVD update] Archiving unknown block " << idx.transpose();
       continue;
     }
 
@@ -293,59 +266,38 @@ void GvdIntegrator::updateVoronoiQueue(GvdVoxel& voxel,
 /****************************************************************************************/
 
 void GvdIntegrator::propagateSurface(const BlockIndex& block_index,
-                                     const SemanticMeshLayer& mesh,
-                                     const Layer<VertexVoxel>& vertices) {
-  const auto& vertex_block = vertices.getBlockByIndex(block_index);
+                                     const TsdfLayer& tsdf) {
+  const auto& tsdf_block = tsdf.getBlockByIndex(block_index);
   auto gvd_block = gvd_layer_->allocateBlockPtrByIndex(block_index);
 
-  for (size_t idx = 0u; idx < vertex_block.num_voxels(); ++idx) {
-    const auto& vertex_voxel = vertex_block.getVoxelByLinearIndex(idx);
-    auto& gvd_voxel = gvd_block->getVoxelByLinearIndex(idx);
-
-    // latches surface status from mesh integrator
-    gvd_voxel.on_surface = vertex_voxel.on_surface;
-    if (!gvd_voxel.on_surface) {
+  for (size_t idx = 0u; idx < tsdf_block.num_voxels(); ++idx) {
+    const auto& tsdf_voxel = tsdf_block.getVoxelByLinearIndex(idx);
+    if (tsdf_voxel.weight < config_.min_weight) {
       continue;
     }
 
-    const auto vertex_idx = vertex_voxel.block_vertex_index;
-    BlockIndex mesh_block_index = Eigen::Map<const BlockIndex>(vertex_voxel.mesh_block);
-    const auto mesh_block = mesh.getMeshBlock(mesh_block_index);
-    const auto semantics_block = mesh.getSemanticBlock(mesh_block_index);
-    if (!mesh_block) {
-      LOG_FIRST_N(ERROR, 5) << "bad mesh index: " << showIndex(mesh_block_index)
-                            << " (block: " << showIndex(block_index) << ")";
+    // surface voxels are anything closer to the surface than the voxel size
+    auto& gvd_voxel = gvd_block->getVoxelByLinearIndex(idx);
+    const auto tsdf_dist = std::abs(tsdf_voxel.distance);
+    gvd_voxel.on_surface = tsdf_dist < tsdf.voxel_size();
+    if (!gvd_voxel.on_surface) {
       continue;
     }
 
     resetParent(gvd_voxel);  // surface voxels don't have parents
 
-    if (vertex_idx >= mesh_block->vertices.size()) {
-      gvd_voxel.on_surface = false;
-      // TODO(nathan) check why this happens with khronos active window
-      LOG_FIRST_N(ERROR, 10) << "Bad surface voxel @ "
-                             << "gvd block: " << block_index.transpose()
-                             << " mesh index: " << mesh_block_index.transpose()
-                             << " (index: " << vertex_idx
-                             << " >= mesh_size: " << mesh_block->vertices.size();
-      continue;
+    Eigen::Vector3f pos = tsdf_block.computeCoordinatesFromLinearIndex(idx);
+    if (config_.refine_voxel_pos) {
+      const voxblox::Interpolator<TsdfVoxel> interp(&tsdf);
+      Eigen::Vector3f grad;
+      if (interp.getGradient(pos, &grad)) {
+        pos -= tsdf_dist * grad;
+      }
     }
 
-    const auto& pos = mesh_block->vertices.at(vertex_idx);
     gvd_voxel.parent_pos[0] = pos.x();
     gvd_voxel.parent_pos[1] = pos.y();
     gvd_voxel.parent_pos[2] = pos.z();
-
-    if (semantics_block) {
-      CHECK_LT(vertex_idx, semantics_block->size())
-          << "gvd block: " << block_index.transpose()
-          << " mesh index: " << mesh_block_index.transpose();
-      gvd_voxel.mesh_label = semantics_block->at(vertex_idx);
-    }
-
-    std::memcpy(
-        gvd_voxel.mesh_block, vertex_voxel.mesh_block, sizeof(gvd_voxel.mesh_block));
-    gvd_voxel.block_vertex_index = vertex_idx;
   }
 }
 
@@ -716,5 +668,4 @@ voxblox::Point GvdIntegrator::getPosition(const GlobalIndex& index) const {
   return getVoxelPosition<float>(*gvd_layer_, index);
 }
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

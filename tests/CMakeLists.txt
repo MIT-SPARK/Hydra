@@ -33,12 +33,12 @@ add_executable(
   places/test_esdf_comparison.cpp
   places/test_floodfill_graph_extractor.cpp
   places/test_graph_extractor_utilities.cpp
-  places/test_gvd_incremental.cpp
   places/test_gvd_integrator.cpp
   places/test_gvd_utilities.cpp
   reconstruction/test_marching_cubes.cpp
   reconstruction/test_reconstruction_module.cpp
   reconstruction/test_semantic_integrator.cpp
+  reconstruction/test_tsdf_interpolators.cpp
   reconstruction/test_volumetric_map.cpp
   rooms/test_graph_clustering.cpp
   rooms/test_graph_filtration.cpp

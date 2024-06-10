@@ -145,9 +145,7 @@ void declare_config(VolumetricMap::Config& config) {
   check(config.truncation_distance, GT, 0, "truncation_distance");
 }
 
-VolumetricMap::VolumetricMap(const Config& _config,
-                             bool with_semantics,
-                             bool with_occupancy)
+VolumetricMap::VolumetricMap(const Config& _config, bool with_semantics)
     : config(config::checkValid(_config)),
       tsdf_layer_(config.voxel_size, config.voxels_per_side),
       mesh_layer_(tsdf_layer_.block_size()),
@@ -155,11 +153,6 @@ VolumetricMap::VolumetricMap(const Config& _config,
       voxel_size_inv(tsdf_layer_.voxel_size_inv()) {
   if (with_semantics) {
     semantic_layer_.reset(new SemanticLayer(config.voxel_size, config.voxels_per_side));
-  }
-
-  if (with_occupancy) {
-    occupancy_layer_.reset(
-        new OccupancyLayer(config.voxel_size, config.voxels_per_side));
   }
 }
 
@@ -169,10 +162,6 @@ void VolumetricMap::removeBlock(const voxblox::BlockIndex& block_index) {
   if (semantic_layer_) {
     semantic_layer_->removeBlock(block_index);
   }
-
-  if (occupancy_layer_) {
-    occupancy_layer_->removeBlock(block_index);
-  }
 }
 
 void VolumetricMap::save(const std::string& filepath) const {
@@ -180,7 +169,6 @@ void VolumetricMap::save(const std::string& filepath) const {
   YAML::Node config_node;
   config_node["map"] = config::toYaml(config);
   config_node["has_semantics"] = hasSemantics();
-  config_node["has_occupancy"] = hasOccupancy();
   std::ofstream config_file(filepath + ".yaml");
   config_file << config_node;
 
@@ -216,12 +204,7 @@ std::unique_ptr<VolumetricMap> VolumetricMap::load(const std::string& filepath) 
     use_semantics = true;
   }
 
-  bool use_occupancy;
-  if (node["has_occupancy"] and node["has_occupancy"].as<bool>()) {
-    use_occupancy = true;
-  }
-
-  auto map = std::make_unique<VolumetricMap>(config, use_semantics, use_occupancy);
+  auto map = std::make_unique<VolumetricMap>(config, use_semantics);
   mergeLayer(*tsdf, map->tsdf_layer_, true);
   voxblox::io::LoadLayer<SemanticVoxel>(map_path, true, &map->semantic_layer_);
   return map;
@@ -238,16 +221,10 @@ std::string VolumetricMap::printStats() const {
     ss << ", SEMANTICS: " << getHumanReadableMemoryString(semantic_size);
   }
 
-  size_t occ_size = 0;
-  if (occupancy_layer_) {
-    occ_size = occupancy_layer_->getMemorySize();
-    ss << ", OCCUPANCY: " << getHumanReadableMemoryString(occ_size);
-  }
-
   const auto mesh_size = mesh_layer_.getMemorySize();
   ss << ", MESH: " << getHumanReadableMemoryString(mesh_size);
 
-  const auto total_size = tsdf_size + semantic_size + occ_size + mesh_size;
+  const auto total_size = tsdf_size + semantic_size + mesh_size;
   ss << ", TOTAL: " << getHumanReadableMemoryString(total_size);
 
   return ss.str();
@@ -255,31 +232,24 @@ std::string VolumetricMap::printStats() const {
 
 std::unique_ptr<VolumetricMap> VolumetricMap::fromTsdf(const TsdfLayer& tsdf,
                                                        double truncation_distance_m,
-                                                       bool with_semantics,
-                                                       bool with_occupancy) {
+                                                       bool with_semantics) {
   VolumetricMap::Config config;
   config.voxel_size = tsdf.voxel_size();
   config.voxels_per_side = tsdf.voxels_per_side();
   config.truncation_distance = truncation_distance_m;
-  auto to_return =
-      std::make_unique<VolumetricMap>(config, with_semantics, with_occupancy);
+  auto to_return = std::make_unique<VolumetricMap>(config, with_semantics);
   mergeLayer(tsdf, to_return->getTsdfLayer());
   return to_return;
 }
 
 std::unique_ptr<VolumetricMap> VolumetricMap::clone() const {
   const auto has_semantics = semantic_layer_ != nullptr;
-  const auto has_occupancy = occupancy_layer_ != nullptr;
-  auto map = std::make_unique<VolumetricMap>(config, has_semantics, has_occupancy);
+  auto map = std::make_unique<VolumetricMap>(config, has_semantics);
   mergeLayer(tsdf_layer_, map->tsdf_layer_);
   mesh_layer_.merge(map->mesh_layer_);
 
   if (has_semantics) {
     mergeLayer(*semantic_layer_, *(map->semantic_layer_));
-  }
-
-  if (has_occupancy) {
-    mergeLayer(*occupancy_layer_, *(map->occupancy_layer_));
   }
 
   return map;
@@ -288,18 +258,12 @@ std::unique_ptr<VolumetricMap> VolumetricMap::clone() const {
 void VolumetricMap::updateFrom(const VolumetricMap& other) {
   const auto has_semantics =
       semantic_layer_ != nullptr && other.semantic_layer_ != nullptr;
-  const auto has_occupancy =
-      occupancy_layer_ != nullptr && other.occupancy_layer_ != nullptr;
 
   mergeLayer(other.tsdf_layer_, tsdf_layer_);
   other.mesh_layer_.merge(mesh_layer_);
 
   if (has_semantics) {
     mergeLayer(*other.semantic_layer_, *semantic_layer_);
-  }
-
-  if (has_occupancy) {
-    mergeLayer(*other.occupancy_layer_, *occupancy_layer_);
   }
 }
 

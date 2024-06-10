@@ -79,6 +79,7 @@ if(HYDRA_ENABLE_PYTHON)
 endif()
 
 if(HYDRA_ENABLE_TESTS)
+  enable_testing()
   add_subdirectory(tests)
 endif()
 

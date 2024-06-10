@@ -52,9 +52,6 @@ class Place2dSegmenter : public SurfacePlacesInterface {
   using MeshVertexCloud = Place2d::CloudT;
   using Places = std::vector<Place2d>;
   using LabelPlaces = std::map<uint32_t, Places>;
-  using CallbackFunc = std::function<void(const MeshVertexCloud& cloud,
-                                          const IndicesVector& indices,
-                                          const LabelIndices& label_indices)>;
 
   struct Config {
     char prefix = 'Q';
@@ -80,10 +77,6 @@ class Place2dSegmenter : public SurfacePlacesInterface {
   void updateGraph(uint64_t timestamp_ns,
                    const ReconstructionOutput&,
                    DynamicSceneGraph& graph) override;
-
-  inline void addVisualizationCallback(const CallbackFunc& func) {
-    callback_funcs_.push_back(func);
-  }
 
  private:
   bool frontendAddPlaceConnection(const Place2dNodeAttributes& attrs1,
@@ -121,7 +114,6 @@ class Place2dSegmenter : public SurfacePlacesInterface {
   std::map<uint32_t, std::set<NodeId>> active_places_;
   std::map<uint32_t, std::set<NodeId>> semiactive_places_;
   std::map<NodeId, uint64_t> active_place_timestamps_;
-  std::vector<CallbackFunc> callback_funcs_;
 
   inline static const auto registration_ =
       config::RegistrationWithConfig<SurfacePlacesInterface, Place2dSegmenter, Config>(

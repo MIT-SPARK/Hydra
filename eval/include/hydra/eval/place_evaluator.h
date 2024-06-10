@@ -36,8 +36,8 @@
 #include <optional>
 
 #include "hydra/common/dsg_types.h"
+#include "hydra/places/gvd_integrator_config.h"
 #include "hydra/eval/place_metrics.h"
-#include "hydra/reconstruction/combo_integrator.h"
 
 namespace hydra::eval {
 
@@ -61,7 +61,6 @@ class PlaceEvaluator {
   places::GvdIntegratorConfig config_;
   voxblox::Layer<voxblox::TsdfVoxel>::Ptr tsdf_;
   voxblox::Layer<places::GvdVoxel>::Ptr gvd_;
-  SemanticMeshLayer::Ptr mesh_;
 };
 
 }  // namespace hydra::eval

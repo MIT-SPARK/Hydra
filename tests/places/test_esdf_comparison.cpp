@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/places/gvd_integrator.h>
-#include <hydra/reconstruction/combo_integrator.h>
 #include <voxblox/integrator/esdf_integrator.h>
 #include <voxblox/utils/evaluation_utils.h>
 
@@ -75,7 +74,7 @@ TEST_F(EsdfTestFixture, DISABLED_TestEsdfSame) {
   map_config.voxel_size = voxel_size;
   map_config.voxels_per_side = voxels_per_side;
   map_config.truncation_distance = tsdf_config.default_truncation_distance;
-  VolumetricMap map(map_config, false, true);
+  VolumetricMap map(map_config, false);
 
   FastTsdfIntegrator tsdf_integrator(tsdf_config, &map.getTsdfLayer());
 
@@ -88,17 +87,15 @@ TEST_F(EsdfTestFixture, DISABLED_TestEsdfSame) {
   Layer<EsdfVoxel> original_layer(voxel_size, voxels_per_side);
   EsdfIntegrator original_integrator(esdf_config, &map.getTsdfLayer(), &original_layer);
 
-  MeshIntegratorConfig mesh_config;
-  mesh_config.integrator_threads = 1;
   GvdIntegratorConfig gvd_config = gvdConfigFromEsdfConfig(esdf_config);
   Layer<GvdVoxel>::Ptr gvd_layer(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
-  ComboIntegrator gvd_integrator(gvd_config, gvd_layer, &mesh_config);
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer, nullptr);
 
   for (size_t i = 0; i < num_poses; ++i) {
     updateTsdfIntegrator(tsdf_integrator, i);
 
     // we need to keep the updated flags for the second integrator
-    gvd_integrator.update(0, map, false);
+    test::updateGvd(gvd_integrator, map, false);
     original_integrator.updateFromTsdfLayer(true);
 
     LayerComparisonResult result =
