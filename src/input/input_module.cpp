@@ -116,7 +116,7 @@ void InputModule::dataSpin() {
         continue;
       }
 
-      ReconstructionInput::Ptr input(new ReconstructionInput());
+      InputPacket::Ptr input(new InputPacket());
       input->timestamp_ns = curr_time;
       input->sensor_input = packet;
       input->world_t_body = odom_T_body.target_p_source;

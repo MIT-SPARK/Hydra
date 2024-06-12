@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/reconstruction/reconstruction_input.h>
+#include <hydra/input/input_packet.h>
 #include <hydra/reconstruction/reconstruction_output.h>
 #include <hydra/utils/pose_graph_tracker.h>
 
@@ -46,7 +46,7 @@ TEST(PoseGraphTracker, EmptyGraphsCorrect) {
   config.make_pose_graph = false;
   PoseGraphTracker tracker(config);
 
-  ReconstructionInput msg;
+  InputPacket msg;
   ReconstructionOutput result;
 
   // no input pose graphs -> no output pose graphs

@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/reconstruction/frame_data.h"
+#include "hydra/input/input_data.h"
 
 namespace hydra {
 
@@ -44,7 +44,7 @@ struct SensorInputPacket {
 
   virtual ~SensorInputPacket() = default;
 
-  virtual bool fillFrameData(FrameData& msg) const = 0;
+  virtual bool fillInputData(InputData& msg) const = 0;
 
  public:
   const uint64_t timestamp_ns;
@@ -55,7 +55,7 @@ struct SensorInputPacket {
 struct ImageInputPacket : public SensorInputPacket {
   explicit ImageInputPacket(uint64_t stamp, size_t sensor_id);
 
-  bool fillFrameData(FrameData& msg) const override;
+  bool fillInputData(InputData& msg) const override;
 
   cv::Mat color;
   cv::Mat depth;
@@ -65,7 +65,7 @@ struct ImageInputPacket : public SensorInputPacket {
 struct CloudInputPacket : public SensorInputPacket {
   explicit CloudInputPacket(uint64_t stamp, size_t sensor_id);
 
-  bool fillFrameData(FrameData& msg) const override;
+  bool fillInputData(InputData& msg) const override;
 
   bool in_world_frame = false;
   cv::Mat points;

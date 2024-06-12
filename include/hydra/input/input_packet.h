@@ -33,57 +33,34 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <Eigen/Geometry>
-#include <cstdint>
-#include <limits>
-#include <opencv2/core/mat.hpp>
+#include <pose_graph_tools_msgs/PoseGraph.h>
 
-#include "hydra/input/sensor.h"
+#include <Eigen/Geometry>
+#include <list>
+
+#include "hydra/input/sensor_input_packet.h"
 
 namespace hydra {
 
-struct FrameData {
+class InputData;
+
+struct InputPacket {
+  using Ptr = std::shared_ptr<InputPacket>;
+
   uint64_t timestamp_ns;
-  Eigen::Isometry3d world_T_body;
 
-  cv::Mat color_image;
-  bool color_is_bgr = false;
-  cv::Mat depth_image;
-  cv::Mat label_image;
-  cv::Mat range_image;
-  cv::Mat vertex_map;
-  bool points_in_world_frame = false;
-  float min_range = 0.0f;
-  float max_range = std::numeric_limits<float>::infinity();
+  SensorInputPacket::Ptr sensor_input;
+  std::list<pose_graph_tools_msgs::PoseGraph::ConstPtr> pose_graphs;
+  pose_graph_tools_msgs::PoseGraph::ConstPtr agent_node_measurements;
+  Eigen::Vector3d world_t_body;
+  Eigen::Quaterniond world_R_body;
 
- public:
-  virtual ~FrameData() = default;
-
-  /**
-   * @brief check that we have enough data to round out the rest of the information
-   */
-  virtual bool hasData() const;
-
-  /**
-   * @brief make sure that all the images are of the right type
-   */
-  virtual bool normalizeData(bool normalize_labels = true);
-
-  virtual bool normalizeDepth();
+  virtual bool fillInputData(InputData& data) const;
 
   template <typename T = double>
-  Eigen::Transform<T, 3, Eigen::Isometry> getSensorPose(const Sensor& sensor) const {
-    return world_T_body.cast<T>() * sensor.body_T_sensor<T>();
+  Eigen::Transform<T, 3, Eigen::Isometry> world_T_body() const {
+    return Eigen::Translation<T, 3>(world_t_body.cast<T>()) * world_R_body.cast<T>();
   }
-
- protected:
-  bool colorToLabels(const cv::Mat& colors);
-
-  bool convertLabels();
-
-  bool convertDepth();
-
-  bool convertColor();
 };
 
 }  // namespace hydra

@@ -243,22 +243,18 @@ const VolumetricMap::Config& GlobalInfo::getMapConfig() const {
 }
 
 const ColorArray& GlobalInfo::getRoomColor(size_t index) const {
-  checkFrozen();
   return config_.room_colors.at(index % config_.room_colors.size());
 }
 
 const std::map<uint32_t, std::string>& GlobalInfo::getLabelToNameMap() const {
-  checkFrozen();
   return config_.label_names;
 }
 
 const LabelSpaceConfig& GlobalInfo::getLabelSpaceConfig() const {
-  checkFrozen();
   return config_.label_space;
 }
 
 size_t GlobalInfo::getTotalLabels() const {
-  checkFrozen();
   return config_.label_space.total_labels;
 }
 

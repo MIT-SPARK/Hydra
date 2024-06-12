@@ -40,7 +40,7 @@
 #include "hydra/input/data_receiver.h"
 #include "hydra/common/input_queue.h"
 #include "hydra/common/module.h"
-#include "hydra/reconstruction/reconstruction_input.h"
+#include "hydra/input/input_packet.h"
 
 namespace hydra {
 
@@ -53,7 +53,7 @@ struct PoseStatus {
 
 class InputModule : public Module {
  public:
-  using OutputQueue = InputQueue<ReconstructionInput::Ptr>;
+  using OutputQueue = InputQueue<InputPacket::Ptr>;
   struct Config {
     std::vector<config::VirtualConfig<DataReceiver>> receivers;
   } const config;

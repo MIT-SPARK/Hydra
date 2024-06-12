@@ -156,7 +156,7 @@ void PythonReconstruction::stop() {
 
 PythonReconstruction::~PythonReconstruction() { stop(); }
 
-bool PythonReconstruction::step(const ReconstructionInput& input) {
+bool PythonReconstruction::step(const InputPacket& input) {
   return module_->spinOnce(input);
 }
 
@@ -204,7 +204,7 @@ void addBindings(pybind11::module_& m) {
               const py::buffer& depth,
               const py::buffer& labels,
               const py::buffer& rgb) {
-             auto input = std::make_shared<ReconstructionInput>();
+             auto input = std::make_shared<InputPacket>();
              input->timestamp_ns = timestamp_ns;
              input->world_t_body = world_t_body;
              input->world_R_body = Eigen::Quaterniond(
@@ -221,7 +221,7 @@ void addBindings(pybind11::module_& m) {
               const PythonSensorInput::PointVec& points,
               const PythonSensorInput::LabelVec& labels,
               const PythonSensorInput::ColorVec& colors) {
-             auto input = std::make_shared<ReconstructionInput>();
+             auto input = std::make_shared<InputPacket>();
              input->timestamp_ns = timestamp_ns;
              input->world_t_body = world_t_body;
              input->world_R_body = Eigen::Quaterniond(

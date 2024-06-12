@@ -115,7 +115,7 @@ PythonSensorInput::PythonSensorInput(uint64_t timestamp_ns,
   }
 }
 
-bool PythonSensorInput::fillFrameData(FrameData& msg) const {
+bool PythonSensorInput::fillInputData(InputData& msg) const {
   if ((depth.empty() && points.empty()) || (color.empty() && labels.empty())) {
     LOG(ERROR) << "Missing required data";
     return false;

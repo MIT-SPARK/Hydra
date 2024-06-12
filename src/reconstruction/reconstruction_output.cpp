@@ -89,7 +89,7 @@ std::shared_ptr<VolumetricMap> ReconstructionOutput::getMapPointer() const {
   return map_;
 }
 
-OutputPtr ReconstructionOutput::fromInput(const ReconstructionInput& msg) {
+OutputPtr ReconstructionOutput::fromInput(const InputPacket& msg) {
   auto new_msg = std::make_shared<ReconstructionOutput>();
   new_msg->timestamp_ns = msg.timestamp_ns;
   new_msg->world_t_body = msg.world_t_body;

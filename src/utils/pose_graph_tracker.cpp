@@ -40,7 +40,7 @@
 #include <tf2_eigen/tf2_eigen.h>
 
 #include "hydra/common/global_info.h"
-#include "hydra/reconstruction/reconstruction_input.h"
+#include "hydra/input/input_packet.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 
 namespace hydra {
@@ -95,7 +95,7 @@ PoseGraph::Ptr makePoseGraph(const StampedPose& curr_pose,
 PoseGraphTracker::PoseGraphTracker(const PoseGraphTracker::Config& config)
     : config_(config::checkValid(config)), num_poses_received_(0) {}
 
-void PoseGraphTracker::update(const ReconstructionInput& msg) {
+void PoseGraphTracker::update(const InputPacket& msg) {
   const Eigen::Isometry3d curr_pose(Eigen::Translation3d(msg.world_t_body) *
                                     msg.world_R_body);
 

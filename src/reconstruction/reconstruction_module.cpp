@@ -44,6 +44,7 @@
 #include "hydra/common/global_info.h"
 #include "hydra/reconstruction/mesh_integrator.h"
 #include "hydra/reconstruction/projective_integrator.h"
+#include "hydra/utils/conversion_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -78,7 +79,7 @@ ReconstructionModule::ReconstructionModule(const Config& config,
       pose_graph_tracker_(new PoseGraphTracker(config.pose_graphs)),
       output_queue_(queue),
       sinks_(Sink::instantiate(config.sinks)) {
-  queue_.reset(new ReconstructionInputQueue());
+  queue_.reset(new InputPacketQueue());
   queue_->max_size = config.max_input_queue_size;
 
   map_.reset(new VolumetricMap(GlobalInfo::instance().getMapConfig(), true));
@@ -144,7 +145,7 @@ bool ReconstructionModule::spinOnce() {
   return success;
 }
 
-bool ReconstructionModule::spinOnce(const ReconstructionInput& msg) {
+bool ReconstructionModule::spinOnce(const InputPacket& msg) {
   if (!msg.sensor_input) {
     LOG(ERROR) << "[Hydra Reconstruction] received invalid sensor data in input!";
     return false;
@@ -198,17 +199,17 @@ void ReconstructionModule::fillOutput(ReconstructionOutput& msg) {
   map_->removeBlocks(indices);
 }
 
-bool ReconstructionModule::update(const ReconstructionInput& msg, bool full_update) {
+bool ReconstructionModule::update(const InputPacket& msg, bool full_update) {
   VLOG(2) << "[Hydra Reconstruction] starting " << ((full_update) ? "full" : "partial")
           << " update @ " << msg.timestamp_ns << " [ns]";
 
-  auto data = std::make_shared<FrameData>();
-  if (!msg.fillFrameData(*data)) {
+  auto data = std::make_shared<InputData>();
+  if (!msg.fillInputData(*data)) {
     LOG(ERROR) << "[Hydra Reconstruction] unable to construct valid input packet!";
     return false;
   }
 
-  if (!data->normalizeData()) {
+  if (!conversions::normalizeData(*data)) {
     LOG(ERROR) << "[Hydra Reconstruction] unable to convert all data";
     return false;
   }

@@ -54,7 +54,7 @@
 
 namespace hydra {
 
-struct FrameData;
+struct InputData;
 
 struct SensorExtrinsics {
   SensorExtrinsics();
@@ -169,7 +169,7 @@ class Sensor {
    * @param force_world_frame Always convert point cloud to be in the world frame, not the sensor frame
    * @return True if the sensor was able to provide all necessary information
    */
-  virtual bool finalizeRepresentations(FrameData& input,
+  virtual bool finalizeRepresentations(InputData& input,
                                        bool force_world_frame = false) const = 0;
 
   /**

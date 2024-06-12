@@ -72,7 +72,7 @@ ProjectiveIntegrator::ProjectiveIntegrator(const ProjectiveIntegratorConfig& con
       semantic_integrator_(config_.semantic_integrator.create()) {}
 
 void ProjectiveIntegrator::updateMap(const Sensor& sensor,
-                                     const FrameData& data,
+                                     const InputData& data,
                                      VolumetricMap& map,
                                      bool allocate_blocks) const {
   BlockIndexList block_indices;
@@ -134,7 +134,7 @@ void ProjectiveIntegrator::updateMap(const Sensor& sensor,
 void ProjectiveIntegrator::updateBlocks(const BlockUpdateFunction& update_function,
                                         const Sensor& sensor,
                                         const BlockIndexList& block_indices,
-                                        const FrameData& data,
+                                        const InputData& data,
                                         VolumetricMap& map) const {
   // Update all blocks in parallel.
   std::vector<BlockIndex> block_idx_vector(block_indices.begin(), block_indices.end());
@@ -158,7 +158,7 @@ void ProjectiveIntegrator::updateBlocks(const BlockUpdateFunction& update_functi
 
 void ProjectiveIntegrator::updateMapBlock(const Sensor& sensor,
                                           const BlockIndex& block_index,
-                                          const FrameData& data,
+                                          const InputData& data,
                                           VolumetricMap& map) const {
   // Get and allocate block if necessary.
   const auto tsdf_block = map.getTsdfLayer().getBlockPtrByIndex(block_index);
@@ -204,7 +204,7 @@ void ProjectiveIntegrator::updateMapBlock(const Sensor& sensor,
 
 VoxelMeasurement ProjectiveIntegrator::getVoxelUpdate(const Sensor& sensor,
                                                       const Point& p_C,
-                                                      const FrameData& data,
+                                                      const InputData& data,
                                                       const float truncation_distance,
                                                       const float voxel_size) const {
   VoxelMeasurement measurement;
@@ -246,7 +246,7 @@ VoxelMeasurement ProjectiveIntegrator::getVoxelUpdate(const Sensor& sensor,
   return measurement;
 }
 
-void ProjectiveIntegrator::updateVoxel(const FrameData& data,
+void ProjectiveIntegrator::updateVoxel(const InputData& data,
                                        const VoxelMeasurement& measurement,
                                        const float truncation_distance,
                                        TsdfVoxel& voxel,
@@ -294,7 +294,7 @@ void ProjectiveIntegrator::updateVoxel(const FrameData& data,
 
 bool ProjectiveIntegrator::interpolatePoint(const Sensor& sensor,
                                             const Point& p_C,
-                                            const FrameData& data,
+                                            const InputData& data,
                                             InterpolationWeights& weights) const {
   // Project the current voxel into the range image, only count points that fall
   // fully into the image so the
@@ -308,7 +308,7 @@ bool ProjectiveIntegrator::interpolatePoint(const Sensor& sensor,
   return weights.valid;
 }
 
-float ProjectiveIntegrator::computeSDF(const FrameData& data,
+float ProjectiveIntegrator::computeSDF(const InputData& data,
                                        const InterpolationWeights& weights,
                                        const float truncation_distance,
                                        const float distance_to_voxel) const {

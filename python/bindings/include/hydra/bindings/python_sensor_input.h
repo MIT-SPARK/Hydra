@@ -59,7 +59,7 @@ struct PythonSensorInput : public SensorInputPacket {
                     const ColorVec& colors,
                     size_t sensor_index = 0);
 
-  bool fillFrameData(FrameData& msg) const override;
+  bool fillInputData(InputData& msg) const override;
 
   bool valid() const;
 

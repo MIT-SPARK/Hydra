@@ -66,7 +66,7 @@ class HydraPythonPipeline : public HydraPipeline {
 
   void save() override;
 
-  bool spinOnce(const ReconstructionInput& input);
+  bool spinOnce(const InputPacket& input);
 
   DynamicSceneGraph::Ptr getSceneGraph() const;
 

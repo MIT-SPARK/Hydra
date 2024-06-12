@@ -193,7 +193,7 @@ TEST(Camera, VertexMapAndRangeCorrect) {
 TEST(Camera, FinalizeRepresentationsCorrect) {
   const auto camera = createCamera(90.0, 90.0, {1.0, 5.0}, {2, 1});
 
-  FrameData msg;
+  InputData msg;
   // depth required for range and pointcloud computation
   EXPECT_FALSE(camera->finalizeRepresentations(msg));
 

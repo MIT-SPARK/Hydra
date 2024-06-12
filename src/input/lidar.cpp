@@ -117,7 +117,7 @@ float Lidar::computeRayDensity(float voxel_size, float depth) const {
   return virtual_fx * virtual_fy * voxel_density * voxel_density;
 }
 
-bool Lidar::finalizeRepresentations(FrameData& input, bool force_world_frame) const {
+bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) const {
   if (input.vertex_map.empty()) {
     LOG(ERROR) << "pointcloud required to finalize data!";
     return false;

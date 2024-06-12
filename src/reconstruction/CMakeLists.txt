@@ -1,7 +1,6 @@
 target_sources(
   ${PROJECT_NAME}
-  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/frame_data.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/marching_cubes.cpp
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/marching_cubes.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/mesh_integrator.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/mesh_integrator_config.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/projection_interpolators.cpp

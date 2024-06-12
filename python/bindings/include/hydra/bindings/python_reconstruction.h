@@ -42,7 +42,7 @@ class module_;
 namespace hydra {
 
 class ReconstructionModule;
-struct ReconstructionInput;
+struct InputPacket;
 struct PipelineConfig;
 
 namespace python {
@@ -56,7 +56,7 @@ class PythonReconstruction {
 
   virtual ~PythonReconstruction();
 
-  bool step(const ReconstructionInput& input);
+  bool step(const InputPacket& input);
 
   void save();
 

@@ -38,7 +38,7 @@
 
 #include <vector>
 
-#include "hydra/reconstruction/reconstruction_input.h"
+#include "hydra/input/input_data.h"
 #include "hydra/input/sensor.h"
 
 namespace hydra {
@@ -78,7 +78,7 @@ class Lidar : public Sensor {
   /**
    * @brief Compute range image from pointcloud
    */
-  bool finalizeRepresentations(FrameData& input,
+  bool finalizeRepresentations(InputData& input,
                                bool force_world_frame = false) const override;
 
   bool projectPointToImagePlane(const Eigen::Vector3f& p_C,

@@ -45,7 +45,7 @@
 #include "hydra/places/robot_footprint_integrator.h"
 #include "hydra/reconstruction/mesh_integrator_config.h"
 #include "hydra/reconstruction/projective_integrator_config.h"
-#include "hydra/reconstruction/reconstruction_input.h"
+#include "hydra/input/input_packet.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/input/sensor.h"
 #include "hydra/reconstruction/volumetric_map.h"
@@ -61,7 +61,7 @@ class ReconstructionModule : public Module {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   using Ptr = std::shared_ptr<ReconstructionModule>;
-  using ReconstructionInputQueue = InputQueue<ReconstructionInput::Ptr>;
+  using InputPacketQueue = InputQueue<InputPacket::Ptr>;
   using OutputQueue = InputQueue<ReconstructionOutput::Ptr>;
   using OutputMsgStatus = std::pair<ReconstructionOutput::Ptr, bool>;
   using Sink = OutputSink<uint64_t,
@@ -101,16 +101,16 @@ class ReconstructionModule : public Module {
   bool spinOnce();
 
   // public for external use
-  bool spinOnce(const ReconstructionInput& input);
+  bool spinOnce(const InputPacket& input);
 
   void addSink(const Sink::Ptr& sink);
 
   const VolumetricMap* getMap() const { return map_.get(); }
 
-  ReconstructionInputQueue::Ptr queue() const { return queue_; }
+  InputPacketQueue::Ptr queue() const { return queue_; }
 
  protected:
-  bool update(const ReconstructionInput& msg, bool full_update);
+  bool update(const InputPacket& msg, bool full_update);
 
   voxblox::BlockIndexList findBlocksToArchive(const Eigen::Vector3f& center) const;
 
@@ -118,7 +118,7 @@ class ReconstructionModule : public Module {
 
  protected:
   std::atomic<bool> should_shutdown_{false};
-  ReconstructionInputQueue::Ptr queue_;
+  InputPacketQueue::Ptr queue_;
   std::unique_ptr<std::thread> spin_thread_;
   size_t num_poses_received_;
   std::set<uint64_t> timestamp_cache_;

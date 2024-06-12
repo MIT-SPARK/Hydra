@@ -41,13 +41,14 @@ namespace hydra {
 ImageInputPacket::ImageInputPacket(uint64_t stamp, size_t sensor_id)
     : SensorInputPacket(stamp, sensor_id) {}
 
-bool ImageInputPacket::fillFrameData(FrameData& msg) const {
+bool ImageInputPacket::fillInputData(InputData& msg) const {
   if (depth.empty() || (color.empty() && labels.empty())) {
     LOG(ERROR) << "Missing required images!!!!";
     return false;
   }
 
   msg.timestamp_ns = timestamp_ns;
+  msg.sensor_id = sensor_id;
   msg.color_image = color;
   msg.depth_image = depth;
   msg.label_image = labels;
@@ -57,13 +58,14 @@ bool ImageInputPacket::fillFrameData(FrameData& msg) const {
 CloudInputPacket::CloudInputPacket(uint64_t stamp, size_t sensor_id)
     : SensorInputPacket(stamp, sensor_id) {}
 
-bool CloudInputPacket::fillFrameData(FrameData& msg) const {
+bool CloudInputPacket::fillInputData(InputData& msg) const {
   if (points.empty() || (labels.empty() && colors.empty())) {
     LOG(ERROR) << "Missing required pointcloud!!!!";
     return false;
   }
 
   msg.timestamp_ns = timestamp_ns;
+  msg.sensor_id = sensor_id;
   msg.vertex_map = points;
   msg.points_in_world_frame = in_world_frame;
   msg.color_image = colors;

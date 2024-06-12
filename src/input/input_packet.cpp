@@ -32,47 +32,20 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <pose_graph_tools_msgs/PoseGraph.h>
+#include "hydra/input/input_packet.h"
 
-#include <Eigen/Geometry>
-#include <cstdint>
-#include <list>
-#include <memory>
-
-#include "hydra/input/sensor_input_packet.h"
+#include "hydra/input/input_data.h"
 
 namespace hydra {
 
-struct ReconstructionInput {
-  using Ptr = std::shared_ptr<ReconstructionInput>;
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  uint64_t timestamp_ns;
-  std::list<pose_graph_tools_msgs::PoseGraph::ConstPtr> pose_graphs;
-  pose_graph_tools_msgs::PoseGraph::ConstPtr agent_node_measurements;
-  Eigen::Vector3d world_t_body;
-  Eigen::Quaterniond world_R_body;
-  SensorInputPacket::Ptr sensor_input;
-
- public:
-  ReconstructionInput() = default;
-
-  virtual ~ReconstructionInput() = default;
-
-  bool fillFrameData(FrameData& data) const {
-    if (!sensor_input) {
-      return false;
-    }
-
-    data.timestamp_ns = timestamp_ns;
-    data.world_T_body = world_T_body();
-    return sensor_input->fillFrameData(data);
+bool InputPacket::fillInputData(InputData& data) const {
+  if (!sensor_input) {
+    return false;
   }
 
-  template <typename T = double>
-  Eigen::Transform<T, 3, Eigen::Isometry> world_T_body() const {
-    return Eigen::Translation<T, 3>(world_t_body.cast<T>()) * world_R_body.cast<T>();
-  }
-};
+  data.timestamp_ns = timestamp_ns;
+  data.world_T_body = world_T_body();
+  return sensor_input->fillInputData(data);
+}
 
 }  // namespace hydra

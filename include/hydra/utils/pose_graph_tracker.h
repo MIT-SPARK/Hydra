@@ -40,7 +40,7 @@
 
 namespace hydra {
 
-struct ReconstructionInput;
+struct InputPacket;
 struct ReconstructionOutput;
 
 class PoseGraphTracker {
@@ -56,7 +56,7 @@ class PoseGraphTracker {
 
   ~PoseGraphTracker() = default;
 
-  void update(const ReconstructionInput& msg);
+  void update(const InputPacket& msg);
 
   void fillPoseGraphs(ReconstructionOutput& output);
 

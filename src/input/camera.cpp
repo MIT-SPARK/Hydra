@@ -103,7 +103,7 @@ float Camera::computeRayDensity(float voxel_size, float depth) const {
   return config_.fx * config_.fy * std::pow(voxel_size / depth, 2.f);
 }
 
-bool Camera::finalizeRepresentations(FrameData& input, bool force_world_frame) const {
+bool Camera::finalizeRepresentations(InputData& input, bool force_world_frame) const {
   if (!input.vertex_map.empty()) {
     input.range_image = computeRangeImageFromPoints(
         input.vertex_map, &input.min_range, &input.max_range);

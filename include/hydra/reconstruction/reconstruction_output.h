@@ -37,7 +37,7 @@
 #include <cstdint>
 #include <memory>
 
-#include "hydra/reconstruction/reconstruction_input.h"
+#include "hydra/input/input_packet.h"
 #include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
@@ -50,7 +50,7 @@ struct ReconstructionOutput {
   uint64_t timestamp_ns;
   Eigen::Vector3d world_t_body;
   Eigen::Quaterniond world_R_body;
-  std::shared_ptr<FrameData> sensor_data;
+  std::shared_ptr<InputData> sensor_data;
 
   const VolumetricMap& map() const;
   voxblox::BlockIndexList archived_blocks;
@@ -68,7 +68,7 @@ struct ReconstructionOutput {
 
   virtual void updateFrom(const ReconstructionOutput& msg, bool clone_map);
 
-  static Ptr fromInput(const ReconstructionInput& input);
+  static Ptr fromInput(const InputPacket& input);
 
  protected:
   std::shared_ptr<VolumetricMap> map_;
