@@ -460,16 +460,37 @@ void FrontendModule::updatePlaces(const ReconstructionOutput& input) {
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
     freespace_places_->updateGraph(input.timestamp_ns, *dsg_->graph);
 
+    // TODO(nathan) fold this into updateGraph and return archived instead
+    // find node ids that are valid, but outside active place window
     active_nodes = freespace_places_->getActiveNodes();
+    for (const auto& prev : previous_active_places_) {
+      if (active_nodes.count(prev)) {
+        continue;
+      }
+
+      const auto has_prev_node = dsg_->graph->findNode(prev);
+      if (!has_prev_node) {
+        continue;
+      }
+
+      const auto& prev_node = *has_prev_node;
+      prev_node.attributes().is_active = false;
+      if (lcd_input_) {
+        lcd_input_->archived_places.insert(prev);
+      }
+
+      if (frontier_places_) {
+        frontier_places_->archived_places_.push_back(prev);
+      }
+    }
+    previous_active_places_ = active_nodes;
+
     const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
     places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
     addPlaceAgentEdges(input.timestamp_ns);
     addPlaceObjectEdges(input.timestamp_ns);
     state_->latest_places = active_nodes;
   }  // end graph update critical section
-
-  archivePlaces(active_nodes);
-  previous_active_places_ = active_nodes;
 }
 
 void FrontendModule::updatePlaces2d(const ReconstructionOutput& input) {
@@ -487,11 +508,8 @@ void FrontendModule::updatePlaces2d(const ReconstructionOutput& input) {
   {  // start graph critical section
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
     surface_places_->updateGraph(input.timestamp_ns, input, *dsg_->graph);
-
-    active_nodes = surface_places_->getActiveNodes();
-    const auto& places = dsg_->graph->getLayer(DsgLayers::MESH_PLACES);
-    places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
-    state_->latest_places = active_nodes;
+    // TODO(nathan) unify places so that active places get populated correctly
+    // depending on run configuration
   }  // end graph update critical section
 
   archivePlaces2d(active_nodes);
@@ -638,35 +656,6 @@ void FrontendModule::invalidateMeshEdges(const kimera_pgmo::MeshDelta& delta) {
   }
 }
 
-void FrontendModule::archivePlaces(const NodeIdSet active_places) {
-  {  // start graph update critical section
-    std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-
-    // find node ids that are valid, but outside active place window
-    for (const auto& prev : previous_active_places_) {
-      if (active_places.count(prev)) {
-        continue;
-      }
-
-      const auto has_prev_node = dsg_->graph->findNode(prev);
-      if (!has_prev_node) {
-        continue;
-      }
-
-      const auto& prev_node = *has_prev_node;
-      prev_node.attributes().is_active = false;
-      if (lcd_input_) {
-        lcd_input_->archived_places.insert(prev);
-      }
-
-      if (frontier_places_) {
-        frontier_places_->archived_places_.push_back(prev);
-      }
-    }
-
-  }  // end graph update critical section
-}
-
 void FrontendModule::archivePlaces2d(const NodeIdSet active_places) {
   {  // start graph update critical section
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
@@ -694,22 +683,16 @@ void FrontendModule::addPlaceObjectEdges(uint64_t timestamp_ns) {
     return;  // haven't received places yet
   }
 
+  // TODO(nathan) fix active window behavior for objects and places
   for (const auto& object_id : segmenter_->getActiveNodes()) {
-    const auto object_opt = dsg_->graph->findNode(object_id);
-    if (!object_opt) {
+    const auto node = dsg_->graph->findNode(object_id);
+    if (!node) {
       continue;
     }
 
-    const auto& object_node = *object_opt;
-    const auto parent_opt = object_node.getParent();
-    if (parent_opt) {
-      dsg_->graph->removeEdge(object_id, *parent_opt);
-    }
-
-    const Eigen::Vector3d object_position = dsg_->graph->getPosition(object_id);
     places_nn_finder_->find(
-        object_position, 1, false, [&](NodeId place_id, size_t, double) {
-          dsg_->graph->insertEdge(place_id, object_id);
+        node->attributes().position, 1, false, [&](NodeId place_id, size_t, double) {
+          dsg_->graph->insertParentEdge(place_id, object_id);
         });
   }
 }
@@ -737,30 +720,21 @@ void FrontendModule::addPlaceAgentEdges(uint64_t timestamp_ns) {
     auto iter = curr_active.begin();
     while (iter != curr_active.end()) {
       const auto& node = layer.getNodeByIndex(*iter);
-      const auto prev_parent = node.getParent();
-      if (prev_parent) {
-        dsg_->graph->removeEdge(node.id, *prev_parent);
+
+      const auto parent = node.getParent();
+      if (parent) {
+        const auto& parent_attrs = dsg_->graph->getNode(*parent).attributes();
+        if (!parent_attrs.is_active) {
+          iter = curr_active.erase(iter);
+          continue;
+        }
       }
 
-      bool found = false;
-      NodeId parent = 0;
       places_nn_finder_->find(
           node.attributes().position, 1, false, [&](NodeId place_id, size_t, double) {
-            CHECK(dsg_->graph->insertEdge(place_id, prefix.makeId(*iter)));
-            found = true;
-            parent = place_id;
+            const auto agent_id = prefix.makeId(*iter);
+            dsg_->graph->insertParentEdge(place_id, agent_id);
           });
-
-      if (!found) {
-        ++iter;
-        continue;
-      }
-
-      const auto& parent_attrs = dsg_->graph->getNode(parent).attributes();
-      if (!parent_attrs.is_active) {
-        iter = curr_active.erase(iter);
-        continue;
-      }
 
       ++iter;
     }
@@ -791,9 +765,9 @@ void FrontendModule::updatePlaceMeshMapping(const ReconstructionOutput& input) {
       continue;
     }
 
-    //for (const auto& vertex : attrs.voxblox_mesh_connections) {
-      //const Eigen::Vector3d pos = Eigen::Map<const Eigen::Vector3d>(vertex.voxel_pos);
-      // TODO(nathan) find nearest deformation graph point and assign
+    // for (const auto& vertex : attrs.voxblox_mesh_connections) {
+    // const Eigen::Vector3d pos = Eigen::Map<const Eigen::Vector3d>(vertex.voxel_pos);
+    // TODO(nathan) find nearest deformation graph point and assign
     //}
     // TODO(nathan) assign mesh vertices and labels based on deformation points
   }

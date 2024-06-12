@@ -352,7 +352,7 @@ void RoomFinder::addRoomPlaceEdges(DynamicSceneGraph& graph) const {
       continue;
     }
 
-    graph.insertEdge(room->second, id_node_pair.first);
+    graph.insertParentEdge(room->second, id_node_pair.first);
   }
 }
 

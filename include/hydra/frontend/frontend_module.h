@@ -135,8 +135,6 @@ class FrontendModule : public Module {
 
   void invalidateMeshEdges(const kimera_pgmo::MeshDelta& delta);
 
-  void archivePlaces(const NodeIdSet active_places);
-
   void archivePlaces2d(const NodeIdSet active_places);
 
   void addPlaceObjectEdges(uint64_t timestamp_ns);

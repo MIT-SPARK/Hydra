@@ -785,7 +785,7 @@ std::map<NodeId, NodeId> UpdateBuildingsFunctor::call(
   }
 
   for (const auto& id_node_pair : rooms.nodes()) {
-    dsg.graph->insertEdge(building_id, id_node_pair.first);
+    dsg.graph->insertParentEdge(building_id, id_node_pair.first);
   }
 
   return {};
@@ -1157,12 +1157,14 @@ NodeSymbol insertNewNodes(
           edges_to_add.push_back({neighbor, node_id_for_place});
         }
       }
-      for (std::pair<NodeId, NodeId> edge : edges_to_add) {
-        graph.insertEdge(edge.first, edge.second);  // TODO add edge attributes
+
+      for (const auto& [source, target] : edges_to_add) {
+        graph.insertEdge(source, target);  // TODO add edge attributes
       }
 
       ++split_ix;
     }
+
     ++og_ix;
     graph.removeNode(id_places_pair.first);
   }
@@ -1334,7 +1336,7 @@ NodeId cleanupPlaces2d(const Places2dConfig& config,
         }
 
         if (neighbor_attrs.is_active) {
-            continue;
+          continue;
         }
 
         if (attrs.semantic_label == neighbor_attrs.semantic_label) {
@@ -1390,11 +1392,11 @@ NodeId cleanupPlaces2d(const Places2dConfig& config,
                                     config.connection_overlap_threshold,
                                     config.connection_max_delta_z,
                                     ea)) {
-          sibs_edges_to_remove.push_back({id, nid});
+        sibs_edges_to_remove.push_back({id, nid});
       }
     }
     for (auto n1_n2 : sibs_edges_to_remove) {
-        graph.removeEdge(n1_n2.first, n1_n2.second);
+      graph.removeEdge(n1_n2.first, n1_n2.second);
     }
 
     if (finalize) {
