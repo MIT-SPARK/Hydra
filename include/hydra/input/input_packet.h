@@ -42,7 +42,7 @@
 
 namespace hydra {
 
-class InputData;
+struct InputData;
 
 struct InputPacket {
   using Ptr = std::shared_ptr<InputPacket>;
@@ -55,6 +55,7 @@ struct InputPacket {
   Eigen::Vector3d world_t_body;
   Eigen::Quaterniond world_R_body;
 
+  virtual ~InputPacket() = default;
   virtual bool fillInputData(InputData& data) const;
 
   template <typename T = double>
