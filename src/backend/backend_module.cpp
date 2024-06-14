@@ -778,7 +778,15 @@ void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
       place_node_poses.push_back(gtsam::Pose3(gtsam::Rot3(), attrs.position));
 
       if (mst_info.leaves.count(node.id)) {
-        place_node_valences.push_back(attrs.deformation_connections);
+        std::vector<size_t> valid_connections;
+        for (const auto& idx : attrs.deformation_connections) {
+          if (idx == std::numeric_limits<size_t>::max()) {
+            continue;
+          }
+          valid_connections.push_back(idx);
+        }
+
+        place_node_valences.push_back(valid_connections);
       } else {
         place_node_valences.push_back(std::vector<size_t>{});
       }

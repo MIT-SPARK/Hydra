@@ -48,9 +48,9 @@
 
 #include "hydra/common/global_info.h"
 #include "hydra/frontend/frontier_extractor.h"
-#include "hydra/frontend/gvd_place_extractor.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/place_2d_segmenter.h"
+#include "hydra/frontend/place_mesh_connector.h"
 #include "hydra/reconstruction/voxblox_utilities.h"
 #include "hydra/utils/display_utilities.h"
 #include "hydra/utils/mesh_interface.h"
@@ -744,33 +744,43 @@ void FrontendModule::addPlaceAgentEdges(uint64_t timestamp_ns) {
 }
 
 void FrontendModule::updatePlaceMeshMapping(const ReconstructionOutput& input) {
-  ScopedTimer timer("frontend/place_mesh_mapping", input.timestamp_ns);
-  std::unique_lock<std::mutex> lock(dsg_->mutex);
   const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
-
-  size_t num_missing = 0;
-  for (const auto& id_node_pair : places.nodes()) {
-    auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
-    // TODO(nathan) archive logic should live here if we actually track mesh vertices
-    if (!attrs.is_active) {
-      continue;
-    }
-
-    attrs.deformation_connections.clear();
-    attrs.pcl_mesh_connections.clear();
-    attrs.mesh_vertex_labels.clear();
-
-    if (attrs.voxblox_mesh_connections.empty()) {
-      ++num_missing;
-      continue;
-    }
-
-    // for (const auto& vertex : attrs.voxblox_mesh_connections) {
-    // const Eigen::Vector3d pos = Eigen::Map<const Eigen::Vector3d>(vertex.voxel_pos);
-    // TODO(nathan) find nearest deformation graph point and assign
-    //}
-    // TODO(nathan) assign mesh vertices and labels based on deformation points
+  if (places.numNodes() == 0) {
+    // avoid doing work by making the kdtree lookup if we don't have places
+    return;
   }
+
+  ScopedTimer timer("frontend/place_mesh_mapping", input.timestamp_ns, true, 1);
+  CHECK(last_mesh_update_);
+  CHECK(mesh_remapping_);
+
+  // TODO(nathan) we can maybe put this somewhere else
+  const auto num_active = last_mesh_update_->vertex_updates->size();
+  const auto& graph_mapping = mesh_frontend_.getVoxbloxMsgToGraphMapping();
+  std::vector<size_t> deformation_mapping(num_active,
+                                          std::numeric_limits<size_t>::max());
+  for (const auto& [block, indices] : *mesh_remapping_) {
+    const auto block_iter = graph_mapping.find(block);
+    if (block_iter == graph_mapping.end()) {
+      LOG(WARNING) << "Missing block " << block.transpose() << " from graph mapping!";
+      continue;
+    }
+
+    const auto& block_mapping = block_iter->second;
+    for (const auto& [block_idx, mesh_idx] : indices) {
+      const auto vertex_iter = block_mapping.find(block_idx);
+      if (vertex_iter == block_mapping.end()) {
+        continue;
+      }
+
+      const auto local_idx = last_mesh_update_->getLocalIndex(mesh_idx);
+      CHECK_LT(local_idx, num_active);
+      deformation_mapping[local_idx] = vertex_iter->second;
+    }
+  }
+
+  PlaceMeshConnector connector(last_mesh_update_);
+  const auto num_missing = connector.addConnections(places, deformation_mapping);
 
   LOG_IF(ERROR, num_missing > 0)
       << "[Frontend] " << num_missing << " places missing basis points @ "

@@ -68,7 +68,7 @@ struct PipelineConfig {
   bool enable_places = true;
   bool timing_disabled = false;
   bool disable_timer_output = true;
-  
+
   // Default settings for other modules. Can be overwritten by other module configs.
   int default_verbosity = 1;
   int default_num_threads = -1;  // -1 means use all available threads.
