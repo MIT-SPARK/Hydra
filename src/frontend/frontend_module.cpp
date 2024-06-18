@@ -439,14 +439,17 @@ void FrontendModule::updateFrontiers(const ReconstructionOutput& input) {
   {  // start graph critical section
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
 
-    NodeIdSet active_nodes = freespace_places_->getActiveNodes();
-    const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
-    places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
+    {  // start timing scope
+      ScopedTimer timer("frontend/frontiers", input.timestamp_ns, true, 1, false);
+      NodeIdSet active_nodes = freespace_places_->getActiveNodes();
+      const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
+      places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
 
-    frontier_places_->detectFrontiers(input, *dsg_->graph, *places_nn_finder_);
-    frontier_places_->addFrontiers(
-        input.timestamp_ns, *dsg_->graph, *places_nn_finder_);
-  }  // end graph update critical section
+      frontier_places_->detectFrontiers(input, *dsg_->graph, *places_nn_finder_);
+      frontier_places_->addFrontiers(
+          input.timestamp_ns, *dsg_->graph, *places_nn_finder_);
+    }  // end timing scope
+  }    // end graph update critical section
 }
 
 void FrontendModule::updatePlaces(const ReconstructionOutput& input) {
@@ -504,16 +507,21 @@ void FrontendModule::updatePlaces2d(const ReconstructionOutput& input) {
   }
 
   NodeIdSet active_nodes;
-  surface_places_->detect(input, *last_mesh_update_, *dsg_->graph);
-  {  // start graph critical section
-    std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-    surface_places_->updateGraph(input.timestamp_ns, input, *dsg_->graph);
-    // TODO(nathan) unify places so that active places get populated correctly
-    // depending on run configuration
-  }  // end graph update critical section
 
-  archivePlaces2d(active_nodes);
-  previous_active_places_2d_ = active_nodes;
+  {  // start timing scope
+    ScopedTimer timer("frontend/places_2d", input.timestamp_ns, true, 1, false);
+    surface_places_->detect(input, *last_mesh_update_, *dsg_->graph);
+    {  // start graph critical section
+      std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
+
+      surface_places_->updateGraph(input.timestamp_ns, input, *dsg_->graph);
+      // TODO(nathan) unify places so that active places get populated correctly
+      // depending on run configuration
+    }  // end graph update critical section
+
+    archivePlaces2d(active_nodes);
+    previous_active_places_2d_ = active_nodes;
+  }  // end timing scope
 }
 
 void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
