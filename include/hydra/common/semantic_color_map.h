@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <spark_dsg/color_utils.h>
+#include <spark_dsg/color.h>
 
 #include <iostream>
 #include <limits>

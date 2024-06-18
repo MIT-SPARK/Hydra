@@ -9,8 +9,8 @@ class Mat;
 namespace hydra {
 
 // Forward declare to avoid includes.
-class InputData;
-class InputPacket;
+struct InputData;
+struct InputPacket;
 
 namespace conversions {
 

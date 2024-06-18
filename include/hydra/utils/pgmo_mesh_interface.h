@@ -55,7 +55,7 @@ struct PgmoMeshInterface : public kimera_pgmo::MeshInterface {
 
   pcl::PointXYZRGBA getActiveVertex(size_t index) const override;
 
-  bool hasSemantics() const { return true; }
+  bool hasSemantics() const override { return true; }
 
   std::optional<uint32_t> getActiveSemantics(size_t index) const override;
   private:

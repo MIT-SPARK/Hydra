@@ -36,7 +36,6 @@
 
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
-#include <spark_dsg/color_utils.h>
 
 #include <fstream>
 #include <iostream>

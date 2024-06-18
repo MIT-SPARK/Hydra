@@ -83,14 +83,14 @@ inline std::string toString(LayerType type) {
 
 // Serialize voxels.
 template <typename VoxelT>
-bool serializeVoxel(BinarySerializer& serializer, const VoxelT& voxel) {
+bool serializeVoxel(BinarySerializer& /* serializer */, const VoxelT& /* voxel */) {
   LOG(ERROR) << "No serialization function for voxel type " << typeid(VoxelT).name()
              << ".";
   return false;
 }
 
 template <typename VoxelT>
-bool deserializeVoxel(BinaryDeserializer& deserializer, VoxelT& voxel) {
+bool deserializeVoxel(BinaryDeserializer& /* deserializer */, VoxelT& /* voxel */) {
   LOG(ERROR) << "No deserialization function for voxel type " << typeid(VoxelT).name()
              << ".";
   return false;
