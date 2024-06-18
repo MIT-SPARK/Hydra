@@ -43,8 +43,12 @@ void declare_config(LabelSpaceConfig& config) {
   name("LabelSpaceConfig");
   field(config.total_labels, "total_semantic_labels");
   field(config.colormap_filepath, "semantic_colormap_file");
+  field(config.label_remap_filepath, "semantic_label_remap_filepath");
   field(config.dynamic_labels, "dynamic_labels");
   field(config.invalid_labels, "invalid_labels");
+  field(config.object_labels, "object_labels");
+  // Optional fields.
+  field(config.surface_places_labels, "surface_places_labels");
 }
 
 }  // namespace hydra

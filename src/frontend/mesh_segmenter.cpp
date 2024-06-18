@@ -73,7 +73,7 @@ void declare_config(MeshSegmenter::Config& config) {
               {spark_dsg::BoundingBox::Type::AABB, "AABB"},
               {spark_dsg::BoundingBox::Type::OBB, "OBB"},
               {spark_dsg::BoundingBox::Type::RAABB, "RAABB"}});
-  field(config.labels, "labels");
+  config.labels = GlobalInfo::instance().getLabelSpaceConfig().object_labels;
   field(config.timer_namespace, "timer_namespace");
   field(config.sinks, "sinks");
 }

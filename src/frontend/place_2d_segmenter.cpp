@@ -493,7 +493,7 @@ void declare_config(Place2dSegmenter::Config& config) {
   field(config.place_overlap_threshold, "place_overlap_threshold");
   field(config.place_max_neighbor_z_diff, "place_max_neighbor_z_diff");
   field(config.connection_ellipse_scale_factor, "connection_ellipse_scale_factor");
-  field(config.labels, "labels");
+  config.labels = GlobalInfo::instance().getLabelSpaceConfig().surface_places_labels;
 }
 
 }  // namespace hydra

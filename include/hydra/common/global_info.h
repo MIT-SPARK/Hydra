@@ -40,6 +40,7 @@
 #include <memory>
 #include <vector>
 
+#include "hydra/common/label_remapper.h"
 #include "hydra/common/label_space_config.h"
 #include "hydra/common/robot_prefix_config.h"
 #include "hydra/common/shared_dsg_info.h"
@@ -141,6 +142,8 @@ class GlobalInfo {
 
   size_t getTotalLabels() const;
 
+  const LabelRemapper& getLabelRemapper() const;
+
   SharedDsgInfo::Ptr createSharedDsg() const;
 
   // this intentionally returns a shared ptr to be threadsafe
@@ -173,6 +176,7 @@ class GlobalInfo {
   RobotPrefixConfig robot_prefix_;
   LogSetup::Ptr logs_;
   std::shared_ptr<SemanticColorMap> label_colormap_;
+  LabelRemapper label_remapper_;
 
   std::vector<config::VirtualConfig<Sensor>> sensor_configs_;
   std::vector<std::shared_ptr<const Sensor>> sensors_;

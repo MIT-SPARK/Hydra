@@ -44,9 +44,17 @@ namespace hydra {
 struct LabelSpaceConfig {
   size_t total_labels = 0;
   std::string colormap_filepath = "";
+  std::string label_remap_filepath = "";
   std::set<uint32_t> dynamic_labels;
   std::set<uint32_t> invalid_labels;
+  std::set<uint32_t> object_labels;
+  std::set<uint32_t> surface_places_labels = {};
   std::map<uint32_t, std::array<uint8_t, 3>> colormap;
+
+  inline bool isObject(const uint32_t id) const { return object_labels.count(id) > 0; }
+  inline bool isDynamic(const uint32_t id) const {
+    return dynamic_labels.count(id) > 0;
+  }
 };
 
 void declare_config(LabelSpaceConfig& conf);

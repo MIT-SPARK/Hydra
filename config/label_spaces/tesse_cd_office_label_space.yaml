@@ -1,0 +1,26 @@
+---
+total_semantic_labels: 19
+dynamic_labels: [17]
+invalid_labels: []
+object_labels: [2, 3, 4, 8, 9, 11, 15]
+surface_places_labels: [5]
+label_names:
+  - {label:  0, name: Nothing                     }
+  - {label:  1, name: Ventilation/Piping          }
+  - {label:  2, name: Small office objects        }
+  - {label:  3, name: Large static wall furniture }
+  - {label:  4, name: Large office objects        }
+  - {label:  5, name: Floor                       }
+  - {label:  6, name: Celing                      }
+  - {label:  7, name: Jail cell                   }
+  - {label:  8, name: Bathroom                    }
+  - {label:  9, name: Bedroom                     }
+  - {label: 10, name: Shelving                    }
+  - {label: 11, name: Chairs                      }
+  - {label: 12, name: Walls                       }
+  - {label: 13, name: Doors                       }
+  - {label: 14, name: Elevator                    }
+  - {label: 15, name: Signs                       }
+  - {label: 16, name: Lighting                    }
+  - {label: 17, name: Humans                      }
+  - {label: 18, name: Railing                     }

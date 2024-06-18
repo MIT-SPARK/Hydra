@@ -1,13 +1,9 @@
 ---
 total_semantic_labels: 24
-semantic_measurement_probability: 0.9
 dynamic_labels: [16]
 invalid_labels: []
-frontend:
-  objects:
-    labels: [3, 4, 7, 8, 14, 15, 18, 19, 20, 23]
-  surface_places:
-    labels: [0, 1, 2, 5, 9, 10, 12, 13, 21, 22]
+obejct_labels: [3, 4, 7, 8, 14, 15, 18, 19, 20, 23]
+surface_places_labels: [0, 1, 2, 5, 9, 10, 12, 13, 21, 22]
 label_names:
   - {label: 0, name: dirt}
   - {label: 1, name: sand}
@@ -33,5 +29,3 @@ label_names:
   - {label: 21, name: bridge}
   - {label: 22, name: concrete}
   - {label: 23, name: picnic-table}
-
-

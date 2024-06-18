@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra/common/semantic_color_map.h"
+#include "hydra/utils/csv_reader.h"
 
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
@@ -141,44 +142,32 @@ std::string SemanticColorMap::toString() const {
 
 SemanticColorMap::Ptr SemanticColorMap::fromCsv(const std::string& filename,
                                                 const Color& unknown,
-                                                bool skip_first,
-                                                char delimiter) {
-  std::ifstream file(filename.c_str());
-  if (!file.good()) {
-    LOG(ERROR) << "Couldn't open file: " << filename.c_str();
-    return nullptr;
+                                                char delimiter,
+                                                bool skip_first_line) {
+  // Required headers (r,g,b,a,id) only
+  static const std::string red_header = "red";
+  static const std::string green_header = "green";
+  static const std::string blue_header = "blue";
+  static const std::string alpha_header = "alpha";
+  static const std::string id_header = "id";
+
+  CsvReader reader(filename, delimiter, skip_first_line);
+
+  // TODO(marcus): make alpha header optional
+  if (!reader.hasHeaders(
+          {red_header, green_header, blue_header, alpha_header, id_header})) {
+    LOG(FATAL) << "CSV file '" << filename << "' is missing required headers.";
   }
 
   ColorToLabelMap cmap;
-  size_t row_number = 0;
-  std::string curr_line;
-  while (std::getline(file, curr_line)) {
-    if (skip_first && !row_number) {
-      row_number++;
-      continue;
-    }
-
-    std::stringstream ss(curr_line);
-    std::vector<std::string> columns;
-    std::string column;
-    while (std::getline(ss, column, delimiter)) {
-      columns.push_back(column);
-      column = "";
-    }
-
-    if (columns.size() != 6) {
-      LOG(ERROR) << "Row " << row_number << " is invalid: [" << columns << "]";
-      return nullptr;
-    }
-
-    // We expect the CSV to have header: name, red, green, blue, alpha, id
-    const uint8_t r = std::atoi(columns[1].c_str());
-    const uint8_t g = std::atoi(columns[2].c_str());
-    const uint8_t b = std::atoi(columns[3].c_str());
-    const uint8_t a = std::atoi(columns[4].c_str());
+  for (size_t row = 0; row < reader.numRows(); row++) {
+    const int id = std::stoi(reader.getEntry(id_header, row));
+    const uint8_t r = std::stoi(reader.getEntry(red_header, row));
+    const uint8_t g = std::stoi(reader.getEntry(green_header, row));
+    const uint8_t b = std::stoi(reader.getEntry(blue_header, row));
+    const uint8_t a = std::stoi(reader.getEntry(alpha_header, row));
     const voxblox::Color rgba(r, g, b, a);
-    cmap[rgba] = std::atoi(columns[5].c_str());
-    row_number++;
+    cmap[rgba] = id;
   }
 
   return std::make_unique<SemanticColorMap>(cmap, unknown);

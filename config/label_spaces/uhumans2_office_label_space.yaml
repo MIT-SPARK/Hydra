@@ -1,13 +1,9 @@
 ---
 total_semantic_labels: 21
-semantic_measurement_probability: 0.9
 dynamic_labels: [20]
 invalid_labels: []
-frontend:
-  objects:
-    labels: [5, 6, 7, 10, 12, 13, 18]
-  surface_places:
-    labels: [3, 15]
+object_labels: [5, 6, 7, 10, 12, 13, 18]
+surface_places_labels: [3, 15]
 label_names:
   - {label: 0, name: unknown}
   - {label: 1, name: air_vent}

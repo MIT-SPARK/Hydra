@@ -100,6 +100,26 @@ bool conversions::convertLabels(InputData& data) {
     return conversions::colorToLabels(data.label_image, data.label_image);
   }
 
+  // Enforcing requirement for int32_t at this point
+  if (data.label_image.type() != CV_32SC1) {
+    cv::Mat new_label_image(data.label_image.size(), CV_32SC1);
+    data.label_image.convertTo(new_label_image, CV_32SC1);
+    data.label_image = new_label_image;
+  }
+
+  LabelRemapper label_remapper = GlobalInfo::instance().getLabelRemapper();
+  if (!label_remapper.empty()) {
+    
+    for (int r = 0; r < data.label_image.rows; ++r) {
+      for (int c = 0; c < data.label_image.cols; ++c) {
+        // TODO(marcus): any reason to cache image and reassign with a new one?
+        const auto& pixel = data.label_image.at<int32_t>(r, c);
+        data.label_image.at<int32_t>(r, c) =
+            label_remapper.remapLabel(pixel).value_or(-1);
+      }
+    }
+  }
+
   const auto label_type = data.label_image.type();
   if (label_type == CV_32SC1) {
     return true;

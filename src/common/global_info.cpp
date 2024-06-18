@@ -172,6 +172,10 @@ void GlobalInfo::initFromConfig(const PipelineConfig& config, int robot_id) {
     label_colormap_ = SemanticColorMap::randomColors(config_.label_space.total_labels);
   }
 
+  if (!config_.label_space.label_remap_filepath.empty()) {
+    label_remapper_ = LabelRemapper(config_.label_space.label_remap_filepath);
+  }
+
   if (label_colormap_) {
     VLOG(2) << "Loaded label space colors:" << std::endl << *label_colormap_;
   }
@@ -257,6 +261,8 @@ const LabelSpaceConfig& GlobalInfo::getLabelSpaceConfig() const {
 size_t GlobalInfo::getTotalLabels() const {
   return config_.label_space.total_labels;
 }
+
+const LabelRemapper& GlobalInfo::getLabelRemapper() const { return label_remapper_; }
 
 SharedDsgInfo::Ptr GlobalInfo::createSharedDsg() const {
   checkFrozen();

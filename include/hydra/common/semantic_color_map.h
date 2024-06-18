@@ -90,8 +90,8 @@ class SemanticColorMap {
 
   static SemanticColorMap::Ptr fromCsv(const std::string& filename,
                                        const voxblox::Color& unknown = {},
-                                       bool skip_first = true,
-                                       char delimiter = ',');
+                                       char delimiter = ',',
+                                       bool skip_first_line = true);
 
  private:
   uint32_t max_label_;

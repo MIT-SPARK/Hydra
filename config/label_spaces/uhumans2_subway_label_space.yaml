@@ -1,11 +1,8 @@
 ---
 total_semantic_labels: 21
-semantic_measurement_probability: 0.9
 dynamic_labels: [20]
 invalid_labels: []
-frontend:
-  objects:
-    labels: [5, 7, 8, 10, 18]
+object_labels: [5, 7, 8, 10, 18]
 label_names:
   - {label: 0, name: unknown}
   - {label: 1, name: vending_machine}

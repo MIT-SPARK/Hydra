@@ -1,0 +1,27 @@
+---
+total_semantic_labels: 21
+dynamic_labels: [20]
+invalid_labels: []
+object_labels: [1, 2, 5, 6, 7, 9, 10, 16, 18, 20]
+label_names:
+- {label: 0,0, name: Unknown}
+- {label: 1,1, name: Fridge}
+- {label: 2,1, name: Books}
+- {label: 3,0, name: Floor}
+- {label: 4,0, name: Ceiling}
+- {label: 5,1, name: Chair}
+- {label: 6,1, name: Vase}
+- {label: 7,1, name: Couch}
+- {label: 8,0, name: Trees}
+- {label: 9,1, name: Drawer}
+- {label: 10,1, name: Objects}
+- {label: 11,0, name: Lamp}
+- {label: 12,0, name: Painting}
+- {label: 13,0, name: Plants}
+- {label: 14,0, name: Bed}
+- {label: 15,0, name: Stairs}
+- {label: 16,1, name: Table}
+- {label: 17,0, name: Screens}
+- {label: 18,1, name: Bin}
+- {label: 19,0, name: Wall}
+- {label: 20,1, name: Humans}
