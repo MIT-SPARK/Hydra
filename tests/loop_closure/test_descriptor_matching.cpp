@@ -35,8 +35,7 @@
 #include <gtest/gtest.h>
 #include <hydra/loop_closure/descriptor_matching.h>
 
-namespace hydra {
-namespace lcd {
+namespace hydra::lcd {
 
 TEST(LoopClosureModuleMatchingTests, TestCosineDistanceFixedSize) {
   Descriptor d1;
@@ -456,5 +455,4 @@ TEST(LoopClosureModuleMatchingTests, SearchLeafDescriptorsMaxRegistrationMatches
   EXPECT_EQ(2u, results.match_nodes.size());
 }
 
-}  // namespace lcd
-}  // namespace hydra
+}  // namespace hydra::lcd

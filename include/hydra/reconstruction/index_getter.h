@@ -61,8 +61,8 @@ namespace hydra {
 template <typename IndexT>
 class IndexGetter {
  public:
-  explicit IndexGetter(std::vector<IndexT> indices)
-      : indices_(std::move(indices)), current_index_(0) {}
+  explicit IndexGetter(const std::vector<IndexT>& indices)
+      : indices_(indices), current_index_(0) {}
   bool getNextIndex(IndexT& index) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (current_index_ >= indices_.size()) {
@@ -80,9 +80,9 @@ class IndexGetter {
   }
 
  private:
-  std::mutex mutex_;
-  std::vector<IndexT> indices_;
+  const std::vector<IndexT>& indices_;
   size_t current_index_;
+  std::mutex mutex_;
 };
 
 }  // namespace hydra

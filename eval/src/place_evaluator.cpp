@@ -37,22 +37,21 @@
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/printing.h>
 #include <glog/logging.h>
-#include <voxblox/io/layer_io.h>
 
 #include "hydra/places/gvd_integrator.h"
 #include "hydra/reconstruction/volumetric_map.h"
+#include "hydra/utils/layer_io.h"
 
 namespace hydra::eval {
 
 using places::GvdIntegratorConfig;
+using places::GvdLayer;
 using places::GvdVoxel;
-using voxblox::Layer;
-using voxblox::TsdfVoxel;
 
 PlaceEvaluator::PlaceEvaluator(const GvdIntegratorConfig& config,
-                               const Layer<TsdfVoxel>::Ptr& tsdf)
+                               const TsdfLayer::Ptr& tsdf)
     : tsdf_(CHECK_NOTNULL(tsdf)) {
-  gvd_.reset(new Layer<GvdVoxel>(tsdf_->voxel_size(), tsdf_->voxels_per_side()));
+  gvd_.reset(new GvdLayer(tsdf_->voxel_size, tsdf_->voxels_per_side));
   computeGroundTruth(config);
 }
 
@@ -75,8 +74,8 @@ PlaceEvaluator::Ptr PlaceEvaluator::fromFile(const std::string& config_filepath,
     config.max_distance_m = *max_distance_m;
   }
 
-  Layer<TsdfVoxel>::Ptr tsdf;
-  if (!voxblox::io::LoadLayer<TsdfVoxel>(tsdf_filepath, &tsdf)) {
+  auto tsdf = io::loadLayer<TsdfLayer>(tsdf_filepath);
+  if (!tsdf) {
     LOG(ERROR) << "Failed to load TSDF from: " << tsdf_filepath;
     return nullptr;
   }

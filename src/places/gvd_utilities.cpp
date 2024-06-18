@@ -34,13 +34,12 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/gvd_utilities.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
-DistancePotential getLowerDistance(FloatingPoint v_dist,
-                                   FloatingPoint n_dist,
-                                   FloatingPoint distance,
-                                   FloatingPoint min_diff_m) {
+DistancePotential getLowerDistance(float v_dist,
+                                   float n_dist,
+                                   float distance,
+                                   float min_diff_m) {
   DistancePotential to_return;
   if (n_dist == 0.0) {
     // this is incorrect for when n and v are both 0.0, but we're not
@@ -79,16 +78,13 @@ VoronoiCondition checkVoronoi(const VoronoiCheckConfig& cfg,
     return result;
   }
 
-  Eigen::Map<const GlobalIndex> neighbor_parent(neighbor.parent);
-  Eigen::Map<const GlobalIndex> current_parent(current.parent);
-
-  if (!isParentUnique(cfg, current_idx, current_parent, neighbor_parent)) {
+  if (!isParentUnique(cfg, current_idx, current.parent, neighbor.parent)) {
     return result;
   }
 
   // Algorithm 4: 51-52 of Lau et al. 2013
-  const GlobalIndex c_pn = current_idx - neighbor_parent;
-  const GlobalIndex n_pc = neighbor_idx - current_parent;
+  const GlobalIndex c_pn = current_idx - neighbor.parent;
+  const GlobalIndex n_pc = neighbor_idx - current.parent;
   const GlobalIndex::Scalar dist_c_pn = c_pn.dot(c_pn);
   const GlobalIndex::Scalar dist_n_pc = n_pc.dot(n_pc);
 
@@ -98,5 +94,39 @@ VoronoiCondition checkVoronoi(const VoronoiCheckConfig& cfg,
   return result;
 }
 
-}  // namespace places
-}  // namespace hydra
+bool isParentUniqueL1(const VoronoiCheckConfig& config,
+                      const GlobalIndex& /* current_index */,
+                      const GlobalIndex& current_parent,
+                      const GlobalIndex& neighbor_parent) {
+  const GlobalIndex parent_diff = current_parent - neighbor_parent;
+  return parent_diff.lpNorm<1>() > config.parent_l1_separation;
+}
+
+bool isParentUniqueAngle(const VoronoiCheckConfig& config,
+                         const GlobalIndex& current_index,
+                         const GlobalIndex& current_parent,
+                         const GlobalIndex& neighbor_parent) {
+  GlobalIndex curr_vec = (current_parent - current_index);
+  GlobalIndex neighbor_vec = (neighbor_parent - current_index);
+  double cos_angle =
+      curr_vec.cast<float>().normalized().dot(neighbor_vec.cast<float>().normalized());
+  return cos_angle < config.parent_cos_angle_separation;
+}
+
+bool isParentUnique(const VoronoiCheckConfig& config,
+                    const GlobalIndex& current_idx,
+                    const GlobalIndex& current_parent,
+                    const GlobalIndex& neighbor_parent) {
+  switch (config.mode) {
+    case ParentUniquenessMode::ANGLE:
+      return isParentUniqueAngle(config, current_idx, current_parent, neighbor_parent);
+    case ParentUniquenessMode::L1_DISTANCE:
+      return isParentUniqueL1(config, current_idx, current_parent, neighbor_parent);
+    case ParentUniquenessMode::L1_THEN_ANGLE:
+    default:
+      return isParentUniqueL1(config, current_idx, current_parent, neighbor_parent) ||
+             isParentUniqueAngle(config, current_idx, current_parent, neighbor_parent);
+  }
+}
+
+}  // namespace hydra::places

@@ -45,8 +45,7 @@
 
 #include "hydra/utils/timing_utilities.h"
 
-namespace hydra {
-namespace lcd {
+namespace hydra::lcd {
 
 template <typename Scalar>
 std::string showVector(const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& vector,
@@ -477,5 +476,4 @@ std::vector<RegistrationSolution> LcdDetector::detect(const DynamicSceneGraph& d
   return results;
 }
 
-}  // namespace lcd
-}  // namespace hydra
+}  // namespace hydra::lcd

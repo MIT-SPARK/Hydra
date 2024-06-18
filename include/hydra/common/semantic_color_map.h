@@ -33,7 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <voxblox/core/common.h>
+
+#include <spark_dsg/color_utils.h>
 
 #include <iostream>
 #include <limits>
@@ -42,39 +43,25 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace voxblox {
-std::ostream& operator<<(std::ostream& out, const Color& color);
-}  // namespace voxblox
+#include "hydra/common/common_types.h"
 
 namespace hydra {
-
-// For unordered map/set using Color as a key.
-struct ColorHasher {
-  size_t operator()(const voxblox::Color& k) const;
-};
-
-// For unordered_map/set using Color as a key
-struct ColorEqual {
-  bool operator()(const voxblox::Color& lhs, const voxblox::Color& rhs) const;
-};
 
 // based on code from kimera-semantics
 class SemanticColorMap {
  public:
   using Ptr = std::unique_ptr<SemanticColorMap>;
-  using ColorSet = std::unordered_set<voxblox::Color, ColorHasher, ColorEqual>;
-  using LabelToColorMap = std::unordered_map<uint32_t, voxblox::Color>;
-  using ColorToLabelMap =
-      std::unordered_map<voxblox::Color, uint32_t, ColorHasher, ColorEqual>;
+  using ColorSet = std::unordered_set<Color, Color::Hash>;
+  using LabelToColorMap = std::unordered_map<uint32_t, Color>;
+  using ColorToLabelMap = std::unordered_map<Color, uint32_t, Color::Hash>;
 
   SemanticColorMap();
 
-  SemanticColorMap(const ColorToLabelMap& map,
-                   const voxblox::Color& unknown_color = {});
+  SemanticColorMap(const ColorToLabelMap& map, const Color& unknown_color = {});
 
-  std::optional<uint32_t> getLabelFromColor(const voxblox::Color& color) const;
+  std::optional<uint32_t> getLabelFromColor(const Color& color) const;
 
-  voxblox::Color getColorFromLabel(const uint32_t& label) const;
+  Color getColorFromLabel(const uint32_t& label) const;
 
   size_t getNumLabels() const;
 
@@ -86,18 +73,19 @@ class SemanticColorMap {
 
  public:
   static SemanticColorMap::Ptr randomColors(size_t num_labels,
-                                            const voxblox::Color& unknown = {});
+                                            const Color& unknown = {});
 
   static SemanticColorMap::Ptr fromCsv(const std::string& filename,
-                                       const voxblox::Color& unknown = {},
+                                       const Color& unknown = {},
                                        char delimiter = ',',
                                        bool skip_first_line = true);
+  // Required headers (r,g,b,a,id) only);
 
  private:
   uint32_t max_label_;
   ColorToLabelMap color_to_label_;
   LabelToColorMap label_to_color_;
-  voxblox::Color unknown_color_;
+  Color unknown_color_;
 
   mutable ColorSet unknown_colors_;
   mutable std::unordered_set<uint32_t> unknown_labels_;

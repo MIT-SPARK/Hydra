@@ -35,10 +35,9 @@
 #pragma once
 #include "hydra/places/gvd_integrator_config.h"
 #include "hydra/places/gvd_voxel.h"
-#include "hydra/places/voxblox_types.h"
+#include "hydra/reconstruction/voxel_types.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 struct DistancePotential {
   bool is_lower;
@@ -50,10 +49,10 @@ struct VoronoiCondition {
   bool current_is_voronoi{false};
 };
 
-DistancePotential getLowerDistance(FloatingPoint v_dist,
-                                   FloatingPoint n_dist,
-                                   FloatingPoint distance,
-                                   FloatingPoint min_diff_m = 0.0f);
+DistancePotential getLowerDistance(float v_dist,
+                                   float n_dist,
+                                   float distance,
+                                   float min_diff_m = 0.0f);
 
 VoronoiCondition checkVoronoi(const VoronoiCheckConfig& config,
                               const GvdVoxel& current,
@@ -61,43 +60,19 @@ VoronoiCondition checkVoronoi(const VoronoiCheckConfig& config,
                               const GvdVoxel& neighbor,
                               const GlobalIndex& neighbor_idx);
 
-template <typename ParentIndex>
-inline bool isParentUniqueL1(const VoronoiCheckConfig& config,
-                             const GlobalIndex& /* current_index */,
-                             const ParentIndex& current_parent,
-                             const ParentIndex& neighbor_parent) {
-  const GlobalIndex parent_diff = current_parent - neighbor_parent;
-  return parent_diff.lpNorm<1>() > config.parent_l1_separation;
-}
+bool isParentUniqueL1(const VoronoiCheckConfig& config,
+                      const GlobalIndex& /* current_index */,
+                      const GlobalIndex& current_parent,
+                      const GlobalIndex& neighbor_parent);
 
-template <typename ParentIndex>
-inline bool isParentUniqueAngle(const VoronoiCheckConfig& config,
-                                const GlobalIndex& current_index,
-                                const ParentIndex& current_parent,
-                                const ParentIndex& neighbor_parent) {
-  GlobalIndex curr_vec = (current_parent - current_index);
-  GlobalIndex neighbor_vec = (neighbor_parent - current_index);
-  double cos_angle =
-      curr_vec.cast<float>().normalized().dot(neighbor_vec.cast<float>().normalized());
-  return cos_angle < config.parent_cos_angle_separation;
-}
+bool isParentUniqueAngle(const VoronoiCheckConfig& config,
+                         const GlobalIndex& current_index,
+                         const GlobalIndex& current_parent,
+                         const GlobalIndex& neighbor_parent);
 
-template <typename ParentIndex>
-inline bool isParentUnique(const VoronoiCheckConfig& config,
-                           const GlobalIndex& current_idx,
-                           const ParentIndex& current_parent,
-                           const ParentIndex& neighbor_parent) {
-  switch (config.mode) {
-    case ParentUniquenessMode::ANGLE:
-      return isParentUniqueAngle(config, current_idx, current_parent, neighbor_parent);
-    case ParentUniquenessMode::L1_DISTANCE:
-      return isParentUniqueL1(config, current_idx, current_parent, neighbor_parent);
-    case ParentUniquenessMode::L1_THEN_ANGLE:
-    default:
-      return isParentUniqueL1(config, current_idx, current_parent, neighbor_parent) ||
-             isParentUniqueAngle(config, current_idx, current_parent, neighbor_parent);
-  }
-}
+bool isParentUnique(const VoronoiCheckConfig& config,
+                    const GlobalIndex& current_idx,
+                    const GlobalIndex& current_parent,
+                    const GlobalIndex& neighbor_parent);
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

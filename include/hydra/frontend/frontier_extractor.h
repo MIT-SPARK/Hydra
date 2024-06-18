@@ -7,7 +7,6 @@
 #include "hydra/common/dsg_types.h"
 #include "hydra/frontend/frontier_places_interface.h"
 #include "hydra/reconstruction/reconstruction_output.h"
-#include "voxblox/core/common.h"
 
 namespace hydra {
 
@@ -26,7 +25,7 @@ class FrontierExtractor : public FrontierPlacesInterface {
     double frontier_splitting_threshold = 0.2;
     size_t point_threshold = 10;
     double recent_block_distance = 25;
-  };
+  } const config;
 
   explicit FrontierExtractor(const Config& config);
 
@@ -39,11 +38,10 @@ class FrontierExtractor : public FrontierPlacesInterface {
                     NearestNodeFinder& finder) override;
 
  private:
-  const Config config_;
   NodeSymbol next_node_id_;
-  std::vector<std::pair<NodeId, voxblox::BlockIndex>> nodes_to_remove_;
+  std::vector<std::pair<NodeId, BlockIndex>> nodes_to_remove_;
 
-  std::vector<voxblox::BlockIndex> recently_archived_blocks_;
+  BlockIndices recently_archived_blocks_;
 
   std::vector<Frontier> frontiers_;
   std::vector<Frontier> archived_frontiers_;
@@ -56,7 +54,13 @@ class FrontierExtractor : public FrontierPlacesInterface {
       config::RegistrationWithConfig<FrontierPlacesInterface,
                                      FrontierExtractor,
                                      Config>("voxel_clustering");
+
+  // Helper functions.
+  void computeSparseFrontiers(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+                              std::vector<Frontier>& frontiers) const;
 };
+
+Eigen::Vector3d frontiersToCenters(const std::vector<Eigen::Vector3f>& positions);
 
 void declare_config(FrontierExtractor::Config& conf);
 

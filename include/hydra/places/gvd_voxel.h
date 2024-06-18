@@ -36,7 +36,7 @@
 #include <iostream>
 #include <optional>
 
-#include "hydra/places/voxblox_types.h"
+#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::places {
 
@@ -54,10 +54,13 @@ struct GvdVoxel {
 
   uint8_t num_extra_basis = 0;
 
-  GlobalIndex::Scalar parent[3];
+  GlobalIndex parent;
   // required for removing blocks (parents leave a dangling reference otherwise)
-  voxblox::Point::Scalar parent_pos[3];
+  Point parent_pos;
 };
+
+using GvdBlock = spatial_hash::VoxelBlock<GvdVoxel>;
+using GvdLayer = spatial_hash::VoxelLayer<GvdBlock>;
 
 std::ostream& operator<<(std::ostream& out, const GvdVoxel& voxel);
 
@@ -68,14 +71,14 @@ inline bool isVoronoi(const GvdVoxel& voxel) { return voxel.num_extra_basis != 0
 inline void setSdfParent(GvdVoxel& voxel,
                          const GvdVoxel& ancestor,
                          const GlobalIndex& ancestor_index,
-                         const voxblox::Point& ancestor_pos) {
+                         const Point& ancestor_pos) {
   voxel.has_parent = true;
   if (ancestor.has_parent) {
-    std::memcpy(voxel.parent, ancestor.parent, sizeof(voxel.parent));
-    std::memcpy(voxel.parent_pos, ancestor.parent_pos, sizeof(voxel.parent_pos));
+    voxel.parent = ancestor.parent;
+    voxel.parent_pos = ancestor.parent_pos;
   } else {
-    Eigen::Map<GlobalIndex>(voxel.parent) = ancestor_index;
-    Eigen::Map<voxblox::Point>(voxel.parent_pos) = ancestor_pos;
+    voxel.parent = ancestor_index;
+    voxel.parent_pos = ancestor_pos;
   }
 }
 
@@ -103,23 +106,5 @@ inline void setGvdSurfaceVoxel(GvdVoxel& voxel) {
   resetParent(voxel);
 }
 
-using GvdNeighborhood = Neighborhood<voxblox::Connectivity::kTwentySix>;
-
-template <typename Scalar = double>
-inline Eigen::Matrix<Scalar, 3, 1> getVoxelPosition(const Layer<GvdVoxel>& layer,
-                                                    const GlobalIndex& index) {
-  BlockIndex block_idx;
-  VoxelIndex voxel_idx;
-  voxblox::getBlockAndVoxelIndexFromGlobalVoxelIndex(
-      index, layer.voxels_per_side(), &block_idx, &voxel_idx);
-
-  CHECK(layer.hasBlock(block_idx))
-      << "Attempting to look up coordinates for " << index.transpose()
-      << ", which is outside of the allocated blocks";
-
-  return layer.getBlockByIndex(block_idx)
-      .computeCoordinatesFromVoxelIndex(voxel_idx)
-      .cast<Scalar>();
-}
 
 }  // namespace hydra::places

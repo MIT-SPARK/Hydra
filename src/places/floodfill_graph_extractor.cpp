@@ -34,14 +34,14 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/floodfill_graph_extractor.h"
 
+#include <spatial_hash/neighbor_utils.h>
+
 #include "hydra/places/graph_extractor_utilities.h"
 #include "hydra/places/nearest_voxel_utilities.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
-using GvdLayer = FloodfillGraphExtractor::GvdLayer;
-using GlobalIndexVector = voxblox::AlignedVector<GlobalIndex>;
+using GlobalIndexVector = GlobalIndices;
 
 VoxelGraphInfo::VoxelGraphInfo() : is_node(false), is_split_node(false) {}
 
@@ -296,7 +296,7 @@ void FloodfillGraphExtractor::addEdgeToGraph(const GvdLayer& layer,
 
 void FloodfillGraphExtractor::findBadEdgeIndices(const EdgeInfo& info) {
   const GlobalIndex start = node_index_map_.at(info.source);
-  voxblox::AlignedVector<GlobalIndex> indices(info.indices.begin(), info.indices.end());
+  GlobalIndices indices(info.indices.begin(), info.indices.end());
 
   checked_edges_[info.id] = info.connections;
   for (auto other_edge : info.connections) {
@@ -308,7 +308,7 @@ void FloodfillGraphExtractor::findBadEdgeIndices(const EdgeInfo& info) {
     const NodeId other_node = edge_info_map_.at(other_edge).source;
     const GlobalIndex end = node_index_map_.at(other_node);
 
-    voxblox::AlignedVector<GlobalIndex> curr_indices(indices);
+    GlobalIndices curr_indices(indices);
     curr_indices.insert(curr_indices.end(),
                         edge_info_map_.at(other_edge).indices.begin(),
                         edge_info_map_.at(other_edge).indices.end());
@@ -333,7 +333,7 @@ void FloodfillGraphExtractor::findBadEdgeIndices(const EdgeInfo& info) {
 }
 
 void FloodfillGraphExtractor::findNewVertices(const GvdLayer& layer) {
-  voxblox::LongIndexSet seen_nodes;
+  GlobalIndexSet seen_nodes;
 
   while (!modified_voxel_queue_.empty()) {
     const GlobalIndex index = popFromModifiedQueue();
@@ -354,7 +354,7 @@ void FloodfillGraphExtractor::findNewVertices(const GvdLayer& layer) {
     }
 
     // TODO(nathan) slightly duplicated with neighbor flag extraction
-    const GvdVoxel* voxel = layer.getVoxelPtrByGlobalIndex(index);
+    const GvdVoxel* voxel = layer.getVoxelPtr(index);
     if (voxel == nullptr) {
       VLOG(2) << "[Graph Extraction] Invalid index: " << index.transpose()
               << " found in modified queue";
@@ -399,7 +399,7 @@ void FloodfillGraphExtractor::addNewPlaceNode(const GvdLayer& layer,
   const NodeId new_node_id = addPlaceToGraph(layer, voxel, index);
 
   index_graph_info_map_.emplace(index, VoxelGraphInfo(new_node_id, is_from_split));
-  node_child_map_[new_node_id] = voxblox::LongIndexSet();
+  node_child_map_[new_node_id] = GlobalIndexSet();
   node_index_map_[new_node_id] = index;
   node_edge_id_map_[new_node_id] = std::set<size_t>();
   node_edge_connections_[new_node_id] = std::set<size_t>();
@@ -410,9 +410,9 @@ bool FloodfillGraphExtractor::attemptNodeMerge(const GvdLayer& layer,
                                                const VoxelGraphInfo& neighbor_info) {
   const auto& graph = getGraph();
   const Eigen::Vector3d curr_pos =
-      getVoxelPosition(layer, node_index_map_[curr_info.id]);
+      layer.getVoxelPosition(node_index_map_[curr_info.id]).cast<double>();
   const Eigen::Vector3d neighbor_pos =
-      getVoxelPosition(layer, node_index_map_[neighbor_info.id]);
+      layer.getVoxelPosition(node_index_map_[neighbor_info.id]).cast<double>();
   if ((curr_pos - neighbor_pos).norm() >= config_.node_merge_distance_m) {
     return false;
   }
@@ -430,19 +430,19 @@ bool FloodfillGraphExtractor::attemptNodeMerge(const GvdLayer& layer,
 }
 
 void FloodfillGraphExtractor::extractEdges(const GvdLayer& layer, bool allow_merging) {
-  GvdNeighborhood::IndexMatrix neighbor_indices;
+  spatial_hash::NeighborSearch search(26);
 
   while (!floodfill_frontier_.empty()) {
     const GlobalIndex index = popFromFloodfillFrontier();
-    GvdNeighborhood::getFromGlobalIndex(index, &neighbor_indices);
+    const auto neighbor_indices = search.neighborIndices(index);
+
     if (!index_graph_info_map_.count(index)) {
       continue;  // partial wavefront from deleted node
     }
 
     VoxelGraphInfo curr_info = index_graph_info_map_.at(index);
-    for (unsigned int n = 0u; n < neighbor_indices.cols(); ++n) {
-      const GlobalIndex& neighbor_index = neighbor_indices.col(n);
-      const GvdVoxel* neighbor = layer.getVoxelPtrByGlobalIndex(neighbor_index);
+    for (const GlobalIndex& neighbor_index : neighbor_indices) {
+      const GvdVoxel* neighbor = layer.getVoxelPtr(neighbor_index);
       if (!neighbor) {
         continue;
       }
@@ -528,8 +528,7 @@ void FloodfillGraphExtractor::splitEdges(const GvdLayer& layer) {
       clearEdgeInfo(curr_voxel.edge_id);
 
       // add a new node and also push to floodfill frontier
-      const GvdVoxel& voxel =
-          *CHECK_NOTNULL(layer.getVoxelPtrByGlobalIndex(curr_voxel.index));
+      const GvdVoxel& voxel = *CHECK_NOTNULL(layer.getVoxelPtr(curr_voxel.index));
       addNewPlaceNode(layer, voxel, curr_voxel.index, true);
       floodfill_frontier_.push(curr_voxel.index);
     }
@@ -583,7 +582,7 @@ void FloodfillGraphExtractor::clearNewConnections(bool clear_modified_voxels) {
   checked_edges_.clear();
   connected_edges_.clear();
   if (clear_modified_voxels) {
-    modified_voxel_queue_ = AlignedQueue<GlobalIndex>();
+    modified_voxel_queue_ = std::queue<GlobalIndex>();
   }
 }
 
@@ -603,5 +602,4 @@ bool FloodfillGraphExtractor::isVertex(const GvdLayer& layer,
   return false;
 }
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

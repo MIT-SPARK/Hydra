@@ -36,34 +36,32 @@
 
 #include "hydra/places/gvd_utilities.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
-uint8_t GvdParentTracker::updateGvdParentMap(const Layer<GvdVoxel>& layer,
+uint8_t GvdParentTracker::updateGvdParentMap(const GvdLayer& layer,
                                              const VoronoiCheckConfig& config,
                                              const GlobalIndex& voxel_index,
                                              const GvdVoxel& neighbor) {
-  const GlobalIndex neighbor_parent = Eigen::Map<const GlobalIndex>(neighbor.parent);
   if (!parents.count(voxel_index)) {
-    parents[voxel_index] = voxblox::LongIndexSet();
+    parents[voxel_index] = GlobalIndexSet();
   }
 
   uint8_t curr_extra_basis = parents[voxel_index].size();
   for (const auto& other_parent : parents[voxel_index]) {
     const bool is_unique =
-        isParentUnique(config, voxel_index, other_parent, neighbor_parent);
+        isParentUnique(config, voxel_index, other_parent, neighbor.parent);
     if (!is_unique) {
       return curr_extra_basis;
     }
   }
 
   // parent is unique enough
-  parents[voxel_index].insert(neighbor_parent);
-  markNewGvdParent(layer, neighbor_parent);
+  parents[voxel_index].insert(neighbor.parent);
+  markNewGvdParent(layer, neighbor.parent);
   return curr_extra_basis + 1;
 }
 
-void GvdParentTracker::markNewGvdParent(const Layer<GvdVoxel>& layer,
+void GvdParentTracker::markNewGvdParent(const GvdLayer& layer,
                                         const GlobalIndex& parent) {
   if (parent_vertices.count(parent)) {
     // make sure the parent vertex map stays alive for this gvd member
@@ -71,7 +69,7 @@ void GvdParentTracker::markNewGvdParent(const Layer<GvdVoxel>& layer,
     return;
   }
 
-  const auto* parent_voxel = layer.getVoxelPtrByGlobalIndex(parent);
+  const auto* parent_voxel = layer.getVoxelPtr(parent);
   if (!parent_voxel || !parent_voxel->on_surface) {
     // we can't do anything for parents that have left the active mesh before being used
     // as a GVD parent, or parents that aren't registered to the mesh
@@ -80,7 +78,7 @@ void GvdParentTracker::markNewGvdParent(const Layer<GvdVoxel>& layer,
 
   GvdVertexInfo info;
   info.ref_count = 1;
-  std::memcpy(info.pos, parent_voxel->parent_pos, sizeof(info.pos));
+  info.pos = parent_voxel->parent_pos;
 
   parent_vertices[parent] = info;
 }
@@ -100,7 +98,7 @@ void GvdParentTracker::removeVoronoiFromGvdParentMap(const GlobalIndex& voxel_in
   }
 }
 
-void GvdParentTracker::updateVertexMapping(const Layer<GvdVoxel>& layer) {
+void GvdParentTracker::updateVertexMapping(const GvdLayer& layer) {
   auto iter = parent_vertices.begin();
   while (iter != parent_vertices.end()) {
     if (!iter->second.ref_count) {
@@ -108,7 +106,7 @@ void GvdParentTracker::updateVertexMapping(const Layer<GvdVoxel>& layer) {
       continue;
     }
 
-    const auto* voxel = layer.getVoxelPtrByGlobalIndex(iter->first);
+    const auto* voxel = layer.getVoxelPtr(static_cast<GlobalIndex>(iter->first));
     if (!voxel) {
       ++iter;
       continue;
@@ -119,10 +117,9 @@ void GvdParentTracker::updateVertexMapping(const Layer<GvdVoxel>& layer) {
       continue;
     }
 
-    std::memcpy(iter->second.pos, voxel->parent_pos, sizeof(iter->second.pos));
+    iter->second.pos = voxel->parent_pos;
     ++iter;
   }
 }
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

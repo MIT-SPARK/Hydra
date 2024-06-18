@@ -36,8 +36,9 @@
 #include <optional>
 
 #include "hydra/common/dsg_types.h"
-#include "hydra/places/gvd_integrator_config.h"
 #include "hydra/eval/place_metrics.h"
+#include "hydra/places/gvd_integrator_config.h"
+#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::eval {
 
@@ -45,8 +46,7 @@ class PlaceEvaluator {
  public:
   using Ptr = std::unique_ptr<PlaceEvaluator>;
 
-  PlaceEvaluator(const places::GvdIntegratorConfig& config,
-                 const voxblox::Layer<voxblox::TsdfVoxel>::Ptr& tsdf);
+  PlaceEvaluator(const places::GvdIntegratorConfig& config, const TsdfLayer::Ptr& tsdf);
 
   void computeGroundTruth(const places::GvdIntegratorConfig& config);
 
@@ -59,8 +59,8 @@ class PlaceEvaluator {
 
  private:
   places::GvdIntegratorConfig config_;
-  voxblox::Layer<voxblox::TsdfVoxel>::Ptr tsdf_;
-  voxblox::Layer<places::GvdVoxel>::Ptr gvd_;
+  TsdfLayer::Ptr tsdf_;
+  places::GvdLayer::Ptr gvd_;
 };
 
 }  // namespace hydra::eval

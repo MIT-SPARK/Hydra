@@ -33,24 +33,27 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <voxblox/core/common.h>
-#include <voxblox/core/layer.h>
 
+#include "hydra/reconstruction/index_getter.h"
 #include "hydra/reconstruction/mesh_integrator_config.h"
-#include "hydra/reconstruction/vertex_voxel.h"
-
-namespace voxblox {
-class ThreadSafeIndex;
-}  // namespace voxblox
+#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra {
 
 class VolumetricMap;
 
+// Former VertexVoxel.
+struct OccupancyVoxel {
+  bool on_surface = false;
+  size_t block_vertex_index;
+  BlockIndex mesh_block;
+};
+using OccupancyBlock = spatial_hash::VoxelBlock<OccupancyVoxel>;
+using OccupancyLayer = spatial_hash::VoxelLayer<OccupancyBlock>;
+
 class MeshIntegrator {
  public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  using OccupancyLayer = voxblox::Layer<VertexVoxel>;
+  using BlockIndexGetter = IndexGetter<BlockIndex>;
 
   explicit MeshIntegrator(const MeshIntegratorConfig& config);
 
@@ -61,38 +64,40 @@ class MeshIntegrator {
                             bool clear_updated_flag,
                             OccupancyLayer* occupancy = nullptr) const;
 
-  void allocateBlocks(const voxblox::BlockIndexList& blocks,
+  void allocateBlocks(const BlockIndices& blocks,
                       VolumetricMap& map,
                       OccupancyLayer* occupancy) const;
 
   void showUpdateInfo(const VolumetricMap& map,
-                      const voxblox::BlockIndexList& blocks,
+                      const BlockIndices& blocks,
                       int verbosity) const;
 
-  void launchThreads(const voxblox::BlockIndexList& blocks,
+  void launchThreads(const BlockIndices& blocks,
                      bool interior_pass,
                      VolumetricMap& map,
                      OccupancyLayer* occupancy) const;
 
-  void processInterior(const voxblox::BlockIndexList& blocks,
-                       VolumetricMap* map,
-                       voxblox::ThreadSafeIndex* index_getter,
+  void processInterior(VolumetricMap* map,
+                       BlockIndexGetter* index_getter,
                        OccupancyLayer* occupancy) const;
 
-  void processExterior(const voxblox::BlockIndexList& blocks,
-                       VolumetricMap* map,
-                       voxblox::ThreadSafeIndex* index_getter,
+  void processExterior(VolumetricMap* map,
+                       BlockIndexGetter* index_getter,
                        OccupancyLayer* occupancy) const;
 
-  virtual void meshBlockInterior(const voxblox::BlockIndex& block_index,
-                                 const voxblox::VoxelIndex& voxel_index,
+  virtual void meshBlockInterior(const BlockIndex& block_index,
+                                 const VoxelIndex& voxel_index,
                                  VolumetricMap& map,
                                  OccupancyLayer* occupancy) const;
 
-  virtual void meshBlockExterior(const voxblox::BlockIndex& block_index,
-                                 const voxblox::VoxelIndex& voxel_index,
+  virtual void meshBlockExterior(const BlockIndex& block_index,
+                                 const VoxelIndex& voxel_index,
                                  VolumetricMap& map,
                                  OccupancyLayer* occupancy) const;
+
+  static BlockIndex getNeighborIndex(const BlockIndex& block_idx,
+                                     int voxels_per_side,
+                                     VoxelIndex& corner_index);
 
  protected:
   const MeshIntegratorConfig config_;

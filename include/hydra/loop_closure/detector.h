@@ -37,8 +37,7 @@
 #include "hydra/loop_closure/registration.h"
 #include "hydra/loop_closure/scene_graph_descriptors.h"
 
-namespace hydra {
-namespace lcd {
+namespace hydra::lcd {
 
 struct GnnLcdConfig {
   bool use_onehot_encoding = true;
@@ -142,5 +141,4 @@ class LcdDetector {
   std::map<size_t, LayerSearchResults> matches_;
 };
 
-}  // namespace lcd
-}  // namespace hydra
+}  // namespace hydra::lcd

@@ -33,6 +33,9 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+
+#include <spatial_hash/neighbor_utils.h>
+
 #include <utility>
 
 #include "hydra/places/graph_extractor_interface.h"
@@ -41,7 +44,8 @@
 #include "hydra/places/gvd_utilities.h"
 #include "hydra/places/gvd_voxel.h"
 #include "hydra/places/update_statistics.h"
-#include "hydra/places/voxblox_types.h"
+#include "hydra/reconstruction/voxel_types.h"
+#include "hydra/utils/bucket_queue.h"
 
 namespace hydra::places {
 
@@ -55,10 +59,6 @@ struct OpenQueueEntry {
  */
 class GvdIntegrator {
  public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  using TsdfLayer = voxblox::Layer<voxblox::TsdfVoxel>;
-  using GvdLayer = voxblox::Layer<GvdVoxel>;
-
   GvdIntegrator(const GvdIntegratorConfig& config,
                 const GvdLayer::Ptr& gvd_layer,
                 const GraphExtractorInterface::Ptr& graph_extractor);
@@ -72,11 +72,12 @@ class GvdIntegrator {
 
   void updateGvd(uint64_t timestamp_ns);
 
-  void archiveBlocks(const BlockIndexList& blocks);
+  void archiveBlocks(const BlockIndices& blocks);
 
   // TODO(nathan) test this
   static bool setFixedParent(const GvdLayer& layer,
-                             const GvdNeighborhood::IndexMatrix& neighbor_indices,
+                             const GlobalIndices& neighbor_indices,
+                             const GlobalIndex& voxel_index,
                              GvdVoxel& voxel);
 
  protected:
@@ -93,7 +94,7 @@ class GvdIntegrator {
   // TSDF propagation
   void propagateSurface(const BlockIndex& block_index, const TsdfLayer& tsdf);
 
-  void processTsdfBlock(const Block<TsdfVoxel>& block, const BlockIndex& index);
+  void processTsdfBlock(const TsdfBlock& block, const BlockIndex& index);
 
   void updateUnobservedVoxel(const TsdfVoxel& tsdf_voxel,
                              const GlobalIndex& index,
@@ -115,10 +116,10 @@ class GvdIntegrator {
   // Helpers
   bool isTsdfFixed(const TsdfVoxel& voxel);
 
-  voxblox::Point getParentPosition(const GlobalIndex& index,
-                                   const GvdVoxel& voxel) const;
+  Point getParentPosition(const GlobalIndex& index, const GvdVoxel& voxel) const;
 
-  voxblox::Point getPosition(const GlobalIndex& index) const;
+  std::optional<Point> computeGradient(const TsdfLayer& tsdf,
+                                       const GlobalIndex& index) const;
 
  protected:
   UpdateStatistics update_stats_;
@@ -129,12 +130,12 @@ class GvdIntegrator {
 
   GraphExtractorInterface::Ptr graph_extractor_;
   GvdParentTracker parent_tracker_;
-  GvdNeighborhood::IndexMatrix neighbor_indices_;
+  const spatial_hash::NeighborSearch neighbor_search_;
 
   BucketQueue<OpenQueueEntry> open_;
 
-  FloatingPoint voxel_size_;
-  FloatingPoint min_integration_distance_m_;
+  float voxel_size_;
+  float min_integration_distance_m_;
 };
 
 }  // namespace hydra::places

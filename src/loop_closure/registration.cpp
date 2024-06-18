@@ -39,8 +39,7 @@
 
 #include "hydra/utils/timing_utilities.h"
 
-namespace hydra {
-namespace lcd {
+namespace hydra::lcd {
 
 inline std::ostream& operator<<(std::ostream& out, const gtsam::Quaternion& q) {
   out << "{w: " << q.w() << ", x: " << q.x() << ", y: " << q.y() << ", z: " << q.z()
@@ -234,5 +233,4 @@ RegistrationSolution DsgTeaserSolver::solve(const DynamicSceneGraph& dsg,
   return getFullSolutionFromLayer(dsg, solution, query_agent_id, match.match_root);
 }
 
-}  // namespace lcd
-}  // namespace hydra
+}  // namespace hydra::lcd

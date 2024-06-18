@@ -33,20 +33,100 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <Eigen/Dense>
-#include <optional>
+
+#include <spark_dsg/mesh.h>
+#include <spatial_hash/voxel_layer.h>
+
+#include <cstddef>
+#include <cstdint>
+
+#include "hydra/common/common_types.h"
 
 namespace hydra {
+
+using spatial_hash::Point;
+
+// Index types.
+using spatial_hash::BlockIndex;
+using spatial_hash::GlobalIndex;
+using spatial_hash::VoxelIndex;
+using spatial_hash::VoxelKey;
+
+// Index containers.
+using spatial_hash::BlockIndices;
+using spatial_hash::GlobalIndices;
+using spatial_hash::VoxelIndices;
+using spatial_hash::VoxelKeys;
+
+// Index Sets.
+using BlockIndexSet = spatial_hash::IndexSet;
+using VoxelIndexSet = spatial_hash::IndexSet;
+using GlobalIndexSet = spatial_hash::IndexSet;
+
+// Index hash maps.
+template <typename ValueT>
+using VoxelIndexMap = spatial_hash::IndexHashMap<ValueT>;
+template <typename ValueT>
+using BlockIndexMap = spatial_hash::IndexHashMap<ValueT>;
+template <typename ValueT>
+using GlobalIndexMap = spatial_hash::IndexHashMap<ValueT>;
+
+// Voxel types.
+struct TsdfVoxel {
+  float distance = 0.0f;
+  float weight = 0.0f;
+  Color color;
+};
 
 // Based on the semantic voxel from Kimera-Semantics
 struct SemanticVoxel {
   //! Current MLE semantic label
-  uint32_t semantic_label;
+  uint32_t semantic_label = 0;
   // TODO(nathan) top-K!
   //! Log-likelihood priors of each label
   Eigen::VectorXf semantic_likelihoods;
   //! Whether or not the voxel has been initialized
   bool empty = true;
 };
+
+// Block types.
+struct TsdfBlock : public spatial_hash::VoxelBlock<TsdfVoxel> {
+  using Ptr = std::shared_ptr<TsdfBlock>;
+  using ConstPtr = std::shared_ptr<const TsdfBlock>;
+
+  TsdfBlock(const float voxel_size,
+            const float voxels_per_side,
+            const BlockIndex& index)
+      : spatial_hash::VoxelBlock<TsdfVoxel>(voxel_size, voxels_per_side, index) {}
+
+  mutable bool esdf_updated = false;
+  mutable bool mesh_updated = false;
+
+  void setUpdated() const {
+    updated = true;
+    esdf_updated = true;
+    mesh_updated = true;
+  }
+
+  // Function to enable iterating over update blocks.
+  static bool esdfUpdated(const TsdfBlock& block) { return block.esdf_updated; }
+  static bool meshUpdated(const TsdfBlock& block) { return block.mesh_updated; }
+};
+
+using SemanticBlock = spatial_hash::VoxelBlock<SemanticVoxel>;
+
+using spark_dsg::Mesh;
+
+struct MeshBlock : public Mesh, public spatial_hash::Block {
+  using Ptr = std::shared_ptr<MeshBlock>;
+  using ConstPtr = std::shared_ptr<const MeshBlock>;
+  MeshBlock(const float block_size, const BlockIndex& index, bool has_labels = false)
+      : Mesh(true, false, has_labels, false), spatial_hash::Block(block_size, index) {}
+};
+
+// Layer types.
+using TsdfLayer = spatial_hash::VoxelLayer<TsdfBlock>;
+using SemanticLayer = spatial_hash::VoxelLayer<SemanticBlock>;
+using MeshLayer = spatial_hash::BlockLayer<MeshBlock>;
 
 }  // namespace hydra

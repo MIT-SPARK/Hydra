@@ -33,11 +33,13 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <queue>
+
 #include "hydra/common/dsg_types.h"
 #include "hydra/places/graph_extractor_config.h"
 #include "hydra/places/gvd_graph.h"
 #include "hydra/places/gvd_voxel.h"
-#include "hydra/places/voxblox_types.h"
+#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::places {
 
@@ -47,7 +49,6 @@ class GraphExtractorInterface {
  public:
   using Ptr = std::shared_ptr<GraphExtractorInterface>;
   using NodeIndexMap = std::unordered_map<NodeId, GlobalIndex>;
-  using GvdLayer = Layer<GvdVoxel>;
 
   explicit GraphExtractorInterface(const GraphExtractorConfig& config);
 
@@ -109,7 +110,7 @@ class GraphExtractorInterface {
   GvdGraph::Ptr gvd_;
 
   NodeIndexMap node_index_map_;
-  AlignedQueue<GlobalIndex> modified_voxel_queue_;
+  std::queue<GlobalIndex> modified_voxel_queue_;
 
   std::map<EdgeKey, bool> heuristic_edges_;
   std::unordered_set<NodeId> deleted_nodes_;

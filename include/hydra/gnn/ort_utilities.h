@@ -42,8 +42,7 @@
 
 #include "hydra/gnn/tensor.h"
 
-namespace hydra {
-namespace gnn {
+namespace hydra::gnn {
 
 struct FieldInfo {
   std::string name;
@@ -75,5 +74,4 @@ std::string getElementTypeString(ONNXTensorElementDataType type);
 
 std::ostream& operator<<(std::ostream& out, const FieldInfo& info);
 
-}  // namespace gnn
-}  // namespace hydra
+}  // namespace::hydra

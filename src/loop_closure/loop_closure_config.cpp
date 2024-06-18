@@ -144,6 +144,7 @@ void declare_config(LcdDetectorConfig& conf) {
 }
 
 }  // namespace lcd
+
 }  // namespace hydra
 
 namespace teaser {

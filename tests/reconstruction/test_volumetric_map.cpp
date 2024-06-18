@@ -41,10 +41,10 @@
 
 namespace hydra {
 
-void fillSemanticBlock(voxblox::Block<SemanticVoxel>& block, size_t offset) {
-  for (size_t i = 0; i < block.num_voxels(); ++i) {
-    auto& voxel = block.getVoxelByLinearIndex(i);
-    if (i % 3 == 0 || i == block.num_voxels() - 1) {
+void fillSemanticBlock(SemanticBlock& block, size_t offset) {
+  for (size_t i = 0; i < block.numVoxels(); ++i) {
+    auto& voxel = block.getVoxel(i);
+    if (i % 3 == 0 || i == block.numVoxels() - 1) {
       voxel.empty = false;
       voxel.semantic_label = 2 * i + offset;
       voxel.semantic_likelihoods = Eigen::VectorXf::Constant(
@@ -56,13 +56,13 @@ void fillSemanticBlock(voxblox::Block<SemanticVoxel>& block, size_t offset) {
   }
 }
 
-void compareVoxels(const voxblox::Block<SemanticVoxel>& lhs,
-                   const voxblox::Block<SemanticVoxel>& rhs) {
-  CHECK_EQ(lhs.num_voxels(), rhs.num_voxels());
-  for (size_t i = 0; i < lhs.num_voxels(); ++i) {
+void compareVoxels(const SemanticBlock& lhs,
+                   const SemanticBlock& rhs) {
+  CHECK_EQ(lhs.numVoxels(), rhs.numVoxels());
+  for (size_t i = 0; i < lhs.numVoxels(); ++i) {
     SCOPED_TRACE("Voxel " + std::to_string(i));
-    auto& v_lhs = lhs.getVoxelByLinearIndex(i);
-    auto& v_rhs = rhs.getVoxelByLinearIndex(i);
+    auto& v_lhs = lhs.getVoxel(i);
+    auto& v_rhs = rhs.getVoxel(i);
     EXPECT_EQ(v_lhs.empty, v_rhs.empty);
     EXPECT_EQ(v_lhs.semantic_label, v_rhs.semantic_label);
     EXPECT_TRUE(v_lhs.semantic_likelihoods.isApprox(v_rhs.semantic_likelihoods));
@@ -124,12 +124,12 @@ TEST_F(VolumetricMapFixture, SaveLoadSemanticsCorrect) {
   auto semantics = original.getSemanticLayer();
   ASSERT_TRUE(semantics != nullptr);
 
-  const voxblox::BlockIndex idx1(0, 0, 0);
-  auto block1 = semantics->allocateBlockPtrByIndex(idx1);
+  const BlockIndex idx1(0, 0, 0);
+  auto block1 = semantics->allocateBlockPtr(idx1);
   fillSemanticBlock(*block1, 0);
 
-  const voxblox::BlockIndex idx2(0, 1, 0);
-  auto block2 = semantics->allocateBlockPtrByIndex(idx2);
+  const BlockIndex idx2(0, 1, 0);
+  auto block2 = semantics->allocateBlockPtr(idx2);
   fillSemanticBlock(*block2, 1);
 
   original.save(map_path.string());
@@ -145,10 +145,10 @@ TEST_F(VolumetricMapFixture, SaveLoadSemanticsCorrect) {
   ASSERT_TRUE(result_semantics != nullptr);
   ASSERT_TRUE(result_semantics->hasBlock(idx1));
   ASSERT_TRUE(result_semantics->hasBlock(idx2));
-  const auto& result_block1 = result_semantics->getBlockByIndex(idx1);
+  const auto& result_block1 = result_semantics->getBlock(idx1);
   SCOPED_TRACE("block 1");
   compareVoxels(*block1, result_block1);
-  const auto& result_block2 = result_semantics->getBlockByIndex(idx2);
+  const auto& result_block2 = result_semantics->getBlock(idx2);
   SCOPED_TRACE("block 2");
   compareVoxels(*block2, result_block2);
 }

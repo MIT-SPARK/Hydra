@@ -35,19 +35,15 @@
 #include "hydra/eval/room_evaluator.h"
 
 #include <glog/logging.h>
-#include <voxblox/io/layer_io.h>
-#include <voxblox/utils/planning_utils.h>
+
+#include "hydra/reconstruction/voxel_types.h"
+#include "hydra/utils/layer_io.h"
 
 namespace hydra::eval {
 
-using voxblox::BlockIndex;
-using voxblox::Layer;
-using voxblox::TsdfVoxel;
-using voxblox::VoxelIndex;
-
 RoomEvaluator::RoomEvaluator(const Config& config,
                              const RoomGeometry& rooms,
-                             const Layer<TsdfVoxel>::Ptr& tsdf)
+                             const TsdfLayer::Ptr& tsdf)
     : config(config), rooms_(rooms), tsdf_(CHECK_NOTNULL(tsdf)) {
   computeRoomIndices();
 }
@@ -57,26 +53,22 @@ void RoomEvaluator::computeRoomIndices() {
     room_indices_[room_id] = {};
   }
 
-  voxblox::BlockIndexList blocks;
-  tsdf_->getAllAllocatedBlocks(&blocks);
-
-  for (const auto& block_idx : blocks) {
-    const auto block = tsdf_->getBlockPtrByIndex(block_idx);
-    for (size_t idx = 0; idx < block->num_voxels(); ++idx) {
-      const auto& voxel = block->getVoxelByLinearIndex(idx);
+  for (const auto& block : *tsdf_) {
+    for (size_t idx = 0; idx < block.numVoxels(); ++idx) {
+      const auto& voxel = block.getVoxel(idx);
       if (voxel.weight < config.min_weight || voxel.distance < config.min_distance) {
         continue;
       }
 
-      const auto pos = block->computeCoordinatesFromLinearIndex(idx);
+      const auto pos = block.getVoxelPosition(idx);
       const auto room_id = rooms_.findRoomIndex(pos);
       if (!room_id) {
         continue;
       }
 
-      const auto voxel_idx = block->computeVoxelIndexFromLinearIndex(idx);
-      const auto global_index = lookupGlobalIndex(block_idx, voxel_idx);
-      room_indices_[*room_id].insert(global_index);
+      const auto global_index = block.getGlobalVoxelIndex(idx);
+      room_indices_[*room_id].insert(
+          {global_index.x(), global_index.y(), global_index.z()});
     }
   }
 }
@@ -98,34 +90,27 @@ void RoomEvaluator::computeDsgIndices(const DynamicSceneGraph& graph,
     for (const auto& child : room_node->children()) {
       const auto& place_node = graph.getNode(child);
       const auto& attrs = place_node.attributes<PlaceNodeAttributes>();
-      const voxblox::Point pos = attrs.position.cast<float>();
+      const Point pos = attrs.position.cast<float>();
+      const auto sphere = getSphereAroundPoint(*tsdf_, pos, attrs.distance);
 
-      voxblox::HierarchicalIndexMap sphere;
-      voxblox::utils::getSphereAroundPoint(*tsdf_, pos, attrs.distance, &sphere);
-
-      for (auto&& [block_idx, local_indices] : sphere) {
-        const auto block = tsdf_->getBlockPtrByIndex(block_idx);
-        if (!block) {
+      for (const auto& global_index : sphere) {
+        auto* voxel = tsdf_->getVoxelPtr(global_index);
+        if (!voxel) {
+          continue;
+        }
+        if (voxel->weight < config.min_weight ||
+            voxel->distance < config.min_distance) {
           continue;
         }
 
-        for (const auto& voxel_idx : local_indices) {
-          const auto& voxel = block->getVoxelByVoxelIndex(voxel_idx);
-          if (voxel.weight < config.min_weight ||
-              voxel.distance < config.min_distance) {
+        if (config.only_labeled) {
+          const auto pos = tsdf_->getVoxelPosition(global_index);
+          const auto room_id = rooms_.findRoomIndex(pos);
+          if (!room_id) {
             continue;
           }
-
-          if (config.only_labeled) {
-            const auto pos = block->computeCoordinatesFromVoxelIndex(voxel_idx);
-            const auto room_id = rooms_.findRoomIndex(pos);
-            if (!room_id) {
-              continue;
-            }
-          }
-
-          indices[room].insert(lookupGlobalIndex(block_idx, voxel_idx));
         }
+        indices[room].insert({global_index.x(), global_index.y(), global_index.z()});
       }
     }
   }
@@ -143,25 +128,43 @@ RoomMetrics RoomEvaluator::eval(const std::string& graph_filepath) const {
   return scoreRooms(room_indices_, est_indices);
 }
 
+GlobalIndices RoomEvaluator::getSphereAroundPoint(const TsdfLayer& layer,
+                                                  const Point& center,
+                                                  float radius) {
+  GlobalIndices result;
+  const GlobalIndex center_index = layer.getGlobalVoxelIndex(center);
+  const float radius_in_voxels = radius / layer.voxel_size;
+
+  for (float x = -radius_in_voxels; x <= radius_in_voxels; x++) {
+    for (float y = -radius_in_voxels; y <= radius_in_voxels; y++) {
+      for (float z = -radius_in_voxels; z <= radius_in_voxels; z++) {
+        Point point_voxel_space(x, y, z);
+
+        // check if point is inside the spheres radius
+        if (point_voxel_space.norm() <= radius_in_voxels) {
+          GlobalIndex voxel_offset_index(std::floor(point_voxel_space.x()),
+                                         std::floor(point_voxel_space.y()),
+                                         std::floor(point_voxel_space.z()));
+          result.push_back(center_index + voxel_offset_index);
+        }
+      }
+    }
+  }
+  return result;
+}
+
 RoomEvaluator::Ptr RoomEvaluator::fromFile(const Config& config,
                                            const std::string& room_filepath,
                                            const std::string& tsdf_filepath) {
   const auto rooms = RoomGeometry::fromFile(room_filepath);
 
-  Layer<TsdfVoxel>::Ptr tsdf;
-  if (!voxblox::io::LoadLayer<TsdfVoxel>(tsdf_filepath, &tsdf)) {
+  auto tsdf = io::loadLayer<TsdfLayer>(tsdf_filepath);
+  if (!tsdf) {
     LOG(ERROR) << "Failed to load TSDF from: " << tsdf_filepath;
     return nullptr;
   }
 
   return std::make_unique<RoomEvaluator>(config, rooms, tsdf);
-}
-
-std::array<int64_t, 3> RoomEvaluator::lookupGlobalIndex(const BlockIndex& block,
-                                                        const VoxelIndex& local) const {
-  const auto global_idx = voxblox::getGlobalVoxelIndexFromBlockAndVoxelIndex(
-      block, local, tsdf_->voxels_per_side());
-  return {global_idx.x(), global_idx.y(), global_idx.z()};
 }
 
 }  // namespace hydra::eval

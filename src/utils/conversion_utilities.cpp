@@ -80,7 +80,7 @@ bool conversions::colorToLabels(cv::Mat& label_image, const cv::Mat& colors) {
   for (int r = 0; r < colors.rows; ++r) {
     for (int c = 0; c < colors.cols; ++c) {
       const auto& pixel = colors.at<cv::Vec3b>(r, c);
-      voxblox::Color color{pixel[0], pixel[1], pixel[2], 255};
+      Color color(pixel[0], pixel[1], pixel[2]);
       // this is lazy, but works out to the same invalid label we normally use
       new_label_image.at<int32_t>(r, c) =
           colormap_ptr->getLabelFromColor(color).value_or(-1);

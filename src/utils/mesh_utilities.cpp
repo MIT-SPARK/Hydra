@@ -72,13 +72,25 @@ bool updateObjectGeometry(const spark_dsg::Mesh& mesh,
   }
 
   const BoundingBox::MeshAdaptor adaptor(mesh, indices ? indices : &mesh_connections);
-  attrs.bounding_box =
-      BoundingBox(adaptor, type.value_or(attrs.bounding_box.type));
+  attrs.bounding_box = BoundingBox(adaptor, type.value_or(attrs.bounding_box.type));
   if (indices) {
     return updateNodeCentroid(mesh, *indices, attrs);
   } else {
     return updateNodeCentroid(mesh, mesh_connections, attrs);
   }
+}
+
+MeshLayer::Ptr getActiveMesh(const MeshLayer& mesh_layer,
+                             const BlockIndices& archived_blocks) {
+  auto active_mesh = std::make_shared<MeshLayer>(mesh_layer.blockSize());
+  const BlockIndexSet archived_set(archived_blocks.begin(), archived_blocks.end());
+  for (const auto& block : mesh_layer.updatedBlockIndices()) {
+    if (archived_set.count(block)) {
+      continue;
+    }
+    active_mesh->allocateBlock(block) = mesh_layer.getBlock(block);
+  }
+  return active_mesh;
 }
 
 }  // namespace hydra

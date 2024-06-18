@@ -33,18 +33,35 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <Eigen/Dense>
-#include <iostream>
+
+#include <kimera_pgmo/utils/MeshInterface.h>
+
+#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra {
 
-template <typename Scalar>
-std::string showIndex(const Eigen::Matrix<Scalar, 3, 1>& vector) {
-  std::stringstream ss;
-  const Eigen::IOFormat format(
-      Eigen::FullPrecision, Eigen::DontAlignCols, ", ", ", ", "", "", "[", "]");
-  ss << vector.format(format);
-  return ss.str();
-}
+/**
+ * @brief Wrapper struct for pgmo mesh interface.
+ * TODO(lschmid): This pulls in voxblox! Clean up once pgmo is more cleaned up.
+ */
+struct PgmoMeshInterface : public kimera_pgmo::MeshInterface {
+  PgmoMeshInterface(const MeshLayer& mesh);
+
+  const voxblox::BlockIndexList& blockIndices() const override;
+
+  void markBlockActive(const voxblox::BlockIndex& block) override;
+
+  size_t activeBlockSize() const override;
+
+  pcl::PointXYZRGBA getActiveVertex(size_t index) const override;
+
+  bool hasSemantics() const { return true; }
+
+  std::optional<uint32_t> getActiveSemantics(size_t index) const override;
+  private:
+    const MeshLayer& mesh_;
+    voxblox::BlockIndexList block_indices;
+    MeshBlock::ConstPtr active_mesh_;
+};
 
 }  // namespace hydra

@@ -40,8 +40,7 @@
 
 #include "hydra/gnn/tensor.h"
 
-namespace hydra {
-namespace gnn {
+namespace hydra::gnn {
 
 using TensorMap = std::map<std::string, Tensor>;
 using DynamicIndexMap = std::map<std::string, std::vector<size_t>>;
@@ -98,5 +97,4 @@ class GnnInterface {
   friend std::ostream& operator<<(std::ostream& out, const GnnInterface& gnn);
 };
 
-}  // namespace gnn
-}  // namespace hydra
+}  // namespace::hydra

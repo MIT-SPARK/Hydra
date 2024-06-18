@@ -37,7 +37,7 @@
 
 #include <cstdint>
 
-#include "hydra/reconstruction/semantic_voxel.h"
+#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra {
 

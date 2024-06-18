@@ -35,14 +35,8 @@
 #include "hydra_test/place_fixtures.h"
 
 #include <hydra/places/gvd_utilities.h>
-#include <voxblox/core/voxel.h>
-#include <voxblox/integrator/esdf_integrator.h>
-#include <voxblox/integrator/tsdf_integrator.h>
-#include <voxblox/simulation/simulation_world.h>
 
-namespace hydra {
-namespace places {
-namespace test {
+namespace hydra::places::test {
 
 void updateGvd(GvdIntegrator& integrator,
                const VolumetricMap& map,
@@ -50,86 +44,6 @@ void updateGvd(GvdIntegrator& integrator,
                bool use_all_blocks) {
   integrator.updateFromTsdf(0, map.getTsdfLayer(), clear_updated, use_all_blocks);
   integrator.updateGvd(0);
-}
-
-void EsdfTestFixture::SetUp() { setupWorld(); }
-
-void EsdfTestFixture::updateTsdfIntegrator(voxblox::TsdfIntegratorBase& integrator,
-                                           size_t index) {
-  voxblox::Transformation world_T_camera = getPose(index);
-  VLOG(10) << "world_T_camera: " << std::endl << world_T_camera;
-
-  Eigen::Vector2i resolution;
-  resolution << depth_camera_width, depth_camera_height;
-
-  voxblox::Colors colors;
-  voxblox::Pointcloud camera_pointcloud;
-  world.getPointcloudFromTransform(world_T_camera,
-                                   resolution,
-                                   depth_camera_fov,
-                                   depth_camera_max_distance,
-                                   &camera_pointcloud,
-                                   &colors);
-
-  VLOG(10) << "camera pointcloud: " << camera_pointcloud.size() << " points";
-
-  voxblox::Pointcloud world_pointcloud;
-  voxblox::transformPointcloud(
-      world_T_camera.inverse(), camera_pointcloud, &world_pointcloud);
-  VLOG(10) << "world pointcloud: " << world_pointcloud.size() << " points";
-
-  integrator.integratePointCloud(world_T_camera, world_pointcloud, colors);
-}
-
-voxblox::Point EsdfTestFixture::getCenter() const {
-  return voxblox::Point(0.0, 0.0, 2.0);
-}
-
-void EsdfTestFixture::setupWorld() {
-  world.setBounds(voxblox::Point(-5.0, -5.0, -1.0), voxblox::Point(5.0, 5.0, 6.0));
-  world.addObject(std::make_unique<voxblox::Cylinder>(
-      getCenter(), 2.0, 4.0, voxblox::Color::Red()));
-  world.addGroundLevel(0.0);
-}
-
-voxblox::Transformation EsdfTestFixture::getPose(size_t index) const {
-  double angle =
-      2.0 * M_PI * (static_cast<double>(index) / static_cast<double>(num_angles));
-  voxblox::Point position(
-      pose_radius * std::sin(angle), pose_radius * std::cos(angle), pose_height);
-
-  voxblox::Point direction = getCenter() - position;
-  double yaw = std::atan2(direction.y(), direction.x());
-
-  voxblox::Quaternion rotation = voxblox::Quaternion(
-      Eigen::AngleAxis<float>(yaw, voxblox::Point::UnitZ()) *
-      Eigen::AngleAxis<float>(camera_pitch, voxblox::Point::UnitY()));
-
-  return voxblox::Transformation(rotation, position);
-}
-
-GvdTestFixture::GvdTestFixture() : EsdfTestFixture() {
-  depth_camera_max_distance = 3.0;
-  depth_camera_fov = M_PI / 7.0;
-  pose_radius = 2.0;
-  pose_height = 1.5;
-  num_angles = 50;
-  num_poses = 2;
-  camera_pitch = 0.6;
-  depth_camera_width = 240;
-  depth_camera_height = 320;
-}
-
-voxblox::Transformation GvdTestFixture::getPose(size_t) const {
-  return EsdfTestFixture::getPose(0);
-}
-
-void GvdTestFixture::setupWorld() {
-  world.setBounds(voxblox::Point(-5.0, -5.0, -1.0), voxblox::Point(5.0, 5.0, 6.0));
-  world.addObject(std::make_unique<voxblox::Cube>(voxblox::Point(0.0, 0.0, 0.0),
-                                                  voxblox::Point(1.0, 1.0, 2.0),
-                                                  voxblox::Color::Red()));
-  world.addGroundLevel(0.0);
 }
 
 void SingleBlockTestFixture::setTsdfVoxel(
@@ -141,7 +55,7 @@ void SingleBlockTestFixture::setTsdfVoxel(
   VoxelIndex v_index;
   v_index << x, y, z;
 
-  auto& voxel = tsdf_block->getVoxelByVoxelIndex(v_index);
+  auto& voxel = tsdf_block->getVoxel(v_index);
   voxel.distance = distance;
   voxel.weight = weight;
 }
@@ -154,7 +68,7 @@ const GvdVoxel& SingleBlockTestFixture::getGvdVoxel(int x, int y, int z) {
   VoxelIndex v_index;
   v_index << x, y, z;
 
-  return gvd_block->getVoxelByVoxelIndex(v_index);
+  return gvd_block->getVoxel(v_index);
 }
 
 const TsdfVoxel& SingleBlockTestFixture::getTsdfVoxel(int x, int y, int z) {
@@ -165,7 +79,7 @@ const TsdfVoxel& SingleBlockTestFixture::getTsdfVoxel(int x, int y, int z) {
   VoxelIndex v_index;
   v_index << x, y, z;
 
-  return tsdf_block->getVoxelByVoxelIndex(v_index);
+  return tsdf_block->getVoxel(v_index);
 }
 
 void SingleBlockTestFixture::SetUp() {
@@ -177,12 +91,12 @@ void SingleBlockTestFixture::SetUp() {
   map_config.voxels_per_side = voxels_per_side;
   map_config.truncation_distance = truncation_distance;
   map = std::make_unique<VolumetricMap>(map_config, false);
-  gvd_layer.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
+  gvd_layer.reset(new GvdLayer(voxel_size, voxels_per_side));
 
   BlockIndex block_index = BlockIndex::Zero();
-  tsdf_block = map->getTsdfLayer().allocateBlockPtrByIndex(block_index);
-  gvd_block = gvd_layer->allocateBlockPtrByIndex(block_index);
-  tsdf_block->updated().set();
+  tsdf_block = map->getTsdfLayer().allocateBlockPtr(block_index);
+  gvd_block = gvd_layer->allocateBlockPtr(block_index);
+  tsdf_block->setUpdated();
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -214,7 +128,7 @@ void TestFixture2d::setSurfaceVoxel(int x, int y) {
   VoxelIndex v_index;
   v_index << x, y, 0;
 
-  auto& voxel = tsdf_block->getVoxelByVoxelIndex(v_index);
+  auto& voxel = tsdf_block->getVoxel(v_index);
   voxel.distance = 0.0;
   voxel.weight = 1.0;
 }
@@ -226,7 +140,7 @@ void TestFixture2d::setTsdfVoxel(int x, int y, float distance, float weight) {
   VoxelIndex v_index;
   v_index << x, y, 0;
 
-  auto& voxel = tsdf_block->getVoxelByVoxelIndex(v_index);
+  auto& voxel = tsdf_block->getVoxel(v_index);
   voxel.distance = distance;
   voxel.weight = weight;
 }
@@ -238,17 +152,17 @@ const GvdVoxel& TestFixture2d::getGvdVoxel(int x, int y) {
   VoxelIndex v_index;
   v_index << x, y, 0;
 
-  return gvd_block->getVoxelByVoxelIndex(v_index);
+  return gvd_block->getVoxel(v_index);
 }
 
 void TestFixture2d::SetUp() {
-  tsdf_layer.reset(new Layer<TsdfVoxel>(voxel_size, voxels_per_side));
-  gvd_layer.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
+  tsdf_layer.reset(new TsdfLayer(voxel_size, voxels_per_side));
+  gvd_layer.reset(new GvdLayer(voxel_size, voxels_per_side));
 
   BlockIndex block_index = BlockIndex::Zero();
-  tsdf_block = tsdf_layer->allocateBlockPtrByIndex(block_index);
-  gvd_block = gvd_layer->allocateBlockPtrByIndex(block_index);
-  tsdf_block->updated().set();
+  tsdf_block = tsdf_layer->allocateBlockPtr(block_index);
+  gvd_block = gvd_layer->allocateBlockPtr(block_index);
+  tsdf_block->setUpdated();
 
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
@@ -256,13 +170,11 @@ void TestFixture2d::SetUp() {
         VoxelIndex v_index;
         v_index << x, y, 0;
 
-        auto& voxel = tsdf_block->getVoxelByVoxelIndex(v_index);
+        auto& voxel = tsdf_block->getVoxel(v_index);
         voxel.weight = 0.0;
       }
     }
   }
 }
 
-}  // namespace test
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places::test

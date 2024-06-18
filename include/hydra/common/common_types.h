@@ -33,35 +33,21 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <voxblox/core/layer.h>
-#include <voxblox/core/voxel.h>
-#include <voxblox/integrator/integrator_utils.h>
-#include <voxblox/mesh/mesh.h>
-#include <voxblox/mesh/mesh_layer.h>
-#include <voxblox/utils/bucket_queue.h>
-#include <voxblox/utils/neighbor_tools.h>
+
+#include <spark_dsg/color.h>
+
+#include <cstdint>
 
 namespace hydra {
-namespace places {
 
-using voxblox::AlignedQueue;
-using voxblox::Block;
-using voxblox::BlockIndex;
-using voxblox::BlockIndexList;
-using voxblox::BucketQueue;
-using voxblox::FloatingPoint;
-using voxblox::GlobalIndex;
-using voxblox::IndexSet;
-using voxblox::Layer;
-using voxblox::Mesh;
-using voxblox::MeshLayer;
-using voxblox::Neighborhood;
-using voxblox::NeighborhoodLookupTables;
-using voxblox::SignedIndex;
-using voxblox::ThreadSafeIndex;
-using voxblox::TsdfVoxel;
-using voxblox::VertexIndex;
-using voxblox::VoxelIndex;
+using spark_dsg::Color;
 
-}  // namespace places
+using TimeStamp = uint64_t;
+
+inline double toSeconds(TimeStamp time) { return static_cast<double>(time) / 1e9f; }
+
+inline TimeStamp fromSeconds(double time) {
+  return static_cast<TimeStamp>(time * 1e9f);
+}
+
 }  // namespace hydra

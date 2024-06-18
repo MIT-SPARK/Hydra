@@ -38,8 +38,7 @@
 
 #include "hydra_test/resources.h"
 
-namespace hydra {
-namespace lcd {
+namespace hydra::lcd {
 
 namespace {
 
@@ -397,5 +396,4 @@ TEST(GnnLcdTests, testObjectPosDescriptor) {
   EXPECT_NEAR((descriptor->values - expected).norm(), 0.0, 1.0e-5);
 }
 
-}  // namespace lcd
-}  // namespace hydra
+}  // namespace hydra::lcd

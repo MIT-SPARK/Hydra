@@ -38,8 +38,7 @@
 
 #include "hydra/gnn/gnn_interface.h"
 
-namespace hydra {
-namespace gnn {
+namespace hydra::gnn {
 
 TEST(GnnInterfaceTests, TestSimpleNetwork) {
   std::string package_path = ros::package::getPath("hydra");
@@ -84,5 +83,4 @@ TEST(GnnInterfaceTests, TestSimpleNetwork) {
   EXPECT_NEAR(diff, 0.0, 1.0e-9);
 }
 
-}  // namespace gnn
-}  // namespace hydra
+}  // namespace::hydra

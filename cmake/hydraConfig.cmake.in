@@ -10,7 +10,7 @@ find_dependency(OpenCV REQUIRED COMPONENTS core imgproc)
 find_dependency(spark_dsg REQUIRED)
 find_dependency(teaserpp REQUIRED)
 find_dependency(kimera_pgmo REQUIRED)
-find_dependency(voxblox REQUIRED)
+find_dependency(spatial_hash REQUIRED)
 
 if(NOT TARGET hydra::hydra)
   include("${hydra_CMAKE_DIR}/hydraTargets.cmake")

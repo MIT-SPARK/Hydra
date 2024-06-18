@@ -66,7 +66,7 @@ class ReconstructionModule : public Module {
   using OutputMsgStatus = std::pair<ReconstructionOutput::Ptr, bool>;
   using Sink = OutputSink<uint64_t,
                           const Eigen::Isometry3d&,
-                          const voxblox::Layer<voxblox::TsdfVoxel>&,
+                          const TsdfLayer&,
                           const ReconstructionOutput&>;
 
   struct Config {
@@ -112,7 +112,7 @@ class ReconstructionModule : public Module {
  protected:
   bool update(const InputPacket& msg, bool full_update);
 
-  voxblox::BlockIndexList findBlocksToArchive(const Eigen::Vector3f& center) const;
+  BlockIndices findBlocksToArchive(const Eigen::Vector3f& center) const;
 
   void fillOutput(ReconstructionOutput& output);
 

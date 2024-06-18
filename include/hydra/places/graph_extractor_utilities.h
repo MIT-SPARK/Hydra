@@ -39,17 +39,16 @@
 #include "hydra/common/dsg_types.h"
 #include "hydra/places/graph_extractor_config.h"
 #include "hydra/places/gvd_voxel.h"
-#include "hydra/places/voxblox_types.h"
+#include "hydra/reconstruction/voxel_types.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 using EdgeInfoMap = std::map<EdgeKey, EdgeAttributes::Ptr>;
 using NodeIndexMap = std::unordered_map<NodeId, GlobalIndex>;
 
 std::bitset<27> convertRowMajorFlags(std::bitset<27> flags_row_major);
 
-std::bitset<27> extractNeighborhoodFlags(const Layer<GvdVoxel>& layer,
+std::bitset<27> extractNeighborhoodFlags(const GvdLayer& layer,
                                          const GlobalIndex& index,
                                          uint8_t min_extra_basis = 1);
 
@@ -103,7 +102,7 @@ struct CornerFinder {
   GvdCornerTemplate positive_z_template;
 };
 
-voxblox::AlignedVector<GlobalIndex> makeBresenhamLine(const GlobalIndex& start,
+GlobalIndices makeBresenhamLine(const GlobalIndex& start,
                                                       const GlobalIndex& end);
 
 EdgeAttributes::Ptr getOverlapEdgeInfo(const SceneGraphLayer& graph,
@@ -112,7 +111,7 @@ EdgeAttributes::Ptr getOverlapEdgeInfo(const SceneGraphLayer& graph,
                                        double min_edge_clearance_m);
 
 EdgeAttributes::Ptr getFreespaceEdgeInfo(const SceneGraphLayer& graph,
-                                         const Layer<GvdVoxel>& gvd,
+                                         const GvdLayer& gvd,
                                          const NodeIndexMap& node_index_map,
                                          NodeId node,
                                          NodeId other,
@@ -125,10 +124,9 @@ void findOverlapEdges(const OverlapEdgeConfig& config,
 
 void findFreespaceEdges(const FreespaceEdgeConfig& config,
                         const SceneGraphLayer& graph,
-                        const Layer<GvdVoxel>& gvd,
+                        const GvdLayer& gvd,
                         const std::unordered_set<NodeId>& nodes,
                         const NodeIndexMap& node_index_map,
                         EdgeInfoMap& proposed_edges);
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

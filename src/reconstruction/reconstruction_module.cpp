@@ -51,8 +51,6 @@ namespace hydra {
 
 using pose_graph_tools_msgs::PoseGraph;
 using timing::ScopedTimer;
-using voxblox::BlockIndexList;
-using voxblox::Layer;
 
 void declare_config(ReconstructionModule::Config& conf) {
   using namespace config;
@@ -219,7 +217,7 @@ bool ReconstructionModule::update(const InputPacket& msg, bool full_update) {
     footprint_integrator_->addFreespaceFootprint(msg.world_T_body<float>(), *map_);
   }
 
-  if (map_->getTsdfLayer().getNumberOfAllocatedBlocks() == 0) {
+  if (map_->getTsdfLayer().numBlocks() == 0) {
     return false;
   }
 
@@ -252,32 +250,27 @@ bool ReconstructionModule::update(const InputPacket& msg, bool full_update) {
 
   auto& tsdf = map_->getTsdfLayer();
   auto& mesh = map_->getMeshLayer();
-  BlockIndexList blocks;
-  tsdf.getAllUpdatedBlocks(voxblox::Update::kEsdf, &blocks);
-  for (const auto& idx : blocks) {
-    tsdf.getBlockByIndex(idx).updated().reset(voxblox::Update::kEsdf);
-    mesh.getMeshBlock(idx)->updated = false;
+  BlockIndices blocks;
+  for (const auto& idx : tsdf.blockIndicesWithCondition(TsdfBlock::esdfUpdated)) {
+    tsdf.getBlock(idx).esdf_updated = false;
+    mesh.getBlock(idx).updated = false;
   }
 
   return true;
 }
 
 // TODO(nathan) push to map?
-BlockIndexList ReconstructionModule::findBlocksToArchive(
+BlockIndices ReconstructionModule::findBlocksToArchive(
     const Eigen::Vector3f& center) const {
   const auto& tsdf = map_->getTsdfLayer();
-  BlockIndexList blocks;
-  tsdf.getAllAllocatedBlocks(&blocks);
-
-  BlockIndexList to_archive;
-  for (const auto& idx : blocks) {
-    auto block = tsdf.getBlockPtrByIndex(idx);
-    if ((center - block->origin()).norm() < config.dense_representation_radius_m) {
+  BlockIndices to_archive;
+  for (const auto& block : tsdf) {
+    if ((center - block.position()).norm() < config.dense_representation_radius_m) {
       continue;
     }
 
     // TODO(nathan) filter by update flag?
-    to_archive.push_back(idx);
+    to_archive.push_back(block.index);
   }
 
   return to_archive;

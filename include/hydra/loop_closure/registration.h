@@ -44,8 +44,7 @@
 #include "hydra/loop_closure/registration_solution.h"
 #include "hydra/loop_closure/subgraph_extraction.h"
 
-namespace hydra {
-namespace lcd {
+namespace hydra::lcd {
 
 struct LayerRegistrationConfig {
   size_t min_correspondences = 5;
@@ -267,5 +266,4 @@ LayerRegistrationSolution registerDsgLayerSemantic(
       });
 }
 
-}  // namespace lcd
-}  // namespace hydra
+}  // namespace hydra::lcd

@@ -45,9 +45,6 @@ namespace hydra {
 struct ProjectiveIntegratorConfig {
   int verbosity = 4;
 
-  /// Compute visible blocks from pointcloud instead of the view frustum
-  bool accurate_visible_blocks = false;
-
   // If true, drop off the weight behind the surface crossing.
   bool use_weight_dropoff = true;
 

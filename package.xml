@@ -19,7 +19,7 @@
   <depend>teaserpp</depend>
   <depend>kimera_pgmo</depend>
   <depend>tf2_eigen</depend>
-  <depend>voxblox</depend>
+  <depend>spatial_hash</depend>
   <depend>pose_graph_tools</depend>
   <depend>pose_graph_tools_ros</depend>
   <depend>pose_graph_tools_msgs</depend>

@@ -33,24 +33,26 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <voxblox/mesh/mesh.h>
+
+#include <spark_dsg/mesh.h>
 
 #include <Eigen/Dense>
 #include <array>
-#include <iostream>
 #include <optional>
 
-#include "hydra/reconstruction/vertex_voxel.h"
+#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra {
+
+struct OccupancyVoxel;
 
 struct SdfPoint {
   float distance;
   float weight;
   Eigen::Vector3f pos;
-  voxblox::Color color;
+  Color color;
   std::optional<uint32_t> label;
-  VertexVoxel* vertex_voxel = nullptr;
+  OccupancyVoxel* vertex_voxel = nullptr;
 };
 
 std::ostream& operator<<(std::ostream& out, const SdfPoint& point);
@@ -66,11 +68,13 @@ class MarchingCubes {
                                EdgeStatus& edge_status,
                                float min_sdf_difference = 1.0e-6);
 
-  static void meshCube(const voxblox::BlockIndex& block,
+  static void meshCube(const BlockIndex& block,
                        const SdfPoints& points,
-                       voxblox::Mesh& mesh,
-                       std::vector<uint32_t>* mesh_labels = nullptr,
+                       spark_dsg::Mesh& mesh,
                        bool compute_normals = true);
+
+  static const int kTriangleTable[256][16];
+  static const int kEdgeIndexPairs[12][2];
 };
 
 }  // namespace hydra

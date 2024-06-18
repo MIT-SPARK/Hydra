@@ -36,8 +36,7 @@
 
 #include <numeric>
 
-namespace hydra {
-namespace gnn {
+namespace hydra::gnn {
 
 size_t getTypeSize(Tensor::Type type) {
   switch (type) {
@@ -159,5 +158,4 @@ std::ostream& operator<<(std::ostream& out, const Tensor& tensor) {
   return out;
 }
 
-}  // namespace gnn
-}  // namespace hydra
+}  // namespace::hydra

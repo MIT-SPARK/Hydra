@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "hydra/common/dsg_types.h"
+#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra {
 
@@ -48,4 +49,8 @@ bool updateObjectGeometry(const spark_dsg::Mesh& mesh,
                           ObjectNodeAttributes& attrs,
                           const std::vector<size_t>* indices = nullptr,
                           std::optional<BoundingBox::Type> type = std::nullopt);
+                          
+MeshLayer::Ptr getActiveMesh(const MeshLayer& mesh_layer,
+                             const BlockIndices& archived_blocks);
+
 }  // namespace hydra

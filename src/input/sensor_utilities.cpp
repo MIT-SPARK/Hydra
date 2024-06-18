@@ -47,30 +47,32 @@
 // purposes notwithstanding any copyright notation herein.
 #include "hydra/input/sensor_utilities.h"
 
-#include <voxblox/integrator/integrator_utils.h>
-
 namespace hydra {
-
-using voxblox::BlockIndex;
-using voxblox::BlockIndexList;
-using voxblox::GlobalIndex;
 
 bool blockIsInViewFrustum(const Sensor& sensor,
                           const BlockIndex& block_index,
                           const Eigen::Isometry3f& T_C_B,
                           float block_size,
                           float block_diag_half) {
-  const auto p_B = voxblox::getCenterPointFromGridIndex(block_index, block_size);
+  const auto p_B = spatial_hash::centerPointFromIndex(block_index, block_size);
   return sensor.pointIsInViewFrustum(T_C_B * p_B, block_diag_half);
 }
 
-BlockIndexList findBlocksInViewFrustum(const Sensor& sensor,
-                                       const Eigen::Isometry3f& T_W_C,
-                                       float block_size,
-                                       float min_range,
-                                       float max_range,
-                                       bool use_sensor_range) {
-  BlockIndexList result;
+bool blockIsInViewFrustum(const Sensor& sensor,
+                          const spatial_hash::Block& block,
+                          const Eigen::Isometry3f& T_C_B) {
+  const auto block_diag_half = std::sqrt(3.0f) * block.block_size / 2.0f;
+  return blockIsInViewFrustum(
+      sensor, block.index, T_C_B, block.block_size, block_diag_half);
+}
+
+BlockIndices findBlocksInViewFrustum(const Sensor& sensor,
+                                     const Eigen::Isometry3f& T_W_C,
+                                     float block_size,
+                                     float min_range,
+                                     float max_range,
+                                     bool use_sensor_range) {
+  BlockIndices result;
   // Simple version to get all blocks in world frame that could be visible: Iterate
   // through all blocks that could be in range and check if they are in the view
   // frustum.
@@ -80,7 +82,7 @@ BlockIndexList findBlocksInViewFrustum(const Sensor& sensor,
   const int max_steps = std::ceil(sensor.max_range() / block_size) + 1;
   const auto block_diag_half = std::sqrt(3.0f) * block_size / 2.0f;
   const auto camera_index =
-      voxblox::getGridIndexFromPoint<BlockIndex>(camera_W, 1.f / block_size);
+      spatial_hash::indexFromPoint<BlockIndex>(camera_W, 1.f / block_size);
 
   min_range = use_sensor_range ? sensor.min_range() : min_range;
   max_range = use_sensor_range ? sensor.max_range() : max_range;
@@ -98,52 +100,13 @@ BlockIndexList findBlocksInViewFrustum(const Sensor& sensor,
         }
 
         if (sensor.pointIsInViewFrustum(p_C, block_diag_half)) {
-          result.push_back(camera_index + offset.cast<voxblox::IndexElement>());
+          result.push_back(camera_index + offset.cast<BlockIndex::Scalar>());
         }
       }
     }
   }
 
   return result;
-}
-
-BlockIndexList findVisibleBlocks(const Sensor& sensor,
-                                 const Eigen::Isometry3f& T_W_C,
-                                 const cv::Mat& vertex_map,
-                                 float block_size,
-                                 float inflation_distance) {
-  if (vertex_map.type() != CV_32FC3) {
-    LOG(ERROR) << "pointcloud type " << vertex_map.type() << " does not match CV_32FC3";
-    return {};
-  }
-
-  // TODO(lschmid): Something about the implementation seems buggy and does not find
-  // all blocks. Probably something in the range computation. Iterate through all
-  // vertices in the vertex map and ray-cast throught the block grid. Therefore scale
-  // all points to grid coordinates and units.
-  const auto block_size_inv = 1.0f / block_size;
-  const auto t_W_C_scaled = T_W_C.translation() * block_size_inv;
-
-  voxblox::IndexSet touched_blocks;
-  for (int v = 0; v < vertex_map.rows; v++) {
-    for (int u = 0; u < vertex_map.cols; u++) {
-      const auto& vertex = vertex_map.at<cv::Vec3f>(v, u);  // x, y, z
-      const Eigen::Vector3f p_W(vertex[0], vertex[1], vertex[2]);
-      const auto range = p_W.norm();
-      // Truncate range to max range and inflate by inflation distance.
-      const auto scale = (std::min(sensor.max_range(), range) + inflation_distance) /
-                         range * block_size_inv;
-      const auto p_W_scaled = p_W * scale;
-
-      GlobalIndex block_index;
-      voxblox::RayCaster ray_caster(p_W_scaled, t_W_C_scaled);
-      while (ray_caster.nextRayIndex(&block_index)) {
-        touched_blocks.insert(block_index.cast<voxblox::IndexElement>());
-      }
-    }
-  }
-
-  return BlockIndexList(touched_blocks.begin(), touched_blocks.end());
 }
 
 cv::Mat computeRangeImageFromPoints(const cv::Mat& points,

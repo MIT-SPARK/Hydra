@@ -56,7 +56,6 @@
 #include "hydra/reconstruction/projection_interpolators.h"
 #include "hydra/reconstruction/projective_integrator_config.h"
 #include "hydra/reconstruction/semantic_integrator.h"
-#include "hydra/input/sensor.h"
 #include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
@@ -72,7 +71,7 @@ namespace hydra {
 class ProjectiveIntegrator {
  public:
   using BlockUpdateFunction = std::function<void(
-      const Sensor&, const voxblox::BlockIndex&, const InputData&, VolumetricMap&)>;
+      const Sensor&, const BlockIndex&, const InputData&, VolumetricMap&)>;
 
   struct VoxelMeasurement {
     bool valid = false;
@@ -108,7 +107,7 @@ class ProjectiveIntegrator {
    */
   void updateBlocks(const BlockUpdateFunction& update_function,
                     const Sensor& sensor,
-                    const voxblox::BlockIndexList& block_indices,
+                    const BlockIndices& block_indices,
                     const InputData& data,
                     VolumetricMap& map) const;
 
@@ -119,7 +118,7 @@ class ProjectiveIntegrator {
    * @param map Map to update.
    */
   void updateMapBlock(const Sensor& sensor,
-                      const voxblox::BlockIndex& block_index,
+                      const BlockIndex& block_index,
                       const InputData& data,
                       VolumetricMap& map) const;
 
@@ -132,7 +131,7 @@ class ProjectiveIntegrator {
    * @return The measurement weight that can be applied to a voxel.
    */
   VoxelMeasurement getVoxelUpdate(const Sensor& sensor,
-                                  const voxblox::Point& p_C,
+                                  const Point& p_C,
                                   const InputData& data,
                                   const float truncation_distance,
                                   const float voxel_size) const;
@@ -147,7 +146,7 @@ class ProjectiveIntegrator {
   void updateVoxel(const InputData& data,
                    const VoxelMeasurement& measurement,
                    const float truncation_distance,
-                   voxblox::TsdfVoxel& voxel,
+                   TsdfVoxel& voxel,
                    SemanticVoxel* semantic_voxel = nullptr) const;
 
   /**
@@ -159,7 +158,7 @@ class ProjectiveIntegrator {
    * @returns True if the point is valid, false otherwise.
    */
   bool interpolatePoint(const Sensor& sensor,
-                        const voxblox::Point& p_C,
+                        const Point& p_C,
                         const InputData& data,
                         InterpolationWeights& weights) const;
 
@@ -175,7 +174,7 @@ class ProjectiveIntegrator {
    * @brief Compute the TSDF update weight for the given point.
    */
   float computeWeight(const Sensor& sensor,
-                      const voxblox::Point& p_C,
+                      const Point& p_C,
                       const float sdf,
                       const float truncation_distance,
                       const float voxel_size) const;

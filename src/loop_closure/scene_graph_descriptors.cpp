@@ -36,8 +36,7 @@
 
 #include <glog/logging.h>
 
-namespace hydra {
-namespace lcd {
+namespace hydra::lcd {
 
 using Dsg = DynamicSceneGraph;
 
@@ -127,5 +126,4 @@ Descriptor::Ptr PlaceDescriptorFactory::construct(
   return descriptor;
 }
 
-}  // namespace lcd
-}  // namespace hydra
+}  // namespace hydra::lcd

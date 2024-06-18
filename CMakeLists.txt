@@ -23,7 +23,7 @@ find_package(OpenCV REQUIRED COMPONENTS core imgproc)
 find_package(spark_dsg REQUIRED)
 find_package(teaserpp REQUIRED)
 find_package(kimera_pgmo REQUIRED)
-find_package(voxblox REQUIRED)
+find_package(spatial_hash REQUIRED)
 
 # we turn off PCL precompile internally to get around having vtk linked. Note: kdtree is
 # REQUIRED to make sure we link against FLANN (used by euclidean extraction)
@@ -42,7 +42,6 @@ target_include_directories(
          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
          ${OpenCV_INCLUDE_DIRS}
          ${kimera_pgmo_INCLUDE_DIRS}
-         ${voxblox_INCLUDE_DIRS}
   PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${tf2_eigen_INCLUE_DIRS} ${PCL_INCLUDE_DIRS}
 )
 target_link_libraries(
@@ -52,8 +51,8 @@ target_link_libraries(
          config_utilities::config_utilities
          spark_dsg::spark_dsg
          gtsam
+         spatial_hash::spatial_hash
          ${kimera_pgmo_LIBRARIES}
-         ${voxblox_LIBRARIES}
   PRIVATE nanoflann::nanoflann ${tf2_eigen_LIBRARIES} ${PCL_LIBRARIES}
 )
 set_property(TARGET ${PROJECT_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)

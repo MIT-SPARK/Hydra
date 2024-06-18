@@ -36,8 +36,7 @@
 
 #include <config_utilities/config.h>
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 void declare_config(OverlapEdgeConfig& conf) {
   using namespace config;
@@ -95,5 +94,4 @@ void declare_config(FloodfillExtractorConfig& conf) {
   field(conf.max_edge_deviation, "max_edge_deviation");
 }
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

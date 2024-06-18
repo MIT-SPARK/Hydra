@@ -34,12 +34,11 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/reconstruction/marching_cubes.h>
+#include <hydra/reconstruction/mesh_integrator.h>
 
 #include <set>
 
 namespace hydra {
-
-using voxblox::BlockIndex;
 
 static constexpr float TEST_TOLERANCE = 1.0e-6f;
 
@@ -125,15 +124,15 @@ TEST(MarchingCubes, CubeMeshingNearestVertexIndexCorrect) {
 
   MarchingCubes::SdfPoints sdf_points;
   fillPointsFromMatrices(vertex_coordinates, sdf_values, sdf_points);
-  VertexVoxel actual_voxels[8];
+  OccupancyVoxel actual_voxels[8];
   for (size_t i = 0; i < 8; ++i) {
     sdf_points[i].vertex_voxel = &(actual_voxels[i]);
   }
 
-  voxblox::Mesh mesh;
+  Mesh mesh;
   BlockIndex block = BlockIndex::Zero();
   MarchingCubes::meshCube(block, sdf_points, mesh);
-  EXPECT_EQ(3u, mesh.size());
+  EXPECT_EQ(3u, mesh.numVertices());
 
   EXPECT_TRUE(actual_voxels[0].on_surface);
   EXPECT_TRUE(actual_voxels[1].on_surface);

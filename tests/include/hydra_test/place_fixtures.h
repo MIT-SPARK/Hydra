@@ -35,58 +35,14 @@
 #pragma once
 #include <gtest/gtest.h>
 #include <hydra/places/gvd_integrator.h>
-#include <hydra/places/voxblox_types.h>
 #include <hydra/reconstruction/volumetric_map.h>
-#include <voxblox/integrator/tsdf_integrator.h>
-#include <voxblox/simulation/simulation_world.h>
 
-namespace hydra {
-namespace places {
-namespace test {
+namespace hydra::places::test {
 
 void updateGvd(GvdIntegrator& integrator,
                const VolumetricMap& map,
                bool clear_updated,
                bool use_all_blocks = false);
-
-// loosely based on the test fixture in test_sdf_integrators.cc in voxblox
-class EsdfTestFixture : public ::testing::Test {
- public:
-  EsdfTestFixture() = default;
-  virtual ~EsdfTestFixture() = default;
-
-  voxblox::SimulationWorld world;
-
-  size_t num_angles = 20;
-  size_t num_poses = 1;
-  double pose_radius = 6.0;
-  double pose_height = 2.0;
-  double camera_pitch = 0.1;
-
-  int depth_camera_width = 320;
-  int depth_camera_height = 240;
-  double depth_camera_fov = 2.61799;
-  double depth_camera_max_distance = 10.0;
-
-  virtual void SetUp() override;
-
-  void updateTsdfIntegrator(voxblox::TsdfIntegratorBase& integrator, size_t index);
-
-  virtual voxblox::Point getCenter() const;
-
-  virtual void setupWorld();
-
-  virtual voxblox::Transformation getPose(size_t index) const;
-};
-
-class GvdTestFixture : public EsdfTestFixture {
- public:
-  GvdTestFixture();
-  virtual ~GvdTestFixture() = default;
-
-  virtual void setupWorld() override;
-  virtual voxblox::Transformation getPose(size_t index) const override;
-};
 
 class SingleBlockTestFixture : public ::testing::Test {
  public:
@@ -107,11 +63,11 @@ class SingleBlockTestFixture : public ::testing::Test {
   double truncation_distance = 0.1;
 
   std::unique_ptr<VolumetricMap> map;
-  Layer<GvdVoxel>::Ptr gvd_layer;
+  GvdLayer::Ptr gvd_layer;
 
   GvdIntegratorConfig gvd_config;
-  voxblox::Block<voxblox::TsdfVoxel>::Ptr tsdf_block;
-  voxblox::Block<GvdVoxel>::Ptr gvd_block;
+  TsdfBlock::Ptr tsdf_block;
+  GvdBlock::Ptr gvd_block;
 };
 
 class LargeSingleBlockTestFixture : public SingleBlockTestFixture {
@@ -155,14 +111,12 @@ class TestFixture2d : public ::testing::Test {
   int voxels_per_side = 8;
   double truncation_distance = 0.1;
 
-  Layer<TsdfVoxel>::Ptr tsdf_layer;
-  Layer<GvdVoxel>::Ptr gvd_layer;
+  TsdfLayer::Ptr tsdf_layer;
+  GvdLayer::Ptr gvd_layer;
 
   GvdIntegratorConfig gvd_config;
-  voxblox::Block<voxblox::TsdfVoxel>::Ptr tsdf_block;
-  voxblox::Block<GvdVoxel>::Ptr gvd_block;
+  TsdfBlock::Ptr tsdf_block;
+  GvdBlock::Ptr gvd_block;
 };
 
-}  // namespace test
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places::test

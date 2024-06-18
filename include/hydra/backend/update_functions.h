@@ -215,12 +215,12 @@ struct UpdateRoomsFunctor : public UpdateFunctor {
 };
 
 struct UpdateBuildingsFunctor : public UpdateFunctor {
-  UpdateBuildingsFunctor(const SemanticNodeAttributes::ColorVector& color,
+  UpdateBuildingsFunctor(const Color& color,
                          SemanticNodeAttributes::Label label);
 
   MergeMap call(SharedDsgInfo& dsg, const UpdateInfo::ConstPtr& info) const override;
 
-  SemanticNodeAttributes::ColorVector building_color;
+  Color building_color;
   SemanticNodeAttributes::Label building_semantic_label;
 };
 

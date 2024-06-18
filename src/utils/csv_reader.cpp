@@ -1,9 +1,9 @@
 #include "hydra/utils/csv_reader.h"
 
+#include <glog/logging.h>
+
 #include <filesystem>
 #include <fstream>
-
-#include <glog/logging.h>
 
 namespace hydra {
 
@@ -58,7 +58,8 @@ bool CsvReader::setup(const std::string& file_name,
       rows_.emplace_back(row, header_to_index_);
     }
   }
-  is_setup = true;
+  loaded_file_name_ = file_name;
+  is_setup_ = true;
   return true;
 }
 
@@ -106,6 +107,52 @@ const std::string& CsvReader::getEntry(const std::string& header, size_t row) co
     return rows_[0][0];
   }
   return rows_[row][it->second];
+}
+
+bool CsvReader::checkRequiredHeaders(const std::vector<std::string>& headers) const {
+  const std::vector<std::string> missing = missingHeaders(headers);
+  if (missing.empty()) {
+    return true;
+  }
+
+  std::stringstream msg;
+  msg << "CSV file '" << loaded_file_name_ << "' is missing required headers: ";
+  for (size_t i = 0; i < missing.size(); i++) {
+    msg << "'" << missing[i] << "'";
+    if (i < missing.size() - 1) {
+      msg << ", ";
+    }
+  }
+  LOG(ERROR) << msg.str();
+  return false;
+}
+
+void CsvReader::checkOptionalHeaders(const std::vector<std::string>& headers) const {
+  const std::vector<std::string> missing = missingHeaders(headers);
+  if (missing.empty()) {
+    return;
+  }
+
+  std::stringstream msg;
+  msg << "CSV file '" << loaded_file_name_ << "' is missing optional headers: ";
+  for (size_t i = 0; i < missing.size(); i++) {
+    msg << "'" << missing[i] << "'";
+    if (i < missing.size() - 1) {
+      msg << ", ";
+    }
+  }
+  LOG(WARNING) << msg.str();
+}
+
+std::vector<std::string> CsvReader::missingHeaders(
+    const std::vector<std::string>& headers) const {
+  std::vector<std::string> missing;
+  for (const auto& header : headers) {
+    if (!hasHeader(header)) {
+      missing.push_back(header);
+    }
+  }
+  return missing;
 }
 
 const std::string& CsvReader::Row::getEntry(const std::string& header) const {

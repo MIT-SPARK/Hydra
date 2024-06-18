@@ -49,7 +49,6 @@ using hydra::timing::ScopedTimer;
 using places::GvdIntegrator;
 using places::GvdIntegratorConfig;
 using places::GvdVoxel;
-using voxblox::Layer;
 
 void declare_config(GvdPlaceExtractor::Config& config) {
   using namespace config;
@@ -140,7 +139,8 @@ std::vector<bool> GvdPlaceExtractor::inFreespace(const PositionMatrix& positions
   // starting lock on tsdf update
   std::unique_lock<std::mutex> lock(gvd_mutex_);
   for (int i = 0; i < positions.cols(); ++i) {
-    const auto* voxel = gvd_->getVoxelPtrByCoordinates(positions.col(i).cast<float>());
+    const Point position = positions.col(i).cast<Point::Scalar>();
+    const auto* voxel = gvd_->getVoxelPtr(position);
     if (!voxel) {
       continue;
     }
@@ -156,27 +156,24 @@ void GvdPlaceExtractor::detect(const ReconstructionOutput& msg) {
 
   const auto& map = msg.map();
   const auto* tsdf = &map.getTsdfLayer();
-  voxblox::Layer<voxblox::TsdfVoxel>::Ptr tsdf_ptr;
+
+  TsdfLayer::Ptr tsdf_ptr;
   if (tsdf_interpolator_) {
     ScopedTimer dtimer("frontend/downsample_tsdf", msg.timestamp_ns, true, 2, false);
-    voxblox::BlockIndexList updated;
+    const auto blocks = tsdf->blockIndicesWithCondition(TsdfBlock::esdfUpdated);
+    tsdf_ptr = tsdf_interpolator_->interpolate(*tsdf, &blocks);
 
-    tsdf->getAllUpdatedBlocks(voxblox::Update::kEsdf, &updated);
-    tsdf_ptr = tsdf_interpolator_->interpolate(*tsdf, &updated);
-
-    voxblox::BlockIndexList blocks;
-    tsdf_ptr->getAllAllocatedBlocks(&blocks);
-    for (const auto& idx : blocks) {
-      tsdf_ptr->getBlockByIndex(idx).updated().set();
+    for (auto& block : *tsdf_ptr) {
+      block.setUpdated();
     }
 
     tsdf = tsdf_ptr.get();
   }
 
   if (!gvd_) {
-    const auto voxel_size = tsdf->voxel_size();
-    const auto vps = tsdf->voxels_per_side();
-    gvd_.reset(new Layer<GvdVoxel>(voxel_size, vps));
+    const auto voxel_size = tsdf->voxel_size;
+    const auto vps = tsdf->voxels_per_side;
+    gvd_.reset(new places::GvdLayer(voxel_size, vps));
     gvd_integrator_.reset(new GvdIntegrator(config.gvd, gvd_, graph_extractor_));
   }
 

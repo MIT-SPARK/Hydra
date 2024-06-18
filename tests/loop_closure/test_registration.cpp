@@ -35,8 +35,7 @@
 #include <gtest/gtest.h>
 #include <hydra/loop_closure/registration.h>
 
-namespace hydra {
-namespace lcd {
+namespace hydra::lcd {
 
 double getPoseDistance(const gtsam::Pose3& expected,
                        const RegistrationSolution& solution) {
@@ -387,5 +386,4 @@ TEST_F(LayerRegistrationTests, TestRepeatedRegistration) {
   ASSERT_TRUE(solution.valid);
 }
 
-}  // namespace lcd
-}  // namespace hydra
+}  // namespace hydra::lcd

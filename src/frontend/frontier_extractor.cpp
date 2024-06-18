@@ -3,9 +3,9 @@
 #include <spark_dsg/dynamic_scene_graph_layer.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/scene_graph_types.h>
-#include <voxblox/core/block.h>
-#include <voxblox/core/common.h>
-#include <voxblox/core/voxel.h>
+#include <spatial_hash/neighbor_utils.h>
+
+#include <algorithm>
 
 #define PCL_NO_PRECOMPILE
 #include <pcl/ModelCoefficients.h>
@@ -27,9 +27,12 @@
 
 #include "hydra/common/config_utilities.h"
 #include "hydra/frontend/frontier_extractor.h"
+#include "hydra/reconstruction/voxel_types.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra {
+
+using spatial_hash::IndexSet;
 
 template <typename T, size_t N>
 std::pair<T, Eigen::Matrix<T, N, 1>> getMaxEigenvector(Eigen::Matrix<T, N, N> cov) {
@@ -43,23 +46,18 @@ std::pair<T, Eigen::Matrix<T, N, 1>> getMaxEigenvector(Eigen::Matrix<T, N, N> co
   return std::pair(evals(max_idx), max_vec);
 }
 
-void frontiersToCenters(const std::vector<Eigen::Vector3f>& positions,
-                        Eigen::Vector3d& center) {
-  center.setZero();
+Eigen::Vector3d frontiersToCenters(const std::vector<Eigen::Vector3f>& positions) {
+  Eigen::Vector3d center = Eigen::Vector3d::Zero();
   for (auto p : positions) {
     center += p.cast<double>();
   }
-  center /= positions.size();
+  return center / positions.size();
 }
 
 void centroidAndCovFromPoints(const std::vector<Eigen::Vector3f>& positions,
                               Eigen::Vector3f& centroid,
                               Eigen::Matrix3f& cov) {
-  centroid.setZero();
-  for (auto p : positions) {
-    centroid += p;
-  }
-  centroid /= positions.size();
+  centroid = frontiersToCenters(positions).cast<float>();
 
   cov.setZero();
   for (auto p : positions) {
@@ -120,7 +118,7 @@ void splitAllFrontiers(std::vector<std::vector<Eigen::Vector3f>>& frontiers,
 }
 
 FrontierExtractor::FrontierExtractor(const Config& config)
-    : config_(config), next_node_id_(config.prefix, 0) {}
+    : config(config), next_node_id_(config.prefix, 0) {}
 
 void clusterFrontiers(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
                       const double cluster_tolerance,
@@ -164,60 +162,14 @@ void clusterFrontiers(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
   }
 }
 
-template <typename T>
-void checkNeighborAndAddBlock(const int i,
-                              const int j,
-                              const int k,
-                              const voxblox::BlockIndex& block_index,
-                              const voxblox::Layer<T>& layer,
-                              std::vector<voxblox::BlockIndex>& blocks_to_skip,
-                              std::queue<voxblox::BlockIndex>& extra_blocks) {
-  voxblox::GlobalIndex gvi = voxblox::getGlobalVoxelIndexFromBlockAndVoxelIndex(
-      block_index, {i, j, k}, layer.voxels_per_side());
-  voxblox::BlockIndex bix =
-      voxblox::getBlockIndexFromGlobalVoxelIndex(gvi, layer.voxels_per_side_inv());
-  if (!layer.hasBlock(bix)) {
-    auto it = find(blocks_to_skip.begin(), blocks_to_skip.end(), bix);
-    if (it == blocks_to_skip.end()) {
-      extra_blocks.push(bix);
-      blocks_to_skip.push_back(bix);
-    }
-  }
-}
-
-voxblox::VoxelIndex computeVoxelIndexFromLinearIndex(size_t linear_index,
-                                                     int voxels_per_side) {
-  int rem = linear_index;
-  voxblox::VoxelIndex result;
-  std::div_t div_temp = std::div(rem, voxels_per_side * voxels_per_side);
-  rem = div_temp.rem;
-  result.z() = div_temp.quot;
-  div_temp = std::div(rem, voxels_per_side);
-  result.y() = div_temp.quot;
-  result.x() = div_temp.rem;
-  return result;
-}
-
-size_t computeLinearIndexFromVoxelIndex(const voxblox::VoxelIndex& index,
-                                        const size_t voxels_per_side) {
-  size_t linear_index = static_cast<size_t>(
-      index.x() + voxels_per_side * (index.y() + index.z() * voxels_per_side));
-  return linear_index;
-}
-
 std::vector<std::pair<Eigen::Vector3d, double>> getPlacesForBlock(
     const DynamicSceneGraph& graph,
-    const Eigen::Vector3f& block_origin,
+    const Eigen::Vector3f& block_center,
     NearestNodeFinder& finder,
     const double block_size,
-    const float voxel_size,
     const double max_place_radius) {
   std::vector<std::pair<Eigen::Vector3d, double>> center_dists;
-  Eigen::Vector3f block_relative_center =
-      voxblox::getCenterPointFromGridIndex<Eigen::Vector3f>(
-          {voxel_size / 2.0f, voxel_size / 2.0f, voxel_size / 2.0f}, voxel_size);
-  Eigen::Vector3f global_block_center = block_origin + block_relative_center;
-  finder.findRadius(global_block_center.cast<double>(),
+  finder.findRadius(block_center.cast<double>(),
                     block_size * 1.414 + max_place_radius,
                     false,
                     [&](NodeId pid, size_t, double) {
@@ -238,11 +190,11 @@ void computeVoxelsInPlace(
     std::vector<bool>& inside_place,
     std::vector<bool>& inside_archived_place) {
   for (size_t v = 0; v < voxels_per_block; ++v) {
-    voxblox::VoxelIndex ind = computeVoxelIndexFromLinearIndex(v, voxels_per_side);
-    voxblox::Point center =
-        block_origin + voxblox::getCenterPointFromGridIndex(ind, voxel_size);
+    VoxelIndex ind = spatial_hash::voxelIndexFromLinearIndex(v, voxels_per_side);
+    const Point center =
+        block_origin + spatial_hash::centerPointFromIndex(ind, voxel_size);
     inside_place[v] = false;
-    for (auto cd : center_dists) {
+    for (const auto& cd : center_dists) {
       if ((center - cd.first.cast<float>()).norm() <= cd.second) {
         inside_place[v] = true;
         break;
@@ -252,7 +204,7 @@ void computeVoxelsInPlace(
     if (inside_place[v]) {
       continue;
     }
-    for (auto cd : archived_center_dists) {
+    for (const auto& cd : archived_center_dists) {
       if ((center - cd.first.cast<float>()).norm() <= cd.second) {
         inside_archived_place[v] = true;
         break;
@@ -264,56 +216,41 @@ void computeVoxelsInPlace(
 void checkFreeNeighbors(const std::vector<bool>& inside_place,
                         const std::vector<bool>& inside_archived_place,
                         const int vps,
-                        const int i,
-                        const int j,
-                        const int k,
+                        const VoxelIndex& index,
                         bool& neighbor_free,
                         bool& neighbor_archived_free) {
-  int offsets[3] = {-1, 0, 1};
-  for (int di : offsets) {
-    for (int dj : offsets) {
-      for (int dk : offsets) {
-        if (i + di < 0 || i + di >= vps || j + dj < 0 || j + dj >= vps || k + dk < 0 ||
-            k + dk >= vps) {
-          continue;
-        }
-
-        size_t vn = computeLinearIndexFromVoxelIndex({i + di, j + dj, k + dk}, vps);
-        neighbor_free = inside_place[vn];
-        neighbor_archived_free |= inside_archived_place[vn];
-        if (neighbor_free) {
-          break;
-        }
-      }
-      if (neighbor_free) {
-        break;
-      }
+  const spatial_hash::NeighborSearch search(26);
+  for (const auto& neighbor : search.neighborIndices(index)) {
+    if (neighbor.array().minCoeff() < 0 || neighbor.array().maxCoeff() >= vps) {
+      continue;
     }
+    const size_t vn = spatial_hash::linearIndexFromVoxelIndex(neighbor, vps);
+    neighbor_free = inside_place[vn];
+    neighbor_archived_free |= inside_archived_place[vn];
     if (neighbor_free) {
-      break;
+      return;
     }
   }
 }
 
-template <typename T>
 void processBlock(NearestNodeFinder& finder,
-                  const voxblox::BlockIndex& block_index,
+                  const BlockIndex& block_index,
                   const DynamicSceneGraph& graph,
                   const ReconstructionOutput& input,
                   const std::vector<NodeId> archived_places,
                   const double max_place_radius,
-                  std::vector<voxblox::BlockIndex>& skip_add_blocks,
-                  std::queue<voxblox::BlockIndex>& extra_blocks,
+                  IndexSet& skip_add_blocks,
+                  std::queue<BlockIndex>& extra_blocks,
                   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
                   pcl::PointCloud<pcl::PointXYZ>::Ptr archived_cloud) {
   const auto& tsdf = input.map().getTsdfLayer();
-  double voxel_size = tsdf.voxel_size();
-  double block_size = tsdf.block_size();
   // Get all active places near block
-  Eigen::Vector3f block_origin =
-      voxblox::getOriginPointFromGridIndex(block_index, block_size);
+  const Eigen::Vector3f block_center =
+      spatial_hash::centerPointFromIndex(block_index, tsdf.blockSize());
+  const Eigen::Vector3f block_origin =
+      spatial_hash::originPointFromIndex(block_index, tsdf.blockSize());
   auto center_dists = getPlacesForBlock(
-      graph, block_origin, finder, block_size, voxel_size, max_place_radius);
+      graph, block_center, finder, tsdf.blockSize(), max_place_radius);
 
   // Get all recently-archived places near block
   std::vector<std::pair<Eigen::Vector3d, double>> archived_center_dists;
@@ -328,56 +265,41 @@ void processBlock(NearestNodeFinder& finder,
   }
 
   // find all voxels that are inside a place
-  int vps = tsdf.voxels_per_side();
-  size_t voxels_per_block = std::pow(vps, 3);
-  std::vector<bool> inside_place;
-  inside_place.resize(voxels_per_block);
-  std::vector<bool> inside_archived_place;
-  inside_archived_place.resize(voxels_per_block);
+  const size_t voxels_per_block = std::pow(tsdf.voxels_per_side, 3);
+  std::vector<bool> inside_place(voxels_per_block);
+  std::vector<bool> inside_archived_place(voxels_per_block);
 
   computeVoxelsInPlace(block_origin,
                        center_dists,
                        archived_center_dists,
                        voxels_per_block,
-                       vps,
-                       voxel_size,
+                       tsdf.voxels_per_side,
+                       tsdf.voxel_size,
                        inside_place,
                        inside_archived_place);
 
   // find voxels that are on boundary of unobserved space and space inside a place
   for (size_t v = 0; v < voxels_per_block; ++v) {
-    // We only need to check if the voxel has been observed if the block is allocated
-    if (tsdf.hasBlock(block_index)) {
-      const auto block = tsdf.getBlockPtrByIndex(block_index);
-      const auto& voxel = block->getVoxelByLinearIndex(v);
-
-      if (voxel.weight >= 1e-6) {
-        continue;
-      }
+    // Check the voxel is not observed in the TSDF
+    const auto tsdf_block = tsdf.getBlockPtr(block_index);
+    if (tsdf_block && tsdf_block->getVoxel(v).weight >= 1e-6) {
+      continue;
     }
-
-    voxblox::VoxelIndex ind = computeVoxelIndexFromLinearIndex(v, vps);
-    int i = ind.x();
-    int j = ind.y();
-    int k = ind.z();
 
     // If voxel is on the "border" of the block, and it is inside a place, and the
     // neighboring block is not allocated, need to add neighbor to queue of "extra"
     // blocks
+    const VoxelIndex voxel_index =
+        spatial_hash::voxelIndexFromLinearIndex(v, tsdf.voxels_per_side);
     if (inside_place[v] || inside_archived_place[v]) {
-      checkNeighborAndAddBlock<voxblox::TsdfVoxel>(
-          i + 1, j, k, block_index, tsdf, skip_add_blocks, extra_blocks);
-      checkNeighborAndAddBlock<voxblox::TsdfVoxel>(
-          i - 1, j, k, block_index, tsdf, skip_add_blocks, extra_blocks);
-      checkNeighborAndAddBlock<voxblox::TsdfVoxel>(
-          i, j + 1, k, block_index, tsdf, skip_add_blocks, extra_blocks);
-      checkNeighborAndAddBlock<voxblox::TsdfVoxel>(
-          i, j - 1, k, block_index, tsdf, skip_add_blocks, extra_blocks);
-      checkNeighborAndAddBlock<voxblox::TsdfVoxel>(
-          i, j, k + 1, block_index, tsdf, skip_add_blocks, extra_blocks);
-      checkNeighborAndAddBlock<voxblox::TsdfVoxel>(
-          i, j, k - 1, block_index, tsdf, skip_add_blocks, extra_blocks);
-
+      const spatial_hash::VoxelNeighborSearch search(tsdf, 6);
+      const VoxelKey key(block_index, voxel_index);
+      for (const auto& key : search.neighborKeys({block_index, voxel_index})) {
+        if (!tsdf.hasBlock(key.first) && !skip_add_blocks.count(key.first)) {
+          extra_blocks.push(key.first);
+          skip_add_blocks.insert(key.first);
+        }
+      }
       continue;
     }
 
@@ -385,34 +307,28 @@ void processBlock(NearestNodeFinder& finder,
     bool neighbor_archived_free = false;
     checkFreeNeighbors(inside_place,
                        inside_archived_place,
-                       vps,
-                       i,
-                       j,
-                       k,
+                       tsdf.voxels_per_side,
+                       voxel_index,
                        neighbor_free,
                        neighbor_archived_free);
 
-    if (neighbor_free || neighbor_archived_free) {
-      auto it = std::find(
-          input.archived_blocks.begin(), input.archived_blocks.end(), block_index);
+    if (!neighbor_free && !neighbor_archived_free) {
+      continue;
+    }
 
-      bool archived = false;
-      if (it != input.archived_blocks.end()) {
-        archived = true;
-      }
-      // A frontier is archived if its block is deallocated, or if its only neighbor
-      // that's inside a place is in an archived place
-      archived = archived || (!neighbor_free && neighbor_archived_free);
-      Eigen::Vector3f relative_center =
-          voxblox::getCenterPointFromGridIndex<Eigen::Vector3i>({i, j, k}, voxel_size);
-      Eigen::Vector3f center = block_origin + relative_center;
+    bool archived = std::find(input.archived_blocks.begin(),
+                              input.archived_blocks.end(),
+                              block_index) != input.archived_blocks.end();
 
-      if (archived) {
-        archived_cloud->points.push_back({center.x(), center.y(), center.z()});
-
-      } else {
-        cloud->points.push_back({center.x(), center.y(), center.z()});
-      }
+    // A frontier is archived if its block is deallocated, or if its only neighbor
+    // that's inside a place is in an archived place
+    archived = archived || (!neighbor_free && neighbor_archived_free);
+    VoxelKey key(block_index, voxel_index);
+    auto center = tsdf.getVoxelPosition(key);
+    if (archived) {
+      archived_cloud->points.push_back({center.x(), center.y(), center.z()});
+    } else {
+      cloud->points.push_back({center.x(), center.y(), center.z()});
     }
   }
 }
@@ -431,9 +347,9 @@ void FrontierExtractor::populateDenseFrontiers(
   }
 }
 
-void computeSparseFrontiers(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
-                            const FrontierExtractor::Config config,
-                            std::vector<Frontier>& frontiers) {
+void FrontierExtractor::computeSparseFrontiers(
+    const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+    std::vector<Frontier>& frontiers) const {
   if (cloud->points.size() <= 0) {
     return;
   }
@@ -477,33 +393,27 @@ void FrontierExtractor::detectFrontiers(const ReconstructionOutput& input,
   }
 
   const auto& tsdf = input.map().getTsdfLayer();
-  voxblox::BlockIndexList allocated_blocks;
-  tsdf.getAllAllocatedBlocks(&allocated_blocks);
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::PointCloud<pcl::PointXYZ>::Ptr archived_cloud(
       new pcl::PointCloud<pcl::PointXYZ>);
   std::vector<NodeId> block_is_archived;
 
-  std::queue<voxblox::BlockIndex> extra_blocks;
-  std::vector<voxblox::BlockIndex> processed_extra_blocks;
-
-  for (const auto& idx : allocated_blocks) {
-    auto block = tsdf.getBlockPtrByIndex(idx);
-
-    processBlock<voxblox::TsdfVoxel>(finder,
-                                     block->block_index(),
-                                     graph,
-                                     input,
-                                     archived_places_,
-                                     config_.max_place_radius,
-                                     processed_extra_blocks,
-                                     extra_blocks,
-                                     cloud,
-                                     archived_cloud);
+  std::queue<BlockIndex> extra_blocks;
+  IndexSet processed_extra_blocks;
+  for (const auto& idx : tsdf.allocatedBlockIndices()) {
+    processBlock(finder,
+                 idx,
+                 graph,
+                 input,
+                 archived_places_,
+                 config.max_place_radius,
+                 processed_extra_blocks,
+                 extra_blocks,
+                 cloud,
+                 archived_cloud);
   }
-
   while (!extra_blocks.empty()) {
-    voxblox::BlockIndex bix = extra_blocks.front();
+    BlockIndex bix = extra_blocks.front();
     extra_blocks.pop();
     if (std::find(recently_archived_blocks_.begin(),
                   recently_archived_blocks_.end(),
@@ -511,23 +421,23 @@ void FrontierExtractor::detectFrontiers(const ReconstructionOutput& input,
       continue;
     }
 
-    processBlock<voxblox::TsdfVoxel>(finder,
-                                     bix,
-                                     graph,
-                                     input,
-                                     archived_places_,
-                                     config_.max_place_radius,
-                                     processed_extra_blocks,
-                                     extra_blocks,
-                                     cloud,
-                                     archived_cloud);
+    processBlock(finder,
+                 bix,
+                 graph,
+                 input,
+                 archived_places_,
+                 config.max_place_radius,
+                 processed_extra_blocks,
+                 extra_blocks,
+                 cloud,
+                 archived_cloud);
   }
 
-  if (config_.dense_frontiers) {
-    populateDenseFrontiers(cloud, archived_cloud, tsdf.voxel_size());
+  if (config.dense_frontiers) {
+    populateDenseFrontiers(cloud, archived_cloud, tsdf.voxel_size);
   } else {
-    computeSparseFrontiers(cloud, config_, frontiers_);
-    computeSparseFrontiers(archived_cloud, config_, archived_frontiers_);
+    computeSparseFrontiers(cloud, frontiers_);
+    computeSparseFrontiers(archived_cloud, archived_frontiers_);
   }
   archived_places_.clear();
 }
@@ -558,7 +468,7 @@ void FrontierExtractor::addFrontiers(uint64_t timestamp_ns,
           graph.insertEdge(place_id, next_node_id_);
         });
 
-    nodes_to_remove_.push_back({next_node_id_, voxblox::BlockIndex()});
+    nodes_to_remove_.push_back({next_node_id_, BlockIndex()});
     ++next_node_id_;
   }
 
@@ -587,12 +497,11 @@ void FrontierExtractor::addFrontiers(uint64_t timestamp_ns,
 
 void FrontierExtractor::updateRecentBlocks(Eigen::Vector3d current_position,
                                            double block_size) {
-  std::vector<voxblox::BlockIndex> updated_archived_blocks;
-  for (voxblox::BlockIndex bix : recently_archived_blocks_) {
-    Eigen::Vector3f block_origin =
-        voxblox::getOriginPointFromGridIndex(bix, block_size);
+  BlockIndices updated_archived_blocks;
+  for (BlockIndex bix : recently_archived_blocks_) {
+    Eigen::Vector3f block_origin = spatial_hash::originPointFromIndex(bix, block_size);
     if ((block_origin - current_position.cast<float>()).norm() <
-        config_.recent_block_distance) {
+        config.recent_block_distance) {
       updated_archived_blocks.push_back(bix);
     }
   }
@@ -601,7 +510,7 @@ void FrontierExtractor::updateRecentBlocks(Eigen::Vector3d current_position,
 
 void declare_config(FrontierExtractor::Config& config) {
   using namespace config;
-  name("FrontierExtractorConfig");
+  name("FrontierExtractor::Config");
   field<CharConversion>(config.prefix, "prefix");
   field(config.cluster_tolerance, "cluster_tolerance");
   field(config.min_cluster_size, "min_cluster_size");

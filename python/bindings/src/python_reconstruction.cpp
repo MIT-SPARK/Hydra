@@ -55,7 +55,8 @@
 #include "hydra/bindings/python_config.h"
 #include "hydra/bindings/python_image.h"
 #include "hydra/bindings/python_sensor_input.h"
-#include "hydra/utils/mesh_interface.h"
+#include "hydra/utils/mesh_utilities.h"
+#include "hydra/utils/pgmo_mesh_interface.h"
 
 namespace hydra::python {
 
@@ -99,12 +100,12 @@ struct MeshUpdater {
       return;
     }
 
-    auto mesh = msg->map().getMeshLayer().getActiveMesh(msg->archived_blocks);
+    auto mesh = getActiveMesh(msg->map().getMeshLayer(), msg->archived_blocks);
     if (!mesh) {
       return;
     }
 
-    auto interface = getMeshInterface(*mesh);
+    auto interface = PgmoMeshInterface(*mesh);
     const auto delta = compression.update(interface, msg->timestamp_ns);
     delta->updateMesh(*graph->mesh());
     zmq_sender.send(*graph, true);

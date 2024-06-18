@@ -428,8 +428,7 @@ void MeshSegmenter::addNodeToGraph(DynamicSceneGraph& graph,
     CHECK(label_map != nullptr);
   }
 
-  const auto color = label_map->getColorFromLabel(label);
-  attrs->color << color.r, color.g, color.b;
+  attrs->color = label_map->getColorFromLabel(label);
 
   updateObjectGeometry(*graph.mesh(), *attrs, nullptr, config.bounding_box_type);
 

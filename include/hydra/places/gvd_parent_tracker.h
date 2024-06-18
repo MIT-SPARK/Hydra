@@ -43,27 +43,24 @@ namespace hydra::places {
 struct VoronoiCheckConfig;
 
 struct GvdVertexInfo {
-  float pos[3];
+  Point pos;
   size_t ref_count = 0;
 };
 
 struct GvdParentTracker {
-  using GvdParentMap = voxblox::LongIndexHashMapType<voxblox::LongIndexSet>::type;
-  using GvdVertexMap = voxblox::LongIndexHashMapType<GvdVertexInfo>::type;
-
-  uint8_t updateGvdParentMap(const Layer<GvdVoxel>& layer,
+  uint8_t updateGvdParentMap(const GvdLayer& layer,
                              const VoronoiCheckConfig& config,
                              const GlobalIndex& voxel_index,
                              const GvdVoxel& neighbor);
 
-  void markNewGvdParent(const Layer<GvdVoxel>& layer, const GlobalIndex& parent);
+  void markNewGvdParent(const GvdLayer& layer, const GlobalIndex& parent);
 
   void removeVoronoiFromGvdParentMap(const GlobalIndex& voxel_index);
 
-  void updateVertexMapping(const Layer<GvdVoxel>& layer);
+  void updateVertexMapping(const GvdLayer& layer);
 
-  GvdParentMap parents;
-  GvdVertexMap parent_vertices;
+  GlobalIndexMap<GlobalIndexSet> parents;
+  GlobalIndexMap<GvdVertexInfo> parent_vertices;
 };
 
 }  // namespace hydra::places

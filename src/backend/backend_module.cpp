@@ -44,7 +44,6 @@
 #include <spark_dsg/pgmo_mesh_traits.h>
 #include <spark_dsg/scene_graph_types.h>
 #include <spark_dsg/zmq_interface.h>
-#include <voxblox/core/block_hash.h>
 
 #include "hydra/common/config_utilities.h"
 #include "hydra/common/global_info.h"
@@ -708,7 +707,7 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
     }
 
     updatePlacePosFromCache();  // copy optimized positions back
-  }                             // end joint critical section
+  }  // end joint critical section
 
   if (logs_) {
     backend_graph_logger_.logGraph(private_dsg_->graph);

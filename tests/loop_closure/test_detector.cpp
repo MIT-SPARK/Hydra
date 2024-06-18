@@ -35,8 +35,7 @@
 #include <gtest/gtest.h>
 #include <hydra/loop_closure/detector.h>
 
-namespace hydra {
-namespace lcd {
+namespace hydra::lcd {
 
 struct LcdDetectorTests : public ::testing::Test {
   LcdDetectorTests() = default;
@@ -177,5 +176,4 @@ TEST_F(LcdDetectorTests, TestNonEmptySearch) {
   EXPECT_EQ(0u, results.size());
 }
 
-}  // namespace lcd
-}  // namespace hydra
+}  // namespace hydra::lcd

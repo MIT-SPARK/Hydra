@@ -36,8 +36,7 @@
 
 #include <glog/logging.h>
 
-namespace hydra {
-namespace lcd {
+namespace hydra::lcd {
 
 using Dsg = DynamicSceneGraph;
 
@@ -329,5 +328,4 @@ LayerSearchResults searchLeafDescriptors(const Descriptor& descriptor,
           matches};
 }
 
-}  // namespace lcd
-}  // namespace hydra
+}  // namespace hydra::lcd

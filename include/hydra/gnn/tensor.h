@@ -38,8 +38,7 @@
 #include <memory>
 #include <vector>
 
-namespace hydra {
-namespace gnn {
+namespace hydra::gnn {
 
 // forward declare for output operator
 class Tensor;
@@ -181,5 +180,4 @@ inline bool Tensor::matchesType(Tensor::Type type, int64_t*) {
   return type == Tensor::Type::INT64;
 }
 
-}  // namespace gnn
-}  // namespace hydra
+}  // namespace::hydra

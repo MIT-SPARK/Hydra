@@ -33,8 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <voxblox/core/layer.h>
-#include <voxblox/core/voxel.h>
 
 #include <list>
 #include <map>
@@ -43,6 +41,7 @@
 
 #include "hydra/eval/room_io.h"
 #include "hydra/eval/room_metrics.h"
+#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::eval {
 
@@ -59,7 +58,7 @@ class RoomEvaluator {
 
   RoomEvaluator(const Config& config,
                 const RoomGeometry& rooms,
-                const voxblox::Layer<voxblox::TsdfVoxel>::Ptr& tsdf);
+                const TsdfLayer::Ptr& tsdf);
 
   void computeRoomIndices();
 
@@ -69,17 +68,18 @@ class RoomEvaluator {
 
   RoomMetrics eval(const std::string& graph_filepath) const;
 
+  static GlobalIndices getSphereAroundPoint(const TsdfLayer& layer,
+                                            const Point& center,
+                                            float radius);
+
  public:
   static RoomEvaluator::Ptr fromFile(const Config& config,
                                      const std::string& room_filepath,
                                      const std::string& tsdf_filepath);
 
  private:
-  std::array<int64_t, 3> lookupGlobalIndex(const voxblox::BlockIndex& block_idx,
-                                           const voxblox::VoxelIndex& voxel_idx) const;
-
   RoomGeometry rooms_;
-  voxblox::Layer<voxblox::TsdfVoxel>::Ptr tsdf_;
+  TsdfLayer::Ptr tsdf_;
   RoomIndices room_indices_;
 };
 

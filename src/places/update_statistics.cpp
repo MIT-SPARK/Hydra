@@ -34,8 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/update_statistics.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 void UpdateStatistics::clear() {
   number_surface_flipped = 0;
@@ -65,5 +64,4 @@ std::ostream& operator<<(std::ostream& out, const UpdateStatistics& stats) {
   return out;
 }
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

@@ -36,8 +36,7 @@
 
 #include "hydra/gnn/tensor.h"
 
-namespace hydra {
-namespace gnn {
+namespace hydra::gnn {
 
 TEST(GnnTensorTests, TestEmptyConstructorInvariants) {
   {  // test case 1: default tensor
@@ -134,5 +133,4 @@ TEST(GnnTensorTests, AbitraryConstructorInvariants) {
   }
 }
 
-}  // namespace gnn
-}  // namespace hydra
+}  // namespace::hydra

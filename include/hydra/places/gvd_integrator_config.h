@@ -35,8 +35,7 @@
 #pragma once
 #include <cstdint>
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 enum class ParentUniquenessMode {
   ANGLE,
@@ -68,5 +67,4 @@ void declare_config(VoronoiCheckConfig& conf);
 
 void declare_config(GvdIntegratorConfig& conf);
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

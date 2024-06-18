@@ -8,7 +8,6 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/projective_integrator_config.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/reconstruction_module.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/reconstruction_output.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/semantic_mesh_layer.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/semantic_integrator.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/tsdf_interpolators.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/volumetric_map.cpp

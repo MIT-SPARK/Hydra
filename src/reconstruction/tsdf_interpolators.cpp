@@ -36,17 +36,8 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <voxblox/integrator/merge_integration.h>
-#include <voxblox/utils/voxel_utils.h>
 
 namespace hydra {
-
-using voxblox::BlockIndexList;
-using voxblox::Layer;
-using voxblox::TsdfVoxel;
-
-using TsdfPtr = std::shared_ptr<TsdfInterpolator::TsdfLayer>;
-using TsdfLayer = Layer<TsdfVoxel>;
 
 Eigen::Matrix<int, 3, 8> getCubeOffsets() {
   Eigen::Matrix<int, 3, 8> offsets;
@@ -58,15 +49,6 @@ Eigen::Matrix<int, 3, 8> getCubeOffsets() {
   return offsets;
 }
 
-void declare_config(TrilinearTsdfInterpolator::Config& config) {
-  using namespace config;
-  name("TrilinearTsdfInterpolator::Config");
-  field(config.voxel_resolution_m, "voxel_resolution_m");
-  field(config.voxels_per_side, "voxels_per_side");
-  checkCondition((config.voxels_per_side % 2 == 0), "voxels_per_side must be even");
-  check(config.voxel_resolution_m, GT, 0.0, "voxel_resolution_m");
-}
-
 void declare_config(DownsampleTsdfInterpolator::Config& config) {
   using namespace config;
   name("DownsampleTsdfInterpolator::Config");
@@ -76,56 +58,38 @@ void declare_config(DownsampleTsdfInterpolator::Config& config) {
   check(config.ratio, GT, 1, "ratio");
 }
 
-TrilinearTsdfInterpolator::TrilinearTsdfInterpolator(const Config& config)
-    : TsdfInterpolator(), config(config::checkValid(config)) {}
-
-TsdfPtr TrilinearTsdfInterpolator::interpolate(const TsdfLayer& input,
-                                               const BlockIndices*) const {
-  auto new_layer = std::make_shared<Layer<TsdfVoxel>>(config.voxel_resolution_m,
-                                                      config.voxels_per_side);
-  voxblox::resampleLayer<TsdfVoxel>(input, new_layer.get());
-  return new_layer;
-}
-
 DownsampleTsdfInterpolator::DownsampleTsdfInterpolator(const Config& config)
     : TsdfInterpolator(), config(config::checkValid(config)) {}
 
-TsdfPtr DownsampleTsdfInterpolator::interpolate(const TsdfLayer& input,
-                                                const BlockIndices* to_use) const {
-  const auto new_resolution = input.voxel_size() * config.ratio;
-  const auto new_vps = input.voxels_per_side() / config.ratio;
+TsdfLayer::Ptr DownsampleTsdfInterpolator::interpolate(
+    const TsdfLayer& input, const BlockIndices* to_use) const {
+  const auto new_vs = input.voxel_size * config.ratio;
+  const auto new_vps = input.voxels_per_side / config.ratio;
   if (new_vps <= 1) {
     LOG(ERROR) << "ratio invalid for current number of voxels";
     return nullptr;
   }
+  auto new_layer = std::make_shared<TsdfLayer>(new_vs, new_vps);
 
   const auto offsets = getCubeOffsets();
-  Eigen::Vector3i center_offset = Eigen::Vector3i::Constant(config.ratio / 2);
-
-  auto new_layer = std::make_shared<Layer<TsdfVoxel>>(new_resolution, new_vps);
-
-  BlockIndexList blocks;
-  if (to_use) {
-    blocks = *to_use;
-  } else {
-    input.getAllAllocatedBlocks(&blocks);
-  }
+  VoxelIndex center_offset = VoxelIndex::Constant(config.ratio / 2);
+  const BlockIndices blocks = to_use ? *to_use : input.allocatedBlockIndices();
 
   for (const auto& idx : blocks) {
-    auto new_block = new_layer->allocateBlockPtrByIndex(idx);
-    const auto& old_block = input.getBlockByIndex(idx);
+    auto& new_block = new_layer->allocateBlock(idx);
+    const auto& old_block = input.getBlock(idx);
 
-    for (size_t i = 0; i < new_block->num_voxels(); ++i) {
-      auto& new_voxel = new_block->getVoxelByLinearIndex(i);
+    for (size_t i = 0; i < new_block.numVoxels(); ++i) {
+      auto& new_voxel = new_block.getVoxel(i);
 
       // get top-level corner of 2x2x2 cube
-      const auto new_idx = new_block->computeVoxelIndexFromLinearIndex(i);
-      const voxblox::VoxelIndex old_idx = config.ratio * new_idx + center_offset;
+      const auto new_idx = new_block.getVoxelIndex(i);
+      const VoxelIndex old_idx = config.ratio * new_idx + center_offset;
 
       // float required to avoid overflow
       Eigen::Vector4f new_color = Eigen::Vector4f::Zero();
       for (size_t i = 0; i < 8; ++i) {
-        const auto& voxel = old_block.getVoxelByVoxelIndex(old_idx - offsets.col(i));
+        const auto& voxel = old_block.getVoxel(old_idx - offsets.col(i));
 
         new_voxel.weight += voxel.weight;
         new_voxel.distance += voxel.weight * voxel.distance;

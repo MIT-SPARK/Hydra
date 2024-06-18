@@ -33,11 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include "hydra/common/semantic_color_map.h"
-#include "hydra/utils/csv_reader.h"
 
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
-#include <voxblox/core/color.h>
+#include <spark_dsg/color_utils.h>
 
 #include <fstream>
 #include <iostream>
@@ -45,31 +44,9 @@
 #include <string>
 #include <unordered_map>
 
-namespace voxblox {
-
-std::ostream& operator<<(std::ostream& out, const Color& color) {
-  out << "[" << std::to_string(color.r) << ' ' << std::to_string(color.g) << ' '
-      << std::to_string(color.b) << ' ' << std::to_string(color.a) << "]";
-  return out;
-}
-
-}  // namespace voxblox
-
-using voxblox::Color;
+#include "hydra/utils/csv_reader.h"
 
 namespace hydra {
-
-size_t ColorHasher::operator()(const Color& k) const {
-  // Compute individual hash values for rgb values and combine them using XOR
-  // and bit shifting
-  return ((std::hash<uint8_t>()(k.r) ^ (std::hash<uint8_t>()(k.g) << 1)) >> 1) ^
-         (std::hash<uint8_t>()(k.b) << 1);
-}
-
-bool ColorEqual::operator()(const Color& lhs, const Color& rhs) const {
-  // note that we don't want to use alpha values
-  return lhs.r == rhs.r && lhs.g == rhs.g && lhs.b == rhs.b;
-}
 
 SemanticColorMap::SemanticColorMap() : SemanticColorMap(ColorToLabelMap()) {}
 
@@ -77,7 +54,7 @@ SemanticColorMap::SemanticColorMap(const ColorToLabelMap& color_to_label,
                                    const Color& unknown)
     : max_label_(0), color_to_label_(color_to_label), unknown_color_(unknown) {
   for (auto&& [color, label] : color_to_label_) {
-    LOG_IF(WARNING, ColorEqual()(unknown_color_, color))
+    LOG_IF(WARNING, unknown_color_ == color)
         << "found duplicate color with provided unknown color " << color
         << " for label " << label;
     label_to_color_[label] = color;
@@ -151,23 +128,24 @@ SemanticColorMap::Ptr SemanticColorMap::fromCsv(const std::string& filename,
   static const std::string alpha_header = "alpha";
   static const std::string id_header = "id";
 
-  CsvReader reader(filename, delimiter, skip_first_line);
+  const CsvReader reader(filename, delimiter, skip_first_line);
+  if (!reader) {
+    return nullptr;
+  }
 
-  // TODO(marcus): make alpha header optional
-  if (!reader.hasHeaders(
-          {red_header, green_header, blue_header, alpha_header, id_header})) {
-    LOG(FATAL) << "CSV file '" << filename << "' is missing required headers.";
+  if (!reader.checkRequiredHeaders({red_header, green_header, blue_header, id_header})) {
+    return nullptr;
   }
 
   ColorToLabelMap cmap;
+  const bool has_alpha = reader.hasHeader(alpha_header);
   for (size_t row = 0; row < reader.numRows(); row++) {
     const int id = std::stoi(reader.getEntry(id_header, row));
     const uint8_t r = std::stoi(reader.getEntry(red_header, row));
     const uint8_t g = std::stoi(reader.getEntry(green_header, row));
     const uint8_t b = std::stoi(reader.getEntry(blue_header, row));
-    const uint8_t a = std::stoi(reader.getEntry(alpha_header, row));
-    const voxblox::Color rgba(r, g, b, a);
-    cmap[rgba] = id;
+    const uint8_t a = has_alpha ? std::stoi(reader.getEntry(alpha_header, row)) : 255;
+    cmap[Color(r, g, b, a)] = id;
   }
 
   return std::make_unique<SemanticColorMap>(cmap, unknown);
@@ -175,18 +153,19 @@ SemanticColorMap::Ptr SemanticColorMap::fromCsv(const std::string& filename,
 
 SemanticColorMap::Ptr SemanticColorMap::randomColors(size_t num_labels,
                                                      const Color& unknown) {
-  const std::vector<Color> defaults{Color::Gray(),
-                                    Color::Green(),
-                                    Color::Blue(),
-                                    Color::Purple(),
-                                    Color::Pink(),
-                                    Color::Teal(),
-                                    Color::Orange(),
-                                    Color::Yellow()};
+  const std::vector<Color> defaults{Color::gray(),
+                                    Color::green(),
+                                    Color::blue(),
+                                    Color::purple(),
+                                    Color::magenta(),
+                                    Color::cyan(),
+                                    Color::orange(),
+                                    Color::yellow(),
+                                    Color::pink()};
 
   ColorToLabelMap cmap;
   for (size_t i = 0; i < num_labels; i++) {
-    cmap[(i < defaults.size()) ? defaults.at(i) : voxblox::randomColor()] = i;
+    cmap[(i < defaults.size()) ? defaults.at(i) : Color::random()] = i;
   }
 
   return std::make_unique<SemanticColorMap>(cmap, unknown);

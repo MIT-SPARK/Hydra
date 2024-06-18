@@ -36,13 +36,14 @@
 #include <glog/logging.h>
 #include <kimera_pgmo/compression/DeltaCompression.h>
 #include <kimera_pgmo/utils/CommonFunctions.h>
-#include <spark_dsg/pgmo_mesh_traits.h>
 #include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/pgmo_mesh_traits.h>
 
 #include <filesystem>
 #include <nanoflann.hpp>
 
 #include "hydra/eval/progress.h"
+#include "hydra/reconstruction/voxel_types.h"
 
 DEFINE_double(mesh_resolution, 0.4, "mesh resolution in meters");
 DEFINE_double(place_resolution, 1.5, "place resolution in meters");
@@ -144,7 +145,7 @@ struct DsgMeshInterface : public kimera_pgmo::MeshInterface {
 
   const voxblox::BlockIndexList& blockIndices() const override { return indices; }
 
-  void markBlockActive(const voxblox::BlockIndex&) override {}
+  void markBlockActive(const BlockIndex&) override {}
 
   size_t activeBlockSize() const override { return 3 * mesh->numFaces(); }
 
@@ -206,7 +207,7 @@ void compressMesh(DynamicSceneGraph& graph, double resolution) {
   auto delta = compression.update(interface, 0, &remapping);
 
   const auto mesh = graph.mesh();
-  auto& face_remapping = remapping.at(voxblox::BlockIndex(0, 0, 0));
+  auto& face_remapping = remapping.at(BlockIndex(0, 0, 0));
   std::unordered_map<size_t, size_t> vertex_remapping;
   for (auto&& [face_idx, new_idx] : face_remapping) {
     size_t vertex_idx = getVertexFromFaces(*mesh, face_idx);

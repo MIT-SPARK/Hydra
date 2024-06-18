@@ -32,16 +32,50 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <cstddef>
-#include <cstdint>
+
+#include "hydra/utils/pgmo_mesh_interface.h"
 
 namespace hydra {
 
-struct VertexVoxel {
-  bool on_surface = false;
-  size_t block_vertex_index;
-  int32_t mesh_block[3];
+PgmoMeshInterface::PgmoMeshInterface(const MeshLayer& mesh) : mesh_(mesh) {
+  block_indices.reserve(mesh.numBlocks());
+  // TODO(lschmid): Ugly hard copy for now.
+  for (const auto& block_idx : mesh.allocatedBlockIndices()) {
+    block_indices.push_back(block_idx.cast<voxblox::BlockIndex::Scalar>());
+  }
+}
+
+const voxblox::BlockIndexList& PgmoMeshInterface::blockIndices() const {
+  return block_indices;
+}
+
+void PgmoMeshInterface::markBlockActive(const voxblox::BlockIndex& block) {
+  active_mesh_ = mesh_.getBlockPtr(block.cast<BlockIndex::Scalar>());
+}
+
+size_t PgmoMeshInterface::activeBlockSize() const {
+  // Assumes we mark the active block first.
+  return active_mesh_->points.size();
+}
+
+pcl::PointXYZRGBA PgmoMeshInterface::getActiveVertex(size_t index) const {
+  // Assumes we mark the active block first.
+  pcl::PointXYZRGBA point;
+  const auto& pos = active_mesh_->points[index];
+  point.x = pos(0);
+  point.y = pos(1);
+  point.z = pos(2);
+  const auto& color = active_mesh_->colors[index];
+  point.r = color.r;
+  point.g = color.g;
+  point.b = color.b;
+  point.a = color.a;
+  return point;
 };
+
+std::optional<uint32_t> PgmoMeshInterface::getActiveSemantics(size_t index) const {
+  // Assumes we mark the active block first.
+  return active_mesh_->labels[index];
+}
 
 }  // namespace hydra

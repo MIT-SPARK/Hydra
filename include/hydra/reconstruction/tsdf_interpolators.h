@@ -34,16 +34,14 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <config_utilities/factory.h>
-#include <voxblox/core/layer.h>
 
 #include <memory>
+
+#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra {
 
 struct TsdfInterpolator {
-  using TsdfLayer = voxblox::Layer<voxblox::TsdfVoxel>;
-  using BlockIndices = voxblox::BlockIndexList;
-
   virtual ~TsdfInterpolator() = default;
 
   virtual std::shared_ptr<TsdfLayer> interpolate(const TsdfLayer& input,
@@ -52,30 +50,6 @@ struct TsdfInterpolator {
   std::shared_ptr<TsdfLayer> interpolate(const TsdfLayer& input) const {
     return interpolate(input, nullptr);
   }
-};
-
-struct TrilinearTsdfInterpolator : public TsdfInterpolator {
-  using TsdfInterpolator::TsdfLayer;
-
-  struct Config {
-    double voxel_resolution_m = 0.2;
-    int voxels_per_side = 16;
-  } const config;
-
-  explicit TrilinearTsdfInterpolator(const Config& config);
-
-  virtual ~TrilinearTsdfInterpolator() = default;
-
-  // note that blocks are disregarded and this is significantly slower than the
-  // downsample method
-  std::shared_ptr<TsdfLayer> interpolate(const TsdfLayer& input,
-                                         const BlockIndices* blocks) const override;
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<TsdfInterpolator,
-                                     TrilinearTsdfInterpolator,
-                                     TrilinearTsdfInterpolator::Config>("trilinear");
 };
 
 struct DownsampleTsdfInterpolator : public TsdfInterpolator {
@@ -96,8 +70,6 @@ struct DownsampleTsdfInterpolator : public TsdfInterpolator {
                                      DownsampleTsdfInterpolator,
                                      DownsampleTsdfInterpolator::Config>("downsample");
 };
-
-void declare_config(TrilinearTsdfInterpolator::Config& config);
 
 void declare_config(DownsampleTsdfInterpolator::Config& config);
 

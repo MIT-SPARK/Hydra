@@ -328,8 +328,7 @@ SceneGraphLayer::Ptr RoomFinder::makeRoomLayer(const SceneGraphLayer& places) {
     // TODO(nathan) define unknown label somewhere
     attrs->semantic_label = 0;
     attrs->name = room_id.getLabel();
-    auto color = GlobalInfo::instance().getRoomColor(room_id.categoryId());
-    attrs->color = Eigen::Map<SemanticNodeAttributes::ColorVector>(color.data());
+    attrs->color = GlobalInfo::instance().getRoomColor(room_id.categoryId());
     attrs->position = getRoomPosition(places, cluster);
 
     rooms->emplaceNode(room_id, std::move(attrs));

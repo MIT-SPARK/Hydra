@@ -38,6 +38,7 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 
+#include "hydra/common/config_utilities.h"
 #include "hydra/common/semantic_color_map.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -162,7 +163,7 @@ void GlobalInfo::initFromConfig(const PipelineConfig& config, int robot_id) {
   if (!config_.label_space.colormap.empty()) {
     SemanticColorMap::ColorToLabelMap new_colors;
     for (auto&& [id, color] : config_.label_space.colormap) {
-      new_colors[voxblox::Color(color[0], color[1], color[2], 255)] = id;
+      new_colors[Color(color[0], color[1], color[2])] = id;
     }
 
     label_colormap_.reset(new SemanticColorMap(new_colors));
@@ -226,27 +227,17 @@ ColorMapPtr GlobalInfo::setRandomColormap() {
 
 bool GlobalInfo::force_shutdown() const { return force_shutdown_; }
 
-const PipelineConfig& GlobalInfo::getConfig() const {
-  return config_;
-}
+const PipelineConfig& GlobalInfo::getConfig() const { return config_; }
 
-const FrameConfig& GlobalInfo::getFrames() const {
-  return config_.frames;
-}
+const FrameConfig& GlobalInfo::getFrames() const { return config_.frames; }
 
-const RobotPrefixConfig& GlobalInfo::getRobotPrefix() const {
-  return robot_prefix_;
-}
+const RobotPrefixConfig& GlobalInfo::getRobotPrefix() const { return robot_prefix_; }
 
-const LogSetup::Ptr& GlobalInfo::getLogs() const {
-  return logs_;
-}
+const LogSetup::Ptr& GlobalInfo::getLogs() const { return logs_; }
 
-const VolumetricMap::Config& GlobalInfo::getMapConfig() const {
-  return config_.map;
-}
+const VolumetricMap::Config& GlobalInfo::getMapConfig() const { return config_.map; }
 
-const ColorArray& GlobalInfo::getRoomColor(size_t index) const {
+const Color& GlobalInfo::getRoomColor(size_t index) const {
   return config_.room_colors.at(index % config_.room_colors.size());
 }
 
@@ -265,7 +256,6 @@ size_t GlobalInfo::getTotalLabels() const {
 const LabelRemapper& GlobalInfo::getLabelRemapper() const { return label_remapper_; }
 
 SharedDsgInfo::Ptr GlobalInfo::createSharedDsg() const {
-  checkFrozen();
   return std::make_shared<SharedDsgInfo>(config_.layer_id_map);
 }
 
@@ -279,7 +269,6 @@ void GlobalInfo::setSensors(std::vector<config::VirtualConfig<Sensor>> sensor_co
 }
 
 std::shared_ptr<const Sensor> GlobalInfo::getSensor(const size_t index) const {
-  checkFrozen();
   if (index >= sensors_.size()) {
     LOG(ERROR) << "Sensor index out of bounds: " << index;
     return nullptr;
@@ -288,7 +277,6 @@ std::shared_ptr<const Sensor> GlobalInfo::getSensor(const size_t index) const {
 }
 
 size_t GlobalInfo::numSensors() const {
-  checkFrozen();
   return sensors_.size();
 }
 

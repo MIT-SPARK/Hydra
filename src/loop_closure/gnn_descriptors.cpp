@@ -39,8 +39,7 @@
 
 #include <deque>
 
-namespace hydra {
-namespace lcd {
+namespace hydra::lcd {
 
 using Dsg = DynamicSceneGraph;
 using DsgNode = DynamicSceneGraphNode;
@@ -311,5 +310,4 @@ ObjectGnnDescriptor::LabelEmbeddings loadLabelEmbeddings(const std::string& file
   return embeddings;
 }
 
-}  // namespace lcd
-}  // namespace hydra
+}  // namespace hydra::lcd

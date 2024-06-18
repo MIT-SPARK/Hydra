@@ -470,8 +470,7 @@ NodeSymbol Place2dSegmenter::addPlaceToGraph(DynamicSceneGraph& graph,
     CHECK(label_map != nullptr);
   }
 
-  const auto color = label_map->getColorFromLabel(label);
-  attrs->color << color.r, color.g, color.b;
+  attrs->color  = label_map->getColorFromLabel(label);
 
   graph.emplaceNode(DsgLayers::MESH_PLACES, next_node_id_, std::move(attrs));
 

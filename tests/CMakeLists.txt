@@ -30,7 +30,6 @@ add_executable(
   loop_closure/test_scene_graph_descriptors.cpp
   loop_closure/test_subgraph_extraction.cpp
   places/test_compression_graph_extractor.cpp
-  places/test_esdf_comparison.cpp
   places/test_floodfill_graph_extractor.cpp
   places/test_graph_extractor_utilities.cpp
   places/test_gvd_integrator.cpp

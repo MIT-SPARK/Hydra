@@ -40,10 +40,9 @@
 #include <set>
 #include <unordered_map>
 
-#include "hydra/places/voxblox_types.h"
+#include "hydra/reconstruction/voxel_types.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 struct GvdMemberInfo {
   double distance;
@@ -84,5 +83,4 @@ class GvdGraph {
   Nodes nodes_;
 };
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

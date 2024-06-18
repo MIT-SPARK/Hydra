@@ -37,16 +37,15 @@
 #include <unordered_set>
 #include <vector>
 
-#include "hydra/places/voxblox_types.h"
+#include "hydra/reconstruction/voxel_types.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 class NearestVoxelFinder {
  public:
   using Callback = std::function<void(const GlobalIndex&, size_t, int64_t)>;
 
-  explicit NearestVoxelFinder(const voxblox::AlignedVector<GlobalIndex>& indices);
+  explicit NearestVoxelFinder(const GlobalIndices& indices);
 
   virtual ~NearestVoxelFinder();
 
@@ -67,17 +66,16 @@ struct FurthestIndexResult {
 };
 
 FurthestIndexResult findFurthestIndexFromLine(
-    const voxblox::AlignedVector<GlobalIndex>& indices,
+    const GlobalIndices& indices,
     const GlobalIndex& start,
     const GlobalIndex& end,
     size_t number_source_edges);
 
 inline FurthestIndexResult findFurthestIndexFromLine(
-    const voxblox::AlignedVector<GlobalIndex>& indices,
+    const GlobalIndices& indices,
     const GlobalIndex& start,
     const GlobalIndex& end) {
   return findFurthestIndexFromLine(indices, start, end, indices.size());
 }
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

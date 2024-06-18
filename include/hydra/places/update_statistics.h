@@ -35,8 +35,7 @@
 #pragma once
 #include <iostream>
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 /**
  * @brief Tracking statistics for what the integrator did
@@ -59,5 +58,4 @@ struct UpdateStatistics {
 
 std::ostream& operator<<(std::ostream& out, const UpdateStatistics& stats);
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

@@ -33,7 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <voxblox/core/layer.h>
 
 #include <vector>
 
@@ -53,7 +52,7 @@ struct PlaceMetrics {
 };
 
 PlaceMetrics scorePlaces(const SceneGraphLayer& places,
-                         const voxblox::Layer<places::GvdVoxel>& gvd,
+                         const places::GvdLayer& gvd,
                          size_t min_gvd_basis);
 
 }  // namespace hydra::eval

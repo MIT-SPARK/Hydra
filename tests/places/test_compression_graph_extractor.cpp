@@ -35,10 +35,7 @@
 #include <gtest/gtest.h>
 #include <hydra/places/compression_graph_extractor.h>
 
-namespace hydra {
-namespace places {
-
-using GvdLayer = GraphExtractorInterface::GvdLayer;
+namespace hydra::places {
 
 namespace {
 
@@ -87,9 +84,9 @@ class CompressionGraphExtractorTestFixture : public ::testing::Test {
   virtual void SetUp() override {
     gvd_layer.reset(new GvdLayer(1.0, 16));
     const auto block_index = BlockIndex::Zero();
-    auto gvd_block = gvd_layer->allocateBlockPtrByIndex(block_index);
-    for (size_t i = 0; i < gvd_block->num_voxels(); ++i) {
-      auto& voxel = gvd_block->getVoxelByLinearIndex(i);
+    auto gvd_block = gvd_layer->allocateBlockPtr(block_index);
+    for (size_t i = 0; i < gvd_block->numVoxels(); ++i) {
+      auto& voxel = gvd_block->getVoxel(i);
       voxel.distance = 0.3;
       voxel.num_extra_basis = 4;
     }
@@ -701,5 +698,4 @@ TEST(CompressionNode, testMergePolicies) {
   EXPECT_EQ(distance_policy.compare(info3, info2), 1);
 }
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

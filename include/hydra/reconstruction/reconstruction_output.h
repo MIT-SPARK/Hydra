@@ -53,7 +53,7 @@ struct ReconstructionOutput {
   std::shared_ptr<InputData> sensor_data;
 
   const VolumetricMap& map() const;
-  voxblox::BlockIndexList archived_blocks;
+  BlockIndices archived_blocks;
   std::list<pose_graph_tools_msgs::PoseGraph::ConstPtr> pose_graphs;
   pose_graph_tools_msgs::PoseGraph::ConstPtr agent_node_measurements;
 

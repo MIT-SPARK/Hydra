@@ -131,13 +131,19 @@ TEST(DsgInterpolationTests, ObjectUpdateMergeLC) {
     // No mesh, so nothing should change
     Eigen::Vector3d expected_pos0(1.0, 2.0, 3.0);
     EXPECT_NEAR(0.0, (expected_pos0 - result0.position).norm(), 1.0e-7);
-    EXPECT_NEAR(0.0, (expected_pos0.cast<float>() - result0.bounding_box.world_P_center).norm(), 1.0e-7);
+    EXPECT_NEAR(
+        0.0,
+        (expected_pos0.cast<float>() - result0.bounding_box.world_P_center).norm(),
+        1.0e-7);
     Eigen::Vector3f expected_dims(0, 0, 0);
     EXPECT_NEAR(0.0, (expected_dims - result0.bounding_box.dimensions).norm(), 1.0e-7);
 
     Eigen::Vector3d expected_pos1(2.0, 3.0, 4.0);
     EXPECT_NEAR(0.0, (expected_pos1 - result1.position).norm(), 1.0e-7);
-    EXPECT_NEAR(0.0, (expected_pos1.cast<float>() - result1.bounding_box.world_P_center).norm(), 1.0e-7);
+    EXPECT_NEAR(
+        0.0,
+        (expected_pos1.cast<float>() - result1.bounding_box.world_P_center).norm(),
+        1.0e-7);
     EXPECT_NEAR(0.0, (expected_dims - result1.bounding_box.dimensions).norm(), 1.0e-7);
   }
 
@@ -156,7 +162,10 @@ TEST(DsgInterpolationTests, ObjectUpdateMergeLC) {
     // valid mesh: things should change
     Eigen::Vector3d expected_pos(0.0, 0.0, 0.0);
     EXPECT_NEAR(0.0, (expected_pos - result0.position).norm(), 1.0e-7);
-    EXPECT_NEAR(0.0, (expected_pos.cast<float>() - result0.bounding_box.world_P_center).norm(), 1.0e-7);
+    EXPECT_NEAR(
+        0.0,
+        (expected_pos.cast<float>() - result0.bounding_box.world_P_center).norm(),
+        1.0e-7);
     Eigen::Vector3f expected_max(2.0, 4.0, 6.0);
     EXPECT_NEAR(0.0, (expected_max - result0.bounding_box.dimensions).norm(), 1.0e-7);
 
@@ -223,8 +232,7 @@ TEST(DsgInterpolationTests, BuildingUpdate) {
   graph.insertEdge("B0"_id, 5);
 
   UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, false, 0, false});
-  dsg_updates::UpdateBuildingsFunctor functor(
-      SemanticNodeAttributes::ColorVector::Zero(), 0);
+  dsg_updates::UpdateBuildingsFunctor functor(Color(), 0);
   functor.call(*dsg, info);
 
   Eigen::Vector3d first_expected(-1.0, 0.0, 1.0);

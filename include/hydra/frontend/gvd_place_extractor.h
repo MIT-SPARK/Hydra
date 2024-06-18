@@ -59,7 +59,7 @@ class GvdPlaceExtractor : public FreespacePlacesInterface {
   using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
   using Sink = OutputSink<uint64_t,
                           const Eigen::Isometry3f&,
-                          const voxblox::Layer<places::GvdVoxel>&,
+                          const places::GvdLayer&,
                           const places::GraphExtractorInterface*>;
 
   struct Config {
@@ -99,7 +99,7 @@ class GvdPlaceExtractor : public FreespacePlacesInterface {
 
  protected:
   mutable std::mutex gvd_mutex_;
-  voxblox::Layer<places::GvdVoxel>::Ptr gvd_;
+  places::GvdLayer::Ptr gvd_;
   std::shared_ptr<places::GraphExtractorInterface> graph_extractor_;
   std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
   std::unique_ptr<TsdfInterpolator> tsdf_interpolator_;

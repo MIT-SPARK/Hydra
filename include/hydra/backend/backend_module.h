@@ -80,7 +80,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
     bool enable_rooms = true;
     RoomFinderConfig room_finder;
     bool enable_buildings = true;
-    SemanticNodeAttributes::ColorVector building_color{169, 8, 194};  // purple
+    Color building_color = Color(169, 8, 194);  // purple
     SemanticNodeAttributes::Label building_semantic_label = 22u;
     HydraPgmoConfig pgmo;
     // dsg

@@ -34,8 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/gvd_graph.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 GvdGraph::GvdGraph() : next_id_(0) {}
 
@@ -92,5 +91,4 @@ uint64_t GvdGraph::getNextId() {
 
 bool GvdGraph::hasNode(uint64_t node) const { return nodes_.count(node) > 0; }
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

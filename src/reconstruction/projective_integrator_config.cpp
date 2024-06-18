@@ -43,7 +43,6 @@ void declare_config(ProjectiveIntegratorConfig& config) {
   using namespace config;
   name("ProjectiveIntegrator");
   field(config.verbosity, "verbosity");
-  field(config.accurate_visible_blocks, "accurate_visible_blocks");
   // TODO(nathan) push to sensor
   field(config.use_weight_dropoff, "use_weight_dropoff");
   field(config.weight_dropoff_epsilon,

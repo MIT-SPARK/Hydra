@@ -37,8 +37,7 @@
 #include <functional>
 #include <sstream>
 
-namespace hydra {
-namespace gnn {
+namespace hydra::gnn {
 
 bool FieldInfo::tensorMatchesType(const Tensor& tensor) const {
   switch (type) {
@@ -363,5 +362,4 @@ std::ostream& operator<<(std::ostream& out, const FieldInfo& info) {
   return out;
 }
 
-}  // namespace gnn
-}  // namespace hydra
+}  // namespace::hydra

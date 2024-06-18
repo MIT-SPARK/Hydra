@@ -53,6 +53,9 @@
     local-name: teaser_plusplus
     uri: git@github.com:MIT-SPARK/TEASER-plusplus.git
 - git:
+    local-name: spatial_hash
+    uri: git@github.mit.edu:SPARK/Spatial-Hash.git
+- git:
     local-name: voxblox
     uri: git@github.com:MIT-SPARK/voxblox.git
     version: feature/hydra

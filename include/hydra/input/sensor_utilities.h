@@ -46,12 +46,11 @@
 // Government is authorized to reproduce and distribute reprints for Government
 // purposes notwithstanding any copyright notation herein.
 #pragma once
-#include <voxblox/core/block.h>
-#include <voxblox/core/common.h>
 
 #include <opencv2/core/mat.hpp>
 
 #include "hydra/input/sensor.h"
+#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra {
 
@@ -65,7 +64,7 @@ namespace hydra {
  * @return True if the block can be in the camera's view frustum.
  */
 bool blockIsInViewFrustum(const Sensor& sensor,
-                          const voxblox::BlockIndex& block_index,
+                          const BlockIndex& block_index,
                           const Eigen::Isometry3f& T_C_B,
                           float block_size,
                           float block_diag_half);
@@ -77,16 +76,9 @@ bool blockIsInViewFrustum(const Sensor& sensor,
  * @param T_C_B Transform from Block (B) frame to the Camera (C) frame.
  * @return True if the block can be in the camera's view frustum.
  */
-template <typename T>
 bool blockIsInViewFrustum(const Sensor& sensor,
-                          const voxblox::Block<T>& block,
-                          const Eigen::Isometry3f& T_C_B) {
-  const auto block_size = block.block_size();
-  const auto block_diag_half = std::sqrt(3.0f) * block_size / 2.0f;
-  return blockIsInViewFrustum(
-      sensor, block.block_index(), T_C_B, block_size, block_diag_half);
-}
-
+                          const spatial_hash::Block& block,
+                          const Eigen::Isometry3f& T_C_B);
 /**
  * @brief Finds the indices of all blocks that could be visible in the camera's view
  * frustum. Does not check for occlusion.
@@ -98,7 +90,7 @@ bool blockIsInViewFrustum(const Sensor& sensor,
  * view in meters.
  * @return List of block indices that could be visible in the camera's view frustum.
  */
-voxblox::BlockIndexList findBlocksInViewFrustum(
+BlockIndices findBlocksInViewFrustum(
     const Sensor& sensor,
     const Eigen::Isometry3f& T_W_C,
     float block_size,
@@ -116,7 +108,7 @@ voxblox::BlockIndexList findBlocksInViewFrustum(
  * count blocks as seen in meters.
  * @return List of block indices that are visible in the camera's view frustum.
  */
-voxblox::BlockIndexList findVisibleBlocks(const Sensor& sensor,
+BlockIndices findVisibleBlocks(const Sensor& sensor,
                                           const Eigen::Isometry3f& T_W_C,
                                           const cv::Mat& vertex_map,
                                           float block_size,

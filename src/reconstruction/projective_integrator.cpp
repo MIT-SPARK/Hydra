@@ -53,18 +53,14 @@
 #include <utility>
 #include <vector>
 
-#include "hydra/reconstruction/index_getter.h"
 #include "hydra/input/sensor_utilities.h"
+#include "hydra/reconstruction/index_getter.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
 
 using VoxelMeasurement = ProjectiveIntegrator::VoxelMeasurement;
 using timing::ScopedTimer;
-using voxblox::BlockIndex;
-using voxblox::BlockIndexList;
-using voxblox::Point;
-using voxblox::TsdfVoxel;
 
 ProjectiveIntegrator::ProjectiveIntegrator(const ProjectiveIntegratorConfig& config)
     : config_(config::checkValid(config)),
@@ -75,31 +71,24 @@ void ProjectiveIntegrator::updateMap(const Sensor& sensor,
                                      const InputData& data,
                                      VolumetricMap& map,
                                      bool allocate_blocks) const {
-  BlockIndexList block_indices;
   const auto body_T_sensor = data.getSensorPose<float>(sensor);
-  if (config_.accurate_visible_blocks) {
-    block_indices = findVisibleBlocks(sensor,
-                                      body_T_sensor,
-                                      data.vertex_map,
-                                      map.block_size,
-                                      map.truncation_distance());
-  } else {
-    block_indices = findBlocksInViewFrustum(
-        sensor, body_T_sensor, map.block_size, data.min_range, data.max_range);
-  }
+  const auto block_indices = findBlocksInViewFrustum(
+      sensor, body_T_sensor, map.block_size, data.min_range, data.max_range);
 
-  BlockIndexList new_blocks;
+  auto& tsdf = map.getTsdfLayer();
+  const auto semantics = map.getSemanticLayer();
+
+  BlockIndices new_blocks;
   if (allocate_blocks) {
     for (const auto& idx : block_indices) {
-      if (map.getTsdfLayer().hasBlock(idx)) {
+      if (tsdf.hasBlock(idx)) {
         continue;
       }
 
       new_blocks.push_back(idx);
-      map.getTsdfLayer().allocateBlockPtrByIndex(idx);
-      const auto semantic_layer = map.getSemanticLayer();
-      if (semantic_integrator_ && semantic_layer) {
-        semantic_layer->allocateBlockPtrByIndex(idx);
+      tsdf.allocateBlock(idx);
+      if (semantic_integrator_ && semantics) {
+        semantics->allocateBlock(idx);
       }
     }
   }
@@ -116,10 +105,9 @@ void ProjectiveIntegrator::updateMap(const Sensor& sensor,
                block_indices,
                data,
                map);
-
   for (const auto& idx : new_blocks) {
-    const auto block = map.getTsdfLayer().getBlockPtrByIndex(idx);
-    if (!block || block->updated().any()) {
+    const auto block = map.getTsdfLayer().getBlockPtr(idx);
+    if (!block || block->esdf_updated || block->mesh_updated) {
       continue;
     }
 
@@ -133,11 +121,11 @@ void ProjectiveIntegrator::updateMap(const Sensor& sensor,
 
 void ProjectiveIntegrator::updateBlocks(const BlockUpdateFunction& update_function,
                                         const Sensor& sensor,
-                                        const BlockIndexList& block_indices,
+                                        const BlockIndices& block_indices,
                                         const InputData& data,
                                         VolumetricMap& map) const {
   // Update all blocks in parallel.
-  std::vector<BlockIndex> block_idx_vector(block_indices.begin(), block_indices.end());
+  BlockIndices block_idx_vector(block_indices.begin(), block_indices.end());
   IndexGetter<BlockIndex> index_getter(block_idx_vector);
 
   // TODO(nathan) reconsider future/async
@@ -161,16 +149,16 @@ void ProjectiveIntegrator::updateMapBlock(const Sensor& sensor,
                                           const InputData& data,
                                           VolumetricMap& map) const {
   // Get and allocate block if necessary.
-  const auto tsdf_block = map.getTsdfLayer().getBlockPtrByIndex(block_index);
+  const auto tsdf_block = map.getTsdfLayer().getBlockPtr(block_index);
   if (!tsdf_block) {
     LOG(WARNING) << "Tried to integrate non-existing TSDF block, skipping!";
     return;
   }
 
-  voxblox::Block<SemanticVoxel>::Ptr semantic_block;
+  SemanticBlock::Ptr semantic_block;
   const auto semantics = map.getSemanticLayer();
   if (semantics) {
-    semantic_block = semantics->getBlockPtrByIndex(block_index);
+    semantic_block = semantics->getBlockPtr(block_index);
   }
 
   const auto body_T_sensor = data.getSensorPose<float>(sensor);
@@ -178,19 +166,19 @@ void ProjectiveIntegrator::updateMapBlock(const Sensor& sensor,
 
   // Update all voxels.
   bool was_updated = false;
-  const float truncation_distance = map.truncation_distance();
-  const float voxel_size = map.voxel_size();
-  for (size_t i = 0; i < tsdf_block->num_voxels(); ++i) {
-    const auto p_C = sensor_T_body * tsdf_block->computeCoordinatesFromLinearIndex(i);
+  const float truncation_distance = map.config.truncation_distance;
+  const float voxel_size = map.config.voxel_size;
+  for (size_t i = 0; i < tsdf_block->numVoxels(); ++i) {
+    const auto p_C = sensor_T_body * tsdf_block->getVoxelPosition(i);
     const auto measurement =
         getVoxelUpdate(sensor, p_C, data, truncation_distance, voxel_size);
     if (!measurement.valid) {
       continue;
     }
 
-    auto& tsdf_voxel = tsdf_block->getVoxelByLinearIndex(i);
+    auto& tsdf_voxel = tsdf_block->getVoxel(i);
     SemanticVoxel* semantic_voxel =
-        semantic_block ? &semantic_block->getVoxelByLinearIndex(i) : nullptr;
+        semantic_block ? &semantic_block->getVoxel(i) : nullptr;
     updateVoxel(data, measurement, truncation_distance, tsdf_voxel, semantic_voxel);
     was_updated = true;
   }
@@ -198,7 +186,7 @@ void ProjectiveIntegrator::updateMapBlock(const Sensor& sensor,
   if (was_updated) {
     VLOG(10) << "integrator updated block [" << block_index.x() << ", "
              << block_index.y() << ", " << block_index.z() << "]";
-    tsdf_block->updated().set();
+    tsdf_block->setUpdated();
   }
 }
 
@@ -279,8 +267,8 @@ void ProjectiveIntegrator::updateVoxel(const InputData& data,
   if (!data.color_image.empty()) {
     const auto color = interpolator_->interpolateColor(
         data.color_image, measurement.interpolation_weights);
-    voxel.color = voxblox::Color::blendTwoColors(
-        voxel.color, prev_weight, color, measurement.weight);
+    const float ratio = measurement.weight / (voxel.weight + measurement.weight);
+    voxel.color.merge(color, ratio);
   }
 
   if (!semantic_integrator_ || !semantic_voxel) {

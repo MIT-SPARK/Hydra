@@ -40,8 +40,7 @@
 #include "hydra/places/graph_extractor_interface.h"
 #include "hydra/places/gvd_merge_policies.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 struct IndexVoxelPair {
   GlobalIndex index;
@@ -79,8 +78,6 @@ using IndexVoxelQueue = std::list<IndexVoxelPair>;
 class CompressionGraphExtractor : public GraphExtractorInterface {
  public:
   using Ptr = std::unique_ptr<CompressionGraphExtractor>;
-  using IndexIdMap = voxblox::LongIndexHashMapType<uint64_t>::type;
-  using IndexCompressedIdMap = voxblox::LongIndexHashMapType<std::set<uint64_t>>::type;
 
   explicit CompressionGraphExtractor(const CompressionExtractorConfig& config);
 
@@ -150,7 +147,7 @@ class CompressionGraphExtractor : public GraphExtractorInterface {
  protected:
   CompressionExtractorConfig config_;
   double compression_factor_;
-  IndexIdMap index_id_map_;
+  GlobalIndexMap<uint64_t> index_id_map_;
   std::unique_ptr<MergePolicy> merge_policy_;
 
   uint64_t next_id_;
@@ -160,7 +157,7 @@ class CompressionGraphExtractor : public GraphExtractorInterface {
   std::unordered_set<uint64_t> to_archive_;
 
   std::unordered_map<uint64_t, CompressedNode> compressed_info_map_;
-  IndexCompressedIdMap compressed_index_map_;
+  GlobalIndexMap<std::set<uint64_t>> compressed_index_map_;
   std::unordered_map<uint64_t, GlobalIndex> compressed_id_map_;
   std::unordered_map<uint64_t, uint64_t> compressed_remapping_;
 
@@ -173,5 +170,4 @@ class CompressionGraphExtractor : public GraphExtractorInterface {
           "CompressionGraphExtractor");
 };
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

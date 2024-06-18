@@ -48,11 +48,13 @@
 #pragma once
 
 #include <config_utilities/factory.h>
-#include <voxblox/core/common.h>
+#include <spark_dsg/color.h>
 
 #include <memory>
 #include <opencv2/core/mat.hpp>
 #include <string>
+
+#include "hydra/common/common_types.h"
 
 namespace hydra {
 
@@ -101,8 +103,8 @@ class ProjectionInterpolator {
    * @param color_image Color image as RGB8 to interpolate in.
    * @return Color The interpolated color value.
    */
-  virtual voxblox::Color interpolateColor(
-      const cv::Mat& color_image, const InterpolationWeights& weights) const = 0;
+  virtual Color interpolateColor(const cv::Mat& color_image,
+                                 const InterpolationWeights& weights) const = 0;
 
   /**
    * @brief Compute the semantic id based on the provided weights.
@@ -126,8 +128,8 @@ class InterpolatorNearest : public ProjectionInterpolator {
   float InterpolateRange(const cv::Mat& range_image,
                          const InterpolationWeights& weights) const override;
 
-  voxblox::Color interpolateColor(const cv::Mat& color_image,
-                                  const InterpolationWeights& weights) const override;
+  Color interpolateColor(const cv::Mat& color_image,
+                         const InterpolationWeights& weights) const override;
 
   int interpolateID(const cv::Mat& id_image,
                     const InterpolationWeights& weights) const override;
@@ -150,8 +152,8 @@ class InterpolatorBilinear : public ProjectionInterpolator {
   float InterpolateRange(const cv::Mat& range_image,
                          const InterpolationWeights& weights) const override;
 
-  voxblox::Color interpolateColor(const cv::Mat& color_image,
-                                  const InterpolationWeights& weights) const override;
+  Color interpolateColor(const cv::Mat& color_image,
+                         const InterpolationWeights& weights) const override;
   int interpolateID(const cv::Mat& id_image,
                     const InterpolationWeights& weights) const override;
 
@@ -175,8 +177,8 @@ class InterpolatorAdaptive : public InterpolatorBilinear {
   float InterpolateRange(const cv::Mat& range_image,
                          const InterpolationWeights& weights) const override;
 
-  voxblox::Color interpolateColor(const cv::Mat& color_image,
-                                  const InterpolationWeights& weights) const override;
+  Color interpolateColor(const cv::Mat& color_image,
+                         const InterpolationWeights& weights) const override;
 
   int interpolateID(const cv::Mat& id_image,
                     const InterpolationWeights& weights) const override;

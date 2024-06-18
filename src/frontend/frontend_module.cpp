@@ -51,10 +51,10 @@
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/place_2d_segmenter.h"
 #include "hydra/frontend/place_mesh_connector.h"
-#include "hydra/reconstruction/voxblox_utilities.h"
 #include "hydra/utils/display_utilities.h"
-#include "hydra/utils/mesh_interface.h"
+#include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
+#include "hydra/utils/pgmo_mesh_interface.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace kimera_pgmo {
@@ -365,7 +365,10 @@ void FrontendModule::updateMesh(const ReconstructionOutput& input) {
     VLOG(5) << "[Hydra Frontend] Clearing " << input.archived_blocks.size()
             << " blocks from mesh";
     if (!input.archived_blocks.empty()) {
-      mesh_compression_->clearArchivedBlocks(input.archived_blocks);
+      // TODO(lschmid): More voxblox deps pulled in from kimera_pgmo.
+      voxblox::BlockIndexList archived_blocks(input.archived_blocks.begin(),
+                                              input.archived_blocks.end());
+      mesh_compression_->clearArchivedBlocks(archived_blocks);
     }
   }  // end timing scope
 
@@ -375,9 +378,9 @@ void FrontendModule::updateMesh(const ReconstructionOutput& input) {
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
     mesh_remapping_.reset(new kimera_pgmo::VoxbloxIndexMapping());
-    auto mesh = input_mesh.getActiveMesh(input.archived_blocks);
+    auto mesh = getActiveMesh(input_mesh, input.archived_blocks);
     VLOG(5) << "[Hydra Frontend] Updating mesh with " << mesh->numBlocks() << " blocks";
-    auto interface = getMeshInterface(*mesh);
+    auto interface = PgmoMeshInterface(*mesh);
     last_mesh_update_ =
         mesh_compression_->update(interface, input.timestamp_ns, mesh_remapping_.get());
   }  // end timing scope
@@ -419,7 +422,7 @@ void FrontendModule::updateDeformationGraph(const ReconstructionOutput& input) {
     const auto time_ns = std::chrono::nanoseconds(input.timestamp_ns);
     double time_s =
         std::chrono::duration_cast<std::chrono::duration<double>>(time_ns).count();
-    auto interface = getMeshInterface(input.map().getMeshLayer());
+    auto interface = PgmoMeshInterface(input.map().getMeshLayer());
     mesh_frontend_.processMeshGraph(interface, time_s);
   }  // end timing scope
 

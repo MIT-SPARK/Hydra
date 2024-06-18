@@ -35,8 +35,7 @@
 #include <gtest/gtest.h>
 #include <hydra/places/floodfill_graph_extractor.h>
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 using NodeSet = std::unordered_set<NodeId>;
 
@@ -77,7 +76,7 @@ class FloodfillGraphExtractorTestFixture : public ::testing::Test {
   virtual ~FloodfillGraphExtractorTestFixture() = default;
 
   virtual void SetUp() override {
-    layer.reset(new Layer<GvdVoxel>(voxel_size, voxels_per_side));
+    layer.reset(new GvdLayer(voxel_size, voxels_per_side));
     // disable "advanced options" to start
     config.max_edge_split_iterations = 0;
     config.merge_new_nodes = false;
@@ -95,14 +94,7 @@ class FloodfillGraphExtractorTestFixture : public ::testing::Test {
     to_return.voxel.distance = distance;
     to_return.voxel.num_extra_basis = num_extra_basis;
     to_return.index << x_idx, y_idx, z_idx;
-
-    VoxelIndex voxel_index;
-    BlockIndex block_index;
-    voxblox::getBlockAndVoxelIndexFromGlobalVoxelIndex(
-        to_return.index, layer->voxels_per_side(), &block_index, &voxel_index);
-    Block<GvdVoxel>::Ptr block = layer->allocateBlockPtrByIndex(block_index);
-    block->getVoxelByVoxelIndex(voxel_index) = to_return.voxel;
-
+    layer->allocateVoxel(to_return.index) = to_return.voxel;
     return to_return;
   }
 
@@ -110,7 +102,7 @@ class FloodfillGraphExtractorTestFixture : public ::testing::Test {
       FloodfillGraphExtractor& extractor, size_t r1, size_t c1, size_t r2, size_t c2) {
     GlobalIndex start(r1, c1, 0);
     GlobalIndex end(r2, c2, 0);
-    voxblox::AlignedVector<GlobalIndex> points = makeBresenhamLine(start, end);
+    GlobalIndices points = makeBresenhamLine(start, end);
     for (const auto& point : points) {
       extractor.pushGvdIndex(
           makeVoxelAndIndex(0.0, 2, point(0), point(1), point(2)).index);
@@ -141,7 +133,7 @@ class FloodfillGraphExtractorTestFixture : public ::testing::Test {
 
   int voxels_per_side = 16;
   float voxel_size = 0.1;
-  std::unique_ptr<Layer<GvdVoxel>> layer;
+  std::unique_ptr<GvdLayer> layer;
   FloodfillExtractorConfig config;
 };
 
@@ -287,5 +279,4 @@ TEST_F(FloodfillGraphExtractorTestFixture, SimpleExtractionWithNodeMerging) {
   EXPECT_EQ(3u, graph.edges().size());
 }
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

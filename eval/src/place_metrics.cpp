@@ -42,32 +42,28 @@ namespace hydra::eval {
 
 using nanoflann::KDTreeSingleIndexAdaptor;
 using nanoflann::L2_Simple_Adaptor;
+using places::GvdLayer;
 using places::GvdVoxel;
-using voxblox::Layer;
 
-void fillGvdPositions(const Layer<GvdVoxel>& layer,
+void fillGvdPositions(const GvdLayer& layer,
                       size_t min_gvd_basis,
-                      voxblox::AlignedVector<Eigen::Vector3d>& result) {
+                      std::vector<Eigen::Vector3d>& result) {
   result.clear();
 
-  voxblox::BlockIndexList blocks;
-  layer.getAllAllocatedBlocks(&blocks);
-
-  for (const auto& idx : blocks) {
-    const auto& block = layer.getBlockByIndex(idx);
-    for (size_t i = 0; i < block.num_voxels(); ++i) {
-      const auto& voxel = block.getVoxelByLinearIndex(i);
+  for (const auto& block : layer) {
+    for (size_t i = 0; i < block.numVoxels(); ++i) {
+      const auto& voxel = block.getVoxel(i);
       if (!voxel.observed || voxel.num_extra_basis < min_gvd_basis) {
         continue;
       }
 
-      result.push_back(block.computeCoordinatesFromLinearIndex(i).cast<double>());
+      result.push_back(block.getVoxelPosition(i).cast<double>());
     }
   }
 }
 
 struct VoxelKdTreeAdaptor {
-  VoxelKdTreeAdaptor(const voxblox::AlignedVector<Eigen::Vector3d>& positions)
+  VoxelKdTreeAdaptor(const std::vector<Eigen::Vector3d>& positions)
       : positions(positions) {}
 
   inline size_t kdtree_get_point_count() const { return positions.size(); }
@@ -81,15 +77,14 @@ struct VoxelKdTreeAdaptor {
     return false;
   }
 
-  voxblox::AlignedVector<Eigen::Vector3d> positions;
+  std::vector<Eigen::Vector3d> positions;
 };
 
 struct DistanceFinder {
   using Dist = L2_Simple_Adaptor<double, VoxelKdTreeAdaptor>;
   using KDTree = KDTreeSingleIndexAdaptor<Dist, VoxelKdTreeAdaptor, 3, size_t>;
 
-  DistanceFinder(voxblox::AlignedVector<Eigen::Vector3d>& positions)
-      : adaptor(positions) {
+  DistanceFinder(std::vector<Eigen::Vector3d>& positions) : adaptor(positions) {
     kdtree.reset(new KDTree(3, adaptor));
     kdtree->buildIndex();
   }
@@ -106,12 +101,12 @@ struct DistanceFinder {
 };
 
 PlaceMetrics scorePlaces(const SceneGraphLayer& places,
-                         const Layer<GvdVoxel>& gvd,
+                         const GvdLayer& gvd,
                          size_t min_gvd_basis) {
   PlaceMetrics metrics;
   metrics.is_valid = true;
 
-  voxblox::AlignedVector<Eigen::Vector3d> gvd_positions;
+  std::vector<Eigen::Vector3d> gvd_positions;
   fillGvdPositions(gvd, min_gvd_basis, gvd_positions);
   const DistanceFinder finder(gvd_positions);
 
@@ -122,7 +117,8 @@ PlaceMetrics scorePlaces(const SceneGraphLayer& places,
     const auto pos = attrs.position;
     metrics.node_gvd_distances.push_back(finder.distance(pos));
 
-    const auto* voxel = gvd.getVoxelPtrByCoordinates(pos.cast<float>());
+    const Point pos_f = pos.cast<float>();
+    const auto* voxel = gvd.getVoxelPtr(pos_f);
     if (!voxel) {
       metrics.num_missing++;
       continue;

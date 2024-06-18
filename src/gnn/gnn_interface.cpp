@@ -38,8 +38,7 @@
 
 #include "hydra/gnn/ort_utilities.h"
 
-namespace hydra {
-namespace gnn {
+namespace hydra::gnn {
 
 struct GnnInterfaceImpl {
   explicit GnnInterfaceImpl(const std::string& model_path)
@@ -206,5 +205,4 @@ std::ostream& operator<<(std::ostream& out, const GnnInterface& gnn) {
   return out;
 }
 
-}  // namespace gnn
-}  // namespace hydra
+}  // namespace::hydra

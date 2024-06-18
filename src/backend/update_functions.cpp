@@ -66,7 +66,6 @@ void declare_config(Places2dConfig& config) {
 namespace dsg_updates {
 
 using timing::ScopedTimer;
-using NodeColor = SemanticNodeAttributes::ColorVector;
 using SemanticLabel = SemanticNodeAttributes::Label;
 
 void filterPlace(DynamicSceneGraph& graph,
@@ -747,7 +746,7 @@ std::map<NodeId, NodeId> UpdateRoomsFunctor::call(
   return {};
 }
 
-UpdateBuildingsFunctor::UpdateBuildingsFunctor(const NodeColor& color,
+UpdateBuildingsFunctor::UpdateBuildingsFunctor(const Color& color,
                                                SemanticLabel label)
     : building_color(color), building_semantic_label(label) {}
 

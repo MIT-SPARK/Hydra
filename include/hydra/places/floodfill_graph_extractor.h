@@ -40,10 +40,10 @@
 #include "hydra/common/dsg_types.h"
 #include "hydra/places/graph_extractor_interface.h"
 #include "hydra/places/graph_extractor_utilities.h"
-#include "hydra/places/voxblox_types.h"
+#include "hydra/places/gvd_voxel.h"
+#include "hydra/reconstruction/voxel_types.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 struct VoxelGraphInfo {
   // TODO(nathan) consider copy constructor-eqsue cleanup of extract edges
@@ -63,7 +63,7 @@ struct EdgeInfo {
 
   size_t id;
   NodeId source;
-  voxblox::LongIndexSet indices;
+  GlobalIndexSet indices;
   std::set<NodeId> node_connections;
   std::set<size_t> connections;
 };
@@ -82,7 +82,7 @@ bool operator<(const EdgeSplitSeed& lhs, const EdgeSplitSeed& rhs);
 
 struct PseudoEdgeInfo {
   std::vector<NodeId> nodes;
-  voxblox::AlignedVector<GlobalIndex> indices;
+  GlobalIndices indices;
 };
 
 std::ostream& operator<<(std::ostream& out, const VoxelGraphInfo& info);
@@ -92,13 +92,11 @@ std::ostream& operator<<(std::ostream& out, const EdgeInfo& info);
 class FloodfillGraphExtractor : public GraphExtractorInterface {
  public:
   using Ptr = std::unique_ptr<FloodfillGraphExtractor>;
-  using GvdLayer = Layer<GvdVoxel>;
 
-  using NodeChildMap = std::unordered_map<NodeId, voxblox::LongIndexSet>;
-  using IndexGraphInfoMap = voxblox::LongIndexHashMapType<VoxelGraphInfo>::type;
+  using NodeChildMap = std::unordered_map<NodeId, GlobalIndexSet>;
+  using IndexGraphInfoMap = GlobalIndexMap<VoxelGraphInfo>;
   using EdgeInfoMap = std::unordered_map<size_t, EdgeInfo>;
-  using EdgeSplitQueue =
-      std::priority_queue<EdgeSplitSeed, voxblox::AlignedVector<EdgeSplitSeed>>;
+  using EdgeSplitQueue = std::priority_queue<EdgeSplitSeed, std::vector<EdgeSplitSeed>>;
 
   explicit FloodfillGraphExtractor(const FloodfillExtractorConfig& config);
 
@@ -157,7 +155,7 @@ class FloodfillGraphExtractor : public GraphExtractorInterface {
   FloodfillExtractorConfig config_;
   CornerFinder corner_finder_;
 
-  AlignedQueue<GlobalIndex> floodfill_frontier_;
+  std::queue<GlobalIndex> floodfill_frontier_;
 
   IndexGraphInfoMap index_graph_info_map_;
   NodeChildMap node_child_map_;
@@ -180,5 +178,4 @@ class FloodfillGraphExtractor : public GraphExtractorInterface {
           "FloodfillGraphExtractor");
 };
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

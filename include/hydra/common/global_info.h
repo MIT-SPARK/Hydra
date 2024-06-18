@@ -52,8 +52,6 @@
 
 namespace hydra {
 
-using ColorArray = std::array<uint8_t, 3>;
-
 // TODO(nathan) don't forward declare and use color array instead
 class SemanticColorMap;
 
@@ -86,7 +84,7 @@ struct PipelineConfig {
   VolumetricMap::Config map;
   LabelSpaceConfig label_space;
   std::map<uint32_t, std::string> label_names;
-  std::vector<ColorArray> room_colors{
+  std::vector<Color> room_colors{
       {166, 206, 227},
       {31, 120, 180},
       {178, 223, 138},
@@ -134,7 +132,7 @@ class GlobalInfo {
 
   const VolumetricMap::Config& getMapConfig() const;
 
-  const ColorArray& getRoomColor(size_t index) const;
+  const Color& getRoomColor(size_t index) const;
 
   const std::map<uint32_t, std::string>& getLabelToNameMap() const;
 

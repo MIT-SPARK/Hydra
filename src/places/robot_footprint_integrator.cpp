@@ -39,9 +39,6 @@
 
 namespace hydra {
 
-using voxblox::BlockIndex;
-using voxblox::BlockIndexList;
-
 void declare_config(RobotFootprintIntegrator::Config& config) {
   using namespace config;
   name("RobotFootprintIntegrator::Config");
@@ -56,9 +53,9 @@ RobotFootprintIntegrator::RobotFootprintIntegrator(const Config& config)
 RobotFootprintIntegrator::~RobotFootprintIntegrator() = default;
 
 // somewhat adapted from findBlocksInViewFrustum
-BlockIndexList getAffectedBlocks(const Eigen::Isometry3f& world_T_body,
-                                 const BoundingBox& bbox,
-                                 VolumetricMap& map) {
+BlockIndices getAffectedBlocks(const Eigen::Isometry3f& world_T_body,
+                               const BoundingBox& bbox,
+                               VolumetricMap& map) {
   const auto b_size = map.block_size;
   const auto block_diag_half = std::sqrt(3.0f) * b_size / 2.0f;
   const auto margin = Eigen::Vector3f::Constant(block_diag_half);
@@ -69,9 +66,9 @@ BlockIndexList getAffectedBlocks(const Eigen::Isometry3f& world_T_body,
   const int max_steps = std::ceil(max_range / b_size) + 1;
   const auto body_T_world = world_T_body.inverse();
   const auto pos = world_T_body.translation();
-  const auto body_idx = voxblox::getGridIndexFromPoint<BlockIndex>(pos, 1.0f / b_size);
+  const auto body_idx = spatial_hash::indexFromPoint<BlockIndex>(pos, 1.0f / b_size);
 
-  BlockIndexList result;
+  BlockIndices result;
   for (int x = -max_steps; x <= max_steps; ++x) {
     for (int y = -max_steps; y <= max_steps; ++y) {
       for (int z = -max_steps; z <= max_steps; ++z) {
@@ -81,7 +78,7 @@ BlockIndexList getAffectedBlocks(const Eigen::Isometry3f& world_T_body,
           continue;
         }
 
-        result.push_back(body_idx + offset.cast<voxblox::IndexElement>());
+        result.push_back(body_idx + offset.cast<BlockIndex::Scalar>());
       }
     }
   }
@@ -96,38 +93,38 @@ void RobotFootprintIntegrator::addFreespaceFootprint(const Eigen::Isometry3f& w_
   auto& tsdf = map.getTsdfLayer();
   const auto semantic_layer = map.getSemanticLayer();
 
-  BlockIndexList new_blocks;
+  BlockIndices new_blocks;
   for (const auto& idx : block_indices) {
-    voxblox::Block<voxblox::TsdfVoxel>::Ptr block;
+    TsdfBlock::Ptr block;
     if (tsdf.hasBlock(idx)) {
-      block = tsdf.getBlockPtrByIndex(idx);
+      block = tsdf.getBlockPtr(idx);
     } else {
-      block = tsdf.allocateBlockPtrByIndex(idx);
+      block = tsdf.allocateBlockPtr(idx);
       if (semantic_layer) {
-        semantic_layer->allocateBlockPtrByIndex(idx);
+        semantic_layer->allocateBlockPtr(idx);
       }
 
       new_blocks.push_back(idx);
     }
 
-    for (size_t i = 0; i < block->num_voxels(); ++i) {
-      const auto p_body = b_T_w * block->computeCoordinatesFromLinearIndex(i);
+    for (size_t i = 0; i < block->numVoxels(); ++i) {
+      const auto p_body = b_T_w * block->getVoxelPosition(i);
       // technically we should expand by sqrt(3) * voxel_size, but the more
       // conservative, the better
       if (!bbox.contains(p_body)) {
         continue;  // voxel doesn't intersect with free-space pattern
       }
 
-      block->updated().set();
-      auto& voxel = block->getVoxelByLinearIndex(i);
-      voxel.distance = map.truncation_distance();
+      block->setUpdated();
+      auto& voxel = block->getVoxel(i);
+      voxel.distance = map.config.truncation_distance;
       voxel.weight = config.tsdf_weight;
     }
   }
 
   for (const auto& idx : new_blocks) {
-    const auto block = map.getTsdfLayer().getBlockPtrByIndex(idx);
-    if (!block || block->updated().any()) {
+    const auto block = map.getTsdfLayer().getBlockPtr(idx);
+    if (!block || block->esdf_updated || block->mesh_updated) {
       continue;
     }
 

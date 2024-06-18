@@ -43,7 +43,6 @@ namespace hydra::places {
 using test::LargeSingleBlockTestFixture;
 using test::SingleBlockTestFixture;
 using test::TestFixture2d;
-using voxblox::VoxelIndex;
 
 class ParentTestFixture : public SingleBlockTestFixture {
  public:
@@ -462,7 +461,7 @@ TEST_F(ParentTestFixture, ParentsCorrect) {
             expected_parent << x, y, 0;
           }
 
-          EXPECT_EQ(expected_parent, Eigen::Map<const GlobalIndex>(voxel.parent))
+          EXPECT_EQ(expected_parent, voxel.parent)
               << voxel << " @ (" << x << ", " << y << ", " << z << ")"
               << ",  expected parent: " << expected_parent.transpose();
         }

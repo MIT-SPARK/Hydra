@@ -82,8 +82,7 @@ DynamicSceneGraph::Ptr BatchPipeline::construct(const VFConfig& frontend_config,
     UpdateInfo::ConstPtr info(new UpdateInfo);
     functor.call(*dsg, info);
 
-    Eigen::Matrix<uint8_t, 3, 1> bcolor(0, 0, 0);
-    dsg_updates::UpdateBuildingsFunctor bfunctor(bcolor, -1);
+    dsg_updates::UpdateBuildingsFunctor bfunctor(Color(), -1);
     bfunctor.call(*dsg, info);
   }
 

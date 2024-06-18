@@ -38,20 +38,18 @@
 
 #include "hydra/places/graph_extractor_utilities.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 using nanoflann::KDTreeSingleIndexAdaptor;
 using nanoflann::KDTreeSingleIndexDynamicAdaptor;
 using nanoflann::L2_Simple_Adaptor;
-using GlobalIndexVector = voxblox::AlignedVector<GlobalIndex>;
 
 struct VoxelKdTreeAdaptor {
-  explicit VoxelKdTreeAdaptor(const GlobalIndexVector& indices) : indices(indices) {}
+  explicit VoxelKdTreeAdaptor(const GlobalIndices& indices) : indices(indices) {}
 
   inline size_t kdtree_get_point_count() const { return indices.size(); }
 
-  inline int64_t kdtree_get_pt(const size_t idx, const size_t dim) const {
+  inline GlobalIndex::Scalar kdtree_get_pt(const size_t idx, const size_t dim) const {
     return indices[idx](dim);
   }
 
@@ -60,14 +58,14 @@ struct VoxelKdTreeAdaptor {
     return false;
   }
 
-  GlobalIndexVector indices;
+  GlobalIndices indices;
 };
 
 struct NearestVoxelFinder::Detail {
-  using Dist = L2_Simple_Adaptor<int64_t, VoxelKdTreeAdaptor>;
+  using Dist = L2_Simple_Adaptor<GlobalIndex::Scalar, VoxelKdTreeAdaptor>;
   using KDTree = KDTreeSingleIndexAdaptor<Dist, VoxelKdTreeAdaptor, 3, size_t>;
 
-  explicit Detail(const GlobalIndexVector& indices) : adaptor(indices) {
+  explicit Detail(const GlobalIndices& indices) : adaptor(indices) {
     kdtree.reset(new KDTree(3, adaptor));
     kdtree->buildIndex();
   }
@@ -78,7 +76,7 @@ struct NearestVoxelFinder::Detail {
   std::unique_ptr<KDTree> kdtree;
 };
 
-NearestVoxelFinder::NearestVoxelFinder(const GlobalIndexVector& indices)
+NearestVoxelFinder::NearestVoxelFinder(const GlobalIndices& indices)
     : internals_(new Detail(indices)) {}
 
 NearestVoxelFinder::~NearestVoxelFinder() {}
@@ -87,23 +85,26 @@ void NearestVoxelFinder::find(const GlobalIndex& index,
                               size_t num_to_find,
                               const NearestVoxelFinder::Callback& callback) {
   std::vector<size_t> nn_indices(num_to_find);
-  std::vector<int64_t> distances(num_to_find);
+  std::vector<GlobalIndex::Scalar> distances(num_to_find);
 
-  size_t num_found = internals_->kdtree->knnSearch(
-      index.data(), num_to_find, nn_indices.data(), distances.data());
+
+  size_t num_found = internals_->kdtree->knnSearch(index.data(),
+                                                   num_to_find,
+                                                   nn_indices.data(),
+                                                   distances.data());
 
   for (size_t i = 0; i < num_found; ++i) {
     callback(internals_->adaptor.indices[nn_indices[i]], nn_indices[i], distances[i]);
   }
 }
 
-FurthestIndexResult findFurthestIndexFromLine(const GlobalIndexVector& indices,
+FurthestIndexResult findFurthestIndexFromLine(const GlobalIndices& indices,
                                               const GlobalIndex& start,
                                               const GlobalIndex& end,
                                               size_t number_source_edges) {
   FurthestIndexResult result;
 
-  GlobalIndexVector line = makeBresenhamLine(start, end);
+  GlobalIndices line = makeBresenhamLine(start, end);
   if (line.empty()) {
     return result;
   }
@@ -111,7 +112,7 @@ FurthestIndexResult findFurthestIndexFromLine(const GlobalIndexVector& indices,
   NearestVoxelFinder nearest_voxel_finder(indices);
   for (const auto& line_idx : line) {
     nearest_voxel_finder.find(
-        line_idx, 1, [&](const GlobalIndex& index, size_t nn_index, int64_t distance) {
+        line_idx, 1, [&](const GlobalIndex& index, size_t nn_index, GlobalIndex::Scalar distance) {
           if (distance > result.distance || !result.valid) {
             result.valid = true;
             result.distance = distance;
@@ -124,5 +125,4 @@ FurthestIndexResult findFurthestIndexFromLine(const GlobalIndexVector& indices,
   return result;
 }
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

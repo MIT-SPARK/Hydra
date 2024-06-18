@@ -47,13 +47,13 @@
 // purposes notwithstanding any copyright notation herein.
 #include "hydra/reconstruction/projection_interpolators.h"
 
+#include <Eigen/Core>
 #include <cmath>
 #include <limits>
 #include <unordered_map>
 
 namespace hydra {
 
-using voxblox::Color;
 
 InterpolationWeights InterpolatorNearest::computeWeights(float u,
                                                          float v,

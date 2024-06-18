@@ -36,8 +36,7 @@
 #include "hydra/common/dsg_types.h"
 #include "hydra/loop_closure/subgraph_extraction.h"
 
-namespace hydra {
-namespace lcd {
+namespace hydra::lcd {
 
 struct Descriptor {
   using Ptr = std::unique_ptr<Descriptor>;
@@ -114,5 +113,4 @@ struct PlaceDescriptorFactory : DescriptorFactory {
   const HistogramConfig<double> histogram;
 };
 
-}  // namespace lcd
-}  // namespace hydra
+}  // namespace hydra::lcd

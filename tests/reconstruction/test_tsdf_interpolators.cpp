@@ -40,16 +40,14 @@
 
 namespace hydra {
 
-using voxblox::Layer;
-using voxblox::TsdfVoxel;
 
 namespace {
 
-Layer<TsdfVoxel>::Ptr makeLayer(double resolution, int voxels_per_side, double weight) {
-  auto layer = std::make_shared<Layer<TsdfVoxel>>(resolution, voxels_per_side);
-  auto block = layer->allocateBlockPtrByIndex(voxblox::BlockIndex(0, 0, 0));
-  for (size_t i = 0; i < block->num_voxels(); ++i) {
-    auto& voxel = block->getVoxelByLinearIndex(i);
+TsdfLayer::Ptr makeLayer(double resolution, int voxels_per_side, double weight) {
+  auto layer = std::make_shared<TsdfLayer>(resolution, voxels_per_side);
+  auto block = layer->allocateBlockPtr(BlockIndex(0, 0, 0));
+  for (size_t i = 0; i < block->numVoxels(); ++i) {
+    auto& voxel = block->getVoxel(i);
     voxel.weight = weight;
     voxel.distance = i;
     voxel.color.r = 1;
@@ -63,26 +61,6 @@ Layer<TsdfVoxel>::Ptr makeLayer(double resolution, int voxels_per_side, double w
 
 }  // namespace
 
-TEST(TsdfInterpolators, TrilinearCorrect) {
-  const auto tsdf = makeLayer(0.1, 4, 0.1);
-  TrilinearTsdfInterpolator::Config config;
-  config.voxels_per_side = 2;
-  TrilinearTsdfInterpolator interp(config);
-  const auto new_layer = interp.interpolate(*tsdf, nullptr);
-
-  ASSERT_TRUE(new_layer != nullptr);
-  const auto new_block = new_layer->getBlockPtrByIndex(voxblox::BlockIndex(0, 0, 0));
-  ASSERT_TRUE(new_block != nullptr);
-
-  const std::vector<double> expected{10.5, 12.5, 18.5, 20.5, 42.5, 44.5, 50.5, 52.5};
-  ASSERT_EQ(expected.size(), new_block->num_voxels());
-  for (size_t i = 0; i < new_block->num_voxels(); ++i) {
-    const auto& voxel = new_block->getVoxelByLinearIndex(i);
-    EXPECT_NEAR(voxel.weight, 0.1, 1.0e-6);
-    EXPECT_NEAR(voxel.distance, expected.at(i), 1.0e-6);
-  }
-}
-
 TEST(TsdfInterpolators, ResampleCorrect) {
   const auto tsdf = makeLayer(0.1, 4, 0.1);
   DownsampleTsdfInterpolator::Config config;
@@ -91,13 +69,13 @@ TEST(TsdfInterpolators, ResampleCorrect) {
   const auto new_layer = interp.interpolate(*tsdf, nullptr);
 
   ASSERT_TRUE(new_layer != nullptr);
-  const auto new_block = new_layer->getBlockPtrByIndex(voxblox::BlockIndex(0, 0, 0));
+  const auto new_block = new_layer->getBlockPtr(BlockIndex(0, 0, 0));
   ASSERT_TRUE(new_block != nullptr);
 
   const std::vector<double> expected{10.5, 12.5, 18.5, 20.5, 42.5, 44.5, 50.5, 52.5};
-  ASSERT_EQ(expected.size(), new_block->num_voxels());
-  for (size_t i = 0; i < new_block->num_voxels(); ++i) {
-    const auto& voxel = new_block->getVoxelByLinearIndex(i);
+  ASSERT_EQ(expected.size(), new_block->numVoxels());
+  for (size_t i = 0; i < new_block->numVoxels(); ++i) {
+    const auto& voxel = new_block->getVoxel(i);
     EXPECT_NEAR(voxel.weight, 0.1, 1.0e-6);
     EXPECT_NEAR(voxel.distance, expected.at(i), 1.0e-5);
   }

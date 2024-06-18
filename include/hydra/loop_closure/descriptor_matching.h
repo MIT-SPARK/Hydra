@@ -35,8 +35,7 @@
 #pragma once
 #include "hydra/loop_closure/scene_graph_descriptors.h"
 
-namespace hydra {
-namespace lcd {
+namespace hydra::lcd {
 
 enum class DescriptorScoreType { COSINE, L1 };
 
@@ -121,5 +120,4 @@ LayerSearchResults searchLeafDescriptors(const Descriptor& descriptor,
                                          const DescriptorCacheMap& leaf_cache_map,
                                          NodeId query_id);
 
-}  // namespace lcd
-}  // namespace hydra
+}  // namespace hydra::lcd

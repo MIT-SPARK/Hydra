@@ -35,8 +35,7 @@
 #include <gtest/gtest.h>
 #include <hydra/loop_closure/scene_graph_descriptors.h>
 
-namespace hydra {
-namespace lcd {
+namespace hydra::lcd {
 
 namespace {
 
@@ -281,5 +280,4 @@ TEST(LoopClosureModuleDescriptorTests, TestObjectDescriptor) {
   }
 }
 
-}  // namespace lcd
-}  // namespace hydra
+}  // namespace hydra::lcd

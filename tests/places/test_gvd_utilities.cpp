@@ -35,11 +35,7 @@
 #include <gtest/gtest.h>
 #include <hydra/places/gvd_utilities.h>
 
-namespace hydra {
-namespace places {
-
-using ParentMap = Eigen::Map<const GlobalIndex>;
-using ParentPosMap = Eigen::Map<const voxblox::Point>;
+namespace hydra::places {
 
 struct GvdVoxelWithIndex {
   GvdVoxel voxel;
@@ -109,7 +105,7 @@ VoronoiCheckConfig makeL1AndAngleConfig(double min_distance_m = 0.1,
 TEST(GvdUtilities, setSdfParent) {
   {  // assign parent from neighbor parent
     GvdVoxelWithIndex neighbor = makeGvdVoxel(1, 2, 3, 4.0, 5, 6, 7);
-    voxblox::Point neighbor_pos(1.0, 2.0, 3.0);
+    Point neighbor_pos(1.0, 2.0, 3.0);
     GvdVoxel current;
     EXPECT_FALSE(current.has_parent);
 
@@ -117,16 +113,16 @@ TEST(GvdUtilities, setSdfParent) {
 
     GlobalIndex expected;
     expected << 5, 6, 7;
-    voxblox::Point expected_pos;
+    Point expected_pos;
     expected_pos << 5.0f, 6.0f, 7.0f;
     EXPECT_TRUE(current.has_parent);
-    EXPECT_EQ(expected, ParentMap(current.parent));
-    EXPECT_EQ(expected_pos, ParentPosMap(current.parent_pos));
+    EXPECT_EQ(expected, current.parent);
+    EXPECT_EQ(expected_pos, current.parent_pos);
   }
 
   {  // assign parent from neighbor
     GvdVoxelWithIndex neighbor = makeGvdVoxel(1, 2, 3, 4.0);
-    voxblox::Point neighbor_pos(1.0f, 2.0f, 3.0f);
+    Point neighbor_pos(1.0f, 2.0f, 3.0f);
     GvdVoxel current;
     EXPECT_FALSE(current.has_parent);
 
@@ -134,8 +130,8 @@ TEST(GvdUtilities, setSdfParent) {
 
     GlobalIndex expected(1, 2, 3);
     EXPECT_TRUE(current.has_parent);
-    EXPECT_EQ(expected, ParentMap(current.parent));
-    EXPECT_EQ(neighbor_pos, ParentPosMap(current.parent_pos));
+    EXPECT_EQ(expected, current.parent);
+    EXPECT_EQ(neighbor_pos, current.parent_pos);
   }
 }
 
@@ -181,68 +177,68 @@ TEST(GvdUtilities, setGvdSurfaceVoxel) {
 // test that estimate distance handles all the different
 // sign cases correctly
 TEST(GvdUtilities, estimateDistanceCorrect) {
-  FloatingPoint d = 0.25;  // distance to use
+  float d = 0.25;  // distance to use
 
   {  // test case 1: both curr and neighbor are positive
-    FloatingPoint v_d = 1.0;
-    FloatingPoint v_n = 2.0;
-    FloatingPoint v_n_est = getLowerDistance(v_d, v_n, d).distance;
+    float v_d = 1.0;
+    float v_n = 2.0;
+    float v_n_est = getLowerDistance(v_d, v_n, d).distance;
     EXPECT_GT(std::abs(v_n - v_d),
               std::abs(v_n - v_n_est));  // we got closer to the true distance
   }
 
   {  // test case 2: both curr and neighbor are negative
-    FloatingPoint v_d = -1.0;
-    FloatingPoint v_n = -2.0;
-    FloatingPoint v_n_est = getLowerDistance(v_d, v_n, d).distance;
+    float v_d = -1.0;
+    float v_n = -2.0;
+    float v_n_est = getLowerDistance(v_d, v_n, d).distance;
     EXPECT_GT(std::abs(v_n - v_d),
               std::abs(v_n - v_n_est));  // we got closer to the true distance
   }
 
   {  // test case 3: curr positive, neighbor negative
-    FloatingPoint v_d = 1.0;
-    FloatingPoint v_n = -2.0;
-    FloatingPoint v_n_est = getLowerDistance(v_d, v_n, d).distance;
+    float v_d = 1.0;
+    float v_n = -2.0;
+    float v_n_est = getLowerDistance(v_d, v_n, d).distance;
     EXPECT_GT(std::abs(v_n - v_d),
               std::abs(v_n - v_n_est));  // we got closer to the true distance
   }
 
   {  // test case 4: curr negative, neighbor positive
-    FloatingPoint v_d = -1.0;
-    FloatingPoint v_n = 2.0;
-    FloatingPoint v_n_est = getLowerDistance(v_d, v_n, d).distance;
+    float v_d = -1.0;
+    float v_n = 2.0;
+    float v_n_est = getLowerDistance(v_d, v_n, d).distance;
     EXPECT_GT(std::abs(v_n - v_d),
               std::abs(v_n - v_n_est));  // we got closer to the true distance
   }
 
   {  // test case 5: curr zero, neighbor positive
-    FloatingPoint v_d = 0.0;
-    FloatingPoint v_n = 2.0;
-    FloatingPoint v_n_est = getLowerDistance(v_d, v_n, d).distance;
+    float v_d = 0.0;
+    float v_n = 2.0;
+    float v_n_est = getLowerDistance(v_d, v_n, d).distance;
     EXPECT_GT(std::abs(v_n - v_d),
               std::abs(v_n - v_n_est));  // we got closer to the true distance
   }
 
   {  // test case 6: curr zero, neighbor positive
-    FloatingPoint v_d = 0.0;
-    FloatingPoint v_n = -2.0;
-    FloatingPoint v_n_est = getLowerDistance(v_d, v_n, d).distance;
+    float v_d = 0.0;
+    float v_n = -2.0;
+    float v_n_est = getLowerDistance(v_d, v_n, d).distance;
     EXPECT_GT(std::abs(v_n - v_d),
               std::abs(v_n - v_n_est));  // we got closer to the true distance
   }
 
   {  // test case 7: curr negative, neighbor zero
-    FloatingPoint v_d = -1.0;
-    FloatingPoint v_n = 0.0;
-    FloatingPoint v_n_est = getLowerDistance(v_d, v_n, d).distance;
+    float v_d = -1.0;
+    float v_n = 0.0;
+    float v_n_est = getLowerDistance(v_d, v_n, d).distance;
     EXPECT_GT(std::abs(v_n - v_d),
               std::abs(v_n - v_n_est));  // we got closer to the true distance
   }
 
   {  // test case 8: curr positive, neighbor zero
-    FloatingPoint v_d = 1.0;
-    FloatingPoint v_n = 0.0;
-    FloatingPoint v_n_est = getLowerDistance(v_d, v_n, d).distance;
+    float v_d = 1.0;
+    float v_n = 0.0;
+    float v_n_est = getLowerDistance(v_d, v_n, d).distance;
     EXPECT_GT(std::abs(v_n - v_d),
               std::abs(v_n - v_n_est));  // we got closer to the true distance
   }
@@ -381,5 +377,4 @@ TEST(GvdUtilities, checkVoronoiParentSeparation) {
   }
 }
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

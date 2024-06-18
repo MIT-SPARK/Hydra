@@ -65,7 +65,7 @@ void GraphExtractorInterface::fillParentInfo(const GvdLayer& gvd,
     auto& attrs = graph_->getNode(node_id).attributes<PlaceNodeAttributes>();
     attrs.voxblox_mesh_connections.clear();
 
-    const auto* voxel = gvd.getVoxelPtrByGlobalIndex(node_index);
+    const auto* voxel = gvd.getVoxelPtr(node_index);
     if (!voxel) {
       // the compression-based extractor can have nodes pointing to archived voxels
       continue;
@@ -75,7 +75,7 @@ void GraphExtractorInterface::fillParentInfo(const GvdLayer& gvd,
         << "bad gvd voxel: " << *voxel << " @ " << node_index.transpose();
 
     // save primary parent first
-    const GlobalIndex curr_parent = Eigen::Map<const GlobalIndex>(voxel->parent);
+    const GlobalIndex curr_parent = voxel->parent;
     auto iter = tracker.parent_vertices.find(curr_parent);
     if (iter != tracker.parent_vertices.end()) {
       attrs.voxblox_mesh_connections.push_back(convertInfo(iter->second));
@@ -125,8 +125,7 @@ NodeId GraphExtractorInterface::addPlaceToGraph(const GvdLayer& layer,
   const auto basis = voxel.num_extra_basis + 1;
 
   PlaceNodeAttributes::Ptr attrs(new PlaceNodeAttributes(distance, basis));
-  attrs->position = getVoxelPosition(layer, index);
-  attrs->color = decltype(attrs->color)::Zero();
+  attrs->position = layer.getVoxelPosition(index).cast<double>();
   graph_->emplaceNode(next_node_id_, std::move(attrs));
 
   NodeId new_node = next_node_id_;
@@ -146,7 +145,7 @@ EdgeAttributes::Ptr GraphExtractorInterface::makeEdgeInfo(const GvdLayer& layer,
 
   const GlobalIndex source = node_index_map_.at(source_id);
   const GlobalIndex target = node_index_map_.at(target_id);
-  voxblox::GlobalIndexVector path = makeBresenhamLine(source, target);
+  auto path = makeBresenhamLine(source, target);
   if (path.empty()) {
     // edge is smaller than voxel size, so we just take the min distance between two
     // voxels
@@ -154,7 +153,7 @@ EdgeAttributes::Ptr GraphExtractorInterface::makeEdgeInfo(const GvdLayer& layer,
   }
 
   for (const auto& index : path) {
-    const GvdVoxel* voxel = layer.getVoxelPtrByGlobalIndex(index);
+    const GvdVoxel* voxel = layer.getVoxelPtr(index);
     if (!voxel) {
       continue;
     }

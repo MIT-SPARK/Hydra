@@ -37,8 +37,7 @@
 #include <cstdint>
 #include <string>
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 struct OverlapEdgeConfig {
   //! Number of nearest neighbors to check for free-space overlap
@@ -110,5 +109,4 @@ void declare_config(GraphExtractorConfig& conf);
 void declare_config(CompressionExtractorConfig& conf);
 void declare_config(FloodfillExtractorConfig& conf);
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

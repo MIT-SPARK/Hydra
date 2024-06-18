@@ -35,15 +35,14 @@
 #include "hydra/places/compression_graph_extractor.h"
 
 #include <glog/stl_logging.h>
+#include <spatial_hash/neighbor_utils.h>
 
 #include "hydra/places/graph_extractor_utilities.h"
 #include "hydra/places/nearest_voxel_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
-using GvdLayer = CompressionGraphExtractor::GvdLayer;
 using PlaceAttrs = PlaceNodeAttributes;
 using timing::ScopedTimer;
 
@@ -319,14 +318,14 @@ void CompressionGraphExtractor::fillSeenVoxels(const GvdLayer& layer,
                                                IndexVoxelQueue& seen_voxels) {
   ScopedTimer timer("places/prune_gvd_queue", timestamp_ns);
 
-  voxblox::LongIndexSet seen_indices;
+  GlobalIndexSet seen_indices;
   while (!modified_voxel_queue_.empty()) {
     const GlobalIndex index = popFromModifiedQueue();
     if (seen_indices.count(index)) {
       continue;
     }
 
-    const GvdVoxel* voxel = layer.getVoxelPtrByGlobalIndex(index);
+    const GvdVoxel* voxel = layer.getVoxelPtr(index);
     if (voxel == nullptr) {
       // this should only happen when we encounter voxels from archived blocks
       VLOG(10) << "[Graph Extraction] Invalid index: " << index.transpose()
@@ -434,7 +433,7 @@ void CompressionGraphExtractor::updateNodeInfoMap(const GvdLayer& layer,
 
   for (const auto& index_voxel_pair : update_info) {
     updateNode(index_voxel_pair.index,
-               getVoxelPosition(layer, index_voxel_pair.index),
+               layer.getVoxelPosition(index_voxel_pair.index).cast<double>(),
                index_voxel_pair.voxel->distance,
                index_voxel_pair.voxel->num_extra_basis + 1);
   }
@@ -445,7 +444,6 @@ void CompressionGraphExtractor::updateGvdGraph(const IndexVoxelQueue& update_inf
   ScopedTimer timer("places/update_gvd_graph", timestamp_ns);
   std::list<DeleteInfo> to_delete;
 
-  GvdNeighborhood::IndexMatrix neighbor_indices;
   for (const auto& index_voxel_pair : update_info) {
     const auto& index = index_voxel_pair.index;
     auto iter = index_id_map_.find(index);
@@ -455,10 +453,8 @@ void CompressionGraphExtractor::updateGvdGraph(const IndexVoxelQueue& update_inf
     }
 
     auto& info = *gvd_->getNode(iter->second);
-
-    GvdNeighborhood::getFromGlobalIndex(index, &neighbor_indices);
-    for (unsigned int n = 0u; n < neighbor_indices.cols(); ++n) {
-      const GlobalIndex& neighbor_index = neighbor_indices.col(n);
+    spatial_hash::NeighborSearch search(26);
+    for (const auto& neighbor_index : search.neighborIndices(index)) {
       auto niter = index_id_map_.find(neighbor_index);
       if (niter == index_id_map_.end()) {
         continue;
@@ -666,7 +662,6 @@ void CompressionGraphExtractor::assignCompressedNodeAttributes() {
     attrs.distance = best_member->distance;
     attrs.num_basis_points = best_member->num_basis_points;
     attrs.position = best_member->position;
-    attrs.color = decltype(attrs.color)::Zero();
   }
 }
 
@@ -790,7 +785,7 @@ void CompressionGraphExtractor::validate(const GvdLayer& layer) const {
     for (const auto child : info.active_refs) {
       children.push_back(child);
       const auto vertex = gvd_->getNode(child);
-      const auto voxel = layer.getVoxelPtrByGlobalIndex(vertex->index);
+      const auto voxel = layer.getVoxelPtr(vertex->index);
       CHECK_NOTNULL(voxel);
       CHECK_GT(voxel->num_extra_basis, 0)
           << " invalid child " << child << " voxel " << *voxel << " @ "
@@ -859,5 +854,4 @@ void CompressionGraphExtractor::validate(const GvdLayer& layer) const {
   }
 }
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

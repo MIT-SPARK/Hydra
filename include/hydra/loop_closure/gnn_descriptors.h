@@ -36,8 +36,7 @@
 #include "hydra/gnn/gnn_interface.h"
 #include "hydra/loop_closure/scene_graph_descriptors.h"
 
-namespace hydra {
-namespace lcd {
+namespace hydra::lcd {
 
 struct ObjectGnnDescriptor : DescriptorFactory {
   using LabelEmbeddings = std::map<uint8_t, Eigen::VectorXf>;
@@ -83,5 +82,4 @@ struct PlaceGnnDescriptor : DescriptorFactory {
 
 ObjectGnnDescriptor::LabelEmbeddings loadLabelEmbeddings(const std::string& filename);
 
-}  // namespace lcd
-}  // namespace hydra
+}  // namespace hydra::lcd

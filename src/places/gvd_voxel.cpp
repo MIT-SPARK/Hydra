@@ -34,8 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/gvd_voxel.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
 std::ostream& operator<<(std::ostream& out, const GvdVoxel& voxel) {
   out << "GvdVoxel<flags=";
@@ -47,7 +46,7 @@ std::ostream& operator<<(std::ostream& out, const GvdVoxel& voxel) {
   out << (voxel.is_negative ? "n" : "-");
   out << ", distance=" << voxel.distance << " -> ";
   if (voxel.has_parent) {
-    out << Eigen::Map<const GlobalIndex>(voxel.parent).transpose();
+    out << voxel.parent.transpose();
   } else {
     out << "unknown";
   }
@@ -61,5 +60,4 @@ std::ostream& operator<<(std::ostream& out, const GvdVoxel& voxel) {
   return out;
 }
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

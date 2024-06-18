@@ -34,15 +34,13 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/graph_extractor_utilities.h"
 
+#include <spatial_hash/neighbor_utils.h>
+
 #include "hydra/places/nearest_voxel_utilities.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 
-namespace hydra {
-namespace places {
+namespace hydra::places {
 
-using voxblox::Connectivity;
-using Neighborhood26Connected = Neighborhood<Connectivity::kTwentySix>;
-using IndexOffsets26Connected = Neighborhood<Connectivity::kTwentySix>::IndexOffsets;
 using Components = std::vector<std::vector<NodeId>>;
 
 namespace {
@@ -74,38 +72,34 @@ void sortComponents(const SceneGraphLayer& graph, Components& to_sort) {
 
 std::bitset<27> convertRowMajorFlags(std::bitset<27> flags_row_major) {
   std::bitset<27> flags_neighborhood{0};
-
-  const IndexOffsets26Connected& offsets = Neighborhood26Connected::kOffsets;
-  for (int i = 0; i < offsets.cols(); ++i) {
+  const spatial_hash::NeighborSearch search(26);
+  const auto offsets = search.neighborIndices(GlobalIndex::Zero().eval(), true);
+  for (size_t i = 1; i < offsets.size(); ++i) {
     // x -> y -> z ordering (plus shift from [-1, 1] to [0, 2] to reflect lower corner
     // origin)
-    size_t row_major_index = 1 * static_cast<size_t>(offsets(0, i) + 1) +
-                             3 * static_cast<size_t>(offsets(1, i) + 1) +
-                             9 * static_cast<size_t>(offsets(2, i) + 1);
+    size_t row_major_index = 1 * static_cast<size_t>(offsets[i].x() + 1) +
+                             3 * static_cast<size_t>(offsets[i].y() + 1) +
+                             9 * static_cast<size_t>(offsets[i].z() + 1);
 
     flags_neighborhood.set(i, flags_row_major[26 - row_major_index]);
   }
 
-  flags_neighborhood.set(26, flags_row_major[13]);
+  flags_neighborhood.set(0, flags_row_major[13]);
   return flags_neighborhood;
 }
 
-std::bitset<27> extractNeighborhoodFlags(const Layer<GvdVoxel>& layer,
+std::bitset<27> extractNeighborhoodFlags(const GvdLayer& layer,
                                          const GlobalIndex& index,
                                          uint8_t min_extra_basis) {
   // TODO(nathan) this is a lot of memory to keep pushing onto the stack
-  Neighborhood<>::IndexMatrix neighbor_indices;
-  Neighborhood<>::getFromGlobalIndex(index, &neighbor_indices);
+  spatial_hash::NeighborSearch search(26);
+  const auto neighbor_indices = search.neighborIndices(index, true);
 
   std::bitset<27> neighbor_values;
-  for (unsigned int n = 0u; n < neighbor_indices.cols(); ++n) {
-    const GvdVoxel* voxel = layer.getVoxelPtrByGlobalIndex(neighbor_indices.col(n));
+  for (unsigned int n = 0u; n < neighbor_indices.size(); ++n) {
+    const GvdVoxel* voxel = layer.getVoxelPtr(neighbor_indices[n]);
     neighbor_values.set(n, isValidPoint(voxel, min_extra_basis));
   }
-
-  const GvdVoxel* voxel = layer.getVoxelPtrByGlobalIndex(index);
-  neighbor_values.set(26, isValidPoint(voxel, min_extra_basis));
-
   return neighbor_values;
 }
 
@@ -188,8 +182,7 @@ CornerFinder::CornerFinder() {
 }
 
 // implementation loosely based on: https://gist.github.com/yamamushi/5823518
-voxblox::AlignedVector<GlobalIndex> makeBresenhamLine(const GlobalIndex& start,
-                                                      const GlobalIndex& end) {
+GlobalIndices makeBresenhamLine(const GlobalIndex& start, const GlobalIndex& end) {
   GlobalIndex diff = end - start;
   GlobalIndex inc(diff(0) < 0 ? -1 : 1, diff(1) < 0 ? -1 : 1, diff(2) < 0 ? -1 : 1);
 
@@ -214,10 +207,10 @@ voxblox::AlignedVector<GlobalIndex> makeBresenhamLine(const GlobalIndex& start,
   }
 
   if (diff(max_idx) <= 1) {
-    return voxblox::AlignedVector<GlobalIndex>();
+    return GlobalIndices();
   }
 
-  voxblox::AlignedVector<GlobalIndex> line_points(diff(max_idx) - 1);
+  GlobalIndices line_points(diff(max_idx) - 1);
   GlobalIndex point = start;
 
   int64_t err_1 = diff_twice(min_idx_1) - diff(max_idx);
@@ -283,7 +276,7 @@ EdgeAttributes::Ptr getOverlapEdgeInfo(const SceneGraphLayer& graph,
 }
 
 EdgeAttributes::Ptr getFreespaceEdgeInfo(const SceneGraphLayer& graph,
-                                         const Layer<GvdVoxel>& gvd,
+                                         const GvdLayer& gvd,
                                          const NodeIndexMap& node_index_map,
                                          NodeId node,
                                          NodeId other,
@@ -302,7 +295,7 @@ EdgeAttributes::Ptr getFreespaceEdgeInfo(const SceneGraphLayer& graph,
   double min_weight = std::min(source_dist, target_dist);
 
   for (const auto& index : path) {
-    const GvdVoxel* voxel = gvd.getVoxelPtrByGlobalIndex(index);
+    const GvdVoxel* voxel = gvd.getVoxelPtr(index);
     if (!voxel || !voxel->observed || voxel->distance <= min_clearance_m) {
       return nullptr;
     }
@@ -341,7 +334,7 @@ void findOverlapEdges(const OverlapEdgeConfig& config,
 
 void findFreespaceEdges(const FreespaceEdgeConfig& config,
                         const SceneGraphLayer& graph,
-                        const Layer<GvdVoxel>& gvd,
+                        const GvdLayer& gvd,
                         const std::unordered_set<NodeId>& nodes,
                         const NodeIndexMap& indices,
                         EdgeInfoMap& proposed_edges) {
@@ -394,5 +387,4 @@ void findFreespaceEdges(const FreespaceEdgeConfig& config,
   }
 }
 
-}  // namespace places
-}  // namespace hydra
+}  // namespace hydra::places

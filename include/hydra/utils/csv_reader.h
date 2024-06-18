@@ -27,7 +27,7 @@ class CsvReader {
   bool setup(const std::string& file_name,
              char separator = ',',
              bool skip_first_line = true);
-  bool isSetup() const { return is_setup; }
+  bool isSetup() const { return is_setup_; }
   operator bool() const { return isSetup(); }
 
   struct Row : std::vector<std::string> {
@@ -53,14 +53,34 @@ class CsvReader {
   const Row& getRow(size_t row) const;
   const std::string& getEntry(const std::string& header, size_t row) const;
 
+  // Interface to verify the read file with required and optional headers.
+  /**
+   * @brief Require the csv file to have the given headers. An error about missing headers will be
+   * printed.
+   * @param headers List of headers that are required.
+   * @return True if all required headers are present, false otherwise.
+   */
+  bool checkRequiredHeaders(const std::vector<std::string>& headers) const;
+
+/**
+ * @brief Check if the csv file has the given headers. A warning about missing headers will be
+ * printed.
+ * @param headers List of headers that are optional.
+ */
+  void checkOptionalHeaders(const std::vector<std::string>& headers) const;
+
  private:
   // State.
-  bool is_setup = false;
+  bool is_setup_ = false;
+  std::string loaded_file_name_;
 
   // Data.
   std::vector<std::string> headers_;
   std::vector<Row> rows_;
   std::shared_ptr<std::unordered_map<std::string, size_t>> header_to_index_;
+
+  // Helper functions.
+  std::vector<std::string> missingHeaders(const std::vector<std::string>& headers) const;
 };
 
 }  // namespace hydra
