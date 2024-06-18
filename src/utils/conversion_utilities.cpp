@@ -6,7 +6,8 @@
 
 #include "hydra/common/global_info.h"
 #include "hydra/common/semantic_color_map.h"
-#include "hydra/input/input_data.h"
+#include "hydra/input/input_packet.h"
+#include "hydra/input/sensor.h"
 
 namespace hydra {
 
@@ -14,6 +15,25 @@ std::string showTypeInfo(const cv::Mat& mat) {
   std::stringstream ss;
   ss << "{depth: " << mat.depth() << ", channels: " << mat.channels() << "}";
   return ss.str();
+}
+
+bool conversions::inputPacketToData(InputData& input_data,
+                                    const InputPacket& input_packet) {
+  if (!input_packet.fillInputData(input_data)) {
+    LOG(ERROR) << "[Hydra Conversions] unable to fill InputData structure.";
+    return false;
+  }
+  if (!conversions::normalizeData(input_data)) {
+    LOG(ERROR) << "[Hydra Conversions] unable to normalize data.";
+    return false;
+  }
+  const Sensor& sensor =
+      *GlobalInfo::instance().getSensor(input_packet.sensor_input->sensor_id);
+  if (!sensor.finalizeRepresentations(input_data)) {
+    LOG(ERROR) << "[Hydra Conversions] unable to compute inputs for integration";
+    return false;
+  }
+  return true;
 }
 
 bool conversions::normalizeDepth(InputData& data) { return conversions::convertDepth(data); }

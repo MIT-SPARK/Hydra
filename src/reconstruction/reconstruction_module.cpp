@@ -204,21 +204,11 @@ bool ReconstructionModule::update(const InputPacket& msg, bool full_update) {
           << " update @ " << msg.timestamp_ns << " [ns]";
 
   auto data = std::make_shared<InputData>();
-  if (!msg.fillInputData(*data)) {
-    LOG(ERROR) << "[Hydra Reconstruction] unable to construct valid input packet!";
-    return false;
-  }
-
-  if (!conversions::normalizeData(*data)) {
-    LOG(ERROR) << "[Hydra Reconstruction] unable to convert all data";
+  if (!conversions::inputPacketToData(*data, msg)) {
     return false;
   }
 
   const Sensor& sensor = *GlobalInfo::instance().getSensor(msg.sensor_input->sensor_id);
-  if (!sensor.finalizeRepresentations(*data)) {
-    LOG(ERROR) << "[Hydra Reconstruction] unable to compute inputs for integration";
-    return false;
-  }
 
   {  // timing scope
     ScopedTimer timer("places/tsdf", msg.timestamp_ns);

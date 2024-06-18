@@ -1,8 +1,20 @@
 #pragma once
 
-#include "hydra/input/input_data.h"
+//Forward declare to avoid includes.
+namespace cv {
 
-namespace hydra::conversions {
+class Mat;
+
+}  // namespace cv
+namespace hydra {
+
+// Forward declare to avoid includes.
+class InputData;
+class InputPacket;
+
+namespace conversions {
+
+bool inputPacketToData(InputData& input_data, const InputPacket& input_packet);
 
 /**
  * @brief make sure that all the images are of the right type
@@ -19,4 +31,6 @@ bool convertDepth(InputData& data);
 
 bool convertColor(InputData& data);
 
-}  // namespace hydra::conversions
+}  // namespace conversions
+
+}  // namespace hydra
