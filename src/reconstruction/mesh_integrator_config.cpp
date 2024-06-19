@@ -44,6 +44,8 @@ void declare_config(MeshIntegratorConfig& config) {
   name("MeshIntegratorConfig");
   field(config.min_weight, "min_weight");
   field<ThreadNumConversion>(config.integrator_threads, "integrator_threads");
+  check(config.min_weight, GT, 0.0f, "min_weight");
+  check(config.integrator_threads, GT, 0, "integrator_threads");
 }
 
 }  // namespace hydra

@@ -46,17 +46,11 @@
 #include "hydra/common/common.h"
 #include "hydra/reconstruction/marching_cubes.h"
 #include "hydra/reconstruction/volumetric_map.h"
-#include "hydra/common/common.h"
 
 namespace hydra {
 
-MeshIntegrator::MeshIntegrator(const MeshIntegratorConfig& config) : config_(config) {
-  // clang-format off
-  cube_index_offsets_ << 0, 1, 1, 0, 0, 1, 1, 0,
-                         0, 0, 1, 1, 0, 0, 1, 1,
-                         0, 0, 0, 0, 1, 1, 1, 1;
-  // clang-format on
-}
+MeshIntegrator::MeshIntegrator(const MeshIntegratorConfig& config)
+    : config(config::checkValid(config)) {}
 
 void MeshIntegrator::allocateBlocks(const BlockIndices& blocks,
                                     VolumetricMap& map,
@@ -103,7 +97,6 @@ void MeshIntegrator::generateMesh(VolumetricMap& map,
                                   OccupancyLayer* occupancy) const {
   // TODO(nathan) think about this more
   cube_coord_offsets_ = cube_index_offsets_.cast<float>() * map.config.voxel_size;
-
   const auto& tsdf = map.getTsdfLayer();
   const BlockIndices blocks =
       only_mesh_updated_blocks ? tsdf.blockIndicesWithCondition(TsdfBlock::meshUpdated)
@@ -114,7 +107,7 @@ void MeshIntegrator::generateMesh(VolumetricMap& map,
   // interior then exterior, but order shouldn't matter too much...
   launchThreads(blocks, true, map, occupancy);
   launchThreads(blocks, false, map, occupancy);
-  showUpdateInfo(map, blocks, 5); 
+  showUpdateInfo(map, blocks, 5);
 
   for (const auto& block_idx : blocks) {
     map.getMeshLayer().getBlock(block_idx).updated = true;
@@ -135,7 +128,7 @@ void MeshIntegrator::launchThreads(const BlockIndices& blocks,
                                    OccupancyLayer* occupancy) const {
   BlockIndexGetter index_getter(blocks);
   std::list<std::thread> threads;
-  for (int i = 0; i < config_.integrator_threads; ++i) {
+  for (int i = 0; i < config.integrator_threads; ++i) {
     if (interior_pass) {
       threads.emplace_back(
           &MeshIntegrator::processInterior, this, &map, &index_getter, occupancy);
@@ -154,6 +147,7 @@ void MeshIntegrator::processInterior(VolumetricMap* map,
                                      BlockIndexGetter* index_getter,
                                      OccupancyLayer* occupancy) const {
   BlockIndex block_index;
+
   while (index_getter->getNextIndex(block_index)) {
     VLOG(10) << "Extracting interior for block: " << showIndex(block_index);
 
@@ -239,7 +233,7 @@ void MeshIntegrator::meshBlockInterior(const BlockIndex& block_index,
     auto& point = points[i];
     VoxelIndex corner_index = index + cube_index_offsets_.col(i);
     const auto& voxel = block->getVoxel(corner_index);
-    if (voxel.weight < config_.min_weight) {
+    if (voxel.weight < config.min_weight) {
       return;
     }
 
@@ -332,7 +326,7 @@ void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
       // voxels[i] = &neighbor_vertex_block->getVoxel(c_idx);
     }
 
-    if (voxel->weight < config_.min_weight) {
+    if (voxel->weight < config.min_weight) {
       return;
     }
     point.distance = voxel->distance;
@@ -346,5 +340,15 @@ void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
 
   ::hydra::MarchingCubes::meshCube(block_index, points, *mesh);
 }
+
+const Eigen::Matrix<int, 3, 8> MeshIntegrator::cube_index_offsets_ = [] {
+  Eigen::Matrix<int, 3, 8> offsets;
+  // clang-format off
+  offsets << 0, 1, 1, 0, 0, 1, 1, 0,
+             0, 0, 1, 1, 0, 0, 1, 1,
+             0, 0, 0, 0, 1, 1, 1, 1;
+  // clang-format on
+  return offsets;
+}();
 
 }  // namespace hydra

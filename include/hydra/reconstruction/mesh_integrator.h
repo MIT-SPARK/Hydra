@@ -99,9 +99,10 @@ class MeshIntegrator {
                                      int voxels_per_side,
                                      VoxelIndex& corner_index);
 
+  const MeshIntegratorConfig config;
+
  protected:
-  const MeshIntegratorConfig config_;
-  Eigen::Matrix<int, 3, 8> cube_index_offsets_;
+  const static Eigen::Matrix<int, 3, 8> cube_index_offsets_;
   mutable Eigen::Matrix<float, 3, 8> cube_coord_offsets_;
 };
 

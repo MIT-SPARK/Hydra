@@ -33,13 +33,14 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <thread>
+
+#include "hydra/common/global_info.h"
 
 namespace hydra {
 
 struct MeshIntegratorConfig {
   float min_weight = 1.0e-4;
-  int integrator_threads = -1;
+  int integrator_threads = GlobalInfo::instance().getConfig().default_num_threads;
 };
 
 void declare_config(MeshIntegratorConfig& config);
