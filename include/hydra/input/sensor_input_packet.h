@@ -60,6 +60,7 @@ struct ImageInputPacket : public SensorInputPacket {
   cv::Mat color;
   cv::Mat depth;
   cv::Mat labels;
+  bool color_is_bgr = false; // Otherwise, color is RGB already.
 };
 
 struct CloudInputPacket : public SensorInputPacket {

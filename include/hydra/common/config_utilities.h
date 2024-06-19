@@ -33,13 +33,14 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/color.h>
 #include <spark_dsg/scene_graph_types.h>
 #include <yaml-cpp/yaml.h>
 
 #include <Eigen/Geometry>
 #include <map>
 #include <string>
+
+#include "hydra/common/common_types.h"
 
 namespace hydra {
 

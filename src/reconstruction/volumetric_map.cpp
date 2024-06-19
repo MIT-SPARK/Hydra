@@ -67,15 +67,43 @@ void declare_config(VolumetricMap::Config& config) {
   check(config.truncation_distance, GT, 0, "truncation_distance");
 }
 
-VolumetricMap::VolumetricMap(const Config& _config, bool with_semantics)
+VolumetricMap::VolumetricMap(const Config& _config,
+                             bool with_semantics,
+                             bool with_tracking)
     : config(config::checkValid(_config)),
       tsdf_layer_(config.voxel_size, config.voxels_per_side),
-      mesh_layer_(tsdf_layer_.blockSize()),
-      block_size(tsdf_layer_.blockSize()),
-      voxel_size_inv(tsdf_layer_.voxel_size_inv) {
+      mesh_layer_(tsdf_layer_.blockSize()) {
   if (with_semantics) {
     semantic_layer_.reset(new SemanticLayer(config.voxel_size, config.voxels_per_side));
   }
+  if (with_tracking) {
+    tracking_layer_.reset(new TrackingLayer(config.voxel_size, config.voxels_per_side));
+  }
+}
+
+bool VolumetricMap::allocateBlock(const BlockIndex& index) {
+  if (tsdf_layer_.hasBlock(index)) {
+    return false;
+  }
+  tsdf_layer_.allocateBlock(index);
+  // NOTE(lschmid): The mesh block is not allocated as the integrator will do this.
+  if (semantic_layer_) {
+    semantic_layer_->allocateBlock(index);
+  }
+  if (tracking_layer_) {
+    tracking_layer_->allocateBlock(index);
+  }
+  return true;
+}
+
+BlockIndices VolumetricMap::allocateBlocks(const BlockIndices& blocks) {
+  BlockIndices new_blocks;
+  for (const auto& idx : blocks) {
+    if (allocateBlock(idx)) {
+      new_blocks.push_back(idx);
+    }
+  }
+  return new_blocks;
 }
 
 void VolumetricMap::removeBlock(const BlockIndex& block_index) {
@@ -84,10 +112,47 @@ void VolumetricMap::removeBlock(const BlockIndex& block_index) {
   if (semantic_layer_) {
     semantic_layer_->removeBlock(block_index);
   }
+  if (tracking_layer_) {
+    tracking_layer_->removeBlock(block_index);
+  }
+}
+
+void VolumetricMap::removeBlocks(const BlockIndices& blocks) {
+  for (const auto& idx : blocks) {
+    removeBlock(idx);
+  }
+}
+
+BlockTuple VolumetricMap::getBlock(const BlockIndex& index) {
+  BlockTuple tuple;
+  tuple.tsdf = tsdf_layer_.getBlockPtr(index);
+  if (semantic_layer_) {
+    tuple.semantic = semantic_layer_->getBlockPtr(index);
+  }
+  if (tracking_layer_) {
+    tuple.tracking = tracking_layer_->getBlockPtr(index);
+  }
+  return tuple;
+}
+
+VoxelTuple BlockTuple::getVoxels(const size_t linear_index) const {
+  VoxelTuple tuple;
+  if (tsdf) {
+    tuple.tsdf = &tsdf->getVoxel(linear_index);
+  }
+  if (semantic) {
+    tuple.semantic = &semantic->getVoxel(linear_index);
+  }
+  if (tracking) {
+    tuple.tracking = &tracking->getVoxel(linear_index);
+  }
+  return tuple;
 }
 
 void VolumetricMap::save(const std::string& filepath) const {
   // TODO(nathan) consider hdf5 or something...
+  // TODO(lschmid): Can use binary serialization tools to write a proper (single) file
+  // io.
 
   YAML::Node config_node;
   config_node["map"] = config::toYaml(config);

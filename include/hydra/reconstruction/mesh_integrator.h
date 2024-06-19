@@ -42,7 +42,7 @@ namespace hydra {
 
 class VolumetricMap;
 
-// Former VertexVoxel.
+// NOTE(lschmid): Former VertexVoxel.
 struct OccupancyVoxel {
   bool on_surface = false;
   size_t block_vertex_index;

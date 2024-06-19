@@ -48,7 +48,6 @@
 #pragma once
 
 #include <config_utilities/factory.h>
-#include <spark_dsg/color.h>
 
 #include <memory>
 #include <opencv2/core/mat.hpp>

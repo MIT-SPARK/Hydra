@@ -1,7 +1,6 @@
 target_sources(
   ${PROJECT_NAME}
-  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/conversion_utilities.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/csv_reader.cpp
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/csv_reader.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/disjoint_set.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/display_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/log_utilities.cpp

@@ -1,4 +1,4 @@
-#include "hydra/utils/conversion_utilities.h"
+#include "hydra/input/input_conversion.h"
 
 #include <glog/logging.h>
 
@@ -9,7 +9,7 @@
 #include "hydra/input/input_packet.h"
 #include "hydra/input/sensor.h"
 
-namespace hydra {
+namespace hydra::conversions {
 
 std::string showTypeInfo(const cv::Mat& mat) {
   std::stringstream ss;
@@ -17,38 +17,65 @@ std::string showTypeInfo(const cv::Mat& mat) {
   return ss.str();
 }
 
-bool conversions::inputPacketToData(InputData& input_data,
-                                    const InputPacket& input_packet) {
-  if (!input_packet.fillInputData(input_data)) {
-    LOG(ERROR) << "[Hydra Conversions] unable to fill InputData structure.";
-    return false;
+std::unique_ptr<InputData> parseInputPacket(const InputPacket& input_packet,
+                                            const bool vertices_in_world_frame) {
+  if (!input_packet.sensor_input) {
+    LOG(ERROR) << "[Input Conversion] Input packet has no sensor input.";
+    return nullptr;
   }
-  if (!conversions::normalizeData(input_data)) {
-    LOG(ERROR) << "[Hydra Conversions] unable to normalize data.";
-    return false;
+
+  if (input_packet.sensor_input->sensor_id >= GlobalInfo::instance().numSensors()) {
+    LOG(ERROR) << "[Input Conversion] Input sensor ID "
+               << input_packet.sensor_input->sensor_id
+               << " is out of range. Existing sensors: "
+               << GlobalInfo::instance().numSensors() << ".";
+    return nullptr;
   }
-  const Sensor& sensor =
-      *GlobalInfo::instance().getSensor(input_packet.sensor_input->sensor_id);
-  if (!sensor.finalizeRepresentations(input_data)) {
-    LOG(ERROR) << "[Hydra Conversions] unable to compute inputs for integration";
-    return false;
+  auto data = std::make_unique<InputData>(
+      GlobalInfo::instance().getSensor(input_packet.sensor_input->sensor_id));
+
+  if (!input_packet.fillInputData(*data)) {
+    LOG(ERROR) << "[Input Conversion] Unable to fill input data from input packet.";
+    return nullptr;
   }
-  return true;
+
+  if (!normalizeData(*data)) {
+    LOG(ERROR) << "[Input Conversion] Unable to normalize data.";
+    return nullptr;
+  }
+
+  if (!data->getSensor().finalizeRepresentations(*data)) {
+    LOG(ERROR) << "[Input Conversion] Unable to compute inputs for integration";
+    return nullptr;
+  }
+
+  convertVertexMap(*data, vertices_in_world_frame);
+  return data;
 }
 
-bool conversions::normalizeDepth(InputData& data) { return conversions::convertDepth(data); }
+bool hasSufficientData(const InputData& data) {
+  // we accept data as either a pointcloud (points) or an rgbd image (depth_image)
+  // labels or color can encode the labels for a depth image or pointcloud. For the
+  // former case, color_image and/or label_image will share the same resolution as
+  // depth image and for the latter it will share the same resolution as the
+  // pointcloud...
+  return (!data.color_image.empty() || !data.label_image.empty()) &&
+         (!data.depth_image.empty() || !data.vertex_map.empty());
+}
 
-bool conversions::normalizeData(InputData& data, bool normalize_labels) {
-  if (!conversions::convertDepth(data)) {
+bool normalizeDepth(InputData& data) { return convertDepth(data); }
+
+bool normalizeData(InputData& data, bool normalize_labels) {
+  if (!convertDepth(data)) {
     return false;
   }
 
-  if (!conversions::convertColor(data)) {
+  if (!convertColor(data)) {
     return false;
   }
 
   // must come after convertColor as it uses color image
-  if (normalize_labels && !conversions::convertLabels(data)) {
+  if (normalize_labels && !convertLabels(data)) {
     return false;
   }
 
@@ -61,7 +88,7 @@ bool conversions::normalizeData(InputData& data, bool normalize_labels) {
   return true;
 }
 
-bool conversions::colorToLabels(cv::Mat& label_image, const cv::Mat& colors) {
+bool colorToLabels(cv::Mat& label_image, const cv::Mat& colors) {
   if (colors.empty() || colors.channels() != 3) {
     LOG(ERROR) << "color image required to decode semantic labels";
     return false;
@@ -91,13 +118,13 @@ bool conversions::colorToLabels(cv::Mat& label_image, const cv::Mat& colors) {
   return true;
 }
 
-bool conversions::convertLabels(InputData& data) {
+bool convertLabels(InputData& data) {
   if (data.label_image.empty()) {
-    return conversions::colorToLabels(data.label_image, data.color_image);
+    return colorToLabels(data.label_image, data.color_image);
   }
 
   if (data.label_image.channels() != 1) {
-    return conversions::colorToLabels(data.label_image, data.label_image);
+    return colorToLabels(data.label_image, data.label_image);
   }
 
   // Enforcing requirement for int32_t at this point
@@ -109,7 +136,6 @@ bool conversions::convertLabels(InputData& data) {
 
   LabelRemapper label_remapper = GlobalInfo::instance().getLabelRemapper();
   if (!label_remapper.empty()) {
-    
     for (int r = 0; r < data.label_image.rows; ++r) {
       for (int c = 0; c < data.label_image.cols; ++c) {
         // TODO(marcus): any reason to cache image and reassign with a new one?
@@ -127,7 +153,8 @@ bool conversions::convertLabels(InputData& data) {
 
   if (label_type != CV_8UC1 && label_type != CV_16UC1 && label_type != CV_8SC1 &&
       label_type != CV_16SC1) {
-    LOG(ERROR) << "label image must be integer type, not " << showTypeInfo(data.label_image);
+    LOG(ERROR) << "label image must be integer type, not "
+               << showTypeInfo(data.label_image);
     return false;
   }
 
@@ -142,7 +169,7 @@ bool conversions::convertLabels(InputData& data) {
   return true;
 }
 
-bool conversions::convertDepth(InputData& data) {
+bool convertDepth(InputData& data) {
   if (data.depth_image.empty()) {
     return true;
   }
@@ -168,7 +195,7 @@ bool conversions::convertDepth(InputData& data) {
   return true;
 }
 
-bool conversions::convertColor(InputData& data) {
+bool convertColor(InputData& data) {
   if (data.color_image.empty()) {
     return true;
   }
@@ -177,15 +204,28 @@ bool conversions::convertColor(InputData& data) {
     LOG(ERROR) << "only 3-channel rgb images supported";
     return false;
   }
-
-  if (data.color_is_bgr) {
-    // TODO(marcus): should this do an assignment at the end?
-    cv::Mat rgb_image;
-    cv::cvtColor(data.color_image, rgb_image, cv::COLOR_BGR2RGB);
-    data.color_image = rgb_image;
-  }
-
   return true;
 }
 
-}  // namespace hydra
+void convertVertexMap(InputData& data, bool in_world_frame) {
+  if (data.points_in_world_frame == in_world_frame) {
+    return;
+  }
+  Eigen::Isometry3f transform = data.getSensorPose().cast<float>();  // world_T_sensor
+  if (!in_world_frame) {
+    transform = transform.inverse(); // Instead get sensor_T_world
+  }
+  for (int r = 0; r < data.vertex_map.rows; ++r) {
+    for (int c = 0; c < data.vertex_map.cols; ++c) {
+      cv::Vec3f& point = data.vertex_map.at<cv::Vec3f>(r, c);
+      Eigen::Vector3f point_eigen(point[0], point[1], point[2]);
+      point_eigen = transform * point_eigen;
+      point[0] = point_eigen.x();
+      point[1] = point_eigen.y();
+      point[2] = point_eigen.z();
+    }
+  }
+  data.points_in_world_frame = in_world_frame;
+}
+
+}  // namespace hydra::conversions

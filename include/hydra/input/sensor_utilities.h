@@ -99,22 +99,6 @@ BlockIndices findBlocksInViewFrustum(
     bool use_sensor_range = true);
 
 /**
- * @brief Finds the indices of all blocks that are within the camera's view, checking
- * for occlusion.
- * @param T_W_C Transform from Camera (C) frame to World (W) frame.
- * @param vertex_map Vertex map in camera frame as 32FC3 with x-y-z as channels.
- * @param block_size Size of the block-grid in meters.
- * @param inflation_distance Additional penetration depth of rays into surfaces to
- * count blocks as seen in meters.
- * @return List of block indices that are visible in the camera's view frustum.
- */
-BlockIndices findVisibleBlocks(const Sensor& sensor,
-                                          const Eigen::Isometry3f& T_W_C,
-                                          const cv::Mat& vertex_map,
-                                          float block_size,
-                                          float inflation_distance = 0.f);
-
-/**
  * @brief Compute range image from pointcloud
  * @param points Pointcloud to compute range image from
  * @param min_range Optional min range to track

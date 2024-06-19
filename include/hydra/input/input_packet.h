@@ -58,9 +58,8 @@ struct InputPacket {
   virtual ~InputPacket() = default;
   virtual bool fillInputData(InputData& data) const;
 
-  template <typename T = double>
-  Eigen::Transform<T, 3, Eigen::Isometry> world_T_body() const {
-    return Eigen::Translation<T, 3>(world_t_body.cast<T>()) * world_R_body.cast<T>();
+  Eigen::Isometry3d world_T_body() const {
+    return Eigen::Translation<double, 3>(world_t_body) * world_R_body;
   }
 };
 

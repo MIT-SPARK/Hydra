@@ -115,7 +115,7 @@ bool Camera::finalizeRepresentations(InputData& input, bool force_world_frame) c
     return false;
   }
 
-  const auto world_T_camera = input.getSensorPose<float>(*this);
+  const auto world_T_camera = input.getSensorPose().cast<float>();
   input.vertex_map = computeVertexMap(input.depth_image,
                                       force_world_frame ? &world_T_camera : nullptr);
   if (force_world_frame) {

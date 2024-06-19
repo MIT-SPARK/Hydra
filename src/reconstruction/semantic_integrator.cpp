@@ -44,7 +44,7 @@
 
 namespace hydra {
 
-MLESemanticIntegrator::MLESemanticIntegrator(const Config& config) : config_(config) {
+MLESemanticIntegrator::MLESemanticIntegrator(const Config& config) : config(config) {
   total_labels_ = GlobalInfo::instance().getTotalLabels();
   init_likelihood_ = std::log(1.0f / static_cast<float>(total_labels_));
 
@@ -52,8 +52,8 @@ MLESemanticIntegrator::MLESemanticIntegrator(const Config& config) : config_(con
   dynamic_labels_ = label_config.dynamic_labels;
   invalid_labels_ = label_config.invalid_labels;
 
-  const auto match_likelihood = std::log(config_.label_confidence);
-  const auto nonmatch_likelihood = std::log(1.0f - config_.label_confidence);
+  const auto match_likelihood = std::log(config.label_confidence);
+  const auto nonmatch_likelihood = std::log(1.0f - config.label_confidence);
   observation_likelihoods_ =
       Eigen::MatrixXf::Constant(total_labels_, total_labels_, nonmatch_likelihood);
   observation_likelihoods_.diagonal().setConstant(match_likelihood);

@@ -41,8 +41,6 @@
 
 namespace hydra::places {
 
-using GlobalIndexVector = GlobalIndices;
-
 VoxelGraphInfo::VoxelGraphInfo() : is_node(false), is_split_node(false) {}
 
 VoxelGraphInfo::VoxelGraphInfo(NodeId id, bool is_from_split)

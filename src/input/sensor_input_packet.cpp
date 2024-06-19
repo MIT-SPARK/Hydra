@@ -36,20 +36,30 @@
 
 #include <glog/logging.h>
 
+#include <opencv2/imgproc.hpp>
+
+#include "hydra/common/global_info.h"
+
 namespace hydra {
 
 ImageInputPacket::ImageInputPacket(uint64_t stamp, size_t sensor_id)
     : SensorInputPacket(stamp, sensor_id) {}
 
 bool ImageInputPacket::fillInputData(InputData& msg) const {
-  if (depth.empty() || (color.empty() && labels.empty())) {
-    LOG(ERROR) << "Missing required images!!!!";
+  if (depth.empty()) {
+    LOG(ERROR) << "Missing required images: Depth image must be set.";
+    return false;
+  }
+  if (color.empty() && labels.empty()) {
+    LOG(ERROR) << "Missing required images: Color or label image must be set.";
     return false;
   }
 
   msg.timestamp_ns = timestamp_ns;
-  msg.sensor_id = sensor_id;
   msg.color_image = color;
+  if (color_is_bgr) {
+    cv::cvtColor(msg.color_image, msg.color_image, cv::COLOR_BGR2RGB);
+  }
   msg.depth_image = depth;
   msg.label_image = labels;
   return true;
@@ -60,12 +70,11 @@ CloudInputPacket::CloudInputPacket(uint64_t stamp, size_t sensor_id)
 
 bool CloudInputPacket::fillInputData(InputData& msg) const {
   if (points.empty() || (labels.empty() && colors.empty())) {
-    LOG(ERROR) << "Missing required pointcloud!!!!";
+    LOG(ERROR) << "Missing required pointcloud.";
     return false;
   }
 
   msg.timestamp_ns = timestamp_ns;
-  msg.sensor_id = sensor_id;
   msg.vertex_map = points;
   msg.points_in_world_frame = in_world_frame;
   msg.color_image = colors;

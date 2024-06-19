@@ -63,78 +63,49 @@ using VoxelMeasurement = ProjectiveIntegrator::VoxelMeasurement;
 using timing::ScopedTimer;
 
 ProjectiveIntegrator::ProjectiveIntegrator(const ProjectiveIntegratorConfig& config)
-    : config_(config::checkValid(config)),
-      interpolator_(config::create<ProjectionInterpolator>(config_.interp_method)),
-      semantic_integrator_(config_.semantic_integrator.create()) {}
+    : config(config::checkValid(config)),
+      interpolator_(config::create<ProjectionInterpolator>(config.interp_method)),
+      semantic_integrator_(config.semantic_integrator.create()) {}
 
-void ProjectiveIntegrator::updateMap(const Sensor& sensor,
-                                     const InputData& data,
+void ProjectiveIntegrator::updateMap(const InputData& data,
                                      VolumetricMap& map,
                                      bool allocate_blocks) const {
-  const auto body_T_sensor = data.getSensorPose<float>(sensor);
-  const auto block_indices = findBlocksInViewFrustum(
-      sensor, body_T_sensor, map.block_size, data.min_range, data.max_range);
-
   auto& tsdf = map.getTsdfLayer();
-  const auto semantics = map.getSemanticLayer();
 
+  // Allocate all blocks that could be seen by the sensor.
+  const auto body_T_sensor = data.getSensorPose().cast<float>();
+  const auto block_indices = findBlocksInViewFrustum(
+      data.getSensor(), body_T_sensor, map.blockSize(), data.min_range, data.max_range);
   BlockIndices new_blocks;
   if (allocate_blocks) {
-    for (const auto& idx : block_indices) {
-      if (tsdf.hasBlock(idx)) {
-        continue;
-      }
-
-      new_blocks.push_back(idx);
-      tsdf.allocateBlock(idx);
-      if (semantic_integrator_ && semantics) {
-        semantics->allocateBlock(idx);
-      }
-    }
+    new_blocks = map.allocateBlocks(block_indices);
   }
 
-  VLOG(config_.verbosity) << "Updating " << block_indices.size() << " blocks.";
+  VLOG(config.verbosity) << "Updating " << block_indices.size() << " blocks.";
   ScopedTimer timer("integration_tsdf", data.timestamp_ns);
-  updateBlocks(std::bind(&ProjectiveIntegrator::updateMapBlock,
-                         this,
-                         std::placeholders::_1,
-                         std::placeholders::_2,
-                         std::placeholders::_3,
-                         std::placeholders::_4),
-               sensor,
-               block_indices,
-               data,
-               map);
-  for (const auto& idx : new_blocks) {
-    const auto block = map.getTsdfLayer().getBlockPtr(idx);
-    if (!block || block->esdf_updated || block->mesh_updated) {
-      continue;
-    }
+  updateBlocks(block_indices, data, map);
 
-    map.getTsdfLayer().removeBlock(idx);
-    const auto semantic_layer = map.getSemanticLayer();
-    if (semantic_layer) {
-      semantic_layer->removeBlock(idx);
+  // De-allocate blocks that were not updated.
+  for (const auto& idx : new_blocks) {
+    if (!tsdf.getBlock(idx).updated) {
+      map.removeBlock(idx);
     }
   }
 }
 
-void ProjectiveIntegrator::updateBlocks(const BlockUpdateFunction& update_function,
-                                        const Sensor& sensor,
-                                        const BlockIndices& block_indices,
+void ProjectiveIntegrator::updateBlocks(const BlockIndices& block_indices,
                                         const InputData& data,
                                         VolumetricMap& map) const {
   // Update all blocks in parallel.
-  BlockIndices block_idx_vector(block_indices.begin(), block_indices.end());
-  IndexGetter<BlockIndex> index_getter(block_idx_vector);
+  IndexGetter<BlockIndex> index_getter(block_indices);
 
   // TODO(nathan) reconsider future/async
   std::vector<std::future<void>> threads;
-  for (int i = 0; i < config_.num_threads; ++i) {
+  for (int i = 0; i < config.num_threads; ++i) {
     threads.emplace_back(std::async(std::launch::async, [&]() {
       BlockIndex block_index;
       while (index_getter.getNextIndex(block_index)) {
-        update_function(sensor, block_index, data, map);
+        updateBlock(block_index, data, map);
       }
     }));
   }
@@ -144,65 +115,54 @@ void ProjectiveIntegrator::updateBlocks(const BlockUpdateFunction& update_functi
   }
 }
 
-void ProjectiveIntegrator::updateMapBlock(const Sensor& sensor,
-                                          const BlockIndex& block_index,
-                                          const InputData& data,
-                                          VolumetricMap& map) const {
-  // Get and allocate block if necessary.
-  const auto tsdf_block = map.getTsdfLayer().getBlockPtr(block_index);
-  if (!tsdf_block) {
-    LOG(WARNING) << "Tried to integrate non-existing TSDF block, skipping!";
+void ProjectiveIntegrator::updateBlock(const BlockIndex& block_index,
+                                       const InputData& data,
+                                       VolumetricMap& map) const {
+  // Get the requested blocks.
+  BlockTuple blocks = map.getBlock(block_index);
+  if (!blocks.tsdf) {
+    // Skip unallocated blocks.
     return;
   }
-
-  SemanticBlock::Ptr semantic_block;
-  const auto semantics = map.getSemanticLayer();
-  if (semantics) {
-    semantic_block = semantics->getBlockPtr(block_index);
-  }
-
-  const auto body_T_sensor = data.getSensorPose<float>(sensor);
-  const auto sensor_T_body = body_T_sensor.inverse();
+  const auto sensor_T_body = data.getSensorPose().cast<float>().inverse();
 
   // Update all voxels.
   bool was_updated = false;
   const float truncation_distance = map.config.truncation_distance;
   const float voxel_size = map.config.voxel_size;
-  for (size_t i = 0; i < tsdf_block->numVoxels(); ++i) {
-    const auto p_C = sensor_T_body * tsdf_block->getVoxelPosition(i);
+  for (size_t i = 0; i < blocks.tsdf->numVoxels(); ++i) {
+    const auto p_sensor = sensor_T_body * blocks.tsdf->getVoxelPosition(i);
     const auto measurement =
-        getVoxelUpdate(sensor, p_C, data, truncation_distance, voxel_size);
+        getVoxelMeasurement(p_sensor, data, truncation_distance, voxel_size);
     if (!measurement.valid) {
       continue;
     }
 
-    auto& tsdf_voxel = tsdf_block->getVoxel(i);
-    SemanticVoxel* semantic_voxel =
-        semantic_block ? &semantic_block->getVoxel(i) : nullptr;
-    updateVoxel(data, measurement, truncation_distance, tsdf_voxel, semantic_voxel);
+    auto voxels = blocks.getVoxels(i);
+    updateVoxel(data, measurement, truncation_distance, voxels);
     was_updated = true;
   }
 
   if (was_updated) {
-    VLOG(10) << "integrator updated block [" << block_index.x() << ", "
-             << block_index.y() << ", " << block_index.z() << "]";
-    tsdf_block->setUpdated();
+    VLOG(10) << "integrator updated block [" << showIndex(block_index) << "]";
+    blocks.tsdf->setUpdated();
   }
 }
 
-VoxelMeasurement ProjectiveIntegrator::getVoxelUpdate(const Sensor& sensor,
-                                                      const Point& p_C,
-                                                      const InputData& data,
-                                                      const float truncation_distance,
-                                                      const float voxel_size) const {
+VoxelMeasurement ProjectiveIntegrator::getVoxelMeasurement(
+    const Point& p_C,
+    const InputData& data,
+    const float truncation_distance,
+    const float voxel_size) const {
   VoxelMeasurement measurement;
   const auto voxel_range = p_C.norm();
-  if (voxel_range < sensor.min_range() || voxel_range > sensor.max_range()) {
+  if (voxel_range < data.getSensor().min_range() ||
+      voxel_range > data.getSensor().max_range() || voxel_range > data.max_range) {
     return measurement;
   }
 
   // Check the point is valid for interpolation.
-  if (!interpolatePoint(sensor, p_C, data, measurement.interpolation_weights)) {
+  if (!interpolatePoint(p_C, data, measurement.interpolation_weights)) {
     return measurement;
   }
 
@@ -218,18 +178,13 @@ VoxelMeasurement ProjectiveIntegrator::getVoxelUpdate(const Sensor& sensor,
   }
 
   // Don't integrate surface voxels of dynamic measurements.
-  const bool is_surface = measurement.sdf < truncation_distance;
-  if (!data.label_image.empty() && semantic_integrator_ && is_surface) {
-    measurement.label = interpolator_->interpolateID(data.label_image,
-                                                     measurement.interpolation_weights);
-    if (!semantic_integrator_->canIntegrate(measurement.label)) {
-      return measurement;
-    }
+  if (!computeLabel(data, truncation_distance, measurement)) {
+    return measurement;
   }
 
   // Compute the weight of the measurement.
-  measurement.weight =
-      computeWeight(sensor, p_C, measurement.sdf, truncation_distance, voxel_size);
+  measurement.weight = computeWeight(
+      data.getSensor(), p_C, measurement.sdf, truncation_distance, voxel_size);
   measurement.valid = true;
   return measurement;
 }
@@ -237,25 +192,26 @@ VoxelMeasurement ProjectiveIntegrator::getVoxelUpdate(const Sensor& sensor,
 void ProjectiveIntegrator::updateVoxel(const InputData& data,
                                        const VoxelMeasurement& measurement,
                                        const float truncation_distance,
-                                       TsdfVoxel& voxel,
-                                       SemanticVoxel* semantic_voxel) const {
-  if (!measurement.valid) {
-    return;
-  }
-
+                                       VoxelTuple& voxels) const {
   if (!std::isfinite(measurement.sdf)) {
     LOG(ERROR) << "found invalid measurement!";
     return;
   }
 
-  // Cache old weight and add measurement to the current weight
-  const auto prev_weight = voxel.weight;
-  voxel.weight = std::min(voxel.weight + measurement.weight, config_.max_weight);
+  // Cache old weight and add measurement to the current weight.
+  auto& tsdf_voxel = *voxels.tsdf;
+  const auto prev_weight = tsdf_voxel.weight;
+  tsdf_voxel.weight =
+      std::min(tsdf_voxel.weight + measurement.weight, config.max_weight);
 
   // Update TSDF distance using weighted averaging fusion.
-  voxel.distance =
-      (voxel.distance * prev_weight + measurement.sdf * measurement.weight) /
+  tsdf_voxel.distance =
+      (tsdf_voxel.distance * prev_weight + measurement.sdf * measurement.weight) /
       (prev_weight + measurement.weight);
+
+  if (voxels.tracking) {
+    voxels.tracking->last_observed = data.timestamp_ns;
+  }
 
   // Only merge other quantities near the surface
   if (measurement.sdf >= truncation_distance) {
@@ -263,31 +219,29 @@ void ProjectiveIntegrator::updateVoxel(const InputData& data,
   }
 
   // TODO(nathan) refactor into update functions
-
   if (!data.color_image.empty()) {
     const auto color = interpolator_->interpolateColor(
         data.color_image, measurement.interpolation_weights);
-    const float ratio = measurement.weight / (voxel.weight + measurement.weight);
-    voxel.color.merge(color, ratio);
+    const float ratio = measurement.weight / (tsdf_voxel.weight + measurement.weight);
+    tsdf_voxel.color.merge(color, ratio);
   }
 
-  if (!semantic_integrator_ || !semantic_voxel) {
+  if (!semantic_integrator_ || !voxels.semantic) {
     return;
   }
 
   if (semantic_integrator_->isValidLabel(measurement.label)) {
-    semantic_integrator_->updateLikelihoods(measurement.label, *semantic_voxel);
+    semantic_integrator_->updateLikelihoods(measurement.label, *voxels.semantic);
   }
 }
 
-bool ProjectiveIntegrator::interpolatePoint(const Sensor& sensor,
-                                            const Point& p_C,
+bool ProjectiveIntegrator::interpolatePoint(const Point& p_C,
                                             const InputData& data,
                                             InterpolationWeights& weights) const {
   // Project the current voxel into the range image, only count points that fall
   // fully into the image so the
   float u, v;
-  if (!sensor.projectPointToImagePlane(p_C, u, v)) {
+  if (!data.getSensor().projectPointToImagePlane(p_C, u, v)) {
     return false;
   }
 
@@ -316,21 +270,33 @@ float ProjectiveIntegrator::computeWeight(const Sensor& sensor,
   auto weight = sensor.computeRayDensity(voxel_size, p_C.z());
 
   // Weight reduction with distance squared (according to sensor noise models).
-  if (!config_.use_constant_weight) {
+  if (!config.use_constant_weight) {
     weight /= std::pow(p_C.z(), 2.f);
   }
 
   // Apply weight drop-off if appropriate.
-  if (config_.use_weight_dropoff) {
-    const float dropoff_epsilon = config_.weight_dropoff_epsilon > 0.f
-                                      ? config_.weight_dropoff_epsilon
-                                      : config_.weight_dropoff_epsilon * -voxel_size;
+  if (config.use_weight_dropoff) {
+    const float dropoff_epsilon = config.weight_dropoff_epsilon > 0.f
+                                      ? config.weight_dropoff_epsilon
+                                      : config.weight_dropoff_epsilon * -voxel_size;
     if (sdf < -dropoff_epsilon) {
       weight *= (truncation_distance + sdf) / (truncation_distance - dropoff_epsilon);
       weight = std::max(weight, 0.f);
     }
   }
   return weight;
+}
+
+bool ProjectiveIntegrator::computeLabel(const InputData& data,
+                                        const float truncation_distance,
+                                        VoxelMeasurement& measurement) const {
+  const bool is_surface = measurement.sdf < truncation_distance;
+  if (data.label_image.empty() || !semantic_integrator_ || !is_surface) {
+    return true;
+  }
+  measurement.label =
+      interpolator_->interpolateID(data.label_image, measurement.interpolation_weights);
+  return semantic_integrator_->canIntegrate(measurement.label);
 }
 
 }  // namespace hydra

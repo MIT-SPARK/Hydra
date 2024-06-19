@@ -177,7 +177,7 @@ void GvdPlaceExtractor::detect(const ReconstructionOutput& msg) {
     gvd_integrator_.reset(new GvdIntegrator(config.gvd, gvd_, graph_extractor_));
   }
 
-  const Eigen::Isometry3f world_T_body = msg.world_T_body<float>();
+  const Eigen::Isometry3f world_T_body = msg.world_T_body().cast<float>();
   latest_pos_ = world_T_body.translation().cast<double>();
 
   {  // start critical section

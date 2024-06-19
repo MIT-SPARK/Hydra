@@ -56,7 +56,7 @@ RobotFootprintIntegrator::~RobotFootprintIntegrator() = default;
 BlockIndices getAffectedBlocks(const Eigen::Isometry3f& world_T_body,
                                const BoundingBox& bbox,
                                VolumetricMap& map) {
-  const auto b_size = map.block_size;
+  const auto b_size = map.blockSize();
   const auto block_diag_half = std::sqrt(3.0f) * b_size / 2.0f;
   const auto margin = Eigen::Vector3f::Constant(block_diag_half);
   BoundingBox inflated = bbox;

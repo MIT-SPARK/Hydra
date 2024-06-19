@@ -68,7 +68,7 @@ class MLESemanticIntegrator : public SemanticIntegrator {
   struct Config {
     /// Measurement probability
     double label_confidence = 0.9;
-  };
+  } const config;
 
   explicit MLESemanticIntegrator(const Config& config);
 
@@ -79,7 +79,6 @@ class MLESemanticIntegrator : public SemanticIntegrator {
   void updateLikelihoods(uint32_t label, SemanticVoxel& voxel) const override;
 
  protected:
-  const Config config_;
   size_t total_labels_;
   std::set<uint32_t> dynamic_labels_;
   std::set<uint32_t> invalid_labels_;

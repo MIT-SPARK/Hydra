@@ -74,6 +74,20 @@ void mergeLayer(const spatial_hash::VoxelLayer<Block>& layer_in,
   }
 }
 
+// Data structure to get access to a block in all layers.
+struct VoxelTuple {
+  TsdfVoxel* tsdf = nullptr;
+  SemanticVoxel* semantic = nullptr;
+  TrackingVoxel* tracking = nullptr;
+};
+
+struct BlockTuple {
+  TsdfBlock::Ptr tsdf;
+  SemanticBlock::Ptr semantic;
+  TrackingBlock::Ptr tracking;
+  VoxelTuple getVoxels(const size_t linear_index) const;
+};
+
 class VolumetricMap {
  public:
   struct Config {
@@ -85,9 +99,14 @@ class VolumetricMap {
     float truncation_distance = 0.3f;
   } const config;
 
-  explicit VolumetricMap(const Config& config, bool with_semantics = false);
-
+  explicit VolumetricMap(const Config& config,
+                         bool with_semantics = false,
+                         bool with_tracking = false);
   virtual ~VolumetricMap() = default;
+
+  float blockSize() const { return config.voxel_size * config.voxels_per_side; }
+
+  virtual BlockTuple getBlock(const BlockIndex& index);
 
   TsdfLayer& getTsdfLayer() { return tsdf_layer_; }
   const TsdfLayer& getTsdfLayer() const { return tsdf_layer_; }
@@ -98,16 +117,29 @@ class VolumetricMap {
   SemanticLayer* getSemanticLayer() { return semantic_layer_.get(); }
   const SemanticLayer* getSemanticLayer() const { return semantic_layer_.get(); }
 
+  TrackingLayer* getTrackingLayer() { return tracking_layer_.get(); }
+  const TrackingLayer* getTrackingLayer() const { return tracking_layer_.get(); }
+
   bool hasSemantics() const { return semantic_layer_ != nullptr; }
+
+  /**
+   * @brief Allocate a block in all relevant layers of the map.
+   * @param index Index of the block to allocate.
+   * @return True if a new bock was allocated, false if the block already existed.
+   */
+  virtual bool allocateBlock(const BlockIndex& index);
+
+  /**
+   * @brief Allocate a set of blocks in all relevant layers of the map.
+   * @tparam BlockIndexIterable Type of the iterable containing block indices.
+   * @param blocks Iterable containing the block indices to allocate.
+   * @return List of block indices that were allocated.
+   */
+  BlockIndices allocateBlocks(const BlockIndices& blocks);
 
   virtual void removeBlock(const BlockIndex& block);
 
-  template <typename BlockIndices>
-  void removeBlocks(const BlockIndices& blocks) {
-    for (const auto& idx : blocks) {
-      removeBlock(idx);
-    }
-  }
+  void removeBlocks(const BlockIndices& blocks);
 
   virtual std::string printStats() const;
 
@@ -127,10 +159,7 @@ class VolumetricMap {
   TsdfLayer tsdf_layer_;
   MeshLayer mesh_layer_;
   SemanticLayer::Ptr semantic_layer_;
-
- public:
-  const float block_size;
-  const float voxel_size_inv;
+  TrackingLayer::Ptr tracking_layer_;
 };
 
 void declare_config(VolumetricMap::Config& config);

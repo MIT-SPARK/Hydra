@@ -44,7 +44,11 @@
 
 namespace hydra {
 
+// Geometry types.
 using spatial_hash::Point;
+
+// Mesh types.
+using spark_dsg::Mesh;
 
 // Index types.
 using spatial_hash::BlockIndex;
@@ -89,6 +93,16 @@ struct SemanticVoxel {
   bool empty = true;
 };
 
+// Voxel to track which parts of space are free with high confidence.
+struct TrackingVoxel {
+  // Time stamp [ns] when the voxel was last observed.
+  TimeStamp last_observed;
+  TimeStamp last_occupied;
+  bool ever_free = false;
+  bool active = false;
+  bool to_remove = false;
+};
+
 // Block types.
 struct TsdfBlock : public spatial_hash::VoxelBlock<TsdfVoxel> {
   using Ptr = std::shared_ptr<TsdfBlock>;
@@ -101,21 +115,20 @@ struct TsdfBlock : public spatial_hash::VoxelBlock<TsdfVoxel> {
 
   mutable bool esdf_updated = false;
   mutable bool mesh_updated = false;
+  mutable bool tracking_updated = false;
 
   void setUpdated() const {
     updated = true;
     esdf_updated = true;
     mesh_updated = true;
+    tracking_updated = true;
   }
 
   // Function to enable iterating over update blocks.
   static bool esdfUpdated(const TsdfBlock& block) { return block.esdf_updated; }
   static bool meshUpdated(const TsdfBlock& block) { return block.mesh_updated; }
+  static bool trackingUpdated(const TsdfBlock& block) { return block.tracking_updated; }
 };
-
-using SemanticBlock = spatial_hash::VoxelBlock<SemanticVoxel>;
-
-using spark_dsg::Mesh;
 
 struct MeshBlock : public Mesh, public spatial_hash::Block {
   using Ptr = std::shared_ptr<MeshBlock>;
@@ -124,9 +137,22 @@ struct MeshBlock : public Mesh, public spatial_hash::Block {
       : Mesh(true, false, has_labels, false), spatial_hash::Block(block_size, index) {}
 };
 
+struct TrackingBlock : public spatial_hash::VoxelBlock<TrackingVoxel> {
+  using Ptr = std::shared_ptr<TrackingBlock>;
+  using ConstPtr = std::shared_ptr<const TrackingBlock>;
+  TrackingBlock(const float voxel_size,
+                const float voxels_per_side,
+                const BlockIndex& index)
+      : spatial_hash::VoxelBlock<TrackingVoxel>(voxel_size, voxels_per_side, index) {}
+  bool has_active_data = false;
+};
+
+using SemanticBlock = spatial_hash::VoxelBlock<SemanticVoxel>;
+
 // Layer types.
 using TsdfLayer = spatial_hash::VoxelLayer<TsdfBlock>;
 using SemanticLayer = spatial_hash::VoxelLayer<SemanticBlock>;
 using MeshLayer = spatial_hash::BlockLayer<MeshBlock>;
+using TrackingLayer = spatial_hash::VoxelLayer<TrackingBlock>;
 
 }  // namespace hydra

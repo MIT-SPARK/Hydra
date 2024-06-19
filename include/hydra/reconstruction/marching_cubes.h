@@ -40,6 +40,7 @@
 #include <array>
 #include <optional>
 
+#include "hydra/common/common.h"
 #include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra {

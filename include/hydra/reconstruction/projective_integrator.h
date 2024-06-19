@@ -52,6 +52,7 @@
 #include <string>
 #include <thread>
 
+#include "hydra/common/common.h"
 #include "hydra/input/input_packet.h"
 #include "hydra/reconstruction/projection_interpolators.h"
 #include "hydra/reconstruction/projective_integrator_config.h"
@@ -70,14 +71,11 @@ namespace hydra {
  */
 class ProjectiveIntegrator {
  public:
-  using BlockUpdateFunction = std::function<void(
-      const Sensor&, const BlockIndex&, const InputData&, VolumetricMap&)>;
-
   struct VoxelMeasurement {
     bool valid = false;
     InterpolationWeights interpolation_weights;
-    float sdf = 0.f;
-    float weight = 0.f;
+    float sdf = 0.0f;
+    float weight = 0.0f;
     int32_t label = -1;
   };
 
@@ -88,13 +86,11 @@ class ProjectiveIntegrator {
   /**
    * @brief Update all specified blocks in the background map with the given data in
    * parallel.
-   * @param block_indices List of block indices to update.
    * @param data Input data to use for the update.
    * @param map Map to update.
    * @param allocate_blocks Allocate blocks to update before integrating
    */
-  void updateMap(const Sensor& sensor,
-                 const InputData& data,
+  void updateMap(const InputData& data,
                  VolumetricMap& map,
                  bool allocate_blocks = true) const;
 
@@ -102,12 +98,9 @@ class ProjectiveIntegrator {
    * @brief Update all specified blocks in the map with the given data in parallel.
    * @param block_indices List of block indices to update.
    * @param data Input data to use for the update.
-   * @param update_function Function to perform on each block.
    * @param map Map to update.
    */
-  void updateBlocks(const BlockUpdateFunction& update_function,
-                    const Sensor& sensor,
-                    const BlockIndices& block_indices,
+  void updateBlocks(const BlockIndices& block_indices,
                     const InputData& data,
                     VolumetricMap& map) const;
 
@@ -117,10 +110,9 @@ class ProjectiveIntegrator {
    * @param data Input data to use for the update.
    * @param map Map to update.
    */
-  void updateMapBlock(const Sensor& sensor,
-                      const BlockIndex& block_index,
-                      const InputData& data,
-                      VolumetricMap& map) const;
+  void updateBlock(const BlockIndex& block_index,
+                   const InputData& data,
+                   VolumetricMap& map) const;
 
   /**
    * @brief Compute the data needed to update a TSDF voxel.
@@ -130,24 +122,22 @@ class ProjectiveIntegrator {
    * @param voxel_size Size of the voxels in the map in meters.
    * @return The measurement weight that can be applied to a voxel.
    */
-  VoxelMeasurement getVoxelUpdate(const Sensor& sensor,
-                                  const Point& p_C,
-                                  const InputData& data,
-                                  const float truncation_distance,
-                                  const float voxel_size) const;
+  VoxelMeasurement getVoxelMeasurement(const Point& p_C,
+                                       const InputData& data,
+                                       const float truncation_distance,
+                                       const float voxel_size) const;
 
   /**
    * @brief Update a voxel with the given measurement.
    * @param data Input data to use for the update.
    * @param measurement Measurement to use for the update.
    * @param truncation_distance Truncation distance of the TSDF in meters.
-   * @param voxel Voxel to update.
+   * @param voxels Voxel to update.
    */
   void updateVoxel(const InputData& data,
                    const VoxelMeasurement& measurement,
                    const float truncation_distance,
-                   TsdfVoxel& voxel,
-                   SemanticVoxel* semantic_voxel = nullptr) const;
+                   VoxelTuple& voxels) const;
 
   /**
    * @brief Check whether the point is valid to be updated and setup the interpolation
@@ -157,8 +147,7 @@ class ProjectiveIntegrator {
    * @param weights Where to write the resulting interpolation weights to.
    * @returns True if the point is valid, false otherwise.
    */
-  bool interpolatePoint(const Sensor& sensor,
-                        const Point& p_C,
+  bool interpolatePoint(const Point& p_C,
                         const InputData& data,
                         InterpolationWeights& weights) const;
 
@@ -179,8 +168,19 @@ class ProjectiveIntegrator {
                       const float truncation_distance,
                       const float voxel_size) const;
 
- private:
-  const ProjectiveIntegratorConfig config_;
+  // TODO(lschmid): Find a good way to clean this up and integrate this more nicely.
+  // Just adding hooks here for now for Khronos updates.
+  /**
+   * @brief Compute the semantic label of the given measurement.
+   * @returns True if the measurement is valid for integration, false otherwise.
+   */
+  virtual bool computeLabel(const InputData& data,
+                            const float truncation_distance,
+                            VoxelMeasurement& measurement) const;
+
+  const ProjectiveIntegratorConfig config;
+
+ protected:
   const std::unique_ptr<const ProjectionInterpolator> interpolator_;
   const std::unique_ptr<const SemanticIntegrator> semantic_integrator_;
 };

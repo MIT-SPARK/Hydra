@@ -44,10 +44,10 @@ using spark_dsg::Color;
 
 using TimeStamp = uint64_t;
 
-inline double toSeconds(TimeStamp time) { return static_cast<double>(time) / 1e9f; }
+inline double toSeconds(TimeStamp time) { return static_cast<double>(time) / 1e9; }
 
 inline TimeStamp fromSeconds(double time) {
-  return static_cast<TimeStamp>(time * 1e9f);
+  return static_cast<TimeStamp>(time * 1e9);
 }
 
 }  // namespace hydra

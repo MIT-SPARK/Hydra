@@ -43,7 +43,6 @@
 
 namespace hydra {
 
-
 std::ostream& operator<<(std::ostream& out, const SdfPoint& point) {
   out << "<";
   out << "d=" << point.distance;

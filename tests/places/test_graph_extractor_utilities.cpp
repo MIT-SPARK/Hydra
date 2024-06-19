@@ -41,7 +41,6 @@
 namespace hydra::places {
 
 using test::SingleBlockExtractionTestFixture;
-
 using IndexRotation = Eigen::Matrix<int, 3, 3>;
 
 IndexRotation rotX() {

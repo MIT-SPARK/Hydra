@@ -74,8 +74,12 @@ pcl::PointXYZRGBA PgmoMeshInterface::getActiveVertex(size_t index) const {
 };
 
 std::optional<uint32_t> PgmoMeshInterface::getActiveSemantics(size_t index) const {
-  // Assumes we mark the active block first.
-  return active_mesh_->labels[index];
+  if (index < active_mesh_->labels.size()) {
+    return active_mesh_->labels[index];
+  }
+  // TODO(lschmid): In the khronos case just hallucinate zero semantics, otherwise
+  // things will break. Fix properly at some point.
+  return 0u;
 }
 
 }  // namespace hydra

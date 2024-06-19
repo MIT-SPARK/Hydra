@@ -122,12 +122,13 @@ struct KimeraSensorExtrinsics : public SensorExtrinsics {
 class Sensor {
  public:
   using Ptr = std::shared_ptr<Sensor>;
+  using ConstPtr = std::shared_ptr<const Sensor>;
 
   struct Config {
     double min_range = 0.0f;
     double max_range = std::numeric_limits<double>::infinity();
     config::VirtualConfig<SensorExtrinsics> extrinsics;
-  };
+  } const config;
 
   explicit Sensor(const Config& config);
 
@@ -136,12 +137,12 @@ class Sensor {
   /**
    * @brief get the minimum valid range of the sensor
    */
-  virtual float min_range() const { return config_.min_range; }
+  virtual float min_range() const { return config.min_range; }
 
   /**
    * @brief get the maximum valid range of the sensor
    */
-  virtual float max_range() const { return config_.max_range; }
+  virtual float max_range() const { return config.max_range; }
 
   /**
    * @brief Get the sensor extrinsics (i.e., sensor pose in the body frame
@@ -206,7 +207,6 @@ class Sensor {
                                     float inflation_distance = 0.f) const = 0;
 
  protected:
-  const Config config_;
   const std::unique_ptr<SensorExtrinsics> extrinsics_;
 };
 

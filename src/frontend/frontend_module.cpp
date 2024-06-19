@@ -437,7 +437,7 @@ void FrontendModule::updateFrontiers(const ReconstructionOutput& input) {
     return;
   }
 
-  frontier_places_->updateRecentBlocks(input.world_t_body, input.map().block_size);
+  frontier_places_->updateRecentBlocks(input.world_t_body, input.map().blockSize());
 
   {  // start graph critical section
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);

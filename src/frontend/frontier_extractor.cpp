@@ -293,7 +293,6 @@ void processBlock(NearestNodeFinder& finder,
         spatial_hash::voxelIndexFromLinearIndex(v, tsdf.voxels_per_side);
     if (inside_place[v] || inside_archived_place[v]) {
       const spatial_hash::VoxelNeighborSearch search(tsdf, 6);
-      const VoxelKey key(block_index, voxel_index);
       for (const auto& key : search.neighborKeys({block_index, voxel_index})) {
         if (!tsdf.hasBlock(key.first) && !skip_add_blocks.count(key.first)) {
           extra_blocks.push(key.first);

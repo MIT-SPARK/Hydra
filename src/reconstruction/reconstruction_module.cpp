@@ -42,9 +42,9 @@
 #include <pose_graph_tools_ros/conversions.h>
 
 #include "hydra/common/global_info.h"
+#include "hydra/input/input_conversion.h"
 #include "hydra/reconstruction/mesh_integrator.h"
 #include "hydra/reconstruction/projective_integrator.h"
-#include "hydra/utils/conversion_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -201,23 +201,23 @@ bool ReconstructionModule::update(const InputPacket& msg, bool full_update) {
   VLOG(2) << "[Hydra Reconstruction] starting " << ((full_update) ? "full" : "partial")
           << " update @ " << msg.timestamp_ns << " [ns]";
 
-  auto data = std::make_shared<InputData>();
-  if (!conversions::inputPacketToData(*data, msg)) {
+  InputData::Ptr data = conversions::parseInputPacket(msg);
+  if (!data) {
     return false;
   }
 
-  const Sensor& sensor = *GlobalInfo::instance().getSensor(msg.sensor_input->sensor_id);
-
   {  // timing scope
     ScopedTimer timer("places/tsdf", msg.timestamp_ns);
-    tsdf_integrator_->updateMap(sensor, *data, *map_);
+    tsdf_integrator_->updateMap(*data, *map_);
   }  // timing scope
 
   if (footprint_integrator_) {
-    footprint_integrator_->addFreespaceFootprint(msg.world_T_body<float>(), *map_);
+    footprint_integrator_->addFreespaceFootprint(msg.world_T_body().cast<float>(),
+                                                 *map_);
   }
 
-  if (map_->getTsdfLayer().numBlocks() == 0) {
+  auto& tsdf = map_->getTsdfLayer();
+  if (tsdf.numBlocks() == 0) {
     return false;
   }
 
@@ -238,22 +238,15 @@ bool ReconstructionModule::update(const InputPacket& msg, bool full_update) {
   output->sensor_data = data;
   fillOutput(*output);
 
-  Sink::callAll(sinks_,
-                msg.timestamp_ns,
-                data->getSensorPose(sensor),
-                map_->getTsdfLayer(),
-                *output);
+  Sink::callAll(sinks_, msg.timestamp_ns, data->getSensorPose(), tsdf, *output);
 
   if (output_queue_) {
     output_queue_->push(output);
   }
 
-  auto& tsdf = map_->getTsdfLayer();
-  auto& mesh = map_->getMeshLayer();
-  BlockIndices blocks;
-  for (const auto& idx : tsdf.blockIndicesWithCondition(TsdfBlock::esdfUpdated)) {
-    tsdf.getBlock(idx).esdf_updated = false;
-    mesh.getBlock(idx).updated = false;
+  for (const auto block : tsdf.blocksWithCondition(TsdfBlock::esdfUpdated)) {
+    block->esdf_updated = false;
+    block->updated = false;
   }
 
   return true;

@@ -141,7 +141,7 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
 
   // TODO(nathan) test
   if (force_world_frame && !input.points_in_world_frame) {
-    const auto world_T_sensor = input.getSensorPose<float>(*this);
+    const auto world_T_sensor = input.getSensorPose().cast<float>();
     auto point_iter = input.vertex_map.begin<cv::Vec3f>();
     while (point_iter != input.vertex_map.end<cv::Vec3f>()) {
       auto& p = *point_iter;
@@ -155,7 +155,7 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
     input.points_in_world_frame = true;
   }
 
-  const auto sensor_T_world = input.getSensorPose<float>(*this).inverse();
+  const auto sensor_T_world = input.getSensorPose().cast<float>().inverse();
   input.min_range = std::numeric_limits<float>::max();
   input.max_range = std::numeric_limits<float>::lowest();
 

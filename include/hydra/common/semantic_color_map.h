@@ -34,8 +34,6 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <spark_dsg/color.h>
-
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -79,8 +77,6 @@ class SemanticColorMap {
                                        const Color& unknown = {},
                                        char delimiter = ',',
                                        bool skip_first_line = true);
-  // Required headers (r,g,b,a,id) only);
-
  private:
   uint32_t max_label_;
   ColorToLabelMap color_to_label_;

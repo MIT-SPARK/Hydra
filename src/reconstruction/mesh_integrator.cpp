@@ -46,6 +46,7 @@
 #include "hydra/common/common.h"
 #include "hydra/reconstruction/marching_cubes.h"
 #include "hydra/reconstruction/volumetric_map.h"
+#include "hydra/common/common.h"
 
 namespace hydra {
 
