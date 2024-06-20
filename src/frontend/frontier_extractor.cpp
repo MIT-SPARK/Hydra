@@ -366,6 +366,9 @@ void FrontierExtractor::computeSparseFrontiers(
                     finished_frontiers);
 
   for (auto f : finished_frontiers) {
+    if (f.size() < config.culling_point_threshold) {
+      continue;
+    }
     Eigen::Vector3f centroid;
     Eigen::Matrix3f cov;
     centroidAndCovFromPoints(f, centroid, cov);
@@ -518,6 +521,7 @@ void declare_config(FrontierExtractor::Config& config) {
   field(config.dense_frontiers, "dense_frontiers");
   field(config.frontier_splitting_threshold, "frontier_splitting_threshold");
   field(config.point_threshold, "point_threshold");
+  field(config.culling_point_threshold, "culling_point_threshold");
   field(config.recent_block_distance, "recent_block_distance");
 }
 

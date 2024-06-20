@@ -24,6 +24,7 @@ class FrontierExtractor : public FrontierPlacesInterface {
     bool dense_frontiers = false;
     double frontier_splitting_threshold = 0.2;
     size_t point_threshold = 10;
+    size_t culling_point_threshold = 10;
     double recent_block_distance = 25;
   } const config;
 
