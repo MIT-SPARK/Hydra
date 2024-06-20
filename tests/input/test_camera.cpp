@@ -42,7 +42,7 @@
 
 namespace hydra {
 
-std::unique_ptr<Camera> createCamera(double vfov,
+std::shared_ptr<Camera> createCamera(double vfov,
                                      double hfov,
                                      std::pair<double, double> range,
                                      std::pair<int, int> width_height_pair = {640,
@@ -193,7 +193,7 @@ TEST(Camera, VertexMapAndRangeCorrect) {
 TEST(Camera, FinalizeRepresentationsCorrect) {
   const auto camera = createCamera(90.0, 90.0, {1.0, 5.0}, {2, 1});
 
-  InputData msg;
+  InputData msg(camera);
   // depth required for range and pointcloud computation
   EXPECT_FALSE(camera->finalizeRepresentations(msg));
 

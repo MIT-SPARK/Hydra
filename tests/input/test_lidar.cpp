@@ -41,7 +41,7 @@
 
 namespace hydra {
 
-std::unique_ptr<Lidar> createLidar(double vfov,
+std::shared_ptr<Lidar> createLidar(double vfov,
                                    double hfov,
                                    std::pair<double, double> range,
                                    std::optional<double> vfov_top = std::nullopt) {
@@ -72,7 +72,7 @@ TEST(Lidar, RayDensityCorrect) {
 
 TEST(Lidar, FinalizeRepresentationsCorrect) {
   const auto lidar = createLidar(90.0, 180.0, {1.0, 5.0});
-  InputData msg;
+  InputData msg(lidar);
   // no points: no ability to make intermediate images
   EXPECT_FALSE(lidar->finalizeRepresentations(msg));
 
@@ -135,7 +135,7 @@ TEST(Lidar, FinalizeRepresentationsCorrect) {
 
 TEST(Lidar, FinalizeRepresentationColor) {
   const auto lidar = createLidar(90.0, 180.0, {1.0, 5.0});
-  InputData msg;
+  InputData msg(lidar);
   msg.vertex_map = cv::Mat(1, 2, CV_32FC3);
   auto& v1 = msg.vertex_map.at<cv::Vec3f>(0, 0);
   v1[0] = 3.0;
