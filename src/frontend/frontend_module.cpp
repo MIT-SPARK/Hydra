@@ -305,6 +305,7 @@ void FrontendModule::spinOnce(const ReconstructionOutput::Ptr& msg) {
   ScopedTimer timer("frontend/spin", msg->timestamp_ns);
 
   if (dsg_->graph && backend_input_) {
+    ScopedTimer sink_timer("frontend/sinks", msg->timestamp_ns);
     Sink::callAll(sinks_, msg->timestamp_ns, *dsg_->graph, *backend_input_);
   }
 
@@ -330,6 +331,7 @@ void FrontendModule::spinOnce(const ReconstructionOutput::Ptr& msg) {
   // no fancy threading: we just mark the update time and copy all changes in one go
   {  // start critical section
     std::unique_lock<std::mutex> lock(state_->backend_graph->mutex);
+    ScopedTimer timer2("frontend/merge_graph", msg->timestamp_ns);
     state_->backend_graph->last_update_time = msg->timestamp_ns;
     state_->backend_graph->graph->mergeGraph(*dsg_->graph);
   }  // end critical section
@@ -337,6 +339,7 @@ void FrontendModule::spinOnce(const ReconstructionOutput::Ptr& msg) {
   if (state_->lcd_queue) {
     {  // start critical section
       std::unique_lock<std::mutex> lock(state_->lcd_graph->mutex);
+      ScopedTimer timer3("frontend/merge_lcd_graph", msg->timestamp_ns);
       state_->lcd_graph->last_update_time = msg->timestamp_ns;
       state_->lcd_graph->graph->mergeGraph(*dsg_->graph);
     }  // end critical section
@@ -355,7 +358,10 @@ void FrontendModule::spinOnce(const ReconstructionOutput::Ptr& msg) {
 }
 
 void FrontendModule::updateImpl(const ReconstructionOutput::Ptr& msg) {
-  launchCallbacks(input_dispatches_, msg);
+  {  // start timing scope
+    ScopedTimer timer("frontend/launch_callbacks", msg->timestamp_ns, true, 1, false);
+    launchCallbacks(input_dispatches_, msg);
+  }
   updatePlaceMeshMapping(*msg);
 }
 
@@ -393,6 +399,8 @@ void FrontendModule::updateMesh(const ReconstructionOutput& input) {
     invalidateMeshEdges(*last_mesh_update_);
   }  // end timing scope
 
+  ScopedTimer timer(
+      "frontend/launch_postmesh_callbacks", input.timestamp_ns, true, 1, false);
   launchCallbacks(post_mesh_callbacks_, input);
 }
 

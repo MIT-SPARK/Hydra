@@ -345,7 +345,7 @@ void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
   if (zmq_sender_) {
     zmq_sender_->send(*private_dsg_->graph, config.zmq_send_mesh);
   }
-
+  ScopedTimer sink_timer("backend/sinks", input.timestamp_ns);
   Sink::callAll(sinks_, input.timestamp_ns, *private_dsg_->graph, *deformation_graph_);
 }
 
@@ -707,7 +707,7 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
     }
 
     updatePlacePosFromCache();  // copy optimized positions back
-  }  // end joint critical section
+  }                             // end joint critical section
 
   if (logs_) {
     backend_graph_logger_.logGraph(private_dsg_->graph);

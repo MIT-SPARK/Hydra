@@ -485,11 +485,12 @@ UpdateFunctor::Hooks UpdateFrontiersFunctor::hooks() const {
     updateFrontier(*info->places_values, node, *attrs);
   };
 
-  my_hooks.cleanup = [](const UpdateInfo::ConstPtr&, SharedDsgInfo* dsg) {
+  my_hooks.cleanup = [](const UpdateInfo::ConstPtr& info, SharedDsgInfo* dsg) {
     if (!dsg) {
       return;
     }
 
+    ScopedTimer spin_timer("backend/cleanup_frontiers", info->timestamp_ns);
     std::unique_lock<std::mutex> lock(dsg->mutex);
     const SceneGraphLayer& places_layer = dsg->graph->getLayer(DsgLayers::PLACES);
 
