@@ -33,51 +33,30 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <memory>
-#include <unordered_set>
-#include <vector>
-
-#include "hydra/common/dsg_types.h"
+#include "hydra/backend/merge_tracker.h"
+#include "hydra/backend/update_functions.h"
+#include "hydra/utils/active_window_tracker.h"
+#include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra {
 
-class NearestNodeFinder {
- public:
-  using Callback = std::function<void(NodeId, size_t, double)>;
-  using Filter = std::function<bool(const SceneGraphNode&)>;
-  using Ptr = std::unique_ptr<NearestNodeFinder>;
+struct UpdateObjectsFunctor : public UpdateFunctor {
+  UpdateObjectsFunctor();
+  Hooks hooks() const override;
+  MergeList call(const DynamicSceneGraph& unmerged,
+                 SharedDsgInfo& dsg,
+                 const UpdateInfo::ConstPtr& info) const override;
 
-  NearestNodeFinder(const SceneGraphLayer& layer, const std::vector<NodeId>& nodes);
+  std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
+                                     const ObjectNodeAttributes& attrs) const;
 
-  NearestNodeFinder(const SceneGraphLayer& layer,
-                    const std::unordered_set<NodeId>& nodes);
+  void mergeAttributes(const DynamicSceneGraph& layer, NodeId from, NodeId to) const;
 
-  virtual ~NearestNodeFinder();
+  size_t num_merges_to_consider = 1;
+  bool allow_connection_merging = true;
 
-  static Ptr fromLayer(const SceneGraphLayer& layer, const Filter& filter);
-
-  void find(const Eigen::Vector3d& position,
-            size_t num_to_find,
-            bool skip_first,
-            const Callback& callback);
-
-  size_t findRadius(const Eigen::Vector3d& position,
-                    double radius_m,
-                    bool skip_first,
-                    const Callback& callback);
-
-  const size_t num_nodes;
-
- private:
-  struct Detail;
-  std::unique_ptr<Detail> internals_;
+  mutable ActiveWindowTracker active_tracker;
+  mutable SemanticNodeFinders node_finders;
 };
-
-using SemanticNodeFinders =
-    std::map<SemanticNodeAttributes::Label, std::unique_ptr<NearestNodeFinder>>;
-
-size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
-                               SemanticNodeFinders& finders,
-                               bool use_active = false);
 
 }  // namespace hydra

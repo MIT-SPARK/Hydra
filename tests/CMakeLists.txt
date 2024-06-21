@@ -17,8 +17,10 @@ add_executable(
   main.cpp
   src/resources.cpp
   src/place_fixtures.cpp
-  backend/test_merge_handler.cpp
-  backend/test_update_functions.cpp
+  backend/test_update_agents_functor.cpp
+  backend/test_update_objects_functor.cpp
+  backend/test_update_places_functor.cpp
+  backend/test_update_rooms_buildings_functor.cpp
   common/test_config_utilities.cpp
   input/test_camera.cpp
   input/test_lidar.cpp
@@ -43,6 +45,7 @@ add_executable(
   rooms/test_graph_filtration.cpp
   rooms/test_room_finder.cpp
   rooms/test_room_utilities.cpp
+  utils/test_active_window_tracker.cpp
   utils/test_minimum_spanning_tree.cpp
   utils/test_nearest_neighbor_utilities.cpp
   utils/test_pose_graph_tracker.cpp

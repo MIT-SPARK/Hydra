@@ -33,51 +33,50 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <memory>
-#include <unordered_set>
-#include <vector>
+#include <glog/logging.h>
 
 #include "hydra/common/dsg_types.h"
+#include "hydra/frontend/place_2d_split_logic.h"
 
-namespace hydra {
+namespace hydra::utils {
 
-class NearestNodeFinder {
- public:
-  using Callback = std::function<void(NodeId, size_t, double)>;
-  using Filter = std::function<bool(const SceneGraphNode&)>;
-  using Ptr = std::unique_ptr<NearestNodeFinder>;
+void getPlace2dAndNeighors(const SceneGraphLayer& places_layer,
+                           std::vector<std::pair<NodeId, Place2d>>& place_2ds,
+                           std::map<NodeId, std::set<NodeId>>& node_neighbors);
 
-  NearestNodeFinder(const SceneGraphLayer& layer, const std::vector<NodeId>& nodes);
+void getNecessaryUpdates(
+    const spark_dsg::Mesh& mesh,
+    size_t min_points,
+    double min_size,
+    double connection_ellipse_scale_factor,
+    std::vector<std::pair<NodeId, Place2d>>& place_2ds,
+    std::vector<std::pair<NodeId, Place2d>>& nodes_to_update,
+    std::vector<std::pair<NodeId, std::vector<Place2d>>>& nodes_to_add);
 
-  NearestNodeFinder(const SceneGraphLayer& layer,
-                    const std::unordered_set<NodeId>& nodes);
+std::map<std::tuple<size_t, size_t, size_t, size_t>, double> buildEdgeMap(
+    const std::vector<std::pair<NodeId, std::vector<Place2d>>>& nodes_to_add,
+    double place_overlap_threshold,
+    double place_neighbor_z_diff);
 
-  virtual ~NearestNodeFinder();
+void updateExistingNodes(const std::vector<std::pair<NodeId, Place2d>>& nodes_to_update,
+                         DynamicSceneGraph& graph);
 
-  static Ptr fromLayer(const SceneGraphLayer& layer, const Filter& filter);
+NodeSymbol insertNewNodes(
+    const std::vector<std::pair<NodeId, std::vector<Place2d>>>& nodes_to_add,
+    const double place_overlap_threshold,
+    const double place_max_neighbor_z_diff,
+    NodeSymbol next_node_symbol,
+    DynamicSceneGraph& graph,
+    std::map<std::tuple<size_t, size_t>, NodeId>& new_id_map);
 
-  void find(const Eigen::Vector3d& position,
-            size_t num_to_find,
-            bool skip_first,
-            const Callback& callback);
+void addNewNodeEdges(
+    const std::vector<std::pair<NodeId, std::vector<Place2d>>> nodes_to_add,
+    const std::map<std::tuple<size_t, size_t, size_t, size_t>, double> edge_map,
+    const std::map<std::tuple<size_t, size_t>, NodeId> new_id_map,
+    DynamicSceneGraph& graph);
 
-  size_t findRadius(const Eigen::Vector3d& position,
-                    double radius_m,
-                    bool skip_first,
-                    const Callback& callback);
+void reallocateMeshPoints(const std::vector<Place2d::PointT>& points,
+                          Place2dNodeAttributes& attrs1,
+                          Place2dNodeAttributes& attrs2);
 
-  const size_t num_nodes;
-
- private:
-  struct Detail;
-  std::unique_ptr<Detail> internals_;
-};
-
-using SemanticNodeFinders =
-    std::map<SemanticNodeAttributes::Label, std::unique_ptr<NearestNodeFinder>>;
-
-size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
-                               SemanticNodeFinders& finders,
-                               bool use_active = false);
-
-}  // namespace hydra
+}  // namespace hydra::utils

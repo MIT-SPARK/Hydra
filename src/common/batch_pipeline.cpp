@@ -38,6 +38,7 @@
 #include <glog/stl_logging.h>
 
 #include "hydra/backend/update_functions.h"
+#include "hydra/backend/update_rooms_buildings_functor.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/reconstruction/mesh_integrator.h"
 
@@ -64,6 +65,7 @@ DynamicSceneGraph::Ptr BatchPipeline::construct(const VFConfig& frontend_config,
   integrator.generateMesh(map, false, false);
 
   auto dsg = GlobalInfo::instance().createSharedDsg();
+  auto graph = dsg->graph->clone();
   auto state = std::make_shared<SharedModuleState>();
   auto module = frontend_config.create(dsg, state, LogSetup::Ptr());
   const auto queue = module->getQueue();
@@ -78,12 +80,13 @@ DynamicSceneGraph::Ptr BatchPipeline::construct(const VFConfig& frontend_config,
   }
 
   if (room_config) {
-    dsg_updates::UpdateRoomsFunctor functor(*room_config);
+    // TODO(nathan) unmerged graph is annoying
+    UpdateRoomsFunctor functor(*room_config);
     UpdateInfo::ConstPtr info(new UpdateInfo);
-    functor.call(*dsg, info);
+    functor.call(*graph, *dsg, info);
 
-    dsg_updates::UpdateBuildingsFunctor bfunctor(Color(), -1);
-    bfunctor.call(*dsg, info);
+    UpdateBuildingsFunctor bfunctor(Color(), -1);
+    bfunctor.call(*graph, *dsg, info);
   }
 
   return dsg->graph;

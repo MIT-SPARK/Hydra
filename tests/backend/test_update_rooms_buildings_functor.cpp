@@ -32,52 +32,42 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <memory>
-#include <unordered_set>
-#include <vector>
+#include <gtest/gtest.h>
+#include <hydra/backend/update_rooms_buildings_functor.h>
 
-#include "hydra/common/dsg_types.h"
+#include "hydra_test/shared_dsg_fixture.h"
 
 namespace hydra {
 
-class NearestNodeFinder {
- public:
-  using Callback = std::function<void(NodeId, size_t, double)>;
-  using Filter = std::function<bool(const SceneGraphNode&)>;
-  using Ptr = std::unique_ptr<NearestNodeFinder>;
+TEST(UpdateRoomsBuildingsFunctor, BuildingUpdate) {
+  auto dsg = test::makeSharedDsg();
+  auto& graph = *dsg->graph;
+  graph.emplaceNode(DsgLayers::BUILDINGS,
+                    "B0"_id,
+                    std::make_unique<NodeAttributes>(Eigen::Vector3d(1.0, 2.0, 3.0)));
 
-  NearestNodeFinder(const SceneGraphLayer& layer, const std::vector<NodeId>& nodes);
+  graph.emplaceNode(DsgLayers::ROOMS,
+                    3,
+                    std::make_unique<NodeAttributes>(Eigen::Vector3d(-1.0, 0.0, 1.0)));
+  graph.emplaceNode(DsgLayers::ROOMS,
+                    4,
+                    std::make_unique<NodeAttributes>(Eigen::Vector3d(-1.0, 0.0, 1.0)));
+  graph.emplaceNode(DsgLayers::ROOMS,
+                    5,
+                    std::make_unique<NodeAttributes>(Eigen::Vector3d(-1.0, 0.0, 1.0)));
 
-  NearestNodeFinder(const SceneGraphLayer& layer,
-                    const std::unordered_set<NodeId>& nodes);
+  graph.insertEdge("B0"_id, 3);
+  graph.insertEdge("B0"_id, 4);
+  graph.insertEdge("B0"_id, 5);
 
-  virtual ~NearestNodeFinder();
+  UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, false, 0, false, {}});
+  UpdateBuildingsFunctor functor(Color(), 0);
+  const auto unmerged = dsg->graph->clone();
+  functor.call(*unmerged, *dsg, info);
 
-  static Ptr fromLayer(const SceneGraphLayer& layer, const Filter& filter);
-
-  void find(const Eigen::Vector3d& position,
-            size_t num_to_find,
-            bool skip_first,
-            const Callback& callback);
-
-  size_t findRadius(const Eigen::Vector3d& position,
-                    double radius_m,
-                    bool skip_first,
-                    const Callback& callback);
-
-  const size_t num_nodes;
-
- private:
-  struct Detail;
-  std::unique_ptr<Detail> internals_;
-};
-
-using SemanticNodeFinders =
-    std::map<SemanticNodeAttributes::Label, std::unique_ptr<NearestNodeFinder>>;
-
-size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
-                               SemanticNodeFinders& finders,
-                               bool use_active = false);
+  Eigen::Vector3d first_expected(-1.0, 0.0, 1.0);
+  Eigen::Vector3d first_result = graph.getPosition("B0"_id);
+  EXPECT_NEAR(0.0, (first_expected - first_result).norm(), 1.0e-7);
+}
 
 }  // namespace hydra

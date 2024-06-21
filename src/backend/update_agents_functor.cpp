@@ -32,52 +32,49 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <memory>
-#include <unordered_set>
-#include <vector>
+#include "hydra/backend/update_agents_functor.h"
 
-#include "hydra/common/dsg_types.h"
+#include <glog/logging.h>
+#include <gtsam/geometry/Pose3.h>
+
+#include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
 
-class NearestNodeFinder {
- public:
-  using Callback = std::function<void(NodeId, size_t, double)>;
-  using Filter = std::function<bool(const SceneGraphNode&)>;
-  using Ptr = std::unique_ptr<NearestNodeFinder>;
+using timing::ScopedTimer;
 
-  NearestNodeFinder(const SceneGraphLayer& layer, const std::vector<NodeId>& nodes);
+MergeList UpdateAgentsFunctor::call(const DynamicSceneGraph&,
+                                    SharedDsgInfo& dsg,
+                                    const UpdateInfo::ConstPtr& info) const {
+  if (!info->complete_agent_values || info->complete_agent_values->size() == 0) {
+    return {};
+  }
 
-  NearestNodeFinder(const SceneGraphLayer& layer,
-                    const std::unordered_set<NodeId>& nodes);
+  ScopedTimer timer("backend/agent_update", info->timestamp_ns, true, 1, false);
+  auto& graph = *dsg.graph;
+  const auto desired_layer = DsgLayers::AGENTS;
+  for (const auto& prefix_layer_pair : graph.dynamicLayersOfType(desired_layer)) {
+    std::set<NodeId> missing_nodes;
+    for (const auto& node : prefix_layer_pair.second->nodes()) {
+      auto& attrs = node->attributes<AgentNodeAttributes>();
+      if (!info->complete_agent_values->exists(attrs.external_key)) {
+        missing_nodes.insert(node->id);
+        continue;
+      }
 
-  virtual ~NearestNodeFinder();
+      auto pose = info->complete_agent_values->at<gtsam::Pose3>(attrs.external_key);
+      attrs.position = pose.translation();
+      attrs.world_R_body = Eigen::Quaterniond(pose.rotation().matrix());
+    }
 
-  static Ptr fromLayer(const SceneGraphLayer& layer, const Filter& filter);
+    if (!missing_nodes.empty()) {
+      LOG(WARNING) << "Layer " << DsgLayers::AGENTS << "(" << prefix_layer_pair.first
+                   << "): could not update "
+                   << displayNodeSymbolContainer(missing_nodes);
+    }
+  }
 
-  void find(const Eigen::Vector3d& position,
-            size_t num_to_find,
-            bool skip_first,
-            const Callback& callback);
-
-  size_t findRadius(const Eigen::Vector3d& position,
-                    double radius_m,
-                    bool skip_first,
-                    const Callback& callback);
-
-  const size_t num_nodes;
-
- private:
-  struct Detail;
-  std::unique_ptr<Detail> internals_;
-};
-
-using SemanticNodeFinders =
-    std::map<SemanticNodeAttributes::Label, std::unique_ptr<NearestNodeFinder>>;
-
-size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
-                               SemanticNodeFinders& finders,
-                               bool use_active = false);
+  return {};
+}
 
 }  // namespace hydra

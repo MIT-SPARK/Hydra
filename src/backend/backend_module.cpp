@@ -45,6 +45,12 @@
 #include <spark_dsg/scene_graph_types.h>
 #include <spark_dsg/zmq_interface.h>
 
+#include "hydra/backend/backend_utilities.h"
+#include "hydra/backend/update_agents_functor.h"
+#include "hydra/backend/update_frontiers_functor.h"
+#include "hydra/backend/update_objects_functor.h"
+#include "hydra/backend/update_places_functor.h"
+#include "hydra/backend/update_rooms_buildings_functor.h"
 #include "hydra/common/config_utilities.h"
 #include "hydra/common/global_info.h"
 #include "hydra/rooms/room_finder.h"
@@ -60,7 +66,6 @@ using kimera_pgmo::DeformationGraphPtr;
 using kimera_pgmo::KimeraPgmoInterface;
 using kimera_pgmo::KimeraPgmoMesh;
 using pose_graph_tools_msgs::PoseGraph;
-using LayerMerges = std::map<LayerId, std::map<NodeId, NodeId>>;
 
 void declare_config(BackendModule::Config& config) {
   using namespace config;
@@ -95,17 +100,6 @@ void declare_config(BackendModule::Config& config) {
   field(config.zmq_send_mesh, "zmq_send_mesh");
 }
 
-std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol key) {
-  NodeSymbol node(key.chr(), key.index());
-  if (!graph.hasNode(node)) {
-    LOG(ERROR) << "Missing node << " << node.getLabel() << "when logging loop closure";
-    LOG(ERROR) << "Num dynamic nodes: " << graph.numDynamicNodes();
-    return std::nullopt;
-  }
-
-  return graph.getNode(node).timestamp.value().count();
-}
-
 BackendModule::BackendModule(const Config& config,
                              const SharedDsgInfo::Ptr& dsg,
                              const SharedModuleState::Ptr& state,
@@ -123,7 +117,11 @@ BackendModule::BackendModule(const Config& config,
 
   setSolverParams();
 
+  // set up frontend graph copy
+  unmerged_graph_ = private_dsg_->graph->clone();
+  // set up mesh infrastructure
   private_dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>());
+  unmerged_graph_->setMesh(private_dsg_->graph->mesh());
   original_vertices_.reset(new pcl::PointCloud<pcl::PointXYZ>());
   deformation_graph_->setForceRecalculate(!config.pgmo.gnc_fix_prev_inliers);
   setSolverParams();
@@ -142,13 +140,6 @@ BackendModule::BackendModule(const Config& config,
   }
 
   setupDefaultFunctors();
-
-  if (config.merge_update_map.count(DsgLayers::OBJECTS)) {
-    if (config.merge_update_map.at(DsgLayers::OBJECTS)) {
-      LOG(WARNING) << "Updating object attributes is currently not supported!";
-      config.merge_update_map.at(DsgLayers::OBJECTS) = false;
-    }
-  }
 
   if (config.use_zmq_interface) {
     zmq_receiver_.reset(
@@ -222,8 +213,8 @@ void BackendModule::save(const LogSetup& log_setup) {
   output_file << "time_from_ns,time_to_ns,x,y,z,qw,qx,qy,qz,type,level" << std::endl;
   for (const auto& loop_closure : loop_closures_) {
     // pose = src.between(dest) or to_T_from
-    auto time_from = getTimeNs(*private_dsg_->graph, loop_closure.dest);
-    auto time_to = getTimeNs(*private_dsg_->graph, loop_closure.src);
+    auto time_from = utils::getTimeNs(*private_dsg_->graph, loop_closure.dest);
+    auto time_to = utils::getTimeNs(*private_dsg_->graph, loop_closure.src);
     if (!time_from || !time_to) {
       continue;
     }
@@ -275,31 +266,6 @@ bool BackendModule::spinOnce(bool force_update) {
   return true;
 }
 
-void BackendModule::logPlaceDistance() {
-  double avg_distance = 0.0;
-  size_t num_valid = 0;
-  const auto& place_values = deformation_graph_->getGtsamTempValues();
-  for (const auto& id_node_pair :
-       private_dsg_->graph->getLayer(DsgLayers::PLACES).nodes()) {
-    const auto node_id = id_node_pair.first;
-    if (!place_values.exists(node_id)) {
-      continue;
-    }
-
-    const auto& attrs = id_node_pair.second->attributes();
-    const double dist =
-        (attrs.position - place_values.at<gtsam::Pose3>(node_id).translation()).norm();
-    avg_distance += dist;
-    num_valid++;
-  }
-  if (num_valid) {
-    avg_distance /= num_valid;
-  }
-
-  LOG(ERROR) << "Average distance: " << avg_distance << ", Num valid: " << num_valid
-             << " / " << private_dsg_->graph->getLayer(DsgLayers::PLACES).numNodes();
-}
-
 void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
   status_.reset();
   std::lock_guard<std::mutex> lock(mutex_);
@@ -327,10 +293,6 @@ void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
   update_timer.reset();  // mark update from dsg finished
 
   ScopedTimer spin_timer("backend/spin", input.timestamp_ns);
-  if (have_loopclosures_ && VLOG_IS_ON(1)) {
-    logPlaceDistance();
-  }
-
   if (config.optimize_on_lc && have_loopclosures_) {
     optimize(input.timestamp_ns);
   } else {
@@ -369,32 +331,8 @@ void BackendModule::addSink(const Sink::Ptr& sink) {
   }
 }
 
-void BackendModule::setUpdateFunctor(LayerId layer,
-                                     const dsg_updates::UpdateFunctor::Ptr& functor) {
+void BackendModule::setUpdateFunctor(LayerId layer, const UpdateFunctor::Ptr& functor) {
   layer_functors_[layer] = functor;
-  setUpdateFuncs();
-}
-
-void BackendModule::setUpdateFuncs() {
-  dsg_update_funcs_.clear();
-  dsg_post_update_funcs_.clear();
-
-  dsg_update_funcs_.push_back(&dsg_updates::updateAgents);
-  for (auto&& [layer, functor] : layer_functors_) {
-    if (!functor) {
-      VLOG(5) << "Skipping invalid functor for layer: " << layer;
-      continue;
-    }
-
-    VLOG(5) << "Registering update function for layer: " << layer;
-    const auto hooks = functor->hooks();
-    dsg_update_funcs_.push_back(hooks.update);
-    if (hooks.cleanup) {
-      dsg_post_update_funcs_.push_back(hooks.cleanup);
-    }
-  }
-
-  merge_handler_.reset(new MergeHandler(layer_functors_, config.enable_merge_undos));
 }
 
 void BackendModule::setSolverParams() {
@@ -410,7 +348,6 @@ void BackendModule::setSolverParams() {
 }
 
 void BackendModule::setupDefaultFunctors() {
-  using namespace dsg_updates;
   layer_functors_[DsgLayers::OBJECTS] = std::make_shared<UpdateObjectsFunctor>();
 
   layer_functors_[DsgLayers::PLACES] = std::make_shared<UpdatePlacesFunctor>(
@@ -430,35 +367,6 @@ void BackendModule::setupDefaultFunctors() {
     layer_functors_[DsgLayers::BUILDINGS] = std::make_shared<UpdateBuildingsFunctor>(
         config.building_color, config.building_semantic_label);
   }
-
-  setUpdateFuncs();
-}
-
-std::string logPoseGraphConnections(const pose_graph_tools_msgs::PoseGraph& msg) {
-  std::stringstream ss;
-  ss << "nodes: [";
-  auto iter = msg.nodes.begin();
-  while (iter != msg.nodes.end()) {
-    ss << "{r=" << iter->robot_id << ", k=" << iter->key << "}";
-    ++iter;
-    if (iter != msg.nodes.end()) {
-      ss << ", ";
-    }
-  }
-
-  ss << "], edges: [";
-  auto eiter = msg.edges.begin();
-  while (eiter != msg.edges.end()) {
-    ss << eiter->robot_from << "(" << eiter->key_from << ") -> " << eiter->robot_to
-       << "(" << eiter->key_to << ")";
-    ++eiter;
-    if (eiter != msg.edges.end()) {
-      ss << ", ";
-    }
-  }
-  ss << "]";
-
-  return ss.str();
 }
 
 void BackendModule::updateFactorGraph(const BackendInput& input) {
@@ -485,7 +393,7 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
     status_.new_factors += msg->edges.size();
 
     VLOG(5) << "[Hydra Backend] Adding pose graph message: "
-            << logPoseGraphConnections(*msg);
+            << utils::logPoseGraphConnections(*msg);
     processIncrementalPoseGraph(msg, &trajectory_, &unconnected_nodes_, &timestamps_);
     logIncrementalLoopClosures(*msg);
   }
@@ -506,6 +414,7 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
     status_.new_loop_closures = num_loop_closures_ - prev_loop_closures;
     have_loopclosures_ = true;
   }
+
   status_.trajectory_len = trajectory_.size();
   status_.total_factors = deformation_graph_->getGtsamFactors().size();
   status_.total_values = deformation_graph_->getGtsamValues().size();
@@ -538,74 +447,6 @@ bool BackendModule::updateFromLcdQueue() {
   return added_new_loop_closure;
 }
 
-void updatePlace2dMesh(Place2dNodeAttributes& attrs,
-                       const kimera_pgmo::MeshDelta& mesh_update,
-                       const size_t num_archived_vertices) {
-  size_t min_index = SIZE_MAX;
-  size_t max_index = 0;
-  auto iter = attrs.pcl_mesh_connections.begin();
-
-  while (iter != attrs.pcl_mesh_connections.end()) {
-    if (mesh_update.deleted_indices.count(*iter)) {
-      iter = attrs.pcl_mesh_connections.erase(iter);
-      continue;
-    }
-
-    auto map_iter = mesh_update.prev_to_curr.find(*iter);
-    if (map_iter != mesh_update.prev_to_curr.end()) {
-      *iter = map_iter->second;
-    }
-    min_index = std::min(min_index, *iter);
-    max_index = std::max(max_index, *iter);
-    ++iter;
-  }
-  attrs.pcl_min_index = min_index;
-  attrs.pcl_max_index = max_index;
-
-  if (attrs.pcl_max_index < num_archived_vertices) {
-    attrs.has_active_mesh_indices = false;
-  }
-}
-
-void updatePlace2dBoundary(Place2dNodeAttributes& attrs,
-                           const kimera_pgmo::MeshDelta& mesh_update) {
-  const auto prev_boundary = attrs.boundary;
-  const auto prev_boundary_connections = attrs.pcl_boundary_connections;
-  attrs.boundary.clear();
-  attrs.pcl_boundary_connections.clear();
-  for (size_t i = 0; i < prev_boundary.size(); ++i) {
-    if (mesh_update.deleted_indices.count(prev_boundary_connections.at(i))) {
-      continue;
-    }
-
-    auto map_iter = mesh_update.prev_to_curr.find(prev_boundary_connections.at(i));
-    if (map_iter != mesh_update.prev_to_curr.end()) {
-      attrs.boundary.push_back(prev_boundary.at(i));
-      attrs.pcl_boundary_connections.push_back(map_iter->second);
-    } else {
-      attrs.boundary.push_back(prev_boundary.at(i));
-      attrs.pcl_boundary_connections.push_back(prev_boundary_connections.at(i));
-    }
-  }
-}
-
-void updatePlaces2d(SharedDsgInfo::Ptr dsg,
-                    kimera_pgmo::MeshDelta& mesh_update,
-                    size_t num_archived_vertices) {
-  if (!dsg->graph->hasLayer(DsgLayers::MESH_PLACES)) {
-    return;
-  }
-  for (auto& id_node_pair : dsg->graph->getLayer(DsgLayers::MESH_PLACES).nodes()) {
-    auto& attrs = id_node_pair.second->attributes<spark_dsg::Place2dNodeAttributes>();
-    if (!attrs.has_active_mesh_indices) {
-      continue;
-    }
-
-    updatePlace2dMesh(attrs, mesh_update, num_archived_vertices);
-    updatePlace2dBoundary(attrs, mesh_update);
-  }
-}
-
 void BackendModule::copyMeshDelta(const BackendInput& input) {
   ScopedTimer timer("backend/copy_mesh_delta", input.timestamp_ns);
   if (!input.mesh_update) {
@@ -620,55 +461,15 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
   // we use this to make sure that deformation only happens for vertices that are
   // still active
   num_archived_vertices_ = input.mesh_update->getTotalArchivedVertices();
-  updatePlaces2d(private_dsg_, *input.mesh_update, num_archived_vertices_);
-
-  updateObjectMapping(*input.mesh_update);
+  utils::updatePlaces2d(private_dsg_, *input.mesh_update, num_archived_vertices_);
 
   have_new_mesh_ = true;
-}
-
-void BackendModule::updateObjectMapping(const kimera_pgmo::MeshDelta& delta) {
-  const auto& objects = private_dsg_->graph->getLayer(DsgLayers::OBJECTS);
-  const auto archived_vertices = delta.getTotalArchivedVertices();
-
-  for (const auto& [node_id, node] : objects.nodes()) {
-    auto& attrs = node->attributes<ObjectNodeAttributes>();
-    if (!attrs.is_active) {
-      continue;
-    }
-
-    VLOG(10) << "Updating mesh connections for " << NodeSymbol(node_id);
-
-    bool still_active = false;
-    auto iter = attrs.mesh_connections.begin();
-    while (iter != attrs.mesh_connections.end()) {
-      if (delta.deleted_indices.count(*iter)) {
-        iter = attrs.mesh_connections.erase(iter);
-        continue;
-      }
-
-      auto map_iter = delta.prev_to_curr.find(*iter);
-      if (map_iter != delta.prev_to_curr.end()) {
-        *iter = map_iter->second;
-      }
-
-      if (*iter >= archived_vertices) {
-        still_active = true;
-      }
-
-      ++iter;
-    }
-
-    attrs.is_active = still_active;
-  }
 }
 
 bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
   std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
   {  // start joint critical section
     ScopedTimer timer("backend/read_graph", timestamp_ns);
-    cachePlacePos();  // save place positions before grabbing new attributes from
-                      // frontend
 
     const auto& shared_dsg = *state_->backend_graph;
     std::unique_lock<std::mutex> shared_graph_lock(shared_dsg.mutex);
@@ -676,38 +477,8 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
       return false;
     }
 
-    GraphMergeConfig merge_config;
-    auto prev_merges = merge_handler_->mergedNodes();
-    auto iter = prev_merges.begin();
-    while (iter != prev_merges.end()) {
-      NodeSymbol id(iter->first);
-      if (id.category() == 'S' || id.category() == 'Q') {
-        iter = prev_merges.erase(iter);
-      } else {
-        ++iter;
-      }
-    }
-
-    merge_config.previous_merges = &prev_merges;
-    merge_config.update_layer_attributes = &config.merge_update_map;
-    merge_config.update_dynamic_attributes = config.merge_update_dynamic;
-    private_dsg_->graph->mergeGraph(*shared_dsg.graph, merge_config);
-
-    // update merge book-keeping and optionally update merged node
-    // connections and attributes
-    merge_handler_->updateFromUnmergedGraph(*shared_dsg.graph);
-
-    // TODO(nathan) handle updating object attributes from frontend
-
-    if (shared_dsg.graph->hasLayer(DsgLayers::PLACES)) {
-      // TODO(nathan) simplify
-      const auto& places = shared_dsg.graph->getLayer(DsgLayers::PLACES);
-      shared_places_copy_ = places.clone(
-          [](const auto& node) { return NodeSymbol(node.id).category() == 'p'; });
-    }
-
-    updatePlacePosFromCache();  // copy optimized positions back
-  }                             // end joint critical section
+    unmerged_graph_->mergeGraph(*shared_dsg.graph);
+  }  // end joint critical section
 
   if (logs_) {
     backend_graph_logger_.logGraph(private_dsg_->graph);
@@ -716,33 +487,9 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
   return true;
 }
 
-void BackendModule::cachePlacePos() {
-  place_pos_cache_.clear();
-  const auto& places = private_dsg_->graph->getLayer(DsgLayers::PLACES);
-  for (const auto& id_node_pair : places.nodes()) {
-    const auto& attributes = id_node_pair.second->attributes();
-    if (attributes.is_active) {
-      continue;
-    }
-
-    place_pos_cache_.emplace(id_node_pair.first, attributes.position);
-  }
-}
-
-void BackendModule::updatePlacePosFromCache() {
-  const auto& places = private_dsg_->graph->getLayer(DsgLayers::PLACES);
-  for (const auto& id_node_pair : places.nodes()) {
-    auto iter = place_pos_cache_.find(id_node_pair.first);
-    if (iter == place_pos_cache_.end()) {
-      continue;
-    }
-
-    id_node_pair.second->attributes().position = iter->second;
-  }
-}
-
 void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
-  if (!shared_places_copy_ || shared_places_copy_->nodes().empty()) {
+  const auto& places = unmerged_graph_->getLayer(DsgLayers::PLACES);
+  if (places.nodes().empty()) {
     LOG(WARNING) << "Attempting to add places to deformation graph without places";
     return;
   }
@@ -755,7 +502,7 @@ void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
   MinimumSpanningTreeInfo mst_info;
   {  // start timing scope
     ScopedTimer mst_timer("backend/places_mst", timestamp_ns);
-    mst_info = getMinimumSpanningEdges(*shared_places_copy_);
+    mst_info = getMinimumSpanningEdges(places);
   }  // end timing scope
 
   {  // start timing scope
@@ -765,7 +512,7 @@ void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
     std::vector<gtsam::Pose3> place_node_poses;
     std::vector<std::vector<size_t>> place_node_valences;
 
-    for (const auto& id_node_pair : shared_places_copy_->nodes()) {
+    for (const auto& id_node_pair : places.nodes()) {
       const auto& node = *id_node_pair.second;
       const auto& attrs = node.attributes<PlaceNodeAttributes>();
 
@@ -803,8 +550,8 @@ void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
     ScopedTimer between_timer("backend/add_places_between", timestamp_ns);
     PoseGraph mst_edges;
     for (const auto& edge : mst_info.edges) {
-      gtsam::Pose3 source(gtsam::Rot3(), shared_places_copy_->getPosition(edge.source));
-      gtsam::Pose3 target(gtsam::Rot3(), shared_places_copy_->getPosition(edge.target));
+      gtsam::Pose3 source(gtsam::Rot3(), places.getPosition(edge.source));
+      gtsam::Pose3 target(gtsam::Rot3(), places.getPosition(edge.target));
       pose_graph_tools_msgs::PoseGraphEdge mst_e;
       mst_e.key_from = edge.source;
       mst_e.key_to = edge.target;
@@ -943,13 +690,16 @@ void BackendModule::optimize(size_t timestamp_ns) {
 
 void BackendModule::resetBackendDsg(size_t timestamp_ns) {
   ScopedTimer timer("backend/reset_dsg", timestamp_ns, true, 0, false);
-  merge_handler_->reset();
   {
     std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
     // First reset private graph
     private_dsg_->graph->clear();
   }
-  updatePrivateDsg(true);
+
+  // TODO(nathan) this might break mesh stuff
+  private_dsg_->graph->mergeGraph(*unmerged_graph_);
+  private_dsg_->merges.clear();
+  merge_tracker.clear();
   deformation_graph_->setRecalculateVertices();
   reset_backend_dsg_ = false;
 }
@@ -958,11 +708,12 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
                                         const gtsam::Values& places_values,
                                         const gtsam::Values& pgmo_values,
                                         bool new_loop_closure,
-                                        const LayerMerges& given_merges) {
-  bool enable_node_merging = config.enable_node_merging;
-  if (given_merges.size() > 0) {
-    enable_node_merging = false;
-  }
+                                        const UpdateInfo::LayerMerges& given_merges) {
+  ScopedTimer spin_timer("backend/update_layers", timestamp_ns);
+
+  // TODO(nathan) chance that this causes weirdness when we have multiple nodes but no
+  // accepted reconciliation merges
+  const bool enable_merging = given_merges.empty() ? config.enable_node_merging : false;
 
   gtsam::Values complete_agent_values;
   if (full_sparse_frame_map_.size() == 0) {
@@ -987,25 +738,36 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
                                            &pgmo_values,
                                            new_loop_closure,
                                            timestamp_ns,
-                                           enable_node_merging,
+                                           enable_merging,
+                                           given_merges,
                                            &complete_agent_values});
 
-  if (config.enable_merge_undos) {
-    status_.num_merges_undone =
-        merge_handler_->checkAndUndo(*private_dsg_->graph, info);
+  // merge topological changes to private dsg, respecting merges
+  // attributes may be overwritten, but ideally we don't bother
+  GraphMergeConfig config;
+  config.previous_merges = &private_dsg_->merges;
+  config.update_dynamic_attributes = false;
+  private_dsg_->graph->mergeGraph(*unmerged_graph_, config);
+
+  if (agent_functor_) {
+    agent_functor_->call(*unmerged_graph_, *private_dsg_, info);
   }
 
-  ScopedTimer spin_timer("backend/update_layers", timestamp_ns);
-  for (const auto& update_func : dsg_update_funcs_) {
-    auto merged_nodes = update_func(*private_dsg_, info);
-    merge_handler_->updateMerges(merged_nodes, *private_dsg_->graph);
+  std::list<LayerCleanupFunc> cleanup_hooks;
+  for (const auto& [layer, functor] : layer_functors_) {
+    if (!functor) {
+      continue;
+    }
+
+    const auto merges = functor->call(*unmerged_graph_, *private_dsg_, info);
+    const auto hooks = functor->hooks();
+    merge_tracker.applyMerges(*unmerged_graph_, merges, *private_dsg_, hooks.merge);
+    if (hooks.cleanup) {
+      cleanup_hooks.push_back(hooks.cleanup);
+    }
   }
 
-  for (const auto& layer_merges : given_merges) {
-    merge_handler_->updateMerges(layer_merges.second, *private_dsg_->graph);
-  }
-
-  launchCallbacks(dsg_post_update_funcs_, info, private_dsg_.get());
+  launchCallbacks(cleanup_hooks, info, private_dsg_.get());
 }
 
 void BackendModule::logStatus(bool init) const {

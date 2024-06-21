@@ -42,9 +42,9 @@
 #include <mutex>
 #include <thread>
 
-#include "hydra/backend/merge_handler.h"
+#include "hydra/backend/merge_tracker.h"
 #include "hydra/backend/pgmo_configs.h"
-#include "hydra/backend/update_functions.h"
+#include "hydra/backend/update_surface_places_functor.h"
 #include "hydra/common/common.h"
 #include "hydra/common/module.h"
 #include "hydra/common/output_sink.h"
@@ -105,7 +105,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
     size_t zmq_poll_time_ms = 10;
     bool zmq_send_mesh = true;
     bool use_2d_places = false;
-    Places2dConfig places2d_config;
+    Update2dPlacesFunctor::Config places2d_config;
     std::vector<Sink::Factory> sinks;
   } const config;
 
@@ -149,13 +149,9 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   using KimeraPgmoInterface::setVerboseFlag;
 
-  void setUpdateFunctor(LayerId layer, const dsg_updates::UpdateFunctor::Ptr& functor);
+  void setUpdateFunctor(LayerId layer, const UpdateFunctor::Ptr& functor);
 
  protected:
-  void setUpdateFuncs();
-
-  void logPlaceDistance();
-
   void setSolverParams();
 
   void addLoopClosure(const gtsam::Key& src,
@@ -184,14 +180,11 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   virtual void resetBackendDsg(size_t timestamp_ns);
 
-  virtual void callUpdateFunctions(
-      size_t timestamp_ns,
-      const gtsam::Values& places_values = gtsam::Values(),
-      const gtsam::Values& pgmo_values = gtsam::Values(),
-      bool new_loop_closure = false,
-      const std::map<LayerId, std::map<NodeId, NodeId>>& given_merges = {});
-
-  virtual void updateObjectMapping(const kimera_pgmo::MeshDelta& delta);
+  virtual void callUpdateFunctions(size_t timestamp_ns,
+                                   const gtsam::Values& places_values = gtsam::Values(),
+                                   const gtsam::Values& pgmo_values = gtsam::Values(),
+                                   bool new_loop_closure = false,
+                                   const UpdateInfo::LayerMerges& given_merges = {});
 
   void runZmqUpdates();
 
@@ -200,10 +193,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   void logStatus(bool init = false) const;
 
   void logIncrementalLoopClosures(const pose_graph_tools_msgs::PoseGraph& msg);
-
-  void cachePlacePos();
-
-  void updatePlacePosFromCache();
 
   void labelRooms(const UpdateInfo& info, SharedDsgInfo* dsg);
 
@@ -222,15 +211,14 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   std::unordered_map<NodeId, Eigen::Vector3d> place_pos_cache_;
 
   SharedDsgInfo::Ptr private_dsg_;
-  SceneGraphLayer::Ptr shared_places_copy_;
-  std::unique_ptr<MergeHandler> merge_handler_;
+  DynamicSceneGraph::Ptr unmerged_graph_;
   SharedModuleState::Ptr state_;
   pcl::PointCloud<pcl::PointXYZ>::Ptr original_vertices_;
   std::vector<uint64_t> vertex_stamps_;
 
-  std::list<LayerUpdateFunc> dsg_update_funcs_;
-  std::list<LayerCleanupFunc> dsg_post_update_funcs_;
-  std::map<LayerId, dsg_updates::UpdateFunctor::Ptr> layer_functors_;
+  MergeTracker merge_tracker;
+  std::map<LayerId, UpdateFunctor::Ptr> layer_functors_;
+  UpdateFunctor::Ptr agent_functor_;
 
   BackendModuleStatus status_;
   SceneGraphLogger backend_graph_logger_;

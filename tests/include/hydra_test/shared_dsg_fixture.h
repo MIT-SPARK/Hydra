@@ -33,51 +33,16 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <memory>
-#include <unordered_set>
-#include <vector>
+#include <hydra/common/shared_dsg_info.h>
 
-#include "hydra/common/dsg_types.h"
+namespace hydra::test {
 
-namespace hydra {
+inline SharedDsgInfo::Ptr makeSharedDsg() {
+  const std::map<LayerId, char> layer_id_map{{DsgLayers::OBJECTS, 'o'},
+                                             {DsgLayers::PLACES, 'p'},
+                                             {DsgLayers::ROOMS, 'r'},
+                                             {DsgLayers::BUILDINGS, 'b'}};
+  return SharedDsgInfo::Ptr(new SharedDsgInfo(layer_id_map));
+}
 
-class NearestNodeFinder {
- public:
-  using Callback = std::function<void(NodeId, size_t, double)>;
-  using Filter = std::function<bool(const SceneGraphNode&)>;
-  using Ptr = std::unique_ptr<NearestNodeFinder>;
-
-  NearestNodeFinder(const SceneGraphLayer& layer, const std::vector<NodeId>& nodes);
-
-  NearestNodeFinder(const SceneGraphLayer& layer,
-                    const std::unordered_set<NodeId>& nodes);
-
-  virtual ~NearestNodeFinder();
-
-  static Ptr fromLayer(const SceneGraphLayer& layer, const Filter& filter);
-
-  void find(const Eigen::Vector3d& position,
-            size_t num_to_find,
-            bool skip_first,
-            const Callback& callback);
-
-  size_t findRadius(const Eigen::Vector3d& position,
-                    double radius_m,
-                    bool skip_first,
-                    const Callback& callback);
-
-  const size_t num_nodes;
-
- private:
-  struct Detail;
-  std::unique_ptr<Detail> internals_;
-};
-
-using SemanticNodeFinders =
-    std::map<SemanticNodeAttributes::Label, std::unique_ptr<NearestNodeFinder>>;
-
-size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
-                               SemanticNodeFinders& finders,
-                               bool use_active = false);
-
-}  // namespace hydra
+}  // namespace hydra::test

@@ -33,51 +33,46 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <memory>
-#include <unordered_set>
-#include <vector>
 
-#include "hydra/common/dsg_types.h"
+#include <gtsam/inference/Symbol.h>
+#include <pose_graph_tools_msgs/PoseGraph.h>
 
-namespace hydra {
+#include "hydra/common/shared_dsg_info.h"
 
-class NearestNodeFinder {
- public:
-  using Callback = std::function<void(NodeId, size_t, double)>;
-  using Filter = std::function<bool(const SceneGraphNode&)>;
-  using Ptr = std::unique_ptr<NearestNodeFinder>;
+namespace kimera_pgmo {
+class MeshDelta;
+}
 
-  NearestNodeFinder(const SceneGraphLayer& layer, const std::vector<NodeId>& nodes);
+namespace hydra::utils {
 
-  NearestNodeFinder(const SceneGraphLayer& layer,
-                    const std::unordered_set<NodeId>& nodes);
+std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol key);
 
-  virtual ~NearestNodeFinder();
+std::string logPoseGraphConnections(const pose_graph_tools_msgs::PoseGraph& msg);
 
-  static Ptr fromLayer(const SceneGraphLayer& layer, const Filter& filter);
+void updatePlace2dMesh(Place2dNodeAttributes& attrs,
+                       const kimera_pgmo::MeshDelta& mesh_update,
+                       const size_t num_archived_vertices);
 
-  void find(const Eigen::Vector3d& position,
-            size_t num_to_find,
-            bool skip_first,
-            const Callback& callback);
+void updatePlace2dBoundary(Place2dNodeAttributes& attrs,
+                           const kimera_pgmo::MeshDelta& mesh_update);
 
-  size_t findRadius(const Eigen::Vector3d& position,
-                    double radius_m,
-                    bool skip_first,
-                    const Callback& callback);
+void updatePlaces2d(SharedDsgInfo::Ptr dsg,
+                    kimera_pgmo::MeshDelta& mesh_update,
+                    size_t num_archived_vertices);
 
-  const size_t num_nodes;
+template <typename T>
+void mergeIndices(const T& from, T& to) {
+  std::vector<typename T::value_type> from_indices(from.begin(), from.end());
+  std::vector<typename T::value_type> to_indices(to.begin(), to.end());
+  to.clear();
 
- private:
-  struct Detail;
-  std::unique_ptr<Detail> internals_;
-};
+  std::sort(from_indices.begin(), from_indices.end());
+  std::sort(to_indices.begin(), to_indices.end());
+  std::set_union(from_indices.begin(),
+                 from_indices.end(),
+                 to_indices.begin(),
+                 to_indices.end(),
+                 std::back_inserter(to));
+}
 
-using SemanticNodeFinders =
-    std::map<SemanticNodeAttributes::Label, std::unique_ptr<NearestNodeFinder>>;
-
-size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
-                               SemanticNodeFinders& finders,
-                               bool use_active = false);
-
-}  // namespace hydra
+}  // namespace hydra::utils

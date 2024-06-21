@@ -33,51 +33,35 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <memory>
-#include <unordered_set>
-#include <vector>
-
 #include "hydra/common/dsg_types.h"
+#include "spark_dsg/layer_view.h"
 
 namespace hydra {
 
-class NearestNodeFinder {
- public:
-  using Callback = std::function<void(NodeId, size_t, double)>;
-  using Filter = std::function<bool(const SceneGraphNode&)>;
-  using Ptr = std::unique_ptr<NearestNodeFinder>;
+/**
+ * @brief class that exposes an iterator over nodes that are active or have just been
+ * archived
+ */
+struct ActiveWindowTracker {
+  using Ptr = std::unique_ptr<ActiveWindowTracker>;
 
-  NearestNodeFinder(const SceneGraphLayer& layer, const std::vector<NodeId>& nodes);
-
-  NearestNodeFinder(const SceneGraphLayer& layer,
-                    const std::unordered_set<NodeId>& nodes);
-
-  virtual ~NearestNodeFinder();
-
-  static Ptr fromLayer(const SceneGraphLayer& layer, const Filter& filter);
-
-  void find(const Eigen::Vector3d& position,
-            size_t num_to_find,
-            bool skip_first,
-            const Callback& callback);
-
-  size_t findRadius(const Eigen::Vector3d& position,
-                    double radius_m,
-                    bool skip_first,
-                    const Callback& callback);
-
-  const size_t num_nodes;
+  /**
+   * @brief Get iterator over active window (active nodes plus just-archived nodes)
+   */
+  spark_dsg::LayerView view(const SceneGraphLayer& layer) const;
+  /**
+   * @brief Remove all archived nodes from iteration
+   */
+  void clear();
+  /**
+   * @brief Fully reset state
+   */
+  void reset();
 
  private:
-  struct Detail;
-  std::unique_ptr<Detail> internals_;
+  bool isActive(const SceneGraphNode& node) const;
+  mutable std::set<NodeId> to_clear_;
+  mutable std::set<NodeId> prev_active_;
 };
-
-using SemanticNodeFinders =
-    std::map<SemanticNodeAttributes::Label, std::unique_ptr<NearestNodeFinder>>;
-
-size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
-                               SemanticNodeFinders& finders,
-                               bool use_active = false);
 
 }  // namespace hydra

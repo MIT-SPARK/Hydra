@@ -61,6 +61,7 @@ struct SharedDsgInfo {
   DynamicSceneGraph::Ptr graph;
   std::map<char, LayerId> prefix_layer_map;
   std::map<LayerId, char> layer_prefix_map;
+  std::map<NodeId, NodeId> merges;
 
  private:
   SharedDsgInfo();

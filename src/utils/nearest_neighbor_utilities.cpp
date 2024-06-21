@@ -81,16 +81,33 @@ struct NearestNodeFinder::Detail {
 
 NearestNodeFinder::NearestNodeFinder(const SceneGraphLayer& layer,
                                      const std::vector<NodeId>& nodes)
-    : internals_(new Detail(layer, nodes)) {}
+    : num_nodes(nodes.size()), internals_(new Detail(layer, nodes)) {}
 
 NearestNodeFinder::NearestNodeFinder(const SceneGraphLayer& layer,
-                                     const std::unordered_set<NodeId>& nodes) {
+                                     const std::unordered_set<NodeId>& nodes)
+    : num_nodes(nodes.size()) {
   std::vector<NodeId> node_vector(nodes.begin(), nodes.end());
   VLOG(10) << "Making node finder with " << nodes.size() << " nodes";
   internals_.reset(new Detail(layer, node_vector));
 }
 
 NearestNodeFinder::~NearestNodeFinder() {}
+
+NearestNodeFinder::Ptr NearestNodeFinder::fromLayer(const SceneGraphLayer& layer,
+                                                    const Filter& filter) {
+  std::unordered_set<NodeId> layer_nodes;
+  for (const auto& [node_id, node] : layer.nodes()) {
+    if (filter(*node)) {
+      layer_nodes.insert(node_id);
+    }
+  }
+
+  if (layer_nodes.empty()) {
+    return nullptr;
+  }
+
+  return std::make_unique<NearestNodeFinder>(layer, layer_nodes);
+}
 
 void NearestNodeFinder::find(const Eigen::Vector3d& position,
                              size_t num_to_find,
@@ -128,6 +145,36 @@ size_t NearestNodeFinder::findRadius(const Eigen::Vector3d& position,
   } else {
     return num_found - (skip_first ? 1 : 0);
   }
+}
+
+size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
+                               SemanticNodeFinders& finders,
+                               bool use_active) {
+  std::map<SemanticLabel, std::unordered_set<NodeId>> label_node_map;
+  size_t total = 0;
+  for (const auto& id_node_pair : layer.nodes()) {
+    auto& attrs = id_node_pair.second->attributes<SemanticNodeAttributes>();
+    if (!use_active && attrs.is_active) {
+      continue;
+    }
+
+    ++total;
+    auto iter = label_node_map.find(attrs.semantic_label);
+    if (iter == label_node_map.end()) {
+      iter = label_node_map.insert({attrs.semantic_label, {}}).first;
+    }
+
+    iter->second.insert(id_node_pair.first);
+  }
+
+  // creating nodefinders
+  finders.clear();
+  for (const auto& label_ids_pair : label_node_map) {
+    finders.emplace(label_ids_pair.first,
+                    std::make_unique<NearestNodeFinder>(layer, label_ids_pair.second));
+  }
+
+  return total;
 }
 
 }  // namespace hydra

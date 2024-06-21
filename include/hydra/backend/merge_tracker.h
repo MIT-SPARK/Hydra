@@ -33,51 +33,22 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <memory>
-#include <unordered_set>
-#include <vector>
-
-#include "hydra/common/dsg_types.h"
+#include "hydra/backend/update_functions.h"
 
 namespace hydra {
 
-class NearestNodeFinder {
- public:
-  using Callback = std::function<void(NodeId, size_t, double)>;
-  using Filter = std::function<bool(const SceneGraphNode&)>;
-  using Ptr = std::unique_ptr<NearestNodeFinder>;
+struct MergeTracker {
+  void applyMerges(const DynamicSceneGraph& unmerged,
+                   const MergeList& proposals,
+                   SharedDsgInfo& dsg,
+                   const MergeFunc& merge_attrs = MergeFunc());
 
-  NearestNodeFinder(const SceneGraphLayer& layer, const std::vector<NodeId>& nodes);
-
-  NearestNodeFinder(const SceneGraphLayer& layer,
-                    const std::unordered_set<NodeId>& nodes);
-
-  virtual ~NearestNodeFinder();
-
-  static Ptr fromLayer(const SceneGraphLayer& layer, const Filter& filter);
-
-  void find(const Eigen::Vector3d& position,
-            size_t num_to_find,
-            bool skip_first,
-            const Callback& callback);
-
-  size_t findRadius(const Eigen::Vector3d& position,
-                    double radius_m,
-                    bool skip_first,
-                    const Callback& callback);
-
-  const size_t num_nodes;
+  void clear();
 
  private:
-  struct Detail;
-  std::unique_ptr<Detail> internals_;
+  void updateParents(std::map<NodeId, NodeId>& prior_merges, const Merge& merge);
+
+  std::map<NodeId, std::set<NodeId>> merge_sets_;
 };
-
-using SemanticNodeFinders =
-    std::map<SemanticNodeAttributes::Label, std::unique_ptr<NearestNodeFinder>>;
-
-size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
-                               SemanticNodeFinders& finders,
-                               bool use_active = false);
 
 }  // namespace hydra

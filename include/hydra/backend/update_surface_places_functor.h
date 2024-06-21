@@ -33,51 +33,57 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <memory>
-#include <unordered_set>
-#include <vector>
-
-#include "hydra/common/dsg_types.h"
+#include "hydra/backend/update_functions.h"
+#include "hydra/utils/active_window_tracker.h"
+#include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra {
 
-class NearestNodeFinder {
- public:
-  using Callback = std::function<void(NodeId, size_t, double)>;
-  using Filter = std::function<bool(const SceneGraphNode&)>;
-  using Ptr = std::unique_ptr<NearestNodeFinder>;
+struct Update2dPlacesFunctor : public UpdateFunctor {
+  struct Config {
+    bool allow_places_merge = true;
+    //! If two places differ by at least this much in z, they won't be merged
+    double merge_max_delta_z = 0.5;
+    //! Minimum number of points to allow splitting place
+    size_t min_points = 10;
+    //! Minimum size of place for splitting
+    double min_size = 2;
+    //! Amount of overlap between places necessary to add edge
+    double connection_overlap_threshold = 0;
+    //! Maximum difference in z between neighboring places
+    double connection_max_delta_z = 0.5;
+    //! How much to inflate place ellipsoid relative to bounding box
+    double connection_ellipse_scale_factor = 1.0;
+  };
 
-  NearestNodeFinder(const SceneGraphLayer& layer, const std::vector<NodeId>& nodes);
+  Update2dPlacesFunctor(const Config& config);
+  Hooks hooks() const override;
+  MergeList call(const DynamicSceneGraph& unmerged,
+                 SharedDsgInfo& dsg,
+                 const UpdateInfo::ConstPtr& info) const override;
 
-  NearestNodeFinder(const SceneGraphLayer& layer,
-                    const std::unordered_set<NodeId>& nodes);
+  void updateNode(const spark_dsg::Mesh::Ptr& mesh,
+                  NodeId node,
+                  Place2dNodeAttributes& attrs) const;
 
-  virtual ~NearestNodeFinder();
+  std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
+                                     const SceneGraphNode& node) const;
 
-  static Ptr fromLayer(const SceneGraphLayer& layer, const Filter& filter);
+  bool shouldMerge(const Place2dNodeAttributes& from_attrs,
+                   const Place2dNodeAttributes& to_attrs) const;
 
-  void find(const Eigen::Vector3d& position,
-            size_t num_to_find,
-            bool skip_first,
-            const Callback& callback);
+  void cleanup(SharedDsgInfo& dsg) const;
 
-  size_t findRadius(const Eigen::Vector3d& position,
-                    double radius_m,
-                    bool skip_first,
-                    const Callback& callback);
-
-  const size_t num_nodes;
+  size_t num_merges_to_consider = 1;
+  mutable SemanticNodeFinders node_finders;
+  mutable ActiveWindowTracker active_tracker;
 
  private:
-  struct Detail;
-  std::unique_ptr<Detail> internals_;
+  Config config_;
+  mutable NodeSymbol next_node_id_ = NodeSymbol('S', 0);
+  const LayerId layer_id_ = DsgLayers::MESH_PLACES;
 };
 
-using SemanticNodeFinders =
-    std::map<SemanticNodeAttributes::Label, std::unique_ptr<NearestNodeFinder>>;
-
-size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
-                               SemanticNodeFinders& finders,
-                               bool use_active = false);
+void declare_config(Update2dPlacesFunctor::Config& conf);
 
 }  // namespace hydra

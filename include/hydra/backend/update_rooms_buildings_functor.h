@@ -34,72 +34,29 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include "hydra/backend/update_functions.h"
+#include "hydra/rooms/room_finder.h"
 
 namespace hydra {
 
-struct NodeInfo {
-  using Ptr = std::unique_ptr<NodeInfo>;
+struct UpdateRoomsFunctor : public UpdateFunctor {
+  UpdateRoomsFunctor(const RoomFinderConfig& config);
+  MergeList call(const DynamicSceneGraph& unmerged,
+                 SharedDsgInfo& dsg,
+                 const UpdateInfo::ConstPtr& info) const override;
 
-  LayerId layer;
-  NodeAttributes::Ptr attrs;
-  bool is_active;
-  bool need_backend_update = false;
-  std::vector<NodeId> neighbors;
+  void rewriteRooms(const SceneGraphLayer* new_rooms, DynamicSceneGraph& graph) const;
+
+  std::unique_ptr<RoomFinder> room_finder;
 };
 
-class MergeHandler {
- public:
-  MergeHandler(const std::map<LayerId, dsg_updates::UpdateFunctor::Ptr>& functors,
-               bool undo_allowed);
+struct UpdateBuildingsFunctor : public UpdateFunctor {
+  UpdateBuildingsFunctor(const Color& color, SemanticNodeAttributes::Label label);
+  MergeList call(const DynamicSceneGraph& unmerged,
+                 SharedDsgInfo& dsg,
+                 const UpdateInfo::ConstPtr& info) const override;
 
-  void updateFromUnmergedGraph(const DynamicSceneGraph& graph);
-
-  size_t checkAndUndo(DynamicSceneGraph& graph, const UpdateInfo::ConstPtr& info);
-
-  void updateMerges(const std::map<NodeId, NodeId>& new_merges,
-                    DynamicSceneGraph& graph);
-
-  void reset();
-
-  inline const std::map<NodeId, NodeId>& mergedNodes() const { return merged_nodes_; }
-
-  inline const std::map<NodeId, std::set<NodeId>>& mergeParentNodes() const {
-    return merged_nodes_parents_;
-  }
-
- protected:
-  dsg_updates::UpdateFunctor::Hooks getLayerHooks(LayerId layer) const;
-
-  void clearRemovedNodes(const DynamicSceneGraph& graph);
-
-  void updateNodeEntry(const SceneGraphNode& node, NodeInfo& entry);
-
-  void addNodeToCache(const SceneGraphNode& node,
-                      std::map<NodeId, NodeInfo::Ptr>& cache,
-                      bool check_if_present);
-
-  void updateCacheEntryFromInfo(const spark_dsg::Mesh::Ptr& mesh,
-                                const UpdateInfo::ConstPtr& info,
-                                NodeId node,
-                                NodeInfo& entry);
-
-  void updateInfoCaches(const DynamicSceneGraph& graph,
-                        const UpdateInfo::ConstPtr& info);
-
-  bool shouldUndo(const NodeInfo& from_info, const NodeInfo& to_info) const;
-
-  void undoMerge(DynamicSceneGraph& graph,
-                 const UpdateInfo::ConstPtr& info,
-                 NodeId from_node,
-                 NodeId to_node);
-
-  bool undo_allowed_;
-  std::map<LayerId, std::shared_ptr<dsg_updates::UpdateFunctor>> layer_functors_;
-
-  std::map<NodeId, NodeInfo::Ptr> merged_nodes_cache_;
-  std::map<NodeId, NodeInfo::Ptr> parent_nodes_cache_;
-  std::map<NodeId, NodeId> merged_nodes_;
-  std::map<NodeId, std::set<NodeId>> merged_nodes_parents_;
+  Color building_color;
+  SemanticNodeAttributes::Label building_semantic_label;
 };
 
 }  // namespace hydra
