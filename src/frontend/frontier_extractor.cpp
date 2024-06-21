@@ -237,8 +237,10 @@ void processBlock(NearestNodeFinder& finder,
                   const BlockIndex& block_index,
                   const DynamicSceneGraph& graph,
                   const ReconstructionOutput& input,
-                  const std::vector<NodeId> archived_places,
+                  const std::vector<NodeId>& archived_places,
                   const double max_place_radius,
+                  const double min_frontier_z,
+                  const double max_frontier_z,
                   IndexSet& skip_add_blocks,
                   std::queue<BlockIndex>& extra_blocks,
                   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
@@ -251,6 +253,9 @@ void processBlock(NearestNodeFinder& finder,
       spatial_hash::originPointFromIndex(block_index, tsdf.blockSize());
   auto center_dists = getPlacesForBlock(
       graph, block_center, finder, tsdf.blockSize(), max_place_radius);
+
+  // TODO(aaron): We should probably check to see if the whole block is outside of the
+  // z band of voxels we are about. Can greatly reduce amount of work.
 
   // Get all recently-archived places near block
   std::vector<std::pair<Eigen::Vector3d, double>> archived_center_dists;
@@ -286,17 +291,26 @@ void processBlock(NearestNodeFinder& finder,
       continue;
     }
 
+    const VoxelIndex voxel_index =
+        spatial_hash::voxelIndexFromLinearIndex(v, tsdf.voxels_per_side);
+
+    // Skip voxels outside of the window that we care about
+    VoxelKey key(block_index, voxel_index);
+    auto center = tsdf.getVoxelPosition(key);
+    if (center.z() < min_frontier_z or center.z() > max_frontier_z) {
+      continue;
+    }
+
     // If voxel is on the "border" of the block, and it is inside a place, and the
     // neighboring block is not allocated, need to add neighbor to queue of "extra"
     // blocks
-    const VoxelIndex voxel_index =
-        spatial_hash::voxelIndexFromLinearIndex(v, tsdf.voxels_per_side);
     if (inside_place[v] || inside_archived_place[v]) {
       const spatial_hash::VoxelNeighborSearch search(tsdf, 6);
-      for (const auto& key : search.neighborKeys({block_index, voxel_index})) {
-        if (!tsdf.hasBlock(key.first) && !skip_add_blocks.count(key.first)) {
-          extra_blocks.push(key.first);
-          skip_add_blocks.insert(key.first);
+      for (const auto& neighbor_key : search.neighborKeys({block_index, voxel_index})) {
+        if (!tsdf.hasBlock(neighbor_key.first) &&
+            !skip_add_blocks.count(neighbor_key.first)) {
+          extra_blocks.push(neighbor_key.first);
+          skip_add_blocks.insert(neighbor_key.first);
         }
       }
       continue;
@@ -322,8 +336,6 @@ void processBlock(NearestNodeFinder& finder,
     // A frontier is archived if its block is deallocated, or if its only neighbor
     // that's inside a place is in an archived place
     archived = archived || (!neighbor_free && neighbor_archived_free);
-    VoxelKey key(block_index, voxel_index);
-    auto center = tsdf.getVoxelPosition(key);
     if (archived) {
       archived_cloud->points.push_back({center.x(), center.y(), center.z()});
     } else {
@@ -400,6 +412,9 @@ void FrontierExtractor::detectFrontiers(const ReconstructionOutput& input,
       new pcl::PointCloud<pcl::PointXYZ>);
   std::vector<NodeId> block_is_archived;
 
+  double min_frontier_z = input.world_t_body.z() + config.minimum_relative_z;
+  double max_frontier_z = input.world_t_body.z() + config.maximum_relative_z;
+
   std::queue<BlockIndex> extra_blocks;
   IndexSet processed_extra_blocks;
   for (const auto& idx : tsdf.allocatedBlockIndices()) {
@@ -409,6 +424,8 @@ void FrontierExtractor::detectFrontiers(const ReconstructionOutput& input,
                  input,
                  archived_places_,
                  config.max_place_radius,
+                 min_frontier_z,
+                 max_frontier_z,
                  processed_extra_blocks,
                  extra_blocks,
                  cloud,
@@ -429,6 +446,8 @@ void FrontierExtractor::detectFrontiers(const ReconstructionOutput& input,
                  input,
                  archived_places_,
                  config.max_place_radius,
+                 min_frontier_z,
+                 max_frontier_z,
                  processed_extra_blocks,
                  extra_blocks,
                  cloud,
@@ -523,6 +542,8 @@ void declare_config(FrontierExtractor::Config& config) {
   field(config.point_threshold, "point_threshold");
   field(config.culling_point_threshold, "culling_point_threshold");
   field(config.recent_block_distance, "recent_block_distance");
+  field(config.minimum_relative_z, "minimum_relative_z");
+  field(config.maximum_relative_z, "maximum_relative_z");
 }
 
 }  // namespace hydra

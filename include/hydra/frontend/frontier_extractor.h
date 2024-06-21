@@ -26,6 +26,8 @@ class FrontierExtractor : public FrontierPlacesInterface {
     size_t point_threshold = 10;
     size_t culling_point_threshold = 10;
     double recent_block_distance = 25;
+    double minimum_relative_z = -0.2;
+    double maximum_relative_z = 1;
   } const config;
 
   explicit FrontierExtractor(const Config& config);

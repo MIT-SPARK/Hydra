@@ -76,3 +76,5 @@ frontier_places:
   frontier_splitting_threshold: 0.2
   point_threshold: 10
   recent_block_distance: 25
+  minimum_relative_z: -1.
+  maximum_relative_z: 1
