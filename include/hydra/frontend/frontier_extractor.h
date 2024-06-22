@@ -3,6 +3,7 @@
 #include <hydra/utils/nearest_neighbor_utilities.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+#include <spatial_hash/types.h>
 
 #include "hydra/common/dsg_types.h"
 #include "hydra/frontend/frontier_places_interface.h"
@@ -10,8 +11,34 @@
 
 namespace hydra {
 
-typedef std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Quaterniond, size_t>
-    Frontier;
+struct Frontier {
+ public:
+  Frontier(){};
+  Frontier(Eigen::Vector3d c,
+           Eigen::Vector3d s,
+           Eigen::Quaterniond o,
+           size_t n,
+           spatial_hash::BlockIndex b)
+      : center(c),
+        scale(s),
+        orientation(o),
+        num_frontier_voxels(n),
+        block_index(b),
+        has_shape_information(true){};
+  Frontier(Eigen::Vector3d c, size_t n, spatial_hash::BlockIndex b)
+      : center(c),
+        num_frontier_voxels(n),
+        block_index(b),
+        has_shape_information(false){};
+
+ public:
+  Eigen::Vector3d center;
+  Eigen::Vector3d scale;
+  Eigen::Quaterniond orientation;
+  size_t num_frontier_voxels = 0;
+  spatial_hash::BlockIndex block_index;
+  bool has_shape_information = false;
+};
 
 class FrontierExtractor : public FrontierPlacesInterface {
  public:
@@ -28,6 +55,7 @@ class FrontierExtractor : public FrontierPlacesInterface {
     double recent_block_distance = 25;
     double minimum_relative_z = -0.2;
     double maximum_relative_z = 1;
+    bool compute_frontier_shape = false;
   } const config;
 
   explicit FrontierExtractor(const Config& config);
@@ -51,7 +79,8 @@ class FrontierExtractor : public FrontierPlacesInterface {
 
   void populateDenseFrontiers(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
                               const pcl::PointCloud<pcl::PointXYZ>::Ptr archived_cloud,
-                              const double voxel_scale);
+                              const double voxel_scale,
+                              const TsdfLayer& layer);
 
   inline static const auto registration_ =
       config::RegistrationWithConfig<FrontierPlacesInterface,
@@ -60,6 +89,8 @@ class FrontierExtractor : public FrontierPlacesInterface {
 
   // Helper functions.
   void computeSparseFrontiers(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+                              const bool compute_frontier_shape,
+                              const TsdfLayer& layer,
                               std::vector<Frontier>& frontiers) const;
 };
 

@@ -241,6 +241,7 @@ void processBlock(NearestNodeFinder& finder,
                   const double max_place_radius,
                   const double min_frontier_z,
                   const double max_frontier_z,
+                  const bool skip_adding_frontiers,
                   IndexSet& skip_add_blocks,
                   std::queue<BlockIndex>& extra_blocks,
                   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
@@ -316,6 +317,9 @@ void processBlock(NearestNodeFinder& finder,
       continue;
     }
 
+    if (skip_adding_frontiers) {
+      return;
+    }
     bool neighbor_free = false;
     bool neighbor_archived_free = false;
     checkFreeNeighbors(inside_place,
@@ -347,19 +351,29 @@ void processBlock(NearestNodeFinder& finder,
 void FrontierExtractor::populateDenseFrontiers(
     const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
     const pcl::PointCloud<pcl::PointXYZ>::Ptr archived_cloud,
-    const double voxel_scale) {
+    const double voxel_scale,
+    const TsdfLayer& layer) {
   for (auto p : cloud->points) {
+    Eigen::Vector3d center = {p.x, p.y, p.z};
+    BlockIndex bix = layer.getBlockIndex(center.cast<float>());
     frontiers_.push_back(
-        {{p.x, p.y, p.z}, {voxel_scale, voxel_scale, voxel_scale}, {1, 0, 0, 0}, 1});
+        {center, {voxel_scale, voxel_scale, voxel_scale}, {1, 0, 0, 0}, 1, bix});
   }
   for (auto p : archived_cloud->points) {
-    archived_frontiers_.push_back(
-        {{p.x, p.y, p.z}, {voxel_scale, voxel_scale, voxel_scale}, {1, 0, 0, 0}, 1});
+    Eigen::Vector3d center = {p.x, p.y, p.z};
+    BlockIndex bix = layer.getBlockIndex(center.cast<float>());
+    archived_frontiers_.push_back({{p.x, p.y, p.z},
+                                   {voxel_scale, voxel_scale, voxel_scale},
+                                   {1, 0, 0, 0},
+                                   1,
+                                   bix});
   }
 }
 
 void FrontierExtractor::computeSparseFrontiers(
     const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+    const bool compute_frontier_shape,
+    const TsdfLayer& layer,
     std::vector<Frontier>& frontiers) const {
   if (cloud->points.size() <= 0) {
     return;
@@ -381,18 +395,25 @@ void FrontierExtractor::computeSparseFrontiers(
     if (f.size() < config.culling_point_threshold) {
       continue;
     }
+
     Eigen::Vector3f centroid;
     Eigen::Matrix3f cov;
     centroidAndCovFromPoints(f, centroid, cov);
 
-    Eigen::EigenSolver<Eigen::Matrix3f> es(cov, true);
-    auto evals_complex = es.eigenvalues();
-    Eigen::Vector3f evals = evals_complex.real();
-    Eigen::Vector3f scale = Eigen::sqrt(evals.array()) * 5;
-    Eigen::Quaterniond quat(es.eigenvectors().real().cast<double>());
+    BlockIndex bix = layer.getBlockIndex(centroid);
 
-    frontiers.push_back(
-        {centroid.cast<double>(), scale.cast<double>(), quat, f.size()});
+    if (compute_frontier_shape) {
+      Eigen::EigenSolver<Eigen::Matrix3f> es(cov, true);
+      auto evals_complex = es.eigenvalues();
+      Eigen::Vector3f evals = evals_complex.real();
+      Eigen::Vector3f scale = Eigen::sqrt(evals.array()) * 5;
+      Eigen::Quaterniond quat(es.eigenvectors().real().cast<double>());
+
+      frontiers.push_back(
+          {centroid.cast<double>(), scale.cast<double>(), quat, f.size(), bix});
+    } else {
+      frontiers.push_back({centroid.cast<double>(), f.size(), bix});
+    }
   }
 }
 
@@ -410,7 +431,6 @@ void FrontierExtractor::detectFrontiers(const ReconstructionOutput& input,
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::PointCloud<pcl::PointXYZ>::Ptr archived_cloud(
       new pcl::PointCloud<pcl::PointXYZ>);
-  std::vector<NodeId> block_is_archived;
 
   double min_frontier_z = input.world_t_body.z() + config.minimum_relative_z;
   double max_frontier_z = input.world_t_body.z() + config.maximum_relative_z;
@@ -426,18 +446,21 @@ void FrontierExtractor::detectFrontiers(const ReconstructionOutput& input,
                  config.max_place_radius,
                  min_frontier_z,
                  max_frontier_z,
+                 false,
                  processed_extra_blocks,
                  extra_blocks,
                  cloud,
                  archived_cloud);
   }
+
   while (!extra_blocks.empty()) {
     BlockIndex bix = extra_blocks.front();
     extra_blocks.pop();
+    bool skip_adding_frontiers = false;
     if (std::find(recently_archived_blocks_.begin(),
                   recently_archived_blocks_.end(),
                   bix) != recently_archived_blocks_.end()) {
-      continue;
+      skip_adding_frontiers = true;
     }
 
     processBlock(finder,
@@ -448,6 +471,7 @@ void FrontierExtractor::detectFrontiers(const ReconstructionOutput& input,
                  config.max_place_radius,
                  min_frontier_z,
                  max_frontier_z,
+                 skip_adding_frontiers,
                  processed_extra_blocks,
                  extra_blocks,
                  cloud,
@@ -455,11 +479,13 @@ void FrontierExtractor::detectFrontiers(const ReconstructionOutput& input,
   }
 
   if (config.dense_frontiers) {
-    populateDenseFrontiers(cloud, archived_cloud, tsdf.voxel_size);
+    populateDenseFrontiers(cloud, archived_cloud, tsdf.voxel_size, tsdf);
   } else {
-    computeSparseFrontiers(cloud, frontiers_);
-    computeSparseFrontiers(archived_cloud, archived_frontiers_);
+    computeSparseFrontiers(cloud, config.compute_frontier_shape, tsdf, frontiers_);
+    computeSparseFrontiers(
+        archived_cloud, config.compute_frontier_shape, tsdf, archived_frontiers_);
   }
+
   archived_places_.clear();
 }
 
@@ -472,46 +498,42 @@ void FrontierExtractor::addFrontiers(uint64_t timestamp_ns,
   nodes_to_remove_.clear();
 
   // Add non-archived frontiers and save their node ids for removing
-  for (size_t ix = 0; ix < frontiers_.size(); ++ix) {
-    finder.find(
-        std::get<0>(frontiers_.at(ix)), 1, false, [&](NodeId place_id, size_t, double) {
-          PlaceNodeAttributes::Ptr attrs(new PlaceNodeAttributes(1, 0));
-          attrs->position = std::get<0>(frontiers_.at(ix));
-          attrs->frontier_scale = std::get<1>(frontiers_.at(ix));
-          attrs->orientation = std::get<2>(frontiers_.at(ix));
-          attrs->num_frontier_voxels = std::get<3>(frontiers_.at(ix));
-          attrs->real_place = false;
-          attrs->need_cleanup = true;
-          attrs->last_update_time_ns = timestamp_ns;
-          attrs->is_active = false;
-          attrs->active_frontier = true;
-          graph.emplaceNode(DsgLayers::PLACES, next_node_id_, std::move(attrs));
-          graph.insertEdge(place_id, next_node_id_);
-        });
+  for (auto& frontier : frontiers_) {
+    finder.find(frontier.center, 1, false, [&](NodeId place_id, size_t, double) {
+      PlaceNodeAttributes::Ptr attrs(new PlaceNodeAttributes(1, 0));
+      attrs->position = frontier.center;
+      attrs->frontier_scale = frontier.scale;
+      attrs->orientation = frontier.orientation;
+      attrs->num_frontier_voxels = frontier.num_frontier_voxels;
+      attrs->real_place = false;
+      attrs->need_cleanup = true;
+      attrs->last_update_time_ns = timestamp_ns;
+      attrs->is_active = false;
+      attrs->active_frontier = true;
+      graph.emplaceNode(DsgLayers::PLACES, next_node_id_, std::move(attrs));
+      graph.insertEdge(place_id, next_node_id_);
+    });
 
-    nodes_to_remove_.push_back({next_node_id_, BlockIndex()});
+    nodes_to_remove_.push_back({next_node_id_, frontier.block_index});
     ++next_node_id_;
   }
 
   // Add archived frontiers
-  for (size_t ix = 0; ix < archived_frontiers_.size(); ++ix) {
-    finder.find(std::get<0>(archived_frontiers_.at(ix)),
-                1,
-                false,
-                [&](NodeId place_id, size_t, double) {
-                  PlaceNodeAttributes::Ptr attrs(new PlaceNodeAttributes(1, 0));
-                  attrs->position = std::get<0>(archived_frontiers_.at(ix));
-                  attrs->frontier_scale = std::get<1>(archived_frontiers_.at(ix));
-                  attrs->orientation = std::get<2>(archived_frontiers_.at(ix));
-                  attrs->num_frontier_voxels = std::get<3>(archived_frontiers_.at(ix));
-                  attrs->real_place = false;
-                  attrs->need_cleanup = true;
-                  attrs->last_update_time_ns = timestamp_ns;
-                  attrs->is_active = false;
-                  attrs->active_frontier = false;
-                  graph.emplaceNode(DsgLayers::PLACES, next_node_id_, std::move(attrs));
-                  graph.insertEdge(place_id, next_node_id_);
-                });
+  for (auto& frontier : archived_frontiers_) {
+    finder.find(frontier.center, 1, false, [&](NodeId place_id, size_t, double) {
+      PlaceNodeAttributes::Ptr attrs(new PlaceNodeAttributes(1, 0));
+      attrs->position = frontier.center;
+      attrs->frontier_scale = frontier.scale;
+      attrs->orientation = frontier.orientation;
+      attrs->num_frontier_voxels = frontier.num_frontier_voxels;
+      attrs->real_place = false;
+      attrs->need_cleanup = true;
+      attrs->last_update_time_ns = timestamp_ns;
+      attrs->is_active = false;
+      attrs->active_frontier = false;
+      graph.emplaceNode(DsgLayers::PLACES, next_node_id_, std::move(attrs));
+      graph.insertEdge(place_id, next_node_id_);
+    });
     ++next_node_id_;
   }
 }
@@ -544,6 +566,7 @@ void declare_config(FrontierExtractor::Config& config) {
   field(config.recent_block_distance, "recent_block_distance");
   field(config.minimum_relative_z, "minimum_relative_z");
   field(config.maximum_relative_z, "maximum_relative_z");
+  field(config.compute_frontier_shape, "compute_frontier_shape");
 }
 
 }  // namespace hydra

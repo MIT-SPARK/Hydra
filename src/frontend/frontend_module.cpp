@@ -453,6 +453,7 @@ void FrontendModule::updateFrontiers(const ReconstructionOutput& input) {
     {  // start timing scope
       ScopedTimer timer("frontend/frontiers", input.timestamp_ns, true, 1, false);
       NodeIdSet active_nodes = freespace_places_->getActiveNodes();
+
       const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
       places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
 
