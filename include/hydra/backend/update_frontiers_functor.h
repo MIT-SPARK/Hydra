@@ -38,7 +38,15 @@
 namespace hydra {
 
 struct UpdateFrontiersFunctor : public UpdateFunctor {
-  UpdateFrontiersFunctor() {}
+  struct Config {
+    //! Frontiers with in this distance of the robot will be checked against places for
+    //! potential removal
+    double frontier_removal_check_threshold = 4;
+    //! Frontiers within this distance of the robot will be removed
+    double frontier_removal_threshold = 1;
+  } const config;
+
+  UpdateFrontiersFunctor(const Config& config) : config(config) {}
   Hooks hooks() const override;
   MergeList call(const DynamicSceneGraph& unmerged,
                  SharedDsgInfo&,

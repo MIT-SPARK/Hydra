@@ -80,7 +80,22 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns, SharedDsgInfo& dsg) 
       continue;
     }
 
-    if (attrs.need_cleanup) {
+    const auto& prefix = GlobalInfo::instance().getRobotPrefix();
+    const auto& agents = dsg.graph->getLayer(DsgLayers::AGENTS, prefix.key);
+    NodeSymbol pgmo_key(prefix.key, agents.numNodes() - 1);
+    Eigen::Vector3d agent_pos = dsg.graph->getNode(pgmo_key).attributes().position;
+
+    // Some frontiers may end up outside any places even when the environment
+    // is fully explored, because the places aren't infinitely dense. If the
+    // robot gets close enough to these frontiers, we clear them.
+    if ((agent_pos - attrs.position).norm() < config.frontier_removal_threshold) {
+      nodes_to_remove.insert(id_node_pair.first);
+      continue;
+    }
+
+    bool close_to_robot =
+        (agent_pos - attrs.position).norm() < config.frontier_removal_check_threshold;
+    if (attrs.need_cleanup || close_to_robot) {
       attrs.need_cleanup = false;
       std::vector<std::pair<Eigen::Vector3d, double>> nearest_places;
       place_finder->findRadius(
@@ -96,19 +111,18 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns, SharedDsgInfo& dsg) 
         }
       }
     }
-
-    const auto& prefix = GlobalInfo::instance().getRobotPrefix();
-    const auto& agents = dsg.graph->getLayer(DsgLayers::AGENTS, prefix.key);
-    NodeSymbol pgmo_key(prefix.key, agents.numNodes() - 1);
-    Eigen::Vector3d agent_pos = dsg.graph->getNode(pgmo_key).attributes().position;
-    if ((agent_pos - attrs.position).norm() < 4) {
-      nodes_to_remove.insert(id_node_pair.first);
-    }
   }
 
   for (const auto nid : nodes_to_remove) {
     dsg.graph->removeNode(nid);
   }
+}
+
+void declare_config(UpdateFrontiersFunctor::Config& config) {
+  using namespace config;
+  name("FrontierConfig");
+  field(config.frontier_removal_threshold, "frontier_removal_threshold");
+  field(config.frontier_removal_check_threshold, "frontier_removal_check_threshold");
 }
 
 }  // namespace hydra

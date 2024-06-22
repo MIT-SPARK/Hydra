@@ -44,6 +44,7 @@
 
 #include "hydra/backend/merge_tracker.h"
 #include "hydra/backend/pgmo_configs.h"
+#include "hydra/backend/update_frontiers_functor.h"
 #include "hydra/backend/update_surface_places_functor.h"
 #include "hydra/common/common.h"
 #include "hydra/common/module.h"
@@ -106,6 +107,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
     bool zmq_send_mesh = true;
     bool use_2d_places = false;
     Update2dPlacesFunctor::Config places2d_config;
+    UpdateFrontiersFunctor::Config frontier_config;
     std::vector<Sink::Factory> sinks;
   } const config;
 
