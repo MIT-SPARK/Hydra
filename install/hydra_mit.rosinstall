@@ -17,10 +17,6 @@
     local-name: glog_catkin
     uri: git@github.com:ethz-asl/glog_catkin.git
 - git:
-    local-name: gtsam
-    uri: git@github.com:borglab/gtsam.git
-    version: 4.2
-- git:
     local-name: hydra_ros
     uri: git@github.mit.edu:SPARK/Hydra-ROS.git
     version: develop
@@ -54,7 +50,7 @@
     uri: git@github.com:MIT-SPARK/TEASER-plusplus.git
 - git:
     local-name: spatial_hash
-    uri: git@github.mit.edu:SPARK/Spatial-Hash.git
+    uri: git@github.com:MIT-SPARK/Spatial-Hash.git
 - git:
     local-name: voxblox
     uri: git@github.com:MIT-SPARK/voxblox.git
