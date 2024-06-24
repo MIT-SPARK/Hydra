@@ -33,7 +33,7 @@
 #
 #
 """Module containing python utilites for loading a valid config."""
-from hydra_python._hydra_bindings import PythonConfig
+from hydra_python._hydra_bindings import PythonConfig, PythonCamera
 from typing import Dict, Any
 import pathlib
 import click
@@ -62,9 +62,22 @@ def get_config_path(dataset=None):
     raise RuntimeError("invalid config path")
 
 
+def create_camera(camera_info: Dict[str, Any]):
+    """Make a camera."""
+    camera = PythonCamera()
+    camera.intrinsics.min_range = 0.1
+    camera.intrinsics.max_range = 5.0
+    camera.intrinsics.width = camera_info.get("width")
+    camera.intrinsics.height = camera_info.get("height")
+    camera.intrinsics.fx = camera_info.get("fx")
+    camera.intrinsics.fy = camera_info.get("fy")
+    camera.intrinsics.cx = camera_info.get("cx")
+    camera.intrinsics.cy = camera_info.get("cy")
+    return camera
+
+
 def load_configs(
     dataset_name: str,
-    camera_info: Dict[str, Any],
     labelspace_name: str = "ade20k_mp3d",
     bounding_box_type: str = "AABB",
 ):
@@ -72,7 +85,6 @@ def load_configs(
     Load various configs to construct the Hydra pipeline.
 
     dataset_name: Dataset name to load config from
-    camera_info: Config dictionary for camera
     labelspace_name: Labelspace name to use
     bounding_box_type: Type of bounding box to use
 
@@ -103,17 +115,8 @@ def load_configs(
     pipeline = {
         "frontend": {"type": "FrontendModule"},
         "backend": {"type": "BackendModule"},
-        "reconstruction": {
-            "type": "ReconstructionModule",
-            "sensor": {
-                "type": "camera",
-                "min_range": 0.1,
-                "max_range": 5.0,
-                "extrinsics": {"type": "identity"},
-            },
-        },
+        "reconstruction": {"type": "ReconstructionModule"},
     }
-    pipeline["reconstruction"]["sensor"].update(camera_info)
     configs.add_yaml(yaml.dump(pipeline))
 
     overrides = {
@@ -125,13 +128,11 @@ def load_configs(
         },
     }
     configs.add_yaml(yaml.dump(overrides))
-
     return configs
 
 
 def load_reconstruction_configs(
     dataset_name: str,
-    camera_info: Dict[str, Any],
     labelspace_name: str = "ade20k_mp3d",
     voxel_size: float = 0.1,
     voxels_per_side: int = 16,
@@ -144,7 +145,6 @@ def load_reconstruction_configs(
     Load various configs to configure a reconstruction pipeline.
 
     dataset_name: Dataset name to load config from
-    camera_info: Config dictionary for camera
     labelspace_name: Labelspace name to use
 
     Returns:
@@ -175,12 +175,6 @@ def load_reconstruction_configs(
         "clear_distant_blocks": False,
         "show_stats": False,
         "pose_graphs": {"make_pose_graph": False},
-        "sensor": {
-            "type": "camera",
-            "min_range": 0.1,
-            "max_range": 5.0,
-            "extrinsics": {"type": "identity"},
-        },
         "reconstruction": {
             "map": {
                 "voxel_size": voxel_size,
@@ -189,6 +183,5 @@ def load_reconstruction_configs(
             }
         },
     }
-    pipeline["sensor"].update(camera_info)
     configs.add_yaml(yaml.dump(pipeline))
     return configs

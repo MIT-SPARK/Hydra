@@ -47,6 +47,14 @@ namespace python {
 
 class PythonConfig;
 
+struct PythonCamera {
+  PythonCamera();
+  Camera::Config camera;
+  Eigen::Matrix3d body_R_sensor;
+  Eigen::Vector3d body_p_sensor;
+  config::VirtualConfig<Sensor> sensor() const;
+};
+
 class HydraPythonPipeline : public HydraPipeline {
  public:
   using PositionMatrix = FrontendModule::PositionMatrix;
@@ -58,7 +66,7 @@ class HydraPythonPipeline : public HydraPipeline {
 
   virtual ~HydraPythonPipeline();
 
-  void initPython(const PythonConfig& config);
+  void initPython(const PythonConfig& config, const PythonCamera& camera);
 
   void start() override;
 

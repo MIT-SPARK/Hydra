@@ -802,9 +802,9 @@ void FrontendModule::updatePlaceMeshMapping(const ReconstructionOutput& input) {
   PlaceMeshConnector connector(last_mesh_update_);
   const auto num_missing = connector.addConnections(places, deformation_mapping);
 
-  LOG_IF(ERROR, num_missing > 0)
-      << "[Frontend] " << num_missing << " places missing basis points @ "
-      << input.timestamp_ns << " [ns]";
+  VLOG_IF(1, num_missing > 0) << "[Frontend] " << num_missing
+                              << " places missing basis points @ " << input.timestamp_ns
+                              << " [ns]";
 }
 
 }  // namespace hydra

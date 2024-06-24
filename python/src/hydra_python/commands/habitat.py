@@ -76,9 +76,7 @@ def run(
         click.secho("Cannot publish and visualize graph.")
         return False
 
-    configs = hydra.load_configs(
-        "habitat", data.camera_info, labelspace_name=label_space
-    )
+    configs = hydra.load_configs("habitat", labelspace_name=label_space)
     if not configs:
         click.secho(
             f"Invalid config: dataset 'habitat' and label space '{label_space}'",
@@ -96,7 +94,7 @@ def run(
     pipeline = hydra.HydraPipeline(
         pipeline_config, robot_id=0, config_verbosity=config_verbosity
     )
-    pipeline.init(configs)
+    pipeline.init(configs, hydra.create_camera(data.camera_info))
     if output_path:
         glog_dir = output_path / "logs"
         if not glog_dir.exists():

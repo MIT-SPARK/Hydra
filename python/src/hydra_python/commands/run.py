@@ -91,9 +91,7 @@ def _load_data(data_path):
 def _load_pipeline(
     data, config_name, label_space, output_path=None, config_verbosity=0
 ):
-    configs = hydra.load_configs(
-        config_name, data.camera_info, labelspace_name=label_space
-    )
+    configs = hydra.load_configs(config_name, labelspace_name=label_space)
     if not configs:
         click.secho(
             f"Invalid config: dataset '{config_name}' and label space '{label_space}'",
@@ -119,7 +117,7 @@ def _load_pipeline(
     pipeline = hydra.HydraPipeline(
         pipeline_config, robot_id=0, config_verbosity=config_verbosity
     )
-    pipeline.init(configs)
+    pipeline.init(configs, hydra.create_camera(data.camera_info))
     if output_path:
         glog_dir = output_path / "logs"
         if not glog_dir.exists():

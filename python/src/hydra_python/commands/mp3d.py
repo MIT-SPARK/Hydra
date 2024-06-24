@@ -106,7 +106,7 @@ def run_dataset(mp3d_path, output, show_images):
 def run_batch(input_paths, verbosity):
     """Make scene graphs from reconstructed information."""
     hydra.set_glog_level(0, verbosity)
-    configs = hydra.load_configs("habitat", {}, labelspace_name="ade20k_mp3d")
+    configs = hydra.load_configs("habitat", labelspace_name="ade20k_mp3d")
     if not configs:
         click.secho(
             "Invalid config: dataset 'habitat' and label space 'ade20k_mp3d'",

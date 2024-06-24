@@ -34,14 +34,15 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/bindings/hydra_python_pipeline.h"
 
-#include <config_utilities/config.h>
 #include <config_utilities/formatting/asl.h>
 #include <config_utilities/logging/log_to_glog.h>
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/validation.h>
 #include <hydra/backend/backend_module.h>
 #include <hydra/common/global_info.h>
+#include <hydra/frontend/gvd_place_extractor.h>
 #include <hydra/loop_closure/loop_closure_module.h>
+#include <hydra/places/compression_graph_extractor.h>
 #include <hydra/reconstruction/reconstruction_module.h>
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h>
@@ -55,6 +56,20 @@
 
 namespace hydra::python {
 
+PythonCamera::PythonCamera()
+    : body_R_sensor(Eigen::Matrix3d::Identity()),
+      body_p_sensor(Eigen::Vector3d::Zero()) {}
+
+config::VirtualConfig<Sensor> PythonCamera::sensor() const {
+  ParamSensorExtrinsics::Config extrinsics_config;
+  extrinsics_config.body_R_sensor = body_R_sensor;
+  extrinsics_config.body_p_sensor = body_p_sensor;
+  Camera::Config camera_config = camera;
+  camera_config.extrinsics = extrinsics_config;
+  config::VirtualConfig<Sensor> to_return(camera_config);
+  return to_return;
+}
+
 HydraPythonPipeline::HydraPythonPipeline(const PipelineConfig& config,
                                          int robot_id,
                                          int config_verbosity,
@@ -62,20 +77,23 @@ HydraPythonPipeline::HydraPythonPipeline(const PipelineConfig& config,
     : HydraPipeline(config, robot_id, config_verbosity),
       step_mode_only_(step_mode_only) {
   GlogSingleton::instance().setLogLevel(0, 0, false);
-  //config::Settings().setLogger("glog");
   config::Settings().print_width = 100;
   config::Settings().print_indent = 45;
 }
 
 HydraPythonPipeline::~HydraPythonPipeline() {}
 
-void HydraPythonPipeline::initPython(const PythonConfig& config) {
+void HydraPythonPipeline::initPython(const PythonConfig& config,
+                                     const PythonCamera& camera) {
+  std::vector<config::VirtualConfig<Sensor>> sensor_configs{camera.sensor()};
+  GlobalInfo::instance().setSensors(sensor_configs);
+
   const auto& logs = GlobalInfo::instance().getLogs();
   const auto node = config.toYaml();
   frontend_ = config::createFromYamlWithNamespace<FrontendModule>(
       node, "frontend", frontend_dsg_, shared_state_, logs);
   backend_ = config::createFromYamlWithNamespace<BackendModule>(
-      node, "backend", frontend_dsg_, backend_dsg_, shared_state_, logs);
+      node, "backend", backend_dsg_, shared_state_, logs);
   reconstruction_ = config::createFromYamlWithNamespace<ReconstructionModule>(
       node, "reconstruction", frontend_->getQueue());
 
@@ -150,13 +168,29 @@ using namespace pybind11::literals;
 namespace py = pybind11;
 
 void addBindings(pybind11::module_& m) {
+  py::class_<Camera::Config>(m, "CameraConfig")
+      .def_readwrite("min_range", &Camera::Config::min_range)
+      .def_readwrite("max_range", &Camera::Config::max_range)
+      .def_readwrite("width", &Camera::Config::width)
+      .def_readwrite("height", &Camera::Config::height)
+      .def_readwrite("cx", &Camera::Config::cx)
+      .def_readwrite("cy", &Camera::Config::cy)
+      .def_readwrite("fx", &Camera::Config::fx)
+      .def_readwrite("fy", &Camera::Config::fy);
+
+  py::class_<PythonCamera>(m, "PythonCamera")
+      .def(py::init<>())
+      .def_readwrite("intrinsics", &PythonCamera::camera)
+      .def_readwrite("body_R_sensor", &PythonCamera::body_R_sensor)
+      .def_readwrite("body_p_sensor", &PythonCamera::body_p_sensor);
+
   py::class_<HydraPythonPipeline>(m, "HydraPipeline")
       .def(py::init<const PipelineConfig&, int, int, bool>(),
            "config"_a,
            "robot_id"_a = 0,
            "config_verbosity"_a = 0,
            "use_step_mode"_a = true)
-      .def("init", &HydraPythonPipeline::initPython, "config"_a)
+      .def("init", &HydraPythonPipeline::initPython, "config"_a, "camera"_a)
       .def("save", &HydraPythonPipeline::save)
       .def("step",
            [](HydraPythonPipeline& pipeline,
