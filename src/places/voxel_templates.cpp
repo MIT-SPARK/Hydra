@@ -36,6 +36,8 @@
 
 #include <spatial_hash/neighbor_utils.h>
 
+#include "hydra/common/common.h"
+
 namespace hydra::places {
 
 namespace {
@@ -120,7 +122,8 @@ std::bitset<27> CubeFlagExtractor::rotate(const IndexRotation& rotation,
   std::bitset<27> rotated{0};
   rotated.set(0, flags_sh[0]);  // center voxel will always remain the same
   for (size_t i = 0; i < sh_offsets.size(); ++i) {
-    size_t rotated_idx = sh_offset_lookup.at(rotation * sh_offsets[i]);
+    const GlobalIndex rotated_index = rotation * sh_offsets[i];
+    size_t rotated_idx = sh_offset_lookup.at(rotated_index);
     rotated[rotated_idx] = flags_sh[i];
   }
 

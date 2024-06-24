@@ -263,27 +263,27 @@ TEST(VoxelTemplates, CornerDetectionTemplateCorrect) {
   }
 
   {  // x composed with z
-    const auto rotation = rotX() * rotZ();
+    const CubeFlagExtractor::IndexRotation rotation = rotX() * rotZ();
     TEST_CORNER_ROTATION(finder, rotation);
   }
 
   {  // 180 z
-    const auto rotation = rotZ() * rotZ();
+    const CubeFlagExtractor::IndexRotation rotation = rotZ() * rotZ();
     TEST_CORNER_ROTATION(finder, rotation);
   }
 
   {  // 270 z
-    const auto rotation = rotZ() * rotZ() * rotZ();
+    const CubeFlagExtractor::IndexRotation rotation = rotZ() * rotZ() * rotZ();
     TEST_CORNER_ROTATION(finder, rotation);
   }
 
   {  // 180 y
-    const auto rotation = rotY() * rotY();
+    const CubeFlagExtractor::IndexRotation rotation = rotY() * rotY();
     TEST_CORNER_ROTATION(finder, rotation);
   }
 
   {  // 270 y
-    const auto rotation = rotY() * rotY() * rotY();
+    const CubeFlagExtractor::IndexRotation rotation = rotY() * rotY() * rotY();
     TEST_CORNER_ROTATION(finder, rotation);
   }
 }
