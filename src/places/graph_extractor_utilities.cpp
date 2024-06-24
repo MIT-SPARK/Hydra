@@ -45,13 +45,6 @@ using Components = std::vector<std::vector<NodeId>>;
 
 namespace {
 
-inline bool isValidPoint(const GvdVoxel* voxel, uint8_t min_extra_basis) {
-  if (!voxel) {
-    return false;
-  }
-  return voxel->num_extra_basis >= min_extra_basis;
-}
-
 inline double getNodeGvdDistance(const SceneGraphLayer& graph, NodeId node) {
   return graph.getNode(node).attributes<PlaceNodeAttributes>().distance;
 }
@@ -69,117 +62,6 @@ void sortComponents(const SceneGraphLayer& graph, Components& to_sort) {
 }
 
 }  // namespace
-
-std::bitset<27> convertRowMajorFlags(std::bitset<27> flags_row_major) {
-  std::bitset<27> flags_neighborhood{0};
-  const spatial_hash::NeighborSearch search(26);
-  const auto offsets = search.neighborIndices(GlobalIndex::Zero().eval(), true);
-  for (size_t i = 1; i < offsets.size(); ++i) {
-    // x -> y -> z ordering (plus shift from [-1, 1] to [0, 2] to reflect lower corner
-    // origin)
-    size_t row_major_index = 1 * static_cast<size_t>(offsets[i].x() + 1) +
-                             3 * static_cast<size_t>(offsets[i].y() + 1) +
-                             9 * static_cast<size_t>(offsets[i].z() + 1);
-
-    flags_neighborhood.set(i, flags_row_major[26 - row_major_index]);
-  }
-
-  flags_neighborhood.set(0, flags_row_major[13]);
-  return flags_neighborhood;
-}
-
-std::bitset<27> extractNeighborhoodFlags(const GvdLayer& layer,
-                                         const GlobalIndex& index,
-                                         uint8_t min_extra_basis) {
-  // TODO(nathan) this is a lot of memory to keep pushing onto the stack
-  spatial_hash::NeighborSearch search(26);
-  const auto neighbor_indices = search.neighborIndices(index, true);
-
-  std::bitset<27> neighbor_values;
-  for (unsigned int n = 0u; n < neighbor_indices.size(); ++n) {
-    const GvdVoxel* voxel = layer.getVoxelPtr(neighbor_indices[n]);
-    neighbor_values.set(n, isValidPoint(voxel, min_extra_basis));
-  }
-  return neighbor_values;
-}
-
-// by default, a template only passes if all points in the 3x3 cube are voronoi
-GvdCornerTemplate::GvdCornerTemplate() : fg_mask(0x7FFF'FFFF) {
-  unused_mask_array = MaskArray{0, 0, 0, 0};
-}
-
-GvdCornerTemplate::GvdCornerTemplate(std::bitset<27> fg_mask_rm,
-                                     GvdCornerTemplate::MaskArray unused_mask_rm)
-    : fg_mask(convertRowMajorFlags(fg_mask_rm)) {
-  for (size_t i = 0; i < 4; ++i) {
-    unused_mask_array[i] = convertRowMajorFlags(unused_mask_rm[i]);
-  }
-}
-
-std::ostream& operator<<(std::ostream& out, const GvdCornerTemplate& corner_template) {
-  out << "Foreground / Background mask: " << std::endl;
-  out << "  - " << corner_template.fg_mask << std::endl;
-  out << "Unused mask: " << std::endl;
-  out << "  -   0 degrees: " << corner_template.unused_mask_array[0] << std::endl;
-  out << "  -  90 degrees: " << corner_template.unused_mask_array[1] << std::endl;
-  out << "  - 180 degrees: " << corner_template.unused_mask_array[2] << std::endl;
-  out << "  - 270 degrees: " << corner_template.unused_mask_array[3] << std::endl;
-  return out;
-}
-
-CornerFinder::CornerFinder() {
-  // format for each template is {fg_mask, {0, 90, 180, 270}} where 0, 90, 180, and 270
-  // represent rotations of the unused_mask around the current axis of the corresponding
-  // amount of degrees (following the right-hand rule around the axis described by the
-  // fg_mask template).
-  // for the actual bitset values: we follow a row-major layout (matrix "shape" z, y, x)
-  // where 9 * z + 3 * y + x gives the index of the bit that describes that voxel. This
-  // means that you can read each mask as a group of 9 "vectors" in three groups: the
-  // slices z=0, z=1, and z=2 where each vector points along the x-axis. The first
-  // "vector" starts at the lower left corner of the 3x3x3 grid and ends at the lower
-  // right corner.
-  negative_x_template = {0b000'000'000'000'110'000'000'000'000,
-                         ///////////  unused masks ////////////
-                         {0b000'110'110'000'000'110'000'000'000,
-                          0b110'110'000'110'000'000'000'000'000,
-                          0b000'000'000'110'000'000'110'110'000,
-                          0b000'000'000'000'000'110'000'110'110}};
-
-  positive_x_template = {0b000'000'000'000'011'000'000'000'000,
-                         ///////////  unused masks ////////////
-                         {0b000'011'011'000'000'011'000'000'000,
-                          0b000'000'000'000'000'011'000'011'011,
-                          0b000'000'000'011'000'000'011'011'000,
-                          0b011'011'000'011'000'000'000'000'000}};
-
-  negative_y_template = {0b000'000'000'010'010'000'000'000'000,
-                         ///////////  unused masks ////////////
-                         {0b110'110'000'100'100'000'000'000'000,
-                          0b011'011'000'001'001'000'000'000'000,
-                          0b000'000'000'001'001'000'011'011'000,
-                          0b000'000'000'100'100'000'110'110'000}};
-
-  positive_y_template = {0b000'000'000'000'010'010'000'000'000,
-                         ///////////  unused masks ////////////
-                         {0b000'011'011'000'001'001'000'000'000,
-                          0b000'110'110'000'100'100'000'000'000,
-                          0b000'000'000'000'100'100'000'110'110,
-                          0b000'000'000'000'001'001'000'011'011}};
-
-  negative_z_template = {0b000'010'000'000'010'000'000'000'000,
-                         ///////////  unused masks ////////////
-                         {0b000'001'011'000'001'011'000'000'000,
-                          0b011'001'000'011'001'000'000'000'000,
-                          0b110'100'000'110'100'000'000'000'000,
-                          0b000'100'110'000'100'110'000'000'000}};
-
-  positive_z_template = {0b000'000'000'000'010'000'000'010'000,
-                         ///////////  unused masks ////////////
-                         {0b000'000'000'000'100'110'000'100'110,
-                          0b000'000'000'110'100'000'110'100'000,
-                          0b000'000'000'011'001'000'011'001'000,
-                          0b000'000'000'000'001'011'000'001'011}};
-}
 
 // implementation loosely based on: https://gist.github.com/yamamushi/5823518
 GlobalIndices makeBresenhamLine(const GlobalIndex& start, const GlobalIndex& end) {

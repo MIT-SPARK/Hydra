@@ -36,40 +36,73 @@
 #include <bitset>
 #include <iostream>
 
-#include "hydra/common/dsg_types.h"
-#include "hydra/places/graph_extractor_config.h"
 #include "hydra/places/gvd_voxel.h"
-#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::places {
 
-using EdgeInfoMap = std::map<EdgeKey, EdgeAttributes::Ptr>;
-using NodeIndexMap = std::unordered_map<NodeId, GlobalIndex>;
+struct CubeFlagExtractor {
+  using IndexRotation = Eigen::Matrix<int, 3, 3>;
+  /**
+   * @brief Convert a 3x3 grid of voxels from row-major order to the offset iteration
+   * order of spatial_hash
+   */
+  static std::bitset<27> fromRowMajor(const std::bitset<27>& flags_row_major);
+  /**
+   * @brief Convert a 3x3 grid of voxels from the offset iteration
+   * order of spatial_hash to row-major order
+   */
+  static std::bitset<27> toRowMajor(const std::bitset<27>& flags_sh);
+  /**
+   * @brief Extract a 3x3 grid of voxels in the offset iteration
+   * order of spatial_hash
+   */
+  static std::bitset<27> extract(const GvdLayer& layer,
+                                 const GlobalIndex& index,
+                                 uint8_t min_extra_basis = 1);
 
-GlobalIndices makeBresenhamLine(const GlobalIndex& start, const GlobalIndex& end);
+  /**
+   * @brief Rotate a 3x3 grid of voxels in the offset iteration order of spatial_hash by
+   * a permutation matrix
+   */
+  static std::bitset<27> rotate(const IndexRotation& rotation,
+                                const std::bitset<27>& flags_sh);
 
-EdgeAttributes::Ptr getOverlapEdgeInfo(const SceneGraphLayer& graph,
-                                       NodeId node,
-                                       NodeId neighbor,
-                                       double min_edge_clearance_m);
+  /**
+   * @brief Offset iteration order
+   */
+  const static std::vector<GlobalIndex> sh_offsets;
+  const static spatial_hash::IndexHashMap<size_t> sh_offset_lookup;
+};
 
-EdgeAttributes::Ptr getFreespaceEdgeInfo(const SceneGraphLayer& graph,
-                                         const GvdLayer& gvd,
-                                         const NodeIndexMap& node_index_map,
-                                         NodeId node,
-                                         NodeId other,
-                                         double min_edge_clearance_m);
+struct GvdCornerTemplate {
+  using MaskArray = std::array<std::bitset<27>, 4>;
 
-void findOverlapEdges(const OverlapEdgeConfig& config,
-                      const SceneGraphLayer& graph,
-                      const std::unordered_set<NodeId> active_nodes,
-                      EdgeInfoMap& proposed_edges);
+  GvdCornerTemplate();
 
-void findFreespaceEdges(const FreespaceEdgeConfig& config,
-                        const SceneGraphLayer& graph,
-                        const GvdLayer& gvd,
-                        const std::unordered_set<NodeId>& nodes,
-                        const NodeIndexMap& node_index_map,
-                        EdgeInfoMap& proposed_edges);
+  GvdCornerTemplate(std::bitset<27> fg_mask_row_major,
+                    MaskArray unused_mask_array_row_major);
+
+  bool matches(std::bitset<27> state) const;
+
+  std::bitset<27> fg_mask;
+  MaskArray unused_mask_array;
+};
+
+std::ostream& operator<<(std::ostream& out, const GvdCornerTemplate& corner_template);
+
+struct CornerFinder {
+  CornerFinder();
+
+  ~CornerFinder() = default;
+
+  bool match(std::bitset<27> values) const;
+
+  GvdCornerTemplate negative_x_template;
+  GvdCornerTemplate positive_x_template;
+  GvdCornerTemplate negative_y_template;
+  GvdCornerTemplate positive_y_template;
+  GvdCornerTemplate negative_z_template;
+  GvdCornerTemplate positive_z_template;
+};
 
 }  // namespace hydra::places

@@ -36,6 +36,7 @@ add_executable(
   places/test_graph_extractor_utilities.cpp
   places/test_gvd_integrator.cpp
   places/test_gvd_utilities.cpp
+  places/test_voxel_templates.cpp
   reconstruction/test_marching_cubes.cpp
   reconstruction/test_reconstruction_module.cpp
   reconstruction/test_semantic_integrator.cpp

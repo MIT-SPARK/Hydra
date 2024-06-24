@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/places/floodfill_graph_extractor.h>
+#include <hydra/places/graph_extractor_utilities.h>
 
 namespace hydra::places {
 

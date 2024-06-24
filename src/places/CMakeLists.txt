@@ -15,4 +15,5 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/nearest_voxel_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/robot_footprint_integrator.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_statistics.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/voxel_templates.cpp
 )

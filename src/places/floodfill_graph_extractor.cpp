@@ -591,13 +591,8 @@ bool FloodfillGraphExtractor::isVertex(const GvdLayer& layer,
     return true;
   }
 
-  std::bitset<27> gvd_flags =
-      extractNeighborhoodFlags(layer, index, config_.min_extra_basis);
-  if (corner_finder_.match(gvd_flags)) {
-    return true;
-  }
-
-  return false;
+  auto gvd_flags = CubeFlagExtractor::extract(layer, index, config_.min_extra_basis);
+  return corner_finder_.match(gvd_flags);
 }
 
 }  // namespace hydra::places

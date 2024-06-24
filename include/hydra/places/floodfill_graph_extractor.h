@@ -39,8 +39,8 @@
 
 #include "hydra/common/dsg_types.h"
 #include "hydra/places/graph_extractor_interface.h"
-#include "hydra/places/graph_extractor_utilities.h"
 #include "hydra/places/gvd_voxel.h"
+#include "hydra/places/voxel_templates.h"
 #include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::places {
