@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <KimeraRPGO/SolverParams.h>
-#include <kimera_pgmo/KimeraPgmoInterface.h>
+#include <kimera_pgmo/kimera_pgmo_interface.h>
 
 namespace hydra {
 
@@ -55,9 +55,3 @@ struct HydraPgmoConfig : public kimera_pgmo::KimeraPgmoConfig {
 void declare_config(HydraPgmoConfig& conf);
 
 }  // namespace hydra
-
-namespace kimera_pgmo {
-
-void declare_config(KimeraPgmoConfig& conf);
-
-}  // namespace kimera_pgmo

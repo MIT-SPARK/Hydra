@@ -40,8 +40,8 @@
 #include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <kimera_pgmo/utils/MeshIO.h>
-#include <spark_dsg/pgmo_mesh_traits.h>
+#include <kimera_pgmo/mesh_delta.h>
+#include <kimera_pgmo/utils/mesh_io.h>
 #include <spark_dsg/scene_graph_types.h>
 #include <spark_dsg/zmq_interface.h>
 
@@ -55,8 +55,8 @@
 #include "hydra/common/global_info.h"
 #include "hydra/rooms/room_finder.h"
 #include "hydra/utils/minimum_spanning_tree.h"
+#include "hydra/utils/pgmo_mesh_traits.h"
 #include "hydra/utils/timing_utilities.h"
-#include "kimera_pgmo/MeshDelta.h"
 
 namespace hydra {
 
@@ -64,8 +64,7 @@ using hydra::timing::ScopedTimer;
 using kimera_pgmo::DeformationGraph;
 using kimera_pgmo::DeformationGraphPtr;
 using kimera_pgmo::KimeraPgmoInterface;
-using kimera_pgmo::KimeraPgmoMesh;
-using pose_graph_tools_msgs::PoseGraph;
+using pose_graph_tools::PoseGraph;
 
 void declare_config(BackendModule::Config& config) {
   using namespace config;
@@ -108,10 +107,7 @@ BackendModule::BackendModule(const Config& config,
       config(config::checkValid(config)),
       private_dsg_(dsg),
       state_(state) {
-  KimeraPgmoInterface::config_ = config.pgmo;
-  KimeraPgmoInterface::config_.valid = config::isValid(config.pgmo);
-
-  if (!KimeraPgmoInterface::initializeFromConfig()) {
+  if (!KimeraPgmoInterface::initialize(config.pgmo)) {
     throw std::runtime_error("invalid pgmo config");
   }
 
@@ -383,7 +379,7 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
 
   try {
     processIncrementalMeshGraph(
-        input.deformation_graph, timestamps_, &unconnected_nodes_);
+        *input.deformation_graph, timestamps_, unconnected_nodes_);
   } catch (const gtsam::ValuesKeyDoesNotExist& e) {
     LOG(ERROR) << *input.deformation_graph;
     throw std::logic_error(e.what());
@@ -394,7 +390,7 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
 
     VLOG(5) << "[Hydra Backend] Adding pose graph message: "
             << utils::logPoseGraphConnections(*msg);
-    processIncrementalPoseGraph(msg, &trajectory_, &unconnected_nodes_, &timestamps_);
+    processIncrementalPoseGraph(*msg, trajectory_, timestamps_, unconnected_nodes_);
     logIncrementalLoopClosures(*msg);
   }
 
@@ -552,10 +548,10 @@ void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
     for (const auto& edge : mst_info.edges) {
       gtsam::Pose3 source(gtsam::Rot3(), places.getPosition(edge.source));
       gtsam::Pose3 target(gtsam::Rot3(), places.getPosition(edge.target));
-      pose_graph_tools_msgs::PoseGraphEdge mst_e;
+      pose_graph_tools::PoseGraphEdge mst_e;
       mst_e.key_from = edge.source;
       mst_e.key_to = edge.target;
-      mst_e.pose = kimera_pgmo::GtsamToRos(source.between(target));
+      mst_e.pose = source.between(target).matrix();
       mst_edges.edges.push_back(mst_e);
     }
     deformation_graph_->addNewTempEdges(mst_edges, config.pgmo.place_edge_variance);
@@ -657,14 +653,14 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
 }
 
 void BackendModule::updateAgentNodeMeasurements(
-    const pose_graph_tools_msgs::PoseGraph& meas) {
+    const pose_graph_tools::PoseGraph& meas) {
   deformation_graph_->removePriorsWithPrefix(
       GlobalInfo::instance().getRobotPrefix().key);
   std::vector<std::pair<gtsam::Key, gtsam::Pose3>> agent_measurements;
   for (const auto& node : meas.nodes) {
     agent_measurements.push_back(
         {gtsam::Symbol(GlobalInfo::instance().getRobotPrefix().key, node.key),
-         kimera_pgmo::RosToGtsam(node.pose)});
+         gtsam::Pose3(node.pose.matrix())});
   }
   deformation_graph_->addNodeMeasurements(agent_measurements);
 }
@@ -807,12 +803,12 @@ void BackendModule::logStatus(bool init) const {
 
 void BackendModule::logIncrementalLoopClosures(const PoseGraph& msg) {
   for (const auto& edge : msg.edges) {
-    if (edge.type != pose_graph_tools_msgs::PoseGraphEdge::LOOPCLOSE) {
+    if (edge.type != pose_graph_tools::PoseGraphEdge::LOOPCLOSE) {
       continue;
     }
 
     const auto& prefix = GlobalInfo::instance().getRobotPrefix();
-    gtsam::Pose3 pose = kimera_pgmo::RosToGtsam(edge.pose);
+    const gtsam::Pose3 pose(edge.pose.matrix());
     const gtsam::Symbol src_key(prefix.key, edge.key_from);
     const gtsam::Symbol dest_key(prefix.key, edge.key_to);
     // note that pose graph convention is pose = src.between(dest) where the edge

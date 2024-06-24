@@ -37,28 +37,24 @@
 
 namespace hydra {
 
-PgmoMeshInterface::PgmoMeshInterface(const MeshLayer& mesh) : mesh_(mesh) {
-  block_indices.reserve(mesh.numBlocks());
-  // TODO(lschmid): Ugly hard copy for now.
-  for (const auto& block_idx : mesh.allocatedBlockIndices()) {
-    block_indices.push_back(block_idx.cast<voxblox::BlockIndex::Scalar>());
-  }
+PgmoMeshLayerInterface::PgmoMeshLayerInterface(const MeshLayer& mesh) : mesh_(mesh) {
+  block_indices_ = mesh.allocatedBlockIndices();
 }
 
-const voxblox::BlockIndexList& PgmoMeshInterface::blockIndices() const {
-  return block_indices;
+const BlockIndices& PgmoMeshLayerInterface::blockIndices() const {
+  return block_indices_;
 }
 
-void PgmoMeshInterface::markBlockActive(const voxblox::BlockIndex& block) {
-  active_mesh_ = mesh_.getBlockPtr(block.cast<BlockIndex::Scalar>());
+void PgmoMeshLayerInterface::markBlockActive(const BlockIndex& block) const {
+  active_mesh_ = mesh_.getBlockPtr(block);
 }
 
-size_t PgmoMeshInterface::activeBlockSize() const {
+size_t PgmoMeshLayerInterface::activeBlockSize() const {
   // Assumes we mark the active block first.
   return active_mesh_->points.size();
 }
 
-pcl::PointXYZRGBA PgmoMeshInterface::getActiveVertex(size_t index) const {
+pcl::PointXYZRGBA PgmoMeshLayerInterface::getActiveVertex(size_t index) const {
   // Assumes we mark the active block first.
   pcl::PointXYZRGBA point;
   const auto& pos = active_mesh_->points[index];
@@ -73,13 +69,61 @@ pcl::PointXYZRGBA PgmoMeshInterface::getActiveVertex(size_t index) const {
   return point;
 };
 
-std::optional<uint32_t> PgmoMeshInterface::getActiveSemantics(size_t index) const {
+std::optional<uint32_t> PgmoMeshLayerInterface::getActiveSemantics(size_t index) const {
   if (index < active_mesh_->labels.size()) {
     return active_mesh_->labels[index];
   }
-  // TODO(lschmid): In the khronos case just hallucinate zero semantics, otherwise
-  // things will break. Fix properly at some point.
-  return 0u;
+  return std::nullopt;
+}
+
+bool PgmoMeshLayerInterface::hasSemantics() const {
+  if (mesh_.numBlocks() == 0) {
+    return false;
+  }
+  return mesh_.begin()->has_labels;
+}
+
+kimera_pgmo::MeshInterface::Ptr PgmoMeshLayerInterface::clone() const {
+  return std::make_shared<PgmoMeshLayerInterface>(*this);
+}
+
+PgmoMeshInterface::PgmoMeshInterface(const Mesh& mesh) : mesh_(mesh) {
+  block_indices_ = {BlockIndex(0, 0, 0)};
+}
+
+const BlockIndices& PgmoMeshInterface::blockIndices() const { return block_indices_; }
+
+size_t PgmoMeshInterface::activeBlockSize() const {
+  // Assumes we mark the active block first.
+  return mesh_.numVertices();
+}
+
+pcl::PointXYZRGBA PgmoMeshInterface::getActiveVertex(size_t index) const {
+  // Assumes we mark the active block first.
+  pcl::PointXYZRGBA point;
+  const auto& pos = mesh_.pos(index);
+  point.x = pos(0);
+  point.y = pos(1);
+  point.z = pos(2);
+  const auto& color = mesh_.color(index);
+  point.r = color.r;
+  point.g = color.g;
+  point.b = color.b;
+  point.a = color.a;
+  return point;
+};
+
+std::optional<uint32_t> PgmoMeshInterface::getActiveSemantics(size_t index) const {
+  if (index < mesh_.labels.size()) {
+    return mesh_.label(index);
+  }
+  return std::nullopt;
+}
+
+bool PgmoMeshInterface::hasSemantics() const { return mesh_.has_labels; }
+
+kimera_pgmo::MeshInterface::Ptr PgmoMeshInterface::clone() const {
+  return std::make_shared<PgmoMeshInterface>(*this);
 }
 
 }  // namespace hydra

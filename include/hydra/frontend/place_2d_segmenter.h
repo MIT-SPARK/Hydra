@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <config_utilities/factory.h>
-#include <kimera_pgmo/MeshDelta.h>
+#include <kimera_pgmo/mesh_delta.h>
 #include <pcl/common/centroid.h>
 
 #include <memory>

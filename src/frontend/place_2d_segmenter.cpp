@@ -38,7 +38,7 @@
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/types/enum.h>
 #include <glog/logging.h>
-#include <kimera_pgmo/MeshDelta.h>
+#include <kimera_pgmo/mesh_delta.h>
 
 #include <memory>
 #define PCL_NO_PRECOMPILE

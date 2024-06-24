@@ -35,7 +35,7 @@
 #include "hydra/frontend/mesh_segmenter.h"
 
 #include <glog/logging.h>
-#include <kimera_pgmo/MeshDelta.h>
+#include <kimera_pgmo/mesh_delta.h>
 #define PCL_NO_PRECOMPILE
 #include <pcl/segmentation/extract_clusters.h>
 #undef PCL_NO_PRECOMPILE

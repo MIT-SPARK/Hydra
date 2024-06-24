@@ -12,7 +12,7 @@ dsg:
   merge_update_dynamic: true
   merge_update_map: {BUILDINGS: false, ROOMS: false, PLACES: true, OBJECTS: false, MESH_PLACES: true}
 pgmo:
-  run_mode: 0    # kimera_pgmo run mode FULL (required)
+  run_mode: FULL    # kimera_pgmo run mode FULL is required
   use_msg_time: true
   embed_trajectory_delta_t: 5.0
   num_interp_pts: 3

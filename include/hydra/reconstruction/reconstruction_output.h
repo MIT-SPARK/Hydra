@@ -54,8 +54,8 @@ struct ReconstructionOutput {
 
   const VolumetricMap& map() const;
   BlockIndices archived_blocks;
-  std::list<pose_graph_tools_msgs::PoseGraph::ConstPtr> pose_graphs;
-  pose_graph_tools_msgs::PoseGraph::ConstPtr agent_node_measurements;
+  std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
+  pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements;
 
   template <typename T = double>
   Eigen::Transform<T, 3, Eigen::Isometry> world_T_body() const {

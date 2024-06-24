@@ -40,7 +40,7 @@
 #include <gtsam/sam/RangeFactor.h>
 #include <gtsam/slam/BoundingConstraint.h>
 #include <gtsam/slam/dataset.h>
-#include <kimera_pgmo/DeformationGraph.h>
+#include <kimera_pgmo/deformation_graph.h>
 #include <spark_dsg/dynamic_scene_graph.h>
 #include <yaml-cpp/yaml.h>
 

@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <config_utilities/factory.h>
-#include <kimera_pgmo/KimeraPgmoInterface.h>
+#include <kimera_pgmo/kimera_pgmo_interface.h>
 #include <spark_dsg/scene_graph_logger.h>
 
 #include <map>
@@ -143,14 +143,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   void addSink(const Sink::Ptr& sink);
 
-  virtual bool initialize(const ros::NodeHandle&) override { return true; }
-
-  virtual bool createPublishers(const ros::NodeHandle&) override { return true; }
-
-  virtual bool registerCallbacks(const ros::NodeHandle&) override { return true; }
-
-  using KimeraPgmoInterface::setVerboseFlag;
-
   void setUpdateFunctor(LayerId layer, const UpdateFunctor::Ptr& functor);
 
  protected:
@@ -173,8 +165,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   virtual void addPlacesToDeformationGraph(size_t timestamp_ns);
 
-  virtual void updateAgentNodeMeasurements(
-      const pose_graph_tools_msgs::PoseGraph& meas);
+  virtual void updateAgentNodeMeasurements(const pose_graph_tools::PoseGraph& meas);
 
   virtual void optimize(size_t timestamp_ns);
 
@@ -194,7 +185,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   void logStatus(bool init = false) const;
 
-  void logIncrementalLoopClosures(const pose_graph_tools_msgs::PoseGraph& msg);
+  void logIncrementalLoopClosures(const pose_graph_tools::PoseGraph& graph);
 
   void labelRooms(const UpdateInfo& info, SharedDsgInfo* dsg);
 

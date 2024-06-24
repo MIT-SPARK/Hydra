@@ -35,11 +35,12 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
 
+#include <atomic>
 #include <thread>
 
-#include "hydra/input/data_receiver.h"
 #include "hydra/common/input_queue.h"
 #include "hydra/common/module.h"
+#include "hydra/input/data_receiver.h"
 #include "hydra/input/input_packet.h"
 
 namespace hydra {

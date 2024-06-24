@@ -37,50 +37,6 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/enum.h>
 
-namespace kimera_pgmo {
-
-void declare_config(KimeraPgmoConfig& config) {
-  using namespace config;
-  name("KimeraPgmoConfig");
-  // TODO(nathan) handle this better
-  enum_field(config.mode,
-             "run_mode",
-             {{RunMode::FULL, "0"}, {RunMode::MESH, "1"}, {RunMode::DPGMO, "2"}});
-  field(config.embed_delta_t, "embed_trajectory_delta_t");
-  field(config.num_interp_pts, "num_interp_pts");
-  field(config.interp_horizon, "interp_horizon");
-  field(config.b_add_initial_prior, "add_initial_prior");
-  field(config.log_path, "output_prefix");
-
-  {  // config namespace covariance
-    NameSpace ns("covariance");
-    field(config.odom_variance, "odom");
-    field(config.lc_variance, "loop_close");
-    field(config.prior_variance, "prior");
-    field(config.mesh_edge_variance, "mesh_mesh");
-    field(config.pose_mesh_variance, "pose_mesh");
-  }  // config namespace covariance
-
-  {  // config namespace rpgo
-    NameSpace ns("rpgo");
-    field(config.odom_trans_threshold, "odom_trans_threshold");
-    field(config.odom_rot_threshold, "odom_rot_threshold");
-    field(config.pcm_trans_threshold, "pcm_trans_threshold");
-    field(config.pcm_rot_threshold, "pcm_rot_threshold");
-    field(config.gnc_alpha, "gnc_alpha");
-    field(config.gnc_max_it, "gnc_max_iterations");
-    field(config.gnc_mu_step, "gnc_mu_step");
-    field(config.gnc_cost_tol, "gnc_cost_tolerance");
-    field(config.gnc_weight_tol, "gnc_weight_tolerance");
-    field(config.gnc_fix_prev_inliers, "gnc_fix_prev_inliers");
-    field(config.lm_diagonal_damping, "lm_diagonal_damping");
-  }  // config namespace rpgo
-
-  // TODO(nathan) handle valid flag
-}
-
-}  // namespace kimera_pgmo
-
 namespace hydra {
 
 void declare_config(HydraPgmoConfig& config) {

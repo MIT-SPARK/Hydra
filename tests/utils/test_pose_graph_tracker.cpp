@@ -39,7 +39,7 @@
 
 namespace hydra {
 
-using pose_graph_tools_msgs::PoseGraph;
+using pose_graph_tools::PoseGraph;
 
 TEST(PoseGraphTracker, EmptyGraphsCorrect) {
   PoseGraphTracker::Config config;

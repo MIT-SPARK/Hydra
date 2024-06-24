@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <kimera_pgmo/MeshDelta.h>
+#include <kimera_pgmo/mesh_delta.h>
 
 #include "hydra/common/dsg_types.h"
 

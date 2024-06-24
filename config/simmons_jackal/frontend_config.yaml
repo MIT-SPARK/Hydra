@@ -2,8 +2,8 @@
 pgmo:
   horizon: 100.0
   track_mesh_graph_mapping: true
-  full_compression_method: 2    # voxel clearing
-  graph_compression_method: 1    # voxblox
+  full_compression_method: VOXEL_CLEARING
+  graph_compression_method: BLOCK
   d_graph_resolution: 2.5
   output_mesh_resolution: 0.005
 objects:

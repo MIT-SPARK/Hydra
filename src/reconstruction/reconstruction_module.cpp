@@ -39,7 +39,6 @@
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/types/eigen_matrix.h>
 #include <config_utilities/validation.h>
-#include <pose_graph_tools_ros/conversions.h>
 
 #include "hydra/common/global_info.h"
 #include "hydra/input/input_conversion.h"
@@ -49,7 +48,7 @@
 
 namespace hydra {
 
-using pose_graph_tools_msgs::PoseGraph;
+using pose_graph_tools::PoseGraph;
 using timing::ScopedTimer;
 
 void declare_config(ReconstructionModule::Config& conf) {

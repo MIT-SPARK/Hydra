@@ -34,34 +34,61 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <kimera_pgmo/utils/MeshInterface.h>
+#include <kimera_pgmo/utils/mesh_interface.h>
 
 #include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra {
 
 /**
- * @brief Wrapper struct for pgmo mesh interface.
- * TODO(lschmid): This pulls in voxblox! Clean up once pgmo is more cleaned up.
+ * @brief Interface for PGMO to access a mesh layer.
  */
-struct PgmoMeshInterface : public kimera_pgmo::MeshInterface {
-  PgmoMeshInterface(const MeshLayer& mesh);
+struct PgmoMeshLayerInterface : public kimera_pgmo::MeshInterface {
+  PgmoMeshLayerInterface(const MeshLayer& mesh);
 
-  const voxblox::BlockIndexList& blockIndices() const override;
+  const BlockIndices& blockIndices() const override;
 
-  void markBlockActive(const voxblox::BlockIndex& block) override;
+  void markBlockActive(const BlockIndex& block) const override;
 
   size_t activeBlockSize() const override;
 
   pcl::PointXYZRGBA getActiveVertex(size_t index) const override;
 
-  bool hasSemantics() const override { return true; }
+  bool hasSemantics() const override;
 
   std::optional<uint32_t> getActiveSemantics(size_t index) const override;
-  private:
-    const MeshLayer& mesh_;
-    voxblox::BlockIndexList block_indices;
-    MeshBlock::ConstPtr active_mesh_;
+
+  kimera_pgmo::MeshInterface::Ptr clone() const override;
+
+ private:
+  const MeshLayer& mesh_;
+  BlockIndices block_indices_;
+  mutable MeshBlock::ConstPtr active_mesh_;
+};
+
+/**
+ * @brief Interface for PGMO to access a spark-dsg mesh.
+ */
+struct PgmoMeshInterface : public kimera_pgmo::MeshInterface {
+  PgmoMeshInterface(const Mesh& mesh);
+
+  const BlockIndices& blockIndices() const override;
+
+  void markBlockActive(const BlockIndex&) const override {}
+
+  size_t activeBlockSize() const override;
+
+  pcl::PointXYZRGBA getActiveVertex(size_t index) const override;
+
+  bool hasSemantics() const override;
+
+  std::optional<uint32_t> getActiveSemantics(size_t index) const override;
+
+  kimera_pgmo::MeshInterface::Ptr clone() const override;
+
+ private:
+  const Mesh& mesh_;
+  BlockIndices block_indices_;
 };
 
 }  // namespace hydra

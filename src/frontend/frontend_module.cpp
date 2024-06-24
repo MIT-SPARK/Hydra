@@ -38,11 +38,9 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <kimera_pgmo/compression/DeltaCompression.h>
-#include <kimera_pgmo/utils/CommonFunctions.h>
-#include <pose_graph_tools_ros/conversions.h>
-#include <spark_dsg/pgmo_mesh_traits.h>
-#include <tf2_eigen/tf2_eigen.h>
+#include <kimera_pgmo/compression/delta_compression.h>
+#include <kimera_pgmo/utils/common_functions.h>
+#include <kimera_pgmo/utils/mesh_io.h>
 
 #include <fstream>
 
@@ -55,27 +53,12 @@
 #include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/pgmo_mesh_interface.h"
+#include "hydra/utils/pgmo_mesh_traits.h"
 #include "hydra/utils/timing_utilities.h"
-
-namespace kimera_pgmo {
-
-void declare_config(kimera_pgmo::MeshFrontendConfig& conf) {
-  using namespace config;
-  name("MeshFrontendConfig");
-  field(conf.time_horizon, "horizon");
-  field(conf.b_track_mesh_graph_mapping, "track_mesh_graph_mapping");
-  field(conf.full_compression_method, "full_compression_method");
-  field(conf.graph_compression_method, "graph_compression_method");
-  field(conf.d_graph_resolution, "d_graph_resolution");
-  field(conf.mesh_resolution, "output_mesh_resolution");
-}
-
-}  // namespace kimera_pgmo
 
 namespace hydra {
 
 using hydra::timing::ScopedTimer;
-using pose_graph_tools_msgs::PoseGraph;
 
 void declare_config(FrontendModule::Config& config) {
   using namespace config;
@@ -83,7 +66,7 @@ void declare_config(FrontendModule::Config& config) {
   field(config.min_object_vertices, "min_object_vertices");
   field(config.min_object_vertices, "min_object_vertices");
   field(config.lcd_use_bow_vectors, "lcd_use_bow_vectors");
-  field(config.pgmo_config, "pgmo");
+  field(config.pgmo, "pgmo");
   field(config.object_config, "objects");
   // surface (i.e., 2D) places
   config.surface_places.setOptional();
@@ -112,7 +95,7 @@ FrontendModule::FrontendModule(const Config& config,
   if (!config.use_frontiers) {
     frontier_places_.reset();
   }
-  kimera_pgmo::MeshFrontendConfig pgmo_config = config.pgmo_config;
+  auto pgmo_config = config.pgmo;
 
   const auto& prefix = GlobalInfo::instance().getRobotPrefix();
   pgmo_config.robot_id = prefix.id;
@@ -141,8 +124,9 @@ FrontendModule::FrontendModule(const Config& config,
     pgmo_config.log_output = false;
   }
 
-  CHECK(mesh_frontend_.initialize(pgmo_config));
-  segmenter_.reset(new MeshSegmenter(config.object_config));
+  mesh_frontend_ = std::make_unique<kimera_pgmo::MeshFrontendInterface>(pgmo_config);
+  CHECK(mesh_frontend_);
+  segmenter_ = std::make_unique<MeshSegmenter>(config.object_config);
 }
 
 FrontendModule::~FrontendModule() {
@@ -371,10 +355,7 @@ void FrontendModule::updateMesh(const ReconstructionOutput& input) {
     VLOG(5) << "[Hydra Frontend] Clearing " << input.archived_blocks.size()
             << " blocks from mesh";
     if (!input.archived_blocks.empty()) {
-      // TODO(lschmid): More voxblox deps pulled in from kimera_pgmo.
-      voxblox::BlockIndexList archived_blocks(input.archived_blocks.begin(),
-                                              input.archived_blocks.end());
-      mesh_compression_->clearArchivedBlocks(archived_blocks);
+      mesh_compression_->clearArchivedBlocks(input.archived_blocks);
     }
   }  // end timing scope
 
@@ -383,10 +364,10 @@ void FrontendModule::updateMesh(const ReconstructionOutput& input) {
   const auto& input_mesh = input.map().getMeshLayer();
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
-    mesh_remapping_.reset(new kimera_pgmo::VoxbloxIndexMapping());
+    mesh_remapping_ = std::make_shared<kimera_pgmo::HashedIndexMapping>();
     auto mesh = getActiveMesh(input_mesh, input.archived_blocks);
     VLOG(5) << "[Hydra Frontend] Updating mesh with " << mesh->numBlocks() << " blocks";
-    auto interface = PgmoMeshInterface(*mesh);
+    auto interface = PgmoMeshLayerInterface(*mesh);
     last_mesh_update_ =
         mesh_compression_->update(interface, input.timestamp_ns, mesh_remapping_.get());
   }  // end timing scope
@@ -430,13 +411,12 @@ void FrontendModule::updateDeformationGraph(const ReconstructionOutput& input) {
     const auto time_ns = std::chrono::nanoseconds(input.timestamp_ns);
     double time_s =
         std::chrono::duration_cast<std::chrono::duration<double>>(time_ns).count();
-    auto interface = PgmoMeshInterface(input.map().getMeshLayer());
-    mesh_frontend_.processMeshGraph(interface, time_s);
+    auto interface = PgmoMeshLayerInterface(input.map().getMeshLayer());
+    mesh_frontend_->update(interface, time_s);
   }  // end timing scope
 
   if (backend_input_) {
-    backend_input_->deformation_graph.reset(new pose_graph_tools_msgs::PoseGraph(
-        mesh_frontend_.getLastProcessedMeshGraph()));
+    backend_input_->deformation_graph = mesh_frontend_->getLastProcessedMeshGraph();
   }
 }
 
@@ -546,13 +526,12 @@ void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
     lcd_input_->new_agent_nodes.clear();
   }
 
-  for (const auto& pose_graph_msg : input.pose_graphs) {
-    if (pose_graph_msg->nodes.empty()) {
+  for (const auto& pose_graph : input.pose_graphs) {
+    if (pose_graph->nodes.empty()) {
       continue;
     }
 
-    const auto pose_graph = pose_graph_tools::fromMsg(*pose_graph_msg);
-    for (const auto& node : pose_graph.nodes) {
+    for (const auto& node : pose_graph->nodes) {
       if (node.key < agents.numNodes()) {
         continue;
       }
@@ -776,7 +755,7 @@ void FrontendModule::updatePlaceMeshMapping(const ReconstructionOutput& input) {
 
   // TODO(nathan) we can maybe put this somewhere else
   const auto num_active = last_mesh_update_->vertex_updates->size();
-  const auto& graph_mapping = mesh_frontend_.getVoxbloxMsgToGraphMapping();
+  const auto& graph_mapping = mesh_frontend_->getVoxbloxMsgToGraphMapping();
   std::vector<size_t> deformation_mapping(num_active,
                                           std::numeric_limits<size_t>::max());
   for (const auto& [block, indices] : *mesh_remapping_) {

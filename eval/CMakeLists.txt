@@ -1,18 +1,14 @@
 find_package(KimeraRPGO REQUIRED)
+find_package(gflags REQUIRED)
 
 add_library(
   ${PROJECT_NAME}_eval
-  src/graph_utilities.cpp
-  src/place_evaluator.cpp
-  src/place_metrics.cpp
-  src/room_evaluator.cpp
-  src/room_io.cpp
-  src/room_metrics.cpp
+  src/graph_utilities.cpp src/place_evaluator.cpp src/place_metrics.cpp
+  src/room_evaluator.cpp src/room_io.cpp src/room_metrics.cpp
 )
 target_include_directories(${PROJECT_NAME}_eval PUBLIC include)
 target_link_libraries(
-  ${PROJECT_NAME}_eval
-  PUBLIC ${PROJECT_NAME}
+  ${PROJECT_NAME}_eval PUBLIC ${PROJECT_NAME} ${gflags_LIBRARIES}
   PRIVATE nanoflann::nanoflann
 )
 
@@ -36,13 +32,8 @@ target_link_libraries(merge_graphs ${PROJECT_NAME}_eval)
 
 if(${HYDRA_ENABLE_ROS_INSTALL_LAYOUT})
   install(
-    TARGETS ${PROJECT_NAME}_eval
-            compress_graph
-            compute_filtrations
-            evaluate_places
-            evaluate_rooms
-            gt_trajectory_optimizer
-            merge_graphs
+    TARGETS ${PROJECT_NAME}_eval compress_graph compute_filtrations evaluate_places
+            evaluate_rooms gt_trajectory_optimizer merge_graphs
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME}

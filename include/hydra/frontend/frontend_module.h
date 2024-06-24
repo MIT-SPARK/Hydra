@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <config_utilities/factory.h>
-#include <kimera_pgmo/MeshFrontendInterface.h>
+#include <kimera_pgmo/mesh_frontend_interface.h>
 #include <spark_dsg/scene_graph_logger.h>
 
 #include <memory>
@@ -74,7 +74,7 @@ class FrontendModule : public Module {
   struct Config {
     size_t min_object_vertices = 20;
     bool lcd_use_bow_vectors = true;
-    kimera_pgmo::MeshFrontendConfig pgmo_config;
+    kimera_pgmo::MeshFrontendInterface::Config pgmo;
     MeshSegmenter::Config object_config;
     config::VirtualConfig<SurfacePlacesInterface> surface_places;
     config::VirtualConfig<FreespacePlacesInterface> freespace_places;
@@ -162,9 +162,9 @@ class FrontendModule : public Module {
   SharedModuleState::Ptr state_;
   kimera_pgmo::MeshDelta::Ptr last_mesh_update_;
 
-  kimera_pgmo::MeshFrontendInterface mesh_frontend_;
+  std::unique_ptr<kimera_pgmo::MeshFrontendInterface> mesh_frontend_;
   std::unique_ptr<kimera_pgmo::DeltaCompression> mesh_compression_;
-  std::shared_ptr<kimera_pgmo::VoxbloxIndexMapping> mesh_remapping_;
+  std::shared_ptr<kimera_pgmo::HashedIndexMapping> mesh_remapping_;
 
   std::unique_ptr<MeshSegmenter> segmenter_;
   std::unique_ptr<SurfacePlacesInterface> surface_places_;
@@ -181,7 +181,7 @@ class FrontendModule : public Module {
   std::map<NodeId, size_t> agent_key_map_;
   std::map<LayerPrefix, size_t> last_agent_edge_index_;
   std::map<LayerPrefix, std::set<size_t>> active_agent_nodes_;
-  std::list<pose_graph_tools_msgs::BowQuery::ConstPtr> cached_bow_messages_;
+  std::list<pose_graph_tools::BowQuery::ConstPtr> cached_bow_messages_;
 
   std::vector<InputCallback> input_callbacks_;
   std::vector<InputPtrCallback> input_dispatches_;
@@ -206,9 +206,3 @@ class FrontendModule : public Module {
 void declare_config(FrontendModule::Config& config);
 
 }  // namespace hydra
-
-namespace kimera_pgmo {
-
-void declare_config(kimera_pgmo::MeshFrontendConfig& conf);
-
-}  // namespace kimera_pgmo

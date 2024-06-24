@@ -5,25 +5,13 @@
     local-name: config_utilities
     uri: git@github.com:MIT-SPARK/config_utilities.git
 - git:
-    local-name: eigen_catkin
-    uri: git@github.com:ethz-asl/eigen_catkin.git
-- git:
-    local-name: eigen_checks
-    uri: git@github.com:ethz-asl/eigen_checks.git
-- git:
-    local-name: gflags_catkin
-    uri: git@github.com:ethz-asl/gflags_catkin.git
-- git:
-    local-name: glog_catkin
-    uri: git@github.com:ethz-asl/glog_catkin.git
-- git:
     local-name: hydra_ros
     uri: git@github.mit.edu:SPARK/Hydra-ROS.git
     version: develop
 - git:
     local-name: kimera_pgmo
     uri: git@github.mit.edu:SPARK/Kimera-PGMO.git
-    version: develop
+    version: future
 - git:
     local-name: kimera_rpgo
     uri: git@github.com:MIT-SPARK/Kimera-RPGO.git
@@ -51,7 +39,3 @@
 - git:
     local-name: spatial_hash
     uri: git@github.com:MIT-SPARK/Spatial-Hash.git
-- git:
-    local-name: voxblox
-    uri: git@github.com:MIT-SPARK/voxblox.git
-    version: feature/hydra

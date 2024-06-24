@@ -9,6 +9,7 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/minimum_spanning_tree.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/nearest_neighbor_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/pgmo_mesh_interface.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/pgmo_mesh_traits.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/place_2d_ellipsoid_math.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/pose_graph_tracker.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/timing_utilities.cpp

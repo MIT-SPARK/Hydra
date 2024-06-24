@@ -33,34 +33,33 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <pose_graph_tools/pose_graph.h>
 
-#include <Eigen/Geometry>
-#include <list>
+#include <kimera_pgmo/mesh_types.h>
+#include <spark_dsg/mesh.h>
 
-#include "hydra/input/sensor_input_packet.h"
+namespace spark_dsg {
 
-namespace hydra {
+size_t pgmoNumVertices(const Mesh& mesh);
 
-struct InputData;
+void pgmoResizeVertices(Mesh& mesh, size_t size);
 
-struct InputPacket {
-  using Ptr = std::shared_ptr<InputPacket>;
+Eigen::Vector3f pgmoGetVertex(const Mesh& mesh,
+                              size_t i,
+                              kimera_pgmo::traits::VertexTraits* traits = nullptr);
 
-  uint64_t timestamp_ns;
+void pgmoSetVertex(Mesh& mesh,
+                   size_t i,
+                   const Eigen::Vector3f& pos,
+                   const kimera_pgmo::traits::VertexTraits& traits = {});
 
-  SensorInputPacket::Ptr sensor_input;
-  std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
-  pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements;
-  Eigen::Vector3d world_t_body;
-  Eigen::Quaterniond world_R_body;
+uint64_t pgmoGetVertexStamp(const Mesh& mesh, size_t i);
 
-  virtual ~InputPacket() = default;
-  virtual bool fillInputData(InputData& data) const;
+size_t pgmoNumFaces(const Mesh& mesh);
 
-  Eigen::Isometry3d world_T_body() const {
-    return Eigen::Translation<double, 3>(world_t_body) * world_R_body;
-  }
-};
+void pgmoResizeFaces(Mesh& mesh, size_t size);
 
-}  // namespace hydra
+kimera_pgmo::traits::Face pgmoGetFace(const Mesh& mesh, size_t i);
+
+void pgmoSetFace(Mesh& mesh, size_t i, const kimera_pgmo::traits::Face& face);
+
+}  // namespace spark_dsg

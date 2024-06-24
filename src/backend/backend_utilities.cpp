@@ -34,7 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/backend/backend_utilities.h"
 
-#include <kimera_pgmo/MeshDelta.h>
+#include <glog/logging.h>
+#include <kimera_pgmo/mesh_delta.h>
 
 #include <sstream>
 
@@ -51,25 +52,25 @@ std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol 
   return graph.getNode(node).timestamp.value().count();
 }
 
-std::string logPoseGraphConnections(const pose_graph_tools_msgs::PoseGraph& msg) {
+std::string logPoseGraphConnections(const pose_graph_tools::PoseGraph& graph) {
   std::stringstream ss;
   ss << "nodes: [";
-  auto iter = msg.nodes.begin();
-  while (iter != msg.nodes.end()) {
+  auto iter = graph.nodes.begin();
+  while (iter != graph.nodes.end()) {
     ss << "{r=" << iter->robot_id << ", k=" << iter->key << "}";
     ++iter;
-    if (iter != msg.nodes.end()) {
+    if (iter != graph.nodes.end()) {
       ss << ", ";
     }
   }
 
   ss << "], edges: [";
-  auto eiter = msg.edges.begin();
-  while (eiter != msg.edges.end()) {
+  auto eiter = graph.edges.begin();
+  while (eiter != graph.edges.end()) {
     ss << eiter->robot_from << "(" << eiter->key_from << ") -> " << eiter->robot_to
        << "(" << eiter->key_to << ")";
     ++eiter;
-    if (eiter != msg.edges.end()) {
+    if (eiter != graph.edges.end()) {
       ss << ", ";
     }
   }

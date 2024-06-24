@@ -36,8 +36,6 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
-#include <pose_graph_tools_ros/conversions.h>
-#include <tf2_eigen/tf2_eigen.h>
 
 #include "hydra/common/global_info.h"
 #include "hydra/input/input_packet.h"
@@ -45,7 +43,7 @@
 
 namespace hydra {
 
-using pose_graph_tools_msgs::PoseGraph;
+using pose_graph_tools::PoseGraph;
 
 struct StampedPose {
   uint64_t stamp;
@@ -54,17 +52,15 @@ struct StampedPose {
 
 void addNode(PoseGraph& graph, const StampedPose& stamped_pose, size_t index) {
   auto& node = graph.nodes.emplace_back();
-  node.header.stamp.fromNSec(stamped_pose.stamp);
-  node.header.frame_id = graph.header.frame_id;
+  node.stamp_ns = stamped_pose.stamp;
   node.robot_id = GlobalInfo::instance().getRobotPrefix().id;
   node.key = index;
-  tf2::convert(stamped_pose.pose, node.pose);
+  node.pose = stamped_pose.pose;
 }
 
 void addEdge(PoseGraph& graph, const Eigen::Isometry3d& body_i_T_body_j) {
   auto& edge = graph.edges.emplace_back();
-  edge.header.stamp = graph.nodes.back().header.stamp;
-  edge.header.frame_id = graph.header.frame_id;
+  edge.stamp_ns = graph.nodes.back().stamp_ns;
 
   const auto& prev_node = graph.nodes.front();
   const auto& curr_node = graph.nodes.back();
@@ -72,17 +68,15 @@ void addEdge(PoseGraph& graph, const Eigen::Isometry3d& body_i_T_body_j) {
   edge.key_to = curr_node.key;
   edge.robot_from = prev_node.robot_id;
   edge.robot_to = curr_node.robot_id;
-  edge.type = pose_graph_tools_msgs::PoseGraphEdge::ODOM;
-  tf2::convert(body_i_T_body_j, edge.pose);
+  edge.type = pose_graph_tools::PoseGraphEdge::ODOM;
+  edge.pose = body_i_T_body_j;
 }
 
 PoseGraph::Ptr makePoseGraph(const StampedPose& curr_pose,
                              const StampedPose& prev_pose,
-                             const std::string& frame_id,
                              size_t prev_index) {
-  PoseGraph::Ptr graph(new PoseGraph());
-  graph->header.stamp.fromNSec(curr_pose.stamp);
-  graph->header.frame_id = frame_id;
+  auto graph = std::make_shared<PoseGraph>();
+  graph->stamp_ns = curr_pose.stamp;
 
   addNode(*graph, prev_pose, prev_index);
   addNode(*graph, curr_pose, prev_index + 1);
@@ -102,10 +96,8 @@ void PoseGraphTracker::update(const InputPacket& msg) {
   if (config_.make_pose_graph && num_poses_received_ > 0) {
     StampedPose curr_pose_stamped{msg.timestamp_ns, curr_pose};
     StampedPose prev_pose_stamped{prev_time_, prev_pose_};
-    graphs_.push_back(makePoseGraph(curr_pose_stamped,
-                                    prev_pose_stamped,
-                                    GlobalInfo::instance().getFrames().odom,
-                                    num_poses_received_ - 1));
+    graphs_.push_back(
+        makePoseGraph(curr_pose_stamped, prev_pose_stamped, num_poses_received_ - 1));
   } else {
     graphs_.insert(graphs_.end(), msg.pose_graphs.begin(), msg.pose_graphs.end());
   }

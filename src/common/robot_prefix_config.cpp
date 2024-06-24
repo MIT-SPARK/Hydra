@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/common/robot_prefix_config.h"
 
-#include <kimera_pgmo/utils/CommonFunctions.h>
+#include <kimera_pgmo/utils/common_functions.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/config.h>
 

@@ -35,7 +35,7 @@
 #pragma once
 
 #include <gtsam/inference/Symbol.h>
-#include <pose_graph_tools_msgs/PoseGraph.h>
+#include <pose_graph_tools/pose_graph.h>
 
 #include "hydra/common/shared_dsg_info.h"
 
@@ -47,7 +47,7 @@ namespace hydra::utils {
 
 std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol key);
 
-std::string logPoseGraphConnections(const pose_graph_tools_msgs::PoseGraph& msg);
+std::string logPoseGraphConnections(const pose_graph_tools::PoseGraph& graph);
 
 void updatePlace2dMesh(Place2dNodeAttributes& attrs,
                        const kimera_pgmo::MeshDelta& mesh_update,

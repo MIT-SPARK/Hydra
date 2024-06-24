@@ -1,16 +1,10 @@
-# catkin forwards gtest, but eventually we won't have catkin dependencies
-if(NOT TARGET gtest)
-  include(FetchContent)
-  FetchContent_Declare(
-    googletest GIT_REPOSITORY https://github.com/google/googletest.git GIT_TAG v1.13.0
-  )
+find_package(GTest REQUIRED)
+find_package(gflags REQUIRED)
 
-  populate_content(googletest BUILD_SHARED_LIBS=OFF)
-endif()
-
-configure_file(hydra_test_config.h.in hydra_test_config.h)
 include(GoogleTest)
 enable_testing()
+
+configure_file(hydra_test_config.h.in hydra_test_config.h)
 
 add_executable(
   test_${PROJECT_NAME}
@@ -53,11 +47,11 @@ add_executable(
   utils/test_timing_utilities.cpp
 )
 target_include_directories(
-  test_${PROJECT_NAME}
-  PUBLIC include
-  PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
+  test_${PROJECT_NAME} PUBLIC include PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
 )
-target_link_libraries(test_${PROJECT_NAME} ${PROJECT_NAME} GTest::gtest_main)
+target_link_libraries(
+  test_${PROJECT_NAME} ${PROJECT_NAME} ${gflags_LIBRARIES} GTest::gtest_main
+)
 gtest_add_tests(TARGET test_${PROJECT_NAME})
 
 if(HYDRA_ENABLE_GNN)

@@ -123,7 +123,7 @@ class ReconstructionModule : public Module {
   size_t num_poses_received_;
   std::set<uint64_t> timestamp_cache_;
 
-  pose_graph_tools_msgs::PoseGraph::ConstPtr agent_node_measurements_;
+  pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements_;
   PoseGraphTracker::Ptr pose_graph_tracker_;
 
   OutputQueue::Ptr output_queue_;

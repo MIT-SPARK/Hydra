@@ -19,17 +19,14 @@ option(BUILD_SHARED_LIBS "Build shared libs" ON)
 find_package(config_utilities REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(GTSAM REQUIRED)
-find_package(OpenCV REQUIRED COMPONENTS core imgproc)
-find_package(spark_dsg REQUIRED)
-find_package(teaserpp REQUIRED)
 find_package(kimera_pgmo REQUIRED)
 find_package(spatial_hash REQUIRED)
-
+find_package(spark_dsg REQUIRED)
+find_package(teaserpp REQUIRED)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc)
 # we turn off PCL precompile internally to get around having vtk linked. Note: kdtree is
 # REQUIRED to make sure we link against FLANN (used by euclidean extraction)
 find_package(PCL REQUIRED COMPONENTS common kdtree)
-# TODO(nathan) push to pose_graph_tools
-find_package(tf2_eigen REQUIRED)
 
 include(GNUInstallDirs)
 include(HydraBuildConfig)
@@ -39,21 +36,20 @@ add_library(${PROJECT_NAME})
 target_include_directories(
   ${PROJECT_NAME}
   PUBLIC $<INSTALL_INTERFACE:include>
-         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-         ${OpenCV_INCLUDE_DIRS}
-         ${kimera_pgmo_INCLUDE_DIRS}
-  PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${tf2_eigen_INCLUE_DIRS} ${PCL_INCLUDE_DIRS}
+         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> ${OpenCV_INCLUDE_DIRS}
+  PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${PCL_INCLUDE_DIRS}
 )
 target_link_libraries(
   ${PROJECT_NAME}
-  PUBLIC ${OpenCV_LIBRARIES}
-         teaserpp::teaser_registration
-         config_utilities::config_utilities
-         spark_dsg::spark_dsg
+  PUBLIC config_utilities::config_utilities
+         Eigen3::Eigen
          gtsam
+         kimera_pgmo::kimera_pgmo
+         spark_dsg::spark_dsg
          spatial_hash::spatial_hash
-         ${kimera_pgmo_LIBRARIES}
-  PRIVATE nanoflann::nanoflann ${tf2_eigen_LIBRARIES} ${PCL_LIBRARIES}
+         teaserpp::teaser_registration
+         ${OpenCV_LIBRARIES}
+  PRIVATE nanoflann::nanoflann ${PCL_LIBRARIES}
 )
 set_property(TARGET ${PROJECT_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)
 add_library(hydra::${PROJECT_NAME} ALIAS ${PROJECT_NAME})

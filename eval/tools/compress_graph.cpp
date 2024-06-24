@@ -34,16 +34,17 @@
  * -------------------------------------------------------------------------- */
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include <kimera_pgmo/compression/DeltaCompression.h>
-#include <kimera_pgmo/utils/CommonFunctions.h>
+#include <kimera_pgmo/compression/delta_compression.h>
+#include <kimera_pgmo/utils/common_functions.h>
 #include <spark_dsg/dynamic_scene_graph.h>
-#include <spark_dsg/pgmo_mesh_traits.h>
 
 #include <filesystem>
 #include <nanoflann.hpp>
 
 #include "hydra/eval/progress.h"
 #include "hydra/reconstruction/voxel_types.h"
+#include "hydra/utils/pgmo_mesh_interface.h"
+#include "hydra/utils/pgmo_mesh_traits.h"
 
 DEFINE_double(mesh_resolution, 0.4, "mesh resolution in meters");
 DEFINE_double(place_resolution, 1.5, "place resolution in meters");
@@ -138,49 +139,6 @@ size_t getVertexFromFaces(const spark_dsg::Mesh& mesh, size_t i) {
   return mesh.face(face)[face_idx];
 }
 
-struct DsgMeshInterface : public kimera_pgmo::MeshInterface {
-  DsgMeshInterface(const DynamicSceneGraph& graph) : mesh(graph.mesh()) {
-    indices.push_back(voxblox::BlockIndex(0, 0, 0));
-  }
-
-  const voxblox::BlockIndexList& blockIndices() const override { return indices; }
-
-  void markBlockActive(const BlockIndex&) override {}
-
-  size_t activeBlockSize() const override { return 3 * mesh->numFaces(); }
-
-  pcl::PointXYZRGBA getActiveVertex(size_t i) const override {
-    size_t vertex_idx = getVertexFromFaces(*mesh, i);
-    const auto& pos = mesh->pos(vertex_idx);
-    pcl::PointXYZRGBA p;
-    p.x = pos.x();
-    p.y = pos.y();
-    p.z = pos.z();
-    if (mesh->has_colors) {
-      const auto& color = mesh->color(vertex_idx);
-      p.r = color.r;
-      p.g = color.g;
-      p.b = color.b;
-    }
-
-    return p;
-  }
-
-  bool hasSemantics() const override { return mesh->has_labels; }
-
-  std::optional<uint32_t> getActiveSemantics(size_t i) const override {
-    if (!mesh->has_labels) {
-      return std::nullopt;
-    }
-
-    size_t vertex_idx = getVertexFromFaces(*mesh, i);
-    return mesh->label(vertex_idx);
-  }
-
-  voxblox::BlockIndexList indices;
-  spark_dsg::Mesh::Ptr mesh;
-};
-
 void remapPlaces(DynamicSceneGraph& graph,
                  const std::unordered_map<size_t, size_t>& remapping) {
   const auto& places = graph.getLayer(DsgLayers::PLACES);
@@ -201,16 +159,18 @@ void remapPlaces(DynamicSceneGraph& graph,
 
 void compressMesh(DynamicSceneGraph& graph, double resolution) {
   kimera_pgmo::DeltaCompression compression(resolution);
-  kimera_pgmo::VoxbloxIndexMapping remapping;
+  kimera_pgmo::HashedIndexMapping remapping;
 
-  DsgMeshInterface interface(graph);
+  if (!graph.mesh()) {
+    return;
+  }
+  PgmoMeshInterface interface(*graph.mesh());
   auto delta = compression.update(interface, 0, &remapping);
 
-  const auto mesh = graph.mesh();
   auto& face_remapping = remapping.at(BlockIndex(0, 0, 0));
   std::unordered_map<size_t, size_t> vertex_remapping;
   for (auto&& [face_idx, new_idx] : face_remapping) {
-    size_t vertex_idx = getVertexFromFaces(*mesh, face_idx);
+    size_t vertex_idx = getVertexFromFaces(*graph.mesh(), face_idx);
     vertex_remapping[vertex_idx] = new_idx;
   }
 

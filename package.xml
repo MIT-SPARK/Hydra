@@ -14,15 +14,12 @@
   <depend>config_utilities</depend>
   <depend>eigen</depend>
   <depend>gtsam</depend>
-  <depend>libopencv-dev</depend>
+  <depend>kimera_pgmo</depend>
+  <depend>spatial_hash</depend>
   <depend>spark_dsg</depend>
   <depend>teaserpp</depend>
-  <depend>kimera_pgmo</depend>
-  <depend>tf2_eigen</depend>
-  <depend>spatial_hash</depend>
-  <depend>pose_graph_tools</depend>
-  <depend>pose_graph_tools_ros</depend>
-  <depend>pose_graph_tools_msgs</depend>
+  <depend>libopencv-dev</depend>
+  <depend>libpcl-all-dev</depend>
 
   <export>
     <build_type>cmake</build_type>

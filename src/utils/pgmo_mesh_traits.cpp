@@ -32,35 +32,74 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <pose_graph_tools/pose_graph.h>
+#include "hydra/utils/pgmo_mesh_traits.h"
 
-#include <Eigen/Geometry>
-#include <list>
+namespace spark_dsg {
 
-#include "hydra/input/sensor_input_packet.h"
+size_t pgmoNumVertices(const Mesh& mesh) { return mesh.numVertices(); }
 
-namespace hydra {
+void pgmoResizeVertices(Mesh& mesh, size_t size) { mesh.resizeVertices(size); }
 
-struct InputData;
-
-struct InputPacket {
-  using Ptr = std::shared_ptr<InputPacket>;
-
-  uint64_t timestamp_ns;
-
-  SensorInputPacket::Ptr sensor_input;
-  std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
-  pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements;
-  Eigen::Vector3d world_t_body;
-  Eigen::Quaterniond world_R_body;
-
-  virtual ~InputPacket() = default;
-  virtual bool fillInputData(InputData& data) const;
-
-  Eigen::Isometry3d world_T_body() const {
-    return Eigen::Translation<double, 3>(world_t_body) * world_R_body;
+Eigen::Vector3f pgmoGetVertex(const Mesh& mesh,
+                              size_t i,
+                              kimera_pgmo::traits::VertexTraits* traits) {
+  if (!traits) {
+    return mesh.pos(i);
   }
-};
 
-}  // namespace hydra
+  if (mesh.has_colors) {
+    const auto c = mesh.color(i);
+    traits->color = {{c.r, c.g, c.b, c.a}};
+  }
+
+  if (mesh.has_timestamps) {
+    traits->stamp = mesh.timestamp(i);
+  }
+
+  if (mesh.has_labels) {
+    traits->label = mesh.label(i);
+  }
+
+  return mesh.pos(i);
+}
+
+void pgmoSetVertex(Mesh& mesh,
+                   size_t i,
+                   const Eigen::Vector3f& pos,
+                   const kimera_pgmo::traits::VertexTraits& traits) {
+  mesh.setPos(i, pos);
+  if (traits.color && mesh.has_colors) {
+    const auto& c = *traits.color;
+    mesh.setColor(i, Color(c[0], c[1], c[2], c[3]));
+  }
+
+  if (traits.stamp && mesh.has_timestamps) {
+    mesh.setTimestamp(i, *traits.stamp);
+  }
+
+  if (traits.label && mesh.has_labels) {
+    mesh.setLabel(i, *traits.label);
+  }
+}
+
+uint64_t pgmoGetVertexStamp(const Mesh& mesh, size_t i) {
+  if (!mesh.has_timestamps) {
+    throw std::runtime_error("mesh has no timestamps");
+  }
+
+  return mesh.stamps.at(i);
+}
+
+size_t pgmoNumFaces(const Mesh& mesh) { return mesh.numFaces(); }
+
+void pgmoResizeFaces(Mesh& mesh, size_t size) { mesh.resizeFaces(size); }
+
+kimera_pgmo::traits::Face pgmoGetFace(const Mesh& mesh, size_t i) {
+  return mesh.face(i);
+}
+
+void pgmoSetFace(Mesh& mesh, size_t i, const kimera_pgmo::traits::Face& face) {
+  mesh.face(i) = face;
+}
+
+}  // namespace spark_dsg

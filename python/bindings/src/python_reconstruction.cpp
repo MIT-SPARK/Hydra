@@ -41,14 +41,13 @@
 #include <config_utilities/validation.h>
 #include <hydra/common/global_info.h>
 #include <hydra/reconstruction/reconstruction_module.h>
-#include <kimera_pgmo/compression/DeltaCompression.h>
-#include <kimera_pgmo/utils/CommonFunctions.h>
+#include <kimera_pgmo/compression/delta_compression.h>
+#include <kimera_pgmo/utils/mesh_io.h>
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
 #include <pybind11/stl_bind.h>
 #include <spark_dsg/dynamic_scene_graph.h>
-#include <spark_dsg/pgmo_mesh_traits.h>
 #include <spark_dsg/zmq_interface.h>
 
 #include "hydra/bindings/glog_utilities.h"
@@ -57,6 +56,7 @@
 #include "hydra/bindings/python_sensor_input.h"
 #include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/pgmo_mesh_interface.h"
+#include "hydra/utils/pgmo_mesh_traits.h"
 
 namespace hydra::python {
 
@@ -105,7 +105,7 @@ struct MeshUpdater {
       return;
     }
 
-    auto interface = PgmoMeshInterface(*mesh);
+    auto interface = PgmoMeshLayerInterface(*mesh);
     const auto delta = compression.update(interface, msg->timestamp_ns);
     delta->updateMesh(*graph->mesh());
     zmq_sender.send(*graph, true);
