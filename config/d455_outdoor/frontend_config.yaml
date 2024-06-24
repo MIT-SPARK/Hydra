@@ -1,11 +1,8 @@
 ---
 pgmo:
-  horizon: 100.0
-  track_mesh_graph_mapping: true
-  full_compression_method: VOXEL_CLEARING
-  graph_compression_method: BLOCK
+  time_horizon: 100.0
   d_graph_resolution: 2.5
-  output_mesh_resolution: 0.005
+  mesh_resolution: 0.005
 objects:
   prefix: O
   active_horizon_s: 10.0

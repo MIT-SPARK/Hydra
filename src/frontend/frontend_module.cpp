@@ -38,6 +38,7 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <kimera_pgmo/compression/block_compression.h>
 #include <kimera_pgmo/compression/delta_compression.h>
 #include <kimera_pgmo/utils/common_functions.h>
 #include <kimera_pgmo/utils/mesh_io.h>
@@ -66,7 +67,14 @@ void declare_config(FrontendModule::Config& config) {
   field(config.min_object_vertices, "min_object_vertices");
   field(config.min_object_vertices, "min_object_vertices");
   field(config.lcd_use_bow_vectors, "lcd_use_bow_vectors");
-  field(config.pgmo, "pgmo");
+
+  {
+    NameSpace ns("pgmo");
+    field(config.pgmo.mesh_resolution, "mesh_resolution");
+    field(config.pgmo.d_graph_resolution, "d_graph_resolution");
+    field(config.pgmo.time_horizon, "time_horizon");
+  }
+
   field(config.object_config, "objects");
   // surface (i.e., 2D) places
   config.surface_places.setOptional();
@@ -88,6 +96,7 @@ FrontendModule::FrontendModule(const Config& config,
       queue_(std::make_shared<FrontendInputQueue>()),
       dsg_(dsg),
       state_(state),
+      segmenter_(new MeshSegmenter(config.object_config)),
       surface_places_(config.surface_places.create()),
       freespace_places_(config.freespace_places.create()),
       frontier_places_(config.frontier_places.create()),
@@ -95,18 +104,17 @@ FrontendModule::FrontendModule(const Config& config,
   if (!config.use_frontiers) {
     frontier_places_.reset();
   }
-  auto pgmo_config = config.pgmo;
-
-  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
-  pgmo_config.robot_id = prefix.id;
 
   CHECK(dsg_ != nullptr);
   CHECK(dsg_->graph != nullptr);
   dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>());
+  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
   dsg_->graph->createDynamicLayer(DsgLayers::AGENTS, prefix.key);
 
-  const auto mesh_resolution = pgmo_config.mesh_resolution;
-  mesh_compression_.reset(new kimera_pgmo::DeltaCompression(mesh_resolution));
+  mesh_compression_.reset(
+      new kimera_pgmo::DeltaCompression(config.pgmo.mesh_resolution));
+  deformation_compression_.reset(
+      new kimera_pgmo::BlockCompression(config.pgmo.d_graph_resolution));
 
   if (logs && logs->valid()) {
     logs_ = logs;
@@ -117,16 +125,7 @@ FrontendModule::FrontendModule(const Config& config,
     frontend_graph_logger_.setLayerName(DsgLayers::OBJECTS, "objects");
     frontend_graph_logger_.setLayerName(DsgLayers::PLACES, "places");
     frontend_graph_logger_.setLayerName(DsgLayers::MESH_PLACES, "places 2d");
-
-    pgmo_config.log_output = true;
-    pgmo_config.log_path = logs->getLogDir("frontend/pgmo");
-  } else {
-    pgmo_config.log_output = false;
   }
-
-  mesh_frontend_ = std::make_unique<kimera_pgmo::MeshFrontendInterface>(pgmo_config);
-  CHECK(mesh_frontend_);
-  segmenter_ = std::make_unique<MeshSegmenter>(config.object_config);
 }
 
 FrontendModule::~FrontendModule() {
@@ -404,19 +403,39 @@ void FrontendModule::updateObjects(const ReconstructionOutput& input) {
   }  // end dsg critical section
 }
 
+using PgmoCloud = pcl::PointCloud<pcl::PointXYZRGBA>;
+
 void FrontendModule::updateDeformationGraph(const ReconstructionOutput& input) {
-  {  // start timing scope
-    ScopedTimer timer(
-        "frontend/dgraph_compresssion", input.timestamp_ns, true, 1, false);
-    const auto time_ns = std::chrono::nanoseconds(input.timestamp_ns);
-    double time_s =
-        std::chrono::duration_cast<std::chrono::duration<double>>(time_ns).count();
-    auto interface = PgmoMeshLayerInterface(input.map().getMeshLayer());
-    mesh_frontend_->update(interface, time_s);
-  }  // end timing scope
+  ScopedTimer timer("frontend/dgraph_compresssion", input.timestamp_ns, true, 1, false);
+  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
+  const auto time_ns = std::chrono::nanoseconds(input.timestamp_ns);
+  double time_s =
+      std::chrono::duration_cast<std::chrono::duration<double>>(time_ns).count();
+  auto interface = PgmoMeshLayerInterface(input.map().getMeshLayer());
+
+  PgmoCloud new_vertices;
+  std::vector<size_t> new_indices;
+  std::vector<pcl::Vertices> new_triangles;
+  deformation_compression_->pruneStoredMesh(time_s - config.pgmo.time_horizon);
+  deformation_compression_->compressAndIntegrate(interface,
+                                                 new_vertices,
+                                                 new_triangles,
+                                                 new_indices,
+                                                 deformation_remapping_,
+                                                 time_s);
+
+  PgmoCloud::Ptr vertices(new PgmoCloud());
+  deformation_compression_->getVertices(vertices);
+
+  std::vector<kimera_pgmo::Edge> new_edges;
+  if (new_indices.size() > 0 && new_triangles.size() > 0) {
+    // Add nodes and edges to graph
+    new_edges = deformation_graph_.addPointsAndSurfaces(new_indices, new_triangles);
+  }
 
   if (backend_input_) {
-    backend_input_->deformation_graph = mesh_frontend_->getLastProcessedMeshGraph();
+    backend_input_->deformation_graph = kimera_pgmo::makePoseGraph(
+        prefix.id, time_s, new_edges, new_indices, *vertices);
   }
 }
 
@@ -527,7 +546,7 @@ void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
   }
 
   for (const auto& pose_graph : input.pose_graphs) {
-    if (pose_graph->nodes.empty()) {
+    if (!pose_graph || pose_graph->nodes.empty()) {
       continue;
     }
 
@@ -755,12 +774,11 @@ void FrontendModule::updatePlaceMeshMapping(const ReconstructionOutput& input) {
 
   // TODO(nathan) we can maybe put this somewhere else
   const auto num_active = last_mesh_update_->vertex_updates->size();
-  const auto& graph_mapping = mesh_frontend_->getVoxbloxMsgToGraphMapping();
   std::vector<size_t> deformation_mapping(num_active,
                                           std::numeric_limits<size_t>::max());
   for (const auto& [block, indices] : *mesh_remapping_) {
-    const auto block_iter = graph_mapping.find(block);
-    if (block_iter == graph_mapping.end()) {
+    const auto block_iter = deformation_remapping_.find(block);
+    if (block_iter == deformation_remapping_.end()) {
       LOG(WARNING) << "Missing block " << block.transpose() << " from graph mapping!";
       continue;
     }
