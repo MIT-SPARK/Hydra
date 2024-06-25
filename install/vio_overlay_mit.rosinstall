@@ -1,4 +1,7 @@
 - git:
+    local-name: catkin_simple
+    uri: git@github.com:catkin/catkin_simple.git
+- git:
     local-name: kimera_vio
     uri: git@github.mit.edu:SPARK/Kimera-VIO.git
     version: feature/bundle_thirdparty

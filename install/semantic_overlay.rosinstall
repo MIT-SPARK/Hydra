@@ -1,4 +1,4 @@
 - git:
-    local-name: semantic_recolor
-    uri: git@github.mit.edu:SPARK/semantic_recolor_nodelet.git
-    version: main
+    local-name: semantic_inference
+    uri: git@github.mit.edu:SPARK/semantic_inference.git
+    version: develop
