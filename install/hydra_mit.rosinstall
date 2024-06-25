@@ -1,7 +1,4 @@
 - git:
-    local-name: catkin_simple
-    uri: git@github.com:catkin/catkin_simple.git
-- git:
     local-name: config_utilities
     uri: git@github.com:MIT-SPARK/config_utilities.git
 - git:
@@ -20,15 +17,6 @@
     local-name: spark_dsg
     uri: git@github.mit.edu:SPARK/Spark-DSG.git
     version: develop
-- git:
-    local-name: mesh_tools
-    uri: git@github.com:yunzc/mesh_tools.git
-- git:
-    local-name: minkindr
-    uri: git@github.com:ethz-asl/minkindr.git
-- git:
-    local-name: minkindr_ros
-    uri: git@github.com:ethz-asl/minkindr_ros.git
 - git:
     local-name: pose_graph_tools
     uri: git@github.mit.edu:SPARK/pose_graph_tools.git
