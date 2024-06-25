@@ -177,4 +177,47 @@ size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
   return total;
 }
 
+struct PointNeighborSearch::Detail {
+  // Nanoflann interface.
+  explicit Detail(const std::vector<Eigen::Vector3f>& points)
+      : points_(points),
+        tree_(3, *this, nanoflann::KDTreeSingleIndexAdaptorParams(10)) {
+    tree_.buildIndex();
+  }
+
+  std::size_t kdtree_get_point_count() const { return points_.size(); }
+
+  float kdtree_get_pt(const size_t idx, const size_t dim) const {
+    if (dim == 0)
+      return points_[idx].x();
+    else if (dim == 1)
+      return points_[idx].y();
+    else
+      return points_[idx].z();
+  }
+
+  template <class BBOX>
+  bool kdtree_get_bbox(BBOX&) const {
+    return false;
+  }
+
+  const std::vector<Eigen::Vector3f>& points_;
+  KDTreeSingleIndexAdaptor<L2_Simple_Adaptor<float, Detail>, Detail, 3> tree_;
+};
+
+PointNeighborSearch::PointNeighborSearch(const std::vector<Eigen::Vector3f>& points) {
+  internals_ = std::make_unique<Detail>(points);
+}
+
+PointNeighborSearch::~PointNeighborSearch(){};
+
+bool PointNeighborSearch::search(const Eigen::Vector3f& query_point,
+                                 float& distance_squared,
+                                 size_t& index) const {
+  nanoflann::KNNResultSet<float> resultSet(1);
+  float query_point_arr[3] = {query_point.x(), query_point.y(), query_point.z()};
+  resultSet.init(&index, &distance_squared);
+  return internals_->tree_.findNeighbors(resultSet, &query_point_arr[0]);
+}
+
 }  // namespace hydra

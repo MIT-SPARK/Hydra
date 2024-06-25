@@ -80,4 +80,30 @@ size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
                                SemanticNodeFinders& finders,
                                bool use_active = false);
 
+/**
+ * @brief Helper class to perform nearest neigbor search on a set of points using
+ * KD-Trees.
+ */
+class PointNeighborSearch {
+ public:
+  explicit PointNeighborSearch(const std::vector<Eigen::Vector3f>& points);
+  virtual ~PointNeighborSearch();
+
+  // Lookup.
+  /**
+   * @brief Find the nearest neighbor of the query point.
+   * @param query_point The query point.
+   * @param distance_squared The output squared distance to the nearest neighbor.
+   * @param index The output index of the nearest neighbor in the tree data.
+   * @returns True if a nearest neighbor was found, false otherwise.
+   */
+  bool search(const Eigen::Vector3f& query_point,
+              float& distance_squared,
+              size_t& index) const;
+
+ private:
+  struct Detail;
+  std::unique_ptr<Detail> internals_;
+};
+
 }  // namespace hydra
