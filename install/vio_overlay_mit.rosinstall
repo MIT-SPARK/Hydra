@@ -1,19 +1,11 @@
 - git:
-    local-name: opengv_catkin
-    uri: git@github.com:MIT-SPARK/opengv_catkin.git
-    version: master
-- git:
-    local-name: dbow2_catkin
-    uri: git@github.com:MIT-SPARK/dbow2_catkin.git
-    version: master
-- git:
     local-name: kimera_vio
     uri: git@github.mit.edu:SPARK/Kimera-VIO.git
-    version: master
+    version: feature/bundle_thirdparty
 - git:
     local-name: kimera_vio_ros
     uri: git@github.mit.edu:SPARK/Kimera-VIO-ROS.git
-    version: master
+    version: develop
 - git:
     local-name: hydra_vio_configs
     uri: git@github.mit.edu:SPARK/hydra_vio_configs.git
