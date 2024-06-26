@@ -9,12 +9,13 @@ Hydra should be set up to output a backtrace when it crashes, but this may not a
 You may have to install GDB (`sudo apt install gdb`) if you haven't already. You can then run:
 
 ```
-roslaunch hydra_dsg_builder start_visualizer:=false debug:=true
+roslaunch hydra_ros uhumans2.launch debug:=true
 ```
 
-which runs `gdb` against the main Hydra node by setting the launch prefix [here](https://github.com/MIT-SPARK/Hydra/blob/29a4a8ed2adaa27a2bb56c44c05165027aee97c9/hydra_dsg_builder/launch/dsg_builder.launch#L27). We recommend disabling the visualizer unless the crash appears to be occurring there. You can look at other useful launch prefixes [here](http://wiki.ros.org/roslaunch/Tutorials/Roslaunch%20Nodes%20in%20Valgrind%20or%20GDB).
+which runs `gdb` against the main Hydra node by setting the launch prefix.
+You can look at other useful launch prefixes [here](http://wiki.ros.org/roslaunch/Tutorials/Roslaunch%20Nodes%20in%20Valgrind%20or%20GDB).
 
-Enter `run` into the prompt (type `run` and then hit enter), and Hydra should attempt to start up (it might take a minute or so for `gdb` to load the multi-thread debugging tools). Once Hydra fully starts up, start the rosbag (or other data source) that you are using, and wait until the crash is reproduced. Entering `bt` into the prompt should get you a similar backtrace to the example one below:
+It might take a minute or so for `gdb` to load the multi-thread debugging tools). Once Hydra fully starts up, start the rosbag (or other data source) that you are using, and wait until the crash is reproduced. Entering `bt` into the prompt should get you a similar backtrace to the example one below:
 
 ```
 Thread 1 "hydra_dsg_build" received signal SIGABRT, Aborted.
