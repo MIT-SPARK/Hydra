@@ -41,6 +41,7 @@
 #include "hydra/common/config_utilities.h"
 #include "hydra/common/semantic_color_map.h"
 #include "hydra/utils/timing_utilities.h"
+#include "hydra/utils/pgmo_glog_sink.h"
 
 namespace hydra {
 
@@ -100,6 +101,7 @@ void declare_config(PipelineConfig& conf) {
   field(conf.enable_places, "enable_places");
   field(conf.timing_disabled, "timing_disabled");
   field(conf.disable_timer_output, "disable_timer_output");
+  field(conf.enable_pgmo_logging, "enable_pgmo_logging");
   field(conf.default_verbosity, "default_verbosity");
   field(conf.default_num_threads, "default_num_threads");
   field(conf.store_visualization_details, "store_visualization_details");
@@ -179,6 +181,10 @@ void GlobalInfo::initFromConfig(const PipelineConfig& config, int robot_id) {
 
   if (label_colormap_) {
     VLOG(2) << "Loaded label space colors:" << std::endl << *label_colormap_;
+  }
+
+  if (config_.enable_pgmo_logging) {
+    logging::Logger::addSink("glog", std::make_shared<PgmoGlogSink>());
   }
 }
 

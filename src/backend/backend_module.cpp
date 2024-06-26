@@ -365,6 +365,15 @@ void BackendModule::setupDefaultFunctors() {
   }
 }
 
+inline bool hasLoopClosure(const PoseGraph& graph) {
+  for (const auto& edge : graph.edges) {
+    if (edge.type == pose_graph_tools::PoseGraphEdge::Type::LOOPCLOSE) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void BackendModule::updateFactorGraph(const BackendInput& input) {
   ScopedTimer timer("backend/process_factors", input.timestamp_ns);
   const size_t prev_loop_closures = num_loop_closures_;
@@ -389,6 +398,11 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
     status_.new_factors += msg->edges.size();
 
     VLOG(5) << "[Hydra Backend] Adding pose graph message: " << *msg;
+    if (hasLoopClosure(*msg)) {
+      LOG(INFO) << "[Hydra Backend] Input pose graph has loop closure @ "
+                << msg->stamp_ns << " [ns]";
+    }
+
     processIncrementalPoseGraph(*msg, trajectory_, timestamps_, unconnected_nodes_);
     logIncrementalLoopClosures(*msg);
   }

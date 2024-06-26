@@ -67,6 +67,7 @@ struct PipelineConfig {
   bool enable_places = true;
   bool timing_disabled = false;
   bool disable_timer_output = true;
+  bool enable_pgmo_logging = true;
 
   // Default settings for other modules. Can be overwritten by other module configs.
   int default_verbosity = 1;
