@@ -48,7 +48,6 @@
 
 namespace hydra {
 
-using pose_graph_tools::PoseGraph;
 using timing::ScopedTimer;
 
 void declare_config(ReconstructionModule::Config& conf) {
@@ -63,7 +62,6 @@ void declare_config(ReconstructionModule::Config& conf) {
   field(conf.semantic_measurement_probability, "semantic_measurement_probability");
   field(conf.tsdf, "tsdf");
   field(conf.mesh, "mesh");
-  field(conf.pose_graphs, "pose_graphs");
   conf.robot_footprint.setOptional();
   field(conf.robot_footprint, "robot_footprint");
   field(conf.sinks, "sinks");
@@ -73,7 +71,6 @@ ReconstructionModule::ReconstructionModule(const Config& config,
                                            const OutputQueue::Ptr& queue)
     : config(config::checkValid(config)),
       num_poses_received_(0),
-      pose_graph_tracker_(new PoseGraphTracker(config.pose_graphs)),
       output_queue_(queue),
       sinks_(Sink::instantiate(config.sinks)) {
   queue_.reset(new InputPacketQueue());
@@ -152,11 +149,6 @@ bool ReconstructionModule::spinOnce(const InputPacket& msg) {
   VLOG(2) << "[Hydra Reconstruction]: Processing msg @ " << msg.timestamp_ns;
   VLOG(2) << "[Hydra Reconstruction]: " << queue_->size() << " message(s) left";
 
-  pose_graph_tracker_->update(msg);
-  if (msg.agent_node_measurements) {
-    agent_node_measurements_ = msg.agent_node_measurements;
-  }
-
   ++num_poses_received_;
   const bool do_full_update = (num_poses_received_ % config.num_poses_per_update == 0);
   update(msg, do_full_update);
@@ -178,13 +170,6 @@ void ReconstructionModule::fillOutput(ReconstructionOutput& msg) {
 
   timestamp_cache_.insert(ts);
   msg.timestamp_ns = ts;
-
-  pose_graph_tracker_->fillPoseGraphs(msg);
-  if (agent_node_measurements_) {
-    msg.agent_node_measurements = agent_node_measurements_;
-    agent_node_measurements_.reset();
-  }
-
   msg.setMap(*map_);
 
   if (!config.clear_distant_blocks) {

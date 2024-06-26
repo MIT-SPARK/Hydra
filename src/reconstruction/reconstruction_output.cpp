@@ -51,10 +51,6 @@ void ReconstructionOutput::updateFrom(const ReconstructionOutput& msg, bool clon
 
   archived_blocks.insert(
       archived_blocks.end(), msg.archived_blocks.begin(), msg.archived_blocks.end());
-  pose_graphs.insert(pose_graphs.end(), msg.pose_graphs.begin(), msg.pose_graphs.end());
-  if (msg.agent_node_measurements) {
-    agent_node_measurements = msg.agent_node_measurements;
-  }
 
   if (!msg.map_) {
     LOG(ERROR) << "Reconstruction output message contained no map!";

@@ -76,6 +76,8 @@ void declare_config(FrontendModule::Config& config) {
   }
 
   field(config.object_config, "objects");
+  config.pose_graph_tracker.setOptional();
+  field(config.pose_graph_tracker, "pose_graph_tracker");
   // surface (i.e., 2D) places
   config.surface_places.setOptional();
   field(config.surface_places, "surface_places");
@@ -97,12 +99,17 @@ FrontendModule::FrontendModule(const Config& config,
       dsg_(dsg),
       state_(state),
       segmenter_(new MeshSegmenter(config.object_config)),
+      tracker_(config.pose_graph_tracker.create()),
       surface_places_(config.surface_places.create()),
       freespace_places_(config.freespace_places.create()),
       frontier_places_(config.frontier_places.create()),
       sinks_(Sink::instantiate(config.sinks)) {
   if (!config.use_frontiers) {
     frontier_places_.reset();
+  }
+
+  if (config.lcd_use_bow_vectors) {
+    state_->bow_queue = std::make_shared<SharedModuleState::BowQueue>();
   }
 
   CHECK(dsg_ != nullptr);
@@ -275,33 +282,12 @@ void FrontendModule::spinOnce(const ReconstructionOutput::Ptr& msg) {
     initCallbacks();
   }
 
-  if (input_dispatches_.size() != input_callbacks_.size()) {
-    input_dispatches_.clear();
-    for (size_t i = 0; i < input_callbacks_.size(); ++i) {
-      input_dispatches_.push_back(
-          [this, i](const auto& msg_ptr) { input_callbacks_.at(i)(*msg_ptr); });
-    }
-  }
-
   VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg->timestamp_ns << " [ns]";
   std::lock_guard<std::mutex> lock(mutex_);
   ScopedTimer timer("frontend/spin", msg->timestamp_ns);
 
-  if (dsg_->graph && backend_input_) {
-    ScopedTimer sink_timer("frontend/sinks", msg->timestamp_ns);
-    Sink::callAll(sinks_, msg->timestamp_ns, *dsg_->graph, *backend_input_);
-  }
-
   backend_input_.reset(new BackendInput());
   backend_input_->timestamp_ns = msg->timestamp_ns;
-  for (const auto& graph : msg->pose_graphs) {
-    backend_input_->pose_graphs.push_back(graph);
-  }
-
-  if (msg->agent_node_measurements) {
-    backend_input_->agent_node_measurements = msg->agent_node_measurements;
-  }
-
   if (state_->lcd_queue) {
     lcd_input_.reset(new LcdInput());
     lcd_input_->timestamp_ns = msg->timestamp_ns;
@@ -314,18 +300,17 @@ void FrontendModule::spinOnce(const ReconstructionOutput::Ptr& msg) {
   // no fancy threading: we just mark the update time and copy all changes in one go
   {  // start critical section
     std::unique_lock<std::mutex> lock(state_->backend_graph->mutex);
-    ScopedTimer timer2("frontend/merge_graph", msg->timestamp_ns);
+    ScopedTimer merge_timer("frontend/merge_graph", msg->timestamp_ns);
     state_->backend_graph->last_update_time = msg->timestamp_ns;
     state_->backend_graph->graph->mergeGraph(*dsg_->graph);
   }  // end critical section
 
   if (state_->lcd_queue) {
-    {  // start critical section
-      std::unique_lock<std::mutex> lock(state_->lcd_graph->mutex);
-      ScopedTimer timer3("frontend/merge_lcd_graph", msg->timestamp_ns);
-      state_->lcd_graph->last_update_time = msg->timestamp_ns;
-      state_->lcd_graph->graph->mergeGraph(*dsg_->graph);
-    }  // end critical section
+    // n.b., critical section in this scope!
+    std::unique_lock<std::mutex> lock(state_->lcd_graph->mutex);
+    ScopedTimer merge_timer("frontend/merge_lcd_graph", msg->timestamp_ns);
+    state_->lcd_graph->last_update_time = msg->timestamp_ns;
+    state_->lcd_graph->graph->mergeGraph(*dsg_->graph);
   }
 
   backend_input_->mesh_update = last_mesh_update_;
@@ -338,9 +323,24 @@ void FrontendModule::spinOnce(const ReconstructionOutput::Ptr& msg) {
     // mutex not required because nothing is modifying the graph
     frontend_graph_logger_.logGraph(dsg_->graph);
   }
+
+  if (dsg_->graph && backend_input_) {
+    ScopedTimer sink_timer("frontend/sinks", msg->timestamp_ns);
+    Sink::callAll(sinks_, msg->timestamp_ns, *dsg_->graph, *backend_input_);
+  }
 }
 
 void FrontendModule::updateImpl(const ReconstructionOutput::Ptr& msg) {
+  // TODO(nathan) make this more formal
+  if (input_dispatches_.size() != input_callbacks_.size()) {
+    // initialize dispatch versions of callbacks if not initialized
+    input_dispatches_.clear();
+    for (size_t i = 0; i < input_callbacks_.size(); ++i) {
+      input_dispatches_.push_back(
+          [this, i](const auto& msg_ptr) { input_callbacks_.at(i)(*msg_ptr); });
+    }
+  }
+
   {  // start timing scope
     ScopedTimer timer("frontend/launch_callbacks", msg->timestamp_ns, true, 1, false);
     launchCallbacks(input_dispatches_, msg);
@@ -536,6 +536,12 @@ void FrontendModule::updatePlaces2d(const ReconstructionOutput& input) {
 }
 
 void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
+  if (!tracker_) {
+    LOG_FIRST_N(WARNING, 1)
+        << "PoseGraphTracker disabled, no agent layer will be created";
+    return;
+  }
+
   std::unique_lock<std::mutex> lock(dsg_->mutex);
   ScopedTimer timer("frontend/update_posegraph", input.timestamp_ns);
   const auto& prefix = GlobalInfo::instance().getRobotPrefix();
@@ -545,7 +551,12 @@ void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
     lcd_input_->new_agent_nodes.clear();
   }
 
-  for (const auto& pose_graph : input.pose_graphs) {
+  const auto packet = tracker_->update(input.timestamp_ns, input.world_T_body());
+  if (backend_input_) {
+    backend_input_->agent_updates = packet;
+  }
+
+  for (const auto& pose_graph : packet.pose_graphs) {
     if (!pose_graph || pose_graph->nodes.empty()) {
       continue;
     }
@@ -585,19 +596,22 @@ void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
   }
 
   addPlaceAgentEdges(input.timestamp_ns);
-  if (config.lcd_use_bow_vectors) {
-    assignBowVectors(agents);
-  }
+  assignBowVectors(agents);
 }
 
 void FrontendModule::assignBowVectors(const DynamicLayer& agents) {
+  if (!state_->bow_queue) {
+    return;
+  }
+
   const auto& prefix = GlobalInfo::instance().getRobotPrefix();
   // TODO(nathan) take care of synchronization better
   // lcd_input_->new_agent_nodes.clear();
 
   // add bow messages received since last spin
-  while (!state_->visual_lcd_queue.empty()) {
-    cached_bow_messages_.push_back(state_->visual_lcd_queue.pop());
+  auto& bow_queue = *state_->bow_queue;
+  while (!bow_queue.empty()) {
+    cached_bow_messages_.push_back(bow_queue.pop());
   }
 
   const auto prior_size = cached_bow_messages_.size();

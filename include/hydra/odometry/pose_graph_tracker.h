@@ -41,35 +41,21 @@
 
 namespace hydra {
 
-struct InputPacket;
-struct ReconstructionOutput;
-
-class PoseGraphTracker {
- public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  using Ptr = std::unique_ptr<PoseGraphTracker>;
-
-  struct Config {
-    bool make_pose_graph = false;
-  };
-
-  explicit PoseGraphTracker(const Config& config);
-
-  ~PoseGraphTracker() = default;
-
-  void update(const InputPacket& msg);
-
-  void fillPoseGraphs(ReconstructionOutput& output);
-
- protected:
-  const Config config_;
-  std::list<pose_graph_tools::PoseGraph::ConstPtr> graphs_;
-
-  uint64_t prev_time_;
-  size_t num_poses_received_;
-  Eigen::Isometry3d prev_pose_;
+struct PoseGraphPacket {
+  using Ptr = std::shared_ptr<PoseGraphPacket>;
+  //! current update
+  uint64_t timestamp_ns;
+  //! pose graph updates
+  std::vector<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
+  //! external optimization priors
+  pose_graph_tools::PoseGraph::ConstPtr external_priors;
 };
 
-void declare_config(PoseGraphTracker::Config& config);
+struct PoseGraphTracker {
+  using Ptr = std::unique_ptr<PoseGraphTracker>;
+  virtual ~PoseGraphTracker() = default;
+  virtual PoseGraphPacket update(uint64_t timestamp_ns,
+                                 const Eigen::Isometry3d& world_T_body) = 0;
+};
 
 }  // namespace hydra

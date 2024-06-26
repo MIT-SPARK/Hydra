@@ -32,44 +32,45 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
+#include <gtest/gtest.h>
+#include <hydra/odometry/pose_graph_from_odom.h>
 
-#include <gtsam/inference/Symbol.h>
+#include "hydra_test/config_guard.h"
 
-#include "hydra/common/shared_dsg_info.h"
+namespace hydra {
 
-namespace kimera_pgmo {
-class MeshDelta;
+using pose_graph_tools::PoseGraph;
+
+TEST(PoseGraphFromOdom, GraphBuildingCorrect) {
+  test::ConfigGuard guard;
+
+  PoseGraphFromOdom::Config config;
+  PoseGraphFromOdom tracker(config);
+
+  Eigen::Isometry3d pose = Eigen::Isometry3d::Identity();
+
+  {  // not enough poses for an edge: no pose graphs
+    const auto packet = tracker.update(10u, pose);
+    EXPECT_FALSE(packet.external_priors);
+    EXPECT_EQ(packet.pose_graphs.size(), 0u);
+  }
+
+  {  // two input poses: single edge
+    const auto packet = tracker.update(15u, pose);
+    EXPECT_FALSE(packet.external_priors);
+    ASSERT_EQ(packet.pose_graphs.size(), 1u);
+    ASSERT_TRUE(packet.pose_graphs.front());
+    const auto& graph = *packet.pose_graphs.front();
+    ASSERT_EQ(graph.nodes.size(), 2u);
+    ASSERT_EQ(graph.edges.size(), 1u);
+    const auto& source = graph.nodes.at(0);
+    const auto& target = graph.nodes.at(1);
+    const auto& edge = graph.edges.at(0);
+    EXPECT_EQ(source.stamp_ns, 10u);
+    EXPECT_EQ(target.stamp_ns, 15u);
+    EXPECT_EQ(edge.stamp_ns, 15u);
+    EXPECT_EQ(graph.stamp_ns, 15u);
+  }
 }
 
-namespace hydra::utils {
-
-std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol key);
-
-void updatePlace2dMesh(Place2dNodeAttributes& attrs,
-                       const kimera_pgmo::MeshDelta& mesh_update,
-                       const size_t num_archived_vertices);
-
-void updatePlace2dBoundary(Place2dNodeAttributes& attrs,
-                           const kimera_pgmo::MeshDelta& mesh_update);
-
-void updatePlaces2d(SharedDsgInfo::Ptr dsg,
-                    kimera_pgmo::MeshDelta& mesh_update,
-                    size_t num_archived_vertices);
-
-template <typename T>
-void mergeIndices(const T& from, T& to) {
-  std::vector<typename T::value_type> from_indices(from.begin(), from.end());
-  std::vector<typename T::value_type> to_indices(to.begin(), to.end());
-  to.clear();
-
-  std::sort(from_indices.begin(), from_indices.end());
-  std::sort(to_indices.begin(), to_indices.end());
-  std::set_union(from_indices.begin(),
-                 from_indices.end(),
-                 to_indices.begin(),
-                 to_indices.end(),
-                 std::back_inserter(to));
-}
-
-}  // namespace hydra::utils
+}  // namespace hydra

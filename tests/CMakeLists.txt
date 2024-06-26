@@ -17,6 +17,7 @@ add_executable(
   backend/test_update_rooms_buildings_functor.cpp
   common/test_config_utilities.cpp
   input/test_camera.cpp
+  input/test_input_packet.cpp
   input/test_lidar.cpp
   input/test_sensor.cpp
   input/test_sensor_utilities.cpp
@@ -25,6 +26,7 @@ add_executable(
   loop_closure/test_registration.cpp
   loop_closure/test_scene_graph_descriptors.cpp
   loop_closure/test_subgraph_extraction.cpp
+  odometry/test_pose_graph_from_odom.cpp
   places/test_compression_graph_extractor.cpp
   places/test_floodfill_graph_extractor.cpp
   places/test_graph_extractor_utilities.cpp
@@ -32,7 +34,6 @@ add_executable(
   places/test_gvd_utilities.cpp
   places/test_voxel_templates.cpp
   reconstruction/test_marching_cubes.cpp
-  reconstruction/test_reconstruction_module.cpp
   reconstruction/test_semantic_integrator.cpp
   reconstruction/test_tsdf_interpolators.cpp
   reconstruction/test_volumetric_map.cpp
@@ -43,7 +44,6 @@ add_executable(
   utils/test_active_window_tracker.cpp
   utils/test_minimum_spanning_tree.cpp
   utils/test_nearest_neighbor_utilities.cpp
-  utils/test_pose_graph_tracker.cpp
   utils/test_timing_utilities.cpp
 )
 target_include_directories(

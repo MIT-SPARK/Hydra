@@ -42,15 +42,14 @@
 #include "hydra/common/input_queue.h"
 #include "hydra/common/module.h"
 #include "hydra/common/output_sink.h"
+#include "hydra/input/input_packet.h"
+#include "hydra/input/sensor.h"
 #include "hydra/places/robot_footprint_integrator.h"
 #include "hydra/reconstruction/mesh_integrator_config.h"
 #include "hydra/reconstruction/projective_integrator_config.h"
-#include "hydra/input/input_packet.h"
 #include "hydra/reconstruction/reconstruction_output.h"
-#include "hydra/input/sensor.h"
 #include "hydra/reconstruction/volumetric_map.h"
 #include "hydra/utils/log_utilities.h"
-#include "hydra/utils/pose_graph_tracker.h"
 
 namespace hydra {
 
@@ -79,7 +78,6 @@ class ReconstructionModule : public Module {
     float semantic_measurement_probability = 0.9;
     ProjectiveIntegratorConfig tsdf;
     MeshIntegratorConfig mesh;
-    PoseGraphTracker::Config pose_graphs;
     config::VirtualConfig<RobotFootprintIntegrator> robot_footprint;
     std::vector<Sink::Factory> sinks;
   } const config;
@@ -122,9 +120,6 @@ class ReconstructionModule : public Module {
   std::unique_ptr<std::thread> spin_thread_;
   size_t num_poses_received_;
   std::set<uint64_t> timestamp_cache_;
-
-  pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements_;
-  PoseGraphTracker::Ptr pose_graph_tracker_;
 
   OutputQueue::Ptr output_queue_;
   Sink::List sinks_;

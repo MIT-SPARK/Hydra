@@ -34,44 +34,16 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/input/input_packet.h>
-#include <hydra/reconstruction/reconstruction_output.h>
-#include <hydra/utils/pose_graph_tracker.h>
 
-namespace hydra {
+TEST(InputPacket, TestIsometryConstruction) {
+  hydra::InputPacket packet;
+  packet.world_R_body = Eigen::Quaterniond(0.0, 1.0, 0.0, 0.0);
+  packet.world_t_body = Eigen::Vector3d(1, 2, 3);
 
-using pose_graph_tools::PoseGraph;
+  Eigen::Matrix4d expected = Eigen::Matrix4d::Identity();
+  expected.block<3, 3>(0, 0) = packet.world_R_body.toRotationMatrix();
+  expected.block<3, 1>(0, 3) = packet.world_t_body;
 
-TEST(PoseGraphTracker, EmptyGraphsCorrect) {
-  PoseGraphTracker::Config config;
-  config.make_pose_graph = false;
-  PoseGraphTracker tracker(config);
-
-  InputPacket msg;
-  ReconstructionOutput result;
-
-  // no input pose graphs -> no output pose graphs
-  tracker.update(msg);
-  tracker.fillPoseGraphs(result);
-  EXPECT_EQ(result.pose_graphs.size(), 0u);
-
-  // two input pose graphs -> two output pose graphs
-  msg.pose_graphs.push_back(PoseGraph::ConstPtr(new PoseGraph()));
-  msg.pose_graphs.push_back(PoseGraph::ConstPtr(new PoseGraph()));
-  tracker.update(msg);
-  tracker.fillPoseGraphs(result);
-  EXPECT_EQ(result.pose_graphs.size(), 2u);
-
-  // no input pose graphs -> no change in output
-  msg.pose_graphs.clear();
-  tracker.update(msg);
-  tracker.fillPoseGraphs(result);
-  EXPECT_EQ(result.pose_graphs.size(), 2u);
-
-  // one input pose graph -> three total graphs
-  msg.pose_graphs.push_back(PoseGraph::ConstPtr(new PoseGraph()));
-  tracker.update(msg);
-  tracker.fillPoseGraphs(result);
-  EXPECT_EQ(result.pose_graphs.size(), 3u);
+  const auto result = packet.world_T_body();
+  EXPECT_TRUE(expected.isApprox(result.matrix(), 1.0e-6));
 }
-
-}  // namespace hydra

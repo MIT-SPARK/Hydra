@@ -33,8 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <pose_graph_tools/pose_graph.h>
-
 #include <Eigen/Geometry>
 #include <list>
 
@@ -50,8 +48,6 @@ struct InputPacket {
   uint64_t timestamp_ns;
 
   SensorInputPacket::Ptr sensor_input;
-  std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
-  pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements;
   Eigen::Vector3d world_t_body;
   Eigen::Quaterniond world_R_body;
 

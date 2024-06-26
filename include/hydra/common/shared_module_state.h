@@ -36,7 +36,6 @@
 #include <kimera_pgmo/mesh_delta.h>
 #include <kimera_pgmo/utils/common_structs.h>
 #include <pose_graph_tools/bow_query.h>
-#include <pose_graph_tools/pose_graph.h>
 
 #include <list>
 #include <map>
@@ -50,6 +49,7 @@
 #include "hydra/common/robot_prefix_config.h"
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/loop_closure/registration_solution.h"
+#include "hydra/odometry/pose_graph_tracker.h"
 
 namespace hydra {
 
@@ -67,13 +67,13 @@ struct BackendInput {
   RobotPrefixConfig prefix;
   uint64_t timestamp_ns;
   pose_graph_tools::PoseGraph::ConstPtr deformation_graph;
-  std::list<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
-  pose_graph_tools::PoseGraph::ConstPtr agent_node_measurements;
+  PoseGraphPacket agent_updates;
   kimera_pgmo::MeshDelta::Ptr mesh_update;
 };
 
 struct SharedModuleState {
   using Ptr = std::shared_ptr<SharedModuleState>;
+  using BowQueue = InputQueue<pose_graph_tools::BowQuery::ConstPtr>;
 
   SharedModuleState();
 
@@ -81,9 +81,9 @@ struct SharedModuleState {
 
   NodeIdSet latest_places;
 
-  InputQueue<pose_graph_tools::BowQuery::ConstPtr> visual_lcd_queue;
   InputQueue<BackendInput::Ptr> backend_queue;
   InputQueue<LcdInput::Ptr>::Ptr lcd_queue;
+  BowQueue::Ptr bow_queue;
   InputQueue<lcd::RegistrationSolution> backend_lcd_queue;
   SharedDsgInfo::Ptr lcd_graph;
   SharedDsgInfo::Ptr backend_graph;

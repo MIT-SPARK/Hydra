@@ -41,13 +41,19 @@ namespace hydra {
 SharedModuleState::SharedModuleState() {}
 
 SharedModuleState::~SharedModuleState() {
-  VLOG(2) << "visual_lcd_queue: " << visual_lcd_queue.size();
   VLOG(2) << "backend_queue: " << backend_queue.size();
   if (lcd_queue) {
     VLOG(2) << "lcd_queue: " << lcd_queue->size();
   } else {
     VLOG(2) << "lcd_queue: n/a";
   }
+
+  if (bow_queue) {
+    VLOG(2) << "bow_queue: " << bow_queue->size();
+  } else {
+    VLOG(2) << "bow_queue: n/a";
+  }
+
   VLOG(2) << "backend_lcd_queue: " << backend_lcd_queue.size();
 }
 

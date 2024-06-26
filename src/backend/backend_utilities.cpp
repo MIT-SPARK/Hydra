@@ -52,33 +52,6 @@ std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol 
   return graph.getNode(node).timestamp.value().count();
 }
 
-std::string logPoseGraphConnections(const pose_graph_tools::PoseGraph& graph) {
-  std::stringstream ss;
-  ss << "nodes: [";
-  auto iter = graph.nodes.begin();
-  while (iter != graph.nodes.end()) {
-    ss << "{r=" << iter->robot_id << ", k=" << iter->key << "}";
-    ++iter;
-    if (iter != graph.nodes.end()) {
-      ss << ", ";
-    }
-  }
-
-  ss << "], edges: [";
-  auto eiter = graph.edges.begin();
-  while (eiter != graph.edges.end()) {
-    ss << eiter->robot_from << "(" << eiter->key_from << ") -> " << eiter->robot_to
-       << "(" << eiter->key_to << ")";
-    ++eiter;
-    if (eiter != graph.edges.end()) {
-      ss << ", ";
-    }
-  }
-  ss << "]";
-
-  return ss.str();
-}
-
 void updatePlace2dMesh(Place2dNodeAttributes& attrs,
                        const kimera_pgmo::MeshDelta& mesh_update,
                        const size_t num_archived_vertices) {

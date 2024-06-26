@@ -385,17 +385,16 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
     throw std::logic_error(e.what());
   }
 
-  for (const auto& msg : input.pose_graphs) {
+  for (const auto& msg : input.agent_updates.pose_graphs) {
     status_.new_factors += msg->edges.size();
 
-    VLOG(5) << "[Hydra Backend] Adding pose graph message: "
-            << utils::logPoseGraphConnections(*msg);
+    VLOG(5) << "[Hydra Backend] Adding pose graph message: " << *msg;
     processIncrementalPoseGraph(*msg, trajectory_, timestamps_, unconnected_nodes_);
     logIncrementalLoopClosures(*msg);
   }
 
-  if (input.agent_node_measurements) {
-    updateAgentNodeMeasurements(*input.agent_node_measurements);
+  if (input.agent_updates.external_priors) {
+    updateAgentNodeMeasurements(*input.agent_updates.external_priors);
     // Think of it as "implicit" loop closures
     have_loopclosures_ = true;
     have_new_loopclosures_ = true;

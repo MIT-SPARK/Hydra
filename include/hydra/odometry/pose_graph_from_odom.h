@@ -32,17 +32,41 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <gtest/gtest.h>
-#include <hydra/reconstruction/reconstruction_module.h>
+#pragma once
+#include <config_utilities/factory.h>
+#include <hydra/odometry/pose_graph_tracker.h>
 
-TEST(PoseGraph, TestAffineConstruction) {
-  Eigen::Quaterniond q(0.0, 1.0, 0.0, 0.0);
-  Eigen::Vector3d t(1, 2, 3);
+namespace hydra {
 
-  Eigen::Matrix4d expected = Eigen::Matrix4d::Identity();
-  expected.block<3, 3>(0, 0) = q.toRotationMatrix();
-  expected.block<3, 1>(0, 3) = t;
+struct StampedPose {
+  uint64_t stamp;
+  Eigen::Isometry3d pose;
+};
 
-  Eigen::Affine3d T(Eigen::Translation3d(t) * q);
-  EXPECT_TRUE(expected.isApprox(T.matrix(), 1.0e-6));
-}
+class PoseGraphFromOdom : public PoseGraphTracker {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  struct Config {
+  } const config;
+
+  explicit PoseGraphFromOdom(const Config& config);
+
+  ~PoseGraphFromOdom() = default;
+
+  PoseGraphPacket update(uint64_t timestamp_ns,
+                         const Eigen::Isometry3d& world_T_body) override;
+
+ protected:
+  size_t num_poses_received_;
+  StampedPose prev_pose_;
+
+ private:
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<PoseGraphTracker, PoseGraphFromOdom, Config>(
+          "PoseGraphFromOdom");
+};
+
+void declare_config(PoseGraphFromOdom::Config& config);
+
+}  // namespace hydra

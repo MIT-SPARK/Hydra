@@ -51,6 +51,7 @@
 #include "hydra/frontend/frontier_places_interface.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/surface_places_interface.h"
+#include "hydra/odometry/pose_graph_from_odom.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/utils/log_utilities.h"
 
@@ -81,6 +82,8 @@ class FrontendModule : public Module {
       double time_horizon = 10.0;
     } pgmo;
     MeshSegmenter::Config object_config;
+    config::VirtualConfig<PoseGraphTracker> pose_graph_tracker{
+        PoseGraphFromOdom::Config()};
     config::VirtualConfig<SurfacePlacesInterface> surface_places;
     config::VirtualConfig<FreespacePlacesInterface> freespace_places;
     bool use_frontiers = false;
@@ -174,6 +177,7 @@ class FrontendModule : public Module {
   std::shared_ptr<kimera_pgmo::HashedIndexMapping> mesh_remapping_;
 
   std::unique_ptr<MeshSegmenter> segmenter_;
+  std::unique_ptr<PoseGraphTracker> tracker_;
   std::unique_ptr<SurfacePlacesInterface> surface_places_;
   std::unique_ptr<FreespacePlacesInterface> freespace_places_;
   std::unique_ptr<FrontierPlacesInterface> frontier_places_;
