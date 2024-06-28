@@ -55,12 +55,10 @@
 
 #include "hydra/input/sensor_utilities.h"
 #include "hydra/reconstruction/index_getter.h"
-#include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
 
 using VoxelMeasurement = ProjectiveIntegrator::VoxelMeasurement;
-using timing::ScopedTimer;
 
 ProjectiveIntegrator::ProjectiveIntegrator(const ProjectiveIntegratorConfig& config)
     : config(config::checkValid(config)),
@@ -82,7 +80,6 @@ void ProjectiveIntegrator::updateMap(const InputData& data,
   }
 
   VLOG(config.verbosity) << "Updating " << block_indices.size() << " blocks.";
-  ScopedTimer timer("integration_tsdf", data.timestamp_ns);
   updateBlocks(block_indices, data, map);
 
   // De-allocate blocks that were not updated.

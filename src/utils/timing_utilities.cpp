@@ -60,6 +60,7 @@ std::ostream& operator<<(std::ostream& out, const ElapsedStatistics& stats) {
 ElapsedTimeRecorder::ElapsedTimeRecorder()
     : timing_disabled(false), disable_output(true), log_incrementally_(false) {}
 
+// TODO(lschmid): Consider moving this into the timers in the future.
 void ElapsedTimeRecorder::start(const std::string& timer_name,
                                 const uint64_t& timestamp) {
   bool have_start_already = false;
@@ -126,6 +127,18 @@ void ElapsedTimeRecorder::stop(const std::string& timer_name) {
   auto& fout = *iter->second;
   std::chrono::duration<double> elapsed_s = elapsed;
   fout << stamp << "," << elapsed_s.count() << std::endl;
+}
+
+void ElapsedTimeRecorder::record(const std::string& timer_name,
+                                 const uint64_t timestamp,
+                                 const std::chrono::nanoseconds elapsed) {
+  std::unique_lock<std::mutex> lock(mutex_);
+  if (!elapsed_.count(timer_name)) {
+    elapsed_[timer_name] = TimeList();
+    stamps_[timer_name] = TimeStamps();
+  }
+  elapsed_[timer_name].push_back(elapsed);
+  stamps_[timer_name].push_back(timestamp);
 }
 
 void ElapsedTimeRecorder::reset() { instance_.reset(new ElapsedTimeRecorder()); }
@@ -289,12 +302,14 @@ void ElapsedTimeRecorder::logStats(const std::string& filename) const {
   output_file.open(filename);
 
   // file format
-  output_file << "name,mean[s],min[s],max[s],std-dev[s]\n";
+  std::stringstream ss;
+  ss << "name,mean[s],min[s],max[s],std-dev[s]\n";
   for (const auto& str_timer_pair : elapsed_) {
     const ElapsedStatistics& stats = getStats(str_timer_pair.first);
-    output_file << str_timer_pair.first << "," << stats.mean_s << "," << stats.min_s
-                << "," << stats.max_s << "," << stats.stddev_s << "\n";
+    ss << str_timer_pair.first << "," << stats.mean_s << "," << stats.min_s << ","
+       << stats.max_s << "," << stats.stddev_s << "\n";
   }
+  output_file << ss.str();
   output_file.close();
 }
 
@@ -319,6 +334,9 @@ ScopedTimer::ScopedTimer(const std::string& name, uint64_t timestamp)
 ScopedTimer::~ScopedTimer() { stop(); }
 
 void ScopedTimer::start() {
+  if (is_running_) {
+    return;
+  }
   if (ElapsedTimeRecorder::instance().timing_disabled) {
     return;
   }
@@ -328,9 +346,13 @@ void ScopedTimer::start() {
   }
 
   ElapsedTimeRecorder::instance().start(name_, timestamp_);
+  is_running_ = true;
 }
 
 void ScopedTimer::stop() {
+  if (!is_running_) {
+    return;
+  }
   if (ElapsedTimeRecorder::instance().timing_disabled) {
     return;
   }
@@ -339,6 +361,7 @@ void ScopedTimer::stop() {
     return;
   }
 
+  is_running_ = false;
   ElapsedTimeRecorder::instance().stop(name_);
   if (!verbose_) {
     return;

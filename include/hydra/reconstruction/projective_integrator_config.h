@@ -37,8 +37,8 @@
 
 #include <string>
 
-#include "hydra/reconstruction/semantic_integrator.h"
 #include "hydra/common/global_info.h"
+#include "hydra/reconstruction/semantic_integrator.h"
 
 namespace hydra {
 

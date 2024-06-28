@@ -71,6 +71,10 @@ class ElapsedTimeRecorder {
 
   void stop(const std::string& timer_name);
 
+  void record(const std::string& timer_name,
+              const uint64_t timestamp,
+              const std::chrono::nanoseconds elapsed);
+
   void reset();
 
   std::optional<double> getLastElapsed(const std::string& timer_name) const;
@@ -140,6 +144,7 @@ class ScopedTimer {
   int verbosity_;
   bool elapsed_only_;
   bool verbosity_disables_;
+  bool is_running_ = false;
 };
 
 }  // namespace timing

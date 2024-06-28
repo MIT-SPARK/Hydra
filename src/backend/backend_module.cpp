@@ -266,8 +266,7 @@ void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
   status_.reset();
   std::lock_guard<std::mutex> lock(mutex_);
 
-  auto update_timer =
-      std::make_unique<ScopedTimer>("backend/update", input.timestamp_ns);
+  ScopedTimer timer("backend/update", input.timestamp_ns);
   updateFactorGraph(input);
   updateFromLcdQueue();
   status_.total_loop_closures = num_loop_closures_;
@@ -282,13 +281,10 @@ void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
     // factor graph update packets (as long as force_update is false)
     // we still log the status for each received frontend packet
     logStatus();
-    update_timer.reset();  // mark update from dsg finished
     return;
   }
 
-  update_timer.reset();  // mark update from dsg finished
-
-  ScopedTimer spin_timer("backend/spin", input.timestamp_ns);
+  timer.reset("backend/spin"); 
   if (config.optimize_on_lc && have_loopclosures_) {
     optimize(input.timestamp_ns);
   } else {

@@ -162,7 +162,6 @@ void GvdPlaceExtractor::detect(const ReconstructionOutput& msg) {
     ScopedTimer dtimer("frontend/downsample_tsdf", msg.timestamp_ns, true, 2, false);
     const auto blocks = tsdf->blockIndicesWithCondition(TsdfBlock::esdfUpdated);
     tsdf_ptr = tsdf_interpolator_->interpolate(*tsdf, &blocks);
-
     for (auto& block : *tsdf_ptr) {
       block.setUpdated();
     }
@@ -171,9 +170,7 @@ void GvdPlaceExtractor::detect(const ReconstructionOutput& msg) {
   }
 
   if (!gvd_) {
-    const auto voxel_size = tsdf->voxel_size;
-    const auto vps = tsdf->voxels_per_side;
-    gvd_.reset(new places::GvdLayer(voxel_size, vps));
+    gvd_.reset(new places::GvdLayer(tsdf->voxel_size, tsdf->voxels_per_side));
     gvd_integrator_.reset(new GvdIntegrator(config.gvd, gvd_, graph_extractor_));
   }
 
