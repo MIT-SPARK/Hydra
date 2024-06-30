@@ -17,7 +17,6 @@
 - git:
     local-name: pose_graph_tools
     uri: git@github.com:MIT-SPARK/pose_graph_tools.git
-    version: develop
 - git:
     local-name: spatial_hash
     uri: git@github.com:MIT-SPARK/Spatial-Hash.git
