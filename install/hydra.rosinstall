@@ -12,11 +12,11 @@
     local-name: kimera_rpgo
     uri: git@github.com:MIT-SPARK/Kimera-RPGO.git
 - git:
-    local-name: spark_dsg
-    uri: git@github.com:MIT-SPARK/Spark-DSG.git
-- git:
     local-name: pose_graph_tools
     uri: git@github.com:MIT-SPARK/pose_graph_tools.git
+- git:
+    local-name: spark_dsg
+    uri: git@github.com:MIT-SPARK/Spark-DSG.git
 - git:
     local-name: spatial_hash
     uri: git@github.com:MIT-SPARK/Spatial-Hash.git

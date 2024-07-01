@@ -2,14 +2,12 @@
     local-name: catkin_simple
     uri: git@github.com:catkin/catkin_simple.git
 - git:
+    local-name: hydra_vio_configs
+    uri: git@github.mit.edu:SPARK/hydra_vio_configs.git
+- git:
     local-name: kimera_vio
     uri: git@github.mit.edu:SPARK/Kimera-VIO.git
     version: feature/bundle_thirdparty
 - git:
     local-name: kimera_vio_ros
     uri: git@github.mit.edu:SPARK/Kimera-VIO-ROS.git
-    version: develop
-- git:
-    local-name: hydra_vio_configs
-    uri: git@github.mit.edu:SPARK/hydra_vio_configs.git
-    version: main
