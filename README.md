@@ -135,6 +135,10 @@ These also detail how to use Hydra with [Kimera-VIO](https://github.com/MIT-SPAR
 
 See [here](python/README.md) for information
 
+### Hydra Evaluation
+
+See [here](eval/README.md) for information
+
 ### Using a Semantic Segmentation Network
 
 > **Note**<br>
