@@ -69,7 +69,6 @@ bool DataReceiver::checkInputTimestamp(uint64_t timestamp_ns) {
 void declare_config(DataReceiver::Config& config) {
   using namespace config;
   name("DataReceiver::Config");
-  field(config.sensor, "sensor");
   field(config.input_separation_s, "input_separation_s");
 }
 
