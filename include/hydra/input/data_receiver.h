@@ -33,13 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/virtual_config.h>
-
 #include <optional>
 
 #include "hydra/common/input_queue.h"
 #include "hydra/input/sensor_input_packet.h"
-#include "hydra/input/sensor.h"
 
 namespace hydra {
 
@@ -48,7 +45,6 @@ class DataReceiver {
   using DataQueue = InputQueue<SensorInputPacket::Ptr>;
 
   struct Config {
-    config::VirtualConfig<Sensor> sensor;
     double input_separation_s = 0.0;
   };
 

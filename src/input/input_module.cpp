@@ -43,20 +43,27 @@
 
 namespace hydra {
 
+void declare_config(InputModule::Config::InputPair& config) {
+  using namespace config;
+  name("InputModule::InputPair::Config");
+  field(config.receiver, "receiver");
+  field(config.sensor, "sensor");
+}
+
 void declare_config(InputModule::Config& config) {
   using namespace config;
   name("InputModule::Config");
-  field(config.receivers, "receivers");
-  checkCondition(!config.receivers.empty(), "At least one receiver must be specified");
+  field(config.inputs, "inputs");
+  checkCondition(!config.inputs.empty(), "At least one input must be specified");
 }
 
 InputModule::InputModule(const Config& config, const OutputQueue::Ptr& queue)
     : config(config::checkValid(config)), queue_(queue) {
   // Setup the receivers and instatiate their sensors globally.
   std::vector<config::VirtualConfig<Sensor>> sensor_configs;
-  for (size_t i = 0; i < config.receivers.size(); ++i) {
-    receivers_.emplace_back(config.receivers[i].create(i));
-    sensor_configs.push_back(receivers_.back()->config.sensor);
+  for (size_t i = 0; i < config.inputs.size(); ++i) {
+    receivers_.emplace_back(config.inputs[i].receiver.create(i));
+    sensor_configs.push_back(config.inputs[i].sensor);
   }
 
   GlobalInfo::instance().setSensors(sensor_configs);

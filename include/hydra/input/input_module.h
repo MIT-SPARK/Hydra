@@ -56,7 +56,11 @@ class InputModule : public Module {
  public:
   using OutputQueue = InputQueue<InputPacket::Ptr>;
   struct Config {
-    std::vector<config::VirtualConfig<DataReceiver>> receivers;
+    struct InputPair {
+      config::VirtualConfig<DataReceiver> receiver;
+      config::VirtualConfig<Sensor> sensor;
+    };
+    std::vector<InputPair> inputs;
   } const config;
 
   InputModule(const Config& config, const OutputQueue::Ptr& output_queue);
@@ -86,6 +90,7 @@ class InputModule : public Module {
   std::unique_ptr<std::thread> data_thread_;
 };
 
+void declare_config(InputModule::Config::InputPair& config);
 void declare_config(InputModule::Config& config);
 
 }  // namespace hydra
