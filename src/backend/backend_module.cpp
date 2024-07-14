@@ -69,28 +69,20 @@ using pose_graph_tools::PoseGraph;
 void declare_config(BackendModule::Config& config) {
   using namespace config;
   name("BackendConfig");
-  field(config.visualize_place_factors, "visualize_place_factors");
   field(config.enable_rooms, "enable_rooms");
   field(config.room_finder, "room_finder");
   field(config.enable_buildings, "enable_buildings");
   field(config.building_color, "building_color");
   field(config.building_semantic_label, "building_semantic_label");
   field(config.pgmo, "pgmo");
-  field(config.use_2d_places, "use_2d_places");
   field(config.places2d_config, "places2d_config");
 
   enter_namespace("dsg");
   field(config.add_places_to_deformation_graph, "add_places_to_deformation_graph");
   field(config.optimize_on_lc, "optimize_on_lc");
   field(config.enable_node_merging, "enable_node_merging");
-  field<LayerMapConversion<bool>>(config.merge_update_map, "merge_update_map");
-  field(config.merge_update_dynamic, "merge_update_dynamic");
   field(config.places_merge_pos_threshold_m, "places_merge_pos_threshold_m");
   field(config.places_merge_distance_tolerance_m, "places_merge_distance_tolerance_m");
-  field(config.use_mesh_subscribers, "use_mesh_subscribers");
-  field(config.enable_merge_undos, "enable_merge_undos");
-  field(config.use_active_flag_for_updates, "use_active_flag_for_updates");
-  field(config.num_neighbors_to_find_for_merge, "num_neighbors_to_find_for_merge");
   field(config.zmq_send_url, "zmq_send_url");
   field(config.zmq_recv_url, "zmq_recv_url");
   field(config.use_zmq_interface, "use_zmq_interface");
@@ -271,10 +263,7 @@ void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
   updateFromLcdQueue();
   status_.total_loop_closures = num_loop_closures_;
 
-  if (!config.use_mesh_subscribers) {
-    copyMeshDelta(input);
-  }
-
+  copyMeshDelta(input);
   if (!updatePrivateDsg(input.timestamp_ns, force_update)) {
     VLOG(2) << "Backend skipping input @ " << input.timestamp_ns << " [ns]";
     // we only read from the frontend dsg if we've processed all the
@@ -284,7 +273,7 @@ void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
     return;
   }
 
-  timer.reset("backend/spin"); 
+  timer.reset("backend/spin");
   if (config.optimize_on_lc && have_loopclosures_) {
     optimize(input.timestamp_ns);
   } else {

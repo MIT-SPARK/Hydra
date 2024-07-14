@@ -3,17 +3,10 @@ dsg:
   add_places_to_deformation_graph: true
   optimize_on_lc: true
   enable_node_merging: true
-  use_active_flag_for_updates: true
-  num_neighbors_to_find_for_merge: 1
-  rpgo_verbosity: update
-  rpgo_solver: LM
   places_merge_pos_threshold_m: 0.35
   places_merge_distance_tolerance_m: 0.25
-  merge_update_dynamic: true
-  merge_update_map: {BUILDINGS: false, ROOMS: false, PLACES: true, OBJECTS: false}
 pgmo:
-  run_mode: FULL    # kimera_pgmo run mode FULL is required
-  use_msg_time: true
+  run_mode: FULL  # kimera_pgmo run mode FULL is required
   embed_trajectory_delta_t: 5.0
   num_interp_pts: 3
   interp_horizon: 10.0
@@ -48,7 +41,6 @@ pgmo:
     object_merge: 10.0
 building_semantic_label: 22
 building_color: [169, 8, 194]
-visualize_place_factors: false
 enable_rooms: true
 room_finder:
   min_dilation_m: 0.5
@@ -63,11 +55,8 @@ room_finder:
   clustering_mode: NEIGHBORS
   max_modularity_iters: 5
   modularity_gamma: 1.0
-  room_prefix: R
   dilation_diff_threshold_m: -1.0
   log_filtrations: false
   log_place_graphs: false
-use_2d_places:
-    true
 places2d_config:
-    allow_places_merge: true
+  allow_places_merge: true

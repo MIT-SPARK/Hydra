@@ -77,7 +77,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
                           const kimera_pgmo::DeformationGraph&>;
 
   struct Config {
-    bool visualize_place_factors = true;
     bool enable_rooms = true;
     RoomFinderConfig room_finder;
     bool enable_buildings = true;
@@ -88,24 +87,14 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
     bool add_places_to_deformation_graph = true;
     bool optimize_on_lc = true;
     bool enable_node_merging = true;
-    bool use_mesh_subscribers = false;
-    mutable std::map<LayerId, bool> merge_update_map{{DsgLayers::OBJECTS, false},
-                                                     {DsgLayers::PLACES, true},
-                                                     {DsgLayers::ROOMS, false},
-                                                     {DsgLayers::BUILDINGS, false}};
-    bool merge_update_dynamic = true;
     double places_merge_pos_threshold_m = 0.4;
     double places_merge_distance_tolerance_m = 0.3;
-    bool enable_merge_undos = false;
-    bool use_active_flag_for_updates = true;
-    size_t num_neighbors_to_find_for_merge = 1;
     std::string zmq_send_url = "tcp://127.0.0.1:8001";
     std::string zmq_recv_url = "tcp://127.0.0.1:8002";
     bool use_zmq_interface = false;
     size_t zmq_num_threads = 2;
     size_t zmq_poll_time_ms = 10;
     bool zmq_send_mesh = true;
-    bool use_2d_places = false;
     Update2dPlacesFunctor::Config places2d_config;
     UpdateFrontiersFunctor::Config frontier_config;
     std::vector<Sink::Factory> sinks;
