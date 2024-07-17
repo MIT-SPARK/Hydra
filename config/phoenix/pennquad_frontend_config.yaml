@@ -95,5 +95,5 @@ frontier_places:
     culling_point_threshold: 0
 
     recent_block_distance: 25
-    minimum_relative_z: -1.
-    maximum_relative_z: 1
+    minimum_relative_z: 0
+    maximum_relative_z: 1.5
