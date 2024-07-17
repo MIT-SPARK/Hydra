@@ -36,6 +36,7 @@
 #include <config_utilities/factory.h>
 
 #include "hydra/backend/update_functions.h"
+#include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra {
 
@@ -46,6 +47,8 @@ struct UpdateFrontiersFunctor : public UpdateFunctor {
     double frontier_removal_check_threshold = 4;
     //! Frontiers within this distance of the robot will be removed
     double frontier_removal_threshold = 1;
+    //! Distance around existing frontiers that blocks adding new frontiers
+    double frontier_exclusion_radius = 0;
   } const config;
 
   explicit UpdateFrontiersFunctor(const Config& config) : config(config) {}
@@ -54,12 +57,18 @@ struct UpdateFrontiersFunctor : public UpdateFunctor {
             SharedDsgInfo&,
             const UpdateInfo::ConstPtr&) const override;
 
-  void cleanup(uint64_t timestamp_ns, SharedDsgInfo& dsg) const;
+  void cleanup(uint64_t timestamp_ns,
+               DynamicSceneGraph& unmerged_dsg,
+               SharedDsgInfo& dsg) const;
 
  private:
   inline static const auto registration_ =
       config::RegistrationWithConfig<UpdateFunctor, UpdateFrontiersFunctor, Config>(
           "UpdateFrontiersFunctor");
+  mutable NodeSymbol next_node_id_ = NodeSymbol('G', 0);
+  mutable std::set<NodeId> deleted_frontiers_;
 };
+
+void declare_config(UpdateFrontiersFunctor::Config& config);
 
 }  // namespace hydra

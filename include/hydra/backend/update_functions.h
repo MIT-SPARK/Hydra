@@ -62,8 +62,8 @@ struct UpdateInfo {
   const std::unordered_map<NodeId, size_t>* node_to_robot_id = nullptr;
 };
 
-using LayerCleanupFunc =
-    std::function<void(const UpdateInfo::ConstPtr&, SharedDsgInfo*)>;
+using LayerCleanupFunc = std::function<void(
+    const UpdateInfo::ConstPtr&, DynamicSceneGraph&, SharedDsgInfo*)>;
 using FindMergeFunc =
     std::function<MergeList(const DynamicSceneGraph&, const UpdateInfo::ConstPtr&)>;
 using MergeFunc = std::function<NodeAttributes::Ptr(const DynamicSceneGraph&,

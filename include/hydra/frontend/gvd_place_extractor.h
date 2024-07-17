@@ -108,6 +108,7 @@ class GvdPlaceExtractor : public FreespacePlacesInterface {
   std::unique_ptr<VolumetricWindow> map_window_;
   NodeIdSet active_nodes_;
   Eigen::Vector3d latest_pos_;
+  NodeSymbol last_agent_place_symbol_ = NodeSymbol('h', 0);
   Sink::List sinks_;
 
  private:

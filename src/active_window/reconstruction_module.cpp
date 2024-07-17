@@ -142,6 +142,7 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputPacket& msg) {
     return nullptr;
   }
 
+  last_update_ns_ = timestamp_ns;
   {  // timing scope
     ScopedTimer timer("reconstruction/mesh", timestamp_ns);
     mesh_integrator_->generateMesh(map_, true, true);

@@ -37,6 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <spark_dsg/node_symbol.h>
 
 #include "hydra/utils/timing_utilities.h"
 
@@ -95,8 +96,10 @@ void UpdateRoomsFunctor::call(const DynamicSceneGraph&,
   }
 
   ScopedTimer timer("backend/room_detection", info->timestamp_ns, true, 1, false);
-  auto places_clone = places_layer->clone(
-      [](const auto& node) { return NodeSymbol(node.id).category() == 'p'; });
+  auto places_clone = places_layer->clone([](const auto& node) {
+    return NodeSymbol(node.id).category() == 'p' ||
+           NodeSymbol(node.id).category() == 'h';
+  });
 
   // TODO(nathan) layer view
   // TODO(nathan) pass in timestamp?

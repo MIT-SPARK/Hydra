@@ -389,6 +389,80 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
   ++sequence_number_;
 }
 
+void GraphBuilder::updateAgentPlaces(DynamicSceneGraph& graph) {
+  double agent_place_radius = 0.2;
+  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
+  const auto layer_key = graph.getLayerKey(DsgLayers::AGENTS);
+  if (!layer_key) {
+    LOG(ERROR) << "Update frontiers functor could not find agents layer";
+    return;
+  }
+  const auto agents = graph.findLayer(layer_key->layer, prefix.key);
+  if (!agents || agents->numNodes() == 0) {
+    LOG(WARNING) << "No agent nodes";
+    return;
+  }
+
+  for (auto& node : agents->nodes()) {
+    if (node.first > last_used_agent_symbol_) {
+      last_used_agent_symbol_ = node.first;
+      NodeSymbol previous_agent_place_symbol = last_agent_place_symbol_++;
+      NodeSymbol new_agent_place_symbol = last_agent_place_symbol_;
+
+      Eigen::Vector3d agent_pos = node.second->attributes().position;
+
+      PlaceNodeAttributes::Ptr attrs(new PlaceNodeAttributes(agent_place_radius, 3));
+      attrs->position = agent_pos;
+      attrs->is_active = true;
+      graph.emplaceNode(DsgLayers::PLACES, new_agent_place_symbol, std::move(attrs));
+      active_agent_places_.insert(new_agent_place_symbol);
+
+      if (previous_agent_place_symbol == NodeSymbol('h', 0)) {
+        continue;
+      }
+
+      auto edge_attrs = std::make_unique<EdgeAttributes>(agent_place_radius);
+
+      graph.insertEdge(
+          new_agent_place_symbol, previous_agent_place_symbol, std::move(edge_attrs));
+    }
+  }
+
+  NodeIdSet active_places = freespace_places_->getActiveNodes();
+  NearestNodeFinder place_finder =
+      NearestNodeFinder(graph.getLayer(DsgLayers::PLACES), active_places);
+
+  std::vector<NodeSymbol> nodes_to_forget;
+  for (auto& place : active_agent_places_) {
+    bool found_existing_connection = false;
+    for (auto& sibling : graph.getNode(place).siblings()) {
+      if (NodeSymbol(sibling).category() == 'h') {
+        continue;
+      }
+
+      found_existing_connection = true;
+      if (!graph.getNode(sibling).attributes().is_active) {
+        graph.findNode(place)->attributes().is_active = false;
+        nodes_to_forget.push_back(place);
+      }
+    }
+
+    if (!found_existing_connection) {
+      auto edge_attrs = std::make_unique<EdgeAttributes>(agent_place_radius);
+
+      place_finder.find(graph.findNode(place)->attributes().position,
+                        1,
+                        false,
+                        [&](NodeId place_id, size_t, double) {
+                          graph.insertEdge(place, place_id, std::move(edge_attrs));
+                        });
+    }
+  }
+  for (auto& n : nodes_to_forget) {
+    active_agent_places_.erase(n);
+  }
+}
+
 void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
   graph_updater_.update(msg->graph_update, *dsg_->graph);
 
@@ -402,7 +476,12 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
     graph_connector_.connect(*dsg_->graph);
   }
 
-  // updatePlaceMeshMapping(*msg);
+  bool add_agent_places = true;
+  if (add_agent_places) {
+    updateAgentPlaces(*dsg_->graph);
+  }
+
+  updatePlaceMeshMapping(*msg);
 }
 
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {

@@ -93,11 +93,10 @@ void updatePlace2dBoundary(Place2dNodeAttributes& attrs,
     }
 
     auto map_iter = mesh_update.prev_to_curr.find(prev_boundary_connections.at(i));
+    attrs.boundary.push_back(prev_boundary.at(i));
     if (map_iter != mesh_update.prev_to_curr.end()) {
-      attrs.boundary.push_back(prev_boundary.at(i));
       attrs.pcl_boundary_connections.push_back(map_iter->second);
     } else {
-      attrs.boundary.push_back(prev_boundary.at(i));
       attrs.pcl_boundary_connections.push_back(prev_boundary_connections.at(i));
     }
   }

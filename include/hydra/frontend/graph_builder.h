@@ -157,6 +157,8 @@ class GraphBuilder : public Module {
 
   void updatePlaceMeshMapping(const ActiveWindowOutput& input);
 
+  void updateAgentPlaces(DynamicSceneGraph& graph);
+
  protected:
   uint64_t sequence_number_;
   mutable std::mutex gvd_mutex_;
@@ -198,6 +200,10 @@ class GraphBuilder : public Module {
   std::list<pose_graph_tools::BowQuery::ConstPtr> cached_bow_messages_;
 
   Sink::List sinks_;
+
+  std::set<NodeSymbol> active_agent_places_;
+  NodeSymbol last_agent_place_symbol_ = NodeSymbol('h', 0);
+  NodeSymbol last_used_agent_symbol_ = NodeSymbol('a', 0);
 
   // TODO(lschmid): This mutex currently simply locks all data for manipulation.
   std::mutex mutex_;

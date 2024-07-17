@@ -40,6 +40,7 @@
 #include <gtsam/geometry/Pose3.h>
 #include <hydra/common/global_info.h>
 #include <kimera_pgmo/deformation_graph.h>
+#include <spark_dsg/node_symbol.h>
 #include <spark_dsg/printing.h>
 
 #include "hydra/utils/timing_utilities.h"
@@ -151,9 +152,15 @@ size_t UpdatePlacesFunctor::updateFromValues(const LayerView& view,
 
     // TODO(nathan) consider updating distance via parents + deformation graph
     ++num_changed;
-    auto& attrs = node.attributes();
-    attrs.position = places_values.at<gtsam::Pose3>(node.id).translation();
-    dsg.graph->setNodeAttributes(node.id, attrs.clone());
+    // auto& attrs = node.attributes();
+    // attrs.position = places_values.at<gtsam::Pose3>(node.id).translation();
+
+    auto node_ptr = dsg.graph->findNode(node.id);
+    if (node_ptr) {
+      node_ptr->attributes().position =
+          places_values.at<gtsam::Pose3>(node.id).translation();
+    }
+    // dsg.graph->setNodeAttributes(node.id, attrs.clone());
   }
 
   // TODO(nathan) fix this
@@ -228,7 +235,11 @@ size_t UpdatePlacesFunctor::interpFromValues(const LayerView& view,
   }
 
   for (const auto& node : view) {
-    dsg.graph->setNodeAttributes(node.id, node.attributes().clone());
+    auto node_ptr = dsg.graph->findNode(node.id);
+    if (node_ptr) {
+      node_ptr->attributes().position = node.attributes().position;
+    }
+    // dsg.graph->setNodeAttributes(node.id, node.attributes().clone());
   }
 
   return 0;
@@ -290,6 +301,11 @@ MergeList UpdatePlacesFunctor::findMerges(const DynamicSceneGraph& graph,
         }
 
         if (!lhs_attrs->real_place || !rhs_attrs->real_place) {
+          return false;
+        }
+
+        if (NodeSymbol(lhs.id).category() == 'h' ||
+            NodeSymbol(rhs.id).category() == 'h') {
           return false;
         }
 

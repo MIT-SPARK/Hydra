@@ -65,7 +65,8 @@ void declare_config(Update2dPlacesFunctor::Config& config) {
   field(config.merge_proposer, "merge_proposer");
 }
 
-NodeAttributes::Ptr merge2dPlaceAttributes(const DynamicSceneGraph& graph,
+NodeAttributes::Ptr merge2dPlaceAttributes(const Update2dPlacesFunctor::Config config,
+                                           const DynamicSceneGraph& graph,
                                            const std::vector<NodeId>& nodes) {
   if (nodes.empty()) {
     return nullptr;
@@ -73,22 +74,27 @@ NodeAttributes::Ptr merge2dPlaceAttributes(const DynamicSceneGraph& graph,
 
   auto iter = nodes.begin();
   CHECK(graph.hasNode(*iter)) << NodeSymbol(*iter).str();
+
   auto attrs_ptr = graph.getNode(*iter).attributes().clone();
   auto& new_attrs =
       *CHECK_NOTNULL(dynamic_cast<Place2dNodeAttributes*>(attrs_ptr.get()));
+
   ++iter;
 
   while (iter != nodes.end()) {
     CHECK(graph.hasNode(*iter)) << NodeSymbol(*iter).str();
     const auto& from_attrs = graph.getNode(*iter).attributes<Place2dNodeAttributes>();
+
     utils::mergeIndices(from_attrs.pcl_mesh_connections,
                         new_attrs.pcl_mesh_connections);
 
-    new_attrs.need_finish_merge = true;
-    new_attrs.need_cleanup_splitting = true;
+    // new_attrs.need_finish_merge = true;
     new_attrs.has_active_mesh_indices |= from_attrs.has_active_mesh_indices;
     ++iter;
   }
+
+  addRectInfo(graph.mesh()->points, config.connection_ellipse_scale_factor, new_attrs);
+  addBoundaryInfo(graph.mesh()->points, new_attrs);
 
   return attrs_ptr;
 }
@@ -98,19 +104,20 @@ Update2dPlacesFunctor::Update2dPlacesFunctor(const Config& config)
 
 UpdateFunctor::Hooks Update2dPlacesFunctor::hooks() const {
   auto my_hooks = UpdateFunctor::hooks();
-  my_hooks.cleanup = [this](const UpdateInfo::ConstPtr&, SharedDsgInfo* dsg) {
-    if (dsg) {
-      cleanup(*dsg);
-    }
-  };
+  my_hooks.cleanup =
+      [this](const UpdateInfo::ConstPtr&, DynamicSceneGraph&, SharedDsgInfo* dsg) {
+        if (dsg) {
+          cleanup(*dsg);
+        }
+      };
 
   my_hooks.find_merges = [this](const auto& graph, const auto& info) {
     return findMerges(graph, info);
   };
 
-  my_hooks.merge = [](const DynamicSceneGraph& graph,
-                      const std::vector<NodeId>& nodes) {
-    return merge2dPlaceAttributes(graph, nodes);
+  my_hooks.merge = [this](const DynamicSceneGraph& graph,
+                          const std::vector<NodeId>& nodes) {
+    return merge2dPlaceAttributes(config, graph, nodes);
   };
 
   return my_hooks;
@@ -215,6 +222,9 @@ void Update2dPlacesFunctor::updateNode(const spark_dsg::Mesh::Ptr& mesh,
 
 bool Update2dPlacesFunctor::shouldMerge(const Place2dNodeAttributes& from_attrs,
                                         const Place2dNodeAttributes& to_attrs) const {
+  if (to_attrs.is_active) {
+    return false;
+  }
   const auto z_diff = std::abs(from_attrs.position(2) - to_attrs.position(2));
   if (z_diff > config.merge_max_delta_z) {
     return false;
@@ -241,89 +251,37 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
   // Get/copy info for places that need cleanup
   std::unique_lock<std::mutex> lock(dsg.mutex);
   utils::getPlace2dAndNeighors(*places_layer, place_2ds, node_neighbors);
-  lock.unlock();
 
-  // Decide which places need to be split and which just need to be updated
   auto& graph = *dsg.graph;
   auto mesh = graph.mesh();
 
   // existing node id for each place
   std::vector<std::pair<NodeId, Place2d>> nodes_to_update;
-  // node id that new nodes split from (necessary to copy other
-  // place info)
-  std::vector<std::pair<NodeId, std::vector<Place2d>>> nodes_to_add;
-  std::map<std::tuple<size_t, size_t, size_t, size_t>, double> edge_map;
 
-  if (config.enable_splitting) {
-    utils::getNecessaryUpdates(*mesh,
-                               config.min_points,
-                               config.min_size,
-                               config.connection_ellipse_scale_factor,
-                               place_2ds,
-                               nodes_to_update,
-                               nodes_to_add);
-    edge_map = utils::buildEdgeMap(nodes_to_add,
-                                   config.connection_overlap_threshold,
-                                   config.connection_max_delta_z);
-  } else {
-    utils::computeAttributeUpdates(
-        *mesh, config.connection_ellipse_scale_factor, place_2ds, nodes_to_update);
-  }
+  utils::computeAttributeUpdates(
+      *mesh, config.connection_ellipse_scale_factor, place_2ds, nodes_to_update);
 
-  lock.lock();
   // Update attributes for place nodes that did not need to split after merge
   utils::updateExistingNodes(nodes_to_update, graph);
 
-  if (config.enable_splitting) {
-    // Insert new nodes that are formed by splitting existing nodes (and delete
-    // previous node)
-    std::map<std::tuple<size_t, size_t>, NodeId> new_id_map;
-    next_node_id_ = utils::insertNewNodes(nodes_to_add,
-                                          config.connection_overlap_threshold,
-                                          config.connection_max_delta_z,
-                                          next_node_id_,
-                                          graph,
-                                          new_id_map);
+  std::set<NodeId> checked_nodes;
+  // Should just be for re-allocation logic?
 
-    // Add edges between new nodes
-    utils::addNewNodeEdges(nodes_to_add, edge_map, new_id_map, graph);
-  }
-
-  std::unordered_map<NodeId, bool> checked_nodes;
   // Clean up places that are far enough away from the active window
   // Far enough means that none of a node's neighbors or the node itself have
   // active mesh vertices
+
   for (auto& [node_id, node] : places_layer->nodes()) {
     auto attrs = node->tryAttributes<Place2dNodeAttributes>();
-    if (!attrs) {
+    if (!attrs || attrs->is_active) {
       continue;
     }
 
-    if (!attrs->need_cleanup_splitting || attrs->is_active) {
-      continue;
-    }
-
-    bool has_active_neighbor = false;
-    for (const auto nid : node->siblings()) {
-      auto& neighbor_attrs = graph.getNode(nid).attributes<Place2dNodeAttributes>();
-      if (attrs->semantic_label != neighbor_attrs.semantic_label) {
-        continue;
-      }
-
-      if (neighbor_attrs.has_active_mesh_indices) {
-        has_active_neighbor = true;
-        break;
-      }
-    }
-
-    checked_nodes[node_id] = !has_active_neighbor && !attrs->has_active_mesh_indices;
+    checked_nodes.insert(node_id);
     for (const auto nid : node->siblings()) {
       auto& neighbor_attrs = graph.getNode(nid).attributes<Place2dNodeAttributes>();
 
-      auto search = checked_nodes.find(nid);
-      if (search == checked_nodes.end()) {
-        checked_nodes.insert({nid, false});
-      }
+      checked_nodes.insert(nid);
 
       if (neighbor_attrs.is_active) {
         continue;
@@ -335,7 +293,7 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
     }
   }
 
-  for (auto& [node_id, should_finalize] : checked_nodes) {
+  for (auto& node_id : checked_nodes) {
     auto& attrs = graph.getNode(node_id).attributes<Place2dNodeAttributes>();
 
     if (attrs.pcl_mesh_connections.size() == 0) {
@@ -349,10 +307,10 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
 
   std::vector<std::pair<NodeId, NodeId>> edges_to_remove;
   std::map<NodeId, NodeId> extra_edges_to_check;
-  for (const auto& [node_id, finalize] : checked_nodes) {
+  for (const auto& node_id : checked_nodes) {
     auto& attrs1 = graph.getNode(node_id).attributes<Place2dNodeAttributes>();
 
-    for (const auto& [neighbor_id, neighbor_finalize] : checked_nodes) {
+    for (const auto& neighbor_id : checked_nodes) {
       const auto& neighbor_node = graph.getNode(neighbor_id);
       auto& attrs2 = neighbor_node.attributes<Place2dNodeAttributes>();
       EdgeAttributes ea;
@@ -383,10 +341,6 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
 
     for (auto [source, target] : sibs_edges_to_remove) {
       graph.removeEdge(source, target);
-    }
-
-    if (finalize) {
-      attrs1.need_cleanup_splitting = false;
     }
   }
 }

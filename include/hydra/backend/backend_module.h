@@ -196,7 +196,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   pcl::PointCloud<pcl::PointXYZ>::Ptr original_vertices_;
   std::vector<uint64_t> vertex_stamps_;
 
-  MergeTracker merge_tracker;
+  GroupedMergeTracker merge_tracker;
   std::map<std::string, UpdateFunctor::Ptr> update_functors_;
 
   LogSetup::Ptr logs_;

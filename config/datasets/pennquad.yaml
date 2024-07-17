@@ -4,11 +4,14 @@ map_window:
   type: spatial
   max_radius_m: 8.0
 active_window:
+  full_update_separation_s: 0.5
   volumetric_map:
     voxels_per_side: 16
     voxel_size: 0.1
-    truncation_distance: 0.3
+    truncation_distance: 0.8
   tsdf:
+    #extra_integration_distance_m: 0.1 # TODO: remove
+    #extra_integration_distance: 0.7
     semantic_integrator:
       type: MLESemanticIntegrator
 frontend:
@@ -22,7 +25,7 @@ frontend:
   surface_places:
     type: place_2d
     prefix: P
-    pure_final_place_size: 1
+    pure_final_place_size: 2
     enable_place_purity: false
     impure_final_place_size: 1
     cluster_tolerance: .3
@@ -42,15 +45,19 @@ frontend:
       voronoi_config:
         mode: L1_THEN_ANGLE
         min_distance_m: 0.30
-        parent_l1_separation: 20
+        parent_l1_separation: 40
         parent_cos_angle_separation: 0.2
     graph:
       type: CompressionGraphExtractor
+      freespace_edges:
+        min_clearance_m: 0.2
+        num_nodes_to_check: 20
       compression_distance_m: 1.0
       min_node_distance_m: 0.4
       min_edge_distance_m: 0.25
       node_merge_distance_m: 0.5
-      add_heuristic_edges: false
+      add_heuristic_edges: true
+      add_overlap_edges: false
   use_frontiers: true
   frontier_places:
     type: voxel_clustering
@@ -60,11 +67,16 @@ frontend:
     max_place_radius: 5
     dense_frontiers: false
     frontier_splitting_threshold: 0.3
-    point_threshold: 10
-    culling_point_threshold: 50
+    # We stop splitting frontiers when they reach this size
+    point_threshold: 20
+    # Frontiers below this size are thrown away
+    culling_point_threshold: 10
     recent_block_distance: 25
+    minimum_relative_z: 0
+    maximum_relative_z: 1.5
 backend:
-  add_places_to_deformation_graph: true
+  add_places_to_deformation_graph: false
+  enable_exhaustive_merging: true
   optimize_on_lc: true
   enable_node_merging: true
   update_functors:
@@ -77,9 +89,12 @@ backend:
     places:
       type: UpdatePlacesFunctor
       pos_threshold_m: 0.35
-      distance_tolerance_m: 0.25
+      distance_tolerance_m: 0.5
     frontiers:
       type: UpdateFrontiersFunctor
+        frontier_removal_threshold: 3
+        frontier_removal_check_threshold: 5
+        frontier_exclusion_radius: 1.5
     rooms:
       type: UpdateRoomsFunctor
       room_finder:

@@ -40,6 +40,7 @@
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
 #include <kimera_pgmo/utils/mesh_io.h>
+#include <spark_dsg/scene_graph_types.h>
 
 #include "hydra/backend/backend_utilities.h"
 #include "hydra/backend/mst_factors.h"
@@ -119,6 +120,7 @@ BackendModule::BackendModule(const Config& config,
 
   for (const auto& [name, functor] : config.update_functors) {
     update_functors_.emplace(name, functor.create());
+    merge_tracker.initializeTracker(name);
   }
 
   if (logs && logs->valid()) {
@@ -155,6 +157,7 @@ void BackendModule::save(const LogSetup& log_setup) {
   std::lock_guard<std::mutex> lock(mutex_);
   const auto backend_path = log_setup.getLogDir("backend");
   const auto pgmo_path = log_setup.getLogDir("backend/pgmo");
+  unmerged_graph_->save(backend_path + "/unmerged_dsg.json", false);
   private_dsg_->graph->save(backend_path + "/dsg.json", false);
   private_dsg_->graph->save(backend_path + "/dsg_with_mesh.json");
 
@@ -433,7 +436,7 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
   // we use this to make sure that deformation only happens for vertices that are
   // still active
   num_archived_vertices_ = input.mesh_update->getTotalArchivedVertices();
-  utils::updatePlaces2d(private_dsg_, *input.mesh_update, num_archived_vertices_);
+  // utils::updatePlaces2d(private_dsg_, *input.mesh_update, num_archived_vertices_);
 
   have_new_mesh_ = true;
 }
@@ -565,6 +568,7 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
   // accepted reconciliation merges
   const bool enable_merging = given_merges.empty() ? config.enable_node_merging : false;
 
+  new_loop_closure = true;
   // TODO(nathan) given_merges probably doesn't need to be passed
   UpdateInfo::ConstPtr info(
       new UpdateInfo{config.add_places_to_deformation_graph ? &places_values : nullptr,
@@ -576,12 +580,49 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
                      deformation_graph_.get(),
                      node_to_robot});
 
+  // Aaron debugging ///////////////
+
+  auto node_to_layer = private_dsg_->graph->node_lookup();
+  auto place_layer_key = private_dsg_->graph->getLayerKey(DsgLayers::PLACES).value();
+  std::vector<NodeId> merges_to_clear;
+  std::vector<NodeId> merge_tracks_to_clear;
+  for (auto from_to : private_dsg_->merges) {
+    // get what layer a node is in, and if it's not a place then continue
+    auto it = node_to_layer.find(from_to.second);
+    if (it == node_to_layer.end()) {
+      continue;
+    }
+    if (it->second == place_layer_key) {
+      private_dsg_->graph->removeNode(from_to.second);
+      merges_to_clear.push_back(from_to.first);
+      merge_tracks_to_clear.push_back(from_to.second);
+    }
+  }
+
+  for (auto n : merges_to_clear) {
+    private_dsg_->merges.erase(n);
+  }
+  // private_dsg_->merges.clear();
+  merge_tracker.erase_nodes(merge_tracks_to_clear);
+  // merge_tracker.clear();
+  /////////////////////////////////
+
   // merge topological changes to private dsg, respecting merges
   // attributes may be overwritten, but ideally we don't bother
   GraphMergeConfig merge_config;
   merge_config.previous_merges = &private_dsg_->merges;
   merge_config.update_dynamic_attributes = false;
   private_dsg_->graph->mergeGraph(*unmerged_graph_, merge_config);
+
+  // TODO : this is where we apply the node activating logic
+  std::vector<NodeId> active_nodes_to_restore;
+  for (auto& node : unmerged_graph_->getLayer(DsgLayers::PLACES).nodes()) {
+    auto& attrs = node.second->attributes();
+    if (unmerged_graph_->checkNode(node.first) == NodeStatus::NEW && !attrs.is_active) {
+      attrs.is_active = true;
+      active_nodes_to_restore.push_back(node.first);
+    }
+  }
 
   std::list<LayerCleanupFunc> cleanup_hooks;
   for (const auto& [name, functor] : update_functors_) {
@@ -596,10 +637,12 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
 
     functor->call(*unmerged_graph_, *private_dsg_, info);
     if (hooks.find_merges && enable_merging) {
+      auto& tracker = merge_tracker.getMergeGroup(name);
+
       // TODO(nathan) handle given merges
       const auto merges = hooks.find_merges(*unmerged_graph_, info);
-      const auto applied = merge_tracker.applyMerges(
-          *unmerged_graph_, merges, *private_dsg_, hooks.merge);
+      const auto applied =
+          tracker.applyMerges(*unmerged_graph_, merges, *private_dsg_, hooks.merge);
       VLOG(1) << "[Backend: " << name << "] Found " << merges.size()
               << " merges (applied " << applied << ")";
 
@@ -607,19 +650,47 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
         size_t merge_iter = 0;
         size_t num_applied = 0;
         do {
+          if (name == "surface_places") {
+            continue;
+          }
+
           const auto new_merges = hooks.find_merges(*private_dsg_->graph, info);
-          num_applied = merge_tracker.applyMerges(
-              *private_dsg_->graph, new_merges, *private_dsg_, hooks.merge);
+          num_applied = tracker.applyMerges(*unmerged_graph_,  // Fixes bug?
+                                            new_merges,
+                                            *private_dsg_,
+                                            hooks.merge);
           VLOG(1) << "[Backend: " << name << "] Found " << new_merges.size()
                   << " merges at pass " << merge_iter << " (" << num_applied
                   << " applied)";
           ++merge_iter;
         } while (num_applied > 0);
       }
+
+      if (new_loop_closure && hooks.merge) {
+        LOG(WARNING) << "Updating all merge attributes for " << name;
+        tracker.print();
+        tracker.updateAllMergeAttributes(
+            *unmerged_graph_, *private_dsg_->graph, hooks.merge);
+      }
     }
   }
 
-  launchCallbacks(cleanup_hooks, info, private_dsg_.get());
+  merge_tracker.print();
+
+  // launchCallbacks(cleanup_hooks, info, private_dsg_.get());
+  for (auto h : cleanup_hooks) {
+    h(info, *unmerged_graph_, private_dsg_.get());
+  }
+
+  // TODO: this is where we undo all of the activations
+  for (NodeId nid : active_nodes_to_restore) {
+    auto node_ptr = unmerged_graph_->findNode(nid);
+    if (node_ptr) {
+      auto& attrs = node_ptr->attributes();
+      attrs.is_active = false;
+    }
+  }
+  unmerged_graph_->getNewNodes(true);
 }
 
 void BackendModule::logStatus(bool init) const {

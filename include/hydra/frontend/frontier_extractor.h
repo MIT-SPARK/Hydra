@@ -67,7 +67,7 @@ class FrontierExtractor {
                        DynamicSceneGraph& graph,
                        const NodeIdSet& active_places);
 
-  void addFrontiers(uint64_t timestamp_ns, DynamicSceneGraph& graph);
+  void addFrontiers(const uint64_t timestamp_ns, DynamicSceneGraph& graph);
 
   void setArchivedPlaces(const std::vector<NodeId>& archived_places);
 
