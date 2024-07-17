@@ -56,7 +56,7 @@ freespace_places:
       voronoi_config:
         mode: L1_THEN_ANGLE
         min_distance_m: 0.30
-        parent_l1_separation: 20
+        parent_l1_separation: 40
         parent_cos_angle_separation: 0.2
 
     graph:
