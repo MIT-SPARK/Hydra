@@ -88,6 +88,12 @@ frontier_places:
     max_place_radius: 5
     dense_frontiers: false
     frontier_splitting_threshold: 0.3
-    point_threshold: 10
-    culling_point_threshold: 50
+
+    # We stop splitting frontiers when they reach this size
+    point_threshold: 20
+    # Frontiers below this size are thrown away
+    culling_point_threshold: 0
+
     recent_block_distance: 25
+    minimum_relative_z: -1.
+    maximum_relative_z: 1

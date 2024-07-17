@@ -60,3 +60,7 @@ room_finder:
   log_place_graphs: false
 places2d_config:
   allow_places_merge: true
+
+frontier_config:
+  frontier_removal_threshold: 2
+  frontier_removal_check_threshold: 4
