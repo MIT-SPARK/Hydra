@@ -181,33 +181,42 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
   // node id that new nodes split from (necessary to copy other
   // place info)
   std::vector<std::pair<NodeId, std::vector<Place2d>>> nodes_to_add;
-  utils::getNecessaryUpdates(*mesh,
-                             config_.min_points,
-                             config_.min_size,
-                             config_.connection_ellipse_scale_factor,
-                             place_2ds,
-                             nodes_to_update,
-                             nodes_to_add);
-  auto edge_map = utils::buildEdgeMap(nodes_to_add,
-                                      config_.connection_overlap_threshold,
-                                      config_.connection_max_delta_z);
+  std::map<std::tuple<size_t, size_t, size_t, size_t>, double> edge_map;
+
+  if (config_.enable_splitting) {
+    utils::getNecessaryUpdates(*mesh,
+                               config_.min_points,
+                               config_.min_size,
+                               config_.connection_ellipse_scale_factor,
+                               place_2ds,
+                               nodes_to_update,
+                               nodes_to_add);
+    edge_map = utils::buildEdgeMap(nodes_to_add,
+                                   config_.connection_overlap_threshold,
+                                   config_.connection_max_delta_z);
+  } else {
+    utils::computeAttributeUpdates(
+        *mesh, config_.connection_ellipse_scale_factor, place_2ds, nodes_to_update);
+  }
 
   lock.lock();
   // Update attributes for place nodes that did not need to split after merge
   utils::updateExistingNodes(nodes_to_update, graph);
 
-  // Insert new nodes that are formed by splitting existing nodes (and delete
-  // previous node)
-  std::map<std::tuple<size_t, size_t>, NodeId> new_id_map;
-  next_node_id_ = utils::insertNewNodes(nodes_to_add,
-                                        config_.connection_overlap_threshold,
-                                        config_.connection_max_delta_z,
-                                        next_node_id_,
-                                        graph,
-                                        new_id_map);
+  if (config_.enable_splitting) {
+    // Insert new nodes that are formed by splitting existing nodes (and delete
+    // previous node)
+    std::map<std::tuple<size_t, size_t>, NodeId> new_id_map;
+    next_node_id_ = utils::insertNewNodes(nodes_to_add,
+                                          config_.connection_overlap_threshold,
+                                          config_.connection_max_delta_z,
+                                          next_node_id_,
+                                          graph,
+                                          new_id_map);
 
-  // Add edges between new nodes
-  utils::addNewNodeEdges(nodes_to_add, edge_map, new_id_map, graph);
+    // Add edges between new nodes
+    utils::addNewNodeEdges(nodes_to_add, edge_map, new_id_map, graph);
+  }
 
   std::unordered_map<NodeId, bool> checked_nodes;
   // Clean up places that are far enough away from the active window
@@ -371,6 +380,7 @@ void declare_config(Update2dPlacesFunctor::Config& config) {
   field(config.connection_overlap_threshold, "connection_overlap_threshold");
   field(config.connection_max_delta_z, "connection_max_delta_z");
   field(config.connection_ellipse_scale_factor, "connection_ellipse_scale_factor");
+  field(config.enable_splitting, "enable_splitting");
 }
 
 }  // namespace hydra
