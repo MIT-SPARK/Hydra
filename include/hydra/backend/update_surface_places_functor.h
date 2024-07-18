@@ -54,6 +54,8 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
     double connection_max_delta_z = 0.5;
     //! How much to inflate place ellipsoid relative to bounding box
     double connection_ellipse_scale_factor = 1.0;
+    //! Whether to allow splitting of large backend places
+    bool enable_splitting = false;
   };
 
   Update2dPlacesFunctor(const Config& config);

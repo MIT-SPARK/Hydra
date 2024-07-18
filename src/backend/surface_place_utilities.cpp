@@ -52,6 +52,25 @@ void getPlace2dAndNeighors(const SceneGraphLayer& places_layer,
   }
 }
 
+void computeAttributeUpdates(const spark_dsg::Mesh& mesh,
+                             const double connection_ellipse_scale_factor,
+                             std::vector<std::pair<NodeId, Place2d>>& place_2ds,
+                             std::vector<std::pair<NodeId, Place2d>>& nodes_to_update) {
+  for (auto& id_place_pair : place_2ds) {
+    addRectInfo(mesh.points, connection_ellipse_scale_factor, id_place_pair.second);
+    addBoundaryInfo(mesh.points, id_place_pair.second);
+    size_t min_ix = SIZE_MAX;
+    size_t max_ix = 0;
+    for (auto midx : id_place_pair.second.indices) {
+      min_ix = std::min(min_ix, midx);
+      max_ix = std::max(max_ix, midx);
+    }
+    id_place_pair.second.min_mesh_index = min_ix;
+    id_place_pair.second.max_mesh_index = max_ix;
+    nodes_to_update.push_back(id_place_pair);
+  }
+}
+
 void getNecessaryUpdates(
     const spark_dsg::Mesh& mesh,
     size_t min_points,
@@ -306,7 +325,8 @@ void reallocateMeshPoints(const std::vector<Place2d::PointT>& points,
 
   // Say there are active mesh indices if either involved node has them.
   // In theory we could actually check if any of the reallocated vertices changes a
-  // place's activeness for a small speed improvement, but not sure how much it matters
+  // place's activeness for a small speed improvement, but not sure how much it
+  // matters
   attrs1.has_active_mesh_indices =
       attrs1.has_active_mesh_indices || attrs2.has_active_mesh_indices;
   attrs2.has_active_mesh_indices =
