@@ -37,6 +37,7 @@
 #include <config_utilities/printing.h>
 #include <glog/logging.h>
 #include <kimera_pgmo/utils/common_functions.h>
+#include <spark_dsg/printing.h>
 
 #include "hydra/common/global_info.h"
 #include "hydra/utils/timing_utilities.h"

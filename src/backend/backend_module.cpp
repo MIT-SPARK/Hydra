@@ -475,7 +475,7 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
   }  // end joint critical section
 
   if (logs_) {
-    backend_graph_logger_.logGraph(private_dsg_->graph);
+    backend_graph_logger_.logGraph(*private_dsg_->graph);
   }
 
   return true;
@@ -544,8 +544,8 @@ void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
     ScopedTimer between_timer("backend/add_places_between", timestamp_ns);
     PoseGraph mst_edges;
     for (const auto& edge : mst_info.edges) {
-      gtsam::Pose3 source(gtsam::Rot3(), places.getPosition(edge.source));
-      gtsam::Pose3 target(gtsam::Rot3(), places.getPosition(edge.target));
+      gtsam::Pose3 source(gtsam::Rot3(), getNodePosition(places, edge.source));
+      gtsam::Pose3 target(gtsam::Rot3(), getNodePosition(places, edge.target));
       pose_graph_tools::PoseGraphEdge mst_e;
       mst_e.key_from = edge.source;
       mst_e.key_to = edge.target;

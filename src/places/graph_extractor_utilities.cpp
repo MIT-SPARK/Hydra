@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/graph_extractor_utilities.h"
 
+#include <spark_dsg/graph_utilities.h>
 #include <spatial_hash/neighbor_utils.h>
 
 #include "hydra/places/nearest_voxel_utilities.h"
@@ -128,7 +129,8 @@ EdgeAttributes::Ptr getOverlapEdgeInfo(const SceneGraphLayer& graph,
 
   const double r1 = getNodeGvdDistance(graph, node);
   const double r2 = getNodeGvdDistance(graph, neighbor);
-  const double d = (graph.getPosition(node) - graph.getPosition(neighbor)).norm();
+  const double d =
+      (getNodePosition(graph, node) - getNodePosition(graph, neighbor)).norm();
 
   if (d >= r1 + r2) {
     return nullptr;
@@ -197,7 +199,7 @@ void findOverlapEdges(const OverlapEdgeConfig& config,
   NearestNodeFinder node_finder(graph, active_nodes);
   for (const auto node : active_nodes) {
     // TODO(nathan) consider deleting edges
-    node_finder.find(graph.getPosition(node),
+    node_finder.find(getNodePosition(graph, node),
                      config.num_neighbors_to_check,
                      true,
                      [&](NodeId other, size_t, double) {
@@ -239,7 +241,7 @@ void findFreespaceEdges(const FreespaceEdgeConfig& config,
       }
 
       const NodeId node = component[j];
-      node_finder.find(graph.getPosition(node),
+      node_finder.find(getNodePosition(graph, node),
                        config.num_neighbors_to_find,
                        false,
                        [&](NodeId other, size_t, double distance) {

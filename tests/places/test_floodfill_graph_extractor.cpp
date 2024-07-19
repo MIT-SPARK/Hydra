@@ -149,7 +149,7 @@ TEST_F(FloodfillGraphExtractorTestFixture, AddAndRemovePlace) {
   EXPECT_TRUE(graph.hasNode(NodeSymbol('p', 0)));
 
   Eigen::Vector3d expected_pos(0.15, 0.25, 0.35);
-  Eigen::Vector3d result_pos = graph.getPosition(NodeSymbol('p', 0));
+  Eigen::Vector3d result_pos = getNodePosition(graph, NodeSymbol('p', 0));
   EXPECT_NEAR(0.0, (expected_pos - result_pos).norm(), 1.0e-8);
 
   EXPECT_EQ(1u, extractor.index_graph_info_map_.size());

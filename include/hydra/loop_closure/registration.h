@@ -35,6 +35,7 @@
 #pragma once
 #include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
+#include <spark_dsg/printing.h>
 #include <teaser/registration.h>
 
 #include <mutex>
@@ -191,8 +192,8 @@ LayerRegistrationSolution registerDsgLayer(
   Eigen::Matrix<double, 3, Eigen::Dynamic> dest_points(3, correspondences.size());
   for (size_t i = 0; i < correspondences.size(); ++i) {
     const auto correspondence = correspondences[i];
-    src_points.col(i) = src.getPosition(correspondence.first);
-    dest_points.col(i) = dest.getPosition(correspondence.second);
+    src_points.col(i) = getNodePosition(src, correspondence.first);
+    dest_points.col(i) = getNodePosition(dest, correspondence.second);
   }
 
   if (correspondences.size() < config.min_correspondences) {

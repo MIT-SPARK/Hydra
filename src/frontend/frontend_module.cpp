@@ -321,7 +321,7 @@ void FrontendModule::spinOnce(const ReconstructionOutput::Ptr& msg) {
 
   if (logs_) {
     // mutex not required because nothing is modifying the graph
-    frontend_graph_logger_.logGraph(dsg_->graph);
+    frontend_graph_logger_.logGraph(*dsg_->graph);
   }
 
   if (dsg_->graph && backend_input_) {

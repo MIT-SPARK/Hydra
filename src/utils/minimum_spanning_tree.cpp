@@ -59,7 +59,8 @@ MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer,
     sorted_edges.emplace_back(
         edge.source,
         edge.target,
-        (layer.getPosition(edge.source) - layer.getPosition(edge.target)).norm());
+        (getNodePosition(layer, edge.source) - getNodePosition(layer, edge.target))
+            .norm());
   }
   std::make_heap(sorted_edges.begin(), sorted_edges.end(), std::greater<>{});
 

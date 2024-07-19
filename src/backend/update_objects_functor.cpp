@@ -35,6 +35,7 @@
 #include "hydra/backend/update_objects_functor.h"
 
 #include <glog/logging.h>
+#include <spark_dsg/printing.h>
 
 #include "hydra/backend/backend_utilities.h"
 #include "hydra/utils/mesh_utilities.h"

@@ -44,7 +44,7 @@ Eigen::Vector3d getRoomPosition(const SceneGraphLayer& places,
 
   Eigen::Vector3d room_position = Eigen::Vector3d::Zero();
   for (const auto& place : cluster) {
-    room_position += places.getPosition(place);
+    room_position += getNodePosition(places, place);
   }
   room_position /= cluster.size();
 
