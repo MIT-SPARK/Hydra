@@ -36,6 +36,8 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
+#include <spark_dsg/graph_utilities.h>
+#include <spark_dsg/printing.h>
 
 #include "hydra/common/global_info.h"
 #include "hydra/places/graph_extractor_interface.h"
@@ -360,8 +362,8 @@ void GvdPlaceExtractor::filterGround(DynamicSceneGraph& graph) {
                              graph_extractor_->getIndexMap(),
                              new_edges);
   for (auto&& [edge_key, attrs] : new_edges) {
-    const auto& source_pos = graph.getPosition(edge_key.k1);
-    const auto& target_pos = graph.getPosition(edge_key.k2);
+    const auto& source_pos = getNodePosition(graph, edge_key.k1);
+    const auto& target_pos = getNodePosition(graph, edge_key.k2);
     double source_min_z = source_pos.z() - attrs->weight;
     double target_min_z = target_pos.z() - attrs->weight;
     if (source_min_z > max_z || target_min_z > max_z) {

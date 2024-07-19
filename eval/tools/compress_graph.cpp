@@ -34,9 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <hydra/common/dsg_types.h>
 #include <kimera_pgmo/compression/delta_compression.h>
 #include <kimera_pgmo/utils/common_functions.h>
-#include <spark_dsg/dynamic_scene_graph.h>
 
 #include <filesystem>
 #include <nanoflann.hpp>
@@ -61,7 +61,7 @@ struct GraphAdaptor {
       : nodes(nodes) {
     positions = Eigen::MatrixXd::Zero(3, nodes.size());
     for (size_t i = 0; i < nodes.size(); ++i) {
-      positions.block<3, 1>(0, i) = layer.getPosition(nodes[i]);
+      positions.block<3, 1>(0, i) = getNodePosition(layer, nodes[i]);
     }
   }
 
@@ -199,7 +199,7 @@ void compressPlaces(DynamicSceneGraph& graph, double resolution) {
       continue;
     }
 
-    const auto pos_i = graph.getPosition(nodes[i]);
+    const auto pos_i = getNodePosition(graph, nodes[i]);
     std::vector<size_t> neighbors;
     search.find(pos_i, threshold, neighbors);
 
@@ -209,7 +209,7 @@ void compressPlaces(DynamicSceneGraph& graph, double resolution) {
         continue;
       }
 
-      const auto pos_j = graph.getPosition(nodes[j]);
+      const auto pos_j = getNodePosition(graph, nodes[j]);
       if ((pos_i - pos_j).norm() >= resolution) {
         continue;
       }

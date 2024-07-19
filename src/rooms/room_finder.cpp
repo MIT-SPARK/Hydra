@@ -35,6 +35,7 @@
 #include "hydra/rooms/room_finder.h"
 
 #include <glog/logging.h>
+#include <spark_dsg/graph_utilities.h>
 
 #include <Eigen/Dense>
 #include <algorithm>
@@ -286,7 +287,7 @@ SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
           components,
           [](const SceneGraphLayer& G, NodeId n1, NodeId n2) {
             // weight should be 1 / distance
-            return 1.0 / (G.getPosition(n1) - G.getPosition(n2)).norm();
+            return 1.0 / (getNodePosition(G, n1) - getNodePosition(G, n2)).norm();
           },
           config_.max_modularity_iters,
           config_.modularity_gamma);

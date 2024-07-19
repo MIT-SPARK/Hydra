@@ -35,6 +35,7 @@
 #include "hydra/loop_closure/subgraph_extraction.h"
 
 #include <glog/logging.h>
+#include <spark_dsg/graph_utilities.h>
 
 namespace hydra {
 
