@@ -76,6 +76,7 @@ void declare_config(BackendModule::Config& config) {
   field(config.building_semantic_label, "building_semantic_label");
   field(config.pgmo, "pgmo");
   field(config.places2d_config, "places2d_config");
+  field(config.frontier_config, "frontier_config");
 
   enter_namespace("dsg");
   field(config.add_places_to_deformation_graph, "add_places_to_deformation_graph");

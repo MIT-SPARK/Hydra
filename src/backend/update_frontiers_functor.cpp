@@ -65,13 +65,21 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns, SharedDsgInfo& dsg) 
   const SceneGraphLayer& places_layer = dsg.graph->getLayer(DsgLayers::PLACES);
 
   std::unordered_set<NodeId> layer_nodes;
+  std::unordered_set<NodeId> frontier_nodes;
   for (const auto& id_node_pair : places_layer.nodes()) {
-    if (id_node_pair.second->attributes<PlaceNodeAttributes>().real_place) {
+    auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
+    if (attrs.real_place) {
       layer_nodes.insert(id_node_pair.first);
+    } else if (!attrs.is_predicted && !attrs.need_cleanup) {
+      frontier_nodes.insert(id_node_pair.first);
     }
   }
 
+  bool have_existing_frontiers = frontier_nodes.size() > 0;
+
   auto place_finder = std::make_unique<NearestNodeFinder>(places_layer, layer_nodes);
+  auto frontier_finder =
+      std::make_unique<NearestNodeFinder>(places_layer, frontier_nodes);
 
   std::set<NodeId> nodes_to_remove;
   for (auto& id_node_pair : places_layer.nodes()) {
@@ -88,15 +96,33 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns, SharedDsgInfo& dsg) 
     // Some frontiers may end up outside any places even when the environment
     // is fully explored, because the places aren't infinitely dense. If the
     // robot gets close enough to these frontiers, we clear them.
+    // NOTE: currently we don't delete these nodes, we actually turn them into
+    // anti-frontiers
     if ((agent_pos - attrs.position).norm() < config.frontier_removal_threshold) {
-      nodes_to_remove.insert(id_node_pair.first);
+      // nodes_to_remove.insert(id_node_pair.first);
+      attrs.anti_frontier = true;
       continue;
+    }
+
+    if (have_existing_frontiers && attrs.need_cleanup) {
+      NodeId nearest_frontier;
+      frontier_finder->find(attrs.position, 1, false, [&](NodeId pid, size_t, double) {
+        nearest_frontier = pid;
+      });
+      const auto& neighbor_attrs =
+          dsg.graph->getNode(nearest_frontier).attributes<FrontierNodeAttributes>();
+      if ((neighbor_attrs.position - attrs.position).norm() <
+          config.frontier_exclusion_radius) {
+        nodes_to_remove.insert(id_node_pair.first);
+        continue;
+      }
     }
 
     bool close_to_robot =
         (agent_pos - attrs.position).norm() < config.frontier_removal_check_threshold;
     if (attrs.need_cleanup || close_to_robot) {
       attrs.need_cleanup = false;
+
       std::vector<std::pair<Eigen::Vector3d, double>> nearest_places;
       place_finder->findRadius(
           attrs.position, 5, false, [&](NodeId pid, size_t, double) {
@@ -123,6 +149,7 @@ void declare_config(UpdateFrontiersFunctor::Config& config) {
   name("FrontierConfig");
   field(config.frontier_removal_threshold, "frontier_removal_threshold");
   field(config.frontier_removal_check_threshold, "frontier_removal_check_threshold");
+  field(config.frontier_exclusion_radius, "frontier_exclusion_radius");
 }
 
 }  // namespace hydra

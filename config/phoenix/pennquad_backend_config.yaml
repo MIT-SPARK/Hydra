@@ -62,5 +62,6 @@ places2d_config:
   allow_places_merge: true
 
 frontier_config:
-  frontier_removal_threshold: 2
-  frontier_removal_check_threshold: 4
+  frontier_removal_threshold: 3
+  frontier_removal_check_threshold: 5
+  frontier_exclusion_radius: 1.5
