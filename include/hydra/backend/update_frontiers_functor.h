@@ -56,6 +56,8 @@ struct UpdateFrontiersFunctor : public UpdateFunctor {
                  const UpdateInfo::ConstPtr&) const override;
 
   void cleanup(uint64_t timestamp_ns, SharedDsgInfo& dsg) const;
+
+  mutable NodeSymbol next_node_id_ = NodeSymbol('G', 0);
 };
 
 void declare_config(UpdateFrontiersFunctor::Config& config);

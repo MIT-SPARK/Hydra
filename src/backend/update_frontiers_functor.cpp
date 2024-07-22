@@ -82,6 +82,7 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns, SharedDsgInfo& dsg) 
       std::make_unique<NearestNodeFinder>(places_layer, frontier_nodes);
 
   std::set<NodeId> nodes_to_remove;
+  std::set<NodeId> nodes_to_copy;
   for (auto& id_node_pair : places_layer.nodes()) {
     auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
     if (attrs.real_place) {
@@ -92,17 +93,6 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns, SharedDsgInfo& dsg) 
     const auto& agents = dsg.graph->getLayer(DsgLayers::AGENTS, prefix.key);
     NodeSymbol pgmo_key(prefix.key, agents.numNodes() - 1);
     Eigen::Vector3d agent_pos = dsg.graph->getNode(pgmo_key).attributes().position;
-
-    // Some frontiers may end up outside any places even when the environment
-    // is fully explored, because the places aren't infinitely dense. If the
-    // robot gets close enough to these frontiers, we clear them.
-    // NOTE: currently we don't delete these nodes, we actually turn them into
-    // anti-frontiers
-    if ((agent_pos - attrs.position).norm() < config.frontier_removal_threshold) {
-      // nodes_to_remove.insert(id_node_pair.first);
-      attrs.anti_frontier = true;
-      continue;
-    }
 
     if (have_existing_frontiers && attrs.need_cleanup) {
       NodeId nearest_frontier;
@@ -130,17 +120,47 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns, SharedDsgInfo& dsg) 
             nearest_places.push_back({pattr.position, pattr.distance});
           });
 
+      bool remove = false;
       for (auto center_rad : nearest_places) {
         if ((center_rad.first - attrs.position).norm() <= center_rad.second) {
           nodes_to_remove.insert(id_node_pair.first);
+          remove = true;
           break;
         }
       }
+      if (remove) {
+        continue;
+      }
+    }
+
+    // Some frontiers may end up outside any places even when the environment
+    // is fully explored, because the places aren't infinitely dense. If the
+    // robot gets close enough to these frontiers, we clear them.
+    // NOTE: currently we don't delete these nodes, we actually turn them into
+    // anti-frontiers
+    if ((agent_pos - attrs.position).norm() < config.frontier_removal_threshold) {
+      // nodes_to_remove.insert(id_node_pair.first);
+      if (!attrs.active_frontier) {
+        attrs.anti_frontier = true;
+      } else {
+        // If the frontier is active, we need to copy it or it will be deleted by the
+        // frontend
+        nodes_to_copy.insert(id_node_pair.first);
+      }
+
+      continue;
     }
   }
 
   for (const auto nid : nodes_to_remove) {
     dsg.graph->removeNode(nid);
+  }
+
+  for (const auto nid : nodes_to_copy) {
+    NodeSymbol new_node_id = next_node_id_++;
+    auto cloned_attrs = dsg.graph->getNode(nid).attributes().clone();
+    dynamic_cast<PlaceNodeAttributes*>(cloned_attrs.get())->active_frontier = false;
+    dsg.graph->emplaceNode(DsgLayers::PLACES, new_node_id, std::move(cloned_attrs));
   }
 }
 
