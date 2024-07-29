@@ -31,6 +31,7 @@ std::unique_ptr<InputData> parseInputPacket(const InputPacket& input_packet,
                << GlobalInfo::instance().numSensors() << ".";
     return nullptr;
   }
+
   auto data = std::make_unique<InputData>(
       GlobalInfo::instance().getSensor(input_packet.sensor_input->sensor_id));
 

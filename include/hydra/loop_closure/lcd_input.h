@@ -32,60 +32,20 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/input/sensor_input_packet.h"
+#pragma once
+#include <spark_dsg/scene_graph_types.h>
 
-#include <glog/logging.h>
-
-#include <opencv2/imgproc.hpp>
-
-#include "hydra/common/global_info.h"
+#include <memory>
+#include <unordered_set>
+#include <vector>
 
 namespace hydra {
 
-bool SensorInputPacket::fillInputData(InputData& msg) const {
-  msg.timestamp_ns = timestamp_ns;
-  msg.feature = input_feature;
-  return fillInputDataImpl(msg);
-}
-
-ImageInputPacket::ImageInputPacket(uint64_t stamp, size_t sensor_id)
-    : SensorInputPacket(stamp, sensor_id) {}
-
-bool ImageInputPacket::fillInputDataImpl(InputData& msg) const {
-  if (depth.empty()) {
-    LOG(ERROR) << "Missing required images: Depth image must be set.";
-    return false;
-  }
-
-  if (color.empty() && labels.empty()) {
-    LOG(ERROR) << "Missing required images: Color or label image must be set.";
-    return false;
-  }
-
-  msg.color_image = color;
-  if (color_is_bgr) {
-    cv::cvtColor(msg.color_image, msg.color_image, cv::COLOR_BGR2RGB);
-  }
-
-  msg.depth_image = depth;
-  msg.label_image = labels;
-  return true;
-}
-
-CloudInputPacket::CloudInputPacket(uint64_t stamp, size_t sensor_id)
-    : SensorInputPacket(stamp, sensor_id) {}
-
-bool CloudInputPacket::fillInputDataImpl(InputData& msg) const {
-  if (points.empty() || (labels.empty() && colors.empty())) {
-    LOG(ERROR) << "Missing required pointcloud.";
-    return false;
-  }
-
-  msg.vertex_map = points;
-  msg.points_in_world_frame = in_world_frame;
-  msg.color_image = colors;
-  msg.label_image = labels;
-  return true;
-}
+struct LcdInput {
+  using Ptr = std::shared_ptr<LcdInput>;
+  uint64_t timestamp_ns;
+  std::unordered_set<spark_dsg::NodeId> archived_places;
+  std::vector<spark_dsg::NodeId> new_agent_nodes;
+};
 
 }  // namespace hydra

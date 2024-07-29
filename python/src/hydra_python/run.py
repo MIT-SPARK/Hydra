@@ -1,7 +1,8 @@
 """Module containing code for running Hydra."""
+
 from scipy.spatial.transform import Rotation as R
 import numpy as np
-import click
+import tqdm
 
 
 class ImageVisualizer:
@@ -34,27 +35,12 @@ def hydra_output_callback(pipeline, visualizer):
         visualizer.update_graph(pipeline.graph)
 
 
-def _take_step(pipeline, data, pose, segmenter, image_viz):
-    timestamp, world_t_body, q_wxyz = pose
-    q_xyzw = np.roll(q_wxyz, -1)
-
-    world_T_body = np.eye(4)
-    world_T_body[:3, 3] = world_t_body
-    world_T_body[:3, :3] = R.from_quat(q_xyzw).as_matrix()
-    data.set_pose(timestamp, world_T_body)
-
-    labels = segmenter(data.rgb) if segmenter else data.labels
-    if image_viz:
-        image_viz.show(data.colormap(labels))
-
-    pipeline.step(timestamp, world_t_body, q_wxyz, data.depth, labels, data.rgb)
-
-
 def run(
     pipeline,
     data,
     pose_source,
     segmenter=None,
+    feature_encoder=None,
     visualizer=None,
     show_images=False,
     show_progress=True,
@@ -62,15 +48,22 @@ def run(
 ):
     """Do stuff."""
     image_viz = ImageVisualizer() if show_images else None
+    pose_iter = tqdm.tqdm(pose_source) if show_progress else pose_source
+    for timestamp, world_t_body, q_wxyz in pose_iter:
+        q_xyzw = np.roll(q_wxyz, -1)
+        world_T_body = np.eye(4)
+        world_T_body[:3, 3] = world_t_body
+        world_T_body[:3, :3] = R.from_quat(q_xyzw).as_matrix()
+        data.set_pose(timestamp, world_T_body)
 
-    if show_progress:
-        with click.progressbar(pose_source) as bar:
-            for pose in bar:
-                _take_step(pipeline, data, pose, segmenter, image_viz)
-                if step_callback:
-                    step_callback(pipeline, visualizer)
-    else:
-        for pose in pose_source:
-            _take_step(pipeline, data, pose, segmenter, image_viz)
-            if step_callback:
-                step_callback(pipeline, visualizer)
+        labels = segmenter(data.rgb) if segmenter else data.labels
+        if image_viz:
+            image_viz.show(data.colormap(labels))
+
+        args = (timestamp, world_t_body, q_wxyz, data.depth, labels, data.rgb)
+        if feature_encoder is not None:
+            args += (feature_encoder(data.rgb),)
+
+        pipeline.step(*args)
+        if step_callback:
+            step_callback(pipeline, visualizer)

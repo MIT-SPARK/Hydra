@@ -59,14 +59,15 @@ struct PythonSensorInput : public SensorInputPacket {
                     const ColorVec& colors,
                     size_t sensor_index = 0);
 
-  bool fillInputData(InputData& msg) const override;
-
   bool valid() const;
 
   cv::Mat points;
   cv::Mat depth;
   cv::Mat labels;
   cv::Mat color;
+
+ protected:
+  bool fillInputDataImpl(InputData& msg) const override;
 };
 
 namespace python_sensor_input {

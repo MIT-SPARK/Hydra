@@ -22,31 +22,36 @@ struct InputData {
   explicit InputData(Sensor::ConstPtr sensor) : sensor_(std::move(sensor)) {}
   virtual ~InputData() = default;
 
-  // Time stamp this input data was captured.
+  //! Time stamp this input data was captured.
   TimeStamp timestamp_ns;
 
-  // Pose of the robot body in the world frame.
+  //! Pose of the robot body in the world frame.
   Eigen::Isometry3d world_T_body;
 
-  // Color image as RGB.
+  //! Color image as RGB.
   cv::Mat color_image;
 
-  // Depth image as planar depth in metres.
+  //! Depth image as planar depth in meters.
   cv::Mat depth_image;
 
-  // Ray lengths in meters.
+  //! Ray lengths in meters.
   cv::Mat range_image;
 
-  // Label image for semantic input data.
+  //! Label image for semantic input data.
   cv::Mat label_image;
 
-  // 3D points of the range image in sensor or world frame.
+  //! 3D points of the range image in sensor or world frame.
   cv::Mat vertex_map;
+  //! Whether or not the vertex map is in the world frame (or sensor frame).
   bool points_in_world_frame = false;
 
-  // Min and max range observed in the range image.
+  //! Min range observed in the range image.
   float min_range = 0.0f;
+  //! Max range observed in the range image.
   float max_range = std::numeric_limits<float>::infinity();
+
+  //! Feature associated with current input data
+  Eigen::VectorXf feature;
 
   /**
    * @brief Get the sensor that captured this data.

@@ -34,38 +34,10 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/common/shared_module_state.h"
 
-#include <glog/logging.h>
-
 namespace hydra {
 
 SharedModuleState::SharedModuleState() {}
 
-SharedModuleState::~SharedModuleState() {
-  VLOG(2) << "backend_queue: " << backend_queue.size();
-  if (lcd_queue) {
-    VLOG(2) << "lcd_queue: " << lcd_queue->size();
-  } else {
-    VLOG(2) << "lcd_queue: n/a";
-  }
-
-  if (bow_queue) {
-    VLOG(2) << "bow_queue: " << bow_queue->size();
-  } else {
-    VLOG(2) << "bow_queue: n/a";
-  }
-
-  VLOG(2) << "backend_lcd_queue: " << backend_lcd_queue.size();
-}
-
-void BackendModuleStatus::reset() {
-  total_loop_closures = 0;
-  new_loop_closures = 0;
-  total_factors = 0;
-  total_values = 0;
-  new_factors = 0;
-  new_graph_factors = 0;
-  trajectory_len = 0;
-  num_merges_undone = 0;
-}
+SharedModuleState::~SharedModuleState() {}
 
 }  // namespace hydra

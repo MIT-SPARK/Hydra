@@ -32,60 +32,47 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/input/sensor_input_packet.h"
+#pragma once
+#include <memory>
 
-#include <glog/logging.h>
+#include "hydra/common/input_queue.h"
+#include "hydra/loop_closure/registration_solution.h"
 
-#include <opencv2/imgproc.hpp>
-
-#include "hydra/common/global_info.h"
+namespace pose_graph_tools {
+struct BowQuery;
+}
 
 namespace hydra {
 
-bool SensorInputPacket::fillInputData(InputData& msg) const {
-  msg.timestamp_ns = timestamp_ns;
-  msg.feature = input_feature;
-  return fillInputDataImpl(msg);
-}
+struct BackendInput;
+struct LcdInput;
+struct FeatureView;
 
-ImageInputPacket::ImageInputPacket(uint64_t stamp, size_t sensor_id)
-    : SensorInputPacket(stamp, sensor_id) {}
+class PipelineQueues {
+ public:
+  using BowQueue = InputQueue<std::shared_ptr<const pose_graph_tools::BowQuery>>;
+  using LcdQueue = InputQueue<std::shared_ptr<LcdInput>>;
 
-bool ImageInputPacket::fillInputDataImpl(InputData& msg) const {
-  if (depth.empty()) {
-    LOG(ERROR) << "Missing required images: Depth image must be set.";
-    return false;
-  }
+  ~PipelineQueues();
+  static PipelineQueues& instance();
 
-  if (color.empty() && labels.empty()) {
-    LOG(ERROR) << "Missing required images: Color or label image must be set.";
-    return false;
-  }
+  //! Connection between frontend and backend
+  InputQueue<std::shared_ptr<BackendInput>> backend_queue;
+  //! Connection between backend and LCD module
+  InputQueue<lcd::RegistrationSolution> backend_lcd_queue;
+  //! Queue for receiving image or pointcloud level descriptors
+  InputQueue<std::unique_ptr<FeatureView>> input_features_queue;
+  //! Optional input queue to LCD module
+  LcdQueue::Ptr lcd_queue;
+  //! Optional BoW descriptor queue to LCD module
+  BowQueue::Ptr bow_queue;
 
-  msg.color_image = color;
-  if (color_is_bgr) {
-    cv::cvtColor(msg.color_image, msg.color_image, cv::COLOR_BGR2RGB);
-  }
+ private:
+  PipelineQueues();
 
-  msg.depth_image = depth;
-  msg.label_image = labels;
-  return true;
-}
-
-CloudInputPacket::CloudInputPacket(uint64_t stamp, size_t sensor_id)
-    : SensorInputPacket(stamp, sensor_id) {}
-
-bool CloudInputPacket::fillInputDataImpl(InputData& msg) const {
-  if (points.empty() || (labels.empty() && colors.empty())) {
-    LOG(ERROR) << "Missing required pointcloud.";
-    return false;
-  }
-
-  msg.vertex_map = points;
-  msg.points_in_world_frame = in_world_frame;
-  msg.color_image = colors;
-  msg.label_image = labels;
-  return true;
-}
+  // TODO(nathan) have some sort of config or pull from global config
+  // TODO(nathan) fix thread safety (by probably just having a single static instance)
+  inline static std::unique_ptr<PipelineQueues> s_instance_;
+};
 
 }  // namespace hydra

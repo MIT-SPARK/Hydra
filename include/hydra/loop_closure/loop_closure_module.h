@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <memory>
+#include <queue>
 #include <thread>
 
 #include "hydra/common/common.h"
@@ -88,6 +89,9 @@ class LoopClosureModule : public Module {
 
   std::unique_ptr<lcd::LcdDetector> lcd_detector_;
   DynamicSceneGraph::Ptr lcd_graph_;
+
+ private:
+  void stopImpl();
 };
 
 }  // namespace hydra

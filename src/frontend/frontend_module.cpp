@@ -46,6 +46,7 @@
 #include <fstream>
 
 #include "hydra/common/global_info.h"
+#include "hydra/common/pipeline_queues.h"
 #include "hydra/frontend/frontier_extractor.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/place_2d_segmenter.h"
@@ -88,6 +89,8 @@ void declare_config(FrontendModule::Config& config) {
   field(config.use_frontiers, "use_frontiers");
   config.frontier_places.setOptional();
   field(config.frontier_places, "frontier_places");
+  field(config.view_database, "view_database");
+  field(config.sinks, "sinks");
 }
 
 FrontendModule::FrontendModule(const Config& config,
@@ -103,13 +106,10 @@ FrontendModule::FrontendModule(const Config& config,
       surface_places_(config.surface_places.create()),
       freespace_places_(config.freespace_places.create()),
       frontier_places_(config.frontier_places.create()),
+      view_database_(config.view_database),
       sinks_(Sink::instantiate(config.sinks)) {
   if (!config.use_frontiers) {
     frontier_places_.reset();
-  }
-
-  if (config.lcd_use_bow_vectors) {
-    state_->bow_queue = std::make_shared<SharedModuleState::BowQueue>();
   }
 
   CHECK(dsg_ != nullptr);
@@ -132,6 +132,10 @@ FrontendModule::FrontendModule(const Config& config,
     frontend_graph_logger_.setLayerName(DsgLayers::OBJECTS, "objects");
     frontend_graph_logger_.setLayerName(DsgLayers::PLACES, "places");
     frontend_graph_logger_.setLayerName(DsgLayers::MESH_PLACES, "places 2d");
+  }
+
+  if (config.lcd_use_bow_vectors) {
+    PipelineQueues::instance().bow_queue.reset(new PipelineQueues::BowQueue());
   }
 }
 
@@ -248,8 +252,21 @@ void FrontendModule::spin() {
   }
 }
 
-void FrontendModule::processNextInput(const ReconstructionOutput& /*msg*/) {
-  // TODO(nathan) cache information if required
+void FrontendModule::processNextInput(const ReconstructionOutput& msg) {
+  if (!msg.sensor_data) {
+    return;
+  }
+
+  const auto& data = *msg.sensor_data;
+  if (data.feature.rows() * data.feature.cols() == 0) {
+    return;  // no feature present
+  }
+
+  auto view = std::make_unique<FeatureView>(data.timestamp_ns,
+                                            data.getSensorPose().inverse(),
+                                            data.feature,
+                                            &data.getSensor());
+  PipelineQueues::instance().input_features_queue.push(std::move(view));
 }
 
 bool FrontendModule::spinOnce() {
@@ -282,13 +299,15 @@ void FrontendModule::spinOnce(const ReconstructionOutput::Ptr& msg) {
     initCallbacks();
   }
 
+  auto& queues = PipelineQueues::instance();
+
   VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg->timestamp_ns << " [ns]";
   std::lock_guard<std::mutex> lock(mutex_);
   ScopedTimer timer("frontend/spin", msg->timestamp_ns);
 
   backend_input_.reset(new BackendInput());
   backend_input_->timestamp_ns = msg->timestamp_ns;
-  if (state_->lcd_queue) {
+  if (queues.lcd_queue) {
     lcd_input_.reset(new LcdInput());
     lcd_input_->timestamp_ns = msg->timestamp_ns;
   }
@@ -305,7 +324,7 @@ void FrontendModule::spinOnce(const ReconstructionOutput::Ptr& msg) {
     state_->backend_graph->graph->mergeGraph(*dsg_->graph);
   }  // end critical section
 
-  if (state_->lcd_queue) {
+  if (queues.lcd_queue) {
     // n.b., critical section in this scope!
     std::unique_lock<std::mutex> lock(state_->lcd_graph->mutex);
     ScopedTimer merge_timer("frontend/merge_lcd_graph", msg->timestamp_ns);
@@ -314,9 +333,9 @@ void FrontendModule::spinOnce(const ReconstructionOutput::Ptr& msg) {
   }
 
   backend_input_->mesh_update = last_mesh_update_;
-  state_->backend_queue.push(backend_input_);
-  if (state_->lcd_queue) {
-    state_->lcd_queue->push(lcd_input_);
+  queues.backend_queue.push(backend_input_);
+  if (queues.lcd_queue) {
+    queues.lcd_queue->push(lcd_input_);
   }
 
   if (logs_) {
@@ -503,6 +522,10 @@ void FrontendModule::updatePlaces(const ReconstructionOutput& input) {
     places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
     addPlaceAgentEdges(input.timestamp_ns);
     addPlaceObjectEdges(input.timestamp_ns);
+
+    // TODO(nathan) should also work for 2d places
+    view_database_.updateAssignments(*dsg_->graph, active_nodes);
+
     state_->latest_places = active_nodes;
   }  // end graph update critical section
 }
@@ -600,7 +623,8 @@ void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
 }
 
 void FrontendModule::assignBowVectors(const DynamicLayer& agents) {
-  if (!state_->bow_queue) {
+  auto& queue = PipelineQueues::instance().bow_queue;
+  if (!queue) {
     return;
   }
 
@@ -609,9 +633,8 @@ void FrontendModule::assignBowVectors(const DynamicLayer& agents) {
   // lcd_input_->new_agent_nodes.clear();
 
   // add bow messages received since last spin
-  auto& bow_queue = *state_->bow_queue;
-  while (!bow_queue.empty()) {
-    cached_bow_messages_.push_back(bow_queue.pop());
+  while (!queue->empty()) {
+    cached_bow_messages_.push_back(queue->pop());
   }
 
   const auto prior_size = cached_bow_messages_.size();

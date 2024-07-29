@@ -27,6 +27,7 @@ add_executable(
   loop_closure/test_scene_graph_descriptors.cpp
   loop_closure/test_subgraph_extraction.cpp
   odometry/test_pose_graph_from_odom.cpp
+  openset/test_embedding_distances.cpp
   places/test_compression_graph_extractor.cpp
   places/test_floodfill_graph_extractor.cpp
   places/test_graph_extractor_utilities.cpp

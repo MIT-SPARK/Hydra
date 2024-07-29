@@ -35,12 +35,14 @@
 #pragma once
 #include <config_utilities/factory.h>
 #include <kimera_pgmo/hashing.h>
+#include <pose_graph_tools/bow_query.h>
 #include <spark_dsg/scene_graph_logger.h>
 
 #include <memory>
 #include <mutex>
 #include <thread>
 
+#include "hydra/backend/backend_input.h"
 #include "hydra/common/common.h"
 #include "hydra/common/input_queue.h"
 #include "hydra/common/module.h"
@@ -51,6 +53,8 @@
 #include "hydra/frontend/frontier_places_interface.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/surface_places_interface.h"
+#include "hydra/frontend/view_database.h"
+#include "hydra/loop_closure/lcd_input.h"
 #include "hydra/odometry/pose_graph_from_odom.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/utils/log_utilities.h"
@@ -88,6 +92,7 @@ class FrontendModule : public Module {
     config::VirtualConfig<FreespacePlacesInterface> freespace_places;
     bool use_frontiers = false;
     config::VirtualConfig<FrontierPlacesInterface> frontier_places;
+    ViewDatabase::Config view_database;
     std::vector<Sink::Factory> sinks;
   } const config;
 
@@ -181,6 +186,7 @@ class FrontendModule : public Module {
   std::unique_ptr<SurfacePlacesInterface> surface_places_;
   std::unique_ptr<FreespacePlacesInterface> freespace_places_;
   std::unique_ptr<FrontierPlacesInterface> frontier_places_;
+  ViewDatabase view_database_;
 
   SceneGraphLogger frontend_graph_logger_;
   LogSetup::Ptr logs_;

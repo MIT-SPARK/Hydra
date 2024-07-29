@@ -53,6 +53,7 @@
 #include "hydra/backend/update_rooms_buildings_functor.h"
 #include "hydra/common/config_utilities.h"
 #include "hydra/common/global_info.h"
+#include "hydra/common/pipeline_queues.h"
 #include "hydra/rooms/room_finder.h"
 #include "hydra/utils/minimum_spanning_tree.h"
 #include "hydra/utils/pgmo_mesh_traits.h"
@@ -65,6 +66,17 @@ using kimera_pgmo::DeformationGraph;
 using kimera_pgmo::DeformationGraphPtr;
 using kimera_pgmo::KimeraPgmoInterface;
 using pose_graph_tools::PoseGraph;
+
+void BackendModuleStatus::reset() {
+  total_loop_closures = 0;
+  new_loop_closures = 0;
+  total_factors = 0;
+  total_values = 0;
+  new_factors = 0;
+  new_graph_factors = 0;
+  trajectory_len = 0;
+  num_merges_undone = 0;
+}
 
 void declare_config(BackendModule::Config& config) {
   using namespace config;
@@ -164,8 +176,6 @@ void BackendModule::stopImpl() {
     zmq_thread_.reset();
     VLOG(2) << "[Hydra Backend] stopped!";
   }
-
-  VLOG(2) << "[Hydra Backend]: " << state_->backend_queue.size() << " messages left";
 }
 
 void BackendModule::stop() { stopImpl(); }
@@ -228,7 +238,8 @@ std::string BackendModule::printInfo() const {
 void BackendModule::spin() {
   bool should_shutdown = false;
   while (!should_shutdown) {
-    bool has_data = state_->backend_queue.poll();
+    auto& queue = PipelineQueues::instance().backend_queue;
+    bool has_data = queue.poll();
     if (GlobalInfo::instance().force_shutdown() || !has_data) {
       // copy over shutdown request
       should_shutdown = should_shutdown_;
@@ -238,19 +249,20 @@ void BackendModule::spin() {
       continue;
     }
 
-    spinOnce(*state_->backend_queue.front(), false);
-    state_->backend_queue.pop();
+    spinOnce(*queue.front(), false);
+    queue.pop();
   }
 }
 
 bool BackendModule::spinOnce(bool force_update) {
-  bool has_data = state_->backend_queue.poll();
+  auto& queue = PipelineQueues::instance().backend_queue;
+  bool has_data = queue.poll();
   if (!has_data) {
     return false;
   }
 
-  spinOnce(*state_->backend_queue.front(), force_update);
-  state_->backend_queue.pop();
+  spinOnce(*queue.front(), force_update);
+  queue.pop();
   return true;
 }
 
@@ -416,8 +428,9 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
 
 bool BackendModule::updateFromLcdQueue() {
   bool added_new_loop_closure = false;
-  while (!state_->backend_lcd_queue.empty()) {
-    const auto result = state_->backend_lcd_queue.pop();
+  auto& queue = PipelineQueues::instance().backend_lcd_queue;
+  while (!queue.empty()) {
+    const auto result = queue.pop();
 
     // note that pose graph convention is pose = src.between(dest) where the edge
     // connects frames "to -> from" (i.e. src = to, dest = from, pose = to_T_from)

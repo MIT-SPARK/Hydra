@@ -40,6 +40,8 @@
 #include <spark_dsg/printing.h>
 
 #include "hydra/common/global_info.h"
+#include "hydra/common/pipeline_queues.h"
+#include "hydra/loop_closure/lcd_input.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -53,14 +55,16 @@ LoopClosureModule::LoopClosureModule(const LoopClosureConfig& config,
   lcd_detector_.reset(new lcd::LcdDetector(config_.detector));
 }
 
-LoopClosureModule::~LoopClosureModule() { stop(); }
+LoopClosureModule::~LoopClosureModule() { stopImpl(); }
 
 void LoopClosureModule::start() {
   spin_thread_.reset(new std::thread(&LoopClosureModule::spin, this));
   LOG(INFO) << "[Hydra LCD] LCD started!";
 }
 
-void LoopClosureModule::stop() {
+void LoopClosureModule::stop() { stopImpl(); }
+
+void LoopClosureModule::stopImpl() {
   VLOG(2) << "[Hydra LCD] stopping lcd!";
 
   should_shutdown_ = true;
@@ -85,14 +89,15 @@ std::string LoopClosureModule::printInfo() const {
 }
 
 void LoopClosureModule::spin() {
-  if (!state_->lcd_queue) {
+  auto queue = PipelineQueues::instance().lcd_queue;
+  if (!queue) {
     LOG(ERROR) << "LCD queue required to run LCD";
     return;
   }
 
   bool should_shutdown = false;
   while (!should_shutdown) {
-    bool has_data = state_->lcd_queue->poll();
+    bool has_data = queue->poll();
     if (GlobalInfo::instance().force_shutdown() || !has_data) {
       // copy over shutdown request
       should_shutdown = should_shutdown_;
@@ -115,12 +120,13 @@ void LoopClosureModule::spin() {
 }
 
 bool LoopClosureModule::spinOnce(bool force_update) {
-  if (!state_->lcd_queue) {
+  auto queue = PipelineQueues::instance().lcd_queue;
+  if (!queue) {
     LOG(ERROR) << "LCD queue required to run LCD";
     return false;
   }
 
-  bool has_data = state_->lcd_queue->poll();
+  bool has_data = queue->poll();
   if (!has_data) {
     return false;
   }
@@ -158,9 +164,10 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
 
     const auto time = lcd_graph_->getNode(*query_agent).timestamp.value();
     auto results = lcd_detector_->detect(*lcd_graph_, *query_agent, time.count());
+    auto& queue = PipelineQueues::instance().backend_lcd_queue;
     for (const auto& result : results) {
       // TODO(nathan) consider augmenting with gtsam key
-      state_->backend_lcd_queue.push(result);
+      queue.push(result);
       LOG(WARNING) << "[Hydra LCD] Found valid loop-closure: "
                    << NodeSymbol(result.from_node).getLabel() << " -> "
                    << NodeSymbol(result.to_node).getLabel();
@@ -173,7 +180,8 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
 }
 
 size_t LoopClosureModule::processFrontendOutput() {
-  const auto& msg = state_->lcd_queue->front();
+  auto queue = PipelineQueues::instance().lcd_queue;
+  const auto& msg = queue->front();
   VLOG(5) << "[Hydra LCD] Received archived places: "
           << displayNodeSymbolContainer(msg->archived_places);
 
@@ -188,7 +196,7 @@ size_t LoopClosureModule::processFrontendOutput() {
   }
 
   size_t timestamp_ns = msg->timestamp_ns;
-  state_->lcd_queue->pop();
+  queue->pop();
   return timestamp_ns;
 }
 

@@ -32,60 +32,45 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/input/sensor_input_packet.h"
+#include "hydra/common/pipeline_queues.h"
 
 #include <glog/logging.h>
 
-#include <opencv2/imgproc.hpp>
-
 #include "hydra/common/global_info.h"
+#include "hydra/frontend/view_selector.h"
 
 namespace hydra {
 
-bool SensorInputPacket::fillInputData(InputData& msg) const {
-  msg.timestamp_ns = timestamp_ns;
-  msg.feature = input_feature;
-  return fillInputDataImpl(msg);
+PipelineQueues::~PipelineQueues() {
+  VLOG(2) << "backend_queue: " << backend_queue.size();
+  VLOG(2) << "backend_lcd_queue: " << backend_lcd_queue.size();
+
+  if (lcd_queue) {
+    VLOG(2) << "lcd_queue: " << lcd_queue->size();
+  } else {
+    VLOG(2) << "lcd_queue: n/a";
+  }
+
+  if (bow_queue) {
+    VLOG(2) << "bow_queue: " << bow_queue->size();
+  } else {
+    VLOG(2) << "bow_queue: n/a";
+  }
 }
 
-ImageInputPacket::ImageInputPacket(uint64_t stamp, size_t sensor_id)
-    : SensorInputPacket(stamp, sensor_id) {}
-
-bool ImageInputPacket::fillInputDataImpl(InputData& msg) const {
-  if (depth.empty()) {
-    LOG(ERROR) << "Missing required images: Depth image must be set.";
-    return false;
+PipelineQueues& PipelineQueues::instance() {
+  if (!s_instance_) {
+    s_instance_.reset(new PipelineQueues());
   }
 
-  if (color.empty() && labels.empty()) {
-    LOG(ERROR) << "Missing required images: Color or label image must be set.";
-    return false;
-  }
-
-  msg.color_image = color;
-  if (color_is_bgr) {
-    cv::cvtColor(msg.color_image, msg.color_image, cv::COLOR_BGR2RGB);
-  }
-
-  msg.depth_image = depth;
-  msg.label_image = labels;
-  return true;
+  return *s_instance_;
 }
 
-CloudInputPacket::CloudInputPacket(uint64_t stamp, size_t sensor_id)
-    : SensorInputPacket(stamp, sensor_id) {}
-
-bool CloudInputPacket::fillInputDataImpl(InputData& msg) const {
-  if (points.empty() || (labels.empty() && colors.empty())) {
-    LOG(ERROR) << "Missing required pointcloud.";
-    return false;
+PipelineQueues::PipelineQueues() {
+  const auto& info = hydra::GlobalInfo::instance();
+  if (info.getConfig().enable_lcd) {
+    lcd_queue.reset(new LcdQueue());
   }
-
-  msg.vertex_map = points;
-  msg.points_in_world_frame = in_world_frame;
-  msg.color_image = colors;
-  msg.label_image = labels;
-  return true;
 }
 
 }  // namespace hydra

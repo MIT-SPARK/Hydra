@@ -115,23 +115,22 @@ PythonSensorInput::PythonSensorInput(uint64_t timestamp_ns,
   }
 }
 
-bool PythonSensorInput::fillInputData(InputData& msg) const {
+bool PythonSensorInput::valid() const {
+  return (!points.empty() || !depth.empty()) && (!color.empty() || !labels.empty());
+}
+
+bool PythonSensorInput::fillInputDataImpl(InputData& msg) const {
   if ((depth.empty() && points.empty()) || (color.empty() && labels.empty())) {
     LOG(ERROR) << "Missing required data";
     return false;
   }
 
-  msg.timestamp_ns = timestamp_ns;
   msg.vertex_map = points;
   msg.points_in_world_frame = false;
   msg.color_image = color;
   msg.depth_image = depth;
   msg.label_image = labels;
   return true;
-}
-
-bool PythonSensorInput::valid() const {
-  return (!points.empty() || !depth.empty()) && (!color.empty() || !labels.empty());
 }
 
 namespace python_sensor_input {

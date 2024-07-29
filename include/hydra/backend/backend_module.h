@@ -42,6 +42,7 @@
 #include <mutex>
 #include <thread>
 
+#include "hydra/backend/backend_input.h"
 #include "hydra/backend/merge_tracker.h"
 #include "hydra/backend/pgmo_configs.h"
 #include "hydra/backend/update_frontiers_functor.h"
@@ -67,6 +68,19 @@ struct LoopClosureLog {
   gtsam::Pose3 src_T_dest;  // src_frame.between(dest_frame)
   bool dsg;
   int64_t level;
+};
+
+struct BackendModuleStatus {
+  size_t total_loop_closures;
+  size_t new_loop_closures;
+  size_t total_factors;
+  size_t total_values;
+  size_t new_factors;
+  size_t new_graph_factors;
+  size_t trajectory_len;
+  size_t num_merges_undone;
+
+  void reset();
 };
 
 class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {

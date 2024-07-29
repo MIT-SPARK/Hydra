@@ -108,7 +108,6 @@ void HydraPythonPipeline::initPython(const PythonConfig& config,
     lcd_config.detector.num_semantic_classes = GlobalInfo::instance().getTotalLabels();
     config::checkValid(lcd_config);
 
-    shared_state_->lcd_queue.reset(new InputQueue<LcdInput::Ptr>());
     loop_closure_ = std::make_shared<LoopClosureModule>(lcd_config, shared_state_);
     modules_["lcd"] = loop_closure_;
   }
@@ -192,40 +191,60 @@ void addBindings(pybind11::module_& m) {
            "use_step_mode"_a = true)
       .def("init", &HydraPythonPipeline::initPython, "config"_a, "camera"_a)
       .def("save", &HydraPythonPipeline::save)
-      .def("step",
-           [](HydraPythonPipeline& pipeline,
-              size_t timestamp_ns,
-              const Eigen::Vector3d& world_t_body,
-              const Eigen::Vector4d& world_R_body,
-              const py::buffer& depth,
-              const py::buffer& labels,
-              const py::buffer& rgb) {
-             auto input = std::make_shared<InputPacket>();
-             input->timestamp_ns = timestamp_ns;
-             input->world_t_body = world_t_body;
-             input->world_R_body = Eigen::Quaterniond(
-                 world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
-             input->sensor_input =
-                 std::make_unique<PythonSensorInput>(timestamp_ns, depth, labels, rgb);
-             return pipeline.spinOnce(*input);
-           })
-      .def("step",
-           [](HydraPythonPipeline& pipeline,
-              size_t timestamp_ns,
-              const Eigen::Vector3d& world_t_body,
-              const Eigen::Vector4d& world_R_body,
-              const PythonSensorInput::PointVec& points,
-              const PythonSensorInput::LabelVec& labels,
-              const PythonSensorInput::ColorVec& colors) {
-             auto input = std::make_shared<InputPacket>();
-             input->timestamp_ns = timestamp_ns;
-             input->world_t_body = world_t_body;
-             input->world_R_body = Eigen::Quaterniond(
-                 world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
-             input->sensor_input = std::make_unique<PythonSensorInput>(
-                 timestamp_ns, points, labels, colors);
-             return pipeline.spinOnce(*input);
-           })
+      .def(
+          "step",
+          [](HydraPythonPipeline& pipeline,
+             size_t timestamp_ns,
+             const Eigen::Vector3d& world_t_body,
+             const Eigen::Vector4d& world_R_body,
+             const py::buffer& depth,
+             const py::buffer& labels,
+             const py::buffer& rgb,
+             const Eigen::VectorXf& feature) {
+            auto input = std::make_shared<InputPacket>();
+            input->timestamp_ns = timestamp_ns;
+            input->world_t_body = world_t_body;
+            input->world_R_body = Eigen::Quaterniond(
+                world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
+            input->sensor_input =
+                std::make_unique<PythonSensorInput>(timestamp_ns, depth, labels, rgb);
+            input->sensor_input->input_feature = feature;
+            return pipeline.spinOnce(*input);
+          },
+          "timestamp_ns"_a,
+          "world_t_body"_a,
+          "world_R_body"_a,
+          "depth"_a,
+          "labels"_a,
+          "rgb"_a,
+          "features"_a = Eigen::VectorXf())
+      .def(
+          "step",
+          [](HydraPythonPipeline& pipeline,
+             size_t timestamp_ns,
+             const Eigen::Vector3d& world_t_body,
+             const Eigen::Vector4d& world_R_body,
+             const PythonSensorInput::PointVec& points,
+             const PythonSensorInput::LabelVec& labels,
+             const PythonSensorInput::ColorVec& colors,
+             const Eigen::VectorXf& feature) {
+            auto input = std::make_shared<InputPacket>();
+            input->timestamp_ns = timestamp_ns;
+            input->world_t_body = world_t_body;
+            input->world_R_body = Eigen::Quaterniond(
+                world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
+            input->sensor_input = std::make_unique<PythonSensorInput>(
+                timestamp_ns, points, labels, colors);
+            input->sensor_input->input_feature = feature;
+            return pipeline.spinOnce(*input);
+          },
+          "timestamp_ns"_a,
+          "world_t_body"_a,
+          "world_R_body"_a,
+          "points"_a,
+          "labels"_a,
+          "colors"_a,
+          "features"_a = Eigen::VectorXf())
       .def_property_readonly("graph", &HydraPythonPipeline::getSceneGraph);
 }
 

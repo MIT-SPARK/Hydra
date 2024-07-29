@@ -33,73 +33,21 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <kimera_pgmo/mesh_delta.h>
-#include <kimera_pgmo/utils/common_structs.h>
-#include <pose_graph_tools/bow_query.h>
-
-#include <list>
-#include <map>
 #include <memory>
-#include <mutex>
-#include <vector>
 
-#include "hydra/common/common.h"
-#include "hydra/common/dsg_types.h"
-#include "hydra/common/input_queue.h"
-#include "hydra/common/robot_prefix_config.h"
 #include "hydra/common/shared_dsg_info.h"
-#include "hydra/loop_closure/registration_solution.h"
-#include "hydra/odometry/pose_graph_tracker.h"
 
 namespace hydra {
 
-struct LcdInput {
-  using Ptr = std::shared_ptr<LcdInput>;
-
-  uint64_t timestamp_ns;
-  NodeIdSet archived_places;
-  std::vector<NodeId> new_agent_nodes;
-};
-
-struct BackendInput {
-  using Ptr = std::shared_ptr<BackendInput>;
-
-  RobotPrefixConfig prefix;
-  uint64_t timestamp_ns;
-  pose_graph_tools::PoseGraph::ConstPtr deformation_graph;
-  PoseGraphPacket agent_updates;
-  kimera_pgmo::MeshDelta::Ptr mesh_update;
-};
-
 struct SharedModuleState {
   using Ptr = std::shared_ptr<SharedModuleState>;
-  using BowQueue = InputQueue<pose_graph_tools::BowQuery::ConstPtr>;
-
   SharedModuleState();
 
   ~SharedModuleState();
 
-  NodeIdSet latest_places;
-
-  InputQueue<BackendInput::Ptr> backend_queue;
-  InputQueue<LcdInput::Ptr>::Ptr lcd_queue;
-  BowQueue::Ptr bow_queue;
-  InputQueue<lcd::RegistrationSolution> backend_lcd_queue;
+  std::unordered_set<NodeId> latest_places;
   SharedDsgInfo::Ptr lcd_graph;
   SharedDsgInfo::Ptr backend_graph;
-};
-
-struct BackendModuleStatus {
-  size_t total_loop_closures;
-  size_t new_loop_closures;
-  size_t total_factors;
-  size_t total_values;
-  size_t new_factors;
-  size_t new_graph_factors;
-  size_t trajectory_len;
-  size_t num_merges_undone;
-
-  void reset();
 };
 
 }  // namespace hydra

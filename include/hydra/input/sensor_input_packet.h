@@ -40,38 +40,45 @@ namespace hydra {
 struct SensorInputPacket {
   using Ptr = std::shared_ptr<SensorInputPacket>;
 
-  explicit SensorInputPacket(uint64_t stamp, size_t sensor_id) : timestamp_ns(stamp), sensor_id(sensor_id) {}
+  explicit SensorInputPacket(uint64_t stamp, size_t sensor_id)
+      : timestamp_ns(stamp), sensor_id(sensor_id) {}
 
   virtual ~SensorInputPacket() = default;
 
-  virtual bool fillInputData(InputData& msg) const = 0;
+  bool fillInputData(InputData& msg) const;
 
- public:
   const uint64_t timestamp_ns;
   const size_t sensor_id;
   std::string sensor_frame;
+  //! Learned feature for the input data (e.g., CLIP for camera)
+  Eigen::VectorXf input_feature;
+
+ protected:
+  virtual bool fillInputDataImpl(InputData& msg) const = 0;
 };
 
 struct ImageInputPacket : public SensorInputPacket {
   explicit ImageInputPacket(uint64_t stamp, size_t sensor_id);
 
-  bool fillInputData(InputData& msg) const override;
-
   cv::Mat color;
   cv::Mat depth;
   cv::Mat labels;
-  bool color_is_bgr = false; // Otherwise, color is RGB already.
+  bool color_is_bgr = false;  // Otherwise, color is RGB already.
+
+ protected:
+  bool fillInputDataImpl(InputData& msg) const override;
 };
 
 struct CloudInputPacket : public SensorInputPacket {
   explicit CloudInputPacket(uint64_t stamp, size_t sensor_id);
 
-  bool fillInputData(InputData& msg) const override;
-
   bool in_world_frame = false;
   cv::Mat points;
   cv::Mat colors;
   cv::Mat labels;
+
+ protected:
+  bool fillInputDataImpl(InputData& msg) const override;
 };
 
 }  // namespace hydra

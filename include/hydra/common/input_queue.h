@@ -35,16 +35,16 @@
 #pragma once
 #include <chrono>
 #include <condition_variable>
+#include <list>
 #include <memory>
 #include <mutex>
-#include <queue>
 
 namespace hydra {
 
 template <typename T>
 struct InputQueue {
   using Ptr = std::shared_ptr<InputQueue<T>>;
-  std::queue<T> queue;
+  std::list<T> queue;
   mutable std::mutex mutex;
   mutable std::condition_variable cv;
   size_t max_size;
@@ -86,12 +86,12 @@ struct InputQueue {
     return cv.wait_for(lock, wait_duration, [&] { return queue.empty(); });
   }
 
-  bool push(const T& input) {
+  bool push(T input) {
     bool added = false;
     {
       std::unique_lock<std::mutex> lock(mutex);
       if (!max_size || queue.size() < max_size) {
-        queue.push(input);
+        queue.push_back(std::move(input));
         added = true;
       }
     }
@@ -103,8 +103,8 @@ struct InputQueue {
 
   T pop() {
     std::unique_lock<std::mutex> lock(mutex);
-    auto value = queue.front();
-    queue.pop();
+    auto value = std::move(queue.front());
+    queue.pop_front();
     return value;
   }
 

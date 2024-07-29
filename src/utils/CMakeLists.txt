@@ -4,6 +4,7 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/csv_reader.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/disjoint_set.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/display_utilities.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/id_tracker.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/log_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/mesh_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/minimum_spanning_tree.cpp

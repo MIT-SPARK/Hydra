@@ -50,6 +50,9 @@ struct PoseStatus {
   Eigen::Quaterniond target_R_source;
   Eigen::Vector3d target_p_source;
   operator bool() const { return is_valid; }
+  Eigen::Isometry3d target_T_source() const {
+    return Eigen::Translation<double, 3>(target_p_source) * target_R_source;
+  }
 };
 
 class InputModule : public Module {

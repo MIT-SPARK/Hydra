@@ -27,3 +27,7 @@
     local-name: kimera_pgmo
     uri: git@github.mit.edu:SPARK/Kimera-PGMO.git
     version: future
+- git:
+    local-name: semantic_inference
+    uri: git@github.mit.edu:SPARK/semantic_inference.git
+    version: develop

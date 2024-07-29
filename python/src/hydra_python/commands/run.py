@@ -15,6 +15,33 @@ def cli():
     pass
 
 
+class ClipEncoder:
+    """Image feature encoder."""
+
+    def __init__(self, model_name="ViT-L/14"):
+        """Load clip."""
+        import semantic_inference.models as models
+
+        config = models.ClipConfig()
+        config.model_name = model_name
+        self.device = models.default_device()
+        self.model = models.ClipVisionWrapper(config).to(self.device)
+        self.model.eval()
+        self.transform = models.get_image_preprocessor(self.model.input_size).to(
+            self.device
+        )
+        self.center_crop = models.center_crop
+
+    def __call__(self, img):
+        """Encode image with clip."""
+        import torch
+
+        with torch.no_grad():
+            img = torch.from_numpy(img).to(self.device).permute((2, 0, 1))
+            img = self.enter_crop(self.transform(img), self.model.input_size)
+            return torch.squeeze(self.model(img.unsqueeze(0)).cpu())
+
+
 class FileDataInterface:
     """Class for loading files."""
 
@@ -137,6 +164,7 @@ def _load_pipeline(
 @click.option("-g", "--glog-level", default=0, help="minimum glog level")
 @click.option("-y", "--force", is_flag=True, help="overwrite previous output")
 @click.option("-m", "--max-frames", default=None, type=int, help="cap max frames")
+@click.option("--openset-model", default=None, type=str, help="clip model to use")
 @click.option("--verbosity", default=0, help="glog verbosity")
 @click.option("--show-images", default=False, help="show semantics", is_flag=True)
 @click.option("--show-config", default=False, help="show hydra config", is_flag=True)
@@ -150,6 +178,7 @@ def run(
     glog_level,
     force,
     max_frames,
+    openset_model,
     verbosity,
     show_images,
     show_config,
@@ -173,6 +202,10 @@ def run(
         visualizer = DsgVisualizer(start_remote=False)
         visualizer.update_graph(pipeline.graph)
 
+    encoder = None
+    if openset_model is not None:
+        encoder = ClipEncoder(model_name=openset_model)
+
     poses = data.poses
     if max_frames is not None:
         poses = poses[:max_frames]
@@ -182,6 +215,7 @@ def run(
             pipeline,
             data,
             poses,
+            feature_encoder=encoder,
             visualizer=visualizer,
             show_images=show_images,
             show_progress=show_progress,
@@ -201,6 +235,7 @@ def run(
 @click.option("-g", "--glog-level", default=0, help="minimum glog level")
 @click.option("-y", "--force", is_flag=True, help="overwrite previous output")
 @click.option("-m", "--max-frames", default=None, type=int, help="cap max frames")
+@click.option("--openset-model", deafult=None, type=str, help="clip model to use")
 @click.option("--verbosity", default=0, help="glog verbosity")
 @click.option("--show-images", default=False, help="show semantics", is_flag=True)
 def run_scenes(
@@ -212,6 +247,7 @@ def run_scenes(
     glog_level,
     force,
     max_frames,
+    openset_model,
     verbosity,
     show_images,
 ):
@@ -233,6 +269,9 @@ def run_scenes(
     args += ["--verbosity", str(verbosity)]
     if show_images:
         args += ["--show-images"]
+
+    if openset_model is not None:
+        args += ["--openset-model", openset_model]
 
     args += ["--show-progress"]
 

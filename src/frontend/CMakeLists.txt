@@ -7,4 +7,6 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/place_mesh_connector.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/place_2d_segmenter.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/place_2d_split_logic.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/view_database.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/view_selector.cpp
 )
