@@ -273,14 +273,37 @@ void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
   Sink::callAll(sinks_, input.timestamp_ns, *private_dsg_->graph, *deformation_graph_);
 }
 
-void BackendModule::loadState(const std::string& state_path,
-                              const std::string& dgrf_path) {
-  const std::string mesh_path = state_path + "/mesh.ply";
+void BackendModule::loadState(const std::filesystem::path& mesh_path,
+                              const std::filesystem::path& dgrf_path,
+                              bool force_loopclosures) {
+  spark_dsg::Mesh::Ptr mesh;
+  if (mesh_path.extension() == ".sparkdsg" || mesh_path.extension() == ".json") {
+    auto graph = DynamicSceneGraph::load(mesh_path);
+    if (!graph) {
+      LOG(ERROR) << "Invalid graph path: " << mesh_path;
+      return;
+    }
 
-  auto mesh = std::make_shared<spark_dsg::Mesh>();
-  kimera_pgmo::ReadMesh(mesh_path, *mesh);
+    if (!graph->hasMesh()) {
+      LOG(WARNING) << "Invalid mesh path: " << mesh_path << ", graph has no mesh!";
+    }
+
+    mesh = graph->mesh();
+  } else {
+    kimera_pgmo::ReadMesh(mesh_path, *mesh);
+  }
+
+  if (mesh) {
+    LOG(ERROR) << "Loaded mesh with " << mesh->numVertices() << " vertices and "
+               << mesh->numFaces() << " faces";
+  } else {
+    LOG(ERROR) << "Failed to load mesh...";
+  }
+
   private_dsg_->graph->setMesh(mesh);
+  unmerged_graph_->setMesh(mesh);
   have_new_mesh_ = true;
+  have_loopclosures_ = force_loopclosures;
 
   loadDeformationGraphFromFile(dgrf_path);
   LOG(WARNING) << "Loaded " << deformation_graph_->getNumVertices()

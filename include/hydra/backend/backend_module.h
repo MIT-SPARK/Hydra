@@ -37,6 +37,7 @@
 #include <kimera_pgmo/kimera_pgmo_interface.h>
 #include <spark_dsg/scene_graph_logger.h>
 
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -125,7 +126,9 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   // used by dsg_optimizer
   virtual void spinOnce(const BackendInput& input, bool force_update = true);
 
-  void loadState(const std::string& state_path, const std::string& dgrf_path);
+  void loadState(const std::filesystem::path& mesh_path,
+                 const std::filesystem::path& dgrf_path,
+                 bool force_loopclosures = true);
 
   void addSink(const Sink::Ptr& sink);
 
