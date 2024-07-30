@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/backend/update_agents_functor.h"
 
+#include <config_utilities/config.h>
 #include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
 #include <spark_dsg/printing.h>
@@ -43,6 +44,12 @@
 namespace hydra {
 
 using timing::ScopedTimer;
+
+void declare_config(UpdateAgentsFunctor::Config&) {
+  config::name("UpdateAgentsFunctor::Config");
+}
+
+UpdateAgentsFunctor::UpdateAgentsFunctor(const Config&) {}
 
 MergeList UpdateAgentsFunctor::call(const DynamicSceneGraph&,
                                     SharedDsgInfo& dsg,

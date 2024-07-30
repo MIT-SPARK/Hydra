@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
+#include <config_utilities/virtual_config.h>
 #include <kimera_pgmo/kimera_pgmo_interface.h>
 #include <spark_dsg/scene_graph_logger.h>
 
@@ -45,20 +45,11 @@
 #include "hydra/backend/backend_input.h"
 #include "hydra/backend/merge_tracker.h"
 #include "hydra/backend/pgmo_configs.h"
-#include "hydra/backend/update_frontiers_functor.h"
-#include "hydra/backend/update_surface_places_functor.h"
-#include "hydra/common/common.h"
 #include "hydra/common/module.h"
 #include "hydra/common/output_sink.h"
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
-#include "hydra/rooms/room_finder_config.h"
 #include "hydra/utils/log_utilities.h"
-
-namespace spark_dsg {
-class ZmqReceiver;
-class ZmqSender;
-}  // namespace spark_dsg
 
 namespace hydra {
 
@@ -91,26 +82,18 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
                           const kimera_pgmo::DeformationGraph&>;
 
   struct Config {
-    bool enable_rooms = true;
-    RoomFinderConfig room_finder;
-    bool enable_buildings = true;
-    Color building_color = Color(169, 8, 194);  // purple
-    SemanticNodeAttributes::Label building_semantic_label = 22u;
+    //! Specialized PGMO configuration that includes scene graph factor covariances
     HydraPgmoConfig pgmo;
-    // dsg
+    //! Add places layer to factor graph via MST approach
     bool add_places_to_deformation_graph = true;
+    //! Actually perform PGO on every detected loop closure
     bool optimize_on_lc = true;
+    //! Enable combining multiple nodes together
     bool enable_node_merging = true;
-    double places_merge_pos_threshold_m = 0.4;
-    double places_merge_distance_tolerance_m = 0.3;
-    std::string zmq_send_url = "tcp://127.0.0.1:8001";
-    std::string zmq_recv_url = "tcp://127.0.0.1:8002";
-    bool use_zmq_interface = false;
-    size_t zmq_num_threads = 2;
-    size_t zmq_poll_time_ms = 10;
-    bool zmq_send_mesh = true;
-    Update2dPlacesFunctor::Config places2d_config;
-    UpdateFrontiersFunctor::Config frontier_config;
+    //! Update functors that get applied in the specified order
+    config::OrderedMap<std::string, config::VirtualConfig<UpdateFunctor>>
+        update_functors;
+    //! Output sinks that process that latest backed scene graph and state
     std::vector<Sink::Factory> sinks;
   } const config;
 
@@ -146,8 +129,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   void addSink(const Sink::Ptr& sink);
 
-  void setUpdateFunctor(LayerId layer, const UpdateFunctor::Ptr& functor);
-
  protected:
   void setSolverParams();
 
@@ -155,8 +136,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
                       const gtsam::Key& dest,
                       const gtsam::Pose3& src_T_dest,
                       double variance);
-
-  virtual void setupDefaultFunctors();
 
   virtual void updateFactorGraph(const BackendInput& input);
 
@@ -182,15 +161,11 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
                                    bool new_loop_closure = false,
                                    const UpdateInfo::LayerMerges& given_merges = {});
 
-  void runZmqUpdates();
-
   void updateMergedNodes(const std::map<NodeId, NodeId>& new_merges);
 
   void logStatus(bool init = false) const;
 
   void logIncrementalLoopClosures(const pose_graph_tools::PoseGraph& graph);
-
-  void labelRooms(const UpdateInfo& info, SharedDsgInfo* dsg);
 
  protected:
   void stopImpl();
@@ -204,33 +179,25 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   size_t num_archived_vertices_{0};
   bool reset_backend_dsg_{false};
 
-  std::unordered_map<NodeId, Eigen::Vector3d> place_pos_cache_;
-
   SharedDsgInfo::Ptr private_dsg_;
   DynamicSceneGraph::Ptr unmerged_graph_;
   SharedModuleState::Ptr state_;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr original_vertices_;
-  std::vector<uint64_t> vertex_stamps_;
-
-  MergeTracker merge_tracker;
-  std::map<LayerId, UpdateFunctor::Ptr> layer_functors_;
-  UpdateFunctor::Ptr agent_functor_;
-
-  BackendModuleStatus status_;
-  SceneGraphLogger backend_graph_logger_;
-  LogSetup::Ptr logs_;
-  std::list<LoopClosureLog> loop_closures_;
 
   kimera_pgmo::Path trajectory_;
   std::vector<size_t> timestamps_;
   std::queue<size_t> unconnected_nodes_;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr original_vertices_;
+  std::vector<uint64_t> vertex_stamps_;
+
+  MergeTracker merge_tracker;
+  std::vector<UpdateFunctor::Ptr> update_functors_;
+
+  LogSetup::Ptr logs_;
+  BackendModuleStatus status_;
+  SceneGraphLogger backend_graph_logger_;
+  std::list<LoopClosureLog> loop_closures_;
 
   Sink::List sinks_;
-
-  std::map<NodeId, std::string> room_name_map_;
-  std::unique_ptr<std::thread> zmq_thread_;
-  std::unique_ptr<spark_dsg::ZmqReceiver> zmq_receiver_;
-  std::unique_ptr<spark_dsg::ZmqSender> zmq_sender_;
 
   // TODO(lschmid): This mutex currently simply locks all data for manipulation.
   std::mutex mutex_;

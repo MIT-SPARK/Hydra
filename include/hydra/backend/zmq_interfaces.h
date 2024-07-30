@@ -33,30 +33,72 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/backend/update_functions.h"
-#include "hydra/rooms/room_finder.h"
+#include <map>
+#include <memory>
+#include <mutex>
+#include <thread>
+
+#include "hydra/backend/backend_module.h"
+
+namespace spark_dsg {
+class ZmqReceiver;
+class ZmqSender;
+}  // namespace spark_dsg
 
 namespace hydra {
 
-struct UpdateRoomsFunctor : public UpdateFunctor {
-  UpdateRoomsFunctor(const RoomFinderConfig& config);
-  MergeList call(const DynamicSceneGraph& unmerged,
-                 SharedDsgInfo& dsg,
-                 const UpdateInfo::ConstPtr& info) const override;
+class ZmqSink : public BackendModule::Sink {
+ public:
+  struct Config {
+    std::string url = "tcp://127.0.0.1:8001";
+    bool send_mesh = true;
+    size_t num_threads = 2;
+  } const config;
 
-  void rewriteRooms(const SceneGraphLayer* new_rooms, DynamicSceneGraph& graph) const;
+  explicit ZmqSink(const Config& config);
+  virtual ~ZmqSink();
+  void call(uint64_t timestamp_ns,
+            const DynamicSceneGraph& graph,
+            const kimera_pgmo::DeformationGraph& dgraph) const override;
+  std::string printInfo() const override;
 
-  std::unique_ptr<RoomFinder> room_finder;
+ private:
+  std::unique_ptr<spark_dsg::ZmqSender> sender_;
+
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<BackendModule::Sink, ZmqSink, Config>("ZmqSink");
 };
 
-struct UpdateBuildingsFunctor : public UpdateFunctor {
-  UpdateBuildingsFunctor(const Color& color, SemanticNodeAttributes::Label label);
-  MergeList call(const DynamicSceneGraph& unmerged,
-                 SharedDsgInfo& dsg,
-                 const UpdateInfo::ConstPtr& info) const override;
+void declare_config(ZmqSink::Config& config);
 
-  Color building_color;
-  SemanticNodeAttributes::Label building_semantic_label;
+class ZmqRoomLabelUpdater : public UpdateFunctor {
+ public:
+  struct Config {
+    std::string url = "tcp://127.0.0.1:8002";
+    size_t num_threads = 2;
+    size_t poll_time_ms = 10;
+  } const config;
+
+  ZmqRoomLabelUpdater(const Config& config);
+  virtual ~ZmqRoomLabelUpdater();
+  MergeList call(const DynamicSceneGraph&,
+                 SharedDsgInfo& graph,
+                 const UpdateInfo::ConstPtr&) const override;
+
+ private:
+  void checkForUpdates();
+
+  mutable std::mutex mutex_;
+  std::unique_ptr<std::thread> thread_;
+  std::atomic<bool> should_shutdown_{false};
+  std::unique_ptr<spark_dsg::ZmqReceiver> receiver_;
+  std::map<NodeId, std::string> room_name_map_;
+
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<UpdateFunctor, ZmqRoomLabelUpdater, Config>(
+          "ZmqRoomLabelUpdater");
 };
+
+void declare_config(ZmqRoomLabelUpdater::Config& conf);
 
 }  // namespace hydra

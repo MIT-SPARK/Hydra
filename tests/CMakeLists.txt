@@ -14,7 +14,7 @@ add_executable(
   backend/test_update_agents_functor.cpp
   backend/test_update_objects_functor.cpp
   backend/test_update_places_functor.cpp
-  backend/test_update_rooms_buildings_functor.cpp
+  backend/test_update_buildings_functor.cpp
   common/test_config_utilities.cpp
   input/test_camera.cpp
   input/test_input_packet.cpp

@@ -32,44 +32,58 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <config_utilities/factory.h>
+#include "hydra/backend/update_buildings_functor.h"
 
-#include "hydra/backend/merge_tracker.h"
-#include "hydra/backend/update_functions.h"
-#include "hydra/utils/active_window_tracker.h"
-#include "hydra/utils/nearest_neighbor_utilities.h"
+#include <config_utilities/config.h>
+#include <config_utilities/validation.h>
+#include <glog/logging.h>
 
 namespace hydra {
 
-struct UpdateObjectsFunctor : public UpdateFunctor {
-  struct Config {
-    //! Number of nearest nodes to consider for each merge
-    size_t num_merges_to_consider = 1;
-    //! Allow mesh vertices for each object to be merged
-    bool allow_connection_merging = true;
-  } const config;
+void declare_config(UpdateBuildingsFunctor::Config& config) {
+  using namespace config;
+  name("UpdateBuildingsFunctor::Config");
+  field(config.semantic_label, "semantic_label");
+}
 
-  explicit UpdateObjectsFunctor(const Config& config);
-  Hooks hooks() const override;
-  MergeList call(const DynamicSceneGraph& unmerged,
-                 SharedDsgInfo& dsg,
-                 const UpdateInfo::ConstPtr& info) const override;
+UpdateBuildingsFunctor::UpdateBuildingsFunctor(const Config& config)
+    : config(config::checkValid(config)) {}
 
-  std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
-                                     const ObjectNodeAttributes& attrs) const;
+MergeList UpdateBuildingsFunctor::call(const DynamicSceneGraph&,
+                                       SharedDsgInfo& dsg,
+                                       const UpdateInfo::ConstPtr&) const {
+  const NodeSymbol building_id('B', 0);
+  const auto& rooms = dsg.graph->getLayer(DsgLayers::ROOMS);
 
-  void mergeAttributes(const DynamicSceneGraph& layer, NodeId from, NodeId to) const;
+  if (!rooms.numNodes()) {
+    if (dsg.graph->hasNode(building_id)) {
+      dsg.graph->removeNode(building_id);
+    }
 
-  mutable ActiveWindowTracker active_tracker;
-  mutable SemanticNodeFinders node_finders;
+    return {};
+  }
 
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<UpdateFunctor, UpdateObjectsFunctor, Config>(
-          "UpdateObjectsFunctor");
-};
+  Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+  for (const auto& id_node_pair : rooms.nodes()) {
+    centroid += id_node_pair.second->attributes().position;
+  }
+  centroid /= rooms.numNodes();
 
-void declare_config(UpdateObjectsFunctor::Config& config);
+  if (!dsg.graph->hasNode(building_id)) {
+    SemanticNodeAttributes::Ptr attrs(new SemanticNodeAttributes());
+    attrs->position = centroid;
+    attrs->semantic_label = config.semantic_label;
+    attrs->name = building_id.getLabel();
+    dsg.graph->emplaceNode(DsgLayers::BUILDINGS, building_id, std::move(attrs));
+  } else {
+    dsg.graph->getNode(building_id).attributes().position = centroid;
+  }
+
+  for (const auto& id_node_pair : rooms.nodes()) {
+    dsg.graph->insertParentEdge(building_id, id_node_pair.first);
+  }
+
+  return {};
+}
 
 }  // namespace hydra

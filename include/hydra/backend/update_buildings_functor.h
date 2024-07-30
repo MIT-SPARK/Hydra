@@ -32,42 +32,31 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <gtest/gtest.h>
-#include <hydra/backend/update_rooms_buildings_functor.h>
+#pragma once
+#include <config_utilities/factory.h>
 
-#include "hydra_test/shared_dsg_fixture.h"
+#include "hydra/backend/update_functions.h"
 
 namespace hydra {
 
-TEST(UpdateRoomsBuildingsFunctor, BuildingUpdate) {
-  auto dsg = test::makeSharedDsg();
-  auto& graph = *dsg->graph;
-  graph.emplaceNode(DsgLayers::BUILDINGS,
-                    "B0"_id,
-                    std::make_unique<NodeAttributes>(Eigen::Vector3d(1.0, 2.0, 3.0)));
+struct UpdateBuildingsFunctor : public UpdateFunctor {
+  struct Config {
+    //! Semantic label assigned to every building node
+    SemanticNodeAttributes::Label semantic_label = 22u;
+  } const config;
 
-  graph.emplaceNode(DsgLayers::ROOMS,
-                    3,
-                    std::make_unique<NodeAttributes>(Eigen::Vector3d(-1.0, 0.0, 1.0)));
-  graph.emplaceNode(DsgLayers::ROOMS,
-                    4,
-                    std::make_unique<NodeAttributes>(Eigen::Vector3d(-1.0, 0.0, 1.0)));
-  graph.emplaceNode(DsgLayers::ROOMS,
-                    5,
-                    std::make_unique<NodeAttributes>(Eigen::Vector3d(-1.0, 0.0, 1.0)));
+  explicit UpdateBuildingsFunctor(const Config& config);
 
-  graph.insertEdge("B0"_id, 3);
-  graph.insertEdge("B0"_id, 4);
-  graph.insertEdge("B0"_id, 5);
+  MergeList call(const DynamicSceneGraph& unmerged,
+                 SharedDsgInfo& dsg,
+                 const UpdateInfo::ConstPtr& info) const override;
 
-  UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, false, 0, false, {}});
-  UpdateBuildingsFunctor functor(Color(), 0);
-  const auto unmerged = dsg->graph->clone();
-  functor.call(*unmerged, *dsg, info);
+ private:
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<UpdateFunctor, UpdateBuildingsFunctor, Config>(
+          "UpdateBuildingsFunctor");
+};
 
-  Eigen::Vector3d first_expected(-1.0, 0.0, 1.0);
-  Eigen::Vector3d first_result = graph.getPosition("B0"_id);
-  EXPECT_NEAR(0.0, (first_expected - first_result).norm(), 1.0e-7);
-}
+void declare_config(UpdateBuildingsFunctor::Config& config);
 
 }  // namespace hydra

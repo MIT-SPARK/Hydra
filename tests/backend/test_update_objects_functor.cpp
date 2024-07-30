@@ -64,7 +64,7 @@ TEST(UpdateObjectsFunctor, ObjectUpdate) {
   }
 
   UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, false, 0, false, {}});
-  UpdateObjectsFunctor functor;
+  UpdateObjectsFunctor functor(UpdateObjectsFunctor::Config{});
   callWithUnmerged(functor, *dsg, info);
 
   {
@@ -133,7 +133,7 @@ TEST(UpdateObjectsFunctor, ObjectUpdateMergeLC) {
   graph.setMesh(mesh);
 
   UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, true, 0, true, {}});
-  UpdateObjectsFunctor functor;
+  UpdateObjectsFunctor functor(UpdateObjectsFunctor::Config{});
   const auto result_merges = callWithUnmerged(functor, *dsg, info);
 
   const auto& result0 = graph.getNode(0).attributes<ObjectNodeAttributes>();
@@ -179,7 +179,7 @@ TEST(UpdateObjectsFunctor, ObjectUpdateMergeNoLC) {
   graph.setMesh(mesh);
 
   UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, false, 0, true, {}});
-  UpdateObjectsFunctor functor;
+  UpdateObjectsFunctor functor(UpdateObjectsFunctor::Config{});
   const auto result_merges = callWithUnmerged(functor, *dsg, info);
 
   MergeList expected{{1, 0}};

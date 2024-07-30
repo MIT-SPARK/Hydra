@@ -37,8 +37,9 @@
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
 
+#include "hydra/backend/update_buildings_functor.h"
 #include "hydra/backend/update_functions.h"
-#include "hydra/backend/update_rooms_buildings_functor.h"
+#include "hydra/backend/update_rooms_functor.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/reconstruction/mesh_integrator.h"
 
@@ -81,11 +82,11 @@ DynamicSceneGraph::Ptr BatchPipeline::construct(const VFConfig& frontend_config,
 
   if (room_config) {
     // TODO(nathan) unmerged graph is annoying
-    UpdateRoomsFunctor functor(*room_config);
+    UpdateRoomsFunctor functor(UpdateRoomsFunctor::Config{*room_config});
     UpdateInfo::ConstPtr info(new UpdateInfo);
     functor.call(*graph, *dsg, info);
 
-    UpdateBuildingsFunctor bfunctor(Color(), -1);
+    UpdateBuildingsFunctor bfunctor(UpdateBuildingsFunctor::Config{0});
     bfunctor.call(*graph, *dsg, info);
   }
 

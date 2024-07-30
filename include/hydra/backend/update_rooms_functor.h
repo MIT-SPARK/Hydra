@@ -35,41 +35,32 @@
 #pragma once
 #include <config_utilities/factory.h>
 
-#include "hydra/backend/merge_tracker.h"
 #include "hydra/backend/update_functions.h"
-#include "hydra/utils/active_window_tracker.h"
-#include "hydra/utils/nearest_neighbor_utilities.h"
+#include "hydra/rooms/room_finder.h"
 
 namespace hydra {
 
-struct UpdateObjectsFunctor : public UpdateFunctor {
+struct UpdateRoomsFunctor : public UpdateFunctor {
   struct Config {
-    //! Number of nearest nodes to consider for each merge
-    size_t num_merges_to_consider = 1;
-    //! Allow mesh vertices for each object to be merged
-    bool allow_connection_merging = true;
+    RoomFinderConfig room_finder;
   } const config;
 
-  explicit UpdateObjectsFunctor(const Config& config);
-  Hooks hooks() const override;
+  explicit UpdateRoomsFunctor(const Config& config);
+
   MergeList call(const DynamicSceneGraph& unmerged,
                  SharedDsgInfo& dsg,
                  const UpdateInfo::ConstPtr& info) const override;
 
-  std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
-                                     const ObjectNodeAttributes& attrs) const;
+  void rewriteRooms(const SceneGraphLayer* new_rooms, DynamicSceneGraph& graph) const;
 
-  void mergeAttributes(const DynamicSceneGraph& layer, NodeId from, NodeId to) const;
-
-  mutable ActiveWindowTracker active_tracker;
-  mutable SemanticNodeFinders node_finders;
+  std::unique_ptr<RoomFinder> room_finder;
 
  private:
   inline static const auto registration_ =
-      config::RegistrationWithConfig<UpdateFunctor, UpdateObjectsFunctor, Config>(
-          "UpdateObjectsFunctor");
+      config::RegistrationWithConfig<UpdateFunctor, UpdateRoomsFunctor, Config>(
+          "UpdateRoomsFunctor");
 };
 
-void declare_config(UpdateObjectsFunctor::Config& config);
+void declare_config(UpdateRoomsFunctor::Config& config);
 
 }  // namespace hydra

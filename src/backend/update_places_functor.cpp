@@ -35,6 +35,7 @@
 #include "hydra/backend/update_places_functor.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
 #include <spark_dsg/printing.h>
@@ -46,9 +47,17 @@ namespace hydra {
 using timing::ScopedTimer;
 using MergeId = std::optional<NodeId>;
 
-UpdatePlacesFunctor::UpdatePlacesFunctor(double pos_threshold,
-                                         double distance_tolerance)
-    : pos_threshold_m(pos_threshold), distance_tolerance_m(distance_tolerance) {}
+void declare_config(UpdatePlacesFunctor::Config& config) {
+  using namespace config;
+  name("UpdatePlacesFunctor::Config");
+  field(config.num_merges_to_consider, "num_merges_to_consider");
+  field(config.pos_threshold_m, "pos_threshold_m", "m");
+  field(config.distance_tolerance_m, "distance_tolerance_m", "m");
+  check(config.num_merges_to_consider, GE, 1, "num_merges_to_consider");
+}
+
+UpdatePlacesFunctor::UpdatePlacesFunctor(const Config& config)
+    : config(config::checkValid(config)) {}
 
 void UpdatePlacesFunctor::updatePlace(const gtsam::Values& values,
                                       NodeId node,
@@ -68,7 +77,7 @@ MergeId UpdatePlacesFunctor::proposeMerge(const SceneGraphLayer& layer,
   const auto& from_attrs = from_node.attributes<PlaceNodeAttributes>();
   std::list<NodeId> candidates;
   node_finder->find(from_attrs.position,
-                    num_merges_to_consider,
+                    config.num_merges_to_consider,
                     !from_attrs.is_active,
                     [&candidates](NodeId place_id, size_t, double) {
                       candidates.push_back(place_id);
@@ -81,11 +90,12 @@ MergeId UpdatePlacesFunctor::proposeMerge(const SceneGraphLayer& layer,
     }
 
     const auto& to_attrs = layer.getNode(id).attributes<PlaceNodeAttributes>();
-    if ((from_attrs.position - to_attrs.position).norm() > pos_threshold_m) {
+    if ((from_attrs.position - to_attrs.position).norm() > config.pos_threshold_m) {
       continue;
     }
 
-    if (std::abs(from_attrs.distance - to_attrs.distance) > distance_tolerance_m) {
+    const auto radii_deviation = std::abs(from_attrs.distance - to_attrs.distance);
+    if (radii_deviation > config.distance_tolerance_m) {
       continue;
     }
 

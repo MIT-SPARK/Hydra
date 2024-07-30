@@ -34,6 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/backend/update_objects_functor.h"
 
+#include <config_utilities/config.h>
+#include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <spark_dsg/printing.h>
 
@@ -77,13 +79,23 @@ NodeAttributes::Ptr mergeObjectAttributes(const DynamicSceneGraph& graph,
   return attrs_ptr;
 }
 
-UpdateObjectsFunctor::UpdateObjectsFunctor() {}
+void declare_config(UpdateObjectsFunctor::Config& config) {
+  using namespace config;
+  name("UpdateObjectsFunctor::Config");
+  field(config.num_merges_to_consider, "num_merges_to_consider");
+  field(config.allow_connection_merging, "allow_connection_merging");
+  check(config.num_merges_to_consider, GE, 1, "num_merges_to_consider");
+}
+
+UpdateObjectsFunctor::UpdateObjectsFunctor(const Config& config)
+    : config(config::checkValid(config)) {}
 
 UpdateFunctor::Hooks UpdateObjectsFunctor::hooks() const {
   auto my_hooks = UpdateFunctor::hooks();
-  if (allow_connection_merging) {
+  if (config.allow_connection_merging) {
     my_hooks.merge = &mergeObjectAttributes;
   }
+
   return my_hooks;
 }
 
@@ -164,7 +176,7 @@ MergeId UpdateObjectsFunctor::proposeMerge(const SceneGraphLayer& layer,
   // the same node)
   std::list<NodeId> candidates;
   (*iter).second->find(attrs.position,
-                       num_merges_to_consider,
+                       config.num_merges_to_consider,
                        !attrs.is_active,
                        [&candidates](NodeId object_id, size_t, double) {
                          candidates.push_back(object_id);

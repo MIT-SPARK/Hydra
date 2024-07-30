@@ -36,25 +36,13 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
-#include <config_utilities/types/eigen_matrix.h>
-#include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <kimera_pgmo/mesh_delta.h>
 #include <kimera_pgmo/utils/mesh_io.h>
-#include <spark_dsg/scene_graph_types.h>
-#include <spark_dsg/zmq_interface.h>
 
 #include "hydra/backend/backend_utilities.h"
-#include "hydra/backend/update_agents_functor.h"
-#include "hydra/backend/update_frontiers_functor.h"
-#include "hydra/backend/update_objects_functor.h"
-#include "hydra/backend/update_places_functor.h"
-#include "hydra/backend/update_rooms_buildings_functor.h"
-#include "hydra/common/config_utilities.h"
 #include "hydra/common/global_info.h"
 #include "hydra/common/pipeline_queues.h"
-#include "hydra/rooms/room_finder.h"
 #include "hydra/utils/minimum_spanning_tree.h"
 #include "hydra/utils/pgmo_mesh_traits.h"
 #include "hydra/utils/timing_utilities.h"
@@ -62,8 +50,6 @@
 namespace hydra {
 
 using hydra::timing::ScopedTimer;
-using kimera_pgmo::DeformationGraph;
-using kimera_pgmo::DeformationGraphPtr;
 using kimera_pgmo::KimeraPgmoInterface;
 using pose_graph_tools::PoseGraph;
 
@@ -78,29 +64,24 @@ void BackendModuleStatus::reset() {
   num_merges_undone = 0;
 }
 
+inline bool hasLoopClosure(const PoseGraph& graph) {
+  for (const auto& edge : graph.edges) {
+    if (edge.type == pose_graph_tools::PoseGraphEdge::Type::LOOPCLOSE) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void declare_config(BackendModule::Config& config) {
   using namespace config;
   name("BackendConfig");
-  field(config.enable_rooms, "enable_rooms");
-  field(config.room_finder, "room_finder");
-  field(config.enable_buildings, "enable_buildings");
-  field(config.building_color, "building_color");
-  field(config.building_semantic_label, "building_semantic_label");
   field(config.pgmo, "pgmo");
-  field(config.places2d_config, "places2d_config");
-
-  enter_namespace("dsg");
   field(config.add_places_to_deformation_graph, "add_places_to_deformation_graph");
   field(config.optimize_on_lc, "optimize_on_lc");
   field(config.enable_node_merging, "enable_node_merging");
-  field(config.places_merge_pos_threshold_m, "places_merge_pos_threshold_m");
-  field(config.places_merge_distance_tolerance_m, "places_merge_distance_tolerance_m");
-  field(config.zmq_send_url, "zmq_send_url");
-  field(config.zmq_recv_url, "zmq_recv_url");
-  field(config.use_zmq_interface, "use_zmq_interface");
-  field(config.zmq_num_threads, "zmq_num_threads");
-  field(config.zmq_poll_time_ms, "zmq_poll_time_ms");
-  field(config.zmq_send_mesh, "zmq_send_mesh");
+  field(config.update_functors, "update_functors");
+  field(config.sinks, "sinks");
 }
 
 BackendModule::BackendModule(const Config& config,
@@ -126,6 +107,10 @@ BackendModule::BackendModule(const Config& config,
   deformation_graph_->setForceRecalculate(!config.pgmo.gnc_fix_prev_inliers);
   setSolverParams();
 
+  for (const auto& [name, functor] : config.update_functors) {
+    update_functors_.push_back(functor.create());
+  }
+
   if (logs && logs->valid()) {
     logs_ = logs;
     const auto log_path = logs->getLogDir("backend");
@@ -138,25 +123,12 @@ BackendModule::BackendModule(const Config& config,
   } else {
     VLOG(1) << "[Hydra Backend] logging disabled.";
   }
-
-  setupDefaultFunctors();
-
-  if (config.use_zmq_interface) {
-    zmq_receiver_.reset(
-        new spark_dsg::ZmqReceiver(config.zmq_recv_url, config.zmq_num_threads));
-    zmq_sender_.reset(
-        new spark_dsg::ZmqSender(config.zmq_send_url, config.zmq_num_threads));
-  }
 }
 
 BackendModule::~BackendModule() { stopImpl(); }
 
 void BackendModule::start() {
   spin_thread_.reset(new std::thread(&BackendModule::spin, this));
-
-  if (config.use_zmq_interface) {
-    zmq_thread_.reset(new std::thread(&BackendModule::runZmqUpdates, this));
-  }
   LOG(INFO) << "[Hydra Backend] started!";
 }
 
@@ -167,13 +139,6 @@ void BackendModule::stopImpl() {
     VLOG(2) << "[Hydra Backend] joining optimizer thread and stopping";
     spin_thread_->join();
     spin_thread_.reset();
-    VLOG(2) << "[Hydra Backend] stopped!";
-  }
-
-  if (zmq_thread_) {
-    VLOG(2) << "[Hydra Backend] joining zmq thread and stopping";
-    zmq_thread_->join();
-    zmq_thread_.reset();
     VLOG(2) << "[Hydra Backend] stopped!";
   }
 }
@@ -231,7 +196,14 @@ void BackendModule::save(const LogSetup& log_setup) {
 
 std::string BackendModule::printInfo() const {
   std::stringstream ss;
-  ss << config::toString(config);
+  ss << config::toString(config) << "\n";
+
+  size_t sink_idx = 0;
+  for (const auto& sink : sinks_) {
+    ss << "Sink " << sink_idx << ": " << (sink ? "\n" + sink->printInfo() : "n/a");
+    ++sink_idx;
+  }
+
   return ss.str();
 }
 
@@ -297,9 +269,6 @@ void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
     logStatus();
   }
 
-  if (zmq_sender_) {
-    zmq_sender_->send(*private_dsg_->graph, config.zmq_send_mesh);
-  }
   ScopedTimer sink_timer("backend/sinks", input.timestamp_ns);
   Sink::callAll(sinks_, input.timestamp_ns, *private_dsg_->graph, *deformation_graph_);
 }
@@ -324,10 +293,6 @@ void BackendModule::addSink(const Sink::Ptr& sink) {
   }
 }
 
-void BackendModule::setUpdateFunctor(LayerId layer, const UpdateFunctor::Ptr& functor) {
-  layer_functors_[layer] = functor;
-}
-
 void BackendModule::setSolverParams() {
   KimeraRPGO::RobustSolverParams params = deformation_graph_->getParams();
   params.verbosity = config.pgmo.rpgo_verbosity;
@@ -338,37 +303,6 @@ void BackendModule::setSolverParams() {
   }
   deformation_graph_->setParams(params);
   setVerboseFlag(false);
-}
-
-void BackendModule::setupDefaultFunctors() {
-  layer_functors_[DsgLayers::OBJECTS] = std::make_shared<UpdateObjectsFunctor>();
-
-  layer_functors_[DsgLayers::PLACES] = std::make_shared<UpdatePlacesFunctor>(
-      config.places_merge_pos_threshold_m, config.places_merge_distance_tolerance_m);
-
-  if (config.enable_rooms) {
-    auto room_functor = std::make_shared<UpdateRoomsFunctor>(config.room_finder);
-    if (logs_) {
-      const auto log_path = logs_->getLogDir("backend/room_filtrations");
-      room_functor->room_finder->enableLogging(log_path);
-    }
-
-    layer_functors_[DsgLayers::ROOMS] = room_functor;
-  }
-
-  if (config.enable_buildings) {
-    layer_functors_[DsgLayers::BUILDINGS] = std::make_shared<UpdateBuildingsFunctor>(
-        config.building_color, config.building_semantic_label);
-  }
-}
-
-inline bool hasLoopClosure(const PoseGraph& graph) {
-  for (const auto& edge : graph.edges) {
-    if (edge.type == pose_graph_tools::PoseGraphEdge::Type::LOOPCLOSE) {
-      return true;
-    }
-  }
-  return false;
 }
 
 void BackendModule::updateFactorGraph(const BackendInput& input) {
@@ -594,40 +528,6 @@ void BackendModule::addLoopClosure(const gtsam::Key& src,
   }
 }
 
-void BackendModule::runZmqUpdates() {
-  while (!should_shutdown_) {
-    if (!zmq_receiver_->recv(config.zmq_poll_time_ms)) {
-      continue;
-    }
-
-    std::unique_lock<std::mutex> lock(private_dsg_->mutex);
-    auto update_graph = zmq_receiver_->graph();
-    if (!update_graph) {
-      LOG(ERROR) << "zmq receiver graph is invalid";
-      continue;
-    }
-
-    const auto& rooms = update_graph->getLayer(DsgLayers::ROOMS);
-    for (const auto& id_node_pair : rooms.nodes()) {
-      const auto new_name =
-          id_node_pair.second->attributes<SemanticNodeAttributes>().name;
-      room_name_map_[id_node_pair.first] = new_name;
-
-      auto node_opt = private_dsg_->graph->findNode(id_node_pair.first);
-      if (!node_opt) {
-        VLOG(2) << "received update for node "
-                << NodeSymbol(id_node_pair.first).getLabel()
-                << " but node no longer exists";
-        continue;
-      }
-
-      VLOG(2) << "assiging name " << new_name << " to "
-              << NodeSymbol(id_node_pair.first).getLabel();
-      node_opt->attributes<SemanticNodeAttributes>().name = new_name;
-    }
-  }
-}
-
 void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
   // deformation_graph_->update();
   if (!force_mesh_update && !have_new_mesh_) {
@@ -663,8 +563,7 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
   prev_num_archived_vertices_ = num_archived_vertices_;
 }
 
-void BackendModule::updateAgentNodeMeasurements(
-    const pose_graph_tools::PoseGraph& meas) {
+void BackendModule::updateAgentNodeMeasurements(const PoseGraph& meas) {
   deformation_graph_->removePriorsWithPrefix(
       GlobalInfo::instance().getRobotPrefix().key);
   std::vector<std::pair<gtsam::Key, gtsam::Pose3>> agent_measurements;
@@ -756,12 +655,9 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
   config.update_dynamic_attributes = false;
   private_dsg_->graph->mergeGraph(*unmerged_graph_, config);
 
-  if (agent_functor_) {
-    agent_functor_->call(*unmerged_graph_, *private_dsg_, info);
-  }
-
   std::list<LayerCleanupFunc> cleanup_hooks;
-  for (const auto& [layer, functor] : layer_functors_) {
+  for (const auto& functor : update_functors_) {
+    // TODO(nathan) keep track of names and push timing here
     if (!functor) {
       continue;
     }
@@ -825,23 +721,6 @@ void BackendModule::logIncrementalLoopClosures(const PoseGraph& msg) {
     // note that pose graph convention is pose = src.between(dest) where the edge
     // connects frames "to -> from" (i.e. src = to, dest = from, pose = to_T_from)
     loop_closures_.push_back({src_key, dest_key, pose, false, 0});
-  }
-}
-
-void BackendModule::labelRooms(const UpdateInfo&, SharedDsgInfo* dsg) {
-  if (!dsg) {
-    return;
-  }
-
-  std::unique_lock<std::mutex> lock(dsg->mutex);
-  const auto& rooms = dsg->graph->getLayer(DsgLayers::ROOMS);
-  for (auto& id_node_pair : rooms.nodes()) {
-    const auto iter = room_name_map_.find(id_node_pair.first);
-    if (iter == room_name_map_.end()) {
-      continue;
-    }
-
-    id_node_pair.second->attributes<SemanticNodeAttributes>().name = iter->second;
   }
 }
 

@@ -33,6 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/factory.h>
+
 #include "hydra/backend/update_functions.h"
 #include "hydra/utils/active_window_tracker.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
@@ -56,9 +58,9 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
     double connection_ellipse_scale_factor = 1.0;
     //! Whether to allow splitting of large backend places
     bool enable_splitting = false;
-  };
+  } const config;
 
-  Update2dPlacesFunctor(const Config& config);
+  explicit Update2dPlacesFunctor(const Config& config);
   Hooks hooks() const override;
   MergeList call(const DynamicSceneGraph& unmerged,
                  SharedDsgInfo& dsg,
@@ -84,6 +86,10 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
   Config config_;
   mutable NodeSymbol next_node_id_ = NodeSymbol('S', 0);
   const LayerId layer_id_ = DsgLayers::MESH_PLACES;
+
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<UpdateFunctor, Update2dPlacesFunctor, Config>(
+          "Update2dPlacesFunctor");
 };
 
 void declare_config(Update2dPlacesFunctor::Config& conf);

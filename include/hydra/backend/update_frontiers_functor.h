@@ -33,6 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/factory.h>
+
 #include "hydra/backend/update_functions.h"
 
 namespace hydra {
@@ -46,13 +48,18 @@ struct UpdateFrontiersFunctor : public UpdateFunctor {
     double frontier_removal_threshold = 1;
   } const config;
 
-  UpdateFrontiersFunctor(const Config& config) : config(config) {}
+  explicit UpdateFrontiersFunctor(const Config& config) : config(config) {}
   Hooks hooks() const override;
   MergeList call(const DynamicSceneGraph& unmerged,
                  SharedDsgInfo&,
                  const UpdateInfo::ConstPtr&) const override;
 
   void cleanup(uint64_t timestamp_ns, SharedDsgInfo& dsg) const;
+
+ private:
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<UpdateFunctor, UpdateFrontiersFunctor, Config>(
+          "UpdateFrontiersFunctor");
 };
 
 }  // namespace hydra

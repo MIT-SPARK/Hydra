@@ -33,6 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/factory.h>
+
 #include "hydra/backend/merge_tracker.h"
 #include "hydra/backend/update_functions.h"
 #include "hydra/utils/active_window_tracker.h"
@@ -41,7 +43,16 @@
 namespace hydra {
 
 struct UpdatePlacesFunctor : public UpdateFunctor {
-  UpdatePlacesFunctor(double pos_threshold, double distance_tolerance);
+  struct Config {
+    //! Number of the nearest nodes to consider for each potential merge
+    size_t num_merges_to_consider = 1;
+    //! Max distance between node centroids for a merge to be considered
+    double pos_threshold_m = 0.4;
+    //! Max deviation between place radii for a merge to be considered
+    double distance_tolerance_m = 0.4;
+  } const config;
+
+  explicit UpdatePlacesFunctor(const Config& config);
   MergeList call(const DynamicSceneGraph& unmerged,
                  SharedDsgInfo& dsg,
                  const UpdateInfo::ConstPtr& info) const override;
@@ -56,12 +67,15 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
   void filterMissing(DynamicSceneGraph& graph,
                      const std::list<NodeId> missing_nodes) const;
 
-  size_t num_merges_to_consider = 1;
-  double pos_threshold_m;
-  double distance_tolerance_m;
-
   mutable ActiveWindowTracker active_tracker;
   mutable std::unique_ptr<NearestNodeFinder> node_finder;
+
+ private:
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<UpdateFunctor, UpdatePlacesFunctor, Config>(
+          "UpdatePlacesFunctor");
 };
+
+void declare_config(UpdatePlacesFunctor::Config& config);
 
 }  // namespace hydra

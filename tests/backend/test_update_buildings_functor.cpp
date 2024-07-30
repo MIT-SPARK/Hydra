@@ -32,44 +32,42 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <config_utilities/factory.h>
+#include <gtest/gtest.h>
+#include <hydra/backend/update_buildings_functor.h>
 
-#include "hydra/backend/merge_tracker.h"
-#include "hydra/backend/update_functions.h"
-#include "hydra/utils/active_window_tracker.h"
-#include "hydra/utils/nearest_neighbor_utilities.h"
+#include "hydra_test/shared_dsg_fixture.h"
 
 namespace hydra {
 
-struct UpdateObjectsFunctor : public UpdateFunctor {
-  struct Config {
-    //! Number of nearest nodes to consider for each merge
-    size_t num_merges_to_consider = 1;
-    //! Allow mesh vertices for each object to be merged
-    bool allow_connection_merging = true;
-  } const config;
+TEST(UpdateRoomsBuildingsFunctor, BuildingUpdate) {
+  auto dsg = test::makeSharedDsg();
+  auto& graph = *dsg->graph;
+  graph.emplaceNode(DsgLayers::BUILDINGS,
+                    "B0"_id,
+                    std::make_unique<NodeAttributes>(Eigen::Vector3d(1.0, 2.0, 3.0)));
 
-  explicit UpdateObjectsFunctor(const Config& config);
-  Hooks hooks() const override;
-  MergeList call(const DynamicSceneGraph& unmerged,
-                 SharedDsgInfo& dsg,
-                 const UpdateInfo::ConstPtr& info) const override;
+  graph.emplaceNode(DsgLayers::ROOMS,
+                    3,
+                    std::make_unique<NodeAttributes>(Eigen::Vector3d(-1.0, 0.0, 1.0)));
+  graph.emplaceNode(DsgLayers::ROOMS,
+                    4,
+                    std::make_unique<NodeAttributes>(Eigen::Vector3d(-1.0, 0.0, 1.0)));
+  graph.emplaceNode(DsgLayers::ROOMS,
+                    5,
+                    std::make_unique<NodeAttributes>(Eigen::Vector3d(-1.0, 0.0, 1.0)));
 
-  std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
-                                     const ObjectNodeAttributes& attrs) const;
+  graph.insertEdge("B0"_id, 3);
+  graph.insertEdge("B0"_id, 4);
+  graph.insertEdge("B0"_id, 5);
 
-  void mergeAttributes(const DynamicSceneGraph& layer, NodeId from, NodeId to) const;
+  UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, false, 0, false, {}});
+  UpdateBuildingsFunctor functor(UpdateBuildingsFunctor::Config{0});
+  const auto unmerged = dsg->graph->clone();
+  functor.call(*unmerged, *dsg, info);
 
-  mutable ActiveWindowTracker active_tracker;
-  mutable SemanticNodeFinders node_finders;
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<UpdateFunctor, UpdateObjectsFunctor, Config>(
-          "UpdateObjectsFunctor");
-};
-
-void declare_config(UpdateObjectsFunctor::Config& config);
+  Eigen::Vector3d first_expected(-1.0, 0.0, 1.0);
+  Eigen::Vector3d first_result = graph.getPosition("B0"_id);
+  EXPECT_NEAR(0.0, (first_expected - first_result).norm(), 1.0e-7);
+}
 
 }  // namespace hydra
