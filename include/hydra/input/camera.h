@@ -77,7 +77,7 @@ class Camera : public Sensor {
     float fy = -1.0;
   };
 
-  explicit Camera(const Config& config);
+  explicit Camera(const Config& config, const std::string& name);
 
   virtual ~Camera() = default;
 
@@ -113,7 +113,8 @@ class Camera : public Sensor {
   Eigen::Matrix<float, 4, 3> view_frustum_;  // Top, right, bottom, left plane normals.
 
   inline static const auto registration_ =
-      config::RegistrationWithConfig<Sensor, Camera, Camera::Config>("camera");
+      config::RegistrationWithConfig<Sensor, Camera, Camera::Config, std::string>(
+          "camera");
 };
 
 void declare_config(Camera::Config& config);

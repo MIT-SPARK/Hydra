@@ -130,7 +130,7 @@ class Sensor {
     config::VirtualConfig<SensorExtrinsics> extrinsics;
   } const config;
 
-  explicit Sensor(const Config& config);
+  explicit Sensor(const Config& config, const std::string& name);
 
   virtual ~Sensor() = default;
 
@@ -167,7 +167,8 @@ class Sensor {
    * For lidar, this would compute a range image from the pointcloud
    *
    * @param input Input struct to fill
-   * @param force_world_frame Always convert point cloud to be in the world frame, not the sensor frame
+   * @param force_world_frame Always convert point cloud to be in the world frame, not
+   * the sensor frame
    * @return True if the sensor was able to provide all necessary information
    */
   virtual bool finalizeRepresentations(InputData& input,
@@ -205,6 +206,9 @@ class Sensor {
    */
   virtual bool pointIsInViewFrustum(const Eigen::Vector3f& point_C,
                                     float inflation_distance = 0.f) const = 0;
+
+  //! @brief Name of current sensor
+  const std::string name;
 
  protected:
   const std::unique_ptr<SensorExtrinsics> extrinsics_;

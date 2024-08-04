@@ -48,8 +48,8 @@ PythonSensorInput::PythonSensorInput(uint64_t timestamp_ns,
                                      const PythonImage& _depth,
                                      const PythonImage& _labels,
                                      const PythonImage& _color,
-                                     size_t sensor_index)
-    : SensorInputPacket(timestamp_ns, sensor_index) {
+                                     const std::string& sensor_name)
+    : SensorInputPacket(timestamp_ns, sensor_name) {
   depth = getDepthImage(_depth);
 
   if (_color.rows() == _depth.rows() && _color.cols() == _depth.cols()) {
@@ -71,8 +71,8 @@ PythonSensorInput::PythonSensorInput(uint64_t timestamp_ns,
                                      const PointVec& pos_vec,
                                      const LabelVec& label_vec,
                                      const ColorVec& color_vec,
-                                     size_t sensor_index)
-    : SensorInputPacket(timestamp_ns, sensor_index) {
+                                     const std::string& sensor_name)
+    : SensorInputPacket(timestamp_ns, sensor_name) {
   if (pos_vec.cols() == 0) {
     LOG(ERROR) << "received input without any points";
     return;
@@ -146,34 +146,33 @@ void addBindings(pybind11::module_& m) {
              const py::buffer& depth,
              const std::optional<py::buffer>& labels,
              const std::optional<py::buffer>& colors,
-             size_t sensor_index) {
+             const std::string& name) {
             return PythonSensorInput(
                 timestamp_ns,
                 depth,
                 labels ? PythonImage(labels.value()) : PythonImage(),
                 colors ? PythonImage(colors.value()) : PythonImage(),
-                sensor_index);
+                name);
           },
           "timestamp_ns"_a,
           "depth"_a,
           "labels"_a = std::nullopt,
           "colors"_a = std::nullopt,
-          "sensor_index"_a = 0)
+          "sensor_name"_a = "python")
       .def_static(
           "from_points",
           [](uint64_t timestamp_ns,
              const PythonSensorInput::PointVec& points,
              const PythonSensorInput::LabelVec& labels,
              const PythonSensorInput::ColorVec& colors,
-             size_t sensor_index) {
-            return PythonSensorInput(
-                timestamp_ns, points, labels, colors, sensor_index);
+             const std::string& name) {
+            return PythonSensorInput(timestamp_ns, points, labels, colors, name);
           },
           "timestamp_ns"_a,
           "points"_a,
           "labels"_a = Eigen::Matrix<int32_t, 1, Eigen::Dynamic>(),
           "colors"_a = Eigen::Matrix<uint8_t, 3, Eigen::Dynamic>(),
-          "sensor_index"_a = 0)
+          "sensor_name"_a = "python")
       .def("__bool__", [](const PythonSensorInput& input) { return input.valid(); });
 }
 

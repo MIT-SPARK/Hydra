@@ -44,8 +44,8 @@
 
 namespace hydra {
 
-DataReceiver::DataReceiver(const Config& config, size_t sensor_id)
-    : config(config::checkValid(config)), sensor_id_(sensor_id) {}
+DataReceiver::DataReceiver(const Config& config, const std::string& sensor_name)
+    : config(config::checkValid(config)), sensor_name_(sensor_name) {}
 
 bool DataReceiver::init() { return initImpl(); }
 

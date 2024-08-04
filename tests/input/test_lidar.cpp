@@ -59,7 +59,7 @@ std::shared_ptr<Lidar> createLidar(double vfov,
     config.is_asymmetric = false;
   }
   config.extrinsics = ParamSensorExtrinsics::Config();
-  return std::make_unique<Lidar>(config);
+  return std::make_unique<Lidar>(config, "");
 }
 
 TEST(Lidar, RayDensityCorrect) {

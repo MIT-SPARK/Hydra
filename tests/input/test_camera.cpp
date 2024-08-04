@@ -57,7 +57,7 @@ std::shared_ptr<Camera> createCamera(double vfov,
   config.fx = config.width / (2.0 * std::tan(hfov * M_PI / 360.0));
   config.fy = config.height / (2.0 * std::tan(vfov * M_PI / 360.0));
   config.extrinsics = ParamSensorExtrinsics::Config();
-  return std::make_unique<Camera>(config);
+  return std::make_unique<Camera>(config, "");
 }
 
 TEST(Camera, ProjectionCorrect) {

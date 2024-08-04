@@ -67,7 +67,7 @@ class Lidar : public Sensor {
     double vertical_fov_top = -1.0;
   };
 
-  explicit Lidar(const Config& config);
+  explicit Lidar(const Config& config, const std::string& name);
 
   virtual ~Lidar() = default;
 
@@ -107,7 +107,8 @@ class Lidar : public Sensor {
   Eigen::Vector3f right_frustum_normal_;
 
   inline static const auto registration_ =
-      config::RegistrationWithConfig<Sensor, Lidar, Lidar::Config>("lidar");
+      config::RegistrationWithConfig<Sensor, Lidar, Lidar::Config, std::string>(
+          "lidar");
 };
 
 void declare_config(Lidar::Config& config);

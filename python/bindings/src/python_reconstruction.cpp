@@ -210,8 +210,8 @@ void addBindings(pybind11::module_& m) {
              input->world_t_body = world_t_body;
              input->world_R_body = Eigen::Quaterniond(
                  world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
-             input->sensor_input =
-                 std::make_unique<PythonSensorInput>(timestamp_ns, depth, labels, rgb);
+             input->sensor_input = std::make_unique<PythonSensorInput>(
+                 timestamp_ns, depth, labels, rgb, "python");
              return pipeline.step(*input);
            })
       .def("step",
@@ -228,7 +228,7 @@ void addBindings(pybind11::module_& m) {
              input->world_R_body = Eigen::Quaterniond(
                  world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
              input->sensor_input = std::make_unique<PythonSensorInput>(
-                 timestamp_ns, points, labels, colors);
+                 timestamp_ns, points, labels, colors, "python");
              return pipeline.step(*input);
            });
 }

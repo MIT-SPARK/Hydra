@@ -85,8 +85,7 @@ HydraPythonPipeline::~HydraPythonPipeline() {}
 
 void HydraPythonPipeline::initPython(const PythonConfig& config,
                                      const PythonCamera& camera) {
-  std::vector<config::VirtualConfig<Sensor>> sensor_configs{camera.sensor()};
-  GlobalInfo::instance().setSensors(sensor_configs);
+  GlobalInfo::instance().setSensor("python", camera.sensor());
 
   const auto& logs = GlobalInfo::instance().getLogs();
   const auto node = config.toYaml();
@@ -206,8 +205,8 @@ void addBindings(pybind11::module_& m) {
             input->world_t_body = world_t_body;
             input->world_R_body = Eigen::Quaterniond(
                 world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
-            input->sensor_input =
-                std::make_unique<PythonSensorInput>(timestamp_ns, depth, labels, rgb);
+            input->sensor_input = std::make_unique<PythonSensorInput>(
+                timestamp_ns, depth, labels, rgb, "python");
             input->sensor_input->input_feature = feature;
             return pipeline.spinOnce(*input);
           },
@@ -234,7 +233,7 @@ void addBindings(pybind11::module_& m) {
             input->world_R_body = Eigen::Quaterniond(
                 world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
             input->sensor_input = std::make_unique<PythonSensorInput>(
-                timestamp_ns, points, labels, colors);
+                timestamp_ns, points, labels, colors, "python");
             input->sensor_input->input_feature = feature;
             return pipeline.spinOnce(*input);
           },

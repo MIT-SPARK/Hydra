@@ -60,13 +60,11 @@ void declare_config(InputModule::Config& config) {
 InputModule::InputModule(const Config& config, const OutputQueue::Ptr& queue)
     : config(config::checkValid(config)), queue_(queue) {
   // Setup the receivers and instatiate their sensors globally.
-  std::vector<config::VirtualConfig<Sensor>> sensor_configs;
-  for (size_t i = 0; i < config.inputs.size(); ++i) {
-    receivers_.emplace_back(config.inputs[i].receiver.create(i));
-    sensor_configs.push_back(config.inputs[i].sensor);
+  auto& info = GlobalInfo::instance();
+  for (const auto& [name, input_pair] : config.inputs) {
+    receivers_.emplace_back(input_pair.receiver.create(name));
+    CHECK(info.setSensor(name, input_pair.sensor, false));
   }
-
-  GlobalInfo::instance().setSensors(sensor_configs);
 }
 
 InputModule::~InputModule() { stopImpl(); }

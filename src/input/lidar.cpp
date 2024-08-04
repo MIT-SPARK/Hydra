@@ -64,8 +64,8 @@ void declare_config(Lidar::Config& config) {
   check(config.vertical_fov, GT, 0, "vertical_fov");
 }
 
-Lidar::Lidar(const Config& config)
-    : Sensor(config),
+Lidar::Lidar(const Config& config, const std::string& name)
+    : Sensor(config, name),
       config_(config::checkValid(config)),
       width_(config_.horizontal_fov / config_.horizontal_resolution),
       height_(config_.vertical_fov / config_.vertical_resolution),

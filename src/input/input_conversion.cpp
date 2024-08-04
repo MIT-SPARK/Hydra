@@ -24,17 +24,15 @@ std::unique_ptr<InputData> parseInputPacket(const InputPacket& input_packet,
     return nullptr;
   }
 
-  if (input_packet.sensor_input->sensor_id >= GlobalInfo::instance().numSensors()) {
-    LOG(ERROR) << "[Input Conversion] Input sensor ID "
-               << input_packet.sensor_input->sensor_id
-               << " is out of range. Existing sensors: "
-               << GlobalInfo::instance().numSensors() << ".";
+  const auto& sensor_name = input_packet.sensor_input->sensor_name;
+  auto sensor = GlobalInfo::instance().getSensor(sensor_name);
+  if (!sensor) {
+    LOG(ERROR) << "[Input Conversion] Missing sensor '" << sensor_name
+               << "' for input packet @ " << input_packet.timestamp_ns << " [ns]";
     return nullptr;
   }
 
-  auto data = std::make_unique<InputData>(
-      GlobalInfo::instance().getSensor(input_packet.sensor_input->sensor_id));
-
+  auto data = std::make_unique<InputData>(sensor);
   if (!input_packet.fillInputData(*data)) {
     LOG(ERROR) << "[Input Conversion] Unable to fill input data from input packet.";
     return nullptr;
@@ -214,7 +212,7 @@ void convertVertexMap(InputData& data, bool in_world_frame) {
   }
   Eigen::Isometry3f transform = data.getSensorPose().cast<float>();  // world_T_sensor
   if (!in_world_frame) {
-    transform = transform.inverse(); // Instead get sensor_T_world
+    transform = transform.inverse();  // Instead get sensor_T_world
   }
   for (int r = 0; r < data.vertex_map.rows; ++r) {
     for (int c = 0; c < data.vertex_map.cols; ++c) {

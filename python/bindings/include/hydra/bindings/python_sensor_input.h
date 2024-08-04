@@ -51,13 +51,13 @@ struct PythonSensorInput : public SensorInputPacket {
                     const PythonImage& depth,
                     const PythonImage& labels,
                     const PythonImage& color,
-                    size_t sensor_index = 0);
+                    const std::string& name);
 
   PythonSensorInput(uint64_t timestamp_ns,
                     const PointVec& points,
                     const LabelVec& labels,
                     const ColorVec& colors,
-                    size_t sensor_index = 0);
+                    const std::string& name);
 
   bool valid() const;
 

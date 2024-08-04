@@ -92,8 +92,10 @@ KimeraSensorExtrinsics::KimeraSensorExtrinsics(const Config& config)
   body_p_sensor = body_T_sensor.block<3, 1>(0, 3);
 }
 
-Sensor::Sensor(const Config& config)
-    : config(config::checkValid(config)), extrinsics_(config.extrinsics.create()) {
+Sensor::Sensor(const Config& config, const std::string& name)
+    : config(config::checkValid(config)),
+      name(name),
+      extrinsics_(config.extrinsics.create()) {
   CHECK(extrinsics_ != nullptr) << "invalid extrinsics!";
   const Eigen::Isometry3d sensor_body_pose = body_T_sensor();
   VLOG(1) << "Parsed sensor with extrinsics: " << std::endl

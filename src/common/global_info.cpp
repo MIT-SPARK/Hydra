@@ -40,8 +40,8 @@
 
 #include "hydra/common/config_utilities.h"
 #include "hydra/common/semantic_color_map.h"
-#include "hydra/utils/timing_utilities.h"
 #include "hydra/utils/pgmo_glog_sink.h"
+#include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
 
@@ -255,9 +255,7 @@ const LabelSpaceConfig& GlobalInfo::getLabelSpaceConfig() const {
   return config_.label_space;
 }
 
-size_t GlobalInfo::getTotalLabels() const {
-  return config_.label_space.total_labels;
-}
+size_t GlobalInfo::getTotalLabels() const { return config_.label_space.total_labels; }
 
 const LabelRemapper& GlobalInfo::getLabelRemapper() const { return label_remapper_; }
 
@@ -267,23 +265,44 @@ SharedDsgInfo::Ptr GlobalInfo::createSharedDsg() const {
 
 ColorMapPtr GlobalInfo::getSemanticColorMap() const { return label_colormap_; }
 
-void GlobalInfo::setSensors(std::vector<config::VirtualConfig<Sensor>> sensor_configs) {
-  sensor_configs_ = std::move(sensor_configs);
-  for (const auto& sensor_config : sensor_configs_) {
-    sensors_.emplace_back(sensor_config.create());
+bool GlobalInfo::setSensor(const std::string& name,
+                           config::VirtualConfig<Sensor> sensor,
+                           bool allow_override) {
+  auto iter = sensors_.find(name);
+  if (iter == sensors_.end()) {
+    sensors_[name] = sensor.create(name);
+    return true;
   }
+
+  if (!allow_override) {
+    LOG(ERROR) << "Sensor '" << name << "' already exists!";
+    return false;
+  }
+
+  VLOG(1) << "Overriding sensor '" << name << "' with config:\n"
+          << config::toString(sensor);
+  iter->second = sensor.create(name);
+  return true;
 }
 
-std::shared_ptr<const Sensor> GlobalInfo::getSensor(const size_t index) const {
-  if (index >= sensors_.size()) {
-    LOG(ERROR) << "Sensor index out of bounds: " << index;
+std::shared_ptr<const Sensor> GlobalInfo::getSensor(const std::string& name) const {
+  auto iter = sensors_.find(name);
+  if (iter == sensors_.end()) {
+    LOG(ERROR) << "Sensor '" << name << "' does not exist!";
     return nullptr;
   }
-  return sensors_[index];
+
+  return iter->second;
 }
 
-size_t GlobalInfo::numSensors() const {
-  return sensors_.size();
+std::vector<std::string> GlobalInfo::getAvailableSensors() const {
+  std::vector<std::string> names;
+  names.reserve(sensors_.size());
+  for (const auto& [name, sensor] : sensors_) {
+    names.push_back(name);
+  }
+
+  return names;
 }
 
 std::ostream& operator<<(std::ostream& out, const GlobalInfo& config) {

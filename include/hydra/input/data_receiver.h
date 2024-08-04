@@ -48,7 +48,7 @@ class DataReceiver {
     double input_separation_s = 0.0;
   };
 
-  DataReceiver(const Config& config, size_t sensor_id);
+  DataReceiver(const Config& config, const std::string& sensor_name);
   virtual ~DataReceiver() = default;
 
   bool init();
@@ -64,7 +64,7 @@ class DataReceiver {
 
   std::optional<uint64_t> last_time_received_;
 
-  const size_t sensor_id_;
+  const std::string sensor_name_;
 };
 
 void declare_config(DataReceiver::Config& config);

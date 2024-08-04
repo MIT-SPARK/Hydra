@@ -77,8 +77,8 @@ void declare_config(Camera::Config& config) {
   checkCondition(config.cy <= config.height, "param 'cy' is expected <= 'height'");
 }
 
-Camera::Camera(const Config& config)
-    : Sensor(config), config_(config::checkValid(config)) {
+Camera::Camera(const Config& config, const std::string& name)
+    : Sensor(config, name), config_(config::checkValid(config)) {
   // Pre-compute the view frustum (top, right, bottom, left, plane normals).
   const auto scale_factor = config_.fx / config_.fy;
   Eigen::Vector3f p1(-config_.cx, -config_.cy * scale_factor, config_.fx);

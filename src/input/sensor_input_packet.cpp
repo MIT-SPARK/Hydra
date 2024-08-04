@@ -48,8 +48,8 @@ bool SensorInputPacket::fillInputData(InputData& msg) const {
   return fillInputDataImpl(msg);
 }
 
-ImageInputPacket::ImageInputPacket(uint64_t stamp, size_t sensor_id)
-    : SensorInputPacket(stamp, sensor_id) {}
+ImageInputPacket::ImageInputPacket(uint64_t stamp, const std::string& sensor_name)
+    : SensorInputPacket(stamp, sensor_name) {}
 
 bool ImageInputPacket::fillInputDataImpl(InputData& msg) const {
   if (depth.empty()) {
@@ -72,8 +72,8 @@ bool ImageInputPacket::fillInputDataImpl(InputData& msg) const {
   return true;
 }
 
-CloudInputPacket::CloudInputPacket(uint64_t stamp, size_t sensor_id)
-    : SensorInputPacket(stamp, sensor_id) {}
+CloudInputPacket::CloudInputPacket(uint64_t stamp, const std::string& sensor_name)
+    : SensorInputPacket(stamp, sensor_name) {}
 
 bool CloudInputPacket::fillInputDataImpl(InputData& msg) const {
   if (points.empty() || (labels.empty() && colors.empty())) {

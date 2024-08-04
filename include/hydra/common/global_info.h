@@ -151,11 +151,13 @@ class GlobalInfo {
   // this intentionally returns a shared ptr to be threadsafe
   std::shared_ptr<SemanticColorMap> getSemanticColorMap() const;
 
-  void setSensors(std::vector<config::VirtualConfig<Sensor>> sensor_configs);
+  bool setSensor(const std::string& name,
+                 config::VirtualConfig<Sensor> sensor,
+                 bool allow_override = true);
 
-  std::shared_ptr<const Sensor> getSensor(const size_t index) const;
+  std::shared_ptr<const Sensor> getSensor(const std::string& name) const;
 
-  size_t numSensors() const;
+  std::vector<std::string> getAvailableSensors() const;
 
  private:
   GlobalInfo();
@@ -177,8 +179,7 @@ class GlobalInfo {
   std::shared_ptr<SemanticColorMap> label_colormap_;
   LabelRemapper label_remapper_;
 
-  std::vector<config::VirtualConfig<Sensor>> sensor_configs_;
-  std::vector<std::shared_ptr<const Sensor>> sensors_;
+  std::map<std::string, std::shared_ptr<const Sensor>> sensors_;
 };
 
 std::ostream& operator<<(std::ostream& out, const GlobalInfo& config);

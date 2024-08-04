@@ -63,7 +63,7 @@ class InputModule : public Module {
       config::VirtualConfig<DataReceiver> receiver;
       config::VirtualConfig<Sensor> sensor;
     };
-    std::vector<InputPair> inputs;
+    std::map<std::string, InputPair> inputs;
   } const config;
 
   InputModule(const Config& config, const OutputQueue::Ptr& output_queue);
