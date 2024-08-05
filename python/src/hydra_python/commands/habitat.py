@@ -57,7 +57,6 @@ def run(
     glog_level,
     use_full_scene,
     force,
-    publish,
     verbosity,
     show_images,
     show_config,
@@ -71,10 +70,6 @@ def run(
     output_path = hydra.resolve_output_path(output_path, force=force)
     data = habitat.HabitatInterface(scene_path)
     poses = _get_trajectory(data, prev_dsg, seed, use_full_scene=use_full_scene)
-
-    if publish and visualize:
-        click.secho("Cannot publish and visualize graph.")
-        return False
 
     configs = hydra.load_configs("habitat", labelspace_name=label_space)
     if not configs:
