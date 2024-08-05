@@ -38,7 +38,6 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 
-#include "hydra/common/common.h"
 #include "hydra/common/global_info.h"
 
 namespace hydra {

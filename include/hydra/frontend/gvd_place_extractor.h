@@ -37,7 +37,6 @@
 
 #include <memory>
 
-#include "hydra/common/common.h"
 #include "hydra/common/output_sink.h"
 #include "hydra/frontend/freespace_places_interface.h"
 #include "hydra/places/graph_extractor_config.h"

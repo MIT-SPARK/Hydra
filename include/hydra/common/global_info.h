@@ -52,7 +52,6 @@
 
 namespace hydra {
 
-// TODO(nathan) don't forward declare and use color array instead
 class SemanticColorMap;
 
 struct FrameConfig {
@@ -75,30 +74,18 @@ struct PipelineConfig {
 
   // If true store additional details for the khronos spatio-temporal viualizer.
   bool store_visualization_details = false;
-  std::map<LayerId, char> layer_id_map{{DsgLayers::OBJECTS, 'o'},
-                                       {DsgLayers::PLACES, 'p'},
-                                       {DsgLayers::MESH_PLACES, 'q'},
-                                       {DsgLayers::ROOMS, 'r'},
-                                       {DsgLayers::BUILDINGS, 'b'}};
+  std::map<spark_dsg::LayerId, char> layer_id_map{
+      {spark_dsg::DsgLayers::OBJECTS, 'o'},
+      {spark_dsg::DsgLayers::PLACES, 'p'},
+      {spark_dsg::DsgLayers::MESH_PLACES, 'q'},
+      {spark_dsg::DsgLayers::ROOMS, 'r'},
+      {spark_dsg::DsgLayers::BUILDINGS, 'b'},
+  };
   LogConfig logs;
   FrameConfig frames;
   VolumetricMap::Config map;
   LabelSpaceConfig label_space;
   std::map<uint32_t, std::string> label_names;
-  std::vector<Color> room_colors{
-      {166, 206, 227},
-      {31, 120, 180},
-      {178, 223, 138},
-      {51, 160, 44},
-      {251, 154, 153},
-      {227, 26, 28},
-      {253, 191, 111},
-      {255, 127, 0},
-      {202, 178, 214},
-      {106, 61, 154},
-      {255, 255, 153},
-      {177, 89, 40},
-  };
 };
 
 void declare_config(FrameConfig& conf);
@@ -133,8 +120,6 @@ class GlobalInfo {
 
   const VolumetricMap::Config& getMapConfig() const;
 
-  const Color& getRoomColor(size_t index) const;
-
   const std::map<uint32_t, std::string>& getLabelToNameMap() const;
 
   const LabelSpaceConfig& getLabelSpaceConfig() const;
@@ -143,13 +128,9 @@ class GlobalInfo {
 
   const LabelRemapper& getLabelRemapper() const;
 
+  const SemanticColorMap* getSemanticColorMap() const;
+
   SharedDsgInfo::Ptr createSharedDsg() const;
-
-  // this intentionally returns a shared ptr to be threadsafe
-  std::shared_ptr<SemanticColorMap> setRandomColormap();
-
-  // this intentionally returns a shared ptr to be threadsafe
-  std::shared_ptr<SemanticColorMap> getSemanticColorMap() const;
 
   bool setSensor(const std::string& name,
                  config::VirtualConfig<Sensor> sensor,
@@ -176,8 +157,8 @@ class GlobalInfo {
 
   RobotPrefixConfig robot_prefix_;
   LogSetup::Ptr logs_;
-  std::shared_ptr<SemanticColorMap> label_colormap_;
   LabelRemapper label_remapper_;
+  std::shared_ptr<SemanticColorMap> label_colormap_;
 
   std::map<std::string, std::shared_ptr<const Sensor>> sensors_;
 };

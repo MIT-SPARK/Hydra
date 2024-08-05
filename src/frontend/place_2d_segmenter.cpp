@@ -458,19 +458,10 @@ NodeSymbol Place2dSegmenter::addPlaceToGraph(DynamicSceneGraph& graph,
   attrs->pcl_min_index = place.min_mesh_index;
   attrs->pcl_max_index = place.max_mesh_index;
   attrs->has_active_mesh_indices = true;
+  attrs->need_finish_merge = false;
 
   attrs->pcl_mesh_connections.insert(
       attrs->pcl_mesh_connections.begin(), place.indices.begin(), place.indices.end());
-
-  attrs->need_finish_merge = false;
-
-  auto label_map = GlobalInfo::instance().getSemanticColorMap();
-  if (!label_map || !label_map->isValid()) {
-    label_map = GlobalInfo::instance().setRandomColormap();
-    CHECK(label_map != nullptr);
-  }
-
-  attrs->color  = label_map->getColorFromLabel(label);
 
   graph.emplaceNode(DsgLayers::MESH_PLACES, next_node_id_, std::move(attrs));
 

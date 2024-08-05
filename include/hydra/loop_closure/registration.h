@@ -40,7 +40,6 @@
 
 #include <mutex>
 
-#include "hydra/common/common.h"
 #include "hydra/loop_closure/descriptor_matching.h"
 #include "hydra/loop_closure/registration_solution.h"
 #include "hydra/loop_closure/subgraph_extraction.h"

@@ -79,7 +79,7 @@ using GlobalIndexMap = spatial_hash::IndexHashMap<ValueT>;
 struct TsdfVoxel {
   float distance = 0.0f;
   float weight = 0.0f;
-  Color color;
+  spark_dsg::Color color;
 };
 
 // Based on the semantic voxel from Kimera-Semantics

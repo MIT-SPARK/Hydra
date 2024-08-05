@@ -37,6 +37,16 @@
 
 namespace hydra {
 
+// Printing.
+template <typename Scalar>
+std::string showIndex(const Eigen::Matrix<Scalar, 3, 1>& vector) {
+  std::stringstream ss;
+  const Eigen::IOFormat format(
+      Eigen::FullPrecision, Eigen::DontAlignCols, ", ", ", ", "", "", "[", "]");
+  ss << vector.format(format);
+  return ss.str();
+}
+
 inline Eigen::IOFormat getDefaultFormat(int precision = Eigen::StreamPrecision) {
   // julia-esque print fmt
   return Eigen::IOFormat(precision, Eigen::DontAlignCols, ", ", "; ", "", "", "[", "]");

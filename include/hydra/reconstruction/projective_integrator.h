@@ -52,7 +52,6 @@
 #include <string>
 #include <thread>
 
-#include "hydra/common/common.h"
 #include "hydra/input/input_packet.h"
 #include "hydra/reconstruction/projection_interpolators.h"
 #include "hydra/reconstruction/projective_integrator_config.h"

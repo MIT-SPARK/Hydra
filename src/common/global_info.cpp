@@ -107,7 +107,6 @@ void declare_config(PipelineConfig& conf) {
   field(conf.store_visualization_details, "store_visualization_details");
   field(conf.map, "reconstruction/map");
   field<LabelNameConversion>(conf.label_names, "label_names");
-  field(conf.room_colors, "room_colors");
 
   // the following subconfigs should not be namespaced
   field(conf.logs, "logs", false);
@@ -127,9 +126,7 @@ void saveTimingInformation(const LogSetup& log_config) {
   LOG(INFO) << "[Hydra] saved timing information";
 }
 
-GlobalInfo::GlobalInfo() : force_shutdown_(false) {
-  label_colormap_.reset(new SemanticColorMap());
-}
+GlobalInfo::GlobalInfo() : force_shutdown_(false) {}
 
 void GlobalInfo::configureTimers() {
   ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
@@ -162,25 +159,20 @@ void GlobalInfo::initFromConfig(const PipelineConfig& config, int robot_id) {
   logs_ = std::make_shared<LogSetup>(config_.logs);
   configureTimers();
 
-  if (!config_.label_space.colormap.empty()) {
-    SemanticColorMap::ColorToLabelMap new_colors;
-    for (auto&& [id, color] : config_.label_space.colormap) {
-      new_colors[Color(color[0], color[1], color[2])] = id;
-    }
-
-    label_colormap_.reset(new SemanticColorMap(new_colors));
-  } else if (!config_.label_space.colormap_filepath.empty()) {
-    label_colormap_ = SemanticColorMap::fromCsv(config_.label_space.colormap_filepath);
-  } else {
-    label_colormap_ = SemanticColorMap::randomColors(config_.label_space.total_labels);
-  }
-
   if (!config_.label_space.label_remap_filepath.empty()) {
     label_remapper_ = LabelRemapper(config_.label_space.label_remap_filepath);
   }
 
+  if (!config_.label_space.colormap_filepath.empty()) {
+    label_colormap_ = SemanticColorMap::fromCsv(config_.label_space.colormap_filepath);
+  }
+
   if (label_colormap_) {
     VLOG(2) << "Loaded label space colors:" << std::endl << *label_colormap_;
+  }
+
+  if (!config_.label_space.label_remap_filepath.empty()) {
+    label_remapper_ = LabelRemapper(config_.label_space.label_remap_filepath);
   }
 
   if (config_.enable_pgmo_logging) {
@@ -226,11 +218,6 @@ void GlobalInfo::setForceShutdown(bool force_shutdown) {
   force_shutdown_ = force_shutdown;
 }
 
-ColorMapPtr GlobalInfo::setRandomColormap() {
-  label_colormap_ = SemanticColorMap::randomColors(config_.label_space.total_labels);
-  return label_colormap_;
-}
-
 bool GlobalInfo::force_shutdown() const { return force_shutdown_; }
 
 const PipelineConfig& GlobalInfo::getConfig() const { return config_; }
@@ -242,10 +229,6 @@ const RobotPrefixConfig& GlobalInfo::getRobotPrefix() const { return robot_prefi
 const LogSetup::Ptr& GlobalInfo::getLogs() const { return logs_; }
 
 const VolumetricMap::Config& GlobalInfo::getMapConfig() const { return config_.map; }
-
-const Color& GlobalInfo::getRoomColor(size_t index) const {
-  return config_.room_colors.at(index % config_.room_colors.size());
-}
 
 const std::map<uint32_t, std::string>& GlobalInfo::getLabelToNameMap() const {
   return config_.label_names;
@@ -259,11 +242,13 @@ size_t GlobalInfo::getTotalLabels() const { return config_.label_space.total_lab
 
 const LabelRemapper& GlobalInfo::getLabelRemapper() const { return label_remapper_; }
 
+const SemanticColorMap* GlobalInfo::getSemanticColorMap() const {
+  return label_colormap_.get();
+}
+
 SharedDsgInfo::Ptr GlobalInfo::createSharedDsg() const {
   return std::make_shared<SharedDsgInfo>(config_.layer_id_map);
 }
-
-ColorMapPtr GlobalInfo::getSemanticColorMap() const { return label_colormap_; }
 
 bool GlobalInfo::setSensor(const std::string& name,
                            config::VirtualConfig<Sensor> sensor,

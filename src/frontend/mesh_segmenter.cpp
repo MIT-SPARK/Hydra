@@ -422,14 +422,6 @@ void MeshSegmenter::addNodeToGraph(DynamicSceneGraph& graph,
   attrs->mesh_connections.insert(
       attrs->mesh_connections.begin(), cluster.indices.begin(), cluster.indices.end());
 
-  auto label_map = GlobalInfo::instance().getSemanticColorMap();
-  if (!label_map || !label_map->isValid()) {
-    label_map = GlobalInfo::instance().setRandomColormap();
-    CHECK(label_map != nullptr);
-  }
-
-  attrs->color = label_map->getColorFromLabel(label);
-
   updateObjectGeometry(*graph.mesh(), *attrs, nullptr, config.bounding_box_type);
 
   graph.emplaceNode(config.layer_id, next_node_id_, std::move(attrs));

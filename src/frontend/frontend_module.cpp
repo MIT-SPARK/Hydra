@@ -46,6 +46,7 @@
 #include <fstream>
 
 #include "hydra/common/global_info.h"
+#include "hydra/common/launch_callbacks.h"
 #include "hydra/common/pipeline_queues.h"
 #include "hydra/frontend/frontier_extractor.h"
 #include "hydra/frontend/mesh_segmenter.h"

@@ -35,7 +35,7 @@
 #pragma once
 #include <gtsam/nonlinear/Values.h>
 
-#include "hydra/common/common.h"
+#include "hydra/common/dsg_types.h"
 #include "hydra/common/shared_dsg_info.h"
 
 namespace hydra {

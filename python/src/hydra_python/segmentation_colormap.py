@@ -114,9 +114,6 @@ class SegmentationColormap:
     def fill_label_space(self, config):
         """Fill label space config with appropriate information."""
         config.total_labels = self._colors.shape[1]
-        config.colormap = {
-            i: self._colors[:, i].tolist() for i in range(self._colors.shape[1])
-        }
 
     @property
     def colors(self):

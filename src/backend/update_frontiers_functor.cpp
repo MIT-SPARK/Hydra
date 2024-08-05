@@ -34,6 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/backend/update_frontiers_functor.h"
 
+#include <config_utilities/config.h>
+
 #include "hydra/common/global_info.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/timing_utilities.h"

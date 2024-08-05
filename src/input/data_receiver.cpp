@@ -40,8 +40,6 @@
 
 #include <chrono>
 
-#include "hydra/common/common.h"
-
 namespace hydra {
 
 DataReceiver::DataReceiver(const Config& config, const std::string& sensor_name)

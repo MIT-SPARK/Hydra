@@ -76,8 +76,7 @@ void addBindings(pybind11::module_& m) {
       .def_readwrite("total_labels", &LabelSpaceConfig::total_labels)
       .def_readwrite("colormap_filepath", &LabelSpaceConfig::colormap_filepath)
       .def_readwrite("dynamic_labels", &LabelSpaceConfig::dynamic_labels)
-      .def_readwrite("invalid_labels", &LabelSpaceConfig::invalid_labels)
-      .def_readwrite("colormap", &LabelSpaceConfig::colormap);
+      .def_readwrite("invalid_labels", &LabelSpaceConfig::invalid_labels);
 
   py::class_<PipelineConfig>(m, "PipelineConfig")
       .def(py::init([](const PythonConfig& config) {
@@ -93,8 +92,7 @@ void addBindings(pybind11::module_& m) {
       .def_readwrite("frames", &PipelineConfig::frames)
       .def_readwrite("map", &PipelineConfig::map)
       .def_readwrite("label_space", &PipelineConfig::label_space)
-      .def_readwrite("label_names", &PipelineConfig::label_names)
-      .def_readwrite("room_colors", &PipelineConfig::room_colors);
+      .def_readwrite("label_names", &PipelineConfig::label_names);
   // GCOVR_EXCL_STOP
 }
 

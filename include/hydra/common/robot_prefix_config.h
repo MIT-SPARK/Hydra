@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-
 namespace hydra {
 
 struct RobotPrefixConfig {

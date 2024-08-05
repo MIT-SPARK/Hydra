@@ -206,7 +206,6 @@ NodeSymbol insertNewNodes(
       attrs->pcl_mesh_connections.insert(attrs->pcl_mesh_connections.begin(),
                                          place.indices.begin(),
                                          place.indices.end());
-      attrs->color = attrs_og.color;
 
       attrs->has_active_mesh_indices = attrs_og.has_active_mesh_indices;
       attrs->need_cleanup_splitting = true;

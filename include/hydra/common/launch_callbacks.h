@@ -33,15 +33,11 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <Eigen/Core>
 #include <list>
 #include <memory>
 #include <thread>
-#include <unordered_set>
 
 namespace hydra {
-
-using NodeIdSet = std::unordered_set<uint64_t>;
 
 template <typename Funcs, typename... Args>
 void launchCallbacks(const Funcs& callbacks, Args... args) {
@@ -53,16 +49,6 @@ void launchCallbacks(const Funcs& callbacks, Args... args) {
   for (auto& thread : threads) {
     thread.join();
   }
-}
-
-// Printing.
-template <typename Scalar>
-std::string showIndex(const Eigen::Matrix<Scalar, 3, 1>& vector) {
-  std::stringstream ss;
-  const Eigen::IOFormat format(
-      Eigen::FullPrecision, Eigen::DontAlignCols, ", ", ", ", "", "", "[", "]");
-  ss << vector.format(format);
-  return ss.str();
 }
 
 }  // namespace hydra

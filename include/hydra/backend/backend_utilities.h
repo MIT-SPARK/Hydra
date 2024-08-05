@@ -36,6 +36,7 @@
 
 #include <gtsam/inference/Symbol.h>
 
+#include "hydra/common/dsg_types.h"
 #include "hydra/common/shared_dsg_info.h"
 
 namespace kimera_pgmo {

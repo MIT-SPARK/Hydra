@@ -37,15 +37,16 @@
 // purposes notwithstanding any copyright notation herein.
 #include "hydra/reconstruction/mesh_integrator.h"
 
+#include <config_utilities/validation.h>
 #include <glog/logging.h>
 
 #include <iomanip>
 #include <list>
 #include <thread>
 
-#include "hydra/common/common.h"
 #include "hydra/reconstruction/marching_cubes.h"
 #include "hydra/reconstruction/volumetric_map.h"
+#include "hydra/utils/printing.h"
 
 namespace hydra {
 

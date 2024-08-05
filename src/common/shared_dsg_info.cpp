@@ -36,6 +36,8 @@
 
 namespace hydra {
 
+using namespace spark_dsg;
+
 SharedDsgInfo::SharedDsgInfo(const std::map<LayerId, char>& layer_id_map)
     : updated(false), last_update_time(0), layer_prefix_map(layer_id_map) {
   DynamicSceneGraph::LayerIds layer_ids;

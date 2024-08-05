@@ -34,14 +34,12 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <spark_dsg/color.h>
-
 #include <cstdint>
+#include <unordered_set>
 
 namespace hydra {
 
-using spark_dsg::Color;
-
+using NodeIdSet = std::unordered_set<uint64_t>;
 using TimeStamp = uint64_t;
 
 inline double toSeconds(TimeStamp time) { return static_cast<double>(time) / 1e9; }

@@ -54,6 +54,7 @@
 
 namespace hydra {
 
+using spark_dsg::Color;
 
 InterpolationWeights InterpolatorNearest::computeWeights(float u,
                                                          float v,

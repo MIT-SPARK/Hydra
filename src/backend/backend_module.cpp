@@ -42,6 +42,7 @@
 
 #include "hydra/backend/backend_utilities.h"
 #include "hydra/common/global_info.h"
+#include "hydra/common/launch_callbacks.h"
 #include "hydra/common/pipeline_queues.h"
 #include "hydra/utils/minimum_spanning_tree.h"
 #include "hydra/utils/pgmo_mesh_traits.h"

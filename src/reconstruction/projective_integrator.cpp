@@ -49,12 +49,11 @@
 
 #include <algorithm>
 #include <future>
-#include <memory>
-#include <utility>
 #include <vector>
 
 #include "hydra/input/sensor_utilities.h"
 #include "hydra/reconstruction/index_getter.h"
+#include "hydra/utils/printing.h"
 
 namespace hydra {
 

@@ -1,5 +1,6 @@
 #include "hydra/common/label_remapper.h"
 
+#include <config_utilities/config.h>
 #include <config_utilities/parsing/yaml.h>
 #include <glog/logging.h>
 

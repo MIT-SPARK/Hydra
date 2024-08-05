@@ -37,7 +37,7 @@
 #include <queue>
 #include <thread>
 
-#include "hydra/common/common.h"
+#include "hydra/common/common_types.h"
 #include "hydra/common/module.h"
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"

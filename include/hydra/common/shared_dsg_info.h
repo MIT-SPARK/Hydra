@@ -33,19 +33,19 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <spark_dsg/dynamic_scene_graph.h>
+
 #include <atomic>
 #include <map>
 #include <memory>
 #include <mutex>
-
-#include "hydra/common/dsg_types.h"
 
 namespace hydra {
 
 struct SharedDsgInfo {
   using Ptr = std::shared_ptr<SharedDsgInfo>;
 
-  explicit SharedDsgInfo(const std::map<LayerId, char>& layer_id_map);
+  explicit SharedDsgInfo(const std::map<spark_dsg::LayerId, char>& layer_id_map);
 
   SharedDsgInfo::Ptr clone() const;
 
@@ -58,10 +58,10 @@ struct SharedDsgInfo {
   mutable std::mutex mutex;
   std::atomic<bool> updated;
   uint64_t last_update_time;
-  DynamicSceneGraph::Ptr graph;
-  std::map<char, LayerId> prefix_layer_map;
-  std::map<LayerId, char> layer_prefix_map;
-  std::map<NodeId, NodeId> merges;
+  spark_dsg::DynamicSceneGraph::Ptr graph;
+  std::map<char, spark_dsg::LayerId> prefix_layer_map;
+  std::map<spark_dsg::LayerId, char> layer_prefix_map;
+  std::map<spark_dsg::NodeId, spark_dsg::NodeId> merges;
 
  private:
   SharedDsgInfo();

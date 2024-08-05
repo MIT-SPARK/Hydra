@@ -1,7 +1,5 @@
 #pragma once
 
-#include <config_utilities/config_utilities.h>
-
 #include <map>
 
 namespace hydra {
@@ -10,6 +8,7 @@ struct LabelRemapRow {
   uint32_t sub_id;
   uint32_t super_id;
 };
+
 void declare_config(LabelRemapRow& config);
 
 class LabelRemapper {

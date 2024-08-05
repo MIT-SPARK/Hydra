@@ -40,7 +40,6 @@
 #include <array>
 #include <optional>
 
-#include "hydra/common/common.h"
 #include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra {
@@ -51,7 +50,7 @@ struct SdfPoint {
   float distance;
   float weight;
   Eigen::Vector3f pos;
-  Color color;
+  spark_dsg::Color color;
   std::optional<uint32_t> label;
   OccupancyVoxel* vertex_voxel = nullptr;
 };

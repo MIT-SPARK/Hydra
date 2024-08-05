@@ -36,8 +36,6 @@
 
 #include <spatial_hash/neighbor_utils.h>
 
-#include "hydra/common/common.h"
-
 namespace hydra::places {
 
 namespace {

@@ -34,14 +34,12 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <iostream>
-#include <limits>
+#include <spark_dsg/color.h>
+
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-
-#include "hydra/common/common_types.h"
 
 namespace hydra {
 
@@ -49,17 +47,19 @@ namespace hydra {
 class SemanticColorMap {
  public:
   using Ptr = std::unique_ptr<SemanticColorMap>;
-  using ColorSet = std::unordered_set<Color, Color::Hash>;
-  using LabelToColorMap = std::unordered_map<uint32_t, Color>;
-  using ColorToLabelMap = std::unordered_map<Color, uint32_t, Color::Hash>;
+  using ColorSet = std::unordered_set<spark_dsg::Color, spark_dsg::Color::Hash>;
+  using LabelToColorMap = std::unordered_map<uint32_t, spark_dsg::Color>;
+  using ColorToLabelMap =
+      std::unordered_map<spark_dsg::Color, uint32_t, spark_dsg::Color::Hash>;
 
   SemanticColorMap();
 
-  SemanticColorMap(const ColorToLabelMap& map, const Color& unknown_color = {});
+  SemanticColorMap(const ColorToLabelMap& map,
+                   const spark_dsg::Color& unknown_color = {});
 
-  std::optional<uint32_t> getLabelFromColor(const Color& color) const;
+  std::optional<uint32_t> getLabelFromColor(const spark_dsg::Color& color) const;
 
-  Color getColorFromLabel(const uint32_t& label) const;
+  spark_dsg::Color getColorFromLabel(const uint32_t& label) const;
 
   size_t getNumLabels() const;
 
@@ -71,17 +71,18 @@ class SemanticColorMap {
 
  public:
   static SemanticColorMap::Ptr randomColors(size_t num_labels,
-                                            const Color& unknown = {});
+                                            const spark_dsg::Color& unknown = {});
 
   static SemanticColorMap::Ptr fromCsv(const std::string& filename,
-                                       const Color& unknown = {},
+                                       const spark_dsg::Color& unknown = {},
                                        char delimiter = ',',
                                        bool skip_first_line = true);
+
  private:
   uint32_t max_label_;
   ColorToLabelMap color_to_label_;
   LabelToColorMap label_to_color_;
-  Color unknown_color_;
+  spark_dsg::Color unknown_color_;
 
   mutable ColorSet unknown_colors_;
   mutable std::unordered_set<uint32_t> unknown_labels_;

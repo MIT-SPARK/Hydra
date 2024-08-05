@@ -43,7 +43,6 @@
 #include <thread>
 
 #include "hydra/backend/backend_input.h"
-#include "hydra/common/common.h"
 #include "hydra/common/input_queue.h"
 #include "hydra/common/module.h"
 #include "hydra/common/output_sink.h"
