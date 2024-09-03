@@ -1,0 +1,65 @@
+---
+map:
+  voxels_per_side: 16
+  voxel_size: 0.35
+  truncation_distance: 1.0
+map_window:
+  type: spatial
+  max_radius_m: 30.0
+reconstruction:
+  tsdf:
+    use_constant_weight: true
+    interpolation_method: bilinear
+    semantic_integrator:
+      type: MLESemanticIntegrator
+frontend:
+  pgmo:
+    time_horizon: 15.0
+    d_graph_resolution: 2.5
+    mesh_resolution: 0.005
+  objects:
+    min_cluster_size: 40
+    cluster_tolerance: 0.25
+  freespace_places:
+    type: gvd
+    gvd:
+      max_distance_m: 5.0
+      min_distance_m: 0.5
+      min_diff_m: 0.1
+      voronoi_config:
+        mode: L1_THEN_ANGLE
+        min_distance_m: 0.30
+        parent_l1_separation: 20
+        parent_cos_angle_separation: 0.2
+    graph:
+      type: CompressionGraphExtractor
+      compression_distance_m: 3.0
+      min_node_distance_m: 0.6
+      min_edge_distance_m: 0.3
+      node_merge_distance_m: 1.5
+      add_heuristic_edges: false
+backend:
+  add_places_to_deformation_graph: true
+  update_functors:
+    agents:
+      type: UpdateAgentsFunctor
+    objects:
+      type: UpdateObjectsFunctor
+    surface_places:
+      type: Update2dPlacesFunctor
+    places:
+      type: UpdatePlacesFunctor
+      pos_threshold_m: 1.0
+      distance_tolerance_m: 0.5
+  pgmo:
+    covariance:
+      odom: 1.0e-02
+      loop_close: 5.0e-02
+      sg_loop_close: 1.0e-01
+      prior: 1.0e-02
+      mesh_mesh: 1.0e-02
+      pose_mesh: 1.0e-02
+      place_mesh: 1.0e-02
+      place_edge: 10.0
+      place_merge: 10.0
+      object_merge: 10.0
