@@ -49,6 +49,7 @@
 #include "hydra/reconstruction/projective_integrator_config.h"
 #include "hydra/reconstruction/reconstruction_output.h"
 #include "hydra/reconstruction/volumetric_map.h"
+#include "hydra/reconstruction/volumetric_window.h"
 #include "hydra/utils/log_utilities.h"
 
 namespace hydra {
@@ -71,11 +72,9 @@ class ReconstructionModule : public Module {
   struct Config {
     bool show_stats = true;
     int stats_verbosity = 2;
-    bool clear_distant_blocks = true;
-    double dense_representation_radius_m = 5.0;
-    size_t num_poses_per_update = 1;
     size_t max_input_queue_size = 0;
-    float semantic_measurement_probability = 0.9;
+    double full_update_separation_s = 0.0;
+    config::VirtualConfig<VolumetricWindow> map_window;
     ProjectiveIntegratorConfig tsdf;
     MeshIntegratorConfig mesh;
     config::VirtualConfig<RobotFootprintIntegrator> robot_footprint;
@@ -108,9 +107,9 @@ class ReconstructionModule : public Module {
   InputPacketQueue::Ptr queue() const { return queue_; }
 
  protected:
-  bool update(const InputPacket& msg, bool full_update);
+  void stopImpl();
 
-  BlockIndices findBlocksToArchive(const Eigen::Vector3f& center) const;
+  bool update(const InputPacket& msg, bool full_update);
 
   void fillOutput(ReconstructionOutput& output);
 
@@ -118,13 +117,14 @@ class ReconstructionModule : public Module {
   std::atomic<bool> should_shutdown_{false};
   InputPacketQueue::Ptr queue_;
   std::unique_ptr<std::thread> spin_thread_;
-  size_t num_poses_received_;
+  std::optional<uint64_t> last_update_ns_;
   std::set<uint64_t> timestamp_cache_;
 
   OutputQueue::Ptr output_queue_;
   Sink::List sinks_;
 
   std::unique_ptr<VolumetricMap> map_;
+  std::unique_ptr<VolumetricWindow> map_window_;
   std::unique_ptr<ProjectiveIntegrator> tsdf_integrator_;
   std::unique_ptr<MeshIntegrator> mesh_integrator_;
   RobotFootprintIntegrator::Ptr footprint_integrator_;

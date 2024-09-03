@@ -6,8 +6,8 @@
 #include <spatial_hash/types.h>
 
 #include "hydra/common/dsg_types.h"
-#include "hydra/frontend/frontier_places_interface.h"
 #include "hydra/reconstruction/reconstruction_output.h"
+#include "hydra/reconstruction/volumetric_window.h"
 
 namespace hydra {
 
@@ -40,7 +40,7 @@ struct Frontier {
   bool has_shape_information = false;
 };
 
-class FrontierExtractor : public FrontierPlacesInterface {
+class FrontierExtractor {
  public:
   struct Config {
     char prefix = 'f';
@@ -60,38 +60,45 @@ class FrontierExtractor : public FrontierPlacesInterface {
 
   explicit FrontierExtractor(const Config& config);
 
-  void updateRecentBlocks(Eigen::Vector3d current_position, double block_size) override;
+  void updateRecentBlocks(const Eigen::Vector3d& current_position, double block_size);
+
   void detectFrontiers(const ReconstructionOutput& input,
                        DynamicSceneGraph& graph,
-                       NearestNodeFinder& finder) override;
+                       NearestNodeFinder& finder);
+
   void addFrontiers(uint64_t timestamp_ns,
                     DynamicSceneGraph& graph,
-                    NearestNodeFinder& finder) override;
+                    NearestNodeFinder& finder);
+
+  void setArchivedPlaces(const std::vector<NodeId>& archived_places);
 
  private:
   NodeSymbol next_node_id_;
   std::vector<std::pair<NodeId, BlockIndex>> nodes_to_remove_;
 
-  BlockIndices recently_archived_blocks_;
+  TsdfLayer::Ptr tsdf_;
+  std::vector<NodeId> archived_places_;
+  spatial_hash::IndexSet just_archived_blocks_;
+  spatial_hash::IndexSet recently_archived_blocks_;
+  std::unique_ptr<VolumetricWindow> map_window_;
 
   std::vector<Frontier> frontiers_;
   std::vector<Frontier> archived_frontiers_;
 
+  // Helper functions.
+  void updateTsdf(const ReconstructionOutput& msg);
+
   void populateDenseFrontiers(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
                               const pcl::PointCloud<pcl::PointXYZ>::Ptr archived_cloud,
-                              const double voxel_scale,
                               const TsdfLayer& layer);
 
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<FrontierPlacesInterface,
-                                     FrontierExtractor,
-                                     Config>("voxel_clustering");
-
-  // Helper functions.
   void computeSparseFrontiers(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
-                              const bool compute_frontier_shape,
                               const TsdfLayer& layer,
                               std::vector<Frontier>& frontiers) const;
+
+  inline static const auto registration_ =
+      config::RegistrationWithConfig<FrontierExtractor, FrontierExtractor, Config>(
+          "voxel_clustering");
 };
 
 Eigen::Vector3d frontiersToCenters(const std::vector<Eigen::Vector3f>& positions);

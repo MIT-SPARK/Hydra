@@ -124,6 +124,13 @@ struct TsdfBlock : public spatial_hash::VoxelBlock<TsdfVoxel> {
     tracking_updated = true;
   }
 
+  void clearUpdated() const {
+    updated = false;
+    esdf_updated = false;
+    mesh_updated = false;
+    tracking_updated = false;
+  }
+
   // Function to enable iterating over update blocks.
   static bool esdfUpdated(const TsdfBlock& block) { return block.esdf_updated; }
   static bool meshUpdated(const TsdfBlock& block) { return block.mesh_updated; }

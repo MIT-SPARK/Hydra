@@ -33,41 +33,52 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <Eigen/Dense>
-#include <cstdint>
-#include <memory>
 
-#include "hydra/input/input_packet.h"
-#include "hydra/reconstruction/volumetric_map.h"
+#include <spatial_hash/block.h>
+#include <spatial_hash/types.h>
+
+#include <Eigen/Geometry>
 
 namespace hydra {
 
-struct ReconstructionOutput {
-  using Ptr = std::shared_ptr<ReconstructionOutput>;
+class VolumetricMap;
 
-  virtual ~ReconstructionOutput() = default;
+struct VolumetricBlockInfo {
+  const spatial_hash::BlockIndex index;
+  const double block_size;
+  const uint64_t update_stamp_ns;
 
-  uint64_t timestamp_ns;
-  Eigen::Vector3d world_t_body;
-  Eigen::Quaterniond world_R_body;
-  std::shared_ptr<InputData> sensor_data;
-
-  const VolumetricMap& map() const;
-
-  template <typename T = double>
-  Eigen::Transform<T, 3, Eigen::Isometry> world_T_body() const {
-    return Eigen::Translation<T, 3>(world_t_body.cast<T>()) * world_R_body.cast<T>();
-  }
-
-  void setMap(const VolumetricMap& map);
-  void setMap(const std::shared_ptr<VolumetricMap>& map);
-
-  virtual void updateFrom(const ReconstructionOutput& msg, bool clone_map);
-
-  static Ptr fromInput(const InputPacket& input);
-
- protected:
-  std::shared_ptr<VolumetricMap> map_;
+  VolumetricBlockInfo(const spatial_hash::Block& block, uint64_t update_stamp_ns = 0);
+  VolumetricBlockInfo(const spatial_hash::BlockIndex& index,
+                      double block_size,
+                      uint64_t update_stamp_ns = 0);
+  Eigen::Vector3f blockCenter() const;
 };
+
+struct VolumetricWindow {
+  virtual ~VolumetricWindow() = default;
+
+  void archiveBlocks(uint64_t timestamp_ns,
+                     const Eigen::Isometry3d& world_T_body,
+                     VolumetricMap& map,
+                     bool skip_updated = true) const;
+
+  virtual bool inBounds(uint64_t timestamp_ns,
+                        const Eigen::Isometry3d& world_T_body,
+                        const VolumetricBlockInfo& block) const = 0;
+};
+
+struct SpatialWindowChecker : VolumetricWindow {
+  struct Config {
+    double max_radius_m = 8.0;
+  } const config;
+
+  explicit SpatialWindowChecker(const Config& config);
+  bool inBounds(uint64_t timestamp_ns,
+                const Eigen::Isometry3d& world_T_body,
+                const VolumetricBlockInfo& block) const override;
+};
+
+void declare_config(SpatialWindowChecker::Config& config);
 
 }  // namespace hydra

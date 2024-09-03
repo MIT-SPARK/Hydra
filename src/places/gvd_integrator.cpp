@@ -257,6 +257,9 @@ void GvdIntegrator::propagateSurface(const BlockIndex& block_index,
   const auto& tsdf_block = tsdf.getBlock(block_index);
   auto& gvd_block = gvd_layer_->allocateBlock(block_index);
 
+  // TODO(nathan) need to enforce that this is smaller than the truncation distance otherwise
+  // updated blocks in free-space will clear the ESDF
+  const auto surface_threshold = std::sqrt(3.0) * tsdf.voxel_size / 2.0;
   for (size_t idx = 0u; idx < tsdf_block.numVoxels(); ++idx) {
     const auto& tsdf_voxel = tsdf_block.getVoxel(idx);
     if (tsdf_voxel.weight < config_.min_weight) {
@@ -266,7 +269,7 @@ void GvdIntegrator::propagateSurface(const BlockIndex& block_index,
     // surface voxels are anything closer to the surface than the voxel size
     auto& gvd_voxel = gvd_block.getVoxel(idx);
     const auto tsdf_dist = std::abs(tsdf_voxel.distance);
-    gvd_voxel.on_surface = tsdf_dist < tsdf.voxel_size;
+    gvd_voxel.on_surface = tsdf_dist < surface_threshold;
     if (!gvd_voxel.on_surface) {
       continue;
     }

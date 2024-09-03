@@ -138,12 +138,6 @@ def _load_prev(output_path):
 
 @click.command()
 @click.argument("label_grouping_file", type=click.Path(exists=True))
-@click.option(
-    "-p",
-    "--measurement_probability",
-    default=0.9,
-    help="semantic measurement probability",
-)
 @click.option("-n", "--name", default=None, help="label space name")
 @click.option("-o", "--output-dir", help="directory to output to")
 @click.option("-f", "--force-overwrite", help="don't load previous labelspace")
@@ -156,7 +150,6 @@ def _load_prev(output_path):
 )
 def main(
     label_grouping_file,
-    measurement_probability,
     name,
     output_dir,
     force_overwrite,
@@ -199,9 +192,6 @@ def main(
 
     with output_path.open("w") as fout:
         fout.write("---\n")
-        fout.write(
-            yaml.dump({"semantic_measurement_probability": measurement_probability})
-        )
         fout.write(yaml.dump({"total_semantic_labels": len(config["groups"])}))
         fout.write(_format_list("dynamic_labels", dynamic_labels))
         fout.write(_format_list("invalid_labels", invalid_labels))

@@ -26,6 +26,7 @@
 #include <queue>
 
 #include "hydra/common/config_utilities.h"
+#include "hydra/common/global_info.h"
 #include "hydra/frontend/frontier_extractor.h"
 #include "hydra/reconstruction/voxel_types.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
@@ -33,6 +34,7 @@
 namespace hydra {
 
 using spatial_hash::IndexSet;
+using SpatialCloud = pcl::PointCloud<pcl::PointXYZ>;
 
 template <typename T, size_t N>
 std::pair<T, Eigen::Matrix<T, N, 1>> getMaxEigenvector(Eigen::Matrix<T, N, N> cov) {
@@ -118,9 +120,11 @@ void splitAllFrontiers(std::vector<std::vector<Eigen::Vector3f>>& frontiers,
 }
 
 FrontierExtractor::FrontierExtractor(const Config& config)
-    : config(config), next_node_id_(config.prefix, 0) {}
+    : config(config),
+      next_node_id_(config.prefix, 0),
+      map_window_(GlobalInfo::instance().createVolumetricWindow()) {}
 
-void clusterFrontiers(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+void clusterFrontiers(const SpatialCloud::Ptr cloud,
                       const double cluster_tolerance,
                       const size_t min_cluster_size,
                       const size_t max_cluster_size,
@@ -234,9 +238,10 @@ void checkFreeNeighbors(const std::vector<bool>& inside_place,
 }
 
 void processBlock(NearestNodeFinder& finder,
+                  const TsdfLayer& tsdf,
                   const BlockIndex& block_index,
+                  const bool block_is_archived,
                   const DynamicSceneGraph& graph,
-                  const ReconstructionOutput& input,
                   const std::vector<NodeId>& archived_places,
                   const double max_place_radius,
                   const double min_frontier_z,
@@ -244,9 +249,8 @@ void processBlock(NearestNodeFinder& finder,
                   const bool skip_adding_frontiers,
                   IndexSet& skip_add_blocks,
                   std::queue<BlockIndex>& extra_blocks,
-                  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
-                  pcl::PointCloud<pcl::PointXYZ>::Ptr archived_cloud) {
-  const auto& tsdf = input.map().getTsdfLayer();
+                  SpatialCloud::Ptr cloud,
+                  SpatialCloud::Ptr archived_cloud) {
   // Get all active places near block
   const Eigen::Vector3f block_center =
       spatial_hash::centerPointFromIndex(block_index, tsdf.blockSize());
@@ -333,13 +337,9 @@ void processBlock(NearestNodeFinder& finder,
       continue;
     }
 
-    bool archived = std::find(input.archived_blocks.begin(),
-                              input.archived_blocks.end(),
-                              block_index) != input.archived_blocks.end();
-
     // A frontier is archived if its block is deallocated, or if its only neighbor
     // that's inside a place is in an archived place
-    archived = archived || (!neighbor_free && neighbor_archived_free);
+    bool archived = block_is_archived || (!neighbor_free && neighbor_archived_free);
     if (archived) {
       archived_cloud->points.push_back({center.x(), center.y(), center.z()});
     } else {
@@ -348,17 +348,17 @@ void processBlock(NearestNodeFinder& finder,
   }
 }
 
-void FrontierExtractor::populateDenseFrontiers(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr archived_cloud,
-    const double voxel_scale,
-    const TsdfLayer& layer) {
+void FrontierExtractor::populateDenseFrontiers(const SpatialCloud::Ptr cloud,
+                                               const SpatialCloud::Ptr archived_cloud,
+                                               const TsdfLayer& layer) {
+  const auto voxel_scale = layer.voxel_size;
   for (auto p : cloud->points) {
     Eigen::Vector3d center = {p.x, p.y, p.z};
     BlockIndex bix = layer.getBlockIndex(center.cast<float>());
     frontiers_.push_back(
         {center, {voxel_scale, voxel_scale, voxel_scale}, {1, 0, 0, 0}, 1, bix});
   }
+
   for (auto p : archived_cloud->points) {
     Eigen::Vector3d center = {p.x, p.y, p.z};
     BlockIndex bix = layer.getBlockIndex(center.cast<float>());
@@ -370,11 +370,9 @@ void FrontierExtractor::populateDenseFrontiers(
   }
 }
 
-void FrontierExtractor::computeSparseFrontiers(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
-    const bool compute_frontier_shape,
-    const TsdfLayer& layer,
-    std::vector<Frontier>& frontiers) const {
+void FrontierExtractor::computeSparseFrontiers(const SpatialCloud::Ptr cloud,
+                                               const TsdfLayer& layer,
+                                               std::vector<Frontier>& frontiers) const {
   if (cloud->points.size() <= 0) {
     return;
   }
@@ -402,7 +400,7 @@ void FrontierExtractor::computeSparseFrontiers(
 
     BlockIndex bix = layer.getBlockIndex(centroid);
 
-    if (compute_frontier_shape) {
+    if (config.compute_frontier_shape) {
       Eigen::EigenSolver<Eigen::Matrix3f> es(cov, true);
       auto evals_complex = es.eigenvalues();
       Eigen::Vector3f evals = evals_complex.real();
@@ -417,31 +415,40 @@ void FrontierExtractor::computeSparseFrontiers(
   }
 }
 
+void FrontierExtractor::updateTsdf(const ReconstructionOutput& msg) {
+  // allocate and copy tsdf
+  const auto& tsdf_update = msg.map().getTsdfLayer();
+  if (!tsdf_) {
+    tsdf_.reset(new TsdfLayer(tsdf_update.voxel_size, tsdf_update.voxels_per_side));
+  }
+
+  for (const auto& block : tsdf_update) {
+    tsdf_->allocateBlock(block.index) = block;
+  }
+}
+
 void FrontierExtractor::detectFrontiers(const ReconstructionOutput& input,
                                         DynamicSceneGraph& graph,
                                         NearestNodeFinder& finder) {
   frontiers_.clear();
   archived_frontiers_.clear();
 
-  for (auto b : input.archived_blocks) {
-    recently_archived_blocks_.push_back(b);
-  }
+  updateTsdf(input);
 
-  const auto& tsdf = input.map().getTsdfLayer();
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::PointCloud<pcl::PointXYZ>::Ptr archived_cloud(
-      new pcl::PointCloud<pcl::PointXYZ>);
+  SpatialCloud::Ptr cloud(new SpatialCloud());
+  SpatialCloud::Ptr archived_cloud(new SpatialCloud());
 
   double min_frontier_z = input.world_t_body.z() + config.minimum_relative_z;
   double max_frontier_z = input.world_t_body.z() + config.maximum_relative_z;
 
   std::queue<BlockIndex> extra_blocks;
   IndexSet processed_extra_blocks;
-  for (const auto& idx : tsdf.allocatedBlockIndices()) {
+  for (const auto& idx : tsdf_->allocatedBlockIndices()) {
     processBlock(finder,
+                 *tsdf_,
                  idx,
+                 just_archived_blocks_.count(idx),
                  graph,
-                 input,
                  archived_places_,
                  config.max_place_radius,
                  min_frontier_z,
@@ -456,17 +463,13 @@ void FrontierExtractor::detectFrontiers(const ReconstructionOutput& input,
   while (!extra_blocks.empty()) {
     BlockIndex bix = extra_blocks.front();
     extra_blocks.pop();
-    bool skip_adding_frontiers = false;
-    if (std::find(recently_archived_blocks_.begin(),
-                  recently_archived_blocks_.end(),
-                  bix) != recently_archived_blocks_.end()) {
-      skip_adding_frontiers = true;
-    }
+    bool skip_adding_frontiers = recently_archived_blocks_.count(bix);
 
     processBlock(finder,
+                 *tsdf_,
                  bix,
+                 just_archived_blocks_.count(bix),
                  graph,
-                 input,
                  archived_places_,
                  config.max_place_radius,
                  min_frontier_z,
@@ -479,14 +482,14 @@ void FrontierExtractor::detectFrontiers(const ReconstructionOutput& input,
   }
 
   if (config.dense_frontiers) {
-    populateDenseFrontiers(cloud, archived_cloud, tsdf.voxel_size, tsdf);
+    populateDenseFrontiers(cloud, archived_cloud, *tsdf_);
   } else {
-    computeSparseFrontiers(cloud, config.compute_frontier_shape, tsdf, frontiers_);
-    computeSparseFrontiers(
-        archived_cloud, config.compute_frontier_shape, tsdf, archived_frontiers_);
+    computeSparseFrontiers(cloud, *tsdf_, frontiers_);
+    computeSparseFrontiers(archived_cloud, *tsdf_, archived_frontiers_);
   }
 
   archived_places_.clear();
+  just_archived_blocks_.clear();
 }
 
 void FrontierExtractor::addFrontiers(uint64_t timestamp_ns,
@@ -538,17 +541,37 @@ void FrontierExtractor::addFrontiers(uint64_t timestamp_ns,
   }
 }
 
-void FrontierExtractor::updateRecentBlocks(Eigen::Vector3d current_position,
+void FrontierExtractor::updateRecentBlocks(const Eigen::Vector3d& current_pos,
                                            double block_size) {
-  BlockIndices updated_archived_blocks;
-  for (BlockIndex bix : recently_archived_blocks_) {
-    Eigen::Vector3f block_origin = spatial_hash::originPointFromIndex(bix, block_size);
-    if ((block_origin - current_position.cast<float>()).norm() <
-        config.recent_block_distance) {
-      updated_archived_blocks.push_back(bix);
+  if (tsdf_ && map_window_) {
+    const Eigen::Isometry3d pose =
+        Eigen::Translation3d(current_pos) * Eigen::Quaterniond::Identity();
+    for (const auto& block : *tsdf_) {
+      if (!map_window_->inBounds(0, pose, block)) {
+        just_archived_blocks_.insert(block.index);
+      }
+    }
+
+    for (const auto& index : just_archived_blocks_) {
+      tsdf_->removeBlock(index);
     }
   }
-  recently_archived_blocks_ = updated_archived_blocks;
+
+  // remove all block indices outside the recent block distance
+  auto iter = recently_archived_blocks_.begin();
+  while (iter != recently_archived_blocks_.end()) {
+    const auto pos = spatial_hash::originPointFromIndex(*iter, block_size);
+    const auto dist = (pos - current_pos.cast<float>()).norm();
+    if (dist >= config.recent_block_distance) {
+      iter = recently_archived_blocks_.erase(iter);
+    } else {
+      ++iter;
+    }
+  }
+}
+
+void FrontierExtractor::setArchivedPlaces(const std::vector<NodeId>& archived_places) {
+  archived_places_ = archived_places;
 }
 
 void declare_config(FrontierExtractor::Config& config) {

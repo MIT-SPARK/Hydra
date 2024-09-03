@@ -48,10 +48,6 @@ void ReconstructionOutput::updateFrom(const ReconstructionOutput& msg, bool clon
   world_t_body = msg.world_t_body;
   world_R_body = msg.world_R_body;
   sensor_data = msg.sensor_data;
-
-  archived_blocks.insert(
-      archived_blocks.end(), msg.archived_blocks.begin(), msg.archived_blocks.end());
-
   if (!msg.map_) {
     LOG(ERROR) << "Reconstruction output message contained no map!";
     return;
@@ -79,10 +75,6 @@ void ReconstructionOutput::setMap(const VolumetricMap& map) {
 
 void ReconstructionOutput::setMap(const std::shared_ptr<VolumetricMap>& map) {
   map_ = map;
-}
-
-std::shared_ptr<VolumetricMap> ReconstructionOutput::getMapPointer() const {
-  return map_;
 }
 
 OutputPtr ReconstructionOutput::fromInput(const InputPacket& msg) {

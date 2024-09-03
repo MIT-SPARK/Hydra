@@ -153,4 +153,11 @@ TEST_F(VolumetricMapFixture, SaveLoadSemanticsCorrect) {
   compareVoxels(*block2, result_block2);
 }
 
+TEST(VolumetricMap, BlockSizeCorrect) {
+  VolumetricMap::Config config{0.2f, 32, 0.5f};
+  VolumetricMap map(config);
+  EXPECT_NEAR(map.blockSize(), 6.4f, 1.0e-6f);
+  EXPECT_NEAR(map.blockSize(), map.getTsdfLayer().blockSize(), 1.0e-6f);
+}
+
 }  // namespace hydra

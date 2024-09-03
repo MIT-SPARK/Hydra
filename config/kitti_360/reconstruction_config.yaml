@@ -3,14 +3,17 @@ map:
   voxels_per_side: 16
   voxel_size: 0.35
   truncation_distance: 1.0
-dense_representation_radius_m: 30.0
-mesh:
-  min_weight: 0.0001
-  integrator_threads: -1
-tsdf:
-  verbosity: 1
-  use_constant_weight: true
-  num_threads: -1
-  interpolation_method: bilinear
-  semantic_integrator:
-    type: MLESemanticIntegrator
+map_window:
+  type: spatial
+  max_radius_m: 30.0
+reconstruction:
+  mesh:
+    min_weight: 0.0001
+    integrator_threads: -1
+  tsdf:
+    verbosity: 1
+    use_constant_weight: true
+    num_threads: -1
+    interpolation_method: bilinear
+    semantic_integrator:
+      type: MLESemanticIntegrator

@@ -11,4 +11,5 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/semantic_integrator.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/tsdf_interpolators.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/volumetric_map.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/volumetric_window.cpp
 )

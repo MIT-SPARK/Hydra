@@ -88,8 +88,10 @@ MeshLayer::Ptr getActiveMesh(const MeshLayer& mesh_layer,
     if (archived_set.count(block)) {
       continue;
     }
+
     active_mesh->allocateBlock(block) = mesh_layer.getBlock(block);
   }
+
   return active_mesh;
 }
 

@@ -198,9 +198,6 @@ void MeshIntegrator::processExterior(VolumetricMap* map,
         meshBlockExterior(block_index, v_idx, *map, occupancy);
       }
     }
-
-    // TODO(nathan) push this earlier
-    // mesh->updated = true;
   }
 }
 

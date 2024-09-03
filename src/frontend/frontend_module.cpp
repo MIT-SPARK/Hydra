@@ -102,6 +102,7 @@ FrontendModule::FrontendModule(const Config& config,
       queue_(std::make_shared<FrontendInputQueue>()),
       dsg_(dsg),
       state_(state),
+      map_window_(GlobalInfo::instance().createVolumetricWindow()),
       segmenter_(new MeshSegmenter(config.object_config)),
       tracker_(config.pose_graph_tracker.create()),
       surface_places_(config.surface_places.create()),
@@ -371,22 +372,28 @@ void FrontendModule::updateImpl(const ReconstructionOutput::Ptr& msg) {
 void FrontendModule::updateMesh(const ReconstructionOutput& input) {
   {  // start timing scope
     ScopedTimer timer("frontend/mesh_archive", input.timestamp_ns, true, 1, false);
-    VLOG(5) << "[Hydra Frontend] Clearing " << input.archived_blocks.size()
-            << " blocks from mesh";
-    if (!input.archived_blocks.empty()) {
-      mesh_compression_->clearArchivedBlocks(input.archived_blocks);
-    }
+    const auto pose = input.world_T_body();
+    const auto block_size = input.map().blockSize();
+    mesh_compression_->archiveBlocks([&](const auto& index, const auto& info) {
+      if (!map_window_) {
+        return false;
+      }
+
+      if (input.map().getMeshLayer().hasBlock(index)) {
+        return false;
+      }
+
+      const VolumetricBlockInfo block(index, block_size, info.update_time_ns);
+      return !map_window_->inBounds(input.timestamp_ns, pose, block);
+    });
   }  // end timing scope
 
-  // TODO(nathan) prune archived blocks from input?
-
-  const auto& input_mesh = input.map().getMeshLayer();
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
     mesh_remapping_ = std::make_shared<kimera_pgmo::HashedIndexMapping>();
-    auto mesh = getActiveMesh(input_mesh, input.archived_blocks);
-    VLOG(5) << "[Hydra Frontend] Updating mesh with " << mesh->numBlocks() << " blocks";
-    auto interface = PgmoMeshLayerInterface(*mesh);
+    const auto& mesh = input.map().getMeshLayer();
+    auto interface = PgmoMeshLayerInterface(mesh);
+    VLOG(5) << "[Hydra Frontend] Updating mesh with " << mesh.numBlocks() << " blocks";
     last_mesh_update_ =
         mesh_compression_->update(interface, input.timestamp_ns, mesh_remapping_.get());
   }  // end timing scope
@@ -497,6 +504,7 @@ void FrontendModule::updatePlaces(const ReconstructionOutput& input) {
     // TODO(nathan) fold this into updateGraph and return archived instead
     // find node ids that are valid, but outside active place window
     active_nodes = freespace_places_->getActiveNodes();
+    std::vector<NodeId> archived_places;
     for (const auto& prev : previous_active_places_) {
       if (active_nodes.count(prev)) {
         continue;
@@ -509,15 +517,18 @@ void FrontendModule::updatePlaces(const ReconstructionOutput& input) {
 
       const auto& prev_node = *has_prev_node;
       prev_node.attributes().is_active = false;
-      if (lcd_input_) {
-        lcd_input_->archived_places.insert(prev);
-      }
-
-      if (frontier_places_) {
-        frontier_places_->archived_places_.push_back(prev);
-      }
+      archived_places.push_back(prev);
     }
+
     previous_active_places_ = active_nodes;
+    if (lcd_input_) {
+      lcd_input_->archived_places.insert(archived_places.begin(),
+                                         archived_places.end());
+    }
+
+    if (frontier_places_) {
+      frontier_places_->setArchivedPlaces(archived_places);
+    }
 
     const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
     places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
@@ -526,8 +537,6 @@ void FrontendModule::updatePlaces(const ReconstructionOutput& input) {
 
     // TODO(nathan) should also work for 2d places
     view_database_.updateAssignments(*dsg_->graph, active_nodes);
-
-    state_->latest_places = active_nodes;
   }  // end graph update critical section
 }
 

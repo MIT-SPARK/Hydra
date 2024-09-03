@@ -33,6 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/virtual_config.h>
+
 #include <array>
 #include <atomic>
 #include <iostream>
@@ -49,6 +51,7 @@
 
 // TODO(nathan) bad....
 #include "hydra/reconstruction/volumetric_map.h"
+#include "hydra/reconstruction/volumetric_window.h"
 
 namespace hydra {
 
@@ -84,6 +87,7 @@ struct PipelineConfig {
   LogConfig logs;
   FrameConfig frames;
   VolumetricMap::Config map;
+  config::VirtualConfig<VolumetricWindow> map_window{SpatialWindowChecker::Config()};
   LabelSpaceConfig label_space;
   std::map<uint32_t, std::string> label_names;
 };
@@ -139,6 +143,8 @@ class GlobalInfo {
   std::shared_ptr<const Sensor> getSensor(const std::string& name) const;
 
   std::vector<std::string> getAvailableSensors() const;
+
+  std::unique_ptr<VolumetricWindow> createVolumetricWindow() const;
 
  private:
   GlobalInfo();

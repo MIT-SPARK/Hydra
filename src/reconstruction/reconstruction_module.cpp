@@ -40,6 +40,8 @@
 #include <config_utilities/types/eigen_matrix.h>
 #include <config_utilities/validation.h>
 
+#include <chrono>
+
 #include "hydra/common/global_info.h"
 #include "hydra/input/input_conversion.h"
 #include "hydra/reconstruction/mesh_integrator.h"
@@ -50,46 +52,56 @@ namespace hydra {
 
 using timing::ScopedTimer;
 
-void declare_config(ReconstructionModule::Config& conf) {
+namespace {
+
+double diffInSeconds(uint64_t lhs, uint64_t rhs) {
+  return std::chrono::duration_cast<std::chrono::duration<double>>(
+             std::chrono::nanoseconds(lhs) - std::chrono::nanoseconds(rhs))
+      .count();
+}
+
+}  // namespace
+
+void declare_config(ReconstructionModule::Config& config) {
   using namespace config;
   name("ReconstructionConfig");
-  field(conf.show_stats, "show_stats");
-  field(conf.stats_verbosity, "stats_verbosity");
-  field(conf.clear_distant_blocks, "clear_distant_blocks");
-  field(conf.dense_representation_radius_m, "dense_representation_radius_m");
-  field(conf.num_poses_per_update, "num_poses_per_update");
-  field(conf.max_input_queue_size, "max_input_queue_size");
-  field(conf.semantic_measurement_probability, "semantic_measurement_probability");
-  field(conf.tsdf, "tsdf");
-  field(conf.mesh, "mesh");
-  conf.robot_footprint.setOptional();
-  field(conf.robot_footprint, "robot_footprint");
-  field(conf.sinks, "sinks");
+  field(config.show_stats, "show_stats");
+  field(config.stats_verbosity, "stats_verbosity");
+  field(config.full_update_separation_s, "full_update_separation_s", "s");
+  field(config.max_input_queue_size, "max_input_queue_size");
+  config.map_window.setOptional();
+  field(config.map_window, "map_window");
+  field(config.tsdf, "tsdf");
+  field(config.mesh, "mesh");
+  config.robot_footprint.setOptional();
+  field(config.robot_footprint, "robot_footprint");
+  field(config.sinks, "sinks");
 }
 
 ReconstructionModule::ReconstructionModule(const Config& config,
                                            const OutputQueue::Ptr& queue)
     : config(config::checkValid(config)),
-      num_poses_received_(0),
+      queue_(new InputPacketQueue(config.max_input_queue_size)),
+      last_update_ns_(std::nullopt),
       output_queue_(queue),
-      sinks_(Sink::instantiate(config.sinks)) {
-  queue_.reset(new InputPacketQueue());
-  queue_->max_size = config.max_input_queue_size;
+      sinks_(Sink::instantiate(config.sinks)),
+      map_(new VolumetricMap(GlobalInfo::instance().getMapConfig(), true)),
+      map_window_(config.map_window ? config.map_window.create()
+                                    : GlobalInfo::instance().createVolumetricWindow()),
+      tsdf_integrator_(std::make_unique<ProjectiveIntegrator>(config.tsdf)),
+      mesh_integrator_(std::make_unique<MeshIntegrator>(config.mesh)),
+      footprint_integrator_(config.robot_footprint.create()) {}
 
-  map_.reset(new VolumetricMap(GlobalInfo::instance().getMapConfig(), true));
-  tsdf_integrator_ = std::make_unique<ProjectiveIntegrator>(config.tsdf);
-  mesh_integrator_ = std::make_unique<MeshIntegrator>(config.mesh);
-  footprint_integrator_ = config.robot_footprint.create();
-}
-
-ReconstructionModule::~ReconstructionModule() { stop(); }
+ReconstructionModule::~ReconstructionModule() { stopImpl(); }
 
 void ReconstructionModule::start() {
   spin_thread_.reset(new std::thread(&ReconstructionModule::spin, this));
   LOG(INFO) << "[Hydra Reconstruction] started!";
 }
 
-void ReconstructionModule::stop() {
+void ReconstructionModule::stop() { stopImpl(); }
+
+void ReconstructionModule::stopImpl() {
   should_shutdown_ = true;
 
   if (spin_thread_) {
@@ -149,8 +161,9 @@ bool ReconstructionModule::spinOnce(const InputPacket& msg) {
   VLOG(2) << "[Hydra Reconstruction]: Processing msg @ " << msg.timestamp_ns;
   VLOG(2) << "[Hydra Reconstruction]: " << queue_->size() << " message(s) left";
 
-  ++num_poses_received_;
-  const bool do_full_update = (num_poses_received_ % config.num_poses_per_update == 0);
+  const bool do_full_update =
+      !last_update_ns_ || diffInSeconds(msg.timestamp_ns, last_update_ns_.value()) >=
+                              config.full_update_separation_s;
   update(msg, do_full_update);
   return do_full_update;
 }
@@ -170,15 +183,7 @@ void ReconstructionModule::fillOutput(ReconstructionOutput& msg) {
 
   timestamp_cache_.insert(ts);
   msg.timestamp_ns = ts;
-  msg.setMap(*map_);
-
-  if (!config.clear_distant_blocks) {
-    return;
-  }
-
-  const auto indices = findBlocksToArchive(msg.world_t_body.cast<float>());
-  msg.archived_blocks.insert(msg.archived_blocks.end(), indices.begin(), indices.end());
-  map_->removeBlocks(indices);
+  msg.setMap(map_->cloneUpdated());
 }
 
 bool ReconstructionModule::update(const InputPacket& msg, bool full_update) {
@@ -201,7 +206,7 @@ bool ReconstructionModule::update(const InputPacket& msg, bool full_update) {
   }
 
   auto& tsdf = map_->getTsdfLayer();
-  if (tsdf.numBlocks() == 0) {
+  if (tsdf.numBlocks() == 0 || !full_update) {
     return false;
   }
 
@@ -209,10 +214,6 @@ bool ReconstructionModule::update(const InputPacket& msg, bool full_update) {
     ScopedTimer timer("places/mesh", msg.timestamp_ns);
     mesh_integrator_->generateMesh(*map_, true, true);
   }  // timing scope
-
-  if (!full_update) {
-    return false;
-  }
 
   if (config.show_stats) {
     VLOG(config.stats_verbosity) << "Memory used: {" << map_->printStats() << "}";
@@ -223,34 +224,21 @@ bool ReconstructionModule::update(const InputPacket& msg, bool full_update) {
   fillOutput(*output);
 
   Sink::callAll(sinks_, msg.timestamp_ns, data->getSensorPose(), tsdf, *output);
-
   if (output_queue_) {
     output_queue_->push(output);
   }
 
-  for (const auto block : tsdf.blocksWithCondition(TsdfBlock::esdfUpdated)) {
-    block->esdf_updated = false;
-    block->updated = false;
+  // NOTE(nathan) this comes before clearing the update flag because we don't archive
+  // blocks that were just updated
+  if (map_window_) {
+    map_window_->archiveBlocks(msg.timestamp_ns, msg.world_T_body(), *map_);
+  }
+
+  for (const auto& block : tsdf) {
+    block.clearUpdated();
   }
 
   return true;
-}
-
-// TODO(nathan) push to map?
-BlockIndices ReconstructionModule::findBlocksToArchive(
-    const Eigen::Vector3f& center) const {
-  const auto& tsdf = map_->getTsdfLayer();
-  BlockIndices to_archive;
-  for (const auto& block : tsdf) {
-    if ((center - block.position()).norm() < config.dense_representation_radius_m) {
-      continue;
-    }
-
-    // TODO(nathan) filter by update flag?
-    to_archive.push_back(block.index);
-  }
-
-  return to_archive;
 }
 
 }  // namespace hydra

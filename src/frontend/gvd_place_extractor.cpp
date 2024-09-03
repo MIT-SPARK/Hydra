@@ -43,6 +43,7 @@
 #include "hydra/places/graph_extractor_interface.h"
 #include "hydra/places/graph_extractor_utilities.h"
 #include "hydra/places/gvd_integrator.h"
+#include "hydra/reconstruction/volumetric_window.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -80,6 +81,7 @@ void declare_config(GvdPlaceExtractor::Config& config) {
 GvdPlaceExtractor::GvdPlaceExtractor(const Config& c)
     : config(config::checkValid(c)),
       graph_extractor_(config.graph.create()),
+      map_window_(GlobalInfo::instance().createVolumetricWindow()),
       sinks_(Sink::instantiate(config.sinks)) {
   if (!graph_extractor_) {
     LOG(ERROR) << "no place graph extraction provided! disabling extraction";
@@ -156,38 +158,45 @@ std::vector<bool> GvdPlaceExtractor::inFreespace(const PositionMatrix& positions
 void GvdPlaceExtractor::detect(const ReconstructionOutput& msg) {
   ScopedTimer timer("frontend/detect_gvd", msg.timestamp_ns, true, 2, false);
 
-  const auto& map = msg.map();
-  const auto* tsdf = &map.getTsdfLayer();
-
-  TsdfLayer::Ptr tsdf_ptr;
+  TsdfLayer::Ptr downsampled_tsdf;
   if (tsdf_interpolator_) {
     ScopedTimer dtimer("frontend/downsample_tsdf", msg.timestamp_ns, true, 2, false);
-    const auto blocks = tsdf->blockIndicesWithCondition(TsdfBlock::esdfUpdated);
-    tsdf_ptr = tsdf_interpolator_->interpolate(*tsdf, &blocks);
-    for (auto& block : *tsdf_ptr) {
-      block.setUpdated();
-    }
-
-    tsdf = tsdf_ptr.get();
+    downsampled_tsdf = tsdf_interpolator_->interpolate(msg.map().getTsdfLayer());
   }
+
+  const auto& tsdf = downsampled_tsdf ? *downsampled_tsdf : msg.map().getTsdfLayer();
+  const Eigen::Isometry3d world_T_body = msg.world_T_body();
+  latest_pos_ = world_T_body.translation();
 
   if (!gvd_) {
-    gvd_.reset(new places::GvdLayer(tsdf->voxel_size, tsdf->voxels_per_side));
+    gvd_.reset(new places::GvdLayer(tsdf.voxel_size, tsdf.voxels_per_side));
     gvd_integrator_.reset(new GvdIntegrator(config.gvd, gvd_, graph_extractor_));
   }
-
-  const Eigen::Isometry3f world_T_body = msg.world_T_body().cast<float>();
-  latest_pos_ = world_T_body.translation().cast<double>();
 
   {  // start critical section
     std::unique_lock<std::mutex> lock(gvd_mutex_);
     ScopedTimer timer("places/gvd", msg.timestamp_ns);
-    gvd_integrator_->updateFromTsdf(msg.timestamp_ns, *tsdf, true);
+    // reconstruction now only sends updated blocks so we integrate everything
+    gvd_integrator_->updateFromTsdf(msg.timestamp_ns, tsdf, false, true);
     gvd_integrator_->updateGvd(msg.timestamp_ns);
-    gvd_integrator_->archiveBlocks(msg.archived_blocks);
+
+    if (map_window_) {
+      BlockIndices to_archive;
+      for (const auto& block : *gvd_) {
+        if (!map_window_->inBounds(msg.timestamp_ns, world_T_body, block)) {
+          to_archive.push_back(block.index);
+        }
+      }
+
+      gvd_integrator_->archiveBlocks(to_archive);
+    }
   }  // end critical section
 
-  Sink::callAll(sinks_, msg.timestamp_ns, world_T_body, *gvd_, graph_extractor_.get());
+  Sink::callAll(sinks_,
+                msg.timestamp_ns,
+                world_T_body.cast<float>(),
+                *gvd_,
+                graph_extractor_.get());
 }
 
 void filterInvalidNodes(const SceneGraphLayer& graph, NodeIdSet& active_nodes) {

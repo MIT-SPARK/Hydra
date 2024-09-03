@@ -100,12 +100,8 @@ struct MeshUpdater {
       return;
     }
 
-    auto mesh = getActiveMesh(msg->map().getMeshLayer(), msg->archived_blocks);
-    if (!mesh) {
-      return;
-    }
-
-    auto interface = PgmoMeshLayerInterface(*mesh);
+    const auto& mesh = msg->map().getMeshLayer();
+    auto interface = PgmoMeshLayerInterface(mesh);
     const auto delta = compression.update(interface, msg->timestamp_ns);
     delta->updateMesh(*graph->mesh());
     zmq_sender.send(*graph, true);

@@ -49,7 +49,6 @@
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/frontend/freespace_places_interface.h"
-#include "hydra/frontend/frontier_places_interface.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/surface_places_interface.h"
 #include "hydra/frontend/view_database.h"
@@ -65,7 +64,9 @@ class MeshCompression;
 
 namespace hydra {
 
+class FrontierExtractor;
 class NearestNodeFinder;
+struct VolumetricWindow;
 
 class FrontendModule : public Module {
  public:
@@ -90,7 +91,7 @@ class FrontendModule : public Module {
     config::VirtualConfig<SurfacePlacesInterface> surface_places;
     config::VirtualConfig<FreespacePlacesInterface> freespace_places;
     bool use_frontiers = false;
-    config::VirtualConfig<FrontierPlacesInterface> frontier_places;
+    config::VirtualConfig<FrontierExtractor> frontier_places;
     ViewDatabase::Config view_database;
     std::vector<Sink::Factory> sinks;
   } const config;
@@ -180,11 +181,12 @@ class FrontendModule : public Module {
   kimera_pgmo::HashedIndexMapping deformation_remapping_;
   std::shared_ptr<kimera_pgmo::HashedIndexMapping> mesh_remapping_;
 
+  std::unique_ptr<VolumetricWindow> map_window_;
   std::unique_ptr<MeshSegmenter> segmenter_;
   std::unique_ptr<PoseGraphTracker> tracker_;
   std::unique_ptr<SurfacePlacesInterface> surface_places_;
   std::unique_ptr<FreespacePlacesInterface> freespace_places_;
-  std::unique_ptr<FrontierPlacesInterface> frontier_places_;
+  std::unique_ptr<FrontierExtractor> frontier_places_;
   ViewDatabase view_database_;
 
   SceneGraphLogger frontend_graph_logger_;

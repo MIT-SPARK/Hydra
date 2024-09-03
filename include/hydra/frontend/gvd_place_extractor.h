@@ -53,6 +53,8 @@ class GvdIntegrator;
 class GraphExtractorInterface;
 }  // namespace places
 
+struct VolumetricWindow;
+
 class GvdPlaceExtractor : public FreespacePlacesInterface {
  public:
   using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
@@ -102,6 +104,7 @@ class GvdPlaceExtractor : public FreespacePlacesInterface {
   std::shared_ptr<places::GraphExtractorInterface> graph_extractor_;
   std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
   std::unique_ptr<TsdfInterpolator> tsdf_interpolator_;
+  std::unique_ptr<VolumetricWindow> map_window_;
   NodeIdSet active_nodes_;
   Eigen::Vector3d latest_pos_;
   Sink::List sinks_;

@@ -242,6 +242,31 @@ std::unique_ptr<VolumetricMap> VolumetricMap::clone() const {
   return std::make_unique<VolumetricMap>(*this);
 }
 
+std::unique_ptr<VolumetricMap> VolumetricMap::cloneUpdated() const {
+  auto map = std::make_unique<VolumetricMap>(
+      config, semantic_layer_ != nullptr, tracking_layer_ != nullptr);
+  const auto blocks = tsdf_layer_.blockIndicesWithCondition(
+      [](const auto& block) { return block.updated; });
+  for (const auto& idx : blocks) {
+    map->tsdf_layer_.allocateBlock(idx) = tsdf_layer_.getBlock(idx);
+    if (mesh_layer_.hasBlock(idx)) {
+      map->mesh_layer_.allocateBlock(idx) = mesh_layer_.getBlock(idx);
+    }
+
+    if (semantic_layer_) {
+      // other semantic layer is always allocated if this semantic layer exists
+      map->semantic_layer_->allocateBlock(idx) = semantic_layer_->getBlock(idx);
+    }
+
+    if (tracking_layer_) {
+      // other tracking layer is always allocated if this tracking layer exists
+      map->tracking_layer_->allocateBlock(idx) = tracking_layer_->getBlock(idx);
+    }
+  }
+
+  return map;
+}
+
 void VolumetricMap::updateFrom(const VolumetricMap& other) {
   const auto has_semantics =
       semantic_layer_ != nullptr && other.semantic_layer_ != nullptr;

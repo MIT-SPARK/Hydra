@@ -153,6 +153,8 @@ class VolumetricMap {
 
   virtual std::unique_ptr<VolumetricMap> clone() const;
 
+  virtual std::unique_ptr<VolumetricMap> cloneUpdated() const;
+
   virtual void updateFrom(const VolumetricMap& other);
 
  protected:

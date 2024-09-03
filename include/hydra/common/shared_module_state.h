@@ -45,7 +45,6 @@ struct SharedModuleState {
 
   ~SharedModuleState();
 
-  std::unordered_set<spark_dsg::NodeId> latest_places;
   SharedDsgInfo::Ptr lcd_graph;
   SharedDsgInfo::Ptr backend_graph;
 };

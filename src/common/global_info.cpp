@@ -93,25 +93,27 @@ void declare_config(FrameConfig& frames) {
   field(frames.map, "map_frame");
 }
 
-void declare_config(PipelineConfig& conf) {
+void declare_config(PipelineConfig& config) {
   using namespace config;
   name("PipelineConfig");
-  field(conf.enable_reconstruction, "enable_reconstruction");
-  field(conf.enable_lcd, "enable_lcd");
-  field(conf.enable_places, "enable_places");
-  field(conf.timing_disabled, "timing_disabled");
-  field(conf.disable_timer_output, "disable_timer_output");
-  field(conf.enable_pgmo_logging, "enable_pgmo_logging");
-  field(conf.default_verbosity, "default_verbosity");
-  field(conf.default_num_threads, "default_num_threads");
-  field(conf.store_visualization_details, "store_visualization_details");
-  field(conf.map, "reconstruction/map");
-  field<LabelNameConversion>(conf.label_names, "label_names");
+  field(config.enable_reconstruction, "enable_reconstruction");
+  field(config.enable_lcd, "enable_lcd");
+  field(config.enable_places, "enable_places");
+  field(config.timing_disabled, "timing_disabled");
+  field(config.disable_timer_output, "disable_timer_output");
+  field(config.enable_pgmo_logging, "enable_pgmo_logging");
+  field(config.default_verbosity, "default_verbosity");
+  field(config.default_num_threads, "default_num_threads");
+  field(config.store_visualization_details, "store_visualization_details");
+  field(config.map, "map");
+  config.map_window.setOptional();
+  field(config.map_window, "map_window");
+  field<LabelNameConversion>(config.label_names, "label_names");
 
   // the following subconfigs should not be namespaced
-  field(conf.logs, "logs", false);
-  field(conf.frames, "frames", false);
-  field(conf.label_space, "label_space", false);
+  field(config.logs, "logs", false);
+  field(config.frames, "frames", false);
+  field(config.label_space, "label_space", false);
 }
 
 void saveTimingInformation(const LogSetup& log_config) {
@@ -288,6 +290,10 @@ std::vector<std::string> GlobalInfo::getAvailableSensors() const {
   }
 
   return names;
+}
+
+std::unique_ptr<VolumetricWindow> GlobalInfo::createVolumetricWindow() const {
+  return config_.map_window.create();
 }
 
 std::ostream& operator<<(std::ostream& out, const GlobalInfo& config) {
