@@ -66,8 +66,6 @@ using hydra::timing::ScopedTimer;
 void declare_config(FrontendModule::Config& config) {
   using namespace config;
   name("FrontendModule::Config");
-  field(config.min_object_vertices, "min_object_vertices");
-  field(config.min_object_vertices, "min_object_vertices");
   field(config.lcd_use_bow_vectors, "lcd_use_bow_vectors");
 
   {
@@ -103,7 +101,9 @@ FrontendModule::FrontendModule(const Config& config,
       dsg_(dsg),
       state_(state),
       map_window_(GlobalInfo::instance().createVolumetricWindow()),
-      segmenter_(new MeshSegmenter(config.object_config)),
+      segmenter_(new MeshSegmenter(
+          config.object_config,
+          GlobalInfo::instance().getLabelSpaceConfig().object_labels)),
       tracker_(config.pose_graph_tracker.create()),
       surface_places_(config.surface_places.create()),
       freespace_places_(config.freespace_places.create()),
@@ -136,6 +136,21 @@ FrontendModule::FrontendModule(const Config& config,
     frontend_graph_logger_.setLayerName(DsgLayers::MESH_PLACES, "places 2d");
   }
 
+  addInputCallback(std::bind(&FrontendModule::updateMesh, this, std::placeholders::_1));
+  addInputCallback(
+      std::bind(&FrontendModule::updateDeformationGraph, this, std::placeholders::_1));
+  addInputCallback(
+      std::bind(&FrontendModule::updatePoseGraph, this, std::placeholders::_1));
+  addInputCallback(
+      std::bind(&FrontendModule::updatePlaces, this, std::placeholders::_1));
+  addInputCallback(
+      std::bind(&FrontendModule::updateFrontiers, this, std::placeholders::_1));
+
+  addPostMeshCallback(
+      std::bind(&FrontendModule::updateObjects, this, std::placeholders::_1));
+  addPostMeshCallback(
+      std::bind(&FrontendModule::updatePlaces2d, this, std::placeholders::_1));
+
   if (config.lcd_use_bow_vectors) {
     PipelineQueues::instance().bow_queue.reset(new PipelineQueues::BowQueue());
   }
@@ -146,29 +161,7 @@ FrontendModule::~FrontendModule() {
   stopImpl();
 }
 
-void FrontendModule::initCallbacks() {
-  initialized_ = true;
-  input_callbacks_.clear();
-  input_callbacks_.push_back(
-      std::bind(&FrontendModule::updateMesh, this, std::placeholders::_1));
-  input_callbacks_.push_back(
-      std::bind(&FrontendModule::updateDeformationGraph, this, std::placeholders::_1));
-  input_callbacks_.push_back(
-      std::bind(&FrontendModule::updatePoseGraph, this, std::placeholders::_1));
-  input_callbacks_.push_back(
-      std::bind(&FrontendModule::updatePlaces, this, std::placeholders::_1));
-  input_callbacks_.push_back(
-      std::bind(&FrontendModule::updateFrontiers, this, std::placeholders::_1));
-
-  post_mesh_callbacks_.clear();
-  post_mesh_callbacks_.push_back(
-      std::bind(&FrontendModule::updateObjects, this, std::placeholders::_1));
-  post_mesh_callbacks_.push_back(
-      std::bind(&FrontendModule::updatePlaces2d, this, std::placeholders::_1));
-}
-
 void FrontendModule::start() {
-  initCallbacks();
   spin_thread_.reset(new std::thread(&FrontendModule::spin, this));
   LOG(INFO) << "[Hydra Frontend] started!";
 }
@@ -291,16 +284,26 @@ void FrontendModule::addSink(const Sink::Ptr& sink) {
   }
 }
 
+void FrontendModule::addInputCallback(InputCallback callback) {
+  input_callbacks_.push_back([callback](ReconstructionOutput::Ptr msg) {
+    if (!msg) {
+      return;
+    }
+
+    callback(*msg);
+  });
+}
+
+void FrontendModule::addPostMeshCallback(InputCallback callback) {
+  post_mesh_callbacks_.push_back(callback);
+}
+
 void FrontendModule::dispatchSpin(ReconstructionOutput::Ptr msg) {
   spinOnce(msg);
   spin_finished_ = true;
 }
 
 void FrontendModule::spinOnce(const ReconstructionOutput::Ptr& msg) {
-  if (!initialized_) {
-    initCallbacks();
-  }
-
   auto& queues = PipelineQueues::instance();
 
   VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg->timestamp_ns << " [ns]";
@@ -352,20 +355,12 @@ void FrontendModule::spinOnce(const ReconstructionOutput::Ptr& msg) {
 }
 
 void FrontendModule::updateImpl(const ReconstructionOutput::Ptr& msg) {
-  // TODO(nathan) make this more formal
-  if (input_dispatches_.size() != input_callbacks_.size()) {
-    // initialize dispatch versions of callbacks if not initialized
-    input_dispatches_.clear();
-    for (size_t i = 0; i < input_callbacks_.size(); ++i) {
-      input_dispatches_.push_back(
-          [this, i](const auto& msg_ptr) { input_callbacks_.at(i)(*msg_ptr); });
-    }
-  }
-
   {  // start timing scope
     ScopedTimer timer("frontend/launch_callbacks", msg->timestamp_ns, true, 1, false);
-    launchCallbacks(input_dispatches_, msg);
+    launchCallbacks(input_callbacks_, msg);
   }
+
+  // TODO(nathan) move interlayer edges here
   updatePlaceMeshMapping(*msg);
 }
 
@@ -403,11 +398,9 @@ void FrontendModule::updateMesh(const ReconstructionOutput& input) {
     // nothing else uses it at the moment
     ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
     last_mesh_update_->updateMesh(*dsg_->graph->mesh());
-    invalidateMeshEdges(*last_mesh_update_);
   }  // end timing scope
 
-  ScopedTimer timer(
-      "frontend/launch_postmesh_callbacks", input.timestamp_ns, true, 1, false);
+  ScopedTimer timer("frontend/postmesh_callbacks", input.timestamp_ns, true, 1, false);
   launchCallbacks(post_mesh_callbacks_, input);
 }
 
@@ -417,20 +410,15 @@ void FrontendModule::updateObjects(const ReconstructionOutput& input) {
     return;
   }
 
-  const auto clusters =
-      segmenter_->detect(input.timestamp_ns, *last_mesh_update_, std::nullopt);
+  const auto timestamp = input.timestamp_ns;
+  const auto clusters = segmenter_->detect(timestamp, *last_mesh_update_);
 
   {  // start dsg critical section
     std::unique_lock<std::mutex> lock(dsg_->mutex);
-    segmenter_->updateGraph(input.timestamp_ns,
-                            clusters,
-                            last_mesh_update_->getTotalArchivedVertices(),
-                            *dsg_->graph);
-    addPlaceObjectEdges(input.timestamp_ns);
+    segmenter_->updateGraph(timestamp, *last_mesh_update_, clusters, *dsg_->graph);
+    addPlaceObjectEdges(timestamp);
   }  // end dsg critical section
 }
-
-using PgmoCloud = pcl::PointCloud<pcl::PointXYZRGBA>;
 
 void FrontendModule::updateDeformationGraph(const ReconstructionOutput& input) {
   ScopedTimer timer("frontend/dgraph_compresssion", input.timestamp_ns, true, 1, false);
@@ -440,7 +428,7 @@ void FrontendModule::updateDeformationGraph(const ReconstructionOutput& input) {
       std::chrono::duration_cast<std::chrono::duration<double>>(time_ns).count();
   auto interface = PgmoMeshLayerInterface(input.map().getMeshLayer());
 
-  PgmoCloud new_vertices;
+  pcl::PointCloud<pcl::PointXYZRGBA> new_vertices;
   std::vector<size_t> new_indices;
   std::vector<pcl::Vertices> new_triangles;
   deformation_compression_->pruneStoredMesh(time_s - config.pgmo.time_horizon);
@@ -451,7 +439,8 @@ void FrontendModule::updateDeformationGraph(const ReconstructionOutput& input) {
                                                  deformation_remapping_,
                                                  time_s);
 
-  PgmoCloud::Ptr vertices(new PgmoCloud());
+  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr vertices(
+      new pcl::PointCloud<pcl::PointXYZRGBA>());
   deformation_compression_->getVertices(vertices);
 
   std::vector<kimera_pgmo::Edge> new_edges;
@@ -471,23 +460,21 @@ void FrontendModule::updateFrontiers(const ReconstructionOutput& input) {
     return;
   }
 
+  const auto timestamp = input.timestamp_ns;
   frontier_places_->updateRecentBlocks(input.world_t_body, input.map().blockSize());
 
   {  // start graph critical section
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
 
-    {  // start timing scope
-      ScopedTimer timer("frontend/frontiers", input.timestamp_ns, true, 1, false);
-      NodeIdSet active_nodes = freespace_places_->getActiveNodes();
+    ScopedTimer timer("frontend/frontiers", timestamp, true, 1, false);
+    NodeIdSet active_nodes = freespace_places_->getActiveNodes();
 
-      const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
-      places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
+    const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
+    places_nn_finder_.reset(new NearestNodeFinder(places, active_nodes));
 
-      frontier_places_->detectFrontiers(input, *dsg_->graph, *places_nn_finder_);
-      frontier_places_->addFrontiers(
-          input.timestamp_ns, *dsg_->graph, *places_nn_finder_);
-    }  // end timing scope
-  }    // end graph update critical section
+    frontier_places_->detectFrontiers(input, *dsg_->graph, *places_nn_finder_);
+    frontier_places_->addFrontiers(timestamp, *dsg_->graph, *places_nn_finder_);
+  }  // end graph update critical section
 }
 
 void FrontendModule::updatePlaces(const ReconstructionOutput& input) {
@@ -632,7 +619,7 @@ void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
   assignBowVectors(agents);
 }
 
-void FrontendModule::assignBowVectors(const DynamicLayer& agents) {
+void FrontendModule::assignBowVectors(const DynamicSceneGraphLayer& agents) {
   auto& queue = PipelineQueues::instance().bow_queue;
   if (!queue) {
     return;
@@ -682,43 +669,6 @@ void FrontendModule::assignBowVectors(const DynamicLayer& agents) {
   size_t num_assigned = prior_size - cached_bow_messages_.size();
   VLOG(3) << "[Hydra Frontend] assigned " << num_assigned << " bow vectors of "
           << prior_size << " original";
-}
-
-void FrontendModule::invalidateMeshEdges(const kimera_pgmo::MeshDelta& delta) {
-  if (config.min_object_vertices == 0) {
-    return;
-  }
-
-  std::unique_lock<std::mutex> lock(dsg_->mutex);
-
-  std::vector<NodeId> objects_to_delete;
-  const auto& objects = dsg_->graph->getLayer(DsgLayers::OBJECTS);
-  for (const auto& id_node_pair : objects.nodes()) {
-    auto& attrs = id_node_pair.second->attributes<ObjectNodeAttributes>();
-
-    auto iter = attrs.mesh_connections.begin();
-    while (iter != attrs.mesh_connections.end()) {
-      if (delta.deleted_indices.count(*iter)) {
-        iter = attrs.mesh_connections.erase(iter);
-        continue;
-      }
-
-      auto map_iter = delta.prev_to_curr.find(*iter);
-      if (map_iter != delta.prev_to_curr.end()) {
-        *iter = map_iter->second;
-      }
-
-      ++iter;
-    }
-
-    if (attrs.mesh_connections.size() < config.min_object_vertices) {
-      objects_to_delete.push_back(id_node_pair.first);
-    }
-  }
-
-  for (const auto& node : objects_to_delete) {
-    dsg_->graph->removeNode(node);
-  }
 }
 
 void FrontendModule::archivePlaces2d(const NodeIdSet active_places) {

@@ -41,6 +41,7 @@ DEFINE_double(max_distance_m, 4.5, "max distance");
 DEFINE_string(tsdf_file, "", "tsdf file to read");
 DEFINE_string(dsg_file, "", "dsg file to read");
 DEFINE_string(gvd_config, "", "gvd integrator config");
+DEFINE_int32(min_basis, 1, "minimum extra basis points to be considered a place");
 
 int main(int argc, char* argv[]) {
   FLAGS_minloglevel = 3;
@@ -69,7 +70,7 @@ int main(int argc, char* argv[]) {
     LOG(FATAL) << "Unable to construct place evaluator.";
   }
 
-  const auto metrics = evaluator->eval(FLAGS_dsg_file);
+  const auto metrics = evaluator->eval(FLAGS_dsg_file, FLAGS_min_basis);
   if (!metrics.is_valid) {
     LOG(FATAL) << "Unable to evaluate invalid graph!";
   }

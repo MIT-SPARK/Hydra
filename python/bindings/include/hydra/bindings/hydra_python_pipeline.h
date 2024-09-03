@@ -57,8 +57,6 @@ struct PythonCamera {
 
 class HydraPythonPipeline : public HydraPipeline {
  public:
-  using PositionMatrix = FrontendModule::PositionMatrix;
-
   HydraPythonPipeline(const PipelineConfig& config,
                       int robot_id = 0,
                       int config_verbosity = 0,

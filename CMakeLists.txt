@@ -61,8 +61,17 @@ if(HYDRA_ENABLE_GNN)
 endif()
 
 if(HYDRA_ENABLE_COVERAGE)
-  target_compile_options(${PROJECT_NAME} PRIVATE --coverage)
-  target_link_options(${PROJECT_NAME} PRIVATE --coverage)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    target_compile_options(
+      ${PROJECT_NAME} PRIVATE -fprofile-instr-generate -fcoverage-mapping
+    )
+    target_link_options(
+      ${PROJECT_NAME} PRIVATE -fprofile-instr-generate -fcoverage-mapping
+    )
+  else()
+    target_compile_options(${PROJECT_NAME} PRIVATE --coverage)
+    target_link_options(${PROJECT_NAME} PRIVATE --coverage)
+  endif()
 endif()
 
 if(HYDRA_ENABLE_EVAL)

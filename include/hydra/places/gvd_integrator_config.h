@@ -55,11 +55,8 @@ struct GvdIntegratorConfig {
   float min_distance_m = 0.2f;
   float min_diff_m = 1.0e-3f;
   float min_weight = 1.0e-6f;
-  int num_buckets = 20;
-  bool multi_queue = false;
   bool refine_voxel_pos = false;
   bool positive_distance_only = true;
-  uint8_t min_basis_for_extraction = 3;
   VoronoiCheckConfig voronoi_config;
 };
 

@@ -43,7 +43,7 @@
 namespace hydra {
 
 struct ProjectiveIntegratorConfig {
-  int verbosity = 4;
+  int verbosity = GlobalInfo::instance().getConfig().default_verbosity;
 
   // If true, drop off the weight behind the surface crossing.
   bool use_weight_dropoff = true;

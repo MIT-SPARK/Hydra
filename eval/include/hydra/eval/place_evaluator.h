@@ -50,7 +50,7 @@ class PlaceEvaluator {
 
   void computeGroundTruth(const places::GvdIntegratorConfig& config);
 
-  PlaceMetrics eval(const std::string& graph_filepath) const;
+  PlaceMetrics eval(const std::string& graph_filepath, uint8_t min_basis) const;
 
  public:
   static PlaceEvaluator::Ptr fromFile(const std::string& config_filepath,

@@ -7,12 +7,7 @@ map_window:
   type: spatial
   max_radius_m: 8.0
 reconstruction:
-  mesh:
-    min_weight: 0.0001
-    integrator_threads: -1
   tsdf:
-    verbosity: 1
-    num_threads: -1
     interpolation_method: bilinear
     semantic_integrator:
       type: MLESemanticIntegrator

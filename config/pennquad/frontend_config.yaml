@@ -1,30 +1,27 @@
 ---
 pgmo:
-  time_horizon: 15.0
+  time_horizon: 100.0
   d_graph_resolution: 2.5
   mesh_resolution: 0.005
 objects:
-  min_cluster_size: 40
-  cluster_tolerance: 0.25
-filter_places: true
-min_places_component_size: 3
+  min_cluster_size: 25
+  cluster_tolerance: 0.18
 surface_places:
   type: place_2d
   prefix: P
-  pure_final_place_size: 3
+  pure_final_place_size: 1
   enable_place_purity: false
   impure_final_place_size: 1
   cluster_tolerance: .3
   min_cluster_size: 50
   max_cluster_size: 100000
   min_final_place_points: 10
-  place_max_neighbor_z_diff: .5
+  place_max_neighbor_z_diff: 100
   place_overlap_threshold: 0.0
 freespace_places:
   type: gvd
   filter_places: true
   min_places_component_size: 3
-  filter_ground: false
   gvd:
     max_distance_m: 4.5
     min_distance_m: 0.2
@@ -36,11 +33,20 @@ freespace_places:
       parent_cos_angle_separation: 0.2
   graph:
     type: CompressionGraphExtractor
-    compression_distance_m: 1.5
+    compression_distance_m: 1.0
     min_node_distance_m: 0.4
     min_edge_distance_m: 0.25
-    node_merge_distance_m: 0.7
+    node_merge_distance_m: 0.5
     add_heuristic_edges: false
-    add_overlap_edges: true
-    add_freespace_edges: false
-    merge_policy: distance
+use_frontiers: true
+frontier_places:
+  type: voxel_clustering
+  cluster_tolerance: 0.3
+  min_cluster_size: 10
+  max_cluster_size: 100000
+  max_place_radius: 5
+  dense_frontiers: false
+  frontier_splitting_threshold: 0.3
+  point_threshold: 10
+  culling_point_threshold: 50
+  recent_block_distance: 25

@@ -21,6 +21,7 @@ add_executable(
   input/test_lidar.cpp
   input/test_sensor.cpp
   input/test_sensor_utilities.cpp
+  frontend/test_mesh_segmenter.cpp
   loop_closure/test_descriptor_matching.cpp
   loop_closure/test_detector.cpp
   loop_closure/test_registration.cpp

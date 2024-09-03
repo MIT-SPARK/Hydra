@@ -72,13 +72,10 @@ class FrontendModule : public Module {
  public:
   using Ptr = std::shared_ptr<FrontendModule>;
   using FrontendInputQueue = InputQueue<ReconstructionOutput::Ptr>;
-  using DynamicLayer = DynamicSceneGraphLayer;
-  using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
   using InputCallback = std::function<void(const ReconstructionOutput&)>;
   using Sink = OutputSink<uint64_t, const DynamicSceneGraph&, const BackendInput&>;
 
   struct Config {
-    size_t min_object_vertices = 20;
     bool lcd_use_bow_vectors = true;
     struct DeformationConfig {
       double mesh_resolution = 0.1;
@@ -120,7 +117,9 @@ class FrontendModule : public Module {
   void addSink(const Sink::Ptr& sink);
 
  protected:
-  virtual void initCallbacks();
+  void addInputCallback(InputCallback callback);
+
+  void addPostMeshCallback(InputCallback callback);
 
   void dispatchSpin(ReconstructionOutput::Ptr msg);
 
@@ -144,9 +143,7 @@ class FrontendModule : public Module {
   void updatePoseGraph(const ReconstructionOutput& msg);
 
  protected:
-  void assignBowVectors(const DynamicLayer& agents);
-
-  void invalidateMeshEdges(const kimera_pgmo::MeshDelta& delta);
+  void assignBowVectors(const DynamicSceneGraphLayer& agents);
 
   void archivePlaces2d(const NodeIdSet active_places);
 
@@ -159,8 +156,6 @@ class FrontendModule : public Module {
   void updatePlaceMeshMapping(const ReconstructionOutput& input);
 
  protected:
-  using InputPtrCallback = std::function<void(const ReconstructionOutput::Ptr&)>;
-
   bool initialized_ = false;
   mutable std::mutex gvd_mutex_;
   std::atomic<bool> should_shutdown_{false};
@@ -201,9 +196,6 @@ class FrontendModule : public Module {
   std::map<LayerPrefix, std::set<size_t>> active_agent_nodes_;
   std::list<pose_graph_tools::BowQuery::ConstPtr> cached_bow_messages_;
 
-  std::vector<InputCallback> input_callbacks_;
-  std::vector<InputPtrCallback> input_dispatches_;
-  std::vector<InputCallback> post_mesh_callbacks_;
   Sink::List sinks_;
 
   // TODO(lschmid): This mutex currently simply locks all data for manipulation.
@@ -211,6 +203,9 @@ class FrontendModule : public Module {
 
  private:
   void stopImpl();
+
+  std::vector<std::function<void(ReconstructionOutput::Ptr)>> input_callbacks_;
+  std::vector<std::function<void(const ReconstructionOutput&)>> post_mesh_callbacks_;
 
   inline static const auto registration_ =
       config::RegistrationWithConfig<FrontendModule,

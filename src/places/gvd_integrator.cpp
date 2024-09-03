@@ -211,7 +211,9 @@ void GvdIntegrator::updateGvdVoxel(const GlobalIndex& voxel_index,
 
   voxel.num_extra_basis = new_basis;
 
-  if (graph_extractor_ && voxel.num_extra_basis == config_.min_basis_for_extraction) {
+  // pushes the new gvd member to the graph extractor on the first instance that the
+  // voxel is observed
+  if (graph_extractor_ && voxel.num_extra_basis == 1) {
     graph_extractor_->pushGvdIndex(voxel_index);
   }
 }
@@ -257,8 +259,8 @@ void GvdIntegrator::propagateSurface(const BlockIndex& block_index,
   const auto& tsdf_block = tsdf.getBlock(block_index);
   auto& gvd_block = gvd_layer_->allocateBlock(block_index);
 
-  // TODO(nathan) need to enforce that this is smaller than the truncation distance otherwise
-  // updated blocks in free-space will clear the ESDF
+  // TODO(nathan) need to enforce that this is smaller than the truncation distance
+  // otherwise updated blocks in free-space will clear the ESDF
   const auto surface_threshold = std::sqrt(3.0) * tsdf.voxel_size / 2.0;
   for (size_t idx = 0u; idx < tsdf_block.numVoxels(); ++idx) {
     const auto& tsdf_voxel = tsdf_block.getVoxel(idx);

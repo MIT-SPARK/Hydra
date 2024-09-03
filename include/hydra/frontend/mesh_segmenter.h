@@ -63,32 +63,28 @@ class MeshSegmenter {
   struct Config {
     char prefix = 'O';
     LayerId layer_id = DsgLayers::OBJECTS;
-    double active_index_horizon_m = 7.0;
     double cluster_tolerance = 0.25;
     size_t min_cluster_size = 40;
     size_t max_cluster_size = 100000;
-    float angle_step = 10.0f;
     BoundingBox::Type bounding_box_type = BoundingBox::Type::AABB;
-    std::set<uint32_t> labels;
     std::string timer_namespace = "frontend/objects";
     std::vector<Sink::Factory> sinks;
   } const config;
 
-  explicit MeshSegmenter(const Config& config);
+  explicit MeshSegmenter(const Config& config, const std::set<uint32_t>& labels);
 
   LabelClusters detect(uint64_t timestamp_ns,
-                       const kimera_pgmo::MeshDelta& active,
-                       const std::optional<Eigen::Vector3d>& pos);
+                       const kimera_pgmo::MeshDelta& active);
 
   void updateGraph(uint64_t timestamp,
+                   const kimera_pgmo::MeshDelta& active,
                    const LabelClusters& clusters,
-                   size_t num_archived_vertices,
                    DynamicSceneGraph& graph);
 
   std::unordered_set<NodeId> getActiveNodes() const;
 
  private:
-  void archiveOldNodes(const DynamicSceneGraph& graph, size_t num_archived_vertices);
+  void updateOldNodes(const kimera_pgmo::MeshDelta& active, DynamicSceneGraph& graph);
 
   void addNodeToGraph(DynamicSceneGraph& graph,
                       const Cluster& cluster,
@@ -104,6 +100,7 @@ class MeshSegmenter {
 
  private:
   NodeSymbol next_node_id_;
+  std::set<uint32_t> labels_;
   std::map<uint32_t, std::set<NodeId>> active_nodes_;
   Sink::List sinks_;
 };
