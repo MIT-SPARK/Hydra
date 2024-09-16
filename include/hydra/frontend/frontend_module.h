@@ -156,7 +156,7 @@ class FrontendModule : public Module {
   void updatePlaceMeshMapping(const ReconstructionOutput& input);
 
  protected:
-  bool initialized_ = false;
+  uint64_t sequence_number_;
   mutable std::mutex gvd_mutex_;
   std::atomic<bool> should_shutdown_{false};
   std::unique_ptr<std::thread> spin_thread_;

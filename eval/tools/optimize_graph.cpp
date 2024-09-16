@@ -90,7 +90,6 @@ void optimize_graph(const OptimizationConfig& info) {
   SharedModuleState::Ptr state(new SharedModuleState());
   state->backend_graph = std::make_shared<SharedDsgInfo>(global_config.layer_id_map);
   state->backend_graph->graph = spark_dsg::DynamicSceneGraph::load(info.graph);
-  state->backend_graph->last_update_time = 1;
 
   auto dsg = state->backend_graph->clone();
   const auto config = config::fromYamlFile<BackendModule::Config>(info.config_path);
@@ -99,11 +98,7 @@ void optimize_graph(const OptimizationConfig& info) {
   backend.loadState(info.graph, info.deformation_graph);
   LOG(INFO) << "Loaded backend state!";
 
-  // TODO(nathan) actuall trigger optimization
-  BackendInput input;
-  input.timestamp_ns = 0;
-  backend.spinOnce(input, true);
-
+  backend.step(true);  // forces optimization even if no loop closures set
   if (!info.output.empty()) {
     LOG(INFO) << "Saving optimized graph to " << info.output;
     dsg->graph->save(info.output);

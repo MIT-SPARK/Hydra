@@ -48,6 +48,7 @@
 #include "hydra/input/camera.h"
 
 #include <config_utilities/config_utilities.h>
+#include <config_utilities/parsing/yaml.h>
 
 #include <unordered_map>
 #include <vector>
@@ -217,8 +218,8 @@ cv::Mat Camera::computeRangeImage(const cv::Mat& depth_image,
                                   float* max_range) const {
   // Compute the range (=radial distance) from the pointcloud.
   cv::Mat range_image(depth_image.size(), CV_32FC1);
-  const float fx_inv = 1.f / config_.fx;
-  const float fy_inv = 1.f / config_.fy;
+  const float fx_inv = 1.0f / config_.fx;
+  const float fy_inv = 1.0f / config_.fy;
   if (min_range) {
     *min_range = std::numeric_limits<float>::max();
   }
@@ -247,5 +248,7 @@ cv::Mat Camera::computeRangeImage(const cv::Mat& depth_image,
 
   return range_image;
 }
+
+YAML::Node Camera::dump() const { return config::toYaml(config_); }
 
 }  // namespace hydra

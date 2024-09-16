@@ -106,6 +106,8 @@ class Camera : public Sensor {
                             float* min_range,
                             float* max_range) const;
 
+  YAML::Node dump() const override;
+
  private:
   const Config config_;
 

@@ -44,6 +44,7 @@ namespace hydra {
 struct LcdInput {
   using Ptr = std::shared_ptr<LcdInput>;
   uint64_t timestamp_ns;
+  uint64_t sequence_number;
   std::unordered_set<spark_dsg::NodeId> archived_places;
   std::vector<spark_dsg::NodeId> new_agent_nodes;
 };

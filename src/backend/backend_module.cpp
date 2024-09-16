@@ -41,6 +41,7 @@
 #include <kimera_pgmo/utils/mesh_io.h>
 
 #include "hydra/backend/backend_utilities.h"
+#include "hydra/backend/mst_factors.h"
 #include "hydra/common/global_info.h"
 #include "hydra/common/launch_callbacks.h"
 #include "hydra/common/pipeline_queues.h"
@@ -222,56 +223,68 @@ void BackendModule::spin() {
       continue;
     }
 
-    spinOnce(*queue.front(), false);
-    queue.pop();
+    spinOnce(false);
   }
+}
+
+bool BackendModule::step(bool force_optimize) {
+  const bool prev_force_optimize = force_optimize_;
+  force_optimize_ |= force_optimize;
+  const auto updated = spinOnce(true);
+  force_optimize_ = prev_force_optimize;
+  return updated;
 }
 
 bool BackendModule::spinOnce(bool force_update) {
   auto& queue = PipelineQueues::instance().backend_queue;
   bool has_data = queue.poll();
-  if (!has_data) {
+  if (!has_data && !force_update) {
     return false;
   }
 
-  spinOnce(*queue.front(), force_update);
-  queue.pop();
-  return true;
-}
+  uint64_t timestamp_ns = 0;
 
-void BackendModule::spinOnce(const BackendInput& input, bool force_update) {
   status_.reset();
   std::lock_guard<std::mutex> lock(mutex_);
+  if (has_data) {
+    const auto packet = queue.front();
+    queue.pop();
+    const auto& input = *packet;
+    timestamp_ns = input.timestamp_ns;
+    last_sequence_number_ = input.sequence_number;
 
-  ScopedTimer timer("backend/update", input.timestamp_ns);
-  updateFactorGraph(input);
+    updateFactorGraph(input);
+    copyMeshDelta(input);
+  }
+
+  ScopedTimer timer("backend/update", timestamp_ns);
   updateFromLcdQueue();
   status_.total_loop_closures = num_loop_closures_;
 
-  copyMeshDelta(input);
-  if (!updatePrivateDsg(input.timestamp_ns, force_update)) {
-    VLOG(2) << "Backend skipping input @ " << input.timestamp_ns << " [ns]";
+  if (!updatePrivateDsg(timestamp_ns, force_update)) {
+    VLOG(2) << "Backend skipping input @ " << timestamp_ns << " [ns]";
     // we only read from the frontend dsg if we've processed all the
     // factor graph update packets (as long as force_update is false)
     // we still log the status for each received frontend packet
     logStatus();
-    return;
+    return true;
   }
 
   timer.reset("backend/spin");
-  if (config.optimize_on_lc && have_loopclosures_) {
-    optimize(input.timestamp_ns);
+  if ((config.optimize_on_lc && have_loopclosures_) || force_optimize_) {
+    optimize(timestamp_ns);
   } else {
-    updateDsgMesh(input.timestamp_ns);
-    callUpdateFunctions(input.timestamp_ns);
+    updateDsgMesh(timestamp_ns);
+    callUpdateFunctions(timestamp_ns);
   }
 
   if (logs_) {
     logStatus();
   }
 
-  ScopedTimer sink_timer("backend/sinks", input.timestamp_ns);
-  Sink::callAll(sinks_, input.timestamp_ns, *private_dsg_->graph, *deformation_graph_);
+  ScopedTimer sink_timer("backend/sinks", timestamp_ns);
+  Sink::callAll(sinks_, timestamp_ns, *private_dsg_->graph, *deformation_graph_);
+  return true;
 }
 
 void BackendModule::loadState(const std::filesystem::path& mesh_path,
@@ -332,34 +345,28 @@ void BackendModule::setSolverParams() {
 void BackendModule::updateFactorGraph(const BackendInput& input) {
   ScopedTimer timer("backend/process_factors", input.timestamp_ns);
   const size_t prev_loop_closures = num_loop_closures_;
-
-  if (!input.deformation_graph) {
-    LOG(WARNING) << "[Hydra Backend] Received invalid deformation graph";
-    return;
-  }
-
-  status_.new_graph_factors = input.deformation_graph->edges.size();
-  status_.new_factors += input.deformation_graph->edges.size();
+  status_.new_graph_factors = input.deformation_graph.edges.size();
+  status_.new_factors += input.deformation_graph.edges.size();
 
   try {
     processIncrementalMeshGraph(
-        *input.deformation_graph, timestamps_, unconnected_nodes_);
+        input.deformation_graph, timestamps_, unconnected_nodes_);
   } catch (const gtsam::ValuesKeyDoesNotExist& e) {
-    LOG(ERROR) << *input.deformation_graph;
+    LOG(ERROR) << input.deformation_graph;
     throw std::logic_error(e.what());
   }
 
   for (const auto& msg : input.agent_updates.pose_graphs) {
-    status_.new_factors += msg->edges.size();
+    status_.new_factors += msg.edges.size();
 
-    VLOG(5) << "[Hydra Backend] Adding pose graph message: " << *msg;
-    if (hasLoopClosure(*msg)) {
+    VLOG(5) << "[Hydra Backend] Adding pose graph message: " << msg;
+    if (hasLoopClosure(msg)) {
       LOG(INFO) << "[Hydra Backend] Input pose graph has loop closure @ "
-                << msg->stamp_ns << " [ns]";
+                << msg.stamp_ns << " [ns]";
     }
 
-    processIncrementalPoseGraph(*msg, trajectory_, timestamps_, unconnected_nodes_);
-    logIncrementalLoopClosures(*msg);
+    processIncrementalPoseGraph(msg, trajectory_, timestamps_, unconnected_nodes_);
+    logIncrementalLoopClosures(msg);
   }
 
   if (input.agent_updates.external_priors) {
@@ -438,7 +445,7 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
 
     const auto& shared_dsg = *state_->backend_graph;
     std::unique_lock<std::mutex> shared_graph_lock(shared_dsg.mutex);
-    if (!force_update && shared_dsg.last_update_time != timestamp_ns) {
+    if (!force_update && shared_dsg.sequence_number != last_sequence_number_) {
       return false;
     }
 
@@ -450,81 +457,6 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
   }
 
   return true;
-}
-
-void BackendModule::addPlacesToDeformationGraph(size_t timestamp_ns) {
-  const auto& places = unmerged_graph_->getLayer(DsgLayers::PLACES);
-  if (places.nodes().empty()) {
-    LOG(WARNING) << "Attempting to add places to deformation graph without places";
-    return;
-  }
-
-  ScopedTimer timer("backend/add_places", timestamp_ns);
-  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
-
-  deformation_graph_->clearTemporaryStructures();
-
-  MinimumSpanningTreeInfo mst_info;
-  {  // start timing scope
-    ScopedTimer mst_timer("backend/places_mst", timestamp_ns);
-    mst_info = getMinimumSpanningEdges(places);
-  }  // end timing scope
-
-  {  // start timing scope
-    ScopedTimer add_timer("backend/add_places_nodes", timestamp_ns);
-
-    std::vector<gtsam::Key> place_nodes;
-    std::vector<gtsam::Pose3> place_node_poses;
-    std::vector<std::vector<size_t>> place_node_valences;
-
-    for (const auto& id_node_pair : places.nodes()) {
-      const auto& node = *id_node_pair.second;
-      const auto& attrs = node.attributes<PlaceNodeAttributes>();
-
-      if (!node.hasSiblings()) {
-        continue;
-      }
-
-      place_nodes.push_back(node.id);
-      place_node_poses.push_back(gtsam::Pose3(gtsam::Rot3(), attrs.position));
-
-      if (mst_info.leaves.count(node.id)) {
-        std::vector<size_t> valid_connections;
-        for (const auto& idx : attrs.deformation_connections) {
-          if (idx == std::numeric_limits<size_t>::max()) {
-            continue;
-          }
-          valid_connections.push_back(idx);
-        }
-
-        place_node_valences.push_back(valid_connections);
-      } else {
-        place_node_valences.push_back(std::vector<size_t>{});
-      }
-    }
-
-    deformation_graph_->addNewTempNodesValences(place_nodes,
-                                                place_node_poses,
-                                                place_node_valences,
-                                                prefix.vertex_key,
-                                                false,
-                                                config.pgmo.place_mesh_variance);
-  }  // end timing scope
-
-  {  // start timing scope
-    ScopedTimer between_timer("backend/add_places_between", timestamp_ns);
-    PoseGraph mst_edges;
-    for (const auto& edge : mst_info.edges) {
-      gtsam::Pose3 source(gtsam::Rot3(), getNodePosition(places, edge.source));
-      gtsam::Pose3 target(gtsam::Rot3(), getNodePosition(places, edge.target));
-      pose_graph_tools::PoseGraphEdge mst_e;
-      mst_e.key_from = edge.source;
-      mst_e.key_to = edge.target;
-      mst_e.pose = source.between(target).matrix();
-      mst_edges.edges.push_back(mst_e);
-    }
-    deformation_graph_->addNewTempEdges(mst_edges, config.pgmo.place_edge_variance);
-  }  // end timing scope
 }
 
 void BackendModule::addLoopClosure(const gtsam::Key& src,
@@ -601,7 +533,13 @@ void BackendModule::updateAgentNodeMeasurements(const PoseGraph& meas) {
 
 void BackendModule::optimize(size_t timestamp_ns) {
   if (config.add_places_to_deformation_graph) {
-    addPlacesToDeformationGraph(timestamp_ns);
+    const auto vertex_key = GlobalInfo::instance().getRobotPrefix().vertex_key;
+    addPlacesToDeformationGraph(*unmerged_graph_,
+                                timestamp_ns,
+                                *deformation_graph_,
+                                config.pgmo.place_edge_variance,
+                                config.pgmo.place_mesh_variance,
+                                [vertex_key](auto) { return vertex_key; });
   }
 
   {  // timer scope
@@ -645,25 +583,8 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
   // accepted reconciliation merges
   const bool enable_merging = given_merges.empty() ? config.enable_node_merging : false;
 
-  gtsam::Values complete_agent_values;
-  if (full_sparse_frame_map_.size() == 0) {
-    complete_agent_values = pgmo_values;
-  } else {
-    for (const auto& agent_sparse_key : full_sparse_frame_map_) {
-      const auto& dense_key = agent_sparse_key.first;
-      const auto& sparse_key = agent_sparse_key.second;
-      if (!pgmo_values.exists(sparse_key)) {
-        continue;
-      }
-
-      const auto& sparse_T_dense =
-          sparse_frames_.at(sparse_key).keyed_transforms.at(dense_key);
-      gtsam::Pose3 agent_pose =
-          pgmo_values.at<gtsam::Pose3>(sparse_key).compose(sparse_T_dense);
-      complete_agent_values.insert(dense_key, agent_pose);
-    }
-  }
-
+  const auto complete_agent_values =
+      utils::getDenseFrames(full_sparse_frame_map_, sparse_frames_, pgmo_values);
   UpdateInfo::ConstPtr info(new UpdateInfo{&places_values,
                                            &pgmo_values,
                                            new_loop_closure,

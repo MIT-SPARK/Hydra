@@ -111,14 +111,11 @@ class ReconstructionModule : public Module {
 
   bool update(const InputPacket& msg, bool full_update);
 
-  void fillOutput(ReconstructionOutput& output);
-
  protected:
   std::atomic<bool> should_shutdown_{false};
   InputPacketQueue::Ptr queue_;
   std::unique_ptr<std::thread> spin_thread_;
   std::optional<uint64_t> last_update_ns_;
-  std::set<uint64_t> timestamp_cache_;
 
   OutputQueue::Ptr output_queue_;
   Sink::List sinks_;

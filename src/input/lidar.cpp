@@ -35,6 +35,7 @@
 #include "hydra/input/lidar.h"
 
 #include <config_utilities/config_utilities.h>
+#include <config_utilities/parsing/yaml.h>
 #include <glog/logging.h>
 
 #include <opencv2/core.hpp>
@@ -292,5 +293,7 @@ bool Lidar::pointIsInViewFrustum(const Eigen::Vector3f& point_C,
   // check to make sure that we're not in the exluded region
   return !(left_prod <= -inflation_distance && right_prod <= -inflation_distance);
 }
+
+YAML::Node Lidar::dump() const { return config::toYaml(config_); }
 
 }  // namespace hydra

@@ -92,6 +92,8 @@ class Lidar : public Sensor {
   bool pointIsInViewFrustum(const Eigen::Vector3f& point_C,
                             float inflation_distance = 0.0f) const override;
 
+  YAML::Node dump() const override;
+
  private:
   const Config config_;
   const int width_;

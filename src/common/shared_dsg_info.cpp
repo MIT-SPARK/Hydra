@@ -39,7 +39,7 @@ namespace hydra {
 using namespace spark_dsg;
 
 SharedDsgInfo::SharedDsgInfo(const std::map<LayerId, char>& layer_id_map)
-    : updated(false), last_update_time(0), layer_prefix_map(layer_id_map) {
+    : updated(false), sequence_number(0), layer_prefix_map(layer_id_map) {
   DynamicSceneGraph::LayerIds layer_ids;
   for (auto&& [layer, prefix] : layer_id_map) {
     layer_ids.push_back(layer);
@@ -54,7 +54,7 @@ SharedDsgInfo::SharedDsgInfo() {}
 SharedDsgInfo::Ptr SharedDsgInfo::clone() const {
   SharedDsgInfo::Ptr other(new SharedDsgInfo());
   other->updated = updated.load();
-  other->last_update_time = last_update_time;
+  other->sequence_number = sequence_number;
   other->graph = graph->clone();
   other->prefix_layer_map = prefix_layer_map;
   other->layer_prefix_map = layer_prefix_map;

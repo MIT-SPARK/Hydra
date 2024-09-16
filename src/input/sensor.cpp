@@ -48,6 +48,7 @@
 #include "hydra/input/sensor.h"
 
 #include <config_utilities/config_utilities.h>
+#include <config_utilities/parsing/yaml.h>
 #include <config_utilities/types/eigen_matrix.h>
 #include <glog/logging.h>
 
@@ -101,6 +102,8 @@ Sensor::Sensor(const Config& config, const std::string& name)
   VLOG(1) << "Parsed sensor with extrinsics: " << std::endl
           << sensor_body_pose.matrix();
 }
+
+YAML::Node Sensor::dump() const { return config::toYaml(config); }
 
 void declare_config(IdentitySensorExtrinsics::Config&) {
   using namespace config;

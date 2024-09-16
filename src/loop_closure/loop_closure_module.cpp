@@ -143,7 +143,7 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
   const auto& dsg = *state_->lcd_graph;
   {  // start critical section
     std::unique_lock<std::mutex> lock(dsg.mutex);
-    if (!force_update && timestamp_ns != dsg.last_update_time) {
+    if (!force_update && last_sequence_number_ != dsg.sequence_number) {
       return;
     }
 
@@ -196,6 +196,7 @@ size_t LoopClosureModule::processFrontendOutput() {
   }
 
   size_t timestamp_ns = msg->timestamp_ns;
+  last_sequence_number_ = msg->sequence_number;
   queue->pop();
   return timestamp_ns;
 }

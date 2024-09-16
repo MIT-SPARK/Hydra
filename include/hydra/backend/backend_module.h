@@ -119,12 +119,9 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   void spin();
 
-  bool spinOnce(bool force_update = true);
+  bool step(bool force_optimize = false);
 
-  inline void triggerBackendDsgReset() { reset_backend_dsg_ = true; }
-
-  // used by dsg_optimizer
-  virtual void spinOnce(const BackendInput& input, bool force_update = true);
+  void triggerBackendDsgReset() { reset_backend_dsg_ = true; }
 
   void loadState(const std::filesystem::path& mesh_path,
                  const std::filesystem::path& dgrf_path,
@@ -133,6 +130,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   void addSink(const Sink::Ptr& sink);
 
  protected:
+  virtual bool spinOnce(bool force_update = true);
+
   void setSolverParams();
 
   void addLoopClosure(const gtsam::Key& src,
@@ -147,8 +146,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   virtual void copyMeshDelta(const BackendInput& input);
 
   virtual bool updatePrivateDsg(size_t timestamp_ns, bool force_update = true);
-
-  virtual void addPlacesToDeformationGraph(size_t timestamp_ns);
 
   virtual void updateAgentNodeMeasurements(const pose_graph_tools::PoseGraph& meas);
 
@@ -175,12 +172,14 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   std::unique_ptr<std::thread> spin_thread_;
   std::atomic<bool> should_shutdown_{false};
-  bool have_loopclosures_{false};
-  bool have_new_loopclosures_{false};
-  bool have_new_mesh_{false};
-  size_t prev_num_archived_vertices_{0};
-  size_t num_archived_vertices_{0};
-  bool reset_backend_dsg_{false};
+  bool force_optimize_ = false;
+  bool have_loopclosures_ = false;
+  bool have_new_loopclosures_ = false;
+  bool have_new_mesh_ = false;
+  size_t prev_num_archived_vertices_ = 0;
+  size_t num_archived_vertices_ = 0;
+  bool reset_backend_dsg_ = false;
+  uint64_t last_sequence_number_ = 0;
 
   SharedDsgInfo::Ptr private_dsg_;
   DynamicSceneGraph::Ptr unmerged_graph_;

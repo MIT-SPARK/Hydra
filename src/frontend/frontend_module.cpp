@@ -97,6 +97,7 @@ FrontendModule::FrontendModule(const Config& config,
                                const SharedModuleState::Ptr& state,
                                const LogSetup::Ptr& logs)
     : config(config::checkValid(config)),
+      sequence_number_(1),  // starts at 1 to differentiate from SharedDsgInfo default
       queue_(std::make_shared<FrontendInputQueue>()),
       dsg_(dsg),
       state_(state),
@@ -312,9 +313,11 @@ void FrontendModule::spinOnce(const ReconstructionOutput::Ptr& msg) {
 
   backend_input_.reset(new BackendInput());
   backend_input_->timestamp_ns = msg->timestamp_ns;
+  backend_input_->sequence_number = sequence_number_;
   if (queues.lcd_queue) {
     lcd_input_.reset(new LcdInput());
     lcd_input_->timestamp_ns = msg->timestamp_ns;
+    lcd_input_->sequence_number = sequence_number_;
   }
 
   updateImpl(msg);
@@ -325,7 +328,7 @@ void FrontendModule::spinOnce(const ReconstructionOutput::Ptr& msg) {
   {  // start critical section
     std::unique_lock<std::mutex> lock(state_->backend_graph->mutex);
     ScopedTimer merge_timer("frontend/merge_graph", msg->timestamp_ns);
-    state_->backend_graph->last_update_time = msg->timestamp_ns;
+    state_->backend_graph->sequence_number = sequence_number_;
     state_->backend_graph->graph->mergeGraph(*dsg_->graph);
   }  // end critical section
 
@@ -333,7 +336,7 @@ void FrontendModule::spinOnce(const ReconstructionOutput::Ptr& msg) {
     // n.b., critical section in this scope!
     std::unique_lock<std::mutex> lock(state_->lcd_graph->mutex);
     ScopedTimer merge_timer("frontend/merge_lcd_graph", msg->timestamp_ns);
-    state_->lcd_graph->last_update_time = msg->timestamp_ns;
+    state_->lcd_graph->sequence_number = sequence_number_;
     state_->lcd_graph->graph->mergeGraph(*dsg_->graph);
   }
 
@@ -352,6 +355,8 @@ void FrontendModule::spinOnce(const ReconstructionOutput::Ptr& msg) {
     ScopedTimer sink_timer("frontend/sinks", msg->timestamp_ns);
     Sink::callAll(sinks_, msg->timestamp_ns, *dsg_->graph, *backend_input_);
   }
+
+  ++sequence_number_;
 }
 
 void FrontendModule::updateImpl(const ReconstructionOutput::Ptr& msg) {
@@ -450,8 +455,8 @@ void FrontendModule::updateDeformationGraph(const ReconstructionOutput& input) {
   }
 
   if (backend_input_) {
-    backend_input_->deformation_graph = kimera_pgmo::makePoseGraph(
-        prefix.id, time_s, new_edges, new_indices, *vertices);
+    backend_input_->deformation_graph = *CHECK_NOTNULL(kimera_pgmo::makePoseGraph(
+        prefix.id, time_s, new_edges, new_indices, *vertices));
   }
 }
 
@@ -577,11 +582,11 @@ void FrontendModule::updatePoseGraph(const ReconstructionOutput& input) {
   }
 
   for (const auto& pose_graph : packet.pose_graphs) {
-    if (!pose_graph || pose_graph->nodes.empty()) {
+    if (pose_graph.nodes.empty()) {
       continue;
     }
 
-    for (const auto& node : pose_graph->nodes) {
+    for (const auto& node : pose_graph.nodes) {
       if (node.key < agents.numNodes()) {
         continue;
       }

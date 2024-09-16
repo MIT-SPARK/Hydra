@@ -51,7 +51,7 @@ void addNode(PoseGraph& graph, const StampedPose& stamped_pose, size_t index) {
   node.pose = stamped_pose.pose;
 }
 
-void addEdge(PoseGraph& graph, const Eigen::Isometry3d& body_i_T_body_j) {
+void addEdge(PoseGraph& graph, const Eigen::Isometry3d& prev_T_curr) {
   auto& edge = graph.edges.emplace_back();
   edge.stamp_ns = graph.nodes.back().stamp_ns;
 
@@ -62,20 +62,21 @@ void addEdge(PoseGraph& graph, const Eigen::Isometry3d& body_i_T_body_j) {
   edge.robot_from = prev_node.robot_id;
   edge.robot_to = curr_node.robot_id;
   edge.type = pose_graph_tools::PoseGraphEdge::ODOM;
-  edge.pose = body_i_T_body_j;
+  // convention is always from_T_to in gtsam
+  edge.pose = prev_T_curr;
 }
 
-PoseGraph::Ptr makePoseGraph(const StampedPose& curr_pose,
-                             const StampedPose& prev_pose,
-                             size_t prev_index) {
-  auto graph = std::make_shared<PoseGraph>();
-  graph->stamp_ns = curr_pose.stamp;
+PoseGraph makePoseGraph(const StampedPose& curr_pose,
+                        const StampedPose& prev_pose,
+                        size_t prev_index) {
+  PoseGraph graph;
+  graph.stamp_ns = curr_pose.stamp;
 
-  addNode(*graph, prev_pose, prev_index);
-  addNode(*graph, curr_pose, prev_index + 1);
+  addNode(graph, prev_pose, prev_index);
+  addNode(graph, curr_pose, prev_index + 1);
 
-  Eigen::Isometry3d body_i_T_body_j = curr_pose.pose.inverse() * prev_pose.pose;
-  addEdge(*graph, body_i_T_body_j);
+  Eigen::Isometry3d prev_T_curr = prev_pose.pose.inverse() * curr_pose.pose;
+  addEdge(graph, prev_T_curr);
   return graph;
 }
 

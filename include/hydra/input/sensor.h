@@ -210,6 +210,8 @@ class Sensor {
   //! @brief Name of current sensor
   const std::string name;
 
+  virtual YAML::Node dump() const;
+
  protected:
   const std::unique_ptr<SensorExtrinsics> extrinsics_;
 };

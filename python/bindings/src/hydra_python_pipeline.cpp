@@ -146,7 +146,7 @@ bool HydraPythonPipeline::spinOnce(const InputPacket& input) {
     return false;
   }
 
-  backend_->spinOnce(true);
+  backend_->step(false);
   return true;
 }
 

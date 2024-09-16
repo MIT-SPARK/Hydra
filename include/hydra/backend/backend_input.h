@@ -46,7 +46,8 @@ struct BackendInput {
   using Ptr = std::shared_ptr<BackendInput>;
   RobotPrefixConfig prefix;
   uint64_t timestamp_ns;
-  pose_graph_tools::PoseGraph::ConstPtr deformation_graph;
+  uint64_t sequence_number;
+  pose_graph_tools::PoseGraph deformation_graph;
   PoseGraphPacket agent_updates;
   kimera_pgmo::MeshDelta::Ptr mesh_update;
 };

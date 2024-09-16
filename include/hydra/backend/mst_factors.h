@@ -32,44 +32,19 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <gtest/gtest.h>
-#include <hydra/odometry/pose_graph_from_odom.h>
 
-#include "hydra_test/config_guard.h"
+#pragma once
+#include <kimera_pgmo/deformation_graph.h>
+
+#include "hydra/common/dsg_types.h"
 
 namespace hydra {
 
-using pose_graph_tools::PoseGraph;
-
-TEST(PoseGraphFromOdom, GraphBuildingCorrect) {
-  test::ConfigGuard guard;
-
-  PoseGraphFromOdom::Config config;
-  PoseGraphFromOdom tracker(config);
-
-  Eigen::Isometry3d pose = Eigen::Isometry3d::Identity();
-
-  {  // not enough poses for an edge: no pose graphs
-    const auto packet = tracker.update(10u, pose);
-    EXPECT_FALSE(packet.external_priors);
-    EXPECT_EQ(packet.pose_graphs.size(), 0u);
-  }
-
-  {  // two input poses: single edge
-    const auto packet = tracker.update(15u, pose);
-    EXPECT_FALSE(packet.external_priors);
-    ASSERT_EQ(packet.pose_graphs.size(), 1u);
-    const auto& graph = packet.pose_graphs.front();
-    ASSERT_EQ(graph.nodes.size(), 2u);
-    ASSERT_EQ(graph.edges.size(), 1u);
-    const auto& source = graph.nodes.at(0);
-    const auto& target = graph.nodes.at(1);
-    const auto& edge = graph.edges.at(0);
-    EXPECT_EQ(source.stamp_ns, 10u);
-    EXPECT_EQ(target.stamp_ns, 15u);
-    EXPECT_EQ(edge.stamp_ns, 15u);
-    EXPECT_EQ(graph.stamp_ns, 15u);
-  }
-}
+void addPlacesToDeformationGraph(const DynamicSceneGraph& graph,
+                                 size_t timestamp_ns,
+                                 kimera_pgmo::DeformationGraph& deformation_graph,
+                                 double mst_edge_variance,
+                                 double mesh_edge_variance,
+                                 const std::function<char(NodeId)>& prefix_lookup);
 
 }  // namespace hydra

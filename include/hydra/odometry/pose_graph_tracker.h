@@ -46,7 +46,7 @@ struct PoseGraphPacket {
   //! current update
   uint64_t timestamp_ns;
   //! pose graph updates
-  std::vector<pose_graph_tools::PoseGraph::ConstPtr> pose_graphs;
+  std::vector<pose_graph_tools::PoseGraph> pose_graphs;
   //! external optimization priors
   pose_graph_tools::PoseGraph::ConstPtr external_priors;
 };

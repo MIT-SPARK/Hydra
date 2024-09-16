@@ -36,6 +36,7 @@
 
 #include <glog/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
+#include <kimera_pgmo/sparse_keyframe.h>
 
 #include <sstream>
 
@@ -118,6 +119,28 @@ void updatePlaces2d(SharedDsgInfo::Ptr dsg,
     updatePlace2dMesh(attrs, mesh_update, num_archived_vertices);
     updatePlace2dBoundary(attrs, mesh_update);
   }
+}
+
+gtsam::Values getDenseFrames(const KeyMap& full_sparse_frame_map,
+                             const FrameMap& sparse_frames,
+                             const gtsam::Values& sparse_values) {
+  if (full_sparse_frame_map.empty() == 0) {
+    return sparse_values;
+  }
+
+  gtsam::Values dense_values;
+  for (const auto& [dense_key, sparse_key] : full_sparse_frame_map) {
+    if (!sparse_values.exists(sparse_key)) {
+      continue;
+    }
+
+    const auto& sparse_T_dense =
+        sparse_frames.at(sparse_key).keyed_transforms.at(dense_key);
+    const auto agent_pose =
+        sparse_values.at<gtsam::Pose3>(sparse_key).compose(sparse_T_dense);
+    dense_values.insert(dense_key, agent_pose);
+  }
+  return dense_values;
 }
 
 }  // namespace hydra::utils

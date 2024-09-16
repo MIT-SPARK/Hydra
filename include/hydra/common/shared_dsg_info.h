@@ -57,7 +57,7 @@ struct SharedDsgInfo {
   // When acquiring two mutexes, always acquire the lowest mutex first
   mutable std::mutex mutex;
   std::atomic<bool> updated;
-  uint64_t last_update_time;
+  uint64_t sequence_number = 0;
   spark_dsg::DynamicSceneGraph::Ptr graph;
   std::map<char, spark_dsg::LayerId> prefix_layer_map;
   std::map<spark_dsg::LayerId, char> layer_prefix_map;

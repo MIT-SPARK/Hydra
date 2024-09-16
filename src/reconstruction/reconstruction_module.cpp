@@ -174,18 +174,6 @@ void ReconstructionModule::addSink(const Sink::Ptr& sink) {
   }
 }
 
-void ReconstructionModule::fillOutput(ReconstructionOutput& msg) {
-  // TODO(nathan) figure out a better way to handle repeated timestamps
-  size_t ts = msg.timestamp_ns;
-  while (timestamp_cache_.count(ts)) {
-    ++ts;
-  }
-
-  timestamp_cache_.insert(ts);
-  msg.timestamp_ns = ts;
-  msg.setMap(map_->cloneUpdated());
-}
-
 bool ReconstructionModule::update(const InputPacket& msg, bool full_update) {
   VLOG(2) << "[Hydra Reconstruction] starting " << ((full_update) ? "full" : "partial")
           << " update @ " << msg.timestamp_ns << " [ns]";
@@ -221,7 +209,7 @@ bool ReconstructionModule::update(const InputPacket& msg, bool full_update) {
 
   auto output = ReconstructionOutput::fromInput(msg);
   output->sensor_data = data;
-  fillOutput(*output);
+  output->setMap(map_->cloneUpdated());
 
   Sink::callAll(sinks_, msg.timestamp_ns, data->getSensorPose(), tsdf, *output);
   if (output_queue_) {

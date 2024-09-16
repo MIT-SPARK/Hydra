@@ -35,8 +35,12 @@
 #include "hydra/common/global_info.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/parsing/yaml.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
+
+#include <filesystem>
+#include <fstream>
 
 #include "hydra/common/config_utilities.h"
 #include "hydra/common/semantic_color_map.h"
@@ -210,6 +214,16 @@ void GlobalInfo::exit() {
   // save timing information to avoid destructor weirdness with singletons
   if (curr.logs_) {
     saveTimingInformation(*curr.logs_);
+
+    auto node = config::toYaml(curr.config_);
+    for (const auto& [name, sensor] : curr.sensors_) {
+      node["sensors"][name] = sensor->dump();
+    }
+
+    std::filesystem::path log_dir = curr.logs_->getLogDir();
+    std::ofstream fout(log_dir / "hydra_config.yaml");
+    fout << node;
+
     curr.logs_.reset();
   }
 

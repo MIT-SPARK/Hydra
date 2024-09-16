@@ -80,6 +80,7 @@ class LoopClosureModule : public Module {
  protected:
   std::atomic<bool> should_shutdown_{false};
   std::unique_ptr<std::thread> spin_thread_;
+  uint64_t last_sequence_number_ = 0;
 
   LoopClosureConfig config_;
   SharedModuleState::Ptr state_;
