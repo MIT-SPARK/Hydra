@@ -415,7 +415,7 @@ void FrontierExtractor::computeSparseFrontiers(const SpatialCloud::Ptr cloud,
   }
 }
 
-void FrontierExtractor::updateTsdf(const ReconstructionOutput& msg) {
+void FrontierExtractor::updateTsdf(const ActiveWindowOutput& msg) {
   // allocate and copy tsdf
   const auto& tsdf_update = msg.map().getTsdfLayer();
   if (!tsdf_) {
@@ -427,9 +427,9 @@ void FrontierExtractor::updateTsdf(const ReconstructionOutput& msg) {
   }
 }
 
-void FrontierExtractor::detectFrontiers(const ReconstructionOutput& input,
+void FrontierExtractor::detectFrontiers(const ActiveWindowOutput& input,
                                         DynamicSceneGraph& graph,
-                                        NearestNodeFinder& finder) {
+                                        const NodeIdSet& active_nodes) {
   frontiers_.clear();
   archived_frontiers_.clear();
 
@@ -441,44 +441,52 @@ void FrontierExtractor::detectFrontiers(const ReconstructionOutput& input,
   double min_frontier_z = input.world_t_body.z() + config.minimum_relative_z;
   double max_frontier_z = input.world_t_body.z() + config.maximum_relative_z;
 
-  std::queue<BlockIndex> extra_blocks;
-  IndexSet processed_extra_blocks;
-  for (const auto& idx : tsdf_->allocatedBlockIndices()) {
-    processBlock(finder,
-                 *tsdf_,
-                 idx,
-                 just_archived_blocks_.count(idx),
-                 graph,
-                 archived_places_,
-                 config.max_place_radius,
-                 min_frontier_z,
-                 max_frontier_z,
-                 false,
-                 processed_extra_blocks,
-                 extra_blocks,
-                 cloud,
-                 archived_cloud);
+  place_finder_.reset();
+  if (!active_nodes.empty()) {
+    place_finder_.reset(
+        new NearestNodeFinder(graph.getLayer(DsgLayers::PLACES), active_nodes));
   }
 
-  while (!extra_blocks.empty()) {
-    BlockIndex bix = extra_blocks.front();
-    extra_blocks.pop();
-    bool skip_adding_frontiers = recently_archived_blocks_.count(bix);
+  if (place_finder_) {
+    std::queue<BlockIndex> extra_blocks;
+    IndexSet processed_extra_blocks;
+    for (const auto& idx : tsdf_->allocatedBlockIndices()) {
+      processBlock(*place_finder_,
+                   *tsdf_,
+                   idx,
+                   just_archived_blocks_.count(idx),
+                   graph,
+                   archived_places_,
+                   config.max_place_radius,
+                   min_frontier_z,
+                   max_frontier_z,
+                   false,
+                   processed_extra_blocks,
+                   extra_blocks,
+                   cloud,
+                   archived_cloud);
+    }
 
-    processBlock(finder,
-                 *tsdf_,
-                 bix,
-                 just_archived_blocks_.count(bix),
-                 graph,
-                 archived_places_,
-                 config.max_place_radius,
-                 min_frontier_z,
-                 max_frontier_z,
-                 skip_adding_frontiers,
-                 processed_extra_blocks,
-                 extra_blocks,
-                 cloud,
-                 archived_cloud);
+    while (!extra_blocks.empty()) {
+      BlockIndex bix = extra_blocks.front();
+      extra_blocks.pop();
+      bool skip_adding_frontiers = recently_archived_blocks_.count(bix);
+
+      processBlock(*place_finder_,
+                   *tsdf_,
+                   bix,
+                   just_archived_blocks_.count(bix),
+                   graph,
+                   archived_places_,
+                   config.max_place_radius,
+                   min_frontier_z,
+                   max_frontier_z,
+                   skip_adding_frontiers,
+                   processed_extra_blocks,
+                   extra_blocks,
+                   cloud,
+                   archived_cloud);
+    }
   }
 
   if (config.dense_frontiers) {
@@ -492,30 +500,33 @@ void FrontierExtractor::detectFrontiers(const ReconstructionOutput& input,
   just_archived_blocks_.clear();
 }
 
-void FrontierExtractor::addFrontiers(uint64_t timestamp_ns,
-                                     DynamicSceneGraph& graph,
-                                     NearestNodeFinder& finder) {
+void FrontierExtractor::addFrontiers(uint64_t timestamp_ns, DynamicSceneGraph& graph) {
   for (auto nid_bix : nodes_to_remove_) {
     graph.removeNode(nid_bix.first);
   }
   nodes_to_remove_.clear();
 
+  if (!place_finder_) {
+    return;
+  }
+
   // Add non-archived frontiers and save their node ids for removing
   for (auto& frontier : frontiers_) {
-    finder.find(frontier.center, 1, false, [&](NodeId place_id, size_t, double) {
-      PlaceNodeAttributes::Ptr attrs(new PlaceNodeAttributes(1, 0));
-      attrs->position = frontier.center;
-      attrs->frontier_scale = frontier.scale;
-      attrs->orientation = frontier.orientation;
-      attrs->num_frontier_voxels = frontier.num_frontier_voxels;
-      attrs->real_place = false;
-      attrs->need_cleanup = true;
-      attrs->last_update_time_ns = timestamp_ns;
-      attrs->is_active = false;
-      attrs->active_frontier = true;
-      graph.emplaceNode(DsgLayers::PLACES, next_node_id_, std::move(attrs));
-      graph.insertEdge(place_id, next_node_id_);
-    });
+    place_finder_->find(
+        frontier.center, 1, false, [&](NodeId place_id, size_t, double) {
+          PlaceNodeAttributes::Ptr attrs(new PlaceNodeAttributes(1, 0));
+          attrs->position = frontier.center;
+          attrs->frontier_scale = frontier.scale;
+          attrs->orientation = frontier.orientation;
+          attrs->num_frontier_voxels = frontier.num_frontier_voxels;
+          attrs->real_place = false;
+          attrs->need_cleanup = true;
+          attrs->last_update_time_ns = timestamp_ns;
+          attrs->is_active = false;
+          attrs->active_frontier = true;
+          graph.emplaceNode(DsgLayers::PLACES, next_node_id_, std::move(attrs));
+          graph.insertEdge(place_id, next_node_id_);
+        });
 
     nodes_to_remove_.push_back({next_node_id_, frontier.block_index});
     ++next_node_id_;
@@ -523,20 +534,21 @@ void FrontierExtractor::addFrontiers(uint64_t timestamp_ns,
 
   // Add archived frontiers
   for (auto& frontier : archived_frontiers_) {
-    finder.find(frontier.center, 1, false, [&](NodeId place_id, size_t, double) {
-      PlaceNodeAttributes::Ptr attrs(new PlaceNodeAttributes(1, 0));
-      attrs->position = frontier.center;
-      attrs->frontier_scale = frontier.scale;
-      attrs->orientation = frontier.orientation;
-      attrs->num_frontier_voxels = frontier.num_frontier_voxels;
-      attrs->real_place = false;
-      attrs->need_cleanup = true;
-      attrs->last_update_time_ns = timestamp_ns;
-      attrs->is_active = false;
-      attrs->active_frontier = false;
-      graph.emplaceNode(DsgLayers::PLACES, next_node_id_, std::move(attrs));
-      graph.insertEdge(place_id, next_node_id_);
-    });
+    place_finder_->find(
+        frontier.center, 1, false, [&](NodeId place_id, size_t, double) {
+          PlaceNodeAttributes::Ptr attrs(new PlaceNodeAttributes(1, 0));
+          attrs->position = frontier.center;
+          attrs->frontier_scale = frontier.scale;
+          attrs->orientation = frontier.orientation;
+          attrs->num_frontier_voxels = frontier.num_frontier_voxels;
+          attrs->real_place = false;
+          attrs->need_cleanup = true;
+          attrs->last_update_time_ns = timestamp_ns;
+          attrs->is_active = false;
+          attrs->active_frontier = false;
+          graph.emplaceNode(DsgLayers::PLACES, next_node_id_, std::move(attrs));
+          graph.insertEdge(place_id, next_node_id_);
+        });
     ++next_node_id_;
   }
 }

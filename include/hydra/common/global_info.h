@@ -50,8 +50,7 @@
 #include "hydra/utils/log_utilities.h"
 
 // TODO(nathan) bad....
-#include "hydra/reconstruction/volumetric_map.h"
-#include "hydra/reconstruction/volumetric_window.h"
+#include "hydra/active_window/volumetric_window.h"
 
 namespace hydra {
 
@@ -86,7 +85,6 @@ struct PipelineConfig {
   };
   LogConfig logs;
   FrameConfig frames;
-  VolumetricMap::Config map;
   config::VirtualConfig<VolumetricWindow> map_window{SpatialWindowChecker::Config()};
   LabelSpaceConfig label_space;
   std::map<uint32_t, std::string> label_names;
@@ -121,8 +119,6 @@ class GlobalInfo {
   const RobotPrefixConfig& getRobotPrefix() const;
 
   const LogSetup::Ptr& getLogs() const;
-
-  const VolumetricMap::Config& getMapConfig() const;
 
   const std::map<uint32_t, std::string>& getLabelToNameMap() const;
 

@@ -37,6 +37,8 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/eigen_matrix.h>
 
+#include "hydra/reconstruction/volumetric_map.h"
+
 namespace hydra {
 
 void declare_config(RobotFootprintIntegrator::Config& config) {
@@ -86,8 +88,8 @@ BlockIndices getAffectedBlocks(const Eigen::Isometry3f& world_T_body,
   return result;
 }
 
-void RobotFootprintIntegrator::addFreespaceFootprint(const Eigen::Isometry3f& w_T_b,
-                                                     VolumetricMap& map) const {
+void RobotFootprintIntegrator::markFreespace(const Eigen::Isometry3f& w_T_b,
+                                             VolumetricMap& map) const {
   const auto block_indices = getAffectedBlocks(w_T_b, bbox, map);
   const auto b_T_w = w_T_b.inverse();
   auto& tsdf = map.getTsdfLayer();

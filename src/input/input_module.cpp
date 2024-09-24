@@ -95,11 +95,7 @@ void InputModule::stopImpl() {
 
 void InputModule::save(const LogSetup&) {}
 
-std::string InputModule::printInfo() const {
-  std::stringstream ss;
-  ss << config::toString(config);
-  return ss.str();
-}
+std::string InputModule::printInfo() const { return config::toString(config); }
 
 void InputModule::dataSpin() {
   while (!should_shutdown_) {

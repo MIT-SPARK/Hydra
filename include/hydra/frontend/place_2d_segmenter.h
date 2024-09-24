@@ -68,14 +68,14 @@ class Place2dSegmenter : public SurfacePlacesInterface {
 
   explicit Place2dSegmenter(const Config& config);
 
-  void detect(const ReconstructionOutput& msg,
+  void detect(const ActiveWindowOutput& msg,
               const kimera_pgmo::MeshDelta& mesh_delta,
               const DynamicSceneGraph& graph) override;
 
   NodeIdSet getActiveNodes() const override;
 
   void updateGraph(uint64_t timestamp_ns,
-                   const ReconstructionOutput&,
+                   const ActiveWindowOutput&,
                    DynamicSceneGraph& graph) override;
 
  private:

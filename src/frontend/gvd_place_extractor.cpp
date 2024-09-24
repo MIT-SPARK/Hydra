@@ -39,11 +39,11 @@
 #include <spark_dsg/graph_utilities.h>
 #include <spark_dsg/printing.h>
 
+#include "hydra/active_window/volumetric_window.h"
 #include "hydra/common/global_info.h"
 #include "hydra/places/graph_extractor_interface.h"
 #include "hydra/places/graph_extractor_utilities.h"
 #include "hydra/places/gvd_integrator.h"
-#include "hydra/reconstruction/volumetric_window.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -92,20 +92,7 @@ GvdPlaceExtractor::GvdPlaceExtractor(const Config& c)
     LOG(INFO) << "Downsampling TSDF when creating places!";
   }
 
-  const auto& map_config = GlobalInfo::instance().getMapConfig();
-  if (static_cast<float>(config.gvd.min_distance_m) >= map_config.truncation_distance) {
-    LOG(ERROR)
-        << "integrator min distance must be less than truncation distance (currently "
-        << config.gvd.min_distance_m << " vs. truncation distance "
-        << map_config.truncation_distance << ")";
-    throw std::runtime_error("invalid integrator min distance");
-  }
-
-  size_t sink_idx = 0;
-  for (const auto& sink : sinks_) {
-    VLOG(1) << "Sink " << sink_idx << ": " << (sink ? sink->printInfo() : "n/a");
-    ++sink_idx;
-  }
+  VLOG(1) << "\n" << Sink::printSinks(sinks_);
 }
 
 GvdPlaceExtractor::~GvdPlaceExtractor() {}
@@ -155,16 +142,25 @@ std::vector<bool> GvdPlaceExtractor::inFreespace(const PositionMatrix& positions
   return flags;
 }
 
-void GvdPlaceExtractor::detect(const ReconstructionOutput& msg) {
+void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg) {
   ScopedTimer timer("frontend/detect_gvd", msg.timestamp_ns, true, 2, false);
+
+  const auto& map = msg.map();
+  if (static_cast<float>(config.gvd.min_distance_m) >= map.config.truncation_distance) {
+    LOG(ERROR) << "GVD integrator min distance must be less than truncation distance "
+                  "(currently "
+               << config.gvd.min_distance_m << " vs. truncation distance "
+               << map.config.truncation_distance << ")";
+    return;
+  }
 
   TsdfLayer::Ptr downsampled_tsdf;
   if (tsdf_interpolator_) {
     ScopedTimer dtimer("frontend/downsample_tsdf", msg.timestamp_ns, true, 2, false);
-    downsampled_tsdf = tsdf_interpolator_->interpolate(msg.map().getTsdfLayer());
+    downsampled_tsdf = tsdf_interpolator_->interpolate(map.getTsdfLayer());
   }
 
-  const auto& tsdf = downsampled_tsdf ? *downsampled_tsdf : msg.map().getTsdfLayer();
+  const auto& tsdf = downsampled_tsdf ? *downsampled_tsdf : map.getTsdfLayer();
   const Eigen::Isometry3d world_T_body = msg.world_T_body();
   latest_pos_ = world_T_body.translation();
 

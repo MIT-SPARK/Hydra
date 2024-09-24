@@ -1,12 +1,12 @@
 ---
-map:
-  voxels_per_side: 16
-  voxel_size: 0.1
-  truncation_distance: 0.3
 map_window:
   type: spatial
   max_radius_m: 8.0
-reconstruction:
+active_window:
+  volumetric_map:
+    voxels_per_side: 16
+    voxel_size: 0.1
+    truncation_distance: 0.3
   full_update_separation_s: 1.0
   tsdf:
     interpolation_method: bilinear

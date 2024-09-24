@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <hydra/common/hydra_pipeline.h>
-#include <hydra/frontend/frontend_module.h>
+#include <hydra/frontend/graph_builder.h>
 #include <hydra/input/camera.h>
 #include <pybind11/pybind11.h>
 
@@ -75,7 +75,7 @@ class HydraPythonPipeline : public HydraPipeline {
 
   void reset();
 
-  bool spinOnce(const InputPacket& input);
+  bool step(const InputPacket::Ptr& input);
 
   DynamicSceneGraph::Ptr getSceneGraph() const;
 
@@ -84,7 +84,7 @@ class HydraPythonPipeline : public HydraPipeline {
 
   bool step_mode_only_;
   std::shared_ptr<ReconstructionModule> reconstruction_;
-  std::shared_ptr<FrontendModule> frontend_;
+  std::shared_ptr<GraphBuilder> frontend_;
   std::shared_ptr<BackendModule> backend_;
   std::shared_ptr<LoopClosureModule> loop_closure_;
 

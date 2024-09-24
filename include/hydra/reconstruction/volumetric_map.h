@@ -91,17 +91,19 @@ struct BlockTuple {
 class VolumetricMap {
  public:
   struct Config {
-    /// Voxel size.
+    //! Voxel size.
     float voxel_size = 0.1f;
-    /// Number of voxels per block side.
-    int voxels_per_side = 16;  // TODO(nathan) fix int
-    /// TSDF truncation distance.
+    //! Number of voxels per block side.
+    size_t voxels_per_side = 16;
+    //! TSDF truncation distance.
     float truncation_distance = 0.3f;
+    //! Whether or not the map has a semantic layer
+    bool with_semantics = false;
+    //! Whether or not the map has a tracking layer
+    bool with_tracking = false;
   } const config;
 
-  explicit VolumetricMap(const Config& config,
-                         bool with_semantics = false,
-                         bool with_tracking = false);
+  explicit VolumetricMap(const Config& config);
   virtual ~VolumetricMap() = default;
 
   float blockSize() const { return config.voxel_size * config.voxels_per_side; }

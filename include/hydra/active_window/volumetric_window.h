@@ -34,33 +34,51 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include "hydra/active_window/active_window_output.h"
-#include "hydra/common/dsg_types.h"
-#include "hydra/utils/log_utilities.h"
+#include <spatial_hash/block.h>
+#include <spatial_hash/types.h>
+
+#include <Eigen/Geometry>
 
 namespace hydra {
 
-class FreespacePlacesInterface {
- public:
-  using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
+class VolumetricMap;
 
-  FreespacePlacesInterface() {}
+struct VolumetricBlockInfo {
+  const spatial_hash::BlockIndex index;
+  const double block_size;
+  const uint64_t update_stamp_ns;
 
-  virtual ~FreespacePlacesInterface() = default;
-
-  virtual void save(const LogSetup& /* logs */) const {}
-
-  virtual void detect(const ActiveWindowOutput& msg) = 0;
-
-  virtual void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) = 0;
-
-  virtual NodeIdSet getActiveNodes() const = 0;
-
-  // takes in a 3xN matrix
-  virtual std::vector<bool> inFreespace(const PositionMatrix& /* positions */,
-                                        double /* freespace_distance_m */) const {
-    return {};
-  }
+  VolumetricBlockInfo(const spatial_hash::Block& block, uint64_t update_stamp_ns = 0);
+  VolumetricBlockInfo(const spatial_hash::BlockIndex& index,
+                      double block_size,
+                      uint64_t update_stamp_ns = 0);
+  Eigen::Vector3f blockCenter() const;
 };
+
+struct VolumetricWindow {
+  virtual ~VolumetricWindow() = default;
+
+  size_t archiveBlocks(uint64_t timestamp_ns,
+                       const Eigen::Isometry3d& world_T_body,
+                       VolumetricMap& map,
+                       bool skip_updated = true) const;
+
+  virtual bool inBounds(uint64_t timestamp_ns,
+                        const Eigen::Isometry3d& world_T_body,
+                        const VolumetricBlockInfo& block) const = 0;
+};
+
+struct SpatialWindowChecker : VolumetricWindow {
+  struct Config {
+    double max_radius_m = 8.0;
+  } const config;
+
+  explicit SpatialWindowChecker(const Config& config);
+  bool inBounds(uint64_t timestamp_ns,
+                const Eigen::Isometry3d& world_T_body,
+                const VolumetricBlockInfo& block) const override;
+};
+
+void declare_config(SpatialWindowChecker::Config& config);
 
 }  // namespace hydra

@@ -33,90 +33,73 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <chrono>
-#include <condition_variable>
-#include <list>
+#include <spark_dsg/layer_prefix.h>
+#include <spark_dsg/scene_graph_types.h>
+
+#include <map>
 #include <memory>
-#include <mutex>
+#include <set>
+#include <vector>
+
+namespace spark_dsg {
+class DynamicSceneGraph;
+}
 
 namespace hydra {
 
-template <typename T>
-struct InputQueue {
-  using Ptr = std::shared_ptr<InputQueue<T>>;
-  std::list<T> queue;
-  mutable std::mutex mutex;
-  mutable std::condition_variable cv;
-  size_t max_size;
+struct LayerConnector {
+  struct Config {
+    struct ChildLayerConfig {
+      spark_dsg::LayerId layer = spark_dsg::DsgLayers::UNKNOWN;
+      bool include_static = true;
+      bool include_dynamic = true;
+    };
+    // TODO(nathan) for implementation reasons, the parent has to be static
+    spark_dsg::LayerId parent_layer = spark_dsg::DsgLayers::PLACES;
+    std::vector<ChildLayerConfig> child_layers{
+        {spark_dsg::DsgLayers::OBJECTS, true, true}};
+    size_t verbosity = 0;
+  } const config;
 
-  explicit InputQueue(size_t max_size) : max_size(max_size) {}
+  explicit LayerConnector(const Config& config);
 
-  InputQueue() : InputQueue(0) {}
+  bool isChild(const spark_dsg::LayerKey& key) const;
 
-  bool empty() const {
-    std::unique_lock<std::mutex> lock(mutex);
-    return queue.empty();
-  }
+  void updateParents(const spark_dsg::DynamicSceneGraph& graph,
+                     const std::vector<spark_dsg::NodeId>& new_nodes);
 
-  const T& front() const {
-    std::unique_lock<std::mutex> lock(mutex);
-    return queue.front();
-  }
+  void connectChildren(spark_dsg::DynamicSceneGraph& graph,
+                       const std::vector<spark_dsg::NodeId>& new_nodes);
 
-  const T& back() const {
-    std::unique_lock<std::mutex> lock(mutex);
-    return queue.back();
-  }
-
-  /**
-   * @brief wait for the queue to have data
-   */
-  bool poll(int wait_time_us = 1000) const {
-    std::chrono::microseconds wait_duration(wait_time_us);
-    std::unique_lock<std::mutex> lock(mutex);
-    return cv.wait_for(lock, wait_duration, [&] { return !queue.empty(); });
-  }
-
-  /**
-   * @brief wait for the queue to not have any data
-   */
-  bool block(int wait_time_us = 1000) const {
-    std::chrono::microseconds wait_duration(wait_time_us);
-    std::unique_lock<std::mutex> lock(mutex);
-    return cv.wait_for(lock, wait_duration, [&] { return queue.empty(); });
-  }
-
-  bool push(T input) {
-    bool added = false;
-    {
-      std::unique_lock<std::mutex> lock(mutex);
-      if (!max_size || queue.size() < max_size) {
-        queue.push_back(std::move(input));
-        added = true;
-      }
-    }
-
-    cv.notify_all();
-
-    return added;
-  }
-
-  T pop() {
-    std::unique_lock<std::mutex> lock(mutex);
-    auto value = std::move(queue.front());
-    queue.pop_front();
-    return value;
-  }
-
-  size_t size() const {
-    std::unique_lock<std::mutex> lock(mutex);
-    return queue.size();
-  }
-
-  void clear() {
-    std::unique_lock<std::mutex> lock(mutex);
-    queue.clear();
-  }
+  // config
+  const spark_dsg::LayerKey parent_layer;
+  std::set<spark_dsg::LayerId> static_child_layers;
+  std::set<spark_dsg::LayerId> dynamic_child_layers;
+  // tracking
+  std::set<spark_dsg::NodeId> active_children;
+  std::map<spark_dsg::NodeId, std::set<spark_dsg::NodeId>> active_parents;
 };
+
+void declare_config(LayerConnector::Config::ChildLayerConfig& config);
+
+void declare_config(LayerConnector::Config& config);
+
+class GraphConnector {
+ public:
+  struct Config {
+    std::vector<LayerConnector::Config> layers{LayerConnector::Config{}};
+  } const config;
+
+  explicit GraphConnector(const Config& config);
+
+  virtual ~GraphConnector();
+
+  void connect(spark_dsg::DynamicSceneGraph& graph);
+
+ protected:
+  std::vector<LayerConnector> layers_;
+};
+
+void declare_config(GraphConnector::Config& config);
 
 }  // namespace hydra

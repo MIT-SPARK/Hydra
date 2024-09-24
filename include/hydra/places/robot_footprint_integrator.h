@@ -39,9 +39,10 @@
 #include <memory>
 
 #include "hydra/common/dsg_types.h"
-#include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
+
+class VolumetricMap;
 
 class RobotFootprintIntegrator {
  public:
@@ -57,8 +58,7 @@ class RobotFootprintIntegrator {
 
   virtual ~RobotFootprintIntegrator();
 
-  void addFreespaceFootprint(const Eigen::Isometry3f& world_T_body,
-                             VolumetricMap& map) const;
+  void markFreespace(const Eigen::Isometry3f& world_T_body, VolumetricMap& map) const;
 
  public:
   const Config config;

@@ -32,53 +32,69 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
+#include "hydra/active_window/active_window_output.h"
 
-#include <spatial_hash/block.h>
-#include <spatial_hash/types.h>
-
-#include <Eigen/Geometry>
+#include <algorithm>
 
 namespace hydra {
 
-class VolumetricMap;
+using spark_dsg::NodeAttributes;
 
-struct VolumetricBlockInfo {
-  const spatial_hash::BlockIndex index;
-  const double block_size;
-  const uint64_t update_stamp_ns;
+const VolumetricMap& ActiveWindowOutput::map() const {
+  CHECK(map_) << "Invalid map!";
+  return *map_;
+}
 
-  VolumetricBlockInfo(const spatial_hash::Block& block, uint64_t update_stamp_ns = 0);
-  VolumetricBlockInfo(const spatial_hash::BlockIndex& index,
-                      double block_size,
-                      uint64_t update_stamp_ns = 0);
-  Eigen::Vector3f blockCenter() const;
-};
+void ActiveWindowOutput::updateFrom(ActiveWindowOutput&& msg, bool clone_map) {
+  timestamp_ns = msg.timestamp_ns;
+  world_t_body = msg.world_t_body;
+  world_R_body = msg.world_R_body;
+  sensor_data = msg.sensor_data;
 
-struct VolumetricWindow {
-  virtual ~VolumetricWindow() = default;
+  // append graph updates to current message
+  for (auto&& [layer_id, layer_update] : msg.graph_update) {
+    if (!layer_update) {
+      continue;
+    }
 
-  void archiveBlocks(uint64_t timestamp_ns,
-                     const Eigen::Isometry3d& world_T_body,
-                     VolumetricMap& map,
-                     bool skip_updated = true) const;
+    auto iter = graph_update.find(layer_id);
+    if (iter == graph_update.end()) {
+      graph_update.emplace(layer_id, layer_update);
+    } else {
+      iter->second->append(std::move(*layer_update));
+    }
+  }
 
-  virtual bool inBounds(uint64_t timestamp_ns,
-                        const Eigen::Isometry3d& world_T_body,
-                        const VolumetricBlockInfo& block) const = 0;
-};
+  msg.graph_update.clear();
 
-struct SpatialWindowChecker : VolumetricWindow {
-  struct Config {
-    double max_radius_m = 8.0;
-  } const config;
+  if (!msg.map_) {
+    LOG(ERROR) << "Reconstruction output message contained no map!";
+    return;
+  }
 
-  explicit SpatialWindowChecker(const Config& config);
-  bool inBounds(uint64_t timestamp_ns,
-                const Eigen::Isometry3d& world_T_body,
-                const VolumetricBlockInfo& block) const override;
-};
+  if (!map_) {
+    // avoid copying the first map if possible
+    map_ = !clone_map ? msg.map_ : std::make_shared<VolumetricMap>(msg.map_->config);
+  }
 
-void declare_config(SpatialWindowChecker::Config& config);
+  map_->updateFrom(*msg.map_);
+}
+
+void ActiveWindowOutput::setMap(const VolumetricMap& map) {
+  auto new_map = map.clone();
+  map_.reset(new_map.release());
+}
+
+void ActiveWindowOutput::setMap(const std::shared_ptr<VolumetricMap>& map) {
+  map_ = map;
+}
+
+ActiveWindowOutput::Ptr ActiveWindowOutput::fromInput(const InputPacket& msg) {
+  auto new_msg = std::make_shared<ActiveWindowOutput>();
+  new_msg->timestamp_ns = msg.timestamp_ns;
+  new_msg->world_t_body = msg.world_t_body;
+  new_msg->world_R_body = msg.world_R_body;
+  return new_msg;
+}
 
 }  // namespace hydra

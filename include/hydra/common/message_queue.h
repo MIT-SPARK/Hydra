@@ -33,33 +33,89 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-
-#include "hydra/active_window/active_window_output.h"
-#include "hydra/common/dsg_types.h"
-#include "hydra/utils/log_utilities.h"
+#include <chrono>
+#include <condition_variable>
+#include <list>
+#include <memory>
+#include <mutex>
 
 namespace hydra {
 
-class FreespacePlacesInterface {
- public:
-  using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
+template <typename T>
+struct MessageQueue {
+  using Ptr = std::shared_ptr<MessageQueue<T>>;
+  std::list<T> queue;
+  mutable std::mutex mutex;
+  mutable std::condition_variable cv;
+  size_t max_size;
 
-  FreespacePlacesInterface() {}
+  explicit MessageQueue(size_t max_size) : max_size(max_size) {}
 
-  virtual ~FreespacePlacesInterface() = default;
+  MessageQueue() : MessageQueue(0) {}
 
-  virtual void save(const LogSetup& /* logs */) const {}
+  bool empty() const {
+    std::unique_lock<std::mutex> lock(mutex);
+    return queue.empty();
+  }
 
-  virtual void detect(const ActiveWindowOutput& msg) = 0;
+  const T& front() const {
+    std::unique_lock<std::mutex> lock(mutex);
+    return queue.front();
+  }
 
-  virtual void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) = 0;
+  const T& back() const {
+    std::unique_lock<std::mutex> lock(mutex);
+    return queue.back();
+  }
 
-  virtual NodeIdSet getActiveNodes() const = 0;
+  /**
+   * @brief wait for the queue to have data
+   */
+  bool poll(int wait_time_us = 1000) const {
+    std::chrono::microseconds wait_duration(wait_time_us);
+    std::unique_lock<std::mutex> lock(mutex);
+    return cv.wait_for(lock, wait_duration, [&] { return !queue.empty(); });
+  }
 
-  // takes in a 3xN matrix
-  virtual std::vector<bool> inFreespace(const PositionMatrix& /* positions */,
-                                        double /* freespace_distance_m */) const {
-    return {};
+  /**
+   * @brief wait for the queue to not have any data
+   */
+  bool block(int wait_time_us = 1000) const {
+    std::chrono::microseconds wait_duration(wait_time_us);
+    std::unique_lock<std::mutex> lock(mutex);
+    return cv.wait_for(lock, wait_duration, [&] { return queue.empty(); });
+  }
+
+  bool push(T input) {
+    bool added = false;
+    {
+      std::unique_lock<std::mutex> lock(mutex);
+      if (!max_size || queue.size() < max_size) {
+        queue.push_back(std::move(input));
+        added = true;
+      }
+    }
+
+    cv.notify_all();
+
+    return added;
+  }
+
+  T pop() {
+    std::unique_lock<std::mutex> lock(mutex);
+    auto value = std::move(queue.front());
+    queue.pop_front();
+    return value;
+  }
+
+  size_t size() const {
+    std::unique_lock<std::mutex> lock(mutex);
+    return queue.size();
+  }
+
+  void clear() {
+    std::unique_lock<std::mutex> lock(mutex);
+    queue.clear();
   }
 };
 

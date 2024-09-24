@@ -78,7 +78,6 @@ void ProjectiveIntegrator::updateMap(const InputData& data,
     new_blocks = map.allocateBlocks(block_indices);
   }
 
-  VLOG(config.verbosity) << "Updating " << block_indices.size() << " blocks.";
   updateBlocks(block_indices, data, map);
 
   // De-allocate blocks that were not updated.
@@ -92,6 +91,8 @@ void ProjectiveIntegrator::updateMap(const InputData& data,
 void ProjectiveIntegrator::updateBlocks(const BlockIndices& block_indices,
                                         const InputData& data,
                                         VolumetricMap& map) const {
+  LOG_IF(INFO, config.verbosity >= 3) << "Updating " << block_indices.size() << " blocks.";
+
   // Update all blocks in parallel.
   IndexGetter<BlockIndex> index_getter(block_indices);
 

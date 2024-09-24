@@ -170,7 +170,7 @@ void MeshIntegrator::processExterior(VolumetricMap* map,
   BlockIndex block_index;
   while (index_getter->getNextIndex(block_index)) {
     VLOG(10) << "Extracting exterior for block: " << showIndex(block_index);
-    const auto vps = map->config.voxels_per_side;
+    const auto vps = static_cast<int>(map->config.voxels_per_side);
     VoxelIndex v_idx;
 
     // Max X plane

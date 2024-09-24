@@ -113,7 +113,7 @@ def load_configs(
     configs.add_file(labelspace_path)
 
     pipeline = {
-        "frontend": {"type": "FrontendModule"},
+        "frontend": {"type": "GraphBuilder"},
         "backend": {"type": "BackendModule"},
         "reconstruction": {"type": "ReconstructionModule"},
     }

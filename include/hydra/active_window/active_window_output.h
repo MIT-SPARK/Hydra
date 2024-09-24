@@ -33,38 +33,70 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <spark_dsg/node_attributes.h>
+
 #include <Eigen/Dense>
 #include <cstdint>
 #include <memory>
 
+#include "hydra/common/graph_update.h"
 #include "hydra/input/input_packet.h"
 #include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
 
-struct ReconstructionOutput {
-  using Ptr = std::shared_ptr<ReconstructionOutput>;
+struct ActiveWindowOutput {
+  using Ptr = std::shared_ptr<ActiveWindowOutput>;
 
-  virtual ~ReconstructionOutput() = default;
+  ActiveWindowOutput() = default;
+  virtual ~ActiveWindowOutput() = default;
 
+  //! Timestamp of update
   uint64_t timestamp_ns;
+  //! Translation component of body pose
   Eigen::Vector3d world_t_body;
+  //! Rotation component of body pose
   Eigen::Quaterniond world_R_body;
+  //! Sensor data from last update
   std::shared_ptr<InputData> sensor_data;
+  //! New nodes to add to the scene graph
+  GraphUpdate graph_update;
 
+  /**
+   * @brief Get the current volumetric map
+   */
   const VolumetricMap& map() const;
 
+  /**
+   * @brief Sets the output volumetric map (by copying the input)
+   */
+  void setMap(const VolumetricMap& map);
+
+  /**
+   * @brief Sets the output volumetric map (without copying)
+   */
+  void setMap(const std::shared_ptr<VolumetricMap>& map);
+
+  /**
+   * @brief Collate the other active window output into this
+   * @param msg Message to add to this one (is invalid after this call)
+   * @param clone_map Explicitly copy the other map if the map for this message is not
+   * set
+   */
+  virtual void updateFrom(ActiveWindowOutput&& msg, bool clone_map);
+
+  /**
+   * @brief Construct an output packet from the input to the active window
+   */
+  static Ptr fromInput(const InputPacket& input);
+
+  /*
+   * @brief Get the body pose from when this packet was created
+   */
   template <typename T = double>
   Eigen::Transform<T, 3, Eigen::Isometry> world_T_body() const {
     return Eigen::Translation<T, 3>(world_t_body.cast<T>()) * world_R_body.cast<T>();
   }
-
-  void setMap(const VolumetricMap& map);
-  void setMap(const std::shared_ptr<VolumetricMap>& map);
-
-  virtual void updateFrom(const ReconstructionOutput& msg, bool clone_map);
-
-  static Ptr fromInput(const InputPacket& input);
 
  protected:
   std::shared_ptr<VolumetricMap> map_;

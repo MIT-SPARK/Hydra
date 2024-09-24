@@ -35,14 +35,14 @@
 #pragma once
 #include <optional>
 
-#include "hydra/common/input_queue.h"
+#include "hydra/common/message_queue.h"
 #include "hydra/input/sensor_input_packet.h"
 
 namespace hydra {
 
 class DataReceiver {
  public:
-  using DataQueue = InputQueue<SensorInputPacket::Ptr>;
+  using DataQueue = MessageQueue<SensorInputPacket::Ptr>;
 
   struct Config {
     double input_separation_s = 0.0;

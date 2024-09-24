@@ -39,8 +39,8 @@
 #include <config_utilities/logging/log_to_glog.h>
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/validation.h>
+#include <hydra/active_window/reconstruction_module.h>
 #include <hydra/common/global_info.h>
-#include <hydra/reconstruction/reconstruction_module.h>
 #include <kimera_pgmo/compression/delta_compression.h>
 #include <kimera_pgmo/utils/mesh_io.h>
 #include <pybind11/eigen.h>
@@ -60,25 +60,26 @@
 
 namespace hydra::python {
 
-struct PythonReconstructionConfig {
+struct PythonReconstructionConfig : ReconstructionModule::Config {
   int verbosity = 1;
   bool visualize_mesh = true;
   std::string zmq_url = "tcp://127.0.0.1:8001";
 };
 
-void declare_config(PythonReconstructionConfig& conf) {
+void declare_config(PythonReconstructionConfig& config) {
   using namespace config;
   name("PythonReconstructionConfig");
-  field(conf.verbosity, "verbosity");
-  field(conf.visualize_mesh, "visualize_mesh");
-  field(conf.zmq_url, "zmq_url");
+  base<ReconstructionModule::Config>(config);
+  field(config.verbosity, "verbosity");
+  field(config.visualize_mesh, "visualize_mesh");
+  field(config.zmq_url, "zmq_url");
 }
 
 struct MeshUpdater {
-  MeshUpdater(double voxel_size, const std::string& url)
-      : compression(voxel_size / 4.0),
+  explicit MeshUpdater(const PythonReconstructionConfig& config)
+      : compression(config.volumetric_map.voxel_size / 4.0),
         queue(new ReconstructionModule::OutputQueue()),
-        zmq_sender(url, 2) {
+        zmq_sender(config.zmq_url, 2) {
     graph.reset(new DynamicSceneGraph(DynamicSceneGraph::LayerIds{2, 3, 4, 5}));
     graph->setMesh(std::make_shared<Mesh>());
   }
@@ -95,7 +96,7 @@ struct MeshUpdater {
     }
   }
 
-  void update(const ReconstructionOutput::Ptr& msg) {
+  void update(const ActiveWindowOutput::Ptr& msg) {
     if (!msg) {
       return;
     }
@@ -117,19 +118,18 @@ struct MeshUpdater {
 };
 
 PythonReconstruction::PythonReconstruction(const PipelineConfig& hydra_config,
-                                           const PythonConfig& config) {
+                                           const PythonConfig& python_config) {
   GlogSingleton::instance().setLogLevel(0, 0, false);
   config::Settings().setLogger("glog");
   config::Settings().print_width = 100;
   config::Settings().print_indent = 45;
 
-  const auto node = config.toYaml();
-  const auto& map_config = GlobalInfo::init(hydra_config).getMapConfig();
-  const auto py_config = config::fromYaml<PythonReconstructionConfig>(node);
+  const auto node = python_config.toYaml();
+  const auto config = config::fromYaml<PythonReconstructionConfig>(node);
 
   ReconstructionModule::OutputQueue::Ptr queue;
-  if (py_config.visualize_mesh) {
-    mesh_updater_.reset(new MeshUpdater(map_config.voxel_size, py_config.zmq_url));
+  if (config.visualize_mesh) {
+    mesh_updater_.reset(new MeshUpdater(config));
     mesh_thread_.reset(new std::thread(&MeshUpdater::spin, mesh_updater_.get()));
     queue = mesh_updater_->queue;
   }
@@ -139,8 +139,8 @@ PythonReconstruction::PythonReconstruction(const PipelineConfig& hydra_config,
     throw std::runtime_error("could not recreate reconstruction module");
   }
 
-  VLOG(py_config.verbosity) << std::endl << GlobalInfo::instance();
-  VLOG(py_config.verbosity) << std::endl << module_->printInfo();
+  VLOG(config.verbosity) << std::endl << GlobalInfo::instance();
+  VLOG(config.verbosity) << std::endl << module_->printInfo();
 }
 
 void PythonReconstruction::stop() {
@@ -153,19 +153,14 @@ void PythonReconstruction::stop() {
 
 PythonReconstruction::~PythonReconstruction() { stop(); }
 
-bool PythonReconstruction::step(const InputPacket& input) {
-  return module_->spinOnce(input);
+bool PythonReconstruction::step(std::shared_ptr<InputPacket> input) {
+  return module_->step(input);
 }
 
 void PythonReconstruction::save() {
-  const auto map = module_->getMap();
-  if (!map) {
-    return;
-  }
-
   const auto& logs = GlobalInfo::instance().getLogs();
   if (logs && logs->valid()) {
-    map->save(logs->getLogDir() + "/map");
+    module_->map().save(logs->getLogDir() + "/map");
   }
 
   stop();
@@ -208,7 +203,7 @@ void addBindings(pybind11::module_& m) {
                  world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
              input->sensor_input = std::make_unique<PythonSensorInput>(
                  timestamp_ns, depth, labels, rgb, "python");
-             return pipeline.step(*input);
+             return pipeline.step(input);
            })
       .def("step",
            [](PythonReconstruction& pipeline,
@@ -225,7 +220,7 @@ void addBindings(pybind11::module_& m) {
                  world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
              input->sensor_input = std::make_unique<PythonSensorInput>(
                  timestamp_ns, points, labels, colors, "python");
-             return pipeline.step(*input);
+             return pipeline.step(input);
            });
 }
 

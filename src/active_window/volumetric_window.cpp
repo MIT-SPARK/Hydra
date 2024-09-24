@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 
-#include "hydra/reconstruction/volumetric_window.h"
+#include "hydra/active_window/volumetric_window.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
@@ -58,10 +58,10 @@ Eigen::Vector3f VolumetricBlockInfo::blockCenter() const {
   return spatial_hash::centerPointFromIndex(index, block_size);
 }
 
-void VolumetricWindow::archiveBlocks(uint64_t timestamp_ns,
-                                     const Eigen::Isometry3d& world_T_body,
-                                     VolumetricMap& map,
-                                     bool skip_updated) const {
+size_t VolumetricWindow::archiveBlocks(uint64_t timestamp_ns,
+                                       const Eigen::Isometry3d& world_T_body,
+                                       VolumetricMap& map,
+                                       bool skip_updated) const {
   BlockIndices to_remove;
   const auto& tsdf = map.getTsdfLayer();
   for (const auto& block : tsdf) {
@@ -78,7 +78,7 @@ void VolumetricWindow::archiveBlocks(uint64_t timestamp_ns,
   }
 
   map.removeBlocks(to_remove);
-  VLOG(2) << "Archived " << to_remove.size() << " @ " << timestamp_ns << " [ns]";
+  return to_remove.size();
 }
 
 void declare_config(SpatialWindowChecker::Config& config) {

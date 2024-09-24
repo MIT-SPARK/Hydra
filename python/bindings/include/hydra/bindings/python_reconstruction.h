@@ -56,7 +56,7 @@ class PythonReconstruction {
 
   virtual ~PythonReconstruction();
 
-  bool step(const InputPacket& input);
+  bool step(std::shared_ptr<InputPacket> input);
 
   void save();
 

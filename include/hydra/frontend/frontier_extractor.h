@@ -1,15 +1,16 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
-#include <hydra/utils/nearest_neighbor_utilities.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <spatial_hash/types.h>
 
+#include "hydra/active_window/active_window_output.h"
+#include "hydra/active_window/volumetric_window.h"
 #include "hydra/common/dsg_types.h"
-#include "hydra/reconstruction/reconstruction_output.h"
-#include "hydra/reconstruction/volumetric_window.h"
 
 namespace hydra {
+
+class NearestNodeFinder;
 
 struct Frontier {
  public:
@@ -62,13 +63,11 @@ class FrontierExtractor {
 
   void updateRecentBlocks(const Eigen::Vector3d& current_position, double block_size);
 
-  void detectFrontiers(const ReconstructionOutput& input,
+  void detectFrontiers(const ActiveWindowOutput& input,
                        DynamicSceneGraph& graph,
-                       NearestNodeFinder& finder);
+                       const NodeIdSet& active_places);
 
-  void addFrontiers(uint64_t timestamp_ns,
-                    DynamicSceneGraph& graph,
-                    NearestNodeFinder& finder);
+  void addFrontiers(uint64_t timestamp_ns, DynamicSceneGraph& graph);
 
   void setArchivedPlaces(const std::vector<NodeId>& archived_places);
 
@@ -82,11 +81,12 @@ class FrontierExtractor {
   spatial_hash::IndexSet recently_archived_blocks_;
   std::unique_ptr<VolumetricWindow> map_window_;
 
+  std::unique_ptr<NearestNodeFinder> place_finder_;
   std::vector<Frontier> frontiers_;
   std::vector<Frontier> archived_frontiers_;
 
   // Helper functions.
-  void updateTsdf(const ReconstructionOutput& msg);
+  void updateTsdf(const ActiveWindowOutput& msg);
 
   void populateDenseFrontiers(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
                               const pcl::PointCloud<pcl::PointXYZ>::Ptr archived_cloud,

@@ -109,7 +109,6 @@ void declare_config(PipelineConfig& config) {
   field(config.default_verbosity, "default_verbosity");
   field(config.default_num_threads, "default_num_threads");
   field(config.store_visualization_details, "store_visualization_details");
-  field(config.map, "map");
   config.map_window.setOptional();
   field(config.map_window, "map_window");
   field<LabelNameConversion>(config.label_names, "label_names");
@@ -243,8 +242,6 @@ const FrameConfig& GlobalInfo::getFrames() const { return config_.frames; }
 const RobotPrefixConfig& GlobalInfo::getRobotPrefix() const { return robot_prefix_; }
 
 const LogSetup::Ptr& GlobalInfo::getLogs() const { return logs_; }
-
-const VolumetricMap::Config& GlobalInfo::getMapConfig() const { return config_.map; }
 
 const std::map<uint32_t, std::string>& GlobalInfo::getLabelToNameMap() const {
   return config_.label_names;

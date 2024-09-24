@@ -197,16 +197,7 @@ void BackendModule::save(const LogSetup& log_setup) {
 }
 
 std::string BackendModule::printInfo() const {
-  std::stringstream ss;
-  ss << config::toString(config) << "\n";
-
-  size_t sink_idx = 0;
-  for (const auto& sink : sinks_) {
-    ss << "Sink " << sink_idx << ": " << (sink ? "\n" + sink->printInfo() : "n/a");
-    ++sink_idx;
-  }
-
-  return ss.str();
+  return config::toString(config) + "\n" + Sink::printSinks(sinks_);
 }
 
 void BackendModule::spin() {
@@ -348,12 +339,18 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
   status_.new_graph_factors = input.deformation_graph.edges.size();
   status_.new_factors += input.deformation_graph.edges.size();
 
-  try {
-    processIncrementalMeshGraph(
-        input.deformation_graph, timestamps_, unconnected_nodes_);
-  } catch (const gtsam::ValuesKeyDoesNotExist& e) {
-    LOG(ERROR) << input.deformation_graph;
-    throw std::logic_error(e.what());
+  if (!input.deformation_graph.nodes.empty() &&
+      !input.deformation_graph.edges.empty()) {
+    try {
+      processIncrementalMeshGraph(
+          input.deformation_graph, timestamps_, unconnected_nodes_);
+    } catch (const gtsam::ValuesKeyDoesNotExist& e) {
+      LOG(ERROR) << input.deformation_graph;
+      throw std::logic_error(e.what());
+    }
+  } else {
+    VLOG(10) << "[Hydra Backend] Dropping empty deformation graph @ "
+             << input.timestamp_ns << " [ns]";
   }
 
   for (const auto& msg : input.agent_updates.pose_graphs) {

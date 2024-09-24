@@ -90,7 +90,7 @@ void SingleBlockTestFixture::SetUp() {
   map_config.voxel_size = voxel_size;
   map_config.voxels_per_side = voxels_per_side;
   map_config.truncation_distance = truncation_distance;
-  map = std::make_unique<VolumetricMap>(map_config, false);
+  map = std::make_unique<VolumetricMap>(map_config);
   gvd_layer.reset(new GvdLayer(voxel_size, voxels_per_side));
 
   BlockIndex block_index = BlockIndex::Zero();

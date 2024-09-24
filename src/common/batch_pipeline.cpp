@@ -45,7 +45,7 @@
 
 namespace hydra {
 
-using VFConfig = config::VirtualConfig<FrontendModule>;
+using VFConfig = config::VirtualConfig<GraphBuilder>;
 using RFConfig = RoomFinderConfig;
 
 BatchPipeline::BatchPipeline(const PipelineConfig& config, int robot_id) {
@@ -69,12 +69,11 @@ DynamicSceneGraph::Ptr BatchPipeline::construct(const VFConfig& frontend_config,
   auto graph = dsg->graph->clone();
   auto state = std::make_shared<SharedModuleState>();
   auto module = frontend_config.create(dsg, state, LogSetup::Ptr());
-  const auto queue = module->getQueue();
 
   // TODO(nathan) this is a little sketchy given the lack of pose info
-  auto msg = std::make_shared<ReconstructionOutput>();
+  auto msg = std::make_shared<ActiveWindowOutput>();
   msg->setMap(map);
-  queue->push(msg);
+  module->queue()->push(msg);
 
   if (!module->spinOnce()) {
     return nullptr;

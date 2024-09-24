@@ -3,6 +3,7 @@ target_sources(
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/batch_pipeline.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/config_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/global_info.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/graph_update.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/hydra_pipeline.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/label_remapper.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/label_space_config.cpp

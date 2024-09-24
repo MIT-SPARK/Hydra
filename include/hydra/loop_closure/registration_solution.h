@@ -55,7 +55,7 @@ struct RegistrationSolution {
   //! Level of hierarchy the solution is from
   int64_t level;
   //! Optional variance of solution
-  std::optional<double> variance;
+  std::optional<double> variance = std::nullopt;
 
   inline Eigen::Isometry3d to_T_from() const {
     return Eigen::Translation3d(to_p_from) * to_R_from;

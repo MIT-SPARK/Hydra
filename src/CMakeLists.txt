@@ -1,3 +1,4 @@
+add_subdirectory(active_window)
 add_subdirectory(backend)
 add_subdirectory(common)
 add_subdirectory(frontend)

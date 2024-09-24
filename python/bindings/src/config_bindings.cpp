@@ -37,6 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/parsing/yaml.h>
 #include <hydra/common/global_info.h>
+#include <hydra/reconstruction/volumetric_map.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
 
@@ -90,7 +91,6 @@ void addBindings(pybind11::module_& m) {
       .def_readwrite("layer_id_map", &PipelineConfig::layer_id_map)
       .def_readwrite("logs", &PipelineConfig::logs)
       .def_readwrite("frames", &PipelineConfig::frames)
-      .def_readwrite("map", &PipelineConfig::map)
       .def_readwrite("label_space", &PipelineConfig::label_space)
       .def_readwrite("label_names", &PipelineConfig::label_names);
   // GCOVR_EXCL_STOP

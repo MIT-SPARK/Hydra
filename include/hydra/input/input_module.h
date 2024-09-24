@@ -38,7 +38,7 @@
 #include <atomic>
 #include <thread>
 
-#include "hydra/common/input_queue.h"
+#include "hydra/common/message_queue.h"
 #include "hydra/common/module.h"
 #include "hydra/input/data_receiver.h"
 #include "hydra/input/input_packet.h"
@@ -57,7 +57,7 @@ struct PoseStatus {
 
 class InputModule : public Module {
  public:
-  using OutputQueue = InputQueue<InputPacket::Ptr>;
+  using OutputQueue = MessageQueue<InputPacket::Ptr>;
   struct Config {
     struct InputPair {
       config::VirtualConfig<DataReceiver> receiver;

@@ -100,8 +100,9 @@ TEST_F(VolumetricMapFixture, SaveLoadEmptyCorrect) {
   config.voxel_size = 0.2;
   config.voxels_per_side = 32;
   config.truncation_distance = 0.5;
+  config.with_semantics = true;
 
-  VolumetricMap original(config, true);
+  VolumetricMap original(config);
   original.save(map_path.string());
 
   auto result = VolumetricMap::load(map_path.string());
@@ -119,8 +120,9 @@ TEST_F(VolumetricMapFixture, SaveLoadSemanticsCorrect) {
   config.voxel_size = 0.2;
   config.voxels_per_side = 32;
   config.truncation_distance = 0.5;
+  config.with_semantics = true;
 
-  VolumetricMap original(config, true);
+  VolumetricMap original(config);
   auto semantics = original.getSemanticLayer();
   ASSERT_TRUE(semantics != nullptr);
 

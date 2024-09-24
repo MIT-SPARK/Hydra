@@ -61,22 +61,23 @@ void declare_config(VolumetricMap::Config& config) {
   field(config.voxel_size, "voxel_size", "m");
   field(config.voxels_per_side, "voxels_per_side");
   field(config.truncation_distance, "truncation_distance", "m");
+  field(config.with_semantics, "with_semantics");
+  field(config.with_tracking, "with_tracking");
 
   check(config.voxel_size, GT, 0, "voxel_size");
   check(config.voxels_per_side, GT, 0, "voxels_per_side");
   check(config.truncation_distance, GT, 0, "truncation_distance");
 }
 
-VolumetricMap::VolumetricMap(const Config& _config,
-                             bool with_semantics,
-                             bool with_tracking)
+VolumetricMap::VolumetricMap(const Config& _config)
     : config(config::checkValid(_config)),
       tsdf_layer_(config.voxel_size, config.voxels_per_side),
       mesh_layer_(tsdf_layer_.blockSize()) {
-  if (with_semantics) {
+  if (config.with_semantics) {
     semantic_layer_.reset(new SemanticLayer(config.voxel_size, config.voxels_per_side));
   }
-  if (with_tracking) {
+
+  if (config.with_tracking) {
     tracking_layer_.reset(new TrackingLayer(config.voxel_size, config.voxels_per_side));
   }
 }
@@ -173,26 +174,25 @@ std::unique_ptr<VolumetricMap> VolumetricMap::load(const std::string& filepath) 
   }
 
   const auto cpath = filepath + ".yaml";
-  const auto config = config::fromYamlFile<VolumetricMap::Config>(cpath, "map");
+  auto config = config::fromYamlFile<VolumetricMap::Config>(cpath, "map");
   if (std::abs(config.voxel_size - tsdf->voxel_size) > 1.0e-5) {
     LOG(ERROR) << "TSDF voxel size does not match config voxel size";
     return nullptr;
   }
 
-  if (static_cast<size_t>(config.voxels_per_side) != tsdf->voxels_per_side) {
+  if (config.voxels_per_side != tsdf->voxels_per_side) {
     LOG(ERROR) << "TSDF vps does not match config vps";
     return nullptr;
   }
 
   const auto node = YAML::LoadFile(cpath);
-  bool use_semantics = false;
   if (node["has_semantics"] and node["has_semantics"].as<bool>()) {
-    use_semantics = true;
+    config.with_semantics = true;
   }
 
-  auto map = std::make_unique<VolumetricMap>(config, use_semantics);
+  auto map = std::make_unique<VolumetricMap>(config);
   map->tsdf_layer_ = *tsdf;
-  if (use_semantics) {
+  if (config.with_semantics) {
     map->semantic_layer_ = io::loadLayer<SemanticLayer>(filepath + "_semantics");
   }
 
@@ -233,7 +233,8 @@ std::unique_ptr<VolumetricMap> VolumetricMap::fromTsdf(const TsdfLayer& tsdf,
   config.voxel_size = tsdf.voxel_size;
   config.voxels_per_side = tsdf.voxels_per_side;
   config.truncation_distance = truncation_distance_m;
-  auto to_return = std::make_unique<VolumetricMap>(config, with_semantics);
+  config.with_semantics = with_semantics;
+  auto to_return = std::make_unique<VolumetricMap>(config);
   to_return->tsdf_layer_ = tsdf;
   return to_return;
 }
@@ -243,8 +244,7 @@ std::unique_ptr<VolumetricMap> VolumetricMap::clone() const {
 }
 
 std::unique_ptr<VolumetricMap> VolumetricMap::cloneUpdated() const {
-  auto map = std::make_unique<VolumetricMap>(
-      config, semantic_layer_ != nullptr, tracking_layer_ != nullptr);
+  auto map = std::make_unique<VolumetricMap>(config);
   const auto blocks = tsdf_layer_.blockIndicesWithCondition(
       [](const auto& block) { return block.updated; });
   for (const auto& idx : blocks) {

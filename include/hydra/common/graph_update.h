@@ -33,34 +33,54 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/node_symbol.h>
 
-#include "hydra/active_window/active_window_output.h"
-#include "hydra/common/dsg_types.h"
-#include "hydra/utils/log_utilities.h"
+#include <list>
+#include <map>
+
+namespace spark_dsg {
+class DynamicSceneGraph;
+}
 
 namespace hydra {
 
-class FreespacePlacesInterface {
- public:
-  using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
+struct LayerUpdate {
+  using Ptr = std::shared_ptr<LayerUpdate>;
+  explicit LayerUpdate(spark_dsg::LayerId layer);
+  void append(LayerUpdate&& other);
 
-  FreespacePlacesInterface() {}
-
-  virtual ~FreespacePlacesInterface() = default;
-
-  virtual void save(const LogSetup& /* logs */) const {}
-
-  virtual void detect(const ActiveWindowOutput& msg) = 0;
-
-  virtual void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) = 0;
-
-  virtual NodeIdSet getActiveNodes() const = 0;
-
-  // takes in a 3xN matrix
-  virtual std::vector<bool> inFreespace(const PositionMatrix& /* positions */,
-                                        double /* freespace_distance_m */) const {
-    return {};
-  }
+  const spark_dsg::LayerId layer;
+  std::list<spark_dsg::NodeAttributes::Ptr> attributes;
 };
+
+using GraphUpdate = std::map<spark_dsg::LayerId, LayerUpdate::Ptr>;
+
+struct LayerTracker {
+  struct Config {
+    char prefix = 0;
+    std::optional<spark_dsg::LayerId> target_layer;
+  } const config;
+
+  explicit LayerTracker(const Config& config);
+
+  spark_dsg::NodeSymbol next_id;
+};
+
+void declare_config(LayerTracker::Config& config);
+
+struct GraphUpdater {
+  struct Config {
+    std::map<std::string, LayerTracker::Config> layer_updates;
+  } const config;
+
+  explicit GraphUpdater(const Config& config);
+  void update(const GraphUpdate& update, spark_dsg::DynamicSceneGraph& graph);
+
+ private:
+  std::map<spark_dsg::LayerId, LayerTracker> trackers_;
+};
+
+void declare_config(GraphUpdater::Config& config);
 
 }  // namespace hydra

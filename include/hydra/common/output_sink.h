@@ -50,7 +50,7 @@ struct OutputSink {
 
   virtual ~OutputSink() = default;
   virtual void call(Args... args) const = 0;
-  virtual std::string printInfo() const { return ""; }
+  virtual std::string printInfo() const { return "n/a"; }
 
   static Ptr fromCallback(const std::function<void(Args...)>& callback);
 
@@ -76,6 +76,24 @@ struct OutputSink {
         sink->call(args...);
       }
     }
+  }
+
+  static std::string printSinks(const List& sinks) {
+    std::stringstream ss;
+
+    size_t sink_idx = 0;
+    auto iter = sinks.begin();
+    while (iter != sinks.end()) {
+      const auto& sink = *iter;
+      ss << "Sink " << sink_idx << ": " << (sink ? "\n" + sink->printInfo() : "n/a");
+      ++iter;
+      ++sink_idx;
+      if (iter != sinks.end()) {
+        ss << "\n";
+      }
+    }
+
+    return ss.str();
   }
 };
 

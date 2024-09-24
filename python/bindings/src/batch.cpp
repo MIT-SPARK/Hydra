@@ -66,7 +66,7 @@ DynamicSceneGraph::Ptr PythonBatchPipeline::construct(const PythonConfig& config
                                                       VolumetricMap& map) const {
   const auto node = config.toYaml();
   const auto frontend_config =
-      config::fromYaml<config::VirtualConfig<FrontendModule>>(node, "frontend");
+      config::fromYaml<config::VirtualConfig<GraphBuilder>>(node, "frontend");
   const auto room_config =
       config::fromYaml<RoomFinderConfig>(node, "backend/room_finder");
   // LOG(INFO) << "Using frontend config: " << std::endl <<

@@ -38,13 +38,13 @@
 #include <config_utilities/logging/log_to_glog.h>
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/validation.h>
+#include <hydra/active_window/reconstruction_module.h>
 #include <hydra/backend/backend_module.h>
 #include <hydra/common/global_info.h>
 #include <hydra/common/pipeline_queues.h>
 #include <hydra/frontend/gvd_place_extractor.h>
 #include <hydra/loop_closure/loop_closure_module.h>
 #include <hydra/places/compression_graph_extractor.h>
-#include <hydra/reconstruction/reconstruction_module.h>
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
@@ -104,12 +104,12 @@ void HydraPythonPipeline::start() {
 
 void HydraPythonPipeline::initModules() {
   const auto& logs = GlobalInfo::instance().getLogs();
-  frontend_ = config::createFromYamlWithNamespace<FrontendModule>(
+  frontend_ = config::createFromYamlWithNamespace<GraphBuilder>(
       pipeline_config_, "frontend", frontend_dsg_, shared_state_, logs);
   backend_ = config::createFromYamlWithNamespace<BackendModule>(
       pipeline_config_, "backend", backend_dsg_, shared_state_, logs);
   reconstruction_ = config::createFromYamlWithNamespace<ReconstructionModule>(
-      pipeline_config_, "reconstruction", frontend_->getQueue());
+      pipeline_config_, "reconstruction", frontend_->queue());
 
   // we want to make use of the module map in the base pipeline, so we add all the
   // explicit modules here
@@ -173,8 +173,8 @@ void HydraPythonPipeline::save() {
   GlobalInfo::exit();
 }
 
-bool HydraPythonPipeline::spinOnce(const InputPacket& input) {
-  if (!reconstruction_->spinOnce(input)) {
+bool HydraPythonPipeline::step(const InputPacket::Ptr& input) {
+  if (!reconstruction_->step(input)) {
     return false;
   }
 
@@ -247,7 +247,7 @@ void addBindings(pybind11::module_& m) {
             input->sensor_input = std::make_unique<PythonSensorInput>(
                 timestamp_ns, depth, labels, rgb, "python");
             input->sensor_input->input_feature = feature;
-            return pipeline.spinOnce(*input);
+            return pipeline.step(input);
           },
           "timestamp_ns"_a,
           "world_t_body"_a,
@@ -274,7 +274,7 @@ void addBindings(pybind11::module_& m) {
             input->sensor_input = std::make_unique<PythonSensorInput>(
                 timestamp_ns, points, labels, colors, "python");
             input->sensor_input->input_feature = feature;
-            return pipeline.spinOnce(*input);
+            return pipeline.step(input);
           },
           "timestamp_ns"_a,
           "world_t_body"_a,

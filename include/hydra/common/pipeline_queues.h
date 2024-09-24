@@ -35,7 +35,7 @@
 #pragma once
 #include <memory>
 
-#include "hydra/common/input_queue.h"
+#include "hydra/common/message_queue.h"
 #include "hydra/loop_closure/registration_solution.h"
 
 namespace pose_graph_tools {
@@ -50,19 +50,19 @@ struct FeatureView;
 
 class PipelineQueues {
  public:
-  using BowQueue = InputQueue<std::shared_ptr<const pose_graph_tools::BowQuery>>;
-  using LcdQueue = InputQueue<std::shared_ptr<LcdInput>>;
+  using BowQueue = MessageQueue<std::shared_ptr<const pose_graph_tools::BowQuery>>;
+  using LcdQueue = MessageQueue<std::shared_ptr<LcdInput>>;
 
   ~PipelineQueues();
   static PipelineQueues& instance();
   void clear();
 
   //! Connection between frontend and backend
-  InputQueue<std::shared_ptr<BackendInput>> backend_queue;
+  MessageQueue<std::shared_ptr<BackendInput>> backend_queue;
   //! Connection between backend and LCD module
-  InputQueue<lcd::RegistrationSolution> backend_lcd_queue;
+  MessageQueue<lcd::RegistrationSolution> backend_lcd_queue;
   //! Queue for receiving image or pointcloud level descriptors
-  InputQueue<std::unique_ptr<FeatureView>> input_features_queue;
+  MessageQueue<std::unique_ptr<FeatureView>> input_features_queue;
   //! Optional input queue to LCD module
   LcdQueue::Ptr lcd_queue;
   //! Optional BoW descriptor queue to LCD module

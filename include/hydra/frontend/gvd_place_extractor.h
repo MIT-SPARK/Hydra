@@ -90,7 +90,7 @@ class GvdPlaceExtractor : public FreespacePlacesInterface {
   std::vector<bool> inFreespace(const PositionMatrix& positions,
                                 double freespace_distance_m) const override;
 
-  void detect(const ReconstructionOutput& msg) override;
+  void detect(const ActiveWindowOutput& msg) override;
 
   void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) override;
 

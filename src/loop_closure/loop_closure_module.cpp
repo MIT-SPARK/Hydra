@@ -82,11 +82,7 @@ void LoopClosureModule::save(const LogSetup& log_setup) {
   lcd_graph_->save(log_path + "/dsg.json", false);
 }
 
-std::string LoopClosureModule::printInfo() const {
-  std::stringstream ss;
-  ss << std::endl << config::toString(config_);
-  return ss.str();
-}
+std::string LoopClosureModule::printInfo() const { return config::toString(config_); }
 
 void LoopClosureModule::spin() {
   auto queue = PipelineQueues::instance().lcd_queue;

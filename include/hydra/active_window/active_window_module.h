@@ -32,57 +32,76 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/reconstruction/reconstruction_output.h"
+#pragma once
+#include <atomic>
+#include <memory>
+#include <thread>
+
+#include "hydra/active_window/active_window_output.h"
+#include "hydra/active_window/volumetric_window.h"
+#include "hydra/common/message_queue.h"
+#include "hydra/common/module.h"
+#include "hydra/common/output_sink.h"
+#include "hydra/input/input_packet.h"
+#include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
 
-using OutputPtr = ReconstructionOutput::Ptr;
+class ActiveWindowModule : public Module {
+ public:
+  using Ptr = std::shared_ptr<ActiveWindowModule>;
+  using InputQueue = MessageQueue<InputPacket::Ptr>;
+  using OutputQueue = MessageQueue<ActiveWindowOutput::Ptr>;
+  using Sink = OutputSink<uint64_t, const VolumetricMap&, const ActiveWindowOutput&>;
 
-const VolumetricMap& ReconstructionOutput::map() const {
-  CHECK(map_) << "Invalid map!";
-  return *map_;
-}
+  struct Config {
+    size_t max_input_queue_size;
+    VolumetricMap::Config volumetric_map;
+    config::VirtualConfig<VolumetricWindow> map_window;
+    std::vector<Sink::Factory> sinks;
 
-void ReconstructionOutput::updateFrom(const ReconstructionOutput& msg, bool clone_map) {
-  timestamp_ns = msg.timestamp_ns;
-  world_t_body = msg.world_t_body;
-  world_R_body = msg.world_R_body;
-  sensor_data = msg.sensor_data;
-  if (!msg.map_) {
-    LOG(ERROR) << "Reconstruction output message contained no map!";
-    return;
-  }
+    // construct to allow downstream modules to set defaults
+    Config(bool with_semantics = true, bool with_tracking = false);
+  } const config;
 
-  if (!map_ && !clone_map) {
-    // avoid copying the first map if possible
-    map_ = msg.map_;
-  }
+  ActiveWindowModule(const Config& config, const OutputQueue::Ptr& output_queue);
 
-  const auto& new_map = *msg.map_;
-  if (!map_) {
-    // make a new map if we don't have one and we are forcing a clone
-    const auto has_labels = new_map.getSemanticLayer() != nullptr;
-    map_ = std::make_shared<VolumetricMap>(new_map.config, has_labels);
-  }
+  virtual ~ActiveWindowModule() = default;
 
-  map_->updateFrom(new_map);
-}
+  void start() override;
 
-void ReconstructionOutput::setMap(const VolumetricMap& map) {
-  auto new_map = map.clone();
-  map_.reset(new_map.release());
-}
+  void stop() override;
 
-void ReconstructionOutput::setMap(const std::shared_ptr<VolumetricMap>& map) {
-  map_ = map;
-}
+  void save(const LogSetup& log_setup) override;
 
-OutputPtr ReconstructionOutput::fromInput(const InputPacket& msg) {
-  auto new_msg = std::make_shared<ReconstructionOutput>();
-  new_msg->timestamp_ns = msg.timestamp_ns;
-  new_msg->world_t_body = msg.world_t_body;
-  new_msg->world_R_body = msg.world_R_body;
-  return new_msg;
-}
+  std::string printInfo() const override;
+
+  void spin();
+
+  bool step(const InputPacket::Ptr& input);
+
+  void addSink(const Sink::Ptr& sink);
+
+  InputQueue::Ptr queue() const { return input_queue_; }
+
+  const VolumetricMap& map() const { return map_; }
+
+ protected:
+  virtual ActiveWindowOutput::Ptr spinOnce(const InputPacket& input) = 0;
+
+  void stopImpl();
+
+  InputQueue::Ptr input_queue_;
+  OutputQueue::Ptr output_queue_;
+  std::atomic<bool> should_shutdown_{false};
+  std::unique_ptr<std::thread> spin_thread_;
+
+  Sink::List sinks_;
+
+  VolumetricMap map_;
+  std::unique_ptr<VolumetricWindow> map_window_;
+};
+
+void declare_config(ActiveWindowModule::Config& config);
 
 }  // namespace hydra

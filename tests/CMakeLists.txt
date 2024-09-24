@@ -22,6 +22,7 @@ add_executable(
   input/test_sensor.cpp
   input/test_sensor_utilities.cpp
   frontend/test_mesh_segmenter.cpp
+  frontend/test_graph_connector.cpp
   loop_closure/test_descriptor_matching.cpp
   loop_closure/test_detector.cpp
   loop_closure/test_registration.cpp

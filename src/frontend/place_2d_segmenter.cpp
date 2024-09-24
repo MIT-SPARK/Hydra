@@ -228,7 +228,7 @@ NodeIdSet Place2dSegmenter::getActiveNodes() const {
   return all_active_nodes;
 }
 
-void Place2dSegmenter::detect(const ReconstructionOutput&,
+void Place2dSegmenter::detect(const ActiveWindowOutput&,
                               const kimera_pgmo::MeshDelta& mesh_delta,
                               const DynamicSceneGraph& graph) {
   VLOG(5) << "[Places 2d Segmenter] detect called";
@@ -326,7 +326,7 @@ bool Place2dSegmenter::frontendAddPlaceConnection(const Place2dNodeAttributes& a
 }
 
 void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
-                                   const ReconstructionOutput& msg,
+                                   const ActiveWindowOutput& msg,
                                    DynamicSceneGraph& graph) {
   // Remove old empty nodes
   for (const auto& nid : nodes_to_remove_) {
