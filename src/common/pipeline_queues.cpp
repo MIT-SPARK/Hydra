@@ -66,6 +66,19 @@ PipelineQueues& PipelineQueues::instance() {
   return *s_instance_;
 }
 
+void PipelineQueues::clear() {
+  backend_queue.clear();
+  backend_lcd_queue.clear();
+  input_features_queue.clear();
+  if (lcd_queue) {
+    lcd_queue->clear();
+  }
+
+  if (bow_queue) {
+    bow_queue->clear();
+  }
+}
+
 PipelineQueues::PipelineQueues() {
   const auto& info = hydra::GlobalInfo::instance();
   if (info.getConfig().enable_lcd) {

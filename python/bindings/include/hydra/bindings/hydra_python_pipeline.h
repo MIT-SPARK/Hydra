@@ -60,6 +60,7 @@ class HydraPythonPipeline : public HydraPipeline {
   HydraPythonPipeline(const PipelineConfig& config,
                       int robot_id = 0,
                       int config_verbosity = 0,
+                      bool freeze_global_info = true,
                       bool step_mode_only = true);
 
   virtual ~HydraPythonPipeline();
@@ -72,17 +73,22 @@ class HydraPythonPipeline : public HydraPipeline {
 
   void save() override;
 
+  void reset();
+
   bool spinOnce(const InputPacket& input);
 
   DynamicSceneGraph::Ptr getSceneGraph() const;
 
  protected:
+  void initModules();
+
   bool step_mode_only_;
   std::shared_ptr<ReconstructionModule> reconstruction_;
   std::shared_ptr<FrontendModule> frontend_;
   std::shared_ptr<BackendModule> backend_;
   std::shared_ptr<LoopClosureModule> loop_closure_;
 
+  YAML::Node pipeline_config_;
   DynamicSceneGraph::Ptr graph_;
 };
 

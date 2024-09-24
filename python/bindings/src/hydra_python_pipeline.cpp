@@ -40,6 +40,7 @@
 #include <config_utilities/validation.h>
 #include <hydra/backend/backend_module.h>
 #include <hydra/common/global_info.h>
+#include <hydra/common/pipeline_queues.h>
 #include <hydra/frontend/gvd_place_extractor.h>
 #include <hydra/loop_closure/loop_closure_module.h>
 #include <hydra/places/compression_graph_extractor.h>
@@ -73,8 +74,9 @@ config::VirtualConfig<Sensor> PythonCamera::sensor() const {
 HydraPythonPipeline::HydraPythonPipeline(const PipelineConfig& config,
                                          int robot_id,
                                          int config_verbosity,
+                                         bool freeze_global_info,
                                          bool step_mode_only)
-    : HydraPipeline(config, robot_id, config_verbosity),
+    : HydraPipeline(config, robot_id, config_verbosity, freeze_global_info),
       step_mode_only_(step_mode_only) {
   GlogSingleton::instance().setLogLevel(0, 0, false);
   config::Settings().print_width = 100;
@@ -86,30 +88,7 @@ HydraPythonPipeline::~HydraPythonPipeline() {}
 void HydraPythonPipeline::initPython(const PythonConfig& config,
                                      const PythonCamera& camera) {
   GlobalInfo::instance().setSensor("python", camera.sensor());
-
-  const auto& logs = GlobalInfo::instance().getLogs();
-  const auto node = config.toYaml();
-  frontend_ = config::createFromYamlWithNamespace<FrontendModule>(
-      node, "frontend", frontend_dsg_, shared_state_, logs);
-  backend_ = config::createFromYamlWithNamespace<BackendModule>(
-      node, "backend", backend_dsg_, shared_state_, logs);
-  reconstruction_ = config::createFromYamlWithNamespace<ReconstructionModule>(
-      node, "reconstruction", frontend_->getQueue());
-
-  // we want to make use of the module map in the base pipeline, so we add all the
-  // explicit modules here
-  modules_["reconstruction"] = reconstruction_;
-  modules_["frontend"] = frontend_;
-  modules_["backend"] = backend_;
-
-  if (GlobalInfo::instance().getConfig().enable_lcd) {
-    auto lcd_config = config::fromYaml<LoopClosureConfig>(node);
-    lcd_config.detector.num_semantic_classes = GlobalInfo::instance().getTotalLabels();
-    config::checkValid(lcd_config);
-
-    loop_closure_ = std::make_shared<LoopClosureModule>(lcd_config, shared_state_);
-    modules_["lcd"] = loop_closure_;
-  }
+  pipeline_config_ = config.toYaml();
 
   showModules();
   VLOG(config_verbosity_) << GlobalInfo::instance();
@@ -123,12 +102,70 @@ void HydraPythonPipeline::start() {
   }
 }
 
+void HydraPythonPipeline::initModules() {
+  const auto& logs = GlobalInfo::instance().getLogs();
+  frontend_ = config::createFromYamlWithNamespace<FrontendModule>(
+      pipeline_config_, "frontend", frontend_dsg_, shared_state_, logs);
+  backend_ = config::createFromYamlWithNamespace<BackendModule>(
+      pipeline_config_, "backend", backend_dsg_, shared_state_, logs);
+  reconstruction_ = config::createFromYamlWithNamespace<ReconstructionModule>(
+      pipeline_config_, "reconstruction", frontend_->getQueue());
+
+  // we want to make use of the module map in the base pipeline, so we add all the
+  // explicit modules here
+  modules_["reconstruction"] = reconstruction_;
+  modules_["frontend"] = frontend_;
+  modules_["backend"] = backend_;
+
+  if (GlobalInfo::instance().getConfig().enable_lcd) {
+    auto lcd_config = config::fromYaml<LoopClosureConfig>(pipeline_config_);
+    lcd_config.detector.num_semantic_classes = GlobalInfo::instance().getTotalLabels();
+    config::checkValid(lcd_config);
+
+    loop_closure_ = std::make_shared<LoopClosureModule>(lcd_config, shared_state_);
+    modules_["lcd"] = loop_closure_;
+  }
+}
+
 void HydraPythonPipeline::stop() {
   if (step_mode_only_) {
     return;
   }
 
   HydraPipeline::stop();
+}
+
+void HydraPythonPipeline::reset() {
+  stop();
+
+  // reset specific module instances
+  reconstruction_.reset();
+  frontend_.reset();
+  backend_.reset();
+  loop_closure_.reset();
+
+  // reset any other modules (will actually deconstruct specific module instances given
+  // shared_ptr usage)
+  modules_.clear();
+
+  // reset state
+  const auto& config = GlobalInfo::instance();
+  frontend_dsg_ = config.createSharedDsg();
+  backend_dsg_ = config.createSharedDsg();
+  shared_state_.reset(new SharedModuleState());
+  shared_state_->lcd_graph = config.createSharedDsg();
+  shared_state_->backend_graph = config.createSharedDsg();
+
+  PipelineQueues::instance().clear();
+
+  // TODO(nathan) fix local graph member
+
+  initModules();
+
+  if (!step_mode_only_) {
+    // avoid spamming config
+    start();
+  }
 }
 
 void HydraPythonPipeline::save() {
@@ -183,13 +220,15 @@ void addBindings(pybind11::module_& m) {
       .def_readwrite("body_p_sensor", &PythonCamera::body_p_sensor);
 
   py::class_<HydraPythonPipeline>(m, "HydraPipeline")
-      .def(py::init<const PipelineConfig&, int, int, bool>(),
+      .def(py::init<const PipelineConfig&, int, int, bool, bool>(),
            "config"_a,
            "robot_id"_a = 0,
            "config_verbosity"_a = 0,
+           "freeze_global_info"_a = true,
            "use_step_mode"_a = true)
       .def("init", &HydraPythonPipeline::initPython, "config"_a, "camera"_a)
       .def("save", &HydraPythonPipeline::save)
+      .def("reset", &HydraPythonPipeline::reset)
       .def(
           "step",
           [](HydraPythonPipeline& pipeline,

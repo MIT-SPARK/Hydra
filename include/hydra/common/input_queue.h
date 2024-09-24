@@ -115,7 +115,7 @@ struct InputQueue {
 
   void clear() {
     std::unique_lock<std::mutex> lock(mutex);
-    queue = {};
+    queue.clear();
   }
 };
 

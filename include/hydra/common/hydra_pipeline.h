@@ -43,7 +43,8 @@ class HydraPipeline {
  public:
   HydraPipeline(const PipelineConfig& config,
                 int robot_id = 0,
-                int config_verbosity = 1);
+                int config_verbosity = 1,
+                bool freeze_global_info = true);
 
   virtual ~HydraPipeline();
 

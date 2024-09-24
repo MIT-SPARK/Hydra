@@ -55,6 +55,7 @@ class PipelineQueues {
 
   ~PipelineQueues();
   static PipelineQueues& instance();
+  void clear();
 
   //! Connection between frontend and backend
   InputQueue<std::shared_ptr<BackendInput>> backend_queue;

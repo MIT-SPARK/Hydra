@@ -40,9 +40,10 @@ namespace hydra {
 
 HydraPipeline::HydraPipeline(const PipelineConfig& pipeline_config,
                              int robot_id,
-                             int config_verbosity)
+                             int config_verbosity,
+                             bool freeze_global_info)
     : config_verbosity_(config_verbosity) {
-  const auto& config = GlobalInfo::init(pipeline_config, robot_id, true);
+  const auto& config = GlobalInfo::init(pipeline_config, robot_id, freeze_global_info);
   frontend_dsg_ = config.createSharedDsg();
   backend_dsg_ = config.createSharedDsg();
   shared_state_.reset(new SharedModuleState());
