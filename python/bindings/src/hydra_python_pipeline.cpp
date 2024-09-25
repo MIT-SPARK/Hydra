@@ -90,6 +90,7 @@ void HydraPythonPipeline::initPython(const PythonConfig& config,
   GlobalInfo::instance().setSensor("python", camera.sensor());
   pipeline_config_ = config.toYaml();
 
+  initModules();
   showModules();
   VLOG(config_verbosity_) << GlobalInfo::instance();
 }
