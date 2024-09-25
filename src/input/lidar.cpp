@@ -108,6 +108,10 @@ Lidar::Lidar(const Config& config, const std::string& name)
                               .normalized();
 }
 
+float Lidar::getPointDepth(const Eigen::Vector3f& p) const {
+  return p.norm();
+}
+
 float Lidar::computeRayDensity(float voxel_size, float depth) const {
   // we want rays per meter... we can do this by computing a virtual focal length
   // compute focal lengths based on percent of spherical image inside 90 degree FOV

@@ -100,6 +100,10 @@ Camera::Camera(const Config& config, const std::string& name)
   view_frustum_.row(3) = p2.cross(p1).normalized();
 }
 
+float Camera::getPointDepth(const Eigen::Vector3f& p) const {
+  return p.z();
+}
+
 float Camera::computeRayDensity(float voxel_size, float depth) const {
   return config_.fx * config_.fy * std::pow(voxel_size / depth, 2.f);
 }

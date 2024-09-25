@@ -264,11 +264,12 @@ float ProjectiveIntegrator::computeWeight(const Sensor& sensor,
   // This approximates the number of rays that would hit this voxel.
   // NOTE(lschmid): For (close) voxels hit by many pixels one could think of denoising
   // the depth image / looking at a local neighborhood for the update.
-  auto weight = sensor.computeRayDensity(voxel_size, p_C.z());
+  const float depth = sensor.getPointDepth(p_C);
+  auto weight = sensor.computeRayDensity(voxel_size, depth);
 
   // Weight reduction with distance squared (according to sensor noise models).
   if (!config.use_constant_weight) {
-    weight /= std::pow(p_C.z(), 2.f);
+    weight /= std::pow(depth, 2.f);
   }
 
   // Apply weight drop-off if appropriate.

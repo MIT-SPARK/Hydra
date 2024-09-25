@@ -73,6 +73,8 @@ class Lidar : public Sensor {
 
   const Config& getConfig() const { return config_; }
 
+  float getPointDepth(const Eigen::Vector3f& p) const override;
+
   float computeRayDensity(float voxel_size, float depth) const override;
 
   /**
