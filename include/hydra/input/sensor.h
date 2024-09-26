@@ -52,66 +52,11 @@
 #include <limits>
 #include <vector>
 
+#include "hydra/input/sensor_extrinsics.h"
+
 namespace hydra {
 
 struct InputData;
-
-struct SensorExtrinsics {
-  SensorExtrinsics();
-
-  explicit SensorExtrinsics(const Eigen::Quaterniond& body_R_sensor);
-
-  explicit SensorExtrinsics(const Eigen::Vector3d& body_p_sensor);
-
-  SensorExtrinsics(const Eigen::Quaterniond& body_R_sensor,
-                   const Eigen::Vector3d& body_p_sensor);
-
-  inline operator Eigen::Isometry3d() const {
-    return Eigen::Translation3d(body_p_sensor) * body_R_sensor;
-  }
-
-  Eigen::Quaterniond body_R_sensor;
-  Eigen::Vector3d body_p_sensor;
-};
-
-struct IdentitySensorExtrinsics : public SensorExtrinsics {
-  struct Config {};
-
-  explicit IdentitySensorExtrinsics(const Config& config);
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<SensorExtrinsics,
-                                     IdentitySensorExtrinsics,
-                                     Config>("identity");
-};
-
-struct ParamSensorExtrinsics : public SensorExtrinsics {
-  struct Config {
-    Eigen::Quaterniond body_R_sensor = Eigen::Quaterniond::Identity();
-    Eigen::Vector3d body_p_sensor = Eigen::Vector3d::Identity();
-  };
-
-  explicit ParamSensorExtrinsics(const Config& config);
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<SensorExtrinsics, ParamSensorExtrinsics, Config>(
-          "param");
-};
-
-struct KimeraSensorExtrinsics : public SensorExtrinsics {
-  struct Config {
-    std::string sensor_filepath = "";
-  };
-
-  explicit KimeraSensorExtrinsics(const Config& config);
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<SensorExtrinsics, KimeraSensorExtrinsics, Config>(
-          "kimera");
-};
 
 /**
  * @brief Base class for different sensors the system could use.
@@ -127,6 +72,7 @@ class Sensor {
   struct Config {
     double min_range = 0.0f;
     double max_range = std::numeric_limits<double>::infinity();
+    // TODO(nathan) try to avoid pulling in factories in the header
     config::VirtualConfig<SensorExtrinsics> extrinsics;
   } const config;
 
@@ -222,9 +168,6 @@ class Sensor {
   const std::unique_ptr<SensorExtrinsics> extrinsics_;
 };
 
-void declare_config(IdentitySensorExtrinsics::Config& config);
-void declare_config(ParamSensorExtrinsics::Config& config);
-void declare_config(KimeraSensorExtrinsics::Config& config);
 void declare_config(Sensor::Config& config);
 
 }  // namespace hydra

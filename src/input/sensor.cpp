@@ -56,43 +56,6 @@
 
 namespace hydra {
 
-SensorExtrinsics::SensorExtrinsics()
-    : SensorExtrinsics(Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero()) {}
-
-SensorExtrinsics::SensorExtrinsics(const Eigen::Quaterniond& body_R_sensor)
-    : SensorExtrinsics(body_R_sensor, Eigen::Vector3d::Zero()) {}
-
-SensorExtrinsics::SensorExtrinsics(const Eigen::Vector3d& body_p_sensor)
-    : SensorExtrinsics(Eigen::Quaterniond::Identity(), body_p_sensor) {}
-
-SensorExtrinsics::SensorExtrinsics(const Eigen::Quaterniond& _body_R_sensor,
-                                   const Eigen::Vector3d& _body_p_sensor)
-    : body_R_sensor(_body_R_sensor), body_p_sensor(_body_p_sensor) {}
-
-IdentitySensorExtrinsics::IdentitySensorExtrinsics(const Config&)
-    : SensorExtrinsics() {}
-
-ParamSensorExtrinsics::ParamSensorExtrinsics(const Config& config)
-    : SensorExtrinsics(config.body_R_sensor, config.body_p_sensor) {}
-
-KimeraSensorExtrinsics::KimeraSensorExtrinsics(const Config& config)
-    : SensorExtrinsics() {
-  config::checkValid(config);
-  const auto node = YAML::LoadFile(config.sensor_filepath);
-  const auto elements = node["T_BS"]["data"].as<std::vector<double>>();
-  CHECK_EQ(elements.size(), 16u);
-
-  Eigen::Matrix4d body_T_sensor = Eigen::Matrix4d::Identity();
-  for (int r = 0; r < 4; ++r) {
-    for (int c = 0; c < 4; ++c) {
-      body_T_sensor(r, c) = elements.at(4 * r + c);
-    }
-  }
-
-  body_R_sensor = Eigen::Quaterniond(body_T_sensor.block<3, 3>(0, 0)).normalized();
-  body_p_sensor = body_T_sensor.block<3, 1>(0, 3);
-}
-
 Sensor::Sensor(const Config& config, const std::string& name)
     : config(config::checkValid(config)),
       name(name),
@@ -104,27 +67,6 @@ Sensor::Sensor(const Config& config, const std::string& name)
 }
 
 YAML::Node Sensor::dump() const { return config::toYaml(config); }
-
-void declare_config(IdentitySensorExtrinsics::Config&) {
-  using namespace config;
-  name("IdentitySensorExtrinsics");
-}
-
-void declare_config(ParamSensorExtrinsics::Config& conf) {
-  using namespace config;
-  name("ParamSensorExtrinsics");
-  field<QuaternionConverter>(conf.body_R_sensor, "body_R_sensor");
-  field(conf.body_p_sensor, "body_p_sensor");
-  checkCondition(std::abs(conf.body_R_sensor.norm() - 1.0) < 1.0e-9,
-                 "Quaternion is not normalized");
-}
-
-void declare_config(KimeraSensorExtrinsics::Config& conf) {
-  using namespace config;
-  name("KimeraSensorExtrinsics");
-  field(conf.sensor_filepath, "sensor_filepath");
-  // TODO(nathan) validate file
-}
 
 void declare_config(Sensor::Config& conf) {
   using namespace config;

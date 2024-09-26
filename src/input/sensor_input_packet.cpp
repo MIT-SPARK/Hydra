@@ -41,6 +41,19 @@
 #include "hydra/common/global_info.h"
 
 namespace hydra {
+namespace {
+
+inline std::string showImageDim(const cv::Mat& mat) {
+  std::stringstream ss;
+  ss << "[rows=" << mat.rows << ", cols=" << mat.cols << "]";
+  return ss.str();
+}
+
+inline bool sizesMatch(const cv::Mat& lhs, const cv::Mat& rhs) {
+  return lhs.rows == rhs.rows && lhs.cols == rhs.cols;
+}
+
+}  // namespace
 
 bool SensorInputPacket::fillInputData(InputData& msg) const {
   msg.timestamp_ns = timestamp_ns;
@@ -53,22 +66,35 @@ ImageInputPacket::ImageInputPacket(uint64_t stamp, const std::string& sensor_nam
 
 bool ImageInputPacket::fillInputDataImpl(InputData& msg) const {
   if (depth.empty()) {
-    LOG(ERROR) << "Missing required images: Depth image must be set.";
+    LOG(ERROR) << "Missing required images: depth image must be set.";
     return false;
   }
 
   if (color.empty() && labels.empty()) {
-    LOG(ERROR) << "Missing required images: Color or label image must be set.";
+    LOG(ERROR) << "Missing required images: color or label image must be set.";
     return false;
   }
 
   msg.color_image = color;
-  if (color_is_bgr) {
+  if (color_is_bgr && !msg.color_image.empty()) {
     cv::cvtColor(msg.color_image, msg.color_image, cv::COLOR_BGR2RGB);
   }
 
   msg.depth_image = depth;
   msg.label_image = labels;
+
+  if (!msg.label_image.empty() && !sizesMatch(msg.depth_image, msg.label_image)) {
+    LOG(ERROR) << "Label dimensions " << showImageDim(msg.label_image)
+               << " do not match depth dimensions " << showImageDim(msg.depth_image);
+    return false;
+  }
+
+  if (!msg.color_image.empty() && !sizesMatch(msg.depth_image, msg.color_image)) {
+    LOG(ERROR) << "Color dimensions " << showImageDim(msg.color_image)
+               << " do not match depth dimensions " << showImageDim(msg.depth_image);
+    return false;
+  }
+
   return true;
 }
 
@@ -85,6 +111,21 @@ bool CloudInputPacket::fillInputDataImpl(InputData& msg) const {
   msg.points_in_world_frame = in_world_frame;
   msg.color_image = colors;
   msg.label_image = labels;
+
+  if (!msg.label_image.empty() && !sizesMatch(msg.vertex_map, msg.label_image)) {
+    LOG(ERROR) << "Label dimensions " << showImageDim(msg.label_image)
+               << " do not match pointcloud dimensions "
+               << showImageDim(msg.vertex_map);
+    return false;
+  }
+
+  if (!msg.color_image.empty() && !sizesMatch(msg.vertex_map, msg.color_image)) {
+    LOG(ERROR) << "Color dimensions " << showImageDim(msg.color_image)
+               << " do not match pointcloud dimensions "
+               << showImageDim(msg.vertex_map);
+    return false;
+  }
+
   return true;
 }
 

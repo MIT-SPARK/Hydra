@@ -20,10 +20,6 @@ namespace conversions {
 std::unique_ptr<InputData> parseInputPacket(const InputPacket& input_packet,
                                             const bool vertices_in_world_frame = false);
 
-// TODO(lschmid): Ported this from the input data. Does not seem to be used anywhere
-// though.
-bool hasSufficientData(const InputData& data);
-
 /**
  * @brief make sure that all the images are of the right type
  */
@@ -33,6 +29,7 @@ bool normalizeDepth(InputData& data);
 
 bool colorToLabels(cv::Mat& label_image, const cv::Mat& colors);
 
+// TODO(nathan) check if the conversions are directly used...
 bool convertLabels(InputData& data);
 
 bool convertDepth(InputData& data);

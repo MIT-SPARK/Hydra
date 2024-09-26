@@ -11,11 +11,15 @@
 
 namespace hydra::conversions {
 
-std::string showTypeInfo(const cv::Mat& mat) {
+namespace {
+
+inline std::string showTypeInfo(const cv::Mat& mat) {
   std::stringstream ss;
   ss << "{depth: " << mat.depth() << ", channels: " << mat.channels() << "}";
   return ss.str();
 }
+
+}  // namespace
 
 std::unique_ptr<InputData> parseInputPacket(const InputPacket& input_packet,
                                             const bool vertices_in_world_frame) {
@@ -50,16 +54,6 @@ std::unique_ptr<InputData> parseInputPacket(const InputPacket& input_packet,
 
   convertVertexMap(*data, vertices_in_world_frame);
   return data;
-}
-
-bool hasSufficientData(const InputData& data) {
-  // we accept data as either a pointcloud (points) or an rgbd image (depth_image)
-  // labels or color can encode the labels for a depth image or pointcloud. For the
-  // former case, color_image and/or label_image will share the same resolution as
-  // depth image and for the latter it will share the same resolution as the
-  // pointcloud...
-  return (!data.color_image.empty() || !data.label_image.empty()) &&
-         (!data.depth_image.empty() || !data.vertex_map.empty());
 }
 
 bool normalizeDepth(InputData& data) { return convertDepth(data); }
