@@ -239,7 +239,7 @@ void addBindings(pybind11::module_& m) {
              const py::buffer& depth,
              const py::buffer& labels,
              const py::buffer& rgb,
-             const Eigen::VectorXf& feature) {
+             const FeatureVector& feature) {
             auto input = std::make_shared<InputPacket>();
             input->timestamp_ns = timestamp_ns;
             input->world_t_body = world_t_body;
@@ -256,7 +256,7 @@ void addBindings(pybind11::module_& m) {
           "depth"_a,
           "labels"_a,
           "rgb"_a,
-          "features"_a = Eigen::VectorXf())
+          "features"_a = FeatureVector())
       .def(
           "step",
           [](HydraPythonPipeline& pipeline,
@@ -266,7 +266,7 @@ void addBindings(pybind11::module_& m) {
              const PythonSensorInput::PointVec& points,
              const PythonSensorInput::LabelVec& labels,
              const PythonSensorInput::ColorVec& colors,
-             const Eigen::VectorXf& feature) {
+             const FeatureVector& feature) {
             auto input = std::make_shared<InputPacket>();
             input->timestamp_ns = timestamp_ns;
             input->world_t_body = world_t_body;
@@ -283,7 +283,7 @@ void addBindings(pybind11::module_& m) {
           "points"_a,
           "labels"_a,
           "colors"_a,
-          "features"_a = Eigen::VectorXf())
+          "features"_a = FeatureVector())
       .def_property_readonly("graph", &HydraPythonPipeline::getSceneGraph);
 }
 

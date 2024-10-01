@@ -14,7 +14,7 @@ EmbeddingGroup::~EmbeddingGroup() {}
 bool EmbeddingGroup::empty() const { return embeddings.empty(); }
 
 Eigen::VectorXf EmbeddingGroup::getDistances(const EmbeddingDistance& dist,
-                                             const Eigen::VectorXf& embedding) const {
+                                             const FeatureVector& embedding) const {
   Eigen::VectorXf distances(embeddings.size());
   for (size_t i = 0; i < embeddings.size(); ++i) {
     distances(i) = dist.dist(embeddings[i], embedding);
@@ -24,7 +24,7 @@ Eigen::VectorXf EmbeddingGroup::getDistances(const EmbeddingDistance& dist,
 }
 
 Eigen::VectorXf EmbeddingGroup::getScores(const EmbeddingDistance& dist,
-                                          const Eigen::VectorXf& embedding) const {
+                                          const FeatureVector& embedding) const {
   const auto fmt = getDefaultFormat();
   VLOG(30) << "====================================================================";
   VLOG(30) << "Embedding: " << embedding.format(fmt);
@@ -39,7 +39,7 @@ Eigen::VectorXf EmbeddingGroup::getScores(const EmbeddingDistance& dist,
 }
 
 ScoreResult EmbeddingGroup::getBestScore(const EmbeddingDistance& dist,
-                                         const Eigen::VectorXf& embedding) const {
+                                         const FeatureVector& embedding) const {
   ScoreResult result;
   for (size_t i = 0; i < embeddings.size(); ++i) {
     const auto score = dist.score(embeddings[i], embedding);

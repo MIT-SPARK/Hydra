@@ -34,6 +34,10 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/utils/mesh_utilities.h"
 
+#include <pcl/point_types.h>
+#define PCL_NO_PRECOMPILE
+#include <pcl/filters/radius_outlier_removal.h>
+#undef PCL_NO_PRECOMPILE
 #include <spark_dsg/bounding_box_extraction.h>
 
 namespace hydra {
@@ -93,6 +97,35 @@ MeshLayer::Ptr getActiveMesh(const MeshLayer& mesh_layer,
   }
 
   return active_mesh;
+}
+
+BoundingBox fitBoxToFilteredMesh(const Mesh& mesh,
+                                 BoundingBox::Type type,
+                                 int inlier_min_neighbors,
+                                 double inlier_search_radius) {
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>());
+  for (const auto& vertex : mesh.points) {
+    auto& p = cloud->emplace_back();
+    p.x = vertex[0];
+    p.y = vertex[1];
+    p.z = vertex[2];
+  }
+
+  pcl::RadiusOutlierRemoval<pcl::PointXYZ> filter;
+  filter.setMinNeighborsInRadius(inlier_min_neighbors);
+  filter.setRadiusSearch(inlier_search_radius);
+  filter.setInputCloud(cloud);
+
+  pcl::Indices valid_list;
+  filter.filter(valid_list);
+
+  std::vector<size_t> mesh_connections(valid_list.begin(), valid_list.end());
+  if (mesh_connections.empty()) {
+    return {};
+  }
+
+  const BoundingBox::MeshAdaptor adaptor(mesh, &mesh_connections);
+  return BoundingBox(adaptor, type);
 }
 
 }  // namespace hydra

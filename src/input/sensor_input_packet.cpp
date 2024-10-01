@@ -82,6 +82,8 @@ bool ImageInputPacket::fillInputDataImpl(InputData& msg) const {
 
   msg.depth_image = depth;
   msg.label_image = labels;
+  // TODO(nathan) think about better copy
+  msg.label_features = label_features;
 
   if (!msg.label_image.empty() && !sizesMatch(msg.depth_image, msg.label_image)) {
     LOG(ERROR) << "Label dimensions " << showImageDim(msg.label_image)

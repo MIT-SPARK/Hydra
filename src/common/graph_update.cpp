@@ -102,7 +102,8 @@ void LayerUpdate::append(LayerUpdate&& rhs) {
   rhs.attributes.clear();
 }
 
-LayerTracker::LayerTracker(const Config& config) : next_id(config.prefix, 0) {}
+LayerTracker::LayerTracker(const Config& config)
+    : config(config), next_id(config.prefix, 0) {}
 
 GraphUpdater::GraphUpdater(const Config& config) : config(config::checkValid(config)) {
   for (const auto& [layer_name, tracker_config] : config.layer_updates) {
@@ -125,6 +126,9 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
 
     auto& tracker = iter->second;
     for (auto&& attrs : layer_update->attributes) {
+      VLOG(5) << "Emplacing " << tracker.next_id.getLabel() << " @ "
+              << tracker.config.target_layer.value_or(layer_id) << " for layer "
+              << layer_id;
       graph.emplaceNode(tracker.config.target_layer.value_or(layer_id),
                         tracker.next_id,
                         std::move(attrs));

@@ -13,7 +13,7 @@ using spark_dsg::SemanticNodeAttributes;
 
 FeatureView::FeatureView(uint64_t timestamp_ns,
                          const Eigen::Isometry3d& sensor_T_world,
-                         const Eigen::VectorXf& feature,
+                         const FeatureVector& feature,
                          const Sensor* sensor)
     : timestamp_ns(timestamp_ns),
       sensor_T_world(sensor_T_world),

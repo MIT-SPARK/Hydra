@@ -33,29 +33,19 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <optional>
-#include <vector>
-
-#include "hydra/common/dsg_types.h"
-#include "hydra/reconstruction/voxel_types.h"
+#include <Eigen/Dense>
+#include <map>
 
 namespace hydra {
 
-bool updateNodeCentroid(const spark_dsg::Mesh& mesh,
-                        const std::vector<size_t>& indices,
-                        NodeAttributes& attrs);
+//! Single embedding or feature column vector
+using FeatureVector = Eigen::VectorXf;
 
-bool updateObjectGeometry(const spark_dsg::Mesh& mesh,
-                          ObjectNodeAttributes& attrs,
-                          const std::vector<size_t>* indices = nullptr,
-                          std::optional<BoundingBox::Type> type = std::nullopt);
+//! Multiple features as column vectors
+using FeatureGroup = Eigen::MatrixXf;
 
-MeshLayer::Ptr getActiveMesh(const MeshLayer& mesh_layer,
-                             const BlockIndices& archived_blocks);
-
-BoundingBox fitBoxToFilteredMesh(const Mesh& mesh,
-                                 BoundingBox::Type type = BoundingBox::Type::AABB,
-                                 int inlier_min_neighbors = 5,
-                                 double inlier_search_radius = 0.1);
+//! Map between some sort of key and a feature
+template <typename Key>
+using FeatureMap = std::map<Key, FeatureVector>;
 
 }  // namespace hydra

@@ -12,14 +12,13 @@ namespace hydra {
 struct EmbeddingDistance {
   virtual ~EmbeddingDistance() = default;
 
-  inline float operator()(const Eigen::VectorXf& lhs,
-                          const Eigen::VectorXf& rhs) const {
+  inline float operator()(const FeatureVector& lhs, const FeatureVector& rhs) const {
     return score(lhs, rhs);
   }
 
-  virtual float dist(const Eigen::VectorXf& lhs, const Eigen::VectorXf& rhs) const = 0;
+  virtual float dist(const FeatureVector& lhs, const FeatureVector& rhs) const = 0;
 
-  virtual float score(const Eigen::VectorXf& lhs, const Eigen::VectorXf& rhs) const = 0;
+  virtual float score(const FeatureVector& lhs, const FeatureVector& rhs) const = 0;
 };
 
 struct CosineDistance : EmbeddingDistance {
@@ -31,9 +30,9 @@ struct CosineDistance : EmbeddingDistance {
 
   explicit CosineDistance(const Config& config) : config(config::checkValid(config)) {}
 
-  float dist(const Eigen::VectorXf& lhs, const Eigen::VectorXf& rhs) const override;
+  float dist(const FeatureVector& lhs, const FeatureVector& rhs) const override;
 
-  float score(const Eigen::VectorXf& lhs, const Eigen::VectorXf& rhs) const override;
+  float score(const FeatureVector& lhs, const FeatureVector& rhs) const override;
 
   const Config config;
 
@@ -54,9 +53,9 @@ struct L1Norm : public EmbeddingDistance {
 
   explicit L1Norm(const Config& = {}) {}
 
-  float dist(const Eigen::VectorXf& lhs, const Eigen::VectorXf& rhs) const override;
+  float dist(const FeatureVector& lhs, const FeatureVector& rhs) const override;
 
-  float score(const Eigen::VectorXf& lhs, const Eigen::VectorXf& rhs) const override;
+  float score(const FeatureVector& lhs, const FeatureVector& rhs) const override;
 
  private:
   inline static const auto registration_ =
@@ -70,9 +69,9 @@ struct L2Norm : public EmbeddingDistance {
 
   explicit L2Norm(const Config& = {}) {}
 
-  float dist(const Eigen::VectorXf& lhs, const Eigen::VectorXf& rhs) const override;
+  float dist(const FeatureVector& lhs, const FeatureVector& rhs) const override;
 
-  float score(const Eigen::VectorXf& lhs, const Eigen::VectorXf& rhs) const override;
+  float score(const FeatureVector& lhs, const FeatureVector& rhs) const override;
 
  private:
   inline static const auto registration_ =
@@ -89,9 +88,9 @@ struct LerfScore : public EmbeddingDistance {
 
   explicit LerfScore(const Config& config);
 
-  float dist(const Eigen::VectorXf& lhs, const Eigen::VectorXf& rhs) const override;
+  float dist(const FeatureVector& lhs, const FeatureVector& rhs) const override;
 
-  float score(const Eigen::VectorXf& lhs, const Eigen::VectorXf& rhs) const override;
+  float score(const FeatureVector& lhs, const FeatureVector& rhs) const override;
 
   const Config config;
 

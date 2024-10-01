@@ -109,6 +109,7 @@ void declare_config(PipelineConfig& config) {
   field(config.default_verbosity, "default_verbosity");
   field(config.default_num_threads, "default_num_threads");
   field(config.store_visualization_details, "store_visualization_details");
+  field<LayerMapConversion<char>>(config.layer_id_map, "layer_id_map");
   config.map_window.setOptional();
   field(config.map_window, "map_window");
   field<LabelNameConversion>(config.label_names, "label_names");
@@ -160,6 +161,7 @@ void GlobalInfo::checkFrozen() const {
 
 void GlobalInfo::initFromConfig(const PipelineConfig& config, int robot_id) {
   config_ = config::checkValid(config);
+  VLOG(5) << "Loading from config: " << config::toString(config);
   robot_prefix_ = RobotPrefixConfig(robot_id);
   logs_ = std::make_shared<LogSetup>(config_.logs);
   configureTimers();

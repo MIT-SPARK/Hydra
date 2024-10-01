@@ -7,6 +7,7 @@
 
 #include "hydra/common/common_types.h"
 #include "hydra/input/sensor.h"
+#include "hydra/openset/openset_types.h"
 
 namespace hydra {
 
@@ -51,7 +52,10 @@ struct InputData {
   float max_range = std::numeric_limits<float>::infinity();
 
   //! Feature associated with current input data
-  Eigen::VectorXf feature;
+  FeatureVector feature;
+
+  //! Features associated with each label
+  FeatureMap<int> label_features;
 
   /**
    * @brief Get the sensor that captured this data.

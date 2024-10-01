@@ -51,7 +51,7 @@ struct SensorInputPacket {
   const std::string sensor_name;
   std::string sensor_frame;
   //! Learned feature for the input data (e.g., CLIP for camera)
-  Eigen::VectorXf input_feature;
+  FeatureVector input_feature;
 
  protected:
   virtual bool fillInputDataImpl(InputData& msg) const = 0;
@@ -60,10 +60,16 @@ struct SensorInputPacket {
 struct ImageInputPacket : public SensorInputPacket {
   explicit ImageInputPacket(uint64_t stamp, const std::string& sensor_name);
 
+  //! Color for each pixel
   cv::Mat color;
+  //! Depth for each pixel
   cv::Mat depth;
+  //! Labels for each pixel
   cv::Mat labels;
-  bool color_is_bgr = false;  // Otherwise, color is RGB already.
+  //! Features associated with each label
+  FeatureMap<int> label_features;
+  //! Whether or not the input color image is bgr order
+  bool color_is_bgr = false;
 
  protected:
   bool fillInputDataImpl(InputData& msg) const override;

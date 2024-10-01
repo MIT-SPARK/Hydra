@@ -6,10 +6,10 @@ namespace hydra {
 
 void declare_config(MeanPooling::Config&) { config::name("MeanPooling::Config"); }
 
-Eigen::VectorXf MeanPooling::pool(const Eigen::MatrixXf& features,
-                                  const Eigen::VectorXf&) const {
+FeatureVector MeanPooling::pool(const FeatureGroup& features,
+                                const WeightVector&) const {
   if (features.cols() == 0) {
-    return Eigen::VectorXf();
+    return FeatureVector();
   }
 
   return features.rowwise().mean();
@@ -19,21 +19,22 @@ void declare_config(WeightedMeanPooling::Config&) {
   config::name("WeightedMeanPooling::Config");
 }
 
-Eigen::VectorXf WeightedMeanPooling::pool(const Eigen::MatrixXf& features,
-                                          const Eigen::VectorXf& weights) const {
+FeatureVector WeightedMeanPooling::pool(const FeatureGroup& features,
+                                        const WeightVector& weights) const {
   if (features.cols() == 0 || weights.rows() != features.cols()) {
-    return Eigen::VectorXf();
+    return FeatureVector();
   }
 
-  const Eigen::VectorXf weighted = features * weights;
+  const FeatureVector weighted = features * weights;
   return weighted / features.cols();
 }
 
 void declare_config(MaxPooling::Config&) { config::name("MaxPooling::Config"); }
-Eigen::VectorXf MaxPooling::pool(const Eigen::MatrixXf& features,
-                                 const Eigen::VectorXf& weights) const {
+
+FeatureVector MaxPooling::pool(const FeatureGroup& features,
+                               const WeightVector& weights) const {
   if (features.cols() == 0 || weights.rows() != features.cols()) {
-    return Eigen::VectorXf();
+    return FeatureVector();
   }
 
   int min_row = 0;

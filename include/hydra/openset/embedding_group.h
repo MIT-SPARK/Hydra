@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "hydra/openset/openset_types.h"
+
 namespace hydra {
 
 struct EmbeddingDistance;
@@ -22,15 +24,15 @@ struct EmbeddingGroup {
   size_t size() const { return embeddings.size(); }
 
   Eigen::VectorXf getDistances(const EmbeddingDistance& dist,
-                               const Eigen::VectorXf& embedding) const;
+                               const FeatureVector& embedding) const;
 
   Eigen::VectorXf getScores(const EmbeddingDistance& dist,
-                            const Eigen::VectorXf& embedding) const;
+                            const FeatureVector& embedding) const;
 
   ScoreResult getBestScore(const EmbeddingDistance& dist,
-                           const Eigen::VectorXf& embedding) const;
+                           const FeatureVector& embedding) const;
 
-  std::vector<Eigen::VectorXf> embeddings;
+  std::vector<FeatureVector> embeddings;
   std::vector<std::string> names;
 };
 

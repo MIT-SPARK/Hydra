@@ -4,8 +4,8 @@
 namespace hydra {
 
 TEST(EmbeddingDistances, TestCosineCorrect) {
-  Eigen::VectorXf a = Eigen::VectorXf::Zero(10);
-  Eigen::VectorXf b = Eigen::VectorXf::Zero(10);
+  FeatureVector a = FeatureVector::Zero(10);
+  FeatureVector b = FeatureVector::Zero(10);
   a(0) = 1.0f;
   b(0) = -1.0f;
   CosineDistance dist;
@@ -26,8 +26,8 @@ TEST(EmbeddingDistances, TestCosineCorrect) {
 }
 
 TEST(EmbeddingDistances, TestL1Norm) {
-  Eigen::VectorXf a = Eigen::VectorXf::Zero(10);
-  Eigen::VectorXf b = Eigen::VectorXf::Zero(10);
+  FeatureVector a = FeatureVector::Zero(10);
+  FeatureVector b = FeatureVector::Zero(10);
   a(0) = 1.0f;
   b(0) = -1.0f;
   L1Norm dist;
@@ -48,8 +48,8 @@ TEST(EmbeddingDistances, TestL1Norm) {
 }
 
 TEST(EmbeddingDistances, TestL2Norm) {
-  Eigen::VectorXf a = Eigen::VectorXf::Zero(10);
-  Eigen::VectorXf b = Eigen::VectorXf::Zero(10);
+  FeatureVector a = FeatureVector::Zero(10);
+  FeatureVector b = FeatureVector::Zero(10);
   a(0) = 1.0f;
   b(0) = -1.0f;
   L2Norm dist;
@@ -76,8 +76,8 @@ TEST(EmbeddingDistances, TestLerf) {
   config.cannonical_features = test::TestEmbeddingGroup::getDefault();
   LerfScore dist(config);
 
-  Eigen::VectorXf a = Eigen::VectorXf::Zero(10);
-  Eigen::VectorXf b = Eigen::VectorXf::Zero(10);
+  FeatureVector a = FeatureVector::Zero(10);
+  FeatureVector b = FeatureVector::Zero(10);
   a(0) = 1.0f;
   b(0) = -1.0f;
   {
