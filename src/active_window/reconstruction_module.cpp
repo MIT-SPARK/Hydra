@@ -140,15 +140,17 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputPacket& msg) {
     mesh_integrator_->generateMesh(map_, true, true);
   }  // timing scope
 
-  // this comes before clearing the update flag as we don't archive updated blocks
-  if (map_window_) {
-    const auto removed = map_window_->archiveBlocks(timestamp_ns, world_T_body, map_);
-    VLOG(2) << "[Hydra Reconstruction] archived " << removed << " @ " << timestamp_ns
-            << " [ns]";
-  }
-
   auto output = ActiveWindowOutput::fromInput(msg);
   output->sensor_data = data;
+
+  // this comes before clearing the update flag as we don't archive updated blocks
+  if (map_window_) {
+    output->archived_mesh_indices =
+        map_window_->archiveBlocks(timestamp_ns, world_T_body, map_);
+    VLOG(2) << "[Hydra Reconstruction] archived "
+            << output->archived_mesh_indices.size() << " @ " << timestamp_ns << " [ns]";
+  }
+
   output->setMap(map_.cloneUpdated());
   for (const auto& block : tsdf) {
     block.clearUpdated();

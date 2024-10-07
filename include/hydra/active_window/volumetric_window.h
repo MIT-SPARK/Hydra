@@ -58,10 +58,10 @@ struct VolumetricBlockInfo {
 struct VolumetricWindow {
   virtual ~VolumetricWindow() = default;
 
-  size_t archiveBlocks(uint64_t timestamp_ns,
-                       const Eigen::Isometry3d& world_T_body,
-                       VolumetricMap& map,
-                       bool skip_updated = true) const;
+  spatial_hash::BlockIndices archiveBlocks(uint64_t timestamp_ns,
+                                           const Eigen::Isometry3d& world_T_body,
+                                           VolumetricMap& map,
+                                           bool skip_updated = true) const;
 
   virtual bool inBounds(uint64_t timestamp_ns,
                         const Eigen::Isometry3d& world_T_body,

@@ -386,19 +386,12 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
   {  // start timing scope
     ScopedTimer timer("frontend/mesh_archive", input.timestamp_ns, true, 1, false);
-    const auto pose = input.world_T_body();
-    const auto block_size = input.map().blockSize();
-    mesh_compression_->archiveBlocks([&](const auto& index, const auto& info) {
-      if (!map_window_) {
-        return false;
-      }
-
-      if (input.map().getMeshLayer().hasBlock(index)) {
-        return false;
-      }
-
-      const VolumetricBlockInfo block(index, block_size, info.update_time_ns);
-      return !map_window_->inBounds(input.timestamp_ns, pose, block);
+    // TODO(nathan) add this back when we fix the khronos active window
+    //const auto pose = input.world_T_body();
+    //const auto block_size = input.map().blockSize();
+    const spatial_hash::IndexSet archived_blocks(input.archived_mesh_indices.begin(), input.archived_mesh_indices.end());
+    mesh_compression_->archiveBlocks([&](const auto& index, const auto& /* info */) {
+      return !archived_blocks.count(index);
     });
   }  // end timing scope
 

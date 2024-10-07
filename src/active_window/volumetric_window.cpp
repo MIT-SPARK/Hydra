@@ -58,10 +58,10 @@ Eigen::Vector3f VolumetricBlockInfo::blockCenter() const {
   return spatial_hash::centerPointFromIndex(index, block_size);
 }
 
-size_t VolumetricWindow::archiveBlocks(uint64_t timestamp_ns,
-                                       const Eigen::Isometry3d& world_T_body,
-                                       VolumetricMap& map,
-                                       bool skip_updated) const {
+BlockIndices VolumetricWindow::archiveBlocks(uint64_t timestamp_ns,
+                                             const Eigen::Isometry3d& world_T_body,
+                                             VolumetricMap& map,
+                                             bool skip_updated) const {
   BlockIndices to_remove;
   const auto& tsdf = map.getTsdfLayer();
   for (const auto& block : tsdf) {
@@ -78,7 +78,7 @@ size_t VolumetricWindow::archiveBlocks(uint64_t timestamp_ns,
   }
 
   map.removeBlocks(to_remove);
-  return to_remove.size();
+  return to_remove;
 }
 
 void declare_config(SpatialWindowChecker::Config& config) {

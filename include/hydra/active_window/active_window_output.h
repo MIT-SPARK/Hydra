@@ -61,6 +61,8 @@ struct ActiveWindowOutput {
   std::shared_ptr<InputData> sensor_data;
   //! New nodes to add to the scene graph
   GraphUpdate graph_update;
+  //! Archived mesh blocks on this pass
+  spatial_hash::BlockIndices archived_mesh_indices;
 
   /**
    * @brief Get the current volumetric map
