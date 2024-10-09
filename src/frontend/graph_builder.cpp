@@ -391,7 +391,7 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
     //const auto block_size = input.map().blockSize();
     const spatial_hash::IndexSet archived_blocks(input.archived_mesh_indices.begin(), input.archived_mesh_indices.end());
     mesh_compression_->archiveBlocks([&](const auto& index, const auto& /* info */) {
-      return !archived_blocks.count(index);
+      return archived_blocks.count(index);
     });
   }  // end timing scope
 
