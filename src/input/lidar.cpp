@@ -141,7 +141,6 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
     return false;
   }
 
-  // TODO(nathan) detect structured
   // TODO(nathan) think about structured points
 
   // TODO(nathan) test
@@ -173,6 +172,13 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
     color = 0;
   }
 
+  cv::Mat vertex_image;
+  bool not_structured = (input.vertex_map.rows != width_) || (input.vertex_map.cols != height_);
+  // NOTE(hyungtae) In case the points are not structured, it automatically generates a vertex image
+  if (not_structured) {
+    vertex_image = cv::Mat(height_, width_, CV_32FC3, cv::Scalar(0.0, 0.0, 0.0));
+  }
+
   auto point_iter = input.vertex_map.begin<cv::Vec3f>();
   auto label_iter = input.label_image.begin<int32_t>();
   size_t num_invalid = 0;
@@ -197,10 +203,19 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
     input.min_range = std::min(input.min_range, range_m);
     input.max_range = std::max(input.max_range, range_m);
 
-    input.range_image.at<float>(v, u) = p_C.norm();
+    // If the pixel has already been updated with a closer point, skip the procedure below
+    if (!(input.range_image.at<float>(v, u) == 0.0f || range_m < input.range_image.at<float>(v, u))) {
+      continue;
+    }
+    
+    input.range_image.at<float>(v, u) = range_m;
     labels.at<int32_t>(v, u) = *label_iter;
     if (has_color) {
       color.at<cv::Vec3b>(v, u) = input.color_image.at<cv::Vec3b>(color_index);
+    }
+
+    if (not_structured) {
+      vertex_image.at<cv::Vec3f>(v, u) = *point_iter;
     }
 
     ++point_iter;
@@ -214,6 +229,9 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
           << " (percent: " << percent_invalid << ")";
   input.label_image = labels;
   input.color_image = color;
+  if (not_structured) {
+    input.vertex_map = vertex_image;
+  }
   return true;
 }
 
@@ -234,11 +252,11 @@ bool Lidar::projectPointToImagePlane(const Eigen::Vector3f& p_C,
   if (config_.is_asymmetric) {
     // phi is [-pi/2, pi/2], ratio is [1, 0], maps to [height, 0]
     const auto vertical_ratio = (vertical_fov_top_rad_ - phi) / vertical_fov_rad_;
-    v = height_ * vertical_ratio;
+    v = height_ * vertical_ratio + 0.5;
   } else {
     // phi is [-pi/2, pi/2], ratio is [1, 0], maps to [height, 0]
     const auto vertical_ratio = (vertical_fov_rad_ / 2.0f - phi) / vertical_fov_rad_;
-    v = height_ * vertical_ratio;
+    v = height_ * vertical_ratio + 0.5;
   }
 
   if (v < 0.0f || v > height_) {
@@ -246,7 +264,7 @@ bool Lidar::projectPointToImagePlane(const Eigen::Vector3f& p_C,
   }
 
   const auto h_ratio = (horizontal_fov_rad_ / 2.0f - theta) / horizontal_fov_rad_;
-  u = width_ * h_ratio;
+  u = width_ * h_ratio + 0.5;
   if (u < 0.0f || u > width_) {
     return false;
   }
