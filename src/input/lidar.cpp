@@ -205,6 +205,9 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
 
     // If the pixel has already been updated with a closer point, skip the procedure below
     if (!(input.range_image.at<float>(v, u) == 0.0f || range_m < input.range_image.at<float>(v, u))) {
+      ++point_iter;
+      ++label_iter;
+      ++color_index;
       continue;
     }
     
