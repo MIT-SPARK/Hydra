@@ -1,0 +1,129 @@
+---
+semantic_measurement_probability: 0.9
+total_semantic_labels: 114
+dynamic_labels: []
+invalid_labels: [] 
+frontend:
+  objects:
+    labels: [14, 19, 20, 21, 22, 23, 24, 25, 26, 27, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
+      40, 41, 42, 43, 44, 45, 46, 47, 49, 52, 53, 55, 56, 57, 58, 59, 60, 61, 62,
+      63, 64, 65, 67, 68, 69, 70, 71, 72, 73, 74, 76, 77, 78, 79, 81, 82, 85, 86,
+      87, 88, 89, 90, 91, 93, 94, 97, 98, 100, 101, 102, 103, 105, 108, 109,
+      110, 111, 112, 113]
+  surface_places:
+    labels: [18, 80, 95, 99, 105, 106]
+label_names:
+  - {label: 0, name: ARLSimulationUnityROSRosRegistry}
+  - {label: 1, name: LayerCulling}
+  - {label: 2, name: UI}
+  - {label: 3, name: DayNightCycle}
+  - {label: 4, name: RadioServer}
+  - {label: 5, name: Moon}
+  - {label: 6, name: TrueState}
+  - {label: 7, name: Daily}
+  - {label: 8, name: Sun}
+  - {label: 9, name: EventSystem}
+  - {label: 10, name: SemanticSegmentationManager}
+  - {label: 11, name: RecognizableObjectManager}
+  - {label: 12, name: Settings}
+  - {label: 13, name: Simulation}
+  - {label: 14, name: Clock, name_descriptive: a clock}
+  - {label: 15, name: Spawner}
+  - {label: 16, name: FlyCamera}
+  - {label: 17, name: Server}
+  - {label: 18, name: Floor, name_descriptive: a floor}
+  - {label: 19, name: LCD, name_descriptive: an LCD screen}
+  - {label: 20, name: Couch, name_descriptive: a couch}
+  - {label: 21, name: Door, name_descriptive: a door}
+  - {label: 22, name: Toilet, name_descriptive: a toilet}
+  - {label: 23, name: Lamp, name_descriptive: a lamp}
+  - {label: 24, name: Spotlight, name_descriptive: a spotlight}
+  - {label: 25, name: WaterSprinklerPipe, name_descriptive: a water sprinkler pipe}
+  - {label: 26, name: TableScreen}
+  - {label: 27, name: Chair, name_descriptive: a chair}
+  - {label: 28, name: Wall, name_descriptive: a wall}
+  - {label: 29, name: Closet, name_descriptive: a closet}
+  - {label: 30, name: FanTable}
+  - {label: 31, name: Airventilation}
+  - {label: 32, name: CeilingLamp, name_descriptive: a ceiling lamp}
+  - {label: 33, name: Files, name_descriptive: files}
+  - {label: 34, name: Painting, name_descriptive: a painting}
+  - {label: 35, name: CeilingLamps,  name_descriptive: a ceiling lamp}
+  - {label: 36, name: WindowBlinds,  name_descriptive: window blinds}
+  - {label: 37, name: Pencil, name_descriptive: a pencil}
+  - {label: 38, name: Mug, name_descriptive: a mug}
+  - {label: 39, name: Pen, name_descriptive: a pen}
+  - {label: 40, name: AirventilationGrid}
+  - {label: 41, name: Trashcan, name_descriptive: a trashcan}
+  - {label: 42, name: MetalCabinet,  name_descriptive: a metal cabinet}
+  - {label: 43, name: PaperBag01,  name_descriptive: a paper bag}
+  - {label: 44, name: CardboardBox01,  name_descriptive: a cardboardbox with id 1}
+  - {label: 45, name: MetalShelf,  name_descriptive: a metal shelf}
+  - {label: 46, name: Flagpole, name_descriptive: a flagpole}
+  - {label: 47, name: Folder02,  name_descriptive: a folder with id 2}
+  - {label: 48, name: Roofs}
+  - {label: 49, name: Drawer, name_descriptive: a drawer}
+  - {label: 50, name: Metal}
+  - {label: 51, name: Hand}
+  - {label: 52, name: Box, name_descriptive: a box}
+  - {label: 53, name: WhiteBoard, name_descriptive: a whiteboard}
+  - {label: 54, name: CeilingHang01}
+  - {label: 55, name: ExitSign, name_descriptive: an exit sign}
+  - {label: 56, name: PC, name_descriptive: a personal computer}
+  - {label: 57, name: Desk, name_descriptive: a desk}
+  - {label: 58, name: Table, name_descriptive: a table}
+  - {label: 59, name: Plant, name_descriptive: a plant}
+  - {label: 60, name: Fan, name_descriptive: a fan}
+  - {label: 61, name: Keyboard, name_descriptive: a keyboard}
+  - {label: 62, name: Paper02}
+  - {label: 63, name: Urinal, name_descriptive: a urinal}
+  - {label: 64, name: FolderHolder}
+  - {label: 65, name: MousePad, name_descriptive: a mouse pad}
+  - {label: 66, name: Area}
+  - {label: 67, name: Sign, name_descriptive: a sign}
+  - {label: 68, name: WaterSprinkler}
+  - {label: 69, name: Paper01}
+  - {label: 70, name: Mouse, name_descriptive: a computer mouse}
+  - {label: 71, name: Leather}
+  - {label: 72, name: Dresser, name_descriptive: a dresser}
+  - {label: 73, name: FileFolder, name_descriptive: a file folder}
+  - {label: 74, name: Books, name_descriptive: books}
+  - {label: 75, name: Sound}
+  - {label: 76, name: Folder01, name_descriptive: a folder with id 1}
+  - {label: 77, name: TableWooden, name_descriptive: a wooden table}
+  - {label: 78, name: Water}
+  - {label: 79, name: Cart, name_descriptive: a cart}
+  - {label: 80, name: Floors, name_descriptive: floors}
+  - {label: 81, name: File, name_descriptive: a file}
+  - {label: 82, name: Sink3x, name_descriptive: a sink}
+  - {label: 83, name: Walls, name_descriptive: walls}
+  - {label: 84, name: ExitWay}
+  - {label: 85, name: Sticker02, name_descriptive: a sticker with id 1}
+  - {label: 86, name: Sticker01, name_descriptive: a sticker with id 2}
+  - {label: 87, name: Sticker03, name_descriptive: a sticker with id 3}
+  - {label: 88, name: CorkBoard, name_descriptive: a cork board}
+  - {label: 89, name: Paper, name_descriptive: a piece of paper}
+  - {label: 90, name: Laptop, name_descriptive: a laptop}
+  - {label: 91, name: Phone, name_descriptive: a phone}
+  - {label: 92, name: Sounds}
+  - {label: 93, name: Reflection, name_descriptive: a reflection from a mirror or glass}
+  - {label: 94, name: Bottle, name_descriptive: a bottle}
+  - {label: 95, name: Stairs, name_descriptive: stairs}
+  - {label: 96, name: Props}
+  - {label: 97, name: Lamps, name_descriptive: lamps}
+  - {label: 98, name: Bookshelf, name_descriptive: a bookshelf}
+  - {label: 99, name: Terrain, name_descriptive: terrain of some type}
+  - {label: 100, name: ToiletSign, name_descriptive: a toilet sign}
+  - {label: 101, name: Lights, name_descriptive: lights}
+  - {label: 102, name: Doors, name_descriptive: doors}
+  - {label: 103, name: Light, name_descriptive: a light}
+  - {label: 104, name: Directional}
+  - {label: 105, name: StairsMod, name_descriptive: stairs of type mod}
+  - {label: 106, name: Carpet, name_descriptive: a carpet}
+  - {label: 107, name: Cell}
+  - {label: 108, name: PaintingSet, name_descriptive: a set of paintings}
+  - {label: 109, name: PipeLargeCeiling6x, name_descriptive: large pipes on ceiling with id 6x}
+  - {label: 110, name: Elevator, name_descriptive: an elevator}
+  - {label: 111, name: PipeLargeCeiling2x, name_descriptive: large pipes on ceiling with id 2x}
+  - {label: 112, name: ElevatorDoor, name_descriptive: an elevator door}
+  - {label: 113, name: Pipe, name_descriptive: a pipe}
