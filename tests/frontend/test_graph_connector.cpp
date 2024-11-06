@@ -79,6 +79,7 @@ void setupGraph(DynamicSceneGraph& graph) {
 
 GraphConnector::Config getDefaultConfig(bool include_static, bool include_dynamic) {
   GraphConnector::Config config;
+  config.layers.clear();
   config.layers.push_back(LayerConnector::Config{
       DsgLayers::PLACES, {{DsgLayers::OBJECTS, include_static, include_dynamic}}});
   return config;
