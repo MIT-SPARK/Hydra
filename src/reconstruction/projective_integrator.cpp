@@ -47,6 +47,10 @@
 // purposes notwithstanding any copyright notation herein.
 #include "hydra/reconstruction/projective_integrator.h"
 
+#include <config_utilities/config.h>
+#include <config_utilities/types/conversions.h>
+#include <config_utilities/validation.h>
+
 #include <algorithm>
 #include <future>
 #include <vector>
@@ -59,9 +63,31 @@ namespace hydra {
 
 using VoxelMeasurement = ProjectiveIntegrator::VoxelMeasurement;
 
-ProjectiveIntegrator::ProjectiveIntegrator(const ProjectiveIntegratorConfig& config)
+void declare_config(ProjectiveIntegrator::Config& config) {
+  using namespace config;
+  name("ProjectiveIntegrator");
+  field(config.verbosity, "verbosity");
+  field(config.use_weight_dropoff, "use_weight_dropoff");
+  field(config.weight_dropoff_epsilon,
+        "weight_dropoff_epsilon",
+        config.weight_dropoff_epsilon >= 0 ? "m" : "vs");
+  field(config.use_constant_weight, "use_constant_weight");
+  field(config.max_weight, "max_weight");
+  field<ThreadNumConversion>(config.num_threads, "num_threads");
+  field(config.interpolation_method, "interpolation_method");
+  config.semantic_integrator.setOptional();
+  field(config.semantic_integrator, "semantic_integrator");
+
+  check(config.num_threads, GT, 0, "num_threads");
+  check(config.max_weight, GT, 0, "max_weight");
+  if (config.use_weight_dropoff) {
+    check(config.weight_dropoff_epsilon, NE, 0.f, "weight_dropoff_epsilon");
+  }
+}
+
+ProjectiveIntegrator::ProjectiveIntegrator(const ProjectiveIntegrator::Config& config)
     : config(config::checkValid(config)),
-      interpolator_(config::create<ProjectionInterpolator>(config.interp_method)),
+      interpolator_(config.interpolation_method.create()),
       semantic_integrator_(config.semantic_integrator.create()) {}
 
 void ProjectiveIntegrator::updateMap(const InputData& data,
@@ -91,7 +117,8 @@ void ProjectiveIntegrator::updateMap(const InputData& data,
 void ProjectiveIntegrator::updateBlocks(const BlockIndices& block_indices,
                                         const InputData& data,
                                         VolumetricMap& map) const {
-  LOG_IF(INFO, config.verbosity >= 3) << "Updating " << block_indices.size() << " blocks.";
+  LOG_IF(INFO, config.verbosity >= 3)
+      << "Updating " << block_indices.size() << " blocks.";
 
   // Update all blocks in parallel.
   IndexGetter<BlockIndex> index_getter(block_indices);

@@ -9,7 +9,6 @@ active_window:
     truncation_distance: 0.3
   full_update_separation_s: 1.0
   tsdf:
-    interpolation_method: bilinear
     semantic_integrator:
       type: MLESemanticIntegrator
 frontend:

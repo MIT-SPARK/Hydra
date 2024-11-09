@@ -47,7 +47,6 @@
 // purposes notwithstanding any copyright notation herein.
 #pragma once
 
-#include <config_utilities/factory.h>
 #include <spark_dsg/color.h>
 
 #include <memory>
@@ -120,6 +119,9 @@ class ProjectionInterpolator {
  */
 class InterpolatorNearest : public ProjectionInterpolator {
  public:
+  struct Config {};
+  explicit InterpolatorNearest(const Config&) {}
+
   InterpolationWeights computeWeights(float u,
                                       float v,
                                       const cv::Mat& range_image) const override;
@@ -132,11 +134,9 @@ class InterpolatorNearest : public ProjectionInterpolator {
 
   int interpolateID(const cv::Mat& id_image,
                     const InterpolationWeights& weights) const override;
-
- private:
-  inline static const auto registration_ =
-      config::Registration<ProjectionInterpolator, InterpolatorNearest>("nearest");
 };
+
+void declare_config(InterpolatorNearest::Config& config);
 
 /**
  * @brief Interpolates values using bilinear interpolation. Use computeWeights()
@@ -144,6 +144,9 @@ class InterpolatorNearest : public ProjectionInterpolator {
  */
 class InterpolatorBilinear : public ProjectionInterpolator {
  public:
+  struct Config {};
+  explicit InterpolatorBilinear(const Config&) {}
+
   InterpolationWeights computeWeights(float u,
                                       float v,
                                       const cv::Mat& range_image) const override;
@@ -156,11 +159,9 @@ class InterpolatorBilinear : public ProjectionInterpolator {
 
   int interpolateID(const cv::Mat& id_image,
                     const InterpolationWeights& weights) const override;
-
- private:
-  inline static const auto registration_ =
-      config::Registration<ProjectionInterpolator, InterpolatorBilinear>("bilinear");
 };
+
+void declare_config(InterpolatorBilinear::Config& config);
 
 /**
  * @brief Use bilinear interpolation if the range values are all close,
@@ -170,6 +171,12 @@ class InterpolatorBilinear : public ProjectionInterpolator {
  */
 class InterpolatorAdaptive : public InterpolatorBilinear {
  public:
+  struct Config {
+    float max_depth_difference_m = 0.2;
+  } const config;
+
+  explicit InterpolatorAdaptive(const Config& config);
+
   InterpolationWeights computeWeights(float u,
                                       float v,
                                       const cv::Mat& range_image) const override;
@@ -184,10 +191,10 @@ class InterpolatorAdaptive : public InterpolatorBilinear {
                     const InterpolationWeights& weights) const override;
 
  private:
-  inline static const auto registration_ =
-      config::Registration<ProjectionInterpolator, InterpolatorAdaptive>("adaptive");
   const int u_offset_[4] = {0, 0, 1, 1};
   const int v_offset_[4] = {0, 1, 0, 1};
 };
+
+void declare_config(InterpolatorAdaptive::Config& config);
 
 }  // namespace hydra

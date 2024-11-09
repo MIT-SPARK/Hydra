@@ -39,7 +39,7 @@
 
 #include "hydra/active_window/active_window_module.h"
 #include "hydra/reconstruction/mesh_integrator_config.h"
-#include "hydra/reconstruction/projective_integrator_config.h"
+#include "hydra/reconstruction/projective_integrator.h"
 
 namespace hydra {
 
@@ -51,7 +51,7 @@ class ReconstructionModule : public ActiveWindowModule {
  public:
   struct Config : ActiveWindowModule::Config {
     double full_update_separation_s = 0.0;
-    ProjectiveIntegratorConfig tsdf;
+    ProjectiveIntegrator::Config tsdf;
     MeshIntegratorConfig mesh;
     config::VirtualConfig<RobotFootprintIntegrator> robot_footprint;
   } const config;

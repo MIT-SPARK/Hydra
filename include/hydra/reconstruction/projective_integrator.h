@@ -46,15 +46,13 @@
 // Government is authorized to reproduce and distribute reprints for Government
 // purposes notwithstanding any copyright notation herein.
 #pragma once
-#include <config_utilities/config_utilities.h>
-
 #include <memory>
 #include <string>
 #include <thread>
 
+#include "hydra/common/global_info.h"
 #include "hydra/input/input_packet.h"
 #include "hydra/reconstruction/projection_interpolators.h"
-#include "hydra/reconstruction/projective_integrator_config.h"
 #include "hydra/reconstruction/semantic_integrator.h"
 #include "hydra/reconstruction/volumetric_map.h"
 
@@ -70,6 +68,31 @@ namespace hydra {
  */
 class ProjectiveIntegrator {
  public:
+  struct Config {
+    //! Verbosity for the projective integrator
+    int verbosity = GlobalInfo::instance().getConfig().default_verbosity;
+    //! If true, drop off the weight behind the surface crossing
+    bool use_weight_dropoff = true;
+    //! Distance in meters where the weight drop-off reaches zero. Negative
+    //! values are multiples of the voxel size
+    float weight_dropoff_epsilon = -1.0f;
+    //! If true, use unitary (w=1) weights to update the TSDF. Otherwise use
+    //! weights as a function of the squared depth to approximate typical RGBD
+    //! sensor confidence
+    bool use_constant_weight = false;
+    //! Maximum weight used for TSDF updates. High max weight keeps information
+    //! longer in memory, low max weight favors rapid updates
+    float max_weight = 1.0e5f;
+    //! Number of threads used to perform integration (parallelized by block)
+    int num_threads = GlobalInfo::instance().getConfig().default_num_threads;
+    //! Which interpolation to use in the image projection [nearest, bilinear,
+    //! adaptive]
+    config::VirtualConfig<ProjectionInterpolator> interpolation_method{
+        InterpolatorAdaptive::Config{}};
+    //! Semantic integrator configuration (optional)
+    config::VirtualConfig<SemanticIntegrator> semantic_integrator;
+  } const config;
+
   struct VoxelMeasurement {
     bool valid = false;
     InterpolationWeights interpolation_weights;
@@ -78,7 +101,7 @@ class ProjectiveIntegrator {
     int32_t label = -1;
   };
 
-  explicit ProjectiveIntegrator(const ProjectiveIntegratorConfig& config);
+  explicit ProjectiveIntegrator(const ProjectiveIntegrator::Config& config);
 
   virtual ~ProjectiveIntegrator() = default;
 
@@ -177,11 +200,11 @@ class ProjectiveIntegrator {
                             const float truncation_distance,
                             VoxelMeasurement& measurement) const;
 
-  const ProjectiveIntegratorConfig config;
-
  protected:
   const std::unique_ptr<const ProjectionInterpolator> interpolator_;
   const std::unique_ptr<const SemanticIntegrator> semantic_integrator_;
 };
+
+void declare_config(ProjectiveIntegrator::Config& config);
 
 }  // namespace hydra
