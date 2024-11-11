@@ -36,12 +36,15 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
+#include <spark_dsg/graph_utilities.h>
 
 #include "hydra/common/global_info.h"
 #include "hydra/places/graph_extractor_interface.h"
 #include "hydra/places/graph_extractor_utilities.h"
 #include "hydra/places/gvd_integrator.h"
 #include "hydra/utils/timing_utilities.h"
+#include <spark_dsg/printing.h>
+
 
 namespace hydra {
 

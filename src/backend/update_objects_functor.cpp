@@ -39,6 +39,8 @@
 #include "hydra/backend/backend_utilities.h"
 #include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/timing_utilities.h"
+#include <spark_dsg/printing.h>
+
 
 namespace hydra {
 

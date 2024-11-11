@@ -33,6 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <spark_dsg/graph_utilities.h>
+
 #include <bitset>
 #include <iostream>
 

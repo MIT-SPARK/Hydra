@@ -39,6 +39,7 @@
 #include <Eigen/Dense>
 #include <algorithm>
 #include <queue>
+#include <spark_dsg/graph_utilities.h>
 
 #include "hydra/common/global_info.h"
 #include "hydra/rooms/graph_filtration.h"

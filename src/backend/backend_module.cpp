@@ -486,7 +486,7 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
   }  // end joint critical section
 
   if (logs_) {
-    backend_graph_logger_.logGraph(private_dsg_->graph);
+    // backend_graph_logger_.logGraph(private_dsg_->graph);
   }
 
   return true;

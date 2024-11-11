@@ -37,6 +37,7 @@
 #include <kimera_pgmo/compression/delta_compression.h>
 #include <kimera_pgmo/utils/common_functions.h>
 #include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/node_symbol.h>
 
 #include <filesystem>
 #include <nanoflann.hpp>

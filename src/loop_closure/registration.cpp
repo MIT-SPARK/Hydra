@@ -34,6 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/loop_closure/registration.h"
 
+#include <spark_dsg/printing.h>
+
 #include <fstream>
 #include <iomanip>
 

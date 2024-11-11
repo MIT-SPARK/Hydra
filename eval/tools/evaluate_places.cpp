@@ -35,6 +35,8 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include <iostream>
+
 #include "hydra/eval/place_evaluator.h"
 
 DEFINE_double(max_distance_m, 4.5, "max distance");

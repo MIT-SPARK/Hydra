@@ -36,6 +36,8 @@
 
 #include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
+#include <spark_dsg/printing.h>
+
 
 #include "hydra/utils/timing_utilities.h"
 
