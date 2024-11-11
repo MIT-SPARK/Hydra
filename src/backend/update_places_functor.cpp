@@ -37,7 +37,7 @@
 #include <config_utilities/config.h>
 #include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
-#include <spark_dsg/printing.h>
+#include <spark_dsg/node_symbol.h>
 
 
 #include "hydra/utils/timing_utilities.h"

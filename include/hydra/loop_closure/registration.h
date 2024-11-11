@@ -36,7 +36,7 @@
 #include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
 #include <teaser/registration.h>
-#include <spark_dsg/printing.h>
+#include <spark_dsg/node_symbol.h>
 
 #include <mutex>
 

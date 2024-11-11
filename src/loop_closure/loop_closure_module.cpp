@@ -40,7 +40,7 @@
 
 #include "hydra/common/global_info.h"
 #include "hydra/utils/timing_utilities.h"
-#include <spark_dsg/printing.h>
+#include <spark_dsg/node_symbol.h>
 
 
 namespace hydra {

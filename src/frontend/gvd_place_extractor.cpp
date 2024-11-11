@@ -43,7 +43,7 @@
 #include "hydra/places/graph_extractor_utilities.h"
 #include "hydra/places/gvd_integrator.h"
 #include "hydra/utils/timing_utilities.h"
-#include <spark_dsg/printing.h>
+#include <spark_dsg/node_symbol.h>
 
 
 namespace hydra {
