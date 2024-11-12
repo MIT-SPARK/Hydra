@@ -49,6 +49,7 @@ struct LabelSpaceConfig {
   std::set<uint32_t> invalid_labels;
   std::set<uint32_t> object_labels;
   std::set<uint32_t> surface_places_labels = {};
+  std::set<uint32_t> ground_labels = {};
 
   inline bool isObject(const uint32_t id) const { return object_labels.count(id) > 0; }
   inline bool isDynamic(const uint32_t id) const {

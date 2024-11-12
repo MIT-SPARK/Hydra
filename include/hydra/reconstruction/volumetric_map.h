@@ -97,9 +97,13 @@ class VolumetricMap {
     size_t voxels_per_side = 16;
     //! TSDF truncation distance.
     float truncation_distance = 0.3f;
-    //! Whether or not the map has a semantic layer
+    //! Adaptive TSDF truncation distance for ground points whose incidence angles are
+    //! close to 90 degrees.
+    //! 0 (default): turn off the adaptive truncation distance mode.
+    float truncation_distance_for_ground = 0.0f;
+    //! Whether or not the map has a semantic layer.
     bool with_semantics = false;
-    //! Whether or not the map has a tracking layer
+    //! Whether or not the map has a tracking layer.
     bool with_tracking = false;
   } const config;
 

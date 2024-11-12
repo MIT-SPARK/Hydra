@@ -138,27 +138,24 @@ class ProjectiveIntegrator {
 
   /**
    * @brief Compute the data needed to update a TSDF voxel.
+   * @param map_config Configuration containing truncation distance, voxel size,
+   * and other map parameters.
    * @param p_C Center point of the voxel in camera (C) frame.
    * @param data Input data to use for the update.
-   * @param truncation_distance Truncation distance of the TSDF in meters.
-   * @param voxel_size Size of the voxels in the map in meters.
    * @return The measurement weight that can be applied to a voxel.
    */
-  VoxelMeasurement getVoxelMeasurement(const Point& p_C,
-                                       const InputData& data,
-                                       const float truncation_distance,
-                                       const float voxel_size) const;
+  VoxelMeasurement getVoxelMeasurement(const VolumetricMap::Config& map_config,
+                                       const Point& p_C,
+                                       const InputData& data) const;
 
   /**
    * @brief Update a voxel with the given measurement.
    * @param data Input data to use for the update.
    * @param measurement Measurement to use for the update.
-   * @param truncation_distance Truncation distance of the TSDF in meters.
    * @param voxels Voxel to update.
    */
   void updateVoxel(const InputData& data,
                    const VoxelMeasurement& measurement,
-                   const float truncation_distance,
                    VoxelTuple& voxels) const;
 
   /**
@@ -196,13 +193,20 @@ class ProjectiveIntegrator {
    * @brief Compute the semantic label of the given measurement.
    * @returns True if the measurement is valid for integration, false otherwise.
    */
-  virtual bool computeLabel(const InputData& data,
-                            const float truncation_distance,
-                            VoxelMeasurement& measurement) const;
+  virtual bool computeLabel(const InputData& data, VoxelMeasurement& measurement) const;
+
+  /**
+   * @brief Check if the given label corresponds to a ground point.
+   * @param label The label associated with the voxel or point.
+   * @return True if the label is part of the predefined ground labels; false otherwise.
+   */
+  bool isGroundLabel(const uint32_t label) const;
 
  protected:
   const std::unique_ptr<const ProjectionInterpolator> interpolator_;
   const std::unique_ptr<const SemanticIntegrator> semantic_integrator_;
+
+  const std::set<uint32_t> ground_labels_;
 };
 
 void declare_config(ProjectiveIntegrator::Config& config);

@@ -49,6 +49,7 @@ void declare_config(LabelSpaceConfig& config) {
   field(config.object_labels, "object_labels");
   // Optional fields.
   field(config.surface_places_labels, "surface_places_labels");
+  field(config.ground_labels, "ground_labels");
 }
 
 }  // namespace hydra

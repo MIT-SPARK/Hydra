@@ -88,7 +88,8 @@ void declare_config(ProjectiveIntegrator::Config& config) {
 ProjectiveIntegrator::ProjectiveIntegrator(const ProjectiveIntegrator::Config& config)
     : config(config::checkValid(config)),
       interpolator_(config.interpolation_method.create()),
-      semantic_integrator_(config.semantic_integrator.create()) {}
+      semantic_integrator_(config.semantic_integrator.create()),
+      ground_labels_(GlobalInfo::instance().getLabelSpaceConfig().ground_labels) {}
 
 void ProjectiveIntegrator::updateMap(const InputData& data,
                                      VolumetricMap& map,
@@ -152,18 +153,15 @@ void ProjectiveIntegrator::updateBlock(const BlockIndex& block_index,
 
   // Update all voxels.
   bool was_updated = false;
-  const float truncation_distance = map.config.truncation_distance;
-  const float voxel_size = map.config.voxel_size;
   for (size_t i = 0; i < blocks.tsdf->numVoxels(); ++i) {
     const auto p_sensor = sensor_T_body * blocks.tsdf->getVoxelPosition(i);
-    const auto measurement =
-        getVoxelMeasurement(p_sensor, data, truncation_distance, voxel_size);
+    const auto measurement = getVoxelMeasurement(map.config, p_sensor, data);
     if (!measurement.valid) {
       continue;
     }
 
     auto voxels = blocks.getVoxels(i);
-    updateVoxel(data, measurement, truncation_distance, voxels);
+    updateVoxel(data, measurement, voxels);
     was_updated = true;
   }
 
@@ -174,20 +172,39 @@ void ProjectiveIntegrator::updateBlock(const BlockIndex& block_index,
 }
 
 VoxelMeasurement ProjectiveIntegrator::getVoxelMeasurement(
+    const VolumetricMap::Config& map_config,
     const Point& p_C,
-    const InputData& data,
-    const float truncation_distance,
-    const float voxel_size) const {
+    const InputData& data) const {
   VoxelMeasurement measurement;
+
   const auto voxel_range = p_C.norm();
+  // Check the point is valid for interpolation.
   if (voxel_range < data.getSensor().min_range() ||
       voxel_range > data.getSensor().max_range() || voxel_range > data.max_range) {
     return measurement;
   }
 
-  // Check the point is valid for interpolation.
   if (!interpolatePoint(p_C, data, measurement.interpolation_weights)) {
     return measurement;
+  }
+
+  // Don't integrate surface voxels of dynamic measurements.
+  if (!computeLabel(data, measurement)) {
+    return measurement;
+  }
+
+  // NOTE(hlim) Set adaptive truncation distance for better mesh generation
+  // Especially, this option considers ground points from LiDAR measurement
+  float truncation_distance = map_config.truncation_distance;
+  if (map_config.truncation_distance_for_ground && isGroundLabel(measurement.label)) {
+    if (map_config.truncation_distance_for_ground > 0) {
+      truncation_distance = map_config.truncation_distance_for_ground;
+    } else {
+      // `truncation_distance_for_ground` is used as a ratio
+      // of the the actual truncation distance
+      truncation_distance =
+          -map_config.truncation_distance_for_ground * map_config.truncation_distance;
+    }
   }
 
   // Compute the signed distance to the surface.
@@ -201,21 +218,18 @@ VoxelMeasurement ProjectiveIntegrator::getVoxelMeasurement(
     return measurement;
   }
 
-  // Don't integrate surface voxels of dynamic measurements.
-  if (!computeLabel(data, truncation_distance, measurement)) {
-    return measurement;
-  }
-
   // Compute the weight of the measurement.
-  measurement.weight = computeWeight(
-      data.getSensor(), p_C, measurement.sdf, truncation_distance, voxel_size);
+  measurement.weight = computeWeight(data.getSensor(),
+                                     p_C,
+                                     measurement.sdf,
+                                     truncation_distance,
+                                     map_config.voxel_size);
   measurement.valid = true;
   return measurement;
 }
 
 void ProjectiveIntegrator::updateVoxel(const InputData& data,
                                        const VoxelMeasurement& measurement,
-                                       const float truncation_distance,
                                        VoxelTuple& voxels) const {
   if (!std::isfinite(measurement.sdf)) {
     LOG(ERROR) << "found invalid measurement!";
@@ -235,11 +249,6 @@ void ProjectiveIntegrator::updateVoxel(const InputData& data,
 
   if (voxels.tracking) {
     voxels.tracking->last_observed = data.timestamp_ns;
-  }
-
-  // Only merge other quantities near the surface
-  if (measurement.sdf >= truncation_distance) {
-    return;
   }
 
   // TODO(nathan) refactor into update functions
@@ -313,10 +322,8 @@ float ProjectiveIntegrator::computeWeight(const Sensor& sensor,
 }
 
 bool ProjectiveIntegrator::computeLabel(const InputData& data,
-                                        const float truncation_distance,
                                         VoxelMeasurement& measurement) const {
-  const bool is_surface = measurement.sdf < truncation_distance;
-  if (data.label_image.empty() || !semantic_integrator_ || !is_surface) {
+  if (data.label_image.empty() || !semantic_integrator_) {
     return true;
   }
   measurement.label =
@@ -324,4 +331,12 @@ bool ProjectiveIntegrator::computeLabel(const InputData& data,
   return semantic_integrator_->canIntegrate(measurement.label);
 }
 
+bool ProjectiveIntegrator::isGroundLabel(const uint32_t label) const {
+  // NOTE(hlim): If ground_labels_ are not provided,
+  // the adaptive mode will not be applied.
+  if (ground_labels_.find(label) != ground_labels_.end()) {
+    return true;
+  }
+  return false;
+}
 }  // namespace hydra

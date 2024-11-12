@@ -61,6 +61,7 @@ void declare_config(VolumetricMap::Config& config) {
   field(config.voxel_size, "voxel_size", "m");
   field(config.voxels_per_side, "voxels_per_side");
   field(config.truncation_distance, "truncation_distance", "m");
+  field(config.truncation_distance_for_ground, "truncation_distance_for_ground", "m");
   field(config.with_semantics, "with_semantics");
   field(config.with_tracking, "with_tracking");
 
@@ -186,7 +187,7 @@ std::unique_ptr<VolumetricMap> VolumetricMap::load(const std::string& filepath) 
   }
 
   const auto node = YAML::LoadFile(cpath);
-  if (node["has_semantics"] and node["has_semantics"].as<bool>()) {
+  if (node["has_semantics"] && node["has_semantics"].as<bool>()) {
     config.with_semantics = true;
   }
 
