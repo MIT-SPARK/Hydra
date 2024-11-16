@@ -32,73 +32,50 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/backend/update_rooms_functor.h"
+#pragma once
 
-#include <config_utilities/config.h>
-#include <config_utilities/validation.h>
-#include <glog/logging.h>
+#include <config_utilities/virtual_config.h>
+#include <spark_dsg/layer_view.h>
 
-#include "hydra/utils/timing_utilities.h"
+#include "hydra/common/dsg_types.h"
 
 namespace hydra {
 
-using timing::ScopedTimer;
-using SemanticLabel = SemanticNodeAttributes::Label;
+struct Merge {
+  NodeId from;
+  NodeId to;
+  Merge remap(const std::map<NodeId, NodeId>& remapping) const;
+};
 
-void declare_config(UpdateRoomsFunctor::Config& config) {
-  using namespace config;
-  name("UpdateRoomsFunctor::Config");
-  field(config.room_finder, "room_finder");
+std::ostream& operator<<(std::ostream& out, const Merge& merge);
+
+inline bool operator==(const Merge& lhs, const Merge& rhs) {
+  return lhs.from == rhs.from && lhs.to == rhs.to;
 }
 
-UpdateRoomsFunctor::UpdateRoomsFunctor(const Config& config)
-    : config(config::checkValid(config)),
-      room_finder(new RoomFinder(config.room_finder)) {}
+using MergeList = std::list<Merge>;
 
-void UpdateRoomsFunctor::rewriteRooms(const SceneGraphLayer* new_rooms,
-                                      DynamicSceneGraph& graph) const {
-  std::vector<NodeId> to_remove;
-  const auto& prev_rooms = graph.getLayer(DsgLayers::ROOMS);
-  for (const auto& id_node_pair : prev_rooms.nodes()) {
-    to_remove.push_back(id_node_pair.first);
-  }
+struct AssociationStrategy {
+  virtual ~AssociationStrategy() = default;
+  virtual spark_dsg::LayerView candidates(const SceneGraphLayer& layer,
+                                          const SceneGraphNode& node) const = 0;
+};
 
-  for (const auto node_id : to_remove) {
-    graph.removeNode(node_id);
-  }
+struct MergeProposer {
+  using MergeCheck = std::function<bool(const SceneGraphNode&, const SceneGraphNode&)>;
 
-  if (!new_rooms) {
-    return;
-  }
+  struct Config {
+    config::VirtualConfig<AssociationStrategy> strategy;
+  } const config;
 
-  for (auto&& [id, node] : new_rooms->nodes()) {
-    graph.emplaceNode(DsgLayers::ROOMS, id, node->attributes().clone());
-  }
+  explicit MergeProposer(const Config& config) : config(config) {}
 
-  for (const auto& id_edge_pair : new_rooms->edges()) {
-    const auto& edge = id_edge_pair.second;
-    graph.insertEdge(edge.source, edge.target, edge.info->clone());
-  }
-}
+  void findMerges(const SceneGraphLayer& layer,
+                  const spark_dsg::LayerView& view,
+                  const MergeCheck& should_merge,
+                  MergeList& nodes_to_merge) const;
+};
 
-void UpdateRoomsFunctor::call(const DynamicSceneGraph&,
-                              SharedDsgInfo& dsg,
-                              const UpdateInfo::ConstPtr& info) const {
-  if (!room_finder) {
-    return;
-  }
-
-  ScopedTimer timer("backend/room_detection", info->timestamp_ns, true, 1, false);
-  auto places_clone =
-      dsg.graph->getLayer(DsgLayers::PLACES).clone([](const auto& node) {
-        return NodeSymbol(node.id).category() == 'p';
-      });
-
-  // TODO(nathan) pass in timestamp?
-  auto rooms = room_finder->findRooms(*places_clone);
-  rewriteRooms(rooms.get(), *dsg.graph);
-  room_finder->addRoomPlaceEdges(*dsg.graph);
-  return;
-}
+void declare_config(MergeProposer::Config& config);
 
 }  // namespace hydra

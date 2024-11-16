@@ -101,9 +101,9 @@ void ZmqRoomLabelUpdater::checkForUpdates() {
   }
 }
 
-MergeList ZmqRoomLabelUpdater::call(const DynamicSceneGraph&,
-                                    SharedDsgInfo& dsg,
-                                    const UpdateInfo::ConstPtr&) const {
+void ZmqRoomLabelUpdater::call(const DynamicSceneGraph&,
+                               SharedDsgInfo& dsg,
+                               const UpdateInfo::ConstPtr&) const {
   // start critical section for reading from room label map
   std::lock_guard<std::mutex> lock(mutex_);
   const auto& rooms = dsg.graph->getLayer(DsgLayers::ROOMS);
@@ -116,7 +116,7 @@ MergeList ZmqRoomLabelUpdater::call(const DynamicSceneGraph&,
     node->attributes<SemanticNodeAttributes>().name = iter->second;
   }
 
-  return {};
+  return;
 }
 
 void declare_config(ZmqRoomLabelUpdater::Config& config) {

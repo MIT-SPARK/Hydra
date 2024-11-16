@@ -47,9 +47,9 @@ struct UpdateRoomsFunctor : public UpdateFunctor {
 
   explicit UpdateRoomsFunctor(const Config& config);
 
-  MergeList call(const DynamicSceneGraph& unmerged,
-                 SharedDsgInfo& dsg,
-                 const UpdateInfo::ConstPtr& info) const override;
+  void call(const DynamicSceneGraph& unmerged,
+            SharedDsgInfo& dsg,
+            const UpdateInfo::ConstPtr& info) const override;
 
   void rewriteRooms(const SceneGraphLayer* new_rooms, DynamicSceneGraph& graph) const;
 

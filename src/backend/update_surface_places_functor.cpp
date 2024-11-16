@@ -35,6 +35,7 @@
 #include "hydra/backend/update_surface_places_functor.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/virtual_config.h>
 #include <glog/logging.h>
 #include <pcl/common/centroid.h>
 #include <pcl/point_types.h>
@@ -48,8 +49,20 @@
 namespace hydra {
 
 using timing::ScopedTimer;
-using SemanticLabel = SemanticNodeAttributes::Label;
-using MergeId = std::optional<NodeId>;
+
+void declare_config(Update2dPlacesFunctor::Config& config) {
+  using namespace config;
+  name("Update2dPlacesFunctor::Config");
+  field(config.allow_places_merge, "allow_places_merge");
+  field(config.merge_max_delta_z, "merge_max_delta_z");
+  field(config.min_points, "min_points");
+  field(config.min_size, "min_size");
+  field(config.connection_overlap_threshold, "connection_overlap_threshold");
+  field(config.connection_max_delta_z, "connection_max_delta_z");
+  field(config.connection_ellipse_scale_factor, "connection_ellipse_scale_factor");
+  field(config.enable_splitting, "enable_splitting");
+  field(config.merge_proposer, "merge_proposer");
+}
 
 NodeAttributes::Ptr merge2dPlaceAttributes(const DynamicSceneGraph& graph,
                                            const std::vector<NodeId>& nodes) {
@@ -79,7 +92,69 @@ NodeAttributes::Ptr merge2dPlaceAttributes(const DynamicSceneGraph& graph,
   return attrs_ptr;
 }
 
-Update2dPlacesFunctor::Update2dPlacesFunctor(const Config& config) : config_(config) {}
+Update2dPlacesFunctor::Update2dPlacesFunctor(const Config& config)
+    : config(config), merge_proposer(config.merge_proposer) {}
+
+UpdateFunctor::Hooks Update2dPlacesFunctor::hooks() const {
+  auto my_hooks = UpdateFunctor::hooks();
+  my_hooks.cleanup = [this](const UpdateInfo::ConstPtr&, SharedDsgInfo* dsg) {
+    if (dsg) {
+      cleanup(*dsg);
+    }
+  };
+
+  my_hooks.merge = [](const DynamicSceneGraph& graph,
+                      const std::vector<NodeId>& nodes) {
+    return merge2dPlaceAttributes(graph, nodes);
+  };
+
+  return my_hooks;
+}
+
+void Update2dPlacesFunctor::call(const DynamicSceneGraph& unmerged,
+                                 SharedDsgInfo& dsg,
+                                 const UpdateInfo::ConstPtr& info) const {
+  ScopedTimer spin_timer("backend/update_2d_places", info->timestamp_ns);
+  if (!unmerged.hasLayer(layer_id_)) {
+    return;
+  }
+
+  const auto& layer = unmerged.getLayer(layer_id_);
+  const auto new_loopclosure = info->loop_closure_detected;
+
+  active_tracker.clear();  // reset from previous pass
+  const auto view = new_loopclosure ? LayerView(layer) : active_tracker.view(layer);
+
+  size_t num_changed = 0;
+  const auto mesh = unmerged.mesh();
+  for (const auto& node : view) {
+    ++num_changed;
+    auto& attrs = node.attributes<Place2dNodeAttributes>();
+    updateNode(mesh, node.id, attrs);
+    dsg.graph->setNodeAttributes(node.id, attrs.clone());
+  }
+
+  VLOG(5) << "[Hydra Backend] 2D Place update: " << num_changed << " node(s)";
+}
+
+MergeList Update2dPlacesFunctor::findMerges(const DynamicSceneGraph& graph,
+                                            const UpdateInfo::ConstPtr& info) const {
+  const auto& layer = graph.getLayer(layer_id_);
+  const auto new_lcd = info->loop_closure_detected;
+  // freeze layer view to avoid messing with tracker
+  const auto view = new_lcd ? LayerView(layer) : active_tracker.view(layer, true);
+
+  MergeList nodes_to_merge;
+  merge_proposer.findMerges(
+      layer,
+      view,
+      [this](const SceneGraphNode& lhs, const SceneGraphNode& rhs) {
+        return shouldMerge(lhs.attributes<Place2dNodeAttributes>(),
+                           rhs.attributes<Place2dNodeAttributes>());
+      },
+      nodes_to_merge);
+  return nodes_to_merge;
+}
 
 void Update2dPlacesFunctor::updateNode(const spark_dsg::Mesh::Ptr& mesh,
                                        NodeId node,
@@ -119,8 +194,8 @@ void Update2dPlacesFunctor::updateNode(const spark_dsg::Mesh::Ptr& mesh,
 
 bool Update2dPlacesFunctor::shouldMerge(const Place2dNodeAttributes& from_attrs,
                                         const Place2dNodeAttributes& to_attrs) const {
-  if (std::abs(from_attrs.position(2) - to_attrs.position(2)) >
-      config_.merge_max_delta_z) {
+  const auto z_diff = std::abs(from_attrs.position(2) - to_attrs.position(2));
+  if (z_diff > config.merge_max_delta_z) {
     return false;
   }
 
@@ -130,36 +205,6 @@ bool Update2dPlacesFunctor::shouldMerge(const Place2dNodeAttributes& from_attrs,
       to_attrs.ellipse_matrix_compress,
       to_attrs.ellipse_centroid.head(2));
   return overlap_distance > 0;
-}
-
-MergeId Update2dPlacesFunctor::proposeMerge(const SceneGraphLayer& layer,
-                                            const SceneGraphNode& node) const {
-  const auto& from_attrs = node.attributes<Place2dNodeAttributes>();
-  const auto iter = node_finders.find(from_attrs.semantic_label);
-  if (iter == node_finders.end()) {
-    return std::nullopt;
-  }
-
-  std::list<NodeId> candidates;
-  (*iter).second->find(from_attrs.position,
-                       num_merges_to_consider,
-                       !from_attrs.is_active,
-                       [&candidates](NodeId object_id, size_t, double) {
-                         candidates.push_back(object_id);
-                       });
-
-  for (const auto& id : candidates) {
-    if (layer.hasEdge(node.id, id)) {
-      continue;  // avoid merging siblings
-    }
-
-    const auto& to_attrs = layer.getNode(id).attributes<Place2dNodeAttributes>();
-    if (shouldMerge(from_attrs, to_attrs)) {
-      return id;
-    }
-  }
-
-  return std::nullopt;
 }
 
 void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
@@ -183,33 +228,33 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
   std::vector<std::pair<NodeId, std::vector<Place2d>>> nodes_to_add;
   std::map<std::tuple<size_t, size_t, size_t, size_t>, double> edge_map;
 
-  if (config_.enable_splitting) {
+  if (config.enable_splitting) {
     utils::getNecessaryUpdates(*mesh,
-                               config_.min_points,
-                               config_.min_size,
-                               config_.connection_ellipse_scale_factor,
+                               config.min_points,
+                               config.min_size,
+                               config.connection_ellipse_scale_factor,
                                place_2ds,
                                nodes_to_update,
                                nodes_to_add);
     edge_map = utils::buildEdgeMap(nodes_to_add,
-                                   config_.connection_overlap_threshold,
-                                   config_.connection_max_delta_z);
+                                   config.connection_overlap_threshold,
+                                   config.connection_max_delta_z);
   } else {
     utils::computeAttributeUpdates(
-        *mesh, config_.connection_ellipse_scale_factor, place_2ds, nodes_to_update);
+        *mesh, config.connection_ellipse_scale_factor, place_2ds, nodes_to_update);
   }
 
   lock.lock();
   // Update attributes for place nodes that did not need to split after merge
   utils::updateExistingNodes(nodes_to_update, graph);
 
-  if (config_.enable_splitting) {
+  if (config.enable_splitting) {
     // Insert new nodes that are formed by splitting existing nodes (and delete
     // previous node)
     std::map<std::tuple<size_t, size_t>, NodeId> new_id_map;
     next_node_id_ = utils::insertNewNodes(nodes_to_add,
-                                          config_.connection_overlap_threshold,
-                                          config_.connection_max_delta_z,
+                                          config.connection_overlap_threshold,
+                                          config.connection_max_delta_z,
                                           next_node_id_,
                                           graph,
                                           new_id_map);
@@ -265,7 +310,7 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
       continue;
     }
 
-    addRectInfo(mesh->points, config_.connection_ellipse_scale_factor, attrs);
+    addRectInfo(mesh->points, config.connection_ellipse_scale_factor, attrs);
     addBoundaryInfo(mesh->points, attrs);
   }
 
@@ -283,8 +328,8 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
       EdgeAttributes ea;
       if (!shouldAddPlaceConnection(attrs1,
                                     attrs2,
-                                    config_.connection_overlap_threshold,
-                                    config_.connection_max_delta_z,
+                                    config.connection_overlap_threshold,
+                                    config.connection_max_delta_z,
                                     ea)) {
         graph.removeEdge(id, nid);
       } else {
@@ -300,8 +345,8 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
       EdgeAttributes ea;
       if (!shouldAddPlaceConnection(attrs1,
                                     attrs2,
-                                    config_.connection_overlap_threshold,
-                                    config_.connection_max_delta_z,
+                                    config.connection_overlap_threshold,
+                                    config.connection_max_delta_z,
                                     ea)) {
         sibs_edges_to_remove.push_back({id, nid});
       }
@@ -315,72 +360,6 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
       attrs1.need_cleanup_splitting = false;
     }
   }
-}
-
-UpdateFunctor::Hooks Update2dPlacesFunctor::hooks() const {
-  auto my_hooks = UpdateFunctor::hooks();
-  my_hooks.cleanup = [this](const UpdateInfo::ConstPtr&, SharedDsgInfo* dsg) {
-    if (dsg) {
-      cleanup(*dsg);
-    }
-  };
-
-  my_hooks.merge = [](const DynamicSceneGraph& graph,
-                      const std::vector<NodeId>& nodes) {
-    return merge2dPlaceAttributes(graph, nodes);
-  };
-
-  return my_hooks;
-}
-
-MergeList Update2dPlacesFunctor::call(const DynamicSceneGraph& unmerged,
-                                      SharedDsgInfo& dsg,
-                                      const UpdateInfo::ConstPtr& info) const {
-  ScopedTimer spin_timer("backend/update_2d_places", info->timestamp_ns);
-  if (!unmerged.hasLayer(layer_id_)) {
-    return {};
-  }
-
-  const auto mesh = unmerged.mesh();
-  const auto new_loopclosure = info->loop_closure_detected;
-  const auto& layer = unmerged.getLayer(layer_id_);
-  makeSemanticNodeFinders(layer, node_finders);
-  const auto view = new_loopclosure ? LayerView(layer) : active_tracker.view(layer);
-
-  size_t num_changed = 0;
-  for (const auto& node : view) {
-    ++num_changed;
-    auto& attrs = node.attributes<Place2dNodeAttributes>();
-    updateNode(mesh, node.id, attrs);
-    dsg.graph->setNodeAttributes(node.id, attrs.clone());
-  }
-
-  MergeList nodes_to_merge;
-  if (info->allow_node_merging && config_.allow_places_merge) {
-    for (const auto& node : view) {
-      const auto to_merge = proposeMerge(layer, node);
-      if (to_merge) {
-        nodes_to_merge.push_back({node.id, *to_merge});
-      }
-    }
-  }
-
-  VLOG(5) << "[Hydra Backend] 2D Place update: " << num_changed << " node(s)";
-  active_tracker.clear();
-  return nodes_to_merge;
-}
-
-void declare_config(Update2dPlacesFunctor::Config& config) {
-  using namespace config;
-  name("Places2dConfig");
-  field(config.allow_places_merge, "allow_places_merge");
-  field(config.merge_max_delta_z, "merge_max_delta_z");
-  field(config.min_points, "min_points");
-  field(config.min_size, "min_size");
-  field(config.connection_overlap_threshold, "connection_overlap_threshold");
-  field(config.connection_max_delta_z, "connection_max_delta_z");
-  field(config.connection_ellipse_scale_factor, "connection_ellipse_scale_factor");
-  field(config.enable_splitting, "enable_splitting");
 }
 
 }  // namespace hydra

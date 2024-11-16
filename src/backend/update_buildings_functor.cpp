@@ -49,9 +49,9 @@ void declare_config(UpdateBuildingsFunctor::Config& config) {
 UpdateBuildingsFunctor::UpdateBuildingsFunctor(const Config& config)
     : config(config::checkValid(config)) {}
 
-MergeList UpdateBuildingsFunctor::call(const DynamicSceneGraph&,
-                                       SharedDsgInfo& dsg,
-                                       const UpdateInfo::ConstPtr&) const {
+void UpdateBuildingsFunctor::call(const DynamicSceneGraph&,
+                                  SharedDsgInfo& dsg,
+                                  const UpdateInfo::ConstPtr&) const {
   const NodeSymbol building_id('B', 0);
   const auto& rooms = dsg.graph->getLayer(DsgLayers::ROOMS);
 
@@ -60,7 +60,7 @@ MergeList UpdateBuildingsFunctor::call(const DynamicSceneGraph&,
       dsg.graph->removeNode(building_id);
     }
 
-    return {};
+    return;
   }
 
   Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
@@ -82,8 +82,6 @@ MergeList UpdateBuildingsFunctor::call(const DynamicSceneGraph&,
   for (const auto& id_node_pair : rooms.nodes()) {
     dsg.graph->insertParentEdge(building_id, id_node_pair.first);
   }
-
-  return {};
 }
 
 }  // namespace hydra

@@ -38,10 +38,10 @@
 namespace hydra {
 
 struct MergeTracker {
-  void applyMerges(const DynamicSceneGraph& unmerged,
-                   const MergeList& proposals,
-                   SharedDsgInfo& dsg,
-                   const MergeFunc& merge_attrs = MergeFunc());
+  size_t applyMerges(const DynamicSceneGraph& unmerged,
+                     const MergeList& proposals,
+                     SharedDsgInfo& dsg,
+                     const MergeFunc& merge_attrs = MergeFunc());
 
   void clear();
 

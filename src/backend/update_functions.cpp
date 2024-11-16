@@ -36,34 +36,11 @@
 
 namespace hydra {
 
-namespace {
+UpdateFunctor::Hooks UpdateFunctor::hooks() const { return {}; }
 
-inline NodeId getRemappedNode(const std::map<NodeId, NodeId>& remapping, NodeId node) {
-  auto iter = remapping.find(node);
-  return iter == remapping.end() ? node : iter->second;
-}
-
-}  // namespace
-
-Merge Merge::remap(const std::map<NodeId, NodeId>& remapping) const {
-  return {getRemappedNode(remapping, from), getRemappedNode(remapping, to)};
-}
-
-std::ostream& operator<<(std::ostream& out, const Merge& merge) {
-  out << NodeSymbol(merge.from).getLabel() << "  -> "
-      << NodeSymbol(merge.to).getLabel();
-  return out;
-}
-
-UpdateFunctor::Hooks UpdateFunctor::hooks() const {
-  Hooks my_hooks;
-  my_hooks.update = [this](const DynamicSceneGraph& unmerged,
-                           SharedDsgInfo& dsg,
-                           const UpdateInfo::ConstPtr& info) {
-    return call(unmerged, dsg, info);
-  };
-
-  return my_hooks;
-}
+MergeList UpdateFunctor::findMerges(const DynamicSceneGraph&,
+                                    const UpdateInfo::ConstPtr&) const {
+  return {};
+};
 
 }  // namespace hydra

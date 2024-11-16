@@ -38,6 +38,7 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <glog/stl_logging.h>
 #include <kimera_pgmo/utils/mesh_io.h>
 
 #include "hydra/backend/backend_utilities.h"
@@ -82,6 +83,7 @@ void declare_config(BackendModule::Config& config) {
   field(config.add_places_to_deformation_graph, "add_places_to_deformation_graph");
   field(config.optimize_on_lc, "optimize_on_lc");
   field(config.enable_node_merging, "enable_node_merging");
+  field(config.enable_exhaustive_merging, "enable_exhaustive_merging");
   field(config.update_functors, "update_functors");
   field(config.sinks, "sinks");
 }
@@ -582,20 +584,20 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
 
   const auto complete_agent_values =
       utils::getDenseFrames(full_sparse_frame_map_, sparse_frames_, pgmo_values);
+  // TODO(nathan) given_merges probably doesn't need to be passed
   UpdateInfo::ConstPtr info(new UpdateInfo{&places_values,
                                            &pgmo_values,
                                            new_loop_closure,
                                            timestamp_ns,
-                                           enable_merging,
                                            given_merges,
                                            &complete_agent_values});
 
   // merge topological changes to private dsg, respecting merges
   // attributes may be overwritten, but ideally we don't bother
-  GraphMergeConfig config;
-  config.previous_merges = &private_dsg_->merges;
-  config.update_dynamic_attributes = false;
-  private_dsg_->graph->mergeGraph(*unmerged_graph_, config);
+  GraphMergeConfig merge_config;
+  merge_config.previous_merges = &private_dsg_->merges;
+  merge_config.update_dynamic_attributes = false;
+  private_dsg_->graph->mergeGraph(*unmerged_graph_, merge_config);
 
   std::list<LayerCleanupFunc> cleanup_hooks;
   for (const auto& functor : update_functors_) {
@@ -604,11 +606,31 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
       continue;
     }
 
-    const auto merges = functor->call(*unmerged_graph_, *private_dsg_, info);
     const auto hooks = functor->hooks();
-    merge_tracker.applyMerges(*unmerged_graph_, merges, *private_dsg_, hooks.merge);
     if (hooks.cleanup) {
       cleanup_hooks.push_back(hooks.cleanup);
+    }
+
+    functor->call(*unmerged_graph_, *private_dsg_, info);
+    if (enable_merging) {
+      // TODO(nathan) handle given merges
+      const auto merges = functor->findMerges(*unmerged_graph_, info);
+      const auto applied = merge_tracker.applyMerges(
+          *unmerged_graph_, merges, *private_dsg_, hooks.merge);
+      VLOG(1) << "Found " << merges.size() << " merges (applied " << applied << ")";
+
+      if (config.enable_exhaustive_merging) {
+        size_t merge_iter = 0;
+        size_t num_applied = 0;
+        do {
+          const auto new_merges = functor->findMerges(*private_dsg_->graph, info);
+          num_applied = merge_tracker.applyMerges(
+              *private_dsg_->graph, new_merges, *private_dsg_, hooks.merge);
+          VLOG(1) << "Found " << new_merges.size() << " merges at pass " << merge_iter
+                  << " (" << num_applied << " applied)";
+          ++merge_iter;
+        } while (num_applied > 0);
+      }
     }
   }
 

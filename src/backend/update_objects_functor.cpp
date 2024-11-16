@@ -82,13 +82,12 @@ NodeAttributes::Ptr mergeObjectAttributes(const DynamicSceneGraph& graph,
 void declare_config(UpdateObjectsFunctor::Config& config) {
   using namespace config;
   name("UpdateObjectsFunctor::Config");
-  field(config.num_merges_to_consider, "num_merges_to_consider");
   field(config.allow_connection_merging, "allow_connection_merging");
-  check(config.num_merges_to_consider, GE, 1, "num_merges_to_consider");
+  field(config.merge_proposer, "merge_proposer");
 }
 
 UpdateObjectsFunctor::UpdateObjectsFunctor(const Config& config)
-    : config(config::checkValid(config)) {}
+    : config(config::checkValid(config)), merge_proposer(config.merge_proposer) {}
 
 UpdateFunctor::Hooks UpdateObjectsFunctor::hooks() const {
   auto my_hooks = UpdateFunctor::hooks();
@@ -99,27 +98,26 @@ UpdateFunctor::Hooks UpdateObjectsFunctor::hooks() const {
   return my_hooks;
 }
 
-MergeList UpdateObjectsFunctor::call(const DynamicSceneGraph& unmerged,
-                                     SharedDsgInfo& dsg,
-                                     const UpdateInfo::ConstPtr& info) const {
+void UpdateObjectsFunctor::call(const DynamicSceneGraph& unmerged,
+                                SharedDsgInfo& dsg,
+                                const UpdateInfo::ConstPtr& info) const {
   ScopedTimer spin_timer("backend/update_objects", info->timestamp_ns);
   if (!unmerged.hasLayer(DsgLayers::OBJECTS)) {
     VLOG(5) << "Skipping object update due to missing layer";
-    return {};
+    return;
   }
 
-  // we want to use the optimized mesh (unmerged doesn't have a mesh)
-  const auto mesh = dsg.graph->mesh();
-  const auto new_loopclosure = info->loop_closure_detected;
   // we want to use the unmerged graph for most things
   const auto& objects = unmerged.getLayer(DsgLayers::OBJECTS);
-  makeSemanticNodeFinders(objects, node_finders);
   // we want to iterate over the unmerged graph
+  const auto new_loopclosure = info->loop_closure_detected;
+  active_tracker.clear();  // reset from previous pass
   LayerView view = new_loopclosure ? LayerView(objects) : active_tracker.view(objects);
 
   // apply updates to every attribute that may have changed since the last call
   size_t num_changed = 0;
-  std::list<NodeId> seen_nodes;
+  // we want to use the optimized mesh (unmerged doesn't have a mesh)
+  const auto mesh = dsg.graph->mesh();
   for (const auto& node : view) {
     ++num_changed;
     auto& attrs = node.attributes<ObjectNodeAttributes>();
@@ -135,62 +133,36 @@ MergeList UpdateObjectsFunctor::call(const DynamicSceneGraph& unmerged,
       VLOG(2) << "Invalid centroid for object " << NodeSymbol(node.id).getLabel();
     }
 
-    seen_nodes.push_back(node.id);
     // TODO(nathan) this is sloppy and needs to be cleaned up
     dsg.graph->setNodeAttributes(node.id, attrs.clone());
   }
 
-  active_tracker.clear();
   VLOG(2) << "[Hydra Backend] Object update: " << num_changed << " node(s)";
+}
 
-  auto iter = info->given_merges.find(DsgLayers::OBJECTS);
-  if (iter != info->given_merges.end()) {
-    return iter->second;
-  }
-
-  if (!info->allow_node_merging) {
+MergeList UpdateObjectsFunctor::findMerges(const DynamicSceneGraph& graph,
+                                           const UpdateInfo::ConstPtr& info) const {
+  if (!graph.hasLayer(DsgLayers::OBJECTS)) {
     return {};
   }
 
+  const auto new_lcd = info->loop_closure_detected;
+  const auto& objects = graph.getLayer(DsgLayers::OBJECTS);
+  // freeze layer view to avoid messing with tracker
+  LayerView view = new_lcd ? LayerView(objects) : active_tracker.view(objects, true);
+
   MergeList proposals;
-  for (const auto& node_id : seen_nodes) {
-    const auto& attrs = unmerged.getNode(node_id).attributes<ObjectNodeAttributes>();
-    const auto proposed = proposeMerge(objects, attrs);
-    if (proposed) {
-      proposals.push_back({node_id, *proposed});
-    }
-  }
-
+  merge_proposer.findMerges(
+      objects,
+      view,
+      [](const SceneGraphNode& lhs, const SceneGraphNode& rhs) {
+        const auto& lhs_attrs = lhs.attributes<SemanticNodeAttributes>();
+        const auto& rhs_attrs = rhs.attributes<SemanticNodeAttributes>();
+        return lhs_attrs.bounding_box.contains(rhs_attrs.position) ||
+               rhs_attrs.bounding_box.contains(lhs_attrs.position);
+      },
+      proposals);
   return proposals;
-}
-
-MergeId UpdateObjectsFunctor::proposeMerge(const SceneGraphLayer& layer,
-                                           const ObjectNodeAttributes& attrs) const {
-  // TODO(nathan) push to node finders
-  const auto iter = node_finders.find(attrs.semantic_label);
-  if (iter == node_finders.end()) {
-    return std::nullopt;
-  }
-
-  // we skip the first entry if the node attributes aren't active (to avoid returning
-  // the same node)
-  std::list<NodeId> candidates;
-  (*iter).second->find(attrs.position,
-                       config.num_merges_to_consider,
-                       !attrs.is_active,
-                       [&candidates](NodeId object_id, size_t, double) {
-                         candidates.push_back(object_id);
-                       });
-
-  for (const auto& id : candidates) {
-    const auto& candiate = layer.getNode(id).attributes<ObjectNodeAttributes>();
-    if (attrs.bounding_box.contains(candiate.position) ||
-        candiate.bounding_box.contains(attrs.position)) {
-      return id;
-    }
-  }
-
-  return std::nullopt;
 }
 
 }  // namespace hydra

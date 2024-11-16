@@ -38,18 +38,20 @@
 
 namespace hydra {
 
-void MergeTracker::applyMerges(const DynamicSceneGraph& unmerged,
-                               const MergeList& proposals,
-                               SharedDsgInfo& dsg,
-                               const MergeFunc& merge_attrs) {
+size_t MergeTracker::applyMerges(const DynamicSceneGraph& unmerged,
+                                 const MergeList& proposals,
+                                 SharedDsgInfo& dsg,
+                                 const MergeFunc& merge_attrs) {
   auto& prior_merges = dsg.merges;
 
+  size_t num_applied = 0;
   auto& graph = *dsg.graph;
   std::set<NodeId> to_update;
   for (const auto& orig_merge : proposals) {
     const auto merge = orig_merge.remap(prior_merges);
     if (merge.from == merge.to) {
-      VLOG(10) << "Found present merge: " << orig_merge;
+      VLOG(10) << "Found present merge: " << orig_merge << " (remapped: " << merge
+               << ")";
       to_update.insert(merge.to);
       continue;
     }
@@ -63,12 +65,13 @@ void MergeTracker::applyMerges(const DynamicSceneGraph& unmerged,
 
     VLOG(5) << "Applied merge: " << merge << " (original: " << orig_merge << ")";
 
+    ++num_applied;
     to_update.insert(merge.to);
     updateParents(prior_merges, merge);
   }
 
   if (!merge_attrs) {
-    return;
+    return num_applied;
   }
 
   for (const auto& node : to_update) {
@@ -90,6 +93,8 @@ void MergeTracker::applyMerges(const DynamicSceneGraph& unmerged,
     nodes.insert(nodes.end(), iter->second.begin(), iter->second.end());
     graph.setNodeAttributes(node, merge_attrs(unmerged, nodes));
   }
+
+  return num_applied;
 }
 
 void MergeTracker::clear() { merge_sets_.clear(); }

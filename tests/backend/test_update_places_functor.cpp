@@ -76,7 +76,7 @@ TEST(UpdatePlacesFunctor, PlaceUpdate) {
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
   UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, true, 0, false, {}});
-  UpdatePlacesFunctor functor({1, 0.4, 0.3});
+  UpdatePlacesFunctor functor({0.4, 0.3});
   callWithUnmerged(functor, *dsg, info);
 
   {  // first key exists: new value
@@ -123,7 +123,7 @@ TEST(UpdatePlacesFunctor, PlaceUpdateNodeFinderBug) {
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
   UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, false, 0, true, {}});
-  UpdatePlacesFunctor functor({1, 0.4, 0.3});
+  UpdatePlacesFunctor functor({0.4, 0.3});
   // initialize node finder
   callWithUnmerged(functor, *dsg, info);
 
@@ -164,7 +164,7 @@ TEST(UpdatePlacesFunctor, PlaceUpdateMerge) {
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
   UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, true, 0, true, {}});
-  UpdatePlacesFunctor functor({1, 0.4, 0.3});
+  UpdatePlacesFunctor functor({0.4, 0.3});
   const auto result_merges = callWithUnmerged(functor, *dsg, info);
 
   {  // first key exists: new value

@@ -66,11 +66,11 @@ void declare_config(UpdateAgentsFunctor::Config&) {
 
 UpdateAgentsFunctor::UpdateAgentsFunctor(const Config&) {}
 
-MergeList UpdateAgentsFunctor::call(const DynamicSceneGraph&,
-                                    SharedDsgInfo& dsg,
-                                    const UpdateInfo::ConstPtr& info) const {
+void UpdateAgentsFunctor::call(const DynamicSceneGraph&,
+                               SharedDsgInfo& dsg,
+                               const UpdateInfo::ConstPtr& info) const {
   if (!info->complete_agent_values || info->complete_agent_values->size() == 0) {
-    return {};
+    return;
   }
 
   ScopedTimer timer("backend/agent_update", info->timestamp_ns, true, 1, false);
@@ -108,8 +108,6 @@ MergeList UpdateAgentsFunctor::call(const DynamicSceneGraph&,
                    << displayNodeSymbolContainer(missing_nodes);
     }
   }
-
-  return {};
 }
 
 }  // namespace hydra

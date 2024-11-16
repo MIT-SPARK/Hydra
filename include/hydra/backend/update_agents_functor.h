@@ -44,9 +44,9 @@ struct UpdateAgentsFunctor : public UpdateFunctor {
 
   explicit UpdateAgentsFunctor(const Config& /* config */ = {});
 
-  MergeList call(const DynamicSceneGraph&,
-                 SharedDsgInfo& graph,
-                 const UpdateInfo::ConstPtr& info) const override;
+  void call(const DynamicSceneGraph&,
+            SharedDsgInfo& graph,
+            const UpdateInfo::ConstPtr& info) const override;
 
  private:
   inline static const auto registration_ =

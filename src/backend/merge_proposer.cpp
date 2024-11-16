@@ -32,73 +32,66 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/backend/update_rooms_functor.h"
+
+#include "hydra/backend/merge_proposer.h"
 
 #include <config_utilities/config.h>
-#include <config_utilities/validation.h>
 #include <glog/logging.h>
-
-#include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
 
-using timing::ScopedTimer;
-using SemanticLabel = SemanticNodeAttributes::Label;
+namespace {
 
-void declare_config(UpdateRoomsFunctor::Config& config) {
+inline NodeId getRemappedNode(const std::map<NodeId, NodeId>& remapping, NodeId node) {
+  auto iter = remapping.find(node);
+  return iter == remapping.end() ? node : iter->second;
+}
+
+}  // namespace
+
+Merge Merge::remap(const std::map<NodeId, NodeId>& remapping) const {
+  return {getRemappedNode(remapping, from), getRemappedNode(remapping, to)};
+}
+
+std::ostream& operator<<(std::ostream& out, const Merge& merge) {
+  out << NodeSymbol(merge.from).getLabel() << "  -> "
+      << NodeSymbol(merge.to).getLabel();
+  return out;
+}
+
+void declare_config(MergeProposer::Config& config) {
   using namespace config;
-  name("UpdateRoomsFunctor::Config");
-  field(config.room_finder, "room_finder");
+  name("MergeProposer::Config");
+  config.strategy.setOptional();
+  field(config.strategy, "strategy");
 }
 
-UpdateRoomsFunctor::UpdateRoomsFunctor(const Config& config)
-    : config(config::checkValid(config)),
-      room_finder(new RoomFinder(config.room_finder)) {}
-
-void UpdateRoomsFunctor::rewriteRooms(const SceneGraphLayer* new_rooms,
-                                      DynamicSceneGraph& graph) const {
-  std::vector<NodeId> to_remove;
-  const auto& prev_rooms = graph.getLayer(DsgLayers::ROOMS);
-  for (const auto& id_node_pair : prev_rooms.nodes()) {
-    to_remove.push_back(id_node_pair.first);
-  }
-
-  for (const auto node_id : to_remove) {
-    graph.removeNode(node_id);
-  }
-
-  if (!new_rooms) {
+void MergeProposer::findMerges(const SceneGraphLayer& layer,
+                               const LayerView& view,
+                               const MergeCheck& should_merge,
+                               MergeList& nodes_to_merge) const {
+  const auto associator = config.strategy.create<const SceneGraphLayer&>(layer);
+  if (!associator) {
+    LOG(WARNING) << "Merges enabled, but factory not specified!";
     return;
   }
 
-  for (auto&& [id, node] : new_rooms->nodes()) {
-    graph.emplaceNode(DsgLayers::ROOMS, id, node->attributes().clone());
+  for (const auto& node : view) {
+    const auto candidates = associator->candidates(layer, node);
+    if (!candidates) {
+      continue;
+    }
+
+    for (const auto& other : candidates) {
+      if (layer.hasEdge(node.id, other.id)) {
+        continue;  // avoid merging siblings
+      }
+
+      if (should_merge(node, other)) {
+        nodes_to_merge.push_back({node.id, other.id});
+      }
+    }
   }
-
-  for (const auto& id_edge_pair : new_rooms->edges()) {
-    const auto& edge = id_edge_pair.second;
-    graph.insertEdge(edge.source, edge.target, edge.info->clone());
-  }
-}
-
-void UpdateRoomsFunctor::call(const DynamicSceneGraph&,
-                              SharedDsgInfo& dsg,
-                              const UpdateInfo::ConstPtr& info) const {
-  if (!room_finder) {
-    return;
-  }
-
-  ScopedTimer timer("backend/room_detection", info->timestamp_ns, true, 1, false);
-  auto places_clone =
-      dsg.graph->getLayer(DsgLayers::PLACES).clone([](const auto& node) {
-        return NodeSymbol(node.id).category() == 'p';
-      });
-
-  // TODO(nathan) pass in timestamp?
-  auto rooms = room_finder->findRooms(*places_clone);
-  rewriteRooms(rooms.get(), *dsg.graph);
-  room_finder->addRoomPlaceEdges(*dsg.graph);
-  return;
 }
 
 }  // namespace hydra

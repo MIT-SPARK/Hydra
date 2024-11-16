@@ -35,9 +35,9 @@
 #pragma once
 #include <config_utilities/factory.h>
 
+#include "hydra/backend/association_strategies.h"
 #include "hydra/backend/update_functions.h"
 #include "hydra/utils/active_window_tracker.h"
-#include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra {
 
@@ -58,32 +58,32 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
     double connection_ellipse_scale_factor = 1.0;
     //! Whether to allow splitting of large backend places
     bool enable_splitting = false;
+    //! Association strategy for finding matches to active nodes
+    MergeProposer::Config merge_proposer = {config::VirtualConfig<AssociationStrategy>{
+        association::SemanticNearestNode::Config{}}};
   } const config;
 
   explicit Update2dPlacesFunctor(const Config& config);
   Hooks hooks() const override;
-  MergeList call(const DynamicSceneGraph& unmerged,
-                 SharedDsgInfo& dsg,
-                 const UpdateInfo::ConstPtr& info) const override;
+  void call(const DynamicSceneGraph& unmerged,
+            SharedDsgInfo& dsg,
+            const UpdateInfo::ConstPtr& info) const override;
+  MergeList findMerges(const DynamicSceneGraph& graph,
+                       const UpdateInfo::ConstPtr& info) const override;
 
   void updateNode(const spark_dsg::Mesh::Ptr& mesh,
                   NodeId node,
                   Place2dNodeAttributes& attrs) const;
-
-  std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
-                                     const SceneGraphNode& node) const;
 
   bool shouldMerge(const Place2dNodeAttributes& from_attrs,
                    const Place2dNodeAttributes& to_attrs) const;
 
   void cleanup(SharedDsgInfo& dsg) const;
 
-  size_t num_merges_to_consider = 1;
-  mutable SemanticNodeFinders node_finders;
   mutable ActiveWindowTracker active_tracker;
+  const MergeProposer merge_proposer;
 
  private:
-  Config config_;
   mutable NodeSymbol next_node_id_ = NodeSymbol('S', 0);
   const LayerId layer_id_ = DsgLayers::MESH_PLACES;
 

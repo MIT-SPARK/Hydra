@@ -50,9 +50,9 @@ struct UpdateFrontiersFunctor : public UpdateFunctor {
 
   explicit UpdateFrontiersFunctor(const Config& config) : config(config) {}
   Hooks hooks() const override;
-  MergeList call(const DynamicSceneGraph& unmerged,
-                 SharedDsgInfo&,
-                 const UpdateInfo::ConstPtr&) const override;
+  void call(const DynamicSceneGraph& unmerged,
+            SharedDsgInfo&,
+            const UpdateInfo::ConstPtr&) const override;
 
   void cleanup(uint64_t timestamp_ns, SharedDsgInfo& dsg) const;
 

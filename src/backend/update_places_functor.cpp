@@ -50,14 +50,13 @@ using MergeId = std::optional<NodeId>;
 void declare_config(UpdatePlacesFunctor::Config& config) {
   using namespace config;
   name("UpdatePlacesFunctor::Config");
-  field(config.num_merges_to_consider, "num_merges_to_consider");
   field(config.pos_threshold_m, "pos_threshold_m", "m");
   field(config.distance_tolerance_m, "distance_tolerance_m", "m");
-  check(config.num_merges_to_consider, GE, 1, "num_merges_to_consider");
+  field(config.merge_proposer, "merge_proposer");
 }
 
 UpdatePlacesFunctor::UpdatePlacesFunctor(const Config& config)
-    : config(config::checkValid(config)) {}
+    : config(config::checkValid(config)), merge_proposer(config.merge_proposer) {}
 
 void UpdatePlacesFunctor::updatePlace(const gtsam::Values& values,
                                       NodeId node,
@@ -70,39 +69,6 @@ void UpdatePlacesFunctor::updatePlace(const gtsam::Values& values,
 
   attrs.position = values.at<gtsam::Pose3>(node).translation();
   // TODO(nathan) consider updating distance via parents + deformation graph
-}
-
-MergeId UpdatePlacesFunctor::proposeMerge(const SceneGraphLayer& layer,
-                                          const SceneGraphNode& from_node) const {
-  const auto& from_attrs = from_node.attributes<PlaceNodeAttributes>();
-  std::list<NodeId> candidates;
-  node_finder->find(from_attrs.position,
-                    config.num_merges_to_consider,
-                    !from_attrs.is_active,
-                    [&candidates](NodeId place_id, size_t, double) {
-                      candidates.push_back(place_id);
-                    });
-
-  for (const auto& id : candidates) {
-    // TODO(nathan) reconsider this
-    if (from_node.siblings().count(id)) {
-      continue;  // avoid merging siblings
-    }
-
-    const auto& to_attrs = layer.getNode(id).attributes<PlaceNodeAttributes>();
-    if ((from_attrs.position - to_attrs.position).norm() > config.pos_threshold_m) {
-      continue;
-    }
-
-    const auto radii_deviation = std::abs(from_attrs.distance - to_attrs.distance);
-    if (radii_deviation > config.distance_tolerance_m) {
-      continue;
-    }
-
-    return id;
-  }
-
-  return std::nullopt;
 }
 
 // drops any isolated place nodes that would cause an inderminate system error
@@ -128,42 +94,24 @@ void UpdatePlacesFunctor::filterMissing(DynamicSceneGraph& graph,
   }
 }
 
-MergeList UpdatePlacesFunctor::call(const DynamicSceneGraph& unmerged,
-                                    SharedDsgInfo& dsg,
-                                    const UpdateInfo::ConstPtr& info) const {
+void UpdatePlacesFunctor::call(const DynamicSceneGraph& unmerged,
+                               SharedDsgInfo& dsg,
+                               const UpdateInfo::ConstPtr& info) const {
   ScopedTimer spin_timer("backend/update_places", info->timestamp_ns);
 
   if (!unmerged.hasLayer(DsgLayers::PLACES) || !info->places_values) {
-    return {};
+    return;
   }
 
-  MergeList proposals;
-  bool has_given_merges = false;
-  auto iter = info->given_merges.find(DsgLayers::PLACES);
-  if (iter != info->given_merges.end()) {
-    has_given_merges = true;
-    proposals = iter->second;
-  }
-
+  const auto new_loopclosure = info->loop_closure_detected;
   const auto& places = unmerged.getLayer(DsgLayers::PLACES);
   const auto& places_values = *info->places_values;
-  if (places_values.size() == 0 && !info->allow_node_merging) {
-    return proposals;
+  if (places_values.size() == 0) {
+    return;
   }
 
-  // node finder constructed from optimized graph
-  node_finder = NearestNodeFinder::fromLayer(places, [](const SceneGraphNode& node) {
-    return !node.attributes().is_active &&
-           node.attributes<PlaceNodeAttributes>().real_place;
-  });
-
-  // we want to iterate over the unmerged graph
-  LayerView view;
-  if (info->loop_closure_detected) {
-    view = LayerView(unmerged.getLayer(DsgLayers::PLACES));
-  } else {
-    view = active_tracker.view(unmerged.getLayer(DsgLayers::PLACES));
-  }
+  active_tracker.clear();  // reset from previous pass
+  const auto view = new_loopclosure ? LayerView(places) : active_tracker.view(places);
 
   size_t num_changed = 0;
   std::list<NodeId> missing_nodes;
@@ -182,17 +130,35 @@ MergeList UpdatePlacesFunctor::call(const DynamicSceneGraph& unmerged,
 
   VLOG(2) << "[Hydra Backend] Places update: " << num_changed << " nodes";
   filterMissing(*dsg.graph, missing_nodes);
+}
 
-  if (!has_given_merges && node_finder) {
-    for (const auto& node : view) {
-      const auto proposed = proposeMerge(places, node);
-      if (proposed) {
-        proposals.push_back({node.id, *proposed});
-      }
-    }
-  }
+MergeList UpdatePlacesFunctor::findMerges(const DynamicSceneGraph& graph,
+                                          const UpdateInfo::ConstPtr& info) const {
+  const auto new_lcd = info->loop_closure_detected;
+  const auto& places = graph.getLayer(DsgLayers::PLACES);
+  // freeze layer view to avoid messing with tracker
+  const auto view = new_lcd ? LayerView(places) : active_tracker.view(places, true);
 
-  active_tracker.clear();
+  MergeList proposals;
+  merge_proposer.findMerges(
+      places,
+      view,
+      [this](const SceneGraphNode& lhs, const SceneGraphNode& rhs) {
+        const auto& lhs_attrs = lhs.attributes<PlaceNodeAttributes>();
+        const auto& rhs_attrs = rhs.attributes<PlaceNodeAttributes>();
+        if (!lhs_attrs.real_place || !rhs_attrs.real_place) {
+          return false;
+        }
+
+        const auto distance = (lhs_attrs.position - rhs_attrs.position).norm();
+        if (distance > config.pos_threshold_m) {
+          return false;
+        }
+
+        const auto radii_deviation = std::abs(lhs_attrs.distance - rhs_attrs.distance);
+        return radii_deviation <= config.distance_tolerance_m;
+      },
+      proposals);
   return proposals;
 }
 

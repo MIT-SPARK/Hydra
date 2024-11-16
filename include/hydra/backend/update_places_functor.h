@@ -35,27 +35,31 @@
 #pragma once
 #include <config_utilities/factory.h>
 
+#include "hydra/backend/association_strategies.h"
 #include "hydra/backend/merge_tracker.h"
 #include "hydra/backend/update_functions.h"
 #include "hydra/utils/active_window_tracker.h"
-#include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra {
 
 struct UpdatePlacesFunctor : public UpdateFunctor {
   struct Config {
-    //! Number of the nearest nodes to consider for each potential merge
-    size_t num_merges_to_consider = 1;
     //! Max distance between node centroids for a merge to be considered
     double pos_threshold_m = 0.4;
     //! Max deviation between place radii for a merge to be considered
     double distance_tolerance_m = 0.4;
+    //! Association strategy for finding matches to active nodes
+    MergeProposer::Config merge_proposer = {
+        config::VirtualConfig<AssociationStrategy>{association::NearestNode::Config{}}};
   } const config;
 
   explicit UpdatePlacesFunctor(const Config& config);
-  MergeList call(const DynamicSceneGraph& unmerged,
-                 SharedDsgInfo& dsg,
-                 const UpdateInfo::ConstPtr& info) const override;
+  void call(const DynamicSceneGraph& unmerged,
+            SharedDsgInfo& dsg,
+            const UpdateInfo::ConstPtr& info) const override;
+
+  MergeList findMerges(const DynamicSceneGraph& graph,
+                       const UpdateInfo::ConstPtr& info) const override;
 
   void updatePlace(const gtsam::Values& values,
                    NodeId node,
@@ -68,7 +72,7 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
                      const std::list<NodeId> missing_nodes) const;
 
   mutable ActiveWindowTracker active_tracker;
-  mutable std::unique_ptr<NearestNodeFinder> node_finder;
+  const MergeProposer merge_proposer;
 
  private:
   inline static const auto registration_ =

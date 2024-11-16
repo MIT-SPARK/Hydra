@@ -35,34 +35,34 @@
 #pragma once
 #include <config_utilities/factory.h>
 
+#include "hydra/backend/association_strategies.h"
 #include "hydra/backend/merge_tracker.h"
 #include "hydra/backend/update_functions.h"
 #include "hydra/utils/active_window_tracker.h"
-#include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra {
 
 struct UpdateObjectsFunctor : public UpdateFunctor {
   struct Config {
-    //! Number of nearest nodes to consider for each merge
-    size_t num_merges_to_consider = 1;
     //! Allow mesh vertices for each object to be merged
     bool allow_connection_merging = true;
+    //! Association strategy for finding matches to active nodes
+    MergeProposer::Config merge_proposer = {config::VirtualConfig<AssociationStrategy>{
+        association::SemanticNearestNode::Config{}}};
   } const config;
 
   explicit UpdateObjectsFunctor(const Config& config);
   Hooks hooks() const override;
-  MergeList call(const DynamicSceneGraph& unmerged,
-                 SharedDsgInfo& dsg,
-                 const UpdateInfo::ConstPtr& info) const override;
-
-  std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
-                                     const ObjectNodeAttributes& attrs) const;
+  void call(const DynamicSceneGraph& unmerged,
+            SharedDsgInfo& dsg,
+            const UpdateInfo::ConstPtr& info) const override;
+  MergeList findMerges(const DynamicSceneGraph& graph,
+                       const UpdateInfo::ConstPtr& info) const override;
 
   void mergeAttributes(const DynamicSceneGraph& layer, NodeId from, NodeId to) const;
 
   mutable ActiveWindowTracker active_tracker;
-  mutable SemanticNodeFinders node_finders;
+  const MergeProposer merge_proposer;
 
  private:
   inline static const auto registration_ =

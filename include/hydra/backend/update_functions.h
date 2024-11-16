@@ -35,24 +35,11 @@
 #pragma once
 #include <gtsam/nonlinear/Values.h>
 
+#include "hydra/backend/merge_proposer.h"
 #include "hydra/common/dsg_types.h"
 #include "hydra/common/shared_dsg_info.h"
 
 namespace hydra {
-
-struct Merge {
-  NodeId from;
-  NodeId to;
-  Merge remap(const std::map<NodeId, NodeId>& remapping) const;
-};
-
-std::ostream& operator<<(std::ostream& out, const Merge& merge);
-
-inline bool operator==(const Merge& lhs, const Merge& rhs) {
-  return lhs.from == rhs.from && lhs.to == rhs.to;
-}
-
-using MergeList = std::list<Merge>;
 
 struct UpdateInfo {
   using Ptr = std::shared_ptr<UpdateInfo>;
@@ -63,15 +50,11 @@ struct UpdateInfo {
   const gtsam::Values* pgmo_values = nullptr;
   bool loop_closure_detected = false;
   uint64_t timestamp_ns = 0;
-  //! Whether or not we allow proposing merges during update
-  bool allow_node_merging = false;
   //! External merges (e.g., from GNC)
   LayerMerges given_merges;
   const gtsam::Values* complete_agent_values = nullptr;
 };
 
-using LayerUpdateFunc = std::function<MergeList(
-    const DynamicSceneGraph&, SharedDsgInfo&, const UpdateInfo::ConstPtr&)>;
 using LayerCleanupFunc =
     std::function<void(const UpdateInfo::ConstPtr&, SharedDsgInfo*)>;
 using MergeFunc = std::function<NodeAttributes::Ptr(const DynamicSceneGraph&,
@@ -81,16 +64,17 @@ struct UpdateFunctor {
   using Ptr = std::shared_ptr<UpdateFunctor>;
 
   struct Hooks {
-    LayerUpdateFunc update;
     LayerCleanupFunc cleanup;
     MergeFunc merge;
   };
 
   virtual ~UpdateFunctor() = default;
   virtual Hooks hooks() const;
-  virtual MergeList call(const DynamicSceneGraph& unmerged,
-                         SharedDsgInfo& dsg,
-                         const UpdateInfo::ConstPtr& info) const = 0;
+  virtual void call(const DynamicSceneGraph& unmerged,
+                    SharedDsgInfo& dsg,
+                    const UpdateInfo::ConstPtr& info) const = 0;
+  virtual MergeList findMerges(const DynamicSceneGraph& graph,
+                               const UpdateInfo::ConstPtr& info) const;
 };
 
 }  // namespace hydra

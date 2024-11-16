@@ -91,6 +91,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
     bool optimize_on_lc = true;
     //! Enable combining multiple nodes together
     bool enable_node_merging = true;
+    //! Repeatedly run merge detection until no more merges are detected
+    bool enable_exhaustive_merging = false;
     //! Update functors that get applied in the specified order
     config::OrderedMap<std::string, config::VirtualConfig<UpdateFunctor>>
         update_functors;

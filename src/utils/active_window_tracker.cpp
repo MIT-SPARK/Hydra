@@ -50,31 +50,35 @@ void ActiveWindowTracker::reset() {
   prev_active_.clear();
 }
 
-spark_dsg::LayerView ActiveWindowTracker::view(const SceneGraphLayer& layer) const {
-  // prune all removed nodes
-  auto iter = prev_active_.begin();
-  while (iter != prev_active_.end()) {
-    if (!layer.hasNode(*iter)) {
-      to_clear_.erase(*iter);
-      iter = prev_active_.erase(iter);
-    } else {
-      ++iter;
+spark_dsg::LayerView ActiveWindowTracker::view(const SceneGraphLayer& layer,
+                                               bool freeze) const {
+  if (!freeze) {
+    // prune all removed nodes
+    auto iter = prev_active_.begin();
+    while (iter != prev_active_.end()) {
+      if (!layer.hasNode(*iter)) {
+        to_clear_.erase(*iter);
+        iter = prev_active_.erase(iter);
+      } else {
+        ++iter;
+      }
     }
   }
 
-  return {layer, [this](const auto& node) -> bool { return isActive(node); }};
+  return {layer,
+          [this, freeze](const auto& node) -> bool { return isActive(node, freeze); }};
 }
 
-bool ActiveWindowTracker::isActive(const SceneGraphNode& node) const {
+bool ActiveWindowTracker::isActive(const SceneGraphNode& node, bool freeze) const {
   const auto active = node.attributes().is_active;
   if (prev_active_.count(node.id)) {
-    if (!active) {
+    if (!active && !freeze) {
       to_clear_.insert(node.id);
     }
     return true;
   }
 
-  if (active) {
+  if (active && !freeze) {
     prev_active_.insert(node.id);
   }
 
