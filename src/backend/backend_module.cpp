@@ -575,7 +575,8 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
                                         const gtsam::Values& places_values,
                                         const gtsam::Values& pgmo_values,
                                         bool new_loop_closure,
-                                        const UpdateInfo::LayerMerges& given_merges) {
+                                        const UpdateInfo::LayerMerges& given_merges,
+                                        const NodeToRobotMap* node_to_robot) {
   ScopedTimer spin_timer("backend/update_layers", timestamp_ns);
 
   // TODO(nathan) chance that this causes weirdness when we have multiple nodes but no
@@ -585,12 +586,15 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
   const auto complete_agent_values =
       utils::getDenseFrames(full_sparse_frame_map_, sparse_frames_, pgmo_values);
   // TODO(nathan) given_merges probably doesn't need to be passed
-  UpdateInfo::ConstPtr info(new UpdateInfo{&places_values,
-                                           &pgmo_values,
-                                           new_loop_closure,
-                                           timestamp_ns,
-                                           given_merges,
-                                           &complete_agent_values});
+  UpdateInfo::ConstPtr info(
+      new UpdateInfo{config.add_places_to_deformation_graph ? &places_values : nullptr,
+                     &pgmo_values,
+                     new_loop_closure,
+                     timestamp_ns,
+                     given_merges,
+                     &complete_agent_values,
+                     deformation_graph_.get(),
+                     node_to_robot});
 
   // merge topological changes to private dsg, respecting merges
   // attributes may be overwritten, but ideally we don't bother

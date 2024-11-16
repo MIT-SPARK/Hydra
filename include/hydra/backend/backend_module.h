@@ -81,6 +81,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   using Sink = OutputSink<uint64_t,
                           const DynamicSceneGraph&,
                           const kimera_pgmo::DeformationGraph&>;
+  using NodeToRobotMap = std::unordered_map<NodeId, size_t>;
 
   struct Config {
     //! Specialized PGMO configuration that includes scene graph factor covariances
@@ -161,7 +162,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
                                    const gtsam::Values& places_values = gtsam::Values(),
                                    const gtsam::Values& pgmo_values = gtsam::Values(),
                                    bool new_loop_closure = false,
-                                   const UpdateInfo::LayerMerges& given_merges = {});
+                                   const UpdateInfo::LayerMerges& given_merges = {},
+                                   const NodeToRobotMap* node_to_robot = nullptr);
 
   void updateMergedNodes(const std::map<NodeId, NodeId>& new_merges);
 

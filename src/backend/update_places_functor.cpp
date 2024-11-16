@@ -38,6 +38,8 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
+#include <hydra/common/global_info.h>
+#include <kimera_pgmo/deformation_graph.h>
 #include <spark_dsg/printing.h>
 
 #include "hydra/utils/timing_utilities.h"
@@ -52,7 +54,39 @@ void declare_config(UpdatePlacesFunctor::Config& config) {
   name("UpdatePlacesFunctor::Config");
   field(config.pos_threshold_m, "pos_threshold_m", "m");
   field(config.distance_tolerance_m, "distance_tolerance_m", "m");
+  field(config.num_control_points, "num_control_points");
+  field(config.control_point_tolerance_s, "control_point_tolerance_s", "s");
   field(config.merge_proposer, "merge_proposer");
+}
+
+struct AttributeMap {
+  std::vector<PlaceNodeAttributes*> attributes;
+
+  void push_back(PlaceNodeAttributes* attrs) { attributes.push_back(attrs); }
+};
+
+size_t pgmoNumVertices(const AttributeMap& map) { return map.attributes.size(); }
+
+kimera_pgmo::traits::Pos pgmoGetVertex(const AttributeMap& map,
+                                       size_t i,
+                                       kimera_pgmo::traits::VertexTraits* traits) {
+  const auto& attrs = map.attributes[i];
+  if (traits) {
+    traits->stamp = attrs->last_update_time_ns;
+  }
+
+  return attrs->position.cast<float>();
+}
+
+uint64_t pgmoGetVertexStamp(const AttributeMap& map, size_t i) {
+  return map.attributes[i]->last_update_time_ns;
+}
+
+void pgmoSetVertex(AttributeMap& map,
+                   size_t i,
+                   const kimera_pgmo::traits::Pos& pos,
+                   const kimera_pgmo::traits::VertexTraits&) {
+  map.attributes[i]->position = pos.cast<double>();
 }
 
 UpdatePlacesFunctor::UpdatePlacesFunctor(const Config& config)
@@ -94,33 +128,20 @@ void UpdatePlacesFunctor::filterMissing(DynamicSceneGraph& graph,
   }
 }
 
-void UpdatePlacesFunctor::call(const DynamicSceneGraph& unmerged,
-                               SharedDsgInfo& dsg,
-                               const UpdateInfo::ConstPtr& info) const {
-  ScopedTimer spin_timer("backend/update_places", info->timestamp_ns);
-
-  if (!unmerged.hasLayer(DsgLayers::PLACES) || !info->places_values) {
-    return;
+size_t UpdatePlacesFunctor::updateFromValues(const LayerView& view,
+                                             SharedDsgInfo& dsg,
+                                             const UpdateInfo::ConstPtr& info) const {
+  if (!info->places_values) {
+    return 0;
   }
-
-  const auto new_loopclosure = info->loop_closure_detected;
-  const auto& places = unmerged.getLayer(DsgLayers::PLACES);
-  const auto& places_values = *info->places_values;
-  if (places_values.size() == 0) {
-    return;
-  }
-
-  active_tracker.clear();  // reset from previous pass
-  const auto view = new_loopclosure ? LayerView(places) : active_tracker.view(places);
 
   size_t num_changed = 0;
-  std::list<NodeId> missing_nodes;
+  const auto& places_values = *info->places_values;
   for (const auto& node : view) {
     ++num_changed;
     auto& attrs = node.attributes<PlaceNodeAttributes>();
     if (!places_values.exists(node.id)) {
       // this happens for the GT version
-      missing_nodes.push_back(node.id);
       continue;
     }
 
@@ -128,8 +149,83 @@ void UpdatePlacesFunctor::call(const DynamicSceneGraph& unmerged,
     dsg.graph->setNodeAttributes(node.id, attrs.clone());
   }
 
+  // TODO(nathan) fix this
+  // filterMissing(*dsg.graph, missing_nodes);
+  return num_changed;
+}
+
+size_t UpdatePlacesFunctor::interpFromValues(const LayerView& view,
+                                             SharedDsgInfo& dsg,
+                                             const UpdateInfo::ConstPtr& info) const {
+  if (!info->deformation_graph) {
+    return 0;
+  }
+
+  const auto this_robot = GlobalInfo::instance().getRobotPrefix().id;
+
+  std::map<char, AttributeMap> nodes;
+  for (const auto& node : view) {
+    size_t robot_id = this_robot;
+    if (info->node_to_robot_id) {
+      auto iter = info->node_to_robot_id->find(node.id);
+      if (iter == info->node_to_robot_id->end()) {
+        LOG(WARNING) << "Node " << NodeSymbol(node.id) << " does not belong to robot";
+      } else {
+        robot_id = iter->second;
+      }
+
+      const auto prefix = kimera_pgmo::GetVertexPrefix(robot_id);
+      auto robot_attrs = nodes.find(prefix);
+      if (robot_attrs == nodes.end()) {
+        robot_attrs = nodes.emplace(prefix, AttributeMap{}).first;
+      }
+
+      robot_attrs->second.push_back(&node.attributes<PlaceNodeAttributes>());
+    }
+  }
+
+  auto& dgraph = *info->deformation_graph;
+  for (auto& [prefix, attributes] : nodes) {
+    dgraph.deformPoints(attributes,
+                        attributes,
+                        prefix,
+                        dgraph.getGtsamValues(),
+                        config.num_control_points,
+                        config.control_point_tolerance_s,
+                        nullptr,
+                        0,
+                        nullptr);
+  }
+
+  for (const auto& node : view) {
+    dsg.graph->setNodeAttributes(node.id, node.attributes().clone());
+  }
+
+  return 0;
+}
+
+void UpdatePlacesFunctor::call(const DynamicSceneGraph& unmerged,
+                               SharedDsgInfo& dsg,
+                               const UpdateInfo::ConstPtr& info) const {
+  ScopedTimer spin_timer("backend/update_places", info->timestamp_ns);
+
+  if (!unmerged.hasLayer(DsgLayers::PLACES)) {
+    return;
+  }
+
+  const auto new_loopclosure = info->loop_closure_detected;
+  const auto& places = unmerged.getLayer(DsgLayers::PLACES);
+  active_tracker.clear();  // reset from previous pass
+  const auto view = new_loopclosure ? LayerView(places) : active_tracker.view(places);
+
+  size_t num_changed = 0;
+  if (!info->places_values || info->places_values->size() == 0) {
+    num_changed = interpFromValues(view, dsg, info);
+  } else {
+    num_changed = updateFromValues(view, dsg, info);
+  }
+
   VLOG(2) << "[Hydra Backend] Places update: " << num_changed << " nodes";
-  filterMissing(*dsg.graph, missing_nodes);
 }
 
 MergeList UpdatePlacesFunctor::findMerges(const DynamicSceneGraph& graph,

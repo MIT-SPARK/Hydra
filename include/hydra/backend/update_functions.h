@@ -39,6 +39,10 @@
 #include "hydra/common/dsg_types.h"
 #include "hydra/common/shared_dsg_info.h"
 
+namespace kimera_pgmo {
+class DeformationGraph;
+}
+
 namespace hydra {
 
 struct UpdateInfo {
@@ -53,6 +57,9 @@ struct UpdateInfo {
   //! External merges (e.g., from GNC)
   LayerMerges given_merges;
   const gtsam::Values* complete_agent_values = nullptr;
+  // TODO(nathan) flip to const when we have mutable state
+  kimera_pgmo::DeformationGraph* deformation_graph = nullptr;
+  const std::unordered_map<NodeId, size_t>* node_to_robot_id = nullptr;
 };
 
 using LayerCleanupFunc =

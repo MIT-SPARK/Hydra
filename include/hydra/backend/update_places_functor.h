@@ -48,6 +48,10 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
     double pos_threshold_m = 0.4;
     //! Max deviation between place radii for a merge to be considered
     double distance_tolerance_m = 0.4;
+    //! Number of control points for deforming the places (if not in optimization)
+    size_t num_control_points = 4;
+    //! Timestamp tolerance when deforming the places (if not in optimization)
+    double control_point_tolerance_s = 10.0;
     //! Association strategy for finding matches to active nodes
     MergeProposer::Config merge_proposer = {
         config::VirtualConfig<AssociationStrategy>{association::NearestNode::Config{}}};
@@ -57,6 +61,14 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
   void call(const DynamicSceneGraph& unmerged,
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
+
+  size_t updateFromValues(const LayerView& view,
+                          SharedDsgInfo& dsg,
+                          const UpdateInfo::ConstPtr& info) const;
+
+  size_t interpFromValues(const LayerView& view,
+                          SharedDsgInfo& dsg,
+                          const UpdateInfo::ConstPtr& info) const;
 
   MergeList findMerges(const DynamicSceneGraph& graph,
                        const UpdateInfo::ConstPtr& info) const override;
