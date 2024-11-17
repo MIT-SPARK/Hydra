@@ -60,7 +60,7 @@ TEST(UpdateRoomsBuildingsFunctor, BuildingUpdate) {
   graph.insertEdge("B0"_id, 4);
   graph.insertEdge("B0"_id, 5);
 
-  UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, false, 0, false, {}});
+  UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, false, 0, {}});
   UpdateBuildingsFunctor functor(UpdateBuildingsFunctor::Config{0});
   const auto unmerged = dsg->graph->clone();
   functor.call(*unmerged, *dsg, info);

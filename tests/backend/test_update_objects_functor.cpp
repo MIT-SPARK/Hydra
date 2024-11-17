@@ -43,9 +43,15 @@ namespace {
 
 MergeList callWithUnmerged(const UpdateFunctor& functor,
                            SharedDsgInfo& dsg,
-                           const UpdateInfo::ConstPtr& info) {
+                           const UpdateInfo::ConstPtr& info,
+                           bool enable_merging) {
   const auto unmerged = dsg.graph->clone();
-  return functor.call(*unmerged, dsg, info);
+  functor.call(*unmerged, dsg, info);
+  if (enable_merging) {
+    return functor.findMerges(*unmerged, info);
+  } else {
+    return {};
+  }
 }
 
 }  // namespace
@@ -63,9 +69,9 @@ TEST(UpdateObjectsFunctor, ObjectUpdate) {
     graph.emplaceNode(DsgLayers::OBJECTS, 0, std::move(attrs));
   }
 
-  UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, false, 0, false, {}});
+  UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, false, 0, {}});
   UpdateObjectsFunctor functor(UpdateObjectsFunctor::Config{});
-  callWithUnmerged(functor, *dsg, info);
+  callWithUnmerged(functor, *dsg, info, false);
 
   {
     // No mesh, so nothing should change
@@ -88,7 +94,7 @@ TEST(UpdateObjectsFunctor, ObjectUpdate) {
   auto& attrs = graph.getNode(0).attributes<ObjectNodeAttributes>();
   attrs.mesh_connections = {0, 1};
 
-  callWithUnmerged(functor, *dsg, info);
+  callWithUnmerged(functor, *dsg, info, false);
 
   {
     // valid mesh: things should change
@@ -132,9 +138,9 @@ TEST(UpdateObjectsFunctor, ObjectUpdateMergeLC) {
   mesh->setPos(1, Mesh::Pos(1.0, 2.0, 3.0));
   graph.setMesh(mesh);
 
-  UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, true, 0, true, {}});
+  UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, true, 0, {}});
   UpdateObjectsFunctor functor(UpdateObjectsFunctor::Config{});
-  const auto result_merges = callWithUnmerged(functor, *dsg, info);
+  const auto result_merges = callWithUnmerged(functor, *dsg, info, true);
 
   const auto& result0 = graph.getNode(0).attributes<ObjectNodeAttributes>();
 
@@ -178,9 +184,9 @@ TEST(UpdateObjectsFunctor, ObjectUpdateMergeNoLC) {
   mesh->setPos(1, Mesh::Pos(1.0, 2.0, 3.0));
   graph.setMesh(mesh);
 
-  UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, false, 0, true, {}});
+  UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, false, 0, {}});
   UpdateObjectsFunctor functor(UpdateObjectsFunctor::Config{});
-  const auto result_merges = callWithUnmerged(functor, *dsg, info);
+  const auto result_merges = callWithUnmerged(functor, *dsg, info, true);
 
   MergeList expected{{1, 0}};
   EXPECT_EQ(result_merges, expected);

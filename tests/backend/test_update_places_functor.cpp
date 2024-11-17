@@ -44,9 +44,15 @@ namespace {
 
 MergeList callWithUnmerged(const UpdateFunctor& functor,
                            SharedDsgInfo& dsg,
-                           const UpdateInfo::ConstPtr& info) {
+                           const UpdateInfo::ConstPtr& info,
+                           bool enable_merging) {
   const auto unmerged = dsg.graph->clone();
-  return functor.call(*unmerged, dsg, info);
+  functor.call(*unmerged, dsg, info);
+  if (enable_merging) {
+    return functor.findMerges(*unmerged, info);
+  } else {
+    return {};
+  }
 }
 
 }  // namespace
@@ -75,9 +81,9 @@ TEST(UpdatePlacesFunctor, PlaceUpdate) {
   values.insert(NodeSymbol('p', 5),
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
-  UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, true, 0, false, {}});
+  UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, true, 0, {}});
   UpdatePlacesFunctor functor({0.4, 0.3});
-  callWithUnmerged(functor, *dsg, info);
+  callWithUnmerged(functor, *dsg, info, false);
 
   {  // first key exists: new value
     Eigen::Vector3d expected(4.0, 5.0, 6.0);
@@ -122,15 +128,15 @@ TEST(UpdatePlacesFunctor, PlaceUpdateNodeFinderBug) {
   values.insert(NodeSymbol('p', 5),
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
-  UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, false, 0, true, {}});
+  UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, false, 0, {}});
   UpdatePlacesFunctor functor({0.4, 0.3});
   // initialize node finder
-  callWithUnmerged(functor, *dsg, info);
+  callWithUnmerged(functor, *dsg, info, false);
 
   // remove one archived node and unarchive the other
   graph.removeNode(NodeSymbol('p', 0));
   graph.getNode(NodeSymbol('p', 5)).attributes().is_active = true;
-  callWithUnmerged(functor, *dsg, info);
+  callWithUnmerged(functor, *dsg, info, false);
 }
 
 TEST(UpdatePlacesFunctor, PlaceUpdateMerge) {
@@ -163,9 +169,9 @@ TEST(UpdatePlacesFunctor, PlaceUpdateMerge) {
   values.insert(NodeSymbol('p', 6),
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
-  UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, true, 0, true, {}});
+  UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, true, 0, {}});
   UpdatePlacesFunctor functor({0.4, 0.3});
-  const auto result_merges = callWithUnmerged(functor, *dsg, info);
+  const auto result_merges = callWithUnmerged(functor, *dsg, info, true);
 
   {  // first key exists: new value
     Eigen::Vector3d expected(4.0, 5.0, 6.0);
