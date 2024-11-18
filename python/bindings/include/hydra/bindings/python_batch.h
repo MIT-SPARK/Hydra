@@ -34,42 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <pybind11/pybind11.h>
-#include <yaml-cpp/yaml.h>
 
-#include <memory>
-#include <string>
-#include <vector>
-
-namespace hydra::python {
-
-struct ConfigOverlay {
-  ConfigOverlay(const std::string& config_ns = "",
-                const std::string& filepath = "",
-                const std::string& contents = "");
-
-  std::string config_ns = "";
-  std::shared_ptr<std::string> filepath;
-  std::shared_ptr<std::string> contents;
-};
-
-class PythonConfig {
- public:
-  explicit PythonConfig(const std::vector<ConfigOverlay>& configs);
-
-  void add(const ConfigOverlay& config);
-
-  void addFile(const std::string& filepath, const std::string& config_ns = "");
-
-  void addYaml(const std::string& filepath, const std::string& config_ns = "");
-
-  YAML::Node toYaml() const;
-
- private:
-  std::vector<ConfigOverlay> configs_;
-};
-
-namespace python_config {
-void addBindings(pybind11::module_& module);
+namespace hydra::python::python_batch {
+void addBindings(pybind11::module_& m);
 }
-
-}  // namespace hydra::python

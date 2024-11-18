@@ -32,29 +32,8 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <hydra/common/batch_pipeline.h>
 #include <pybind11/pybind11.h>
 
-namespace hydra {
-
-namespace python {
-
-class PythonConfig;
-
-class PythonBatchPipeline : public BatchPipeline {
- public:
-  PythonBatchPipeline(const PipelineConfig& config, int robot_id = 0);
-
-  virtual ~PythonBatchPipeline();
-
-  DynamicSceneGraph::Ptr construct(const PythonConfig& config,
-                                   VolumetricMap& map) const;
-};
-
-namespace batch {
+namespace hydra::python::python_pipeline {
 void addBindings(pybind11::module_& m);
 }
-
-}  // namespace python
-}  // namespace hydra

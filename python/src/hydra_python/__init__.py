@@ -33,12 +33,12 @@
 #
 #
 """The hydra_python package."""
-# need to come before other things get imported
-from hydra_python.run import *
-from hydra_python.trajectory import *
-from hydra_python.config_loader import *
-from hydra_python.output import *
-from hydra_python.data_interface import *
-from hydra_python.segmentation_colormap import *
+import logging
+
 from hydra_python._hydra_bindings import *
-from hydra_python.dataset_logger import *
+from hydra_python.data_callbacks import *
+from hydra_python.data_loader import *
+from hydra_python.pipeline import *
+from hydra_python.semantics import *
+from hydra_python.simulators import *
+from hydra_python.trajectory import *

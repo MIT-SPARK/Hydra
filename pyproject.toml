@@ -4,8 +4,51 @@ requires = [
     "wheel",
     "cmake>=3.14",
     "ninja",
-    "catkin_pkg",
-    "empy",
-    "catkin @ git+https://github.com/ros/catkin.git@noetic-devel"
 ]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "hydra_python"
+authors = [
+  {name = "Nathan Hughes", email="na26933@mit.edu"},
+]
+description = "Python bindings for Hydra"
+readme = "README.md"
+version = "0.0.1"
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: BSD License",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "click",
+    "distinctipy",
+    "imageio",
+    "networkx",
+    "numpy",
+    "pyqtgraph",
+    "pyyaml",
+    "scipy",
+    "tqdm",
+    "spark_dsg[viz] @ git+https://github.com/MIT-SPARK/Spark-DSG@develop"
+]
+
+[project.urls]
+Repository = "https://github.com/MIT-SPARK/Hydra"
+
+[project.scripts]
+hydra = "hydra_python.commands:main.cli"
+
+[tool.setuptools]
+include-package-data = true
+packages = [
+    "hydra_python",
+    "hydra_python.config",
+    "hydra_python.commands",
+    "hydra_python.semantics",
+    "hydra_python.simulators",
+]
+
+[tool.setuptools.package-dir]
+"hydra_python" = "python/src/hydra_python"
+"hydra_python.config" = "config"

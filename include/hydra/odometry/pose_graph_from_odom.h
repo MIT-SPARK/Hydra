@@ -33,7 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
 #include <hydra/odometry/pose_graph_tracker.h>
 
 namespace hydra {
@@ -60,11 +59,6 @@ class PoseGraphFromOdom : public PoseGraphTracker {
  protected:
   size_t num_poses_received_;
   StampedPose prev_pose_;
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<PoseGraphTracker, PoseGraphFromOdom, Config>(
-          "PoseGraphFromOdom");
 };
 
 void declare_config(PoseGraphFromOdom::Config& config);

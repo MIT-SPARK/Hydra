@@ -51,7 +51,6 @@
 #include <spark_dsg/zmq_interface.h>
 
 #include "hydra/bindings/glog_utilities.h"
-#include "hydra/bindings/python_config.h"
 #include "hydra/bindings/python_image.h"
 #include "hydra/bindings/python_sensor_input.h"
 #include "hydra/utils/mesh_utilities.h"
@@ -60,26 +59,11 @@
 
 namespace hydra::python {
 
-struct PythonReconstructionConfig : ReconstructionModule::Config {
-  int verbosity = 1;
-  bool visualize_mesh = true;
-  std::string zmq_url = "tcp://127.0.0.1:8001";
-};
-
-void declare_config(PythonReconstructionConfig& config) {
-  using namespace config;
-  name("PythonReconstructionConfig");
-  base<ReconstructionModule::Config>(config);
-  field(config.verbosity, "verbosity");
-  field(config.visualize_mesh, "visualize_mesh");
-  field(config.zmq_url, "zmq_url");
-}
-
 struct MeshUpdater {
-  explicit MeshUpdater(const PythonReconstructionConfig& config)
-      : compression(config.volumetric_map.voxel_size / 4.0),
+  MeshUpdater(double voxel_size, const std::string& url)
+      : compression(voxel_size / 4.0),
         queue(new ReconstructionModule::OutputQueue()),
-        zmq_sender(config.zmq_url, 2) {
+        zmq_sender(url, 2) {
     graph.reset(new DynamicSceneGraph(DynamicSceneGraph::LayerIds{2, 3, 4, 5}));
     graph->setMesh(std::make_shared<Mesh>());
   }
@@ -117,26 +101,68 @@ struct MeshUpdater {
   ZmqSender zmq_sender;
 };
 
-PythonReconstruction::PythonReconstruction(const PipelineConfig& hydra_config,
-                                           const PythonConfig& python_config) {
+class PythonReconstruction {
+ public:
+  struct Config : PipelineConfig {
+    int verbosity = 1;
+    bool visualize_mesh = true;
+    ReconstructionModule::Config reconstruction;
+    std::string zmq_url = "tcp://127.0.0.1:8001";
+  } const config;
+
+  PythonReconstruction(const Config& config, const Sensor::Ptr& sensor);
+
+  virtual ~PythonReconstruction();
+
+  bool step(const std::shared_ptr<InputPacket>& input);
+
+  void save(const std::filesystem::path& output);
+
+  void stop();
+
+  const std::string sensor_name;
+
+ protected:
+  std::shared_ptr<ReconstructionModule> module_;
+  std::unique_ptr<MeshUpdater> mesh_updater_;
+  std::unique_ptr<std::thread> mesh_thread_;
+};
+
+void declare_config(PythonReconstruction::Config& config) {
+  using namespace config;
+  name("PythonReconstructionConfig");
+  base<PipelineConfig>(config);
+  field(config.verbosity, "verbosity");
+  field(config.visualize_mesh, "visualize_mesh");
+  field(config.reconstruction, "reconstruction");
+  field(config.zmq_url, "zmq_url");
+}
+
+PythonReconstruction::PythonReconstruction(const Config& config,
+                                           const Sensor::Ptr& sensor)
+    : config(config::checkValid(config)), sensor_name(sensor ? sensor->name : "") {
+  if (!sensor) {
+    throw std::runtime_error("invalid sensor!");
+  }
+
   GlogSingleton::instance().setLogLevel(0, 0, false);
   config::Settings().setLogger("glog");
   config::Settings().print_width = 100;
   config::Settings().print_indent = 45;
 
-  const auto node = python_config.toYaml();
-  const auto config = config::fromYaml<PythonReconstructionConfig>(node);
+  GlobalInfo::instance().setSensor(sensor);
 
   ReconstructionModule::OutputQueue::Ptr queue;
   if (config.visualize_mesh) {
-    mesh_updater_.reset(new MeshUpdater(config));
+    const auto& map_config = config.reconstruction.volumetric_map;
+    mesh_updater_.reset(new MeshUpdater(map_config.voxel_size, config.zmq_url));
     mesh_thread_.reset(new std::thread(&MeshUpdater::spin, mesh_updater_.get()));
     queue = mesh_updater_->queue;
   }
 
-  module_ = config::createFromYaml<ReconstructionModule>(node, queue);
+  module_ = std::make_shared<ReconstructionModule>(config.reconstruction, queue);
   if (!module_) {
-    throw std::runtime_error("could not recreate reconstruction module");
+    throw std::runtime_error("could not create reconstruction module");
   }
 
   VLOG(config.verbosity) << std::endl << GlobalInfo::instance();
@@ -153,14 +179,18 @@ void PythonReconstruction::stop() {
 
 PythonReconstruction::~PythonReconstruction() { stop(); }
 
-bool PythonReconstruction::step(std::shared_ptr<InputPacket> input) {
+bool PythonReconstruction::step(const std::shared_ptr<InputPacket>& input) {
   return module_->step(input);
 }
 
-void PythonReconstruction::save() {
-  const auto& logs = GlobalInfo::instance().getLogs();
-  if (logs && logs->valid()) {
-    module_->map().save(logs->getLogDir() + "/map");
+void PythonReconstruction::save(const std::filesystem::path& output) {
+  if (output.empty()) {
+    return;
+  }
+
+  LogSetup logs(output);
+  if (logs.valid()) {
+    module_->map().save(logs.getLogDir() + "/map");
   }
 
   stop();
@@ -174,7 +204,7 @@ void PythonReconstruction::save() {
     return;
   }
 
-  kimera_pgmo::WriteMesh(logs->getLogDir() + "/mesh.ply", *mesh);
+  kimera_pgmo::WriteMesh(logs.getLogDir() + "/mesh.ply", *mesh);
 }
 
 namespace python_reconstruction {
@@ -183,9 +213,18 @@ namespace py = pybind11;
 
 void addBindings(pybind11::module_& m) {
   py::class_<PythonReconstruction>(m, "HydraReconstruction")
-      .def(py::init<const PipelineConfig&, const PythonConfig&>(),
-           "hydra_config"_a,
-           "config"_a)
+      .def_static("from_config",
+                  [](const std::string& config, const Sensor::Ptr& sensor) {
+                    const auto node = YAML::Load(config);
+                    return std::make_unique<PythonReconstruction>(
+                        config::fromYaml<PythonReconstruction::Config>(node), sensor);
+                  })
+      .def_static("from_file",
+                  [](const std::filesystem::path& config, const Sensor::Ptr& sensor) {
+                    const auto node = YAML::LoadFile(config);
+                    return std::make_unique<PythonReconstruction>(
+                        config::fromYaml<PythonReconstruction::Config>(node), sensor);
+                  })
       .def("save", &PythonReconstruction::save)
       .def("stop", &PythonReconstruction::stop)
       .def("step",
@@ -202,7 +241,7 @@ void addBindings(pybind11::module_& m) {
              input->world_R_body = Eigen::Quaterniond(
                  world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
              input->sensor_input = std::make_unique<PythonSensorInput>(
-                 timestamp_ns, depth, labels, rgb, "python");
+                 timestamp_ns, depth, labels, rgb, pipeline.sensor_name);
              return pipeline.step(input);
            })
       .def("step",
@@ -219,7 +258,7 @@ void addBindings(pybind11::module_& m) {
              input->world_R_body = Eigen::Quaterniond(
                  world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
              input->sensor_input = std::make_unique<PythonSensorInput>(
-                 timestamp_ns, points, labels, colors, "python");
+                 timestamp_ns, points, labels, colors, pipeline.sensor_name);
              return pipeline.step(input);
            });
 }

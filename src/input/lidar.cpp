@@ -35,6 +35,7 @@
 #include "hydra/input/lidar.h"
 
 #include <config_utilities/config_utilities.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/parsing/yaml.h>
 #include <glog/logging.h>
 
@@ -45,6 +46,12 @@
 #include "hydra/input/sensor_utilities.h"
 
 namespace hydra {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<Sensor, Lidar, Lidar::Config, std::string>("lidar");
+
+}
 
 void declare_config(Lidar::Config& config) {
   using namespace config;
@@ -108,9 +115,7 @@ Lidar::Lidar(const Config& config, const std::string& name)
                               .normalized();
 }
 
-float Lidar::getPointDepth(const Eigen::Vector3f& p) const {
-  return p.norm();
-}
+float Lidar::getPointDepth(const Eigen::Vector3f& p) const { return p.norm(); }
 
 float Lidar::computeRayDensity(float voxel_size, float depth) const {
   // we want rays per meter... we can do this by computing a virtual focal length

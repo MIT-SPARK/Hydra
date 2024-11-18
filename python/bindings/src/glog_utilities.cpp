@@ -1,6 +1,7 @@
 #include "hydra/bindings/glog_utilities.h"
 
 #include <glog/logging.h>
+#include <pybind11/stl/filesystem.h>
 
 #include <iostream>
 
@@ -57,6 +58,12 @@ void addBindings(pybind11::module_& m) {
   m.def(
       "set_glog_dir",
       [](const std::string& dirname) {
+        GlogSingleton::instance().setLogDirectory(dirname);
+      },
+      "dirname"_a);
+  m.def(
+      "set_glog_dir",
+      [](const std::filesystem::path& dirname) {
         GlogSingleton::instance().setLogDirectory(dirname);
       },
       "dirname"_a);

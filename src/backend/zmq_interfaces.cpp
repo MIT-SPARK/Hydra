@@ -35,12 +35,25 @@
 #include "hydra/backend/zmq_interfaces.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <spark_dsg/zmq_interface.h>
 
 namespace hydra {
+namespace {
+
+static const auto sink_registration =
+    config::RegistrationWithConfig<BackendModule::Sink, ZmqSink, ZmqSink::Config>(
+        "ZmqSink");
+
+static const auto update_registration =
+    config::RegistrationWithConfig<UpdateFunctor,
+                                   ZmqRoomLabelUpdater,
+                                   ZmqRoomLabelUpdater::Config>("ZmqRoomLabelUpdater");
+
+}  // namespace
 
 void declare_config(ZmqSink::Config& config) {
   using namespace config;
@@ -56,9 +69,11 @@ ZmqSink::ZmqSink(const Config& config) : config(config::checkValid(config)) {
 
 ZmqSink::~ZmqSink() = default;
 
-void ZmqSink::call(uint64_t /*timestamp_ns*/,
+void ZmqSink::call(uint64_t timestamp_ns,
                    const DynamicSceneGraph& graph,
                    const kimera_pgmo::DeformationGraph& /*dgraph*/) const {
+  VLOG(5) << "Sending graph via zmq to '" << config.url << "' @ " << timestamp_ns
+          << " [ns]";
   CHECK_NOTNULL(sender_)->send(graph, config.send_mesh);
 }
 

@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
+#include <config_utilities/virtual_config.h>
 
 #include <Eigen/Geometry>
 
@@ -73,12 +73,6 @@ class ReconstructionModule : public ActiveWindowModule {
   std::unique_ptr<ProjectiveIntegrator> tsdf_integrator_;
   std::unique_ptr<MeshIntegrator> mesh_integrator_;
   std::unique_ptr<RobotFootprintIntegrator> footprint_integrator_;
-
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<ActiveWindowModule,
-                                     ReconstructionModule,
-                                     Config,
-                                     OutputQueue::Ptr>("ReconstructionModule");
 };
 
 void declare_config(ReconstructionModule::Config& config);

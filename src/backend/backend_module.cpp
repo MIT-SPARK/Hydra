@@ -51,6 +51,17 @@
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<BackendModule,
+                                   BackendModule,
+                                   BackendModule::Config,
+                                   SharedDsgInfo::Ptr,
+                                   SharedModuleState::Ptr,
+                                   LogSetup::Ptr>("BackendModule");
+
+}
 
 using hydra::timing::ScopedTimer;
 using kimera_pgmo::KimeraPgmoInterface;

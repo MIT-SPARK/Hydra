@@ -34,14 +34,13 @@
  * -------------------------------------------------------------------------- */
 #include <pybind11/pybind11.h>
 
-#include "hydra/bindings/batch.h"
-#include "hydra/bindings/config_bindings.h"
 #include "hydra/bindings/glog_utilities.h"
-#include "hydra/bindings/hydra_python_pipeline.h"
-#include "hydra/bindings/python_config.h"
+#include "hydra/bindings/python_batch.h"
 #include "hydra/bindings/python_image.h"
+#include "hydra/bindings/python_pipeline.h"
 #include "hydra/bindings/python_reconstruction.h"
 #include "hydra/bindings/python_sensor_input.h"
+#include "hydra/bindings/python_sensors.h"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -50,14 +49,13 @@ PYBIND11_MODULE(_hydra_bindings, m) {
   py::module_::import("spark_dsg");
   py::options options;
 
-  ::hydra::python::batch::addBindings(m);
-  ::hydra::python::config_bindings::addBindings(m);
   ::hydra::python::glog_utilities::addBindings(m);
-  ::hydra::python::hydra_python_pipeline::addBindings(m);
-  ::hydra::python::python_config::addBindings(m);
+  ::hydra::python::python_batch::addBindings(m);
   ::hydra::python::python_image::addBindings(m);
-  ::hydra::python::python_sensor_input::addBindings(m);
+  ::hydra::python::python_pipeline::addBindings(m);
   ::hydra::python::python_reconstruction::addBindings(m);
+  ::hydra::python::python_sensor_input::addBindings(m);
+  ::hydra::python::python_sensors::addBindings(m);
 
   py::class_<Eigen::Quaterniond>(m, "Quaterniond")
       .def(py::init([]() { return Eigen::Quaterniond::Identity(); }))

@@ -47,8 +47,6 @@
 // purposes notwithstanding any copyright notation herein.
 #pragma once
 
-#include <config_utilities/factory.h>
-
 #include <vector>
 
 #include "hydra/input/input_data.h"
@@ -115,10 +113,6 @@ class Camera : public Sensor {
 
   // Pre-computed stored values.
   Eigen::Matrix<float, 4, 3> view_frustum_;  // Top, right, bottom, left plane normals.
-
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<Sensor, Camera, Camera::Config, std::string>(
-          "camera");
 };
 
 void declare_config(Camera::Config& config);

@@ -64,9 +64,6 @@ class ZmqSink : public BackendModule::Sink {
 
  private:
   std::unique_ptr<spark_dsg::ZmqSender> sender_;
-
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<BackendModule::Sink, ZmqSink, Config>("ZmqSink");
 };
 
 void declare_config(ZmqSink::Config& config);
@@ -93,10 +90,6 @@ class ZmqRoomLabelUpdater : public UpdateFunctor {
   std::atomic<bool> should_shutdown_{false};
   std::unique_ptr<spark_dsg::ZmqReceiver> receiver_;
   std::map<NodeId, std::string> room_name_map_;
-
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<UpdateFunctor, ZmqRoomLabelUpdater, Config>(
-          "ZmqRoomLabelUpdater");
 };
 
 void declare_config(ZmqRoomLabelUpdater::Config& conf);

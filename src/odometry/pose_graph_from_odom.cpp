@@ -35,11 +35,20 @@
 #include "hydra/odometry/pose_graph_from_odom.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
 
 #include "hydra/common/global_info.h"
 
 namespace hydra {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<PoseGraphTracker,
+                                   PoseGraphFromOdom,
+                                   PoseGraphFromOdom::Config>("PoseGraphFromOdom");
+
+}
 
 using pose_graph_tools::PoseGraph;
 

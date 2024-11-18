@@ -62,7 +62,7 @@ InputModule::InputModule(const Config& config, const OutputQueue::Ptr& queue)
   auto& info = GlobalInfo::instance();
   for (const auto& [name, input_pair] : config.inputs) {
     receivers_.emplace_back(input_pair.receiver.create(name));
-    CHECK(info.setSensor(name, input_pair.sensor, false));
+    CHECK(info.setSensor(input_pair.sensor.create(name), false));
   }
 }
 

@@ -35,6 +35,7 @@
 #include "hydra/input/sensor_extrinsics.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/types/eigen_matrix.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
@@ -42,6 +43,24 @@
 #include "hydra/common/config_utilities.h"
 
 namespace hydra {
+namespace {
+
+static const auto identity_registration =
+    config::RegistrationWithConfig<SensorExtrinsics,
+                                   IdentitySensorExtrinsics,
+                                   IdentitySensorExtrinsics::Config>("identity");
+
+static const auto param_registration_ =
+    config::RegistrationWithConfig<SensorExtrinsics,
+                                   ParamSensorExtrinsics,
+                                   ParamSensorExtrinsics::Config>("param");
+
+static const auto kimera_registration =
+    config::RegistrationWithConfig<SensorExtrinsics,
+                                   KimeraSensorExtrinsics,
+                                   KimeraSensorExtrinsics::Config>("kimera");
+
+}  // namespace
 
 SensorExtrinsics::SensorExtrinsics()
     : SensorExtrinsics(Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero()) {}

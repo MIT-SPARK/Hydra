@@ -207,14 +207,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   // TODO(lschmid): This mutex currently simply locks all data for manipulation.
   std::mutex mutex_;
-
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<BackendModule,
-                                     BackendModule,
-                                     Config,
-                                     SharedDsgInfo::Ptr,
-                                     SharedModuleState::Ptr,
-                                     LogSetup::Ptr>("BackendModule");
 };
 
 void declare_config(BackendModule::Config& conf);

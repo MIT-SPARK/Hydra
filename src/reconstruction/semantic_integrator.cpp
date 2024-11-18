@@ -35,6 +35,7 @@
 #include "hydra/reconstruction/semantic_integrator.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <glog/logging.h>
 
 #include <cmath>
@@ -43,6 +44,15 @@
 #include "hydra/common/global_info.h"
 
 namespace hydra {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<SemanticIntegrator,
+                                   MLESemanticIntegrator,
+                                   MLESemanticIntegrator::Config>(
+        "MLESemanticIntegrator");
+
+}
 
 MLESemanticIntegrator::MLESemanticIntegrator(const Config& config) : config(config) {
   total_labels_ = GlobalInfo::instance().getTotalLabels();

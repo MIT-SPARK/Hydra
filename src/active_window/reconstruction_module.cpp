@@ -48,10 +48,14 @@
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
-
-using timing::ScopedTimer;
-
 namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<ActiveWindowModule,
+                                   ReconstructionModule,
+                                   ReconstructionModule::Config,
+                                   ActiveWindowModule::OutputQueue::Ptr>(
+        "ReconstructionModule");
 
 double diffInSeconds(uint64_t lhs, uint64_t rhs) {
   return std::chrono::duration_cast<std::chrono::duration<double>>(
@@ -60,6 +64,8 @@ double diffInSeconds(uint64_t lhs, uint64_t rhs) {
 }
 
 }  // namespace
+
+using timing::ScopedTimer;
 
 void declare_config(ReconstructionModule::Config& config) {
   using namespace config;

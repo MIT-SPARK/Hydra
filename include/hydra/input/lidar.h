@@ -34,8 +34,6 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <config_utilities/factory.h>
-
 #include <vector>
 
 #include "hydra/input/input_data.h"
@@ -109,10 +107,6 @@ class Lidar : public Sensor {
   Eigen::Vector3f bottom_frustum_normal_;
   Eigen::Vector3f left_frustum_normal_;
   Eigen::Vector3f right_frustum_normal_;
-
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<Sensor, Lidar, Lidar::Config, std::string>(
-          "lidar");
 };
 
 void declare_config(Lidar::Config& config);

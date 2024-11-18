@@ -164,6 +164,11 @@ void GlobalInfo::initFromConfig(const PipelineConfig& config, int robot_id) {
   VLOG(5) << "Loading from config: " << config::toString(config);
   robot_prefix_ = RobotPrefixConfig(robot_id);
   logs_ = std::make_shared<LogSetup>(config_.logs);
+  if (!logs_->valid()) {
+    // delete logs if they don't point to a valid path
+    logs_.reset();
+  }
+
   configureTimers();
 
   if (!config_.label_space.label_remap_filepath.empty()) {
@@ -265,27 +270,29 @@ SharedDsgInfo::Ptr GlobalInfo::createSharedDsg() const {
   return std::make_shared<SharedDsgInfo>(config_.layer_id_map);
 }
 
-bool GlobalInfo::setSensor(const std::string& name,
-                           config::VirtualConfig<Sensor> sensor,
-                           bool allow_override) {
-  auto iter = sensors_.find(name);
+bool GlobalInfo::setSensor(const Sensor::Ptr& sensor, bool allow_override) {
+  if (!sensor) {
+    LOG(ERROR) << "Sensor is invalid!";
+    return false;
+  }
+
+  auto iter = sensors_.find(sensor->name);
   if (iter == sensors_.end()) {
-    sensors_[name] = sensor.create(name);
+    sensors_[sensor->name] = sensor;
     return true;
   }
 
   if (!allow_override) {
-    LOG(ERROR) << "Sensor '" << name << "' already exists!";
+    LOG(ERROR) << "Sensor '" << sensor->name << "' already exists!";
     return false;
   }
 
-  VLOG(1) << "Overriding sensor '" << name << "' with config:\n"
-          << config::toString(sensor);
-  iter->second = sensor.create(name);
+  VLOG(1) << "Overriding sensor '" << sensor->name << "'!";
+  iter->second = sensor;
   return true;
 }
 
-std::shared_ptr<const Sensor> GlobalInfo::getSensor(const std::string& name) const {
+Sensor::ConstPtr GlobalInfo::getSensor(const std::string& name) const {
   auto iter = sensors_.find(name);
   if (iter == sensors_.end()) {
     LOG(ERROR) << "Sensor '" << name << "' does not exist!";

@@ -1,11 +1,10 @@
 """Setup script for building against hydra."""
+
 import os
-import re
 import subprocess
 import multiprocessing
 import sys
 import shutil
-import em
 
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
@@ -79,23 +78,19 @@ class CMakeBuild(build_ext):
         )
 
 
-empy_path = re.compile("/__init__.py.*").sub("", em.__file__)
 cmake_flags = [
-    f"-DPY_EM={empy_path}",
     "-DHYDRA_ENABLE_EVAL=OFF",
     "-DHYDRA_ENABLE_GNN=OFF",
     "-DHYDRA_ENABLE_TESTS=OFF",
     "-DHYDRA_ENABLE_PYTHON=ON",
     "-DBUILD_SHARED_LIBS=OFF",
-    # "-DHYDRA_ENABLE_COVERAGE=ON",
 ]
-ccache = shutil.which("ccache")
-if ccache:
-    cmake_flags.append(f"-DCMAKE_CXX_COMPILER_LAUNCHER={ccache}")
 
 cmake_modules = [
     CMakeExtension(
-        "hydra_python._hydra_bindings", sourcedir=".", extra_cmake_flags=cmake_flags
+        "hydra_python._hydra_bindings",
+        sourcedir="python",
+        extra_cmake_flags=cmake_flags,
     )
 ]
 

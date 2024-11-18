@@ -1,8 +1,9 @@
 """Module containing utilities for interfacing a new simulator with Hydra."""
+
 import abc
 
 
-class DataInterface(abc.ABC):
+class SimulatorInterface(abc.ABC):
     """Interface to inherit from for new data sources."""
 
     @abc.abstractmethod
@@ -12,14 +13,13 @@ class DataInterface(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def colormap(self):
-        """Get current colormap."""
-        pass
+    def sensor(self):
+        """
+        Get current sensor.
 
-    @property
-    @abc.abstractmethod
-    def camera_info(self):
-        """Get current sensor."""
+        Returns:
+            (hydra_python.Sensor) Sensor simulator uses
+        """
         pass
 
     @property
@@ -39,8 +39,3 @@ class DataInterface(abc.ABC):
     def rgb(self):
         """Get last RGB image."""
         pass
-
-    @property
-    def semantics(self):
-        """Get last semantic image."""
-        return self.colormap(self.labels())

@@ -60,6 +60,17 @@
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<GraphBuilder,
+                                   GraphBuilder,
+                                   GraphBuilder::Config,
+                                   SharedDsgInfo::Ptr,
+                                   SharedModuleState::Ptr,
+                                   LogSetup::Ptr>("GraphBuilder");
+
+}
 
 using hydra::timing::ScopedTimer;
 
@@ -387,9 +398,10 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
   {  // start timing scope
     ScopedTimer timer("frontend/mesh_archive", input.timestamp_ns, true, 1, false);
     // TODO(nathan) add this back when we fix the khronos active window
-    //const auto pose = input.world_T_body();
-    //const auto block_size = input.map().blockSize();
-    const spatial_hash::IndexSet archived_blocks(input.archived_mesh_indices.begin(), input.archived_mesh_indices.end());
+    // const auto pose = input.world_T_body();
+    // const auto block_size = input.map().blockSize();
+    const spatial_hash::IndexSet archived_blocks(input.archived_mesh_indices.begin(),
+                                                 input.archived_mesh_indices.end());
     mesh_compression_->archiveBlocks([&](const auto& index, const auto& /* info */) {
       return archived_blocks.count(index);
     });

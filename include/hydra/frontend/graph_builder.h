@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
+#include <config_utilities/virtual_config.h>
 #include <kimera_pgmo/hashing.h>
 #include <pose_graph_tools/bow_query.h>
 #include <spark_dsg/scene_graph_logger.h>
@@ -205,14 +205,6 @@ class GraphBuilder : public Module {
 
   std::vector<std::function<void(ActiveWindowOutput::Ptr)>> input_callbacks_;
   std::vector<std::function<void(const ActiveWindowOutput&)>> post_mesh_callbacks_;
-
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<GraphBuilder,
-                                     GraphBuilder,
-                                     Config,
-                                     SharedDsgInfo::Ptr,
-                                     SharedModuleState::Ptr,
-                                     LogSetup::Ptr>("GraphBuilder");
 };
 
 void declare_config(GraphBuilder::Config& config);

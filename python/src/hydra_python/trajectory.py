@@ -145,8 +145,6 @@ class Trajectory:
 
         poses.append(pose_end)
         poses = np.array(poses)
-        # print(poses[:, :3])
-        # print(poses[:, 3:])
 
         times_s = dt * np.arange(poses.shape[0]) + start_time_s
         times_ns = (1.0e9 * times_s).astype(np.uint64)

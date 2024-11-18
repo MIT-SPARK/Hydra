@@ -33,8 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
 
+#include <set>
 #include <cstdint>
 
 #include "hydra/reconstruction/voxel_types.h"
@@ -85,12 +85,6 @@ class MLESemanticIntegrator : public SemanticIntegrator {
 
   float init_likelihood_;
   Eigen::MatrixXf observation_likelihoods_;
-
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<SemanticIntegrator,
-                                     MLESemanticIntegrator,
-                                     MLESemanticIntegrator::Config>(
-          "MLESemanticIntegrator");
 };
 
 void declare_config(MLESemanticIntegrator::Config& config);

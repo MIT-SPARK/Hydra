@@ -32,13 +32,12 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
 #include <pybind11/pybind11.h>
 
 namespace hydra::python {
 
-namespace config_bindings {
-void addBindings(pybind11::module_& module);
+namespace python_sensors {
+void addBindings(pybind11::module_& m);
 }
 
 }  // namespace hydra::python

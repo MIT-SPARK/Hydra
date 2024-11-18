@@ -33,7 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
 
 #include <Eigen/Geometry>
 
@@ -61,12 +60,6 @@ struct IdentitySensorExtrinsics : public SensorExtrinsics {
   struct Config {};
 
   explicit IdentitySensorExtrinsics(const Config& config);
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<SensorExtrinsics,
-                                     IdentitySensorExtrinsics,
-                                     Config>("identity");
 };
 
 struct ParamSensorExtrinsics : public SensorExtrinsics {
@@ -76,11 +69,6 @@ struct ParamSensorExtrinsics : public SensorExtrinsics {
   };
 
   explicit ParamSensorExtrinsics(const Config& config);
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<SensorExtrinsics, ParamSensorExtrinsics, Config>(
-          "param");
 };
 
 struct KimeraSensorExtrinsics : public SensorExtrinsics {
@@ -89,11 +77,6 @@ struct KimeraSensorExtrinsics : public SensorExtrinsics {
   };
 
   explicit KimeraSensorExtrinsics(const Config& config);
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<SensorExtrinsics, KimeraSensorExtrinsics, Config>(
-          "kimera");
 };
 
 void declare_config(IdentitySensorExtrinsics::Config& config);

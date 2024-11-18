@@ -132,11 +132,9 @@ class GlobalInfo {
 
   SharedDsgInfo::Ptr createSharedDsg() const;
 
-  bool setSensor(const std::string& name,
-                 config::VirtualConfig<Sensor> sensor,
-                 bool allow_override = true);
+  bool setSensor(const Sensor::Ptr& sensor, bool allow_override = true);
 
-  std::shared_ptr<const Sensor> getSensor(const std::string& name) const;
+  Sensor::ConstPtr getSensor(const std::string& name) const;
 
   std::vector<std::string> getAvailableSensors() const;
 

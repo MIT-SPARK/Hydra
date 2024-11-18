@@ -32,50 +32,56 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/bindings/batch.h"
+#include "hydra/bindings/python_batch.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/formatting/asl.h>
 #include <config_utilities/logging/log_to_glog.h>
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/validation.h>
+#include <hydra/common/batch_pipeline.h>
 #include <hydra/common/global_info.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
 
 #include "hydra/bindings/glog_utilities.h"
-#include "hydra/bindings/python_config.h"
 
 namespace hydra::python {
 
-PythonBatchPipeline::PythonBatchPipeline(const PipelineConfig& config, int robot_id)
-    : BatchPipeline(config, robot_id) {
-  if (!GlobalInfo::instance().frozen()) {
-    GlobalInfo::init(config, robot_id, true);
-  }
+class PythonBatchPipeline : public BatchPipeline {
+ public:
+  struct Config : PipelineConfig {
+    config::VirtualConfig<GraphBuilder> frontend;
+    RoomFinderConfig room_finder;
+  } const config;
 
+  PythonBatchPipeline(const Config& config, int robot_id = 0);
+  virtual ~PythonBatchPipeline() = default;
+  DynamicSceneGraph::Ptr construct(const VolumetricMap& map) const;
+};
+
+void declare_config(PythonBatchPipeline::Config& config) {
+  using namespace config;
+  name("PythonBatchPipeline::Config");
+  base<PipelineConfig>(config);
+  field(config.frontend, "frontend");
+  field(config.room_finder, "backend/room_finder");
+}
+
+PythonBatchPipeline::PythonBatchPipeline(const Config& config, int robot_id)
+    : BatchPipeline(config, robot_id) {
+  GlobalInfo::init(config, robot_id, true);
   GlogSingleton::instance().setLogLevel(0, 0, false);
-  // config::Settings().setLogger("glog");
   config::Settings().print_width = 100;
   config::Settings().print_indent = 45;
 }
 
-PythonBatchPipeline::~PythonBatchPipeline() {}
-
-DynamicSceneGraph::Ptr PythonBatchPipeline::construct(const PythonConfig& config,
-                                                      VolumetricMap& map) const {
-  const auto node = config.toYaml();
-  const auto frontend_config =
-      config::fromYaml<config::VirtualConfig<GraphBuilder>>(node, "frontend");
-  const auto room_config =
-      config::fromYaml<RoomFinderConfig>(node, "backend/room_finder");
-  // LOG(INFO) << "Using frontend config: " << std::endl <<
-  // config::toString(frontend_config); LOG(INFO) << "Using room config: " << std::endl
-  // << config::toString(room_config);
-  return BatchPipeline::construct(frontend_config, map, &room_config);
+DynamicSceneGraph::Ptr PythonBatchPipeline::construct(const VolumetricMap& map) const {
+  const auto new_map = map.clone();
+  return BatchPipeline::construct(config.frontend, *new_map, &config.room_finder);
 }
 
-namespace batch {
+namespace python_batch {
 
 using namespace pybind11::literals;
 namespace py = pybind11;
@@ -90,10 +96,27 @@ void addBindings(pybind11::module_& m) {
       });
 
   py::class_<PythonBatchPipeline>(m, "BatchPipeline")
-      .def(py::init<const PipelineConfig&, int>(), "config"_a, "robot_id"_a = 0)
+      .def_static(
+          "from_config",
+          [](const std::string& config, int robot_id) {
+            const auto node = YAML::Load(config);
+            return std::make_unique<PythonBatchPipeline>(
+                config::fromYaml<PythonBatchPipeline::Config>(node), robot_id);
+          },
+          "config"_a,
+          "robot_id"_a = 0)
+      .def_static(
+          "from_file",
+          [](const std::filesystem::path& config, int robot_id) {
+            const auto node = YAML::LoadFile(config);
+            return std::make_unique<PythonBatchPipeline>(
+                config::fromYaml<PythonBatchPipeline::Config>(node), robot_id);
+          },
+          "config"_a,
+          "robot_id"_a = 0)
       .def("construct", &PythonBatchPipeline::construct);
 }
 
-}  // namespace batch
+}  // namespace python_batch
 
 };  // namespace hydra::python

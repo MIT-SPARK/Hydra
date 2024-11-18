@@ -48,6 +48,7 @@
 #include "hydra/input/camera.h"
 
 #include <config_utilities/config_utilities.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/parsing/yaml.h>
 
 #include <unordered_map>
@@ -56,6 +57,13 @@
 #include "hydra/input/sensor_utilities.h"
 
 namespace hydra {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<Sensor, Camera, Camera::Config, std::string>(
+        "camera");
+
+}
 
 void declare_config(Camera::Config& config) {
   using namespace config;
@@ -100,9 +108,7 @@ Camera::Camera(const Config& config, const std::string& name)
   view_frustum_.row(3) = p2.cross(p1).normalized();
 }
 
-float Camera::getPointDepth(const Eigen::Vector3f& p) const {
-  return p.z();
-}
+float Camera::getPointDepth(const Eigen::Vector3f& p) const { return p.z(); }
 
 float Camera::computeRayDensity(float voxel_size, float depth) const {
   return config_.fx * config_.fy * std::pow(voxel_size / depth, 2.f);

@@ -32,45 +32,8 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <memory>
-#include <thread>
+#include <pybind11/pybind11.h>
 
-namespace pybind11 {
-class module_;
-}
-
-namespace hydra {
-
-class ReconstructionModule;
-struct InputPacket;
-struct PipelineConfig;
-
-namespace python {
-
-class PythonConfig;
-struct MeshUpdater;
-
-class PythonReconstruction {
- public:
-  PythonReconstruction(const PipelineConfig& hydra_config, const PythonConfig& config);
-
-  virtual ~PythonReconstruction();
-
-  bool step(std::shared_ptr<InputPacket> input);
-
-  void save();
-
-  void stop();
-
- protected:
-  std::shared_ptr<ReconstructionModule> module_;
-  std::unique_ptr<MeshUpdater> mesh_updater_;
-  std::unique_ptr<std::thread> mesh_thread_;
-};
-
-namespace python_reconstruction {
+namespace hydra::python::python_reconstruction {
 void addBindings(pybind11::module_& m);
 }
-
-}  // namespace python
-}  // namespace hydra
