@@ -33,6 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <pose_graph_tools/pose_graph.h>
+
 #include <memory>
 
 #include "hydra/common/message_queue.h"
@@ -40,7 +42,7 @@
 
 namespace pose_graph_tools {
 struct BowQuery;
-}
+}  // namespace pose_graph_tools
 
 namespace hydra {
 
@@ -63,6 +65,9 @@ class PipelineQueues {
   MessageQueue<lcd::RegistrationSolution> backend_lcd_queue;
   //! Queue for receiving image or pointcloud level descriptors
   MessageQueue<std::unique_ptr<FeatureView>> input_features_queue;
+  //! Queue for receiving (timestamped) external loop closures
+  MessageQueue<pose_graph_tools::PoseGraph> external_loop_closure_queue;
+
   //! Optional input queue to LCD module
   LcdQueue::Ptr lcd_queue;
   //! Optional BoW descriptor queue to LCD module
