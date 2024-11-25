@@ -98,7 +98,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
     //! agent pose. 0 disables checking time differences.
     double max_external_loop_closure_time_difference = 1.0;
     //! Update functors that get applied in the specified order
-    config::OrderedMap<std::string, config::VirtualConfig<UpdateFunctor>>
+    config::OrderedMap<std::string, config::VirtualConfig<UpdateFunctor, true>>
         update_functors;
     //! Output sinks that process that latest backed scene graph and state
     std::vector<Sink::Factory> sinks;

@@ -45,7 +45,7 @@ template <typename... Args>
 struct OutputSink {
   using Sink = OutputSink<Args...>;
   using Ptr = std::shared_ptr<Sink>;
-  using Factory = config::VirtualConfig<Sink>;
+  using Factory = config::VirtualConfig<Sink, true>;
   using List = std::list<Ptr>;
 
   virtual ~OutputSink() = default;
