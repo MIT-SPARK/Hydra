@@ -69,6 +69,11 @@ struct InputData {
     return world_T_body * sensor_->body_T_sensor();
   }
 
+  bool inRange(float range_m) const {
+    return range_m >= sensor_->min_range() && range_m <= sensor_->max_range() &&
+           range_m <= max_range;
+  }
+
  private:
   Sensor::ConstPtr sensor_;
 };

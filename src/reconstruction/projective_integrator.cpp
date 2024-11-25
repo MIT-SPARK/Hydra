@@ -61,17 +61,22 @@
 
 namespace hydra {
 
-using VoxelMeasurement = ProjectiveIntegrator::VoxelMeasurement;
+using Measurement = ProjectiveIntegrator::VoxelMeasurement;
+using MapConfig = VolumetricMap::Config;
 
 void declare_config(ProjectiveIntegrator::Config& config) {
   using namespace config;
   name("ProjectiveIntegrator");
   field(config.verbosity, "verbosity");
+  field(config.extra_integration_distance,
+        "extra_integration_distance",
+        config.extra_integration_distance >= 0 ? "m" : "vs");
   field(config.use_weight_dropoff, "use_weight_dropoff");
   field(config.weight_dropoff_epsilon,
         "weight_dropoff_epsilon",
         config.weight_dropoff_epsilon >= 0 ? "m" : "vs");
   field(config.use_constant_weight, "use_constant_weight");
+  field(config.min_measurement_weight, "min_measurement_weight");
   field(config.max_weight, "max_weight");
   field<ThreadNumConversion>(config.num_threads, "num_threads");
   field(config.interpolation_method, "interpolation_method");
@@ -79,17 +84,17 @@ void declare_config(ProjectiveIntegrator::Config& config) {
   field(config.semantic_integrator, "semantic_integrator");
 
   check(config.num_threads, GT, 0, "num_threads");
+  check(config.min_measurement_weight, GE, 0.0f, "min_measurement_weight");
   check(config.max_weight, GT, 0, "max_weight");
   if (config.use_weight_dropoff) {
-    check(config.weight_dropoff_epsilon, NE, 0.f, "weight_dropoff_epsilon");
+    check(config.weight_dropoff_epsilon, NE, 0.0f, "weight_dropoff_epsilon");
   }
 }
 
 ProjectiveIntegrator::ProjectiveIntegrator(const ProjectiveIntegrator::Config& config)
     : config(config::checkValid(config)),
       interpolator_(config.interpolation_method.create()),
-      semantic_integrator_(config.semantic_integrator.create()),
-      ground_labels_(GlobalInfo::instance().getLabelSpaceConfig().ground_labels) {}
+      semantic_integrator_(config.semantic_integrator.create()) {}
 
 void ProjectiveIntegrator::updateMap(const InputData& data,
                                      VolumetricMap& map,
@@ -155,13 +160,13 @@ void ProjectiveIntegrator::updateBlock(const BlockIndex& block_index,
   bool was_updated = false;
   for (size_t i = 0; i < blocks.tsdf->numVoxels(); ++i) {
     const auto p_sensor = sensor_T_body * blocks.tsdf->getVoxelPosition(i);
-    const auto measurement = getVoxelMeasurement(map.config, p_sensor, data);
+    const auto measurement = getVoxelMeasurement(map.config, data, p_sensor);
     if (!measurement.valid) {
       continue;
     }
 
     auto voxels = blocks.getVoxels(i);
-    updateVoxel(data, measurement, voxels);
+    updateVoxel(map.config, data, measurement, voxels);
     was_updated = true;
   }
 
@@ -171,84 +176,91 @@ void ProjectiveIntegrator::updateBlock(const BlockIndex& block_index,
   }
 }
 
-VoxelMeasurement ProjectiveIntegrator::getVoxelMeasurement(
-    const VolumetricMap::Config& map_config,
-    const Point& p_C,
-    const InputData& data) const {
-  VoxelMeasurement measurement;
+Measurement ProjectiveIntegrator::getVoxelMeasurement(const MapConfig& map_config,
+                                                      const InputData& data,
+                                                      const Point& p_C) const {
+  Measurement measurement;
 
+  // Check the point is within range of the sensor and input data
   const auto voxel_range = p_C.norm();
-  // Check the point is valid for interpolation.
-  if (voxel_range < data.getSensor().min_range() ||
-      voxel_range > data.getSensor().max_range() || voxel_range > data.max_range) {
+  if (!data.inRange(voxel_range)) {
     return measurement;
   }
 
-  if (!interpolatePoint(p_C, data, measurement.interpolation_weights)) {
+  // Check the point is valid for interpolation
+  if (!interpolatePoint(data, p_C, measurement.interpolation_weights)) {
     return measurement;
   }
 
-  // Don't integrate surface voxels of dynamic measurements.
-  if (!computeLabel(data, measurement)) {
-    return measurement;
-  }
-
-  // NOTE(hlim) Set adaptive truncation distance for better mesh generation
-  // Especially, this option considers ground points from LiDAR measurement
-  float truncation_distance = map_config.truncation_distance;
-  if (map_config.truncation_distance_for_ground && isGroundLabel(measurement.label)) {
-    if (map_config.truncation_distance_for_ground > 0) {
-      truncation_distance = map_config.truncation_distance_for_ground;
-    } else {
-      // `truncation_distance_for_ground` is used as a ratio
-      // of the the actual truncation distance
-      truncation_distance =
-          -map_config.truncation_distance_for_ground * map_config.truncation_distance;
-    }
-  }
-
-  // Compute the signed distance to the surface.
-  measurement.sdf = computeSDF(
-      data, measurement.interpolation_weights, truncation_distance, voxel_range);
+  // Compute the (partially truncated) signed distance to the surface
+  measurement.sdf =
+      computeSDF(map_config, data, measurement.interpolation_weights, voxel_range);
   if (!std::isfinite(measurement.sdf)) {
     return measurement;
   }
 
-  if (measurement.sdf < -truncation_distance) {
+  // Avoid integrating points where we don't have information
+  if (measurement.sdf < -map_config.truncation_distance) {
+    if (!config.extra_integration_distance) {
+      return measurement;  // voxel beyond truncation distance
+    }
+
+    // Voxel's negative distance past the truncation band
+    const auto dist_m = measurement.sdf + map_config.truncation_distance;
+    // Positive distance threshold past the truncation band
+    const auto threshold_m =
+        config.extra_integration_distance < 0.0f
+            ? -config.extra_integration_distance * map_config.voxel_size
+            : config.extra_integration_distance;
+
+    // If dist_m is bigger than threshold_m in absolute value, the sum will be negative
+    if (dist_m + threshold_m < 0.0f) {
+      return measurement;
+    }
+
+    // Clip measurement to be at the negative truncation distance
+    measurement.sdf = -map_config.truncation_distance;
+  }
+
+  // Get associated semantic label if applicable and check if it can be integrated
+  if (!computeLabel(map_config, data, measurement)) {
     return measurement;
   }
 
-  // Compute the weight of the measurement.
-  measurement.weight = computeWeight(data.getSensor(),
-                                     p_C,
-                                     measurement.sdf,
-                                     truncation_distance,
-                                     map_config.voxel_size);
+  // Compute the weight of the measurement
+  measurement.weight =
+      computeWeight(map_config, data.getSensor(), p_C, measurement.sdf);
   measurement.valid = true;
   return measurement;
 }
 
-void ProjectiveIntegrator::updateVoxel(const InputData& data,
-                                       const VoxelMeasurement& measurement,
+void ProjectiveIntegrator::updateVoxel(const MapConfig& map_config,
+                                       const InputData& data,
+                                       const Measurement& measurement,
                                        VoxelTuple& voxels) const {
   if (!std::isfinite(measurement.sdf)) {
     LOG(ERROR) << "found invalid measurement!";
     return;
   }
 
-  // Cache old weight and add measurement to the current weight.
+  // Cache old weight and add measurement to the current weight
   auto& tsdf_voxel = *voxels.tsdf;
   const auto prev_weight = tsdf_voxel.weight;
   tsdf_voxel.weight =
       std::min(tsdf_voxel.weight + measurement.weight, config.max_weight);
 
-  // Update TSDF distance using weighted averaging fusion.
+  // Update TSDF distance using weighted averaging fusion
   tsdf_voxel.distance =
       (tsdf_voxel.distance * prev_weight + measurement.sdf * measurement.weight) /
       (prev_weight + measurement.weight);
 
   if (voxels.tracking) {
     voxels.tracking->last_observed = data.timestamp_ns;
+  }
+
+  // Don't bother updating colors or labels outside the truncation distance
+  if (std::abs(measurement.sdf) >= map_config.truncation_distance) {
+    return;
   }
 
   // TODO(nathan) refactor into update functions
@@ -268,8 +280,8 @@ void ProjectiveIntegrator::updateVoxel(const InputData& data,
   }
 }
 
-bool ProjectiveIntegrator::interpolatePoint(const Point& p_C,
-                                            const InputData& data,
+bool ProjectiveIntegrator::interpolatePoint(const InputData& data,
+                                            const Point& p_C,
                                             InterpolationWeights& weights) const {
   // Project the current voxel into the range image, only count points that fall
   // fully into the image so the
@@ -283,25 +295,26 @@ bool ProjectiveIntegrator::interpolatePoint(const Point& p_C,
   return weights.valid;
 }
 
-float ProjectiveIntegrator::computeSDF(const InputData& data,
+float ProjectiveIntegrator::computeSDF(const MapConfig& map_config,
+                                       const InputData& data,
                                        const InterpolationWeights& weights,
-                                       const float truncation_distance,
                                        const float distance_to_voxel) const {
   const auto d_to_surface = interpolator_->InterpolateRange(data.range_image, weights);
-  const auto sdf = d_to_surface - distance_to_voxel;
-  return std::min(sdf, truncation_distance);
+  // NOTE(nathan) If the sdf value is NaN, this should return NaN (min returns a if a <
+  // b, a < NaN is false) This is probably the desired behavior if the range image
+  // contains NaNs (the only source of non-finite values) but may need to be checked
+  return std::min(map_config.truncation_distance, d_to_surface - distance_to_voxel);
 }
 
-float ProjectiveIntegrator::computeWeight(const Sensor& sensor,
+float ProjectiveIntegrator::computeWeight(const MapConfig& map_config,
+                                          const Sensor& sensor,
                                           const Point& p_C,
-                                          const float sdf,
-                                          const float truncation_distance,
-                                          const float voxel_size) const {
+                                          const float sdf) const {
   // This approximates the number of rays that would hit this voxel.
   // NOTE(lschmid): For (close) voxels hit by many pixels one could think of denoising
   // the depth image / looking at a local neighborhood for the update.
   const float depth = sensor.getPointDepth(p_C);
-  auto weight = sensor.computeRayDensity(voxel_size, depth);
+  auto weight = sensor.computeRayDensity(map_config.voxel_size, depth);
 
   // Weight reduction with distance squared (according to sensor noise models).
   if (!config.use_constant_weight) {
@@ -310,33 +323,38 @@ float ProjectiveIntegrator::computeWeight(const Sensor& sensor,
 
   // Apply weight drop-off if appropriate.
   if (config.use_weight_dropoff) {
-    const float dropoff_epsilon = config.weight_dropoff_epsilon > 0.f
-                                      ? config.weight_dropoff_epsilon
-                                      : config.weight_dropoff_epsilon * -voxel_size;
+    const float dropoff_epsilon =
+        config.weight_dropoff_epsilon > 0.f
+            ? config.weight_dropoff_epsilon
+            : config.weight_dropoff_epsilon * -map_config.voxel_size;
     if (sdf < -dropoff_epsilon) {
-      weight *= (truncation_distance + sdf) / (truncation_distance - dropoff_epsilon);
-      weight = std::max(weight, 0.f);
+      weight *= (map_config.truncation_distance + sdf) /
+                (map_config.truncation_distance - dropoff_epsilon);
     }
   }
+
+  // clip weight to be at least as much as the specified min weight (which is always
+  // nonnegative)
+  weight = std::max(weight, config.min_measurement_weight);
   return weight;
 }
 
-bool ProjectiveIntegrator::computeLabel(const InputData& data,
-                                        VoxelMeasurement& measurement) const {
+bool ProjectiveIntegrator::computeLabel(const MapConfig& map_config,
+                                        const InputData& data,
+                                        Measurement& measurement) const {
+  if (std::abs(measurement.sdf) >= map_config.truncation_distance) {
+    // If SDF value is beyond the truncation band, we don't need to
+    // compute a label and the point is always valid for integration
+    return true;
+  }
+
   if (data.label_image.empty() || !semantic_integrator_) {
     return true;
   }
+
   measurement.label =
       interpolator_->interpolateID(data.label_image, measurement.interpolation_weights);
   return semantic_integrator_->canIntegrate(measurement.label);
 }
 
-bool ProjectiveIntegrator::isGroundLabel(const uint32_t label) const {
-  // NOTE(hlim): If ground_labels_ are not provided,
-  // the adaptive mode will not be applied.
-  if (ground_labels_.find(label) != ground_labels_.end()) {
-    return true;
-  }
-  return false;
-}
 }  // namespace hydra

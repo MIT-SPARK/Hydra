@@ -71,6 +71,9 @@ class ProjectiveIntegrator {
   struct Config {
     //! Verbosity for the projective integrator
     int verbosity = GlobalInfo::instance().getConfig().default_verbosity;
+    //! If nonzero, integrates negative voxels outside of the truncation distance by the
+    //! specified threshold. Negative values are multiples of the voxel size
+    float extra_integration_distance = 0.0f;
     //! If true, drop off the weight behind the surface crossing
     bool use_weight_dropoff = true;
     //! Distance in meters where the weight drop-off reaches zero. Negative
@@ -80,6 +83,10 @@ class ProjectiveIntegrator {
     //! weights as a function of the squared depth to approximate typical RGBD
     //! sensor confidence
     bool use_constant_weight = false;
+    //! Force measurements to carry at least a minimum weight for integration
+    //! (corresponds to minimum weight required for a voxel to be observed in the mesh
+    //! integrator)
+    float min_measurement_weight = 1.0e-4f;
     //! Maximum weight used for TSDF updates. High max weight keeps information
     //! longer in memory, low max weight favors rapid updates
     float max_weight = 1.0e5f;
@@ -145,8 +152,8 @@ class ProjectiveIntegrator {
    * @return The measurement weight that can be applied to a voxel.
    */
   VoxelMeasurement getVoxelMeasurement(const VolumetricMap::Config& map_config,
-                                       const Point& p_C,
-                                       const InputData& data) const;
+                                       const InputData& data,
+                                       const Point& p_C) const;
 
   /**
    * @brief Update a voxel with the given measurement.
@@ -154,7 +161,8 @@ class ProjectiveIntegrator {
    * @param measurement Measurement to use for the update.
    * @param voxels Voxel to update.
    */
-  void updateVoxel(const InputData& data,
+  void updateVoxel(const VolumetricMap::Config& map_config,
+                   const InputData& data,
                    const VoxelMeasurement& measurement,
                    VoxelTuple& voxels) const;
 
@@ -166,26 +174,25 @@ class ProjectiveIntegrator {
    * @param weights Where to write the resulting interpolation weights to.
    * @returns True if the point is valid, false otherwise.
    */
-  bool interpolatePoint(const Point& p_C,
-                        const InputData& data,
+  bool interpolatePoint(const InputData& data,
+                        const Point& p_C,
                         InterpolationWeights& weights) const;
 
   /**
    * @brief Compute the signed distance value for the given point.
    */
-  float computeSDF(const InputData& data,
+  float computeSDF(const VolumetricMap::Config& map_config,
+                   const InputData& data,
                    const InterpolationWeights& weights,
-                   const float truncation_distance,
                    const float distance_to_voxel) const;
 
   /**
    * @brief Compute the TSDF update weight for the given point.
    */
-  float computeWeight(const Sensor& sensor,
+  float computeWeight(const VolumetricMap::Config& map_config,
+                      const Sensor& sensor,
                       const Point& p_C,
-                      const float sdf,
-                      const float truncation_distance,
-                      const float voxel_size) const;
+                      const float sdf) const;
 
   // TODO(lschmid): Find a good way to clean this up and integrate this more nicely.
   // Just adding hooks here for now for Khronos updates.
@@ -193,20 +200,13 @@ class ProjectiveIntegrator {
    * @brief Compute the semantic label of the given measurement.
    * @returns True if the measurement is valid for integration, false otherwise.
    */
-  virtual bool computeLabel(const InputData& data, VoxelMeasurement& measurement) const;
-
-  /**
-   * @brief Check if the given label corresponds to a ground point.
-   * @param label The label associated with the voxel or point.
-   * @return True if the label is part of the predefined ground labels; false otherwise.
-   */
-  bool isGroundLabel(const uint32_t label) const;
+  virtual bool computeLabel(const VolumetricMap::Config& map_config,
+                            const InputData& data,
+                            VoxelMeasurement& measurement) const;
 
  protected:
   const std::unique_ptr<const ProjectionInterpolator> interpolator_;
   const std::unique_ptr<const SemanticIntegrator> semantic_integrator_;
-
-  const std::set<uint32_t> ground_labels_;
 };
 
 void declare_config(ProjectiveIntegrator::Config& config);

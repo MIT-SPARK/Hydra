@@ -101,10 +101,6 @@ class VolumetricMap {
     bool with_semantics = false;
     //! Whether or not the map has a tracking layer.
     bool with_tracking = false;
-    //! Adaptive TSDF truncation distance for ground points whose incidence angles are
-    //! close to 90 degrees.
-    //! 0 (default): turn off the adaptive truncation distance mode.
-    float truncation_distance_for_ground = 0.0f;
   } const config;
 
   explicit VolumetricMap(const Config& config);
