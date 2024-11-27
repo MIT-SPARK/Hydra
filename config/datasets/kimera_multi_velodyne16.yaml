@@ -1,0 +1,126 @@
+---
+map_window:
+  type: spatial
+  max_radius_m: 48.0
+active_window:
+  volumetric_map:
+    voxels_per_side: 16
+    voxel_size: 0.3
+    truncation_distance: 0.6
+  tsdf:
+    extra_integration_distance: 3.0
+    use_constant_weight: true
+    interpolation_method:
+      type: adaptive
+      max_depth_difference_m: 0.75
+    semantic_integrator:
+      type: MLESemanticIntegrator
+  mesh:
+    min_weight: 1.0
+frontend:
+  pgmo:
+    time_horizon: 15.0
+    d_graph_resolution: 2.5
+    mesh_resolution: 0.005
+  objects:
+    min_cluster_size: 15
+    cluster_tolerance: 1.25
+  surface_places:
+    type: place_2d
+    prefix: P
+    pure_final_place_size: 1
+    cluster_tolerance: .3
+    min_cluster_size: 10
+    max_cluster_size: 100000
+    min_final_place_points: 10
+    place_max_neighbor_z_diff: .5
+    place_overlap_threshold: 0.0
+  freespace_places:
+    type: gvd
+    filter_places: true
+    min_places_component_size: 3
+    filter_ground: false
+    gvd:
+      max_distance_m: 5.0
+      min_distance_m: 0.5
+      min_diff_m: 0.1
+      voronoi_config:
+        mode: L1_THEN_ANGLE
+        min_distance_m: 0.30
+        parent_l1_separation: 20
+        parent_cos_angle_separation: 0.2
+    graph:
+      type: CompressionGraphExtractor
+      compression_distance_m: 1.5
+      min_node_distance_m: 0.4
+      min_edge_distance_m: 0.25
+      node_merge_distance_m: 0.7
+      merge_policy: distance
+    tsdf_interpolator:
+      type: downsample
+      ratio: 2
+  use_frontiers: false
+backend:
+  add_places_to_deformation_graph: false # `false` means that place meshes are not used in PGO
+  optimize_on_lc: true
+  enable_node_merging: true
+  max_external_loop_closure_time_difference: 1.0
+  update_functors:
+    agents:
+      type: UpdateAgentsFunctor
+    objects:
+      type: UpdateObjectsFunctor
+    surface_places:
+      type: Update2dPlacesFunctor
+    places:
+      type: UpdatePlacesFunctor
+    frontiers:
+      type: UpdateFrontiersFunctor
+    rooms:
+      type: UpdateRoomsFunctor
+      room_finder:
+        min_dilation_m: 0.5
+        max_dilation_m: 1.2
+        min_component_size: 10
+        min_room_size: 10
+        dilation_threshold_mode: PLATEAU
+        min_lifetime_length_m: 0.1
+        plateau_ratio: 0.15
+        clustering_mode: NEIGHBORS
+        dilation_diff_threshold_m: -1.0
+    buildings:
+      type: UpdateBuildingsFunctor
+  pgmo:
+    run_mode: FULL  # kimera_pgmo run mode FULL is required
+    embed_trajectory_delta_t: 5.0
+    num_interp_pts: 3
+    interp_horizon: 10.0
+    enable_sparsify: false
+    trans_node_dist: 1.0
+    rot_node_dist: 1.2
+    rpgo:
+      odom_trans_threshold: 0.05
+      odom_rot_threshold: 0.01
+      pcm_trans_threshold: -1
+      pcm_rot_threshold: -1
+      lm_diagonal_damping: true
+      gnc_alpha: 0.9
+      gnc_max_iterations: 100
+      gnc_mu_step: 1.6
+      gnc_cost_tolerance: 1.0e-05
+      gnc_weight_tolerance: 1.0e-04
+      gnc_fix_prev_inliers: true
+      verbosity: UPDATE
+      solver: LM
+    add_initial_prior: true
+    covariance:
+      odom: 1.0e-02
+      loop_close: 1e-02
+      sg_loop_close: 1.0e-01
+      prior: 1.0e-02
+      mesh_mesh: 1.0e-01
+      pose_mesh: 1.0e-01
+      place_mesh: 1.0e-02
+      place_edge: 10.0
+      place_merge: 10.0
+      object_merge: 10.0
