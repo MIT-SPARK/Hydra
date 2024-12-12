@@ -34,11 +34,12 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <hydra/odometry/pose_graph_tracker.h>
+#include <chrono>
 
 namespace hydra {
 
 struct StampedPose {
-  uint64_t stamp;
+  std::chrono::nanoseconds stamp;
   Eigen::Isometry3d pose;
 };
 
@@ -47,6 +48,12 @@ class PoseGraphFromOdom : public PoseGraphTracker {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   struct Config {
+    //! @brief Minimum between pose norm to add new pose graph node
+    double min_pose_separation = 0.5;
+    //! @brief Weighting between rotation (frobenius) norm and translation (l2) norm
+    double rotation_separation_weight = 0.1;
+    //! @brief Minimum time separation to add new pose graph node
+    double min_time_separation_s = 0.2;
   } const config;
 
   explicit PoseGraphFromOdom(const Config& config);

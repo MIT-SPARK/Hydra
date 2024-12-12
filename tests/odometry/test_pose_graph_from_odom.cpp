@@ -45,6 +45,8 @@ TEST(PoseGraphFromOdom, GraphBuildingCorrect) {
   test::ConfigGuard guard;
 
   PoseGraphFromOdom::Config config;
+  config.min_pose_separation = 0.0;
+  config.min_time_separation_s = 0.0;
   PoseGraphFromOdom tracker(config);
 
   Eigen::Isometry3d pose = Eigen::Isometry3d::Identity();
