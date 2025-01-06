@@ -65,7 +65,7 @@ struct IdentitySensorExtrinsics : public SensorExtrinsics {
 struct ParamSensorExtrinsics : public SensorExtrinsics {
   struct Config {
     Eigen::Quaterniond body_R_sensor = Eigen::Quaterniond::Identity();
-    Eigen::Vector3d body_p_sensor = Eigen::Vector3d::Identity();
+    Eigen::Vector3d body_p_sensor = Eigen::Vector3d::Zero();
   };
 
   explicit ParamSensorExtrinsics(const Config& config);
