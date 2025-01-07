@@ -171,7 +171,8 @@ void ProjectiveIntegrator::updateBlock(const BlockIndex& block_index,
   }
 
   if (was_updated) {
-    VLOG(10) << "integrator updated block [" << showIndex(block_index) << "]";
+    LOG_IF(INFO, config.verbosity >= 10) << "integrator updated block "
+                                         << showIndex(block_index);
     blocks.tsdf->setUpdated();
   }
 }

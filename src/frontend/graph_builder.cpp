@@ -118,17 +118,16 @@ GraphBuilder::GraphBuilder(const Config& config,
       graph_updater_(config.graph_updater),
       graph_connector_(config.graph_connector),
       map_window_(GlobalInfo::instance().createVolumetricWindow()),
-      segmenter_(new MeshSegmenter(
-          config.object_config,
-          GlobalInfo::instance().getLabelSpaceConfig().object_labels)),
       tracker_(config.pose_graph_tracker.create()),
       surface_places_(config.surface_places.create()),
       freespace_places_(config.freespace_places.create()),
       frontier_places_(config.frontier_places.create()),
       view_database_(config.view_database),
       sinks_(Sink::instantiate(config.sinks)) {
-  if (!config.enable_mesh_objects) {
-    segmenter_.reset();
+  if (config.enable_mesh_objects) {
+    segmenter_ = std::make_unique<MeshSegmenter>(
+        config.object_config,
+        GlobalInfo::instance().getLabelSpaceConfig().object_labels);
   }
 
   if (!config.use_frontiers) {
