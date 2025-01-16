@@ -60,9 +60,16 @@ void declare_config(UpdatePlacesFunctor::Config& config) {
 }
 
 struct AttributeMap {
-  std::vector<PlaceNodeAttributes*> attributes;
+  std::vector<NodeAttributes*> attributes;
 
-  void push_back(PlaceNodeAttributes* attrs) { attributes.push_back(attrs); }
+  void push_back(NodeAttributes* attrs) { attributes.push_back(attrs); }
+
+  void sort() {
+    std::sort(
+        attributes.begin(), attributes.end(), [](const auto& lhs, const auto& rhs) {
+          return lhs->last_update_time_ns < rhs->last_update_time_ns;
+        });
+  }
 };
 
 size_t pgmoNumVertices(const AttributeMap& map) { return map.attributes.size(); }
@@ -91,19 +98,6 @@ void pgmoSetVertex(AttributeMap& map,
 
 UpdatePlacesFunctor::UpdatePlacesFunctor(const Config& config)
     : config(config::checkValid(config)), merge_proposer(config.merge_proposer) {}
-
-void UpdatePlacesFunctor::updatePlace(const gtsam::Values& values,
-                                      NodeId node,
-                                      NodeAttributes& attrs) const {
-  if (!values.exists(node)) {
-    VLOG(5) << "[Hydra Backend] missing place " << NodeSymbol(node).getLabel()
-            << " from places factors.";
-    return;
-  }
-
-  attrs.position = values.at<gtsam::Pose3>(node).translation();
-  // TODO(nathan) consider updating distance via parents + deformation graph
-}
 
 // drops any isolated place nodes that would cause an inderminate system error
 void UpdatePlacesFunctor::filterMissing(DynamicSceneGraph& graph,
@@ -141,11 +135,14 @@ size_t UpdatePlacesFunctor::updateFromValues(const LayerView& view,
     ++num_changed;
     auto& attrs = node.attributes<PlaceNodeAttributes>();
     if (!places_values.exists(node.id)) {
+      VLOG(10) << "[Hydra Backend] missing place " << NodeSymbol(node.id).getLabel()
+               << " from places factors.";
       // this happens for the GT version
       continue;
     }
 
-    updatePlace(places_values, node.id, attrs);
+    // TODO(nathan) consider updating distance via parents + deformation graph
+    attrs.position = places_values.at<gtsam::Pose3>(node.id).translation();
     dsg.graph->setNodeAttributes(node.id, attrs.clone());
   }
 
@@ -173,28 +170,51 @@ size_t UpdatePlacesFunctor::interpFromValues(const LayerView& view,
       } else {
         robot_id = iter->second;
       }
-
-      const auto prefix = kimera_pgmo::GetVertexPrefix(robot_id);
-      auto robot_attrs = nodes.find(prefix);
-      if (robot_attrs == nodes.end()) {
-        robot_attrs = nodes.emplace(prefix, AttributeMap{}).first;
-      }
-
-      robot_attrs->second.push_back(&node.attributes<PlaceNodeAttributes>());
     }
+
+    const auto prefix = kimera_pgmo::GetVertexPrefix(robot_id);
+    auto robot_attrs = nodes.find(prefix);
+    if (robot_attrs == nodes.end()) {
+      robot_attrs = nodes.emplace(prefix, AttributeMap{}).first;
+    }
+
+    auto& attrs = node.attributes();
+    auto cache_iter = cached_pos_.find(node.id);
+    if (cache_iter == cached_pos_.end()) {
+      cache_iter = cached_pos_.emplace(node.id, attrs.position).first;
+    } else if (attrs.is_active) {
+      // update cache if node is still active
+      cache_iter->second = attrs.position;
+    }
+
+    // set the position of the node to the original position before deformation
+    attrs.position = cache_iter->second;
+    robot_attrs->second.push_back(&attrs);
   }
 
   auto& dgraph = *info->deformation_graph;
   for (auto& [prefix, attributes] : nodes) {
-    dgraph.deformPoints(attributes,
-                        attributes,
-                        prefix,
-                        dgraph.getGtsamValues(),
-                        config.num_control_points,
-                        config.control_point_tolerance_s,
-                        nullptr,
-                        0,
-                        nullptr);
+    if (!dgraph.hasVertexKey(prefix)) {
+      continue;
+    }
+
+    const auto& control_points = dgraph.getInitialPositionsVertices(prefix);
+    if (control_points.size() < config.num_control_points) {
+      continue;
+    }
+
+    attributes.sort(); // make sure attributes are sorted by timestamp
+    std::vector<std::set<size_t>> vertex_graph_map_deformed;
+    kimera_pgmo::deformation::deformPoints(attributes,
+                                           vertex_graph_map_deformed,
+                                           attributes,
+                                           prefix,
+                                           control_points,
+                                           dgraph.getVertexStamps(prefix),
+                                           dgraph.getGtsamValues(),
+                                           config.num_control_points,
+                                           config.control_point_tolerance_s,
+                                           nullptr);
   }
 
   for (const auto& node : view) {
@@ -221,6 +241,17 @@ void UpdatePlacesFunctor::call(const DynamicSceneGraph& unmerged,
   size_t num_changed = 0;
   if (!info->places_values || info->places_values->size() == 0) {
     num_changed = interpFromValues(view, dsg, info);
+
+    std::vector<NodeId> to_remove;
+    for (const auto& [node_id, pos] : cached_pos_) {
+      if (!unmerged.hasNode(node_id)) {
+        to_remove.push_back(node_id);
+      }
+    }
+
+    for (const auto& node_id : to_remove) {
+      cached_pos_.erase(node_id);
+    }
   } else {
     num_changed = updateFromValues(view, dsg, info);
   }

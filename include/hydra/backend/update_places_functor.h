@@ -73,10 +73,6 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
   MergeList findMerges(const DynamicSceneGraph& graph,
                        const UpdateInfo::ConstPtr& info) const override;
 
-  void updatePlace(const gtsam::Values& values,
-                   NodeId node,
-                   NodeAttributes& attrs) const;
-
   std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
                                      const SceneGraphNode& node) const;
 
@@ -84,6 +80,7 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
                      const std::list<NodeId> missing_nodes) const;
 
   mutable ActiveWindowTracker active_tracker;
+  mutable std::unordered_map<NodeId, Eigen::Vector3d> cached_pos_;
   const MergeProposer merge_proposer;
 
  private:
