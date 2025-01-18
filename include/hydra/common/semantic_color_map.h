@@ -37,6 +37,7 @@
 #include <spark_dsg/color.h>
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -54,8 +55,8 @@ class SemanticColorMap {
 
   SemanticColorMap();
 
-  SemanticColorMap(const ColorToLabelMap& map,
-                   const spark_dsg::Color& unknown_color = {});
+  explicit SemanticColorMap(const ColorToLabelMap& map,
+                            const spark_dsg::Color& unknown_color = {});
 
   std::optional<uint32_t> getLabelFromColor(const spark_dsg::Color& color) const;
 

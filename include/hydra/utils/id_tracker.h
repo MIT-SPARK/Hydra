@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <list>
+#include <cstddef>
 
 namespace hydra {
 

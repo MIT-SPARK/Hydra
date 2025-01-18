@@ -45,8 +45,8 @@
 namespace hydra::places {
 
 struct GvdMemberInfo {
-  double distance;
-  uint8_t num_basis_points;
+  double distance = 0.0;
+  uint8_t num_basis_points = 0;
   Eigen::Vector3d position;
   GlobalIndex index;
   std::set<uint64_t> siblings;
