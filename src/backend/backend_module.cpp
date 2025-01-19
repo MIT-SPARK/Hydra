@@ -483,7 +483,7 @@ void BackendModule::addLoopClosure(const gtsam::Key& src,
                                    double variance) {
   if (full_sparse_frame_map_.size() == 0 ||
       !KimeraPgmoInterface::config_.b_enable_sparsify) {
-    deformation_graph_->addNewBetween(src, dest, src_T_dest, gtsam::Pose3(), variance);
+    deformation_graph_->processNewBetween(src, dest, src_T_dest, variance);
   } else {
     if (!full_sparse_frame_map_.count(src) || !full_sparse_frame_map_.count(dest)) {
       // TODO(yun) this happened a few times when loop closure found for node that has
@@ -497,13 +497,13 @@ void BackendModule::addLoopClosure(const gtsam::Key& src,
     gtsam::Pose3 sparse_src_T_sparse_dest =
         sparse_frames_.at(sparse_src).keyed_transforms.at(src) * src_T_dest *
         sparse_frames_.at(sparse_dest).keyed_transforms.at(dest).inverse();
-    deformation_graph_->addNewBetween(
-        sparse_src, sparse_dest, sparse_src_T_sparse_dest, gtsam::Pose3(), variance);
+    deformation_graph_->processNewBetween(
+        sparse_src, sparse_dest, sparse_src_T_sparse_dest, variance);
   }
 }
 
 void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
-  // deformation_graph_->update();
+  deformation_graph_->update();
   if (!force_mesh_update && !have_new_mesh_) {
     return;
   }
@@ -619,7 +619,7 @@ void BackendModule::updateAgentNodeMeasurements(const PoseGraph& meas) {
         {gtsam::Symbol(GlobalInfo::instance().getRobotPrefix().key, node.key),
          gtsam::Pose3(node.pose.matrix())});
   }
-  deformation_graph_->addNodeMeasurements(agent_measurements);
+  deformation_graph_->processNodeMeasurements(agent_measurements);
 }
 
 void BackendModule::optimize(size_t timestamp_ns) {

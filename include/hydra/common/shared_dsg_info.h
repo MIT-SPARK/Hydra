@@ -63,7 +63,7 @@ struct SharedDsgInfo {
   std::map<spark_dsg::LayerId, char> layer_prefix_map;
   std::map<spark_dsg::NodeId, spark_dsg::NodeId> merges;
 
- private:
+ protected:
   SharedDsgInfo();
 };
 

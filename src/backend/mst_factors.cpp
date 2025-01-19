@@ -90,7 +90,7 @@ void addPlacesToDeformationGraph(const DynamicSceneGraph& graph,
       }
     }
 
-    deformation_graph.addNewTempNodesValences(factors, false, mesh_edge_variance);
+    deformation_graph.processNewTempNodesValences(factors, false, mesh_edge_variance);
   }  // end timing scope
 
   {  // start timing scope
@@ -106,7 +106,7 @@ void addPlacesToDeformationGraph(const DynamicSceneGraph& graph,
       mst_edges.edges.push_back(mst_e);
     }
 
-    deformation_graph.addNewTempEdges(mst_edges, mst_edge_variance);
+    deformation_graph.processNewTempEdges(mst_edges, mst_edge_variance);
   }  // end timing scope
 }
 
