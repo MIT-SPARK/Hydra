@@ -41,6 +41,15 @@ Research was sponsored by the United States Air Force Research Laboratory and th
 
 ## News
 
+**Update (01/28/25):** We've released a new version of Hydra. This involves the following changes:
+  - Open-set semantic capabilities used by downstream projects (i.e., [Khronos](https://github.com/MIT-SPARK/Khronos) and [Clio](https://github.com/MIT-SPARK/Clio))
+  - A clear separation between colors and semantic labels. Hydra no longer assigns colors to nodes when building a scene graph; this is done by the visualizer
+  - Instructions for using a real semantic segmentation model via [semantic_inference](https://github.com/MIT-SPARK/semantic_inference.git)
+  - Internal refactoring and cleanup
+
+> **Node**<br>
+> We've updated our rosinstall file to point to the `main` branch of Kimera-PGMO. Please make sure you have the right branch checked out!
+
 **Update (06/26/24):** We've released the latest version of Hydra.
 This release also includes the following features:
   - Room category classification networks from our most recent paper, available [here](https://github.com/MIT-SPARK/Hydra-GNN)
@@ -105,7 +114,8 @@ catkin build
 > **Note**<br>
 > Depending on the amount of RAM available on your machine and whether or not you are compiling Kimera-VIO as well, you may run out of memory when compiling with `catkin build` directly (which will result in a `GCC killed` error). If this occurs, you can either specify fewer threads for catkin via `catkin build -j NUM_THREADS` or compile certain larger packages directly first by building them specifically.
 
-:warning: In the `vcs import` step, GitHub may block too many concurrent requests. If you receive `kex_exchange_identification: read: Connection reset by peer` errors, try running `vcs import . < hydra/install/hydra.rosinstall --workers 1`.
+> :warning: **Warning**</br>
+> In the `vcs import` step, GitHub may block too many concurrent requests. If you receive `kex_exchange_identification: read: Connection reset by peer` errors, try running `vcs import . < hydra/install/hydra.rosinstall --workers 1`.
 
 Please help us by creating new issues when you run into problems with these instructions!
 
@@ -143,17 +153,14 @@ See [here](eval/README.md) for information
 
 ### Using a Semantic Segmentation Network
 
-> **Note**<br>
-> This package is not public (yet)
-
-Add `semantic_recolor` to your workspace via:
+Add `semantic_inference` to your workspace via:
 
 ```
 roscd && cd ../src
 vcs import . < hydra/install/semantic_overlay.rosinstall
 ```
 
-Then, follow the instructions to install cuda and other dependencies for the `semantic_recolor` package (which can be found [here](https://github.mit.edu/SPARK/semantic_recolor_nodelet#semantic-recolor-utilities)).
+Then, follow the instructions to install cuda and other dependencies for the `semantic_inference` package (which can be found [here](https://github.com/MIT-SPARK/semantic_inference/blob/main/docs/closed_set.md#getting-dependencies)).
 
 Finally, build your workspace:
 

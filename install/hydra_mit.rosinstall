@@ -3,6 +3,9 @@
     local-name: config_utilities
     uri: git@github.com:MIT-SPARK/config_utilities.git
 - git:
+    local-name: kimera_pgmo
+    uri: git@github.com:MIT-SPARK/Kimera-PGMO.git
+- git:
     local-name: kimera_rpgo
     uri: git@github.com:MIT-SPARK/Kimera-RPGO.git
 - git:
@@ -18,16 +21,12 @@
 - git:
     local-name: teaser_plusplus
     uri: git@github.com:MIT-SPARK/TEASER-plusplus.git
+- git:
+    local-name: semantic_inference
+    uri: git@github.com:MIT-SPARK/semantic_inference.git
 # private dependencies
 - git:
     local-name: hydra_ros
     uri: git@github.mit.edu:SPARK/Hydra-ROS.git
     version: develop
-- git:
-    local-name: kimera_pgmo
-    uri: git@github.mit.edu:SPARK/Kimera-PGMO.git
-    version: future
-- git:
-    local-name: semantic_inference
-    uri: git@github.mit.edu:SPARK/semantic_inference.git
-    version: develop
+
