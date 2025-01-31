@@ -264,17 +264,14 @@ void output(const gtsam::NonlinearFactorGraph& factors, gtsam::Values& values) {
   }
 }
 
-void load_factors_pgmo(const RobustSolverParams& params,
-                       gtsam::NonlinearFactorGraph& factors,
-                       gtsam::Values& values) {
+void load_factors_pgmo(gtsam::NonlinearFactorGraph& factors, gtsam::Values& values) {
   const std::string pgmo_file = FLAGS_result_dir + "/" + FLAGS_pgmo_file;
 
   kimera_pgmo::DeformationGraph graph;
-  graph.initialize(params);
   graph.load(pgmo_file);
 
-  factors = graph.getGtsamFactors();
-  values = graph.getGtsamValues();
+  factors = *graph.getFactors();
+  values = *graph.getValues();
 }
 
 void add_manual_loop_clousres(const YAML::Node& config,
@@ -391,7 +388,7 @@ int main(int argc, char* argv[]) {
   if (FLAGS_use_g2o) {
     load_factors_g2o(old_factors, values);
   } else {
-    load_factors_pgmo(params, factors, values);
+    load_factors_pgmo(factors, values);
   }
 
   remap_covariances(config, old_factors, factors);
