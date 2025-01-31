@@ -111,24 +111,16 @@ BackendModule::BackendModule(const Config& config,
                              const SharedDsgInfo::Ptr& dsg,
                              const SharedModuleState::Ptr& state,
                              const LogSetup::Ptr& logs)
-    : KimeraPgmoInterface(),
+    : KimeraPgmoInterface(config.pgmo),
       config(config::checkValid(config)),
       private_dsg_(dsg),
       state_(state) {
-  if (!KimeraPgmoInterface::initialize(config.pgmo)) {
-    throw std::runtime_error("invalid pgmo config");
-  }
-
-  setSolverParams();
-
   // set up frontend graph copy
   unmerged_graph_ = private_dsg_->graph->clone();
   // set up mesh infrastructure
   private_dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>());
   unmerged_graph_->setMesh(private_dsg_->graph->mesh());
   original_vertices_.reset(new pcl::PointCloud<pcl::PointXYZ>());
-  deformation_graph_->setForceRecalculate(!config.pgmo.gnc_fix_prev_inliers);
-  setSolverParams();
 
   for (const auto& [name, functor] : config.update_functors) {
     update_functors_.push_back(functor.create());
@@ -189,7 +181,6 @@ void BackendModule::save(const LogSetup& log_setup) {
     kimera_pgmo::WriteMesh(backend_path + "/mesh.ply", *mesh, *mesh);
   }
 
-  deformation_graph_->update();  // Update before saving
   deformation_graph_->save(pgmo_path + "/deformation_graph.dgrf");
 
   const std::string output_csv = backend_path + "/loop_closures.csv";
@@ -342,18 +333,6 @@ void BackendModule::addSink(const Sink::Ptr& sink) {
   }
 }
 
-void BackendModule::setSolverParams() {
-  KimeraRPGO::RobustSolverParams params = deformation_graph_->getParams();
-  params.verbosity = config.pgmo.rpgo_verbosity;
-  params.solver = config.pgmo.rpgo_solver;
-  if (logs_) {
-    params.logOutput(logs_->getLogDir("backend/pgmo"));
-    logStatus(true);
-  }
-  deformation_graph_->setParams(params);
-  setVerboseFlag(false);
-}
-
 void BackendModule::updateFactorGraph(const BackendInput& input) {
   ScopedTimer timer("backend/process_factors", input.timestamp_ns);
   const size_t prev_loop_closures = num_loop_closures_;
@@ -406,8 +385,8 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
   }
 
   status_.trajectory_len = trajectory_.size();
-  status_.total_factors = deformation_graph_->getGtsamFactors().size();
-  status_.total_values = deformation_graph_->getGtsamValues().size();
+  status_.total_factors = deformation_graph_->getFactors()->size();
+  status_.total_values = deformation_graph_->getValues()->size();
 }
 
 bool BackendModule::updateFromLcdQueue() {
@@ -503,7 +482,6 @@ void BackendModule::addLoopClosure(const gtsam::Key& src,
 }
 
 void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
-  deformation_graph_->update();
   if (!force_mesh_update && !have_new_mesh_) {
     return;
   }
@@ -529,7 +507,7 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
   deformation_graph_->deformPoints(*private_dsg_->graph->mesh(),
                                    cloud_in,
                                    GlobalInfo::instance().getRobotPrefix().vertex_key,
-                                   deformation_graph_->getGtsamValues(),
+                                   *deformation_graph_->getValues(),
                                    KimeraPgmoInterface::config_.num_interp_pts,
                                    KimeraPgmoInterface::config_.interp_horizon,
                                    nullptr,
@@ -635,14 +613,14 @@ void BackendModule::optimize(size_t timestamp_ns) {
 
   {  // timer scope
     ScopedTimer timer("backend/optimization", timestamp_ns, true, 0, false);
-    deformation_graph_->optimize();
+    KimeraPgmoInterface::optimize();
   }  // timer scope
 
   updateDsgMesh(timestamp_ns, true);
 
   callUpdateFunctions(timestamp_ns,
-                      deformation_graph_->getGtsamTempValues(),
-                      deformation_graph_->getGtsamValues(),
+                      *deformation_graph_->getTempValues(),
+                      *deformation_graph_->getValues(),
                       have_new_loopclosures_);
   have_new_loopclosures_ = false;
 }

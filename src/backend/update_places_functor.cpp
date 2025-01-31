@@ -211,7 +211,7 @@ size_t UpdatePlacesFunctor::interpFromValues(const LayerView& view,
                                            prefix,
                                            control_points,
                                            dgraph.getVertexStamps(prefix),
-                                           dgraph.getGtsamValues(),
+                                           *dgraph.getValues(),
                                            config.num_control_points,
                                            config.control_point_tolerance_s,
                                            nullptr);

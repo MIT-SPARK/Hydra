@@ -138,8 +138,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
  protected:
   virtual bool spinOnce(bool force_update = true);
 
-  void setSolverParams();
-
   void addLoopClosure(const gtsam::Key& src,
                       const gtsam::Key& dest,
                       const gtsam::Pose3& src_T_dest,
