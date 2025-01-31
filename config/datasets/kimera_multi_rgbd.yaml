@@ -96,7 +96,8 @@ backend:
     enable_sparsify: false
     trans_node_dist: 1.0
     rot_node_dist: 1.2
-    rpgo:
+    optimizer:
+      type: KimeraRpgoOptimizer
       odom_trans_threshold: 0.05
       odom_rot_threshold: 0.01
       pcm_trans_threshold: -1
