@@ -51,19 +51,6 @@ void declare_config(HydraPgmoConfig& config) {
     field(config.object_merge_variance, "object_merge");
     field(config.sg_loop_closure_variance, "sg_loop_close");
   }  // config namespace covariance
-
-  {  // config namespace rpgo
-    NameSpace ns("rpgo");
-    field(config.gnc_fix_prev_inliers, "gnc_fix_prev_inliers");
-    enum_field(config.rpgo_verbosity,
-               "verbosity",
-               {{KimeraRPGO::Verbosity::UPDATE, "UPDATE"},
-                {KimeraRPGO::Verbosity::QUIET, "QUIET"},
-                {KimeraRPGO::Verbosity::VERBOSE, "VERBOSE"}});
-    enum_field(config.rpgo_solver,
-               "solver",
-               {{KimeraRPGO::Solver::LM, "LM"}, {KimeraRPGO::Solver::GN, "GN"}});
-  }  // config namespace rpgo
 }
 
 }  // namespace hydra
