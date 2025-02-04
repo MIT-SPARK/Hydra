@@ -78,19 +78,11 @@ backend:
     rot_node_dist: 1.2
     optimizer:
       type: KimeraRpgoOptimizer
-      odom_trans_threshold: 0.05
-      odom_rot_threshold: 0.01
-      pcm_trans_threshold: -1
-      pcm_rot_threshold: -1
-      lm_diagonal_damping: true
-      gnc_alpha: 0.9
-      gnc_max_iterations: 100
-      gnc_mu_step: 1.6
-      gnc_cost_tolerance: 1.0e-05
-      gnc_weight_tolerance: 1.0e-04
-      gnc_fix_prev_inliers: true
-      verbosity: UPDATE
       solver: LM
+      gnc:
+        inlier_probability: 0.9
+        mu_step: 1.6
+        max_iterations: 100
     add_initial_prior: true
     covariance:
       odom: 1.0e-02

@@ -33,7 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <KimeraRPGO/SolverParams.h>
 #include <kimera_pgmo/kimera_pgmo_interface.h>
 
 namespace hydra {
@@ -46,10 +45,6 @@ struct HydraPgmoConfig : public kimera_pgmo::KimeraPgmoConfig {
   double place_merge_variance;
   double object_merge_variance;
   double sg_loop_closure_variance;
-  // rpgo
-  bool gnc_fix_prev_inliers = true;
-  KimeraRPGO::Verbosity rpgo_verbosity = KimeraRPGO::Verbosity::UPDATE;
-  KimeraRPGO::Solver rpgo_solver = KimeraRPGO::Solver::LM;
 };
 
 void declare_config(HydraPgmoConfig& conf);
