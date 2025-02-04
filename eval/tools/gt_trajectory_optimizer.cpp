@@ -32,7 +32,6 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <KimeraRPGO/RobustSolver.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtsam/inference/Symbol.h>
@@ -41,6 +40,7 @@
 #include <gtsam/slam/BoundingConstraint.h>
 #include <gtsam/slam/dataset.h>
 #include <kimera_pgmo/deformation_graph.h>
+#include <kimera_rpgo/rpgo.h>
 #include <spark_dsg/dynamic_scene_graph.h>
 #include <yaml-cpp/yaml.h>
 
@@ -52,7 +52,7 @@ DEFINE_string(config_file, "gt_sidpac_f34.yaml", "file to read");
 DEFINE_string(agent_prefix, "a", "agent prefix");
 DEFINE_bool(use_g2o, false, "use g2o file");
 
-using namespace KimeraRPGO;
+using namespace kimera_rpgo;
 using namespace spark_dsg;
 using PoseFactor = gtsam::BetweenFactor<gtsam::Pose3>;
 using PriorFactor = gtsam::PriorFactor<gtsam::Pose3>;
@@ -369,19 +369,13 @@ int main(int argc, char* argv[]) {
   std::string config_path(FLAGS_config_file);
   YAML::Node config = YAML::LoadFile(config_path);
 
-  RobustSolverParams params;
-  params.setPcmSimple3DParams(config["odom_trans_threshold"].as<double>(),
-                              config["odom_rot_threshold"].as<double>(),
-                              config["pcm_trans_threshold"].as<double>(),
-                              config["pcm_rot_threshold"].as<double>(),
-                              KimeraRPGO::Verbosity::UPDATE);
-  params.setGncInlierCostThresholdsAtProbability(
-      config["gnc_alpha"].as<double>(),
-      config["gnc_max_iterations"].as<size_t>(),
-      config["gnc_mu_step"].as<double>(),
-      config["gnc_cost_tolerance"].as<double>(),
-      config["gnc_weight_tolerance"].as<double>(),
-      config["gnc_fix_prev_inliers"].as<bool>());
+  RpgoConfig rpgo_config;
+  rpgo_config.solver_config.setLeastSquaresParamsDefault();
+  GncParams gnc_params;
+  gnc_params.inlier_probability = config["gnc_alpha"].as<double>();
+  gnc_params.mu_step = config["gnc_mu_step"].as<double>();
+  gnc_params.max_iterations = config["gnc_max_iterations"].as<size_t>();
+  rpgo_config.solver_config.setGncParams(gnc_params);
 
   gtsam::Values values;
   gtsam::NonlinearFactorGraph factors, old_factors;
@@ -396,11 +390,11 @@ int main(int argc, char* argv[]) {
   add_bounds_from_config(config, values, factors);
   add_manual_loop_clousres(config, values, factors);
 
-  RobustSolver solver(params);
-  solver.forceUpdate(factors, values);
-
-  auto opt_values = solver.calculateEstimate();
-  std::cout << "Finished!" << '\a' << std::endl;
+  Rpgo rpgo(rpgo_config);
+  rpgo.addFactors(factors);
+  rpgo.addValues(values);
+  rpgo.run();
+  auto opt_values = rpgo.getResult();
 
   output(factors, opt_values);
 

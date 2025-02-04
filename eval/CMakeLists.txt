@@ -1,4 +1,4 @@
-find_package(KimeraRPGO REQUIRED)
+find_package(kimera_rpgo REQUIRED)
 find_package(gflags REQUIRED)
 
 add_library(
@@ -25,7 +25,7 @@ add_executable(evaluate_rooms tools/evaluate_rooms.cpp)
 target_link_libraries(evaluate_rooms ${PROJECT_NAME}_eval)
 
 add_executable(gt_trajectory_optimizer tools/gt_trajectory_optimizer.cpp)
-target_link_libraries(gt_trajectory_optimizer ${PROJECT_NAME}_eval KimeraRPGO)
+target_link_libraries(gt_trajectory_optimizer ${PROJECT_NAME}_eval kimera_rpgo::kimera_rpgo)
 
 add_executable(merge_graphs tools/merge_graphs.cpp)
 target_link_libraries(merge_graphs ${PROJECT_NAME}_eval)
