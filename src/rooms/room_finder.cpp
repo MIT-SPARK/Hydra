@@ -310,7 +310,7 @@ SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
 }
 
 SceneGraphLayer::Ptr RoomFinder::makeRoomLayer(const SceneGraphLayer& places) {
-  IsolatedSceneGraphLayer::Ptr rooms(new IsolatedSceneGraphLayer(DsgLayers::ROOMS));
+  SceneGraphLayer::Ptr rooms(new SceneGraphLayer(DsgLayers::ROOMS));
 
   // organize rooms by their oldest place
   IndexTimePairQueue queue;
@@ -327,7 +327,7 @@ SceneGraphLayer::Ptr RoomFinder::makeRoomLayer(const SceneGraphLayer& places) {
     auto attrs = std::make_unique<RoomNodeAttributes>();
     // TODO(nathan) define unknown label somewhere
     attrs->semantic_label = 0;
-    attrs->name = room_id.getLabel();
+    attrs->name = room_id.str();
     attrs->position = getRoomPosition(places, cluster);
 
     rooms->emplaceNode(room_id, std::move(attrs));
@@ -350,7 +350,8 @@ void RoomFinder::addRoomPlaceEdges(DynamicSceneGraph& graph) const {
       continue;
     }
 
-    graph.insertParentEdge(room->second, id_node_pair.first);
+    // add edge enforcing parent invariants
+    graph.insertEdge(room->second, id_node_pair.first, nullptr, true);
   }
 }
 

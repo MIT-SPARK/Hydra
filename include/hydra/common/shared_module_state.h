@@ -45,6 +45,11 @@ struct SharedModuleState {
 
   ~SharedModuleState();
 
+  // mutexes are considered ordered (for avoiding deadlock):
+  // 1. SharedDsgInfo::mutex (lcd)
+  // 2. SharedDsgInfo::mutex (backend)
+  // 3. SharedDsgInfo::mutex (frontend)
+  // When acquiring two mutexes, always acquire the lowest mutex first
   SharedDsgInfo::Ptr lcd_graph;
   SharedDsgInfo::Ptr backend_graph;
 };

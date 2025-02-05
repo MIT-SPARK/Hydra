@@ -34,10 +34,16 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <pose_graph_tools/pose_graph.h>
+#include <spark_dsg/scene_graph_types.h>
 
 #include <Eigen/Geometry>
 #include <list>
 #include <memory>
+#include <optional>
+
+namespace spark_dsg {
+class DynamicSceneGraph;
+}
 
 namespace hydra {
 
@@ -49,6 +55,9 @@ struct PoseGraphPacket {
   std::vector<pose_graph_tools::PoseGraph> pose_graphs;
   //! external optimization priors
   pose_graph_tools::PoseGraph::ConstPtr external_priors;
+
+  //! @brief Add all pose graph nodes and edges to graph
+  std::vector<spark_dsg::NodeId> addToGraph(spark_dsg::DynamicSceneGraph& graph, std::optional<int> robot_id = std::nullopt) const;
 };
 
 struct PoseGraphTracker {

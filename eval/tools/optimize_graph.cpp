@@ -88,7 +88,7 @@ void optimize_graph(const OptimizationConfig& info) {
   const PipelineConfig global_config;
   GlobalInfo::init(global_config, 0);
   SharedModuleState::Ptr state(new SharedModuleState());
-  state->backend_graph = std::make_shared<SharedDsgInfo>(global_config.layer_id_map);
+  state->backend_graph = GlobalInfo::instance().createSharedDsg();
   state->backend_graph->graph = spark_dsg::DynamicSceneGraph::load(info.graph);
 
   auto dsg = state->backend_graph->clone();

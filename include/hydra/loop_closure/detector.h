@@ -75,7 +75,7 @@ struct LcdDetectorConfig {
 
 class LcdDetector {
  public:
-  using FactoryMap = std::map<LayerId, DescriptorFactory::Ptr>;
+  using FactoryMap = std::map<std::string, DescriptorFactory::Ptr>;
   using SearchResultMap = std::map<size_t, LayerSearchResults>;
 
   explicit LcdDetector(const LcdDetectorConfig& config);
@@ -94,15 +94,15 @@ class LcdDetector {
 
   size_t numDescriptors() const;
 
-  size_t numGraphDescriptors(LayerId layer) const;
+  size_t numGraphDescriptors(const std::string& layer) const;
 
   size_t numAgentDescriptors() const;
 
   const SearchResultMap& getLatestMatches() const;
 
-  const std::map<LayerId, size_t>& getLayerRemapping() const;
+  const std::map<std::string, size_t>& getLayerRemapping() const;
 
-  const DescriptorCache& getDescriptorCache(LayerId layer);
+  const DescriptorCache& getDescriptorCache(const std::string& layer);
 
   void dumpDescriptors(const std::string& log_path) const;
 
@@ -110,8 +110,8 @@ class LcdDetector {
   void makeDefaultDescriptorFactories();
 
   void resetLayerAssignments(
-      const std::map<LayerId, DescriptorMatchConfig>& match_configs,
-      const std::map<LayerId, LayerRegistrationConfig>& reg_configs);
+      const std::map<std::string, DescriptorMatchConfig>& match_configs,
+      const std::map<std::string, LayerRegistrationConfig>& reg_configs);
 
   bool addNewDescriptors(const DynamicSceneGraph& graph,
                          const SceneGraphNode& agent_node);
@@ -125,16 +125,16 @@ class LcdDetector {
   DescriptorFactory::Ptr agent_factory_;
   FactoryMap layer_factories_;
 
-  LayerId root_layer_;
+  std::string root_layer_;
   size_t max_internal_index_;
-  std::map<LayerId, size_t> layer_to_internal_index_;
-  std::map<size_t, LayerId> internal_index_to_layer_;
+  std::map<std::string, size_t> layer_to_internal_index_;
+  std::map<size_t, std::string> internal_index_to_layer_;
 
   std::map<size_t, DescriptorMatchConfig> match_config_map_;
   std::map<size_t, DsgRegistrationSolver::Ptr> registration_solvers_;
   // std::map<size_t, ValidationFunc> validation_funcs_;
 
-  std::map<LayerId, DescriptorCache> cache_map_;
+  std::map<std::string, DescriptorCache> cache_map_;
   std::map<NodeId, DescriptorCache> leaf_cache_;
   std::map<NodeId, std::set<NodeId>> root_leaf_map_;
 

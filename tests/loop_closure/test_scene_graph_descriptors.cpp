@@ -43,8 +43,9 @@ inline const SceneGraphNode& makeDefaultAgentNode(DynamicSceneGraph& graph) {
   using namespace std::chrono_literals;
   Eigen::Quaterniond q = Eigen::Quaterniond::Identity();
   Eigen::Vector3d t = Eigen::Vector3d::Zero();
-  graph.emplaceNode(2, 'a', 10ns, std::make_unique<AgentNodeAttributes>(q, t, 0));
-  return graph.getNode(NodeSymbol('a', 0));
+  graph.emplaceNode(
+      2, "a0"_id, std::make_unique<AgentNodeAttributes>(10ns, q, t, 0), 'a');
+  return graph.getNode("a0"_id);
 }
 
 inline void emplacePlaceNode(DynamicSceneGraph& graph,

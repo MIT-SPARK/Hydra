@@ -38,11 +38,11 @@
 namespace hydra::test {
 
 inline SharedDsgInfo::Ptr makeSharedDsg() {
-  const std::map<LayerId, char> layer_id_map{{DsgLayers::OBJECTS, 'o'},
-                                             {DsgLayers::PLACES, 'p'},
-                                             {DsgLayers::ROOMS, 'r'},
-                                             {DsgLayers::BUILDINGS, 'b'}};
-  return SharedDsgInfo::Ptr(new SharedDsgInfo(layer_id_map));
+  return SharedDsgInfo::Ptr(
+      new SharedDsgInfo({{{spark_dsg::DsgLayers::OBJECTS, 2},
+                          {spark_dsg::DsgLayers::PLACES, 3},
+                          {spark_dsg::DsgLayers::ROOMS, 4},
+                          {spark_dsg::DsgLayers::BUILDINGS, 5}}}));
 }
 
 }  // namespace hydra::test

@@ -57,6 +57,8 @@ void declare_config(UpdatePlacesFunctor::Config& config) {
   field(config.num_control_points, "num_control_points");
   field(config.control_point_tolerance_s, "control_point_tolerance_s", "s");
   field(config.merge_proposer, "merge_proposer");
+  field(config.layer, "layer");
+  field(config.partition, "partition");
 }
 
 struct AttributeMap {
@@ -99,6 +101,15 @@ void pgmoSetVertex(AttributeMap& map,
 UpdatePlacesFunctor::UpdatePlacesFunctor(const Config& config)
     : config(config::checkValid(config)), merge_proposer(config.merge_proposer) {}
 
+UpdateFunctor::Hooks UpdatePlacesFunctor::hooks() const {
+  auto my_hooks = UpdateFunctor::hooks();
+  my_hooks.find_merges = [this](const auto& graph, const auto& info) {
+    return findMerges(graph, info);
+  };
+
+  return my_hooks;
+}
+
 // drops any isolated place nodes that would cause an inderminate system error
 void UpdatePlacesFunctor::filterMissing(DynamicSceneGraph& graph,
                                         const std::list<NodeId> missing_nodes) const {
@@ -116,7 +127,7 @@ void UpdatePlacesFunctor::filterMissing(DynamicSceneGraph& graph,
 
     const auto& node = graph.getNode(node_id);
     if (!node.attributes().is_active && !node.hasSiblings()) {
-      VLOG(2) << "[Places Layer]: removing node " << NodeSymbol(node_id).getLabel();
+      VLOG(2) << "[Places Layer]: removing node " << NodeSymbol(node_id).str();
       graph.removeNode(node_id);
     }
   }
@@ -132,16 +143,16 @@ size_t UpdatePlacesFunctor::updateFromValues(const LayerView& view,
   size_t num_changed = 0;
   const auto& places_values = *info->places_values;
   for (const auto& node : view) {
-    ++num_changed;
-    auto& attrs = node.attributes<PlaceNodeAttributes>();
     if (!places_values.exists(node.id)) {
-      VLOG(10) << "[Hydra Backend] missing place " << NodeSymbol(node.id).getLabel()
-               << " from places factors.";
       // this happens for the GT version
+      VLOG(10) << "[Hydra Backend] missing place " << NodeSymbol(node.id).str()
+               << " from places factors.";
       continue;
     }
 
     // TODO(nathan) consider updating distance via parents + deformation graph
+    ++num_changed;
+    auto& attrs = node.attributes();
     attrs.position = places_values.at<gtsam::Pose3>(node.id).translation();
     dsg.graph->setNodeAttributes(node.id, attrs.clone());
   }
@@ -229,12 +240,12 @@ void UpdatePlacesFunctor::call(const DynamicSceneGraph& unmerged,
                                const UpdateInfo::ConstPtr& info) const {
   ScopedTimer spin_timer("backend/update_places", info->timestamp_ns);
 
-  if (!unmerged.hasLayer(DsgLayers::PLACES)) {
+  if (!unmerged.hasLayer(config.layer, config.partition)) {
     return;
   }
 
   const auto new_loopclosure = info->loop_closure_detected;
-  const auto& places = unmerged.getLayer(DsgLayers::PLACES);
+  const auto& places = unmerged.getLayer(config.layer, config.partition);
   active_tracker.clear();  // reset from previous pass
   const auto view = new_loopclosure ? LayerView(places) : active_tracker.view(places);
 
@@ -262,7 +273,7 @@ void UpdatePlacesFunctor::call(const DynamicSceneGraph& unmerged,
 MergeList UpdatePlacesFunctor::findMerges(const DynamicSceneGraph& graph,
                                           const UpdateInfo::ConstPtr& info) const {
   const auto new_lcd = info->loop_closure_detected;
-  const auto& places = graph.getLayer(DsgLayers::PLACES);
+  const auto& places = graph.getLayer(config.layer, config.partition);
   // freeze layer view to avoid messing with tracker
   const auto view = new_lcd ? LayerView(places) : active_tracker.view(places, true);
 
@@ -271,18 +282,25 @@ MergeList UpdatePlacesFunctor::findMerges(const DynamicSceneGraph& graph,
       places,
       view,
       [this](const SceneGraphNode& lhs, const SceneGraphNode& rhs) {
-        const auto& lhs_attrs = lhs.attributes<PlaceNodeAttributes>();
-        const auto& rhs_attrs = rhs.attributes<PlaceNodeAttributes>();
-        if (!lhs_attrs.real_place || !rhs_attrs.real_place) {
+        const auto lhs_attrs = lhs.tryAttributes<PlaceNodeAttributes>();
+        const auto rhs_attrs = rhs.tryAttributes<PlaceNodeAttributes>();
+        if (!lhs_attrs || !rhs_attrs) {
+          LOG(WARNING) << "Invalid place nodes: " << NodeSymbol(lhs.id).str() << ", "
+                       << NodeSymbol(rhs.id).str();
           return false;
         }
 
-        const auto distance = (lhs_attrs.position - rhs_attrs.position).norm();
+        if (!lhs_attrs->real_place || !rhs_attrs->real_place) {
+          return false;
+        }
+
+        const auto distance = (lhs_attrs->position - rhs_attrs->position).norm();
         if (distance > config.pos_threshold_m) {
           return false;
         }
 
-        const auto radii_deviation = std::abs(lhs_attrs.distance - rhs_attrs.distance);
+        const auto radii_deviation =
+            std::abs(lhs_attrs->distance - rhs_attrs->distance);
         return radii_deviation <= config.distance_tolerance_m;
       },
       proposals);

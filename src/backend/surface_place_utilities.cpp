@@ -39,15 +39,19 @@ namespace hydra::utils {
 void getPlace2dAndNeighors(const SceneGraphLayer& places_layer,
                            std::vector<std::pair<NodeId, Place2d>>& place_2ds,
                            std::map<NodeId, std::set<NodeId>>& node_neighbors) {
-  for (auto& id_node_pair : places_layer.nodes()) {
-    auto& attrs = id_node_pair.second->attributes<Place2dNodeAttributes>();
-    if (attrs.need_finish_merge) {
+  for (auto& [node_id, node] : places_layer.nodes()) {
+    auto attrs = node->tryAttributes<Place2dNodeAttributes>();
+    if (!attrs) {
+      continue;
+    }
+
+    if (attrs->need_finish_merge) {
       Place2d p;
       p.indices.insert(p.indices.end(),
-                       attrs.pcl_mesh_connections.begin(),
-                       attrs.pcl_mesh_connections.end());
-      place_2ds.push_back(std::pair(id_node_pair.first, p));
-      node_neighbors.insert({id_node_pair.first, id_node_pair.second->siblings()});
+                       attrs->pcl_mesh_connections.begin(),
+                       attrs->pcl_mesh_connections.end());
+      place_2ds.push_back(std::pair(node_id, p));
+      node_neighbors.insert({node_id, node->siblings()});
     }
   }
 }
@@ -190,7 +194,7 @@ NodeSymbol insertNewNodes(
       attrs->is_active = false;
 
       attrs->semantic_label = attrs_og.semantic_label;
-      attrs->name = NodeSymbol(node_id_for_place).getLabel();
+      attrs->name = NodeSymbol(node_id_for_place).str();
       attrs->boundary = place.boundary;
       attrs->pcl_boundary_connections.insert(attrs->pcl_boundary_connections.begin(),
                                              place.boundary_indices.begin(),

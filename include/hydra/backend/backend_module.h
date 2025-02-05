@@ -204,7 +204,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   std::vector<uint64_t> vertex_stamps_;
 
   MergeTracker merge_tracker;
-  std::vector<UpdateFunctor::Ptr> update_functors_;
+  std::map<std::string, UpdateFunctor::Ptr> update_functors_;
 
   LogSetup::Ptr logs_;
   BackendModuleStatus status_;

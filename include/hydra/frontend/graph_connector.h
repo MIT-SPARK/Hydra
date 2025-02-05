@@ -33,7 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/layer_prefix.h>
 #include <spark_dsg/scene_graph_types.h>
 
 #include <map>
@@ -50,20 +49,25 @@ namespace hydra {
 struct LayerConnector {
   struct Config {
     struct ChildLayerConfig {
-      spark_dsg::LayerId layer = spark_dsg::DsgLayers::UNKNOWN;
-      bool include_static = true;
-      bool include_dynamic = true;
+      //! Layer to find parents for
+      std::string layer = "";
+      //! Include nodes from partition=0
+      bool include_primary = true;
+      //! Include nodes from partition > 0
+      bool include_partitions = true;
     };
-    // TODO(nathan) for implementation reasons, the parent has to be static
-    spark_dsg::LayerId parent_layer = spark_dsg::DsgLayers::PLACES;
+    //! Layer to find parents from
+    std::string parent_layer = spark_dsg::DsgLayers::PLACES;
+    //! Layer parition to find parents from
+    spark_dsg::PartitionId parent_partition = 0;
+    //! All layers to find parents for (defaults to objects and agents)
     std::vector<ChildLayerConfig> child_layers{
         {spark_dsg::DsgLayers::OBJECTS, true, true}};
+    //! Verbosity of graph connector
     size_t verbosity = 0;
   } const config;
 
   explicit LayerConnector(const Config& config);
-
-  bool isChild(const spark_dsg::LayerKey& key) const;
 
   void updateParents(const spark_dsg::DynamicSceneGraph& graph,
                      const std::vector<spark_dsg::NodeId>& new_nodes);
@@ -71,10 +75,6 @@ struct LayerConnector {
   void connectChildren(spark_dsg::DynamicSceneGraph& graph,
                        const std::vector<spark_dsg::NodeId>& new_nodes);
 
-  // config
-  const spark_dsg::LayerKey parent_layer;
-  std::set<spark_dsg::LayerId> static_child_layers;
-  std::set<spark_dsg::LayerId> dynamic_child_layers;
   // tracking
   std::set<spark_dsg::NodeId> active_children;
   std::map<spark_dsg::NodeId, std::set<spark_dsg::NodeId>> active_parents;

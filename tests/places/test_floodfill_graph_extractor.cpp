@@ -273,7 +273,7 @@ TEST_F(FloodfillGraphExtractorTestFixture, SimpleExtractionWithNodeMerging) {
   ASSERT_EQ(4u, graph.nodes().size());
   for (size_t i = 1; i < 4; ++i) {
     NodeId node = NodeSymbol('p', i);
-    EXPECT_TRUE(graph.hasNode(node)) << "missing " << NodeSymbol('p', i).getLabel();
+    EXPECT_TRUE(graph.hasNode(node)) << "missing " << NodeSymbol('p', i).str();
     EXPECT_TRUE(extractor.node_index_map_.count(node));
   }
 

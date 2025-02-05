@@ -78,7 +78,7 @@ struct GraphUpdater {
   void update(const GraphUpdate& update, spark_dsg::DynamicSceneGraph& graph);
 
  private:
-  std::map<spark_dsg::LayerId, LayerTracker> trackers_;
+  std::map<std::string, LayerTracker> trackers_;
 };
 
 void declare_config(GraphUpdater::Config& config);

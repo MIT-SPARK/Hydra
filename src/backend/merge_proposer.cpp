@@ -54,8 +54,7 @@ Merge Merge::remap(const std::map<NodeId, NodeId>& remapping) const {
 }
 
 std::ostream& operator<<(std::ostream& out, const Merge& merge) {
-  out << NodeSymbol(merge.from).getLabel() << "  -> "
-      << NodeSymbol(merge.to).getLabel();
+  out << NodeSymbol(merge.from).str() << "  -> " << NodeSymbol(merge.to).str();
   return out;
 }
 

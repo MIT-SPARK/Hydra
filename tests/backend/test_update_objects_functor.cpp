@@ -47,8 +47,9 @@ MergeList callWithUnmerged(const UpdateFunctor& functor,
                            bool enable_merging) {
   const auto unmerged = dsg.graph->clone();
   functor.call(*unmerged, dsg, info);
-  if (enable_merging) {
-    return functor.findMerges(*unmerged, info);
+  const auto hooks = functor.hooks();
+  if (enable_merging && hooks.find_merges) {
+    return hooks.find_merges(*unmerged, info);
   } else {
     return {};
   }

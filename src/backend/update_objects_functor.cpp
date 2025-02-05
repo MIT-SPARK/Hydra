@@ -91,6 +91,10 @@ UpdateObjectsFunctor::UpdateObjectsFunctor(const Config& config)
 
 UpdateFunctor::Hooks UpdateObjectsFunctor::hooks() const {
   auto my_hooks = UpdateFunctor::hooks();
+  my_hooks.find_merges = [this](const auto& graph, const auto& info) {
+    return findMerges(graph, info);
+  };
+
   if (config.allow_connection_merging) {
     my_hooks.merge = &mergeObjectAttributes;
   }
@@ -120,21 +124,25 @@ void UpdateObjectsFunctor::call(const DynamicSceneGraph& unmerged,
   const auto mesh = dsg.graph->mesh();
   for (const auto& node : view) {
     ++num_changed;
-    auto& attrs = node.attributes<ObjectNodeAttributes>();
-    VLOG(10) << "Processing object " << NodeSymbol(node.id).getLabel()
+    auto attrs = node.tryAttributes<ObjectNodeAttributes>();
+    if (!attrs) {
+      continue;  // not an object
+    }
+
+    VLOG(10) << "Processing object " << NodeSymbol(node.id).str()
              << " with attributes:\n"
-             << attrs;
-    if (attrs.mesh_connections.empty()) {
-      VLOG(2) << "Found empty object node " << NodeSymbol(node.id).getLabel();
+             << *attrs;
+    if (attrs->mesh_connections.empty()) {
+      VLOG(2) << "Found empty object node " << NodeSymbol(node.id).str();
       continue;
     }
 
-    if (!updateObjectGeometry(*mesh, attrs)) {
-      VLOG(2) << "Invalid centroid for object " << NodeSymbol(node.id).getLabel();
+    if (!updateObjectGeometry(*mesh, *attrs)) {
+      VLOG(2) << "Invalid centroid for object " << NodeSymbol(node.id).str();
     }
 
     // TODO(nathan) this is sloppy and needs to be cleaned up
-    dsg.graph->setNodeAttributes(node.id, attrs.clone());
+    dsg.graph->setNodeAttributes(node.id, attrs->clone());
   }
 
   VLOG(2) << "[Hydra Backend] Object update: " << num_changed << " node(s)";
@@ -156,10 +164,14 @@ MergeList UpdateObjectsFunctor::findMerges(const DynamicSceneGraph& graph,
       objects,
       view,
       [](const SceneGraphNode& lhs, const SceneGraphNode& rhs) {
-        const auto& lhs_attrs = lhs.attributes<SemanticNodeAttributes>();
-        const auto& rhs_attrs = rhs.attributes<SemanticNodeAttributes>();
-        return lhs_attrs.bounding_box.contains(rhs_attrs.position) ||
-               rhs_attrs.bounding_box.contains(lhs_attrs.position);
+        const auto lhs_attrs = lhs.tryAttributes<ObjectNodeAttributes>();
+        const auto rhs_attrs = rhs.tryAttributes<ObjectNodeAttributes>();
+        if (!lhs_attrs || !rhs_attrs) {
+          return false;
+        }
+
+        return lhs_attrs->bounding_box.contains(rhs_attrs->position) ||
+               rhs_attrs->bounding_box.contains(lhs_attrs->position);
       },
       proposals);
   return proposals;

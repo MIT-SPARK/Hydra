@@ -49,6 +49,8 @@ void declare_config(UpdateRoomsFunctor::Config& config) {
   using namespace config;
   name("UpdateRoomsFunctor::Config");
   field(config.room_finder, "room_finder");
+  field(config.places_layer, "places_layer");
+  field(config.places_partition, "places_partition");
 }
 
 UpdateRoomsFunctor::UpdateRoomsFunctor(const Config& config)
@@ -88,12 +90,17 @@ void UpdateRoomsFunctor::call(const DynamicSceneGraph&,
     return;
   }
 
-  ScopedTimer timer("backend/room_detection", info->timestamp_ns, true, 1, false);
-  auto places_clone =
-      dsg.graph->getLayer(DsgLayers::PLACES).clone([](const auto& node) {
-        return NodeSymbol(node.id).category() == 'p';
-      });
+  const auto places_layer =
+      dsg.graph->findLayer(config.places_layer, config.places_partition);
+  if (!places_layer) {
+    return;
+  }
 
+  ScopedTimer timer("backend/room_detection", info->timestamp_ns, true, 1, false);
+  auto places_clone = places_layer->clone(
+      [](const auto& node) { return NodeSymbol(node.id).category() == 'p'; });
+
+  // TODO(nathan) layer view
   // TODO(nathan) pass in timestamp?
   auto rooms = room_finder->findRooms(*places_clone);
   rewriteRooms(rooms.get(), *dsg.graph);

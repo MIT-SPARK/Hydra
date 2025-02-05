@@ -37,25 +37,6 @@
 
 namespace hydra {
 
-using spark_dsg::LayerId;
-
-TEST(HydraConversions, LayerMapConversion) {
-  std::map<std::string, float> original{
-      {"objects", 1.0}, {"places", 2.0}, {"rooms", 5.0}};
-  std::map<LayerId, float> expected{{2, 1.0}, {3, 2.0}, {4, 5.0}};
-
-  std::string err;
-  std::map<LayerId, float> result;
-  LayerMapConversion<float>::fromIntermediate(original, result, err);
-  EXPECT_EQ(result, expected);
-  EXPECT_TRUE(err.empty());
-  err = "";
-
-  const auto result_rt = LayerMapConversion<float>::toIntermediate(result, err);
-  EXPECT_EQ(result, expected);
-  EXPECT_TRUE(err.empty());
-}
-
 TEST(HydraConversions, QuaternionConversion) {
   std::map<std::string, double> valid{{"w", 0.5}, {"x", 0.5}, {"y", 0.0}, {"z", 0.0}};
   std::map<std::string, double> invalid{{"x", 0.5}, {"y", 0.0}, {"z", 0.0}};

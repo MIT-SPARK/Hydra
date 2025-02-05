@@ -66,7 +66,7 @@ TEST(GraphClusteringTests, FillFromClusters) {
 }
 
 TEST(GraphClusteringTests, ModularityClusteringCorrect) {
-  IsolatedSceneGraphLayer layer(1);
+  SceneGraphLayer layer(1);
   for (size_t i = 0; i < 10; ++i) {
     layer.emplaceNode(i, std::make_unique<NodeAttributes>());
   }

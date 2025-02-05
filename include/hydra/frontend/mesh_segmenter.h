@@ -61,8 +61,7 @@ class MeshSegmenter {
                           const LabelIndices&>;
 
   struct Config {
-    char prefix = 'O';
-    LayerId layer_id = DsgLayers::OBJECTS;
+    std::string layer_id = DsgLayers::OBJECTS;
     double cluster_tolerance = 0.25;
     size_t min_cluster_size = 40;
     size_t max_cluster_size = 100000;

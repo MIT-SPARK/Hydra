@@ -51,7 +51,7 @@ TEST(DisjointSet, TestSameCluster) {
 }
 
 TEST(MinimumSpanningTreeTests, TestSingleChain) {
-  IsolatedSceneGraphLayer layer(1);
+  SceneGraphLayer layer(1);
   layer.emplaceNode(0,
                     std::make_unique<NodeAttributes>(Eigen::Vector3d(0.0, 0.0, 0.0)));
   layer.emplaceNode(1,
@@ -78,7 +78,7 @@ TEST(MinimumSpanningTreeTests, TestSingleChain) {
 }
 
 TEST(MinimumSpanningTreeTests, TestCompleteGraph) {
-  IsolatedSceneGraphLayer layer(1);
+  SceneGraphLayer layer(1);
   layer.emplaceNode(0,
                     std::make_unique<NodeAttributes>(Eigen::Vector3d(0.0, 0.0, 0.0)));
   layer.emplaceNode(1,

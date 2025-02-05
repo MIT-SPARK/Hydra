@@ -766,18 +766,18 @@ void CompressionGraphExtractor::validate(const GvdLayer& layer) const {
     if (node_index_map_.count(node_id)) {
       const auto index = node_index_map_.at(node_id);
       CHECK(index_id_map_.count(index))
-          << "unarchived node " << node_id.getLabel()
+          << "unarchived node " << node_id.str()
           << " points to archived index: " << index.transpose();
     }
 
     CHECK(compressed_info_map_.count(node_id.categoryId()))
-        << "unarchived node " << node_id.getLabel() << " missing from info map";
+        << "unarchived node " << node_id.str() << " missing from info map";
     const auto& info = compressed_info_map_.at(node_id.categoryId());
 
     for (const auto sibling : info.siblings) {
       if (!compressed_info_map_.count(sibling)) {
         CHECK(archived_node_ids_.count(sibling))
-            << "missing sibling: " << sibling << " from node " << node_id.getLabel();
+            << "missing sibling: " << sibling << " from node " << node_id.str();
       }
     }
 
@@ -800,12 +800,12 @@ void CompressionGraphExtractor::validate(const GvdLayer& layer) const {
       CHECK_EQ(compressed_remapping_.at(child), node_id.categoryId());
     }
 
-    CHECK(!children.empty()) << "invalid node: " << node_id.getLabel();
+    CHECK(!children.empty()) << "invalid node: " << node_id.str();
 
     std::set<uint64_t> gvd_neighbors;
     for (const auto child : children) {
       CHECK(gvd_->hasNode(child))
-          << node_id.getLabel() << " points to missing child " << child;
+          << node_id.str() << " points to missing child " << child;
       auto child_info = gvd_->getNode(child);
       for (const auto neighbor : child_info->siblings) {
         gvd_neighbors.insert(neighbor);
@@ -833,7 +833,7 @@ void CompressionGraphExtractor::validate(const GvdLayer& layer) const {
     }
 
     CHECK_EQ(neighbors, info.siblings)
-        << "current siblings don't agree for " << node_id.getLabel();
+        << "current siblings don't agree for " << node_id.str();
 
     std::set<uint64_t> graph_siblings;
     for (const auto sibling : id_node_pair.second->siblings()) {
@@ -846,7 +846,7 @@ void CompressionGraphExtractor::validate(const GvdLayer& layer) const {
         iter = graph_siblings.erase(iter);
       } else {
         CHECK(compressed_info_map_.count(*iter))
-            << "graph edge for " << node_id.getLabel()
+            << "graph edge for " << node_id.str()
             << " points to invalid index: " << *iter;
         ++iter;
       }

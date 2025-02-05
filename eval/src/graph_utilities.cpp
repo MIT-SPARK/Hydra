@@ -45,29 +45,25 @@ DynamicSceneGraph::Ptr mergeGraphs(const std::vector<DynamicSceneGraph::Ptr>& gr
   size_t num_edges_expected = 0;
 
   std::map<LayerId, size_t> layer_counts;
-  layer_counts[DsgLayers::OBJECTS] = 0;
-  layer_counts[DsgLayers::PLACES] = 0;
-  layer_counts[DsgLayers::ROOMS] = 0;
-  layer_counts[DsgLayers::BUILDINGS] = 0;
-
   for (const auto& graph_ptr : graphs) {
     const auto& graph = *graph_ptr;
-    num_nodes_expected += graph.numStaticNodes();
-    num_edges_expected += graph.numStaticEdges();
+    num_nodes_expected += graph.numUnpartitionedNodes();
+    num_edges_expected += graph.numUnpartitionedEdges();
 
     std::map<NodeId, NodeId> node_id_map;
-    for (const auto& id_layer_pair : graph.layers()) {
-      const auto layer = id_layer_pair.first;
-      auto& curr_count = layer_counts.at(layer);
+    for (const auto& [layer_id, layer] : graph.layers()) {
+      auto iter = layer_counts.find(layer_id);
+      if (iter == layer_counts.end()) {
+        iter = layer_counts.emplace(layer_id, 0).first;
+      }
 
-      for (const auto& id_node_pair : id_layer_pair.second->nodes()) {
-        NodeSymbol prev_id(id_node_pair.first);
-        NodeSymbol new_id(prev_id.category(), curr_count);
-        ++curr_count;
+      for (const auto& [node_id, node] : layer->nodes()) {
+        const NodeSymbol prev_id(node_id);
+        NodeSymbol new_id(prev_id.category(), iter->second);
+        ++iter->second;
 
-        node_id_map[prev_id] = new_id;
-        to_return->emplaceNode(
-            layer, new_id, id_node_pair.second->attributes().clone());
+        node_id_map[node_id] = new_id;
+        to_return->emplaceNode(layer_id, new_id, node->attributes().clone());
       }
     }
 
@@ -90,8 +86,8 @@ DynamicSceneGraph::Ptr mergeGraphs(const std::vector<DynamicSceneGraph::Ptr>& gr
     }
   }
 
-  CHECK_EQ(to_return->numStaticNodes(), num_nodes_expected);
-  CHECK_EQ(to_return->numStaticEdges(), num_edges_expected);
+  CHECK_EQ(to_return->numUnpartitionedNodes(), num_nodes_expected);
+  CHECK_EQ(to_return->numUnpartitionedEdges(), num_edges_expected);
   return to_return;
 }
 

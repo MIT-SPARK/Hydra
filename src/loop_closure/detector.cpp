@@ -104,8 +104,8 @@ void configureDescriptorFactories(lcd::LcdDetector&, const LcdDetectorConfig&) {
 #endif
 
 using hydra::timing::ScopedTimer;
-using SearchConfigMap = std::map<LayerId, DescriptorMatchConfig>;
-using RegConfigMap = std::map<LayerId, LayerRegistrationConfig>;
+using SearchConfigMap = std::map<std::string, DescriptorMatchConfig>;
+using RegConfigMap = std::map<std::string, LayerRegistrationConfig>;
 
 LcdDetector::LcdDetector(const LcdDetectorConfig& config) : config_(config) {
   makeDefaultDescriptorFactories();
@@ -144,7 +144,7 @@ size_t LcdDetector::numDescriptors() const {
   return num_descriptors + numAgentDescriptors();
 }
 
-size_t LcdDetector::numGraphDescriptors(LayerId layer) const {
+size_t LcdDetector::numGraphDescriptors(const std::string& layer) const {
   if (!cache_map_.count(layer)) {
     return 0;
   }
@@ -164,11 +164,11 @@ const std::map<size_t, LayerSearchResults>& LcdDetector::getLatestMatches() cons
   return matches_;
 }
 
-const std::map<LayerId, size_t>& LcdDetector::getLayerRemapping() const {
+const std::map<std::string, size_t>& LcdDetector::getLayerRemapping() const {
   return layer_to_internal_index_;
 }
 
-const DescriptorCache& LcdDetector::getDescriptorCache(LayerId layer) {
+const DescriptorCache& LcdDetector::getDescriptorCache(const std::string& layer) {
   return cache_map_.at(layer);
 }
 
@@ -300,7 +300,6 @@ void LcdDetector::updateDescriptorCache(
     uint64_t timestamp) {
   ScopedTimer timer("lcd/update_descriptors", timestamp, true, 2, false);
 
-  std::set<NodeId> new_agent_nodes;
   for (const auto& place_id : archived_places) {
     if (!dsg.hasNode(place_id)) {
       continue;  // ideally this doesn't happen in practice, but worth building in the
@@ -308,17 +307,16 @@ void LcdDetector::updateDescriptorCache(
     }
 
     const auto& node = dsg.getNode(place_id);
-
-    for (const auto& child : node.children()) {
-      if (dsg.isDynamic(child)) {
-        new_agent_nodes.insert(child);
+    for (const auto& child_id : node.children()) {
+      const auto& child = dsg.getNode(child_id);
+      if (!child.layer.partition) {
+        // agent layer nodes are in partitions
+        continue;
       }
-    }
-  }
 
-  for (const auto& agent_node : new_agent_nodes) {
-    const auto& node = dsg.getNode(agent_node);
-    addNewDescriptors(dsg, node);
+      // every agent node only has one parent
+      addNewDescriptors(dsg, child);
+    }
   }
 }
 
@@ -353,9 +351,9 @@ std::vector<RegistrationSolution> LcdDetector::registerAndVerify(
       }
 
       const auto root = match.match_root.at(i);
-      CHECK(dsg.hasNode(root)) << "Invalid match root: " << NodeSymbol(root).getLabel();
+      CHECK(dsg.hasNode(root)) << "Invalid match root: " << NodeSymbol(root).str();
       CHECK(dsg.hasNode(match.query_root))
-          << "Invalid query root: " << NodeSymbol(match.query_root).getLabel();
+          << "Invalid query root: " << NodeSymbol(match.query_root).str();
 
       DsgRegistrationInput registration_input = {match.query_nodes,
                                                  match.match_nodes[i],
@@ -410,12 +408,12 @@ std::vector<RegistrationSolution> LcdDetector::detect(const DynamicSceneGraph& d
 
   const auto& latest_node = dsg.getNode(agent_id);
   VLOG(2) << "************************************************************";
-  VLOG(2) << "LCD Matching: " << NodeSymbol(latest_node.id).getLabel();
+  VLOG(2) << "LCD Matching: " << NodeSymbol(latest_node.id).str();
 
   matches_.clear();
   for (size_t idx = max_internal_index_ - 1; idx > 0; --idx) {
     const auto& config = match_config_map_.at(idx);
-    const LayerId layer = internal_index_to_layer_.at(idx);
+    const auto& layer = internal_index_to_layer_.at(idx);
     auto descriptor = layer_factories_[layer]->construct(dsg, latest_node);
     if (descriptor) {
       VLOG(2) << "level " << idx << ": " << showVector(descriptor->values, 3, 20, 9);
@@ -443,13 +441,13 @@ std::vector<RegistrationSolution> LcdDetector::detect(const DynamicSceneGraph& d
   }
 
   if (matches_.empty()) {
-    VLOG(1) << "No LCD matches for node " << NodeSymbol(agent_id).getLabel()
-            << " against " << numDescriptors() << " descriptors";
+    VLOG(1) << "No LCD matches for node " << NodeSymbol(agent_id).str() << " against "
+            << numDescriptors() << " descriptors";
     return {};
   }
 
   VLOG(2) << "-----------------------------------------------------------";
-  VLOG(2) << "LCD results for node " << NodeSymbol(agent_id).getLabel() << " against "
+  VLOG(2) << "LCD results for node " << NodeSymbol(agent_id).str() << " against "
           << numDescriptors() / 2 << " roots";
   for (const auto& id_match_pair : matches_) {
     const auto& scores = id_match_pair.second.score;
@@ -463,8 +461,8 @@ std::vector<RegistrationSolution> LcdDetector::detect(const DynamicSceneGraph& d
 
     for (size_t i = 0; i < id_match_pair.second.match_root.size(); ++i) {
       VLOG(2) << "   - #" << i
-              << ": query=" << NodeSymbol(id_match_pair.second.query_root).getLabel()
-              << ", match=" << NodeSymbol(id_match_pair.second.match_root[i]).getLabel()
+              << ": query=" << NodeSymbol(id_match_pair.second.query_root).str()
+              << ", match=" << NodeSymbol(id_match_pair.second.match_root[i]).str()
               << " -> " << id_match_pair.second.score[i];
     }
   }

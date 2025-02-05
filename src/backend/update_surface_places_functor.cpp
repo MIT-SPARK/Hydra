@@ -53,6 +53,8 @@ using timing::ScopedTimer;
 void declare_config(Update2dPlacesFunctor::Config& config) {
   using namespace config;
   name("Update2dPlacesFunctor::Config");
+  field(config.layer, "layer");
+  field(config.partition, "partition");
   field(config.allow_places_merge, "allow_places_merge");
   field(config.merge_max_delta_z, "merge_max_delta_z");
   field(config.min_points, "min_points");
@@ -71,14 +73,14 @@ NodeAttributes::Ptr merge2dPlaceAttributes(const DynamicSceneGraph& graph,
   }
 
   auto iter = nodes.begin();
-  CHECK(graph.hasNode(*iter)) << NodeSymbol(*iter).getLabel();
+  CHECK(graph.hasNode(*iter)) << NodeSymbol(*iter).str();
   auto attrs_ptr = graph.getNode(*iter).attributes().clone();
   auto& new_attrs =
       *CHECK_NOTNULL(dynamic_cast<Place2dNodeAttributes*>(attrs_ptr.get()));
   ++iter;
 
   while (iter != nodes.end()) {
-    CHECK(graph.hasNode(*iter)) << NodeSymbol(*iter).getLabel();
+    CHECK(graph.hasNode(*iter)) << NodeSymbol(*iter).str();
     const auto& from_attrs = graph.getNode(*iter).attributes<Place2dNodeAttributes>();
     utils::mergeIndices(from_attrs.pcl_mesh_connections,
                         new_attrs.pcl_mesh_connections);
@@ -103,6 +105,10 @@ UpdateFunctor::Hooks Update2dPlacesFunctor::hooks() const {
     }
   };
 
+  my_hooks.find_merges = [this](const auto& graph, const auto& info) {
+    return findMerges(graph, info);
+  };
+
   my_hooks.merge = [](const DynamicSceneGraph& graph,
                       const std::vector<NodeId>& nodes) {
     return merge2dPlaceAttributes(graph, nodes);
@@ -115,11 +121,11 @@ void Update2dPlacesFunctor::call(const DynamicSceneGraph& unmerged,
                                  SharedDsgInfo& dsg,
                                  const UpdateInfo::ConstPtr& info) const {
   ScopedTimer spin_timer("backend/update_2d_places", info->timestamp_ns);
-  if (!unmerged.hasLayer(layer_id_)) {
+  if (!unmerged.hasLayer(config.layer, config.partition)) {
     return;
   }
 
-  const auto& layer = unmerged.getLayer(layer_id_);
+  const auto& layer = unmerged.getLayer(config.layer, config.partition);
   const auto new_loopclosure = info->loop_closure_detected;
 
   active_tracker.clear();  // reset from previous pass
@@ -128,10 +134,15 @@ void Update2dPlacesFunctor::call(const DynamicSceneGraph& unmerged,
   size_t num_changed = 0;
   const auto mesh = unmerged.mesh();
   for (const auto& node : view) {
+    auto attrs = node.tryAttributes<Place2dNodeAttributes>();
+    if (!attrs) {
+      LOG(WARNING) << "Node " << NodeSymbol(node.id).str() << " is not a 2D place!";
+      continue;
+    }
+
     ++num_changed;
-    auto& attrs = node.attributes<Place2dNodeAttributes>();
-    updateNode(mesh, node.id, attrs);
-    dsg.graph->setNodeAttributes(node.id, attrs.clone());
+    updateNode(mesh, node.id, *attrs);
+    dsg.graph->setNodeAttributes(node.id, attrs->clone());
   }
 
   VLOG(5) << "[Hydra Backend] 2D Place update: " << num_changed << " node(s)";
@@ -139,7 +150,7 @@ void Update2dPlacesFunctor::call(const DynamicSceneGraph& unmerged,
 
 MergeList Update2dPlacesFunctor::findMerges(const DynamicSceneGraph& graph,
                                             const UpdateInfo::ConstPtr& info) const {
-  const auto& layer = graph.getLayer(layer_id_);
+  const auto& layer = graph.getLayer(config.layer, config.partition);
   const auto new_lcd = info->loop_closure_detected;
   // freeze layer view to avoid messing with tracker
   const auto view = new_lcd ? LayerView(layer) : active_tracker.view(layer, true);
@@ -149,8 +160,15 @@ MergeList Update2dPlacesFunctor::findMerges(const DynamicSceneGraph& graph,
       layer,
       view,
       [this](const SceneGraphNode& lhs, const SceneGraphNode& rhs) {
-        return shouldMerge(lhs.attributes<Place2dNodeAttributes>(),
-                           rhs.attributes<Place2dNodeAttributes>());
+        auto lhs_attrs = lhs.tryAttributes<Place2dNodeAttributes>();
+        auto rhs_attrs = rhs.tryAttributes<Place2dNodeAttributes>();
+        if (!lhs_attrs || !rhs_attrs) {
+          LOG(WARNING) << "Invalid 2D Place nodes: " << NodeSymbol(lhs.id).str() << ", "
+                       << NodeSymbol(rhs.id).str();
+          return false;
+        }
+
+        return shouldMerge(*lhs_attrs, *rhs_attrs);
       },
       nodes_to_merge);
   return nodes_to_merge;
@@ -161,7 +179,7 @@ void Update2dPlacesFunctor::updateNode(const spark_dsg::Mesh::Ptr& mesh,
                                        Place2dNodeAttributes& attrs) const {
   const auto& connections = attrs.pcl_mesh_connections;
   if (connections.empty()) {
-    LOG(ERROR) << "Found empty place2d node " << NodeSymbol(node).getLabel();
+    LOG(ERROR) << "Found empty place2d node " << NodeSymbol(node).str();
     return;
   }
 
@@ -178,7 +196,7 @@ void Update2dPlacesFunctor::updateNode(const spark_dsg::Mesh::Ptr& mesh,
   }
 
   if (!centroid.getSize()) {
-    VLOG(2) << "Invalid centroid for 2D place " << NodeSymbol(node).getLabel();
+    VLOG(2) << "Invalid centroid for 2D place " << NodeSymbol(node).str();
     return;
   }
 
@@ -213,7 +231,7 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
 
   // Get/copy info for places that need cleanup
   std::unique_lock<std::mutex> lock(dsg.mutex);
-  const SceneGraphLayer& places_layer = dsg.graph->getLayer(DsgLayers::MESH_PLACES);
+  const auto& places_layer = dsg.graph->getLayer(DsgLayers::MESH_PLACES);
   utils::getPlace2dAndNeighors(places_layer, place_2ds, node_neighbors);
   lock.unlock();
 
@@ -267,43 +285,50 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
   // Clean up places that are far enough away from the active window
   // Far enough means that none of a node's neighbors or the node itself have
   // active mesh vertices
-  for (auto& id_node_pair : places_layer.nodes()) {
-    auto& attrs = id_node_pair.second->attributes<Place2dNodeAttributes>();
-    if (attrs.need_cleanup_splitting && !attrs.is_active) {
-      bool has_active_neighbor = false;
-      for (NodeId nid : id_node_pair.second->siblings()) {
-        auto& neighbor_attrs = graph.getNode(nid).attributes<Place2dNodeAttributes>();
-        if (attrs.semantic_label != neighbor_attrs.semantic_label) {
-          continue;
-        }
-        if (neighbor_attrs.has_active_mesh_indices) {
-          has_active_neighbor = true;
-          break;
-        }
+  for (auto& [node_id, node] : places_layer.nodes()) {
+    auto attrs = node->tryAttributes<Place2dNodeAttributes>();
+    if (!attrs) {
+      continue;
+    }
+
+    if (!attrs->need_cleanup_splitting || attrs->is_active) {
+      continue;
+    }
+
+    bool has_active_neighbor = false;
+    for (const auto nid : node->siblings()) {
+      auto& neighbor_attrs = graph.getNode(nid).attributes<Place2dNodeAttributes>();
+      if (attrs->semantic_label != neighbor_attrs.semantic_label) {
+        continue;
       }
-      checked_nodes[id_node_pair.first] =
-          !has_active_neighbor && !attrs.has_active_mesh_indices;
-      for (NodeId nid : id_node_pair.second->siblings()) {
-        auto& neighbor_attrs = graph.getNode(nid).attributes<Place2dNodeAttributes>();
 
-        auto search = checked_nodes.find(nid);
-        if (search == checked_nodes.end()) {
-          checked_nodes.insert({nid, false});
-        }
+      if (neighbor_attrs.has_active_mesh_indices) {
+        has_active_neighbor = true;
+        break;
+      }
+    }
 
-        if (neighbor_attrs.is_active) {
-          continue;
-        }
+    checked_nodes[node_id] = !has_active_neighbor && !attrs->has_active_mesh_indices;
+    for (const auto nid : node->siblings()) {
+      auto& neighbor_attrs = graph.getNode(nid).attributes<Place2dNodeAttributes>();
 
-        if (attrs.semantic_label == neighbor_attrs.semantic_label) {
-          utils::reallocateMeshPoints(mesh->points, attrs, neighbor_attrs);
-        }
+      auto search = checked_nodes.find(nid);
+      if (search == checked_nodes.end()) {
+        checked_nodes.insert({nid, false});
+      }
+
+      if (neighbor_attrs.is_active) {
+        continue;
+      }
+
+      if (attrs->semantic_label == neighbor_attrs.semantic_label) {
+        utils::reallocateMeshPoints(mesh->points, *attrs, neighbor_attrs);
       }
     }
   }
 
-  for (auto& id_finalize : checked_nodes) {
-    auto& attrs = graph.getNode(id_finalize.first).attributes<Place2dNodeAttributes>();
+  for (auto& [node_id, should_finalize] : checked_nodes) {
+    auto& attrs = graph.getNode(node_id).attributes<Place2dNodeAttributes>();
 
     if (attrs.pcl_mesh_connections.size() == 0) {
       LOG(ERROR) << "Reallocating mesh points would make empty place. Skipping.";
@@ -316,14 +341,11 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
 
   std::vector<std::pair<NodeId, NodeId>> edges_to_remove;
   std::map<NodeId, NodeId> extra_edges_to_check;
-  for (auto& id_finalize : checked_nodes) {
-    NodeId id = id_finalize.first;
-    bool finalize = id_finalize.second;
-    auto& attrs1 = graph.getNode(id).attributes<Place2dNodeAttributes>();
+  for (const auto& [node_id, finalize] : checked_nodes) {
+    auto& attrs1 = graph.getNode(node_id).attributes<Place2dNodeAttributes>();
 
-    for (auto& neighbor_id_final : checked_nodes) {
-      NodeId nid = neighbor_id_final.first;
-      auto& neighbor_node = graph.getNode(nid);
+    for (const auto& [neighbor_id, neighbor_finalize] : checked_nodes) {
+      const auto& neighbor_node = graph.getNode(neighbor_id);
       auto& attrs2 = neighbor_node.attributes<Place2dNodeAttributes>();
       EdgeAttributes ea;
       if (!shouldAddPlaceConnection(attrs1,
@@ -331,29 +353,28 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
                                     config.connection_overlap_threshold,
                                     config.connection_max_delta_z,
                                     ea)) {
-        graph.removeEdge(id, nid);
+        graph.removeEdge(node_id, neighbor_id);
       } else {
-        graph.insertEdge(id, nid, ea.clone());
+        graph.insertEdge(node_id, neighbor_id, ea.clone());
       }
     }
 
     std::vector<std::pair<NodeId, NodeId>> sibs_edges_to_remove;
-    for (auto& nid : graph.getNode(id).siblings()) {
+    for (auto& nid : graph.getNode(node_id).siblings()) {
       auto neighbor_node = graph.findNode(nid);
-      Place2dNodeAttributes& attrs2 =
-          neighbor_node->attributes<Place2dNodeAttributes>();
+      auto& attrs2 = neighbor_node->attributes<Place2dNodeAttributes>();
       EdgeAttributes ea;
       if (!shouldAddPlaceConnection(attrs1,
                                     attrs2,
                                     config.connection_overlap_threshold,
                                     config.connection_max_delta_z,
                                     ea)) {
-        sibs_edges_to_remove.push_back({id, nid});
+        sibs_edges_to_remove.push_back({node_id, nid});
       }
     }
 
-    for (auto n1_n2 : sibs_edges_to_remove) {
-      graph.removeEdge(n1_n2.first, n1_n2.second);
+    for (auto [source, target] : sibs_edges_to_remove) {
+      graph.removeEdge(source, target);
     }
 
     if (finalize) {

@@ -77,7 +77,7 @@ struct DsgRegistrationSolver {
 using TeaserParams = teaser::RobustRegistrationSolver::Params;
 
 struct DsgTeaserSolver : DsgRegistrationSolver {
-  DsgTeaserSolver(LayerId layer_id,
+  DsgTeaserSolver(const std::string& layer,
                   const LayerRegistrationConfig& config,
                   const TeaserParams& params);
 
@@ -87,7 +87,7 @@ struct DsgTeaserSolver : DsgRegistrationSolver {
                              const DsgRegistrationInput& match,
                              NodeId query_agent_id) const override;
 
-  LayerId layer_id;
+  const std::string layer_id;
   LayerRegistrationConfig config;
   std::string timer_prefix;
   std::string log_prefix;

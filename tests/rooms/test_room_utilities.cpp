@@ -39,7 +39,7 @@ namespace hydra {
 
 namespace {
 
-void addNode(IsolatedSceneGraphLayer& layer,
+void addNode(SceneGraphLayer& layer,
              size_t node_id,
              const Eigen::Vector3d& position,
              double distance) {
@@ -52,7 +52,7 @@ void addNode(IsolatedSceneGraphLayer& layer,
 }  // namespace
 
 TEST(RoomHelpersTests, TestGetRoomPosition) {
-  IsolatedSceneGraphLayer places(DsgLayers::PLACES);
+  SceneGraphLayer places(DsgLayers::PLACES);
   addNode(places, 0, Eigen::Vector3d(1.0, 2.0, 3.0), 1.0);
   addNode(places, 1, Eigen::Vector3d(1.5, 0.0, 0.0), 0.1);
   addNode(places, 2, Eigen::Vector3d(1.0, 0.0, 0.0), 1.0);
@@ -81,7 +81,7 @@ TEST(RoomHelpersTests, TestGetRoomPosition) {
 }
 
 TEST(RoomHelpersTests, TestAddRoomEdges) {
-  IsolatedSceneGraphLayer places(DsgLayers::PLACES);
+  SceneGraphLayer places(DsgLayers::PLACES);
   for (size_t i = 0; i < 10; ++i) {
     places.emplaceNode(i, std::make_unique<NodeAttributes>());
   }
@@ -90,7 +90,7 @@ TEST(RoomHelpersTests, TestAddRoomEdges) {
   places.insertEdge(6, 4);  // forces a sibling not being in a room
   places.insertEdge(0, 6);  // forces siblings with the same room
 
-  IsolatedSceneGraphLayer rooms(DsgLayers::ROOMS);
+  SceneGraphLayer rooms(DsgLayers::ROOMS);
   rooms.emplaceNode(0, std::make_unique<NodeAttributes>());
   rooms.emplaceNode(1, std::make_unique<NodeAttributes>());
   rooms.emplaceNode(2, std::make_unique<NodeAttributes>());

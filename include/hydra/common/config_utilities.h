@@ -33,35 +33,11 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/scene_graph_types.h>
-
 #include <Eigen/Geometry>
 #include <map>
 #include <string>
 
 namespace hydra {
-
-template <typename T>
-struct LayerMapConversion {
-  using TargetMap = std::map<std::string, T>;
-  using SourceMap = std::map<spark_dsg::LayerId, T>;
-
-  static TargetMap toIntermediate(const SourceMap& other, std::string&) {
-    TargetMap to_return;
-    for (const auto& kv_pair : other) {
-      to_return[spark_dsg::DsgLayers::LayerIdToString(kv_pair.first)] = kv_pair.second;
-    }
-
-    return to_return;
-  }
-
-  static void fromIntermediate(const TargetMap& other, SourceMap& value, std::string&) {
-    value.clear();
-    for (const auto& kv_pair : other) {
-      value[spark_dsg::DsgLayers::StringToLayerId(kv_pair.first)] = kv_pair.second;
-    }
-  }
-};
 
 struct QuaternionConverter {
   using DoubleMap = std::map<std::string, double>;

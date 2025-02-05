@@ -58,8 +58,8 @@ struct LayerRegistrationTests : public ::testing::Test {
     dest_points = dest_R_src * src_points;
     dest_points.colwise() += dest_t_src;
 
-    src_layer.reset(new IsolatedSceneGraphLayer(1));
-    dest_layer.reset(new IsolatedSceneGraphLayer(1));
+    src_layer.reset(new SceneGraphLayer(1));
+    dest_layer.reset(new SceneGraphLayer(1));
 
     for (int i = 0; i < src_points.cols(); ++i) {
       auto src_attrs = std::make_unique<SemanticNodeAttributes>();
@@ -81,8 +81,8 @@ struct LayerRegistrationTests : public ::testing::Test {
   Eigen::Vector3d dest_t_src;
 
   std::list<NodeId> node_ids;
-  std::unique_ptr<IsolatedSceneGraphLayer> src_layer;
-  std::unique_ptr<IsolatedSceneGraphLayer> dest_layer;
+  std::unique_ptr<SceneGraphLayer> src_layer;
+  std::unique_ptr<SceneGraphLayer> dest_layer;
 
   LayerRegistrationConfig reg_config;
 };
@@ -95,7 +95,7 @@ struct GraphRegistrationTests : public ::testing::Test {
   ~GraphRegistrationTests() = default;
 
   virtual void SetUp() override {
-    std::map<LayerId, char> layer_map = {
+    std::map<std::string, char> layer_map = {
         {DsgLayers::PLACES, 'p'}, {DsgLayers::OBJECTS, 'O'}, {DsgLayers::ROOMS, 'R'}};
 
     dsg.reset(new DynamicSceneGraph());
@@ -140,9 +140,9 @@ struct GraphRegistrationTests : public ::testing::Test {
     Eigen::Vector3d world_t_body1(-1.0, 0.2, 0.5);
     dsg->emplaceNode(
         DsgLayers::AGENTS,
-        'a',
-        10ns,
-        std::make_unique<AgentNodeAttributes>(world_q_body1, world_t_body1, NodeId(0)));
+        "a0"_id,
+        std::make_unique<AgentNodeAttributes>(10ns, world_q_body1, world_t_body1, 0),
+        'a');
 
     Eigen::Quaterniond world_q_body2(std::cos(M_PI / 8), 0.0, std::sin(M_PI / 8), 0.0);
     Eigen::Vector3d world_t_body2(5.0, -0.3, 2.1);
@@ -151,9 +151,9 @@ struct GraphRegistrationTests : public ::testing::Test {
     Eigen::Vector3d dest_t_body2 = dest_R_src * world_t_body2 + dest_t_src;
     dsg->emplaceNode(
         DsgLayers::AGENTS,
-        'a',
-        20ns,
-        std::make_unique<AgentNodeAttributes>(dest_q_body2, dest_t_body2, NodeId(0)));
+        "a1"_id,
+        std::make_unique<AgentNodeAttributes>(20ns, dest_q_body2, dest_t_body2, 0),
+        'a');
 
     dsg->insertEdge(NodeSymbol('p', 0), NodeSymbol('a', 0));
     dsg->insertEdge(NodeSymbol('p', src_points.cols()), NodeSymbol('a', 1));

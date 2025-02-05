@@ -38,17 +38,28 @@
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <spark_dsg/printing.h>
 
 #include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra {
+namespace {
+
+inline bool isChild(LayerKey layer,
+                    const std::set<LayerId>& layer_ids,
+                    const std::set<LayerId>& partition_layer_ids) {
+  return !layer.partition ? layer_ids.count(layer.layer)
+                          : partition_layer_ids.count(layer.layer);
+}
+
+}  // namespace
 
 void declare_config(LayerConnector::Config::ChildLayerConfig& config) {
   using namespace config;
   name("ChildLayerConfig");
   field(config.layer, "layer");
-  field(config.include_static, "include_static");
-  field(config.include_dynamic, "include_dynamic");
+  field(config.include_primary, "include_primary");
+  field(config.include_partitions, "include_partitions");
 }
 
 void declare_config(LayerConnector::Config& config) {
@@ -59,29 +70,20 @@ void declare_config(LayerConnector::Config& config) {
   field(config.verbosity, "verbosity");
 }
 
-LayerConnector::LayerConnector(const Config& config)
-    : config(config), parent_layer(config.parent_layer) {
-  for (const auto& child_config : config.child_layers) {
-    if (child_config.include_static) {
-      static_child_layers.insert(child_config.layer);
-    }
-
-    if (child_config.include_dynamic) {
-      dynamic_child_layers.insert(child_config.layer);
-    }
-  }
-}
-
-bool LayerConnector::isChild(const LayerKey& key) const {
-  return key.dynamic ? dynamic_child_layers.count(key.layer)
-                     : static_child_layers.count(key.layer);
-}
+LayerConnector::LayerConnector(const Config& config) : config(config) {}
 
 void LayerConnector::updateParents(const DynamicSceneGraph& graph,
                                    const std::vector<NodeId>& new_nodes) {
+  const auto parent_key =
+      graph.getLayerKey(config.parent_layer, config.parent_partition);
+  if (!parent_key) {
+    LOG(ERROR) << "Invalid parent layer and partition!";
+    return;
+  }
+
   for (const auto& new_id : new_nodes) {
-    const auto layer_key = graph.getLayerForNode(new_id);
-    if (!layer_key || *layer_key != parent_layer) {
+    const auto node = graph.findNode(new_id);
+    if (!node || node->layer != *parent_key) {
       continue;
     }
 
@@ -112,9 +114,27 @@ void LayerConnector::updateParents(const DynamicSceneGraph& graph,
 
 void LayerConnector::connectChildren(DynamicSceneGraph& graph,
                                      const std::vector<NodeId>& new_nodes) {
+  std::set<LayerId> child_layer_ids;
+  std::set<LayerId> partition_child_layer_ids;
+  for (const auto& child_config : config.child_layers) {
+    const auto key = graph.getLayerKey(child_config.layer);
+    if (!key) {
+      LOG(WARNING) << "Invalid layer '" << child_config.layer << "' for graph!";
+      continue;
+    }
+
+    if (child_config.include_primary) {
+      child_layer_ids.insert(key->layer);
+    }
+
+    if (child_config.include_partitions) {
+      partition_child_layer_ids.insert(key->layer);
+    }
+  }
+
   for (const auto& new_id : new_nodes) {
-    const auto layer_key = graph.getLayerForNode(new_id);
-    if (!layer_key || !isChild(*layer_key)) {
+    const auto node = graph.findNode(new_id);
+    if (!node || !isChild(node->layer, child_layer_ids, partition_child_layer_ids)) {
       continue;
     }
 
@@ -126,7 +146,7 @@ void LayerConnector::connectChildren(DynamicSceneGraph& graph,
   }
 
   LOG_IF(INFO, config.verbosity >= 5)
-      << "Detecting interlayer edges for layer " << parent_layer << " with "
+      << "Detecting interlayer edges for layer " << config.parent_layer << " with "
       << active_parents.size() << " parents and " << active_children.size()
       << " children";
 
@@ -136,7 +156,7 @@ void LayerConnector::connectChildren(DynamicSceneGraph& graph,
                  std::back_inserter(parent_ids),
                  [](const auto& id_child_pair) { return id_child_pair.first; });
 
-  const auto& parents = graph.getLayer(parent_layer.layer);
+  const auto& parents = graph.getLayer(config.parent_layer, config.parent_partition);
   NearestNodeFinder nn_finder(parents, parent_ids);
 
   auto iter = active_children.begin();
@@ -155,7 +175,8 @@ void LayerConnector::connectChildren(DynamicSceneGraph& graph,
 
     nn_finder.find(
         node->attributes().position, 1, false, [&](NodeId parent_id, size_t, double) {
-          graph.insertParentEdge(parent_id, node->id);
+          // add edge enforcing single-parent constraint
+          graph.insertEdge(parent_id, node->id, nullptr, true);
           active_parents.at(parent_id).insert(node->id);
         });
   }

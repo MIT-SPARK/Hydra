@@ -61,16 +61,13 @@ Filtration makeFiltration(const std::vector<size_t>& components) {
   return filtration;
 }
 
-void addNode(IsolatedSceneGraphLayer& layer, NodeId node, double distance) {
+void addNode(SceneGraphLayer& layer, NodeId node, double distance) {
   auto attrs = std::make_unique<PlaceNodeAttributes>();
   attrs->distance = distance;
   layer.emplaceNode(node, std::move(attrs));
 }
 
-void addEdge(IsolatedSceneGraphLayer& layer,
-             NodeId source,
-             NodeId target,
-             double distance) {
+void addEdge(SceneGraphLayer& layer, NodeId source, NodeId target, double distance) {
   auto attrs = std::make_unique<EdgeAttributes>();
   attrs->weight = distance;
   layer.insertEdge(source, target, std::move(attrs));
@@ -81,7 +78,7 @@ std::optional<FiltrationInfo> getLongestSequence(const Filtration& values) {
 }
 
 TEST(GraphFiltrationTests, TestSimpleSingleComponent) {
-  IsolatedSceneGraphLayer layer(1);
+  SceneGraphLayer layer(1);
   addNode(layer, 0, 1.0);
   addNode(layer, 1, 2.0);
   addNode(layer, 2, 3.0);
@@ -97,7 +94,7 @@ TEST(GraphFiltrationTests, TestSimpleSingleComponent) {
 }
 
 TEST(GraphFiltrationTests, TestSimpleSingleComponentMinSize) {
-  IsolatedSceneGraphLayer layer(1);
+  SceneGraphLayer layer(1);
   addNode(layer, 0, 1.0);
   addNode(layer, 1, 2.0);
   addNode(layer, 2, 3.0);
@@ -113,7 +110,7 @@ TEST(GraphFiltrationTests, TestSimpleSingleComponentMinSize) {
 }
 
 TEST(GraphFiltrationTests, TestDelayedEdgesSingleComponent) {
-  IsolatedSceneGraphLayer layer(1);
+  SceneGraphLayer layer(1);
   addNode(layer, 0, 1.0);
   addNode(layer, 1, 2.0);
   addNode(layer, 2, 3.0);
@@ -128,7 +125,7 @@ TEST(GraphFiltrationTests, TestDelayedEdgesSingleComponent) {
 }
 
 TEST(GraphFiltrationTests, TestRepeatedDistanceSingleComponent) {
-  IsolatedSceneGraphLayer layer(1);
+  SceneGraphLayer layer(1);
   addNode(layer, 0, 1.0);
   addNode(layer, 1, 2.0);
   addNode(layer, 2, 3.0);
@@ -143,7 +140,7 @@ TEST(GraphFiltrationTests, TestRepeatedDistanceSingleComponent) {
 }
 
 TEST(GraphFiltrationTests, TestDelayedEdgeBothNodes) {
-  IsolatedSceneGraphLayer layer(1);
+  SceneGraphLayer layer(1);
   addNode(layer, 0, 1.0);
   addNode(layer, 1, 2.0);
   addNode(layer, 2, 3.0);
@@ -156,7 +153,7 @@ TEST(GraphFiltrationTests, TestDelayedEdgeBothNodes) {
 }
 
 TEST(GraphFiltrationTests, TestEdgesFiltrationOnly) {
-  IsolatedSceneGraphLayer layer(1);
+  SceneGraphLayer layer(1);
   addNode(layer, 0, 1.0);
   addNode(layer, 1, 2.0);
   addNode(layer, 2, 3.0);
@@ -177,7 +174,7 @@ TEST(GraphFiltrationTests, TestEdgesFiltrationOnly) {
 }
 
 TEST(GraphFiltrationTests, TestBarcodeFiltration) {
-  IsolatedSceneGraphLayer layer(1);
+  SceneGraphLayer layer(1);
   addNode(layer, 0, 1.0);
   addNode(layer, 1, 2.0);
   addNode(layer, 2, 3.0);

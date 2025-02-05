@@ -43,6 +43,11 @@ namespace hydra {
 
 struct Update2dPlacesFunctor : public UpdateFunctor {
   struct Config {
+    //! Layer to update
+    std::string layer = DsgLayers::MESH_PLACES;
+    //! Partition to update
+    PartitionId partition = 1;
+    //! Allow merging of 2D places
     bool allow_places_merge = true;
     //! If two places differ by at least this much in z, they won't be merged
     double merge_max_delta_z = 0.5;
@@ -69,7 +74,7 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
   MergeList findMerges(const DynamicSceneGraph& graph,
-                       const UpdateInfo::ConstPtr& info) const override;
+                       const UpdateInfo::ConstPtr& info) const;
 
   void updateNode(const spark_dsg::Mesh::Ptr& mesh,
                   NodeId node,
@@ -85,7 +90,6 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
 
  private:
   mutable NodeSymbol next_node_id_ = NodeSymbol('S', 0);
-  const LayerId layer_id_ = DsgLayers::MESH_PLACES;
 
   inline static const auto registration_ =
       config::RegistrationWithConfig<UpdateFunctor, Update2dPlacesFunctor, Config>(

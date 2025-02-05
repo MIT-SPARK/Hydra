@@ -64,6 +64,8 @@ struct UpdateInfo {
 
 using LayerCleanupFunc =
     std::function<void(const UpdateInfo::ConstPtr&, SharedDsgInfo*)>;
+using FindMergeFunc =
+    std::function<MergeList(const DynamicSceneGraph&, const UpdateInfo::ConstPtr&)>;
 using MergeFunc = std::function<NodeAttributes::Ptr(const DynamicSceneGraph&,
                                                     const std::vector<NodeId>&)>;
 
@@ -72,6 +74,7 @@ struct UpdateFunctor {
 
   struct Hooks {
     LayerCleanupFunc cleanup;
+    FindMergeFunc find_merges;
     MergeFunc merge;
   };
 
@@ -80,8 +83,6 @@ struct UpdateFunctor {
   virtual void call(const DynamicSceneGraph& unmerged,
                     SharedDsgInfo& dsg,
                     const UpdateInfo::ConstPtr& info) const = 0;
-  virtual MergeList findMerges(const DynamicSceneGraph& graph,
-                               const UpdateInfo::ConstPtr& info) const;
 };
 
 }  // namespace hydra

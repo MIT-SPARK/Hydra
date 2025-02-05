@@ -143,7 +143,7 @@ void remapPlaces(DynamicSceneGraph& graph,
                  const std::unordered_map<size_t, size_t>& remapping) {
   const auto& places = graph.getLayer(DsgLayers::PLACES);
   for (auto&& [id, node] : places.nodes()) {
-    VLOG(10) << "remapping place node: " << NodeSymbol(id).getLabel();
+    VLOG(10) << "remapping place node: " << NodeSymbol(id).str();
 
     auto& attrs = node->attributes<PlaceNodeAttributes>();
     for (auto& connection : attrs.pcl_mesh_connections) {

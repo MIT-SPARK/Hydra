@@ -47,11 +47,6 @@ inline const Eigen::Vector3d& getNodePosition(const SceneGraphLayer& graph,
   return graph.getNode(node).attributes().position;
 }
 
-inline const Eigen::Vector3d& getNodePosition(const DynamicSceneGraphLayer& graph,
-                                              NodeId node) {
-  return graph.getNode(node).attributes().position;
-}
-
 inline const Eigen::Vector3d& getNodePosition(const DynamicSceneGraph& graph,
                                               NodeId node) {
   return graph.getNode(node).attributes().position;

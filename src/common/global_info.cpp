@@ -109,7 +109,7 @@ void declare_config(PipelineConfig& config) {
   field(config.default_verbosity, "default_verbosity");
   field(config.default_num_threads, "default_num_threads");
   field(config.store_visualization_details, "store_visualization_details");
-  field<LayerMapConversion<char>>(config.layer_id_map, "layer_id_map");
+  // field<LayerMapConversion<char>>(config.layer_id_map, "layer_id_map");
   config.map_window.setOptional();
   field(config.map_window, "map_window");
   field<LabelNameConversion>(config.label_names, "label_names");
@@ -117,6 +117,7 @@ void declare_config(PipelineConfig& config) {
   // the following subconfigs should not be namespaced
   field(config.logs, "logs", false);
   field(config.frames, "frames", false);
+  field(config.graph, "graph", false);
   field(config.label_space, "label_space", false);
 }
 
@@ -267,7 +268,7 @@ const SemanticColorMap* GlobalInfo::getSemanticColorMap() const {
 }
 
 SharedDsgInfo::Ptr GlobalInfo::createSharedDsg() const {
-  return std::make_shared<SharedDsgInfo>(config_.layer_id_map);
+  return std::make_shared<SharedDsgInfo>(config_.graph);
 }
 
 bool GlobalInfo::setSensor(const Sensor::Ptr& sensor, bool allow_override) {

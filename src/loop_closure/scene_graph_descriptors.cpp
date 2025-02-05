@@ -54,7 +54,7 @@ Descriptor::Ptr AgentDescriptorFactory::construct(
   descriptor->values = attrs.dbow_values;
   descriptor->root_node = *parent;
   descriptor->nodes.insert(agent_node.id);
-  descriptor->timestamp = agent_node.timestamp.value();
+  descriptor->timestamp = attrs.timestamp;
   descriptor->root_position = graph.getNode(*parent).attributes().position;
   return descriptor;
 }
@@ -76,7 +76,7 @@ Descriptor::Ptr ObjectDescriptorFactory::construct(
   descriptor->normalized = false;
   descriptor->values = decltype(descriptor->values)::Zero(num_classes, 1);
   descriptor->root_node = *parent;
-  descriptor->timestamp = agent_node.timestamp.value();
+  descriptor->timestamp = agent_node.attributes<AgentNodeAttributes>().timestamp;
   descriptor->root_position = root_position;
   descriptor->nodes = getSubgraphNodes(config, graph, *parent, false);
 
@@ -85,7 +85,7 @@ Descriptor::Ptr ObjectDescriptorFactory::construct(
     const size_t label = attrs.semantic_label;
     if (label > static_cast<size_t>(descriptor->values.rows())) {
       LOG(ERROR) << "label " << static_cast<int>(label) << " for node "
-                 << NodeSymbol(node).getLabel() << " exceeds max label "
+                 << NodeSymbol(node).str() << " exceeds max label "
                  << descriptor->values.rows();
       continue;
     }
@@ -113,7 +113,7 @@ Descriptor::Ptr PlaceDescriptorFactory::construct(
   descriptor->normalized = false;
   descriptor->values = decltype(descriptor->values)::Zero(histogram.bins, 1);
   descriptor->root_node = *parent;
-  descriptor->timestamp = agent_node.timestamp.value();
+  descriptor->timestamp = agent_node.attributes<AgentNodeAttributes>().timestamp;
   descriptor->root_position = root_position;
   descriptor->nodes = getSubgraphNodes(config, graph, *parent, true);
 

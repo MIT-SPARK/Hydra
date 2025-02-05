@@ -73,14 +73,15 @@ void UpdateBuildingsFunctor::call(const DynamicSceneGraph&,
     SemanticNodeAttributes::Ptr attrs(new SemanticNodeAttributes());
     attrs->position = centroid;
     attrs->semantic_label = config.semantic_label;
-    attrs->name = building_id.getLabel();
+    attrs->name = building_id.str();
     dsg.graph->emplaceNode(DsgLayers::BUILDINGS, building_id, std::move(attrs));
   } else {
     dsg.graph->getNode(building_id).attributes().position = centroid;
   }
 
   for (const auto& id_node_pair : rooms.nodes()) {
-    dsg.graph->insertParentEdge(building_id, id_node_pair.first);
+    // add an edge while enforcing single parent
+    dsg.graph->insertEdge(building_id, id_node_pair.first, nullptr, true);
   }
 }
 

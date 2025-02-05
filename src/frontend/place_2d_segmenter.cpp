@@ -445,7 +445,7 @@ NodeSymbol Place2dSegmenter::addPlaceToGraph(DynamicSceneGraph& graph,
   attrs->is_active = true;
 
   attrs->semantic_label = label;
-  attrs->name = NodeSymbol(next_node_id_).getLabel();
+  attrs->name = NodeSymbol(next_node_id_).str();
   attrs->boundary = place.boundary;
   attrs->pcl_boundary_connections.insert(attrs->pcl_boundary_connections.begin(),
                                          place.boundary_indices.begin(),
@@ -463,7 +463,7 @@ NodeSymbol Place2dSegmenter::addPlaceToGraph(DynamicSceneGraph& graph,
   attrs->pcl_mesh_connections.insert(
       attrs->pcl_mesh_connections.begin(), place.indices.begin(), place.indices.end());
 
-  graph.emplaceNode(DsgLayers::MESH_PLACES, next_node_id_, std::move(attrs));
+  graph.emplaceNode(config.layer, next_node_id_, std::move(attrs), config.partition);
 
   active_places_.at(label).insert(next_node_id_);
   active_place_timestamps_[next_node_id_] = timestamp;
@@ -474,6 +474,8 @@ NodeSymbol Place2dSegmenter::addPlaceToGraph(DynamicSceneGraph& graph,
 void declare_config(Place2dSegmenter::Config& config) {
   using namespace config;
   name("Place2dSegmenterConfig");
+  field(config.layer, "layer");
+  field(config.partition, "partition");
   field<CharConversion>(config.prefix, "prefix");
   field(config.cluster_tolerance, "cluster_tolerance");
   field(config.min_cluster_size, "min_cluster_size");

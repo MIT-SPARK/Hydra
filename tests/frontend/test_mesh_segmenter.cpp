@@ -141,7 +141,7 @@ TEST(MeshSegmenter, TestIndicesRemapping) {
     };
 
     for (const auto& [node_id, expected] : expected_nodes) {
-      SCOPED_TRACE("Object " + NodeSymbol(node_id).getLabel());
+      SCOPED_TRACE("Object " + NodeSymbol(node_id).str());
       EXPECT_TRUE(checkNode(graph, node_id, expected));
     }
   }
@@ -168,7 +168,7 @@ TEST(MeshSegmenter, TestIndicesRemapping) {
     };
 
     for (const auto& [node_id, expected] : expected_nodes) {
-      SCOPED_TRACE("Object " + NodeSymbol(node_id).getLabel());
+      SCOPED_TRACE("Object " + NodeSymbol(node_id).str());
       EXPECT_TRUE(checkNode(graph, node_id, expected));
     }
   }
@@ -207,7 +207,7 @@ TEST(MeshSegmenter, TestDeletedObject) {
     };
 
     for (const auto& [node_id, expected] : expected_nodes) {
-      SCOPED_TRACE("Object " + NodeSymbol(node_id).getLabel());
+      SCOPED_TRACE("Object " + NodeSymbol(node_id).str());
       EXPECT_TRUE(checkNode(graph, node_id, expected));
     }
   }
@@ -261,7 +261,7 @@ TEST(MeshSegmenter, TestArchivedObject) {
     };
 
     for (const auto& [node_id, expected] : expected_nodes) {
-      SCOPED_TRACE("Object " + NodeSymbol(node_id).getLabel());
+      SCOPED_TRACE("Object " + NodeSymbol(node_id).str());
       EXPECT_TRUE(checkNode(graph, node_id, expected));
     }
   }
@@ -296,7 +296,7 @@ TEST(MeshSegmenter, TestDeltaWithOffset) {
     };
 
     for (const auto& [node_id, expected] : expected_nodes) {
-      SCOPED_TRACE("Object " + NodeSymbol(node_id).getLabel());
+      SCOPED_TRACE("Object " + NodeSymbol(node_id).str());
       EXPECT_TRUE(checkNode(graph, node_id, expected));
     }
   }
