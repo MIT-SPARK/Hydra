@@ -118,7 +118,7 @@ class GraphExtractorInterface {
 
  private:
   // just to make book-keeping easier
-  IsolatedSceneGraphLayer::Ptr graph_;
+  SceneGraphLayer::Ptr graph_;
 };
 
 }  // namespace hydra::places

@@ -38,7 +38,7 @@
 namespace hydra {
 
 TEST(NearestNeighborUtilities, TestSkipFirst) {
-  IsolatedSceneGraphLayer layer(1);
+  SceneGraphLayer layer(1);
   layer.emplaceNode(0, std::make_unique<NodeAttributes>(Eigen::Vector3d(0, 0, 3)));
   layer.emplaceNode(1, std::make_unique<NodeAttributes>(Eigen::Vector3d(0, 0, 0)));
   layer.emplaceNode(2, std::make_unique<NodeAttributes>(Eigen::Vector3d(3, 0, 0)));

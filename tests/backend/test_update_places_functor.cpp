@@ -48,8 +48,9 @@ MergeList callWithUnmerged(const UpdateFunctor& functor,
                            bool enable_merging) {
   const auto unmerged = dsg.graph->clone();
   functor.call(*unmerged, dsg, info);
-  if (enable_merging) {
-    return functor.findMerges(*unmerged, info);
+  const auto hooks = functor.hooks();
+  if (enable_merging && hooks.find_merges) {
+    return hooks.find_merges(*unmerged, info);
   } else {
     return {};
   }
@@ -58,22 +59,21 @@ MergeList callWithUnmerged(const UpdateFunctor& functor,
 }  // namespace
 
 TEST(UpdatePlacesFunctor, PlaceUpdate) {
-  const LayerId place_layer = DsgLayers::PLACES;
   auto dsg = test::makeSharedDsg();
   auto& graph = *dsg->graph;
 
   auto attrs1 = std::make_unique<PlaceNodeAttributes>(0.0, 0.0);
   attrs1->position = Eigen::Vector3d(1.0, 2.0, 3.0);
-  graph.emplaceNode(place_layer, NodeSymbol('p', 0), std::move(attrs1));
+  graph.emplaceNode(DsgLayers::PLACES, NodeSymbol('p', 0), std::move(attrs1));
 
   auto attrs2 = std::make_unique<PlaceNodeAttributes>(0.0, 0.0);
   attrs2->position = Eigen::Vector3d(1.0, 2.0, 3.0);
-  graph.emplaceNode(place_layer, NodeSymbol('p', 5), std::move(attrs2));
+  graph.emplaceNode(DsgLayers::PLACES, NodeSymbol('p', 5), std::move(attrs2));
 
   auto attrs3 = std::make_unique<PlaceNodeAttributes>(0.0, 0.0);
   attrs3->position = Eigen::Vector3d(1.0, 2.0, 3.0);
   attrs3->is_active = true;  // make sure it doesn't get dropped
-  graph.emplaceNode(place_layer, NodeSymbol('p', 6), std::move(attrs3));
+  graph.emplaceNode(DsgLayers::PLACES, NodeSymbol('p', 6), std::move(attrs3));
 
   gtsam::Values values;
   values.insert(NodeSymbol('p', 0),
@@ -105,22 +105,21 @@ TEST(UpdatePlacesFunctor, PlaceUpdate) {
 }
 
 TEST(UpdatePlacesFunctor, PlaceUpdateNodeFinderBug) {
-  const LayerId place_layer = DsgLayers::PLACES;
   auto dsg = test::makeSharedDsg();
   auto& graph = *dsg->graph;
 
   auto attrs1 = std::make_unique<PlaceNodeAttributes>(0.0, 0.0);
   attrs1->position = Eigen::Vector3d(1.0, 2.0, 3.0);
-  graph.emplaceNode(place_layer, NodeSymbol('p', 0), std::move(attrs1));
+  graph.emplaceNode(DsgLayers::PLACES, NodeSymbol('p', 0), std::move(attrs1));
 
   auto attrs2 = std::make_unique<PlaceNodeAttributes>(0.0, 0.0);
   attrs2->position = Eigen::Vector3d(1.0, 2.0, 3.0);
-  graph.emplaceNode(place_layer, NodeSymbol('p', 5), std::move(attrs2));
+  graph.emplaceNode(DsgLayers::PLACES, NodeSymbol('p', 5), std::move(attrs2));
 
   auto attrs3 = std::make_unique<PlaceNodeAttributes>(0.0, 0.0);
   attrs3->position = Eigen::Vector3d(1.0, 2.0, 3.0);
   attrs3->is_active = true;  // make sure it doesn't get dropped
-  graph.emplaceNode(place_layer, NodeSymbol('p', 6), std::move(attrs3));
+  graph.emplaceNode(DsgLayers::PLACES, NodeSymbol('p', 6), std::move(attrs3));
 
   gtsam::Values values;
   values.insert(NodeSymbol('p', 0),
@@ -140,7 +139,6 @@ TEST(UpdatePlacesFunctor, PlaceUpdateNodeFinderBug) {
 }
 
 TEST(UpdatePlacesFunctor, PlaceUpdateMerge) {
-  const LayerId place_layer = DsgLayers::PLACES;
   auto dsg = test::makeSharedDsg();
   auto& graph = *dsg->graph;
 
@@ -157,9 +155,9 @@ TEST(UpdatePlacesFunctor, PlaceUpdateMerge) {
   attrs6->distance = 1.0;
   attrs6->is_active = true;
 
-  graph.emplaceNode(place_layer, NodeSymbol('p', 0), std::move(attrs0));
-  graph.emplaceNode(place_layer, NodeSymbol('p', 5), std::move(attrs5));
-  graph.emplaceNode(place_layer, NodeSymbol('p', 6), std::move(attrs6));
+  graph.emplaceNode(DsgLayers::PLACES, NodeSymbol('p', 0), std::move(attrs0));
+  graph.emplaceNode(DsgLayers::PLACES, NodeSymbol('p', 5), std::move(attrs5));
+  graph.emplaceNode(DsgLayers::PLACES, NodeSymbol('p', 6), std::move(attrs6));
 
   gtsam::Values values;
   values.insert(NodeSymbol('p', 0),

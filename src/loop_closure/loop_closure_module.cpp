@@ -149,8 +149,9 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
 
   auto query_agent = getQueryAgentId(timestamp_ns);
   while (query_agent) {
-    const Eigen::Vector3d query_pos = lcd_graph_->getPosition(*query_agent);
-    const auto to_cache = getPlacesToCache(query_pos);
+    const auto& attrs =
+        lcd_graph_->getNode(*query_agent).attributes<AgentNodeAttributes>();
+    const auto to_cache = getPlacesToCache(attrs.position);
 
     if (!to_cache.empty()) {
       VLOG(5) << "[Hydra LCD] Constructing descriptors for "
@@ -158,15 +159,15 @@ void LoopClosureModule::spinOnceImpl(bool force_update) {
       lcd_detector_->updateDescriptorCache(*lcd_graph_, to_cache, timestamp_ns);
     }
 
-    const auto time = lcd_graph_->getNode(*query_agent).timestamp.value();
-    auto results = lcd_detector_->detect(*lcd_graph_, *query_agent, time.count());
+    auto results =
+        lcd_detector_->detect(*lcd_graph_, *query_agent, attrs.timestamp.count());
     auto& queue = PipelineQueues::instance().backend_lcd_queue;
     for (const auto& result : results) {
       // TODO(nathan) consider augmenting with gtsam key
       queue.push(result);
       LOG(WARNING) << "[Hydra LCD] Found valid loop-closure: "
-                   << NodeSymbol(result.from_node).getLabel() << " -> "
-                   << NodeSymbol(result.to_node).getLabel();
+                   << NodeSymbol(result.from_node).str() << " -> "
+                   << NodeSymbol(result.to_node).str();
     }
 
     // if should_shutdown_ is true and agent/place parent invariant is broken, this
@@ -203,7 +204,7 @@ NodeIdSet LoopClosureModule::getPlacesToCache(const Eigen::Vector3d& agent_pos) 
   while (iter != potential_lcd_root_nodes_.end()) {
     auto node_opt = lcd_graph_->findNode(*iter);
     if (!node_opt) {
-      VLOG(5) << "[Hydra LCD] Deleted place " << NodeSymbol(*iter).getLabel()
+      VLOG(5) << "[Hydra LCD] Deleted place " << NodeSymbol(*iter).str()
               << " found in LCD queue";
       iter = potential_lcd_root_nodes_.erase(iter);
       continue;
@@ -215,7 +216,7 @@ NodeIdSet LoopClosureModule::getPlacesToCache(const Eigen::Vector3d& agent_pos) 
       continue;
     }
 
-    CHECK(!attrs.is_active) << "Found active node: " << NodeSymbol(*iter).getLabel();
+    CHECK(!attrs.is_active) << "Found active node: " << NodeSymbol(*iter).str();
 
     to_cache.insert(*iter);
     iter = potential_lcd_root_nodes_.erase(iter);
@@ -230,11 +231,11 @@ std::optional<NodeId> LoopClosureModule::getQueryAgentId(size_t stamp_ns) {
   }
 
   const auto& node = lcd_graph_->getNode(agent_queue_.top());
-  const auto prev_time = node.timestamp.value();
+  const auto prev_time = node.attributes<AgentNodeAttributes>().timestamp;
 
   if (!node.hasParent()) {
     LOG(ERROR) << "Found agent node without parent: "
-               << NodeSymbol(agent_queue_.top()).getLabel() << ". Discarding!";
+               << NodeSymbol(agent_queue_.top()).str() << ". Discarding!";
     agent_queue_.pop();
     return std::nullopt;
   }
@@ -247,7 +248,7 @@ std::optional<NodeId> LoopClosureModule::getQueryAgentId(size_t stamp_ns) {
   }
 
   if (should_shutdown_ && (diff_s.count() < config_.lcd_agent_horizon_s)) {
-    LOG(ERROR) << "Forcing pop of node " << NodeSymbol(agent_queue_.top()).getLabel()
+    LOG(ERROR) << "Forcing pop of node " << NodeSymbol(agent_queue_.top()).str()
                << " from lcd queue due to shutdown: "
                << ", diff: " << diff_s.count() << " / " << config_.lcd_agent_horizon_s;
   }

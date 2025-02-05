@@ -38,9 +38,4 @@ namespace hydra {
 
 UpdateFunctor::Hooks UpdateFunctor::hooks() const { return {}; }
 
-MergeList UpdateFunctor::findMerges(const DynamicSceneGraph&,
-                                    const UpdateInfo::ConstPtr&) const {
-  return {};
-};
-
 }  // namespace hydra

@@ -66,8 +66,4 @@ std::string showVector(const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& vector,
   return ss.str();
 }
 
-inline std::string printNodeId(spark_dsg::NodeId id) {
-  return spark_dsg::NodeSymbol(id).getLabel();
-}
-
 }  // namespace hydra

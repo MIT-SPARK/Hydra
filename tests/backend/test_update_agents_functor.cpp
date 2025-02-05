@@ -41,29 +41,33 @@
 namespace hydra {
 
 TEST(UpdateAgentsFunctor, AgentUpdate) {
-  const LayerId agent_layer = DsgLayers::AGENTS;
   auto dsg = test::makeSharedDsg();
   auto& graph = *dsg->graph;
+  graph.emplaceNode(
+      DsgLayers::AGENTS,
+      "a0"_id,
+      std::make_unique<AgentNodeAttributes>(std::chrono::seconds(1),
+                                            Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0),
+                                            Eigen::Vector3d(1.0, 2.0, 3.0),
+                                            NodeSymbol('a', 0)),
+      'a');
+  graph.emplaceNode(
+      DsgLayers::AGENTS,
+      "a1"_id,
+      std::make_unique<AgentNodeAttributes>(std::chrono::seconds(2),
+                                            Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0),
+                                            Eigen::Vector3d(1.0, 2.0, 3.0),
+                                            NodeSymbol('a', 5)),
+      'a');
   {
-    NodeAttributes::Ptr attrs =
-        std::make_unique<AgentNodeAttributes>(Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0),
+    graph.emplaceNode(
+        DsgLayers::AGENTS,
+        "b0"_id,
+        std::make_unique<AgentNodeAttributes>(std::chrono::seconds(2),
+                                              Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0),
                                               Eigen::Vector3d(1.0, 2.0, 3.0),
-                                              NodeSymbol('a', 0));
-    graph.emplaceNode(agent_layer, 'a', std::chrono::seconds(1), std::move(attrs));
-  }
-  {
-    NodeAttributes::Ptr attrs =
-        std::make_unique<AgentNodeAttributes>(Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0),
-                                              Eigen::Vector3d(1.0, 2.0, 3.0),
-                                              NodeSymbol('a', 5));
-    graph.emplaceNode(agent_layer, 'a', std::chrono::seconds(2), std::move(attrs));
-  }
-  {
-    NodeAttributes::Ptr attrs =
-        std::make_unique<AgentNodeAttributes>(Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0),
-                                              Eigen::Vector3d(1.0, 2.0, 3.0),
-                                              NodeSymbol('c', 5));
-    graph.emplaceNode(agent_layer, 'b', std::chrono::seconds(2), std::move(attrs));
+                                              NodeSymbol('c', 5)),
+        'b');
   }
 
   gtsam::Values agent_values;

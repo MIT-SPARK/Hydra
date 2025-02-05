@@ -42,6 +42,7 @@
 #include <kimera_pgmo/compression/delta_compression.h>
 #include <kimera_pgmo/utils/common_functions.h>
 #include <kimera_pgmo/utils/mesh_io.h>
+#include <spark_dsg/printing.h>
 
 #include <fstream>
 
@@ -142,7 +143,7 @@ GraphBuilder::GraphBuilder(const Config& config,
   dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>(
       true, true, true, config.overwrite_mesh_timestamps));
   const auto& prefix = GlobalInfo::instance().getRobotPrefix();
-  dsg_->graph->createDynamicLayer(DsgLayers::AGENTS, prefix.key);
+  dsg_->graph->addLayer(DsgLayers::AGENTS, prefix.key);
 
   mesh_compression_.reset(
       new kimera_pgmo::DeltaCompression(config.pgmo.mesh_resolution));
@@ -155,9 +156,6 @@ GraphBuilder::GraphBuilder(const Config& config,
     const auto frontend_dir = logs->getLogDir("frontend");
     VLOG(1) << "[Hydra Frontend] logging to " << frontend_dir;
     frontend_graph_logger_.setOutputPath(frontend_dir);
-    frontend_graph_logger_.setLayerName(DsgLayers::OBJECTS, "objects");
-    frontend_graph_logger_.setLayerName(DsgLayers::PLACES, "places");
-    frontend_graph_logger_.setLayerName(DsgLayers::MESH_PLACES, "places 2d");
   }
 
   addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
@@ -637,14 +635,7 @@ void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
 }
 
 void GraphBuilder::updatePoseGraph(const ActiveWindowOutput& input) {
-  std::unique_lock<std::mutex> lock(dsg_->mutex);
   ScopedTimer timer("frontend/update_posegraph", input.timestamp_ns);
-  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
-  const auto& agents = dsg_->graph->getLayer(DsgLayers::AGENTS, prefix.key);
-
-  if (lcd_input_) {
-    lcd_input_->new_agent_nodes.clear();
-  }
 
   PoseGraphPacket packet;
   while (!pose_graph_updates_.empty()) {
@@ -655,55 +646,25 @@ void GraphBuilder::updatePoseGraph(const ActiveWindowOutput& input) {
     backend_input_->agent_updates = packet;
   }
 
-  for (const auto& pose_graph : packet.pose_graphs) {
-    if (pose_graph.nodes.empty()) {
-      continue;
-    }
-
-    for (const auto& node : pose_graph.nodes) {
-      if (node.key < agents.numNodes()) {
-        continue;
-      }
-
-      Eigen::Vector3d position = node.pose.translation();
-      Eigen::Quaterniond rotation(node.pose.linear());
-
-      // TODO(nathan) implicit assumption that pgmo ids are sequential starting at 0
-      // TODO(nathan) implicit assumption that gtsam symbol and dsg node symbol are
-      // same
-      NodeSymbol pgmo_key(prefix.key, node.key);
-
-      const std::chrono::nanoseconds stamp(node.stamp_ns);
-      VLOG(5) << "[Hydra Frontend] Adding agent " << agents.nodes().size() << " @ "
-              << stamp.count() << " [ns] for layer " << agents.prefix.str()
-              << " (key: " << node.key << ")";
-      auto attrs = std::make_unique<AgentNodeAttributes>(rotation, position, pgmo_key);
-      if (!dsg_->graph->emplaceNode(
-              agents.id, agents.prefix, stamp, std::move(attrs))) {
-        VLOG(1) << "[Hydra Frontend] repeated timestamp " << stamp.count()
-                << "[ns] found";
-        continue;
-      }
-
-      // TODO(nathan) save key association for lcd
-      const size_t last_index = agents.nodes().size() - 1;
-      agent_key_map_[pgmo_key] = last_index;
-      if (lcd_input_) {
-        lcd_input_->new_agent_nodes.push_back(agents.prefix.makeId(last_index));
-      }
-    }
+  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
+  // TODO(nathan) thinking about locking more
+  std::lock_guard<std::mutex> lock(dsg_->mutex);
+  const auto new_node_ids = packet.addToGraph(*dsg_->graph, prefix.id);
+  if (lcd_input_) {
+    lcd_input_->new_agent_nodes = new_node_ids;
   }
 
-  assignBowVectors(agents);
+  assignBowVectors();
 }
 
-void GraphBuilder::assignBowVectors(const DynamicSceneGraphLayer& agents) {
+void GraphBuilder::assignBowVectors() {
   auto& queue = PipelineQueues::instance().bow_queue;
   if (!queue) {
     return;
   }
 
   const auto& prefix = GlobalInfo::instance().getRobotPrefix();
+  const auto& agents = dsg_->graph->getLayer(DsgLayers::AGENTS, prefix.key);
   // TODO(nathan) take care of synchronization better
   // lcd_input_->new_agent_nodes.clear();
 
@@ -722,24 +683,19 @@ void GraphBuilder::assignBowVectors(const DynamicSceneGraphLayer& agents) {
       iter = cached_bow_messages_.erase(iter);
     }
 
-    const NodeSymbol pgmo_key(prefix.key, msg->pose_id);
-
-    auto agent_index = agent_key_map_.find(pgmo_key);
-    if (agent_index == agent_key_map_.end()) {
+    const NodeSymbol node_id(prefix.key, msg->pose_id);
+    const auto node = agents.findNode(node_id);
+    if (!node) {
       ++iter;
       continue;
     }
 
-    const auto& node = agents.getNodeByIndex(agent_index->second);
-    VLOG(5) << "[Hydra Frontend] assigned bow vector of " << pgmo_key.getLabel()
-            << " to dsg node " << NodeSymbol(node.id).getLabel();
-    // lcd_input_->new_agent_nodes.push_back(node.id);
-
-    auto& attrs = node.attributes<AgentNodeAttributes>();
+    auto& attrs = node->attributes<AgentNodeAttributes>();
     attrs.dbow_ids = Eigen::Map<const AgentNodeAttributes::BowIdVector>(
         msg->bow_vector.word_ids.data(), msg->bow_vector.word_ids.size());
     attrs.dbow_values = Eigen::Map<const Eigen::VectorXf>(
         msg->bow_vector.word_values.data(), msg->bow_vector.word_values.size());
+    VLOG(5) << "[Hydra Frontend] assigned bow vector for " << node_id.str();
 
     iter = cached_bow_messages_.erase(iter);
   }

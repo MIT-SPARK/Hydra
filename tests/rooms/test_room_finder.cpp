@@ -58,7 +58,7 @@ class TestableRoomFinder : public RoomFinder {
 
 namespace {
 
-void addNode(IsolatedSceneGraphLayer& layer, size_t node_id, size_t timestamp_ns) {
+void addNode(SceneGraphLayer& layer, size_t node_id, size_t timestamp_ns) {
   auto attrs = std::make_unique<PlaceNodeAttributes>();
   attrs->position = Eigen::Vector3d::Zero();
   attrs->distance = 1.0;
@@ -114,7 +114,7 @@ TEST(RoomFinderTests, TestMakeRoomLayer) {
   PipelineConfig pipeline_config;
   GlobalInfo::init(pipeline_config);
 
-  IsolatedSceneGraphLayer places(DsgLayers::PLACES);
+  SceneGraphLayer places(DsgLayers::PLACES);
   addNode(places, 0, 3);
   addNode(places, 1, 4);
   addNode(places, 2, 10);

@@ -43,7 +43,7 @@ GraphExtractorInterface::GraphExtractorInterface(const GraphExtractorConfig& con
     : config_(config),
       next_node_id_('p', 0),
       gvd_(new GvdGraph()),
-      graph_(new IsolatedSceneGraphLayer(DsgLayers::PLACES)) {}
+      graph_(new SceneGraphLayer(DsgLayers::PLACES)) {}
 
 GraphExtractorInterface::~GraphExtractorInterface() = default;
 

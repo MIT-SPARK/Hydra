@@ -76,15 +76,9 @@ struct PipelineConfig {
 
   // If true store additional details for the khronos spatio-temporal viualizer.
   bool store_visualization_details = false;
-  std::map<spark_dsg::LayerId, char> layer_id_map{
-      {spark_dsg::DsgLayers::OBJECTS, 'o'},
-      {spark_dsg::DsgLayers::PLACES, 'p'},
-      {spark_dsg::DsgLayers::MESH_PLACES, 'q'},
-      {spark_dsg::DsgLayers::ROOMS, 'r'},
-      {spark_dsg::DsgLayers::BUILDINGS, 'b'},
-  };
   LogConfig logs;
   FrameConfig frames;
+  SharedDsgInfo::Config graph;
   config::VirtualConfig<VolumetricWindow> map_window{SpatialWindowChecker::Config()};
   LabelSpaceConfig label_space;
   std::map<uint32_t, std::string> label_names;

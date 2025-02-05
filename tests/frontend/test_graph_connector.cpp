@@ -53,10 +53,6 @@ std::set<EdgeKey> getEdges(const DynamicSceneGraph& graph) {
     edges.insert(key);
   }
 
-  for (const auto& [key, edge] : graph.dynamic_interlayer_edges()) {
-    edges.insert(key);
-  }
-
   return edges;
 }
 
@@ -72,16 +68,17 @@ void setupGraph(DynamicSceneGraph& graph) {
     graph.emplaceNode(DsgLayers::PLACES, NodeSymbol('p', i), makeAttrs(i));
     graph.emplaceNode(DsgLayers::OBJECTS, NodeSymbol('o', i), makeAttrs(i));
     graph.emplaceNode(DsgLayers::ROOMS, NodeSymbol('r', i), makeAttrs(i));
-    graph.emplaceNode(
-        DsgLayers::AGENTS, 'a', std::chrono::nanoseconds(100 * i), makeAttrs(i));
+    graph.emplaceNode(DsgLayers::AGENTS, NodeSymbol('a', i), makeAttrs(i), 'a');
   }
 }
 
-GraphConnector::Config getDefaultConfig(bool include_static, bool include_dynamic) {
+GraphConnector::Config getDefaultConfig(bool include_primary, bool include_partitions) {
   GraphConnector::Config config;
   config.layers.clear();
   config.layers.push_back(LayerConnector::Config{
-      DsgLayers::PLACES, {{DsgLayers::OBJECTS, include_static, include_dynamic}}});
+      DsgLayers::PLACES,
+      0,
+      {{DsgLayers::OBJECTS, include_primary, include_partitions}}});
   return config;
 }
 
@@ -143,8 +140,7 @@ TEST(GraphConnector, TestNewNodes) {
 
   // add new nodes
   graph.emplaceNode(DsgLayers::OBJECTS, "o5"_id, makeAttrs(3.0));
-  graph.emplaceNode(
-      DsgLayers::AGENTS, 'a', std::chrono::nanoseconds(500), makeAttrs(2.0));
+  graph.emplaceNode(DsgLayers::AGENTS, "a5"_id, makeAttrs(2.0), 'a');
   graph.emplaceNode(DsgLayers::ROOMS, "r5"_id, makeAttrs(4.0));
   connector.connect(graph);
 

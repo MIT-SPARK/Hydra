@@ -55,9 +55,14 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
     //! Association strategy for finding matches to active nodes
     MergeProposer::Config merge_proposer = {
         config::VirtualConfig<AssociationStrategy>{association::NearestNode::Config{}}};
+    //! Layer to update
+    std::string layer = DsgLayers::PLACES;
+    //! Partition to update
+    PartitionId partition = 0;
   } const config;
 
   explicit UpdatePlacesFunctor(const Config& config);
+  Hooks hooks() const override;
   void call(const DynamicSceneGraph& unmerged,
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
@@ -71,7 +76,7 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
                           const UpdateInfo::ConstPtr& info) const;
 
   MergeList findMerges(const DynamicSceneGraph& graph,
-                       const UpdateInfo::ConstPtr& info) const override;
+                       const UpdateInfo::ConstPtr& info) const;
 
   std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
                                      const SceneGraphNode& node) const;

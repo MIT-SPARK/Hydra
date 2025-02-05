@@ -61,7 +61,11 @@ static const auto registration =
                                    SharedModuleState::Ptr,
                                    LogSetup::Ptr>("BackendModule");
 
+inline std::chrono::nanoseconds getAgentTimestamp(const SceneGraphNode& node) {
+  return node.attributes<AgentNodeAttributes>().timestamp;
 }
+
+}  // namespace
 
 using hydra::timing::ScopedTimer;
 using kimera_pgmo::KimeraPgmoInterface;
@@ -123,7 +127,7 @@ BackendModule::BackendModule(const Config& config,
   original_vertices_.reset(new pcl::PointCloud<pcl::PointXYZ>());
 
   for (const auto& [name, functor] : config.update_functors) {
-    update_functors_.push_back(functor.create());
+    update_functors_.emplace(name, functor.create());
   }
 
   if (logs && logs->valid()) {
@@ -131,10 +135,6 @@ BackendModule::BackendModule(const Config& config,
     const auto log_path = logs->getLogDir("backend");
     backend_graph_logger_.setOutputPath(log_path);
     VLOG(1) << "[Hydra Backend] logging to " << log_path;
-    backend_graph_logger_.setLayerName(DsgLayers::OBJECTS, "objects");
-    backend_graph_logger_.setLayerName(DsgLayers::PLACES, "places");
-    backend_graph_logger_.setLayerName(DsgLayers::ROOMS, "rooms");
-    backend_graph_logger_.setLayerName(DsgLayers::BUILDINGS, "buildings");
   } else {
     VLOG(1) << "[Hydra Backend] logging disabled.";
   }
@@ -538,8 +538,8 @@ std::optional<NodeId> BackendModule::findClosestAgentId(uint64_t stamp_ns,
       std::min_element(layer.nodes().begin(),
                        layer.nodes().end(),
                        [stamp](const auto& lhs, const auto& rhs) {
-                         const auto diff_lhs = lhs->timestamp.value() - stamp;
-                         const auto diff_rhs = rhs->timestamp.value() - stamp;
+                         const auto diff_lhs = getAgentTimestamp(*lhs.second) - stamp;
+                         const auto diff_rhs = getAgentTimestamp(*rhs.second) - stamp;
                          return std::abs(diff_lhs.count()) < std::abs(diff_rhs.count());
                        });
   if (closest == layer.nodes().end()) {
@@ -548,26 +548,25 @@ std::optional<NodeId> BackendModule::findClosestAgentId(uint64_t stamp_ns,
     return std::nullopt;
   }
 
-  const auto& best_node = *closest;
+  const auto& best_node = *closest->second;
   // NOTE(hlim) It's heuristic, but occasionally,
   // during Hydra's mesh generation process, a delay can occur,
   // causing the most recently stored node in `timestamps_` to be mistakenly
   // identified as the closest node. This needs to be rejected.
   const auto diff_s = std::chrono::duration_cast<std::chrono::duration<double>>(
-                          best_node->timestamp.value() - stamp)
+                          getAgentTimestamp(best_node) - stamp)
                           .count();
-  VLOG(5) << "[Hydra Backend] Found node " << NodeSymbol(best_node->id).getLabel()
+  VLOG(5) << "[Hydra Backend] Found node " << NodeSymbol(best_node.id).str()
           << " with difference of " << diff_s << " [s] for timestamp " << stamp_ns
           << " [ns]";
   if (max_diff_s && std::abs(diff_s) >= max_diff_s) {
-    LOG(WARNING) << "[Hydra Backend] Nearest node "
-                 << NodeSymbol(best_node->id).getLabel()
+    LOG(WARNING) << "[Hydra Backend] Nearest node " << NodeSymbol(best_node.id).str()
                  << " has too large of a time difference: " << diff_s
                  << " [s] >= " << max_diff_s << " [s]";
     return std::nullopt;
   }
 
-  return best_node->id;
+  return best_node.id;
 }
 
 void BackendModule::updateExternalLoopClosures() {
@@ -686,8 +685,7 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
   private_dsg_->graph->mergeGraph(*unmerged_graph_, merge_config);
 
   std::list<LayerCleanupFunc> cleanup_hooks;
-  for (const auto& functor : update_functors_) {
-    // TODO(nathan) keep track of names and push timing here
+  for (const auto& [name, functor] : update_functors_) {
     if (!functor) {
       continue;
     }
@@ -698,22 +696,24 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
     }
 
     functor->call(*unmerged_graph_, *private_dsg_, info);
-    if (enable_merging) {
+    if (hooks.find_merges && enable_merging) {
       // TODO(nathan) handle given merges
-      const auto merges = functor->findMerges(*unmerged_graph_, info);
+      const auto merges = hooks.find_merges(*unmerged_graph_, info);
       const auto applied = merge_tracker.applyMerges(
           *unmerged_graph_, merges, *private_dsg_, hooks.merge);
-      VLOG(1) << "Found " << merges.size() << " merges (applied " << applied << ")";
+      VLOG(1) << "[Backend: " << name << "] Found " << merges.size()
+              << " merges (applied " << applied << ")";
 
       if (config.enable_exhaustive_merging) {
         size_t merge_iter = 0;
         size_t num_applied = 0;
         do {
-          const auto new_merges = functor->findMerges(*private_dsg_->graph, info);
+          const auto new_merges = hooks.find_merges(*private_dsg_->graph, info);
           num_applied = merge_tracker.applyMerges(
               *private_dsg_->graph, new_merges, *private_dsg_, hooks.merge);
-          VLOG(1) << "Found " << new_merges.size() << " merges at pass " << merge_iter
-                  << " (" << num_applied << " applied)";
+          VLOG(1) << "[Backend: " << name << "] Found " << new_merges.size()
+                  << " merges at pass " << merge_iter << " (" << num_applied
+                  << " applied)";
           ++merge_iter;
         } while (num_applied > 0);
       }

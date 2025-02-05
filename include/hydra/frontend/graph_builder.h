@@ -83,7 +83,7 @@ class GraphBuilder : public Module {
       double d_graph_resolution = 1.5;
       double time_horizon = 10.0;
     } pgmo;
-    GraphUpdater::Config graph_updater{{{"objects", {'O', std::nullopt}}}};
+    GraphUpdater::Config graph_updater{{{DsgLayers::OBJECTS, {'O', std::nullopt}}}};
     GraphConnector::Config graph_connector;
     bool enable_mesh_objects = true;
     MeshSegmenter::Config object_config;
@@ -152,7 +152,7 @@ class GraphBuilder : public Module {
   void updatePoseGraph(const ActiveWindowOutput& msg);
 
  protected:
-  void assignBowVectors(const DynamicSceneGraphLayer& agents);
+  void assignBowVectors();
 
   void archivePlaces2d(const NodeIdSet active_places);
 
@@ -199,7 +199,6 @@ class GraphBuilder : public Module {
 
   NodeIdSet previous_active_places_;
   NodeIdSet previous_active_places_2d_;
-  std::map<NodeId, size_t> agent_key_map_;
   std::list<pose_graph_tools::BowQuery::ConstPtr> cached_bow_messages_;
 
   Sink::List sinks_;
