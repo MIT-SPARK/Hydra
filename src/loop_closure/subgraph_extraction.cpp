@@ -56,12 +56,14 @@ void getObjectsWithinRadius(const DynamicSceneGraph& graph,
       frontier,
       visited,
       [&](const auto& node) {
-        for (const auto& child : node.children()) {
-          if (graph.isDynamic(child)) {
+        for (const auto& child_id : node.children()) {
+          const auto& child = graph.getNode(child_id);
+          if (child.layer.partition) {
+            // object nodes are in the primary partition
             continue;
           }
 
-          if ((origin - graph.getPosition(child)).norm() < radius_m) {
+          if ((origin - child.attributes().position).norm() < radius_m) {
             return true;
           }
         }
@@ -70,16 +72,16 @@ void getObjectsWithinRadius(const DynamicSceneGraph& graph,
       },
       [](const auto&) { return true; },
       [&](const SceneGraphLayer&, NodeId node) {
-        for (const auto& child : graph.getNode(node).children()) {
-          if (graph.isDynamic(child)) {
+        for (const auto& child_id : graph.getNode(node).children()) {
+          const auto& child = graph.getNode(child_id);
+          if (child.layer.partition) {
+            // object nodes are in the primary partition
             continue;
           }
 
-          if ((origin - graph.getPosition(child)).norm() >= radius_m) {
-            continue;
+          if ((origin - child.attributes().position).norm() < radius_m) {
+            found.insert(child_id);
           }
-
-          found.insert(child);
         }
       });
 }
@@ -153,7 +155,7 @@ std::set<NodeId> getSubgraphNodes(const SubgraphConfig& config,
   try {
     origin = graph.getPosition(root_node);
   } catch (const std::out_of_range& e) {
-    LOG(ERROR) << "Invalid root node " << NodeSymbol(root_node).getLabel() << ": "
+    LOG(ERROR) << "Invalid root node " << NodeSymbol(root_node).str() << ": "
                << e.what();
     return {};
   }

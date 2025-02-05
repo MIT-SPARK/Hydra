@@ -42,6 +42,7 @@
 #include <kimera_pgmo/deformation_graph.h>
 #include <kimera_rpgo/rpgo.h>
 #include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/node_attributes.h>
 #include <yaml-cpp/yaml.h>
 
 DEFINE_string(result_dir, "", "directory to read from");
@@ -155,8 +156,8 @@ std::vector<size_t> read_timestamps(const std::string& filepath) {
   const auto& agents = graph.getLayer(DsgLayers::AGENTS, 'a');
 
   std::vector<size_t> times_ns;
-  for (const auto& node : agents.nodes()) {
-    times_ns.push_back(node->timestamp.value().count());
+  for (const auto& [node_id, node] : agents.nodes()) {
+    times_ns.push_back(node->attributes<AgentNodeAttributes>().timestamp.count());
   }
 
   return times_ns;

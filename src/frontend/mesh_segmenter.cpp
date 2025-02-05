@@ -62,8 +62,6 @@ using timing::ScopedTimer;
 void declare_config(MeshSegmenter::Config& config) {
   using namespace config;
   name("MeshSegmenterConfig");
-  field<CharConversion>(config.prefix, "prefix");
-  // TODO(nathan) string to number conversion
   field(config.layer_id, "layer_id");
   field(config.cluster_tolerance, "cluster_tolerance");
   field(config.min_cluster_size, "min_cluster_size");
@@ -189,9 +187,10 @@ Clusters findClusters(const MeshSegmenter::Config& config,
   return clusters;
 }
 
+// TODO(nathan) move node ID to not be here
 MeshSegmenter::MeshSegmenter(const Config& config, const std::set<uint32_t>& labels)
     : config(config::checkValid(config)),
-      next_node_id_(config.prefix, 0),
+      next_node_id_('O', 0),
       labels_(labels),
       sinks_(Sink::instantiate(config.sinks)) {
   VLOG(2) << "[Mesh Segmenter] using labels: " << printLabels(labels_);
@@ -288,8 +287,8 @@ void MeshSegmenter::updateOldNodes(const kimera_pgmo::MeshDelta& delta,
       auto& attrs = graph.getNode(node_id).attributes<ObjectNodeAttributes>();
 
       // remap and prune mesh connections
-      VLOG(20) << "Updating node " << NodeSymbol(node_id).getLabel()
-               << " with connections " << attrs.mesh_connections;
+      VLOG(20) << "Updating node " << NodeSymbol(node_id).str() << " with connections "
+               << attrs.mesh_connections;
       const auto is_active = updateIndices(delta, attrs.mesh_connections);
       VLOG(20) << "After update: " << attrs.mesh_connections << std::boolalpha
                << " (active: " << is_active << ")";
@@ -426,7 +425,7 @@ void MeshSegmenter::addNodeToGraph(DynamicSceneGraph& graph,
   attrs->last_update_time_ns = timestamp;
   attrs->is_active = true;
   attrs->semantic_label = label;
-  attrs->name = next_node_id_.getLabel();
+  attrs->name = next_node_id_.str();
   const auto& label_to_name = GlobalInfo::instance().getLabelToNameMap();
   auto iter = label_to_name.find(label);
   if (iter != label_to_name.end()) {

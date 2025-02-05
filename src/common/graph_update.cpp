@@ -107,26 +107,36 @@ LayerTracker::LayerTracker(const Config& config)
 
 GraphUpdater::GraphUpdater(const Config& config) : config(config::checkValid(config)) {
   for (const auto& [layer_name, tracker_config] : config.layer_updates) {
-    trackers_.emplace(DsgLayers::StringToLayerId(layer_name),
-                      LayerTracker(tracker_config));
+    trackers_.emplace(layer_name, LayerTracker(tracker_config));
   }
 }
 
 void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
+  std::map<LayerId, LayerTracker&> trackers_by_id;
+  for (auto& [name, tracker] : trackers_) {
+    const auto key = graph.getLayerKey(name);
+    if (!key) {
+      LOG(WARNING) << "Invalid layer '" << name << "'";
+      continue;
+    }
+
+    trackers_by_id.emplace(key->layer, tracker);
+  }
+
   for (const auto& [layer_id, layer_update] : update) {
     if (!layer_update) {
       LOG(WARNING) << "Received invalid update for layer " << layer_id;
     }
 
-    auto iter = trackers_.find(layer_id);
-    if (iter == trackers_.end()) {
-      LOG(WARNING) << "Recieved udpates for unhandled layer " << layer_id;
+    auto iter = trackers_by_id.find(layer_id);
+    if (iter == trackers_by_id.end()) {
+      LOG(WARNING) << "Recieved updates for unhandled layer " << layer_id;
       return;
     }
 
     auto& tracker = iter->second;
     for (auto&& attrs : layer_update->attributes) {
-      VLOG(5) << "Emplacing " << tracker.next_id.getLabel() << " @ "
+      VLOG(5) << "Emplacing " << tracker.next_id.str() << " @ "
               << tracker.config.target_layer.value_or(layer_id) << " for layer "
               << layer_id;
       graph.emplaceNode(tracker.config.target_layer.value_or(layer_id),

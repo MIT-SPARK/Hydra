@@ -64,6 +64,8 @@ class GvdPlaceExtractor : public FreespacePlacesInterface {
                           const places::GraphExtractorInterface*>;
 
   struct Config {
+    std::string layer = DsgLayers::PLACES;
+    PartitionId partition = 0;
     places::GvdIntegratorConfig gvd;
     config::VirtualConfig<places::GraphExtractorInterface> graph;
     config::VirtualConfig<TsdfInterpolator> tsdf_interpolator;

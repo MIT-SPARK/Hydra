@@ -34,10 +34,16 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <pose_graph_tools/pose_graph.h>
+#include <spark_dsg/scene_graph_types.h>
 
 #include <Eigen/Geometry>
 #include <list>
 #include <memory>
+#include <optional>
+
+namespace spark_dsg {
+class DynamicSceneGraph;
+}
 
 namespace hydra {
 
@@ -50,12 +56,13 @@ struct PoseGraphPacket {
   //! external optimization priors
   pose_graph_tools::PoseGraph::ConstPtr external_priors;
 
-  void updateFrom(const PoseGraphPacket& other) {
-    timestamp_ns = other.timestamp_ns;
-    pose_graphs.insert(pose_graphs.end(), other.pose_graphs.begin(), other.pose_graphs.end());
-    // TODO(nathan) this is technically bad, but we'll get to it
-    external_priors = other.external_priors;
-  }
+  //! @brief Merge two update packets
+  void updateFrom(const PoseGraphPacket& other);
+
+  //! @brief Add all pose graph nodes and edges to graph
+  std::vector<spark_dsg::NodeId> addToGraph(
+      spark_dsg::DynamicSceneGraph& graph,
+      std::optional<int> robot_id = std::nullopt) const;
 };
 
 struct PoseGraphTracker {

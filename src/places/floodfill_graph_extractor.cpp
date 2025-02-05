@@ -59,7 +59,7 @@ bool operator<(const EdgeSplitSeed& lhs, const EdgeSplitSeed& rhs) {
 
 std::ostream& operator<<(std::ostream& out, const VoxelGraphInfo& info) {
   if (info.is_node) {
-    out << "node " << NodeSymbol(info.id).getLabel();
+    out << "node " << NodeSymbol(info.id).str();
   } else {
     out << "edge " << info.edge_id;
   }
@@ -68,7 +68,7 @@ std::ostream& operator<<(std::ostream& out, const VoxelGraphInfo& info) {
 }
 
 std::ostream& operator<<(std::ostream& out, const EdgeInfo& info) {
-  out << "source: " << NodeSymbol(info.id).getLabel() << ", id: " << info.id
+  out << "source: " << NodeSymbol(info.id).str() << ", id: " << info.id
       << ", size: " << info.indices.size()
       << ", connections: " << info.connections.size()
       << ", node connections: " << info.node_connections.size();

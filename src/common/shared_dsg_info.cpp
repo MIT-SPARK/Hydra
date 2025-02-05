@@ -34,31 +34,29 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/common/shared_dsg_info.h"
 
+#include <config_utilities/config.h>
+
 namespace hydra {
 
 using namespace spark_dsg;
 
-SharedDsgInfo::SharedDsgInfo(const std::map<LayerId, char>& layer_id_map)
-    : updated(false), sequence_number(0), layer_prefix_map(layer_id_map) {
-  DynamicSceneGraph::LayerIds layer_ids;
-  for (auto&& [layer, prefix] : layer_id_map) {
-    layer_ids.push_back(layer);
-    prefix_layer_map[prefix] = layer;
-  }
-
-  graph.reset(new DynamicSceneGraph(layer_ids));
+SharedDsgInfo::SharedDsgInfo(const Config& config)
+    : updated(false), sequence_number(0) {
+  graph = DynamicSceneGraph::fromNames(config.layers);
 }
 
-SharedDsgInfo::SharedDsgInfo() {}
-
 SharedDsgInfo::Ptr SharedDsgInfo::clone() const {
-  SharedDsgInfo::Ptr other(new SharedDsgInfo());
+  auto other = std::make_shared<SharedDsgInfo>(config);
   other->updated = updated.load();
   other->sequence_number = sequence_number;
   other->graph = graph->clone();
-  other->prefix_layer_map = prefix_layer_map;
-  other->layer_prefix_map = layer_prefix_map;
   return other;
+}
+
+void declare_config(SharedDsgInfo::Config& config) {
+  using namespace config;
+  name("SharedDsgInfo::Config");
+  field(config.layers, "layers");
 }
 
 }  // namespace hydra

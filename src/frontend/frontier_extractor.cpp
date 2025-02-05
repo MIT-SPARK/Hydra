@@ -1,6 +1,5 @@
 #include <config_utilities/config_utilities.h>
 #include <spark_dsg/dynamic_scene_graph.h>
-#include <spark_dsg/dynamic_scene_graph_layer.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/scene_graph_types.h>
 #include <spatial_hash/neighbor_utils.h>

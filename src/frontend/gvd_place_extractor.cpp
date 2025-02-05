@@ -56,6 +56,8 @@ using places::GvdVoxel;
 void declare_config(GvdPlaceExtractor::Config& config) {
   using namespace config;
   name("GvdPlaceExtractor::Config");
+  field(config.layer, "layer");
+  field(config.partition, "partition");
   field(config.gvd, "gvd");
   config.graph.setOptional();
   field(config.graph, "graph");
@@ -100,20 +102,10 @@ GvdPlaceExtractor::~GvdPlaceExtractor() {}
 void GvdPlaceExtractor::save(const LogSetup& log_setup) const {
   const auto output_path = log_setup.getLogDir("frontend");
   if (graph_extractor_) {
-    const auto& original_places = graph_extractor_->getGraph();
-    auto places = original_places.clone();
-
-    std::unique_ptr<DynamicSceneGraph::Edges> edges(new DynamicSceneGraph::Edges());
-    for (const auto& id_edge_pair : places->edges()) {
-      edges->emplace(std::piecewise_construct,
-                     std::forward_as_tuple(id_edge_pair.first),
-                     std::forward_as_tuple(id_edge_pair.second.source,
-                                           id_edge_pair.second.target,
-                                           id_edge_pair.second.info->clone()));
-    }
+    const auto& places = graph_extractor_->getGraph();
 
     DynamicSceneGraph::Ptr graph(new DynamicSceneGraph());
-    graph->updateFromLayer(*places, std::move(edges));
+    graph->updateFromLayer(places, places.edges());
     graph->save(output_path + "/places.json", false);
   }
 }
@@ -266,7 +258,7 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& gr
     auto attrs = node.attributes().clone();
     attrs->is_active = true;
     attrs->last_update_time_ns = timestamp_ns;
-    graph.addOrUpdateNode(DsgLayers::PLACES, node_id, std::move(attrs));
+    graph.addOrUpdateNode(config.layer, node_id, std::move(attrs), config.partition);
 
     for (const auto sibling : node.siblings()) {
       const auto& edge = places.getEdge(node_id, sibling);

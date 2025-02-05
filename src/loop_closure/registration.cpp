@@ -62,24 +62,19 @@ AgentNodePose getAgentPose(const DynamicSceneGraph& graph, NodeId root_id) {
   }
 
   const auto& root_node = graph.getNode(root_id);
-
-  std::optional<NodeId> child_id = std::nullopt;
   for (const auto& root_child : root_node.children()) {
-    if (graph.isDynamic(root_child)) {
-      child_id = root_child;
-      break;
+    const auto& child = graph.getNode(root_child);
+    if (!child.layer.partition) {
+      continue;  // skip non-agent nodes
     }
+
+    const auto& attrs = child.attributes<AgentNodeAttributes>();
+    return {true,
+            gtsam::Pose3(gtsam::Rot3(attrs.world_R_body), attrs.position),
+            root_child};
   }
 
-  if (!child_id) {
-    return {};
-  }
-
-  CHECK(child_id);
-
-  const auto& attrs = graph.getNode(*child_id).attributes<AgentNodeAttributes>();
-  return {
-      true, gtsam::Pose3(gtsam::Rot3(attrs.world_R_body), attrs.position), *child_id};
+  return {};
 }
 
 AgentNodePose getQueryPose(const DynamicSceneGraph& graph, NodeId query_agent_id) {
@@ -119,8 +114,8 @@ RegistrationSolution getFullSolutionFromLayer(const DynamicSceneGraph& graph,
   gtsam::Pose3 to_T_from = to_pose_info.world_T_body.inverse() * solution.dest_T_src *
                            from_pose_info.world_T_body;
 
-  VLOG(3) << "[DSG_LCD] Solution of " << NodeSymbol(query_agent_id).getLabel() << " -> "
-          << NodeSymbol(to_pose_info.id).getLabel() << ":";
+  VLOG(3) << "[DSG_LCD] Solution of " << NodeSymbol(query_agent_id).str() << " -> "
+          << NodeSymbol(to_pose_info.id).str() << ":";
   VLOG(3) << "  - world_T_from: " << getPoseRepr(from_pose_info.world_T_body);
   VLOG(3) << "  - world_T_to:   " << getPoseRepr(to_pose_info.world_T_body);
   VLOG(3) << "  - dest_T_src:   " << getPoseRepr(solution.dest_T_src);
@@ -167,20 +162,20 @@ void logRegistrationProblem(const std::string& path_prefix,
   // TODO(nathan) output position data
 }
 
-DsgTeaserSolver::DsgTeaserSolver(LayerId layer_id,
+DsgTeaserSolver::DsgTeaserSolver(const std::string& layer,
                                  const LayerRegistrationConfig& config,
                                  const TeaserParams& params)
-    : layer_id(layer_id), config(config), solver(params) {
-  const std::string layer_str = DsgLayers::LayerIdToString(layer_id);
-  timer_prefix = "lcd/" + layer_str + "_registration";
-  log_prefix = config.registration_output_path + "/" + layer_str + "_registration_";
+    : layer_id(layer), config(config), solver(params) {
+  timer_prefix = "lcd/" + layer_id + "_registration";
+  log_prefix = config.registration_output_path + "/" + layer_id + "_registration_";
 }
 
 RegistrationSolution DsgTeaserSolver::solve(const DynamicSceneGraph& dsg,
                                             const DsgRegistrationInput& match,
                                             NodeId query_agent_id) const {
   // TODO(nathan) helper function in dsg
-  const uint64_t timestamp = dsg.getNode(query_agent_id).timestamp.value().count();
+  const uint64_t timestamp =
+      dsg.getNode(query_agent_id).attributes<AgentNodeAttributes>().timestamp.count();
   ScopedTimer timer(timer_prefix, timestamp, true, 2, false);
 
   LayerRegistrationProblem<std::set<NodeId>> problem;
@@ -197,9 +192,9 @@ RegistrationSolution DsgTeaserSolver::solve(const DynamicSceneGraph& dsg,
 
   if (problem.src_nodes.size() <= 3 || problem.dest_nodes.size() <= 3) {
     if (problem.src_nodes.empty()) {
-      LOG(ERROR) << "Invalid query: " << NodeSymbol(match.query_root).getLabel();
+      LOG(ERROR) << "Invalid query: " << NodeSymbol(match.query_root).str();
     } else {
-      LOG(ERROR) << "Invalid match: " << NodeSymbol(match.match_root).getLabel();
+      LOG(ERROR) << "Invalid match: " << NodeSymbol(match.match_root).str();
     }
 
     return {};

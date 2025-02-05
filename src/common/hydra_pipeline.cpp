@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/common/hydra_pipeline.h"
 
+#include <config_utilities/printing.h>
 #include <config_utilities/settings.h>
 
 namespace hydra {
@@ -49,6 +50,8 @@ HydraPipeline::HydraPipeline(const PipelineConfig& pipeline_config,
   shared_state_.reset(new SharedModuleState());
   shared_state_->lcd_graph = config.createSharedDsg();
   shared_state_->backend_graph = config.createSharedDsg();
+  LOG(INFO) << "[Hydra] Initialized pipeline with:\n"
+            << config::toString(config.getConfig());
 }
 
 void HydraPipeline::init() {}

@@ -110,16 +110,18 @@ TEST_F(LcdDetectorTests, TestActualChildren) {
   using namespace std::chrono_literals;
   dsg->emplaceNode(DsgLayers::PLACES, 1, std::make_unique<PlaceNodeAttributes>());
   dsg->emplaceNode(DsgLayers::OBJECTS, 2, std::make_unique<ObjectNodeAttributes>());
-  dsg->emplaceNode(DsgLayers::AGENTS,
-                   'a',
-                   10ns,
-                   std::make_unique<AgentNodeAttributes>(
-                       Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
-  dsg->emplaceNode(DsgLayers::AGENTS,
-                   'a',
-                   20ns,
-                   std::make_unique<AgentNodeAttributes>(
-                       Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
+  dsg->emplaceNode(
+      DsgLayers::AGENTS,
+      "a0"_id,
+      std::make_unique<AgentNodeAttributes>(
+          10ns, Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0),
+      'a');
+  dsg->emplaceNode(
+      DsgLayers::AGENTS,
+      "a1"_id,
+      std::make_unique<AgentNodeAttributes>(
+          20ns, Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0),
+      'a');
   dsg->insertEdge(1, 2);
   dsg->insertEdge(1, NodeSymbol('a', 0));
   dsg->insertEdge(1, NodeSymbol('a', 1));
@@ -134,11 +136,12 @@ TEST_F(LcdDetectorTests, TestActualChildren) {
 
 TEST_F(LcdDetectorTests, TestEmptySearch) {
   using namespace std::chrono_literals;
-  dsg->emplaceNode(DsgLayers::AGENTS,
-                   'a',
-                   10ns,
-                   std::make_unique<AgentNodeAttributes>(
-                       Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
+  dsg->emplaceNode(
+      DsgLayers::AGENTS,
+      "a0"_id,
+      std::make_unique<AgentNodeAttributes>(
+          10ns, Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0),
+      'a');
 
   LcdDetector module(config);
   std::unordered_set<NodeId> active_places{1};
@@ -151,16 +154,18 @@ TEST_F(LcdDetectorTests, TestNonEmptySearch) {
   using namespace std::chrono_literals;
   dsg->emplaceNode(DsgLayers::PLACES, 1, std::make_unique<PlaceNodeAttributes>());
   dsg->emplaceNode(DsgLayers::OBJECTS, 2, std::make_unique<ObjectNodeAttributes>());
-  dsg->emplaceNode(DsgLayers::AGENTS,
-                   'a',
-                   10ns,
-                   std::make_unique<AgentNodeAttributes>(
-                       Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
-  dsg->emplaceNode(DsgLayers::AGENTS,
-                   'a',
-                   20ns,
-                   std::make_unique<AgentNodeAttributes>(
-                       Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0));
+  dsg->emplaceNode(
+      DsgLayers::AGENTS,
+      "a0"_id,
+      std::make_unique<AgentNodeAttributes>(
+          10ns, Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0),
+      'a');
+  dsg->emplaceNode(
+      DsgLayers::AGENTS,
+      "a1"_id,
+      std::make_unique<AgentNodeAttributes>(
+          20ns, Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0),
+      'a');
   dsg->insertEdge(1, 2);
   dsg->insertEdge(1, NodeSymbol('a', 0));
   dsg->insertEdge(1, NodeSymbol('a', 1));

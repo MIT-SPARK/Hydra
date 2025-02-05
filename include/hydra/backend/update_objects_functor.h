@@ -57,7 +57,7 @@ struct UpdateObjectsFunctor : public UpdateFunctor {
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
   MergeList findMerges(const DynamicSceneGraph& graph,
-                       const UpdateInfo::ConstPtr& info) const override;
+                       const UpdateInfo::ConstPtr& info) const;
 
   void mergeAttributes(const DynamicSceneGraph& layer, NodeId from, NodeId to) const;
 

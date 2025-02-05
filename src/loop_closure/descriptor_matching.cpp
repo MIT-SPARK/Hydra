@@ -145,8 +145,8 @@ LayerSearchResults searchDescriptors(
                             NodeSymbol(*root_leaf_map.at(valid_id).begin()).category();
     if (!same_robot) {
       const auto child = NodeSymbol(*root_leaf_map.at(valid_id).begin());
-      LOG(WARNING) << "Found different robot: query " << NodeSymbol(query_id).getLabel()
-                   << ", putative: " << child.getLabel();
+      LOG(WARNING) << "Found different robot: query " << NodeSymbol(query_id).str()
+                   << ", putative: " << child.str();
     }
 
     const Descriptor& other_descriptor = *other_ptr;

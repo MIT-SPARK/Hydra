@@ -45,12 +45,11 @@ namespace hydra::utils {
 std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol key) {
   NodeSymbol node(key.chr(), key.index());
   if (!graph.hasNode(node)) {
-    LOG(ERROR) << "Missing node << " << node.getLabel() << "when logging loop closure";
-    LOG(ERROR) << "Num dynamic nodes: " << graph.numDynamicNodes();
+    LOG(ERROR) << "Missing node << " << node.str() << "when logging loop closure";
     return std::nullopt;
   }
 
-  return graph.getNode(node).timestamp.value().count();
+  return graph.getNode(node).attributes<AgentNodeAttributes>().timestamp.count();
 }
 
 void updatePlace2dMesh(Place2dNodeAttributes& attrs,
@@ -110,14 +109,15 @@ void updatePlaces2d(SharedDsgInfo::Ptr dsg,
   if (!dsg->graph->hasLayer(DsgLayers::MESH_PLACES)) {
     return;
   }
-  for (auto& id_node_pair : dsg->graph->getLayer(DsgLayers::MESH_PLACES).nodes()) {
-    auto& attrs = id_node_pair.second->attributes<spark_dsg::Place2dNodeAttributes>();
-    if (!attrs.has_active_mesh_indices) {
+
+  for (auto& [node_id, node] : dsg->graph->getLayer(DsgLayers::MESH_PLACES).nodes()) {
+    auto attrs = node->tryAttributes<spark_dsg::Place2dNodeAttributes>();
+    if (!attrs || !attrs->has_active_mesh_indices) {
       continue;
     }
 
-    updatePlace2dMesh(attrs, mesh_update, num_archived_vertices);
-    updatePlace2dBoundary(attrs, mesh_update);
+    updatePlace2dMesh(*attrs, mesh_update, num_archived_vertices);
+    updatePlace2dBoundary(*attrs, mesh_update);
   }
 }
 
