@@ -73,7 +73,6 @@ void UpdateBuildingsFunctor::call(const DynamicSceneGraph&,
     SemanticNodeAttributes::Ptr attrs(new SemanticNodeAttributes());
     attrs->position = centroid;
     attrs->semantic_label = config.semantic_label;
-    attrs->name = building_id.str();
     dsg.graph->emplaceNode(DsgLayers::BUILDINGS, building_id, std::move(attrs));
   } else {
     dsg.graph->getNode(building_id).attributes().position = centroid;

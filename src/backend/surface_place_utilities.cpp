@@ -194,7 +194,6 @@ NodeSymbol insertNewNodes(
       attrs->is_active = false;
 
       attrs->semantic_label = attrs_og.semantic_label;
-      attrs->name = NodeSymbol(node_id_for_place).str();
       attrs->boundary = place.boundary;
       attrs->pcl_boundary_connections.insert(attrs->pcl_boundary_connections.begin(),
                                              place.boundary_indices.begin(),

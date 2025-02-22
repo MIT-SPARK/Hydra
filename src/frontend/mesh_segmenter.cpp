@@ -425,15 +425,6 @@ void MeshSegmenter::addNodeToGraph(DynamicSceneGraph& graph,
   attrs->last_update_time_ns = timestamp;
   attrs->is_active = true;
   attrs->semantic_label = label;
-  attrs->name = next_node_id_.str();
-  const auto& label_to_name = GlobalInfo::instance().getLabelToNameMap();
-  auto iter = label_to_name.find(label);
-  if (iter != label_to_name.end()) {
-    attrs->name = iter->second;
-  } else {
-    VLOG(2) << "Missing semantic label from map: " << std::to_string(label);
-  }
-
   attrs->mesh_connections.insert(
       attrs->mesh_connections.begin(), cluster.indices.begin(), cluster.indices.end());
 
