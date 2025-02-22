@@ -1,0 +1,3 @@
+---
+name: hydra
+hooks: [share/hydra/local_setup.bash, share/hydra/local_setup.dsv, share/hydra/local_setup.sh, share/hydra/local_setup.zsh]
