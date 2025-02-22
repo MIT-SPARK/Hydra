@@ -38,6 +38,7 @@
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
+#include <spark_dsg/labelspace.h>
 
 #include <filesystem>
 #include <fstream>
@@ -268,7 +269,21 @@ const SemanticColorMap* GlobalInfo::getSemanticColorMap() const {
 }
 
 SharedDsgInfo::Ptr GlobalInfo::createSharedDsg() const {
-  return std::make_shared<SharedDsgInfo>(config_.graph);
+  auto graph_info = std::make_shared<SharedDsgInfo>(config_.graph);
+  auto& graph = *graph_info->graph;
+
+  const spark_dsg::Labelspace labelspace(getLabelToNameMap());
+  if (labelspace) {
+    labelspace.save(graph, "mesh");
+    for (const auto& layer_name : config_.label_space.semantic_layers) {
+      const auto key = graph.getLayerKey(layer_name);
+      if (key) {
+        labelspace.save(graph, key->layer, key->partition);
+      }
+    }
+  }
+
+  return graph_info;
 }
 
 bool GlobalInfo::setSensor(const Sensor::Ptr& sensor, bool allow_override) {
