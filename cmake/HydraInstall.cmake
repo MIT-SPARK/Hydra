@@ -5,11 +5,10 @@ install(
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-install(
-  EXPORT hydra-targets
-  FILE hydraTargets.cmake
-  NAMESPACE hydra::
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/hydra
+install(DIRECTORY config DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
+
+install(EXPORT hydra-targets FILE hydraTargets.cmake NAMESPACE hydra::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/hydra
 )
 
 include(CMakePackageConfigHelpers)
@@ -19,11 +18,15 @@ configure_package_config_file(
   INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/hydra
 )
 write_basic_package_version_file(
-  hydraConfigVersion.cmake
-  VERSION ${PACKAGE_VERSION}
-  COMPATIBILITY AnyNewerVersion
+  hydraConfigVersion.cmake VERSION ${PACKAGE_VERSION} COMPATIBILITY AnyNewerVersion
 )
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/hydraConfig.cmake
-              ${CMAKE_CURRENT_BINARY_DIR}/hydraConfigVersion.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/hydra
+install(
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/hydraConfig.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/hydraConfigVersion.cmake
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/hydra
 )
+
+find_package(ament_cmake_core QUIET)
+if (${ament_cmake_core_FOUND})
+  ament_package()
+endif()
