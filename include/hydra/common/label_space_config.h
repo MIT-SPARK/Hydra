@@ -38,6 +38,8 @@
 #include <map>
 #include <set>
 #include <string>
+#include <vector>
+#include <spark_dsg/scene_graph_types.h>
 
 namespace hydra {
 
@@ -50,6 +52,9 @@ struct LabelSpaceConfig {
   std::set<uint32_t> object_labels;
   std::set<uint32_t> surface_places_labels = {};
   std::set<uint32_t> ground_labels = {};
+  //! @brief Scene graph layers that use this label space
+  std::vector<std::string> semantic_layers{spark_dsg::DsgLayers::OBJECTS,
+                                           spark_dsg::DsgLayers::MESH_PLACES};
 
   inline bool isObject(const uint32_t id) const { return object_labels.count(id) > 0; }
   inline bool isDynamic(const uint32_t id) const {

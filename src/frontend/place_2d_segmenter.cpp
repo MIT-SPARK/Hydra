@@ -445,7 +445,6 @@ NodeSymbol Place2dSegmenter::addPlaceToGraph(DynamicSceneGraph& graph,
   attrs->is_active = true;
 
   attrs->semantic_label = label;
-  attrs->name = NodeSymbol(next_node_id_).str();
   attrs->boundary = place.boundary;
   attrs->pcl_boundary_connections.insert(attrs->pcl_boundary_connections.begin(),
                                          place.boundary_indices.begin(),
