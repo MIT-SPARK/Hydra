@@ -45,10 +45,10 @@ namespace hydra {
 struct SharedDsgInfo {
   using Ptr = std::shared_ptr<SharedDsgInfo>;
   struct Config {
-    std::map<std::string, spark_dsg::LayerId> layers{
+    std::map<std::string, spark_dsg::LayerKey> layers{
         {spark_dsg::DsgLayers::OBJECTS, 2},
         {spark_dsg::DsgLayers::PLACES, 3},
-        {spark_dsg::DsgLayers::MESH_PLACES, 3},
+        {spark_dsg::DsgLayers::MESH_PLACES, {3, 1}},
         {spark_dsg::DsgLayers::ROOMS, 4},
         {spark_dsg::DsgLayers::BUILDINGS, 5},
         {spark_dsg::DsgLayers::AGENTS, 2},

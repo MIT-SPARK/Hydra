@@ -57,7 +57,6 @@ void declare_config(GvdPlaceExtractor::Config& config) {
   using namespace config;
   name("GvdPlaceExtractor::Config");
   field(config.layer, "layer");
-  field(config.partition, "partition");
   field(config.gvd, "gvd");
   config.graph.setOptional();
   field(config.graph, "graph");
@@ -258,7 +257,7 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& gr
     auto attrs = node.attributes().clone();
     attrs->is_active = true;
     attrs->last_update_time_ns = timestamp_ns;
-    graph.addOrUpdateNode(config.layer, node_id, std::move(attrs), config.partition);
+    graph.addOrUpdateNode(config.layer, node_id, std::move(attrs));
 
     for (const auto sibling : node.siblings()) {
       const auto& edge = places.getEdge(node_id, sibling);

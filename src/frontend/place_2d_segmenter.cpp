@@ -462,7 +462,7 @@ NodeSymbol Place2dSegmenter::addPlaceToGraph(DynamicSceneGraph& graph,
   attrs->pcl_mesh_connections.insert(
       attrs->pcl_mesh_connections.begin(), place.indices.begin(), place.indices.end());
 
-  graph.emplaceNode(config.layer, next_node_id_, std::move(attrs), config.partition);
+  graph.emplaceNode(config.layer, next_node_id_, std::move(attrs));
 
   active_places_.at(label).insert(next_node_id_);
   active_place_timestamps_[next_node_id_] = timestamp;

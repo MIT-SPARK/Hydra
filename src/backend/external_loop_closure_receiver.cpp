@@ -89,7 +89,8 @@ LookupResult ExternalLoopClosureReceiver::findClosest(const DynamicSceneGraph& g
                                                       int robot_id,
                                                       double max_diff_s) const {
   const auto prefix = kimera_pgmo::GetRobotPrefix(robot_id);
-  const auto layer = graph.findLayer(config.layer, prefix);
+  const auto layer_id = graph.getLayerKey(config.layer)->layer;
+  const auto layer = graph.findLayer(layer_id, prefix);
   if (!layer) {
     LOG(WARNING) << "Missing robot " << robot_id << " for external loop closure";
     return {};
