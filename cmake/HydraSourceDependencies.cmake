@@ -50,6 +50,8 @@ FetchContent_Declare(
   nanoflann GIT_REPOSITORY https://github.com/jlblancoc/nanoflann.git GIT_TAG v1.5.0
 )
 populate_content(nanoflann NANOFLANN_BUILD_TESTS=OFF NANOFLANN_BUILD_EXAMPLES=OFF)
+# nanoflann overrides this, so we set it back
+unset(EXECUTABLE_OUTPUT_PATH CACHE)
 
 if(HYDRA_ENABLE_GNN)
   # TODO(nathan) fetch content
