@@ -44,6 +44,7 @@
 #include <thread>
 
 #include "hydra/backend/backend_input.h"
+#include "hydra/backend/external_loop_closure_receiver.h"
 #include "hydra/backend/merge_tracker.h"
 #include "hydra/backend/pgmo_configs.h"
 #include "hydra/common/module.h"
@@ -94,9 +95,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
     bool enable_node_merging = true;
     //! Repeatedly run merge detection until no more merges are detected
     bool enable_exhaustive_merging = false;
-    //! Maximum difference in seconds between a loop closure timestamp and the nearest
-    //! agent pose. 0 disables checking time differences.
-    double max_external_loop_closure_time_difference = 1.0;
+    //! External loop closure receivers
+    ExternalLoopClosureReceiver::Config external_loop_closures;
     //! Update functors that get applied in the specified order
     config::OrderedMap<std::string, config::VirtualConfig<UpdateFunctor, true>>
         update_functors;
@@ -147,16 +147,9 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   virtual bool updateFromLcdQueue();
 
-  virtual void updateExternalLoopClosures();
-
   virtual void copyMeshDelta(const BackendInput& input);
 
   virtual bool updatePrivateDsg(size_t timestamp_ns, bool force_update = true);
-
-  virtual std::optional<NodeId> findClosestAgentId(
-      uint64_t timestamp_ns,
-      std::optional<int> robot_id = std::nullopt,
-      double max_diff_s = 0.0) const;
 
   virtual void updateAgentNodeMeasurements(const pose_graph_tools::PoseGraph& meas);
 
@@ -210,6 +203,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   BackendModuleStatus status_;
   SceneGraphLogger backend_graph_logger_;
   std::list<LoopClosureLog> loop_closures_;
+  ExternalLoopClosureReceiver external_lc_receiver_;
 
   Sink::List sinks_;
 

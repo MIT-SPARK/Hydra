@@ -11,6 +11,7 @@ add_executable(
   main.cpp
   src/resources.cpp
   src/place_fixtures.cpp
+  backend/test_external_loop_closure.cpp
   backend/test_update_agents_functor.cpp
   backend/test_update_objects_functor.cpp
   backend/test_update_places_functor.cpp

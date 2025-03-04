@@ -33,17 +33,53 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <hydra/common/shared_dsg_info.h>
 
-namespace hydra::test {
+#include <gtsam/geometry/Pose3.h>
+#include <pose_graph_tools/pose_graph.h>
+#include <spark_dsg/dynamic_scene_graph.h>
 
-inline SharedDsgInfo::Ptr makeSharedDsg() {
-  return SharedDsgInfo::Ptr(
-      new SharedDsgInfo({{{spark_dsg::DsgLayers::AGENTS, 2},
-                          {spark_dsg::DsgLayers::OBJECTS, 2},
-                          {spark_dsg::DsgLayers::PLACES, 3},
-                          {spark_dsg::DsgLayers::ROOMS, 4},
-                          {spark_dsg::DsgLayers::BUILDINGS, 5}}}));
-}
+#include <list>
+#include <optional>
 
-}  // namespace hydra::test
+#include "hydra/common/message_queue.h"
+
+namespace hydra {
+
+class ExternalLoopClosureReceiver {
+ public:
+  using Queue = MessageQueue<pose_graph_tools::PoseGraph>;
+  using Callback = std::function<void(
+      spark_dsg::NodeId to, spark_dsg::NodeId from, const gtsam::Pose3 to_T_from)>;
+
+  struct LookupResult {
+    enum class Status {
+      UNKNOWN,
+      INVALID,
+      VALID,
+    } const status = Status::UNKNOWN;
+    const spark_dsg::NodeId id = 0;
+  };
+
+  struct Config {
+    //! Layer to use for the pose graph
+    std::string layer = spark_dsg::DsgLayers::AGENTS;
+    //! Maximum difference in seconds between a loop closure timestamp and the nearest
+    //! agent pose. 0 disables checking time differences.
+    double max_time_difference = 1.0;
+  } const config;
+
+  ExternalLoopClosureReceiver(const Config& config, Queue* const queue);
+  void update(const spark_dsg::DynamicSceneGraph& graph, const Callback& callback);
+  LookupResult findClosest(const spark_dsg::DynamicSceneGraph& graph,
+                           uint64_t timestamp_ns,
+                           int robot_id,
+                           double max_diff_s = 0.0) const;
+
+ protected:
+  Queue* const input_queue_;
+  std::list<pose_graph_tools::PoseGraphEdge> loop_closures_;
+};
+
+void declare_config(ExternalLoopClosureReceiver::Config& config);
+
+}  // namespace hydra
