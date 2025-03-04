@@ -38,7 +38,6 @@
 #include <spatial_hash/neighbor_utils.h>
 
 #include "hydra/places/graph_extractor_utilities.h"
-#include "hydra/places/nearest_voxel_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra::places {
