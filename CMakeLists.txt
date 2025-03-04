@@ -12,7 +12,6 @@ option(HYDRA_ENABLE_COVERAGE "Build core library with GCC --coverage option" OFF
 option(HYDRA_ENABLE_EVAL "Build evaluation code" ON)
 option(HYDRA_ENABLE_GNN "Build GNN interface" OFF)
 option(HYDRA_ENABLE_PYTHON "Build Hydra python bindings" OFF)
-option(HYDRA_ENABLE_TESTS "Build Hydra unit tests" OFF)
 option(HYDRA_ENABLE_ROS_INSTALL_LAYOUT "Install binaries to ROS location" ON)
 option(BUILD_SHARED_LIBS "Build shared libs" ON)
 
@@ -82,7 +81,8 @@ if(HYDRA_ENABLE_PYTHON)
   add_subdirectory(python)
 endif()
 
-if(HYDRA_ENABLE_TESTS)
+include(CTest)
+if(BUILD_TESTING)
   enable_testing()
   add_subdirectory(tests)
 endif()

@@ -61,10 +61,6 @@ static const auto registration =
                                    SharedModuleState::Ptr,
                                    LogSetup::Ptr>("BackendModule");
 
-inline std::chrono::nanoseconds getAgentTimestamp(const SceneGraphNode& node) {
-  return node.attributes<AgentNodeAttributes>().timestamp;
-}
-
 }  // namespace
 
 using hydra::timing::ScopedTimer;
@@ -99,16 +95,9 @@ void declare_config(BackendModule::Config& config) {
   field(config.optimize_on_lc, "optimize_on_lc");
   field(config.enable_node_merging, "enable_node_merging");
   field(config.enable_exhaustive_merging, "enable_exhaustive_merging");
-  field(config.max_external_loop_closure_time_difference,
-        "max_external_loop_closure_time_difference",
-        "s");
+  field(config.external_loop_closures, "external_loop_closures");
   field(config.update_functors, "update_functors");
   field(config.sinks, "sinks");
-
-  check(config.max_external_loop_closure_time_difference,
-        GE,
-        0.0,
-        "max_external_loop_closure_time_difference");
 }
 
 BackendModule::BackendModule(const Config& config,
@@ -118,7 +107,9 @@ BackendModule::BackendModule(const Config& config,
     : KimeraPgmoInterface(config.pgmo),
       config(config::checkValid(config)),
       private_dsg_(dsg),
-      state_(state) {
+      state_(state),
+      external_lc_receiver_(config.external_loop_closures,
+                            &PipelineQueues::instance().external_loop_closure_queue) {
   // set up frontend graph copy
   unmerged_graph_ = private_dsg_->graph->clone();
   // set up mesh infrastructure
@@ -372,7 +363,14 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
     have_new_loopclosures_ = true;
   }
 
-  updateExternalLoopClosures();
+  external_lc_receiver_.update(
+      *unmerged_graph_,
+      [this](NodeId to_node, NodeId from_node, const gtsam::Pose3 to_T_from) {
+        LoopClosureLog lc{to_node, from_node, to_T_from, true, 1};
+        addLoopClosure(
+            lc.src, lc.dest, lc.src_T_dest, (KimeraPgmoInterface::config_.lc_variance));
+        loop_closures_.push_back(lc);
+      });
 
   if (num_loop_closures_ > prev_loop_closures) {
     LOG(WARNING) << "New loop closures detected!";
@@ -525,78 +523,6 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
                                    nullptr,
                                    prev_num_archived_vertices_);
   prev_num_archived_vertices_ = num_archived_vertices_;
-}
-
-std::optional<NodeId> BackendModule::findClosestAgentId(uint64_t stamp_ns,
-                                                        std::optional<int> robot_id,
-                                                        double max_diff_s) const {
-  const auto prefix = robot_id ? RobotPrefixConfig(robot_id.value()).key
-                               : GlobalInfo::instance().getRobotPrefix().key;
-  const auto& layer = unmerged_graph_->getLayer(DsgLayers::AGENTS, prefix);
-  const auto stamp = std::chrono::nanoseconds(stamp_ns);
-  auto closest =
-      std::min_element(layer.nodes().begin(),
-                       layer.nodes().end(),
-                       [stamp](const auto& lhs, const auto& rhs) {
-                         const auto diff_lhs = getAgentTimestamp(*lhs.second) - stamp;
-                         const auto diff_rhs = getAgentTimestamp(*rhs.second) - stamp;
-                         return std::abs(diff_lhs.count()) < std::abs(diff_rhs.count());
-                       });
-  if (closest == layer.nodes().end()) {
-    LOG(ERROR) << "[Hydra Backend] No nodes exist for agent layer '" << prefix
-               << "' when looking up timestamp " << stamp_ns << " [ns]";
-    return std::nullopt;
-  }
-
-  const auto& best_node = *closest->second;
-  // NOTE(hlim) It's heuristic, but occasionally,
-  // during Hydra's mesh generation process, a delay can occur,
-  // causing the most recently stored node in `timestamps_` to be mistakenly
-  // identified as the closest node. This needs to be rejected.
-  const auto diff_s = std::chrono::duration_cast<std::chrono::duration<double>>(
-                          getAgentTimestamp(best_node) - stamp)
-                          .count();
-  VLOG(5) << "[Hydra Backend] Found node " << NodeSymbol(best_node.id).str()
-          << " with difference of " << diff_s << " [s] for timestamp " << stamp_ns
-          << " [ns]";
-  if (max_diff_s && std::abs(diff_s) >= max_diff_s) {
-    LOG(WARNING) << "[Hydra Backend] Nearest node " << NodeSymbol(best_node.id).str()
-                 << " has too large of a time difference: " << diff_s
-                 << " [s] >= " << max_diff_s << " [s]";
-    return std::nullopt;
-  }
-
-  return best_node.id;
-}
-
-void BackendModule::updateExternalLoopClosures() {
-  auto& queue = PipelineQueues::instance().external_loop_closure_queue;
-  while (!queue.empty()) {
-    const auto lcd_message = queue.pop();
-    for (const auto& edge : lcd_message.edges) {
-      // NOTE(hlim) the pose graph edge IDs contain the loop closure timestamps, not the
-      // keyframe IDs
-      const auto max_diff_s = config.max_external_loop_closure_time_difference;
-      const auto from_node =
-          findClosestAgentId(edge.key_from, std::nullopt, max_diff_s);
-      const auto to_node = findClosestAgentId(edge.key_to, std::nullopt, max_diff_s);
-      if (!from_node || !to_node) {
-        LOG(WARNING) << "[Hydra Backend] dropped external loop closure: " << edge;
-        continue;
-      }
-
-      const gtsam::Pose3 to_T_from(edge.pose.matrix());
-      LoopClosureLog lc = LoopClosureLog{*to_node, *from_node, to_T_from, true, 1};
-
-      addLoopClosure(
-          lc.src, lc.dest, lc.src_T_dest, (KimeraPgmoInterface::config_.lc_variance));
-      loop_closures_.push_back(lc);
-
-      have_loopclosures_ = true;
-      have_new_loopclosures_ = true;
-      num_loop_closures_++;
-    }
-  }
 }
 
 void BackendModule::updateAgentNodeMeasurements(const PoseGraph& meas) {
