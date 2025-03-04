@@ -15,10 +15,12 @@ namespace conversions {
  * @param input_packet The input packet to convert.
  * @param vertices_in_world_frame If true, convert the vertex image to be in world
  * frame. Otherwise it will be in sensor frame.
+ * @param normalize_labels Force label normalization
  * @return The input data if successful, nullptr otherwise.
  */
 std::unique_ptr<InputData> parseInputPacket(const InputPacket& input_packet,
-                                            const bool vertices_in_world_frame = false);
+                                            bool vertices_in_world_frame = false,
+                                            bool normalize_labels = true);
 
 /**
  * @brief make sure that all the images are of the right type

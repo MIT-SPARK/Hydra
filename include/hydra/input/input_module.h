@@ -64,6 +64,7 @@ class InputModule : public Module {
       config::VirtualConfig<Sensor> sensor;
     };
     std::map<std::string, InputPair> inputs;
+    size_t max_receiver_queue_size = 0;
   } const config;
 
   InputModule(const Config& config, const OutputQueue::Ptr& output_queue);
