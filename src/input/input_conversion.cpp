@@ -22,7 +22,8 @@ inline std::string showTypeInfo(const cv::Mat& mat) {
 }  // namespace
 
 std::unique_ptr<InputData> parseInputPacket(const InputPacket& input_packet,
-                                            const bool vertices_in_world_frame) {
+                                            bool vertices_in_world_frame,
+                                            bool normalize_labels) {
   if (!input_packet.sensor_input) {
     LOG(ERROR) << "[Input Conversion] Input packet has no sensor input.";
     return nullptr;
@@ -42,7 +43,7 @@ std::unique_ptr<InputData> parseInputPacket(const InputPacket& input_packet,
     return nullptr;
   }
 
-  if (!normalizeData(*data)) {
+  if (!normalizeData(*data, normalize_labels)) {
     LOG(ERROR) << "[Input Conversion] Unable to normalize data.";
     return nullptr;
   }

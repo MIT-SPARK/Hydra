@@ -49,27 +49,53 @@ struct MessageQueue {
   mutable std::condition_variable cv;
   size_t max_size;
 
+  /**
+   * @brief Construct a queue with a size limit
+   * @param max_size Maximum size of the queue. If 0, size limit is disabled
+   */
   explicit MessageQueue(size_t max_size) : max_size(max_size) {}
 
+  /**
+   * @brief Construct a queue without a size limit
+   */
   MessageQueue() : MessageQueue(0) {}
 
+  /**
+   * @brief Check whether the queue is empty
+   */
   bool empty() const {
-    std::unique_lock<std::mutex> lock(mutex);
+    std::lock_guard<std::mutex> lock(mutex);
     return queue.empty();
   }
 
+  /**
+   * @brief Get a reference to the first element in the queue
+   * @throw std::out_of_range Throws an exception if the queue is empty
+   */
   const T& front() const {
-    std::unique_lock<std::mutex> lock(mutex);
+    std::lock_guard<std::mutex> lock(mutex);
+    if (queue.empty()) {
+      throw std::out_of_range("queue is empty");
+    }
+
     return queue.front();
   }
 
+  /**
+   * @brief Get a reference to the last element in the queue
+   * @throw std::out_of_range Throws an exception if the queue is empty
+   */
   const T& back() const {
-    std::unique_lock<std::mutex> lock(mutex);
+    std::lock_guard<std::mutex> lock(mutex);
+    if (queue.empty()) {
+      throw std::out_of_range("queue is empty");
+    }
+
     return queue.back();
   }
 
   /**
-   * @brief wait for the queue to have data
+   * @brief Wait for the queue to have data
    */
   bool poll(int wait_time_us = 1000) const {
     std::chrono::microseconds wait_duration(wait_time_us);
@@ -78,7 +104,7 @@ struct MessageQueue {
   }
 
   /**
-   * @brief wait for the queue to not have any data
+   * @brief Wait for the queue to not have any data
    */
   bool block(int wait_time_us = 1000) const {
     std::chrono::microseconds wait_duration(wait_time_us);
@@ -86,36 +112,97 @@ struct MessageQueue {
     return cv.wait_for(lock, wait_duration, [&] { return queue.empty(); });
   }
 
-  bool push(T input) {
+  /**
+   * @brief Push a new element to the queue
+   *
+   * Note that the blocking behavior is on by default but will not take effect unless
+   * the queue max size is set.
+   *
+   * @param input New element for queue
+   * @param blocking Wait until queue has room for new element
+   * @param wait_time_us Max time to wait for room in the queue in microseconds
+   * @returns Whether the element was added to the queue or not
+   */
+  bool push(T input, bool blocking = true, int wait_time_us = 0) {
     bool added = false;
-    {
+    {  // start critical section
       std::unique_lock<std::mutex> lock(mutex);
       if (!max_size || queue.size() < max_size) {
         queue.push_back(std::move(input));
         added = true;
       }
-    }
 
-    cv.notify_all();
+      if (!added && blocking) {
+        if (wait_time_us) {
+          const std::chrono::microseconds wait_duration(wait_time_us);
+          cv.wait_for(lock, wait_duration, [this] { return queue.size() < max_size; });
+        } else {
+          cv.wait(lock, [this] { return queue.size() < max_size; });
+        }
+
+        // condition variable wait succeeded
+        if (queue.size() < max_size) {
+          queue.push_back(std::move(input));
+          added = true;
+        }
+      }
+    }  // end critical section
+
+    // let writers know that queue has a new element
+    if (added) {
+      cv.notify_all();
+    }
 
     return added;
   }
 
+  /**
+   * @brief Get the first element from the queue
+   *
+   * This will notify any other threads attempting to modify the queue
+   *
+   * @throw std::out_of_range Throws an exception if the queue is empty
+   * @returns The first element of the queue.
+   */
   T pop() {
-    std::unique_lock<std::mutex> lock(mutex);
-    auto value = std::move(queue.front());
-    queue.pop_front();
+    T value;
+    {  // start critical section
+      std::lock_guard<std::mutex> lock(mutex);
+      if (queue.empty()) {
+        throw std::out_of_range("queue is empty");
+      }
+
+      value = std::move(queue.front());
+      queue.pop_front();
+    }  // end critical section
+
+    // let writers know that queue has decreased in size
+    cv.notify_all();
     return value;
   }
 
+  /**
+   * @brief Get size of the queue
+   * @returns The size of the queue
+   */
   size_t size() const {
-    std::unique_lock<std::mutex> lock(mutex);
+    std::lock_guard<std::mutex> lock(mutex);
     return queue.size();
   }
 
+  /**
+   * @brief Clear the queue (i.e., remove all elements)
+   *
+   * This will notify any other threads attempting to modify the queue
+   */
   void clear() {
-    std::unique_lock<std::mutex> lock(mutex);
-    queue.clear();
+    {  // start critical section
+      std::lock_guard<std::mutex> lock(mutex);
+      queue.clear();
+    }  // end critical section
+
+    // let writers know that queue is now empty
+    cv.notify_all();
   }
 };
 

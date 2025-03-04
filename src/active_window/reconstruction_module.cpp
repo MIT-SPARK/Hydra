@@ -123,7 +123,8 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputPacket& msg) {
           << " message(s) left)";
 
   ScopedTimer timer("reconstruction/spin", timestamp_ns);
-  InputData::Ptr data = conversions::parseInputPacket(msg);
+  // force semantic normalization if volumetric map has semantic layer
+  InputData::Ptr data = conversions::parseInputPacket(msg, false, map_.hasSemantics());
   if (!data) {
     return nullptr;
   }

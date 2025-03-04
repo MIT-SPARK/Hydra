@@ -53,6 +53,7 @@ void declare_config(InputModule::Config& config) {
   using namespace config;
   name("InputModule::Config");
   field(config.inputs, "inputs");
+  field(config.max_receiver_queue_size, "max_receiver_queue_size");
   checkCondition(!config.inputs.empty(), "At least one input must be specified");
 }
 
@@ -63,6 +64,10 @@ InputModule::InputModule(const Config& config, const OutputQueue::Ptr& queue)
   for (const auto& [name, input_pair] : config.inputs) {
     receivers_.emplace_back(input_pair.receiver.create(name));
     CHECK(info.setSensor(input_pair.sensor.create(name), false));
+  }
+
+  for (auto& receiver : receivers_) {
+    receiver->queue.max_size = config.max_receiver_queue_size;
   }
 }
 
@@ -121,6 +126,8 @@ void InputModule::dataSpin() {
       input->sensor_input = packet;
       input->world_t_body = odom_T_body.target_p_source;
       input->world_R_body = odom_T_body.target_R_source;
+      VLOG(5) << "[Hydra Input] output queue state: size=" << queue_->size()
+              << " (max=" << queue_->max_size << ") @ " << curr_time << " [ns]";
       queue_->push(input);
     }
   }
