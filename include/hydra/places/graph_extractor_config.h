@@ -89,24 +89,8 @@ struct CompressionExtractorConfig : public GraphExtractorConfig {
   std::string merge_policy = "basis_points";
 };
 
-struct FloodfillExtractorConfig : public GraphExtractorConfig {
-  //! Number of basis points for a voxel to be consider for extraction
-  uint8_t min_extra_basis = 2;
-  //! Number of basis points for a voxel to be automatically labeled a vertex
-  uint8_t min_vertex_basis = 3;
-  //! Whether or not to merge nodes close together during initial edge extraction
-  bool merge_new_nodes = true;
-  //! @brief Whether or not to merge nodes close together when splitting edges
-  bool edge_splitting_merge_nodes = true;
-  //! Number of maximum iterations to run edges splitting (set to 0 to disable)
-  size_t max_edge_split_iterations = 5;
-  //! Maximum squared voxel distance an edge can be from supporting voxels at any point
-  int64_t max_edge_deviation = 4;
-};
-
 void declare_config(OverlapEdgeConfig& conf);
 void declare_config(GraphExtractorConfig& conf);
 void declare_config(CompressionExtractorConfig& conf);
-void declare_config(FloodfillExtractorConfig& conf);
 
 }  // namespace hydra::places
