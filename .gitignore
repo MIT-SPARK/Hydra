@@ -214,3 +214,4 @@ pyrightconfig.json
 *.vscode/
 
 compile_commands.json
+*.clangd
