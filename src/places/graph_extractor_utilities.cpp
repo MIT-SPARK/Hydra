@@ -37,7 +37,6 @@
 #include <spark_dsg/graph_utilities.h>
 #include <spatial_hash/neighbor_utils.h>
 
-#include "hydra/places/nearest_voxel_utilities.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra::places {

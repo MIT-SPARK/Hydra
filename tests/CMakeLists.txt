@@ -32,11 +32,9 @@ add_executable(
   odometry/test_pose_graph_from_odom.cpp
   openset/test_embedding_distances.cpp
   places/test_compression_graph_extractor.cpp
-  places/test_floodfill_graph_extractor.cpp
   places/test_graph_extractor_utilities.cpp
   places/test_gvd_integrator.cpp
   places/test_gvd_utilities.cpp
-  places/test_voxel_templates.cpp
   reconstruction/test_marching_cubes.cpp
   reconstruction/test_semantic_integrator.cpp
   reconstruction/test_tsdf_interpolators.cpp

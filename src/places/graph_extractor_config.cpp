@@ -82,16 +82,4 @@ void declare_config(CompressionExtractorConfig& conf) {
   field(conf.merge_policy, "merge_policy");
 }
 
-void declare_config(FloodfillExtractorConfig& conf) {
-  using namespace config;
-  name("FloodfillExtractorConfig");
-  base<GraphExtractorConfig>(conf);
-  field(conf.min_extra_basis, "min_extra_basis");
-  field(conf.min_vertex_basis, "min_vertex_basis");
-  field(conf.merge_new_nodes, "merge_new_nodes");
-  field(conf.edge_splitting_merge_nodes, "edge_splitting_merge_nodes");
-  field(conf.max_edge_split_iterations, "max_edge_split_iterations");
-  field(conf.max_edge_deviation, "max_edge_deviation");
-}
-
 }  // namespace hydra::places
