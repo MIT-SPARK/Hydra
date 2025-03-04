@@ -56,7 +56,7 @@ SharedDsgInfo::Ptr SharedDsgInfo::clone() const {
 void declare_config(SharedDsgInfo::Config& config) {
   using namespace config;
   name("SharedDsgInfo::Config");
-  field(config.layers, "layers");
+  // field(config.layers, "layers");
 }
 
 }  // namespace hydra

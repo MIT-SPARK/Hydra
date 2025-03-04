@@ -54,7 +54,6 @@ void declare_config(Update2dPlacesFunctor::Config& config) {
   using namespace config;
   name("Update2dPlacesFunctor::Config");
   field(config.layer, "layer");
-  field(config.partition, "partition");
   field(config.allow_places_merge, "allow_places_merge");
   field(config.merge_max_delta_z, "merge_max_delta_z");
   field(config.min_points, "min_points");
@@ -121,11 +120,11 @@ void Update2dPlacesFunctor::call(const DynamicSceneGraph& unmerged,
                                  SharedDsgInfo& dsg,
                                  const UpdateInfo::ConstPtr& info) const {
   ScopedTimer spin_timer("backend/update_2d_places", info->timestamp_ns);
-  if (!unmerged.hasLayer(config.layer, config.partition)) {
+  if (!unmerged.hasLayer(config.layer)) {
     return;
   }
 
-  const auto& layer = unmerged.getLayer(config.layer, config.partition);
+  const auto& layer = unmerged.getLayer(config.layer);
   const auto new_loopclosure = info->loop_closure_detected;
 
   active_tracker.clear();  // reset from previous pass
@@ -150,7 +149,7 @@ void Update2dPlacesFunctor::call(const DynamicSceneGraph& unmerged,
 
 MergeList Update2dPlacesFunctor::findMerges(const DynamicSceneGraph& graph,
                                             const UpdateInfo::ConstPtr& info) const {
-  const auto& layer = graph.getLayer(config.layer, config.partition);
+  const auto& layer = graph.getLayer(config.layer);
   const auto new_lcd = info->loop_closure_detected;
   // freeze layer view to avoid messing with tracker
   const auto view = new_lcd ? LayerView(layer) : active_tracker.view(layer, true);

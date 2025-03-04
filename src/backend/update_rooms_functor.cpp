@@ -50,7 +50,6 @@ void declare_config(UpdateRoomsFunctor::Config& config) {
   name("UpdateRoomsFunctor::Config");
   field(config.room_finder, "room_finder");
   field(config.places_layer, "places_layer");
-  field(config.places_partition, "places_partition");
 }
 
 UpdateRoomsFunctor::UpdateRoomsFunctor(const Config& config)
@@ -90,8 +89,7 @@ void UpdateRoomsFunctor::call(const DynamicSceneGraph&,
     return;
   }
 
-  const auto places_layer =
-      dsg.graph->findLayer(config.places_layer, config.places_partition);
+  const auto places_layer = dsg.graph->findLayer(config.places_layer);
   if (!places_layer) {
     return;
   }

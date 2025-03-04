@@ -45,8 +45,6 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
   struct Config {
     //! Layer to update
     std::string layer = DsgLayers::MESH_PLACES;
-    //! Partition to update
-    PartitionId partition = 1;
     //! Allow merging of 2D places
     bool allow_places_merge = true;
     //! If two places differ by at least this much in z, they won't be merged

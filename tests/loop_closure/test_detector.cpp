@@ -111,13 +111,13 @@ TEST_F(LcdDetectorTests, TestActualChildren) {
   dsg->emplaceNode(DsgLayers::PLACES, 1, std::make_unique<PlaceNodeAttributes>());
   dsg->emplaceNode(DsgLayers::OBJECTS, 2, std::make_unique<ObjectNodeAttributes>());
   dsg->emplaceNode(
-      DsgLayers::AGENTS,
+      2,
       "a0"_id,
       std::make_unique<AgentNodeAttributes>(
           10ns, Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0),
       'a');
   dsg->emplaceNode(
-      DsgLayers::AGENTS,
+      2,
       "a1"_id,
       std::make_unique<AgentNodeAttributes>(
           20ns, Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0),
@@ -137,7 +137,7 @@ TEST_F(LcdDetectorTests, TestActualChildren) {
 TEST_F(LcdDetectorTests, TestEmptySearch) {
   using namespace std::chrono_literals;
   dsg->emplaceNode(
-      DsgLayers::AGENTS,
+      2,
       "a0"_id,
       std::make_unique<AgentNodeAttributes>(
           10ns, Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0),
@@ -155,13 +155,13 @@ TEST_F(LcdDetectorTests, TestNonEmptySearch) {
   dsg->emplaceNode(DsgLayers::PLACES, 1, std::make_unique<PlaceNodeAttributes>());
   dsg->emplaceNode(DsgLayers::OBJECTS, 2, std::make_unique<ObjectNodeAttributes>());
   dsg->emplaceNode(
-      DsgLayers::AGENTS,
+      2,
       "a0"_id,
       std::make_unique<AgentNodeAttributes>(
           10ns, Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0),
       'a');
   dsg->emplaceNode(
-      DsgLayers::AGENTS,
+      2,
       "a1"_id,
       std::make_unique<AgentNodeAttributes>(
           20ns, Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero(), 0),

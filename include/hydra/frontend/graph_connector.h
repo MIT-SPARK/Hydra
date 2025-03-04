@@ -58,8 +58,6 @@ struct LayerConnector {
     };
     //! Layer to find parents from
     std::string parent_layer = spark_dsg::DsgLayers::PLACES;
-    //! Layer parition to find parents from
-    spark_dsg::PartitionId parent_partition = 0;
     //! All layers to find parents for (defaults to objects and agents)
     std::vector<ChildLayerConfig> child_layers{
         {spark_dsg::DsgLayers::OBJECTS, true, true}};

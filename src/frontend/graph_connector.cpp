@@ -74,8 +74,7 @@ LayerConnector::LayerConnector(const Config& config) : config(config) {}
 
 void LayerConnector::updateParents(const DynamicSceneGraph& graph,
                                    const std::vector<NodeId>& new_nodes) {
-  const auto parent_key =
-      graph.getLayerKey(config.parent_layer, config.parent_partition);
+  const auto parent_key = graph.getLayerKey(config.parent_layer);
   if (!parent_key) {
     LOG(ERROR) << "Invalid parent layer and partition!";
     return;
@@ -156,7 +155,7 @@ void LayerConnector::connectChildren(DynamicSceneGraph& graph,
                  std::back_inserter(parent_ids),
                  [](const auto& id_child_pair) { return id_child_pair.first; });
 
-  const auto& parents = graph.getLayer(config.parent_layer, config.parent_partition);
+  const auto& parents = graph.getLayer(config.parent_layer);
   NearestNodeFinder nn_finder(parents, parent_ids);
 
   auto iter = active_children.begin();

@@ -153,7 +153,7 @@ std::vector<size_t> read_timestamps(const std::string& filepath) {
   DynamicSceneGraph graph;
   graph.load(filepath);
 
-  const auto& agents = graph.getLayer(DsgLayers::AGENTS, 'a');
+  const auto& agents = graph.getLayer(2, 'a');
 
   std::vector<size_t> times_ns;
   for (const auto& [node_id, node] : agents.nodes()) {

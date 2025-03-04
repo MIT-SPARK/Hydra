@@ -75,7 +75,7 @@ void UpdateAgentsFunctor::call(const DynamicSceneGraph&,
 
   ScopedTimer timer("backend/agent_update", info->timestamp_ns, true, 1, false);
   auto& graph = *dsg.graph;
-  const auto desired_layer = DsgLayers::AGENTS;
+  const auto desired_layer = graph.getLayerKey(DsgLayers::AGENTS)->layer;
   for (const auto& [prefix, layer] : graph.layer_partition(desired_layer)) {
     std::set<NodeId> missing_nodes;
     for (const auto& [node_id, node] : layer->nodes()) {
