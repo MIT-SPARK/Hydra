@@ -64,13 +64,13 @@ std::vector<NodeId> PoseGraphPacket::addToGraph(DynamicSceneGraph& graph,
       VLOG(5) << "Adding agent " << node_id.str() << " @ " << stamp.count() << " [ns]";
 
       auto attrs = std::make_unique<AgentNodeAttributes>(stamp, rot, pos, node_id);
-      const auto layer = graph.getLayerKey(DsgLayers::AGENTS, node_prefix.key);
-      if (!layer) {
+      const auto key = graph.getLayerKey(DsgLayers::AGENTS);
+      if (!key) {
         LOG(ERROR) << "No layer named '" << DsgLayers::AGENTS << "' in graph!";
         continue;
       }
 
-      if (!graph.emplaceNode(layer.value(), node_id, std::move(attrs))) {
+      if (!graph.emplaceNode(key->layer, node_id, std::move(attrs), node_prefix.key)) {
         VLOG(1) << "Failed to add node @ " << stamp.count() << "[ns]";
         continue;
       }

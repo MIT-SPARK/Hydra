@@ -58,7 +58,6 @@ void declare_config(UpdatePlacesFunctor::Config& config) {
   field(config.control_point_tolerance_s, "control_point_tolerance_s", "s");
   field(config.merge_proposer, "merge_proposer");
   field(config.layer, "layer");
-  field(config.partition, "partition");
 }
 
 struct AttributeMap {
@@ -214,7 +213,7 @@ size_t UpdatePlacesFunctor::interpFromValues(const LayerView& view,
       continue;
     }
 
-    attributes.sort(); // make sure attributes are sorted by timestamp
+    attributes.sort();  // make sure attributes are sorted by timestamp
     std::vector<std::set<size_t>> vertex_graph_map_deformed;
     kimera_pgmo::deformation::deformPoints(attributes,
                                            vertex_graph_map_deformed,
@@ -240,12 +239,12 @@ void UpdatePlacesFunctor::call(const DynamicSceneGraph& unmerged,
                                const UpdateInfo::ConstPtr& info) const {
   ScopedTimer spin_timer("backend/update_places", info->timestamp_ns);
 
-  if (!unmerged.hasLayer(config.layer, config.partition)) {
+  if (!unmerged.hasLayer(config.layer)) {
     return;
   }
 
   const auto new_loopclosure = info->loop_closure_detected;
-  const auto& places = unmerged.getLayer(config.layer, config.partition);
+  const auto& places = unmerged.getLayer(config.layer);
   active_tracker.clear();  // reset from previous pass
   const auto view = new_loopclosure ? LayerView(places) : active_tracker.view(places);
 
@@ -273,7 +272,7 @@ void UpdatePlacesFunctor::call(const DynamicSceneGraph& unmerged,
 MergeList UpdatePlacesFunctor::findMerges(const DynamicSceneGraph& graph,
                                           const UpdateInfo::ConstPtr& info) const {
   const auto new_lcd = info->loop_closure_detected;
-  const auto& places = graph.getLayer(config.layer, config.partition);
+  const auto& places = graph.getLayer(config.layer);
   // freeze layer view to avoid messing with tracker
   const auto view = new_lcd ? LayerView(places) : active_tracker.view(places, true);
 

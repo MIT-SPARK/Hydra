@@ -44,7 +44,7 @@ TEST(UpdateAgentsFunctor, AgentUpdate) {
   auto dsg = test::makeSharedDsg();
   auto& graph = *dsg->graph;
   graph.emplaceNode(
-      DsgLayers::AGENTS,
+      2,
       "a0"_id,
       std::make_unique<AgentNodeAttributes>(std::chrono::seconds(1),
                                             Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0),
@@ -52,7 +52,7 @@ TEST(UpdateAgentsFunctor, AgentUpdate) {
                                             NodeSymbol('a', 0)),
       'a');
   graph.emplaceNode(
-      DsgLayers::AGENTS,
+      2,
       "a1"_id,
       std::make_unique<AgentNodeAttributes>(std::chrono::seconds(2),
                                             Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0),
@@ -61,7 +61,7 @@ TEST(UpdateAgentsFunctor, AgentUpdate) {
       'a');
   {
     graph.emplaceNode(
-        DsgLayers::AGENTS,
+        2,
         "b0"_id,
         std::make_unique<AgentNodeAttributes>(std::chrono::seconds(2),
                                               Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0),

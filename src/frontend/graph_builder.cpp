@@ -142,8 +142,6 @@ GraphBuilder::GraphBuilder(const Config& config,
   CHECK(dsg_->graph != nullptr);
   dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>(
       true, true, true, config.overwrite_mesh_timestamps));
-  const auto& prefix = GlobalInfo::instance().getRobotPrefix();
-  dsg_->graph->addLayer(DsgLayers::AGENTS, prefix.key);
 
   mesh_compression_.reset(
       new kimera_pgmo::DeltaCompression(config.pgmo.mesh_resolution));
@@ -664,7 +662,13 @@ void GraphBuilder::assignBowVectors() {
   }
 
   const auto& prefix = GlobalInfo::instance().getRobotPrefix();
-  const auto& agents = dsg_->graph->getLayer(DsgLayers::AGENTS, prefix.key);
+  const auto layer_id = dsg_->graph->getLayerKey(DsgLayers::AGENTS)->layer;
+  const auto agents = dsg_->graph->findLayer(layer_id, prefix.key);
+  if (!agents) {
+    // we have no nodes added to the pose graph yet, so don't do work
+    return;
+  }
+
   // TODO(nathan) take care of synchronization better
   // lcd_input_->new_agent_nodes.clear();
 
@@ -684,7 +688,7 @@ void GraphBuilder::assignBowVectors() {
     }
 
     const NodeSymbol node_id(prefix.key, msg->pose_id);
-    const auto node = agents.findNode(node_id);
+    const auto node = agents->findNode(node_id);
     if (!node) {
       ++iter;
       continue;

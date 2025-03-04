@@ -57,8 +57,6 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
         config::VirtualConfig<AssociationStrategy>{association::NearestNode::Config{}}};
     //! Layer to update
     std::string layer = DsgLayers::PLACES;
-    //! Partition to update
-    PartitionId partition = 0;
   } const config;
 
   explicit UpdatePlacesFunctor(const Config& config);
