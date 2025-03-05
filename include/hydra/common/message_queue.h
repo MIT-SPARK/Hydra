@@ -38,6 +38,7 @@
 #include <list>
 #include <memory>
 #include <mutex>
+#include <stdexcept>
 
 namespace hydra {
 
