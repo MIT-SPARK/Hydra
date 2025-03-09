@@ -49,6 +49,13 @@ struct PoseGraphPacket {
   std::vector<pose_graph_tools::PoseGraph> pose_graphs;
   //! external optimization priors
   pose_graph_tools::PoseGraph::ConstPtr external_priors;
+
+  void updateFrom(const PoseGraphPacket& other) {
+    timestamp_ns = other.timestamp_ns;
+    pose_graphs.insert(pose_graphs.end(), other.pose_graphs.begin(), other.pose_graphs.end());
+    // TODO(nathan) this is technically bad, but we'll get to it
+    external_priors = other.external_priors;
+  }
 };
 
 struct PoseGraphTracker {

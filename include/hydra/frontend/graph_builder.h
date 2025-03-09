@@ -189,6 +189,7 @@ class GraphBuilder : public Module {
 
   SceneGraphLogger frontend_graph_logger_;
   LogSetup::Ptr logs_;
+  MessageQueue<PoseGraphPacket> pose_graph_updates_;
 
   NodeIdSet previous_active_places_;
   NodeIdSet previous_active_places_2d_;

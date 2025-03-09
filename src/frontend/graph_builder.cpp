@@ -267,6 +267,15 @@ void GraphBuilder::spin() {
 }
 
 void GraphBuilder::processNextInput(const ActiveWindowOutput& msg) {
+  if (tracker_) {
+    const auto packet = tracker_->update(msg.timestamp_ns, msg.world_T_body());
+    pose_graph_updates_.push(packet);
+  } else {
+    LOG_FIRST_N(WARNING, 1)
+        << "PoseGraphTracker disabled, no agent layer will be created";
+    return;
+  }
+
   if (!msg.sensor_data) {
     return;
   }
@@ -573,12 +582,6 @@ void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
 }
 
 void GraphBuilder::updatePoseGraph(const ActiveWindowOutput& input) {
-  if (!tracker_) {
-    LOG_FIRST_N(WARNING, 1)
-        << "PoseGraphTracker disabled, no agent layer will be created";
-    return;
-  }
-
   std::unique_lock<std::mutex> lock(dsg_->mutex);
   ScopedTimer timer("frontend/update_posegraph", input.timestamp_ns);
   const auto& prefix = GlobalInfo::instance().getRobotPrefix();
@@ -588,7 +591,11 @@ void GraphBuilder::updatePoseGraph(const ActiveWindowOutput& input) {
     lcd_input_->new_agent_nodes.clear();
   }
 
-  const auto packet = tracker_->update(input.timestamp_ns, input.world_T_body());
+  PoseGraphPacket packet;
+  while (!pose_graph_updates_.empty()) {
+    packet.updateFrom(pose_graph_updates_.pop());
+  }
+
   if (backend_input_) {
     backend_input_->agent_updates = packet;
   }
