@@ -95,9 +95,6 @@ backend:
     embed_trajectory_delta_t: 5.0
     num_interp_pts: 3
     interp_horizon: 10.0
-    enable_sparsify: false
-    trans_node_dist: 1.0
-    rot_node_dist: 1.2
     optimizer:
       type: KimeraRpgoOptimizer
       solver: LM
