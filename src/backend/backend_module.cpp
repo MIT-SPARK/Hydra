@@ -157,7 +157,6 @@ void BackendModule::save(const LogSetup& log_setup) {
   const auto pgmo_path = log_setup.getLogDir("backend/pgmo");
   private_dsg_->graph->save(backend_path + "/dsg.json", false);
   private_dsg_->graph->save(backend_path + "/dsg_with_mesh.json");
-  savePoseGraphSparseMapping(pgmo_path + "/sparsification_mapping.txt");
 
   const auto& prefix = GlobalInfo::instance().getRobotPrefix();
   if (deformation_graph_->hasPrefixPoses(prefix.key)) {
@@ -330,11 +329,16 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
   status_.new_graph_factors = input.deformation_graph.edges.size();
   status_.new_factors += input.deformation_graph.edges.size();
 
+  std::vector<size_t> inc_mesh_indices;
+  std::vector<uint64_t> inc_mesh_index_stamps;
+
   if (!input.deformation_graph.nodes.empty() &&
       !input.deformation_graph.edges.empty()) {
     try {
-      processIncrementalMeshGraph(
-          input.deformation_graph, timestamps_, unconnected_nodes_);
+      processIncrementalMeshGraph(input.deformation_graph,
+                                  timestamps_,
+                                  inc_mesh_indices,
+                                  inc_mesh_index_stamps);
     } catch (const gtsam::ValuesKeyDoesNotExist& e) {
       LOG(ERROR) << input.deformation_graph;
       throw std::logic_error(e.what());
@@ -352,7 +356,8 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
       LOG(INFO) << "[Hydra Backend] Input pose graph has loop closure @ "
                 << msg.stamp_ns << " [ns]";
     }
-    processIncrementalPoseGraph(msg, trajectory_, timestamps_, unconnected_nodes_);
+    processIncrementalPoseGraph(
+        msg, inc_mesh_indices, inc_mesh_index_stamps, trajectory_, timestamps_);
     logIncrementalLoopClosures(msg);
   }
 
@@ -458,25 +463,7 @@ void BackendModule::addLoopClosure(const gtsam::Key& src,
                                    const gtsam::Key& dest,
                                    const gtsam::Pose3& src_T_dest,
                                    double variance) {
-  if (full_sparse_frame_map_.size() == 0 ||
-      !KimeraPgmoInterface::config_.b_enable_sparsify) {
-    deformation_graph_->processNewBetween(src, dest, src_T_dest, variance);
-  } else {
-    if (!full_sparse_frame_map_.count(src) || !full_sparse_frame_map_.count(dest)) {
-      // TODO(yun) this happened a few times when loop closure found for node that has
-      // not yet been received
-      LOG(ERROR)
-          << "Attempted to add loop closure with node not yet processed by PGMO.\n";
-      return;
-    }
-    gtsam::Key sparse_src = full_sparse_frame_map_.at(src);
-    gtsam::Key sparse_dest = full_sparse_frame_map_.at(dest);
-    gtsam::Pose3 sparse_src_T_sparse_dest =
-        sparse_frames_.at(sparse_src).keyed_transforms.at(src) * src_T_dest *
-        sparse_frames_.at(sparse_dest).keyed_transforms.at(dest).inverse();
-    deformation_graph_->processNewBetween(
-        sparse_src, sparse_dest, sparse_src_T_sparse_dest, variance);
-  }
+  deformation_graph_->processNewBetween(src, dest, src_T_dest, variance);
 }
 
 void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
@@ -578,8 +565,6 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
   // accepted reconciliation merges
   const bool enable_merging = given_merges.empty() ? config.enable_node_merging : false;
 
-  const auto complete_agent_values =
-      utils::getDenseFrames(full_sparse_frame_map_, sparse_frames_, pgmo_values);
   // TODO(nathan) given_merges probably doesn't need to be passed
   UpdateInfo::ConstPtr info(
       new UpdateInfo{config.add_places_to_deformation_graph ? &places_values : nullptr,
@@ -587,7 +572,7 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
                      new_loop_closure,
                      timestamp_ns,
                      given_merges,
-                     &complete_agent_values,
+                     &pgmo_values,
                      deformation_graph_.get(),
                      node_to_robot});
 
