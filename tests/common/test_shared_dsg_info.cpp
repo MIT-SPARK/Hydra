@@ -32,67 +32,27 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/common/shared_dsg_info.h"
-
-#include <config_utilities/config.h>
-#include <glog/logging.h>
-
-namespace YAML {
-
-template <>
-struct convert<spark_dsg::LayerKey> {
-  static Node encode(const spark_dsg::LayerKey& key) {
-    Node node;
-    node["layer"] = key.layer;
-    node["partition"] = key.partition;
-    return node;
-  }
-
-  static bool decode(const Node& node, spark_dsg::LayerKey& key) {
-    if (node.IsScalar()) {
-      key = node.as<spark_dsg::LayerId>();
-      return true;
-    }
-
-    if (!node["layer"]) {
-      LOG(ERROR) << "Invalid layer key '" << node << "', missing layer!";
-      return false;
-    }
-
-    const spark_dsg::LayerId layer = node["layer"].as<spark_dsg::LayerId>();
-    spark_dsg::PartitionId partition = 0;
-    if (node["partition"]) {
-      partition = node["partition"].as<spark_dsg::PartitionId>();
-    }
-
-    key = {layer, partition};
-    return true;
-  }
-};
-
-}  // namespace YAML
+#include <config_utilities/parsing/yaml.h>
+#include <gtest/gtest.h>
+#include <hydra/common/shared_dsg_info.h>
+#include <spark_dsg/printing.h>
 
 namespace hydra {
 
-using namespace spark_dsg;
-
-SharedDsgInfo::SharedDsgInfo(const Config& config)
-    : updated(false), sequence_number(0) {
-  graph = DynamicSceneGraph::fromNames(config.layers);
-}
-
-SharedDsgInfo::Ptr SharedDsgInfo::clone() const {
-  auto other = std::make_shared<SharedDsgInfo>(config);
-  other->updated = updated.load();
-  other->sequence_number = sequence_number;
-  other->graph = graph->clone();
-  return other;
-}
-
-void declare_config(SharedDsgInfo::Config& config) {
-  using namespace config;
-  name("SharedDsgInfo::Config");
-  field(config.layers, "layers");
+TEST(SharedDsgInfo, ConfigParsingCorrect) {
+  const std::string layers = R"yaml(
+layers:
+  OBJECTS: 2
+  PLACES: {layer: 3}
+  MESH_PLACES: {layer: 4, partition: 0}
+  FLOORS: {layer: 5, partition: 5}
+)yaml";
+  const auto config = config::fromYaml<SharedDsgInfo::Config>(YAML::Load(layers));
+  const std::map<std::string, spark_dsg::LayerKey> expected{{"OBJECTS", {2, 0}},
+                                                            {"PLACES", {3, 0}},
+                                                            {"MESH_PLACES", {4, 0}},
+                                                            {"FLOORS", {5, 5}}};
+  EXPECT_EQ(config.layers, expected);
 }
 
 }  // namespace hydra
