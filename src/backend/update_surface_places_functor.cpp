@@ -120,15 +120,15 @@ void Update2dPlacesFunctor::call(const DynamicSceneGraph& unmerged,
                                  SharedDsgInfo& dsg,
                                  const UpdateInfo::ConstPtr& info) const {
   ScopedTimer spin_timer("backend/update_2d_places", info->timestamp_ns);
-  if (!unmerged.hasLayer(config.layer)) {
+  const auto layer = unmerged.findLayer(config.layer);
+  if (!layer) {
     return;
   }
 
-  const auto& layer = unmerged.getLayer(config.layer);
   const auto new_loopclosure = info->loop_closure_detected;
 
   active_tracker.clear();  // reset from previous pass
-  const auto view = new_loopclosure ? LayerView(layer) : active_tracker.view(layer);
+  const auto view = new_loopclosure ? LayerView(*layer) : active_tracker.view(*layer);
 
   size_t num_changed = 0;
   const auto mesh = unmerged.mesh();
@@ -149,14 +149,18 @@ void Update2dPlacesFunctor::call(const DynamicSceneGraph& unmerged,
 
 MergeList Update2dPlacesFunctor::findMerges(const DynamicSceneGraph& graph,
                                             const UpdateInfo::ConstPtr& info) const {
-  const auto& layer = graph.getLayer(config.layer);
+  const auto layer = graph.findLayer(config.layer);
+  if (!layer) {
+    return {};
+  }
+
   const auto new_lcd = info->loop_closure_detected;
   // freeze layer view to avoid messing with tracker
-  const auto view = new_lcd ? LayerView(layer) : active_tracker.view(layer, true);
+  const auto view = new_lcd ? LayerView(*layer) : active_tracker.view(*layer, true);
 
   MergeList nodes_to_merge;
   merge_proposer.findMerges(
-      layer,
+      *layer,
       view,
       [this](const SceneGraphNode& lhs, const SceneGraphNode& rhs) {
         auto lhs_attrs = lhs.tryAttributes<Place2dNodeAttributes>();
