@@ -232,10 +232,15 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
   std::map<NodeId, std::set<NodeId>> node_neighbors;
   std::vector<std::pair<NodeId, Place2d>> place_2ds;
 
+  const auto places_layer = dsg.graph->findLayer(DsgLayers::MESH_PLACES);
+  if (!places_layer) {
+    return;
+  }
+
+  // TODO(nathan) critical section appears to be wrong here
   // Get/copy info for places that need cleanup
   std::unique_lock<std::mutex> lock(dsg.mutex);
-  const auto& places_layer = dsg.graph->getLayer(DsgLayers::MESH_PLACES);
-  utils::getPlace2dAndNeighors(places_layer, place_2ds, node_neighbors);
+  utils::getPlace2dAndNeighors(*places_layer, place_2ds, node_neighbors);
   lock.unlock();
 
   // Decide which places need to be split and which just need to be updated
@@ -288,7 +293,7 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
   // Clean up places that are far enough away from the active window
   // Far enough means that none of a node's neighbors or the node itself have
   // active mesh vertices
-  for (auto& [node_id, node] : places_layer.nodes()) {
+  for (auto& [node_id, node] : places_layer->nodes()) {
     auto attrs = node->tryAttributes<Place2dNodeAttributes>();
     if (!attrs) {
       continue;
