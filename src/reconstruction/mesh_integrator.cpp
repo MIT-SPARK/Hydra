@@ -95,8 +95,8 @@ void MeshIntegrator::generateMesh(VolumetricMap& map,
   allocateBlocks(blocks, map);
 
   // interior then exterior, but order shouldn't matter too much...
-  launchThreads(blocks, true, map, occupancy);
-  launchThreads(blocks, false, map, occupancy);
+  launchThreads(blocks, true, map);
+  launchThreads(blocks, false, map);
   showUpdateInfo(map, blocks, 5);
 
   for (const auto& block_idx : blocks) {
