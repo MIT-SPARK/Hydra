@@ -95,6 +95,8 @@ class GraphBuilder : public Module {
     config::VirtualConfig<FrontierExtractor> frontier_places;
     ViewDatabase::Config view_database;
     std::vector<Sink::Factory> sinks;
+    //! @brief Disable merging update packets from the active window if true
+    bool no_packet_collation = false;
   } const config;
 
   GraphBuilder(const Config& config,

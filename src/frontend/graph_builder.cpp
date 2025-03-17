@@ -104,6 +104,7 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.frontier_places, "frontier_places");
   field(config.view_database, "view_database");
   field(config.sinks, "sinks");
+  field(config.no_packet_collation, "no_packet_collation");
 }
 
 GraphBuilder::GraphBuilder(const Config& config,
@@ -242,6 +243,12 @@ void GraphBuilder::spin() {
     }
 
     if (!has_data) {
+      continue;
+    }
+
+    if (!spin_finished_ && config.no_packet_collation) {
+      using namespace std::chrono_literals;
+      std::this_thread::sleep_for(1ms);
       continue;
     }
 
