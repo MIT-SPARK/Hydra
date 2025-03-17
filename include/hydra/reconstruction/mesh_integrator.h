@@ -42,15 +42,6 @@ namespace hydra {
 
 class VolumetricMap;
 
-// NOTE(lschmid): Former VertexVoxel.
-struct OccupancyVoxel {
-  bool on_surface = false;
-  size_t block_vertex_index;
-  BlockIndex mesh_block;
-};
-using OccupancyBlock = spatial_hash::VoxelBlock<OccupancyVoxel>;
-using OccupancyLayer = spatial_hash::VoxelLayer<OccupancyBlock>;
-
 class MeshIntegrator {
  public:
   using BlockIndexGetter = IndexGetter<BlockIndex>;
@@ -61,12 +52,10 @@ class MeshIntegrator {
 
   virtual void generateMesh(VolumetricMap& map,
                             bool only_mesh_updated_blocks,
-                            bool clear_updated_flag,
-                            OccupancyLayer* occupancy = nullptr) const;
+                            bool clear_updated_flag) const;
 
   void allocateBlocks(const BlockIndices& blocks,
-                      VolumetricMap& map,
-                      OccupancyLayer* occupancy) const;
+                      VolumetricMap& map) const;
 
   void showUpdateInfo(const VolumetricMap& map,
                       const BlockIndices& blocks,
@@ -74,26 +63,21 @@ class MeshIntegrator {
 
   void launchThreads(const BlockIndices& blocks,
                      bool interior_pass,
-                     VolumetricMap& map,
-                     OccupancyLayer* occupancy) const;
+                     VolumetricMap& map) const;
 
   void processInterior(VolumetricMap* map,
-                       BlockIndexGetter* index_getter,
-                       OccupancyLayer* occupancy) const;
+                       BlockIndexGetter* index_getter) const;
 
   void processExterior(VolumetricMap* map,
-                       BlockIndexGetter* index_getter,
-                       OccupancyLayer* occupancy) const;
+                       BlockIndexGetter* index_getter) const;
 
   virtual void meshBlockInterior(const BlockIndex& block_index,
                                  const VoxelIndex& voxel_index,
-                                 VolumetricMap& map,
-                                 OccupancyLayer* occupancy) const;
+                                 VolumetricMap& map) const;
 
   virtual void meshBlockExterior(const BlockIndex& block_index,
                                  const VoxelIndex& voxel_index,
-                                 VolumetricMap& map,
-                                 OccupancyLayer* occupancy) const;
+                                 VolumetricMap& map) const;
 
   static BlockIndex getNeighborIndex(const BlockIndex& block_idx,
                                      int voxels_per_side,
