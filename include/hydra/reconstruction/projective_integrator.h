@@ -68,6 +68,8 @@ namespace hydra {
  */
 class ProjectiveIntegrator {
  public:
+  using SemanticIntegratorPtr = std::unique_ptr<const SemanticIntegrator>;
+
   struct Config {
     //! Verbosity for the projective integrator
     int verbosity = GlobalInfo::instance().getConfig().default_verbosity;
@@ -108,7 +110,8 @@ class ProjectiveIntegrator {
     int32_t label = -1;
   };
 
-  explicit ProjectiveIntegrator(const ProjectiveIntegrator::Config& config);
+  explicit ProjectiveIntegrator(const ProjectiveIntegrator::Config& config,
+                                SemanticIntegratorPtr&& semantic_integrator = nullptr);
 
   virtual ~ProjectiveIntegrator() = default;
 
@@ -206,7 +209,7 @@ class ProjectiveIntegrator {
 
  protected:
   const std::unique_ptr<const ProjectionInterpolator> interpolator_;
-  const std::unique_ptr<const SemanticIntegrator> semantic_integrator_;
+  const SemanticIntegratorPtr semantic_integrator_;
 };
 
 void declare_config(ProjectiveIntegrator::Config& config);

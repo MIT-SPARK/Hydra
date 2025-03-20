@@ -91,10 +91,12 @@ void declare_config(ProjectiveIntegrator::Config& config) {
   }
 }
 
-ProjectiveIntegrator::ProjectiveIntegrator(const ProjectiveIntegrator::Config& config)
+ProjectiveIntegrator::ProjectiveIntegrator(const ProjectiveIntegrator::Config& config,
+                                           SemanticIntegratorPtr&& semantics)
     : config(config::checkValid(config)),
       interpolator_(config.interpolation_method.create()),
-      semantic_integrator_(config.semantic_integrator.create()) {}
+      semantic_integrator_(semantics ? std::move(semantics)
+                                     : config.semantic_integrator.create()) {}
 
 void ProjectiveIntegrator::updateMap(const InputData& data,
                                      VolumetricMap& map,
@@ -171,8 +173,8 @@ void ProjectiveIntegrator::updateBlock(const BlockIndex& block_index,
   }
 
   if (was_updated) {
-    LOG_IF(INFO, config.verbosity >= 10) << "integrator updated block "
-                                         << showIndex(block_index);
+    LOG_IF(INFO, config.verbosity >= 10)
+        << "integrator updated block " << showIndex(block_index);
     blocks.tsdf->setUpdated();
   }
 }
@@ -256,7 +258,8 @@ void ProjectiveIntegrator::updateVoxel(const MapConfig& map_config,
       (prev_weight + measurement.weight);
 
   if (voxels.tracking) {
-    // this condition should always trigger when the voxel has no integrated measurements
+    // this condition should always trigger when the voxel has no integrated
+    // measurements
     if (prev_weight == 0.0f) {
       voxels.tracking->first_observed = data.timestamp_ns;
     }
