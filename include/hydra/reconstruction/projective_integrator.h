@@ -124,7 +124,8 @@ class ProjectiveIntegrator {
    */
   void updateMap(const InputData& data,
                  VolumetricMap& map,
-                 bool allocate_blocks = true) const;
+                 bool allocate_blocks = true,
+                 const cv::Mat& integration_mask = cv::Mat()) const;
 
   /**
    * @brief Update all specified blocks in the map with the given data in parallel.
@@ -134,6 +135,7 @@ class ProjectiveIntegrator {
    */
   void updateBlocks(const BlockIndices& block_indices,
                     const InputData& data,
+                    const cv::Mat& integration_mask,
                     VolumetricMap& map) const;
 
   /**
@@ -144,6 +146,7 @@ class ProjectiveIntegrator {
    */
   void updateBlock(const BlockIndex& block_index,
                    const InputData& data,
+                   const cv::Mat& integration_mask,
                    VolumetricMap& map) const;
 
   /**
@@ -156,6 +159,7 @@ class ProjectiveIntegrator {
    */
   VoxelMeasurement getVoxelMeasurement(const VolumetricMap::Config& map_config,
                                        const InputData& data,
+                                       const cv::Mat& integration_mask,
                                        const Point& p_C) const;
 
   /**
@@ -205,6 +209,7 @@ class ProjectiveIntegrator {
    */
   virtual bool computeLabel(const VolumetricMap::Config& map_config,
                             const InputData& data,
+                            const cv::Mat& integration_mask,
                             VoxelMeasurement& measurement) const;
 
  protected:

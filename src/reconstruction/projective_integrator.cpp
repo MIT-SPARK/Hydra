@@ -100,7 +100,8 @@ ProjectiveIntegrator::ProjectiveIntegrator(const ProjectiveIntegrator::Config& c
 
 void ProjectiveIntegrator::updateMap(const InputData& data,
                                      VolumetricMap& map,
-                                     bool allocate_blocks) const {
+                                     bool allocate_blocks,
+                                     const cv::Mat& integration_mask) const {
   auto& tsdf = map.getTsdfLayer();
 
   // Allocate all blocks that could be seen by the sensor.
@@ -112,7 +113,8 @@ void ProjectiveIntegrator::updateMap(const InputData& data,
     new_blocks = map.allocateBlocks(block_indices);
   }
 
-  updateBlocks(block_indices, data, map);
+  // TODO(nathan) think about converting the mask
+  updateBlocks(block_indices, data, integration_mask, map);
 
   // De-allocate blocks that were not updated.
   for (const auto& idx : new_blocks) {
@@ -124,6 +126,7 @@ void ProjectiveIntegrator::updateMap(const InputData& data,
 
 void ProjectiveIntegrator::updateBlocks(const BlockIndices& block_indices,
                                         const InputData& data,
+                                        const cv::Mat& integration_mask,
                                         VolumetricMap& map) const {
   LOG_IF(INFO, config.verbosity >= 3)
       << "Updating " << block_indices.size() << " blocks.";
@@ -137,7 +140,7 @@ void ProjectiveIntegrator::updateBlocks(const BlockIndices& block_indices,
     threads.emplace_back(std::async(std::launch::async, [&]() {
       BlockIndex block_index;
       while (index_getter.getNextIndex(block_index)) {
-        updateBlock(block_index, data, map);
+        updateBlock(block_index, data, integration_mask, map);
       }
     }));
   }
@@ -149,6 +152,7 @@ void ProjectiveIntegrator::updateBlocks(const BlockIndices& block_indices,
 
 void ProjectiveIntegrator::updateBlock(const BlockIndex& block_index,
                                        const InputData& data,
+                                       const cv::Mat& integration_mask,
                                        VolumetricMap& map) const {
   // Get the requested blocks.
   BlockTuple blocks = map.getBlock(block_index);
@@ -162,7 +166,8 @@ void ProjectiveIntegrator::updateBlock(const BlockIndex& block_index,
   bool was_updated = false;
   for (size_t i = 0; i < blocks.tsdf->numVoxels(); ++i) {
     const auto p_sensor = sensor_T_body * blocks.tsdf->getVoxelPosition(i);
-    const auto measurement = getVoxelMeasurement(map.config, data, p_sensor);
+    const auto measurement =
+        getVoxelMeasurement(map.config, data, integration_mask, p_sensor);
     if (!measurement.valid) {
       continue;
     }
@@ -181,6 +186,7 @@ void ProjectiveIntegrator::updateBlock(const BlockIndex& block_index,
 
 Measurement ProjectiveIntegrator::getVoxelMeasurement(const MapConfig& map_config,
                                                       const InputData& data,
+                                                      const cv::Mat& integration_mask,
                                                       const Point& p_C) const {
   Measurement measurement;
 
@@ -226,7 +232,7 @@ Measurement ProjectiveIntegrator::getVoxelMeasurement(const MapConfig& map_confi
   }
 
   // Get associated semantic label if applicable and check if it can be integrated
-  if (!computeLabel(map_config, data, measurement)) {
+  if (!computeLabel(map_config, data, integration_mask, measurement)) {
     return measurement;
   }
 
@@ -349,6 +355,7 @@ float ProjectiveIntegrator::computeWeight(const MapConfig& map_config,
 
 bool ProjectiveIntegrator::computeLabel(const MapConfig& map_config,
                                         const InputData& data,
+                                        const cv::Mat& integration_mask,
                                         Measurement& measurement) const {
   if (std::abs(measurement.sdf) >= map_config.truncation_distance) {
     // If SDF value is beyond the truncation band, we don't need to
@@ -356,13 +363,21 @@ bool ProjectiveIntegrator::computeLabel(const MapConfig& map_config,
     return true;
   }
 
-  if (data.label_image.empty() || !semantic_integrator_) {
-    return true;
+  // the formatting here is a little ugly, but if an integration mask is supplied and it
+  // is non-zero for the best pixel, we skip integrating the current voxel
+  if (!integration_mask.empty() &&
+      interpolator_->interpolateID(integration_mask,
+                                   measurement.interpolation_weights)) {
+    return false;
   }
 
-  measurement.label =
-      interpolator_->interpolateID(data.label_image, measurement.interpolation_weights);
-  return semantic_integrator_->canIntegrate(measurement.label);
+  // we only compute labels if we have a semantic integrator and a label image
+  if (!data.label_image.empty() && semantic_integrator_) {
+    measurement.label = interpolator_->interpolateID(data.label_image,
+                                                     measurement.interpolation_weights);
+  }
+
+  return true;
 }
 
 }  // namespace hydra
