@@ -124,6 +124,8 @@ class VolumetricMap {
 
   bool hasSemantics() const { return semantic_layer_ != nullptr; }
 
+  bool hasTracking() const { return tracking_layer_ != nullptr; }
+
   /**
    * @brief Allocate a block in all relevant layers of the map.
    * @param index Index of the block to allocate.

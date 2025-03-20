@@ -58,7 +58,7 @@ void MeshIntegrator::allocateBlocks(const BlockIndices& blocks,
                                     OccupancyLayer* occupancy) const {
   auto& mesh_layer = map.getMeshLayer();
   for (const BlockIndex& block_index : blocks) {
-    auto& mesh = mesh_layer.allocateBlock(block_index, map.hasSemantics());
+    auto& mesh = mesh_layer.allocateBlock(block_index, map.hasSemantics(), map.hasTracking());
     mesh.clear();
 
     if (!occupancy) {
@@ -224,6 +224,7 @@ void MeshIntegrator::meshBlockInterior(const BlockIndex& block_index,
 
   const auto coords = block->getVoxelPosition(index);
   auto vertex_block = maybeGetBlockPtr(occupancy, block_index);
+  const auto tracking_block = maybeGetBlockPtr(map.getTrackingLayer(), block_index);
   const auto semantics = maybeGetBlockPtr(map.getSemanticLayer(), block_index);
 
   MarchingCubes::SdfPoints points;
@@ -248,6 +249,10 @@ void MeshIntegrator::meshBlockInterior(const BlockIndex& block_index,
 
     if (vertex_block) {
       point.vertex_voxel = &vertex_block->getVoxel(corner_index);
+    }
+
+    if (tracking_block) {
+      point.tracking_voxel = &tracking_block->getVoxel(corner_index);
     }
   }
 
@@ -285,6 +290,7 @@ void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
 
   const auto coords = block->getVoxelPosition(index);
   auto vertex_block = maybeGetBlockPtr(occupancy, block_index);
+  const auto tracking_block = maybeGetBlockPtr(map.getTrackingLayer(), block_index);
   const auto semantics = maybeGetBlockPtr(map.getSemanticLayer(), block_index);
 
   MarchingCubes::SdfPoints points;
@@ -298,6 +304,9 @@ void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
       voxel = &block->getVoxel(c_idx);
       if (vertex_block) {
         point.vertex_voxel = &vertex_block->getVoxel(c_idx);
+      }
+      if (tracking_block) {
+        point.tracking_voxel = &tracking_block->getVoxel(c_idx);
       }
       if (semantics) {
         semantic_voxel = &semantics->getVoxel(c_idx);
@@ -316,6 +325,11 @@ void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
       if (semantics) {
         const auto& s_block = map.getSemanticLayer()->getBlock(n_idx);
         semantic_voxel = &s_block.getVoxel(c_idx);
+      }
+
+      if (tracking_block) {
+        const auto& t_block = map.getTrackingLayer()->getBlock(n_idx);
+        point.tracking_voxel = &t_block.getVoxel(c_idx);
       }
 
       // // we can't ensure that neighboring blocks stay in sync with the current mesh

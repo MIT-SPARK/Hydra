@@ -53,6 +53,7 @@ struct SdfPoint {
   spark_dsg::Color color;
   std::optional<uint32_t> label;
   OccupancyVoxel* vertex_voxel = nullptr;
+  const TrackingVoxel* tracking_voxel = nullptr;
 };
 
 std::ostream& operator<<(std::ostream& out, const SdfPoint& point);

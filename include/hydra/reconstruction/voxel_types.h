@@ -96,6 +96,7 @@ struct SemanticVoxel {
 // Voxel to track which parts of space are free with high confidence.
 struct TrackingVoxel {
   // Time stamp [ns] when the voxel was last observed.
+  TimeStamp first_observed = 0;
   TimeStamp last_observed;
   TimeStamp last_occupied;
   bool ever_free = false;
@@ -140,8 +141,8 @@ struct TsdfBlock : public spatial_hash::VoxelBlock<TsdfVoxel> {
 struct MeshBlock : public Mesh, public spatial_hash::Block {
   using Ptr = std::shared_ptr<MeshBlock>;
   using ConstPtr = std::shared_ptr<const MeshBlock>;
-  MeshBlock(const float block_size, const BlockIndex& index, bool has_labels = false)
-      : Mesh(true, false, has_labels, false), spatial_hash::Block(block_size, index) {}
+  MeshBlock(const float block_size, const BlockIndex& index, bool has_labels = false, bool has_stamps = false)
+      : Mesh(true, has_stamps, has_labels, has_stamps), spatial_hash::Block(block_size, index) {}
 };
 
 struct TrackingBlock : public spatial_hash::VoxelBlock<TrackingVoxel> {

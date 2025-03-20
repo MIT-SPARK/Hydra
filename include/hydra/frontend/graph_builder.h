@@ -97,6 +97,8 @@ class GraphBuilder : public Module {
     std::vector<Sink::Factory> sinks;
     //! @brief Disable merging update packets from the active window if true
     bool no_packet_collation = false;
+    //! @brief Overwrite mesh timestamps using information from tracking layer
+    bool overwrite_mesh_timestamps = false;
   } const config;
 
   GraphBuilder(const Config& config,
@@ -171,6 +173,7 @@ class GraphBuilder : public Module {
   SharedDsgInfo::Ptr dsg_;
   SharedModuleState::Ptr state_;
   kimera_pgmo::MeshDelta::Ptr last_mesh_update_;
+  StampUpdate::Ptr last_mesh_stamp_update_;
 
   kimera_pgmo::Graph deformation_graph_;
   std::unique_ptr<kimera_pgmo::DeltaCompression> mesh_compression_;

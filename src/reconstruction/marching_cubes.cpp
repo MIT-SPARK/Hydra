@@ -186,6 +186,24 @@ inline void updateVoxels(const BlockIndex& block,
   }
 }
 
+inline void addStamps(Mesh& mesh,
+                      int edge_coord,
+                      const MarchingCubes::SdfPoints& points) {
+  const int* pairs = MarchingCubes::kEdgeIndexPairs[edge_coord];
+  const auto* first_voxel = points[pairs[0]].tracking_voxel;
+  const auto* second_voxel = points[pairs[1]].tracking_voxel;
+
+  auto& first_seen = mesh.first_seen_stamps.emplace_back();
+  auto& last_seen = mesh.stamps.emplace_back();
+  if (!first_voxel || !second_voxel) {
+    first_seen = 0;
+    last_seen = 0;
+  } else {
+    first_seen = std::min(first_voxel->first_observed, second_voxel->first_observed);
+    last_seen = std::max(first_voxel->last_observed, second_voxel->last_observed);
+  }
+}
+
 void MarchingCubes::meshCube(const BlockIndex& block,
                              const SdfPoints& points,
                              Mesh& mesh,
@@ -228,6 +246,13 @@ void MarchingCubes::meshCube(const BlockIndex& block,
       mesh.labels.push_back(v1.label.value_or(std::numeric_limits<uint32_t>::max()));
       mesh.labels.push_back(v2.label.value_or(std::numeric_limits<uint32_t>::max()));
       mesh.labels.push_back(v3.label.value_or(std::numeric_limits<uint32_t>::max()));
+    }
+    if (mesh.has_timestamps && mesh.has_first_seen_stamps) {
+      // TODO(nathan) this is kinda janky and could use the point interpolation as well,
+      // but that's more than I want to touch at the moment
+      addStamps(mesh, table_row[table_col + 2], points);
+      addStamps(mesh, table_row[table_col + 1], points);
+      addStamps(mesh, table_row[table_col], points);
     }
 
     if (compute_normals) {

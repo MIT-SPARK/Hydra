@@ -105,6 +105,7 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.view_database, "view_database");
   field(config.sinks, "sinks");
   field(config.no_packet_collation, "no_packet_collation");
+  field(config.overwrite_mesh_timestamps, "overwrite_mesh_timestamps");
 }
 
 GraphBuilder::GraphBuilder(const Config& config,
@@ -137,7 +138,8 @@ GraphBuilder::GraphBuilder(const Config& config,
 
   CHECK(dsg_ != nullptr);
   CHECK(dsg_->graph != nullptr);
-  dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>());
+  dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>(
+      true, true, true, config.overwrite_mesh_timestamps));
   const auto& prefix = GlobalInfo::instance().getRobotPrefix();
   dsg_->graph->createDynamicLayer(DsgLayers::AGENTS, prefix.key);
 
@@ -375,6 +377,7 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
   }
 
   backend_input_->mesh_update = last_mesh_update_;
+  backend_input_->mesh_stamp_update = last_mesh_stamp_update_;
   queues.backend_queue.push(backend_input_);
   if (queues.lcd_queue) {
     queues.lcd_queue->push(lcd_input_);
@@ -428,8 +431,46 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
     const auto& mesh = input.map().getMeshLayer();
     auto interface = PgmoMeshLayerInterface(mesh);
     VLOG(5) << "[Hydra Frontend] Updating mesh with " << mesh.numBlocks() << " blocks";
-    last_mesh_update_ =
+    const auto new_mesh_update =
         mesh_compression_->update(interface, input.timestamp_ns, mesh_remapping_.get());
+
+    if (config.overwrite_mesh_timestamps) {
+      auto new_stamps =
+          std::make_shared<StampUpdate>(new_mesh_update->vertex_updates->size());
+      if (last_mesh_stamp_update_) {
+        for (const auto& [prev, curr] : new_mesh_update->prev_to_curr) {
+          const auto curr_local = new_mesh_update->getLocalIndex(curr);
+          const auto prev_local = last_mesh_update_->getLocalIndex(prev);
+          new_stamps->first_seen.at(curr_local) =
+              last_mesh_stamp_update_->first_seen.at(prev_local);
+          new_stamps->last_seen.at(curr_local) =
+              last_mesh_stamp_update_->last_seen.at(prev_local);
+        }
+      }
+
+      for (const auto& block : mesh) {
+        auto block_remap = mesh_remapping_->find(block.index);
+        if (block_remap == mesh_remapping_->end()) {
+          LOG(ERROR) << "Unknown block: " << block.index.transpose();
+          continue;
+        }
+
+        CHECK(block.has_first_seen_stamps && block.has_timestamps);
+        for (size_t i = 0; i < block.numVertices(); ++i) {
+          auto iter = block_remap->second.find(i);
+          if (iter != block_remap->second.end()) {
+            const auto local_idx = new_mesh_update->getLocalIndex(iter->second);
+            new_stamps->first_seen.at(local_idx) = block.first_seen_stamps.at(i);
+            new_stamps->last_seen.at(local_idx) = block.stamps.at(i);
+          }
+        }
+      }
+
+      last_mesh_stamp_update_ = new_stamps;
+    }
+
+    // cache last mesh update for sending to backend
+    last_mesh_update_ = new_mesh_update;
   }  // end timing scope
 
   {  // start timing scope
@@ -437,6 +478,10 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
     // nothing else uses it at the moment
     ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
     last_mesh_update_->updateMesh(*dsg_->graph->mesh());
+    if (last_mesh_stamp_update_) {
+      last_mesh_stamp_update_->updateMesh(*dsg_->graph->mesh(),
+                                          last_mesh_update_->vertex_start);
+    }
   }  // end timing scope
 
   ScopedTimer timer("frontend/postmesh_callbacks", input.timestamp_ns, true, 1, false);

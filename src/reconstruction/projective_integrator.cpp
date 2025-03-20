@@ -256,6 +256,10 @@ void ProjectiveIntegrator::updateVoxel(const MapConfig& map_config,
       (prev_weight + measurement.weight);
 
   if (voxels.tracking) {
+    // this condition should always trigger when the voxel has no integrated measurements
+    if (prev_weight == 0.0f) {
+      voxels.tracking->first_observed = data.timestamp_ns;
+    }
     voxels.tracking->last_observed = data.timestamp_ns;
   }
 

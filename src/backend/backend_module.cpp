@@ -444,7 +444,19 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
     return;
   }
 
+  // TODO(nathan) this is ugly, but no good way to know at backend init whether
+  // we're tracking first-seen stamps or not (because that's private to the active
+  // window map)
+  if (input.mesh_stamp_update && !private_dsg_->graph->mesh()->numVertices()) {
+    const_cast<bool&>(private_dsg_->graph->mesh()->has_first_seen_stamps) = true;
+  }
+
   input.mesh_update->updateMesh(*private_dsg_->graph->mesh());
+  if (input.mesh_stamp_update) {
+    input.mesh_stamp_update->updateMesh(*private_dsg_->graph->mesh(),
+                                        input.mesh_update->vertex_start);
+  }
+
   kimera_pgmo::StampedCloud<pcl::PointXYZ> cloud_out{*original_vertices_,
                                                      vertex_stamps_};
   input.mesh_update->updateVertices(cloud_out);
