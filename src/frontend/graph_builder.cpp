@@ -93,6 +93,7 @@ void declare_config(GraphBuilder::Config& config) {
   config.pose_graph_tracker.setOptional();
   field(config.pose_graph_tracker, "pose_graph_tracker");
   // surface (i.e., 2D) places
+  field(config.enable_place_mesh_mapping, "enable_place_mesh_mapping");
   config.surface_places.setOptional();
   field(config.surface_places, "surface_places");
   // freespace (i.e., 3D) places
@@ -409,7 +410,9 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
     graph_connector_.connect(*dsg_->graph);
   }
 
-  updatePlaceMeshMapping(*msg);
+  if (config.enable_place_mesh_mapping) {
+    updatePlaceMeshMapping(*msg);
+  }
 }
 
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {

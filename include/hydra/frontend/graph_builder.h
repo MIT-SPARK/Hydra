@@ -89,6 +89,7 @@ class GraphBuilder : public Module {
     MeshSegmenter::Config object_config;
     config::VirtualConfig<PoseGraphTracker> pose_graph_tracker{
         PoseGraphFromOdom::Config()};
+    bool enable_place_mesh_mapping = false;
     config::VirtualConfig<SurfacePlacesInterface> surface_places;
     config::VirtualConfig<FreespacePlacesInterface> freespace_places;
     bool use_frontiers = false;
