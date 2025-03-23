@@ -76,11 +76,13 @@ void declare_config(ExternalLoopClosureReceiver::Config& config) {
   field(config.layer, "layer");
   field(config.max_time_difference, "max_time_difference", "s");
   check(config.max_time_difference, GE, 0.0, "max_time_difference");
+  field(config.lc_lockout_time, "lc_lockout_time_ns", "s");
+  field(config.lc_min_pose_discrepancy, "lc_min_pose_discrepancy", "m");
 }
 
 ExternalLoopClosureReceiver::ExternalLoopClosureReceiver(const Config& config,
                                                          Queue* const queue)
-    : config(config), input_queue_(queue) {
+    : config(config), input_queue_(queue), added_loop_closures_(&pose_graph_edge_cmp) {
   LOG_IF(WARNING, !input_queue_) << "External loop closures disabled!";
 }
 
@@ -134,6 +136,55 @@ LookupResult ExternalLoopClosureReceiver::findClosest(const DynamicSceneGraph& g
   return {LookupResult::Status::VALID, best_id};
 }
 
+bool should_add_lc(const std::set<pose_graph_tools::PoseGraphEdge,
+                                  decltype(pose_graph_edge_cmp)*>& added_lcs,
+                   const uint64_t stamp_ns_from,
+                   const uint64_t stamp_ns_to,
+                   const Eigen::Affine3d& to_T_from,
+                   const uint64_t lockout_time_ns,
+                   const double min_pose_discrepancy) {
+  auto pge_stamp_cmp = [](const pose_graph_tools::PoseGraphEdge& pge,
+                          const uint64_t value) { return pge.key_from < value; };
+
+  auto lc_iter = std::lower_bound(added_lcs.begin(),
+                                  added_lcs.end(),
+                                  stamp_ns_from - lockout_time_ns,
+                                  pge_stamp_cmp);
+
+  uint64_t stamp_to_lower;
+  if (lockout_time_ns > stamp_ns_to) {
+    stamp_to_lower = 0;
+  } else {
+    stamp_to_lower = stamp_ns_to - lockout_time_ns;
+  }
+
+  uint64_t stamp_to_upper = stamp_ns_to + lockout_time_ns;
+
+  while (lc_iter != added_lcs.end()) {
+    uint64_t key_to = lc_iter->key_to;
+    if (lc_iter->key_from > stamp_ns_from + lockout_time_ns) {
+      break;
+    }
+    if (key_to < stamp_to_lower || key_to > stamp_to_upper) {
+      ++lc_iter;
+      continue;
+    }
+    // The putative loop closure constrains approximately the same poses as an existing
+    // loop closure. We still add the new loop closure if the relative pose measurement
+    // is different enough from the existing one.
+    Eigen::Affine3d pose_discrepancy = to_T_from.inverse() * lc_iter->pose;
+    double translation_diff = pose_discrepancy.translation().norm();
+    double rotation_diff = std::acos((pose_discrepancy.rotation().trace() - 1) / 2);
+    double rotation_scale = 1;
+    double pose_diff = translation_diff + rotation_scale * abs(rotation_diff);
+    if (pose_diff < min_pose_discrepancy) {
+      return false;
+    }
+    ++lc_iter;
+  }
+  return true;
+}
+
 void ExternalLoopClosureReceiver::update(const DynamicSceneGraph& graph,
                                          const Callback& callback) {
   if (!input_queue_) {
@@ -171,8 +222,24 @@ void ExternalLoopClosureReceiver::update(const DynamicSceneGraph& graph,
       continue;
     }
 
-    // to_id, from_id, to_T_from
-    callback(to_node.id, from_node.id, gtsam::Pose3(edge.pose.matrix()));
+    const auto to_ns = getAgentTimestamp(graph.getNode(to_node.id)).count();
+    const auto from_ns = getAgentTimestamp(graph.getNode(from_node.id)).count();
+    uint64_t lc_lockout_ns = config.lc_lockout_time * 1e9;
+    bool should_add = should_add_lc(added_loop_closures_,
+                                    from_ns,
+                                    to_ns,
+                                    edge.pose,
+                                    lc_lockout_ns,
+                                    config.lc_min_pose_discrepancy);
+
+    if (should_add) {
+      LOG(WARNING) << "Added LC";
+      added_loop_closures_.insert(edge);
+      // to_id, from_id, to_T_from
+      callback(to_node.id, from_node.id, gtsam::Pose3(edge.pose.matrix()));
+    } else {
+      LOG(WARNING) << "Rejected LC";
+    }
     iter = loop_closures_.erase(iter);
   }
 }

@@ -45,6 +45,11 @@
 
 namespace hydra {
 
+inline bool pose_graph_edge_cmp(pose_graph_tools::PoseGraphEdge a,
+                                pose_graph_tools::PoseGraphEdge b) {
+  return a.key_from < b.key_from;
+}
+
 class ExternalLoopClosureReceiver {
  public:
   using Queue = MessageQueue<pose_graph_tools::PoseGraph>;
@@ -66,6 +71,12 @@ class ExternalLoopClosureReceiver {
     //! Maximum difference in seconds between a loop closure timestamp and the nearest
     //! agent pose. 0 disables checking time differences.
     double max_time_difference = 1.0;
+    //! Time window where a loop closure may block adding future loop closures
+    double lc_lockout_time = 5.0;
+    //! Threshold above which a loop closure constraining equivalent poses is considered
+    //! unique
+    double lc_min_pose_discrepancy = 2.0;
+
   } const config;
 
   ExternalLoopClosureReceiver(const Config& config, Queue* const queue);
@@ -78,6 +89,8 @@ class ExternalLoopClosureReceiver {
  protected:
   Queue* const input_queue_;
   std::list<pose_graph_tools::PoseGraphEdge> loop_closures_;
+  std::set<pose_graph_tools::PoseGraphEdge, decltype(pose_graph_edge_cmp)*>
+      added_loop_closures_;
 };
 
 void declare_config(ExternalLoopClosureReceiver::Config& config);
