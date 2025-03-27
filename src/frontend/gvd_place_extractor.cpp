@@ -105,7 +105,7 @@ void GvdPlaceExtractor::save(const LogSetup& log_setup) const {
 
     DynamicSceneGraph::Ptr graph(new DynamicSceneGraph());
     graph->updateFromLayer(places, places.edges());
-    graph->save(output_path + "/places.json", false);
+    graph->save(output_path / "places.json", false);
   }
 }
 

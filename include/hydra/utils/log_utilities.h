@@ -39,11 +39,12 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <filesystem>
 
 namespace hydra {
 
 struct LogConfig {
-  std::string log_dir = "";
+  std::filesystem::path log_dir;
   bool log_timing_incrementally = false;
   std::string timing_stats_name = "timing_stats.csv";
   std::string timing_suffix = "_timing_raw.csv";
@@ -73,13 +74,13 @@ class LogSetup {
 
   void init();
 
-  std::string getLogDir() const;
+  std::filesystem::path getLogDir() const;
 
-  std::string getLogDir(const std::string& log_namespace) const;
+  std::filesystem::path getLogDir(const std::string& log_namespace) const;
 
-  std::string getTimerFilepath() const;
+  std::filesystem::path getTimerFilepath() const;
 
-  std::string getTimerFilepath(const std::string& timer_name) const;
+  std::filesystem::path getTimerFilepath(const std::string& timer_name) const;
 
   bool valid() const;
 

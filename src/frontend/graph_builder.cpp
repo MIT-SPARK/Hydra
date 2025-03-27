@@ -203,12 +203,12 @@ void GraphBuilder::stopImpl() {
 void GraphBuilder::save(const LogSetup& log_setup) {
   std::lock_guard<std::mutex> lock(mutex_);
   const auto output_path = log_setup.getLogDir("frontend");
-  dsg_->graph->save(output_path + "/dsg.json", false);
-  dsg_->graph->save(output_path + "/dsg_with_mesh.json");
+  dsg_->graph->save(output_path / "dsg.json", false);
+  dsg_->graph->save(output_path / "dsg_with_mesh.json");
 
   const auto mesh = dsg_->graph->mesh();
   if (mesh && !mesh->empty()) {
-    kimera_pgmo::WriteMesh(output_path + "/mesh.ply", *mesh);
+    kimera_pgmo::WriteMesh(output_path / "mesh.ply", *mesh);
   }
 
   if (freespace_places_) {

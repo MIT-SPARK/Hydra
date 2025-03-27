@@ -79,7 +79,7 @@ void LoopClosureModule::stopImpl() {
 void LoopClosureModule::save(const LogSetup& log_setup) {
   const auto log_path = log_setup.getLogDir("lcd");
   lcd_detector_->dumpDescriptors(log_path);
-  lcd_graph_->save(log_path + "/dsg.json", false);
+  lcd_graph_->save(log_path / "dsg.json", false);
 }
 
 std::string LoopClosureModule::printInfo() const { return config::toString(config_); }

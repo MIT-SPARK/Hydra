@@ -155,25 +155,25 @@ void BackendModule::save(const LogSetup& log_setup) {
   std::lock_guard<std::mutex> lock(mutex_);
   const auto backend_path = log_setup.getLogDir("backend");
   const auto pgmo_path = log_setup.getLogDir("backend/pgmo");
-  private_dsg_->graph->save(backend_path + "/dsg.json", false);
-  private_dsg_->graph->save(backend_path + "/dsg_with_mesh.json");
+  private_dsg_->graph->save(backend_path / "dsg.json", false);
+  private_dsg_->graph->save(backend_path / "dsg_with_mesh.json");
 
   const auto& prefix = GlobalInfo::instance().getRobotPrefix();
   if (deformation_graph_->hasPrefixPoses(prefix.key)) {
     const auto optimized_path = getOptimizedTrajectory(prefix.id);
-    std::string csv_name = pgmo_path + "/traj_pgmo.csv";
+    std::string csv_name = pgmo_path / "traj_pgmo.csv";
     saveTrajectory(optimized_path, timestamps_, csv_name);
   }
 
   const auto mesh = private_dsg_->graph->mesh();
   if (mesh && !mesh->empty()) {
     // mesh implements vertex and face traits
-    kimera_pgmo::WriteMesh(backend_path + "/mesh.ply", *mesh, *mesh);
+    kimera_pgmo::WriteMesh(backend_path / "mesh.ply", *mesh, *mesh);
   }
 
-  deformation_graph_->save(pgmo_path + "/deformation_graph.dgrf");
+  deformation_graph_->save(pgmo_path / "deformation_graph.dgrf");
 
-  const std::string output_csv = backend_path + "/loop_closures.csv";
+  const std::string output_csv = backend_path / "loop_closures.csv";
   std::ofstream output_file;
   output_file.open(output_csv);
 
@@ -639,7 +639,7 @@ void BackendModule::logStatus(bool init) const {
     return;
   }
 
-  const auto filename = logs_->getLogDir("backend/pgmo") + "/dsg_pgmo_status.csv";
+  const auto filename = logs_->getLogDir("backend/pgmo") / "dsg_pgmo_status.csv";
 
   std::ofstream file;
   if (init) {

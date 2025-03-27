@@ -35,6 +35,7 @@
 #include "hydra/utils/log_utilities.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/types/path.h>
 #include <glog/logging.h>
 
 #include <filesystem>
@@ -55,7 +56,7 @@ inline bool makeDirs(const fs::path& path) {
 void declare_config(LogConfig& config) {
   using namespace config;
   name("LogConfig");
-  field(config.log_dir, "log_path");
+  field<Path::Absolute>(config.log_dir, "log_path");
   field(config.log_timing_incrementally, "log_timing_incrementally");
   field(config.timing_stats_name, "timing_stats_name");
   field(config.timing_suffix, "timing_suffix");
@@ -63,13 +64,12 @@ void declare_config(LogConfig& config) {
 }
 
 LogSetup::LogSetup(const LogConfig& conf) : valid_(false), config_(conf) {
-  if (config_.log_dir == "") {
+  if (config_.log_dir.empty()) {
     return;
   }
 
-  fs::path log_path(config_.log_dir);
-  if (!makeDirs(log_path)) {
-    LOG(WARNING) << "Failed to make dir: " << log_path << ". logging Disabled!";
+  if (!makeDirs(config_.log_dir)) {
+    LOG(WARNING) << "Failed to make dir: " << config_.log_dir << ". logging Disabled!";
     return;
   }
 
@@ -89,9 +89,9 @@ LogSetup::~LogSetup() {
   }
 }
 
-std::string LogSetup::getLogDir() const { return valid_ ? config_.log_dir : ""; }
+fs::path LogSetup::getLogDir() const { return valid_ ? config_.log_dir : ""; }
 
-std::string LogSetup::getLogDir(const std::string& log_namespace) const {
+fs::path LogSetup::getLogDir(const std::string& log_namespace) const {
   if (!valid_) {
     return "";
   }
@@ -102,24 +102,21 @@ std::string LogSetup::getLogDir(const std::string& log_namespace) const {
     namespaces_.insert(log_namespace);
   }
 
-  return ns_path.string();
+  return ns_path;
 }
 
-std::string LogSetup::getTimerFilepath() const {
+fs::path LogSetup::getTimerFilepath() const {
   if (!valid_) {
     throw std::runtime_error("logging not configured, unable to get timer filepath");
   }
 
-  const auto log_dir = fs::path(config_.log_dir);
-  return (log_dir / config_.timing_stats_name).lexically_normal().string();
+  return (config_.log_dir / config_.timing_stats_name).lexically_normal();
 }
 
-std::string LogSetup::getTimerFilepath(const std::string& timer_name) const {
+fs::path LogSetup::getTimerFilepath(const std::string& timer_name) const {
   if (!valid_) {
     throw std::runtime_error("unable to save timer: " + timer_name);
   }
-
-  const auto log_dir = fs::path(config_.log_dir);
 
   std::string used_name = timer_name;
   // If requested, replace all '/' with '_' to avoid creating a directory.
@@ -135,11 +132,11 @@ std::string LogSetup::getTimerFilepath(const std::string& timer_name) const {
   const auto timer_ns = timer_path.parent_path();
   const auto filename = timer_path.stem().string() + config_.timing_suffix;
   if (timer_ns.empty()) {
-    return (log_dir / filename).lexically_normal().string();
+    return (config_.log_dir / filename).lexically_normal();
   }
 
   fs::path full_path(getLogDir(timer_ns.string()));
-  return (full_path / filename).lexically_normal().string();
+  return (full_path / filename).lexically_normal();
 }
 
 bool LogSetup::valid() const { return valid_; }
