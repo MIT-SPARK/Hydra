@@ -190,7 +190,7 @@ void PythonReconstruction::save(const std::filesystem::path& output) {
 
   LogSetup logs(output);
   if (logs.valid()) {
-    module_->map().save(logs.getLogDir() + "/map");
+    module_->map().save(logs.getLogDir() / "map");
   }
 
   stop();
@@ -204,7 +204,7 @@ void PythonReconstruction::save(const std::filesystem::path& output) {
     return;
   }
 
-  kimera_pgmo::WriteMesh(logs.getLogDir() + "/mesh.ply", *mesh);
+  kimera_pgmo::WriteMesh(logs.getLogDir() / "mesh.ply", *mesh);
 }
 
 namespace python_reconstruction {
