@@ -50,6 +50,7 @@ void declare_config(LabelSpaceConfig& config) {
   // Optional fields.
   field(config.surface_places_labels, "surface_places_labels");
   field(config.ground_labels, "ground_labels");
+  field(config.semantic_layers, "semantic_layers");
 }
 
 }  // namespace hydra
