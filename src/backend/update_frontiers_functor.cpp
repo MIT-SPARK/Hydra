@@ -86,7 +86,7 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns, SharedDsgInfo& dsg) 
     }
 
     const auto& prefix = GlobalInfo::instance().getRobotPrefix();
-    const auto& layer_id = dsg.graph->getLayerKey(DsgLayers::AGENTS)->layer;
+    const auto layer_id = dsg.graph->getLayerKey(DsgLayers::AGENTS)->layer;
     const auto& agents = dsg.graph->getLayer(layer_id, prefix.key);
     NodeSymbol pgmo_key(prefix.key, agents.numNodes() - 1);
     Eigen::Vector3d agent_pos = dsg.graph->getNode(pgmo_key).attributes().position;

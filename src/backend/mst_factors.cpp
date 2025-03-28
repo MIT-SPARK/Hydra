@@ -37,6 +37,7 @@
 #include <glog/logging.h>
 #include <pose_graph_tools/pose_graph.h>
 
+#include "hydra/common/global_info.h"
 #include "hydra/utils/minimum_spanning_tree.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -95,6 +96,7 @@ void addPlacesToDeformationGraph(const DynamicSceneGraph& graph,
 
   {  // start timing scope
     ScopedTimer between_timer("backend/add_places_between", timestamp_ns);
+    const auto robot_id = GlobalInfo::instance().getRobotPrefix().id;
     pose_graph_tools::PoseGraph mst_edges;
     for (const auto& edge : mst_info.edges) {
       gtsam::Pose3 source(gtsam::Rot3(), getNodePosition(places, edge.source));
@@ -102,7 +104,13 @@ void addPlacesToDeformationGraph(const DynamicSceneGraph& graph,
       pose_graph_tools::PoseGraphEdge mst_e;
       mst_e.key_from = edge.source;
       mst_e.key_to = edge.target;
+      mst_e.robot_from = robot_id;
+      mst_e.robot_to = robot_id;
+      // TODO(nathan) this should technically be something else
+      mst_e.type = pose_graph_tools::PoseGraphEdge::Type::MESH;
+      mst_e.stamp_ns = 0;
       mst_e.pose = source.between(target).matrix();
+      mst_e.covariance.setIdentity();
       mst_edges.edges.push_back(mst_e);
     }
 

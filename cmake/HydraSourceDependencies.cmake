@@ -47,7 +47,7 @@ function(populate_content pkgname)
 endfunction()
 
 FetchContent_Declare(
-  nanoflann GIT_REPOSITORY https://github.com/jlblancoc/nanoflann.git GIT_TAG v1.5.0
+  nanoflann GIT_REPOSITORY https://github.com/jlblancoc/nanoflann.git GIT_TAG v1.7.1
 )
 populate_content(nanoflann NANOFLANN_BUILD_TESTS=OFF NANOFLANN_BUILD_EXAMPLES=OFF)
 # nanoflann overrides this, so we set it back
