@@ -112,7 +112,7 @@ void SingleBlockExtractionTestFixture::SetUp() {
   SingleBlockTestFixture::SetUp();
   setBlockState();
 
-  gvd_integrator.reset(new GvdIntegrator(gvd_config, gvd_layer, nullptr));
+  gvd_integrator.reset(new GvdIntegrator(gvd_config, gvd_layer));
   gvd_integrator->updateFromTsdf(0, map->getTsdfLayer(), true);
   gvd_integrator->updateGvd(0);
 }

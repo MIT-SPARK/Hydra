@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/graph_extractor_utilities.h"
 
+#include <config_utilities/config.h>
 #include <spark_dsg/graph_utilities.h>
 #include <spatial_hash/neighbor_utils.h>
 
@@ -62,6 +63,22 @@ void sortComponents(const SceneGraphLayer& graph, Components& to_sort) {
 }
 
 }  // namespace
+
+void declare_config(OverlapEdgeConfig& conf) {
+  using namespace config;
+  name("OverlapEdgeConfig");
+  field(conf.num_neighbors_to_check, "num_neighbors_to_check");
+  field(conf.min_clearance_m, "min_clearance_m");
+}
+
+void declare_config(FreespaceEdgeConfig& conf) {
+  using namespace config;
+  name("FreespaceEdgeConfig");
+  field(conf.max_length_m, "max_length_m");
+  field(conf.num_nodes_to_check, "num_nodes_to_check");
+  field(conf.num_neighbors_to_find, "num_neighbors_to_find");
+  field(conf.min_clearance_m, "min_clearance_m");
+}
 
 // implementation loosely based on: https://gist.github.com/yamamushi/5823518
 GlobalIndices makeBresenhamLine(const GlobalIndex& start, const GlobalIndex& end) {

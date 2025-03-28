@@ -34,14 +34,37 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <bitset>
+#include <cstddef>
+#include <cstdint>
 #include <iostream>
+#include <string>
 
 #include "hydra/common/dsg_types.h"
-#include "hydra/places/graph_extractor_config.h"
 #include "hydra/places/gvd_voxel.h"
 #include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::places {
+
+struct OverlapEdgeConfig {
+  //! Number of nearest neighbors to check for free-space overlap
+  size_t num_neighbors_to_check = 4;
+  //! Minimum radius to nearest obstacle for the free-space intersection
+  double min_clearance_m = 0.4;
+};
+
+struct FreespaceEdgeConfig {
+  //! Maximum edge length to project
+  double max_length_m = 2.0;
+  //! Number of nodes to check in a disconnected component for edge candidates
+  size_t num_nodes_to_check = 5;
+  //! Number of nearest neighbors to find in another disconnected component
+  size_t num_neighbors_to_find = 1;
+  //! Minimum distance to the nearest obstacle along an edge
+  double min_clearance_m = 0.5;
+};
+
+void declare_config(FreespaceEdgeConfig& config);
+void declare_config(OverlapEdgeConfig& config);
 
 using EdgeInfoMap = std::map<EdgeKey, EdgeAttributes::Ptr>;
 using NodeIndexMap = std::unordered_map<NodeId, GlobalIndex>;

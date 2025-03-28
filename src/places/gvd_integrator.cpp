@@ -51,12 +51,10 @@ namespace hydra::places {
 using timing::ScopedTimer;
 
 GvdIntegrator::GvdIntegrator(const GvdIntegratorConfig& config,
-                             const GvdLayer::Ptr& gvd_layer,
-                             const GraphExtractorInterface::Ptr& graph_extractor)
+                             const GvdLayer::Ptr& gvd_layer)
     : default_distance_(config.max_distance_m),
       config_(config),
       gvd_layer_(gvd_layer),
-      graph_extractor_(graph_extractor),
       neighbor_search_(26) {
   // TODO(nathan) we could consider an exception here
   CHECK(gvd_layer_);
@@ -99,28 +97,29 @@ void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
   }
 }
 
-void GvdIntegrator::updateGvd(uint64_t timestamp_ns) {
+void GvdIntegrator::updateGvd(uint64_t timestamp_ns, GraphExtractor* graph_extractor) {
   ScopedTimer timer("places/overall_update", timestamp_ns);
 
   VLOG(2) << "[GVD update] Processing open queue";
   {  // timing scope
     ScopedTimer timer("places/open_queue", timestamp_ns);
-    processOpenQueue();
+    processOpenQueue(graph_extractor);
   }  // timing scope
 
   parent_tracker_.updateVertexMapping(*gvd_layer_);
 
-  if (graph_extractor_) {
+  if (graph_extractor) {
     VLOG(2) << "[GVD update] Starting graph extraction";
     ScopedTimer timer("places/graph_extractor", timestamp_ns);
-    graph_extractor_->extract(*gvd_layer_, timestamp_ns);
-    graph_extractor_->fillParentInfo(*gvd_layer_, parent_tracker_);
+    graph_extractor->extract(*gvd_layer_, timestamp_ns);
+    graph_extractor->fillParentInfo(*gvd_layer_, parent_tracker_);
   }
 
   VLOG(2) << "[GVD update]" << std::endl << update_stats_;
 }
 
-void GvdIntegrator::archiveBlocks(const BlockIndices& blocks) {
+void GvdIntegrator::archiveBlocks(const BlockIndices& blocks,
+                                  GraphExtractor* graph_extractor) {
   for (const auto& idx : blocks) {
     auto block = gvd_layer_->getBlockPtr(idx);
     if (!block) {
@@ -135,8 +134,8 @@ void GvdIntegrator::archiveBlocks(const BlockIndices& blocks) {
       }
 
       const GlobalIndex global_index = block->getGlobalVoxelIndex(v);
-      if (graph_extractor_) {
-        graph_extractor_->removeDistantIndex(global_index);
+      if (graph_extractor) {
+        graph_extractor->removeDistantIndex(global_index);
       }
 
       parent_tracker_.removeVoronoiFromGvdParentMap(global_index);
@@ -197,7 +196,8 @@ bool GvdIntegrator::setFixedParent(const GvdLayer& layer,
 
 void GvdIntegrator::updateGvdVoxel(const GlobalIndex& voxel_index,
                                    GvdVoxel& voxel,
-                                   GvdVoxel& other) {
+                                   GvdVoxel& other,
+                                   GraphExtractor* graph_extractor) {
   if (!isVoronoi(voxel)) {
     update_stats_.number_voronoi_found++;
     parent_tracker_.markNewGvdParent(*gvd_layer_, voxel.parent);
@@ -213,17 +213,20 @@ void GvdIntegrator::updateGvdVoxel(const GlobalIndex& voxel_index,
 
   // pushes the new gvd member to the graph extractor on the first instance that the
   // voxel is observed
-  if (graph_extractor_ && voxel.num_extra_basis == 1) {
-    graph_extractor_->pushGvdIndex(voxel_index);
+  if (graph_extractor && voxel.num_extra_basis == 1) {
+    graph_extractor->pushGvdIndex(voxel_index);
   }
 }
 
-void GvdIntegrator::clearGvdVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
+void GvdIntegrator::clearGvdVoxel(const GlobalIndex& index,
+                                  GvdVoxel& voxel,
+                                  GraphExtractor* graph_extractor) {
   if (voxel.num_extra_basis) {
     // TODO(nathan) rethink how clearing voxels from graph extractor works
-    if (graph_extractor_) {
-      graph_extractor_->clearGvdIndex(index);
+    if (graph_extractor) {
+      graph_extractor->clearGvdIndex(index);
     }
+
     parent_tracker_.removeVoronoiFromGvdParentMap(index);
   }
 
@@ -233,7 +236,8 @@ void GvdIntegrator::clearGvdVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
 void GvdIntegrator::updateVoronoiQueue(GvdVoxel& voxel,
                                        const GlobalIndex& voxel_idx,
                                        GvdVoxel& neighbor,
-                                       const GlobalIndex& neighbor_idx) {
+                                       const GlobalIndex& neighbor_idx,
+                                       GraphExtractor* extractor) {
   VoronoiCondition result =
       checkVoronoi(config_.voronoi_config, voxel, voxel_idx, neighbor, neighbor_idx);
 
@@ -242,11 +246,11 @@ void GvdIntegrator::updateVoronoiQueue(GvdVoxel& voxel,
   }
 
   if (result.current_is_voronoi) {
-    updateGvdVoxel(voxel_idx, voxel, neighbor);
+    updateGvdVoxel(voxel_idx, voxel, neighbor, extractor);
   }
 
   if (result.neighbor_is_voronoi) {
-    updateGvdVoxel(neighbor_idx, neighbor, voxel);
+    updateGvdVoxel(neighbor_idx, neighbor, voxel, extractor);
   }
 }
 
@@ -497,7 +501,9 @@ void GvdIntegrator::raiseVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
   VLOG(10) << "after raise: " << voxel << " @ " << index.transpose();
 }
 
-void GvdIntegrator::lowerVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
+void GvdIntegrator::lowerVoxel(const GlobalIndex& index,
+                               GvdVoxel& voxel,
+                               GraphExtractor* extractor) {
   update_stats_.number_lower_updated++;
   const auto neighbor_indices = neighbor_search_.neighborIndices(index);
 
@@ -554,7 +560,7 @@ void GvdIntegrator::lowerVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
     }
 
     if (!candidate.is_lower) {
-      updateVoronoiQueue(voxel, index, *neighbor, neighbor_index);
+      updateVoronoiQueue(voxel, index, *neighbor, neighbor_index, extractor);
       continue;
     }
 
@@ -572,7 +578,7 @@ void GvdIntegrator::lowerVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
 }
 
 // updateDistanceMap in "B. Lau et al., Efficient grid-based .. (2013)"
-void GvdIntegrator::processOpenQueue() {
+void GvdIntegrator::processOpenQueue(GraphExtractor* extractor) {
   VLOG(10) << "***************************************************";
   VLOG(10) << "* Processing Open Queue                           *";
   VLOG(10) << "***************************************************";
@@ -609,8 +615,8 @@ void GvdIntegrator::processOpenQueue() {
       continue;
     }
 
-    clearGvdVoxel(index, voxel);
-    lowerVoxel(index, voxel);
+    clearGvdVoxel(index, voxel, extractor);
+    lowerVoxel(index, voxel, extractor);
   }
 }
 

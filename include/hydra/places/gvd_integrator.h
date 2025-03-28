@@ -38,7 +38,7 @@
 
 #include <utility>
 
-#include "hydra/places/graph_extractor_interface.h"
+#include "hydra/places/graph_extractor.h"
 #include "hydra/places/gvd_integrator_config.h"
 #include "hydra/places/gvd_parent_tracker.h"
 #include "hydra/places/gvd_utilities.h"
@@ -59,9 +59,7 @@ struct OpenQueueEntry {
  */
 class GvdIntegrator {
  public:
-  GvdIntegrator(const GvdIntegratorConfig& config,
-                const GvdLayer::Ptr& gvd_layer,
-                const GraphExtractorInterface::Ptr& graph_extractor);
+  GvdIntegrator(const GvdIntegratorConfig& config, const GvdLayer::Ptr& gvd_layer);
 
   virtual ~GvdIntegrator() = default;
 
@@ -70,9 +68,10 @@ class GvdIntegrator {
                       bool clear_updated_flag,
                       bool use_all_blocks = false);
 
-  void updateGvd(uint64_t timestamp_ns);
+  void updateGvd(uint64_t timestamp_ns, GraphExtractor* graph_extractor = nullptr);
 
-  void archiveBlocks(const BlockIndices& blocks);
+  void archiveBlocks(const BlockIndices& blocks,
+                     GraphExtractor* graph_extractor = nullptr);
 
   // TODO(nathan) test this
   static bool setFixedParent(const GvdLayer& layer,
@@ -82,14 +81,20 @@ class GvdIntegrator {
 
  protected:
   // GVD membership
-  void updateGvdVoxel(const GlobalIndex& voxel_index, GvdVoxel& voxel, GvdVoxel& other);
+  void updateGvdVoxel(const GlobalIndex& voxel_index,
+                      GvdVoxel& voxel,
+                      GvdVoxel& other,
+                      GraphExtractor* graph_extractor);
 
-  void clearGvdVoxel(const GlobalIndex& index, GvdVoxel& voxel);
+  void clearGvdVoxel(const GlobalIndex& index,
+                     GvdVoxel& voxel,
+                     GraphExtractor* graph_extractor);
 
   void updateVoronoiQueue(GvdVoxel& curr_voxel,
                           const GlobalIndex& curr_pos,
                           GvdVoxel& neighbor_voxel,
-                          const GlobalIndex& neighbor_pos);
+                          const GlobalIndex& neighbor_pos,
+                          GraphExtractor* extractor);
 
   // TSDF propagation
   void propagateSurface(const BlockIndex& block_index, const TsdfLayer& tsdf);
@@ -109,9 +114,9 @@ class GvdIntegrator {
 
   void raiseVoxel(const GlobalIndex& index, GvdVoxel& voxel);
 
-  void lowerVoxel(const GlobalIndex& index, GvdVoxel& voxel);
+  void lowerVoxel(const GlobalIndex& index, GvdVoxel& voxel, GraphExtractor* extractor);
 
-  void processOpenQueue();
+  void processOpenQueue(GraphExtractor* extractor);
 
   // Helpers
   bool isTsdfFixed(const TsdfVoxel& voxel);
@@ -128,7 +133,6 @@ class GvdIntegrator {
   GvdIntegratorConfig config_;
   GvdLayer::Ptr gvd_layer_;
 
-  GraphExtractorInterface::Ptr graph_extractor_;
   GvdParentTracker parent_tracker_;
   const spatial_hash::NeighborSearch neighbor_search_;
 

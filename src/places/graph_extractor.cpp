@@ -32,12 +32,14 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/places/compression_graph_extractor.h"
+#include "hydra/places/graph_extractor.h"
 
+#include <config_utilities/config.h>
 #include <glog/stl_logging.h>
 #include <spatial_hash/neighbor_utils.h>
 
 #include "hydra/places/graph_extractor_utilities.h"
+#include "hydra/places/gvd_parent_tracker.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra::places {
@@ -49,6 +51,28 @@ struct DeleteInfo {
   GlobalIndex index;
   uint64_t id;
 };
+
+void declare_config(GraphExtractor::Config& config) {
+  using namespace config;
+  name("GraphExtractor::Config");
+  field(config.compression_distance_m, "compression_distance_m");
+  field(config.validate_graph, "validate_graph");
+  field(config.min_node_distance_m, "min_node_distance_m");
+  field(config.min_edge_distance_m, "min_edge_distance_m");
+  field(config.merge_nearby_nodes, "merge_new_nodes");
+  field(config.add_heuristic_edges, "add_heuristic_edges");
+  field(config.merge_policy, "merge_policy");
+  field(config.node_merge_distance_m, "node_merge_distance_m");
+  field(config.add_overlap_edges, "add_overlap_edges");
+  if (config.add_overlap_edges) {
+    field(config.overlap_edges, "overlap_edges");
+  }
+
+  field(config.add_freespace_edges, "add_freespace_edges");
+  if (config.add_freespace_edges) {
+    field(config.freespace_edges, "freespace_edges");
+  }
+}
 
 CompressedNode::CompressedNode(uint64_t id) : node_id(id) {}
 
@@ -168,18 +192,247 @@ void CompressedNode::merge(CompressedNode& other, CompressedNodeMap& nodes) {
   }
 }
 
-CompressionGraphExtractor::CompressionGraphExtractor(
-    const CompressionExtractorConfig& config)
-    : GraphExtractorInterface(config),
-      config_(config),
+GraphExtractor::GraphExtractor(const Config& config)
+    : config(config),
+      next_node_id_('p', 0),
+      gvd_(new GvdGraph()),
+      graph_(new SceneGraphLayer(DsgLayers::PLACES)),
+      compression_factor_(1.0 / config.compression_distance_m),
       merge_policy_(config::create<MergePolicy>(config.merge_policy)),
-      next_id_(0) {
-  compression_factor_ = 1.0 / config_.compression_distance_m;
+      next_id_(0) {}
+
+GraphExtractor::~GraphExtractor() = default;
+
+void GraphExtractor::pushGvdIndex(const GlobalIndex& index) {
+  modified_voxel_queue_.push(index);
 }
 
-CompressionGraphExtractor::~CompressionGraphExtractor() = default;
+NearestVertexInfo convertInfo(const GvdVertexInfo& parent_info) {
+  NearestVertexInfo info;
+  info.voxel_pos[0] = parent_info.pos[0];
+  info.voxel_pos[1] = parent_info.pos[1];
+  info.voxel_pos[2] = parent_info.pos[2];
+  return info;
+}
 
-void CompressionGraphExtractor::clearGvdIndex(const GlobalIndex& index) {
+void GraphExtractor::fillParentInfo(const GvdLayer& gvd,
+                                    const GvdParentTracker& tracker) {
+  for (auto&& [node_id, node_index] : node_index_map_) {
+    auto& attrs = graph_->getNode(node_id).attributes<PlaceNodeAttributes>();
+    attrs.voxblox_mesh_connections.clear();
+
+    const auto* voxel = gvd.getVoxelPtr(node_index);
+    if (!voxel) {
+      // the compression-based extractor can have nodes pointing to archived voxels
+      continue;
+    }
+
+    CHECK(tracker.parents.count(node_index))
+        << "bad gvd voxel: " << *voxel << " @ " << node_index.transpose();
+
+    // save primary parent first
+    const GlobalIndex curr_parent = voxel->parent;
+    auto iter = tracker.parent_vertices.find(curr_parent);
+    if (iter != tracker.parent_vertices.end()) {
+      attrs.voxblox_mesh_connections.push_back(convertInfo(iter->second));
+    }
+
+    // save all other basis points
+    for (const auto& parent : tracker.parents.at(node_index)) {
+      if (!tracker.parent_vertices.count(parent)) {
+        continue;
+      }
+
+      const auto& parent_info = tracker.parent_vertices.at(parent);
+      attrs.voxblox_mesh_connections.push_back(convertInfo(parent_info));
+    }
+  }
+}
+
+const SceneGraphLayer& GraphExtractor::getGraph() const { return *graph_; }
+
+const GvdGraph& GraphExtractor::getGvdGraph() const { return *gvd_; }
+
+std::unordered_set<NodeId> GraphExtractor::getActiveNodes() const {
+  std::unordered_set<NodeId> nodes;
+  for (const auto& id_index_pair : node_index_map_) {
+    nodes.insert(id_index_pair.first);
+  }
+  return nodes;
+}
+
+const std::unordered_set<NodeId>& GraphExtractor::getDeletedNodes() const {
+  return deleted_nodes_;
+}
+
+const std::vector<NodeId>& GraphExtractor::getDeletedEdges() const {
+  return deleted_edges_;
+}
+
+void GraphExtractor::clearDeleted() {
+  deleted_nodes_.clear();
+  deleted_edges_.clear();
+}
+
+NodeId GraphExtractor::addPlaceToGraph(const GvdLayer& layer,
+                                       const GvdVoxel& voxel,
+                                       const GlobalIndex& index) {
+  const auto distance = voxel.distance;
+  const auto basis = voxel.num_extra_basis + 1;
+
+  PlaceNodeAttributes::Ptr attrs(new PlaceNodeAttributes(distance, basis));
+  attrs->position = layer.getVoxelPosition(index).cast<double>();
+  graph_->emplaceNode(next_node_id_, std::move(attrs));
+
+  NodeId new_node = next_node_id_;
+  next_node_id_++;
+  return new_node;
+}
+
+EdgeAttributes::Ptr GraphExtractor::makeEdgeInfo(const GvdLayer& layer,
+                                                 NodeId source_id,
+                                                 NodeId target_id) const {
+  const double source_dist =
+      graph_->getNode(source_id).attributes<PlaceNodeAttributes>().distance;
+  const double target_dist =
+      graph_->getNode(target_id).attributes<PlaceNodeAttributes>().distance;
+
+  double min_weight = std::min(source_dist, target_dist);
+
+  const GlobalIndex source = node_index_map_.at(source_id);
+  const GlobalIndex target = node_index_map_.at(target_id);
+  auto path = makeBresenhamLine(source, target);
+  if (path.empty()) {
+    // edge is smaller than voxel size, so we just take the min distance between two
+    // voxels
+    return std::make_unique<EdgeAttributes>(min_weight);
+  }
+
+  for (const auto& index : path) {
+    const GvdVoxel* voxel = layer.getVoxelPtr(index);
+    if (!voxel) {
+      continue;
+    }
+
+    if (voxel->distance < min_weight) {
+      min_weight = voxel->distance;
+    }
+  }
+
+  return std::make_unique<EdgeAttributes>(min_weight);
+}
+
+GlobalIndex GraphExtractor::popFromModifiedQueue() {
+  GlobalIndex index = modified_voxel_queue_.front();
+  modified_voxel_queue_.pop();
+  return index;
+}
+
+void GraphExtractor::removeGraphNode(NodeId node) {
+  graph_->removeNode(node);
+  deleted_nodes_.insert(node);
+}
+
+void GraphExtractor::updateGraphEdge(NodeId source,
+                                     NodeId target,
+                                     EdgeAttributes::Ptr&& attrs,
+                                     bool is_heursitic) {
+  auto prev_edge = graph_->findEdge(source, target);
+  if (prev_edge) {
+    *prev_edge->info = *attrs;
+    if (!is_heursitic) {
+      // make sure any non-heurstic source of an edge takes precedence
+      heuristic_edges_.erase(EdgeKey(source, target));
+    }
+  } else {
+    graph_->insertEdge(source, target, std::move(attrs));
+  }
+}
+
+void GraphExtractor::addGraphNode(NodeId node, PlaceNodeAttributes::Ptr&& attrs) {
+  graph_->emplaceNode(
+      node, attrs ? std::move(attrs) : std::make_unique<PlaceNodeAttributes>());
+}
+
+void GraphExtractor::removeGraphEdge(NodeId source, NodeId target) {
+  graph_->removeEdge(source, target);
+  deleted_edges_.push_back(source);
+  deleted_edges_.push_back(target);
+}
+
+void GraphExtractor::mergeGraphNodes(NodeId from, NodeId to) {
+  graph_->mergeNodes(from, to);
+  deleted_nodes_.insert(from);
+}
+
+void GraphExtractor::updateHeuristicEdges(const GvdLayer& gvd) {
+  const auto active_nodes = getActiveNodes();
+
+  auto iter = heuristic_edges_.begin();
+  while (iter != heuristic_edges_.end()) {
+    const auto source = iter->first.k1;
+    const auto target = iter->first.k2;
+    if (!active_nodes.count(source) || !active_nodes.count(target)) {
+      iter = heuristic_edges_.erase(iter);
+      continue;
+    }
+
+    EdgeAttributes::Ptr info;
+    if (iter->second) {
+      info = getOverlapEdgeInfo(
+          *graph_, source, target, config.overlap_edges.min_clearance_m);
+    } else {
+      info = getFreespaceEdgeInfo(*graph_,
+                                  gvd,
+                                  node_index_map_,
+                                  source,
+                                  target,
+                                  config.freespace_edges.min_clearance_m);
+    }
+
+    if (!info) {
+      removeGraphEdge(source, target);
+      iter = heuristic_edges_.erase(iter);
+      continue;
+    }
+
+    updateGraphEdge(source, target, std::move(info), true);
+    ++iter;
+  }
+
+  // add local connectivity
+  if (config.add_overlap_edges) {
+    EdgeInfoMap proposed_edges;
+    findOverlapEdges(config.overlap_edges, *graph_, active_nodes, proposed_edges);
+    for (auto& key_edge_pair : proposed_edges) {
+      updateGraphEdge(key_edge_pair.first.k1,
+                      key_edge_pair.first.k2,
+                      std::move(key_edge_pair.second),
+                      true);
+      heuristic_edges_.emplace(key_edge_pair.first, true);
+    }
+  }
+
+  if (config.add_freespace_edges) {
+    EdgeInfoMap proposed_edges;
+    findFreespaceEdges(config.freespace_edges,
+                       *graph_,
+                       gvd,
+                       active_nodes,
+                       node_index_map_,
+                       proposed_edges);
+
+    for (auto& key_edge_pair : proposed_edges) {
+      updateGraphEdge(key_edge_pair.first.k1,
+                      key_edge_pair.first.k2,
+                      std::move(key_edge_pair.second),
+                      true);
+      heuristic_edges_.emplace(key_edge_pair.first, false);
+    }
+  }
+}
+
+void GraphExtractor::clearGvdIndex(const GlobalIndex& index) {
   // gvd integrator update removes any invalidated voxels, deleting nodes that no
   // longer have any support. We remove any deleted entries from the active set, and
   // once the active set is empty, we delete the compressed node if the archived set is
@@ -240,7 +493,7 @@ void CompressionGraphExtractor::clearGvdIndex(const GlobalIndex& index) {
   }
 }
 
-void CompressionGraphExtractor::clearCompressionId(uint64_t node_id, bool is_delete) {
+void GraphExtractor::clearCompressionId(uint64_t node_id, bool is_delete) {
   // clear mapping between compression index and node id
   {
     // erase node entry from compression cell and erase compression cell if empty
@@ -269,14 +522,14 @@ void CompressionGraphExtractor::clearCompressionId(uint64_t node_id, bool is_del
            << " from compressed graph";
 }
 
-void CompressionGraphExtractor::deleteChildren(const CompressedNode& info) {
+void GraphExtractor::deleteChildren(const CompressedNode& info) {
   for (const auto gvd_id : info.archived_refs) {
     compressed_remapping_.erase(gvd_id);
     gvd_->removeNode(gvd_id);
   }
 }
 
-void CompressionGraphExtractor::removeDistantIndex(const GlobalIndex& index) {
+void GraphExtractor::removeDistantIndex(const GlobalIndex& index) {
   // 4. we archive all voxels, updating each compressed node
   //   a. we move entries from an active set to an archived set
   //   b. once there are no more entires in the active set, we flag as archived
@@ -312,9 +565,9 @@ void CompressionGraphExtractor::removeDistantIndex(const GlobalIndex& index) {
   }
 }
 
-void CompressionGraphExtractor::fillSeenVoxels(const GvdLayer& layer,
-                                               uint64_t timestamp_ns,
-                                               IndexVoxelQueue& seen_voxels) {
+void GraphExtractor::fillSeenVoxels(const GvdLayer& layer,
+                                    uint64_t timestamp_ns,
+                                    IndexVoxelQueue& seen_voxels) {
   ScopedTimer timer("places/prune_gvd_queue", timestamp_ns);
 
   GlobalIndexSet seen_indices;
@@ -344,7 +597,7 @@ void CompressionGraphExtractor::fillSeenVoxels(const GvdLayer& layer,
   }
 }
 
-void CompressionGraphExtractor::clearArchived() {
+void GraphExtractor::clearArchived() {
   std::list<uint64_t> to_remove;
   for (const auto id : to_archive_) {
     auto& info = compressed_info_map_.at(id);
@@ -370,7 +623,7 @@ void CompressionGraphExtractor::clearArchived() {
   }
 }
 
-void CompressionGraphExtractor::extract(const GvdLayer& layer, uint64_t timestamp_ns) {
+void GraphExtractor::extract(const GvdLayer& layer, uint64_t timestamp_ns) {
   // 0(a). remove all archived nodes that no longer have active siblings
   clearArchived();
 
@@ -396,24 +649,24 @@ void CompressionGraphExtractor::extract(const GvdLayer& layer, uint64_t timestam
 
   // TODO(nathan) think about the order here a little more
   // 5. we optionally merge nearby nodes
-  if (config_.merge_nearby_nodes) {
+  if (config.merge_nearby_nodes) {
     mergeNearbyNodes();
   }
   updated_nodes_.clear();
 
-  if (config_.add_heuristic_edges) {
+  if (config.add_heuristic_edges) {
     updateHeuristicEdges(layer);
   }
 
-  if (config_.validate_graph) {
+  if (config.validate_graph) {
     validate(layer);
   }
 }
 
-void CompressionGraphExtractor::updateNode(const GlobalIndex& index,
-                                           const Eigen::Vector3d& position,
-                                           double distance,
-                                           uint8_t num_basis_points) {
+void GraphExtractor::updateNode(const GlobalIndex& index,
+                                const Eigen::Vector3d& position,
+                                double distance,
+                                uint8_t num_basis_points) {
   auto iter = index_id_map_.find(index);
   if (iter == index_id_map_.end()) {
     const auto next_id = gvd_->addNode(position, index);
@@ -425,9 +678,9 @@ void CompressionGraphExtractor::updateNode(const GlobalIndex& index,
   info.num_basis_points = num_basis_points;
 }
 
-void CompressionGraphExtractor::updateNodeInfoMap(const GvdLayer& layer,
-                                                  const IndexVoxelQueue& update_info,
-                                                  uint64_t timestamp_ns) {
+void GraphExtractor::updateNodeInfoMap(const GvdLayer& layer,
+                                       const IndexVoxelQueue& update_info,
+                                       uint64_t timestamp_ns) {
   ScopedTimer timer("places/handle_gvd_queue", timestamp_ns);
 
   for (const auto& index_voxel_pair : update_info) {
@@ -438,8 +691,8 @@ void CompressionGraphExtractor::updateNodeInfoMap(const GvdLayer& layer,
   }
 }
 
-void CompressionGraphExtractor::updateGvdGraph(const IndexVoxelQueue& update_info,
-                                               uint64_t timestamp_ns) {
+void GraphExtractor::updateGvdGraph(const IndexVoxelQueue& update_info,
+                                    uint64_t timestamp_ns) {
   ScopedTimer timer("places/update_gvd_graph", timestamp_ns);
   std::list<DeleteInfo> to_delete;
 
@@ -468,7 +721,7 @@ void CompressionGraphExtractor::updateGvdGraph(const IndexVoxelQueue& update_inf
       continue;  // isolated voxel
     }
 
-    if (info.distance >= config_.min_node_distance_m) {
+    if (info.distance >= config.min_node_distance_m) {
       compressNode(iter->second, info);
     }
   }
@@ -478,19 +731,18 @@ void CompressionGraphExtractor::updateGvdGraph(const IndexVoxelQueue& update_inf
   }
 }
 
-GlobalIndex CompressionGraphExtractor::getCompressedIndex(
-    const Eigen::Vector3d& point) const {
+GlobalIndex GraphExtractor::getCompressedIndex(const Eigen::Vector3d& point) const {
   const Eigen::Vector3d scaled_point = point * compression_factor_;
   return GlobalIndex(std::round(scaled_point(0)),
                      std::round(scaled_point(1)),
                      std::round(scaled_point(2)));
 }
 
-NodeId CompressionGraphExtractor::getPlaceId(uint64_t gvd_id) const {
+NodeId GraphExtractor::getPlaceId(uint64_t gvd_id) const {
   return NodeSymbol(next_node_id_.category(), gvd_id);
 }
 
-uint64_t CompressionGraphExtractor::getNextId() {
+uint64_t GraphExtractor::getNextId() {
   uint64_t new_id;
   // if (id_queue_.empty()) {
   new_id = next_id_;
@@ -503,7 +755,7 @@ uint64_t CompressionGraphExtractor::getNextId() {
   return new_id;
 }
 
-std::optional<uint64_t> CompressionGraphExtractor::findCluster(
+std::optional<uint64_t> GraphExtractor::findCluster(
     uint64_t node_id, const GvdMemberInfo& node, const std::set<uint64_t>& clusters) {
   for (const auto cluster : clusters) {
     CHECK(compressed_info_map_.count(cluster))
@@ -528,9 +780,9 @@ std::optional<uint64_t> CompressionGraphExtractor::findCluster(
   return std::nullopt;
 }
 
-void CompressionGraphExtractor::mergeCompressedNodes(uint64_t curr_node_id,
-                                                     CompressedNode& curr_node,
-                                                     uint64_t neighbor_node_id) {
+void GraphExtractor::mergeCompressedNodes(uint64_t curr_node_id,
+                                          CompressedNode& curr_node,
+                                          uint64_t neighbor_node_id) {
   auto iter = compressed_info_map_.find(neighbor_node_id);
   for (const auto child : iter->second.active_refs) {
     compressed_remapping_[child] = curr_node_id;
@@ -555,8 +807,7 @@ void CompressionGraphExtractor::mergeCompressedNodes(uint64_t curr_node_id,
   archived_node_ids_.erase(neighbor_node_id);
 }
 
-void CompressionGraphExtractor::compressNode(uint64_t node_id,
-                                             const GvdMemberInfo& node) {
+void GraphExtractor::compressNode(uint64_t node_id, const GvdMemberInfo& node) {
   // TODO(nathan) can maybe speed this up by looking up id->index mapping
   // get index via spatial hashing at (1 / desired_resolution)
   const auto index = getCompressedIndex(node.position);
@@ -609,7 +860,7 @@ void CompressionGraphExtractor::compressNode(uint64_t node_id,
   }
 }
 
-void CompressionGraphExtractor::assignCompressedNodeAttributes() {
+void GraphExtractor::assignCompressedNodeAttributes() {
   for (const auto& compressed_id : updated_nodes_) {
     auto& info = compressed_info_map_.at(compressed_id);
 
@@ -664,7 +915,7 @@ void CompressionGraphExtractor::assignCompressedNodeAttributes() {
   }
 }
 
-void CompressionGraphExtractor::mergeNearbyNodes() {
+void GraphExtractor::mergeNearbyNodes() {
   std::unordered_map<uint64_t, uint64_t> merges;
   std::unordered_map<uint64_t, std::unordered_set<uint64_t>> reversed_merges;
   for (const auto& compressed_id : updated_nodes_) {
@@ -685,7 +936,7 @@ void CompressionGraphExtractor::mergeNearbyNodes() {
 
       const auto gvd1 = gvd_->getNode(info.best_gvd_id);
       const auto gvd2 = gvd_->getNode(sibling_info.best_gvd_id);
-      if ((gvd1->position - gvd2->position).norm() > config_.node_merge_distance_m) {
+      if ((gvd1->position - gvd2->position).norm() > config.node_merge_distance_m) {
         continue;
       }
 
@@ -727,7 +978,7 @@ void CompressionGraphExtractor::mergeNearbyNodes() {
   }
 }
 
-void CompressionGraphExtractor::updateCompressedEdges(const GvdLayer& layer) {
+void GraphExtractor::updateCompressedEdges(const GvdLayer& layer) {
   for (const auto& compressed_id : updated_nodes_) {
     auto& info = compressed_info_map_.at(compressed_id);
     const auto graph_id = getPlaceId(compressed_id);
@@ -744,7 +995,7 @@ void CompressionGraphExtractor::updateCompressedEdges(const GvdLayer& layer) {
       }
 
       auto attrs = makeEdgeInfo(layer, graph_id, sibling_graph_id);
-      if (attrs->weight < config_.min_edge_distance_m) {
+      if (attrs->weight < config.min_edge_distance_m) {
         removeGraphEdge(graph_id, sibling_id);
         continue;
       }
@@ -754,7 +1005,7 @@ void CompressionGraphExtractor::updateCompressedEdges(const GvdLayer& layer) {
   }
 }
 
-void CompressionGraphExtractor::validate(const GvdLayer& layer) const {
+void GraphExtractor::validate(const GvdLayer& layer) const {
   const auto& graph = getGraph();
   for (const auto& id_node_pair : graph.nodes()) {
     const NodeSymbol node_id(id_node_pair.first);

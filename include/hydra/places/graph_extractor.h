@@ -33,14 +33,18 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
-
 #include <queue>
 
-#include "hydra/places/graph_extractor_interface.h"
+#include "hydra/common/dsg_types.h"
+#include "hydra/places/graph_extractor_utilities.h"
+#include "hydra/places/gvd_graph.h"
 #include "hydra/places/gvd_merge_policies.h"
+#include "hydra/places/gvd_voxel.h"
+#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::places {
+
+struct GvdParentTracker;
 
 struct IndexVoxelPair {
   GlobalIndex index;
@@ -75,30 +79,100 @@ struct CompressedNode {
 
 using IndexVoxelQueue = std::list<IndexVoxelPair>;
 
-class CompressionGraphExtractor : public GraphExtractorInterface {
+class GraphExtractor {
  public:
-  using Ptr = std::unique_ptr<CompressionGraphExtractor>;
+  using Ptr = std::shared_ptr<GraphExtractor>;
+  using NodeIndexMap = std::unordered_map<NodeId, GlobalIndex>;
 
-  explicit CompressionGraphExtractor(const CompressionExtractorConfig& config);
+  struct Config {
+    //! Average resolution of sparse graph
+    double compression_distance_m = 0.5;
+    //! Validate graph properties
+    bool validate_graph = false;
+    //! Minimum distance for a GVD node to be considered for compression
+    double min_node_distance_m = 0.3;
+    //! Minimum distance for a edge to be valid
+    double min_edge_distance_m = 0.4;
+    //! Whether to merge nearby neighbors
+    bool merge_nearby_nodes = true;
+    //! Distance to consider a merge at
+    double node_merge_distance_m = 0.3;
+    //! Merge policy
+    std::string merge_policy = "basis_points";
+    //! Whether or not to add heuristic edges
+    bool add_heuristic_edges = false;
+    //! Add edges between nodes that have overlapping free-space regions
+    bool add_overlap_edges = true;
+    //! Configuration for overlap-based edges
+    OverlapEdgeConfig overlap_edges;
+    //! Add edges between disconnected components
+    bool add_freespace_edges = true;
+    //! Configuration for freespace edges
+    FreespaceEdgeConfig freespace_edges;
+  } const config;
 
-  virtual ~CompressionGraphExtractor();
+  explicit GraphExtractor(const Config& config);
 
-  void clearGvdIndex(const GlobalIndex& index) override;
+  virtual ~GraphExtractor();
 
-  void removeDistantIndex(const GlobalIndex& index) override;
+  void pushGvdIndex(const GlobalIndex& index);
 
-  void extract(const GvdLayer& layer, uint64_t timestamp_ns) override;
+  void clearGvdIndex(const GlobalIndex& index);
 
-  inline const std::unordered_map<uint64_t, CompressedNode>& getCompressedNodeInfo()
-      const {
+  void removeDistantIndex(const GlobalIndex& index);
+
+  void extract(const GvdLayer& layer, uint64_t timestamp_ns);
+
+  void fillParentInfo(const GvdLayer& gvd, const GvdParentTracker& parents);
+
+  const SceneGraphLayer& getGraph() const;
+
+  const GvdGraph& getGvdGraph() const;
+
+  std::unordered_set<NodeId> getActiveNodes() const;
+
+  const std::unordered_set<NodeId>& getDeletedNodes() const;
+
+  const std::vector<NodeId>& getDeletedEdges() const;
+
+  void clearDeleted();
+
+  const NodeIndexMap& getIndexMap() const { return node_index_map_; }
+
+  const std::unordered_map<uint64_t, CompressedNode>& getCompressedNodeInfo() const {
     return compressed_info_map_;
   }
 
-  inline const std::unordered_map<uint64_t, uint64_t>& getCompressedRemapping() const {
+  const std::unordered_map<uint64_t, uint64_t>& getCompressedRemapping() const {
     return compressed_remapping_;
   }
 
  protected:
+  NodeId addPlaceToGraph(const GvdLayer& layer,
+                         const GvdVoxel& voxel,
+                         const GlobalIndex& index);
+
+  EdgeAttributes::Ptr makeEdgeInfo(const GvdLayer& layer,
+                                   NodeId source_id,
+                                   NodeId target_id) const;
+
+  GlobalIndex popFromModifiedQueue();
+
+  void removeGraphNode(NodeId node);
+
+  void updateGraphEdge(NodeId source,
+                       NodeId target,
+                       EdgeAttributes::Ptr&& attrs,
+                       bool is_heursitic = false);
+
+  void addGraphNode(NodeId node, PlaceNodeAttributes::Ptr&& attrs = nullptr);
+
+  void removeGraphEdge(NodeId source, NodeId target);
+
+  void mergeGraphNodes(NodeId from, NodeId to);
+
+  void updateHeuristicEdges(const GvdLayer& layer);
+
   void fillSeenVoxels(const GvdLayer& layer,
                       uint64_t timestamp_ns,
                       IndexVoxelQueue& seen_voxels);
@@ -145,8 +219,19 @@ class CompressionGraphExtractor : public GraphExtractorInterface {
                             uint64_t neighbor_node_id);
 
  protected:
-  CompressionExtractorConfig config_;
-  double compression_factor_;
+  NodeSymbol next_node_id_;
+  GvdGraph::Ptr gvd_;
+  // just to make book-keeping easier
+  SceneGraphLayer::Ptr graph_;
+
+  NodeIndexMap node_index_map_;
+  std::queue<GlobalIndex> modified_voxel_queue_;
+
+  std::map<EdgeKey, bool> heuristic_edges_;
+  std::unordered_set<NodeId> deleted_nodes_;
+  std::vector<NodeId> deleted_edges_;
+
+  const double compression_factor_;
   GlobalIndexMap<uint64_t> index_id_map_;
   std::unique_ptr<MergePolicy> merge_policy_;
 
@@ -162,12 +247,8 @@ class CompressionGraphExtractor : public GraphExtractorInterface {
   std::unordered_map<uint64_t, uint64_t> compressed_remapping_;
 
   std::unordered_set<NodeId> archived_node_ids_;
-
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<GraphExtractorInterface,
-                                     CompressionGraphExtractor,
-                                     CompressionExtractorConfig>(
-          "CompressionGraphExtractor");
 };
+
+void declare_config(GraphExtractor::Config& config);
 
 }  // namespace hydra::places

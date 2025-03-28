@@ -33,36 +33,34 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/places/compression_graph_extractor.h>
+#include <hydra/places/graph_extractor.h>
 
 namespace hydra::places {
 
 namespace {
 
-class TestGraphExtractor : public CompressionGraphExtractor {
+class TestGraphExtractor : public GraphExtractor {
  public:
-  explicit TestGraphExtractor(const CompressionExtractorConfig& config)
-      : CompressionGraphExtractor(config) {}
-
+  explicit TestGraphExtractor(const Config& config) : GraphExtractor(config) {}
   ~TestGraphExtractor() = default;
 
   void assignCompressedNodeAttributes(bool clear_active = true) {
-    CompressionGraphExtractor::assignCompressedNodeAttributes();
+    GraphExtractor::assignCompressedNodeAttributes();
     if (clear_active) {
       updated_nodes_.clear();
     }
   }
 
-  using CompressionGraphExtractor::clearArchived;
-  using CompressionGraphExtractor::updateGvdGraph;
-  using CompressionGraphExtractor::updateNode;
+  using GraphExtractor::clearArchived;
+  using GraphExtractor::updateGvdGraph;
+  using GraphExtractor::updateNode;
 
-  using CompressionGraphExtractor::compressed_id_map_;
-  using CompressionGraphExtractor::compressed_index_map_;
-  using CompressionGraphExtractor::compressed_info_map_;
-  using CompressionGraphExtractor::compressed_remapping_;
-  using CompressionGraphExtractor::to_archive_;
-  using CompressionGraphExtractor::updated_nodes_;
+  using GraphExtractor::compressed_id_map_;
+  using GraphExtractor::compressed_index_map_;
+  using GraphExtractor::compressed_info_map_;
+  using GraphExtractor::compressed_remapping_;
+  using GraphExtractor::to_archive_;
+  using GraphExtractor::updated_nodes_;
 
   void setGvdNode(
       uint64_t x, uint64_t y, uint64_t z, double distance, uint8_t num_basis) {
@@ -96,7 +94,7 @@ class CompressionGraphExtractorTestFixture : public ::testing::Test {
 };
 
 TEST_F(CompressionGraphExtractorTestFixture, TestUpdateNode) {
-  CompressionExtractorConfig config;
+  GraphExtractor::Config config;
   TestGraphExtractor extractor(config);
   const auto& gvd = extractor.getGvdGraph();
 
@@ -139,7 +137,7 @@ TEST_F(CompressionGraphExtractorTestFixture, TestUpdateNode) {
 }
 
 TEST_F(CompressionGraphExtractorTestFixture, testUpdateGraph) {
-  CompressionExtractorConfig config;
+  GraphExtractor::Config config;
   config.min_node_distance_m = 0.0;
   TestGraphExtractor extractor(config);
   const auto& gvd = extractor.getGvdGraph();
@@ -222,7 +220,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testUpdateGraph) {
 }
 
 TEST_F(CompressionGraphExtractorTestFixture, testAttributeAssignmentOneToOne) {
-  CompressionExtractorConfig config;
+  GraphExtractor::Config config;
   config.min_node_distance_m = 0.0;
 
   TestGraphExtractor extractor(config);
@@ -282,7 +280,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testAttributeAssignmentOneToOne) {
 }
 
 TEST_F(CompressionGraphExtractorTestFixture, testAttributeAssignmentManyToOne) {
-  CompressionExtractorConfig config;
+  GraphExtractor::Config config;
   config.min_node_distance_m = 0.1;
   config.compression_distance_m = 3.0;
   TestGraphExtractor extractor(config);
@@ -335,7 +333,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testAttributeAssignmentManyToOne) {
 
 // show that isolated voxels deletion gets propagated to compressed graph
 TEST_F(CompressionGraphExtractorTestFixture, testSingleVoxelDeletion) {
-  CompressionExtractorConfig config;
+  GraphExtractor::Config config;
   config.compression_distance_m = 3.0;
   config.min_node_distance_m = 0.1;
   TestGraphExtractor extractor(config);
@@ -391,7 +389,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testSingleVoxelDeletion) {
 }
 
 TEST_F(CompressionGraphExtractorTestFixture, testVoxelDeletion) {
-  CompressionExtractorConfig config;
+  GraphExtractor::Config config;
   config.compression_distance_m = 3.0;
   config.min_node_distance_m = 0.0;
   TestGraphExtractor extractor(config);
@@ -481,7 +479,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testVoxelDeletion) {
 }
 
 TEST_F(CompressionGraphExtractorTestFixture, testVoxelArchival) {
-  CompressionExtractorConfig config;
+  GraphExtractor::Config config;
   config.compression_distance_m = 3.0;
   config.min_node_distance_m = 0.0;
   TestGraphExtractor extractor(config);
@@ -552,7 +550,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testVoxelArchival) {
 }
 
 TEST_F(CompressionGraphExtractorTestFixture, testArchiveAndDelete) {
-  CompressionExtractorConfig config;
+  GraphExtractor::Config config;
   config.compression_distance_m = 3.0;
   config.min_node_distance_m = 0.0;
   TestGraphExtractor extractor(config);
@@ -611,9 +609,9 @@ TEST_F(CompressionGraphExtractorTestFixture, testArchiveAndDelete) {
 }
 
 TEST_F(CompressionGraphExtractorTestFixture, testUniformGvd) {
-  CompressionExtractorConfig config;
+  GraphExtractor::Config config;
   config.compression_distance_m = 0.5;
-  CompressionGraphExtractor extractor(config);
+  GraphExtractor extractor(config);
 
   const auto& gvd = extractor.getGvdGraph();
   EXPECT_TRUE(gvd.empty());

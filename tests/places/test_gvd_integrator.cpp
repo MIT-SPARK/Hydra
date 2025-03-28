@@ -121,8 +121,7 @@ TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
   gvd_config.voronoi_config.min_distance_m = 1.0;
   gvd_config.voronoi_config.parent_l1_separation = 2.0;
 
-  // no graph extractor disables places extraction
-  GvdIntegrator gvd_integrator(gvd_config, gvd_layer, nullptr);
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
   gvd_integrator.updateFromTsdf(0, *tsdf_layer, false);
   gvd_integrator.updateGvd(0);
 
@@ -248,7 +247,7 @@ TEST_F(TestFixture2d, NegativeIntegrationCorrect) {
   gvd_config.positive_distance_only = false;
 
   // no graph extractor disables places extraction
-  GvdIntegrator gvd_integrator(gvd_config, gvd_layer, nullptr);
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
   gvd_integrator.updateFromTsdf(0, *tsdf_layer, false);
   gvd_integrator.updateGvd(0);
 
@@ -286,7 +285,7 @@ TEST_F(TestFixture2d, NegativeIntegrationCorrect) {
 }
 
 TEST_F(SingleBlockTestFixture, PlaneCorrect) {
-  GvdIntegrator gvd_integrator(gvd_config, gvd_layer, nullptr);
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {
@@ -317,7 +316,7 @@ TEST_F(SingleBlockTestFixture, PlaneCorrect) {
 }
 
 TEST_F(SingleBlockTestFixture, LCorrect) {
-  GvdIntegrator gvd_integrator(gvd_config, gvd_layer, nullptr);
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {
@@ -350,7 +349,7 @@ TEST_F(SingleBlockTestFixture, LCorrect) {
 }
 
 TEST_F(LargeSingleBlockTestFixture, LCorrect) {
-  GvdIntegrator gvd_integrator(gvd_config, gvd_layer, nullptr);
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {
@@ -383,7 +382,7 @@ TEST_F(LargeSingleBlockTestFixture, LCorrect) {
 }
 
 TEST_F(SingleBlockTestFixture, CornerCorrect) {
-  GvdIntegrator gvd_integrator(gvd_config, gvd_layer, nullptr);
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
   test::updateGvd(gvd_integrator, *map, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
@@ -409,7 +408,7 @@ TEST_F(SingleBlockTestFixture, CornerCorrect) {
 }
 
 TEST_F(ParentTestFixture, ParentsCorrect) {
-  GvdIntegrator gvd_integrator(gvd_config, gvd_layer, nullptr);
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
   test::updateGvd(gvd_integrator, *map, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {
@@ -472,7 +471,7 @@ TEST_F(ParentTestFixture, ParentsCorrect) {
 
 TEST_F(SingleBlockTestFixture, RaiseCorrectForSurface) {
   gvd_config.min_diff_m = 0.03;
-  GvdIntegrator gvd_integrator(gvd_config, gvd_layer, nullptr);
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
   for (int x = 0; x < voxels_per_side; ++x) {
     for (int y = 0; y < voxels_per_side; ++y) {
       for (int z = 0; z < voxels_per_side; ++z) {

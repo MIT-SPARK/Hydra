@@ -59,7 +59,7 @@ void PlaceEvaluator::computeGroundTruth(const GvdIntegratorConfig& config) {
   config_ = config;
 
   VLOG(1) << "using GVD config:" << std::endl << config_;
-  places::GvdIntegrator integrator(config_, gvd_, nullptr);
+  places::GvdIntegrator integrator(config_, gvd_);
   auto map = VolumetricMap::fromTsdf(*tsdf_, 0.3, false);
   CHECK(map) << "Invalid map!";
   integrator.updateFromTsdf(0, map->getTsdfLayer(), false, true);
