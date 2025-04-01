@@ -586,7 +586,9 @@ void BackendModule::callUpdateFunctions(size_t timestamp_ns,
                      given_merges,
                      &pgmo_values,
                      deformation_graph_.get(),
-                     node_to_robot});
+                     node_to_robot,
+                     num_archived_vertices_,
+                     prev_num_archived_vertices_});
 
   // merge topological changes to private dsg, respecting merges
   // attributes may be overwritten, but ideally we don't bother

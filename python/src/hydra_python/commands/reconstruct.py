@@ -7,7 +7,6 @@ import hydra_python
 import yaml
 from hydra_python._hydra_bindings import HydraReconstruction
 from hydra_python.commands import resolve_output_path
-from hydra_python.data_loader import DataLoader
 
 
 @click.command(name="reconstruct")

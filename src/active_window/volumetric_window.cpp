@@ -81,6 +81,13 @@ BlockIndices VolumetricWindow::archiveBlocks(uint64_t timestamp_ns,
   return to_remove;
 }
 
+bool VolumetricWindow::inBounds(uint64_t stamp,
+                                const Eigen::Isometry3d& world_T_body,
+                                const VolumetricBlockInfo& block) const {
+  const Eigen::Vector3d block_pos = block.blockCenter().cast<double>();
+  return inBounds(stamp, world_T_body, block.update_stamp_ns, block_pos);
+}
+
 void declare_config(SpatialWindowChecker::Config& config) {
   using namespace config;
   name("SpatialWindowChecker::Config");
@@ -100,9 +107,9 @@ SpatialWindowChecker::SpatialWindowChecker(const Config& config)
 
 bool SpatialWindowChecker::inBounds(uint64_t /* timestamp_ns */,
                                     const Eigen::Isometry3d& world_T_body,
-                                    const VolumetricBlockInfo& block) const {
-  const Eigen::Vector3f pos = world_T_body.translation().cast<float>();
-  return (pos - block.blockCenter()).norm() <= config.max_radius_m;
+                                    const uint64_t /* last_update_ns */,
+                                    const Eigen::Vector3d& last_pos) const {
+  return (world_T_body.translation() - last_pos).norm() <= config.max_radius_m;
 }
 
 }  // namespace hydra

@@ -63,9 +63,14 @@ struct VolumetricWindow {
                                            VolumetricMap& map,
                                            bool skip_updated = true) const;
 
+  bool inBounds(uint64_t timestamp_ns,
+                const Eigen::Isometry3d& world_T_body,
+                const VolumetricBlockInfo& block) const;
+
   virtual bool inBounds(uint64_t timestamp_ns,
                         const Eigen::Isometry3d& world_T_body,
-                        const VolumetricBlockInfo& block) const = 0;
+                        const uint64_t last_updated_ns,
+                        const Eigen::Vector3d& last_pos) const = 0;
 };
 
 struct SpatialWindowChecker : VolumetricWindow {
@@ -76,7 +81,8 @@ struct SpatialWindowChecker : VolumetricWindow {
   explicit SpatialWindowChecker(const Config& config);
   bool inBounds(uint64_t timestamp_ns,
                 const Eigen::Isometry3d& world_T_body,
-                const VolumetricBlockInfo& block) const override;
+                const uint64_t last_updated_ns,
+                const Eigen::Vector3d& last_pos) const override;
 };
 
 void declare_config(SpatialWindowChecker::Config& config);

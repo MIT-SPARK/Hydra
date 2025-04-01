@@ -52,6 +52,8 @@
 #include <config_utilities/types/eigen_matrix.h>
 #include <glog/logging.h>
 
+#include <iomanip>
+
 #include "hydra/common/config_utilities.h"
 
 namespace hydra {
@@ -62,8 +64,9 @@ Sensor::Sensor(const Config& config, const std::string& name)
       extrinsics_(config.extrinsics.create()) {
   CHECK(extrinsics_ != nullptr) << "invalid extrinsics!";
   const Eigen::Isometry3d sensor_body_pose = body_T_sensor();
+  Eigen::IOFormat fmt(6, 0, ", ", "\n", "", "", "[", "]");
   VLOG(1) << "Parsed sensor with extrinsics: " << std::endl
-          << sensor_body_pose.matrix();
+          << std::setfill(' ') << sensor_body_pose.matrix().format(fmt);
 }
 
 YAML::Node Sensor::dump() const { return config::toYaml(config); }

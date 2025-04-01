@@ -25,17 +25,19 @@ FeatureView::FeatureView(uint64_t timestamp_ns,
 const Sensor& FeatureView::sensor() const { return *sensor_; }
 
 bool FeatureView::pointInView(const Eigen::Vector3d& point_w,
+                              float inflation_distance,
                               Eigen::Vector3d* point_s) const {
   const Eigen::Vector3d p_s = (sensor_T_world * point_w);
   if (point_s) {
     *point_s = p_s;
   }
 
-  return sensor_->pointIsInViewFrustum(p_s.cast<float>());
+  return sensor_->pointIsInViewFrustum(p_s.cast<float>(), inflation_distance);
 }
 
 struct BoundaryViewSelector : ViewSelector {
   void selectFeature(const FeatureList& views,
+                     float inflation_distance,
                      SemanticNodeAttributes& attrs) const override {
     double min_dist = std::numeric_limits<double>::max();
     const FeatureView* best_view = nullptr;
@@ -45,7 +47,7 @@ struct BoundaryViewSelector : ViewSelector {
       }
 
       Eigen::Vector3d p_s;
-      if (!view->pointInView(attrs.position, &p_s)) {
+      if (!view->pointInView(attrs.position, inflation_distance, &p_s)) {
         continue;
       }
 
@@ -72,6 +74,7 @@ struct BoundaryViewSelector : ViewSelector {
 
 struct ClosestViewSelector : ViewSelector {
   void selectFeature(const FeatureList& views,
+                     float inflation_distance,
                      SemanticNodeAttributes& attrs) const override {
     const FeatureView* best_view = nullptr;
     double min_dist = std::numeric_limits<double>::max();
@@ -81,7 +84,7 @@ struct ClosestViewSelector : ViewSelector {
       }
 
       Eigen::Vector3d p_s;
-      if (!view->pointInView(attrs.position, &p_s)) {
+      if (!view->pointInView(attrs.position, inflation_distance, &p_s)) {
         continue;
       }
 
@@ -104,6 +107,7 @@ struct ClosestViewSelector : ViewSelector {
 
 struct FusionViewSelector : ViewSelector {
   void selectFeature(const FeatureList& views,
+                     float inflation_distance,
                      SemanticNodeAttributes& attrs) const override {
     size_t num_visible = 0;
     for (const auto& view : views) {
@@ -111,7 +115,7 @@ struct FusionViewSelector : ViewSelector {
         continue;
       }
 
-      if (!view->pointInView(attrs.position)) {
+      if (!view->pointInView(attrs.position, inflation_distance)) {
         continue;
       }
 

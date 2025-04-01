@@ -4,9 +4,7 @@ import pathlib
 
 import click
 import hydra_python
-import spark_dsg
 from hydra_python.commands import resolve_output_path
-from hydra_python.data_loader import DataLoader
 from hydra_python.pipeline import load_pipeline
 
 

@@ -27,12 +27,12 @@ class LabelConverter:
     def reindex(self, remap):
         """Combine two converters."""
         remapped_array = []
-        remapped_names = []
-        for source_idx, target_idx in enumerate(self._index_array):
+        for _source_idx, target_idx in enumerate(self._index_array):
             new_target = remap.get(target_idx, target_idx)
             remapped_array.append(new_target)
-            remapped_names.append(self.name(new_target))
 
+        max_category = np.max(remapped_array)
+        remapped_names = [self.name(remap.get(x, x)) for x in range(max_category)]
         remapped_array = np.array(remapped_array, dtype=self._index_array.dtype)
         return LabelConverter(remapped_array, remapped_names)
 
@@ -43,7 +43,7 @@ class LabelConverter:
     @property
     def names(self):
         """Get category names."""
-        return self.names
+        return self._names
 
     @classmethod
     def from_mapping(cls, sublabel_to_label, name_mapping=None, unknown=0):
@@ -56,9 +56,9 @@ class LabelConverter:
             unknown (int): Default label
         """
         N_sublabels = max(sublabel_to_label) + 1
-        label_map = unknown * np.ones(N_sublabels, dtype=np.uint8)
+        label_map = unknown * np.ones(N_sublabels, dtype=np.int16)
         for sublabel, label in sublabel_to_label.items():
-            label_map[sublabel] = label
+            label_map[sublabel] = label if label >= 0 else unknown
 
         names = []
         name_mapping = name_mapping if name_mapping is not None else {}

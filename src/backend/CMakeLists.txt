@@ -6,6 +6,7 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/external_loop_closure_receiver.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/merge_proposer.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/merge_tracker.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/mesh_clustering.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/mst_factors.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/pgmo_configs.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/surface_place_utilities.cpp

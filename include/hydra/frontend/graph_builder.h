@@ -198,7 +198,6 @@ class GraphBuilder : public Module {
   MessageQueue<PoseGraphPacket> pose_graph_updates_;
 
   NodeIdSet previous_active_places_;
-  NodeIdSet previous_active_places_2d_;
   std::list<pose_graph_tools::BowQuery::ConstPtr> cached_bow_messages_;
 
   Sink::List sinks_;

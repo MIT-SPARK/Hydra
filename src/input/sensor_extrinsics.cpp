@@ -79,7 +79,7 @@ IdentitySensorExtrinsics::IdentitySensorExtrinsics(const Config&)
     : SensorExtrinsics() {}
 
 ParamSensorExtrinsics::ParamSensorExtrinsics(const Config& config)
-    : SensorExtrinsics(config.body_R_sensor, config.body_p_sensor) {}
+    : SensorExtrinsics(config.body_R_sensor.normalized(), config.body_p_sensor) {}
 
 KimeraSensorExtrinsics::KimeraSensorExtrinsics(const Config& config)
     : SensorExtrinsics() {
@@ -109,7 +109,7 @@ void declare_config(ParamSensorExtrinsics::Config& conf) {
   name("ParamSensorExtrinsics");
   field<QuaternionConverter>(conf.body_R_sensor, "body_R_sensor");
   field(conf.body_p_sensor, "body_p_sensor");
-  checkCondition(std::abs(conf.body_R_sensor.norm() - 1.0) < 1.0e-9,
+  checkCondition(std::abs(conf.body_R_sensor.norm() - 1.0) < 1.0e-3,
                  "Quaternion is not normalized");
 }
 

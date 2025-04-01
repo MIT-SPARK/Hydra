@@ -406,6 +406,16 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
     graph_connector_.connect(*dsg_->graph);
   }
 
+  view_database_.updateAssignments(
+      *dsg_->graph, [&](const Eigen::Vector3d& pos, uint64_t timestamp) {
+        if (!map_window_) {
+          return false;
+        }
+
+        return !map_window_->inBounds(
+            msg->timestamp_ns, msg->world_T_body(), timestamp, pos);
+      });
+
   if (config.enable_place_mesh_mapping) {
     updatePlaceMeshMapping(*msg);
   }
@@ -598,9 +608,6 @@ void GraphBuilder::updatePlaces(const ActiveWindowOutput& input) {
     if (frontier_places_) {
       frontier_places_->setArchivedPlaces(archived_places);
     }
-
-    // TODO(nathan) should also work for 2d places
-    view_database_.updateAssignments(*dsg_->graph, active_nodes);
   }  // end graph update critical section
 }
 
@@ -614,22 +621,12 @@ void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
     return;
   }
 
-  NodeIdSet active_nodes;
+  ScopedTimer timer("frontend/places_2d", input.timestamp_ns, true, 1, false);
+  surface_places_->detect(input, *last_mesh_update_, *dsg_->graph);
 
-  {  // start timing scope
-    ScopedTimer timer("frontend/places_2d", input.timestamp_ns, true, 1, false);
-    surface_places_->detect(input, *last_mesh_update_, *dsg_->graph);
-    {  // start graph critical section
-      std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-
-      surface_places_->updateGraph(input.timestamp_ns, input, *dsg_->graph);
-      // TODO(nathan) unify places so that active places get populated correctly
-      // depending on run configuration
-    }  // end graph update critical section
-
-    archivePlaces2d(active_nodes);
-    previous_active_places_2d_ = active_nodes;
-  }  // end timing scope
+  // start graph critical section
+  std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
+  surface_places_->updateGraph(input.timestamp_ns, input, *dsg_->graph);
 }
 
 void GraphBuilder::updatePoseGraph(const ActiveWindowOutput& input) {
@@ -707,27 +704,6 @@ void GraphBuilder::assignBowVectors() {
   size_t num_assigned = prior_size - cached_bow_messages_.size();
   VLOG(3) << "[Hydra Frontend] assigned " << num_assigned << " bow vectors of "
           << prior_size << " original";
-}
-
-void GraphBuilder::archivePlaces2d(const NodeIdSet active_places) {
-  {  // start graph update critical section
-    std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-
-    // find node ids that are valid, but outside active place window
-    for (const auto& prev : previous_active_places_2d_) {
-      if (active_places.count(prev)) {
-        continue;
-      }
-
-      const auto has_prev_node = dsg_->graph->findNode(prev);
-      if (!has_prev_node) {
-        continue;
-      }
-
-      const auto& prev_node = *has_prev_node;
-      prev_node.attributes().is_active = false;
-    }
-  }  // end graph update critical section
 }
 
 void GraphBuilder::updatePlaceMeshMapping(const ActiveWindowOutput& input) {

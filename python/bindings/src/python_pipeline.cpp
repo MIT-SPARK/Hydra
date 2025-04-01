@@ -35,6 +35,7 @@
 #include "hydra/bindings/python_pipeline.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/external_registry.h>
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
@@ -59,6 +60,22 @@
 #include "hydra/bindings/python_sensors.h"
 
 namespace hydra::python {
+
+struct ExternalPluginConfig {
+  bool allow = true;
+  bool verbose = false;
+  bool trace_allocations = false;
+  std::vector<std::string> paths;
+};
+
+void declare_config(ExternalPluginConfig& config) {
+  using namespace config;
+  name("ExternalPluginConfig");
+  field(config.allow, "allow");
+  field(config.verbose, "verbose");
+  field(config.trace_allocations, "trace_allocations");
+  field(config.paths, "paths");
+}
 
 class PythonPipeline : public HydraPipeline {
  public:
@@ -132,14 +149,11 @@ PythonPipeline::PythonPipeline(const Config& _config,
     throw std::runtime_error("Invalid sensor!");
   }
 
-  GlogSingleton::instance().setLogLevel(0, 0, false);
   config::Settings().print_width = 100;
   config::Settings().print_indent = 45;
 
   GlobalInfo::instance().setSensor(sensor);
-  VLOG(config_verbosity) << "\n"
-                         << config::toString(GlobalInfo::instance().getConfig());
-
+  VLOG(config_verbosity) << "Using sensor '" << sensor->name << "':\n" << sensor->dump();
   initModules();
 }
 
@@ -175,7 +189,6 @@ void PythonPipeline::initModules() {
   // TODO(nathan) LCD
 
   showModules();
-  VLOG(config_verbosity_) << GlobalInfo::instance();
 }
 
 void PythonPipeline::stop() {
@@ -247,7 +260,45 @@ namespace python_pipeline {
 using namespace pybind11::literals;
 namespace py = pybind11;
 
+struct PluginManager {
+  static void init(const ExternalPluginConfig& config) {
+    auto& manager = instance();
+    config::Settings().allow_external_libraries = config.allow;
+    config::Settings().verbose_external_load = config.verbose;
+    config::Settings().print_external_allocations = config.trace_allocations;
+
+    manager.plugins_ = config::loadExternalFactories(config.paths);
+  }
+
+  static void deinit() {
+    auto& manager = instance();
+    // TODO(nathan) will likely segfault
+    manager.plugins_.unload();
+  }
+
+ private:
+  static PluginManager& instance() {
+    static PluginManager s_instance;
+    return s_instance;
+  }
+
+  config::internal::LibraryGuard plugins_;
+};
+
 void addBindings(pybind11::module_& m) {
+  py::class_<ExternalPluginConfig>(m, "ExternalPluginConfig")
+      .def(py::init<>())
+      .def_readwrite("allow", &ExternalPluginConfig::allow)
+      .def_readwrite("verbose", &ExternalPluginConfig::allow)
+      .def_readwrite("trace_allocations", &ExternalPluginConfig::allow)
+      .def_readwrite("paths", &ExternalPluginConfig::paths)
+      .def("__repr__",
+           [](const ExternalPluginConfig& config) { return config::toString(config); });
+
+  m.def("init_plugins",
+        [](const ExternalPluginConfig& config) { PluginManager::init(config); });
+  m.def("deinit_plugins", []() { PluginManager::deinit(); });
+
   py::class_<PythonPipeline>(m, "HydraPipeline")
       .def_static(
           "from_config",

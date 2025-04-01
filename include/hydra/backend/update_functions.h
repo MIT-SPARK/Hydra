@@ -60,6 +60,10 @@ struct UpdateInfo {
   // TODO(nathan) flip to const when we have mutable state
   kimera_pgmo::DeformationGraph* deformation_graph = nullptr;
   const std::unordered_map<NodeId, size_t>* node_to_robot_id = nullptr;
+  //! Number of vertices currently archived in the mesh
+  size_t num_archived_vertices = 0;
+  //! Number of vertices previously archived in the mesh
+  size_t num_previous_archived_vertices = 0;
 };
 
 using LayerCleanupFunc =

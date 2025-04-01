@@ -55,7 +55,6 @@ class Place2dSegmenter : public SurfacePlacesInterface {
 
   struct Config {
     std::string layer = DsgLayers::MESH_PLACES;
-    PartitionId partition = 1;
     char prefix = 'Q';
     double cluster_tolerance = 1;
     size_t min_cluster_size = 600;

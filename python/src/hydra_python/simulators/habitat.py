@@ -6,11 +6,8 @@ from typing import Union
 
 import networkx as nx
 import numpy as np
-import spark_dsg.mp3d
-from hydra_python._hydra_bindings import Camera, CameraConfig
+import spark_dataset_interfaces as sdi
 from hydra_python.semantics import LabelConverter
-from hydra_python.simulators.simulator_interface import SimulatorInterface
-from hydra_python.trajectory import Trajectory
 from scipy.spatial.transform import Rotation as R
 
 
@@ -77,7 +74,7 @@ def _build_navgraph(sim, inflation_radius, threshold):
     return G.subgraph(largest_cc)
 
 
-def _make_sensor(sensor_type, width=640, height=360, hfov=90.0, z_offset=0.0):
+def _make_sensor(sensor_type, width=640, height=480, hfov=90.0, z_offset=0.0):
     import habitat_sim
 
     spec = habitat_sim.CameraSensorSpec()
@@ -98,6 +95,7 @@ def _make_habitat_config(scene, z_offset=0.0, agent_radius=0.1):
     path = scene.parent.parent
     json_path = path / "mp3d.scene_dataset_config.json"
     sim_cfg.scene_dataset_config_file = str(json_path)
+    sim_cfg.create_renderer = False
     sim_cfg.gpu_device_id = 0
     sim_cfg.scene_id = str(scene)
     sim_cfg.enable_physics = True
@@ -176,7 +174,7 @@ def _camera_point_from_habitat(p_ah, z_offset=1.5):
 class HabitatInterface:
     """Class handling interfacing with habitat."""
 
-    def __init__(self, scene: Union[str, pathlib.Path]):
+    def __init__(self, scene: Union[str, pathlib.Path], reindex_labels=True):
         """Initialize the simulator."""
         import habitat_sim
 
@@ -185,11 +183,19 @@ class HabitatInterface:
         self._camera_info = camera_info
         self._sim = habitat_sim.Simulator(config)
 
+        def _parse_instance(obj_id):
+            parts = obj_id.split("_")
+            return int(parts[-1])
+
         try:
             scene = self.sim.semantic_scene
-            label_map = {c.id: c.category.index() for c in scene.objects}
+            label_map = {
+                _parse_instance(c.id): c.category.index() for c in scene.objects
+            }
             name_map = {c.index(): c.name() for c in scene.categories}
             self._labelmap = LabelConverter.from_mapping(label_map, name_map)
+            if reindex_labels:
+                self._labelmap = self._labelmap.reindex(self.mpcat_to_ade)
         except Exception as e:
             print(f"Loading label conversion failed: {e}")
             self._labelmap = None
@@ -235,7 +241,8 @@ class HabitatInterface:
         import magnum
 
         w_q_c = R.from_matrix(world_T_camera[:3, :3]).as_quat()
-        w_q_b, p_b = _transform_to_body(w_q_c, world_T_camera[:3, 3])
+        p_c = world_T_camera[:3, 3]
+        w_q_b, p_b = _transform_to_body(w_q_c, p_c)
         h_q_c, p_h = _transform_to_habitat(w_q_b, p_b)
 
         new_state = habitat_sim.AgentState()
@@ -246,18 +253,9 @@ class HabitatInterface:
         self._labels = None
 
     @property
-    def sensor(self, min_range=0.1, max_range=5.0):
+    def sensor(self):
         """Get camera properties."""
-        config = CameraConfig()
-        config.min_range = min_range
-        config.max_range = max_range
-        config.width = self._camera_info["width"]
-        config.height = self._camera_info["height"]
-        config.fx = self._camera_info["fx"]
-        config.fy = self._camera_info["fy"]
-        config.cx = self._camera_info["cx"]
-        config.cy = self._camera_info["cy"]
-        return Camera(config, "habitat")
+        return self._camera_info
 
     @property
     def depth(self):
@@ -284,9 +282,6 @@ class HabitatInterface:
     def rgb(self):
         """Get current RGB observation if available."""
         return None if self._obs is None else self._obs[self._color_name][:, :, :3]
-
-
-SimulatorInterface.register(HabitatInterface)
 
 
 def get_random_trajectory(
@@ -337,84 +332,6 @@ def get_random_trajectory(
         _camera_point_from_habitat(p, z_offset=z_offset) for p in positions_habitat
     ]
     b_R_c = np.array([[0, 0, 1], [-1, 0, 0], [0, -1, 0]])
-    return Trajectory.from_positions(np.array(positions_camera), body_R_camera=b_R_c)
-
-
-def get_room_trajectory(
-    habitat_interface,
-    inflation_radius=0.1,
-    threshold=1.0e-3,
-    seed=None,
-    z_offset=1.0,
-    add_reverse=False,
-    max_room_distance=5.0,
-    **kwargs,
-):
-    """Get a trajectory that explores the entire scene."""
-    G = _build_navgraph(habitat_interface.sim, inflation_radius, threshold)
-    components = list(nx.connected_components(G))
-    if len(components) > 1:
-        print("Warning: {len(components)} components found in navgraph!")
-        components = sorted(components, lambda x: len(x), reverse=True)
-
-    mp3d_info = spark_dsg.mp3d.load_mp3d_info(habitat_interface.house_path)
-    rooms = spark_dsg.mp3d.get_rooms_from_mp3d_info(mp3d_info, angle_deg=-90)
-
-    node_sequence = []
-    for room in rooms:
-        best_node = None
-        best_distance = None
-        for x in components[0]:
-            pos = _camera_point_from_habitat(G.nodes[x]["pos"], z_offset=z_offset)
-            dist = np.linalg.norm(pos - room.centroid)
-            if not best_distance or dist < best_distance:
-                best_node = x
-                best_distance = dist
-
-        if best_node is None:
-            continue
-
-        if best_distance > max_room_distance:
-            pos = _camera_point_from_habitat(
-                G.nodes[best_node]["pos"], z_offset=z_offset
-            )
-            print(f"No node for {room.get_id()} @ {np.squeeze(room.centroid)}")
-            print(f"Closest: {best_node} @ {np.squeeze(pos)}")
-            continue
-
-        node_sequence.append(best_node)
-
-    if len(node_sequence) <= 1:
-        return None
-
-    if seed is not None:
-        random.seed(seed)
-
-    random.shuffle(node_sequence)
-    if add_reverse:
-        node_sequence = node_sequence + node_sequence[::-1]
-
-    b_R_c = np.array([[0, 0, 1], [-1, 0, 0], [0, -1, 0]])
-    first_pos_habitat = G.nodes[node_sequence[0]]["pos"]
-    first_pos_cam = _camera_point_from_habitat(first_pos_habitat, z_offset=z_offset)
-
-    traj = Trajectory.rotate(first_pos_cam, body_R_camera=b_R_c, **kwargs)
-    for i in range(len(node_sequence) - 1):
-        start = node_sequence[i]
-        end = node_sequence[i + 1]
-        nodes = nx.shortest_path(G, source=start, target=end, weight="weight")
-        if len(nodes) <= 1:
-            continue
-
-        pos_habitat = [G.nodes[x]["pos"] for x in nodes]
-        pos_cam = [
-            _camera_point_from_habitat(p, z_offset=z_offset) for p in pos_habitat
-        ]
-        new_traj = Trajectory.from_positions(
-            np.array(pos_cam), body_R_camera=b_R_c, **kwargs
-        )
-
-        traj += new_traj
-        traj += Trajectory.rotate(np.array(pos_cam[-1]), body_R_camera=b_R_c, **kwargs)
-
-    return traj
+    return sdi.Trajectory.from_positions(
+        np.array(positions_camera), body_R_camera=b_R_c
+    )

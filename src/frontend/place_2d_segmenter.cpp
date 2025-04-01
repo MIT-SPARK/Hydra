@@ -326,7 +326,7 @@ bool Place2dSegmenter::frontendAddPlaceConnection(const Place2dNodeAttributes& a
 }
 
 void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
-                                   const ActiveWindowOutput& msg,
+                                   const ActiveWindowOutput& /*msg*/,
                                    DynamicSceneGraph& graph) {
   // Remove old empty nodes
   for (const auto& nid : nodes_to_remove_) {
@@ -334,34 +334,30 @@ void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
   }
   nodes_to_remove_.clear();
 
-  std::optional<Eigen::Vector3d> pos = msg.world_t_body;
   VLOG(5) << "[Places 2d Segmenter] updateGraph";
   std::map<uint32_t, std::set<NodeId>> active_places_to_check;
   for (const auto& label : config.labels) {
     active_places_to_check[label] = std::set<NodeId>();
   }
+
   std::map<uint32_t, std::set<NodeId>> new_active_places;
   for (const auto& label : config.labels) {
     new_active_places[label] = std::set<NodeId>();
   }
 
-  if (!pos) {
-    new_active_places = active_places_;
-  } else {
-    for (auto kv : active_places_) {
-      std::set<NodeId> nodes = kv.second;
-      for (NodeId nid : nodes) {
-        auto& attrs = graph.getNode(nid).attributes<Place2dNodeAttributes>();
-        if (attrs.pcl_mesh_connections.size() == 0 || attrs.boundary.size() < 3) {
-          // Remove dangling places
-          graph.removeNode(nid);
-          continue;
-        }
-        if (attrs.pcl_min_index >= num_archived_vertices_) {
-          graph.removeNode(nid);
-        } else {
-          active_places_to_check.at(kv.first).insert(nid);
-        }
+  for (auto kv : active_places_) {
+    std::set<NodeId> nodes = kv.second;
+    for (NodeId nid : nodes) {
+      auto& attrs = graph.getNode(nid).attributes<Place2dNodeAttributes>();
+      if (attrs.pcl_mesh_connections.size() == 0 || attrs.boundary.size() < 3) {
+        // Remove dangling places
+        graph.removeNode(nid);
+        continue;
+      }
+      if (attrs.pcl_min_index >= num_archived_vertices_) {
+        graph.removeNode(nid);
+      } else {
+        active_places_to_check.at(kv.first).insert(nid);
       }
     }
   }
@@ -380,6 +376,7 @@ void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
       full_nodes.insert(std::pair<uint32_t, NodeId>(kv.first, nid));
     }
   }
+
   for (auto kv : semiactive_places_) {
     std::set<NodeId> nodes = kv.second;
     for (NodeId nid : nodes) {
@@ -391,6 +388,7 @@ void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
   for (const auto& label : config.labels) {
     new_semiactive_places[label] = std::set<NodeId>();
   }
+
   for (auto label_ns : full_nodes) {
     uint32_t label = label_ns.first;
     NodeSymbol ns1 = label_ns.second;
@@ -474,7 +472,6 @@ void declare_config(Place2dSegmenter::Config& config) {
   using namespace config;
   name("Place2dSegmenterConfig");
   field(config.layer, "layer");
-  field(config.partition, "partition");
   field<CharConversion>(config.prefix, "prefix");
   field(config.cluster_tolerance, "cluster_tolerance");
   field(config.min_cluster_size, "min_cluster_size");

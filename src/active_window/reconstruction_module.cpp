@@ -39,13 +39,15 @@
 #include <config_utilities/validation.h>
 
 #include <chrono>
+#include <iomanip>
 
 #include "hydra/common/global_info.h"
 #include "hydra/input/input_conversion.h"
 #include "hydra/places/robot_footprint_integrator.h"
+#include "hydra/reconstruction/integration_masking.h"
 #include "hydra/reconstruction/mesh_integrator.h"
 #include "hydra/reconstruction/projective_integrator.h"
-#include "hydra/reconstruction/integration_masking.h"
+#include "hydra/utils/printing.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -62,6 +64,14 @@ double diffInSeconds(uint64_t lhs, uint64_t rhs) {
   return std::chrono::duration_cast<std::chrono::duration<double>>(
              std::chrono::nanoseconds(lhs) - std::chrono::nanoseconds(rhs))
       .count();
+}
+
+std::string printRotation(const Eigen::Matrix3d& rot) {
+  const Eigen::Quaterniond q(rot);
+  std::stringstream ss;
+  ss << std::setprecision(3) << "{w: " << q.w() << ", x: " << q.x() << ", y: " << q.y()
+     << ", z: " << q.z() << "}";
+  return ss.str();
 }
 
 }  // namespace
@@ -117,6 +127,11 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputPacket& msg) {
 
   const auto timestamp_ns = msg.timestamp_ns;
   const auto world_T_body = msg.world_T_body();
+  const auto fmt = getDefaultFormat();
+  VLOG(5) << "[Hydra Reconstruction] Got input @ " << timestamp_ns
+          << " [ns] with pose: p=" << world_T_body.translation().format(fmt)
+          << ", q=" << printRotation(world_T_body.rotation());
+
   const auto do_full_update = shouldUpdate(timestamp_ns);
 
   VLOG(2) << "[Hydra Reconstruction] starting " << (do_full_update ? "full" : "partial")
@@ -133,8 +148,10 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputPacket& msg) {
   // TODO(nathan) cache somewhere
   const auto label_config = GlobalInfo::instance().getLabelSpaceConfig();
   std::set<int32_t> invalid_labels;
-  invalid_labels.insert(label_config.invalid_labels.begin(), label_config.invalid_labels.end());
-  invalid_labels.insert(label_config.dynamic_labels.begin(), label_config.dynamic_labels.end());
+  invalid_labels.insert(label_config.invalid_labels.begin(),
+                        label_config.invalid_labels.end());
+  invalid_labels.insert(label_config.dynamic_labels.begin(),
+                        label_config.dynamic_labels.end());
 
   cv::Mat integration_mask;
   maskInvalidSemantics(data->label_image, invalid_labels, integration_mask);
@@ -152,6 +169,7 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputPacket& msg) {
     return nullptr;
   }
 
+  last_update_ns_ = timestamp_ns;
   {  // timing scope
     ScopedTimer timer("reconstruction/mesh", timestamp_ns);
     mesh_integrator_->generateMesh(map_, true, true);

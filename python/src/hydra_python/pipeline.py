@@ -39,7 +39,9 @@ import pprint
 
 import yaml
 
-from hydra_python._hydra_bindings import HydraPipeline, set_glog_dir
+from hydra_python._hydra_bindings import (Camera, CameraConfig,
+                                          ExtrinsicsConfig, HydraPipeline,
+                                          set_glog_dir)
 
 
 def get_config_path(dataset=None):
@@ -70,7 +72,10 @@ def update_nested(contents, other):
 
 
 def load_configs(
-    dataset: str, labelspace: str = "ade20k_mp3d", bounding_box_type: str = "AABB"
+    dataset: str,
+    labelspace: str = "ade20k_mp3d",
+    config_path=None,
+    bounding_box_type: str = "AABB",
 ):
     """
     Load various configs to construct the Hydra pipeline.
@@ -82,7 +87,11 @@ def load_configs(
     Returns:
         (Optional[PythonConfig]) Pipline config or none if invalid
     """
-    config_path = get_config_path()
+    config_path = (
+        get_config_path()
+        if config_path is None
+        else pathlib.Path(config_path).resolve()
+    )
     dataset_path = config_path / "datasets" / f"{dataset}.yaml"
     labelspace_path = config_path / "label_spaces" / f"{labelspace}_label_space.yaml"
     if not dataset_path.exists():
@@ -117,17 +126,44 @@ def load_configs(
     return contents
 
 
+def make_camera(
+    fx,
+    fy,
+    cx,
+    cy,
+    width,
+    height,
+    min_range=0.1,
+    max_range=5.0,
+    name="camera",
+    extrinsics=None,
+):
+    config = CameraConfig()
+    config.min_range = min_range
+    config.max_range = max_range
+    config.width = width
+    config.height = height
+    config.fx = fx
+    config.fy = fy
+    config.cx = cx
+    config.cy = cy
+    config.extrinsics = ExtrinsicsConfig() if extrinsics is None else extrinsics
+    return Camera(config, name)
+
+
 def load_pipeline(
-    data,
+    sensor,
     config_name,
     labelspace,
+    config_path=None,
     output_path=None,
     config_verbosity=0,
     place_feature_strategy=None,
+    freeze_global_info=True,
     zmq_url=None,
 ):
     """Load Hydra pipeline from configs."""
-    contents = load_configs(config_name, labelspace=labelspace)
+    contents = load_configs(config_name, labelspace=labelspace, config_path=config_path)
     if not contents:
         return None
 
@@ -152,10 +188,11 @@ def load_pipeline(
     logging.debug(pprint.pformat(contents, sort_dicts=False))
     pipeline = HydraPipeline.from_config(
         yaml.safe_dump(contents),
-        data.sensor,
+        sensor,
         robot_id=0,
         config_verbosity=config_verbosity,
-        zmq_url="" if zmq_url is None else zmq_url
+        freeze_global_info=freeze_global_info,
+        zmq_url="" if zmq_url is None else zmq_url,
     )
 
     return pipeline

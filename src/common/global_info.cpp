@@ -163,7 +163,6 @@ void GlobalInfo::checkFrozen() const {
 
 void GlobalInfo::initFromConfig(const PipelineConfig& config, int robot_id) {
   config_ = config::checkValid(config);
-  VLOG(5) << "Loading from config: " << config::toString(config);
   robot_prefix_ = RobotPrefixConfig(robot_id);
   logs_ = std::make_shared<LogSetup>(config_.logs);
   if (!logs_->valid()) {
@@ -334,6 +333,16 @@ std::unique_ptr<VolumetricWindow> GlobalInfo::createVolumetricWindow() const {
 
 std::ostream& operator<<(std::ostream& out, const GlobalInfo& config) {
   out << config::toString(config.getConfig());
+  const auto sensor_names = config.getAvailableSensors();
+  for (const auto& name : sensor_names) {
+    auto sensor = config.getSensor(name);
+    if (!sensor) {
+      continue;
+    }
+
+    out << "sensor '" << name << "'" << sensor->dump();
+  }
+
   return out;
 }
 

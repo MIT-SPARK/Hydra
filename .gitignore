@@ -213,5 +213,6 @@ pyrightconfig.json
 *.ccls*
 *.vscode/
 
+*.ipynb
 compile_commands.json
 *.clangd

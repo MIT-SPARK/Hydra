@@ -20,6 +20,7 @@ struct FeatureView {
 
   const Sensor& sensor() const;
   bool pointInView(const Eigen::Vector3d& point_w,
+                   float inflation_distance,
                    Eigen::Vector3d* point_s = nullptr) const;
 
  private:
@@ -30,6 +31,7 @@ struct ViewSelector {
   using FeatureList = std::list<FeatureView::Ptr>;
   virtual ~ViewSelector() = default;
   virtual void selectFeature(const FeatureList& views,
+                             float inflation_distance,
                              spark_dsg::SemanticNodeAttributes& attrs) const = 0;
 };
 

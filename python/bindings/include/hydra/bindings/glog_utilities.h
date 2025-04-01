@@ -45,7 +45,7 @@ struct GlogSingleton {
 
   void setLogLevel(int log_level, int verbosity = 0, bool override_settings = true);
 
-  void setLogDirectory(const std::string& dirname);
+  void setLogDirectory(const std::string& dirname, int min_stderr_threshold = 2);
 
  private:
   GlogSingleton();

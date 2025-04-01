@@ -1,7 +1,7 @@
 """Encoder for clip feature."""
 
+import spark_dataset_interfaces as sdi
 from hydra_python.data_callbacks import register_data_callback
-from hydra_python.data_loader import InputPacket
 
 
 @register_data_callback("clip")
@@ -22,7 +22,7 @@ class ClipEncoder:
         )
         self.center_crop = models.center_crop
 
-    def __call__(self, packet: InputPacket):
+    def __call__(self, packet: sdi.InputPacket):
         """Add clip feature encoding to input packet."""
         import torch
 

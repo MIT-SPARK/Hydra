@@ -26,12 +26,13 @@ void GlogSingleton::setLogLevel(int log_level, int verbosity, bool override_sett
   configured_ = true;
 }
 
-void GlogSingleton::setLogDirectory(const std::string& dirname) {
+void GlogSingleton::setLogDirectory(const std::string& dirname,
+                                    int min_stderr_threshold) {
   std::cerr << "[Hydra Python] Logging to: " << dirname << std::endl;
   FLAGS_log_dir = dirname;
   FLAGS_logtostderr = false;
   FLAGS_alsologtostderr = false;
-  FLAGS_stderrthreshold = 1;
+  FLAGS_stderrthreshold = min_stderr_threshold;
   FLAGS_minloglevel = 0;
   FLAGS_v = 5;
 }
@@ -57,16 +58,18 @@ void addBindings(pybind11::module_& m) {
       "override_settings"_a = true);
   m.def(
       "set_glog_dir",
-      [](const std::string& dirname) {
-        GlogSingleton::instance().setLogDirectory(dirname);
+      [](const std::string& dirname, int min_stderr_threshold) {
+        GlogSingleton::instance().setLogDirectory(dirname, min_stderr_threshold);
       },
-      "dirname"_a);
+      "dirname"_a,
+      "min_stderr_threshold"_a = 2);
   m.def(
       "set_glog_dir",
-      [](const std::filesystem::path& dirname) {
-        GlogSingleton::instance().setLogDirectory(dirname);
+      [](const std::filesystem::path& dirname, int min_stderr_threshold) {
+        GlogSingleton::instance().setLogDirectory(dirname, min_stderr_threshold);
       },
-      "dirname"_a);
+      "dirname"_a,
+      "min_stderr_threshold"_a = 2);
 }
 
 }  // namespace glog_utilities

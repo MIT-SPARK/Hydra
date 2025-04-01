@@ -40,9 +40,23 @@
 
 namespace hydra::python {
 
-std::string showDim(const PythonImage& img) {
+namespace {
+
+inline std::string showImageDim(const cv::Mat& mat) {
+  std::stringstream ss;
+  ss << "[rows=" << mat.rows << ", cols=" << mat.cols << "]";
+  return ss.str();
+}
+
+inline bool sizesMatch(const cv::Mat& lhs, const cv::Mat& rhs) {
+  return lhs.rows == rhs.rows && lhs.cols == rhs.cols;
+}
+
+inline std::string showDim(const PythonImage& img) {
   return "[" + std::to_string(img.rows()) + ", " + std::to_string(img.cols()) + "]";
 }
+
+}  // namespace
 
 PythonSensorInput::PythonSensorInput(uint64_t timestamp_ns,
                                      const PythonImage& _depth,
@@ -130,6 +144,18 @@ bool PythonSensorInput::fillInputDataImpl(InputData& msg) const {
   msg.color_image = color;
   msg.depth_image = depth;
   msg.label_image = labels;
+  if (!msg.label_image.empty() && !sizesMatch(msg.depth_image, msg.label_image)) {
+    LOG(ERROR) << "Label dimensions " << showImageDim(msg.label_image)
+               << " do not match depth dimensions " << showImageDim(msg.depth_image);
+    return false;
+  }
+
+  if (!msg.color_image.empty() && !sizesMatch(msg.depth_image, msg.color_image)) {
+    LOG(ERROR) << "Color dimensions " << showImageDim(msg.color_image)
+               << " do not match depth dimensions " << showImageDim(msg.depth_image);
+    return false;
+  }
+
   return true;
 }
 
