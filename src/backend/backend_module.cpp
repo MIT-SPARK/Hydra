@@ -375,6 +375,7 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
         addLoopClosure(
             lc.src, lc.dest, lc.src_T_dest, (KimeraPgmoInterface::config_.lc_variance));
         loop_closures_.push_back(lc);
+        ++num_loop_closures_;
       });
 
   if (num_loop_closures_ > prev_loop_closures) {
