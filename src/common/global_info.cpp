@@ -184,10 +184,6 @@ void GlobalInfo::initFromConfig(const PipelineConfig& config, int robot_id) {
     VLOG(2) << "Loaded label space colors:" << std::endl << *label_colormap_;
   }
 
-  if (!config_.label_space.label_remap_filepath.empty()) {
-    label_remapper_ = LabelRemapper(config_.label_space.label_remap_filepath);
-  }
-
   if (config_.enable_pgmo_logging) {
     logging::Logger::addSink("glog", std::make_shared<PgmoGlogSink>());
   }
