@@ -359,6 +359,14 @@ void addBindings(pybind11::module_& m) {
                     return ss.str();
                   })
       .def("save", &PythonPipeline::save)
+      .def("save_graph",
+          [](PythonPipeline& pipeline,
+              const std::string& path,
+              bool include_mesh) {
+            pipeline.getSceneGraph()->save(path, include_mesh);
+          },
+          "path"_a,
+          "include_mesh"_a = true)
       .def("reset", &PythonPipeline::reset)
       .def(
           "step",
