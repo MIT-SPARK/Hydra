@@ -110,8 +110,7 @@ class ProjectiveIntegrator {
     int32_t label = -1;
   };
 
-  explicit ProjectiveIntegrator(const ProjectiveIntegrator::Config& config,
-                                SemanticIntegratorPtr&& semantic_integrator = nullptr);
+  explicit ProjectiveIntegrator(const ProjectiveIntegrator::Config& config);
 
   virtual ~ProjectiveIntegrator() = default;
 

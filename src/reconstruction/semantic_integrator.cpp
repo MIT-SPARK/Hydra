@@ -46,13 +46,19 @@
 namespace hydra {
 namespace {
 
-static const auto registration =
+static const auto registration_mle =
     config::RegistrationWithConfig<SemanticIntegrator,
                                    MLESemanticIntegrator,
                                    MLESemanticIntegrator::Config>(
         "MLESemanticIntegrator");
 
-}
+static const auto registration_binary =
+    config::RegistrationWithConfig<SemanticIntegrator,
+                                   BinarySemanticIntegrator,
+                                   BinarySemanticIntegrator::Config>(
+        "BinarySemanticIntegrator");
+
+}  // namespace
 
 MLESemanticIntegrator::MLESemanticIntegrator(const Config& config) : config(config) {
   total_labels_ = GlobalInfo::instance().getTotalLabels();
@@ -113,6 +119,25 @@ void declare_config(MLESemanticIntegrator::Config& config) {
                "label_confidence is valid probability",
                false,
                true);
+}
+
+bool BinarySemanticIntegrator::canIntegrate(uint32_t label) const { return label <= 1; }
+
+bool BinarySemanticIntegrator::isValidLabel(uint32_t label) const { return label <= 1; }
+
+void BinarySemanticIntegrator::updateLikelihoods(uint32_t label,
+                                                 SemanticVoxel& voxel) const {
+  // Use the semantic_likelihoods to store the counts of the observations.
+  if (voxel.empty) {
+    voxel.empty = false;
+    voxel.semantic_likelihoods.setConstant(2, 0);
+  }
+  voxel.semantic_likelihoods[label] += 1;
+}
+
+void declare_config(BinarySemanticIntegrator::Config& /* config */) {
+  using namespace config;
+  name("BinarySemanticIntegrator::Config");
 }
 
 }  // namespace hydra

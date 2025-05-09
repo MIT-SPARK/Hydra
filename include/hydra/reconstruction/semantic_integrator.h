@@ -34,8 +34,8 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <set>
 #include <cstdint>
+#include <set>
 
 #include "hydra/reconstruction/voxel_types.h"
 
@@ -88,5 +88,20 @@ class MLESemanticIntegrator : public SemanticIntegrator {
 };
 
 void declare_config(MLESemanticIntegrator::Config& config);
+
+class BinarySemanticIntegrator : public hydra::SemanticIntegrator {
+ public:
+  struct Config {};
+
+  explicit BinarySemanticIntegrator(const Config& /* config */) {};
+
+  bool canIntegrate(uint32_t label) const override;
+
+  bool isValidLabel(uint32_t label) const override;
+
+  void updateLikelihoods(uint32_t label, SemanticVoxel& voxel) const override;
+};
+
+void declare_config(BinarySemanticIntegrator::Config& config);
 
 }  // namespace hydra

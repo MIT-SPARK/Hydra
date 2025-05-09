@@ -91,12 +91,10 @@ void declare_config(ProjectiveIntegrator::Config& config) {
   }
 }
 
-ProjectiveIntegrator::ProjectiveIntegrator(const ProjectiveIntegrator::Config& config,
-                                           SemanticIntegratorPtr&& semantics)
+ProjectiveIntegrator::ProjectiveIntegrator(const ProjectiveIntegrator::Config& config)
     : config(config::checkValid(config)),
       interpolator_(config.interpolation_method.create()),
-      semantic_integrator_(semantics ? std::move(semantics)
-                                     : config.semantic_integrator.create()) {}
+      semantic_integrator_(config.semantic_integrator.create()) {}
 
 void ProjectiveIntegrator::updateMap(const InputData& data,
                                      VolumetricMap& map,
