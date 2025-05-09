@@ -9,7 +9,7 @@ active_window:
     truncation_distance: 0.3
   tsdf:
     semantic_integrator:
-      type: MLESemanticIntegrator
+      type: SingleLabelIntegrator
 frontend:
   pgmo:
     time_horizon: 15.0

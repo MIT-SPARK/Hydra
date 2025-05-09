@@ -283,12 +283,9 @@ void ProjectiveIntegrator::updateVoxel(const MapConfig& map_config,
     tsdf_voxel.color.merge(color, ratio);
   }
 
-  if (!semantic_integrator_ || !voxels.semantic) {
-    return;
-  }
-
-  if (semantic_integrator_->isValidLabel(measurement.label)) {
-    semantic_integrator_->updateLikelihoods(measurement.label, *voxels.semantic);
+  if (semantic_integrator_ && voxels.semantic) {
+    semantic_integrator_->updateLikelihoods(
+        measurement.label, measurement.weight, *voxels.semantic);
   }
 }
 

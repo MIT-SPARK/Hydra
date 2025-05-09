@@ -56,22 +56,12 @@ std::unique_ptr<SemanticIntegrator> createIntegrator(
   return std::make_unique<MLESemanticIntegrator>(config);
 }
 
-TEST(SemanticIntegrator, MLEValidLabelCorrect) {
-  test::ConfigGuard guard(false);
-  const auto integrator = createIntegrator(5, {1}, {4});
-  EXPECT_FALSE(integrator->isValidLabel(1));
-  EXPECT_FALSE(integrator->isValidLabel(4));
-  EXPECT_FALSE(integrator->isValidLabel(5));
-  EXPECT_TRUE(integrator->isValidLabel(0));
-  EXPECT_TRUE(integrator->isValidLabel(2));
-}
-
 TEST(SemanticIntegrator, MLEIntegrationCorrect) {
   test::ConfigGuard guard(false);
   const auto integrator = createIntegrator(5, {}, {}, 0.8);
   SemanticVoxel voxel;
   EXPECT_TRUE(voxel.empty);
-  integrator->updateLikelihoods(2, voxel);
+  integrator->updateLikelihoods(2, 1.0, voxel);
   EXPECT_FALSE(voxel.empty);
   ASSERT_EQ(voxel.semantic_likelihoods.size(), 5);
   EXPECT_GT(voxel.semantic_likelihoods(2), voxel.semantic_likelihoods(0));
@@ -82,6 +72,76 @@ TEST(SemanticIntegrator, MLEIntegrationCorrect) {
   expected << 0.04, 0.04, 0.16, 0.04, 0.04;
   Eigen::VectorXf result_prob = voxel.semantic_likelihoods.array().exp();
   EXPECT_TRUE(result_prob.isApprox(expected));
+}
+
+TEST(SemanticIntegrator, FirstKIntegrationCorrect) {
+  FirstKSemanticIntegrator integrator(FirstKSemanticIntegrator::Config{2});
+
+  SemanticVoxel voxel;
+  EXPECT_TRUE(voxel.empty);
+
+  // add new observation
+  integrator.updateLikelihoods(10, 0.1, voxel);
+  EXPECT_FALSE(voxel.empty);
+  ASSERT_EQ(voxel.semantic_likelihoods.size(), 2);
+  EXPECT_GT(voxel.semantic_likelihoods(0), 0.0);
+  EXPECT_EQ(voxel.semantic_label, 10u);
+
+  // add new observation
+  integrator.updateLikelihoods(15, 0.15, voxel);
+  EXPECT_FALSE(voxel.empty);
+  ASSERT_EQ(voxel.semantic_likelihoods.size(), 2);
+  EXPECT_GT(voxel.semantic_likelihoods(0), 0.0);
+  EXPECT_GT(voxel.semantic_likelihoods(1), 0.0);
+  EXPECT_EQ(voxel.semantic_label, 15u);
+
+  // add new (unrecorded) observation
+  integrator.updateLikelihoods(20, 0.20, voxel);
+  EXPECT_FALSE(voxel.empty);
+  ASSERT_EQ(voxel.semantic_likelihoods.size(), 2);
+  EXPECT_GT(voxel.semantic_likelihoods(0), 0.0);
+  EXPECT_GT(voxel.semantic_likelihoods(1), 0.0);
+  EXPECT_EQ(voxel.semantic_label, 15u);
+
+  // add more weight to first label
+  integrator.updateLikelihoods(10, 0.20, voxel);
+  EXPECT_FALSE(voxel.empty);
+  ASSERT_EQ(voxel.semantic_likelihoods.size(), 2);
+  EXPECT_GT(voxel.semantic_likelihoods(0), 0.0);
+  EXPECT_GT(voxel.semantic_likelihoods(1), 0.0);
+  EXPECT_EQ(voxel.semantic_label, 10u);
+}
+
+TEST(SemanticIntegrator, SingleLabelCorrect) {
+  SingleLabelIntegrator integrator;
+
+  SemanticVoxel voxel;
+  EXPECT_TRUE(voxel.empty);
+
+  // add new observation
+  integrator.updateLikelihoods(10, 0.1, voxel);
+  EXPECT_FALSE(voxel.empty);
+  EXPECT_EQ(voxel.semantic_label, 10u);
+
+  // add new observation
+  integrator.updateLikelihoods(15, 0.15, voxel);
+  EXPECT_FALSE(voxel.empty);
+  EXPECT_EQ(voxel.semantic_label, 15u);
+
+  // add new observation
+  integrator.updateLikelihoods(20, 0.20, voxel);
+  EXPECT_FALSE(voxel.empty);
+  EXPECT_EQ(voxel.semantic_label, 20u);
+
+  // add more weight to first label
+  integrator.updateLikelihoods(10, 0.10, voxel);
+  EXPECT_FALSE(voxel.empty);
+  EXPECT_EQ(voxel.semantic_label, 20u);
+
+  // last label to override likelihood gets picked
+  integrator.updateLikelihoods(15, 0.15, voxel);
+  EXPECT_FALSE(voxel.empty);
+  EXPECT_EQ(voxel.semantic_label, 15u);
 }
 
 }  // namespace hydra

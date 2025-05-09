@@ -8,7 +8,6 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 add_compile_options(-Wall -Wextra)
 
-option(HYDRA_ENABLE_COVERAGE "Build core library with GCC --coverage option" OFF)
 option(HYDRA_ENABLE_EVAL "Build evaluation code" ON)
 option(HYDRA_ENABLE_GNN "Build GNN interface" OFF)
 option(HYDRA_ENABLE_PYTHON "Build Hydra python bindings" OFF)
@@ -27,7 +26,6 @@ find_package(OpenCV REQUIRED COMPONENTS core imgproc)
 # REQUIRED to make sure we link against FLANN (used by euclidean extraction)
 find_package(PCL REQUIRED COMPONENTS common kdtree)
 
-include(GNUInstallDirs)
 include(HydraBuildConfig)
 include(HydraSourceDependencies)
 
@@ -59,20 +57,6 @@ if(HYDRA_ENABLE_GNN)
   target_link_libraries(${PROJECT_NAME} PRIVATE ort::ort)
 endif()
 
-if(HYDRA_ENABLE_COVERAGE)
-  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    target_compile_options(
-      ${PROJECT_NAME} PRIVATE -fprofile-instr-generate -fcoverage-mapping
-    )
-    target_link_options(
-      ${PROJECT_NAME} PRIVATE -fprofile-instr-generate -fcoverage-mapping
-    )
-  else()
-    target_compile_options(${PROJECT_NAME} PRIVATE --coverage)
-    target_link_options(${PROJECT_NAME} PRIVATE --coverage)
-  endif()
-endif()
-
 if(HYDRA_ENABLE_EVAL)
   add_subdirectory(eval)
 endif()
@@ -87,4 +71,39 @@ if(BUILD_TESTING)
   add_subdirectory(tests)
 endif()
 
-include(HydraInstall)
+include(GNUInstallDirs)
+
+install(
+  TARGETS ${PROJECT_NAME}
+  EXPORT hydra-targets
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(EXPORT hydra-targets FILE hydraTargets.cmake NAMESPACE hydra::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/hydra
+)
+
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+  ${CMAKE_CURRENT_LIST_DIR}/cmake/hydraConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/hydraConfig.cmake
+  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/hydra
+)
+write_basic_package_version_file(
+  hydraConfigVersion.cmake VERSION ${PACKAGE_VERSION} COMPATIBILITY AnyNewerVersion
+)
+install(
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/hydraConfig.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/hydraConfigVersion.cmake
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/hydra
+)
+
+find_package(ament_cmake_core QUIET)
+if (${ament_cmake_core_FOUND})
+  # NOTE(nathan) this will actually likely change once we drop ros1 support, but
+  # for now this is a good proxy if we are in ros2 and need to install the config files
+  # versus in ros1 (where installing them breaks things)
+  install(DIRECTORY config DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
+  ament_package()
+endif()

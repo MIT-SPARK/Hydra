@@ -86,9 +86,10 @@ struct TsdfVoxel {
 struct SemanticVoxel {
   //! Current MLE semantic label
   uint32_t semantic_label = 0;
-  // TODO(nathan) top-K!
   //! Log-likelihood priors of each label
   Eigen::VectorXf semantic_likelihoods;
+  //! Labels assigned to each likelihood slot
+  Eigen::Matrix<uint32_t, Eigen::Dynamic, 1> semantic_labels;
   //! Whether or not the voxel has been initialized
   bool empty = true;
 };
