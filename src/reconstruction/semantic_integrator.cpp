@@ -117,7 +117,7 @@ void declare_config(MLESemanticIntegrator::Config& config) {
 }
 
 void BinarySemanticIntegrator::updateLikelihoods(uint32_t label,
-                                                 float /* weight */
+                                                 float /* weight */,
                                                  SemanticVoxel& voxel) const {
   // Use the semantic_likelihoods to store the counts of the observations.
   if (voxel.empty) {
