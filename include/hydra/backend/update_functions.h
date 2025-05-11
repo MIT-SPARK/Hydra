@@ -50,13 +50,12 @@ struct UpdateInfo {
   using ConstPtr = std::shared_ptr<const UpdateInfo>;
   using LayerMerges = std::map<LayerId, MergeList>;
 
+  uint64_t timestamp_ns = 0;
   const gtsam::Values* places_values = nullptr;
   const gtsam::Values* pgmo_values = nullptr;
   bool loop_closure_detected = false;
-  uint64_t timestamp_ns = 0;
   //! External merges (e.g., from GNC)
-  LayerMerges given_merges;
-  const gtsam::Values* complete_agent_values = nullptr;
+  LayerMerges given_merges = {};
   // TODO(nathan) flip to const when we have mutable state
   kimera_pgmo::DeformationGraph* deformation_graph = nullptr;
   const std::unordered_map<NodeId, size_t>* node_to_robot_id = nullptr;

@@ -63,7 +63,7 @@ void UpdateFrontiersFunctor::call(const DynamicSceneGraph&,
 
 void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns, SharedDsgInfo& dsg) const {
   ScopedTimer spin_timer("backend/cleanup_frontiers", timestamp_ns);
-  std::unique_lock<std::mutex> lock(dsg.mutex);
+  std::lock_guard<std::mutex> lock(dsg.mutex);
   const auto& places_layer = dsg.graph->getLayer(DsgLayers::PLACES);
 
   std::unordered_set<NodeId> layer_nodes;

@@ -70,7 +70,7 @@ TEST(UpdateObjectsFunctor, ObjectUpdate) {
     graph.emplaceNode(DsgLayers::OBJECTS, 0, std::move(attrs));
   }
 
-  UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, false, 0, {}});
+  UpdateInfo::ConstPtr info(new UpdateInfo{0, nullptr, nullptr, false, {}});
   UpdateObjectsFunctor functor(UpdateObjectsFunctor::Config{});
   callWithUnmerged(functor, *dsg, info, false);
 
@@ -139,7 +139,7 @@ TEST(UpdateObjectsFunctor, ObjectUpdateMergeLC) {
   mesh->setPos(1, Mesh::Pos(1.0, 2.0, 3.0));
   graph.setMesh(mesh);
 
-  UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, true, 0, {}});
+  UpdateInfo::ConstPtr info(new UpdateInfo{0, nullptr, nullptr, true, {}});
   UpdateObjectsFunctor functor(UpdateObjectsFunctor::Config{});
   const auto result_merges = callWithUnmerged(functor, *dsg, info, true);
 
@@ -185,7 +185,7 @@ TEST(UpdateObjectsFunctor, ObjectUpdateMergeNoLC) {
   mesh->setPos(1, Mesh::Pos(1.0, 2.0, 3.0));
   graph.setMesh(mesh);
 
-  UpdateInfo::ConstPtr info(new UpdateInfo{nullptr, nullptr, false, 0, {}});
+  UpdateInfo::ConstPtr info(new UpdateInfo{0, nullptr, nullptr, false, {}});
   UpdateObjectsFunctor functor(UpdateObjectsFunctor::Config{});
   const auto result_merges = callWithUnmerged(functor, *dsg, info, true);
 

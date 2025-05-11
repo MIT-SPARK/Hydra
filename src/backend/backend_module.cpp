@@ -89,14 +89,12 @@ inline bool hasLoopClosure(const PoseGraph& graph) {
 
 void declare_config(BackendModule::Config& config) {
   using namespace config;
+  base<DsgUpdater::Config>(config);
   name("BackendConfig");
   field(config.pgmo, "pgmo");
   field(config.add_places_to_deformation_graph, "add_places_to_deformation_graph");
   field(config.optimize_on_lc, "optimize_on_lc");
-  field(config.enable_node_merging, "enable_node_merging");
-  field(config.enable_exhaustive_merging, "enable_exhaustive_merging");
   field(config.external_loop_closures, "external_loop_closures");
-  field(config.update_functors, "update_functors");
   field(config.sinks, "sinks");
 }
 
@@ -115,11 +113,11 @@ BackendModule::BackendModule(const Config& config,
   // set up mesh infrastructure
   private_dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>());
   unmerged_graph_->setMesh(private_dsg_->graph->mesh());
-  original_vertices_.reset(new pcl::PointCloud<pcl::PointXYZ>());
+  original_vertices_.reset(
+      new pcl::PointCloud<pcl::PointXYZ>());  // set up frontend graph copy
+  vertex_stamps_.reset(new std::vector<uint64_t>());
 
-  for (const auto& [name, functor] : config.update_functors) {
-    update_functors_.emplace(name, functor.create());
-  }
+  dsg_updater_.reset(new DsgUpdater(config, unmerged_graph_, private_dsg_));
 
   if (logs && logs->valid()) {
     logs_ = logs;
@@ -153,25 +151,17 @@ void BackendModule::stop() { stopImpl(); }
 
 void BackendModule::save(const LogSetup& log_setup) {
   std::lock_guard<std::mutex> lock(mutex_);
-  const auto backend_path = log_setup.getLogDir("backend");
-  const auto pgmo_path = log_setup.getLogDir("backend/pgmo");
-  private_dsg_->graph->save(backend_path / "dsg.json", false);
-  private_dsg_->graph->save(backend_path / "dsg_with_mesh.json");
+  dsg_updater_->save(log_setup, "backend");
 
+  const auto backend_path = log_setup.getLogDir("backend");
+
+  deformation_graph_->save(backend_path / "deformation_graph.dgrf");
   const auto& prefix = GlobalInfo::instance().getRobotPrefix();
   if (deformation_graph_->hasPrefixPoses(prefix.key)) {
     const auto optimized_path = getOptimizedTrajectory(prefix.id);
-    std::string csv_name = pgmo_path / "traj_pgmo.csv";
+    std::string csv_name = backend_path / "trajectory.csv";
     saveTrajectory(optimized_path, timestamps_, csv_name);
   }
-
-  const auto mesh = private_dsg_->graph->mesh();
-  if (mesh && !mesh->empty()) {
-    // mesh implements vertex and face traits
-    kimera_pgmo::WriteMesh(backend_path / "mesh.ply", *mesh, *mesh);
-  }
-
-  deformation_graph_->save(pgmo_path / "deformation_graph.dgrf");
 
   const std::string output_csv = backend_path / "loop_closures.csv";
   std::ofstream output_file;
@@ -268,7 +258,8 @@ bool BackendModule::spinOnce(bool force_update) {
     optimize(timestamp_ns);
   } else {
     updateDsgMesh(timestamp_ns);
-    callUpdateFunctions(timestamp_ns);
+    UpdateInfo::ConstPtr info(new UpdateInfo{timestamp_ns});
+    dsg_updater_->callUpdateFunctions(timestamp_ns, info);
   }
 
   if (logs_) {
@@ -434,30 +425,33 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
     const_cast<bool&>(private_dsg_->graph->mesh()->has_first_seen_stamps) = true;
   }
 
-  input.mesh_update->updateMesh(*private_dsg_->graph->mesh());
-  if (input.mesh_stamp_update) {
-    input.mesh_stamp_update->updateMesh(*private_dsg_->graph->mesh(),
-                                        input.mesh_update->vertex_start);
+  {
+    std::lock_guard<std::mutex> graph_lock(private_dsg_->mutex);
+
+    input.mesh_update->updateMesh(*private_dsg_->graph->mesh());
+    if (input.mesh_stamp_update) {
+      input.mesh_stamp_update->updateMesh(*private_dsg_->graph->mesh(),
+                                          input.mesh_update->vertex_start);
+    }
+
+    kimera_pgmo::StampedCloud<pcl::PointXYZ> cloud_out{*original_vertices_,
+                                                       *vertex_stamps_};
+    input.mesh_update->updateVertices(cloud_out);
+    // we use this to make sure that deformation only happens for vertices that are
+    // still active
+    num_archived_vertices_ = input.mesh_update->getTotalArchivedVertices();
+    utils::updatePlaces2d(private_dsg_, *input.mesh_update, num_archived_vertices_);
   }
-
-  kimera_pgmo::StampedCloud<pcl::PointXYZ> cloud_out{*original_vertices_,
-                                                     vertex_stamps_};
-  input.mesh_update->updateVertices(cloud_out);
-  // we use this to make sure that deformation only happens for vertices that are
-  // still active
-  num_archived_vertices_ = input.mesh_update->getTotalArchivedVertices();
-  utils::updatePlaces2d(private_dsg_, *input.mesh_update, num_archived_vertices_);
-
   have_new_mesh_ = true;
 }
 
 bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
-  std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
+  std::lock_guard<std::mutex> graph_lock(private_dsg_->mutex);
   {  // start joint critical section
     ScopedTimer timer("backend/read_graph", timestamp_ns);
 
     const auto& shared_dsg = *state_->backend_graph;
-    std::unique_lock<std::mutex> shared_graph_lock(shared_dsg.mutex);
+    std::lock_guard<std::mutex> shared_graph_lock(shared_dsg.mutex);
     if (!force_update && shared_dsg.sequence_number != last_sequence_number_) {
       return false;
     }
@@ -485,6 +479,7 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
   }
 
   have_new_mesh_ = false;
+
   auto mesh = private_dsg_->graph->mesh();
   if (!mesh || mesh->empty()) {
     return;
@@ -498,10 +493,11 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
   }
 
   ScopedTimer timer("backend/mesh_deformation", timestamp_ns);
+
   VLOG(2) << "Deforming mesh with " << mesh->numVertices() << " vertices";
 
   kimera_pgmo::ConstStampedCloud<pcl::PointXYZ> cloud_in{*original_vertices_,
-                                                         vertex_stamps_};
+                                                         *vertex_stamps_};
   deformation_graph_->deformPoints(*private_dsg_->graph->mesh(),
                                    cloud_in,
                                    GlobalInfo::instance().getRobotPrefix().vertex_key,
@@ -525,7 +521,7 @@ void BackendModule::updateAgentNodeMeasurements(const PoseGraph& meas) {
   deformation_graph_->processNodeMeasurements(agent_measurements);
 }
 
-void BackendModule::optimize(size_t timestamp_ns) {
+void BackendModule::optimize(size_t timestamp_ns, bool force_find_merge) {
   if (config.add_places_to_deformation_graph) {
     const auto vertex_key = GlobalInfo::instance().getRobotPrefix().vertex_key;
     addPlacesToDeformationGraph(*unmerged_graph_,
@@ -537,104 +533,25 @@ void BackendModule::optimize(size_t timestamp_ns) {
   }
 
   {  // timer scope
-    ScopedTimer timer("backend/optimization", timestamp_ns, true, 0, false);
+    ScopedTimer timer("dsg_updater/optimization", timestamp_ns, true, 0, false);
     KimeraPgmoInterface::optimize();
   }  // timer scope
 
-  updateDsgMesh(timestamp_ns, true);
+  updateDsgMesh(timestamp_ns);
 
-  callUpdateFunctions(timestamp_ns,
-                      *deformation_graph_->getTempValues(),
-                      *deformation_graph_->getValues(),
-                      have_new_loopclosures_);
+  UpdateInfo::ConstPtr info(new UpdateInfo{timestamp_ns,
+                                           config.add_places_to_deformation_graph
+                                               ? deformation_graph_->getTempValues()
+                                               : nullptr,
+                                           deformation_graph_->getValues(),
+                                           have_new_loopclosures_ || force_find_merge,
+                                           {},
+                                           deformation_graph_.get(),
+                                           nullptr,
+                                           num_archived_vertices_,
+                                           prev_num_archived_vertices_});
+  dsg_updater_->callUpdateFunctions(timestamp_ns, info);
   have_new_loopclosures_ = false;
-}
-
-void BackendModule::resetBackendDsg(size_t timestamp_ns) {
-  ScopedTimer timer("backend/reset_dsg", timestamp_ns, true, 0, false);
-  {
-    std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
-    // First reset private graph
-    private_dsg_->graph->clear();
-  }
-
-  // TODO(nathan) this might break mesh stuff
-  private_dsg_->graph->mergeGraph(*unmerged_graph_);
-  private_dsg_->merges.clear();
-  merge_tracker.clear();
-  deformation_graph_->setRecalculateVertices();
-  reset_backend_dsg_ = false;
-}
-
-void BackendModule::callUpdateFunctions(size_t timestamp_ns,
-                                        const gtsam::Values& places_values,
-                                        const gtsam::Values& pgmo_values,
-                                        bool new_loop_closure,
-                                        const UpdateInfo::LayerMerges& given_merges,
-                                        const NodeToRobotMap* node_to_robot) {
-  ScopedTimer spin_timer("backend/update_layers", timestamp_ns);
-
-  // TODO(nathan) chance that this causes weirdness when we have multiple nodes but no
-  // accepted reconciliation merges
-  const bool enable_merging = given_merges.empty() ? config.enable_node_merging : false;
-
-  // TODO(nathan) given_merges probably doesn't need to be passed
-  UpdateInfo::ConstPtr info(
-      new UpdateInfo{config.add_places_to_deformation_graph ? &places_values : nullptr,
-                     &pgmo_values,
-                     new_loop_closure,
-                     timestamp_ns,
-                     given_merges,
-                     &pgmo_values,
-                     deformation_graph_.get(),
-                     node_to_robot,
-                     num_archived_vertices_,
-                     prev_num_archived_vertices_});
-
-  // merge topological changes to private dsg, respecting merges
-  // attributes may be overwritten, but ideally we don't bother
-  GraphMergeConfig merge_config;
-  merge_config.previous_merges = &private_dsg_->merges;
-  merge_config.update_dynamic_attributes = false;
-  private_dsg_->graph->mergeGraph(*unmerged_graph_, merge_config);
-
-  std::list<LayerCleanupFunc> cleanup_hooks;
-  for (const auto& [name, functor] : update_functors_) {
-    if (!functor) {
-      continue;
-    }
-
-    const auto hooks = functor->hooks();
-    if (hooks.cleanup) {
-      cleanup_hooks.push_back(hooks.cleanup);
-    }
-
-    functor->call(*unmerged_graph_, *private_dsg_, info);
-    if (hooks.find_merges && enable_merging) {
-      // TODO(nathan) handle given merges
-      const auto merges = hooks.find_merges(*unmerged_graph_, info);
-      const auto applied = merge_tracker.applyMerges(
-          *unmerged_graph_, merges, *private_dsg_, hooks.merge);
-      VLOG(1) << "[Backend: " << name << "] Found " << merges.size()
-              << " merges (applied " << applied << ")";
-
-      if (config.enable_exhaustive_merging) {
-        size_t merge_iter = 0;
-        size_t num_applied = 0;
-        do {
-          const auto new_merges = hooks.find_merges(*private_dsg_->graph, info);
-          num_applied = merge_tracker.applyMerges(
-              *private_dsg_->graph, new_merges, *private_dsg_, hooks.merge);
-          VLOG(1) << "[Backend: " << name << "] Found " << new_merges.size()
-                  << " merges at pass " << merge_iter << " (" << num_applied
-                  << " applied)";
-          ++merge_iter;
-        } while (num_applied > 0);
-      }
-    }
-  }
-
-  launchCallbacks(cleanup_hooks, info, private_dsg_.get());
 }
 
 void BackendModule::logStatus(bool init) const {

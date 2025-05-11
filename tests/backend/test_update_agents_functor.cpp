@@ -82,8 +82,7 @@ TEST(UpdateAgentsFunctor, AgentUpdate) {
       NodeSymbol('b', 5),
       gtsam::Pose3(gtsam::Rot3(0.0, 0.0, 1.0, 0.0), gtsam::Point3(7.0, 8.0, 9.0)));
 
-  UpdateInfo::ConstPtr info(
-      new UpdateInfo{nullptr, nullptr, false, 0, {}, &agent_values});
+  UpdateInfo::ConstPtr info(new UpdateInfo{0, nullptr, &agent_values, false, {}});
   UpdateAgentsFunctor functor;
   functor.call(*dsg->graph, *dsg, info);
 

@@ -32,42 +32,71 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <gtest/gtest.h>
-#include <hydra/backend/update_buildings_functor.h>
+#pragma once
+#include <config_utilities/virtual_config.h>
+#include <kimera_pgmo/kimera_pgmo_interface.h>
+#include <spark_dsg/scene_graph_logger.h>
 
-#include "hydra_test/shared_dsg_fixture.h"
+#include <filesystem>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <thread>
+
+#include "hydra/backend/backend_input.h"
+#include "hydra/backend/external_loop_closure_receiver.h"
+#include "hydra/backend/merge_tracker.h"
+#include "hydra/backend/pgmo_configs.h"
+#include "hydra/common/module.h"
+#include "hydra/common/output_sink.h"
+#include "hydra/common/shared_dsg_info.h"
+#include "hydra/common/shared_module_state.h"
+#include "hydra/utils/log_utilities.h"
 
 namespace hydra {
 
-TEST(UpdateRoomsBuildingsFunctor, BuildingUpdate) {
-  auto dsg = test::makeSharedDsg();
-  auto& graph = *dsg->graph;
-  graph.emplaceNode(DsgLayers::BUILDINGS,
-                    "B0"_id,
-                    std::make_unique<NodeAttributes>(Eigen::Vector3d(1.0, 2.0, 3.0)));
+class DsgUpdater {
+ public:
+  using Ptr = std::shared_ptr<DsgUpdater>;
+  using Sink = OutputSink<uint64_t,
+                          const DynamicSceneGraph&,
+                          const kimera_pgmo::DeformationGraph&>;
+  using NodeToRobotMap = std::unordered_map<NodeId, size_t>;
 
-  graph.emplaceNode(DsgLayers::ROOMS,
-                    3,
-                    std::make_unique<NodeAttributes>(Eigen::Vector3d(-1.0, 0.0, 1.0)));
-  graph.emplaceNode(DsgLayers::ROOMS,
-                    4,
-                    std::make_unique<NodeAttributes>(Eigen::Vector3d(-1.0, 0.0, 1.0)));
-  graph.emplaceNode(DsgLayers::ROOMS,
-                    5,
-                    std::make_unique<NodeAttributes>(Eigen::Vector3d(-1.0, 0.0, 1.0)));
+  struct Config {
+    //! Enable combining multiple nodes together
+    bool enable_node_merging = true;
+    //! Repeatedly run merge detection until no more merges are detected
+    bool enable_exhaustive_merging = false;
+    //! Update functors that get applied in the specified order
+    config::OrderedMap<std::string, config::VirtualConfig<UpdateFunctor, true>>
+        update_functors;
+  } const config;
 
-  graph.insertEdge("B0"_id, 3);
-  graph.insertEdge("B0"_id, 4);
-  graph.insertEdge("B0"_id, 5);
+  DsgUpdater(const Config& config,
+             DynamicSceneGraph::Ptr source,
+             SharedDsgInfo::Ptr target);
 
-  UpdateInfo::ConstPtr info(new UpdateInfo{0, nullptr, nullptr, false, {}});
-  UpdateBuildingsFunctor functor(UpdateBuildingsFunctor::Config{0});
-  const auto unmerged = dsg->graph->clone();
-  functor.call(*unmerged, *dsg, info);
+  virtual ~DsgUpdater(){};
 
-  Eigen::Vector3d first_expected(-1.0, 0.0, 1.0);
-  Eigen::Vector3d first_result = graph.getPosition("B0"_id);
-  EXPECT_NEAR(0.0, (first_expected - first_result).norm(), 1.0e-7);
-}
+  DsgUpdater(const DsgUpdater& other) = delete;
+
+  DsgUpdater& operator=(const DsgUpdater& other) = delete;
+
+  void save(const LogSetup& log_setup, std::string label) const;
+
+  void resetBackendDsg(size_t timestamp_ns);
+
+  void callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr info);
+
+ private:
+  MergeTracker merge_tracker;
+  std::map<std::string, UpdateFunctor::Ptr> update_functors_;
+
+  DynamicSceneGraph::Ptr source_graph_;
+  SharedDsgInfo::Ptr target_dsg_;
+};
+
+void declare_config(DsgUpdater::Config& conf);
 
 }  // namespace hydra

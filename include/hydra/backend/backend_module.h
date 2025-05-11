@@ -44,6 +44,7 @@
 #include <thread>
 
 #include "hydra/backend/backend_input.h"
+#include "hydra/backend/dsg_updater.h"
 #include "hydra/backend/external_loop_closure_receiver.h"
 #include "hydra/backend/merge_tracker.h"
 #include "hydra/backend/pgmo_configs.h"
@@ -82,24 +83,15 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   using Sink = OutputSink<uint64_t,
                           const DynamicSceneGraph&,
                           const kimera_pgmo::DeformationGraph&>;
-  using NodeToRobotMap = std::unordered_map<NodeId, size_t>;
 
-  struct Config {
+  struct Config : DsgUpdater::Config {
     //! Specialized PGMO configuration that includes scene graph factor covariances
     HydraPgmoConfig pgmo;
     //! Add places layer to factor graph via MST approach
     bool add_places_to_deformation_graph = true;
-    //! Actually perform PGO on every detected loop closure
+    //! Optimize
     bool optimize_on_lc = true;
-    //! Enable combining multiple nodes together
-    bool enable_node_merging = true;
-    //! Repeatedly run merge detection until no more merges are detected
-    bool enable_exhaustive_merging = false;
-    //! External loop closure receivers
     ExternalLoopClosureReceiver::Config external_loop_closures;
-    //! Update functors that get applied in the specified order
-    config::OrderedMap<std::string, config::VirtualConfig<UpdateFunctor, true>>
-        update_functors;
     //! Output sinks that process that latest backed scene graph and state
     std::vector<Sink::Factory> sinks;
   } const config;
@@ -127,8 +119,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   bool step(bool force_optimize = false);
 
-  void triggerBackendDsgReset() { reset_backend_dsg_ = true; }
-
   void loadState(const std::filesystem::path& mesh_path,
                  const std::filesystem::path& dgrf_path,
                  bool force_loopclosures = true);
@@ -143,30 +133,19 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
                       const gtsam::Pose3& src_T_dest,
                       double variance);
 
-  virtual void updateFactorGraph(const BackendInput& input);
+  void updateFactorGraph(const BackendInput& input);
 
-  virtual bool updateFromLcdQueue();
+  bool updateFromLcdQueue();
 
-  virtual void copyMeshDelta(const BackendInput& input);
+  void copyMeshDelta(const BackendInput& input);
 
-  virtual bool updatePrivateDsg(size_t timestamp_ns, bool force_update = true);
+  bool updatePrivateDsg(size_t timestamp_ns, bool force_update = true);
 
-  virtual void updateAgentNodeMeasurements(const pose_graph_tools::PoseGraph& meas);
+  void updateAgentNodeMeasurements(const pose_graph_tools::PoseGraph& meas);
 
-  virtual void optimize(size_t timestamp_ns);
+  void optimize(size_t timestamp_ns, bool force_find_merge = false);
 
-  virtual void updateDsgMesh(size_t timestamp_ns, bool force_mesh_update = false);
-
-  virtual void resetBackendDsg(size_t timestamp_ns);
-
-  virtual void callUpdateFunctions(size_t timestamp_ns,
-                                   const gtsam::Values& places_values = gtsam::Values(),
-                                   const gtsam::Values& pgmo_values = gtsam::Values(),
-                                   bool new_loop_closure = false,
-                                   const UpdateInfo::LayerMerges& given_merges = {},
-                                   const NodeToRobotMap* node_to_robot = nullptr);
-
-  void updateMergedNodes(const std::map<NodeId, NodeId>& new_merges);
+  void updateDsgMesh(size_t timestamp_ns, bool force_mesh_update = false);
 
   void logStatus(bool init = false) const;
 
@@ -181,23 +160,20 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   bool have_loopclosures_ = false;
   bool have_new_loopclosures_ = false;
   bool have_new_mesh_ = false;
-  size_t prev_num_archived_vertices_ = 0;
-  size_t num_archived_vertices_ = 0;
-  bool reset_backend_dsg_ = false;
   uint64_t last_sequence_number_ = 0;
 
   SharedDsgInfo::Ptr private_dsg_;
   DynamicSceneGraph::Ptr unmerged_graph_;
   SharedModuleState::Ptr state_;
 
+  DsgUpdater::Ptr dsg_updater_;
+
   kimera_pgmo::Path trajectory_;
   std::vector<size_t> timestamps_;
-  std::queue<size_t> unconnected_nodes_;
   pcl::PointCloud<pcl::PointXYZ>::Ptr original_vertices_;
-  std::vector<uint64_t> vertex_stamps_;
-
-  MergeTracker merge_tracker;
-  std::map<std::string, UpdateFunctor::Ptr> update_functors_;
+  std::shared_ptr<std::vector<uint64_t>> vertex_stamps_;
+  size_t prev_num_archived_vertices_ = 0;
+  size_t num_archived_vertices_ = 0;
 
   LogSetup::Ptr logs_;
   BackendModuleStatus status_;

@@ -239,9 +239,8 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
 
   // TODO(nathan) critical section appears to be wrong here
   // Get/copy info for places that need cleanup
-  std::unique_lock<std::mutex> lock(dsg.mutex);
+  std::lock_guard<std::mutex> lock(dsg.mutex);
   utils::getPlace2dAndNeighors(*places_layer, place_2ds, node_neighbors);
-  lock.unlock();
 
   // Decide which places need to be split and which just need to be updated
   auto& graph = *dsg.graph;
@@ -270,7 +269,6 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
         *mesh, config.connection_ellipse_scale_factor, place_2ds, nodes_to_update);
   }
 
-  lock.lock();
   // Update attributes for place nodes that did not need to split after merge
   utils::updateExistingNodes(nodes_to_update, graph);
 

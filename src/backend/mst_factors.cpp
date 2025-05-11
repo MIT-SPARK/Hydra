@@ -57,17 +57,17 @@ void addPlacesToDeformationGraph(const DynamicSceneGraph& graph,
     return;
   }
 
-  ScopedTimer timer("backend/add_places", timestamp_ns);
+  ScopedTimer timer("dsg_updater/add_places", timestamp_ns);
   deformation_graph.clearTemporaryStructures();
 
   MinimumSpanningTreeInfo mst_info;
   {  // start timing scope
-    ScopedTimer mst_timer("backend/places_mst", timestamp_ns);
+    ScopedTimer mst_timer("dsg_updater/places_mst", timestamp_ns);
     mst_info = getMinimumSpanningEdges(places);
   }  // end timing scope
 
   {  // start timing scope
-    ScopedTimer add_timer("backend/add_places_nodes", timestamp_ns);
+    ScopedTimer add_timer("dsg_updater/add_places_nodes", timestamp_ns);
 
     kimera_pgmo::NodeValenceInfoList factors;
     for (const auto& [node_id, node] : places.nodes()) {
@@ -95,7 +95,7 @@ void addPlacesToDeformationGraph(const DynamicSceneGraph& graph,
   }  // end timing scope
 
   {  // start timing scope
-    ScopedTimer between_timer("backend/add_places_between", timestamp_ns);
+    ScopedTimer between_timer("dsg_updater/add_places_between", timestamp_ns);
     const auto robot_id = GlobalInfo::instance().getRobotPrefix().id;
     pose_graph_tools::PoseGraph mst_edges;
     for (const auto& edge : mst_info.edges) {

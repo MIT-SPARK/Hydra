@@ -81,7 +81,7 @@ TEST(UpdatePlacesFunctor, PlaceUpdate) {
   values.insert(NodeSymbol('p', 5),
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
-  UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, true, 0, {}});
+  UpdateInfo::ConstPtr info(new UpdateInfo{0, &values, nullptr, true, {}});
   UpdatePlacesFunctor functor({0.4, 0.3});
   callWithUnmerged(functor, *dsg, info, false);
 
@@ -127,7 +127,7 @@ TEST(UpdatePlacesFunctor, PlaceUpdateNodeFinderBug) {
   values.insert(NodeSymbol('p', 5),
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
-  UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, false, 0, {}});
+  UpdateInfo::ConstPtr info(new UpdateInfo{0, &values, nullptr, false, {}});
   UpdatePlacesFunctor functor({0.4, 0.3});
   // initialize node finder
   callWithUnmerged(functor, *dsg, info, false);
@@ -167,7 +167,7 @@ TEST(UpdatePlacesFunctor, PlaceUpdateMerge) {
   values.insert(NodeSymbol('p', 6),
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
-  UpdateInfo::ConstPtr info(new UpdateInfo{&values, nullptr, true, 0, {}});
+  UpdateInfo::ConstPtr info(new UpdateInfo{0, &values, nullptr, true, {}});
   UpdatePlacesFunctor functor({0.4, 0.3});
   const auto result_merges = callWithUnmerged(functor, *dsg, info, true);
 
