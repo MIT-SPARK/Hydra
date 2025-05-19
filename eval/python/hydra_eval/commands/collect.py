@@ -1,5 +1,7 @@
 """Command to run hydra and collect results."""
 
+import pprint
+
 import click
 from hydra_eval.result_collection import ExperimentManager, ResultManager
 
@@ -29,8 +31,5 @@ def run(output_path, experiments):
 def show(output_path):
     """Collect a new set of Hydra results."""
     with ResultManager(output_path) as manager:
-        cur = manager.db.cursor()
-        for row in cur.execute(
-            "SELECT uuid, date, experiment_name FROM results ORDER BY date"
-        ):
-            print(row)
+        for result in manager.results:
+            pprint.pprint(result)
