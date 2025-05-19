@@ -6,4 +6,4 @@ from hydra_python.semantics.segmentation_colormap import (
     SegmentationColormap,
 )
 
-__all__ = [OnnxSegmenter, LabelConverter, SegmentationColormap]
+__all__ = ["OnnxSegmenter", "LabelConverter", "SegmentationColormap"]

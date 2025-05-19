@@ -19,8 +19,8 @@ repos:
       - {id: ruff, args: [--select, I, --fix]}
       - id: ruff
       - id: ruff-format
-  - repo: https://github.com/lyz-code/yamlfix
-    rev: 1.17.0
-    hooks:
-      - id: yamlfix
-        entry: env YAMLFIX_LINE_LENGTH=200 yamlfix
+# - repo: https://github.com/lyz-code/yamlfix
+#   rev: 1.17.0
+#   hooks:
+#     - id: yamlfix
+#       entry: env YAMLFIX_LINE_LENGTH=200 yamlfix
