@@ -72,8 +72,7 @@ class MeshSegmenter {
 
   explicit MeshSegmenter(const Config& config, const std::set<uint32_t>& labels);
 
-  LabelClusters detect(uint64_t timestamp_ns,
-                       const kimera_pgmo::MeshDelta& active);
+  LabelClusters detect(uint64_t timestamp_ns, const kimera_pgmo::MeshDelta& active);
 
   void updateGraph(uint64_t timestamp,
                    const kimera_pgmo::MeshDelta& active,

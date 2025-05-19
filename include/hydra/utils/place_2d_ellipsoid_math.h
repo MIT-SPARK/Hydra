@@ -18,16 +18,16 @@ std::pair<Eigen::Vector2d, Eigen::Vector2d> computeMinTransverseIntersectionPoin
     const Eigen::Vector2d& dm);
 
 Eigen::Vector2d computeMLambda(const Eigen::Matrix2d& A,
-                                 const Eigen::Vector2d& a,
-                                 const Eigen::Matrix2d& B,
-                                 const Eigen::Vector2d& b,
-                                 const double lambda);
+                               const Eigen::Vector2d& a,
+                               const Eigen::Matrix2d& B,
+                               const Eigen::Vector2d& b,
+                               const double lambda);
 
 Eigen::Vector2d computeDmLambda(const Eigen::Matrix2d& A,
-                                  const Eigen::Vector2d& a,
-                                  const Eigen::Matrix2d& B,
-                                  const Eigen::Vector2d& b,
-                                  const double lambda);
+                                const Eigen::Vector2d& a,
+                                const Eigen::Matrix2d& B,
+                                const Eigen::Vector2d& b,
+                                const double lambda);
 
 struct IntersectionCenters {
   bool certified = false;
@@ -36,14 +36,14 @@ struct IntersectionCenters {
 };
 
 void findIntersectionCenterPoints(const Eigen::Matrix2d& A,
-                                     const Eigen::Vector2d& a,
-                                     const Eigen::Matrix2d& B,
-                                     const Eigen::Vector2d& b,
-                                     IntersectionCenters& intersection_centers);
+                                  const Eigen::Vector2d& a,
+                                  const Eigen::Matrix2d& B,
+                                  const Eigen::Vector2d& b,
+                                  IntersectionCenters& intersection_centers);
 
 double getEllipsoidTransverseOverlapDistance(const Eigen::Matrix2d& A,
-                                                 const Eigen::Vector2d& a,
-                                                 const Eigen::Matrix2d& B,
-                                                 const Eigen::Vector2d& b);
+                                             const Eigen::Vector2d& a,
+                                             const Eigen::Matrix2d& B,
+                                             const Eigen::Vector2d& b);
 
 }  // namespace hydra::ellipse

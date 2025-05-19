@@ -1,9 +1,10 @@
 """Run Hydra stuff."""
 
-import subprocess
-import pathlib
-import click
 import os
+import pathlib
+import subprocess
+
+import click
 
 
 @click.group(name="mp3d")

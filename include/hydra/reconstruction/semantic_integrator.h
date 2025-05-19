@@ -86,9 +86,11 @@ class BinarySemanticIntegrator : public hydra::SemanticIntegrator {
  public:
   struct Config {};
 
-  explicit BinarySemanticIntegrator(const Config& /* config */) {};
+  explicit BinarySemanticIntegrator(const Config& /* config */){};
 
-  void updateLikelihoods(uint32_t label, float weight, SemanticVoxel& voxel) const override;
+  void updateLikelihoods(uint32_t label,
+                         float weight,
+                         SemanticVoxel& voxel) const override;
 };
 
 void declare_config(BinarySemanticIntegrator::Config& config);

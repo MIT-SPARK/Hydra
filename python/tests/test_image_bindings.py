@@ -1,11 +1,12 @@
 """Test python image conversion."""
+
+import numpy as np
+import pytest
 from hydra_python._hydra_bindings import (
     _get_color_image,
     _get_depth_image,
     _get_label_image,
 )
-import numpy as np
-import pytest
 
 
 def _get_img(dtype):

@@ -1,11 +1,11 @@
 """Some small helpers for getting timing information."""
 
-import numpy as np
 import logging
+
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
-
 
 DEFAULT_FOLDERS = ["frontend", "backend", "lcd"]
 FRONTEND_TIMERS = ["frontend/spin"]
@@ -211,7 +211,6 @@ def plot_comparison(results, plot_config, keys, use_bars=False, rt_threshold=Non
             if key not in result:
                 continue
 
-            result_df = _get_longform_df(result, lambda x: key in x)
             # TODO(nathan) remap key to actual name
             # TODO(nathan) add result key
             key_label = plot_config.get("key_map", {}).get(key, key)

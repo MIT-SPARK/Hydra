@@ -7,8 +7,9 @@ from typing import Union
 import networkx as nx
 import numpy as np
 import spark_dataset_interfaces as sdi
-from hydra_python.semantics import LabelConverter
 from scipy.spatial.transform import Rotation as R
+
+from hydra_python.semantics import LabelConverter
 
 
 def _get_index(vertices, pos):

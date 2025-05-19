@@ -34,12 +34,12 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
+#include <filesystem>
 #include <functional>
 #include <list>
 #include <memory>
 #include <set>
 #include <string>
-#include <filesystem>
 
 namespace hydra {
 

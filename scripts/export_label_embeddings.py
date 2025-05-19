@@ -33,11 +33,13 @@
 # purposes notwithstanding any copyright notation herein.
 
 """Quick script to export label embeddings."""
+
+import pathlib
+
+import click
 import gensim.models as gm
 import numpy as np
-import pathlib
 import yaml
-import click
 
 
 @click.command()

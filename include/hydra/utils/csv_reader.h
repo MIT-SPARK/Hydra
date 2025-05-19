@@ -55,18 +55,18 @@ class CsvReader {
 
   // Interface to verify the read file with required and optional headers.
   /**
-   * @brief Require the csv file to have the given headers. An error about missing headers will be
-   * printed.
+   * @brief Require the csv file to have the given headers. An error about missing
+   * headers will be printed.
    * @param headers List of headers that are required.
    * @return True if all required headers are present, false otherwise.
    */
   bool checkRequiredHeaders(const std::vector<std::string>& headers) const;
 
-/**
- * @brief Check if the csv file has the given headers. A warning about missing headers will be
- * printed.
- * @param headers List of headers that are optional.
- */
+  /**
+   * @brief Check if the csv file has the given headers. A warning about missing headers
+   * will be printed.
+   * @param headers List of headers that are optional.
+   */
   void checkOptionalHeaders(const std::vector<std::string>& headers) const;
 
  private:
@@ -80,7 +80,8 @@ class CsvReader {
   std::shared_ptr<std::unordered_map<std::string, size_t>> header_to_index_;
 
   // Helper functions.
-  std::vector<std::string> missingHeaders(const std::vector<std::string>& headers) const;
+  std::vector<std::string> missingHeaders(
+      const std::vector<std::string>& headers) const;
 };
 
 }  // namespace hydra

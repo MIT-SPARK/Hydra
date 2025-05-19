@@ -362,4 +362,4 @@ std::ostream& operator<<(std::ostream& out, const FieldInfo& info) {
   return out;
 }
 
-}  // namespace::hydra
+}  // namespace hydra::gnn

@@ -14,18 +14,18 @@
 # ---
 
 # %%
+import json
+import pathlib
+
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import networkx as nx
 import networkx.algorithms.community as nx_comm
 import networkx.readwrite as nxio
-import matplotlib.patches as mpatches
-import matplotlib.pyplot as plt
+import numpy as np
 import scipy
 import seaborn as sns
-import numpy as np
-import pathlib
 import sklearn.cluster
-import json
-
 
 # %%
 node_size = 30

@@ -106,5 +106,4 @@ inline void setGvdSurfaceVoxel(GvdVoxel& voxel) {
   resetParent(voxel);
 }
 
-
 }  // namespace hydra::places

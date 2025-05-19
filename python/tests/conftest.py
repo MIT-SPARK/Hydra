@@ -1,6 +1,7 @@
 """Test fixtures for python binding tests."""
-import pytest
+
 import hydra_python as hydra
+import pytest
 
 
 @pytest.fixture(autouse=True)

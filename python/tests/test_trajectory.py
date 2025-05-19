@@ -1,6 +1,7 @@
 """Test trajectory class."""
-from hydra_python.trajectory import Trajectory
+
 import numpy as np
+from hydra_python.trajectory import Trajectory
 
 
 def test_trajectory_manual():

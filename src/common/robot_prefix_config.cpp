@@ -34,10 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/common/robot_prefix_config.h"
 
-#include <kimera_pgmo/utils/common_functions.h>
-#include <config_utilities/types/conversions.h>
 #include <config_utilities/config.h>
-
+#include <config_utilities/types/conversions.h>
+#include <kimera_pgmo/utils/common_functions.h>
 
 namespace hydra {
 
@@ -47,7 +46,6 @@ RobotPrefixConfig::RobotPrefixConfig(int robot_id)
       vertex_key(kimera_pgmo::robot_id_to_vertex_prefix.at(robot_id)) {}
 
 RobotPrefixConfig::RobotPrefixConfig() : RobotPrefixConfig(0) {}
-
 
 void declare_config(RobotPrefixConfig& config) {
   using namespace config;

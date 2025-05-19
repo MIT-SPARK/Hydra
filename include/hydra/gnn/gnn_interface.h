@@ -97,4 +97,4 @@ class GnnInterface {
   friend std::ostream& operator<<(std::ostream& out, const GnnInterface& gnn);
 };
 
-}  // namespace::hydra
+}  // namespace hydra::gnn

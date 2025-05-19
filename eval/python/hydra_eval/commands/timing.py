@@ -1,12 +1,13 @@
 """Command to gather timing information."""
 
+import json
+import logging
+import pathlib
+import sys
+
+import click
 import hydra_eval.timing as timing
 import numpy as np
-import pathlib
-import logging
-import click
-import json
-import sys
 
 
 def _normalize_path(path_str):

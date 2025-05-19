@@ -1,8 +1,10 @@
 """Entry points for hydra."""
 
-import hydra_eval.commands.timing as timing
-import click
 import logging
+
+import click
+
+import hydra_eval.commands.timing as timing
 
 
 class ClickHandler(logging.Handler):

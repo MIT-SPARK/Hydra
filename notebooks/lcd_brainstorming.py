@@ -14,19 +14,20 @@
 # ---
 
 # %%
-import networkx as nx
-import networkx.readwrite as nxio
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import seaborn as sns
-import pandas as pd
-import numpy as np
 import collections
-import shapely
-import shapely.geometry
+import json
 import pathlib
 import random
-import json
+
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+import networkx as nx
+import networkx.readwrite as nxio
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import shapely
+import shapely.geometry
 
 # %matplotlib notebook
 

@@ -1,10 +1,10 @@
 """Setup script for building against hydra."""
 
-import os
-import subprocess
 import multiprocessing
-import sys
+import os
 import shutil
+import subprocess
+import sys
 
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext

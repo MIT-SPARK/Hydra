@@ -14,10 +14,11 @@
 # ---
 
 # %%
+import pathlib
+import re
+
 import numpy as np
 import teaserpp_python as teaser
-import re
-import pathlib
 
 
 # %%

@@ -1,7 +1,7 @@
 ---
 map_window:
   type: spatial
-  max_radius_m: 60.0 # NOTE(hyungtae) It should be larger than `max_range` + `voxel_size` * `voxels_per_side`
+  max_radius_m: 60.0  # NOTE(hyungtae) It should be larger than `max_range` + `voxel_size` * `voxels_per_side`
 active_window:
   volumetric_map:
     voxels_per_side: 16

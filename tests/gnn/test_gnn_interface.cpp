@@ -83,4 +83,4 @@ TEST(GnnInterfaceTests, TestSimpleNetwork) {
   EXPECT_NEAR(diff, 0.0, 1.0e-9);
 }
 
-}  // namespace::hydra
+}  // namespace hydra::gnn

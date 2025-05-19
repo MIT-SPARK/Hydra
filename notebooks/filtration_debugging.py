@@ -15,13 +15,14 @@
 
 # %%
 import json
-import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
 import pathlib
+
+import matplotlib.pyplot as plt
+import networkx as nx
+import numpy as np
+import seaborn as sns
 import spark_dsg as dsg
 import spark_dsg.networkx
-import networkx as nx
 
 # %matplotlib notebook
 

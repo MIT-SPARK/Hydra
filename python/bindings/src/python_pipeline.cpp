@@ -153,7 +153,8 @@ PythonPipeline::PythonPipeline(const Config& _config,
   config::Settings().print_indent = 45;
 
   GlobalInfo::instance().setSensor(sensor);
-  VLOG(config_verbosity) << "Using sensor '" << sensor->name << "':\n" << sensor->dump();
+  VLOG(config_verbosity) << "Using sensor '" << sensor->name << "':\n"
+                         << sensor->dump();
   initModules();
 }
 
@@ -359,10 +360,9 @@ void addBindings(pybind11::module_& m) {
                     return ss.str();
                   })
       .def("save", &PythonPipeline::save)
-      .def("save_graph",
-          [](PythonPipeline& pipeline,
-              const std::string& path,
-              bool include_mesh) {
+      .def(
+          "save_graph",
+          [](PythonPipeline& pipeline, const std::string& path, bool include_mesh) {
             pipeline.getSceneGraph()->save(path, include_mesh);
           },
           "path"_a,

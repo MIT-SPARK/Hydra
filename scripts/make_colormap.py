@@ -31,9 +31,10 @@
 # Government is authorized to reproduce and distribute reprints for Government
 # purposes notwithstanding any copyright notation herein.
 """Make a colormap."""
+
 import click
-import seaborn as sns
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 @click.command()

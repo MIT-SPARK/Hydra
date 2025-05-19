@@ -1,6 +1,7 @@
 """Entry points for hydra."""
 
 import click
+
 import hydra_python.commands.batch as batch
 import hydra_python.commands.reconstruct as reconstruct
 import hydra_python.commands.run as run

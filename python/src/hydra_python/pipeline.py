@@ -33,15 +33,20 @@
 #
 #
 """Module containing python utilites for loading a valid config."""
+
 import logging
 import pathlib
 import pprint
 
 import yaml
 
-from hydra_python._hydra_bindings import (Camera, CameraConfig,
-                                          ExtrinsicsConfig, HydraPipeline,
-                                          set_glog_dir)
+from hydra_python._hydra_bindings import (
+    Camera,
+    CameraConfig,
+    ExtrinsicsConfig,
+    HydraPipeline,
+    set_glog_dir,
+)
 
 
 def get_config_path(dataset=None):

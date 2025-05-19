@@ -205,4 +205,4 @@ std::ostream& operator<<(std::ostream& out, const GnnInterface& gnn) {
   return out;
 }
 
-}  // namespace::hydra
+}  // namespace hydra::gnn

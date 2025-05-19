@@ -58,7 +58,8 @@ void MeshIntegrator::allocateBlocks(const BlockIndices& blocks,
                                     OccupancyLayer* occupancy) const {
   auto& mesh_layer = map.getMeshLayer();
   for (const BlockIndex& block_index : blocks) {
-    auto& mesh = mesh_layer.allocateBlock(block_index, map.hasSemantics(), map.hasTracking());
+    auto& mesh =
+        mesh_layer.allocateBlock(block_index, map.hasSemantics(), map.hasTracking());
     mesh.clear();
 
     if (!occupancy) {

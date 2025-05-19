@@ -14,18 +14,17 @@
 # ---
 
 # %%
-import networkx as nx
-import networkx.readwrite as nxio
-import pathlib
 import json
+import pathlib
 
-import seaborn as sns
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
-
-import scipy
-import sklearn.cluster
+import networkx as nx
+import networkx.readwrite as nxio
 import numpy as np
+import scipy
+import seaborn as sns
+import sklearn.cluster
 
 
 # %%

@@ -32,13 +32,14 @@
 # Government is authorized to reproduce and distribute reprints for Government
 # purposes notwithstanding any copyright notation herein.
 """Make a simple model."""
-import torch
-import torch.onnx
-import torch.nn as nn
-import torch_geometric.nn as pyg_nn
-import torch_geometric as pyg
+
 import onnx
 import onnxruntime as ort
+import torch
+import torch.nn as nn
+import torch.onnx
+import torch_geometric as pyg
+import torch_geometric.nn as pyg_nn
 
 
 class SimpleNetwork(nn.Module):

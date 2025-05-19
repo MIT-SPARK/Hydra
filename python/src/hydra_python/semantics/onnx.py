@@ -7,8 +7,8 @@ class OnnxSegmenter:
     def __init__(self, filename, colormap):
         """Load an onnx file and set up the model."""
         try:
-            import torchvision
             import onnxruntime as ort
+            import torchvision
 
             self._initialized = True
         except ImportError:

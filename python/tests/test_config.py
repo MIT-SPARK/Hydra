@@ -1,4 +1,5 @@
 """Test config collation."""
+
 import hydra_python as hydra
 import yaml
 

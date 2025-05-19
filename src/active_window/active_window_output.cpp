@@ -50,8 +50,11 @@ void ActiveWindowOutput::updateFrom(ActiveWindowOutput&& msg, bool clone_map) {
   world_t_body = msg.world_t_body;
   world_R_body = msg.world_R_body;
   sensor_data = msg.sensor_data;
-  // TODO(nathan) this leads to incorrect behavior if we add in one update but then archive in another
-  archived_mesh_indices.insert(archived_mesh_indices.end(), msg.archived_mesh_indices.begin(), msg.archived_mesh_indices.end());
+  // TODO(nathan) this leads to incorrect behavior if we add in one update but then
+  // archive in another
+  archived_mesh_indices.insert(archived_mesh_indices.end(),
+                               msg.archived_mesh_indices.begin(),
+                               msg.archived_mesh_indices.end());
 
   // append graph updates to current message
   for (auto&& [layer_id, layer_update] : msg.graph_update) {

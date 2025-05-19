@@ -133,4 +133,4 @@ TEST(GnnTensorTests, AbitraryConstructorInvariants) {
   }
 }
 
-}  // namespace::hydra
+}  // namespace hydra::gnn

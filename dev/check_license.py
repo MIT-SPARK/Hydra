@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Script to check source file for license info."""
+
 import difflib
 import pathlib
+
 import click
 
 

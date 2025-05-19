@@ -34,12 +34,13 @@
 #
 #!/usr/bin/env python3
 """Modify deformation graph file."""
+
 import argparse
 import pathlib
-import yaml
-import sys
 import re
+import sys
 
+import yaml
 
 POSE_FINDER = re.compile(r"^NODE(_TEMP)?.*?$", flags=re.MULTILINE)
 BETWEEN_FINDER = re.compile(r"^BETWEEN(_TEMP)?.*?$", flags=re.MULTILINE)

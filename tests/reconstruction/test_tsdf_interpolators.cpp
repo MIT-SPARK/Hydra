@@ -40,7 +40,6 @@
 
 namespace hydra {
 
-
 namespace {
 
 TsdfLayer::Ptr makeLayer(double resolution, int voxels_per_side, double weight) {

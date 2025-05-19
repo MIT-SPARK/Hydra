@@ -3,8 +3,9 @@
 import pathlib
 
 import click
-import hydra_python as hydra
 from spark_dsg.open3d_visualization import DsgVisualizer
+
+import hydra_python as hydra
 
 
 def _get_trajectory(data, prev_dsg, seed, use_full_scene=False):

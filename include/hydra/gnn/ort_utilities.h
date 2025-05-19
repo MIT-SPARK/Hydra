@@ -74,4 +74,4 @@ std::string getElementTypeString(ONNXTensorElementDataType type);
 
 std::ostream& operator<<(std::ostream& out, const FieldInfo& info);
 
-}  // namespace::hydra
+}  // namespace hydra::gnn

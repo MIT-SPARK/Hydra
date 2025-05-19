@@ -1,7 +1,8 @@
 """Entry point to run open3d visualizer."""
 
-import click
 import subprocess
+
+import click
 from spark_dsg.open3d_visualization import RemoteVisualizer
 
 

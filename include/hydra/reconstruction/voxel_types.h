@@ -142,8 +142,12 @@ struct TsdfBlock : public spatial_hash::VoxelBlock<TsdfVoxel> {
 struct MeshBlock : public Mesh, public spatial_hash::Block {
   using Ptr = std::shared_ptr<MeshBlock>;
   using ConstPtr = std::shared_ptr<const MeshBlock>;
-  MeshBlock(const float block_size, const BlockIndex& index, bool has_labels = false, bool has_stamps = false)
-      : Mesh(true, has_stamps, has_labels, has_stamps), spatial_hash::Block(block_size, index) {}
+  MeshBlock(const float block_size,
+            const BlockIndex& index,
+            bool has_labels = false,
+            bool has_stamps = false)
+      : Mesh(true, has_stamps, has_labels, has_stamps),
+        spatial_hash::Block(block_size, index) {}
 };
 
 struct TrackingBlock : public spatial_hash::VoxelBlock<TrackingVoxel> {

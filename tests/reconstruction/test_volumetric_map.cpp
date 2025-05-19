@@ -56,8 +56,7 @@ void fillSemanticBlock(SemanticBlock& block, size_t offset) {
   }
 }
 
-void compareVoxels(const SemanticBlock& lhs,
-                   const SemanticBlock& rhs) {
+void compareVoxels(const SemanticBlock& lhs, const SemanticBlock& rhs) {
   CHECK_EQ(lhs.numVoxels(), rhs.numVoxels());
   for (size_t i = 0; i < lhs.numVoxels(); ++i) {
     SCOPED_TRACE("Voxel " + std::to_string(i));

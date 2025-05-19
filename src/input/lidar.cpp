@@ -178,8 +178,10 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
   }
 
   cv::Mat vertex_image;
-  bool not_structured = (input.vertex_map.rows != width_) || (input.vertex_map.cols != height_);
-  // NOTE(hyungtae) In case the points are not structured, it automatically generates a vertex image
+  bool not_structured =
+      (input.vertex_map.rows != width_) || (input.vertex_map.cols != height_);
+  // NOTE(hyungtae) In case the points are not structured, it automatically generates a
+  // vertex image
   if (not_structured) {
     vertex_image = cv::Mat(height_, width_, CV_32FC3, cv::Scalar(0.0, 0.0, 0.0));
   }
@@ -208,14 +210,16 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
     input.min_range = std::min(input.min_range, range_m);
     input.max_range = std::max(input.max_range, range_m);
 
-    // If the pixel has already been updated with a closer point, skip the procedure below
-    if (!(input.range_image.at<float>(v, u) == 0.0f || range_m < input.range_image.at<float>(v, u))) {
+    // If the pixel has already been updated with a closer point, skip the procedure
+    // below
+    if (!(input.range_image.at<float>(v, u) == 0.0f ||
+          range_m < input.range_image.at<float>(v, u))) {
       ++point_iter;
       ++label_iter;
       ++color_index;
       continue;
     }
-    
+
     input.range_image.at<float>(v, u) = range_m;
     labels.at<int32_t>(v, u) = *label_iter;
     if (has_color) {

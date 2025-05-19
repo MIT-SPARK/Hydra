@@ -32,9 +32,10 @@
 # Government is authorized to reproduce and distribute reprints for Government
 # purposes notwithstanding any copyright notation herein.
 """Make a simple model."""
+
 import torch
-import torch.onnx
 import torch.nn as nn
+import torch.onnx
 import torch_geometric.nn as pyg
 
 

@@ -1,7 +1,7 @@
 ---
 map_window:
   type: spatial
-  max_radius_m: 50.0 # NOTE(hyungtae) It should be larger than `max_range` + `voxel_size` * `voxels_per_side`
+  max_radius_m: 50.0  # NOTE(hyungtae) It should be larger than `max_range` + `voxel_size` * `voxels_per_side`
 active_window:
   volumetric_map:
     voxels_per_side: 16
@@ -61,7 +61,7 @@ frontend:
       ratio: 2
   use_frontiers: false
 backend:
-  add_places_to_deformation_graph: false # `false` means that place meshes are not used in PGO
+  add_places_to_deformation_graph: false  # `false` means that place meshes are not used in PGO
   optimize_on_lc: true
   max_external_loop_closure_time_difference: 1.0
   enable_node_merging: true

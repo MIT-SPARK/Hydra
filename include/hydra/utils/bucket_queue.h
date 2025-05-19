@@ -134,4 +134,3 @@ class BucketQueue {
 };
 
 }  // namespace hydra
-

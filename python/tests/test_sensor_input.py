@@ -1,4 +1,5 @@
 """Test sensor input validation."""
+
 import hydra_python as hydra
 import numpy as np
 import pytest

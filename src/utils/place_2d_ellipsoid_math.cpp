@@ -111,10 +111,10 @@ std::pair<Eigen::Vector2d, Eigen::Vector2d> computeMinTransverseIntersectionPoin
 }
 
 Eigen::Vector2d computeMLambda(const Eigen::Matrix2d& A,
-                                 const Eigen::Vector2d& a,
-                                 const Eigen::Matrix2d& B,
-                                 const Eigen::Vector2d& b,
-                                 const double lambda) {
+                               const Eigen::Vector2d& a,
+                               const Eigen::Matrix2d& B,
+                               const Eigen::Vector2d& b,
+                               const double lambda) {
   // Point interpolated between ellipses A and B. lambda = 0 equals b, lambda = 1 equals
   // a
   Eigen::Matrix2d e_inv = (lambda * A + (1 - lambda) * B).inverse();
@@ -122,10 +122,10 @@ Eigen::Vector2d computeMLambda(const Eigen::Matrix2d& A,
 }
 
 Eigen::Vector2d computeDmLambda(const Eigen::Matrix2d& A,
-                                  const Eigen::Vector2d& a,
-                                  const Eigen::Matrix2d& B,
-                                  const Eigen::Vector2d& b,
-                                  const double lambda) {
+                                const Eigen::Vector2d& a,
+                                const Eigen::Matrix2d& B,
+                                const Eigen::Vector2d& b,
+                                const double lambda) {
   // Gradient of m_lambda curve
   Eigen::Matrix2d e_inv = (lambda * A + (1 - lambda) * B).inverse();
   return -e_inv * (A - B) * e_inv * (lambda * A * a + (1 - lambda) * B * b) +
@@ -133,9 +133,9 @@ Eigen::Vector2d computeDmLambda(const Eigen::Matrix2d& A,
 }
 
 IntersectionCenters findIntersectionCenterPoints(const Eigen::Matrix2d& A,
-                                                    const Eigen::Vector2d& a,
-                                                    const Eigen::Matrix2d& B,
-                                                    const Eigen::Vector2d& b) {
+                                                 const Eigen::Vector2d& a,
+                                                 const Eigen::Matrix2d& B,
+                                                 const Eigen::Vector2d& b) {
   IntersectionCenters intersection_centers;
   double lower_a = 0;
   double upper_a = 1;
@@ -199,9 +199,9 @@ IntersectionCenters findIntersectionCenterPoints(const Eigen::Matrix2d& A,
 }
 
 double getEllipsoidTransverseOverlapDistance(const Eigen::Matrix2d& A,
-                                                 const Eigen::Vector2d& a,
-                                                 const Eigen::Matrix2d& B,
-                                                 const Eigen::Vector2d& b) {
+                                             const Eigen::Vector2d& a,
+                                             const Eigen::Matrix2d& B,
+                                             const Eigen::Vector2d& b) {
   IntersectionCenters centers = findIntersectionCenterPoints(A, a, B, b);
   if (centers.certified) {
     Eigen::Vector2d m =

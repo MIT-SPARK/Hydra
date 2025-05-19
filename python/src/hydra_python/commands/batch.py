@@ -1,7 +1,9 @@
 """Entry point for constructing scene graph from scene reconstruction."""
+
 import pathlib
 
 import click
+
 import hydra_python as hydra
 
 

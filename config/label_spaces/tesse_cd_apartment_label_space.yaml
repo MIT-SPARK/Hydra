@@ -4,24 +4,24 @@ dynamic_labels: [20]
 invalid_labels: []
 object_labels: [1, 2, 5, 6, 7, 9, 10, 16, 18, 20]
 label_names:
-- {label: 0, name: Unknown}
-- {label: 1, name: Fridge}
-- {label: 2, name: Books}
-- {label: 3, name: Floor}
-- {label: 4, name: Ceiling}
-- {label: 5, name: Chair}
-- {label: 6, name: Vase}
-- {label: 7, name: Couch}
-- {label: 8, name: Trees}
-- {label: 9, name: Drawer}
-- {label: 10, name: Objects}
-- {label: 11, name: Lamp}
-- {label: 12, name: Painting}
-- {label: 13, name: Plants}
-- {label: 14, name: Bed}
-- {label: 15, name: Stairs}
-- {label: 16, name: Table}
-- {label: 17, name: Screens}
-- {label: 18, name: Bin}
-- {label: 19, name: Wall}
-- {label: 20, name: Humans}
+  - {label: 0, name: Unknown}
+  - {label: 1, name: Fridge}
+  - {label: 2, name: Books}
+  - {label: 3, name: Floor}
+  - {label: 4, name: Ceiling}
+  - {label: 5, name: Chair}
+  - {label: 6, name: Vase}
+  - {label: 7, name: Couch}
+  - {label: 8, name: Trees}
+  - {label: 9, name: Drawer}
+  - {label: 10, name: Objects}
+  - {label: 11, name: Lamp}
+  - {label: 12, name: Painting}
+  - {label: 13, name: Plants}
+  - {label: 14, name: Bed}
+  - {label: 15, name: Stairs}
+  - {label: 16, name: Table}
+  - {label: 17, name: Screens}
+  - {label: 18, name: Bin}
+  - {label: 19, name: Wall}
+  - {label: 20, name: Humans}

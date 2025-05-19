@@ -1,9 +1,10 @@
 """Colormaps and label converters."""
 
+import csv
+
 import distinctipy
 import numpy as np
 import yaml
-import csv
 
 
 class LabelConverter:

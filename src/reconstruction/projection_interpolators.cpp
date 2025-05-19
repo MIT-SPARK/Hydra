@@ -165,7 +165,8 @@ int InterpolatorBilinear::interpolateID(const cv::Mat& id_image,
   // based on the corner weights and return the highest weights ID.
   // NOTE(nathan) this is not the same as just picking the maximum weight from the
   // pixels
-  // TODO(nathan) consider manually implementing to avoid std::unordered_map memory usage
+  // TODO(nathan) consider manually implementing to avoid std::unordered_map memory
+  // usage
   std::unordered_map<int, float> ids;  // These are zero initialized by default.
   ids[id_image.at<int32_t>(weights.v, weights.u)] += weights.w0;
   ids[id_image.at<int32_t>(weights.v + 1, weights.u)] += weights.w1;

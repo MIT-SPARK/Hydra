@@ -61,7 +61,7 @@ frontend:
       ratio: 2
   use_frontiers: false
 backend:
-  add_places_to_deformation_graph: false # `false` means that place meshes are not used in PGO
+  add_places_to_deformation_graph: false  # `false` means that place meshes are not used in PGO
   optimize_on_lc: true
   enable_node_merging: true
   max_external_loop_closure_time_difference: 1.0

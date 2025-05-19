@@ -31,10 +31,11 @@
 # Government is authorized to reproduce and distribute reprints for Government
 # purposes notwithstanding any copyright notation herein.
 """Quick script to convert semantic color configuration to a label space."""
-import click
-import pathlib
-import yaml
 
+import pathlib
+
+import click
+import yaml
 
 HELP_TEXT = """n: normal (default)
 o: object
