@@ -1,3 +1,4 @@
+import contextlib
 import pathlib
 import shutil
 import sqlite3
@@ -11,37 +12,13 @@ import spark_config as sc
 from hydra_eval.utils import get_logger
 
 
+@dataclass
 class ResultEntry:
-    """Single entry in the result table."""
+    """Entry in the result table."""
 
-    def __init__(self, db, output_path, name):
-        self._name = name
-        self._uuid = str(uuid.uuid4())
-        self._result_path = pathlib.Path(output_path) / self._uuid
-        self._db = db
-
-    def __enter__(self):
-        self._result_path.mkdir()
-        return self
-
-    def __exit__(self, exc_type, exc_value, tb):
-        """Close the result entry."""
-        if exc_type is not None:
-            shutil.rmtree(self._result_path)
-            return
-
-        values = f"{self._uuid}, {time.time_ns()}, '{self._name}'"
-        try:
-            self._db.execute(f"INSERT INTO results VALUES ({values})")
-            self._db.commit()
-        except Exception as e:
-            shutil.rmtree(self._result_path)
-            raise e
-
-    @property
-    def result_path(self):
-        """Get path to results for this session."""
-        return self._result_path
+    path: pathlib.Path
+    name: str
+    date: str
 
 
 class ResultManager:
@@ -49,6 +26,7 @@ class ResultManager:
 
     def __init__(self, output_path):
         self._output_path = pathlib.Path(output_path).expanduser().resolve()
+        self._fields = "uuid, date, experiment_name"
         self._db = None
 
     def __enter__(self):
@@ -59,9 +37,7 @@ class ResultManager:
             get_logger().critical(f"Failed to open '{self._output_path}': {e}")
             raise e
 
-        self._db.execute(
-            "CREATE TABLE IF NOT EXISTS results(uuid, date, experiment_name)"
-        )
+        self._db.execute(f"CREATE TABLE IF NOT EXISTS results({self._fields})")
         return self
 
     def __exit__(self, exc, exc_type, exc_str):
@@ -70,20 +46,43 @@ class ResultManager:
             self._db.close()
             self._db = None
 
+    @contextlib.contextmanager
     def open_result(self, name):
         if self._db is None:
             get_logger().critical("Result manager not initialized!")
             raise RuntimeError("DB not initialized!")
 
-        return ResultEntry(self._db, self._output_path, name)
+        ident = str(uuid.uuid4())
+        result_path = self._output_path / ident
+        result_path.mkdir()
+
+        try:
+            yield result_path
+        except Exception as e:
+            shutil.rmtree(result_path)
+            raise e
+
+        try:
+            values = f"'{ident}', {int(time.time())}, '{name}'"
+            self._db.execute(f"INSERT INTO results VALUES ({values})")
+            self._db.commit()
+        except Exception as e:
+            shutil.rmtree(result_path)
+            raise e
 
     @property
-    def db(self):
+    def results(self):
         if self._db is None:
             get_logger().critical("Result manager not initialized!")
             raise RuntimeError("DB not initialized!")
 
-        return self._db
+        cur = self._db.cursor()
+        for row in cur.execute(f"SELECT {self._fields} FROM results ORDER BY date"):
+            yield ResultEntry(
+                path=self._output_path / row[0],
+                name=row[2],
+                date=time.asctime(time.localtime(row[1])),
+            )
 
 
 @dataclass
@@ -123,8 +122,8 @@ class ExperimentManager:
 
     def run(self):
         """Run all experiments."""
-        with self._results.open_result(self._config.name) as entry:
-            print(entry.result_path)
+        with self._results.open_result(self._config.name) as result_path:
+            print(result_path)
 
 
 class TmuxpExperiment:
