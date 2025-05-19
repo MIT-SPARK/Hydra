@@ -1,0 +1,5 @@
+[lint.per-file-ignores]
+"__init__.py" = ["F403"]
+
+[lint.isort]
+split-on-trailing-comma = true
