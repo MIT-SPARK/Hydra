@@ -8,7 +8,7 @@ from hydra_eval.result_collection import ExperimentManager, ResultManager
 
 @click.group(name="collect")
 def cli():
-    """Display info about Hydra timing in various ways."""
+    """Run and manage experimental results."""
     pass
 
 
@@ -27,7 +27,7 @@ def run(output_path, experiments):
 
 
 @cli.command(name="show")
-@click.argument("output_path", type=click.Path())
+@click.argument("output_path", type=click.Path(exists=True))
 def show(output_path):
     """Collect a new set of Hydra results."""
     with ResultManager(output_path) as manager:
