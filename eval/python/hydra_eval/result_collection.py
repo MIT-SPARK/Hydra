@@ -4,8 +4,9 @@ import shutil
 import sqlite3
 import time
 import uuid
-from dataclasses import dataclass
-from typing import Any
+import pprint
+from dataclasses import dataclass, field
+from typing import Any, List
 
 import spark_config as sc
 
@@ -86,16 +87,24 @@ class ResultManager:
 
 
 @dataclass
-class ExperimentManagerConfig(sc.Config):
+class TrialConfig(sc.Config):
+    """Configuration for a single trial."""
+
+    name: str = ""
+    executable: Any = sc.config_field("exec")
+    datasource: Any = sc.config_field("datasource", required=False)
+
+
+@dataclass
+class ExperimentConfig(sc.Config):
     """Configuration for experiments."""
 
     name: str = ""
-    place_method: Any = sc.config_field("place_model", default="Salad")
-    descriptor_method: Any = sc.config_field("descriptor_model", required=False)
+    trials: List[TrialConfig] = field(default_factory=list)
 
     @classmethod
     def load(cls, path: str):
-        return sc.Config.load(ExperimentManagerConfig, path)
+        return sc.Config.load(ExperimentConfig, path)
 
 
 class ExperimentManager:
@@ -109,7 +118,7 @@ class ExperimentManager:
     def from_file(cls, result_manager, config_path):
         logger = get_logger()
         config_path = pathlib.Path(config_path).expanduser().absolute()
-        config = ExperimentManagerConfig.load(config_path)
+        config = ExperimentConfig.load(config_path)
         if config is None:
             logger.error(f"Failed to load config for experiment from '{config_path}'")
             return None
@@ -118,23 +127,39 @@ class ExperimentManager:
             logger.error("Experiment name is required!")
             return None
 
-        return cls(result_manager, config_path)
+        return cls(result_manager, config)
 
     def run(self):
         """Run all experiments."""
-        with self._results.open_result(self._config.name) as result_path:
-            print(result_path)
+        for trial in self._config.trials:
+            pprint.pprint(trial)
+            executable = trial.executable.create()
+            print(executable)
+            # datasource = trial.datasource.create()
 
 
-class TmuxpExperiment:
+#             with self._results.open_result(
+# self._config.name, self._trial.name
+# ) as result_path:
+# print(result_path)
+
+
+class TMUXPExec:
+    """Construct a subprocess command for tmuxp."""
+
     def __init__(self, config):
-        """Run an experiment from a tmuxp file."""
-        self._config = config
+        """Set up subprocess command via config."""
+        self.config = config
+        print(f"path: '{self.config.path}'")
 
-    @property
-    def config(self):
-        """Get underlying config."""
-        return self.config
-
-    def run(self):
+    async def run(self):
+        """Run command."""
         pass
+
+
+@sc.register_config("exec", "tmuxp", constructor=TMUXPExec)
+@dataclass
+class TMUXPConfig(sc.Config):
+    """Config for a tmuxp executable."""
+
+    path: str = ""
