@@ -4,13 +4,15 @@ import shutil
 import sqlite3
 import time
 import uuid
-import pprint
 from dataclasses import dataclass, field
-from typing import Any, List
+from typing import Any, Dict, List, Optional
 
 import spark_config as sc
+from ruamel.yaml import YAML
 
 from hydra_eval.utils import get_logger
+
+yaml = YAML(typ="safe")
 
 
 @dataclass
@@ -19,6 +21,7 @@ class ResultEntry:
 
     path: pathlib.Path
     name: str
+    trial_name: str
     date: str
 
 
@@ -27,7 +30,7 @@ class ResultManager:
 
     def __init__(self, output_path):
         self._output_path = pathlib.Path(output_path).expanduser().resolve()
-        self._fields = "uuid, date, experiment_name"
+        self._fields = "uuid, date, experiment_name, trial_name"
         self._db = None
 
     def __enter__(self):
@@ -48,7 +51,7 @@ class ResultManager:
             self._db = None
 
     @contextlib.contextmanager
-    def open_result(self, name):
+    def open_result(self, name, trial_name):
         if self._db is None:
             get_logger().critical("Result manager not initialized!")
             raise RuntimeError("DB not initialized!")
@@ -64,7 +67,7 @@ class ResultManager:
             raise e
 
         try:
-            values = f"'{ident}', {int(time.time())}, '{name}'"
+            values = f"'{ident}', {int(time.time())}, '{name}', '{trial_name}'"
             self._db.execute(f"INSERT INTO results VALUES ({values})")
             self._db.commit()
         except Exception as e:
@@ -82,6 +85,7 @@ class ResultManager:
             yield ResultEntry(
                 path=self._output_path / row[0],
                 name=row[2],
+                trial_name=row[3],
                 date=time.asctime(time.localtime(row[1])),
             )
 
@@ -92,7 +96,7 @@ class TrialConfig(sc.Config):
 
     name: str = ""
     executable: Any = sc.config_field("exec")
-    datasource: Any = sc.config_field("datasource", required=False)
+    args: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -132,34 +136,62 @@ class ExperimentManager:
     def run(self):
         """Run all experiments."""
         for trial in self._config.trials:
-            pprint.pprint(trial)
-            executable = trial.executable.create()
-            print(executable)
-            # datasource = trial.datasource.create()
+            with self._results.open_result(self._config.name, trial.name) as output:
+                executable = trial.executable.create(trial.name, output, trial.args)
+                executable.run()
 
 
-#             with self._results.open_result(
-# self._config.name, self._trial.name
-# ) as result_path:
-# print(result_path)
-
-
-class TMUXPExec:
+class LaunchExec:
     """Construct a subprocess command for tmuxp."""
 
-    def __init__(self, config):
+    def __init__(self, config, name, result_path, args):
         """Set up subprocess command via config."""
+        import launch
+
         self.config = config
-        print(f"path: '{self.config.path}'")
+        has_path = self.config.path is not None
+        has_yaml = self.config.contents is not None
+        if has_path and has_yaml:
+            get_logger().error("Cannot specify both file and contents!")
+            return
 
-    async def run(self):
+        if not has_path and not has_yaml:
+            get_logger().error("Must specify either file or contents!")
+            return
+
+        rendered_path = result_path / f"{name}.launch.yaml"
+        if has_path:
+            norm_path = pathlib.Path(self.config.path).expanduser().resolve()
+            shutil.copy2(norm_path, rendered_path)
+        else:
+            with rendered_path.open("w") as fout:
+                yaml.dump(config.contents, fout)
+
+        self._desc = launch.LaunchDescription(
+            [
+                launch.actions.IncludeLaunchDescription(
+                    launch.launch_description_sources.AnyLaunchDescriptionSource(
+                        str(rendered_path)
+                    ),
+                    launch_arguments=args.items(),
+                )
+            ]
+        )
+
+    def run(self):
         """Run command."""
-        pass
+        import launch
+
+        serv = launch.LaunchService()
+        serv.include_launch_description(self._desc)
+        ret = serv.run()
+        print(ret)
 
 
-@sc.register_config("exec", "tmuxp", constructor=TMUXPExec)
+@sc.register_config("exec", "launch", constructor=LaunchExec)
 @dataclass
-class TMUXPConfig(sc.Config):
+class LaunchExec(sc.Config):
     """Config for a tmuxp executable."""
 
-    path: str = ""
+    path: Optional[str] = None
+    contents: Optional[Any] = None
