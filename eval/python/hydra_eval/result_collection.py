@@ -23,6 +23,7 @@ class ResultEntry:
     name: str
     trial_name: str
     date: str
+    error_code: int
 
 
 class ResultManager:
@@ -30,7 +31,7 @@ class ResultManager:
 
     def __init__(self, output_path):
         self._output_path = pathlib.Path(output_path).expanduser().resolve()
-        self._fields = "uuid, date, experiment_name, trial_name"
+        self._fields = "uuid, date, experiment_name, trial_name, error_code"
         self._db = None
 
     def __enter__(self):
@@ -67,12 +68,19 @@ class ResultManager:
             raise e
 
         try:
-            values = f"'{ident}', {int(time.time())}, '{name}', '{trial_name}'"
+            values = f"'{ident}', {int(time.time())}, '{name}', '{trial_name}', -1"
             self._db.execute(f"INSERT INTO results VALUES ({values})")
             self._db.commit()
         except Exception as e:
             shutil.rmtree(result_path)
             raise e
+
+    def set_error_code(self, uuid, code):
+        cur = self._db.cursor()
+        cur.execute(
+            f"UPDATE results SET error_code = {code} WHERE results.uuid = '{uuid}'"
+        )
+        self._db.commit()
 
     @property
     def results(self):
@@ -87,6 +95,7 @@ class ResultManager:
                 name=row[2],
                 trial_name=row[3],
                 date=time.asctime(time.localtime(row[1])),
+                error_code=row[4],
             )
 
 
@@ -138,7 +147,9 @@ class ExperimentManager:
         for trial in self._config.trials:
             with self._results.open_result(self._config.name, trial.name) as output:
                 executable = trial.executable.create(trial.name, output, trial.args)
-                executable.run()
+                ret = executable.run()
+
+            self._results.set_error_code(output.stem, ret)
 
 
 class LaunchExec:
@@ -147,6 +158,10 @@ class LaunchExec:
     def __init__(self, config, name, result_path, args):
         """Set up subprocess command via config."""
         import launch
+
+        ros_logs = result_path / "roslogs"
+        ros_logs.mkdir(parents=True)
+        launch.logging.launch_config.log_dir = str(ros_logs)
 
         self.config = config
         has_path = self.config.path is not None
@@ -167,13 +182,14 @@ class LaunchExec:
             with rendered_path.open("w") as fout:
                 yaml.dump(config.contents, fout)
 
+        arg_list = list(args.items()) + [("output_path", str(result_path))]
         self._desc = launch.LaunchDescription(
             [
                 launch.actions.IncludeLaunchDescription(
                     launch.launch_description_sources.AnyLaunchDescriptionSource(
                         str(rendered_path)
                     ),
-                    launch_arguments=args.items(),
+                    launch_arguments=arg_list,
                 )
             ]
         )
@@ -184,8 +200,7 @@ class LaunchExec:
 
         serv = launch.LaunchService()
         serv.include_launch_description(self._desc)
-        ret = serv.run()
-        print(ret)
+        return serv.run()
 
 
 @sc.register_config("exec", "launch", constructor=LaunchExec)
