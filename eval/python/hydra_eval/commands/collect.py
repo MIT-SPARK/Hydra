@@ -26,9 +26,9 @@ def run(output_path, experiments):
             experiment.run()
 
 
-@cli.command(name="show")
+@cli.command(name="list")
 @click.argument("output_path", type=click.Path(exists=True))
-def show(output_path):
+def list(output_path):
     """Collect a new set of Hydra results."""
     with ResultManager(output_path) as manager:
         for result in manager.results:
