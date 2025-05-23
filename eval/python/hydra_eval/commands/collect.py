@@ -49,3 +49,18 @@ def find(output_path, experiment_name, trial_name):
         results = manager.find_trials(experiment_name, trial_name)
         for result in results:
             pprint.pprint(result)
+
+
+@cli.command(name="drop")
+@click.argument("output_path", type=click.Path(exists=True))
+@click.argument("condition", type=str)
+def drop(output_path, condition):
+    """Collect a new set of Hydra results."""
+    with ResultManager(output_path) as manager:
+        print("Would drop:")
+        print("-----------")
+        for result in manager.find(condition):
+            pprint.pprint(result)
+
+        click.confirm("Drop results?", abort=True)
+        manager.drop(condition)
