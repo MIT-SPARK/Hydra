@@ -168,7 +168,7 @@ class ExperimentManager:
         """Run all experiments."""
         for trial in self._config.trials:
             if skip_existing:
-                existing = self._result.find_trials(self._config.name, trial.name)
+                existing = self._results.find_trials(self._config.name, trial.name)
                 if len(existing) > 0:
                     get_logger().info(
                         f"Skipping existing {self._config.name}:{trial.name}"
