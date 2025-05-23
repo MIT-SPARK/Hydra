@@ -25,6 +25,16 @@ class ResultEntry:
     date: str
     error_code: int
 
+    @classmethod
+    def from_row(cls, output_path, row):
+        return cls(
+            path=output_path / row[0],
+            name=row[2],
+            trial_name=row[3],
+            date=time.asctime(time.localtime(row[1])),
+            error_code=row[4],
+        )
+
 
 class ResultManager:
     """Class that manages sessions."""
@@ -75,6 +85,11 @@ class ResultManager:
             shutil.rmtree(result_path)
             raise e
 
+    def find_trials(self, name, trial_name):
+        cond = f"experiment_name='{name}' AND trial_name='{trial_name}'"
+        query = self._db.execute(f"SELECT * FROM results WHERE {cond}")
+        return [ResultEntry.from_row(self._output_path, x) for x in query.fetchall()]
+
     def set_error_code(self, uuid, code):
         cur = self._db.cursor()
         cur.execute(
@@ -90,13 +105,7 @@ class ResultManager:
 
         cur = self._db.cursor()
         for row in cur.execute(f"SELECT {self._fields} FROM results ORDER BY date"):
-            yield ResultEntry(
-                path=self._output_path / row[0],
-                name=row[2],
-                trial_name=row[3],
-                date=time.asctime(time.localtime(row[1])),
-                error_code=row[4],
-            )
+            yield ResultEntry.from_row(self._output_path, row)
 
 
 @dataclass
@@ -142,9 +151,16 @@ class ExperimentManager:
 
         return cls(result_manager, config)
 
-    def run(self):
+    def run(self, skip_existing):
         """Run all experiments."""
         for trial in self._config.trials:
+            if (
+                skip_existing
+                and len(self._results.find_trials(self._config.name, trial.name)) > 0
+            ):
+                get_logger().info(f"Skipping existing {self._config.name}:{trial.name}")
+                continue
+
             with self._results.open_result(self._config.name, trial.name) as output:
                 executable = trial.executable.create(trial.name, output, trial.args)
                 ret = executable.run()
