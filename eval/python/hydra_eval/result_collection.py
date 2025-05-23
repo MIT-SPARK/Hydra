@@ -85,10 +85,23 @@ class ResultManager:
             shutil.rmtree(result_path)
             raise e
 
-    def find_trials(self, name, trial_name):
-        cond = f"experiment_name='{name}' AND trial_name='{trial_name}'"
+    def find_trials(self, exp, trial):
+        cond = f"experiment_name='{exp}' AND trial_name='{trial}'"
+        return self.find(cond)
+
+    def find(self, cond):
         query = self._db.execute(f"SELECT * FROM results WHERE {cond}")
         return [ResultEntry.from_row(self._output_path, x) for x in query.fetchall()]
+
+    def drop(self, cond):
+        to_remove = self.find(cond)
+        get_logger().info(f"Dropping {len(to_remove)} entries!")
+        for x in to_remove:
+            if x.path.exists():
+                shutil.rmtree(x.path)
+
+        with self._db:
+            self._db.execute(f"DELETE FROM results WHERE {cond}")
 
     def set_error_code(self, uuid, code):
         cur = self._db.cursor()
@@ -154,12 +167,13 @@ class ExperimentManager:
     def run(self, skip_existing):
         """Run all experiments."""
         for trial in self._config.trials:
-            if (
-                skip_existing
-                and len(self._results.find_trials(self._config.name, trial.name)) > 0
-            ):
-                get_logger().info(f"Skipping existing {self._config.name}:{trial.name}")
-                continue
+            if skip_existing:
+                existing = self._result.find_trials(self._config.name, trial.name)
+                if len(existing) > 0:
+                    get_logger().info(
+                        f"Skipping existing {self._config.name}:{trial.name}"
+                    )
+                    continue
 
             with self._results.open_result(self._config.name, trial.name) as output:
                 executable = trial.executable.create(trial.name, output, trial.args)
