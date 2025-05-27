@@ -82,12 +82,13 @@ def export(result_path, output_path, condition):
     output_path.mkdir(parents=True)
     with ResultManager(result_path) as manager:
         for result in manager.find(condition):
+            hydra_path = result.path / "hydra"
             required = [
-                "hydra/frontend/dsg_with_mesh.json",
-                "hydra/backend/dsg_with_mesh.json",
-                "hydra/backend/deformation_graph.dgrf",
+                "hydra_config.yaml",
+                "frontend/dsg_with_mesh.json",
+                "backend/deformation_graph.dgrf",
             ]
-            required = [result.path / x for x in required]
+            required = [hydra_path / x for x in required]
             missing = [str(x) for x in required if not x.exists()]
             if len(missing) > 0:
                 result_name = f"{result.name}:{result.trial_name}"
@@ -100,15 +101,7 @@ def export(result_path, output_path, condition):
 
             exp_path = output_path / result.name / result.trial_name
             exp_path.mkdir(parents=True)
-            shutil.copy2(
-                result.path / "hydra/frontend/dsg_with_mesh.json",
-                exp_path / "frontend_dsg.json",
-            )
-            shutil.copy2(
-                result.path / "hydra/backend/dsg_with_mesh.json",
-                exp_path / "backend_dsg.json",
-            )
-            shutil.copy2(
-                result.path / "hydra/backend/deformation_graph.dgrf",
-                exp_path / "deformation_graph.dgrf",
-            )
+            dest_paths = [exp_path / x.relative_to(hydra_path) for x in required]
+            for src, dest in zip(required, dest_paths):
+                dest.parent.mkdir(exist_ok=True, parents=True)
+                shutil.copy2(src, dest)
