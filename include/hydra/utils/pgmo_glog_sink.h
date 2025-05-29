@@ -38,7 +38,11 @@
 namespace hydra {
 
 struct PgmoGlogSink : logging::LogSink {
+  explicit PgmoGlogSink(int debug_verbosity = 1);
+
   void dispatch(const logging::LogEntry& entry) const override;
+
+  const int debug_verbosity;
 };
 
 }  // namespace hydra
