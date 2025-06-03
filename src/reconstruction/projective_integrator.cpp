@@ -64,6 +64,22 @@ namespace hydra {
 using Measurement = ProjectiveIntegrator::VoxelMeasurement;
 using MapConfig = VolumetricMap::Config;
 
+namespace {
+
+// Return whether or not a measurement is considered outside the truncation band and
+// shouldn't be considered for computing label and color information. Rejects all
+// measurements outside the padded truncation band and optionally measurements
+// within the exra padding but outside the truncation band itself.
+inline bool measurementOutsideTruncation(const MapConfig& map_config,
+                                         const ProjectiveIntegrator::Config& config,
+                                         const Measurement& measurement) {
+  const auto is_outside = std::abs(measurement.sdf) >= map_config.truncation_distance;
+  return is_outside && (config.skip_extra_colors_and_labels ||
+                        !measurement.within_extra_integration_distance);
+}
+
+}  // namespace
+
 void declare_config(ProjectiveIntegrator::Config& config) {
   using namespace config;
   name("ProjectiveIntegrator");
@@ -71,6 +87,8 @@ void declare_config(ProjectiveIntegrator::Config& config) {
   field(config.extra_integration_distance,
         "extra_integration_distance",
         config.extra_integration_distance >= 0 ? "m" : "vs");
+  field(config.extra_integration_distance_labels, "extra_integration_distance_labels");
+  field(config.skip_extra_colors_and_labels, "skip_extra_colors_and_labels");
   field(config.use_weight_dropoff, "use_weight_dropoff");
   field(config.weight_dropoff_epsilon,
         "weight_dropoff_epsilon",
@@ -83,6 +101,10 @@ void declare_config(ProjectiveIntegrator::Config& config) {
   config.semantic_integrator.setOptional();
   field(config.semantic_integrator, "semantic_integrator");
 
+  const auto labels_ok = !config.extra_integration_distance_labels.empty() ||
+                         !config.skip_extra_colors_and_labels;
+  checkCondition(labels_ok,
+                 "skip_extra must be false if extra_distance_labels are specified");
   check(config.num_threads, GT, 0, "num_threads");
   check(config.min_measurement_weight, GE, 0.0f, "min_measurement_weight");
   check(config.max_weight, GT, 0, "max_weight");
@@ -200,38 +222,32 @@ Measurement ProjectiveIntegrator::getVoxelMeasurement(const MapConfig& map_confi
   }
 
   // Compute the (partially truncated) signed distance to the surface
-  measurement.sdf =
-      computeSDF(map_config, data, measurement.interpolation_weights, voxel_range);
+  computeSDF(map_config, data, voxel_range, measurement);
   if (!std::isfinite(measurement.sdf)) {
     return measurement;
   }
 
-  // Avoid integrating points where we don't have information
   if (measurement.sdf < -map_config.truncation_distance) {
-    if (!config.extra_integration_distance) {
-      return measurement;  // voxel beyond truncation distance
-    }
-
-    // Voxel's negative distance past the truncation band
-    const auto dist_m = measurement.sdf + map_config.truncation_distance;
-    // Positive distance threshold past the truncation band
-    const auto threshold_m =
-        config.extra_integration_distance < 0.0f
-            ? -config.extra_integration_distance * map_config.voxel_size
-            : config.extra_integration_distance;
-
-    // If dist_m is bigger than threshold_m in absolute value, the sum will be negative
-    if (dist_m + threshold_m < 0.0f) {
+    if (!measurement.within_extra_integration_distance) {
+      // Avoid integrating points where we don't have information
       return measurement;
     }
 
-    // Clip measurement to be at the negative truncation distance
+    // Clip measurement to negative side of truncation band
     measurement.sdf = -map_config.truncation_distance;
   }
 
   // Get associated semantic label if applicable and check if it can be integrated
   if (!computeLabel(map_config, data, integration_mask, measurement)) {
     return measurement;
+  }
+
+  // Filter measurements outside truncation band by label
+  if (measurement.within_extra_integration_distance) {
+    if (!config.extra_integration_distance_labels.empty() &&
+        !config.extra_integration_distance_labels.count(measurement.label)) {
+      return measurement;
+    }
   }
 
   // Compute the weight of the measurement
@@ -271,7 +287,7 @@ void ProjectiveIntegrator::updateVoxel(const MapConfig& map_config,
   }
 
   // Don't bother updating colors or labels outside the truncation distance
-  if (std::abs(measurement.sdf) >= map_config.truncation_distance) {
+  if (measurementOutsideTruncation(map_config, config, measurement)) {
     return;
   }
 
@@ -304,15 +320,32 @@ bool ProjectiveIntegrator::interpolatePoint(const InputData& data,
   return weights.valid;
 }
 
-float ProjectiveIntegrator::computeSDF(const MapConfig& map_config,
-                                       const InputData& data,
-                                       const InterpolationWeights& weights,
-                                       const float distance_to_voxel) const {
-  const auto d_to_surface = interpolator_->InterpolateRange(data.range_image, weights);
+void ProjectiveIntegrator::computeSDF(const MapConfig& map_config,
+                                      const InputData& data,
+                                      const float distance_to_voxel,
+                                      VoxelMeasurement& measurement) const {
+  const auto d_to_surface = interpolator_->InterpolateRange(
+      data.range_image, measurement.interpolation_weights);
+  const auto sdf = d_to_surface - distance_to_voxel;
+  if (config.extra_integration_distance) {
+    // distance threshold past the truncation band
+    const auto threshold_m =
+        config.extra_integration_distance < 0.0f
+            ? -config.extra_integration_distance * map_config.voxel_size
+            : config.extra_integration_distance;
+
+    // If measurement is inside truncation band, diff_m is negative, if outside
+    // extra distance, it will be above threshold
+    const auto diff_m = std::abs(sdf) - map_config.truncation_distance;
+    if (diff_m >= 0.0f && diff_m <= threshold_m) {
+      measurement.within_extra_integration_distance = true;
+    }
+  }
+
   // NOTE(nathan) If the sdf value is NaN, this should return NaN (min returns a if a <
   // b, a < NaN is false) This is probably the desired behavior if the range image
   // contains NaNs (the only source of non-finite values) but may need to be checked
-  return std::min(map_config.truncation_distance, d_to_surface - distance_to_voxel);
+  measurement.sdf = std::min(map_config.truncation_distance, sdf);
 }
 
 float ProjectiveIntegrator::computeWeight(const MapConfig& map_config,
@@ -352,9 +385,7 @@ bool ProjectiveIntegrator::computeLabel(const MapConfig& map_config,
                                         const InputData& data,
                                         const cv::Mat& integration_mask,
                                         Measurement& measurement) const {
-  if (std::abs(measurement.sdf) >= map_config.truncation_distance) {
-    // If SDF value is beyond the truncation band, we don't need to
-    // compute a label and the point is always valid for integration
+  if (measurementOutsideTruncation(map_config, config, measurement)) {
     return true;
   }
 

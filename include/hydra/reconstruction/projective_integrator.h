@@ -76,6 +76,12 @@ class ProjectiveIntegrator {
     //! If nonzero, integrates negative voxels outside of the truncation distance by the
     //! specified threshold. Negative values are multiples of the voxel size
     float extra_integration_distance = 0.0f;
+    //! If non-empty, filter extra integration distance by label. Mutually exclusive
+    //! with `skip_extra_colors_and_labels`
+    std::set<int32_t> extra_integration_distance_labels;
+    //! Skip computing and integrating colors and labels for valid voxel observations
+    //! beyond the truncation band.
+    bool skip_extra_colors_and_labels = false;
     //! If true, drop off the weight behind the surface crossing
     bool use_weight_dropoff = true;
     //! Distance in meters where the weight drop-off reaches zero. Negative
@@ -105,6 +111,7 @@ class ProjectiveIntegrator {
   struct VoxelMeasurement {
     bool valid = false;
     InterpolationWeights interpolation_weights;
+    bool within_extra_integration_distance = false;
     float sdf = 0.0f;
     float weight = 0.0f;
     int32_t label = -1;
@@ -187,10 +194,10 @@ class ProjectiveIntegrator {
   /**
    * @brief Compute the signed distance value for the given point.
    */
-  float computeSDF(const VolumetricMap::Config& map_config,
-                   const InputData& data,
-                   const InterpolationWeights& weights,
-                   const float distance_to_voxel) const;
+  void computeSDF(const VolumetricMap::Config& map_config,
+                  const InputData& data,
+                  const float distance_to_voxel,
+                  VoxelMeasurement& measurement) const;
 
   /**
    * @brief Compute the TSDF update weight for the given point.
