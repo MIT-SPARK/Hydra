@@ -153,14 +153,6 @@ void GlobalInfo::configureTimers() {
   }
 }
 
-void GlobalInfo::checkFrozen() const {
-  if (!frozen_) {
-    LOG(ERROR) << "GlobalInfo is not frozen! Call init with freeze set to 'true' "
-                  "before using config";
-    throw std::runtime_error("config not frozen");
-  }
-}
-
 void GlobalInfo::initFromConfig(const PipelineConfig& config, int robot_id) {
   config_ = config::checkValid(config);
   robot_prefix_ = RobotPrefixConfig(robot_id);
@@ -196,16 +188,9 @@ GlobalInfo& GlobalInfo::instance() {
   return *instance_;
 }
 
-GlobalInfo& GlobalInfo::init(const PipelineConfig& config, int robot_id, bool freeze) {
+GlobalInfo& GlobalInfo::init(const PipelineConfig& config, int robot_id) {
   auto& curr = instance();
-  if (curr.frozen_) {
-    LOG(ERROR) << "Failed to initialize GlobalInfo as config was already frozen";
-    throw std::runtime_error("hydra global config is frozen");
-  }
-
   curr.initFromConfig(config, robot_id);
-  // TODO(nathan) print?
-  curr.frozen_ = freeze;
   return curr;
 }
 

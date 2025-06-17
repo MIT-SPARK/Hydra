@@ -41,10 +41,9 @@ namespace hydra {
 
 HydraPipeline::HydraPipeline(const PipelineConfig& pipeline_config,
                              int robot_id,
-                             int config_verbosity,
-                             bool freeze_global_info)
+                             int config_verbosity)
     : config_verbosity_(config_verbosity) {
-  const auto& config = GlobalInfo::init(pipeline_config, robot_id, freeze_global_info);
+  const auto& config = GlobalInfo::init(pipeline_config, robot_id);
   frontend_dsg_ = config.createSharedDsg();
   backend_dsg_ = config.createSharedDsg();
   shared_state_.reset(new SharedModuleState());
@@ -77,14 +76,14 @@ std::string makeBanner(const std::string& message,
 }
 
 std::string HydraPipeline::getModuleInfo(const std::string& name,
-                                         const Module* module) const {
+                                         const Module* mod) const {
   const auto print_width = config::Settings().print_width;
   std::stringstream ss;
   ss << makeBanner(name, print_width, '*', true, true);
-  if (!module) {
+  if (!mod) {
     ss << "UNITIALIZED MODULE!" << std::endl;
   } else {
-    const auto info = module->printInfo();
+    const auto info = mod->printInfo();
     if (!info.empty()) {
       ss << info << std::endl;
     }
@@ -97,8 +96,8 @@ void HydraPipeline::showModules() const {
   const auto print_width = config::Settings().print_width;
   std::stringstream ss;
   ss << std::endl << makeBanner("Modules", print_width, '=', true, true);
-  for (auto&& [name, module] : modules_) {
-    ss << std::endl << getModuleInfo(name, module.get());
+  for (auto&& [name, mod] : modules_) {
+    ss << std::endl << getModuleInfo(name, mod.get());
   }
   VLOG(config_verbosity_) << ss.str();
 }
@@ -111,13 +110,13 @@ void HydraPipeline::start() {
     input_module_->start();
   }
 
-  for (auto&& [name, module] : modules_) {
-    if (!module) {
+  for (auto&& [name, mod] : modules_) {
+    if (!mod) {
       LOG(FATAL) << "Found unitialized module: " << name;
       continue;
     }
 
-    module->start();
+    mod->start();
   }
 
   if (input_module_) {
@@ -126,13 +125,13 @@ void HydraPipeline::start() {
 }
 
 void HydraPipeline::stop() {
-  for (auto&& [name, module] : modules_) {
-    if (!module) {
+  for (auto&& [name, mod] : modules_) {
+    if (!mod) {
       LOG(FATAL) << "Found unitialized module: " << name;
       continue;
     }
 
-    module->stop();
+    mod->stop();
   }
 }
 
@@ -142,13 +141,13 @@ void HydraPipeline::save() {
     return;
   }
 
-  for (auto&& [name, module] : modules_) {
-    if (!module) {
+  for (auto&& [name, mod] : modules_) {
+    if (!mod) {
       LOG(FATAL) << "Found unitialized module: " << name;
       continue;
     }
 
-    module->save(*logs);
+    mod->save(*logs);
   }
 }
 

@@ -91,16 +91,12 @@ class GlobalInfo {
  public:
   static GlobalInfo& instance();
 
-  static GlobalInfo& init(const PipelineConfig& config,
-                          int robot_id = 0,
-                          bool freeze = true);
+  static GlobalInfo& init(const PipelineConfig& config, int robot_id = 0);
 
   static void exit();
 
   // this invalidates any instances (mostly intended for testing)
   static void reset();
-
-  inline bool frozen() const { return frozen_; }
 
   void setForceShutdown(bool force_shutdown);
 
@@ -141,11 +137,8 @@ class GlobalInfo {
 
   void initFromConfig(const PipelineConfig& config, int robot_id);
 
-  void checkFrozen() const;
-
  private:
   static std::unique_ptr<GlobalInfo> instance_;
-  bool frozen_ = false;
   PipelineConfig config_;
   std::atomic<bool> force_shutdown_;
 

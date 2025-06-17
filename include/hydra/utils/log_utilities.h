@@ -72,8 +72,6 @@ class LogSetup {
 
   ~LogSetup();
 
-  void init();
-
   std::filesystem::path getLogDir() const;
 
   std::filesystem::path getLogDir(const std::string& log_namespace) const;

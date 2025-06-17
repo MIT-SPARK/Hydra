@@ -49,7 +49,7 @@ using VFConfig = config::VirtualConfig<GraphBuilder>;
 using RFConfig = RoomFinderConfig;
 
 BatchPipeline::BatchPipeline(const PipelineConfig& config, int robot_id) {
-  GlobalInfo::init(config, robot_id, true);
+  GlobalInfo::init(config, robot_id);
 }
 
 BatchPipeline::~BatchPipeline() {}
