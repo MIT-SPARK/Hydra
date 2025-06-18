@@ -1,24 +1,13 @@
 [build-system]
-requires = [
-    "setuptools>=42",
-    "wheel",
-    "cmake>=3.14",
-    "ninja",
-]
-build-backend = "setuptools.build_meta"
+requires = ["scikit-build-core", "pybind11"]
+build-backend = "scikit_build_core.build"
 
 [project]
 name = "hydra_python"
-authors = [
-  {name = "Nathan Hughes", email="na26933@mit.edu"},
-]
+version = "0.0.1"
 description = "Python bindings for Hydra"
 readme = "README.md"
-version = "0.0.1"
-classifiers = [
-  "Programming Language :: Python :: 3",
-  "License :: OSI Approved :: BSD License",
-]
+license = "BSD-3-Clause"
 requires-python = ">=3.8"
 dependencies = [
     "click",
@@ -29,9 +18,14 @@ dependencies = [
     "pyqtgraph",
     "pyyaml",
     "scipy",
-    "tqdm",
     "spark_dataset_interfaces @ git+https://github.com/MIT-SPARK/spark_dataset_interfaces",
-    "spark_dsg[viz] @ git+https://github.com/MIT-SPARK/Spark-DSG@develop",
+]
+authors = [
+  {name = "Nathan Hughes", email="na26933@mit.edu"},
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python :: 3",
 ]
 
 [project.urls]
@@ -40,16 +34,11 @@ Repository = "https://github.com/MIT-SPARK/Hydra"
 [project.scripts]
 hydra = "hydra_python.commands:main.cli"
 
-[tool.setuptools]
-include-package-data = true
-packages = [
-    "hydra_python",
-    "hydra_python.config",
-    "hydra_python.commands",
-    "hydra_python.semantics",
-    "hydra_python.simulators",
-]
+[tool.scikit-build.cmake]
+source-dir = "python"
 
-[tool.setuptools.package-dir]
-"hydra_python" = "python/src/hydra_python"
-"hydra_python.config" = "config"
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F403"]
+
+[tool.ruff.lint.isort]
+split-on-trailing-comma = true
