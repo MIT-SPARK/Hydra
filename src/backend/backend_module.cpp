@@ -58,8 +58,7 @@ static const auto registration =
                                    BackendModule,
                                    BackendModule::Config,
                                    SharedDsgInfo::Ptr,
-                                   SharedModuleState::Ptr,
-                                   LogSetup::Ptr>("BackendModule");
+                                   SharedModuleState::Ptr>("BackendModule");
 
 }  // namespace
 
@@ -100,8 +99,7 @@ void declare_config(BackendModule::Config& config) {
 
 BackendModule::BackendModule(const Config& config,
                              const SharedDsgInfo::Ptr& dsg,
-                             const SharedModuleState::Ptr& state,
-                             const LogSetup::Ptr& logs)
+                             const SharedModuleState::Ptr& state)
     : KimeraPgmoInterface(config.pgmo),
       config(config::checkValid(config)),
       private_dsg_(dsg),

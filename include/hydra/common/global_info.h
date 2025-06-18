@@ -76,7 +76,7 @@ struct PipelineConfig {
 
   // If true store additional details for the khronos spatio-temporal viualizer.
   bool store_visualization_details = false;
-  LogConfig logs;
+  LogSetup::Config logs;
   FrameConfig frames;
   SharedDsgInfo::Config graph;
   config::VirtualConfig<VolumetricWindow> map_window{SpatialWindowChecker::Config()};
@@ -107,8 +107,6 @@ class GlobalInfo {
   const FrameConfig& getFrames() const;
 
   const RobotPrefixConfig& getRobotPrefix() const;
-
-  const LogSetup::Ptr& getLogs() const;
 
   const std::map<uint32_t, std::string>& getLabelToNameMap() const;
 
@@ -142,8 +140,8 @@ class GlobalInfo {
   PipelineConfig config_;
   std::atomic<bool> force_shutdown_;
 
+  LogSetup logs_;
   RobotPrefixConfig robot_prefix_;
-  LogSetup::Ptr logs_;
   LabelRemapper label_remapper_;
   std::shared_ptr<SemanticColorMap> label_colormap_;
 

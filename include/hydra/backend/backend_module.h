@@ -98,8 +98,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   BackendModule(const Config& config,
                 const SharedDsgInfo::Ptr& dsg,
-                const SharedModuleState::Ptr& state,
-                const LogSetup::Ptr& logs = nullptr);
+                const SharedModuleState::Ptr& state);
 
   virtual ~BackendModule();
 
@@ -175,7 +174,6 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   size_t prev_num_archived_vertices_ = 0;
   size_t num_archived_vertices_ = 0;
 
-  LogSetup::Ptr logs_;
   BackendModuleStatus status_;
   SceneGraphLogger backend_graph_logger_;
   std::list<LoopClosureLog> loop_closures_;

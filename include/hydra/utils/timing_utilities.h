@@ -89,8 +89,6 @@ class ElapsedTimeRecorder {
 
   void logStats(const std::string& stat_filepath) const;
 
-  void setupIncrementalLogging(const LogSetup::Ptr& log_config);
-
   bool timing_disabled;
 
   bool disable_output;
@@ -114,8 +112,6 @@ class ElapsedTimeRecorder {
   std::map<std::string, TimeStamps> stamps_;
   mutable std::mutex mutex_;
 
-  bool log_incrementally_;
-  LogSetup::Ptr log_setup_;
   std::map<std::string, std::shared_ptr<std::ofstream>> files_;
 };
 

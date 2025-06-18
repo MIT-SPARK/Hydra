@@ -68,8 +68,7 @@ static const auto registration =
                                    GraphBuilder,
                                    GraphBuilder::Config,
                                    SharedDsgInfo::Ptr,
-                                   SharedModuleState::Ptr,
-                                   LogSetup::Ptr>("GraphBuilder");
+                                   SharedModuleState::Ptr>("GraphBuilder");
 
 }
 
@@ -112,8 +111,7 @@ void declare_config(GraphBuilder::Config& config) {
 
 GraphBuilder::GraphBuilder(const Config& config,
                            const SharedDsgInfo::Ptr& dsg,
-                           const SharedModuleState::Ptr& state,
-                           const LogSetup::Ptr& logs)
+                           const SharedModuleState::Ptr& state)
     : config(config::checkValid(config)),
       sequence_number_(1),  // starts at 1 to differentiate from SharedDsgInfo default
       queue_(std::make_shared<InputQueue>()),

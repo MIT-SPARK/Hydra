@@ -58,7 +58,7 @@ std::ostream& operator<<(std::ostream& out, const ElapsedStatistics& stats) {
 }
 
 ElapsedTimeRecorder::ElapsedTimeRecorder()
-    : timing_disabled(false), disable_output(true), log_incrementally_(false) {}
+    : timing_disabled(false), disable_output(true) {}
 
 // TODO(lschmid): Consider moving this into the timers in the future.
 void ElapsedTimeRecorder::start(const std::string& timer_name,
@@ -112,21 +112,6 @@ void ElapsedTimeRecorder::stop(const std::string& timer_name) {
                << " was not started. Discarding current time point";
     return;
   }
-
-  if (!log_incrementally_) {
-    return;
-  }
-
-  auto iter = files_.find(timer_name);
-  if (iter == files_.end()) {
-    const auto fname = log_setup_->getTimerFilepath(timer_name);
-    auto file_ptr = std::make_shared<std::ofstream>(fname);
-    iter = files_.emplace(std::make_pair(timer_name, file_ptr)).first;
-  }
-
-  auto& fout = *iter->second;
-  std::chrono::duration<double> elapsed_s = elapsed;
-  fout << stamp << "," << elapsed_s.count() << std::endl;
 }
 
 void ElapsedTimeRecorder::record(const std::string& timer_name,
@@ -137,6 +122,7 @@ void ElapsedTimeRecorder::record(const std::string& timer_name,
     elapsed_[timer_name] = TimeList();
     stamps_[timer_name] = TimeStamps();
   }
+
   elapsed_[timer_name].push_back(elapsed);
   stamps_[timer_name].push_back(timestamp);
 }
@@ -166,7 +152,6 @@ ElapsedStatistics ElapsedTimeRecorder::getStats(const std::string& name) const {
   TimeList durations;
   {  // start critical section
     std::unique_lock<std::mutex> lock(mutex_);
-
     if (!elapsed_.count(name)) {
       return {0.0, 0.0, 0.0, 0.0, 0.0, 0};
     }
@@ -267,20 +252,7 @@ void ElapsedTimeRecorder::logElapsed(const std::string& name,
   VLOG(5) << "Saved timer '" << name << "'";
 }
 
-void ElapsedTimeRecorder::setupIncrementalLogging(const LogSetup::Ptr& log_setup) {
-  if (log_setup and log_setup->valid()) {
-    log_incrementally_ = true;
-    log_setup_ = log_setup;
-  } else {
-    LOG(WARNING) << "unable to configure incremental timer logging";
-  }
-}
-
 void ElapsedTimeRecorder::logAllElapsed(const LogSetup& log_setup) const {
-  if (log_incrementally_) {
-    return;
-  }
-
   std::list<std::string> all_timers;
   VLOG(5) << "Getting timer names...";
   {  // start critical region

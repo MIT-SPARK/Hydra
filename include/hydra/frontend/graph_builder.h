@@ -104,8 +104,7 @@ class GraphBuilder : public Module {
 
   GraphBuilder(const Config& config,
                const SharedDsgInfo::Ptr& dsg,
-               const SharedModuleState::Ptr& state,
-               const LogSetup::Ptr& logs = nullptr);
+               const SharedModuleState::Ptr& state);
 
   virtual ~GraphBuilder();
 
@@ -194,7 +193,6 @@ class GraphBuilder : public Module {
   ViewDatabase view_database_;
 
   SceneGraphLogger frontend_graph_logger_;
-  LogSetup::Ptr logs_;
   MessageQueue<PoseGraphPacket> pose_graph_updates_;
 
   NodeIdSet previous_active_places_;

@@ -40,9 +40,11 @@
 
 #include <filesystem>
 
+namespace hydra {
+
 namespace fs = std::filesystem;
 
-namespace hydra {
+namespace {
 
 inline bool makeDirs(const fs::path& path) {
   if (fs::exists(path)) {
@@ -53,23 +55,32 @@ inline bool makeDirs(const fs::path& path) {
   return fs::create_directories(path, code);
 }
 
-void declare_config(LogConfig& config) {
+}  // namespace
+
+void declare_config(LogSetup::Config& config) {
   using namespace config;
   name("LogConfig");
   field<Path::Absolute>(config.log_dir, "log_path");
-  field(config.log_timing_incrementally, "log_timing_incrementally");
   field(config.timing_stats_name, "timing_stats_name");
   field(config.timing_suffix, "timing_suffix");
   field(config.log_raw_timers_to_single_dir, "log_raw_timers_to_single_dir");
 }
 
-LogSetup::LogSetup(const LogConfig& conf) : valid_(false), config_(conf) {
-  if (config_.log_dir.empty()) {
+LogSetup::Config LogSetup::Config::fromString(const std::string& output_path) {
+  LogSetup::Config config;
+  config.log_dir = output_path;
+  return config;
+}
+
+LogSetup::LogSetup() : LogSetup("") {}
+
+LogSetup::LogSetup(const Config& config) : config(config), valid_(false) {
+  if (config.log_dir.empty()) {
     return;
   }
 
-  if (!makeDirs(config_.log_dir)) {
-    LOG(WARNING) << "Failed to make dir: " << config_.log_dir << ". logging Disabled!";
+  if (!makeDirs(config.log_dir)) {
+    LOG(WARNING) << "Failed to make dir '" << config.log_dir << "'. Logging disabled!";
     return;
   }
 
@@ -77,7 +88,7 @@ LogSetup::LogSetup(const LogConfig& conf) : valid_(false), config_(conf) {
 }
 
 LogSetup::LogSetup(const std::string& output_path)
-    : LogSetup(LogConfig::fromString(output_path)) {}
+    : LogSetup(Config::fromString(output_path)) {}
 
 LogSetup::~LogSetup() {
   if (!valid_) {
@@ -89,14 +100,20 @@ LogSetup::~LogSetup() {
   }
 }
 
-fs::path LogSetup::getLogDir() const { return valid_ ? config_.log_dir : ""; }
+fs::path LogSetup::getLogDir() const {
+  if (!valid_) {
+    throw std::runtime_error("logging not configured, unable to get timer filepath");
+  }
+
+  return config.log_dir;
+}
 
 fs::path LogSetup::getLogDir(const std::string& log_namespace) const {
   if (!valid_) {
-    return "";
+    throw std::runtime_error("logging not configured, unable to get timer filepath");
   }
 
-  auto ns_path = fs::path(config_.log_dir) / log_namespace;
+  auto ns_path = fs::path(config.log_dir) / log_namespace;
   if (!namespaces_.count(log_namespace)) {
     makeDirs(ns_path);
     namespaces_.insert(log_namespace);
@@ -110,7 +127,7 @@ fs::path LogSetup::getTimerFilepath() const {
     throw std::runtime_error("logging not configured, unable to get timer filepath");
   }
 
-  return (config_.log_dir / config_.timing_stats_name).lexically_normal();
+  return (config.log_dir / config.timing_stats_name).lexically_normal();
 }
 
 fs::path LogSetup::getTimerFilepath(const std::string& timer_name) const {
@@ -120,7 +137,7 @@ fs::path LogSetup::getTimerFilepath(const std::string& timer_name) const {
 
   std::string used_name = timer_name;
   // If requested, replace all '/' with '_' to avoid creating a directory.
-  if (config_.log_raw_timers_to_single_dir) {
+  if (config.log_raw_timers_to_single_dir) {
     for (char& c : used_name) {
       if (c == '/') {
         c = '_';
@@ -130,9 +147,9 @@ fs::path LogSetup::getTimerFilepath(const std::string& timer_name) const {
 
   const auto timer_path = fs::path(timer_name);
   const auto timer_ns = timer_path.parent_path();
-  const auto filename = timer_path.stem().string() + config_.timing_suffix;
+  const auto filename = timer_path.stem().string() + config.timing_suffix;
   if (timer_ns.empty()) {
-    return (config_.log_dir / filename).lexically_normal();
+    return (config.log_dir / filename).lexically_normal();
   }
 
   fs::path full_path(getLogDir(timer_ns.string()));
@@ -141,7 +158,7 @@ fs::path LogSetup::getTimerFilepath(const std::string& timer_name) const {
 
 bool LogSetup::valid() const { return valid_; }
 
-const LogConfig& LogSetup::config() const { return config_; }
+LogSetup::operator bool() const { return valid(); }
 
 void LogSetup::registerExitCallback(const std::function<void(const LogSetup&)>& func) {
   callbacks_.push_back(func);

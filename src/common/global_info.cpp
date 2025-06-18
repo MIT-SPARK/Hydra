@@ -143,24 +143,12 @@ void GlobalInfo::configureTimers() {
   if (timer.timing_disabled) {
     return;
   }
-
-  if (!logs_ || !logs_->valid()) {
-    return;
-  }
-
-  if (logs_->config().log_timing_incrementally) {
-    timer.setupIncrementalLogging(logs_);
-  }
 }
 
 void GlobalInfo::initFromConfig(const PipelineConfig& config, int robot_id) {
   config_ = config::checkValid(config);
   robot_prefix_ = RobotPrefixConfig(robot_id);
-  logs_ = std::make_shared<LogSetup>(config_.logs);
-  if (!logs_->valid()) {
-    // delete logs if they don't point to a valid path
-    logs_.reset();
-  }
+  logs_ = LogSetup(config_.logs);
 
   configureTimers();
 
@@ -201,18 +189,18 @@ void GlobalInfo::exit() {
 
   // save timing information to avoid destructor weirdness with singletons
   if (curr.logs_) {
-    saveTimingInformation(*curr.logs_);
+    saveTimingInformation(curr.logs_);
 
     auto node = config::toYaml(curr.config_);
     for (const auto& [name, sensor] : curr.sensors_) {
       node["sensors"][name] = sensor->dump();
     }
 
-    std::filesystem::path log_dir = curr.logs_->getLogDir();
+    std::filesystem::path log_dir = curr.logs_.getLogDir();
     std::ofstream fout(log_dir / "hydra_config.yaml");
     fout << node;
 
-    curr.logs_.reset();
+    curr.logs_ = LogSetup();
   }
 
   // TODO(nathan) see if anything else needs to be saved;
@@ -230,7 +218,7 @@ const FrameConfig& GlobalInfo::getFrames() const { return config_.frames; }
 
 const RobotPrefixConfig& GlobalInfo::getRobotPrefix() const { return robot_prefix_; }
 
-const LogSetup::Ptr& GlobalInfo::getLogs() const { return logs_; }
+const LogSetup& GlobalInfo::getLogs() const { return logs_; }
 
 const std::map<uint32_t, std::string>& GlobalInfo::getLabelToNameMap() const {
   return config_.label_names;
