@@ -54,7 +54,7 @@ class HydraPipeline {
 
   virtual void stop();
 
-  virtual void save(const LogSetup& logs);
+  virtual void save(const LogSetup& logs) const;
 
   template <typename Derived = Module>
   Derived* getModule(const std::string& name) {

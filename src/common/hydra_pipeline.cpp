@@ -140,7 +140,7 @@ void HydraPipeline::stop() {
   }
 }
 
-void HydraPipeline::save(const LogSetup& logs) {
+void HydraPipeline::save(const LogSetup& logs) const {
   if (!logs) {
     return;
   }

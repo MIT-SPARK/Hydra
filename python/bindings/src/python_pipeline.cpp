@@ -54,6 +54,8 @@
 #include <pybind11/stl/filesystem.h>
 #include <pybind11/stl_bind.h>
 
+#include <filesystem>
+
 #include "hydra/bindings/glog_utilities.h"
 #include "hydra/bindings/python_image.h"
 #include "hydra/bindings/python_sensor_input.h"
@@ -90,7 +92,6 @@ class PythonPipeline : public HydraPipeline {
                  const Sensor::Ptr& sensor,
                  int robot_id = 0,
                  int config_verbosity = 0,
-                 bool freeze_global_info = true,
                  bool step_mode_only = true,
                  std::string zmq_url = "");
 
@@ -99,8 +100,6 @@ class PythonPipeline : public HydraPipeline {
   void start() override;
 
   void stop() override;
-
-  void save() override;
 
   void reset();
 
@@ -137,10 +136,9 @@ PythonPipeline::PythonPipeline(const Config& _config,
                                const Sensor::Ptr& sensor,
                                int robot_id,
                                int config_verbosity,
-                               bool freeze_global_info,
                                bool step_mode_only,
                                std::string zmq_url)
-    : HydraPipeline(_config, robot_id, config_verbosity, freeze_global_info),
+    : HydraPipeline(_config, robot_id, config_verbosity),
       config(_config),
       sensor_name(sensor ? sensor->name : ""),
       zmq_url(zmq_url),
@@ -170,14 +168,13 @@ void PythonPipeline::start() {
 }
 
 void PythonPipeline::initModules() {
-  const auto& logs = GlobalInfo::instance().getLogs();
-  frontend_ = config.frontend.create(frontend_dsg_, shared_state_, logs);
+  frontend_ = config.frontend.create(frontend_dsg_, shared_state_);
   if (!frontend_) {
     throw std::runtime_error("Invalid frontend config!");
   }
 
   modules_["frontend"] = frontend_;
-  backend_ = config.backend.create(backend_dsg_, shared_state_, logs);
+  backend_ = config.backend.create(backend_dsg_, shared_state_);
   modules_["backend"] = backend_;
   active_window_ = config.active_window.create(frontend_->queue());
   modules_["reconstruction"] = active_window_;
@@ -231,11 +228,6 @@ void PythonPipeline::reset() {
     // avoid spamming config
     start();
   }
-}
-
-void PythonPipeline::save() {
-  HydraPipeline::save();
-  GlobalInfo::exit();
 }
 
 bool PythonPipeline::step(const InputPacket::Ptr& input) {
@@ -307,7 +299,6 @@ void addBindings(pybind11::module_& m) {
              const Sensor::Ptr& sensor,
              int robot_id,
              int config_verbosity,
-             bool freeze_global_info,
              bool step_mode_only,
              const std::string zmq_url) {
             const auto node = YAML::Load(contents);
@@ -316,7 +307,6 @@ void addBindings(pybind11::module_& m) {
                 sensor,
                 robot_id,
                 config_verbosity,
-                freeze_global_info,
                 step_mode_only,
                 zmq_url);
           },
@@ -324,7 +314,6 @@ void addBindings(pybind11::module_& m) {
           "camera"_a,
           "robot_id"_a = 0,
           "config_verbosity"_a = 0,
-          "freeze_global_info"_a = true,
           "use_step_mode"_a = true,
           "zmq_url"_a = "")
       .def_static(
@@ -333,7 +322,6 @@ void addBindings(pybind11::module_& m) {
              const Sensor::Ptr& sensor,
              int robot_id,
              int config_verbosity,
-             bool freeze_global_info,
              bool step_mode_only,
              const std::string& zmq_url) {
             const auto node = YAML::LoadFile(filepath);
@@ -342,7 +330,6 @@ void addBindings(pybind11::module_& m) {
                 sensor,
                 robot_id,
                 config_verbosity,
-                freeze_global_info,
                 step_mode_only,
                 zmq_url);
           },
@@ -350,7 +337,6 @@ void addBindings(pybind11::module_& m) {
           "camera"_a,
           "robot_id"_a = 0,
           "config_verbosity"_a = 0,
-          "freeze_global_info"_a = true,
           "use_step_mode"_a = true,
           "zmq_url"_a = "")
       .def_static("default_config",
@@ -359,7 +345,12 @@ void addBindings(pybind11::module_& m) {
                     ss << config::toYaml(PythonPipeline::Config());
                     return ss.str();
                   })
-      .def("save", &PythonPipeline::save)
+      .def(
+          "save",
+          [](const PythonPipeline& pipeline, const std::filesystem::path& output) {
+            pipeline.save(LogSetup(output));
+          },
+          "output"_a)
       .def(
           "save_graph",
           [](PythonPipeline& pipeline, const std::string& path, bool include_mesh) {
