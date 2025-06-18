@@ -65,16 +65,17 @@ struct LoopClosureLog {
 };
 
 struct BackendModuleStatus {
-  size_t total_loop_closures;
-  size_t new_loop_closures;
-  size_t total_factors;
-  size_t total_values;
-  size_t new_factors;
-  size_t new_graph_factors;
-  size_t trajectory_len;
-  size_t num_merges_undone;
-
-  void reset();
+  size_t total_loop_closures = 0;
+  size_t new_loop_closures = 0;
+  size_t total_factors = 0;
+  size_t total_values = 0;
+  size_t new_factors = 0;
+  size_t new_graph_factors = 0;
+  size_t trajectory_len = 0;
+  size_t num_merges_undone = 0;
+  std::optional<double> last_spin_s = 0.0;
+  std::optional<double> last_opt_s = 0.0;
+  std::optional<double> last_mesh_update_s = 0.0;
 };
 
 class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
@@ -146,9 +147,9 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   void updateDsgMesh(size_t timestamp_ns, bool force_mesh_update = false);
 
-  void logStatus(bool init = false) const;
-
   void logIncrementalLoopClosures(const pose_graph_tools::PoseGraph& graph);
+
+  void logStatus();
 
  protected:
   void stopImpl();
@@ -174,7 +175,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   size_t prev_num_archived_vertices_ = 0;
   size_t num_archived_vertices_ = 0;
 
-  BackendModuleStatus status_;
+  std::vector<BackendModuleStatus> status_log_;
   SceneGraphLogger backend_graph_logger_;
   std::list<LoopClosureLog> loop_closures_;
   ExternalLoopClosureReceiver external_lc_receiver_;

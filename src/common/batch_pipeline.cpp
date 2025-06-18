@@ -68,14 +68,14 @@ DynamicSceneGraph::Ptr BatchPipeline::construct(const VFConfig& frontend_config,
   auto dsg = GlobalInfo::instance().createSharedDsg();
   auto graph = dsg->graph->clone();
   auto state = std::make_shared<SharedModuleState>();
-  auto module = frontend_config.create(dsg, state, LogSetup::Ptr());
+  auto frontend = frontend_config.create(dsg, state);
 
   // TODO(nathan) this is a little sketchy given the lack of pose info
   auto msg = std::make_shared<ActiveWindowOutput>();
   msg->setMap(map);
-  module->queue()->push(msg);
+  frontend->queue()->push(msg);
 
-  if (!module->spinOnce()) {
+  if (!frontend->spinOnce()) {
     return nullptr;
   }
 

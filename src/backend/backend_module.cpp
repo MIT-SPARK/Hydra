@@ -51,6 +51,11 @@
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+
+using hydra::timing::ScopedTimer;
+using kimera_pgmo::KimeraPgmoInterface;
+using pose_graph_tools::PoseGraph;
+
 namespace {
 
 static const auto registration =
@@ -60,21 +65,26 @@ static const auto registration =
                                    SharedDsgInfo::Ptr,
                                    SharedModuleState::Ptr>("BackendModule");
 
-}  // namespace
+void writeBackendStatus(const std::vector<BackendModuleStatus>& entries,
+                        const std::filesystem::path& filename) {
+  std::ofstream file(filename, std::ofstream::out);
+  // file format
+  file << "total_lc,new_lc,total_factors,total_values,new_factors,new_graph_"
+          "factors,trajectory_len,run_time,optimize_time,mesh_update_time,num_"
+          "merges_"
+          "undone\n";
 
-using hydra::timing::ScopedTimer;
-using kimera_pgmo::KimeraPgmoInterface;
-using pose_graph_tools::PoseGraph;
+  const auto nan = std::numeric_limits<double>::quiet_NaN();
+  for (const auto& entry : entries) {
+    file << entry.total_loop_closures << "," << entry.new_loop_closures << ","
+         << entry.total_factors << "," << entry.total_values << "," << entry.new_factors
+         << "," << entry.new_graph_factors << "," << entry.trajectory_len << ","
+         << entry.last_spin_s.value_or(nan) << "," << entry.last_opt_s.value_or(nan)
+         << "," << entry.last_mesh_update_s.value_or(nan) << entry.num_merges_undone
+         << "\n";
+  }
 
-void BackendModuleStatus::reset() {
-  total_loop_closures = 0;
-  new_loop_closures = 0;
-  total_factors = 0;
-  total_values = 0;
-  new_factors = 0;
-  new_graph_factors = 0;
-  trajectory_len = 0;
-  num_merges_undone = 0;
+  file.close();
 }
 
 inline bool hasLoopClosure(const PoseGraph& graph) {
@@ -85,6 +95,8 @@ inline bool hasLoopClosure(const PoseGraph& graph) {
   }
   return false;
 }
+
+}  // namespace
 
 void declare_config(BackendModule::Config& config) {
   using namespace config;
@@ -116,14 +128,6 @@ BackendModule::BackendModule(const Config& config,
   vertex_stamps_.reset(new std::vector<uint64_t>());
 
   dsg_updater_.reset(new DsgUpdater(config, unmerged_graph_, private_dsg_));
-
-  if (logs && logs->valid()) {
-    logs_ = logs;
-    const auto log_path = logs->getLogDir("backend");
-    VLOG(1) << "[Hydra Backend] logging to " << log_path;
-  } else {
-    VLOG(1) << "[Hydra Backend] logging disabled.";
-  }
 }
 
 BackendModule::~BackendModule() { stopImpl(); }
@@ -152,6 +156,9 @@ void BackendModule::save(const LogSetup& log_setup) {
 
   const auto backend_path = log_setup.getLogDir("backend");
   backend_graph_logger_.save(backend_path);
+
+  const auto filename = log_setup.getLogDir("backend/pgmo") / "dsg_pgmo_status.csv";
+  writeBackendStatus(status_log_, filename);
 
   deformation_graph_->save(backend_path / "deformation_graph.dgrf");
   const auto& prefix = GlobalInfo::instance().getRobotPrefix();
@@ -224,8 +231,8 @@ bool BackendModule::spinOnce(bool force_update) {
   }
 
   uint64_t timestamp_ns = 0;
+  status_log_.emplace_back(BackendModuleStatus{});
 
-  status_.reset();
   std::lock_guard<std::mutex> lock(mutex_);
   if (has_data) {
     const auto packet = queue.front();
@@ -240,7 +247,7 @@ bool BackendModule::spinOnce(bool force_update) {
 
   ScopedTimer timer("backend/update", timestamp_ns);
   updateFromLcdQueue();
-  status_.total_loop_closures = num_loop_closures_;
+  status_log_.back().total_loop_closures = num_loop_closures_;
 
   if (!updatePrivateDsg(timestamp_ns, force_update)) {
     VLOG(2) << "Backend skipping input @ " << timestamp_ns << " [ns]";
@@ -260,9 +267,7 @@ bool BackendModule::spinOnce(bool force_update) {
     dsg_updater_->callUpdateFunctions(timestamp_ns, info);
   }
 
-  if (logs_) {
-    logStatus();
-  }
+  logStatus();
 
   ScopedTimer sink_timer("backend/sinks", timestamp_ns);
   Sink::callAll(sinks_, timestamp_ns, *private_dsg_->graph, *deformation_graph_);
@@ -315,8 +320,8 @@ void BackendModule::addSink(const Sink::Ptr& sink) {
 void BackendModule::updateFactorGraph(const BackendInput& input) {
   ScopedTimer timer("backend/process_factors", input.timestamp_ns);
   const size_t prev_loop_closures = num_loop_closures_;
-  status_.new_graph_factors = input.deformation_graph.edges.size();
-  status_.new_factors += input.deformation_graph.edges.size();
+  status_log_.back().new_graph_factors = input.deformation_graph.edges.size();
+  status_log_.back().new_factors += input.deformation_graph.edges.size();
 
   std::vector<size_t> inc_mesh_indices;
   std::vector<uint64_t> inc_mesh_index_stamps;
@@ -338,7 +343,7 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
   }
 
   for (const auto& msg : input.agent_updates.pose_graphs) {
-    status_.new_factors += msg.edges.size();
+    status_log_.back().new_factors += msg.edges.size();
 
     VLOG(5) << "[Hydra Backend] Adding pose graph message: " << msg;
     if (hasLoopClosure(msg)) {
@@ -373,13 +378,13 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
   }
 
   if (num_loop_closures_ > 0) {
-    status_.new_loop_closures = num_loop_closures_ - prev_loop_closures;
+    status_log_.back().new_loop_closures = num_loop_closures_ - prev_loop_closures;
     have_loopclosures_ = true;
   }
 
-  status_.trajectory_len = trajectory_.size();
-  status_.total_factors = deformation_graph_->getFactors()->size();
-  status_.total_values = deformation_graph_->getValues()->size();
+  status_log_.back().trajectory_len = trajectory_.size();
+  status_log_.back().total_factors = deformation_graph_->getFactors()->size();
+  status_log_.back().total_values = deformation_graph_->getValues()->size();
 }
 
 bool BackendModule::updateFromLcdQueue() {
@@ -403,7 +408,7 @@ bool BackendModule::updateFromLcdQueue() {
     have_loopclosures_ = true;
     have_new_loopclosures_ = true;
     num_loop_closures_++;
-    status_.new_loop_closures++;
+    status_log_.back().new_loop_closures++;
   }
 
   return added_new_loop_closure;
@@ -457,10 +462,7 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
     unmerged_graph_->mergeGraph(*shared_dsg.graph);
   }  // end joint critical section
 
-  if (logs_) {
-    backend_graph_logger_.logGraph(*private_dsg_->graph);
-  }
-
+  backend_graph_logger_.logGraph(*private_dsg_->graph);
   return true;
 }
 
@@ -552,41 +554,6 @@ void BackendModule::optimize(size_t timestamp_ns, bool force_find_merge) {
   have_new_loopclosures_ = false;
 }
 
-void BackendModule::logStatus(bool init) const {
-  if (!logs_) {
-    return;
-  }
-
-  const auto filename = logs_->getLogDir("backend/pgmo") / "dsg_pgmo_status.csv";
-
-  std::ofstream file;
-  if (init) {
-    LOG(INFO) << "[Hydra Backend] logging PGMO status output to " << filename;
-    file.open(filename);
-    // file format
-    file << "total_lc,new_lc,total_factors,total_values,new_factors,new_graph_"
-            "factors,trajectory_len,run_time,optimize_time,mesh_update_time,num_"
-            "merges_"
-            "undone\n";
-    file.close();
-    return;
-  }
-
-  const auto& timer = hydra::timing::ElapsedTimeRecorder::instance();
-  const double nan = std::numeric_limits<double>::quiet_NaN();
-  file.open(filename, std::ofstream::out | std::ofstream::app);
-  file << status_.total_loop_closures << "," << status_.new_loop_closures << ","
-       << status_.total_factors << "," << status_.total_values << ","
-       << status_.new_factors << "," << status_.new_graph_factors << ","
-       << status_.trajectory_len << ","
-       << timer.getLastElapsed("backend/spin").value_or(nan) << ","
-       << timer.getLastElapsed("backend/optimization").value_or(nan) << ","
-       << timer.getLastElapsed("backend/mesh_update").value_or(nan) << ","
-       << status_.num_merges_undone << std::endl;
-  file.close();
-  return;
-}
-
 void BackendModule::logIncrementalLoopClosures(const PoseGraph& msg) {
   for (const auto& edge : msg.edges) {
     if (edge.type != pose_graph_tools::PoseGraphEdge::LOOPCLOSE) {
@@ -601,6 +568,18 @@ void BackendModule::logIncrementalLoopClosures(const PoseGraph& msg) {
     // connects frames "to -> from" (i.e. src = to, dest = from, pose = to_T_from)
     loop_closures_.push_back({src_key, dest_key, pose, false, 0});
   }
+}
+
+void BackendModule::logStatus() {
+  if (status_log_.empty()) {
+    return;
+  }
+
+  auto& status = status_log_.back();
+  const auto& timer = hydra::timing::ElapsedTimeRecorder::instance();
+  status.last_spin_s = timer.getLastElapsed("backend/spin");
+  status.last_opt_s = timer.getLastElapsed("backend/optimization");
+  status.last_mesh_update_s = timer.getLastElapsed("backend/mesh_update");
 }
 
 }  // namespace hydra

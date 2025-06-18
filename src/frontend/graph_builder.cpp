@@ -146,13 +146,6 @@ GraphBuilder::GraphBuilder(const Config& config,
   deformation_compression_.reset(
       new kimera_pgmo::BlockCompression(config.pgmo.d_graph_resolution));
 
-  if (logs && logs->valid()) {
-    logs_ = logs;
-
-    const auto frontend_dir = logs->getLogDir("frontend");
-    VLOG(1) << "[Hydra Frontend] logging to " << frontend_dir;
-  }
-
   addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
   addInputCallback(
       std::bind(&GraphBuilder::updateDeformationGraph, this, std::placeholders::_1));
@@ -379,10 +372,8 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
     queues.lcd_queue->push(lcd_input_);
   }
 
-  if (logs_) {
-    // mutex not required because nothing is modifying the graph
-    frontend_graph_logger_.logGraph(*dsg_->graph);
-  }
+  // mutex not required because nothing is modifying the graph
+  frontend_graph_logger_.logGraph(*dsg_->graph);
 
   if (dsg_->graph && backend_input_) {
     ScopedTimer sink_timer("frontend/sinks", msg->timestamp_ns);
