@@ -34,10 +34,15 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/common/hydra_pipeline.h"
 
+#include <config_utilities/parsing/yaml.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/settings.h>
 
+#include "hydra/utils/timing_utilities.h"
+
 namespace hydra {
+
+using hydra::timing::ElapsedTimeRecorder;
 
 HydraPipeline::HydraPipeline(const PipelineConfig& pipeline_config,
                              int robot_id,
@@ -135,11 +140,23 @@ void HydraPipeline::stop() {
   }
 }
 
-void HydraPipeline::save() {
-  const auto& logs = GlobalInfo::instance().getLogs();
-  if (!logs || !logs->valid()) {
+void HydraPipeline::save(const LogSetup& logs) {
+  if (!logs) {
     return;
   }
+
+  auto& info = GlobalInfo::instance();
+  auto node = config::toYaml(info.getConfig());
+  for (const auto& name : info.getAvailableSensors()) {
+    const auto sensor = info.getSensor(name);
+    if (sensor) {
+      node["sensors"][name] = info.getSensor(name)->dump();
+    }
+  }
+
+  std::filesystem::path log_dir = logs.getLogDir();
+  std::ofstream fout(log_dir / "hydra_config.yaml");
+  fout << node;
 
   for (auto&& [name, mod] : modules_) {
     if (!mod) {
@@ -147,8 +164,15 @@ void HydraPipeline::save() {
       continue;
     }
 
-    mod->save(*logs);
+    mod->save(logs);
   }
+
+  // save timing information to avoid destructor weirdness with singletons
+  LOG(INFO) << "[Hydra] saving timing information to " << logs.getLogDir();
+  const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
+  timer.logAllElapsed(logs);
+  timer.logStats(logs.getTimerFilepath());
+  LOG(INFO) << "[Hydra] saved timing information";
 }
 
 }  // namespace hydra
