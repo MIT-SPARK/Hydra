@@ -1,0 +1,13 @@
+---
+# based on https://github.com/actions/starter-workflows/blob/main/ci/cmake-single-platform.yml
+name: Hydra Build and Test
+on: [pull_request]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: sudo apt-get update && sudo apt install pipx
+      - name: Lint
+        run: pipx install pre-commit && cd ${{github.workspace}} && pre-commit run --all-files
