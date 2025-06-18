@@ -34,8 +34,9 @@ Repository = "https://github.com/MIT-SPARK/Hydra"
 [project.scripts]
 hydra = "hydra_python.commands:main.cli"
 
-[tool.scikit-build.cmake]
-source-dir = "python"
+[tool.scikit-build]
+cmake.source-dir = "python"
+wheel.packages = ["python/src/hydra_python"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F403"]

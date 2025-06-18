@@ -1,9 +1,9 @@
 ### Installation
 
-0. Build Hydra normally via catkin and make sure your catkin workspace is sourced
+0. Build Hydra normally via colcon and make sure your colcon workspace is sourced
 
 > **Note**<br>
-> You can also manually build and install every listed dependency of Hydra (and Hydra) instead of building through catkin, but we do not maintain instructions on how to do this. Proceed at your own risk!
+> You can also manually build and install every listed dependency of Hydra (and Hydra) instead of building through colcon, but we do not maintain instructions on how to do this. Proceed at your own risk!
 
 1. Make a virtual environment (you can use `venv` or whatever you want):
 
@@ -17,34 +17,81 @@ python3 -m virtualenv -p /usr/bin/python3 --download hydra # or some other envir
 
 ```bash
 source /path/to/hydra/environment/bin/activate
-cd "/path/to/catkin_ws/src/hydra"
 
 # note that you may want to install a different version of spark_dsg than is installed automatically by the bindings
-# pip install "/path/to/catkin_ws/src/spark_dsg[viz]"
-
-pip install .  # use `-e` to enable an editable install
+pip install /path/to/colcon_ws/src/spark_dsg
+pip install /path/to/colcon_ws/src/hydra
 ```
-
-> **:warning: Warning**<br>
-> Some versions of `setuptools` may not install listed build requirements when making an editable install. You may have to install the listed build requirements beforehand if this is the case (see [pyproject.toml](pyproject.toml]) for details).
 
 ### Running on MP3D Image Dataset
 
 Point Hydra at the scene(s) you want to run:
 ```
-hydra run /data/datasets/1LXtFkjw3qL [other scenes...]
+hydra run mp3d /data/datasets/1LXtFkjw3qL [other scenes...]
 ```
 
-You may find other arguments useful:
+This commmand runs against a dataset structured like this
 ```
-hydra run /data/datasets/1LXtFkjw3qL --openset-model "ViT-L/14" -m 500 -o ~/test_python_clip -v
+.
+├── camera_info.yaml
+├── color
+│   ├── rgb_0000000.png
+│   ├── rgb_0000001.png
+│   ├── rgb_0000002.png
+│   ├── rgb_0000003.png
+│   ├── rgb_0000004.png
+│   ├── rgb_0000005.png
+│   ├── rgb_0000006.png
+│   ├── rgb_0000007.png
+│   ├── rgb_0000008.png
+│   └── rgb_0000009.png
+├── depth
+│   ├── depth_0000000.tiff
+│   ├── depth_0000001.tiff
+│   ├── depth_0000002.tiff
+│   ├── depth_0000003.tiff
+│   ├── depth_0000004.tiff
+│   ├── depth_0000005.tiff
+│   ├── depth_0000006.tiff
+│   ├── depth_0000007.tiff
+│   ├── depth_0000008.tiff
+│   └── depth_0000009.tiff
+├── labels
+│   ├── labels_0000000.png
+│   ├── labels_0000001.png
+│   ├── labels_0000002.png
+│   ├── labels_0000003.png
+│   ├── labels_0000004.png
+│   ├── labels_0000005.png
+│   ├── labels_0000006.png
+│   ├── labels_0000007.png
+│   ├── labels_0000008.png
+│   └── labels_0000009.png
+└── poses.csv
 ```
-
-In this case:
-  - `--openset-model "ViT-L/14"` turns on assigning features (produced by clip) to nodes
-  - `-v` turns on publishing the scene graph via zmq
-  - `-m 500` limits the total number of images to 500
-  - `-o ~/test_python_clip` sets the top-level output directory (each scene will be saved in a subdirectory)
+with `camera_info.yaml` as
+```yaml
+cx: 320.0
+cy: 240.0
+fx: 320.00000000000006
+fy: 320.00000000000006
+height: 480
+width: 640
+```
+and `poses.csv` as
+```
+timestamp_ns,tx,ty,tz,qw,qx,qy,qz
+0,3.663007259368897,-3.0140908559163413,0.680124095082283,-0.6739747339486684,0.6739747339486684,0.2139113320953844,-0.2139113320953844
+200000000,3.5630072355270386,-2.8724242051442466,0.680124095082283,-0.6739747339486684,0.6739747339486684,0.2139113320953844,-0.2139113320953844
+400000000,3.4630072116851807,-2.730757554372152,0.680124095082283,-0.6739747339486684,0.6739747339486684,0.2139113320953844,-0.2139113320953844
+600000000,3.3630071878433228,-2.589090903600057,0.680124095082283,-0.6739747339486684,0.6739747339486684,0.2139113320953844,-0.2139113320953844
+800000000,3.263007164001465,-2.4474242528279624,0.680124095082283,-0.6739747339486684,0.6739747339486684,0.2139113320953844,-0.2139113320953844
+1000000000,3.263007164001465,-2.4474242528279624,0.680124095082283,-0.6314914426627815,0.6314914426627815,0.3181486411155627,-0.3181486411155627
+1200000000,3.263007164001465,-2.4474242528279624,0.680124095082283,-0.5730058467300353,0.5730058467300353,0.4143239066397151,-0.4143239066397151
+1400000000,3.263007164001465,-2.4474242528279624,0.680124095082283,-0.5000000000000001,0.5000000000000001,0.5,-0.5
+1600000000,3.0741182963053384,-2.4474242528279624,0.680124095082283,-0.5000000000000001,0.5000000000000001,0.5,-0.5
+1800000000,2.8852294286092124,-2.4474242528279624,0.680124095082283,-0.5000000000000001,0.5000000000000001,0.5,-0.5
+```
 
 ### Setting up Habitat
 
@@ -59,24 +106,3 @@ Set up habitat via [conda](https://github.com/facebookresearch/habitat-sim#insta
     }
 }
 ```
-
-### Running against Habitat
-
-As long as you have mp3d set up on your machine and, then source your virtual environment and:
-
-```bash
-hydra habitat run /path/to/habitat/mp3d/17DRP5sb8fy/17DRP5sb8fy.glb
-```
-
-You can enable the open3d visualizer via:
-
-```bash
-hydra habitat run /path/to/habitat/mp3d/17DRP5sb8fy/17DRP5sb8fy.glb -v
-```
-
-and then running (in a different terminal):
-```bash
-hydra visualize
-```
-
-For some reason it appears habitat and the open3d visualizer are incompatible (if the open3d visualizer is launched as a child process of the process running habitat).
