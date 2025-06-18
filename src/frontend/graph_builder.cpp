@@ -153,7 +153,6 @@ GraphBuilder::GraphBuilder(const Config& config,
 
     const auto frontend_dir = logs->getLogDir("frontend");
     VLOG(1) << "[Hydra Frontend] logging to " << frontend_dir;
-    frontend_graph_logger_.setOutputPath(frontend_dir);
   }
 
   addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
@@ -205,6 +204,8 @@ void GraphBuilder::save(const LogSetup& log_setup) {
   const auto output_path = log_setup.getLogDir("frontend");
   dsg_->graph->save(output_path / "dsg.json", false);
   dsg_->graph->save(output_path / "dsg_with_mesh.json");
+
+  frontend_graph_logger_.save(output_path);
 
   const auto mesh = dsg_->graph->mesh();
   if (mesh && !mesh->empty()) {

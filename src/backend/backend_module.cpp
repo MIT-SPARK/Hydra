@@ -122,7 +122,6 @@ BackendModule::BackendModule(const Config& config,
   if (logs && logs->valid()) {
     logs_ = logs;
     const auto log_path = logs->getLogDir("backend");
-    backend_graph_logger_.setOutputPath(log_path);
     VLOG(1) << "[Hydra Backend] logging to " << log_path;
   } else {
     VLOG(1) << "[Hydra Backend] logging disabled.";
@@ -154,6 +153,7 @@ void BackendModule::save(const LogSetup& log_setup) {
   dsg_updater_->save(log_setup, "backend");
 
   const auto backend_path = log_setup.getLogDir("backend");
+  backend_graph_logger_.save(backend_path);
 
   deformation_graph_->save(backend_path / "deformation_graph.dgrf");
   const auto& prefix = GlobalInfo::instance().getRobotPrefix();
