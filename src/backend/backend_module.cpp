@@ -150,14 +150,14 @@ void BackendModule::stopImpl() {
 
 void BackendModule::stop() { stopImpl(); }
 
-void BackendModule::save(const LogSetup& log_setup) {
+void BackendModule::save(const DataDirectory& output) {
   std::lock_guard<std::mutex> lock(mutex_);
-  dsg_updater_->save(log_setup, "backend");
+  dsg_updater_->save(output, "backend");
 
-  const auto backend_path = log_setup.getLogDir("backend");
+  const auto backend_path = output.path("backend");
   backend_graph_logger_.save(backend_path);
 
-  const auto filename = log_setup.getLogDir("backend/pgmo") / "dsg_pgmo_status.csv";
+  const auto filename = output.path("backend/pgmo") / "dsg_pgmo_status.csv";
   writeBackendStatus(status_log_, filename);
 
   deformation_graph_->save(backend_path / "deformation_graph.dgrf");

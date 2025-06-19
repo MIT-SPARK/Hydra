@@ -140,7 +140,7 @@ void HydraPipeline::stop() {
   }
 }
 
-void HydraPipeline::save(const LogSetup& logs) const {
+void HydraPipeline::save(const DataDirectory& logs) const {
   if (!logs) {
     return;
   }
@@ -154,7 +154,7 @@ void HydraPipeline::save(const LogSetup& logs) const {
     }
   }
 
-  std::filesystem::path log_dir = logs.getLogDir();
+  std::filesystem::path log_dir = logs.path();
   std::ofstream fout(log_dir / "hydra_config.yaml");
   fout << node;
 
@@ -168,10 +168,10 @@ void HydraPipeline::save(const LogSetup& logs) const {
   }
 
   // save timing information to avoid destructor weirdness with singletons
-  LOG(INFO) << "[Hydra] saving timing information to " << logs.getLogDir();
+  LOG(INFO) << "[Hydra] saving timing information to " << log_dir;
   const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
-  timer.logAllElapsed(logs);
-  timer.logStats(logs.getTimerFilepath());
+  timer.logTimers(logs.path("timing"));
+  timer.logStats(log_dir / "timing_stats.csv");
   LOG(INFO) << "[Hydra] saved timing information";
 }
 

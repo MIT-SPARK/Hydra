@@ -36,7 +36,6 @@
 
 #include "hydra/active_window/active_window_output.h"
 #include "hydra/common/dsg_types.h"
-#include "hydra/utils/log_utilities.h"
 
 namespace hydra {
 
@@ -47,8 +46,6 @@ class FreespacePlacesInterface {
   FreespacePlacesInterface() {}
 
   virtual ~FreespacePlacesInterface() = default;
-
-  virtual void save(const LogSetup& /* logs */) const {}
 
   virtual void detect(const ActiveWindowOutput& msg) = 0;
 

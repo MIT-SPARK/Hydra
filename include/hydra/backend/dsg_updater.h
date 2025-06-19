@@ -47,11 +47,10 @@
 #include "hydra/backend/external_loop_closure_receiver.h"
 #include "hydra/backend/merge_tracker.h"
 #include "hydra/backend/pgmo_configs.h"
-#include "hydra/common/module.h"
 #include "hydra/common/output_sink.h"
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
-#include "hydra/utils/log_utilities.h"
+#include "hydra/utils/data_directory.h"
 
 namespace hydra {
 
@@ -77,13 +76,13 @@ class DsgUpdater {
              DynamicSceneGraph::Ptr source,
              SharedDsgInfo::Ptr target);
 
-  virtual ~DsgUpdater(){};
+  virtual ~DsgUpdater() = default;
 
   DsgUpdater(const DsgUpdater& other) = delete;
 
   DsgUpdater& operator=(const DsgUpdater& other) = delete;
 
-  void save(const LogSetup& log_setup, std::string label) const;
+  void save(const DataDirectory& output, const std::string& label) const;
 
   void resetBackendDsg(size_t timestamp_ns);
 

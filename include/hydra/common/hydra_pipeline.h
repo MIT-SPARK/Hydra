@@ -36,7 +36,6 @@
 #include "hydra/common/global_info.h"
 #include "hydra/common/module.h"
 #include "hydra/common/shared_module_state.h"
-#include "hydra/utils/log_utilities.h"
 
 namespace hydra {
 
@@ -54,7 +53,8 @@ class HydraPipeline {
 
   virtual void stop();
 
-  virtual void save(const LogSetup& logs) const;
+  // TODO(nathan) expand API?
+  virtual void save(const DataDirectory& output) const;
 
   template <typename Derived = Module>
   Derived* getModule(const std::string& name) {

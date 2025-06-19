@@ -33,73 +33,36 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <atomic>
-#include <memory>
-#include <thread>
 
-#include "hydra/active_window/active_window_output.h"
-#include "hydra/active_window/volumetric_window.h"
-#include "hydra/common/message_queue.h"
-#include "hydra/common/module.h"
-#include "hydra/common/output_sink.h"
-#include "hydra/input/input_packet.h"
-#include "hydra/reconstruction/volumetric_map.h"
+#include <filesystem>
+#include <optional>
+#include <string>
 
 namespace hydra {
 
-class ActiveWindowModule : public Module {
+class DataDirectory {
  public:
-  using Ptr = std::shared_ptr<ActiveWindowModule>;
-  using InputQueue = MessageQueue<InputPacket::Ptr>;
-  using OutputQueue = MessageQueue<ActiveWindowOutput::Ptr>;
-  using Sink = OutputSink<uint64_t, const VolumetricMap&, const ActiveWindowOutput&>;
-
   struct Config {
-    size_t max_input_queue_size;
-    VolumetricMap::Config volumetric_map;
-    config::VirtualConfig<VolumetricWindow> map_window;
-    std::vector<Sink::Factory> sinks;
-
-    // construct to allow downstream modules to set defaults
-    Config(bool with_semantics = true, bool with_tracking = false);
+    //! Remove any pre-existing contents of the directory
+    bool overwrite = false;
+    //! Construct the directory
+    bool allocate = true;
   } const config;
 
-  ActiveWindowModule(const Config& config, const OutputQueue::Ptr& output_queue);
+  DataDirectory();
+  explicit DataDirectory(const std::filesystem::path& output_path,
+                         std::optional<Config> config = std::nullopt);
+  ~DataDirectory() = default;
 
-  virtual ~ActiveWindowModule() = default;
+  bool valid() const;
+  operator bool() const;
+  std::filesystem::path path(const std::filesystem::path& sub_path = "") const;
 
-  void start() override;
-
-  void stop() override;
-
-  std::string printInfo() const override;
-
-  void spin();
-
-  bool step(const InputPacket::Ptr& input);
-
-  void addSink(const Sink::Ptr& sink);
-
-  InputQueue::Ptr queue() const { return input_queue_; }
-
-  const VolumetricMap& map() const { return map_; }
-
- protected:
-  virtual ActiveWindowOutput::Ptr spinOnce(const InputPacket& input) = 0;
-
-  void stopImpl();
-
-  InputQueue::Ptr input_queue_;
-  OutputQueue::Ptr output_queue_;
-  std::atomic<bool> should_shutdown_{false};
-  std::unique_ptr<std::thread> spin_thread_;
-
-  Sink::List sinks_;
-
-  VolumetricMap map_;
-  std::unique_ptr<VolumetricWindow> map_window_;
+ private:
+  bool valid_;
+  std::filesystem::path root_path_;
 };
 
-void declare_config(ActiveWindowModule::Config& config);
+void declare_config(DataDirectory::Config& config);
 
 }  // namespace hydra

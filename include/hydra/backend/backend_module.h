@@ -52,7 +52,6 @@
 #include "hydra/common/output_sink.h"
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
-#include "hydra/utils/log_utilities.h"
 
 namespace hydra {
 
@@ -111,7 +110,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   void stop() override;
 
-  void save(const LogSetup& log_setup) override;
+  void save(const DataDirectory& output) override;
 
   std::string printInfo() const override;
 

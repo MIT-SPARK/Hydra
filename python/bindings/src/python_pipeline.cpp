@@ -348,7 +348,7 @@ void addBindings(pybind11::module_& m) {
       .def(
           "save",
           [](const PythonPipeline& pipeline, const std::filesystem::path& output) {
-            pipeline.save(LogSetup(output));
+            pipeline.save(DataDirectory(output));
           },
           "output"_a)
       .def(

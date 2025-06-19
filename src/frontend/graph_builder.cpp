@@ -190,21 +190,17 @@ void GraphBuilder::stopImpl() {
   VLOG(2) << "[Hydra Frontend]: " << queue_->size() << " messages left";
 }
 
-void GraphBuilder::save(const LogSetup& log_setup) {
+void GraphBuilder::save(const DataDirectory& output) {
   std::lock_guard<std::mutex> lock(mutex_);
-  const auto output_path = log_setup.getLogDir("frontend");
+  const auto output_path = output.path("frontend");
+
   dsg_->graph->save(output_path / "dsg.json", false);
   dsg_->graph->save(output_path / "dsg_with_mesh.json");
-
   frontend_graph_logger_.save(output_path);
 
   const auto mesh = dsg_->graph->mesh();
   if (mesh && !mesh->empty()) {
     kimera_pgmo::WriteMesh(output_path / "mesh.ply", *mesh);
-  }
-
-  if (freespace_places_) {
-    freespace_places_->save(log_setup);
   }
 }
 
