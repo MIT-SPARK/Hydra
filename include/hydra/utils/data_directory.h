@@ -47,6 +47,10 @@ class DataDirectory {
     bool overwrite = false;
     //! Construct the directory
     bool allocate = true;
+    //! Make a new directory using the current time and date
+    bool use_timestamp = true;
+    //! Date/Time format to use
+    std::string timestamp_format = "%Y_%m_%d-%H_%M_%S";
   } const config;
 
   DataDirectory();
@@ -57,6 +61,7 @@ class DataDirectory {
   bool valid() const;
   operator bool() const;
   std::filesystem::path path(const std::filesystem::path& sub_path = "") const;
+  DataDirectory child(const std::string& sub_path) const;
 
  private:
   bool valid_;

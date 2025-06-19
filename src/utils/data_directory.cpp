@@ -38,6 +38,7 @@
 #include <config_utilities/types/path.h>
 #include <glog/logging.h>
 
+#include <ctime>
 #include <filesystem>
 
 namespace hydra {
@@ -55,6 +56,14 @@ inline bool makeDirs(const fs::path& path) {
   return fs::create_directories(path, code);
 }
 
+inline std::string getDateTime(const std::string& format) {
+  auto now = std::time(nullptr);
+  auto tm = *std::localtime(&now);
+  std::stringstream ss;
+  ss << std::put_time(&tm, format.c_str());
+  return ss.str();
+}
+
 }  // namespace
 
 void declare_config(DataDirectory::Config& config) {
@@ -62,6 +71,8 @@ void declare_config(DataDirectory::Config& config) {
   name("LogConfig");
   field(config.overwrite, "overwrite");
   field(config.allocate, "allocate");
+  field(config.use_timestamp, "use_timestamp");
+  field(config.timestamp_format, "timestamp_format");
 }
 
 DataDirectory::DataDirectory() : valid_(false) {}
@@ -69,7 +80,14 @@ DataDirectory::DataDirectory() : valid_(false) {}
 DataDirectory::DataDirectory(const std::filesystem::path& output_path,
                              std::optional<Config> _config)
     : config(_config.value_or(Config{})), valid_(false), root_path_(output_path) {
-  // TODO(nathan) overwrite
+  if (config.use_timestamp) {
+    root_path_ /= getDateTime(config.timestamp_format);
+  }
+
+  if (std::filesystem::exists(root_path_) && config.overwrite) {
+    LOG(WARNING) << "Overwriting existing directory: '" << root_path_.string() << "'.";
+    std::filesystem::remove_all(root_path_);
+  }
 
   if (config.allocate && !makeDirs(root_path_)) {
     LOG(WARNING) << "Failed to make dir '" << root_path_ << "'. Logging disabled!";
@@ -90,6 +108,12 @@ fs::path DataDirectory::path(const std::filesystem::path& sub_path) const {
   }
 
   return ns_path;
+}
+
+DataDirectory DataDirectory::child(const std::string& sub_path) const {
+  Config new_config = config;
+  new_config.overwrite = false;  // no need to clear children
+  return DataDirectory(sub_path, new_config);
 }
 
 bool DataDirectory::valid() const { return valid_; }
