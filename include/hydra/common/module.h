@@ -46,7 +46,7 @@ class Module {
   virtual ~Module() = default;
   virtual void start() = 0;
   virtual void stop() = 0;
-  virtual void save(const DataDirectory& /* output */) {};
+  virtual void save(const DataDirectory& /* output */) {}
   virtual std::string printInfo() const { return ""; }
 };
 
