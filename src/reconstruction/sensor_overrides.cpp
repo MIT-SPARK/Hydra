@@ -32,36 +32,37 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
 
-#include <cstdint>
-#include <map>
-#include <optional>
-#include <string>
+#include "hydra/reconstruction/sensor_overrides.h"
+
+#include <config_utilities/config.h>
+
+using OverrideImpl = hydra::SensorOverrides::Config::Overrides;
+
+namespace YAML {
+
+template <>
+struct convert<OverrideImpl> {
+  static Node encode(const OverrideImpl& impl) { return impl.contents; }
+
+  static bool decode(const Node& node, OverrideImpl& impl) {
+    impl.contents = node;
+    return true;
+  }
+};
+
+}  // namespace YAML
 
 namespace hydra {
 
-struct LabelRemapRow {
-  uint32_t sub_id;
-  uint32_t super_id;
-};
+void declare_config(SensorOverrides::Config& config) {
+  using namespace config;
+  name("SensorOverrides::Config");
+  // don't namespace the overrides
+  field(config.overrides_, "overrides_");
+  field(config.remaps, "remaps");
+}
 
-class LabelRemapper {
- public:
-  // Construction
-  LabelRemapper();
-  explicit LabelRemapper(const std::string& remapping_file);
-  explicit LabelRemapper(const std::map<uint32_t, uint32_t>& remapping);
-  virtual ~LabelRemapper() = default;
-
-  std::optional<uint32_t> remapLabel(const uint32_t from) const;
-
-  inline bool empty() const { return label_remapping_.empty(); }
-
-  inline operator bool() const { return empty(); }
-
- private:
-  std::map<uint32_t, uint32_t> label_remapping_;
-};
+SensorOverrides::SensorOverrides(const Config& config) : remapper_(config.remaps) {}
 
 }  // namespace hydra

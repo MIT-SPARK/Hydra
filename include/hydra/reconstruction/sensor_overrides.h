@@ -34,34 +34,32 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <cstdint>
-#include <map>
-#include <optional>
-#include <string>
+#include <yaml-cpp/yaml.h>
+
+#include "hydra/common/label_remapper.h"
 
 namespace hydra {
 
-struct LabelRemapRow {
-  uint32_t sub_id;
-  uint32_t super_id;
-};
-
-class LabelRemapper {
+/**
+ * @brief Extra YAML used to compute config overrides
+ */
+class SensorOverrides {
  public:
-  // Construction
-  LabelRemapper();
-  explicit LabelRemapper(const std::string& remapping_file);
-  explicit LabelRemapper(const std::map<uint32_t, uint32_t>& remapping);
-  virtual ~LabelRemapper() = default;
+  struct Config {
+    struct Overrides {
+      YAML::Node contents;
+    } overrides_;
+    std::map<uint32_t, uint32_t> remaps;
+  } const config;
 
-  std::optional<uint32_t> remapLabel(const uint32_t from) const;
+  explicit SensorOverrides(const Config& config);
+  virtual ~SensorOverrides() = default;
 
-  inline bool empty() const { return label_remapping_.empty(); }
+  virtual YAML::Node dump() const;
 
-  inline operator bool() const { return empty(); }
-
- private:
-  std::map<uint32_t, uint32_t> label_remapping_;
+  const LabelRemapper remapper_;
 };
+
+void declare_config(SensorOverrides::Config& config);
 
 }  // namespace hydra
