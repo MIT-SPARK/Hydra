@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <yaml-cpp/yaml.h>
+#include <config_utilities/parsing/yaml.h>
 
 #include "hydra/common/label_remapper.h"
 
@@ -54,6 +54,13 @@ class SensorOverrides {
 
   explicit SensorOverrides(const Config& config);
   virtual ~SensorOverrides() = default;
+
+  template <typename ConfigT>
+  void update(ConfigT& to_update, const std::string& override_ns) const {
+    if (!config::updateFromYaml(to_update, config.overrides.contents, override_ns)) {
+      throw std::runtime_error("Unable to override config!");
+    }
+  }
 
   const LabelRemapper remapper;
 };

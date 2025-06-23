@@ -62,28 +62,18 @@
 namespace hydra {
 
 using Measurement = ProjectiveIntegrator::VoxelMeasurement;
-using MapConfig = VolumetricMap::Config;
+using IntegrationSettings = ProjectiveIntegrator::Config::IntegratorConfig;
 
 namespace {
 
-// Return whether or not a measurement is considered outside the truncation band and
-// shouldn't be considered for computing label and color information. Rejects all
-// measurements outside the padded truncation band and optionally measurements
-// within the exra padding but outside the truncation band itself.
-inline bool measurementOutsideTruncation(const MapConfig& map_config,
-                                         const ProjectiveIntegrator::Config& config,
-                                         const Measurement& measurement) {
-  const auto is_outside = std::abs(measurement.sdf) >= map_config.truncation_distance;
-  return is_outside && (config.skip_extra_colors_and_labels ||
-                        !measurement.within_extra_integration_distance);
+inline float getRelVoxelSize(float voxel_size, float ratio_or_abs) {
+  return ratio_or_abs > 0.0f ? ratio_or_abs : ratio_or_abs * -voxel_size;
 }
 
 }  // namespace
 
-void declare_config(ProjectiveIntegrator::Config& config) {
+void declare_config(ProjectiveIntegrator::Config::IntegratorConfig& config) {
   using namespace config;
-  name("ProjectiveIntegrator");
-  field(config.verbosity, "verbosity");
   field(config.extra_integration_distance,
         "extra_integration_distance",
         config.extra_integration_distance >= 0 ? "m" : "vs");
@@ -96,21 +86,59 @@ void declare_config(ProjectiveIntegrator::Config& config) {
   field(config.use_constant_weight, "use_constant_weight");
   field(config.min_measurement_weight, "min_measurement_weight");
   field(config.max_weight, "max_weight");
-  field<ThreadNumConversion>(config.num_threads, "num_threads");
-  field(config.interpolation_method, "interpolation_method");
-  config.semantic_integrator.setOptional();
-  field(config.semantic_integrator, "semantic_integrator");
-
   const auto labels_ok = !config.extra_integration_distance_labels.empty() ||
                          !config.skip_extra_colors_and_labels;
   checkCondition(labels_ok,
                  "skip_extra must be false if extra_distance_labels are specified");
-  check(config.num_threads, GT, 0, "num_threads");
   check(config.min_measurement_weight, GE, 0.0f, "min_measurement_weight");
   check(config.max_weight, GT, 0, "max_weight");
   if (config.use_weight_dropoff) {
     check(config.weight_dropoff_epsilon, NE, 0.0f, "weight_dropoff_epsilon");
   }
+}
+
+void declare_config(ProjectiveIntegrator::Config& config) {
+  using namespace config;
+  name("ProjectiveIntegrator");
+  field(config.verbosity, "verbosity");
+  field<ThreadNumConversion>(config.num_threads, "num_threads");
+  field(config.interpolation_method, "interpolation_method");
+  config.semantic_integrator.setOptional();
+  field(config.semantic_integrator, "semantic_integrator");
+
+  check(config.num_threads, GT, 0, "num_threads");
+}
+
+IntegrationSettings IntegrationSettings::resolve(
+    const VolumetricMap::Config& map) const {
+  IntegrationSettings resolved;
+  resolved.extra_integration_distance =
+      getRelVoxelSize(map.voxel_size, extra_integration_distance);
+
+  if (use_weight_dropoff) {
+    resolved.weight_dropoff_epsilon =
+        getRelVoxelSize(map.voxel_size, weight_dropoff_epsilon);
+  } else {
+    resolved.weight_dropoff_epsilon = 0.0;
+  }
+
+  return resolved;
+}
+
+bool IntegrationSettings::validExtraIntegrationLabel(uint32_t label) const {
+  return extra_integration_distance_labels.empty() ||
+         extra_integration_distance_labels.count(label);
+}
+
+// Return whether or not a measurement is considered outside the truncation band and
+// shouldn't be considered for computing label and color information. Rejects all
+// measurements outside the padded truncation band and optionally measurements
+// within the exra padding but outside the truncation band itself.
+bool IntegrationSettings::outsideTruncation(const VolumetricMap::Config& map_config,
+                                            const VoxelMeasurement& measurement) const {
+  const auto is_outside = std::abs(measurement.sdf) >= map_config.truncation_distance;
+  return is_outside && (skip_extra_colors_and_labels ||
+                        !measurement.within_extra_integration_distance);
 }
 
 ProjectiveIntegrator::ProjectiveIntegrator(const ProjectiveIntegrator::Config& config)
@@ -153,6 +181,8 @@ void ProjectiveIntegrator::updateBlocks(const BlockIndices& block_indices,
 
   // Update all blocks in parallel.
   IndexGetter<BlockIndex> index_getter(block_indices);
+  auto settings = config.settings.resolve(map.config);
+  data.getSensor().overrides.update(settings, config.override_ns);
 
   // TODO(nathan) reconsider future/async
   std::vector<std::future<void>> threads;
@@ -160,7 +190,7 @@ void ProjectiveIntegrator::updateBlocks(const BlockIndices& block_indices,
     threads.emplace_back(std::async(std::launch::async, [&]() {
       BlockIndex block_index;
       while (index_getter.getNextIndex(block_index)) {
-        updateBlock(block_index, data, integration_mask, map);
+        updateBlock(block_index, settings, data, integration_mask, map);
       }
     }));
   }
@@ -171,6 +201,7 @@ void ProjectiveIntegrator::updateBlocks(const BlockIndices& block_indices,
 }
 
 void ProjectiveIntegrator::updateBlock(const BlockIndex& block_index,
+                                       const IntegrationSettings& settings,
                                        const InputData& data,
                                        const cv::Mat& integration_mask,
                                        VolumetricMap& map) const {
@@ -187,13 +218,13 @@ void ProjectiveIntegrator::updateBlock(const BlockIndex& block_index,
   for (size_t i = 0; i < blocks.tsdf->numVoxels(); ++i) {
     const auto p_sensor = sensor_T_body * blocks.tsdf->getVoxelPosition(i);
     const auto measurement =
-        getVoxelMeasurement(map.config, data, integration_mask, p_sensor);
+        getVoxelMeasurement(settings, map.config, data, integration_mask, p_sensor);
     if (!measurement.valid) {
       continue;
     }
 
     auto voxels = blocks.getVoxels(i);
-    updateVoxel(map.config, data, measurement, voxels);
+    updateVoxel(settings, map.config, data, measurement, voxels);
     was_updated = true;
   }
 
@@ -204,7 +235,8 @@ void ProjectiveIntegrator::updateBlock(const BlockIndex& block_index,
   }
 }
 
-Measurement ProjectiveIntegrator::getVoxelMeasurement(const MapConfig& map_config,
+Measurement ProjectiveIntegrator::getVoxelMeasurement(const IntegrationSettings& conf,
+                                                      const VolumetricMap::Config& map,
                                                       const InputData& data,
                                                       const cv::Mat& integration_mask,
                                                       const Point& p_C) const {
@@ -222,42 +254,41 @@ Measurement ProjectiveIntegrator::getVoxelMeasurement(const MapConfig& map_confi
   }
 
   // Compute the (partially truncated) signed distance to the surface
-  computeSDF(map_config, data, voxel_range, measurement);
+  computeSDF(conf, map, data, voxel_range, measurement);
   if (!std::isfinite(measurement.sdf)) {
     return measurement;
   }
 
-  if (measurement.sdf < -map_config.truncation_distance) {
+  if (measurement.sdf < -map.truncation_distance) {
     if (!measurement.within_extra_integration_distance) {
       // Avoid integrating points where we don't have information
       return measurement;
     }
 
     // Clip measurement to negative side of truncation band
-    measurement.sdf = -map_config.truncation_distance;
+    measurement.sdf = -map.truncation_distance;
   }
 
   // Get associated semantic label if applicable and check if it can be integrated
-  if (!computeLabel(map_config, data, integration_mask, measurement)) {
+  if (!computeLabel(conf, map, data, integration_mask, measurement)) {
     return measurement;
   }
 
   // Filter measurements outside truncation band by label
   if (measurement.within_extra_integration_distance) {
-    if (!config.extra_integration_distance_labels.empty() &&
-        !config.extra_integration_distance_labels.count(measurement.label)) {
+    if (!conf.validExtraIntegrationLabel(measurement.label)) {
       return measurement;
     }
   }
 
   // Compute the weight of the measurement
-  measurement.weight =
-      computeWeight(map_config, data.getSensor(), p_C, measurement.sdf);
+  measurement.weight = computeWeight(conf, map, data.getSensor(), p_C, measurement.sdf);
   measurement.valid = true;
   return measurement;
 }
 
-void ProjectiveIntegrator::updateVoxel(const MapConfig& map_config,
+void ProjectiveIntegrator::updateVoxel(const IntegrationSettings& settings,
+                                       const VolumetricMap::Config& map_config,
                                        const InputData& data,
                                        const Measurement& measurement,
                                        VoxelTuple& voxels) const {
@@ -270,7 +301,7 @@ void ProjectiveIntegrator::updateVoxel(const MapConfig& map_config,
   auto& tsdf_voxel = *voxels.tsdf;
   const auto prev_weight = tsdf_voxel.weight;
   tsdf_voxel.weight =
-      std::min(tsdf_voxel.weight + measurement.weight, config.max_weight);
+      std::min(tsdf_voxel.weight + measurement.weight, settings.max_weight);
 
   // Update TSDF distance using weighted averaging fusion
   tsdf_voxel.distance =
@@ -287,7 +318,7 @@ void ProjectiveIntegrator::updateVoxel(const MapConfig& map_config,
   }
 
   // Don't bother updating colors or labels outside the truncation distance
-  if (measurementOutsideTruncation(map_config, config, measurement)) {
+  if (settings.outsideTruncation(map_config, measurement)) {
     return;
   }
 
@@ -320,35 +351,31 @@ bool ProjectiveIntegrator::interpolatePoint(const InputData& data,
   return weights.valid;
 }
 
-void ProjectiveIntegrator::computeSDF(const MapConfig& map_config,
+void ProjectiveIntegrator::computeSDF(const IntegrationSettings& settings,
+                                      const VolumetricMap::Config& map_config,
                                       const InputData& data,
                                       const float distance_to_voxel,
                                       VoxelMeasurement& measurement) const {
   const auto d_to_surface = interpolator_->InterpolateRange(
       data.range_image, measurement.interpolation_weights);
   const auto sdf = d_to_surface - distance_to_voxel;
-  if (config.extra_integration_distance) {
-    // distance threshold past the truncation band
-    const auto threshold_m =
-        config.extra_integration_distance < 0.0f
-            ? -config.extra_integration_distance * map_config.voxel_size
-            : config.extra_integration_distance;
-
+  if (settings.extra_integration_distance) {
     // If measurement is inside truncation band, diff_m is negative, if outside
     // extra distance, it will be above threshold
     const auto diff_m = std::abs(sdf) - map_config.truncation_distance;
-    if (diff_m >= 0.0f && diff_m <= threshold_m) {
+    if (diff_m >= 0.0f && diff_m <= settings.extra_integration_distance) {
       measurement.within_extra_integration_distance = true;
     }
   }
 
-  // NOTE(nathan) If the sdf value is NaN, this should return NaN (min returns a if a <
-  // b, a < NaN is false) This is probably the desired behavior if the range image
+  // NOTE(nathan) If the sdf value is NaN, this should return NaN (min returns a if a
+  // < b, a < NaN is false) This is probably the desired behavior if the range image
   // contains NaNs (the only source of non-finite values) but may need to be checked
   measurement.sdf = std::min(map_config.truncation_distance, sdf);
 }
 
-float ProjectiveIntegrator::computeWeight(const MapConfig& map_config,
+float ProjectiveIntegrator::computeWeight(const IntegrationSettings& settings,
+                                          const VolumetricMap::Config& map_config,
                                           const Sensor& sensor,
                                           const Point& p_C,
                                           const float sdf) const {
@@ -359,38 +386,33 @@ float ProjectiveIntegrator::computeWeight(const MapConfig& map_config,
   auto weight = sensor.computeRayDensity(map_config.voxel_size, depth);
 
   // Weight reduction with distance squared (according to sensor noise models).
-  if (!config.use_constant_weight) {
+  if (!settings.use_constant_weight) {
     weight /= std::pow(depth, 2.f);
   }
 
   // Apply weight drop-off if appropriate.
-  if (config.use_weight_dropoff) {
-    const float dropoff_epsilon =
-        config.weight_dropoff_epsilon > 0.f
-            ? config.weight_dropoff_epsilon
-            : config.weight_dropoff_epsilon * -map_config.voxel_size;
-    if (sdf < -dropoff_epsilon) {
-      weight *= (map_config.truncation_distance + sdf) /
-                (map_config.truncation_distance - dropoff_epsilon);
-    }
+  if (settings.weight_dropoff_epsilon && sdf < -settings.weight_dropoff_epsilon) {
+    weight *= (map_config.truncation_distance + sdf) /
+              (map_config.truncation_distance - settings.weight_dropoff_epsilon);
   }
 
   // clip weight to be at least as much as the specified min weight (which is always
   // nonnegative)
-  weight = std::max(weight, config.min_measurement_weight);
+  weight = std::max(weight, settings.min_measurement_weight);
   return weight;
 }
 
-bool ProjectiveIntegrator::computeLabel(const MapConfig& map_config,
+bool ProjectiveIntegrator::computeLabel(const IntegrationSettings& settings,
+                                        const VolumetricMap::Config& map_config,
                                         const InputData& data,
                                         const cv::Mat& integration_mask,
                                         Measurement& measurement) const {
-  if (measurementOutsideTruncation(map_config, config, measurement)) {
+  if (settings.outsideTruncation(map_config, measurement)) {
     return true;
   }
 
-  // the formatting here is a little ugly, but if an integration mask is supplied and it
-  // is non-zero for the best pixel, we skip integrating the current voxel
+  // the formatting here is a little ugly, but if an integration mask is supplied and
+  // it is non-zero for the best pixel, we skip integrating the current voxel
   if (!integration_mask.empty() &&
       interpolator_->interpolateID(integration_mask,
                                    measurement.interpolation_weights)) {
