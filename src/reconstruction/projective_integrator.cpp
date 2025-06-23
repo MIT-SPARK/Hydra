@@ -100,11 +100,14 @@ void declare_config(ProjectiveIntegrator::Config::IntegratorConfig& config) {
 void declare_config(ProjectiveIntegrator::Config& config) {
   using namespace config;
   name("ProjectiveIntegrator");
+  field(config.override_ns, "override_ns");
   field(config.verbosity, "verbosity");
   field<ThreadNumConversion>(config.num_threads, "num_threads");
   field(config.interpolation_method, "interpolation_method");
   config.semantic_integrator.setOptional();
   field(config.semantic_integrator, "semantic_integrator");
+  // intentionally not namespaced
+  field(config.settings, "settings", false);
 
   check(config.num_threads, GT, 0, "num_threads");
 }
