@@ -8,6 +8,7 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/lidar.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/sensor_extrinsics.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/sensor_input_packet.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/sensor_overrides.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/sensor_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/sensor.cpp
 )

@@ -61,6 +61,7 @@ namespace hydra {
 Sensor::Sensor(const Config& config, const std::string& name)
     : config(config::checkValid(config)),
       name(name),
+      overrides(config.overrides),
       extrinsics_(config.extrinsics.create()) {
   CHECK(extrinsics_ != nullptr) << "invalid extrinsics!";
   const Eigen::Isometry3d sensor_body_pose = body_T_sensor();
@@ -71,14 +72,16 @@ Sensor::Sensor(const Config& config, const std::string& name)
 
 YAML::Node Sensor::dump() const { return config::toYaml(config); }
 
-void declare_config(Sensor::Config& conf) {
+void declare_config(Sensor::Config& config) {
   using namespace config;
   name("Sensor");
-  field(conf.min_range, "min_range", "m");
-  field(conf.max_range, "max_range", "m");
-  field(conf.extrinsics, "extrinsics");
-  check(conf.min_range, GT, 0.0, "min_range");
-  checkCondition(conf.max_range > conf.min_range,
+  field(config.min_range, "min_range", "m");
+  field(config.max_range, "max_range", "m");
+  field(config.extrinsics, "extrinsics");
+  // intentionally not namespaced
+  field(config.overrides, "overrides", false);
+  check(config.min_range, GT, 0.0, "min_range");
+  checkCondition(config.max_range > config.min_range,
                  "param 'max_range' is expected > 'min_range'");
 }
 

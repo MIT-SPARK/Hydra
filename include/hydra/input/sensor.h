@@ -53,6 +53,7 @@
 #include <vector>
 
 #include "hydra/input/sensor_extrinsics.h"
+#include "hydra/input/sensor_overrides.h"
 
 namespace hydra {
 
@@ -74,6 +75,8 @@ class Sensor {
     double max_range = std::numeric_limits<double>::infinity();
     // TODO(nathan) try to avoid pulling in factories in the header
     config::VirtualConfig<SensorExtrinsics> extrinsics;
+    //! Extra processing configuration for this particular sensor in active window
+    SensorOverrides::Config overrides;
   } const config;
 
   explicit Sensor(const Config& config, const std::string& name);
@@ -163,6 +166,8 @@ class Sensor {
   const std::string name;
 
   virtual YAML::Node dump() const;
+
+  const SensorOverrides overrides;
 
  protected:
   const std::unique_ptr<SensorExtrinsics> extrinsics_;

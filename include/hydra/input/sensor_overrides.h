@@ -32,37 +32,32 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
+#pragma once
 
-#include "hydra/reconstruction/sensor_overrides.h"
+#include <yaml-cpp/yaml.h>
 
-#include <config_utilities/config.h>
-
-using OverrideImpl = hydra::SensorOverrides::Config::Overrides;
-
-namespace YAML {
-
-template <>
-struct convert<OverrideImpl> {
-  static Node encode(const OverrideImpl& impl) { return impl.contents; }
-
-  static bool decode(const Node& node, OverrideImpl& impl) {
-    impl.contents = node;
-    return true;
-  }
-};
-
-}  // namespace YAML
+#include "hydra/common/label_remapper.h"
 
 namespace hydra {
 
-void declare_config(SensorOverrides::Config& config) {
-  using namespace config;
-  name("SensorOverrides::Config");
-  // don't namespace the overrides
-  field(config.overrides_, "overrides_");
-  field(config.remaps, "remaps");
-}
+/**
+ * @brief Extra YAML used to compute config overrides
+ */
+class SensorOverrides {
+ public:
+  struct Config {
+    struct Overrides {
+      YAML::Node contents;
+    } overrides;
+    std::map<uint32_t, uint32_t> label_remapping;
+  } const config;
 
-SensorOverrides::SensorOverrides(const Config& config) : remapper_(config.remaps) {}
+  explicit SensorOverrides(const Config& config);
+  virtual ~SensorOverrides() = default;
+
+  const LabelRemapper remapper;
+};
+
+void declare_config(SensorOverrides::Config& config);
 
 }  // namespace hydra
