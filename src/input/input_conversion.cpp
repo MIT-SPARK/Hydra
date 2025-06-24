@@ -19,6 +19,23 @@ inline std::string showTypeInfo(const cv::Mat& mat) {
   return ss.str();
 }
 
+void remapLabelImage(const LabelRemapper& remap, cv::Mat& img) {
+  if (!remap) {
+    return;
+  }
+
+  if (img.type() != CV_32SC1) {
+    LOG(ERROR) << "[Input Conversion] Invalid label image type";
+    return;
+  }
+
+  for (int r = 0; r < img.rows; ++r) {
+    for (int c = 0; c < img.cols; ++c) {
+      img.at<int32_t>(r, c) = remap.remapLabel(img.at<int32_t>(r, c)).value_or(-1);
+    }
+  }
+}
+
 }  // namespace
 
 std::unique_ptr<InputData> parseInputPacket(const InputPacket& input_packet,
@@ -128,17 +145,12 @@ bool convertLabels(InputData& data) {
     data.label_image = new_label_image;
   }
 
-  LabelRemapper label_remapper = GlobalInfo::instance().getLabelRemapper();
-  if (!label_remapper.empty()) {
-    for (int r = 0; r < data.label_image.rows; ++r) {
-      for (int c = 0; c < data.label_image.cols; ++c) {
-        // TODO(marcus): any reason to cache image and reassign with a new one?
-        const auto& pixel = data.label_image.at<int32_t>(r, c);
-        data.label_image.at<int32_t>(r, c) =
-            label_remapper.remapLabel(pixel).value_or(-1);
-      }
-    }
-  }
+  // remap by sensor, then by global labelspace
+  // remapping is no-op if remapper is empty
+  const auto& sensor_remap = data.getSensor().overrides.remapper;
+  const auto& global_remap = GlobalInfo::instance().getLabelRemapper();
+  remapLabelImage(sensor_remap, data.label_image);
+  remapLabelImage(global_remap, data.label_image);
 
   const auto label_type = data.label_image.type();
   if (label_type == CV_32SC1) {
