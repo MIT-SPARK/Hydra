@@ -151,7 +151,13 @@ pcl::IndicesPtr getActivePlaceIndices(
   for (auto kv : active_places) {
     std::set<NodeId> nodes = kv.second;
     for (auto nid : nodes) {
-      auto& attrs = graph.getNode(nid).attributes<Place2dNodeAttributes>();
+      const auto node = graph.findNode(nid);
+      if (!node) {
+        LOG(ERROR) << "Found removed node: " << NodeSymbol(nid);
+        continue;
+      }
+
+      auto& attrs = node->attributes<Place2dNodeAttributes>();
       size_t min_index = std::numeric_limits<size_t>::max();
       size_t max_index = 0;
       auto iter = attrs.pcl_mesh_connections.begin();
