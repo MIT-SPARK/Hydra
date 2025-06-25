@@ -33,43 +33,50 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <map>
 #include <memory>
-#include <set>
-#include <vector>
 
-#include "hydra/reconstruction/voxel_types.h"
+#include "hydra/common/dsg_types.h"
+#include "hydra/common/output_sink.h"
+#include "hydra/frontend/mesh_segmenter.h"
+#include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
 
-class MeshSegmenter {
+class ObjectExtractor {
  public:
-  struct Cluster {
-    Eigen::Vector3f centroid;
-    std::vector<Eigen::Vector3f> points;
-  };
-  using Clusters = std::vector<Cluster>;
+  using Sink = OutputSink<uint64_t, const ObjectExtractor&>;
 
   struct Config {
-    //! Labels to use for clustering
-    std::set<uint32_t> labels;
-    //! Resolution to run clustering at
-    float grid_size = 0.1f;
-    //! Euclidean clustering connection radius (meters)
-    double cluster_tolerance = 0.25;
-    //! Minimum number of vertices
-    size_t min_cluster_size = 40;
-    //! Maximum number of vertices
-    size_t max_cluster_size = 100000;
-
-    Config with_labels(const std::set<uint32_t>& labels) const;
+    //! Layer to add objects to
+    std::string layer_id = DsgLayers::OBJECTS;
+    //! Bounding box type to fit
+    BoundingBox::Type bounding_box_type = BoundingBox::Type::AABB;
+    //! Segmentation config
+    MeshSegmenter::Config mesh_segmenter;
+    //! Visualization sinks
+    std::vector<Sink::Factory> sinks;
   } const config;
 
-  explicit MeshSegmenter(const Config& config);
+  explicit ObjectExtractor(const Config& config, const std::set<uint32_t>& labels);
 
-  std::map<uint32_t, Clusters> segment(const MeshLayer& mesh) const;
+  void detect(uint64_t timestamp_ns, const VolumetricMap& map);
+
+  void updateGraph(uint64_t timestamp, DynamicSceneGraph& graph);
+
+ private:
+  void updateOldNodes(const VolumetricMap& map);
+
+  void mergeActiveNodes();
+
+ private:
+  const Sink::List sinks_;
+  const MeshSegmenter segmenter_;
+
+  NodeSymbol next_node_id_;
+  std::set<NodeId> removed_nodes_;
+  std::map<uint32_t, std::map<NodeId, ObjectNodeAttributes::Ptr>> active_nodes_;
 };
 
-void declare_config(MeshSegmenter::Config& config);
+void declare_config(ObjectExtractor::Config& config);
 
 }  // namespace hydra

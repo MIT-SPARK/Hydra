@@ -51,7 +51,7 @@
 #include "hydra/common/shared_module_state.h"
 #include "hydra/frontend/freespace_places_interface.h"
 #include "hydra/frontend/graph_connector.h"
-#include "hydra/frontend/mesh_segmenter.h"
+#include "hydra/frontend/object_extractor.h"
 #include "hydra/frontend/surface_places_interface.h"
 #include "hydra/frontend/traversability_place_extractor.h"
 #include "hydra/frontend/view_database.h"
@@ -86,7 +86,7 @@ class GraphBuilder : public Module {
     GraphUpdater::Config graph_updater{{{DsgLayers::OBJECTS, {'O', std::nullopt, {}}}}};
     GraphConnector::Config graph_connector;
     bool enable_mesh_objects = true;
-    MeshSegmenter::Config object_config;
+    ObjectExtractor::Config objects;
     config::VirtualConfig<PoseGraphTracker> pose_graph_tracker{
         PoseGraphFromOdom::Config()};
     bool enable_place_mesh_mapping = false;
@@ -188,7 +188,7 @@ class GraphBuilder : public Module {
   GraphConnector graph_connector_;
 
   std::unique_ptr<VolumetricWindow> map_window_;
-  std::unique_ptr<MeshSegmenter> segmenter_;
+  std::unique_ptr<ObjectExtractor> object_segmenter_;
   std::unique_ptr<PoseGraphTracker> tracker_;
   std::unique_ptr<SurfacePlacesInterface> surface_places_;
   std::unique_ptr<places::TraversabilityPlaceExtractor> traversability_places_;

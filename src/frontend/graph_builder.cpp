@@ -50,7 +50,6 @@
 #include "hydra/common/launch_callbacks.h"
 #include "hydra/common/pipeline_queues.h"
 #include "hydra/frontend/frontier_extractor.h"
-#include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/place_2d_segmenter.h"
 #include "hydra/frontend/place_mesh_connector.h"
 #include "hydra/utils/display_utilities.h"
@@ -91,7 +90,7 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.graph_connector, "graph_connector");
   field(config.graph_updater, "graph_updater");
   field(config.enable_mesh_objects, "enable_mesh_objects");
-  field(config.object_config, "objects");
+  field(config.objects, "objects");
   config.pose_graph_tracker.setOptional();
   field(config.pose_graph_tracker, "pose_graph_tracker");
   // surface (i.e., 2D) places
@@ -133,9 +132,8 @@ GraphBuilder::GraphBuilder(const Config& config,
       view_database_(config.view_database),
       sinks_(Sink::instantiate(config.sinks)) {
   if (config.enable_mesh_objects) {
-    segmenter_ = std::make_unique<MeshSegmenter>(
-        config.object_config,
-        GlobalInfo::instance().getLabelSpaceConfig().object_labels);
+    object_segmenter_ = std::make_unique<ObjectExtractor>(
+        config.objects, GlobalInfo::instance().getLabelSpaceConfig().object_labels);
   }
 
   CHECK(dsg_ != nullptr);
@@ -148,21 +146,16 @@ GraphBuilder::GraphBuilder(const Config& config,
   deformation_compression_.reset(
       new kimera_pgmo::BlockCompression(config.pgmo.d_graph_resolution));
 
-  addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
-  addInputCallback(
-      std::bind(&GraphBuilder::updateDeformationGraph, this, std::placeholders::_1));
-  addInputCallback(
-      std::bind(&GraphBuilder::updatePoseGraph, this, std::placeholders::_1));
-  addInputCallback(std::bind(&GraphBuilder::updatePlaces, this, std::placeholders::_1));
-  addInputCallback(
-      std::bind(&GraphBuilder::updateFrontiers, this, std::placeholders::_1));
-  addInputCallback(std::bind(
-      &GraphBuilder::updateTraversabilityPlaces, this, std::placeholders::_1));
+  using std::placeholders::_1;
+  addInputCallback(std::bind(&GraphBuilder::updateMesh, this, _1));
+  addInputCallback(std::bind(&GraphBuilder::updateDeformationGraph, this, _1));
+  addInputCallback(std::bind(&GraphBuilder::updatePoseGraph, this, _1));
+  addInputCallback(std::bind(&GraphBuilder::updatePlaces, this, _1));
+  addInputCallback(std::bind(&GraphBuilder::updateFrontiers, this, _1));
+  addInputCallback(std::bind(&GraphBuilder::updateTraversabilityPlaces, this, _1));
+  addInputCallback(std::bind(&GraphBuilder::updateObjects, this, _1));
 
-  addPostMeshCallback(
-      std::bind(&GraphBuilder::updateObjects, this, std::placeholders::_1));
-  addPostMeshCallback(
-      std::bind(&GraphBuilder::updatePlaces2d, this, std::placeholders::_1));
+  addPostMeshCallback(std::bind(&GraphBuilder::updatePlaces2d, this, _1));
 
   if (config.lcd_use_bow_vectors) {
     PipelineQueues::instance().bow_queue.reset(new PipelineQueues::BowQueue());
@@ -504,21 +497,16 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
 }
 
 void GraphBuilder::updateObjects(const ActiveWindowOutput& input) {
-  if (!segmenter_) {
-    return;
-  }
-
-  if (!last_mesh_update_) {
-    LOG(ERROR) << "Cannot detect objects without valid mesh";
+  if (!object_segmenter_) {
     return;
   }
 
   const auto timestamp = input.timestamp_ns;
-  const auto clusters = segmenter_->detect(timestamp, *last_mesh_update_);
+  object_segmenter_->detect(timestamp, input.map());
 
   {  // start dsg critical section
-    std::unique_lock<std::mutex> lock(dsg_->mutex);
-    segmenter_->updateGraph(timestamp, *last_mesh_update_, clusters, *dsg_->graph);
+    std::lock_guard<std::mutex> lock(dsg_->mutex);
+    object_segmenter_->updateGraph(timestamp, *dsg_->graph);
   }  // end dsg critical section
 }
 
