@@ -32,11 +32,11 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/frontend/mesh_segmenter.h"
-
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
 #include <kimera_pgmo/mesh_delta.h>
+
+#include "hydra/frontend/mesh_segmenter.h"
 #define PCL_NO_PRECOMPILE
 #include <pcl/segmentation/extract_clusters.h>
 #undef PCL_NO_PRECOMPILE
@@ -54,12 +54,12 @@
 
 namespace hydra {
 
-using Clusters = MeshSegmenter::Clusters;
-using LabelClusters = MeshSegmenter::LabelClusters;
+using Clusters = ObjectSegmenter::Clusters;
+using LabelClusters = ObjectSegmenter::LabelClusters;
 using KdTreeT = pcl::search::KdTree<pcl::PointXYZRGBA>;
 using timing::ScopedTimer;
 
-void declare_config(MeshSegmenter::Config& config) {
+void declare_config(ObjectSegmenter::Config& config) {
   using namespace config;
   name("MeshSegmenterConfig");
   field(config.layer_id, "layer_id");
@@ -147,7 +147,7 @@ LabelIndices getLabelIndices(const std::set<uint32_t>& desired_labels,
   return label_indices;
 }
 
-Clusters findClusters(const MeshSegmenter::Config& config,
+Clusters findClusters(const ObjectSegmenter::Config& config,
                       const kimera_pgmo::MeshDelta& delta,
                       const std::vector<size_t>& indices) {
   pcl::IndicesPtr pcl_indices(new pcl::Indices(indices.begin(), indices.end()));
@@ -188,7 +188,7 @@ Clusters findClusters(const MeshSegmenter::Config& config,
 }
 
 // TODO(nathan) move node ID to not be here
-MeshSegmenter::MeshSegmenter(const Config& config, const std::set<uint32_t>& labels)
+ObjectSegmenter::ObjectSegmenter(const Config& config, const std::set<uint32_t>& labels)
     : config(config::checkValid(config)),
       next_node_id_('O', 0),
       labels_(labels),
@@ -213,8 +213,8 @@ std::vector<size_t> getActiveIndices(const kimera_pgmo::MeshDelta& delta) {
   return indices;
 }
 
-LabelClusters MeshSegmenter::detect(uint64_t timestamp_ns,
-                                    const kimera_pgmo::MeshDelta& delta) {
+LabelClusters ObjectSegmenter::detect(uint64_t timestamp_ns,
+                                      const kimera_pgmo::MeshDelta& delta) {
   const auto timer_name = config.timer_namespace + "_detection";
   ScopedTimer timer(timer_name, timestamp_ns, true, 1, false);
   LabelClusters label_clusters;
@@ -278,8 +278,8 @@ bool updateIndices(const kimera_pgmo::MeshDelta& delta, std::list<size_t>& indic
   return is_active;
 }
 
-void MeshSegmenter::updateOldNodes(const kimera_pgmo::MeshDelta& delta,
-                                   DynamicSceneGraph& graph) {
+void ObjectSegmenter::updateOldNodes(const kimera_pgmo::MeshDelta& delta,
+                                     DynamicSceneGraph& graph) {
   for (auto& [label, label_nodes] : active_nodes_) {
     auto iter = label_nodes.begin();
     while (iter != label_nodes.end()) {
@@ -313,10 +313,10 @@ void MeshSegmenter::updateOldNodes(const kimera_pgmo::MeshDelta& delta,
   }
 }
 
-void MeshSegmenter::updateGraph(uint64_t timestamp_ns,
-                                const kimera_pgmo::MeshDelta& active,
-                                const LabelClusters& clusters,
-                                DynamicSceneGraph& graph) {
+void ObjectSegmenter::updateGraph(uint64_t timestamp_ns,
+                                  const kimera_pgmo::MeshDelta& active,
+                                  const LabelClusters& clusters,
+                                  DynamicSceneGraph& graph) {
   ScopedTimer timer(config.timer_namespace + "_graph_update", timestamp_ns);
   updateOldNodes(active, graph);
   if (!graph.hasMesh()) {
@@ -346,7 +346,7 @@ void MeshSegmenter::updateGraph(uint64_t timestamp_ns,
   }
 }
 
-void MeshSegmenter::mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label) {
+void ObjectSegmenter::mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label) {
   std::set<NodeId> merged_nodes;
 
   auto& curr_active = active_nodes_.at(label);
@@ -391,7 +391,7 @@ void MeshSegmenter::mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label) {
   }
 }
 
-std::unordered_set<NodeId> MeshSegmenter::getActiveNodes() const {
+std::unordered_set<NodeId> ObjectSegmenter::getActiveNodes() const {
   std::unordered_set<NodeId> active_nodes;
   for (const auto& label_nodes_pair : active_nodes_) {
     active_nodes.insert(label_nodes_pair.second.begin(), label_nodes_pair.second.end());
@@ -399,10 +399,10 @@ std::unordered_set<NodeId> MeshSegmenter::getActiveNodes() const {
   return active_nodes;
 }
 
-void MeshSegmenter::updateNodeInGraph(DynamicSceneGraph& graph,
-                                      const Cluster& cluster,
-                                      const SceneGraphNode& node,
-                                      uint64_t timestamp) {
+void ObjectSegmenter::updateNodeInGraph(DynamicSceneGraph& graph,
+                                        const Cluster& cluster,
+                                        const SceneGraphNode& node,
+                                        uint64_t timestamp) {
   auto& attrs = node.attributes<ObjectNodeAttributes>();
   attrs.last_update_time_ns = timestamp;
   attrs.is_active = true;
@@ -411,10 +411,10 @@ void MeshSegmenter::updateNodeInGraph(DynamicSceneGraph& graph,
   updateObjectGeometry(*graph.mesh(), attrs);
 }
 
-void MeshSegmenter::addNodeToGraph(DynamicSceneGraph& graph,
-                                   const Cluster& cluster,
-                                   uint32_t label,
-                                   uint64_t timestamp) {
+void ObjectSegmenter::addNodeToGraph(DynamicSceneGraph& graph,
+                                     const Cluster& cluster,
+                                     uint32_t label,
+                                     uint64_t timestamp) {
   if (cluster.indices.empty()) {
     LOG(ERROR) << "Encountered empty cluster with label" << static_cast<int>(label)
                << " @ " << timestamp << "[ns]";

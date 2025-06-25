@@ -133,7 +133,7 @@ GraphBuilder::GraphBuilder(const Config& config,
       view_database_(config.view_database),
       sinks_(Sink::instantiate(config.sinks)) {
   if (config.enable_mesh_objects) {
-    segmenter_ = std::make_unique<MeshSegmenter>(
+    object_segmenter_ = std::make_unique<MeshSegmenter>(
         config.object_config,
         GlobalInfo::instance().getLabelSpaceConfig().object_labels);
   }
@@ -158,9 +158,9 @@ GraphBuilder::GraphBuilder(const Config& config,
       std::bind(&GraphBuilder::updateFrontiers, this, std::placeholders::_1));
   addInputCallback(std::bind(
       &GraphBuilder::updateTraversabilityPlaces, this, std::placeholders::_1));
-
-  addPostMeshCallback(
+  addInputCallback(
       std::bind(&GraphBuilder::updateObjects, this, std::placeholders::_1));
+
   addPostMeshCallback(
       std::bind(&GraphBuilder::updatePlaces2d, this, std::placeholders::_1));
 
@@ -504,21 +504,17 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
 }
 
 void GraphBuilder::updateObjects(const ActiveWindowOutput& input) {
-  if (!segmenter_) {
-    return;
-  }
-
-  if (!last_mesh_update_) {
-    LOG(ERROR) << "Cannot detect objects without valid mesh";
+  if (!object_segmenter_) {
     return;
   }
 
   const auto timestamp = input.timestamp_ns;
-  const auto clusters = segmenter_->detect(timestamp, *last_mesh_update_);
+  const auto clusters = object_segmenter_->detect(timestamp, input.map.getMeshLayer());
 
   {  // start dsg critical section
     std::unique_lock<std::mutex> lock(dsg_->mutex);
-    segmenter_->updateGraph(timestamp, *last_mesh_update_, clusters, *dsg_->graph);
+    object_segmenter_->updateGraph(
+        timestamp, input.map.getMeshLayer(), clusters, *dsg_->graph);
   }  // end dsg critical section
 }
 

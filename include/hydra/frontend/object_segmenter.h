@@ -38,10 +38,6 @@
 #include "hydra/common/dsg_types.h"
 #include "hydra/common/output_sink.h"
 
-namespace kimera_pgmo {
-class MeshDelta;
-}  // namespace kimera_pgmo
-
 namespace hydra {
 
 struct Cluster {
@@ -51,7 +47,7 @@ struct Cluster {
 
 using LabelIndices = std::map<uint32_t, std::vector<size_t>>;
 
-class MeshSegmenter {
+class ObjectSegmenter {
  public:
   using Clusters = std::vector<Cluster>;
   using LabelClusters = std::map<uint32_t, Clusters>;
@@ -70,7 +66,7 @@ class MeshSegmenter {
     std::vector<Sink::Factory> sinks;
   } const config;
 
-  explicit MeshSegmenter(const Config& config, const std::set<uint32_t>& labels);
+  explicit ObjectSegmenter(const Config& config, const std::set<uint32_t>& labels);
 
   LabelClusters detect(uint64_t timestamp_ns, const kimera_pgmo::MeshDelta& active);
 
@@ -103,6 +99,6 @@ class MeshSegmenter {
   Sink::List sinks_;
 };
 
-void declare_config(MeshSegmenter::Config& config);
+void declare_config(ObjectSegmenter::Config& config);
 
 }  // namespace hydra
