@@ -147,9 +147,6 @@ PythonPipeline::PythonPipeline(const Config& _config,
     throw std::runtime_error("Invalid sensor!");
   }
 
-  config::Settings().print_width = 100;
-  config::Settings().print_indent = 45;
-
   GlobalInfo::instance().setSensor(sensor);
   VLOG(config_verbosity) << "Using sensor '" << sensor->name << "':\n"
                          << sensor->dump();
@@ -256,10 +253,9 @@ namespace py = pybind11;
 struct PluginManager {
   static void init(const ExternalPluginConfig& config) {
     auto& manager = instance();
-    config::Settings().allow_external_libraries = config.allow;
-    config::Settings().verbose_external_load = config.verbose;
-    config::Settings().print_external_allocations = config.trace_allocations;
-
+    config::Settings().external_libraries.enabled = config.allow;
+    config::Settings().external_libraries.verbose_load = config.verbose;
+    config::Settings().external_libraries.log_allocation = config.trace_allocations;
     manager.plugins_ = config::loadExternalFactories(config.paths);
   }
 
