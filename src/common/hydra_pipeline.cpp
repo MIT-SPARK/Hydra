@@ -82,7 +82,7 @@ std::string makeBanner(const std::string& message,
 
 std::string HydraPipeline::getModuleInfo(const std::string& name,
                                          const Module* mod) const {
-  const auto print_width = config::Settings().print_width;
+  const auto print_width = config::Settings().printing.width;
   std::stringstream ss;
   ss << makeBanner(name, print_width, '*', true, true);
   if (!mod) {
@@ -98,7 +98,7 @@ std::string HydraPipeline::getModuleInfo(const std::string& name,
 }
 
 void HydraPipeline::showModules() const {
-  const auto print_width = config::Settings().print_width;
+  const auto print_width = config::Settings().printing.width;
   std::stringstream ss;
   ss << std::endl << makeBanner("Modules", print_width, '=', true, true);
   for (auto&& [name, mod] : modules_) {
