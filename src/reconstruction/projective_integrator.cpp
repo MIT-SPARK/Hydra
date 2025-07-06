@@ -51,13 +51,11 @@
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
 
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/core.hpp>
-
-
 #include <algorithm>
 #include <future>
+#include <opencv2/core.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
 #include <vector>
 
 #include "hydra/input/sensor_utilities.h"
