@@ -21,7 +21,7 @@ find_package(kimera_pgmo REQUIRED)
 find_package(spatial_hash REQUIRED)
 find_package(spark_dsg REQUIRED)
 find_package(teaserpp REQUIRED)
-find_package(OpenCV REQUIRED COMPONENTS core imgproc)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs)
 # we turn off PCL precompile internally to get around having vtk linked. Note: kdtree is
 # REQUIRED to make sure we link against FLANN (used by euclidean extraction)
 find_package(PCL REQUIRED COMPONENTS common kdtree)

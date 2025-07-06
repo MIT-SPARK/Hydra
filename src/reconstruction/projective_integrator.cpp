@@ -51,6 +51,11 @@
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
 
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/core.hpp>
+
+
 #include <algorithm>
 #include <future>
 #include <vector>
@@ -100,6 +105,7 @@ void declare_config(ProjectiveIntegrator::Config& config) {
   field(config.interpolation_method, "interpolation_method");
   config.semantic_integrator.setOptional();
   field(config.semantic_integrator, "semantic_integrator");
+  field(config.static_mask, "static_mask");
 
   const auto labels_ok = !config.extra_integration_distance_labels.empty() ||
                          !config.skip_extra_colors_and_labels;
