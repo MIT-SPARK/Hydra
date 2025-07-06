@@ -1,0 +1,4 @@
+source;share/hydra/local_setup.bash
+source;share/hydra/local_setup.dsv
+source;share/hydra/local_setup.sh
+source;share/hydra/local_setup.zsh

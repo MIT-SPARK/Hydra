@@ -50,6 +50,10 @@
 #include <string>
 #include <thread>
 
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/core.hpp>
+
 #include "hydra/common/global_info.h"
 #include "hydra/input/input_packet.h"
 #include "hydra/reconstruction/projection_interpolators.h"
@@ -105,6 +109,8 @@ class ProjectiveIntegrator {
         InterpolatorAdaptive::Config{}};
     //! Semantic integrator configuration (optional)
     config::VirtualConfig<SemanticIntegrator> semantic_integrator;
+    //! Static Mask for Camera 
+    std::string static_mask = "";
   } const config;
 
   struct VoxelMeasurement {

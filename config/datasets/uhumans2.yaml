@@ -11,6 +11,7 @@ active_window:
   tsdf:
     semantic_integrator:
       type: SingleLabelIntegrator
+    static_mask: "bottom_mask"
 frontend:
   pgmo:
     time_horizon: 15.0
