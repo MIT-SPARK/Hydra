@@ -10,7 +10,7 @@ active_window:
   tsdf:
     semantic_integrator:
       type: SingleLabelIntegrator
-    static_mask: "bottom_mask"
+    static_mask_file_path: "/home/anaveen/Documents/mit_research_ws/hydra_ws/src/hydra/config/static_masks/bottom_mask.png"
 frontend:
   pgmo:
     time_horizon: 15.0

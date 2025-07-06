@@ -111,7 +111,7 @@ class ProjectiveIntegrator {
     //! Semantic integrator configuration (optional)
     config::VirtualConfig<SemanticIntegrator> semantic_integrator;
     //! Static Mask for Camera 
-    std::string static_mask = "";
+    std::string static_mask_file_path = "";
   } const config;
 
   struct VoxelMeasurement {

@@ -105,7 +105,7 @@ void declare_config(ProjectiveIntegrator::Config& config) {
   field(config.interpolation_method, "interpolation_method");
   config.semantic_integrator.setOptional();
   field(config.semantic_integrator, "semantic_integrator");
-  field(config.static_mask, "static_mask");
+  field(config.static_mask_file_path, "static_mask_file_path");
 
   const auto labels_ok = !config.extra_integration_distance_labels.empty() ||
                          !config.skip_extra_colors_and_labels;
