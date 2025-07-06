@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/active_window/reconstruction_module.h"
 
-
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
@@ -166,14 +165,14 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputPacket& msg) {
   maskInvalidSemantics(data->label_image, invalid_labels, integration_mask);
 
   cv::Mat static_mask;
-  if (config.tsdf.static_mask_file_path != ""){
+  if (config.tsdf.static_mask_file_path != "") {
     static_mask = cv::imread(config.tsdf.static_mask_file_path);
     if (static_mask.empty()) {
-        std::cerr << "Error: Could not open or find the image at " << config.tsdf.static_mask_file_path << std::endl;
+      std::cerr << "Error: Could not open or find the image at "
+                << config.tsdf.static_mask_file_path << std::endl;
     }
   }
   maskNonZero(static_mask, integration_mask);
-
 
   {  // timing scope
     ScopedTimer timer("reconstruction/tsdf", timestamp_ns);
