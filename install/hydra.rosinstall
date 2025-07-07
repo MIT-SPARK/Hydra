@@ -1,22 +1,26 @@
 - git:
     local-name: config_utilities
     uri: git@github.com:MIT-SPARK/config_utilities.git
+    version: archive/ros_noetic
 - git:
     local-name: hydra_ros
     uri: git@github.com:MIT-SPARK/Hydra-ROS.git
+    version: archive/ros_noetic
 - git:
     local-name: kimera_pgmo
     uri: git@github.com:MIT-SPARK/Kimera-PGMO.git
-    version: main
+    version: archive/ros_noetic
 - git:
     local-name: kimera_rpgo
     uri: git@github.com:MIT-SPARK/Kimera-RPGO.git
 - git:
     local-name: pose_graph_tools
     uri: git@github.com:MIT-SPARK/pose_graph_tools.git
+    version: archive/ros_noetic
 - git:
     local-name: spark_dsg
     uri: git@github.com:MIT-SPARK/Spark-DSG.git
+    version: archive/ros_noetic
 - git:
     local-name: spatial_hash
     uri: git@github.com:MIT-SPARK/Spatial-Hash.git
