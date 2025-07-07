@@ -1,0 +1,15 @@
+- git:
+    local-name: catkin_simple
+    uri: git@github.com:catkin/catkin_simple.git
+- git:
+    local-name: dbow2_catkin
+    uri: git@github.com:MIT-SPARK/dbow2_catkin.git
+- git:
+    local-name: kimera_vio
+    uri: git@github.com:MIT-SPARK/Kimera-VIO.git
+- git:
+    local-name: kimera_vio_ros
+    uri: git@github.com:MIT-SPARK/Kimera-VIO-ROS.git
+- git:
+    local-name: opengv_catkin
+    uri: git@github.com:MIT-SPARK/opengv_catkin.git
