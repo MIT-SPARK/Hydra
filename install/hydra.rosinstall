@@ -13,6 +13,7 @@
 - git:
     local-name: kimera_rpgo
     uri: git@github.com:MIT-SPARK/Kimera-RPGO.git
+    version: d28b4df0570d642a2bb00e511344ce1110f87519
 - git:
     local-name: pose_graph_tools
     uri: git@github.com:MIT-SPARK/pose_graph_tools.git
@@ -24,6 +25,8 @@
 - git:
     local-name: spatial_hash
     uri: git@github.com:MIT-SPARK/Spatial-Hash.git
+    version: 88b235966c998ec97cd910dece1c70139235fec1
 - git:
     local-name: teaser_plusplus
     uri: git@github.com:MIT-SPARK/TEASER-plusplus.git
+    version: f91cfdb7baed951a3607257bd31f3f6694773497
