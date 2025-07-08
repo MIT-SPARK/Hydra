@@ -31,7 +31,15 @@ If you find this code relevant for your work, please consider citing one or both
 }
 ```
 
-### Filing Issues
+#### Acknowledgements
+
+This work was partially funded by the AIA CRA FA8750-19-2-1000, ARL DCIST CRA W911NF-17-2-0181, and ONR RAIDER N00014-18-1-2828.
+
+#### Disclaimer
+
+Research was sponsored by the United States Air Force Research Laboratory and the United States Air Force Artificial Intelligence Accelerator and was accomplished under Cooperative Agreement Number FA8750-19-2-1000. The views and conclusions contained in this document are those of the authors and should not be interpreted as representing the official policies, either expressed or implied, of the United States Air Force or the U.S. Government. The U.S. Government is authorized to reproduce and distribute reprints for Government purposes notwithstanding any copyright notation herein.
+
+## Filing Issues
 
 Please understand that this is research code maintained by busy graduate students, **which comes with some caveats**:
   1. We do our best to maintain and keep the code up-to-date, but things may break or change occasionally
@@ -44,14 +52,6 @@ Please understand that this is research code maintained by busy graduate student
 Depending on the nature of the issue, it may be helpful to browse [this](doc/debugging.md) page about debugging Hydra first.
 
 Thank you in advance for your understanding!
-
-#### Acknowledgements
-
-This work was partially funded by the AIA CRA FA8750-19-2-1000, ARL DCIST CRA W911NF-17-2-0181, and ONR RAIDER N00014-18-1-2828.
-
-#### Disclaimer
-
-Research was sponsored by the United States Air Force Research Laboratory and the United States Air Force Artificial Intelligence Accelerator and was accomplished under Cooperative Agreement Number FA8750-19-2-1000. The views and conclusions contained in this document are those of the authors and should not be interpreted as representing the official policies, either expressed or implied, of the United States Air Force or the U.S. Government. The U.S. Government is authorized to reproduce and distribute reprints for Government purposes notwithstanding any copyright notation herein.
 
 ## News
 
