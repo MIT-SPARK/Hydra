@@ -31,6 +31,20 @@ If you find this code relevant for your work, please consider citing one or both
 }
 ```
 
+### Filing Issues
+
+Please understand that this is research code maintained by busy graduate students, **which comes with some caveats**:
+  1. We do our best to maintain and keep the code up-to-date, but things may break or change occasionally
+  2. We do not have bandwidth to help adapt the code to new applications
+  3. The documentation, code-base and installation instructions are geared towards practitioners familiar with ROS and 3D scene graph research.
+
+> **:warning: Warning**<br>
+> We don't support other platforms. Issues requesting support on other platforms (e.g., Ubuntu 18.04, Windows) will be summarily closed.
+
+Depending on the nature of the issue, it may be helpful to browse [this](doc/debugging.md) page about debugging Hydra first.
+
+Thank you in advance for your understanding!
+
 #### Acknowledgements
 
 This work was partially funded by the AIA CRA FA8750-19-2-1000, ARL DCIST CRA W911NF-17-2-0181, and ONR RAIDER N00014-18-1-2828.
@@ -41,7 +55,7 @@ Research was sponsored by the United States Air Force Research Laboratory and th
 
 ## News
 
-**Update (07/09/25):** We've archived the ROS1 version of Hydra and switched to the ROS2 version by default. See [this branch](https://github.com/MIT-SPARK/Hydra/tree/archive/ros_noetic) for the pinned version of the code if you need the ROS1 version for any reason.
+**Update (07/09/25):** We've archived the ROS1 version of Hydra and switched to the ROS2 version by default. See [this branch](https://github.com/MIT-SPARK/Hydra/tree/archive/ros_noetic) for the pinned version of the code if you need the ROS1 version for any reason. We are unlikely to support any issues that come up with the archived ROS1 version.
 
 **Update (01/28/25):** We've released a new version of Hydra. This involves the following changes:
   - Open-set semantic capabilities used by downstream projects (i.e., [Khronos](https://github.com/MIT-SPARK/Khronos) and [Clio](https://github.com/MIT-SPARK/Clio))
@@ -71,79 +85,10 @@ We will link to the new repository once this is done.
 
 ## Installation and Running
 
-### General Requirements
-
-Hydra has been tested on Ubuntu 20.04 and ROS Noetic
-
-You can follow the instructions [here](http://wiki.ros.org/ROS/Installation) to install ROS if you haven't already.
-Then, make sure you have some general requirements:
-```
-sudo apt install python3-rosdep python3-catkin-tools python3-vcstool
-```
-
-Finally, if you haven't set up rosdep yet:
-```
-sudo rosdep init
-rosdep update
-```
-
-### Filing Issues
-
-> **:warning: Warning**<br>
-> We don't support other platforms. Issues requesting support on other platforms (e.g., Ubuntu 18.04, Windows) will be summarily closed.
-
-Depending on the nature of the issue, it may be helpful to browse [this](doc/debugging.md) page about debugging Hydra first.
-
-### Building Hydra
-
-To get started:
-
-```
-mkdir -p catkin_ws/src
-cd catkin_ws
-catkin init
-catkin config -DCMAKE_BUILD_TYPE=Release
-
-cd src
-git clone git@github.com:MIT-SPARK/Hydra.git hydra
-vcs import . < hydra/install/hydra.rosinstall
-rosdep install --from-paths . --ignore-src -r -y
-
-cd ..
-catkin build
-```
-
-> **Note**<br>
-> Depending on the amount of RAM available on your machine and whether or not you are compiling Kimera-VIO as well, you may run out of memory when compiling with `catkin build` directly (which will result in a `GCC killed` error). If this occurs, you can either specify fewer threads for catkin via `catkin build -j NUM_THREADS` or compile certain larger packages directly first by building them specifically.
-
-> :warning: **Warning**</br>
-> In the `vcs import` step, GitHub may block too many concurrent requests. If you receive `kex_exchange_identification: read: Connection reset by peer` errors, try running `vcs import . < hydra/install/hydra.rosinstall --workers 1`.
-
-Please help us by creating new issues when you run into problems with these instructions!
-
-### Quickstart
-
-To test Hydra out, you can just download a single scene (the office scene without humans is recommended, and can be found [here](https://drive.google.com/uc?id=1CA_1Awu-bewJKpDrILzWok_H_6cOkGDb).
-Make sure to decompress the rosbag (`rosbag decompress path/to/bagfile`) before running!
-
-> **:warning: Warning**<br>
-> Also make sure to source the workspace before starting.<br>
-> This is typically `source path/to/catkin_ws/devel/setup.bash`, though if you use zsh you should use the correct setup file for that.
-
-To start Hydra:
-```
-roslaunch hydra_ros uhumans2.launch
-```
-
-Then, start the rosbag in a separate terminal:
-```
-rosbag play path/to/rosbag --clock
-```
-
-### Running Hydra
+Hydra has been tested on Ubuntu 24.04 and ROS2 Jazzy.
+Please refer to our guide [here](https://github.com/MIT-SPARK/Hydra-ROS/blob/ros2/doc/ros2_setup.md) for installation instructions.
 
 See [here](https://github.com/MIT-SPARK/Hydra-ROS/blob/main/doc/quickstart.md) for detailed instructions discussing how to run Hydra using ROS.
-These also detail how to use Hydra with [Kimera-VIO](https://github.com/MIT-SPARK/Kimera-VIO.git), including how to build Kimera-VIO alongside Hydra.
 
 ### Hydra Python Bindings
 
@@ -152,20 +97,3 @@ See [here](python/README.md) for information
 ### Hydra Evaluation
 
 See [here](eval/README.md) for information
-
-### Using a Semantic Segmentation Network
-
-Add `semantic_inference` to your workspace via:
-
-```
-roscd && cd ../src
-vcs import . < hydra/install/semantic_overlay.rosinstall
-```
-
-Then, follow the instructions to install cuda and other dependencies for the `semantic_inference` package (which can be found [here](https://github.com/MIT-SPARK/semantic_inference/blob/main/docs/closed_set.md#getting-dependencies)).
-
-Finally, build your workspace:
-
-```
-catkin build
-```
