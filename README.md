@@ -41,6 +41,8 @@ Research was sponsored by the United States Air Force Research Laboratory and th
 
 ## News
 
+**Update (07/09/25):** We've archived the ROS1 version of Hydra and switched to the ROS2 version by default. See [this branch](https://github.com/MIT-SPARK/Hydra/tree/archive/ros_noetic) for the pinned version of the code if you need the ROS1 version for any reason.
+
 **Update (01/28/25):** We've released a new version of Hydra. This involves the following changes:
   - Open-set semantic capabilities used by downstream projects (i.e., [Khronos](https://github.com/MIT-SPARK/Khronos) and [Clio](https://github.com/MIT-SPARK/Clio))
   - A clear separation between colors and semantic labels. Hydra no longer assigns colors to nodes when building a scene graph; this is done by the visualizer
