@@ -43,7 +43,6 @@
 
 namespace hydra {
 
-class ProjectiveIntegrator;
 class MeshIntegrator;
 class RobotFootprintIntegrator;
 
@@ -51,8 +50,9 @@ class ReconstructionModule : public ActiveWindowModule {
  public:
   struct Config : ActiveWindowModule::Config {
     double full_update_separation_s = 0.0;
-    ProjectiveIntegrator::Config tsdf;
     MeshIntegratorConfig mesh;
+    bool use_multi_sensor_config = false;
+    config::OrderedMap<std::string, ProjectiveIntegrator::Config> tsdf;
     config::VirtualConfig<RobotFootprintIntegrator> robot_footprint;
   } const config;
 
@@ -70,7 +70,7 @@ class ReconstructionModule : public ActiveWindowModule {
  protected:
   std::optional<uint64_t> last_update_ns_;
 
-  std::unique_ptr<ProjectiveIntegrator> tsdf_integrator_;
+  std::map<std::string, std::unique_ptr<ProjectiveIntegrator>> tsdf_integrators_;
   std::unique_ptr<MeshIntegrator> mesh_integrator_;
   std::unique_ptr<RobotFootprintIntegrator> footprint_integrator_;
 };

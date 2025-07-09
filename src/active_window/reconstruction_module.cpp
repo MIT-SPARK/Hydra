@@ -78,14 +78,47 @@ std::string printRotation(const Eigen::Matrix3d& rot) {
 
 using timing::ScopedTimer;
 
+template <typename T>
+struct SingleMapConversion {
+  static T toIntermediate(const config::OrderedMap<std::string, T>& value,
+                          std::string& error) {
+    if (value.size() > 1u) {
+      error = "Map does not have a single element";
+      return {};
+    }
+
+    return value.empty() ? T{} : value.front().second;
+  }
+
+  static void fromIntermediate(const T& intermediate,
+                               config::OrderedMap<std::string, T>& value,
+                               std::string& error) {
+    if (value.size() > 1u) {
+      error = "Map does not have a single element";
+      return;
+    }
+
+    if (value.empty()) {
+      value.emplace_back(std::make_pair("", intermediate));
+    } else {
+      value[0].second = intermediate;
+    }
+  }
+};
+
 void declare_config(ReconstructionModule::Config& config) {
   using namespace config;
   name("ReconstructionModule::Config");
   base<ActiveWindowModule::Config>(config);
   field(config.full_update_separation_s, "full_update_separation_s", "s");
   field(config.max_input_queue_size, "max_input_queue_size");
-  field(config.tsdf, "tsdf");
   field(config.mesh, "mesh");
+  field(config.use_multi_sensor_config, "use_multi_sensor_config");
+  if (config.use_multi_sensor_config) {
+    field(config.tsdf, "tsdf");
+  } else {
+    field<SingleMapConversion<ProjectiveIntegrator::Config>>(config.tsdf, "tsdf");
+  }
   config.robot_footprint.setOptional();
   field(config.robot_footprint, "robot_footprint");
 }
@@ -95,12 +128,13 @@ ReconstructionModule::ReconstructionModule(const Config& config,
     : ActiveWindowModule(config, queue),
       config(config::checkValid(config)),
       last_update_ns_(std::nullopt),
-      tsdf_integrator_(std::make_unique<ProjectiveIntegrator>(config.tsdf)),
       mesh_integrator_(std::make_unique<MeshIntegrator>(config.mesh)),
       footprint_integrator_(config.robot_footprint.create()) {
-  if (config.tsdf.semantic_integrator && !map_.config.with_semantics) {
-    LOG(ERROR)
-        << "Semantic integrator specified but map does not contain semantic layer!";
+  for (const auto& [name, tsdf_config] : config.tsdf) {
+    if (tsdf_config.semantic_integrator && !map_.config.with_semantics) {
+      LOG(ERROR) << "Semantic integrator specified for sensor " << name
+                 << " but map does not contain semantic layer!";
+    }
   }
 }
 
@@ -156,9 +190,25 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputPacket& msg) {
   cv::Mat integration_mask;
   maskInvalidSemantics(data->label_image, invalid_labels, integration_mask);
 
+  auto iter = tsdf_integrators_.find(data->getSensor().name);
+  if (iter == tsdf_integrators_.end()) {
+    ProjectiveIntegrator::Config tsdf;
+    for (const auto& [name, candidate] : config.tsdf) {
+      if (name.empty() || name == data->getSensor().name) {
+        tsdf = candidate;
+      }
+    }
+
+    // TODO(nathan) warn about sensors that use defaults
+    iter = tsdf_integrators_
+               .emplace(data->getSensor().name,
+                        std::make_unique<ProjectiveIntegrator>(tsdf))
+               .first;
+  }
+
   {  // timing scope
     ScopedTimer timer("reconstruction/tsdf", timestamp_ns);
-    tsdf_integrator_->updateMap(*data, map_, true, integration_mask);
+    iter->second->updateMap(*data, map_, true, integration_mask);
     if (footprint_integrator_) {
       footprint_integrator_->markFreespace(world_T_body.cast<float>(), map_);
     }
