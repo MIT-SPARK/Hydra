@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/config.h>
 #include <config_utilities/virtual_config.h>
 
 #include <Eigen/Geometry>
@@ -46,13 +47,117 @@ namespace hydra {
 class MeshIntegrator;
 class RobotFootprintIntegrator;
 
+enum class SensorMapMode {
+  //! Config is not namespaced by sensor
+  Single,
+  //! Config is namespaced by sensor. If sensor name is not matched, throw error
+  Strict,
+  //! Config is namespaced by sensor. If sensor name is not matched, use default config
+  Permissive,
+};
+
+template <typename T, typename ConfigT = typename T::Config>
+class SensorMap {
+ public:
+  struct Config {
+    SensorMapMode mode = SensorMapMode::Single;
+    config::OrderedMap<std::string, ConfigT> sensors;
+  } const config;
+
+  explicit SensorMap(const Config& config) : config(config) {}
+  T* get(const std::string& name);
+  const T* get(const std::string& name) const;
+
+ private:
+  mutable std::map<std::string, std::unique_ptr<T>> elements_;
+};
+
+template <typename T>
+struct SensorMapConversion {
+  static T toIntermediate(const config::OrderedMap<std::string, T>& value,
+                          std::string& error) {
+    if (value.size() > 1u) {
+      error = "Map does not have a single element";
+      return {};
+    }
+
+    return value.empty() ? T{} : value.front().second;
+  }
+
+  static void fromIntermediate(const T& intermediate,
+                               config::OrderedMap<std::string, T>& value,
+                               std::string& error) {
+    if (value.size() > 1u) {
+      error = "Map does not have a single element";
+      return;
+    }
+
+    if (value.empty()) {
+      value.emplace_back(std::make_pair("", intermediate));
+    } else {
+      value[0].second = intermediate;
+    }
+  }
+};
+
+template <typename T, typename ConfigT>
+T* SensorMap<T, ConfigT>::get(const std::string& name) {
+  auto iter = elements_.find(name);
+  if (iter == elements_.end()) {
+    std::optional<ConfigT> sensor_config;
+    for (const auto& [_name, candidate] : config.sensors) {
+      if (name.empty() || _name == name) {
+        sensor_config = candidate;
+        break;
+      }
+    }
+
+    if (!sensor_config) {
+      switch (config.mode) {
+        case SensorMapMode::Single:
+          throw std::runtime_error("single mode must always have config!");
+        case SensorMapMode::Permissive:
+          sensor_config = ConfigT();
+          break;
+        case SensorMapMode::Strict:
+        default:
+          return nullptr;
+      }
+    }
+
+    iter = elements_.emplace(name, std::make_unique<T>(*sensor_config)).first;
+  }
+
+  return iter->second.get();
+}
+
+template <typename T, typename ConfigT>
+const T* SensorMap<T, ConfigT>::get(const std::string& name) const {
+  return const_cast<SensorMap<T, ConfigT>*>(this)->get(name);
+}
+
+template <typename T, typename ConfigT>
+void declare_config(typename SensorMap<T, ConfigT>::Config& config) {
+  using namespace config;
+  name("SensorMap???::Config");
+  enum_field(config.mode,
+             "sensor_map_mode",
+             {{SensorMapMode::Single, "Single"},
+              {SensorMapMode::Strict, "Strict"},
+              {SensorMapMode::Permissive, "Permissive"}});
+  if (config.mode == SensorMapMode::Single) {
+    field<SensorMapConversion<ConfigT>>(config.sensors, "sensors", false);
+  } else {
+    field > (config.sensors, "sensors");
+  }
+}
+
 class ReconstructionModule : public ActiveWindowModule {
  public:
   struct Config : ActiveWindowModule::Config {
     double full_update_separation_s = 0.0;
     MeshIntegratorConfig mesh;
-    bool use_multi_sensor_config = false;
-    config::OrderedMap<std::string, ProjectiveIntegrator::Config> tsdf;
+    SensorMap<ProjectiveIntegrator>::Config tsdf;
     config::VirtualConfig<RobotFootprintIntegrator> robot_footprint;
   } const config;
 
@@ -70,7 +175,7 @@ class ReconstructionModule : public ActiveWindowModule {
  protected:
   std::optional<uint64_t> last_update_ns_;
 
-  std::map<std::string, std::unique_ptr<ProjectiveIntegrator>> tsdf_integrators_;
+  SensorMap<ProjectiveIntegrator> tsdf_integrators_;
   std::unique_ptr<MeshIntegrator> mesh_integrator_;
   std::unique_ptr<RobotFootprintIntegrator> footprint_integrator_;
 };
