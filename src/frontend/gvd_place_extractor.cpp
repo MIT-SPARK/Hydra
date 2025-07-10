@@ -89,15 +89,6 @@ GvdPlaceExtractor::GvdPlaceExtractor(const Config& c)
 
 GvdPlaceExtractor::~GvdPlaceExtractor() {}
 
-void GvdPlaceExtractor::save(const LogSetup& log_setup) const {
-  const auto output_path = log_setup.getLogDir("frontend");
-  const auto& places = graph_extractor_.getGraph();
-
-  DynamicSceneGraph::Ptr graph(new DynamicSceneGraph());
-  graph->updateFromLayer(places, places.edges());
-  graph->save(output_path / "places.json", false);
-}
-
 NodeIdSet GvdPlaceExtractor::getActiveNodes() const { return active_nodes_; }
 
 std::vector<bool> GvdPlaceExtractor::inFreespace(const PositionMatrix& positions,

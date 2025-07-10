@@ -53,6 +53,7 @@
 #include "hydra/bindings/glog_utilities.h"
 #include "hydra/bindings/python_image.h"
 #include "hydra/bindings/python_sensor_input.h"
+#include "hydra/utils/data_directory.h"
 #include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/pgmo_mesh_interface.h"
 #include "hydra/utils/pgmo_mesh_traits.h"
@@ -188,9 +189,9 @@ void PythonReconstruction::save(const std::filesystem::path& output) {
     return;
   }
 
-  LogSetup logs(output);
+  DataDirectory logs(output);
   if (logs.valid()) {
-    module_->map().save(logs.getLogDir() / "map");
+    module_->map().save(logs.path("map"));
   }
 
   stop();
@@ -204,7 +205,7 @@ void PythonReconstruction::save(const std::filesystem::path& output) {
     return;
   }
 
-  kimera_pgmo::WriteMesh(logs.getLogDir() / "mesh.ply", *mesh);
+  kimera_pgmo::WriteMesh(logs.path() / "mesh.ply", *mesh);
 }
 
 namespace python_reconstruction {

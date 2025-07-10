@@ -56,7 +56,6 @@
 #include "hydra/frontend/view_database.h"
 #include "hydra/loop_closure/lcd_input.h"
 #include "hydra/odometry/pose_graph_from_odom.h"
-#include "hydra/utils/log_utilities.h"
 
 namespace kimera_pgmo {
 class DeltaCompression;
@@ -104,8 +103,7 @@ class GraphBuilder : public Module {
 
   GraphBuilder(const Config& config,
                const SharedDsgInfo::Ptr& dsg,
-               const SharedModuleState::Ptr& state,
-               const LogSetup::Ptr& logs = nullptr);
+               const SharedModuleState::Ptr& state);
 
   virtual ~GraphBuilder();
 
@@ -113,7 +111,7 @@ class GraphBuilder : public Module {
 
   void stop() override;
 
-  void save(const LogSetup& log_setup) override;
+  void save(const DataDirectory& output) override;
 
   std::string printInfo() const override;
 
@@ -194,7 +192,6 @@ class GraphBuilder : public Module {
   ViewDatabase view_database_;
 
   SceneGraphLogger frontend_graph_logger_;
-  LogSetup::Ptr logs_;
   MessageQueue<PoseGraphPacket> pose_graph_updates_;
 
   NodeIdSet previous_active_places_;

@@ -34,18 +34,16 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <chrono>
-#include <list>
+#include <cstdint>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
+#include <vector>
 
-#include "hydra/utils/log_utilities.h"
-
-namespace hydra {
-
-namespace timing {
+namespace hydra::timing {
 
 struct ElapsedStatistics {
   double last_s;
@@ -60,14 +58,17 @@ std::ostream& operator<<(std::ostream& out, const ElapsedStatistics& stats);
 
 class ElapsedTimeRecorder {
  public:
-  static ElapsedTimeRecorder& instance() {
-    if (!instance_) {
-      instance_.reset(new ElapsedTimeRecorder());
-    }
-    return *instance_;
-  }
+  struct Entry {
+    uint64_t timestamp;
+    std::chrono::nanoseconds elapsed;
+    double elapsed_seconds() const;
+  };
 
-  void start(const std::string& timer_name, const uint64_t& timestamp);
+  static ElapsedTimeRecorder& instance();
+
+  void reset();
+
+  void start(const std::string& timer_name, const uint64_t timestamp);
 
   void stop(const std::string& timer_name);
 
@@ -75,48 +76,43 @@ class ElapsedTimeRecorder {
               const uint64_t timestamp,
               const std::chrono::nanoseconds elapsed);
 
-  void reset();
+  std::vector<std::string> timerNames() const;
 
   std::optional<double> getLastElapsed(const std::string& timer_name) const;
 
   ElapsedStatistics getStats(const std::string& timer_name) const;
 
-  void logElapsed(const std::string& name, const LogSetup& log_config) const;
+  std::string printAllStats() const;
 
-  void logAllElapsed(const LogSetup& log_config) const;
+  void logTimers(const std::filesystem::path& output,
+                 const std::string& name_prefix = "",
+                 const std::string& name_suffix = "_timing_raw") const;
 
-  std::string getPrintableStats() const;
+  void logStats(const std::filesystem::path& stat_filepath) const;
 
-  void logStats(const std::string& stat_filepath) const;
-
-  void setupIncrementalLogging(const LogSetup::Ptr& log_config);
-
+  //! Whether or not timing is enabled
   bool timing_disabled;
 
+  //! Whether or not timers log to console
   bool disable_output;
 
-  bool log_to_same_folder = false;
-
  private:
-  using TimeList = std::list<std::chrono::nanoseconds>;
-  using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
-  using TimeMap = std::map<std::string, TimePoint>;
-  using TimeStamps = std::list<uint64_t>;
-  using TimeStamp = std::map<std::string, uint64_t>;
+  struct TimePoint {
+    uint64_t timestamp;
+    std::chrono::time_point<std::chrono::high_resolution_clock> now;
+  };
 
   ElapsedTimeRecorder();
 
+  void add(const std::string& name,
+           const uint64_t timestamp,
+           const std::chrono::nanoseconds elapsed);
+
+  mutable std::mutex mutex_;
   static std::unique_ptr<ElapsedTimeRecorder> instance_;
 
-  TimeMap starts_;
-  TimeStamp start_stamps_;
-  std::map<std::string, TimeList> elapsed_;
-  std::map<std::string, TimeStamps> stamps_;
-  mutable std::mutex mutex_;
-
-  bool log_incrementally_;
-  LogSetup::Ptr log_setup_;
-  std::map<std::string, std::shared_ptr<std::ofstream>> files_;
+  std::map<std::string, TimePoint> starts_;
+  std::map<std::string, std::vector<Entry>> elapsed_;
 };
 
 class ScopedTimer {
@@ -147,5 +143,4 @@ class ScopedTimer {
   bool is_running_ = false;
 };
 
-}  // namespace timing
-}  // namespace hydra
+}  // namespace hydra::timing

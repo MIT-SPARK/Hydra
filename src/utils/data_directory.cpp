@@ -32,17 +32,20 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/utils/log_utilities.h"
+#include "hydra/utils/data_directory.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/types/path.h>
 #include <glog/logging.h>
 
+#include <ctime>
 #include <filesystem>
+
+namespace hydra {
 
 namespace fs = std::filesystem;
 
-namespace hydra {
+namespace {
 
 inline bool makeDirs(const fs::path& path) {
   if (fs::exists(path)) {
@@ -53,98 +56,68 @@ inline bool makeDirs(const fs::path& path) {
   return fs::create_directories(path, code);
 }
 
-void declare_config(LogConfig& config) {
-  using namespace config;
-  name("LogConfig");
-  field<Path::Absolute>(config.log_dir, "log_path");
-  field(config.log_timing_incrementally, "log_timing_incrementally");
-  field(config.timing_stats_name, "timing_stats_name");
-  field(config.timing_suffix, "timing_suffix");
-  field(config.log_raw_timers_to_single_dir, "log_raw_timers_to_single_dir");
+inline std::string getDateTime(const std::string& format) {
+  auto now = std::time(nullptr);
+  auto tm = *std::localtime(&now);
+  std::stringstream ss;
+  ss << std::put_time(&tm, format.c_str());
+  return ss.str();
 }
 
-LogSetup::LogSetup(const LogConfig& conf) : valid_(false), config_(conf) {
-  if (config_.log_dir.empty()) {
-    return;
+}  // namespace
+
+void declare_config(DataDirectory::Config& config) {
+  using namespace config;
+  name("LogConfig");
+  field(config.overwrite, "overwrite");
+  field(config.allocate, "allocate");
+  field(config.use_timestamp, "use_timestamp");
+  field(config.timestamp_format, "timestamp_format");
+}
+
+DataDirectory::DataDirectory() : valid_(false) {}
+
+DataDirectory::DataDirectory(const std::filesystem::path& output_path,
+                             std::optional<Config> _config)
+    : config(_config.value_or(Config{})), valid_(false), root_path_(output_path) {
+  if (config.use_timestamp) {
+    root_path_ /= getDateTime(config.timestamp_format);
   }
 
-  if (!makeDirs(config_.log_dir)) {
-    LOG(WARNING) << "Failed to make dir: " << config_.log_dir << ". logging Disabled!";
+  if (std::filesystem::exists(root_path_) && config.overwrite) {
+    LOG(WARNING) << "Overwriting existing directory: '" << root_path_.string() << "'.";
+    std::filesystem::remove_all(root_path_);
+  }
+
+  if (config.allocate && !makeDirs(root_path_)) {
+    LOG(WARNING) << "Failed to make dir '" << root_path_ << "'. Logging disabled!";
     return;
   }
 
   valid_ = true;
 }
 
-LogSetup::LogSetup(const std::string& output_path)
-    : LogSetup(LogConfig::fromString(output_path)) {}
-
-LogSetup::~LogSetup() {
+fs::path DataDirectory::path(const std::filesystem::path& sub_path) const {
   if (!valid_) {
-    return;
+    throw std::runtime_error("logging not configured, unable to get timer filepath");
   }
 
-  for (const auto& func : callbacks_) {
-    func(*this);
-  }
-}
-
-fs::path LogSetup::getLogDir() const { return valid_ ? config_.log_dir : ""; }
-
-fs::path LogSetup::getLogDir(const std::string& log_namespace) const {
-  if (!valid_) {
-    return "";
-  }
-
-  auto ns_path = fs::path(config_.log_dir) / log_namespace;
-  if (!namespaces_.count(log_namespace)) {
+  auto ns_path = root_path_ / sub_path;
+  if (config.allocate && !std::filesystem::exists(ns_path)) {
     makeDirs(ns_path);
-    namespaces_.insert(log_namespace);
   }
 
   return ns_path;
 }
 
-fs::path LogSetup::getTimerFilepath() const {
-  if (!valid_) {
-    throw std::runtime_error("logging not configured, unable to get timer filepath");
-  }
-
-  return (config_.log_dir / config_.timing_stats_name).lexically_normal();
+DataDirectory DataDirectory::child(const std::string& sub_path) const {
+  Config new_config = config;
+  new_config.overwrite = false;  // no need to clear children
+  return DataDirectory(sub_path, new_config);
 }
 
-fs::path LogSetup::getTimerFilepath(const std::string& timer_name) const {
-  if (!valid_) {
-    throw std::runtime_error("unable to save timer: " + timer_name);
-  }
+bool DataDirectory::valid() const { return valid_; }
 
-  std::string used_name = timer_name;
-  // If requested, replace all '/' with '_' to avoid creating a directory.
-  if (config_.log_raw_timers_to_single_dir) {
-    for (char& c : used_name) {
-      if (c == '/') {
-        c = '_';
-      }
-    }
-  }
-
-  const auto timer_path = fs::path(timer_name);
-  const auto timer_ns = timer_path.parent_path();
-  const auto filename = timer_path.stem().string() + config_.timing_suffix;
-  if (timer_ns.empty()) {
-    return (config_.log_dir / filename).lexically_normal();
-  }
-
-  fs::path full_path(getLogDir(timer_ns.string()));
-  return (full_path / filename).lexically_normal();
-}
-
-bool LogSetup::valid() const { return valid_; }
-
-const LogConfig& LogSetup::config() const { return config_; }
-
-void LogSetup::registerExitCallback(const std::function<void(const LogSetup&)>& func) {
-  callbacks_.push_back(func);
-}
+DataDirectory::operator bool() const { return valid(); }
 
 }  // namespace hydra

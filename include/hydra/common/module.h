@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/utils/log_utilities.h"
+#include "hydra/utils/data_directory.h"
 
 namespace hydra {
 
@@ -43,13 +43,10 @@ namespace hydra {
 class Module {
  public:
   using Ptr = std::shared_ptr<Module>;
-
   virtual ~Module() = default;
-
   virtual void start() = 0;
   virtual void stop() = 0;
-  virtual void save(const LogSetup& setup) = 0;
-
+  virtual void save(const DataDirectory& /* output */) {}
   virtual std::string printInfo() const { return ""; }
 };
 

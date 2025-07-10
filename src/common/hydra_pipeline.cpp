@@ -34,17 +34,21 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/common/hydra_pipeline.h"
 
+#include <config_utilities/parsing/yaml.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/settings.h>
 
+#include "hydra/utils/timing_utilities.h"
+
 namespace hydra {
+
+using hydra::timing::ElapsedTimeRecorder;
 
 HydraPipeline::HydraPipeline(const PipelineConfig& pipeline_config,
                              int robot_id,
-                             int config_verbosity,
-                             bool freeze_global_info)
+                             int config_verbosity)
     : config_verbosity_(config_verbosity) {
-  const auto& config = GlobalInfo::init(pipeline_config, robot_id, freeze_global_info);
+  const auto& config = GlobalInfo::init(pipeline_config, robot_id);
   frontend_dsg_ = config.createSharedDsg();
   backend_dsg_ = config.createSharedDsg();
   shared_state_.reset(new SharedModuleState());
@@ -77,14 +81,14 @@ std::string makeBanner(const std::string& message,
 }
 
 std::string HydraPipeline::getModuleInfo(const std::string& name,
-                                         const Module* module) const {
+                                         const Module* mod) const {
   const auto print_width = config::Settings().print_width;
   std::stringstream ss;
   ss << makeBanner(name, print_width, '*', true, true);
-  if (!module) {
+  if (!mod) {
     ss << "UNITIALIZED MODULE!" << std::endl;
   } else {
-    const auto info = module->printInfo();
+    const auto info = mod->printInfo();
     if (!info.empty()) {
       ss << info << std::endl;
     }
@@ -97,8 +101,8 @@ void HydraPipeline::showModules() const {
   const auto print_width = config::Settings().print_width;
   std::stringstream ss;
   ss << std::endl << makeBanner("Modules", print_width, '=', true, true);
-  for (auto&& [name, module] : modules_) {
-    ss << std::endl << getModuleInfo(name, module.get());
+  for (auto&& [name, mod] : modules_) {
+    ss << std::endl << getModuleInfo(name, mod.get());
   }
   VLOG(config_verbosity_) << ss.str();
 }
@@ -111,13 +115,13 @@ void HydraPipeline::start() {
     input_module_->start();
   }
 
-  for (auto&& [name, module] : modules_) {
-    if (!module) {
+  for (auto&& [name, mod] : modules_) {
+    if (!mod) {
       LOG(FATAL) << "Found unitialized module: " << name;
       continue;
     }
 
-    module->start();
+    mod->start();
   }
 
   if (input_module_) {
@@ -126,30 +130,49 @@ void HydraPipeline::start() {
 }
 
 void HydraPipeline::stop() {
-  for (auto&& [name, module] : modules_) {
-    if (!module) {
+  for (auto&& [name, mod] : modules_) {
+    if (!mod) {
       LOG(FATAL) << "Found unitialized module: " << name;
       continue;
     }
 
-    module->stop();
+    mod->stop();
   }
 }
 
-void HydraPipeline::save() {
-  const auto& logs = GlobalInfo::instance().getLogs();
-  if (!logs || !logs->valid()) {
+void HydraPipeline::save(const DataDirectory& logs) const {
+  if (!logs) {
     return;
   }
 
-  for (auto&& [name, module] : modules_) {
-    if (!module) {
+  auto& info = GlobalInfo::instance();
+  auto node = config::toYaml(info.getConfig());
+  for (const auto& name : info.getAvailableSensors()) {
+    const auto sensor = info.getSensor(name);
+    if (sensor) {
+      node["sensors"][name] = info.getSensor(name)->dump();
+    }
+  }
+
+  std::filesystem::path log_dir = logs.path();
+  std::ofstream fout(log_dir / "hydra_config.yaml");
+  fout << node;
+
+  for (auto&& [name, mod] : modules_) {
+    if (!mod) {
       LOG(FATAL) << "Found unitialized module: " << name;
       continue;
     }
 
-    module->save(*logs);
+    mod->save(logs);
   }
+
+  // save timing information to avoid destructor weirdness with singletons
+  LOG(INFO) << "[Hydra] saving timing information to " << log_dir;
+  const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
+  timer.logTimers(logs.path("timing"));
+  timer.logStats(log_dir / "timing_stats.csv");
+  LOG(INFO) << "[Hydra] saved timing information";
 }
 
 }  // namespace hydra

@@ -76,8 +76,8 @@ void LoopClosureModule::stopImpl() {
   }
 }
 
-void LoopClosureModule::save(const LogSetup& log_setup) {
-  const auto log_path = log_setup.getLogDir("lcd");
+void LoopClosureModule::save(const DataDirectory& output) {
+  const auto log_path = output.path("lcd");
   lcd_detector_->dumpDescriptors(log_path);
   lcd_graph_->save(log_path / "dsg.json", false);
 }

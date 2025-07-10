@@ -71,17 +71,16 @@ DsgUpdater::DsgUpdater(const Config& config,
   }
 }
 
-void DsgUpdater::save(const LogSetup& log_setup, std::string label) const {
+void DsgUpdater::save(const DataDirectory& output, const std::string& label) const {
   std::lock_guard<std::mutex> graph_lock(target_dsg_->mutex);
-  const auto backend_path = log_setup.getLogDir(label);
-  const auto pgmo_path = log_setup.getLogDir(label + "/pgmo");
-  target_dsg_->graph->save(backend_path / "dsg.json", false);
-  target_dsg_->graph->save(backend_path / "dsg_with_mesh.json");
+  const auto graph_path = output.path(label);
+  target_dsg_->graph->save(graph_path / "dsg.json", false);
+  target_dsg_->graph->save(graph_path / "dsg_with_mesh.json");
 
   const auto mesh = target_dsg_->graph->mesh();
   if (mesh && !mesh->empty()) {
     // mesh implements vertex and face traits
-    kimera_pgmo::WriteMesh(backend_path / "mesh.ply", *mesh, *mesh);
+    kimera_pgmo::WriteMesh(graph_path / "mesh.ply", *mesh, *mesh);
   }
 }
 

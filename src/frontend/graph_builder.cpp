@@ -68,8 +68,7 @@ static const auto registration =
                                    GraphBuilder,
                                    GraphBuilder::Config,
                                    SharedDsgInfo::Ptr,
-                                   SharedModuleState::Ptr,
-                                   LogSetup::Ptr>("GraphBuilder");
+                                   SharedModuleState::Ptr>("GraphBuilder");
 
 }
 
@@ -112,8 +111,7 @@ void declare_config(GraphBuilder::Config& config) {
 
 GraphBuilder::GraphBuilder(const Config& config,
                            const SharedDsgInfo::Ptr& dsg,
-                           const SharedModuleState::Ptr& state,
-                           const LogSetup::Ptr& logs)
+                           const SharedModuleState::Ptr& state)
     : config(config::checkValid(config)),
       sequence_number_(1),  // starts at 1 to differentiate from SharedDsgInfo default
       queue_(std::make_shared<InputQueue>()),
@@ -147,13 +145,6 @@ GraphBuilder::GraphBuilder(const Config& config,
       new kimera_pgmo::DeltaCompression(config.pgmo.mesh_resolution));
   deformation_compression_.reset(
       new kimera_pgmo::BlockCompression(config.pgmo.d_graph_resolution));
-
-  if (logs && logs->valid()) {
-    logs_ = logs;
-
-    const auto frontend_dir = logs->getLogDir("frontend");
-    VLOG(1) << "[Hydra Frontend] logging to " << frontend_dir;
-  }
 
   addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
   addInputCallback(
@@ -199,21 +190,17 @@ void GraphBuilder::stopImpl() {
   VLOG(2) << "[Hydra Frontend]: " << queue_->size() << " messages left";
 }
 
-void GraphBuilder::save(const LogSetup& log_setup) {
+void GraphBuilder::save(const DataDirectory& output) {
   std::lock_guard<std::mutex> lock(mutex_);
-  const auto output_path = log_setup.getLogDir("frontend");
+  const auto output_path = output.path("frontend");
+
   dsg_->graph->save(output_path / "dsg.json", false);
   dsg_->graph->save(output_path / "dsg_with_mesh.json");
-
   frontend_graph_logger_.save(output_path);
 
   const auto mesh = dsg_->graph->mesh();
   if (mesh && !mesh->empty()) {
     kimera_pgmo::WriteMesh(output_path / "mesh.ply", *mesh);
-  }
-
-  if (freespace_places_) {
-    freespace_places_->save(log_setup);
   }
 }
 
@@ -381,10 +368,8 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
     queues.lcd_queue->push(lcd_input_);
   }
 
-  if (logs_) {
-    // mutex not required because nothing is modifying the graph
-    frontend_graph_logger_.logGraph(*dsg_->graph);
-  }
+  // mutex not required because nothing is modifying the graph
+  frontend_graph_logger_.logGraph(*dsg_->graph);
 
   if (dsg_->graph && backend_input_) {
     ScopedTimer sink_timer("frontend/sinks", msg->timestamp_ns);

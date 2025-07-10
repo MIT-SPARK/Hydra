@@ -70,7 +70,7 @@ void declare_config(PythonBatchPipeline::Config& config) {
 
 PythonBatchPipeline::PythonBatchPipeline(const Config& config, int robot_id)
     : BatchPipeline(config, robot_id) {
-  GlobalInfo::init(config, robot_id, true);
+  GlobalInfo::init(config, robot_id);
   GlogSingleton::instance().setLogLevel(0, 0, false);
   config::Settings().print_width = 100;
   config::Settings().print_indent = 45;

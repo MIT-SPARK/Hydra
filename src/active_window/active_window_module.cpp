@@ -92,8 +92,6 @@ void ActiveWindowModule::stopImpl() {
   }
 }
 
-void ActiveWindowModule::save(const LogSetup&) {}
-
 std::string ActiveWindowModule::printInfo() const {
   return config::toString(config) + "\n" + Sink::printSinks(sinks_);
 }
