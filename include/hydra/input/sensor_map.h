@@ -43,21 +43,29 @@ enum class SensorMapMode {
   Single,
   //! Config is namespaced by sensor. If sensor name is not matched, throw error
   Strict,
-  //! Config is namespaced by sensor. If sensor name is not matched, use default config
+  //! Config is namespaced by sensor. If sensor name is not matched, use default
   Permissive,
 };
 
-template <typename T, typename ConfigT = typename T::Config>
+// NOTE(nathan) this is intentionally separate from SensorMap to make template argument
+// deduction work (an argument of `SensorMap<T>::Config&` will not participate in
+// template argument deduction)
+template <typename T>
+struct SensorMapConfig {
+  SensorMapMode mode = SensorMapMode::Single;
+  config::OrderedMap<std::string, typename T::Config> sensors;
+};
+
+template <typename T>
 class SensorMap {
  public:
-  struct Config {
-    SensorMapMode mode = SensorMapMode::Single;
-    config::OrderedMap<std::string, ConfigT> sensors;
-  } const config;
+  using Config = SensorMapConfig<T>;
 
   explicit SensorMap(const Config& config) : config(config) {}
   T* get(const std::string& name);
   const T* get(const std::string& name) const;
+
+  const Config config;
 
  private:
   mutable std::map<std::string, std::unique_ptr<T>> elements_;
@@ -91,11 +99,11 @@ struct SensorMapConversion {
   }
 };
 
-template <typename T, typename ConfigT>
-T* SensorMap<T, ConfigT>::get(const std::string& name) {
+template <typename T>
+T* SensorMap<T>::get(const std::string& name) {
   auto iter = elements_.find(name);
   if (iter == elements_.end()) {
-    std::optional<ConfigT> sensor_config;
+    std::optional<typename T::Config> sensor_config;
     for (const auto& [_name, candidate] : config.sensors) {
       if (name.empty() || _name == name) {
         sensor_config = candidate;
@@ -108,7 +116,7 @@ T* SensorMap<T, ConfigT>::get(const std::string& name) {
         case SensorMapMode::Single:
           throw std::runtime_error("single mode must always have config!");
         case SensorMapMode::Permissive:
-          sensor_config = ConfigT();
+          sensor_config = typename T::Config();
           break;
         case SensorMapMode::Strict:
         default:
@@ -122,22 +130,22 @@ T* SensorMap<T, ConfigT>::get(const std::string& name) {
   return iter->second.get();
 }
 
-template <typename T, typename ConfigT>
-const T* SensorMap<T, ConfigT>::get(const std::string& name) const {
-  return const_cast<SensorMap<T, ConfigT>*>(this)->get(name);
+template <typename T>
+const T* SensorMap<T>::get(const std::string& name) const {
+  return const_cast<SensorMap<T>*>(this)->get(name);
 }
 
-template <typename T, typename ConfigT>
-void declare_config(typename SensorMap<T, ConfigT>::Config& config) {
+template <typename T>
+void declare_config(SensorMapConfig<T>& config) {
   using namespace config;
-  name("SensorMap???::Config");
+  name<SensorMapConfig<T>>();
   enum_field(config.mode,
              "sensor_map_mode",
              {{SensorMapMode::Single, "Single"},
               {SensorMapMode::Strict, "Strict"},
               {SensorMapMode::Permissive, "Permissive"}});
   if (config.mode == SensorMapMode::Single) {
-    field<SensorMapConversion<ConfigT>>(config.sensors, "sensors", false);
+    field<SensorMapConversion<typename T::Config>>(config.sensors, "sensors");
   } else {
     field(config.sensors, "sensors");
   }
