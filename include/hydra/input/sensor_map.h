@@ -105,7 +105,7 @@ T* SensorMap<T>::get(const std::string& name) {
   if (iter == elements_.end()) {
     std::optional<typename T::Config> sensor_config;
     for (const auto& [_name, candidate] : config.sensors) {
-      if (name.empty() || _name == name) {
+      if (_name.empty() || _name == name) {
         sensor_config = candidate;
         break;
       }
