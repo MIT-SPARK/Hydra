@@ -76,7 +76,11 @@ struct SensorMapConversion {
   static T toIntermediate(const config::OrderedMap<std::string, T>& value,
                           std::string& error) {
     if (value.size() > 1u) {
-      error = "Map does not have a single element";
+      // NOTE(nathan) we rely having up to a single element with an empty name when
+      // faking a single config with the map. If there are multiple elements, something
+      // has gone wrong in the conversion process (the conversion likely used to point
+      // to a map created from one of the other multi-sensor modes)
+      error = "Multiple elements are ambiguous, something went wrong!";
       return {};
     }
 
@@ -87,7 +91,7 @@ struct SensorMapConversion {
                                config::OrderedMap<std::string, T>& value,
                                std::string& error) {
     if (value.size() > 1u) {
-      error = "Map does not have a single element";
+      error = "Multiple elements are ambiguous, something went wrong!";
       return;
     }
 
@@ -114,7 +118,8 @@ T* SensorMap<T>::get(const std::string& name) {
     if (!sensor_config) {
       switch (config.mode) {
         case SensorMapMode::Single:
-          throw std::runtime_error("single mode must always have config!");
+          // this should be unreachable given how the sensor map works
+          throw std::runtime_error("Single mode requires a config!");
         case SensorMapMode::Permissive:
           sensor_config = typename T::Config();
           break;
