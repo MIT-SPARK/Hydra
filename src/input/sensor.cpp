@@ -67,6 +67,12 @@ Sensor::Sensor(const Config& config, const std::string& name)
   Eigen::IOFormat fmt(6, 0, ", ", "\n", "", "", "[", "]");
   VLOG(1) << "Parsed sensor with extrinsics: " << std::endl
           << std::setfill(' ') << sensor_body_pose.matrix().format(fmt);
+  if (!config.static_mask_fp.empty()) {
+    static_mask_ = cv::imread(config.static_mask_fp);
+    if (static_mask_.empty()) {
+      LOG(WARNING) << "Failed to load static mask from: " << config.static_mask_fp;
+    }
+  }
 }
 
 YAML::Node Sensor::dump() const { return config::toYaml(config); }
@@ -77,6 +83,7 @@ void declare_config(Sensor::Config& conf) {
   field(conf.min_range, "min_range", "m");
   field(conf.max_range, "max_range", "m");
   field(conf.extrinsics, "extrinsics");
+  field(conf.static_mask_fp, "static_mask_fp");
   check(conf.min_range, GT, 0.0, "min_range");
   checkCondition(conf.max_range > conf.min_range,
                  "param 'max_range' is expected > 'min_range'");
