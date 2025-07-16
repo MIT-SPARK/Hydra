@@ -47,9 +47,7 @@
 // purposes notwithstanding any copyright notation herein.
 #pragma once
 #include <memory>
-#include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
-#include <opencv2/imgproc.hpp>
 #include <string>
 #include <thread>
 
