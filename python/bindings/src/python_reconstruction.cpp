@@ -147,10 +147,6 @@ PythonReconstruction::PythonReconstruction(const Config& config,
   }
 
   GlogSingleton::instance().setLogLevel(0, 0, false);
-  config::Settings().setLogger("glog");
-  config::Settings().print_width = 100;
-  config::Settings().print_indent = 45;
-
   GlobalInfo::instance().setSensor(sensor);
 
   ReconstructionModule::OutputQueue::Ptr queue;
