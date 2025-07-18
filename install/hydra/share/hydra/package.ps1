@@ -104,5 +104,3 @@ function colcon_package_source_powershell_script {
     Write-Error "not found: '$_colcon_package_source_powershell_script'"
   }
 }
-
-
