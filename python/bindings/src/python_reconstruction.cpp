@@ -65,7 +65,7 @@ struct MeshUpdater {
       : compression(voxel_size / 4.0),
         queue(new ReconstructionModule::OutputQueue()),
         zmq_sender(url, 2) {
-    graph.reset(new DynamicSceneGraph(DynamicSceneGraph::LayerIds{2, 3, 4, 5}));
+    graph.reset(new DynamicSceneGraph());
     graph->setMesh(std::make_shared<Mesh>());
   }
 
