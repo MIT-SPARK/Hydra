@@ -87,7 +87,7 @@ We will link to the new repository once this is done.
 > **Note**<br>
 > As part of the this release, we have moved ROS related code to a new repository located [here](https://github.com/MIT-SPARK/Hydra-ROS). This code (and our installation process) still do rely on the ROS ecosystem.
 
-<details>
+</details>
 
 ## Installation and Running
 
