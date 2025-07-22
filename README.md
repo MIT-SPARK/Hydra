@@ -78,9 +78,7 @@ We will link to the new repository once this is done.
 ## Installation and Running
 
 Hydra has been tested on Ubuntu 24.04 and ROS2 Jazzy.
-Please refer to our guide [here](https://github.com/MIT-SPARK/Hydra-ROS/blob/ros2/doc/ros2_setup.md) for installation instructions.
-
-See [here](https://github.com/MIT-SPARK/Hydra-ROS/blob/main/doc/quickstart.md) for detailed instructions discussing how to run Hydra using ROS.
+Please refer to our guide [here](https://github.com/MIT-SPARK/Hydra-ROS/tree/main?tab=readme-ov-file#getting-started) for installation instructions.
 
 ### Hydra Python Bindings
 
