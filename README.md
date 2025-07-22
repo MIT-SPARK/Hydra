@@ -31,13 +31,14 @@ If you find this code relevant for your work, please consider citing one or both
 }
 ```
 
-#### Acknowledgements
+## Table of Contents
 
-This work was partially funded by the AIA CRA FA8750-19-2-1000, ARL DCIST CRA W911NF-17-2-0181, and ONR RAIDER N00014-18-1-2828.
-
-#### Disclaimer
-
-Research was sponsored by the United States Air Force Research Laboratory and the United States Air Force Artificial Intelligence Accelerator and was accomplished under Cooperative Agreement Number FA8750-19-2-1000. The views and conclusions contained in this document are those of the authors and should not be interpreted as representing the official policies, either expressed or implied, of the United States Air Force or the U.S. Government. The U.S. Government is authorized to reproduce and distribute reprints for Government purposes notwithstanding any copyright notation herein.
+- [Filing Issues](#filing-issues)
+- [News](#news)
+- [Installation and Running](#installation-and-running)
+    - [Python Bindings](#hydra-python-bindings)
+    - [Evalaution](#hydra-evaluation)
+- [Acknowledgements](#acknowledgements)
 
 ## Filing Issues
 
@@ -56,6 +57,9 @@ Thank you in advance for your understanding!
 ## News
 
 **Update (07/09/25):** We've archived the ROS1 version of Hydra and switched to the ROS2 version by default. See [this branch](https://github.com/MIT-SPARK/Hydra/tree/archive/ros_noetic) for the pinned version of the code if you need the ROS1 version for any reason. We are unlikely to support any issues that come up with the archived ROS1 version.
+
+<details>
+<summary> Previous News</summary>
 
 **Update (01/28/25):** We've released a new version of Hydra. This involves the following changes:
   - Open-set semantic capabilities used by downstream projects (i.e., [Khronos](https://github.com/MIT-SPARK/Khronos) and [Clio](https://github.com/MIT-SPARK/Clio))
@@ -83,6 +87,8 @@ We will link to the new repository once this is done.
 > **Note**<br>
 > As part of the this release, we have moved ROS related code to a new repository located [here](https://github.com/MIT-SPARK/Hydra-ROS). This code (and our installation process) still do rely on the ROS ecosystem.
 
+<details>
+
 ## Installation and Running
 
 Hydra has been tested on Ubuntu 24.04 and ROS2 Jazzy.
@@ -97,3 +103,11 @@ See [here](python/README.md) for information
 ### Hydra Evaluation
 
 See [here](eval/README.md) for information
+
+## Acknowledgements
+
+This work was partially funded by the AIA CRA FA8750-19-2-1000, ARL DCIST CRA W911NF-17-2-0181, and ONR RAIDER N00014-18-1-2828.
+
+#### Disclaimer
+
+Research was sponsored by the United States Air Force Research Laboratory and the United States Air Force Artificial Intelligence Accelerator and was accomplished under Cooperative Agreement Number FA8750-19-2-1000. The views and conclusions contained in this document are those of the authors and should not be interpreted as representing the official policies, either expressed or implied, of the United States Air Force or the U.S. Government. The U.S. Government is authorized to reproduce and distribute reprints for Government purposes notwithstanding any copyright notation herein.
