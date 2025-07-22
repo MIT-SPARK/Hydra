@@ -33,33 +33,19 @@ If you find this code relevant for your work, please consider citing one or both
 
 ## Table of Contents
 
-- [Filing Issues](#filing-issues)
 - [News](#news)
 - [Installation and Running](#installation-and-running)
     - [Python Bindings](#hydra-python-bindings)
     - [Evalaution](#hydra-evaluation)
+- [Filing Issues](#filing-issues)
 - [Acknowledgements](#acknowledgements)
-
-## Filing Issues
-
-Please understand that this is research code maintained by busy graduate students, **which comes with some caveats**:
-  1. We do our best to maintain and keep the code up-to-date, but things may break or change occasionally
-  2. We do not have bandwidth to help adapt the code to new applications
-  3. The documentation, code-base and installation instructions are geared towards practitioners familiar with ROS and 3D scene graph research.
-
-> **:warning: Warning**<br>
-> We don't support other platforms. Issues requesting support on other platforms (e.g., Ubuntu 18.04, Windows) will be summarily closed.
-
-Depending on the nature of the issue, it may be helpful to browse [this](doc/debugging.md) page about debugging Hydra first.
-
-Thank you in advance for your understanding!
 
 ## News
 
 **Update (07/09/25):** We've archived the ROS1 version of Hydra and switched to the ROS2 version by default. See [this branch](https://github.com/MIT-SPARK/Hydra/tree/archive/ros_noetic) for the pinned version of the code if you need the ROS1 version for any reason. We are unlikely to support any issues that come up with the archived ROS1 version.
 
 <details>
-<summary> Previous News</summary>
+<summary>Previous News</summary>
 
 **Update (01/28/25):** We've released a new version of Hydra. This involves the following changes:
   - Open-set semantic capabilities used by downstream projects (i.e., [Khronos](https://github.com/MIT-SPARK/Khronos) and [Clio](https://github.com/MIT-SPARK/Clio))
@@ -103,6 +89,20 @@ See [here](python/README.md) for information
 ### Hydra Evaluation
 
 See [here](eval/README.md) for information
+
+## Filing Issues
+
+Please understand that this is research code maintained by busy graduate students, **which comes with some caveats**:
+  1. We do our best to maintain and keep the code up-to-date, but things may break or change occasionally
+  2. We do not have bandwidth to help adapt the code to new applications
+  3. The documentation, code-base and installation instructions are geared towards practitioners familiar with ROS and 3D scene graph research.
+
+> **:warning: Warning**<br>
+> We don't support other platforms. Issues requesting support on other platforms (e.g., Ubuntu 18.04, Windows) will be summarily closed.
+
+Depending on the nature of the issue, it may be helpful to browse [this](doc/debugging.md) page about debugging Hydra first.
+
+Thank you in advance for your understanding!
 
 ## Acknowledgements
 
