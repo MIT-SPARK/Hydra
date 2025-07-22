@@ -84,8 +84,8 @@ void declare_config(ReconstructionModule::Config& config) {
   base<ActiveWindowModule::Config>(config);
   field(config.full_update_separation_s, "full_update_separation_s", "s");
   field(config.max_input_queue_size, "max_input_queue_size");
-  field(config.tsdf, "tsdf");
   field(config.mesh, "mesh");
+  field(config.tsdf, "tsdf");
   config.robot_footprint.setOptional();
   field(config.robot_footprint, "robot_footprint");
 }
@@ -95,12 +95,14 @@ ReconstructionModule::ReconstructionModule(const Config& config,
     : ActiveWindowModule(config, queue),
       config(config::checkValid(config)),
       last_update_ns_(std::nullopt),
-      tsdf_integrator_(std::make_unique<ProjectiveIntegrator>(config.tsdf)),
+      tsdf_integrators_(config.tsdf),
       mesh_integrator_(std::make_unique<MeshIntegrator>(config.mesh)),
       footprint_integrator_(config.robot_footprint.create()) {
-  if (config.tsdf.semantic_integrator && !map_.config.with_semantics) {
-    LOG(ERROR)
-        << "Semantic integrator specified but map does not contain semantic layer!";
+  for (const auto& [name, tsdf_config] : config.tsdf.sensors) {
+    if (tsdf_config.semantic_integrator && !map_.config.with_semantics) {
+      LOG(ERROR) << "Semantic integrator specified for sensor " << name
+                 << " but map does not contain semantic layer!";
+    }
   }
 }
 
@@ -145,6 +147,12 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputPacket& msg) {
     return nullptr;
   }
 
+  const auto tsdf_integrator = tsdf_integrators_.get(data->getSensor().name);
+  if (!tsdf_integrator) {
+    VLOG(1) << "Unknown sensor '" << data->getSensor().name << "'";
+    return nullptr;
+  }
+
   // TODO(nathan) cache somewhere
   const auto label_config = GlobalInfo::instance().getLabelSpaceConfig();
   std::set<int32_t> invalid_labels;
@@ -158,7 +166,7 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputPacket& msg) {
 
   {  // timing scope
     ScopedTimer timer("reconstruction/tsdf", timestamp_ns);
-    tsdf_integrator_->updateMap(*data, map_, true, integration_mask);
+    tsdf_integrator->updateMap(*data, map_, true, integration_mask);
     if (footprint_integrator_) {
       footprint_integrator_->markFreespace(world_T_body.cast<float>(), map_);
     }
