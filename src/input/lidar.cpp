@@ -191,14 +191,25 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
   size_t num_invalid = 0;
   size_t color_index = 0;
   while (point_iter != input.vertex_map.end<cv::Vec3f>()) {
-    int u, v;
     const auto& p = *point_iter;
     Eigen::Vector3f p_C(p[0], p[1], p[2]);
     if (input.points_in_world_frame) {
       p_C = sensor_T_world * p_C;
     }
 
-    if (!projectPointToImagePlane(p_C, u, v)) {
+    // get float projection in [0, w] x [0, h]
+    float u_coord, v_coord;
+    projectPointToImagePlane(p_C, u_coord, v_coord);
+
+    // NOTE(nathan) typically we take the floor of any projection (which gives us the
+    // pixel the ray falls into). This is not ideal for handling slightly misaligned
+    // point clouds to the image coordinates. Rounding the projected coordinates should
+    // bin the distribution of bearings correctly (and should work like adding a
+    // constant offset to the pixel coordinates)
+    // TODO(nathan) think about PCL implementation
+    int u = std::round(u_coord);
+    int v = std::round(v_coord);
+    if (u < 0 || u >= width_ || v < 0 || v >= height_) {
       ++num_invalid;
       ++point_iter;
       ++label_iter;
@@ -264,11 +275,11 @@ bool Lidar::projectPointToImagePlane(const Eigen::Vector3f& p_C,
   if (config_.is_asymmetric) {
     // phi is [-pi/2, pi/2], ratio is [1, 0], maps to [height, 0]
     const auto vertical_ratio = (vertical_fov_top_rad_ - phi) / vertical_fov_rad_;
-    v = height_ * vertical_ratio + 0.5;
+    v = height_ * vertical_ratio;
   } else {
     // phi is [-pi/2, pi/2], ratio is [1, 0], maps to [height, 0]
     const auto vertical_ratio = (vertical_fov_rad_ / 2.0f - phi) / vertical_fov_rad_;
-    v = height_ * vertical_ratio + 0.5;
+    v = height_ * vertical_ratio;
   }
 
   if (v < 0.0f || v > height_) {
@@ -276,7 +287,7 @@ bool Lidar::projectPointToImagePlane(const Eigen::Vector3f& p_C,
   }
 
   const auto h_ratio = (horizontal_fov_rad_ / 2.0f - theta) / horizontal_fov_rad_;
-  u = width_ * h_ratio + 0.5;
+  u = width_ * h_ratio;
   if (u < 0.0f || u > width_) {
     return false;
   }
