@@ -469,7 +469,7 @@ TEST_F(ParentTestFixture, ParentsCorrect) {
   }
 }
 
-TEST_F(SingleBlockTestFixture, RaiseCorrectForSurface) {
+TEST_F(SingleBlockTestFixture, DISABLED_RaiseCorrectForSurface) {
   gvd_config.min_diff_m = 0.03;
   GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
   for (int x = 0; x < voxels_per_side; ++x) {

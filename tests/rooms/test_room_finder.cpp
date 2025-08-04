@@ -41,7 +41,7 @@ namespace hydra {
 
 class TestableRoomFinder : public RoomFinder {
  public:
-  explicit TestableRoomFinder(const RoomFinderConfig& config) : RoomFinder(config) {}
+  explicit TestableRoomFinder(const RoomFinder::Config& config) : RoomFinder(config) {}
 
   virtual ~TestableRoomFinder() = default;
 
@@ -79,7 +79,7 @@ TEST(RoomFinderTests, TestRoomPlaceEdges) {
   graph.emplaceNode(DsgLayers::PLACES, "p3"_id, std::make_unique<NodeAttributes>());
   graph.emplaceNode(DsgLayers::PLACES, "p4"_id, std::make_unique<NodeAttributes>());
 
-  RoomFinderConfig config;
+  RoomFinder::Config config;
 
   {  // test case: no clusters
     TestableRoomFinder room_finder(config);
@@ -122,7 +122,7 @@ TEST(RoomFinderTests, TestMakeRoomLayer) {
   addNode(places, 4, 5);
   addNode(places, 5, 50);
 
-  RoomFinderConfig config;
+  RoomFinder::Config config;
   config.min_room_size = 2;
 
   TestableRoomFinder room_finder(config);

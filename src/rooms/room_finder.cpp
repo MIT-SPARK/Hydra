@@ -34,6 +34,10 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/rooms/room_finder.h"
 
+#include <config_utilities/config.h>
+#include <config_utilities/types/conversions.h>
+#include <config_utilities/types/enum.h>
+#include <config_utilities/types/path.h>
 #include <glog/logging.h>
 #include <spark_dsg/graph_utilities.h>
 
@@ -98,7 +102,54 @@ void logFiltration(std::ostream& fout,
   fout << "]},";
 }
 
-RoomFinder::RoomFinder(const RoomFinderConfig& config) : config_(config) {}
+void declare_config(RoomFinder::Config& conf) {
+  using namespace config;
+  name("RoomFinder::Config");
+  field<CharConversion>(conf.room_prefix, "prefix");
+  field(conf.min_dilation_m, "min_dilation_m", "m");
+  field(conf.max_dilation_m, "max_dilation_m", "m");
+  field(conf.min_window_size, "min_window_size");
+  field(conf.clip_dilation_window_to_max, "clip_dilation_window_to_max");
+  field(conf.min_component_size, "min_component_size");
+  field(conf.min_room_size, "min_room_size");
+  enum_field(conf.dilation_threshold_mode,
+             "dilation_threshold_mode",
+             {{DilationThresholdMode::REPEATED, "REPEATED"},
+              {DilationThresholdMode::LONGEST_LIFETIME, "LONGEST_LIFETIME"},
+              {DilationThresholdMode::PLATEAU, "PLATEAU"},
+              {DilationThresholdMode::PLATEAU_THRESHOLD, "PLATEAU_THRESHOLD"}});
+  field(conf.min_lifetime_length_m, "min_lifetime_length_m");
+  field(conf.plateau_ratio, "plateau_ratio");
+  field(conf.max_modularity_iters, "max_modularity_iters");
+  field(conf.modularity_gamma, "modularity_gamma");
+  enum_field(conf.clustering_mode,
+             "clustering_mode",
+             {{RoomClusterMode::MODULARITY, "MODULARITY"},
+              {RoomClusterMode::MODULARITY, "MODULARITY_DISTANCE"},
+              {RoomClusterMode::NEIGHBORS, "NEIGHBORS"},
+              {RoomClusterMode::NONE, "NONE"}});
+  field(conf.dilation_diff_threshold_m, "dilation_diff_threshold_m", "m");
+  field<Path::Absolute>(conf.log_path, "log_path");
+  field(conf.log_filtrations, "log_filtrations");
+  field(conf.log_place_graphs, "log_place_graphs");
+  // TODO(nathan) checks
+}
+
+RoomFinder::RoomFinder(const Config& config) : config(config) {
+  if (!config.log_filtrations) {
+    return;
+  }
+
+  log_file_.reset(new std::ofstream(config.log_path / "room_finder.json"));
+  (*log_file_) << "{\"contents\":[";
+
+  if (!config.log_place_graphs) {
+    return;
+  }
+
+  const std::string gname = config.log_path / "room_finder.graphs";
+  graph_log_file_.reset(new std::ofstream(gname, std::ios::binary));
+}
 
 RoomFinder::~RoomFinder() {
   if (log_file_) {
@@ -137,32 +188,16 @@ RoomFinder::~RoomFinder() {
   }
 }
 
-void RoomFinder::enableLogging(const std::string& log_path) {
-  if (!config_.log_filtrations) {
-    return;
-  }
-
-  log_file_.reset(new std::ofstream(log_path + ".json"));
-  (*log_file_) << "{\"contents\":[";
-
-  if (!config_.log_place_graphs) {
-    return;
-  }
-
-  const std::string gname = log_path + ".graphs";
-  graph_log_file_.reset(new std::ofstream(gname, std::ios::binary));
-}
-
 InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) const {
-  BarcodeTracker tracker(config_.min_component_size);
+  BarcodeTracker tracker(config.min_component_size);
   const auto filtration = getGraphFiltration(
       places,
       tracker,
-      config_.dilation_diff_threshold_m,
+      config.dilation_diff_threshold_m,
       [this](const DisjointSet& components) -> size_t {
         size_t num_components = 0;
         for (const auto id_size_pair : components.sizes) {
-          if (id_size_pair.second >= config_.min_component_size) {
+          if (id_size_pair.second >= config.min_component_size) {
             ++num_components;
           }
         }
@@ -173,40 +208,40 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
   VLOG(10) << "[RoomFinder] Filtration: " << filtration;
 
   auto window = getTrimmedFiltration(filtration,
-                                     config_.min_dilation_m,
-                                     config_.max_dilation_m,
-                                     config_.clip_dilation_window_to_max);
+                                     config.min_dilation_m,
+                                     config.max_dilation_m,
+                                     config.clip_dilation_window_to_max);
   if (window.first >= filtration.size()) {
     return {};
   }
 
-  if (config_.clip_dilation_window_to_max) {
+  if (config.clip_dilation_window_to_max) {
     const double window_size =
         filtration[window.second].distance - filtration[window.first].distance;
-    if (window_size < config_.min_window_size) {
-      VLOG(2) << "[RoomFinder] Bad window bounds: [" << config_.min_dilation_m << ", "
-              << config_.max_dilation_m << "],  window: [" << window.first << ", "
+    if (window_size < config.min_window_size) {
+      VLOG(2) << "[RoomFinder] Bad window bounds: [" << config.min_dilation_m << ", "
+              << config.max_dilation_m << "],  window: [" << window.first << ", "
               << window.second << "]"
               << " with size: " << window_size;
 
       window = getTrimmedFiltration(
-          filtration, config_.min_dilation_m, config_.max_dilation_m, false);
+          filtration, config.min_dilation_m, config.max_dilation_m, false);
     }
   }
 
-  VLOG(2) << "[RoomFinder] Bounds: [" << config_.min_dilation_m << ", "
-          << config_.max_dilation_m << "],  window: [" << window.first << ", "
+  VLOG(2) << "[RoomFinder] Bounds: [" << config.min_dilation_m << ", "
+          << config.max_dilation_m << "],  window: [" << window.first << ", "
           << window.second << "]";
 
   std::optional<FiltrationInfo> candidate = std::nullopt;
-  switch (config_.dilation_threshold_mode) {
+  switch (config.dilation_threshold_mode) {
     case DilationThresholdMode::REPEATED:
       candidate = getLongestSequence(filtration, window.first, window.second);
       break;
     case DilationThresholdMode::LONGEST_LIFETIME:
       candidate = getLongestLifetimeDilation(filtration,
                                              tracker.barcodes,
-                                             config_.min_lifetime_length_m,
+                                             config.min_lifetime_length_m,
                                              window.first,
                                              window.second);
       break;
@@ -214,10 +249,10 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
     case DilationThresholdMode::PLATEAU_THRESHOLD:
     default:
       const bool use_threshold =
-          config_.dilation_threshold_mode == DilationThresholdMode::PLATEAU_THRESHOLD;
+          config.dilation_threshold_mode == DilationThresholdMode::PLATEAU_THRESHOLD;
       candidate = getBestPlateau(
           filtration,
-          use_threshold ? config_.min_lifetime_length_m : config_.plateau_ratio,
+          use_threshold ? config.min_lifetime_length_m : config.plateau_ratio,
           window.first,
           window.second,
           use_threshold);
@@ -255,7 +290,7 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
 
   InitialClusters filtered;
   for (const auto& component : components) {
-    if (component.size() < config_.min_component_size) {
+    if (component.size() < config.min_component_size) {
       continue;
     }
 
@@ -275,10 +310,10 @@ SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
   }
 
   last_results_.clear();
-  switch (config_.clustering_mode) {
+  switch (config.clustering_mode) {
     case RoomClusterMode::MODULARITY:
       last_results_ = clusterGraphByModularity(
-          places, components, config_.max_modularity_iters, config_.modularity_gamma);
+          places, components, config.max_modularity_iters, config.modularity_gamma);
       break;
     case RoomClusterMode::MODULARITY_DISTANCE:
       last_results_ = clusterGraphByModularity(
@@ -288,8 +323,8 @@ SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
             // weight should be 1 / distance
             return 1.0 / (getNodePosition(G, n1) - getNodePosition(G, n2)).norm();
           },
-          config_.max_modularity_iters,
-          config_.modularity_gamma);
+          config.max_modularity_iters,
+          config.modularity_gamma);
       break;
     case RoomClusterMode::NEIGHBORS:
       last_results_ = clusterGraphByNeighbors(places, components);
@@ -314,9 +349,9 @@ SceneGraphLayer::Ptr RoomFinder::makeRoomLayer(const SceneGraphLayer& places) {
 
   // organize rooms by their oldest place
   IndexTimePairQueue queue;
-  fillIndexQueue(places, last_results_.clusters, queue, config_.min_room_size);
+  fillIndexQueue(places, last_results_.clusters, queue, config.min_room_size);
 
-  NodeSymbol room_id(config_.room_prefix, 0);
+  NodeSymbol room_id(config.room_prefix, 0);
   while (!queue.empty()) {
     const auto cluster_index = queue.top().index;
     queue.pop();
@@ -351,32 +386,6 @@ void RoomFinder::addRoomPlaceEdges(DynamicSceneGraph& graph) const {
 
     // add edge enforcing parent invariants
     graph.insertEdge(room->second, id_node_pair.first, nullptr, true);
-  }
-}
-
-void RoomFinder::fillClusterMap(const SceneGraphLayer& places,
-                                ClusterMap& assignments) const {
-  assignments.clear();
-  for (const auto& id_node_pair : places.nodes()) {
-    const auto place_id = id_node_pair.first;
-
-    const auto cluster = last_results_.labels.find(place_id);
-    if (cluster == last_results_.labels.end()) {
-      continue;
-    }
-
-    const auto room = cluster_room_map_.find(cluster->second);
-    if (room == cluster_room_map_.end()) {
-      continue;
-    }
-
-    const auto room_id = room->second;
-    auto assignment = assignments.find(room_id);
-    if (assignment == assignments.end()) {
-      assignment = assignments.emplace(room_id, std::vector<NodeId>()).first;
-    }
-
-    assignment->second.push_back(place_id);
   }
 }
 

@@ -46,7 +46,7 @@
 namespace hydra {
 
 using VFConfig = config::VirtualConfig<GraphBuilder>;
-using RFConfig = RoomFinderConfig;
+using RFConfig = RoomFinder::Config;
 
 BatchPipeline::BatchPipeline(const PipelineConfig& config, int robot_id) {
   GlobalInfo::init(config, robot_id);
