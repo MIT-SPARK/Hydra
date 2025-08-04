@@ -85,22 +85,11 @@ void fillIndexQueue(const SceneGraphLayer& places,
   }
 }
 
-void logFiltration(std::ostream& fout,
-                   const Filtration& filtration,
-                   const std::pair<size_t, size_t>& window,
-                   double distance) {
-  fout << "{";
-  fout << "\"start\":" << window.first << ",\"end\":" << window.second
-       << ",\"threshold\":" << distance << ",\"filtration\":[";
-  auto iter = filtration.begin();
-  while (iter != filtration.end()) {
-    fout << "{\"c\":" << iter->num_components << ",\"d\":" << iter->distance << "}";
-    ++iter;
-    if (iter != filtration.end()) {
-      fout << ",";
-    }
-  }
-  fout << "]},";
+// TODO(nathan) embed in graph metadata
+void logFiltration(const Filtration& /* filtration */,
+                   const std::pair<size_t, size_t>& /* window */,
+                   double /* distance */) {
+  LOG(FATAL) << "Not implemented yet!";
 }
 
 void declare_config(RoomFinder::Config& conf) {
@@ -138,57 +127,13 @@ void declare_config(RoomFinder::Config& conf) {
 
 RoomFinder::RoomFinder(const Config& config)
     : config(config::checkValid(config)), distance_adaptor_(new DistanceAdaptor()) {
-  if (!config.log_filtrations) {
+  if (!config.log_path.empty()) {
+    LOG(FATAL) << "Logging not implemented!";
     return;
   }
-
-  log_file_.reset(new std::ofstream(config.log_path / "room_finder.json"));
-  (*log_file_) << "{\"contents\":[";
-
-  if (!config.log_place_graphs) {
-    return;
-  }
-
-  const std::string gname = config.log_path / "room_finder.graphs";
-  graph_log_file_.reset(new std::ofstream(gname, std::ios::binary));
 }
 
-RoomFinder::~RoomFinder() {
-  if (log_file_) {
-    if (logged_once_) {
-      const size_t curr_pos = log_file_->tellp();
-      log_file_->seekp(curr_pos - 1);
-    }
-
-    (*log_file_) << "]";
-    if (graph_log_file_) {
-      graph_log_file_->flush();
-      graph_log_file_->close();
-      graph_log_file_.reset();
-
-      auto& fout = *log_file_;
-      fout << ",\"offsets\":[";
-      for (size_t i = 0; i < graph_entries_.size(); ++i) {
-        const auto& entry = graph_entries_[i];
-        fout << "{\"index\":" << i;
-        fout << ",\"offset\":" << entry.offset;
-        fout << ",\"size\":" << entry.size;
-        fout << ",\"num_nodes\":" << entry.num_nodes;
-        fout << ",\"num_edges\":" << entry.num_edges;
-        fout << "}";
-        if (i + 1 < graph_entries_.size()) {
-          fout << ",";
-        }
-      }
-      fout << "]";
-    }
-
-    (*log_file_) << "}" << std::endl;
-    log_file_->flush();
-    log_file_->close();
-    log_file_.reset();
-  }
-}
+RoomFinder::~RoomFinder() {}
 
 InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) const {
   BarcodeTracker tracker(config.min_component_size);
@@ -272,14 +217,9 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
   if (log_file_) {
     if (graph_log_file_) {
       LOG(FATAL) << "Not implemented currently";
-      /* const auto bson_str = places.toBson();*/
-      /* graph_entries_.push_back(*/
-      /*{graph_offset_, bson_str.size(), places.numNodes(), places.numEdges()});*/
-      /*graph_log_file_->write(bson_str.data(), bson_str.size());*/
-      /*graph_offset_ += bson_str.size();*/
     }
 
-    logFiltration(*log_file_, filtration, window, info.distance);
+    logFiltration(filtration, window, info.distance);
     logged_once_ = true;
   }
 

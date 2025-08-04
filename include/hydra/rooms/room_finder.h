@@ -105,8 +105,6 @@ class RoomFinder {
   ClusterResults last_results_;
   std::map<size_t, NodeId> cluster_room_map_;
   mutable bool logged_once_ = false;
-  std::unique_ptr<std::ofstream> log_file_;
-  std::unique_ptr<std::ofstream> graph_log_file_;
   mutable std::vector<GraphInfo> graph_entries_;
   mutable size_t graph_offset_ = 0;
 };
