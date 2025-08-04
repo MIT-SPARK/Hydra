@@ -52,7 +52,7 @@ class PythonBatchPipeline : public BatchPipeline {
  public:
   struct Config : PipelineConfig {
     config::VirtualConfig<GraphBuilder> frontend;
-    RoomFinderConfig room_finder;
+    RoomFinder::Config room_finder;
   } const config;
 
   PythonBatchPipeline(const Config& config, int robot_id = 0);

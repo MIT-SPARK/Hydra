@@ -38,7 +38,7 @@
 #include "hydra/common/global_info.h"
 #include "hydra/frontend/graph_builder.h"
 #include "hydra/reconstruction/volumetric_map.h"
-#include "hydra/rooms/room_finder_config.h"
+#include "hydra/rooms/room_finder.h"
 
 namespace hydra {
 
@@ -51,7 +51,7 @@ class BatchPipeline {
   DynamicSceneGraph::Ptr construct(
       const config::VirtualConfig<GraphBuilder>& graph_config,
       VolumetricMap& map,
-      const RoomFinderConfig* room_config = nullptr) const;
+      const RoomFinder::Config* room_config = nullptr) const;
 };
 
 }  // namespace hydra

@@ -38,8 +38,6 @@
 
 #include "hydra/common/dsg_types.h"
 #include "hydra/rooms/graph_clustering.h"
-#include "hydra/rooms/room_finder_config.h"
-#include "hydra/rooms/room_utilities.h"
 
 namespace hydra {
 
@@ -52,23 +50,49 @@ struct GraphInfo {
   size_t num_edges;
 };
 
+enum class RoomClusterMode { MODULARITY, MODULARITY_DISTANCE, NEIGHBORS, NONE };
+
+enum class DilationThresholdMode {
+  REPEATED,
+  LONGEST_LIFETIME,
+  PLATEAU,
+  PLATEAU_THRESHOLD
+};
+
 class RoomFinder {
  public:
   using ClusterMap = std::map<NodeId, std::vector<NodeId>>;
 
-  explicit RoomFinder(const RoomFinderConfig& config);
+  struct Config {
+    char room_prefix = 'R';
+    double min_dilation_m = 0.1;
+    double max_dilation_m = 0.7;
+    double min_window_size = 0.2;
+    bool clip_dilation_window_to_max = false;
+    size_t min_component_size = 15;
+    size_t min_room_size = 10;
+    DilationThresholdMode dilation_threshold_mode = DilationThresholdMode::REPEATED;
+    double min_lifetime_length_m = 0.1;
+    double plateau_ratio = 0.5;
+    RoomClusterMode clustering_mode = RoomClusterMode::NEIGHBORS;
+    double max_modularity_iters = 5;
+    double modularity_gamma = 1.0;
+    double dilation_diff_threshold_m = 1.0e-4;
+    //! @brief Whether or not to log filtration for a particular place graph
+    bool log_filtrations = false;
+    //! @brief Whether or not to log place graphs
+    bool log_place_graphs = false;
+    //! @brief Path to log intermediate results. Empty path disables logging
+    std::filesystem::path log_path;
+  } const config;
+
+  explicit RoomFinder(const Config& config);
 
   virtual ~RoomFinder();
 
   SceneGraphLayer::Ptr findRooms(const SceneGraphLayer& places);
 
   void addRoomPlaceEdges(DynamicSceneGraph& graph, const std::string& layer) const;
-
-  void enableLogging(const std::string& log_path);
-
-  void fillClusterMap(const SceneGraphLayer& places, ClusterMap& assignments) const;
-
-  const RoomFinderConfig config;
 
  protected:
   InitialClusters getBestComponents(const SceneGraphLayer& places) const;
@@ -86,5 +110,7 @@ class RoomFinder {
   mutable std::vector<GraphInfo> graph_entries_;
   mutable size_t graph_offset_ = 0;
 };
+
+void declare_config(RoomFinder::Config& config);
 
 }  // namespace hydra

@@ -42,7 +42,7 @@ namespace hydra {
 
 struct UpdateRoomsFunctor : public UpdateFunctor {
   struct Config {
-    RoomFinderConfig room_finder;
+    RoomFinder::Config room_finder;
     std::string places_layer = DsgLayers::PLACES;
   } const config;
 
