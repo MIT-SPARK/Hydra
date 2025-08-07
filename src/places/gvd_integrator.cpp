@@ -73,6 +73,7 @@ GvdIntegrator::GvdIntegrator(const GvdIntegratorConfig& config,
 
 void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
                                    const TsdfLayer& tsdf,
+                                   const MeshLayer& mesh,
                                    bool clear_updated_flag,
                                    bool use_all_blocks) {
   const BlockIndices blocks =
@@ -83,8 +84,8 @@ void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
   ScopedTimer timer("places/propagate_tsdf", timestamp_ns);
   update_stats_.clear();
 
+  propagateSurface(tsdf, mesh);
   for (const BlockIndex& idx : blocks) {
-    propagateSurface(idx, tsdf);
     processTsdfBlock(tsdf.getBlock(idx), idx);
   }
 
@@ -258,10 +259,36 @@ void GvdIntegrator::updateVoronoiQueue(GvdVoxel& voxel,
 /* TSDF Propagation */
 /****************************************************************************************/
 
-void GvdIntegrator::propagateSurface(const BlockIndex& block_index,
-                                     const TsdfLayer& tsdf) {
-  const auto& tsdf_block = tsdf.getBlock(block_index);
-  auto& gvd_block = gvd_layer_->allocateBlock(block_index);
+void GvdIntegrator::propagateSurface(const MeshLayer& layer, const TsdfLayer& tsdf) {
+  size_t num_outside = 0;
+  size_t num_invalid = 0;
+  size_t num_marked = 0;
+  for (const auto& block : mesh) {
+    for (const auto& point : block.points) {
+      auto block = gvd.getBlockPtr(point);
+      if (!block) {
+        ++num_outside;
+        continue;  // surface vertex falls outside gvd
+      }
+
+      const auto& voxel_idx = block->getVoxelIndex(point);
+      if (!block->isValidVoxelIndex(voxel_idx)) {
+        ++num_invalid;
+        continue;  // shouldn't happen, but...
+      }
+
+      auto& voxel = block->getVoxel(voxel_idx);
+      voxel.on_surface = true;
+      resetParent(voxel);  // surface voxels don't have parents
+      voxel.parent_pos[0] = point.x();
+      voxel.parent_pos[1] = point.y();
+      voxel.parent_pos[2] = point.z();
+      ++num_marked;
+    }
+  }
+
+  LOG(ERROR) << "Marked mesh: outside=" << num_outside << ", invalid=" << num_invalid
+             << ", marked=" << num_marked;
 
   // TODO(nathan) need to enforce that this is smaller than the truncation distance
   // otherwise updated blocks in free-space will clear the ESDF

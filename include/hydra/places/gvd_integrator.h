@@ -65,6 +65,7 @@ class GvdIntegrator {
 
   void updateFromTsdf(uint64_t timestamp_ns,
                       const TsdfLayer& tsdf,
+                      const MeshLayer& mesh,
                       bool clear_updated_flag,
                       bool use_all_blocks = false);
 
@@ -97,7 +98,7 @@ class GvdIntegrator {
                           GraphExtractor* extractor);
 
   // TSDF propagation
-  void propagateSurface(const BlockIndex& block_index, const TsdfLayer& tsdf);
+  void propagateSurface(const TsdfLayer& tsdf, const MeshLayer& mesh);
 
   void processTsdfBlock(const TsdfBlock& block, const BlockIndex& index);
 
