@@ -82,7 +82,7 @@ class GraphBuilder : public Module {
       double d_graph_resolution = 1.5;
       double time_horizon = 10.0;
     } pgmo;
-    GraphUpdater::Config graph_updater{{{DsgLayers::OBJECTS, {'O', std::nullopt}}}};
+    GraphUpdater::Config graph_updater{{{DsgLayers::OBJECTS, {'O', std::nullopt, {}}}}};
     GraphConnector::Config graph_connector;
     bool enable_mesh_objects = true;
     MeshSegmenter::Config object_config;

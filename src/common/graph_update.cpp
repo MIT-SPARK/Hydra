@@ -135,13 +135,38 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
     }
 
     auto& tracker = iter->second;
+    const auto target_layer_id = tracker.config.target_layer.value_or(layer_id);
+
+    std::map<NodeId, const NodeAttributes*> active_targets;
+    const auto target_layer = graph.findLayer(target_layer_id);
+    if (tracker.matcher && target_layer) {
+      for (const auto& [node_id, node] : target_layer->nodes()) {
+        auto& attrs = node->attributes();
+        if (attrs.is_active) {
+          active_targets[node_id] = &attrs;
+        }
+      }
+    }
+
     for (auto&& attrs : layer_update->attributes) {
-      VLOG(5) << "Emplacing " << tracker.next_id.str() << " @ "
-              << tracker.config.target_layer.value_or(layer_id) << " for layer "
-              << layer_id;
-      graph.emplaceNode(tracker.config.target_layer.value_or(layer_id),
-                        tracker.next_id,
-                        std::move(attrs));
+      std::optional<NodeId> to_merge;
+      for (const auto& [target_id, target_attrs] : active_targets) {
+        if (tracker.matcher && tracker.matcher->match(*attrs, *target_attrs)) {
+          to_merge = target_id;
+          break;
+        }
+      }
+
+      if (to_merge) {
+        VLOG(5) << "Merging attributes to " << NodeSymbol(*to_merge).str() << " @ "
+                << target_layer_id << " for layer " << layer_id;
+        // TODO(nathan) actual merge attributes
+        continue;
+      }
+
+      VLOG(5) << "Emplacing " << tracker.next_id.str() << " @ " << target_layer_id
+              << " for layer " << layer_id;
+      graph.emplaceNode(target_layer_id, tracker.next_id, std::move(attrs));
       ++tracker.next_id;
     }
   }
