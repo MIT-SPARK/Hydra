@@ -49,7 +49,7 @@ static const auto bbox_registration =
 
 static const auto iou_registration =
     config::RegistrationWithConfig<NodeMatcher, IoUNodeMatcher, IoUNodeMatcher::Config>(
-        "CentroidBBoxMatcher");
+        "IoUNodeMatcher");
 
 }  // namespace
 

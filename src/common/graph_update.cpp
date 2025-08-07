@@ -82,6 +82,8 @@ void declare_config(LayerTracker::Config& config) {
   name("LayerTracker::Config");
   field<CharConversion>(config.prefix, "prefix");
   field(config.target_layer, "target_layer");
+  config.matcher.setOptional();
+  field(config.matcher, "matcher");
 }
 
 void declare_config(GraphUpdater::Config& config) {
@@ -103,7 +105,7 @@ void LayerUpdate::append(LayerUpdate&& rhs) {
 }
 
 LayerTracker::LayerTracker(const Config& config)
-    : config(config), next_id(config.prefix, 0) {}
+    : config(config), next_id(config.prefix, 0), matcher(config.matcher.create()) {}
 
 GraphUpdater::GraphUpdater(const Config& config) : config(config::checkValid(config)) {
   for (const auto& [layer_name, tracker_config] : config.layer_updates) {
