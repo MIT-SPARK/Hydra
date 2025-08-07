@@ -99,6 +99,8 @@ class GraphBuilder : public Module {
     bool no_packet_collation = false;
     //! @brief Overwrite mesh timestamps using information from tracking layer
     bool overwrite_mesh_timestamps = false;
+    //! @brief Drop object meshes for memory savings
+    bool clear_object_meshes = false;
   } const config;
 
   GraphBuilder(const Config& config,
