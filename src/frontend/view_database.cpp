@@ -70,7 +70,7 @@ void ViewDatabase::updateAssignments(const DynamicSceneGraph& graph,
 
   LOG_IF(INFO, config.verbosity >= 1)
       << "Assigning features with " << views_.size() << " active view(s)";
-  for (const auto& [layer_name, layer_tracker] : trackers_) {
+  for (auto& [layer_name, layer_tracker] : trackers_) {
     auto layer = graph.findLayer(layer_name);
     if (!layer) {
       LOG(WARNING) << "Skipping unknown layer: '" << layer_name << "'";
@@ -78,6 +78,7 @@ void ViewDatabase::updateAssignments(const DynamicSceneGraph& graph,
     }
 
     size_t num_assigned = 0;
+    layer_tracker.clear();
     const auto layer_view = layer_tracker.view(*layer);
     for (const auto& node : layer_view) {
       auto attrs = node.tryAttributes<SemanticNodeAttributes>();

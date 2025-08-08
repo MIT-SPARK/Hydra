@@ -33,7 +33,7 @@ class ViewDatabase {
  protected:
   mutable ViewSelector::FeatureList views_;
   std::unique_ptr<ViewSelector> view_selector_;
-  std::map<std::string, ActiveWindowTracker> trackers_;
+  mutable std::map<std::string, ActiveWindowTracker> trackers_;
 };
 
 void declare_config(ViewDatabase::Config& config);
