@@ -160,7 +160,6 @@ class GraphBuilder : public Module {
 
  protected:
   uint64_t sequence_number_;
-  mutable std::mutex gvd_mutex_;
   std::atomic<bool> should_shutdown_{false};
   std::unique_ptr<std::thread> spin_thread_;
   InputQueue::Ptr queue_;
