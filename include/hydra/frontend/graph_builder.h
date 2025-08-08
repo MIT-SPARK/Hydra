@@ -192,8 +192,6 @@ class GraphBuilder : public Module {
 
   SceneGraphLogger frontend_graph_logger_;
   MessageQueue<PoseGraphPacket> pose_graph_updates_;
-
-  NodeIdSet previous_active_places_;
   std::list<pose_graph_tools::BowQuery::ConstPtr> cached_bow_messages_;
 
   Sink::List sinks_;
