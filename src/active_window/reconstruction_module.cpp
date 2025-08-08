@@ -163,6 +163,7 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputPacket& msg) {
 
   cv::Mat integration_mask;
   maskInvalidSemantics(data->label_image, invalid_labels, integration_mask);
+  maskNonZero(data->getSensor().getStaticMask(), integration_mask);
 
   {  // timing scope
     ScopedTimer timer("reconstruction/tsdf", timestamp_ns);
