@@ -3,6 +3,7 @@ map_window:
   type: spatial
   max_radius_m: 8.0
 active_window:
+  full_update_separation_s: 0.2
   volumetric_map:
     voxels_per_side: 16
     voxel_size: 0.1

@@ -99,6 +99,8 @@ class GraphBuilder : public Module {
     bool no_packet_collation = false;
     //! @brief Overwrite mesh timestamps using information from tracking layer
     bool overwrite_mesh_timestamps = false;
+    //! @brief Verbosity control for frontend
+    size_t verbosity = 0;
   } const config;
 
   GraphBuilder(const Config& config,

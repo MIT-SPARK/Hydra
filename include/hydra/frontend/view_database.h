@@ -19,6 +19,8 @@ class ViewDatabase {
     double inflation_distance = 0.0;
     //! @brief Layers to assign views for
     std::vector<std::string> layers{DsgLayers::PLACES, DsgLayers::MESH_PLACES};
+    //! @brief Verbosity for database
+    int verbosity = 0;
   } const config;
 
   explicit ViewDatabase(const Config& config);
