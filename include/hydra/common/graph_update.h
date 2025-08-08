@@ -77,6 +77,8 @@ void declare_config(LayerTracker::Config& config);
 struct GraphUpdater {
   struct Config {
     std::map<std::string, LayerTracker::Config> layer_updates;
+    //! @brief mark all added nodes as active
+    bool mark_active = true;
   } const config;
 
   explicit GraphUpdater(const Config& config);

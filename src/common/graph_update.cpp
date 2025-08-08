@@ -90,6 +90,7 @@ void declare_config(GraphUpdater::Config& config) {
   using namespace config;
   name("GraphUpdater::Config");
   field(config.layer_updates, "layer_updates");
+  field(config.mark_active, "mark_active");
 }
 
 LayerUpdate::LayerUpdate(spark_dsg::LayerId layer) : layer(layer) {}
@@ -151,6 +152,10 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
     }
 
     for (auto&& attrs : layer_update->attributes) {
+      if (!attrs) {
+        continue;
+      }
+
       std::optional<NodeId> to_merge;
       for (const auto& [target_id, target_attrs] : active_targets) {
         if (tracker.matcher && tracker.matcher->match(*attrs, *target_attrs)) {
@@ -164,6 +169,10 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
                 << target_layer_id << " for layer " << layer_id;
         // TODO(nathan) actual merge attributes
         continue;
+      }
+
+      if (config.mark_active) {
+        attrs->is_active = true;
       }
 
       VLOG(5) << "Emplacing " << tracker.next_id.str() << " @ " << target_layer_id
