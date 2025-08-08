@@ -7,6 +7,7 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/hydra_pipeline.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/label_remapper.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/label_space_config.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/node_matchers.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/pipeline_queues.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/robot_prefix_config.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/semantic_color_map.cpp

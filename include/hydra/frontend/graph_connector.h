@@ -63,6 +63,8 @@ struct LayerConnector {
         {spark_dsg::DsgLayers::OBJECTS, true, true}};
     //! Verbosity of graph connector
     size_t verbosity = 0;
+    //! Whether or not to force `is_active` to false
+    bool clear_active_flag = true;
   } const config;
 
   explicit LayerConnector(const Config& config);

@@ -33,61 +33,39 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/virtual_config.h>
 #include <spark_dsg/node_attributes.h>
-#include <spark_dsg/node_symbol.h>
-
-#include <list>
-#include <map>
-
-#include "hydra/common/node_matchers.h"
-
-namespace spark_dsg {
-class DynamicSceneGraph;
-}
 
 namespace hydra {
 
-struct LayerUpdate {
-  using Ptr = std::shared_ptr<LayerUpdate>;
-  explicit LayerUpdate(spark_dsg::LayerId layer);
-  void append(LayerUpdate&& other);
+struct NodeMatcher {
+  using Attrs = spark_dsg::NodeAttributes;
 
-  const spark_dsg::LayerId layer;
-  std::list<spark_dsg::NodeAttributes::Ptr> attributes;
+  virtual ~NodeMatcher() = default;
+  virtual bool match(const Attrs& new_attributes,
+                     const Attrs& prev_attributes) const = 0;
 };
 
-using GraphUpdate = std::map<spark_dsg::LayerId, LayerUpdate::Ptr>;
+struct CentroidBBoxMatcher : public NodeMatcher {
+  struct Config {};
 
-struct LayerTracker {
+  explicit CentroidBBoxMatcher(const Config&) {}
+  bool match(const Attrs& new_attrs, const Attrs& prev_attrs) const override;
+};
+
+void declare_config(CentroidBBoxMatcher::Config& config);
+
+struct IoUNodeMatcher : public NodeMatcher {
   struct Config {
-    char prefix = 0;
-    std::optional<spark_dsg::LayerId> target_layer;
-    config::VirtualConfig<NodeMatcher> matcher;
+    //! @brief Minimum IoU between two nodes of same class
+    double min_same_iou = 0.2;
+    //! @brief Minimum IoU between two nodes of different classes
+    double min_cross_iou = 0.5;
   } const config;
 
-  explicit LayerTracker(const Config& config);
-
-  spark_dsg::NodeSymbol next_id;
-  std::unique_ptr<NodeMatcher> matcher;
+  explicit IoUNodeMatcher(const Config& config);
+  bool match(const Attrs& new_attrs, const Attrs& prev_attrs) const override;
 };
 
-void declare_config(LayerTracker::Config& config);
-
-struct GraphUpdater {
-  struct Config {
-    std::map<std::string, LayerTracker::Config> layer_updates;
-    //! @brief mark all added nodes as active
-    bool mark_active = true;
-  } const config;
-
-  explicit GraphUpdater(const Config& config);
-  void update(const GraphUpdate& update, spark_dsg::DynamicSceneGraph& graph);
-
- private:
-  std::map<std::string, LayerTracker> trackers_;
-};
-
-void declare_config(GraphUpdater::Config& config);
+void declare_config(IoUNodeMatcher::Config& config);
 
 }  // namespace hydra

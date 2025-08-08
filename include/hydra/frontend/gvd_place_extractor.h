@@ -83,10 +83,6 @@ class GvdPlaceExtractor : public FreespacePlacesInterface {
 
   NodeIdSet getActiveNodes() const override;
 
-  // takes in a 3xN matrix
-  std::vector<bool> inFreespace(const PositionMatrix& positions,
-                                double freespace_distance_m) const override;
-
   void detect(const ActiveWindowOutput& msg) override;
 
   void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) override;
@@ -96,7 +92,6 @@ class GvdPlaceExtractor : public FreespacePlacesInterface {
   void filterGround(DynamicSceneGraph& graph);
 
  protected:
-  mutable std::mutex gvd_mutex_;
   places::GvdLayer::Ptr gvd_;
   places::GraphExtractor graph_extractor_;
   std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
