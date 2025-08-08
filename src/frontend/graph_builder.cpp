@@ -58,6 +58,7 @@
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/pgmo_mesh_interface.h"
 #include "hydra/utils/pgmo_mesh_traits.h"
+#include "hydra/utils/printing.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -107,6 +108,7 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.sinks, "sinks");
   field(config.no_packet_collation, "no_packet_collation");
   field(config.overwrite_mesh_timestamps, "overwrite_mesh_timestamps");
+  field(config.verbosity, "verbosity");
 }
 
 GraphBuilder::GraphBuilder(const Config& config,
@@ -398,6 +400,10 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
           return false;
         }
 
+        const auto fmt = getDefaultFormat(3);
+        LOG_IF(INFO, config.verbosity >= 2)
+            << "view @ " << timestamp << "[ns]: " << pos.format(fmt) << " vs. "
+            << msg->world_T_body().translation().format(fmt);
         return !map_window_->inBounds(
             msg->timestamp_ns, msg->world_T_body(), timestamp, pos);
       });
