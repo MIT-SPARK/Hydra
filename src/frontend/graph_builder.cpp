@@ -510,26 +510,19 @@ void GraphBuilder::updatePlaces(const ActiveWindowOutput& input) {
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
     freespace_places_->updateGraph(input.timestamp_ns, *dsg_->graph);
 
-    // TODO(nathan) fold this into updateGraph and return archived instead
-    // find node ids that are valid, but outside active place window
+    // force active flag on places
     active_nodes = freespace_places_->getActiveNodes();
     std::vector<NodeId> archived_places;
-    for (const auto& prev : previous_active_places_) {
-      if (active_nodes.count(prev)) {
-        continue;
+    for (const auto& [node_id, node] :
+         dsg_->graph->getLayer(DsgLayers::PLACES).nodes()) {
+      auto& attrs = node->attributes();
+      const auto prev_active = attrs.is_active;
+      attrs.is_active = active_nodes.count(node_id);
+      if (prev_active && !attrs.is_active) {
+        archived_places.push_back(node_id);
       }
-
-      const auto has_prev_node = dsg_->graph->findNode(prev);
-      if (!has_prev_node) {
-        continue;
-      }
-
-      const auto& prev_node = *has_prev_node;
-      prev_node.attributes().is_active = false;
-      archived_places.push_back(prev);
     }
 
-    previous_active_places_ = active_nodes;
     if (lcd_input_) {
       lcd_input_->archived_places.insert(archived_places.begin(),
                                          archived_places.end());
