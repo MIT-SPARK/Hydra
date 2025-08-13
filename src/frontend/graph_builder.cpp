@@ -109,6 +109,7 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.no_packet_collation, "no_packet_collation");
   field(config.overwrite_mesh_timestamps, "overwrite_mesh_timestamps");
   field(config.verbosity, "verbosity");
+  field(config.clear_object_meshes, "clear_object_meshes");
 }
 
 GraphBuilder::GraphBuilder(const Config& config,
@@ -382,6 +383,19 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
 }
 
 void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
+  // TODO(nathan) remove this temporary patch once we fix serialization/mesh storage
+  if (config.clear_object_meshes) {
+    auto iter = msg->graph_update.find(2);
+    if (iter != msg->graph_update.end()) {
+      for (auto& attr : iter->second->attributes) {
+        auto derived = dynamic_cast<KhronosObjectAttributes*>(attr.get());
+        if (derived) {
+          derived->mesh.clear();
+        }
+      }
+    }
+  }
+
   graph_updater_.update(msg->graph_update, *dsg_->graph);
 
   {  // start timing scope
