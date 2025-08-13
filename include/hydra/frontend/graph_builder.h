@@ -101,6 +101,8 @@ class GraphBuilder : public Module {
     bool overwrite_mesh_timestamps = false;
     //! @brief Verbosity control for frontend
     size_t verbosity = 0;
+    //! @brief Drop object meshes for memory savings
+    bool clear_object_meshes = false;
   } const config;
 
   GraphBuilder(const Config& config,
