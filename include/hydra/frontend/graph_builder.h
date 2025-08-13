@@ -85,7 +85,7 @@ class GraphBuilder : public Module {
       double d_graph_resolution = 1.5;
       double time_horizon = 10.0;
     } pgmo;
-    GraphUpdater::Config graph_updater{{{DsgLayers::OBJECTS, {'O', std::nullopt}}}};
+    GraphUpdater::Config graph_updater{{{DsgLayers::OBJECTS, {'O', std::nullopt, {}}}}};
     GraphConnector::Config graph_connector;
     bool enable_mesh_objects = true;
     MeshSegmenter::Config object_config;
@@ -160,7 +160,6 @@ class GraphBuilder : public Module {
 
  protected:
   uint64_t sequence_number_;
-  mutable std::mutex gvd_mutex_;
   std::atomic<bool> should_shutdown_{false};
   std::unique_ptr<std::thread> spin_thread_;
   InputQueue::Ptr queue_;
@@ -191,8 +190,6 @@ class GraphBuilder : public Module {
 
   SceneGraphLogger frontend_graph_logger_;
   MessageQueue<PoseGraphPacket> pose_graph_updates_;
-
-  NodeIdSet previous_active_places_;
   std::list<pose_graph_tools::BowQuery::ConstPtr> cached_bow_messages_;
 
   Sink::List sinks_;
