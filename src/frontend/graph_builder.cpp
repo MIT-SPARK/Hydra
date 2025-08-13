@@ -383,6 +383,7 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
 }
 
 void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
+  // TODO(nathan) remove this temporary patch once we fix serialization/mesh storage
   if (config.clear_object_meshes) {
     auto iter = msg->graph_update.find(2);
     if (iter != msg->graph_update.end()) {
