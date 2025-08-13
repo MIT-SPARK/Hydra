@@ -91,28 +91,6 @@ GvdPlaceExtractor::~GvdPlaceExtractor() {}
 
 NodeIdSet GvdPlaceExtractor::getActiveNodes() const { return active_nodes_; }
 
-std::vector<bool> GvdPlaceExtractor::inFreespace(const PositionMatrix& positions,
-                                                 double freespace_distance_m) const {
-  if (positions.cols() < 1) {
-    return {};
-  }
-
-  std::vector<bool> flags(positions.cols(), false);
-  // starting lock on tsdf update
-  std::unique_lock<std::mutex> lock(gvd_mutex_);
-  for (int i = 0; i < positions.cols(); ++i) {
-    const Point position = positions.col(i).cast<Point::Scalar>();
-    const auto* voxel = gvd_->getVoxelPtr(position);
-    if (!voxel) {
-      continue;
-    }
-
-    flags[i] = voxel->observed && voxel->distance > freespace_distance_m;
-  }
-
-  return flags;
-}
-
 void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg) {
   ScopedTimer timer("frontend/detect_gvd", msg.timestamp_ns, true, 2, false);
 
@@ -140,24 +118,21 @@ void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg) {
     gvd_integrator_.reset(new GvdIntegrator(config.gvd, gvd_));
   }
 
-  {  // start critical section
-    std::unique_lock<std::mutex> lock(gvd_mutex_);
-    ScopedTimer timer("places/gvd", msg.timestamp_ns);
-    // reconstruction now only sends updated blocks so we integrate everything
-    gvd_integrator_->updateFromTsdf(msg.timestamp_ns, tsdf, false, true);
-    gvd_integrator_->updateGvd(msg.timestamp_ns, &graph_extractor_);
+  ScopedTimer graph_timer("places/gvd", msg.timestamp_ns);
+  // reconstruction now only sends updated blocks so we integrate everything
+  gvd_integrator_->updateFromTsdf(msg.timestamp_ns, tsdf, false, true);
+  gvd_integrator_->updateGvd(msg.timestamp_ns, &graph_extractor_);
 
-    if (map_window_) {
-      BlockIndices to_archive;
-      for (const auto& block : *gvd_) {
-        if (!map_window_->inBounds(msg.timestamp_ns, world_T_body, block)) {
-          to_archive.push_back(block.index);
-        }
+  if (map_window_) {
+    BlockIndices to_archive;
+    for (const auto& block : *gvd_) {
+      if (!map_window_->inBounds(msg.timestamp_ns, world_T_body, block)) {
+        to_archive.push_back(block.index);
       }
-
-      gvd_integrator_->archiveBlocks(to_archive, &graph_extractor_);
     }
-  }  // end critical section
+
+    gvd_integrator_->archiveBlocks(to_archive, &graph_extractor_);
+  }
 
   Sink::callAll(sinks_, msg.timestamp_ns, world_T_body, *gvd_, graph_extractor_);
 }
