@@ -324,7 +324,7 @@ void ProjectiveIntegrator::computeSDF(const MapConfig& map_config,
                                       const InputData& data,
                                       const float distance_to_voxel,
                                       VoxelMeasurement& measurement) const {
-  const auto d_to_surface = interpolator_->InterpolateRange(
+  const auto d_to_surface = interpolator_->interpolateRange(
       data.range_image, measurement.interpolation_weights);
   const auto sdf = d_to_surface - distance_to_voxel;
   if (config.extra_integration_distance) {

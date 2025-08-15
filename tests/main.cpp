@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
   FLAGS_logtostderr = true;
   FLAGS_alsologtostderr = true;
   FLAGS_colorlogtostderr = true;
-  FLAGS_minloglevel = 1;
+  FLAGS_minloglevel = 0;
 
   ::testing::InitGoogleTest(&argc, argv);
   google::ParseCommandLineFlags(&argc, &argv, true);

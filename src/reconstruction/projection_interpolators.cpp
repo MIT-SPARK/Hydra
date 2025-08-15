@@ -96,7 +96,7 @@ Weights InterpolatorNearest::computeWeights(float u,
   return weights;
 }
 
-float InterpolatorNearest::InterpolateRange(const cv::Mat& range_image,
+float InterpolatorNearest::interpolateRange(const cv::Mat& range_image,
                                             const Weights& weights) const {
   return range_image.at<float>(weights.v, weights.u);
 }
@@ -136,7 +136,7 @@ Weights InterpolatorBilinear::computeWeights(float u,
   return weights;
 }
 
-float InterpolatorBilinear::InterpolateRange(const cv::Mat& range_image,
+float InterpolatorBilinear::interpolateRange(const cv::Mat& range_image,
                                              const Weights& weights) const {
   return range_image.at<float>(weights.v, weights.u) * weights.w0 +
          range_image.at<float>(weights.v + 1, weights.u) * weights.w1 +
@@ -223,10 +223,10 @@ Weights InterpolatorAdaptive::computeWeights(float u,
   return InterpolatorBilinear::computeWeights(u, v, ranges);
 }
 
-float InterpolatorAdaptive::InterpolateRange(const cv::Mat& range_image,
+float InterpolatorAdaptive::interpolateRange(const cv::Mat& range_image,
                                              const Weights& weights) const {
   if (weights.use_bilinear) {
-    return InterpolatorBilinear::InterpolateRange(range_image, weights);
+    return InterpolatorBilinear::interpolateRange(range_image, weights);
   }
 
   return range_image.at<float>(weights.v, weights.u);
