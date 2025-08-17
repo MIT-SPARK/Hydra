@@ -32,7 +32,6 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <hydra/reconstruction/projection_interpolators.h>
 
@@ -134,6 +133,14 @@ TEST(ProjectionInterpolators, AdaptiveCorrect) {
     EXPECT_NEAR(range_bilinear.value(), 1.5f, 1.0e-3f);
     EXPECT_NEAR(range_nearest.value(), 2.0f, 1.0e-3f);
   }
+}
+
+TEST(ProjectionInterpolators, AdaptiveOutOfRange) {
+  // force nearest interpolation outside of image
+  InterpolatorAdaptive interp({0.5});
+  cv::Mat img = (cv::Mat_<float>(2, 2) << 1.0, 2.0, 3.0, 4.0);
+  const auto range = getRange(interp, img, 1.9, 0.9);
+  ASSERT_FALSE(range);
 }
 
 }  // namespace hydra
