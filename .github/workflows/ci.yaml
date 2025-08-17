@@ -1,7 +1,7 @@
 ---
 # based on https://github.com/actions/starter-workflows/blob/main/ci/cmake-single-platform.yml
 name: Hydra Build and Test
-on: [pull_request]
+on: {push: {branches: [main]}, pull_request: {}}
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -11,3 +11,33 @@ jobs:
         run: sudo apt-get update && sudo apt install pipx
       - name: Lint
         run: pipx install pre-commit && cd ${{github.workspace}} && pre-commit run --all-files
+  ros2:
+    runs-on: ubuntu-latest
+    container: ros:jazzy-perception
+    steps:
+      - uses: actions/checkout@v4
+        with: {path: src/hydra}
+      - name: CCache
+        id: cache-ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ${{ runner.os }}-ccache-${{ github.sha}}
+          restore-keys: |
+            ${{ runner.os }}-ccache-${{ github.sha}}
+            ${{ runner.os }}-ccache-
+      - name: Dependencies
+        run: |
+          apt update && apt install -y python3-vcstool git ccache
+          vcs import src < src/hydra/install/packages.yaml
+          rosdep update --rosdistro jazzy && rosdep install --rosdistro jazzy --from-paths src --ignore-src -r -y
+      - name: Build
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          colcon build --cmake-args --no-warn-unused-cli -DCMAKE_BUILD_TYPE=Release -DSEMANTIC_INFERENCE_USE_TRT=OFF -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache
+      - name: Test
+        shell: bash
+        run: |-
+          source /opt/ros/jazzy/setup.bash
+          colcon test --packages-select hydra hydra_visualizer hydra_ros --return-code-on-test-failure --ctest-args --rerun-failed --output-on-failure --event-handlers console_cohesion+
