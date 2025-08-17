@@ -17,16 +17,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: {path: src/hydra}
+      - name: CCache
+        id: cache-ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ${{ runner.os }}-ccache-${{ github.sha}}
+          restore-keys: |
+            ${{ runner.os }}-ccache-${{ github.sha}}
+            ${{ runner.os }}-ccache-
       - name: Dependencies
         run: |
-          apt update && apt install -y python3-vcstool git
+          apt update && apt install -y python3-vcstool git ccache
           vcs import src < src/hydra/install/packages.yaml
           rosdep update --rosdistro jazzy && rosdep install --rosdistro jazzy --from-paths src --ignore-src -r -y
       - name: Build
         shell: bash
         run: |
           source /opt/ros/jazzy/setup.bash
-          colcon build --cmake-args --no-warn-unused-cli -DCMAKE_BUILD_TYPE=Release -DSEMANTIC_INFERENCE_USE_TRT=OFF
+          colcon build --cmake-args --no-warn-unused-cli -DCMAKE_BUILD_TYPE=Release -DSEMANTIC_INFERENCE_USE_TRT=OFF -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache
       - name: Test
         shell: bash
         run: |-
