@@ -214,8 +214,8 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
   VLOG(2) << "[RoomFinder] Best threshold: " << info.distance << " ("
           << info.num_components << " components)";
 
-  if (log_file_) {
-    if (graph_log_file_) {
+  if (!config.log_path.empty()) {
+    if (config.log_place_graphs) {
       LOG(FATAL) << "Not implemented currently";
     }
 
