@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/rooms/graph_clustering.h>
+#include <hydra/regions/graph_clustering.h>
 
 namespace hydra {
 

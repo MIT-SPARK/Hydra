@@ -37,7 +37,7 @@
 #include <unordered_set>
 
 #include "hydra/common/dsg_types.h"
-#include "hydra/rooms/graph_clustering.h"
+#include "hydra/regions/graph_clustering.h"
 
 namespace hydra {
 

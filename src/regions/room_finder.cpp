@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/rooms/room_finder.h"
+#include "hydra/regions/room_finder.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/types/conversions.h>
@@ -46,8 +46,8 @@
 #include <algorithm>
 #include <queue>
 
-#include "hydra/rooms/graph_filtration.h"
-#include "hydra/rooms/room_utilities.h"
+#include "hydra/regions/graph_filtration.h"
+#include "hydra/regions/room_utilities.h"
 
 namespace hydra {
 

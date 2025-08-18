@@ -38,7 +38,7 @@
 #include "hydra/common/global_info.h"
 #include "hydra/frontend/graph_builder.h"
 #include "hydra/reconstruction/volumetric_map.h"
-#include "hydra/rooms/room_finder.h"
+#include "hydra/regions/room_finder.h"
 
 namespace hydra {
 

@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <glog/logging.h>
-#include <hydra/rooms/graph_filtration.h>
+#include <hydra/regions/graph_filtration.h>
 #include <hydra/utils/timing_utilities.h>
 #include <yaml-cpp/yaml.h>
 

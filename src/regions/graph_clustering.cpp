@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/rooms/graph_clustering.h"
+#include "hydra/regions/graph_clustering.h"
 
 #include <queue>
 

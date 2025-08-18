@@ -43,10 +43,10 @@ add_executable(
   reconstruction/test_semantic_integrator.cpp
   reconstruction/test_tsdf_interpolators.cpp
   reconstruction/test_volumetric_map.cpp
-  rooms/test_graph_clustering.cpp
-  rooms/test_graph_filtration.cpp
-  rooms/test_room_finder.cpp
-  rooms/test_room_utilities.cpp
+  regions/test_graph_clustering.cpp
+  regions/test_graph_filtration.cpp
+  regions/test_room_finder.cpp
+  regions/test_room_utilities.cpp
   utils/test_active_window_tracker.cpp
   utils/test_minimum_spanning_tree.cpp
   utils/test_nearest_neighbor_utilities.cpp

@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/rooms/room_finder.h>
+#include <hydra/regions/room_finder.h>
 
 #include "hydra_test/config_guard.h"
 

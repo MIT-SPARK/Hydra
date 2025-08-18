@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/rooms/room_utilities.h>
+#include <hydra/regions/room_utilities.h>
 
 namespace hydra {
 

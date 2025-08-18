@@ -36,7 +36,7 @@
 #include <config_utilities/factory.h>
 
 #include "hydra/backend/update_functions.h"
-#include "hydra/rooms/room_finder.h"
+#include "hydra/regions/room_finder.h"
 
 namespace hydra {
 
