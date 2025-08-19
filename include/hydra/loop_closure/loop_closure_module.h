@@ -43,7 +43,6 @@
 #include "hydra/common/shared_module_state.h"
 #include "hydra/loop_closure/detector.h"
 #include "hydra/loop_closure/loop_closure_config.h"
-#include "hydra/utils/log_utilities.h"
 
 namespace hydra {
 
@@ -58,7 +57,7 @@ class LoopClosureModule : public Module {
 
   void stop() override;
 
-  void save(const LogSetup& log_setup) override;
+  void save(const DataDirectory& output) override;
 
   std::string printInfo() const override;
 

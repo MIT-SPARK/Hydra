@@ -33,11 +33,14 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <config_utilities/virtual_config.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
 #include <list>
 #include <map>
+
+#include "hydra/common/node_matchers.h"
 
 namespace spark_dsg {
 class DynamicSceneGraph;
@@ -60,11 +63,13 @@ struct LayerTracker {
   struct Config {
     char prefix = 0;
     std::optional<spark_dsg::LayerId> target_layer;
+    config::VirtualConfig<NodeMatcher> matcher;
   } const config;
 
   explicit LayerTracker(const Config& config);
 
   spark_dsg::NodeSymbol next_id;
+  std::unique_ptr<NodeMatcher> matcher;
 };
 
 void declare_config(LayerTracker::Config& config);
@@ -72,6 +77,8 @@ void declare_config(LayerTracker::Config& config);
 struct GraphUpdater {
   struct Config {
     std::map<std::string, LayerTracker::Config> layer_updates;
+    //! @brief mark all added nodes as active
+    bool mark_active = true;
   } const config;
 
   explicit GraphUpdater(const Config& config);

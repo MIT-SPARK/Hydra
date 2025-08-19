@@ -44,192 +44,50 @@
 #include <numeric>
 #include <sstream>
 
-#include "hydra/utils/log_utilities.h"
+namespace hydra::timing {
 
-namespace hydra {
-namespace timing {
-
-decltype(ElapsedTimeRecorder::instance_) ElapsedTimeRecorder::instance_;
-
-std::ostream& operator<<(std::ostream& out, const ElapsedStatistics& stats) {
-  return out << "elapsed: " << stats.last_s << " [s] (" << stats.mean_s << " +/- "
-             << stats.stddev_s << " [s] with " << stats.num_measurements
-             << " measurements)";
+bool operator<(const ElapsedTimeRecorder::Entry& lhs,
+               const ElapsedTimeRecorder::Entry& rhs) {
+  return lhs.elapsed < rhs.elapsed;
 }
 
-ElapsedTimeRecorder::ElapsedTimeRecorder()
-    : timing_disabled(false), disable_output(true), log_incrementally_(false) {}
+namespace {
 
-// TODO(lschmid): Consider moving this into the timers in the future.
-void ElapsedTimeRecorder::start(const std::string& timer_name,
-                                const uint64_t& timestamp) {
-  bool have_start_already = false;
-  {  // start critical section
-    std::unique_lock<std::mutex> lock(mutex_);
-    if (starts_.count(timer_name)) {
-      have_start_already = true;
-    } else {
-      starts_[timer_name] = std::chrono::high_resolution_clock::now();
-      start_stamps_[timer_name] = timestamp;
-    }
-  }  // end critical section
+using Entries = std::vector<ElapsedTimeRecorder::Entry>;
 
-  if (have_start_already) {
-    LOG(ERROR) << "Timer " << timer_name
-               << " was already started. Discarding current time point";
-  }
-}
-
-void ElapsedTimeRecorder::stop(const std::string& timer_name) {
-  // we grab the time point first (to not mess up timing with later processing)
-  const auto stop_point = std::chrono::high_resolution_clock::now();
-
-  std::chrono::nanoseconds elapsed;
-  uint64_t stamp;
-
-  bool no_start_present = false;
-  {  // start critical section
-    std::unique_lock<std::mutex> lock(mutex_);
-
-    if (!starts_.count(timer_name)) {
-      no_start_present = true;
-    } else {
-      if (!elapsed_.count(timer_name)) {
-        elapsed_[timer_name] = TimeList();
-        stamps_[timer_name] = TimeStamps();
-      }
-
-      elapsed = stop_point - starts_.at(timer_name);
-      elapsed_[timer_name].push_back(elapsed);
-      stamp = start_stamps_.at(timer_name);
-      stamps_[timer_name].push_back(stamp);
-      starts_.erase(timer_name);
-    }
-  }  // end critical section
-
-  if (no_start_present) {
-    LOG(ERROR) << "Timer " << timer_name
-               << " was not started. Discarding current time point";
-    return;
+ElapsedStatistics computeStats(const Entries& entries) {
+  if (entries.empty()) {
+    return {};
   }
 
-  if (!log_incrementally_) {
-    return;
-  }
-
-  auto iter = files_.find(timer_name);
-  if (iter == files_.end()) {
-    const auto fname = log_setup_->getTimerFilepath(timer_name);
-    auto file_ptr = std::make_shared<std::ofstream>(fname);
-    iter = files_.emplace(std::make_pair(timer_name, file_ptr)).first;
-  }
-
-  auto& fout = *iter->second;
-  std::chrono::duration<double> elapsed_s = elapsed;
-  fout << stamp << "," << elapsed_s.count() << std::endl;
-}
-
-void ElapsedTimeRecorder::record(const std::string& timer_name,
-                                 const uint64_t timestamp,
-                                 const std::chrono::nanoseconds elapsed) {
-  std::unique_lock<std::mutex> lock(mutex_);
-  if (!elapsed_.count(timer_name)) {
-    elapsed_[timer_name] = TimeList();
-    stamps_[timer_name] = TimeStamps();
-  }
-  elapsed_[timer_name].push_back(elapsed);
-  stamps_[timer_name].push_back(timestamp);
-}
-
-void ElapsedTimeRecorder::reset() { instance_.reset(new ElapsedTimeRecorder()); }
-
-std::optional<double> ElapsedTimeRecorder::getLastElapsed(
-    const std::string& name) const {
-  std::optional<std::chrono::nanoseconds> elapsed_ns = std::nullopt;
-
-  {  // start critical section
-    std::unique_lock<std::mutex> lock(mutex_);
-    if (elapsed_.count(name)) {
-      elapsed_ns = elapsed_.at(name).back();
-    }
-  }  // end critical section
-
-  if (!elapsed_ns) {
-    return std::nullopt;
-  }
-
-  std::chrono::duration<double> elapsed_s = *elapsed_ns;
-  return elapsed_s.count();
-}
-
-ElapsedStatistics ElapsedTimeRecorder::getStats(const std::string& name) const {
-  TimeList durations;
-  {  // start critical section
-    std::unique_lock<std::mutex> lock(mutex_);
-
-    if (!elapsed_.count(name)) {
-      return {0.0, 0.0, 0.0, 0.0, 0.0, 0};
-    }
-
-    durations = elapsed_.at(name);
-  }  // end critical section
-
-  const double last_elapsed = *getLastElapsed(name);
-
-  if (durations.size() == 1) {
+  const auto last_elapsed = entries.back().elapsed_seconds();
+  if (entries.size() == 1) {
     return {last_elapsed, last_elapsed, last_elapsed, last_elapsed, 0.0, 1};
   }
 
-  const size_t N = durations.size();
+  const size_t N = entries.size();
   const double mean = std::accumulate(
-      durations.begin(), durations.end(), 0.0, [&](double total, const auto& elapsed) {
-        std::chrono::duration<double> elapsed_s = elapsed;
-        return total + (elapsed_s.count() / N);
+      entries.begin(), entries.end(), 0.0, [&](double total, const auto& entry) {
+        return total + (entry.elapsed_seconds() / N);
       });
 
-  std::chrono::duration<double> min_elapsed_s =
-      *std::min_element(durations.begin(), durations.end());
-
-  std::chrono::duration<double> max_elapsed_s =
-      *std::max_element(durations.begin(), durations.end());
-
   const double variance = std::accumulate(
-      durations.begin(), durations.end(), 0.0, [&](double total, const auto& elapsed) {
-        std::chrono::duration<double> elapsed_s = elapsed;
-        const double mean_diff = elapsed_s.count() - mean;
+      entries.begin(), entries.end(), 0.0, [&](double total, const auto& entry) {
+        const double mean_diff = entry.elapsed_seconds() - mean;
         return total + (mean_diff * mean_diff / N);
       });
 
+  const auto min_entry = std::min_element(entries.begin(), entries.end());
+  const auto max_entry = std::max_element(entries.begin(), entries.end());
   return {last_elapsed,
           mean,
-          min_elapsed_s.count(),
-          max_elapsed_s.count(),
+          min_entry == entries.end() ? 0.0 : min_entry->elapsed_seconds(),
+          max_entry == entries.end() ? 0.0 : max_entry->elapsed_seconds(),
           std::sqrt(variance),
-          durations.size()};
+          N};
 }
 
-std::string ElapsedTimeRecorder::getPrintableStats() const {
-  std::string result;
-  for (const auto& str_timer_pair : elapsed_) {
-    const ElapsedStatistics& stats = getStats(str_timer_pair.first);
-    std::stringstream ss;
-    ss << str_timer_pair.first << ": " << stats.mean_s;
-    if (stats.num_measurements > 1) {
-      ss << " +/- " << stats.stddev_s;
-      ss << " [" << stats.min_s << ", " << stats.max_s << "]";
-    }
-    ss << " [s] over " << stats.num_measurements << " call(s).\n";
-    result += ss.str();
-  }
-
-  return result;
-};
-
-void ElapsedTimeRecorder::logElapsed(const std::string& name,
-                                     const LogSetup& log_setup) const {
-  VLOG(5) << "Saving timer '" << name << "'";
-
-  const auto output_csv = log_setup.getTimerFilepath(name);
+void writeEntries(const std::filesystem::path& output_csv, const Entries& entries) {
   std::ofstream output_file;
   output_file.open(output_csv);
   if (!output_file.is_open()) {
@@ -237,67 +95,192 @@ void ElapsedTimeRecorder::logElapsed(const std::string& name,
     return;
   }
 
-  TimeList durations;
-  TimeStamps stamps;
-  {  // start critical section
-    std::unique_lock<std::mutex> lock(mutex_);
-
-    if (!elapsed_.count(name)) {
-      return;
-    }
-
-    durations = elapsed_.at(name);
-    stamps = stamps_.at(name);
-  }  // end critical section
-
-  VLOG(2) << "Writing " << durations.size() << " measurements for timer '" << name
-          << "' to '" << output_csv << "'";
-
   std::stringstream ss;
   ss << "timestamp(ns),elapsed(s)\n";
-  auto d_it = durations.begin();
-  auto s_it = stamps.begin();
-  for (; d_it != durations.end() && s_it != stamps.end(); ++d_it, ++s_it) {
-    std::chrono::duration<double> elapsed_s = *d_it;
-    ss << *s_it << "," << elapsed_s.count() << "\n";
+  for (const auto& entry : entries) {
+    ss << entry.timestamp << "," << entry.elapsed_seconds() << "\n";
   }
 
   output_file << ss.str();
   output_file.close();
-  VLOG(5) << "Saved timer '" << name << "'";
 }
 
-void ElapsedTimeRecorder::setupIncrementalLogging(const LogSetup::Ptr& log_setup) {
-  if (log_setup and log_setup->valid()) {
-    log_incrementally_ = true;
-    log_setup_ = log_setup;
-  } else {
-    LOG(WARNING) << "unable to configure incremental timer logging";
-  }
+std::filesystem::path getTimerPath(const std::filesystem::path& output,
+                                   std::string name,
+                                   const std::string& prefix,
+                                   const std::string& suffix) {
+  // replace all '/' with '_' to avoid creating a directory.
+  std::transform(name.cbegin(), name.cend(), name.begin(), [](const char c) {
+    return c == '/' ? '_' : c;
+  });
+  return (output / std::filesystem::path(prefix + name + suffix + ".csv"))
+      .lexically_normal();
 }
 
-void ElapsedTimeRecorder::logAllElapsed(const LogSetup& log_setup) const {
-  if (log_incrementally_) {
-    return;
+}  // namespace
+
+decltype(ElapsedTimeRecorder::instance_) ElapsedTimeRecorder::instance_;
+
+std::ostream& operator<<(std::ostream& out, const ElapsedStatistics& stats) {
+  if (!stats.num_measurements) {
+    out << "N/A [s] over 0 call(s)";
+    return out;
   }
 
-  std::list<std::string> all_timers;
-  VLOG(5) << "Getting timer names...";
-  {  // start critical region
+  out << stats.mean_s;
+  if (stats.num_measurements > 1) {
+    out << " +/- " << stats.stddev_s;
+    out << " [" << stats.min_s << ", " << stats.max_s << "]";
+  }
+
+  out << " [s] over " << stats.num_measurements << " call(s) (last: " << stats.last_s
+      << " [s])";
+  return out;
+}
+
+double ElapsedTimeRecorder::Entry::elapsed_seconds() const {
+  return std::chrono::duration_cast<std::chrono::duration<double>>(elapsed).count();
+}
+
+ElapsedTimeRecorder::ElapsedTimeRecorder()
+    : timing_disabled(false), disable_output(true) {}
+
+ElapsedTimeRecorder& ElapsedTimeRecorder::instance() {
+  if (!instance_) {
+    instance_.reset(new ElapsedTimeRecorder());
+  }
+
+  return *instance_;
+}
+
+void ElapsedTimeRecorder::reset() { instance_.reset(new ElapsedTimeRecorder()); }
+
+void ElapsedTimeRecorder::start(const std::string& name, const uint64_t timestamp) {
+  {  // start critical section
     std::unique_lock<std::mutex> lock(mutex_);
-    for (const auto& str_timer_pair : elapsed_) {
-      all_timers.push_back(str_timer_pair.first);
+    auto iter = starts_.find(name);
+    if (iter == starts_.end()) {
+      starts_.emplace(name,
+                      TimePoint{timestamp, std::chrono::high_resolution_clock::now()});
+      return;  // break to avoid error statement
     }
-  }  // end critical region
+  }  // end critical section
 
+  LOG(ERROR) << "Timer '" << name << "' was already started. Discarding time point!";
+}
+
+void ElapsedTimeRecorder::stop(const std::string& name) {
+  // we grab the time point first (to not mess up timing with later processing)
+  const auto stop_point = std::chrono::high_resolution_clock::now();
+  {  // start critical section
+    std::unique_lock<std::mutex> lock(mutex_);
+    auto iter = starts_.find(name);
+    if (iter != starts_.end()) {
+      add(name, iter->second.timestamp, stop_point - iter->second.now);
+      starts_.erase(iter);
+      return;  // break to avoid error statement
+    }
+  }  // end critical section
+
+  LOG(ERROR) << "Timer '" << name << "' was not started. Discarding time point!";
+}
+
+void ElapsedTimeRecorder::record(const std::string& name,
+                                 const uint64_t timestamp,
+                                 const std::chrono::nanoseconds elapsed) {
+  std::unique_lock<std::mutex> lock(mutex_);
+  add(name, timestamp, elapsed);
+}
+
+std::vector<std::string> ElapsedTimeRecorder::timerNames() const {
+  std::vector<std::string> names;
+  {  // start critical section
+    std::unique_lock<std::mutex> lock(mutex_);
+    std::transform(elapsed_.begin(),
+                   elapsed_.end(),
+                   std::back_inserter(names),
+                   [](const auto& entry) { return entry.first; });
+  }
+
+  return names;
+}
+
+std::optional<double> ElapsedTimeRecorder::getLastElapsed(const std::string& n) const {
+  {  // start critical section
+    std::unique_lock<std::mutex> lock(mutex_);
+    auto iter = elapsed_.find(n);
+    if (iter != elapsed_.end()) {
+      // NOTE(nathan) invariant that every timer has at least one sample
+      return iter->second.back().elapsed_seconds();
+    }
+  }  // end critical section
+
+  return std::nullopt;
+}
+
+ElapsedStatistics ElapsedTimeRecorder::getStats(const std::string& name) const {
+  std::vector<Entry> durations;
+  {  // start critical section
+    std::unique_lock<std::mutex> lock(mutex_);
+    auto iter = elapsed_.find(name);
+    if (iter != elapsed_.end()) {
+      durations = iter->second;
+    }
+  }  // end critical section
+
+  return computeStats(durations);
+}
+
+std::string ElapsedTimeRecorder::printAllStats() const {
+  std::stringstream ss;
+  const auto timers = timerNames();
+  for (const auto& name : timers) {
+    const auto stats = getStats(name);
+    ss << name << ": " << stats << std::endl;
+  }
+
+  return ss.str();
+};
+
+//! Suffix for individual timing files
+std::string timing_suffix = "_timing_raw.csv";
+/**
+ * If true log all timers into a single directory, replacing '/' with '_' in the
+ * names. If false create separate directories for separators '/' (default).
+ */
+bool log_raw_timers_to_single_dir = false;
+
+void ElapsedTimeRecorder::logTimers(const std::filesystem::path& output,
+                                    const std::string& name_prefix,
+                                    const std::string& name_suffix) const {
+  const auto all_timers = timerNames();
   VLOG(5) << "Saving timers: [" << all_timers << "]";
-
   for (const auto& name : all_timers) {
-    logElapsed(name, log_setup);
+    VLOG(5) << "Saving timer '" << name << "'";
+
+    std::vector<Entry> entries;
+    {  // start critical section
+      std::unique_lock<std::mutex> lock(mutex_);
+      auto iter = elapsed_.find(name);
+      if (iter != elapsed_.end()) {
+        entries = iter->second;
+      }
+    }  // end critical section
+
+    if (entries.empty()) {
+      LOG(ERROR) << "Invalid timer encountered while saving '" << name << "'";
+      continue;
+    }
+
+    const auto output_csv = getTimerPath(output, name, name_prefix, name_suffix);
+    VLOG(2) << "Writing " << entries.size() << " measurements for timer '" << name
+            << "' to '" << output_csv << "'";
+    writeEntries(output_csv, entries);
+    VLOG(5) << "Saved timer '" << name << "'";
   }
 }
 
-void ElapsedTimeRecorder::logStats(const std::string& filename) const {
+void ElapsedTimeRecorder::logStats(const std::filesystem::path& filename) const {
   std::ofstream output_file;
   output_file.open(filename);
 
@@ -311,6 +294,19 @@ void ElapsedTimeRecorder::logStats(const std::string& filename) const {
   }
   output_file << ss.str();
   output_file.close();
+}
+
+// NOTE(nathan) this is intentionally NOT threadsafe, the callee is responsible
+// for locking the mutex
+void ElapsedTimeRecorder::add(const std::string& name,
+                              const uint64_t timestamp,
+                              const std::chrono::nanoseconds elapsed) {
+  auto iter = elapsed_.find(name);
+  if (iter == elapsed_.end()) {
+    iter = elapsed_.emplace(name, std::vector<Entry>()).first;
+  }
+
+  iter->second.emplace_back(Entry{timestamp, elapsed});
 }
 
 ScopedTimer::ScopedTimer(const std::string& name,
@@ -337,6 +333,7 @@ void ScopedTimer::start() {
   if (is_running_) {
     return;
   }
+
   if (ElapsedTimeRecorder::instance().timing_disabled) {
     return;
   }
@@ -353,6 +350,7 @@ void ScopedTimer::stop() {
   if (!is_running_) {
     return;
   }
+
   if (ElapsedTimeRecorder::instance().timing_disabled) {
     return;
   }
@@ -398,5 +396,4 @@ void ScopedTimer::reset(const std::string& name, uint64_t timestamp) {
   start();
 }
 
-}  // namespace timing
-}  // namespace hydra
+}  // namespace hydra::timing

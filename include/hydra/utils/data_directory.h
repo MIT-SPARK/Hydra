@@ -35,65 +35,39 @@
 #pragma once
 
 #include <filesystem>
-#include <functional>
-#include <list>
-#include <memory>
-#include <set>
+#include <optional>
 #include <string>
 
 namespace hydra {
 
-struct LogConfig {
-  std::filesystem::path log_dir;
-  bool log_timing_incrementally = false;
-  std::string timing_stats_name = "timing_stats.csv";
-  std::string timing_suffix = "_timing_raw.csv";
-
-  // If true log all timers into a single directory, replacing '/' with '_' in the
-  // names. If false create separate directories for separators '/' (default).
-  bool log_raw_timers_to_single_dir = false;
-
-  static LogConfig fromString(const std::string& output_path) {
-    LogConfig config;
-    config.log_dir = output_path;
-    return config;
-  }
-};
-
-void declare_config(LogConfig& config);
-
-class LogSetup {
+class DataDirectory {
  public:
-  using Ptr = std::shared_ptr<LogSetup>;
+  struct Config {
+    //! Remove any pre-existing contents of the directory
+    bool overwrite = false;
+    //! Construct the directory
+    bool allocate = true;
+    //! Make a new directory using the current time and date
+    bool use_timestamp = true;
+    //! Date/Time format to use
+    std::string timestamp_format = "%Y_%m_%d-%H_%M_%S";
+  } const config;
 
-  explicit LogSetup(const LogConfig& config);
-
-  explicit LogSetup(const std::string& output_path);
-
-  ~LogSetup();
-
-  void init();
-
-  std::filesystem::path getLogDir() const;
-
-  std::filesystem::path getLogDir(const std::string& log_namespace) const;
-
-  std::filesystem::path getTimerFilepath() const;
-
-  std::filesystem::path getTimerFilepath(const std::string& timer_name) const;
+  DataDirectory();
+  explicit DataDirectory(const std::filesystem::path& output_path,
+                         std::optional<Config> config = std::nullopt);
+  ~DataDirectory() = default;
 
   bool valid() const;
-
-  const LogConfig& config() const;
-
-  void registerExitCallback(const std::function<void(const LogSetup&)>& func);
+  operator bool() const;
+  std::filesystem::path path(const std::filesystem::path& sub_path = "") const;
+  DataDirectory child(const std::string& sub_path) const;
 
  private:
   bool valid_;
-  LogConfig config_;
-  mutable std::set<std::string> namespaces_;
-
-  std::list<std::function<void(const LogSetup&)>> callbacks_;
+  std::filesystem::path root_path_;
 };
+
+void declare_config(DataDirectory::Config& config);
 
 }  // namespace hydra

@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_compile_options(-Wall -Wextra)
+add_compile_options(-Wall -Wextra -Wno-maybe-uninitialized)
 
 find_package(Python COMPONENTS Interpreter Development)
 find_package(pybind11 CONFIG REQUIRED)
@@ -28,6 +28,7 @@ pybind11_add_module(
   bindings/src/python_sensors.cpp
 )
 target_link_libraries(_hydra_bindings PRIVATE hydra::hydra)
+target_compile_options(_hydra_bindings PRIVATE -Wno-maybe-uninitialized)
 target_include_directories(
   _hydra_bindings PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/bindings/include
 )

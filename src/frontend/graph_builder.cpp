@@ -58,6 +58,7 @@
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/pgmo_mesh_interface.h"
 #include "hydra/utils/pgmo_mesh_traits.h"
+#include "hydra/utils/printing.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -68,8 +69,7 @@ static const auto registration =
                                    GraphBuilder,
                                    GraphBuilder::Config,
                                    SharedDsgInfo::Ptr,
-                                   SharedModuleState::Ptr,
-                                   LogSetup::Ptr>("GraphBuilder");
+                                   SharedModuleState::Ptr>("GraphBuilder");
 
 }
 
@@ -108,12 +108,13 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.sinks, "sinks");
   field(config.no_packet_collation, "no_packet_collation");
   field(config.overwrite_mesh_timestamps, "overwrite_mesh_timestamps");
+  field(config.verbosity, "verbosity");
+  field(config.clear_object_meshes, "clear_object_meshes");
 }
 
 GraphBuilder::GraphBuilder(const Config& config,
                            const SharedDsgInfo::Ptr& dsg,
-                           const SharedModuleState::Ptr& state,
-                           const LogSetup::Ptr& logs)
+                           const SharedModuleState::Ptr& state)
     : config(config::checkValid(config)),
       sequence_number_(1),  // starts at 1 to differentiate from SharedDsgInfo default
       queue_(std::make_shared<InputQueue>()),
@@ -147,13 +148,6 @@ GraphBuilder::GraphBuilder(const Config& config,
       new kimera_pgmo::DeltaCompression(config.pgmo.mesh_resolution));
   deformation_compression_.reset(
       new kimera_pgmo::BlockCompression(config.pgmo.d_graph_resolution));
-
-  if (logs && logs->valid()) {
-    logs_ = logs;
-
-    const auto frontend_dir = logs->getLogDir("frontend");
-    VLOG(1) << "[Hydra Frontend] logging to " << frontend_dir;
-  }
 
   addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
   addInputCallback(
@@ -199,21 +193,17 @@ void GraphBuilder::stopImpl() {
   VLOG(2) << "[Hydra Frontend]: " << queue_->size() << " messages left";
 }
 
-void GraphBuilder::save(const LogSetup& log_setup) {
+void GraphBuilder::save(const DataDirectory& output) {
   std::lock_guard<std::mutex> lock(mutex_);
-  const auto output_path = log_setup.getLogDir("frontend");
+  const auto output_path = output.path("frontend");
+
   dsg_->graph->save(output_path / "dsg.json", false);
   dsg_->graph->save(output_path / "dsg_with_mesh.json");
-
   frontend_graph_logger_.save(output_path);
 
   const auto mesh = dsg_->graph->mesh();
   if (mesh && !mesh->empty()) {
     kimera_pgmo::WriteMesh(output_path / "mesh.ply", *mesh);
-  }
-
-  if (freespace_places_) {
-    freespace_places_->save(log_setup);
   }
 }
 
@@ -381,10 +371,8 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
     queues.lcd_queue->push(lcd_input_);
   }
 
-  if (logs_) {
-    // mutex not required because nothing is modifying the graph
-    frontend_graph_logger_.logGraph(*dsg_->graph);
-  }
+  // mutex not required because nothing is modifying the graph
+  frontend_graph_logger_.logGraph(*dsg_->graph);
 
   if (dsg_->graph && backend_input_) {
     ScopedTimer sink_timer("frontend/sinks", msg->timestamp_ns);
@@ -395,6 +383,19 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
 }
 
 void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
+  // TODO(nathan) remove this temporary patch once we fix serialization/mesh storage
+  if (config.clear_object_meshes) {
+    auto iter = msg->graph_update.find(2);
+    if (iter != msg->graph_update.end()) {
+      for (auto& attr : iter->second->attributes) {
+        auto derived = dynamic_cast<KhronosObjectAttributes*>(attr.get());
+        if (derived) {
+          derived->mesh.clear();
+        }
+      }
+    }
+  }
+
   graph_updater_.update(msg->graph_update, *dsg_->graph);
 
   {  // start timing scope
@@ -413,6 +414,10 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
           return false;
         }
 
+        const auto fmt = getDefaultFormat(3);
+        LOG_IF(INFO, config.verbosity >= 2)
+            << "view @ " << timestamp << "[ns]: " << pos.format(fmt) << " vs. "
+            << msg->world_T_body().translation().format(fmt);
         return !map_window_->inBounds(
             msg->timestamp_ns, msg->world_T_body(), timestamp, pos);
       });
@@ -581,26 +586,19 @@ void GraphBuilder::updatePlaces(const ActiveWindowOutput& input) {
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
     freespace_places_->updateGraph(input.timestamp_ns, *dsg_->graph);
 
-    // TODO(nathan) fold this into updateGraph and return archived instead
-    // find node ids that are valid, but outside active place window
+    // force active flag on places
     active_nodes = freespace_places_->getActiveNodes();
     std::vector<NodeId> archived_places;
-    for (const auto& prev : previous_active_places_) {
-      if (active_nodes.count(prev)) {
-        continue;
+    for (const auto& [node_id, node] :
+         dsg_->graph->getLayer(DsgLayers::PLACES).nodes()) {
+      auto& attrs = node->attributes();
+      const auto prev_active = attrs.is_active;
+      attrs.is_active = active_nodes.count(node_id);
+      if (prev_active && !attrs.is_active) {
+        archived_places.push_back(node_id);
       }
-
-      const auto has_prev_node = dsg_->graph->findNode(prev);
-      if (!has_prev_node) {
-        continue;
-      }
-
-      const auto& prev_node = *has_prev_node;
-      prev_node.attributes().is_active = false;
-      archived_places.push_back(prev);
     }
 
-    previous_active_places_ = active_nodes;
     if (lcd_input_) {
       lcd_input_->archived_places.insert(archived_places.begin(),
                                          archived_places.end());

@@ -16,6 +16,7 @@ void declare_config(ViewDatabase::Config& config) {
   field(config.view_selection_method, "view_selection_method");
   field(config.inflation_distance, "inflation_distance");
   field(config.layers, "layers");
+  field(config.verbosity, "verbosity");
 }
 
 using NodeSet = std::unordered_set<NodeId>;
@@ -46,11 +47,14 @@ void ViewDatabase::updateAssignments(const DynamicSceneGraph& graph,
     const auto& view = *iter;
     if (!view) {
       iter = views_.erase(iter);
+      LOG_IF(INFO, config.verbosity >= 2) << "Removed empty view!";
       continue;
     }
 
-    const auto view_pos = view->sensor_T_world.inverse().translation();
+    const Eigen::Vector3d view_pos = view->sensor_T_world.inverse().translation();
     if (should_archive(view_pos, view->timestamp_ns)) {
+      LOG_IF(INFO, config.verbosity >= 2)
+          << "Archived view @ " << view->timestamp_ns << " [ns]";
       iter = views_.erase(iter);
       continue;
     }
@@ -58,14 +62,15 @@ void ViewDatabase::updateAssignments(const DynamicSceneGraph& graph,
     ++iter;
   }
 
-  VLOG(2) << "Got " << new_views << " new views!";
+  LOG_IF(INFO, config.verbosity >= 1) << "Got " << new_views << " new views!";
   if (views_.empty()) {
-    VLOG(2) << "No views assigned!";
+    LOG_IF(INFO, config.verbosity >= 1) << "No views assigned!";
     return;
   }
 
-  VLOG(2) << "Assigning features with " << views_.size() << " active view(s)";
-  for (const auto& [layer_name, layer_tracker] : trackers_) {
+  LOG_IF(INFO, config.verbosity >= 1)
+      << "Assigning features with " << views_.size() << " active view(s)";
+  for (auto& [layer_name, layer_tracker] : trackers_) {
     auto layer = graph.findLayer(layer_name);
     if (!layer) {
       LOG(WARNING) << "Skipping unknown layer: '" << layer_name << "'";
@@ -73,6 +78,7 @@ void ViewDatabase::updateAssignments(const DynamicSceneGraph& graph,
     }
 
     size_t num_assigned = 0;
+    layer_tracker.clear();
     const auto layer_view = layer_tracker.view(*layer);
     for (const auto& node : layer_view) {
       auto attrs = node.tryAttributes<SemanticNodeAttributes>();
@@ -86,8 +92,8 @@ void ViewDatabase::updateAssignments(const DynamicSceneGraph& graph,
       view_selector_->selectFeature(views_, config.inflation_distance, *attrs);
     }
 
-    VLOG(2) << "Assigned features for " << num_assigned << " nodes for layer '"
-            << layer_name << "'";
+    LOG_IF(INFO, config.verbosity >= 1) << "Assigned features for " << num_assigned
+                                        << " nodes for layer '" << layer_name << "'";
   }
 }
 

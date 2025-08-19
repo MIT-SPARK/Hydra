@@ -35,7 +35,6 @@
 #include "hydra/common/global_info.h"
 
 #include <config_utilities/config.h>
-#include <config_utilities/parsing/yaml.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
 #include <spark_dsg/labelspace.h>
@@ -101,37 +100,20 @@ void declare_config(FrameConfig& frames) {
 void declare_config(PipelineConfig& config) {
   using namespace config;
   name("PipelineConfig");
-  field(config.enable_reconstruction, "enable_reconstruction");
   field(config.enable_lcd, "enable_lcd");
-  field(config.enable_places, "enable_places");
   field(config.timing_disabled, "timing_disabled");
   field(config.disable_timer_output, "disable_timer_output");
   field(config.enable_pgmo_logging, "enable_pgmo_logging");
   field(config.default_verbosity, "default_verbosity");
   field(config.default_num_threads, "default_num_threads");
   field(config.store_visualization_details, "store_visualization_details");
-  // field<LayerMapConversion<char>>(config.layer_id_map, "layer_id_map");
   config.map_window.setOptional();
   field(config.map_window, "map_window");
   field<LabelNameConversion>(config.label_names, "label_names");
-
   // the following subconfigs should not be namespaced
-  field(config.logs, "logs", false);
   field(config.frames, "frames", false);
   field(config.graph, "graph", false);
   field(config.label_space, "label_space", false);
-}
-
-void saveTimingInformation(const LogSetup& log_config) {
-  if (!log_config.valid()) {
-    return;
-  }
-
-  LOG(INFO) << "[Hydra] saving timing information to " << log_config.getLogDir();
-  const ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
-  timer.logAllElapsed(log_config);
-  timer.logStats(log_config.getTimerFilepath());
-  LOG(INFO) << "[Hydra] saved timing information";
 }
 
 GlobalInfo::GlobalInfo() : force_shutdown_(false) {}
@@ -140,35 +122,11 @@ void GlobalInfo::configureTimers() {
   ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
   timer.timing_disabled = config_.timing_disabled;
   timer.disable_output = config_.disable_timer_output;
-  if (timer.timing_disabled) {
-    return;
-  }
-
-  if (!logs_ || !logs_->valid()) {
-    return;
-  }
-
-  if (logs_->config().log_timing_incrementally) {
-    timer.setupIncrementalLogging(logs_);
-  }
-}
-
-void GlobalInfo::checkFrozen() const {
-  if (!frozen_) {
-    LOG(ERROR) << "GlobalInfo is not frozen! Call init with freeze set to 'true' "
-                  "before using config";
-    throw std::runtime_error("config not frozen");
-  }
 }
 
 void GlobalInfo::initFromConfig(const PipelineConfig& config, int robot_id) {
   config_ = config::checkValid(config);
   robot_prefix_ = RobotPrefixConfig(robot_id);
-  logs_ = std::make_shared<LogSetup>(config_.logs);
-  if (!logs_->valid()) {
-    // delete logs if they don't point to a valid path
-    logs_.reset();
-  }
 
   configureTimers();
 
@@ -193,45 +151,17 @@ GlobalInfo& GlobalInfo::instance() {
   if (!instance_) {
     instance_.reset(new GlobalInfo());
   }
+
   return *instance_;
 }
 
-GlobalInfo& GlobalInfo::init(const PipelineConfig& config, int robot_id, bool freeze) {
+GlobalInfo& GlobalInfo::init(const PipelineConfig& config, int robot_id) {
   auto& curr = instance();
-  if (curr.frozen_) {
-    LOG(ERROR) << "Failed to initialize GlobalInfo as config was already frozen";
-    throw std::runtime_error("hydra global config is frozen");
-  }
-
   curr.initFromConfig(config, robot_id);
-  // TODO(nathan) print?
-  curr.frozen_ = freeze;
   return curr;
 }
 
 void GlobalInfo::reset() { instance_.reset(new GlobalInfo()); }
-
-void GlobalInfo::exit() {
-  auto& curr = instance();
-
-  // save timing information to avoid destructor weirdness with singletons
-  if (curr.logs_) {
-    saveTimingInformation(*curr.logs_);
-
-    auto node = config::toYaml(curr.config_);
-    for (const auto& [name, sensor] : curr.sensors_) {
-      node["sensors"][name] = sensor->dump();
-    }
-
-    std::filesystem::path log_dir = curr.logs_->getLogDir();
-    std::ofstream fout(log_dir / "hydra_config.yaml");
-    fout << node;
-
-    curr.logs_.reset();
-  }
-
-  // TODO(nathan) see if anything else needs to be saved;
-}
 
 void GlobalInfo::setForceShutdown(bool force_shutdown) {
   force_shutdown_ = force_shutdown;
@@ -244,8 +174,6 @@ const PipelineConfig& GlobalInfo::getConfig() const { return config_; }
 const FrameConfig& GlobalInfo::getFrames() const { return config_.frames; }
 
 const RobotPrefixConfig& GlobalInfo::getRobotPrefix() const { return robot_prefix_; }
-
-const LogSetup::Ptr& GlobalInfo::getLogs() const { return logs_; }
 
 const std::map<uint32_t, std::string>& GlobalInfo::getLabelToNameMap() const {
   return config_.label_names;

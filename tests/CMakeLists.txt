@@ -38,6 +38,7 @@ add_executable(
   places/test_gvd_utilities.cpp
   reconstruction/test_integration_masking.cpp
   reconstruction/test_marching_cubes.cpp
+  reconstruction/test_projection_interpolators.cpp
   reconstruction/test_semantic_integrator.cpp
   reconstruction/test_tsdf_interpolators.cpp
   reconstruction/test_volumetric_map.cpp

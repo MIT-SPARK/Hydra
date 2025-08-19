@@ -72,8 +72,6 @@ class ActiveWindowModule : public Module {
 
   void stop() override;
 
-  void save(const LogSetup& log_setup) override;
-
   std::string printInfo() const override;
 
   void spin();

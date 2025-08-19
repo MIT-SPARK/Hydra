@@ -53,6 +53,7 @@
 #include "hydra/bindings/glog_utilities.h"
 #include "hydra/bindings/python_image.h"
 #include "hydra/bindings/python_sensor_input.h"
+#include "hydra/utils/data_directory.h"
 #include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/pgmo_mesh_interface.h"
 #include "hydra/utils/pgmo_mesh_traits.h"
@@ -64,7 +65,7 @@ struct MeshUpdater {
       : compression(voxel_size / 4.0),
         queue(new ReconstructionModule::OutputQueue()),
         zmq_sender(url, 2) {
-    graph.reset(new DynamicSceneGraph(DynamicSceneGraph::LayerIds{2, 3, 4, 5}));
+    graph.reset(new DynamicSceneGraph());
     graph->setMesh(std::make_shared<Mesh>());
   }
 
@@ -146,10 +147,6 @@ PythonReconstruction::PythonReconstruction(const Config& config,
   }
 
   GlogSingleton::instance().setLogLevel(0, 0, false);
-  config::Settings().setLogger("glog");
-  config::Settings().print_width = 100;
-  config::Settings().print_indent = 45;
-
   GlobalInfo::instance().setSensor(sensor);
 
   ReconstructionModule::OutputQueue::Ptr queue;
@@ -188,9 +185,9 @@ void PythonReconstruction::save(const std::filesystem::path& output) {
     return;
   }
 
-  LogSetup logs(output);
+  DataDirectory logs(output);
   if (logs.valid()) {
-    module_->map().save(logs.getLogDir() / "map");
+    module_->map().save(logs.path("map"));
   }
 
   stop();
@@ -204,7 +201,7 @@ void PythonReconstruction::save(const std::filesystem::path& output) {
     return;
   }
 
-  kimera_pgmo::WriteMesh(logs.getLogDir() / "mesh.ply", *mesh);
+  kimera_pgmo::WriteMesh(logs.path() / "mesh.ply", *mesh);
 }
 
 namespace python_reconstruction {

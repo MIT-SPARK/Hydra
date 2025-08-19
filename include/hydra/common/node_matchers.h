@@ -32,64 +32,40 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/common/batch_pipeline.h"
-
-#include <glog/logging.h>
-#include <glog/stl_logging.h>
-
-#include "hydra/backend/update_buildings_functor.h"
-#include "hydra/backend/update_functions.h"
-#include "hydra/backend/update_rooms_functor.h"
-#include "hydra/common/shared_module_state.h"
-#include "hydra/reconstruction/mesh_integrator.h"
+#pragma once
+#include <spark_dsg/node_attributes.h>
 
 namespace hydra {
 
-using VFConfig = config::VirtualConfig<GraphBuilder>;
-using RFConfig = RoomFinderConfig;
+struct NodeMatcher {
+  using Attrs = spark_dsg::NodeAttributes;
 
-BatchPipeline::BatchPipeline(const PipelineConfig& config, int robot_id) {
-  GlobalInfo::init(config, robot_id);
-}
+  virtual ~NodeMatcher() = default;
+  virtual bool match(const Attrs& new_attributes,
+                     const Attrs& prev_attributes) const = 0;
+};
 
-BatchPipeline::~BatchPipeline() {}
+struct CentroidBBoxMatcher : public NodeMatcher {
+  struct Config {};
 
-DynamicSceneGraph::Ptr BatchPipeline::construct(const VFConfig& frontend_config,
-                                                VolumetricMap& map,
-                                                const RFConfig* room_config) const {
-  if (!map.hasSemantics()) {
-    return nullptr;
-  }
+  explicit CentroidBBoxMatcher(const Config&) {}
+  bool match(const Attrs& new_attrs, const Attrs& prev_attrs) const override;
+};
 
-  MeshIntegratorConfig mesh_config;
-  MeshIntegrator integrator(mesh_config);
-  integrator.generateMesh(map, false, false);
+void declare_config(CentroidBBoxMatcher::Config& config);
 
-  auto dsg = GlobalInfo::instance().createSharedDsg();
-  auto graph = dsg->graph->clone();
-  auto state = std::make_shared<SharedModuleState>();
-  auto frontend = frontend_config.create(dsg, state);
+struct IoUNodeMatcher : public NodeMatcher {
+  struct Config {
+    //! @brief Minimum IoU between two nodes of same class
+    double min_same_iou = 0.2;
+    //! @brief Minimum IoU between two nodes of different classes
+    double min_cross_iou = 0.5;
+  } const config;
 
-  // TODO(nathan) this is a little sketchy given the lack of pose info
-  auto msg = std::make_shared<ActiveWindowOutput>();
-  msg->setMap(map);
-  frontend->queue()->push(msg);
+  explicit IoUNodeMatcher(const Config& config);
+  bool match(const Attrs& new_attrs, const Attrs& prev_attrs) const override;
+};
 
-  if (!frontend->spinOnce()) {
-    return nullptr;
-  }
-
-  if (room_config) {
-    // TODO(nathan) unmerged graph is annoying
-    UpdateRoomsFunctor functor(UpdateRoomsFunctor::Config{*room_config});
-    UpdateInfo::ConstPtr info(new UpdateInfo);
-    functor.call(*graph, *dsg, info);
-
-    UpdateBuildingsFunctor bfunctor(UpdateBuildingsFunctor::Config{0});
-    bfunctor.call(*graph, *dsg, info);
-  }
-
-  return dsg->graph;
-}
+void declare_config(IoUNodeMatcher::Config& config);
 
 }  // namespace hydra

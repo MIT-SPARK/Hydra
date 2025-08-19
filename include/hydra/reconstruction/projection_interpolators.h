@@ -92,7 +92,7 @@ class ProjectionInterpolator {
    * @param range_image Range image as 32FC1 to interpolate in.
    * @return float The interpolated range value.
    */
-  virtual float InterpolateRange(const cv::Mat& range_image,
+  virtual float interpolateRange(const cv::Mat& range_image,
                                  const InterpolationWeights& weights) const = 0;
 
   /**
@@ -120,13 +120,13 @@ class ProjectionInterpolator {
 class InterpolatorNearest : public ProjectionInterpolator {
  public:
   struct Config {};
-  explicit InterpolatorNearest(const Config&) {}
+  explicit InterpolatorNearest(const Config& = Config{}) {}
 
   InterpolationWeights computeWeights(float u,
                                       float v,
                                       const cv::Mat& range_image) const override;
 
-  float InterpolateRange(const cv::Mat& range_image,
+  float interpolateRange(const cv::Mat& range_image,
                          const InterpolationWeights& weights) const override;
 
   spark_dsg::Color interpolateColor(const cv::Mat& color_image,
@@ -145,13 +145,13 @@ void declare_config(InterpolatorNearest::Config& config);
 class InterpolatorBilinear : public ProjectionInterpolator {
  public:
   struct Config {};
-  explicit InterpolatorBilinear(const Config&) {}
+  explicit InterpolatorBilinear(const Config& = Config{}) {}
 
   InterpolationWeights computeWeights(float u,
                                       float v,
                                       const cv::Mat& range_image) const override;
 
-  float InterpolateRange(const cv::Mat& range_image,
+  float interpolateRange(const cv::Mat& range_image,
                          const InterpolationWeights& weights) const override;
 
   spark_dsg::Color interpolateColor(const cv::Mat& color_image,
@@ -181,7 +181,7 @@ class InterpolatorAdaptive : public InterpolatorBilinear {
                                       float v,
                                       const cv::Mat& range_image) const override;
 
-  float InterpolateRange(const cv::Mat& range_image,
+  float interpolateRange(const cv::Mat& range_image,
                          const InterpolationWeights& weights) const override;
 
   spark_dsg::Color interpolateColor(const cv::Mat& color_image,

@@ -43,8 +43,7 @@ class HydraPipeline {
  public:
   HydraPipeline(const PipelineConfig& config,
                 int robot_id = 0,
-                int config_verbosity = 1,
-                bool freeze_global_info = true);
+                int config_verbosity = 1);
 
   virtual ~HydraPipeline();
 
@@ -54,7 +53,8 @@ class HydraPipeline {
 
   virtual void stop();
 
-  virtual void save();
+  // TODO(nathan) expand API?
+  virtual void save(const DataDirectory& output) const;
 
   template <typename Derived = Module>
   Derived* getModule(const std::string& name) {
@@ -69,7 +69,7 @@ class HydraPipeline {
  protected:
   void showModules() const;
 
-  std::string getModuleInfo(const std::string& name, const Module* module) const;
+  std::string getModuleInfo(const std::string& name, const Module* mod) const;
 
  protected:
   int config_verbosity_;

@@ -19,6 +19,8 @@ class ViewDatabase {
     double inflation_distance = 0.0;
     //! @brief Layers to assign views for
     std::vector<std::string> layers{DsgLayers::PLACES, DsgLayers::MESH_PLACES};
+    //! @brief Verbosity for database
+    int verbosity = 0;
   } const config;
 
   explicit ViewDatabase(const Config& config);
@@ -31,7 +33,7 @@ class ViewDatabase {
  protected:
   mutable ViewSelector::FeatureList views_;
   std::unique_ptr<ViewSelector> view_selector_;
-  std::map<std::string, ActiveWindowTracker> trackers_;
+  mutable std::map<std::string, ActiveWindowTracker> trackers_;
 };
 
 void declare_config(ViewDatabase::Config& config);

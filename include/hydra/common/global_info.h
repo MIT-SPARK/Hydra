@@ -47,7 +47,6 @@
 #include "hydra/common/robot_prefix_config.h"
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/input/sensor.h"
-#include "hydra/utils/log_utilities.h"
 
 // TODO(nathan) bad....
 #include "hydra/active_window/volumetric_window.h"
@@ -57,50 +56,53 @@ namespace hydra {
 class SemanticColorMap;
 
 struct FrameConfig {
+  //! Body frame for robot constructing the scene graph (see REP 105)
   std::string robot = "base_link";
+  //! Frame odometry estimates are relative to (see REP 105)
   std::string odom = "odom";
+  //! Frame that the optimized scene graph is in (see REP 105)
   std::string map = "map";
 };
 
+void declare_config(FrameConfig& config);
+
 struct PipelineConfig {
-  bool enable_reconstruction = true;
+  //! If true, turn on internal loop closure detection
   bool enable_lcd = false;
-  bool enable_places = true;
+  //! If true, disable all performance timers
   bool timing_disabled = false;
+  //! If true, don't show latest elapsed for timers
   bool disable_timer_output = true;
+  //! If true, forward pgmo custom logging to glog
   bool enable_pgmo_logging = true;
-
-  // Default settings for other modules. Can be overwritten by other module configs.
-  int default_verbosity = 1;
-  int default_num_threads = -1;  // -1 means use all available threads.
-
-  // If true store additional details for the khronos spatio-temporal viualizer.
+  //! If true, store additional details for the khronos spatio-temporal viualizer.
   bool store_visualization_details = false;
-  LogConfig logs;
+  //! Default settings for other modules. Can be overwritten by other module configs.
+  int default_verbosity = 1;
+  //! Default number of threads for multi-threaded integrators to use
+  int default_num_threads = -1;  // -1 means use all available threads.
+  //! Frame information for Hydra
   FrameConfig frames;
+  //! Layer names for the scene graph that Hydra builds
   SharedDsgInfo::Config graph;
+  //! Default windowing function that determines the active window
   config::VirtualConfig<VolumetricWindow> map_window{SpatialWindowChecker::Config()};
+  //! Closed-set labelspace information
   LabelSpaceConfig label_space;
+  //! Human readable category names for the labelspace
   std::map<uint32_t, std::string> label_names;
 };
 
-void declare_config(FrameConfig& conf);
-void declare_config(PipelineConfig& conf);
+void declare_config(PipelineConfig& config);
 
 class GlobalInfo {
  public:
   static GlobalInfo& instance();
 
-  static GlobalInfo& init(const PipelineConfig& config,
-                          int robot_id = 0,
-                          bool freeze = true);
-
-  static void exit();
+  static GlobalInfo& init(const PipelineConfig& config, int robot_id = 0);
 
   // this invalidates any instances (mostly intended for testing)
   static void reset();
-
-  inline bool frozen() const { return frozen_; }
 
   void setForceShutdown(bool force_shutdown);
 
@@ -111,8 +113,6 @@ class GlobalInfo {
   const FrameConfig& getFrames() const;
 
   const RobotPrefixConfig& getRobotPrefix() const;
-
-  const LogSetup::Ptr& getLogs() const;
 
   const std::map<uint32_t, std::string>& getLabelToNameMap() const;
 
@@ -141,16 +141,12 @@ class GlobalInfo {
 
   void initFromConfig(const PipelineConfig& config, int robot_id);
 
-  void checkFrozen() const;
-
  private:
   static std::unique_ptr<GlobalInfo> instance_;
-  bool frozen_ = false;
-  PipelineConfig config_;
   std::atomic<bool> force_shutdown_;
 
+  PipelineConfig config_;
   RobotPrefixConfig robot_prefix_;
-  LogSetup::Ptr logs_;
   LabelRemapper label_remapper_;
   std::shared_ptr<SemanticColorMap> label_colormap_;
 

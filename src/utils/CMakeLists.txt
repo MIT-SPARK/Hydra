@@ -2,10 +2,10 @@ target_sources(
   ${PROJECT_NAME}
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/active_window_tracker.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/csv_reader.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/data_directory.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/disjoint_set.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/display_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/id_tracker.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/log_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/mesh_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/minimum_spanning_tree.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/nearest_neighbor_utilities.cpp

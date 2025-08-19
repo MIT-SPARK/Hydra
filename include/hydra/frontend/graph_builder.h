@@ -56,7 +56,6 @@
 #include "hydra/frontend/view_database.h"
 #include "hydra/loop_closure/lcd_input.h"
 #include "hydra/odometry/pose_graph_from_odom.h"
-#include "hydra/utils/log_utilities.h"
 
 namespace kimera_pgmo {
 class DeltaCompression;
@@ -83,7 +82,7 @@ class GraphBuilder : public Module {
       double d_graph_resolution = 1.5;
       double time_horizon = 10.0;
     } pgmo;
-    GraphUpdater::Config graph_updater{{{DsgLayers::OBJECTS, {'O', std::nullopt}}}};
+    GraphUpdater::Config graph_updater{{{DsgLayers::OBJECTS, {'O', std::nullopt, {}}}}};
     GraphConnector::Config graph_connector;
     bool enable_mesh_objects = true;
     MeshSegmenter::Config object_config;
@@ -100,12 +99,15 @@ class GraphBuilder : public Module {
     bool no_packet_collation = false;
     //! @brief Overwrite mesh timestamps using information from tracking layer
     bool overwrite_mesh_timestamps = false;
+    //! @brief Verbosity control for frontend
+    size_t verbosity = 0;
+    //! @brief Drop object meshes for memory savings
+    bool clear_object_meshes = false;
   } const config;
 
   GraphBuilder(const Config& config,
                const SharedDsgInfo::Ptr& dsg,
-               const SharedModuleState::Ptr& state,
-               const LogSetup::Ptr& logs = nullptr);
+               const SharedModuleState::Ptr& state);
 
   virtual ~GraphBuilder();
 
@@ -113,7 +115,7 @@ class GraphBuilder : public Module {
 
   void stop() override;
 
-  void save(const LogSetup& log_setup) override;
+  void save(const DataDirectory& output) override;
 
   std::string printInfo() const override;
 
@@ -162,7 +164,6 @@ class GraphBuilder : public Module {
 
  protected:
   uint64_t sequence_number_;
-  mutable std::mutex gvd_mutex_;
   std::atomic<bool> should_shutdown_{false};
   std::unique_ptr<std::thread> spin_thread_;
   InputQueue::Ptr queue_;
@@ -194,10 +195,7 @@ class GraphBuilder : public Module {
   ViewDatabase view_database_;
 
   SceneGraphLogger frontend_graph_logger_;
-  LogSetup::Ptr logs_;
   MessageQueue<PoseGraphPacket> pose_graph_updates_;
-
-  NodeIdSet previous_active_places_;
   std::list<pose_graph_tools::BowQuery::ConstPtr> cached_bow_messages_;
 
   Sink::List sinks_;

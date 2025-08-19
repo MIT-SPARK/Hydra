@@ -43,7 +43,6 @@
 #include "hydra/places/gvd_integrator_config.h"
 #include "hydra/places/gvd_voxel.h"
 #include "hydra/reconstruction/tsdf_interpolators.h"
-#include "hydra/utils/log_utilities.h"
 
 namespace hydra {
 
@@ -82,13 +81,7 @@ class GvdPlaceExtractor : public FreespacePlacesInterface {
 
   virtual ~GvdPlaceExtractor();
 
-  void save(const LogSetup& logs) const override;
-
   NodeIdSet getActiveNodes() const override;
-
-  // takes in a 3xN matrix
-  std::vector<bool> inFreespace(const PositionMatrix& positions,
-                                double freespace_distance_m) const override;
 
   void detect(const ActiveWindowOutput& msg) override;
 
@@ -99,7 +92,6 @@ class GvdPlaceExtractor : public FreespacePlacesInterface {
   void filterGround(DynamicSceneGraph& graph);
 
  protected:
-  mutable std::mutex gvd_mutex_;
   places::GvdLayer::Ptr gvd_;
   places::GraphExtractor graph_extractor_;
   std::unique_ptr<places::GvdIntegrator> gvd_integrator_;

@@ -37,7 +37,6 @@
 #include "hydra/active_window/active_window_output.h"
 #include "hydra/common/dsg_types.h"
 #include "hydra/places/gvd_voxel.h"
-#include "hydra/utils/log_utilities.h"
 
 namespace kimera_pgmo {
 class MeshDelta;
@@ -50,8 +49,6 @@ class SurfacePlacesInterface {
   SurfacePlacesInterface() {}
 
   virtual ~SurfacePlacesInterface() = default;
-
-  virtual void save(const LogSetup& /* logs */) const {}
 
   virtual void detect(const ActiveWindowOutput& msg,
                       const kimera_pgmo::MeshDelta& mesh_delta,

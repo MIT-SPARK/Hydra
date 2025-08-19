@@ -98,8 +98,6 @@ void InputModule::stopImpl() {
   }
 }
 
-void InputModule::save(const LogSetup&) {}
-
 std::string InputModule::printInfo() const { return config::toString(config); }
 
 void InputModule::dataSpin() {

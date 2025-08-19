@@ -68,6 +68,7 @@ void declare_config(LayerConnector::Config& config) {
   field(config.parent_layer, "parent_layer");
   field(config.child_layers, "child_layers");
   field(config.verbosity, "verbosity");
+  field(config.clear_active_flag, "clear_active_flag");
 }
 
 LayerConnector::LayerConnector(const Config& config) : config(config) {}
@@ -105,6 +106,10 @@ void LayerConnector::updateParents(const DynamicSceneGraph& graph,
 
     for (const auto& child_id : iter->second) {
       active_children.erase(child_id);
+      auto node = graph.findNode(child_id);
+      if (config.clear_active_flag && node) {
+        node->attributes().is_active = false;
+      }
     }
 
     iter = active_parents.erase(iter);
