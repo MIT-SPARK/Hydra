@@ -50,6 +50,7 @@
 
 #include <Eigen/Geometry>
 #include <limits>
+#include <opencv2/imgcodecs.hpp>
 #include <vector>
 
 #include "hydra/input/sensor_extrinsics.h"
@@ -59,7 +60,8 @@ namespace hydra {
 struct InputData;
 
 /**
- * @brief Base class for different sensors the system could use.
+ * @brief Base class for different sensors
+ * src/active_window/reconstruction_module.cppthe system could use.
  *
  * Current design is around any sensor that can operate around images such as RGBD
  * cameras or LiDARs.
@@ -72,6 +74,9 @@ class Sensor {
   struct Config {
     double min_range = 0.0f;
     double max_range = std::numeric_limits<double>::infinity();
+
+    std::string static_mask_fp = "";
+
     // TODO(nathan) try to avoid pulling in factories in the header
     config::VirtualConfig<SensorExtrinsics> extrinsics;
   } const config;
@@ -159,6 +164,12 @@ class Sensor {
   virtual bool pointIsInViewFrustum(const Eigen::Vector3f& point_C,
                                     float inflation_distance = 0.f) const = 0;
 
+  /**
+   * @brief Get the static mask for this sensor
+   * @return cv::Mat containing the mask, or empty cv::Mat if no mask is defined
+   */
+  virtual const cv::Mat& getStaticMask() const { return static_mask_; }
+
   //! @brief Name of current sensor
   const std::string name;
 
@@ -166,6 +177,8 @@ class Sensor {
 
  protected:
   const std::unique_ptr<SensorExtrinsics> extrinsics_;
+
+  cv::Mat static_mask_;
 };
 
 void declare_config(Sensor::Config& config);
