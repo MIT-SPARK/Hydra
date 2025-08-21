@@ -1,0 +1,41 @@
+repositories:
+  config_utilities:
+    type: git
+    url: https://github.com/MIT-SPARK/config_utilities.git
+    version: main
+  hydra_ros:
+    type: git
+    url: https://github.com/MIT-SPARK/Hydra-ROS.git
+    version: main
+  ianvs:
+    type: git
+    url: https://github.com/MIT-SPARK/Ianvs.git
+    version: main
+  kimera_pgmo:
+    type: git
+    url: https://github.com/MIT-SPARK/Kimera-PGMO.git
+    version: ros2
+  kimera_rpgo:
+    type: git
+    url: https://github.com/MIT-SPARK/Kimera-RPGO.git
+    version: develop
+  pose_graph_tools:
+    type: git
+    url: https://github.com/MIT-SPARK/pose_graph_tools.git
+    version: ros2
+  semantic_inference:
+    type: git
+    url: https://github.com/MIT-SPARK/semantic_inference.git
+    version: main
+  spark_dsg:
+    type: git
+    url: https://github.com/MIT-SPARK/Spark-DSG.git
+    version: main
+  spatial_hash:
+    type: git
+    url: https://github.com/MIT-SPARK/Spatial-Hash.git
+    version: main
+  teaser_plusplus:
+    type: git
+    url: https://github.com/MIT-SPARK/TEASER-plusplus.git
+    version: master
