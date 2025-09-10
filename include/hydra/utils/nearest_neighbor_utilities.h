@@ -59,12 +59,21 @@ class NearestNodeFinder {
   void find(const Eigen::Vector3d& position,
             size_t num_to_find,
             bool skip_first,
-            const Callback& callback);
+            const Callback& callback) const;
 
   size_t findRadius(const Eigen::Vector3d& position,
                     double radius_m,
                     bool skip_first,
                     const Callback& callback);
+
+  // Simplified interface to just get the IDs.
+  std::vector<NodeId> find(const Eigen::Vector3d& position,
+                           size_t num_to_find,
+                           bool skip_first) const;
+
+  std::vector<NodeId> findRadius(const Eigen::Vector3d& position,
+                                 double radius_m,
+                                 bool skip_first) const;
 
   const size_t num_nodes;
 

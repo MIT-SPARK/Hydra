@@ -86,15 +86,23 @@ void DsgUpdater::save(const DataDirectory& output, const std::string& label) con
 
 void DsgUpdater::resetBackendDsg(size_t timestamp_ns) {
   ScopedTimer timer("dsg_updater/reset_dsg", timestamp_ns, true, 0, false);
+  constexpr bool reset_mesh = false;
   {
+    std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
     // First reset private graph
-    target_dsg_->graph->clear();
+    private_dsg_->graph->clear(reset_mesh);
   }
 
   // TODO(nathan) this might break mesh stuff
-  target_dsg_->graph->mergeGraph(*source_graph_);
-  target_dsg_->merges.clear();
+  // NOTE(lschmid): This does break mesh stuff (copyMeshDelta and
+  // extractObjectAABBs-from mesh object segmentation).
+  private_dsg_->graph->mergeGraph(*unmerged_graph_);
+  private_dsg_->merges.clear();
   merge_tracker.clear();
+  reset_backend_dsg_ = false;
+  if (reset_mesh) {
+    deformation_graph_->setRecalculateVertices();
+  }
 }
 
 void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr info) {
@@ -107,6 +115,9 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
 
   // merge topological changes to private dsg, respecting merges
   // attributes may be overwritten, but ideally we don't bother
+  if (config.reset_dsg_on_loop_closure && info->loop_closure_detected) {
+    resetBackendDsg(timestamp_ns);
+  }
   GraphMergeConfig merge_config;
   merge_config.previous_merges = &target_dsg_->merges;
   merge_config.update_dynamic_attributes = false;

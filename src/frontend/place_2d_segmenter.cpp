@@ -37,6 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/types/enum.h>
+#include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
 
@@ -89,7 +90,9 @@ std::string printLabels(const std::set<T>& labels) {
 }
 
 Place2dSegmenter::Place2dSegmenter(const Config& config)
-    : config(config), next_node_id_(config.prefix, 0), num_archived_vertices_(0) {
+    : config(config::checkValid(config)),
+      next_node_id_(config.prefix, 0),
+      num_archived_vertices_(0) {
   VLOG(1) << "[Hydra Frontend] Detecting 2d places: " << printLabels(config.labels);
   for (const auto& label : config.labels) {
     active_places_[label] = std::set<NodeId>();
@@ -331,8 +334,7 @@ bool Place2dSegmenter::frontendAddPlaceConnection(const Place2dNodeAttributes& a
                                   edge_attrs);
 }
 
-void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
-                                   const ActiveWindowOutput& /*msg*/,
+void Place2dSegmenter::updateGraph(const ActiveWindowOutput& /*msg*/,
                                    DynamicSceneGraph& graph) {
   // Remove old empty nodes
   for (const auto& nid : nodes_to_remove_) {

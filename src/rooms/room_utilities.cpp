@@ -37,7 +37,8 @@
 namespace hydra {
 
 Eigen::Vector3d getRoomPosition(const SceneGraphLayer& places,
-                                const std::unordered_set<NodeId>& cluster) {
+                                const std::unordered_set<NodeId>& cluster,
+                                const DistanceAdaptor& get_distance) {
   if (cluster.empty()) {
     return Eigen::Vector3d::Zero();
   }
@@ -54,18 +55,16 @@ Eigen::Vector3d getRoomPosition(const SceneGraphLayer& places,
 
   bool room_in_freespace = false;
   for (const auto& place : cluster) {
-    const auto& attrs = places.getNode(place).attributes<PlaceNodeAttributes>();
-    double room_distance = (room_position - attrs.position).norm();
-    if (room_distance <= attrs.distance) {
-      room_in_freespace = true;
-      break;
-    }
+    const auto& node = places.getNode(place);
+    const auto& position = node.attributes().position;
+    const double room_distance = (room_position - position).norm();
+    const double distance = get_distance(node);
+    const double distance_to_freespace = room_distance - distance;
 
-    double distance_to_freespace = room_distance - attrs.distance;
     if (distance_to_freespace < best_distance) {
       best_distance = distance_to_freespace;
-      best_radius = attrs.distance;
-      best_position = attrs.position;
+      best_radius = distance;
+      best_position = position;
     }
   }
 
