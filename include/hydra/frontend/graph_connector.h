@@ -40,6 +40,8 @@
 #include <set>
 #include <vector>
 
+#include "hydra/utils/logging.h"
+
 namespace spark_dsg {
 class DynamicSceneGraph;
 }
@@ -47,7 +49,7 @@ class DynamicSceneGraph;
 namespace hydra {
 
 struct LayerConnector {
-  struct Config {
+  struct Config : public VerbosityConfig {
     struct ChildLayerConfig {
       //! Layer to find parents for
       std::string layer = "";
@@ -61,8 +63,6 @@ struct LayerConnector {
     //! All layers to find parents for (defaults to objects and agents)
     std::vector<ChildLayerConfig> child_layers{
         {spark_dsg::DsgLayers::OBJECTS, true, true}};
-    //! Verbosity of graph connector
-    size_t verbosity = 0;
     //! Whether or not to force `is_active` to false
     bool clear_active_flag = true;
   } const config;

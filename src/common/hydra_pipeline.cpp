@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/common/hydra_pipeline.h"
 
+#include <config_utilities/config.h>
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/settings.h>
@@ -44,17 +45,28 @@ namespace hydra {
 
 using hydra::timing::ElapsedTimeRecorder;
 
+void declare_config(HydraPipeline::Config& config) {
+  using namespace config;
+  name("HydraPipeline::Config");
+  base<VerbosityConfig>(config);
+  field(config.robot_id, "robot_id");
+}
+
 HydraPipeline::HydraPipeline(const PipelineConfig& pipeline_config,
                              int robot_id,
                              int config_verbosity)
-    : config_verbosity_(config_verbosity) {
-  const auto& config = GlobalInfo::init(pipeline_config, robot_id);
-  frontend_dsg_ = config.createSharedDsg();
-  backend_dsg_ = config.createSharedDsg();
+    : HydraPipeline(Config{config_verbosity, robot_id}, pipeline_config) {}
+
+HydraPipeline::HydraPipeline(const Config& config,
+                             const PipelineConfig& pipeline_config)
+    : config(config) {
+  const auto& info = GlobalInfo::init(pipeline_config, config.robot_id);
+  frontend_dsg_ = info.createSharedDsg();
+  backend_dsg_ = info.createSharedDsg();
   shared_state_.reset(new SharedModuleState());
-  shared_state_->lcd_graph = config.createSharedDsg();
-  shared_state_->backend_graph = config.createSharedDsg();
-  LOG(INFO) << "[Hydra] Initialized pipeline with:\n" << config;
+  shared_state_->lcd_graph = info.createSharedDsg();
+  shared_state_->backend_graph = info.createSharedDsg();
+  MLOG(0) << "[Hydra] Initialized pipeline with:\n" << info;
 }
 
 void HydraPipeline::init() {}
@@ -70,6 +82,7 @@ std::string makeBanner(const std::string& message,
   if (with_header) {
     ss << std::string(print_width, fill) << std::endl;
   }
+
   const auto msg_size = message.size() + 3;
   const auto spacing = msg_size >= print_width ? 0 : print_width - msg_size;
   ss << fill << " " << message << (spacing ? std::string(spacing, ' ') + fill : "")
@@ -77,6 +90,7 @@ std::string makeBanner(const std::string& message,
   if (with_footer) {
     ss << std::string(print_width, fill) << std::endl;
   }
+
   return ss.str();
 }
 
@@ -93,6 +107,7 @@ std::string HydraPipeline::getModuleInfo(const std::string& name,
       ss << info << std::endl;
     }
   }
+
   ss << std::string(print_width, '*') << std::endl;
   return ss.str();
 }
@@ -104,11 +119,11 @@ void HydraPipeline::showModules() const {
   for (auto&& [name, mod] : modules_) {
     ss << std::endl << getModuleInfo(name, mod.get());
   }
-  VLOG(config_verbosity_) << ss.str();
+  MLOG(1) << ss.str();
 }
 
 void HydraPipeline::start() {
-  VLOG(config_verbosity_) << std::endl << getModuleInfo("input", input_module_.get());
+  MLOG(2) << std::endl << getModuleInfo("input", input_module_.get());
   showModules();
 
   if (input_module_) {

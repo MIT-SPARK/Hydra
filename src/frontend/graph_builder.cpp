@@ -78,6 +78,7 @@ using hydra::timing::ScopedTimer;
 void declare_config(GraphBuilder::Config& config) {
   using namespace config;
   name("GraphBuilder::Config");
+  base<VerbosityConfig>(config);
   field(config.lcd_use_bow_vectors, "lcd_use_bow_vectors");
 
   {
@@ -108,7 +109,6 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.sinks, "sinks");
   field(config.no_packet_collation, "no_packet_collation");
   field(config.overwrite_mesh_timestamps, "overwrite_mesh_timestamps");
-  field(config.verbosity, "verbosity");
   field(config.clear_object_meshes, "clear_object_meshes");
 }
 
@@ -415,9 +415,8 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
         }
 
         const auto fmt = getDefaultFormat(3);
-        LOG_IF(INFO, config.verbosity >= 2)
-            << "view @ " << timestamp << "[ns]: " << pos.format(fmt) << " vs. "
-            << msg->world_T_body().translation().format(fmt);
+        MLOG(2) << "view @ " << timestamp << "[ns]: " << pos.format(fmt) << " vs. "
+                << msg->world_T_body().translation().format(fmt);
         return !map_window_->inBounds(
             msg->timestamp_ns, msg->world_T_body(), timestamp, pos);
       });

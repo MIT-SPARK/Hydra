@@ -76,7 +76,10 @@ GraphConnector::Config getDefaultConfig(bool include_primary, bool include_parti
   GraphConnector::Config config;
   config.layers.clear();
   config.layers.push_back(LayerConnector::Config{
-      DsgLayers::PLACES, {{DsgLayers::OBJECTS, include_primary, include_partitions}}});
+      0,
+      DsgLayers::PLACES,
+      {{DsgLayers::OBJECTS, include_primary, include_partitions}},
+  });
   return config;
 }
 
