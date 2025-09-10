@@ -533,10 +533,9 @@ void BackendModule::optimize(size_t timestamp_ns, bool force_find_merge) {
                                 [vertex_key](auto) { return vertex_key; });
   }
 
-  {  // timer scope
-    ScopedTimer timer("dsg_updater/optimization", timestamp_ns, true, 0, false);
-    KimeraPgmoInterface::optimize();
-  }  // timer scope
+  ScopedTimer timer("dsg_updater/optimization", timestamp_ns, true, 0, false);
+  KimeraPgmoInterface::optimize();
+  timer.stop();
 
   updateDsgMesh(timestamp_ns);
 

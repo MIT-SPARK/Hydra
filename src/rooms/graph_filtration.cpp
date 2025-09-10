@@ -40,6 +40,23 @@
 
 namespace hydra {
 
+double DistanceAdaptor::operator()(const SceneGraphNode& node) const {
+  return node.attributes<PlaceNodeAttributes>().distance;
+}
+
+double DistanceAdaptor::operator()(const SceneGraphEdge& edge) const {
+  return edge.info->weight;
+}
+
+double TraversabilityDistanceAdaptor::operator()(const SceneGraphNode& node) const {
+  return node.attributes<spark_dsg::TraversabilityNodeAttributes>().distance;
+}
+
+double TraversabilityDistanceAdaptor::operator()(const SceneGraphEdge& edge) const {
+  return std::min(this->operator()(layer.getNode(edge.source)),
+                  this->operator()(layer.getNode(edge.target)));
+}
+
 BarcodeTracker::BarcodeTracker() : BarcodeTracker(0) {}
 
 BarcodeTracker::BarcodeTracker(size_t min_component_size)
@@ -139,16 +156,17 @@ std::ostream& operator<<(std::ostream& out, const Entry& e) {
 void fillEntries(const SceneGraphLayer& layer,
                  std::vector<Entry>& entries,
                  std::unordered_map<NodeId, double>& node_distances,
-                 bool include_nodes) {
+                 bool include_nodes,
+                 const DistanceAdaptor& get_distance) {
   entries.reserve(layer.edges().size() + layer.nodes().size());
 
   for (const auto& id_edge_pair : layer.edges()) {
     const auto& edge = id_edge_pair.second;
-    entries.push_back({edge.info->weight, edge.source, edge.target});
+    entries.push_back({get_distance(edge), edge.source, edge.target});
   }
 
   for (auto&& [id, node] : layer.nodes()) {
-    const auto distance = node->attributes<PlaceNodeAttributes>().distance;
+    const auto distance = get_distance(*node);
     node_distances.emplace(id, distance);
 
     if (include_nodes) {
@@ -227,17 +245,23 @@ void updateComponentsFromNode(NodeId node,
   unused_edges.erase(edge_iter);
 }
 
-Filtration getGraphFiltration(const SceneGraphLayer& layer, double diff_threshold_m) {
+Filtration getGraphFiltration(const SceneGraphLayer& layer,
+                              double diff_threshold_m,
+                              const DistanceAdaptor& get_distance) {
   BarcodeTracker tracker;
   return getGraphFiltration(
-      layer, tracker, diff_threshold_m, [](const DisjointSet& components) -> size_t {
-        return components.sizes.size();
-      });
+      layer,
+      tracker,
+      diff_threshold_m,
+      [](const DisjointSet& components) -> size_t { return components.sizes.size(); },
+      true,
+      get_distance);
 }
 
 Filtration getGraphFiltration(const SceneGraphLayer& layer,
                               size_t min_component_size,
-                              double diff_threshold_m) {
+                              double diff_threshold_m,
+                              const DistanceAdaptor& get_distance) {
   BarcodeTracker tracker;
   return getGraphFiltration(
       layer,
@@ -251,17 +275,20 @@ Filtration getGraphFiltration(const SceneGraphLayer& layer,
           }
         }
         return num_components;
-      });
+      },
+      true,
+      get_distance);
 }
 
 Filtration getGraphFiltration(const SceneGraphLayer& layer,
                               BarcodeTracker& tracker,
                               double diff_threshold_m,
                               const ComponentCallback& count_components,
-                              bool include_nodes) {
+                              bool include_nodes,
+                              const DistanceAdaptor& get_distance) {
   std::vector<Entry> entries;
   std::unordered_map<NodeId, double> node_distances;
-  fillEntries(layer, entries, node_distances, include_nodes);
+  fillEntries(layer, entries, node_distances, include_nodes, get_distance);
 
   DisjointSet components;
   UnusedEdgeMap unused_edges;

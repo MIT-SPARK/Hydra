@@ -32,24 +32,61 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <unordered_set>
+#include "hydra/frontend/traversability_place_extractor.h"
 
-#include "hydra/common/dsg_types.h"
-#include "hydra/rooms/graph_filtration.h"
+#include <config_utilities/config.h>
+#include <config_utilities/types/conversions.h>
+#include <config_utilities/types/enum.h>
+#include <config_utilities/validation.h>
+#include <glog/logging.h>
 
-namespace hydra {
+#include <memory>
 
-Eigen::Vector3d getRoomPosition(const SceneGraphLayer& places,
-                                const std::unordered_set<NodeId>& cluster,
-                                const DistanceAdaptor& get_distance = {});
+#include "hydra/common/global_info.h"
+#include "hydra/utils/timing_utilities.h"
 
-void addEdgesToRoomLayer(const SceneGraphLayer& places,
-                         const std::map<NodeId, size_t>& labels,
-                         const std::map<size_t, NodeId> label_to_room_map,
-                         SceneGraphLayer& rooms);
+using Timer = hydra::timing::ScopedTimer;
 
-void addEdgesToRoomLayer(DynamicSceneGraph& graph,
-                         const std::set<NodeId>& active_rooms);
+namespace hydra::places {
 
-}  // namespace hydra
+void declare_config(TraversabilityPlaceExtractor::Config& config) {
+  using namespace config;
+  name("TraversabilityPlaceExtractor::Config");
+  field(config.estimator, "estimator");
+  field(config.clustering, "clustering");
+  field(config.postprocessing, "postprocessing");
+  field(config.sinks, "sinks");
+}
+
+TraversabilityPlaceExtractor::TraversabilityPlaceExtractor(const Config& config)
+    : config(config::checkValid(config)),
+      estimator_(config.estimator.create()),
+      clustering_(config.clustering.create()),
+      postprocessing_(config.postprocessing),
+      sinks_(Sink::instantiate(config.sinks)) {}
+
+NodeIdSet TraversabilityPlaceExtractor::getActiveNodes() const { return active_nodes_; }
+
+void TraversabilityPlaceExtractor::detect(const ActiveWindowOutput& msg,
+                                          const kimera_pgmo::MeshDelta& mesh_delta,
+                                          const DynamicSceneGraph& graph) {
+  Timer timer("traversability/estimate", msg.timestamp_ns);
+  estimator_->updateTraversability(msg, mesh_delta, graph);
+}
+
+void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
+                                               DynamicSceneGraph& graph) {
+  // TODO(lschmid): Find a nicer way than copying the layer here. Should not be too
+  // expensive though.
+  auto timer = Timer("traversability/postprocessing", msg.timestamp_ns);
+  TraversabilityLayer layer = estimator_->getTraversabilityLayer();
+  postprocessing_.apply(layer);
+
+  timer.reset("traversability/clustering");
+  clustering_->updateGraph(layer, msg, graph);
+
+  timer.reset("traversability/sinks");
+  Sink::callAll(sinks_, msg.timestamp_ns, msg.world_t_body, layer);
+}
+
+}  // namespace hydra::places

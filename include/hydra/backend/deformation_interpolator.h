@@ -49,7 +49,7 @@ class DeformationInterpolator {
   struct Config {
     //! Number of control points to use for deformation interpolation
     size_t num_control_points = 4;
-    //! Timestamp tolerance for control points [s].
+    //! Timestamp tolerance for control points [s]
     double control_point_tolerance_s = 10.0;
   } const config;
 

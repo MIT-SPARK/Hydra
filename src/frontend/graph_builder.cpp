@@ -97,11 +97,13 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.enable_place_mesh_mapping, "enable_place_mesh_mapping");
   config.surface_places.setOptional();
   field(config.surface_places, "surface_places");
+  // traversability places
+  config.traversability_places.setOptional();
+  field(config.traversability_places, "traversability_places");
   // freespace (i.e., 3D) places
   config.freespace_places.setOptional();
   field(config.freespace_places, "freespace_places");
   // frontier (i.e. 3D, boundary to unknown space) places
-  field(config.use_frontiers, "use_frontiers");
   config.frontier_places.setOptional();
   field(config.frontier_places, "frontier_places");
   field(config.view_database, "view_database");
@@ -125,6 +127,7 @@ GraphBuilder::GraphBuilder(const Config& config,
       map_window_(GlobalInfo::instance().createVolumetricWindow()),
       tracker_(config.pose_graph_tracker.create()),
       surface_places_(config.surface_places.create()),
+      traversability_places_(config.traversability_places.create()),
       freespace_places_(config.freespace_places.create()),
       frontier_places_(config.frontier_places.create()),
       view_database_(config.view_database),
@@ -133,10 +136,6 @@ GraphBuilder::GraphBuilder(const Config& config,
     segmenter_ = std::make_unique<MeshSegmenter>(
         config.object_config,
         GlobalInfo::instance().getLabelSpaceConfig().object_labels);
-  }
-
-  if (!config.use_frontiers) {
-    frontier_places_.reset();
   }
 
   CHECK(dsg_ != nullptr);
@@ -162,6 +161,10 @@ GraphBuilder::GraphBuilder(const Config& config,
       std::bind(&GraphBuilder::updateObjects, this, std::placeholders::_1));
   addPostMeshCallback(
       std::bind(&GraphBuilder::updatePlaces2d, this, std::placeholders::_1));
+  if (traversability_places_) {
+    addPostMeshCallback(std::bind(
+        &GraphBuilder::updateTraversabilityPlaces, this, std::placeholders::_1));
+  }
 
   if (config.lcd_use_bow_vectors) {
     PipelineQueues::instance().bow_queue.reset(new PipelineQueues::BowQueue());
@@ -625,7 +628,17 @@ void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
 
   // start graph critical section
   std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-  surface_places_->updateGraph(input.timestamp_ns, input, *dsg_->graph);
+  surface_places_->updateGraph(input, *dsg_->graph);
+}
+
+void GraphBuilder::updateTraversabilityPlaces(const ActiveWindowOutput& input) {
+  if (!traversability_places_ || !last_mesh_update_) {
+    return;
+  }
+  // TODO(lschmid): The mesh update is not used here. Also think about unifying places.
+  traversability_places_->detect(input, *last_mesh_update_, *dsg_->graph);
+  std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
+  traversability_places_->updateGraph(input, *dsg_->graph);
 }
 
 void GraphBuilder::updatePoseGraph(const ActiveWindowOutput& input) {

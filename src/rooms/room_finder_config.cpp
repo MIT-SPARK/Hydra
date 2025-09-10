@@ -37,6 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/types/enum.h>
+#include <config_utilities/validation.h>
 
 namespace hydra {
 

@@ -95,14 +95,16 @@ void UpdateRoomsFunctor::call(const DynamicSceneGraph&,
   }
 
   ScopedTimer timer("backend/room_detection", info->timestamp_ns, true, 1, false);
-  auto places_clone = places_layer->clone(
-      [](const auto& node) { return NodeSymbol(node.id).category() == 'p'; });
+  auto places_clone = places_layer->clone([](const auto& node) {
+    const auto cat = NodeSymbol(node.id).category();
+    return cat == 'p' || cat == 'h' || cat == 't';
+  });
 
   // TODO(nathan) layer view
   // TODO(nathan) pass in timestamp?
   auto rooms = room_finder->findRooms(*places_clone);
   rewriteRooms(rooms.get(), *dsg.graph);
-  room_finder->addRoomPlaceEdges(*dsg.graph);
+  room_finder->addRoomPlaceEdges(*dsg.graph, config.places_layer);
   return;
 }
 

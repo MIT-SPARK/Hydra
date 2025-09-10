@@ -90,7 +90,7 @@ TEST(RoomFinderTests, TestRoomPlaceEdges) {
     room_finder.setResults(results, map);
 
     auto graph_to_use = graph.clone();
-    room_finder.addRoomPlaceEdges(*graph_to_use);
+    room_finder.addRoomPlaceEdges(*graph_to_use, DsgLayers::PLACES);
     EXPECT_EQ(graph_to_use->numEdges(), 0u);
   }
 
@@ -103,7 +103,7 @@ TEST(RoomFinderTests, TestRoomPlaceEdges) {
     room_finder.setResults(results, map);
 
     auto graph_to_use = graph.clone();
-    room_finder.addRoomPlaceEdges(*graph_to_use);
+    room_finder.addRoomPlaceEdges(*graph_to_use, DsgLayers::PLACES);
     EXPECT_EQ(graph_to_use->numEdges(), 1u);
     EXPECT_TRUE(graph_to_use->hasEdge("r0"_id, "p0"_id));
   }
