@@ -75,9 +75,7 @@ class Place2dSegmenter : public SurfacePlacesInterface {
 
   NodeIdSet getActiveNodes() const override;
 
-  void updateGraph(uint64_t timestamp_ns,
-                   const ActiveWindowOutput&,
-                   DynamicSceneGraph& graph) override;
+  void updateGraph(const ActiveWindowOutput&, DynamicSceneGraph& graph) override;
 
  private:
   bool frontendAddPlaceConnection(const Place2dNodeAttributes& attrs1,

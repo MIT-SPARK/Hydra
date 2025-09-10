@@ -33,60 +33,56 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
 
-#include "hydra/backend/association_strategies.h"
-#include "hydra/backend/deformation_interpolator.h"
-#include "hydra/backend/merge_tracker.h"
-#include "hydra/backend/update_functions.h"
-#include "hydra/utils/active_window_tracker.h"
+#include <config_utilities/virtual_config.h>
 
-namespace hydra {
+#include <memory>
 
-struct UpdatePlacesFunctor : public UpdateFunctor {
+#include "hydra/common/output_sink.h"
+#include "hydra/frontend/surface_places_interface.h"
+#include "hydra/places/traversability_clustering.h"
+#include "hydra/places/traversability_estimator.h"
+#include "hydra/places/traversability_postprocessing.h"
+
+namespace hydra::places {
+
+class TraversabilityPlaceExtractor : public SurfacePlacesInterface {
+ public:
+  using Sink = OutputSink<uint64_t, const Eigen::Vector3d&, const TraversabilityLayer&>;
+
   struct Config {
-    //! Max distance between node centroids for a merge to be considered
-    double pos_threshold_m = 0.4;
-    //! Max deviation between place radii for a merge to be considered
-    double distance_tolerance_m = 0.4;
-    //! Settings for deformation of the places from the deformation graph
-    DeformationInterpolator::Config deformation_interpolator;
-    //! Association strategy for finding matches to active nodes
-    MergeProposer::Config merge_proposer = {
-        config::VirtualConfig<AssociationStrategy>{association::NearestNode::Config{}}};
-    //! Layer to update
-    std::string layer = DsgLayers::PLACES;
+    config::VirtualConfig<TraversabilityEstimator> estimator;
+    config::VirtualConfig<TraversabilityClustering> clustering;
+    TraversabilityProcessors::Config postprocessing;
+    std::vector<Sink::Factory> sinks;
   } const config;
 
-  explicit UpdatePlacesFunctor(const Config& config);
-  Hooks hooks() const override;
-  void call(const DynamicSceneGraph& unmerged,
-            SharedDsgInfo& dsg,
-            const UpdateInfo::ConstPtr& info) const override;
+  explicit TraversabilityPlaceExtractor(const Config& config);
 
-  size_t updateFromValues(const LayerView& view,
-                          SharedDsgInfo& dsg,
-                          const UpdateInfo::ConstPtr& info) const;
+  virtual ~TraversabilityPlaceExtractor() = default;
 
-  MergeList findMerges(const DynamicSceneGraph& graph,
-                       const UpdateInfo::ConstPtr& info) const;
+  NodeIdSet getActiveNodes() const override;
 
-  std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
-                                     const SceneGraphNode& node) const;
+  void detect(const ActiveWindowOutput& msg,
+              const kimera_pgmo::MeshDelta& mesh_delta,
+              const DynamicSceneGraph& graph) override;
 
-  void filterMissing(DynamicSceneGraph& graph,
-                     const std::list<NodeId> missing_nodes) const;
+  void updateGraph(const ActiveWindowOutput& msg, DynamicSceneGraph& graph) override;
 
-  mutable ActiveWindowTracker active_tracker;
-  const MergeProposer merge_proposer;
-  const DeformationInterpolator deformation_interpolator;
+ protected:
+  NodeIdSet active_nodes_;
+  TraversabilityEstimator::Ptr estimator_;
+  TraversabilityClustering::Ptr clustering_;
+  const TraversabilityProcessors postprocessing_;
+  Sink::List sinks_;
 
  private:
   inline static const auto registration_ =
-      config::RegistrationWithConfig<UpdateFunctor, UpdatePlacesFunctor, Config>(
-          "UpdatePlacesFunctor");
+      config::RegistrationWithConfig<SurfacePlacesInterface,
+                                     TraversabilityPlaceExtractor,
+                                     Config>("traversability");
 };
 
-void declare_config(UpdatePlacesFunctor::Config& config);
+void declare_config(TraversabilityPlaceExtractor::Config& config);
 
-}  // namespace hydra
+}  // namespace hydra::places

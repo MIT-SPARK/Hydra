@@ -89,8 +89,10 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
     HydraPgmoConfig pgmo;
     //! Add places layer to factor graph via MST approach
     bool add_places_to_deformation_graph = true;
-    //! Optimize
+    //! Optimize the graph on every detected loop closure
     bool optimize_on_lc = true;
+    //! If true, reset the private DSG with the unmerged graph on every loop closure
+    bool reset_dsg_on_loop_closure = false;
     ExternalLoopClosureReceiver::Config external_loop_closures;
     //! Output sinks that process that latest backed scene graph and state
     std::vector<Sink::Factory> sinks;
