@@ -367,7 +367,7 @@ void BlockTraversabilityClustering::classifyPlaceBoundaries() {
             if (states.empty()) {
               states.resize(width, State::UNKNOWN);
             } else {
-              fuseStates(State::UNKNOWN, states, true);
+              fuseStates(State::UNKNOWN, states, false);
             }
           } else {
             // Neighbor block exists.
@@ -375,7 +375,7 @@ void BlockTraversabilityClustering::classifyPlaceBoundaries() {
               if (states.empty()) {
                 states.resize(width, State::TRAVERSABLE);
               } else {
-                fuseStates(State::TRAVERSABLE, states, true);
+                fuseStates(State::TRAVERSABLE, states, false);
               }
             } else {
               const auto range = place.range.projectToNextBlock(
@@ -385,7 +385,7 @@ void BlockTraversabilityClustering::classifyPlaceBoundaries() {
               if (states.empty()) {
                 states = std::move(next_states);
               } else {
-                fuseStates(next_states, states, true);
+                fuseStates(next_states, states, false);
               }
             }
           }

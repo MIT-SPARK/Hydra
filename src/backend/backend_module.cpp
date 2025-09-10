@@ -105,7 +105,6 @@ void declare_config(BackendModule::Config& config) {
   field(config.pgmo, "pgmo");
   field(config.add_places_to_deformation_graph, "add_places_to_deformation_graph");
   field(config.optimize_on_lc, "optimize_on_lc");
-  field(config.reset_dsg_on_loop_closure, "reset_dsg_on_loop_closure");
   field(config.external_loop_closures, "external_loop_closures");
   field(config.sinks, "sinks");
 }

@@ -100,7 +100,7 @@ void logFiltration(std::ostream& fout,
 }
 
 RoomFinder::RoomFinder(const RoomFinderConfig& config)
-    : config(config::checkValid(config)) {}
+    : config(config::checkValid(config)), distance_adaptor_(new DistanceAdaptor()) {}
 
 RoomFinder::~RoomFinder() {
   if (log_file_) {
