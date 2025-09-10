@@ -33,60 +33,78 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+
 #include <config_utilities/factory.h>
+#include <config_utilities/virtual_config.h>
 
-#include "hydra/backend/association_strategies.h"
-#include "hydra/backend/deformation_interpolator.h"
-#include "hydra/backend/merge_tracker.h"
-#include "hydra/backend/update_functions.h"
-#include "hydra/utils/active_window_tracker.h"
+#include <memory>
 
-namespace hydra {
+#include "hydra/places/traversability_layer.h"
 
-struct UpdatePlacesFunctor : public UpdateFunctor {
+namespace hydra::places {
+
+/**
+ * @brief Interface for various traversability post processing functions that can be
+ * applied to the traversability layer.
+ */
+class TraversabilityProcessor {
+ public:
+  using Ptr = std::shared_ptr<TraversabilityProcessor>;
+  using ConstPtr = std::shared_ptr<const TraversabilityProcessor>;
+
+  TraversabilityProcessor() = default;
+  virtual ~TraversabilityProcessor() = default;
+
+  /**
+   * @brief Apply the post processing to the traversability layer.
+   * @param layer The traversability layer to process.
+   */
+  virtual void apply(TraversabilityLayer& layer) = 0;
+};
+
+/**
+ * @brief Utility container for several processors.
+ */
+struct TraversabilityProcessors {
+  using Config = std::vector<config::VirtualConfig<TraversabilityProcessor>>;
+
+  explicit TraversabilityProcessors(const Config& config);
+
+  /** @brief Apply all processors to the traversability layer.
+   * @param layer The traversability layer to process.
+   */
+  void apply(TraversabilityLayer& layer) const;
+
+ private:
+  std::vector<TraversabilityProcessor::Ptr> processors_;
+};
+
+/**
+ * @brief Dilate intraversable space in the traversability layer.
+ */
+class ErosionDilation : public TraversabilityProcessor {
+ public:
   struct Config {
-    //! Max distance between node centroids for a merge to be considered
-    double pos_threshold_m = 0.4;
-    //! Max deviation between place radii for a merge to be considered
-    double distance_tolerance_m = 0.4;
-    //! Settings for deformation of the places from the deformation graph
-    DeformationInterpolator::Config deformation_interpolator;
-    //! Association strategy for finding matches to active nodes
-    MergeProposer::Config merge_proposer = {
-        config::VirtualConfig<AssociationStrategy>{association::NearestNode::Config{}}};
-    //! Layer to update
-    std::string layer = DsgLayers::PLACES;
-  } const config;
+    //! @brief Number of dilation steps to apply.
+    size_t num_dilations = 1;
+  };
 
-  explicit UpdatePlacesFunctor(const Config& config);
-  Hooks hooks() const override;
-  void call(const DynamicSceneGraph& unmerged,
-            SharedDsgInfo& dsg,
-            const UpdateInfo::ConstPtr& info) const override;
+  ErosionDilation(const Config& config);
+  ~ErosionDilation() override = default;
 
-  size_t updateFromValues(const LayerView& view,
-                          SharedDsgInfo& dsg,
-                          const UpdateInfo::ConstPtr& info) const;
+  void apply(TraversabilityLayer& layer) override;
 
-  MergeList findMerges(const DynamicSceneGraph& graph,
-                       const UpdateInfo::ConstPtr& info) const;
+  const Config config;
 
-  std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
-                                     const SceneGraphNode& node) const;
-
-  void filterMissing(DynamicSceneGraph& graph,
-                     const std::list<NodeId> missing_nodes) const;
-
-  mutable ActiveWindowTracker active_tracker;
-  const MergeProposer merge_proposer;
-  const DeformationInterpolator deformation_interpolator;
+ protected:
+  static const std::array<Index2D, 4> offsets_;
 
  private:
   inline static const auto registration_ =
-      config::RegistrationWithConfig<UpdateFunctor, UpdatePlacesFunctor, Config>(
-          "UpdatePlacesFunctor");
+      config::RegistrationWithConfig<TraversabilityProcessor, ErosionDilation, Config>(
+          "ErosionDilation");
 };
 
-void declare_config(UpdatePlacesFunctor::Config& config);
+void declare_config(ErosionDilation::Config& config);
 
-}  // namespace hydra
+}  // namespace hydra::places

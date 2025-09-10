@@ -33,60 +33,46 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
 
-#include "hydra/backend/association_strategies.h"
-#include "hydra/backend/deformation_interpolator.h"
-#include "hydra/backend/merge_tracker.h"
+#include <memory>
+
 #include "hydra/backend/update_functions.h"
-#include "hydra/utils/active_window_tracker.h"
 
 namespace hydra {
 
-struct UpdatePlacesFunctor : public UpdateFunctor {
+/**
+ * @brief Tool to apply the deformation of the mesh control points to other nodes in the
+ * DSG.
+ */
+class DeformationInterpolator {
+ public:
   struct Config {
-    //! Max distance between node centroids for a merge to be considered
-    double pos_threshold_m = 0.4;
-    //! Max deviation between place radii for a merge to be considered
-    double distance_tolerance_m = 0.4;
-    //! Settings for deformation of the places from the deformation graph
-    DeformationInterpolator::Config deformation_interpolator;
-    //! Association strategy for finding matches to active nodes
-    MergeProposer::Config merge_proposer = {
-        config::VirtualConfig<AssociationStrategy>{association::NearestNode::Config{}}};
-    //! Layer to update
-    std::string layer = DsgLayers::PLACES;
+    //! Number of control points to use for deformation interpolation
+    size_t num_control_points = 4;
+    //! Timestamp tolerance for control points [s].
+    double control_point_tolerance_s = 10.0;
   } const config;
 
-  explicit UpdatePlacesFunctor(const Config& config);
-  Hooks hooks() const override;
-  void call(const DynamicSceneGraph& unmerged,
-            SharedDsgInfo& dsg,
-            const UpdateInfo::ConstPtr& info) const override;
+  explicit DeformationInterpolator(const Config& config);
 
-  size_t updateFromValues(const LayerView& view,
-                          SharedDsgInfo& dsg,
-                          const UpdateInfo::ConstPtr& info) const;
-
-  MergeList findMerges(const DynamicSceneGraph& graph,
-                       const UpdateInfo::ConstPtr& info) const;
-
-  std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
-                                     const SceneGraphNode& node) const;
-
-  void filterMissing(DynamicSceneGraph& graph,
-                     const std::list<NodeId> missing_nodes) const;
-
-  mutable ActiveWindowTracker active_tracker;
-  const MergeProposer merge_proposer;
-  const DeformationInterpolator deformation_interpolator;
+  /**
+   * @brief Interpolate the node positions based on the deformation graph, using the
+   * temporally closest control points as reference.
+   *
+   * @param unmerged Unmerged scene graph to keep up to date.
+   * @param dsg Private DSG to update.
+   * @param info Update information containing deformation graph.
+   * @param view View on the unmerged scene graph selecting all nodes to update.
+   */
+  void interpolateNodePositions(const DynamicSceneGraph& unmerged,
+                                DynamicSceneGraph& dsg,
+                                const UpdateInfo::ConstPtr& info,
+                                const LayerView& view) const;
 
  private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<UpdateFunctor, UpdatePlacesFunctor, Config>(
-          "UpdatePlacesFunctor");
+  mutable std::unordered_map<NodeId, Eigen::Vector3d> cached_pos_;
 };
 
-void declare_config(UpdatePlacesFunctor::Config& config);
+void declare_config(DeformationInterpolator::Config& config);
 
 }  // namespace hydra

@@ -91,7 +91,7 @@ class GraphBuilder : public Module {
     bool enable_place_mesh_mapping = false;
     config::VirtualConfig<SurfacePlacesInterface> surface_places;
     config::VirtualConfig<FreespacePlacesInterface> freespace_places;
-    bool use_frontiers = false;
+    config::VirtualConfig<SurfacePlacesInterface> traversability_places;
     config::VirtualConfig<FrontierExtractor> frontier_places;
     ViewDatabase::Config view_database;
     std::vector<Sink::Factory> sinks;
@@ -149,6 +149,8 @@ class GraphBuilder : public Module {
 
   void updatePlaces2d(const ActiveWindowOutput& msg);
 
+  void updateTraversabilityPlaces(const ActiveWindowOutput& msg);
+
   void updateDeformationGraph(const ActiveWindowOutput& msg);
 
   void updatePoseGraph(const ActiveWindowOutput& msg);
@@ -190,6 +192,7 @@ class GraphBuilder : public Module {
   std::unique_ptr<MeshSegmenter> segmenter_;
   std::unique_ptr<PoseGraphTracker> tracker_;
   std::unique_ptr<SurfacePlacesInterface> surface_places_;
+  std::unique_ptr<SurfacePlacesInterface> traversability_places_;
   std::unique_ptr<FreespacePlacesInterface> freespace_places_;
   std::unique_ptr<FrontierExtractor> frontier_places_;
   ViewDatabase view_database_;
