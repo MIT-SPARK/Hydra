@@ -89,9 +89,7 @@ struct UpdateTraversabilityFunctor : public UpdateFunctor {
   NodeAttributes::Ptr mergeNodes(const DynamicSceneGraph& dsg,
                                  const std::vector<NodeId>& merge_ids) const;
 
-  void cleanup(const UpdateInfo::ConstPtr& /* info */,
-               DynamicSceneGraph& /* unmerged */,
-               SharedDsgInfo* dsg) const;
+  void cleanup(const UpdateInfo::ConstPtr& /* info */, SharedDsgInfo* dsg) const;
 
   // Processing Steps.
   /**

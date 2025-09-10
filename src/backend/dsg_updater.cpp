@@ -59,6 +59,7 @@ void declare_config(DsgUpdater::Config& config) {
   name("DsgUpdaterConfig");
   field(config.enable_node_merging, "enable_node_merging");
   field(config.enable_exhaustive_merging, "enable_exhaustive_merging");
+  field(config.reset_dsg_on_loop_closure, "reset_dsg_on_loop_closure");
   field(config.update_functors, "update_functors");
 }
 
@@ -88,21 +89,18 @@ void DsgUpdater::resetBackendDsg(size_t timestamp_ns) {
   ScopedTimer timer("dsg_updater/reset_dsg", timestamp_ns, true, 0, false);
   constexpr bool reset_mesh = false;
   {
-    std::unique_lock<std::mutex> graph_lock(private_dsg_->mutex);
+    std::unique_lock<std::mutex> graph_lock(target_dsg_->mutex);
     // First reset private graph
-    private_dsg_->graph->clear(reset_mesh);
+    target_dsg_->graph->clear(reset_mesh);
   }
 
   // TODO(nathan) this might break mesh stuff
   // NOTE(lschmid): This does break mesh stuff (copyMeshDelta and
-  // extractObjectAABBs-from mesh object segmentation).
-  private_dsg_->graph->mergeGraph(*unmerged_graph_);
-  private_dsg_->merges.clear();
+  // extractObjectAABBs-from mesh object segmentation). If reset mesh functionality is
+  // added again "deformation_graph_->setRecalculateVertices();" used to be called here.
+  target_dsg_->graph->mergeGraph(*source_graph_);
+  target_dsg_->merges.clear();
   merge_tracker.clear();
-  reset_backend_dsg_ = false;
-  if (reset_mesh) {
-    deformation_graph_->setRecalculateVertices();
-  }
 }
 
 void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr info) {

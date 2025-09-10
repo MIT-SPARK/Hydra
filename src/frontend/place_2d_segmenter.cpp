@@ -334,7 +334,7 @@ bool Place2dSegmenter::frontendAddPlaceConnection(const Place2dNodeAttributes& a
                                   edge_attrs);
 }
 
-void Place2dSegmenter::updateGraph(const ActiveWindowOutput& /*msg*/,
+void Place2dSegmenter::updateGraph(const ActiveWindowOutput& msg,
                                    DynamicSceneGraph& graph) {
   // Remove old empty nodes
   for (const auto& nid : nodes_to_remove_) {
@@ -372,7 +372,8 @@ void Place2dSegmenter::updateGraph(const ActiveWindowOutput& /*msg*/,
 
   for (const auto& label_places : detected_label_places_) {
     for (const auto& place : label_places.second) {
-      NodeSymbol ns = addPlaceToGraph(graph, place, label_places.first, timestamp_ns);
+      NodeSymbol ns =
+          addPlaceToGraph(graph, place, label_places.first, msg.timestamp_ns);
       active_places_to_check.at(label_places.first).insert(ns);
     }
   }

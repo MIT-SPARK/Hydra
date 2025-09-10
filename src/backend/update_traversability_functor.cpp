@@ -87,9 +87,9 @@ UpdateFunctor::Hooks UpdateTraversabilityFunctor::hooks() const {
                           const std::vector<NodeId>& merge_ids) {
     return mergeNodes(dsg, merge_ids);
   };
-  my_hooks.cleanup = [this](const UpdateInfo::ConstPtr& info,
-                            DynamicSceneGraph& unmerged,
-                            SharedDsgInfo* dsg) { cleanup(info, unmerged, dsg); };
+  my_hooks.cleanup = [this](const UpdateInfo::ConstPtr& info, SharedDsgInfo* dsg) {
+    cleanup(info, dsg);
+  };
   return my_hooks;
 }
 
@@ -327,7 +327,6 @@ NodeAttributes::Ptr UpdateTraversabilityFunctor::mergeNodes(
 }
 
 void UpdateTraversabilityFunctor::cleanup(const UpdateInfo::ConstPtr&,
-                                          DynamicSceneGraph&,
                                           SharedDsgInfo* dsg) const {
   if (!dsg || !dsg->graph->hasLayer(config.layer)) {
     return;
@@ -426,7 +425,7 @@ double UpdateTraversabilityFunctor::distanceToIntraversable(
   const Boundary boundary(attrs);
   for (const Side side : Side::ALL) {
     // Check if the side has any intraversable state.
-    if (spark_dsg::isIntraversable(boundary.states[side], true)) {
+    if (!spark_dsg::areAllTraversable(boundary.states[side], true)) {
       min_distance = std::min(min_distance, boundary.distanceToSide(side, point));
     }
   }
@@ -442,7 +441,7 @@ void UpdateTraversabilityFunctor::computeTopologicalDistances(
     auto& attrs = node->attributes<TraversabilityNodeAttributes>();
     attrs.distance = std::numeric_limits<double>::max();
     for (const Side side : Side::ALL) {
-      if (spark_dsg::isIntraversable(attrs.boundary.states[side], true)) {
+      if (!spark_dsg::areAllTraversable(attrs.boundary.states[side], true)) {
         attrs.distance = 0.0;
         queue.push(id);
         break;

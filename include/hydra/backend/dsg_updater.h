@@ -67,6 +67,8 @@ class DsgUpdater {
     bool enable_node_merging = true;
     //! Repeatedly run merge detection until no more merges are detected
     bool enable_exhaustive_merging = false;
+    //! If true, reset the private DSG with the unmerged graph on every loop closure
+    bool reset_dsg_on_loop_closure = false;
     //! Update functors that get applied in the specified order
     config::OrderedMap<std::string, config::VirtualConfig<UpdateFunctor, true>>
         update_functors;
