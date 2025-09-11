@@ -76,17 +76,25 @@ void TraversabilityPlaceExtractor::detect(const ActiveWindowOutput& msg,
 
 void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
                                                DynamicSceneGraph& graph) {
-  // TODO(lschmid): Find a nicer way than copying the layer here. Should not be too
-  // expensive though.
-  auto timer = Timer("traversability/postprocessing", msg.timestamp_ns);
-  TraversabilityLayer layer = estimator_->getTraversabilityLayer();
-  postprocessing_.apply(layer);
+  // If traversability postprocessing is enabled, make a copy of the layer to apply all
+  // postprocessing. Not ideal but should also not be too costly.
+  const TraversabilityLayer* layer;
+  std::unique_ptr<TraversabilityLayer> processed_layer;
+  if (postprocessing_) {
+    Timer timer("traversability/postprocessing", msg.timestamp_ns);
+    processed_layer =
+        std::make_unique<TraversabilityLayer>(estimator_->getTraversabilityLayer());
+    postprocessing_.apply(*processed_layer);
+    layer = processed_layer.get();
+  } else {
+    layer = &estimator_->getTraversabilityLayer();
+  }
 
-  timer.reset("traversability/clustering");
-  clustering_->updateGraph(layer, msg, graph);
+  Timer timer("traversability/clustering", msg.timestamp_ns);
+  clustering_->updateGraph(*layer, msg, graph);
 
   timer.reset("traversability/sinks");
-  Sink::callAll(sinks_, msg.timestamp_ns, msg.world_t_body, layer);
+  Sink::callAll(sinks_, msg.timestamp_ns, msg.world_t_body, *layer);
 }
 
 }  // namespace hydra::places

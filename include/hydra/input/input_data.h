@@ -43,6 +43,7 @@ struct InputData {
 
   //! 3D points of the range image in sensor or world frame.
   cv::Mat vertex_map;
+
   //! Whether or not the vertex map is in the world frame (or sensor frame).
   bool points_in_world_frame = false;
 

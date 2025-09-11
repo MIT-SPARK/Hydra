@@ -286,6 +286,11 @@ NodeAttributes::Ptr UpdateTraversabilityFunctor::mergeNodes(
       to_attrs.last_observed_ns = from_attrs.last_observed_ns;
     }
 
+    // Cognition Labels: Fuse with weights.
+    for (const auto& [label, weight] : from_attrs.cognition_labels) {
+      to_attrs.cognition_labels[label] += weight;
+    }
+
     // Simple case: If places are completely contained.
     if (isContained(from_boundary, to_boundary)) {
       continue;

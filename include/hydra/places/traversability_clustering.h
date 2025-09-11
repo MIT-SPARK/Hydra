@@ -80,6 +80,11 @@ class BlockTraversabilityClustering : public TraversabilityClustering {
     //! If true, simplify the traversability of each boundary to a single value.
     //! Otherwise classify each voxel.
     bool simplify_boundary_traversability = true;
+
+    // TMP cognition_verifier parameters.
+    bool project_labels_to_ground = true;
+    float label_depth_tolerance = 1.0f;   // Meters.
+    bool label_use_const_weight = false;  // True: use inverse depth squared.
   };
 
   using State = spark_dsg::TraversabilityState;
@@ -173,6 +178,11 @@ class BlockTraversabilityClustering : public TraversabilityClustering {
 
   // Archive exiting places in the Active Window.
   void archivePlaceInfos(spark_dsg::DynamicSceneGraph& graph);
+
+  // Extract semantic place features for each node from the input image.
+  // TMP(lschmid): currently added for cognition_verifier.
+  void extractSemanticLabels(const ActiveWindowOutput& msg,
+                             spark_dsg::DynamicSceneGraph& graph);
 
   /* Utility functions */
   // Find all info block indices that would overlap with the given traversability block.

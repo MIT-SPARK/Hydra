@@ -58,6 +58,10 @@ void declare_config(BlockTraversabilityClustering::Config& config) {
   field(config.max_place_width, "max_place_width");
   field(config.recursive, "recursive");
   field(config.simplify_boundary_traversability, "simplify_boundary_traversability");
+  // Cognition_verifier parameters.
+  field(config.project_labels_to_ground, "project_labels_to_ground");
+  field(config.label_depth_tolerance, "label_depth_tolerance");
+  field(config.label_use_const_weight, "label_use_const_weight");
 
   check(config.min_place_width, GT, 0, "min_place_width");
   check(config.max_place_width, GT, 0, "max_place_width");
@@ -79,6 +83,7 @@ void BlockTraversabilityClustering::updateGraph(const TraversabilityLayer& layer
   updatePlaceNodesInDsg(graph);
   updatePlaceEdgesInDsg(graph);
   archivePlaceInfos(graph);
+  extractSemanticLabels(msg, graph);
 }
 
 void BlockTraversabilityClustering::updateInfoLayer(const TraversabilityLayer& layer) {
@@ -612,6 +617,53 @@ void BlockTraversabilityClustering::archivePlaceInfos(
   }
   infos_.removeBlocks(to_remove);
 };
+
+void BlockTraversabilityClustering::extractSemanticLabels(
+    const ActiveWindowOutput& msg, spark_dsg::DynamicSceneGraph& graph) {
+  const auto& tsdf = msg.map().getTsdfLayer();
+  const auto& sensor = msg.sensor_data->getSensor();
+  const Eigen::Isometry3f sensor_T_world =
+      msg.sensor_data->getSensorPose().cast<float>().inverse();
+
+  for (const auto& [id, node] :
+       graph.getLayer(spark_dsg::DsgLayers::TRAVERSABILITY).nodes()) {
+    auto& attrs = node->attributes<spark_dsg::TraversabilityNodeAttributes>();
+    if (!attrs.is_active) {
+      continue;
+    }
+
+    // Find the intersection with the floor of the 3D point.
+    Eigen::Vector3f pos_W = attrs.position.cast<float>();
+    while (config.project_labels_to_ground) {
+      const auto voxel = tsdf.getVoxelPtr(pos_W);
+      if (!voxel) {
+        break;
+      }
+      if (voxel->distance <= 0.0) {
+        break;
+      }
+      pos_W.z() -= tsdf.voxel_size;
+    }
+
+    // Project to semantic frame, check is visible, and get ID.
+    const Eigen::Vector3f pos_C = sensor_T_world * pos_W;
+    int u, v;
+    if (!sensor.projectPointToImagePlane(pos_C, u, v)) {
+      continue;
+    }
+    const float img_range = msg.sensor_data->depth_image.at<InputData::RangeType>(v, u);
+    const float place_range = pos_C.norm();
+    if (place_range > img_range + config.label_depth_tolerance) {
+      continue;
+    }
+    const int label = msg.sensor_data->label_image.at<InputData::LabelType>(v, u);
+    float weight = 1.0f;
+    if (!config.label_use_const_weight) {
+      weight /= (place_range * place_range);  // Inverse square distance weighting.
+    }
+    attrs.cognition_labels[label] += weight;
+  }
+}
 
 BlockIndices BlockTraversabilityClustering::touchedInfoBlocks(
     const TraversabilityBlock& block) const {

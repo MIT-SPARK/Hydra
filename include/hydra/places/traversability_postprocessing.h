@@ -70,10 +70,14 @@ struct TraversabilityProcessors {
 
   explicit TraversabilityProcessors(const Config& config);
 
-  /** @brief Apply all processors to the traversability layer.
+  /**
+   * @brief Apply all processors to the traversability layer.
    * @param layer The traversability layer to process.
    */
   void apply(TraversabilityLayer& layer) const;
+
+  bool empty() const { return processors_.empty(); }
+  operator bool() const { return !empty(); }
 
  private:
   std::vector<TraversabilityProcessor::Ptr> processors_;
