@@ -94,6 +94,9 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
     ExternalLoopClosureReceiver::Config external_loop_closures;
     //! Output sinks that process that latest backed scene graph and state
     std::vector<Sink::Factory> sinks;
+
+    // TMP cognition_verifier parameters.
+    bool simplify_place_labels = true;
   } const config;
 
   BackendModule(const Config& config,

@@ -107,6 +107,9 @@ void declare_config(BackendModule::Config& config) {
   field(config.optimize_on_lc, "optimize_on_lc");
   field(config.external_loop_closures, "external_loop_closures");
   field(config.sinks, "sinks");
+
+  // TMP cognition_verifier parameters.
+  field(config.simplify_place_labels, "simplify_place_labels");
 }
 
 BackendModule::BackendModule(const Config& config,
@@ -152,6 +155,32 @@ void BackendModule::stop() { stopImpl(); }
 
 void BackendModule::save(const DataDirectory& output) {
   std::lock_guard<std::mutex> lock(mutex_);
+
+  // TMP Simplify place labels before saving for cognition verifier.
+  if (config.simplify_place_labels &&
+      private_dsg_->graph->hasLayer(spark_dsg::DsgLayers::TRAVERSABILITY)) {
+    const auto& layer =
+        private_dsg_->graph->getLayer(spark_dsg::DsgLayers::TRAVERSABILITY);
+    for (auto& [id, node] : layer.nodes()) {
+      auto attrs = node->tryAttributes<TraversabilityNodeAttributes>();
+      if (attrs && !attrs->cognition_labels.empty()) {
+        int max_label = -1;
+        float max_weight = -1.0f;
+        float total_weight = 0.0f;
+
+        for (const auto& [label, weight] : attrs->cognition_labels) {
+          total_weight += weight;
+          if (weight > max_weight) {
+            max_weight = weight;
+            max_label = label;
+          }
+        }
+        attrs->cognition_labels.clear();
+        attrs->cognition_labels[max_label] = max_weight / total_weight;
+      }
+    }
+  }
+
   dsg_updater_->save(output, "backend");
 
   const auto backend_path = output.path("backend");
