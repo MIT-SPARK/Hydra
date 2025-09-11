@@ -63,6 +63,9 @@ void UpdateFrontiersFunctor::call(const DynamicSceneGraph&,
 
 void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns, SharedDsgInfo& dsg) const {
   ScopedTimer spin_timer("backend/cleanup_frontiers", timestamp_ns);
+  if (!dsg.graph->hasLayer(DsgLayers::PLACES)) {
+    return;
+  }
   std::lock_guard<std::mutex> lock(dsg.mutex);
   const auto& places_layer = dsg.graph->getLayer(DsgLayers::PLACES);
 
@@ -87,6 +90,9 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns, SharedDsgInfo& dsg) 
 
     const auto& prefix = GlobalInfo::instance().getRobotPrefix();
     const auto layer_id = dsg.graph->getLayerKey(DsgLayers::AGENTS)->layer;
+    if (!dsg.graph->hasLayer(layer_id, prefix.key)) {
+      continue;
+    }
     const auto& agents = dsg.graph->getLayer(layer_id, prefix.key);
     NodeSymbol pgmo_key(prefix.key, agents.numNodes() - 1);
     Eigen::Vector3d agent_pos = dsg.graph->getNode(pgmo_key).attributes().position;
