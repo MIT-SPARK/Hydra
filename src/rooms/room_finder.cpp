@@ -170,7 +170,8 @@ InitialClusters RoomFinder::getBestComponents(const SceneGraphLayer& places) con
         }
         return num_components;
       },
-      false);
+      false,
+      *distance_adaptor_);
 
   VLOG(10) << "[RoomFinder] Filtration: " << filtration;
 
