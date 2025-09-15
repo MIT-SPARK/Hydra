@@ -36,14 +36,20 @@
 #include "hydra/common/global_info.h"
 #include "hydra/common/module.h"
 #include "hydra/common/shared_module_state.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
 class HydraPipeline {
  public:
-  HydraPipeline(const PipelineConfig& config,
-                int robot_id = 0,
-                int config_verbosity = 1);
+  struct Config : public VerbosityConfig {
+    int robot_id = 0;
+  } const config;
+
+  // TODO(nathan) deprecate and/or drop this
+  HydraPipeline(const PipelineConfig& config, int robot_id = 0, int verbosity = 1);
+
+  HydraPipeline(const Config& config, const PipelineConfig& pipeline_config);
 
   virtual ~HydraPipeline();
 
@@ -72,7 +78,6 @@ class HydraPipeline {
   std::string getModuleInfo(const std::string& name, const Module* mod) const;
 
  protected:
-  int config_verbosity_;
   SharedDsgInfo::Ptr frontend_dsg_;
   SharedDsgInfo::Ptr backend_dsg_;
   SharedModuleState::Ptr shared_state_;
@@ -80,5 +85,7 @@ class HydraPipeline {
   Module::Ptr input_module_;
   std::map<std::string, Module::Ptr> modules_;
 };
+
+void declare_config(HydraPipeline::Config& config);
 
 }  // namespace hydra
