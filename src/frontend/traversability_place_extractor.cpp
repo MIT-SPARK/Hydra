@@ -32,80 +32,69 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/backend/update_rooms_functor.h"
+#include "hydra/frontend/traversability_place_extractor.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/types/conversions.h>
+#include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 
+#include <memory>
+
+#include "hydra/common/global_info.h"
 #include "hydra/utils/timing_utilities.h"
 
-namespace hydra {
+using Timer = hydra::timing::ScopedTimer;
 
-using timing::ScopedTimer;
-using SemanticLabel = SemanticNodeAttributes::Label;
+namespace hydra::places {
 
-void declare_config(UpdateRoomsFunctor::Config& config) {
+namespace {
+static const auto registration =
+    config::RegistrationWithConfig<SurfacePlacesInterface,
+                                   TraversabilityPlaceExtractor,
+                                   TraversabilityPlaceExtractor::Config>(
+        "traversability");
+}  // namespace
+
+void declare_config(TraversabilityPlaceExtractor::Config& config) {
   using namespace config;
-  name("UpdateRoomsFunctor::Config");
-  field(config.room_finder, "room_finder");
-  field(config.places_layer, "places_layer");
+  name("TraversabilityPlaceExtractor::Config");
+  field(config.estimator, "estimator");
+  field(config.clustering, "clustering");
+  field(config.postprocessing, "postprocessing");
+  field(config.sinks, "sinks");
 }
 
-UpdateRoomsFunctor::UpdateRoomsFunctor(const Config& config)
+TraversabilityPlaceExtractor::TraversabilityPlaceExtractor(const Config& config)
     : config(config::checkValid(config)),
-      room_finder(new RoomFinder(config.room_finder)) {}
+      estimator_(config.estimator.create()),
+      clustering_(config.clustering.create()),
+      postprocessing_(config.postprocessing),
+      sinks_(Sink::instantiate(config.sinks)) {}
 
-void UpdateRoomsFunctor::rewriteRooms(const SceneGraphLayer* new_rooms,
-                                      DynamicSceneGraph& graph) const {
-  std::vector<NodeId> to_remove;
-  const auto& prev_rooms = graph.getLayer(DsgLayers::ROOMS);
-  for (const auto& id_node_pair : prev_rooms.nodes()) {
-    to_remove.push_back(id_node_pair.first);
-  }
+NodeIdSet TraversabilityPlaceExtractor::getActiveNodes() const { return active_nodes_; }
 
-  for (const auto node_id : to_remove) {
-    graph.removeNode(node_id);
-  }
-
-  if (!new_rooms) {
-    return;
-  }
-
-  for (auto&& [id, node] : new_rooms->nodes()) {
-    graph.emplaceNode(DsgLayers::ROOMS, id, node->attributes().clone());
-  }
-
-  for (const auto& id_edge_pair : new_rooms->edges()) {
-    const auto& edge = id_edge_pair.second;
-    graph.insertEdge(edge.source, edge.target, edge.info->clone());
-  }
+void TraversabilityPlaceExtractor::detect(const ActiveWindowOutput& msg,
+                                          const kimera_pgmo::MeshDelta& mesh_delta,
+                                          const DynamicSceneGraph& graph) {
+  Timer timer("traversability/estimate", msg.timestamp_ns);
+  estimator_->updateTraversability(msg, mesh_delta, graph);
 }
 
-void UpdateRoomsFunctor::call(const DynamicSceneGraph&,
-                              SharedDsgInfo& dsg,
-                              const UpdateInfo::ConstPtr& info) const {
-  if (!room_finder) {
-    return;
-  }
+void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
+                                               DynamicSceneGraph& graph) {
+  // TODO(lschmid): Find a nicer way than copying the layer here. Should not be too
+  // expensive though.
+  auto timer = Timer("traversability/postprocessing", msg.timestamp_ns);
+  TraversabilityLayer layer = estimator_->getTraversabilityLayer();
+  postprocessing_.apply(layer);
 
-  const auto places_layer = dsg.graph->findLayer(config.places_layer);
-  if (!places_layer) {
-    return;
-  }
+  timer.reset("traversability/clustering");
+  clustering_->updateGraph(layer, msg, graph);
 
-  ScopedTimer timer("backend/room_detection", info->timestamp_ns, true, 1, false);
-  auto places_clone = places_layer->clone([](const auto& node) {
-    const auto cat = NodeSymbol(node.id).category();
-    return cat == 'p' || cat == 'h' || cat == 't';
-  });
-
-  // TODO(nathan) layer view
-  // TODO(nathan) pass in timestamp?
-  auto rooms = room_finder->findRooms(*places_clone);
-  rewriteRooms(rooms.get(), *dsg.graph);
-  room_finder->addRoomPlaceEdges(*dsg.graph, config.places_layer);
-  return;
+  timer.reset("traversability/sinks");
+  Sink::callAll(sinks_, msg.timestamp_ns, msg.world_t_body, layer);
 }
 
-}  // namespace hydra
+}  // namespace hydra::places
