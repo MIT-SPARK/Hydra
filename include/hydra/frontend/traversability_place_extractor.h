@@ -33,23 +33,53 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <unordered_set>
 
-#include "hydra/common/dsg_types.h"
-#include "hydra/rooms/graph_filtration.h"
+#include <config_utilities/virtual_config.h>
 
-namespace hydra {
+#include <memory>
 
-Eigen::Vector3d getRoomPosition(const SceneGraphLayer& places,
-                                const std::unordered_set<NodeId>& cluster,
-                                const DistanceAdaptor& get_distance = {});
+#include "hydra/common/output_sink.h"
+#include "hydra/frontend/surface_places_interface.h"
+#include "hydra/places/traversability_clustering.h"
+#include "hydra/places/traversability_estimator.h"
+#include "hydra/places/traversability_postprocessing.h"
 
-void addEdgesToRoomLayer(const SceneGraphLayer& places,
-                         const std::map<NodeId, size_t>& labels,
-                         const std::map<size_t, NodeId> label_to_room_map,
-                         SceneGraphLayer& rooms);
+namespace hydra::places {
 
-void addEdgesToRoomLayer(DynamicSceneGraph& graph,
-                         const std::set<NodeId>& active_rooms);
+class TraversabilityPlaceExtractor : public SurfacePlacesInterface {
+ public:
+  using Sink = OutputSink<uint64_t, const Eigen::Vector3d&, const TraversabilityLayer&>;
 
-}  // namespace hydra
+  struct Config {
+    config::VirtualConfig<TraversabilityEstimator> estimator;
+    config::VirtualConfig<TraversabilityClustering> clustering;
+    TraversabilityProcessors::Config postprocessing;
+    std::vector<Sink::Factory> sinks;
+  } const config;
+
+  explicit TraversabilityPlaceExtractor(const Config& config);
+
+  virtual ~TraversabilityPlaceExtractor() = default;
+
+  NodeIdSet getActiveNodes() const override;
+
+  void detect(const ActiveWindowOutput& msg,
+              const kimera_pgmo::MeshDelta& mesh_delta,
+              const kimera_pgmo::MeshOffsetInfo& offsets,
+              const spark_dsg::DynamicSceneGraph& graph) override;
+
+  void updateGraph(const ActiveWindowOutput& msg,
+                   const kimera_pgmo::MeshOffsetInfo& offsets,
+                   spark_dsg::DynamicSceneGraph& graph) override;
+
+ protected:
+  NodeIdSet active_nodes_;
+  TraversabilityEstimator::Ptr estimator_;
+  TraversabilityClustering::Ptr clustering_;
+  const TraversabilityProcessors postprocessing_;
+  Sink::List sinks_;
+};
+
+void declare_config(TraversabilityPlaceExtractor::Config& config);
+
+}  // namespace hydra::places

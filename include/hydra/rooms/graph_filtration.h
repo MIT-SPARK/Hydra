@@ -50,6 +50,22 @@ struct ComponentLifetime {
 
 using LifetimeMap = std::unordered_map<NodeId, ComponentLifetime>;
 
+struct DistanceAdaptor {
+  virtual ~DistanceAdaptor() = default;
+  virtual double operator()(const SceneGraphNode& node) const;
+  virtual double operator()(const SceneGraphEdge& edge) const;
+};
+
+struct TraversabilityDistanceAdaptor : public DistanceAdaptor {
+  explicit TraversabilityDistanceAdaptor(const SceneGraphLayer& layer) : layer(layer){};
+
+  double operator()(const SceneGraphNode& node) const override;
+  double operator()(const SceneGraphEdge& edge) const override;
+
+ private:
+  const SceneGraphLayer& layer;
+};
+
 struct BarcodeTracker : public DisjointSet {
   BarcodeTracker();
 
@@ -77,17 +93,18 @@ std::ostream& operator<<(std::ostream& out, const FiltrationInfo& info);
 std::ostream& operator<<(std::ostream& out, const Filtration& info);
 
 Filtration getGraphFiltration(const SceneGraphLayer& layer,
-                              double diff_threshold_m = 1.0e-4);
-
+                              double diff_threshold_m = 1.0e-4,
+                              const DistanceAdaptor& get_distance = {});
 Filtration getGraphFiltration(const SceneGraphLayer& layer,
                               size_t min_component_size,
-                              double diff_threshold_m = 1.0e-4);
-
+                              double diff_threshold_m = 1.0e-4,
+                              const DistanceAdaptor& get_distance = {});
 Filtration getGraphFiltration(const SceneGraphLayer& layer,
                               BarcodeTracker& tracker,
                               double diff_threshold_m,
                               const ComponentCallback& count_components,
-                              bool include_nodes = true);
+                              bool include_nodes = true,
+                              const DistanceAdaptor& get_distance = {});
 
 std::pair<size_t, size_t> getTrimmedFiltration(const Filtration& old_filtration,
                                                double min_dilation_m,

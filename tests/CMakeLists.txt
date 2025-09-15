@@ -9,22 +9,22 @@ configure_file(hydra_test_config.h.in hydra_test_config.h)
 add_executable(
   test_${PROJECT_NAME}
   main.cpp
-  src/resources.cpp
   src/place_fixtures.cpp
+  src/resources.cpp
   backend/test_external_loop_closure.cpp
   backend/test_update_agents_functor.cpp
+  backend/test_update_buildings_functor.cpp
   backend/test_update_objects_functor.cpp
   backend/test_update_places_functor.cpp
-  backend/test_update_buildings_functor.cpp
-  common/test_shared_dsg_info.cpp
   common/test_config_utilities.cpp
+  common/test_shared_dsg_info.cpp
+  frontend/test_graph_connector.cpp
+  frontend/test_mesh_segmenter.cpp
   input/test_camera.cpp
   input/test_input_packet.cpp
   input/test_lidar.cpp
-  input/test_sensor.cpp
   input/test_sensor_utilities.cpp
-  frontend/test_mesh_segmenter.cpp
-  frontend/test_graph_connector.cpp
+  input/test_sensor.cpp
   loop_closure/test_descriptor_matching.cpp
   loop_closure/test_detector.cpp
   loop_closure/test_registration.cpp
@@ -32,10 +32,11 @@ add_executable(
   loop_closure/test_subgraph_extraction.cpp
   odometry/test_pose_graph_from_odom.cpp
   openset/test_embedding_distances.cpp
-  places/test_graph_extractor.cpp
   places/test_graph_extractor_utilities.cpp
+  places/test_graph_extractor.cpp
   places/test_gvd_integrator.cpp
   places/test_gvd_utilities.cpp
+  places/test_traversability.cpp
   reconstruction/test_integration_masking.cpp
   reconstruction/test_marching_cubes.cpp
   reconstruction/test_projection_interpolators.cpp

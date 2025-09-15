@@ -216,3 +216,7 @@ pyrightconfig.json
 *.ipynb
 compile_commands.json
 *.clangd
+
+
+# ROS2
+log/

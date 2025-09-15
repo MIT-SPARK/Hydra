@@ -112,7 +112,7 @@ NearestNodeFinder::Ptr NearestNodeFinder::fromLayer(const SceneGraphLayer& layer
 void NearestNodeFinder::find(const Eigen::Vector3d& position,
                              size_t num_to_find,
                              bool skip_first,
-                             const NearestNodeFinder::Callback& callback) {
+                             const NearestNodeFinder::Callback& callback) const {
   const size_t limit = skip_first ? num_to_find + 1 : num_to_find;
   std::vector<size_t> nn_indices(limit);
   std::vector<double> distances(limit);
@@ -129,7 +129,7 @@ void NearestNodeFinder::find(const Eigen::Vector3d& position,
 size_t NearestNodeFinder::findRadius(const Eigen::Vector3d& position,
                                      double radius,
                                      bool skip_first,
-                                     const NearestNodeFinder::Callback& callback) {
+                                     const Callback& callback) const {
   std::vector<nanoflann::ResultItem<size_t, double>> neighbors;
   size_t num_found = internals_->kdtree->radiusSearch(
       position.data(), radius, neighbors, nanoflann::SearchParameters());
@@ -145,6 +145,26 @@ size_t NearestNodeFinder::findRadius(const Eigen::Vector3d& position,
   } else {
     return num_found - (skip_first ? 1 : 0);
   }
+}
+
+std::vector<NodeId> NearestNodeFinder::find(const Eigen::Vector3d& position,
+                                            size_t num_to_find,
+                                            bool skip_first) const {
+  std::vector<NodeId> result;
+  find(position, num_to_find, skip_first, [&result](NodeId id, size_t, double) {
+    result.push_back(id);
+  });
+  return result;
+}
+
+std::vector<NodeId> NearestNodeFinder::findRadius(const Eigen::Vector3d& position,
+                                                  double radius_m,
+                                                  bool skip_first) const {
+  std::vector<NodeId> result;
+  findRadius(position, radius_m, skip_first, [&result](NodeId id, size_t, double) {
+    result.push_back(id);
+  });
+  return result;
 }
 
 size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
