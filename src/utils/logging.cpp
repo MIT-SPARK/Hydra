@@ -32,60 +32,14 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include "hydra/common/global_info.h"
-#include "hydra/common/module.h"
-#include "hydra/common/shared_module_state.h"
 #include "hydra/utils/logging.h"
+
+#include <config_utilities/config.h>
 
 namespace hydra {
 
-class HydraPipeline {
- public:
-  struct Config : public VerbosityConfig {
-    int robot_id = 0;
-  } const config;
-
-  // TODO(nathan) deprecate and/or drop this
-  HydraPipeline(const PipelineConfig& config, int robot_id = 0, int verbosity = 1);
-
-  HydraPipeline(const Config& config, const PipelineConfig& pipeline_config);
-
-  virtual ~HydraPipeline();
-
-  virtual void init();
-
-  virtual void start();
-
-  virtual void stop();
-
-  // TODO(nathan) expand API?
-  virtual void save(const DataDirectory& output) const;
-
-  template <typename Derived = Module>
-  Derived* getModule(const std::string& name) {
-    auto iter = modules_.find(name);
-    if (iter == modules_.end()) {
-      return nullptr;
-    }
-
-    return dynamic_cast<Derived*>(iter->second.get());
-  }
-
- protected:
-  void showModules() const;
-
-  std::string getModuleInfo(const std::string& name, const Module* mod) const;
-
- protected:
-  SharedDsgInfo::Ptr frontend_dsg_;
-  SharedDsgInfo::Ptr backend_dsg_;
-  SharedModuleState::Ptr shared_state_;
-
-  Module::Ptr input_module_;
-  std::map<std::string, Module::Ptr> modules_;
-};
-
-void declare_config(HydraPipeline::Config& config);
+void declare_config(VerbosityConfig& config) {
+  config::field(config.verbosity, "verbosity");
+}
 
 }  // namespace hydra
