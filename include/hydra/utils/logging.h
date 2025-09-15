@@ -33,69 +33,17 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/dynamic_scene_graph.h>
-
-#include <map>
-#include <memory>
-#include <set>
-#include <vector>
-
-#include "hydra/utils/logging.h"
 
 namespace hydra {
 
-struct LayerConnector {
-  struct Config : public VerbosityConfig {
-    struct ChildLayerConfig {
-      //! Layer to find parents for
-      std::string layer = "";
-      //! Include nodes from partition=0
-      bool include_primary = true;
-      //! Include nodes from partition > 0
-      bool include_partitions = true;
-    };
-    //! Layer to find parents from
-    std::string parent_layer = spark_dsg::DsgLayers::PLACES;
-    //! All layers to find parents for (defaults to objects and agents)
-    std::vector<ChildLayerConfig> child_layers{
-        {spark_dsg::DsgLayers::OBJECTS, true, true}};
-    //! Whether or not to force `is_active` to false
-    bool clear_active_flag = true;
-  } const config;
-
-  explicit LayerConnector(const Config& config);
-
-  void updateParents(const spark_dsg::DynamicSceneGraph& graph,
-                     const std::vector<spark_dsg::NodeId>& new_nodes);
-
-  void connectChildren(spark_dsg::DynamicSceneGraph& graph,
-                       const std::vector<spark_dsg::NodeId>& new_nodes);
-
-  // tracking
-  std::set<spark_dsg::NodeId> active_children;
-  std::map<spark_dsg::NodeId, std::set<spark_dsg::NodeId>> active_parents;
+struct VerbosityConfig {
+  int verbosity = 0;
 };
 
-void declare_config(LayerConnector::Config::ChildLayerConfig& config);
+void declare_config(VerbosityConfig& config);
 
-void declare_config(LayerConnector::Config& config);
-
-class GraphConnector {
- public:
-  struct Config {
-    std::vector<LayerConnector::Config> layers{LayerConnector::Config{}};
-  } const config;
-
-  explicit GraphConnector(const Config& config);
-
-  virtual ~GraphConnector();
-
-  void connect(spark_dsg::DynamicSceneGraph& graph);
-
- protected:
-  std::vector<LayerConnector> layers_;
-};
-
-void declare_config(GraphConnector::Config& config);
+// NOTE(nathan) you need to include <glog/logging.h> for this to work, but
+// I don't want have <glog/logging.h> included in a bunch of header files
+#define MLOG(V) LOG_IF(INFO, config.verbosity >= V)
 
 }  // namespace hydra
