@@ -65,9 +65,9 @@ void declare_config(LayerConnector::Config::ChildLayerConfig& config) {
 void declare_config(LayerConnector::Config& config) {
   using namespace config;
   name("LayerConnector::Config");
+  base<VerbosityConfig>(config);
   field(config.parent_layer, "parent_layer");
   field(config.child_layers, "child_layers");
-  field(config.verbosity, "verbosity");
   field(config.clear_active_flag, "clear_active_flag");
 }
 
@@ -149,10 +149,9 @@ void LayerConnector::connectChildren(DynamicSceneGraph& graph,
     return;
   }
 
-  LOG_IF(INFO, config.verbosity >= 5)
-      << "Detecting interlayer edges for layer " << config.parent_layer << " with "
-      << active_parents.size() << " parents and " << active_children.size()
-      << " children";
+  MLOG(5) << "Detecting interlayer edges for layer " << config.parent_layer << " with "
+          << active_parents.size() << " parents and " << active_children.size()
+          << " children";
 
   std::vector<spark_dsg::NodeId> parent_ids;
   std::transform(active_parents.begin(),

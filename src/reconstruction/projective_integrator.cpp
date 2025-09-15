@@ -83,7 +83,7 @@ inline bool measurementOutsideTruncation(const MapConfig& map_config,
 void declare_config(ProjectiveIntegrator::Config& config) {
   using namespace config;
   name("ProjectiveIntegrator");
-  field(config.verbosity, "verbosity");
+  base<VerbosityConfig>(config);
   field(config.extra_integration_distance,
         "extra_integration_distance",
         config.extra_integration_distance >= 0 ? "m" : "vs");
@@ -148,8 +148,7 @@ void ProjectiveIntegrator::updateBlocks(const BlockIndices& block_indices,
                                         const InputData& data,
                                         const cv::Mat& integration_mask,
                                         VolumetricMap& map) const {
-  LOG_IF(INFO, config.verbosity >= 3)
-      << "Updating " << block_indices.size() << " blocks.";
+  MLOG(3) << "Updating " << block_indices.size() << " blocks.";
 
   // Update all blocks in parallel.
   IndexGetter<BlockIndex> index_getter(block_indices);
@@ -198,8 +197,7 @@ void ProjectiveIntegrator::updateBlock(const BlockIndex& block_index,
   }
 
   if (was_updated) {
-    LOG_IF(INFO, config.verbosity >= 10)
-        << "integrator updated block " << showIndex(block_index);
+    MLOG(10) << "integrator updated block " << showIndex(block_index);
     blocks.tsdf->setUpdated();
   }
 }
