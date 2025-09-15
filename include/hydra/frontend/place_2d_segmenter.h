@@ -74,8 +74,7 @@ class Place2dSegmenter : public SurfacePlacesInterface {
 
   NodeIdSet getActiveNodes() const override;
 
-  void updateGraph(uint64_t timestamp_ns,
-                   const ActiveWindowOutput&,
+  void updateGraph(const ActiveWindowOutput& msg,
                    const kimera_pgmo::MeshOffsetInfo& offsets,
                    DynamicSceneGraph& graph) override;
 

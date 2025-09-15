@@ -38,6 +38,7 @@
 #include <config_utilities/factory.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/types/enum.h>
+#include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <spark_dsg/bounding_box_extraction.h>
@@ -115,7 +116,7 @@ std::unordered_set<size_t> getFrozenSet(const LabelToNodes& active_places,
 }
 
 Place2dSegmenter::Place2dSegmenter(const Config& config)
-    : config(config), next_node_id_(config.prefix, 0) {
+    : config(config::checkValid(config)), next_node_id_(config.prefix, 0) {
   VLOG(1) << "[2D Places] Using labels: " << clustering::printLabels(config.labels);
   for (const auto& label : config.labels) {
     active_places_[label] = std::set<NodeId>();
@@ -174,8 +175,7 @@ void Place2dSegmenter::detect(const ActiveWindowOutput&,
   }
 }
 
-void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
-                                   const ActiveWindowOutput& /*msg*/,
+void Place2dSegmenter::updateGraph(const ActiveWindowOutput& msg,
                                    const kimera_pgmo::MeshOffsetInfo& offsets,
                                    DynamicSceneGraph& graph) {
   // Remove old empty nodes
@@ -214,7 +214,7 @@ void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
 
   for (const auto& [label, places] : label_places_) {
     for (const auto& place : places) {
-      NodeSymbol ns = addPlaceToGraph(graph, place, label, timestamp_ns);
+      NodeSymbol ns = addPlaceToGraph(graph, place, label, msg.timestamp_ns);
       active_places_to_check.at(label).insert(ns);
     }
   }

@@ -56,8 +56,7 @@ class SurfacePlacesInterface {
                       const kimera_pgmo::MeshOffsetInfo& offsets,
                       const spark_dsg::DynamicSceneGraph& graph) = 0;
 
-  virtual void updateGraph(uint64_t timestamp_ns,
-                           const ActiveWindowOutput& msg,
+  virtual void updateGraph(const ActiveWindowOutput& msg,
                            const kimera_pgmo::MeshOffsetInfo& offsets,
                            spark_dsg::DynamicSceneGraph& graph) = 0;
 
