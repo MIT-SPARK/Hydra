@@ -58,6 +58,7 @@
 #include "hydra/frontend/view_database.h"
 #include "hydra/loop_closure/lcd_input.h"
 #include "hydra/odometry/pose_graph_from_odom.h"
+#include "hydra/utils/logging.h"
 
 namespace kimera_pgmo {
 class DeltaCompression;
@@ -78,7 +79,7 @@ class GraphBuilder : public Module {
   using InputCallback = std::function<void(const ActiveWindowOutput&)>;
   using Sink = OutputSink<uint64_t, const DynamicSceneGraph&, const BackendInput&>;
 
-  struct Config {
+  struct Config : public VerbosityConfig {
     bool lcd_use_bow_vectors = true;
     struct DeformationConfig {
       double mesh_resolution = 0.1;
@@ -99,8 +100,6 @@ class GraphBuilder : public Module {
     std::vector<Sink::Factory> sinks;
     //! @brief Disable merging update packets from the active window if true
     bool no_packet_collation = false;
-    //! @brief Verbosity control for frontend
-    size_t verbosity = 0;
     //! @brief Drop object meshes for memory savings
     bool clear_object_meshes = false;
   } const config;
