@@ -41,6 +41,13 @@ namespace hydra::places {
 
 using State = spark_dsg::TraversabilityState;
 
+namespace {
+static const auto registration =
+    config::RegistrationWithConfig<TraversabilityProcessor,
+                                   ErosionDilation,
+                                   ErosionDilation::Config>("ErosionDilation");
+}  // namespace
+
 TraversabilityProcessors::TraversabilityProcessors(const Config& config) {
   for (const auto& processor_config : config) {
     auto processor = processor_config.create();

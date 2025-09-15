@@ -226,12 +226,6 @@ class BlockTraversabilityClustering : public TraversabilityClustering {
       BlockIndex(0, 1, 0),   // top
       BlockIndex(1, 0, 0)    // right
   };
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<TraversabilityClustering,
-                                     BlockTraversabilityClustering,
-                                     Config>("BlockTraversabilityClustering");
 };
 
 void declare_config(BlockTraversabilityClustering::Config& config);

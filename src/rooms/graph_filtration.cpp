@@ -53,8 +53,7 @@ double TraversabilityDistanceAdaptor::operator()(const SceneGraphNode& node) con
 }
 
 double TraversabilityDistanceAdaptor::operator()(const SceneGraphEdge& edge) const {
-  return std::min(this->operator()(layer.getNode(edge.source)),
-                  this->operator()(layer.getNode(edge.target)));
+  return edge.info->weight;
 }
 
 BarcodeTracker::BarcodeTracker() : BarcodeTracker(0) {}

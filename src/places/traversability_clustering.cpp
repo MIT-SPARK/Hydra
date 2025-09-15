@@ -51,6 +51,14 @@ using spark_dsg::Boundary;
 using spark_dsg::Side;
 using spark_dsg::TraversabilityNodeAttributes;
 
+namespace {
+static const auto registration =
+    config::RegistrationWithConfig<TraversabilityClustering,
+                                   BlockTraversabilityClustering,
+                                   BlockTraversabilityClustering::Config>(
+        "BlockTraversabilityClustering");
+}  // namespace
+
 void declare_config(BlockTraversabilityClustering::Config& config) {
   using namespace config;
   name("BlockTraversabilityClustering::Config");

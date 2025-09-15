@@ -49,6 +49,14 @@ using Timer = hydra::timing::ScopedTimer;
 
 namespace hydra::places {
 
+namespace {
+static const auto registration =
+    config::RegistrationWithConfig<SurfacePlacesInterface,
+                                   TraversabilityPlaceExtractor,
+                                   TraversabilityPlaceExtractor::Config>(
+        "traversability");
+}  // namespace
+
 void declare_config(TraversabilityPlaceExtractor::Config& config) {
   using namespace config;
   name("TraversabilityPlaceExtractor::Config");

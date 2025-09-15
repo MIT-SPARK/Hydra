@@ -163,12 +163,12 @@ void DeformationInterpolator::interpolateNodePositions(
                                            nullptr);
   }
 
+  // Copy the newly interpolated positions to the merged DSG.
   for (const auto& node : view) {
     auto node_ptr = dsg.findNode(node.id);
     if (node_ptr) {
       node_ptr->attributes().position = node.attributes().position;
     }
-    // dsg.setNodeAttributes(node.id, node.attributes().clone());
   }
 
   // Update the cached positions.

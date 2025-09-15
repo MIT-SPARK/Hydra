@@ -98,11 +98,6 @@ class ErosionDilation : public TraversabilityProcessor {
 
  protected:
   static const std::array<Index2D, 4> offsets_;
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<TraversabilityProcessor, ErosionDilation, Config>(
-          "ErosionDilation");
 };
 
 void declare_config(ErosionDilation::Config& config);

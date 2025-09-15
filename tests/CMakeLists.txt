@@ -8,6 +8,9 @@ configure_file(hydra_test_config.h.in hydra_test_config.h)
 
 add_executable(
   test_${PROJECT_NAME}
+  main.cpp
+  src/place_fixtures.cpp
+  src/resources.cpp
   backend/test_external_loop_closure.cpp
   backend/test_update_agents_functor.cpp
   backend/test_update_buildings_functor.cpp
@@ -27,7 +30,6 @@ add_executable(
   loop_closure/test_registration.cpp
   loop_closure/test_scene_graph_descriptors.cpp
   loop_closure/test_subgraph_extraction.cpp
-  main.cpp
   odometry/test_pose_graph_from_odom.cpp
   openset/test_embedding_distances.cpp
   places/test_graph_extractor_utilities.cpp
@@ -45,8 +47,6 @@ add_executable(
   rooms/test_graph_filtration.cpp
   rooms/test_room_finder.cpp
   rooms/test_room_utilities.cpp
-  src/place_fixtures.cpp
-  src/resources.cpp
   utils/test_active_window_tracker.cpp
   utils/test_minimum_spanning_tree.cpp
   utils/test_nearest_neighbor_utilities.cpp

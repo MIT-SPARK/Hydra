@@ -75,12 +75,6 @@ class TraversabilityPlaceExtractor : public SurfacePlacesInterface {
   TraversabilityClustering::Ptr clustering_;
   const TraversabilityProcessors postprocessing_;
   Sink::List sinks_;
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<SurfacePlacesInterface,
-                                     TraversabilityPlaceExtractor,
-                                     Config>("traversability");
 };
 
 void declare_config(TraversabilityPlaceExtractor::Config& config);
