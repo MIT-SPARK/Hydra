@@ -36,7 +36,6 @@
 
 #include "hydra/active_window/active_window_output.h"
 #include "hydra/common/dsg_types.h"
-#include "hydra/places/gvd_voxel.h"
 
 namespace kimera_pgmo {
 class MeshDelta;
@@ -54,9 +53,7 @@ class SurfacePlacesInterface {
                       const kimera_pgmo::MeshDelta& mesh_delta,
                       const DynamicSceneGraph& graph) = 0;
 
-  virtual void updateGraph(uint64_t timestamp_ns,
-                           const ActiveWindowOutput& msg,
-                           DynamicSceneGraph& graph) = 0;
+  virtual void updateGraph(const ActiveWindowOutput& msg, DynamicSceneGraph& graph) = 0;
 
   virtual NodeIdSet getActiveNodes() const = 0;
 };

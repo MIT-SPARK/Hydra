@@ -33,23 +33,46 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <unordered_set>
 
-#include "hydra/common/dsg_types.h"
-#include "hydra/rooms/graph_filtration.h"
+#include <memory>
+
+#include "hydra/backend/update_functions.h"
 
 namespace hydra {
 
-Eigen::Vector3d getRoomPosition(const SceneGraphLayer& places,
-                                const std::unordered_set<NodeId>& cluster,
-                                const DistanceAdaptor& get_distance = {});
+/**
+ * @brief Tool to apply the deformation of the mesh control points to other nodes in the
+ * DSG.
+ */
+class DeformationInterpolator {
+ public:
+  struct Config {
+    //! Number of control points to use for deformation interpolation
+    size_t num_control_points = 4;
+    //! Timestamp tolerance for control points [s]
+    double control_point_tolerance_s = 10.0;
+  } const config;
 
-void addEdgesToRoomLayer(const SceneGraphLayer& places,
-                         const std::map<NodeId, size_t>& labels,
-                         const std::map<size_t, NodeId> label_to_room_map,
-                         SceneGraphLayer& rooms);
+  explicit DeformationInterpolator(const Config& config);
 
-void addEdgesToRoomLayer(DynamicSceneGraph& graph,
-                         const std::set<NodeId>& active_rooms);
+  /**
+   * @brief Interpolate the node positions based on the deformation graph, using the
+   * temporally closest control points as reference.
+   *
+   * @param unmerged Unmerged scene graph to keep up to date.
+   * @param dsg Private DSG to update.
+   * @param info Update information containing deformation graph.
+   * @param view View on the unmerged scene graph selecting all nodes to update.
+   */
+  void interpolateNodePositions(const DynamicSceneGraph& unmerged,
+                                DynamicSceneGraph& dsg,
+                                const UpdateInfo::ConstPtr& info,
+                                const LayerView& view) const;
+
+ private:
+  mutable std::unordered_map<NodeId, Eigen::Vector3d> cached_pos_;
+};
+
+void declare_config(DeformationInterpolator::Config& config);
 
 }  // namespace hydra

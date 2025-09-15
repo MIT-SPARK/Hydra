@@ -39,8 +39,11 @@
 #include "hydra/common/dsg_types.h"
 #include "hydra/rooms/graph_clustering.h"
 #include "hydra/rooms/room_finder_config.h"
+#include "hydra/rooms/room_utilities.h"
 
 namespace hydra {
+
+struct DistanceAdaptor;
 
 struct GraphInfo {
   size_t offset;
@@ -59,18 +62,22 @@ class RoomFinder {
 
   SceneGraphLayer::Ptr findRooms(const SceneGraphLayer& places);
 
-  void addRoomPlaceEdges(DynamicSceneGraph& graph) const;
+  void addRoomPlaceEdges(DynamicSceneGraph& graph, const std::string& layer) const;
 
   void enableLogging(const std::string& log_path);
 
   void fillClusterMap(const SceneGraphLayer& places, ClusterMap& assignments) const;
+
+  const RoomFinderConfig config;
 
  protected:
   InitialClusters getBestComponents(const SceneGraphLayer& places) const;
 
   SceneGraphLayer::Ptr makeRoomLayer(const SceneGraphLayer& places);
 
-  RoomFinderConfig config_;
+  void setupDistanceAdaptor(const SceneGraphLayer& places);
+
+  std::unique_ptr<DistanceAdaptor> distance_adaptor_;
   ClusterResults last_results_;
   std::map<size_t, NodeId> cluster_room_map_;
   mutable bool logged_once_ = false;

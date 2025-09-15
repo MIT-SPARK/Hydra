@@ -36,6 +36,7 @@
 #include <config_utilities/factory.h>
 
 #include "hydra/backend/association_strategies.h"
+#include "hydra/backend/deformation_interpolator.h"
 #include "hydra/backend/merge_tracker.h"
 #include "hydra/backend/update_functions.h"
 #include "hydra/utils/active_window_tracker.h"
@@ -48,10 +49,8 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
     double pos_threshold_m = 0.4;
     //! Max deviation between place radii for a merge to be considered
     double distance_tolerance_m = 0.4;
-    //! Number of control points for deforming the places (if not in optimization)
-    size_t num_control_points = 4;
-    //! Timestamp tolerance when deforming the places (if not in optimization)
-    double control_point_tolerance_s = 10.0;
+    //! Settings for deformation of the places from the deformation graph
+    DeformationInterpolator::Config deformation_interpolator;
     //! Association strategy for finding matches to active nodes
     MergeProposer::Config merge_proposer = {
         config::VirtualConfig<AssociationStrategy>{association::NearestNode::Config{}}};
@@ -69,10 +68,6 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
                           SharedDsgInfo& dsg,
                           const UpdateInfo::ConstPtr& info) const;
 
-  size_t interpFromValues(const LayerView& view,
-                          SharedDsgInfo& dsg,
-                          const UpdateInfo::ConstPtr& info) const;
-
   MergeList findMerges(const DynamicSceneGraph& graph,
                        const UpdateInfo::ConstPtr& info) const;
 
@@ -83,8 +78,8 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
                      const std::list<NodeId> missing_nodes) const;
 
   mutable ActiveWindowTracker active_tracker;
-  mutable std::unordered_map<NodeId, Eigen::Vector3d> cached_pos_;
   const MergeProposer merge_proposer;
+  const DeformationInterpolator deformation_interpolator;
 
  private:
   inline static const auto registration_ =
