@@ -29,6 +29,23 @@ frontend:
     min_final_place_points: 10
     place_max_neighbor_z_diff: .5
     place_overlap_threshold: 0.0
+  traversability_places:
+    type: traversability
+    estimator:
+      type: HeightTraversabilityEstimator
+      height_below: 0
+      height_above: 0.5
+      min_confidence: 1.0
+      min_traversability: 1.0
+      pessimistic: true
+    clustering:
+      type: BlockTraversabilityClustering
+      min_place_width: &min_place_width 0.5 # m
+      max_place_width: &max_place_width 1.0 # m
+      recursive: true
+      simplify_boundary_traversability: false
+    sinks:
+      - type: TraversabilityVisualizer
   freespace_places:
     type: gvd
     filter_places: true
@@ -79,6 +96,12 @@ backend:
       type: Update2dPlacesFunctor
     places:
       type: UpdatePlacesFunctor
+    traversability:
+      type: UpdateTraversabilityFunctor
+      min_place_size: *min_place_width # m
+      max_place_size: *max_place_width # m
+      use_metric_distance: false
+      tolerance: 0.1 # m
     frontiers:
       type: UpdateFrontiersFunctor
     rooms:

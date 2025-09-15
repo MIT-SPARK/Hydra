@@ -33,23 +33,73 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <unordered_set>
 
-#include "hydra/common/dsg_types.h"
-#include "hydra/rooms/graph_filtration.h"
+#include <config_utilities/factory.h>
+#include <config_utilities/virtual_config.h>
 
-namespace hydra {
+#include <memory>
 
-Eigen::Vector3d getRoomPosition(const SceneGraphLayer& places,
-                                const std::unordered_set<NodeId>& cluster,
-                                const DistanceAdaptor& get_distance = {});
+#include "hydra/places/traversability_layer.h"
 
-void addEdgesToRoomLayer(const SceneGraphLayer& places,
-                         const std::map<NodeId, size_t>& labels,
-                         const std::map<size_t, NodeId> label_to_room_map,
-                         SceneGraphLayer& rooms);
+namespace hydra::places {
 
-void addEdgesToRoomLayer(DynamicSceneGraph& graph,
-                         const std::set<NodeId>& active_rooms);
+/**
+ * @brief Interface for various traversability post processing functions that can be
+ * applied to the traversability layer.
+ */
+class TraversabilityProcessor {
+ public:
+  using Ptr = std::shared_ptr<TraversabilityProcessor>;
+  using ConstPtr = std::shared_ptr<const TraversabilityProcessor>;
 
-}  // namespace hydra
+  TraversabilityProcessor() = default;
+  virtual ~TraversabilityProcessor() = default;
+
+  /**
+   * @brief Apply the post processing to the traversability layer.
+   * @param layer The traversability layer to process.
+   */
+  virtual void apply(TraversabilityLayer& layer) = 0;
+};
+
+/**
+ * @brief Utility container for several processors.
+ */
+struct TraversabilityProcessors {
+  using Config = std::vector<config::VirtualConfig<TraversabilityProcessor>>;
+
+  explicit TraversabilityProcessors(const Config& config);
+
+  /** @brief Apply all processors to the traversability layer.
+   * @param layer The traversability layer to process.
+   */
+  void apply(TraversabilityLayer& layer) const;
+
+ private:
+  std::vector<TraversabilityProcessor::Ptr> processors_;
+};
+
+/**
+ * @brief Dilate intraversable space in the traversability layer.
+ */
+class ErosionDilation : public TraversabilityProcessor {
+ public:
+  struct Config {
+    //! @brief Number of dilation steps to apply.
+    size_t num_dilations = 1;
+  };
+
+  ErosionDilation(const Config& config);
+  ~ErosionDilation() override = default;
+
+  void apply(TraversabilityLayer& layer) override;
+
+  const Config config;
+
+ protected:
+  static const std::array<Index2D, 4> offsets_;
+};
+
+void declare_config(ErosionDilation::Config& config);
+
+}  // namespace hydra::places
