@@ -22,10 +22,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ccache
-          key: ${{ runner.os }}-ccache-${{ github.sha}}
-          restore-keys: |
-            ${{ runner.os }}-ccache-${{ github.sha}}
-            ${{ runner.os }}-ccache-
+          key: ${{ runner.os }}-ccache-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-ccache-
       - name: Dependencies
         run: |
           apt update && apt install -y python3-vcstool git ccache
