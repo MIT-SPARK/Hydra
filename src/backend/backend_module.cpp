@@ -120,7 +120,8 @@ BackendModule::BackendModule(const Config& config,
       private_dsg_(dsg),
       state_(state),
       external_lc_receiver_(config.external_loop_closures,
-                            &PipelineQueues::instance().external_loop_closure_queue) {
+                            &PipelineQueues::instance().external_loop_closure_queue),
+      sinks_(Sink::instantiate(config.sinks)) {
   // set up frontend graph copy
   unmerged_graph_ = private_dsg_->graph->clone();
   // set up mesh infrastructure
