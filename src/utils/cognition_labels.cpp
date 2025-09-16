@@ -30,7 +30,31 @@ CognitionLabels::CognitionLabels(const Config& config)
 }
 
 void CognitionLabels::setup(const Config& config) {
-  instance_ = std::make_unique<CognitionLabels>(config);
+  instance_.reset(new CognitionLabels(config));
+}
+
+FeatureVector getClipFeature(const nlohmann::json& meta) {
+  if (!meta.contains("clip_feature") || meta["clip_feature"].is_null()) {
+    return {};
+  }
+  const auto clip_vec = meta["clip_feature"].get<std::vector<float>>();
+  if (clip_vec.empty()) {
+    return {};
+  }
+  return Eigen::Map<const FeatureVector>(clip_vec.data(), clip_vec.size());
+}
+
+FeatureVector getSentenceFeature(const nlohmann::json& meta) {
+  if (!meta.contains("sentence_embedding_feature") ||
+      meta["sentence_embedding_feature"].is_null()) {
+    return {};
+  }
+  const auto sentence_vec =
+      meta["sentence_embedding_feature"].get<std::vector<float>>();
+  if (sentence_vec.empty()) {
+    return {};
+  }
+  return Eigen::Map<const FeatureVector>(sentence_vec.data(), sentence_vec.size());
 }
 
 FeatureVector CognitionLabels::getFeature(const spark_dsg::DynamicSceneGraph& dsg,
@@ -38,11 +62,25 @@ FeatureVector CognitionLabels::getFeature(const spark_dsg::DynamicSceneGraph& ds
   // Lookup the ID in the DSG.
   const auto& config = instance().config;
   if (!dsg.metadata.get().contains(config.ns)) {
+    // std::stringstream ss;
+    // for (auto it = dsg.metadata.get().begin(); it != dsg.metadata.get().end(); ++it)
+    // {
+    //   ss << " " << it.key();
+    // }
+    // LOG(ERROR) << "DSG does not contain namespace '" << config.ns
+    //            << "', contains:" << ss.str();
     return {};
   }
   const auto string_id = std::to_string(id);
   const auto meta = dsg.metadata.get().at(config.ns);
   if (!meta.contains(string_id)) {
+    // std::stringstream ss;
+    // for (auto it = meta.begin(); it != meta.end(); ++it) {
+    //   ss << " " << it.key();
+    // }
+    // LOG(ERROR) << "DSG metadata does not contain ID " << string_id << " in namespace
+    // "
+    //            << config.ns << ", contains:" << ss.str();
     return {};
   }
   const auto& value = meta.at(string_id);
@@ -73,11 +111,11 @@ FeatureVector CognitionLabels::getFeature(const spark_dsg::DynamicSceneGraph& ds
 float CognitionLabels::getScore(const spark_dsg::DynamicSceneGraph& dsg,
                                 int id1,
                                 int id2) {
-  const auto f1 = getFeatureVector(dsg, id1);
+  const auto f1 = getFeature(dsg, id1);
   if (f1.size() == 0) {
     return 0.0f;
   }
-  return getScore(f1, getFeatureVector(dsg, id2));
+  return getScore(f1, getFeature(dsg, id2));
 }
 
 float CognitionLabels::getScore(const FeatureVector& f1, const FeatureVector& f2) {
@@ -85,30 +123,6 @@ float CognitionLabels::getScore(const FeatureVector& f1, const FeatureVector& f2
     return 0.0f;
   }
   return instance().distance_metric_->score(f1, f2);
-}
-
-FeatureVector getClipFeature(const nlohmann::json& meta) {
-  if (!meta.contains("clip_feature") || meta["clip_feature"].is_null()) {
-    return {};
-  }
-  const auto clip_vec = meta["clip_feature"].get<std::vector<float>>();
-  if (clip_vec.empty()) {
-    return {};
-  }
-  return Eigen::Map<const FeatureVector>(clip_vec.data(), clip_vec.size());
-}
-
-FeatureVector getSentenceFeature(const nlohmann::json& meta) {
-  if (!meta.contains("sentence_embedding_feature") ||
-      meta["sentence_embedding_feature"].is_null()) {
-    return {};
-  }
-  const auto sentence_vec =
-      meta["sentence_embedding_feature"].get<std::vector<float>>();
-  if (sentence_vec.empty()) {
-    return {};
-  }
-  return Eigen::Map<const FeatureVector>(sentence_vec.data(), sentence_vec.size());
 }
 
 CognitionLabels& CognitionLabels::instance() {
@@ -120,14 +134,13 @@ CognitionLabels& CognitionLabels::instance() {
 
 std::unique_ptr<CognitionLabels> CognitionLabels::instance_ = nullptr;
 
-FeatureVector LazyCognitionLabels::get(int id) {
-  const auto it = cache_.find(id);
+const FeatureVector& LazyCognitionLabels::get(int id) const {
+  auto it = cache_.find(id);
   if (it != cache_.end()) {
     return it->second;
   }
-  const auto feature = CognitionLabels::getFeature(dsg_, id);
-  cache_[id] = feature;
-  return feature;
+  it = cache_.emplace(id, CognitionLabels::getFeature(dsg_, id)).first;
+  return it->second;
 }
 
 std::pair<int, float> getMaxCognitionLabel(const std::map<int, float>& labels) {

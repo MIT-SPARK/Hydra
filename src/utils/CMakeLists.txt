@@ -1,6 +1,7 @@
 target_sources(
   ${PROJECT_NAME}
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/active_window_tracker.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/cognition_labels.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/csv_reader.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/data_directory.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/disjoint_set.cpp

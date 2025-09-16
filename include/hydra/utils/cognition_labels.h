@@ -82,11 +82,11 @@ struct CognitionLabels {
 struct LazyCognitionLabels {
   explicit LazyCognitionLabels(const spark_dsg::DynamicSceneGraph& dsg) : dsg_(dsg) {}
 
-  FeatureVector get(int id);
+  const FeatureVector& get(int id) const;
 
  private:
   const spark_dsg::DynamicSceneGraph& dsg_;
-  std::unordered_map<int, FeatureVector> cache_;
+  mutable std::unordered_map<int, FeatureVector> cache_;
 };
 
 // Returns the label with the highest score and its confidence from observations <label,

@@ -509,36 +509,44 @@ void UpdateTraversabilityFunctor::computeCognitionDistances(
 
   // Get all edges that need updating.
   EdgeSet to_update;
-  for (const auto& [id, node] : layer.nodes()) {
+  for (const auto& [node_id, node] : layer.nodes()) {
     auto& attrs = node->attributes<TraversabilityNodeAttributes>();
     if (attrs.cognition_labels.empty()) {
       continue;
     }
-    const auto it = previous_cognition_labels_.find(id);
-    const int current_label = getMaxCognitionLabel(attrs.cognition_labels).first;
-    if (it != previous_cognition_labels_.end() && it->second == current_label) {
+    const auto it = previous_cognition_labels_.find(node_id);
+    const int current_id = getMaxCognitionLabel(attrs.cognition_labels).first;
+    if (it != previous_cognition_labels_.end() && it->second == current_id) {
+      // Already exists and unchanged.
       continue;
     }
-    previous_cognition_labels_[id] = current_label;
+    if (labels.get(current_id).size() == 0) {
+      // Ensure there exists a label.
+      continue;
+    }
+    previous_cognition_labels_[node_id] = current_id;
     attrs.distance = 0.0;  // reset distance to be updated below
     for (const auto& to_id : node->siblings()) {
-      to_update.insert(EdgeKey(node->id, to_id));
+      to_update.insert(EdgeKey(node_id, to_id));
     }
   }
 
   // Compute the new edge and node distances.
   for (const auto& edge_key : to_update) {
     auto& edge = layer.getEdge(edge_key.k1, edge_key.k2);
-    const auto f1 = labels.get(previous_cognition_labels_[edge_key.k1]);
-    const auto f2 = labels.get(previous_cognition_labels_[edge_key.k2]);
-    const float score = CognitionLabels::getScore(f1, f2);
+    const auto& f1 = labels.get(previous_cognition_labels_[edge_key.k1]);
+    const auto& f2 = labels.get(previous_cognition_labels_[edge_key.k2]);
+    const double score = CognitionLabels::getScore(f1, f2);
     edge.attributes().weight = score;
     auto& from_attrs =
         layer.getNode(edge_key.k1).attributes<TraversabilityNodeAttributes>();
     auto& to_attrs =
         layer.getNode(edge_key.k2).attributes<TraversabilityNodeAttributes>();
-    from_attrs.distance = std::max(from_attrs.distance, static_cast<double>(score));
-    to_attrs.distance = std::max(to_attrs.distance, static_cast<double>(score));
+    from_attrs.distance = std::max(from_attrs.distance, score);
+    to_attrs.distance = std::max(to_attrs.distance, score);
+    // LOG(INFO) << "\nUpdating edge " << NodeSymbol(edge_key.k1) << " <-> "
+    //           << NodeSymbol(edge_key.k2) << ". Dims f1: " << f1.size()
+    //           << ", f2: " << f2.size() << ", score: " << score;
   }
 }
 
