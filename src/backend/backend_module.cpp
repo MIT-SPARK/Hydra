@@ -46,6 +46,7 @@
 #include "hydra/common/global_info.h"
 #include "hydra/common/launch_callbacks.h"
 #include "hydra/common/pipeline_queues.h"
+#include "hydra/utils/cognition_labels.h"
 #include "hydra/utils/minimum_spanning_tree.h"
 #include "hydra/utils/pgmo_mesh_traits.h"
 #include "hydra/utils/timing_utilities.h"
@@ -165,19 +166,12 @@ void BackendModule::save(const DataDirectory& output) {
     for (auto& [id, node] : layer.nodes()) {
       auto attrs = node->tryAttributes<TraversabilityNodeAttributes>();
       if (attrs && !attrs->cognition_labels.empty()) {
-        int max_label = -1;
-        float max_weight = -1.0f;
-        float total_weight = 0.0f;
-
-        for (const auto& [label, weight] : attrs->cognition_labels) {
-          total_weight += weight;
-          if (weight > max_weight) {
-            max_weight = weight;
-            max_label = label;
-          }
+        const auto [max_label, max_weight] =
+            getMaxCognitionLabel(attrs->cognition_labels);
+        if (max_label != -1) {
+          attrs->cognition_labels.clear();
+          attrs->cognition_labels[max_label] = max_weight;
         }
-        attrs->cognition_labels.clear();
-        attrs->cognition_labels[max_label] = max_weight / total_weight;
       }
     }
   }

@@ -42,6 +42,7 @@
 #include <queue>
 
 #include "hydra/common/global_info.h"
+#include "hydra/utils/cognition_labels.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -59,6 +60,7 @@ void declare_config(UpdateTraversabilityFunctor::Config& config) {
   field(config.tolerance, "tolerance", "m");
   field(config.use_metric_distance, "use_metric_distance");
   field(config.deformation, "deformation");
+  field(config.use_cognition_labels, "use_cognition_labels");
 
   check(config.min_place_size, GT, 0.0, "min_place_size");
   check(config.max_place_size, GT, 0.0, "max_place_size");
@@ -356,6 +358,11 @@ void UpdateTraversabilityFunctor::cleanup(const UpdateInfo::ConstPtr&,
   overlapping_nodes_to_cleanup_.clear();
 
   // 2. Compute the new distances for all nodes.
+  // TMP Cognition labels.
+  if (config.use_cognition_labels) {
+    computeCognitionDistances(*dsg->graph);
+    return;
+  }
   updateDistances(dsg->graph->getLayer(config.layer));
 }
 
@@ -493,6 +500,46 @@ void UpdateTraversabilityFunctor::resetNeighborFinder(
   nn_ = NearestNodeFinder::fromLayer(
       dsg.getLayer(config.layer),
       [](const SceneGraphNode& node) { return !node.attributes().is_active; });
+}
+
+void UpdateTraversabilityFunctor::computeCognitionDistances(
+    const DynamicSceneGraph& dsg) const {
+  const auto& layer = dsg.getLayer(config.layer);
+  LazyCognitionLabels labels(dsg);
+
+  // Get all edges that need updating.
+  EdgeSet to_update;
+  for (const auto& [id, node] : layer.nodes()) {
+    auto& attrs = node->attributes<TraversabilityNodeAttributes>();
+    if (attrs.cognition_labels.empty()) {
+      continue;
+    }
+    const auto it = previous_cognition_labels_.find(id);
+    const int current_label = getMaxCognitionLabel(attrs.cognition_labels).first;
+    if (it != previous_cognition_labels_.end() && it->second == current_label) {
+      continue;
+    }
+    previous_cognition_labels_[id] = current_label;
+    attrs.distance = 0.0;  // reset distance to be updated below
+    for (const auto& to_id : node->siblings()) {
+      to_update.insert(EdgeKey(node->id, to_id));
+    }
+  }
+
+  // Compute the new edge and node distances.
+  for (const auto& edge_key : to_update) {
+    auto& edge = layer.getEdge(edge_key.k1, edge_key.k2);
+    const auto f1 = labels.get(previous_cognition_labels_[edge_key.k1]);
+    const auto f2 = labels.get(previous_cognition_labels_[edge_key.k2]);
+    const float score = CognitionLabels::getScore(f1, f2);
+    edge.attributes().weight = score;
+    auto& from_attrs =
+        layer.getNode(edge_key.k1).attributes<TraversabilityNodeAttributes>();
+    auto& to_attrs =
+        layer.getNode(edge_key.k2).attributes<TraversabilityNodeAttributes>();
+    from_attrs.distance = std::max(from_attrs.distance, static_cast<double>(score));
+    to_attrs.distance = std::max(to_attrs.distance, static_cast<double>(score));
+  }
 }
 
 }  // namespace hydra

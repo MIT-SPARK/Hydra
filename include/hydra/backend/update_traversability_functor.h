@@ -38,6 +38,7 @@
 
 #include "hydra/backend/deformation_interpolator.h"
 #include "hydra/backend/update_functions.h"
+#include "hydra/openset/embedding_distances.h"
 #include "hydra/utils/active_window_tracker.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 
@@ -67,6 +68,9 @@ struct UpdateTraversabilityFunctor : public UpdateFunctor {
     bool use_metric_distance = false;
 
     DeformationInterpolator::Config deformation;
+
+    // TMP(lschmid): Cognition labels.
+    bool use_cognition_labels = true;
   } const config;
 
   using EdgeSet = std::set<EdgeKey>;
@@ -145,6 +149,8 @@ struct UpdateTraversabilityFunctor : public UpdateFunctor {
 
   void resetNeighborFinder(const DynamicSceneGraph& dsg) const;
 
+  void computeCognitionDistances(const DynamicSceneGraph& dsg) const;
+
  protected:
   // Cached constants.
   const double radius_;
@@ -158,6 +164,9 @@ struct UpdateTraversabilityFunctor : public UpdateFunctor {
   mutable ActiveWindowTracker active_tracker_;
   const DeformationInterpolator deformation_interpolator_;
   mutable NearestNodeFinder::Ptr nn_;
+
+  // TMP(lschmid): Track cognition labels.
+  mutable std::unordered_map<NodeId, int> previous_cognition_labels_;
 };
 
 void declare_config(UpdateTraversabilityFunctor::Config& config);
