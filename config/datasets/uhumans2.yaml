@@ -70,9 +70,8 @@ frontend:
     tsdf_interpolator:
       type: downsample
       ratio: 2
-  use_frontiers: false
   frontier_places:
-    type: voxel_clustering
+    # type: voxel_clustering
     cluster_tolerance: 0.3
     min_cluster_size: 10
     max_cluster_size: 100000
