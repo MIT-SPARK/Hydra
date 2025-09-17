@@ -82,9 +82,14 @@ class BlockTraversabilityClustering : public TraversabilityClustering {
     bool simplify_boundary_traversability = true;
 
     // TMP cognition_verifier parameters.
+    // If true project the labels to the ground using the TSDF.
     bool project_labels_to_ground = true;
-    float label_depth_tolerance = 1.0f;   // Meters.
-    bool label_use_const_weight = false;  // True: use inverse depth squared.
+    // If >0, use a fixed height above the sensor pose for projecting labels [m].
+    float robot_height = -1.0f;
+    // Maximum depth difference to check for occlusions when projecting labels [m].
+    float label_depth_tolerance = 1.0f;
+    // True: use inverse depth squared. False: use counting.
+    bool label_use_const_weight = false;
   };
 
   using State = spark_dsg::TraversabilityState;
@@ -179,11 +184,6 @@ class BlockTraversabilityClustering : public TraversabilityClustering {
   // Archive exiting places in the Active Window.
   void archivePlaceInfos(spark_dsg::DynamicSceneGraph& graph);
 
-  // Extract semantic place features for each node from the input image.
-  // TMP(lschmid): currently added for cognition_verifier.
-  void extractSemanticLabels(const ActiveWindowOutput& msg,
-                             spark_dsg::DynamicSceneGraph& graph);
-
   /* Utility functions */
   // Find all info block indices that would overlap with the given traversability block.
   BlockIndices touchedInfoBlocks(const TraversabilityBlock& block) const;
@@ -220,10 +220,16 @@ class BlockTraversabilityClustering : public TraversabilityClustering {
                      bool should_connect,
                      spark_dsg::DynamicSceneGraph& graph) const;
 
+  /** TMP(lschmid): Currently added for Cognition verifier */
+  // Extract semantic place features for each node from the input image.
+  void extractSemanticLabels(const ActiveWindowOutput& msg,
+                             spark_dsg::DynamicSceneGraph& graph);
+
   // Data.
   InfoLayer infos_;
   size_t current_id_ = 0;
   uint64_t current_time_ns_ = 0;
+  double current_robot_height_ = 0.0;
 
   // Cached constants.
   // Minimum sizes in voxels.

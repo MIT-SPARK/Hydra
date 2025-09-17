@@ -60,6 +60,7 @@ void declare_config(BlockTraversabilityClustering::Config& config) {
   field(config.simplify_boundary_traversability, "simplify_boundary_traversability");
   // Cognition_verifier parameters.
   field(config.project_labels_to_ground, "project_labels_to_ground");
+  field(config.robot_height, "robot_height");
   field(config.label_depth_tolerance, "label_depth_tolerance");
   field(config.label_use_const_weight, "label_use_const_weight");
 
@@ -77,6 +78,7 @@ void BlockTraversabilityClustering::updateGraph(const TraversabilityLayer& layer
                                                 spark_dsg::DynamicSceneGraph& graph) {
   // Compute all updated places and store them in the place_infos.
   current_time_ns_ = msg.timestamp_ns;
+  current_robot_height_ = msg.world_t_body.z();
   updateInfoLayer(layer);
   computePlaces();
   classifyPlaceBoundaries();
@@ -537,6 +539,9 @@ void BlockTraversabilityClustering::updatePlaceNodeAttributes(
   attrs.first_observed_ns = place.first_seen_time_ns;
   attrs.last_observed_ns = current_time_ns_;
   attrs.is_active = true;
+
+  // TODO(lschmid): Implement a proper filter for this.
+  attrs.position.z() = current_robot_height_;  // Keep at robot height.
 }
 
 void BlockTraversabilityClustering::updatePlaceEdgesInDsg(
@@ -634,15 +639,22 @@ void BlockTraversabilityClustering::extractSemanticLabels(
 
     // Find the intersection with the floor of the 3D point.
     Eigen::Vector3f pos_W = attrs.position.cast<float>();
-    while (config.project_labels_to_ground) {
-      const auto voxel = tsdf.getVoxelPtr(pos_W);
-      if (!voxel) {
-        break;
+    if (config.project_labels_to_ground) {
+      if (config.robot_height > 0.0f) {
+        pos_W.z() = current_robot_height_ - config.robot_height;
+      } else {
+        while (true) {
+          const auto voxel = tsdf.getVoxelPtr(pos_W);
+          if (!voxel) {
+            pos_W = attrs.position.cast<float>();
+            break;
+          }
+          if (voxel->distance <= 0.0) {
+            break;
+          }
+          pos_W.z() -= tsdf.voxel_size;
+        }
       }
-      if (voxel->distance <= 0.0) {
-        break;
-      }
-      pos_W.z() -= tsdf.voxel_size;
     }
 
     // Project to semantic frame, check is visible, and get ID.
