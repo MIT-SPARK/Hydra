@@ -59,7 +59,6 @@ frontend:
     tsdf_interpolator:
       type: downsample
       ratio: 2
-  use_frontiers: false
 backend:
   add_places_to_deformation_graph: false  # `false` means that place meshes are not used in PGO
   optimize_on_lc: true
