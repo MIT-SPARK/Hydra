@@ -56,6 +56,8 @@
 #include <opencv2/imgcodecs.hpp>
 
 #include "hydra/common/config_utilities.h"
+#include <config_utilities/types/path.h>
+
 
 namespace hydra {
 
@@ -84,7 +86,7 @@ void declare_config(Sensor::Config& conf) {
   field(conf.min_range, "min_range", "m");
   field(conf.max_range, "max_range", "m");
   field(conf.extrinsics, "extrinsics");
-  field(conf.static_mask_fp, "static_mask_fp");
+  field<Path::Absolute>(conf.static_mask_fp, "static_mask_fp");
   check(conf.min_range, GT, 0.0, "min_range");
   checkCondition(conf.max_range > conf.min_range,
                  "param 'max_range' is expected > 'min_range'");

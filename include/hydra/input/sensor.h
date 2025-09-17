@@ -52,6 +52,7 @@
 #include <limits>
 #include <opencv2/core/mat.hpp>
 #include <vector>
+#include <filesystem>
 
 #include "hydra/input/sensor_extrinsics.h"
 
@@ -75,7 +76,7 @@ class Sensor {
     double min_range = 0.0f;
     double max_range = std::numeric_limits<double>::infinity();
 
-    std::string static_mask_fp = "";
+    std::filesystem::path static_mask_fp = "";
 
     // TODO(nathan) try to avoid pulling in factories in the header
     config::VirtualConfig<SensorExtrinsics> extrinsics;
