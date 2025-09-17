@@ -50,14 +50,13 @@
 #include <config_utilities/config_utilities.h>
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/types/eigen_matrix.h>
+#include <config_utilities/types/path.h>
 #include <glog/logging.h>
 
 #include <iomanip>
 #include <opencv2/imgcodecs.hpp>
 
 #include "hydra/common/config_utilities.h"
-#include <config_utilities/types/path.h>
-
 
 namespace hydra {
 
