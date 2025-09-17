@@ -50,8 +50,8 @@
 
 #include <Eigen/Geometry>
 #include <limits>
-#include <vector>
 #include <opencv2/core/mat.hpp>
+#include <vector>
 
 #include "hydra/input/sensor_extrinsics.h"
 
