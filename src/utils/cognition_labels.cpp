@@ -25,9 +25,7 @@ void declare_config(CognitionLabels::Config& config) {
 
 CognitionLabels::CognitionLabels(const Config& config)
     : config(config::checkValid(config)),
-      distance_metric_(config.distance_metric.create()) {
-  LOG(INFO) << "Using CognitionLabels:\n" << config::toString(config);
-}
+      distance_metric_(config.distance_metric.create()) {}
 
 void CognitionLabels::setup(const Config& config) {
   instance_.reset(new CognitionLabels(config));
