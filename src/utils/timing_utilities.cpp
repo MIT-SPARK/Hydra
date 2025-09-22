@@ -40,7 +40,7 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
-#include <iostream>
+#include <ostream>
 #include <numeric>
 #include <sstream>
 

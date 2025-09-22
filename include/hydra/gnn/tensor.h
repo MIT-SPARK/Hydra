@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <Eigen/Dense>
-#include <iostream>
+#include <ostream>
 #include <memory>
 #include <vector>
 

@@ -49,7 +49,6 @@ void declare_config(LabelSpaceConfig& config) {
   field(config.surface_places_labels, "surface_places_labels");
   field<Path::Absolute>(config.colormap_filepath, "semantic_colormap_file");
   field<Path::Absolute>(config.label_remap_filepath, "semantic_label_remap_filepath");
-  field(config.semantic_layers, "semantic_layers");
 }
 
 }  // namespace hydra

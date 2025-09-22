@@ -35,7 +35,7 @@
 #pragma once
 #include <onnxruntime_cxx_api.h>
 
-#include <iostream>
+#include <ostream>
 #include <memory>
 #include <string>
 #include <vector>
