@@ -49,7 +49,9 @@
 #include <config_utilities/virtual_config.h>
 
 #include <Eigen/Geometry>
+#include <filesystem>
 #include <limits>
+#include <opencv2/core/mat.hpp>
 #include <vector>
 
 #include "hydra/input/sensor_extrinsics.h"
@@ -72,6 +74,9 @@ class Sensor {
   struct Config {
     double min_range = 0.0f;
     double max_range = std::numeric_limits<double>::infinity();
+
+    std::filesystem::path static_mask_fp = "";
+
     // TODO(nathan) try to avoid pulling in factories in the header
     config::VirtualConfig<SensorExtrinsics> extrinsics;
   } const config;
@@ -159,6 +164,12 @@ class Sensor {
   virtual bool pointIsInViewFrustum(const Eigen::Vector3f& point_C,
                                     float inflation_distance = 0.f) const = 0;
 
+  /**
+   * @brief Get the static mask for this sensor
+   * @return cv::Mat containing the mask, or empty cv::Mat if no mask is defined
+   */
+  virtual const cv::Mat& getStaticMask() const { return static_mask_; }
+
   //! @brief Name of current sensor
   const std::string name;
 
@@ -166,6 +177,8 @@ class Sensor {
 
  protected:
   const std::unique_ptr<SensorExtrinsics> extrinsics_;
+
+  cv::Mat static_mask_;
 };
 
 void declare_config(Sensor::Config& config);
