@@ -47,8 +47,6 @@ struct LabelSpaceConfig {
   std::set<uint32_t> surface_places_labels;
   std::filesystem::path colormap_filepath;
   std::filesystem::path label_remap_filepath;
-
-  bool isObject(const uint32_t id) const { return object_labels.count(id) > 0; }
 };
 
 void declare_config(LabelSpaceConfig& conf);
