@@ -61,8 +61,7 @@ namespace hydra {
 struct InputData;
 
 /**
- * @brief Base class for different sensors
- * src/active_window/reconstruction_module.cppthe system could use.
+ * @brief Base class for different sensors the system could use.
  *
  * Current design is around any sensor that can operate around images such as RGBD
  * cameras or LiDARs.
