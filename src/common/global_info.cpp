@@ -39,9 +39,6 @@
 #include <config_utilities/validation.h>
 #include <spark_dsg/labelspace.h>
 
-#include <filesystem>
-#include <fstream>
-
 #include "hydra/common/config_utilities.h"
 #include "hydra/common/semantic_color_map.h"
 #include "hydra/utils/pgmo_glog_sink.h"
@@ -118,6 +115,7 @@ void declare_config(PipelineConfig& config) {
   config.map_window.setOptional();
   field(config.map_window, "map_window");
   field<LabelNameConversion>(config.label_names, "label_names");
+  field(config.semantic_layers, "semantic_layers");
 
   // the following subconfigs should not be namespaced
   field(config.frames, "frames", false);
@@ -209,7 +207,7 @@ SharedDsgInfo::Ptr GlobalInfo::createSharedDsg() const {
   const spark_dsg::Labelspace labelspace(getLabelToNameMap());
   if (labelspace) {
     labelspace.save(graph, "mesh");
-    for (const auto& layer_name : config_.label_space.semantic_layers) {
+    for (const auto& layer_name : config_.semantic_layers) {
       const auto key = graph.getLayerKey(layer_name);
       if (key) {
         labelspace.save(graph, key->layer, key->partition);
