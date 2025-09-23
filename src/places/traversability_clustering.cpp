@@ -39,7 +39,6 @@
 #include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
-#include <iostream>
 #include <queue>
 
 #include "hydra/utils/timing_utilities.h"

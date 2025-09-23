@@ -37,7 +37,6 @@
 
 #include <array>
 #include <atomic>
-#include <iostream>
 #include <map>
 #include <memory>
 #include <vector>
@@ -91,6 +90,9 @@ struct PipelineConfig {
   LabelSpaceConfig label_space;
   //! Human readable category names for the labelspace
   std::map<uint32_t, std::string> label_names;
+  //! @brief Layers in the scene graph that use the labelspace
+  std::vector<std::string> semantic_layers{spark_dsg::DsgLayers::OBJECTS,
+                                           spark_dsg::DsgLayers::MESH_PLACES};
 };
 
 void declare_config(PipelineConfig& config);
