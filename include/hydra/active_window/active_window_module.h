@@ -87,6 +87,8 @@ class ActiveWindowModule : public Module {
   const VolumetricMap& map() const { return map_; }
 
  protected:
+  cv::Mat getDefaultIntegrationMask(const InputData& data) const;
+
   virtual ActiveWindowOutput::Ptr spinOnce(const InputPacket& input) = 0;
 
   void stopImpl();
