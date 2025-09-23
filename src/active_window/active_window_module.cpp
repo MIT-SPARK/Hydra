@@ -160,7 +160,7 @@ cv::Mat ActiveWindowModule::getDefaultIntegrationMask(const InputData& data) con
 
   cv::Mat integration_mask;
   maskInvalidSemantics(data.label_image, invalid_labels, integration_mask);
-  maskNonZero(data->getSensor().getStaticMask(), integration_mask);
+  maskNonZero(data.getSensor().getStaticMask(), integration_mask);
   return integration_mask;
 }
 
