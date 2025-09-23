@@ -44,7 +44,6 @@
 #include "hydra/common/global_info.h"
 #include "hydra/input/input_conversion.h"
 #include "hydra/places/robot_footprint_integrator.h"
-#include "hydra/reconstruction/integration_masking.h"
 #include "hydra/reconstruction/mesh_integrator.h"
 #include "hydra/reconstruction/projective_integrator.h"
 #include "hydra/utils/printing.h"
@@ -153,20 +152,9 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputPacket& msg) {
     return nullptr;
   }
 
-  // TODO(nathan) cache somewhere
-  const auto label_config = GlobalInfo::instance().getLabelSpaceConfig();
-  std::set<int32_t> invalid_labels;
-  invalid_labels.insert(label_config.invalid_labels.begin(),
-                        label_config.invalid_labels.end());
-  invalid_labels.insert(label_config.dynamic_labels.begin(),
-                        label_config.dynamic_labels.end());
-
-  cv::Mat integration_mask;
-  maskInvalidSemantics(data->label_image, invalid_labels, integration_mask);
-  maskNonZero(data->getSensor().getStaticMask(), integration_mask);
-
   {  // timing scope
     ScopedTimer timer("reconstruction/tsdf", timestamp_ns);
+    const auto integration_mask = getDefaultIntegrationMask(*data);
     tsdf_integrator->updateMap(*data, map_, true, integration_mask);
     if (footprint_integrator_) {
       footprint_integrator_->markFreespace(world_T_body.cast<float>(), map_);

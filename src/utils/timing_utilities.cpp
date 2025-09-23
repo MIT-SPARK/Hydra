@@ -40,8 +40,8 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
-#include <iostream>
 #include <numeric>
+#include <ostream>
 #include <sstream>
 
 namespace hydra::timing {

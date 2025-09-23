@@ -189,6 +189,10 @@ SingleLabelIntegrator::SingleLabelIntegrator(const Config& config) : config(conf
 void SingleLabelIntegrator::updateLikelihoods(uint32_t label,
                                               float weight,
                                               SemanticVoxel& voxel) const {
+  if (config.labels_to_ignore.count(label)) {
+    return;
+  }
+
   if (voxel.empty) {
     voxel.empty = false;
     voxel.semantic_likelihoods.setConstant(1, weight);
@@ -209,8 +213,10 @@ void SingleLabelIntegrator::updateLikelihoods(uint32_t label,
   }
 }
 
-void declare_config(SingleLabelIntegrator::Config&) {
-  ::config::name("SingleLabelIntegrator::Config");
+void declare_config(SingleLabelIntegrator::Config& config) {
+  using namespace config;
+  name("SingleLabelIntegrator::Config");
+  field(config.labels_to_ignore, "labels_to_ignore");
 }
 
 }  // namespace hydra

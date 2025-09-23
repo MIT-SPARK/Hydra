@@ -33,8 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <iostream>
 #include <optional>
+#include <ostream>
 
 #include "hydra/reconstruction/voxel_types.h"
 
