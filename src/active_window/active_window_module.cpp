@@ -155,7 +155,8 @@ cv::Mat ActiveWindowModule::getDefaultIntegrationMask(const InputData& data) con
                         label_config.invalid_labels.end());
   invalid_labels.insert(label_config.dynamic_labels.begin(),
                         label_config.dynamic_labels.end());
-  invalid_labels.insert(sensor.config.invalid_labels.begin(), sensor.config.invalid_labels.end());
+  invalid_labels.insert(sensor.config.invalid_labels.begin(),
+                        sensor.config.invalid_labels.end());
 
   cv::Mat integration_mask;
   maskInvalidSemantics(data.label_image, invalid_labels, integration_mask);
