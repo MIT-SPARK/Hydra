@@ -40,6 +40,7 @@
 #include <spark_dsg/printing.h>
 
 #include "hydra/backend/backend_utilities.h"
+#include "hydra/utils/cognition_labels.h"
 #include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -84,6 +85,7 @@ void declare_config(UpdateObjectsFunctor::Config& config) {
   name("UpdateObjectsFunctor::Config");
   field(config.allow_connection_merging, "allow_connection_merging");
   field(config.merge_proposer, "merge_proposer");
+  field(config.cognition_similarity_threshold, "cognition_similarity_threshold");
 }
 
 UpdateObjectsFunctor::UpdateObjectsFunctor(const Config& config)
@@ -163,15 +165,26 @@ MergeList UpdateObjectsFunctor::findMerges(const DynamicSceneGraph& graph,
   merge_proposer.findMerges(
       objects,
       view,
-      [](const SceneGraphNode& lhs, const SceneGraphNode& rhs) {
+      [this, &graph](const SceneGraphNode& lhs, const SceneGraphNode& rhs) {
         const auto lhs_attrs = lhs.tryAttributes<ObjectNodeAttributes>();
         const auto rhs_attrs = rhs.tryAttributes<ObjectNodeAttributes>();
         if (!lhs_attrs || !rhs_attrs) {
           return false;
         }
 
-        return lhs_attrs->bounding_box.contains(rhs_attrs->position) ||
-               rhs_attrs->bounding_box.contains(lhs_attrs->position);
+        if (config.cognition_similarity_threshold <= 0.0) {
+          // Classical Hydra merging.
+          return lhs_attrs->bounding_box.contains(rhs_attrs->position) ||
+                 rhs_attrs->bounding_box.contains(lhs_attrs->position);
+        }
+
+        // Cognition Labels
+        if (!lhs_attrs->bounding_box.intersects(rhs_attrs->bounding_box)) {
+          return false;
+        }
+
+        const auto score = CognitionLabels::getScore(graph, lhs.id, rhs.id);
+        return score >= config.cognition_similarity_threshold;
       },
       proposals);
   return proposals;

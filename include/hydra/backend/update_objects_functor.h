@@ -49,6 +49,9 @@ struct UpdateObjectsFunctor : public UpdateFunctor {
     //! Association strategy for finding matches to active nodes
     MergeProposer::Config merge_proposer = {config::VirtualConfig<AssociationStrategy>{
         association::SemanticNearestNode::Config{}}};
+    // If set (>0), use cognition labels for merging. Scores have to be large than this
+    // value to merge.
+    double cognition_similarity_threshold = 0.0;
   } const config;
 
   explicit UpdateObjectsFunctor(const Config& config);

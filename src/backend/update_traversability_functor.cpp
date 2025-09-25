@@ -195,15 +195,29 @@ MergeList UpdateTraversabilityFunctor::findNodeMerges(
                                                 : active_tracker_.view(places, true);
 
   // Compare all (newly) archived nodes against inactive candidate nodes.
+  size_t num_contained = 0;
+  size_t num_contains = 0;
+  size_t num_aligned = 0;
+  size_t num_large_overlap = 0;
+  size_t num_small_overlap = 0;
+  size_t num_checked = 0;
+  size_t num_active = 0;
+  size_t num_already_merged = 0;
+  size_t num_aw_overlap = 0;
+  size_t num_no_overlap = 0;
   MergeList result;
   std::set<NodeId> merged;
+
   for (const auto& from_node : view) {
+    num_checked++;
     if (merged.count(from_node.id)) {
+      num_already_merged++;
       continue;
     }
 
     auto& from_attrs = from_node.attributes<TraversabilityNodeAttributes>();
     if (from_attrs.is_active) {
+      num_active++;
       continue;
     }
 
@@ -216,12 +230,14 @@ MergeList UpdateTraversabilityFunctor::findNodeMerges(
       // Avoid merging nodes with active window (temporal) overlap.
       if (from_attrs.last_observed_ns >= to_attrs.first_observed_ns &&
           from_attrs.first_observed_ns <= to_attrs.last_observed_ns) {
+        num_aw_overlap++;
         continue;
       }
 
       // Check boundaries.
       auto to_boundary = Boundary(to_attrs);
       if (!to_boundary.intersects(from_boundary)) {
+        num_no_overlap++;
         continue;
       }
 
@@ -229,11 +245,13 @@ MergeList UpdateTraversabilityFunctor::findNodeMerges(
       if (isContained(to_boundary, from_boundary)) {
         result.push_back({to_id, from_node.id});
         merged.insert(to_id);
+        num_contains++;
         continue;
       }
       if (isContained(from_boundary, to_boundary)) {
         result.push_back({from_node.id, to_id});
         merged.insert(from_node.id);
+        num_contained++;
         continue;
       }
 
@@ -244,6 +262,7 @@ MergeList UpdateTraversabilityFunctor::findNodeMerges(
         // TODO(lschmid): Can consider cropping and dropping in the future.
         // Always update the classification of the boundary sides.
         overlapping_nodes_to_cleanup_.insert({from_node.id, to_id});
+        num_small_overlap++;
         continue;
       }
 
@@ -254,10 +273,12 @@ MergeList UpdateTraversabilityFunctor::findNodeMerges(
            std::abs(from_boundary.max.y() - to_boundary.max.y()) < config.tolerance)) {
         merged.insert(to_id);
         result.push_back({to_id, from_node.id});
+        num_aligned++;
         continue;
       }
 
       // If not fuseable easily keep larger.
+      num_large_overlap++;
       if (from_boundary.area() >= to_boundary.area()) {
         result.push_back({to_id, from_node.id});
         merged.insert(to_id);
@@ -267,7 +288,13 @@ MergeList UpdateTraversabilityFunctor::findNodeMerges(
       }
     }
   }
-
+  LOG(INFO) << "Checked " << num_checked << ", proposed " << result.size()
+            << " traversability merges: " << num_contained << " contained, "
+            << num_contains << " contains, " << num_aligned << " aligned, "
+            << num_large_overlap << " large overlap, " << num_small_overlap
+            << " small overlap. Failed because of " << num_already_merged
+            << " already merged, " << num_active << " active, " << num_no_overlap
+            << " no overlap, " << num_aw_overlap << " AW overlap";
   return result;
 }
 
