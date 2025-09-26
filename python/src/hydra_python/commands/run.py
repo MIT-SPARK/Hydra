@@ -99,7 +99,7 @@ def mp3d(scenes, visualize, zmq_url, max_steps, force, output):
                 show_progress=True,
             )
 
-            pipeline.save()
+            pipeline.save(f"{output}")
 
         except Exception:
             click.secho(f"Pipeline failed for '{scene_path}'", fg="red")
