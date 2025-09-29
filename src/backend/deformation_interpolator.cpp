@@ -138,29 +138,13 @@ void DeformationInterpolator::interpolateNodePositions(
     robot_attrs->second.push_back(&attrs);
   }
 
-  auto& dgraph = *info->deformation_graph;
+  const auto& dgraph = *info->deformation_graph;
   for (auto& [prefix, attributes] : nodes) {
-    if (!dgraph.hasVertexKey(prefix)) {
-      continue;
-    }
-
-    const auto& control_points = dgraph.getInitialPositionsVertices(prefix);
-    if (control_points.size() < config.num_control_points) {
-      continue;
-    }
-
-    attributes.sort();  // make sure attributes are sorted by timestamp
-    std::vector<std::set<size_t>> vertex_graph_map_deformed;
-    kimera_pgmo::deformation::deformPoints(attributes,
-                                           vertex_graph_map_deformed,
-                                           attributes,
-                                           prefix,
-                                           control_points,
-                                           dgraph.getVertexStamps(prefix),
-                                           *dgraph.getValues(),
-                                           config.num_control_points,
-                                           config.control_point_tolerance_s,
-                                           nullptr);
+    dgraph.deformAllPoints(attributes,
+                           attributes,
+                           prefix,
+                           config.num_control_points,
+                           config.control_point_tolerance_s);
   }
 
   // Copy the newly interpolated positions to the merged DSG.
