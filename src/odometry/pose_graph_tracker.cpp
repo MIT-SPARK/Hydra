@@ -64,6 +64,15 @@ std::vector<NodeId> PoseGraphPacket::addToGraph(DynamicSceneGraph& graph,
       VLOG(5) << "Adding agent " << node_id.str() << " @ " << stamp.count() << " [ns]";
 
       auto attrs = std::make_unique<AgentNodeAttributes>(stamp, rot, pos, node_id);
+
+      // semantic_labels
+      auto labels_iter = semantic_labels_by_timestamp.find(node.stamp_ns);
+      if (labels_iter != semantic_labels_by_timestamp.end()) {
+        attrs->observed_semantic_labels = labels_iter->second;
+        VLOG(5) << "Assigned " << labels_iter->second.size()
+                << " semantic labels to agent @ " << node.stamp_ns << " [ns]";
+      }
+
       const auto key = graph.getLayerKey(DsgLayers::AGENTS);
       if (!key) {
         LOG(ERROR) << "No layer named '" << DsgLayers::AGENTS << "' in graph!";
@@ -108,6 +117,10 @@ void PoseGraphPacket::updateFrom(const PoseGraphPacket& other) {
       pose_graphs.end(), other.pose_graphs.begin(), other.pose_graphs.end());
   // TODO(nathan) this is technically bad, but we'll get to it
   external_priors = other.external_priors;
+  // merge semantic labels
+  semantic_labels_by_timestamp.insert(
+      other.semantic_labels_by_timestamp.begin(),
+      other.semantic_labels_by_timestamp.end());
 }
 
 }  // namespace hydra

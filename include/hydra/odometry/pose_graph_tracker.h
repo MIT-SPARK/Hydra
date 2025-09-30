@@ -38,6 +38,7 @@
 
 #include <Eigen/Geometry>
 #include <list>
+#include <map>
 #include <memory>
 #include <optional>
 
@@ -55,6 +56,8 @@ struct PoseGraphPacket {
   std::vector<pose_graph_tools::PoseGraph> pose_graphs;
   //! external optimization priors
   pose_graph_tools::PoseGraph::ConstPtr external_priors;
+  //! semantic labels observed at each timestamp
+  std::map<uint64_t, std::vector<uint32_t>> semantic_labels_by_timestamp;
 
   //! @brief Merge two update packets
   void updateFrom(const PoseGraphPacket& other);

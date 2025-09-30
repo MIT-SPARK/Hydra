@@ -44,7 +44,9 @@
 #include <kimera_pgmo/utils/mesh_io.h>
 #include <spark_dsg/printing.h>
 
+#include <algorithm>
 #include <fstream>
+#include <unordered_set>
 
 #include "hydra/common/global_info.h"
 #include "hydra/common/launch_callbacks.h"
@@ -70,6 +72,27 @@ static const auto registration =
                                    GraphBuilder::Config,
                                    SharedDsgInfo::Ptr,
                                    SharedModuleState::Ptr>("GraphBuilder");
+
+std::vector<uint32_t> extractUniqueLabels(const cv::Mat& label_image) {
+  if (label_image.empty() || label_image.type() != CV_32SC1) {
+    return {};
+  }
+
+  std::unordered_set<int> unique_labels_set;
+  const int* data = label_image.ptr<int>(0);
+  const size_t total = label_image.rows * label_image.cols;
+
+  for (size_t i = 0; i < total; ++i) {
+    const int label = data[i];
+    if (label > 0) {  // filter out 0 (unalabeled) and invalid pixels
+      unique_labels_set.insert(label);
+    }
+  }
+
+  std::vector<uint32_t> result(unique_labels_set.begin(), unique_labels_set.end());
+  std::sort(result.begin(), result.end());  // deterministic order 
+  return result;
+}
 
 }
 
@@ -268,7 +291,18 @@ void GraphBuilder::spin() {
 
 void GraphBuilder::processNextInput(const ActiveWindowOutput& msg) {
   if (tracker_) {
-    const auto packet = tracker_->update(msg.timestamp_ns, msg.world_T_body());
+    auto packet = tracker_->update(msg.timestamp_ns, msg.world_T_body());
+
+    // attach semantic labels to packet
+    if (msg.sensor_data && !msg.sensor_data->label_image.empty()) {
+      auto labels = extractUniqueLabels(msg.sensor_data->label_image);
+      if (!labels.empty()) {
+        packet.semantic_labels_by_timestamp[msg.timestamp_ns] = std::move(labels);
+        VLOG(5) << "[Hydra Frontend] attached " << labels.size()
+                << " semantic labels to packet @ " << msg.timestamp_ns << " [ns]";
+      }
+    }
+
     pose_graph_updates_.push(packet);
   } else {
     LOG_FIRST_N(WARNING, 1)
