@@ -60,7 +60,7 @@ class ActiveWindowModule : public Module {
     config::VirtualConfig<VolumetricWindow> map_window;
     std::vector<Sink::Factory> sinks;
 
-    // construct to allow downstream modules to set defaults
+    // reconstruction. construct to allow downstream modules to set defaults
     Config(bool with_semantics = true, bool with_tracking = false);
   } const config;
 
