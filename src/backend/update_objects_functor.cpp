@@ -183,7 +183,8 @@ MergeList UpdateObjectsFunctor::findMerges(const DynamicSceneGraph& graph,
           return false;
         }
 
-        const auto score = CognitionLabels::getScore(graph, lhs.id, rhs.id);
+        const auto score = CognitionLabels::getScore(
+            graph, lhs_attrs->semantic_label, rhs_attrs->semantic_label);
         return score >= config.cognition_similarity_threshold;
       },
       proposals);
