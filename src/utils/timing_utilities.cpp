@@ -89,6 +89,7 @@ ElapsedStatistics computeStats(const Entries& entries) {
 
 void writeEntries(const std::filesystem::path& output_csv, const Entries& entries) {
   std::ofstream output_file;
+  std::filesystem::create_directories(output_csv.parent_path());
   output_file.open(output_csv);
   if (!output_file.is_open()) {
     LOG(ERROR) << "Could not open file " << output_csv << " for writing";
