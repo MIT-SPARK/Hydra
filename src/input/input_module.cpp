@@ -54,6 +54,7 @@ void declare_config(InputModule::Config& config) {
   name("InputModule::Config");
   field(config.inputs, "inputs");
   field(config.max_receiver_queue_size, "max_receiver_queue_size");
+  field(config.fix_z_coordinate, "fix_z_coordinate");
   checkCondition(!config.inputs.empty(), "At least one input must be specified");
 }
 
@@ -123,6 +124,7 @@ void InputModule::dataSpin() {
       input->timestamp_ns = curr_time;
       input->sensor_input = packet;
       input->world_t_body = odom_T_body.target_p_source;
+      input->fix_z_coodinate = config.fix_z_coordinate;
       input->world_R_body = odom_T_body.target_R_source;
       VLOG(5) << "[Hydra Input] output queue state: size=" << queue_->size()
               << " (max=" << queue_->max_size << ") @ " << curr_time << " [ns]";

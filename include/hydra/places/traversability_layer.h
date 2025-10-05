@@ -58,7 +58,10 @@ struct TraversabilityVoxel {
   // TODO(lschmid): Remove this at some point.
   mutable float debug_value = 0.0f;
 
-  bool operator==(const TraversabilityVoxel& other) const;
+  bool operator==(const TraversabilityVoxel& other) const {
+    return traversability == other.traversability && confidence == other.confidence &&
+           state == other.state;
+  }
 };
 
 // Voxel indices as pairs of (x, y) coordinates.
@@ -82,60 +85,127 @@ using Index2DMap =
                        Eigen::aligned_allocator<std::pair<const Index2D, ValueT>>>;
 
 // TODO(lschmid): Update SpatialHash to support 2D blocks.
-struct TraversabilityBlock : spatial_hash::Block {
-  TraversabilityBlock(float block_size,
-                      const BlockIndex& Index2D,
-                      size_t voxels_per_side);
-  virtual ~TraversabilityBlock() = default;
+template <typename VoxelT>
+struct Block2D : spatial_hash::Block {
+  Block2D(float block_size, const BlockIndex& index, size_t voxels_per_side)
+      : spatial_hash::Block(block_size, index), voxels_per_side(voxels_per_side) {
+    voxels.resize(voxels_per_side * voxels_per_side);
+  }
+  virtual ~Block2D() = default;
 
-  TraversabilityBlock& operator=(const TraversabilityBlock& other);
-  TraversabilityBlock& operator=(TraversabilityBlock&& other);
-  TraversabilityBlock(const TraversabilityBlock& other) = default;
-  TraversabilityBlock(TraversabilityBlock&& other) = default;
+  Block2D& operator=(const Block2D& other) {
+    if (this != &other) {
+      spatial_hash::Block::operator=(other);
+      voxels = other.voxels;
+      const_cast<size_t&>(voxels_per_side) = other.voxels_per_side;
+    }
+    return *this;
+  }
+  Block2D& operator=(Block2D&& other) {
+    if (this != &other) {
+      spatial_hash::Block::operator=(std::move(other));
+      voxels = std::move(other.voxels);
+      const_cast<size_t&>(voxels_per_side) = other.voxels_per_side;
+    }
+    return *this;
+  }
+  Block2D(const Block2D& other) = default;
+  Block2D(Block2D&& other) = default;
 
   // Accessors for voxels.
-  TraversabilityVoxel& voxel(size_t x, size_t y);
-  const TraversabilityVoxel& voxel(size_t x, size_t y) const;
-  TraversabilityVoxel& voxel(const Index2D& Index2D);
-  const TraversabilityVoxel& voxel(const Index2D& Index2D) const;
+  VoxelT& voxel(size_t x, size_t y) { return voxels[linearFromIndex(x, y)]; }
+
+  const VoxelT& voxel(size_t x, size_t y) const {
+    return voxels[linearFromIndex(x, y)];
+  }
+
+  VoxelT& voxel(const Index2D& index) {
+    return voxels[linearFromIndex(index.x(), index.y())];
+  }
+
+  const VoxelT& voxel(const Index2D& index) const {
+    return voxels[linearFromIndex(index.x(), index.y())];
+  }
 
   // Operations.
-  void reset();
+  void reset() { voxels = std::vector<VoxelT>(voxels_per_side * voxels_per_side); }
 
   // Indexing tools.
-  Index2D indexFromLinear(size_t linear_index) const;
-  size_t linearFromIndex(size_t x, size_t y) const;
-  size_t linearFromIndex(const Index2D& index) const;
-  BlockIndex globalFromLocalIndex(const Index2D& local_index) const;
-  Index2D localFromGlobalIndex(const BlockIndex& global_index) const;
-  bool isValidIndex(const Index2D& index) const;
+  Index2D indexFromLinear(size_t linear_index) const {
+    return {linear_index % voxels_per_side, linear_index / voxels_per_side};
+  }
+
+  size_t linearFromIndex(size_t x, size_t y) const { return x + y * voxels_per_side; }
+  size_t linearFromIndex(const Index2D& index) const {
+    return linearFromIndex(index.x(), index.y());
+  }
+  BlockIndex globalFromLocalIndex(const Index2D& local_index) const {
+    return {index.x() * static_cast<int>(voxels_per_side) + local_index.x(),
+            index.y() * static_cast<int>(voxels_per_side) + local_index.y(),
+            index.z()};
+  }
+  Index2D localFromGlobalIndex(const BlockIndex& global_index) const {
+    return {global_index.x() % voxels_per_side, global_index.y() % voxels_per_side};
+  }
+  bool isValidIndex(const Index2D& index) const {
+    return index.x() >= 0 && index.x() < static_cast<int>(voxels_per_side) &&
+           index.y() >= 0 && index.y() < static_cast<int>(voxels_per_side);
+  }
 
   // Data.
   const size_t voxels_per_side;
-  std::vector<TraversabilityVoxel> voxels;
+  std::vector<VoxelT> voxels;
 };
 
-struct TraversabilityLayer : public spatial_hash::BlockLayer<TraversabilityBlock> {
-  using Ptr = std::shared_ptr<TraversabilityLayer>;
-  using ConstPtr = std::shared_ptr<const TraversabilityLayer>;
+template <typename VoxelT>
+struct Layer2D : public spatial_hash::BlockLayer<Block2D<VoxelT>> {
+  using Ptr = std::shared_ptr<Layer2D>;
+  using ConstPtr = std::shared_ptr<const Layer2D>;
 
-  TraversabilityLayer(float voxel_size, size_t voxels_per_side)
-      : spatial_hash::BlockLayer<TraversabilityBlock>(voxel_size * voxels_per_side),
+  Layer2D(float voxel_size, size_t voxels_per_side)
+      : spatial_hash::BlockLayer<Block2D<VoxelT>>(voxel_size * voxels_per_side),
         voxels_per_side(voxels_per_side),
         voxel_size(voxel_size) {}
-  virtual ~TraversabilityLayer() = default;
-
-  // Accessors.
-  TraversabilityVoxel* voxel(const BlockIndex& global_index);
-  const TraversabilityVoxel* voxel(const BlockIndex& global_index) const;
+  virtual ~Layer2D() = default;
 
   // Indexing.
-  BlockIndex blockIndexFromGlobal(const BlockIndex& global_index) const;
-  Index2D voxelIndexFromGlobal(const BlockIndex& global_index) const;
+  BlockIndex blockIndexFromGlobal(const BlockIndex& global_index) const {
+    return BlockIndex(global_index.x() / static_cast<int>(voxels_per_side),
+                      global_index.y() / static_cast<int>(voxels_per_side),
+                      global_index.z());
+  }
+  Index2D voxelIndexFromGlobal(const BlockIndex& global_index) const {
+    return Index2D(global_index.x() % voxels_per_side,
+                   global_index.y() % voxels_per_side);
+  }
+  BlockIndex globalIndexFromPoint(const Eigen::Vector3f& position) const {
+    return {static_cast<int>(position.x() / voxel_size),
+            static_cast<int>(position.y() / voxel_size),
+            static_cast<int>(position.z() / voxel_size)};
+  }
+
+  // Accessors.
+  VoxelT* voxel(const BlockIndex& global_index) {
+    auto block = getBlockPtr(blockIndexFromGlobal(global_index));
+    if (!block) {
+      return nullptr;
+    }
+    return &block->voxel(voxelIndexFromGlobal(global_index));
+  }
+  const VoxelT* voxel(const BlockIndex& global_index) const {
+    auto block = getBlockPtr(blockIndexFromGlobal(global_index));
+    if (!block) {
+      return nullptr;
+    }
+    return &block->voxel(voxelIndexFromGlobal(global_index));
+  }
 
   // Data.
   const size_t voxels_per_side;
   const float voxel_size;
 };
+
+using TraversabilityBlock = Block2D<TraversabilityVoxel>;
+using TraversabilityLayer = Layer2D<TraversabilityVoxel>;
 
 }  // namespace hydra::places

@@ -65,7 +65,7 @@ class TraversabilityEstimator {
                                     const kimera_pgmo::MeshDelta& mesh_delta,
                                     const spark_dsg::DynamicSceneGraph& graph) = 0;
 
-  const TraversabilityLayer& getTraversabilityLayer() const {
+  virtual const TraversabilityLayer& getTraversabilityLayer() const {
     return *traversability_layer_;
   }
 

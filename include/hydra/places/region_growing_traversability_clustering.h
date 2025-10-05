@@ -33,36 +33,69 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <Eigen/Geometry>
-#include <list>
 
-#include "hydra/input/sensor_input_packet.h"
+#include <config_utilities/factory.h>
+#include <spark_dsg/traversability_boundary.h>
 
-namespace hydra {
+#include <optional>
+#include <utility>
+#include <vector>
 
-struct InputData;
+#include "hydra/places/traversability_clustering.h"
 
-struct InputPacket {
-  using Ptr = std::shared_ptr<InputPacket>;
+namespace hydra::places {
 
-  uint64_t timestamp_ns;
+/**
+ * @brief Simple clustering that assigns places by block.
+ */
+class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
+ public:
+  struct Config {
+    //! Maximum number of voxels per place. A larger value results in coarser places.
+    int maximum_place_size = 100;
+  } const config;
 
-  SensorInputPacket::Ptr sensor_input;
-  Eigen::Vector3d world_t_body;
-  Eigen::Quaterniond world_R_body;
+  using State = spark_dsg::TraversabilityState;
+  using Component = Index2DSet;
+  using Components = std::vector<Component>;
 
-  bool fix_z_coodinate = false;
+  // TODO(lschmid): For now a simple data structure and algorithm, consdier aligning
+  // better with blocks in the future and make more efficient.
+  struct Region {
+    BlockIndexSet voxels;
+    BlockIndexSet boundary_voxels;
+  };
+  using RegionVoxels = BlockIndexMap<int>;
 
-  virtual ~InputPacket() = default;
-  virtual bool fillInputData(InputData& data) const;
+  RegionGrowingTraversabilityClustering(const Config& config);
+  ~RegionGrowingTraversabilityClustering() = default;
 
-  Eigen::Isometry3d world_T_body() const {
-    auto world_T_body = Eigen::Translation<double, 3>(world_t_body) * world_R_body;
-    if (fix_z_coodinate) {
-      world_T_body.translation().z() = 0.0;
-    }
-    return world_T_body;
-  }
+  void updateGraph(const TraversabilityLayer& layer,
+                   const ActiveWindowOutput& msg,
+                   spark_dsg::DynamicSceneGraph& graph) override;
+
+ protected:
+  size_t current_id_ = 0;
+  uint64_t current_time_ns_ = 0;
+
+  // <id, region>
+  std::map<int, Region> regions_;
+
+  // Processing steps.
+  void detectPlaces(const TraversabilityLayer& layer,
+                    const Eigen::Vector3d& start_position);
+
+  // Helper functions.
+  RegionVoxels pruneExistingRegions(const TraversabilityLayer& layer);
+
+  inline static const std::array<BlockIndex, 4> neighbors_ = {
+      BlockIndex(0, -1, 0),  // bottom
+      BlockIndex(-1, 0, 0),  // left
+      BlockIndex(0, 1, 0),   // top
+      BlockIndex(1, 0, 0)    // right
+  };
 };
 
-}  // namespace hydra
+void declare_config(RegionGrowingTraversabilityClustering::Config& config);
+
+}  // namespace hydra::places
