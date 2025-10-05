@@ -42,6 +42,7 @@
 
 #include <queue>
 
+#include "hydra/places/block_traversability_clustering.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra::places {
