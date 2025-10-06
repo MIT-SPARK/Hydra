@@ -36,6 +36,8 @@
 
 #include <spark_dsg/node_attributes.h>
 
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "hydra/reconstruction/voxel_types.h"
@@ -186,18 +188,14 @@ struct Layer2D : public spatial_hash::BlockLayer<Block2D<VoxelT>> {
 
   // Accessors.
   VoxelT* voxel(const BlockIndex& global_index) {
-    auto block = getBlockPtr(blockIndexFromGlobal(global_index));
+    auto block = this->getBlockPtr(blockIndexFromGlobal(global_index));
     if (!block) {
       return nullptr;
     }
     return &block->voxel(voxelIndexFromGlobal(global_index));
   }
   const VoxelT* voxel(const BlockIndex& global_index) const {
-    auto block = getBlockPtr(blockIndexFromGlobal(global_index));
-    if (!block) {
-      return nullptr;
-    }
-    return &block->voxel(voxelIndexFromGlobal(global_index));
+    return const_cast<Layer2D*>(this)->voxel(global_index);
   }
 
   // Data.

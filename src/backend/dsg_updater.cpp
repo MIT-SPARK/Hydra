@@ -114,7 +114,7 @@ void DsgUpdater::save(const DataDirectory& output, const std::string& label) con
 }
 
 void DsgUpdater::resetBackendDsg(size_t timestamp_ns) {
-  ScopedTimer timer("dsg_updater/reset_dsg", timestamp_ns, true, 0, false);
+  ScopedTimer timer("dsg_updater/reset_dsg", timestamp_ns, true, 1, false);
   constexpr bool reset_mesh = false;
   {
     std::unique_lock<std::mutex> graph_lock(target_dsg_->mutex);

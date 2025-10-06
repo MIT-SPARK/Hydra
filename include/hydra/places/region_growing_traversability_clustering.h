@@ -52,20 +52,28 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
  public:
   struct Config {
     //! Maximum number of voxels per place. A larger value results in coarser places.
-    int maximum_place_size = 100;
+    int max_place_size = 100;
   } const config;
 
-  using State = spark_dsg::TraversabilityState;
-  using Component = Index2DSet;
-  using Components = std::vector<Component>;
+  using VoxelMap = BlockIndexMap<spark_dsg::NodeId>;
+  using Voxels = BlockIndexSet;
 
   // TODO(lschmid): For now a simple data structure and algorithm, consdier aligning
   // better with blocks in the future and make more efficient.
   struct Region {
-    BlockIndexSet voxels;
-    BlockIndexSet boundary_voxels;
+    // ID of the region. This is also the node ID in the DSG.
+    spark_dsg::NodeId id;
+
+    // Voxels assigned to this region. These can be in the current layer or outside.
+    Voxels voxels;
+
+    // Voxels bordering the voxels of this region.
+    Voxels boundary_voxels;
+
+    // True: this region has voxels in the current layer. False: all voxels are outside
+    // the current layer.
+    bool is_active = true;
   };
-  using RegionVoxels = BlockIndexMap<int>;
 
   RegionGrowingTraversabilityClustering(const Config& config);
   ~RegionGrowingTraversabilityClustering() = default;
@@ -79,20 +87,54 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
   uint64_t current_time_ns_ = 0;
 
   // <id, region>
-  std::map<int, Region> regions_;
+  std::map<spark_dsg::NodeId, Region> regions_;
 
   // Processing steps.
-  void detectPlaces(const TraversabilityLayer& layer,
-                    const Eigen::Vector3d& start_position);
+  VoxelMap pruneExistingRegions(const TraversabilityLayer& layer,
+                                spark_dsg::DynamicSceneGraph& graph);
 
-  // Helper functions.
-  RegionVoxels pruneExistingRegions(const TraversabilityLayer& layer);
+  void initializeRegions(const TraversabilityLayer& layer,
+                         const Eigen::Vector3d& start_position,
+                         VoxelMap& assigned_voxels);
 
-  inline static const std::array<BlockIndex, 4> neighbors_ = {
-      BlockIndex(0, -1, 0),  // bottom
-      BlockIndex(-1, 0, 0),  // left
-      BlockIndex(0, 1, 0),   // top
-      BlockIndex(1, 0, 0)    // right
+  void detectPlaces(const TraversabilityLayer& layer, VoxelMap& assigned_voxels);
+
+  void updatePlaceNodesInDsg(spark_dsg::DynamicSceneGraph& graph,
+                             const TraversabilityLayer& layer) const;
+
+  void updatePlaceEdgesInDsg(spark_dsg::DynamicSceneGraph& graph,
+                             const VoxelMap& assigned_voxels) const;
+
+  void visualizeAssignments(const TraversabilityLayer& layer,
+                            const VoxelMap& assigned_voxels) const;
+
+  /* Helper functions */
+
+  Region& allocateNewRegion();
+
+  // Grow the region until the max is reached, also recomputing the frontier voxels.
+  void growRegion(const TraversabilityLayer& layer,
+                  Region& region,
+                  VoxelMap& assigned_voxels);
+
+  void updateFrontierVoxels(Voxels& frontier_voxels,
+                            const TraversabilityLayer& layer,
+                            const Region& region,
+                            const VoxelMap& assigned_voxels) const;
+
+  void updatePlaceNodeAttributes(spark_dsg::TraversabilityNodeAttributes& attrs,
+                                 const Region& region,
+                                 const TraversabilityLayer& layer) const;
+
+  inline static const std::array<BlockIndex, 8> neighbors_ = {
+      BlockIndex(0, -1, 0),   // bottom
+      BlockIndex(-1, 0, 0),   // left
+      BlockIndex(0, 1, 0),    // top
+      BlockIndex(1, 0, 0),    // right
+      BlockIndex(-1, -1, 0),  // bottom-left
+      BlockIndex(1, -1, 0),   // bottom-right
+      BlockIndex(-1, 1, 0),   // top-left
+      BlockIndex(1, 1, 0)     // top-right
   };
 };
 
