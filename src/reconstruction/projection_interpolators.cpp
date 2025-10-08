@@ -187,7 +187,8 @@ void declare_config(InterpolatorAdaptive::Config& config) {
 }
 
 InterpolatorAdaptive::InterpolatorAdaptive(const Config& config)
-    : InterpolatorBilinear({}), config(config::checkValid(config)) {}
+    : InterpolatorBilinear(InterpolatorBilinear::Config()),
+      config(config::checkValid(config)) {}
 
 Weights InterpolatorAdaptive::computeWeights(float u,
                                              float v,
