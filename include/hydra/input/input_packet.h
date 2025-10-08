@@ -55,8 +55,7 @@ struct InputPacket {
   virtual bool fillInputData(InputData& data) const;
 
   Eigen::Isometry3d world_T_body() const {
-    auto world_T_body = Eigen::Translation<double, 3>(world_t_body) * world_R_body;
-    return world_T_body;
+    return Eigen::Translation<double, 3>(world_t_body) * world_R_body;
   }
 };
 
