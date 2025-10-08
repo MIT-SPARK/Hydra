@@ -32,9 +32,10 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/places/traversability_clustering.h"
+#include "hydra/places/block_traversability_clustering.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
 #include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/node_symbol.h>
