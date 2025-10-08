@@ -140,6 +140,7 @@ void DeformationInterpolator::interpolateNodePositions(
 
   const auto& dgraph = *info->deformation_graph;
   for (auto& [prefix, attributes] : nodes) {
+    attributes.sort();
     dgraph.deformAllPoints(attributes,
                            attributes,
                            prefix,
