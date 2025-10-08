@@ -34,8 +34,8 @@ struct Frontier {
 
  public:
   Eigen::Vector3d center;
-  Eigen::Vector3d scale;
-  Eigen::Quaterniond orientation;
+  Eigen::Vector3d scale = Eigen::Vector3d::Zero();
+  Eigen::Quaterniond orientation = Eigen::Quaterniond::Identity();
   size_t num_frontier_voxels = 0;
   spatial_hash::BlockIndex block_index;
   bool has_shape_information = false;

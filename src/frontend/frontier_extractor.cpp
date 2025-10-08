@@ -37,13 +37,15 @@ using SpatialCloud = pcl::PointCloud<pcl::PointXYZ>;
 
 template <typename T, size_t N>
 std::pair<T, Eigen::Matrix<T, N, 1>> getMaxEigenvector(Eigen::Matrix<T, N, N> cov) {
-  Eigen::EigenSolver<Eigen::Matrix<T, N, N>> es(cov, true);
-  auto evals_complex = es.eigenvalues();
-  Eigen::Matrix<T, N, 1> evals = evals_complex.real();
+  using Solver = Eigen::EigenSolver<Eigen::Matrix<T, N, N>>;
+
+  Solver es(cov, true);
+  const Eigen::Matrix<T, N, 1> evals = es.eigenvalues().real();
+
   Eigen::Index max_idx;
   evals.maxCoeff(&max_idx);
-  auto max_vec_complex = es.eigenvectors().col(max_idx);
-  Eigen::Matrix<T, N, 1> max_vec = max_vec_complex.real();
+
+  const Eigen::Matrix<T, N, 1> max_vec = es.eigenvectors().col(max_idx).real();
   return std::pair(evals(max_idx), max_vec);
 }
 
