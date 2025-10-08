@@ -4,6 +4,7 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/backend_module.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/backend_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/dsg_updater.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/deformation_interpolator.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/external_loop_closure_receiver.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/merge_proposer.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/merge_tracker.cpp
