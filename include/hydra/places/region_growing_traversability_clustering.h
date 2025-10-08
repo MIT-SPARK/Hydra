@@ -51,8 +51,10 @@ namespace hydra::places {
 class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
  public:
   struct Config {
-    //! Maximum number of voxels per place. A larger value results in coarser places.
-    int max_place_size = 100;
+    //! Approximate maximum radius when growing regions in meters.
+    float max_place_radius = 2.0f;
+
+    float min_place_radius = 1.0f;
   } const config;
 
   using VoxelMap = BlockIndexMap<spark_dsg::NodeId>;
@@ -73,6 +75,27 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
     // True: this region has voxels in the current layer. False: all voxels are outside
     // the current layer.
     bool is_active = true;
+
+    // True: Created this iteration. False: is in the scene graph.
+    bool is_new = true;
+
+    // Centroid of the region.
+    Eigen::Vector3d centroid;
+
+    // Regions connecting to this one.
+    NodeIdSet neighbors;
+
+    // Radii.
+    double min;
+    double max;
+
+    // Merge other into this region.
+    void merge(const Region& other);
+
+    void computeCentroid(double voxel_size = 1.0);
+
+    // Min-Max distances w.r.t. the centroid.
+    void computeRadii(double voxel_size = 1.0);
   };
 
   RegionGrowingTraversabilityClustering(const Config& config);
@@ -99,17 +122,16 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
 
   void detectPlaces(const TraversabilityLayer& layer, VoxelMap& assigned_voxels);
 
-  void updatePlaceNodesInDsg(spark_dsg::DynamicSceneGraph& graph,
-                             const TraversabilityLayer& layer) const;
+  void simplifyRegions(double voxel_size);
 
-  void updatePlaceEdgesInDsg(spark_dsg::DynamicSceneGraph& graph,
-                             const VoxelMap& assigned_voxels) const;
+  void updatePlaceNodesInDsg(spark_dsg::DynamicSceneGraph& graph);
+
+  void updatePlaceEdgesInDsg(spark_dsg::DynamicSceneGraph& graph) const;
 
   void visualizeAssignments(const TraversabilityLayer& layer,
                             const VoxelMap& assigned_voxels) const;
 
   /* Helper functions */
-
   Region& allocateNewRegion();
 
   // Grow the region until the max is reached, also recomputing the frontier voxels.
@@ -123,8 +145,9 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
                             const VoxelMap& assigned_voxels) const;
 
   void updatePlaceNodeAttributes(spark_dsg::TraversabilityNodeAttributes& attrs,
-                                 const Region& region,
-                                 const TraversabilityLayer& layer) const;
+                                 const Region& region) const;
+
+  void computeNeighbors(const VoxelMap& assigned_voxels);
 
   inline static const std::array<BlockIndex, 8> neighbors_ = {
       BlockIndex(0, -1, 0),   // bottom
