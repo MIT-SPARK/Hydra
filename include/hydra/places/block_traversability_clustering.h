@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <config_utilities/factory.h>
 #include <spark_dsg/traversability_boundary.h>
 
 #include <optional>
