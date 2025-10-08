@@ -172,8 +172,8 @@ struct Layer2D : public spatial_hash::BlockLayer<Block2D<VoxelT>> {
 
   // Indexing.
   BlockIndex blockIndexFromGlobal(const BlockIndex& global_index) const {
-    return BlockIndex(global_index.x() / static_cast<int>(voxels_per_side),
-                      global_index.y() / static_cast<int>(voxels_per_side),
+    return BlockIndex(global_index.x() / voxels_per_side,
+                      global_index.y() / voxels_per_side,
                       global_index.z());
   }
   Index2D voxelIndexFromGlobal(const BlockIndex& global_index) const {
@@ -181,9 +181,9 @@ struct Layer2D : public spatial_hash::BlockLayer<Block2D<VoxelT>> {
                    global_index.y() % voxels_per_side);
   }
   BlockIndex globalIndexFromPoint(const Eigen::Vector3f& position) const {
-    return {static_cast<int>(position.x() / voxel_size),
-            static_cast<int>(position.y() / voxel_size),
-            static_cast<int>(position.z() / voxel_size)};
+    return BlockIndex(std::floor(position.x() / static_cast<float>(voxel_size)),
+                      std::floor(position.y() / static_cast<float>(voxel_size)),
+                      std::floor(position.z() / static_cast<float>(voxel_size)));
   }
 
   // Accessors.
