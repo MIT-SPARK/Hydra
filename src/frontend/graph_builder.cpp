@@ -50,7 +50,7 @@
 #include "hydra/common/launch_callbacks.h"
 #include "hydra/common/pipeline_queues.h"
 #include "hydra/frontend/frontier_extractor.h"
-#include "hydra/frontend/mesh_segmenter.h"
+#include "hydra/frontend/object_segmenter.h"
 #include "hydra/frontend/place_2d_segmenter.h"
 #include "hydra/frontend/place_mesh_connector.h"
 #include "hydra/utils/display_utilities.h"
@@ -133,7 +133,7 @@ GraphBuilder::GraphBuilder(const Config& config,
       view_database_(config.view_database),
       sinks_(Sink::instantiate(config.sinks)) {
   if (config.enable_mesh_objects) {
-    object_segmenter_ = std::make_unique<MeshSegmenter>(
+    object_segmenter_ = std::make_unique<ObjectSegmenter>(
         config.object_config,
         GlobalInfo::instance().getLabelSpaceConfig().object_labels);
   }
@@ -509,12 +509,13 @@ void GraphBuilder::updateObjects(const ActiveWindowOutput& input) {
   }
 
   const auto timestamp = input.timestamp_ns;
-  const auto clusters = object_segmenter_->detect(timestamp, input.map.getMeshLayer());
+  const auto clusters =
+      object_segmenter_->detect(timestamp, input.map().getMeshLayer());
 
   {  // start dsg critical section
     std::unique_lock<std::mutex> lock(dsg_->mutex);
     object_segmenter_->updateGraph(
-        timestamp, input.map.getMeshLayer(), clusters, *dsg_->graph);
+        timestamp, input.map().getMeshLayer(), clusters, *dsg_->graph);
   }  // end dsg critical section
 }
 

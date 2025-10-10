@@ -32,49 +32,28 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
+#include "hydra/frontend/object_segmenter.h"
+
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
-#include <kimera_pgmo/mesh_delta.h>
-
-#include "hydra/frontend/mesh_segmenter.h"
 #define PCL_NO_PRECOMPILE
 #include <pcl/segmentation/extract_clusters.h>
 #undef PCL_NO_PRECOMPILE
 #include <config_utilities/config.h>
-#include <config_utilities/types/conversions.h>
 #include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
 #include <spark_dsg/bounding_box_extraction.h>
 #include <spark_dsg/printing.h>
 
-#include "hydra/common/global_info.h"
-#include "hydra/common/semantic_color_map.h"
 #include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
 
 using Clusters = ObjectSegmenter::Clusters;
 using LabelClusters = ObjectSegmenter::LabelClusters;
-using KdTreeT = pcl::search::KdTree<pcl::PointXYZRGBA>;
 using timing::ScopedTimer;
-
-void declare_config(ObjectSegmenter::Config& config) {
-  using namespace config;
-  name("MeshSegmenterConfig");
-  field(config.layer_id, "layer_id");
-  field(config.cluster_tolerance, "cluster_tolerance");
-  field(config.min_cluster_size, "min_cluster_size");
-  field(config.max_cluster_size, "max_cluster_size");
-  enum_field(config.bounding_box_type,
-             "bounding_box_type",
-             {{spark_dsg::BoundingBox::Type::INVALID, "INVALID"},
-              {spark_dsg::BoundingBox::Type::AABB, "AABB"},
-              {spark_dsg::BoundingBox::Type::OBB, "OBB"},
-              {spark_dsg::BoundingBox::Type::RAABB, "RAABB"}});
-  field(config.timer_namespace, "timer_namespace");
-  field(config.sinks, "sinks");
-}
 
 template <typename LList, typename RList>
 void mergeList(LList& lhs, const RList& rhs) {
@@ -115,141 +94,76 @@ inline bool nodesMatch(const Cluster& cluster, const SceneGraphNode& node) {
       cluster.centroid);
 }
 
-LabelIndices getLabelIndices(const std::set<uint32_t>& desired_labels,
-                             const kimera_pgmo::MeshDelta& delta,
-                             const std::vector<size_t>& indices) {
-  CHECK(delta.hasSemantics());
-  const auto& labels = delta.semantic_updates;
+using XYZPointCloud = pcl::PointCloud<pcl::PointXYZ>;
+using LabeledClouds = std::map<uint32_t, XYZPointCloud::Ptr>;
 
-  LabelIndices label_indices;
+LabeledClouds getLabelClouds(std::set<uint32_t> valid_labels,
+                             const MeshLayer& mesh,
+                             std::optional<double> resolution = std::nullopt) {
+  LabeledClouds label_clouds;
   std::set<uint32_t> seen_labels;
-  for (const auto idx : indices) {
-    if (static_cast<size_t>(idx) >= labels.size()) {
-      LOG(ERROR) << "bad index " << idx << " (of " << labels.size() << ")";
+  for (const auto& block : mesh) {
+    if (!block.has_labels || block.labels.size() != block.points.size()) {
+      LOG(WARNING) << "[Mesh Segmenter] Block has no labels!";
       continue;
     }
 
-    const auto label = labels[idx];
-    seen_labels.insert(label);
-    if (!desired_labels.count(label)) {
-      continue;
-    }
+    for (size_t i = 0; i < block.labels.size(); ++i) {
+      const auto label = block.labels[i];
+      seen_labels.insert(label);
+      if (!valid_labels.count(label)) {
+        continue;
+      }
 
-    auto iter = label_indices.find(label);
-    if (iter == label_indices.end()) {
-      iter = label_indices.emplace(label, std::vector<size_t>()).first;
-    }
+      auto iter = label_clouds.find(label);
+      if (iter == label_clouds.end()) {
+        iter = label_clouds.emplace(label, std::make_shared<XYZPointCloud>()).first;
+      }
 
-    iter->second.push_back(idx);
+      const auto& pos = block.points[i];
+      iter->second->push_back(pcl::PointXYZ(pos.x(), pos.y(), pos.z()));
+    }
   }
 
   VLOG(2) << "[Mesh Segmenter] Seen labels: " << printLabels(seen_labels);
-  return label_indices;
+  return label_clouds;
 }
 
 Clusters findClusters(const ObjectSegmenter::Config& config,
-                      const kimera_pgmo::MeshDelta& delta,
-                      const std::vector<size_t>& indices) {
-  pcl::IndicesPtr pcl_indices(new pcl::Indices(indices.begin(), indices.end()));
-
+                      const XYZPointCloud::Ptr& vertices) {
+  using KdTreeT = pcl::search::KdTree<pcl::PointXYZ>;
   KdTreeT::Ptr tree(new KdTreeT());
-  tree->setInputCloud(delta.vertex_updates, pcl_indices);
+  tree->setInputCloud(vertices);
 
-  pcl::EuclideanClusterExtraction<pcl::PointXYZRGBA> estimator;
+  pcl::EuclideanClusterExtraction<pcl::PointXYZ> estimator;
   estimator.setClusterTolerance(config.cluster_tolerance);
   estimator.setMinClusterSize(config.min_cluster_size);
   estimator.setMaxClusterSize(config.max_cluster_size);
   estimator.setSearchMethod(tree);
-  estimator.setInputCloud(delta.vertex_updates);
-  estimator.setIndices(pcl_indices);
+  estimator.setInputCloud(vertices);
 
   std::vector<pcl::PointIndices> cluster_indices;
   estimator.extract(cluster_indices);
 
   Clusters clusters;
-  clusters.resize(cluster_indices.size());
   for (size_t k = 0; k < clusters.size(); ++k) {
-    auto& cluster = clusters.at(k);
     const auto& curr_indices = cluster_indices.at(k).indices;
-    for (const auto local_idx : curr_indices) {
-      cluster.indices.push_back(delta.getGlobalIndex(local_idx));
+    if (curr_indices.empty()) {
+      continue;
+    }
 
-      const auto& p = delta.vertex_updates->at(local_idx);
+    auto& cluster = clusters.emplace_back();
+    cluster.indices.assign(curr_indices.begin(), curr_indices.end());
+    for (const auto idx : cluster.indices) {
+      const auto& p = vertices->at(idx);
       const Eigen::Vector3d pos(p.x, p.y, p.z);
       cluster.centroid += pos;
     }
 
-    if (curr_indices.size()) {
-      cluster.centroid /= curr_indices.size();
-    }
+    cluster.centroid /= cluster.indices.size();
   }
 
   return clusters;
-}
-
-// TODO(nathan) move node ID to not be here
-ObjectSegmenter::ObjectSegmenter(const Config& config, const std::set<uint32_t>& labels)
-    : config(config::checkValid(config)),
-      next_node_id_('O', 0),
-      labels_(labels),
-      sinks_(Sink::instantiate(config.sinks)) {
-  VLOG(2) << "[Mesh Segmenter] using labels: " << printLabels(labels_);
-  for (const auto& label : labels_) {
-    active_nodes_[label] = std::set<NodeId>();
-  }
-}
-
-std::vector<size_t> getActiveIndices(const kimera_pgmo::MeshDelta& delta) {
-  const auto active = delta.getActiveIndices();
-  if (!active) {
-    return {};
-  }
-
-  std::vector<size_t> indices;
-  for (const auto& idx : *active) {
-    indices.push_back(delta.getLocalIndex(idx));
-  }
-
-  return indices;
-}
-
-LabelClusters ObjectSegmenter::detect(uint64_t timestamp_ns,
-                                      const kimera_pgmo::MeshDelta& delta) {
-  const auto timer_name = config.timer_namespace + "_detection";
-  ScopedTimer timer(timer_name, timestamp_ns, true, 1, false);
-  LabelClusters label_clusters;
-
-  const auto indices = getActiveIndices(delta);
-  if (indices.empty()) {
-    VLOG(2) << "[Mesh Segmenter] No active indices in mesh";
-    return label_clusters;
-  }
-
-  const auto label_indices = getLabelIndices(labels_, delta, indices);
-  if (label_indices.empty()) {
-    VLOG(2) << "[Mesh Segmenter] No vertices found matching desired labels";
-    Sink::callAll(sinks_, timestamp_ns, delta, indices, label_indices);
-    return label_clusters;
-  }
-
-  for (const auto label : labels_) {
-    if (!label_indices.count(label)) {
-      continue;
-    }
-
-    if (label_indices.at(label).size() < config.min_cluster_size) {
-      continue;
-    }
-
-    const auto clusters = findClusters(config, delta, label_indices.at(label));
-
-    VLOG(2) << "[Mesh Segmenter]  - Found " << clusters.size()
-            << " cluster(s) of label " << static_cast<int>(label);
-    label_clusters.insert({label, clusters});
-  }
-
-  Sink::callAll(sinks_, timestamp_ns, delta, indices, label_indices);
-  return label_clusters;
 }
 
 bool updateIndices(const kimera_pgmo::MeshDelta& delta, std::list<size_t>& indices) {
@@ -278,8 +192,68 @@ bool updateIndices(const kimera_pgmo::MeshDelta& delta, std::list<size_t>& indic
   return is_active;
 }
 
-void ObjectSegmenter::updateOldNodes(const kimera_pgmo::MeshDelta& delta,
-                                     DynamicSceneGraph& graph) {
+}  // namespace
+
+void declare_config(ObjectSegmenter::Config& config) {
+  using namespace config;
+  name("MeshSegmenterConfig");
+  field(config.layer_id, "layer_id");
+  field(config.cluster_tolerance, "cluster_tolerance");
+  field(config.min_cluster_size, "min_cluster_size");
+  field(config.max_cluster_size, "max_cluster_size");
+  enum_field(config.bounding_box_type,
+             "bounding_box_type",
+             {{spark_dsg::BoundingBox::Type::INVALID, "INVALID"},
+              {spark_dsg::BoundingBox::Type::AABB, "AABB"},
+              {spark_dsg::BoundingBox::Type::OBB, "OBB"},
+              {spark_dsg::BoundingBox::Type::RAABB, "RAABB"}});
+  field(config.sinks, "sinks");
+}
+
+// TODO(nathan) move node ID to not be here
+ObjectSegmenter::ObjectSegmenter(const Config& config, const std::set<uint32_t>& labels)
+    : config(config::checkValid(config)),
+      next_node_id_('O', 0),
+      labels_(labels),
+      sinks_(Sink::instantiate(config.sinks)) {
+  VLOG(2) << "[Mesh Segmenter] using labels: " << printLabels(labels_);
+  for (const auto& label : labels_) {
+    active_nodes_[label] = std::set<NodeId>();
+  }
+}
+
+LabelClusters ObjectSegmenter::detect(uint64_t timestamp_ns, const MeshLayer& mesh) {
+  ScopedTimer timer("frontend/object_detection", timestamp_ns, true, 1, false);
+
+  LabelClusters label_clusters;
+  const auto clouds = getLabelClouds(labels_, mesh);
+  if (clouds.empty()) {
+    VLOG(2) << "[Mesh Segmenter] No matching vertices found!";
+    return label_clusters;
+  }
+
+  for (const auto& [label, cloud] : clouds) {
+    if (!cloud || cloud->empty()) {
+      VLOG(2) << "[Mesh Segmenter] No vertices found matching label "
+              << static_cast<int>(label);
+      continue;
+    }
+
+    if (cloud->size() < config.min_cluster_size) {
+      continue;
+    }
+
+    const auto clusters = findClusters(config, cloud);
+    label_clusters.insert({label, clusters});
+    VLOG(2) << "[Mesh Segmenter]  - Found " << clusters.size()
+            << " cluster(s) of label " << static_cast<int>(label);
+  }
+
+  Sink::callAll(sinks_, timestamp_ns, *this);
+  return label_clusters;
+}
+
+void ObjectSegmenter::updateOldNodes(DynamicSceneGraph& graph) {
   for (auto& [label, label_nodes] : active_nodes_) {
     auto iter = label_nodes.begin();
     while (iter != label_nodes.end()) {
@@ -314,11 +288,10 @@ void ObjectSegmenter::updateOldNodes(const kimera_pgmo::MeshDelta& delta,
 }
 
 void ObjectSegmenter::updateGraph(uint64_t timestamp_ns,
-                                  const kimera_pgmo::MeshDelta& active,
                                   const LabelClusters& clusters,
                                   DynamicSceneGraph& graph) {
-  ScopedTimer timer(config.timer_namespace + "_graph_update", timestamp_ns);
-  updateOldNodes(active, graph);
+  ScopedTimer timer("frontend/object_graph_update", timestamp_ns);
+  updateOldNodes(graph);
   if (!graph.hasMesh()) {
     LOG(ERROR) << "Unable to update graph without mesh!";
     return;
