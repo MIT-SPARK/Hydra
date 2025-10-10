@@ -37,6 +37,7 @@
 
 #include "hydra/common/dsg_types.h"
 #include "hydra/common/output_sink.h"
+#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra {
 
@@ -51,10 +52,7 @@ class ObjectSegmenter {
  public:
   using Clusters = std::vector<Cluster>;
   using LabelClusters = std::map<uint32_t, Clusters>;
-  using Sink = OutputSink<uint64_t,
-                          const kimera_pgmo::MeshDelta&,
-                          const std::vector<size_t>&,
-                          const LabelIndices&>;
+  using Sink = OutputSink<uint64_t, const ObjectSegmenter&>;
 
   struct Config {
     std::string layer_id = DsgLayers::OBJECTS;
@@ -62,23 +60,21 @@ class ObjectSegmenter {
     size_t min_cluster_size = 40;
     size_t max_cluster_size = 100000;
     BoundingBox::Type bounding_box_type = BoundingBox::Type::AABB;
-    std::string timer_namespace = "frontend/objects";
     std::vector<Sink::Factory> sinks;
   } const config;
 
   explicit ObjectSegmenter(const Config& config, const std::set<uint32_t>& labels);
 
-  LabelClusters detect(uint64_t timestamp_ns, const kimera_pgmo::MeshDelta& active);
+  LabelClusters detect(uint64_t timestamp_ns, const MeshLayer& active);
 
   void updateGraph(uint64_t timestamp,
-                   const kimera_pgmo::MeshDelta& active,
                    const LabelClusters& clusters,
                    DynamicSceneGraph& graph);
 
   std::unordered_set<NodeId> getActiveNodes() const;
 
  private:
-  void updateOldNodes(const kimera_pgmo::MeshDelta& active, DynamicSceneGraph& graph);
+  void updateOldNodes(DynamicSceneGraph& graph);
 
   void addNodeToGraph(DynamicSceneGraph& graph,
                       const Cluster& cluster,
