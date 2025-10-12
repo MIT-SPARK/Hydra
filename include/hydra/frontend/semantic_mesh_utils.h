@@ -35,8 +35,6 @@
 #pragma once
 #include <memory>
 
-#include "hydra/common/dsg_types.h"
-#include "hydra/common/output_sink.h"
 #include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra {
@@ -46,63 +44,23 @@ struct Cluster {
   std::vector<size_t> indices;
 };
 
-using LabelIndices = std::map<uint32_t, std::vector<size_t>>;
-
 class ObjectSegmenter {
  public:
+using XYZPointCloud = pcl::PointCloud<pcl::PointXYZ>;
+using LabeledClouds = std::map<uint32_t, XYZPointCloud::Ptr>;
+using spatial_hash::LongIndex;
+using spatial_hash::LongIndexSet;
+
+
   using Clusters = std::vector<Cluster>;
   using LabelClusters = std::map<uint32_t, Clusters>;
-  using Sink = OutputSink<uint64_t, const ObjectSegmenter&>;
 
-  struct Config {
-    //! Layer to add objects to
-    std::string layer_id = DsgLayers::OBJECTS;
-    //! Euclidean clustering connection radius (meters)
-    double cluster_tolerance = 0.25;
-    //! Minimum number of vertices
-    size_t min_cluster_size = 40;
-    //! Maximum number of vertices
-    size_t max_cluster_size = 100000;
-    //! Bounding box type to fit
-    BoundingBox::Type bounding_box_type = BoundingBox::Type::AABB;
-    //! Resolution to run clustering at
-    float grid_size = 0.1f;
-    //! Visualization sinks
-    std::vector<Sink::Factory> sinks;
-  } const config;
-
-  explicit ObjectSegmenter(const Config& config, const std::set<uint32_t>& labels);
+  explicit ObjectSegmenter(const std::set<uint32_t>& labels, float grid_size = 0.1f);
 
   LabelClusters detect(uint64_t timestamp_ns, const MeshLayer& active);
 
-  void updateGraph(uint64_t timestamp,
-                   const LabelClusters& clusters,
-                   DynamicSceneGraph& graph);
-
-  std::unordered_set<NodeId> getActiveNodes() const;
-
  private:
-  void updateOldNodes(DynamicSceneGraph& graph);
-
-  void addNodeToGraph(DynamicSceneGraph& graph,
-                      const Cluster& cluster,
-                      uint32_t label,
-                      uint64_t timestamp);
-
-  void updateNodeInGraph(DynamicSceneGraph& graph,
-                         const Cluster& cluster,
-                         const SceneGraphNode& node,
-                         uint64_t timestamp);
-
-  void mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label);
-
- private:
-  NodeSymbol next_node_id_;
-  std::set<uint32_t> labels_;
-  std::map<uint32_t, std::set<NodeId>> active_nodes_;
-  Sink::List sinks_;
+  const std::set<uint32_t> labels_;
 };
-
-void declare_config(ObjectSegmenter::Config& config);
 
 }  // namespace hydra

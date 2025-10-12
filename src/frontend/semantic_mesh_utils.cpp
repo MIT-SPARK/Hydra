@@ -94,11 +94,6 @@ inline bool nodesMatch(const Cluster& cluster, const SceneGraphNode& node) {
       cluster.centroid);
 }
 
-using XYZPointCloud = pcl::PointCloud<pcl::PointXYZ>;
-using LabeledClouds = std::map<uint32_t, XYZPointCloud::Ptr>;
-using spatial_hash::LongIndex;
-using spatial_hash::LongIndexSet;
-
 LabeledClouds getLabelClouds(std::set<uint32_t> valid_labels,
                              const MeshLayer& mesh,
                              float resolution) {
