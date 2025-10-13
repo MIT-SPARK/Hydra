@@ -40,7 +40,7 @@
 #include <spark_dsg/bounding_box_extraction.h>
 #include <spark_dsg/printing.h>
 
-#include "hydra/frontend/object_segmenter.h"
+#include "hydra/frontend/object_extractor.h"
 #include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
