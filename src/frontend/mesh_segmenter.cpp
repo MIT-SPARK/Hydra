@@ -32,24 +32,20 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/frontend/semantic_mesh_utils.h"
+#include "hydra/frontend/mesh_segmenter.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
-#include <glog/stl_logging.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #define PCL_NO_PRECOMPILE
 #include <pcl/segmentation/extract_clusters.h>
 #undef PCL_NO_PRECOMPILE
 
-#include "hydra/utils/timing_utilities.h"
-
 namespace hydra {
 
 using spatial_hash::LongIndex;
-using timing::ScopedTimer;
 using ClusterMap = std::map<uint32_t, MeshSegmenter::Clusters>;
 
 namespace {

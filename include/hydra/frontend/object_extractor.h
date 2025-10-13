@@ -37,14 +37,14 @@
 
 #include "hydra/common/dsg_types.h"
 #include "hydra/common/output_sink.h"
-#include "hydra/reconstruction/voxel_types.h"
 #include "hydra/frontend/mesh_segmenter.h"
+#include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
 
-class ObjectSegmenter {
+class ObjectExtractor {
  public:
-  using Sink = OutputSink<uint64_t, const ObjectSegmenter&>;
+  using Sink = OutputSink<uint64_t, const ObjectExtractor&>;
 
   struct Config {
     //! Layer to add objects to
@@ -57,40 +57,35 @@ class ObjectSegmenter {
     std::vector<Sink::Factory> sinks;
   } const config;
 
-  explicit ObjectSegmenter(const Config& config, const std::set<uint32_t>& labels);
+  explicit ObjectExtractor(const Config& config, const std::set<uint32_t>& labels);
 
-  LabelClusters detect(uint64_t timestamp_ns, const MeshLayer& active);
+  void detect(uint64_t timestamp_ns, const VolumetricMap& active);
 
-  void updateGraph(uint64_t timestamp,
-                   const LabelClusters& clusters,
-                   DynamicSceneGraph& graph);
-
-  std::unordered_set<NodeId> getActiveNodes() const;
+  void updateGraph(uint64_t timestamp, DynamicSceneGraph& graph);
 
  private:
   void updateOldNodes(DynamicSceneGraph& graph);
 
   void addNodeToGraph(DynamicSceneGraph& graph,
-                      const Cluster& cluster,
+                      const MeshSegmenter::Cluster& cluster,
                       uint32_t label,
                       uint64_t timestamp);
 
   void updateNodeInGraph(DynamicSceneGraph& graph,
-                         const Cluster& cluster,
+                         const MeshSegmenter::Cluster& cluster,
                          const SceneGraphNode& node,
                          uint64_t timestamp);
 
   void mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label);
 
  private:
+  const Sink::List sinks_;
   const MeshSegmenter segmenter_;
 
   NodeSymbol next_node_id_;
-  std::set<uint32_t> labels_;
   std::map<uint32_t, std::set<NodeId>> active_nodes_;
-  Sink::List sinks_;
 };
 
-void declare_config(ObjectSegmenter::Config& config);
+void declare_config(ObjectExtractor::Config& config);
 
 }  // namespace hydra
