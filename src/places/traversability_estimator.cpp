@@ -59,9 +59,7 @@ HeightTraversabilityEstimator::HeightTraversabilityEstimator(const Config& confi
     : config(config::checkValid(config)) {}
 
 void HeightTraversabilityEstimator::updateTraversability(
-    const ActiveWindowOutput& msg,
-    const kimera_pgmo::MeshDelta&,
-    const spark_dsg::DynamicSceneGraph&) {
+    const ActiveWindowOutput& msg) {
   updateTsdf(msg);
   computeTraversability(msg);
 }
@@ -191,4 +189,5 @@ BlockIndexSet HeightTraversabilityEstimator::get2DBlockIndices(
   }
   return block_indices;
 }
+
 }  // namespace hydra::places

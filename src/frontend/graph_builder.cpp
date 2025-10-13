@@ -146,15 +146,13 @@ GraphBuilder::GraphBuilder(const Config& config,
   addInputCallback(std::bind(&GraphBuilder::updatePlaces, this, std::placeholders::_1));
   addInputCallback(
       std::bind(&GraphBuilder::updateFrontiers, this, std::placeholders::_1));
+  addInputCallback(std::bind(
+      &GraphBuilder::updateTraversabilityPlaces, this, std::placeholders::_1));
 
   addPostMeshCallback(
       std::bind(&GraphBuilder::updateObjects, this, std::placeholders::_1));
   addPostMeshCallback(
       std::bind(&GraphBuilder::updatePlaces2d, this, std::placeholders::_1));
-  if (traversability_places_) {
-    addPostMeshCallback(std::bind(
-        &GraphBuilder::updateTraversabilityPlaces, this, std::placeholders::_1));
-  }
 
   if (config.lcd_use_bow_vectors) {
     PipelineQueues::instance().bow_queue.reset(new PipelineQueues::BowQueue());
@@ -569,14 +567,14 @@ void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
 }
 
 void GraphBuilder::updateTraversabilityPlaces(const ActiveWindowOutput& input) {
-  if (!traversability_places_ || !last_mesh_update_) {
+  if (!traversability_places_) {
     return;
   }
-  // TODO(lschmid): The mesh update is not used here. Also think about unifying places.
-  traversability_places_->detect(
-      input, *last_mesh_update_, mesh_offsets_, *dsg_->graph);
-  std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-  traversability_places_->updateGraph(input, mesh_offsets_, *dsg_->graph);
+
+  traversability_places_->detect(input);
+
+  std::lock_guard<std::mutex> graph_lock(dsg_->mutex);
+  traversability_places_->updateGraph(input, *dsg_->graph);
 }
 
 void GraphBuilder::updatePoseGraph(const ActiveWindowOutput& input) {

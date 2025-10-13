@@ -38,15 +38,15 @@
 
 #include <memory>
 
+#include "hydra/common/dsg_types.h"
 #include "hydra/common/output_sink.h"
-#include "hydra/frontend/surface_places_interface.h"
 #include "hydra/places/traversability_clustering.h"
 #include "hydra/places/traversability_estimator.h"
 #include "hydra/places/traversability_postprocessing.h"
 
 namespace hydra::places {
 
-class TraversabilityPlaceExtractor : public SurfacePlacesInterface {
+class TraversabilityPlaceExtractor {
  public:
   using Sink = OutputSink<uint64_t, const Eigen::Vector3d&, const TraversabilityLayer&>;
 
@@ -61,16 +61,9 @@ class TraversabilityPlaceExtractor : public SurfacePlacesInterface {
 
   virtual ~TraversabilityPlaceExtractor() = default;
 
-  NodeIdSet getActiveNodes() const override;
+  void detect(const ActiveWindowOutput& msg);
 
-  void detect(const ActiveWindowOutput& msg,
-              const kimera_pgmo::MeshDelta& mesh_delta,
-              const kimera_pgmo::MeshOffsetInfo& offsets,
-              const spark_dsg::DynamicSceneGraph& graph) override;
-
-  void updateGraph(const ActiveWindowOutput& msg,
-                   const kimera_pgmo::MeshOffsetInfo& offsets,
-                   spark_dsg::DynamicSceneGraph& graph) override;
+  void updateGraph(const ActiveWindowOutput& msg, DynamicSceneGraph& graph);
 
  protected:
   NodeIdSet active_nodes_;
