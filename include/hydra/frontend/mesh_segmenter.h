@@ -44,25 +44,30 @@ namespace hydra {
 
 class MeshSegmenter {
  public:
+  struct Cluster {
+    Eigen::Vector3f centroid;
+    std::vector<Eigen::Vector3f> points;
+  };
+  using Clusters = std::vector<Cluster>;
+
   struct Config {
+    //! Labels to use for clustering
     std::set<uint32_t> labels;
+    //! Resolution to run clustering at
     float grid_size = 0.1f;
+    //! Euclidean clustering connection radius (meters)
+    double cluster_tolerance = 0.25;
+    //! Minimum number of vertices
+    size_t min_cluster_size = 40;
+    //! Maximum number of vertices
+    size_t max_cluster_size = 100000;
 
     Config with_labels(const std::set<uint32_t>& labels);
   } const config;
 
   explicit MeshSegmenter(const Config& config);
 
- private:
-  void updateClouds(const MeshLayer& mesh);
-
-  void addNewVertices(const MeshLayer& mesh);
-
- private:
-  const float grid_size_inv_;
-
-  struct HashedCloud;
-  std::map<uint32_t, std::unique_ptr<HashedCloud>> clouds_;
+  std::map<uint32_t, Clusters> segment(const MeshLayer& mesh) const;
 };
 
 void declare_config(MeshSegmenter::Config& config);

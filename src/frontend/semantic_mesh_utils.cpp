@@ -47,6 +47,11 @@
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+
+using spatial_hash::LongIndex;
+using timing::ScopedTimer;
+using ClusterMap = std::map<uint32_t, MeshSegmenter::Clusters>;
+
 namespace {
 
 std::string printLabels(const std::set<uint32_t>& labels) {
@@ -64,8 +69,31 @@ std::string printLabels(const std::set<uint32_t>& labels) {
   return ss.str();
 }
 
-Clusters findClusters(const ObjectSegmenter::Config& config,
-                      const XYZPointCloud::Ptr& vertices) {
+struct HashedCloud {
+  explicit HashedCloud(float grid_size);
+  void addPoint(const Eigen::Vector3f& pos);
+
+  const spatial_hash::Grid<LongIndex> grid;
+  spatial_hash::LongIndexSet occupied;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr vertices;
+};
+
+HashedCloud::HashedCloud(float grid_size)
+    : grid(grid_size), vertices(new pcl::PointCloud<pcl::PointXYZ>()) {}
+
+void HashedCloud::addPoint(const Eigen::Vector3f& pos) {
+  const auto index = grid.toIndex(pos);
+  if (occupied.count(index)) {
+    return;
+  }
+
+  occupied.insert(index);
+  vertices->push_back(pcl::PointXYZ(pos.x(), pos.y(), pos.z()));
+}
+
+void findAndFillClusters(const MeshSegmenter::Config& config,
+                         const pcl::PointCloud<pcl::PointXYZ>::Ptr& vertices,
+                         MeshSegmenter::Clusters& clusters) {
   using KdTreeT = pcl::search::KdTree<pcl::PointXYZ>;
   KdTreeT::Ptr tree(new KdTreeT());
   tree->setInputCloud(vertices);
@@ -77,34 +105,29 @@ Clusters findClusters(const ObjectSegmenter::Config& config,
   estimator.setSearchMethod(tree);
   estimator.setInputCloud(vertices);
 
-  std::vector<pcl::PointIndices> cluster_indices;
-  estimator.extract(cluster_indices);
+  std::vector<pcl::PointIndices> found;
+  estimator.extract(found);
 
-  Clusters clusters;
-  for (size_t k = 0; k < clusters.size(); ++k) {
-    const auto& curr_indices = cluster_indices.at(k).indices;
-    if (curr_indices.empty()) {
+  clusters.reserve(found.size());
+  for (const auto& curr : found) {
+    if (curr.indices.empty()) {
       continue;
     }
 
     auto& cluster = clusters.emplace_back();
-    cluster.indices.assign(curr_indices.begin(), curr_indices.end());
-    for (const auto idx : cluster.indices) {
+    cluster.points.reserve(curr.indices.size());
+    for (const auto idx : curr.indices) {
       const auto& p = vertices->at(idx);
-      const Eigen::Vector3d pos(p.x, p.y, p.z);
+      const Eigen::Vector3f pos(p.x, p.y, p.z);
       cluster.centroid += pos;
+      cluster.points.push_back(pos);
     }
 
-    cluster.centroid /= cluster.indices.size();
+    cluster.centroid /= cluster.points.size();
   }
-
-  return clusters;
 }
 
 }  // namespace
-
-using spatial_hash::LongIndex;
-using timing::ScopedTimer;
 
 void declare_config(MeshSegmenter::Config& config) {
   using namespace config;
@@ -114,34 +137,14 @@ void declare_config(MeshSegmenter::Config& config) {
   check(config.grid_size, GT, 0.0f, "grid_size");
 }
 
-struct MeshSegmenter::HashedCloud {
-  HashedCloud(float grid_size)
-      : grid(grid_size), vertices(new pcl::PointCloud<pcl::PointXYZ>()) {}
-
-  void addPoint(const Eigen::Vector3f& pos) {
-    const auto index = grid.toIndex(pos);
-    if (occupied.count(index)) {
-      return;
-    }
-
-    occupied.insert(index);
-    vertices->push_back(pcl::PointXYZ(pos.x(), pos.y(), pos.z()));
-  }
-
-  const spatial_hash::Grid<LongIndex> grid;
-  spatial_hash::LongIndexSet occupied;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr vertices;
-};
-
 MeshSegmenter::MeshSegmenter(const Config& config)
-    : config(config::checkValid(config)), grid_size_inv_(1.0f / config.grid_size) {
+    : config(config::checkValid(config)) {
   VLOG(2) << "[Mesh Segmenter] using labels: " << printLabels(config.labels);
 }
 
-void MeshSegmenter::updateClouds(const MeshLayer& mesh) { addNewVertices(mesh); }
-
-void MeshSegmenter::addNewVertices(const MeshLayer& mesh) {
+ClusterMap MeshSegmenter::segment(const MeshLayer& mesh) const {
   std::set<uint32_t> seen_labels;
+  std::map<uint32_t, HashedCloud> clouds;
   for (const auto& block : mesh) {
     if (!block.has_labels || block.labels.size() != block.points.size()) {
       LOG(WARNING) << "[Mesh Segmenter] Block has no labels!";
@@ -155,17 +158,24 @@ void MeshSegmenter::addNewVertices(const MeshLayer& mesh) {
         continue;
       }
 
-      auto iter = clouds_.find(label);
-      if (iter == clouds_.end()) {
-        iter = clouds_.emplace(label, std::make_unique<HashedCloud>(config.grid_size))
-                   .first;
+      auto iter = clouds.find(label);
+      if (iter == clouds.end()) {
+        iter = clouds.emplace(label, HashedCloud(config.grid_size)).first;
       }
 
-      iter->second->addPoint(block.points[i]);
+      iter->second.addPoint(block.points[i]);
     }
   }
 
   VLOG(2) << "[Mesh Segmenter] Seen labels: " << printLabels(seen_labels);
+
+  std::map<uint32_t, Clusters> clusters_by_label;
+  for (const auto& [label, cloud] : clouds) {
+    auto iter = clusters_by_label.emplace(label, Clusters{}).first;
+    findAndFillClusters(config, cloud.vertices, iter->second);
+  }
+
+  return clusters_by_label;
 }
 
 }  // namespace hydra
