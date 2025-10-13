@@ -33,34 +33,38 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <map>
 #include <memory>
+#include <set>
+#include <vector>
 
 #include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra {
 
-struct Cluster {
-  Eigen::Vector3d centroid;
-  std::vector<size_t> indices;
-};
-
-class ObjectSegmenter {
+class MeshSegmenter {
  public:
-using XYZPointCloud = pcl::PointCloud<pcl::PointXYZ>;
-using LabeledClouds = std::map<uint32_t, XYZPointCloud::Ptr>;
-using spatial_hash::LongIndex;
-using spatial_hash::LongIndexSet;
+  struct Config {
+    std::set<uint32_t> labels;
+    float grid_size = 0.1f;
 
+    Config with_labels(const std::set<uint32_t>& labels);
+  } const config;
 
-  using Clusters = std::vector<Cluster>;
-  using LabelClusters = std::map<uint32_t, Clusters>;
-
-  explicit ObjectSegmenter(const std::set<uint32_t>& labels, float grid_size = 0.1f);
-
-  LabelClusters detect(uint64_t timestamp_ns, const MeshLayer& active);
+  explicit MeshSegmenter(const Config& config);
 
  private:
-  const std::set<uint32_t> labels_;
+  void updateClouds(const MeshLayer& mesh);
+
+  void addNewVertices(const MeshLayer& mesh);
+
+ private:
+  const float grid_size_inv_;
+
+  struct HashedCloud;
+  std::map<uint32_t, std::unique_ptr<HashedCloud>> clouds_;
 };
+
+void declare_config(MeshSegmenter::Config& config);
 
 }  // namespace hydra
