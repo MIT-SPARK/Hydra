@@ -32,19 +32,15 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/frontend/object_segmenter.h"
-
-#include <glog/logging.h>
-#include <glog/stl_logging.h>
-#define PCL_NO_PRECOMPILE
-#include <pcl/segmentation/extract_clusters.h>
-#undef PCL_NO_PRECOMPILE
 #include <config_utilities/config.h>
 #include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
+#include <glog/logging.h>
+#include <glog/stl_logging.h>
 #include <spark_dsg/bounding_box_extraction.h>
 #include <spark_dsg/printing.h>
 
+#include "hydra/frontend/object_segmenter.h"
 #include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -55,35 +51,6 @@ using Clusters = ObjectSegmenter::Clusters;
 using LabelClusters = ObjectSegmenter::LabelClusters;
 using timing::ScopedTimer;
 
-template <typename LList, typename RList>
-void mergeList(LList& lhs, const RList& rhs) {
-  std::unordered_set<size_t> seen(lhs.begin(), lhs.end());
-  for (const auto idx : rhs) {
-    if (seen.count(idx)) {
-      continue;
-    }
-
-    lhs.push_back(idx);
-    seen.insert(idx);
-  }
-}
-
-template <typename T>
-std::string printLabels(const std::set<T>& labels) {
-  std::stringstream ss;
-  ss << "[";
-  auto iter = labels.begin();
-  while (iter != labels.end()) {
-    ss << static_cast<uint64_t>(*iter);
-    ++iter;
-    if (iter != labels.end()) {
-      ss << ", ";
-    }
-  }
-  ss << "]";
-  return ss.str();
-}
-
 inline bool nodesMatch(const SceneGraphNode& lhs_node, const SceneGraphNode& rhs_node) {
   return lhs_node.attributes<SemanticNodeAttributes>().bounding_box.contains(
       rhs_node.attributes().position);
@@ -92,78 +59,6 @@ inline bool nodesMatch(const SceneGraphNode& lhs_node, const SceneGraphNode& rhs
 inline bool nodesMatch(const Cluster& cluster, const SceneGraphNode& node) {
   return node.attributes<SemanticNodeAttributes>().bounding_box.contains(
       cluster.centroid);
-}
-
-using XYZPointCloud = pcl::PointCloud<pcl::PointXYZ>;
-using LabeledClouds = std::map<uint32_t, XYZPointCloud::Ptr>;
-
-LabeledClouds getLabelClouds(std::set<uint32_t> valid_labels,
-                             const MeshLayer& mesh,
-                             std::optional<double> resolution = std::nullopt) {
-  LabeledClouds label_clouds;
-  std::set<uint32_t> seen_labels;
-  for (const auto& block : mesh) {
-    if (!block.has_labels || block.labels.size() != block.points.size()) {
-      LOG(WARNING) << "[Mesh Segmenter] Block has no labels!";
-      continue;
-    }
-
-    for (size_t i = 0; i < block.labels.size(); ++i) {
-      const auto label = block.labels[i];
-      seen_labels.insert(label);
-      if (!valid_labels.count(label)) {
-        continue;
-      }
-
-      auto iter = label_clouds.find(label);
-      if (iter == label_clouds.end()) {
-        iter = label_clouds.emplace(label, std::make_shared<XYZPointCloud>()).first;
-      }
-
-      const auto& pos = block.points[i];
-      iter->second->push_back(pcl::PointXYZ(pos.x(), pos.y(), pos.z()));
-    }
-  }
-
-  VLOG(2) << "[Mesh Segmenter] Seen labels: " << printLabels(seen_labels);
-  return label_clouds;
-}
-
-Clusters findClusters(const ObjectSegmenter::Config& config,
-                      const XYZPointCloud::Ptr& vertices) {
-  using KdTreeT = pcl::search::KdTree<pcl::PointXYZ>;
-  KdTreeT::Ptr tree(new KdTreeT());
-  tree->setInputCloud(vertices);
-
-  pcl::EuclideanClusterExtraction<pcl::PointXYZ> estimator;
-  estimator.setClusterTolerance(config.cluster_tolerance);
-  estimator.setMinClusterSize(config.min_cluster_size);
-  estimator.setMaxClusterSize(config.max_cluster_size);
-  estimator.setSearchMethod(tree);
-  estimator.setInputCloud(vertices);
-
-  std::vector<pcl::PointIndices> cluster_indices;
-  estimator.extract(cluster_indices);
-
-  Clusters clusters;
-  for (size_t k = 0; k < clusters.size(); ++k) {
-    const auto& curr_indices = cluster_indices.at(k).indices;
-    if (curr_indices.empty()) {
-      continue;
-    }
-
-    auto& cluster = clusters.emplace_back();
-    cluster.indices.assign(curr_indices.begin(), curr_indices.end());
-    for (const auto idx : cluster.indices) {
-      const auto& p = vertices->at(idx);
-      const Eigen::Vector3d pos(p.x, p.y, p.z);
-      cluster.centroid += pos;
-    }
-
-    cluster.centroid /= cluster.indices.size();
-  }
-
-  return clusters;
 }
 
 bool updateIndices(const kimera_pgmo::MeshDelta& delta, std::list<size_t>& indices) {
@@ -198,21 +93,20 @@ void declare_config(ObjectSegmenter::Config& config) {
   using namespace config;
   name("MeshSegmenterConfig");
   field(config.layer_id, "layer_id");
-  field(config.cluster_tolerance, "cluster_tolerance");
-  field(config.min_cluster_size, "min_cluster_size");
-  field(config.max_cluster_size, "max_cluster_size");
   enum_field(config.bounding_box_type,
              "bounding_box_type",
              {{spark_dsg::BoundingBox::Type::INVALID, "INVALID"},
               {spark_dsg::BoundingBox::Type::AABB, "AABB"},
               {spark_dsg::BoundingBox::Type::OBB, "OBB"},
               {spark_dsg::BoundingBox::Type::RAABB, "RAABB"}});
+  field(config.mesh_segmenter, "mesh_segmenter", false);
   field(config.sinks, "sinks");
 }
 
 // TODO(nathan) move node ID to not be here
 ObjectSegmenter::ObjectSegmenter(const Config& config, const std::set<uint32_t>& labels)
     : config(config::checkValid(config)),
+      segmenter_(config.mesh_segmenter),
       next_node_id_('O', 0),
       labels_(labels),
       sinks_(Sink::instantiate(config.sinks)) {

@@ -38,35 +38,21 @@
 #include "hydra/common/dsg_types.h"
 #include "hydra/common/output_sink.h"
 #include "hydra/reconstruction/voxel_types.h"
+#include "hydra/frontend/mesh_segmenter.h"
 
 namespace hydra {
 
-struct Cluster {
-  Eigen::Vector3d centroid;
-  std::vector<size_t> indices;
-};
-
-using LabelIndices = std::map<uint32_t, std::vector<size_t>>;
-
 class ObjectSegmenter {
  public:
-  using Clusters = std::vector<Cluster>;
-  using LabelClusters = std::map<uint32_t, Clusters>;
   using Sink = OutputSink<uint64_t, const ObjectSegmenter&>;
 
   struct Config {
     //! Layer to add objects to
     std::string layer_id = DsgLayers::OBJECTS;
-    //! Euclidean clustering connection radius (meters)
-    double cluster_tolerance = 0.25;
-    //! Minimum number of vertices
-    size_t min_cluster_size = 40;
-    //! Maximum number of vertices
-    size_t max_cluster_size = 100000;
     //! Bounding box type to fit
     BoundingBox::Type bounding_box_type = BoundingBox::Type::AABB;
-    //! Resolution to run clustering at
-    float grid_size = 0.1f;
+    //! Segmentation config
+    MeshSegmenter::Config mesh_segmenter;
     //! Visualization sinks
     std::vector<Sink::Factory> sinks;
   } const config;
@@ -97,6 +83,8 @@ class ObjectSegmenter {
   void mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label);
 
  private:
+  const MeshSegmenter segmenter_;
+
   NodeSymbol next_node_id_;
   std::set<uint32_t> labels_;
   std::map<uint32_t, std::set<NodeId>> active_nodes_;
