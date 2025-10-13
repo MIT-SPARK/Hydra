@@ -148,21 +148,16 @@ GraphBuilder::GraphBuilder(const Config& config,
   deformation_compression_.reset(
       new kimera_pgmo::BlockCompression(config.pgmo.d_graph_resolution));
 
-  addInputCallback(std::bind(&GraphBuilder::updateMesh, this, std::placeholders::_1));
-  addInputCallback(
-      std::bind(&GraphBuilder::updateDeformationGraph, this, std::placeholders::_1));
-  addInputCallback(
-      std::bind(&GraphBuilder::updatePoseGraph, this, std::placeholders::_1));
-  addInputCallback(std::bind(&GraphBuilder::updatePlaces, this, std::placeholders::_1));
-  addInputCallback(
-      std::bind(&GraphBuilder::updateFrontiers, this, std::placeholders::_1));
-  addInputCallback(std::bind(
-      &GraphBuilder::updateTraversabilityPlaces, this, std::placeholders::_1));
-  addInputCallback(
-      std::bind(&GraphBuilder::updateObjects, this, std::placeholders::_1));
+  using std::placeholders::_1;
+  addInputCallback(std::bind(&GraphBuilder::updateMesh, this, _1));
+  addInputCallback(std::bind(&GraphBuilder::updateDeformationGraph, this, _1));
+  addInputCallback(std::bind(&GraphBuilder::updatePoseGraph, this, _1));
+  addInputCallback(std::bind(&GraphBuilder::updatePlaces, this, _1));
+  addInputCallback(std::bind(&GraphBuilder::updateFrontiers, this, _1));
+  addInputCallback(std::bind(&GraphBuilder::updateTraversabilityPlaces, this, _1));
+  addInputCallback(std::bind(&GraphBuilder::updateObjects, this, _1));
 
-  addPostMeshCallback(
-      std::bind(&GraphBuilder::updatePlaces2d, this, std::placeholders::_1));
+  addPostMeshCallback(std::bind(&GraphBuilder::updatePlaces2d, this, _1));
 
   if (config.lcd_use_bow_vectors) {
     PipelineQueues::instance().bow_queue.reset(new PipelineQueues::BowQueue());
