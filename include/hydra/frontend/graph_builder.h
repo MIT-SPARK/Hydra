@@ -55,6 +55,7 @@
 #include "hydra/frontend/graph_connector.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/surface_places_interface.h"
+#include "hydra/frontend/traversability_place_extractor.h"
 #include "hydra/frontend/view_database.h"
 #include "hydra/loop_closure/lcd_input.h"
 #include "hydra/odometry/pose_graph_from_odom.h"
@@ -69,7 +70,6 @@ class MeshDelta;
 namespace hydra {
 
 class FrontierExtractor;
-class NearestNodeFinder;
 struct VolumetricWindow;
 
 class GraphBuilder : public Module {
@@ -94,7 +94,7 @@ class GraphBuilder : public Module {
         PoseGraphFromOdom::Config()};
     config::VirtualConfig<SurfacePlacesInterface> surface_places;
     config::VirtualConfig<FreespacePlacesInterface> freespace_places;
-    config::VirtualConfig<SurfacePlacesInterface> traversability_places;
+    config::VirtualConfig<places::TraversabilityPlaceExtractor> traversability_places;
     config::VirtualConfig<FrontierExtractor> frontier_places;
     ViewDatabase::Config view_database;
     std::vector<Sink::Factory> sinks;
@@ -187,7 +187,7 @@ class GraphBuilder : public Module {
   std::unique_ptr<MeshSegmenter> segmenter_;
   std::unique_ptr<PoseGraphTracker> tracker_;
   std::unique_ptr<SurfacePlacesInterface> surface_places_;
-  std::unique_ptr<SurfacePlacesInterface> traversability_places_;
+  std::unique_ptr<places::TraversabilityPlaceExtractor> traversability_places_;
   std::unique_ptr<FreespacePlacesInterface> freespace_places_;
   std::unique_ptr<FrontierExtractor> frontier_places_;
   ViewDatabase view_database_;

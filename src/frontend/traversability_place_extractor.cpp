@@ -48,16 +48,15 @@
 using Timer = hydra::timing::ScopedTimer;
 
 namespace hydra::places {
-
 namespace {
+
 static const auto registration =
-    config::RegistrationWithConfig<SurfacePlacesInterface,
+    config::RegistrationWithConfig<TraversabilityPlaceExtractor,
                                    TraversabilityPlaceExtractor,
                                    TraversabilityPlaceExtractor::Config>(
         "traversability");
-}  // namespace
 
-using spark_dsg::DynamicSceneGraph;
+}  // namespace
 
 void declare_config(TraversabilityPlaceExtractor::Config& config) {
   using namespace config;
@@ -75,18 +74,12 @@ TraversabilityPlaceExtractor::TraversabilityPlaceExtractor(const Config& config)
       postprocessing_(config.postprocessing),
       sinks_(Sink::instantiate(config.sinks)) {}
 
-NodeIdSet TraversabilityPlaceExtractor::getActiveNodes() const { return active_nodes_; }
-
-void TraversabilityPlaceExtractor::detect(const ActiveWindowOutput& msg,
-                                          const kimera_pgmo::MeshDelta& mesh_delta,
-                                          const kimera_pgmo::MeshOffsetInfo&,
-                                          const DynamicSceneGraph& graph) {
+void TraversabilityPlaceExtractor::detect(const ActiveWindowOutput& msg) {
   Timer timer("traversability/estimate", msg.timestamp_ns);
-  estimator_->updateTraversability(msg, mesh_delta, graph);
+  estimator_->updateTraversability(msg);
 }
 
 void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
-                                               const kimera_pgmo::MeshOffsetInfo&,
                                                DynamicSceneGraph& graph) {
   // TODO(lschmid): Find a nicer way than copying the layer here. Should not be too
   // expensive though.
