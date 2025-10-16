@@ -62,7 +62,7 @@ class MeshSegmenter {
     //! Maximum number of vertices
     size_t max_cluster_size = 100000;
 
-    Config with_labels(const std::set<uint32_t>& labels);
+    Config with_labels(const std::set<uint32_t>& labels) const;
   } const config;
 
   explicit MeshSegmenter(const Config& config);

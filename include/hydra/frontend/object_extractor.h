@@ -59,31 +59,22 @@ class ObjectExtractor {
 
   explicit ObjectExtractor(const Config& config, const std::set<uint32_t>& labels);
 
-  void detect(uint64_t timestamp_ns, const VolumetricMap& active);
+  void detect(uint64_t timestamp_ns, const VolumetricMap& map);
 
   void updateGraph(uint64_t timestamp, DynamicSceneGraph& graph);
 
  private:
-  void updateOldNodes(DynamicSceneGraph& graph);
+  void updateOldNodes(const VolumetricMap& map);
 
-  void addNodeToGraph(DynamicSceneGraph& graph,
-                      const MeshSegmenter::Cluster& cluster,
-                      uint32_t label,
-                      uint64_t timestamp);
-
-  void updateNodeInGraph(DynamicSceneGraph& graph,
-                         const MeshSegmenter::Cluster& cluster,
-                         const SceneGraphNode& node,
-                         uint64_t timestamp);
-
-  void mergeActiveNodes(DynamicSceneGraph& graph, uint32_t label);
+  void mergeActiveNodes();
 
  private:
   const Sink::List sinks_;
   const MeshSegmenter segmenter_;
 
   NodeSymbol next_node_id_;
-  std::map<uint32_t, std::set<NodeId>> active_nodes_;
+  std::set<NodeId> removed_nodes_;
+  std::map<uint32_t, std::map<NodeId, ObjectNodeAttributes::Ptr>> active_nodes_;
 };
 
 void declare_config(ObjectExtractor::Config& config);

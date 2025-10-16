@@ -133,6 +133,13 @@ void declare_config(MeshSegmenter::Config& config) {
   check(config.grid_size, GT, 0.0f, "grid_size");
 }
 
+MeshSegmenter::Config MeshSegmenter::Config::with_labels(
+    const std::set<uint32_t>& labels) const {
+  auto to_return = *this;
+  to_return.labels = labels;
+  return to_return;
+}
+
 MeshSegmenter::MeshSegmenter(const Config& config)
     : config(config::checkValid(config)) {
   VLOG(2) << "[Mesh Segmenter] using labels: " << printLabels(config.labels);
@@ -167,8 +174,14 @@ ClusterMap MeshSegmenter::segment(const MeshLayer& mesh) const {
 
   std::map<uint32_t, Clusters> clusters_by_label;
   for (const auto& [label, cloud] : clouds) {
+    if (cloud.vertices->size() < config.min_cluster_size) {
+      continue;
+    }
+
     auto iter = clusters_by_label.emplace(label, Clusters{}).first;
     findAndFillClusters(config, cloud.vertices, iter->second);
+    VLOG(2) << "[Mesh Segmenter] Found " << iter->second.size()
+            << " cluster(s) of label " << label;
   }
 
   return clusters_by_label;
