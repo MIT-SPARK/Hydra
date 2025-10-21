@@ -33,65 +33,52 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/node_attributes.h>
+
+#include <config_utilities/virtual_config.h>
+
+#include "hydra/backend/association_strategies.h"
+#include "hydra/backend/deformation_interpolator.h"
+#include "hydra/backend/merge_tracker.h"
+#include "hydra/backend/update_functions.h"
+#include "hydra/utils/active_window_tracker.h"
+#include "hydra/utils/logging.h"
+#include "hydra/common/node_matchers.h"
 
 namespace hydra {
 
-struct NodeMatcher {
-  using Attrs = spark_dsg::NodeAttributes;
-
-  virtual ~NodeMatcher() = default;
-  virtual bool match(const Attrs& new_attributes,
-                     const Attrs& prev_attributes) const = 0;
-};
-
-struct CentroidBBoxMatcher : public NodeMatcher {
-  struct Config {};
-
-  explicit CentroidBBoxMatcher(const Config&) {}
-  bool match(const Attrs& new_attrs, const Attrs& prev_attrs) const override;
-};
-
-void declare_config(CentroidBBoxMatcher::Config& config);
-
-struct IoUNodeMatcher : public NodeMatcher {
-  struct Config {
-    //! @brief Minimum IoU between two nodes of same class
-    double min_same_iou = 0.2;
-    //! @brief Minimum IoU between two nodes of different classes
-    double min_cross_iou = 0.5;
+struct GenericUpdateFunctor : public UpdateFunctor {
+  struct Config : VerbosityConfig {
+    //! Layer to update
+    std::string layer;
+    //! Settings for deformation of the places from the deformation graph
+    DeformationInterpolator::Config deformation_interpolator;
+    //! Enable merging for this update functor
+    bool enable_merging = true;
+    //! Validator of association between two nodes
+    config::VirtualConfig<NodeMatcher> matcher{DistanceNodeMatcher::Config{}};
+    //! Association strategy for finding matches to active nodes
+    MergeProposer::Config merge_proposer = {
+        config::VirtualConfig<AssociationStrategy>{association::NearestNode::Config{}}};
   } const config;
 
-  explicit IoUNodeMatcher(const Config& config);
-  bool match(const Attrs& new_attrs, const Attrs& prev_attrs) const override;
+  explicit GenericUpdateFunctor(const Config& config);
+  Hooks hooks() const override;
+  void call(const DynamicSceneGraph& unmerged,
+            SharedDsgInfo& dsg,
+            const UpdateInfo::ConstPtr& info) const override;
+
+  MergeList findMerges(const DynamicSceneGraph& graph,
+                       const UpdateInfo::ConstPtr& info) const;
+
+  std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
+                                     const SceneGraphNode& node) const;
+
+  mutable ActiveWindowTracker active_tracker;
+  const std::unique_ptr<NodeMatcher> node_matcher;
+  const MergeProposer merge_proposer;
+  const DeformationInterpolator deformation_interpolator;
 };
 
-void declare_config(IoUNodeMatcher::Config& config);
-
-struct DistanceNodeMatcher : public NodeMatcher {
-  struct Config {
-    //! Max distance between node centroids for a merge to be considered
-    double pos_threshold_m = 0.4;
-  } const config;
-
-  explicit DistanceNodeMatcher(const Config& config);
-  bool match(const Attrs& new_attrs, const Attrs& prev_attrs) const override;
-};
-
-void declare_config(DistanceNodeMatcher::Config& config);
-
-struct PlaceNodeMatcher : public NodeMatcher {
-  struct Config {
-    //! Max distance between node centroids for a merge to be considered
-    double pos_threshold_m = 0.4;
-    //! Max deviation between place radii for a merge to be considered
-    double distance_tolerance_m = 0.4;
-  } const config;
-
-  explicit PlaceNodeMatcher(const Config& config);
-  bool match(const Attrs& new_attrs, const Attrs& prev_attrs) const override;
-};
-
-void declare_config(PlaceNodeMatcher::Config& config);
+void declare_config(GenericUpdateFunctor::Config& config);
 
 }  // namespace hydra

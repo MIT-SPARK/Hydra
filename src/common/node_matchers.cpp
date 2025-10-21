@@ -51,20 +51,25 @@ static const auto iou_registration =
     config::RegistrationWithConfig<NodeMatcher, IoUNodeMatcher, IoUNodeMatcher::Config>(
         "IoUNodeMatcher");
 
+static const auto place_registration =
+    config::RegistrationWithConfig<NodeMatcher,
+                                   PlaceNodeMatcher,
+                                   PlaceNodeMatcher::Config>("PlaceNodeMatcher");
+
 }  // namespace
 
 using namespace spark_dsg;
 
-bool CentroidBBoxMatcher::match(const Attrs& new_attrs, const Attrs& prev_attrs) const {
-  const auto new_derived = dynamic_cast<const SemanticNodeAttributes*>(&new_attrs);
-  const auto prev_derived = dynamic_cast<const SemanticNodeAttributes*>(&prev_attrs);
-  if (!new_derived || !prev_derived) {
+bool CentroidBBoxMatcher::match(const Attrs& lhs_attrs, const Attrs& rhs_attrs) const {
+  const auto lhs_derived = dynamic_cast<const SemanticNodeAttributes*>(&lhs_attrs);
+  const auto rhs_derived = dynamic_cast<const SemanticNodeAttributes*>(&rhs_attrs);
+  if (!lhs_derived || !rhs_derived) {
     LOG(WARNING) << "Unable to cast both attributes to SemanticNodeAttributes";
     return false;
   }
 
-  return prev_derived->bounding_box.contains(new_derived->position) ||
-         new_derived->bounding_box.contains(prev_derived->position);
+  return rhs_derived->bounding_box.contains(lhs_derived->position) ||
+         lhs_derived->bounding_box.contains(rhs_derived->position);
 }
 
 void declare_config(CentroidBBoxMatcher::Config&) {
@@ -75,17 +80,17 @@ void declare_config(CentroidBBoxMatcher::Config&) {
 IoUNodeMatcher::IoUNodeMatcher(const Config& config)
     : config(config::checkValid(config)) {}
 
-bool IoUNodeMatcher::match(const Attrs& new_attrs, const Attrs& prev_attrs) const {
-  const auto new_derived = dynamic_cast<const SemanticNodeAttributes*>(&new_attrs);
-  const auto prev_derived = dynamic_cast<const SemanticNodeAttributes*>(&prev_attrs);
-  if (!new_derived || !prev_derived) {
+bool IoUNodeMatcher::match(const Attrs& lhs_attrs, const Attrs& rhs_attrs) const {
+  const auto lhs_derived = dynamic_cast<const SemanticNodeAttributes*>(&lhs_attrs);
+  const auto rhs_derived = dynamic_cast<const SemanticNodeAttributes*>(&rhs_attrs);
+  if (!lhs_derived || !rhs_derived) {
     LOG(WARNING) << "Unable to cast both attributes to SemanticNodeAttributes";
     return false;
   }
 
   // TODO(nathan) label vs. feature, logging
-  const auto iou = new_derived->bounding_box.computeIoU(prev_derived->bounding_box);
-  const auto threshold = new_derived->semantic_label == prev_derived->semantic_label
+  const auto iou = lhs_derived->bounding_box.computeIoU(rhs_derived->bounding_box);
+  const auto threshold = lhs_derived->semantic_label == rhs_derived->semantic_label
                              ? config.min_same_iou
                              : config.min_cross_iou;
   return iou >= threshold;
@@ -98,6 +103,53 @@ void declare_config(IoUNodeMatcher::Config& config) {
   field(config.min_same_iou, "min_same_iou");
   check(config.min_cross_iou, GT, 0.0, "min_cross_iou");
   check(config.min_same_iou, GT, 0.0, "min_same_iou");
+}
+
+DistanceNodeMatcher::DistanceNodeMatcher(const Config& config)
+    : config(config::checkValid(config)) {}
+
+bool DistanceNodeMatcher::match(const Attrs& lhs_attrs, const Attrs& rhs_attrs) const {
+  const auto distance = (lhs_attrs.position - rhs_attrs.position).norm();
+  return distance <= config.pos_threshold_m;
+}
+
+void declare_config(DistanceNodeMatcher::Config& config) {
+  using namespace config;
+  name("DistanceNodeMatcher::Config");
+  field(config.pos_threshold_m, "pos_threshold_m");
+  check(config.pos_threshold_m, GT, 0.0, "pos_threshold_m");
+}
+
+PlaceNodeMatcher::PlaceNodeMatcher(const Config& config)
+    : config(config::checkValid(config)) {}
+
+bool PlaceNodeMatcher::match(const Attrs& lhs_attrs, const Attrs& rhs_attrs) const {
+  const auto lhs_derived = dynamic_cast<const PlaceNodeAttributes*>(&lhs_attrs);
+  const auto rhs_derived = dynamic_cast<const PlaceNodeAttributes*>(&rhs_attrs);
+  if (!lhs_derived || !rhs_derived) {
+    LOG(WARNING) << "Unable to cast both attributes to PlaceNodeAttributes";
+    return false;
+  }
+  if (!lhs_derived->real_place || !rhs_derived->real_place) {
+    return false;
+  }
+
+  const auto distance = (lhs_derived->position - rhs_derived->position).norm();
+  if (distance > config.pos_threshold_m) {
+    return false;
+  }
+
+  const auto radii_deviation = std::abs(lhs_derived->distance - rhs_derived->distance);
+  return radii_deviation <= config.distance_tolerance_m;
+}
+
+void declare_config(PlaceNodeMatcher::Config& config) {
+  using namespace config;
+  name("PlaceNodeMatcher::Config");
+  field(config.pos_threshold_m, "pos_threshold_m");
+  field(config.distance_tolerance_m, "distance_tolerance_m");
+  check(config.pos_threshold_m, GT, 0.0, "pos_threshold_m");
+  check(config.distance_tolerance_m, GT, 0.0, "distance_tolerance_m");
 }
 
 }  // namespace hydra
