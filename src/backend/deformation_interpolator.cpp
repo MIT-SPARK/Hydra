@@ -141,11 +141,15 @@ void DeformationInterpolator::interpolateNodePositions(
   const auto& dgraph = *info->deformation_graph;
   for (auto& [prefix, attributes] : nodes) {
     attributes.sort();
-    dgraph.deformAllPoints(attributes,
-                           attributes,
-                           prefix,
-                           config.num_control_points,
-                           config.control_point_tolerance_s);
+    dgraph.customDeformation(
+        [&](const Eigen::Isometry3d& transform, size_t index) {
+          auto& attrs = *attributes.attributes[index];
+          attrs.position = (transform * attrs.position).eval();
+        },
+        attributes,
+        prefix,
+        config.num_control_points,
+        config.control_point_tolerance_s);
   }
 
   // Copy the newly interpolated positions to the merged DSG.
