@@ -43,6 +43,17 @@
 #include <spark_dsg/node_symbol.h>
 
 namespace hydra {
+namespace {
+
+std::string printTransform(const Eigen::Isometry3d& tf) {
+  Eigen::IOFormat fmt(4, Eigen::DontAlignCols, ", ", "; ", "", "", "[", "]");
+  std::stringstream ss;
+  ss << "q: " << Eigen::Quaterniond(tf.rotation()).coeffs().format(fmt)
+     << ", t: " << tf.translation().format(fmt);
+  return ss.str();
+}
+
+}  // namespace
 
 using spark_dsg::NodeSymbol;
 
@@ -51,122 +62,127 @@ void declare_config(DeformationInterpolator::Config& config) {
   name("DeformationInterpolator::Config");
   field(config.num_control_points, "num_control_points");
   field(config.control_point_tolerance_s, "control_point_tolerance_s", "s");
-  check(config.num_control_points, GT, 0, "num_control_points");
+  check(config.num_control_points, GE, 0, "num_control_points");
   check(config.control_point_tolerance_s, GE, 0.0, "control_point_tolerance_s");
 }
 
-struct AttributeMap {
-  std::vector<NodeAttributes*> attributes;
+NodeCache::Entry* NodeCache::add(NodeId node_id, const NodeAttributes& attrs) {
+  auto iter = nodes.find(node_id);
+  if (iter == nodes.end()) {
+    return &nodes
+                .emplace(node_id,
+                         Entry{node_id,
+                               attrs.last_update_time_ns,
+                               attrs.position.cast<float>()})
+                .first->second;
+  }
 
-  void push_back(NodeAttributes* attrs) { attributes.push_back(attrs); }
+  if (attrs.is_active) {
+    iter->second.init_pos = attrs.position.cast<float>();
+    iter->second.timestamp = attrs.last_update_time_ns;
+  }
+
+  return &iter->second;
+}
+
+struct EntryList {
+  std::vector<NodeCache::Entry*> entries;
 
   void sort() {
-    std::sort(
-        attributes.begin(), attributes.end(), [](const auto& lhs, const auto& rhs) {
-          return lhs->last_update_time_ns < rhs->last_update_time_ns;
-        });
+    std::sort(entries.begin(), entries.end(), [this](const auto& lhs, const auto& rhs) {
+      return lhs->timestamp < rhs->timestamp;
+    });
   }
 };
 
-size_t pgmoNumVertices(const AttributeMap& map) { return map.attributes.size(); }
+size_t pgmoNumVertices(const EntryList& entries) { return entries.entries.size(); }
 
-kimera_pgmo::traits::Pos pgmoGetVertex(const AttributeMap& map,
+kimera_pgmo::traits::Pos pgmoGetVertex(const EntryList& entries,
                                        size_t i,
                                        kimera_pgmo::traits::VertexTraits* traits) {
-  const auto& attrs = map.attributes[i];
+  const auto& entry = entries.entries[i];
   if (traits) {
-    traits->stamp = attrs->last_update_time_ns;
+    traits->stamp = entry->timestamp;
   }
 
-  return attrs->position.cast<float>();
+  return entry->init_pos;
 }
 
-uint64_t pgmoGetVertexStamp(const AttributeMap& map, size_t i) {
-  return map.attributes[i]->last_update_time_ns;
-}
-
-void pgmoSetVertex(AttributeMap& map,
-                   size_t i,
-                   const kimera_pgmo::traits::Pos& pos,
-                   const kimera_pgmo::traits::VertexTraits&) {
-  map.attributes[i]->position = pos.cast<double>();
+uint64_t pgmoGetVertexStamp(const EntryList& entries, size_t i) {
+  return entries.entries[i]->timestamp;
 }
 
 DeformationInterpolator::DeformationInterpolator(const Config& config)
     : config(config::checkValid(config)) {}
 
-void DeformationInterpolator::interpolateNodePositions(
-    const DynamicSceneGraph& unmerged,
-    DynamicSceneGraph& dsg,
-    const UpdateInfo::ConstPtr& info,
-    const LayerView& view) const {
+void DeformationInterpolator::interpolate(const DynamicSceneGraph& unmerged,
+                                          DynamicSceneGraph& dsg,
+                                          const UpdateInfo::ConstPtr& info,
+                                          const LayerView& view) const {
   if (!info->deformation_graph) {
     return;
   }
 
-  const auto this_robot = GlobalInfo::instance().getRobotPrefix().id;
+  auto iter = cache_.nodes.begin();
+  while (iter != cache_.nodes.end()) {
+    if (!unmerged.hasNode(iter->first)) {
+      iter = cache_.nodes.erase(iter);
+    } else {
+      ++iter;
+    }
+  }
 
-  std::map<char, AttributeMap> nodes;
+  const auto this_robot = GlobalInfo::instance().getRobotPrefix().id;
+  std::map<size_t, EntryList> robot_entries;
   for (const auto& node : view) {
     size_t robot_id = this_robot;
     if (info->node_to_robot_id) {
       auto iter = info->node_to_robot_id->find(node.id);
       if (iter == info->node_to_robot_id->end()) {
-        LOG(WARNING) << "Node " << NodeSymbol(node.id) << " does not belong to robot";
+        LOG(WARNING) << "Node " << NodeSymbol(node.id) << " does not belong to a robot";
       } else {
         robot_id = iter->second;
       }
     }
 
-    const auto prefix = kimera_pgmo::GetVertexPrefix(robot_id);
-    auto robot_attrs = nodes.find(prefix);
-    if (robot_attrs == nodes.end()) {
-      robot_attrs = nodes.emplace(prefix, AttributeMap{}).first;
+    auto entry = cache_.add(node.id, node.attributes());
+    auto entries = robot_entries.find(robot_id);
+    if (entries == robot_entries.end()) {
+      entries = robot_entries.emplace(robot_id, EntryList{}).first;
     }
 
-    auto& attrs = node.attributes();
-    auto cache_iter = cached_pos_.find(node.id);
-    if (cache_iter == cached_pos_.end()) {
-      cache_iter = cached_pos_.emplace(node.id, attrs.position).first;
-    } else if (attrs.is_active) {
-      // update cache if node is still active
-      cache_iter->second = attrs.position;
-    }
-
-    // set the position of the node to the original position before deformation
-    attrs.position = cache_iter->second;
-    robot_attrs->second.push_back(&attrs);
+    entries->second.entries.push_back(entry);
   }
 
   const auto& dgraph = *info->deformation_graph;
-  for (auto& [prefix, attributes] : nodes) {
-    attributes.sort();
-    dgraph.customDeformation(
-        [&](const Eigen::Isometry3d& transform, size_t index) {
-          auto& attrs = *attributes.attributes[index];
-          attrs.position = (transform * attrs.position).eval();
-        },
-        attributes,
-        prefix,
-        config.num_control_points,
-        config.control_point_tolerance_s);
-  }
+  for (auto& [robot_id, entries] : robot_entries) {
+    const auto prefix = kimera_pgmo::GetVertexPrefix(robot_id);
+    entries.sort();
 
-  // Copy the newly interpolated positions to the merged DSG.
-  for (const auto& node : view) {
-    auto node_ptr = dsg.findNode(node.id);
-    if (node_ptr) {
-      node_ptr->attributes().position = node.attributes().position;
-    }
-  }
+    const auto deform_func = [&](const Eigen::Isometry3d& transform, size_t index) {
+      auto entry = entries.entries[index];
+      LOG(INFO) << "node " << spark_dsg::NodeSymbol(entry->id).str()
+                << " -> new: " << printTransform(transform)
+                << ", last: " << printTransform(entry->last_transform);
 
-  // Update the cached positions.
-  for (auto it = cached_pos_.begin(); it != cached_pos_.end();) {
-    if (!unmerged.hasNode(it->first)) {
-      it = cached_pos_.erase(it);
-    } else {
-      ++it;
-    }
+      auto& attrs = dsg.getNode(entry->id).attributes();
+      attrs.transform(entry->last_transform.inverse());
+      attrs.transform(transform);
+
+      auto node_ptr = dsg.findNode(entry->id);
+      if (node_ptr) {
+        node_ptr->attributes().transform(entry->last_transform.inverse());
+        node_ptr->attributes().transform(transform);
+      }
+
+      entry->last_transform = transform;
+    };
+
+    dgraph.customDeformation(deform_func,
+                             entries,
+                             prefix,
+                             config.num_control_points,
+                             config.control_point_tolerance_s);
   }
 }
 

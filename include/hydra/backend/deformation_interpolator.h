@@ -40,6 +40,19 @@
 
 namespace hydra {
 
+struct NodeCache {
+  struct Entry {
+    NodeId id;
+    uint64_t timestamp;
+    Eigen::Vector3f init_pos;
+    Eigen::Isometry3d last_transform = Eigen::Isometry3d::Identity();
+  };
+
+  Entry* add(NodeId node, const NodeAttributes& attrs);
+
+  std::map<NodeId, Entry> nodes;
+};
+
 /**
  * @brief Tool to apply the deformation of the mesh control points to other nodes in the
  * DSG.
@@ -64,13 +77,29 @@ class DeformationInterpolator {
    * @param info Update information containing deformation graph.
    * @param view View on the unmerged scene graph selecting all nodes to update.
    */
+  void interpolate(const DynamicSceneGraph& unmerged,
+                   DynamicSceneGraph& dsg,
+                   const UpdateInfo::ConstPtr& info,
+                   const LayerView& view) const;
+
+  /**
+   * @brief Interpolate the node positions based on the deformation graph, using the
+   * temporally closest control points as reference.
+   *
+   * @param unmerged Unmerged scene graph to keep up to date.
+   * @param dsg Private DSG to update.
+   * @param info Update information containing deformation graph.
+   * @param view View on the unmerged scene graph selecting all nodes to update.
+   */
   void interpolateNodePositions(const DynamicSceneGraph& unmerged,
                                 DynamicSceneGraph& dsg,
                                 const UpdateInfo::ConstPtr& info,
-                                const LayerView& view) const;
+                                const LayerView& view) const {
+    interpolate(unmerged, dsg, info, view);
+  }
 
  private:
-  mutable std::unordered_map<NodeId, Eigen::Vector3d> cached_pos_;
+  mutable NodeCache cache_;
 };
 
 void declare_config(DeformationInterpolator::Config& config);

@@ -51,6 +51,11 @@ static const auto iou_registration =
     config::RegistrationWithConfig<NodeMatcher, IoUNodeMatcher, IoUNodeMatcher::Config>(
         "IoUNodeMatcher");
 
+static const auto distance_registration =
+    config::RegistrationWithConfig<NodeMatcher,
+                                   DistanceNodeMatcher,
+                                   DistanceNodeMatcher::Config>("DistanceNodeMatcher");
+
 static const auto place_registration =
     config::RegistrationWithConfig<NodeMatcher,
                                    PlaceNodeMatcher,
