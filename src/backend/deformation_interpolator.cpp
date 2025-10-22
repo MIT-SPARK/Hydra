@@ -67,6 +67,18 @@ void declare_config(DeformationInterpolator::Config& config) {
 }
 
 NodeCache::Entry* NodeCache::add(NodeId node_id, const NodeAttributes& attrs) {
+  uint64_t timestamp_ns = attrs.last_update_time_ns;
+  if (timestamp_ns == 0u) {
+    const auto derived = dynamic_cast<const KhronosObjectAttributes*>(&attrs);
+    if (!derived || derived->last_observed_ns.empty()) {
+      LOG(ERROR) << "Unable to find valid timestamp for node "
+                 << NodeSymbol(node_id).str();
+      return nullptr;
+    }
+
+    timestamp_ns = derived->last_observed_ns.back();
+  }
+
   auto iter = nodes.find(node_id);
   if (iter == nodes.end()) {
     return &nodes
@@ -146,6 +158,10 @@ void DeformationInterpolator::interpolate(const DynamicSceneGraph& unmerged,
     }
 
     auto entry = cache_.add(node.id, node.attributes());
+    if (!entry) {
+      continue;
+    }
+
     auto entries = robot_entries.find(robot_id);
     if (entries == robot_entries.end()) {
       entries = robot_entries.emplace(robot_id, EntryList{}).first;
@@ -169,11 +185,11 @@ void DeformationInterpolator::interpolate(const DynamicSceneGraph& unmerged,
       attrs.transform(entry->last_transform.inverse());
       attrs.transform(transform);
 
-      auto node_ptr = dsg.findNode(entry->id);
-      if (node_ptr) {
-        node_ptr->attributes().transform(entry->last_transform.inverse());
-        node_ptr->attributes().transform(transform);
-      }
+      //auto node_ptr = dsg.findNode(entry->id);
+      //if (node_ptr) {
+        //node_ptr->attributes().transform(entry->last_transform.inverse());
+        //node_ptr->attributes().transform(transform);
+      //}
 
       entry->last_transform = transform;
     };
