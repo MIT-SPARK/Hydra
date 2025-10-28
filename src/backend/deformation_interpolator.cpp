@@ -177,18 +177,18 @@ void DeformationInterpolator::interpolate(const DynamicSceneGraph& unmerged,
 
     const auto deform_func = [&](const Eigen::Isometry3d& transform, size_t index) {
       auto entry = entries.entries[index];
-      LOG(INFO) << "node " << spark_dsg::NodeSymbol(entry->id).str()
-                << " -> new: " << printTransform(transform)
-                << ", last: " << printTransform(entry->last_transform);
+      VLOG(5) << "node " << spark_dsg::NodeSymbol(entry->id).str()
+              << " -> new: " << printTransform(transform)
+              << ", last: " << printTransform(entry->last_transform);
 
       auto& attrs = dsg.getNode(entry->id).attributes();
       attrs.transform(entry->last_transform.inverse());
       attrs.transform(transform);
 
-      //auto node_ptr = dsg.findNode(entry->id);
-      //if (node_ptr) {
-        //node_ptr->attributes().transform(entry->last_transform.inverse());
-        //node_ptr->attributes().transform(transform);
+      // auto node_ptr = dsg.findNode(entry->id);
+      // if (node_ptr) {
+      // node_ptr->attributes().transform(entry->last_transform.inverse());
+      // node_ptr->attributes().transform(transform);
       //}
 
       entry->last_transform = transform;
