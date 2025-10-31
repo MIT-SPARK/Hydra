@@ -73,8 +73,7 @@ TEST(MarchingCubes, EdgeInterpolation) {
     edge_coords[i].pos.setZero();
   }
 
-  MarchingCubes::EdgeStatus edge_status;
-  MarchingCubes::interpolateEdges(sdf_points, edge_coords, edge_status);
+  MarchingCubes::interpolateEdges(sdf_points, edge_coords);
 
   std::set<int> valid_edges{0, 3, 8};
   for (size_t i = 0; i < edge_coords.size(); ++i) {
@@ -82,15 +81,9 @@ TEST(MarchingCubes, EdgeInterpolation) {
       continue;
     }
 
-    EXPECT_EQ(0u, edge_status[i]);
     EXPECT_EQ(0.0f, edge_coords[i].pos.norm())
         << "i: " << edge_coords[i].pos.transpose();
   }
-
-  // see kEdgeIndexPairs for edge index to voxel index mapping
-  EXPECT_EQ(3u, edge_status[0]);  // both voxels are valid
-  EXPECT_EQ(2u, edge_status[3]);  // the second voxel is valid
-  EXPECT_EQ(1u, edge_status[8]);  // the first voxel is valid
 
   Eigen::Vector3f expected_edge0;
   expected_edge0 << 0.0f, 0.0f, 0.0f;
@@ -124,21 +117,10 @@ TEST(MarchingCubes, CubeMeshingNearestVertexIndexCorrect) {
 
   MarchingCubes::SdfPoints sdf_points;
   fillPointsFromMatrices(vertex_coordinates, sdf_values, sdf_points);
-  OccupancyVoxel actual_voxels[8];
-  for (size_t i = 0; i < 8; ++i) {
-    sdf_points[i].vertex_voxel = &(actual_voxels[i]);
-  }
 
   Mesh mesh;
-  BlockIndex block = BlockIndex::Zero();
-  MarchingCubes::meshCube(block, sdf_points, mesh);
+  MarchingCubes::meshCube(sdf_points, mesh);
   EXPECT_EQ(3u, mesh.numVertices());
-
-  EXPECT_TRUE(actual_voxels[0].on_surface);
-  EXPECT_TRUE(actual_voxels[1].on_surface);
-  // the last vertex overwrites the index for 0, and is the only valid vertex for 1
-  EXPECT_EQ(2u, actual_voxels[0].block_vertex_index);
-  EXPECT_EQ(2u, actual_voxels[1].block_vertex_index);
 }
 
 }  // namespace hydra

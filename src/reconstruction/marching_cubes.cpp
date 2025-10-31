@@ -54,7 +54,6 @@ std::ostream& operator<<(std::ostream& out, const SdfPoint& point) {
       << static_cast<int>(point.color.g) << ", " << static_cast<int>(point.color.b)
       << "]";
   out << ", label=" << (point.label ? std::to_string(point.label.value()) : "n/a");
-  out << ", vertex=" << (point.vertex_voxel ? "y" : "n");
   out << ">";
   return out;
 }
@@ -80,12 +79,8 @@ Color interpColor(const SdfPoint& v0, const SdfPoint& v1, float t) {
 
 void MarchingCubes::interpolateEdges(const SdfPoints& points,
                                      EdgePoints& edge_points,
-                                     EdgeStatus& edge_status,
                                      float min_sdf_difference) {
   for (size_t i = 0; i < 12; ++i) {
-    // clear edge status flags
-    edge_status[i] = 0;
-
     const auto* pairs = MarchingCubes::kEdgeIndexPairs[i];
     const auto edge0 = pairs[0];
     const auto edge1 = pairs[1];
@@ -107,17 +102,14 @@ void MarchingCubes::interpolateEdges(const SdfPoints& points,
     // corners intersecting at some point through the edge between the two corners.
     const float sdf_diff = sdf0 - sdf1;
     if (std::abs(sdf_diff) <= min_sdf_difference) {
-      edge_point.pos = 0.5f * (point0.pos + point1.pos);
       // force interpolation to occur exactly in the middle
+      edge_point.pos = 0.5f * (point0.pos + point1.pos);
       edge_point.color = interpColor(point0, point1, 0.5);
       edge_point.label = interpLabel(point0, point1, 0.5);
 
       VLOG(15) << "- t=n/a"
                << ", v0=" << point0.pos.transpose() << ", v1=" << point1.pos.transpose()
                << ", coord: " << edge_point.pos.transpose();
-
-      edge_status[i] |= 0x01;
-      edge_status[i] |= 0x02;
       continue;
     }
 
@@ -130,14 +122,6 @@ void MarchingCubes::interpolateEdges(const SdfPoints& points,
     VLOG(15) << "- t=" << t << ", v0=" << point0.pos.transpose()
              << ", v1=" << point1.pos.transpose()
              << ", coord: " << edge_point.pos.transpose();
-
-    if (std::abs(t) <= 0.5) {
-      edge_status[i] |= 0x01;
-    }
-
-    if (std::abs(t) >= 0.5) {
-      edge_status[i] |= 0x02;
-    }
   }
 }
 
@@ -156,34 +140,12 @@ inline int calculateVertexConfig(const MarchingCubes::SdfPoints& points) {
   return to_return;
 }
 
-inline void updateVoxels(const BlockIndex& block,
-                         int edge_coord,
-                         size_t new_vertex_index,
-                         const MarchingCubes::EdgeStatus& status,
-                         const MarchingCubes::SdfPoints& points) {
-  // note that because of the pointer indirection, const points work fine for this
-  // this is somewhat intentional; nothing specific to struct should ever change (just
-  // the underlying vertex voxel info)
-  const int* pairs = MarchingCubes::kEdgeIndexPairs[edge_coord];
-  const uint8_t curr_status = status[edge_coord];
-
-  if (VLOG_IS_ON(15) && (curr_status & 0x01 || curr_status & 0x02)) {
-    VLOG(15) << "vertex added: " << new_vertex_index << " @ " << showIndex(block);
-  }
-
-  auto* first_voxel = points[pairs[0]].vertex_voxel;
-  if (first_voxel && (curr_status & 0x01)) {
-    first_voxel->on_surface = true;
-    first_voxel->block_vertex_index = new_vertex_index;
-    first_voxel->mesh_block = block;
-  }
-
-  auto* second_voxel = points[pairs[1]].vertex_voxel;
-  if (second_voxel && (curr_status & 0x02)) {
-    second_voxel->on_surface = true;
-    second_voxel->block_vertex_index = new_vertex_index;
-    second_voxel->mesh_block = block;
-  }
+Eigen::Vector3f computeNormal(const spark_dsg::Mesh::Positions& vertices,
+                              const spark_dsg::Mesh::Face& face) {
+  const auto& p0 = vertices[face[0]];
+  const auto& p1 = vertices[face[1]];
+  const auto& p2 = vertices[face[2]];
+  return (p1 - p0).cross((p2 - p0)).normalized();
 }
 
 inline void addStamps(Mesh& mesh,
@@ -204,8 +166,7 @@ inline void addStamps(Mesh& mesh,
   }
 }
 
-void MarchingCubes::meshCube(const BlockIndex& block,
-                             const SdfPoints& points,
+void MarchingCubes::meshCube(const SdfPoints& points,
                              Mesh& mesh,
                              bool compute_normals) {
   if (VLOG_IS_ON(15)) {
@@ -224,8 +185,7 @@ void MarchingCubes::meshCube(const BlockIndex& block,
 
   // TODO(nathan) augment edge points
   EdgePoints edge_points;
-  EdgeStatus status;
-  interpolateEdges(points, edge_points, status);
+  interpolateEdges(points, edge_points);
 
   const int* table_row = MarchingCubes::kTriangleTable[index];
 
@@ -241,7 +201,6 @@ void MarchingCubes::meshCube(const BlockIndex& block,
     mesh.colors.emplace_back(v1.color);
     mesh.colors.emplace_back(v2.color);
     mesh.colors.emplace_back(v3.color);
-    mesh.faces.push_back({next_index, next_index + 1, next_index + 2});
     if (mesh.has_labels) {
       mesh.labels.push_back(v1.label.value_or(std::numeric_limits<uint32_t>::max()));
       mesh.labels.push_back(v2.label.value_or(std::numeric_limits<uint32_t>::max()));
@@ -255,24 +214,11 @@ void MarchingCubes::meshCube(const BlockIndex& block,
       addStamps(mesh, table_row[table_col], points);
     }
 
+    mesh.faces.push_back({next_index, next_index + 1, next_index + 2});
     if (compute_normals) {
       // NOTE(lschmid): Spark DSG meshes currently don't have normals, disabled for now.
-      /*
-      const auto& p0 = mesh.vertices[next_index];
-      const auto& p1 = mesh.vertices[next_index + 1];
-      const auto& p2 = mesh.vertices[next_index + 2];
-      const auto n = (p1 - p0).cross((p2 - p0)).normalized();
-      mesh.normals.push_back(n);
-      mesh.normals.push_back(n);
-      mesh.normals.push_back(n);
-      */
+      // computeNormal(mesh.points, mesh.faces.back());
     }
-
-    // mark voxels with a nearest vertex. overwriting is okay (as remapping downstream
-    // tracks which vertices are the same)
-    updateVoxels(block, table_row[table_col + 2], next_index, status, points);
-    updateVoxels(block, table_row[table_col + 1], next_index + 1, status, points);
-    updateVoxels(block, table_row[table_col], next_index + 2, status, points);
 
     next_index += 3;
     table_col += 3;
