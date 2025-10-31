@@ -54,8 +54,7 @@ class MeshIntegrator {
                             bool only_mesh_updated_blocks,
                             bool clear_updated_flag) const;
 
-  void allocateBlocks(const BlockIndices& blocks,
-                      VolumetricMap& map) const;
+  void allocateBlocks(const BlockIndices& blocks, VolumetricMap& map) const;
 
   void showUpdateInfo(const VolumetricMap& map,
                       const BlockIndices& blocks,
@@ -65,11 +64,9 @@ class MeshIntegrator {
                      bool interior_pass,
                      VolumetricMap& map) const;
 
-  void processInterior(VolumetricMap* map,
-                       BlockIndexGetter* index_getter) const;
+  void processInterior(VolumetricMap* map, BlockIndexGetter* index_getter) const;
 
-  void processExterior(VolumetricMap* map,
-                       BlockIndexGetter* index_getter) const;
+  void processExterior(VolumetricMap* map, BlockIndexGetter* index_getter) const;
 
   virtual void meshBlockInterior(const BlockIndex& block_index,
                                  const VoxelIndex& voxel_index,
