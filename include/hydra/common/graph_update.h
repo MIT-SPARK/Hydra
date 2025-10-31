@@ -33,15 +33,12 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <spark_dsg/dynamic_scene_graph.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
 #include <list>
 #include <map>
-
-namespace spark_dsg {
-class DynamicSceneGraph;
-}
 
 namespace hydra {
 
