@@ -181,15 +181,15 @@ void DeformationInterpolator::interpolate(const DynamicSceneGraph& unmerged,
               << " -> new: " << printTransform(transform)
               << ", last: " << printTransform(entry->last_transform);
 
-      auto& attrs = dsg.getNode(entry->id).attributes();
+      auto& attrs = unmerged.getNode(entry->id).attributes();
       attrs.transform(entry->last_transform.inverse());
       attrs.transform(transform);
 
-      // auto node_ptr = dsg.findNode(entry->id);
-      // if (node_ptr) {
-      // node_ptr->attributes().transform(entry->last_transform.inverse());
-      // node_ptr->attributes().transform(transform);
-      //}
+      auto node_ptr = dsg.findNode(entry->id);
+      if (node_ptr) {
+        node_ptr->attributes().transform(entry->last_transform.inverse());
+        node_ptr->attributes().transform(transform);
+      }
 
       entry->last_transform = transform;
     };

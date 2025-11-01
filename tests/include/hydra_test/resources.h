@@ -33,16 +33,16 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <string>
+#include <filesystem>
 
 namespace hydra {
 namespace test {
 
-std::string get_resource_path();
+std::filesystem::path get_resource_path();
 
-std::string get_resource_path(const std::string& name);
+std::filesystem::path get_resource_path(const std::string& name);
 
-std::string get_default_semantic_map();
+std::filesystem::path get_default_semantic_map();
 
 }  // namespace test
 }  // namespace hydra

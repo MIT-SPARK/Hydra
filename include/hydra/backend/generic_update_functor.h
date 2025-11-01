@@ -50,10 +50,10 @@ struct GenericUpdateFunctor : public UpdateFunctor {
   struct Config : VerbosityConfig {
     //! Layer to update
     std::string layer;
-    //! Settings for deformation of the places from the deformation graph
-    DeformationInterpolator::Config deformation_interpolator;
     //! Enable merging for this update functor
     bool enable_merging = true;
+    //! Settings for deformation of the places from the deformation graph
+    DeformationInterpolator::Config deformation_interpolator = {};
     //! Validator of association between two nodes
     config::VirtualConfig<NodeMatcher> matcher{DistanceNodeMatcher::Config{}};
     //! Association strategy for finding matches to active nodes
