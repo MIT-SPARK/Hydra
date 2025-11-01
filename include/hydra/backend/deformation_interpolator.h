@@ -45,7 +45,6 @@ struct NodeCache {
     NodeId id;
     uint64_t timestamp;
     Eigen::Vector3f init_pos;
-    Eigen::Isometry3d last_transform = Eigen::Isometry3d::Identity();
   };
 
   Entry* add(NodeId node, const NodeAttributes& attrs);

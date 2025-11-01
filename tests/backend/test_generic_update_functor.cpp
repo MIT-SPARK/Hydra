@@ -102,6 +102,7 @@ TEST(GenericUpdateFunctor, shouldUpdate) {
 
   kimera_pgmo::DeformationGraph dgraph;
   dgraph.load(test::get_resource_path() / "graph.dgrf");
+
   UpdateInfo::ConstPtr info(new UpdateInfo{0, nullptr, nullptr, false, {}, &dgraph});
   auto config = defaultConfig();
   config.enable_merging = false;
@@ -110,13 +111,14 @@ TEST(GenericUpdateFunctor, shouldUpdate) {
   GenericUpdateFunctor functor(config);
   callWithUnmerged(functor, *dsg, info, false);
 
-  // No deformation, so nothing should change
-  Eigen::IOFormat fmt(3, Eigen::DontAlign, ", ", "; ", "", "", "[", "]");
   const auto& result = graph.getNode(0).attributes();
   const Eigen::Vector3d expected(1.0, 2.0, 3.0);
-  EXPECT_NEAR(0.0, (expected - result.position).norm(), 1.0e-7)
-      << "result: " << result.position.format(fmt)
-      << " vs. expected: " << expected.format(fmt);
+  EXPECT_NEAR(0.0, (expected - result.position).norm(), 1.0e-7);
+
+  // second call shouldn't change position
+  graph.getNode(0).attributes().is_active = false;
+  callWithUnmerged(functor, *dsg, info, false);
+  EXPECT_NEAR(0.0, (expected - result.position).norm(), 1.0e-7);
 }
 
 }  // namespace hydra
