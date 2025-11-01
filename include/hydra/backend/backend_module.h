@@ -161,8 +161,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   bool have_new_mesh_ = false;
   uint64_t last_sequence_number_ = 0;
 
-  SharedDsgInfo::Ptr private_dsg_;
-  DynamicSceneGraph::Ptr unmerged_graph_;
+  SharedDsgInfo::Ptr optimized_dsg_;
+  DynamicSceneGraph::Ptr unoptimized_graph_;
   SharedModuleState::Ptr state_;
 
   DsgUpdater::Ptr dsg_updater_;
