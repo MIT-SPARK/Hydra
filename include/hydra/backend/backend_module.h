@@ -169,8 +169,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   kimera_pgmo::Path trajectory_;
   std::vector<size_t> timestamps_;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr original_vertices_;
-  std::shared_ptr<std::vector<uint64_t>> vertex_stamps_;
+  std::vector<uint64_t> mesh_stamps_;
+  pcl::PointCloud<pcl::PointXYZ> original_vertices_;
   size_t prev_num_archived_vertices_ = 0;
   size_t num_archived_vertices_ = 0;
 

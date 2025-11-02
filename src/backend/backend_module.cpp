@@ -114,21 +114,17 @@ BackendModule::BackendModule(const Config& config,
                              const SharedModuleState::Ptr& state)
     : KimeraPgmoInterface(config.pgmo),
       config(config::checkValid(config)),
-      private_dsg_(dsg),
+      optimized_dsg_(dsg),
       state_(state),
       external_lc_receiver_(config.external_loop_closures,
                             &PipelineQueues::instance().external_loop_closure_queue) {
   // set up graphs
-  unmerged_graph_ = private_dsg_->graph->clone();
-  private_dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>());
-  unmerged_graph_->setMesh(private_dsg_->graph->mesh());
+  unoptimized_graph_ = optimized_dsg_->graph->clone();
+  optimized_dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>());
+  unoptimized_graph_->setMesh(optimized_dsg_->graph->mesh());
 
   // set graph updater
-  dsg_updater_.reset(new DsgUpdater(config, unmerged_graph_, private_dsg_));
-
-  // original mesh
-  original_vertices_.reset(new pcl::PointCloud<pcl::PointXYZ>());
-  vertex_stamps_.reset(new std::vector<uint64_t>());
+  dsg_updater_.reset(new DsgUpdater(config, unoptimized_graph_, optimized_dsg_));
 }
 
 BackendModule::~BackendModule() { stopImpl(); }
@@ -176,8 +172,8 @@ void BackendModule::save(const DataDirectory& output) {
   output_file << "time_from_ns,time_to_ns,x,y,z,qw,qx,qy,qz,type,level" << std::endl;
   for (const auto& loop_closure : loop_closures_) {
     // pose = src.between(dest) or to_T_from
-    auto time_from = utils::getTimeNs(*private_dsg_->graph, loop_closure.dest);
-    auto time_to = utils::getTimeNs(*private_dsg_->graph, loop_closure.src);
+    auto time_from = utils::getTimeNs(*unoptimized_graph_, loop_closure.dest);
+    auto time_to = utils::getTimeNs(*unoptimized_graph_, loop_closure.src);
     if (!time_from || !time_to) {
       continue;
     }
@@ -271,7 +267,7 @@ bool BackendModule::spinOnce(bool force_update) {
   logStatus();
 
   ScopedTimer sink_timer("backend/sinks", timestamp_ns);
-  Sink::callAll(sinks_, timestamp_ns, *private_dsg_->graph, *deformation_graph_);
+  Sink::callAll(sinks_, timestamp_ns, *optimized_dsg_->graph, *deformation_graph_);
   return true;
 }
 
@@ -302,8 +298,8 @@ void BackendModule::loadState(const std::filesystem::path& mesh_path,
     LOG(ERROR) << "Failed to load mesh...";
   }
 
-  private_dsg_->graph->setMesh(mesh);
-  unmerged_graph_->setMesh(mesh);
+  optimized_dsg_->graph->setMesh(mesh);
+  unoptimized_graph_->setMesh(mesh);
   have_new_mesh_ = true;
   have_loopclosures_ = force_loopclosures;
 
@@ -364,7 +360,7 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
   }
 
   external_lc_receiver_.update(
-      *unmerged_graph_,
+      *unoptimized_graph_,
       [this](NodeId to_node, NodeId from_node, const gtsam::Pose3 to_T_from) {
         LoopClosureLog lc{to_node, from_node, to_T_from, true, 1};
         addLoopClosure(
@@ -425,45 +421,43 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
   // TODO(nathan) this is ugly, but no good way to know at backend init whether
   // we're tracking first-seen stamps or not (because that's private to the active
   // window map)
-  if (input.mesh_stamp_update && !private_dsg_->graph->mesh()->numVertices()) {
-    const_cast<bool&>(private_dsg_->graph->mesh()->has_first_seen_stamps) = true;
+  if (input.mesh_stamp_update && !optimized_dsg_->graph->mesh()->numVertices()) {
+    const_cast<bool&>(optimized_dsg_->graph->mesh()->has_first_seen_stamps) = true;
   }
 
   {
-    std::lock_guard<std::mutex> graph_lock(private_dsg_->mutex);
+    std::lock_guard<std::mutex> graph_lock(optimized_dsg_->mutex);
 
-    input.mesh_update->updateMesh(*private_dsg_->graph->mesh());
+    input.mesh_update->updateMesh(*optimized_dsg_->graph->mesh());
     if (input.mesh_stamp_update) {
-      input.mesh_stamp_update->updateMesh(*private_dsg_->graph->mesh(),
+      input.mesh_stamp_update->updateMesh(*optimized_dsg_->graph->mesh(),
                                           input.mesh_update->vertex_start);
     }
 
-    kimera_pgmo::StampedCloud<pcl::PointXYZ> cloud_out{*original_vertices_,
-                                                       *vertex_stamps_};
+    kimera_pgmo::StampedCloud<pcl::PointXYZ> cloud_out{original_vertices_,
+                                                       mesh_stamps_};
     input.mesh_update->updateVertices(cloud_out);
     // we use this to make sure that deformation only happens for vertices that are
     // still active
     num_archived_vertices_ = input.mesh_update->getTotalArchivedVertices();
-    utils::updatePlaces2d(private_dsg_, *input.mesh_update, num_archived_vertices_);
+    utils::updatePlaces2d(optimized_dsg_, *input.mesh_update, num_archived_vertices_);
   }
   have_new_mesh_ = true;
 }
 
 bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
-  std::lock_guard<std::mutex> graph_lock(private_dsg_->mutex);
+  ScopedTimer timer("backend/read_graph", timestamp_ns);
   {  // start joint critical section
-    ScopedTimer timer("backend/read_graph", timestamp_ns);
-
     const auto& shared_dsg = *state_->backend_graph;
     std::lock_guard<std::mutex> shared_graph_lock(shared_dsg.mutex);
     if (!force_update && shared_dsg.sequence_number != last_sequence_number_) {
       return false;
     }
 
-    unmerged_graph_->mergeGraph(*shared_dsg.graph);
+    unoptimized_graph_->mergeGraph(*shared_dsg.graph);
   }  // end joint critical section
 
-  backend_graph_logger_.logGraph(*private_dsg_->graph);
+  backend_graph_logger_.logGraph(*unoptimized_graph_);
   return true;
 }
 
@@ -481,7 +475,7 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
 
   have_new_mesh_ = false;
 
-  auto mesh = private_dsg_->graph->mesh();
+  auto mesh = optimized_dsg_->graph->mesh();
   if (!mesh || mesh->empty()) {
     return;
   }
@@ -497,9 +491,9 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
 
   VLOG(2) << "Deforming mesh with " << mesh->numVertices() << " vertices";
 
-  kimera_pgmo::ConstStampedCloud<pcl::PointXYZ> cloud_in{*original_vertices_,
-                                                         *vertex_stamps_};
-  deformation_graph_->deformPoints(*private_dsg_->graph->mesh(),
+  kimera_pgmo::ConstStampedCloud<pcl::PointXYZ> cloud_in{original_vertices_,
+                                                         mesh_stamps_};
+  deformation_graph_->deformPoints(*optimized_dsg_->graph->mesh(),
                                    cloud_in,
                                    GlobalInfo::instance().getRobotPrefix().vertex_key,
                                    *deformation_graph_->getValues(),
@@ -525,7 +519,7 @@ void BackendModule::updateAgentNodeMeasurements(const PoseGraph& meas) {
 void BackendModule::optimize(size_t timestamp_ns, bool force_find_merge) {
   if (config.add_places_to_deformation_graph) {
     const auto vertex_key = GlobalInfo::instance().getRobotPrefix().vertex_key;
-    addPlacesToDeformationGraph(*unmerged_graph_,
+    addPlacesToDeformationGraph(*unoptimized_graph_,
                                 timestamp_ns,
                                 *deformation_graph_,
                                 config.pgmo.place_edge_variance,
