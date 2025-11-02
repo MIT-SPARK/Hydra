@@ -15,11 +15,11 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/pgmo_configs.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/surface_place_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functions.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/mst_places_update_functor.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/root_node_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/update_agents_functor.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/update_buildings_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/update_frontiers_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/update_objects_functor.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/update_places_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_rooms_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_surface_places_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/zmq_interfaces.cpp
