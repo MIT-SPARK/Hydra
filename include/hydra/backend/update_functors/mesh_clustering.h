@@ -39,6 +39,7 @@
 #include <spatial_hash/hash.h>
 
 #include "hydra/backend/update_functions.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -104,7 +105,7 @@ void MeshLabelClustering::update(const Vertices& vertices,
 }
 
 struct UpdateMeshClustersFunctor : public UpdateFunctor {
-  struct Config {
+  struct Config : VerbosityConfig {
     //! Spatial resolution for clustering
     float resolution = 0.5f;
     //! Layer ID to update
@@ -119,9 +120,9 @@ struct UpdateMeshClustersFunctor : public UpdateFunctor {
 
   explicit UpdateMeshClustersFunctor(const Config& config);
 
-  void call(const DynamicSceneGraph& unmerged,
-            SharedDsgInfo& dsg,
-            const UpdateInfo::ConstPtr& info) const override;
+  void call(const UpdateInfo& info,
+            const DynamicSceneGraph& unoptimized,
+            DynamicSceneGraph& optimized) const override;
 
  private:
   mutable NodeSymbol next_node_id_;

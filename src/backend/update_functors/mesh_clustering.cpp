@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 
-#include "hydra/backend/mesh_clustering.h"
+#include "hydra/backend/update_functors/mesh_clustering.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
@@ -146,24 +146,24 @@ UpdateMeshClustersFunctor::UpdateMeshClustersFunctor(const Config& config)
       next_node_id_(config.prefix, 0),
       clustering_(config.resolution) {}
 
-void UpdateMeshClustersFunctor::call(const DynamicSceneGraph&,
-                                     SharedDsgInfo& dsg,
-                                     const UpdateInfo::ConstPtr& info) const {
-  auto mesh = dsg.graph->mesh();
+void UpdateMeshClustersFunctor::call(const UpdateInfo& info,
+                                     const DynamicSceneGraph&,
+                                     DynamicSceneGraph& optimized) const {
+  auto mesh = optimized.mesh();
   if (!mesh) {
     LOG(WARNING) << "No mesh to cluster!";
     return;
   }
 
-  ScopedTimer spin_timer("backend/cluster_mesh", info ? info->timestamp_ns : 0);
+  ScopedTimer spin_timer("backend/cluster_mesh", info.timestamp_ns);
 
   // set layer name
-  dsg.graph->addLayer(config.layer, config.partition, config.layer_name);
+  optimized.addLayer(config.layer, config.partition, config.layer_name);
 
   // TODO(nathan) fix this partial processing
-  const auto num_archived = info ? info->num_archived_vertices : 0;
-  const auto num_previous = info ? info->num_previous_archived_vertices : 0;
-  if (info && info->loop_closure_detected) {
+  const auto num_archived = info.num_archived_vertices;
+  const auto num_previous = info.num_previous_archived_vertices;
+  if (info.loop_closure_detected) {
     clustering_.clear();
     clustering_.update(*mesh, [num_archived](size_t i) { return i > num_archived; });
   } else {
@@ -184,7 +184,7 @@ void UpdateMeshClustersFunctor::call(const DynamicSceneGraph&,
         attrs->position = info.bbox.world_P_center.cast<double>();
         attrs->bounding_box = info.bbox;
         attrs->semantic_feature = info.counts.cast<float>();
-        dsg.graph->addOrUpdateNode(
+        optimized.addOrUpdateNode(
             config.layer, iter->second, std::move(attrs), config.partition);
       },
       true);
@@ -193,6 +193,7 @@ void UpdateMeshClustersFunctor::call(const DynamicSceneGraph&,
 void declare_config(UpdateMeshClustersFunctor::Config& config) {
   using namespace config;
   name("UpdateMeshClustersFunctor::Config");
+  base<VerbosityConfig>(config);
   field(config.resolution, "resolution");
   field(config.layer, "layer");
   field(config.layer_name, "layer_name");

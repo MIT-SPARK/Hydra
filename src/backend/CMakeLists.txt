@@ -9,11 +9,11 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/generic_update_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/merge_proposer.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/merge_tracker.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/mesh_clustering.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/mst_factors.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/pgmo_configs.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/surface_place_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functions.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/mesh_clustering.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/mst_places_update_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/root_node_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/update_agents_functor.cpp
