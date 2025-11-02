@@ -32,14 +32,13 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/backend/update_buildings_functor.h"
-
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 
+#include "hydra/backend/update_buildings_functor.h"
 #include "hydra/utils/printing.h"
 
 namespace hydra {

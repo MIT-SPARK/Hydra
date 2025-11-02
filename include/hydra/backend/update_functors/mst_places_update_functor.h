@@ -36,21 +36,19 @@
 #include <config_utilities/factory.h>
 
 #include "hydra/backend/association_strategies.h"
-#include "hydra/backend/deformation_interpolator.h"
 #include "hydra/backend/merge_tracker.h"
 #include "hydra/backend/update_functions.h"
 #include "hydra/utils/active_window_tracker.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
-struct UpdatePlacesFunctor : public UpdateFunctor {
-  struct Config {
+struct MstPlacesUpdateFunctor : public UpdateFunctor {
+  struct Config : VerbosityConfig {
     //! Max distance between node centroids for a merge to be considered
     double pos_threshold_m = 0.4;
     //! Max deviation between place radii for a merge to be considered
     double distance_tolerance_m = 0.4;
-    //! Settings for deformation of the places from the deformation graph
-    DeformationInterpolator::Config deformation_interpolator;
     //! Association strategy for finding matches to active nodes
     MergeProposer::Config merge_proposer = {
         config::VirtualConfig<AssociationStrategy>{association::NearestNode::Config{}}};
@@ -58,35 +56,20 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
     std::string layer = DsgLayers::PLACES;
   } const config;
 
-  explicit UpdatePlacesFunctor(const Config& config);
+  explicit MstPlacesUpdateFunctor(const Config& config);
   Hooks hooks() const override;
-  void call(const DynamicSceneGraph& unmerged,
-            SharedDsgInfo& dsg,
-            const UpdateInfo::ConstPtr& info) const override;
+  void call(const UpdateInfo& info,
+            const DynamicSceneGraph& unoptimized,
+            DynamicSceneGraph& optimized) const override;
 
-  size_t updateFromValues(const LayerView& view,
-                          SharedDsgInfo& dsg,
-                          const UpdateInfo::ConstPtr& info) const;
-
-  MergeList findMerges(const DynamicSceneGraph& graph,
-                       const UpdateInfo::ConstPtr& info) const;
-
+  MergeList findMerges(const DynamicSceneGraph& graph, const UpdateInfo& info) const;
   std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
                                      const SceneGraphNode& node) const;
 
-  void filterMissing(DynamicSceneGraph& graph,
-                     const std::list<NodeId> missing_nodes) const;
-
   mutable ActiveWindowTracker active_tracker;
   const MergeProposer merge_proposer;
-  const DeformationInterpolator deformation_interpolator;
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<UpdateFunctor, UpdatePlacesFunctor, Config>(
-          "UpdatePlacesFunctor");
 };
 
-void declare_config(UpdatePlacesFunctor::Config& config);
+void declare_config(MstPlacesUpdateFunctor::Config& config);
 
 }  // namespace hydra
