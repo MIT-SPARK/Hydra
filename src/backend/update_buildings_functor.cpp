@@ -35,52 +35,66 @@
 #include "hydra/backend/update_buildings_functor.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
+#include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 
-namespace hydra {
+#include "hydra/utils/printing.h"
 
-void declare_config(UpdateBuildingsFunctor::Config& config) {
-  using namespace config;
-  name("UpdateBuildingsFunctor::Config");
-  field(config.semantic_label, "semantic_label");
+namespace hydra {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<UpdateFunctor,
+                                   RootNodeFunctor,
+                                   RootNodeFunctor::Config>("RootNodeFunctor");
+
 }
 
-UpdateBuildingsFunctor::UpdateBuildingsFunctor(const Config& config)
+void declare_config(RootNodeFunctor::Config& config) {
+  using namespace config;
+  name("RootNodeFunctor::Config");
+  base<VerbosityConfig>(config);
+  field(config.layer, "layer");
+  field(config.child_layer, "child_layer");
+  field<CharConversion>(config.prefix, "prefix");
+}
+
+RootNodeFunctor::RootNodeFunctor(const Config& config)
     : config(config::checkValid(config)) {}
 
-void UpdateBuildingsFunctor::call(const DynamicSceneGraph&,
-                                  SharedDsgInfo& dsg,
-                                  const UpdateInfo::ConstPtr&) const {
-  const NodeSymbol building_id('B', 0);
-  const auto& rooms = dsg.graph->getLayer(DsgLayers::ROOMS);
-
-  if (!rooms.numNodes()) {
-    if (dsg.graph->hasNode(building_id)) {
-      dsg.graph->removeNode(building_id);
+void RootNodeFunctor::call(const UpdateInfo&,
+                           const DynamicSceneGraph&,
+                           DynamicSceneGraph& graph) const {
+  const NodeSymbol node_id(config.prefix, 0);
+  const auto& layer = graph.getLayer(config.child_layer);
+  if (!layer.numNodes()) {
+    if (graph.hasNode(node_id)) {
+      graph.removeNode(node_id);
     }
 
     return;
   }
 
   Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
-  for (const auto& id_node_pair : rooms.nodes()) {
+  for (const auto& id_node_pair : layer.nodes()) {
     centroid += id_node_pair.second->attributes().position;
   }
-  centroid /= rooms.numNodes();
+  centroid /= layer.numNodes();
+  MLOG(1) << "Graph centroid: " << centroid.format(getDefaultFormat());
 
-  if (!dsg.graph->hasNode(building_id)) {
-    SemanticNodeAttributes::Ptr attrs(new SemanticNodeAttributes());
+  if (!graph.hasNode(node_id)) {
+    auto attrs = std::make_unique<SemanticNodeAttributes>();
     attrs->position = centroid;
-    attrs->semantic_label = config.semantic_label;
-    dsg.graph->emplaceNode(DsgLayers::BUILDINGS, building_id, std::move(attrs));
+    graph.emplaceNode(DsgLayers::BUILDINGS, node_id, std::move(attrs));
   } else {
-    dsg.graph->getNode(building_id).attributes().position = centroid;
+    graph.getNode(node_id).attributes().position = centroid;
   }
 
-  for (const auto& id_node_pair : rooms.nodes()) {
+  for (const auto& id_node_pair : layer.nodes()) {
     // add an edge while enforcing single parent
-    dsg.graph->insertEdge(building_id, id_node_pair.first, nullptr, true);
+    graph.insertEdge(node_id, id_node_pair.first, nullptr, true);
   }
 }
 

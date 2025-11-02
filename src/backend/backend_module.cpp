@@ -421,13 +421,12 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
   // TODO(nathan) this is ugly, but no good way to know at backend init whether
   // we're tracking first-seen stamps or not (because that's private to the active
   // window map)
-  if (input.mesh_stamp_update && !optimized_dsg_->graph->mesh()->numVertices()) {
-    const_cast<bool&>(optimized_dsg_->graph->mesh()->has_first_seen_stamps) = true;
+  if (input.mesh_stamp_update && !unoptimized_graph_->mesh()->numVertices()) {
+    const_cast<bool&>(unoptimized_graph_->mesh()->has_first_seen_stamps) = true;
   }
 
   {
     std::lock_guard<std::mutex> graph_lock(optimized_dsg_->mutex);
-
     input.mesh_update->updateMesh(*optimized_dsg_->graph->mesh());
     if (input.mesh_stamp_update) {
       input.mesh_stamp_update->updateMesh(*optimized_dsg_->graph->mesh(),
@@ -442,6 +441,7 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
     num_archived_vertices_ = input.mesh_update->getTotalArchivedVertices();
     utils::updatePlaces2d(optimized_dsg_, *input.mesh_update, num_archived_vertices_);
   }
+
   have_new_mesh_ = true;
 }
 

@@ -33,30 +33,26 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
 
 #include "hydra/backend/update_functions.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
-struct UpdateBuildingsFunctor : public UpdateFunctor {
-  struct Config {
-    //! Semantic label assigned to every building node
-    SemanticNodeAttributes::Label semantic_label = 22u;
+struct RootNodeFunctor : public UpdateFunctor {
+  struct Config : VerbosityConfig {
+    std::string layer = DsgLayers::BUILDINGS;
+    std::string child_layer = DsgLayers::ROOMS;
+    char prefix = 'B';
   } const config;
 
-  explicit UpdateBuildingsFunctor(const Config& config);
+  explicit RootNodeFunctor(const Config& config);
 
-  void call(const DynamicSceneGraph& unmerged,
-            SharedDsgInfo& dsg,
-            const UpdateInfo::ConstPtr& info) const override;
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<UpdateFunctor, UpdateBuildingsFunctor, Config>(
-          "UpdateBuildingsFunctor");
+  void call(const UpdateInfo& info,
+            const DynamicSceneGraph& unoptimized,
+            DynamicSceneGraph& optimized) const override;
 };
 
-void declare_config(UpdateBuildingsFunctor::Config& config);
+void declare_config(RootNodeFunctor::Config& config);
 
 }  // namespace hydra

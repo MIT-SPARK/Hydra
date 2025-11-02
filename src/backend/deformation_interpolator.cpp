@@ -180,9 +180,7 @@ void DeformationInterpolator::interpolate(const DynamicSceneGraph& unmerged,
       VLOG(5) << "node " << spark_dsg::NodeSymbol(entry->id).str()
               << " -> transform: " << printTransform(transform);
 
-      const auto new_pos = transform * entry->init_pos.cast<double>();
       auto& attrs = unmerged.getNode(entry->id).attributes();
-      attrs.position = new_pos;
 
       auto node_ptr = dsg.findNode(entry->id);
       if (node_ptr) {
