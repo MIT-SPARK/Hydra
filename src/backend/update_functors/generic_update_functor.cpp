@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/backend/generic_update_functor.h"
+#include "hydra/backend/update_functors/generic_update_functor.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
@@ -82,31 +82,30 @@ UpdateFunctor::Hooks GenericUpdateFunctor::hooks() const {
   return my_hooks;
 }
 
-void GenericUpdateFunctor::call(const DynamicSceneGraph& unmerged,
-                                SharedDsgInfo& dsg,
-                                const UpdateInfo::ConstPtr& info) const {
-  ScopedTimer spin_timer("backend/update_" + config.layer, info->timestamp_ns);
-  if (!unmerged.hasLayer(config.layer)) {
+void GenericUpdateFunctor::call(const UpdateInfo& info,
+                                const DynamicSceneGraph& unoptimized,
+                                DynamicSceneGraph& optimized) const {
+  ScopedTimer spin_timer("backend/update_" + config.layer, info.timestamp_ns);
+  if (!unoptimized.hasLayer(config.layer)) {
     return;
   }
 
-  const auto new_loopclosure = info->loop_closure_detected;
-  const auto& layer = unmerged.getLayer(config.layer);
+  const auto new_loopclosure = info.loop_closure_detected;
+  const auto& layer = unoptimized.getLayer(config.layer);
   active_tracker.clear();  // reset from previous pass
   const auto view = new_loopclosure ? LayerView(layer) : active_tracker.view(layer);
-  deformation_interpolator.interpolateNodePositions(unmerged, *dsg.graph, info, view);
-  MLOG(1) << "[Hydra Backend] " << config.layer << " update: " << layer.numNodes()
-          << " node(s)";
+  deformation_interpolator.interpolate(unoptimized, optimized, info, view);
+  MLOG(1) << "[" << config.layer << " update]: " << layer.numNodes() << " node(s)";
 }
 
 MergeList GenericUpdateFunctor::findMerges(const DynamicSceneGraph& graph,
-                                           const UpdateInfo::ConstPtr& info) const {
+                                           const UpdateInfo& info) const {
   if (!node_matcher) {
     LOG(WARNING) << "No node matcher!";
     return {};
   }
 
-  const auto new_lcd = info->loop_closure_detected;
+  const auto new_lcd = info.loop_closure_detected;
   const auto& layer = graph.getLayer(config.layer);
   // freeze layer view to avoid messing with tracker
   const auto view = new_lcd ? LayerView(layer) : active_tracker.view(layer, true);

@@ -63,13 +63,10 @@ struct GenericUpdateFunctor : public UpdateFunctor {
 
   explicit GenericUpdateFunctor(const Config& config);
   Hooks hooks() const override;
-  void call(const DynamicSceneGraph& unmerged,
-            SharedDsgInfo& dsg,
-            const UpdateInfo::ConstPtr& info) const override;
-
-  MergeList findMerges(const DynamicSceneGraph& graph,
-                       const UpdateInfo::ConstPtr& info) const;
-
+  void call(const UpdateInfo& info,
+            const DynamicSceneGraph& unoptimized,
+            DynamicSceneGraph& optimized) const override;
+  MergeList findMerges(const DynamicSceneGraph& graph, const UpdateInfo& info) const;
   std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
                                      const SceneGraphNode& node) const;
 
