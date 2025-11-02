@@ -35,6 +35,7 @@
 #include "hydra/backend/update_objects_functor.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <spark_dsg/printing.h>
@@ -44,6 +45,15 @@
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
+
+static const auto registration_ =
+    config::RegistrationWithConfig<UpdateFunctor,
+                                   UpdateObjectsFunctor,
+                                   UpdateObjectsFunctor::Config>(
+        "UpdateObjectsFunctor");
+
+}
 
 using timing::ScopedTimer;
 using SemanticLabel = SemanticNodeAttributes::Label;
@@ -82,6 +92,7 @@ NodeAttributes::Ptr mergeObjectAttributes(const DynamicSceneGraph& graph,
 void declare_config(UpdateObjectsFunctor::Config& config) {
   using namespace config;
   name("UpdateObjectsFunctor::Config");
+  base<VerbosityConfig>(config);
   field(config.allow_connection_merging, "allow_connection_merging");
   field(config.merge_proposer, "merge_proposer");
 }
@@ -102,26 +113,28 @@ UpdateFunctor::Hooks UpdateObjectsFunctor::hooks() const {
   return my_hooks;
 }
 
-void UpdateObjectsFunctor::call(const DynamicSceneGraph& unmerged,
-                                SharedDsgInfo& dsg,
-                                const UpdateInfo::ConstPtr& info) const {
-  ScopedTimer spin_timer("backend/update_objects", info->timestamp_ns);
-  if (!unmerged.hasLayer(DsgLayers::OBJECTS)) {
+void UpdateObjectsFunctor::call(const UpdateInfo& info,
+                                const DynamicSceneGraph&,
+                                DynamicSceneGraph& optimized) const {
+  ScopedTimer spin_timer("backend/update_objects", info.timestamp_ns);
+  auto objects = optimized.findLayer(DsgLayers::OBJECTS);
+  if (!objects) {
     VLOG(5) << "Skipping object update due to missing layer";
     return;
   }
 
-  // we want to use the unmerged graph for most things
-  const auto& objects = unmerged.getLayer(DsgLayers::OBJECTS);
-  // we want to iterate over the unmerged graph
-  const auto new_loopclosure = info->loop_closure_detected;
+  const auto mesh = optimized.mesh();
+  if (!mesh) {
+    LOG(WARNING) << "Skipping object update due to missing mesh";
+    return;
+  }
+
   active_tracker.clear();  // reset from previous pass
-  LayerView view = new_loopclosure ? LayerView(objects) : active_tracker.view(objects);
+  const auto new_loopclosure = info.loop_closure_detected;
+  auto view = new_loopclosure ? LayerView(*objects) : active_tracker.view(*objects);
 
   // apply updates to every attribute that may have changed since the last call
   size_t num_changed = 0;
-  // we want to use the optimized mesh (unmerged doesn't have a mesh)
-  const auto mesh = dsg.graph->mesh();
   for (const auto& node : view) {
     ++num_changed;
     auto attrs = node.tryAttributes<ObjectNodeAttributes>();
@@ -129,32 +142,27 @@ void UpdateObjectsFunctor::call(const DynamicSceneGraph& unmerged,
       continue;  // not an object
     }
 
-    VLOG(10) << "Processing object " << NodeSymbol(node.id).str()
-             << " with attributes:\n"
-             << *attrs;
+    MLOG(3) << "Processing " << NodeSymbol(node.id).str() << ":\n" << *attrs;
     if (attrs->mesh_connections.empty()) {
-      VLOG(2) << "Found empty object node " << NodeSymbol(node.id).str();
+      MLOG(1) << "Found empty object node " << NodeSymbol(node.id).str();
       continue;
     }
 
     if (!updateObjectGeometry(*mesh, *attrs)) {
-      VLOG(2) << "Invalid centroid for object " << NodeSymbol(node.id).str();
+      MLOG(1) << "Invalid centroid for object " << NodeSymbol(node.id).str();
     }
-
-    // TODO(nathan) this is sloppy and needs to be cleaned up
-    dsg.graph->setNodeAttributes(node.id, attrs->clone());
   }
 
-  VLOG(2) << "[Hydra Backend] Object update: " << num_changed << " node(s)";
+  MLOG(1) << "[Hydra Backend] OBJECTS update: " << num_changed << " node(s)";
 }
 
 MergeList UpdateObjectsFunctor::findMerges(const DynamicSceneGraph& graph,
-                                           const UpdateInfo::ConstPtr& info) const {
+                                           const UpdateInfo& info) const {
   if (!graph.hasLayer(DsgLayers::OBJECTS)) {
     return {};
   }
 
-  const auto new_lcd = info->loop_closure_detected;
+  const auto new_lcd = info.loop_closure_detected;
   const auto& objects = graph.getLayer(DsgLayers::OBJECTS);
   // freeze layer view to avoid messing with tracker
   LayerView view = new_lcd ? LayerView(objects) : active_tracker.view(objects, true);

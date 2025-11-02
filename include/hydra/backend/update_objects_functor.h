@@ -33,17 +33,17 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
 
 #include "hydra/backend/association_strategies.h"
 #include "hydra/backend/merge_tracker.h"
 #include "hydra/backend/update_functions.h"
 #include "hydra/utils/active_window_tracker.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
 struct UpdateObjectsFunctor : public UpdateFunctor {
-  struct Config {
+  struct Config : VerbosityConfig {
     //! Allow mesh vertices for each object to be merged
     bool allow_connection_merging = true;
     //! Association strategy for finding matches to active nodes
@@ -53,21 +53,14 @@ struct UpdateObjectsFunctor : public UpdateFunctor {
 
   explicit UpdateObjectsFunctor(const Config& config);
   Hooks hooks() const override;
-  void call(const DynamicSceneGraph& unmerged,
-            SharedDsgInfo& dsg,
-            const UpdateInfo::ConstPtr& info) const override;
-  MergeList findMerges(const DynamicSceneGraph& graph,
-                       const UpdateInfo::ConstPtr& info) const;
-
+  void call(const UpdateInfo& info,
+            const DynamicSceneGraph& unoptimized,
+            DynamicSceneGraph& optimized) const override;
+  MergeList findMerges(const DynamicSceneGraph& graph, const UpdateInfo& info) const;
   void mergeAttributes(const DynamicSceneGraph& layer, NodeId from, NodeId to) const;
 
   mutable ActiveWindowTracker active_tracker;
   const MergeProposer merge_proposer;
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<UpdateFunctor, UpdateObjectsFunctor, Config>(
-          "UpdateObjectsFunctor");
 };
 
 void declare_config(UpdateObjectsFunctor::Config& config);
