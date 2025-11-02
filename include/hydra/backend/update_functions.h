@@ -65,7 +65,7 @@ struct UpdateInfo {
   size_t num_previous_archived_vertices = 0;
 };
 
-using LayerCleanupFunc = std::function<void(const UpdateInfo&, SharedDsgInfo*)>;
+using LayerCleanupFunc = std::function<void(const UpdateInfo&, SharedDsgInfo&)>;
 using FindMergeFunc =
     std::function<MergeList(const DynamicSceneGraph&, const UpdateInfo&)>;
 using MergeFunc = std::function<NodeAttributes::Ptr(const DynamicSceneGraph&,

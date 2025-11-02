@@ -132,10 +132,10 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
       cleanup_hooks.push_back(hooks.cleanup);
     }
 
-    functor->call(*source_graph_, *target_dsg_, info);
+    functor->call(*info, *source_graph_, *target_dsg_->graph);
     if (hooks.find_merges && enable_merging) {
       // TODO(nathan) handle given merges
-      const auto merges = hooks.find_merges(*source_graph_, info);
+      const auto merges = hooks.find_merges(*source_graph_, *info);
       const auto applied =
           merge_tracker.applyMerges(*source_graph_, merges, *target_dsg_, hooks.merge);
       VLOG(1) << "[Backend: " << name << "] Found " << merges.size()
@@ -145,7 +145,7 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
         size_t merge_iter = 0;
         size_t num_applied = 0;
         do {
-          const auto new_merges = hooks.find_merges(*target_dsg_->graph, info);
+          const auto new_merges = hooks.find_merges(*target_dsg_->graph, *info);
           num_applied = merge_tracker.applyMerges(
               *target_dsg_->graph, new_merges, *target_dsg_, hooks.merge);
           VLOG(1) << "[Backend: " << name << "] Found " << new_merges.size()

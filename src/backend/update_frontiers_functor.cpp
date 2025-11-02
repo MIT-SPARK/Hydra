@@ -35,30 +35,32 @@
 #include "hydra/backend/update_frontiers_functor.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 
 #include "hydra/common/global_info.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<UpdateFunctor,
+                                   UpdateFrontiersFunctor,
+                                   UpdateFrontiersFunctor::Config>(
+        "UpdateFrontiersFunctor");
+
+}
 
 using timing::ScopedTimer;
 
 UpdateFunctor::Hooks UpdateFrontiersFunctor::hooks() const {
   auto my_hooks = UpdateFunctor::hooks();
-  my_hooks.cleanup = [this](const UpdateInfo::ConstPtr& info, SharedDsgInfo* dsg) {
-    if (dsg) {
-      cleanup(info->timestamp_ns, *dsg);
-    }
+  my_hooks.cleanup = [this](const UpdateInfo& info, SharedDsgInfo& dsg) {
+    cleanup(info.timestamp_ns, dsg);
   };
 
   return my_hooks;
-}
-
-void UpdateFrontiersFunctor::call(const DynamicSceneGraph&,
-                                  SharedDsgInfo&,
-                                  const UpdateInfo::ConstPtr&) const {
-  return;
 }
 
 void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns, SharedDsgInfo& dsg) const {
@@ -66,6 +68,7 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns, SharedDsgInfo& dsg) 
   if (!dsg.graph->hasLayer(DsgLayers::PLACES)) {
     return;
   }
+
   std::lock_guard<std::mutex> lock(dsg.mutex);
   const auto& places_layer = dsg.graph->getLayer(DsgLayers::PLACES);
 
