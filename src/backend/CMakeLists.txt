@@ -12,6 +12,8 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/pgmo_configs.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/surface_place_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functions.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/zmq_sink.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/external_rooms_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/generic_update_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/mesh_clustering.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/mst_places_update_functor.cpp
@@ -22,5 +24,4 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/update_rooms_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/update_surface_places_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/update_traversability_functor.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/zmq_interfaces.cpp
 )

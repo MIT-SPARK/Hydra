@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/backend/zmq_interfaces.h"
+#include "hydra/backend/update_functor/external_rooms_functor.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
@@ -44,48 +44,21 @@
 namespace hydra {
 namespace {
 
-static const auto sink_registration =
-    config::RegistrationWithConfig<BackendModule::Sink, ZmqSink, ZmqSink::Config>(
-        "ZmqSink");
-
 static const auto update_registration =
     config::RegistrationWithConfig<UpdateFunctor,
-                                   ZmqRoomLabelUpdater,
-                                   ZmqRoomLabelUpdater::Config>("ZmqRoomLabelUpdater");
+                                   ExternalRoomsFunctor,
+                                   ExternalRoomsFunctor::Config>(
+        "ExternalRoomsFunctor");
 
 }  // namespace
 
-void declare_config(ZmqSink::Config& config) {
-  using namespace config;
-  name("ZmqSink::Config");
-  field(config.url, "url");
-  field(config.num_threads, "num_threads");
-  field(config.send_mesh, "send_mesh");
-}
-
-ZmqSink::ZmqSink(const Config& config) : config(config::checkValid(config)) {
-  sender_ = std::make_unique<spark_dsg::ZmqSender>(config.url, config.num_threads);
-}
-
-ZmqSink::~ZmqSink() = default;
-
-void ZmqSink::call(uint64_t timestamp_ns,
-                   const DynamicSceneGraph& graph,
-                   const kimera_pgmo::DeformationGraph& /*dgraph*/) const {
-  VLOG(5) << "Sending graph via zmq to '" << config.url << "' @ " << timestamp_ns
-          << " [ns]";
-  CHECK_NOTNULL(sender_)->send(graph, config.send_mesh);
-}
-
-std::string ZmqSink::printInfo() const { return config::toString(config); }
-
-ZmqRoomLabelUpdater::ZmqRoomLabelUpdater(const Config& config)
+ExternalRoomsFunctor::ExternalRoomsFunctor(const Config& config)
     : config(config::checkValid(config)) {
   receiver_ = std::make_unique<spark_dsg::ZmqReceiver>(config.url, config.num_threads);
-  thread_ = std::make_unique<std::thread>(&ZmqRoomLabelUpdater::checkForUpdates, this);
+  thread_ = std::make_unique<std::thread>(&ExternalRoomsFunctor::checkForUpdates, this);
 }
 
-ZmqRoomLabelUpdater::~ZmqRoomLabelUpdater() {
+ExternalRoomsFunctor::~ExternalRoomsFunctor() {
   should_shutdown_ = true;
   if (thread_) {
     VLOG(2) << "[Hydra Backend] joining zmq thread and stopping";
@@ -95,7 +68,7 @@ ZmqRoomLabelUpdater::~ZmqRoomLabelUpdater() {
   }
 }
 
-void ZmqRoomLabelUpdater::checkForUpdates() {
+void ExternalRoomsFunctor::checkForUpdates() {
   while (!should_shutdown_) {
     if (!receiver_->recv(config.poll_time_ms)) {
       continue;
@@ -116,12 +89,12 @@ void ZmqRoomLabelUpdater::checkForUpdates() {
   }
 }
 
-void ZmqRoomLabelUpdater::call(const DynamicSceneGraph&,
-                               SharedDsgInfo& dsg,
-                               const UpdateInfo::ConstPtr&) const {
+void ExternalRoomsFunctor::call(const UpdateInfo&,
+                                const DynamicSceneGraph&,
+                                DynamicSceneGraph& optimized) const {
   // start critical section for reading from room label map
   std::lock_guard<std::mutex> lock(mutex_);
-  const auto& rooms = dsg.graph->getLayer(DsgLayers::ROOMS);
+  const auto& rooms = optimized.getLayer(DsgLayers::ROOMS);
   for (const auto& [node_id, node] : rooms.nodes()) {
     const auto iter = room_name_map_.find(node_id);
     if (iter == room_name_map_.end()) {
@@ -134,9 +107,9 @@ void ZmqRoomLabelUpdater::call(const DynamicSceneGraph&,
   return;
 }
 
-void declare_config(ZmqRoomLabelUpdater::Config& config) {
+void declare_config(ExternalRoomsFunctor::Config& config) {
   using namespace config;
-  name("ZmqRoomLabelUpdater::Config");
+  name("ExternalRoomsFunctor::Config");
   field(config.url, "url");
   field(config.num_threads, "num_threads");
   field(config.poll_time_ms, "poll_time_ms");
