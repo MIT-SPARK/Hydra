@@ -32,9 +32,10 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/backend/update_traversability_functor.h"
+#include "hydra/backend/update_functors/update_traversability_functor.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/traversability_boundary.h>
@@ -46,6 +47,15 @@
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<UpdateFunctor,
+                                   UpdateTraversabilityFunctor,
+                                   UpdateTraversabilityFunctor::Config>(
+        "UpdateTraversabilityFunctor");
+
+}
 
 using Timer = timing::ScopedTimer;
 using spark_dsg::TraversabilityNodeAttributes;
@@ -53,6 +63,7 @@ using spark_dsg::TraversabilityNodeAttributes;
 void declare_config(UpdateTraversabilityFunctor::Config& config) {
   using namespace config;
   name("UpdateTraversabilityFunctor::Config");
+  base<VerbosityConfig>(config);
   field(config.layer, "layer");
   field(config.min_place_size, "min_place_size", "m");
   field(config.max_place_size, "max_place_size", "m");
@@ -65,12 +76,6 @@ void declare_config(UpdateTraversabilityFunctor::Config& config) {
   check(config.tolerance, GE, 0.0, "min_place_size");
 }
 
-static const auto registration =
-    config::RegistrationWithConfig<UpdateFunctor,
-                                   UpdateTraversabilityFunctor,
-                                   UpdateTraversabilityFunctor::Config>(
-        "UpdateTraversabilityFunctor");
-
 UpdateTraversabilityFunctor::UpdateTraversabilityFunctor(const Config& config)
     : config(config::checkValid(config)),
       radius_(2 * config.max_place_size),
@@ -79,25 +84,21 @@ UpdateTraversabilityFunctor::UpdateTraversabilityFunctor(const Config& config)
 
 UpdateFunctor::Hooks UpdateTraversabilityFunctor::hooks() const {
   auto my_hooks = UpdateFunctor::hooks();
-  my_hooks.find_merges = [this](const DynamicSceneGraph& dsg,
-                                const UpdateInfo::ConstPtr& info) {
+  my_hooks.find_merges = [this](const auto& dsg, const auto& info) {
     return findNodeMerges(dsg, info);
   };
-  my_hooks.merge = [this](const DynamicSceneGraph& dsg,
-                          const std::vector<NodeId>& merge_ids) {
+  my_hooks.merge = [this](const auto& dsg, const auto& merge_ids) {
     return mergeNodes(dsg, merge_ids);
   };
-  my_hooks.cleanup = [this](const UpdateInfo::ConstPtr& info, SharedDsgInfo* dsg) {
-    cleanup(info, dsg);
-  };
+  my_hooks.cleanup = [this](const auto& info, auto& dsg) { cleanup(info, dsg); };
   return my_hooks;
 }
 
-void UpdateTraversabilityFunctor::call(const DynamicSceneGraph& unmerged,
-                                       SharedDsgInfo& dsg,
-                                       const UpdateInfo::ConstPtr& info) const {
-  Timer timer("backend/update_traversability", info->timestamp_ns);
-  if (!unmerged.hasLayer(config.layer)) {
+void UpdateTraversabilityFunctor::call(const UpdateInfo& info,
+                                       const DynamicSceneGraph& unoptimized,
+                                       DynamicSceneGraph& optimized) const {
+  Timer timer("backend/update_traversability", info.timestamp_ns);
+  if (!optimized.hasLayer(config.layer)) {
     return;
   }
 
@@ -105,24 +106,24 @@ void UpdateTraversabilityFunctor::call(const DynamicSceneGraph& unmerged,
   active_tracker_.clear();  // reset from previous pass
 
   // Update global poses (deformation) of all nodes.
-  updateDeformation(unmerged, dsg, info);
-  resetNeighborFinder(*dsg.graph);
+  updateDeformation(info, unoptimized, optimized);
+  resetNeighborFinder(optimized);
 
   // Find and update all edges from active to inactive nodes.
-  const auto active_edges = findActiveWindowEdges(*dsg.graph);
-  pruneActiveWindowEdges(*dsg.graph, active_edges);
+  const auto active_edges = findActiveWindowEdges(optimized);
+  pruneActiveWindowEdges(optimized, active_edges);
   previous_active_edges_ = std::move(active_edges);
 }
 
 void UpdateTraversabilityFunctor::updateDeformation(
-    const DynamicSceneGraph& unmerged,
-    SharedDsgInfo& dsg,
-    const UpdateInfo::ConstPtr& info) const {
+    const UpdateInfo& info,
+    const DynamicSceneGraph& unoptimized,
+    DynamicSceneGraph& optimized) const {
   // Update global poses (deformation) of all nodes.
-  const auto& places = unmerged.getLayer(config.layer);
+  const auto& places = unoptimized.getLayer(config.layer);
   const auto view =
-      info->loop_closure_detected ? LayerView(places) : active_tracker_.view(places);
-  deformation_interpolator_.interpolateNodePositions(unmerged, *dsg.graph, info, view);
+      info.loop_closure_detected ? LayerView(places) : active_tracker_.view(places);
+  deformation_interpolator_.interpolate(unoptimized, optimized, info, view);
 }
 
 UpdateTraversabilityFunctor::EdgeSet UpdateTraversabilityFunctor::findActiveWindowEdges(
@@ -180,8 +181,8 @@ void UpdateTraversabilityFunctor::updateDistances(const SceneGraphLayer& layer) 
   }
 }
 
-MergeList UpdateTraversabilityFunctor::findNodeMerges(
-    const DynamicSceneGraph& dsg, const UpdateInfo::ConstPtr& info) const {
+MergeList UpdateTraversabilityFunctor::findNodeMerges(const DynamicSceneGraph& dsg,
+                                                      const UpdateInfo& info) const {
   // Iteratively match all newly archived nodes against inactive candidate nodes.
   resetNeighborFinder(dsg);
   if (!nn_) {
@@ -189,8 +190,8 @@ MergeList UpdateTraversabilityFunctor::findNodeMerges(
   }
 
   const auto& places = dsg.getLayer(config.layer);
-  const auto view = info->loop_closure_detected ? LayerView(places)
-                                                : active_tracker_.view(places, true);
+  const auto view = info.loop_closure_detected ? LayerView(places)
+                                               : active_tracker_.view(places, true);
 
   // Compare all (newly) archived nodes against inactive candidate nodes.
   MergeList result;
@@ -326,21 +327,21 @@ NodeAttributes::Ptr UpdateTraversabilityFunctor::mergeNodes(
   return result;
 }
 
-void UpdateTraversabilityFunctor::cleanup(const UpdateInfo::ConstPtr&,
-                                          SharedDsgInfo* dsg) const {
-  if (!dsg || !dsg->graph->hasLayer(config.layer)) {
+void UpdateTraversabilityFunctor::cleanup(const UpdateInfo&, SharedDsgInfo& dsg) const {
+  if (!dsg.graph->hasLayer(config.layer)) {
     return;
   }
 
   // 1. Update the classification of all overlapping node boundaries.
   for (const auto& id_pair : overlapping_nodes_to_cleanup_) {
-    if (!dsg->graph->hasNode(id_pair.k1) || !dsg->graph->hasNode(id_pair.k2)) {
+    if (!dsg.graph->hasNode(id_pair.k1) || !dsg.graph->hasNode(id_pair.k2)) {
       continue;
     }
+
     auto& from_attrs =
-        dsg->graph->getNode(id_pair.k1).attributes<TraversabilityNodeAttributes>();
+        dsg.graph->getNode(id_pair.k1).attributes<TraversabilityNodeAttributes>();
     auto& to_attrs =
-        dsg->graph->getNode(id_pair.k2).attributes<TraversabilityNodeAttributes>();
+        dsg.graph->getNode(id_pair.k2).attributes<TraversabilityNodeAttributes>();
     auto from_boundary = Boundary(from_attrs);
     auto to_boundary = Boundary(to_attrs);
     from_boundary.mergeTraversabilityStates(to_boundary, config.min_place_size);
@@ -348,10 +349,11 @@ void UpdateTraversabilityFunctor::cleanup(const UpdateInfo::ConstPtr&,
     to_boundary.mergeTraversabilityStates(from_boundary, config.min_place_size);
     to_boundary.toAttributes(to_attrs);
   }
+
   overlapping_nodes_to_cleanup_.clear();
 
   // 2. Compute the new distances for all nodes.
-  updateDistances(dsg->graph->getLayer(config.layer));
+  updateDistances(dsg.graph->getLayer(config.layer));
 }
 
 std::vector<NodeId> UpdateTraversabilityFunctor::findConnections(

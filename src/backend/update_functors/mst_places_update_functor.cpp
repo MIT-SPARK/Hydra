@@ -32,6 +32,8 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
+#include "hydra/backend/update_functors/mst_places_update_functor.h"
+
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
@@ -40,7 +42,6 @@
 #include <kimera_pgmo/deformation_graph.h>
 #include <spark_dsg/printing.h>
 
-#include "hydra/backend/update_places_functor.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {

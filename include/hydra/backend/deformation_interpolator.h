@@ -78,24 +78,8 @@ class DeformationInterpolator {
    */
   void interpolate(const DynamicSceneGraph& unmerged,
                    DynamicSceneGraph& dsg,
-                   const UpdateInfo::ConstPtr& info,
+                   const UpdateInfo& info,
                    const LayerView& view) const;
-
-  /**
-   * @brief Interpolate the node positions based on the deformation graph, using the
-   * temporally closest control points as reference.
-   *
-   * @param unmerged Unmerged scene graph to keep up to date.
-   * @param dsg Private DSG to update.
-   * @param info Update information containing deformation graph.
-   * @param view View on the unmerged scene graph selecting all nodes to update.
-   */
-  void interpolateNodePositions(const DynamicSceneGraph& unmerged,
-                                DynamicSceneGraph& dsg,
-                                const UpdateInfo::ConstPtr& info,
-                                const LayerView& view) const {
-    interpolate(unmerged, dsg, info, view);
-  }
 
  private:
   mutable NodeCache cache_;

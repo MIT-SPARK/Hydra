@@ -33,33 +33,25 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
-
 #include "hydra/backend/update_functions.h"
 #include "hydra/rooms/room_finder.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
 struct UpdateRoomsFunctor : public UpdateFunctor {
-  struct Config {
+  struct Config : VerbosityConfig {
     RoomFinderConfig room_finder;
     std::string places_layer = DsgLayers::PLACES;
   } const config;
 
   explicit UpdateRoomsFunctor(const Config& config);
-
-  void call(const DynamicSceneGraph& unmerged,
-            SharedDsgInfo& dsg,
-            const UpdateInfo::ConstPtr& info) const override;
-
+  void call(const UpdateInfo& info,
+            const DynamicSceneGraph& unoptimized,
+            DynamicSceneGraph& optimized) const override;
   void rewriteRooms(const SceneGraphLayer* new_rooms, DynamicSceneGraph& graph) const;
 
-  std::unique_ptr<RoomFinder> room_finder;
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<UpdateFunctor, UpdateRoomsFunctor, Config>(
-          "UpdateRoomsFunctor");
+  mutable RoomFinder room_finder;
 };
 
 void declare_config(UpdateRoomsFunctor::Config& config);

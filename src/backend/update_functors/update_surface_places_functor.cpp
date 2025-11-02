@@ -32,9 +32,10 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/backend/update_surface_places_functor.h"
+#include "hydra/backend/update_functors/update_surface_places_functor.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/virtual_config.h>
 #include <glog/logging.h>
 #include <pcl/common/centroid.h>
@@ -47,12 +48,22 @@
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<UpdateFunctor,
+                                   UpdateSurfacePlacesFunctor,
+                                   UpdateSurfacePlacesFunctor::Config>(
+        "UpdateSurfacePlacesFunctor");
+
+}
 
 using timing::ScopedTimer;
 
-void declare_config(Update2dPlacesFunctor::Config& config) {
+void declare_config(UpdateSurfacePlacesFunctor::Config& config) {
   using namespace config;
-  name("Update2dPlacesFunctor::Config");
+  name("UpdateSurfacePlacesFunctor::Config");
+  base<VerbosityConfig>(config);
   field(config.layer, "layer");
   field(config.allow_places_merge, "allow_places_merge");
   field(config.merge_max_delta_z, "merge_max_delta_z");
@@ -93,45 +104,37 @@ NodeAttributes::Ptr merge2dPlaceAttributes(const DynamicSceneGraph& graph,
   return attrs_ptr;
 }
 
-Update2dPlacesFunctor::Update2dPlacesFunctor(const Config& config)
+UpdateSurfacePlacesFunctor::UpdateSurfacePlacesFunctor(const Config& config)
     : config(config), merge_proposer(config.merge_proposer) {}
 
-UpdateFunctor::Hooks Update2dPlacesFunctor::hooks() const {
+UpdateFunctor::Hooks UpdateSurfacePlacesFunctor::hooks() const {
   auto my_hooks = UpdateFunctor::hooks();
-  my_hooks.cleanup = [this](const UpdateInfo::ConstPtr&, SharedDsgInfo* dsg) {
-    if (dsg) {
-      cleanup(*dsg);
-    }
-  };
-
+  my_hooks.cleanup = [this](const auto&, auto& dsg) { cleanup(dsg); };
   my_hooks.find_merges = [this](const auto& graph, const auto& info) {
     return findMerges(graph, info);
   };
-
-  my_hooks.merge = [](const DynamicSceneGraph& graph,
-                      const std::vector<NodeId>& nodes) {
+  my_hooks.merge = [](const auto& graph, const auto& nodes) {
     return merge2dPlaceAttributes(graph, nodes);
   };
 
   return my_hooks;
 }
 
-void Update2dPlacesFunctor::call(const DynamicSceneGraph& unmerged,
-                                 SharedDsgInfo& dsg,
-                                 const UpdateInfo::ConstPtr& info) const {
-  ScopedTimer spin_timer("backend/update_2d_places", info->timestamp_ns);
-  const auto layer = unmerged.findLayer(config.layer);
+void UpdateSurfacePlacesFunctor::call(const UpdateInfo& info,
+                                      const DynamicSceneGraph&,
+                                      DynamicSceneGraph& optimized) const {
+  ScopedTimer spin_timer("backend/update_2d_places", info.timestamp_ns);
+  const auto layer = optimized.findLayer(config.layer);
   if (!layer) {
     return;
   }
 
-  const auto new_loopclosure = info->loop_closure_detected;
-
   active_tracker.clear();  // reset from previous pass
+  const auto new_loopclosure = info.loop_closure_detected;
   const auto view = new_loopclosure ? LayerView(*layer) : active_tracker.view(*layer);
 
   size_t num_changed = 0;
-  const auto mesh = unmerged.mesh();
+  const auto mesh = optimized.mesh();
   for (const auto& node : view) {
     auto attrs = node.tryAttributes<Place2dNodeAttributes>();
     if (!attrs) {
@@ -141,21 +144,20 @@ void Update2dPlacesFunctor::call(const DynamicSceneGraph& unmerged,
 
     ++num_changed;
     updateNode(mesh, node.id, *attrs);
-    dsg.graph->setNodeAttributes(node.id, attrs->clone());
   }
 
-  VLOG(5) << "[Hydra Backend] 2D Place update: " << num_changed << " node(s)";
+  MLOG(1) << "[SURFACE_PLACES update] changed " << num_changed << " node(s)";
 }
 
-MergeList Update2dPlacesFunctor::findMerges(const DynamicSceneGraph& graph,
-                                            const UpdateInfo::ConstPtr& info) const {
+MergeList UpdateSurfacePlacesFunctor::findMerges(const DynamicSceneGraph& graph,
+                                                 const UpdateInfo& info) const {
   const auto layer = graph.findLayer(config.layer);
   if (!layer) {
     return {};
   }
 
-  const auto new_lcd = info->loop_closure_detected;
   // freeze layer view to avoid messing with tracker
+  const auto new_lcd = info.loop_closure_detected;
   const auto view = new_lcd ? LayerView(*layer) : active_tracker.view(*layer, true);
 
   MergeList nodes_to_merge;
@@ -177,9 +179,9 @@ MergeList Update2dPlacesFunctor::findMerges(const DynamicSceneGraph& graph,
   return nodes_to_merge;
 }
 
-void Update2dPlacesFunctor::updateNode(const spark_dsg::Mesh::Ptr& mesh,
-                                       NodeId node,
-                                       Place2dNodeAttributes& attrs) const {
+void UpdateSurfacePlacesFunctor::updateNode(const spark_dsg::Mesh::Ptr& mesh,
+                                            NodeId node,
+                                            Place2dNodeAttributes& attrs) const {
   const auto& connections = attrs.pcl_mesh_connections;
   if (connections.empty()) {
     LOG(ERROR) << "Found empty place2d node " << NodeSymbol(node).str();
@@ -213,8 +215,9 @@ void Update2dPlacesFunctor::updateNode(const spark_dsg::Mesh::Ptr& mesh,
   }
 }
 
-bool Update2dPlacesFunctor::shouldMerge(const Place2dNodeAttributes& from_attrs,
-                                        const Place2dNodeAttributes& to_attrs) const {
+bool UpdateSurfacePlacesFunctor::shouldMerge(
+    const Place2dNodeAttributes& from_attrs,
+    const Place2dNodeAttributes& to_attrs) const {
   const auto z_diff = std::abs(from_attrs.position(2) - to_attrs.position(2));
   if (z_diff > config.merge_max_delta_z) {
     return false;
@@ -228,7 +231,7 @@ bool Update2dPlacesFunctor::shouldMerge(const Place2dNodeAttributes& from_attrs,
   return overlap_distance > 0;
 }
 
-void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
+void UpdateSurfacePlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
   std::map<NodeId, std::set<NodeId>> node_neighbors;
   std::vector<std::pair<NodeId, Place2d>> place_2ds;
 

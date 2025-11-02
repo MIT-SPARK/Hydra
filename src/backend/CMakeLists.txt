@@ -1,7 +1,6 @@
 target_sources(
   ${PROJECT_NAME}
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/association_strategies.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/update_traversability_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/backend_module.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/backend_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/deformation_interpolator.cpp
@@ -20,7 +19,8 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/update_agents_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/update_frontiers_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/update_objects_functor.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/update_rooms_functor.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/update_surface_places_functor.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/update_rooms_functor.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/update_surface_places_functor.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/update_functors/update_traversability_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/zmq_interfaces.cpp
 )

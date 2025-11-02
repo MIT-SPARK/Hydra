@@ -129,9 +129,9 @@ DeformationInterpolator::DeformationInterpolator(const Config& config)
 
 void DeformationInterpolator::interpolate(const DynamicSceneGraph& unmerged,
                                           DynamicSceneGraph& dsg,
-                                          const UpdateInfo::ConstPtr& info,
+                                          const UpdateInfo& info,
                                           const LayerView& view) const {
-  if (!info->deformation_graph) {
+  if (!info.deformation_graph) {
     return;
   }
 
@@ -148,9 +148,9 @@ void DeformationInterpolator::interpolate(const DynamicSceneGraph& unmerged,
   std::map<size_t, EntryList> robot_entries;
   for (const auto& node : view) {
     size_t robot_id = this_robot;
-    if (info->node_to_robot_id) {
-      auto iter = info->node_to_robot_id->find(node.id);
-      if (iter == info->node_to_robot_id->end()) {
+    if (info.node_to_robot_id) {
+      auto iter = info.node_to_robot_id->find(node.id);
+      if (iter == info.node_to_robot_id->end()) {
         LOG(WARNING) << "Node " << NodeSymbol(node.id) << " does not belong to a robot";
       } else {
         robot_id = iter->second;
@@ -170,7 +170,7 @@ void DeformationInterpolator::interpolate(const DynamicSceneGraph& unmerged,
     entries->second.entries.push_back(entry);
   }
 
-  const auto& dgraph = *info->deformation_graph;
+  const auto& dgraph = *info.deformation_graph;
   for (auto& [robot_id, entries] : robot_entries) {
     const auto prefix = kimera_pgmo::GetVertexPrefix(robot_id);
     entries.sort();
@@ -181,7 +181,6 @@ void DeformationInterpolator::interpolate(const DynamicSceneGraph& unmerged,
               << " -> transform: " << printTransform(transform);
 
       auto& attrs = unmerged.getNode(entry->id).attributes();
-
       auto node_ptr = dsg.findNode(entry->id);
       if (node_ptr) {
         node_ptr->attributes().position = new_pos;

@@ -32,15 +32,24 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/backend/update_rooms_functor.h"
+#include "hydra/backend/update_functors/update_rooms_functor.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<UpdateFunctor,
+                                   UpdateRoomsFunctor,
+                                   UpdateRoomsFunctor::Config>("UpdateRoomsFunctor");
+
+}
 
 using timing::ScopedTimer;
 using SemanticLabel = SemanticNodeAttributes::Label;
@@ -48,13 +57,13 @@ using SemanticLabel = SemanticNodeAttributes::Label;
 void declare_config(UpdateRoomsFunctor::Config& config) {
   using namespace config;
   name("UpdateRoomsFunctor::Config");
+  base<VerbosityConfig>(config);
   field(config.room_finder, "room_finder");
   field(config.places_layer, "places_layer");
 }
 
 UpdateRoomsFunctor::UpdateRoomsFunctor(const Config& config)
-    : config(config::checkValid(config)),
-      room_finder(new RoomFinder(config.room_finder)) {}
+    : config(config::checkValid(config)), room_finder(config.room_finder) {}
 
 void UpdateRoomsFunctor::rewriteRooms(const SceneGraphLayer* new_rooms,
                                       DynamicSceneGraph& graph) const {
@@ -82,19 +91,15 @@ void UpdateRoomsFunctor::rewriteRooms(const SceneGraphLayer* new_rooms,
   }
 }
 
-void UpdateRoomsFunctor::call(const DynamicSceneGraph&,
-                              SharedDsgInfo& dsg,
-                              const UpdateInfo::ConstPtr& info) const {
-  if (!room_finder) {
-    return;
-  }
-
-  const auto places_layer = dsg.graph->findLayer(config.places_layer);
+void UpdateRoomsFunctor::call(const UpdateInfo& info,
+                              const DynamicSceneGraph&,
+                              DynamicSceneGraph& optimized) const {
+  const auto places_layer = optimized.findLayer(config.places_layer);
   if (!places_layer) {
     return;
   }
 
-  ScopedTimer timer("backend/room_detection", info->timestamp_ns, true, 1, false);
+  ScopedTimer timer("backend/room_detection", info.timestamp_ns, true, 1, false);
   auto places_clone = places_layer->clone([](const auto& node) {
     const auto cat = NodeSymbol(node.id).category();
     return cat == 'p' || cat == 'h' || cat == 't';
@@ -102,9 +107,9 @@ void UpdateRoomsFunctor::call(const DynamicSceneGraph&,
 
   // TODO(nathan) layer view
   // TODO(nathan) pass in timestamp?
-  auto rooms = room_finder->findRooms(*places_clone);
-  rewriteRooms(rooms.get(), *dsg.graph);
-  room_finder->addRoomPlaceEdges(*dsg.graph, config.places_layer);
+  auto rooms = room_finder.findRooms(*places_clone);
+  rewriteRooms(rooms.get(), optimized);
+  room_finder.addRoomPlaceEdges(optimized, config.places_layer);
   return;
 }
 

@@ -33,12 +33,12 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
 #include <spark_dsg/traversability_boundary.h>
 
 #include "hydra/backend/deformation_interpolator.h"
 #include "hydra/backend/update_functions.h"
 #include "hydra/utils/active_window_tracker.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra {
@@ -48,7 +48,7 @@ namespace hydra {
  * called with exhaustive merging enabled.
  */
 struct UpdateTraversabilityFunctor : public UpdateFunctor {
-  struct Config {
+  struct Config : VerbosityConfig {
     //! Layer to update traversability in
     std::string layer = DsgLayers::TRAVERSABILITY;
 
@@ -77,28 +77,27 @@ struct UpdateTraversabilityFunctor : public UpdateFunctor {
 
   Hooks hooks() const override;
 
-  void call(const DynamicSceneGraph& unmerged,
-            SharedDsgInfo& dsg,
-            const UpdateInfo::ConstPtr& info) const override;
+  void call(const UpdateInfo& info,
+            const DynamicSceneGraph& unoptimized,
+            DynamicSceneGraph& optimized) const override;
 
  protected:
   // Hook callbacks.
-  MergeList findNodeMerges(const DynamicSceneGraph& dsg,
-                           const UpdateInfo::ConstPtr& info) const;
+  MergeList findNodeMerges(const DynamicSceneGraph& dsg, const UpdateInfo& info) const;
 
   NodeAttributes::Ptr mergeNodes(const DynamicSceneGraph& dsg,
                                  const std::vector<NodeId>& merge_ids) const;
 
-  void cleanup(const UpdateInfo::ConstPtr& /* info */, SharedDsgInfo* dsg) const;
+  void cleanup(const UpdateInfo& info, SharedDsgInfo& dsg) const;
 
   // Processing Steps.
   /**
    * @brief Update the positions of all traversability nodes in the DSG. Propagates to
    * the complete DSG in case of new loop closures.
    */
-  void updateDeformation(const DynamicSceneGraph& unmerged,
-                         SharedDsgInfo& dsg,
-                         const UpdateInfo::ConstPtr& info) const;
+  void updateDeformation(const UpdateInfo& info,
+                         const DynamicSceneGraph& unoptimized,
+                         DynamicSceneGraph& optimized) const;
 
   EdgeSet findActiveWindowEdges(DynamicSceneGraph& dsg) const;
 

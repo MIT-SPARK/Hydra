@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/backend/update_agents_functor.h"
+#include "hydra/backend/update_functors/update_agents_functor.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>

@@ -33,16 +33,16 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
 
 #include "hydra/backend/association_strategies.h"
 #include "hydra/backend/update_functions.h"
 #include "hydra/utils/active_window_tracker.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
-struct Update2dPlacesFunctor : public UpdateFunctor {
-  struct Config {
+struct UpdateSurfacePlacesFunctor : public UpdateFunctor {
+  struct Config : VerbosityConfig {
     //! Layer to update
     std::string layer = DsgLayers::MESH_PLACES;
     //! Allow merging of 2D places
@@ -66,34 +66,27 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
         association::SemanticNearestNode::Config{}}};
   } const config;
 
-  explicit Update2dPlacesFunctor(const Config& config);
+  explicit UpdateSurfacePlacesFunctor(const Config& config);
   Hooks hooks() const override;
-  void call(const DynamicSceneGraph& unmerged,
-            SharedDsgInfo& dsg,
-            const UpdateInfo::ConstPtr& info) const override;
-  MergeList findMerges(const DynamicSceneGraph& graph,
-                       const UpdateInfo::ConstPtr& info) const;
+  void call(const UpdateInfo& info,
+            const DynamicSceneGraph& unoptimized,
+            DynamicSceneGraph& optimized) const override;
+  MergeList findMerges(const DynamicSceneGraph& graph, const UpdateInfo& info) const;
+  void cleanup(SharedDsgInfo& dsg) const;
 
   void updateNode(const spark_dsg::Mesh::Ptr& mesh,
                   NodeId node,
                   Place2dNodeAttributes& attrs) const;
-
   bool shouldMerge(const Place2dNodeAttributes& from_attrs,
                    const Place2dNodeAttributes& to_attrs) const;
-
-  void cleanup(SharedDsgInfo& dsg) const;
 
   mutable ActiveWindowTracker active_tracker;
   const MergeProposer merge_proposer;
 
  private:
   mutable NodeSymbol next_node_id_ = NodeSymbol('S', 0);
-
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<UpdateFunctor, Update2dPlacesFunctor, Config>(
-          "Update2dPlacesFunctor");
 };
 
-void declare_config(Update2dPlacesFunctor::Config& conf);
+void declare_config(UpdateSurfacePlacesFunctor::Config& conf);
 
 }  // namespace hydra
