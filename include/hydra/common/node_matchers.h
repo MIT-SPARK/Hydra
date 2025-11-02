@@ -68,4 +68,30 @@ struct IoUNodeMatcher : public NodeMatcher {
 
 void declare_config(IoUNodeMatcher::Config& config);
 
+struct DistanceNodeMatcher : public NodeMatcher {
+  struct Config {
+    //! Max distance between node centroids for a merge to be considered
+    double pos_threshold_m = 0.4;
+  } const config;
+
+  explicit DistanceNodeMatcher(const Config& config);
+  bool match(const Attrs& new_attrs, const Attrs& prev_attrs) const override;
+};
+
+void declare_config(DistanceNodeMatcher::Config& config);
+
+struct PlaceNodeMatcher : public NodeMatcher {
+  struct Config {
+    //! Max distance between node centroids for a merge to be considered
+    double pos_threshold_m = 0.4;
+    //! Max deviation between place radii for a merge to be considered
+    double distance_tolerance_m = 0.4;
+  } const config;
+
+  explicit PlaceNodeMatcher(const Config& config);
+  bool match(const Attrs& new_attrs, const Attrs& prev_attrs) const override;
+};
+
+void declare_config(PlaceNodeMatcher::Config& config);
+
 }  // namespace hydra
