@@ -38,15 +38,17 @@
 
 namespace hydra::test {
 
-std::string get_package_path() { return HYDRA_PACKAGE_PATH; }
+std::filesystem::path get_package_path() { return HYDRA_PACKAGE_PATH; }
 
-std::string get_resource_path() { return get_package_path() + "/tests/resources/"; }
-
-std::string get_resource_path(const std::string& name) {
-  return get_resource_path() + name;
+std::filesystem::path get_resource_path() {
+  return get_package_path() / "tests" / "resources";
 }
 
-std::string get_default_semantic_map() {
+std::filesystem::path get_resource_path(const std::string& name) {
+  return get_resource_path() / name;
+}
+
+std::filesystem::path get_default_semantic_map() {
   return get_resource_path("test_semantic_map.csv");
 }
 

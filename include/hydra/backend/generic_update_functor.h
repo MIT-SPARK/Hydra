@@ -33,16 +33,52 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <filesystem>
+
+#include <config_utilities/virtual_config.h>
+
+#include "hydra/backend/association_strategies.h"
+#include "hydra/backend/deformation_interpolator.h"
+#include "hydra/backend/merge_tracker.h"
+#include "hydra/backend/update_functions.h"
+#include "hydra/common/node_matchers.h"
+#include "hydra/utils/active_window_tracker.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
-namespace test {
 
-std::filesystem::path get_resource_path();
+struct GenericUpdateFunctor : public UpdateFunctor {
+  struct Config : VerbosityConfig {
+    //! Layer to update
+    std::string layer;
+    //! Enable merging for this update functor
+    bool enable_merging = true;
+    //! Settings for deformation of the places from the deformation graph
+    DeformationInterpolator::Config deformation_interpolator = {};
+    //! Validator of association between two nodes
+    config::VirtualConfig<NodeMatcher> matcher{DistanceNodeMatcher::Config{}};
+    //! Association strategy for finding matches to active nodes
+    MergeProposer::Config merge_proposer = {
+        config::VirtualConfig<AssociationStrategy>{association::NearestNode::Config{}}};
+  } const config;
 
-std::filesystem::path get_resource_path(const std::string& name);
+  explicit GenericUpdateFunctor(const Config& config);
+  Hooks hooks() const override;
+  void call(const DynamicSceneGraph& unmerged,
+            SharedDsgInfo& dsg,
+            const UpdateInfo::ConstPtr& info) const override;
 
-std::filesystem::path get_default_semantic_map();
+  MergeList findMerges(const DynamicSceneGraph& graph,
+                       const UpdateInfo::ConstPtr& info) const;
 
-}  // namespace test
+  std::optional<NodeId> proposeMerge(const SceneGraphLayer& layer,
+                                     const SceneGraphNode& node) const;
+
+  mutable ActiveWindowTracker active_tracker;
+  const std::unique_ptr<NodeMatcher> node_matcher;
+  const MergeProposer merge_proposer;
+  const DeformationInterpolator deformation_interpolator;
+};
+
+void declare_config(GenericUpdateFunctor::Config& config);
+
 }  // namespace hydra
