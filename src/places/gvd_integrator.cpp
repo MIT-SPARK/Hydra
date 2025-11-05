@@ -109,8 +109,15 @@ void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
   ScopedTimer timer("places/propagate_tsdf", timestamp_ns);
   update_stats_.clear();
 
+  for (const auto& idx : blocks) {
+    auto& block = gvd_layer_->allocateBlock(idx);
+    for (size_t idx = 0u; idx < block.numVoxels(); ++idx) {
+      block.getVoxel(idx).on_surface = false;
+    }
+  }
+
   propagateSurface(mesh);
-  for (const BlockIndex& idx : blocks) {
+  for (const auto& idx : blocks) {
     processTsdfBlock(tsdf.getBlock(idx), idx);
   }
 
@@ -350,7 +357,14 @@ void GvdIntegrator::updateUnobservedVoxel(const TsdfVoxel& tsdf_voxel,
   update_stats_.number_new_voxels++;
 
   const bool is_fixed = isTsdfFixed(tsdf_voxel);
-  if (is_fixed) {
+  if (!is_fixed && gvd_voxel.on_surface) {
+    MLOG(Verbosity::STATUS)
+        << "Invalid surface with d_parent="
+        << (gvd_voxel.parent_pos - gvd_layer_->getVoxelPosition(index)).norm()
+        << " vs d_tsdf=" << tsdf_voxel.distance;
+  }
+
+  if (is_fixed || gvd_voxel.on_surface) {
     gvd_voxel.distance = tsdf_voxel.distance;
     gvd_voxel.fixed = true;
     MLOG(Verbosity::DEBUG) << "[gvd] voxel @ " << index.transpose()
@@ -359,14 +373,15 @@ void GvdIntegrator::updateUnobservedVoxel(const TsdfVoxel& tsdf_voxel,
     return;
   }
 
-  if (!is_fixed && gvd_voxel.on_surface) {
-    MLOG(Verbosity::DEBUG) << "[gvd] flipping invalid surface @ " << index.transpose();
-    // Flip surface flag if voxel marked as containing a surface, but outside the
-    // trunction distance. This shouldn't happen if the tsdf is smooth, but doesn't
-    // appear that this is always the case
-    gvd_voxel.on_surface = false;
-    update_stats_.number_surface_flipped++;
-  }
+  /*  if (!is_fixed && gvd_voxel.on_surface) {*/
+  /*MLOG(Verbosity::DEBUG) << "[gvd] flipping invalid surface @ " <<
+   * index.transpose();*/
+  /*// Flip surface flag if voxel marked as containing a surface, but outside the*/
+  /*// trunction distance. This shouldn't happen if the tsdf is smooth, but doesn't*/
+  /*// appear that this is always the case*/
+  /*gvd_voxel.on_surface = false;*/
+  /*update_stats_.number_surface_flipped++;*/
+  /*}*/
 
   setDefaultDistance(gvd_voxel, default_distance);
   MLOG(Verbosity::DEBUG) << "[gvd] voxel @ " << index.transpose()
@@ -433,10 +448,10 @@ void GvdIntegrator::updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
 
   // is_fixed is false after this point
 
-  if (gvd_voxel.on_surface) {
-    gvd_voxel.on_surface = false;
-    update_stats_.number_surface_flipped++;
-  }
+  // if (gvd_voxel.on_surface) {
+  // gvd_voxel.on_surface = false;
+  // update_stats_.number_surface_flipped++;
+  //}
 
   if (gvd_voxel.fixed) {
     gvd_voxel.fixed = false;
