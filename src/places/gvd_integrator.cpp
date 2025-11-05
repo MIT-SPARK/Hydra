@@ -331,6 +331,8 @@ void GvdIntegrator::processTsdfBlock(const TsdfBlock& tsdf_block,
 
   for (size_t idx = 0u; idx < tsdf_block.numVoxels(); ++idx) {
     const TsdfVoxel& tsdf_voxel = tsdf_block.getVoxel(idx);
+    // TODO(nathan) handle unobserved voxel that borders observed voxels
+    // as optional surface point to lower from (maybe also raise?)
     if (tsdf_voxel.weight < config.min_weight) {
       continue;  // If this voxel is unobserved in the original map, skip it.
     }
