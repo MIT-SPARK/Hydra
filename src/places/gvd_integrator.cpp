@@ -84,7 +84,7 @@ void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
   ScopedTimer timer("places/propagate_tsdf", timestamp_ns);
   update_stats_.clear();
 
-  propagateSurface(tsdf, mesh);
+  propagateSurface(mesh);
   for (const BlockIndex& idx : blocks) {
     processTsdfBlock(tsdf.getBlock(idx), idx);
   }
@@ -259,13 +259,13 @@ void GvdIntegrator::updateVoronoiQueue(GvdVoxel& voxel,
 /* TSDF Propagation */
 /****************************************************************************************/
 
-void GvdIntegrator::propagateSurface(const MeshLayer& layer, const TsdfLayer& tsdf) {
+void GvdIntegrator::propagateSurface(const MeshLayer& mesh) {
   size_t num_outside = 0;
   size_t num_invalid = 0;
   size_t num_marked = 0;
   for (const auto& block : mesh) {
     for (const auto& point : block.points) {
-      auto block = gvd.getBlockPtr(point);
+      auto block = gvd_layer_->getBlockPtr(point);
       if (!block) {
         ++num_outside;
         continue;  // surface vertex falls outside gvd
@@ -289,38 +289,6 @@ void GvdIntegrator::propagateSurface(const MeshLayer& layer, const TsdfLayer& ts
 
   LOG(ERROR) << "Marked mesh: outside=" << num_outside << ", invalid=" << num_invalid
              << ", marked=" << num_marked;
-
-  // TODO(nathan) need to enforce that this is smaller than the truncation distance
-  // otherwise updated blocks in free-space will clear the ESDF
-  const auto surface_threshold = std::sqrt(3.0) * tsdf.voxel_size / 2.0;
-  for (size_t idx = 0u; idx < tsdf_block.numVoxels(); ++idx) {
-    const auto& tsdf_voxel = tsdf_block.getVoxel(idx);
-    if (tsdf_voxel.weight < config_.min_weight) {
-      continue;
-    }
-
-    // surface voxels are anything closer to the surface than the voxel size
-    auto& gvd_voxel = gvd_block.getVoxel(idx);
-    const auto tsdf_dist = std::abs(tsdf_voxel.distance);
-    gvd_voxel.on_surface = tsdf_dist < surface_threshold;
-    if (!gvd_voxel.on_surface) {
-      continue;
-    }
-
-    resetParent(gvd_voxel);  // surface voxels don't have parents
-
-    Point pos = tsdf_block.getVoxelPosition(idx);
-    if (config_.refine_voxel_pos) {
-      const auto grad = computeGradient(tsdf, tsdf.getGlobalVoxelIndex(pos));
-      if (grad) {
-        pos -= tsdf_dist * grad.value();
-      }
-    }
-
-    gvd_voxel.parent_pos[0] = pos.x();
-    gvd_voxel.parent_pos[1] = pos.y();
-    gvd_voxel.parent_pos[2] = pos.z();
-  }
 }
 
 void GvdIntegrator::processTsdfBlock(const TsdfBlock& tsdf_block,

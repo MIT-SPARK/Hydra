@@ -42,7 +42,8 @@ void updateGvd(GvdIntegrator& integrator,
                const VolumetricMap& map,
                bool clear_updated,
                bool use_all_blocks) {
-  integrator.updateFromTsdf(0, map.getTsdfLayer(), clear_updated, use_all_blocks);
+  integrator.updateFromTsdf(
+      0, map.getTsdfLayer(), map.getMeshLayer(), clear_updated, use_all_blocks);
   integrator.updateGvd(0);
 }
 
@@ -58,6 +59,11 @@ void SingleBlockTestFixture::setTsdfVoxel(
   auto& voxel = tsdf_block->getVoxel(v_index);
   voxel.distance = distance;
   voxel.weight = weight;
+
+  if (distance < 0.0f && weight > 0.0f) {
+    const auto pos = tsdf_block->getVoxelPosition(v_index);
+    mesh_block->points.push_back(pos);
+  }
 }
 
 const GvdVoxel& SingleBlockTestFixture::getGvdVoxel(int x, int y, int z) {
@@ -95,6 +101,7 @@ void SingleBlockTestFixture::SetUp() {
 
   BlockIndex block_index = BlockIndex::Zero();
   tsdf_block = map->getTsdfLayer().allocateBlockPtr(block_index);
+  mesh_block = map->getMeshLayer().allocateBlockPtr(block_index);
   gvd_block = gvd_layer->allocateBlockPtr(block_index);
   tsdf_block->setUpdated();
 
@@ -113,7 +120,7 @@ void SingleBlockExtractionTestFixture::SetUp() {
   setBlockState();
 
   gvd_integrator.reset(new GvdIntegrator(gvd_config, gvd_layer));
-  gvd_integrator->updateFromTsdf(0, map->getTsdfLayer(), true);
+  gvd_integrator->updateFromTsdf(0, map->getTsdfLayer(), map->getMeshLayer(), true);
   gvd_integrator->updateGvd(0);
 }
 
@@ -158,6 +165,7 @@ const GvdVoxel& TestFixture2d::getGvdVoxel(int x, int y) {
 void TestFixture2d::SetUp() {
   tsdf_layer.reset(new TsdfLayer(voxel_size, voxels_per_side));
   gvd_layer.reset(new GvdLayer(voxel_size, voxels_per_side));
+  mesh_layer.reset(new MeshLayer(tsdf_layer->blockSize()));
 
   BlockIndex block_index = BlockIndex::Zero();
   tsdf_block = tsdf_layer->allocateBlockPtr(block_index);

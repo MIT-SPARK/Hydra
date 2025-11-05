@@ -68,6 +68,7 @@ class SingleBlockTestFixture : public ::testing::Test {
   GvdIntegratorConfig gvd_config;
   TsdfBlock::Ptr tsdf_block;
   GvdBlock::Ptr gvd_block;
+  MeshBlock::Ptr mesh_block;
 };
 
 class LargeSingleBlockTestFixture : public SingleBlockTestFixture {
@@ -111,6 +112,7 @@ class TestFixture2d : public ::testing::Test {
   int voxels_per_side = 8;
   double truncation_distance = 0.1;
 
+  MeshLayer::Ptr mesh_layer;
   TsdfLayer::Ptr tsdf_layer;
   GvdLayer::Ptr gvd_layer;
 

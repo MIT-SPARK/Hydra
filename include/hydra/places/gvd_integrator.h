@@ -98,7 +98,7 @@ class GvdIntegrator {
                           GraphExtractor* extractor);
 
   // TSDF propagation
-  void propagateSurface(const TsdfLayer& tsdf, const MeshLayer& mesh);
+  void propagateSurface(const MeshLayer& mesh);
 
   void processTsdfBlock(const TsdfBlock& block, const BlockIndex& index);
 
