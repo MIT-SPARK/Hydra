@@ -46,6 +46,7 @@
 #include "hydra/places/update_statistics.h"
 #include "hydra/reconstruction/voxel_types.h"
 #include "hydra/utils/bucket_queue.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra::places {
 
@@ -59,7 +60,17 @@ struct OpenQueueEntry {
  */
 class GvdIntegrator {
  public:
-  GvdIntegrator(const GvdIntegratorConfig& config, const GvdLayer::Ptr& gvd_layer);
+  struct Config : VerbosityConfig {
+    float max_distance_m = 2.0f;
+    float min_distance_m = 0.2f;
+    float min_diff_m = 1.0e-3f;
+    float min_weight = 1.0e-6f;
+    bool refine_voxel_pos = false;
+    bool positive_distance_only = true;
+    VoronoiCheckConfig voronoi_config;
+  } const config;
+
+  GvdIntegrator(const Config& config, const GvdLayer::Ptr& gvd_layer);
 
   virtual ~GvdIntegrator() = default;
 
@@ -79,6 +90,8 @@ class GvdIntegrator {
                              const GlobalIndices& neighbor_indices,
                              const GlobalIndex& voxel_index,
                              GvdVoxel& voxel);
+
+  const double default_distance;
 
  protected:
   // GVD membership
@@ -130,8 +143,6 @@ class GvdIntegrator {
  protected:
   UpdateStatistics update_stats_;
 
-  const double default_distance_;
-  GvdIntegratorConfig config_;
   GvdLayer::Ptr gvd_layer_;
 
   GvdParentTracker parent_tracker_;
@@ -142,5 +153,7 @@ class GvdIntegrator {
   float voxel_size_;
   float min_integration_distance_m_;
 };
+
+void declare_config(GvdIntegrator::Config& config);
 
 }  // namespace hydra::places

@@ -44,18 +44,18 @@
 
 namespace hydra::eval {
 
-using places::GvdIntegratorConfig;
+using places::GvdIntegrator;
 using places::GvdLayer;
 using places::GvdVoxel;
 
-PlaceEvaluator::PlaceEvaluator(const GvdIntegratorConfig& config,
+PlaceEvaluator::PlaceEvaluator(const GvdIntegrator::Config& config,
                                const TsdfLayer::Ptr& tsdf)
     : tsdf_(CHECK_NOTNULL(tsdf)) {
   gvd_.reset(new GvdLayer(tsdf_->voxel_size, tsdf_->voxels_per_side));
   computeGroundTruth(config);
 }
 
-void PlaceEvaluator::computeGroundTruth(const GvdIntegratorConfig& config) {
+void PlaceEvaluator::computeGroundTruth(const GvdIntegrator::Config& config) {
   config_ = config;
 
   VLOG(1) << "using GVD config:" << std::endl << config_;
@@ -69,7 +69,7 @@ void PlaceEvaluator::computeGroundTruth(const GvdIntegratorConfig& config) {
 PlaceEvaluator::Ptr PlaceEvaluator::fromFile(const std::string& config_filepath,
                                              const std::string& tsdf_filepath,
                                              std::optional<double> max_distance_m) {
-  auto config = config::fromYamlFile<GvdIntegratorConfig>(config_filepath);
+  auto config = config::fromYamlFile<GvdIntegrator::Config>(config_filepath);
   if (max_distance_m) {
     config.max_distance_m = *max_distance_m;
   }

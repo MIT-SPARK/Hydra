@@ -65,7 +65,7 @@ class SingleBlockTestFixture : public ::testing::Test {
   std::unique_ptr<VolumetricMap> map;
   GvdLayer::Ptr gvd_layer;
 
-  GvdIntegratorConfig gvd_config;
+  GvdIntegrator::Config gvd_config;
   TsdfBlock::Ptr tsdf_block;
   GvdBlock::Ptr gvd_block;
   MeshBlock::Ptr mesh_block;
@@ -116,7 +116,7 @@ class TestFixture2d : public ::testing::Test {
   TsdfLayer::Ptr tsdf_layer;
   GvdLayer::Ptr gvd_layer;
 
-  GvdIntegratorConfig gvd_config;
+  GvdIntegrator::Config gvd_config;
   TsdfBlock::Ptr tsdf_block;
   GvdBlock::Ptr gvd_block;
 };
