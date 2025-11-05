@@ -1,0 +1,95 @@
+---
+# YOLOv11 Label Space (COCO 80 classes)
+# Based on COCO dataset for instance segmentation
+# Dynamic: humans, animals, airplanes
+# Objects: vehicles (including bicycles), static objects, furniture, etc.
+total_semantic_labels: 81
+dynamic_labels: [0, 4, 8, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+invalid_labels: [80]
+object_labels: [1, 2, 3, 5, 6, 7, 9, 10, 11, 12, 13, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79]
+# dynamic_labels: []
+# invalid_labels: [1, 2, 3, 5, 6, 7, 9, 10, 11, 12, 13, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 0, 4, 8, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+# object_labels: [2, 13]
+surface_places_labels: []
+label_names:
+  - {label: 0, name: person}
+  - {label: 1, name: bicycle}
+  - {label: 2, name: car}
+  - {label: 3, name: motorcycle}
+  - {label: 4, name: airplane}
+  - {label: 5, name: bus}
+  - {label: 6, name: train}
+  - {label: 7, name: truck}
+  - {label: 8, name: boat}
+  - {label: 9, name: traffic light}
+  - {label: 10, name: fire hydrant}
+  - {label: 11, name: stop sign}
+  - {label: 12, name: parking meter}
+  - {label: 13, name: bench}
+  - {label: 14, name: bird}
+  - {label: 15, name: cat}
+  - {label: 16, name: dog}
+  - {label: 17, name: horse}
+  - {label: 18, name: sheep}
+  - {label: 19, name: cow}
+  - {label: 20, name: elephant}
+  - {label: 21, name: bear}
+  - {label: 22, name: zebra}
+  - {label: 23, name: giraffe}
+  - {label: 24, name: backpack}
+  - {label: 25, name: umbrella}
+  - {label: 26, name: handbag}
+  - {label: 27, name: tie}
+  - {label: 28, name: suitcase}
+  - {label: 29, name: frisbee}
+  - {label: 30, name: skis}
+  - {label: 31, name: snowboard}
+  - {label: 32, name: sports ball}
+  - {label: 33, name: kite}
+  - {label: 34, name: baseball bat}
+  - {label: 35, name: baseball glove}
+  - {label: 36, name: skateboard}
+  - {label: 37, name: surfboard}
+  - {label: 38, name: tennis racket}
+  - {label: 39, name: bottle}
+  - {label: 40, name: wine glass}
+  - {label: 41, name: cup}
+  - {label: 42, name: fork}
+  - {label: 43, name: knife}
+  - {label: 44, name: spoon}
+  - {label: 45, name: bowl}
+  - {label: 46, name: banana}
+  - {label: 47, name: apple}
+  - {label: 48, name: sandwich}
+  - {label: 49, name: orange}
+  - {label: 50, name: broccoli}
+  - {label: 51, name: carrot}
+  - {label: 52, name: hot dog}
+  - {label: 53, name: pizza}
+  - {label: 54, name: donut}
+  - {label: 55, name: cake}
+  - {label: 56, name: chair}
+  - {label: 57, name: couch}
+  - {label: 58, name: potted plant}
+  - {label: 59, name: bed}
+  - {label: 60, name: dining table}
+  - {label: 61, name: toilet}
+  - {label: 62, name: tv}
+  - {label: 63, name: laptop}
+  - {label: 64, name: mouse}
+  - {label: 65, name: remote}
+  - {label: 66, name: keyboard}
+  - {label: 67, name: cell phone}
+  - {label: 68, name: microwave}
+  - {label: 69, name: oven}
+  - {label: 70, name: toaster}
+  - {label: 71, name: sink}
+  - {label: 72, name: refrigerator}
+  - {label: 73, name: book}
+  - {label: 74, name: clock}
+  - {label: 75, name: vase}
+  - {label: 76, name: scissors}
+  - {label: 77, name: teddy bear}
+  - {label: 78, name: hair drier}
+  - {label: 79, name: toothbrush}
+  - {label: 80, name: unknown}
