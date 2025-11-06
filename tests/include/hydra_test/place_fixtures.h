@@ -44,54 +44,36 @@ void updateGvd(GvdIntegrator& integrator,
                bool clear_updated,
                bool use_all_blocks = false);
 
-class SingleBlockTestFixture : public ::testing::Test {
+class GvdIntegratorData {
  public:
-  SingleBlockTestFixture() = default;
+  using Coord = Eigen::Matrix<size_t, 3, 1>;
+  struct Obs {
+    float distance;
+    float weight = 0.1f;
+  };
+  using ObservationCallback = std::function<std::optional<Obs>(const Coord&)>;
 
-  virtual ~SingleBlockTestFixture() = default;
+  GvdIntegratorData(float voxel_size = 0.1f,
+                    size_t voxels_per_side = 4,
+                    float truncation_distance = 0.1f);
 
-  virtual void SetUp() override;
+  void setup(const ObservationCallback& callback);
 
-  void setTsdfVoxel(int x, int y, int z, float distance, float weight = 0.1f);
+  void setTsdfVoxel(size_t x, size_t y, size_t z, float distance, float weight = 0.1f);
 
   const TsdfVoxel& getTsdfVoxel(int x, int y, int z);
 
   const GvdVoxel& getGvdVoxel(int x, int y, int z);
 
-  float voxel_size = 0.1f;
-  int voxels_per_side = 4;
-  double truncation_distance = 0.1;
-
-  std::unique_ptr<VolumetricMap> map;
-  GvdLayer::Ptr gvd_layer;
+  const VolumetricMap::Config map_config;
+  VolumetricMap map;
 
   GvdIntegrator::Config gvd_config;
+  GvdLayer::Ptr gvd_layer;
+
   TsdfBlock::Ptr tsdf_block;
   GvdBlock::Ptr gvd_block;
   MeshBlock::Ptr mesh_block;
-};
-
-class LargeSingleBlockTestFixture : public SingleBlockTestFixture {
- public:
-  LargeSingleBlockTestFixture() = default;
-
-  virtual ~LargeSingleBlockTestFixture() = default;
-
-  virtual void SetUp() override;
-};
-
-class SingleBlockExtractionTestFixture : public SingleBlockTestFixture {
- public:
-  SingleBlockExtractionTestFixture() = default;
-
-  virtual ~SingleBlockExtractionTestFixture() = default;
-
-  virtual void SetUp() override;
-
-  std::unique_ptr<GvdIntegrator> gvd_integrator;
-
- protected:
-  virtual void setBlockState();
 };
 
 class TestFixture2d : public ::testing::Test {

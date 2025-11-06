@@ -40,10 +40,6 @@
 
 namespace hydra::places {
 
-using test::LargeSingleBlockTestFixture;
-using test::SingleBlockTestFixture;
-using test::TestFixture2d;
-
 class ParentTestFixture : public SingleBlockTestFixture {
  public:
   ParentTestFixture() : SingleBlockTestFixture() {}
@@ -284,17 +280,15 @@ TEST_F(TestFixture2d, NegativeIntegrationCorrect) {
   }
 }
 
-TEST_F(SingleBlockTestFixture, PlaneCorrect) {
-  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
-  for (int x = 0; x < voxels_per_side; ++x) {
-    for (int y = 0; y < voxels_per_side; ++y) {
-      for (int z = 0; z < voxels_per_side; ++z) {
-        const bool is_edge = (x == 0);
-        setTsdfVoxel(x, y, z, is_edge ? -0.05 : truncation_distance);
-      }
-    }
-  }
+TEST(GvdIntegrator, PlaneCorrect) {
+  test::GvdIntegratorData data;
+  data.setup([&](const auto& coord) {
+    test::GvdIntegratorData::Obs obs;
+    obs.distance = coord.x() == 0 ? -0.05 : data.map_config.truncation_distance;
+    return obs;
+  });
 
+  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
   test::updateGvd(gvd_integrator, *map, true);
 
   for (int x = 0; x < voxels_per_side; ++x) {

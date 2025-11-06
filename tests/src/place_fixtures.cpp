@@ -47,11 +47,42 @@ void updateGvd(GvdIntegrator& integrator,
   integrator.updateGvd(0);
 }
 
-void SingleBlockTestFixture::setTsdfVoxel(
-    int x, int y, int z, float distance, float weight) {
-  CHECK_LT(x, voxels_per_side);
-  CHECK_LT(y, voxels_per_side);
-  CHECK_LT(z, voxels_per_side);
+GvdIntegratorData::GvdIntegratorData(float voxel_size,
+                                     size_t voxels_per_side,
+                                     float truncation_distance)
+    : map_config({voxel_size, voxels_per_side, truncation_distance}), map(map_config) {
+  gvd_config.min_distance_m = truncation_distance;
+  gvd_config.max_distance_m = 10.0;
+  gvd_layer.reset(new GvdLayer(voxel_size, voxels_per_side));
+
+  BlockIndex block_index = BlockIndex::Zero();
+  tsdf_block = map.getTsdfLayer().allocateBlockPtr(block_index);
+  mesh_block = map.getMeshLayer().allocateBlockPtr(block_index);
+  gvd_block = gvd_layer->allocateBlockPtr(block_index);
+  tsdf_block->setUpdated();
+}
+
+void GvdIntegratorData::setup(const ObservationCallback& callback) {
+  for (size_t x = 0; x < map_config.voxels_per_side; ++x) {
+    for (size_t y = 0; y < map_config.voxels_per_side; ++y) {
+      for (size_t z = 0; z < map_config.voxels_per_side; ++z) {
+        const Coord coord(x, y, z);
+        const auto obs = callback(coord);
+        if (!obs) {
+          continue;
+        }
+
+        setTsdfVoxel(x, y, z, obs->distance, obs->weight);
+      }
+    }
+  }
+}
+
+void GvdIntegratorData::setTsdfVoxel(
+    size_t x, size_t y, size_t z, float distance, float weight) {
+  CHECK_LT(x, map_config.voxels_per_side);
+  CHECK_LT(y, map_config.voxels_per_side);
+  CHECK_LT(z, map_config.voxels_per_side);
 
   VoxelIndex v_index;
   v_index << x, y, z;
@@ -66,53 +97,24 @@ void SingleBlockTestFixture::setTsdfVoxel(
   }
 }
 
-const GvdVoxel& SingleBlockTestFixture::getGvdVoxel(int x, int y, int z) {
-  CHECK_LT(x, voxels_per_side);
-  CHECK_LT(y, voxels_per_side);
-  CHECK_LT(z, voxels_per_side);
+const GvdVoxel& GvdIntegratorData::getGvdVoxel(int x, int y, int z) {
+  CHECK_LT(x, map_config.voxels_per_side);
+  CHECK_LT(y, map_config.voxels_per_side);
+  CHECK_LT(z, map_config.voxels_per_side);
 
   VoxelIndex v_index;
   v_index << x, y, z;
-
   return gvd_block->getVoxel(v_index);
 }
 
-const TsdfVoxel& SingleBlockTestFixture::getTsdfVoxel(int x, int y, int z) {
-  CHECK_LT(x, voxels_per_side);
-  CHECK_LT(y, voxels_per_side);
-  CHECK_LT(z, voxels_per_side);
+const TsdfVoxel& GvdIntegratorData::getTsdfVoxel(int x, int y, int z) {
+  CHECK_LT(x, map_config.voxels_per_side);
+  CHECK_LT(y, map_config.voxels_per_side);
+  CHECK_LT(z, map_config.voxels_per_side);
 
   VoxelIndex v_index;
   v_index << x, y, z;
-
   return tsdf_block->getVoxel(v_index);
-}
-
-void SingleBlockTestFixture::SetUp() {
-  gvd_config.min_distance_m = truncation_distance;
-  gvd_config.max_distance_m = 10.0;
-
-  VolumetricMap::Config map_config;
-  map_config.voxel_size = voxel_size;
-  map_config.voxels_per_side = voxels_per_side;
-  map_config.truncation_distance = truncation_distance;
-  map = std::make_unique<VolumetricMap>(map_config);
-  gvd_layer.reset(new GvdLayer(voxel_size, voxels_per_side));
-
-  BlockIndex block_index = BlockIndex::Zero();
-  tsdf_block = map->getTsdfLayer().allocateBlockPtr(block_index);
-  mesh_block = map->getMeshLayer().allocateBlockPtr(block_index);
-  gvd_block = gvd_layer->allocateBlockPtr(block_index);
-  tsdf_block->setUpdated();
-
-  for (int x = 0; x < voxels_per_side; ++x) {
-    for (int y = 0; y < voxels_per_side; ++y) {
-      for (int z = 0; z < voxels_per_side; ++z) {
-        const bool is_edge = (x == 0) || (y == 0) || (z == 0);
-        setTsdfVoxel(x, y, z, is_edge ? -0.05 : truncation_distance);
-      }
-    }
-  }
 }
 
 void SingleBlockExtractionTestFixture::SetUp() {
@@ -122,13 +124,6 @@ void SingleBlockExtractionTestFixture::SetUp() {
   gvd_integrator.reset(new GvdIntegrator(gvd_config, gvd_layer));
   gvd_integrator->updateFromTsdf(0, map->getTsdfLayer(), map->getMeshLayer(), true);
   gvd_integrator->updateGvd(0);
-}
-
-void SingleBlockExtractionTestFixture::setBlockState() {}
-
-void LargeSingleBlockTestFixture::SetUp() {
-  voxels_per_side = 8;
-  SingleBlockTestFixture::SetUp();
 }
 
 void TestFixture2d::setSurfaceVoxel(int x, int y) {
