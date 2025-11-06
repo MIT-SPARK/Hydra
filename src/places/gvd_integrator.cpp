@@ -81,7 +81,6 @@ GvdIntegrator::GvdIntegrator(const GvdIntegrator::Config& config,
       default_distance(config.max_distance_m),
       gvd_layer_(gvd_layer),
       neighbor_search_(26) {
-  // TODO(nathan) we could consider an exception here
   CHECK(gvd_layer_);
 
   // config.positive_distance_only toggles between only integrating to the negative
@@ -359,13 +358,6 @@ void GvdIntegrator::updateUnobservedVoxel(const TsdfVoxel& tsdf_voxel,
   update_stats_.number_new_voxels++;
 
   const bool is_fixed = isTsdfFixed(tsdf_voxel);
-  if (!is_fixed && gvd_voxel.on_surface) {
-    MLOG(Verbosity::STATUS)
-        << "Invalid surface with d_parent="
-        << (gvd_voxel.parent_pos - gvd_layer_->getVoxelPosition(index)).norm()
-        << " vs d_tsdf=" << tsdf_voxel.distance;
-  }
-
   if (is_fixed || gvd_voxel.on_surface) {
     gvd_voxel.distance = tsdf_voxel.distance;
     gvd_voxel.fixed = true;
@@ -374,16 +366,6 @@ void GvdIntegrator::updateUnobservedVoxel(const TsdfVoxel& tsdf_voxel,
     pushToQueue(index, gvd_voxel);
     return;
   }
-
-  /*  if (!is_fixed && gvd_voxel.on_surface) {*/
-  /*MLOG(Verbosity::DEBUG) << "[gvd] flipping invalid surface @ " <<
-   * index.transpose();*/
-  /*// Flip surface flag if voxel marked as containing a surface, but outside the*/
-  /*// trunction distance. This shouldn't happen if the tsdf is smooth, but doesn't*/
-  /*// appear that this is always the case*/
-  /*gvd_voxel.on_surface = false;*/
-  /*update_stats_.number_surface_flipped++;*/
-  /*}*/
 
   setDefaultDistance(gvd_voxel, default_distance);
   MLOG(Verbosity::DEBUG) << "[gvd] voxel @ " << index.transpose()
@@ -449,11 +431,6 @@ void GvdIntegrator::updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
   }
 
   // is_fixed is false after this point
-
-  // if (gvd_voxel.on_surface) {
-  // gvd_voxel.on_surface = false;
-  // update_stats_.number_surface_flipped++;
-  //}
 
   if (gvd_voxel.fixed) {
     gvd_voxel.fixed = false;
@@ -624,7 +601,6 @@ void GvdIntegrator::processOpenQueue(GraphExtractor* extractor) {
   MLOG(Verbosity::DEBUG) << "* Processing Open Queue                           *";
   MLOG(Verbosity::DEBUG) << "***************************************************";
   while (!open_.empty()) {
-    // TODO(nathan) potentially add telemetry
     auto entry = open_.front();
     open_.pop();
 
@@ -682,9 +658,9 @@ std::optional<Point> GvdIntegrator::computeGradient(const TsdfLayer& tsdf,
   if (!tsdf.hasVoxel(index)) {
     return std::nullopt;
   }
+
+  // Iterate over negative and positive signs in central difference.
   Point grad = Point::Zero();
-  // Iterate over all 3 D, and over negative and positive signs in central
-  // difference.
   for (unsigned int i = 0u; i < 3u; ++i) {
     for (int sign : {-1, 1}) {
       GlobalIndex neighbor_index = index;
@@ -693,10 +669,11 @@ std::optional<Point> GvdIntegrator::computeGradient(const TsdfLayer& tsdf,
       if (!neighbor) {
         return std::nullopt;
       }
+
       grad(i) += sign * neighbor->distance;
     }
   }
-  // Scale by correct size.
+
   // This is central difference, so it's 2x voxel size between measurements.
   return grad / (2.0f * tsdf.voxel_size);
 }
