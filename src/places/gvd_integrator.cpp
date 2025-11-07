@@ -490,9 +490,7 @@ void GvdIntegrator::updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
     MLOG(Verbosity::DEBUG) << "Fixed @ " << index.transpose()
                            << ", lower: " << std::boolalpha << is_tsdf_lower;
     return;
-  }
-
-  // is_fixed is false after this point
+  }  // is_fixed is false after this point
 
   if (gvd_voxel.fixed) {
     gvd_voxel.fixed = false;
@@ -506,9 +504,10 @@ void GvdIntegrator::updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
     return;  // no need to update if the signs match
   }
 
+  // we raise any voxel where the sign flips
+  ++update_stats_.number_sign_flipped;
   MLOG(Verbosity::DEBUG) << "Raising flipped voxel @ " << index.transpose();
   // TODO(nathan) add to tracked statistics
-  // we raise any voxel where the sign flips
   pushToQueue(index, gvd_voxel);  // push uses distance and needs to come before raise
   setRaiseStatus(gvd_voxel, default_distance);
 }

@@ -5,9 +5,13 @@ import logging
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import rich
+import rich.columns
+import rich.console
+import rich.text
 import seaborn as sns
 
-DEFAULT_FOLDERS = ["frontend", "backend", "lcd"]
+DEFAULT_FOLDERS = ["frontend", "backend", "lcd", "timing"]
 FRONTEND_TIMERS = ["frontend/spin"]
 BACKEND_TIMERS = ["backend/spin"]
 
@@ -19,7 +23,14 @@ def _get_filenames(result_path, subdir):
 
 
 def _get_timer_name(path):
-    return path.parent.name + "/" + path.stem[: -len("_timing_raw")]
+    parent_name = path.parent.name
+    if parent_name == "timing":
+        parent_name = ""
+    else:
+        parent_name += "_"
+
+    name = parent_name + path.stem[: -len("_timing_raw")]
+    return name.replace("/", "_")
 
 
 def _get_time_array_from_log(filename):
@@ -205,7 +216,19 @@ def plot_comparison(results, plot_config, keys, use_bars=False, rt_threshold=Non
     labels = []
     result_set = []
 
+    console = rich.console.Console()
+
+    keys = [x.replace("/", "_") for x in keys]
     for stem, result in results.items():
+        console.print(
+            rich.panel.Panel(
+                rich.console.Group(
+                    rich.text.Text(stem.upper(), justify="center", style="bold green"),
+                    rich.columns.Columns([key for key in result]),
+                )
+            )
+        )
+
         result_label = plot_config.get("result_map", {}).get(stem, stem.upper())
         for key in keys:
             if key not in result:

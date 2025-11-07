@@ -41,11 +41,11 @@ namespace hydra::places {
  * @brief Tracking statistics for what the integrator did
  */
 struct UpdateStatistics {
-  size_t number_surface_flipped;
   size_t number_queue_inserts;
   size_t number_lowered_voxels;
   size_t number_raised_voxels;
   size_t number_new_voxels;
+  size_t number_sign_flipped;
   size_t number_raise_updates;
   size_t number_voronoi_found;
   size_t number_lower_skipped;
