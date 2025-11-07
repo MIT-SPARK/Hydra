@@ -46,27 +46,29 @@ void updateGvd(GvdIntegrator& integrator,
 
 class GvdIntegratorData {
  public:
-  using Coord = Eigen::Matrix<size_t, 3, 1>;
+  using Coords = std::array<size_t, 3>;
   struct Obs {
     float distance;
     float weight = 0.1f;
   };
-  using ObservationCallback = std::function<std::optional<Obs>(const Coord&)>;
-  using CheckCallback = std::function<void(const Coord&, const GvdVoxel&)>;
+
+  using ObservationCallback =
+      std::function<std::optional<Obs>(const Coords&, const VolumetricMap::Config&)>;
+  using CheckCallback =
+      std::function<void(const Coords&, const GvdVoxel&, const VolumetricMap::Config&)>;
 
   GvdIntegratorData(float voxel_size = 0.1f,
                     size_t voxels_per_side = 4,
                     float truncation_distance = 0.1f);
 
   void setup(const ObservationCallback& callback);
-
   void check(const CheckCallback& callback);
 
-  void setTsdfVoxel(size_t x, size_t y, size_t z, float distance, float weight = 0.1f);
+  void setTsdf(const Coords& coords, float distance, float weight = 0.1f);
+  void setTsdf(size_t x, size_t y, float distance, float weight = 0.1f);
 
-  const TsdfVoxel& getTsdfVoxel(int x, int y, int z);
-
-  const GvdVoxel& getGvdVoxel(int x, int y, int z);
+  const TsdfVoxel& getTsdf(const Coords& coords) const;
+  const GvdVoxel& getGvd(const Coords& coords) const;
 
   const VolumetricMap::Config map_config;
   VolumetricMap map;
@@ -77,33 +79,6 @@ class GvdIntegratorData {
   TsdfBlock::Ptr tsdf_block;
   GvdBlock::Ptr gvd_block;
   MeshBlock::Ptr mesh_block;
-};
-
-class TestFixture2d : public ::testing::Test {
- public:
-  TestFixture2d() = default;
-
-  virtual ~TestFixture2d() = default;
-
-  virtual void SetUp() override;
-
-  void setSurfaceVoxel(int x, int y);
-
-  void setTsdfVoxel(int x, int y, float distance, float weight = 0.1f);
-
-  const GvdVoxel& getGvdVoxel(int x, int y);
-
-  float voxel_size = 1.0f;
-  int voxels_per_side = 8;
-  double truncation_distance = 0.1;
-
-  MeshLayer::Ptr mesh_layer;
-  TsdfLayer::Ptr tsdf_layer;
-  GvdLayer::Ptr gvd_layer;
-
-  GvdIntegrator::Config gvd_config;
-  TsdfBlock::Ptr tsdf_block;
-  GvdBlock::Ptr gvd_block;
 };
 
 }  // namespace hydra::places::test

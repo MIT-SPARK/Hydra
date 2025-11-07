@@ -37,6 +37,20 @@
 #include <hydra/places/gvd_utilities.h>
 
 namespace hydra::places::test {
+namespace {
+
+VoxelIndex validateCoords(const GvdIntegratorData::Coords& coords,
+                          size_t voxels_per_side) {
+  CHECK_LT(coords[0], voxels_per_side);
+  CHECK_LT(coords[1], voxels_per_side);
+  CHECK_LT(coords[2], voxels_per_side);
+
+  VoxelIndex v_index;
+  v_index << coords[0], coords[1], coords[2];
+  return v_index;
+}
+
+}  // namespace
 
 void updateGvd(GvdIntegrator& integrator,
                const VolumetricMap& map,
@@ -66,13 +80,13 @@ void GvdIntegratorData::setup(const ObservationCallback& callback) {
   for (size_t x = 0; x < map_config.voxels_per_side; ++x) {
     for (size_t y = 0; y < map_config.voxels_per_side; ++y) {
       for (size_t z = 0; z < map_config.voxels_per_side; ++z) {
-        const Coord coord(x, y, z);
-        const auto obs = callback(coord);
+        const Coords coords{x, y, z};
+        const auto obs = callback(coords, map_config);
         if (!obs) {
           continue;
         }
 
-        setTsdfVoxel(x, y, z, obs->distance, obs->weight);
+        setTsdf(coords, obs->distance, obs->weight);
       }
     }
   }
@@ -82,103 +96,36 @@ void GvdIntegratorData::check(const CheckCallback& callback) {
   for (size_t x = 0; x < map_config.voxels_per_side; ++x) {
     for (size_t y = 0; y < map_config.voxels_per_side; ++y) {
       for (size_t z = 0; z < map_config.voxels_per_side; ++z) {
-        callback(Coord(x, y, z), getGvdVoxel(x, y, z));
+        const Coords coords{x, y, z};
+        callback(coords, getGvd(coords), map_config);
       }
     }
   }
 }
 
-void GvdIntegratorData::setTsdfVoxel(
-    size_t x, size_t y, size_t z, float distance, float weight) {
-  CHECK_LT(x, map_config.voxels_per_side);
-  CHECK_LT(y, map_config.voxels_per_side);
-  CHECK_LT(z, map_config.voxels_per_side);
+void GvdIntegratorData::setTsdf(size_t x, size_t y, float distance, float weight) {
+  setTsdf({x, y, 0}, distance, weight);
+}
 
-  VoxelIndex v_index;
-  v_index << x, y, z;
-
+void GvdIntegratorData::setTsdf(const Coords& coords, float distance, float weight) {
+  const auto v_index = validateCoords(coords, map_config.voxels_per_side);
   auto& voxel = tsdf_block->getVoxel(v_index);
   voxel.distance = distance;
   voxel.weight = weight;
-
   if (distance < 0.0f && weight > 0.0f) {
     const auto pos = tsdf_block->getVoxelPosition(v_index);
     mesh_block->points.push_back(pos);
   }
 }
 
-const GvdVoxel& GvdIntegratorData::getGvdVoxel(int x, int y, int z) {
-  CHECK_LT(x, map_config.voxels_per_side);
-  CHECK_LT(y, map_config.voxels_per_side);
-  CHECK_LT(z, map_config.voxels_per_side);
-
-  VoxelIndex v_index;
-  v_index << x, y, z;
+const GvdVoxel& GvdIntegratorData::getGvd(const Coords& coords) const {
+  const auto v_index = validateCoords(coords, map_config.voxels_per_side);
   return gvd_block->getVoxel(v_index);
 }
 
-const TsdfVoxel& GvdIntegratorData::getTsdfVoxel(int x, int y, int z) {
-  CHECK_LT(x, map_config.voxels_per_side);
-  CHECK_LT(y, map_config.voxels_per_side);
-  CHECK_LT(z, map_config.voxels_per_side);
-
-  VoxelIndex v_index;
-  v_index << x, y, z;
+const TsdfVoxel& GvdIntegratorData::getTsdf(const Coords& coords) const {
+  const auto v_index = validateCoords(coords, map_config.voxels_per_side);
   return tsdf_block->getVoxel(v_index);
-}
-
-void TestFixture2d::setSurfaceVoxel(int x, int y) {
-  VoxelIndex v_index;
-  v_index << x, y, 0;
-
-  auto& voxel = tsdf_block->getVoxel(v_index);
-  voxel.distance = 0.0;
-  voxel.weight = 1.0;
-}
-
-void TestFixture2d::setTsdfVoxel(int x, int y, float distance, float weight) {
-  CHECK_LT(x, voxels_per_side);
-  CHECK_LT(y, voxels_per_side);
-
-  VoxelIndex v_index;
-  v_index << x, y, 0;
-
-  auto& voxel = tsdf_block->getVoxel(v_index);
-  voxel.distance = distance;
-  voxel.weight = weight;
-}
-
-const GvdVoxel& TestFixture2d::getGvdVoxel(int x, int y) {
-  CHECK_LT(x, voxels_per_side);
-  CHECK_LT(y, voxels_per_side);
-
-  VoxelIndex v_index;
-  v_index << x, y, 0;
-
-  return gvd_block->getVoxel(v_index);
-}
-
-void TestFixture2d::SetUp() {
-  tsdf_layer.reset(new TsdfLayer(voxel_size, voxels_per_side));
-  gvd_layer.reset(new GvdLayer(voxel_size, voxels_per_side));
-  mesh_layer.reset(new MeshLayer(tsdf_layer->blockSize()));
-
-  BlockIndex block_index = BlockIndex::Zero();
-  tsdf_block = tsdf_layer->allocateBlockPtr(block_index);
-  gvd_block = gvd_layer->allocateBlockPtr(block_index);
-  tsdf_block->setUpdated();
-
-  for (int x = 0; x < voxels_per_side; ++x) {
-    for (int y = 0; y < voxels_per_side; ++y) {
-      for (int z = 1; z < voxels_per_side; ++z) {
-        VoxelIndex v_index;
-        v_index << x, y, 0;
-
-        auto& voxel = tsdf_block->getVoxel(v_index);
-        voxel.weight = 0.0;
-      }
-    }
-  }
 }
 
 }  // namespace hydra::places::test
