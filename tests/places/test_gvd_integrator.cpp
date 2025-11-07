@@ -35,20 +35,143 @@
 #include <gtest/gtest.h>
 #include <hydra/places/gvd_integrator.h>
 #include <hydra/places/gvd_utilities.h>
-
-#include "hydra_test/place_fixtures.h"
+#include <hydra/reconstruction/volumetric_map.h>
 
 namespace hydra::places {
 namespace {
 
-std::string formatCoords(const test::GvdIntegratorData::Coords& coords) {
+void updateGvd(GvdIntegrator& integrator,
+               const VolumetricMap& map,
+               bool clear_updated,
+               bool use_all_blocks = false) {
+  integrator.updateFromTsdf(
+      0, map.getTsdfLayer(), map.getMeshLayer(), clear_updated, use_all_blocks);
+  integrator.updateGvd(0);
+}
+
+class GvdIntegratorData {
+ public:
+  using Coords = std::array<size_t, 3>;
+  struct Obs {
+    float distance;
+    float weight = 0.1f;
+  };
+
+  using ObservationCallback =
+      std::function<std::optional<Obs>(const Coords&, const VolumetricMap::Config&)>;
+  using CheckCallback =
+      std::function<void(const Coords&, const GvdVoxel&, const VolumetricMap::Config&)>;
+
+  GvdIntegratorData(float voxel_size = 0.1f,
+                    size_t voxels_per_side = 4,
+                    float truncation_distance = 0.1f);
+
+  void setup(const ObservationCallback& callback);
+  void check(const CheckCallback& callback);
+
+  void setTsdf(const Coords& coords, float distance, float weight = 0.1f);
+  void setTsdf(size_t x, size_t y, float distance, float weight = 0.1f);
+
+  const TsdfVoxel& getTsdf(const Coords& coords) const;
+  const GvdVoxel& getGvd(const Coords& coords) const;
+
+  const VolumetricMap::Config map_config;
+  VolumetricMap map;
+
+  GvdIntegrator::Config gvd_config;
+  GvdLayer::Ptr gvd_layer;
+
+  TsdfBlock::Ptr tsdf_block;
+  GvdBlock::Ptr gvd_block;
+  MeshBlock::Ptr mesh_block;
+};
+
+VoxelIndex validateCoords(const GvdIntegratorData::Coords& coords,
+                          size_t voxels_per_side) {
+  CHECK_LT(coords[0], voxels_per_side);
+  CHECK_LT(coords[1], voxels_per_side);
+  CHECK_LT(coords[2], voxels_per_side);
+
+  VoxelIndex v_index;
+  v_index << coords[0], coords[1], coords[2];
+  return v_index;
+}
+
+GvdIntegratorData::GvdIntegratorData(float voxel_size,
+                                     size_t voxels_per_side,
+                                     float truncation_distance)
+    : map_config({voxel_size, voxels_per_side, truncation_distance}), map(map_config) {
+  gvd_config.min_distance_m = truncation_distance;
+  gvd_config.max_distance_m = 10.0;
+  gvd_layer.reset(new GvdLayer(voxel_size, voxels_per_side));
+
+  BlockIndex block_index = BlockIndex::Zero();
+  tsdf_block = map.getTsdfLayer().allocateBlockPtr(block_index);
+  mesh_block = map.getMeshLayer().allocateBlockPtr(block_index);
+  gvd_block = gvd_layer->allocateBlockPtr(block_index);
+  tsdf_block->setUpdated();
+}
+
+void GvdIntegratorData::setup(const ObservationCallback& callback) {
+  for (size_t x = 0; x < map_config.voxels_per_side; ++x) {
+    for (size_t y = 0; y < map_config.voxels_per_side; ++y) {
+      for (size_t z = 0; z < map_config.voxels_per_side; ++z) {
+        const Coords coords{x, y, z};
+        const auto obs = callback(coords, map_config);
+        if (!obs) {
+          continue;
+        }
+
+        setTsdf(coords, obs->distance, obs->weight);
+      }
+    }
+  }
+}
+
+void GvdIntegratorData::check(const CheckCallback& callback) {
+  for (size_t x = 0; x < map_config.voxels_per_side; ++x) {
+    for (size_t y = 0; y < map_config.voxels_per_side; ++y) {
+      for (size_t z = 0; z < map_config.voxels_per_side; ++z) {
+        const Coords coords{x, y, z};
+        callback(coords, getGvd(coords), map_config);
+      }
+    }
+  }
+}
+
+void GvdIntegratorData::setTsdf(size_t x, size_t y, float distance, float weight) {
+  setTsdf({x, y, 0}, distance, weight);
+}
+
+void GvdIntegratorData::setTsdf(const Coords& coords, float distance, float weight) {
+  const auto v_index = validateCoords(coords, map_config.voxels_per_side);
+  auto& voxel = tsdf_block->getVoxel(v_index);
+  voxel.distance = distance;
+  voxel.weight = weight;
+  if (std::abs(distance) < map_config.truncation_distance && weight > 0.0f) {
+    const auto pos = tsdf_block->getVoxelPosition(v_index);
+    mesh_block->points.push_back(pos);
+  }
+}
+
+const GvdVoxel& GvdIntegratorData::getGvd(const Coords& coords) const {
+  const auto v_index = validateCoords(coords, map_config.voxels_per_side);
+  return gvd_block->getVoxel(v_index);
+}
+
+const TsdfVoxel& GvdIntegratorData::getTsdf(const Coords& coords) const {
+  const auto v_index = validateCoords(coords, map_config.voxels_per_side);
+  return tsdf_block->getVoxel(v_index);
+}
+
+std::string formatCoords(const GvdIntegratorData::Coords& coords) {
   const auto [x, y, z] = coords;
   std::stringstream ss;
   ss << " @ (" << x << ", " << y << ", " << z << ")";
   return ss.str();
 }
 
-bool coordsMatchParent(const test::GvdIntegratorData::Coords& coords,
+bool coordsMatchParent(const GvdIntegratorData::Coords& coords,
                        const GlobalIndex& parent,
                        const std::vector<size_t>& indices) {
   bool matches = false;
@@ -68,15 +191,13 @@ struct GvdSlice {
 
   GvdSlice(int rows, int cols) : distances(rows, cols), is_voronoi(rows, cols) {}
 
-  static GvdSlice fromData(size_t rows,
-                           size_t cols,
-                           const test::GvdIntegratorData& data) {
+  static GvdSlice fromData(size_t rows, size_t cols, const GvdIntegratorData& data) {
     GvdSlice result(rows, cols);
-    for (size_t x = 0; x < rows; ++x) {
-      for (size_t y = 0; y < cols; ++y) {
-        const auto& voxel = data.getGvd({x, y, 0});
-        result.distances(y, x) = voxel.observed ? voxel.distance : -1.0;
-        result.is_voronoi(y, x) = isVoronoi(voxel) ? 1.0 : 0.0;
+    for (size_t r = 0; r < rows; ++r) {
+      for (size_t c = 0; c < cols; ++c) {
+        const auto& voxel = data.getGvd({c, r, 0});
+        result.distances(r, c) = voxel.observed ? voxel.distance : -1.0;
+        result.is_voronoi(r, c) = isVoronoi(voxel) ? 1.0 : 0.0;
       }
     }
 
@@ -137,14 +258,14 @@ std::ostream& operator<<(std::ostream& out, const GvdSlice& result) {
 }  // namespace
 
 TEST(GvdIntegrator, OccupancyIntegration2DCorrect) {
-  test::GvdIntegratorData data(1.0, 8, 0.1);
+  GvdIntegratorData data(1.0, 8, 0.1);
   data.setup([](const auto& coords, const auto& config) {
     const auto [x, y, z] = coords;
     if (z > 0 || y >= 4) {
-      return test::GvdIntegratorData::Obs{0.0, 0.0};
+      return GvdIntegratorData::Obs{0.0, 0.0};
     }
 
-    return test::GvdIntegratorData::Obs{3.0f * config.voxel_size};
+    return GvdIntegratorData::Obs{3.0f * config.voxel_size};
   });
 
   data.setTsdf(0, 0, 0.0);
@@ -160,7 +281,7 @@ TEST(GvdIntegrator, OccupancyIntegration2DCorrect) {
   data.gvd_config.voronoi_config.parent_l1_separation = 2.0;
 
   GvdIntegrator gvd_integrator(data.gvd_config, data.gvd_layer);
-  test::updateGvd(gvd_integrator, data.map, false, true);
+  updateGvd(gvd_integrator, data.map, false, true);
 
   {  // scope for expected lifetime
     // clang-format off
@@ -181,15 +302,16 @@ TEST(GvdIntegrator, OccupancyIntegration2DCorrect) {
   VLOG(1) << "Perturbing GVD: (3, 2) -> 10.0, (7, 2) -> 0.0";
 
   // raise the middle obstacle and lower one on the side
+  // reset surface flags for previous surfaces
+  data.mesh_block->points.clear();
   data.setTsdf(3, 2, 10.0);
   data.setTsdf(7, 2, 0.0);
-  // reset surface flags for previous surfaces
   data.setTsdf(0, 0, 0.0, 1.0);
   data.setTsdf(0, 1, 0.0, 1.0);
   data.setTsdf(0, 2, 0.0, 1.0);
   data.setTsdf(0, 3, 0.0, 1.0);
 
-  test::updateGvd(gvd_integrator, data.map, false, true);
+  updateGvd(gvd_integrator, data.map, false, true);
 
   {  // scope for expected lifetime
     // clang-format off
@@ -210,22 +332,22 @@ TEST(GvdIntegrator, OccupancyIntegration2DCorrect) {
 }
 
 TEST(GvdIntegrator, NegativeIntegration2DCorrect) {
-  test::GvdIntegratorData data(1.0, 8, 0.1);
+  GvdIntegratorData data(1.0, 8, 0.1);
   data.setup([](const auto& coords, const auto& config) {
     const auto [x, y, z] = coords;
     if (z > 0) {
-      return test::GvdIntegratorData::Obs{0.0, 0.0};
+      return GvdIntegratorData::Obs{0.0, 0.0};
     }
 
     // exterior border is set to -truncation_distance
     if (x == 0 || y == 0 || x == 7 || y == 7) {
-      return test::GvdIntegratorData::Obs{-2.0f * config.voxel_size};
+      return GvdIntegratorData::Obs{-2.0f * config.voxel_size};
     }
 
     // interior border is set to half truncation distance
     if (x == 1 || y == 1 || x == 6 || y == 6) {
       bool is_corner = x == y || (x == 1 && y == 6) || (x == 6 && y == 1);
-      test::GvdIntegratorData::Obs obs{-config.voxel_size};
+      GvdIntegratorData::Obs obs{-config.voxel_size};
       if (is_corner) {
         obs.distance *= std::sqrt(2.0);
       }
@@ -235,11 +357,11 @@ TEST(GvdIntegrator, NegativeIntegration2DCorrect) {
 
     // set next ring of distances to 0
     if (x == 2 || y == 2 || x == 5 || y == 5) {
-      return test::GvdIntegratorData::Obs{0.0};
+      return GvdIntegratorData::Obs{0.0};
     }
 
     // set inner four voxels to 1.0
-    return test::GvdIntegratorData::Obs{1.0};
+    return GvdIntegratorData::Obs{1.0};
   });
 
   data.gvd_config.min_diff_m = 0.0;
@@ -250,7 +372,7 @@ TEST(GvdIntegrator, NegativeIntegration2DCorrect) {
   data.gvd_config.positive_distance_only = false;
 
   GvdIntegrator gvd_integrator(data.gvd_config, data.gvd_layer);
-  test::updateGvd(gvd_integrator, data.map, false, true);
+  updateGvd(gvd_integrator, data.map, false, true);
 
   Eigen::MatrixXd expected_distances(8, 8);
   // clang-format off
@@ -272,16 +394,16 @@ TEST(GvdIntegrator, NegativeIntegration2DCorrect) {
 }
 
 TEST(GvdIntegrator, PlaneCorrect) {
-  test::GvdIntegratorData data;
+  GvdIntegratorData data;
   data.setup([](const auto& coords, const auto& config) {
     const auto [x, y, z] = coords;
-    test::GvdIntegratorData::Obs obs;
+    GvdIntegratorData::Obs obs;
     obs.distance = x == 0 ? -0.05 : config.truncation_distance;
     return obs;
   });
 
   GvdIntegrator gvd_integrator(data.gvd_config, data.gvd_layer);
-  test::updateGvd(gvd_integrator, data.map, true);
+  updateGvd(gvd_integrator, data.map, true);
 
   data.check([](const auto& coords, const auto& voxel, const auto& config) {
     const auto [x, y, z] = coords;
@@ -293,17 +415,17 @@ TEST(GvdIntegrator, PlaneCorrect) {
 }
 
 TEST(GvdIntegrator, LCorrect) {
-  test::GvdIntegratorData data;
+  GvdIntegratorData data;
   data.setup([](const auto& coords, const auto& config) {
     const auto [x, y, z] = coords;
-    test::GvdIntegratorData::Obs obs;
+    GvdIntegratorData::Obs obs;
     const bool is_edge = (x == 0) || (y == 0);
     obs.distance = is_edge ? -0.05 : config.truncation_distance;
     return obs;
   });
 
   GvdIntegrator gvd_integrator(data.gvd_config, data.gvd_layer);
-  test::updateGvd(gvd_integrator, data.map, true);
+  updateGvd(gvd_integrator, data.map, true);
   data.check([](const auto& coords, const auto& voxel, const auto& config) {
     const auto [x, y, z] = coords;
 
@@ -320,17 +442,17 @@ TEST(GvdIntegrator, LCorrect) {
 }
 
 TEST(GvdIntegrator, LargeLCorrect) {
-  test::GvdIntegratorData data(0.1, 8);
+  GvdIntegratorData data(0.1, 8);
   data.setup([](const auto& coords, const auto& config) {
     const auto [x, y, z] = coords;
-    test::GvdIntegratorData::Obs obs;
+    GvdIntegratorData::Obs obs;
     const bool is_edge = (x == 0) || (y == 0);
     obs.distance = is_edge ? -0.05 : config.truncation_distance;
     return obs;
   });
 
   GvdIntegrator gvd_integrator(data.gvd_config, data.gvd_layer);
-  test::updateGvd(gvd_integrator, data.map, true);
+  updateGvd(gvd_integrator, data.map, true);
   data.check([](const auto& coords, const auto& voxel, const auto& config) {
     const auto [x, y, z] = coords;
 
@@ -347,17 +469,17 @@ TEST(GvdIntegrator, LargeLCorrect) {
 }
 
 TEST(GvdIntegrator, CornerCorrect) {
-  test::GvdIntegratorData data;
+  GvdIntegratorData data;
   data.setup([](const auto& coords, const auto& config) {
     const auto [x, y, z] = coords;
-    test::GvdIntegratorData::Obs obs;
+    GvdIntegratorData::Obs obs;
     const bool is_edge = (x == 0) || (y == 0) || (z == 0);
     obs.distance = is_edge ? -0.05 : config.truncation_distance;
     return obs;
   });
 
   GvdIntegrator gvd_integrator(data.gvd_config, data.gvd_layer);
-  test::updateGvd(gvd_integrator, data.map, true);
+  updateGvd(gvd_integrator, data.map, true);
   data.check([](const auto& coords, const auto& voxel, const auto& config) {
     const auto [x, y, z] = coords;
 
@@ -375,9 +497,9 @@ TEST(GvdIntegrator, CornerCorrect) {
 }
 
 TEST(GvdIntegrator, RaiseCorrectForSurface) {
-  test::GvdIntegratorData data;
+  GvdIntegratorData data;
   data.setup([](const auto& coords, const auto& config) {
-    test::GvdIntegratorData::Obs obs;
+    GvdIntegratorData::Obs obs;
     const auto [x, y, z] = coords;
     const bool is_edge = (x == 0);
     obs.distance = is_edge ? -0.05 : config.truncation_distance;
@@ -386,14 +508,14 @@ TEST(GvdIntegrator, RaiseCorrectForSurface) {
 
   data.gvd_config.min_diff_m = 0.03;
   GvdIntegrator gvd_integrator(data.gvd_config, data.gvd_layer);
-  test::updateGvd(gvd_integrator, data.map, true);
+  updateGvd(gvd_integrator, data.map, true);
 
   // trigger a lower wavefront
   data.setTsdf({0, 2, 0}, -0.01);
   // flip value to be raised
   data.setTsdf({0, 2, 2}, -0.09);
 
-  test::updateGvd(gvd_integrator, data.map, true, true);
+  updateGvd(gvd_integrator, data.map, true, true);
   EXPECT_TRUE(data.getGvd({0, 2, 2}).on_surface);
 
   data.check([&](const auto& coords, const auto& voxel, const auto& config) {
@@ -410,26 +532,19 @@ TEST(GvdIntegrator, RaiseCorrectForSurface) {
 }
 
 TEST(GvdIntegrator, ParentsCorrect) {
-  test::GvdIntegratorData data(0.1, 8, 0.2);
+  GvdIntegratorData data(0.1, 8, 0.2);
   data.setup([](const auto& coords, const auto& config) {
     const auto [x, y, z] = coords;
-    test::GvdIntegratorData::Obs obs;
+    GvdIntegratorData::Obs obs;
 
-    // creates a corner at the edge of the block and a intermediate
-    // layer of positive distance one voxel in from the corner
+    // creates a corner at the edge of the block
     const bool is_edge = (x == 0) || (y == 0) || (z == 0);
-    if (is_edge) {
-      obs.distance = -0.05;
-    } else if (x == 1 || y == 1 || z == 1) {
-      obs.distance = 0.1;
-    } else {
-      obs.distance = config.truncation_distance;
-    }
+    obs.distance = is_edge ? -0.05 : config.truncation_distance;
     return obs;
   });
 
   GvdIntegrator gvd_integrator(data.gvd_config, data.gvd_layer);
-  test::updateGvd(gvd_integrator, data.map, true);
+  updateGvd(gvd_integrator, data.map, true);
 
   data.check([&](const auto& coords, const auto& voxel, const auto&) {
     const auto [x, y, z] = coords;
