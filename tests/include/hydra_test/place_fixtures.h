@@ -52,12 +52,15 @@ class GvdIntegratorData {
     float weight = 0.1f;
   };
   using ObservationCallback = std::function<std::optional<Obs>(const Coord&)>;
+  using CheckCallback = std::function<void(const Coord&, const GvdVoxel&)>;
 
   GvdIntegratorData(float voxel_size = 0.1f,
                     size_t voxels_per_side = 4,
                     float truncation_distance = 0.1f);
 
   void setup(const ObservationCallback& callback);
+
+  void check(const CheckCallback& callback);
 
   void setTsdfVoxel(size_t x, size_t y, size_t z, float distance, float weight = 0.1f);
 

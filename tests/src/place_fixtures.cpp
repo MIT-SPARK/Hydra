@@ -78,6 +78,16 @@ void GvdIntegratorData::setup(const ObservationCallback& callback) {
   }
 }
 
+void GvdIntegratorData::check(const CheckCallback& callback) {
+  for (size_t x = 0; x < map_config.voxels_per_side; ++x) {
+    for (size_t y = 0; y < map_config.voxels_per_side; ++y) {
+      for (size_t z = 0; z < map_config.voxels_per_side; ++z) {
+        callback(Coord(x, y, z), getGvdVoxel(x, y, z));
+      }
+    }
+  }
+}
+
 void GvdIntegratorData::setTsdfVoxel(
     size_t x, size_t y, size_t z, float distance, float weight) {
   CHECK_LT(x, map_config.voxels_per_side);
@@ -115,15 +125,6 @@ const TsdfVoxel& GvdIntegratorData::getTsdfVoxel(int x, int y, int z) {
   VoxelIndex v_index;
   v_index << x, y, z;
   return tsdf_block->getVoxel(v_index);
-}
-
-void SingleBlockExtractionTestFixture::SetUp() {
-  SingleBlockTestFixture::SetUp();
-  setBlockState();
-
-  gvd_integrator.reset(new GvdIntegrator(gvd_config, gvd_layer));
-  gvd_integrator->updateFromTsdf(0, map->getTsdfLayer(), map->getMeshLayer(), true);
-  gvd_integrator->updateGvd(0);
 }
 
 void TestFixture2d::setSurfaceVoxel(int x, int y) {

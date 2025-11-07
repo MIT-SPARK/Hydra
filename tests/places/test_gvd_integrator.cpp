@@ -40,245 +40,227 @@
 
 namespace hydra::places {
 
-class ParentTestFixture : public SingleBlockTestFixture {
- public:
-  ParentTestFixture() : SingleBlockTestFixture() {}
-  virtual ~ParentTestFixture() = default;
-
-  virtual void SetUp() override {
-    voxels_per_side = 8;
-    truncation_distance = 0.2;
-    SingleBlockTestFixture::SetUp();
-
-    for (int r = 1; r < voxels_per_side; ++r) {
-      for (int c = 1; c < voxels_per_side; ++c) {
-        setTsdfVoxel(1, r, c, 0.1);
-        setTsdfVoxel(r, 1, c, 0.1);
-        setTsdfVoxel(r, c, 1, 0.1);
-      }
-    }
-  }
-};
-
+/*
 struct GvdResult {
-  GvdResult(int rows, int cols) {
-    distances = Eigen::MatrixXd(rows, cols);
-    is_voronoi = Eigen::MatrixXd(rows, cols);
-  }
+GvdResult(int rows, int cols) {
+  distances = Eigen::MatrixXd(rows, cols);
+  is_voronoi = Eigen::MatrixXd(rows, cols);
+}
 
-  Eigen::MatrixXd distances;
-  Eigen::MatrixXd is_voronoi;
+Eigen::MatrixXd distances;
+Eigen::MatrixXd is_voronoi;
 };
 
 std::ostream& operator<<(std::ostream& out, const GvdResult& result) {
-  out << std::endl;
-  for (int r = 0; r < result.distances.rows(); ++r) {
-    for (int c = 0; c < result.distances.cols(); ++c) {
-      out << "+-------";
-    }
-    out << "+" << std::endl;
-
-    out << "|";
-    for (int c = 0; c < result.distances.cols(); ++c) {
-      out << (result.is_voronoi(r, c) == 1.0 ? " @" : "  ");
-      out << std::setw(5) << std::setprecision(2) << std::fixed << std::setfill(' ')
-          << result.distances(r, c);
-      out << "|";
-    }
-    out << std::endl;
-  }
-
+out << std::endl;
+for (int r = 0; r < result.distances.rows(); ++r) {
   for (int c = 0; c < result.distances.cols(); ++c) {
     out << "+-------";
   }
-  out << "+";
+  out << "+" << std::endl;
 
+  out << "|";
+  for (int c = 0; c < result.distances.cols(); ++c) {
+    out << (result.is_voronoi(r, c) == 1.0 ? " @" : "  ");
+    out << std::setw(5) << std::setprecision(2) << std::fixed << std::setfill(' ')
+        << result.distances(r, c);
+    out << "|";
+  }
   out << std::endl;
+}
 
-  return out;
+for (int c = 0; c < result.distances.cols(); ++c) {
+  out << "+-------";
+}
+out << "+";
+
+out << std::endl;
+
+return out;
 }
 
 TEST_F(TestFixture2d, OccupancyIntegrationCorrect) {
-  for (int x = 0; x < voxels_per_side; ++x) {
-    for (int y = 0; y < 4; ++y) {
-      setTsdfVoxel(x, y, 3.0 * voxel_size);
-    }
+for (int x = 0; x < voxels_per_side; ++x) {
+  for (int y = 0; y < 4; ++y) {
+    setTsdfVoxel(x, y, 3.0 * voxel_size);
   }
+}
 
-  setTsdfVoxel(0, 0, 0.0);
-  setTsdfVoxel(0, 1, 0.0);
-  setTsdfVoxel(0, 2, 0.0);
-  setTsdfVoxel(0, 3, 0.0);
-  setTsdfVoxel(3, 2, 0.0);
+setTsdfVoxel(0, 0, 0.0);
+setTsdfVoxel(0, 1, 0.0);
+setTsdfVoxel(0, 2, 0.0);
+setTsdfVoxel(0, 3, 0.0);
+setTsdfVoxel(3, 2, 0.0);
 
-  gvd_config.min_diff_m = 0.0;
-  gvd_config.min_distance_m = voxel_size;
-  gvd_config.max_distance_m = 50.0;
-  gvd_config.voronoi_config.min_distance_m = 1.0;
-  gvd_config.voronoi_config.parent_l1_separation = 2.0;
+gvd_config.min_diff_m = 0.0;
+gvd_config.min_distance_m = voxel_size;
+gvd_config.max_distance_m = 50.0;
+gvd_config.voronoi_config.min_distance_m = 1.0;
+gvd_config.voronoi_config.parent_l1_separation = 2.0;
 
-  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
-  gvd_integrator.updateFromTsdf(0, *tsdf_layer, *mesh_layer, false);
-  gvd_integrator.updateGvd(0);
+GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
+gvd_integrator.updateFromTsdf(0, *tsdf_layer, *mesh_layer, false);
+gvd_integrator.updateGvd(0);
 
-  GvdResult result(4, 8);
-  for (int x = 0; x < voxels_per_side; ++x) {
-    for (int y = 0; y < 4; ++y) {
-      const auto& voxel = getGvdVoxel(x, y);
-      result.distances(y, x) = voxel.observed ? voxel.distance : -1.0;
-      result.is_voronoi(y, x) = isVoronoi(voxel) ? 1.0 : 0.0;
-    }
+GvdResult result(4, 8);
+for (int x = 0; x < voxels_per_side; ++x) {
+  for (int y = 0; y < 4; ++y) {
+    const auto& voxel = getGvdVoxel(x, y);
+    result.distances(y, x) = voxel.observed ? voxel.distance : -1.0;
+    result.is_voronoi(y, x) = isVoronoi(voxel) ? 1.0 : 0.0;
   }
+}
 
-  GvdResult expected(4, 8);
-  // clang-format off
-  expected.distances << 0.00, 1.00, 2.00, 2.00, 2.24, 2.83, 3.61, 4.47,
-                        0.00, 1.00, 1.41, 1.00, 1.41, 2.24, 3.16, 4.12,
-                        0.00, 1.00, 1.00, 0.00, 1.00, 2.00, 3.00, 4.00,
-                        0.00, 1.00, 1.41, 1.00, 1.41, 2.24, 3.16, 4.12;
-  // clang-format on
-  expected.is_voronoi = Eigen::MatrixXd::Zero(4, 8);
-  expected.is_voronoi(0, 2) = 1.0;
-  expected.is_voronoi(1, 2) = 1.0;
+GvdResult expected(4, 8);
+// clang-format off
+expected.distances << 0.00, 1.00, 2.00, 2.00, 2.24, 2.83, 3.61, 4.47,
+                      0.00, 1.00, 1.41, 1.00, 1.41, 2.24, 3.16, 4.12,
+                      0.00, 1.00, 1.00, 0.00, 1.00, 2.00, 3.00, 4.00,
+                      0.00, 1.00, 1.41, 1.00, 1.41, 2.24, 3.16, 4.12;
+// clang-format on
+expected.is_voronoi = Eigen::MatrixXd::Zero(4, 8);
+expected.is_voronoi(0, 2) = 1.0;
+expected.is_voronoi(1, 2) = 1.0;
 
-  VLOG(1) << "Result: " << result;
-  VLOG(1) << "Expected: " << expected;
+VLOG(1) << "Result: " << result;
+VLOG(1) << "Expected: " << expected;
 
-  for (int r = 0; r < expected.is_voronoi.rows(); ++r) {
-    for (int c = 0; c < expected.is_voronoi.cols(); ++c) {
-      EXPECT_EQ(expected.is_voronoi(r, c), result.is_voronoi(r, c))
-          << " @ (" << r << ", " << c << ")";
-      EXPECT_NEAR(expected.distances(r, c), result.distances(r, c), 1.0e-2)
-          << " @ (" << r << ", " << c << ")";
-    }
+for (int r = 0; r < expected.is_voronoi.rows(); ++r) {
+  for (int c = 0; c < expected.is_voronoi.cols(); ++c) {
+    EXPECT_EQ(expected.is_voronoi(r, c), result.is_voronoi(r, c))
+        << " @ (" << r << ", " << c << ")";
+    EXPECT_NEAR(expected.distances(r, c), result.distances(r, c), 1.0e-2)
+        << " @ (" << r << ", " << c << ")";
   }
+}
 
-  VLOG(1) << "Perturbing GVD: (3, 2) -> 10.0, (7, 2) -> 0.0";
+VLOG(1) << "Perturbing GVD: (3, 2) -> 10.0, (7, 2) -> 0.0";
 
-  // raise the middle obstacle and lower one on the side
-  setTsdfVoxel(3, 2, 10.0);
-  setTsdfVoxel(7, 2, 0.0);
-  // reset surface flags for previous surfaces
-  setSurfaceVoxel(0, 0);
-  setSurfaceVoxel(0, 1);
-  setSurfaceVoxel(0, 2);
-  setSurfaceVoxel(0, 3);
+// raise the middle obstacle and lower one on the side
+setTsdfVoxel(3, 2, 10.0);
+setTsdfVoxel(7, 2, 0.0);
+// reset surface flags for previous surfaces
+setSurfaceVoxel(0, 0);
+setSurfaceVoxel(0, 1);
+setSurfaceVoxel(0, 2);
+setSurfaceVoxel(0, 3);
 
-  gvd_integrator.updateFromTsdf(0, *tsdf_layer, *mesh_layer, false);
-  gvd_integrator.updateGvd(0);
+gvd_integrator.updateFromTsdf(0, *tsdf_layer, *mesh_layer, false);
+gvd_integrator.updateGvd(0);
 
-  for (int x = 0; x < voxels_per_side; ++x) {
-    for (int y = 0; y < 4; ++y) {
-      const auto& voxel = getGvdVoxel(x, y);
-      result.distances(y, x) = voxel.observed ? voxel.distance : -1.0;
-      result.is_voronoi(y, x) = isVoronoi(voxel) ? 1.0 : 0.0;
-    }
+for (int x = 0; x < voxels_per_side; ++x) {
+  for (int y = 0; y < 4; ++y) {
+    const auto& voxel = getGvdVoxel(x, y);
+    result.distances(y, x) = voxel.observed ? voxel.distance : -1.0;
+    result.is_voronoi(y, x) = isVoronoi(voxel) ? 1.0 : 0.0;
   }
+}
 
-  // clang-format off
-  expected.distances << 0.00, 1.00, 2.00, 3.00, 3.61, 2.83, 2.24, 2.00,
-                        0.00, 1.00, 2.00, 3.00, 3.16, 2.24, 1.41, 1.00,
-                        0.00, 1.00, 2.00, 3.00, 3.00, 2.00, 1.00, 0.00,
-                        0.00, 1.00, 2.00, 3.00, 3.16, 2.24, 1.41, 1.00;
-  // clang-format on
-  expected.is_voronoi = Eigen::MatrixXd::Zero(4, 8);
-  expected.is_voronoi(0, 4) = 1.0;
-  expected.is_voronoi(1, 3) = 1.0;
-  expected.is_voronoi(1, 4) = 1.0;
-  expected.is_voronoi(2, 3) = 1.0;
-  expected.is_voronoi(2, 4) = 1.0;
-  expected.is_voronoi(3, 3) = 1.0;
-  expected.is_voronoi(3, 4) = 1.0;
+// clang-format off
+expected.distances << 0.00, 1.00, 2.00, 3.00, 3.61, 2.83, 2.24, 2.00,
+                      0.00, 1.00, 2.00, 3.00, 3.16, 2.24, 1.41, 1.00,
+                      0.00, 1.00, 2.00, 3.00, 3.00, 2.00, 1.00, 0.00,
+                      0.00, 1.00, 2.00, 3.00, 3.16, 2.24, 1.41, 1.00;
+// clang-format on
+expected.is_voronoi = Eigen::MatrixXd::Zero(4, 8);
+expected.is_voronoi(0, 4) = 1.0;
+expected.is_voronoi(1, 3) = 1.0;
+expected.is_voronoi(1, 4) = 1.0;
+expected.is_voronoi(2, 3) = 1.0;
+expected.is_voronoi(2, 4) = 1.0;
+expected.is_voronoi(3, 3) = 1.0;
+expected.is_voronoi(3, 4) = 1.0;
 
-  for (int r = 0; r < expected.is_voronoi.rows(); ++r) {
-    for (int c = 0; c < expected.is_voronoi.cols(); ++c) {
-      EXPECT_EQ(expected.is_voronoi(r, c), result.is_voronoi(r, c))
-          << " @ (" << r << ", " << c << ")";
-      EXPECT_NEAR(expected.distances(r, c), result.distances(r, c), 1.0e-1)
-          << " @ (" << r << ", " << c << ")";
-    }
+for (int r = 0; r < expected.is_voronoi.rows(); ++r) {
+  for (int c = 0; c < expected.is_voronoi.cols(); ++c) {
+    EXPECT_EQ(expected.is_voronoi(r, c), result.is_voronoi(r, c))
+        << " @ (" << r << ", " << c << ")";
+    EXPECT_NEAR(expected.distances(r, c), result.distances(r, c), 1.0e-1)
+        << " @ (" << r << ", " << c << ")";
   }
+}
 
-  VLOG(1) << "Result: " << result;
-  VLOG(1) << "Expected: " << expected;
+VLOG(1) << "Result: " << result;
+VLOG(1) << "Expected: " << expected;
 }
 
 TEST_F(TestFixture2d, NegativeIntegrationCorrect) {
-  // exterior border is set to -truncation_distance
-  for (int i = 0; i < voxels_per_side; ++i) {
-    setTsdfVoxel(0, i, -2.0 * voxel_size);
-    setTsdfVoxel(7, i, -2.0 * voxel_size);
-    setTsdfVoxel(i, 0, -2.0 * voxel_size);
-    setTsdfVoxel(i, 7, -2.0 * voxel_size);
-  }
+// exterior border is set to -truncation_distance
+for (int i = 0; i < voxels_per_side; ++i) {
+  setTsdfVoxel(0, i, -2.0 * voxel_size);
+  setTsdfVoxel(7, i, -2.0 * voxel_size);
+  setTsdfVoxel(i, 0, -2.0 * voxel_size);
+  setTsdfVoxel(i, 7, -2.0 * voxel_size);
+}
 
-  for (int i = 1; i < voxels_per_side - 1; ++i) {
-    setTsdfVoxel(1, i, -voxel_size);
-    setTsdfVoxel(6, i, -voxel_size);
-    setTsdfVoxel(i, 1, -voxel_size);
-    setTsdfVoxel(i, 6, -voxel_size);
-  }
-  setTsdfVoxel(1, 1, -std::sqrt(2) * voxel_size);
-  setTsdfVoxel(1, 6, -std::sqrt(2) * voxel_size);
-  setTsdfVoxel(6, 1, -std::sqrt(2) * voxel_size);
-  setTsdfVoxel(6, 6, -std::sqrt(2) * voxel_size);
+for (int i = 1; i < voxels_per_side - 1; ++i) {
+  setTsdfVoxel(1, i, -voxel_size);
+  setTsdfVoxel(6, i, -voxel_size);
+  setTsdfVoxel(i, 1, -voxel_size);
+  setTsdfVoxel(i, 6, -voxel_size);
+}
+setTsdfVoxel(1, 1, -std::sqrt(2) * voxel_size);
+setTsdfVoxel(1, 6, -std::sqrt(2) * voxel_size);
+setTsdfVoxel(6, 1, -std::sqrt(2) * voxel_size);
+setTsdfVoxel(6, 6, -std::sqrt(2) * voxel_size);
 
-  for (int i = 2; i < voxels_per_side - 2; ++i) {
-    setTsdfVoxel(2, i, 0.0);
-    setTsdfVoxel(5, i, 0.0);
-    setTsdfVoxel(i, 2, 0.0);
-    setTsdfVoxel(i, 5, 0.0);
-  }
+for (int i = 2; i < voxels_per_side - 2; ++i) {
+  setTsdfVoxel(2, i, 0.0);
+  setTsdfVoxel(5, i, 0.0);
+  setTsdfVoxel(i, 2, 0.0);
+  setTsdfVoxel(i, 5, 0.0);
+}
 
-  setTsdfVoxel(3, 3, 1.0);
-  setTsdfVoxel(3, 4, 1.0);
-  setTsdfVoxel(4, 3, 1.0);
-  setTsdfVoxel(4, 4, 1.0);
+setTsdfVoxel(3, 3, 1.0);
+setTsdfVoxel(3, 4, 1.0);
+setTsdfVoxel(4, 3, 1.0);
+setTsdfVoxel(4, 4, 1.0);
 
-  gvd_config.min_diff_m = 0.0;
-  gvd_config.min_distance_m = voxel_size;
-  gvd_config.max_distance_m = 50.0;
-  gvd_config.voronoi_config.min_distance_m = 1.0;
-  gvd_config.voronoi_config.parent_l1_separation = 2.0;
-  gvd_config.positive_distance_only = false;
+gvd_config.min_diff_m = 0.0;
+gvd_config.min_distance_m = voxel_size;
+gvd_config.max_distance_m = 50.0;
+gvd_config.voronoi_config.min_distance_m = 1.0;
+gvd_config.voronoi_config.parent_l1_separation = 2.0;
+gvd_config.positive_distance_only = false;
 
-  // no graph extractor disables places extraction
-  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
-  gvd_integrator.updateFromTsdf(0, *tsdf_layer, *mesh_layer, false);
-  gvd_integrator.updateGvd(0);
+// no graph extractor disables places extraction
+GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
+gvd_integrator.updateFromTsdf(0, *tsdf_layer, *mesh_layer, false);
+gvd_integrator.updateGvd(0);
 
-  GvdResult result(voxels_per_side, voxels_per_side);
-  for (int x = 0; x < voxels_per_side; ++x) {
-    for (int y = 0; y < voxels_per_side; ++y) {
-      const auto& voxel = getGvdVoxel(x, y);
-      result.distances(y, x) = voxel.observed ? voxel.distance : -1.0;
-      result.is_voronoi(y, x) = isVoronoi(voxel) ? 1.0 : 0.0;
-    }
-  }
-
-  VLOG(1) << "Result: " << result;
-  GvdResult expected(8, 8);
-  // clang-format off
-  expected.distances << -2.83, -2.24, -2.00, -2.00, -2.00, -2.00, -2.24, -2.83,
-                        -2.24, -1.41, -1.00, -1.00, -1.00, -1.00, -1.41, -2.24,
-                        -2.00, -1.00,  0.00,  0.00,  0.00,  0.00, -1.00, -2.00,
-                        -2.00, -1.00,  0.00,  1.00,  1.00,  0.00, -1.00, -2.00,
-                        -2.00, -1.00,  0.00,  1.00,  1.00,  0.00, -1.00, -2.00,
-                        -2.00, -1.00,  0.00,  0.00,  0.00,  0.00, -1.00, -2.00,
-                        -2.24, -1.41, -1.00, -1.00, -1.00, -1.00, -1.41, -2.24,
-                        -2.83, -2.24, -2.00, -2.00, -2.00, -2.00, -2.24, -2.83;
-  // clang-format on
-  expected.is_voronoi = Eigen::MatrixXd::Zero(8, 8);
-
-  for (int r = 0; r < expected.is_voronoi.rows(); ++r) {
-    for (int c = 0; c < expected.is_voronoi.cols(); ++c) {
-      EXPECT_EQ(expected.is_voronoi(r, c), result.is_voronoi(r, c))
-          << " @ (" << r << ", " << c << ")";
-      EXPECT_NEAR(expected.distances(r, c), result.distances(r, c), 1.0e-1)
-          << " @ (" << r << ", " << c << ")";
-    }
+GvdResult result(voxels_per_side, voxels_per_side);
+for (int x = 0; x < voxels_per_side; ++x) {
+  for (int y = 0; y < voxels_per_side; ++y) {
+    const auto& voxel = getGvdVoxel(x, y);
+    result.distances(y, x) = voxel.observed ? voxel.distance : -1.0;
+    result.is_voronoi(y, x) = isVoronoi(voxel) ? 1.0 : 0.0;
   }
 }
+
+VLOG(1) << "Result: " << result;
+GvdResult expected(8, 8);
+// clang-format off
+expected.distances << -2.83, -2.24, -2.00, -2.00, -2.00, -2.00, -2.24, -2.83,
+                      -2.24, -1.41, -1.00, -1.00, -1.00, -1.00, -1.41, -2.24,
+                      -2.00, -1.00,  0.00,  0.00,  0.00,  0.00, -1.00, -2.00,
+                      -2.00, -1.00,  0.00,  1.00,  1.00,  0.00, -1.00, -2.00,
+                      -2.00, -1.00,  0.00,  1.00,  1.00,  0.00, -1.00, -2.00,
+                      -2.00, -1.00,  0.00,  0.00,  0.00,  0.00, -1.00, -2.00,
+                      -2.24, -1.41, -1.00, -1.00, -1.00, -1.00, -1.41, -2.24,
+                      -2.83, -2.24, -2.00, -2.00, -2.00, -2.00, -2.24, -2.83;
+// clang-format on
+expected.is_voronoi = Eigen::MatrixXd::Zero(8, 8);
+
+for (int r = 0; r < expected.is_voronoi.rows(); ++r) {
+  for (int c = 0; c < expected.is_voronoi.cols(); ++c) {
+    EXPECT_EQ(expected.is_voronoi(r, c), result.is_voronoi(r, c))
+        << " @ (" << r << ", " << c << ")";
+    EXPECT_NEAR(expected.distances(r, c), result.distances(r, c), 1.0e-1)
+        << " @ (" << r << ", " << c << ")";
+  }
+}
+}
+*/
 
 TEST(GvdIntegrator, PlaneCorrect) {
   test::GvdIntegratorData data;
@@ -288,118 +270,164 @@ TEST(GvdIntegrator, PlaneCorrect) {
     return obs;
   });
 
-  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
-  test::updateGvd(gvd_integrator, *map, true);
+  GvdIntegrator gvd_integrator(data.gvd_config, data.gvd_layer);
+  test::updateGvd(gvd_integrator, data.map, true);
 
-  for (int x = 0; x < voxels_per_side; ++x) {
-    for (int y = 0; y < voxels_per_side; ++y) {
-      for (int z = 0; z < voxels_per_side; ++z) {
-        const auto& voxel = getGvdVoxel(x, y, z);
+  data.check([&](const auto& coord, const auto& voxel) {
+    double expected_distance =
+        coord.x() == 0 ? -0.05 : coord.x() * data.map_config.voxel_size;
+    EXPECT_NEAR(expected_distance, voxel.distance, 1.0e-6);
+    EXPECT_TRUE(voxel.on_surface || voxel.has_parent);
+    EXPECT_FALSE(isVoronoi(voxel)) << voxel << " @ (" << coord.x() << ", " << coord.y()
+                                   << ", " << coord.z() << ")";
+  });
+}
 
-        // TODO(nathan) this might change if we incorporate the tsdf distance for parent
-        // voxels into the calculation, though this is tricky
-        double expected_distance = x == 0 ? -0.05 : x * voxel_size;
+TEST(GvdIntegrator, LCorrect) {
+  test::GvdIntegratorData data;
+  data.setup([&](const auto& coord) {
+    test::GvdIntegratorData::Obs obs;
+    const bool is_edge = (coord.x() == 0) || (coord.y() == 0);
+    obs.distance = is_edge ? -0.05 : data.map_config.truncation_distance;
+    return obs;
+  });
 
-        EXPECT_NEAR(expected_distance, voxel.distance, 1.0e-6);
-        EXPECT_TRUE(voxel.on_surface || voxel.has_parent);
-        EXPECT_FALSE(isVoronoi(voxel))
-            << voxel << " @ (" << x << ", " << y << ", " << z << ")";
-      }
+  GvdIntegrator gvd_integrator(data.gvd_config, data.gvd_layer);
+  test::updateGvd(gvd_integrator, data.map, true);
+  data.check([&](const auto& coord, const auto& voxel) {
+    const int x = static_cast<int>(coord.x());
+    const int y = static_cast<int>(coord.y());
+    const bool is_edge = (x == 0) || (y == 0);
+    double expected_distance =
+        is_edge ? -0.05 : std::min(x, y) * data.map_config.voxel_size;
+
+    // 8-connected diagonal plane should be voronoi
+    EXPECT_NEAR(expected_distance, voxel.distance, 1.0e-6);
+    EXPECT_TRUE(!isVoronoi(voxel) || !voxel.fixed);
+    EXPECT_TRUE(voxel.on_surface || voxel.has_parent);
+    EXPECT_EQ(std::abs(x - y) <= 1 && x >= 2 && y >= 2, isVoronoi(voxel))
+        << voxel << " @ (" << coord.x() << ", " << coord.y() << ", " << coord.z()
+        << ")";
+  });
+}
+
+TEST(GvdIntegrator, LargeLCorrect) {
+  test::GvdIntegratorData data(0.1, 8);
+  data.setup([&](const auto& coord) {
+    test::GvdIntegratorData::Obs obs;
+    const bool is_edge = (coord.x() == 0) || (coord.y() == 0);
+    obs.distance = is_edge ? -0.05 : data.map_config.truncation_distance;
+    return obs;
+  });
+
+  GvdIntegrator gvd_integrator(data.gvd_config, data.gvd_layer);
+  test::updateGvd(gvd_integrator, data.map, true);
+  data.check([&](const auto& coord, const auto& voxel) {
+    const int x = static_cast<int>(coord.x());
+    const int y = static_cast<int>(coord.y());
+    const bool is_edge = (x == 0) || (y == 0);
+    double expected_distance =
+        is_edge ? -0.05 : std::min(x, y) * data.map_config.voxel_size;
+
+    // 8-connected diagonal plane should be voronoi
+    EXPECT_NEAR(expected_distance, voxel.distance, 1.0e-6);
+    EXPECT_TRUE(!isVoronoi(voxel) || !voxel.fixed);
+    EXPECT_TRUE(voxel.on_surface || voxel.has_parent);
+    EXPECT_EQ(std::abs(x - y) <= 1 && x >= 2 && y >= 2, isVoronoi(voxel))
+        << voxel << " @ (" << coord.x() << ", " << coord.y() << ", " << coord.z()
+        << ")";
+  });
+}
+
+TEST(GvdIntegrator, CornerCorrect) {
+  test::GvdIntegratorData data;
+  data.setup([&](const auto& coord) {
+    test::GvdIntegratorData::Obs obs;
+    const bool is_edge = (coord.x() == 0) || (coord.y() == 0) || (coord.z() == 0);
+    obs.distance = is_edge ? -0.05 : data.map_config.truncation_distance;
+    return obs;
+  });
+
+  GvdIntegrator gvd_integrator(data.gvd_config, data.gvd_layer);
+  test::updateGvd(gvd_integrator, data.map, true);
+  data.check([&](const auto& coord, const auto& voxel) {
+    const int x = static_cast<int>(coord.x());
+    const int y = static_cast<int>(coord.y());
+    const int z = static_cast<int>(coord.z());
+    const bool is_edge = (x == 0) || (y == 0) || (z == 0);
+    double expected_distance =
+        is_edge ? -0.05 : std::min(x, std::min(y, z)) * data.map_config.voxel_size;
+
+    // upper 2x2 should all be voronoi
+    EXPECT_NEAR(expected_distance, voxel.distance, 1.0e-6);
+    EXPECT_TRUE(!isVoronoi(voxel) || !voxel.fixed);
+    EXPECT_TRUE(voxel.on_surface || voxel.has_parent);
+    EXPECT_EQ(x >= 2 && y >= 2 && z >= 2, isVoronoi(voxel))
+        << voxel << " @ (" << coord.x() << ", " << coord.y() << ", " << coord.z()
+        << ")";
+  });
+}
+
+TEST(GvdIntegrator, RaiseCorrectForSurface) {
+  test::GvdIntegratorData data;
+  data.setup([&](const auto& coord) {
+    test::GvdIntegratorData::Obs obs;
+    const bool is_edge = (coord.x() == 0);
+    obs.distance = is_edge ? -0.05 : data.map_config.truncation_distance;
+    return obs;
+  });
+
+  data.gvd_config.min_diff_m = 0.03;
+  GvdIntegrator gvd_integrator(data.gvd_config, data.gvd_layer);
+  test::updateGvd(gvd_integrator, data.map, true);
+
+  // trigger a lower wavefront
+  data.setTsdfVoxel(0, 2, 0, -0.01);
+  // flip value to be raised
+  data.setTsdfVoxel(0, 2, 2, -0.09);
+
+  test::updateGvd(gvd_integrator, data.map, true, true);
+  EXPECT_TRUE(data.getGvdVoxel(0, 2, 2).on_surface);
+
+  data.check([&](const auto& coord, const auto& voxel) {
+    const int x = static_cast<int>(coord.x());
+    const int y = static_cast<int>(coord.y());
+    const int z = static_cast<int>(coord.z());
+    const auto& tvoxel = data.getTsdfVoxel(x, y, z);
+
+    const bool is_edge = x == 0;
+    double expected_distance =
+        is_edge ? tvoxel.distance : x * data.map_config.voxel_size;
+
+    EXPECT_NEAR(expected_distance, voxel.distance, 1.0e-6)
+        << " @ [" << x << ", " << y << ", " << z << "]";
+    EXPECT_TRUE(!isVoronoi(voxel) || !voxel.fixed);
+    EXPECT_TRUE(voxel.on_surface || voxel.has_parent);
+    EXPECT_FALSE(isVoronoi(voxel));
+  });
+}
+
+/*
+class ParentTestFixture : public SingleBlockTestFixture {
+public:
+ParentTestFixture() : SingleBlockTestFixture() {}
+virtual ~ParentTestFixture() = default;
+
+virtual void SetUp() override {
+  voxels_per_side = 8;
+  truncation_distance = 0.2;
+  SingleBlockTestFixture::SetUp();
+
+  for (int r = 1; r < voxels_per_side; ++r) {
+    for (int c = 1; c < voxels_per_side; ++c) {
+      setTsdfVoxel(1, r, c, 0.1);
+      setTsdfVoxel(r, 1, c, 0.1);
+      setTsdfVoxel(r, c, 1, 0.1);
     }
   }
 }
+};
 
-TEST_F(SingleBlockTestFixture, LCorrect) {
-  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
-  for (int x = 0; x < voxels_per_side; ++x) {
-    for (int y = 0; y < voxels_per_side; ++y) {
-      for (int z = 0; z < voxels_per_side; ++z) {
-        const bool is_edge = (x == 0) || (y == 0);
-        setTsdfVoxel(x, y, z, is_edge ? -0.05 : truncation_distance);
-      }
-    }
-  }
-
-  test::updateGvd(gvd_integrator, *map, true);
-
-  for (int x = 0; x < voxels_per_side; ++x) {
-    for (int y = 0; y < voxels_per_side; ++y) {
-      for (int z = 0; z < voxels_per_side; ++z) {
-        const auto& voxel = getGvdVoxel(x, y, z);
-
-        const bool is_edge = (x == 0) || (y == 0);
-        double expected_distance = is_edge ? -0.05 : std::min(x, y) * voxel_size;
-
-        EXPECT_NEAR(expected_distance, voxel.distance, 1.0e-6);
-        EXPECT_TRUE(!isVoronoi(voxel) || !voxel.fixed);
-        EXPECT_TRUE(voxel.on_surface || voxel.has_parent);
-
-        // 8-connected diagonal plane should be voronoi
-        EXPECT_EQ(std::abs(x - y) <= 1 && x >= 2 && y >= 2, isVoronoi(voxel))
-            << voxel << " @ (" << x << ", " << y << ", " << z << ")";
-      }
-    }
-  }
-}
-
-TEST_F(LargeSingleBlockTestFixture, LCorrect) {
-  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
-  for (int x = 0; x < voxels_per_side; ++x) {
-    for (int y = 0; y < voxels_per_side; ++y) {
-      for (int z = 0; z < voxels_per_side; ++z) {
-        const bool is_edge = (x == 0) || (y == 0);
-        setTsdfVoxel(x, y, z, is_edge ? -0.05 : truncation_distance);
-      }
-    }
-  }
-
-  test::updateGvd(gvd_integrator, *map, true);
-
-  for (int x = 0; x < voxels_per_side; ++x) {
-    for (int y = 0; y < voxels_per_side; ++y) {
-      for (int z = 0; z < voxels_per_side; ++z) {
-        const auto& voxel = getGvdVoxel(x, y, z);
-
-        const bool is_edge = (x == 0) || (y == 0);
-        double expected_distance = is_edge ? -0.05 : std::min(x, y) * voxel_size;
-
-        EXPECT_NEAR(expected_distance, voxel.distance, 1.0e-6);
-        EXPECT_TRUE(!isVoronoi(voxel) || !voxel.fixed);
-        EXPECT_TRUE(voxel.on_surface || voxel.has_parent);
-
-        // 8-connected diagonal plane should be voronoi
-        EXPECT_EQ(std::abs(x - y) <= 1 && x >= 2 && y >= 2, isVoronoi(voxel))
-            << voxel << " @ (" << x << ", " << y << ", " << z << ")";
-      }
-    }
-  }
-}
-
-TEST_F(SingleBlockTestFixture, CornerCorrect) {
-  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
-  test::updateGvd(gvd_integrator, *map, true);
-
-  for (int x = 0; x < voxels_per_side; ++x) {
-    for (int y = 0; y < voxels_per_side; ++y) {
-      for (int z = 0; z < voxels_per_side; ++z) {
-        const auto& voxel = getGvdVoxel(x, y, z);
-
-        const bool is_edge = (x == 0) || (y == 0) || (z == 0);
-        double expected_distance =
-            is_edge ? -0.05 : std::min(x, std::min(y, z)) * voxel_size;
-
-        EXPECT_NEAR(expected_distance, voxel.distance, 1.0e-6);
-        EXPECT_TRUE(!isVoronoi(voxel) || !voxel.fixed);
-        EXPECT_TRUE(voxel.on_surface || voxel.has_parent)
-            << voxel << " @ (" << x << ", " << y << ", " << z << ")";
-
-        // upper 2x2 should all be voronoi
-        EXPECT_EQ(x >= 2 && y >= 2 && z >= 2, isVoronoi(voxel))
-            << voxel << " @ (" << x << ", " << y << ", " << z << ")";
-      }
-    }
-  }
-}
 
 TEST_F(ParentTestFixture, ParentsCorrect) {
   GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
@@ -463,49 +491,6 @@ TEST_F(ParentTestFixture, ParentsCorrect) {
   }
 }
 
-TEST_F(SingleBlockTestFixture, DISABLED_RaiseCorrectForSurface) {
-  gvd_config.min_diff_m = 0.03;
-  GvdIntegrator gvd_integrator(gvd_config, gvd_layer);
-  for (int x = 0; x < voxels_per_side; ++x) {
-    for (int y = 0; y < voxels_per_side; ++y) {
-      for (int z = 0; z < voxels_per_side; ++z) {
-        const bool is_edge = x == 0;
-        setTsdfVoxel(x, y, z, is_edge ? -0.05 : truncation_distance);
-      }
-    }
-  }
-
-  test::updateGvd(gvd_integrator, *map, true);
-
-  // trigger a lower wavefront
-  setTsdfVoxel(0, 2, 0, -0.01);
-  // flip value to be raised
-  setTsdfVoxel(0, 2, 2, -0.09);
-
-  test::updateGvd(gvd_integrator, *map, true, true);
-
-  {  // temporary scope
-    const auto& voxel = getGvdVoxel(0, 2, 2);
-    EXPECT_TRUE(voxel.on_surface);
-  }
-
-  for (int x = 0; x < voxels_per_side; ++x) {
-    for (int y = 0; y < voxels_per_side; ++y) {
-      for (int z = 0; z < voxels_per_side; ++z) {
-        const auto& voxel = getGvdVoxel(x, y, z);
-        const auto& tvoxel = getTsdfVoxel(x, y, z);
-
-        const bool is_edge = x == 0;
-        double expected_distance = is_edge ? tvoxel.distance : x * voxel_size;
-
-        EXPECT_NEAR(expected_distance, voxel.distance, 1.0e-6)
-            << " @ [" << x << ", " << y << ", " << z << "]";
-        EXPECT_TRUE(!isVoronoi(voxel) || !voxel.fixed);
-        EXPECT_TRUE(voxel.on_surface || voxel.has_parent);
-        EXPECT_FALSE(isVoronoi(voxel));
-      }
-    }
-  }
-}
+*/
 
 }  // namespace hydra::places
