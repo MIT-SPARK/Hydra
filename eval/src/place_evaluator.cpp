@@ -62,7 +62,7 @@ void PlaceEvaluator::computeGroundTruth(const GvdIntegrator::Config& config) {
   places::GvdIntegrator integrator(config_, gvd_);
   auto map = VolumetricMap::fromTsdf(*tsdf_, 0.3, false);
   CHECK(map) << "Invalid map!";
-  integrator.updateFromTsdf(0, map->getTsdfLayer(), map->getMeshLayer(), false, true);
+  integrator.updateFromTsdf(0, map->getTsdfLayer(), false, &map->getMeshLayer(), true);
   integrator.updateGvd(0);
 }
 

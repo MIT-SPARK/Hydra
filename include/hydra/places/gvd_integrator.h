@@ -49,6 +49,14 @@
 #include "hydra/utils/logging.h"
 
 namespace hydra::places {
+namespace gvd {
+
+bool setFixedParent(const GvdLayer& layer,
+                    const GlobalIndices& neighbor_indices,
+                    const GlobalIndex& voxel_index,
+                    GvdVoxel& voxel);
+
+}
 
 struct OpenQueueEntry {
   GlobalIndex index;
@@ -61,13 +69,26 @@ struct OpenQueueEntry {
 class GvdIntegrator {
  public:
   struct Config : VerbosityConfig {
+    //! Maximum distance to integrate ESDF to
     float max_distance_m = 2.0f;
+    //! Minimum distance to start integration at
     float min_distance_m = 0.2f;
+    //! Minimum difference in TSDF value to trigger voxel update
     float min_diff_m = 1.0e-3f;
+    //! Minimum observation weight
     float min_weight = 1.0e-6f;
-    bool refine_voxel_pos = false;
+    //! Only integrate ESDF for positive values
     bool positive_distance_only = true;
+    //! Use TSDF values to detect surfaces instead of mesh vertices
+    bool use_tsdf_for_surface = false;
+    //! Amount to inflate SDF zero-crossing threshold
+    float surface_threshold_inflation = 1.0;
+    //! Use TSDF gradient to refine basis point positions
+    bool refine_surface_voxel_pos = false;
+    //! Criteria for GVD membership
     VoronoiCheckConfig voronoi_config;
+
+    Config() : VerbosityConfig("[gvd] ") {}
   } const config;
 
   GvdIntegrator(const Config& config, const GvdLayer::Ptr& gvd_layer);
@@ -76,20 +97,14 @@ class GvdIntegrator {
 
   void updateFromTsdf(uint64_t timestamp_ns,
                       const TsdfLayer& tsdf,
-                      const MeshLayer& mesh,
                       bool clear_updated_flag,
+                      const MeshLayer* mesh = nullptr,
                       bool use_all_blocks = false);
 
   void updateGvd(uint64_t timestamp_ns, GraphExtractor* graph_extractor = nullptr);
 
   void archiveBlocks(const BlockIndices& blocks,
                      GraphExtractor* graph_extractor = nullptr);
-
-  // TODO(nathan) test this
-  static bool setFixedParent(const GvdLayer& layer,
-                             const GlobalIndices& neighbor_indices,
-                             const GlobalIndex& voxel_index,
-                             GvdVoxel& voxel);
 
   const double default_distance;
 
@@ -111,6 +126,7 @@ class GvdIntegrator {
                           GraphExtractor* extractor);
 
   // TSDF propagation
+  void propagateSurface(const TsdfLayer& tsdf, const BlockIndices& blocks);
   void propagateSurface(const MeshLayer& mesh);
 
   void processTsdfBlock(const TsdfBlock& block, const BlockIndex& index);

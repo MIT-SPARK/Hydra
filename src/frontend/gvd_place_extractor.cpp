@@ -128,7 +128,7 @@ void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg) {
   ScopedTimer graph_timer("places/gvd", msg.timestamp_ns);
   // reconstruction now only sends updated blocks so we integrate everything
   gvd_integrator_->updateFromTsdf(
-      msg.timestamp_ns, tsdf, map.getMeshLayer(), false, true);
+      msg.timestamp_ns, tsdf, false, &map.getMeshLayer(), true);
   gvd_integrator_->updateGvd(msg.timestamp_ns, &graph_extractor_);
 
   if (map_window_) {

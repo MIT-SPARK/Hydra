@@ -60,128 +60,12 @@ struct Verbosity {
 
 }  // namespace
 
-using timing::ScopedTimer;
+namespace gvd {
 
-void declare_config(GvdIntegrator::Config& config) {
-  using namespace config;
-  name("GvdIntegrator::Config");
-  base<VerbosityConfig>(config);
-  field(config.max_distance_m, "max_distance_m");
-  field(config.min_distance_m, "min_distance_m");
-  field(config.min_diff_m, "min_diff_m");
-  field(config.min_weight, "min_weight");
-  field(config.refine_voxel_pos, "refine_voxel_pos");
-  field(config.positive_distance_only, "positive_distance_only");
-  field(config.voronoi_config, "voronoi_config");
-}
-
-GvdIntegrator::GvdIntegrator(const GvdIntegrator::Config& config,
-                             const GvdLayer::Ptr& gvd_layer)
-    : config(config::checkValid(config)),
-      default_distance(config.max_distance_m),
-      gvd_layer_(gvd_layer),
-      neighbor_search_(26) {
-  CHECK(gvd_layer_);
-
-  // config.positive_distance_only toggles between only integrating to the negative
-  // truncation distance or integrating to the full max distance
-  min_integration_distance_m_ =
-      config.positive_distance_only ? -config.min_distance_m : -config.max_distance_m;
-
-  // we want at least enough buckets so that we bin voxels within approximately the same
-  // distance (i.e. within half a voxel)
-  const size_t num_buckets = 4 * config.max_distance_m / gvd_layer_->voxel_size;
-  open_.setNumBuckets(num_buckets, config.max_distance_m);
-}
-
-void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
-                                   const TsdfLayer& tsdf,
-                                   const MeshLayer& mesh,
-                                   bool clear_updated_flag,
-                                   bool use_all_blocks) {
-  const BlockIndices blocks =
-      use_all_blocks ? tsdf.allocatedBlockIndices()
-                     : tsdf.blockIndicesWithCondition(TsdfBlock::esdfUpdated);
-
-  MLOG(Verbosity::STATUS) << "[GVD update] Propagating TSDF using " << blocks.size()
-                          << " TSDF blocks";
-  ScopedTimer timer("places/propagate_tsdf", timestamp_ns);
-  update_stats_.clear();
-
-  for (const auto& idx : blocks) {
-    auto& block = gvd_layer_->allocateBlock(idx);
-    for (size_t idx = 0u; idx < block.numVoxels(); ++idx) {
-      block.getVoxel(idx).on_surface = false;
-    }
-  }
-
-  propagateSurface(mesh);
-  for (const auto& idx : blocks) {
-    processTsdfBlock(tsdf.getBlock(idx), idx);
-  }
-
-  if (!clear_updated_flag) {
-    return;
-  }
-
-  for (const auto& idx : blocks) {
-    tsdf.getBlock(idx).esdf_updated = false;
-  }
-}
-
-void GvdIntegrator::updateGvd(uint64_t timestamp_ns, GraphExtractor* graph_extractor) {
-  ScopedTimer timer("places/overall_update", timestamp_ns);
-
-  MLOG(Verbosity::STATUS) << "[GVD update] Processing open queue";
-  {  // timing scope
-    ScopedTimer timer("places/open_queue", timestamp_ns);
-    processOpenQueue(graph_extractor);
-  }  // timing scope
-
-  parent_tracker_.updateVertexMapping(*gvd_layer_);
-
-  if (graph_extractor) {
-    MLOG(Verbosity::STATUS) << "[GVD update] Starting graph extraction";
-    ScopedTimer timer("places/graph_extractor", timestamp_ns);
-    graph_extractor->extract(*gvd_layer_, timestamp_ns);
-    graph_extractor->fillParentInfo(*gvd_layer_, parent_tracker_);
-  }
-
-  MLOG(Verbosity::STATUS) << "[GVD update]" << std::endl << update_stats_;
-}
-
-void GvdIntegrator::archiveBlocks(const BlockIndices& blocks,
-                                  GraphExtractor* graph_extractor) {
-  for (const auto& idx : blocks) {
-    auto block = gvd_layer_->getBlockPtr(idx);
-    if (!block) {
-      MLOG(1) << "[GVD update] Archiving unknown block " << idx.transpose();
-      continue;
-    }
-
-    for (size_t v = 0; v < block->numVoxels(); ++v) {
-      const GvdVoxel& voxel = block->getVoxel(v);
-      if (!voxel.observed) {
-        continue;
-      }
-
-      const GlobalIndex global_index = block->getGlobalVoxelIndex(v);
-      if (graph_extractor) {
-        graph_extractor->removeDistantIndex(global_index);
-      }
-
-      parent_tracker_.removeVoronoiFromGvdParentMap(global_index);
-    }
-
-    MLOG(Verbosity::DETAILED) << "Removing block: " << idx.transpose();
-    gvd_layer_->removeBlock(idx);
-  }
-}
-
-bool GvdIntegrator::setFixedParent(const GvdLayer& layer,
-                                   const BlockIndices& neighbor_indices,
-                                   const GlobalIndex& voxel_index,
-                                   GvdVoxel& voxel) {
+bool setFixedParent(const GvdLayer& layer,
+                    const BlockIndices& neighbor_indices,
+                    const GlobalIndex& voxel_index,
+                    GvdVoxel& voxel) {
   float best_distance = 0.0;  // overwritten by first valid neighbor
   const GvdVoxel* best_neighbor = nullptr;
   GlobalIndex best_index;
@@ -220,6 +104,140 @@ bool GvdIntegrator::setFixedParent(const GvdLayer& layer,
   const Point p_n = layer.getVoxelPosition(best_index);
   setSdfParent(voxel, *best_neighbor, best_index, p_n);
   return true;
+}
+
+}  // namespace gvd
+
+using timing::ScopedTimer;
+
+void declare_config(GvdIntegrator::Config& config) {
+  using namespace config;
+  name("GvdIntegrator::Config");
+  base<VerbosityConfig>(config);
+  field(config.max_distance_m, "max_distance_m");
+  field(config.min_distance_m, "min_distance_m");
+  field(config.min_diff_m, "min_diff_m");
+  field(config.min_weight, "min_weight");
+  field(config.positive_distance_only, "positive_distance_only");
+  field(config.use_tsdf_for_surface, "use_tsdf_for_surface");
+  field(config.surface_threshold_inflation, "surface_threshold_inflation");
+  field(config.refine_surface_voxel_pos, "refine_surface_voxel_pos");
+  field(config.voronoi_config, "voronoi_config");
+
+  check(config.max_distance_m, GT, config.min_distance_m, "max > min");
+  check(config.max_distance_m, GT, 0.0, "max_distance_m");
+  check(config.min_distance_m, GE, 0.0, "min_distance_m");
+  check(config.min_weight, GE, 0.0, "min_weight");
+  check(config.surface_threshold_inflation, GT, 0.0, "surface_threshold_inflation");
+}
+
+GvdIntegrator::GvdIntegrator(const GvdIntegrator::Config& config,
+                             const GvdLayer::Ptr& gvd_layer)
+    : config(config::checkValid(config)),
+      default_distance(config.max_distance_m),
+      gvd_layer_(gvd_layer),
+      neighbor_search_(26) {
+  CHECK(gvd_layer_);
+
+  // config.positive_distance_only toggles between only integrating to the negative
+  // truncation distance or integrating to the full max distance
+  min_integration_distance_m_ =
+      config.positive_distance_only ? -config.min_distance_m : -config.max_distance_m;
+
+  // we want at least enough buckets so that we bin voxels within approximately the same
+  // distance (i.e. within half a voxel)
+  const size_t num_buckets = 4 * config.max_distance_m / gvd_layer_->voxel_size;
+  open_.setNumBuckets(num_buckets, config.max_distance_m);
+}
+
+void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
+                                   const TsdfLayer& tsdf,
+                                   bool clear_updated_flag,
+                                   const MeshLayer* mesh,
+                                   bool use_all_blocks) {
+  const BlockIndices blocks =
+      use_all_blocks ? tsdf.allocatedBlockIndices()
+                     : tsdf.blockIndicesWithCondition(TsdfBlock::esdfUpdated);
+
+  MLOG(Verbosity::STATUS) << "Propagating TSDF using " << blocks.size()
+                          << " TSDF blocks";
+  ScopedTimer timer("places/propagate_tsdf", timestamp_ns);
+  update_stats_.clear();
+
+  for (const auto& idx : blocks) {
+    auto& block = gvd_layer_->allocateBlock(idx);
+    for (size_t idx = 0u; idx < block.numVoxels(); ++idx) {
+      block.getVoxel(idx).on_surface = false;
+    }
+  }
+
+  if (mesh && !config.use_tsdf_for_surface) {
+    ScopedTimer timer("places/propagate_mesh", timestamp_ns);
+    propagateSurface(*mesh);
+  } else {
+    propagateSurface(tsdf, blocks);
+  }
+
+  for (const auto& idx : blocks) {
+    processTsdfBlock(tsdf.getBlock(idx), idx);
+  }
+
+  if (!clear_updated_flag) {
+    return;
+  }
+
+  for (const auto& idx : blocks) {
+    tsdf.getBlock(idx).esdf_updated = false;
+  }
+}
+
+void GvdIntegrator::updateGvd(uint64_t timestamp_ns, GraphExtractor* graph_extractor) {
+  ScopedTimer timer("places/overall_update", timestamp_ns);
+
+  MLOG(Verbosity::STATUS) << "Processing open queue";
+  {  // timing scope
+    ScopedTimer timer("places/open_queue", timestamp_ns);
+    processOpenQueue(graph_extractor);
+  }  // timing scope
+
+  parent_tracker_.updateVertexMapping(*gvd_layer_);
+
+  if (graph_extractor) {
+    MLOG(Verbosity::STATUS) << "Starting graph extraction";
+    ScopedTimer timer("places/graph_extractor", timestamp_ns);
+    graph_extractor->extract(*gvd_layer_, timestamp_ns);
+    graph_extractor->fillParentInfo(*gvd_layer_, parent_tracker_);
+  }
+
+  MLOG(Verbosity::STATUS) << "\n" << update_stats_;
+}
+
+void GvdIntegrator::archiveBlocks(const BlockIndices& blocks,
+                                  GraphExtractor* graph_extractor) {
+  for (const auto& idx : blocks) {
+    auto block = gvd_layer_->getBlockPtr(idx);
+    if (!block) {
+      MLOG(1) << "Archiving unknown block " << idx.transpose();
+      continue;
+    }
+
+    for (size_t v = 0; v < block->numVoxels(); ++v) {
+      const GvdVoxel& voxel = block->getVoxel(v);
+      if (!voxel.observed) {
+        continue;
+      }
+
+      const GlobalIndex global_index = block->getGlobalVoxelIndex(v);
+      if (graph_extractor) {
+        graph_extractor->removeDistantIndex(global_index);
+      }
+
+      parent_tracker_.removeVoronoiFromGvdParentMap(global_index);
+    }
+
+    MLOG(Verbosity::DETAILED) << "Removing block: " << idx.transpose();
+    gvd_layer_->removeBlock(idx);
+  }
 }
 
 /****************************************************************************************/
@@ -290,6 +308,50 @@ void GvdIntegrator::updateVoronoiQueue(GvdVoxel& voxel,
 /* TSDF Propagation */
 /****************************************************************************************/
 
+void GvdIntegrator::propagateSurface(const TsdfLayer& tsdf,
+                                     const BlockIndices& blocks) {
+  // surface_threshold needs to be smaller than the truncation distance
+  // otherwise updated blocks in free-space will clear the ESDF
+  const auto voxel_radius = std::sqrt(3.0) * tsdf.voxel_size / 2.0;
+  const auto surface_threshold = config.surface_threshold_inflation * voxel_radius;
+  CHECK_LT(surface_threshold, config.min_distance_m)
+      << "TSDF surface threshold too large!";
+
+  for (const auto& block : blocks) {
+    const auto& tsdf_block = tsdf.getBlock(block);
+    auto& gvd_block = gvd_layer_->getBlock(block);
+
+    for (size_t idx = 0u; idx < tsdf_block.numVoxels(); ++idx) {
+      const auto& tsdf_voxel = tsdf_block.getVoxel(idx);
+      if (tsdf_voxel.weight < config.min_weight) {
+        continue;
+      }
+
+      // surface voxels are anything closer to the surface than the voxel size
+      auto& gvd_voxel = gvd_block.getVoxel(idx);
+      const auto tsdf_dist = std::abs(tsdf_voxel.distance);
+      gvd_voxel.on_surface = tsdf_dist < surface_threshold;
+      if (!gvd_voxel.on_surface) {
+        continue;
+      }
+
+      resetParent(gvd_voxel);  // surface voxels don't have parents
+
+      Point pos = tsdf_block.getVoxelPosition(idx);
+      if (config.refine_surface_voxel_pos) {
+        const auto grad = computeGradient(tsdf, tsdf.getGlobalVoxelIndex(pos));
+        if (grad) {
+          pos -= tsdf_dist * grad.value();
+        }
+      }
+
+      gvd_voxel.parent_pos[0] = pos.x();
+      gvd_voxel.parent_pos[1] = pos.y();
+      gvd_voxel.parent_pos[2] = pos.z();
+    }
+  }
+}
+
 void GvdIntegrator::propagateSurface(const MeshLayer& mesh) {
   size_t num_outside = 0;
   size_t num_invalid = 0;
@@ -318,7 +380,7 @@ void GvdIntegrator::propagateSurface(const MeshLayer& mesh) {
     }
   }
 
-  MLOG(Verbosity::STATUS) << "Marked mesh: outside=" << num_outside
+  MLOG(Verbosity::STATUS) << "Mesh vertices: outside=" << num_outside
                           << ", invalid=" << num_invalid << ", marked=" << num_marked;
 }
 
@@ -351,7 +413,7 @@ void GvdIntegrator::processTsdfBlock(const TsdfBlock& tsdf_block,
 void GvdIntegrator::updateUnobservedVoxel(const TsdfVoxel& tsdf_voxel,
                                           const GlobalIndex& index,
                                           GvdVoxel& gvd_voxel) {
-  MLOG(Verbosity::DEBUG) << "[gvd] updating unobserved @ " << index.transpose()
+  MLOG(Verbosity::DEBUG) << "Updating unobserved @ " << index.transpose()
                          << " (d=" << tsdf_voxel.distance << ")";
   gvd_voxel.observed = true;
   gvd_voxel.is_negative = tsdf_voxel.distance < 0.0;
@@ -361,15 +423,15 @@ void GvdIntegrator::updateUnobservedVoxel(const TsdfVoxel& tsdf_voxel,
   if (is_fixed || gvd_voxel.on_surface) {
     gvd_voxel.distance = tsdf_voxel.distance;
     gvd_voxel.fixed = true;
-    MLOG(Verbosity::DEBUG) << "[gvd] voxel @ " << index.transpose()
+    MLOG(Verbosity::DEBUG) << "Voxel @ " << index.transpose()
                            << " pushed to queue as fixed voxel!";
     pushToQueue(index, gvd_voxel);
     return;
   }
 
   setDefaultDistance(gvd_voxel, default_distance);
-  MLOG(Verbosity::DEBUG) << "[gvd] voxel @ " << index.transpose()
-                         << " set to default of " << gvd_voxel.distance;
+  MLOG(Verbosity::DEBUG) << "Voxel @ " << index.transpose() << " set to default of "
+                         << gvd_voxel.distance;
   gvd_voxel.fixed = false;
   // TODO(nathan) pretty sure that we don't need to enqueue here, but should think
   // carefully about Lau version
@@ -378,7 +440,7 @@ void GvdIntegrator::updateUnobservedVoxel(const TsdfVoxel& tsdf_voxel,
 void GvdIntegrator::updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
                                         const GlobalIndex& index,
                                         GvdVoxel& gvd_voxel) {
-  MLOG(Verbosity::DEBUG) << "[gvd] updating observed @ " << index.transpose()
+  MLOG(Verbosity::DEBUG) << "Updating observed @ " << index.transpose()
                          << " (d=" << tsdf_voxel.distance
                          << ", gd=" << gvd_voxel.distance << ")";
 
@@ -387,7 +449,7 @@ void GvdIntegrator::updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
   const bool is_fixed = isTsdfFixed(tsdf_voxel);
 
   if (!gvd_voxel.on_surface && !gvd_voxel.has_parent) {
-    MLOG(Verbosity::DEBUG) << "[gvd] raising potential previous surface voxel";
+    MLOG(Verbosity::DEBUG) << "Raising potential previous surface voxel";
     // raise any "cleared" voxels (equivalent to removeObstacle in Lau et al.)
     pushToQueue(index, gvd_voxel);
     gvd_voxel.fixed = is_fixed;
@@ -397,7 +459,7 @@ void GvdIntegrator::updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
 
   if (is_fixed && !gvd_voxel.fixed) {
     // flipping to fixed will always result in a smaller distance value
-    MLOG(Verbosity::DEBUG) << "[gvd] new fixed voxel @ " << index.transpose();
+    MLOG(Verbosity::DEBUG) << "New fixed voxel @ " << index.transpose();
     gvd_voxel.fixed = true;
     // okay to rewire fixed parents
     resetParent(gvd_voxel);
@@ -409,7 +471,7 @@ void GvdIntegrator::updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
 
   if (is_fixed || gvd_voxel.on_surface) {
     if (std::abs(tsdf_voxel.distance - gvd_voxel.distance) <= config.min_diff_m) {
-      MLOG(Verbosity::DEBUG) << "[gvd] no change @ " << index.transpose();
+      MLOG(Verbosity::DEBUG) << "No change @ " << index.transpose();
       return;  // hysterisis to avoid re-integrating near surfaces
     }
 
@@ -424,8 +486,8 @@ void GvdIntegrator::updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
     // the fixed layer (when not on a surface) can also raise voxels
     gvd_voxel.to_raise = !is_tsdf_lower;
 
-    MLOG(Verbosity::DEBUG) << "[gvd] |d| =" << d_t << ", |gd| =" << d_g;
-    MLOG(Verbosity::DEBUG) << "[gvd] fixed @ " << index.transpose()
+    MLOG(Verbosity::DEBUG) << "|d| =" << d_t << ", |gd| =" << d_g;
+    MLOG(Verbosity::DEBUG) << "Fixed @ " << index.transpose()
                            << ", lower: " << std::boolalpha << is_tsdf_lower;
     return;
   }
@@ -436,8 +498,7 @@ void GvdIntegrator::updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
     gvd_voxel.fixed = false;
     pushToQueue(index, gvd_voxel);  // push uses distance and needs to come before raise
     setRaiseStatus(gvd_voxel, default_distance);
-    MLOG(Verbosity::DEBUG) << "[gvd] raising previously fixed voxel @ "
-                           << index.transpose();
+    MLOG(Verbosity::DEBUG) << "Raising previously fixed voxel @ " << index.transpose();
     return;
   }
 
@@ -445,7 +506,7 @@ void GvdIntegrator::updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
     return;  // no need to update if the signs match
   }
 
-  MLOG(Verbosity::DEBUG) << "[gvd] raising flipped voxel @ " << index.transpose();
+  MLOG(Verbosity::DEBUG) << "Raising flipped voxel @ " << index.transpose();
   // TODO(nathan) add to tracked statistics
   // we raise any voxel where the sign flips
   pushToQueue(index, gvd_voxel);  // push uses distance and needs to come before raise
@@ -467,7 +528,7 @@ void GvdIntegrator::raiseVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
     GvdVoxel* neighbor = gvd_layer_->getVoxelPtr(neighbor_index);
 
     if (neighbor && neighbor->observed) {
-      MLOG(Verbosity::DEBUG) << "[gvd] checking neighbor " << *neighbor << " @ "
+      MLOG(Verbosity::DEBUG) << "Checking neighbor " << *neighbor << " @ "
                              << neighbor_index.transpose() << " during raise for "
                              << index.transpose();
     }
@@ -486,7 +547,7 @@ void GvdIntegrator::raiseVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
     // starts a lower wavefront at the end of raising (see Lau et al. 33)
     // or continues propagating raise wavefront
     pushToQueue(neighbor_index, *neighbor);
-    MLOG(Verbosity::DEBUG) << "[gvd] pushing neighbor " << *neighbor << " @ "
+    MLOG(Verbosity::DEBUG) << "Pushing neighbor " << *neighbor << " @ "
                            << neighbor_index.transpose() << " to queue";
 
     // Lau et al. 34: check to see if the parent of the neighbor still exists
@@ -497,7 +558,7 @@ void GvdIntegrator::raiseVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
     // yes: we shouldn't be able to clear it if it doesn't exist.
     GvdVoxel* parent_ptr = gvd_layer_->getVoxelPtr(neighbor->parent);
     if (parent_ptr) {
-      MLOG(Verbosity::DEBUG) << "[gvd] parent: " << *parent_ptr << " @ "
+      MLOG(Verbosity::DEBUG) << "Parent: " << *parent_ptr << " @ "
                              << neighbor->parent.transpose();
     }
 
@@ -507,14 +568,14 @@ void GvdIntegrator::raiseVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
       continue;
     }
 
-    MLOG(Verbosity::DEBUG) << "[gvd] raising neighbor " << neighbor_index.transpose();
+    MLOG(Verbosity::DEBUG) << "Raising neighbor " << neighbor_index.transpose();
     setRaiseStatus(*neighbor, default_distance);
   }
 
   // TODO(nathan) make sure we handle raise criteria appropriately earlier
   update_stats_.number_raise_updates++;
   voxel.to_raise = false;
-  MLOG(Verbosity::DEBUG) << "after raise: " << voxel << " @ " << index.transpose();
+  MLOG(Verbosity::DEBUG) << "After raise: " << voxel << " @ " << index.transpose();
 }
 
 void GvdIntegrator::lowerVoxel(const GlobalIndex& index,
@@ -527,13 +588,12 @@ void GvdIntegrator::lowerVoxel(const GlobalIndex& index,
     // we delay assigning parents for voxels in the fixed layer until this point
     // as it should be an invariant that all potential parents have been seen by
     // processLowerSet
-    if (!setFixedParent(*gvd_layer_, neighbor_indices, index, voxel)) {
+    if (!gvd::setFixedParent(*gvd_layer_, neighbor_indices, index, voxel)) {
       update_stats_.number_fixed_no_parent++;
-      MLOG(Verbosity::DETAILED)
-          << "[GVD Update] Unable to set parent for fixed voxel: " << voxel;
+      MLOG(Verbosity::DETAILED) << "Unable to set parent for fixed voxel: " << voxel;
       return;
     } else {
-      MLOG(Verbosity::DEBUG) << "set new parent: " << voxel << " @ "
+      MLOG(Verbosity::DEBUG) << "Set new parent: " << voxel << " @ "
                              << index.transpose();
     }
   }
@@ -565,7 +625,7 @@ void GvdIntegrator::lowerVoxel(const GlobalIndex& index,
       candidate.is_lower = true;
     }
 
-    MLOG(Verbosity::DEBUG) << "[gvd] candidate: " << candidate.distance << " for "
+    MLOG(Verbosity::DEBUG) << "Candidate: " << candidate.distance << " for "
                            << *neighbor << " @ " << neighbor_index.transpose()
                            << " (for " << index.transpose() << ")";
 
@@ -589,7 +649,7 @@ void GvdIntegrator::lowerVoxel(const GlobalIndex& index,
 
     neighbor->distance = candidate.distance;
     setSdfParent(*neighbor, voxel, index, p_v);
-    MLOG(Verbosity::DEBUG) << "pushing neighbor " << *neighbor << " @ "
+    MLOG(Verbosity::DEBUG) << "Pushing neighbor " << *neighbor << " @ "
                            << neighbor_index.transpose() << " to queue";
     pushToQueue(neighbor_index, *neighbor);
   }
@@ -597,9 +657,9 @@ void GvdIntegrator::lowerVoxel(const GlobalIndex& index,
 
 // updateDistanceMap in "B. Lau et al., Efficient grid-based .. (2013)"
 void GvdIntegrator::processOpenQueue(GraphExtractor* extractor) {
-  MLOG(Verbosity::DEBUG) << "***************************************************";
-  MLOG(Verbosity::DEBUG) << "* Processing Open Queue                           *";
-  MLOG(Verbosity::DEBUG) << "***************************************************";
+  MLOG(Verbosity::DEBUG) << "*************************";
+  MLOG(Verbosity::DEBUG) << "* Processing Open Queue *";
+  MLOG(Verbosity::DEBUG) << "*************************";
   while (!open_.empty()) {
     auto entry = open_.front();
     open_.pop();
@@ -614,7 +674,7 @@ void GvdIntegrator::processOpenQueue(GraphExtractor* extractor) {
     const GlobalIndex& index = entry.index;
 
     MLOG(Verbosity::DEBUG) << "-----------------------";
-    MLOG(Verbosity::DEBUG) << "processing " << voxel << " @ " << index.transpose();
+    MLOG(Verbosity::DEBUG) << "Processing " << voxel << " @ " << index.transpose();
 
     if (voxel.to_raise) {
       voxel.to_raise = false;
@@ -628,7 +688,7 @@ void GvdIntegrator::processOpenQueue(GraphExtractor* extractor) {
     // (i.e., fixed voxels that still need an assigned parent)
     if ((!voxel.has_parent && !voxel.fixed) || !voxel.observed) {
       update_stats_.number_lower_skipped++;
-      MLOG(Verbosity::DEBUG) << "skipped";
+      MLOG(Verbosity::DEBUG) << "Skipped";
       continue;
     }
 

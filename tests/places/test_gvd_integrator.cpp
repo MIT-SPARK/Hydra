@@ -45,7 +45,7 @@ void updateGvd(GvdIntegrator& integrator,
                bool clear_updated,
                bool use_all_blocks = false) {
   integrator.updateFromTsdf(
-      0, map.getTsdfLayer(), map.getMeshLayer(), clear_updated, use_all_blocks);
+      0, map.getTsdfLayer(), clear_updated, &map.getMeshLayer(), use_all_blocks);
   integrator.updateGvd(0);
 }
 
@@ -507,6 +507,43 @@ TEST(GvdIntegrator, RaiseCorrectForSurface) {
   });
 
   data.gvd_config.min_diff_m = 0.03;
+  GvdIntegrator gvd_integrator(data.gvd_config, data.gvd_layer);
+  updateGvd(gvd_integrator, data.map, true);
+
+  // trigger a lower wavefront
+  data.setTsdf({0, 2, 0}, -0.01);
+  // flip value to be raised
+  data.setTsdf({0, 2, 2}, -0.09);
+
+  updateGvd(gvd_integrator, data.map, true, true);
+  EXPECT_TRUE(data.getGvd({0, 2, 2}).on_surface);
+
+  data.check([&](const auto& coords, const auto& voxel, const auto& config) {
+    const auto [x, y, z] = coords;
+    const auto& tvoxel = data.getTsdf(coords);
+
+    const bool is_edge = x == 0;
+    double expected_distance = is_edge ? tvoxel.distance : x * config.voxel_size;
+    EXPECT_NEAR(expected_distance, voxel.distance, 1.0e-6) << formatCoords(coords);
+    EXPECT_TRUE(!isVoronoi(voxel) || !voxel.fixed);
+    EXPECT_TRUE(voxel.on_surface || voxel.has_parent);
+    EXPECT_FALSE(isVoronoi(voxel));
+  });
+}
+
+TEST(GvdIntegrator, RaiseCorrectForTsdfSurface) {
+  GvdIntegratorData data;
+  data.setup([](const auto& coords, const auto& config) {
+    GvdIntegratorData::Obs obs;
+    const auto [x, y, z] = coords;
+    const bool is_edge = (x == 0);
+    obs.distance = is_edge ? -0.05 : config.truncation_distance;
+    return obs;
+  });
+
+  data.gvd_config.min_diff_m = 0.03;
+  data.gvd_config.surface_threshold_inflation = 1.1;
+  data.gvd_config.use_tsdf_for_surface = true;
   GvdIntegrator gvd_integrator(data.gvd_config, data.gvd_layer);
   updateGvd(gvd_integrator, data.map, true);
 
