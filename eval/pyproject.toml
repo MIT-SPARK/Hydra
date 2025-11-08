@@ -9,6 +9,7 @@ dependencies = [
   "click",
   "matplotlib",
   "pandas",
+  "rich",
   "seaborn",
   "tqdm",
 ]
