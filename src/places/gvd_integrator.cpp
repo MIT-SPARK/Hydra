@@ -45,6 +45,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
+#include <spatial_hash/neighbor_utils.h>
 
 #include "hydra/places/gvd_utilities.h"
 #include "hydra/utils/timing_utilities.h"
@@ -117,6 +118,7 @@ void declare_config(GvdIntegrator::Config& config) {
   field(config.min_distance_m, "min_distance_m");
   field(config.min_diff_m, "min_diff_m");
   field(config.min_weight, "min_weight");
+  field(config.integrate_frontiers, "integrate_frontiers");
   field(config.positive_distance_only, "positive_distance_only");
   field(config.use_tsdf_for_surface, "use_tsdf_for_surface");
   field(config.surface_threshold_inflation, "surface_threshold_inflation");
@@ -178,7 +180,7 @@ void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
   }
 
   for (const auto& idx : blocks) {
-    processTsdfBlock(tsdf.getBlock(idx), idx);
+    processTsdfBlock(tsdf, idx);
   }
 
   if (!clear_updated_flag) {
@@ -383,22 +385,50 @@ void GvdIntegrator::propagateSurface(const MeshLayer& mesh) {
                           << ", invalid=" << num_invalid << ", marked=" << num_marked;
 }
 
-void GvdIntegrator::processTsdfBlock(const TsdfBlock& tsdf_block,
+void GvdIntegrator::processTsdfBlock(const TsdfLayer& tsdf,
                                      const BlockIndex& block_index) {
-  // Allocate the same block in the ESDF layer.
+  const spatial_hash::VoxelNeighborSearch<TsdfBlock> search(tsdf, 6);
+  const auto& tsdf_block = tsdf.getBlock(block_index);
   auto& gvd_block = gvd_layer_->getBlock(block_index);
   gvd_block.updated = true;
 
   for (size_t idx = 0u; idx < tsdf_block.numVoxels(); ++idx) {
-    const TsdfVoxel& tsdf_voxel = tsdf_block.getVoxel(idx);
-    // TODO(nathan) handle unobserved voxel that borders observed voxels
-    // as optional surface point to lower from (maybe also raise?)
-    if (tsdf_voxel.weight < config.min_weight) {
+    const auto& tsdf_voxel = tsdf_block.getVoxel(idx);
+    const bool observed = tsdf_voxel.weight >= config.min_weight;
+    if (!config.integrate_frontiers && !observed) {
       continue;  // If this voxel is unobserved in the original map, skip it.
     }
 
-    GvdVoxel& gvd_voxel = gvd_block.getVoxel(idx);
-    const GlobalIndex global_index = gvd_block.getGlobalVoxelIndex(idx);
+    const auto global_index = gvd_block.getGlobalVoxelIndex(idx);
+    auto& gvd_voxel = gvd_block.getVoxel(idx);
+    if (!observed) {
+      bool is_frontier = false;
+      const auto neighbors = search.neighborVoxels(global_index, false);
+      for (const auto neighbor : neighbors) {
+        if (!neighbor) {
+          continue;
+        }
+
+        // observed neighbor beyond truncation distance is evidence of frontier
+        if (neighbor->weight >= config.min_weight &&
+            neighbor->distance >= config.min_distance_m) {
+          is_frontier = true;
+          break;
+        }
+      }
+
+      if (is_frontier) {
+        gvd_voxel.observed = true;
+        gvd_voxel.distance = 0.0;
+        gvd_voxel.fixed = true;
+        gvd_voxel.on_surface = true;
+        gvd_voxel.parent_pos = tsdf_block.getVoxelPosition(idx);
+        MLOG(Verbosity::DEBUG)
+            << "Pushed " << global_index.transpose() << " as frontier surface!";
+        pushToQueue(global_index, gvd_voxel);
+        continue;
+      }
+    }
 
     if (!gvd_voxel.observed) {
       updateUnobservedVoxel(tsdf_voxel, global_index, gvd_voxel);

@@ -568,6 +568,46 @@ TEST(GvdIntegrator, RaiseCorrectForTsdfSurface) {
   });
 }
 
+TEST(GvdIntegrator, RaiseCorrectWithFrontiers) {
+  GvdIntegratorData data;
+  data.setup([](const auto& coords,
+                const auto& config) -> std::optional<GvdIntegratorData::Obs> {
+    const auto [x, y, z] = coords;
+    if (x == 0) {
+      return std::nullopt;
+    }
+
+    GvdIntegratorData::Obs obs;
+    obs.distance = config.truncation_distance;
+    return obs;
+  });
+
+  // data.gvd_config.verbosity = 5;
+  data.gvd_config.integrate_frontiers = true;
+  data.gvd_config.min_diff_m = 0.03;
+  GvdIntegrator gvd_integrator(data.gvd_config, data.gvd_layer);
+  updateGvd(gvd_integrator, data.map, true);
+
+  // trigger a lower wavefront
+  data.setTsdf({0, 2, 0}, -0.01);
+  // flip value to be raised
+  data.setTsdf({0, 2, 2}, -0.09);
+
+  updateGvd(gvd_integrator, data.map, true, true);
+  EXPECT_TRUE(data.getGvd({0, 2, 2}).on_surface);
+
+  data.check([&](const auto& coords, const auto& voxel, const auto& config) {
+    const auto [x, y, z] = coords;
+    const auto& tvoxel = data.getTsdf(coords);
+
+    const bool is_edge = x == 0;
+    double expected_distance = is_edge ? tvoxel.distance : x * config.voxel_size;
+    EXPECT_NEAR(expected_distance, voxel.distance, 1.0e-6) << formatCoords(coords);
+    EXPECT_TRUE(!isVoronoi(voxel) || !voxel.fixed);
+    EXPECT_FALSE(isVoronoi(voxel));
+  });
+}
+
 TEST(GvdIntegrator, ParentsCorrect) {
   GvdIntegratorData data(0.1, 8, 0.2);
   data.setup([](const auto& coords, const auto& config) {

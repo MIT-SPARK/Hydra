@@ -77,6 +77,8 @@ class GvdIntegrator {
     float min_diff_m = 1.0e-3f;
     //! Minimum observation weight
     float min_weight = 1.0e-6f;
+    //! Use frontier voxels as surface
+    bool integrate_frontiers = false;
     //! Only integrate ESDF for positive values
     bool positive_distance_only = true;
     //! Use TSDF values to detect surfaces instead of mesh vertices
@@ -128,13 +130,10 @@ class GvdIntegrator {
   // TSDF propagation
   void propagateSurface(const TsdfLayer& tsdf, const BlockIndices& blocks);
   void propagateSurface(const MeshLayer& mesh);
-
-  void processTsdfBlock(const TsdfBlock& block, const BlockIndex& index);
-
+  void processTsdfBlock(const TsdfLayer& tsdf, const BlockIndex& index);
   void updateUnobservedVoxel(const TsdfVoxel& tsdf_voxel,
                              const GlobalIndex& index,
                              GvdVoxel& gvd_voxel);
-
   void updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
                            const GlobalIndex& index,
                            GvdVoxel& gvd_voxel);
