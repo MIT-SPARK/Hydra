@@ -40,7 +40,6 @@
 
 namespace hydra::places {
 
-// TODO(nathan) packed?
 struct GvdVoxel {
   float distance;
   // TODO(nathan) consider bitset instead
@@ -82,16 +81,12 @@ inline void setSdfParent(GvdVoxel& voxel,
   }
 }
 
-// TODO(nathan) should probably be resetSdfParent
-inline void resetParent(GvdVoxel& voxel) { voxel.has_parent = false; }
-
 inline void setDefaultDistance(GvdVoxel& voxel, const double default_distance) {
-  // TODO(nathan) there's probably a better way to do this
   voxel.distance = std::copysign(default_distance, voxel.is_negative ? -1.0 : 1.0);
 }
 
 inline void setRaiseStatus(GvdVoxel& voxel, const double default_distance) {
-  resetParent(voxel);
+  voxel.has_parent = false;
   voxel.to_raise = true;
 
   if (voxel.fixed) {
@@ -103,7 +98,7 @@ inline void setRaiseStatus(GvdVoxel& voxel, const double default_distance) {
 
 inline void setGvdSurfaceVoxel(GvdVoxel& voxel) {
   voxel.on_surface = true;
-  resetParent(voxel);
+  voxel.has_parent = false;
 }
 
 }  // namespace hydra::places

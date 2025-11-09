@@ -86,7 +86,6 @@ bool setFixedParent(const GvdLayer& layer,
       continue;
     }
 
-    // TODO(nathan) might need to double check handling of negative distances here
     const float dist =
         (voxel_index - neighbor_index).cast<float>().norm() * layer.voxel_size;
     const float dist_n = neighbor->distance + std::copysign(dist, voxel.distance);
@@ -335,7 +334,7 @@ void GvdIntegrator::propagateSurface(const TsdfLayer& tsdf,
         continue;
       }
 
-      resetParent(gvd_voxel);  // surface voxels don't have parents
+      gvd_voxel.has_parent = false;  // surface voxels don't have parents
 
       Point pos = tsdf_block.getVoxelPosition(idx);
       if (config.refine_surface_voxel_pos) {
@@ -372,7 +371,7 @@ void GvdIntegrator::propagateSurface(const MeshLayer& mesh) {
 
       auto& voxel = block->getVoxel(voxel_idx);
       voxel.on_surface = true;
-      resetParent(voxel);  // surface voxels don't have parents
+      voxel.has_parent = false;
       voxel.parent_pos[0] = point.x();
       voxel.parent_pos[1] = point.y();
       voxel.parent_pos[2] = point.z();
@@ -461,8 +460,7 @@ void GvdIntegrator::updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
     // flipping to fixed will always result in a smaller distance value
     MLOG(Verbosity::DEBUG) << "New fixed voxel @ " << index.transpose();
     gvd_voxel.fixed = true;
-    // okay to rewire fixed parents
-    resetParent(gvd_voxel);
+    gvd_voxel.has_parent = false;  // okay to rewire fixed parents
     // push after updating distance because this is a lower wavefront
     gvd_voxel.distance = tsdf_voxel.distance;
     pushToQueue(index, gvd_voxel);
@@ -507,7 +505,6 @@ void GvdIntegrator::updateObservedVoxel(const TsdfVoxel& tsdf_voxel,
   // we raise any voxel where the sign flips
   ++update_stats_.number_sign_flipped;
   MLOG(Verbosity::DEBUG) << "Raising flipped voxel @ " << index.transpose();
-  // TODO(nathan) add to tracked statistics
   pushToQueue(index, gvd_voxel);  // push uses distance and needs to come before raise
   setRaiseStatus(gvd_voxel, default_distance);
 }
@@ -523,9 +520,8 @@ void GvdIntegrator::pushToQueue(const GlobalIndex& index, GvdVoxel& voxel) {
 }
 
 void GvdIntegrator::raiseVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
-  for (const GlobalIndex& neighbor_index : neighbor_search_.neighborIndices(index)) {
-    GvdVoxel* neighbor = gvd_layer_->getVoxelPtr(neighbor_index);
-
+  for (const auto& neighbor_index : neighbor_search_.neighborIndices(index)) {
+    auto neighbor = gvd_layer_->getVoxelPtr(neighbor_index);
     if (neighbor && neighbor->observed) {
       MLOG(Verbosity::DEBUG) << "Checking neighbor " << *neighbor << " @ "
                              << neighbor_index.transpose() << " during raise for "
@@ -539,7 +535,6 @@ void GvdIntegrator::raiseVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
       // 1) doesn't exist
       // 2) has already been inserted in the raise queue
       // 3) if the parent has already been cleared
-      // TODO(nathan) on surface should be covered by !has_parent
       continue;
     }
 
@@ -555,7 +550,7 @@ void GvdIntegrator::raiseVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
     // we can't promise that the parent exists though. Maybe we can promise that the
     // parent will exist if it gets cleared?
     // yes: we shouldn't be able to clear it if it doesn't exist.
-    GvdVoxel* parent_ptr = gvd_layer_->getVoxelPtr(neighbor->parent);
+    auto parent_ptr = gvd_layer_->getVoxelPtr(neighbor->parent);
     if (parent_ptr) {
       MLOG(Verbosity::DEBUG) << "Parent: " << *parent_ptr << " @ "
                              << neighbor->parent.transpose();
@@ -571,7 +566,6 @@ void GvdIntegrator::raiseVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
     setRaiseStatus(*neighbor, default_distance);
   }
 
-  // TODO(nathan) make sure we handle raise criteria appropriately earlier
   update_stats_.number_raise_updates++;
   voxel.to_raise = false;
   MLOG(Verbosity::DEBUG) << "After raise: " << voxel << " @ " << index.transpose();
@@ -582,7 +576,6 @@ void GvdIntegrator::lowerVoxel(const GlobalIndex& index,
                                GraphExtractor* extractor) {
   update_stats_.number_lower_updated++;
   const auto neighbor_indices = neighbor_search_.neighborIndices(index);
-
   if (voxel.fixed && !voxel.has_parent && !voxel.on_surface) {
     // we delay assigning parents for voxels in the fixed layer until this point
     // as it should be an invariant that all potential parents have been seen by
@@ -628,11 +621,10 @@ void GvdIntegrator::lowerVoxel(const GlobalIndex& index,
                            << *neighbor << " @ " << neighbor_index.transpose()
                            << " (for " << index.transpose() << ")";
 
-    // TODO(nathan) this used to be before calling lower, not for each neighbor. Both
+    // This used to be before calling lower, not for each neighbor. Both
     // seem correct, but this is closer to the Lau et al. paper
     if (candidate.distance >= config.max_distance_m ||
         candidate.distance <= min_integration_distance_m_) {
-      // TODO(nathan) track this as a statistic?
       continue;
     }
 
@@ -642,7 +634,6 @@ void GvdIntegrator::lowerVoxel(const GlobalIndex& index,
     }
 
     if (neighbor->fixed) {
-      // TODO(nathan) maybe reconsider this
       continue;
     }
 
@@ -667,10 +658,10 @@ void GvdIntegrator::processOpenQueue(GraphExtractor* extractor) {
     if (!entry.voxel->in_queue) {
       continue;
     }
-    entry.voxel->in_queue = false;
 
-    GvdVoxel& voxel = *entry.voxel;
-    const GlobalIndex& index = entry.index;
+    entry.voxel->in_queue = false;
+    auto& voxel = *entry.voxel;
+    const auto& index = entry.index;
 
     MLOG(Verbosity::DEBUG) << "-----------------------";
     MLOG(Verbosity::DEBUG) << "Processing " << voxel << " @ " << index.transpose();
