@@ -36,7 +36,7 @@
 #include <unordered_set>
 
 #include "hydra/common/dsg_types.h"
-#include "hydra/rooms/graph_filtration.h"
+#include "hydra/regions/graph_filtration.h"
 
 namespace hydra {
 
