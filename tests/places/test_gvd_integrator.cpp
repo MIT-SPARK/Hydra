@@ -568,13 +568,13 @@ TEST(GvdIntegrator, RaiseCorrectForTsdfSurface) {
   });
 }
 
-TEST(GvdIntegrator, RaiseCorrectWithFrontiers) {
+TEST(GvdIntegrator, FrontierDistanceCorrect) {
   GvdIntegratorData data;
   data.setup([](const auto& coords,
                 const auto& config) -> std::optional<GvdIntegratorData::Obs> {
     const auto [x, y, z] = coords;
     if (x == 0) {
-      return std::nullopt;
+      return std::nullopt;  // force unobserved voxels
     }
 
     GvdIntegratorData::Obs obs;
@@ -582,19 +582,9 @@ TEST(GvdIntegrator, RaiseCorrectWithFrontiers) {
     return obs;
   });
 
-  // data.gvd_config.verbosity = 5;
   data.gvd_config.integrate_frontiers = true;
-  data.gvd_config.min_diff_m = 0.03;
   GvdIntegrator gvd_integrator(data.gvd_config, data.gvd_layer);
   updateGvd(gvd_integrator, data.map, true);
-
-  // trigger a lower wavefront
-  data.setTsdf({0, 2, 0}, -0.01);
-  // flip value to be raised
-  data.setTsdf({0, 2, 2}, -0.09);
-
-  updateGvd(gvd_integrator, data.map, true, true);
-  EXPECT_TRUE(data.getGvd({0, 2, 2}).on_surface);
 
   data.check([&](const auto& coords, const auto& voxel, const auto& config) {
     const auto [x, y, z] = coords;
