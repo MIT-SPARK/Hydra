@@ -41,7 +41,7 @@ def plot(result_path, show_trends, keys):
     result_path = pathlib.Path(result_path).expanduser().absolute()
     durations = timing.collect_timing_info(result_path)
     if len(durations) == 0:
-        click.secho(f"result path {result_path} has no contain timing data", fg="red")
+        click.secho(f"Result path {result_path} does not contain timing info", fg="red")
         sys.exit(1)
 
     if show_trends:
