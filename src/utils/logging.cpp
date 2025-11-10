@@ -40,6 +40,12 @@ namespace hydra {
 
 void declare_config(VerbosityConfig& config) {
   config::field(config.verbosity, "verbosity");
+  config::field(config.prefix, "prefix");
 }
+
+VerbosityConfig::VerbosityConfig(int verbosity) : VerbosityConfig("", verbosity) {}
+
+VerbosityConfig::VerbosityConfig(const std::string& prefix, int verbosity)
+    : verbosity(verbosity), prefix(prefix) {}
 
 }  // namespace hydra

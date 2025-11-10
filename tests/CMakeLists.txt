@@ -9,7 +9,6 @@ configure_file(hydra_test_config.h.in hydra_test_config.h)
 add_executable(
   test_${PROJECT_NAME}
   main.cpp
-  src/place_fixtures.cpp
   src/resources.cpp
   backend/test_external_loop_closure.cpp
   backend/test_generic_update_functor.cpp

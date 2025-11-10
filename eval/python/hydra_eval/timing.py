@@ -1,25 +1,26 @@
 """Some small helpers for getting timing information."""
 
 import logging
+import re
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import rich
+import rich.console
 import seaborn as sns
 
-DEFAULT_FOLDERS = ["frontend", "backend", "lcd"]
+DEFAULT_FOLDERS = ["frontend", "backend", "lcd", "timing"]
 FRONTEND_TIMERS = ["frontend/spin"]
 BACKEND_TIMERS = ["backend/spin"]
-
-
-def _get_filenames(result_path, subdir):
-    if not (result_path / subdir).exists():
-        return []
-    return [f for f in (result_path / subdir).iterdir() if f.match("*timing_raw.csv")]
-
-
-def _get_timer_name(path):
-    return path.parent.name + "/" + path.stem[: -len("_timing_raw")]
+OBJECT_TIMERS = ["frontend/objects_detection", "frontend/objects_graph_update"]
+PLACE_TIMERS = ["frontend/detect_gvd", "frontend/update_gvd_places"]
+ROOM_TIMERS = ["backend/room_detection"]
+DEFAULT_COMPARE_KEYS = [
+    "frontend/object_detection",
+    "gvd/extract_graph",
+    "backend/room_detection",
+]
 
 
 def _get_time_array_from_log(filename):
@@ -30,88 +31,18 @@ def _get_time_array_from_log(filename):
     return arr
 
 
-def collect_timing_info(path, default_folders=None):
-    """Collect timing info for a specfic path."""
-    timing_files = []
-    folders_to_use = DEFAULT_FOLDERS if default_folders is None else default_folders
-    for folder in folders_to_use:
-        timing_files += _get_filenames(path, folder)
+def _get_filenames(result_path, subdir):
+    if not (result_path / subdir).exists():
+        return []
 
-    return {_get_timer_name(f): _get_time_array_from_log(f) for f in timing_files}
+    return [f for f in (result_path / subdir).iterdir() if f.match("*timing_raw.csv")]
 
 
-def compute_timing_statistics(timing_data, order):
-    """Compute timing metrics for the dsg layers for a result directory."""
-    means = np.full((1, len(order)), np.nan)
-    stddevs = np.full((1, len(order)), np.nan)
-
-    for idx, timer in enumerate(order):
-        if timer in timing_data:
-            values = timing_data[timer]
-            times_to_use = np.squeeze(values) if values.shape[1] == 1 else values[:, 1]
-            means[0, idx] = np.mean(times_to_use)
-            stddevs[0, idx] = np.std(times_to_use)
-        else:
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Missing timer {timer} in timing data")
-
-    return means, stddevs
-
-
-def collate_timers(info, timers, max_diff_ns=1000000):
-    """Combine multiple timers together."""
-    logger = logging.getLogger(__name__)
-    stamps = []
-    elapsed = []
-
-    for stamp in info[timers[0]][:, 0]:
-        curr_elapsed = []
-        for timer in timers:
-            diff = np.abs(info[timer][:, 0] - stamp)
-            idx = np.argmin(diff)
-            if diff[idx] > max_diff_ns:
-                logger.warn(f"could not find stamp @ {stamp} [ns] for timer {timer}")
-                logger.warn(
-                    f"best stamp @ {info[timer][idx][0]} [ns] (diff {diff[idx]} [ns]"
-                )
-                continue
-
-            curr_elapsed.append(info[timer][idx, 1])
-
-        if len(curr_elapsed) != len(timers):
-            continue
-
-        stamps.append(stamp)
-        elapsed.append(sum(curr_elapsed))
-
-    return np.array(stamps), np.array(elapsed)
-
-
-def read_incremental_stamps(path, frontend_timers=None, backend_timers=None):
-    """Read and collate incremental times."""
-    timing_info = collect_timing_info(path)
-    frontend_info = collate_timers(
-        timing_info, FRONTEND_TIMERS if frontend_timers is None else frontend_timers
-    )
-    backend_info = collate_timers(
-        timing_info, BACKEND_TIMERS if backend_timers is None else backend_timers
-    )
-    return frontend_info, backend_info
-
-
-def read_batch_stamps(path, batch_name="batch_dsg", tsdf_name="tsdf_updates"):
-    """Read and collate batch times."""
-    batch_times = _get_time_array_from_log(path / f"{batch_name}_timing_raw.csv")
-    tsdf_times = _get_time_array_from_log(path / f"{tsdf_name}_timing_raw.csv")
-
-    stamps = batch_times[:, 0]
-    elapsed = batch_times[:, 1]
-
-    for i, stamp in enumerate(stamps):
-        tsdf_total = tsdf_times[tsdf_times[:, 0] <= stamp, 1].sum()
-        elapsed[i] += tsdf_total
-
-    return stamps, elapsed
+def _get_timer_name(path):
+    parent_name = path.parent.name
+    parent_name = "" if parent_name == "timing" else parent_name + "_"
+    name = parent_name + path.stem[: -len("_timing_raw")]
+    return name.replace("/", "_")
 
 
 def _draw_realtime_threshold(ax, threshold, padding=0.022):
@@ -143,6 +74,71 @@ def _get_longform_df(durations, filter_func=None):
     return pd.DataFrame({"Name": names, "Elapsed Time [s]": data})
 
 
+def collect_timing_info(path, default_folders=None):
+    """Collect timing info for a specfic path."""
+    timing_files = []
+    folders_to_use = default_folders or DEFAULT_FOLDERS
+    for folder in folders_to_use:
+        timing_files += _get_filenames(path, folder)
+
+    return {_get_timer_name(f): _get_time_array_from_log(f) for f in timing_files}
+
+
+def collate_timers(info, timers, max_diff_ns=1000000):
+    """Combine multiple timers together."""
+    logger = logging.getLogger(__name__)
+
+    stamps = []
+    elapsed = []
+    for stamp in info[timers[0]][:, 0]:
+        curr_elapsed = []
+        for timer in timers:
+            diff = np.abs(info[timer][:, 0] - stamp)
+            idx = np.argmin(diff)
+            if diff[idx] > max_diff_ns:
+                logger.warn(f"could not find stamp @ {stamp} [ns] for timer {timer}")
+                logger.warn(f"best {info[timer][idx][0]} [ns] (diff {diff[idx]} [ns]")
+                continue
+
+            curr_elapsed.append(info[timer][idx, 1])
+
+        if len(curr_elapsed) != len(timers):
+            continue
+
+        stamps.append(stamp)
+        elapsed.append(sum(curr_elapsed))
+
+    return np.array(stamps), np.array(elapsed)
+
+
+def show_timing_info(data, key_regex=None):
+    def _get_stat_str(stat):
+        return rf"{1000 * stat:>.3f}"
+
+    console = rich.console.Console()
+    table = rich.table.Table(title="Timing Information")
+    table.add_column("Timer")
+    table.add_column(r"μ \[ms]")
+    table.add_column(r"σ \[ms]")
+    table.add_column(r"Min \[ms]")
+    table.add_column(r"Max \[ms]")
+
+    sorted_keys = sorted([key for key in data])
+    if key_regex is not None:
+        matcher = re.compile(key_regex)
+        sorted_keys = [x for x in sorted_keys if matcher.match(x)]
+
+    for key in sorted_keys:
+        timing = data[key]
+        mean = _get_stat_str(np.mean(timing[:, 1]))
+        std = _get_stat_str(np.std(timing[:, 1]))
+        v_min = _get_stat_str(np.min(timing[:, 1]))
+        v_max = _get_stat_str(np.max(timing[:, 1]))
+        table.add_row(key, mean, std, v_min, v_max)
+
+    console.print(table)
+
+
 def plot_durations(durations, keys=["frontend", "backend"], rt_threshold=None):
     """Make a plot of durations."""
     sns.set()
@@ -171,7 +167,6 @@ def plot_trends(durations, keys=["frontend", "backend"], rt_threshold=None):
     sns.set()
     sns.set_style("whitegrid")
     sns.set_context("notebook")
-
     fig, ax = plt.subplots(len(keys), 1, squeeze=False)
 
     for idx, key in enumerate(keys):
@@ -205,6 +200,7 @@ def plot_comparison(results, plot_config, keys, use_bars=False, rt_threshold=Non
     labels = []
     result_set = []
 
+    keys = [x.replace("/", "_") for x in keys]
     for stem, result in results.items():
         result_label = plot_config.get("result_map", {}).get(stem, stem.upper())
         for key in keys:
