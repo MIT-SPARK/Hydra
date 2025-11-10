@@ -52,6 +52,7 @@ frontend:
     min_places_component_size: 3
     filter_ground: false
     gvd:
+      verbosity: 2
       max_distance_m: 4.5
       min_distance_m: 0.2
       min_diff_m: 0.1
