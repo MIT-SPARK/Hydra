@@ -1,0 +1,16 @@
+---
+# YOLOv11 Label Space (COCO 80 classes)
+# Based on COCO dataset for instance segmentation
+# Dynamic: humans, animals, airplanes
+# Objects: vehicles (including bicycles), static objects, furniture, etc.
+total_semantic_labels: 4
+dynamic_labels: []
+invalid_labels: []
+object_labels: [0, 1, 2, 3]
+surface_places_labels: []
+label_names:
+  - {label: 0, name: bench}
+  - {label: 1, name: car}
+  - {label: 2, name: trash bin}
+  - {label: 3, name: fire hydrant}
+
