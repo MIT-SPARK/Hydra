@@ -100,8 +100,8 @@ void logFiltration(std::ostream& fout,
 }
 
 RoomFinder::RoomFinder(const RoomFinderConfig& config)
-    : room_extents_(config.ground_truth_rooms_path),
-      config(config::checkValid(config)),
+    : config(config::checkValid(config)),
+      room_extents(config.ground_truth_rooms_path),
       distance_adaptor_(new DistanceAdaptor()) {}
 
 RoomFinder::~RoomFinder() {
@@ -296,8 +296,14 @@ void RoomFinder::setupDistanceAdaptor(const SceneGraphLayer& places) {
 
 SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
   VLOG(2) << "[Room Finder] Detecting rooms for " << places.numNodes() << " nodes";
-  setupDistanceAdaptor(places);
 
+  if (config.clustering_mode == RoomClusterMode::GROUND_TRUTH) {
+    last_results_ = clusterGraphByGt(places, room_extents);
+    cluster_room_map_.clear();
+    return makeRoomLayer(places);
+  }
+
+  setupDistanceAdaptor(places);
   const auto components = getBestComponents(places);
   if (components.empty()) {
     VLOG(2) << "[Room Finder] No components found";
@@ -325,7 +331,7 @@ SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
       last_results_ = clusterGraphByNeighbors(places, components);
       break;
     case RoomClusterMode::GROUND_TRUTH:
-      last_results_ = clusterGraphByGt(places, room_extents_);
+      last_results_ = clusterGraphByGt(places, room_extents);
       LOG(WARNING) << "Got GT results";
       break;
     case RoomClusterMode::NONE:

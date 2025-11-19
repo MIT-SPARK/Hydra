@@ -153,8 +153,7 @@ void addEdgesToRoomLayer(DynamicSceneGraph& graph,
   }
 }
 
-RoomExtents::RoomExtents(
-    const std::vector<std::vector<spark_dsg::BoundingBox>>& room_extents)
+RoomExtents::RoomExtents(const RoomExtents::BoundingBoxes& room_extents)
     : room_bounding_boxes(room_extents) {}
 
 RoomExtents::RoomExtents(const std::filesystem::path& path_to_yaml) {
