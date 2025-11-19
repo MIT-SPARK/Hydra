@@ -46,10 +46,25 @@ Eigen::Vector3d getRoomPosition(const SceneGraphLayer& places,
 
 void addEdgesToRoomLayer(const SceneGraphLayer& places,
                          const std::map<NodeId, size_t>& labels,
-                         const std::map<size_t, NodeId> label_to_room_map,
+                         const std::map<size_t, NodeId>& label_to_room_map,
                          SceneGraphLayer& rooms);
 
 void addEdgesToRoomLayer(DynamicSceneGraph& graph,
                          const std::set<NodeId>& active_rooms);
+
+struct RoomExtents {
+  using BoundingBoxes = std::vector<std::vector<spark_dsg::BoundingBox>>;
+
+  explicit RoomExtents(const BoundingBoxes& boxes);
+  explicit RoomExtents(const std::filesystem::path& path_to_json);
+
+  struct QueryResult {
+    bool valid = false;
+    size_t index = 0;
+  };
+  QueryResult getRoomForPoint(Eigen::Vector3d point) const;
+
+  BoundingBoxes room_bounding_boxes;
+};
 
 }  // namespace hydra
