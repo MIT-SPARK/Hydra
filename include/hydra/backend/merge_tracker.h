@@ -69,5 +69,4 @@ struct GroupedMergeTracker {
   std::map<std::string, MergeTracker> group_to_tracker_;
 };
 
-
 }  // namespace hydra

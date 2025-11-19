@@ -178,8 +178,15 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
       }
     }
 
-    launchCallbacks(cleanup_hooks, info, target_dsg_.get());
     merge_tracker.print();
+
+    // NOTE: the followings fails with hundreds of lines of errors about templates and
+    // threads:
+    // launchCallbacks(cleanup_hooks, info, *source_graph_, target_dsg_.get());
+
+    for (const auto& func : cleanup_hooks) {
+      func(info, *source_graph_, target_dsg_.get());
+    }
 
     for (auto h : cleanup_hooks) {
       h(info, *source_graph_, target_dsg_.get());
