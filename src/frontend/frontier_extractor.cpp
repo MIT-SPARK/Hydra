@@ -185,59 +185,6 @@ std::vector<std::pair<Eigen::Vector3d, double>> getPlacesForBlock(
   return center_dists;
 }
 
-void computeVoxelsInPlace(
-    const Eigen::Vector3f block_origin,
-    const std::vector<std::pair<Eigen::Vector3d, double>>& center_dists,
-    const std::vector<std::pair<Eigen::Vector3d, double>>& archived_center_dists,
-    const size_t voxels_per_block,
-    const size_t voxels_per_side,
-    const double voxel_size,
-    std::vector<bool>& inside_place,
-    std::vector<bool>& inside_archived_place) {
-  for (size_t v = 0; v < voxels_per_block; ++v) {
-    VoxelIndex ind = spatial_hash::voxelIndexFromLinearIndex(v, voxels_per_side);
-    const Point center =
-        block_origin + spatial_hash::centerPointFromIndex(ind, voxel_size);
-    inside_place[v] = false;
-    for (const auto& cd : center_dists) {
-      if ((center - cd.first.cast<float>()).norm() <= cd.second) {
-        inside_place[v] = true;
-        break;
-      }
-    }
-    inside_archived_place[v] = false;
-    if (inside_place[v]) {
-      continue;
-    }
-    for (const auto& cd : archived_center_dists) {
-      if ((center - cd.first.cast<float>()).norm() <= cd.second) {
-        inside_archived_place[v] = true;
-        break;
-      }
-    }
-  }
-}
-
-void checkFreeNeighbors(const std::vector<bool>& inside_place,
-                        const std::vector<bool>& inside_archived_place,
-                        const int vps,
-                        const VoxelIndex& index,
-                        bool& neighbor_free,
-                        bool& neighbor_archived_free) {
-  const spatial_hash::NeighborSearch search(26);
-  for (const auto& neighbor : search.neighborIndices(index)) {
-    if (neighbor.array().minCoeff() < 0 || neighbor.array().maxCoeff() >= vps) {
-      continue;
-    }
-    const size_t vn = spatial_hash::linearIndexFromVoxelIndex(neighbor, vps);
-    neighbor_free = inside_place[vn];
-    neighbor_archived_free |= inside_archived_place[vn];
-    if (neighbor_free) {
-      return;
-    }
-  }
-}
-
 void processBlock(NearestNodeFinder& finder,
                   const TsdfLayer& tsdf,
                   const BlockIndex& block_index,
@@ -252,48 +199,12 @@ void processBlock(NearestNodeFinder& finder,
                   std::queue<BlockIndex>& extra_blocks,
                   SpatialCloud::Ptr cloud,
                   SpatialCloud::Ptr archived_cloud) {
-  // Get all active places near block
-  const Eigen::Vector3f block_center =
-      spatial_hash::centerPointFromIndex(block_index, tsdf.blockSize());
-  const Eigen::Vector3f block_origin =
-      spatial_hash::originPointFromIndex(block_index, tsdf.blockSize());
-  auto center_dists = getPlacesForBlock(
-      graph, block_center, finder, tsdf.blockSize(), max_place_radius);
-
-  // TODO(aaron): We should probably check to see if the whole block is outside of the
-  // z band of voxels we are about. Can greatly reduce amount of work.
-
-  // Get all recently-archived places near block
-  std::vector<std::pair<Eigen::Vector3d, double>> archived_center_dists;
-  for (auto pid : archived_places) {
-    const auto node = graph.findNode(pid);
-    if (!node) {
-      continue;
-    }
-
-    const auto& pattr = node->attributes<PlaceNodeAttributes>();
-    archived_center_dists.push_back({pattr.position, pattr.distance});
-  }
-
-  // find all voxels that are inside a place
   const size_t voxels_per_block = std::pow(tsdf.voxels_per_side, 3);
-  std::vector<bool> inside_place(voxels_per_block);
-  std::vector<bool> inside_archived_place(voxels_per_block);
 
-  computeVoxelsInPlace(block_origin,
-                       center_dists,
-                       archived_center_dists,
-                       voxels_per_block,
-                       tsdf.voxels_per_side,
-                       tsdf.voxel_size,
-                       inside_place,
-                       inside_archived_place);
-
-  // find voxels that are on boundary of unobserved space and space inside a place
   for (size_t v = 0; v < voxels_per_block; ++v) {
-    // Check the voxel is not observed in the TSDF
     const auto tsdf_block = tsdf.getBlockPtr(block_index);
     if (tsdf_block && tsdf_block->getVoxel(v).weight >= 1e-6) {
+      // If the voxel has been observed, it's not a frontier
       continue;
     }
 
@@ -307,45 +218,31 @@ void processBlock(NearestNodeFinder& finder,
       continue;
     }
 
-    // If voxel is on the "border" of the block, and it is inside a place, and the
-    // neighboring block is not allocated, need to add neighbor to queue of "extra"
-    // blocks
-    if (inside_place[v] || inside_archived_place[v]) {
-      const spatial_hash::VoxelNeighborSearch search(tsdf, 6);
-      for (const auto& neighbor_key : search.neighborKeys({block_index, voxel_index})) {
-        if (!tsdf.hasBlock(neighbor_key.first) &&
-            !skip_add_blocks.count(neighbor_key.first)) {
-          extra_blocks.push(neighbor_key.first);
-          skip_add_blocks.insert(neighbor_key.first);
-        }
+    bool found_free_neighbor = false;
+    const spatial_hash::NeighborSearch search(26);
+    for (const auto& neighbor : search.neighborIndices(voxel_index)) {
+      if (neighbor.array().minCoeff() < 0 ||
+          neighbor.array().maxCoeff() >= tsdf.voxels_per_side) {
+        continue;
       }
+      const size_t vn =
+          spatial_hash::linearIndexFromVoxelIndex(neighbor, tsdf.voxels_per_side);
+      auto& neighbor_voxel = tsdf_block->getVoxel(vn);
+      if (neighbor_voxel.weight > 1e-6 && neighbor_voxel.distance > 0.5) {
+        found_free_neighbor = true;
+      }
+    }
+    if (!found_free_neighbor) {
       continue;
     }
 
+    // TODO: if we get free space on the edge of a block that goes into an unallocated
+    // block, do we need to add that block to the processing queue?
     if (skip_adding_frontiers) {
       return;
     }
-    bool neighbor_free = false;
-    bool neighbor_archived_free = false;
-    checkFreeNeighbors(inside_place,
-                       inside_archived_place,
-                       tsdf.voxels_per_side,
-                       voxel_index,
-                       neighbor_free,
-                       neighbor_archived_free);
 
-    if (!neighbor_free && !neighbor_archived_free) {
-      continue;
-    }
-
-    // A frontier is archived if its block is deallocated, or if its only neighbor
-    // that's inside a place is in an archived place
-    bool archived = block_is_archived || (!neighbor_free && neighbor_archived_free);
-    if (archived) {
-      archived_cloud->points.push_back({center.x(), center.y(), center.z()});
-    } else {
-      cloud->points.push_back({center.x(), center.y(), center.z()});
-    }
+    cloud->points.push_back({center.x(), center.y(), center.z()});
   }
 }
 
@@ -501,9 +398,15 @@ void FrontierExtractor::detectFrontiers(const ActiveWindowOutput& input,
   just_archived_blocks_.clear();
 }
 
-void FrontierExtractor::addFrontiers(uint64_t timestamp_ns, DynamicSceneGraph& graph) {
+void FrontierExtractor::addFrontiers(const uint64_t timestamp_ns,
+                                     DynamicSceneGraph& graph) {
   for (auto nid_bix : nodes_to_remove_) {
-    graph.removeNode(nid_bix.first);
+    if (tsdf_->hasBlock(nid_bix.second)) {
+      graph.removeNode(nid_bix.first);
+    } else {
+      graph.getNode(nid_bix.first).attributes<PlaceNodeAttributes>().active_frontier =
+          false;
+    }
   }
   nodes_to_remove_.clear();
 
@@ -515,7 +418,7 @@ void FrontierExtractor::addFrontiers(uint64_t timestamp_ns, DynamicSceneGraph& g
   for (auto& frontier : frontiers_) {
     place_finder_->find(
         frontier.center, 1, false, [&](NodeId place_id, size_t, double) {
-          PlaceNodeAttributes::Ptr attrs(new PlaceNodeAttributes(1, 0));
+          PlaceNodeAttributes::Ptr attrs(new PlaceNodeAttributes(.001, 0));
           attrs->position = frontier.center;
           attrs->frontier_scale = frontier.scale;
           attrs->orientation = frontier.orientation;
@@ -530,26 +433,6 @@ void FrontierExtractor::addFrontiers(uint64_t timestamp_ns, DynamicSceneGraph& g
         });
 
     nodes_to_remove_.push_back({next_node_id_, frontier.block_index});
-    ++next_node_id_;
-  }
-
-  // Add archived frontiers
-  for (auto& frontier : archived_frontiers_) {
-    place_finder_->find(
-        frontier.center, 1, false, [&](NodeId place_id, size_t, double) {
-          PlaceNodeAttributes::Ptr attrs(new PlaceNodeAttributes(1, 0));
-          attrs->position = frontier.center;
-          attrs->frontier_scale = frontier.scale;
-          attrs->orientation = frontier.orientation;
-          attrs->num_frontier_voxels = frontier.num_frontier_voxels;
-          attrs->real_place = false;
-          attrs->need_cleanup = true;
-          attrs->last_update_time_ns = timestamp_ns;
-          attrs->is_active = false;
-          attrs->active_frontier = false;
-          graph.emplaceNode(DsgLayers::PLACES, next_node_id_, std::move(attrs));
-          graph.insertEdge(place_id, next_node_id_);
-        });
     ++next_node_id_;
   }
 }
