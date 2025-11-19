@@ -52,4 +52,12 @@ void addEdgesToRoomLayer(const SceneGraphLayer& places,
 void addEdgesToRoomLayer(DynamicSceneGraph& graph,
                          const std::set<NodeId>& active_rooms);
 
+class RoomExtents {
+ public:
+  RoomExtents(std::vector<std::vector<spark_dsg::BoundingBox>>);
+  RoomExtents(std::string path_to_json);
+  std::pair<bool, size_t> getRoomForPoint(Eigen::Vector3d point) const;
+  std::vector<std::vector<spark_dsg::BoundingBox>> room_bounding_boxes_;
+};
+
 }  // namespace hydra

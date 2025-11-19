@@ -68,6 +68,8 @@ class RoomFinder {
 
   void fillClusterMap(const SceneGraphLayer& places, ClusterMap& assignments) const;
 
+  RoomExtents room_extents_;
+
   const RoomFinderConfig config;
 
  protected:

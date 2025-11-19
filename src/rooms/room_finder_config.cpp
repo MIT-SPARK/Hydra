@@ -65,10 +65,12 @@ void declare_config(RoomFinderConfig& conf) {
              {{RoomClusterMode::MODULARITY, "MODULARITY"},
               {RoomClusterMode::MODULARITY, "MODULARITY_DISTANCE"},
               {RoomClusterMode::NEIGHBORS, "NEIGHBORS"},
+              {RoomClusterMode::GROUND_TRUTH, "GROUND_TRUTH"},
               {RoomClusterMode::NONE, "NONE"}});
   field(conf.dilation_diff_threshold_m, "dilation_diff_threshold_m", "m");
   field(conf.log_filtrations, "log_filtrations");
   field(conf.log_place_graphs, "log_place_graphs");
+  field(conf.ground_truth_rooms_path, "ground_truth_rooms_path");
   // TODO(nathan) checks
 }
 

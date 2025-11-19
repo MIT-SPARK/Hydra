@@ -34,6 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/rooms/graph_clustering.h"
 
+#include <glog/logging.h>
+
 #include <queue>
 
 namespace hydra {
@@ -247,6 +249,29 @@ ClusterResults clusterGraphByNeighbors(const SceneGraphLayer& layer,
     }
 
     clusters[node_cluster_pair.second].insert(node_cluster_pair.first);
+  }
+
+  return {clusters, labels, 0, true};
+}
+
+ClusterResults clusterGraphByGt(const SceneGraphLayer& layer,
+                                const RoomExtents& room_extents) {
+  LOG(WARNING) << "Clustering by GT!";
+  std::map<size_t, std::unordered_set<NodeId>> clusters;
+  std::map<NodeId, size_t> labels;
+
+  for (const auto& id_node_pair : layer.nodes()) {
+    std::pair<bool, size_t> valid_room_idx =
+        room_extents.getRoomForPoint(id_node_pair.second->attributes().position);
+    if (!valid_room_idx.first) {
+      continue;
+    }
+    size_t room_idx = valid_room_idx.second;
+    if (!clusters.count(room_idx)) {
+      clusters[room_idx] = std::unordered_set<NodeId>();
+    }
+    clusters[room_idx].insert(id_node_pair.first);
+    labels[id_node_pair.first] = room_idx;
   }
 
   return {clusters, labels, 0, true};

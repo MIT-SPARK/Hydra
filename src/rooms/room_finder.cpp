@@ -100,7 +100,9 @@ void logFiltration(std::ostream& fout,
 }
 
 RoomFinder::RoomFinder(const RoomFinderConfig& config)
-    : config(config::checkValid(config)), distance_adaptor_(new DistanceAdaptor()) {}
+    : room_extents_(config.ground_truth_rooms_path),
+      config(config::checkValid(config)),
+      distance_adaptor_(new DistanceAdaptor()) {}
 
 RoomFinder::~RoomFinder() {
   if (log_file_) {
@@ -321,6 +323,10 @@ SceneGraphLayer::Ptr RoomFinder::findRooms(const SceneGraphLayer& places) {
       break;
     case RoomClusterMode::NEIGHBORS:
       last_results_ = clusterGraphByNeighbors(places, components);
+      break;
+    case RoomClusterMode::GROUND_TRUTH:
+      last_results_ = clusterGraphByGt(places, room_extents_);
+      LOG(WARNING) << "Got GT results";
       break;
     case RoomClusterMode::NONE:
     default:

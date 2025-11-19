@@ -34,6 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/rooms/room_utilities.h"
 
+#include <glog/logging.h>
+#include <yaml-cpp/yaml.h>
+
 namespace hydra {
 
 Eigen::Vector3d getRoomPosition(const SceneGraphLayer& places,
@@ -149,6 +152,63 @@ void addEdgesToRoomLayer(DynamicSceneGraph& graph,
       }
     }
   }
+}
+
+RoomExtents::RoomExtents(std::vector<std::vector<spark_dsg::BoundingBox>> room_extents)
+    : room_bounding_boxes_(room_extents) {}
+
+RoomExtents::RoomExtents(std::string path_to_yaml) {
+  YAML::Node root = YAML::LoadFile(path_to_yaml);
+  std::vector<std::vector<spark_dsg::BoundingBox>> result;
+
+  // Sort keys numerically to preserve order if needed
+  std::map<int, YAML::Node> sorted_entries;
+  for (const auto& kv : root) {
+    sorted_entries[kv.first.as<int>()] = kv.second;
+  }
+
+  for (const auto& [key, group_node] : sorted_entries) {
+    std::vector<spark_dsg::BoundingBox> group;
+
+    for (const auto& box_node : group_node) {
+      // Extract center
+      const auto& center_node = box_node["center"];
+      Eigen::Vector3f center(center_node[0].as<float>(),
+                             center_node[1].as<float>(),
+                             center_node[2].as<float>());
+
+      // Extract extents
+      const auto& extents_node = box_node["extents"];
+      Eigen::Vector3f dimensions(extents_node[0].as<float>(),
+                                 extents_node[1].as<float>(),
+                                 extents_node[2].as<float>());
+
+      // Extract rotation
+      const auto& rot_node = box_node["rotation"];
+      Eigen::Quaternionf rotation(rot_node["w"].as<float>(),
+                                  rot_node["x"].as<float>(),
+                                  rot_node["y"].as<float>(),
+                                  rot_node["z"].as<float>());
+
+      group.emplace_back(dimensions, center, rotation);
+    }
+
+    result.push_back(std::move(group));
+  }
+  LOG(WARNING) << "GT Rooms Loaded " << result.size() << "rooms";
+
+  room_bounding_boxes_ = result;
+}
+
+std::pair<bool, size_t> RoomExtents::getRoomForPoint(Eigen::Vector3d point) const {
+  for (size_t room_idx = 0; room_idx < room_bounding_boxes_.size(); ++room_idx) {
+    for (auto bb : room_bounding_boxes_.at(room_idx)) {
+      if (bb.contains(point)) {
+        return {true, room_idx};
+      }
+    }
+  }
+  return {false, 0};
 }
 
 }  // namespace hydra

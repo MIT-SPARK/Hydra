@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include "hydra/common/dsg_types.h"
+#include "hydra/rooms/room_utilities.h"
 
 namespace hydra {
 
@@ -68,4 +69,6 @@ ClusterResults clusterGraphByModularity(const SceneGraphLayer& layer,
 ClusterResults clusterGraphByNeighbors(const SceneGraphLayer& layer,
                                        const InitialClusters& initial_clusters);
 
+ClusterResults clusterGraphByGt(const SceneGraphLayer& layer,
+                                const RoomExtents& room_extents);
 }  // namespace hydra
