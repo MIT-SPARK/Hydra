@@ -147,7 +147,7 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
         do {
           const auto new_merges = hooks.find_merges(*target_dsg_->graph, info);
           num_applied = merge_tracker.applyMerges(
-              *target_dsg_->graph, new_merges, *target_dsg_, hooks.merge);
+              *source_graph_, new_merges, *target_dsg_, hooks.merge);
           VLOG(1) << "[Backend: " << name << "] Found " << new_merges.size()
                   << " merges at pass " << merge_iter << " (" << num_applied
                   << " applied)";
