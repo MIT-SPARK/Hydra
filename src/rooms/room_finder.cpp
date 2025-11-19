@@ -99,9 +99,16 @@ void logFiltration(std::ostream& fout,
   fout << "]},";
 }
 
+RoomExtents load_room_extents(std::filesystem::path path) {
+  if (path != "") {
+    return RoomExtents(path);
+  }
+  return RoomExtents(std::vector<std::vector<spark_dsg::BoundingBox>>());
+}
+
 RoomFinder::RoomFinder(const RoomFinderConfig& config)
     : config(config::checkValid(config)),
-      room_extents(config.ground_truth_rooms_path),
+      room_extents(load_room_extents(config.ground_truth_rooms_path)),
       distance_adaptor_(new DistanceAdaptor()) {}
 
 RoomFinder::~RoomFinder() {
