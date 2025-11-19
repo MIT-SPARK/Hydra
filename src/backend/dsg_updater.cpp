@@ -69,6 +69,7 @@ DsgUpdater::DsgUpdater(const Config& config,
     : config(config::checkValid(config)), source_graph_(source), target_dsg_(target) {
   for (const auto& [name, functor] : config.update_functors) {
     update_functors_.emplace(name, functor.create());
+    merge_tracker.initializeTracker(name);
   }
 }
 
@@ -121,6 +122,15 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
   merge_config.update_dynamic_attributes = false;
   target_dsg_->graph->mergeGraph(*source_graph_, merge_config);
 
+  std::vector<NodeId> active_nodes_to_restore;
+  for (auto& node : source_graph_->getLayer(DsgLayers::PLACES).nodes()) {
+    auto& attrs = node.second->attributes();
+    if (source_graph_->checkNode(node.first) == NodeStatus::NEW && !attrs.is_active) {
+      attrs.is_active = true;
+      active_nodes_to_restore.push_back(node.first);
+    }
+  }
+
   std::list<LayerCleanupFunc> cleanup_hooks;
   for (const auto& [name, functor] : update_functors_) {
     if (!functor) {
@@ -134,10 +144,12 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
 
     functor->call(*source_graph_, *target_dsg_, info);
     if (hooks.find_merges && enable_merging) {
+      auto& tracker = merge_tracker.getMergeGroup(name);
+
       // TODO(nathan) handle given merges
       const auto merges = hooks.find_merges(*source_graph_, info);
       const auto applied =
-          merge_tracker.applyMerges(*source_graph_, merges, *target_dsg_, hooks.merge);
+          tracker.applyMerges(*source_graph_, merges, *target_dsg_, hooks.merge);
       VLOG(1) << "[Backend: " << name << "] Found " << merges.size()
               << " merges (applied " << applied << ")";
 
@@ -145,6 +157,10 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
         size_t merge_iter = 0;
         size_t num_applied = 0;
         do {
+          if (name == "surface_places") {
+            continue;
+          }
+
           const auto new_merges = hooks.find_merges(*target_dsg_->graph, info);
           num_applied = merge_tracker.applyMerges(
               *source_graph_, new_merges, *target_dsg_, hooks.merge);
@@ -154,10 +170,31 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
           ++merge_iter;
         } while (num_applied > 0);
       }
+      if (info->loop_closure_detected && hooks.merge) {
+        LOG(WARNING) << "Updating all merge attributes for " << name;
+        tracker.print();
+        tracker.updateAllMergeAttributes(
+            *source_graph_, *target_dsg_->graph, hooks.merge);
+      }
     }
-  }
 
-  launchCallbacks(cleanup_hooks, info, target_dsg_.get());
+    launchCallbacks(cleanup_hooks, info, target_dsg_.get());
+    merge_tracker.print();
+
+    for (auto h : cleanup_hooks) {
+      h(info, *source_graph_, target_dsg_.get());
+    }
+
+    // TODO: this is where we undo all of the activations
+    for (NodeId nid : active_nodes_to_restore) {
+      auto node_ptr = source_graph_->findNode(nid);
+      if (node_ptr) {
+        auto& attrs = node_ptr->attributes();
+        attrs.is_active = false;
+      }
+    }
+    source_graph_->getNewNodes(true);
+  }
 }
 
 }  // namespace hydra

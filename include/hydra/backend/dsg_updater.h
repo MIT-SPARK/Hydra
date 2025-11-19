@@ -91,7 +91,7 @@ class DsgUpdater {
   void callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr info);
 
  private:
-  MergeTracker merge_tracker;
+  GroupedMergeTracker merge_tracker;
   std::map<std::string, UpdateFunctor::Ptr> update_functors_;
 
   DynamicSceneGraph::Ptr source_graph_;
