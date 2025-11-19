@@ -188,10 +188,6 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
       func(info, *source_graph_, target_dsg_.get());
     }
 
-    for (auto h : cleanup_hooks) {
-      h(info, *source_graph_, target_dsg_.get());
-    }
-
     // TODO: this is where we undo all of the activations
     for (NodeId nid : active_nodes_to_restore) {
       auto node_ptr = source_graph_->findNode(nid);
