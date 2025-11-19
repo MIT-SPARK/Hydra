@@ -70,6 +70,8 @@ class RoomFinder {
 
   const RoomFinderConfig config;
 
+  const RoomExtents room_extents;
+
  protected:
   InitialClusters getBestComponents(const SceneGraphLayer& places) const;
 
