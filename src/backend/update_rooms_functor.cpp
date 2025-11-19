@@ -107,7 +107,7 @@ void UpdateRoomsFunctor::call(const DynamicSceneGraph&,
   auto rooms = room_finder->findRooms(*places_clone);
   rewriteRooms(rooms.get(), *dsg.graph);
   room_finder->addRoomPlaceEdges(*dsg.graph, config.places_layer);
-  Sink::callAll(sinks_, info->timestamp_ns, room_finder);
+  Sink::callAll(sinks_, info->timestamp_ns, *room_finder);
   return;
 }
 

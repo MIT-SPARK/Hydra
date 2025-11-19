@@ -37,6 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/types/enum.h>
+#include <config_utilities/types/path.h>
 
 namespace hydra {
 
@@ -70,7 +71,7 @@ void declare_config(RoomFinderConfig& conf) {
   field(conf.dilation_diff_threshold_m, "dilation_diff_threshold_m", "m");
   field(conf.log_filtrations, "log_filtrations");
   field(conf.log_place_graphs, "log_place_graphs");
-  field(conf.ground_truth_rooms_path, "ground_truth_rooms_path");
+  field<Path::Absolute>(conf.ground_truth_rooms_path, "ground_truth_rooms_path");
   // TODO(nathan) checks
 }
 

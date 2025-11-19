@@ -42,7 +42,7 @@
 namespace hydra {
 
 struct UpdateRoomsFunctor : public UpdateFunctor {
-  using Sink = OutputSink<uint64_t, const std::shared_ptr<RoomFinder>>;
+  using Sink = OutputSink<uint64_t, const RoomFinder&>;
   struct Config {
     RoomFinderConfig room_finder;
     std::string places_layer = DsgLayers::PLACES;
@@ -57,7 +57,7 @@ struct UpdateRoomsFunctor : public UpdateFunctor {
 
   void rewriteRooms(const SceneGraphLayer* new_rooms, DynamicSceneGraph& graph) const;
 
-  std::shared_ptr<RoomFinder> room_finder;
+  std::unique_ptr<RoomFinder> room_finder;
 
  private:
   inline static const auto registration_ =

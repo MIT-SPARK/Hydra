@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <filesystem>
 #include <string>
 
 namespace hydra {
@@ -69,7 +70,7 @@ struct RoomFinderConfig {
   double dilation_diff_threshold_m = 1.0e-4;
   bool log_filtrations = false;
   bool log_place_graphs = false;
-  std::string ground_truth_rooms_path = "";
+  std::filesystem::path ground_truth_rooms_path = "";
 };
 
 void declare_config(RoomFinderConfig& config);

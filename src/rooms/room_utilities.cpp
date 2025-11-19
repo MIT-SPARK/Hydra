@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/rooms/room_utilities.h"
 
-#include <glog/logging.h>
 #include <yaml-cpp/yaml.h>
 
 namespace hydra {
@@ -82,7 +81,7 @@ Eigen::Vector3d getRoomPosition(const SceneGraphLayer& places,
 
 void addEdgesToRoomLayer(const SceneGraphLayer& places,
                          const std::map<NodeId, size_t>& labels,
-                         const std::map<size_t, NodeId> label_to_room_map,
+                         const std::map<size_t, NodeId>& label_to_room_map,
                          SceneGraphLayer& rooms) {
   for (const auto& id_node_pair : places.nodes()) {
     const auto place = id_node_pair.first;
@@ -154,21 +153,17 @@ void addEdgesToRoomLayer(DynamicSceneGraph& graph,
   }
 }
 
-RoomExtents::RoomExtents(std::vector<std::vector<spark_dsg::BoundingBox>> room_extents)
-    : room_bounding_boxes_(room_extents) {}
+RoomExtents::RoomExtents(
+    const std::vector<std::vector<spark_dsg::BoundingBox>>& room_extents)
+    : room_bounding_boxes(room_extents) {}
 
-RoomExtents::RoomExtents(std::string path_to_yaml) {
+RoomExtents::RoomExtents(const std::filesystem::path& path_to_yaml) {
   YAML::Node root = YAML::LoadFile(path_to_yaml);
   std::vector<std::vector<spark_dsg::BoundingBox>> result;
 
-  // Sort keys numerically to preserve order if needed
-  std::map<int, YAML::Node> sorted_entries;
-  for (const auto& kv : root) {
-    sorted_entries[kv.first.as<int>()] = kv.second;
-  }
-
-  for (const auto& [key, group_node] : sorted_entries) {
-    std::vector<spark_dsg::BoundingBox> group;
+  for (const auto& key_group : root) {
+    auto& group_node = key_group.second;
+    auto& group = result.emplace_back();
 
     for (const auto& box_node : group_node) {
       // Extract center
@@ -192,17 +187,14 @@ RoomExtents::RoomExtents(std::string path_to_yaml) {
 
       group.emplace_back(dimensions, center, rotation);
     }
-
-    result.push_back(std::move(group));
   }
-  LOG(WARNING) << "GT Rooms Loaded " << result.size() << "rooms";
 
-  room_bounding_boxes_ = result;
+  room_bounding_boxes = result;
 }
 
-std::pair<bool, size_t> RoomExtents::getRoomForPoint(Eigen::Vector3d point) const {
-  for (size_t room_idx = 0; room_idx < room_bounding_boxes_.size(); ++room_idx) {
-    for (auto bb : room_bounding_boxes_.at(room_idx)) {
+RoomExtents::QueryResult RoomExtents::getRoomForPoint(Eigen::Vector3d point) const {
+  for (size_t room_idx = 0; room_idx < room_bounding_boxes.size(); ++room_idx) {
+    for (const auto& bb : room_bounding_boxes.at(room_idx)) {
       if (bb.contains(point)) {
         return {true, room_idx};
       }
