@@ -99,8 +99,12 @@ ExternalLoopClosureReceiver::ExternalLoopClosureReceiver(const Config& config,
 ExternalLoopClosureReceiver::OrderedPreviousLoops&
 ExternalLoopClosureReceiver::getPreviousLoopsForRobotPair(size_t robot_a,
                                                           size_t robot_b) {
-  return added_loop_closures_.at(
-      {std::min(robot_a, robot_b), std::max(robot_a, robot_b)});
+  std::pair<size_t, size_t> key = {std::min(robot_a, robot_b),
+                                   std::max(robot_a, robot_b)};
+  if (!added_loop_closures_.count(key)) {
+    added_loop_closures_.insert({key, {}});
+  }
+  return added_loop_closures_.at(key);
 }
 
 LookupResult ExternalLoopClosureReceiver::findClosest(const DynamicSceneGraph& graph,
