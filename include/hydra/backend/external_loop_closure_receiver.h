@@ -100,7 +100,7 @@ class ExternalLoopClosureReceiver {
                      const Eigen::Affine3d& to_T_from);
   Queue* const input_queue_;
   std::list<pose_graph_tools::PoseGraphEdge> loop_closures_;
-  // Maps robot ID to
+  // Maps robot ID pairs to previous loop closures between those robots
   std::map<std::pair<size_t, size_t>, OrderedPreviousLoops> added_loop_closures_;
 };
 
