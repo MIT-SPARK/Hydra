@@ -123,11 +123,13 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
   target_dsg_->graph->mergeGraph(*source_graph_, merge_config);
 
   std::vector<NodeId> active_nodes_to_restore;
-  for (auto& node : source_graph_->getLayer(DsgLayers::PLACES).nodes()) {
-    auto& attrs = node.second->attributes();
-    if (source_graph_->checkNode(node.first) == NodeStatus::NEW && !attrs.is_active) {
-      attrs.is_active = true;
-      active_nodes_to_restore.push_back(node.first);
+  for (auto& [layer_id, layer] : source_graph_->layers()) {
+    for (auto& node : layer->nodes()) {
+      auto& attrs = node.second->attributes();
+      if (source_graph_->checkNode(node.first) == NodeStatus::NEW && !attrs.is_active) {
+        attrs.is_active = true;
+        active_nodes_to_restore.push_back(node.first);
+      }
     }
   }
 
@@ -162,7 +164,7 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
           }
 
           const auto new_merges = hooks.find_merges(*target_dsg_->graph, info);
-          num_applied = merge_tracker.applyMerges(
+          num_applied = tracker.applyMerges(
               *source_graph_, new_merges, *target_dsg_, hooks.merge);
           VLOG(1) << "[Backend: " << name << "] Found " << new_merges.size()
                   << " merges at pass " << merge_iter << " (" << num_applied
@@ -171,7 +173,7 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
         } while (num_applied > 0);
       }
       if (info->loop_closure_detected && hooks.merge) {
-        LOG(WARNING) << "Updating all merge attributes for " << name;
+        LOG(INFO) << "Updating all merge attributes for " << name;
         tracker.print();
         tracker.updateAllMergeAttributes(
             *source_graph_, *target_dsg_->graph, hooks.merge);
@@ -179,10 +181,6 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
     }
 
     merge_tracker.print();
-
-    // NOTE: the followings fails with hundreds of lines of errors about templates and
-    // threads:
-    // launchCallbacks(cleanup_hooks, info, *source_graph_, target_dsg_.get());
 
     for (const auto& func : cleanup_hooks) {
       func(info, *source_graph_, target_dsg_.get());

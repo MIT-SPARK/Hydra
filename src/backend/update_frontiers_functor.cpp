@@ -35,7 +35,6 @@
 #include "hydra/backend/update_frontiers_functor.h"
 
 #include <config_utilities/config.h>
-#include <spark_dsg/dynamic_scene_graph.h>
 
 #include "hydra/common/global_info.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
