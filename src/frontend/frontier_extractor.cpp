@@ -404,6 +404,7 @@ void FrontierExtractor::addFrontiers(const uint64_t timestamp_ns,
     if (tsdf_->hasBlock(nid_bix.second)) {
       graph.removeNode(nid_bix.first);
     } else {
+      graph.getNode(nid_bix.first).attributes<PlaceNodeAttributes>().is_active = false;
       graph.getNode(nid_bix.first).attributes<PlaceNodeAttributes>().active_frontier =
           false;
     }
@@ -426,7 +427,7 @@ void FrontierExtractor::addFrontiers(const uint64_t timestamp_ns,
           attrs->real_place = false;
           attrs->need_cleanup = true;
           attrs->last_update_time_ns = timestamp_ns;
-          attrs->is_active = false;
+          attrs->is_active = true;
           attrs->active_frontier = true;
           graph.emplaceNode(DsgLayers::PLACES, next_node_id_, std::move(attrs));
           graph.insertEdge(place_id, next_node_id_);

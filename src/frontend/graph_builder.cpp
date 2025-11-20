@@ -529,9 +529,11 @@ void GraphBuilder::updatePlaces(const ActiveWindowOutput& input) {
     std::vector<NodeId> archived_places;
     for (const auto& [node_id, node] :
          dsg_->graph->getLayer(DsgLayers::PLACES).nodes()) {
-      auto& attrs = node->attributes();
+      auto& attrs = node->attributes<PlaceNodeAttributes>();
       const auto prev_active = attrs.is_active;
-      attrs.is_active = active_nodes.count(node_id);
+      if (attrs.real_place) {
+        attrs.is_active = active_nodes.count(node_id);
+      }
       if (prev_active && !attrs.is_active) {
         archived_places.push_back(node_id);
       }
