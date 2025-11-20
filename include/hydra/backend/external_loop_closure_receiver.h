@@ -39,22 +39,25 @@
 #include <spark_dsg/dynamic_scene_graph.h>
 
 #include <list>
-#include <optional>
 
 #include "hydra/common/message_queue.h"
 
 namespace hydra {
 
-inline bool pose_graph_edge_cmp(pose_graph_tools::PoseGraphEdge a,
-                                pose_graph_tools::PoseGraphEdge b) {
-  return a.key_from < b.key_from;
-}
+struct KeyFromComparator {
+  bool operator()(pose_graph_tools::PoseGraphEdge a,
+                  pose_graph_tools::PoseGraphEdge b) const {
+    return a.key_from < b.key_from;
+  }
+};
 
 class ExternalLoopClosureReceiver {
  public:
   using Queue = MessageQueue<pose_graph_tools::PoseGraph>;
   using Callback = std::function<void(
       spark_dsg::NodeId to, spark_dsg::NodeId from, const gtsam::Pose3 to_T_from)>;
+  using OrderedPreviousLoops =
+      std::set<pose_graph_tools::PoseGraphEdge, KeyFromComparator>;
 
   struct LookupResult {
     enum class Status {
@@ -72,10 +75,12 @@ class ExternalLoopClosureReceiver {
     //! agent pose. 0 disables checking time differences.
     double max_time_difference = 1.0;
     //! Time window where a loop closure may block adding future loop closures
-    double lc_lockout_time = 5.0;
+    double lockout_time = 5.0;
     //! Threshold above which a loop closure constraining equivalent poses is considered
     //! unique
-    double lc_min_pose_discrepancy = 2.0;
+    double min_pose_discrepancy = 2.0;
+    //! Weighting of rotation component of pose discrepency calculation
+    double rotation_scale = 1.0;
 
   } const config;
 
@@ -86,11 +91,17 @@ class ExternalLoopClosureReceiver {
                            int robot_id,
                            double max_diff_s = 0.0) const;
 
+  OrderedPreviousLoops& getPreviousLoopsForRobotPair(size_t, size_t);
+
  protected:
+  bool should_add_lc(const OrderedPreviousLoops& added_lcs,
+                     const uint64_t stamp_ns_from,
+                     const uint64_t stamp_ns_to,
+                     const Eigen::Affine3d& to_T_from);
   Queue* const input_queue_;
   std::list<pose_graph_tools::PoseGraphEdge> loop_closures_;
-  std::set<pose_graph_tools::PoseGraphEdge, decltype(pose_graph_edge_cmp)*>
-      added_loop_closures_;
+  // Maps robot ID to
+  std::map<std::pair<size_t, size_t>, OrderedPreviousLoops> added_loop_closures_;
 };
 
 void declare_config(ExternalLoopClosureReceiver::Config& config);

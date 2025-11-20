@@ -76,14 +76,31 @@ void declare_config(ExternalLoopClosureReceiver::Config& config) {
   field(config.layer, "layer");
   field(config.max_time_difference, "max_time_difference", "s");
   check(config.max_time_difference, GE, 0.0, "max_time_difference");
-  field(config.lc_lockout_time, "lc_lockout_time_ns", "s");
-  field(config.lc_min_pose_discrepancy, "lc_min_pose_discrepancy", "m");
+  field(config.lockout_time, "lockout_time_ns", "s");
+  field(config.min_pose_discrepancy, "min_pose_discrepancy", "m");
+  field(config.rotation_scale, "rotation_scale");
+}
+
+double computePoseDiff(const Eigen::Affine3d& pose1,
+                       const Eigen::Affine3d& pose2,
+                       const double rotation_scale) {
+  Eigen::Affine3d pose_discrepancy = pose1.inverse() * pose2;
+  double translation_diff = pose_discrepancy.translation().norm();
+  double rotation_diff = std::acos((pose_discrepancy.rotation().trace() - 1) / 2);
+  return translation_diff + rotation_scale * abs(rotation_diff);
 }
 
 ExternalLoopClosureReceiver::ExternalLoopClosureReceiver(const Config& config,
                                                          Queue* const queue)
-    : config(config), input_queue_(queue), added_loop_closures_(&pose_graph_edge_cmp) {
+    : config(config), input_queue_(queue) {
   LOG_IF(WARNING, !input_queue_) << "External loop closures disabled!";
+}
+
+ExternalLoopClosureReceiver::OrderedPreviousLoops&
+ExternalLoopClosureReceiver::getPreviousLoopsForRobotPair(size_t robot_a,
+                                                          size_t robot_b) {
+  return added_loop_closures_.at(
+      {std::min(robot_a, robot_b), std::max(robot_a, robot_b)});
 }
 
 LookupResult ExternalLoopClosureReceiver::findClosest(const DynamicSceneGraph& graph,
@@ -136,20 +153,26 @@ LookupResult ExternalLoopClosureReceiver::findClosest(const DynamicSceneGraph& g
   return {LookupResult::Status::VALID, best_id};
 }
 
-bool should_add_lc(const std::set<pose_graph_tools::PoseGraphEdge,
-                                  decltype(pose_graph_edge_cmp)*>& added_lcs,
-                   const uint64_t stamp_ns_from,
-                   const uint64_t stamp_ns_to,
-                   const Eigen::Affine3d& to_T_from,
-                   const uint64_t lockout_time_ns,
-                   const double min_pose_discrepancy) {
+bool ExternalLoopClosureReceiver::should_add_lc(const OrderedPreviousLoops& added_lcs,
+                                                const uint64_t stamp_ns_from,
+                                                const uint64_t stamp_ns_to,
+                                                const Eigen::Affine3d& to_T_from) {
+  size_t lockout_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                               std::chrono::duration<double>(config.lockout_time))
+                               .count();
+  double min_pose_discrepancy = config.min_pose_discrepancy;
+
   auto pge_stamp_cmp = [](const pose_graph_tools::PoseGraphEdge& pge,
                           const uint64_t value) { return pge.key_from < value; };
 
-  auto lc_iter = std::lower_bound(added_lcs.begin(),
-                                  added_lcs.end(),
-                                  stamp_ns_from - lockout_time_ns,
-                                  pge_stamp_cmp);
+  uint64_t stamp_from_lower;
+  if (lockout_time_ns > stamp_ns_from) {
+    stamp_from_lower = 0;
+  } else {
+    stamp_from_lower = stamp_ns_from - lockout_time_ns;
+  }
+  auto lc_iter = std::lower_bound(
+      added_lcs.begin(), added_lcs.end(), stamp_from_lower, pge_stamp_cmp);
 
   uint64_t stamp_to_lower;
   if (lockout_time_ns > stamp_ns_to) {
@@ -169,14 +192,12 @@ bool should_add_lc(const std::set<pose_graph_tools::PoseGraphEdge,
       ++lc_iter;
       continue;
     }
-    // The putative loop closure constrains approximately the same poses as an existing
-    // loop closure. We still add the new loop closure if the relative pose measurement
-    // is different enough from the existing one.
-    Eigen::Affine3d pose_discrepancy = to_T_from.inverse() * lc_iter->pose;
-    double translation_diff = pose_discrepancy.translation().norm();
-    double rotation_diff = std::acos((pose_discrepancy.rotation().trace() - 1) / 2);
-    double rotation_scale = 1;
-    double pose_diff = translation_diff + rotation_scale * abs(rotation_diff);
+
+    // The putative loop closure constrains approximately the same poses as an
+    // existing loop closure. We still add the new loop closure if the relative pose
+    // measurement is different enough from the existing one.
+
+    double pose_diff = computePoseDiff(to_T_from, lc_iter->pose, config.rotation_scale);
     if (pose_diff < min_pose_discrepancy) {
       return false;
     }
@@ -224,21 +245,14 @@ void ExternalLoopClosureReceiver::update(const DynamicSceneGraph& graph,
 
     const auto to_ns = getAgentTimestamp(graph.getNode(to_node.id)).count();
     const auto from_ns = getAgentTimestamp(graph.getNode(from_node.id)).count();
-    uint64_t lc_lockout_ns = config.lc_lockout_time * 1e9;
-    bool should_add = should_add_lc(added_loop_closures_,
-                                    from_ns,
-                                    to_ns,
-                                    edge.pose,
-                                    lc_lockout_ns,
-                                    config.lc_min_pose_discrepancy);
+    auto& previous_loops_for_pair =
+        getPreviousLoopsForRobotPair(edge.robot_from, edge.robot_to);
+    bool should_add = should_add_lc(previous_loops_for_pair, from_ns, to_ns, edge.pose);
 
     if (should_add) {
-      LOG(WARNING) << "Added LC";
-      added_loop_closures_.insert(edge);
+      previous_loops_for_pair.insert(edge);
       // to_id, from_id, to_T_from
       callback(to_node.id, from_node.id, gtsam::Pose3(edge.pose.matrix()));
-    } else {
-      LOG(WARNING) << "Rejected LC";
     }
     iter = loop_closures_.erase(iter);
   }
