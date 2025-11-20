@@ -201,8 +201,8 @@ void processBlock(NearestNodeFinder& finder,
                   SpatialCloud::Ptr archived_cloud) {
   const size_t voxels_per_block = std::pow(tsdf.voxels_per_side, 3);
 
+  const auto tsdf_block = tsdf.getBlockPtr(block_index);
   for (size_t v = 0; v < voxels_per_block; ++v) {
-    const auto tsdf_block = tsdf.getBlockPtr(block_index);
     if (tsdf_block && tsdf_block->getVoxel(v).weight >= 1e-6) {
       // If the voxel has been observed, it's not a frontier
       continue;
@@ -227,7 +227,7 @@ void processBlock(NearestNodeFinder& finder,
       }
       const size_t vn =
           spatial_hash::linearIndexFromVoxelIndex(neighbor, tsdf.voxels_per_side);
-      auto& neighbor_voxel = tsdf_block->getVoxel(vn);
+      const auto& neighbor_voxel = tsdf_block->getVoxel(vn);
       if (neighbor_voxel.weight > 1e-6 && neighbor_voxel.distance > 0.5) {
         found_free_neighbor = true;
       }
@@ -239,7 +239,7 @@ void processBlock(NearestNodeFinder& finder,
     // TODO: if we get free space on the edge of a block that goes into an unallocated
     // block, do we need to add that block to the processing queue?
     if (skip_adding_frontiers) {
-      return;
+      continue;
     }
 
     cloud->points.push_back({center.x(), center.y(), center.z()});
@@ -287,7 +287,7 @@ void FrontierExtractor::computeSparseFrontiers(const SpatialCloud::Ptr cloud,
                     config.point_threshold,
                     finished_frontiers);
 
-  for (auto f : finished_frontiers) {
+  for (const auto& f : finished_frontiers) {
     if (f.size() < config.culling_point_threshold) {
       continue;
     }
