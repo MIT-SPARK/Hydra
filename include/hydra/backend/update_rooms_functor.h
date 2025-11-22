@@ -46,7 +46,7 @@ struct UpdateRoomsFunctor : public UpdateFunctor {
   struct Config {
     RoomFinderConfig room_finder;
     std::string places_layer = DsgLayers::PLACES;
-    std::vector<Sink::Factory> sinks;
+    std::vector<Sink::Factory> sinks = {};
   } const config;
 
   explicit UpdateRoomsFunctor(const Config& config);
