@@ -36,6 +36,7 @@
 
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
+#include <spark_dsg/node_attributes.h>
 
 #include <nanoflann.hpp>
 
@@ -43,18 +44,17 @@ namespace hydra {
 
 using nanoflann::KDTreeSingleIndexAdaptor;
 using nanoflann::L2_Simple_Adaptor;
+using spark_dsg::PlaceNodeAttributes;
+using spark_dsg::SceneGraphLayer;
 
 struct MeshDeltaAdaptor {
-  MeshDeltaAdaptor(const kimera_pgmo::MeshDelta& delta)
-      : delta(delta), indices(*delta.getActiveIndices()) {}
+  MeshDeltaAdaptor(const kimera_pgmo::MeshDelta& delta) : delta(delta) {}
 
-  inline size_t kdtree_get_point_count() const { return indices.size(); }
+  inline size_t kdtree_get_point_count() const { return delta.getNumVertices(); }
 
   inline double kdtree_get_pt(const size_t idx, const size_t dim) const {
-    const auto cloud_idx = delta.getLocalIndex(indices.at(idx));
-    CHECK_LT(cloud_idx, delta.vertex_updates->size());
-    const auto& p = delta.vertex_updates->at(cloud_idx);
-    return dim == 0 ? p.x : (dim == 1 ? p.y : p.z);
+    const auto& p = delta.getVertex(idx);
+    return dim == 0 ? p.pos.x() : (dim == 1 ? p.pos.y() : p.pos.z());
   }
 
   template <class T>
@@ -63,7 +63,6 @@ struct MeshDeltaAdaptor {
   }
 
   const kimera_pgmo::MeshDelta& delta;
-  pcl::Indices indices;
 };
 
 struct PlaceMeshConnector::Detail {
@@ -85,7 +84,8 @@ struct PlaceMeshConnector::Detail {
       return std::nullopt;
     }
 
-    return adaptor.indices.at(index);
+    // TODO(nathan) think about global indices
+    return index;
   }
 
   MeshDeltaAdaptor adaptor;
@@ -99,8 +99,6 @@ PlaceMeshConnector::~PlaceMeshConnector() {}
 
 size_t PlaceMeshConnector::addConnections(const SceneGraphLayer& places,
                                           const DeformationMapping& mapping) const {
-  const auto has_labels = delta_->hasSemantics();
-
   size_t num_missing = 0;
   for (const auto& id_node_pair : places.nodes()) {
     auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
@@ -125,18 +123,16 @@ size_t PlaceMeshConnector::addConnections(const SceneGraphLayer& places,
         continue;
       }
 
-      const auto local_idx = delta_->getLocalIndex(*nearest);
+      const auto& v = delta_->getVertex(*nearest);
       // assign mesh vertex to relevant fields
       vertex.vertex = *nearest;
       attrs.pcl_mesh_connections.push_back(*nearest);
 
       // assign (potentially valid) deformation connection
-      attrs.deformation_connections.push_back(mapping.at(local_idx));
-
-      if (has_labels) {
-        const auto label = delta_->semantic_updates.at(local_idx);
-        attrs.mesh_vertex_labels.push_back(label);
-        vertex.label = label;
+      attrs.deformation_connections.push_back(mapping.at(*nearest));
+      if (v.traits.label) {
+        attrs.mesh_vertex_labels.push_back(*v.traits.label);
+        vertex.label = v.traits.label;
       }
     }
   }
