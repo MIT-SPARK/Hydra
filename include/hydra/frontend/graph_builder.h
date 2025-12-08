@@ -89,7 +89,6 @@ class GraphBuilder : public Module {
     MeshSegmenter::Config object_config;
     config::VirtualConfig<PoseGraphTracker> pose_graph_tracker{
         PoseGraphFromOdom::Config()};
-    bool enable_place_mesh_mapping = false;
     config::VirtualConfig<SurfacePlacesInterface> surface_places;
     config::VirtualConfig<FreespacePlacesInterface> freespace_places;
     bool use_frontiers = false;
@@ -159,8 +158,6 @@ class GraphBuilder : public Module {
 
   void processNextInput(const ActiveWindowOutput& msg);
 
-  void updatePlaceMeshMapping(const ActiveWindowOutput& input);
-
  protected:
   uint64_t sequence_number_;
   mutable std::mutex gvd_mutex_;
@@ -180,7 +177,6 @@ class GraphBuilder : public Module {
   kimera_pgmo::Graph deformation_graph_;
   std::unique_ptr<kimera_pgmo::DeltaCompression> mesh_compression_;
   std::unique_ptr<kimera_pgmo::MeshCompression> deformation_compression_;
-  kimera_pgmo::HashedIndexMapping deformation_remapping_;
   std::shared_ptr<kimera_pgmo::HashedIndexMapping> mesh_remapping_;
 
   GraphUpdater graph_updater_;

@@ -408,9 +408,8 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
             msg->timestamp_ns, msg->world_T_body(), timestamp, pos);
       });
 
-  if (config.enable_place_mesh_mapping) {
-    updatePlaceMeshMapping(*msg);
-  }
+  // TODO(nathan) follow up on whether or not we need to do stuff with the 3D places and
+  // mesh
 }
 
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
@@ -519,13 +518,10 @@ void GraphBuilder::updateDeformationGraph(const ActiveWindowOutput& input) {
   pcl::PointCloud<pcl::PointXYZRGBA> new_vertices;
   std::vector<size_t> new_indices;
   std::vector<pcl::Vertices> new_triangles;
+  kimera_pgmo::HashedIndexMapping new_remapping;
   deformation_compression_->pruneStoredMesh(time_s - config.pgmo.time_horizon);
-  deformation_compression_->compressAndIntegrate(interface,
-                                                 new_vertices,
-                                                 new_triangles,
-                                                 new_indices,
-                                                 deformation_remapping_,
-                                                 time_s);
+  deformation_compression_->compressAndIntegrate(
+      interface, new_vertices, new_triangles, new_indices, new_remapping, time_s);
 
   pcl::PointCloud<pcl::PointXYZRGBA>::Ptr vertices(
       new pcl::PointCloud<pcl::PointXYZRGBA>());
@@ -696,49 +692,6 @@ void GraphBuilder::assignBowVectors() {
   size_t num_assigned = prior_size - cached_bow_messages_.size();
   VLOG(3) << "[Hydra Frontend] assigned " << num_assigned << " bow vectors of "
           << prior_size << " original";
-}
-
-void GraphBuilder::updatePlaceMeshMapping(const ActiveWindowOutput& input) {
-  const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
-  if (places.numNodes() == 0) {
-    // avoid doing work by making the kdtree lookup if we don't have places
-    return;
-  }
-
-  ScopedTimer timer("frontend/place_mesh_mapping", input.timestamp_ns, true, 1);
-  CHECK(last_mesh_update_);
-  CHECK(mesh_remapping_);
-
-  // TODO(nathan) we can maybe put this somewhere else
-  const auto num_active = last_mesh_update_->vertex_updates->size();
-  std::vector<size_t> deformation_mapping(num_active,
-                                          std::numeric_limits<size_t>::max());
-  for (const auto& [block, indices] : *mesh_remapping_) {
-    const auto block_iter = deformation_remapping_.find(block);
-    if (block_iter == deformation_remapping_.end()) {
-      LOG(WARNING) << "Missing block " << block.transpose() << " from graph mapping!";
-      continue;
-    }
-
-    const auto& block_mapping = block_iter->second;
-    for (const auto& [block_idx, mesh_idx] : indices) {
-      const auto vertex_iter = block_mapping.find(block_idx);
-      if (vertex_iter == block_mapping.end()) {
-        continue;
-      }
-
-      const auto local_idx = last_mesh_update_->getLocalIndex(mesh_idx);
-      CHECK_LT(local_idx, num_active);
-      deformation_mapping[local_idx] = vertex_iter->second;
-    }
-  }
-
-  PlaceMeshConnector connector(last_mesh_update_);
-  const auto num_missing = connector.addConnections(places, deformation_mapping);
-
-  VLOG_IF(1, num_missing > 0) << "[Frontend] " << num_missing
-                              << " places missing basis points @ " << input.timestamp_ns
-                              << " [ns]";
 }
 
 }  // namespace hydra
