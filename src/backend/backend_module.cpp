@@ -44,10 +44,8 @@
 #include "hydra/backend/backend_utilities.h"
 #include "hydra/backend/mst_factors.h"
 #include "hydra/common/global_info.h"
-#include "hydra/common/launch_callbacks.h"
 #include "hydra/common/pipeline_queues.h"
-#include "hydra/utils/minimum_spanning_tree.h"
-#include "hydra/utils/pgmo_mesh_traits.h"
+#include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -421,22 +419,10 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
     return;
   }
 
-  // TODO(nathan) this is ugly, but no good way to know at backend init whether
-  // we're tracking first-seen stamps or not (because that's private to the active
-  // window map)
-  if (input.mesh_stamp_update && !private_dsg_->graph->mesh()->numVertices()) {
-    const_cast<bool&>(private_dsg_->graph->mesh()->has_first_seen_stamps) = true;
-  }
-
   {
     std::lock_guard<std::mutex> graph_lock(private_dsg_->mutex);
 
     input.mesh_update->updateMesh(*private_dsg_->graph->mesh());
-    if (input.mesh_stamp_update) {
-      input.mesh_stamp_update->updateMesh(*private_dsg_->graph->mesh(),
-                                          input.mesh_update->vertex_start);
-    }
-
     kimera_pgmo::StampedCloud<pcl::PointXYZ> cloud_out{*original_vertices_,
                                                        *vertex_stamps_};
     input.mesh_update->updateVertices(cloud_out);
@@ -445,6 +431,7 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
     num_archived_vertices_ = input.mesh_update->getTotalArchivedVertices();
     utils::updatePlaces2d(private_dsg_, *input.mesh_update, num_archived_vertices_);
   }
+
   have_new_mesh_ = true;
 }
 
