@@ -37,6 +37,8 @@
 #include <kimera_pgmo/mesh_types.h>
 #include <spark_dsg/mesh.h>
 
+#include "hydra/reconstruction/voxel_types.h"
+
 namespace spark_dsg {
 
 size_t pgmoNumVertices(const Mesh& mesh);
@@ -63,3 +65,43 @@ kimera_pgmo::traits::Face pgmoGetFace(const Mesh& mesh, size_t i);
 void pgmoSetFace(Mesh& mesh, size_t i, const kimera_pgmo::traits::Face& face);
 
 }  // namespace spark_dsg
+
+namespace hydra {
+
+struct BlockMeshIter {
+  explicit BlockMeshIter(const MeshLayer& mesh) : mesh(mesh) {}
+
+  struct const_iterator {
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = const std::pair<BlockIndex, const spark_dsg::Mesh&>;
+
+    explicit const_iterator(MeshLayer::const_iterator iter) : iter_(iter) {}
+
+    value_type operator*() const { return {iter_->index, *iter_}; }
+
+    const_iterator& operator++() {
+      ++iter_;
+      return *this;
+    }
+
+    const_iterator operator++(int) {
+      auto tmp = *this;
+      ++iter_;
+      return tmp;
+    }
+
+    bool operator==(const const_iterator& other) const { return other.iter_ == iter_; }
+
+    bool operator!=(const const_iterator& other) const { return other.iter_ != iter_; }
+
+   private:
+    MeshLayer::const_iterator iter_;
+  };
+
+  const MeshLayer& mesh;
+  const_iterator begin() const { return const_iterator(mesh.begin()); }
+  const_iterator end() const { return const_iterator(mesh.end()); }
+};
+
+}  // namespace hydra

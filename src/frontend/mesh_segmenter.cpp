@@ -38,8 +38,8 @@
 #include <glog/stl_logging.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <pcl/point_cloud.h>
-#include <pcl/search/kdtree.h>
 #define PCL_NO_PRECOMPILE
+#include <pcl/search/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
 #undef PCL_NO_PRECOMPILE
 #include <config_utilities/config.h>

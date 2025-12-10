@@ -406,42 +406,6 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
   // mesh
 }
 
-struct BlockMeshIter {
-  explicit BlockMeshIter(const MeshLayer& mesh) : mesh(mesh) {}
-
-  struct const_iterator {
-    using iterator_category = std::forward_iterator_tag;
-    using difference_type = std::ptrdiff_t;
-    using value_type = const std::pair<BlockIndex, const spark_dsg::Mesh&>;
-
-    explicit const_iterator(MeshLayer::const_iterator iter) : iter_(iter) {}
-
-    value_type operator*() const { return {iter_->index, *iter_}; }
-
-    const_iterator& operator++() {
-      ++iter_;
-      return *this;
-    }
-
-    const_iterator operator++(int) {
-      auto tmp = *this;
-      ++iter_;
-      return tmp;
-    }
-
-    bool operator==(const const_iterator& other) const { return other.iter_ == iter_; }
-
-    bool operator!=(const const_iterator& other) const { return other.iter_ != iter_; }
-
-   private:
-    MeshLayer::const_iterator iter_;
-  };
-
-  const MeshLayer& mesh;
-  const_iterator begin() const { return const_iterator(mesh.begin()); }
-  const_iterator end() const { return const_iterator(mesh.end()); }
-};
-
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
   {  // start timing scope
     ScopedTimer timer("frontend/mesh_archive", input.timestamp_ns, true, 1, false);

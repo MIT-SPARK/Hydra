@@ -42,6 +42,7 @@
 
 #include <memory>
 #define PCL_NO_PRECOMPILE
+#include <pcl/search/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
 #undef PCL_NO_PRECOMPILE
 #include <spark_dsg/bounding_box_extraction.h>
