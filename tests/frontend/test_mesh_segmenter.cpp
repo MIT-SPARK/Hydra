@@ -79,8 +79,8 @@ void stepSegmenter(const kimera_pgmo::MeshDelta& delta,
                    MeshSegmenter& segmenter,
                    DynamicSceneGraph& graph) {
   delta.updateMesh(*graph.mesh());
-  const auto clusters = segmenter.detect(0, delta);
-  segmenter.updateGraph(0, delta, clusters, graph);
+  const auto clusters = segmenter.detect(0, delta, 0);
+  segmenter.updateGraph(0, delta, clusters, graph, 0);
 }
 
 void addPoints(kimera_pgmo::MeshDelta& delta,
@@ -90,11 +90,9 @@ void addPoints(kimera_pgmo::MeshDelta& delta,
                bool archive = false) {
   const auto corners = BoundingBox(scale, offset).corners();
   for (const auto& corner : corners) {
-    pcl::PointXYZRGBA point;
-    point.x = corner.x();
-    point.y = corner.y();
-    point.z = corner.z();
-    delta.addVertex(0, point, label, archive);
+    kimera_pgmo::traits::VertexTraits traits;
+    traits.label = label;
+    delta.addVertex(corner, traits, archive);
   }
 }
 
@@ -105,11 +103,11 @@ TEST(MeshSegmenter, TestClustering) {
   config.min_cluster_size = 4;
   MeshSegmenter segmenter(config, {1, 2});
 
-  kimera_pgmo::MeshDelta delta;
+  kimera_pgmo::MeshDelta delta({0, 0, 0});
   addPoints(delta, 1, {1, 2, 3}, Eigen::Vector3f::Constant(0.1));
   addPoints(delta, 2, {4, 5, 6}, Eigen::Vector3f::Constant(0.1));
 
-  const auto clusters = segmenter.detect(0, delta);
+  const auto clusters = segmenter.detect(0, delta, 0);
   ASSERT_EQ(clusters.size(), 2u);
 }
 
@@ -123,7 +121,7 @@ TEST(MeshSegmenter, TestIndicesRemapping) {
   graph.setMesh(std::make_shared<spark_dsg::Mesh>());
 
   {  // original objects
-    kimera_pgmo::MeshDelta delta;
+    kimera_pgmo::MeshDelta delta({0, 0, 0});
     addPoints(delta, 1, {1, 2, 3}, dims);
     addPoints(delta, 2, {4, 5, 6}, dims);
     stepSegmenter(delta, segmenter, graph);
@@ -147,13 +145,14 @@ TEST(MeshSegmenter, TestIndicesRemapping) {
   }
 
   {  // swapped objects
-    kimera_pgmo::MeshDelta delta;
+    kimera_pgmo::MeshDelta delta({0, 0, 0});
     addPoints(delta, 2, {4, 5, 6}, Eigen::Vector3f::Constant(0.1));
     addPoints(delta, 1, {1, 2, 3}, Eigen::Vector3f::Constant(0.1));
+    auto& remap = delta.prev_to_curr();
     for (size_t i = 0; i < 8; ++i) {
       // two corner sets are swapped in order
-      delta.prev_to_curr[i] = i + 8;
-      delta.prev_to_curr[i + 8] = i;
+      remap[i] = i + 8;
+      remap[i + 8] = i;
     }
 
     stepSegmenter(delta, segmenter, graph);
@@ -184,19 +183,19 @@ TEST(MeshSegmenter, TestDeletedObject) {
   graph.setMesh(std::make_shared<spark_dsg::Mesh>());
 
   {  // setup original objects
-    kimera_pgmo::MeshDelta delta;
+    kimera_pgmo::MeshDelta delta({0, 0, 0});
     addPoints(delta, 1, {1, 2, 3}, dims);
     addPoints(delta, 2, {4, 5, 6}, dims);
     stepSegmenter(delta, segmenter, graph);
   }
 
   {  // delete object one
-    kimera_pgmo::MeshDelta delta;
+    kimera_pgmo::MeshDelta delta({0, 0, 0});
     addPoints(delta, 2, {4, 5, 6}, dims);
+    auto& remap = delta.prev_to_curr();
     for (size_t i = 0; i < 8; ++i) {
       // previous object gets moved up
-      delta.prev_to_curr[i + 8] = i;
-      delta.deleted_indices.insert(i);
+      remap[i + 8] = i;
     }
 
     stepSegmenter(delta, segmenter, graph);
@@ -223,23 +222,24 @@ TEST(MeshSegmenter, TestArchivedObject) {
   graph.setMesh(std::make_shared<spark_dsg::Mesh>());
 
   {  // setup original objects
-    kimera_pgmo::MeshDelta delta;
+    kimera_pgmo::MeshDelta delta({0, 0, 0});
     addPoints(delta, 1, {1, 2, 3}, dims);
     addPoints(delta, 2, {4, 5, 6}, dims);
     stepSegmenter(delta, segmenter, graph);
   }
 
   {  // archive object two
-    kimera_pgmo::MeshDelta delta;
+    kimera_pgmo::MeshDelta delta({0, 0, 0});
     addPoints(delta, 2, {4, 5, 6}, dims, true);
     addPoints(delta, 1, {1, 2, 3}, dims);
     addPoints(delta, 2, {4, 5, 6}, dims);
 
+    auto& remap = delta.prev_to_curr();
     for (size_t i = 0; i < 8; ++i) {
       // archived object gets moved down
-      delta.prev_to_curr[i + 8] = i;
+      remap[i + 8] = i;
       // active object gets moved up
-      delta.prev_to_curr[i] = i + 8;
+      remap[i] = i + 8;
     }
 
     stepSegmenter(delta, segmenter, graph);
@@ -276,13 +276,13 @@ TEST(MeshSegmenter, TestDeltaWithOffset) {
   DynamicSceneGraph graph;
   graph.setMesh(std::make_shared<spark_dsg::Mesh>());
   {  // add 8 archived vertices to mesh
-    kimera_pgmo::MeshDelta delta;
+    kimera_pgmo::MeshDelta delta({0, 0, 0});
     addPoints(delta, 1, {1, 2, 3}, dims, true);
     delta.updateMesh(*graph.mesh());
   }
 
   {  // add actual object
-    kimera_pgmo::MeshDelta delta(8, 0);
+    kimera_pgmo::MeshDelta delta({0, 0, 0});
     addPoints(delta, 1, {1, 2, 3}, dims);
     // no prev-to-curr mapping for archived vertices
 

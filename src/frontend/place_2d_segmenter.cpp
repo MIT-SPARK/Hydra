@@ -47,7 +47,6 @@
 #include <spark_dsg/bounding_box_extraction.h>
 
 #include "hydra/common/global_info.h"
-#include "hydra/common/semantic_color_map.h"
 #include "hydra/frontend/place_2d_split_logic.h"
 #include "hydra/utils/place_2d_ellipsoid_math.h"
 
@@ -56,9 +55,6 @@ namespace hydra {
 using Places = Place2dSegmenter::Places;
 using LabelPlaces = Place2dSegmenter::LabelPlaces;
 using LabelIndices = Place2dSegmenter::LabelIndices;
-using IndicesVector = Place2dSegmenter::IndicesVector;
-using OptPosition = std::optional<Eigen::Vector3d>;
-using KdTreeT = pcl::search::KdTree<pcl::PointXYZRGBA>;
 
 void mergeList(std::vector<size_t>& lhs, const std::vector<int>& rhs) {
   std::unordered_set<size_t> seen(lhs.begin(), lhs.end());
@@ -89,33 +85,35 @@ std::string printLabels(const std::set<T>& labels) {
 }
 
 Place2dSegmenter::Place2dSegmenter(const Config& config)
-    : config(config), next_node_id_(config.prefix, 0), num_archived_vertices_(0) {
+    : config(config), next_node_id_(config.prefix, 0) {
   VLOG(1) << "[Hydra Frontend] Detecting 2d places: " << printLabels(config.labels);
   for (const auto& label : config.labels) {
     active_places_[label] = std::set<NodeId>();
   }
 }
 
-Places Place2dSegmenter::findPlaces(const Mesh::Positions& points,
-                                    const kimera_pgmo::MeshDelta& delta,
-                                    const pcl::IndicesPtr& cloud_indices,
-                                    double connection_ellipse_scale_factor) const {
-  pcl::IndicesPtr inds(new pcl::Indices());
-  inds->resize(cloud_indices->size());
-  for (size_t ix = 0; ix < cloud_indices->size(); ++ix) {
-    inds->at(ix) = delta.getLocalIndex(cloud_indices->at(ix));
+Places Place2dSegmenter::findPlaces(const kimera_pgmo::MeshDelta& delta,
+                                    const std::vector<size_t>& indices,
+                                    size_t num_archived) const {
+  using pcl::PointXYZ;
+  pcl::PointCloud<PointXYZ>::Ptr cloud(new pcl::PointCloud<PointXYZ>());
+  for (const auto idx : indices) {
+    const auto& pos = delta.getVertex(idx).pos;
+    auto& p = cloud->emplace_back();
+    p.x = pos.x();
+    p.y = pos.y();
+    p.z = pos.z();
   }
 
-  KdTreeT::Ptr tree(new KdTreeT());
-  tree->setInputCloud(delta.vertex_updates, inds);
+  pcl::search::KdTree<PointXYZ>::Ptr tree(new pcl::search::KdTree<PointXYZ>());
+  tree->setInputCloud(cloud);
 
-  pcl::EuclideanClusterExtraction<pcl::PointXYZRGBA> estimator;
+  pcl::EuclideanClusterExtraction<PointXYZ> estimator;
   estimator.setClusterTolerance(config.cluster_tolerance);
   estimator.setMinClusterSize(config.min_cluster_size);
   estimator.setMaxClusterSize(config.max_cluster_size);
   estimator.setSearchMethod(tree);
-  estimator.setInputCloud(delta.vertex_updates);
-  estimator.setIndices(inds);
+  estimator.setInputCloud(cloud);
 
   std::vector<pcl::PointIndices> cluster_indices;
   estimator.extract(cluster_indices);
@@ -124,32 +122,28 @@ Places Place2dSegmenter::findPlaces(const Mesh::Positions& points,
   places.resize(cluster_indices.size());
   for (size_t k = 0; k < places.size(); ++k) {
     for (const auto& ind : cluster_indices.at(k).indices) {
-      places.at(k).indices.push_back(static_cast<size_t>(delta.getGlobalIndex(ind)));
+      places.at(k).indices.push_back(ind + num_archived);
     }
-
-    addRectInfo(points, connection_ellipse_scale_factor, places.at(k));
   }
 
   return places;
 }
 
-pcl::IndicesPtr getActivePlaceIndices(
-    const pcl::IndicesPtr& indices,
+std::vector<size_t> getActivePlaceIndices(
     const std::map<uint32_t, std::set<NodeId>>& active_places,
     const kimera_pgmo::MeshDelta& delta,
     const DynamicSceneGraph& graph,
-    size_t& num_archived_vertices,
+    size_t num_archived_vertices,
     std::list<NodeId>& empty_nodes) {
-  pcl::IndicesPtr active_indices;
-  active_indices.reset(new IndicesVector());
-  active_indices->reserve(indices->size());
+  std::vector<size_t> active_indices;
+  active_indices.reserve(delta.getNumActiveVertices());
 
-  num_archived_vertices = delta.getTotalArchivedVertices();
+  VLOG(5) << "[Places 2d Segmenter] n original active indices: "
+          << delta.getNumActiveVertices();
 
-  VLOG(5) << "[Places 2d Segmenter] n original active indices: " << indices->size();
+  const auto& remap = delta.prev_to_curr();
   std::unordered_set<size_t> frozen_indices;
-  for (auto kv : active_places) {
-    std::set<NodeId> nodes = kv.second;
+  for (const auto& [label, nodes] : active_places) {
     for (auto nid : nodes) {
       const auto node = graph.findNode(nid);
       if (!node) {
@@ -162,13 +156,12 @@ pcl::IndicesPtr getActivePlaceIndices(
       size_t max_index = 0;
       auto iter = attrs.pcl_mesh_connections.begin();
       while (iter != attrs.pcl_mesh_connections.end()) {
-        if (delta.deleted_indices.count(*iter)) {
-          iter = attrs.pcl_mesh_connections.erase(iter);
+        if (*iter < num_archived_vertices) {
           continue;
         }
 
-        auto map_iter = delta.prev_to_curr.find(*iter);
-        if (map_iter != delta.prev_to_curr.end()) {
+        auto map_iter = remap.find(*iter);
+        if (map_iter != remap.end()) {
           *iter = map_iter->second;
         }
 
@@ -180,24 +173,7 @@ pcl::IndicesPtr getActivePlaceIndices(
       attrs.pcl_min_index = min_index;
       attrs.pcl_max_index = max_index;
 
-      const auto prev_boundary = attrs.boundary;
-      const auto prev_boundary_connections = attrs.pcl_boundary_connections;
-      attrs.boundary.clear();
-      attrs.pcl_boundary_connections.clear();
-      for (size_t i = 0; i < prev_boundary.size(); ++i) {
-        if (delta.deleted_indices.count(prev_boundary_connections.at(i))) {
-          continue;
-        }
-
-        auto map_iter = delta.prev_to_curr.find(prev_boundary_connections.at(i));
-        if (map_iter != delta.prev_to_curr.end()) {
-          attrs.boundary.push_back(prev_boundary.at(i));
-          attrs.pcl_boundary_connections.push_back(map_iter->second);
-        } else {
-          attrs.boundary.push_back(prev_boundary.at(i));
-          attrs.pcl_boundary_connections.push_back(prev_boundary_connections.at(i));
-        }
-      }
+      // TODO(nathan) update boundary
 
       if (attrs.pcl_min_index < num_archived_vertices) {
         // ^ this means that the place contains an archived vertex
@@ -216,13 +192,13 @@ pcl::IndicesPtr getActivePlaceIndices(
 
   VLOG(5) << "[Places 2d Segmenter] n frozen indices: " << frozen_indices.size();
 
-  for (const size_t idx : *indices) {
-    if (!frozen_indices.count(idx)) {
-      active_indices->push_back(idx);
+  for (size_t i = delta.getNumArchivedVertices(); i < delta.getNumVertices(); ++i) {
+    if (!frozen_indices.count(i)) {
+      active_indices.push_back(i);
     }
   }
 
-  VLOG(5) << "[Places 2d Segmenter] n final active indices: " << active_indices->size();
+  VLOG(5) << "[Places 2d Segmenter] n final active indices: " << active_indices.size();
   return active_indices;
 }
 
@@ -236,25 +212,21 @@ NodeIdSet Place2dSegmenter::getActiveNodes() const {
 
 void Place2dSegmenter::detect(const ActiveWindowOutput&,
                               const kimera_pgmo::MeshDelta& mesh_delta,
-                              const DynamicSceneGraph& graph) {
+                              const DynamicSceneGraph& graph,
+                              size_t num_archived) {
   VLOG(5) << "[Places 2d Segmenter] detect called";
-  const auto active_indices = getActivePlaceIndices(mesh_delta.getActiveIndices(),
-                                                    active_places_,
-                                                    mesh_delta,
-                                                    graph,
-                                                    num_archived_vertices_,
-                                                    nodes_to_remove_);
+  const auto active_indices = getActivePlaceIndices(
+      active_places_, mesh_delta, graph, num_archived, nodes_to_remove_);
 
   LabelPlaces label_places;
-
-  if (active_indices->empty()) {
+  if (active_indices.empty()) {
     VLOG(5) << "[Places 2d Segmenter] No active indices in mesh";
     detected_label_places_ = label_places;
     return;
   }
 
   const auto& mesh = *CHECK_NOTNULL(graph.mesh());
-  LabelIndices label_indices = getLabelIndices(mesh.labels, *active_indices);
+  LabelIndices label_indices = getLabelIndices(mesh.labels, active_indices);
   if (label_indices.empty()) {
     VLOG(5) << "[Places 2d Segmenter] No vertices found matching desired labels";
     detected_label_places_ = label_places;
@@ -266,14 +238,14 @@ void Place2dSegmenter::detect(const ActiveWindowOutput&,
       continue;
     }
 
-    if (label_indices.at(label)->size() < config.min_cluster_size) {
+    if (label_indices.at(label).size() < config.min_cluster_size) {
       continue;
     }
 
-    const auto initial_places = findPlaces(mesh.points,
-                                           mesh_delta,
-                                           label_indices.at(label),
-                                           config.connection_ellipse_scale_factor);
+    auto initial_places = findPlaces(mesh_delta, label_indices.at(label), num_archived);
+    for (auto& place : initial_places) {
+      addRectInfo(mesh.points, config.connection_ellipse_scale_factor, place);
+    }
 
     VLOG(5) << "[Places 2d Segmenter] got " << initial_places.size()
             << " initial places";
@@ -292,8 +264,8 @@ void Place2dSegmenter::detect(const ActiveWindowOutput&,
   detected_label_places_ = label_places;
 }
 
-LabelIndices Place2dSegmenter::getLabelIndices(const Mesh::Labels& labels,
-                                               const IndicesVector& indices) const {
+LabelIndices Place2dSegmenter::getLabelIndices(
+    const Mesh::Labels& labels, const std::vector<size_t>& indices) const {
   LabelIndices label_indices;
 
   std::set<uint32_t> seen_labels;
@@ -311,10 +283,10 @@ LabelIndices Place2dSegmenter::getLabelIndices(const Mesh::Labels& labels,
     }
 
     if (!label_indices.count(label)) {
-      label_indices[label] = pcl::IndicesPtr(new IndicesVector());
+      label_indices[label] = std::vector<size_t>();
     }
 
-    label_indices[label]->push_back(idx);
+    label_indices[label].push_back(idx);
   }
 
   VLOG(5) << "[Places 2d Segmenter] Seen labels: " << printLabels(seen_labels);
@@ -333,7 +305,8 @@ bool Place2dSegmenter::frontendAddPlaceConnection(const Place2dNodeAttributes& a
 
 void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
                                    const ActiveWindowOutput& /*msg*/,
-                                   DynamicSceneGraph& graph) {
+                                   DynamicSceneGraph& graph,
+                                   size_t num_archived) {
   // Remove old empty nodes
   for (const auto& nid : nodes_to_remove_) {
     graph.removeNode(nid);
@@ -360,7 +333,7 @@ void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
         graph.removeNode(nid);
         continue;
       }
-      if (attrs.pcl_min_index >= num_archived_vertices_) {
+      if (attrs.pcl_min_index >= num_archived) {
         graph.removeNode(nid);
       } else {
         active_places_to_check.at(kv.first).insert(nid);
@@ -410,12 +383,12 @@ void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
       EdgeAttributes ea;
       if (frontendAddPlaceConnection(attrs1, attrs2, ea)) {
         graph.insertEdge(ns1, ns2, ea.clone());
-        if (attrs2.pcl_min_index >= num_archived_vertices_) {
+        if (attrs2.pcl_min_index >= num_archived) {
           neighbors_are_fixed = false;
         }
       }
     }
-    if (attrs1.pcl_max_index < num_archived_vertices_) {
+    if (attrs1.pcl_max_index < num_archived) {
       attrs1.has_active_mesh_indices = false;
     }
     if (!attrs1.has_active_mesh_indices && neighbors_are_fixed) {

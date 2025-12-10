@@ -47,8 +47,7 @@ namespace hydra {
 
 class Place2dSegmenter : public SurfacePlacesInterface {
  public:
-  using IndicesVector = pcl::IndicesPtr::element_type;
-  using LabelIndices = std::map<uint32_t, pcl::IndicesPtr>;
+  using LabelIndices = std::map<uint32_t, std::vector<size_t>>;
   using MeshVertexCloud = Place2d::CloudT;
   using Places = std::vector<Place2d>;
   using LabelPlaces = std::map<uint32_t, Places>;
@@ -71,29 +70,30 @@ class Place2dSegmenter : public SurfacePlacesInterface {
 
   void detect(const ActiveWindowOutput& msg,
               const kimera_pgmo::MeshDelta& mesh_delta,
-              const DynamicSceneGraph& graph) override;
+              const DynamicSceneGraph& graph,
+              size_t num_archived_vertices) override;
 
   NodeIdSet getActiveNodes() const override;
 
   void updateGraph(uint64_t timestamp_ns,
                    const ActiveWindowOutput&,
-                   DynamicSceneGraph& graph) override;
+                   DynamicSceneGraph& graph,
+                   size_t num_archived_vertices) override;
 
  private:
   bool frontendAddPlaceConnection(const Place2dNodeAttributes& attrs1,
                                   const Place2dNodeAttributes& attrs2,
                                   EdgeAttributes& edge_weight);
 
-  Places findPlaces(const Mesh::Positions& positions,
-                    const kimera_pgmo::MeshDelta& delta,
-                    const pcl::IndicesPtr& indices,
-                    double connection_ellipse_scale_factor) const;
+  Places findPlaces(const kimera_pgmo::MeshDelta& delta,
+                    const std::vector<size_t>& indices,
+                    size_t num_archived_vertices) const;
 
   std::set<NodeId> archiveOldObjects(const DynamicSceneGraph& graph,
                                      uint64_t latest_timestamp);
 
   LabelIndices getLabelIndices(const Mesh::Labels& labels,
-                               const IndicesVector& indices) const;
+                               const std::vector<size_t>& indices) const;
 
   NodeSymbol addPlaceToGraph(DynamicSceneGraph& graph,
                              const Place2d& place,
@@ -111,7 +111,6 @@ class Place2dSegmenter : public SurfacePlacesInterface {
 
   std::list<NodeId> nodes_to_remove_;
 
-  size_t num_archived_vertices_;
   std::map<uint32_t, std::set<NodeId>> active_places_;
   std::map<uint32_t, std::set<NodeId>> semiactive_places_;
   std::map<NodeId, uint64_t> active_place_timestamps_;

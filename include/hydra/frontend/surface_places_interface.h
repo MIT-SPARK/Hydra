@@ -52,11 +52,13 @@ class SurfacePlacesInterface {
 
   virtual void detect(const ActiveWindowOutput& msg,
                       const kimera_pgmo::MeshDelta& mesh_delta,
-                      const DynamicSceneGraph& graph) = 0;
+                      const DynamicSceneGraph& graph,
+                      size_t num_archived_vertices) = 0;
 
   virtual void updateGraph(uint64_t timestamp_ns,
                            const ActiveWindowOutput& msg,
-                           DynamicSceneGraph& graph) = 0;
+                           DynamicSceneGraph& graph,
+                           size_t num_archived_vertices) = 0;
 
   virtual NodeIdSet getActiveNodes() const = 0;
 };
