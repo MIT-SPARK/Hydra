@@ -33,8 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <memory>
-
 #include "hydra/common/dsg_types.h"
 #include "hydra/common/output_sink.h"
 
@@ -55,10 +53,7 @@ class MeshSegmenter {
  public:
   using Clusters = std::vector<Cluster>;
   using LabelClusters = std::map<uint32_t, Clusters>;
-  using Sink = OutputSink<uint64_t,
-                          const kimera_pgmo::MeshDelta&,
-                          const std::vector<size_t>&,
-                          const LabelIndices&>;
+  using Sink = OutputSink<uint64_t, const kimera_pgmo::MeshDelta&, const LabelIndices&>;
 
   struct Config {
     std::string layer_id = DsgLayers::OBJECTS;
@@ -72,17 +67,22 @@ class MeshSegmenter {
 
   explicit MeshSegmenter(const Config& config, const std::set<uint32_t>& labels);
 
-  LabelClusters detect(uint64_t timestamp_ns, const kimera_pgmo::MeshDelta& active);
+  LabelClusters detect(uint64_t timestamp_ns,
+                       const kimera_pgmo::MeshDelta& active,
+                       size_t num_archived_vertices);
 
   void updateGraph(uint64_t timestamp,
                    const kimera_pgmo::MeshDelta& active,
                    const LabelClusters& clusters,
-                   DynamicSceneGraph& graph);
+                   DynamicSceneGraph& graph,
+                   size_t num_archived_vertices);
 
   std::unordered_set<NodeId> getActiveNodes() const;
 
  private:
-  void updateOldNodes(const kimera_pgmo::MeshDelta& active, DynamicSceneGraph& graph);
+  void updateOldNodes(const kimera_pgmo::MeshDelta& active,
+                      DynamicSceneGraph& graph,
+                      size_t num_archived_vertices);
 
   void addNodeToGraph(DynamicSceneGraph& graph,
                       const Cluster& cluster,

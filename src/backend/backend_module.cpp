@@ -420,18 +420,17 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
     return;
   }
 
-  {
+  {  // mesh critical section
     std::lock_guard<std::mutex> graph_lock(private_dsg_->mutex);
-
-    input.mesh_update->updateMesh(*private_dsg_->graph->mesh());
+    num_archived_vertices_ =
+        input.mesh_update->updateMesh(*private_dsg_->graph->mesh());
     kimera_pgmo::StampedCloud<pcl::PointXYZ> cloud_out{*original_vertices_,
                                                        *vertex_stamps_};
     input.mesh_update->updateVertices(cloud_out);
     // we use this to make sure that deformation only happens for vertices that are
     // still active
-    num_archived_vertices_ = input.mesh_update->getTotalArchivedVertices();
     utils::updatePlaces2d(private_dsg_, *input.mesh_update, num_archived_vertices_);
-  }
+  }  // mesh critical section
 
   have_new_mesh_ = true;
 }

@@ -40,6 +40,55 @@
 #include <limits>
 
 namespace hydra::utils {
+namespace {
+
+void updatePlace2dMesh(Place2dNodeAttributes& attrs,
+                       const kimera_pgmo::MeshDelta& delta,
+                       const size_t archived) {
+  attrs.pcl_min_index = std::numeric_limits<size_t>::max();
+  attrs.pcl_max_index = 0;
+
+  attrs.pcl_mesh_connections = delta.remapIndices(attrs.pcl_mesh_connections, archived);
+  for (const auto idx : attrs.pcl_mesh_connections) {
+    attrs.pcl_min_index = std::min(attrs.pcl_min_index, idx);
+    attrs.pcl_max_index = std::max(attrs.pcl_max_index, idx);
+  }
+
+  if (attrs.pcl_max_index < archived) {
+    attrs.has_active_mesh_indices = false;
+  }
+}
+
+void updatePlace2dBoundary(Place2dNodeAttributes& attrs,
+                           const kimera_pgmo::MeshDelta& delta,
+                           const size_t archived) {
+  const auto prev_boundary = attrs.boundary;
+  const auto prev_connections = attrs.pcl_boundary_connections;
+  attrs.boundary.clear();
+  attrs.pcl_boundary_connections.clear();
+
+  const auto& remap = delta.prev_to_curr();
+  for (size_t i = 0; i < prev_boundary.size(); ++i) {
+    auto global_idx = prev_connections.at(i);
+    if (global_idx < archived) {
+      attrs.boundary.push_back(prev_boundary.at(i));
+      attrs.pcl_boundary_connections.push_back(global_idx);
+      continue;
+    }
+
+    const auto prev_local = global_idx - archived;
+    auto new_idx = remap.find(prev_local);
+    if (new_idx == remap.end()) {
+      continue;
+    }
+
+    // TODO(nathan) this is wrong
+    attrs.boundary.push_back(prev_boundary.at(i));
+    attrs.pcl_boundary_connections.push_back(new_idx->second + archived);
+  }
+}
+
+}  // namespace
 
 std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol key) {
   NodeSymbol node(key.chr(), key.index());
@@ -49,45 +98,6 @@ std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol 
   }
 
   return graph.getNode(node).attributes<AgentNodeAttributes>().timestamp.count();
-}
-
-void updatePlace2dMesh(Place2dNodeAttributes& attrs,
-                       const kimera_pgmo::MeshDelta& mesh_update,
-                       const size_t num_archived_vertices) {
-  attrs.pcl_min_index = std::numeric_limits<size_t>::max();
-  attrs.pcl_max_index = 0;
-
-  mesh_update.remapIndices(attrs.pcl_mesh_connections, num_archived_vertices);
-  for (const auto idx : attrs.pcl_mesh_connections) {
-    attrs.pcl_min_index = std::min(attrs.pcl_min_index, idx);
-    attrs.pcl_max_index = std::max(attrs.pcl_max_index, idx);
-  }
-
-  if (attrs.pcl_max_index < num_archived_vertices) {
-    attrs.has_active_mesh_indices = false;
-  }
-}
-
-void updatePlace2dBoundary(Place2dNodeAttributes& attrs,
-                           const kimera_pgmo::MeshDelta& mesh_update) {
-  const auto prev_boundary = attrs.boundary;
-  const auto prev_boundary_connections = attrs.pcl_boundary_connections;
-  attrs.boundary.clear();
-  attrs.pcl_boundary_connections.clear();
-  for (size_t i = 0; i < prev_boundary.size(); ++i) {
-    if (mesh_update.deleted_indices.count(prev_boundary_connections.at(i))) {
-      continue;
-    }
-
-    auto map_iter = mesh_update.prev_to_curr.find(prev_boundary_connections.at(i));
-    if (map_iter != mesh_update.prev_to_curr.end()) {
-      attrs.boundary.push_back(prev_boundary.at(i));
-      attrs.pcl_boundary_connections.push_back(map_iter->second);
-    } else {
-      attrs.boundary.push_back(prev_boundary.at(i));
-      attrs.pcl_boundary_connections.push_back(prev_boundary_connections.at(i));
-    }
-  }
 }
 
 void updatePlaces2d(SharedDsgInfo::Ptr dsg,
@@ -104,7 +114,7 @@ void updatePlaces2d(SharedDsgInfo::Ptr dsg,
     }
 
     updatePlace2dMesh(*attrs, mesh_update, num_archived_vertices);
-    updatePlace2dBoundary(*attrs, mesh_update);
+    updatePlace2dBoundary(*attrs, mesh_update, num_archived_vertices);
   }
 }
 

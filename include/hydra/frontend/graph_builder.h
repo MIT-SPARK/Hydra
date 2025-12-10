@@ -170,6 +170,7 @@ class GraphBuilder : public Module {
   SharedDsgInfo::Ptr dsg_;
   SharedModuleState::Ptr state_;
   kimera_pgmo::MeshDelta::Ptr last_mesh_update_;
+  size_t num_archived_vertices_;
 
   kimera_pgmo::Graph deformation_graph_;
   std::unique_ptr<kimera_pgmo::DeltaCompression> mesh_compression_;

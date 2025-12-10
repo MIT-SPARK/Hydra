@@ -113,6 +113,7 @@ GraphBuilder::GraphBuilder(const Config& config,
       queue_(std::make_shared<InputQueue>()),
       dsg_(dsg),
       state_(state),
+      num_archived_vertices_(0),
       graph_updater_(config.graph_updater),
       graph_connector_(config.graph_connector),
       map_window_(GlobalInfo::instance().createVolumetricWindow()),
@@ -467,7 +468,7 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
     // TODO(nathan) we should probably have a mutex before modifying the mesh, but
     // nothing else uses it at the moment
     ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
-    last_mesh_update_->updateMesh(*dsg_->graph->mesh());
+    num_archived_vertices_ = last_mesh_update_->updateMesh(*dsg_->graph->mesh());
   }  // end timing scope
 
   ScopedTimer timer("frontend/postmesh_callbacks", input.timestamp_ns, true, 1, false);
@@ -485,11 +486,13 @@ void GraphBuilder::updateObjects(const ActiveWindowOutput& input) {
   }
 
   const auto timestamp = input.timestamp_ns;
-  const auto clusters = segmenter_->detect(timestamp, *last_mesh_update_);
+  const auto clusters =
+      segmenter_->detect(timestamp, *last_mesh_update_, num_archived_vertices_);
 
   {  // start dsg critical section
     std::unique_lock<std::mutex> lock(dsg_->mutex);
-    segmenter_->updateGraph(timestamp, *last_mesh_update_, clusters, *dsg_->graph);
+    segmenter_->updateGraph(
+        timestamp, *last_mesh_update_, clusters, *dsg_->graph, num_archived_vertices_);
   }  // end dsg critical section
 }
 

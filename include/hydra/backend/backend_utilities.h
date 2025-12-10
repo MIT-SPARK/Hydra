@@ -47,13 +47,6 @@ namespace hydra::utils {
 
 std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol key);
 
-void updatePlace2dMesh(Place2dNodeAttributes& attrs,
-                       const kimera_pgmo::MeshDelta& mesh_update,
-                       const size_t num_archived_vertices);
-
-void updatePlace2dBoundary(Place2dNodeAttributes& attrs,
-                           const kimera_pgmo::MeshDelta& mesh_update);
-
 void updatePlaces2d(SharedDsgInfo::Ptr dsg,
                     kimera_pgmo::MeshDelta& mesh_update,
                     size_t num_archived_vertices);
