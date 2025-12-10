@@ -39,6 +39,7 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
+#include <kimera_pgmo/pcl_mesh_traits.h>
 #include <kimera_pgmo/utils/mesh_io.h>
 
 #include "hydra/backend/backend_utilities.h"

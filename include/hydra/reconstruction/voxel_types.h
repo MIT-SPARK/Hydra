@@ -37,7 +37,6 @@
 #include <spark_dsg/mesh.h>
 #include <spatial_hash/voxel_layer.h>
 
-#include <cstddef>
 #include <cstdint>
 
 #include "hydra/common/common_types.h"

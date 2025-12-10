@@ -44,20 +44,15 @@
 #include <kimera_pgmo/utils/mesh_io.h>
 #include <spark_dsg/printing.h>
 
-#include <fstream>
+#include <iterator>
 
 #include "hydra/common/global_info.h"
 #include "hydra/common/launch_callbacks.h"
 #include "hydra/common/pipeline_queues.h"
 #include "hydra/frontend/frontier_extractor.h"
 #include "hydra/frontend/mesh_segmenter.h"
-#include "hydra/frontend/place_2d_segmenter.h"
-#include "hydra/frontend/place_mesh_connector.h"
-#include "hydra/utils/display_utilities.h"
-#include "hydra/utils/mesh_utilities.h"
-#include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/pgmo_mesh_interface.h"
-#include "hydra/utils/pgmo_mesh_traits.h"
+#include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/printing.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -94,7 +89,6 @@ void declare_config(GraphBuilder::Config& config) {
   config.pose_graph_tracker.setOptional();
   field(config.pose_graph_tracker, "pose_graph_tracker");
   // surface (i.e., 2D) places
-  field(config.enable_place_mesh_mapping, "enable_place_mesh_mapping");
   config.surface_places.setOptional();
   field(config.surface_places, "surface_places");
   // freespace (i.e., 3D) places
@@ -107,7 +101,6 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.view_database, "view_database");
   field(config.sinks, "sinks");
   field(config.no_packet_collation, "no_packet_collation");
-  field(config.overwrite_mesh_timestamps, "overwrite_mesh_timestamps");
   field(config.verbosity, "verbosity");
 }
 
@@ -140,8 +133,8 @@ GraphBuilder::GraphBuilder(const Config& config,
 
   CHECK(dsg_ != nullptr);
   CHECK(dsg_->graph != nullptr);
-  dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>(
-      true, true, true, config.overwrite_mesh_timestamps));
+  // TODO(nathan) pull this from somewhere
+  dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>(true, true, true, true));
 
   mesh_compression_.reset(
       new kimera_pgmo::DeltaCompression(config.pgmo.mesh_resolution));
@@ -410,6 +403,16 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
   // TODO(nathan) follow up on whether or not we need to do stuff with the 3D places and
   // mesh
 }
+
+struct BlockMeshIter {
+  struct Iter {
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = const std::pair<BlockIndex, const spark_dsg::Mesh&>;
+    using pointer = const value_type*;
+    using reference = const value_type&;
+  };
+};
 
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
   {  // start timing scope
