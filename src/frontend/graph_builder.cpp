@@ -51,6 +51,7 @@
 #include "hydra/common/pipeline_queues.h"
 #include "hydra/frontend/frontier_extractor.h"
 #include "hydra/frontend/mesh_segmenter.h"
+#include "hydra/reconstruction/voxel_types.h"
 #include "hydra/utils/pgmo_mesh_interface.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/printing.h"
@@ -405,13 +406,39 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
 }
 
 struct BlockMeshIter {
-  struct Iter {
+  explicit BlockMeshIter(const MeshLayer& mesh) : mesh(mesh) {}
+
+  struct const_iterator {
     using iterator_category = std::forward_iterator_tag;
     using difference_type = std::ptrdiff_t;
     using value_type = const std::pair<BlockIndex, const spark_dsg::Mesh&>;
-    using pointer = const value_type*;
-    using reference = const value_type&;
+
+    explicit const_iterator(MeshLayer::const_iterator iter) : iter_(iter) {}
+
+    value_type operator*() const { return {iter_->index, *iter_}; }
+
+    const_iterator& operator++() {
+      ++iter_;
+      return *this;
+    }
+
+    const_iterator operator++(int) {
+      auto tmp = *this;
+      ++iter_;
+      return tmp;
+    }
+
+    bool operator==(const const_iterator& other) const { return other.iter_ == iter_; }
+
+    bool operator!=(const const_iterator& other) const { return other.iter_ != iter_; }
+
+   private:
+    MeshLayer::const_iterator iter_;
   };
+
+  const MeshLayer& mesh;
+  const_iterator begin() const { return const_iterator(mesh.begin()); }
+  const_iterator end() const { return const_iterator(mesh.end()); }
 };
 
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
@@ -427,14 +454,13 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
     });
   }  // end timing scope
 
+  const auto& mesh = input.map().getMeshLayer();
+
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
-    mesh_remapping_ = std::make_shared<kimera_pgmo::HashedIndexMapping>();
-    const auto& mesh = input.map().getMeshLayer();
-    auto interface = PgmoMeshLayerInterface(mesh);
     VLOG(5) << "[Hydra Frontend] Updating mesh with " << mesh.numBlocks() << " blocks";
-    const auto new_mesh_update =
-        mesh_compression_->update(interface, input.timestamp_ns, mesh_remapping_.get());
+    const BlockMeshIter wrapper(mesh);
+    last_mesh_update_ = mesh_compression_->update(wrapper, input.timestamp_ns);
   }  // end timing scope
 
   {  // start timing scope

@@ -36,9 +36,8 @@
 
 #include <glog/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
-#include <kimera_pgmo/sparse_keyframe.h>
 
-#include <sstream>
+#include <limits>
 
 namespace hydra::utils {
 
@@ -55,26 +54,14 @@ std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol 
 void updatePlace2dMesh(Place2dNodeAttributes& attrs,
                        const kimera_pgmo::MeshDelta& mesh_update,
                        const size_t num_archived_vertices) {
-  size_t min_index = SIZE_MAX;
-  size_t max_index = 0;
-  auto iter = attrs.pcl_mesh_connections.begin();
+  attrs.pcl_min_index = std::numeric_limits<size_t>::max();
+  attrs.pcl_max_index = 0;
 
-  while (iter != attrs.pcl_mesh_connections.end()) {
-    if (mesh_update.deleted_indices.count(*iter)) {
-      iter = attrs.pcl_mesh_connections.erase(iter);
-      continue;
-    }
-
-    auto map_iter = mesh_update.prev_to_curr.find(*iter);
-    if (map_iter != mesh_update.prev_to_curr.end()) {
-      *iter = map_iter->second;
-    }
-    min_index = std::min(min_index, *iter);
-    max_index = std::max(max_index, *iter);
-    ++iter;
+  mesh_update.remapIndices(attrs.pcl_mesh_connections, num_archived_vertices);
+  for (const auto idx : attrs.pcl_mesh_connections) {
+    attrs.pcl_min_index = std::min(attrs.pcl_min_index, idx);
+    attrs.pcl_max_index = std::max(attrs.pcl_max_index, idx);
   }
-  attrs.pcl_min_index = min_index;
-  attrs.pcl_max_index = max_index;
 
   if (attrs.pcl_max_index < num_archived_vertices) {
     attrs.has_active_mesh_indices = false;
@@ -119,28 +106,6 @@ void updatePlaces2d(SharedDsgInfo::Ptr dsg,
     updatePlace2dMesh(*attrs, mesh_update, num_archived_vertices);
     updatePlace2dBoundary(*attrs, mesh_update);
   }
-}
-
-gtsam::Values getDenseFrames(const KeyMap& full_sparse_frame_map,
-                             const FrameMap& sparse_frames,
-                             const gtsam::Values& sparse_values) {
-  if (full_sparse_frame_map.empty() == 0) {
-    return sparse_values;
-  }
-
-  gtsam::Values dense_values;
-  for (const auto& [dense_key, sparse_key] : full_sparse_frame_map) {
-    if (!sparse_values.exists(sparse_key)) {
-      continue;
-    }
-
-    const auto& sparse_T_dense =
-        sparse_frames.at(sparse_key).keyed_transforms.at(dense_key);
-    const auto agent_pose =
-        sparse_values.at<gtsam::Pose3>(sparse_key).compose(sparse_T_dense);
-    dense_values.insert(dense_key, agent_pose);
-  }
-  return dense_values;
 }
 
 }  // namespace hydra::utils

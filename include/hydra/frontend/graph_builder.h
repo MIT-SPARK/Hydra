@@ -174,7 +174,6 @@ class GraphBuilder : public Module {
   kimera_pgmo::Graph deformation_graph_;
   std::unique_ptr<kimera_pgmo::DeltaCompression> mesh_compression_;
   std::unique_ptr<kimera_pgmo::MeshCompression> deformation_compression_;
-  std::shared_ptr<kimera_pgmo::HashedIndexMapping> mesh_remapping_;
 
   GraphUpdater graph_updater_;
   GraphConnector graph_connector_;
