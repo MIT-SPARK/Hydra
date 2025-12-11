@@ -107,6 +107,7 @@ void declare_config(BackendModule::Config& config) {
   field(config.optimize_on_lc, "optimize_on_lc");
   field(config.external_loop_closures, "external_loop_closures");
   field(config.sinks, "sinks");
+  field(config.log_memory_usage_every_n_frames, "log_memory_usage_every_n_frames");
 }
 
 BackendModule::BackendModule(const Config& config,
@@ -120,8 +121,10 @@ BackendModule::BackendModule(const Config& config,
                             &PipelineQueues::instance().external_loop_closure_queue) {
   // set up frontend graph copy
   unmerged_graph_ = private_dsg_->graph->clone();
-  // set up mesh infrastructure
-  private_dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>());
+  // set up mesh infrastructure (enable all optional attributes)
+  // TODO(marcus): figure out if there's a config-level way to do this.
+  private_dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>(
+      true, true, true, true, true, true));
   unmerged_graph_->setMesh(private_dsg_->graph->mesh());
   original_vertices_.reset(
       new pcl::PointCloud<pcl::PointXYZ>());  // set up frontend graph copy
@@ -190,6 +193,10 @@ void BackendModule::save(const DataDirectory& output) {
                 << ",";
     output_file << (loop_closure.dsg ? 1 : 0) << "," << loop_closure.level;
     output_file << std::endl;
+  }
+
+  if (config.log_memory_usage_every_n_frames >= 0 && !memory_log_.empty()) {
+    writeMemoryLog(backend_path / "dsg_memory_usage.csv");
   }
 }
 
@@ -268,6 +275,7 @@ bool BackendModule::spinOnce(bool force_update) {
   }
 
   logStatus();
+  logMemoryUsage(timestamp_ns);
 
   ScopedTimer sink_timer("backend/sinks", timestamp_ns);
   Sink::callAll(sinks_, timestamp_ns, *private_dsg_->graph, *deformation_graph_);
@@ -579,6 +587,76 @@ void BackendModule::logStatus() {
   status.last_spin_s = timer.getLastElapsed("backend/spin");
   status.last_opt_s = timer.getLastElapsed("backend/optimization");
   status.last_mesh_update_s = timer.getLastElapsed("backend/mesh_update");
+}
+
+void BackendModule::logMemoryUsage(uint64_t timestamp_ns) {
+  if (config.log_memory_usage_every_n_frames < 0) {
+    return;
+  }
+
+  ++memory_log_frame_counter_;
+  if (config.log_memory_usage_every_n_frames > 0 &&
+      memory_log_frame_counter_ % config.log_memory_usage_every_n_frames != 0) {
+    return;
+  }
+
+  const auto& graph = *unmerged_graph_;
+
+  DsgMemoryRecord record;
+  record.timestamp_ns = timestamp_ns;
+  record.frame_number = memory_log_frame_counter_;
+  record.total_bytes = graph.memoryUsage();
+
+  for (const auto& [layer_id, layer_ptr] : graph.layers()) {
+    record.layer_bytes[layer_id] = layer_ptr->memoryUsage();
+  }
+
+  if (graph.hasMesh()) {
+    record.mesh_bytes = graph.mesh()->memoryUsage();
+    record.mesh_vertices = graph.mesh()->numVertices();
+    record.mesh_faces = graph.mesh()->numFaces();
+  }
+
+  record.num_nodes = graph.numNodes();
+  record.num_edges = graph.numEdges();
+
+  memory_log_.push_back(record);
+}
+
+void BackendModule::writeMemoryLog(const std::filesystem::path& output_path) const {
+  std::set<spark_dsg::LayerId> all_layer_ids;
+  for (const auto& record : memory_log_) {
+    for (const auto& [lid, _] : record.layer_bytes) {
+      all_layer_ids.insert(lid);
+    }
+  }
+
+  std::ofstream file(output_path);
+  if (!file.is_open()) {
+    LOG(ERROR) << "Failed to open memory log file: " << output_path;
+    return;
+  }
+
+  // Write header
+  file << "timestamp_ns,frame,total_bytes";
+  for (auto lid : all_layer_ids) {
+    file << ",layer_" << static_cast<int>(lid) << "_bytes";
+  }
+  file << ",mesh_bytes,mesh_vertices,mesh_faces,num_nodes,num_edges\n";
+
+  // Write records
+  for (const auto& r : memory_log_) {
+    file << r.timestamp_ns << "," << r.frame_number << "," << r.total_bytes;
+    for (auto lid : all_layer_ids) {
+      auto it = r.layer_bytes.find(lid);
+      file << "," << (it != r.layer_bytes.end() ? it->second : 0);
+    }
+    file << "," << r.mesh_bytes << "," << r.mesh_vertices << "," << r.mesh_faces;
+    file << "," << r.num_nodes << "," << r.num_edges << "\n";
+  }
+
+  file.close();
+  LOG(INFO) << "Wrote " << memory_log_.size() << " memory records to " << output_path;
 }
 
 }  // namespace hydra

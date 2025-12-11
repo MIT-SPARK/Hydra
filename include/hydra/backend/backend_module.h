@@ -77,6 +77,18 @@ struct BackendModuleStatus {
   std::optional<double> last_mesh_update_s = 0.0;
 };
 
+struct DsgMemoryRecord {
+  uint64_t timestamp_ns = 0;
+  size_t frame_number = 0;
+  size_t total_bytes = 0;
+  std::map<spark_dsg::LayerId, size_t> layer_bytes;
+  size_t mesh_bytes = 0;
+  size_t mesh_vertices = 0;
+  size_t mesh_faces = 0;
+  size_t num_nodes = 0;
+  size_t num_edges = 0;
+};
+
 class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
  public:
   using Ptr = std::shared_ptr<BackendModule>;
@@ -94,6 +106,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
     ExternalLoopClosureReceiver::Config external_loop_closures;
     //! Output sinks that process that latest backed scene graph and state
     std::vector<Sink::Factory> sinks;
+    //! Log DSG memory usage every N frames. < 0 disables
+    int log_memory_usage_every_n_frames = -1;
   } const config;
 
   BackendModule(const Config& config,
@@ -150,6 +164,10 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
 
   void logStatus();
 
+  void logMemoryUsage(uint64_t timestamp_ns);
+
+  void writeMemoryLog(const std::filesystem::path& output_path) const;
+
  protected:
   void stopImpl();
 
@@ -180,6 +198,9 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   ExternalLoopClosureReceiver external_lc_receiver_;
 
   Sink::List sinks_;
+
+  std::vector<DsgMemoryRecord> memory_log_;
+  size_t memory_log_frame_counter_ = 0;
 
   // TODO(lschmid): This mutex currently simply locks all data for manipulation.
   std::mutex mutex_;
