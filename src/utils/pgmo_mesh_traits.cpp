@@ -77,23 +77,27 @@ Eigen::Vector3f pgmoGetVertex(const Mesh& mesh,
 void pgmoSetVertex(Mesh& mesh,
                    size_t i,
                    const Eigen::Vector3f& pos,
-                   const kimera_pgmo::traits::VertexTraits& traits) {
+                   const kimera_pgmo::traits::VertexTraits* traits) {
   mesh.setPos(i, pos);
-  if (traits.properties.has_color && mesh.has_colors) {
-    const auto& c = traits.color;
+  if (!traits) {
+    return;
+  }
+
+  if (traits->properties.has_color && mesh.has_colors) {
+    const auto& c = traits->color;
     mesh.setColor(i, Color(c[0], c[1], c[2], c[3]));
   }
 
-  if (traits.properties.has_stamp && mesh.has_timestamps) {
-    mesh.setTimestamp(i, traits.stamp);
+  if (traits->properties.has_stamp && mesh.has_timestamps) {
+    mesh.setTimestamp(i, traits->stamp);
   }
 
-  if (traits.properties.has_label && mesh.has_labels) {
-    mesh.setLabel(i, traits.label);
+  if (traits->properties.has_label && mesh.has_labels) {
+    mesh.setLabel(i, traits->label);
   }
 
-  if (traits.properties.has_first_seen_stamp && mesh.has_first_seen_stamps) {
-    mesh.setFirstSeenTimestamp(i, traits.first_seen_stamp);
+  if (traits->properties.has_first_seen_stamp && mesh.has_first_seen_stamps) {
+    mesh.setFirstSeenTimestamp(i, traits->first_seen_stamp);
   }
 }
 

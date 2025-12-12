@@ -44,14 +44,11 @@
 #include <kimera_pgmo/utils/mesh_io.h>
 #include <spark_dsg/printing.h>
 
-#include <iterator>
-
 #include "hydra/common/global_info.h"
 #include "hydra/common/launch_callbacks.h"
 #include "hydra/common/pipeline_queues.h"
 #include "hydra/frontend/frontier_extractor.h"
 #include "hydra/frontend/mesh_segmenter.h"
-#include "hydra/reconstruction/voxel_types.h"
 #include "hydra/utils/pgmo_mesh_interface.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/printing.h"
@@ -358,7 +355,7 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
     state_->lcd_graph->graph->mergeGraph(*dsg_->graph);
   }
 
-  backend_input_->mesh_update = last_mesh_update_;
+  backend_input_->mesh_update = std::move(last_mesh_update_);
   queues.backend_queue.push(backend_input_);
   if (queues.lcd_queue) {
     queues.lcd_queue->push(lcd_input_);
@@ -480,12 +477,9 @@ void GraphBuilder::updateDeformationGraph(const ActiveWindowOutput& input) {
       new pcl::PointCloud<pcl::PointXYZRGBA>());
   deformation_compression_->getVertices(vertices);
 
-  std::vector<kimera_pgmo::Edge> new_edges;
-  if (new_indices.size() > 0 && new_triangles.size() > 0) {
-    // Add nodes and edges to graph
-    new_edges = deformation_graph_.addPointsAndSurfaces(new_indices, new_triangles);
-  }
-
+  // Add nodes and edges to graph
+  const auto new_edges =
+      deformation_graph_.addPointsAndSurfaces(new_indices, new_triangles);
   if (backend_input_) {
     backend_input_->deformation_graph = *CHECK_NOTNULL(kimera_pgmo::makePoseGraph(
         prefix.id, time_s, new_edges, new_indices, *vertices));

@@ -54,7 +54,7 @@ Eigen::Vector3f pgmoGetVertex(const Mesh& mesh,
 void pgmoSetVertex(Mesh& mesh,
                    size_t i,
                    const Eigen::Vector3f& pos,
-                   const kimera_pgmo::traits::VertexTraits& traits = {});
+                   const kimera_pgmo::traits::VertexTraits* traits = nullptr);
 
 uint64_t pgmoGetVertexStamp(const Mesh& mesh, size_t i);
 
