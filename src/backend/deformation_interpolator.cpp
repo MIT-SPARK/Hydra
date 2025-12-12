@@ -40,7 +40,11 @@
 #include <glog/logging.h>
 #include <hydra/common/global_info.h>
 #include <kimera_pgmo/deformation_graph.h>
+#include <kimera_pgmo/mesh_types.h>
+#include <kimera_pgmo/utils/common_functions.h>
 #include <spark_dsg/node_symbol.h>
+
+#include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 
 namespace hydra {
 
@@ -70,6 +74,11 @@ struct AttributeMap {
 
 size_t pgmoNumVertices(const AttributeMap& map) { return map.attributes.size(); }
 
+kimera_pgmo::traits::VertexProperties pgmoGetVertexProperties(
+    const AttributeMap& /* map */) {
+  return {false, true, false, false};
+}
+
 kimera_pgmo::traits::Pos pgmoGetVertex(const AttributeMap& map,
                                        size_t i,
                                        kimera_pgmo::traits::VertexTraits* traits) {
@@ -88,7 +97,7 @@ uint64_t pgmoGetVertexStamp(const AttributeMap& map, size_t i) {
 void pgmoSetVertex(AttributeMap& map,
                    size_t i,
                    const kimera_pgmo::traits::Pos& pos,
-                   const kimera_pgmo::traits::VertexTraits&) {
+                   const kimera_pgmo::traits::VertexTraits*) {
   map.attributes[i]->position = pos.cast<double>();
 }
 

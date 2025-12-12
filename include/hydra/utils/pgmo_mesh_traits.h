@@ -45,6 +45,8 @@ size_t pgmoNumVertices(const Mesh& mesh);
 
 void pgmoResizeVertices(Mesh& mesh, size_t size);
 
+kimera_pgmo::traits::VertexProperties pgmoGetVertexProperties(const Mesh& mesh);
+
 Eigen::Vector3f pgmoGetVertex(const Mesh& mesh,
                               size_t i,
                               kimera_pgmo::traits::VertexTraits* traits = nullptr);

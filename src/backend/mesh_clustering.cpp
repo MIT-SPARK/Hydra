@@ -69,6 +69,10 @@ size_t pgmoNumVertices(const ActiveMeshWrapper& wrapper) {
   return total > wrapper.start_idx ? total - wrapper.start_idx : 0;
 }
 
+auto pgmoGetVertexProperties(const ActiveMeshWrapper& wrapper) {
+  return pgmoGetVertexProperties(wrapper.mesh);
+}
+
 kimera_pgmo::traits::Pos pgmoGetVertex(const ActiveMeshWrapper& wrapper,
                                        size_t i,
                                        kimera_pgmo::traits::VertexTraits* traits) {

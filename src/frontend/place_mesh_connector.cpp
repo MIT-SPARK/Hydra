@@ -36,6 +36,7 @@
 
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
+#include <kimera_pgmo/mesh_delta.h>
 #include <spark_dsg/node_attributes.h>
 
 #include <nanoflann.hpp>
@@ -65,16 +66,16 @@ struct MeshDeltaAdaptor {
   const kimera_pgmo::MeshDelta& delta;
 };
 
-struct PlaceMeshConnector::Detail {
+struct MeshVertexLookup {
   using Dist = L2_Simple_Adaptor<double, MeshDeltaAdaptor>;
   using KDTree = KDTreeSingleIndexAdaptor<Dist, MeshDeltaAdaptor, 3, size_t>;
 
-  Detail(const kimera_pgmo::MeshDelta& delta) : adaptor(delta) {
+  MeshVertexLookup(const kimera_pgmo::MeshDelta& delta) : adaptor(delta) {
     kdtree.reset(new KDTree(3, adaptor));
     kdtree->buildIndex();
   }
 
-  ~Detail() = default;
+  ~MeshVertexLookup() = default;
 
   std::optional<size_t> find(const Eigen::Vector3d& position) const {
     size_t index;
@@ -92,16 +93,14 @@ struct PlaceMeshConnector::Detail {
   std::unique_ptr<KDTree> kdtree;
 };
 
-PlaceMeshConnector::PlaceMeshConnector(const kimera_pgmo::MeshDelta::Ptr& delta)
-    : delta_(delta), internals_(new Detail(*CHECK_NOTNULL(delta))) {}
+size_t PlaceMeshConnector::addConnections(const kimera_pgmo::MeshDelta& delta,
+                                          const SceneGraphLayer& places,
+                                          const DeformationMapping& mapping) {
+  const MeshVertexLookup lookup(delta);
 
-PlaceMeshConnector::~PlaceMeshConnector() {}
-
-size_t PlaceMeshConnector::addConnections(const SceneGraphLayer& places,
-                                          const DeformationMapping& mapping) const {
   size_t num_missing = 0;
-  for (const auto& id_node_pair : places.nodes()) {
-    auto& attrs = id_node_pair.second->attributes<PlaceNodeAttributes>();
+  for (const auto& [node_id, node] : places.nodes()) {
+    auto& attrs = node->attributes<PlaceNodeAttributes>();
     // TODO(nathan) archive logic should live here if we actually track mesh vertices
     if (!attrs.is_active) {
       continue;
@@ -118,20 +117,20 @@ size_t PlaceMeshConnector::addConnections(const SceneGraphLayer& places,
 
     for (auto& vertex : attrs.voxblox_mesh_connections) {
       const Eigen::Vector3d pos = Eigen::Map<const Eigen::Vector3d>(vertex.voxel_pos);
-      const auto nearest = internals_->find(pos);
+      const auto nearest = lookup.find(pos);
       if (!nearest) {
         continue;
       }
 
-      const auto& v = delta_->getVertex(*nearest);
       // assign mesh vertex to relevant fields
+      const auto& v = delta.getVertex(*nearest);
       vertex.vertex = *nearest;
       attrs.pcl_mesh_connections.push_back(*nearest);
 
       // assign (potentially valid) deformation connection
       attrs.deformation_connections.push_back(mapping.at(*nearest));
-      if (v.traits.label) {
-        attrs.mesh_vertex_labels.push_back(*v.traits.label);
+      if (v.traits.properties.has_label) {
+        attrs.mesh_vertex_labels.push_back(v.traits.label);
         vertex.label = v.traits.label;
       }
     }

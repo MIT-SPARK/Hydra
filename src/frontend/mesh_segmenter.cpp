@@ -37,6 +37,7 @@
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
 #include <kimera_pgmo/mesh_delta.h>
+#include <kimera_pgmo/mesh_traits.h>
 #include <pcl/point_cloud.h>
 #define PCL_NO_PRECOMPILE
 #include <pcl/search/kdtree.h>
@@ -117,15 +118,15 @@ inline bool nodesMatch(const Cluster& cluster, const SceneGraphNode& node) {
 LabelIndices getLabelIndices(const std::set<uint32_t>& desired_labels,
                              const kimera_pgmo::MeshDelta& delta) {
   LabelIndices label_indices;
+  if (!kimera_pgmo::traits::get_vertex_properties(delta).has_label) {
+    LOG(WARNING) << "[Mesh Segmenter] Mesh missing label!";
+    return label_indices;
+  }
+
   std::set<uint32_t> seen_labels;
   for (size_t i = delta.getNumArchivedVertices(); i < delta.getNumVertices(); ++i) {
     const auto& v = delta.getVertex(i);
-    if (!v.traits.label) {
-      VLOG(10) << "[Mesh Segmenter] Point " << i << " missing label!";
-      continue;
-    }
-
-    const auto label = v.traits.label.value();
+    const auto label = v.traits.label;
     seen_labels.insert(label);
     if (!desired_labels.count(label)) {
       continue;
