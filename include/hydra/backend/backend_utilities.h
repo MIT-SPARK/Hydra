@@ -35,6 +35,7 @@
 #pragma once
 
 #include <gtsam/inference/Symbol.h>
+#include <kimera_pgmo/mesh_delta.h>
 
 #include "hydra/common/dsg_types.h"
 #include "hydra/common/shared_dsg_info.h"
@@ -48,8 +49,8 @@ namespace hydra::utils {
 std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol key);
 
 void updatePlaces2d(SharedDsgInfo::Ptr dsg,
-                    kimera_pgmo::MeshDelta& mesh_update,
-                    size_t num_archived_vertices);
+                    const kimera_pgmo::MeshDelta& mesh_update,
+                    const kimera_pgmo::MeshOffsetInfo& offsets);
 
 template <typename T>
 void mergeIndices(const T& from, T& to) {

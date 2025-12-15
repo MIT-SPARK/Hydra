@@ -163,17 +163,17 @@ void MeshSegmenter::updateOldNodes(const kimera_pgmo::MeshDelta& delta,
       // remap and prune mesh connections
       VLOG(20) << "Updating node " << NodeSymbol(node_id).str() << " with connections "
                << attrs.mesh_connections;
-      bool is_archived = false;
-      delta.updateIndices(attrs.mesh_connections, offsets, &is_archived);
+      kimera_pgmo::MeshOffsetInfo::RemapInfo info;
+      delta.updateIndices(attrs.mesh_connections, offsets, &info);
       VLOG(20) << "After update: " << attrs.mesh_connections << std::boolalpha
-               << " (active: " << !is_archived << ")";
+               << " (active: " << !info.all_archived << ")";
       if (attrs.mesh_connections.size() < config.clustering.min_cluster_size) {
         graph.removeNode(node_id);
         iter = label_nodes.erase(iter);
         continue;
       }
 
-      attrs.is_active = !is_archived;
+      attrs.is_active = !info.all_archived;
       if (!attrs.is_active) {
         iter = label_nodes.erase(iter);
       } else {

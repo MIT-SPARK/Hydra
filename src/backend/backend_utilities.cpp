@@ -37,58 +37,9 @@
 #include <glog/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
 
-#include <limits>
+#include "hydra/frontend/place_2d_split_logic.h"
 
 namespace hydra::utils {
-namespace {
-
-void updatePlace2dMesh(Place2dNodeAttributes& attrs,
-                       const kimera_pgmo::MeshDelta& delta,
-                       const size_t archived) {
-  attrs.pcl_min_index = std::numeric_limits<size_t>::max();
-  attrs.pcl_max_index = 0;
-
-  attrs.pcl_mesh_connections = delta.remapIndices(attrs.pcl_mesh_connections, archived);
-  for (const auto idx : attrs.pcl_mesh_connections) {
-    attrs.pcl_min_index = std::min(attrs.pcl_min_index, idx);
-    attrs.pcl_max_index = std::max(attrs.pcl_max_index, idx);
-  }
-
-  if (attrs.pcl_max_index < archived) {
-    attrs.has_active_mesh_indices = false;
-  }
-}
-
-void updatePlace2dBoundary(Place2dNodeAttributes& attrs,
-                           const kimera_pgmo::MeshDelta& delta,
-                           const size_t archived) {
-  const auto prev_boundary = attrs.boundary;
-  const auto prev_connections = attrs.pcl_boundary_connections;
-  attrs.boundary.clear();
-  attrs.pcl_boundary_connections.clear();
-
-  const auto& remap = delta.prev_to_curr();
-  for (size_t i = 0; i < prev_boundary.size(); ++i) {
-    auto global_idx = prev_connections.at(i);
-    if (global_idx < archived) {
-      attrs.boundary.push_back(prev_boundary.at(i));
-      attrs.pcl_boundary_connections.push_back(global_idx);
-      continue;
-    }
-
-    const auto prev_local = global_idx - archived;
-    auto new_idx = remap.find(prev_local);
-    if (new_idx == remap.end()) {
-      continue;
-    }
-
-    // TODO(nathan) this is wrong
-    attrs.boundary.push_back(prev_boundary.at(i));
-    attrs.pcl_boundary_connections.push_back(new_idx->second + archived);
-  }
-}
-
-}  // namespace
 
 std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol key) {
   NodeSymbol node(key.chr(), key.index());
@@ -101,8 +52,8 @@ std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol 
 }
 
 void updatePlaces2d(SharedDsgInfo::Ptr dsg,
-                    kimera_pgmo::MeshDelta& mesh_update,
-                    size_t num_archived_vertices) {
+                    const kimera_pgmo::MeshDelta& mesh_update,
+                    const kimera_pgmo::MeshOffsetInfo& offsets) {
   if (!dsg->graph->hasLayer(DsgLayers::MESH_PLACES)) {
     return;
   }
@@ -113,8 +64,7 @@ void updatePlaces2d(SharedDsgInfo::Ptr dsg,
       continue;
     }
 
-    updatePlace2dMesh(*attrs, mesh_update, num_archived_vertices);
-    updatePlace2dBoundary(*attrs, mesh_update, num_archived_vertices);
+    remapPlace2dMesh(*attrs, mesh_update, offsets);
   }
 }
 

@@ -85,7 +85,6 @@ std::unordered_set<size_t> getFrozenSet(const LabelToNodes& active_places,
                                         std::list<NodeId>& empty_nodes) {
   VLOG(5) << "[2D Places] n original active indices: " << delta.getNumActiveVertices();
 
-  const auto& remap = delta.prev_to_curr();
   std::unordered_set<size_t> frozen_indices;
   for (const auto& [label, nodes] : active_places) {
     for (const auto nid : nodes) {
@@ -96,14 +95,7 @@ std::unordered_set<size_t> getFrozenSet(const LabelToNodes& active_places,
       }
 
       auto& attrs = node->attributes<Place2dNodeAttributes>();
-      kimera_pgmo::MeshOffsetInfo::RemapInfo info;
-      attrs.pcl_mesh_connections =
-          delta.remapIndices(attrs.pcl_mesh_connections, offsets, &info);
-      attrs.pcl_min_index = info.min_index;
-      attrs.pcl_max_index = info.max_index;
-
-      // TODO(nathan) update boundary
-
+      remapPlace2dMesh(attrs, delta, offsets);
       if (!attrs.is_active && placeIsEmpty(attrs)) {
         empty_nodes.push_back(nid);
         continue;
@@ -232,7 +224,7 @@ void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
   std::set<std::pair<uint32_t, NodeId>> full_nodes;
   for (const auto& [label, nodes] : active_places_to_check) {
     for (const auto nid : nodes) {
-      full_nodes.insert(std::pair<uint32_t, NodeId>(label, nid));
+      full_nodes.insert({label, nid});
     }
   }
 
@@ -247,40 +239,30 @@ void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
     new_semiactive_places[label] = std::set<NodeId>();
   }
 
-  for (auto label_ns : full_nodes) {
-    uint32_t label = label_ns.first;
-    NodeSymbol ns1 = label_ns.second;
+  for (const auto& [label, ns1] : full_nodes) {
     auto& attrs1 = graph.getNode(ns1).attributes<Place2dNodeAttributes>();
+    attrs1.has_active_mesh_indices = attrs1.pcl_max_index >= offsets.archived_vertices;
 
-    bool neighbors_are_fixed = true;
-    for (auto label_ns2 : full_nodes) {
-      NodeSymbol ns2 = label_ns2.second;
+    bool fixed_neighbors = true;
+    for (const auto& [neighbor_label, ns2] : full_nodes) {
       if (ns1 == ns2) {
         continue;
       }
 
-      const auto& attrs2 = graph.getNode(ns2).attributes<Place2dNodeAttributes>();
-
       EdgeAttributes ea;
+      const auto& attrs2 = graph.getNode(ns2).attributes<Place2dNodeAttributes>();
       const bool has_edge = shouldAddPlaceConnection(attrs1,
                                                      attrs2,
                                                      config.place_overlap_threshold,
                                                      config.place_max_neighbor_z_diff,
                                                      ea);
-
       if (has_edge) {
         graph.insertEdge(ns1, ns2, ea.clone());
-        if (attrs2.pcl_min_index >= num_archived) {
-          neighbors_are_fixed = false;
-        }
+        fixed_neighbors &= attrs2.pcl_min_index < offsets.archived_vertices;
       }
     }
 
-    if (attrs1.pcl_max_index < num_archived) {
-      attrs1.has_active_mesh_indices = false;
-    }
-
-    if (!attrs1.has_active_mesh_indices && neighbors_are_fixed) {
+    if (!attrs1.has_active_mesh_indices && fixed_neighbors) {
       attrs1.is_active = false;
     } else if (!attrs1.has_active_mesh_indices) {
       new_semiactive_places.at(label).insert(ns1);

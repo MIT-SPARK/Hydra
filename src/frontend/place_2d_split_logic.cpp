@@ -260,4 +260,32 @@ bool shouldAddPlaceConnection(const Place2d& p1,
   }
 }
 
+void remapPlace2dMesh(Place2dNodeAttributes& attrs,
+                      const kimera_pgmo::MeshDelta& delta,
+                      const kimera_pgmo::MeshOffsetInfo& offsets) {
+  {  // scope for mesh info
+    kimera_pgmo::MeshOffsetInfo::RemapInfo info;
+    attrs.pcl_mesh_connections =
+        delta.remapIndices(attrs.pcl_mesh_connections, offsets, &info);
+    attrs.pcl_min_index = info.min_index;
+    attrs.pcl_max_index = info.max_index;
+    attrs.has_active_mesh_indices = !info.all_archived;
+  }  // end scope for mesh info
+
+  kimera_pgmo::MeshOffsetInfo::RemapInfo info;
+  attrs.pcl_boundary_connections =
+      delta.remapIndices(attrs.pcl_boundary_connections, offsets, &info);
+
+  const auto prev_boundary = attrs.boundary;
+  attrs.boundary.clear();
+  attrs.boundary.reserve(prev_boundary.size());
+  for (size_t i = 0; i < prev_boundary.size(); ++i) {
+    if (info.deleted_indices.count(i)) {
+      continue;
+    }
+
+    attrs.boundary.push_back(prev_boundary[i]);
+  }
+}
+
 }  // namespace hydra

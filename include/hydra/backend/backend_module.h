@@ -35,6 +35,7 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
 #include <kimera_pgmo/kimera_pgmo_interface.h>
+#include <kimera_pgmo/mesh_delta.h>
 #include <spark_dsg/scene_graph_logger.h>
 
 #include <filesystem>
@@ -171,8 +172,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   std::vector<size_t> timestamps_;
   pcl::PointCloud<pcl::PointXYZ>::Ptr original_vertices_;
   std::shared_ptr<std::vector<uint64_t>> vertex_stamps_;
-  size_t prev_num_archived_vertices_ = 0;
-  size_t num_archived_vertices_ = 0;
+  kimera_pgmo::MeshOffsetInfo mesh_offsets_;
+  size_t last_deformed_vertices_ = 0;
 
   std::vector<BackendModuleStatus> status_log_;
   SceneGraphLogger backend_graph_logger_;

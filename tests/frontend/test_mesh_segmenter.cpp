@@ -79,8 +79,8 @@ void stepSegmenter(const kimera_pgmo::MeshDelta& delta,
                    MeshSegmenter& segmenter,
                    DynamicSceneGraph& graph) {
   delta.updateMesh(*graph.mesh());
-  const auto clusters = segmenter.detect(0, delta, 0);
-  segmenter.updateGraph(0, delta, clusters, graph, 0);
+  const auto clusters = segmenter.detect(0, delta, {0, 0, 0});
+  segmenter.updateGraph(0, delta, {0, 0, 0}, clusters, graph);
 }
 
 void addPoints(kimera_pgmo::MeshDelta& delta,
@@ -100,21 +100,21 @@ void addPoints(kimera_pgmo::MeshDelta& delta,
 
 TEST(MeshSegmenter, TestClustering) {
   MeshSegmenter::Config config;
-  config.min_cluster_size = 4;
+  config.clustering.min_cluster_size = 4;
   MeshSegmenter segmenter(config, {1, 2});
 
   kimera_pgmo::MeshDelta delta({0, 0, 0});
   addPoints(delta, 1, {1, 2, 3}, Eigen::Vector3f::Constant(0.1));
   addPoints(delta, 2, {4, 5, 6}, Eigen::Vector3f::Constant(0.1));
 
-  const auto clusters = segmenter.detect(0, delta, 0);
+  const auto clusters = segmenter.detect(0, delta, {0, 0, 0});
   ASSERT_EQ(clusters.size(), 2u);
 }
 
 TEST(MeshSegmenter, TestIndicesRemapping) {
   Eigen::Vector3f dims = Eigen::Vector3f::Constant(0.1);
   MeshSegmenter::Config config;
-  config.min_cluster_size = 4;
+  config.clustering.min_cluster_size = 4;
   MeshSegmenter segmenter(config, {1, 2});
 
   DynamicSceneGraph graph;
@@ -176,7 +176,7 @@ TEST(MeshSegmenter, TestIndicesRemapping) {
 TEST(MeshSegmenter, TestDeletedObject) {
   Eigen::Vector3f dims = Eigen::Vector3f::Constant(0.1);
   MeshSegmenter::Config config;
-  config.min_cluster_size = 4;
+  config.clustering.min_cluster_size = 4;
   MeshSegmenter segmenter(config, {1, 2});
 
   DynamicSceneGraph graph;
@@ -215,7 +215,7 @@ TEST(MeshSegmenter, TestDeletedObject) {
 TEST(MeshSegmenter, TestArchivedObject) {
   Eigen::Vector3f dims = Eigen::Vector3f::Constant(0.1);
   MeshSegmenter::Config config;
-  config.min_cluster_size = 4;
+  config.clustering.min_cluster_size = 4;
   MeshSegmenter segmenter(config, {1, 2});
 
   DynamicSceneGraph graph;
@@ -270,7 +270,7 @@ TEST(MeshSegmenter, TestArchivedObject) {
 TEST(MeshSegmenter, TestDeltaWithOffset) {
   Eigen::Vector3f dims = Eigen::Vector3f::Constant(0.1);
   MeshSegmenter::Config config;
-  config.min_cluster_size = 4;
+  config.clustering.min_cluster_size = 4;
   MeshSegmenter segmenter(config, {1, 2});
 
   DynamicSceneGraph graph;

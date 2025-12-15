@@ -34,9 +34,10 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <gtsam/nonlinear/Values.h>
+#include <kimera_pgmo/mesh_delta.h>
 
 #include "hydra/backend/merge_proposer.h"
-#include "hydra/common/dsg_types.h"
+#include "hydra/common/dsg_types.h"  // IWYU pragma: keep
 #include "hydra/common/shared_dsg_info.h"
 
 namespace kimera_pgmo {
@@ -58,11 +59,10 @@ struct UpdateInfo {
   LayerMerges given_merges = {};
   // TODO(nathan) flip to const when we have mutable state
   kimera_pgmo::DeformationGraph* deformation_graph = nullptr;
+  //! Mapping between nodes and robots
   const std::unordered_map<NodeId, size_t>* node_to_robot_id = nullptr;
-  //! Number of vertices currently archived in the mesh
-  size_t num_archived_vertices = 0;
-  //! Number of vertices previously archived in the mesh
-  size_t num_previous_archived_vertices = 0;
+  //! Archival information for mesh
+  kimera_pgmo::MeshOffsetInfo mesh_offsets = {};
 };
 
 using LayerCleanupFunc =

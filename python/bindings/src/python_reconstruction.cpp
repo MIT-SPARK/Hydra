@@ -60,6 +60,8 @@
 
 namespace hydra::python {
 
+using namespace spark_dsg;
+
 struct MeshUpdater {
   MeshUpdater(double voxel_size, const std::string& url)
       : compression(voxel_size / 4.0),
@@ -87,8 +89,8 @@ struct MeshUpdater {
     }
 
     const auto& mesh = msg->map().getMeshLayer();
-    auto interface = PgmoMeshLayerInterface(mesh);
-    const auto delta = compression.update(interface, msg->timestamp_ns);
+    const BlockMeshIter wrapper(mesh);
+    const auto delta = compression.update(wrapper, msg->timestamp_ns);
     delta->updateMesh(*graph->mesh());
     zmq_sender.send(*graph, true);
   }

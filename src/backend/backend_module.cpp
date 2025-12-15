@@ -422,14 +422,13 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
 
   {  // mesh critical section
     std::lock_guard<std::mutex> graph_lock(private_dsg_->mutex);
-    num_archived_vertices_ =
-        input.mesh_update->updateMesh(*private_dsg_->graph->mesh());
+    mesh_offsets_ = input.mesh_update->updateMesh(*private_dsg_->graph->mesh());
     kimera_pgmo::StampedCloud<pcl::PointXYZ> cloud_out{*original_vertices_,
                                                        *vertex_stamps_};
     input.mesh_update->updateVertices(cloud_out);
     // we use this to make sure that deformation only happens for vertices that are
     // still active
-    utils::updatePlaces2d(private_dsg_, *input.mesh_update, num_archived_vertices_);
+    utils::updatePlaces2d(private_dsg_, *input.mesh_update, mesh_offsets_);
   }  // mesh critical section
 
   have_new_mesh_ = true;
@@ -492,8 +491,8 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
                                    KimeraPgmoInterface::config_.num_interp_pts,
                                    KimeraPgmoInterface::config_.interp_horizon,
                                    nullptr,
-                                   prev_num_archived_vertices_);
-  prev_num_archived_vertices_ = num_archived_vertices_;
+                                   last_deformed_vertices_);
+  last_deformed_vertices_ = mesh_offsets_.archived_vertices;
 }
 
 void BackendModule::updateAgentNodeMeasurements(const PoseGraph& meas) {
@@ -535,8 +534,7 @@ void BackendModule::optimize(size_t timestamp_ns, bool force_find_merge) {
                                            {},
                                            deformation_graph_.get(),
                                            nullptr,
-                                           num_archived_vertices_,
-                                           prev_num_archived_vertices_});
+                                           mesh_offsets_});
   dsg_updater_->callUpdateFunctions(timestamp_ns, info);
   have_new_loopclosures_ = false;
 }
