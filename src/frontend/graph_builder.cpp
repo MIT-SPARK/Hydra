@@ -110,7 +110,6 @@ GraphBuilder::GraphBuilder(const Config& config,
       queue_(std::make_shared<InputQueue>()),
       dsg_(dsg),
       state_(state),
-      num_archived_vertices_(0),
       graph_updater_(config.graph_updater),
       graph_connector_(config.graph_connector),
       map_window_(GlobalInfo::instance().createVolumetricWindow()),
@@ -429,7 +428,7 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
     // TODO(nathan) we should probably have a mutex before modifying the mesh, but
     // nothing else uses it at the moment
     ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
-    num_archived_vertices_ = last_mesh_update_->updateMesh(*dsg_->graph->mesh());
+    mesh_offsets_ = last_mesh_update_->updateMesh(*dsg_->graph->mesh());
   }  // end timing scope
 
   ScopedTimer timer("frontend/postmesh_callbacks", input.timestamp_ns, true, 1, false);
@@ -446,14 +445,12 @@ void GraphBuilder::updateObjects(const ActiveWindowOutput& input) {
     return;
   }
 
-  const auto timestamp = input.timestamp_ns;
-  const auto clusters =
-      segmenter_->detect(timestamp, *last_mesh_update_, num_archived_vertices_);
-
+  const auto stamp = input.timestamp_ns;
+  const auto clusters = segmenter_->detect(stamp, *last_mesh_update_, mesh_offsets_);
   {  // start dsg critical section
     std::unique_lock<std::mutex> lock(dsg_->mutex);
     segmenter_->updateGraph(
-        timestamp, *last_mesh_update_, clusters, *dsg_->graph, num_archived_vertices_);
+        stamp, *last_mesh_update_, mesh_offsets_, clusters, *dsg_->graph);
   }  // end dsg critical section
 }
 
@@ -557,13 +554,11 @@ void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
   }
 
   ScopedTimer timer("frontend/places_2d", input.timestamp_ns, true, 1, false);
-  surface_places_->detect(
-      input, *last_mesh_update_, *dsg_->graph, num_archived_vertices_);
+  surface_places_->detect(input, *last_mesh_update_, mesh_offsets_, *dsg_->graph);
 
   // start graph critical section
   std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-  surface_places_->updateGraph(
-      input.timestamp_ns, input, *dsg_->graph, num_archived_vertices_);
+  surface_places_->updateGraph(input.timestamp_ns, input, mesh_offsets_, *dsg_->graph);
 }
 
 void GraphBuilder::updatePoseGraph(const ActiveWindowOutput& input) {

@@ -34,13 +34,10 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include "hydra/active_window/active_window_output.h"
-#include "hydra/common/dsg_types.h"
-#include "hydra/places/gvd_voxel.h"
+#include <kimera_pgmo/mesh_delta.h>
+#include <spark_dsg/dynamic_scene_graph.h>
 
-namespace kimera_pgmo {
-class MeshDelta;
-}
+#include "hydra/active_window/active_window_output.h"
 
 namespace hydra {
 
@@ -52,13 +49,13 @@ class SurfacePlacesInterface {
 
   virtual void detect(const ActiveWindowOutput& msg,
                       const kimera_pgmo::MeshDelta& mesh_delta,
-                      const DynamicSceneGraph& graph,
-                      size_t num_archived_vertices) = 0;
+                      const kimera_pgmo::MeshOffsetInfo& offsets,
+                      const spark_dsg::DynamicSceneGraph& graph) = 0;
 
   virtual void updateGraph(uint64_t timestamp_ns,
                            const ActiveWindowOutput& msg,
-                           DynamicSceneGraph& graph,
-                           size_t num_archived_vertices) = 0;
+                           const kimera_pgmo::MeshOffsetInfo& offsets,
+                           spark_dsg::DynamicSceneGraph& graph) = 0;
 
   virtual NodeIdSet getActiveNodes() const = 0;
 };

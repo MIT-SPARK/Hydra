@@ -33,31 +33,27 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
 #include <kimera_pgmo/mesh_delta.h>
-#include <pcl/common/centroid.h>
-
-#include <memory>
 
 #include "hydra/common/dsg_types.h"
+#include "hydra/frontend/mesh_delta_clustering.h"
 #include "hydra/frontend/place_2d_split_logic.h"
 #include "hydra/frontend/surface_places_interface.h"
 
 namespace hydra {
 
+using clustering::LabelIndices;
+
 class Place2dSegmenter : public SurfacePlacesInterface {
  public:
-  using LabelIndices = std::map<uint32_t, std::vector<size_t>>;
-  using MeshVertexCloud = Place2d::CloudT;
   using Places = std::vector<Place2d>;
   using LabelPlaces = std::map<uint32_t, Places>;
+  using LabelToNodes = std::map<uint32_t, std::set<NodeId>>;
 
   struct Config {
     std::string layer = DsgLayers::MESH_PLACES;
     char prefix = 'Q';
-    double cluster_tolerance = 1;
-    size_t min_cluster_size = 600;
-    size_t max_cluster_size = 100000;
+    clustering::ClusteringConfig clustering{1.0, 600, 100000};
     double pure_final_place_size = 3;
     size_t min_final_place_points = 1000;
     double place_overlap_threshold = 0.1;
@@ -70,54 +66,31 @@ class Place2dSegmenter : public SurfacePlacesInterface {
 
   void detect(const ActiveWindowOutput& msg,
               const kimera_pgmo::MeshDelta& mesh_delta,
-              const DynamicSceneGraph& graph,
-              size_t num_archived_vertices) override;
+              const kimera_pgmo::MeshOffsetInfo& offsets,
+              const DynamicSceneGraph& graph) override;
 
   NodeIdSet getActiveNodes() const override;
 
   void updateGraph(uint64_t timestamp_ns,
                    const ActiveWindowOutput&,
-                   DynamicSceneGraph& graph,
-                   size_t num_archived_vertices) override;
+                   const kimera_pgmo::MeshOffsetInfo& offsets,
+                   DynamicSceneGraph& graph) override;
 
  private:
-  bool frontendAddPlaceConnection(const Place2dNodeAttributes& attrs1,
-                                  const Place2dNodeAttributes& attrs2,
-                                  EdgeAttributes& edge_weight);
-
-  Places findPlaces(const kimera_pgmo::MeshDelta& delta,
-                    const std::vector<size_t>& indices,
-                    size_t num_archived_vertices) const;
-
-  std::set<NodeId> archiveOldObjects(const DynamicSceneGraph& graph,
-                                     uint64_t latest_timestamp);
-
-  LabelIndices getLabelIndices(const Mesh::Labels& labels,
-                               const std::vector<size_t>& indices) const;
-
   NodeSymbol addPlaceToGraph(DynamicSceneGraph& graph,
                              const Place2d& place,
                              uint32_t label,
                              uint64_t timestamp);
 
-  void updatePlaceInGraph(const Place2d& place,
-                          const SceneGraphNode& node,
-                          uint64_t timestamp);
-
  private:
-  LabelPlaces detected_label_places_;
+  LabelPlaces label_places_;
+  std::list<NodeId> to_remove_;
 
   NodeSymbol next_node_id_;
 
-  std::list<NodeId> nodes_to_remove_;
-
-  std::map<uint32_t, std::set<NodeId>> active_places_;
-  std::map<uint32_t, std::set<NodeId>> semiactive_places_;
+  LabelToNodes active_places_;
+  LabelToNodes semiactive_places_;
   std::map<NodeId, uint64_t> active_place_timestamps_;
-
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<SurfacePlacesInterface, Place2dSegmenter, Config>(
-          "place_2d");
 };
 
 void declare_config(Place2dSegmenter::Config& config);

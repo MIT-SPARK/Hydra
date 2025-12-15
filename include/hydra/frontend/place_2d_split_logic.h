@@ -10,7 +10,6 @@
 namespace hydra {
 
 struct Place2d {
-  // using PointT = pcl::PointXYZRGBA;
   using PointT = spark_dsg::Mesh::Pos;
   using CloudT = spark_dsg::Mesh::Positions;
   using CentroidT = pcl::CentroidPoint<pcl::PointXYZ>;
