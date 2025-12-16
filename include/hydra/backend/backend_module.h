@@ -35,11 +35,10 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
 #include <kimera_pgmo/kimera_pgmo_interface.h>
-#include <kimera_pgmo/mesh_delta.h>
+#include <kimera_pgmo/mesh_offset_info.h>
 #include <spark_dsg/scene_graph_logger.h>
 
 #include <filesystem>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -47,7 +46,6 @@
 #include "hydra/backend/backend_input.h"
 #include "hydra/backend/dsg_updater.h"
 #include "hydra/backend/external_loop_closure_receiver.h"
-#include "hydra/backend/merge_tracker.h"
 #include "hydra/backend/pgmo_configs.h"
 #include "hydra/common/module.h"
 #include "hydra/common/output_sink.h"

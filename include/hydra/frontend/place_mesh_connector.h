@@ -34,8 +34,11 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <kimera_pgmo/mesh_delta.h>
 #include <spark_dsg/scene_graph_layer.h>
+
+namespace kimera_pgmo {
+class MeshDelta;
+}
 
 namespace hydra {
 

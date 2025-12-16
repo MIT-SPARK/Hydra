@@ -34,11 +34,15 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <kimera_pgmo/mesh_delta.h>
+#include <kimera_pgmo/mesh_traits.h>
 #include <spark_dsg/bounding_box.h>
 #include <spatial_hash/hash.h>
 
 #include "hydra/backend/update_functions.h"
+
+namespace kimera_pgmo {
+class MeshDelta;
+}
 
 namespace hydra {
 

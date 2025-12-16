@@ -33,13 +33,16 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <kimera_pgmo/mesh_delta.h>
 #include <spark_dsg/mesh.h>
 
 #include <memory>
 
 #include "hydra/common/robot_prefix_config.h"
 #include "hydra/odometry/pose_graph_tracker.h"
+
+namespace kimera_pgmo {
+class MeshDelta;
+}
 
 namespace hydra {
 
@@ -50,7 +53,7 @@ struct BackendInput {
   uint64_t sequence_number;
   pose_graph_tools::PoseGraph deformation_graph;
   PoseGraphPacket agent_updates;
-  kimera_pgmo::MeshDelta::Ptr mesh_update;
+  std::shared_ptr<kimera_pgmo::MeshDelta> mesh_update;
 };
 
 }  // namespace hydra

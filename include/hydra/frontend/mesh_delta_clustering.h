@@ -1,10 +1,15 @@
 #pragma once
+#include <cstdint>
 #include <map>
 #include <set>
+#include <string>
 #include <unordered_set>
 #include <vector>
 
-#include "kimera_pgmo/mesh_delta.h"
+namespace kimera_pgmo {
+class MeshDelta;
+struct MeshOffsetInfo;
+}  // namespace kimera_pgmo
 
 namespace hydra::clustering {
 

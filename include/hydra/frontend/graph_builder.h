@@ -35,7 +35,7 @@
 #pragma once
 #include <config_utilities/virtual_config.h>
 #include <kimera_pgmo/hashing.h>
-#include <kimera_pgmo/mesh_delta.h>
+#include <kimera_pgmo/mesh_offset_info.h>
 #include <kimera_pgmo/utils/common_structs.h>
 #include <pose_graph_tools/bow_query.h>
 #include <spark_dsg/scene_graph_logger.h>
@@ -62,6 +62,7 @@
 namespace kimera_pgmo {
 class DeltaCompression;
 class MeshCompression;
+class MeshDelta;
 }  // namespace kimera_pgmo
 
 namespace hydra {
@@ -171,7 +172,7 @@ class GraphBuilder : public Module {
   SharedDsgInfo::Ptr dsg_;
   SharedModuleState::Ptr state_;
   kimera_pgmo::MeshOffsetInfo mesh_offsets_;
-  kimera_pgmo::MeshDelta::Ptr last_mesh_update_;
+  std::shared_ptr<kimera_pgmo::MeshDelta> last_mesh_update_;
 
   kimera_pgmo::Graph deformation_graph_;
   std::unique_ptr<kimera_pgmo::DeltaCompression> mesh_compression_;

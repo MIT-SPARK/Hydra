@@ -1,10 +1,14 @@
 #pragma once
-#include <kimera_pgmo/mesh_delta.h>
 #include <pcl/common/centroid.h>
 #include <pcl/point_types.h>
 #include <spark_dsg/edge_attributes.h>
 
 #include "spark_dsg/node_attributes.h"
+
+namespace kimera_pgmo {
+class MeshDelta;
+struct MeshOffsetInfo;
+}  // namespace kimera_pgmo
 
 namespace hydra {
 

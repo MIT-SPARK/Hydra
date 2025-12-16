@@ -34,10 +34,14 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <kimera_pgmo/mesh_delta.h>
 #include <spark_dsg/dynamic_scene_graph.h>
 
 #include "hydra/active_window/active_window_output.h"
+
+namespace kimera_pgmo {
+class MeshDelta;
+struct MeshOffsetInfo;
+}  // namespace kimera_pgmo
 
 namespace hydra {
 

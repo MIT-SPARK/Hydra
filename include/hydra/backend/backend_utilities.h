@@ -35,7 +35,7 @@
 #pragma once
 
 #include <gtsam/inference/Symbol.h>
-#include <kimera_pgmo/mesh_delta.h>
+#include <kimera_pgmo/mesh_offset_info.h>
 
 #include "hydra/common/dsg_types.h"
 #include "hydra/common/shared_dsg_info.h"

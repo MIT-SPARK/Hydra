@@ -33,12 +33,15 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <kimera_pgmo/mesh_delta.h>
-
 #include "hydra/common/dsg_types.h"
 #include "hydra/frontend/mesh_delta_clustering.h"
 #include "hydra/frontend/place_2d_split_logic.h"
 #include "hydra/frontend/surface_places_interface.h"
+
+namespace kimera_pgmo {
+class MeshDelta;
+struct MeshOffsetInfo;
+}  // namespace kimera_pgmo
 
 namespace hydra {
 

@@ -1,5 +1,6 @@
 #include "hydra/frontend/place_2d_split_logic.h"
 
+#include <kimera_pgmo/mesh_delta.h>
 #include <spark_dsg/dynamic_scene_graph.h>
 #include <spark_dsg/node_attributes.h>
 

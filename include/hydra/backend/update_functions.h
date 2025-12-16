@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <gtsam/nonlinear/Values.h>
-#include <kimera_pgmo/mesh_delta.h>
+#include <kimera_pgmo/mesh_offset_info.h>
 
 #include "hydra/backend/merge_proposer.h"
 #include "hydra/common/dsg_types.h"  // IWYU pragma: keep
@@ -42,7 +42,7 @@
 
 namespace kimera_pgmo {
 class DeformationGraph;
-}
+}  // namespace kimera_pgmo
 
 namespace hydra {
 
