@@ -76,9 +76,10 @@ bool checkNode(const DynamicSceneGraph& graph,
 }
 
 void stepSegmenter(const kimera_pgmo::MeshDelta& delta,
+                   kimera_pgmo::MeshOffsetInfo& offsets,
                    MeshSegmenter& segmenter,
                    DynamicSceneGraph& graph) {
-  delta.updateMesh(*graph.mesh());
+  delta.updateMesh(*graph.mesh(), offsets);
   const auto clusters = segmenter.detect(0, delta, {0, 0, 0});
   segmenter.updateGraph(0, delta, {0, 0, 0}, clusters, graph);
 }
@@ -119,12 +120,13 @@ TEST(MeshSegmenter, TestIndicesRemapping) {
 
   DynamicSceneGraph graph;
   graph.setMesh(std::make_shared<spark_dsg::Mesh>());
+  kimera_pgmo::MeshOffsetInfo offsets;
 
   {  // original objects
     kimera_pgmo::MeshDelta delta({0, 0, 0});
     addPoints(delta, 1, {1, 2, 3}, dims);
     addPoints(delta, 2, {4, 5, 6}, dims);
-    stepSegmenter(delta, segmenter, graph);
+    stepSegmenter(delta, offsets, segmenter, graph);
 
     std::unordered_set<NodeId> active{"O0"_id, "O1"_id};
     EXPECT_EQ(active, segmenter.getActiveNodes());
@@ -155,7 +157,7 @@ TEST(MeshSegmenter, TestIndicesRemapping) {
       remap[i + 8] = i;
     }
 
-    stepSegmenter(delta, segmenter, graph);
+    stepSegmenter(delta, offsets, segmenter, graph);
 
     const std::map<NodeId, NodeResult> expected_nodes{
         {"O0"_id,
@@ -181,12 +183,13 @@ TEST(MeshSegmenter, TestDeletedObject) {
 
   DynamicSceneGraph graph;
   graph.setMesh(std::make_shared<spark_dsg::Mesh>());
+  kimera_pgmo::MeshOffsetInfo offsets;
 
   {  // setup original objects
     kimera_pgmo::MeshDelta delta({0, 0, 0});
     addPoints(delta, 1, {1, 2, 3}, dims);
     addPoints(delta, 2, {4, 5, 6}, dims);
-    stepSegmenter(delta, segmenter, graph);
+    stepSegmenter(delta, offsets, segmenter, graph);
   }
 
   {  // delete object one
@@ -198,7 +201,7 @@ TEST(MeshSegmenter, TestDeletedObject) {
       remap[i + 8] = i;
     }
 
-    stepSegmenter(delta, segmenter, graph);
+    stepSegmenter(delta, offsets, segmenter, graph);
 
     const std::map<NodeId, NodeResult> expected_nodes{
         {"O1"_id,
@@ -220,12 +223,13 @@ TEST(MeshSegmenter, TestArchivedObject) {
 
   DynamicSceneGraph graph;
   graph.setMesh(std::make_shared<spark_dsg::Mesh>());
+  kimera_pgmo::MeshOffsetInfo offsets;
 
   {  // setup original objects
     kimera_pgmo::MeshDelta delta({0, 0, 0});
     addPoints(delta, 1, {1, 2, 3}, dims);
     addPoints(delta, 2, {4, 5, 6}, dims);
-    stepSegmenter(delta, segmenter, graph);
+    stepSegmenter(delta, offsets, segmenter, graph);
   }
 
   {  // archive object two
@@ -242,7 +246,7 @@ TEST(MeshSegmenter, TestArchivedObject) {
       remap[i] = i + 8;
     }
 
-    stepSegmenter(delta, segmenter, graph);
+    stepSegmenter(delta, offsets, segmenter, graph);
 
     const std::map<NodeId, NodeResult> expected_nodes{
         {"O0"_id,
@@ -275,10 +279,12 @@ TEST(MeshSegmenter, TestDeltaWithOffset) {
 
   DynamicSceneGraph graph;
   graph.setMesh(std::make_shared<spark_dsg::Mesh>());
+  kimera_pgmo::MeshOffsetInfo offsets;
+
   {  // add 8 archived vertices to mesh
     kimera_pgmo::MeshDelta delta({0, 0, 0});
     addPoints(delta, 1, {1, 2, 3}, dims, true);
-    delta.updateMesh(*graph.mesh());
+    delta.updateMesh(*graph.mesh(), offsets);
   }
 
   {  // add actual object
@@ -286,7 +292,7 @@ TEST(MeshSegmenter, TestDeltaWithOffset) {
     addPoints(delta, 1, {1, 2, 3}, dims);
     // no prev-to-curr mapping for archived vertices
 
-    stepSegmenter(delta, segmenter, graph);
+    stepSegmenter(delta, offsets, segmenter, graph);
 
     const std::map<NodeId, NodeResult> expected_nodes{
         {"O0"_id,

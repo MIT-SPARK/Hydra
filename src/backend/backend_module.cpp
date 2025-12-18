@@ -423,7 +423,7 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
 
   {  // mesh critical section
     std::lock_guard<std::mutex> graph_lock(private_dsg_->mutex);
-    mesh_offsets_ = input.mesh_update->updateMesh(*private_dsg_->graph->mesh());
+    input.mesh_update->updateMesh(*private_dsg_->graph->mesh(), mesh_offsets_);
     kimera_pgmo::StampedCloud<pcl::PointXYZ> cloud_out{*original_vertices_,
                                                        *vertex_stamps_};
     input.mesh_update->updateVertices(cloud_out);

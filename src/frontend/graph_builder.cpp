@@ -428,7 +428,7 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
     // TODO(nathan) we should probably have a mutex before modifying the mesh, but
     // nothing else uses it at the moment
     ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
-    mesh_offsets_ = last_mesh_update_->updateMesh(*dsg_->graph->mesh());
+    last_mesh_update_->updateMesh(*dsg_->graph->mesh(), mesh_offsets_);
   }  // end timing scope
 
   ScopedTimer timer("frontend/postmesh_callbacks", input.timestamp_ns, true, 1, false);
