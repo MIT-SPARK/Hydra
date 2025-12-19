@@ -1,6 +1,5 @@
 """Command to gather timing information."""
 
-import json
 import pathlib
 import sys
 
@@ -52,9 +51,11 @@ def plot(result_path, show_trends, keys):
 
 @cli.command(name="compare")
 @click.argument("results", nargs=-1, type=click.Path(exists=True))
-@click.option("-k", "--key", "keys", multiple=True, default=timing.DEFAULT_COMPARE_KEYS)
-@click.option("-c", "--config", default=None)
-def compare(results, keys, config):
+@click.option(
+    "-k", "--key", "keys", multiple=True, default=("frontend/spin", "backend/spin")
+)
+@click.option("--use-bars", is_flag=True, default=False)
+def compare(results, keys, use_bars):
     """Plot timing comparison between different runs of Hydra."""
     if len(results) == 0:
         return
@@ -62,5 +63,4 @@ def compare(results, keys, config):
     paths = [pathlib.Path(x).expanduser().absolute() for x in results]
     results = {path.stem: timing.collect_timing_info(path) for path in paths}
 
-    plot_config = {} if config is None else json.loads(config)
-    timing.plot_comparison(results, plot_config, keys)
+    timing.plot_comparison(results, keys, use_bars=use_bars)
