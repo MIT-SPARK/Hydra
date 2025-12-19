@@ -64,9 +64,8 @@ def _get_longform_df(durations, filter_func=None):
             continue
 
         times = np.squeeze(info[:, 1])
-        part_name = name.split("/")[1]
         data = np.concatenate((data, times), axis=None)
-        names += [part_name] * len(times)
+        names += [name] * len(times)
 
     if len(names) == 0:
         return None
@@ -139,7 +138,7 @@ def show_timing_info(data, key_regex=None):
     console.print(table)
 
 
-def plot_durations(durations, keys=["frontend", "backend"], rt_threshold=None):
+def plot_durations(durations, keys):
     """Make a plot of durations."""
     sns.set()
     sns.set_style("whitegrid")
@@ -147,22 +146,22 @@ def plot_durations(durations, keys=["frontend", "backend"], rt_threshold=None):
     fig, ax = plt.subplots(len(keys), 1, squeeze=False)
 
     for idx, key in enumerate(keys):
-        ax[idx][0].set_title(f"{key.capitalize()} Timing Distributions")
-        df = _get_longform_df(durations, lambda x: key not in x)
+        matcher = re.compile(key)
+        ax[idx][0].set_title(f"{key} Timing Distributions")
+        df = _get_longform_df(durations, lambda x: matcher.match(x))
         if df is None:
             continue
 
         sns.boxenplot(data=df, x="Name", y="Elapsed Time [s]", ax=ax[idx][0])
         lax = ax[idx][0]
         lax.set_xticks(lax.get_xticks(), lax.get_xticklabels(), rotation=30, ha="right")
-        _draw_realtime_threshold(lax, rt_threshold)
 
     fig.set_size_inches([14, 12 * len(keys)])
     fig.tight_layout()
     plt.show()
 
 
-def plot_trends(durations, keys=["frontend", "backend"], rt_threshold=None):
+def plot_trends(durations, keys):
     """Make a plot of durations."""
     sns.set()
     sns.set_style("whitegrid")
@@ -171,8 +170,9 @@ def plot_trends(durations, keys=["frontend", "backend"], rt_threshold=None):
 
     for idx, key in enumerate(keys):
         added_plot = False
+        matcher = re.compile(key)
         for name, time_array in durations.items():
-            if key not in name:
+            if not matcher.match(name):
                 continue
 
             assert len(time_array.shape) == 2 and time_array.shape[1] == 2
@@ -183,11 +183,10 @@ def plot_trends(durations, keys=["frontend", "backend"], rt_threshold=None):
             ax[idx][0].plot(to_plot[:, 0], to_plot[:, 1], label=name)
             added_plot = True
 
-        ax[idx][0].set_title(f"{key.capitalize()} Timing Trends")
+        ax[idx][0].set_title(f"{key} Timing Trends")
         ax[idx][0].set_xlabel("Timestamp [s]")
         ax[idx][0].set_ylabel("Elapsed Time [s]")
         if added_plot:
-            _draw_realtime_threshold(ax[idx][0], rt_threshold)
             ax[idx][0].legend()
 
     fig.set_size_inches([16, 8 * len(keys)])

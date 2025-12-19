@@ -35,7 +35,7 @@ def show(result_path, keys):
 @cli.command(name="plot")
 @click.argument("result_path", type=click.Path(exists=True))
 @click.option("-t", "--show-trends", is_flag=True, default=False)
-@click.option("-k", "--key", "keys", multiple=True, default=("frontend", "backend"))
+@click.option("-k", "--key", "keys", multiple=True, default=("frontend.*", "backend.*"))
 def plot(result_path, show_trends, keys):
     """Plot timing information for a single set of Hydra results."""
     result_path = pathlib.Path(result_path).expanduser().absolute()
