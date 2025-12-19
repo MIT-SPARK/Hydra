@@ -4,7 +4,6 @@
 #include <glog/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <pcl/point_cloud.h>
-
 #define PCL_NO_PRECOMPILE
 #include <pcl/search/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
@@ -77,9 +76,10 @@ Clusters findClusters(const ClusteringConfig& config,
                       const std::vector<size_t>& indices) {
   using pcl::PointXYZ;
   pcl::PointCloud<PointXYZ>::Ptr cloud(new pcl::PointCloud<PointXYZ>());
-  for (const auto idx : indices) {
-    const auto& pos = delta.getVertex(idx).pos;
-    auto& p = cloud->emplace_back();
+  cloud->resize(indices.size());
+  for (size_t i = 0; i < indices.size(); ++i) {
+    const auto& pos = delta.getVertex(indices.at(i)).pos;
+    auto& p = cloud->at(i);
     p.x = pos.x();
     p.y = pos.y();
     p.z = pos.z();
@@ -95,15 +95,18 @@ Clusters findClusters(const ClusteringConfig& config,
   estimator.setSearchMethod(tree);
   estimator.setInputCloud(cloud);
 
-  std::vector<pcl::PointIndices> cluster_indices;
-  estimator.extract(cluster_indices);
+  std::vector<pcl::PointIndices> result;
+  estimator.extract(result);
 
   Clusters clusters;
-  clusters.resize(cluster_indices.size());
+  clusters.resize(result.size());
   for (size_t k = 0; k < clusters.size(); ++k) {
     auto& cluster = clusters.at(k);
-    const auto& indices = cluster_indices.at(k).indices;
-    cluster.insert(cluster.end(), indices.begin(), indices.end());
+    const auto& pcl_indices = result.at(k).indices;
+    cluster.resize(pcl_indices.size());
+    for (size_t i = 0; i < pcl_indices.size(); ++i) {
+      cluster[i] = indices[pcl_indices[i]];
+    }
   }
 
   return clusters;
