@@ -118,7 +118,7 @@ LabelClusters MeshSegmenter::detect(uint64_t stamp_ns,
   const auto label_indices = clustering::getLabelIndices(labels_, delta);
   if (label_indices.empty()) {
     VLOG(2) << "[Mesh Segmenter] No vertices found matching desired labels";
-    Sink::callAll(sinks_, stamp_ns, delta, label_indices);
+    Sink::callAll(sinks_, stamp_ns, delta, label_indices, {});
     return label_clusters;
   }
 
@@ -134,7 +134,7 @@ LabelClusters MeshSegmenter::detect(uint64_t stamp_ns,
     for (const auto& cluster_indices : result) {
       auto& cluster = clusters.emplace_back();
       for (const auto local_idx : cluster_indices) {
-        cluster.indices.push_back(offsets.toGlobal(local_idx));
+        cluster.indices.push_back(local_idx);
         cluster.centroid += delta.getVertex(local_idx).pos.cast<double>();
       }
 
@@ -147,7 +147,17 @@ LabelClusters MeshSegmenter::detect(uint64_t stamp_ns,
             << label;
   }
 
-  Sink::callAll(sinks_, stamp_ns, delta, label_indices);
+  Sink::callAll(sinks_, stamp_ns, delta, label_indices, label_clusters);
+
+  // TODO(nathan) fix this
+  for (auto& [label, clusters] : label_clusters) {
+    for (auto& cluster : clusters) {
+      for (auto& idx : cluster.indices) {
+        idx = offsets.toGlobal(idx);
+      }
+    }
+  }
+
   return label_clusters;
 }
 

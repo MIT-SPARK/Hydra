@@ -55,7 +55,10 @@ class MeshSegmenter {
   };
 
   using LabelClusters = std::map<uint32_t, std::vector<Cluster>>;
-  using Sink = OutputSink<uint64_t, const kimera_pgmo::MeshDelta&, const LabelIndices&>;
+  using Sink = OutputSink<uint64_t,
+                          const kimera_pgmo::MeshDelta&,
+                          const LabelIndices&,
+                          const LabelClusters&>;
 
   struct Config {
     std::string layer_id = DsgLayers::OBJECTS;
