@@ -153,7 +153,7 @@ LabelClusters MeshSegmenter::detect(uint64_t stamp_ns,
   for (auto& [label, clusters] : label_clusters) {
     for (auto& cluster : clusters) {
       for (auto& idx : cluster.indices) {
-        idx = offsets.toGlobal(idx);
+        idx = offsets.toGlobalVertex(idx);
       }
     }
   }
@@ -161,8 +161,7 @@ LabelClusters MeshSegmenter::detect(uint64_t stamp_ns,
   return label_clusters;
 }
 
-void MeshSegmenter::updateOldNodes(const kimera_pgmo::MeshDelta& delta,
-                                   const kimera_pgmo::MeshOffsetInfo& offsets,
+void MeshSegmenter::updateOldNodes(const kimera_pgmo::MeshOffsetInfo& offsets,
                                    DynamicSceneGraph& graph) {
   for (auto& [label, label_nodes] : active_nodes_) {
     auto iter = label_nodes.begin();
@@ -173,17 +172,17 @@ void MeshSegmenter::updateOldNodes(const kimera_pgmo::MeshDelta& delta,
       // remap and prune mesh connections
       VLOG(20) << "Updating node " << NodeSymbol(node_id).str() << " with connections "
                << attrs.mesh_connections;
-      kimera_pgmo::MeshOffsetInfo::RemapInfo info;
-      delta.updateIndices(attrs.mesh_connections, offsets, &info);
+      kimera_pgmo::MeshOffsetInfo::RemapStats stats;
+      offsets.remapVertexIndices(attrs.mesh_connections, &stats);
       VLOG(20) << "After update: " << attrs.mesh_connections << std::boolalpha
-               << " (active: " << !info.all_archived << ")";
+               << " (active: " << !stats.all_archived << ")";
       if (attrs.mesh_connections.size() < config.clustering.min_cluster_size) {
         graph.removeNode(node_id);
         iter = label_nodes.erase(iter);
         continue;
       }
 
-      attrs.is_active = !info.all_archived;
+      attrs.is_active = !stats.all_archived;
       if (!attrs.is_active) {
         iter = label_nodes.erase(iter);
       } else {
@@ -199,12 +198,11 @@ void MeshSegmenter::updateOldNodes(const kimera_pgmo::MeshDelta& delta,
 }
 
 void MeshSegmenter::updateGraph(uint64_t timestamp_ns,
-                                const kimera_pgmo::MeshDelta& active,
                                 const kimera_pgmo::MeshOffsetInfo& offsets,
                                 const LabelClusters& clusters,
                                 DynamicSceneGraph& graph) {
   ScopedTimer timer(config.timer_namespace + "_graph_update", timestamp_ns);
-  updateOldNodes(active, offsets, graph);
+  updateOldNodes(offsets, graph);
   if (!graph.hasMesh()) {
     LOG(ERROR) << "Unable to update graph without mesh!";
     return;

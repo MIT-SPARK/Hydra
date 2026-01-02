@@ -79,12 +79,9 @@ void mergeList(std::vector<size_t>& lhs, const std::vector<int>& rhs) {
 }
 
 std::unordered_set<size_t> getFrozenSet(const LabelToNodes& active_places,
-                                        const kimera_pgmo::MeshDelta& delta,
                                         const kimera_pgmo::MeshOffsetInfo& offsets,
                                         const DynamicSceneGraph& graph,
                                         std::list<NodeId>& empty_nodes) {
-  VLOG(5) << "[2D Places] n original active indices: " << delta.getNumActiveVertices();
-
   std::unordered_set<size_t> frozen_indices;
   for (const auto& [label, nodes] : active_places) {
     for (const auto nid : nodes) {
@@ -95,7 +92,7 @@ std::unordered_set<size_t> getFrozenSet(const LabelToNodes& active_places,
       }
 
       auto& attrs = node->attributes<Place2dNodeAttributes>();
-      remapPlace2dMesh(attrs, delta, offsets);
+      remapPlace2dMesh(attrs, offsets);
       if (!attrs.is_active && placeIsEmpty(attrs)) {
         empty_nodes.push_back(nid);
         continue;
@@ -138,8 +135,9 @@ void Place2dSegmenter::detect(const ActiveWindowOutput&,
                               const kimera_pgmo::MeshOffsetInfo& offsets,
                               const DynamicSceneGraph& graph) {
   VLOG(5) << "[2D Places] detect called";
+  VLOG(5) << "[2D Places] n original active indices: " << delta.getNumActiveVertices();
   label_places_.clear();
-  const auto frozen = getFrozenSet(active_places_, delta, offsets, graph, to_remove_);
+  const auto frozen = getFrozenSet(active_places_, offsets, graph, to_remove_);
   const auto label_indices = clustering::getLabelIndices(config.labels, delta, &frozen);
   if (label_indices.empty()) {
     VLOG(5) << "[2D Places] No vertices found matching desired labels";
@@ -159,7 +157,7 @@ void Place2dSegmenter::detect(const ActiveWindowOutput&,
     for (auto& cluster_indices : clusters) {
       auto& place = initial_places.emplace_back();
       for (const auto& idx : cluster_indices) {
-        place.indices.push_back(offsets.toGlobal(idx));
+        place.indices.push_back(offsets.toGlobalVertex(idx));
       }
 
       addRectInfo(mesh.points, config.connection_ellipse_scale_factor, place);

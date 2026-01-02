@@ -6,7 +6,6 @@
 #include "spark_dsg/node_attributes.h"
 
 namespace kimera_pgmo {
-class MeshDelta;
 struct MeshOffsetInfo;
 }  // namespace kimera_pgmo
 
@@ -74,7 +73,6 @@ bool shouldAddPlaceConnection(const Place2d& p1,
                               double& weight);
 
 void remapPlace2dMesh(Place2dNodeAttributes& attrs,
-                      const kimera_pgmo::MeshDelta& delta,
                       const kimera_pgmo::MeshOffsetInfo& offsets);
 
 }  // namespace hydra

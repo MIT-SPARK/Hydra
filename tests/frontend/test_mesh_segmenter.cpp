@@ -39,6 +39,9 @@
 #include <kimera_pgmo/mesh_delta.h>
 
 namespace hydra {
+
+using kimera_pgmo::MeshDelta;
+
 namespace {
 
 struct NodeResult {
@@ -75,16 +78,16 @@ bool checkNode(const DynamicSceneGraph& graph,
   return true;
 }
 
-void stepSegmenter(const kimera_pgmo::MeshDelta& delta,
+void stepSegmenter(const MeshDelta& delta,
                    kimera_pgmo::MeshOffsetInfo& offsets,
                    MeshSegmenter& segmenter,
                    DynamicSceneGraph& graph) {
   delta.updateMesh(*graph.mesh(), offsets);
   const auto clusters = segmenter.detect(0, delta, {0, 0, 0});
-  segmenter.updateGraph(0, delta, {0, 0, 0}, clusters, graph);
+  segmenter.updateGraph(0, offsets, clusters, graph);
 }
 
-void addPoints(kimera_pgmo::MeshDelta& delta,
+void addPoints(MeshDelta& delta,
                uint32_t label,
                const Eigen::Vector3f& offset,
                const Eigen::Vector3f& scale,
@@ -104,7 +107,7 @@ TEST(MeshSegmenter, TestClustering) {
   config.clustering.min_cluster_size = 4;
   MeshSegmenter segmenter(config, {1, 2});
 
-  kimera_pgmo::MeshDelta delta({0, 0, 0});
+  MeshDelta delta({0, 0, 0});
   addPoints(delta, 1, {1, 2, 3}, Eigen::Vector3f::Constant(0.1));
   addPoints(delta, 2, {4, 5, 6}, Eigen::Vector3f::Constant(0.1));
 
@@ -123,7 +126,7 @@ TEST(MeshSegmenter, TestIndicesRemapping) {
   kimera_pgmo::MeshOffsetInfo offsets;
 
   {  // original objects
-    kimera_pgmo::MeshDelta delta({0, 0, 0});
+    MeshDelta delta({0, 0, 0});
     addPoints(delta, 1, {1, 2, 3}, dims);
     addPoints(delta, 2, {4, 5, 6}, dims);
     stepSegmenter(delta, offsets, segmenter, graph);
@@ -147,15 +150,17 @@ TEST(MeshSegmenter, TestIndicesRemapping) {
   }
 
   {  // swapped objects
-    kimera_pgmo::MeshDelta delta({0, 0, 0});
-    addPoints(delta, 2, {4, 5, 6}, Eigen::Vector3f::Constant(0.1));
-    addPoints(delta, 1, {1, 2, 3}, Eigen::Vector3f::Constant(0.1));
-    auto& remap = delta.prev_to_curr();
+    std::map<size_t, size_t> remap;
     for (size_t i = 0; i < 8; ++i) {
       // two corner sets are swapped in order
       remap[i] = i + 8;
       remap[i + 8] = i;
     }
+
+    const auto tracking = MeshDelta::TrackingInfo::with_remap(0, 0, 0, remap);
+    MeshDelta delta(tracking);
+    addPoints(delta, 2, {4, 5, 6}, Eigen::Vector3f::Constant(0.1));
+    addPoints(delta, 1, {1, 2, 3}, Eigen::Vector3f::Constant(0.1));
 
     stepSegmenter(delta, offsets, segmenter, graph);
 
@@ -186,20 +191,22 @@ TEST(MeshSegmenter, TestDeletedObject) {
   kimera_pgmo::MeshOffsetInfo offsets;
 
   {  // setup original objects
-    kimera_pgmo::MeshDelta delta({0, 0, 0});
+    MeshDelta delta({0, 0, 0});
     addPoints(delta, 1, {1, 2, 3}, dims);
     addPoints(delta, 2, {4, 5, 6}, dims);
     stepSegmenter(delta, offsets, segmenter, graph);
   }
 
   {  // delete object one
-    kimera_pgmo::MeshDelta delta({0, 0, 0});
-    addPoints(delta, 2, {4, 5, 6}, dims);
-    auto& remap = delta.prev_to_curr();
+    std::map<size_t, size_t> remap;
     for (size_t i = 0; i < 8; ++i) {
       // previous object gets moved up
       remap[i + 8] = i;
     }
+
+    const auto tracking = MeshDelta::TrackingInfo::with_remap(0, 0, 0, remap);
+    MeshDelta delta(tracking);
+    addPoints(delta, 2, {4, 5, 6}, dims);
 
     stepSegmenter(delta, offsets, segmenter, graph);
 
@@ -226,25 +233,26 @@ TEST(MeshSegmenter, TestArchivedObject) {
   kimera_pgmo::MeshOffsetInfo offsets;
 
   {  // setup original objects
-    kimera_pgmo::MeshDelta delta({0, 0, 0});
+    MeshDelta delta({0, 0, 0});
     addPoints(delta, 1, {1, 2, 3}, dims);
     addPoints(delta, 2, {4, 5, 6}, dims);
     stepSegmenter(delta, offsets, segmenter, graph);
   }
 
   {  // archive object two
-    kimera_pgmo::MeshDelta delta({0, 0, 0});
-    addPoints(delta, 2, {4, 5, 6}, dims, true);
-    addPoints(delta, 1, {1, 2, 3}, dims);
-    addPoints(delta, 2, {4, 5, 6}, dims);
-
-    auto& remap = delta.prev_to_curr();
+    std::map<size_t, size_t> remap;
     for (size_t i = 0; i < 8; ++i) {
       // archived object gets moved down
       remap[i + 8] = i;
       // active object gets moved up
       remap[i] = i + 8;
     }
+
+    const auto tracking = MeshDelta::TrackingInfo::with_remap(0, 0, 0, remap);
+    MeshDelta delta(tracking);
+    addPoints(delta, 2, {4, 5, 6}, dims, true);
+    addPoints(delta, 1, {1, 2, 3}, dims);
+    addPoints(delta, 2, {4, 5, 6}, dims);
 
     stepSegmenter(delta, offsets, segmenter, graph);
 
@@ -282,13 +290,13 @@ TEST(MeshSegmenter, TestDeltaWithOffset) {
   kimera_pgmo::MeshOffsetInfo offsets;
 
   {  // add 8 archived vertices to mesh
-    kimera_pgmo::MeshDelta delta({0, 0, 0});
+    MeshDelta delta({0, 0, 0});
     addPoints(delta, 1, {1, 2, 3}, dims, true);
     delta.updateMesh(*graph.mesh(), offsets);
   }
 
   {  // add actual object
-    kimera_pgmo::MeshDelta delta({0, 0, 0});
+    MeshDelta delta({0, 0, 0});
     addPoints(delta, 1, {1, 2, 3}, dims);
     // no prev-to-curr mapping for archived vertices
 

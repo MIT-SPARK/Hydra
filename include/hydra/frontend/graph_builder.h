@@ -36,7 +36,7 @@
 #include <config_utilities/virtual_config.h>
 #include <kimera_pgmo/hashing.h>
 #include <kimera_pgmo/mesh_offset_info.h>
-#include <kimera_pgmo/utils/common_structs.h>
+#include <kimera_pgmo/utils/graph.h>
 #include <pose_graph_tools/bow_query.h>
 #include <spark_dsg/scene_graph_logger.h>
 

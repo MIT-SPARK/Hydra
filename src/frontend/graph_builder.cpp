@@ -449,8 +449,7 @@ void GraphBuilder::updateObjects(const ActiveWindowOutput& input) {
   const auto clusters = segmenter_->detect(stamp, *last_mesh_update_, mesh_offsets_);
   {  // start dsg critical section
     std::unique_lock<std::mutex> lock(dsg_->mutex);
-    segmenter_->updateGraph(
-        stamp, *last_mesh_update_, mesh_offsets_, clusters, *dsg_->graph);
+    segmenter_->updateGraph(stamp, mesh_offsets_, clusters, *dsg_->graph);
   }  // end dsg critical section
 }
 

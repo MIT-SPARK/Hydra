@@ -427,9 +427,7 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
     kimera_pgmo::StampedCloud<pcl::PointXYZ> cloud_out{*original_vertices_,
                                                        *vertex_stamps_};
     input.mesh_update->updateVertices(cloud_out);
-    // we use this to make sure that deformation only happens for vertices that are
-    // still active
-    utils::updatePlaces2d(private_dsg_, *input.mesh_update, mesh_offsets_);
+    utils::updatePlaces2d(private_dsg_, mesh_offsets_);
   }  // mesh critical section
 
   have_new_mesh_ = true;

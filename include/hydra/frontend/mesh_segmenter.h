@@ -75,7 +75,6 @@ class MeshSegmenter {
                        const kimera_pgmo::MeshOffsetInfo& offsets);
 
   void updateGraph(uint64_t timestamp,
-                   const kimera_pgmo::MeshDelta& active,
                    const kimera_pgmo::MeshOffsetInfo& offsets,
                    const LabelClusters& clusters,
                    DynamicSceneGraph& graph);
@@ -83,8 +82,7 @@ class MeshSegmenter {
   std::unordered_set<NodeId> getActiveNodes() const;
 
  private:
-  void updateOldNodes(const kimera_pgmo::MeshDelta& active,
-                      const kimera_pgmo::MeshOffsetInfo& offsets,
+  void updateOldNodes(const kimera_pgmo::MeshOffsetInfo& offsets,
                       DynamicSceneGraph& graph);
 
   void addNodeToGraph(DynamicSceneGraph& graph,

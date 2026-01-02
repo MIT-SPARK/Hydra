@@ -35,11 +35,16 @@
 #include "hydra/backend/backend_utilities.h"
 
 #include <glog/logging.h>
-#include <kimera_pgmo/mesh_delta.h>
+#include <spark_dsg/node_symbol.h>
 
 #include "hydra/frontend/place_2d_split_logic.h"
 
 namespace hydra::utils {
+
+using spark_dsg::AgentNodeAttributes;
+using spark_dsg::DsgLayers;
+using spark_dsg::DynamicSceneGraph;
+using spark_dsg::NodeSymbol;
 
 std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol key) {
   NodeSymbol node(key.chr(), key.index());
@@ -52,7 +57,6 @@ std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol 
 }
 
 void updatePlaces2d(SharedDsgInfo::Ptr dsg,
-                    const kimera_pgmo::MeshDelta& mesh_update,
                     const kimera_pgmo::MeshOffsetInfo& offsets) {
   if (!dsg->graph->hasLayer(DsgLayers::MESH_PLACES)) {
     return;
@@ -64,7 +68,7 @@ void updatePlaces2d(SharedDsgInfo::Ptr dsg,
       continue;
     }
 
-    remapPlace2dMesh(*attrs, mesh_update, offsets);
+    remapPlace2dMesh(*attrs, offsets);
   }
 }
 
