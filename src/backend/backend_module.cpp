@@ -121,7 +121,9 @@ BackendModule::BackendModule(const Config& config,
   // set up frontend graph copy
   unmerged_graph_ = private_dsg_->graph->clone();
   // set up mesh infrastructure
-  private_dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>());
+  // TODO(nathan) pull this from somewhere
+  private_dsg_->graph->setMesh(
+      std::make_shared<spark_dsg::Mesh>(true, true, true, true));
   unmerged_graph_->setMesh(private_dsg_->graph->mesh());
   original_vertices_.reset(
       new pcl::PointCloud<pcl::PointXYZ>());  // set up frontend graph copy
