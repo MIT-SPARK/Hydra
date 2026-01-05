@@ -120,16 +120,13 @@ BackendModule::BackendModule(const Config& config,
                             &PipelineQueues::instance().external_loop_closure_queue) {
   // set up frontend graph copy
   unmerged_graph_ = private_dsg_->graph->clone();
-  // set up mesh infrastructure
-  // TODO(nathan) pull this from somewhere
-  private_dsg_->graph->setMesh(
-      std::make_shared<spark_dsg::Mesh>(true, true, true, true));
+  private_dsg_->graph->setMesh(GlobalInfo::instance().createMesh());
   unmerged_graph_->setMesh(private_dsg_->graph->mesh());
-  original_vertices_.reset(
-      new pcl::PointCloud<pcl::PointXYZ>());  // set up frontend graph copy
-  vertex_stamps_.reset(new std::vector<uint64_t>());
-
   dsg_updater_.reset(new DsgUpdater(config, unmerged_graph_, private_dsg_));
+
+  // set up pgmo mesh infrastructure
+  original_vertices_.reset(new pcl::PointCloud<pcl::PointXYZ>());
+  vertex_stamps_.reset(new std::vector<uint64_t>());
 }
 
 BackendModule::~BackendModule() { stopImpl(); }

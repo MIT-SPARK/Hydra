@@ -119,10 +119,10 @@ GraphBuilder::GraphBuilder(const Config& config,
       frontier_places_(config.frontier_places.create()),
       view_database_(config.view_database),
       sinks_(Sink::instantiate(config.sinks)) {
+  const auto& global_info = GlobalInfo::instance();
   if (config.enable_mesh_objects) {
     segmenter_ = std::make_unique<MeshSegmenter>(
-        config.object_config,
-        GlobalInfo::instance().getLabelSpaceConfig().object_labels);
+        config.object_config, global_info.getLabelSpaceConfig().object_labels);
   }
 
   if (!config.use_frontiers) {
@@ -131,8 +131,7 @@ GraphBuilder::GraphBuilder(const Config& config,
 
   CHECK(dsg_ != nullptr);
   CHECK(dsg_->graph != nullptr);
-  // TODO(nathan) pull this from somewhere
-  dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>(true, true, true, true));
+  dsg_->graph->setMesh(global_info.createMesh());
 
   mesh_compression_.reset(
       new kimera_pgmo::DeltaCompression(config.pgmo.mesh_resolution));

@@ -89,6 +89,14 @@ struct LabelNameConversion {
   }
 };
 
+void declare_config(MeshFieldConfig& config) {
+  using namespace config;
+  name("MeshFieldConfgi");
+  field(config.with_colors, "with_colors");
+  field(config.with_first_seen_stamps, "with_first_seen_stamps");
+  field(config.with_labels, "with_labels");
+}
+
 void declare_config(FrameConfig& frames) {
   using namespace config;
   name("FrameConfig");
@@ -110,10 +118,13 @@ void declare_config(PipelineConfig& config) {
   config.map_window.setOptional();
   field(config.map_window, "map_window");
   field<LabelNameConversion>(config.label_names, "label_names");
+
   // the following subconfigs should not be namespaced
   field(config.frames, "frames", false);
   field(config.graph, "graph", false);
   field(config.label_space, "label_space", false);
+
+  field(config.mesh, "mesh");
 }
 
 GlobalInfo::GlobalInfo() : force_shutdown_(false) {}
@@ -253,6 +264,14 @@ std::vector<std::string> GlobalInfo::getAvailableSensors() const {
 
 std::unique_ptr<VolumetricWindow> GlobalInfo::createVolumetricWindow() const {
   return config_.map_window.create();
+}
+
+spark_dsg::Mesh::Ptr GlobalInfo::createMesh() const {
+  return std::make_shared<spark_dsg::Mesh>(
+      config_.mesh.with_colors,
+      true,  // we force the mesh to have last seen stamps
+      config_.mesh.with_labels,
+      config_.mesh.with_first_seen_stamps);
 }
 
 std::ostream& operator<<(std::ostream& out, const GlobalInfo& config) {
