@@ -6,7 +6,7 @@ repositories:
   hydra_ros:
     type: git
     url: https://github.com/MIT-SPARK/Hydra-ROS.git
-    version: main
+    version: feature/refactor_delta
   ianvs:
     type: git
     url: https://github.com/MIT-SPARK/Ianvs.git
@@ -14,7 +14,7 @@ repositories:
   kimera_pgmo:
     type: git
     url: https://github.com/MIT-SPARK/Kimera-PGMO.git
-    version: ros2
+    version: feature/refactor_delta
   kimera_rpgo:
     type: git
     url: https://github.com/MIT-SPARK/Kimera-RPGO.git
