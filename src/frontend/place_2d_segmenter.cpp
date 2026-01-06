@@ -53,7 +53,7 @@ namespace hydra {
 namespace {
 
 static const auto registration_ =
-    config::RegistrationWithConfig<SurfacePlacesInterface,
+    config::RegistrationWithConfig<Place2dSegmenter,
                                    Place2dSegmenter,
                                    Place2dSegmenter::Config>("place_2d");
 
@@ -66,6 +66,10 @@ bool placeIsEmpty(const Place2dNodeAttributes& attrs) {
 using Places = Place2dSegmenter::Places;
 using LabelPlaces = Place2dSegmenter::LabelPlaces;
 using LabelToNodes = Place2dSegmenter::LabelToNodes;
+
+using spark_dsg::DynamicSceneGraph;
+using spark_dsg::NodeId;
+using spark_dsg::NodeSymbol;
 
 void mergeList(std::vector<size_t>& lhs, const std::vector<int>& rhs) {
   std::unordered_set<size_t> seen(lhs.begin(), lhs.end());
@@ -88,7 +92,7 @@ std::unordered_set<size_t> getFrozenSet(const LabelToNodes& active_places,
     for (const auto nid : nodes) {
       const auto node = graph.findNode(nid);
       if (!node) {
-        LOG(ERROR) << "[2D Places] Found removed node: " << NodeSymbol(nid);
+        LOG(ERROR) << "[2D Places] Found removed node: " << NodeSymbol(nid).str();
         continue;
       }
 
@@ -123,14 +127,6 @@ Place2dSegmenter::Place2dSegmenter(const Config& config)
   for (const auto& label : config.labels) {
     active_places_[label] = std::set<NodeId>();
   }
-}
-
-NodeIdSet Place2dSegmenter::getActiveNodes() const {
-  std::unordered_set<NodeId> all_active_nodes;
-  for (auto kv : active_places_) {
-    all_active_nodes.insert(kv.second.begin(), kv.second.end());
-  }
-  return all_active_nodes;
 }
 
 void Place2dSegmenter::detect(const ActiveWindowOutput& msg,
@@ -218,7 +214,7 @@ void Place2dSegmenter::updateGraph(const ActiveWindowOutput& msg,
 
   for (const auto& [label, places] : label_places_) {
     for (const auto& place : places) {
-      NodeSymbol ns = addPlaceToGraph(graph, place, label, msg.timestamp_ns);
+      const auto ns = addPlaceToGraph(graph, place, label, msg.timestamp_ns);
       active_places_to_check.at(label).insert(ns);
     }
   }
@@ -277,7 +273,7 @@ void Place2dSegmenter::updateGraph(const ActiveWindowOutput& msg,
   semiactive_places_ = new_semiactive_places;
 }
 
-NodeSymbol Place2dSegmenter::addPlaceToGraph(DynamicSceneGraph& graph,
+NodeId Place2dSegmenter::addPlaceToGraph(DynamicSceneGraph& graph,
                                              const Place2d& place,
                                              uint32_t label,
                                              uint64_t timestamp) {
