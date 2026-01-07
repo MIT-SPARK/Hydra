@@ -1,26 +1,38 @@
 ---
+paths: [khronos]
 map_window:
   type: spatial
   max_radius_m: 8.0
 active_window:
+  #type: ActiveWindow
+  min_output_separation: 0.2
   full_update_separation_s: 0.2
+  map_window:
+    type: temporal
+    max_time_since_update_s: 3.0
   volumetric_map:
     voxels_per_side: 16
     voxel_size: 0.1
     truncation_distance: 0.3
+    with_semantics: true
   tsdf:
     semantic_integrator:
       type: SingleLabelIntegrator
+  projective_integrator:
+    semantic_integrator:
+      type: SingleLabelIntegrator
 frontend:
+  verbosity: 2
   pgmo:
     time_horizon: 15.0
     d_graph_resolution: 2.5
     mesh_resolution: 0.005
+  enable_mesh_objects: false
   objects:
     min_cluster_size: 40
     cluster_tolerance: 0.25
   surface_places:
-    type: place_2d
+    #type: place_2d
     prefix: P
     pure_final_place_size: 1
     cluster_tolerance: .3
@@ -30,7 +42,7 @@ frontend:
     place_max_neighbor_z_diff: .5
     place_overlap_threshold: 0.0
   traversability_places:
-    type: traversability
+    #type: traversability
     estimator:
       type: HeightTraversabilityEstimator
       height_below: 0
@@ -47,7 +59,7 @@ frontend:
     sinks:
       - type: TraversabilityVisualizer
   freespace_places:
-    type: gvd
+    #type: gvd
     filter_places: true
     min_places_component_size: 3
     filter_ground: false
