@@ -39,7 +39,6 @@
 #include "hydra/active_window/active_window_output.h"
 #include "hydra/common/output_sink.h"
 #include "hydra/frontend/mesh_delta_clustering.h"
-#include "hydra/frontend/place_2d_split_logic.h"
 
 namespace kimera_pgmo {
 class MeshDelta;
@@ -52,13 +51,9 @@ using clustering::LabelIndices;
 
 class Place2dSegmenter {
  public:
-  using Places = std::vector<Place2d>;
-  using LabelPlaces = std::map<uint32_t, Places>;
-  using LabelToNodes = std::map<uint32_t, std::set<spark_dsg::NodeId>>;
   using Sink = OutputSink<uint64_t,
                           const kimera_pgmo::MeshDelta&,
-                          const kimera_pgmo::MeshOffsetInfo&,
-                          const LabelPlaces&>;
+                          const kimera_pgmo::MeshOffsetInfo&>;
 
   struct Config {
     std::string layer = spark_dsg::DsgLayers::MESH_PLACES;
@@ -77,30 +72,17 @@ class Place2dSegmenter {
 
   void detect(const ActiveWindowOutput& msg,
               const kimera_pgmo::MeshDelta& mesh_delta,
-              const kimera_pgmo::MeshOffsetInfo& offsets,
-              const spark_dsg::DynamicSceneGraph& graph);
+              const kimera_pgmo::MeshOffsetInfo& offsets);
 
   void updateGraph(const ActiveWindowOutput& msg,
                    const kimera_pgmo::MeshOffsetInfo& offsets,
                    spark_dsg::DynamicSceneGraph& graph);
 
  private:
-  spark_dsg::NodeId addPlaceToGraph(spark_dsg::DynamicSceneGraph& graph,
-                                    const Place2d& place,
-                                    uint32_t label,
-                                    uint64_t timestamp);
-
- private:
-  LabelPlaces label_places_;
-  std::list<spark_dsg::NodeId> to_remove_;
-
-  spark_dsg::NodeSymbol next_node_id_;
-
-  LabelToNodes active_places_;
-  LabelToNodes semiactive_places_;
-  std::map<spark_dsg::NodeId, uint64_t> active_place_timestamps_;
-
   Sink::List sinks_;
+  spark_dsg::NodeSymbol next_node_id_;
+  std::list<spark_dsg::NodeId> to_remove_;
+  std::map<spark_dsg::NodeId, spark_dsg::Place2dNodeAttributes> active_places_;
 };
 
 void declare_config(Place2dSegmenter::Config& config);

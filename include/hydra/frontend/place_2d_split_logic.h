@@ -22,6 +22,7 @@ struct Place2d {
   Eigen::Vector2d cut_plane = Eigen::Vector2d::Zero();
   bool can_split = false;
 
+  void fillAttributes(spark_dsg::Place2dNodeAttributes& attrs) const;
   void updateIndexBounds();
 };
 

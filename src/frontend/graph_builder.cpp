@@ -559,7 +559,7 @@ void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
   }
 
   ScopedTimer timer("frontend/places_2d", input.timestamp_ns, true, 1, false);
-  surface_places_->detect(input, *last_mesh_update_, mesh_offsets_, *dsg_->graph);
+  surface_places_->detect(input, *last_mesh_update_, mesh_offsets_);
 
   // start graph critical section
   std::unique_lock<std::mutex> graph_lock(dsg_->mutex);

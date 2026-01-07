@@ -51,10 +51,9 @@ namespace hydra {
 using spark_dsg::DynamicSceneGraph;
 using spark_dsg::EdgeAttributes;
 using spark_dsg::NodeId;
-using spark_dsg::NodeSymbol;
 using spark_dsg::Place2dNodeAttributes;
 
-using LabelToNodes = Place2dSegmenter::LabelToNodes;
+using AttrMap = std::map<NodeId, Place2dNodeAttributes>;
 
 namespace {
 
@@ -63,40 +62,44 @@ static const auto registration_ =
                                    Place2dSegmenter,
                                    Place2dSegmenter::Config>("place_2d");
 
-bool placeIsEmpty(const Place2dNodeAttributes& attrs) {
+inline bool placeIsEmpty(const Place2dNodeAttributes& attrs) {
   return attrs.pcl_mesh_connections.size() == 0 || attrs.boundary.size() < 3;
 }
 
-std::unordered_set<size_t> getFrozenSet(const LabelToNodes& active_places,
+std::unordered_set<size_t> getFrozenSet(uint64_t timestamp_ns,
                                         const kimera_pgmo::MeshOffsetInfo& offsets,
-                                        const DynamicSceneGraph& graph,
-                                        std::list<NodeId>& empty_nodes) {
+                                        AttrMap& active_places,
+                                        std::list<NodeId>& to_remove) {
   std::unordered_set<size_t> frozen_indices;
-  for (const auto& [label, nodes] : active_places) {
-    for (const auto nid : nodes) {
-      const auto node = graph.findNode(nid);
-      if (!node) {
-        LOG(ERROR) << "[2D Places] Found removed node: " << NodeSymbol(nid).str();
-        continue;
-      }
 
-      auto& attrs = node->attributes<Place2dNodeAttributes>();
-      remapPlace2dMesh(attrs, offsets);
-      if (!attrs.is_active && placeIsEmpty(attrs)) {
-        empty_nodes.push_back(nid);
-        continue;
-      }
+  auto iter = active_places.begin();
+  while (iter != active_places.end()) {
+    auto& [node_id, attrs] = *iter;
+    remapPlace2dMesh(attrs, offsets);
 
-      if (attrs.pcl_min_index >= offsets.archived_vertices) {
-        continue;
-      }
+    // if remapping results in vertices disappearing, we drop the place
+    if (placeIsEmpty(attrs)) {
+      to_remove.push_back(node_id);
+      iter = active_places.erase(iter);
+      continue;
+    }
 
-      for (auto mi : attrs.pcl_mesh_connections) {
-        if (mi >= offsets.archived_vertices) {
-          frozen_indices.insert(offsets.toLocalVertex(mi));
-        }
+    // we delete any previous place with only active mesh vertices
+    if (attrs.pcl_min_index >= offsets.archived_vertices) {
+      to_remove.push_back(node_id);
+      iter = active_places.erase(iter);
+      continue;
+    }
+
+    attrs.last_update_time_ns = timestamp_ns;
+    attrs.has_active_mesh_indices = attrs.pcl_max_index >= offsets.archived_vertices;
+    for (auto idx : attrs.pcl_mesh_connections) {
+      if (idx >= offsets.archived_vertices) {
+        frozen_indices.insert(offsets.toLocalVertex(idx));
       }
     }
+
+    ++iter;
   }
 
   VLOG(5) << "[2D Places] n frozen indices: " << frozen_indices.size();
@@ -107,23 +110,18 @@ std::unordered_set<size_t> getFrozenSet(const LabelToNodes& active_places,
 
 Place2dSegmenter::Place2dSegmenter(const Config& config)
     : config(config::checkValid(config)),
-      next_node_id_(config.prefix, 0),
-      sinks_(Sink::instantiate(config.sinks)) {
+      sinks_(Sink::instantiate(config.sinks)),
+      next_node_id_(config.prefix, 0) {
   VLOG(1) << "[2D Places] Using labels: " << clustering::printLabels(config.labels);
-  for (const auto& label : config.labels) {
-    active_places_[label] = std::set<NodeId>();
-  }
 }
 
 void Place2dSegmenter::detect(const ActiveWindowOutput& msg,
                               const kimera_pgmo::MeshDelta& delta,
-                              const kimera_pgmo::MeshOffsetInfo& offsets,
-                              const DynamicSceneGraph& graph) {
+                              const kimera_pgmo::MeshOffsetInfo& offsets) {
   VLOG(5) << "[2D Places] detect called";
   VLOG(5) << "[2D Places] n original active indices: " << delta.getNumActiveVertices();
-  label_places_.clear();
-  // TODO(nathan) maintain frozen indices instead of using graph
-  const auto frozen = getFrozenSet(active_places_, offsets, graph, to_remove_);
+  const auto frozen =
+      getFrozenSet(msg.timestamp_ns, offsets, active_places_, to_remove_);
   const auto label_indices = clustering::getLabelIndices(config.labels, delta, &frozen);
   if (label_indices.empty()) {
     VLOG(5) << "[2D Places] No vertices found matching desired labels";
@@ -137,8 +135,7 @@ void Place2dSegmenter::detect(const ActiveWindowOutput& msg,
 
     auto clusters = clustering::findClusters(config.clustering, delta, indices);
     VLOG(5) << "[2D Places] got " << clusters.size() << " initial places";
-
-    Places places;
+    std::vector<Place2d> places;
     for (auto& cluster_indices : clusters) {
       Place2d place;
       for (const auto& idx : cluster_indices) {
@@ -159,16 +156,33 @@ void Place2dSegmenter::detect(const ActiveWindowOutput& msg,
     }
 
     VLOG(5) << "[2D Places] " << places.size() << " final places of label " << label;
-    label_places_.insert({label, places});
+    for (const auto& place : places) {
+      if (place.indices.empty()) {
+        LOG(ERROR) << "[2D Places] Encountered empty place with label" << label << " @ "
+                   << msg.timestamp_ns << "[ns]";
+        continue;
+      }
+
+      auto& attrs = active_places_[next_node_id_];
+      ++next_node_id_;
+
+      // add attributes to active place
+      place.fillAttributes(attrs);
+      attrs.last_update_time_ns = msg.timestamp_ns;
+      attrs.semantic_label = label;
+      attrs.is_active = true;
+      attrs.has_active_mesh_indices = true;
+      attrs.need_finish_merge = false;
+    }
   }
 
-  Sink::callAll(sinks_, msg.timestamp_ns, delta, offsets, label_places_);
+  Sink::callAll(sinks_, msg.timestamp_ns, delta, offsets);
 }
 
-void Place2dSegmenter::updateGraph(const ActiveWindowOutput& msg,
+void Place2dSegmenter::updateGraph(const ActiveWindowOutput&,
                                    const kimera_pgmo::MeshOffsetInfo& offsets,
                                    DynamicSceneGraph& graph) {
-  // Remove old empty nodes
+  // Remove old empty nodes and previous active nodes
   for (const auto& nid : to_remove_) {
     graph.removeNode(nid);
   }
@@ -176,129 +190,40 @@ void Place2dSegmenter::updateGraph(const ActiveWindowOutput& msg,
   to_remove_.clear();
 
   VLOG(5) << "[2D Places] updateGraph";
-  std::map<uint32_t, std::set<NodeId>> active_places_to_check;
-  for (const auto& label : config.labels) {
-    active_places_to_check[label] = std::set<NodeId>();
+  for (const auto& [nid, attrs] : active_places_) {
+    // overrides all previous nodes
+    graph.addOrUpdateNode(config.layer, nid, attrs.clone());
   }
 
-  LabelToNodes new_active_places;
-  for (const auto& label : config.labels) {
-    new_active_places[label] = std::set<NodeId>();
-  }
-
-  for (const auto& [label, nodes] : active_places_) {
-    for (const auto nid : nodes) {
-      auto& attrs = graph.getNode(nid).attributes<Place2dNodeAttributes>();
-      if (placeIsEmpty(attrs)) {
-        graph.removeNode(nid);  // Remove dangling places
-        continue;
-      }
-
-      if (attrs.pcl_min_index >= offsets.archived_vertices) {
-        graph.removeNode(nid);  // drop all previously active nodes
-      } else {
-        active_places_to_check.at(label).insert(nid);
-      }
-    }
-  }
-
-  for (const auto& [label, places] : label_places_) {
-    for (const auto& place : places) {
-      const auto ns = addPlaceToGraph(graph, place, label, msg.timestamp_ns);
-      active_places_to_check.at(label).insert(ns);
-    }
-  }
-
-  std::set<std::pair<uint32_t, NodeId>> full_nodes;
-  for (const auto& [label, nodes] : active_places_to_check) {
-    for (const auto nid : nodes) {
-      full_nodes.insert({label, nid});
-    }
-  }
-
-  for (const auto& [label, nodes] : semiactive_places_) {
-    for (const auto nid : nodes) {
-      full_nodes.insert(std::pair<uint32_t, NodeId>(label, nid));
-    }
-  }
-
-  std::map<uint32_t, std::set<NodeId>> new_semiactive_places;
-  for (const auto& label : config.labels) {
-    new_semiactive_places[label] = std::set<NodeId>();
-  }
-
-  for (const auto& [label, ns1] : full_nodes) {
-    auto& attrs1 = graph.getNode(ns1).attributes<Place2dNodeAttributes>();
-    attrs1.has_active_mesh_indices = attrs1.pcl_max_index >= offsets.archived_vertices;
-
+  auto iter = active_places_.begin();
+  while (iter != active_places_.end()) {
     bool fixed_neighbors = true;
-    for (const auto& [neighbor_label, ns2] : full_nodes) {
+    const auto ns1 = iter->first;
+    auto& attrs1 = graph.getNode(ns1).attributes<Place2dNodeAttributes>();
+    for (const auto& [ns2, attrs2] : active_places_) {
       if (ns1 == ns2) {
         continue;
       }
 
-      EdgeAttributes ea;
-      const auto& attrs2 = graph.getNode(ns2).attributes<Place2dNodeAttributes>();
+      auto ea = std::make_unique<EdgeAttributes>();
       const bool has_edge = shouldAddPlaceConnection(attrs1,
                                                      attrs2,
                                                      config.place_overlap_threshold,
                                                      config.place_max_neighbor_z_diff,
-                                                     ea);
+                                                     *ea);
       if (has_edge) {
-        graph.insertEdge(ns1, ns2, ea.clone());
+        graph.insertEdge(ns1, ns2, std::move(ea));
         fixed_neighbors &= attrs2.pcl_min_index < offsets.archived_vertices;
       }
     }
 
     if (!attrs1.has_active_mesh_indices && fixed_neighbors) {
       attrs1.is_active = false;
-    } else if (!attrs1.has_active_mesh_indices) {
-      new_semiactive_places.at(label).insert(ns1);
+      iter = active_places_.erase(iter);
     } else {
-      new_active_places.at(label).insert(ns1);
+      ++iter;
     }
   }
-
-  active_places_ = new_active_places;
-  semiactive_places_ = new_semiactive_places;
-}
-
-NodeId Place2dSegmenter::addPlaceToGraph(DynamicSceneGraph& graph,
-                                         const Place2d& place,
-                                         uint32_t label,
-                                         uint64_t timestamp) {
-  if (place.indices.size() == 0) {
-    LOG(ERROR) << "[2D Places] Encountered empty place with label"
-               << static_cast<int>(label) << " @ " << timestamp << "[ns]";
-    return next_node_id_;
-  }
-
-  auto attrs = std::make_unique<Place2dNodeAttributes>();
-  attrs->position << place.centroid.cast<double>();
-  attrs->is_active = true;
-  attrs->semantic_label = label;
-  attrs->boundary = place.boundary;
-  attrs->pcl_boundary_connections.insert(attrs->pcl_boundary_connections.begin(),
-                                         place.boundary_indices.begin(),
-                                         place.boundary_indices.end());
-  attrs->ellipse_matrix_compress = place.ellipse_matrix_compress;
-  attrs->ellipse_matrix_expand = place.ellipse_matrix_expand;
-  attrs->ellipse_centroid(0) = place.ellipse_centroid(0);
-  attrs->ellipse_centroid(1) = place.ellipse_centroid(1);
-  attrs->ellipse_centroid(2) = attrs->position.z();
-  attrs->pcl_min_index = place.min_mesh_index;
-  attrs->pcl_max_index = place.max_mesh_index;
-  attrs->has_active_mesh_indices = true;
-  attrs->need_finish_merge = false;
-
-  attrs->pcl_mesh_connections.insert(
-      attrs->pcl_mesh_connections.begin(), place.indices.begin(), place.indices.end());
-
-  graph.emplaceNode(config.layer, next_node_id_, std::move(attrs));
-
-  active_places_.at(label).insert(next_node_id_);
-  active_place_timestamps_[next_node_id_] = timestamp;
-  return next_node_id_++;
 }
 
 void declare_config(Place2dSegmenter::Config& config) {

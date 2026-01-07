@@ -201,6 +201,24 @@ void Place2d::updateIndexBounds() {
   }
 }
 
+void Place2d::fillAttributes(Place2dNodeAttributes& attrs) const {
+  attrs.position = centroid.cast<double>();
+  attrs.boundary = boundary;
+  attrs.ellipse_matrix_compress = ellipse_matrix_compress;
+  attrs.ellipse_matrix_expand = ellipse_matrix_expand;
+  attrs.ellipse_centroid(0) = ellipse_centroid(0);
+  attrs.ellipse_centroid(1) = ellipse_centroid(1);
+  attrs.ellipse_centroid(2) = centroid.z();
+  attrs.pcl_min_index = min_mesh_index;
+  attrs.pcl_max_index = max_mesh_index;
+
+  attrs.pcl_mesh_connections.insert(
+      attrs.pcl_mesh_connections.begin(), indices.begin(), indices.end());
+  attrs.pcl_boundary_connections.insert(attrs.pcl_boundary_connections.begin(),
+                                        boundary_indices.begin(),
+                                        boundary_indices.end());
+}
+
 void addRectInfo(const kimera_pgmo::MeshDelta& delta,
                  const kimera_pgmo::MeshOffsetInfo& offsets,
                  const double connection_ellipse_scale_factor,
