@@ -282,7 +282,7 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
       }
 
       if (attrs->semantic_label == neighbor_attrs.semantic_label) {
-        utils::reallocateMeshPoints(mesh->points, *attrs, neighbor_attrs);
+        utils::reallocateMeshPoints(*mesh, *attrs, neighbor_attrs);
       }
     }
   }
@@ -295,8 +295,8 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
       continue;
     }
 
-    addRectInfo(mesh->points, config.connection_ellipse_scale_factor, attrs);
-    addBoundaryInfo(mesh->points, attrs);
+    addRectInfo(*mesh, config.connection_ellipse_scale_factor, attrs);
+    addBoundaryInfo(*mesh, attrs);
   }
 
   std::vector<std::pair<NodeId, NodeId>> edges_to_remove;

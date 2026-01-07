@@ -33,14 +33,13 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <glog/logging.h>
 
-#include "hydra/common/dsg_types.h"
+#include "hydra/common/dsg_types.h"  // IWYU pragma: keep
 #include "hydra/frontend/place_2d_split_logic.h"
 
 namespace hydra::utils {
 
-void getPlace2dAndNeighors(const SceneGraphLayer& places_layer,
+void getPlace2dAndNeighors(const spark_dsg::SceneGraphLayer& places_layer,
                            std::vector<std::pair<NodeId, Place2d>>& place_2ds,
                            std::map<NodeId, std::set<NodeId>>& node_neighbors);
 
@@ -80,7 +79,7 @@ void addNewNodeEdges(
     const std::map<std::tuple<size_t, size_t>, NodeId> new_id_map,
     DynamicSceneGraph& graph);
 
-void reallocateMeshPoints(const std::vector<Place2d::PointT>& points,
+void reallocateMeshPoints(const spark_dsg::Mesh& mesh,
                           Place2dNodeAttributes& attrs1,
                           Place2dNodeAttributes& attrs2);
 

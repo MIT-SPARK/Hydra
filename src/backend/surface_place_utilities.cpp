@@ -34,6 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/backend/surface_place_utilities.h"
 
+#include <glog/logging.h>
+
 namespace hydra::utils {
 
 void getPlace2dAndNeighors(const SceneGraphLayer& places_layer,
@@ -60,95 +62,52 @@ void computeAttributeUpdates(const spark_dsg::Mesh& mesh,
                              const double connection_ellipse_scale_factor,
                              std::vector<std::pair<NodeId, Place2d>>& place_2ds,
                              std::vector<std::pair<NodeId, Place2d>>& nodes_to_update) {
-  for (auto& id_place_pair : place_2ds) {
-    addRectInfo(mesh.points, connection_ellipse_scale_factor, id_place_pair.second);
-    addBoundaryInfo(mesh.points, id_place_pair.second);
-    size_t min_ix = SIZE_MAX;
-    size_t max_ix = 0;
-    for (auto midx : id_place_pair.second.indices) {
-      min_ix = std::min(min_ix, midx);
-      max_ix = std::max(max_ix, midx);
-    }
-    id_place_pair.second.min_mesh_index = min_ix;
-    id_place_pair.second.max_mesh_index = max_ix;
-    nodes_to_update.push_back(id_place_pair);
+  for (auto& [node_id, place] : place_2ds) {
+    addRectInfo(mesh, connection_ellipse_scale_factor, place);
+    addBoundaryInfo(mesh, place);
+    place.updateIndexBounds();
+    nodes_to_update.push_back({node_id, place});
   }
 }
 
-void getNecessaryUpdates(
-    const spark_dsg::Mesh& mesh,
-    size_t min_points,
-    double min_size,
-    double connection_ellipse_scale_factor,
-    std::vector<std::pair<NodeId, Place2d>>& place_2ds,
-    std::vector<std::pair<NodeId, Place2d>>& nodes_to_update,
-    std::vector<std::pair<NodeId, std::vector<Place2d>>>& nodes_to_add) {
-  for (auto& id_place_pair : place_2ds) {
-    addRectInfo(mesh.points, connection_ellipse_scale_factor, id_place_pair.second);
+// TODO(nathan) these get dropped when we rebase on the active DSG stuff
+[[deprecated]] void getNecessaryUpdates(
+    const spark_dsg::Mesh&,
+    size_t,
+    double,
+    double,
+    std::vector<std::pair<NodeId, Place2d>>&,
+    std::vector<std::pair<NodeId, Place2d>>&,
+    std::vector<std::pair<NodeId, std::vector<Place2d>>>&) {}
 
-    if (id_place_pair.second.indices.size() > min_points &&
-        id_place_pair.second.cut_plane.norm() > min_size) {
-      std::vector<Place2d> split_places =
-          decomposePlace(mesh.points,
-                         id_place_pair.second,
-                         min_size,
-                         min_points,
-                         connection_ellipse_scale_factor);
-      for (Place2d& p : split_places) {
-        addBoundaryInfo(mesh.points, p);
-      }
-      nodes_to_add.push_back(std::pair(id_place_pair.first, split_places));
-    } else {
-      addBoundaryInfo(mesh.points, id_place_pair.second);
-      size_t min_ix = SIZE_MAX;
-      size_t max_ix = 0;
-      for (auto midx : id_place_pair.second.indices) {
-        min_ix = std::min(min_ix, midx);
-        max_ix = std::max(max_ix, midx);
-      }
-      id_place_pair.second.min_mesh_index = min_ix;
-      id_place_pair.second.max_mesh_index = max_ix;
-      nodes_to_update.push_back(id_place_pair);
-    }
-  }
+[[deprecated]] std::map<std::tuple<size_t, size_t, size_t, size_t>, double>
+buildEdgeMap(const std::vector<std::pair<NodeId, std::vector<Place2d>>>&,
+             double,
+             double) {
+  return {};
 }
 
-std::map<std::tuple<size_t, size_t, size_t, size_t>, double> buildEdgeMap(
-    const std::vector<std::pair<NodeId, std::vector<Place2d>>>& nodes_to_add,
-    double place_overlap_threshold,
-    double place_neighbor_z_diff) {
-  std::map<std::tuple<size_t, size_t, size_t, size_t>, double> edge_map;
-  // compute which pairs of new nodes will need to have an edge added
-  // Currently checks all split merged nodes. Maybe just check neighbors-of-neighbors?
-  for (size_t og_ix = 0; og_ix < nodes_to_add.size(); ++og_ix) {
-    for (size_t split_ix = 0; split_ix < nodes_to_add.at(og_ix).second.size();
-         ++split_ix) {
-      Place2d p1 = nodes_to_add.at(og_ix).second.at(split_ix);
-      for (size_t og_jx = 0; og_jx <= og_ix; ++og_jx) {
-        for (size_t split_jx = 0; split_jx < nodes_to_add.at(og_jx).second.size();
-             ++split_jx) {
-          Place2d p2 = nodes_to_add.at(og_jx).second.at(split_jx);
-          double weight;
-          bool connected = shouldAddPlaceConnection(
-              p1, p2, place_overlap_threshold, place_neighbor_z_diff, weight);
-          edge_map.insert({std::make_tuple(og_ix, split_ix, og_jx, split_jx),
-                           connected ? weight : 0});
-        }
-      }
-    }
-  }
-  return edge_map;
+[[deprecated]] NodeSymbol insertNewNodes(
+    const std::vector<std::pair<NodeId, std::vector<Place2d>>>&,
+    const double,
+    const double,
+    NodeSymbol,
+    DynamicSceneGraph&,
+    std::map<std::tuple<size_t, size_t>, NodeId>&) {
+  return 0;
 }
+
+[[deprecated]] void addNewNodeEdges(
+    const std::vector<std::pair<NodeId, std::vector<Place2d>>>,
+    const std::map<std::tuple<size_t, size_t, size_t, size_t>, double>,
+    const std::map<std::tuple<size_t, size_t>, NodeId>,
+    DynamicSceneGraph&) {}
 
 void updateExistingNodes(const std::vector<std::pair<NodeId, Place2d>>& nodes_to_update,
                          DynamicSceneGraph& graph) {
-  for (auto& id_place_pair : nodes_to_update) {
-    auto& attrs =
-        graph.getNode(id_place_pair.first).attributes<Place2dNodeAttributes>();
-    Place2d place = id_place_pair.second;
-    pcl::PointXYZ centroid;
-    place.centroid.get(centroid);
-    attrs.position << centroid.x, centroid.y, centroid.z;
+  for (const auto& [node_id, place] : nodes_to_update) {
+    auto& attrs = graph.getNode(node_id).attributes<Place2dNodeAttributes>();
+    attrs.position = place.centroid.cast<double>();
 
     attrs.boundary = place.boundary;
     attrs.pcl_boundary_connections.clear();
@@ -159,7 +118,7 @@ void updateExistingNodes(const std::vector<std::pair<NodeId, Place2d>>& nodes_to
     attrs.ellipse_matrix_expand = place.ellipse_matrix_expand;
     attrs.ellipse_centroid(0) = place.ellipse_centroid(0);
     attrs.ellipse_centroid(1) = place.ellipse_centroid(1);
-    attrs.ellipse_centroid(2) = centroid.z;
+    attrs.ellipse_centroid(2) = attrs.position.z();
     attrs.pcl_min_index = place.min_mesh_index;
     attrs.pcl_max_index = place.max_mesh_index;
 
@@ -171,127 +130,17 @@ void updateExistingNodes(const std::vector<std::pair<NodeId, Place2d>>& nodes_to
   }
 }
 
-NodeSymbol insertNewNodes(
-    const std::vector<std::pair<NodeId, std::vector<Place2d>>>& nodes_to_add,
-    const double place_overlap_threshold,
-    const double place_max_neighbor_z_diff,
-    NodeSymbol next_node_symbol,
-    DynamicSceneGraph& graph,
-    std::map<std::tuple<size_t, size_t>, NodeId>& new_id_map) {
-  // insert new nodes that needed to be split
-  int og_ix = 0;
-  for (auto& id_places_pair : nodes_to_add) {
-    const auto& node = graph.getNode(id_places_pair.first);
-    auto& attrs_og = node.attributes<Place2dNodeAttributes>();
-
-    int split_ix = 0;
-    for (Place2d place : id_places_pair.second) {
-      NodeSymbol node_id_for_place = next_node_symbol++;
-      Place2dNodeAttributes::Ptr attrs = std::make_unique<Place2dNodeAttributes>();
-      pcl::PointXYZ centroid;
-      place.centroid.get(centroid);
-      attrs->position << centroid.x, centroid.y, centroid.z;
-      attrs->is_active = false;
-
-      attrs->semantic_label = attrs_og.semantic_label;
-      attrs->boundary = place.boundary;
-      attrs->pcl_boundary_connections.insert(attrs->pcl_boundary_connections.begin(),
-                                             place.boundary_indices.begin(),
-                                             place.boundary_indices.end());
-      attrs->ellipse_matrix_compress = place.ellipse_matrix_compress;
-      attrs->ellipse_matrix_expand = place.ellipse_matrix_expand;
-      attrs->ellipse_centroid(0) = place.ellipse_centroid(0);
-      attrs->ellipse_centroid(1) = place.ellipse_centroid(1);
-      attrs->ellipse_centroid(2) = centroid.z;
-      attrs->pcl_min_index = place.min_mesh_index;
-      attrs->pcl_max_index = place.max_mesh_index;
-
-      attrs->pcl_mesh_connections.insert(attrs->pcl_mesh_connections.begin(),
-                                         place.indices.begin(),
-                                         place.indices.end());
-
-      attrs->has_active_mesh_indices = attrs_og.has_active_mesh_indices;
-      attrs->need_cleanup_splitting = true;
-      attrs->need_finish_merge = false;
-
-      graph.emplaceNode(DsgLayers::MESH_PLACES, node_id_for_place, std::move(attrs));
-      new_id_map.insert({std::make_tuple(og_ix, split_ix), node_id_for_place});
-
-      auto& attrs_added =
-          graph.getNode(node_id_for_place).attributes<Place2dNodeAttributes>();
-      // Check for connections between this place and the original place's siblings
-      std::vector<std::pair<NodeId, NodeId>> edges_to_add;
-      for (NodeId neighbor : node.siblings()) {
-        EdgeAttributes ea;
-        Place2dNodeAttributes attrs_neighbor =
-            graph.getNode(neighbor).attributes<Place2dNodeAttributes>();
-
-        if (!attrs_neighbor.need_finish_merge &&
-            shouldAddPlaceConnection(attrs_added,
-                                     attrs_neighbor,
-                                     place_overlap_threshold,
-                                     place_max_neighbor_z_diff,
-                                     ea)) {
-          edges_to_add.push_back({neighbor, node_id_for_place});
-        }
-      }
-
-      for (const auto& [source, target] : edges_to_add) {
-        graph.insertEdge(source, target);  // TODO add edge attributes
-      }
-
-      ++split_ix;
-    }
-
-    ++og_ix;
-    graph.removeNode(id_places_pair.first);
-  }
-  return next_node_symbol;
-}
-
-void addNewNodeEdges(
-    const std::vector<std::pair<NodeId, std::vector<Place2d>>> nodes_to_add,
-    const std::map<std::tuple<size_t, size_t, size_t, size_t>, double> edge_map,
-    const std::map<std::tuple<size_t, size_t>, NodeId> new_id_map,
-    DynamicSceneGraph& graph) {
-  // It looks like this loop would take a long time, but all of these sizes should be
-  // extremely small (e.g. 2ish)
-  for (size_t og_ix = 0; og_ix < nodes_to_add.size(); ++og_ix) {
-    for (size_t split_ix = 0; split_ix < nodes_to_add.at(og_ix).second.size();
-         ++split_ix) {
-      Place2d p1 = nodes_to_add.at(og_ix).second.at(split_ix);
-      for (size_t og_jx = 0; og_jx <= og_ix; ++og_jx) {
-        for (size_t split_jx = 0; split_jx < nodes_to_add.at(og_jx).second.size();
-             ++split_jx) {
-          double weight =
-              edge_map.at(std::make_tuple(og_ix, split_ix, og_jx, split_jx));
-          if (weight > 0) {
-            NodeId n1 = new_id_map.at(std::make_tuple(og_ix, split_ix));
-            NodeId n2 = new_id_map.at(std::make_tuple(og_jx, split_jx));
-            EdgeAttributes ea;
-            ea.weight = weight;
-            ea.weighted = true;
-            graph.insertEdge(n1, n2, ea.clone());
-          }
-        }
-      }
-    }
-  }
-}
-
-void reallocateMeshPoints(const std::vector<Place2d::PointT>& points,
+void reallocateMeshPoints(const spark_dsg::Mesh& mesh,
                           Place2dNodeAttributes& attrs1,
                           Place2dNodeAttributes& attrs2) {
   Eigen::Vector2d delta = attrs2.position.head(2) - attrs1.position.head(2);
   Eigen::Vector2d d = attrs1.position.head(2) + delta / 2;
 
-  std::vector<Place2d::Index> p1_new_indices;
-  std::vector<Place2d::Index> p2_new_indices;
+  std::vector<size_t> p1_new_indices;
+  std::vector<size_t> p2_new_indices;
 
   for (auto midx : attrs1.pcl_mesh_connections) {
-    // pcl::PointXYZRGBA pclp = points.at(midx);
-    // Eigen::Vector2d p(pclp.x, pclp.y);
-    Eigen::Vector2d p = points.at(midx).head(2).cast<double>();
+    Eigen::Vector2d p = mesh.points.at(midx).head(2).cast<double>();
     if ((p - d).dot(delta) > 0) {
       p2_new_indices.push_back(midx);
     } else {
@@ -299,9 +148,7 @@ void reallocateMeshPoints(const std::vector<Place2d::PointT>& points,
     }
   }
   for (auto midx : attrs2.pcl_mesh_connections) {
-    // pcl::PointXYZRGBA pclp = points.at(midx);
-    // Eigen::Vector2d p(pclp.x, pclp.y);
-    Eigen::Vector2d p = points.at(midx).head(2).cast<double>();
+    Eigen::Vector2d p = mesh.points.at(midx).head(2).cast<double>();
     if ((p - d).dot(delta) > 0) {
       p2_new_indices.push_back(midx);
     } else {

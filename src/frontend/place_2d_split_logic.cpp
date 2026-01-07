@@ -8,40 +8,65 @@
 #include "opencv2/imgproc.hpp"
 
 namespace hydra {
+
+using spark_dsg::EdgeAttributes;
+using spark_dsg::Place2dNodeAttributes;
+
 namespace {
 
-inline void remapPlace2dConnections(Place2dNodeAttributes& attrs,
-                                    const kimera_pgmo::MeshOffsetInfo& offsets) {
-  kimera_pgmo::MeshOffsetInfo::RemapStats info;
-  auto& connections = attrs.pcl_mesh_connections;
-  connections = offsets.remapVertexIndices(connections, &info);
-  attrs.pcl_min_index = info.min_index;
-  attrs.pcl_max_index = info.max_index;
-  attrs.has_active_mesh_indices = !info.all_archived;
-}
+struct PointAdaptor {
+  virtual Eigen::Vector3f get(size_t i) const = 0;
 
-}  // namespace
+  inline Eigen::Vector2d get2d(size_t i) const {
+    return get(i).head<2>().cast<double>();
+  }
 
-void addRectInfo(const Place2d::CloudT& points,
-                 const std::vector<Place2d::Index> mindices,
-                 const double connection_ellipse_scale_factor,
-                 Eigen::Vector2d& ellipse_centroid,
-                 Eigen::Matrix2d& m_expand,
-                 Eigen::Matrix2d& m_compress,
-                 Eigen::Vector2d& cut_plane) {
+  inline cv::Point2f getCv(size_t i) const {
+    auto p = get(i);
+    return {p.x(), p.y()};
+  }
+};
+
+struct MeshAdaptor : public PointAdaptor {
+  explicit MeshAdaptor(const spark_dsg::Mesh& mesh) : mesh(mesh) {}
+
+  Eigen::Vector3f get(size_t i) const override { return mesh.points[i]; }
+
+  const spark_dsg::Mesh& mesh;
+};
+
+struct DeltaAdaptor : public PointAdaptor {
+  DeltaAdaptor(const kimera_pgmo::MeshDelta& delta,
+               const kimera_pgmo::MeshOffsetInfo& offsets)
+      : delta(delta), offsets(offsets) {}
+
+  Eigen::Vector3f get(size_t i) const override {
+    return delta.getVertex(offsets.toLocalVertex(i)).pos;
+  }
+
+  const kimera_pgmo::MeshDelta& delta;
+  const kimera_pgmo::MeshOffsetInfo& offsets;
+};
+
+inline void addRectInfo(const PointAdaptor& points,
+                        const std::vector<size_t> mindices,
+                        const double connection_ellipse_scale_factor,
+                        Eigen::Vector2d& ellipse_centroid,
+                        Eigen::Matrix2d& m_expand,
+                        Eigen::Matrix2d& m_compress,
+                        Eigen::Vector2d& cut_plane) {
   std::vector<cv::Point2f> region;
   for (auto midx : mindices) {
-    region.push_back(cv::Point2f(points[midx].x(), points[midx].y()));
+    region.push_back(points.getCv(midx));
   }
-  cv::RotatedRect box = cv::minAreaRect(region);
 
+  cv::RotatedRect box = cv::minAreaRect(region);
   cv::Point2f box_pts[4];
   box.points(box_pts);
 
   // Get rays along two sides of bounding box
   cv::Point2f e1_ray = box_pts[1] - box_pts[0];
   cv::Point2f e2_ray = box_pts[3] - box_pts[0];
-
   cv::Point2f long_ray = cv::norm(e1_ray) > cv::norm(e2_ray) ? e1_ray : e2_ray;
 
   cv::Point2f box_center = (box_pts[0] + box_pts[1] + box_pts[2] + box_pts[3]) / 4;
@@ -60,12 +85,141 @@ void addRectInfo(const Place2d::CloudT& points,
   cut_plane(1) = long_ray.y;
 }
 
-void addRectInfo(const Place2d::CloudT& points,
+inline void addRectInfo(const PointAdaptor& points,
+                        const double connection_ellipse_scale_factor,
+                        Place2d& place) {
+  addRectInfo(points,
+              place.indices,
+              connection_ellipse_scale_factor,
+              place.ellipse_centroid,
+              place.ellipse_matrix_expand,
+              place.ellipse_matrix_compress,
+              place.cut_plane);
+}
+
+inline void addBoundaryInfo(const PointAdaptor& points,
+                            const std::vector<size_t>& mindices,
+                            Eigen::Vector3f& centroid,
+                            std::vector<Eigen::Vector3d>& boundary,
+                            std::vector<size_t>& boundary_mindices) {
+  std::vector<cv::Point2f> region_pts;
+  std::vector<size_t> region_to_cloud_index;
+  centroid = Eigen::Vector3f::Zero();
+  for (const auto midx : mindices) {
+    const auto p = points.get(midx);
+    region_to_cloud_index.push_back(midx);
+    region_pts.push_back({p.x(), p.y()});
+    centroid += p;
+  }
+
+  if (mindices.size()) {
+    centroid /= mindices.size();
+  }
+
+  // compute convex hull for each place
+  std::vector<int> ch;
+  cv::convexHull(region_pts, ch);
+  boundary.clear();
+  boundary_mindices.clear();
+  for (const auto pix : ch) {
+    const auto cloud_ix = region_to_cloud_index.at(pix);
+    boundary.push_back(points.get(cloud_ix).cast<double>());
+    boundary_mindices.push_back(cloud_ix);
+  }
+}
+
+inline void addBoundaryInfo(const PointAdaptor& points, Place2d& p) {
+  addBoundaryInfo(points, p.indices, p.centroid, p.boundary, p.boundary_indices);
+}
+
+inline std::pair<Place2d, Place2d> splitPlace(const PointAdaptor& points,
+                                              const Place2d& place,
+                                              const double scale_factor) {
+  Place2d new_place_1;
+  Place2d new_place_2;
+  for (auto midx : place.indices) {
+    const auto pt = points.get2d(midx);
+    double side = (pt - place.ellipse_centroid).dot(place.cut_plane);
+    if (side >= 0) {
+      new_place_1.indices.push_back(midx);
+      new_place_1.min_mesh_index = std::min(new_place_1.min_mesh_index, midx);
+      new_place_1.max_mesh_index = std::max(new_place_1.max_mesh_index, midx);
+    }
+
+    if (side <= 0) {
+      new_place_2.indices.push_back(midx);
+      new_place_2.min_mesh_index = std::min(new_place_2.min_mesh_index, midx);
+      new_place_2.max_mesh_index = std::max(new_place_2.max_mesh_index, midx);
+    }
+  }
+
+  addRectInfo(points, scale_factor, new_place_1);
+  addRectInfo(points, scale_factor, new_place_2);
+  return std::pair(new_place_1, new_place_2);
+}
+
+inline void decomposePlace(const PointAdaptor& points,
+                           const Place2d& place,
+                           const double min_size,
+                           const size_t min_points,
+                           const double scale_factor,
+                           std::vector<Place2d>& descendants) {
+  const auto [c1, c2] = splitPlace(points, place, scale_factor);
+  if (c1.indices.size() > min_points && c1.cut_plane.norm() > min_size) {
+    decomposePlace(points, c1, min_size, min_points, scale_factor, descendants);
+  } else {
+    descendants.push_back(c1);
+    addBoundaryInfo(points, descendants.back());
+  }
+
+  if (c2.indices.size() > min_points && c2.cut_plane.norm() > min_size) {
+    decomposePlace(points, c2, min_size, min_points, scale_factor, descendants);
+  } else {
+    descendants.push_back(c2);
+    addBoundaryInfo(points, descendants.back());
+  }
+}
+
+inline void remapPlace2dConnections(Place2dNodeAttributes& attrs,
+                                    const kimera_pgmo::MeshOffsetInfo& offsets) {
+  kimera_pgmo::MeshOffsetInfo::RemapStats info;
+  auto& connections = attrs.pcl_mesh_connections;
+  connections = offsets.remapVertexIndices(connections, &info);
+  attrs.pcl_min_index = info.min_index;
+  attrs.pcl_max_index = info.max_index;
+  attrs.has_active_mesh_indices = !info.all_archived;
+}
+
+}  // namespace
+
+void Place2d::updateIndexBounds() {
+  min_mesh_index = std::numeric_limits<size_t>::max();
+  max_mesh_index = 0;
+  for (const auto idx : indices) {
+    min_mesh_index = std::min(idx, min_mesh_index);
+    max_mesh_index = std::max(idx, max_mesh_index);
+  }
+}
+
+void addRectInfo(const kimera_pgmo::MeshDelta& delta,
+                 const kimera_pgmo::MeshOffsetInfo& offsets,
+                 const double connection_ellipse_scale_factor,
+                 Place2d& place) {
+  addRectInfo(DeltaAdaptor(delta, offsets), connection_ellipse_scale_factor, place);
+}
+
+void addRectInfo(const spark_dsg::Mesh& mesh,
+                 const double connection_ellipse_scale_factor,
+                 Place2d& place) {
+  addRectInfo(MeshAdaptor(mesh), connection_ellipse_scale_factor, place);
+}
+
+void addRectInfo(const spark_dsg::Mesh& mesh,
                  const double connection_ellipse_scale_factor,
                  Place2dNodeAttributes& attrs) {
   Eigen::Vector2d cut_plane;         // place node attributes don't have cut_plane
   Eigen::Vector2d ellipse_centroid;  // attrs.ellipse_centroid is Vector3d
-  addRectInfo(points,
+  addRectInfo(MeshAdaptor(mesh),
               attrs.pcl_mesh_connections,
               connection_ellipse_scale_factor,
               ellipse_centroid,
@@ -76,155 +230,40 @@ void addRectInfo(const Place2d::CloudT& points,
   attrs.ellipse_centroid(1) = ellipse_centroid(1);
 }
 
-void addRectInfo(const Place2d::CloudT& points,
-                 const double connection_ellipse_scale_factor,
-                 Place2d& place) {
-  addRectInfo(points,
-              place.indices,
-              connection_ellipse_scale_factor,
-              place.ellipse_centroid,
-              place.ellipse_matrix_expand,
-              place.ellipse_matrix_compress,
-              place.cut_plane);
+void addBoundaryInfo(const kimera_pgmo::MeshDelta& delta,
+                     const kimera_pgmo::MeshOffsetInfo& offsets,
+                     Place2d& p) {
+  addBoundaryInfo(DeltaAdaptor(delta, offsets), p);
 }
 
-void addBoundaryInfo(const Place2d::CloudT& points,
-                     const std::vector<Place2d::Index>& mindices,
-                     Place2d::CentroidT& centroid,
-                     std::vector<Eigen::Vector3d>& boundary,
-                     std::vector<Place2d::Index>& boundary_mindices) {
-  std::vector<cv::Point2f> region_pts;
-  std::vector<Place2d::Index> region_to_cloud_index;
-  centroid = Place2d::CentroidT();
-  for (auto midx : mindices) {
-    region_to_cloud_index.push_back(midx);
-    region_pts.push_back(cv::Point2f(points[midx].x(), points[midx].y()));
-    centroid.add(pcl::PointXYZ(points[midx].x(), points[midx].y(), points[midx].z()));
-  }
-
-  // compute convex hull for each place
-  std::vector<int> ch;
-  cv::convexHull(region_pts, ch);
-  boundary.clear();
-  boundary_mindices.clear();
-  for (int pix : ch) {
-    auto cloud_ix = region_to_cloud_index.at(pix);
-    Place2d::PointT p = points[cloud_ix];
-    Eigen::Vector3d v = {p.x(), p.y(), p.z()};
-    boundary.push_back(v);
-    boundary_mindices.push_back(cloud_ix);
-  }
+void addBoundaryInfo(const spark_dsg::Mesh& mesh, Place2d& p) {
+  addBoundaryInfo(MeshAdaptor(mesh), p);
 }
 
-void addBoundaryInfo(const Place2d::CloudT& points, Place2d& place) {
-  addBoundaryInfo(
-      points, place.indices, place.centroid, place.boundary, place.boundary_indices);
-}
-
-void addBoundaryInfo(const Place2d::CloudT& points, Place2dNodeAttributes& attrs) {
-  Place2d::CentroidT pcl_centroid;
-  addBoundaryInfo(points,
+void addBoundaryInfo(const spark_dsg::Mesh& mesh, Place2dNodeAttributes& attrs) {
+  Eigen::Vector3f centroid;
+  addBoundaryInfo(MeshAdaptor(mesh),
                   attrs.pcl_mesh_connections,
-                  pcl_centroid,
+                  centroid,
                   attrs.boundary,
                   attrs.pcl_boundary_connections);
-  pcl::PointXYZ centroid;
-  pcl_centroid.get(centroid);
-  attrs.position << centroid.x, centroid.y, centroid.z;
-  attrs.ellipse_centroid(2) = centroid.z;
+  attrs.position = centroid.cast<double>();
+  attrs.ellipse_centroid(2) = centroid.z();
 }
 
-std::pair<Place2d, Place2d> splitPlace(const Place2d::CloudT& points,
-                                       const Place2d& place,
-                                       const double connection_ellipse_scale_factor) {
-  Place2d new_place_1;
-  Place2d new_place_2;
-
-  size_t min_ix_1 = SIZE_MAX;
-  size_t max_ix_1 = 0;
-  size_t min_ix_2 = SIZE_MAX;
-  size_t max_ix_2 = 0;
-
-  for (auto midx : place.indices) {
-    Eigen::Vector2d pt(points[midx].x(), points[midx].y());
-    double side = (pt - place.ellipse_centroid).dot(place.cut_plane);
-    if (side >= 0) {
-      new_place_1.indices.push_back(midx);
-      min_ix_1 = std::min(min_ix_1, midx);
-      max_ix_1 = std::max(max_ix_1, midx);
-    }
-    if (side <= 0) {
-      new_place_2.indices.push_back(midx);
-      min_ix_2 = std::min(min_ix_2, midx);
-      max_ix_2 = std::max(max_ix_2, midx);
-    }
-  }
-
-  new_place_1.min_mesh_index = min_ix_1;
-  new_place_1.max_mesh_index = max_ix_1;
-
-  new_place_2.min_mesh_index = min_ix_2;
-  new_place_2.max_mesh_index = max_ix_2;
-
-  addRectInfo(points, connection_ellipse_scale_factor, new_place_1);
-  addRectInfo(points, connection_ellipse_scale_factor, new_place_2);
-
-  return std::pair(new_place_1, new_place_2);
-}
-
-std::vector<Place2d> decomposePlaces(const Place2d::CloudT& cloud,
-                                     const std::vector<Place2d>& initial_places,
-                                     double min_size,
-                                     size_t min_points,
-                                     const double connection_ellipse_scale_factor) {
-  std::vector<Place2d> final_places;
-  for (auto p : initial_places) {
-    // Recursively decompose initial place into smaller places
-    std::vector<Place2d> sub_places =
-        decomposePlace(cloud, p, min_size, min_points, connection_ellipse_scale_factor);
-
-    for (Place2d sp : sub_places) {
-      addBoundaryInfo(cloud, sp);
-      final_places.push_back(sp);
-    }
-  }
-
-  return final_places;
-}
-
-std::vector<Place2d> decomposePlace(const Place2d::CloudT& cloud_pts,
-                                    const Place2d& place,
-                                    const double min_size,
-                                    const size_t min_points,
-                                    const double connection_ellipse_scale_factor) {
-  std::pair<Place2d, Place2d> children =
-      splitPlace(cloud_pts, place, connection_ellipse_scale_factor);
-
-  std::vector<Place2d> descendants;
-  if (children.first.indices.size() > min_points &&
-      children.first.cut_plane.norm() > min_size) {
-    descendants = decomposePlace(cloud_pts,
-                                 children.first,
-                                 min_size,
-                                 min_points,
-                                 connection_ellipse_scale_factor);
-  } else {
-    descendants.push_back(children.first);
-  }
-
-  if (children.second.indices.size() > min_points &&
-      children.second.cut_plane.norm() > min_size) {
-    std::vector<Place2d> temp = decomposePlace(cloud_pts,
-                                               children.second,
-                                               min_size,
-                                               min_points,
-                                               connection_ellipse_scale_factor);
-    descendants.insert(descendants.end(), temp.begin(), temp.end());
-  } else {
-    descendants.push_back(children.second);
-  }
-
-  return descendants;
+void decomposePlace(const kimera_pgmo::MeshDelta& delta,
+                    const kimera_pgmo::MeshOffsetInfo& offsets,
+                    const Place2d& place,
+                    const double min_size,
+                    const size_t min_points,
+                    const double scale_factor,
+                    std::vector<Place2d>& descendants) {
+  decomposePlace(DeltaAdaptor(delta, offsets),
+                 place,
+                 min_size,
+                 min_points,
+                 scale_factor,
+                 descendants);
 }
 
 bool shouldAddPlaceConnection(const Place2dNodeAttributes& attrs1,
@@ -240,32 +279,6 @@ bool shouldAddPlaceConnection(const Place2dNodeAttributes& attrs1,
   double centroid_height_offset = std::abs(attrs1.position(2) - attrs2.position(2));
   edge_attrs.weight = overlap_distance;
   edge_attrs.weighted = true;
-  if (overlap_distance > place_overlap_threshold &&
-      centroid_height_offset < place_max_neighbor_z_diff) {
-    return true;
-  } else {
-    return false;
-  }
-}
-
-bool shouldAddPlaceConnection(const Place2d& p1,
-                              const Place2d& p2,
-                              const double place_overlap_threshold,
-                              const double place_max_neighbor_z_diff,
-                              double& weight) {
-  double overlap_distance =
-      ellipse::getEllipsoidTransverseOverlapDistance(p1.ellipse_matrix_expand,
-                                                     p1.ellipse_centroid,
-                                                     p2.ellipse_matrix_expand,
-                                                     p2.ellipse_centroid);
-
-  pcl::PointXYZ centroid;
-  p1.centroid.get(centroid);
-  double p1z = centroid.z;
-  p2.centroid.get(centroid);
-  double p2z = centroid.z;
-  double centroid_height_offset = std::abs(p1z - p2z);
-  weight = overlap_distance;
   if (overlap_distance > place_overlap_threshold &&
       centroid_height_offset < place_max_neighbor_z_diff) {
     return true;

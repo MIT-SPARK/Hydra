@@ -35,13 +35,10 @@
 #include "hydra/frontend/place_2d_segmenter.h"
 
 #include <config_utilities/config.h>
-#include <config_utilities/factory.h>
 #include <config_utilities/types/conversions.h>
-#include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
-#include <spark_dsg/bounding_box_extraction.h>
 
 #include <memory>
 
@@ -50,6 +47,15 @@
 #include "hydra/utils/place_2d_ellipsoid_math.h"
 
 namespace hydra {
+
+using spark_dsg::DynamicSceneGraph;
+using spark_dsg::EdgeAttributes;
+using spark_dsg::NodeId;
+using spark_dsg::NodeSymbol;
+using spark_dsg::Place2dNodeAttributes;
+
+using LabelToNodes = Place2dSegmenter::LabelToNodes;
+
 namespace {
 
 static const auto registration_ =
@@ -59,28 +65,6 @@ static const auto registration_ =
 
 bool placeIsEmpty(const Place2dNodeAttributes& attrs) {
   return attrs.pcl_mesh_connections.size() == 0 || attrs.boundary.size() < 3;
-}
-
-}  // namespace
-
-using Places = Place2dSegmenter::Places;
-using LabelPlaces = Place2dSegmenter::LabelPlaces;
-using LabelToNodes = Place2dSegmenter::LabelToNodes;
-
-using spark_dsg::DynamicSceneGraph;
-using spark_dsg::NodeId;
-using spark_dsg::NodeSymbol;
-
-void mergeList(std::vector<size_t>& lhs, const std::vector<int>& rhs) {
-  std::unordered_set<size_t> seen(lhs.begin(), lhs.end());
-  for (const auto idx : rhs) {
-    if (seen.count(idx)) {
-      continue;
-    }
-
-    lhs.push_back(idx);
-    seen.insert(idx);
-  }
 }
 
 std::unordered_set<size_t> getFrozenSet(const LabelToNodes& active_places,
@@ -119,6 +103,8 @@ std::unordered_set<size_t> getFrozenSet(const LabelToNodes& active_places,
   return frozen_indices;
 }
 
+}  // namespace
+
 Place2dSegmenter::Place2dSegmenter(const Config& config)
     : config(config::checkValid(config)),
       next_node_id_(config.prefix, 0),
@@ -136,6 +122,7 @@ void Place2dSegmenter::detect(const ActiveWindowOutput& msg,
   VLOG(5) << "[2D Places] detect called";
   VLOG(5) << "[2D Places] n original active indices: " << delta.getNumActiveVertices();
   label_places_.clear();
+  // TODO(nathan) maintain frozen indices instead of using graph
   const auto frozen = getFrozenSet(active_places_, offsets, graph, to_remove_);
   const auto label_indices = clustering::getLabelIndices(config.labels, delta, &frozen);
   if (label_indices.empty()) {
@@ -143,31 +130,34 @@ void Place2dSegmenter::detect(const ActiveWindowOutput& msg,
     return;
   }
 
-  // TODO(nathan) we don't actually need the mesh here...
-  const auto& mesh = *CHECK_NOTNULL(graph.mesh());
   for (const auto& [label, indices] : label_indices) {
     if (indices.size() < config.clustering.min_cluster_size) {
       continue;
     }
 
     auto clusters = clustering::findClusters(config.clustering, delta, indices);
+    VLOG(5) << "[2D Places] got " << clusters.size() << " initial places";
 
-    Places initial_places;
+    Places places;
     for (auto& cluster_indices : clusters) {
-      auto& place = initial_places.emplace_back();
+      Place2d place;
       for (const auto& idx : cluster_indices) {
         place.indices.push_back(offsets.toGlobalVertex(idx));
       }
 
-      addRectInfo(mesh.points, config.connection_ellipse_scale_factor, place);
+      // Set up initial bounds from delta
+      addRectInfo(delta, offsets, config.connection_ellipse_scale_factor, place);
+
+      // Recursively decompose initial place into smaller places
+      decomposePlace(delta,
+                     offsets,
+                     place,
+                     config.pure_final_place_size,
+                     config.min_final_place_points,
+                     config.connection_ellipse_scale_factor,
+                     places);
     }
 
-    VLOG(5) << "[2D Places] got " << initial_places.size() << " initial places";
-    auto places = decomposePlaces(mesh.points,
-                                  initial_places,
-                                  config.pure_final_place_size,
-                                  config.min_final_place_points,
-                                  config.connection_ellipse_scale_factor);
     VLOG(5) << "[2D Places] " << places.size() << " final places of label " << label;
     label_places_.insert({label, places});
   }
@@ -274,9 +264,9 @@ void Place2dSegmenter::updateGraph(const ActiveWindowOutput& msg,
 }
 
 NodeId Place2dSegmenter::addPlaceToGraph(DynamicSceneGraph& graph,
-                                             const Place2d& place,
-                                             uint32_t label,
-                                             uint64_t timestamp) {
+                                         const Place2d& place,
+                                         uint32_t label,
+                                         uint64_t timestamp) {
   if (place.indices.size() == 0) {
     LOG(ERROR) << "[2D Places] Encountered empty place with label"
                << static_cast<int>(label) << " @ " << timestamp << "[ns]";
@@ -284,12 +274,8 @@ NodeId Place2dSegmenter::addPlaceToGraph(DynamicSceneGraph& graph,
   }
 
   auto attrs = std::make_unique<Place2dNodeAttributes>();
-
-  pcl::PointXYZ centroid;
-  place.centroid.get(centroid);
-  attrs->position << centroid.x, centroid.y, centroid.z;
+  attrs->position << place.centroid.cast<double>();
   attrs->is_active = true;
-
   attrs->semantic_label = label;
   attrs->boundary = place.boundary;
   attrs->pcl_boundary_connections.insert(attrs->pcl_boundary_connections.begin(),
@@ -299,7 +285,7 @@ NodeId Place2dSegmenter::addPlaceToGraph(DynamicSceneGraph& graph,
   attrs->ellipse_matrix_expand = place.ellipse_matrix_expand;
   attrs->ellipse_centroid(0) = place.ellipse_centroid(0);
   attrs->ellipse_centroid(1) = place.ellipse_centroid(1);
-  attrs->ellipse_centroid(2) = centroid.z;
+  attrs->ellipse_centroid(2) = attrs->position.z();
   attrs->pcl_min_index = place.min_mesh_index;
   attrs->pcl_max_index = place.max_mesh_index;
   attrs->has_active_mesh_indices = true;
