@@ -46,6 +46,7 @@ namespace hydra {
 void declare_config(ActiveWindowModule::Config& config) {
   using namespace config;
   name("ActiveWindowModule::Config");
+  base<VerbosityConfig>(config);
   field(config.max_input_queue_size, "max_input_queue_size");
   field(config.volumetric_map, "volumetric_map");
   config.map_window.setOptional();
@@ -55,7 +56,8 @@ void declare_config(ActiveWindowModule::Config& config) {
 }
 
 ActiveWindowModule::Config::Config(bool with_semantics, bool with_tracking)
-    : max_input_queue_size(0),
+    : VerbosityConfig("[active_window] "),
+      max_input_queue_size(0),
       volumetric_map({0.1, 16, 0.3, with_semantics, with_tracking}) {}
 
 ActiveWindowModule::ActiveWindowModule(const Config& config,
@@ -85,7 +87,7 @@ ActiveWindowModule::ActiveWindowModule(const Config& config,
 
 void ActiveWindowModule::start() {
   spin_thread_.reset(new std::thread(&ActiveWindowModule::spin, this));
-  LOG(INFO) << "[Active Window] started!";
+  MLOG_NAMED(INFO) << "started!";
 }
 
 void ActiveWindowModule::stop() { stopImpl(); }
@@ -94,18 +96,15 @@ void ActiveWindowModule::stopImpl() {
   should_shutdown_ = true;
 
   if (spin_thread_) {
-    VLOG(2) << "[Active Window] stopping!";
+    MLOG_NAMED(STATUS) << "stopping!";
     spin_thread_->join();
     spin_thread_.reset();
-    VLOG(2) << "[Active Window] stopped!";
+    MLOG_NAMED(STATUS) << "stopped!";
   }
 
-  VLOG(2) << "[Active Window] input queue: " << input_queue_->size();
-  if (output_queue_) {
-    VLOG(2) << "[Active Window] output queue: " << output_queue_->size();
-  } else {
-    VLOG(2) << "[Active Window] output queue: n/a";
-  }
+  MLOG_NAMED(STATUS) << "input queue: " << input_queue_->size();
+  MLOG_NAMED(STATUS) << "output queue: "
+                     << (output_queue_ ? std::to_string(output_queue_->size()) : "n/a");
 }
 
 std::string ActiveWindowModule::printInfo() const {

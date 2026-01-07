@@ -42,6 +42,26 @@
 #include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
+namespace {
+
+static const auto spatial_registration =
+    config::RegistrationWithConfig<VolumetricWindow,
+                                   SpatialWindowChecker,
+                                   SpatialWindowChecker::Config>("spatial");
+
+static const auto temporal_registration =
+    config::RegistrationWithConfig<VolumetricWindow,
+                                   TemporalWindowChecker,
+                                   TemporalWindowChecker::Config>("temporal");
+
+inline double ns_to_sec(uint64_t time_ns) {
+  using std::chrono::duration;
+  using std::chrono::duration_cast;
+  using std::chrono::nanoseconds;
+  return duration_cast<duration<double>>(nanoseconds(time_ns)).count();
+}
+
+}  // namespace
 
 VolumetricBlockInfo::VolumetricBlockInfo(const spatial_hash::Block& block,
                                          uint64_t update_stamp_ns)
@@ -95,13 +115,6 @@ void declare_config(SpatialWindowChecker::Config& config) {
   check(config.max_radius_m, GT, 0.0, "max_radius_m");
 }
 
-namespace {
-static const auto registration =
-    config::RegistrationWithConfig<VolumetricWindow,
-                                   SpatialWindowChecker,
-                                   SpatialWindowChecker::Config>("spatial");
-}
-
 SpatialWindowChecker::SpatialWindowChecker(const Config& config)
     : config(config::checkValid(config)) {}
 
@@ -110,6 +123,28 @@ bool SpatialWindowChecker::inBounds(uint64_t /* timestamp_ns */,
                                     const uint64_t /* last_update_ns */,
                                     const Eigen::Vector3d& last_pos) const {
   return (world_T_body.translation() - last_pos).norm() <= config.max_radius_m;
+}
+
+void declare_config(TemporalWindowChecker::Config& config) {
+  using namespace config;
+  name("TemporalWindowChecker::Config");
+  field(config.max_time_since_update_s, "max_time_since_update_s");
+  check(config.max_time_since_update_s, GT, 0.0, "max_time_since_update_s");
+}
+
+TemporalWindowChecker::TemporalWindowChecker(const Config& config)
+    : config(config::checkValid(config)) {}
+
+bool TemporalWindowChecker::inBounds(uint64_t timestamp_ns,
+                                     const Eigen::Isometry3d&,
+                                     const uint64_t last_update_ns,
+                                     const Eigen::Vector3d&) const {
+  // this can maybe happen in multi-sensor configurations
+  if (last_update_ns > timestamp_ns) {
+    return true;
+  }
+
+  return ns_to_sec(timestamp_ns - last_update_ns) <= config.max_time_since_update_s;
 }
 
 }  // namespace hydra

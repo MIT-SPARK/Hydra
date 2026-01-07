@@ -47,10 +47,7 @@
 // purposes notwithstanding any copyright notation herein.
 #pragma once
 #include <memory>
-#include <string>
-#include <thread>
 
-#include "hydra/common/global_info.h"
 #include "hydra/input/input_packet.h"
 #include "hydra/reconstruction/projection_interpolators.h"
 #include "hydra/reconstruction/semantic_integrator.h"
@@ -72,6 +69,8 @@ class ProjectiveIntegrator {
   using SemanticIntegratorPtr = std::unique_ptr<const SemanticIntegrator>;
 
   struct Config : public VerbosityConfig {
+    Config();
+
     //! If nonzero, integrates negative voxels outside of the truncation distance by the
     //! specified threshold. Negative values are multiples of the voxel size
     float extra_integration_distance = 0.0f;
@@ -98,7 +97,7 @@ class ProjectiveIntegrator {
     //! longer in memory, low max weight favors rapid updates
     float max_weight = 1.0e5f;
     //! Number of threads used to perform integration (parallelized by block)
-    int num_threads = GlobalInfo::instance().getConfig().default_num_threads;
+    int num_threads;
     //! Which interpolation to use in the image projection [nearest, bilinear,
     //! adaptive]
     config::VirtualConfig<ProjectionInterpolator> interpolation_method{

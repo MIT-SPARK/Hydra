@@ -55,6 +55,7 @@
 #include <future>
 #include <vector>
 
+#include "hydra/common/global_info.h"
 #include "hydra/input/sensor_utilities.h"
 #include "hydra/reconstruction/index_getter.h"
 #include "hydra/utils/printing.h"
@@ -79,6 +80,10 @@ inline bool measurementOutsideTruncation(const MapConfig& map_config,
 }
 
 }  // namespace
+
+ProjectiveIntegrator::Config::Config()
+    : VerbosityConfig("[projective_integrator] "),
+      num_threads(GlobalInfo::instance().getConfig().default_num_threads) {}
 
 void declare_config(ProjectiveIntegrator::Config& config) {
   using namespace config;
@@ -148,7 +153,7 @@ void ProjectiveIntegrator::updateBlocks(const BlockIndices& block_indices,
                                         const InputData& data,
                                         const cv::Mat& integration_mask,
                                         VolumetricMap& map) const {
-  MLOG(3) << "Updating " << block_indices.size() << " blocks.";
+  MLOG_NAMED(STATUS) << "updating " << block_indices.size() << " blocks";
 
   // Update all blocks in parallel.
   IndexGetter<BlockIndex> index_getter(block_indices);
@@ -197,7 +202,7 @@ void ProjectiveIntegrator::updateBlock(const BlockIndex& block_index,
   }
 
   if (was_updated) {
-    MLOG(10) << "integrator updated block " << showIndex(block_index);
+    MLOG_NAMED(DETAILED) << "integrator updated block " << showIndex(block_index);
     blocks.tsdf->setUpdated();
   }
 }

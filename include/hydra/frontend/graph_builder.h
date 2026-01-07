@@ -80,15 +80,25 @@ class GraphBuilder : public Module {
   using Sink = OutputSink<uint64_t, const DynamicSceneGraph&, const BackendInput&>;
 
   struct Config : public VerbosityConfig {
+    Config() : VerbosityConfig("[frontend] ") {}
+
+    //! @brief Enable using external features during LCD
     bool lcd_use_bow_vectors = true;
+    //! @brief Turn on/off mesh-based objects
+    bool enable_mesh_objects = true;
+    //! @brief Disable merging update packets from the active window if true
+    bool no_packet_collation = false;
+    //! @brief Drop object meshes for memory savings
+    bool clear_object_meshes = false;
+
     struct DeformationConfig {
       double mesh_resolution = 0.1;
       double d_graph_resolution = 1.5;
       double time_horizon = 10.0;
     } pgmo;
+
     GraphUpdater::Config graph_updater{{{DsgLayers::OBJECTS, {'O', std::nullopt, {}}}}};
     GraphConnector::Config graph_connector;
-    bool enable_mesh_objects = true;
     MeshSegmenter::Config object_config;
     config::VirtualConfig<PoseGraphTracker> pose_graph_tracker{
         PoseGraphFromOdom::Config()};
@@ -98,10 +108,6 @@ class GraphBuilder : public Module {
     config::VirtualConfig<FrontierExtractor> frontier_places;
     ViewDatabase::Config view_database;
     std::vector<Sink::Factory> sinks;
-    //! @brief Disable merging update packets from the active window if true
-    bool no_packet_collation = false;
-    //! @brief Drop object meshes for memory savings
-    bool clear_object_meshes = false;
   } const config;
 
   GraphBuilder(const Config& config,

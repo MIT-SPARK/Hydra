@@ -73,6 +73,9 @@ void declare_config(GraphBuilder::Config& config) {
   name("GraphBuilder::Config");
   base<VerbosityConfig>(config);
   field(config.lcd_use_bow_vectors, "lcd_use_bow_vectors");
+  field(config.enable_mesh_objects, "enable_mesh_objects");
+  field(config.no_packet_collation, "no_packet_collation");
+  field(config.clear_object_meshes, "clear_object_meshes");
 
   {
     NameSpace ns("pgmo");
@@ -83,7 +86,6 @@ void declare_config(GraphBuilder::Config& config) {
 
   field(config.graph_connector, "graph_connector");
   field(config.graph_updater, "graph_updater");
-  field(config.enable_mesh_objects, "enable_mesh_objects");
   field(config.object_config, "objects");
   config.pose_graph_tracker.setOptional();
   field(config.pose_graph_tracker, "pose_graph_tracker");
@@ -101,8 +103,6 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.frontier_places, "frontier_places");
   field(config.view_database, "view_database");
   field(config.sinks, "sinks");
-  field(config.no_packet_collation, "no_packet_collation");
-  field(config.clear_object_meshes, "clear_object_meshes");
 }
 
 GraphBuilder::GraphBuilder(const Config& config,
@@ -166,7 +166,7 @@ GraphBuilder::~GraphBuilder() {
 
 void GraphBuilder::start() {
   spin_thread_.reset(new std::thread(&GraphBuilder::spin, this));
-  LOG(INFO) << "[Hydra Frontend] started!";
+  MLOG_NAMED(INFO) << "started!";
 }
 
 void GraphBuilder::stop() { stopImpl(); }
@@ -175,13 +175,13 @@ void GraphBuilder::stopImpl() {
   should_shutdown_ = true;
 
   if (spin_thread_) {
-    VLOG(2) << "[Hydra Frontend] stopping frontend!";
+    MLOG_NAMED(STATUS) << "stopping!";
     spin_thread_->join();
     spin_thread_.reset();
-    VLOG(2) << "[Hydra Frontend] stopped!";
+    MLOG_NAMED(STATUS) << "stopped!";
   }
 
-  VLOG(2) << "[Hydra Frontend]: " << queue_->size() << " messages left";
+  MLOG_NAMED(STATUS) << queue_->size() << " messages left";
 }
 
 void GraphBuilder::save(const DataDirectory& output) {
@@ -322,7 +322,7 @@ void GraphBuilder::dispatchSpin(ActiveWindowOutput::Ptr msg) {
 void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
   auto& queues = PipelineQueues::instance();
 
-  VLOG(5) << "[Hydra Frontend] Popped input packet @ " << msg->timestamp_ns << " [ns]";
+  MLOG_NAMED(STATUS) << "popped input packet @ " << msg->timestamp_ns << " [ns]";
   std::lock_guard<std::mutex> lock(mutex_);
   ScopedTimer timer("frontend/spin", msg->timestamp_ns);
 
@@ -405,8 +405,9 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
         }
 
         const auto fmt = getDefaultFormat(3);
-        MLOG(2) << "view @ " << timestamp << "[ns]: " << pos.format(fmt) << " vs. "
-                << msg->world_T_body().translation().format(fmt);
+        MLOG_NAMED(DETAILED) << "view @ " << timestamp << "[ns]: " << pos.format(fmt)
+                             << " vs. "
+                             << msg->world_T_body().translation().format(fmt);
         return !map_window_->inBounds(
             msg->timestamp_ns, msg->world_T_body(), timestamp, pos);
       });
@@ -416,30 +417,51 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
 }
 
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
+  const spatial_hash::IndexSet archived_blocks(input.archived_mesh_indices.begin(),
+                                               input.archived_mesh_indices.end());
+
   {  // start timing scope
     ScopedTimer timer("frontend/mesh_archive", input.timestamp_ns, true, 1, false);
     // TODO(nathan) add this back when we fix the khronos active window
     // const auto pose = input.world_T_body();
     // const auto block_size = input.map().blockSize();
-    const spatial_hash::IndexSet archived_blocks(input.archived_mesh_indices.begin(),
-                                                 input.archived_mesh_indices.end());
     mesh_compression_->archiveBlocks([&](const auto& index, const auto& /* info */) {
       return archived_blocks.count(index);
     });
   }  // end timing scope
 
   const auto& mesh = input.map().getMeshLayer();
+  std::list<spatial_hash::BlockIndex> invalid_blocks;
+  for (const auto& block : mesh) {
+    if (archived_blocks.count(block.index)) {
+      invalid_blocks.push_back(block.index);
+    }
+  }
+
+  if (!invalid_blocks.empty()) {
+    std::stringstream ss;
+    ss << "[";
+    auto iter = invalid_blocks.begin();
+    while (iter != invalid_blocks.end()) {
+      ss << "(" << iter->x() << ", " << iter->y() << ", " << iter->z() << ")";
+      ++iter;
+      if (iter != invalid_blocks.end()) {
+        ss << ", ";
+      }
+    }
+    ss << "]";
+    LOG(ERROR) << "Archived and updated block(s) detected: " << ss.str();
+  }
 
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
-    VLOG(5) << "[Hydra Frontend] Updating mesh with " << mesh.numBlocks() << " blocks";
+    MLOG_NAMED(DETAILED) << "updating mesh with " << mesh.numBlocks() << " blocks";
     const BlockMeshIter wrapper(mesh);
     last_mesh_update_ = mesh_compression_->update(wrapper, input.timestamp_ns);
   }  // end timing scope
 
   {  // start timing scope
-    // TODO(nathan) we should probably have a mutex before modifying the mesh, but
-    // nothing else uses it at the moment
+    // TODO(nathan) we should probably have a mutex before modifying the mesh
     ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
     last_mesh_update_->updateMesh(*dsg_->graph->mesh(), mesh_offsets_);
   }  // end timing scope
@@ -628,7 +650,7 @@ void GraphBuilder::assignBowVectors() {
   while (iter != cached_bow_messages_.end()) {
     const auto& msg = *iter;
     if (static_cast<int>(msg->robot_id) != prefix.id) {
-      VLOG(1) << "[Hydra Frontend] rejected bow message from robot " << msg->robot_id;
+      MLOG_NAMED(STATUS) << "rejected bow message from robot " << msg->robot_id;
       iter = cached_bow_messages_.erase(iter);
     }
 
@@ -644,14 +666,14 @@ void GraphBuilder::assignBowVectors() {
         msg->bow_vector.word_ids.data(), msg->bow_vector.word_ids.size());
     attrs.dbow_values = Eigen::Map<const Eigen::VectorXf>(
         msg->bow_vector.word_values.data(), msg->bow_vector.word_values.size());
-    VLOG(5) << "[Hydra Frontend] assigned bow vector for " << node_id.str();
+    MLOG_NAMED(DEBUG) << "assigned bow vector for " << node_id.str();
 
     iter = cached_bow_messages_.erase(iter);
   }
 
   size_t num_assigned = prior_size - cached_bow_messages_.size();
-  VLOG(3) << "[Hydra Frontend] assigned " << num_assigned << " bow vectors of "
-          << prior_size << " original";
+  MLOG_NAMED(DETAILED) << "assigned " << num_assigned << " bow vectors of "
+                       << prior_size << " original";
 }
 
 }  // namespace hydra

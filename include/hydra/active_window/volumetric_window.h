@@ -87,4 +87,18 @@ struct SpatialWindowChecker : VolumetricWindow {
 
 void declare_config(SpatialWindowChecker::Config& config);
 
+struct TemporalWindowChecker : VolumetricWindow {
+  struct Config {
+    double max_time_since_update_s = 3.0;
+  } const config;
+
+  explicit TemporalWindowChecker(const Config& config);
+  bool inBounds(uint64_t timestamp_ns,
+                const Eigen::Isometry3d& world_T_body,
+                const uint64_t last_updated_ns,
+                const Eigen::Vector3d& last_pos) const override;
+};
+
+void declare_config(TemporalWindowChecker::Config& config);
+
 }  // namespace hydra

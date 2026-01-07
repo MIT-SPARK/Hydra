@@ -47,6 +47,13 @@ struct VerbosityConfig {
 
   //! Make a copy of the verbosity config with a prefix derived from the provided name
   VerbosityConfig with_name(const std::string& name) const;
+
+  struct Levels {
+    inline static constexpr const int INFO = 0;
+    inline static constexpr const int STATUS = 1;
+    inline static constexpr const int DETAILED = 2;
+    inline static constexpr const int DEBUG = 5;
+  };
 };
 
 void declare_config(VerbosityConfig& config);
@@ -54,5 +61,9 @@ void declare_config(VerbosityConfig& config);
 // NOTE(nathan) you need to include <glog/logging.h> for this to work, but
 // I don't want have <glog/logging.h> included in a bunch of header files
 #define MLOG(V) LOG_IF(INFO, config.verbosity >= V) << config.prefix
+#define MLOG_ERROR() LOG(ERROR) << config.prefix
+#define MLOG_WARN() LOG(WARNING) << config.prefix
+#define MLOG_NAMED(V) \
+  LOG_IF(INFO, config.verbosity >= hydra::VerbosityConfig::Levels::V) << config.prefix
 
 }  // namespace hydra

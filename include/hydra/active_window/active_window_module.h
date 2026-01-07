@@ -44,6 +44,7 @@
 #include "hydra/common/output_sink.h"
 #include "hydra/input/input_packet.h"
 #include "hydra/reconstruction/volumetric_map.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -54,7 +55,7 @@ class ActiveWindowModule : public Module {
   using OutputQueue = MessageQueue<ActiveWindowOutput::Ptr>;
   using Sink = OutputSink<uint64_t, const VolumetricMap&, const ActiveWindowOutput&>;
 
-  struct Config {
+  struct Config : VerbosityConfig {
     size_t max_input_queue_size;
     VolumetricMap::Config volumetric_map;
     config::VirtualConfig<VolumetricWindow> map_window;

@@ -41,7 +41,6 @@
 #include <chrono>
 #include <iomanip>
 
-#include "hydra/common/global_info.h"
 #include "hydra/input/input_conversion.h"
 #include "hydra/places/robot_footprint_integrator.h"
 #include "hydra/reconstruction/mesh_integrator.h"
@@ -60,9 +59,10 @@ static const auto registration =
         "ReconstructionModule");
 
 double diffInSeconds(uint64_t lhs, uint64_t rhs) {
-  return std::chrono::duration_cast<std::chrono::duration<double>>(
-             std::chrono::nanoseconds(lhs) - std::chrono::nanoseconds(rhs))
-      .count();
+  using std::chrono::duration_cast;
+  using std::chrono::nanoseconds;
+  using secs = std::chrono::duration<double>;
+  return duration_cast<secs>(nanoseconds(lhs) - nanoseconds(rhs)).count();
 }
 
 std::string printRotation(const Eigen::Matrix3d& rot) {
@@ -122,22 +122,22 @@ bool ReconstructionModule::shouldUpdate(uint64_t timestamp_ns) const {
 
 ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputPacket& msg) {
   if (!msg.sensor_input) {
-    LOG(ERROR) << "[Hydra Reconstruction] received invalid sensor data in input!";
+    MLOG_ERROR() << "received invalid sensor data in input!";
     return nullptr;
   }
 
   const auto timestamp_ns = msg.timestamp_ns;
   const auto world_T_body = msg.world_T_body();
   const auto fmt = getDefaultFormat();
-  VLOG(5) << "[Hydra Reconstruction] Got input @ " << timestamp_ns
-          << " [ns] with pose: p=" << world_T_body.translation().format(fmt)
-          << ", q=" << printRotation(world_T_body.rotation());
+  MLOG_NAMED(DEBUG) << "got input @ " << timestamp_ns
+                    << " [ns] with pose: p=" << world_T_body.translation().format(fmt)
+                    << ", q=" << printRotation(world_T_body.rotation());
 
   const auto do_full_update = shouldUpdate(timestamp_ns);
 
-  VLOG(2) << "[Hydra Reconstruction] starting " << (do_full_update ? "full" : "partial")
-          << " update for message @ " << timestamp_ns << " (" << input_queue_->size()
-          << " message(s) left)";
+  MLOG_NAMED(STATUS) << "starting " << (do_full_update ? "full" : "partial")
+                     << " update for message @ " << timestamp_ns << " ("
+                     << input_queue_->size() << " message(s) left)";
 
   ScopedTimer timer("reconstruction/spin", timestamp_ns);
   // force semantic normalization if volumetric map has semantic layer
@@ -148,7 +148,7 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputPacket& msg) {
 
   const auto tsdf_integrator = tsdf_integrators_.get(data->getSensor().name);
   if (!tsdf_integrator) {
-    VLOG(1) << "Unknown sensor '" << data->getSensor().name << "'";
+    MLOG_NAMED(STATUS) << "unknown sensor '" << data->getSensor().name << "'";
     return nullptr;
   }
 
@@ -179,8 +179,8 @@ ActiveWindowOutput::Ptr ReconstructionModule::spinOnce(const InputPacket& msg) {
   if (map_window_) {
     output->archived_mesh_indices =
         map_window_->archiveBlocks(timestamp_ns, world_T_body, map_);
-    VLOG(2) << "[Hydra Reconstruction] archived "
-            << output->archived_mesh_indices.size() << " @ " << timestamp_ns << " [ns]";
+    MLOG_NAMED(STATUS) << "archived " << output->archived_mesh_indices.size() << " @ "
+                       << timestamp_ns << " [ns]";
   }
 
   output->setMap(map_.cloneUpdated());
