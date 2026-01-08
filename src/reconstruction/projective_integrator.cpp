@@ -204,6 +204,7 @@ void ProjectiveIntegrator::updateBlock(const BlockIndex& block_index,
   if (was_updated) {
     MLOG_NAMED(DETAILED) << "integrator updated block " << showIndex(block_index);
     blocks.tsdf->setUpdated();
+    blocks.tsdf->last_update_time_ns = data.timestamp_ns;
   }
 }
 

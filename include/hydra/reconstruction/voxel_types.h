@@ -117,6 +117,7 @@ struct TsdfBlock : public spatial_hash::VoxelBlock<TsdfVoxel> {
   mutable bool esdf_updated = false;
   mutable bool mesh_updated = false;
   mutable bool tracking_updated = false;
+  mutable uint64_t last_update_time_ns = 0;
 
   void setUpdated() const {
     updated = true;

@@ -64,14 +64,14 @@ inline double ns_to_sec(uint64_t time_ns) {
 }  // namespace
 
 VolumetricBlockInfo::VolumetricBlockInfo(const spatial_hash::Block& block,
-                                         uint64_t update_stamp_ns)
+                                         std::optional<uint64_t> update_stamp_ns)
     : index(block.index),
       block_size(block.block_size),
       update_stamp_ns(update_stamp_ns) {}
 
 VolumetricBlockInfo::VolumetricBlockInfo(const spatial_hash::BlockIndex& index,
                                          double block_size,
-                                         uint64_t update_stamp_ns)
+                                         std::optional<uint64_t> update_stamp_ns)
     : index(index), block_size(block_size), update_stamp_ns(update_stamp_ns) {}
 
 Eigen::Vector3f VolumetricBlockInfo::blockCenter() const {
@@ -85,8 +85,7 @@ BlockIndices VolumetricWindow::archiveBlocks(uint64_t timestamp_ns,
   BlockIndices to_remove;
   const auto& tsdf = map.getTsdfLayer();
   for (const auto& block : tsdf) {
-    // TODO(nathan|lukas) the implicit constructor zeros the block update timestamp
-    if (inBounds(timestamp_ns, world_T_body, block)) {
+    if (inBounds(timestamp_ns, world_T_body, {block, block.last_update_time_ns})) {
       continue;
     }
 
@@ -120,7 +119,7 @@ SpatialWindowChecker::SpatialWindowChecker(const Config& config)
 
 bool SpatialWindowChecker::inBounds(uint64_t /* timestamp_ns */,
                                     const Eigen::Isometry3d& world_T_body,
-                                    const uint64_t /* last_update_ns */,
+                                    const std::optional<uint64_t> /* last_update_ns */,
                                     const Eigen::Vector3d& last_pos) const {
   return (world_T_body.translation() - last_pos).norm() <= config.max_radius_m;
 }
@@ -137,14 +136,15 @@ TemporalWindowChecker::TemporalWindowChecker(const Config& config)
 
 bool TemporalWindowChecker::inBounds(uint64_t timestamp_ns,
                                      const Eigen::Isometry3d&,
-                                     const uint64_t last_update_ns,
+                                     const std::optional<uint64_t> last_update_ns,
                                      const Eigen::Vector3d&) const {
+  CHECK(last_update_ns) << "Timestamp required for temporal window!";
   // this can maybe happen in multi-sensor configurations
-  if (last_update_ns > timestamp_ns) {
+  if (*last_update_ns > timestamp_ns) {
     return true;
   }
 
-  return ns_to_sec(timestamp_ns - last_update_ns) <= config.max_time_since_update_s;
+  return ns_to_sec(timestamp_ns - *last_update_ns) <= config.max_time_since_update_s;
 }
 
 }  // namespace hydra

@@ -38,6 +38,7 @@
 #include <spatial_hash/types.h>
 
 #include <Eigen/Geometry>
+#include <optional>
 
 namespace hydra {
 
@@ -46,12 +47,13 @@ class VolumetricMap;
 struct VolumetricBlockInfo {
   const spatial_hash::BlockIndex index;
   const double block_size;
-  const uint64_t update_stamp_ns;
+  const std::optional<uint64_t> update_stamp_ns;
 
-  VolumetricBlockInfo(const spatial_hash::Block& block, uint64_t update_stamp_ns = 0);
+  VolumetricBlockInfo(const spatial_hash::Block& block,
+                      std::optional<uint64_t> update_stamp_ns = std::nullopt);
   VolumetricBlockInfo(const spatial_hash::BlockIndex& index,
                       double block_size,
-                      uint64_t update_stamp_ns = 0);
+                      std::optional<uint64_t> update_stamp_ns = std::nullopt);
   Eigen::Vector3f blockCenter() const;
 };
 
@@ -69,7 +71,7 @@ struct VolumetricWindow {
 
   virtual bool inBounds(uint64_t timestamp_ns,
                         const Eigen::Isometry3d& world_T_body,
-                        const uint64_t last_updated_ns,
+                        const std::optional<uint64_t> last_updated_ns,
                         const Eigen::Vector3d& last_pos) const = 0;
 };
 
@@ -81,7 +83,7 @@ struct SpatialWindowChecker : VolumetricWindow {
   explicit SpatialWindowChecker(const Config& config);
   bool inBounds(uint64_t timestamp_ns,
                 const Eigen::Isometry3d& world_T_body,
-                const uint64_t last_updated_ns,
+                const std::optional<uint64_t> last_updated_ns,
                 const Eigen::Vector3d& last_pos) const override;
 };
 
@@ -95,7 +97,7 @@ struct TemporalWindowChecker : VolumetricWindow {
   explicit TemporalWindowChecker(const Config& config);
   bool inBounds(uint64_t timestamp_ns,
                 const Eigen::Isometry3d& world_T_body,
-                const uint64_t last_updated_ns,
+                const std::optional<uint64_t> last_updated_ns,
                 const Eigen::Vector3d& last_pos) const override;
 };
 
