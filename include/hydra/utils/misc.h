@@ -33,52 +33,28 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <vector>
 
-#include <spatial_hash/types.h>
+namespace hydra::utils {
 
-#include "hydra/reconstruction/index_getter.h"
+template <typename T>
+void remove_by_index(std::vector<T>& vec, const std::vector<size_t>& indices) {
+  if (indices.empty()) {
+    return;
+  }
 
-namespace hydra {
+  size_t i;
+  for (i = 0; i < indices.size() - 1; ++i) {
+    for (size_t j = indices[i] + 1; j < indices[i + 1]; ++j) {
+      vec[j - i - 1] = std::move(vec[j]);
+    }
+  }
 
-class VolumetricMap;
+  for (size_t j = indices.back() + 1; j < vec.size(); ++j) {
+    vec[j - i - 1] = std::move(vec[j]);
+  }
 
-class MeshIntegrator {
- public:
-  using BlockIndexGetter = IndexGetter<spatial_hash::BlockIndex>;
+  vec.resize(vec.size() - indices.size());
+}
 
-  struct Config {
-    Config();
-    //! Minimum weight for a TSDF voxel to be considered observered
-    float min_weight = 1.0e-4f;
-    //! Number of thread to use during integration
-    int integrator_threads;
-    //! Remove redundant vertices per-block after marching cubes
-    bool flatten_blocks = false;
-    //! Inverse resolution for hashing
-    float vertex_tolerance_m = 1.0e-4f;
-  } const config;
-
-  explicit MeshIntegrator(const Config& config);
-
-  virtual ~MeshIntegrator() = default;
-
-  virtual void generateMesh(VolumetricMap& map,
-                            bool only_mesh_updated_blocks,
-                            bool clear_updated_flag) const;
-
- protected:
-  void allocateBlocks(const spatial_hash::BlockIndices& blocks,
-                      VolumetricMap& map) const;
-
-  void launchThreads(const spatial_hash::BlockIndices& blocks,
-                     VolumetricMap& map) const;
-
-  void processBlock(VolumetricMap* map, BlockIndexGetter* index_getter) const;
-
-  const static Eigen::Matrix<int, 3, 8> cube_index_offsets_;
-  mutable Eigen::Matrix<float, 3, 8> cube_coord_offsets_;
-};
-
-void declare_config(MeshIntegrator::Config& config);
-
-}  // namespace hydra
+}  // namespace hydra::utils

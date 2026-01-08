@@ -41,6 +41,7 @@
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
+#include <spatial_hash/hash.h>
 
 #include <iomanip>
 #include <list>
@@ -49,8 +50,12 @@
 #include "hydra/common/global_info.h"
 #include "hydra/reconstruction/marching_cubes.h"
 #include "hydra/reconstruction/volumetric_map.h"
+#include "hydra/utils/misc.h"
 
 namespace hydra {
+
+using spatial_hash::LongIndex;
+using spatial_hash::LongIndexHashMap;
 
 namespace {
 
@@ -226,10 +231,13 @@ void declare_config(MeshIntegrator::Config& config) {
   using namespace config;
   name("MeshIntegrator::Config");
   field(config.min_weight, "min_weight");
-  field(config.flatten_blocks, "flatten_blocks");
   field<ThreadNumConversion>(config.integrator_threads, "integrator_threads");
+  field(config.flatten_blocks, "flatten_blocks");
+  field(config.vertex_tolerance_m, "vertex_tolerance_m");
+
   check(config.min_weight, GT, 0.0f, "min_weight");
   check(config.integrator_threads, GT, 0, "integrator_threads");
+  check(config.vertex_tolerance_m, GT, 0.0f, "vertex_tolerance_m");
 }
 
 const Eigen::Matrix<int, 3, 8> MeshIntegrator::cube_index_offsets_ = [] {
@@ -300,6 +308,59 @@ void MeshIntegrator::processBlock(VolumetricMap* map,
   while (index_getter->getNextIndex(b_idx)) {
     VLOG(10) << "Extracting mesh for block: " << indexToStr(b_idx);
     meshBlock(cube_index_offsets_, cube_coord_offsets_, b_idx, config.min_weight, *map);
+    if (!config.flatten_blocks) {
+      continue;
+    }
+
+    auto mesh = map->getMeshLayer().getBlockPtr(b_idx);
+    if (!mesh) {
+      continue;
+    }
+
+    const auto scale = 1.0f / config.vertex_tolerance_m;
+
+    size_t new_idx = 0;
+    LongIndexHashMap<size_t> seen;
+    std::vector<size_t> remap(mesh->points.size(), 0);
+    std::vector<size_t> to_delete;
+    for (size_t i = 0; i < mesh->points.size(); ++i) {
+      const auto& p = mesh->points[i];
+      const LongIndex p_idx(std::round(p.x() * scale),
+                            std::round(p.y() * scale),
+                            std::round(p.z() * scale));
+      auto iter = seen.find(p_idx);
+      if (iter != seen.end()) {
+        remap[i] = iter->second;
+        to_delete.push_back(i);
+      } else {
+        remap[i] = new_idx;
+        seen[p_idx] = new_idx;
+        ++new_idx;
+      }
+    }
+
+    for (auto& face : mesh->faces) {
+      face[0] = remap[face[0]];
+      face[1] = remap[face[1]];
+      face[2] = remap[face[2]];
+    }
+
+    utils::remove_by_index(mesh->points, to_delete);
+    if (mesh->has_colors) {
+      utils::remove_by_index(mesh->colors, to_delete);
+    }
+
+    if (mesh->has_timestamps) {
+      utils::remove_by_index(mesh->stamps, to_delete);
+    }
+
+    if (mesh->has_first_seen_stamps) {
+      utils::remove_by_index(mesh->first_seen_stamps, to_delete);
+    }
+
+    if (mesh->has_labels) {
+      utils::remove_by_index(mesh->labels, to_delete);
+    }
   }
 }
 
