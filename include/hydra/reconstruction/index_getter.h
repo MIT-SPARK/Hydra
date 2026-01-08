@@ -48,7 +48,6 @@
 #pragma once
 
 #include <mutex>
-#include <utility>
 #include <vector>
 
 namespace hydra {
@@ -63,11 +62,13 @@ class IndexGetter {
  public:
   explicit IndexGetter(const std::vector<IndexT>& indices)
       : indices_(indices), current_index_(0) {}
+
   bool getNextIndex(IndexT& index) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (current_index_ >= indices_.size()) {
       return false;
     }
+
     index = indices_[current_index_];
     current_index_++;
     return true;

@@ -61,7 +61,7 @@ DynamicSceneGraph::Ptr BatchPipeline::construct(const VFConfig& frontend_config,
     return nullptr;
   }
 
-  MeshIntegratorConfig mesh_config;
+  MeshIntegrator::Config mesh_config;
   MeshIntegrator integrator(mesh_config);
   integrator.generateMesh(map, false, false);
 

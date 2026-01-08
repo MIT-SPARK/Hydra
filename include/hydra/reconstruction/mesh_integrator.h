@@ -34,9 +34,9 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
+#include <spatial_hash/types.h>
+
 #include "hydra/reconstruction/index_getter.h"
-#include "hydra/reconstruction/mesh_integrator_config.h"
-#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra {
 
@@ -44,9 +44,19 @@ class VolumetricMap;
 
 class MeshIntegrator {
  public:
-  using BlockIndexGetter = IndexGetter<BlockIndex>;
+  using BlockIndexGetter = IndexGetter<spatial_hash::BlockIndex>;
 
-  explicit MeshIntegrator(const MeshIntegratorConfig& config);
+  struct Config {
+    Config();
+    //! Minimum weight for a TSDF voxel to be considered observered
+    float min_weight = 1.0e-4;
+    //! Remove redundant vertices per-block after marching cubes
+    bool flatten_blocks = false;
+    //! Number of thread to use during integration
+    int integrator_threads;
+  } const config;
+
+  explicit MeshIntegrator(const Config& config);
 
   virtual ~MeshIntegrator() = default;
 
@@ -54,37 +64,19 @@ class MeshIntegrator {
                             bool only_mesh_updated_blocks,
                             bool clear_updated_flag) const;
 
-  void allocateBlocks(const BlockIndices& blocks, VolumetricMap& map) const;
+ protected:
+  void allocateBlocks(const spatial_hash::BlockIndices& blocks,
+                      VolumetricMap& map) const;
 
-  void showUpdateInfo(const VolumetricMap& map,
-                      const BlockIndices& blocks,
-                      int verbosity) const;
-
-  void launchThreads(const BlockIndices& blocks,
-                     bool interior_pass,
+  void launchThreads(const spatial_hash::BlockIndices& blocks,
                      VolumetricMap& map) const;
 
-  void processInterior(VolumetricMap* map, BlockIndexGetter* index_getter) const;
+  void processBlock(VolumetricMap* map, BlockIndexGetter* index_getter) const;
 
-  void processExterior(VolumetricMap* map, BlockIndexGetter* index_getter) const;
-
-  virtual void meshBlockInterior(const BlockIndex& block_index,
-                                 const VoxelIndex& voxel_index,
-                                 VolumetricMap& map) const;
-
-  virtual void meshBlockExterior(const BlockIndex& block_index,
-                                 const VoxelIndex& voxel_index,
-                                 VolumetricMap& map) const;
-
-  static BlockIndex getNeighborIndex(const BlockIndex& block_idx,
-                                     int voxels_per_side,
-                                     VoxelIndex& corner_index);
-
-  const MeshIntegratorConfig config;
-
- protected:
   const static Eigen::Matrix<int, 3, 8> cube_index_offsets_;
   mutable Eigen::Matrix<float, 3, 8> cube_coord_offsets_;
 };
+
+void declare_config(MeshIntegrator::Config& config);
 
 }  // namespace hydra
