@@ -39,15 +39,15 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
+#include <kimera_pgmo/mesh_delta.h>
+#include <kimera_pgmo/pcl_mesh_traits.h>
 #include <kimera_pgmo/utils/mesh_io.h>
 
 #include "hydra/backend/backend_utilities.h"
 #include "hydra/backend/mst_factors.h"
 #include "hydra/common/global_info.h"
-#include "hydra/common/launch_callbacks.h"
 #include "hydra/common/pipeline_queues.h"
-#include "hydra/utils/minimum_spanning_tree.h"
-#include "hydra/utils/pgmo_mesh_traits.h"
+#include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -120,14 +120,13 @@ BackendModule::BackendModule(const Config& config,
                             &PipelineQueues::instance().external_loop_closure_queue) {
   // set up frontend graph copy
   unmerged_graph_ = private_dsg_->graph->clone();
-  // set up mesh infrastructure
-  private_dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>());
+  private_dsg_->graph->setMesh(GlobalInfo::instance().createMesh());
   unmerged_graph_->setMesh(private_dsg_->graph->mesh());
-  original_vertices_.reset(
-      new pcl::PointCloud<pcl::PointXYZ>());  // set up frontend graph copy
-  vertex_stamps_.reset(new std::vector<uint64_t>());
-
   dsg_updater_.reset(new DsgUpdater(config, unmerged_graph_, private_dsg_));
+
+  // set up pgmo mesh infrastructure
+  original_vertices_.reset(new pcl::PointCloud<pcl::PointXYZ>());
+  vertex_stamps_.reset(new std::vector<uint64_t>());
 }
 
 BackendModule::~BackendModule() { stopImpl(); }
@@ -421,30 +420,15 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
     return;
   }
 
-  // TODO(nathan) this is ugly, but no good way to know at backend init whether
-  // we're tracking first-seen stamps or not (because that's private to the active
-  // window map)
-  if (input.mesh_stamp_update && !private_dsg_->graph->mesh()->numVertices()) {
-    const_cast<bool&>(private_dsg_->graph->mesh()->has_first_seen_stamps) = true;
-  }
-
-  {
+  {  // mesh critical section
     std::lock_guard<std::mutex> graph_lock(private_dsg_->mutex);
-
-    input.mesh_update->updateMesh(*private_dsg_->graph->mesh());
-    if (input.mesh_stamp_update) {
-      input.mesh_stamp_update->updateMesh(*private_dsg_->graph->mesh(),
-                                          input.mesh_update->vertex_start);
-    }
-
+    input.mesh_update->updateMesh(*private_dsg_->graph->mesh(), mesh_offsets_);
     kimera_pgmo::StampedCloud<pcl::PointXYZ> cloud_out{*original_vertices_,
                                                        *vertex_stamps_};
     input.mesh_update->updateVertices(cloud_out);
-    // we use this to make sure that deformation only happens for vertices that are
-    // still active
-    num_archived_vertices_ = input.mesh_update->getTotalArchivedVertices();
-    utils::updatePlaces2d(private_dsg_, *input.mesh_update, num_archived_vertices_);
-  }
+    utils::updatePlaces2d(private_dsg_, mesh_offsets_);
+  }  // mesh critical section
+
   have_new_mesh_ = true;
 }
 
@@ -505,8 +489,8 @@ void BackendModule::updateDsgMesh(size_t timestamp_ns, bool force_mesh_update) {
                                    KimeraPgmoInterface::config_.num_interp_pts,
                                    KimeraPgmoInterface::config_.interp_horizon,
                                    nullptr,
-                                   prev_num_archived_vertices_);
-  prev_num_archived_vertices_ = num_archived_vertices_;
+                                   last_deformed_vertices_);
+  last_deformed_vertices_ = mesh_offsets_.archived_vertices;
 }
 
 void BackendModule::updateAgentNodeMeasurements(const PoseGraph& meas) {
@@ -548,8 +532,7 @@ void BackendModule::optimize(size_t timestamp_ns, bool force_find_merge) {
                                            {},
                                            deformation_graph_.get(),
                                            nullptr,
-                                           num_archived_vertices_,
-                                           prev_num_archived_vertices_});
+                                           mesh_offsets_});
   dsg_updater_->callUpdateFunctions(timestamp_ns, info);
   have_new_loopclosures_ = false;
 }

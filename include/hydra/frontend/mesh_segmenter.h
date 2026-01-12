@@ -33,38 +33,36 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <memory>
-
 #include "hydra/common/dsg_types.h"
 #include "hydra/common/output_sink.h"
+#include "hydra/frontend/mesh_delta_clustering.h"
 
 namespace kimera_pgmo {
 class MeshDelta;
+struct MeshOffsetInfo;
 }  // namespace kimera_pgmo
 
 namespace hydra {
 
-struct Cluster {
-  Eigen::Vector3d centroid;
-  std::vector<size_t> indices;
-};
-
-using LabelIndices = std::map<uint32_t, std::vector<size_t>>;
+using clustering::Clusters;
+using clustering::LabelIndices;
 
 class MeshSegmenter {
  public:
-  using Clusters = std::vector<Cluster>;
-  using LabelClusters = std::map<uint32_t, Clusters>;
+  struct Cluster {
+    Eigen::Vector3d centroid;
+    std::vector<size_t> indices;
+  };
+
+  using LabelClusters = std::map<uint32_t, std::vector<Cluster>>;
   using Sink = OutputSink<uint64_t,
                           const kimera_pgmo::MeshDelta&,
-                          const std::vector<size_t>&,
-                          const LabelIndices&>;
+                          const LabelIndices&,
+                          const LabelClusters&>;
 
   struct Config {
     std::string layer_id = DsgLayers::OBJECTS;
-    double cluster_tolerance = 0.25;
-    size_t min_cluster_size = 40;
-    size_t max_cluster_size = 100000;
+    clustering::ClusteringConfig clustering;
     BoundingBox::Type bounding_box_type = BoundingBox::Type::AABB;
     std::string timer_namespace = "frontend/objects";
     std::vector<Sink::Factory> sinks;
@@ -72,17 +70,20 @@ class MeshSegmenter {
 
   explicit MeshSegmenter(const Config& config, const std::set<uint32_t>& labels);
 
-  LabelClusters detect(uint64_t timestamp_ns, const kimera_pgmo::MeshDelta& active);
+  LabelClusters detect(uint64_t timestamp_ns,
+                       const kimera_pgmo::MeshDelta& active,
+                       const kimera_pgmo::MeshOffsetInfo& offsets);
 
   void updateGraph(uint64_t timestamp,
-                   const kimera_pgmo::MeshDelta& active,
+                   const kimera_pgmo::MeshOffsetInfo& offsets,
                    const LabelClusters& clusters,
                    DynamicSceneGraph& graph);
 
   std::unordered_set<NodeId> getActiveNodes() const;
 
  private:
-  void updateOldNodes(const kimera_pgmo::MeshDelta& active, DynamicSceneGraph& graph);
+  void updateOldNodes(const kimera_pgmo::MeshOffsetInfo& offsets,
+                      DynamicSceneGraph& graph);
 
   void addNodeToGraph(DynamicSceneGraph& graph,
                       const Cluster& cluster,

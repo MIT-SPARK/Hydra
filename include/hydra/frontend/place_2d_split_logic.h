@@ -1,16 +1,20 @@
 #pragma once
 #include <pcl/common/centroid.h>
-#include <pcl/pcl_base.h>
 #include <pcl/point_types.h>
+#include <spark_dsg/edge_attributes.h>
 
-#include "hydra/common/dsg_types.h"
-#include "spark_dsg/dynamic_scene_graph.h"
 #include "spark_dsg/node_attributes.h"
+
+namespace kimera_pgmo {
+struct MeshOffsetInfo;
+}  // namespace kimera_pgmo
 
 namespace hydra {
 
+using spark_dsg::EdgeAttributes;
+using spark_dsg::Place2dNodeAttributes;
+
 struct Place2d {
-  // using PointT = pcl::PointXYZRGBA;
   using PointT = spark_dsg::Mesh::Pos;
   using CloudT = spark_dsg::Mesh::Positions;
   using CentroidT = pcl::CentroidPoint<pcl::PointXYZ>;
@@ -67,5 +71,8 @@ bool shouldAddPlaceConnection(const Place2d& p1,
                               const double place_overlap_threshold,
                               const double place_max_neighbor_z_diff,
                               double& weight);
+
+void remapPlace2dMesh(Place2dNodeAttributes& attrs,
+                      const kimera_pgmo::MeshOffsetInfo& offsets);
 
 }  // namespace hydra

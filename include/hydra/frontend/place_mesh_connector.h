@@ -34,9 +34,11 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <kimera_pgmo/mesh_delta.h>
+#include <spark_dsg/scene_graph_layer.h>
 
-#include "hydra/common/dsg_types.h"
+namespace kimera_pgmo {
+class MeshDelta;
+}
 
 namespace hydra {
 
@@ -44,17 +46,9 @@ class PlaceMeshConnector {
  public:
   using DeformationMapping = std::vector<size_t>;
 
-  explicit PlaceMeshConnector(const kimera_pgmo::MeshDelta::Ptr& delta);
-  ~PlaceMeshConnector();
-
-  size_t addConnections(const SceneGraphLayer& places,
-                        const DeformationMapping& mapping) const;
-
- protected:
-  kimera_pgmo::MeshDelta::Ptr delta_;
-
-  struct Detail;
-  std::unique_ptr<Detail> internals_;
+  static size_t addConnections(const kimera_pgmo::MeshDelta& delta,
+                               const spark_dsg::SceneGraphLayer& places,
+                               const DeformationMapping& mapping);
 };
 
 }  // namespace hydra

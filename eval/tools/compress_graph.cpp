@@ -157,26 +157,8 @@ void remapPlaces(DynamicSceneGraph& graph,
   }
 }
 
-void compressMesh(DynamicSceneGraph& graph, double resolution) {
-  kimera_pgmo::DeltaCompression compression(resolution);
-  kimera_pgmo::HashedIndexMapping remapping;
-
-  if (!graph.mesh()) {
-    return;
-  }
-  PgmoMeshInterface interface(*graph.mesh());
-  auto delta = compression.update(interface, 0, &remapping);
-
-  auto& face_remapping = remapping.at(BlockIndex(0, 0, 0));
-  std::unordered_map<size_t, size_t> vertex_remapping;
-  for (auto&& [face_idx, new_idx] : face_remapping) {
-    size_t vertex_idx = getVertexFromFaces(*graph.mesh(), face_idx);
-    vertex_remapping[vertex_idx] = new_idx;
-  }
-
-  graph.setMesh(std::make_shared<spark_dsg::Mesh>());
-  delta->updateMesh(*graph.mesh());
-  remapPlaces(graph, vertex_remapping);
+void compressMesh(DynamicSceneGraph& /* graph */, double /* resolution */) {
+  throw std::runtime_error("Not implemented currently!");
 }
 
 void compressPlaces(DynamicSceneGraph& graph, double resolution) {

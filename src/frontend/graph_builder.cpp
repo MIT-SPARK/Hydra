@@ -44,20 +44,13 @@
 #include <kimera_pgmo/utils/mesh_io.h>
 #include <spark_dsg/printing.h>
 
-#include <fstream>
-
 #include "hydra/common/global_info.h"
 #include "hydra/common/launch_callbacks.h"
 #include "hydra/common/pipeline_queues.h"
 #include "hydra/frontend/frontier_extractor.h"
 #include "hydra/frontend/mesh_segmenter.h"
-#include "hydra/frontend/place_2d_segmenter.h"
-#include "hydra/frontend/place_mesh_connector.h"
-#include "hydra/utils/display_utilities.h"
-#include "hydra/utils/mesh_utilities.h"
-#include "hydra/utils/nearest_neighbor_utilities.h"
 #include "hydra/utils/pgmo_mesh_interface.h"
-#include "hydra/utils/pgmo_mesh_traits.h"
+#include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/printing.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -94,7 +87,6 @@ void declare_config(GraphBuilder::Config& config) {
   config.pose_graph_tracker.setOptional();
   field(config.pose_graph_tracker, "pose_graph_tracker");
   // surface (i.e., 2D) places
-  field(config.enable_place_mesh_mapping, "enable_place_mesh_mapping");
   config.surface_places.setOptional();
   field(config.surface_places, "surface_places");
   // freespace (i.e., 3D) places
@@ -107,7 +99,6 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.view_database, "view_database");
   field(config.sinks, "sinks");
   field(config.no_packet_collation, "no_packet_collation");
-  field(config.overwrite_mesh_timestamps, "overwrite_mesh_timestamps");
   field(config.verbosity, "verbosity");
 }
 
@@ -128,10 +119,10 @@ GraphBuilder::GraphBuilder(const Config& config,
       frontier_places_(config.frontier_places.create()),
       view_database_(config.view_database),
       sinks_(Sink::instantiate(config.sinks)) {
+  const auto& global_info = GlobalInfo::instance();
   if (config.enable_mesh_objects) {
     segmenter_ = std::make_unique<MeshSegmenter>(
-        config.object_config,
-        GlobalInfo::instance().getLabelSpaceConfig().object_labels);
+        config.object_config, global_info.getLabelSpaceConfig().object_labels);
   }
 
   if (!config.use_frontiers) {
@@ -140,8 +131,7 @@ GraphBuilder::GraphBuilder(const Config& config,
 
   CHECK(dsg_ != nullptr);
   CHECK(dsg_->graph != nullptr);
-  dsg_->graph->setMesh(std::make_shared<spark_dsg::Mesh>(
-      true, true, true, config.overwrite_mesh_timestamps));
+  dsg_->graph->setMesh(global_info.createMesh());
 
   mesh_compression_.reset(
       new kimera_pgmo::DeltaCompression(config.pgmo.mesh_resolution));
@@ -363,8 +353,7 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
     state_->lcd_graph->graph->mergeGraph(*dsg_->graph);
   }
 
-  backend_input_->mesh_update = last_mesh_update_;
-  backend_input_->mesh_stamp_update = last_mesh_stamp_update_;
+  backend_input_->mesh_update = std::move(last_mesh_update_);
   queues.backend_queue.push(backend_input_);
   if (queues.lcd_queue) {
     queues.lcd_queue->push(lcd_input_);
@@ -408,9 +397,8 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
             msg->timestamp_ns, msg->world_T_body(), timestamp, pos);
       });
 
-  if (config.enable_place_mesh_mapping) {
-    updatePlaceMeshMapping(*msg);
-  }
+  // TODO(nathan) follow up on whether or not we need to do stuff with the 3D places and
+  // mesh
 }
 
 void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
@@ -426,63 +414,20 @@ void GraphBuilder::updateMesh(const ActiveWindowOutput& input) {
     });
   }  // end timing scope
 
+  const auto& mesh = input.map().getMeshLayer();
+
   {
     ScopedTimer timer("frontend/mesh_compression", input.timestamp_ns, true, 1, false);
-    mesh_remapping_ = std::make_shared<kimera_pgmo::HashedIndexMapping>();
-    const auto& mesh = input.map().getMeshLayer();
-    auto interface = PgmoMeshLayerInterface(mesh);
     VLOG(5) << "[Hydra Frontend] Updating mesh with " << mesh.numBlocks() << " blocks";
-    const auto new_mesh_update =
-        mesh_compression_->update(interface, input.timestamp_ns, mesh_remapping_.get());
-
-    if (config.overwrite_mesh_timestamps) {
-      auto new_stamps =
-          std::make_shared<StampUpdate>(new_mesh_update->vertex_updates->size());
-      if (last_mesh_stamp_update_) {
-        for (const auto& [prev, curr] : new_mesh_update->prev_to_curr) {
-          const auto curr_local = new_mesh_update->getLocalIndex(curr);
-          const auto prev_local = last_mesh_update_->getLocalIndex(prev);
-          new_stamps->first_seen.at(curr_local) =
-              last_mesh_stamp_update_->first_seen.at(prev_local);
-          new_stamps->last_seen.at(curr_local) =
-              last_mesh_stamp_update_->last_seen.at(prev_local);
-        }
-      }
-
-      for (const auto& block : mesh) {
-        auto block_remap = mesh_remapping_->find(block.index);
-        if (block_remap == mesh_remapping_->end()) {
-          LOG(ERROR) << "Unknown block: " << block.index.transpose();
-          continue;
-        }
-
-        CHECK(block.has_first_seen_stamps && block.has_timestamps);
-        for (size_t i = 0; i < block.numVertices(); ++i) {
-          auto iter = block_remap->second.find(i);
-          if (iter != block_remap->second.end()) {
-            const auto local_idx = new_mesh_update->getLocalIndex(iter->second);
-            new_stamps->first_seen.at(local_idx) = block.first_seen_stamps.at(i);
-            new_stamps->last_seen.at(local_idx) = block.stamps.at(i);
-          }
-        }
-      }
-
-      last_mesh_stamp_update_ = new_stamps;
-    }
-
-    // cache last mesh update for sending to backend
-    last_mesh_update_ = new_mesh_update;
+    const BlockMeshIter wrapper(mesh);
+    last_mesh_update_ = mesh_compression_->update(wrapper, input.timestamp_ns);
   }  // end timing scope
 
   {  // start timing scope
     // TODO(nathan) we should probably have a mutex before modifying the mesh, but
     // nothing else uses it at the moment
     ScopedTimer timer("frontend/mesh_update", input.timestamp_ns, true, 1, false);
-    last_mesh_update_->updateMesh(*dsg_->graph->mesh());
-    if (last_mesh_stamp_update_) {
-      last_mesh_stamp_update_->updateMesh(*dsg_->graph->mesh(),
-                                          last_mesh_update_->vertex_start);
-    }
+    last_mesh_update_->updateMesh(*dsg_->graph->mesh(), mesh_offsets_);
   }  // end timing scope
 
   ScopedTimer timer("frontend/postmesh_callbacks", input.timestamp_ns, true, 1, false);
@@ -499,12 +444,11 @@ void GraphBuilder::updateObjects(const ActiveWindowOutput& input) {
     return;
   }
 
-  const auto timestamp = input.timestamp_ns;
-  const auto clusters = segmenter_->detect(timestamp, *last_mesh_update_);
-
+  const auto stamp = input.timestamp_ns;
+  const auto clusters = segmenter_->detect(stamp, *last_mesh_update_, mesh_offsets_);
   {  // start dsg critical section
     std::unique_lock<std::mutex> lock(dsg_->mutex);
-    segmenter_->updateGraph(timestamp, *last_mesh_update_, clusters, *dsg_->graph);
+    segmenter_->updateGraph(stamp, mesh_offsets_, clusters, *dsg_->graph);
   }  // end dsg critical section
 }
 
@@ -519,24 +463,18 @@ void GraphBuilder::updateDeformationGraph(const ActiveWindowOutput& input) {
   pcl::PointCloud<pcl::PointXYZRGBA> new_vertices;
   std::vector<size_t> new_indices;
   std::vector<pcl::Vertices> new_triangles;
+  kimera_pgmo::HashedIndexMapping new_remapping;
   deformation_compression_->pruneStoredMesh(time_s - config.pgmo.time_horizon);
-  deformation_compression_->compressAndIntegrate(interface,
-                                                 new_vertices,
-                                                 new_triangles,
-                                                 new_indices,
-                                                 deformation_remapping_,
-                                                 time_s);
+  deformation_compression_->compressAndIntegrate(
+      interface, new_vertices, new_triangles, new_indices, new_remapping, time_s);
 
   pcl::PointCloud<pcl::PointXYZRGBA>::Ptr vertices(
       new pcl::PointCloud<pcl::PointXYZRGBA>());
   deformation_compression_->getVertices(vertices);
 
-  std::vector<kimera_pgmo::Edge> new_edges;
-  if (new_indices.size() > 0 && new_triangles.size() > 0) {
-    // Add nodes and edges to graph
-    new_edges = deformation_graph_.addPointsAndSurfaces(new_indices, new_triangles);
-  }
-
+  // Add nodes and edges to graph
+  const auto new_edges =
+      deformation_graph_.addPointsAndSurfaces(new_indices, new_triangles);
   if (backend_input_) {
     backend_input_->deformation_graph = *CHECK_NOTNULL(kimera_pgmo::makePoseGraph(
         prefix.id, time_s, new_edges, new_indices, *vertices));
@@ -614,11 +552,11 @@ void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
   }
 
   ScopedTimer timer("frontend/places_2d", input.timestamp_ns, true, 1, false);
-  surface_places_->detect(input, *last_mesh_update_, *dsg_->graph);
+  surface_places_->detect(input, *last_mesh_update_, mesh_offsets_, *dsg_->graph);
 
   // start graph critical section
   std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-  surface_places_->updateGraph(input.timestamp_ns, input, *dsg_->graph);
+  surface_places_->updateGraph(input.timestamp_ns, input, mesh_offsets_, *dsg_->graph);
 }
 
 void GraphBuilder::updatePoseGraph(const ActiveWindowOutput& input) {
@@ -696,49 +634,6 @@ void GraphBuilder::assignBowVectors() {
   size_t num_assigned = prior_size - cached_bow_messages_.size();
   VLOG(3) << "[Hydra Frontend] assigned " << num_assigned << " bow vectors of "
           << prior_size << " original";
-}
-
-void GraphBuilder::updatePlaceMeshMapping(const ActiveWindowOutput& input) {
-  const auto& places = dsg_->graph->getLayer(DsgLayers::PLACES);
-  if (places.numNodes() == 0) {
-    // avoid doing work by making the kdtree lookup if we don't have places
-    return;
-  }
-
-  ScopedTimer timer("frontend/place_mesh_mapping", input.timestamp_ns, true, 1);
-  CHECK(last_mesh_update_);
-  CHECK(mesh_remapping_);
-
-  // TODO(nathan) we can maybe put this somewhere else
-  const auto num_active = last_mesh_update_->vertex_updates->size();
-  std::vector<size_t> deformation_mapping(num_active,
-                                          std::numeric_limits<size_t>::max());
-  for (const auto& [block, indices] : *mesh_remapping_) {
-    const auto block_iter = deformation_remapping_.find(block);
-    if (block_iter == deformation_remapping_.end()) {
-      LOG(WARNING) << "Missing block " << block.transpose() << " from graph mapping!";
-      continue;
-    }
-
-    const auto& block_mapping = block_iter->second;
-    for (const auto& [block_idx, mesh_idx] : indices) {
-      const auto vertex_iter = block_mapping.find(block_idx);
-      if (vertex_iter == block_mapping.end()) {
-        continue;
-      }
-
-      const auto local_idx = last_mesh_update_->getLocalIndex(mesh_idx);
-      CHECK_LT(local_idx, num_active);
-      deformation_mapping[local_idx] = vertex_iter->second;
-    }
-  }
-
-  PlaceMeshConnector connector(last_mesh_update_);
-  const auto num_missing = connector.addConnections(places, deformation_mapping);
-
-  VLOG_IF(1, num_missing > 0) << "[Frontend] " << num_missing
-                              << " places missing basis points @ " << input.timestamp_ns
-                              << " [ns]";
 }
 
 }  // namespace hydra

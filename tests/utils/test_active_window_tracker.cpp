@@ -35,8 +35,17 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <hydra/utils/active_window_tracker.h>
+#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph_layer.h>
+#include <spark_dsg/scene_graph_types.h>
 
 namespace hydra {
+
+using spark_dsg::DynamicSceneGraph;
+using spark_dsg::NodeAttributes;
+using spark_dsg::NodeId;
+using spark_dsg::SceneGraphLayer;
 
 namespace {
 

@@ -35,33 +35,16 @@
 #pragma once
 
 #include <gtsam/inference/Symbol.h>
-#include <gtsam/nonlinear/Values.h>
+#include <kimera_pgmo/mesh_offset_info.h>
 
-#include "hydra/common/dsg_types.h"
 #include "hydra/common/shared_dsg_info.h"
-
-namespace kimera_pgmo {
-class MeshDelta;
-class SparseKeyframe;
-}  // namespace kimera_pgmo
 
 namespace hydra::utils {
 
-using KeyMap = std::unordered_map<gtsam::Key, gtsam::Key>;
-using FrameMap = std::unordered_map<gtsam::Key, kimera_pgmo::SparseKeyframe>;
+std::optional<uint64_t> getTimeNs(const spark_dsg::DynamicSceneGraph& graph,
+                                  gtsam::Symbol key);
 
-std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol key);
-
-void updatePlace2dMesh(Place2dNodeAttributes& attrs,
-                       const kimera_pgmo::MeshDelta& mesh_update,
-                       const size_t num_archived_vertices);
-
-void updatePlace2dBoundary(Place2dNodeAttributes& attrs,
-                           const kimera_pgmo::MeshDelta& mesh_update);
-
-void updatePlaces2d(SharedDsgInfo::Ptr dsg,
-                    kimera_pgmo::MeshDelta& mesh_update,
-                    size_t num_archived_vertices);
+void updatePlaces2d(SharedDsgInfo::Ptr dsg, const kimera_pgmo::MeshOffsetInfo& offsets);
 
 template <typename T>
 void mergeIndices(const T& from, T& to) {
@@ -77,9 +60,5 @@ void mergeIndices(const T& from, T& to) {
                  to_indices.end(),
                  std::back_inserter(to));
 }
-
-gtsam::Values getDenseFrames(const KeyMap& full_sparse_frame_map,
-                             const FrameMap& sparse_frames,
-                             const gtsam::Values& sparse_values);
 
 }  // namespace hydra::utils

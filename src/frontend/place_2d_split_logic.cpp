@@ -1,5 +1,6 @@
 #include "hydra/frontend/place_2d_split_logic.h"
 
+#include <kimera_pgmo/mesh_delta.h>
 #include <spark_dsg/dynamic_scene_graph.h>
 #include <spark_dsg/node_attributes.h>
 
@@ -7,6 +8,19 @@
 #include "opencv2/imgproc.hpp"
 
 namespace hydra {
+namespace {
+
+inline void remapPlace2dConnections(Place2dNodeAttributes& attrs,
+                                    const kimera_pgmo::MeshOffsetInfo& offsets) {
+  kimera_pgmo::MeshOffsetInfo::RemapStats info;
+  auto& connections = attrs.pcl_mesh_connections;
+  connections = offsets.remapVertexIndices(connections, &info);
+  attrs.pcl_min_index = info.min_index;
+  attrs.pcl_max_index = info.max_index;
+  attrs.has_active_mesh_indices = !info.all_archived;
+}
+
+}  // namespace
 
 void addRectInfo(const Place2d::CloudT& points,
                  const std::vector<Place2d::Index> mindices,
@@ -257,6 +271,26 @@ bool shouldAddPlaceConnection(const Place2d& p1,
     return true;
   } else {
     return false;
+  }
+}
+
+void remapPlace2dMesh(Place2dNodeAttributes& attrs,
+                      const kimera_pgmo::MeshOffsetInfo& offsets) {
+  remapPlace2dConnections(attrs, offsets);
+
+  auto& indices = attrs.pcl_boundary_connections;
+  kimera_pgmo::MeshOffsetInfo::RemapStats info;
+  indices = offsets.remapVertexIndices(indices, &info);
+
+  const auto prev_boundary = attrs.boundary;
+  attrs.boundary.clear();
+  attrs.boundary.reserve(prev_boundary.size());
+  for (size_t i = 0; i < prev_boundary.size(); ++i) {
+    if (info.deleted_indices.count(i)) {
+      continue;
+    }
+
+    attrs.boundary.push_back(prev_boundary[i]);
   }
 }
 

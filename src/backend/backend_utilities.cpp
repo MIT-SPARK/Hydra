@@ -35,12 +35,16 @@
 #include "hydra/backend/backend_utilities.h"
 
 #include <glog/logging.h>
-#include <kimera_pgmo/mesh_delta.h>
-#include <kimera_pgmo/sparse_keyframe.h>
+#include <spark_dsg/node_symbol.h>
 
-#include <sstream>
+#include "hydra/frontend/place_2d_split_logic.h"
 
 namespace hydra::utils {
+
+using spark_dsg::AgentNodeAttributes;
+using spark_dsg::DsgLayers;
+using spark_dsg::DynamicSceneGraph;
+using spark_dsg::NodeSymbol;
 
 std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol key) {
   NodeSymbol node(key.chr(), key.index());
@@ -52,60 +56,8 @@ std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol 
   return graph.getNode(node).attributes<AgentNodeAttributes>().timestamp.count();
 }
 
-void updatePlace2dMesh(Place2dNodeAttributes& attrs,
-                       const kimera_pgmo::MeshDelta& mesh_update,
-                       const size_t num_archived_vertices) {
-  size_t min_index = SIZE_MAX;
-  size_t max_index = 0;
-  auto iter = attrs.pcl_mesh_connections.begin();
-
-  while (iter != attrs.pcl_mesh_connections.end()) {
-    if (mesh_update.deleted_indices.count(*iter)) {
-      iter = attrs.pcl_mesh_connections.erase(iter);
-      continue;
-    }
-
-    auto map_iter = mesh_update.prev_to_curr.find(*iter);
-    if (map_iter != mesh_update.prev_to_curr.end()) {
-      *iter = map_iter->second;
-    }
-    min_index = std::min(min_index, *iter);
-    max_index = std::max(max_index, *iter);
-    ++iter;
-  }
-  attrs.pcl_min_index = min_index;
-  attrs.pcl_max_index = max_index;
-
-  if (attrs.pcl_max_index < num_archived_vertices) {
-    attrs.has_active_mesh_indices = false;
-  }
-}
-
-void updatePlace2dBoundary(Place2dNodeAttributes& attrs,
-                           const kimera_pgmo::MeshDelta& mesh_update) {
-  const auto prev_boundary = attrs.boundary;
-  const auto prev_boundary_connections = attrs.pcl_boundary_connections;
-  attrs.boundary.clear();
-  attrs.pcl_boundary_connections.clear();
-  for (size_t i = 0; i < prev_boundary.size(); ++i) {
-    if (mesh_update.deleted_indices.count(prev_boundary_connections.at(i))) {
-      continue;
-    }
-
-    auto map_iter = mesh_update.prev_to_curr.find(prev_boundary_connections.at(i));
-    if (map_iter != mesh_update.prev_to_curr.end()) {
-      attrs.boundary.push_back(prev_boundary.at(i));
-      attrs.pcl_boundary_connections.push_back(map_iter->second);
-    } else {
-      attrs.boundary.push_back(prev_boundary.at(i));
-      attrs.pcl_boundary_connections.push_back(prev_boundary_connections.at(i));
-    }
-  }
-}
-
 void updatePlaces2d(SharedDsgInfo::Ptr dsg,
-                    kimera_pgmo::MeshDelta& mesh_update,
-                    size_t num_archived_vertices) {
+                    const kimera_pgmo::MeshOffsetInfo& offsets) {
   if (!dsg->graph->hasLayer(DsgLayers::MESH_PLACES)) {
     return;
   }
@@ -116,31 +68,8 @@ void updatePlaces2d(SharedDsgInfo::Ptr dsg,
       continue;
     }
 
-    updatePlace2dMesh(*attrs, mesh_update, num_archived_vertices);
-    updatePlace2dBoundary(*attrs, mesh_update);
+    remapPlace2dMesh(*attrs, offsets);
   }
-}
-
-gtsam::Values getDenseFrames(const KeyMap& full_sparse_frame_map,
-                             const FrameMap& sparse_frames,
-                             const gtsam::Values& sparse_values) {
-  if (full_sparse_frame_map.empty() == 0) {
-    return sparse_values;
-  }
-
-  gtsam::Values dense_values;
-  for (const auto& [dense_key, sparse_key] : full_sparse_frame_map) {
-    if (!sparse_values.exists(sparse_key)) {
-      continue;
-    }
-
-    const auto& sparse_T_dense =
-        sparse_frames.at(sparse_key).keyed_transforms.at(dense_key);
-    const auto agent_pose =
-        sparse_values.at<gtsam::Pose3>(sparse_key).compose(sparse_T_dense);
-    dense_values.insert(dense_key, agent_pose);
-  }
-  return dense_values;
 }
 
 }  // namespace hydra::utils

@@ -34,11 +34,15 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <kimera_pgmo/mesh_delta.h>
+#include <kimera_pgmo/mesh_traits.h>
 #include <spark_dsg/bounding_box.h>
 #include <spatial_hash/hash.h>
 
 #include "hydra/backend/update_functions.h"
+
+namespace kimera_pgmo {
+class MeshDelta;
+}
 
 namespace hydra {
 
@@ -98,7 +102,7 @@ void MeshLabelClustering::update(const Vertices& vertices,
     const spatial_hash::LongIndex block_index(std::round(pos.x() * index_scale_),
                                               std::round(pos.y() * index_scale_),
                                               std::round(pos.z() * index_scale_));
-    updateBlockTracking(is_active(i) ? active_ : archived_, block_index, *traits.label);
+    updateBlockTracking(is_active(i) ? active_ : archived_, block_index, traits.label);
     seen_.insert(block_index);
   }
 }

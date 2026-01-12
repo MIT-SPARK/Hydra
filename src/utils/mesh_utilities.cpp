@@ -35,12 +35,16 @@
 #include "hydra/utils/mesh_utilities.h"
 
 #include <pcl/point_types.h>
+#include <spark_dsg/node_attributes.h>
 #define PCL_NO_PRECOMPILE
 #include <pcl/filters/radius_outlier_removal.h>
 #undef PCL_NO_PRECOMPILE
 #include <spark_dsg/bounding_box_extraction.h>
 
 namespace hydra {
+
+using spark_dsg::NodeAttributes;
+using spark_dsg::ObjectNodeAttributes;
 
 bool updateNodeCentroid(const spark_dsg::Mesh& mesh,
                         const std::vector<size_t>& indices,
