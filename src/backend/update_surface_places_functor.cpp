@@ -47,6 +47,14 @@
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
+
+static const auto reg = config::RegistrationWithConfig<UpdateFunctor,
+                                                       Update2dPlacesFunctor,
+                                                       Update2dPlacesFunctor::Config>(
+    "Update2dPlacesFunctor");
+
+}
 
 using timing::ScopedTimer;
 

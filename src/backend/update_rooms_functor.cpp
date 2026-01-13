@@ -41,6 +41,14 @@
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
+
+static const auto reg =
+    config::RegistrationWithConfig<UpdateFunctor,
+                                   UpdateRoomsFunctor,
+                                   UpdateRoomsFunctor::Config>("UpdateRoomsFunctor");
+
+}
 
 using timing::ScopedTimer;
 using SemanticLabel = SemanticNodeAttributes::Label;

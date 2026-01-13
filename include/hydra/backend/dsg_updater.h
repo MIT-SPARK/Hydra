@@ -37,19 +37,12 @@
 #include <kimera_pgmo/kimera_pgmo_interface.h>
 #include <spark_dsg/scene_graph_logger.h>
 
-#include <filesystem>
 #include <map>
 #include <memory>
-#include <mutex>
-#include <thread>
 
-#include "hydra/backend/backend_input.h"
-#include "hydra/backend/external_loop_closure_receiver.h"
 #include "hydra/backend/merge_tracker.h"
-#include "hydra/backend/pgmo_configs.h"
 #include "hydra/common/output_sink.h"
 #include "hydra/common/shared_dsg_info.h"
-#include "hydra/common/shared_module_state.h"
 #include "hydra/utils/data_directory.h"
 
 namespace hydra {
