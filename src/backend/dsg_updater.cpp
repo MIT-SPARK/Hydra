@@ -84,6 +84,7 @@ void declare_config(DsgUpdater::Config& config) {
   field(config.enable_node_merging, "enable_node_merging");
   field(config.reset_dsg_on_loop_closure, "reset_dsg_on_loop_closure");
   field(config.update_functors, "update_functors");
+  field(config.exhaustive_functors, "exhaustive_functors");
 }
 
 DsgUpdater::DsgUpdater(const Config& config,
@@ -160,6 +161,8 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
     }
   }
 
+  const std::set<std::string> exhaustive_names(config.exhaustive_functors.begin(),
+                                               config.exhaustive_functors.end());
   std::list<LayerCleanupFunc> cleanup_hooks;
   for (const auto& [name, functor] : update_functors_) {
     if (!functor) {
@@ -180,7 +183,7 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
                          *source_graph_,
                          *target_dsg_,
                          tracker,
-                         functor->config.enable_exhaustive_merging);
+                         exhaustive_names.count(name));
       if (info->loop_closure_detected && hooks.merge) {
         LOG(INFO) << "Updating all merge attributes for " << name;
         LOG(INFO) << "Current tracker: " << tracker.print();

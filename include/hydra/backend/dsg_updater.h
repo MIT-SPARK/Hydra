@@ -57,6 +57,7 @@ class DsgUpdater {
   using NodeToRobotMap = std::unordered_map<NodeId, size_t>;
 
   struct Config {
+    using FunctorConfig = config::VirtualConfig<UpdateFunctor, true>;
     //! Verbosity controls for functors
     VerbosityConfig functor_logging;
     //! Enable combining multiple nodes together
@@ -64,8 +65,9 @@ class DsgUpdater {
     //! If true, reset the private DSG with the unmerged graph on every loop closure
     bool reset_dsg_on_loop_closure = false;
     //! Update functors that get applied in the specified order
-    config::OrderedMap<std::string, config::VirtualConfig<UpdateFunctor, true>>
-        update_functors;
+    config::OrderedMap<std::string, FunctorConfig> update_functors;
+    //! Names of functors to use exhaustive merging for
+    std::vector<std::string> exhaustive_functors;
   } const config;
 
   DsgUpdater(const Config& config,

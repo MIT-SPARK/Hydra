@@ -80,18 +80,11 @@ struct UpdateFunctor {
     MergeFunc merge;
   };
 
-  struct Config {
-    bool enable_exhaustive_merging = false;
-  } const config;
-
-  explicit UpdateFunctor(const Config& config = {false});
   virtual ~UpdateFunctor() = default;
   virtual Hooks hooks() const;
   virtual void call(const DynamicSceneGraph& unmerged,
                     SharedDsgInfo& dsg,
                     const UpdateInfo::ConstPtr& info) const = 0;
 };
-
-void declare_config(UpdateFunctor::Config& config);
 
 }  // namespace hydra
