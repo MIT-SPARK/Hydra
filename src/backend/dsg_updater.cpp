@@ -77,9 +77,12 @@ void findAndApplyMerges(const VerbosityConfig& config,
 
 using hydra::timing::ScopedTimer;
 
+DsgUpdater::Config::Config() : VerbosityConfig("[dsg_updated] ") {}
+
 void declare_config(DsgUpdater::Config& config) {
   using namespace config;
   name("DsgUpdaterConfig");
+  base<VerbosityConfig>(config);
   field(config.functor_logging, "functor_logging");
   field(config.enable_node_merging, "enable_node_merging");
   field(config.reset_dsg_on_loop_closure, "reset_dsg_on_loop_closure");
@@ -185,14 +188,14 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
                          tracker,
                          exhaustive_names.count(name));
       if (info->loop_closure_detected && hooks.merge) {
-        LOG(INFO) << "Updating all merge attributes for " << name;
-        LOG(INFO) << "Current tracker: " << tracker.print();
+        MLOG(3) << "updating all merge attributes for " << name;
+        MLOG(3) << "current tracker: " << tracker.print();
         tracker.updateAllMergeAttributes(
             *source_graph_, *target_dsg_->graph, hooks.merge);
       }
     }
 
-    LOG(INFO) << "All merges: " << merge_tracker.print();
+    MLOG(2) << "all merges: " << merge_tracker.print();
     for (const auto& func : cleanup_hooks) {
       func(info, *source_graph_, target_dsg_.get());
     }
