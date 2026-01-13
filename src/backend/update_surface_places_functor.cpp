@@ -47,6 +47,14 @@
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
+
+static const auto reg = config::RegistrationWithConfig<UpdateFunctor,
+                                                       Update2dPlacesFunctor,
+                                                       Update2dPlacesFunctor::Config>(
+    "Update2dPlacesFunctor");
+
+}
 
 using timing::ScopedTimer;
 
@@ -98,7 +106,7 @@ Update2dPlacesFunctor::Update2dPlacesFunctor(const Config& config)
 
 UpdateFunctor::Hooks Update2dPlacesFunctor::hooks() const {
   auto my_hooks = UpdateFunctor::hooks();
-  my_hooks.cleanup = [this](const UpdateInfo::ConstPtr&, SharedDsgInfo* dsg) {
+  my_hooks.cleanup = [this](const auto&, auto&, auto dsg) {
     if (dsg) {
       cleanup(*dsg);
     }

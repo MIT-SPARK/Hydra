@@ -43,12 +43,30 @@ struct MergeTracker {
                      SharedDsgInfo& dsg,
                      const MergeFunc& merge_attrs = MergeFunc());
 
+  void updateAllMergeAttributes(const DynamicSceneGraph& unmerged,
+                                DynamicSceneGraph& merged,
+                                const MergeFunc& merge_attrs);
+
   void clear();
+
+  void erase_nodes(std::vector<NodeId> nodes_to_erase);
+  std::string print() const;
 
  private:
   void updateParents(std::map<NodeId, NodeId>& prior_merges, const Merge& merge);
 
   std::map<NodeId, std::set<NodeId>> merge_sets_;
+};
+
+struct GroupedMergeTracker {
+  void initializeTracker(std::string name);
+  void clear();
+  void erase_nodes(std::vector<NodeId> nodes);
+  std::string print() const;
+  MergeTracker& getMergeGroup(std::string name);
+
+ private:
+  std::map<std::string, MergeTracker> group_to_tracker_;
 };
 
 }  // namespace hydra

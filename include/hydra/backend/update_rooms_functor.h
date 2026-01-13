@@ -33,8 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
-
 #include "hydra/backend/update_functions.h"
 #include "hydra/common/output_sink.h"
 #include "hydra/rooms/room_finder.h"
@@ -60,9 +58,6 @@ struct UpdateRoomsFunctor : public UpdateFunctor {
   std::unique_ptr<RoomFinder> room_finder;
 
  private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<UpdateFunctor, UpdateRoomsFunctor, Config>(
-          "UpdateRoomsFunctor");
   Sink::List sinks_;
 };
 

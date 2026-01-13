@@ -41,26 +41,53 @@
 #include <glog/stl_logging.h>
 #include <kimera_pgmo/utils/mesh_io.h>
 
-#include "hydra/common/global_info.h"
-#include "hydra/common/launch_callbacks.h"
-#include "hydra/common/pipeline_queues.h"
-#include "hydra/utils/minimum_spanning_tree.h"
-#include "hydra/utils/pgmo_mesh_traits.h"
+#include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
+
+void findAndApplyMerges(const VerbosityConfig& config,
+                        const UpdateFunctor::Hooks& hooks,
+                        const UpdateInfo::ConstPtr& info,
+                        const DynamicSceneGraph& source,
+                        SharedDsgInfo& target,
+                        MergeTracker& tracker,
+                        bool exhaustive) {
+  // TODO(nathan) handle given merges
+  auto merges = hooks.find_merges(source, info);
+  auto applied = tracker.applyMerges(source, merges, target, hooks.merge);
+  MLOG(1) << "pass 0: " << merges.size() << " merges (applied " << applied << ")";
+  if (!exhaustive) {
+    return;
+  }
+
+  applied = 0;
+  size_t iter = 0;
+  do {
+    merges = hooks.find_merges(*target.graph, info);
+    applied = tracker.applyMerges(source, merges, target, hooks.merge);
+    MLOG(1) << "pass " << iter << ": " << merges.size() << " merges (applied "
+            << applied << ")";
+    ++iter;
+  } while (applied > 0);
+}
+
+}  // namespace
 
 using hydra::timing::ScopedTimer;
-using kimera_pgmo::KimeraPgmoInterface;
-using pose_graph_tools::PoseGraph;
+
+DsgUpdater::Config::Config() : VerbosityConfig("[dsg_updated] ") {}
 
 void declare_config(DsgUpdater::Config& config) {
   using namespace config;
   name("DsgUpdaterConfig");
+  base<VerbosityConfig>(config);
+  field(config.functor_logging, "functor_logging");
   field(config.enable_node_merging, "enable_node_merging");
-  field(config.enable_exhaustive_merging, "enable_exhaustive_merging");
   field(config.reset_dsg_on_loop_closure, "reset_dsg_on_loop_closure");
   field(config.update_functors, "update_functors");
+  field(config.exhaustive_functors, "exhaustive_functors");
 }
 
 DsgUpdater::DsgUpdater(const Config& config,
@@ -69,6 +96,7 @@ DsgUpdater::DsgUpdater(const Config& config,
     : config(config::checkValid(config)), source_graph_(source), target_dsg_(target) {
   for (const auto& [name, functor] : config.update_functors) {
     update_functors_.emplace(name, functor.create());
+    merge_tracker.initializeTracker(name);
   }
 }
 
@@ -116,11 +144,28 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
   if (config.reset_dsg_on_loop_closure && info->loop_closure_detected) {
     resetBackendDsg(timestamp_ns);
   }
+
   GraphMergeConfig merge_config;
   merge_config.previous_merges = &target_dsg_->merges;
   merge_config.update_dynamic_attributes = false;
   target_dsg_->graph->mergeGraph(*source_graph_, merge_config);
 
+  // Nodes occasionally get added to the backend after they've left the active window,
+  // which means they never get deformed or updated correctly. This forces them to be
+  // active for at least one update
+  std::vector<NodeId> active_nodes_to_restore;
+  for (auto& [layer_id, layer] : source_graph_->layers()) {
+    for (auto& [node_id, node] : layer->nodes()) {
+      auto& attrs = node->attributes();
+      if (source_graph_->checkNode(node_id) == NodeStatus::NEW && !attrs.is_active) {
+        attrs.is_active = true;
+        active_nodes_to_restore.push_back(node_id);
+      }
+    }
+  }
+
+  const std::set<std::string> exhaustive_names(config.exhaustive_functors.begin(),
+                                               config.exhaustive_functors.end());
   std::list<LayerCleanupFunc> cleanup_hooks;
   for (const auto& [name, functor] : update_functors_) {
     if (!functor) {
@@ -134,30 +179,39 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
 
     functor->call(*source_graph_, *target_dsg_, info);
     if (hooks.find_merges && enable_merging) {
-      // TODO(nathan) handle given merges
-      const auto merges = hooks.find_merges(*source_graph_, info);
-      const auto applied =
-          merge_tracker.applyMerges(*source_graph_, merges, *target_dsg_, hooks.merge);
-      VLOG(1) << "[Backend: " << name << "] Found " << merges.size()
-              << " merges (applied " << applied << ")";
-
-      if (config.enable_exhaustive_merging) {
-        size_t merge_iter = 0;
-        size_t num_applied = 0;
-        do {
-          const auto new_merges = hooks.find_merges(*target_dsg_->graph, info);
-          num_applied = merge_tracker.applyMerges(
-              *source_graph_, new_merges, *target_dsg_, hooks.merge);
-          VLOG(1) << "[Backend: " << name << "] Found " << new_merges.size()
-                  << " merges at pass " << merge_iter << " (" << num_applied
-                  << " applied)";
-          ++merge_iter;
-        } while (num_applied > 0);
+      auto& tracker = merge_tracker.getMergeGroup(name);
+      findAndApplyMerges(config.functor_logging.with_name(name),
+                         hooks,
+                         info,
+                         *source_graph_,
+                         *target_dsg_,
+                         tracker,
+                         exhaustive_names.count(name));
+      if (info->loop_closure_detected && hooks.merge) {
+        MLOG(3) << "updating all merge attributes for " << name;
+        MLOG(3) << "current tracker: " << tracker.print();
+        tracker.updateAllMergeAttributes(
+            *source_graph_, *target_dsg_->graph, hooks.merge);
       }
     }
-  }
 
-  launchCallbacks(cleanup_hooks, info, target_dsg_.get());
+    MLOG(2) << "all merges: " << merge_tracker.print();
+    for (const auto& func : cleanup_hooks) {
+      func(info, *source_graph_, target_dsg_.get());
+    }
+
+    // We reset active flags for all new nodes that were inactive after one update
+    for (auto node_id : active_nodes_to_restore) {
+      auto node = source_graph_->findNode(node_id);
+      if (node) {
+        node->attributes().is_active = false;
+      }
+    }
+
+    // clear new node status
+    // TODO(nathan) add API for marking new nodes
+    source_graph_->getNewNodes(true);
+  }
 }
 
 }  // namespace hydra

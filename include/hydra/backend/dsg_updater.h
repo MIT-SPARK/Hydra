@@ -37,20 +37,14 @@
 #include <kimera_pgmo/kimera_pgmo_interface.h>
 #include <spark_dsg/scene_graph_logger.h>
 
-#include <filesystem>
 #include <map>
 #include <memory>
-#include <mutex>
-#include <thread>
 
-#include "hydra/backend/backend_input.h"
-#include "hydra/backend/external_loop_closure_receiver.h"
 #include "hydra/backend/merge_tracker.h"
-#include "hydra/backend/pgmo_configs.h"
 #include "hydra/common/output_sink.h"
 #include "hydra/common/shared_dsg_info.h"
-#include "hydra/common/shared_module_state.h"
 #include "hydra/utils/data_directory.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -62,16 +56,20 @@ class DsgUpdater {
                           const kimera_pgmo::DeformationGraph&>;
   using NodeToRobotMap = std::unordered_map<NodeId, size_t>;
 
-  struct Config {
+  struct Config : VerbosityConfig {
+    using FunctorConfig = config::VirtualConfig<UpdateFunctor, true>;
+
+    Config();
+    //! Verbosity controls for functors
+    VerbosityConfig functor_logging;
     //! Enable combining multiple nodes together
     bool enable_node_merging = true;
-    //! Repeatedly run merge detection until no more merges are detected
-    bool enable_exhaustive_merging = false;
     //! If true, reset the private DSG with the unmerged graph on every loop closure
     bool reset_dsg_on_loop_closure = false;
     //! Update functors that get applied in the specified order
-    config::OrderedMap<std::string, config::VirtualConfig<UpdateFunctor, true>>
-        update_functors;
+    config::OrderedMap<std::string, FunctorConfig> update_functors;
+    //! Names of functors to use exhaustive merging for
+    std::vector<std::string> exhaustive_functors;
   } const config;
 
   DsgUpdater(const Config& config,
@@ -91,7 +89,7 @@ class DsgUpdater {
   void callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr info);
 
  private:
-  MergeTracker merge_tracker;
+  GroupedMergeTracker merge_tracker;
   std::map<std::string, UpdateFunctor::Ptr> update_functors_;
 
   DynamicSceneGraph::Ptr source_graph_;

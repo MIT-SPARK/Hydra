@@ -48,4 +48,10 @@ VerbosityConfig::VerbosityConfig(int verbosity) : VerbosityConfig("", verbosity)
 VerbosityConfig::VerbosityConfig(const std::string& prefix, int verbosity)
     : verbosity(verbosity), prefix(prefix) {}
 
+VerbosityConfig VerbosityConfig::with_name(const std::string& name) const {
+  auto new_config = *this;
+  new_config.prefix = "[" + name + "] ";
+  return new_config;
+}
+
 }  // namespace hydra

@@ -88,10 +88,6 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
 
  private:
   mutable NodeSymbol next_node_id_ = NodeSymbol('S', 0);
-
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<UpdateFunctor, Update2dPlacesFunctor, Config>(
-          "Update2dPlacesFunctor");
 };
 
 void declare_config(Update2dPlacesFunctor::Config& conf);
