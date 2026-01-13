@@ -98,13 +98,11 @@ Update2dPlacesFunctor::Update2dPlacesFunctor(const Config& config)
 
 UpdateFunctor::Hooks Update2dPlacesFunctor::hooks() const {
   auto my_hooks = UpdateFunctor::hooks();
-
-  my_hooks.cleanup =
-      [this](const UpdateInfo::ConstPtr&, DynamicSceneGraph&, SharedDsgInfo* dsg) {
-        if (dsg) {
-          cleanup(*dsg);
-        }
-      };
+  my_hooks.cleanup = [this](const auto&, auto&, auto dsg) {
+    if (dsg) {
+      cleanup(*dsg);
+    }
+  };
 
   my_hooks.find_merges = [this](const auto& graph, const auto& info) {
     return findMerges(graph, info);

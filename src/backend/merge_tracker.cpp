@@ -116,10 +116,10 @@ void MergeTracker::updateAllMergeAttributes(const DynamicSceneGraph& unmerged,
   }
 }
 
-void MergeTracker::print() {
+std::string MergeTracker::print() const {
   std::stringstream ss;
   for (const auto& [parent, children] : merge_sets_) {
-    ss << NodeSymbol(parent).str() << ": [";
+    ss << " - " << NodeSymbol(parent).str() << ": [";
     auto iter = children.begin();
     while (iter != children.end()) {
       ss << NodeSymbol(*iter).str();
@@ -130,7 +130,8 @@ void MergeTracker::print() {
     }
     ss << "]\n";
   }
-  LOG(WARNING) << "MERGES: \n" << ss.str();
+
+  return ss.str();
 }
 
 void MergeTracker::clear() { merge_sets_.clear(); }
@@ -184,11 +185,13 @@ void GroupedMergeTracker::erase_nodes(std::vector<NodeId> nodes) {
   }
 }
 
-void GroupedMergeTracker::print() {
+std::string GroupedMergeTracker::print() const {
+  std::stringstream ss;
   for (auto& [name, tracker] : group_to_tracker_) {
-    LOG(WARNING) << "Merge group: " << name;
-    tracker.print();
+    ss << "Group '" << name << "' merges:\n" << tracker.print();
   }
+
+  return ss.str();
 }
 
 MergeTracker& GroupedMergeTracker::getMergeGroup(std::string name) {

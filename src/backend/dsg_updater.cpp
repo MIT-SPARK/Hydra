@@ -41,18 +41,12 @@
 #include <glog/stl_logging.h>
 #include <kimera_pgmo/utils/mesh_io.h>
 
-#include "hydra/common/global_info.h"
-#include "hydra/common/launch_callbacks.h"
-#include "hydra/common/pipeline_queues.h"
-#include "hydra/utils/minimum_spanning_tree.h"
-#include "hydra/utils/pgmo_mesh_traits.h"
+#include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
 
 using hydra::timing::ScopedTimer;
-using kimera_pgmo::KimeraPgmoInterface;
-using pose_graph_tools::PoseGraph;
 
 void declare_config(DsgUpdater::Config& config) {
   using namespace config;
@@ -117,18 +111,22 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
   if (config.reset_dsg_on_loop_closure && info->loop_closure_detected) {
     resetBackendDsg(timestamp_ns);
   }
+
   GraphMergeConfig merge_config;
   merge_config.previous_merges = &target_dsg_->merges;
   merge_config.update_dynamic_attributes = false;
   target_dsg_->graph->mergeGraph(*source_graph_, merge_config);
 
+  // Nodes occasionally get added to the backend after they've left the active window,
+  // which means they never get deformed or updated correctly. This forces them to be
+  // active for at least one update
   std::vector<NodeId> active_nodes_to_restore;
   for (auto& [layer_id, layer] : source_graph_->layers()) {
-    for (auto& node : layer->nodes()) {
-      auto& attrs = node.second->attributes();
-      if (source_graph_->checkNode(node.first) == NodeStatus::NEW && !attrs.is_active) {
+    for (auto& [node_id, node] : layer->nodes()) {
+      auto& attrs = node->attributes();
+      if (source_graph_->checkNode(node_id) == NodeStatus::NEW && !attrs.is_active) {
         attrs.is_active = true;
-        active_nodes_to_restore.push_back(node.first);
+        active_nodes_to_restore.push_back(node_id);
       }
     }
   }
@@ -174,26 +172,27 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
       }
       if (info->loop_closure_detected && hooks.merge) {
         LOG(INFO) << "Updating all merge attributes for " << name;
-        tracker.print();
+        LOG(INFO) << "Current tracker: " << tracker.print();
         tracker.updateAllMergeAttributes(
             *source_graph_, *target_dsg_->graph, hooks.merge);
       }
     }
 
-    merge_tracker.print();
-
+    LOG(INFO) << "All merges: " << merge_tracker.print();
     for (const auto& func : cleanup_hooks) {
       func(info, *source_graph_, target_dsg_.get());
     }
 
-    // TODO: this is where we undo all of the activations
-    for (NodeId nid : active_nodes_to_restore) {
-      auto node_ptr = source_graph_->findNode(nid);
-      if (node_ptr) {
-        auto& attrs = node_ptr->attributes();
-        attrs.is_active = false;
+    // We reset active flags for all new nodes that were inactive after one update
+    for (auto node_id : active_nodes_to_restore) {
+      auto node = source_graph_->findNode(node_id);
+      if (node) {
+        node->attributes().is_active = false;
       }
     }
+
+    // clear new node status
+    // TODO(nathan) add API for marking new nodes
     source_graph_->getNewNodes(true);
   }
 }

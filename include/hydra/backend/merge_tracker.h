@@ -50,7 +50,7 @@ struct MergeTracker {
   void clear();
 
   void erase_nodes(std::vector<NodeId> nodes_to_erase);
-  void print();
+  std::string print() const;
 
  private:
   void updateParents(std::map<NodeId, NodeId>& prior_merges, const Merge& merge);
@@ -62,7 +62,7 @@ struct GroupedMergeTracker {
   void initializeTracker(std::string name);
   void clear();
   void erase_nodes(std::vector<NodeId> nodes);
-  void print();
+  std::string print() const;
   MergeTracker& getMergeGroup(std::string name);
 
  private:
