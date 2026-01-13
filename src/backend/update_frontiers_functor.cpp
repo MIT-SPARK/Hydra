@@ -86,7 +86,7 @@ bool point_in_polygon(Eigen::Vector2d pt, std::vector<Eigen::Vector3d> polygon) 
   }
 
   double projection_minimum = 0.0;
-  for (int idx = 0; idx < polygon.size(); ++idx) {
+  for (size_t idx = 0; idx < polygon.size(); ++idx) {
     auto x1 = polygon.at(idx);
     auto x2 = polygon.at((idx + 1) % polygon.size());
     auto u = (x2 - x1).head(2);
@@ -276,8 +276,8 @@ void UpdateFrontiersFunctor::cleanup(uint64_t timestamp_ns,
     unmerged_dsg.removeNode(nid);
   }
 
-  // TODO: do we need to also deal with copying the "active" frontiers to the unmerged
-  // graph?
+  // TODO(aaron): do we need to also deal with copying the "active" frontiers to the
+  // unmerged graph?
   for (const auto nid : nodes_to_copy) {
     NodeSymbol new_node_id = next_node_id_++;
     auto cloned_attrs = dsg.graph->getNode(nid).attributes().clone();
