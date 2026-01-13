@@ -354,7 +354,7 @@ void RegionGrowingTraversabilityClustering::growRegion(const TraversabilityLayer
       continue;
     }
     const Eigen::Vector3d pos = current_index.cast<double>();
-    if ((pos - region.centroid).norm() > max_radius) {
+    if (distance(pos, region.centroid) > max_radius) {
       continue;
     }
     region.voxels.insert(current_index);
@@ -413,6 +413,14 @@ void RegionGrowingTraversabilityClustering::computeNeighbors(
   }
 }
 
+double RegionGrowingTraversabilityClustering::distance(const Eigen::Vector3d& a,
+                                                       const Eigen::Vector3d& b) const {
+  // L2 distance
+  // return (a - b).norm();
+  // Maximum norm
+  return (a - b).cwiseAbs().maxCoeff();
+}
+
 void RegionGrowingTraversabilityClustering::Region::merge(const Region& other) {
   voxels.insert(other.voxels.begin(), other.voxels.end());
   boundary_voxels.insert(other.boundary_voxels.begin(), other.boundary_voxels.end());
@@ -442,6 +450,19 @@ void RegionGrowingTraversabilityClustering::Region::computeRadii(double voxel_si
     const double distance = (voxel.cast<double>() * voxel_size - centroid).norm();
     min = std::min(min, distance);
     max = std::max(max, distance);
+  }
+}
+
+void RegionGrowingTraversabilityClustering::Region::computeBoundaryVoxels() {
+  boundary_voxels.clear();
+  for (const auto& voxel : voxels) {
+    for (const auto& offset : neighbors_) {
+      const BlockIndex n_index = voxel + offset;
+      if (voxels.count(n_index)) {
+        continue;
+      }
+      boundary_voxels.insert(n_index);
+    }
   }
 }
 

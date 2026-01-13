@@ -96,6 +96,9 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
 
     // Min-Max distances w.r.t. the centroid.
     void computeRadii(double voxel_size = 1.0);
+
+    // Recompute all voxels bordering the voxels of this region.
+    void computeBoundaryVoxels();
   };
 
   RegionGrowingTraversabilityClustering(const Config& config);
@@ -148,6 +151,8 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
                                  const Region& region) const;
 
   void computeNeighbors(const VoxelMap& assigned_voxels);
+
+  double distance(const Eigen::Vector3d& a, const Eigen::Vector3d& b) const;
 
   inline static const std::array<BlockIndex, 8> neighbors_ = {
       BlockIndex(0, -1, 0),   // bottom
