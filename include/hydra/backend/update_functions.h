@@ -74,18 +74,24 @@ using MergeFunc = std::function<NodeAttributes::Ptr(const DynamicSceneGraph&,
 
 struct UpdateFunctor {
   using Ptr = std::shared_ptr<UpdateFunctor>;
-
   struct Hooks {
     LayerCleanupFunc cleanup;
     FindMergeFunc find_merges;
     MergeFunc merge;
   };
 
+  struct Config {
+    bool enable_exhaustive_merging = false;
+  } const config;
+
+  explicit UpdateFunctor(const Config& config = {false});
   virtual ~UpdateFunctor() = default;
   virtual Hooks hooks() const;
   virtual void call(const DynamicSceneGraph& unmerged,
                     SharedDsgInfo& dsg,
                     const UpdateInfo::ConstPtr& info) const = 0;
 };
+
+void declare_config(UpdateFunctor::Config& config);
 
 }  // namespace hydra

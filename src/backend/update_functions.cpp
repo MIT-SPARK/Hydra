@@ -34,7 +34,20 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/backend/update_functions.h"
 
+#include <config_utilities/config.h>
+#include <config_utilities/validation.h>
+#include <glog/logging.h>
+
 namespace hydra {
+
+void declare_config(UpdateFunctor::Config& config) {
+  using namespace config;
+  name<UpdateFunctor::Config>();
+  field(config.enable_exhaustive_merging, "enable_exhaustive_merging");
+}
+
+UpdateFunctor::UpdateFunctor(const Config& config)
+    : config(config::checkValid(config)) {}
 
 UpdateFunctor::Hooks UpdateFunctor::hooks() const { return {}; }
 

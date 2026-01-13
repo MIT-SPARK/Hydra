@@ -44,6 +44,7 @@
 #include "hydra/common/output_sink.h"
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/utils/data_directory.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -56,10 +57,10 @@ class DsgUpdater {
   using NodeToRobotMap = std::unordered_map<NodeId, size_t>;
 
   struct Config {
+    //! Verbosity controls for functors
+    VerbosityConfig functor_logging;
     //! Enable combining multiple nodes together
     bool enable_node_merging = true;
-    //! Repeatedly run merge detection until no more merges are detected
-    bool enable_exhaustive_merging = false;
     //! If true, reset the private DSG with the unmerged graph on every loop closure
     bool reset_dsg_on_loop_closure = false;
     //! Update functors that get applied in the specified order

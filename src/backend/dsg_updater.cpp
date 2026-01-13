@@ -45,14 +45,43 @@
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
+
+void findAndApplyMerges(const VerbosityConfig& config,
+                        const UpdateFunctor::Hooks& hooks,
+                        const UpdateInfo::ConstPtr& info,
+                        const DynamicSceneGraph& source,
+                        SharedDsgInfo& target,
+                        MergeTracker& tracker,
+                        bool exhaustive) {
+  // TODO(nathan) handle given merges
+  auto merges = hooks.find_merges(source, info);
+  auto applied = tracker.applyMerges(source, merges, target, hooks.merge);
+  MLOG(1) << "pass 0: " << merges.size() << " merges (applied " << applied << ")";
+  if (!exhaustive) {
+    return;
+  }
+
+  applied = 0;
+  size_t iter = 0;
+  do {
+    merges = hooks.find_merges(*target.graph, info);
+    applied = tracker.applyMerges(source, merges, target, hooks.merge);
+    MLOG(1) << "pass " << iter << ": " << merges.size() << " merges (applied "
+            << applied << ")";
+    ++iter;
+  } while (applied > 0);
+}
+
+}  // namespace
 
 using hydra::timing::ScopedTimer;
 
 void declare_config(DsgUpdater::Config& config) {
   using namespace config;
   name("DsgUpdaterConfig");
+  field(config.functor_logging, "functor_logging");
   field(config.enable_node_merging, "enable_node_merging");
-  field(config.enable_exhaustive_merging, "enable_exhaustive_merging");
   field(config.reset_dsg_on_loop_closure, "reset_dsg_on_loop_closure");
   field(config.update_functors, "update_functors");
 }
@@ -145,31 +174,13 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
     functor->call(*source_graph_, *target_dsg_, info);
     if (hooks.find_merges && enable_merging) {
       auto& tracker = merge_tracker.getMergeGroup(name);
-
-      // TODO(nathan) handle given merges
-      const auto merges = hooks.find_merges(*source_graph_, info);
-      const auto applied =
-          tracker.applyMerges(*source_graph_, merges, *target_dsg_, hooks.merge);
-      VLOG(1) << "[Backend: " << name << "] Found " << merges.size()
-              << " merges (applied " << applied << ")";
-
-      if (config.enable_exhaustive_merging) {
-        size_t merge_iter = 0;
-        size_t num_applied = 0;
-        do {
-          if (name == "surface_places") {
-            continue;
-          }
-
-          const auto new_merges = hooks.find_merges(*target_dsg_->graph, info);
-          num_applied = tracker.applyMerges(
-              *source_graph_, new_merges, *target_dsg_, hooks.merge);
-          VLOG(1) << "[Backend: " << name << "] Found " << new_merges.size()
-                  << " merges at pass " << merge_iter << " (" << num_applied
-                  << " applied)";
-          ++merge_iter;
-        } while (num_applied > 0);
-      }
+      findAndApplyMerges(config.functor_logging.with_name(name),
+                         hooks,
+                         info,
+                         *source_graph_,
+                         *target_dsg_,
+                         tracker,
+                         functor->config.enable_exhaustive_merging);
       if (info->loop_closure_detected && hooks.merge) {
         LOG(INFO) << "Updating all merge attributes for " << name;
         LOG(INFO) << "Current tracker: " << tracker.print();
