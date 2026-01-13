@@ -62,14 +62,10 @@ void declare_config(Update2dPlacesFunctor::Config& config) {
   using namespace config;
   name("Update2dPlacesFunctor::Config");
   field(config.layer, "layer");
-  field(config.allow_places_merge, "allow_places_merge");
   field(config.merge_max_delta_z, "merge_max_delta_z");
-  field(config.min_points, "min_points");
-  field(config.min_size, "min_size");
   field(config.connection_overlap_threshold, "connection_overlap_threshold");
   field(config.connection_max_delta_z, "connection_max_delta_z");
   field(config.connection_ellipse_scale_factor, "connection_ellipse_scale_factor");
-  field(config.enable_splitting, "enable_splitting");
   field(config.merge_proposer, "merge_proposer");
 }
 
@@ -99,7 +95,6 @@ NodeAttributes::Ptr merge2dPlaceAttributes(const Update2dPlacesFunctor::Config c
 
   addRectInfo(graph.mesh()->points, config.connection_ellipse_scale_factor, new_attrs);
   addBoundaryInfo(graph.mesh()->points, new_attrs);
-
   return attrs_ptr;
 }
 
@@ -118,8 +113,7 @@ UpdateFunctor::Hooks Update2dPlacesFunctor::hooks() const {
     return findMerges(graph, info);
   };
 
-  my_hooks.merge = [this](const DynamicSceneGraph& graph,
-                          const std::vector<NodeId>& nodes) {
+  my_hooks.merge = [this](const auto& graph, const auto& nodes) {
     return merge2dPlaceAttributes(config, graph, nodes);
   };
 
@@ -261,7 +255,6 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
 
   // existing node id for each place
   std::vector<std::pair<NodeId, Place2d>> nodes_to_update;
-
   utils::computeAttributeUpdates(
       *mesh, config.connection_ellipse_scale_factor, place_2ds, nodes_to_update);
 

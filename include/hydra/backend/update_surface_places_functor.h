@@ -43,27 +43,20 @@ namespace hydra {
 
 struct Update2dPlacesFunctor : public UpdateFunctor {
   struct Config {
+    using AssociationConfig = config::VirtualConfig<AssociationStrategy>;
+    using SemanticAssociation = association::SemanticNearestNode::Config;
     //! Layer to update
     std::string layer = DsgLayers::MESH_PLACES;
-    //! Allow merging of 2D places
-    bool allow_places_merge = true;
     //! If two places differ by at least this much in z, they won't be merged
     double merge_max_delta_z = 0.5;
-    //! Minimum number of points to allow splitting place
-    size_t min_points = 10;
-    //! Minimum size of place for splitting
-    double min_size = 2;
     //! Amount of overlap between places necessary to add edge
     double connection_overlap_threshold = 0;
     //! Maximum difference in z between neighboring places
     double connection_max_delta_z = 0.5;
     //! How much to inflate place ellipsoid relative to bounding box
     double connection_ellipse_scale_factor = 1.0;
-    //! Whether to allow splitting of large backend places
-    bool enable_splitting = false;
     //! Association strategy for finding matches to active nodes
-    MergeProposer::Config merge_proposer = {config::VirtualConfig<AssociationStrategy>{
-        association::SemanticNearestNode::Config{}}};
+    MergeProposer::Config merge_proposer = {AssociationConfig{SemanticAssociation{}}};
   } const config;
 
   explicit Update2dPlacesFunctor(const Config& config);
