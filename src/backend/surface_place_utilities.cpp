@@ -38,9 +38,13 @@
 
 namespace hydra::utils {
 
+using spark_dsg::DynamicSceneGraph;
+using spark_dsg::Place2dNodeAttributes;
+using spark_dsg::SceneGraphLayer;
+
 void getPlace2dAndNeighors(const SceneGraphLayer& places_layer,
-                           std::vector<std::pair<NodeId, Place2d>>& place_2ds,
-                           std::map<NodeId, std::set<NodeId>>& node_neighbors) {
+                           std::vector<IdPlacePair>& place_2ds,
+                           EdgeMap& node_neighbors) {
   for (auto& [node_id, node] : places_layer.nodes()) {
     auto attrs = node->tryAttributes<Place2dNodeAttributes>();
     if (!attrs) {
@@ -60,8 +64,8 @@ void getPlace2dAndNeighors(const SceneGraphLayer& places_layer,
 
 void computeAttributeUpdates(const spark_dsg::Mesh& mesh,
                              const double connection_ellipse_scale_factor,
-                             std::vector<std::pair<NodeId, Place2d>>& place_2ds,
-                             std::vector<std::pair<NodeId, Place2d>>& nodes_to_update) {
+                             std::vector<IdPlacePair>& place_2ds,
+                             std::vector<IdPlacePair>& nodes_to_update) {
   for (auto& [node_id, place] : place_2ds) {
     addRectInfo(mesh, connection_ellipse_scale_factor, place);
     addBoundaryInfo(mesh, place);
@@ -70,40 +74,7 @@ void computeAttributeUpdates(const spark_dsg::Mesh& mesh,
   }
 }
 
-// TODO(nathan) these get dropped when we rebase on the active DSG stuff
-[[deprecated]] void getNecessaryUpdates(
-    const spark_dsg::Mesh&,
-    size_t,
-    double,
-    double,
-    std::vector<std::pair<NodeId, Place2d>>&,
-    std::vector<std::pair<NodeId, Place2d>>&,
-    std::vector<std::pair<NodeId, std::vector<Place2d>>>&) {}
-
-[[deprecated]] std::map<std::tuple<size_t, size_t, size_t, size_t>, double>
-buildEdgeMap(const std::vector<std::pair<NodeId, std::vector<Place2d>>>&,
-             double,
-             double) {
-  return {};
-}
-
-[[deprecated]] NodeSymbol insertNewNodes(
-    const std::vector<std::pair<NodeId, std::vector<Place2d>>>&,
-    const double,
-    const double,
-    NodeSymbol,
-    DynamicSceneGraph&,
-    std::map<std::tuple<size_t, size_t>, NodeId>&) {
-  return 0;
-}
-
-[[deprecated]] void addNewNodeEdges(
-    const std::vector<std::pair<NodeId, std::vector<Place2d>>>,
-    const std::map<std::tuple<size_t, size_t, size_t, size_t>, double>,
-    const std::map<std::tuple<size_t, size_t>, NodeId>,
-    DynamicSceneGraph&) {}
-
-void updateExistingNodes(const std::vector<std::pair<NodeId, Place2d>>& nodes_to_update,
+void updateExistingNodes(const std::vector<IdPlacePair>& nodes_to_update,
                          DynamicSceneGraph& graph) {
   for (const auto& [node_id, place] : nodes_to_update) {
     auto& attrs = graph.getNode(node_id).attributes<Place2dNodeAttributes>();
