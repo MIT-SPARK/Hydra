@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include "hydra/common/dsg_types.h"
+#include "hydra/common/output_sink.h"
 #include "hydra/frontend/mesh_delta_clustering.h"
 #include "hydra/frontend/place_2d_split_logic.h"
 #include "hydra/frontend/surface_places_interface.h"
@@ -52,6 +53,10 @@ class Place2dSegmenter : public SurfacePlacesInterface {
   using Places = std::vector<Place2d>;
   using LabelPlaces = std::map<uint32_t, Places>;
   using LabelToNodes = std::map<uint32_t, std::set<NodeId>>;
+  using Sink = OutputSink<uint64_t,
+                          const kimera_pgmo::MeshDelta&,
+                          const kimera_pgmo::MeshOffsetInfo&,
+                          const LabelPlaces&>;
 
   struct Config {
     std::string layer = DsgLayers::MESH_PLACES;
@@ -63,6 +68,7 @@ class Place2dSegmenter : public SurfacePlacesInterface {
     double place_max_neighbor_z_diff = 0.5;
     double connection_ellipse_scale_factor = 1;
     std::set<uint32_t> labels;
+    std::vector<Sink::Factory> sinks;
   } const config;
 
   explicit Place2dSegmenter(const Config& config);
@@ -94,6 +100,8 @@ class Place2dSegmenter : public SurfacePlacesInterface {
   LabelToNodes active_places_;
   LabelToNodes semiactive_places_;
   std::map<NodeId, uint64_t> active_place_timestamps_;
+
+  Sink::List sinks_;
 };
 
 void declare_config(Place2dSegmenter::Config& config);
