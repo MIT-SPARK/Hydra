@@ -30,7 +30,7 @@ frontend:
       pessimistic: true
     clustering:
       type: RegionGrowingTraversabilityClustering
-
+      max_size: 2.0
     sinks:
       - type: TraversabilityVisualizer
 backend:

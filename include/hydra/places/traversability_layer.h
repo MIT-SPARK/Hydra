@@ -58,7 +58,7 @@ struct TraversabilityVoxel {
 
   //! @brief Arbitrary debug value that can be set for viualization.
   // TODO(lschmid): Remove this at some point.
-  mutable float debug_value = 0.0f;
+  mutable float debug_value = -1.0f;
 
   bool operator==(const TraversabilityVoxel& other) const {
     return traversability == other.traversability && confidence == other.confidence &&
