@@ -53,8 +53,8 @@ namespace hydra::places {
 class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
  public:
   struct Config {
-    //! Maximum side length of a place [m].
-    float max_size = 2.0f;
+    //! Maximum radius of a place [m].
+    float max_radius = 2.0f;
   } const config;
 
   using VoxelSet = BlockIndexSet;
@@ -87,8 +87,8 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
     Eigen::Vector2i min_coordinates;
     Eigen::Vector2i max_coordinates;
 
-    // Regions connecting to this one.
-    NodeIdSet neighbors;
+    // Regions connecting to this one. <region id, num connecting voxels>
+    std::map<spark_dsg::NodeId, int> neighbors;
 
     /* Tools */
 
@@ -180,15 +180,15 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
                                  const Region& region,
                                  const TraversabilityLayer& layer) const;
 
-  inline static const std::array<BlockIndex, 4> neighbors_ = {
-      BlockIndex(0, -1, 0),  // bottom
-      BlockIndex(-1, 0, 0),  // left
-      BlockIndex(0, 1, 0),   // top
-      BlockIndex(1, 0, 0),   // right
-                             // BlockIndex(-1, -1, 0),  // bottom-left
-                             // BlockIndex(1, -1, 0),   // bottom-right
-                             // BlockIndex(-1, 1, 0),   // top-left
-                             // BlockIndex(1, 1, 0)     // top-right
+  inline static const std::array<BlockIndex, 8> neighbors_ = {
+      BlockIndex(0, -1, 0),   // bottom
+      BlockIndex(-1, 0, 0),   // left
+      BlockIndex(0, 1, 0),    // top
+      BlockIndex(1, 0, 0),    // right
+      BlockIndex(-1, -1, 0),  // bottom-left
+      BlockIndex(1, -1, 0),   // bottom-right
+      BlockIndex(-1, 1, 0),   // top-left
+      BlockIndex(1, 1, 0)     // top-right
   };
 };
 

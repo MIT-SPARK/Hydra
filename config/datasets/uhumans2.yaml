@@ -96,7 +96,7 @@ backend:
     places:
       type: UpdatePlacesFunctor
     traversability:
-      type: UpdateTraversabilityFunctor
+      type: UpdateBlockTraversabilityFunctor
       min_place_size: *min_place_width # m
       max_place_size: *max_place_width # m
       use_metric_distance: false
@@ -120,7 +120,7 @@ backend:
     zmq_labels:
       type: ZmqRoomLabelUpdater
   pgmo:
-    run_mode: FULL  # kimera_pgmo run mode FULL is required
+    run_mode: FULL # kimera_pgmo run mode FULL is required
     embed_trajectory_delta_t: 5.0
     num_interp_pts: 3
     interp_horizon: 10.0
