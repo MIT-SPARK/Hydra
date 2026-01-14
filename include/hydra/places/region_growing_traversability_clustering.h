@@ -37,7 +37,9 @@
 #include <config_utilities/factory.h>
 #include <spark_dsg/traversability_boundary.h>
 
+#include <map>
 #include <optional>
+#include <queue>
 #include <utility>
 #include <vector>
 
@@ -51,14 +53,13 @@ namespace hydra::places {
 class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
  public:
   struct Config {
-    //! Approximate maximum radius when growing regions in meters.
-    float max_place_radius = 2.0f;
-
-    float min_place_radius = 1.0f;
+    //! Maximum side length of a place [m].
+    float max_size = 2.0f;
   } const config;
 
+  using VoxelSet = BlockIndexSet;
+  using VoxelQueue = std::queue<BlockIndex>;
   using VoxelMap = BlockIndexMap<spark_dsg::NodeId>;
-  using Voxels = BlockIndexSet;
 
   // TODO(lschmid): For now a simple data structure and algorithm, consdier aligning
   // better with blocks in the future and make more efficient.
@@ -66,11 +67,11 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
     // ID of the region. This is also the node ID in the DSG.
     spark_dsg::NodeId id;
 
-    // Voxels assigned to this region. These can be in the current layer or outside.
-    Voxels voxels;
+    // VoxelSet assigned to this region. These can be in the current layer or outside.
+    VoxelSet voxels;
 
-    // Voxels bordering the voxels of this region.
-    Voxels boundary_voxels;
+    // VoxelSet bordering the voxels of this region.
+    VoxelSet boundary_voxels;
 
     // True: this region has voxels in the current layer. False: all voxels are outside
     // the current layer.
@@ -80,22 +81,22 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
     bool is_new = true;
 
     // Centroid of the region.
-    Eigen::Vector3d centroid;
+    Eigen::Vector3f centroid;
+
+    // Axis-aligned bounding box of the region in voxel coordinates.
+    Eigen::Vector2i min_coordinates;
+    Eigen::Vector2i max_coordinates;
 
     // Regions connecting to this one.
     NodeIdSet neighbors;
 
-    // Radii.
-    double min;
-    double max;
+    /* Tools */
 
     // Merge other into this region.
     void merge(const Region& other);
 
-    void computeCentroid(double voxel_size = 1.0);
-
-    // Min-Max distances w.r.t. the centroid.
-    void computeRadii(double voxel_size = 1.0);
+    // Compute the centroid and min-max coordinates based on the boundary voxels.
+    void computeCentroid();
 
     // Recompute all voxels bordering the voxels of this region.
     void computeBoundaryVoxels();
@@ -111,58 +112,83 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
  protected:
   size_t current_id_ = 0;
   uint64_t current_time_ns_ = 0;
+  int max_region_size_ = 0;  // Cached region size in voxels.
 
   // <id, region>
   std::map<spark_dsg::NodeId, Region> regions_;
 
   // Processing steps.
-  VoxelMap pruneExistingRegions(const TraversabilityLayer& layer,
-                                spark_dsg::DynamicSceneGraph& graph);
+  /**
+   * @brief Prune existing regions by removing all voxels that are no longer
+   * traversable. Regions without any remaining voxels are marked as inactive.
+   * @return Map of all inactive assigned voxels to region IDs.
+  //  */
+  VoxelMap initializeRegions(const TraversabilityLayer& layer,
+                             const VoxelSet& all_voxels);
 
-  void initializeRegions(const TraversabilityLayer& layer,
-                         const Eigen::Vector3d& start_position,
-                         VoxelMap& assigned_voxels);
+  /**
+   * @brief Initialize all connected traversable voxels from the starting position of
+   * the robot.
+   */
+  VoxelSet initializeVoxels(const TraversabilityLayer& layer,
+                            const Eigen::Vector3d& start_position) const;
 
-  void detectPlaces(const TraversabilityLayer& layer, VoxelMap& assigned_voxels);
+  /**
+   * @brief Assign all traversable voxels by assigning them to closest existing regions
+   * and assigning new ones where needed.
+   */
+  void growRegions(VoxelSet& all_voxels, VoxelMap& assigned_voxels);
 
-  void simplifyRegions(double voxel_size);
+  /**
+   * @brief Compute region boundaries, extents, centroids, and compute the neighbors
+   * from that.
+   */
+  void computeNeighbors(const VoxelMap& assigned_voxels);
 
-  void updatePlaceNodesInDsg(spark_dsg::DynamicSceneGraph& graph);
+  /**
+   * @brief Merge all regions that don't exceed the max size.
+   */
+  void mergeRegions(spark_dsg::DynamicSceneGraph& graph);
+
+  void updatePlaceNodesInDsg(spark_dsg::DynamicSceneGraph& graph,
+                             const TraversabilityLayer& layer);
 
   void updatePlaceEdgesInDsg(spark_dsg::DynamicSceneGraph& graph) const;
 
   void visualizeAssignments(const TraversabilityLayer& layer,
                             const VoxelMap& assigned_voxels) const;
 
-  /* Helper functions */
+  void pruneRegions();
+
+  // Helper functions.
+  /**
+   * @brief Allocate a new region, keeping track of the IDs. ID 0 is reserved.
+   */
   Region& allocateNewRegion();
 
-  // Grow the region until the max is reached, also recomputing the frontier voxels.
-  void growRegion(const TraversabilityLayer& layer,
-                  Region& region,
-                  VoxelMap& assigned_voxels);
-
-  void updateFrontierVoxels(Voxels& frontier_voxels,
-                            const TraversabilityLayer& layer,
-                            const Region& region,
-                            const VoxelMap& assigned_voxels) const;
+  /**
+   * @brief Breadth-first search to grow a region from a seed index.
+   */
+  VoxelSet growRegion(
+      const VoxelSet& candidates,
+      const BlockIndex& seed_index,
+      std::function<bool(const BlockIndex&)> condition = [](const BlockIndex&) {
+        return true;
+      }) const;
 
   void updatePlaceNodeAttributes(spark_dsg::TraversabilityNodeAttributes& attrs,
-                                 const Region& region) const;
+                                 const Region& region,
+                                 const TraversabilityLayer& layer) const;
 
-  void computeNeighbors(const VoxelMap& assigned_voxels);
-
-  double distance(const Eigen::Vector3d& a, const Eigen::Vector3d& b) const;
-
-  inline static const std::array<BlockIndex, 8> neighbors_ = {
-      BlockIndex(0, -1, 0),   // bottom
-      BlockIndex(-1, 0, 0),   // left
-      BlockIndex(0, 1, 0),    // top
-      BlockIndex(1, 0, 0),    // right
-      BlockIndex(-1, -1, 0),  // bottom-left
-      BlockIndex(1, -1, 0),   // bottom-right
-      BlockIndex(-1, 1, 0),   // top-left
-      BlockIndex(1, 1, 0)     // top-right
+  inline static const std::array<BlockIndex, 4> neighbors_ = {
+      BlockIndex(0, -1, 0),  // bottom
+      BlockIndex(-1, 0, 0),  // left
+      BlockIndex(0, 1, 0),   // top
+      BlockIndex(1, 0, 0),   // right
+                             // BlockIndex(-1, -1, 0),  // bottom-left
+                             // BlockIndex(1, -1, 0),   // bottom-right
+                             // BlockIndex(-1, 1, 0),   // top-left
+                             // BlockIndex(1, 1, 0)     // top-right
   };
 };
 
