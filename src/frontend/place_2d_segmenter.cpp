@@ -103,8 +103,8 @@ std::unordered_set<size_t> getFrozenSet(const LabelToNodes& active_places,
       }
 
       for (auto mi : attrs.pcl_mesh_connections) {
-        if (mi > offsets.archived_vertices) {
-          frozen_indices.insert(mi);
+        if (mi >= offsets.archived_vertices) {
+          frozen_indices.insert(offsets.toLocalVertex(mi));
         }
       }
     }
@@ -115,7 +115,9 @@ std::unordered_set<size_t> getFrozenSet(const LabelToNodes& active_places,
 }
 
 Place2dSegmenter::Place2dSegmenter(const Config& config)
-    : config(config), next_node_id_(config.prefix, 0) {
+    : config(config),
+      next_node_id_(config.prefix, 0),
+      sinks_(Sink::instantiate(config.sinks)) {
   VLOG(1) << "[2D Places] Using labels: " << clustering::printLabels(config.labels);
   for (const auto& label : config.labels) {
     active_places_[label] = std::set<NodeId>();
@@ -130,7 +132,7 @@ NodeIdSet Place2dSegmenter::getActiveNodes() const {
   return all_active_nodes;
 }
 
-void Place2dSegmenter::detect(const ActiveWindowOutput&,
+void Place2dSegmenter::detect(const ActiveWindowOutput& msg,
                               const kimera_pgmo::MeshDelta& delta,
                               const kimera_pgmo::MeshOffsetInfo& offsets,
                               const DynamicSceneGraph& graph) {
@@ -172,6 +174,8 @@ void Place2dSegmenter::detect(const ActiveWindowOutput&,
     VLOG(5) << "[2D Places] " << places.size() << " final places of label " << label;
     label_places_.insert({label, places});
   }
+
+  Sink::callAll(sinks_, msg.timestamp_ns, delta, offsets, label_places_);
 }
 
 void Place2dSegmenter::updateGraph(uint64_t timestamp_ns,
@@ -326,6 +330,7 @@ void declare_config(Place2dSegmenter::Config& config) {
   field(config.place_overlap_threshold, "place_overlap_threshold");
   field(config.place_max_neighbor_z_diff, "place_max_neighbor_z_diff");
   field(config.connection_ellipse_scale_factor, "connection_ellipse_scale_factor");
+  field(config.sinks, "sinks");
   config.labels = GlobalInfo::instance().getLabelSpaceConfig().surface_places_labels;
 }
 
