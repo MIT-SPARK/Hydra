@@ -30,7 +30,7 @@ frontend:
       pessimistic: true
     clustering:
       type: RegionGrowingTraversabilityClustering
-      max_size: 2.0
+      max_radius: 3.0
     sinks:
       - type: TraversabilityVisualizer
 backend:
@@ -42,12 +42,8 @@ backend:
       type: UpdateAgentsFunctor
     objects:
       type: UpdateObjectsFunctor
-    # traversability:
-    #   type: UpdateTraversabilityFunctor
-    # min_place_size: *min_place_width # m
-    # max_place_size: *max_place_width # m
-    # use_metric_distance: false
-    # tolerance: 0.1 # m
+    traversability:
+      type: UpdateRegionGrowingTraversabilityFunctor
     frontiers:
       type: UpdateFrontiersFunctor
     rooms:

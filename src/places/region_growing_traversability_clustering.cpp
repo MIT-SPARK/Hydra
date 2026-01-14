@@ -67,8 +67,8 @@ static const auto registration =
 void declare_config(RegionGrowingTraversabilityClustering::Config& config) {
   using namespace config;
   name("RegionGrowingTraversabilityClustering::Config");
-  field(config.max_size, "max_size", "m");
-  check(config.max_size, GT, 0.0f, "max_size");
+  field(config.max_radius, "max_radius", "m");
+  check(config.max_radius, GT, 0.0f, "max_radius");
 }
 
 RegionGrowingTraversabilityClustering::RegionGrowingTraversabilityClustering(
@@ -88,7 +88,7 @@ void RegionGrowingTraversabilityClustering::updateGraph(
 
   // Cache params for this pass.
   current_time_ns_ = msg.timestamp_ns;
-  max_region_size_ = std::round(config.max_size / layer.voxel_size);
+  max_region_size_ = std::round(config.max_radius / layer.voxel_size);
 
   // Initialize regions and voxels for this pass.
   VoxelSet all_voxels = initializeVoxels(layer, msg.world_t_body);
@@ -219,7 +219,7 @@ void RegionGrowingTraversabilityClustering::computeNeighbors(
     for (const auto& voxel_index : region.boundary_voxels) {
       const auto it = assigned_voxels.find(voxel_index);
       if (it != assigned_voxels.end()) {
-        region.neighbors.insert(it->second);
+        region.neighbors[it->second]++;
       }
     }
   }
@@ -236,7 +236,7 @@ void RegionGrowingTraversabilityClustering::mergeRegions(
       if (!region.is_active) {
         continue;
       }
-      for (const auto neighbor_id : region.neighbors) {
+      for (const auto& [neighbor_id, num_connecting_voxels] : region.neighbors) {
         auto neighbor_it = regions_.find(neighbor_id);
         if (neighbor_it == regions_.end()) {
           continue;
@@ -313,9 +313,9 @@ void RegionGrowingTraversabilityClustering::updatePlaceEdgesInDsg(
       graph.removeEdge(id, n_id);
     }
 
-    // Add all new edges.
-    for (const auto& n_id : region.neighbors) {
-      auto attrs = std::make_unique<spark_dsg::EdgeAttributes>();
+    // Add all current and new edges.
+    for (const auto& [n_id, num_connecting_voxels] : region.neighbors) {
+      auto attrs = std::make_unique<spark_dsg::EdgeAttributes>(num_connecting_voxels);
       graph.addOrUpdateEdge(id, n_id, std::move(attrs));
     }
   }

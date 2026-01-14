@@ -47,24 +47,10 @@ namespace hydra {
  * @brief Functor to update traversability places in the DSG. This functor should be
  * called with exhaustive merging enabled.
  */
-struct UpdateTraversabilityFunctor : public UpdateFunctor {
+struct UpdateRegionGrowingTraversabilityFunctor : public UpdateFunctor {
   struct Config {
     //! Layer to update traversability in
     std::string layer = DsgLayers::TRAVERSABILITY;
-
-    //! Minimum side length of a traversability area to be considered [m].
-    double min_place_size = 0.5;
-
-    //! Maximum width of a place created in the active window [m].
-    double max_place_size = 1.0;
-
-    //! Extra tolerance for connectivity distance and overlap checks for merging in
-    //! meters.
-    double tolerance = 0.1;
-
-    //! If false, compute the topoligcal distance to occupied space. If true, use metric
-    //! distance.
-    bool use_metric_distance = false;
 
     DeformationInterpolator::Config deformation;
   } const config;
@@ -73,7 +59,7 @@ struct UpdateTraversabilityFunctor : public UpdateFunctor {
   using NodeSet = std::set<NodeId>;
   using State = spark_dsg::TraversabilityState;
 
-  explicit UpdateTraversabilityFunctor(const Config& config);
+  explicit UpdateRegionGrowingTraversabilityFunctor(const Config& config);
 
   Hooks hooks() const override;
 
@@ -89,7 +75,7 @@ struct UpdateTraversabilityFunctor : public UpdateFunctor {
   NodeAttributes::Ptr mergeNodes(const DynamicSceneGraph& dsg,
                                  const std::vector<NodeId>& merge_ids) const;
 
-  void cleanup(const UpdateInfo::ConstPtr& /* info */, SharedDsgInfo* dsg) const;
+  void cleanup(const UpdateInfo::ConstPtr& /* info */, SharedDsgInfo* /* dsg */) const;
 
   // Processing Steps.
   /**
@@ -124,33 +110,11 @@ struct UpdateTraversabilityFunctor : public UpdateFunctor {
   bool hasTraversableOverlap(const TraversabilityNodeAttributes& from,
                              const TraversabilityNodeAttributes& to) const;
 
-  /**
-   * @brief Check whether the from boundary is contained in the in boundary.
-   */
-  bool isContained(const Boundary& from, const Boundary& in) const;
-
-  /**
-   * @brief Recursively compute the metrc distance to the nearest intraversable
-   * obstacle for the query place.
-   */
-  double computeMetricDistance(const SceneGraphLayer& layer,
-                               const Eigen::Vector2d& point,
-                               const NodeSet& to_visit,
-                               NodeSet& visited) const;
-
-  double distanceToIntraversable(const TraversabilityNodeAttributes& attrs,
-                                 const Eigen::Vector2d& point) const;
-
-  void computeTopologicalDistances(const SceneGraphLayer& layer) const;
-
   void resetNeighborFinder(const DynamicSceneGraph& dsg) const;
 
  protected:
-  // Cached constants.
-  const double radius_;
-  const double min_connectivity_;
-
   // State.
+  mutable float radius_;  // Max radius for overlap search.
   mutable EdgeSet previous_active_edges_;
   mutable std::set<EdgeKey> overlapping_nodes_to_cleanup_;
 
@@ -160,6 +124,6 @@ struct UpdateTraversabilityFunctor : public UpdateFunctor {
   mutable NearestNodeFinder::Ptr nn_;
 };
 
-void declare_config(UpdateTraversabilityFunctor::Config& config);
+void declare_config(UpdateRegionGrowingTraversabilityFunctor::Config& config);
 
 }  // namespace hydra
