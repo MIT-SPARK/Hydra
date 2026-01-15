@@ -49,7 +49,7 @@ void reallocateMeshPoints(const spark_dsg::Mesh& mesh,
   std::vector<size_t> p1_new_indices;
   std::vector<size_t> p2_new_indices;
 
-  for (auto midx : attrs1.pcl_mesh_connections) {
+  for (auto midx : attrs1.mesh_connections) {
     Eigen::Vector2d p = mesh.points.at(midx).head(2).cast<double>();
     if ((p - d).dot(delta) > 0) {
       p2_new_indices.push_back(midx);
@@ -58,7 +58,7 @@ void reallocateMeshPoints(const spark_dsg::Mesh& mesh,
     }
   }
 
-  for (auto midx : attrs2.pcl_mesh_connections) {
+  for (auto midx : attrs2.mesh_connections) {
     Eigen::Vector2d p = mesh.points.at(midx).head(2).cast<double>();
     if ((p - d).dot(delta) > 0) {
       p2_new_indices.push_back(midx);
@@ -80,8 +80,8 @@ void reallocateMeshPoints(const spark_dsg::Mesh& mesh,
   last = std::unique(p2_new_indices.begin(), p2_new_indices.end());
   p2_new_indices.erase(last, p2_new_indices.end());
 
-  attrs1.pcl_mesh_connections = p1_new_indices;
-  attrs2.pcl_mesh_connections = p2_new_indices;
+  attrs1.mesh_connections = p1_new_indices;
+  attrs2.mesh_connections = p2_new_indices;
 
   // Say there are active mesh indices if either involved node has them.
   // In theory we could actually check if any of the reallocated vertices changes a

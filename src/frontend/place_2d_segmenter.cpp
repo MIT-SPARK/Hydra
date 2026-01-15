@@ -63,7 +63,7 @@ static const auto registration_ =
                                    Place2dSegmenter::Config>("place_2d");
 
 inline bool placeIsEmpty(const Place2dNodeAttributes& attrs) {
-  return attrs.pcl_mesh_connections.size() == 0 || attrs.boundary.size() < 3;
+  return attrs.mesh_connections.size() == 0 || attrs.boundary.size() < 3;
 }
 
 std::unordered_set<size_t> getFrozenSet(uint64_t timestamp_ns,
@@ -85,15 +85,15 @@ std::unordered_set<size_t> getFrozenSet(uint64_t timestamp_ns,
     }
 
     // we delete any previous place with only active mesh vertices
-    if (attrs.pcl_min_index >= offsets.archived_vertices) {
+    if (attrs.min_mesh_index >= offsets.archived_vertices) {
       to_remove.push_back(node_id);
       iter = active_places.erase(iter);
       continue;
     }
 
     attrs.last_update_time_ns = timestamp_ns;
-    attrs.has_active_mesh_indices = attrs.pcl_max_index >= offsets.archived_vertices;
-    for (auto idx : attrs.pcl_mesh_connections) {
+    attrs.has_active_mesh_indices = attrs.max_mesh_index >= offsets.archived_vertices;
+    for (auto idx : attrs.mesh_connections) {
       if (idx >= offsets.archived_vertices) {
         frozen_indices.insert(offsets.toLocalVertex(idx));
       }
@@ -213,7 +213,7 @@ void Place2dSegmenter::updateGraph(const ActiveWindowOutput&,
                                                      *ea);
       if (has_edge) {
         graph.insertEdge(ns1, ns2, std::move(ea));
-        fixed_neighbors &= attrs2.pcl_min_index < offsets.archived_vertices;
+        fixed_neighbors &= attrs2.min_mesh_index < offsets.archived_vertices;
       }
     }
 

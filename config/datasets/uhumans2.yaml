@@ -12,6 +12,7 @@ active_window:
     semantic_integrator:
       type: SingleLabelIntegrator
 frontend:
+  eanble_mesh_objects: false
   pgmo:
     time_horizon: 15.0
     d_graph_resolution: 2.5
@@ -22,7 +23,7 @@ frontend:
   surface_places:
     type: place_2d
     prefix: P
-    pure_final_place_size: 1
+    pure_final_place_size: 2
     cluster_tolerance: .3
     min_cluster_size: 50
     max_cluster_size: 100000
@@ -30,7 +31,7 @@ frontend:
     place_max_neighbor_z_diff: .5
     place_overlap_threshold: 0.0
   traversability_places:
-    type: traversability
+    #type: traversability
     estimator:
       type: HeightTraversabilityEstimator
       height_below: 0
@@ -47,7 +48,7 @@ frontend:
     sinks:
       - type: TraversabilityVisualizer
   freespace_places:
-    type: gvd
+    #type: gvd
     filter_places: true
     min_places_component_size: 3
     filter_ground: false

@@ -54,7 +54,7 @@ static const auto reg = config::RegistrationWithConfig<UpdateFunctor,
 inline void updateNode(const spark_dsg::Mesh& mesh,
                        NodeId node,
                        Place2dNodeAttributes& attrs) {
-  const auto& connections = attrs.pcl_mesh_connections;
+  const auto& connections = attrs.mesh_connections;
   if (connections.empty()) {
     LOG(ERROR) << "Found empty place2d node " << NodeSymbol(node).str();
     return;
@@ -67,7 +67,7 @@ inline void updateNode(const spark_dsg::Mesh& mesh,
 
   attrs.position /= connections.size();
   for (size_t i = 0; i < attrs.boundary.size(); ++i) {
-    attrs.boundary[i] = mesh.pos(attrs.pcl_boundary_connections.at(i)).cast<double>();
+    attrs.boundary[i] = mesh.pos(attrs.boundary_connections.at(i)).cast<double>();
   }
 }
 
@@ -103,9 +103,7 @@ NodeAttributes::Ptr merge2dPlaceAttributes(const Update2dPlacesFunctor::Config c
   while (iter != nodes.end()) {
     CHECK(graph.hasNode(*iter)) << NodeSymbol(*iter).str();
     const auto& from_attrs = graph.getNode(*iter).attributes<Place2dNodeAttributes>();
-    utils::mergeIndices(from_attrs.pcl_mesh_connections,
-                        new_attrs.pcl_mesh_connections);
-
+    utils::mergeIndices(from_attrs.mesh_connections, new_attrs.mesh_connections);
     new_attrs.has_active_mesh_indices |= from_attrs.has_active_mesh_indices;
     ++iter;
   }
@@ -253,7 +251,7 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
 
   for (auto& node_id : checked_nodes) {
     auto& attrs = graph.getNode(node_id).attributes<Place2dNodeAttributes>();
-    if (attrs.pcl_mesh_connections.size() == 0) {
+    if (attrs.mesh_connections.size() == 0) {
       LOG(ERROR) << "Reallocating mesh points would make empty place. Skipping.";
       continue;
     }

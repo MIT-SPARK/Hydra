@@ -183,10 +183,10 @@ inline void decomposePlace(const PointAdaptor& points,
 inline void remapPlace2dConnections(Place2dNodeAttributes& attrs,
                                     const kimera_pgmo::MeshOffsetInfo& offsets) {
   kimera_pgmo::MeshOffsetInfo::RemapStats info;
-  auto& connections = attrs.pcl_mesh_connections;
+  auto& connections = attrs.mesh_connections;
   connections = offsets.remapVertexIndices(connections, &info);
-  attrs.pcl_min_index = info.min_index;
-  attrs.pcl_max_index = info.max_index;
+  attrs.min_mesh_index = info.min_index;
+  attrs.max_mesh_index = info.max_index;
   attrs.has_active_mesh_indices = !info.all_archived;
 }
 
@@ -209,14 +209,14 @@ void Place2d::fillAttributes(Place2dNodeAttributes& attrs) const {
   attrs.ellipse_centroid(0) = ellipse_centroid(0);
   attrs.ellipse_centroid(1) = ellipse_centroid(1);
   attrs.ellipse_centroid(2) = centroid.z();
-  attrs.pcl_min_index = min_mesh_index;
-  attrs.pcl_max_index = max_mesh_index;
+  attrs.min_mesh_index = min_mesh_index;
+  attrs.max_mesh_index = max_mesh_index;
 
-  attrs.pcl_mesh_connections.insert(
-      attrs.pcl_mesh_connections.begin(), indices.begin(), indices.end());
-  attrs.pcl_boundary_connections.insert(attrs.pcl_boundary_connections.begin(),
-                                        boundary_indices.begin(),
-                                        boundary_indices.end());
+  attrs.mesh_connections.insert(
+      attrs.mesh_connections.begin(), indices.begin(), indices.end());
+  attrs.boundary_connections.insert(attrs.boundary_connections.begin(),
+                                    boundary_indices.begin(),
+                                    boundary_indices.end());
 }
 
 void addRectInfo(const kimera_pgmo::MeshDelta& delta,
@@ -232,7 +232,7 @@ void addRectInfo(const spark_dsg::Mesh& mesh,
   Eigen::Vector2d cut_plane;         // place node attributes don't have cut_plane
   Eigen::Vector2d ellipse_centroid;  // attrs.ellipse_centroid is Vector3d
   addRectInfo(MeshAdaptor(mesh),
-              attrs.pcl_mesh_connections,
+              attrs.mesh_connections,
               connection_ellipse_scale_factor,
               ellipse_centroid,
               attrs.ellipse_matrix_expand,
@@ -251,10 +251,10 @@ void addBoundaryInfo(const kimera_pgmo::MeshDelta& delta,
 void addBoundaryInfo(const spark_dsg::Mesh& mesh, Place2dNodeAttributes& attrs) {
   Eigen::Vector3f centroid;
   addBoundaryInfo(MeshAdaptor(mesh),
-                  attrs.pcl_mesh_connections,
+                  attrs.mesh_connections,
                   centroid,
                   attrs.boundary,
-                  attrs.pcl_boundary_connections);
+                  attrs.boundary_connections);
   attrs.position = centroid.cast<double>();
   attrs.ellipse_centroid(2) = centroid.z();
 }
@@ -299,7 +299,7 @@ void remapPlace2dMesh(Place2dNodeAttributes& attrs,
                       const kimera_pgmo::MeshOffsetInfo& offsets) {
   remapPlace2dConnections(attrs, offsets);
 
-  auto& indices = attrs.pcl_boundary_connections;
+  auto& indices = attrs.boundary_connections;
   kimera_pgmo::MeshOffsetInfo::RemapStats info;
   indices = offsets.remapVertexIndices(indices, &info);
 
