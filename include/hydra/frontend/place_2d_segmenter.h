@@ -39,6 +39,7 @@
 #include "hydra/active_window/active_window_output.h"
 #include "hydra/common/output_sink.h"
 #include "hydra/frontend/mesh_delta_clustering.h"
+#include "hydra/utils/logging.h"
 
 namespace kimera_pgmo {
 class MeshDelta;
@@ -55,7 +56,9 @@ class Place2dSegmenter {
                           const kimera_pgmo::MeshDelta&,
                           const kimera_pgmo::MeshOffsetInfo&>;
 
-  struct Config {
+  struct Config : VerbosityConfig {
+    Config();
+
     std::string layer = spark_dsg::DsgLayers::MESH_PLACES;
     char prefix = 'Q';
     clustering::ClusteringConfig clustering{1.0, 600, 100000};
@@ -64,11 +67,10 @@ class Place2dSegmenter {
     double place_overlap_threshold = 0.1;
     double place_max_neighbor_z_diff = 0.5;
     double connection_ellipse_scale_factor = 1;
-    std::set<uint32_t> labels;
     std::vector<Sink::Factory> sinks;
   } const config;
 
-  explicit Place2dSegmenter(const Config& config);
+  Place2dSegmenter(const Config& config, const std::set<uint32_t>& labels);
 
   void detect(const ActiveWindowOutput& msg,
               const kimera_pgmo::MeshDelta& mesh_delta,
@@ -80,6 +82,7 @@ class Place2dSegmenter {
 
  private:
   Sink::List sinks_;
+  std::set<uint32_t> labels_;
   spark_dsg::NodeSymbol next_node_id_;
   std::list<spark_dsg::NodeId> to_remove_;
   std::map<spark_dsg::NodeId, spark_dsg::Place2dNodeAttributes> active_places_;

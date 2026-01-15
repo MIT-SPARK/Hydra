@@ -60,13 +60,15 @@ namespace {
 static const auto registration_ =
     config::RegistrationWithConfig<Place2dSegmenter,
                                    Place2dSegmenter,
-                                   Place2dSegmenter::Config>("place_2d");
+                                   Place2dSegmenter::Config,
+                                   std::set<uint32_t>>("place_2d");
 
 inline bool placeIsEmpty(const Place2dNodeAttributes& attrs) {
   return attrs.mesh_connections.size() == 0 || attrs.boundary.size() < 3;
 }
 
-std::unordered_set<size_t> getFrozenSet(uint64_t timestamp_ns,
+std::unordered_set<size_t> getFrozenSet(const VerbosityConfig& config,
+                                        uint64_t timestamp_ns,
                                         const kimera_pgmo::MeshOffsetInfo& offsets,
                                         AttrMap& active_places,
                                         std::list<NodeId>& to_remove) {
@@ -102,29 +104,48 @@ std::unordered_set<size_t> getFrozenSet(uint64_t timestamp_ns,
     ++iter;
   }
 
-  VLOG(5) << "[2D Places] n frozen indices: " << frozen_indices.size();
+  MLOG(2) << "n frozen indices: " << frozen_indices.size();
   return frozen_indices;
 }
 
 }  // namespace
 
-Place2dSegmenter::Place2dSegmenter(const Config& config)
+void declare_config(Place2dSegmenter::Config& config) {
+  using namespace config;
+  name("Place2dSegmenter::Config");
+  base<VerbosityConfig>(config);
+  field(config.layer, "layer");
+  field<CharConversion>(config.prefix, "prefix");
+  field(config.clustering, "clustering", false);
+  field(config.pure_final_place_size, "pure_final_place_size");
+  field(config.min_final_place_points, "min_final_place_points");
+  field(config.place_overlap_threshold, "place_overlap_threshold");
+  field(config.place_max_neighbor_z_diff, "place_max_neighbor_z_diff");
+  field(config.connection_ellipse_scale_factor, "connection_ellipse_scale_factor");
+  field(config.sinks, "sinks");
+}
+
+Place2dSegmenter::Config::Config() : VerbosityConfig("[places_2d] ") {}
+
+Place2dSegmenter::Place2dSegmenter(const Config& config,
+                                   const std::set<uint32_t>& labels)
     : config(config::checkValid(config)),
       sinks_(Sink::instantiate(config.sinks)),
+      labels_(labels),
       next_node_id_(config.prefix, 0) {
-  VLOG(1) << "[2D Places] Using labels: " << clustering::printLabels(config.labels);
+  MLOG(1) << "using labels: " << clustering::printLabels(labels_);
 }
 
 void Place2dSegmenter::detect(const ActiveWindowOutput& msg,
                               const kimera_pgmo::MeshDelta& delta,
                               const kimera_pgmo::MeshOffsetInfo& offsets) {
-  VLOG(5) << "[2D Places] detect called";
-  VLOG(5) << "[2D Places] n original active indices: " << delta.getNumActiveVertices();
+  MLOG(2) << "detect called";
+  MLOG(2) << "n original active indices: " << delta.getNumActiveVertices();
   const auto frozen =
-      getFrozenSet(msg.timestamp_ns, offsets, active_places_, to_remove_);
-  const auto label_indices = clustering::getLabelIndices(config.labels, delta, &frozen);
+      getFrozenSet(config, msg.timestamp_ns, offsets, active_places_, to_remove_);
+  const auto label_indices = clustering::getLabelIndices(labels_, delta, &frozen);
   if (label_indices.empty()) {
-    VLOG(5) << "[2D Places] No vertices found matching desired labels";
+    MLOG(2) << "no vertices found matching desired labels";
     return;
   }
 
@@ -134,7 +155,7 @@ void Place2dSegmenter::detect(const ActiveWindowOutput& msg,
     }
 
     auto clusters = clustering::findClusters(config.clustering, delta, indices);
-    VLOG(5) << "[2D Places] got " << clusters.size() << " initial places";
+    MLOG(2) << "got " << clusters.size() << " initial places";
     std::vector<Place2d> places;
     for (auto& cluster_indices : clusters) {
       Place2d place;
@@ -155,7 +176,7 @@ void Place2dSegmenter::detect(const ActiveWindowOutput& msg,
                      places);
     }
 
-    VLOG(5) << "[2D Places] " << places.size() << " final places of label " << label;
+    MLOG(2) << places.size() << " final places of label " << label;
     for (const auto& place : places) {
       if (place.indices.empty()) {
         LOG(ERROR) << "[2D Places] Encountered empty place with label" << label << " @ "
@@ -189,7 +210,7 @@ void Place2dSegmenter::updateGraph(const ActiveWindowOutput&,
 
   to_remove_.clear();
 
-  VLOG(5) << "[2D Places] updateGraph";
+  MLOG(2) << "updateGraph";
   for (const auto& [nid, attrs] : active_places_) {
     // overrides all previous nodes
     graph.addOrUpdateNode(config.layer, nid, attrs.clone());
@@ -224,21 +245,6 @@ void Place2dSegmenter::updateGraph(const ActiveWindowOutput&,
       ++iter;
     }
   }
-}
-
-void declare_config(Place2dSegmenter::Config& config) {
-  using namespace config;
-  name("Place2dSegmenterConfig");
-  field(config.layer, "layer");
-  field<CharConversion>(config.prefix, "prefix");
-  field(config.clustering, "clustering", false);
-  field(config.pure_final_place_size, "pure_final_place_size");
-  field(config.min_final_place_points, "min_final_place_points");
-  field(config.place_overlap_threshold, "place_overlap_threshold");
-  field(config.place_max_neighbor_z_diff, "place_max_neighbor_z_diff");
-  field(config.connection_ellipse_scale_factor, "connection_ellipse_scale_factor");
-  field(config.sinks, "sinks");
-  config.labels = GlobalInfo::instance().getLabelSpaceConfig().surface_places_labels;
 }
 
 }  // namespace hydra
