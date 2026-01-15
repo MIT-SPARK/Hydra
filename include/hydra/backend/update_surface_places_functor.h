@@ -60,16 +60,15 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
   } const config;
 
   explicit Update2dPlacesFunctor(const Config& config);
+
   Hooks hooks() const override;
+
   void call(const DynamicSceneGraph& unmerged,
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
+
   MergeList findMerges(const DynamicSceneGraph& graph,
                        const UpdateInfo::ConstPtr& info) const;
-
-  void updateNode(const spark_dsg::Mesh::Ptr& mesh,
-                  NodeId node,
-                  Place2dNodeAttributes& attrs) const;
 
   bool shouldMerge(const Place2dNodeAttributes& from_attrs,
                    const Place2dNodeAttributes& to_attrs) const;

@@ -35,10 +35,7 @@
 #include "hydra/backend/update_surface_places_functor.h"
 
 #include <config_utilities/config.h>
-#include <config_utilities/virtual_config.h>
 #include <glog/logging.h>
-#include <pcl/common/centroid.h>
-#include <pcl/point_types.h>
 
 #include "hydra/backend/backend_utilities.h"
 #include "hydra/backend/surface_place_utilities.h"
@@ -54,7 +51,27 @@ static const auto reg = config::RegistrationWithConfig<UpdateFunctor,
                                                        Update2dPlacesFunctor::Config>(
     "Update2dPlacesFunctor");
 
+inline void updateNode(const spark_dsg::Mesh& mesh,
+                       NodeId node,
+                       Place2dNodeAttributes& attrs) {
+  const auto& connections = attrs.pcl_mesh_connections;
+  if (connections.empty()) {
+    LOG(ERROR) << "Found empty place2d node " << NodeSymbol(node).str();
+    return;
+  }
+
+  attrs.position.setZero();
+  for (const auto idx : connections) {
+    attrs.position += mesh.pos(idx).cast<double>();
+  }
+
+  attrs.position /= connections.size();
+  for (size_t i = 0; i < attrs.boundary.size(); ++i) {
+    attrs.boundary[i] = mesh.pos(attrs.pcl_boundary_connections.at(i)).cast<double>();
+  }
 }
+
+}  // namespace
 
 using timing::ScopedTimer;
 
@@ -144,7 +161,7 @@ void Update2dPlacesFunctor::call(const DynamicSceneGraph& unmerged,
     }
 
     ++num_changed;
-    updateNode(mesh, node.id, *attrs);
+    updateNode(*mesh, node.id, *attrs);
     dsg.graph->setNodeAttributes(node.id, attrs->clone());
   }
 
@@ -179,42 +196,6 @@ MergeList Update2dPlacesFunctor::findMerges(const DynamicSceneGraph& graph,
       },
       nodes_to_merge);
   return nodes_to_merge;
-}
-
-void Update2dPlacesFunctor::updateNode(const spark_dsg::Mesh::Ptr& mesh,
-                                       NodeId node,
-                                       Place2dNodeAttributes& attrs) const {
-  const auto& connections = attrs.pcl_mesh_connections;
-  if (connections.empty()) {
-    LOG(ERROR) << "Found empty place2d node " << NodeSymbol(node).str();
-    return;
-  }
-
-  pcl::CentroidPoint<pcl::PointXYZ> centroid;
-  for (const auto& midx : connections) {
-    const auto& point = mesh->pos(midx);
-    if (std::isnan(point.x()) || std::isnan(point.y()) || std::isnan(point.z())) {
-      VLOG(4) << "found nan at index: " << midx << " with point: [" << point.x() << ", "
-              << point.y() << ", " << point.z() << "]";
-      continue;
-    }
-
-    centroid.add(pcl::PointXYZ(point.x(), point.y(), point.z()));
-  }
-
-  if (!centroid.getSize()) {
-    VLOG(2) << "Invalid centroid for 2D place " << NodeSymbol(node).str();
-    return;
-  }
-
-  pcl::PointXYZ pcl_pos;
-  centroid.get(pcl_pos);
-  attrs.position << pcl_pos.x, pcl_pos.y, pcl_pos.z;
-
-  for (size_t i = 0; i < attrs.boundary.size(); ++i) {
-    const auto& point = mesh->pos(attrs.pcl_boundary_connections.at(i));
-    attrs.boundary[i] << point.x(), point.y(), point.z();
-  }
 }
 
 bool Update2dPlacesFunctor::shouldMerge(const Place2dNodeAttributes& from_attrs,
@@ -256,17 +237,15 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
       continue;
     }
 
-    checked_nodes.insert(node_id);
     for (const auto nid : node->siblings()) {
       auto& neighbor_attrs = graph.getNode(nid).attributes<Place2dNodeAttributes>();
-
-      checked_nodes.insert(nid);
-
       if (neighbor_attrs.is_active) {
         continue;
       }
 
       if (attrs->semantic_label == neighbor_attrs.semantic_label) {
+        checked_nodes.insert(node_id);
+        checked_nodes.insert(nid);
         utils::reallocateMeshPoints(*mesh, *attrs, neighbor_attrs);
       }
     }

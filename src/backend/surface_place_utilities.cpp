@@ -57,6 +57,7 @@ void reallocateMeshPoints(const spark_dsg::Mesh& mesh,
       p1_new_indices.push_back(midx);
     }
   }
+
   for (auto midx : attrs2.pcl_mesh_connections) {
     Eigen::Vector2d p = mesh.points.at(midx).head(2).cast<double>();
     if ((p - d).dot(delta) > 0) {
