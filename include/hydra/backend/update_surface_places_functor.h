@@ -78,9 +78,6 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
 
   mutable ActiveWindowTracker active_tracker;
   const MergeProposer merge_proposer;
-
- private:
-  mutable NodeSymbol next_node_id_ = NodeSymbol('S', 0);
 };
 
 void declare_config(Update2dPlacesFunctor::Config& conf);

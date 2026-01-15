@@ -38,68 +38,7 @@
 
 namespace hydra::utils {
 
-using spark_dsg::DynamicSceneGraph;
 using spark_dsg::Place2dNodeAttributes;
-using spark_dsg::SceneGraphLayer;
-
-void getPlace2dAndNeighors(const SceneGraphLayer& places_layer,
-                           std::vector<IdPlacePair>& place_2ds,
-                           EdgeMap& node_neighbors) {
-  for (auto& [node_id, node] : places_layer.nodes()) {
-    auto attrs = node->tryAttributes<Place2dNodeAttributes>();
-    if (!attrs) {
-      continue;
-    }
-
-    if (attrs->need_finish_merge) {
-      Place2d p;
-      p.indices.insert(p.indices.end(),
-                       attrs->pcl_mesh_connections.begin(),
-                       attrs->pcl_mesh_connections.end());
-      place_2ds.push_back(std::pair(node_id, p));
-      node_neighbors.insert({node_id, node->siblings()});
-    }
-  }
-}
-
-void computeAttributeUpdates(const spark_dsg::Mesh& mesh,
-                             const double connection_ellipse_scale_factor,
-                             std::vector<IdPlacePair>& place_2ds,
-                             std::vector<IdPlacePair>& nodes_to_update) {
-  for (auto& [node_id, place] : place_2ds) {
-    addRectInfo(mesh, connection_ellipse_scale_factor, place);
-    addBoundaryInfo(mesh, place);
-    place.updateIndexBounds();
-    nodes_to_update.push_back({node_id, place});
-  }
-}
-
-void updateExistingNodes(const std::vector<IdPlacePair>& nodes_to_update,
-                         DynamicSceneGraph& graph) {
-  for (const auto& [node_id, place] : nodes_to_update) {
-    auto& attrs = graph.getNode(node_id).attributes<Place2dNodeAttributes>();
-    attrs.position = place.centroid.cast<double>();
-
-    attrs.boundary = place.boundary;
-    attrs.pcl_boundary_connections.clear();
-    attrs.pcl_boundary_connections.insert(attrs.pcl_boundary_connections.begin(),
-                                          place.boundary_indices.begin(),
-                                          place.boundary_indices.end());
-    attrs.ellipse_matrix_compress = place.ellipse_matrix_compress;
-    attrs.ellipse_matrix_expand = place.ellipse_matrix_expand;
-    attrs.ellipse_centroid(0) = place.ellipse_centroid(0);
-    attrs.ellipse_centroid(1) = place.ellipse_centroid(1);
-    attrs.ellipse_centroid(2) = attrs.position.z();
-    attrs.pcl_min_index = place.min_mesh_index;
-    attrs.pcl_max_index = place.max_mesh_index;
-
-    attrs.pcl_mesh_connections.clear();
-    attrs.pcl_mesh_connections.insert(
-        attrs.pcl_mesh_connections.begin(), place.indices.begin(), place.indices.end());
-
-    attrs.need_finish_merge = false;
-  }
-}
 
 void reallocateMeshPoints(const spark_dsg::Mesh& mesh,
                           Place2dNodeAttributes& attrs1,

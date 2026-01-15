@@ -34,26 +34,10 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <spark_dsg/dynamic_scene_graph.h>
-
-#include "hydra/frontend/place_2d_split_logic.h"
+#include <spark_dsg/mesh.h>
+#include <spark_dsg/node_attributes.h>
 
 namespace hydra::utils {
-
-using IdPlacePair = std::pair<spark_dsg::NodeId, Place2d>;
-using EdgeMap = std::map<spark_dsg::NodeId, std::set<spark_dsg::NodeId>>;
-
-void getPlace2dAndNeighors(const spark_dsg::SceneGraphLayer& places_layer,
-                           std::vector<IdPlacePair>& place_2ds,
-                           EdgeMap& node_neighbors);
-
-void computeAttributeUpdates(const spark_dsg::Mesh& mesh,
-                             const double connection_ellipse_scale_factor,
-                             std::vector<IdPlacePair>& place_2ds,
-                             std::vector<IdPlacePair>& nodes_to_update);
-
-void updateExistingNodes(const std::vector<IdPlacePair>& nodes_to_update,
-                         spark_dsg::DynamicSceneGraph& graph);
 
 void reallocateMeshPoints(const spark_dsg::Mesh& mesh,
                           spark_dsg::Place2dNodeAttributes& attrs1,

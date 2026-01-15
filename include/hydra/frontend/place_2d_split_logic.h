@@ -31,11 +31,6 @@ void addRectInfo(const kimera_pgmo::MeshDelta& delta,
                  const double connection_ellipse_scale_factor,
                  Place2d& place);
 
-// TODO(nathan) drop this when rebased on active dsg
-void addRectInfo(const spark_dsg::Mesh& mesh,
-                 const double connection_ellipse_scale_factor,
-                 Place2d& place);
-
 void addRectInfo(const spark_dsg::Mesh& mesh,
                  const double connection_ellipse_scale_factor,
                  spark_dsg::Place2dNodeAttributes& attrs);
@@ -43,9 +38,6 @@ void addRectInfo(const spark_dsg::Mesh& mesh,
 void addBoundaryInfo(const kimera_pgmo::MeshDelta& delta,
                      const kimera_pgmo::MeshOffsetInfo& offsets,
                      Place2d& place);
-
-// TODO(nathan) drop this when rebased on active dsg
-void addBoundaryInfo(const spark_dsg::Mesh& mesh, Place2d& place);
 
 void addBoundaryInfo(const spark_dsg::Mesh& mesh,
                      spark_dsg::Place2dNodeAttributes& attrs);

@@ -93,8 +93,8 @@ NodeAttributes::Ptr merge2dPlaceAttributes(const Update2dPlacesFunctor::Config c
     ++iter;
   }
 
-  addRectInfo(graph.mesh()->points, config.connection_ellipse_scale_factor, new_attrs);
-  addBoundaryInfo(graph.mesh()->points, new_attrs);
+  addRectInfo(*graph.mesh(), config.connection_ellipse_scale_factor, new_attrs);
+  addBoundaryInfo(*graph.mesh(), new_attrs);
   return attrs_ptr;
 }
 
@@ -236,35 +236,20 @@ bool Update2dPlacesFunctor::shouldMerge(const Place2dNodeAttributes& from_attrs,
 }
 
 void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
-  std::map<NodeId, std::set<NodeId>> node_neighbors;
-  std::vector<std::pair<NodeId, Place2d>> place_2ds;
-
+  std::lock_guard<std::mutex> lock(dsg.mutex);
   const auto places_layer = dsg.graph->findLayer(DsgLayers::MESH_PLACES);
   if (!places_layer) {
     return;
   }
 
-  // TODO(nathan) critical section appears to be wrong here
-  // Get/copy info for places that need cleanup
-  std::lock_guard<std::mutex> lock(dsg.mutex);
-  utils::getPlace2dAndNeighors(*places_layer, place_2ds, node_neighbors);
-
   // Decide which places need to be split and which just need to be updated
   auto& graph = *dsg.graph;
   auto mesh = graph.mesh();
 
-  // existing node id for each place
-  std::vector<std::pair<NodeId, Place2d>> nodes_to_update;
-  utils::computeAttributeUpdates(
-      *mesh, config.connection_ellipse_scale_factor, place_2ds, nodes_to_update);
-
-  // Update attributes for place nodes that did not need to split after merge
-  utils::updateExistingNodes(nodes_to_update, graph);
-
-  std::set<NodeId> checked_nodes;
   // Clean up places that are far enough away from the active window
   // Far enough means that none of a node's neighbors or the node itself have
   // active mesh vertices
+  std::set<NodeId> checked_nodes;
   for (auto& [node_id, node] : places_layer->nodes()) {
     auto attrs = node->tryAttributes<Place2dNodeAttributes>();
     if (!attrs || attrs->is_active) {
@@ -289,7 +274,6 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
 
   for (auto& node_id : checked_nodes) {
     auto& attrs = graph.getNode(node_id).attributes<Place2dNodeAttributes>();
-
     if (attrs.pcl_mesh_connections.size() == 0) {
       LOG(ERROR) << "Reallocating mesh points would make empty place. Skipping.";
       continue;

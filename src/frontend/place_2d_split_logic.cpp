@@ -228,12 +228,6 @@ void addRectInfo(const kimera_pgmo::MeshDelta& delta,
 
 void addRectInfo(const spark_dsg::Mesh& mesh,
                  const double connection_ellipse_scale_factor,
-                 Place2d& place) {
-  addRectInfo(MeshAdaptor(mesh), connection_ellipse_scale_factor, place);
-}
-
-void addRectInfo(const spark_dsg::Mesh& mesh,
-                 const double connection_ellipse_scale_factor,
                  Place2dNodeAttributes& attrs) {
   Eigen::Vector2d cut_plane;         // place node attributes don't have cut_plane
   Eigen::Vector2d ellipse_centroid;  // attrs.ellipse_centroid is Vector3d
@@ -252,10 +246,6 @@ void addBoundaryInfo(const kimera_pgmo::MeshDelta& delta,
                      const kimera_pgmo::MeshOffsetInfo& offsets,
                      Place2d& p) {
   addBoundaryInfo(DeltaAdaptor(delta, offsets), p);
-}
-
-void addBoundaryInfo(const spark_dsg::Mesh& mesh, Place2d& p) {
-  addBoundaryInfo(MeshAdaptor(mesh), p);
 }
 
 void addBoundaryInfo(const spark_dsg::Mesh& mesh, Place2dNodeAttributes& attrs) {
