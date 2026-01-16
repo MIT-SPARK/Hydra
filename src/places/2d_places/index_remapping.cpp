@@ -38,16 +38,4 @@ void remap2dPlaceIndices(spark_dsg::Place2dNodeAttributes& attrs,
   }
 }
 
-void remap2dPlaceIndices(const spark_dsg::SceneGraphLayer& layer,
-                         const kimera_pgmo::MeshOffsetInfo& offsets) {
-  for (auto& [node_id, node] : layer.nodes()) {
-    auto attrs = node->tryAttributes<spark_dsg::Place2dNodeAttributes>();
-    if (!attrs || !attrs->has_active_mesh_indices) {
-      continue;
-    }
-
-    remap2dPlaceIndices(*attrs, offsets);
-  }
-}
-
 }  // namespace hydra

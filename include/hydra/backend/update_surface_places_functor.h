@@ -75,6 +75,9 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
 
   void cleanup(SharedDsgInfo& dsg) const;
 
+  void updateMeshIndices(SharedDsgInfo& dsg,
+                         const kimera_pgmo::MeshOffsetInfo& offsets) const;
+
   mutable ActiveWindowTracker active_tracker;
   const MergeProposer merge_proposer;
 };

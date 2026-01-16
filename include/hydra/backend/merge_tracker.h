@@ -38,6 +38,8 @@
 namespace hydra {
 
 struct MergeTracker {
+  using MergeFunc = UpdateFunctor::Hooks::MergeFunc;
+
   size_t applyMerges(const DynamicSceneGraph& unmerged,
                      const MergeList& proposals,
                      SharedDsgInfo& dsg,

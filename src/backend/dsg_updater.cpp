@@ -41,6 +41,7 @@
 #include <glog/stl_logging.h>
 #include <kimera_pgmo/utils/mesh_io.h>
 
+#include "hydra/common/launch_callbacks.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
 
@@ -113,7 +114,7 @@ void DsgUpdater::save(const DataDirectory& output, const std::string& label) con
   }
 }
 
-void DsgUpdater::resetBackendDsg(size_t timestamp_ns) {
+void DsgUpdater::resetBackendDsg(uint64_t timestamp_ns) {
   ScopedTimer timer("dsg_updater/reset_dsg", timestamp_ns, true, 0, false);
   constexpr bool reset_mesh = false;
   {
@@ -129,6 +130,24 @@ void DsgUpdater::resetBackendDsg(size_t timestamp_ns) {
   target_dsg_->graph->mergeGraph(*source_graph_);
   target_dsg_->merges.clear();
   merge_tracker.clear();
+}
+
+void DsgUpdater::handleMeshUpdate(uint64_t timestamp_ns,
+                                  const kimera_pgmo::MeshOffsetInfo& offsets) {
+  ScopedTimer spin_timer("dsg_updater/update_layers", timestamp_ns);
+  std::list<UpdateFunctor::Hooks::MeshUpdateFunc> funcs;
+  for (const auto& [name, functor] : update_functors_) {
+    if (!functor) {
+      continue;
+    }
+
+    const auto hooks = functor->hooks();
+    if (hooks.mesh_update) {
+      funcs.push_back(hooks.mesh_update);
+    }
+  }
+
+  launchCallbacks(funcs, offsets, target_dsg_.get());
 }
 
 void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr info) {
@@ -166,7 +185,7 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
 
   const std::set<std::string> exhaustive_names(config.exhaustive_functors.begin(),
                                                config.exhaustive_functors.end());
-  std::list<LayerCleanupFunc> cleanup_hooks;
+  std::list<UpdateFunctor::Hooks::CleanupFunc> cleanup_hooks;
   for (const auto& [name, functor] : update_functors_) {
     if (!functor) {
       continue;
@@ -195,6 +214,7 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
       }
     }
 
+    // TODO(nathan) fix args for multithreading
     MLOG(2) << "all merges: " << merge_tracker.print();
     for (const auto& func : cleanup_hooks) {
       func(info, *source_graph_, target_dsg_.get());

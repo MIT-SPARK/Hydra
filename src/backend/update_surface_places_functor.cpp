@@ -39,6 +39,7 @@
 
 #include "hydra/backend/backend_utilities.h"
 #include "hydra/places/2d_places/ellipsoid_math.h"
+#include "hydra/places/2d_places/index_remapping.h"
 #include "hydra/places/2d_places/place_reallocation.h"
 #include "hydra/places/2d_places/place_splitting.h"
 #include "hydra/utils/timing_utilities.h"
@@ -73,6 +74,7 @@ inline void updateNode(const spark_dsg::Mesh& mesh,
 
 }  // namespace
 
+using kimera_pgmo::MeshOffsetInfo;
 using timing::ScopedTimer;
 
 void declare_config(Update2dPlacesFunctor::Config& config) {
@@ -130,6 +132,12 @@ UpdateFunctor::Hooks Update2dPlacesFunctor::hooks() const {
 
   my_hooks.merge = [this](const auto& graph, const auto& nodes) {
     return merge2dPlaceAttributes(config, graph, nodes);
+  };
+
+  my_hooks.mesh_update = [this](const auto& offsets, auto dsg) {
+    if (dsg) {
+      updateMeshIndices(*dsg, offsets);
+    }
   };
 
   return my_hooks;
@@ -297,6 +305,25 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
     for (auto [source, target] : sibs_edges_to_remove) {
       graph.removeEdge(source, target);
     }
+  }
+}
+
+void Update2dPlacesFunctor::updateMeshIndices(SharedDsgInfo& dsg,
+                                              const MeshOffsetInfo& offsets) const {
+  std::lock_guard<std::mutex> lock(dsg.mutex);
+  const auto surface_places = dsg.graph->findLayer(config.layer);
+  if (!surface_places) {
+    return;
+  }
+
+  const auto& layer = *surface_places;
+  for (auto& [node_id, node] : layer.nodes()) {
+    auto attrs = node->tryAttributes<spark_dsg::Place2dNodeAttributes>();
+    if (!attrs || !attrs->has_active_mesh_indices) {
+      continue;
+    }
+
+    remap2dPlaceIndices(*attrs, offsets);
   }
 }
 
