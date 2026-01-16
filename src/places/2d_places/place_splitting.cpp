@@ -50,7 +50,7 @@ struct DeltaAdaptor : public PointAdaptor {
 };
 
 inline void addRectInfo(const PointAdaptor& points,
-                        const std::vector<size_t> mindices,
+                        const std::list<size_t> mindices,
                         const double connection_ellipse_scale_factor,
                         Eigen::Vector2d& ellipse_centroid,
                         Eigen::Matrix2d& m_expand,
@@ -74,10 +74,10 @@ inline void addRectInfo(const PointAdaptor& points,
   ellipse_centroid(0) = box_center.x;
   ellipse_centroid(1) = box_center.y;
 
-  m_expand(0, 0) = connection_ellipse_scale_factor * sqrt(2) * (e1_ray.x / 2);
-  m_expand(1, 0) = connection_ellipse_scale_factor * sqrt(2) * (e1_ray.y / 2);
-  m_expand(0, 1) = connection_ellipse_scale_factor * sqrt(2) * (e2_ray.x / 2);
-  m_expand(1, 1) = connection_ellipse_scale_factor * sqrt(2) * (e2_ray.y / 2);
+  m_expand(0, 0) = connection_ellipse_scale_factor * std::sqrt(2) * (e1_ray.x / 2);
+  m_expand(1, 0) = connection_ellipse_scale_factor * std::sqrt(2) * (e1_ray.y / 2);
+  m_expand(0, 1) = connection_ellipse_scale_factor * std::sqrt(2) * (e2_ray.x / 2);
+  m_expand(1, 1) = connection_ellipse_scale_factor * std::sqrt(2) * (e2_ray.y / 2);
 
   Eigen::Matrix2d minv = m_expand.inverse();
   m_compress = minv.transpose() * minv;
@@ -99,7 +99,7 @@ inline void addRectInfo(const PointAdaptor& points,
 }
 
 inline void addBoundaryInfo(const PointAdaptor& points,
-                            const std::vector<size_t>& mindices,
+                            const std::list<size_t>& mindices,
                             Eigen::Vector3f& centroid,
                             std::vector<Eigen::Vector3d>& boundary,
                             std::vector<size_t>& boundary_mindices) {

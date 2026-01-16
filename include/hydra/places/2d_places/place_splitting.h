@@ -11,7 +11,7 @@ namespace hydra {
 
 struct Place2d {
   Eigen::Vector3f centroid = Eigen::Vector3f::Zero();
-  std::vector<size_t> indices;
+  std::list<size_t> indices;
   size_t min_mesh_index = std::numeric_limits<size_t>::max();
   size_t max_mesh_index = 0;
   std::vector<size_t> boundary_indices;

@@ -84,6 +84,7 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
 
   mutable ActiveWindowTracker active_tracker;
   const MergeProposer merge_proposer;
+  mutable std::set<spark_dsg::NodeId> cleanup_nodes;
 };
 
 void declare_config(Update2dPlacesFunctor::Config& conf);

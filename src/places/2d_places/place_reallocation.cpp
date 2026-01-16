@@ -34,63 +34,109 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/2d_places/place_reallocation.h"
 
-#include <glog/logging.h>
-
 namespace hydra::utils {
 
+using spark_dsg::NodeId;
 using spark_dsg::Place2dNodeAttributes;
+using spark_dsg::SceneGraphLayer;
+
+namespace {
+
+using Filter = std::function<bool(size_t)>;
+
+std::vector<size_t> filterPoints(Place2dNodeAttributes& attrs, const Filter& filter) {
+  std::vector<size_t> filtered;
+  auto iter = attrs.mesh_connections.begin();
+  while (iter != attrs.mesh_connections.end()) {
+    if (!filter(*iter)) {
+      ++iter;
+      continue;
+    }
+
+    filtered.push_back(*iter);
+    iter = attrs.mesh_connections.erase(iter);
+  }
+
+  return filtered;
+}
+
+}  // namespace
 
 void reallocateMeshPoints(const spark_dsg::Mesh& mesh,
                           Place2dNodeAttributes& attrs1,
                           Place2dNodeAttributes& attrs2) {
-  Eigen::Vector2d delta = attrs2.position.head(2) - attrs1.position.head(2);
-  Eigen::Vector2d d = attrs1.position.head(2) + delta / 2;
+  const Eigen::Vector2f delta =
+      (attrs2.position.head(2) - attrs1.position.head(2)).cast<float>();
+  const Eigen::Vector2f p_mid = attrs1.position.head(2).cast<float>() + delta / 2.0f;
+  const auto p2_new = filterPoints(attrs1, [&](size_t idx) {
+    // positive distance -> closer to attrs2
+    return (mesh.points.at(idx).head(2) - p_mid).dot(delta) > 0.0f;
+  });
 
-  std::vector<size_t> p1_new_indices;
-  std::vector<size_t> p2_new_indices;
+  const auto p1_new = filterPoints(attrs2, [&](size_t idx) {
+    // negative distance -> closer to attrs1
+    return (mesh.points.at(idx).head(2) - p_mid).dot(delta) <= 0.0f;
+  });
 
-  for (auto midx : attrs1.mesh_connections) {
-    Eigen::Vector2d p = mesh.points.at(midx).head(2).cast<double>();
-    if ((p - d).dot(delta) > 0) {
-      p2_new_indices.push_back(midx);
-    } else {
-      p1_new_indices.push_back(midx);
-    }
-  }
-
-  for (auto midx : attrs2.mesh_connections) {
-    Eigen::Vector2d p = mesh.points.at(midx).head(2).cast<double>();
-    if ((p - d).dot(delta) > 0) {
-      p2_new_indices.push_back(midx);
-    } else {
-      p1_new_indices.push_back(midx);
-    }
-  }
-
-  if (p1_new_indices.size() == 0 || p2_new_indices.size() == 0) {
-    LOG(ERROR) << "Reallocating mesh points would make empty place. Skippings.";
-    return;
-  }
-
-  std::sort(p1_new_indices.begin(), p1_new_indices.end());
-  auto last = std::unique(p1_new_indices.begin(), p1_new_indices.end());
-  p1_new_indices.erase(last, p1_new_indices.end());
-
-  std::sort(p2_new_indices.begin(), p2_new_indices.end());
-  last = std::unique(p2_new_indices.begin(), p2_new_indices.end());
-  p2_new_indices.erase(last, p2_new_indices.end());
-
-  attrs1.mesh_connections = p1_new_indices;
-  attrs2.mesh_connections = p2_new_indices;
+  attrs1.mesh_connections.insert(
+      attrs1.mesh_connections.end(), p1_new.begin(), p1_new.end());
+  attrs2.mesh_connections.insert(
+      attrs2.mesh_connections.end(), p2_new.begin(), p2_new.end());
 
   // Say there are active mesh indices if either involved node has them.
-  // In theory we could actually check if any of the reallocated vertices changes a
-  // place's activeness for a small speed improvement, but not sure how much it
-  // matters
-  attrs1.has_active_mesh_indices =
-      attrs1.has_active_mesh_indices || attrs2.has_active_mesh_indices;
-  attrs2.has_active_mesh_indices =
-      attrs1.has_active_mesh_indices || attrs2.has_active_mesh_indices;
+  attrs1.has_active_mesh_indices |= attrs2.has_active_mesh_indices;
+  attrs2.has_active_mesh_indices |= attrs1.has_active_mesh_indices;
+}
+
+inline Place2dNodeAttributes* getAttrs(const SceneGraphLayer& layer,
+                                       spark_dsg::NodeId node_id) {
+  auto node = layer.findNode(node_id);
+  if (!node) {
+    return nullptr;
+  }
+
+  auto attrs = node->tryAttributes<Place2dNodeAttributes>();
+  return (!attrs || attrs->is_active) ? nullptr : attrs;
+}
+
+void propagateReallocation(const spark_dsg::Mesh& mesh,
+                           const SceneGraphLayer& layer,
+                           const std::set<NodeId>& changed_nodes,
+                           std::set<NodeId>& seen_nodes,
+                           size_t max_number_changes) {
+  std::list<spark_dsg::NodeId> frontier(changed_nodes.begin(), changed_nodes.end());
+  while (!frontier.empty()) {
+    const auto node_id = frontier.front();
+    frontier.pop_front();
+    if (seen_nodes.count(node_id)) {
+      continue;
+    }
+
+    const auto node = layer.findNode(node_id);
+    if (!node) {
+      continue;
+    }
+
+    auto attrs = node->tryAttributes<Place2dNodeAttributes>();
+    if (!attrs || attrs->is_active) {
+      continue;
+    }
+
+    seen_nodes.insert(node_id);
+    for (const auto& sibling_id : node->siblings()) {
+      const auto& sibling = layer.getNode(sibling_id);
+      auto sibling_attrs = sibling.tryAttributes<Place2dNodeAttributes>();
+      if (!sibling_attrs || sibling_attrs->is_active) {
+        continue;
+      }
+
+      if (!seen_nodes.count(sibling_id)) {
+        frontier.push_back(sibling_id);
+      }
+
+      reallocateMeshPoints(mesh, *attrs, *sibling_attrs);
+    }
+  }
 }
 
 }  // namespace hydra::utils

@@ -80,6 +80,7 @@ using timing::ScopedTimer;
 void declare_config(Update2dPlacesFunctor::Config& config) {
   using namespace config;
   name("Update2dPlacesFunctor::Config");
+  base<VerbosityConfig>(config);
   field(config.layer, "layer");
   field(config.merge_max_delta_z, "merge_max_delta_z");
   field(config.connection_overlap_threshold, "connection_overlap_threshold");
@@ -131,6 +132,7 @@ UpdateFunctor::Hooks Update2dPlacesFunctor::hooks() const {
   };
 
   my_hooks.merge = [this](const auto& graph, const auto& nodes) {
+    cleanup_nodes.insert(nodes.begin(), nodes.end());
     return merge2dPlaceAttributes(config, graph, nodes);
   };
 
@@ -236,26 +238,7 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
   // Far enough means that none of a node's neighbors or the node itself have
   // active mesh vertices
   std::set<NodeId> checked_nodes;
-  for (auto& [node_id, node] : places_layer->nodes()) {
-    auto attrs = node->tryAttributes<Place2dNodeAttributes>();
-    if (!attrs || attrs->is_active) {
-      continue;
-    }
-
-    for (const auto nid : node->siblings()) {
-      auto& neighbor_attrs = graph.getNode(nid).attributes<Place2dNodeAttributes>();
-      if (neighbor_attrs.is_active) {
-        continue;
-      }
-
-      if (attrs->semantic_label == neighbor_attrs.semantic_label) {
-        checked_nodes.insert(node_id);
-        checked_nodes.insert(nid);
-        utils::reallocateMeshPoints(*mesh, *attrs, neighbor_attrs);
-      }
-    }
-  }
-
+  utils::propagateReallocation(*mesh, *places_layer, cleanup_nodes, checked_nodes, 0);
   for (auto& node_id : checked_nodes) {
     auto& attrs = graph.getNode(node_id).attributes<Place2dNodeAttributes>();
     if (attrs.mesh_connections.size() == 0) {

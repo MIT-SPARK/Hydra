@@ -36,11 +36,20 @@
 
 #include <spark_dsg/mesh.h>
 #include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph_layer.h>
+
+#include <set>
 
 namespace hydra::utils {
 
 void reallocateMeshPoints(const spark_dsg::Mesh& mesh,
                           spark_dsg::Place2dNodeAttributes& attrs1,
                           spark_dsg::Place2dNodeAttributes& attrs2);
+
+void propagateReallocation(const spark_dsg::Mesh& mesh,
+                           const spark_dsg::SceneGraphLayer& layer,
+                           const std::set<spark_dsg::NodeId>& changed_nodes,
+                           std::set<spark_dsg::NodeId>& seen_nodes,
+                           size_t max_number_changes);
 
 }  // namespace hydra::utils

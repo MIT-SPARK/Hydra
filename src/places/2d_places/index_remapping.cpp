@@ -9,8 +9,7 @@ namespace {
 inline void remapPlace2dConnections(spark_dsg::Place2dNodeAttributes& attrs,
                                     const kimera_pgmo::MeshOffsetInfo& offsets) {
   kimera_pgmo::MeshOffsetInfo::RemapStats info;
-  auto& connections = attrs.mesh_connections;
-  connections = offsets.remapVertexIndices(connections, &info);
+  offsets.remapVertexIndices(attrs.mesh_connections, &info);
   attrs.min_mesh_index = info.min_index;
   attrs.max_mesh_index = info.max_index;
   attrs.has_active_mesh_indices = !info.all_archived;
