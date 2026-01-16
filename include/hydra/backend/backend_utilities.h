@@ -36,15 +36,12 @@
 
 #include <gtsam/inference/Symbol.h>
 #include <kimera_pgmo/mesh_offset_info.h>
-
-#include "hydra/common/shared_dsg_info.h"
+#include <spark_dsg/dynamic_scene_graph.h>
 
 namespace hydra::utils {
 
 std::optional<uint64_t> getTimeNs(const spark_dsg::DynamicSceneGraph& graph,
                                   gtsam::Symbol key);
-
-void updatePlaces2d(SharedDsgInfo::Ptr dsg, const kimera_pgmo::MeshOffsetInfo& offsets);
 
 template <typename T>
 void mergeIndices(const T& from, T& to) {

@@ -56,7 +56,4 @@ bool shouldAddPlaceConnection(const spark_dsg::Place2dNodeAttributes& attrs1,
                               const double place_max_neighbor_z_diff,
                               spark_dsg::EdgeAttributes& edge_attrs);
 
-void remapPlace2dMesh(spark_dsg::Place2dNodeAttributes& attrs,
-                      const kimera_pgmo::MeshOffsetInfo& offsets);
-
 }  // namespace hydra

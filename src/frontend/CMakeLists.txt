@@ -7,9 +7,8 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/mesh_delta_clustering.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/mesh_segmenter.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/place_mesh_connector.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/place_2d_segmenter.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/place_2d_split_logic.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/surface_place_extractor.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/traversability_place_extractor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/view_database.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/view_selector.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/traversability_place_extractor.cpp
 )

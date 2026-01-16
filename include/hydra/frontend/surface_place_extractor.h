@@ -32,65 +32,62 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/backend/surface_place_utilities.h"
+#pragma once
+#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/node_symbol.h>
 
-#include <glog/logging.h>
+#include "hydra/active_window/active_window_output.h"
+#include "hydra/common/output_sink.h"
+#include "hydra/frontend/mesh_delta_clustering.h"
+#include "hydra/utils/logging.h"
 
-namespace hydra::utils {
+namespace kimera_pgmo {
+class MeshDelta;
+struct MeshOffsetInfo;
+}  // namespace kimera_pgmo
 
-using spark_dsg::Place2dNodeAttributes;
+namespace hydra {
 
-void reallocateMeshPoints(const spark_dsg::Mesh& mesh,
-                          Place2dNodeAttributes& attrs1,
-                          Place2dNodeAttributes& attrs2) {
-  Eigen::Vector2d delta = attrs2.position.head(2) - attrs1.position.head(2);
-  Eigen::Vector2d d = attrs1.position.head(2) + delta / 2;
+using clustering::LabelIndices;
 
-  std::vector<size_t> p1_new_indices;
-  std::vector<size_t> p2_new_indices;
+class SurfacePlaceExtractor {
+ public:
+  using Sink = OutputSink<uint64_t,
+                          const kimera_pgmo::MeshDelta&,
+                          const kimera_pgmo::MeshOffsetInfo&>;
 
-  for (auto midx : attrs1.mesh_connections) {
-    Eigen::Vector2d p = mesh.points.at(midx).head(2).cast<double>();
-    if ((p - d).dot(delta) > 0) {
-      p2_new_indices.push_back(midx);
-    } else {
-      p1_new_indices.push_back(midx);
-    }
-  }
+  struct Config : VerbosityConfig {
+    Config();
 
-  for (auto midx : attrs2.mesh_connections) {
-    Eigen::Vector2d p = mesh.points.at(midx).head(2).cast<double>();
-    if ((p - d).dot(delta) > 0) {
-      p2_new_indices.push_back(midx);
-    } else {
-      p1_new_indices.push_back(midx);
-    }
-  }
+    std::string layer = spark_dsg::DsgLayers::MESH_PLACES;
+    char prefix = 'Q';
+    clustering::ClusteringConfig clustering{1.0, 600, 100000};
+    double pure_final_place_size = 3;
+    size_t min_final_place_points = 1000;
+    double place_overlap_threshold = 0.1;
+    double place_max_neighbor_z_diff = 0.5;
+    double connection_ellipse_scale_factor = 1;
+    std::vector<Sink::Factory> sinks;
+  } const config;
 
-  if (p1_new_indices.size() == 0 || p2_new_indices.size() == 0) {
-    LOG(ERROR) << "Reallocating mesh points would make empty place. Skippings.";
-    return;
-  }
+  SurfacePlaceExtractor(const Config& config, const std::set<uint32_t>& labels);
 
-  std::sort(p1_new_indices.begin(), p1_new_indices.end());
-  auto last = std::unique(p1_new_indices.begin(), p1_new_indices.end());
-  p1_new_indices.erase(last, p1_new_indices.end());
+  void detect(const ActiveWindowOutput& msg,
+              const kimera_pgmo::MeshDelta& mesh_delta,
+              const kimera_pgmo::MeshOffsetInfo& offsets);
 
-  std::sort(p2_new_indices.begin(), p2_new_indices.end());
-  last = std::unique(p2_new_indices.begin(), p2_new_indices.end());
-  p2_new_indices.erase(last, p2_new_indices.end());
+  void updateGraph(const ActiveWindowOutput& msg,
+                   const kimera_pgmo::MeshOffsetInfo& offsets,
+                   spark_dsg::DynamicSceneGraph& graph);
 
-  attrs1.mesh_connections = p1_new_indices;
-  attrs2.mesh_connections = p2_new_indices;
+ private:
+  Sink::List sinks_;
+  std::set<uint32_t> labels_;
+  spark_dsg::NodeSymbol next_node_id_;
+  std::list<spark_dsg::NodeId> to_remove_;
+  std::map<spark_dsg::NodeId, spark_dsg::Place2dNodeAttributes> active_places_;
+};
 
-  // Say there are active mesh indices if either involved node has them.
-  // In theory we could actually check if any of the reallocated vertices changes a
-  // place's activeness for a small speed improvement, but not sure how much it
-  // matters
-  attrs1.has_active_mesh_indices =
-      attrs1.has_active_mesh_indices || attrs2.has_active_mesh_indices;
-  attrs2.has_active_mesh_indices =
-      attrs1.has_active_mesh_indices || attrs2.has_active_mesh_indices;
-}
+void declare_config(SurfacePlaceExtractor::Config& config);
 
-}  // namespace hydra::utils
+}  // namespace hydra

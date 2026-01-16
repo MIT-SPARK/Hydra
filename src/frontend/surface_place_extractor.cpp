@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/frontend/place_2d_segmenter.h"
+#include "hydra/frontend/surface_place_extractor.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/types/conversions.h>
@@ -42,9 +42,8 @@
 
 #include <memory>
 
-#include "hydra/common/global_info.h"
-#include "hydra/frontend/place_2d_split_logic.h"
-#include "hydra/utils/place_2d_ellipsoid_math.h"
+#include "hydra/places/2d_places/index_remapping.h"
+#include "hydra/places/2d_places/place_splitting.h"
 
 namespace hydra {
 
@@ -58,9 +57,9 @@ using AttrMap = std::map<NodeId, Place2dNodeAttributes>;
 namespace {
 
 static const auto registration_ =
-    config::RegistrationWithConfig<Place2dSegmenter,
-                                   Place2dSegmenter,
-                                   Place2dSegmenter::Config,
+    config::RegistrationWithConfig<SurfacePlaceExtractor,
+                                   SurfacePlaceExtractor,
+                                   SurfacePlaceExtractor::Config,
                                    std::set<uint32_t>>("place_2d");
 
 inline bool placeIsEmpty(const Place2dNodeAttributes& attrs) {
@@ -77,7 +76,7 @@ std::unordered_set<size_t> getFrozenSet(const VerbosityConfig& config,
   auto iter = active_places.begin();
   while (iter != active_places.end()) {
     auto& [node_id, attrs] = *iter;
-    remapPlace2dMesh(attrs, offsets);
+    remap2dPlaceIndices(attrs, offsets);
 
     // if remapping results in vertices disappearing, we drop the place
     if (placeIsEmpty(attrs)) {
@@ -110,9 +109,9 @@ std::unordered_set<size_t> getFrozenSet(const VerbosityConfig& config,
 
 }  // namespace
 
-void declare_config(Place2dSegmenter::Config& config) {
+void declare_config(SurfacePlaceExtractor::Config& config) {
   using namespace config;
-  name("Place2dSegmenter::Config");
+  name("SurfacePlaceExtractor::Config");
   base<VerbosityConfig>(config);
   field(config.layer, "layer");
   field<CharConversion>(config.prefix, "prefix");
@@ -125,10 +124,10 @@ void declare_config(Place2dSegmenter::Config& config) {
   field(config.sinks, "sinks");
 }
 
-Place2dSegmenter::Config::Config() : VerbosityConfig("[places_2d] ") {}
+SurfacePlaceExtractor::Config::Config() : VerbosityConfig("[places_2d] ") {}
 
-Place2dSegmenter::Place2dSegmenter(const Config& config,
-                                   const std::set<uint32_t>& labels)
+SurfacePlaceExtractor::SurfacePlaceExtractor(const Config& config,
+                                             const std::set<uint32_t>& labels)
     : config(config::checkValid(config)),
       sinks_(Sink::instantiate(config.sinks)),
       labels_(labels),
@@ -136,9 +135,9 @@ Place2dSegmenter::Place2dSegmenter(const Config& config,
   MLOG(1) << "using labels: " << clustering::printLabels(labels_);
 }
 
-void Place2dSegmenter::detect(const ActiveWindowOutput& msg,
-                              const kimera_pgmo::MeshDelta& delta,
-                              const kimera_pgmo::MeshOffsetInfo& offsets) {
+void SurfacePlaceExtractor::detect(const ActiveWindowOutput& msg,
+                                   const kimera_pgmo::MeshDelta& delta,
+                                   const kimera_pgmo::MeshOffsetInfo& offsets) {
   MLOG(2) << "detect called";
   MLOG(2) << "n original active indices: " << delta.getNumActiveVertices();
   const auto frozen =
@@ -200,9 +199,9 @@ void Place2dSegmenter::detect(const ActiveWindowOutput& msg,
   Sink::callAll(sinks_, msg.timestamp_ns, delta, offsets);
 }
 
-void Place2dSegmenter::updateGraph(const ActiveWindowOutput&,
-                                   const kimera_pgmo::MeshOffsetInfo& offsets,
-                                   DynamicSceneGraph& graph) {
+void SurfacePlaceExtractor::updateGraph(const ActiveWindowOutput&,
+                                        const kimera_pgmo::MeshOffsetInfo& offsets,
+                                        DynamicSceneGraph& graph) {
   // Remove old empty nodes and previous active nodes
   for (const auto& nid : to_remove_) {
     graph.removeNode(nid);

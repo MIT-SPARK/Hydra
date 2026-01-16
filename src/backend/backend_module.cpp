@@ -47,6 +47,7 @@
 #include "hydra/backend/mst_factors.h"
 #include "hydra/common/global_info.h"
 #include "hydra/common/pipeline_queues.h"
+#include "hydra/places/2d_places/index_remapping.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
 #include "hydra/utils/timing_utilities.h"
 
@@ -426,7 +427,10 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
     kimera_pgmo::StampedCloud<pcl::PointXYZ> cloud_out{*original_vertices_,
                                                        *vertex_stamps_};
     input.mesh_update->updateVertices(cloud_out);
-    utils::updatePlaces2d(private_dsg_, mesh_offsets_);
+    const auto surface_places = private_dsg_->graph->findLayer(DsgLayers::MESH_PLACES);
+    if (surface_places) {
+      remap2dPlaceIndices(*surface_places, mesh_offsets_);
+    }
   }  // mesh critical section
 
   have_new_mesh_ = true;

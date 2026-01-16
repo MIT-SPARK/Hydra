@@ -14,4 +14,8 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/traversability_estimator.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/traversability_postprocessing.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_statistics.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/2d_places/ellipsoid_math.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/2d_places/index_remapping.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/2d_places/place_reallocation.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/2d_places/place_splitting.cpp
 )

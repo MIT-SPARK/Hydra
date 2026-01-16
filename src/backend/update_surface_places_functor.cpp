@@ -38,9 +38,9 @@
 #include <glog/logging.h>
 
 #include "hydra/backend/backend_utilities.h"
-#include "hydra/backend/surface_place_utilities.h"
-#include "hydra/frontend/place_2d_split_logic.h"
-#include "hydra/utils/place_2d_ellipsoid_math.h"
+#include "hydra/places/2d_places/ellipsoid_math.h"
+#include "hydra/places/2d_places/place_reallocation.h"
+#include "hydra/places/2d_places/place_splitting.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {

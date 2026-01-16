@@ -1,4 +1,4 @@
-#include "hydra/utils/place_2d_ellipsoid_math.h"
+#include "hydra/places/2d_places/ellipsoid_math.h"
 
 namespace hydra::ellipse {
 
