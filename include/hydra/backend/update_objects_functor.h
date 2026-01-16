@@ -70,7 +70,7 @@ struct UpdateObjectsFunctor : public UpdateFunctor {
 
   void mergeAttributes(const DynamicSceneGraph& layer, NodeId from, NodeId to) const;
 
-  void updateMeshIndices(SharedDsgInfo& dsg,
+  void updateMeshIndices(const DynamicSceneGraph& graph,
                          const kimera_pgmo::MeshOffsetInfo& offsets) const;
 
   mutable std::set<spark_dsg::NodeId> merged_nodes_;

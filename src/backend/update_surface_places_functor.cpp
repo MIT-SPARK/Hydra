@@ -134,10 +134,8 @@ UpdateFunctor::Hooks Update2dPlacesFunctor::hooks() const {
     return merge2dPlaceAttributes(config, graph, nodes);
   };
 
-  my_hooks.mesh_update = [this](const auto& offsets, auto dsg) {
-    if (dsg) {
-      updateMeshIndices(*dsg, offsets);
-    }
+  my_hooks.mesh_update = [this](const auto& graph, const auto& offsets) {
+    updateMeshIndices(graph, offsets);
   };
 
   return my_hooks;
@@ -162,7 +160,7 @@ void Update2dPlacesFunctor::call(const DynamicSceneGraph& unmerged,
   for (const auto& node : view) {
     auto attrs = node.tryAttributes<Place2dNodeAttributes>();
     if (!attrs) {
-      LOG(WARNING) << "Node " << NodeSymbol(node.id).str() << " is not a 2D place!";
+      MLOG(2) << "node " << NodeSymbol(node.id).str() << " is not a 2D place!";
       continue;
     }
 
@@ -171,7 +169,7 @@ void Update2dPlacesFunctor::call(const DynamicSceneGraph& unmerged,
     dsg.graph->setNodeAttributes(node.id, attrs->clone());
   }
 
-  VLOG(5) << "[Hydra Backend] 2D Place update: " << num_changed << " node(s)";
+  MLOG(1) << "updated " << num_changed << " node(s)";
 }
 
 MergeList Update2dPlacesFunctor::findMerges(const DynamicSceneGraph& graph,
@@ -193,8 +191,8 @@ MergeList Update2dPlacesFunctor::findMerges(const DynamicSceneGraph& graph,
         auto lhs_attrs = lhs.tryAttributes<Place2dNodeAttributes>();
         auto rhs_attrs = rhs.tryAttributes<Place2dNodeAttributes>();
         if (!lhs_attrs || !rhs_attrs) {
-          LOG(WARNING) << "Invalid 2D Place nodes: " << NodeSymbol(lhs.id).str() << ", "
-                       << NodeSymbol(rhs.id).str();
+          MLOG(2) << "invalid 2D place nodes: " << NodeSymbol(lhs.id).str() << ", "
+                  << NodeSymbol(rhs.id).str();
           return false;
         }
 
@@ -209,17 +207,18 @@ bool Update2dPlacesFunctor::shouldMerge(const Place2dNodeAttributes& from_attrs,
   if (to_attrs.is_active) {
     return false;
   }
+
   const auto z_diff = std::abs(from_attrs.position(2) - to_attrs.position(2));
   if (z_diff > config.merge_max_delta_z) {
     return false;
   }
 
-  double overlap_distance = hydra::ellipse::getEllipsoidTransverseOverlapDistance(
+  const auto overlap_distance = ellipse::getEllipsoidTransverseOverlapDistance(
       from_attrs.ellipse_matrix_compress,
       from_attrs.ellipse_centroid.head(2),
       to_attrs.ellipse_matrix_compress,
       to_attrs.ellipse_centroid.head(2));
-  return overlap_distance > 0;
+  return overlap_distance > 0.0;
 }
 
 void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
@@ -308,10 +307,9 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
   }
 }
 
-void Update2dPlacesFunctor::updateMeshIndices(SharedDsgInfo& dsg,
+void Update2dPlacesFunctor::updateMeshIndices(const DynamicSceneGraph& graph,
                                               const MeshOffsetInfo& offsets) const {
-  std::lock_guard<std::mutex> lock(dsg.mutex);
-  const auto surface_places = dsg.graph->findLayer(config.layer);
+  const auto surface_places = graph.findLayer(config.layer);
   if (!surface_places) {
     return;
   }

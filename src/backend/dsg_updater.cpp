@@ -147,7 +147,7 @@ void DsgUpdater::handleMeshUpdate(uint64_t timestamp_ns,
     }
   }
 
-  launchCallbacks(funcs, offsets, target_dsg_.get());
+  launchCallbacks(funcs, std::cref(*target_dsg_->graph), offsets);
 }
 
 void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr info) {

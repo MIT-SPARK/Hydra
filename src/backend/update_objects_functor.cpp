@@ -114,10 +114,8 @@ UpdateFunctor::Hooks UpdateObjectsFunctor::hooks() const {
     };
 
     // merging indices means that we have archived objects with active vertices
-    my_hooks.mesh_update = [this](const auto& offsets, auto dsg) {
-      if (dsg) {
-        updateMeshIndices(*dsg, offsets);
-      }
+    my_hooks.mesh_update = [this](const auto& graph, const auto& offsets) {
+      updateMeshIndices(graph, offsets);
     };
   }
 
@@ -199,18 +197,17 @@ MergeList UpdateObjectsFunctor::findMerges(const DynamicSceneGraph& graph,
   return proposals;
 }
 
-void UpdateObjectsFunctor::updateMeshIndices(SharedDsgInfo& dsg,
+void UpdateObjectsFunctor::updateMeshIndices(const DynamicSceneGraph& graph,
                                              const MeshOffsetInfo& offsets) const {
-  std::lock_guard<std::mutex> lock(dsg.mutex);
-  const auto surface_places = dsg.graph->findLayer(config.layer);
-  if (!surface_places) {
+  const auto objects = graph.findLayer(config.layer);
+  if (!objects) {
     return;
   }
 
   MLOG(2) << "remapping indices for " << merged_nodes_.size() << " merged node(s)";
   auto iter = merged_nodes_.begin();
   while (iter != merged_nodes_.end()) {
-    auto node = surface_places->findNode(*iter);
+    auto node = objects->findNode(*iter);
     if (!node) {
       iter = merged_nodes_.erase(iter);
       continue;

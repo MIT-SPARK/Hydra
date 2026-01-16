@@ -74,8 +74,8 @@ struct UpdateFunctor {
         std::function<MergeList(const DynamicSceneGraph&, const UpdateInfo::ConstPtr&)>;
     using MergeFunc = std::function<NodeAttributes::Ptr(const DynamicSceneGraph&,
                                                         const std::vector<NodeId>&)>;
-    using MeshUpdateFunc =
-        std::function<void(const kimera_pgmo::MeshOffsetInfo&, SharedDsgInfo*)>;
+    using MeshUpdateFunc = std::function<void(const DynamicSceneGraph&,
+                                              const kimera_pgmo::MeshOffsetInfo&)>;
 
     MeshUpdateFunc mesh_update;
     CleanupFunc cleanup;

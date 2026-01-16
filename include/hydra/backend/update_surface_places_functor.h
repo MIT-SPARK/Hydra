@@ -38,13 +38,17 @@
 #include "hydra/backend/association_strategies.h"
 #include "hydra/backend/update_functions.h"
 #include "hydra/utils/active_window_tracker.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
 struct Update2dPlacesFunctor : public UpdateFunctor {
-  struct Config {
+  struct Config : VerbosityConfig {
     using AssociationConfig = config::VirtualConfig<AssociationStrategy>;
     using SemanticAssociation = association::SemanticNearestNode::Config;
+
+    Config() : VerbosityConfig("[update_2d_places] ") {}
+
     //! Layer to update
     std::string layer = DsgLayers::MESH_PLACES;
     //! If two places differ by at least this much in z, they won't be merged
@@ -75,7 +79,7 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
 
   void cleanup(SharedDsgInfo& dsg) const;
 
-  void updateMeshIndices(SharedDsgInfo& dsg,
+  void updateMeshIndices(const DynamicSceneGraph& graph,
                          const kimera_pgmo::MeshOffsetInfo& offsets) const;
 
   mutable ActiveWindowTracker active_tracker;
