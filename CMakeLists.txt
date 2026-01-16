@@ -1,18 +1,31 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.22)
 project(hydra VERSION 2.0.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-add_compile_options(-Wall -Wextra)
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
 
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  # from: https://www.kitware.com//cmake-and-the-default-build-type/
+  message(STATUS "Setting build type to 'Release' as none was specified.")
+  set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
+endif()
+
+if(NOT CMAKE_INTERPROCEDURAL_OPTIMIZATION)
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON CACHE STRING "Turn on -flto" FORCE)
+endif()
+
+option(BUILD_SHARED_LIBS "Build shared libs" ON)
 option(HYDRA_ENABLE_EVAL "Build evaluation code" ON)
 option(HYDRA_ENABLE_GNN "Build GNN interface" OFF)
 option(HYDRA_ENABLE_PYTHON "Build Hydra python bindings" OFF)
 option(HYDRA_ENABLE_ROS_INSTALL_LAYOUT "Install binaries to ROS location" ON)
-option(BUILD_SHARED_LIBS "Build shared libs" ON)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 find_package(config_utilities REQUIRED)
 find_package(Eigen3 REQUIRED)
