@@ -42,8 +42,8 @@ backend:
       type: UpdateAgentsFunctor
     objects:
       type: UpdateObjectsFunctor
-    traversability:
-      type: UpdateRegionGrowingTraversabilityFunctor
+    # traversability:
+    #   type: UpdateRegionGrowingTraversabilityFunctor
     frontiers:
       type: UpdateFrontiersFunctor
     rooms:

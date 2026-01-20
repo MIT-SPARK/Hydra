@@ -39,7 +39,6 @@
 
 #include <map>
 #include <optional>
-#include <queue>
 #include <utility>
 #include <vector>
 
@@ -55,14 +54,15 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
   struct Config {
     //! Maximum radius of a place [m].
     float max_radius = 2.0f;
+
+    //! Number of rays to consider for boundary computation.
+    int orientation_bins = 16;
   } const config;
 
-  using VoxelSet = BlockIndexSet;
-  using VoxelQueue = std::queue<BlockIndex>;
-  using VoxelMap = BlockIndexMap<spark_dsg::NodeId>;
+  using Voxels = VoxelIndices;
+  using VoxelSet = VoxelIndexSet;
+  using VoxelMap = VoxelIndexMap<spark_dsg::NodeId>;
 
-  // TODO(lschmid): For now a simple data structure and algorithm, consdier aligning
-  // better with blocks in the future and make more efficient.
   struct Region {
     // ID of the region. This is also the node ID in the DSG.
     spark_dsg::NodeId id;
@@ -70,15 +70,16 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
     // VoxelSet assigned to this region. These can be in the current layer or outside.
     VoxelSet voxels;
 
-    // VoxelSet bordering the voxels of this region.
-    VoxelSet boundary_voxels;
+    // Voxels bordering the voxels of this region. These are the exterior boundary of
+    // the region and are ordered by traversal.
+    VoxelSet exterior_boundary;
+
+    //
+    VoxelSet interior_boundary;
 
     // True: this region has voxels in the current layer. False: all voxels are outside
     // the current layer.
     bool is_active = true;
-
-    // True: Created this iteration. False: is in the scene graph.
-    bool is_new = true;
 
     // Centroid of the region.
     Eigen::Vector3f centroid;
@@ -90,16 +91,19 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
     // Regions connecting to this one. <region id, num connecting voxels>
     std::map<spark_dsg::NodeId, int> neighbors;
 
-    /* Tools */
-
     // Merge other into this region.
     void merge(const Region& other);
 
-    // Compute the centroid and min-max coordinates based on the boundary voxels.
-    void computeCentroid();
+    /**
+     * @brief Compute the ordered exterior boundary, min/max extents, and centroid.
+     */
+    void computeBoundary();
 
-    // Recompute all voxels bordering the voxels of this region.
-    void computeBoundaryVoxels();
+    /**
+     * @brief Compute region boundaries, extents, centroids, and compute the neighbors
+     * from that.
+     */
+    void computeNeighbors(const VoxelMap& assigned_voxels);
   };
 
   RegionGrowingTraversabilityClustering(const Config& config);
@@ -140,15 +144,10 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
   void growRegions(VoxelSet& all_voxels, VoxelMap& assigned_voxels);
 
   /**
-   * @brief Compute region boundaries, extents, centroids, and compute the neighbors
-   * from that.
-   */
-  void computeNeighbors(const VoxelMap& assigned_voxels);
-
-  /**
    * @brief Merge all regions that don't exceed the max size.
    */
-  void mergeRegions(spark_dsg::DynamicSceneGraph& graph);
+  void mergeRegions(const VoxelMap& assigned_voxels,
+                    spark_dsg::DynamicSceneGraph& graph);
 
   void updatePlaceNodesInDsg(spark_dsg::DynamicSceneGraph& graph,
                              const TraversabilityLayer& layer);
@@ -169,26 +168,26 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
   /**
    * @brief Breadth-first search to grow a region from a seed index.
    */
-  VoxelSet growRegion(
+  static VoxelSet growRegion(
       const VoxelSet& candidates,
-      const BlockIndex& seed_index,
-      std::function<bool(const BlockIndex&)> condition = [](const BlockIndex&) {
+      const VoxelIndex& seed_index,
+      std::function<bool(const VoxelIndex&)> condition = [](const VoxelIndex&) {
         return true;
-      }) const;
+      });
 
-  void updatePlaceNodeAttributes(spark_dsg::TraversabilityNodeAttributes& attrs,
+  void updatePlaceNodeAttributes(spark_dsg::TravNodeAttributes& attrs,
                                  const Region& region,
                                  const TraversabilityLayer& layer) const;
 
-  inline static const std::array<BlockIndex, 8> neighbors_ = {
-      BlockIndex(0, -1, 0),   // bottom
-      BlockIndex(-1, 0, 0),   // left
-      BlockIndex(0, 1, 0),    // top
-      BlockIndex(1, 0, 0),    // right
-      BlockIndex(-1, -1, 0),  // bottom-left
-      BlockIndex(1, -1, 0),   // bottom-right
-      BlockIndex(-1, 1, 0),   // top-left
-      BlockIndex(1, 1, 0)     // top-right
+  inline static const std::array<VoxelIndex, 8> neighbors_ = {
+      VoxelIndex(0, -1, 0),   // bottom
+      VoxelIndex(-1, 0, 0),   // left
+      VoxelIndex(0, 1, 0),    // top
+      VoxelIndex(1, 0, 0),    // right
+      VoxelIndex(-1, -1, 0),  // bottom-left
+      VoxelIndex(-1, 1, 0),   // top-left
+      VoxelIndex(1, 1, 0),    // top-right
+      VoxelIndex(1, -1, 0)    // bottom-right
   };
 };
 

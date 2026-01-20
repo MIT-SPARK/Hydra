@@ -41,6 +41,7 @@
 #include <spark_dsg/node_symbol.h>
 
 #include <algorithm>
+#include <queue>
 
 #include "hydra/utils/timing_utilities.h"
 
@@ -50,10 +51,9 @@ using Timer = hydra::timing::ScopedTimer;
 using spark_dsg::Boundary;
 using spark_dsg::NodeId;
 using spark_dsg::Side;
-using spark_dsg::TraversabilityNodeAttributes;
+using spark_dsg::TravNodeAttributes;
 using State = spark_dsg::TraversabilityState;
 using VoxelSet = RegionGrowingTraversabilityClustering::VoxelSet;
-using VoxelQueue = RegionGrowingTraversabilityClustering::VoxelQueue;
 using VoxelMap = RegionGrowingTraversabilityClustering::VoxelMap;
 
 namespace {
@@ -101,8 +101,7 @@ void RegionGrowingTraversabilityClustering::updateGraph(
   growRegions(all_voxels, assignment);
 
   // Compute neighbors and simplification.
-  computeNeighbors(assignment);
-  mergeRegions(graph);
+  mergeRegions(assignment, graph);
 
   // Update the DSG.
   updatePlaceNodesInDsg(graph, layer);
@@ -145,7 +144,6 @@ VoxelMap RegionGrowingTraversabilityClustering::initializeRegions(
     }
     region.voxels = std::move(inactive_voxels);
     region.is_active = false;
-    region.is_new = false;
   }
 
   // Initialize a new region if none exist.
@@ -166,13 +164,13 @@ void RegionGrowingTraversabilityClustering::growRegions(VoxelSet& all_voxels,
     centroids.push_back(region.centroid);
     region_ids.push_back(id);
   }
-  auto nn = std::make_unique<hydra::PointNeighborSearch>(centroids);
+  hydra::PointNeighborSearch nn(centroids);
   std::map<NodeId, VoxelSet> region_candidates;
   for (const auto& voxel_index : all_voxels) {
     size_t nn_index;
     float nn_dist_sq;
     const Eigen::Vector3f voxel_pos = voxel_index.cast<float>();
-    if (nn->search(voxel_pos, nn_dist_sq, nn_index) && nn_dist_sq <= max_dist_sq) {
+    if (nn.search(voxel_pos, nn_dist_sq, nn_index) && nn_dist_sq <= max_dist_sq) {
       const NodeId nn_region_id = region_ids[nn_index];
       region_candidates[nn_region_id].insert(voxel_index);
     }
@@ -197,7 +195,7 @@ void RegionGrowingTraversabilityClustering::growRegions(VoxelSet& all_voxels,
     const auto seed_index = *all_voxels.begin();
     new_region.centroid = seed_index.cast<float>();
     VoxelSet grown_voxels =
-        growRegion(all_voxels, seed_index, [&](const BlockIndex& index) {
+        growRegion(all_voxels, seed_index, [&](const VoxelIndex& index) {
           return (index.cast<float>() - new_region.centroid).squaredNorm() <=
                  max_dist_sq;
         });
@@ -209,42 +207,36 @@ void RegionGrowingTraversabilityClustering::growRegions(VoxelSet& all_voxels,
   }
 }
 
-void RegionGrowingTraversabilityClustering::computeNeighbors(
-    const VoxelMap& assigned_voxels) {
-  // Compute all edges given by neighboring regions.
-  for (auto& [id, region] : regions_) {
-    region.neighbors.clear();
-    region.computeBoundaryVoxels();
-    region.computeCentroid();
-    for (const auto& voxel_index : region.boundary_voxels) {
-      const auto it = assigned_voxels.find(voxel_index);
-      if (it != assigned_voxels.end()) {
-        region.neighbors[it->second]++;
-      }
-    }
-  }
-}
-
 void RegionGrowingTraversabilityClustering::mergeRegions(
-    spark_dsg::DynamicSceneGraph& graph) {
+    const VoxelMap& assigned_voxels, spark_dsg::DynamicSceneGraph& graph) {
+  // Update neighbors and boundaries for all regions.
+  for (auto& [id, region] : regions_) {
+    region.computeBoundary();
+    region.computeNeighbors(assigned_voxels);
+  }
+
   // Merge all regions that don't exceed the max size.
   bool merged = true;
   while (merged) {
     merged = false;
     for (auto it = regions_.begin(); it != regions_.end(); ++it) {
       Region& region = it->second;
+      // Only active regions.
       if (!region.is_active) {
         continue;
       }
+      std::list<spark_dsg::NodeId> neighbors_to_remove;
       for (const auto& [neighbor_id, num_connecting_voxels] : region.neighbors) {
         auto neighbor_it = regions_.find(neighbor_id);
         if (neighbor_it == regions_.end()) {
+          neighbors_to_remove.push_back(neighbor_id);
           continue;
         }
         Region& neighbor_region = neighbor_it->second;
         if (!neighbor_region.is_active) {
           continue;
         }
+
         // Check size constraint.
         const Eigen::Vector2i combined_min =
             region.min_coordinates.cwiseMin(neighbor_region.min_coordinates);
@@ -258,6 +250,9 @@ void RegionGrowingTraversabilityClustering::mergeRegions(
           merged = true;
           break;
         }
+      }
+      for (const auto neighbor_id : neighbors_to_remove) {
+        region.neighbors.erase(neighbor_id);
       }
       if (merged) {
         break;
@@ -275,7 +270,7 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodesInDsg(
     if (!node) {
       // Node does not exist yet, create a new place node.
       if (is_valid) {
-        auto attrs = std::make_unique<spark_dsg::TraversabilityNodeAttributes>();
+        auto attrs = std::make_unique<spark_dsg::TravNodeAttributes>();
         updatePlaceNodeAttributes(*attrs, region, layer);
         graph.emplaceNode(spark_dsg::DsgLayers::TRAVERSABILITY, id, std::move(attrs));
       }
@@ -289,7 +284,7 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodesInDsg(
     }
 
     // Update the place attributes.
-    auto& attrs = node->attributes<spark_dsg::TraversabilityNodeAttributes>();
+    auto& attrs = node->attributes<spark_dsg::TravNodeAttributes>();
     updatePlaceNodeAttributes(attrs, region, layer);
   }
 }
@@ -313,7 +308,7 @@ void RegionGrowingTraversabilityClustering::updatePlaceEdgesInDsg(
       graph.removeEdge(id, n_id);
     }
 
-    // Add all current and new edges.
+    // Add or update all current and new edges.
     for (const auto& [n_id, num_connecting_voxels] : region.neighbors) {
       auto attrs = std::make_unique<spark_dsg::EdgeAttributes>(num_connecting_voxels);
       graph.addOrUpdateEdge(id, n_id, std::move(attrs));
@@ -351,25 +346,36 @@ void RegionGrowingTraversabilityClustering::visualizeAssignments(
 }
 
 void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
-    spark_dsg::TraversabilityNodeAttributes& attrs,
+    spark_dsg::TravNodeAttributes& attrs,
     const Region& region,
     const TraversabilityLayer& layer) const {
   // Position.
   attrs.position = region.centroid.cast<double>() * layer.voxel_size;
-  attrs.boundary.type = spark_dsg::BoundaryType::REGION;
 
   // Min and max extents as radii.
-  float min = std::numeric_limits<float>::max();
-  float max = 0.0f;
-  for (const auto& voxel : region.boundary_voxels) {
-    const float distance = (voxel.cast<float>() - region.centroid).norm();
-    min = std::min(min, distance);
-    max = std::max(max, distance);
-  }
-  attrs.boundary.min.x() = min * layer.voxel_size;
-  attrs.boundary.max.x() = max * layer.voxel_size;
+  attrs.clear();
+  attrs.min_radius = std::numeric_limits<double>::max();
+  attrs.max_radius = 0.0;
+  for (const auto& index : region.exterior_boundary) {
+    const Eigen::Vector3d point =
+        index.cast<double>() * layer.voxel_size - attrs.position;
+    const double distance = point.norm();
+    attrs.min_radius = std::min(attrs.min_radius, distance);
+    attrs.max_radius = std::max(attrs.max_radius, distance);
 
-  // General attributes.
+    // Classify the boundary voxels.
+    // TODO(lschmid): This doesn't work w/ archiving the layer, need to move into the
+    // region itself if needed.
+    const auto* voxel = layer.voxel(index);
+    attrs.points.push_back(point);
+    if (!voxel) {
+      attrs.states.push_back(spark_dsg::TraversabilityState::UNKNOWN);
+    } else {
+      attrs.states.push_back(voxel->state);
+    }
+  }
+
+  // Active and timing attributes.
   attrs.is_active = region.is_active;
   attrs.last_update_time_ns = current_time_ns_;
   if (attrs.first_observed_ns == 0) {
@@ -388,13 +394,13 @@ RegionGrowingTraversabilityClustering::allocateNewRegion() {
 
 VoxelSet RegionGrowingTraversabilityClustering::growRegion(
     const VoxelSet& candidates,
-    const BlockIndex& seed_index,
-    std::function<bool(const BlockIndex&)> condition) const {
+    const VoxelIndex& seed_index,
+    std::function<bool(const VoxelIndex&)> condition) {
   VoxelSet result;
   if (candidates.find(seed_index) == candidates.end()) {
     return result;
   }
-  VoxelQueue queue;
+  std::queue<VoxelIndex> queue;
   queue.push(seed_index);
   result.insert(seed_index);
 
@@ -403,7 +409,7 @@ VoxelSet RegionGrowingTraversabilityClustering::growRegion(
     const auto current_index = queue.front();
     queue.pop();
     for (const auto& offset : neighbors_) {
-      const BlockIndex n_index = current_index + offset;
+      const VoxelIndex n_index = current_index + offset;
       if (candidates.find(n_index) == candidates.end() || !condition(n_index)) {
         continue;
       }
@@ -417,39 +423,62 @@ VoxelSet RegionGrowingTraversabilityClustering::growRegion(
 
 void RegionGrowingTraversabilityClustering::Region::merge(const Region& other) {
   voxels.insert(other.voxels.begin(), other.voxels.end());
-  boundary_voxels.insert(other.boundary_voxels.begin(), other.boundary_voxels.end());
-  auto it = boundary_voxels.begin();
-  while (it != boundary_voxels.end()) {
-    if (voxels.count(*it)) {
-      it = boundary_voxels.erase(it);
-    } else {
-      ++it;
+  for (const auto& [n_id, n_count] : other.neighbors) {
+    if (n_id == id) {
+      continue;
     }
+    neighbors[n_id] += n_count;
   }
-  neighbors.insert(other.neighbors.begin(), other.neighbors.end());
+  neighbors.erase(other.id);
+  computeBoundary();
 }
 
-void RegionGrowingTraversabilityClustering::Region::computeCentroid() {
-  centroid = Eigen::Vector3f::Zero();
+void RegionGrowingTraversabilityClustering::Region::computeBoundary() {
+  // Compute all boundary voxels.
+  VoxelSet boundary;
+  VoxelIndex furthest = VoxelIndex::Zero();
   min_coordinates = Eigen::Vector2i::Constant(std::numeric_limits<int>::max());
   max_coordinates = Eigen::Vector2i::Constant(std::numeric_limits<int>::lowest());
-  for (const auto& voxel : boundary_voxels) {
-    centroid += voxel.cast<float>();
-    min_coordinates = min_coordinates.cwiseMin(voxel.head<2>());
-    max_coordinates = max_coordinates.cwiseMax(voxel.head<2>());
-  }
-  centroid = centroid / boundary_voxels.size();
-}
-
-void RegionGrowingTraversabilityClustering::Region::computeBoundaryVoxels() {
-  boundary_voxels.clear();
   for (const auto& voxel : voxels) {
     for (const auto& offset : neighbors_) {
-      const BlockIndex n_index = voxel + offset;
+      const VoxelIndex n_index = voxel + offset;
       if (voxels.count(n_index)) {
         continue;
       }
-      boundary_voxels.insert(n_index);
+      boundary.insert(n_index);
+      if (n_index.head<2>().squaredNorm() > furthest.head<2>().squaredNorm()) {
+        furthest = n_index;
+      }
+      min_coordinates = min_coordinates.cwiseMin(n_index.head<2>());
+      max_coordinates = max_coordinates.cwiseMax(n_index.head<2>());
+    }
+  }
+
+  // Find exterior and interior boundary voxels.
+  exterior_boundary = growRegion(boundary, furthest);
+  interior_boundary.clear();
+  interior_boundary.reserve(boundary.size() - exterior_boundary.size());
+  for (const auto& voxel : boundary) {
+    if (!exterior_boundary.count(voxel)) {
+      interior_boundary.insert(voxel);
+    }
+  }
+
+  // Compute the centroid.
+  centroid = Eigen::Vector3f::Zero();
+  for (const auto& voxel : exterior_boundary) {
+    centroid += voxel.cast<float>();
+  }
+  centroid /= exterior_boundary.size();
+}
+
+void RegionGrowingTraversabilityClustering::Region::computeNeighbors(
+    const VoxelMap& assigned_voxels) {
+  neighbors.clear();
+  for (const auto& voxel : exterior_boundary) {
+    const auto it = assigned_voxels.find(voxel);
+    if (it != assigned_voxels.end() && it->second != id) {
+      neighbors[it->second]++;
     }
   }
 }
