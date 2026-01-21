@@ -16,9 +16,6 @@ frontend:
     time_horizon: 15.0
     d_graph_resolution: 2.5
     mesh_resolution: 0.005
-  objects:
-    min_cluster_size: 40
-    cluster_tolerance: 0.25
   traversability_places:
     type: traversability
     estimator:
@@ -30,7 +27,8 @@ frontend:
       pessimistic: true
     clustering:
       type: RegionGrowingTraversabilityClustering
-      max_radius: 3.0
+      max_radius: 4.0
+      num_orientation_bins: 16
     sinks:
       - type: TraversabilityVisualizer
 backend:
@@ -40,8 +38,6 @@ backend:
   update_functors:
     agents:
       type: UpdateAgentsFunctor
-    objects:
-      type: UpdateObjectsFunctor
     # traversability:
     #   type: UpdateRegionGrowingTraversabilityFunctor
     frontiers:

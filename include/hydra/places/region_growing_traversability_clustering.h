@@ -53,10 +53,10 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
  public:
   struct Config {
     //! Maximum radius of a place [m].
-    float max_radius = 2.0f;
+    float max_radius = 3.0f;
 
     //! Number of rays to consider for boundary computation.
-    int orientation_bins = 16;
+    int num_orientation_bins = 16;
   } const config;
 
   using Voxels = VoxelIndices;
