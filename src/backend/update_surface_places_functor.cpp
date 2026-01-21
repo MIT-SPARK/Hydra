@@ -37,7 +37,6 @@
 #include <config_utilities/config.h>
 #include <glog/logging.h>
 
-#include "hydra/backend/backend_utilities.h"
 #include "hydra/places/2d_places/ellipsoid_math.h"
 #include "hydra/places/2d_places/index_remapping.h"
 #include "hydra/places/2d_places/place_reallocation.h"
@@ -51,6 +50,22 @@ static const auto reg = config::RegistrationWithConfig<UpdateFunctor,
                                                        Update2dPlacesFunctor,
                                                        Update2dPlacesFunctor::Config>(
     "Update2dPlacesFunctor");
+
+std::string mergeListToStr(const MergeList& merges) {
+  std::stringstream ss;
+  ss << "[";
+  auto iter = merges.begin();
+  while (iter != merges.end()) {
+    ss << *iter;
+    ++iter;
+    if (iter != merges.end()) {
+      ss << ", ";
+    }
+  }
+
+  ss << "]";
+  return ss.str();
+}
 
 inline void updateNode(const spark_dsg::Mesh& mesh,
                        NodeId node,
@@ -72,33 +87,46 @@ inline void updateNode(const spark_dsg::Mesh& mesh,
   }
 }
 
-NodeAttributes::Ptr merge2dPlaceAttributes(const Update2dPlacesFunctor::Config config,
-                                           const DynamicSceneGraph& graph,
+NodeAttributes::Ptr merge2dPlaceAttributes(const DynamicSceneGraph& graph,
                                            const std::vector<NodeId>& nodes) {
   if (nodes.empty()) {
     return nullptr;
   }
 
-  for (const auto node_id : nodes) {
-  }
+  // set attributes to the attributes of the first node
   auto iter = nodes.begin();
-  CHECK(graph.hasNode(*iter)) << NodeSymbol(*iter).str();
-  auto attrs_ptr = graph.getNode(*iter).attributes().clone();
-  auto& new_attrs =
-      *CHECK_NOTNULL(dynamic_cast<Place2dNodeAttributes*>(attrs_ptr.get()));
+  const spark_dsg::SceneGraphNode* node = graph.findNode(*iter);
+  CHECK(node) << "Invalid node during merge!";
+  auto cloned = node->attributes().clone();
+  auto attrs = dynamic_cast<Place2dNodeAttributes*>(cloned.get());
+  CHECK(attrs) << "Invalid attributes during merge!";
   ++iter;
 
   while (iter != nodes.end()) {
-    CHECK(graph.hasNode(*iter)) << NodeSymbol(*iter).str();
-    const auto& from_attrs = graph.getNode(*iter).attributes<Place2dNodeAttributes>();
-    utils::mergeIndices(from_attrs.mesh_connections, new_attrs.mesh_connections);
-    new_attrs.has_active_mesh_indices |= from_attrs.has_active_mesh_indices;
+    const auto node_id = *iter;
     ++iter;
+    node = graph.findNode(node_id);
+    if (!node) {
+      LOG(FATAL) << "Invalid node during merge: '" << NodeSymbol(node_id).str() << "'";
+    }
+
+    auto from_attrs = node->tryAttributes<Place2dNodeAttributes>();
+    if (!from_attrs) {
+      LOG(FATAL) << "Invalid node attributes during merge: '"
+                 << NodeSymbol(node_id).str() << "'";
+    }
+
+    attrs->position += from_attrs->position;
+    attrs->mesh_connections.insert(attrs->mesh_connections.end(),
+                                   from_attrs->mesh_connections.begin(),
+                                   from_attrs->mesh_connections.end());
+    attrs->min_mesh_index = std::min(attrs->min_mesh_index, from_attrs->min_mesh_index);
+    attrs->max_mesh_index = std::min(attrs->max_mesh_index, from_attrs->max_mesh_index);
+    attrs->has_active_mesh_indices |= from_attrs->has_active_mesh_indices;
   }
 
-  addRectInfo(*graph.mesh(), config.connection_ellipse_scale_factor, new_attrs);
-  addBoundaryInfo(*graph.mesh(), new_attrs);
-  return attrs_ptr;
+  attrs->position /= nodes.size();
+  return cloned;
 }
 
 }  // namespace
@@ -135,7 +163,7 @@ UpdateFunctor::Hooks Update2dPlacesFunctor::hooks() const {
 
   my_hooks.merge = [this](const auto& graph, const auto& nodes) {
     cleanup_nodes.insert(nodes.begin(), nodes.end());
-    return merge2dPlaceAttributes(config, graph, nodes);
+    return merge2dPlaceAttributes(graph, nodes);
   };
 
   my_hooks.mesh_update = [this](const auto& graph, const auto& offsets) {
@@ -204,6 +232,8 @@ MergeList Update2dPlacesFunctor::findMerges(const DynamicSceneGraph& graph,
         return shouldMerge(*lhs_attrs, *rhs_attrs);
       },
       nodes_to_merge);
+
+  MLOG(1) << "Found merges: " << mergeListToStr(nodes_to_merge);
   return nodes_to_merge;
 }
 
@@ -246,7 +276,7 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
     }
 
     addRectInfo(*mesh, config.connection_ellipse_scale_factor, attrs);
-    addBoundaryInfo(*mesh, attrs);
+    addBoundaryInfo(*mesh, attrs, false);
   }
 
   // drop existing edges for all updated nodes that no longer make sense

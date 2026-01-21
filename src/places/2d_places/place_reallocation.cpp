@@ -103,14 +103,7 @@ void propagateReallocation(const spark_dsg::Mesh& mesh,
                            const SceneGraphLayer& layer,
                            const std::set<NodeId>& changed_nodes,
                            std::set<NodeId>& seen_nodes) {
-  std::list<spark_dsg::NodeId> frontier(changed_nodes.begin(), changed_nodes.end());
-  while (!frontier.empty()) {
-    const auto node_id = frontier.front();
-    frontier.pop_front();
-    if (seen_nodes.count(node_id)) {
-      continue;
-    }
-
+  for (const auto node_id : changed_nodes) {
     const auto node = layer.findNode(node_id);
     if (!node) {
       continue;
@@ -122,17 +115,14 @@ void propagateReallocation(const spark_dsg::Mesh& mesh,
     }
 
     seen_nodes.insert(node_id);
-    for (const auto& sibling_id : node->siblings()) {
+    for (const auto sibling_id : node->siblings()) {
       const auto& sibling = layer.getNode(sibling_id);
       auto sibling_attrs = sibling.tryAttributes<Place2dNodeAttributes>();
       if (!sibling_attrs || sibling_attrs->is_active) {
         continue;
       }
 
-      if (!seen_nodes.count(sibling_id)) {
-        frontier.push_back(sibling_id);
-      }
-
+      seen_nodes.insert(sibling_id);
       reallocateMeshPoints(mesh, *attrs, *sibling_attrs);
     }
   }

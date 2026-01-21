@@ -100,21 +100,27 @@ inline void addRectInfo(const PointAdaptor& points,
 
 inline void addBoundaryInfo(const PointAdaptor& points,
                             const std::list<size_t>& mindices,
-                            Eigen::Vector3f& centroid,
                             std::vector<Eigen::Vector3d>& boundary,
-                            std::vector<size_t>& boundary_mindices) {
+                            std::vector<size_t>& boundary_mindices,
+                            Eigen::Vector3f* centroid = nullptr) {
   std::vector<cv::Point2f> region_pts;
   std::vector<size_t> region_to_cloud_index;
-  centroid = Eigen::Vector3f::Zero();
+
+  if (centroid) {
+    centroid->setZero();
+  }
+
   for (const auto midx : mindices) {
     const auto p = points.get(midx);
     region_to_cloud_index.push_back(midx);
     region_pts.push_back({p.x(), p.y()});
-    centroid += p;
+    if (centroid) {
+      *centroid += p;
+    }
   }
 
-  if (mindices.size()) {
-    centroid /= mindices.size();
+  if (centroid && mindices.size()) {
+    *centroid /= mindices.size();
   }
 
   // compute convex hull for each place
@@ -130,7 +136,7 @@ inline void addBoundaryInfo(const PointAdaptor& points,
 }
 
 inline void addBoundaryInfo(const PointAdaptor& points, Place2d& p) {
-  addBoundaryInfo(points, p.indices, p.centroid, p.boundary, p.boundary_indices);
+  addBoundaryInfo(points, p.indices, p.boundary, p.boundary_indices, &p.centroid);
 }
 
 inline std::pair<Place2d, Place2d> splitPlace(const PointAdaptor& points,
@@ -239,15 +245,20 @@ void addBoundaryInfo(const kimera_pgmo::MeshDelta& delta,
   addBoundaryInfo(DeltaAdaptor(delta, offsets), p);
 }
 
-void addBoundaryInfo(const spark_dsg::Mesh& mesh, Place2dNodeAttributes& attrs) {
+void addBoundaryInfo(const spark_dsg::Mesh& mesh,
+                     Place2dNodeAttributes& attrs,
+                     bool compute_centroid) {
   Eigen::Vector3f centroid;
   addBoundaryInfo(MeshAdaptor(mesh),
                   attrs.mesh_connections,
-                  centroid,
                   attrs.boundary,
-                  attrs.boundary_connections);
-  attrs.position = centroid.cast<double>();
-  attrs.ellipse_centroid(2) = centroid.z();
+                  attrs.boundary_connections,
+                  compute_centroid ? &centroid : nullptr);
+  if (compute_centroid) {
+    attrs.position = centroid.cast<double>();
+  }
+
+  attrs.ellipse_centroid(2) = attrs.position.z();
 }
 
 void decomposePlace(const kimera_pgmo::MeshDelta& delta,

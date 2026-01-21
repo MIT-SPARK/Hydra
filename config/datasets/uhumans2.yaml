@@ -94,6 +94,7 @@ backend:
       type: UpdateObjectsFunctor
     surface_places:
       type: Update2dPlacesFunctor
+      verbosity: 1
     places:
       type: UpdatePlacesFunctor
     traversability:

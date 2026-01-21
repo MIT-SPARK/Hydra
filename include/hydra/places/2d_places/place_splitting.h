@@ -40,7 +40,8 @@ void addBoundaryInfo(const kimera_pgmo::MeshDelta& delta,
                      Place2d& place);
 
 void addBoundaryInfo(const spark_dsg::Mesh& mesh,
-                     spark_dsg::Place2dNodeAttributes& attrs);
+                     spark_dsg::Place2dNodeAttributes& attrs,
+                     bool compute_centroid = true);
 
 void decomposePlace(const kimera_pgmo::MeshDelta& delta,
                     const kimera_pgmo::MeshOffsetInfo& offset,
