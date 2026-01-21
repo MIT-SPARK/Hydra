@@ -30,7 +30,7 @@ repositories:
   spark_dsg:
     type: git
     url: https://github.com/MIT-SPARK/Spark-DSG.git
-    version: main
+    version: feature/cleanup_2d_places
   spatial_hash:
     type: git
     url: https://github.com/MIT-SPARK/Spatial-Hash.git
