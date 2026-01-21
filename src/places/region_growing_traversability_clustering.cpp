@@ -68,7 +68,9 @@ void declare_config(RegionGrowingTraversabilityClustering::Config& config) {
   using namespace config;
   name("RegionGrowingTraversabilityClustering::Config");
   field(config.max_radius, "max_radius", "m");
+  field(config.num_orientation_bins, "num_orientation_bins");
   check(config.max_radius, GT, 0.0f, "max_radius");
+  check(config.num_orientation_bins, GE, 3, "num_orientation_bins");
 }
 
 RegionGrowingTraversabilityClustering::RegionGrowingTraversabilityClustering(
@@ -352,8 +354,11 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
   // Position.
   attrs.position = region.centroid.cast<double>() * layer.voxel_size;
 
-  // Min and max extents as radii.
-  attrs.clear();
+  // Min and max extents as radii. Also compute the radial discretization of the
+  // boundary.
+  attrs.radii = std::vector<double>(config.num_orientation_bins,
+                                    std::numeric_limits<double>::max());
+  attrs.states = std::vector<State>(config.num_orientation_bins, State::TRAVERSABLE);
   attrs.min_radius = std::numeric_limits<double>::max();
   attrs.max_radius = 0.0;
   for (const auto& index : region.exterior_boundary) {
@@ -363,16 +368,21 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
     attrs.min_radius = std::min(attrs.min_radius, distance);
     attrs.max_radius = std::max(attrs.max_radius, distance);
 
+    const int bin =
+        static_cast<int>((std::atan2(point.y(), point.x()) / (2.0 * M_PI) + 1.0) *
+                         config.num_orientation_bins) %
+        config.num_orientation_bins;
+
     // Classify the boundary voxels.
     // TODO(lschmid): This doesn't work w/ archiving the layer, need to move into the
     // region itself if needed.
     const auto* voxel = layer.voxel(index);
-    attrs.points.push_back(point);
-    if (!voxel) {
-      attrs.states.push_back(spark_dsg::TraversabilityState::UNKNOWN);
-    } else {
-      attrs.states.push_back(voxel->state);
+    State state = State::UNKNOWN;
+    if (voxel) {
+      state = voxel->state;
     }
+    attrs.radii[bin] = std::min(attrs.radii[bin], distance);
+    spark_dsg::fuseStates(state, attrs.states[bin], false);
   }
 
   // Active and timing attributes.
