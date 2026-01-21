@@ -49,7 +49,6 @@ void reallocateMeshPoints(const spark_dsg::Mesh& mesh,
 void propagateReallocation(const spark_dsg::Mesh& mesh,
                            const spark_dsg::SceneGraphLayer& layer,
                            const std::set<spark_dsg::NodeId>& changed_nodes,
-                           std::set<spark_dsg::NodeId>& seen_nodes,
-                           size_t max_number_changes);
+                           std::set<spark_dsg::NodeId>& seen_nodes);
 
 }  // namespace hydra::utils

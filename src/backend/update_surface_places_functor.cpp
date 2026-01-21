@@ -72,23 +72,6 @@ inline void updateNode(const spark_dsg::Mesh& mesh,
   }
 }
 
-}  // namespace
-
-using kimera_pgmo::MeshOffsetInfo;
-using timing::ScopedTimer;
-
-void declare_config(Update2dPlacesFunctor::Config& config) {
-  using namespace config;
-  name("Update2dPlacesFunctor::Config");
-  base<VerbosityConfig>(config);
-  field(config.layer, "layer");
-  field(config.merge_max_delta_z, "merge_max_delta_z");
-  field(config.connection_overlap_threshold, "connection_overlap_threshold");
-  field(config.connection_max_delta_z, "connection_max_delta_z");
-  field(config.connection_ellipse_scale_factor, "connection_ellipse_scale_factor");
-  field(config.merge_proposer, "merge_proposer");
-}
-
 NodeAttributes::Ptr merge2dPlaceAttributes(const Update2dPlacesFunctor::Config config,
                                            const DynamicSceneGraph& graph,
                                            const std::vector<NodeId>& nodes) {
@@ -96,6 +79,8 @@ NodeAttributes::Ptr merge2dPlaceAttributes(const Update2dPlacesFunctor::Config c
     return nullptr;
   }
 
+  for (const auto node_id : nodes) {
+  }
   auto iter = nodes.begin();
   CHECK(graph.hasNode(*iter)) << NodeSymbol(*iter).str();
   auto attrs_ptr = graph.getNode(*iter).attributes().clone();
@@ -114,6 +99,23 @@ NodeAttributes::Ptr merge2dPlaceAttributes(const Update2dPlacesFunctor::Config c
   addRectInfo(*graph.mesh(), config.connection_ellipse_scale_factor, new_attrs);
   addBoundaryInfo(*graph.mesh(), new_attrs);
   return attrs_ptr;
+}
+
+}  // namespace
+
+using kimera_pgmo::MeshOffsetInfo;
+using timing::ScopedTimer;
+
+void declare_config(Update2dPlacesFunctor::Config& config) {
+  using namespace config;
+  name("Update2dPlacesFunctor::Config");
+  base<VerbosityConfig>(config);
+  field(config.layer, "layer");
+  field(config.merge_max_delta_z, "merge_max_delta_z");
+  field(config.connection_overlap_threshold, "connection_overlap_threshold");
+  field(config.connection_max_delta_z, "connection_max_delta_z");
+  field(config.connection_ellipse_scale_factor, "connection_ellipse_scale_factor");
+  field(config.merge_proposer, "merge_proposer");
 }
 
 Update2dPlacesFunctor::Update2dPlacesFunctor(const Config& config)
@@ -152,9 +154,8 @@ void Update2dPlacesFunctor::call(const DynamicSceneGraph& unmerged,
     return;
   }
 
-  const auto new_loopclosure = info->loop_closure_detected;
-
   active_tracker.clear();  // reset from previous pass
+  const auto new_loopclosure = info->loop_closure_detected;
   const auto view = new_loopclosure ? LayerView(*layer) : active_tracker.view(*layer);
 
   size_t num_changed = 0;
@@ -166,6 +167,8 @@ void Update2dPlacesFunctor::call(const DynamicSceneGraph& unmerged,
       continue;
     }
 
+    // note that updateNode recomputes the centroid from the frontend mesh indices,
+    // not the set of merged indices (which would break the cleanup logic).
     ++num_changed;
     updateNode(*mesh, node.id, *attrs);
     dsg.graph->setNodeAttributes(node.id, attrs->clone());
@@ -224,25 +227,21 @@ bool Update2dPlacesFunctor::shouldMerge(const Place2dNodeAttributes& from_attrs,
 }
 
 void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
-  std::lock_guard<std::mutex> lock(dsg.mutex);
-  const auto places_layer = dsg.graph->findLayer(DsgLayers::MESH_PLACES);
-  if (!places_layer) {
-    return;
-  }
-
-  // Decide which places need to be split and which just need to be updated
   auto& graph = *dsg.graph;
   auto mesh = graph.mesh();
 
-  // Clean up places that are far enough away from the active window
-  // Far enough means that none of a node's neighbors or the node itself have
-  // active mesh vertices
+  std::lock_guard<std::mutex> lock(dsg.mutex);
+  const auto places_layer = graph.findLayer(DsgLayers::MESH_PLACES);
+  if (!places_layer || !mesh) {
+    return;
+  }
+
   std::set<NodeId> checked_nodes;
-  utils::propagateReallocation(*mesh, *places_layer, cleanup_nodes, checked_nodes, 0);
+  utils::propagateReallocation(*mesh, *places_layer, cleanup_nodes, checked_nodes);
   for (auto& node_id : checked_nodes) {
     auto& attrs = graph.getNode(node_id).attributes<Place2dNodeAttributes>();
     if (attrs.mesh_connections.size() == 0) {
-      LOG(ERROR) << "Reallocating mesh points would make empty place. Skipping.";
+      MLOG(1) << "place " << NodeSymbol(node_id).str() << " too small";
       continue;
     }
 
@@ -250,42 +249,46 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
     addBoundaryInfo(*mesh, attrs);
   }
 
-  std::vector<std::pair<NodeId, NodeId>> edges_to_remove;
-  std::map<NodeId, NodeId> extra_edges_to_check;
-  for (const auto& node_id : checked_nodes) {
-    auto& attrs1 = graph.getNode(node_id).attributes<Place2dNodeAttributes>();
+  // drop existing edges for all updated nodes that no longer make sense
+  for (const auto node_id : checked_nodes) {
+    const auto& node = graph.getNode(node_id);
+    const auto& attrs = node.attributes<Place2dNodeAttributes>();
+    const auto siblings = node.siblings();
+    for (const auto other_id : siblings) {
+      const auto other = graph.getNode(other_id).tryAttributes<Place2dNodeAttributes>();
+      if (!other) {
+        continue;
+      }
 
-    for (const auto& neighbor_id : checked_nodes) {
-      const auto& neighbor_node = graph.getNode(neighbor_id);
-      auto& attrs2 = neighbor_node.attributes<Place2dNodeAttributes>();
       EdgeAttributes ea;
-      if (!shouldAddPlaceConnection(attrs1,
-                                    attrs2,
+      if (!shouldAddPlaceConnection(attrs,
+                                    *other,
                                     config.connection_overlap_threshold,
                                     config.connection_max_delta_z,
                                     ea)) {
-        graph.removeEdge(node_id, neighbor_id);
-      } else {
-        graph.insertEdge(node_id, neighbor_id, ea.clone());
+        // this is safe because we clone the siblings before iterating
+        graph.removeEdge(node_id, other_id);
       }
     }
+  }
 
-    std::vector<std::pair<NodeId, NodeId>> sibs_edges_to_remove;
-    for (auto& nid : graph.getNode(node_id).siblings()) {
-      auto neighbor_node = graph.findNode(nid);
-      auto& attrs2 = neighbor_node->attributes<Place2dNodeAttributes>();
+  // pairwise search for new edges
+  for (const auto node_id : checked_nodes) {
+    const auto& attrs = graph.getNode(node_id).attributes<Place2dNodeAttributes>();
+    for (const auto other_id : checked_nodes) {
+      if (node_id == other_id) {
+        continue;
+      }
+
+      const auto& other = graph.getNode(other_id).attributes<Place2dNodeAttributes>();
       EdgeAttributes ea;
-      if (!shouldAddPlaceConnection(attrs1,
-                                    attrs2,
-                                    config.connection_overlap_threshold,
-                                    config.connection_max_delta_z,
-                                    ea)) {
-        sibs_edges_to_remove.push_back({node_id, nid});
+      if (shouldAddPlaceConnection(attrs,
+                                   other,
+                                   config.connection_overlap_threshold,
+                                   config.connection_max_delta_z,
+                                   ea)) {
+        graph.insertEdge(node_id, other_id, ea.clone());
       }
-    }
-
-    for (auto [source, target] : sibs_edges_to_remove) {
-      graph.removeEdge(source, target);
     }
   }
 }

@@ -102,8 +102,7 @@ inline Place2dNodeAttributes* getAttrs(const SceneGraphLayer& layer,
 void propagateReallocation(const spark_dsg::Mesh& mesh,
                            const SceneGraphLayer& layer,
                            const std::set<NodeId>& changed_nodes,
-                           std::set<NodeId>& seen_nodes,
-                           size_t max_number_changes) {
+                           std::set<NodeId>& seen_nodes) {
   std::list<spark_dsg::NodeId> frontier(changed_nodes.begin(), changed_nodes.end());
   while (!frontier.empty()) {
     const auto node_id = frontier.front();
