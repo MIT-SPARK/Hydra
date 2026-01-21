@@ -195,6 +195,11 @@ void Update2dPlacesFunctor::call(const DynamicSceneGraph& unmerged,
       continue;
     }
 
+    if (!new_loopclosure && !attrs->is_active) {
+      // reallocate mesh vertices for newly archived nodes
+      cleanup_nodes.insert(node.id);
+    }
+
     // note that updateNode recomputes the centroid from the frontend mesh indices,
     // not the set of merged indices (which would break the cleanup logic).
     ++num_changed;
@@ -268,6 +273,7 @@ void Update2dPlacesFunctor::cleanup(SharedDsgInfo& dsg) const {
 
   std::set<NodeId> checked_nodes;
   utils::propagateReallocation(*mesh, *places_layer, cleanup_nodes, checked_nodes);
+  cleanup_nodes.clear();
   for (auto& node_id : checked_nodes) {
     auto& attrs = graph.getNode(node_id).attributes<Place2dNodeAttributes>();
     if (attrs.mesh_connections.size() == 0) {
