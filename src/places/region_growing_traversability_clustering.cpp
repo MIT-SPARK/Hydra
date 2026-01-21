@@ -352,7 +352,22 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
     const Region& region,
     const TraversabilityLayer& layer) const {
   // Position.
-  attrs.position = region.centroid.cast<double>() * layer.voxel_size;
+  const auto centroid_index = region.centroid.cast<int>();
+  if (region.voxels.count(centroid_index)) {
+    attrs.position = region.centroid.cast<double>() * layer.voxel_size;
+  } else {
+    // Centroid is not in the voxel set, pick the closest voxel to the centroid.
+    float min_dist_sq = std::numeric_limits<float>::max();
+    VoxelIndex closest_index = VoxelIndex::Zero();
+    for (const auto& voxel_index : region.voxels) {
+      const float dist_sq = (voxel_index.cast<float>() - region.centroid).squaredNorm();
+      if (dist_sq < min_dist_sq) {
+        min_dist_sq = dist_sq;
+        closest_index = voxel_index;
+      }
+    }
+    attrs.position = closest_index.cast<double>() * layer.voxel_size;
+  }
 
   // Min and max extents as radii. Also compute the radial discretization of the
   // boundary.
@@ -383,6 +398,11 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
     }
     attrs.radii[bin] = std::min(attrs.radii[bin], distance);
     spark_dsg::fuseStates(state, attrs.states[bin], false);
+  }
+  for (auto& radius : attrs.radii) {
+    if (radius == std::numeric_limits<double>::max()) {
+      radius = attrs.min_radius;
+    }
   }
 
   // Active and timing attributes.
