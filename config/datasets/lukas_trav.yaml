@@ -28,7 +28,7 @@ frontend:
     clustering:
       type: RegionGrowingTraversabilityClustering
       max_radius: 4.0
-      num_orientation_bins: 16
+      num_orientation_bins: 20
     sinks:
       - type: TraversabilityVisualizer
 backend:
@@ -38,8 +38,8 @@ backend:
   update_functors:
     agents:
       type: UpdateAgentsFunctor
-    # traversability:
-    #   type: UpdateRegionGrowingTraversabilityFunctor
+    traversability:
+      type: UpdateRegionGrowingTraversabilityFunctor
     frontiers:
       type: UpdateFrontiersFunctor
     rooms:

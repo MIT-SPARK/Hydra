@@ -33,12 +33,14 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+
 #include <config_utilities/factory.h>
 #include <spark_dsg/traversability_boundary.h>
 
 #include "hydra/backend/deformation_interpolator.h"
 #include "hydra/backend/update_functions.h"
 #include "hydra/utils/active_window_tracker.h"
+#include "hydra/utils/logging.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra {
@@ -48,7 +50,7 @@ namespace hydra {
  * called with exhaustive merging enabled.
  */
 struct UpdateRegionGrowingTraversabilityFunctor : public UpdateFunctor {
-  struct Config {
+  struct Config : public VerbosityConfig {
     //! Layer to update traversability in
     std::string layer = DsgLayers::TRAVERSABILITY;
 
@@ -99,16 +101,15 @@ struct UpdateRegionGrowingTraversabilityFunctor : public UpdateFunctor {
    * @brief Find connections of places that should be considered for merging or
    * connection in the active window.
    */
-  std::vector<NodeId> findConnections(
-      const DynamicSceneGraph& dsg,
-      const TraversabilityNodeAttributes& from_attrs) const;
+  std::vector<NodeId> findConnections(const DynamicSceneGraph& dsg,
+                                      const TravNodeAttributes& from_attrs) const;
 
   /**
    * @brief Check whether the two traversability areas overlap sufficiently to be
    * considered traversable in-place.
    */
-  bool hasTraversableOverlap(const TraversabilityNodeAttributes& from,
-                             const TraversabilityNodeAttributes& to) const;
+  bool hasTraversableOverlap(const TravNodeAttributes& from,
+                             const TravNodeAttributes& to) const;
 
   void resetNeighborFinder(const DynamicSceneGraph& dsg) const;
 
