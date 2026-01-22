@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <config_utilities/factory.h>
 #include <config_utilities/virtual_config.h>
 
 #include <memory>

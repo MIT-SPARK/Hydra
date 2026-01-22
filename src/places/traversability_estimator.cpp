@@ -39,6 +39,14 @@
 
 namespace hydra::places {
 
+namespace {
+static const auto registration_ =
+    config::RegistrationWithConfig<TraversabilityEstimator,
+                                   HeightTraversabilityEstimator,
+                                   HeightTraversabilityEstimator::Config>(
+        "HeightTraversabilityEstimator");
+}
+
 using spark_dsg::TraversabilityState;
 
 void declare_config(HeightTraversabilityEstimator::Config& config) {
