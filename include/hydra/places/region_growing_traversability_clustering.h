@@ -74,7 +74,7 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
     // the region and are ordered by traversal.
     VoxelSet exterior_boundary;
 
-    //
+    // Unobserved or intraversable voxels inside the region.
     VoxelSet interior_boundary;
 
     // True: this region has voxels in the current layer. False: all voxels are outside

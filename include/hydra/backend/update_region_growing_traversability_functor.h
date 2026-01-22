@@ -93,31 +93,36 @@ struct UpdateRegionGrowingTraversabilityFunctor : public UpdateFunctor {
   void pruneActiveWindowEdges(DynamicSceneGraph& dsg,
                               const EdgeSet& active_edges) const;
 
-  void updateDistances(const SceneGraphLayer& layer) const;
+  /**
+   * @brief Compute edges between overlapping inactive nodes.
+   */
+  void updateInactiveEdges(DynamicSceneGraph& dsg) const;
 
   // Helper functions.
 
   /**
-   * @brief Find connections of places that should be considered for merging or
-   * connection in the active window.
+   * @brief Find places that are inactive and spatially but not temporally overlap with
+   * the given node.
    */
   std::vector<NodeId> findConnections(const DynamicSceneGraph& dsg,
                                       const TravNodeAttributes& from_attrs) const;
 
-  /**
-   * @brief Check whether the two traversability areas overlap sufficiently to be
-   * considered traversable in-place.
-   */
-  bool hasTraversableOverlap(const TravNodeAttributes& from,
-                             const TravNodeAttributes& to) const;
-
   void resetNeighborFinder(const DynamicSceneGraph& dsg) const;
+
+  /**
+   * @brief Check if two traversability nodes have active window (temporal) overlap.
+   */
+  bool hasActiveOverlap(const TravNodeAttributes& attrs1,
+                        const TravNodeAttributes& attrs2) const;
 
  protected:
   // State.
   mutable float radius_;  // Max radius for overlap search.
   mutable EdgeSet previous_active_edges_;
   mutable std::set<EdgeKey> overlapping_nodes_to_cleanup_;
+
+  // TMP.
+  std::set<NodeId> previous_active_nodes_;
 
   // Members.
   mutable ActiveWindowTracker active_tracker_;

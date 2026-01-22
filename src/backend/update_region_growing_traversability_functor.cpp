@@ -113,6 +113,9 @@ void UpdateRegionGrowingTraversabilityFunctor::call(
   const auto active_edges = findActiveWindowEdges(*dsg.graph);
   pruneActiveWindowEdges(*dsg.graph, active_edges);
   previous_active_edges_ = std::move(active_edges);
+
+  // Maintain and update edges between overlapping inactive nodes.
+  updateInactiveEdges(*dsg.graph);
 }
 
 void UpdateRegionGrowingTraversabilityFunctor::updateDeformation(
@@ -129,25 +132,24 @@ void UpdateRegionGrowingTraversabilityFunctor::updateDeformation(
 UpdateRegionGrowingTraversabilityFunctor::EdgeSet
 UpdateRegionGrowingTraversabilityFunctor::findActiveWindowEdges(
     DynamicSceneGraph& dsg) const {
-  if (!nn_) {
-    return {};
-  }
-
   std::stringstream info;
 
   // Compare all active against inactive candidate nodes.
   EdgeSet active_edges;
-  const auto view = active_tracker_.view(dsg.getLayer(config.layer), true);
-  for (const auto& node : view) {
-    const auto& from_attrs = node.attributes<TravNodeAttributes>();
+
+  // TMP(lschmid): Just iterate over the entire graph until the AW tracker is fixed.
+  // const auto view = active_tracker_.view(dsg.getLayer(config.layer), true);
+  const auto& layer = dsg.getLayer(config.layer);
+  for (const auto& [from_id, node] : layer.nodes()) {
+    const auto& from_attrs = node->attributes<TravNodeAttributes>();
     if (!from_attrs.is_active) {
       continue;
     }
-    info << "\nActive " << NodeSymbol(node.id) << ": [";
+    info << "\nActive " << NodeSymbol(from_id) << ": [";
     for (const auto to_id : findConnections(dsg, from_attrs)) {
-      // NOTE(lschmid): Weight of 0.0 indicates this is an AW edge.
-      dsg.addOrUpdateEdge(node.id, to_id, std::make_unique<EdgeAttributes>(0.0));
-      active_edges.insert(EdgeKey(node.id, to_id));
+      // NOTE(lschmid): Weight of -1 indicates this is an AW edge.
+      dsg.addOrUpdateEdge(from_id, to_id, std::make_unique<EdgeAttributes>(-1.0));
+      active_edges.insert(EdgeKey(from_id, to_id));
       info << NodeSymbol(to_id) << ", ";
     }
     info << "]";
@@ -164,88 +166,77 @@ void UpdateRegionGrowingTraversabilityFunctor::pruneActiveWindowEdges(
     }
     const auto& attrs_1 = dsg.getNode(edge_key.k1).attributes<TravNodeAttributes>();
     const auto& attrs_2 = dsg.getNode(edge_key.k2).attributes<TravNodeAttributes>();
-    if (!(attrs_1.is_active || attrs_2.is_active) || !attrs_1.intersects(attrs_2)) {
+    if ((!attrs_1.is_active && !attrs_2.is_active) || !attrs_1.intersects(attrs_2)) {
       dsg.removeEdge(edge_key.k1, edge_key.k2);
     }
   }
 }
 
-MergeList UpdateRegionGrowingTraversabilityFunctor::findNodeMerges(
-    const DynamicSceneGraph& dsg, const UpdateInfo::ConstPtr& info) const {
-  // Iteratively match all newly archived nodes against inactive candidate nodes.
-  resetNeighborFinder(dsg);
-  if (!nn_) {
-    return {};
+void UpdateRegionGrowingTraversabilityFunctor::updateInactiveEdges(
+    DynamicSceneGraph& dsg) const {
+  // TODO(lschmid): Consider an incremental version in the future.
+  EdgeSet visited;
+  for (const auto& [from_id, node] : dsg.getLayer(config.layer).nodes()) {
+    const auto& from_attrs = node->attributes<TravNodeAttributes>();
+    if (from_attrs.is_active) {
+      continue;
+    }
+
+    // Find all overlapping inactive nodes.
+    for (const auto to_id : findConnections(dsg, from_attrs)) {
+      const EdgeKey edge_key(from_id, to_id);
+      if (from_id == to_id || visited.count(edge_key)) {
+        continue;
+      }
+      const auto& to_attrs = dsg.getNode(to_id).attributes<TravNodeAttributes>();
+      if (to_attrs.is_active) {
+        continue;
+      }
+
+      visited.insert(edge_key);
+      const bool should_connect = from_attrs.intersects(to_attrs);
+      if (should_connect) {
+        // NOTE(lschmid): Weight of -2 indicates this is an inactive overlap edge.
+        dsg.addOrUpdateEdge(from_id, to_id, std::make_unique<EdgeAttributes>(-2.0));
+      } else {
+        dsg.removeEdge(from_id, to_id);
+      }
+    }
   }
+}
 
-  const auto& places = dsg.getLayer(config.layer);
-  const auto view = info->loop_closure_detected ? LayerView(places)
-                                                : active_tracker_.view(places, true);
-
-  // Compare all (newly) archived nodes against inactive candidate nodes.
-  // std::stringstream info;
-  size_t n_tested = 0;
-  size_t n_merged = 0;
-  size_t n_active = 0;
+MergeList UpdateRegionGrowingTraversabilityFunctor::findNodeMerges(
+    const DynamicSceneGraph& dsg, const UpdateInfo::ConstPtr& /* info */) const {
+  // TODO(lschmid): Consider an incremental version in the future.
   MergeList result;
   std::set<NodeId> merged;
-  for (const auto& from_node : view) {
-    n_tested++;
-    if (merged.count(from_node.id)) {
-      n_merged++;
+  // Candidates are all inactive connections, as these already overlap.
+  for (const auto& [key, edge] : dsg.getLayer(config.layer).edges()) {
+    if (edge.attributes<EdgeAttributes>().weight != -2.0 || merged.count(key.k1) ||
+        merged.count(key.k2)) {
       continue;
     }
 
-    auto& from_attrs = from_node.attributes<TravNodeAttributes>();
-    if (from_attrs.is_active) {
-      n_active++;
+    const auto& from_attrs = dsg.getNode(key.k1).attributes<TravNodeAttributes>();
+    const auto& to_attrs = dsg.getNode(key.k2).attributes<TravNodeAttributes>();
+
+    // Check boundaries. Merge if the centroids are included in the other's radius. If
+    // both are included, keep the larger one.
+    const bool from_included = from_attrs.contains(to_attrs.position);
+    const bool to_included = to_attrs.contains(from_attrs.position);
+
+    if (!to_included && !from_included) {
       continue;
     }
 
-    std::stringstream ss;
-    ss << NodeSymbol(from_node.id) << " -> ";
-
-    for (const auto to_id : nn_->findRadius(from_attrs.position, radius_, true)) {
-      if (to_id == from_node.id || merged.count(to_id)) {
-        ss << NodeSymbol(to_id) << " (skipped), ";
-        continue;
-      }
-      auto& to_attrs = dsg.getNode(to_id).attributes<TravNodeAttributes>();
-      if (to_attrs.is_active) {
-        ss << NodeSymbol(to_id) << " (active), ";
-        continue;
-      }
-
-      // Avoid merging nodes with active window (temporal) overlap.
-      if (from_attrs.last_observed_ns >= to_attrs.first_observed_ns &&
-          from_attrs.first_observed_ns <= to_attrs.last_observed_ns) {
-        ss << NodeSymbol(to_id) << " (aw), ";
-        continue;
-      }
-
-      // Check boundaries. Merge if the centroids are included in the other's radius.
-      const bool to_included = to_attrs.contains(from_attrs.position);
-      const bool from_included = from_attrs.contains(to_attrs.position);
-
-      ss << NodeSymbol(to_id) << " (to: " << to_included << ", from: " << from_included
-         << "), ";
-      LOG(INFO) << ss.str();
-
-      if (!to_included && !from_included) {
-        continue;
-      }
-
-      if (!from_included || to_attrs.min_radius > from_attrs.min_radius) {
-        result.push_back({from_node.id, to_id});
-        merged.insert(from_node.id);
-      } else {
-        result.push_back({to_id, from_node.id});
-        merged.insert(to_id);
-      }
+    if (!from_included || to_attrs.area() > from_attrs.area()) {
+      result.push_back({key.k1, key.k2});
+      merged.insert(key.k1);
+    } else {
+      result.push_back({key.k2, key.k1});
+      merged.insert(key.k2);
     }
   }
-  LOG(INFO) << "Tested: " << n_tested << ", merged: " << n_merged
-            << ", active: " << n_active;
   return result;
 }
 
@@ -260,12 +251,12 @@ void UpdateRegionGrowingTraversabilityFunctor::cleanup(const UpdateInfo::ConstPt
 
 std::vector<NodeId> UpdateRegionGrowingTraversabilityFunctor::findConnections(
     const DynamicSceneGraph& dsg, const TravNodeAttributes& from_attrs) const {
-  if (!nn_) {
-    return {};
-  }
   std::vector<NodeId> connections;
   for (const auto to_id : nn_->findRadius(from_attrs.position, radius_, true)) {
     const auto& to_attrs = dsg.getNode(to_id).attributes<TravNodeAttributes>();
+    if (hasActiveOverlap(from_attrs, to_attrs)) {
+      continue;
+    }
     if (from_attrs.intersects(to_attrs)) {
       connections.emplace_back(to_id);
     }
@@ -278,6 +269,16 @@ void UpdateRegionGrowingTraversabilityFunctor::resetNeighborFinder(
   nn_ = NearestNodeFinder::fromLayer(
       dsg.getLayer(config.layer),
       [](const SceneGraphNode& node) { return !node.attributes().is_active; });
+}
+
+bool UpdateRegionGrowingTraversabilityFunctor::hasActiveOverlap(
+    const TravNodeAttributes& attrs1, const TravNodeAttributes& attrs2) const {
+  // TODO(lschmid): Double check this is correct.
+  if (attrs1.last_observed_ns < attrs2.first_observed_ns ||
+      attrs1.first_observed_ns > attrs2.last_observed_ns) {
+    return false;
+  }
+  return true;
 }
 
 }  // namespace hydra
