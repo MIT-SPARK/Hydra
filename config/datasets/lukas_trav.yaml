@@ -40,8 +40,6 @@ backend:
       type: UpdateAgentsFunctor
     traversability:
       type: UpdateRegionGrowingTraversabilityFunctor
-    frontiers:
-      type: UpdateFrontiersFunctor
     rooms:
       type: UpdateRoomsFunctor
       room_finder:
