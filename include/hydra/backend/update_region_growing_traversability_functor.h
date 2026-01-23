@@ -34,12 +34,8 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <config_utilities/factory.h>
-#include <spark_dsg/traversability_boundary.h>
-
 #include "hydra/backend/deformation_interpolator.h"
 #include "hydra/backend/update_functions.h"
-#include "hydra/utils/active_window_tracker.h"
 #include "hydra/utils/logging.h"
 #include "hydra/utils/nearest_neighbor_utilities.h"
 
@@ -88,15 +84,26 @@ struct UpdateRegionGrowingTraversabilityFunctor : public UpdateFunctor {
                          SharedDsgInfo& dsg,
                          const UpdateInfo::ConstPtr& info) const;
 
-  EdgeSet findActiveWindowEdges(DynamicSceneGraph& dsg) const;
-
-  void pruneActiveWindowEdges(DynamicSceneGraph& dsg,
-                              const EdgeSet& active_edges) const;
+  /**
+   * @brief Remove all active window and inactive edges from the graph.
+   */
+  void resetAddedEdges(DynamicSceneGraph& dsg) const;
 
   /**
-   * @brief Compute edges between overlapping inactive nodes.
+   * @brief Compute edges between overlapping inactive nodes globally.
    */
-  void updateInactiveEdges(DynamicSceneGraph& dsg) const;
+  void findInactiveEdges(DynamicSceneGraph& dsg) const;
+
+  /**
+   * @brief Find and add edges from active to inactive nodes.
+   */
+  void findActiveWindowEdges(DynamicSceneGraph& dsg) const;
+
+  /**
+   * @brief Remove active window edges that no longer have active overlap and move
+   * designate archived ones as inactive edges.
+   */
+  void pruneActiveWindowEdges(DynamicSceneGraph& dsg) const;
 
   // Helper functions.
 
@@ -107,27 +114,24 @@ struct UpdateRegionGrowingTraversabilityFunctor : public UpdateFunctor {
   std::vector<NodeId> findConnections(const DynamicSceneGraph& dsg,
                                       const TravNodeAttributes& from_attrs) const;
 
-  void resetNeighborFinder(const DynamicSceneGraph& dsg) const;
-
   /**
    * @brief Check if two traversability nodes have active window (temporal) overlap.
    */
-  bool hasActiveOverlap(const TravNodeAttributes& attrs1,
-                        const TravNodeAttributes& attrs2) const;
+  static bool hasActiveOverlap(const TravNodeAttributes& attrs1,
+                               const TravNodeAttributes& attrs2);
+
+  /**
+   * @brief View on all active nodes in a layer.
+   */
+  static LayerView activeNodes(const SceneGraphLayer& layer);
 
  protected:
   // State.
-  mutable float radius_;  // Max radius for overlap search.
-  mutable EdgeSet previous_active_edges_;
-  mutable std::set<EdgeKey> overlapping_nodes_to_cleanup_;
-
-  // TMP.
-  std::set<NodeId> previous_active_nodes_;
+  mutable float radius_;          // Cached max radius for overlap search.
+  mutable EdgeSet active_edges_;  // Active window edges in the current update.
 
   // Members.
-  mutable ActiveWindowTracker active_tracker_;
   const DeformationInterpolator deformation_interpolator_;
-  mutable NearestNodeFinder::Ptr nn_;
 };
 
 void declare_config(UpdateRegionGrowingTraversabilityFunctor::Config& config);

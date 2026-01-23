@@ -369,41 +369,21 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
     attrs.position = closest_index.cast<double>() * layer.voxel_size;
   }
 
-  // Min and max extents as radii. Also compute the radial discretization of the
-  // boundary.
-  attrs.radii = std::vector<double>(config.num_orientation_bins,
-                                    std::numeric_limits<double>::max());
-  attrs.states = std::vector<State>(config.num_orientation_bins, State::TRAVERSABLE);
-  attrs.min_radius = std::numeric_limits<double>::max();
-  attrs.max_radius = 0.0;
+  // Compute the boundary from the exterior boundary voxels.
+  std::vector<Eigen::Vector3d> points;
+  spark_dsg::TraversabilityStates states;
+  points.reserve(region.exterior_boundary.size());
+  states.reserve(region.exterior_boundary.size());
+  attrs.radii.resize(config.num_orientation_bins);
+
   for (const auto& index : region.exterior_boundary) {
-    const Eigen::Vector3d point =
-        index.cast<double>() * layer.voxel_size - attrs.position;
-    const double distance = point.norm();
-    attrs.min_radius = std::min(attrs.min_radius, distance);
-    attrs.max_radius = std::max(attrs.max_radius, distance);
-
-    const int bin =
-        static_cast<int>((std::atan2(point.y(), point.x()) / (2.0 * M_PI) + 1.0) *
-                         config.num_orientation_bins) %
-        config.num_orientation_bins;
-
-    // Classify the boundary voxels.
+    points.push_back(index.cast<double>() * layer.voxel_size);
     // TODO(lschmid): This doesn't work w/ archiving the layer, need to move into the
     // region itself if needed.
     const auto* voxel = layer.voxel(index);
-    State state = State::UNKNOWN;
-    if (voxel) {
-      state = voxel->state;
-    }
-    attrs.radii[bin] = std::min(attrs.radii[bin], distance);
-    spark_dsg::fuseStates(state, attrs.states[bin], false);
+    states.push_back(voxel ? voxel->state : State::UNKNOWN);
   }
-  for (auto& radius : attrs.radii) {
-    if (radius == std::numeric_limits<double>::max()) {
-      radius = attrs.min_radius;
-    }
-  }
+  attrs.fromExteriorPoints(points, states);
 
   // Active and timing attributes.
   attrs.is_active = region.is_active;

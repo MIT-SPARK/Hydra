@@ -71,8 +71,7 @@ void writeBackendStatus(const std::vector<BackendModuleStatus>& entries,
   // file format
   file << "total_lc,new_lc,total_factors,total_values,new_factors,new_graph_"
           "factors,trajectory_len,run_time,optimize_time,mesh_update_time,num_"
-          "merges_"
-          "undone\n";
+          "merges_undone\n";
 
   const auto nan = std::numeric_limits<double>::quiet_NaN();
   for (const auto& entry : entries) {
@@ -80,8 +79,8 @@ void writeBackendStatus(const std::vector<BackendModuleStatus>& entries,
          << entry.total_factors << "," << entry.total_values << "," << entry.new_factors
          << "," << entry.new_graph_factors << "," << entry.trajectory_len << ","
          << entry.last_spin_s.value_or(nan) << "," << entry.last_opt_s.value_or(nan)
-         << "," << entry.last_mesh_update_s.value_or(nan) << entry.num_merges_undone
-         << "\n";
+         << "," << entry.last_mesh_update_s.value_or(nan) << ","
+         << entry.num_merges_undone << "\n";
   }
 
   file.close();
