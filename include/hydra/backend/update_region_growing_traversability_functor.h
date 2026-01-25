@@ -126,12 +126,13 @@ struct UpdateRegionGrowingTraversabilityFunctor : public UpdateFunctor {
   static LayerView activeNodes(const SceneGraphLayer& layer);
 
  protected:
-  // State.
-  mutable float radius_;          // Cached max radius for overlap search.
-  mutable EdgeSet active_edges_;  // Active window edges in the current update.
-
   // Members.
   const DeformationInterpolator deformation_interpolator_;
+
+  // State.
+  mutable EdgeSet active_edges_;      // Active window edges in the current update.
+  mutable EdgeSet merge_candidates_;  // List of nodes that have inactive edges and
+                                      // could thus be merged this iteration.
 };
 
 void declare_config(UpdateRegionGrowingTraversabilityFunctor::Config& config);

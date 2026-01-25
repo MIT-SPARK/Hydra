@@ -98,11 +98,11 @@ void UpdateRegionGrowingTraversabilityFunctor::call(
   updateDeformation(unmerged, dsg, info);
 
   // In the case of loop closures, reset all added edges.
-  // TMP(lschmid): Always recompute.
-  // if (info->loop_closure_detected) {
-  resetAddedEdges(*dsg.graph);
-  findInactiveEdges(*dsg.graph);
-  // }
+  merge_candidates_.clear();
+  if (info->loop_closure_detected) {
+    resetAddedEdges(*dsg.graph);
+    findInactiveEdges(*dsg.graph);
+  }
 
   // Find and update all edges from active to inactive nodes.
   findActiveWindowEdges(*dsg.graph);
@@ -164,6 +164,7 @@ void UpdateRegionGrowingTraversabilityFunctor::findInactiveEdges(
       if (from_attrs.intersects(to_attrs)) {
         // NOTE(lschmid): Weight of -2 indicates this is an inactive overlap edge.
         dsg.addOrUpdateEdge(from_id, to_id, std::make_unique<EdgeAttributes>(-2.0));
+        merge_candidates_.insert(edge_key);
       }
     }
   }
@@ -201,6 +202,7 @@ void UpdateRegionGrowingTraversabilityFunctor::pruneActiveWindowEdges(
     if (!attrs_1.is_active && !attrs_2.is_active) {
       // Move to inactive edges.
       dsg.getEdge(edge_key.k1, edge_key.k2).attributes().weight = -2.0;
+      merge_candidates_.insert(edge_key);
     }
   }
 
@@ -215,21 +217,20 @@ MergeList UpdateRegionGrowingTraversabilityFunctor::findNodeMerges(
   MergeList result;
   std::set<NodeId> merged;
   // Candidates are all inactive connections, as these already overlap.
-  for (const auto& [key, edge] : dsg.getLayer(config.layer).edges()) {
-    if (edge.attributes().weight > -1.5 || merged.count(key.k1) ||
-        merged.count(key.k2)) {
+  for (const auto& edge_key : merge_candidates_) {
+    if (merged.count(edge_key.k1) || merged.count(edge_key.k2)) {
       continue;
     }
 
-    const auto& from_attrs = dsg.getNode(key.k1).attributes<TravNodeAttributes>();
-    const auto& to_attrs = dsg.getNode(key.k2).attributes<TravNodeAttributes>();
+    const auto& from_attrs = dsg.getNode(edge_key.k1).attributes<TravNodeAttributes>();
+    const auto& to_attrs = dsg.getNode(edge_key.k2).attributes<TravNodeAttributes>();
 
     // Check boundaries. Merge if the centroids are included in the other's radius. If
     // both are included, keep the larger one.
     const bool from_included = from_attrs.contains(to_attrs.position);
     const bool to_included = to_attrs.contains(from_attrs.position);
-    LOG(INFO) << "Candidate merge: " << NodeSymbol(key.k1) << " -> "
-              << NodeSymbol(key.k2) << " | from_included: " << from_included
+    LOG(INFO) << "Candidate merge: " << NodeSymbol(edge_key.k1) << " -> "
+              << NodeSymbol(edge_key.k2) << " | from_included: " << from_included
               << " | to_included: " << to_included;
 
     if (!to_included && !from_included) {
@@ -237,11 +238,12 @@ MergeList UpdateRegionGrowingTraversabilityFunctor::findNodeMerges(
     }
 
     if (!from_included || to_attrs.area() > from_attrs.area()) {
-      result.push_back({key.k1, key.k2});
-      merged.insert(key.k1);
+      // Merge from -> to
+      result.push_back({edge_key.k1, edge_key.k2});
+      merged.insert(edge_key.k1);
     } else {
-      result.push_back({key.k2, key.k1});
-      merged.insert(key.k2);
+      result.push_back({edge_key.k2, edge_key.k1});
+      merged.insert(edge_key.k2);
     }
   }
   return result;
