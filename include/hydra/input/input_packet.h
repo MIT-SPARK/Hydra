@@ -51,17 +51,11 @@ struct InputPacket {
   Eigen::Vector3d world_t_body;
   Eigen::Quaterniond world_R_body;
 
-  bool fix_z_coodinate = false;
-
   virtual ~InputPacket() = default;
   virtual bool fillInputData(InputData& data) const;
 
   Eigen::Isometry3d world_T_body() const {
-    auto world_T_body = Eigen::Translation<double, 3>(world_t_body) * world_R_body;
-    if (fix_z_coodinate) {
-      world_T_body.translation().z() = 0.0;
-    }
-    return world_T_body;
+    return Eigen::Translation<double, 3>(world_t_body) * world_R_body;
   }
 };
 
