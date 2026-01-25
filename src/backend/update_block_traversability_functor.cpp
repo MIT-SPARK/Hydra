@@ -87,7 +87,9 @@ UpdateFunctor::Hooks UpdateBlockTraversabilityFunctor::hooks() const {
                           const std::vector<NodeId>& merge_ids) {
     return mergeNodes(dsg, merge_ids);
   };
-  my_hooks.cleanup = [this](const auto& info, auto&, auto dsg) { cleanup(info, dsg); };
+  my_hooks.cleanup = [this](const UpdateInfo::ConstPtr& info,
+                            DynamicSceneGraph&,
+                            SharedDsgInfo* dsg) { cleanup(info, dsg); };
   return my_hooks;
 }
 
