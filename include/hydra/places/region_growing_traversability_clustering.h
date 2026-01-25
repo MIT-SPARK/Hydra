@@ -77,6 +77,9 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
     // Unobserved or intraversable voxels inside the region.
     VoxelSet interior_boundary;
 
+    // Archived boundary voxels with their last known traversability state.
+    VoxelIndexMap<spark_dsg::TraversabilityState> archived_boundary;
+
     // True: this region has voxels in the current layer. False: all voxels are outside
     // the current layer.
     bool is_active = true;
@@ -159,7 +162,6 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
 
   void pruneRegions();
 
-  // Helper functions.
   /**
    * @brief Allocate a new region, keeping track of the IDs. ID 0 is reserved.
    */
@@ -176,7 +178,7 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
       });
 
   void updatePlaceNodeAttributes(spark_dsg::TravNodeAttributes& attrs,
-                                 const Region& region,
+                                 Region& region,
                                  const TraversabilityLayer& layer) const;
 
   inline static const std::array<VoxelIndex, 8> neighbors_ = {

@@ -302,6 +302,8 @@ void RegionGrowingTraversabilityClustering::updatePlaceEdgesInDsg(
     NodeIdSet to_remove;
     for (const auto n_id : node->siblings()) {
       // Do not remove edges to archived regions.
+      // TODO(lschmid): Revisit this assumption for regions that move away from archived
+      // ones.
       if (!region.neighbors.count(n_id) && regions_.count(n_id)) {
         to_remove.insert(n_id);
       }
@@ -349,7 +351,7 @@ void RegionGrowingTraversabilityClustering::visualizeAssignments(
 
 void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
     spark_dsg::TravNodeAttributes& attrs,
-    const Region& region,
+    Region& region,
     const TraversabilityLayer& layer) const {
   // Position.
   const auto centroid_index = region.centroid.cast<int>();
@@ -357,6 +359,8 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
     attrs.position = region.centroid.cast<double>() * layer.voxel_size;
   } else {
     // Centroid is not in the voxel set, pick the closest voxel to the centroid.
+    // TODO(lschmid): Consider splitting up regions, as the resulting areas look bad if
+    // the center is on the boundary.
     float min_dist_sq = std::numeric_limits<float>::max();
     VoxelIndex closest_index = VoxelIndex::Zero();
     for (const auto& voxel_index : region.voxels) {
@@ -378,10 +382,16 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
 
   for (const auto& index : region.exterior_boundary) {
     points.push_back(index.cast<double>() * layer.voxel_size);
-    // TODO(lschmid): This doesn't work w/ archiving the layer, need to move into the
-    // region itself if needed.
+    // Classify boundary points.
     const auto* voxel = layer.voxel(index);
-    states.push_back(voxel ? voxel->state : State::UNKNOWN);
+    if (voxel) {
+      states.push_back(voxel->state);
+      region.archived_boundary[index] = voxel->state;
+    } else {
+      const auto it = region.archived_boundary.find(index);
+      states.push_back(it == region.archived_boundary.end() ? State::UNKNOWN
+                                                            : it->second);
+    }
   }
   attrs.fromExteriorPoints(points, states);
 
