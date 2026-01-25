@@ -33,23 +33,16 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <bitset>
-#include <cstddef>
-#include <cstdint>
-#include <string>
+#include <spark_dsg/edge_attributes.h>
+#include <spark_dsg/edge_container.h>
+#include <spark_dsg/node_attributes.h>
 
-#include "hydra/common/dsg_types.h"
+#include <cstddef>
+
 #include "hydra/places/gvd_voxel.h"
 #include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::places {
-
-struct OverlapEdgeConfig {
-  //! Number of nearest neighbors to check for free-space overlap
-  size_t num_neighbors_to_check = 4;
-  //! Minimum radius to nearest obstacle for the free-space intersection
-  double min_clearance_m = 0.4;
-};
 
 struct FreespaceEdgeConfig {
   //! Maximum edge length to project
@@ -63,34 +56,31 @@ struct FreespaceEdgeConfig {
 };
 
 void declare_config(FreespaceEdgeConfig& config);
-void declare_config(OverlapEdgeConfig& config);
 
-using EdgeInfoMap = std::map<EdgeKey, EdgeAttributes::Ptr>;
-using NodeIndexMap = std::unordered_map<NodeId, GlobalIndex>;
+using EdgeInfoMap = std::map<spark_dsg::EdgeKey, spark_dsg::EdgeAttributes::Ptr>;
+using NodeIndexMap = std::unordered_map<spark_dsg::NodeId, GlobalIndex>;
+using NodeAttrMap =
+    std::map<spark_dsg::NodeId, std::unique_ptr<spark_dsg::PlaceNodeAttributes>>;
 
 GlobalIndices makeBresenhamLine(const GlobalIndex& start, const GlobalIndex& end);
 
-EdgeAttributes::Ptr getOverlapEdgeInfo(const SceneGraphLayer& graph,
-                                       NodeId node,
-                                       NodeId neighbor,
-                                       double min_edge_clearance_m);
+spark_dsg::EdgeAttributes::Ptr getOverlapEdgeInfo(const NodeAttrMap& graph,
+                                                  spark_dsg::NodeId node,
+                                                  spark_dsg::NodeId neighbor,
+                                                  double min_edge_clearance_m);
 
-EdgeAttributes::Ptr getFreespaceEdgeInfo(const SceneGraphLayer& graph,
-                                         const GvdLayer& gvd,
-                                         const NodeIndexMap& node_index_map,
-                                         NodeId node,
-                                         NodeId other,
-                                         double min_edge_clearance_m);
-
-void findOverlapEdges(const OverlapEdgeConfig& config,
-                      const SceneGraphLayer& graph,
-                      const std::unordered_set<NodeId> active_nodes,
-                      EdgeInfoMap& proposed_edges);
+spark_dsg::EdgeAttributes::Ptr getFreespaceEdgeInfo(const NodeAttrMap& graph,
+                                                    const GvdLayer& gvd,
+                                                    const NodeIndexMap& node_index_map,
+                                                    spark_dsg::NodeId node,
+                                                    spark_dsg::NodeId other,
+                                                    double min_edge_clearance_m);
 
 void findFreespaceEdges(const FreespaceEdgeConfig& config,
-                        const SceneGraphLayer& graph,
+                        const NodeAttrMap& nodes,
+                        const spark_dsg::EdgeContainer& edges,
                         const GvdLayer& gvd,
-                        const std::unordered_set<NodeId>& nodes,
+                        const std::unordered_set<spark_dsg::NodeId>& active,
                         const NodeIndexMap& node_index_map,
                         EdgeInfoMap& proposed_edges);
 

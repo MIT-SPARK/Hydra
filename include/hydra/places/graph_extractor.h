@@ -35,7 +35,7 @@
 #pragma once
 #include <queue>
 
-#include "hydra/common/dsg_types.h"
+#include "hydra/common/dsg_types.h"  // IWYU pragma: keep
 #include "hydra/places/graph_extractor_utilities.h"
 #include "hydra/places/gvd_graph.h"
 #include "hydra/places/gvd_merge_policies.h"
@@ -87,8 +87,6 @@ class GraphExtractor {
   struct Config {
     //! Average resolution of sparse graph
     double compression_distance_m = 0.5;
-    //! Validate graph properties
-    bool validate_graph = false;
     //! Minimum distance for a GVD node to be considered for compression
     double min_node_distance_m = 0.3;
     //! Minimum distance for a edge to be valid
@@ -104,7 +102,10 @@ class GraphExtractor {
     //! Add edges between nodes that have overlapping free-space regions
     bool add_overlap_edges = true;
     //! Configuration for overlap-based edges
-    OverlapEdgeConfig overlap_edges;
+    struct OverlapEdgeConfig {
+      //! Minimum radius to nearest obstacle for the free-space intersection
+      double min_clearance_m = 0.4;
+    } overlap_edges;
     //! Add edges between disconnected components
     bool add_freespace_edges = true;
     //! Configuration for freespace edges
@@ -125,33 +126,23 @@ class GraphExtractor {
 
   void fillParentInfo(const GvdLayer& gvd, const GvdParentTracker& parents);
 
-  const SceneGraphLayer& getGraph() const;
-
   const GvdGraph& getGvdGraph() const;
 
   std::unordered_set<NodeId> getActiveNodes() const;
 
   const std::unordered_set<NodeId>& getDeletedNodes() const;
 
-  const std::vector<NodeId>& getDeletedEdges() const;
+  const std::vector<EdgeKey>& getDeletedEdges() const;
 
   void clearDeleted();
 
-  const NodeIndexMap& getIndexMap() const { return node_index_map_; }
+  const NodeIndexMap& getIndexMap() const;
 
-  const std::unordered_map<uint64_t, CompressedNode>& getCompressedNodeInfo() const {
-    return compressed_info_map_;
-  }
+  const std::unordered_map<uint64_t, CompressedNode>& getCompressedNodeInfo() const;
 
-  const std::unordered_map<uint64_t, uint64_t>& getCompressedRemapping() const {
-    return compressed_remapping_;
-  }
+  const std::unordered_map<uint64_t, uint64_t>& getCompressedRemapping() const;
 
  protected:
-  NodeId addPlaceToGraph(const GvdLayer& layer,
-                         const GvdVoxel& voxel,
-                         const GlobalIndex& index);
-
   EdgeAttributes::Ptr makeEdgeInfo(const GvdLayer& layer,
                                    NodeId source_id,
                                    NodeId target_id) const;
@@ -171,7 +162,9 @@ class GraphExtractor {
 
   void mergeGraphNodes(NodeId from, NodeId to);
 
-  void updateHeuristicEdges(const GvdLayer& layer);
+  void updateOverlapEdges();
+
+  void updateFreespaceEdges(const GvdLayer& layer);
 
   void fillSeenVoxels(const GvdLayer& layer,
                       uint64_t timestamp_ns,
@@ -208,8 +201,6 @@ class GraphExtractor {
                   double distance,
                   uint8_t num_basis_points);
 
-  void validate(const GvdLayer& layer) const;
-
   std::optional<uint64_t> findCluster(uint64_t node_id,
                                       const GvdMemberInfo& node,
                                       const std::set<uint64_t>& clusters);
@@ -221,23 +212,23 @@ class GraphExtractor {
  protected:
   NodeSymbol next_node_id_;
   GvdGraph::Ptr gvd_;
-  // just to make book-keeping easier
-  SceneGraphLayer::Ptr graph_;
+
+  std::map<NodeId, std::unique_ptr<PlaceNodeAttributes>> nodes_;
+  EdgeContainer edges_;
 
   NodeIndexMap node_index_map_;
   std::queue<GlobalIndex> modified_voxel_queue_;
 
-  std::map<EdgeKey, bool> heuristic_edges_;
+  std::set<EdgeKey> overlap_edges_;
+  std::set<EdgeKey> freespace_edges_;
   std::unordered_set<NodeId> deleted_nodes_;
-  std::vector<NodeId> deleted_edges_;
+  std::vector<EdgeKey> deleted_edges_;
 
   const double compression_factor_;
   GlobalIndexMap<uint64_t> index_id_map_;
   std::unique_ptr<MergePolicy> merge_policy_;
 
   uint64_t next_id_;
-  std::list<uint64_t> id_queue_;
-
   std::unordered_set<uint64_t> updated_nodes_;
   std::unordered_set<uint64_t> to_archive_;
 

@@ -42,18 +42,20 @@
 
 namespace hydra::places {
 
+using spark_dsg::EdgeAttributes;
+using spark_dsg::EdgeContainer;
+using spark_dsg::EdgeKey;
+using spark_dsg::NodeId;
+using spark_dsg::PlaceNodeAttributes;
+
 using Components = std::vector<std::vector<NodeId>>;
 
 namespace {
 
-inline double getNodeGvdDistance(const SceneGraphLayer& graph, NodeId node) {
-  return graph.getNode(node).attributes<PlaceNodeAttributes>().distance;
-}
-
-void sortComponents(const SceneGraphLayer& graph, Components& to_sort) {
+void sortComponents(const NodeAttrMap& attrs, Components& to_sort) {
   for (auto& c : to_sort) {
     std::sort(c.begin(), c.end(), [&](const NodeId& lhs, const NodeId& rhs) {
-      return getNodeGvdDistance(graph, lhs) > getNodeGvdDistance(graph, rhs);
+      return attrs.at(lhs)->distance > attrs.at(rhs)->distance;
     });
   }
 
@@ -135,7 +137,7 @@ GlobalIndices makeBresenhamLine(const GlobalIndex& start, const GlobalIndex& end
   return line_points;
 }
 
-EdgeAttributes::Ptr getOverlapEdgeInfo(const SceneGraphLayer& graph,
+EdgeAttributes::Ptr getOverlapEdgeInfo(const NodeAttrMap& attrs,
                                        NodeId node,
                                        NodeId neighbor,
                                        double min_clearance) {
@@ -143,11 +145,9 @@ EdgeAttributes::Ptr getOverlapEdgeInfo(const SceneGraphLayer& graph,
     return nullptr;
   }
 
-  const double r1 = getNodeGvdDistance(graph, node);
-  const double r2 = getNodeGvdDistance(graph, neighbor);
-  const double d =
-      (getNodePosition(graph, node) - getNodePosition(graph, neighbor)).norm();
-
+  const auto r1 = attrs.at(node)->distance;
+  const auto r2 = attrs.at(neighbor)->distance;
+  const auto d = (attrs.at(node)->position - attrs.at(neighbor)->position).norm();
   if (d >= r1 + r2) {
     return nullptr;
   }
@@ -175,27 +175,24 @@ EdgeAttributes::Ptr getOverlapEdgeInfo(const SceneGraphLayer& graph,
   return std::make_unique<EdgeAttributes>(clearance);
 }
 
-EdgeAttributes::Ptr getFreespaceEdgeInfo(const SceneGraphLayer& graph,
+EdgeAttributes::Ptr getFreespaceEdgeInfo(const NodeAttrMap& attrs,
                                          const GvdLayer& gvd,
                                          const NodeIndexMap& node_index_map,
                                          NodeId node,
                                          NodeId other,
                                          double min_clearance_m) {
-  const GlobalIndex source = node_index_map.at(node);
-  const GlobalIndex target = node_index_map.at(other);
+  const auto source = node_index_map.at(node);
+  const auto target = node_index_map.at(other);
   const auto path = makeBresenhamLine(source, target);
   if (path.empty()) {
     return nullptr;
   }
 
-  const double source_dist =
-      graph.getNode(node).attributes<PlaceNodeAttributes>().distance;
-  const double target_dist =
-      graph.getNode(other).attributes<PlaceNodeAttributes>().distance;
-  double min_weight = std::min(source_dist, target_dist);
-
+  const auto source_dist = attrs.at(node)->distance;
+  const auto target_dist = attrs.at(other)->distance;
+  auto min_weight = std::min(source_dist, target_dist);
   for (const auto& index : path) {
-    const GvdVoxel* voxel = gvd.getVoxelPtr(index);
+    const auto* voxel = gvd.getVoxelPtr(index);
     if (!voxel || !voxel->observed || voxel->distance <= min_clearance_m) {
       return nullptr;
     }
@@ -209,7 +206,8 @@ EdgeAttributes::Ptr getFreespaceEdgeInfo(const SceneGraphLayer& graph,
 }
 
 void findOverlapEdges(const OverlapEdgeConfig& config,
-                      const SceneGraphLayer& graph,
+                      const NodeAttrMap& attrs,
+                      const EdgeContainer& edges,
                       const std::unordered_set<NodeId> active_nodes,
                       EdgeInfoMap& proposed_edges) {
   NearestNodeFinder node_finder(graph, active_nodes);
@@ -219,12 +217,12 @@ void findOverlapEdges(const OverlapEdgeConfig& config,
                      config.num_neighbors_to_check,
                      true,
                      [&](NodeId other, size_t, double) {
-                       if (graph.hasEdge(node, other)) {
+                       if (edges.contains(node, other)) {
                          return;
                        }
 
-                       auto info = getOverlapEdgeInfo(
-                           graph, node, other, config.min_clearance_m);
+                       const auto thresh = config.min_clearance_m;
+                       auto info = getOverlapEdgeInfo(attrs, node, other, thresh);
                        if (info) {
                          proposed_edges.emplace(EdgeKey(node, other), std::move(info));
                        }
@@ -233,7 +231,8 @@ void findOverlapEdges(const OverlapEdgeConfig& config,
 }
 
 void findFreespaceEdges(const FreespaceEdgeConfig& config,
-                        const SceneGraphLayer& graph,
+                        const AttrMap& nodes,
+                        const EdgeContainer& edges,
                         const GvdLayer& gvd,
                         const std::unordered_set<NodeId>& nodes,
                         const NodeIndexMap& indices,
