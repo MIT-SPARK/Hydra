@@ -41,8 +41,11 @@
 namespace hydra {
 
 using nanoflann::KDTreeSingleIndexAdaptor;
-using nanoflann::KDTreeSingleIndexDynamicAdaptor;
 using nanoflann::L2_Simple_Adaptor;
+using spark_dsg::NodeId;
+using spark_dsg::SceneGraphLayer;
+using spark_dsg::SemanticLabel;
+using spark_dsg::SemanticNodeAttributes;
 
 struct GraphKdTreeAdaptor {
   GraphKdTreeAdaptor(const SceneGraphLayer& layer, const std::vector<NodeId>& nodes)
@@ -51,7 +54,7 @@ struct GraphKdTreeAdaptor {
   inline size_t kdtree_get_point_count() const { return nodes.size(); }
 
   inline double kdtree_get_pt(const size_t idx, const size_t dim) const {
-    return getNodePosition(layer, nodes[idx])(dim);
+    return layer.getNode(nodes[idx]).attributes().position(dim);
   }
 
   template <class T>
