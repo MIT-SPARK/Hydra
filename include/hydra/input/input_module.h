@@ -65,10 +65,6 @@ class InputModule : public Module {
     };
     std::map<std::string, InputPair> inputs;
     size_t max_receiver_queue_size = 0;
-
-    // If true, fix all incoming input poses to have z=0. This is useful for 2D SLAM
-    // with a known flat ground plane.
-    bool fix_z_coordinate = false;
   } const config;
 
   InputModule(const Config& config, const OutputQueue::Ptr& output_queue);
