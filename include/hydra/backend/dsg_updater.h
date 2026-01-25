@@ -56,7 +56,7 @@ class DsgUpdater {
                           const kimera_pgmo::DeformationGraph&>;
   using NodeToRobotMap = std::unordered_map<NodeId, size_t>;
 
-  struct Config : VerbosityConfig {
+  struct Config : public VerbosityConfig {
     using FunctorConfig = config::VirtualConfig<UpdateFunctor, true>;
 
     Config();

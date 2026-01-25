@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <config_utilities/factory.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <spark_dsg/dynamic_scene_graph.h>
 
@@ -113,12 +112,6 @@ class HeightTraversabilityEstimator : public TraversabilityEstimator {
 
   // Helper functions.
   BlockIndexSet get2DBlockIndices(const BlockIndices& blocks) const;
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<TraversabilityEstimator,
-                                     HeightTraversabilityEstimator,
-                                     Config>("HeightTraversabilityEstimator");
 };
 
 void declare_config(HeightTraversabilityEstimator::Config& config);

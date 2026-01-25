@@ -36,6 +36,8 @@
 
 #include <spark_dsg/node_attributes.h>
 
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "hydra/reconstruction/voxel_types.h"
@@ -56,7 +58,7 @@ struct TraversabilityVoxel {
 
   //! @brief Arbitrary debug value that can be set for viualization.
   // TODO(lschmid): Remove this at some point.
-  mutable float debug_value = 0.0f;
+  mutable float debug_value = -1.0f;
 
   bool operator==(const TraversabilityVoxel& other) const {
     return traversability == other.traversability && confidence == other.confidence &&
@@ -170,8 +172,8 @@ struct Layer2D : public spatial_hash::BlockLayer<Block2D<VoxelT>> {
 
   // Indexing.
   BlockIndex blockIndexFromGlobal(const BlockIndex& global_index) const {
-    return BlockIndex(global_index.x() / static_cast<int>(voxels_per_side),
-                      global_index.y() / static_cast<int>(voxels_per_side),
+    return BlockIndex(global_index.x() / voxels_per_side,
+                      global_index.y() / voxels_per_side,
                       global_index.z());
   }
   Index2D voxelIndexFromGlobal(const BlockIndex& global_index) const {
@@ -179,25 +181,21 @@ struct Layer2D : public spatial_hash::BlockLayer<Block2D<VoxelT>> {
                    global_index.y() % voxels_per_side);
   }
   BlockIndex globalIndexFromPoint(const Eigen::Vector3f& position) const {
-    return {static_cast<int>(position.x() / voxel_size),
-            static_cast<int>(position.y() / voxel_size),
-            static_cast<int>(position.z() / voxel_size)};
+    return BlockIndex(std::floor(position.x() / static_cast<float>(voxel_size)),
+                      std::floor(position.y() / static_cast<float>(voxel_size)),
+                      std::floor(position.z() / static_cast<float>(voxel_size)));
   }
 
   // Accessors.
   VoxelT* voxel(const BlockIndex& global_index) {
-    auto block = getBlockPtr(blockIndexFromGlobal(global_index));
+    auto block = this->getBlockPtr(blockIndexFromGlobal(global_index));
     if (!block) {
       return nullptr;
     }
     return &block->voxel(voxelIndexFromGlobal(global_index));
   }
   const VoxelT* voxel(const BlockIndex& global_index) const {
-    auto block = getBlockPtr(blockIndexFromGlobal(global_index));
-    if (!block) {
-      return nullptr;
-    }
-    return &block->voxel(voxelIndexFromGlobal(global_index));
+    return const_cast<Layer2D*>(this)->voxel(global_index);
   }
 
   // Data.

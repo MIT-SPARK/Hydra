@@ -16,19 +16,6 @@ frontend:
     time_horizon: 15.0
     d_graph_resolution: 2.5
     mesh_resolution: 0.005
-  objects:
-    min_cluster_size: 40
-    cluster_tolerance: 0.25
-  surface_places:
-    type: place_2d
-    prefix: P
-    pure_final_place_size: 1
-    cluster_tolerance: .3
-    min_cluster_size: 50
-    max_cluster_size: 100000
-    min_final_place_points: 10
-    place_max_neighbor_z_diff: .5
-    place_overlap_threshold: 0.0
   traversability_places:
     type: traversability
     estimator:
@@ -39,49 +26,11 @@ frontend:
       min_traversability: 1.0
       pessimistic: true
     clustering:
-      type: BlockTraversabilityClustering
-      min_place_width: &min_place_width 0.5 # m
-      max_place_width: &max_place_width 1.0 # m
-      recursive: true
-      simplify_boundary_traversability: false
+      type: RegionGrowingTraversabilityClustering
+      max_radius: 4.0
+      num_orientation_bins: 20
     sinks:
       - type: TraversabilityVisualizer
-  freespace_places:
-    type: gvd
-    filter_places: true
-    min_places_component_size: 3
-    filter_ground: false
-    gvd:
-      max_distance_m: 4.5
-      min_distance_m: 0.2
-      min_diff_m: 0.1
-      voronoi_config:
-        mode: L1_THEN_ANGLE
-        min_distance_m: 0.30
-        parent_l1_separation: 20
-        parent_cos_angle_separation: 0.2
-    graph:
-      type: CompressionGraphExtractor
-      compression_distance_m: 1.5
-      min_node_distance_m: 0.4
-      min_edge_distance_m: 0.25
-      node_merge_distance_m: 0.7
-      merge_policy: distance
-    tsdf_interpolator:
-      type: downsample
-      ratio: 2
-  frontier_places:
-    # type: voxel_clustering
-    cluster_tolerance: 0.3
-    min_cluster_size: 10
-    max_cluster_size: 100000
-    max_place_radius: 5
-    dense_frontiers: false
-    frontier_splitting_threshold: 0.2
-    point_threshold: 10
-    recent_block_distance: 25
-    minimum_relative_z: -1.
-    maximum_relative_z: 1
 backend:
   add_places_to_deformation_graph: true
   optimize_on_lc: true
@@ -89,20 +38,8 @@ backend:
   update_functors:
     agents:
       type: UpdateAgentsFunctor
-    objects:
-      type: UpdateObjectsFunctor
-    surface_places:
-      type: Update2dPlacesFunctor
-    places:
-      type: UpdatePlacesFunctor
     traversability:
-      type: UpdateBlockTraversabilityFunctor
-      min_place_size: *min_place_width # m
-      max_place_size: *max_place_width # m
-      use_metric_distance: false
-      tolerance: 0.1 # m
-    frontiers:
-      type: UpdateFrontiersFunctor
+      type: UpdateRegionGrowingTraversabilityFunctor
     rooms:
       type: UpdateRoomsFunctor
       room_finder:

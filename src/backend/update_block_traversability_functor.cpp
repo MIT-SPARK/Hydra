@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/backend/update_traversability_functor.h"
+#include "hydra/backend/update_block_traversability_functor.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
@@ -50,9 +50,9 @@ namespace hydra {
 using Timer = timing::ScopedTimer;
 using spark_dsg::TraversabilityNodeAttributes;
 
-void declare_config(UpdateTraversabilityFunctor::Config& config) {
+void declare_config(UpdateBlockTraversabilityFunctor::Config& config) {
   using namespace config;
-  name("UpdateTraversabilityFunctor::Config");
+  name("UpdateBlockTraversabilityFunctor::Config");
   field(config.layer, "layer");
   field(config.min_place_size, "min_place_size", "m");
   field(config.max_place_size, "max_place_size", "m");
@@ -67,17 +67,17 @@ void declare_config(UpdateTraversabilityFunctor::Config& config) {
 
 static const auto registration =
     config::RegistrationWithConfig<UpdateFunctor,
-                                   UpdateTraversabilityFunctor,
-                                   UpdateTraversabilityFunctor::Config>(
-        "UpdateTraversabilityFunctor");
+                                   UpdateBlockTraversabilityFunctor,
+                                   UpdateBlockTraversabilityFunctor::Config>(
+        "UpdateBlockTraversabilityFunctor");
 
-UpdateTraversabilityFunctor::UpdateTraversabilityFunctor(const Config& config)
+UpdateBlockTraversabilityFunctor::UpdateBlockTraversabilityFunctor(const Config& config)
     : config(config::checkValid(config)),
       radius_(2 * config.max_place_size),
       min_connectivity_(config.min_place_size - config.tolerance),
       deformation_interpolator_(config.deformation) {}
 
-UpdateFunctor::Hooks UpdateTraversabilityFunctor::hooks() const {
+UpdateFunctor::Hooks UpdateBlockTraversabilityFunctor::hooks() const {
   auto my_hooks = UpdateFunctor::hooks();
   my_hooks.find_merges = [this](const DynamicSceneGraph& dsg,
                                 const UpdateInfo::ConstPtr& info) {
@@ -87,13 +87,15 @@ UpdateFunctor::Hooks UpdateTraversabilityFunctor::hooks() const {
                           const std::vector<NodeId>& merge_ids) {
     return mergeNodes(dsg, merge_ids);
   };
-  my_hooks.cleanup = [this](const auto& info, auto&, auto dsg) { cleanup(info, dsg); };
+  my_hooks.cleanup = [this](const UpdateInfo::ConstPtr& info,
+                            DynamicSceneGraph&,
+                            SharedDsgInfo* dsg) { cleanup(info, dsg); };
   return my_hooks;
 }
 
-void UpdateTraversabilityFunctor::call(const DynamicSceneGraph& unmerged,
-                                       SharedDsgInfo& dsg,
-                                       const UpdateInfo::ConstPtr& info) const {
+void UpdateBlockTraversabilityFunctor::call(const DynamicSceneGraph& unmerged,
+                                            SharedDsgInfo& dsg,
+                                            const UpdateInfo::ConstPtr& info) const {
   Timer timer("backend/update_traversability", info->timestamp_ns);
   if (!unmerged.hasLayer(config.layer)) {
     return;
@@ -112,7 +114,7 @@ void UpdateTraversabilityFunctor::call(const DynamicSceneGraph& unmerged,
   previous_active_edges_ = std::move(active_edges);
 }
 
-void UpdateTraversabilityFunctor::updateDeformation(
+void UpdateBlockTraversabilityFunctor::updateDeformation(
     const DynamicSceneGraph& unmerged,
     SharedDsgInfo& dsg,
     const UpdateInfo::ConstPtr& info) const {
@@ -123,8 +125,8 @@ void UpdateTraversabilityFunctor::updateDeformation(
   deformation_interpolator_.interpolateNodePositions(unmerged, *dsg.graph, info, view);
 }
 
-UpdateTraversabilityFunctor::EdgeSet UpdateTraversabilityFunctor::findActiveWindowEdges(
-    DynamicSceneGraph& dsg) const {
+UpdateBlockTraversabilityFunctor::EdgeSet
+UpdateBlockTraversabilityFunctor::findActiveWindowEdges(DynamicSceneGraph& dsg) const {
   if (!nn_) {
     return {};
   }
@@ -146,7 +148,7 @@ UpdateTraversabilityFunctor::EdgeSet UpdateTraversabilityFunctor::findActiveWind
   return active_edges;
 }
 
-void UpdateTraversabilityFunctor::pruneActiveWindowEdges(
+void UpdateBlockTraversabilityFunctor::pruneActiveWindowEdges(
     DynamicSceneGraph& dsg, const EdgeSet& active_edges) const {
   for (const auto& edge_key : previous_active_edges_) {
     if (active_edges.count(edge_key) || !dsg.hasEdge(edge_key.k1, edge_key.k2)) {
@@ -163,7 +165,8 @@ void UpdateTraversabilityFunctor::pruneActiveWindowEdges(
   }
 }
 
-void UpdateTraversabilityFunctor::updateDistances(const SceneGraphLayer& layer) const {
+void UpdateBlockTraversabilityFunctor::updateDistances(
+    const SceneGraphLayer& layer) const {
   // Simple initial solution: Recompute distances for all places. This is not pretty but
   // should be ok for a first test.
   if (config.use_metric_distance) {
@@ -178,7 +181,7 @@ void UpdateTraversabilityFunctor::updateDistances(const SceneGraphLayer& layer) 
   }
 }
 
-MergeList UpdateTraversabilityFunctor::findNodeMerges(
+MergeList UpdateBlockTraversabilityFunctor::findNodeMerges(
     const DynamicSceneGraph& dsg, const UpdateInfo::ConstPtr& info) const {
   // Iteratively match all newly archived nodes against inactive candidate nodes.
   resetNeighborFinder(dsg);
@@ -267,7 +270,7 @@ MergeList UpdateTraversabilityFunctor::findNodeMerges(
   return result;
 }
 
-NodeAttributes::Ptr UpdateTraversabilityFunctor::mergeNodes(
+NodeAttributes::Ptr UpdateBlockTraversabilityFunctor::mergeNodes(
     const DynamicSceneGraph& dsg, const std::vector<NodeId>& merge_ids) const {
   auto result = dsg.getNode(merge_ids.front()).attributes().clone();
   auto& to_attrs = dynamic_cast<TraversabilityNodeAttributes&>(*result);
@@ -324,8 +327,8 @@ NodeAttributes::Ptr UpdateTraversabilityFunctor::mergeNodes(
   return result;
 }
 
-void UpdateTraversabilityFunctor::cleanup(const UpdateInfo::ConstPtr&,
-                                          SharedDsgInfo* dsg) const {
+void UpdateBlockTraversabilityFunctor::cleanup(const UpdateInfo::ConstPtr&,
+                                               SharedDsgInfo* dsg) const {
   if (!dsg || !dsg->graph->hasLayer(config.layer)) {
     return;
   }
@@ -352,7 +355,7 @@ void UpdateTraversabilityFunctor::cleanup(const UpdateInfo::ConstPtr&,
   updateDistances(dsg->graph->getLayer(config.layer));
 }
 
-std::vector<NodeId> UpdateTraversabilityFunctor::findConnections(
+std::vector<NodeId> UpdateBlockTraversabilityFunctor::findConnections(
     const DynamicSceneGraph& dsg,
     const TraversabilityNodeAttributes& from_attrs) const {
   if (!nn_) {
@@ -370,7 +373,7 @@ std::vector<NodeId> UpdateTraversabilityFunctor::findConnections(
   return connections;
 }
 
-bool UpdateTraversabilityFunctor::hasTraversableOverlap(
+bool UpdateBlockTraversabilityFunctor::hasTraversableOverlap(
     const TraversabilityNodeAttributes& from,
     const TraversabilityNodeAttributes& to) const {
   // Simple first implementation: Check the intersecting area meets the minimum place
@@ -383,18 +386,19 @@ bool UpdateTraversabilityFunctor::hasTraversableOverlap(
           intersection.height() >= min_connectivity_);
 }
 
-bool UpdateTraversabilityFunctor::isContained(const Boundary& from,
-                                              const Boundary& in) const {
+bool UpdateBlockTraversabilityFunctor::isContained(const Boundary& from,
+                                                   const Boundary& in) const {
   return (from.min.x() >= in.min.x() - config.tolerance &&
           from.max.x() <= in.max.x() + config.tolerance &&
           from.min.y() >= in.min.y() - config.tolerance &&
           from.max.y() <= in.max.y() + config.tolerance);
 }
 
-double UpdateTraversabilityFunctor::computeMetricDistance(const SceneGraphLayer& layer,
-                                                          const Eigen::Vector2d& point,
-                                                          const NodeSet& to_visit,
-                                                          NodeSet& visited) const {
+double UpdateBlockTraversabilityFunctor::computeMetricDistance(
+    const SceneGraphLayer& layer,
+    const Eigen::Vector2d& point,
+    const NodeSet& to_visit,
+    NodeSet& visited) const {
   double min_distance = std::numeric_limits<double>::max();
   NodeSet neighbors;
   for (const auto& node_id : to_visit) {
@@ -417,7 +421,7 @@ double UpdateTraversabilityFunctor::computeMetricDistance(const SceneGraphLayer&
   return computeMetricDistance(layer, point, neighbors, visited);
 }
 
-double UpdateTraversabilityFunctor::distanceToIntraversable(
+double UpdateBlockTraversabilityFunctor::distanceToIntraversable(
     const TraversabilityNodeAttributes& attrs, const Eigen::Vector2d& point) const {
   double min_distance = std::numeric_limits<double>::max();
   const Boundary boundary(attrs);
@@ -430,7 +434,7 @@ double UpdateTraversabilityFunctor::distanceToIntraversable(
   return min_distance;
 }
 
-void UpdateTraversabilityFunctor::computeTopologicalDistances(
+void UpdateBlockTraversabilityFunctor::computeTopologicalDistances(
     const SceneGraphLayer& layer) const {
   std::queue<NodeId> queue;
 
@@ -481,7 +485,7 @@ void UpdateTraversabilityFunctor::computeTopologicalDistances(
   }
 }
 
-void UpdateTraversabilityFunctor::resetNeighborFinder(
+void UpdateBlockTraversabilityFunctor::resetNeighborFinder(
     const DynamicSceneGraph& dsg) const {
   nn_ = NearestNodeFinder::fromLayer(
       dsg.getLayer(config.layer),
