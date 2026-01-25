@@ -229,10 +229,6 @@ MergeList UpdateRegionGrowingTraversabilityFunctor::findNodeMerges(
     // both are included, keep the larger one.
     const bool from_included = from_attrs.contains(to_attrs.position);
     const bool to_included = to_attrs.contains(from_attrs.position);
-    LOG(INFO) << "Candidate merge: " << NodeSymbol(edge_key.k1) << " -> "
-              << NodeSymbol(edge_key.k2) << " | from_included: " << from_included
-              << " | to_included: " << to_included;
-
     if (!to_included && !from_included) {
       continue;
     }
