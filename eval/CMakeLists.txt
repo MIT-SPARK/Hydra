@@ -33,10 +33,14 @@ target_link_libraries(merge_graphs ${PROJECT_NAME}_eval)
 add_executable(optimize_graph tools/optimize_graph.cpp)
 target_link_libraries(optimize_graph ${PROJECT_NAME}_eval)
 
+add_executable(object_reconciliation tools/object_reconciliation.cpp)
+target_link_libraries(object_reconciliation ${PROJECT_NAME}_eval)
+
 if(${HYDRA_ENABLE_ROS_INSTALL_LAYOUT})
   install(
     TARGETS ${PROJECT_NAME}_eval compress_graph compute_filtrations evaluate_places
             evaluate_rooms gt_trajectory_optimizer merge_graphs optimize_graph
+            object_reconciliation
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME}
