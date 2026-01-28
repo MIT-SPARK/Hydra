@@ -1,7 +1,7 @@
 ---
 # based on https://github.com/actions/starter-workflows/blob/main/ci/cmake-single-platform.yml
 name: Hydra Build and Test
-on: {push: {branches: [main, develop]}, pull_request: {}}
+on: {push: {branches: [main, develop]}, pull_request: {branches: [main, develop]}}
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -27,7 +27,7 @@ jobs:
       - name: Dependencies
         run: |
           apt update && apt install -y python3-vcstool git ccache
-          vcs import src < src/hydra/install/packages.yaml
+          vcs import src < src/hydra/install/ci/${{ github.base_ref || github.ref_name }}.yaml
           rosdep update --rosdistro jazzy && rosdep install --rosdistro jazzy --from-paths src --ignore-src -r -y
       - name: Build
         shell: bash

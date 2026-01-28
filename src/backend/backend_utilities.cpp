@@ -35,14 +35,12 @@
 #include "hydra/backend/backend_utilities.h"
 
 #include <glog/logging.h>
+#include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
-
-#include "hydra/frontend/place_2d_split_logic.h"
 
 namespace hydra::utils {
 
 using spark_dsg::AgentNodeAttributes;
-using spark_dsg::DsgLayers;
 using spark_dsg::DynamicSceneGraph;
 using spark_dsg::NodeSymbol;
 
@@ -54,22 +52,6 @@ std::optional<uint64_t> getTimeNs(const DynamicSceneGraph& graph, gtsam::Symbol 
   }
 
   return graph.getNode(node).attributes<AgentNodeAttributes>().timestamp.count();
-}
-
-void updatePlaces2d(SharedDsgInfo::Ptr dsg,
-                    const kimera_pgmo::MeshOffsetInfo& offsets) {
-  if (!dsg->graph->hasLayer(DsgLayers::MESH_PLACES)) {
-    return;
-  }
-
-  for (auto& [node_id, node] : dsg->graph->getLayer(DsgLayers::MESH_PLACES).nodes()) {
-    auto attrs = node->tryAttributes<spark_dsg::Place2dNodeAttributes>();
-    if (!attrs || !attrs->has_active_mesh_indices) {
-      continue;
-    }
-
-    remapPlace2dMesh(*attrs, offsets);
-  }
 }
 
 }  // namespace hydra::utils

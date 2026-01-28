@@ -426,9 +426,9 @@ void BackendModule::copyMeshDelta(const BackendInput& input) {
     kimera_pgmo::StampedCloud<pcl::PointXYZ> cloud_out{*original_vertices_,
                                                        *vertex_stamps_};
     input.mesh_update->updateVertices(cloud_out);
-    utils::updatePlaces2d(private_dsg_, mesh_offsets_);
   }  // mesh critical section
 
+  dsg_updater_->handleMeshUpdate(input.timestamp_ns, mesh_offsets_);
   have_new_mesh_ = true;
 }
 

@@ -84,9 +84,12 @@ class DsgUpdater {
 
   void save(const DataDirectory& output, const std::string& label) const;
 
-  void resetBackendDsg(size_t timestamp_ns);
+  void resetBackendDsg(uint64_t timestamp_ns);
 
-  void callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr info);
+  void handleMeshUpdate(uint64_t timestamp_ns,
+                        const kimera_pgmo::MeshOffsetInfo& offsets);
+
+  void callUpdateFunctions(uint64_t timestamp_ns, UpdateInfo::ConstPtr info);
 
  private:
   GroupedMergeTracker merge_tracker;

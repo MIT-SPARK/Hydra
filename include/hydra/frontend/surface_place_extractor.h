@@ -33,11 +33,13 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/common/dsg_types.h"
+#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/node_symbol.h>
+
+#include "hydra/active_window/active_window_output.h"
 #include "hydra/common/output_sink.h"
 #include "hydra/frontend/mesh_delta_clustering.h"
-#include "hydra/frontend/place_2d_split_logic.h"
-#include "hydra/frontend/surface_places_interface.h"
+#include "hydra/utils/logging.h"
 
 namespace kimera_pgmo {
 class MeshDelta;
@@ -48,18 +50,16 @@ namespace hydra {
 
 using clustering::LabelIndices;
 
-class Place2dSegmenter : public SurfacePlacesInterface {
+class SurfacePlaceExtractor {
  public:
-  using Places = std::vector<Place2d>;
-  using LabelPlaces = std::map<uint32_t, Places>;
-  using LabelToNodes = std::map<uint32_t, std::set<NodeId>>;
   using Sink = OutputSink<uint64_t,
                           const kimera_pgmo::MeshDelta&,
-                          const kimera_pgmo::MeshOffsetInfo&,
-                          const LabelPlaces&>;
+                          const kimera_pgmo::MeshOffsetInfo&>;
 
-  struct Config {
-    std::string layer = DsgLayers::MESH_PLACES;
+  struct Config : VerbosityConfig {
+    Config();
+
+    std::string layer = spark_dsg::DsgLayers::MESH_PLACES;
     char prefix = 'Q';
     clustering::ClusteringConfig clustering{1.0, 600, 100000};
     double pure_final_place_size = 3;
@@ -67,42 +67,27 @@ class Place2dSegmenter : public SurfacePlacesInterface {
     double place_overlap_threshold = 0.1;
     double place_max_neighbor_z_diff = 0.5;
     double connection_ellipse_scale_factor = 1;
-    std::set<uint32_t> labels;
     std::vector<Sink::Factory> sinks;
   } const config;
 
-  explicit Place2dSegmenter(const Config& config);
+  SurfacePlaceExtractor(const Config& config, const std::set<uint32_t>& labels);
 
   void detect(const ActiveWindowOutput& msg,
               const kimera_pgmo::MeshDelta& mesh_delta,
-              const kimera_pgmo::MeshOffsetInfo& offsets,
-              const DynamicSceneGraph& graph) override;
-
-  NodeIdSet getActiveNodes() const override;
+              const kimera_pgmo::MeshOffsetInfo& offsets);
 
   void updateGraph(const ActiveWindowOutput& msg,
                    const kimera_pgmo::MeshOffsetInfo& offsets,
-                   DynamicSceneGraph& graph) override;
+                   spark_dsg::DynamicSceneGraph& graph);
 
  private:
-  NodeSymbol addPlaceToGraph(DynamicSceneGraph& graph,
-                             const Place2d& place,
-                             uint32_t label,
-                             uint64_t timestamp);
-
- private:
-  LabelPlaces label_places_;
-  std::list<NodeId> to_remove_;
-
-  NodeSymbol next_node_id_;
-
-  LabelToNodes active_places_;
-  LabelToNodes semiactive_places_;
-  std::map<NodeId, uint64_t> active_place_timestamps_;
-
   Sink::List sinks_;
+  std::set<uint32_t> labels_;
+  spark_dsg::NodeSymbol next_node_id_;
+  std::list<spark_dsg::NodeId> to_remove_;
+  std::map<spark_dsg::NodeId, spark_dsg::Place2dNodeAttributes> active_places_;
 };
 
-void declare_config(Place2dSegmenter::Config& config);
+void declare_config(SurfacePlaceExtractor::Config& config);
 
 }  // namespace hydra

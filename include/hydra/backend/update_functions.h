@@ -65,17 +65,20 @@ struct UpdateInfo {
   kimera_pgmo::MeshOffsetInfo mesh_offsets = {};
 };
 
-using LayerCleanupFunc = std::function<void(
-    const UpdateInfo::ConstPtr&, DynamicSceneGraph&, SharedDsgInfo*)>;
-using FindMergeFunc =
-    std::function<MergeList(const DynamicSceneGraph&, const UpdateInfo::ConstPtr&)>;
-using MergeFunc = std::function<NodeAttributes::Ptr(const DynamicSceneGraph&,
-                                                    const std::vector<NodeId>&)>;
-
 struct UpdateFunctor {
   using Ptr = std::shared_ptr<UpdateFunctor>;
   struct Hooks {
-    LayerCleanupFunc cleanup;
+    using CleanupFunc = std::function<void(
+        const UpdateInfo::ConstPtr&, DynamicSceneGraph&, SharedDsgInfo*)>;
+    using FindMergeFunc =
+        std::function<MergeList(const DynamicSceneGraph&, const UpdateInfo::ConstPtr&)>;
+    using MergeFunc = std::function<NodeAttributes::Ptr(const DynamicSceneGraph&,
+                                                        const std::vector<NodeId>&)>;
+    using MeshUpdateFunc = std::function<void(const DynamicSceneGraph&,
+                                              const kimera_pgmo::MeshOffsetInfo&)>;
+
+    MeshUpdateFunc mesh_update;
+    CleanupFunc cleanup;
     FindMergeFunc find_merges;
     MergeFunc merge;
   };

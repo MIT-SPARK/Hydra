@@ -117,7 +117,8 @@ GraphBuilder::GraphBuilder(const Config& config,
       graph_connector_(config.graph_connector),
       map_window_(GlobalInfo::instance().createVolumetricWindow()),
       tracker_(config.pose_graph_tracker.create()),
-      surface_places_(config.surface_places.create()),
+      surface_places_(config.surface_places.create(
+          GlobalInfo::instance().getLabelSpaceConfig().surface_places_labels)),
       traversability_places_(config.traversability_places.create()),
       freespace_places_(config.freespace_places.create()),
       frontier_places_(config.frontier_places.create()),
@@ -559,7 +560,7 @@ void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
   }
 
   ScopedTimer timer("frontend/places_2d", input.timestamp_ns, true, 1, false);
-  surface_places_->detect(input, *last_mesh_update_, mesh_offsets_, *dsg_->graph);
+  surface_places_->detect(input, *last_mesh_update_, mesh_offsets_);
 
   // start graph critical section
   std::unique_lock<std::mutex> graph_lock(dsg_->mutex);

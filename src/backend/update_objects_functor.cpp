@@ -44,12 +44,23 @@
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
 
+static const auto reg = config::RegistrationWithConfig<UpdateFunctor,
+                                                       UpdateObjectsFunctor,
+                                                       UpdateObjectsFunctor::Config>(
+    "UpdateObjectsFunctor");
+
+}
+
+using kimera_pgmo::MeshOffsetInfo;
 using timing::ScopedTimer;
+
 using SemanticLabel = SemanticNodeAttributes::Label;
 using MergeId = std::optional<NodeId>;
 
-NodeAttributes::Ptr mergeObjectAttributes(const DynamicSceneGraph& graph,
+NodeAttributes::Ptr mergeObjectAttributes(const VerbosityConfig& config,
+                                          const DynamicSceneGraph& graph,
                                           const std::vector<NodeId>& nodes) {
   if (nodes.empty()) {
     return nullptr;
@@ -67,13 +78,13 @@ NodeAttributes::Ptr mergeObjectAttributes(const DynamicSceneGraph& graph,
   }
 
   if (new_attrs.mesh_connections.empty()) {
-    VLOG(2) << "Merge is empty: " << displayNodeSymbolContainer(nodes);
+    MLOG(1) << "merge is empty: " << displayNodeSymbolContainer(nodes);
     return attrs_ptr;
   }
 
   auto mesh = graph.mesh();
   if (!updateObjectGeometry(*mesh, new_attrs)) {
-    VLOG(2) << "Merge geometry invalid: " << displayNodeSymbolContainer(nodes);
+    MLOG(1) << "merge geometry invalid: " << displayNodeSymbolContainer(nodes);
   }
 
   return attrs_ptr;
@@ -82,6 +93,7 @@ NodeAttributes::Ptr mergeObjectAttributes(const DynamicSceneGraph& graph,
 void declare_config(UpdateObjectsFunctor::Config& config) {
   using namespace config;
   name("UpdateObjectsFunctor::Config");
+  base<VerbosityConfig>(config);
   field(config.allow_connection_merging, "allow_connection_merging");
   field(config.merge_proposer, "merge_proposer");
 }
@@ -96,7 +108,15 @@ UpdateFunctor::Hooks UpdateObjectsFunctor::hooks() const {
   };
 
   if (config.allow_connection_merging) {
-    my_hooks.merge = &mergeObjectAttributes;
+    my_hooks.merge = [this](const auto& graph, const auto& nodes) {
+      merged_nodes_.insert(nodes.begin(), nodes.end());
+      return mergeObjectAttributes(config, graph, nodes);
+    };
+
+    // merging indices means that we have archived objects with active vertices
+    my_hooks.mesh_update = [this](const auto& graph, const auto& offsets) {
+      updateMeshIndices(graph, offsets);
+    };
   }
 
   return my_hooks;
@@ -107,7 +127,7 @@ void UpdateObjectsFunctor::call(const DynamicSceneGraph& unmerged,
                                 const UpdateInfo::ConstPtr& info) const {
   ScopedTimer spin_timer("backend/update_objects", info->timestamp_ns);
   if (!unmerged.hasLayer(DsgLayers::OBJECTS)) {
-    VLOG(5) << "Skipping object update due to missing layer";
+    MLOG(2) << "skipping object update due to missing layer";
     return;
   }
 
@@ -129,23 +149,23 @@ void UpdateObjectsFunctor::call(const DynamicSceneGraph& unmerged,
       continue;  // not an object
     }
 
-    VLOG(10) << "Processing object " << NodeSymbol(node.id).str()
-             << " with attributes:\n"
-             << *attrs;
+    MLOG(5) << "processing object " << NodeSymbol(node.id).str()
+            << " with attributes:\n"
+            << *attrs;
     if (attrs->mesh_connections.empty()) {
-      VLOG(2) << "Found empty object node " << NodeSymbol(node.id).str();
+      MLOG(2) << "found empty object node " << NodeSymbol(node.id).str();
       continue;
     }
 
     if (!updateObjectGeometry(*mesh, *attrs)) {
-      VLOG(2) << "Invalid centroid for object " << NodeSymbol(node.id).str();
+      MLOG(2) << "invalid centroid for object " << NodeSymbol(node.id).str();
     }
 
     // TODO(nathan) this is sloppy and needs to be cleaned up
     dsg.graph->setNodeAttributes(node.id, attrs->clone());
   }
 
-  VLOG(2) << "[Hydra Backend] Object update: " << num_changed << " node(s)";
+  MLOG(1) << "object update: " << num_changed << " node(s)";
 }
 
 MergeList UpdateObjectsFunctor::findMerges(const DynamicSceneGraph& graph,
@@ -175,6 +195,40 @@ MergeList UpdateObjectsFunctor::findMerges(const DynamicSceneGraph& graph,
       },
       proposals);
   return proposals;
+}
+
+void UpdateObjectsFunctor::updateMeshIndices(const DynamicSceneGraph& graph,
+                                             const MeshOffsetInfo& offsets) const {
+  const auto objects = graph.findLayer(config.layer);
+  if (!objects) {
+    return;
+  }
+
+  MLOG(2) << "remapping indices for " << merged_nodes_.size() << " merged node(s)";
+  auto iter = merged_nodes_.begin();
+  while (iter != merged_nodes_.end()) {
+    auto node = objects->findNode(*iter);
+    if (!node) {
+      iter = merged_nodes_.erase(iter);
+      continue;
+    }
+
+    auto attrs = node->tryAttributes<ObjectNodeAttributes>();
+    if (!attrs) {
+      iter = merged_nodes_.erase(iter);
+      continue;
+    }
+
+    kimera_pgmo::MeshOffsetInfo::RemapStats stats;
+    offsets.remapVertexIndices(attrs->mesh_connections, &stats);
+    if (stats.all_archived) {
+      iter = merged_nodes_.erase(iter);
+    } else {
+      ++iter;
+    }
+  }
+
+  MLOG(2) << merged_nodes_.size() << " merged node(s)";
 }
 
 }  // namespace hydra

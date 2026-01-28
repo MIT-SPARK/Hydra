@@ -38,13 +38,17 @@
 #include "hydra/backend/association_strategies.h"
 #include "hydra/backend/update_functions.h"
 #include "hydra/utils/active_window_tracker.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
 struct Update2dPlacesFunctor : public UpdateFunctor {
-  struct Config {
+  struct Config : VerbosityConfig {
     using AssociationConfig = config::VirtualConfig<AssociationStrategy>;
     using SemanticAssociation = association::SemanticNearestNode::Config;
+
+    Config() : VerbosityConfig("[update_2d_places] ") {}
+
     //! Layer to update
     std::string layer = DsgLayers::MESH_PLACES;
     //! If two places differ by at least this much in z, they won't be merged
@@ -60,27 +64,27 @@ struct Update2dPlacesFunctor : public UpdateFunctor {
   } const config;
 
   explicit Update2dPlacesFunctor(const Config& config);
+
   Hooks hooks() const override;
+
   void call(const DynamicSceneGraph& unmerged,
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
+
   MergeList findMerges(const DynamicSceneGraph& graph,
                        const UpdateInfo::ConstPtr& info) const;
-
-  void updateNode(const spark_dsg::Mesh::Ptr& mesh,
-                  NodeId node,
-                  Place2dNodeAttributes& attrs) const;
 
   bool shouldMerge(const Place2dNodeAttributes& from_attrs,
                    const Place2dNodeAttributes& to_attrs) const;
 
   void cleanup(SharedDsgInfo& dsg) const;
 
+  void updateMeshIndices(const DynamicSceneGraph& graph,
+                         const kimera_pgmo::MeshOffsetInfo& offsets) const;
+
   mutable ActiveWindowTracker active_tracker;
   const MergeProposer merge_proposer;
-
- private:
-  mutable NodeSymbol next_node_id_ = NodeSymbol('S', 0);
+  mutable std::set<spark_dsg::NodeId> cleanup_nodes;
 };
 
 void declare_config(Update2dPlacesFunctor::Config& conf);

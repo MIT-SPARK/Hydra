@@ -33,55 +33,22 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <glog/logging.h>
 
-#include "hydra/common/dsg_types.h"
-#include "hydra/frontend/place_2d_split_logic.h"
+#include <spark_dsg/mesh.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph_layer.h>
+
+#include <set>
 
 namespace hydra::utils {
 
-void getPlace2dAndNeighors(const SceneGraphLayer& places_layer,
-                           std::vector<std::pair<NodeId, Place2d>>& place_2ds,
-                           std::map<NodeId, std::set<NodeId>>& node_neighbors);
+void reallocateMeshPoints(const spark_dsg::Mesh& mesh,
+                          spark_dsg::Place2dNodeAttributes& attrs1,
+                          spark_dsg::Place2dNodeAttributes& attrs2);
 
-void computeAttributeUpdates(const spark_dsg::Mesh& mesh,
-                             const double connection_ellipse_scale_factor,
-                             std::vector<std::pair<NodeId, Place2d>>& place_2ds,
-                             std::vector<std::pair<NodeId, Place2d>>& nodes_to_update);
-
-void getNecessaryUpdates(
-    const spark_dsg::Mesh& mesh,
-    size_t min_points,
-    double min_size,
-    double connection_ellipse_scale_factor,
-    std::vector<std::pair<NodeId, Place2d>>& place_2ds,
-    std::vector<std::pair<NodeId, Place2d>>& nodes_to_update,
-    std::vector<std::pair<NodeId, std::vector<Place2d>>>& nodes_to_add);
-
-std::map<std::tuple<size_t, size_t, size_t, size_t>, double> buildEdgeMap(
-    const std::vector<std::pair<NodeId, std::vector<Place2d>>>& nodes_to_add,
-    double place_overlap_threshold,
-    double place_neighbor_z_diff);
-
-void updateExistingNodes(const std::vector<std::pair<NodeId, Place2d>>& nodes_to_update,
-                         DynamicSceneGraph& graph);
-
-NodeSymbol insertNewNodes(
-    const std::vector<std::pair<NodeId, std::vector<Place2d>>>& nodes_to_add,
-    const double place_overlap_threshold,
-    const double place_max_neighbor_z_diff,
-    NodeSymbol next_node_symbol,
-    DynamicSceneGraph& graph,
-    std::map<std::tuple<size_t, size_t>, NodeId>& new_id_map);
-
-void addNewNodeEdges(
-    const std::vector<std::pair<NodeId, std::vector<Place2d>>> nodes_to_add,
-    const std::map<std::tuple<size_t, size_t, size_t, size_t>, double> edge_map,
-    const std::map<std::tuple<size_t, size_t>, NodeId> new_id_map,
-    DynamicSceneGraph& graph);
-
-void reallocateMeshPoints(const std::vector<Place2d::PointT>& points,
-                          Place2dNodeAttributes& attrs1,
-                          Place2dNodeAttributes& attrs2);
+void propagateReallocation(const spark_dsg::Mesh& mesh,
+                           const spark_dsg::SceneGraphLayer& layer,
+                           const std::set<spark_dsg::NodeId>& changed_nodes,
+                           std::set<spark_dsg::NodeId>& seen_nodes);
 
 }  // namespace hydra::utils

@@ -4,14 +4,6 @@ repositories:
     type: git
     url: https://github.com/MIT-SPARK/config_utilities.git
     version: main
-  hydra_ros:
-    type: git
-    url: https://github.com/MIT-SPARK/Hydra-ROS.git
-    version: main
-  ianvs:
-    type: git
-    url: https://github.com/MIT-SPARK/Ianvs.git
-    version: main
   kimera_pgmo:
     type: git
     url: https://github.com/MIT-SPARK/Kimera-PGMO.git
@@ -24,14 +16,10 @@ repositories:
     type: git
     url: https://github.com/MIT-SPARK/pose_graph_tools.git
     version: main
-  semantic_inference:
-    type: git
-    url: https://github.com/MIT-SPARK/semantic_inference.git
-    version: main
   spark_dsg:
     type: git
     url: https://github.com/MIT-SPARK/Spark-DSG.git
-    version: main
+    version: develop
   spatial_hash:
     type: git
     url: https://github.com/MIT-SPARK/Spatial-Hash.git

@@ -43,7 +43,7 @@
 
 namespace hydra {
 
-using spark_dsg::BoundingBox;
+using BoxType = spark_dsg::BoundingBox::Type;
 
 bool updateNodeCentroid(const spark_dsg::Mesh& mesh,
                         const std::vector<size_t>& indices,
@@ -52,14 +52,14 @@ bool updateNodeCentroid(const spark_dsg::Mesh& mesh,
 bool updateObjectGeometry(const spark_dsg::Mesh& mesh,
                           spark_dsg::ObjectNodeAttributes& attrs,
                           const std::vector<size_t>* indices = nullptr,
-                          std::optional<BoundingBox::Type> type = std::nullopt);
+                          std::optional<BoxType> type = std::nullopt);
 
 MeshLayer::Ptr getActiveMesh(const MeshLayer& mesh_layer,
                              const BlockIndices& archived_blocks);
 
-BoundingBox fitBoxToFilteredMesh(const Mesh& mesh,
-                                 BoundingBox::Type type = BoundingBox::Type::AABB,
-                                 int inlier_min_neighbors = 5,
-                                 double inlier_search_radius = 0.1);
+spark_dsg::BoundingBox fitBoxToFilteredMesh(const Mesh& mesh,
+                                            BoxType type = BoxType::AABB,
+                                            int inlier_min_neighbors = 5,
+                                            double inlier_search_radius = 0.1);
 
 }  // namespace hydra
