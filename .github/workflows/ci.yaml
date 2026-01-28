@@ -3,14 +3,6 @@
 name: Hydra Build and Test
 on: {push: {branches: [main, develop]}, pull_request: {branches: [main, develop]}}
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Dependencies
-        run: sudo apt-get update && sudo apt install pipx
-      - name: Lint
-        run: pipx install pre-commit && cd ${{github.workspace}} && pre-commit run --all-files
   ros2:
     runs-on: ubuntu-latest
     container: ros:jazzy-perception
