@@ -27,7 +27,7 @@ jobs:
       - name: Dependencies
         run: |
           apt update && apt install -y python3-vcstool git ccache
-          vcs import src < src/hydra/install/ci/${{ github.base_ref || github.ref_name }}.yaml
+          vcs import src < src/hydra/.ci_install/${{ github.base_ref || github.ref_name }}.yaml
           rosdep update --rosdistro jazzy && rosdep install --rosdistro jazzy --from-paths src --ignore-src -r -y
       - name: Build
         shell: bash
