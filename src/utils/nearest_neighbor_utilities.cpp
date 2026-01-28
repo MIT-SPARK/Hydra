@@ -229,7 +229,7 @@ PointNeighborSearch::PointNeighborSearch(const std::vector<Eigen::Vector3f>& poi
   internals_ = std::make_unique<Detail>(points);
 }
 
-PointNeighborSearch::~PointNeighborSearch(){};
+PointNeighborSearch::~PointNeighborSearch() {};
 
 bool PointNeighborSearch::search(const Eigen::Vector3f& query_point,
                                  float& distance_squared,

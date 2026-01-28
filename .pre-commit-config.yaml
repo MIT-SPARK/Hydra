@@ -4,23 +4,23 @@
 exclude: \.clang-format|notebooks.*|\.github.*
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.2.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-added-large-files
   - repo: https://github.com/pre-commit/mirrors-clang-format
-    rev: v14.0.6
+    rev: v21.1.8
     hooks:
       - id: clang-format
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.2
+    rev: v0.14.14
     hooks:
       - {id: ruff, args: [--select, I, --fix]}
       - id: ruff
       - id: ruff-format
   - repo: https://github.com/lyz-code/yamlfix
-    rev: main
+    rev: 1.19.1
     hooks:
       - id: yamlfix
         entry: env YAMLFIX_LINE_LENGTH=200 yamlfix
