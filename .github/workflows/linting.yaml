@@ -1,6 +1,6 @@
 ---
 # based on https://github.com/actions/starter-workflows/blob/main/ci/cmake-single-platform.yml
-name: Hydra-ROS Linting
+name: Hydra Linting
 on: {push: {branches: [main, develop]}, pull_request: {}}
 jobs:
   lint:
