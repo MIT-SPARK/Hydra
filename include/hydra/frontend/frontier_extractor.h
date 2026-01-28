@@ -13,7 +13,7 @@ namespace hydra {
 
 struct Frontier {
  public:
-  Frontier(){};
+  Frontier() {};
   Frontier(Eigen::Vector3d c,
            Eigen::Vector3d s,
            Eigen::Quaterniond o,
@@ -24,12 +24,12 @@ struct Frontier {
         orientation(o),
         num_frontier_voxels(n),
         block_index(b),
-        has_shape_information(true){};
+        has_shape_information(true) {};
   Frontier(Eigen::Vector3d c, size_t n, spatial_hash::BlockIndex b)
       : center(c),
         num_frontier_voxels(n),
         block_index(b),
-        has_shape_information(false){};
+        has_shape_information(false) {};
 
  public:
   Eigen::Vector3d center;

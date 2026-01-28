@@ -62,7 +62,8 @@ using ManualLCFactor = gtsam::RangeFactor<gtsam::Pose3, gtsam::Pose3, double>;
 #if GTSAM_VERSION_MAJOR <= 4 && GTSAM_VERSION_MINOR < 3
 using GtsamJacobianType = boost::optional<gtsam::Matrix&>;
 #define JACOBIAN_DEFAULT \
-  {}
+  {                      \
+  }
 #else
 using GtsamJacobianType = gtsam::OptionalMatrixType;
 #define JACOBIAN_DEFAULT nullptr
