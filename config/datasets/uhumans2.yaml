@@ -40,8 +40,8 @@ frontend:
       pessimistic: true
     clustering:
       type: BlockTraversabilityClustering
-      min_place_width: &min_place_width 0.5 # m
-      max_place_width: &max_place_width 1.0 # m
+      min_place_width: &min_place_width 0.5  # m
+      max_place_width: &max_place_width 1.0  # m
       recursive: true
       simplify_boundary_traversability: false
     sinks:
@@ -97,10 +97,10 @@ backend:
       type: UpdatePlacesFunctor
     traversability:
       type: UpdateTraversabilityFunctor
-      min_place_size: *min_place_width # m
-      max_place_size: *max_place_width # m
+      min_place_size: *min_place_width
+      max_place_size: *max_place_width
       use_metric_distance: false
-      tolerance: 0.1 # m
+      tolerance: 0.1  # m
     frontiers:
       type: UpdateFrontiersFunctor
     rooms:
