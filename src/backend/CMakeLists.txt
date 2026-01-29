@@ -22,6 +22,5 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/update_region_growing_traversability_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_rooms_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_surface_places_functor.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/update_traversability_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/zmq_interfaces.cpp
 )
