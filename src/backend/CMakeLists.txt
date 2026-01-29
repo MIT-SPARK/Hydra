@@ -13,13 +13,14 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/mst_factors.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/pgmo_configs.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_agents_functor.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/update_block_traversability_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_buildings_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_frontiers_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_functions.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_objects_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_places_functor.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/update_region_growing_traversability_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_rooms_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_surface_places_functor.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/update_traversability_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/zmq_interfaces.cpp
 )

@@ -47,7 +47,7 @@ namespace hydra {
  * @brief Functor to update traversability places in the DSG. This functor should be
  * called with exhaustive merging enabled.
  */
-struct UpdateTraversabilityFunctor : public UpdateFunctor {
+struct UpdateBlockTraversabilityFunctor : public UpdateFunctor {
   struct Config {
     //! Layer to update traversability in
     std::string layer = DsgLayers::TRAVERSABILITY;
@@ -73,7 +73,7 @@ struct UpdateTraversabilityFunctor : public UpdateFunctor {
   using NodeSet = std::set<NodeId>;
   using State = spark_dsg::TraversabilityState;
 
-  explicit UpdateTraversabilityFunctor(const Config& config);
+  explicit UpdateBlockTraversabilityFunctor(const Config& config);
 
   Hooks hooks() const override;
 
@@ -160,6 +160,6 @@ struct UpdateTraversabilityFunctor : public UpdateFunctor {
   mutable NearestNodeFinder::Ptr nn_;
 };
 
-void declare_config(UpdateTraversabilityFunctor::Config& config);
+void declare_config(UpdateBlockTraversabilityFunctor::Config& config);
 
 }  // namespace hydra

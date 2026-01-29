@@ -96,9 +96,11 @@ backend:
     places:
       type: UpdatePlacesFunctor
     traversability:
-      type: UpdateTraversabilityFunctor
+      type: UpdateBlockTraversabilityFunctor
       min_place_size: *min_place_width
+                                       # m
       max_place_size: *max_place_width
+                                       # m
       use_metric_distance: false
       tolerance: 0.1  # m
     frontiers:
