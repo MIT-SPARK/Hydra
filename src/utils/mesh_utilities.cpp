@@ -41,6 +41,10 @@
 #undef PCL_NO_PRECOMPILE
 #include <spark_dsg/bounding_box_extraction.h>
 
+#include <deque>
+
+#include "hydra/utils/nearest_neighbor_utilities.h"
+
 namespace hydra {
 
 using spark_dsg::BoundingBox;
@@ -131,6 +135,40 @@ BoundingBox fitBoxToFilteredMesh(const Mesh& mesh,
 
   const BoundingBox::MeshAdaptor adaptor(mesh, &mesh_connections);
   return BoundingBox(adaptor, type);
+}
+
+std::vector<std::vector<size_t>> getConnectedComponents(const ComponentAdaptor& points,
+                                                        float radius_m) {
+  std::vector<std::vector<size_t>> clusters;
+  PointNeighborSearch search(points);
+  std::vector<bool> seen(points.size(), false);
+  for (size_t seed = 0; seed < points.size(); ++seed) {
+    if (seen[seed]) {
+      continue;
+    }
+
+    seen[seed] = true;
+    std::deque<size_t> frontier{seed};
+    auto& cluster = clusters.emplace_back();
+    while (!frontier.empty()) {
+      const size_t i = frontier.front();
+      frontier.pop_front();
+
+      const auto& pos = points[i];
+      cluster.push_back(i);
+      const auto neighbors = search.pointsInRadius(pos, radius_m);
+      for (const auto idx : neighbors) {
+        if (seen[idx]) {
+          continue;
+        }
+
+        frontier.push_back(idx);
+        seen[idx] = true;
+      }
+    }
+  }
+
+  return clusters;
 }
 
 }  // namespace hydra

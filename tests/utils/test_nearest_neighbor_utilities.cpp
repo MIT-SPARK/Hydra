@@ -35,9 +35,22 @@
 #include <gtest/gtest.h>
 #include <hydra/utils/nearest_neighbor_utilities.h>
 
-namespace hydra {
+#include <random>
 
-TEST(NearestNeighborUtilities, TestSkipFirst) {
+namespace hydra {
+namespace {
+
+std::set<size_t> getIndexResults(const PointNeighborSearch& finder,
+                                 const Eigen::Vector3f& pos,
+                                 float radius) {
+  const auto vec = finder.pointsInRadius(pos, radius);
+  std::set result(vec.begin(), vec.end());
+  return result;
+}
+
+}  // namespace
+
+TEST(NearestNeighborUtilities, SkipFirst) {
   SceneGraphLayer layer(1);
   layer.emplaceNode(0, std::make_unique<NodeAttributes>(Eigen::Vector3d(0, 0, 3)));
   layer.emplaceNode(1, std::make_unique<NodeAttributes>(Eigen::Vector3d(0, 0, 0)));
@@ -69,6 +82,41 @@ TEST(NearestNeighborUtilities, TestSkipFirst) {
         });
     EXPECT_EQ(result, 1u);
     EXPECT_NEAR(distance, 2.0, 1.0e-9);
+  }
+}
+
+TEST(NearestNeighborUtilities, RadiusSearch) {
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<float> dist(-0.25, 0.25);
+  std::vector<Eigen::Vector3f> points;
+
+  Eigen::Vector3f seed0(1.0, 2.0, 3.0);
+  Eigen::Vector3f seed1(2.0, 3.0, 4.0);
+  for (size_t i = 0; i < 10; ++i) {
+    points.push_back(seed0 + Eigen::Vector3f(dist(gen), dist(gen), dist(gen)));
+    points.push_back(seed1 + Eigen::Vector3f(dist(gen), dist(gen), dist(gen)));
+  }
+
+  PointNeighborSearch finder(points);
+  {  // separate points
+    const std::set<size_t> expected0{0, 2, 4, 6, 8, 10, 12, 14, 16, 18};
+    EXPECT_EQ(getIndexResults(finder, seed0, 0.5), expected0);
+    const std::set<size_t> expected1{1, 3, 5, 7, 9, 11, 13, 15, 17, 19};
+    EXPECT_EQ(getIndexResults(finder, seed1, 0.5), expected1);
+  }
+
+  {  // all points
+    std::set<size_t> expected{0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
+                              10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
+    EXPECT_EQ(getIndexResults(finder, seed0, 5.0), expected);
+    EXPECT_EQ(getIndexResults(finder, seed1, 5.0), expected);
+  }
+
+  {  // no points
+    const std::set<size_t> expected{};
+    Eigen::Vector3f query(100.0, 200.0, 300.0);
+    EXPECT_EQ(getIndexResults(finder, query, 5.0), expected);
   }
 }
 

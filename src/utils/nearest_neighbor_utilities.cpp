@@ -41,7 +41,6 @@
 namespace hydra {
 
 using nanoflann::KDTreeSingleIndexAdaptor;
-using nanoflann::KDTreeSingleIndexDynamicAdaptor;
 using nanoflann::L2_Simple_Adaptor;
 
 struct GraphKdTreeAdaptor {
@@ -199,7 +198,7 @@ size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
 
 struct PointNeighborSearch::Detail {
   // Nanoflann interface.
-  explicit Detail(const std::vector<Eigen::Vector3f>& points)
+  explicit Detail(const Adapter& points)
       : points_(points),
         tree_(3, *this, nanoflann::KDTreeSingleIndexAdaptorParams(10)) {
     tree_.buildIndex();
@@ -208,12 +207,13 @@ struct PointNeighborSearch::Detail {
   std::size_t kdtree_get_point_count() const { return points_.size(); }
 
   float kdtree_get_pt(const size_t idx, const size_t dim) const {
-    if (dim == 0)
+    if (dim == 0) {
       return points_[idx].x();
-    else if (dim == 1)
+    } else if (dim == 1) {
       return points_[idx].y();
-    else
+    } else {
       return points_[idx].z();
+    }
   }
 
   template <class BBOX>
@@ -221,15 +221,15 @@ struct PointNeighborSearch::Detail {
     return false;
   }
 
-  const std::vector<Eigen::Vector3f>& points_;
+  const Adapter& points_;
   KDTreeSingleIndexAdaptor<L2_Simple_Adaptor<float, Detail>, Detail, 3> tree_;
 };
 
-PointNeighborSearch::PointNeighborSearch(const std::vector<Eigen::Vector3f>& points) {
+PointNeighborSearch::PointNeighborSearch(const Adapter& points) {
   internals_ = std::make_unique<Detail>(points);
 }
 
-PointNeighborSearch::~PointNeighborSearch() {};
+PointNeighborSearch::~PointNeighborSearch() {}
 
 bool PointNeighborSearch::search(const Eigen::Vector3f& query_point,
                                  float& distance_squared,
@@ -238,6 +238,20 @@ bool PointNeighborSearch::search(const Eigen::Vector3f& query_point,
   float query_point_arr[3] = {query_point.x(), query_point.y(), query_point.z()};
   resultSet.init(&index, &distance_squared);
   return internals_->tree_.findNeighbors(resultSet, &query_point_arr[0]);
+}
+
+std::vector<size_t> PointNeighborSearch::pointsInRadius(const Eigen::Vector3f& query,
+                                                        float radius) const {
+  std::vector<nanoflann::ResultItem<uint32_t, float>> neighbors;
+  size_t num_found = internals_->tree_.radiusSearch(
+      query.data(), radius, neighbors, nanoflann::SearchParameters());
+
+  std::vector<size_t> result(num_found);
+  for (size_t i = 0; i < num_found; ++i) {
+    result[i] = neighbors.at(i).first;
+  }
+
+  return result;
 }
 
 }  // namespace hydra
