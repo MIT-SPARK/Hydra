@@ -33,8 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
-
 #include "hydra/backend/update_functions.h"
 
 namespace hydra {
@@ -50,11 +48,6 @@ struct UpdateBuildingsFunctor : public UpdateFunctor {
   void call(const DynamicSceneGraph& unmerged,
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<UpdateFunctor, UpdateBuildingsFunctor, Config>(
-          "UpdateBuildingsFunctor");
 };
 
 void declare_config(UpdateBuildingsFunctor::Config& config);

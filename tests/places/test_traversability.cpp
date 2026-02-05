@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/places/traversability_clustering.h>
+#include <hydra/places/block_traversability_clustering.h>
 
 namespace hydra::places {
 

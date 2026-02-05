@@ -33,31 +33,26 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-
-#include "hydra/active_window/active_window_output.h"
-#include "hydra/common/dsg_types.h"
+#include <string>
 
 namespace hydra {
 
-class FreespacePlacesInterface {
- public:
-  using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
+struct VerbosityConfig {
+  int verbosity = 0;
+  std::string prefix = "";
 
-  FreespacePlacesInterface() {}
+  VerbosityConfig() = default;
+  VerbosityConfig(int verbosity);
+  VerbosityConfig(const std::string& prefix, int verbosity = 0);
 
-  virtual ~FreespacePlacesInterface() = default;
-
-  virtual void detect(const ActiveWindowOutput& msg) = 0;
-
-  virtual void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) = 0;
-
-  virtual NodeIdSet getActiveNodes() const = 0;
-
-  // takes in a 3xN matrix
-  virtual std::vector<bool> inFreespace(const PositionMatrix& /* positions */,
-                                        double /* freespace_distance_m */) const {
-    return {};
-  }
+  //! Make a copy of the verbosity config with a prefix derived from the provided name
+  VerbosityConfig with_name(const std::string& name) const;
 };
+
+void declare_config(VerbosityConfig& config);
+
+// NOTE(nathan) you need to include <glog/logging.h> for this to work, but
+// I don't want have <glog/logging.h> included in a bunch of header files
+#define MLOG(V) LOG_IF(INFO, config.verbosity >= V) << config.prefix
 
 }  // namespace hydra

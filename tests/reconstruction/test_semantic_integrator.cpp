@@ -40,28 +40,21 @@
 
 namespace hydra {
 
-std::unique_ptr<SemanticIntegrator> createIntegrator(
-    size_t num_labels,
-    const std::set<uint32_t>& dynamic_labels = {},
-    const std::set<uint32_t>& invalid_labels = {},
-    double label_confidence = 0.9) {
+TEST(SemanticIntegrator, MLEIntegrationCorrect) {
+  test::ConfigGuard guard(false);
+
+  // MLE integrator reads total labels from global info
   PipelineConfig pipeline_config;
-  pipeline_config.label_space.total_labels = num_labels;
-  pipeline_config.label_space.dynamic_labels = dynamic_labels;
-  pipeline_config.label_space.invalid_labels = invalid_labels;
+  pipeline_config.label_space.total_labels = 5;
   GlobalInfo::init(pipeline_config);
 
   MLESemanticIntegrator::Config config;
-  config.label_confidence = label_confidence;
-  return std::make_unique<MLESemanticIntegrator>(config);
-}
+  config.label_confidence = 0.8;
+  MLESemanticIntegrator integrator(config);
 
-TEST(SemanticIntegrator, MLEIntegrationCorrect) {
-  test::ConfigGuard guard(false);
-  const auto integrator = createIntegrator(5, {}, {}, 0.8);
   SemanticVoxel voxel;
   EXPECT_TRUE(voxel.empty);
-  integrator->updateLikelihoods(2, 1.0, voxel);
+  integrator.updateLikelihoods(2, 1.0, voxel);
   EXPECT_FALSE(voxel.empty);
   ASSERT_EQ(voxel.semantic_likelihoods.size(), 5);
   EXPECT_GT(voxel.semantic_likelihoods(2), voxel.semantic_likelihoods(0));

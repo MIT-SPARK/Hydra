@@ -51,7 +51,6 @@ frontend:
       min_edge_distance_m: 0.25
       node_merge_distance_m: 0.5
       add_heuristic_edges: false
-  use_frontiers: true
   frontier_places:
     type: voxel_clustering
     cluster_tolerance: 0.3

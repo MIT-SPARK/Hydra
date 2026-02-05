@@ -55,6 +55,7 @@
 #include "hydra/reconstruction/projection_interpolators.h"
 #include "hydra/reconstruction/semantic_integrator.h"
 #include "hydra/reconstruction/volumetric_map.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -70,9 +71,7 @@ class ProjectiveIntegrator {
  public:
   using SemanticIntegratorPtr = std::unique_ptr<const SemanticIntegrator>;
 
-  struct Config {
-    //! Verbosity for the projective integrator
-    int verbosity = GlobalInfo::instance().getConfig().default_verbosity;
+  struct Config : public VerbosityConfig {
     //! If nonzero, integrates negative voxels outside of the truncation distance by the
     //! specified threshold. Negative values are multiples of the voxel size
     float extra_integration_distance = 0.0f;

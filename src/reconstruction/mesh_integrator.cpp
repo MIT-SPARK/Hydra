@@ -54,23 +54,12 @@ MeshIntegrator::MeshIntegrator(const MeshIntegratorConfig& config)
     : config(config::checkValid(config)) {}
 
 void MeshIntegrator::allocateBlocks(const BlockIndices& blocks,
-                                    VolumetricMap& map,
-                                    OccupancyLayer* occupancy) const {
+                                    VolumetricMap& map) const {
   auto& mesh_layer = map.getMeshLayer();
   for (const BlockIndex& block_index : blocks) {
     auto& mesh =
         mesh_layer.allocateBlock(block_index, map.hasSemantics(), map.hasTracking());
     mesh.clear();
-
-    if (!occupancy) {
-      continue;
-    }
-
-    // reset layer tracking vertex occupancy in voxels so that marching cubes can assign
-    // them correctly
-    for (auto& vertex_voxel : occupancy->allocateBlock(block_index)) {
-      vertex_voxel.on_surface = false;
-    }
   }
 }
 
@@ -95,8 +84,7 @@ void MeshIntegrator::showUpdateInfo(const VolumetricMap& map,
 
 void MeshIntegrator::generateMesh(VolumetricMap& map,
                                   bool only_mesh_updated_blocks,
-                                  bool clear_updated_flag,
-                                  OccupancyLayer* occupancy) const {
+                                  bool clear_updated_flag) const {
   // TODO(nathan) think about this more
   cube_coord_offsets_ = cube_index_offsets_.cast<float>() * map.config.voxel_size;
   const auto& tsdf = map.getTsdfLayer();
@@ -104,11 +92,11 @@ void MeshIntegrator::generateMesh(VolumetricMap& map,
       only_mesh_updated_blocks ? tsdf.blockIndicesWithCondition(TsdfBlock::meshUpdated)
                                : tsdf.allocatedBlockIndices();
 
-  allocateBlocks(blocks, map, occupancy);
+  allocateBlocks(blocks, map);
 
   // interior then exterior, but order shouldn't matter too much...
-  launchThreads(blocks, true, map, occupancy);
-  launchThreads(blocks, false, map, occupancy);
+  launchThreads(blocks, true, map);
+  launchThreads(blocks, false, map);
   showUpdateInfo(map, blocks, 5);
 
   for (const auto& block_idx : blocks) {
@@ -126,17 +114,14 @@ void MeshIntegrator::generateMesh(VolumetricMap& map,
 
 void MeshIntegrator::launchThreads(const BlockIndices& blocks,
                                    bool interior_pass,
-                                   VolumetricMap& map,
-                                   OccupancyLayer* occupancy) const {
+                                   VolumetricMap& map) const {
   BlockIndexGetter index_getter(blocks);
   std::list<std::thread> threads;
   for (int i = 0; i < config.integrator_threads; ++i) {
     if (interior_pass) {
-      threads.emplace_back(
-          &MeshIntegrator::processInterior, this, &map, &index_getter, occupancy);
+      threads.emplace_back(&MeshIntegrator::processInterior, this, &map, &index_getter);
     } else {
-      threads.emplace_back(
-          &MeshIntegrator::processExterior, this, &map, &index_getter, occupancy);
+      threads.emplace_back(&MeshIntegrator::processExterior, this, &map, &index_getter);
     }
   }
 
@@ -146,8 +131,7 @@ void MeshIntegrator::launchThreads(const BlockIndices& blocks,
 }
 
 void MeshIntegrator::processInterior(VolumetricMap* map,
-                                     BlockIndexGetter* index_getter,
-                                     OccupancyLayer* occupancy) const {
+                                     BlockIndexGetter* index_getter) const {
   BlockIndex block_index;
 
   while (index_getter->getNextIndex(block_index)) {
@@ -158,7 +142,7 @@ void MeshIntegrator::processInterior(VolumetricMap* map,
     for (v_idx.x() = 0; v_idx.x() < limit; ++v_idx.x()) {
       for (v_idx.y() = 0; v_idx.y() < limit; ++v_idx.y()) {
         for (v_idx.z() = 0; v_idx.z() < limit; ++v_idx.z()) {
-          meshBlockInterior(block_index, v_idx, *map, occupancy);
+          meshBlockInterior(block_index, v_idx, *map);
         }
       }
     }
@@ -166,8 +150,7 @@ void MeshIntegrator::processInterior(VolumetricMap* map,
 }
 
 void MeshIntegrator::processExterior(VolumetricMap* map,
-                                     BlockIndexGetter* index_getter,
-                                     OccupancyLayer* occupancy) const {
+                                     BlockIndexGetter* index_getter) const {
   BlockIndex block_index;
   while (index_getter->getNextIndex(block_index)) {
     VLOG(10) << "Extracting exterior for block: " << showIndex(block_index);
@@ -179,7 +162,7 @@ void MeshIntegrator::processExterior(VolumetricMap* map,
     v_idx.x() = vps - 1;
     for (v_idx.z() = 0; v_idx.z() < vps; v_idx.z()++) {
       for (v_idx.y() = 0; v_idx.y() < vps; v_idx.y()++) {
-        meshBlockExterior(block_index, v_idx, *map, occupancy);
+        meshBlockExterior(block_index, v_idx, *map);
       }
     }
 
@@ -188,7 +171,7 @@ void MeshIntegrator::processExterior(VolumetricMap* map,
     v_idx.y() = vps - 1;
     for (v_idx.z() = 0; v_idx.z() < vps; v_idx.z()++) {
       for (v_idx.x() = 0; v_idx.x() < vps - 1; v_idx.x()++) {
-        meshBlockExterior(block_index, v_idx, *map, occupancy);
+        meshBlockExterior(block_index, v_idx, *map);
       }
     }
 
@@ -196,7 +179,7 @@ void MeshIntegrator::processExterior(VolumetricMap* map,
     v_idx.z() = vps - 1;
     for (v_idx.y() = 0; v_idx.y() < vps - 1; v_idx.y()++) {
       for (v_idx.x() = 0; v_idx.x() < vps - 1; v_idx.x()++) {
-        meshBlockExterior(block_index, v_idx, *map, occupancy);
+        meshBlockExterior(block_index, v_idx, *map);
       }
     }
   }
@@ -213,8 +196,7 @@ Block* maybeGetBlockPtr(spatial_hash::BlockLayer<Block>* layer,
 
 void MeshIntegrator::meshBlockInterior(const BlockIndex& block_index,
                                        const VoxelIndex& index,
-                                       VolumetricMap& map,
-                                       OccupancyLayer* occupancy) const {
+                                       VolumetricMap& map) const {
   VLOG(15) << "[mesh] processing interior voxel: " << index.transpose();
   auto mesh = map.getMeshLayer().getBlockPtr(block_index);
   auto block = map.getTsdfLayer().getBlockPtr(block_index);
@@ -224,7 +206,6 @@ void MeshIntegrator::meshBlockInterior(const BlockIndex& block_index,
   }
 
   const auto coords = block->getVoxelPosition(index);
-  auto vertex_block = maybeGetBlockPtr(occupancy, block_index);
   const auto tracking_block = maybeGetBlockPtr(map.getTrackingLayer(), block_index);
   const auto semantics = maybeGetBlockPtr(map.getSemanticLayer(), block_index);
 
@@ -248,16 +229,12 @@ void MeshIntegrator::meshBlockInterior(const BlockIndex& block_index,
       }
     }
 
-    if (vertex_block) {
-      point.vertex_voxel = &vertex_block->getVoxel(corner_index);
-    }
-
     if (tracking_block) {
       point.tracking_voxel = &tracking_block->getVoxel(corner_index);
     }
   }
 
-  ::hydra::MarchingCubes::meshCube(block_index, points, *mesh);
+  ::hydra::MarchingCubes::meshCube(points, *mesh);
 }
 
 BlockIndex MeshIntegrator::getNeighborIndex(const BlockIndex& block_idx,
@@ -279,8 +256,7 @@ BlockIndex MeshIntegrator::getNeighborIndex(const BlockIndex& block_idx,
 
 void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
                                        const VoxelIndex& index,
-                                       VolumetricMap& map,
-                                       OccupancyLayer* occupancy) const {
+                                       VolumetricMap& map) const {
   VLOG(15) << "[mesh] processing exterior voxel: " << index.transpose();
   auto mesh = map.getMeshLayer().getBlockPtr(block_index);
   auto block = map.getTsdfLayer().getBlockPtr(block_index);
@@ -290,7 +266,6 @@ void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
   }
 
   const auto coords = block->getVoxelPosition(index);
-  auto vertex_block = maybeGetBlockPtr(occupancy, block_index);
   const auto tracking_block = maybeGetBlockPtr(map.getTrackingLayer(), block_index);
   const auto semantics = maybeGetBlockPtr(map.getSemanticLayer(), block_index);
 
@@ -303,9 +278,6 @@ void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
     const SemanticVoxel* semantic_voxel = nullptr;
     if (block->isValidVoxelIndex(c_idx)) {
       voxel = &block->getVoxel(c_idx);
-      if (vertex_block) {
-        point.vertex_voxel = &vertex_block->getVoxel(c_idx);
-      }
       if (tracking_block) {
         point.tracking_voxel = &tracking_block->getVoxel(c_idx);
       }
@@ -332,11 +304,6 @@ void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
         const auto& t_block = map.getTrackingLayer()->getBlock(n_idx);
         point.tracking_voxel = &t_block.getVoxel(c_idx);
       }
-
-      // // we can't ensure that neighboring blocks stay in sync with the current mesh
-      // // easily, so we don't track nearest surfaces to neighboring blocks for now
-      // auto neighbor_vertex_block = vertex_layer_->getBlockPtr(n_idx);
-      // voxels[i] = &neighbor_vertex_block->getVoxel(c_idx);
     }
 
     if (voxel->weight < config.min_weight) {
@@ -351,7 +318,7 @@ void MeshIntegrator::meshBlockExterior(const BlockIndex& block_index,
     }
   }
 
-  ::hydra::MarchingCubes::meshCube(block_index, points, *mesh);
+  ::hydra::MarchingCubes::meshCube(points, *mesh);
 }
 
 const Eigen::Matrix<int, 3, 8> MeshIntegrator::cube_index_offsets_ = [] {

@@ -46,10 +46,14 @@
 // Government is authorized to reproduce and distribute reprints for Government
 // purposes notwithstanding any copyright notation herein.
 #pragma once
+
+// TODO(nathan) try to avoid pulling in factories in the header
 #include <config_utilities/virtual_config.h>
 
 #include <Eigen/Geometry>
+#include <filesystem>
 #include <limits>
+#include <opencv2/core/mat.hpp>
 #include <vector>
 
 #include "hydra/input/sensor_extrinsics.h"
@@ -70,10 +74,17 @@ class Sensor {
   using ConstPtr = std::shared_ptr<const Sensor>;
 
   struct Config {
+    // Minimum range the sensor can handle
     double min_range = 0.0f;
+    // Maximum range the sensor can handle
     double max_range = std::numeric_limits<double>::infinity();
+    //! Filepath to load static mask from
+    std::filesystem::path static_mask_fp;
     // TODO(nathan) try to avoid pulling in factories in the header
+    //! Transform between body and sensor
     config::VirtualConfig<SensorExtrinsics> extrinsics;
+    //! Sensor-specific semantic labels that the sensor should ignore
+    std::set<uint32_t> invalid_labels;
   } const config;
 
   explicit Sensor(const Config& config, const std::string& name);
@@ -159,6 +170,12 @@ class Sensor {
   virtual bool pointIsInViewFrustum(const Eigen::Vector3f& point_C,
                                     float inflation_distance = 0.f) const = 0;
 
+  /**
+   * @brief Get the static mask for this sensor
+   * @return cv::Mat containing the mask, or empty cv::Mat if no mask is defined
+   */
+  virtual const cv::Mat& getStaticMask() const { return static_mask_; }
+
   //! @brief Name of current sensor
   const std::string name;
 
@@ -166,6 +183,8 @@ class Sensor {
 
  protected:
   const std::unique_ptr<SensorExtrinsics> extrinsics_;
+
+  cv::Mat static_mask_;
 };
 
 void declare_config(Sensor::Config& config);

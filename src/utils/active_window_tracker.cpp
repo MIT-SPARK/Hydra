@@ -35,8 +35,14 @@
 #include "hydra/utils/active_window_tracker.h"
 
 #include <glog/logging.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph_layer.h>
+#include <spark_dsg/scene_graph_node.h>
 
 namespace hydra {
+
+using spark_dsg::SceneGraphLayer;
+using spark_dsg::SceneGraphNode;
 
 void ActiveWindowTracker::clear() {
   for (const auto node : to_clear_) {

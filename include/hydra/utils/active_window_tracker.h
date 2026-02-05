@@ -35,8 +35,6 @@
 #pragma once
 #include <spark_dsg/layer_view.h>
 
-#include "hydra/common/dsg_types.h"
-
 namespace hydra {
 
 /**
@@ -49,7 +47,8 @@ struct ActiveWindowTracker {
   /**
    * @brief Get iterator over active window (active nodes plus just-archived nodes)
    */
-  spark_dsg::LayerView view(const SceneGraphLayer& layer, bool freeze = false) const;
+  spark_dsg::LayerView view(const spark_dsg::SceneGraphLayer& layer,
+                            bool freeze = false) const;
   /**
    * @brief Remove all archived nodes from iteration
    */
@@ -60,9 +59,9 @@ struct ActiveWindowTracker {
   void reset();
 
  private:
-  bool isActive(const SceneGraphNode& node, bool freeze = false) const;
-  mutable std::set<NodeId> to_clear_;
-  mutable std::set<NodeId> prev_active_;
+  bool isActive(const spark_dsg::SceneGraphNode& node, bool freeze = false) const;
+  mutable std::set<spark_dsg::NodeId> to_clear_;
+  mutable std::set<spark_dsg::NodeId> prev_active_;
 };
 
 }  // namespace hydra

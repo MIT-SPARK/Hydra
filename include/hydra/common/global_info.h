@@ -34,10 +34,10 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <config_utilities/virtual_config.h>
+#include <spark_dsg/mesh.h>
 
 #include <array>
 #include <atomic>
-#include <iostream>
 #include <map>
 #include <memory>
 #include <vector>
@@ -54,6 +54,21 @@
 namespace hydra {
 
 class SemanticColorMap;
+
+/**
+ * @brief Configuration struct for spark_dsg::Mesh
+ * Note that per-vertex timestamps are required and can not be turned off
+ */
+struct MeshFieldConfig {
+  //! Whether or not the mesh should have colors
+  bool with_colors = true;
+  //! Whether or not the mesh should have labels
+  bool with_labels = true;
+  //! Whether or not the mesh should have first-seen stamps
+  bool with_first_seen_stamps = true;
+};
+
+void declare_config(MeshFieldConfig& config);
 
 struct FrameConfig {
   //! Body frame for robot constructing the scene graph (see REP 105)
@@ -91,6 +106,11 @@ struct PipelineConfig {
   LabelSpaceConfig label_space;
   //! Human readable category names for the labelspace
   std::map<uint32_t, std::string> label_names;
+  //! Configuration for scene graph mesh fields
+  MeshFieldConfig mesh;
+  //! @brief Layers in the scene graph that use the labelspace
+  std::vector<std::string> semantic_layers{spark_dsg::DsgLayers::OBJECTS,
+                                           spark_dsg::DsgLayers::MESH_PLACES};
 };
 
 void declare_config(PipelineConfig& config);
@@ -133,6 +153,8 @@ class GlobalInfo {
   std::vector<std::string> getAvailableSensors() const;
 
   std::unique_ptr<VolumetricWindow> createVolumetricWindow() const;
+
+  spark_dsg::Mesh::Ptr createMesh() const;
 
  private:
   GlobalInfo();

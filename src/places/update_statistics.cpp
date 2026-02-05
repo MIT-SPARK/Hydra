@@ -37,10 +37,10 @@
 namespace hydra::places {
 
 void UpdateStatistics::clear() {
-  number_surface_flipped = 0;
   number_lowered_voxels = 0;
   number_raised_voxels = 0;
   number_new_voxels = 0;
+  number_sign_flipped = 0;
   number_raise_updates = 0;
   number_voronoi_found = 0;
   number_lower_skipped = 0;
@@ -50,17 +50,16 @@ void UpdateStatistics::clear() {
 }
 
 std::ostream& operator<<(std::ostream& out, const UpdateStatistics& stats) {
-  out << "  - Invalid surface flags: " << stats.number_surface_flipped << std::endl;
   out << "  - Voxel changes: ";
   out << stats.number_lowered_voxels << " lowered, ";
   out << stats.number_raised_voxels << " raised, ";
-  out << stats.number_new_voxels << " new" << std::endl;
-  out << "  - New Voronoi Cells: " << stats.number_voronoi_found << std::endl;
-  out << "  - Fixed without parents (lower): " << stats.number_fixed_no_parent
-      << std::endl;
-  out << "  - Skipped (lower): " << stats.number_lower_skipped << std::endl;
-  out << "  - Updated (lower): " << stats.number_lower_updated << std::endl;
-  out << "  - Forced (lower): " << stats.number_force_lowered << std::endl;
+  out << stats.number_new_voxels << " new, ";
+  out << stats.number_sign_flipped << " sign flipped";
+  out << "\n  - New Voronoi Cells: " << stats.number_voronoi_found;
+  out << "\n  - Fixed without parents (lower): " << stats.number_fixed_no_parent;
+  out << "\n  - Skipped (lower): " << stats.number_lower_skipped;
+  out << "\n  - Updated (lower): " << stats.number_lower_updated;
+  out << "\n  - Forced (lower): " << stats.number_force_lowered;
   return out;
 }
 

@@ -40,6 +40,13 @@ size_t pgmoNumVertices(const Mesh& mesh) { return mesh.numVertices(); }
 
 void pgmoResizeVertices(Mesh& mesh, size_t size) { mesh.resizeVertices(size); }
 
+kimera_pgmo::traits::VertexProperties pgmoGetVertexProperties(const Mesh& mesh) {
+  return {mesh.has_colors,
+          mesh.has_timestamps,
+          mesh.has_labels,
+          mesh.has_first_seen_stamps};
+}
+
 Eigen::Vector3f pgmoGetVertex(const Mesh& mesh,
                               size_t i,
                               kimera_pgmo::traits::VertexTraits* traits) {
@@ -60,25 +67,37 @@ Eigen::Vector3f pgmoGetVertex(const Mesh& mesh,
     traits->label = mesh.label(i);
   }
 
+  if (mesh.has_first_seen_stamps) {
+    traits->first_seen_stamp = mesh.firstSeenTimestamp(i);
+  }
+
   return mesh.pos(i);
 }
 
 void pgmoSetVertex(Mesh& mesh,
                    size_t i,
                    const Eigen::Vector3f& pos,
-                   const kimera_pgmo::traits::VertexTraits& traits) {
+                   const kimera_pgmo::traits::VertexTraits* traits) {
   mesh.setPos(i, pos);
-  if (traits.color && mesh.has_colors) {
-    const auto& c = *traits.color;
+  if (!traits) {
+    return;
+  }
+
+  if (traits->properties.has_color && mesh.has_colors) {
+    const auto& c = traits->color;
     mesh.setColor(i, Color(c[0], c[1], c[2], c[3]));
   }
 
-  if (traits.stamp && mesh.has_timestamps) {
-    mesh.setTimestamp(i, *traits.stamp);
+  if (traits->properties.has_stamp && mesh.has_timestamps) {
+    mesh.setTimestamp(i, traits->stamp);
   }
 
-  if (traits.label && mesh.has_labels) {
-    mesh.setLabel(i, *traits.label);
+  if (traits->properties.has_label && mesh.has_labels) {
+    mesh.setLabel(i, traits->label);
+  }
+
+  if (traits->properties.has_first_seen_stamp && mesh.has_first_seen_stamps) {
+    mesh.setFirstSeenTimestamp(i, traits->first_seen_stamp);
   }
 }
 

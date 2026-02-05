@@ -42,6 +42,7 @@
 #include <hydra/active_window/reconstruction_module.h>
 #include <hydra/common/global_info.h>
 #include <kimera_pgmo/compression/delta_compression.h>
+#include <kimera_pgmo/mesh_offset_info.h>
 #include <kimera_pgmo/utils/mesh_io.h>
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h>
@@ -59,6 +60,8 @@
 #include "hydra/utils/pgmo_mesh_traits.h"
 
 namespace hydra::python {
+
+using namespace spark_dsg;
 
 struct MeshUpdater {
   MeshUpdater(double voxel_size, const std::string& url)
@@ -87,15 +90,16 @@ struct MeshUpdater {
     }
 
     const auto& mesh = msg->map().getMeshLayer();
-    auto interface = PgmoMeshLayerInterface(mesh);
-    const auto delta = compression.update(interface, msg->timestamp_ns);
-    delta->updateMesh(*graph->mesh());
+    const BlockMeshIter wrapper(mesh);
+    const auto delta = compression.update(wrapper, msg->timestamp_ns);
+    delta->updateMesh(*graph->mesh(), mesh_offsets);
     zmq_sender.send(*graph, true);
   }
 
  public:
   std::atomic<bool> should_shutdown = false;
   kimera_pgmo::DeltaCompression compression;
+  kimera_pgmo::MeshOffsetInfo mesh_offsets;
   std::shared_ptr<spark_dsg::DynamicSceneGraph> graph;
   std::vector<uint64_t> mesh_timestamps;
   ReconstructionModule::OutputQueue::Ptr queue;

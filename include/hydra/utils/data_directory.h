@@ -48,7 +48,7 @@ class DataDirectory {
     //! Construct the directory
     bool allocate = true;
     //! Make a new directory using the current time and date
-    bool use_timestamp = true;
+    bool use_timestamp = false;
     //! Date/Time format to use
     std::string timestamp_format = "%Y_%m_%d-%H_%M_%S";
   } const config;

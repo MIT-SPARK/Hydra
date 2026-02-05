@@ -41,6 +41,14 @@
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
+
+static const auto reg =
+    config::RegistrationWithConfig<UpdateFunctor,
+                                   UpdateRoomsFunctor,
+                                   UpdateRoomsFunctor::Config>("UpdateRoomsFunctor");
+
+}
 
 using timing::ScopedTimer;
 using SemanticLabel = SemanticNodeAttributes::Label;
@@ -50,11 +58,13 @@ void declare_config(UpdateRoomsFunctor::Config& config) {
   name("UpdateRoomsFunctor::Config");
   field(config.room_finder, "room_finder");
   field(config.places_layer, "places_layer");
+  field(config.sinks, "sinks");
 }
 
 UpdateRoomsFunctor::UpdateRoomsFunctor(const Config& config)
     : config(config::checkValid(config)),
-      room_finder(new RoomFinder(config.room_finder)) {}
+      room_finder(new RoomFinder(config.room_finder)),
+      sinks_(Sink::instantiate(config.sinks)) {}
 
 void UpdateRoomsFunctor::rewriteRooms(const SceneGraphLayer* new_rooms,
                                       DynamicSceneGraph& graph) const {
@@ -105,6 +115,7 @@ void UpdateRoomsFunctor::call(const DynamicSceneGraph&,
   auto rooms = room_finder->findRooms(*places_clone);
   rewriteRooms(rooms.get(), *dsg.graph);
   room_finder->addRoomPlaceEdges(*dsg.graph, config.places_layer);
+  Sink::callAll(sinks_, info->timestamp_ns, *room_finder);
   return;
 }
 

@@ -97,7 +97,50 @@ size_t MergeTracker::applyMerges(const DynamicSceneGraph& unmerged,
   return num_applied;
 }
 
+void MergeTracker::updateAllMergeAttributes(const DynamicSceneGraph& unmerged,
+                                            DynamicSceneGraph& merged,
+                                            const MergeFunc& merge_attrs) {
+  for (auto& [parent, children] : merge_sets_) {
+    auto child_iter = children.begin();
+    while (child_iter != children.end()) {
+      if (!unmerged.hasNode(*child_iter)) {
+        child_iter = children.erase(child_iter);
+      } else {
+        ++child_iter;
+      }
+    }
+
+    std::vector<NodeId> nodes{parent};
+    nodes.insert(nodes.end(), children.begin(), children.end());
+    merged.setNodeAttributes(parent, merge_attrs(unmerged, nodes));
+  }
+}
+
+std::string MergeTracker::print() const {
+  std::stringstream ss;
+  for (const auto& [parent, children] : merge_sets_) {
+    ss << " - " << NodeSymbol(parent).str() << ": [";
+    auto iter = children.begin();
+    while (iter != children.end()) {
+      ss << NodeSymbol(*iter).str();
+      ++iter;
+      if (iter != children.end()) {
+        ss << ", ";
+      }
+    }
+    ss << "]\n";
+  }
+
+  return ss.str();
+}
+
 void MergeTracker::clear() { merge_sets_.clear(); }
+
+void MergeTracker::erase_nodes(std::vector<NodeId> nodes_to_erase) {
+  for (auto n : nodes_to_erase) {
+    merge_sets_.erase(n);
+  }
+}
 
 void MergeTracker::updateParents(std::map<NodeId, NodeId>& prior_merges,
                                  const Merge& merge) {
@@ -124,6 +167,35 @@ void MergeTracker::updateParents(std::map<NodeId, NodeId>& prior_merges,
   }
 
   merge_sets_.erase(from_iter);
+}
+
+void GroupedMergeTracker::initializeTracker(std::string name) {
+  group_to_tracker_.insert({name, MergeTracker()});
+}
+
+void GroupedMergeTracker::clear() {
+  for (auto& [name, tracker] : group_to_tracker_) {
+    tracker.clear();
+  }
+}
+
+void GroupedMergeTracker::erase_nodes(std::vector<NodeId> nodes) {
+  for (auto& [name, tracker] : group_to_tracker_) {
+    tracker.erase_nodes(nodes);
+  }
+}
+
+std::string GroupedMergeTracker::print() const {
+  std::stringstream ss;
+  for (auto& [name, tracker] : group_to_tracker_) {
+    ss << "Group '" << name << "' merges:\n" << tracker.print();
+  }
+
+  return ss.str();
+}
+
+MergeTracker& GroupedMergeTracker::getMergeGroup(std::string name) {
+  return group_to_tracker_.at(name);
 }
 
 }  // namespace hydra

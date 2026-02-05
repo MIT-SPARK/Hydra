@@ -34,8 +34,8 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <Eigen/Dense>
-#include <iostream>
 #include <memory>
+#include <ostream>
 #include <vector>
 
 namespace hydra::gnn {

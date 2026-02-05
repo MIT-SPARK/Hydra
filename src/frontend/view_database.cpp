@@ -13,10 +13,10 @@ namespace hydra {
 void declare_config(ViewDatabase::Config& config) {
   using namespace config;
   name("ViewDatabase::Config");
+  base<VerbosityConfig>(config);
   field(config.view_selection_method, "view_selection_method");
   field(config.inflation_distance, "inflation_distance");
   field(config.layers, "layers");
-  field(config.verbosity, "verbosity");
 }
 
 using NodeSet = std::unordered_set<NodeId>;
@@ -47,14 +47,13 @@ void ViewDatabase::updateAssignments(const DynamicSceneGraph& graph,
     const auto& view = *iter;
     if (!view) {
       iter = views_.erase(iter);
-      LOG_IF(INFO, config.verbosity >= 2) << "Removed empty view!";
+      MLOG(2) << "Removed empty view!";
       continue;
     }
 
     const Eigen::Vector3d view_pos = view->sensor_T_world.inverse().translation();
     if (should_archive(view_pos, view->timestamp_ns)) {
-      LOG_IF(INFO, config.verbosity >= 2)
-          << "Archived view @ " << view->timestamp_ns << " [ns]";
+      MLOG(2) << "Archived view @ " << view->timestamp_ns << " [ns]";
       iter = views_.erase(iter);
       continue;
     }
@@ -62,14 +61,13 @@ void ViewDatabase::updateAssignments(const DynamicSceneGraph& graph,
     ++iter;
   }
 
-  LOG_IF(INFO, config.verbosity >= 1) << "Got " << new_views << " new views!";
+  MLOG(1) << "Got " << new_views << " new views!";
   if (views_.empty()) {
-    LOG_IF(INFO, config.verbosity >= 1) << "No views assigned!";
+    MLOG(1) << "No views assigned!";
     return;
   }
 
-  LOG_IF(INFO, config.verbosity >= 1)
-      << "Assigning features with " << views_.size() << " active view(s)";
+  MLOG(1) << "Assigning features with " << views_.size() << " active view(s)";
   for (auto& [layer_name, layer_tracker] : trackers_) {
     auto layer = graph.findLayer(layer_name);
     if (!layer) {
@@ -92,8 +90,8 @@ void ViewDatabase::updateAssignments(const DynamicSceneGraph& graph,
       view_selector_->selectFeature(views_, config.inflation_distance, *attrs);
     }
 
-    LOG_IF(INFO, config.verbosity >= 1) << "Assigned features for " << num_assigned
-                                        << " nodes for layer '" << layer_name << "'";
+    MLOG(1) << "Assigned features for " << num_assigned << " nodes for layer '"
+            << layer_name << "'";
   }
 }
 

@@ -8,7 +8,10 @@ configure_file(hydra_test_config.h.in hydra_test_config.h)
 
 add_executable(
   test_${PROJECT_NAME}
+  main.cpp
+  src/resources.cpp
   backend/test_external_loop_closure.cpp
+  backend/test_generic_update_functor.cpp
   backend/test_update_agents_functor.cpp
   backend/test_update_buildings_functor.cpp
   backend/test_update_objects_functor.cpp

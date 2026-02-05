@@ -33,17 +33,18 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
-
 #include "hydra/backend/update_functions.h"
+#include "hydra/common/output_sink.h"
 #include "hydra/rooms/room_finder.h"
 
 namespace hydra {
 
 struct UpdateRoomsFunctor : public UpdateFunctor {
+  using Sink = OutputSink<uint64_t, const RoomFinder&>;
   struct Config {
     RoomFinderConfig room_finder;
     std::string places_layer = DsgLayers::PLACES;
+    std::vector<Sink::Factory> sinks = {};
   } const config;
 
   explicit UpdateRoomsFunctor(const Config& config);
@@ -57,9 +58,7 @@ struct UpdateRoomsFunctor : public UpdateFunctor {
   std::unique_ptr<RoomFinder> room_finder;
 
  private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<UpdateFunctor, UpdateRoomsFunctor, Config>(
-          "UpdateRoomsFunctor");
+  Sink::List sinks_;
 };
 
 void declare_config(UpdateRoomsFunctor::Config& config);

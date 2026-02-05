@@ -36,7 +36,6 @@
 #include <bitset>
 #include <cstddef>
 #include <cstdint>
-#include <iostream>
 #include <string>
 
 #include "hydra/common/dsg_types.h"

@@ -57,7 +57,8 @@ struct DistanceAdaptor {
 };
 
 struct TraversabilityDistanceAdaptor : public DistanceAdaptor {
-  explicit TraversabilityDistanceAdaptor(const SceneGraphLayer& layer) : layer(layer){};
+  explicit TraversabilityDistanceAdaptor(const SceneGraphLayer& layer)
+      : layer(layer) {};
 
   double operator()(const SceneGraphNode& node) const override;
   double operator()(const SceneGraphEdge& edge) const override;

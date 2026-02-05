@@ -37,25 +37,18 @@
 
 #include <memory>
 
+#include "hydra/active_window/active_window_output.h"
+#include "hydra/active_window/volumetric_window.h"
 #include "hydra/common/output_sink.h"
-#include "hydra/frontend/freespace_places_interface.h"
 #include "hydra/places/graph_extractor.h"
-#include "hydra/places/gvd_integrator_config.h"
+#include "hydra/places/gvd_integrator.h"
 #include "hydra/places/gvd_voxel.h"
 #include "hydra/reconstruction/tsdf_interpolators.h"
 
 namespace hydra {
 
-namespace places {
-// forward declare to avoid include
-class GvdIntegrator;
-}  // namespace places
-
-struct VolumetricWindow;
-
-class GvdPlaceExtractor : public FreespacePlacesInterface {
+class GvdPlaceExtractor {
  public:
-  using PositionMatrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
   using Sink = OutputSink<uint64_t,
                           const Eigen::Isometry3d&,
                           const places::GvdLayer&,
@@ -63,7 +56,7 @@ class GvdPlaceExtractor : public FreespacePlacesInterface {
 
   struct Config {
     std::string layer = DsgLayers::PLACES;
-    places::GvdIntegratorConfig gvd;
+    places::GvdIntegrator::Config gvd;
     places::GraphExtractor::Config graph;
     config::VirtualConfig<TsdfInterpolator> tsdf_interpolator;
     size_t min_component_size = 3;
@@ -81,11 +74,11 @@ class GvdPlaceExtractor : public FreespacePlacesInterface {
 
   virtual ~GvdPlaceExtractor();
 
-  NodeIdSet getActiveNodes() const override;
+  NodeIdSet getActiveNodes() const;
 
-  void detect(const ActiveWindowOutput& msg) override;
+  void detect(const ActiveWindowOutput& msg);
 
-  void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) override;
+  void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph);
 
   void filterIsolated(DynamicSceneGraph& graph, NodeIdSet& active_neighborhood);
 
@@ -100,12 +93,6 @@ class GvdPlaceExtractor : public FreespacePlacesInterface {
   NodeIdSet active_nodes_;
   Eigen::Vector3d latest_pos_;
   Sink::List sinks_;
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<FreespacePlacesInterface,
-                                     GvdPlaceExtractor,
-                                     Config>("gvd");
 };
 
 void declare_config(GvdPlaceExtractor::Config& config);

@@ -7,14 +7,13 @@
 #include "hydra/active_window/active_window_output.h"
 #include "hydra/active_window/volumetric_window.h"
 #include "hydra/common/dsg_types.h"
+#include "hydra/utils/nearest_neighbor_utilities.h"
 
 namespace hydra {
 
-class NearestNodeFinder;
-
 struct Frontier {
  public:
-  Frontier(){};
+  Frontier() {};
   Frontier(Eigen::Vector3d c,
            Eigen::Vector3d s,
            Eigen::Quaterniond o,
@@ -25,17 +24,17 @@ struct Frontier {
         orientation(o),
         num_frontier_voxels(n),
         block_index(b),
-        has_shape_information(true){};
+        has_shape_information(true) {};
   Frontier(Eigen::Vector3d c, size_t n, spatial_hash::BlockIndex b)
       : center(c),
         num_frontier_voxels(n),
         block_index(b),
-        has_shape_information(false){};
+        has_shape_information(false) {};
 
  public:
   Eigen::Vector3d center;
-  Eigen::Vector3d scale;
-  Eigen::Quaterniond orientation;
+  Eigen::Vector3d scale = Eigen::Vector3d::Zero();
+  Eigen::Quaterniond orientation = Eigen::Quaterniond::Identity();
   size_t num_frontier_voxels = 0;
   spatial_hash::BlockIndex block_index;
   bool has_shape_information = false;

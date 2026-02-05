@@ -39,6 +39,9 @@
 #include <kimera_pgmo/mesh_delta.h>
 
 namespace hydra {
+
+using kimera_pgmo::MeshDelta;
+
 namespace {
 
 struct NodeResult {
@@ -75,26 +78,26 @@ bool checkNode(const DynamicSceneGraph& graph,
   return true;
 }
 
-void stepSegmenter(const kimera_pgmo::MeshDelta& delta,
+void stepSegmenter(const MeshDelta& delta,
+                   kimera_pgmo::MeshOffsetInfo& offsets,
                    MeshSegmenter& segmenter,
                    DynamicSceneGraph& graph) {
-  delta.updateMesh(*graph.mesh());
-  const auto clusters = segmenter.detect(0, delta);
-  segmenter.updateGraph(0, delta, clusters, graph);
+  delta.updateMesh(*graph.mesh(), offsets);
+  const auto clusters = segmenter.detect(0, delta, offsets);
+  segmenter.updateGraph(0, offsets, clusters, graph);
 }
 
-void addPoints(kimera_pgmo::MeshDelta& delta,
+void addPoints(MeshDelta& delta,
                uint32_t label,
                const Eigen::Vector3f& offset,
                const Eigen::Vector3f& scale,
                bool archive = false) {
   const auto corners = BoundingBox(scale, offset).corners();
   for (const auto& corner : corners) {
-    pcl::PointXYZRGBA point;
-    point.x = corner.x();
-    point.y = corner.y();
-    point.z = corner.z();
-    delta.addVertex(0, point, label, archive);
+    kimera_pgmo::traits::VertexTraits traits;
+    traits.properties.has_label = true;
+    traits.label = label;
+    delta.addVertex(corner, traits, archive);
   }
 }
 
@@ -102,42 +105,42 @@ void addPoints(kimera_pgmo::MeshDelta& delta,
 
 TEST(MeshSegmenter, TestClustering) {
   MeshSegmenter::Config config;
-  config.min_cluster_size = 4;
+  config.clustering.min_cluster_size = 4;
   MeshSegmenter segmenter(config, {1, 2});
 
-  kimera_pgmo::MeshDelta delta;
+  MeshDelta delta({0, 0, 0});
   addPoints(delta, 1, {1, 2, 3}, Eigen::Vector3f::Constant(0.1));
   addPoints(delta, 2, {4, 5, 6}, Eigen::Vector3f::Constant(0.1));
 
-  const auto clusters = segmenter.detect(0, delta);
+  const auto clusters = segmenter.detect(0, delta, {0, 0, 0});
   ASSERT_EQ(clusters.size(), 2u);
 }
 
 TEST(MeshSegmenter, TestIndicesRemapping) {
   Eigen::Vector3f dims = Eigen::Vector3f::Constant(0.1);
+  const BoundingBox b1(dims, Eigen::Vector3f(1, 2, 3));
+  const BoundingBox b2(dims, Eigen::Vector3f(4, 5, 6));
+
   MeshSegmenter::Config config;
-  config.min_cluster_size = 4;
+  config.clustering.min_cluster_size = 4;
   MeshSegmenter segmenter(config, {1, 2});
 
   DynamicSceneGraph graph;
+  kimera_pgmo::MeshOffsetInfo offsets;
   graph.setMesh(std::make_shared<spark_dsg::Mesh>());
 
   {  // original objects
-    kimera_pgmo::MeshDelta delta;
+    MeshDelta delta({0, 0, 0});
     addPoints(delta, 1, {1, 2, 3}, dims);
     addPoints(delta, 2, {4, 5, 6}, dims);
-    stepSegmenter(delta, segmenter, graph);
+    stepSegmenter(delta, offsets, segmenter, graph);
 
     std::unordered_set<NodeId> active{"O0"_id, "O1"_id};
     EXPECT_EQ(active, segmenter.getActiveNodes());
 
     const std::map<NodeId, NodeResult> expected_nodes{
-        {"O0"_id,
-         {1, {0, 1, 2, 3, 4, 5, 6, 7}, BoundingBox(dims, Eigen::Vector3f(1, 2, 3))}},
-        {"O1"_id,
-         {2,
-          {8, 9, 10, 11, 12, 13, 14, 15},
-          BoundingBox(dims, Eigen::Vector3f(4, 5, 6))}},
+        {"O0"_id, {1, {0, 1, 2, 3, 4, 5, 6, 7}, b1}},
+        {"O1"_id, {2, {8, 9, 10, 11, 12, 13, 14, 15}, b2}},
     };
 
     for (const auto& [node_id, expected] : expected_nodes) {
@@ -147,24 +150,22 @@ TEST(MeshSegmenter, TestIndicesRemapping) {
   }
 
   {  // swapped objects
-    kimera_pgmo::MeshDelta delta;
-    addPoints(delta, 2, {4, 5, 6}, Eigen::Vector3f::Constant(0.1));
-    addPoints(delta, 1, {1, 2, 3}, Eigen::Vector3f::Constant(0.1));
+    std::map<size_t, size_t> remap;
     for (size_t i = 0; i < 8; ++i) {
       // two corner sets are swapped in order
-      delta.prev_to_curr[i] = i + 8;
-      delta.prev_to_curr[i + 8] = i;
+      remap[i] = i + 8;
+      remap[i + 8] = i;
     }
 
-    stepSegmenter(delta, segmenter, graph);
+    const auto tracking = MeshDelta::TrackingInfo::with_remap(0, 16, 0, remap);
+    MeshDelta delta(tracking);
+    addPoints(delta, 2, {4, 5, 6}, Eigen::Vector3f::Constant(0.1));
+    addPoints(delta, 1, {1, 2, 3}, Eigen::Vector3f::Constant(0.1));
+    stepSegmenter(delta, offsets, segmenter, graph);
 
     const std::map<NodeId, NodeResult> expected_nodes{
-        {"O0"_id,
-         {1,
-          {8, 9, 10, 11, 12, 13, 14, 15},
-          BoundingBox(dims, Eigen::Vector3f(1, 2, 3))}},
-        {"O1"_id,
-         {2, {0, 1, 2, 3, 4, 5, 6, 7}, BoundingBox(dims, Eigen::Vector3f(4, 5, 6))}},
+        {"O0"_id, {1, {8, 9, 10, 11, 12, 13, 14, 15}, b1}},
+        {"O1"_id, {2, {0, 1, 2, 3, 4, 5, 6, 7}, b2}},
     };
 
     for (const auto& [node_id, expected] : expected_nodes) {
@@ -176,90 +177,85 @@ TEST(MeshSegmenter, TestIndicesRemapping) {
 
 TEST(MeshSegmenter, TestDeletedObject) {
   Eigen::Vector3f dims = Eigen::Vector3f::Constant(0.1);
+  const spark_dsg::BoundingBox b2(dims, Eigen::Vector3f(4, 5, 6));
+
   MeshSegmenter::Config config;
-  config.min_cluster_size = 4;
+  config.clustering.min_cluster_size = 4;
   MeshSegmenter segmenter(config, {1, 2});
 
   DynamicSceneGraph graph;
+  kimera_pgmo::MeshOffsetInfo offsets;
   graph.setMesh(std::make_shared<spark_dsg::Mesh>());
 
   {  // setup original objects
-    kimera_pgmo::MeshDelta delta;
+    MeshDelta delta({0, 0, 0});
     addPoints(delta, 1, {1, 2, 3}, dims);
     addPoints(delta, 2, {4, 5, 6}, dims);
-    stepSegmenter(delta, segmenter, graph);
+    stepSegmenter(delta, offsets, segmenter, graph);
   }
 
   {  // delete object one
-    kimera_pgmo::MeshDelta delta;
-    addPoints(delta, 2, {4, 5, 6}, dims);
+    std::map<size_t, size_t> remap;
     for (size_t i = 0; i < 8; ++i) {
       // previous object gets moved up
-      delta.prev_to_curr[i + 8] = i;
-      delta.deleted_indices.insert(i);
+      remap[i + 8] = i;
     }
 
-    stepSegmenter(delta, segmenter, graph);
+    const auto tracking = MeshDelta::TrackingInfo::with_remap(0, 16, 0, remap);
+    MeshDelta delta(tracking);
+    addPoints(delta, 2, {4, 5, 6}, dims);
+    stepSegmenter(delta, offsets, segmenter, graph);
 
-    const std::map<NodeId, NodeResult> expected_nodes{
-        {"O1"_id,
-         {2, {0, 1, 2, 3, 4, 5, 6, 7}, BoundingBox(dims, Eigen::Vector3f(4, 5, 6))}},
-    };
-
-    for (const auto& [node_id, expected] : expected_nodes) {
+    const std::map<NodeId, NodeResult> expected{
+        {"O1"_id, {2, {0, 1, 2, 3, 4, 5, 6, 7}, b2}}};
+    for (const auto& [node_id, node] : expected) {
       SCOPED_TRACE("Object " + NodeSymbol(node_id).str());
-      EXPECT_TRUE(checkNode(graph, node_id, expected));
+      EXPECT_TRUE(checkNode(graph, node_id, node));
     }
   }
 }
 
 TEST(MeshSegmenter, TestArchivedObject) {
   Eigen::Vector3f dims = Eigen::Vector3f::Constant(0.1);
+  const BoundingBox b1(dims, Eigen::Vector3f(1, 2, 3));
+  const BoundingBox b2(dims, Eigen::Vector3f(4, 5, 6));
+
   MeshSegmenter::Config config;
-  config.min_cluster_size = 4;
+  config.clustering.min_cluster_size = 4;
   MeshSegmenter segmenter(config, {1, 2});
 
   DynamicSceneGraph graph;
+  kimera_pgmo::MeshOffsetInfo offsets;
   graph.setMesh(std::make_shared<spark_dsg::Mesh>());
 
   {  // setup original objects
-    kimera_pgmo::MeshDelta delta;
+    MeshDelta delta({0, 0, 0});
     addPoints(delta, 1, {1, 2, 3}, dims);
     addPoints(delta, 2, {4, 5, 6}, dims);
-    stepSegmenter(delta, segmenter, graph);
+    stepSegmenter(delta, offsets, segmenter, graph);
   }
 
   {  // archive object two
-    kimera_pgmo::MeshDelta delta;
+    std::map<size_t, size_t> remap;
+    for (size_t i = 0; i < 8; ++i) {
+      // archived object gets moved down
+      remap[i + 8] = i;
+      // active object gets moved up
+      remap[i] = i + 8;
+    }
+
+    const auto tracking = MeshDelta::TrackingInfo::with_remap(0, 16, 0, remap);
+    MeshDelta delta(tracking);
     addPoints(delta, 2, {4, 5, 6}, dims, true);
     addPoints(delta, 1, {1, 2, 3}, dims);
     addPoints(delta, 2, {4, 5, 6}, dims);
-
-    for (size_t i = 0; i < 8; ++i) {
-      // archived object gets moved down
-      delta.prev_to_curr[i + 8] = i;
-      // active object gets moved up
-      delta.prev_to_curr[i] = i + 8;
-    }
-
-    stepSegmenter(delta, segmenter, graph);
+    stepSegmenter(delta, offsets, segmenter, graph);
 
     const std::map<NodeId, NodeResult> expected_nodes{
-        {"O0"_id,
-         {1,
-          {8, 9, 10, 11, 12, 13, 14, 15},
-          BoundingBox(dims, Eigen::Vector3f(1, 2, 3))}},
-        {"O1"_id,
-         {2,
-          {0, 1, 2, 3, 4, 5, 6, 7},
-          BoundingBox(dims, Eigen::Vector3f(4, 5, 6)),
-          false}},
-        {"O2"_id,
-         {2,
-          {16, 17, 18, 19, 20, 21, 22, 23},
-          BoundingBox(dims, Eigen::Vector3f(4, 5, 6))}},
+        {"O0"_id, {1, {8, 9, 10, 11, 12, 13, 14, 15}, b1}},
+        {"O1"_id, {2, {0, 1, 2, 3, 4, 5, 6, 7}, b2, false}},
+        {"O2"_id, {2, {16, 17, 18, 19, 20, 21, 22, 23}, b2}},
     };
-
     for (const auto& [node_id, expected] : expected_nodes) {
       SCOPED_TRACE("Object " + NodeSymbol(node_id).str());
       EXPECT_TRUE(checkNode(graph, node_id, expected));
@@ -269,32 +265,30 @@ TEST(MeshSegmenter, TestArchivedObject) {
 
 TEST(MeshSegmenter, TestDeltaWithOffset) {
   Eigen::Vector3f dims = Eigen::Vector3f::Constant(0.1);
+  const BoundingBox b1(dims, Eigen::Vector3f(1, 2, 3));
+
   MeshSegmenter::Config config;
-  config.min_cluster_size = 4;
+  config.clustering.min_cluster_size = 4;
   MeshSegmenter segmenter(config, {1, 2});
 
   DynamicSceneGraph graph;
+  kimera_pgmo::MeshOffsetInfo offsets;
   graph.setMesh(std::make_shared<spark_dsg::Mesh>());
+
   {  // add 8 archived vertices to mesh
-    kimera_pgmo::MeshDelta delta;
+    MeshDelta delta({0, 0, 0});
     addPoints(delta, 1, {1, 2, 3}, dims, true);
-    delta.updateMesh(*graph.mesh());
+    delta.updateMesh(*graph.mesh(), offsets);
   }
 
   {  // add actual object
-    kimera_pgmo::MeshDelta delta(8, 0);
+    MeshDelta delta({0, 0, 0});
     addPoints(delta, 1, {1, 2, 3}, dims);
-    // no prev-to-curr mapping for archived vertices
-
-    stepSegmenter(delta, segmenter, graph);
+    stepSegmenter(delta, offsets, segmenter, graph);
 
     const std::map<NodeId, NodeResult> expected_nodes{
-        {"O0"_id,
-         {1,
-          {8, 9, 10, 11, 12, 13, 14, 15},
-          BoundingBox(dims, Eigen::Vector3f(1, 2, 3))}},
+        {"O0"_id, {1, {8, 9, 10, 11, 12, 13, 14, 15}, b1}},
     };
-
     for (const auto& [node_id, expected] : expected_nodes) {
       SCOPED_TRACE("Object " + NodeSymbol(node_id).str());
       EXPECT_TRUE(checkNode(graph, node_id, expected));

@@ -84,13 +84,10 @@ frontend:
       pessimistic: true
     clustering:
       type: BlockTraversabilityClustering
-      min_place_width: &min_place_width 0.4 # m
-      max_place_width: &max_place_width 2.0 # m
+      min_place_width: &min_place_width 0.5  # m
+      max_place_width: &max_place_width 1.0  # m
       recursive: true
       simplify_boundary_traversability: false
-      project_labels_to_ground: true # True is probably more accurate, this gives labels more often for boundary places.
-      label_depth_tolerance: 1.0
-      label_use_const_weight: false # true: counting, false: inverse distance squared
     sinks:
       - type: TraversabilityVisualizer
   freespace_places:
@@ -117,9 +114,8 @@ frontend:
     tsdf_interpolator:
       type: downsample
       ratio: 2
-  use_frontiers: false
   frontier_places:
-    type: voxel_clustering
+    # type: voxel_clustering
     cluster_tolerance: 0.3
     min_cluster_size: 10
     max_cluster_size: 100000
@@ -145,11 +141,13 @@ backend:
     places:
       type: UpdatePlacesFunctor
     traversability:
-      type: UpdateTraversabilityFunctor
-      min_place_size: *min_place_width # m
-      max_place_size: *max_place_width # m
+      type: UpdateBlockTraversabilityFunctor
+      min_place_size: *min_place_width
+                                       # m
+      max_place_size: *max_place_width
+                                       # m
       use_metric_distance: false
-      tolerance: 0.1 # m
+      tolerance: 0.1  # m
     frontiers:
       type: UpdateFrontiersFunctor
     rooms:

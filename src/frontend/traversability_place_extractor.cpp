@@ -48,6 +48,15 @@
 using Timer = hydra::timing::ScopedTimer;
 
 namespace hydra::places {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<TraversabilityPlaceExtractor,
+                                   TraversabilityPlaceExtractor,
+                                   TraversabilityPlaceExtractor::Config>(
+        "traversability");
+
+}  // namespace
 
 void declare_config(TraversabilityPlaceExtractor::Config& config) {
   using namespace config;
@@ -65,36 +74,24 @@ TraversabilityPlaceExtractor::TraversabilityPlaceExtractor(const Config& config)
       postprocessing_(config.postprocessing),
       sinks_(Sink::instantiate(config.sinks)) {}
 
-NodeIdSet TraversabilityPlaceExtractor::getActiveNodes() const { return active_nodes_; }
-
-void TraversabilityPlaceExtractor::detect(const ActiveWindowOutput& msg,
-                                          const kimera_pgmo::MeshDelta& mesh_delta,
-                                          const DynamicSceneGraph& graph) {
+void TraversabilityPlaceExtractor::detect(const ActiveWindowOutput& msg) {
   Timer timer("traversability/estimate", msg.timestamp_ns);
-  estimator_->updateTraversability(msg, mesh_delta, graph);
+  estimator_->updateTraversability(msg);
 }
 
 void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
                                                DynamicSceneGraph& graph) {
-  // If traversability postprocessing is enabled, make a copy of the layer to apply all
-  // postprocessing. Not ideal but should also not be too costly.
-  const TraversabilityLayer* layer;
-  std::unique_ptr<TraversabilityLayer> processed_layer;
-  if (postprocessing_) {
-    Timer timer("traversability/postprocessing", msg.timestamp_ns);
-    processed_layer =
-        std::make_unique<TraversabilityLayer>(estimator_->getTraversabilityLayer());
-    postprocessing_.apply(*processed_layer);
-    layer = processed_layer.get();
-  } else {
-    layer = &estimator_->getTraversabilityLayer();
-  }
+  // TODO(lschmid): Find a nicer way than copying the layer here. Should not be too
+  // expensive though.
+  auto timer = Timer("traversability/postprocessing", msg.timestamp_ns);
+  TraversabilityLayer layer = estimator_->getTraversabilityLayer();
+  postprocessing_.apply(layer);
 
-  Timer timer("traversability/clustering", msg.timestamp_ns);
-  clustering_->updateGraph(*layer, msg, graph);
+  timer.reset("traversability/clustering");
+  clustering_->updateGraph(layer, msg, graph);
 
   timer.reset("traversability/sinks");
-  Sink::callAll(sinks_, msg.timestamp_ns, msg.world_t_body, *layer);
+  Sink::callAll(sinks_, msg.timestamp_ns, msg.world_t_body, layer);
 }
 
 }  // namespace hydra::places

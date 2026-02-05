@@ -39,6 +39,7 @@
 #include <config_utilities/validation.h>
 
 #include "hydra/common/global_info.h"
+#include "hydra/reconstruction/integration_masking.h"
 
 namespace hydra {
 
@@ -50,6 +51,7 @@ void declare_config(ActiveWindowModule::Config& config) {
   config.map_window.setOptional();
   field(config.map_window, "map_window");
   field(config.sinks, "sinks");
+  field(config.validate_mesh_fields, "validate_mesh_fields");
 }
 
 ActiveWindowModule::Config::Config(bool with_semantics, bool with_tracking)
@@ -65,6 +67,20 @@ ActiveWindowModule::ActiveWindowModule(const Config& config,
       map_(config.volumetric_map),
       map_window_(config.map_window ? config.map_window.create()
                                     : GlobalInfo::instance().createVolumetricWindow()) {
+  const auto mesh_config = GlobalInfo::instance().getConfig().mesh;
+  if (config.validate_mesh_fields) {
+    // double-check that the frontend and backend will actually receive labels and
+    // first-seen stamps
+    if (config.volumetric_map.with_semantics && !mesh_config.with_labels) {
+      LOG(FATAL) << "Volumetric map contains semantics, but mesh does not have labels "
+                    "enabled!";
+    }
+
+    if (config.volumetric_map.with_tracking && !mesh_config.with_first_seen_stamps) {
+      LOG(FATAL) << "Volumetric map contains tracking layer, but mesh does not have "
+                    "first-seen stamps enabled!";
+    }
+  }
 }
 
 void ActiveWindowModule::start() {
@@ -143,6 +159,24 @@ void ActiveWindowModule::addSink(const Sink::Ptr& sink) {
   if (sink) {
     sinks_.push_back(sink);
   }
+}
+
+cv::Mat ActiveWindowModule::getDefaultIntegrationMask(const InputData& data) const {
+  // TODO(nathan) cache somewhere
+  const auto& sensor = data.getSensor();
+  const auto label_config = GlobalInfo::instance().getLabelSpaceConfig();
+  std::set<int32_t> invalid_labels;
+  invalid_labels.insert(label_config.invalid_labels.begin(),
+                        label_config.invalid_labels.end());
+  invalid_labels.insert(label_config.dynamic_labels.begin(),
+                        label_config.dynamic_labels.end());
+  invalid_labels.insert(sensor.config.invalid_labels.begin(),
+                        sensor.config.invalid_labels.end());
+
+  cv::Mat integration_mask;
+  maskInvalidSemantics(data.label_image, invalid_labels, integration_mask);
+  maskNonZero(data.getSensor().getStaticMask(), integration_mask);
+  return integration_mask;
 }
 
 }  // namespace hydra

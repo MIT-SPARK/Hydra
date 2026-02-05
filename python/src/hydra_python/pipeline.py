@@ -196,7 +196,7 @@ def load_pipeline(
         sensor,
         robot_id=0,
         config_verbosity=config_verbosity,
-        freeze_global_info=freeze_global_info,
+        use_step_mode=True,
         zmq_url="" if zmq_url is None else zmq_url,
     )
 

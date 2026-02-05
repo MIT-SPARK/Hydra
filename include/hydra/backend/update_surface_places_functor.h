@@ -38,60 +38,53 @@
 #include "hydra/backend/association_strategies.h"
 #include "hydra/backend/update_functions.h"
 #include "hydra/utils/active_window_tracker.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
 struct Update2dPlacesFunctor : public UpdateFunctor {
-  struct Config {
+  struct Config : VerbosityConfig {
+    using AssociationConfig = config::VirtualConfig<AssociationStrategy>;
+    using SemanticAssociation = association::SemanticNearestNode::Config;
+
+    Config() : VerbosityConfig("[update_2d_places] ") {}
+
     //! Layer to update
     std::string layer = DsgLayers::MESH_PLACES;
-    //! Allow merging of 2D places
-    bool allow_places_merge = true;
     //! If two places differ by at least this much in z, they won't be merged
     double merge_max_delta_z = 0.5;
-    //! Minimum number of points to allow splitting place
-    size_t min_points = 10;
-    //! Minimum size of place for splitting
-    double min_size = 2;
     //! Amount of overlap between places necessary to add edge
     double connection_overlap_threshold = 0;
     //! Maximum difference in z between neighboring places
     double connection_max_delta_z = 0.5;
     //! How much to inflate place ellipsoid relative to bounding box
     double connection_ellipse_scale_factor = 1.0;
-    //! Whether to allow splitting of large backend places
-    bool enable_splitting = false;
     //! Association strategy for finding matches to active nodes
-    MergeProposer::Config merge_proposer = {config::VirtualConfig<AssociationStrategy>{
-        association::SemanticNearestNode::Config{}}};
+    MergeProposer::Config merge_proposer = {AssociationConfig{SemanticAssociation{}}};
   } const config;
 
   explicit Update2dPlacesFunctor(const Config& config);
+
   Hooks hooks() const override;
+
   void call(const DynamicSceneGraph& unmerged,
             SharedDsgInfo& dsg,
             const UpdateInfo::ConstPtr& info) const override;
+
   MergeList findMerges(const DynamicSceneGraph& graph,
                        const UpdateInfo::ConstPtr& info) const;
-
-  void updateNode(const spark_dsg::Mesh::Ptr& mesh,
-                  NodeId node,
-                  Place2dNodeAttributes& attrs) const;
 
   bool shouldMerge(const Place2dNodeAttributes& from_attrs,
                    const Place2dNodeAttributes& to_attrs) const;
 
   void cleanup(SharedDsgInfo& dsg) const;
 
+  void updateMeshIndices(const DynamicSceneGraph& graph,
+                         const kimera_pgmo::MeshOffsetInfo& offsets) const;
+
   mutable ActiveWindowTracker active_tracker;
   const MergeProposer merge_proposer;
-
- private:
-  mutable NodeSymbol next_node_id_ = NodeSymbol('S', 0);
-
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<UpdateFunctor, Update2dPlacesFunctor, Config>(
-          "Update2dPlacesFunctor");
+  mutable std::set<spark_dsg::NodeId> cleanup_nodes;
 };
 
 void declare_config(Update2dPlacesFunctor::Config& conf);

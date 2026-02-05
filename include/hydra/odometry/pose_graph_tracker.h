@@ -34,17 +34,13 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <pose_graph_tools/pose_graph.h>
-#include <spark_dsg/scene_graph_types.h>
+#include <spark_dsg/dynamic_scene_graph.h>
 
 #include <Eigen/Geometry>
 #include <list>
 #include <map>
 #include <memory>
 #include <optional>
-
-namespace spark_dsg {
-class DynamicSceneGraph;
-}
 
 namespace hydra {
 

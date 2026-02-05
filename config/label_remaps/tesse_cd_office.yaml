@@ -218,7 +218,7 @@
 - {sub_id: 217, super_id: 11}
 - {sub_id: 218, super_id: 11}
 
-# # Super-ID mapping for tesse_cd office dataset
+#  # Super-ID mapping for tesse_cd office dataset
 # 0 : Nothing
 # 1 : Ventilation/Piping
 # 2 : Small office objects (eg books)

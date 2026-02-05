@@ -39,6 +39,14 @@
 #include <glog/logging.h>
 
 namespace hydra {
+namespace {
+
+static const auto reg = config::RegistrationWithConfig<UpdateFunctor,
+                                                       UpdateBuildingsFunctor,
+                                                       UpdateBuildingsFunctor::Config>(
+    "UpdateBuildingsFunctor");
+
+}
 
 void declare_config(UpdateBuildingsFunctor::Config& config) {
   using namespace config;

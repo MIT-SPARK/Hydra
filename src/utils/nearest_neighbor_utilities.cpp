@@ -126,11 +126,10 @@ void NearestNodeFinder::find(const Eigen::Vector3d& position,
   }
 }
 
-size_t NearestNodeFinder::findRadius(
-    const Eigen::Vector3d& position,
-    double radius,
-    bool skip_first,
-    const NearestNodeFinder::Callback& callback) const {
+size_t NearestNodeFinder::findRadius(const Eigen::Vector3d& position,
+                                     double radius,
+                                     bool skip_first,
+                                     const Callback& callback) const {
   std::vector<nanoflann::ResultItem<size_t, double>> neighbors;
   size_t num_found = internals_->kdtree->radiusSearch(
       position.data(), radius, neighbors, nanoflann::SearchParameters());
@@ -230,7 +229,7 @@ PointNeighborSearch::PointNeighborSearch(const std::vector<Eigen::Vector3f>& poi
   internals_ = std::make_unique<Detail>(points);
 }
 
-PointNeighborSearch::~PointNeighborSearch(){};
+PointNeighborSearch::~PointNeighborSearch() {};
 
 bool PointNeighborSearch::search(const Eigen::Vector3f& query_point,
                                  float& distance_squared,

@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <config_utilities/factory.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <spark_dsg/dynamic_scene_graph.h>
 
@@ -58,14 +57,10 @@ class TraversabilityEstimator {
    * @brief Update the traversability based on the active window output and mesh delta.
    * @param msg The active window output containing the latest sensor data and
    * volumetric map updates.
-   * @param mesh_delta The mesh delta representing changes in the mesh.
-   * @param graph The dynamic scene graph to update with traversability information.
    */
-  virtual void updateTraversability(const ActiveWindowOutput& msg,
-                                    const kimera_pgmo::MeshDelta& mesh_delta,
-                                    const spark_dsg::DynamicSceneGraph& graph) = 0;
+  virtual void updateTraversability(const ActiveWindowOutput& msg) = 0;
 
-  const TraversabilityLayer& getTraversabilityLayer() const {
+  virtual const TraversabilityLayer& getTraversabilityLayer() const {
     return *traversability_layer_;
   }
 
@@ -103,9 +98,7 @@ class HeightTraversabilityEstimator : public TraversabilityEstimator {
   HeightTraversabilityEstimator(const Config& config);
   ~HeightTraversabilityEstimator() override = default;
 
-  void updateTraversability(const ActiveWindowOutput& msg,
-                            const kimera_pgmo::MeshDelta& /* mesh_delta */,
-                            const spark_dsg::DynamicSceneGraph& /* graph */) override;
+  void updateTraversability(const ActiveWindowOutput& msg) override;
 
   const Config config;
 
@@ -119,12 +112,6 @@ class HeightTraversabilityEstimator : public TraversabilityEstimator {
 
   // Helper functions.
   BlockIndexSet get2DBlockIndices(const BlockIndices& blocks) const;
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<TraversabilityEstimator,
-                                     HeightTraversabilityEstimator,
-                                     Config>("HeightTraversabilityEstimator");
 };
 
 void declare_config(HeightTraversabilityEstimator::Config& config);

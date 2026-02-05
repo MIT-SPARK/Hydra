@@ -50,18 +50,6 @@ struct VoronoiCheckConfig {
   double parent_cos_angle_separation = 0.5;
 };
 
-struct GvdIntegratorConfig {
-  float max_distance_m = 2.0f;
-  float min_distance_m = 0.2f;
-  float min_diff_m = 1.0e-3f;
-  float min_weight = 1.0e-6f;
-  bool refine_voxel_pos = false;
-  bool positive_distance_only = true;
-  VoronoiCheckConfig voronoi_config;
-};
-
-void declare_config(VoronoiCheckConfig& conf);
-
-void declare_config(GvdIntegratorConfig& conf);
+void declare_config(VoronoiCheckConfig& config);
 
 }  // namespace hydra::places

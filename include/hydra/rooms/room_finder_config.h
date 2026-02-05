@@ -33,11 +33,18 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <filesystem>
 #include <string>
 
 namespace hydra {
 
-enum class RoomClusterMode { MODULARITY, MODULARITY_DISTANCE, NEIGHBORS, NONE };
+enum class RoomClusterMode {
+  MODULARITY,
+  MODULARITY_DISTANCE,
+  NEIGHBORS,
+  GROUND_TRUTH,
+  NONE
+};
 
 enum class DilationThresholdMode {
   REPEATED,
@@ -63,6 +70,7 @@ struct RoomFinderConfig {
   double dilation_diff_threshold_m = 1.0e-4;
   bool log_filtrations = false;
   bool log_place_graphs = false;
+  std::filesystem::path ground_truth_rooms_path = "";
 };
 
 void declare_config(RoomFinderConfig& config);

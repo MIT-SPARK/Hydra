@@ -35,6 +35,7 @@
 #include "hydra/frontend/gvd_place_extractor.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
 #include <spark_dsg/graph_utilities.h>
 #include <spark_dsg/printing.h>
@@ -43,14 +44,20 @@
 #include "hydra/common/global_info.h"
 #include "hydra/places/graph_extractor.h"
 #include "hydra/places/graph_extractor_utilities.h"
-#include "hydra/places/gvd_integrator.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<GvdPlaceExtractor,
+                                   GvdPlaceExtractor,
+                                   GvdPlaceExtractor::Config>("gvd");
+
+}
 
 using hydra::timing::ScopedTimer;
 using places::GvdIntegrator;
-using places::GvdIntegratorConfig;
 using places::GvdVoxel;
 
 void declare_config(GvdPlaceExtractor::Config& config) {
@@ -120,7 +127,8 @@ void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg) {
 
   ScopedTimer graph_timer("places/gvd", msg.timestamp_ns);
   // reconstruction now only sends updated blocks so we integrate everything
-  gvd_integrator_->updateFromTsdf(msg.timestamp_ns, tsdf, false, true);
+  gvd_integrator_->updateFromTsdf(
+      msg.timestamp_ns, tsdf, false, &map.getMeshLayer(), true);
   gvd_integrator_->updateGvd(msg.timestamp_ns, &graph_extractor_);
 
   if (map_window_) {

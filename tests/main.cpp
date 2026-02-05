@@ -36,6 +36,8 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
+#include "hydra/utils/pgmo_glog_sink.h"
+
 int main(int argc, char** argv) {
   FLAGS_logtostderr = true;
   FLAGS_alsologtostderr = true;
@@ -46,5 +48,6 @@ int main(int argc, char** argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
 
+  logging::Logger::addSink("glog", std::make_shared<hydra::PgmoGlogSink>());
   return RUN_ALL_TESTS();
 }

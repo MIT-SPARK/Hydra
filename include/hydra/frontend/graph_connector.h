@@ -33,21 +33,19 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/scene_graph_types.h>
+#include <spark_dsg/dynamic_scene_graph.h>
 
 #include <map>
 #include <memory>
 #include <set>
 #include <vector>
 
-namespace spark_dsg {
-class DynamicSceneGraph;
-}
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
 struct LayerConnector {
-  struct Config {
+  struct Config : public VerbosityConfig {
     struct ChildLayerConfig {
       //! Layer to find parents for
       std::string layer = "";
@@ -61,8 +59,6 @@ struct LayerConnector {
     //! All layers to find parents for (defaults to objects and agents)
     std::vector<ChildLayerConfig> child_layers{
         {spark_dsg::DsgLayers::OBJECTS, true, true}};
-    //! Verbosity of graph connector
-    size_t verbosity = 0;
     //! Whether or not to force `is_active` to false
     bool clear_active_flag = true;
   } const config;

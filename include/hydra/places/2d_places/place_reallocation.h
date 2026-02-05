@@ -33,90 +33,22 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <gtest/gtest.h>
-#include <hydra/places/gvd_integrator.h>
-#include <hydra/reconstruction/volumetric_map.h>
 
-namespace hydra::places::test {
+#include <spark_dsg/mesh.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph_layer.h>
 
-void updateGvd(GvdIntegrator& integrator,
-               const VolumetricMap& map,
-               bool clear_updated,
-               bool use_all_blocks = false);
+#include <set>
 
-class SingleBlockTestFixture : public ::testing::Test {
- public:
-  SingleBlockTestFixture() = default;
+namespace hydra::utils {
 
-  virtual ~SingleBlockTestFixture() = default;
+void reallocateMeshPoints(const spark_dsg::Mesh& mesh,
+                          spark_dsg::Place2dNodeAttributes& attrs1,
+                          spark_dsg::Place2dNodeAttributes& attrs2);
 
-  virtual void SetUp() override;
+void propagateReallocation(const spark_dsg::Mesh& mesh,
+                           const spark_dsg::SceneGraphLayer& layer,
+                           const std::set<spark_dsg::NodeId>& changed_nodes,
+                           std::set<spark_dsg::NodeId>& seen_nodes);
 
-  void setTsdfVoxel(int x, int y, int z, float distance, float weight = 0.1f);
-
-  const TsdfVoxel& getTsdfVoxel(int x, int y, int z);
-
-  const GvdVoxel& getGvdVoxel(int x, int y, int z);
-
-  float voxel_size = 0.1f;
-  int voxels_per_side = 4;
-  double truncation_distance = 0.1;
-
-  std::unique_ptr<VolumetricMap> map;
-  GvdLayer::Ptr gvd_layer;
-
-  GvdIntegratorConfig gvd_config;
-  TsdfBlock::Ptr tsdf_block;
-  GvdBlock::Ptr gvd_block;
-};
-
-class LargeSingleBlockTestFixture : public SingleBlockTestFixture {
- public:
-  LargeSingleBlockTestFixture() = default;
-
-  virtual ~LargeSingleBlockTestFixture() = default;
-
-  virtual void SetUp() override;
-};
-
-class SingleBlockExtractionTestFixture : public SingleBlockTestFixture {
- public:
-  SingleBlockExtractionTestFixture() = default;
-
-  virtual ~SingleBlockExtractionTestFixture() = default;
-
-  virtual void SetUp() override;
-
-  std::unique_ptr<GvdIntegrator> gvd_integrator;
-
- protected:
-  virtual void setBlockState();
-};
-
-class TestFixture2d : public ::testing::Test {
- public:
-  TestFixture2d() = default;
-
-  virtual ~TestFixture2d() = default;
-
-  virtual void SetUp() override;
-
-  void setSurfaceVoxel(int x, int y);
-
-  void setTsdfVoxel(int x, int y, float distance, float weight = 0.1f);
-
-  const GvdVoxel& getGvdVoxel(int x, int y);
-
-  float voxel_size = 1.0f;
-  int voxels_per_side = 8;
-  double truncation_distance = 0.1;
-
-  TsdfLayer::Ptr tsdf_layer;
-  GvdLayer::Ptr gvd_layer;
-
-  GvdIntegratorConfig gvd_config;
-  TsdfBlock::Ptr tsdf_block;
-  GvdBlock::Ptr gvd_block;
-};
-
-}  // namespace hydra::places::test
+}  // namespace hydra::utils

@@ -39,9 +39,6 @@
 #include <config_utilities/validation.h>
 #include <spark_dsg/labelspace.h>
 
-#include <filesystem>
-#include <fstream>
-
 #include "hydra/common/config_utilities.h"
 #include "hydra/common/semantic_color_map.h"
 #include "hydra/utils/pgmo_glog_sink.h"
@@ -89,6 +86,14 @@ struct LabelNameConversion {
   }
 };
 
+void declare_config(MeshFieldConfig& config) {
+  using namespace config;
+  name("MeshFieldConfgi");
+  field(config.with_colors, "with_colors");
+  field(config.with_first_seen_stamps, "with_first_seen_stamps");
+  field(config.with_labels, "with_labels");
+}
+
 void declare_config(FrameConfig& frames) {
   using namespace config;
   name("FrameConfig");
@@ -110,10 +115,14 @@ void declare_config(PipelineConfig& config) {
   config.map_window.setOptional();
   field(config.map_window, "map_window");
   field<LabelNameConversion>(config.label_names, "label_names");
+  field(config.semantic_layers, "semantic_layers");
+
   // the following subconfigs should not be namespaced
   field(config.frames, "frames", false);
   field(config.graph, "graph", false);
   field(config.label_space, "label_space", false);
+
+  field(config.mesh, "mesh");
 }
 
 GlobalInfo::GlobalInfo() : force_shutdown_(false) {}
@@ -198,7 +207,7 @@ SharedDsgInfo::Ptr GlobalInfo::createSharedDsg() const {
   const spark_dsg::Labelspace labelspace(getLabelToNameMap());
   if (labelspace) {
     labelspace.save(graph, "mesh");
-    for (const auto& layer_name : config_.label_space.semantic_layers) {
+    for (const auto& layer_name : config_.semantic_layers) {
       const auto key = graph.getLayerKey(layer_name);
       if (key) {
         labelspace.save(graph, key->layer, key->partition);
@@ -253,6 +262,14 @@ std::vector<std::string> GlobalInfo::getAvailableSensors() const {
 
 std::unique_ptr<VolumetricWindow> GlobalInfo::createVolumetricWindow() const {
   return config_.map_window.create();
+}
+
+spark_dsg::Mesh::Ptr GlobalInfo::createMesh() const {
+  return std::make_shared<spark_dsg::Mesh>(
+      config_.mesh.with_colors,
+      true,  // we force the mesh to have last seen stamps
+      config_.mesh.with_labels,
+      config_.mesh.with_first_seen_stamps);
 }
 
 std::ostream& operator<<(std::ostream& out, const GlobalInfo& config) {

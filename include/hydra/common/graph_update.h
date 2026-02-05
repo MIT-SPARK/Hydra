@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <config_utilities/virtual_config.h>
+#include <spark_dsg/dynamic_scene_graph.h>
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
@@ -41,10 +42,6 @@
 #include <map>
 
 #include "hydra/common/node_matchers.h"
-
-namespace spark_dsg {
-class DynamicSceneGraph;
-}
 
 namespace hydra {
 

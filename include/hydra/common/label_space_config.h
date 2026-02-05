@@ -33,34 +33,20 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/scene_graph_types.h>
-
-#include <array>
 #include <cstdint>
-#include <map>
+#include <filesystem>
 #include <set>
-#include <string>
-#include <vector>
 
 namespace hydra {
 
 struct LabelSpaceConfig {
   size_t total_labels = 0;
-  std::string colormap_filepath = "";
-  std::string label_remap_filepath = "";
   std::set<uint32_t> dynamic_labels;
   std::set<uint32_t> invalid_labels;
   std::set<uint32_t> object_labels;
-  std::set<uint32_t> surface_places_labels = {};
-  std::set<uint32_t> ground_labels = {};
-  //! @brief Scene graph layers that use this label space
-  std::vector<std::string> semantic_layers{spark_dsg::DsgLayers::OBJECTS,
-                                           spark_dsg::DsgLayers::MESH_PLACES};
-
-  inline bool isObject(const uint32_t id) const { return object_labels.count(id) > 0; }
-  inline bool isDynamic(const uint32_t id) const {
-    return dynamic_labels.count(id) > 0;
-  }
+  std::set<uint32_t> surface_places_labels;
+  std::filesystem::path colormap_filepath;
+  std::filesystem::path label_remap_filepath;
 };
 
 void declare_config(LabelSpaceConfig& conf);

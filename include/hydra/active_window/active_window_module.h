@@ -59,8 +59,10 @@ class ActiveWindowModule : public Module {
     VolumetricMap::Config volumetric_map;
     config::VirtualConfig<VolumetricWindow> map_window;
     std::vector<Sink::Factory> sinks;
+    //! Check whether or not the spark_dsg::Mesh fields agree with the map
+    bool validate_mesh_fields = true;
 
-    // construct to allow downstream modules to set defaults
+    // Constructor to allow downstream modules to set defaults
     Config(bool with_semantics = true, bool with_tracking = false);
   } const config;
 
@@ -85,6 +87,8 @@ class ActiveWindowModule : public Module {
   const VolumetricMap& map() const { return map_; }
 
  protected:
+  cv::Mat getDefaultIntegrationMask(const InputData& data) const;
+
   virtual ActiveWindowOutput::Ptr spinOnce(const InputPacket& input) = 0;
 
   void stopImpl();

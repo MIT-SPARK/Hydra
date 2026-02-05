@@ -135,19 +135,13 @@ TEST(GvdUtilities, setSdfParent) {
   }
 }
 
-TEST(GvdUtilities, ressetGvdParent) {
-  GvdVoxelWithIndex current;
+TEST(GvdUtilities, GvdParentCorrect) {
   // invariant of new voxels
-  EXPECT_FALSE(current.voxel.has_parent);
-  // resetting can't assign a new parent
-  resetParent(current.voxel);
+  GvdVoxelWithIndex current;
   EXPECT_FALSE(current.voxel.has_parent);
 
   current = makeGvdVoxel(1, 2, 3, 4.0, 5, 6, 7);
   EXPECT_TRUE(current.voxel.has_parent);
-  // resetting should clear a previous parent
-  resetParent(current.voxel);
-  EXPECT_FALSE(current.voxel.has_parent);
 }
 
 TEST(GvdUtilities, setGvdSurfaceVoxel) {

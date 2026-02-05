@@ -52,16 +52,4 @@ void declare_config(VoronoiCheckConfig& config) {
   field(config.parent_cos_angle_separation, "parent_cos_angle_separation");
 }
 
-void declare_config(GvdIntegratorConfig& config) {
-  using namespace config;
-  name("GvdIntegratorConfig");
-  field(config.max_distance_m, "max_distance_m");
-  field(config.min_distance_m, "min_distance_m");
-  field(config.min_diff_m, "min_diff_m");
-  field(config.min_weight, "min_weight");
-  field(config.refine_voxel_pos, "refine_voxel_pos");
-  field(config.positive_distance_only, "positive_distance_only");
-  field(config.voronoi_config, "voronoi_config");
-}
-
 }  // namespace hydra::places

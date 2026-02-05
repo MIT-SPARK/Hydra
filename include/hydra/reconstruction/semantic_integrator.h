@@ -86,7 +86,7 @@ class BinarySemanticIntegrator : public hydra::SemanticIntegrator {
  public:
   struct Config {};
 
-  explicit BinarySemanticIntegrator(const Config& /* config */){};
+  explicit BinarySemanticIntegrator(const Config& /* config */) {};
 
   void updateLikelihoods(uint32_t label,
                          float weight,
@@ -128,6 +128,8 @@ void declare_config(FirstKSemanticIntegrator::Config& config);
 class SingleLabelIntegrator : public SemanticIntegrator {
  public:
   struct Config {
+    //! Labels that shouldn't be tracked
+    std::set<int32_t> labels_to_ignore;
   } const config;
 
   explicit SingleLabelIntegrator(const Config& config = {});

@@ -44,15 +44,12 @@
 
 namespace hydra {
 
-struct OccupancyVoxel;
-
 struct SdfPoint {
   float distance;
   float weight;
   Eigen::Vector3f pos;
   spark_dsg::Color color;
   std::optional<uint32_t> label;
-  OccupancyVoxel* vertex_voxel = nullptr;
   const TrackingVoxel* tracking_voxel = nullptr;
 };
 
@@ -61,16 +58,13 @@ std::ostream& operator<<(std::ostream& out, const SdfPoint& point);
 class MarchingCubes {
  public:
   using EdgePoints = std::array<SdfPoint, 12>;
-  using EdgeStatus = std::array<uint8_t, 12>;
   using SdfPoints = std::array<SdfPoint, 8>;
 
   static void interpolateEdges(const SdfPoints& points,
                                EdgePoints& edge_points,
-                               EdgeStatus& edge_status,
                                float min_sdf_difference = 1.0e-6);
 
-  static void meshCube(const BlockIndex& block,
-                       const SdfPoints& points,
+  static void meshCube(const SdfPoints& points,
                        spark_dsg::Mesh& mesh,
                        bool compute_normals = true);
 

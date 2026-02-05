@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <config_utilities/factory.h>
 #include <config_utilities/virtual_config.h>
 
 #include <memory>
@@ -70,14 +69,10 @@ struct TraversabilityProcessors {
 
   explicit TraversabilityProcessors(const Config& config);
 
-  /**
-   * @brief Apply all processors to the traversability layer.
+  /** @brief Apply all processors to the traversability layer.
    * @param layer The traversability layer to process.
    */
   void apply(TraversabilityLayer& layer) const;
-
-  bool empty() const { return processors_.empty(); }
-  operator bool() const { return !empty(); }
 
  private:
   std::vector<TraversabilityProcessor::Ptr> processors_;
@@ -102,11 +97,6 @@ class ErosionDilation : public TraversabilityProcessor {
 
  protected:
   static const std::array<Index2D, 4> offsets_;
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<TraversabilityProcessor, ErosionDilation, Config>(
-          "ErosionDilation");
 };
 
 void declare_config(ErosionDilation::Config& config);

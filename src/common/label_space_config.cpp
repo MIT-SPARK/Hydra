@@ -35,6 +35,7 @@
 #include "hydra/common/label_space_config.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/types/path.h>
 
 namespace hydra {
 
@@ -42,15 +43,12 @@ void declare_config(LabelSpaceConfig& config) {
   using namespace config;
   name("LabelSpaceConfig");
   field(config.total_labels, "total_semantic_labels");
-  field(config.colormap_filepath, "semantic_colormap_file");
-  field(config.label_remap_filepath, "semantic_label_remap_filepath");
   field(config.dynamic_labels, "dynamic_labels");
   field(config.invalid_labels, "invalid_labels");
   field(config.object_labels, "object_labels");
-  // Optional fields.
   field(config.surface_places_labels, "surface_places_labels");
-  field(config.ground_labels, "ground_labels");
-  field(config.semantic_layers, "semantic_layers");
+  field<Path::Absolute>(config.colormap_filepath, "semantic_colormap_file");
+  field<Path::Absolute>(config.label_remap_filepath, "semantic_label_remap_filepath");
 }
 
 }  // namespace hydra
