@@ -1,0 +1,12 @@
+---
+total_semantic_labels: 4
+dynamic_labels: []
+invalid_labels: []
+object_labels: [1, 2, 3]
+surface_places_labels: [0]
+label_names:
+  - {label: 0, name: unknown}
+  - {label: 1, name: green chair}
+  - {label: 2, name: van}
+  - {label: 3, name: fire hydrant}
+
