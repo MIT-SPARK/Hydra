@@ -41,6 +41,7 @@
 #include <hydra/utils/data_directory.h>
 #include <spark_dsg/dynamic_scene_graph.h>
 #include "hydra/common/shared_dsg_info.h"
+#include "config_utilities/printing.h"
 
 #include <iostream>
 
@@ -58,15 +59,22 @@ int main(int argc, char* argv[]) {
   const hydra::PipelineConfig global_config;
   hydra::GlobalInfo::init(global_config, 0);
 
-  hydra::SharedDsgInfo::Ptr private_dsg_ = hydra::GlobalInfo::instance().createSharedDsg();
+
+  // Easier way is to just make a shared dsg info
+  // make_unique only one thread uses it make_shared multiple threads use the object
+  auto private_dsg_ =  std::make_shared<hydra::SharedDsgInfo>(hydra::SharedDsgInfo::Config{});
   private_dsg_->graph = graph;
 
 
   
   std::cout << "Loaded DSG with " << private_dsg_->graph->numNodes() << " nodes" << std::endl;
 
+
   // Load configuration from YAML file
-  const auto config = config::fromYamlFile<hydra::DsgUpdater::Config>(argv[2]);
+  const auto config = config::fromYamlFile<hydra::DsgUpdater::Config>(argv[2], "backend");
+
+  std::cout << "Loaded DsgUpdater config: \n"
+            << config::toString(config) << std::endl;
 
   auto output_path = std::filesystem::path(argv[3]);
   if (!std::filesystem::exists(output_path)) {
@@ -77,6 +85,7 @@ int main(int argc, char* argv[]) {
   hydra::DynamicSceneGraph::Ptr unmerged_graph_ = private_dsg_->graph->clone();
   
   // Initialize dsg updater
+  // use .reset for a constructor of a class where a member uses shared or unique
   hydra::DsgUpdater::Ptr dsg_updater;
   dsg_updater.reset(new hydra::DsgUpdater(config, unmerged_graph_, private_dsg_)); 
   
@@ -85,7 +94,8 @@ int main(int argc, char* argv[]) {
   std::cout << "Frontend DSG has " << objects_layer.numNodes() << " objects" << std::endl;
   
   // Call dsg updater callUpdateFunctions
-  hydra::UpdateInfo::ConstPtr update_info(new hydra::UpdateInfo{0});
+  hydra::UpdateInfo::Ptr update_info(new hydra::UpdateInfo{0});
+  update_info->loop_closure_detected = true;  // Force update all
   dsg_updater->callUpdateFunctions(0, update_info);
   
   // Call dsg updater save
