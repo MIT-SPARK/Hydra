@@ -45,10 +45,47 @@ std::vector<NodeId> PoseGraphPacket::addToGraph(DynamicSceneGraph& graph,
                                                 std::optional<int> robot_id) const {
   std::vector<NodeId> new_nodes;
 
+  // assigning semantic labels and timestamps to agent nodes
+  // collect all node timestamps for orphan detection
+  std::set<uint64_t> node_timestamps;
   for (const auto& pose_graph : pose_graphs) {
     for (const auto& node : pose_graph.nodes) {
       if (robot_id && node.robot_id != robot_id.value()) {
-        VLOG(1) << "Dropping node for other robot: " << node;
+        continue;
+      }
+      node_timestamps.insert(node.stamp_ns);
+    }
+  }
+
+  // find orphaned labels,  map to next available node timestamp
+  std::map<uint64_t, std::vector<uint32_t>> additional_labels_for_node;
+
+  for (const auto& [timestamp, labels] : semantic_labels_by_timestamp) {
+    if (node_timestamps.find(timestamp) == node_timestamps.end()) {
+      // labels but no node -> orphaned
+      auto next_node_it = node_timestamps.lower_bound(timestamp);
+      if (next_node_it != node_timestamps.end()) {
+        // assign to next node
+        uint64_t next_timestamp = *next_node_it;
+        additional_labels_for_node[next_timestamp].insert(
+          additional_labels_for_node[next_timestamp].end(),
+          labels.begin(),
+          labels.end()
+        );
+        VLOG(5) << "carrying forward " << labels.size() << " orphaned labels from "
+                << timestamp << " to " << next_timestamp << " [ns]";
+      } else {
+        VLOG(5) << "dropping " << labels.size() << " orphaned labels from "
+                << timestamp << " [ns] (no subsequent node)";
+      }
+    }
+  }
+
+  // create nodes with both their own and orphaned labels
+  for (const auto& pose_graph : pose_graphs) {
+    for (const auto& node : pose_graph.nodes) {
+      if (robot_id && node.robot_id != robot_id.value()) {
+        VLOG(1) << "dropping node for other robot: " << node;
         continue;
       }
 
@@ -61,16 +98,28 @@ std::vector<NodeId> PoseGraphPacket::addToGraph(DynamicSceneGraph& graph,
       const std::chrono::nanoseconds stamp(node.stamp_ns);
       const Eigen::Vector3d pos = node.pose.translation();
       const Eigen::Quaterniond rot(node.pose.linear());
-      VLOG(5) << "Adding agent " << node_id.str() << " @ " << stamp.count() << " [ns]";
+      VLOG(5) << "adding agent " << node_id.str() << " @ " << stamp.count() << " [ns]";
 
       auto attrs = std::make_unique<AgentNodeAttributes>(stamp, rot, pos, node_id);
 
-      // semantic_labels
+      // assign semantic labels for this timestamp
       auto labels_iter = semantic_labels_by_timestamp.find(node.stamp_ns);
       if (labels_iter != semantic_labels_by_timestamp.end()) {
         attrs->observed_semantic_labels = labels_iter->second;
         VLOG(5) << "Assigned " << labels_iter->second.size()
                 << " semantic labels to agent @ " << node.stamp_ns << " [ns]";
+      }
+
+      // assign any orphaned labels carried forward to this node
+      auto additional_iter = additional_labels_for_node.find(node.stamp_ns);
+      if (additional_iter != additional_labels_for_node.end()) {
+        attrs->observed_semantic_labels.insert(
+          attrs->observed_semantic_labels.end(),
+          additional_iter->second.begin(),
+          additional_iter->second.end()
+        );
+        VLOG(5) << "added " << additional_iter->second.size()
+                << " orphaned semantic labels to agent @ " << node.stamp_ns << " [ns]";
       }
 
       const auto key = graph.getLayerKey(DsgLayers::AGENTS);
