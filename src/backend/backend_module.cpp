@@ -158,6 +158,9 @@ void BackendModule::stop() { stopImpl(); }
 void BackendModule::save(const DataDirectory& output) {
   std::lock_guard<std::mutex> lock(mutex_);
 
+  spinOnce(true);
+  spinOnce(true);
+
   // TMP Simplify place labels before saving for cognition verifier.
   if (config.simplify_place_labels &&
       private_dsg_->graph->hasLayer(spark_dsg::DsgLayers::TRAVERSABILITY)) {
