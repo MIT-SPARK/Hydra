@@ -32,67 +32,15 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <config_utilities/virtual_config.h>
+#include <gflags/gflags.h>
+#include <glog/logging.h>
+#include <gtsam/inference/Symbol.h>
+#include <gtsam/nonlinear/GncOptimizer.h>
+#include <gtsam/sam/RangeFactor.h>
+#include <gtsam/slam/BoundingConstraint.h>
+#include <gtsam/slam/dataset.h>
+#include <kimera_pgmo/deformation_graph.h>
+#include <kimera_rpgo/rpgo.h>
 #include <spark_dsg/dynamic_scene_graph.h>
 #include <spark_dsg/node_attributes.h>
-#include <spark_dsg/node_symbol.h>
-
-#include <functional>
-#include <list>
-#include <map>
-#include <string>
-
-#include "hydra/common/node_matchers.h"
-
-namespace hydra {
-
-struct LayerUpdate {
-  using Ptr = std::shared_ptr<LayerUpdate>;
-  explicit LayerUpdate(spark_dsg::LayerId layer);
-  void append(LayerUpdate&& other);
-
-  const spark_dsg::LayerId layer;
-  std::list<spark_dsg::NodeAttributes::Ptr> attributes;
-};
-
-using GraphUpdate = std::map<spark_dsg::LayerId, LayerUpdate::Ptr>;
-
-struct LayerTracker {
-  struct Config {
-    char prefix = 0;
-    std::optional<spark_dsg::LayerId> target_layer;
-    config::VirtualConfig<NodeMatcher> matcher;
-  } const config;
-
-  explicit LayerTracker(const Config& config);
-
-  spark_dsg::NodeSymbol next_id;
-  std::unique_ptr<NodeMatcher> matcher;
-};
-
-void declare_config(LayerTracker::Config& config);
-
-struct GraphUpdater {
-  struct Config {
-    std::map<std::string, LayerTracker::Config> layer_updates;
-    //! @brief mark all added nodes as active
-    bool mark_active = true;
-  } const config;
-
-  using MergeLogCallback = std::function<void(const std::string&)>;
-
-  explicit GraphUpdater(const Config& config);
-  void update(const GraphUpdate& update,
-              spark_dsg::DynamicSceneGraph& graph,
-              uint64_t timestamp_ns = 0,
-              uint64_t sequence_number = 0,
-              MergeLogCallback log_callback = nullptr);
-
- private:
-  std::map<std::string, LayerTracker> trackers_;
-};
-
-void declare_config(GraphUpdater::Config& config);
-
-}  // namespace hydra
+#include <yaml-cpp/yaml.h>

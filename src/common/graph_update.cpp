@@ -39,8 +39,10 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/serialization/json_conversions.h>
 
 #include <algorithm>
+#include <nlohmann/json.hpp>
 
 #include "hydra/common/config_utilities.h"
 
@@ -114,7 +116,11 @@ GraphUpdater::GraphUpdater(const Config& config) : config(config::checkValid(con
   }
 }
 
-void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
+void GraphUpdater::update(const GraphUpdate& update,
+                          DynamicSceneGraph& graph,
+                          uint64_t timestamp_ns,
+                          uint64_t sequence_number,
+                          MergeLogCallback log_callback) {
   std::map<LayerId, LayerTracker&> trackers_by_id;
   for (auto& [name, tracker] : trackers_) {
     const auto key = graph.getLayerKey(name);
@@ -129,6 +135,7 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
   for (const auto& [layer_id, layer_update] : update) {
     if (!layer_update) {
       LOG(WARNING) << "Received invalid update for layer " << layer_id;
+      continue;
     }
 
     auto iter = trackers_by_id.find(layer_id);
@@ -151,6 +158,24 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
       }
     }
 
+    nlohmann::json log_record;
+    if (log_callback) {
+      log_record["timestamp_ns"] = timestamp_ns;
+      log_record["sequence_number"] = sequence_number;
+      log_record["layer_id"] = layer_id;
+      log_record["target_layer_id"] = target_layer_id;
+      log_record["frontend_nodes_before"] = nlohmann::json::array();
+      if (target_layer) {
+        for (const auto& [node_id, node] : target_layer->nodes()) {
+          nlohmann::json node_entry;
+          node_entry["node_id"] = NodeSymbol(node_id).str();
+          to_json(node_entry["attributes"], node->attributes());
+          log_record["frontend_nodes_before"].push_back(node_entry);
+        }
+      }
+      log_record["updates"] = nlohmann::json::array();
+    }
+
     for (auto&& attrs : layer_update->attributes) {
       if (!attrs) {
         continue;
@@ -164,10 +189,23 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
         }
       }
 
+      if (log_callback) {
+        nlohmann::json upd;
+        to_json(upd["incoming_attributes"], *attrs);
+        if (to_merge) {
+          upd["action"] = "merge";
+          upd["target_node_id"] = NodeSymbol(*to_merge).str();
+          to_json(upd["target_attributes"], *active_targets.at(*to_merge));
+        } else {
+          upd["action"] = "new";
+          upd["target_node_id"] = tracker.next_id.str();
+        }
+        log_record["updates"].push_back(upd);
+      }
+
       if (to_merge) {
         VLOG(5) << "Merging attributes to " << NodeSymbol(*to_merge).str() << " @ "
                 << target_layer_id << " for layer " << layer_id;
-        // TODO(nathan) actual merge attributes
         continue;
       }
 
@@ -179,6 +217,10 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
               << " for layer " << layer_id;
       graph.emplaceNode(target_layer_id, tracker.next_id, std::move(attrs));
       ++tracker.next_id;
+    }
+
+    if (log_callback) {
+      log_callback(log_record.dump());
     }
   }
 }

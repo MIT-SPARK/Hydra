@@ -42,7 +42,9 @@
 
 #include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
+#include <vector>
 
 #include "hydra/active_window/active_window_output.h"
 #include "hydra/backend/backend_input.h"
@@ -102,6 +104,8 @@ class GraphBuilder : public Module {
     bool no_packet_collation = false;
     //! @brief Drop object meshes for memory savings
     bool clear_object_meshes = false;
+    //! @brief Log objects and merges per GraphUpdater::update for merge analysis
+    bool log_update_merge_analysis = false;
   } const config;
 
   GraphBuilder(const Config& config,
@@ -194,6 +198,7 @@ class GraphBuilder : public Module {
 
   SceneGraphLogger frontend_graph_logger_;
   MessageQueue<PoseGraphPacket> pose_graph_updates_;
+  std::vector<std::string> merge_log_records_;
   std::list<pose_graph_tools::BowQuery::ConstPtr> cached_bow_messages_;
 
   Sink::List sinks_;
