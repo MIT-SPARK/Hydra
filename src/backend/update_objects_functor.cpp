@@ -40,7 +40,7 @@
 #include <spark_dsg/printing.h>
 
 #include "hydra/backend/backend_utilities.h"
-#include "hydra/utils/cognition_labels.h"
+#include "hydra/utils/daaam_labels.h"
 #include "hydra/utils/mesh_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
@@ -97,7 +97,7 @@ void declare_config(UpdateObjectsFunctor::Config& config) {
   base<VerbosityConfig>(config);
   field(config.allow_connection_merging, "allow_connection_merging");
   field(config.merge_proposer, "merge_proposer");
-  field(config.cognition_similarity_threshold, "cognition_similarity_threshold");
+  field(config.daaam_object_embedding_merge_threshold, "daaam_object_embedding_merge_threshold");
 }
 
 UpdateObjectsFunctor::UpdateObjectsFunctor(const Config& config)
@@ -192,20 +192,20 @@ MergeList UpdateObjectsFunctor::findMerges(const DynamicSceneGraph& graph,
           return false;
         }
 
-        if (config.cognition_similarity_threshold <= 0.0) {
+        if (config.daaam_object_embedding_merge_threshold <= 0.0) {
           // Classical Hydra merging.
           return lhs_attrs->bounding_box.contains(rhs_attrs->position) ||
                  rhs_attrs->bounding_box.contains(lhs_attrs->position);
         }
 
-        // Cognition Labels
+        // daaam labels
         if (!lhs_attrs->bounding_box.intersects(rhs_attrs->bounding_box)) {
           return false;
         }
 
-        const auto score = CognitionLabels::getScore(
+        const auto score = DaaamLabels::getScore(
             graph, lhs_attrs->semantic_label, rhs_attrs->semantic_label);
-        return score >= config.cognition_similarity_threshold;
+        return score >= config.daaam_object_embedding_merge_threshold;
       },
       proposals);
   return proposals;

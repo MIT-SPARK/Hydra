@@ -55,6 +55,9 @@ struct UpdateObjectsFunctor : public UpdateFunctor {
     bool allow_connection_merging = true;
     //! Association strategy for finding matches to active nodes
     MergeProposer::Config merge_proposer = {AssociationConfig{SemanticAssociation{}}};
+    //! DAAAM label similarity threshold for merging. <= 0 uses classical Hydra merging.
+    double daaam_object_embedding_merge_threshold = -1.0;
+
   } const config;
 
   explicit UpdateObjectsFunctor(const Config& config);

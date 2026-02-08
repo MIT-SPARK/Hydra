@@ -107,7 +107,7 @@ void declare_config(BackendModule::Config& config) {
   field(config.external_loop_closures, "external_loop_closures");
   field(config.sinks, "sinks");
 
-  // TMP cognition_verifier parameters.
+  // TMP daaam parameters.
   field(config.simplify_place_labels, "simplify_place_labels");
 }
 
@@ -158,19 +158,19 @@ void BackendModule::save(const DataDirectory& output) {
   spinOnce(true);
   spinOnce(true);
 
-  // TMP Simplify place labels before saving for cognition verifier.
+  // TMP Simplify place labels before saving for daaam.
   if (config.simplify_place_labels &&
       private_dsg_->graph->hasLayer(spark_dsg::DsgLayers::TRAVERSABILITY)) {
     const auto& layer =
         private_dsg_->graph->getLayer(spark_dsg::DsgLayers::TRAVERSABILITY);
     for (auto& [id, node] : layer.nodes()) {
       auto attrs = node->tryAttributes<TraversabilityNodeAttributes>();
-      if (attrs && !attrs->cognition_labels.empty()) {
+      if (attrs && !attrs->daaam_labels.empty()) {
         const auto [max_label, max_weight] =
-            getMaxCognitionLabel(attrs->cognition_labels);
+            getMaxDaaamLabel(attrs->daaam_labels);
         if (max_label != -1) {
-          attrs->cognition_labels.clear();
-          attrs->cognition_labels[max_label] = max_weight;
+          attrs->daaam_labels.clear();
+          attrs->daaam_labels[max_label] = max_weight;
         }
       }
     }

@@ -44,9 +44,9 @@
 namespace hydra {
 
 /**
- * @brief Utility struct to globally manage cognition label lookup via a singleton.
+ * @brief Utility struct to globally manage Daaam label lookup via a singleton.
  */
-struct CognitionLabels {
+struct DaaamLabels {
   struct Config {
     //! Namespace of the features in the dsg meta_data.
     std::string ns = "features";
@@ -63,10 +63,10 @@ struct CognitionLabels {
         hydra::CosineDistance::Config()};
   } const config;
 
-  static CognitionLabels& instance();
+  static DaaamLabels& instance();
 
   static void setup(
-      const Config& config = config::fromContext<Config>("cognition_labels"));
+      const Config& config = config::fromContext<Config>("daaam_labels"));
 
   // Lookup.
   static FeatureVector getFeature(const spark_dsg::DynamicSceneGraph& dsg, int id);
@@ -74,13 +74,13 @@ struct CognitionLabels {
   static float getScore(const FeatureVector& f1, const FeatureVector& f2);
 
  private:
-  explicit CognitionLabels(const Config& config);
+  explicit DaaamLabels(const Config& config);
   std::unique_ptr<hydra::EmbeddingDistance> distance_metric_;
-  static std::unique_ptr<CognitionLabels> instance_;
+  static std::unique_ptr<DaaamLabels> instance_;
 };
 
-struct LazyCognitionLabels {
-  explicit LazyCognitionLabels(const spark_dsg::DynamicSceneGraph& dsg) : dsg_(dsg) {}
+struct LazyDaaamLabels {
+  explicit LazyDaaamLabels(const spark_dsg::DynamicSceneGraph& dsg) : dsg_(dsg) {}
 
   const FeatureVector& get(int id) const;
 
@@ -91,8 +91,8 @@ struct LazyCognitionLabels {
 
 // Returns the label with the highest score and its confidence from observations <label,
 // weight>
-std::pair<int, float> getMaxCognitionLabel(const std::map<int, float>& labels);
+std::pair<int, float> getMaxDaaamLabel(const std::map<int, float>& labels);
 
-void declare_config(CognitionLabels::Config& config);
+void declare_config(DaaamLabels::Config& config);
 
 }  // namespace hydra

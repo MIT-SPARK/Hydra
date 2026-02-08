@@ -58,7 +58,7 @@ void declare_config(BlockTraversabilityClustering::Config& config) {
   field(config.max_place_width, "max_place_width");
   field(config.recursive, "recursive");
   field(config.simplify_boundary_traversability, "simplify_boundary_traversability");
-  // Cognition_verifier parameters.
+  // daaam parameters.
   field(config.project_labels_to_ground, "project_labels_to_ground");
   field(config.robot_height, "robot_height");
   field(config.label_depth_tolerance, "label_depth_tolerance");
@@ -516,8 +516,14 @@ void BlockTraversabilityClustering::updatePlaceNodesInDsg(
         place.node_id = spark_dsg::NodeSymbol('t', current_id_++);
         auto attrs = std::make_unique<spark_dsg::TraversabilityNodeAttributes>();
         attrs->is_active = true;
-        graph.emplaceNode(
-            spark_dsg::DsgLayers::TRAVERSABILITY, place.node_id, std::move(attrs));
+        if (!graph.emplaceNode(
+                spark_dsg::DsgLayers::TRAVERSABILITY, place.node_id, std::move(attrs))) {
+          LOG(ERROR) << "Failed to create traversability node " << place.node_id
+                     << ". TRAVERSABILITY layer may not exist in graph.";
+          place.node_id = 0;  // Reset so we try again next iteration
+          ++it;
+          continue;
+        }
       }
 
       // Update the place attributes.
@@ -597,7 +603,7 @@ void BlockTraversabilityClustering::archivePlaceInfos(
 
     // Deactivate all places in deactivated blocks.
     for (const auto& place : info.places) {
-      if (place.node_id != 0) {
+      if (place.node_id != 0 && graph.hasNode(place.node_id)) {
         graph.getNode(place.node_id)
             .attributes<spark_dsg::TraversabilityNodeAttributes>()
             .is_active = false;
@@ -673,7 +679,7 @@ void BlockTraversabilityClustering::extractSemanticLabels(
     if (!config.label_use_const_weight) {
       weight /= (place_range * place_range);  // Inverse square distance weighting.
     }
-    attrs.cognition_labels[label] += weight;
+    attrs.daaam_labels[label] += weight;
   }
 }
 

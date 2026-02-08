@@ -52,6 +52,8 @@
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
 
+#include "hydra/utils/daaam_labels.h"
+
 namespace hydra {
 
 struct LoopClosureLog {
@@ -94,7 +96,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
     //! Output sinks that process that latest backed scene graph and state
     std::vector<Sink::Factory> sinks;
 
-    // TMP cognition_verifier parameters.
+    // TMP daaam parameters.
     bool simplify_place_labels = true;
   } const config;
 

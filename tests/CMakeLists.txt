@@ -48,7 +48,7 @@ add_executable(
   rooms/test_graph_filtration.cpp
   rooms/test_room_finder.cpp
   rooms/test_room_utilities.cpp
-  src/place_fixtures.cpp
+  # src/place_fixtures.cpp
   src/resources.cpp
   utils/test_active_window_tracker.cpp
   utils/test_minimum_spanning_tree.cpp

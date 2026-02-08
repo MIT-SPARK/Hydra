@@ -69,8 +69,8 @@ struct UpdateTraversabilityFunctor : public UpdateFunctor {
 
     DeformationInterpolator::Config deformation;
 
-    // TMP(lschmid): Cognition labels.
-    bool use_cognition_labels = true;
+    // TMP(lschmid): daaam labels.
+    bool use_daaam_labels = true;
   } const config;
 
   using EdgeSet = std::set<EdgeKey>;
@@ -149,7 +149,7 @@ struct UpdateTraversabilityFunctor : public UpdateFunctor {
 
   void resetNeighborFinder(const DynamicSceneGraph& dsg) const;
 
-  void computeCognitionDistances(const DynamicSceneGraph& dsg) const;
+  void computeDaaamDistances(const DynamicSceneGraph& dsg) const;
 
  protected:
   // Cached constants.
@@ -165,8 +165,8 @@ struct UpdateTraversabilityFunctor : public UpdateFunctor {
   const DeformationInterpolator deformation_interpolator_;
   mutable NearestNodeFinder::Ptr nn_;
 
-  // TMP(lschmid): Track cognition labels.
-  mutable std::unordered_map<NodeId, int> previous_cognition_labels_;
+  // TMP(lschmid): Track daaam labels.
+  mutable std::unordered_map<NodeId, int> previous_daaam_labels_;
 };
 
 void declare_config(UpdateTraversabilityFunctor::Config& config);
