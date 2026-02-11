@@ -196,12 +196,17 @@ void GraphBuilder::save(const DataDirectory& output) {
   dsg_->graph->save(output_path / "dsg_with_mesh.json");
   frontend_graph_logger_.save(output_path);
 
-  if (config.log_update_merge_analysis && !merge_log_records_.empty()) {
+  if (config.log_update_merge_analysis) {
     std::ofstream out(output_path / "update_merge.jsonl");
-    for (const auto& line : merge_log_records_) {
-      out << line << '\n';
+    if (merge_log_records_.empty()) {
+      out << R"({"message":"no_merge_records","reason":"graph_update_was_empty"})"
+          << '\n';
+    } else {
+      for (const auto& line : merge_log_records_) {
+        out << line << '\n';
+      }
+      merge_log_records_.clear();
     }
-    merge_log_records_.clear();
   }
 
   const auto mesh = dsg_->graph->mesh();

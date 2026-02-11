@@ -12,6 +12,7 @@ active_window:
     semantic_integrator:
       type: SingleLabelIntegrator
 frontend:
+  log_update_merge_analysis: true
   pgmo:
     time_horizon: 15.0
     d_graph_resolution: 2.5
@@ -91,7 +92,7 @@ backend:
       type: UpdateAgentsFunctor
     objects:
       type: GenericUpdateFunctor
-      layer: "OBJECTS"
+      layer: OBJECTS
       matcher:
         type: DistanceNodeMatcher
         pos_threshold_m: 1.5
