@@ -9,6 +9,8 @@ active_window:
     truncation_distance: 0.75
   tsdf:
     extra_integration_distance: 3.0
+    # NOTE(hlim): '4' is the ground label from ground segmentation
+    extra_integration_distance_labels: [4]
     use_constant_weight: true
     interpolation_method:
       type: adaptive
