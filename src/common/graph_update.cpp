@@ -160,7 +160,6 @@ void GraphUpdater::update(const GraphUpdate& update,
 
     nlohmann::json log_record;
     if (log_callback) {
-      LOG(INFO) << "LOG CALLBACK CALLED FOR LAYER ";
       log_record["timestamp_ns"] = timestamp_ns;
       log_record["sequence_number"] = sequence_number;
       log_record["layer_id"] = layer_id;
