@@ -40,6 +40,8 @@
 #include <pose_graph_tools/bow_query.h>
 #include <spark_dsg/scene_graph_logger.h>
 
+#include <filesystem>
+#include <fstream>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -106,6 +108,8 @@ class GraphBuilder : public Module {
     bool clear_object_meshes = false;
     //! @brief Log objects and merges per GraphUpdater::update for merge analysis
     bool log_update_merge_analysis = false;
+    //! @brief Unused; merge log is always written to output path frontend/update_merge.jsonl in save()
+    std::string update_merge_log_path;
   } const config;
 
   GraphBuilder(const Config& config,

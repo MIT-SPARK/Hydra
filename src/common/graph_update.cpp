@@ -39,12 +39,30 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/node_attributes.h>
 #include <spark_dsg/serialization/json_conversions.h>
 
 #include <algorithm>
 #include <nlohmann/json.hpp>
 
 #include "hydra/common/config_utilities.h"
+
+namespace {
+
+// Serialize node attributes for merge log; object meshes are omitted to reduce size.
+void to_json_merge_log(nlohmann::json& record, const spark_dsg::NodeAttributes& attrs) {
+  const auto* khronos =
+      dynamic_cast<const spark_dsg::KhronosObjectAttributes*>(&attrs);
+  if (khronos) {
+    auto copy = khronos->clone();
+    static_cast<spark_dsg::KhronosObjectAttributes*>(copy.get())->mesh.clear();
+    to_json(record, *copy);
+  } else {
+    to_json(record, attrs);
+  }
+}
+
+}  // namespace
 
 namespace YAML {
 
@@ -167,9 +185,13 @@ void GraphUpdater::update(const GraphUpdate& update,
       log_record["frontend_nodes_before"] = nlohmann::json::array();
       if (target_layer) {
         for (const auto& [node_id, node] : target_layer->nodes()) {
+          auto& attrs = node->attributes();
+          if (!attrs.is_active) {
+            continue;
+          }
           nlohmann::json node_entry;
           node_entry["node_id"] = NodeSymbol(node_id).str();
-          to_json(node_entry["attributes"], node->attributes());
+          to_json_merge_log(node_entry["attributes"], node->attributes());
           log_record["frontend_nodes_before"].push_back(node_entry);
         }
       }
@@ -192,11 +214,11 @@ void GraphUpdater::update(const GraphUpdate& update,
 
       if (log_callback) {
         nlohmann::json upd;
-        to_json(upd["incoming_attributes"], *attrs);
+        to_json_merge_log(upd["incoming_attributes"], *attrs);
         if (to_merge) {
           upd["action"] = "merge";
           upd["target_node_id"] = NodeSymbol(*to_merge).str();
-          to_json(upd["target_attributes"], *active_targets.at(*to_merge));
+          to_json_merge_log(upd["target_attributes"], *active_targets.at(*to_merge));
         } else {
           upd["action"] = "new";
           upd["target_node_id"] = tracker.next_id.str();

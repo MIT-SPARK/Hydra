@@ -44,6 +44,7 @@
 #include <kimera_pgmo/utils/mesh_io.h>
 #include <spark_dsg/printing.h>
 
+#include <filesystem>
 #include <fstream>
 
 #include "hydra/common/global_info.h"
@@ -106,6 +107,7 @@ void declare_config(GraphBuilder::Config& config) {
   field(config.no_packet_collation, "no_packet_collation");
   field(config.clear_object_meshes, "clear_object_meshes");
   field(config.log_update_merge_analysis, "log_update_merge_analysis");
+  field(config.update_merge_log_path, "update_merge_log_path");
 }
 
 GraphBuilder::GraphBuilder(const Config& config,
@@ -205,8 +207,8 @@ void GraphBuilder::save(const DataDirectory& output) {
       for (const auto& line : merge_log_records_) {
         out << line << '\n';
       }
-      merge_log_records_.clear();
     }
+    merge_log_records_.clear();
   }
 
   const auto mesh = dsg_->graph->mesh();
@@ -404,13 +406,20 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
   }
 
   if (config.log_update_merge_analysis) {
-    graph_updater_.update(msg->graph_update,
-                          *dsg_->graph,
-                          msg->timestamp_ns,
-                          sequence_number_,
-                          [this](const std::string& json_line) {
-                            merge_log_records_.push_back(json_line);
-                          });
+    try {
+      graph_updater_.update(msg->graph_update,
+                            *dsg_->graph,
+                            msg->timestamp_ns,
+                            sequence_number_,
+                            [this](const std::string& json_line) {
+                              merge_log_records_.push_back(json_line);
+                            });
+    } catch (const std::exception& e) {
+      LOG(ERROR) << "[Hydra Frontend] Merge log serialization or callback failed (sequence "
+                 << sequence_number_ << ", ts " << msg->timestamp_ns
+                 << "): " << e.what()
+                 << " — run continues without this log record; check DEBUGGING_merge_log.md";
+    }
   } else {
     graph_updater_.update(msg->graph_update, *dsg_->graph);
   }
