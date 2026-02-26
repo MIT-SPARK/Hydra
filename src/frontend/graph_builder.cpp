@@ -175,10 +175,6 @@ GraphBuilder::GraphBuilder(const Config& config,
       std::bind(&GraphBuilder::updateObjects, this, std::placeholders::_1));
   addPostMeshCallback(
       std::bind(&GraphBuilder::updatePlaces2d, this, std::placeholders::_1));
-  if (traversability_places_) {
-    addPostMeshCallback(std::bind(
-        &GraphBuilder::updateTraversabilityPlaces, this, std::placeholders::_1));
-  }
 
   if (config.lcd_use_bow_vectors) {
     PipelineQueues::instance().bow_queue.reset(new PipelineQueues::BowQueue());
