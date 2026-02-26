@@ -154,10 +154,13 @@ void BackendModule::stopImpl() {
 void BackendModule::stop() { stopImpl(); }
 
 void BackendModule::save(const DataDirectory& output) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  // Flush pending data before acquiring lock. spinOnce() acquires mutex_
+  // internally, so calling it under lock is UB (non-recursive mutex).
+  // stop() is called before save(), so the spin thread is already joined.
+  spinOnce(true);
+  spinOnce(true);
 
-  spinOnce(true);
-  spinOnce(true);
+  std::lock_guard<std::mutex> lock(mutex_);
 
   // TMP Simplify place labels before saving for daaam.
   if (config.simplify_place_labels &&

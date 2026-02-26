@@ -61,10 +61,13 @@ void extractSemanticLabels(const SemanticLabelConfig& config,
 
   for (const auto& [id, node] :
        graph.getLayer(spark_dsg::DsgLayers::TRAVERSABILITY).nodes()) {
-    auto& attrs = node->attributes<spark_dsg::TraversabilityNodeAttributes>();
-    if (!attrs.is_active) continue;
+    auto& base_attrs = node->attributes();
+    if (!base_attrs.is_active) continue;
+    auto* attrs = dynamic_cast<spark_dsg::TraversabilityNodeAttributes*>(&base_attrs);
+    CHECK(attrs) << "Node " << spark_dsg::NodeSymbol(id).str()
+                 << " in TRAVERSABILITY layer has non-TraversabilityNodeAttributes";
 
-    Eigen::Vector3f pos_W = attrs.position.cast<float>();
+    Eigen::Vector3f pos_W = attrs->position.cast<float>();
     if (config.project_labels_to_ground) {
       if (config.robot_height > 0.0f) {
         pos_W.z() = current_robot_height - config.robot_height;
@@ -72,7 +75,7 @@ void extractSemanticLabels(const SemanticLabelConfig& config,
         while (true) {
           const auto voxel = tsdf.getVoxelPtr(pos_W);
           if (!voxel) {
-            pos_W = attrs.position.cast<float>();
+            pos_W = attrs->position.cast<float>();
             break;
           }
           if (voxel->distance <= 0.0) break;
@@ -94,7 +97,7 @@ void extractSemanticLabels(const SemanticLabelConfig& config,
     if (!config.label_use_const_weight) {
       weight /= (place_range * place_range);
     }
-    attrs.label_weights[static_cast<Label>(label)] += weight;
+    attrs->label_weights[static_cast<Label>(label)] += weight;
   }
 }
 
