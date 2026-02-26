@@ -38,6 +38,7 @@
 #include <config_utilities/parsing/context.h>
 #include <hydra/openset/embedding_distances.h>
 #include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/node_attributes.h>
 
 #include <memory>
 
@@ -91,7 +92,7 @@ struct LazyDaaamLabels {
 
 // Returns the label with the highest score and its confidence from observations <label,
 // weight>
-std::pair<int, float> getMaxDaaamLabel(const std::map<int, float>& labels);
+std::pair<int, float> getMaxDaaamLabel(const std::map<spark_dsg::SemanticLabel, float>& labels);
 
 void declare_config(DaaamLabels::Config& config);
 

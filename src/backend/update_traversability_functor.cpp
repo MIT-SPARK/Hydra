@@ -290,9 +290,8 @@ NodeAttributes::Ptr UpdateTraversabilityFunctor::mergeNodes(
       to_attrs.last_observed_ns = from_attrs.last_observed_ns;
     }
 
-    // daaam labels: Fuse with weights.
-    for (const auto& [label, weight] : from_attrs.daaam_labels) {
-      to_attrs.daaam_labels[label] += weight;
+    for (const auto& [label, weight] : from_attrs.label_weights) {
+      to_attrs.label_weights[label] += weight;
     }
 
     // Simple case: If places are completely contained.
@@ -513,12 +512,12 @@ void UpdateTraversabilityFunctor::computeDaaamDistances(
   EdgeSet to_update;
   for (const auto& [node_id, node] : layer.nodes()) {
     auto& attrs = node->attributes<TraversabilityNodeAttributes>();
-    if (attrs.daaam_labels.empty()) {
+    if (attrs.label_weights.empty()) {
       continue;
     }
-    const auto it = previous_daaam_labels_.find(node_id);
-    const int current_id = getMaxDaaamLabel(attrs.daaam_labels).first;
-    if (it != previous_daaam_labels_.end() && it->second == current_id) {
+    const auto it = previous_max_labels_.find(node_id);
+    const int current_id = getMaxDaaamLabel(attrs.label_weights).first;
+    if (it != previous_max_labels_.end() && it->second == current_id) {
       // Already exists and unchanged.
       continue;
     }
@@ -526,7 +525,7 @@ void UpdateTraversabilityFunctor::computeDaaamDistances(
       // Ensure there exists a label.
       continue;
     }
-    previous_daaam_labels_[node_id] = current_id;
+    previous_max_labels_[node_id] = current_id;
     attrs.distance = 0.0;  // reset distance to be updated below
     for (const auto& to_id : node->siblings()) {
       to_update.insert(EdgeKey(node_id, to_id));
@@ -536,8 +535,8 @@ void UpdateTraversabilityFunctor::computeDaaamDistances(
   // Compute the new edge and node distances.
   for (const auto& edge_key : to_update) {
     auto& edge = layer.getEdge(edge_key.k1, edge_key.k2);
-    const auto& f1 = labels.get(previous_daaam_labels_[edge_key.k1]);
-    const auto& f2 = labels.get(previous_daaam_labels_[edge_key.k2]);
+    const auto& f1 = labels.get(previous_max_labels_[edge_key.k1]);
+    const auto& f2 = labels.get(previous_max_labels_[edge_key.k2]);
     const double score = DaaamLabels::getScore(f1, f2);
     edge.attributes().weight = score;
     auto& from_attrs =

@@ -141,16 +141,16 @@ const FeatureVector& LazyDaaamLabels::get(int id) const {
   return it->second;
 }
 
-std::pair<int, float> getMaxDaaamLabel(const std::map<int, float>& labels) {
+std::pair<int, float> getMaxDaaamLabel(const std::map<spark_dsg::SemanticLabel, float>& labels) {
   int max_label = -1;
   float max_weight = -1.0f;
   float total_weight = 0.0f;
 
-  for (const auto& [label, weight] : labels) {
-    total_weight += weight;
-    if (weight > max_weight) {
-      max_weight = weight;
-      max_label = label;
+  for (auto it = labels.begin(); it != labels.end(); ++it) {
+    total_weight += it->second;
+    if (it->second > max_weight) {
+      max_weight = it->second;
+      max_label = static_cast<int>(it->first);
     }
   }
   if (total_weight > 0.0f) {

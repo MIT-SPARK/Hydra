@@ -165,8 +165,7 @@ struct UpdateTraversabilityFunctor : public UpdateFunctor {
   const DeformationInterpolator deformation_interpolator_;
   mutable NearestNodeFinder::Ptr nn_;
 
-  // TMP(lschmid): Track daaam labels.
-  mutable std::unordered_map<NodeId, int> previous_daaam_labels_;
+  mutable std::unordered_map<NodeId, int> previous_max_labels_;
 };
 
 void declare_config(UpdateTraversabilityFunctor::Config& config);

@@ -55,6 +55,7 @@ namespace hydra {
 using hydra::timing::ScopedTimer;
 using kimera_pgmo::KimeraPgmoInterface;
 using pose_graph_tools::PoseGraph;
+using Label = spark_dsg::SemanticNodeAttributes::Label;
 
 namespace {
 
@@ -165,12 +166,12 @@ void BackendModule::save(const DataDirectory& output) {
         private_dsg_->graph->getLayer(spark_dsg::DsgLayers::TRAVERSABILITY);
     for (auto& [id, node] : layer.nodes()) {
       auto attrs = node->tryAttributes<TraversabilityNodeAttributes>();
-      if (attrs && !attrs->daaam_labels.empty()) {
+      if (attrs && !attrs->label_weights.empty()) {
         const auto [max_label, max_weight] =
-            getMaxDaaamLabel(attrs->daaam_labels);
+            getMaxDaaamLabel(attrs->label_weights);
         if (max_label != -1) {
-          attrs->daaam_labels.clear();
-          attrs->daaam_labels[max_label] = max_weight;
+          attrs->label_weights.clear();
+          attrs->label_weights[static_cast<Label>(max_label)] = max_weight;
         }
       }
     }

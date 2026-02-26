@@ -50,6 +50,7 @@ using Timer = hydra::timing::ScopedTimer;
 using spark_dsg::Boundary;
 using spark_dsg::Side;
 using spark_dsg::TraversabilityNodeAttributes;
+using Label = spark_dsg::SemanticNodeAttributes::Label;
 
 void declare_config(BlockTraversabilityClustering::Config& config) {
   using namespace config;
@@ -679,7 +680,7 @@ void BlockTraversabilityClustering::extractSemanticLabels(
     if (!config.label_use_const_weight) {
       weight /= (place_range * place_range);  // Inverse square distance weighting.
     }
-    attrs.daaam_labels[label] += weight;
+    attrs.label_weights[static_cast<Label>(label)] += weight;
   }
 }
 
