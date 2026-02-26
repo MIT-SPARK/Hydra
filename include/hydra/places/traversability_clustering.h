@@ -59,4 +59,18 @@ class TraversabilityClustering {
                            spark_dsg::DynamicSceneGraph& graph) = 0;
 };
 
+struct SemanticLabelConfig {
+  bool project_labels_to_ground = true;
+  float robot_height = 0.0f;
+  float label_depth_tolerance = 1.0f;
+  bool label_use_const_weight = false;
+};
+
+void declare_config(SemanticLabelConfig& config);
+
+void extractSemanticLabels(const SemanticLabelConfig& config,
+                           float current_robot_height,
+                           const ActiveWindowOutput& msg,
+                           spark_dsg::DynamicSceneGraph& graph);
+
 }  // namespace hydra::places

@@ -71,6 +71,10 @@ void declare_config(RegionGrowingTraversabilityClustering::Config& config) {
   field(config.num_orientation_bins, "num_orientation_bins");
   check(config.max_radius, GT, 0.0f, "max_radius");
   check(config.num_orientation_bins, GE, 3, "num_orientation_bins");
+  field(config.label_config.project_labels_to_ground, "project_labels_to_ground");
+  field(config.label_config.robot_height, "robot_height");
+  field(config.label_config.label_depth_tolerance, "label_depth_tolerance");
+  field(config.label_config.label_use_const_weight, "label_use_const_weight");
 }
 
 RegionGrowingTraversabilityClustering::RegionGrowingTraversabilityClustering(
@@ -90,6 +94,7 @@ void RegionGrowingTraversabilityClustering::updateGraph(
 
   // Cache params for this pass.
   current_time_ns_ = msg.timestamp_ns;
+  current_robot_height_ = msg.world_t_body.z();
   max_region_size_ = std::round(config.max_radius / layer.voxel_size);
 
   // Initialize regions and voxels for this pass.
@@ -110,6 +115,7 @@ void RegionGrowingTraversabilityClustering::updateGraph(
   updatePlaceEdgesInDsg(graph);
   visualizeAssignments(layer, assignment);
   pruneRegions();
+  extractSemanticLabels(config.label_config, current_robot_height_, msg, graph);
 }
 
 VoxelSet RegionGrowingTraversabilityClustering::initializeVoxels(

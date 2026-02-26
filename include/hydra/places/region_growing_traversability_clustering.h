@@ -57,6 +57,9 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
 
     //! Number of rays to consider for boundary computation.
     int num_orientation_bins = 16;
+
+    // Semantic label projection from images to traversability nodes.
+    SemanticLabelConfig label_config;
   } const config;
 
   using Voxels = VoxelIndices;
@@ -119,6 +122,7 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
  protected:
   size_t current_id_ = 0;
   uint64_t current_time_ns_ = 0;
+  float current_robot_height_ = 0.0f;
   int max_region_size_ = 0;  // Cached region size in voxels.
 
   // <id, region>

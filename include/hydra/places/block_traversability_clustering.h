@@ -65,10 +65,7 @@ class BlockTraversabilityClustering : public TraversabilityClustering {
     bool simplify_boundary_traversability = true;
 
     // Semantic label projection from images to traversability nodes.
-    bool project_labels_to_ground = true;
-    float robot_height = 0.0f;
-    float label_depth_tolerance = 1.0f;
-    bool label_use_const_weight = false;
+    SemanticLabelConfig label_config;
   } const config;
 
   using State = spark_dsg::TraversabilityState;
@@ -160,10 +157,6 @@ class BlockTraversabilityClustering : public TraversabilityClustering {
 
   // Archive exiting places in the Active Window.
   void archivePlaceInfos(spark_dsg::DynamicSceneGraph& graph);
-
-  // Project semantic labels from images onto active traversability nodes.
-  void extractSemanticLabels(const ActiveWindowOutput& msg,
-                             spark_dsg::DynamicSceneGraph& graph);
 
   /* Utility functions */
   // Find all info block indices that would overlap with the given traversability block.
