@@ -63,6 +63,12 @@ class BlockTraversabilityClustering : public TraversabilityClustering {
     //! If true, simplify the traversability of each boundary to a single value.
     //! Otherwise classify each voxel.
     bool simplify_boundary_traversability = true;
+
+    // Semantic label projection from images to traversability nodes.
+    bool project_labels_to_ground = true;
+    float robot_height = 0.0f;
+    float label_depth_tolerance = 1.0f;
+    bool label_use_const_weight = false;
   } const config;
 
   using State = spark_dsg::TraversabilityState;
@@ -155,6 +161,10 @@ class BlockTraversabilityClustering : public TraversabilityClustering {
   // Archive exiting places in the Active Window.
   void archivePlaceInfos(spark_dsg::DynamicSceneGraph& graph);
 
+  // Project semantic labels from images onto active traversability nodes.
+  void extractSemanticLabels(const ActiveWindowOutput& msg,
+                             spark_dsg::DynamicSceneGraph& graph);
+
   /* Utility functions */
   // Find all info block indices that would overlap with the given traversability block.
   BlockIndices touchedInfoBlocks(const TraversabilityBlock& block) const;
@@ -195,6 +205,7 @@ class BlockTraversabilityClustering : public TraversabilityClustering {
   InfoLayer infos_;
   size_t current_id_ = 0;
   uint64_t current_time_ns_ = 0;
+  float current_robot_height_ = 0.0f;
 
   // Cached constants.
   // Minimum sizes in voxels.
