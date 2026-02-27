@@ -114,6 +114,11 @@ bool CloudInputPacket::fillInputDataImpl(InputData& msg) const {
   msg.color_image = colors;
   msg.label_image = labels;
 
+  // Initialize labels with -1 (unknown) if not provided but points exist
+  if (msg.label_image.empty() && !msg.vertex_map.empty()) {
+    msg.label_image = cv::Mat(msg.vertex_map.size(), CV_32SC1, cv::Scalar(-1));
+  }
+
   if (!msg.label_image.empty() && !sizesMatch(msg.vertex_map, msg.label_image)) {
     LOG(ERROR) << "Label dimensions " << showImageDim(msg.label_image)
                << " do not match pointcloud dimensions "
