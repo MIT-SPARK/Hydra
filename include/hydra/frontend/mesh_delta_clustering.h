@@ -29,7 +29,8 @@ std::string printLabels(const LabelSet& labels);
 
 LabelIndices getLabelIndices(const LabelSet& desired_labels,
                              const kimera_pgmo::MeshDelta& delta,
-                             const std::unordered_set<size_t>* invalid = nullptr);
+                             const std::unordered_set<size_t>* invalid = nullptr,
+                             bool instance_id = false);
 
 Clusters findClusters(const ClusteringConfig& config,
                       const kimera_pgmo::MeshDelta& delta,
