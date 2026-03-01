@@ -306,7 +306,10 @@ LabelIndices Place2dSegmenter::getLabelIndices(const Mesh::Labels& labels,
       continue;
     }
 
-    const auto label = labels.at(idx);
+    const auto raw_label = labels.at(idx);
+    const auto label = (config.instance_id && raw_label > 0xFFFF)
+                           ? static_cast<uint32_t>(raw_label >> 16)
+                           : raw_label;
     seen_labels.insert(label);
 
     if (!config.labels.count(label)) {
@@ -490,6 +493,7 @@ void declare_config(Place2dSegmenter::Config& config) {
   field(config.place_overlap_threshold, "place_overlap_threshold");
   field(config.place_max_neighbor_z_diff, "place_max_neighbor_z_diff");
   field(config.connection_ellipse_scale_factor, "connection_ellipse_scale_factor");
+  field(config.instance_id, "instance_id");
   config.labels = GlobalInfo::instance().getLabelSpaceConfig().surface_places_labels;
 }
 

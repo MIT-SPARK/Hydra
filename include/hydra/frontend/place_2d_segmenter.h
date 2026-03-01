@@ -64,6 +64,7 @@ class Place2dSegmenter : public SurfacePlacesInterface {
     double place_overlap_threshold = 0.1;
     double place_max_neighbor_z_diff = 0.5;
     double connection_ellipse_scale_factor = 1;
+    bool instance_id = false;
     std::set<uint32_t> labels;
   } const config;
 
