@@ -78,8 +78,6 @@ struct GraphUpdater {
     std::map<std::string, LayerTracker::Config> layer_updates;
     //! @brief mark all added nodes as active
     bool mark_active = true;
-    //! @brief when true, merge log records omit full nodes/attributes (counts and action only) to reduce memory
-    bool log_merge_light = false;
   } const config;
 
   using MergeLogCallback = std::function<void(const std::string&)>;

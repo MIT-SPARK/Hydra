@@ -96,10 +96,14 @@ void declare_config(SpatialWindowChecker::Config& config) {
 }
 
 namespace {
-static const auto registration =
+static const auto spatial_registration =
     config::RegistrationWithConfig<VolumetricWindow,
                                    SpatialWindowChecker,
                                    SpatialWindowChecker::Config>("spatial");
+static const auto temporal_registration =
+    config::RegistrationWithConfig<VolumetricWindow,
+                                   TemporalWindowChecker,
+                                   TemporalWindowChecker::Config>("temporal");
 }
 
 SpatialWindowChecker::SpatialWindowChecker(const Config& config)
@@ -110,6 +114,24 @@ bool SpatialWindowChecker::inBounds(uint64_t /* timestamp_ns */,
                                     const uint64_t /* last_update_ns */,
                                     const Eigen::Vector3d& last_pos) const {
   return (world_T_body.translation() - last_pos).norm() <= config.max_radius_m;
+}
+
+void declare_config(TemporalWindowChecker::Config& config) {
+  using namespace config;
+  name("TemporalWindowChecker::Config");
+  field(config.window_sec, "window_sec", "s");
+  check(config.window_sec, GT, 0.0, "window_sec");
+}
+
+TemporalWindowChecker::TemporalWindowChecker(const Config& config)
+    : config(config::checkValid(config)) {}
+
+bool TemporalWindowChecker::inBounds(uint64_t timestamp_ns,
+                                     const Eigen::Isometry3d& /* world_T_body */,
+                                     const uint64_t last_updated_ns,
+                                     const Eigen::Vector3d& /* last_pos */) const {
+  const uint64_t window_ns = static_cast<uint64_t>(config.window_sec * 1e9);
+  return timestamp_ns >= last_updated_ns && (timestamp_ns - last_updated_ns) <= window_ns;
 }
 
 }  // namespace hydra

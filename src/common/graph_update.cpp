@@ -214,15 +214,15 @@ void GraphUpdater::update(const GraphUpdate& update,
 
       if (log_callback) {
         nlohmann::json upd;
-        to_json_merge_log(upd["incoming_attributes"], *attrs);
-        if (to_merge) {
-          upd["action"] = "merge";
-          upd["target_node_id"] = NodeSymbol(*to_merge).str();
-          to_json_merge_log(upd["target_attributes"], *active_targets.at(*to_merge));
-        } else {
-          upd["action"] = "new";
-          upd["target_node_id"] = tracker.next_id.str();
-        }
+          to_json_merge_log(upd["incoming_attributes"], *attrs);
+          if (to_merge) {
+            upd["action"] = "merge";
+            upd["target_node_id"] = NodeSymbol(*to_merge).str();
+            to_json_merge_log(upd["target_attributes"], *active_targets.at(*to_merge));
+          } else {
+            upd["action"] = "new";
+            upd["target_node_id"] = tracker.next_id.str();
+          }
         log_record["updates"].push_back(upd);
       }
 
