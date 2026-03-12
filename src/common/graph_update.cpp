@@ -115,10 +115,7 @@ GraphUpdater::GraphUpdater(const Config& config) : config(config::checkValid(con
   }
 }
 
-void GraphUpdater::update(const GraphUpdate& update,
-                          DynamicSceneGraph& graph,
-                          uint64_t timestamp_ns,
-                          uint64_t sequence_number) {
+void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
   std::map<LayerId, LayerTracker&> trackers_by_id;
   for (auto& [name, tracker] : trackers_) {
     const auto key = graph.getLayerKey(name);

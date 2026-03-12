@@ -80,10 +80,7 @@ struct GraphUpdater {
 
 
   explicit GraphUpdater(const Config& config);
-  void update(const GraphUpdate& update,
-              spark_dsg::DynamicSceneGraph& graph,
-              uint64_t timestamp_ns = 0,
-              uint64_t sequence_number = 0);
+  void update(const GraphUpdate& update, spark_dsg::DynamicSceneGraph& graph);
 
  private:
   std::map<std::string, LayerTracker> trackers_;

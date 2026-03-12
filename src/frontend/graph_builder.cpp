@@ -388,7 +388,7 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
     }
   }
 
-
+  graph_updater_.update(msg->graph_update, *dsg_->graph);
   {  // start timing scope
     ScopedTimer timer("frontend/launch_callbacks", msg->timestamp_ns, true, 1, false);
     launchCallbacks(input_callbacks_, msg);
