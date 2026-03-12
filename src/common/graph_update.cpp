@@ -39,30 +39,11 @@
 #include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <spark_dsg/dynamic_scene_graph.h>
-#include <spark_dsg/node_attributes.h>
-#include <spark_dsg/serialization/json_conversions.h>
 
 #include <algorithm>
-#include <nlohmann/json.hpp>
 
 #include "hydra/common/config_utilities.h"
 
-namespace {
-
-// Serialize node attributes for merge log; object meshes are omitted to reduce size.
-void to_json_merge_log(nlohmann::json& record, const spark_dsg::NodeAttributes& attrs) {
-  const auto* khronos =
-      dynamic_cast<const spark_dsg::KhronosObjectAttributes*>(&attrs);
-  if (khronos) {
-    auto copy = khronos->clone();
-    static_cast<spark_dsg::KhronosObjectAttributes*>(copy.get())->mesh.clear();
-    to_json(record, *copy);
-  } else {
-    to_json(record, attrs);
-  }
-}
-
-}  // namespace
 
 namespace YAML {
 
@@ -137,8 +118,7 @@ GraphUpdater::GraphUpdater(const Config& config) : config(config::checkValid(con
 void GraphUpdater::update(const GraphUpdate& update,
                           DynamicSceneGraph& graph,
                           uint64_t timestamp_ns,
-                          uint64_t sequence_number,
-                          MergeLogCallback log_callback) {
+                          uint64_t sequence_number) {
   std::map<LayerId, LayerTracker&> trackers_by_id;
   for (auto& [name, tracker] : trackers_) {
     const auto key = graph.getLayerKey(name);
@@ -153,7 +133,6 @@ void GraphUpdater::update(const GraphUpdate& update,
   for (const auto& [layer_id, layer_update] : update) {
     if (!layer_update) {
       LOG(WARNING) << "Received invalid update for layer " << layer_id;
-      continue;
     }
 
     auto iter = trackers_by_id.find(layer_id);
@@ -176,29 +155,6 @@ void GraphUpdater::update(const GraphUpdate& update,
       }
     }
 
-    nlohmann::json log_record;
-    if (log_callback) {
-      log_record["timestamp_ns"] = timestamp_ns;
-      log_record["sequence_number"] = sequence_number;
-      log_record["layer_id"] = layer_id;
-      log_record["target_layer_id"] = target_layer_id;
-      log_record["frontend_nodes_before"] = nlohmann::json::array();
-      if (target_layer) {
-        for (const auto& [node_id, node] : target_layer->nodes()) {
-          auto& attrs = node->attributes();
-          if (!attrs.is_active) {
-            continue;
-          }
-          nlohmann::json node_entry;
-          node_entry["node_id"] = NodeSymbol(node_id).str();
-          to_json_merge_log(node_entry["attributes"], node->attributes());
-          log_record["frontend_nodes_before"].push_back(node_entry);
-        }
-      }
-      log_record["updates"] = nlohmann::json::array();
-    } else {
-    }
-
     for (auto&& attrs : layer_update->attributes) {
       if (!attrs) {
         continue;
@@ -210,20 +166,6 @@ void GraphUpdater::update(const GraphUpdate& update,
           to_merge = target_id;
           break;
         }
-      }
-
-      if (log_callback) {
-        nlohmann::json upd;
-          to_json_merge_log(upd["incoming_attributes"], *attrs);
-          if (to_merge) {
-            upd["action"] = "merge";
-            upd["target_node_id"] = NodeSymbol(*to_merge).str();
-            to_json_merge_log(upd["target_attributes"], *active_targets.at(*to_merge));
-          } else {
-            upd["action"] = "new";
-            upd["target_node_id"] = tracker.next_id.str();
-          }
-        log_record["updates"].push_back(upd);
       }
 
       if (to_merge) {
@@ -242,9 +184,6 @@ void GraphUpdater::update(const GraphUpdate& update,
       ++tracker.next_id;
     }
 
-    if (log_callback) {
-      log_callback(log_record.dump());
-    }
   }
 }
 

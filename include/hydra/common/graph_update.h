@@ -38,10 +38,8 @@
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
-#include <functional>
 #include <list>
 #include <map>
-#include <string>
 
 #include "hydra/common/node_matchers.h"
 
@@ -80,14 +78,12 @@ struct GraphUpdater {
     bool mark_active = true;
   } const config;
 
-  using MergeLogCallback = std::function<void(const std::string&)>;
 
   explicit GraphUpdater(const Config& config);
   void update(const GraphUpdate& update,
               spark_dsg::DynamicSceneGraph& graph,
               uint64_t timestamp_ns = 0,
-              uint64_t sequence_number = 0,
-              MergeLogCallback log_callback = nullptr);
+              uint64_t sequence_number = 0);
 
  private:
   std::map<std::string, LayerTracker> trackers_;
