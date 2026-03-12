@@ -3,6 +3,7 @@ paths: [khronos, khronos_ros]
 map_window:
   type: spatial
   max_radius_m: &spatial_window 8.0
+  window_sec: &temporal_window 3.0
 active_window:
   type: ActiveWindow
   full_update_separation_s: 0.2
@@ -28,9 +29,6 @@ active_window:
     min_cross_iou: 0.1
     voxel_size: 0.2 # m
     min_num_observations: 15
-  tracking_integrator:
-    temporal_window: *temporal_window # Time unobserved until a voxel exits the active window [s]
-    spatial_window: *spatial_window # m
   object_extractor:
     type: MeshObjectExtractor
     min_object_allocation_confidence: 0.5
