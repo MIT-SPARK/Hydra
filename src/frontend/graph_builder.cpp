@@ -44,7 +44,6 @@
 #include <kimera_pgmo/utils/mesh_io.h>
 #include <spark_dsg/printing.h>
 
-
 #include "hydra/common/global_info.h"
 #include "hydra/common/launch_callbacks.h"
 #include "hydra/common/pipeline_queues.h"
@@ -389,6 +388,7 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
   }
 
   graph_updater_.update(msg->graph_update, *dsg_->graph);
+  
   {  // start timing scope
     ScopedTimer timer("frontend/launch_callbacks", msg->timestamp_ns, true, 1, false);
     launchCallbacks(input_callbacks_, msg);
