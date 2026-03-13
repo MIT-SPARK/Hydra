@@ -167,6 +167,7 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
       if (to_merge) {
         VLOG(5) << "Merging attributes to " << NodeSymbol(*to_merge).str() << " @ "
                 << target_layer_id << " for layer " << layer_id;
+        // TODO(nathan) actual merge attributes
         continue;
       }
 

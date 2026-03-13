@@ -45,7 +45,6 @@ active_window:
     max_radius_m: *spatial_window
     window_sec: *temporal_window
 frontend:
-  log_update_merge_analysis: true
   enable_mesh_objects: false
   pgmo:
     time_horizon: 15.0
