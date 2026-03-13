@@ -78,7 +78,6 @@ struct GraphUpdater {
     bool mark_active = true;
   } const config;
 
-
   explicit GraphUpdater(const Config& config);
   void update(const GraphUpdate& update, spark_dsg::DynamicSceneGraph& graph);
 

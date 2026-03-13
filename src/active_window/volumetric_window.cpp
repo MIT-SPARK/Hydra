@@ -104,7 +104,7 @@ static const auto temporal_registration =
     config::RegistrationWithConfig<VolumetricWindow,
                                    TemporalWindowChecker,
                                    TemporalWindowChecker::Config>("temporal");
-}
+}  // namespace
 
 SpatialWindowChecker::SpatialWindowChecker(const Config& config)
     : config(config::checkValid(config)) {}
@@ -131,7 +131,8 @@ bool TemporalWindowChecker::inBounds(uint64_t timestamp_ns,
                                      const uint64_t last_updated_ns,
                                      const Eigen::Vector3d& /* last_pos */) const {
   const uint64_t window_ns = static_cast<uint64_t>(config.window_sec * 1e9);
-  return timestamp_ns >= last_updated_ns && (timestamp_ns - last_updated_ns) <= window_ns;
+  return timestamp_ns >= last_updated_ns &&
+         (timestamp_ns - last_updated_ns) <= window_ns;
 }
 
 }  // namespace hydra

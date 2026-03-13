@@ -44,7 +44,6 @@
 
 #include "hydra/common/config_utilities.h"
 
-
 namespace YAML {
 
 template <typename T>
@@ -180,7 +179,6 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
       graph.emplaceNode(target_layer_id, tracker.next_id, std::move(attrs));
       ++tracker.next_id;
     }
-
   }
 }
 
