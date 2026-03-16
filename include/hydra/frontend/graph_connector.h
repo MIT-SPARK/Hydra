@@ -36,7 +36,6 @@
 #include <spark_dsg/dynamic_scene_graph.h>
 
 #include <map>
-#include <memory>
 #include <set>
 #include <vector>
 
@@ -60,7 +59,7 @@ struct LayerConnector {
     std::vector<ChildLayerConfig> child_layers{
         {spark_dsg::DsgLayers::OBJECTS, true, true}};
     //! Whether or not to force `is_active` to false
-    bool clear_active_flag = true;
+    bool clear_active_flag = false;
   } const config;
 
   explicit LayerConnector(const Config& config);
