@@ -41,6 +41,7 @@
 #include <list>
 
 #include "hydra/common/message_queue.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra {
 
@@ -68,7 +69,9 @@ class ExternalLoopClosureReceiver {
     const spark_dsg::NodeId id = 0;
   };
 
-  struct Config {
+  struct Config : VerbosityConfig {
+    Config() : VerbosityConfig("[external_lc_receiver] ") {}
+
     //! Layer to use for the pose graph
     std::string layer = spark_dsg::DsgLayers::AGENTS;
     //! Maximum difference in seconds between a loop closure timestamp and the nearest
@@ -81,7 +84,6 @@ class ExternalLoopClosureReceiver {
     double min_pose_discrepancy = 2.0;
     //! Weighting of rotation component of pose discrepency calculation
     double rotation_scale = 1.0;
-
   } const config;
 
   ExternalLoopClosureReceiver(const Config& config, Queue* const queue);

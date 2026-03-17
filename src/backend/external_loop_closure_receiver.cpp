@@ -73,6 +73,7 @@ inline std::chrono::nanoseconds getLastStamp(const SceneGraphLayer& layer) {
 void declare_config(ExternalLoopClosureReceiver::Config& config) {
   using namespace config;
   name("ExternalLoopClosureReceiver::Config");
+  base<VerbosityConfig>(config);
   field(config.layer, "layer");
   field(config.max_time_difference, "max_time_difference", "s");
   check(config.max_time_difference, GE, 0.0, "max_time_difference");
@@ -104,6 +105,7 @@ ExternalLoopClosureReceiver::getPreviousLoopsForRobotPair(size_t robot_a,
   if (!added_loop_closures_.count(key)) {
     added_loop_closures_.insert({key, {}});
   }
+
   return added_loop_closures_.at(key);
 }
 
@@ -135,7 +137,7 @@ LookupResult ExternalLoopClosureReceiver::findClosest(const DynamicSceneGraph& g
                          return std::abs(diff_lhs.count()) < std::abs(diff_rhs.count());
                        });
   if (closest == layer->nodes().end()) {
-    VLOG(1) << "No nodes exist for robot " << robot_id << "' when looking up timestamp "
+    MLOG(1) << "No nodes exist for robot " << robot_id << "' when looking up timestamp "
             << stamp_ns << " [ns]";
     return {};
   }
@@ -143,7 +145,7 @@ LookupResult ExternalLoopClosureReceiver::findClosest(const DynamicSceneGraph& g
   const NodeSymbol best_id(closest->second->id);
   const auto best_stamp = getAgentTimestamp(*closest->second);
   const auto diff_s = convertToSeconds(best_stamp - stamp);
-  VLOG(5) << "Found node " << best_id.str() << " with difference of " << diff_s
+  MLOG(2) << "Found node " << best_id.str() << " with difference of " << diff_s
           << " [s] for timestamp " << stamp_ns << " [ns]";
 
   // avoid associating to nodes that are too far away in time
@@ -252,12 +254,14 @@ void ExternalLoopClosureReceiver::update(const DynamicSceneGraph& graph,
     auto& previous_loops_for_pair =
         getPreviousLoopsForRobotPair(edge.robot_from, edge.robot_to);
     bool should_add = should_add_lc(previous_loops_for_pair, from_ns, to_ns, edge.pose);
-
     if (should_add) {
+      MLOG(1) << "Added external loop closure " << NodeSymbol(to_node.id).str()
+              << " -> " << NodeSymbol(from_node.id).str();
       previous_loops_for_pair.insert(edge);
       // to_id, from_id, to_T_from
       callback(to_node.id, from_node.id, gtsam::Pose3(edge.pose.matrix()));
     }
+
     iter = loop_closures_.erase(iter);
   }
 }
