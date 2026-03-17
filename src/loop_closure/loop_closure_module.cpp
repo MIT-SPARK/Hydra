@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/loop_closure/loop_closure_module.h"
 
+#include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <glog/logging.h>
 #include <kimera_pgmo/utils/common_functions.h>
@@ -49,10 +50,20 @@ namespace hydra {
 using hydra::timing::ScopedTimer;
 using lcd::LayerRegistrationConfig;
 
-LoopClosureModule::LoopClosureModule(const LoopClosureConfig& config,
+void declare_config(LoopClosureModule::Config& config) {
+  using namespace config;
+  name("LoopClosureConfig");
+  field(config.detector, "lcd");
+  field(config.visualize_dsg_lcd, "visualize_dsg_lcd");
+  field(config.lcd_visualizer_ns, "lcd_visualizer_ns");
+  field(config.lcd_agent_horizon_s, "lcd_agent_horizon_s");
+  field(config.descriptor_creation_horizon_m, "descriptor_creation_horizon_m");
+}
+
+LoopClosureModule::LoopClosureModule(const Config& config,
                                      const SharedModuleState::Ptr& state)
-    : config_(config), state_(state), lcd_graph_(new DynamicSceneGraph()) {
-  lcd_detector_.reset(new lcd::LcdDetector(config_.detector));
+    : config(config), state_(state), lcd_graph_(new DynamicSceneGraph()) {
+  lcd_detector_.reset(new lcd::LcdDetector(config.detector));
 }
 
 LoopClosureModule::~LoopClosureModule() { stopImpl(); }
@@ -82,7 +93,7 @@ void LoopClosureModule::save(const DataDirectory& output) {
   lcd_graph_->save(log_path / "dsg.json", false);
 }
 
-std::string LoopClosureModule::printInfo() const { return config::toString(config_); }
+std::string LoopClosureModule::printInfo() const { return config::toString(config); }
 
 void LoopClosureModule::spin() {
   auto queue = PipelineQueues::instance().lcd_queue;
@@ -211,7 +222,7 @@ NodeIdSet LoopClosureModule::getPlacesToCache(const Eigen::Vector3d& agent_pos) 
     }
 
     const auto& attrs = node_opt->attributes();
-    if ((agent_pos - attrs.position).norm() < config_.descriptor_creation_horizon_m) {
+    if ((agent_pos - attrs.position).norm() < config.descriptor_creation_horizon_m) {
       ++iter;
       continue;
     }
@@ -243,14 +254,14 @@ std::optional<NodeId> LoopClosureModule::getQueryAgentId(size_t stamp_ns) {
   std::chrono::duration<double> diff_s = std::chrono::nanoseconds(stamp_ns) - prev_time;
   // we consider should_shutdown_ here to make sure we're not waiting on popping from
   // the LCD queue while not getting new place messages
-  if (!should_shutdown_ && diff_s.count() < config_.lcd_agent_horizon_s) {
+  if (!should_shutdown_ && diff_s.count() < config.lcd_agent_horizon_s) {
     return std::nullopt;
   }
 
-  if (should_shutdown_ && (diff_s.count() < config_.lcd_agent_horizon_s)) {
+  if (should_shutdown_ && (diff_s.count() < config.lcd_agent_horizon_s)) {
     LOG(ERROR) << "Forcing pop of node " << NodeSymbol(agent_queue_.top()).str()
-               << " from lcd queue due to shutdown: "
-               << ", diff: " << diff_s.count() << " / " << config_.lcd_agent_horizon_s;
+               << " from lcd queue due to shutdown: " << ", diff: " << diff_s.count()
+               << " / " << config.lcd_agent_horizon_s;
   }
 
   auto valid_node = agent_queue_.top();

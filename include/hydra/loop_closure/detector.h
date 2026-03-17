@@ -50,35 +50,39 @@ struct GnnLcdConfig {
   bool objects_pos_in_feature = false;
 };
 
+void declare_config(GnnLcdConfig& config);
+
 struct LayerLcdConfig {
   DescriptorMatchConfig matching;
   LayerRegistrationConfig registration;
 };
 
-struct LcdDetectorConfig {
-  TeaserParams teaser_config;
-  bool enable_agent_registration = true;
-  DescriptorMatchConfig agent_search_config;
-
-  // TODO(nathan) refactor this
-  LayerLcdConfig objects;
-  LayerLcdConfig places;
-
-  SubgraphConfig object_extraction{5.0};
-  SubgraphConfig places_extraction{5.0};
-
-  size_t num_semantic_classes = 20;
-  HistogramConfig<double> place_histogram_config{0.5, 2.5, 30};
-  bool use_gnn_descriptors = false;
-  GnnLcdConfig gnn_lcd;
-};
+void declare_config(LayerLcdConfig& config);
 
 class LcdDetector {
  public:
   using FactoryMap = std::map<std::string, DescriptorFactory::Ptr>;
   using SearchResultMap = std::map<size_t, LayerSearchResults>;
 
-  explicit LcdDetector(const LcdDetectorConfig& config);
+  struct Config {
+    TeaserParams teaser_config;
+    bool enable_agent_registration = true;
+    DescriptorMatchConfig agent_search_config;
+
+    // TODO(nathan) refactor this
+    LayerLcdConfig objects;
+    LayerLcdConfig places;
+
+    SubgraphConfig object_extraction{5.0};
+    SubgraphConfig places_extraction{5.0};
+
+    size_t num_semantic_classes = 20;
+    HistogramConfig<double> place_histogram_config{0.5, 2.5, 30};
+    bool use_gnn_descriptors = false;
+    GnnLcdConfig gnn_lcd;
+  } const config;
+
+  explicit LcdDetector(const Config& config);
 
   void setDescriptorFactories(FactoryMap&& factories);
 
@@ -121,7 +125,6 @@ class LcdDetector {
                                                       NodeId agent_node,
                                                       uint64_t timestamp = 0) const;
 
-  LcdDetectorConfig config_;
   DescriptorFactory::Ptr agent_factory_;
   FactoryMap layer_factories_;
 
@@ -140,5 +143,7 @@ class LcdDetector {
 
   std::map<size_t, LayerSearchResults> matches_;
 };
+
+void declare_config(LcdDetector::Config& config);
 
 }  // namespace hydra::lcd

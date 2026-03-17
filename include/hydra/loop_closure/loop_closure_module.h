@@ -39,17 +39,22 @@
 
 #include "hydra/common/common_types.h"
 #include "hydra/common/module.h"
-#include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
 #include "hydra/loop_closure/detector.h"
-#include "hydra/loop_closure/loop_closure_config.h"
 
 namespace hydra {
 
 class LoopClosureModule : public Module {
  public:
-  LoopClosureModule(const LoopClosureConfig& config,
-                    const SharedModuleState::Ptr& state);
+  struct Config {
+    lcd::LcdDetector::Config detector;
+    bool visualize_dsg_lcd = false;
+    std::string lcd_visualizer_ns = "/dsg/lcd_visualizer";
+    double lcd_agent_horizon_s = 1.5;
+    double descriptor_creation_horizon_m = 10.0;
+  } const config;
+
+  LoopClosureModule(const Config& config, const SharedModuleState::Ptr& state);
 
   virtual ~LoopClosureModule();
 
@@ -81,9 +86,7 @@ class LoopClosureModule : public Module {
   std::unique_ptr<std::thread> spin_thread_;
   uint64_t last_sequence_number_ = 0;
 
-  LoopClosureConfig config_;
   SharedModuleState::Ptr state_;
-
   std::priority_queue<NodeId, std::vector<NodeId>, std::greater<NodeId>> agent_queue_;
   std::list<NodeId> potential_lcd_root_nodes_;
 
@@ -93,5 +96,7 @@ class LoopClosureModule : public Module {
  private:
   void stopImpl();
 };
+
+void declare_config(LoopClosureModule::Config& config);
 
 }  // namespace hydra
