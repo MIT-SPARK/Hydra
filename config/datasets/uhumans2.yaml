@@ -90,14 +90,7 @@ backend:
     agents:
       type: UpdateAgentsFunctor
     objects:
-      type: GenericUpdateFunctor
-      layer: OBJECTS
-      matcher:
-        type: DistanceNodeMatcher
-        pos_threshold_m: 1.5
-      merge_proposer:
-        type: SemanticNearestNode
-        pos_threshold_m: 1.5
+      type: UpdateObjectsFunctor
     surface_places:
       type: Update2dPlacesFunctor
     places:
