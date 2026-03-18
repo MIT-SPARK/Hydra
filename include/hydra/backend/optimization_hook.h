@@ -33,20 +33,22 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <kimera_pgmo/kimera_pgmo_interface.h>
+#include <kimera_pgmo/deformation_graph.h>
+#include <spark_dsg/scene_graph.h>
 
 namespace hydra {
 
-// supplementary pgmo config
-struct HydraPgmoConfig : public kimera_pgmo::KimeraPgmoConfig {
-  // covariance
-  double place_mesh_variance;
-  double place_edge_variance;
-  double place_merge_variance;
-  double object_merge_variance;
-  double sg_loop_closure_variance;
-};
+class OptimizationHook {
+ public:
+  using Ptr = std::unique_ptr<OptimizationHook>;
+  using NodeRobotMap = std::map<spark_dsg::NodeId, int>;
 
-void declare_config(HydraPgmoConfig& conf);
+  virtual ~OptimizationHook() = default;
+
+  virtual void updateProblem(size_t timestamp_ns,
+                             const spark_dsg::SceneGraph& graph,
+                             kimera_pgmo::DeformationGraph& deformation_graph,
+                             const NodeRobotMap* robot_lookup = nullptr) const = 0;
+};
 
 }  // namespace hydra

@@ -34,6 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/backend/mst_factors.h"
 
+#include <config_utilities/config.h>
+#include <config_utilities/factory.h>
+#include <config_utilities/validation.h>
 #include <glog/logging.h>
 #include <pose_graph_tools/pose_graph.h>
 
@@ -42,32 +45,51 @@
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<OptimizationHook,
+                                   MstPlaceFactors,
+                                   MstPlaceFactors::Config>("MstPlaceFactors");
+
+}
 
 using timing::ScopedTimer;
 
-void addPlacesToDeformationGraph(const DynamicSceneGraph& graph,
-                                 size_t timestamp_ns,
-                                 kimera_pgmo::DeformationGraph& deformation_graph,
-                                 double mst_edge_variance,
-                                 double mesh_edge_variance,
-                                 const std::function<char(NodeId)>& prefix_lookup) {
+void declare_config(MstPlaceFactors::Config& config) {
+  using namespace config;
+  name("MstPlaceFactors::Config");
+  field(config.mesh_variance, "mesh_variance");
+  field(config.edge_variance, "edge_variance");
+  check(config.mesh_variance, GT, 0.0, "mesh_variance");
+  check(config.edge_variance, GT, 0.0, "edge_variance");
+}
+
+MstPlaceFactors::MstPlaceFactors(const Config& config)
+    : config(config::checkValid(config)) {}
+
+void MstPlaceFactors::updateProblem(uint64_t timestamp_ns,
+                                    const spark_dsg::SceneGraph& graph,
+                                    kimera_pgmo::DeformationGraph& deformation_graph,
+                                    const NodeRobotMap* robot_lookup) const {
   const auto& places = graph.getLayer(DsgLayers::PLACES);
   if (places.nodes().empty()) {
     LOG(WARNING) << "Attempting to add places to deformation graph without places";
     return;
   }
 
-  ScopedTimer timer("dsg_updater/add_places", timestamp_ns);
+  const auto this_vertex_key = GlobalInfo::instance().getRobotPrefix().vertex_key;
+  ScopedTimer timer("backend/mst_place_factors", timestamp_ns);
   deformation_graph.clearTemporaryStructures();
 
   MinimumSpanningTreeInfo mst_info;
   {  // start timing scope
-    ScopedTimer mst_timer("dsg_updater/places_mst", timestamp_ns);
+    ScopedTimer mst_timer("backend/places_mst", timestamp_ns);
     mst_info = getMinimumSpanningEdges(places);
   }  // end timing scope
 
   {  // start timing scope
-    ScopedTimer add_timer("dsg_updater/add_places_nodes", timestamp_ns);
+    ScopedTimer add_timer("backend/add_places_nodes", timestamp_ns);
 
     kimera_pgmo::NodeValenceInfoList factors;
     for (const auto& [node_id, node] : places.nodes()) {
@@ -77,7 +99,10 @@ void addPlacesToDeformationGraph(const DynamicSceneGraph& graph,
       }
 
       auto& factor = factors.emplace_back();
-      factor.valence_prefix = prefix_lookup(node_id);
+      if (robot_lookup) {
+      } else {
+        factor.valence_prefix = this_vertex_key;
+      }
       factor.key = node_id;
       factor.pose = gtsam::Pose3(gtsam::Rot3(), attrs.position);
 
@@ -91,7 +116,7 @@ void addPlacesToDeformationGraph(const DynamicSceneGraph& graph,
       }
     }
 
-    deformation_graph.processNewTempNodesValences(factors, false, mesh_edge_variance);
+    deformation_graph.processNewTempNodesValences(factors, false, config.mesh_variance);
   }  // end timing scope
 
   {  // start timing scope
@@ -114,7 +139,7 @@ void addPlacesToDeformationGraph(const DynamicSceneGraph& graph,
       mst_edges.edges.push_back(mst_e);
     }
 
-    deformation_graph.processNewTempEdges(mst_edges, mst_edge_variance);
+    deformation_graph.processNewTempEdges(mst_edges, config.edge_variance);
   }  // end timing scope
 }
 

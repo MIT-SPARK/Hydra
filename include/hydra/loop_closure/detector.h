@@ -80,6 +80,11 @@ class LcdDetector {
     HistogramConfig<double> place_histogram_config{0.5, 2.5, 30};
     bool use_gnn_descriptors = false;
     GnnLcdConfig gnn_lcd;
+
+    struct Variances {
+      double scene_graph = 0.1;
+      double visual = 0.05;
+    } variances;
   } const config;
 
   explicit LcdDetector(const Config& config);

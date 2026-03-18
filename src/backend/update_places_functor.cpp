@@ -57,6 +57,7 @@ void declare_config(UpdatePlacesFunctor::Config& config) {
   field(config.deformation_interpolator, "deformation_interpolator");
   field(config.merge_proposer, "merge_proposer");
   field(config.layer, "layer");
+  field(config.use_temp_values, "use_temp_values");
 }
 
 UpdatePlacesFunctor::UpdatePlacesFunctor(const Config& config)
@@ -140,10 +141,10 @@ void UpdatePlacesFunctor::call(const DynamicSceneGraph& unmerged,
   const auto view = new_loopclosure ? LayerView(places) : active_tracker.view(places);
 
   size_t num_changed = 0;
-  if (!info->places_values || info->places_values->size() == 0) {
-    deformation_interpolator.interpolateNodePositions(unmerged, *dsg.graph, info, view);
-  } else {
+  if (config.use_temp_values) {
     num_changed = updateFromValues(view, dsg, info);
+  } else {
+    deformation_interpolator.interpolateNodePositions(unmerged, *dsg.graph, info, view);
   }
 
   VLOG(2) << "[Hydra Backend] Places update: " << num_changed << " nodes";

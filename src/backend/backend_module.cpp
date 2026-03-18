@@ -44,7 +44,6 @@
 #include <kimera_pgmo/utils/mesh_io.h>
 
 #include "hydra/backend/backend_utilities.h"
-#include "hydra/backend/mst_factors.h"
 #include "hydra/common/global_info.h"
 #include "hydra/common/pipeline_queues.h"
 #include "hydra/utils/pgmo_mesh_traits.h"  // IWYU pragma: keep
@@ -102,9 +101,9 @@ void declare_config(BackendModule::Config& config) {
   base<DsgUpdater::Config>(config);
   name("BackendConfig");
   field(config.pgmo, "pgmo");
-  field(config.add_places_to_deformation_graph, "add_places_to_deformation_graph");
   field(config.optimize_on_lc, "optimize_on_lc");
   field(config.external_loop_closures, "external_loop_closures");
+  field(config.optimization_hooks, "optimization_hooks");
   field(config.sinks, "sinks");
 }
 
@@ -117,6 +116,10 @@ BackendModule::BackendModule(const Config& config,
       state_(state),
       external_lc_receiver_(config.external_loop_closures,
                             &PipelineQueues::instance().external_loop_closure_queue) {
+  for (const auto& hook : config.optimization_hooks) {
+    optimization_hooks_.push_back(hook.create());
+  }
+
   // set up frontend graph copy
   unmerged_graph_ = private_dsg_->graph->clone();
   private_dsg_->graph->setMesh(GlobalInfo::instance().createMesh());
@@ -364,8 +367,7 @@ void BackendModule::updateFactorGraph(const BackendInput& input) {
       *unmerged_graph_,
       [this](NodeId to_node, NodeId from_node, const gtsam::Pose3 to_T_from) {
         LoopClosureLog lc{to_node, from_node, to_T_from, true, 1};
-        addLoopClosure(
-            lc.src, lc.dest, lc.src_T_dest, (KimeraPgmoInterface::config_.lc_variance));
+        addLoopClosure(lc.src, lc.dest, lc.src_T_dest, config.pgmo.lc_variance);
         loop_closures_.push_back(lc);
         ++num_loop_closures_;
       });
@@ -397,9 +399,7 @@ bool BackendModule::updateFromLcdQueue() {
     addLoopClosure(lc.src,
                    lc.dest,
                    lc.src_T_dest,
-                   (result.level ? KimeraPgmoInterface::config_.lc_variance
-                                 : config.pgmo.sg_loop_closure_variance));
-
+                   result.variance.value_or(KimeraPgmoInterface::config_.lc_variance));
     loop_closures_.push_back(lc);
 
     added_new_loop_closure = true;
@@ -505,14 +505,12 @@ void BackendModule::updateAgentNodeMeasurements(const PoseGraph& meas) {
 }
 
 void BackendModule::optimize(size_t timestamp_ns, bool force_find_merge) {
-  if (config.add_places_to_deformation_graph) {
-    const auto vertex_key = GlobalInfo::instance().getRobotPrefix().vertex_key;
-    addPlacesToDeformationGraph(*unmerged_graph_,
-                                timestamp_ns,
-                                *deformation_graph_,
-                                config.pgmo.place_edge_variance,
-                                config.pgmo.place_mesh_variance,
-                                [vertex_key](auto) { return vertex_key; });
+  for (const auto& hook : optimization_hooks_) {
+    if (!hook) {
+      continue;
+    }
+
+    hook->updateProblem(timestamp_ns, *unmerged_graph_, *deformation_graph_);
   }
 
   ScopedTimer timer("dsg_updater/optimization", timestamp_ns, true, 0, false);
@@ -522,9 +520,7 @@ void BackendModule::optimize(size_t timestamp_ns, bool force_find_merge) {
   updateDsgMesh(timestamp_ns);
 
   UpdateInfo::ConstPtr info(new UpdateInfo{timestamp_ns,
-                                           config.add_places_to_deformation_graph
-                                               ? deformation_graph_->getTempValues()
-                                               : nullptr,
+                                           deformation_graph_->getTempValues(),
                                            deformation_graph_->getValues(),
                                            have_new_loopclosures_ || force_find_merge,
                                            {},

@@ -11,7 +11,6 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/merge_tracker.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/mesh_clustering.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/mst_factors.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/pgmo_configs.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_agents_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_block_traversability_functor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/update_buildings_functor.cpp

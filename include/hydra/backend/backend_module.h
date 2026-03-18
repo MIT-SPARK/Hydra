@@ -46,7 +46,7 @@
 #include "hydra/backend/backend_input.h"
 #include "hydra/backend/dsg_updater.h"
 #include "hydra/backend/external_loop_closure_receiver.h"
-#include "hydra/backend/pgmo_configs.h"
+#include "hydra/backend/optimization_hook.h"
 #include "hydra/common/module.h"
 #include "hydra/common/output_sink.h"
 #include "hydra/common/shared_dsg_info.h"
@@ -86,12 +86,12 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   struct Config : DsgUpdater::Config {
     //! Optimize the graph on every detected loop closure
     bool optimize_on_lc = true;
-    //! Specialized PGMO configuration that includes scene graph factor covariances
-    HydraPgmoConfig pgmo;
-    //! Add places layer to factor graph via MST approach
-    bool add_places_to_deformation_graph = false;
+    //! PGMO backend configuration
+    kimera_pgmo::KimeraPgmoConfig pgmo;
     //! Configuration for associating loop closures to pose graph
     ExternalLoopClosureReceiver::Config external_loop_closures;
+    //! Configuration for various optimization add-ons
+    std::vector<config::VirtualConfig<OptimizationHook, true>> optimization_hooks;
     //! Output sinks that process that latest backed scene graph and state
     std::vector<Sink::Factory> sinks;
   } const config;
@@ -166,6 +166,7 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   SharedModuleState::Ptr state_;
 
   DsgUpdater::Ptr dsg_updater_;
+  std::vector<OptimizationHook::Ptr> optimization_hooks_;
 
   kimera_pgmo::Path trajectory_;
   std::vector<size_t> timestamps_;

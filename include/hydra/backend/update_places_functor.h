@@ -56,6 +56,8 @@ struct UpdatePlacesFunctor : public UpdateFunctor {
         config::VirtualConfig<AssociationStrategy>{association::NearestNode::Config{}}};
     //! Layer to update
     std::string layer = DsgLayers::PLACES;
+    //! Temporary flag to update from values instead of deformation graph
+    bool use_temp_values = false;
   } const config;
 
   explicit UpdatePlacesFunctor(const Config& config);

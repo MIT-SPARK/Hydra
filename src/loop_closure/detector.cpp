@@ -163,6 +163,16 @@ void declare_config(LayerLcdConfig& conf) {
   field(conf.registration, "registration");
 }
 
+void declare_config(LcdDetector::Config::Variances& config) {
+  using namespace config;
+  name("LcdDetector::Config::Variances");
+  field(config.scene_graph, "scene_graph");
+  field(config.visual, "visual");
+
+  check(config.scene_graph, GT, 0.0, "scene_graph");
+  check(config.visual, GT, 0.0, "visual");
+}
+
 void declare_config(LcdDetector::Config& config) {
   using namespace config;
   name("LcdDetectorConfig");
@@ -174,7 +184,7 @@ void declare_config(LcdDetector::Config& config) {
   field(config.places_extraction, "places_extraction");
   field(config.place_histogram_config, "place_histogram_config");
   field(config.agent_search_config, "agent");
-
+  field(config.variances, "variances");
   // TODO(nathan) pin agent registration to agent min
 
   field(config.use_gnn_descriptors, "use_gnn_descriptors");
@@ -437,6 +447,8 @@ std::vector<RegistrationSolution> LcdDetector::registerAndVerify(
       registration_result =
           registration_solvers_.at(idx)->solve(dsg, registration_input, agent_id);
       registration_result.level = static_cast<int64_t>(idx);
+      registration_result.variance =
+          idx ? config.variances.scene_graph : config.variances.visual;
       if (registration_result.valid) {
         break;
       }
