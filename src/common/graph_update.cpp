@@ -228,7 +228,7 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
           }
           const auto map_iter = tracker.track_to_node.find(entry.track_id);
           if (map_iter == tracker.track_to_node.end()) {
-            VLOG(5) << "Delete for unknown track_id " << entry.track_id << " on layer "
+            LOG(WARNING) << "Delete for unknown track_id " << entry.track_id << " on layer "
                     << layer_id;
             break;
           }
