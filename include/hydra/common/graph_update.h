@@ -38,12 +38,67 @@
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
+#include <limits>
 #include <list>
 #include <map>
+#include <memory>
+#include <unordered_map>
 
 #include "hydra/common/node_matchers.h"
 
 namespace hydra {
+
+struct NodeUpdateAttributes {
+  using Ptr = std::shared_ptr<NodeUpdateAttributes>;
+
+  enum class UpdateType {
+    Add,
+    Update,
+    Delete
+  };
+
+  //! Sentinel when no track id is present (e.g. not stored in attributes.details).
+  static constexpr size_t kInvalidTrackId = std::numeric_limits<size_t>::max();
+
+  static size_t inferTrackId(const std::shared_ptr<spark_dsg::NodeAttributes>& attrs) {
+    if (!attrs) {
+      return kInvalidTrackId;
+    }
+    const auto* khronos =
+        dynamic_cast<const spark_dsg::KhronosObjectAttributes*>(attrs.get());
+    if (!khronos) {
+      return kInvalidTrackId;
+    }
+    const auto iter = khronos->details.find("track_id");
+    if (iter == khronos->details.end() || iter->second.empty()) {
+      return kInvalidTrackId;
+    }
+    return iter->second.front();
+  }
+
+  //! @param attrs Null only when @p update_type is Delete (track id still required).
+  NodeUpdateAttributes(std::shared_ptr<spark_dsg::NodeAttributes> attrs,
+                       UpdateType update_type,
+                       size_t track_id)
+      : attributes(std::move(attrs)),
+        update_type(update_type),
+        track_id(track_id) {}
+
+  NodeUpdateAttributes(std::shared_ptr<spark_dsg::NodeAttributes> attrs,
+                       UpdateType update_type)
+      : attributes(std::move(attrs)),
+        update_type(update_type),
+        track_id(inferTrackId(attributes)) {}
+
+  explicit NodeUpdateAttributes(std::shared_ptr<spark_dsg::NodeAttributes> attrs)
+      : attributes(std::move(attrs)),
+        update_type(UpdateType::Add),
+        track_id(inferTrackId(attributes)) {}
+
+  const std::shared_ptr<spark_dsg::NodeAttributes> attributes;
+  const UpdateType update_type;
+  const size_t track_id;
+};
 
 struct LayerUpdate {
   using Ptr = std::shared_ptr<LayerUpdate>;
@@ -51,7 +106,7 @@ struct LayerUpdate {
   void append(LayerUpdate&& other);
 
   const spark_dsg::LayerId layer;
-  std::list<spark_dsg::NodeAttributes::Ptr> attributes;
+  std::list<NodeUpdateAttributes::Ptr> attributes;
 };
 
 using GraphUpdate = std::map<spark_dsg::LayerId, LayerUpdate::Ptr>;
@@ -67,6 +122,8 @@ struct LayerTracker {
 
   spark_dsg::NodeSymbol next_id;
   std::unique_ptr<NodeMatcher> matcher;
+  //! Committed DSG node id for each object track on this logical layer.
+  std::unordered_map<size_t, spark_dsg::NodeId> track_to_node;
 };
 
 void declare_config(LayerTracker::Config& config);

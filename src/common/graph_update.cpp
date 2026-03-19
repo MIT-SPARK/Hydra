@@ -77,6 +77,66 @@ namespace hydra {
 
 using namespace spark_dsg;
 
+namespace {
+
+void applyAttributesToNode(DynamicSceneGraph& graph,
+                           NodeId node_id,
+                           const NodeAttributes& attrs,
+                           bool mark_active) {
+  auto updated = attrs.clone();
+  if (mark_active) {
+    updated->is_active = true;
+  }
+  graph.setNodeAttributes(node_id, std::move(updated));
+}
+
+void tryMatcherOrEmplace(DynamicSceneGraph& graph,
+                         LayerTracker& tracker,
+                         LayerId target_layer_id,
+                         LayerId source_layer_id,
+                         const NodeUpdateAttributes& entry,
+                         bool mark_active,
+                         std::map<NodeId, const NodeAttributes*>& active_targets) {
+  if (!entry.attributes) {
+    LOG(WARNING) << "Graph update missing attributes for layer " << source_layer_id;
+    return;
+  }
+
+  std::optional<NodeId> to_merge;
+  for (const auto& [target_id, target_attrs] : active_targets) {
+    if (tracker.matcher && tracker.matcher->match(*entry.attributes, *target_attrs)) {
+      to_merge = target_id;
+      break;
+    }
+  }
+
+  if (to_merge) {
+    VLOG(5) << "Merging attributes to " << NodeSymbol(*to_merge).str() << " @ "
+            << target_layer_id << " for layer " << source_layer_id;
+    if (entry.track_id != NodeUpdateAttributes::kInvalidTrackId) {
+      tracker.track_to_node[entry.track_id] = *to_merge;
+    }
+    // TODO(nathan) actual merge attributes
+    return;
+  }
+
+  auto attrs = entry.attributes->clone();
+  if (mark_active) {
+    attrs->is_active = true;
+  }
+
+  const NodeId new_id = tracker.next_id;
+  VLOG(5) << "Emplacing " << tracker.next_id.str() << " @ " << target_layer_id
+          << " for layer " << source_layer_id;
+  graph.emplaceNode(target_layer_id, new_id, std::move(attrs));
+  if (entry.track_id != NodeUpdateAttributes::kInvalidTrackId) {
+    tracker.track_to_node[entry.track_id] = new_id;
+  }
+  ++tracker.next_id;
+}
+
+}  // namespace
+
 void declare_config(LayerTracker::Config& config) {
   using namespace config;
   name("LayerTracker::Config");
@@ -95,6 +155,7 @@ void declare_config(GraphUpdater::Config& config) {
 
 LayerUpdate::LayerUpdate(spark_dsg::LayerId layer) : layer(layer) {}
 
+// TODO: Potentially implement merge resolution if multiple updates for same node are added in the same update.
 void LayerUpdate::append(LayerUpdate&& rhs) {
   if (layer != rhs.layer) {
     return;
@@ -129,12 +190,13 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
   for (const auto& [layer_id, layer_update] : update) {
     if (!layer_update) {
       LOG(WARNING) << "Received invalid update for layer " << layer_id;
+      continue;
     }
 
     auto iter = trackers_by_id.find(layer_id);
     if (iter == trackers_by_id.end()) {
       LOG(WARNING) << "Recieved updates for unhandled layer " << layer_id;
-      return;
+      continue;
     }
 
     auto& tracker = iter->second;
@@ -151,34 +213,75 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
       }
     }
 
-    for (auto&& attrs : layer_update->attributes) {
-      if (!attrs) {
+    for (auto&& entry_ptr : layer_update->attributes) {
+      if (!entry_ptr) {
         continue;
       }
 
-      std::optional<NodeId> to_merge;
-      for (const auto& [target_id, target_attrs] : active_targets) {
-        if (tracker.matcher && tracker.matcher->match(*attrs, *target_attrs)) {
-          to_merge = target_id;
+      const NodeUpdateAttributes& entry = *entry_ptr;
+
+      switch (entry.update_type) {
+        case NodeUpdateAttributes::UpdateType::Delete: {
+          if (entry.track_id == NodeUpdateAttributes::kInvalidTrackId) {
+            LOG(WARNING) << "Delete graph update missing track_id for layer " << layer_id;
+            break;
+          }
+          const auto map_iter = tracker.track_to_node.find(entry.track_id);
+          if (map_iter == tracker.track_to_node.end()) {
+            VLOG(5) << "Delete for unknown track_id " << entry.track_id << " on layer "
+                    << layer_id;
+            break;
+          }
+          graph.removeNode(map_iter->second);
+          tracker.track_to_node.erase(map_iter);
+          break;
+        }
+        case NodeUpdateAttributes::UpdateType::Update: {
+          if (!entry.attributes) {
+            LOG(WARNING) << "Update graph update missing attributes for layer " << layer_id;
+            break;
+          }
+          const auto map_iter = tracker.track_to_node.find(entry.track_id);
+          if (map_iter != tracker.track_to_node.end()) {
+            applyAttributesToNode(
+                graph, map_iter->second, *entry.attributes, config.mark_active);
+            break;
+          }
+          VLOG(5) << "Update for track_id " << entry.track_id
+                  << " with no prior node; trying matcher / emplace for layer "
+                  << layer_id;
+          tryMatcherOrEmplace(graph,
+                              tracker,
+                              target_layer_id,
+                              layer_id,
+                              entry,
+                              config.mark_active,
+                              active_targets);
+          break;
+        }
+        case NodeUpdateAttributes::UpdateType::Add: {
+          if (!entry.attributes) {
+            LOG(WARNING) << "Add graph update missing attributes for layer " << layer_id;
+            break;
+          }
+          if (entry.track_id != NodeUpdateAttributes::kInvalidTrackId) {
+            const auto map_iter = tracker.track_to_node.find(entry.track_id);
+            if (map_iter != tracker.track_to_node.end()) {
+              applyAttributesToNode(
+                  graph, map_iter->second, *entry.attributes, config.mark_active);
+              break;
+            }
+          }
+          tryMatcherOrEmplace(graph,
+                              tracker,
+                              target_layer_id,
+                              layer_id,
+                              entry,
+                              config.mark_active,
+                              active_targets);
           break;
         }
       }
-
-      if (to_merge) {
-        VLOG(5) << "Merging attributes to " << NodeSymbol(*to_merge).str() << " @ "
-                << target_layer_id << " for layer " << layer_id;
-        // TODO(nathan) actual merge attributes
-        continue;
-      }
-
-      if (config.mark_active) {
-        attrs->is_active = true;
-      }
-
-      VLOG(5) << "Emplacing " << tracker.next_id.str() << " @ " << target_layer_id
-              << " for layer " << layer_id;
-      graph.emplaceNode(target_layer_id, tracker.next_id, std::move(attrs));
-      ++tracker.next_id;
     }
   }
 }
