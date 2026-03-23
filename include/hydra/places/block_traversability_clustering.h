@@ -37,7 +37,6 @@
 #include <spark_dsg/traversability_boundary.h>
 
 #include <optional>
-#include <utility>
 #include <vector>
 
 #include "hydra/places/traversability_clustering.h"
@@ -52,16 +51,11 @@ class BlockTraversabilityClustering : public TraversabilityClustering {
   struct Config {
     //! Minimum width of a place in meters.
     float min_place_width = 0.5f;
-
     //! Maximum width of a place in meters. This defines the place block size.
     float max_place_width = 1.0f;
-
-    //! If true, identify multiple connected places in the same block where
-    //! possible.
+    //! Identify multiple connected places in the same block where possible.
     bool recursive = false;
-
-    //! If true, simplify the traversability of each boundary to a single value.
-    //! Otherwise classify each voxel.
+    //! Simplify the traversability of boundaries to a single value instead of by voxel
     bool simplify_boundary_traversability = true;
   } const config;
 
@@ -139,7 +133,8 @@ class BlockTraversabilityClustering : public TraversabilityClustering {
 
   void updateGraph(const TraversabilityLayer& layer,
                    const ActiveWindowOutput& msg,
-                   spark_dsg::DynamicSceneGraph& graph) override;
+                   spark_dsg::SceneGraph& graph,
+                   const std::string& layer_name) override;
 
  protected:
   /* Processing steps */
@@ -148,12 +143,13 @@ class BlockTraversabilityClustering : public TraversabilityClustering {
   void classifyPlaceBoundaries();
 
   // Extract places and add to DSG.
-  void updatePlaceNodesInDsg(spark_dsg::DynamicSceneGraph& graph);
+  void updatePlaceNodesInDsg(spark_dsg::SceneGraph& graph,
+                             const std::string& layer_name);
 
-  void updatePlaceEdgesInDsg(spark_dsg::DynamicSceneGraph& graph);
+  void updatePlaceEdgesInDsg(spark_dsg::SceneGraph& graph);
 
   // Archive exiting places in the Active Window.
-  void archivePlaceInfos(spark_dsg::DynamicSceneGraph& graph);
+  void archivePlaceInfos(spark_dsg::SceneGraph& graph);
 
   /* Utility functions */
   // Find all info block indices that would overlap with the given traversability block.
@@ -189,7 +185,7 @@ class BlockTraversabilityClustering : public TraversabilityClustering {
   void updateDsgEdge(const PlaceInfo& from,
                      const PlaceInfo& to,
                      bool should_connect,
-                     spark_dsg::DynamicSceneGraph& graph) const;
+                     spark_dsg::SceneGraph& graph) const;
 
   // Data.
   InfoLayer infos_;

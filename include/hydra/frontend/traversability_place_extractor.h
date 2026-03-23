@@ -35,10 +35,8 @@
 #pragma once
 
 #include <config_utilities/virtual_config.h>
+#include <spark_dsg/scene_graph.h>
 
-#include <memory>
-
-#include "hydra/common/dsg_types.h"
 #include "hydra/common/output_sink.h"
 #include "hydra/places/traversability_clustering.h"
 #include "hydra/places/traversability_estimator.h"
@@ -51,9 +49,15 @@ class TraversabilityPlaceExtractor {
   using Sink = OutputSink<uint64_t, const Eigen::Vector3d&, const TraversabilityLayer&>;
 
   struct Config {
+    //! Layer to fill in the scene graph
+    std::string layer = spark_dsg::DsgLayers::TRAVERSABILITY;
+    //! Estimator for maintaining traversability state
     config::VirtualConfig<TraversabilityEstimator> estimator;
-    config::VirtualConfig<TraversabilityClustering> clustering;
+    //! Postprocessing filters for the traversability state (before clustering)
     TraversabilityProcessors::Config postprocessing;
+    //! Clustering that produces the places layer from the traversability state
+    config::VirtualConfig<TraversabilityClustering> clustering;
+    //! Visualization sinks for the current traversaiblity information
     std::vector<Sink::Factory> sinks;
   } const config;
 
@@ -63,13 +67,12 @@ class TraversabilityPlaceExtractor {
 
   void detect(const ActiveWindowOutput& msg);
 
-  void updateGraph(const ActiveWindowOutput& msg, DynamicSceneGraph& graph);
+  void updateGraph(const ActiveWindowOutput& msg, spark_dsg::SceneGraph& graph);
 
  protected:
-  NodeIdSet active_nodes_;
   TraversabilityEstimator::Ptr estimator_;
-  TraversabilityClustering::Ptr clustering_;
   const TraversabilityProcessors postprocessing_;
+  TraversabilityClustering::Ptr clustering_;
   Sink::List sinks_;
 };
 

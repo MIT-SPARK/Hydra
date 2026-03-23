@@ -42,23 +42,23 @@
 
 #include <queue>
 
-#include "hydra/places/block_traversability_clustering.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra::places {
-
-using Timer = hydra::timing::ScopedTimer;
-using spark_dsg::Boundary;
-using spark_dsg::Side;
-using spark_dsg::TraversabilityNodeAttributes;
-
 namespace {
+
 static const auto registration =
     config::RegistrationWithConfig<TraversabilityClustering,
                                    BlockTraversabilityClustering,
                                    BlockTraversabilityClustering::Config>(
         "BlockTraversabilityClustering");
+
 }  // namespace
+
+using Timer = hydra::timing::ScopedTimer;
+using spark_dsg::Boundary;
+using spark_dsg::Side;
+using spark_dsg::TraversabilityNodeAttributes;
 
 void declare_config(BlockTraversabilityClustering::Config& config) {
   using namespace config;
@@ -79,13 +79,14 @@ BlockTraversabilityClustering::BlockTraversabilityClustering(const Config& confi
 
 void BlockTraversabilityClustering::updateGraph(const TraversabilityLayer& layer,
                                                 const ActiveWindowOutput& msg,
-                                                spark_dsg::DynamicSceneGraph& graph) {
+                                                spark_dsg::SceneGraph& graph,
+                                                const std::string& layer_name) {
   // Compute all updated places and store them in the place_infos.
   current_time_ns_ = msg.timestamp_ns;
   updateInfoLayer(layer);
   computePlaces();
   classifyPlaceBoundaries();
-  updatePlaceNodesInDsg(graph);
+  updatePlaceNodesInDsg(graph, layer_name);
   updatePlaceEdgesInDsg(graph);
   archivePlaceInfos(graph);
 }
@@ -481,11 +482,10 @@ bool BlockTraversabilityClustering::shouldConnect(const Boundary& from,
   return width >= config.min_place_width;
 }
 
-void BlockTraversabilityClustering::updateDsgEdge(
-    const PlaceInfo& from,
-    const PlaceInfo& to,
-    bool should_connect,
-    spark_dsg::DynamicSceneGraph& graph) const {
+void BlockTraversabilityClustering::updateDsgEdge(const PlaceInfo& from,
+                                                  const PlaceInfo& to,
+                                                  bool should_connect,
+                                                  spark_dsg::SceneGraph& graph) const {
   if (should_connect) {
     // TODO(lschmid): For now use the weights to indicate that the edge is an
     // original active window edge when w=0.5.
@@ -497,11 +497,12 @@ void BlockTraversabilityClustering::updateDsgEdge(
 }
 
 void BlockTraversabilityClustering::updatePlaceNodesInDsg(
-    spark_dsg::DynamicSceneGraph& graph) {
+    spark_dsg::SceneGraph& graph, const std::string& layer_name) {
   for (auto& info : infos_) {
     if (!info.places_updated) {
       continue;
     }
+
     for (auto it = info.places.begin(); it != info.places.end();) {
       auto& place = *it;
       if (place.deleted) {
@@ -516,15 +517,14 @@ void BlockTraversabilityClustering::updatePlaceNodesInDsg(
       if (place.node_id == 0) {
         // Node does not exist yet, create a new place node.
         place.node_id = spark_dsg::NodeSymbol('t', current_id_++);
-        auto attrs = std::make_unique<spark_dsg::TraversabilityNodeAttributes>();
+        auto attrs = std::make_unique<TraversabilityNodeAttributes>();
         attrs->is_active = true;
-        graph.emplaceNode(
-            spark_dsg::DsgLayers::TRAVERSABILITY, place.node_id, std::move(attrs));
+        graph.emplaceNode(layer_name, place.node_id, std::move(attrs));
       }
 
       // Update the place attributes.
-      auto& attrs = graph.getNode(place.node_id)
-                        .attributes<spark_dsg::TraversabilityNodeAttributes>();
+      auto& attrs =
+          graph.getNode(place.node_id).attributes<TraversabilityNodeAttributes>();
       updatePlaceNodeAttributes(attrs, place);
       ++it;
     }
@@ -532,7 +532,7 @@ void BlockTraversabilityClustering::updatePlaceNodesInDsg(
 }
 
 void BlockTraversabilityClustering::updatePlaceNodeAttributes(
-    spark_dsg::TraversabilityNodeAttributes& attrs, const PlaceInfo& place) {
+    TraversabilityNodeAttributes& attrs, const PlaceInfo& place) {
   // Boundary positions relative to the block origin.
   Boundary(place.boundary_info).toAttributes(attrs);
 
@@ -544,7 +544,7 @@ void BlockTraversabilityClustering::updatePlaceNodeAttributes(
 }
 
 void BlockTraversabilityClustering::updatePlaceEdgesInDsg(
-    spark_dsg::DynamicSceneGraph& graph) {
+    spark_dsg::SceneGraph& graph) {
   for (const auto& info : infos_) {
     if (!info.places_updated) {
       continue;
@@ -585,8 +585,7 @@ void BlockTraversabilityClustering::updatePlaceEdgesInDsg(
   }
 }
 
-void BlockTraversabilityClustering::archivePlaceInfos(
-    spark_dsg::DynamicSceneGraph& graph) {
+void BlockTraversabilityClustering::archivePlaceInfos(spark_dsg::SceneGraph& graph) {
   // Remove all place info blocks that are not in the current active window.
   BlockIndices to_remove;
   for (auto& info : infos_) {
@@ -598,7 +597,7 @@ void BlockTraversabilityClustering::archivePlaceInfos(
     for (const auto& place : info.places) {
       if (place.node_id != 0) {
         graph.getNode(place.node_id)
-            .attributes<spark_dsg::TraversabilityNodeAttributes>()
+            .attributes<TraversabilityNodeAttributes>()
             .is_active = false;
       }
     }

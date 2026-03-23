@@ -34,7 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <spark_dsg/dynamic_scene_graph.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <memory>
 
@@ -56,7 +56,8 @@ class TraversabilityClustering {
 
   virtual void updateGraph(const TraversabilityLayer& layer,
                            const ActiveWindowOutput& msg,
-                           spark_dsg::DynamicSceneGraph& graph) = 0;
+                           spark_dsg::SceneGraph& graph,
+                           const std::string& layer_name) = 0;
 };
 
 }  // namespace hydra::places
