@@ -35,34 +35,35 @@
 #include "hydra/places/region_growing_traversability_clustering.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
 #include <hydra/utils/nearest_neighbor_utilities.h>
 #include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
-#include <algorithm>
 #include <queue>
 
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra::places {
-
-using Timer = hydra::timing::ScopedTimer;
-using spark_dsg::Boundary;
-using spark_dsg::NodeId;
-using spark_dsg::Side;
-using spark_dsg::TravNodeAttributes;
-using State = spark_dsg::TraversabilityState;
-using VoxelSet = RegionGrowingTraversabilityClustering::VoxelSet;
-using VoxelMap = RegionGrowingTraversabilityClustering::VoxelMap;
-
 namespace {
+
 static const auto registration =
     config::RegistrationWithConfig<TraversabilityClustering,
                                    RegionGrowingTraversabilityClustering,
                                    RegionGrowingTraversabilityClustering::Config>(
         "RegionGrowingTraversabilityClustering");
+
 }  // namespace
+
+using spark_dsg::NodeId;
+using spark_dsg::SceneGraph;
+using spark_dsg::TravNodeAttributes;
+
+using Timer = hydra::timing::ScopedTimer;
+using State = spark_dsg::TraversabilityState;
+using VoxelSet = RegionGrowingTraversabilityClustering::VoxelSet;
+using VoxelMap = RegionGrowingTraversabilityClustering::VoxelMap;
 
 void declare_config(RegionGrowingTraversabilityClustering::Config& config) {
   using namespace config;
@@ -80,11 +81,11 @@ RegionGrowingTraversabilityClustering::RegionGrowingTraversabilityClustering(
 void RegionGrowingTraversabilityClustering::updateGraph(
     const TraversabilityLayer& layer,
     const ActiveWindowOutput& msg,
-    spark_dsg::DynamicSceneGraph& graph) {
+    SceneGraph& graph,
+    const std::string& layer_name) {
   // Compute all updated places and store them in the place_infos.
-  if (!graph.hasLayer(spark_dsg::DsgLayers::TRAVERSABILITY)) {
-    LOG(WARNING) << "Layer '" << spark_dsg::DsgLayers::TRAVERSABILITY
-                 << "' does not exist in the DSG.";
+  if (!graph.hasLayer(layer_name)) {
+    LOG(WARNING) << "Layer '" << layer_name << "' does not exist in the DSG.";
     return;
   }
 
@@ -93,20 +94,20 @@ void RegionGrowingTraversabilityClustering::updateGraph(
   max_region_size_ = std::round(config.max_radius / layer.voxel_size);
 
   // Initialize regions and voxels for this pass.
-  VoxelSet all_voxels = initializeVoxels(layer, msg.world_t_body);
+  auto all_voxels = initializeVoxels(layer, msg.world_t_body);
   if (all_voxels.empty()) {
     return;
   }
-  VoxelMap assignment = initializeRegions(layer, all_voxels);
 
   // Run voxel clustering.
+  auto assignment = initializeRegions(layer, all_voxels);
   growRegions(all_voxels, assignment);
 
   // Compute neighbors and simplification.
   mergeRegions(assignment, graph);
 
   // Update the DSG.
-  updatePlaceNodesInDsg(graph, layer);
+  updatePlaceNodesInDsg(graph, layer_name, layer);
   updatePlaceEdgesInDsg(graph);
   visualizeAssignments(layer, assignment);
   pruneRegions();
@@ -159,13 +160,14 @@ VoxelMap RegionGrowingTraversabilityClustering::initializeRegions(
 void RegionGrowingTraversabilityClustering::growRegions(VoxelSet& all_voxels,
                                                         VoxelMap& assigned_voxels) {
   // Try to grow existing regions into the closest voxels to each region.
-  const float max_dist_sq = static_cast<float>(max_region_size_ * max_region_size_);
+  const auto max_dist_sq = static_cast<float>(max_region_size_ * max_region_size_);
   std::vector<Eigen::Vector3f> centroids;
   std::vector<NodeId> region_ids;
   for (const auto& [id, region] : regions_) {
     centroids.push_back(region.centroid);
     region_ids.push_back(id);
   }
+
   hydra::PointNeighborSearch nn(centroids);
   std::map<NodeId, VoxelSet> region_candidates;
   for (const auto& voxel_index : all_voxels) {
@@ -210,7 +212,7 @@ void RegionGrowingTraversabilityClustering::growRegions(VoxelSet& all_voxels,
 }
 
 void RegionGrowingTraversabilityClustering::mergeRegions(
-    const VoxelMap& assigned_voxels, spark_dsg::DynamicSceneGraph& graph) {
+    const VoxelMap& assigned_voxels, SceneGraph& graph) {
   // Update neighbors and boundaries for all regions.
   for (auto& [id, region] : regions_) {
     region.computeBoundary();
@@ -227,7 +229,7 @@ void RegionGrowingTraversabilityClustering::mergeRegions(
       if (!region.is_active) {
         continue;
       }
-      std::list<spark_dsg::NodeId> neighbors_to_remove;
+      std::list<NodeId> neighbors_to_remove;
       for (const auto& [neighbor_id, num_connecting_voxels] : region.neighbors) {
         auto neighbor_it = regions_.find(neighbor_id);
         if (neighbor_it == regions_.end()) {
@@ -264,7 +266,9 @@ void RegionGrowingTraversabilityClustering::mergeRegions(
 }
 
 void RegionGrowingTraversabilityClustering::updatePlaceNodesInDsg(
-    spark_dsg::DynamicSceneGraph& graph, const TraversabilityLayer& layer) {
+    SceneGraph& graph,
+    const std::string& layer_name,
+    const TraversabilityLayer& layer) {
   for (auto& [id, region] : regions_) {
     const bool is_valid = region.voxels.size() > 0;
     const auto* node = graph.findNode(id);
@@ -272,9 +276,9 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodesInDsg(
     if (!node) {
       // Node does not exist yet, create a new place node.
       if (is_valid) {
-        auto attrs = std::make_unique<spark_dsg::TravNodeAttributes>();
+        auto attrs = std::make_unique<TravNodeAttributes>();
         updatePlaceNodeAttributes(*attrs, region, layer);
-        graph.emplaceNode(spark_dsg::DsgLayers::TRAVERSABILITY, id, std::move(attrs));
+        graph.emplaceNode(layer_name, id, std::move(attrs));
       }
       continue;
     }
@@ -286,19 +290,20 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodesInDsg(
     }
 
     // Update the place attributes.
-    auto& attrs = node->attributes<spark_dsg::TravNodeAttributes>();
+    auto& attrs = node->attributes<TravNodeAttributes>();
     updatePlaceNodeAttributes(attrs, region, layer);
   }
 }
 
 void RegionGrowingTraversabilityClustering::updatePlaceEdgesInDsg(
-    spark_dsg::DynamicSceneGraph& graph) const {
+    SceneGraph& graph) const {
   for (const auto& [id, region] : regions_) {
     // Remove edges that should no longer exist.
     const auto* node = graph.findNode(id);
     if (!node) {
       continue;
     }
+
     NodeIdSet to_remove;
     for (const auto n_id : node->siblings()) {
       // Do not remove edges to archived regions.
@@ -308,6 +313,7 @@ void RegionGrowingTraversabilityClustering::updatePlaceEdgesInDsg(
         to_remove.insert(n_id);
       }
     }
+
     for (const auto n_id : to_remove) {
       graph.removeEdge(id, n_id);
     }
@@ -350,9 +356,7 @@ void RegionGrowingTraversabilityClustering::visualizeAssignments(
 }
 
 void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
-    spark_dsg::TravNodeAttributes& attrs,
-    Region& region,
-    const TraversabilityLayer& layer) const {
+    TravNodeAttributes& attrs, Region& region, const TraversabilityLayer& layer) const {
   // Position.
   const auto centroid_index = region.centroid.cast<int>();
   if (region.voxels.count(centroid_index)) {
@@ -407,7 +411,7 @@ void RegionGrowingTraversabilityClustering::updatePlaceNodeAttributes(
 RegionGrowingTraversabilityClustering::Region&
 RegionGrowingTraversabilityClustering::allocateNewRegion() {
   const NodeId id = spark_dsg::NodeSymbol('t', ++current_id_);
-  Region& region = regions_[id];
+  auto& region = regions_[id];
   region.id = id;
   return region;
 }
@@ -420,6 +424,7 @@ VoxelSet RegionGrowingTraversabilityClustering::growRegion(
   if (candidates.find(seed_index) == candidates.end()) {
     return result;
   }
+
   std::queue<VoxelIndex> queue;
   queue.push(seed_index);
   result.insert(seed_index);
@@ -438,6 +443,7 @@ VoxelSet RegionGrowingTraversabilityClustering::growRegion(
       }
     }
   }
+
   return result;
 }
 
@@ -449,6 +455,7 @@ void RegionGrowingTraversabilityClustering::Region::merge(const Region& other) {
     }
     neighbors[n_id] += n_count;
   }
+
   neighbors.erase(other.id);
   computeBoundary();
 }
@@ -465,10 +472,12 @@ void RegionGrowingTraversabilityClustering::Region::computeBoundary() {
       if (voxels.count(n_index)) {
         continue;
       }
+
       boundary.insert(n_index);
       if (n_index.head<2>().squaredNorm() > furthest.head<2>().squaredNorm()) {
         furthest = n_index;
       }
+
       min_coordinates = min_coordinates.cwiseMin(n_index.head<2>());
       max_coordinates = max_coordinates.cwiseMax(n_index.head<2>());
     }
@@ -489,6 +498,7 @@ void RegionGrowingTraversabilityClustering::Region::computeBoundary() {
   for (const auto& voxel : exterior_boundary) {
     centroid += voxel.cast<float>();
   }
+
   centroid /= exterior_boundary.size();
 }
 

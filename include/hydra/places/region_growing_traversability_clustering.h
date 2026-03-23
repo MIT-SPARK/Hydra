@@ -34,13 +34,9 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <config_utilities/factory.h>
 #include <spark_dsg/traversability_boundary.h>
 
 #include <map>
-#include <optional>
-#include <utility>
-#include <vector>
 
 #include "hydra/places/traversability_clustering.h"
 
@@ -54,7 +50,6 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
   struct Config {
     //! Maximum radius of a place [m].
     float max_radius = 3.0f;
-
     //! Number of rays to consider for boundary computation.
     int num_orientation_bins = 16;
   } const config;
@@ -114,7 +109,8 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
 
   void updateGraph(const TraversabilityLayer& layer,
                    const ActiveWindowOutput& msg,
-                   spark_dsg::DynamicSceneGraph& graph) override;
+                   spark_dsg::SceneGraph& graph,
+                   const std::string& layer_name) override;
 
  protected:
   size_t current_id_ = 0;
@@ -149,13 +145,13 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
   /**
    * @brief Merge all regions that don't exceed the max size.
    */
-  void mergeRegions(const VoxelMap& assigned_voxels,
-                    spark_dsg::DynamicSceneGraph& graph);
+  void mergeRegions(const VoxelMap& assigned_voxels, spark_dsg::SceneGraph& graph);
 
-  void updatePlaceNodesInDsg(spark_dsg::DynamicSceneGraph& graph,
+  void updatePlaceNodesInDsg(spark_dsg::SceneGraph& graph,
+                             const std::string& layer_name,
                              const TraversabilityLayer& layer);
 
-  void updatePlaceEdgesInDsg(spark_dsg::DynamicSceneGraph& graph) const;
+  void updatePlaceEdgesInDsg(spark_dsg::SceneGraph& graph) const;
 
   void visualizeAssignments(const TraversabilityLayer& layer,
                             const VoxelMap& assigned_voxels) const;

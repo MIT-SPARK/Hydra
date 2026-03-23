@@ -35,14 +35,8 @@
 #include "hydra/frontend/traversability_place_extractor.h"
 
 #include <config_utilities/config.h>
-#include <config_utilities/types/conversions.h>
-#include <config_utilities/types/enum.h>
 #include <config_utilities/validation.h>
-#include <glog/logging.h>
 
-#include <memory>
-
-#include "hydra/common/global_info.h"
 #include "hydra/utils/timing_utilities.h"
 
 using Timer = hydra::timing::ScopedTimer;
@@ -61,17 +55,18 @@ static const auto registration =
 void declare_config(TraversabilityPlaceExtractor::Config& config) {
   using namespace config;
   name("TraversabilityPlaceExtractor::Config");
+  field(config.layer, "layer");
   field(config.estimator, "estimator");
-  field(config.clustering, "clustering");
   field(config.postprocessing, "postprocessing");
+  field(config.clustering, "clustering");
   field(config.sinks, "sinks");
 }
 
 TraversabilityPlaceExtractor::TraversabilityPlaceExtractor(const Config& config)
     : config(config::checkValid(config)),
       estimator_(config.estimator.create()),
-      clustering_(config.clustering.create()),
       postprocessing_(config.postprocessing),
+      clustering_(config.clustering.create()),
       sinks_(Sink::instantiate(config.sinks)) {}
 
 void TraversabilityPlaceExtractor::detect(const ActiveWindowOutput& msg) {
@@ -80,15 +75,15 @@ void TraversabilityPlaceExtractor::detect(const ActiveWindowOutput& msg) {
 }
 
 void TraversabilityPlaceExtractor::updateGraph(const ActiveWindowOutput& msg,
-                                               DynamicSceneGraph& graph) {
+                                               spark_dsg::SceneGraph& graph) {
   // TODO(lschmid): Find a nicer way than copying the layer here. Should not be too
   // expensive though.
-  auto timer = Timer("traversability/postprocessing", msg.timestamp_ns);
-  TraversabilityLayer layer = estimator_->getTraversabilityLayer();
+  Timer timer("traversability/postprocessing", msg.timestamp_ns);
+  auto layer = estimator_->getTraversabilityLayer();
   postprocessing_.apply(layer);
 
   timer.reset("traversability/clustering");
-  clustering_->updateGraph(layer, msg, graph);
+  clustering_->updateGraph(layer, msg, graph, config.layer);
 
   timer.reset("traversability/sinks");
   Sink::callAll(sinks_, msg.timestamp_ns, msg.world_t_body, layer);
