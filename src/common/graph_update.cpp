@@ -75,6 +75,8 @@ struct convert<std::optional<T>> {
 
 namespace hydra {
 
+using namespace spark_dsg;
+
 void declare_config(LayerTracker::Config& config) {
   using namespace config;
   name("LayerTracker::Config");

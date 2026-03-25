@@ -48,12 +48,10 @@
 
 namespace hydra {
 
-using namespace spark_dsg;
-
 struct NodeUpdate {
   using Ptr = std::shared_ptr<NodeUpdate>;
 
-  const std::shared_ptr<NodeAttributes> attributes;
+  const std::shared_ptr<spark_dsg::NodeAttributes> attributes;
 
   std::optional<size_t> track_id;
 
@@ -62,28 +60,28 @@ struct NodeUpdate {
 
 struct LayerUpdate {
   using Ptr = std::shared_ptr<LayerUpdate>;
-  explicit LayerUpdate(LayerId layer);
+  explicit LayerUpdate(spark_dsg::LayerId layer);
   void append(LayerUpdate&& other);
 
-  const LayerId layer;
+  const spark_dsg::LayerId layer;
   std::list<NodeUpdate> updates;
 };
 
-using GraphUpdate = std::map<LayerId, LayerUpdate::Ptr>;
+using GraphUpdate = std::map<spark_dsg::LayerId, LayerUpdate::Ptr>;
 
 struct LayerTracker {
   struct Config {
     char prefix = 0;
-    std::optional<LayerId> target_layer;
+    std::optional<spark_dsg::LayerId> target_layer;
     config::VirtualConfig<NodeMatcher> matcher;
   } const config;
 
   explicit LayerTracker(const Config& config);
 
-  NodeSymbol next_id;
+  spark_dsg::NodeSymbol next_id;
   std::unique_ptr<NodeMatcher> matcher;
   //! Committed DSG node id for each object track on this logical layer.
-  std::unordered_map<size_t, NodeId> track_to_node;
+  std::unordered_map<size_t, spark_dsg::NodeId> track_to_node;
 };
 
 void declare_config(LayerTracker::Config& config);
@@ -96,18 +94,18 @@ struct GraphUpdater {
   } const config;
 
   explicit GraphUpdater(const Config& config);
-  void update(const GraphUpdate& update, DynamicSceneGraph& graph);
+  void update(const GraphUpdate& update, spark_dsg::DynamicSceneGraph& graph);
 
  private:
   std::map<std::string, LayerTracker> trackers_;
 
-  void addNode(DynamicSceneGraph& graph,
+  void addNode(spark_dsg::DynamicSceneGraph& graph,
                LayerTracker& tracker,
-               LayerId target_layer_id,
-               LayerId source_layer_id,
+               spark_dsg::LayerId target_layer_id,
+               spark_dsg::LayerId source_layer_id,
                const NodeUpdate& entry,
                bool mark_active,
-               std::map<NodeId, const NodeAttributes*>& active_targets);
+               std::map<spark_dsg::NodeId, const spark_dsg::NodeAttributes*>& active_targets);
 
   bool updateNode(const NodeUpdate& entry,
                   LayerTracker& tracker,
