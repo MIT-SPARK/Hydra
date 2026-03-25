@@ -185,8 +185,6 @@ bool GraphUpdater::updateNode(const NodeUpdate& entry,
     graph.setNodeAttributes(map_iter->second, std::move(updated));
     return true;
   }
-  VLOG(5) << "Update for track_id " << *entry.track_id
-          << " with no prior node; adding new node";
   return false;
 }
 
@@ -238,7 +236,7 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
           deleteNode(entry, tracker, graph);
           break;
         }
-        case NodeUpdate::UpdateType::Update: {
+        case NodeUpdate::UpdateType::UpdateOrAdd: {
           if (!updateNode(entry, tracker, graph)) {
             addNode(graph,
                     tracker,
@@ -248,16 +246,6 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
                     config.mark_active,
                     active_targets);
           }
-          break;
-        }
-        case NodeUpdate::UpdateType::Add: {
-          addNode(graph,
-                  tracker,
-                  target_layer_id,
-                  layer_id,
-                  entry,
-                  config.mark_active,
-                  active_targets);
           break;
         }
       }
