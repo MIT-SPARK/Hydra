@@ -95,14 +95,15 @@ void declare_config(GraphUpdater::Config& config) {
 
 LayerUpdate::LayerUpdate(spark_dsg::LayerId layer) : layer(layer) {}
 
+// TODO: Potentially implement merge resolution if multiple updates for same node are
+// added in the same update.
 void LayerUpdate::append(LayerUpdate&& rhs) {
   if (layer != rhs.layer) {
     return;
   }
 
-  std::move(
-      rhs.attributes.begin(), rhs.attributes.end(), std::back_inserter(attributes));
-  rhs.attributes.clear();
+  std::move(rhs.updates.begin(), rhs.updates.end(), std::back_inserter(updates));
+  rhs.updates.clear();
 }
 
 LayerTracker::LayerTracker(const Config& config)
@@ -112,6 +113,81 @@ GraphUpdater::GraphUpdater(const Config& config) : config(config::checkValid(con
   for (const auto& [layer_name, tracker_config] : config.layer_updates) {
     trackers_.emplace(layer_name, LayerTracker(tracker_config));
   }
+}
+
+void GraphUpdater::addNode(DynamicSceneGraph& graph,
+                           LayerTracker& tracker,
+                           LayerId target_layer_id,
+                           LayerId source_layer_id,
+                           const NodeUpdate& entry,
+                           bool mark_active,
+                           std::map<NodeId, const NodeAttributes*>& active_targets) {
+  std::optional<NodeId> to_merge;
+  for (const auto& [target_id, target_attrs] : active_targets) {
+    if (tracker.matcher && tracker.matcher->match(*entry.attributes, *target_attrs)) {
+      to_merge = target_id;
+      break;
+    }
+  }
+
+  if (to_merge) {
+    VLOG(5) << "Merging attributes to " << NodeSymbol(*to_merge).str() << " @ "
+            << target_layer_id << " for layer " << source_layer_id;
+    if (entry.track_id) {
+      tracker.track_to_node[*entry.track_id] = *to_merge;
+    }
+    // TODO(nathan) actual merge attributes
+    return;
+  }
+
+  auto attrs = entry.attributes->clone();
+  if (mark_active) {
+    attrs->is_active = true;
+  }
+
+  const NodeId new_id = tracker.next_id;
+  VLOG(5) << "Emplacing " << tracker.next_id.str() << " @ " << target_layer_id
+          << " for layer " << source_layer_id;
+  graph.emplaceNode(target_layer_id, new_id, std::move(attrs));
+  if (entry.track_id) {
+    tracker.track_to_node[*entry.track_id] = new_id;
+  }
+  ++tracker.next_id;
+  return;
+}
+
+void GraphUpdater::deleteNode(const NodeUpdate& entry,
+                              LayerTracker& tracker,
+                              DynamicSceneGraph& graph) {
+  if (!entry.track_id) {
+    LOG(WARNING) << "Delete graph update missing track_id";
+    return;
+  }
+  const auto map_iter = tracker.track_to_node.find(*entry.track_id);
+  if (map_iter == tracker.track_to_node.end()) {
+    LOG(WARNING) << "Delete for unknown track_id " << *entry.track_id;
+    return;
+  }
+  graph.removeNode(map_iter->second);
+  tracker.track_to_node.erase(map_iter);
+  return;
+}
+
+bool GraphUpdater::updateNode(const NodeUpdate& entry,
+                              LayerTracker& tracker,
+                              DynamicSceneGraph& graph) {
+  const auto map_iter = tracker.track_to_node.find(*entry.track_id);
+  if (map_iter != tracker.track_to_node.end()) {
+    auto updated = entry.attributes->clone();
+    if (config.mark_active) {
+      updated->is_active = true;
+    }
+    graph.setNodeAttributes(map_iter->second, std::move(updated));
+    return true;
+  }
+  VLOG(5) << "Update for track_id " << *entry.track_id
+          << " with no prior node; adding new node";
+  return false;
 }
 
 void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
@@ -129,12 +205,13 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
   for (const auto& [layer_id, layer_update] : update) {
     if (!layer_update) {
       LOG(WARNING) << "Received invalid update for layer " << layer_id;
+      continue;
     }
 
     auto iter = trackers_by_id.find(layer_id);
     if (iter == trackers_by_id.end()) {
       LOG(WARNING) << "Recieved updates for unhandled layer " << layer_id;
-      return;
+      continue;
     }
 
     auto& tracker = iter->second;
@@ -151,34 +228,39 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
       }
     }
 
-    for (auto&& attrs : layer_update->attributes) {
-      if (!attrs) {
+    for (auto&& entry : layer_update->updates) {
+      if (!entry.attributes) {
+        LOG(WARNING) << "Update graph update missing attributes";
         continue;
       }
-
-      std::optional<NodeId> to_merge;
-      for (const auto& [target_id, target_attrs] : active_targets) {
-        if (tracker.matcher && tracker.matcher->match(*attrs, *target_attrs)) {
-          to_merge = target_id;
+      switch (entry.update_type) {
+        case NodeUpdate::UpdateType::Delete: {
+          deleteNode(entry, tracker, graph);
+          break;
+        }
+        case NodeUpdate::UpdateType::Update: {
+          if (!updateNode(entry, tracker, graph)) {
+            addNode(graph,
+                    tracker,
+                    target_layer_id,
+                    layer_id,
+                    entry,
+                    config.mark_active,
+                    active_targets);
+          }
+          break;
+        }
+        case NodeUpdate::UpdateType::Add: {
+          addNode(graph,
+                  tracker,
+                  target_layer_id,
+                  layer_id,
+                  entry,
+                  config.mark_active,
+                  active_targets);
           break;
         }
       }
-
-      if (to_merge) {
-        VLOG(5) << "Merging attributes to " << NodeSymbol(*to_merge).str() << " @ "
-                << target_layer_id << " for layer " << layer_id;
-        // TODO(nathan) actual merge attributes
-        continue;
-      }
-
-      if (config.mark_active) {
-        attrs->is_active = true;
-      }
-
-      VLOG(5) << "Emplacing " << tracker.next_id.str() << " @ " << target_layer_id
-              << " for layer " << layer_id;
-      graph.emplaceNode(target_layer_id, tracker.next_id, std::move(attrs));
-      ++tracker.next_id;
     }
   }
 }

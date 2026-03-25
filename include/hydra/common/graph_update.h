@@ -38,12 +38,25 @@
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
+#include <limits>
 #include <list>
 #include <map>
+#include <memory>
+#include <unordered_map>
 
 #include "hydra/common/node_matchers.h"
 
 namespace hydra {
+
+struct NodeUpdate {
+  using Ptr = std::shared_ptr<NodeUpdate>;
+
+  const std::shared_ptr<spark_dsg::NodeAttributes> attributes;
+
+  std::optional<size_t> track_id;
+
+  enum class UpdateType { Add, Update, Delete } const update_type = UpdateType::Add;
+};
 
 struct LayerUpdate {
   using Ptr = std::shared_ptr<LayerUpdate>;
@@ -51,7 +64,7 @@ struct LayerUpdate {
   void append(LayerUpdate&& other);
 
   const spark_dsg::LayerId layer;
-  std::list<spark_dsg::NodeAttributes::Ptr> attributes;
+  std::list<NodeUpdate> updates;
 };
 
 using GraphUpdate = std::map<spark_dsg::LayerId, LayerUpdate::Ptr>;
@@ -67,6 +80,8 @@ struct LayerTracker {
 
   spark_dsg::NodeSymbol next_id;
   std::unique_ptr<NodeMatcher> matcher;
+  //! Committed DSG node id for each object track on this logical layer.
+  std::unordered_map<size_t, spark_dsg::NodeId> track_to_node;
 };
 
 void declare_config(LayerTracker::Config& config);
@@ -83,6 +98,22 @@ struct GraphUpdater {
 
  private:
   std::map<std::string, LayerTracker> trackers_;
+
+  void addNode(
+      spark_dsg::DynamicSceneGraph& graph,
+      LayerTracker& tracker,
+      spark_dsg::LayerId target_layer_id,
+      spark_dsg::LayerId source_layer_id,
+      const NodeUpdate& entry,
+      bool mark_active,
+      std::map<spark_dsg::NodeId, const spark_dsg::NodeAttributes*>& active_targets);
+
+  bool updateNode(const NodeUpdate& entry,
+                  LayerTracker& tracker,
+                  spark_dsg::DynamicSceneGraph& graph);
+  void deleteNode(const NodeUpdate& entry,
+                  LayerTracker& tracker,
+                  spark_dsg::DynamicSceneGraph& graph);
 };
 
 void declare_config(GraphUpdater::Config& config);
