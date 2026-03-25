@@ -239,9 +239,16 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
           break;
         }
         case NodeUpdate::UpdateType::Update: {
-          if (updateNode(entry, tracker, graph)) {
-            break;
+          if (!updateNode(entry, tracker, graph)) {
+            addNode(graph,
+                    tracker,
+                    target_layer_id,
+                    layer_id,
+                    entry,
+                    config.mark_active,
+                    active_targets);
           }
+          break;
         }
         case NodeUpdate::UpdateType::Add: {
           addNode(graph,
