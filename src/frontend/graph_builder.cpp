@@ -379,12 +379,12 @@ void GraphBuilder::updateImpl(const ActiveWindowOutput::Ptr& msg) {
   if (config.clear_object_meshes) {
     auto iter = msg->graph_update.find(2);
     if (iter != msg->graph_update.end()) {
-      for (auto& node_update : iter->second->attributes) {
-        if (!node_update || !node_update->attributes) {
+      for (auto& node_update : iter->second->updates) {
+        if (!node_update.attributes) {
           continue;
         }
         auto derived =
-            dynamic_cast<KhronosObjectAttributes*>(node_update->attributes.get());
+            dynamic_cast<KhronosObjectAttributes*>(node_update.attributes.get());
         if (derived) {
           derived->mesh.clear();
         }

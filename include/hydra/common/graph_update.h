@@ -48,82 +48,42 @@
 
 namespace hydra {
 
-struct NodeUpdateAttributes {
-  using Ptr = std::shared_ptr<NodeUpdateAttributes>;
+using namespace spark_dsg;
 
-  enum class UpdateType {
-    Add,
-    Update,
-    Delete
-  };
+struct NodeUpdate {
+  using Ptr = std::shared_ptr<NodeUpdate>;
 
-  //! Sentinel when no track id is present (e.g. not stored in attributes.details).
-  static constexpr size_t kInvalidTrackId = std::numeric_limits<size_t>::max();
+  const std::shared_ptr<NodeAttributes> attributes;
 
-  static size_t inferTrackId(const std::shared_ptr<spark_dsg::NodeAttributes>& attrs) {
-    if (!attrs) {
-      return kInvalidTrackId;
-    }
-    const auto* khronos =
-        dynamic_cast<const spark_dsg::KhronosObjectAttributes*>(attrs.get());
-    if (!khronos) {
-      return kInvalidTrackId;
-    }
-    const auto iter = khronos->details.find("track_id");
-    if (iter == khronos->details.end() || iter->second.empty()) {
-      return kInvalidTrackId;
-    }
-    return iter->second.front();
-  }
+  std::optional<size_t> track_id;
 
-  //! @param attrs Null only when @p update_type is Delete (track id still required).
-  NodeUpdateAttributes(std::shared_ptr<spark_dsg::NodeAttributes> attrs,
-                       UpdateType update_type,
-                       size_t track_id)
-      : attributes(std::move(attrs)),
-        update_type(update_type),
-        track_id(track_id) {}
-
-  NodeUpdateAttributes(std::shared_ptr<spark_dsg::NodeAttributes> attrs,
-                       UpdateType update_type)
-      : attributes(std::move(attrs)),
-        update_type(update_type),
-        track_id(inferTrackId(attributes)) {}
-
-  explicit NodeUpdateAttributes(std::shared_ptr<spark_dsg::NodeAttributes> attrs)
-      : attributes(std::move(attrs)),
-        update_type(UpdateType::Add),
-        track_id(inferTrackId(attributes)) {}
-
-  const std::shared_ptr<spark_dsg::NodeAttributes> attributes;
-  const UpdateType update_type;
-  const size_t track_id;
+  enum class UpdateType { Add, Update, Delete } const update_type = UpdateType::Add;
 };
 
 struct LayerUpdate {
   using Ptr = std::shared_ptr<LayerUpdate>;
-  explicit LayerUpdate(spark_dsg::LayerId layer);
+  explicit LayerUpdate(LayerId layer);
   void append(LayerUpdate&& other);
 
-  const spark_dsg::LayerId layer;
-  std::list<NodeUpdateAttributes::Ptr> attributes;
+  const LayerId layer;
+  std::list<NodeUpdate> updates;
 };
 
-using GraphUpdate = std::map<spark_dsg::LayerId, LayerUpdate::Ptr>;
+using GraphUpdate = std::map<LayerId, LayerUpdate::Ptr>;
 
 struct LayerTracker {
   struct Config {
     char prefix = 0;
-    std::optional<spark_dsg::LayerId> target_layer;
+    std::optional<LayerId> target_layer;
     config::VirtualConfig<NodeMatcher> matcher;
   } const config;
 
   explicit LayerTracker(const Config& config);
 
-  spark_dsg::NodeSymbol next_id;
+  NodeSymbol next_id;
   std::unique_ptr<NodeMatcher> matcher;
   //! Committed DSG node id for each object track on this logical layer.
-  std::unordered_map<size_t, spark_dsg::NodeId> track_to_node;
+  std::unordered_map<size_t, NodeId> track_to_node;
 };
 
 void declare_config(LayerTracker::Config& config);
@@ -136,10 +96,25 @@ struct GraphUpdater {
   } const config;
 
   explicit GraphUpdater(const Config& config);
-  void update(const GraphUpdate& update, spark_dsg::DynamicSceneGraph& graph);
+  void update(const GraphUpdate& update, DynamicSceneGraph& graph);
 
  private:
   std::map<std::string, LayerTracker> trackers_;
+
+  void addNode(DynamicSceneGraph& graph,
+               LayerTracker& tracker,
+               LayerId target_layer_id,
+               LayerId source_layer_id,
+               const NodeUpdate& entry,
+               bool mark_active,
+               std::map<NodeId, const NodeAttributes*>& active_targets);
+
+  bool updateNode(const NodeUpdate& entry,
+                  LayerTracker& tracker,
+                  spark_dsg::DynamicSceneGraph& graph);
+  void deleteNode(const NodeUpdate& entry,
+                  LayerTracker& tracker,
+                  spark_dsg::DynamicSceneGraph& graph);
 };
 
 void declare_config(GraphUpdater::Config& config);
