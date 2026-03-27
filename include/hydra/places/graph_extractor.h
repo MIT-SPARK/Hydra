@@ -33,9 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <spark_dsg/node_symbol.h>
+
 #include <queue>
 
-#include "hydra/common/dsg_types.h"  // IWYU pragma: keep
 #include "hydra/places/graph_extractor_utilities.h"
 #include "hydra/places/gvd_graph.h"
 #include "hydra/places/gvd_merge_policies.h"
@@ -82,7 +83,7 @@ using IndexVoxelQueue = std::list<IndexVoxelPair>;
 class GraphExtractor {
  public:
   using Ptr = std::shared_ptr<GraphExtractor>;
-  using NodeIndexMap = std::unordered_map<NodeId, GlobalIndex>;
+  using NodeIndexMap = std::unordered_map<spark_dsg::NodeId, GlobalIndex>;
 
   struct Config {
     //! Average resolution of sparse graph
@@ -128,11 +129,11 @@ class GraphExtractor {
 
   const GvdGraph& getGvdGraph() const;
 
-  std::unordered_set<NodeId> getActiveNodes() const;
+  std::unordered_set<spark_dsg::NodeId> getActiveNodes() const;
 
-  const std::unordered_set<NodeId>& getDeletedNodes() const;
+  const std::unordered_set<spark_dsg::NodeId>& getDeletedNodes() const;
 
-  const std::vector<EdgeKey>& getDeletedEdges() const;
+  const std::vector<spark_dsg::EdgeKey>& getDeletedEdges() const;
 
   void clearDeleted();
 
@@ -143,24 +144,25 @@ class GraphExtractor {
   const std::unordered_map<uint64_t, uint64_t>& getCompressedRemapping() const;
 
  protected:
-  EdgeAttributes::Ptr makeEdgeInfo(const GvdLayer& layer,
-                                   NodeId source_id,
-                                   NodeId target_id) const;
+  spark_dsg::EdgeAttributes::Ptr makeEdgeInfo(const GvdLayer& layer,
+                                              spark_dsg::NodeId source_id,
+                                              spark_dsg::NodeId target_id) const;
 
   GlobalIndex popFromModifiedQueue();
 
-  void removeGraphNode(NodeId node);
+  void removeGraphNode(spark_dsg::NodeId node);
 
-  void updateGraphEdge(NodeId source,
-                       NodeId target,
-                       EdgeAttributes::Ptr&& attrs,
+  void updateGraphEdge(spark_dsg::NodeId source,
+                       spark_dsg::NodeId target,
+                       spark_dsg::EdgeAttributes::Ptr&& attrs,
                        bool is_heursitic = false);
 
-  void addGraphNode(NodeId node, PlaceNodeAttributes::Ptr&& attrs = nullptr);
+  void addGraphNode(spark_dsg::NodeId node,
+                    spark_dsg::PlaceNodeAttributes::Ptr&& attrs = nullptr);
 
-  void removeGraphEdge(NodeId source, NodeId target);
+  void removeGraphEdge(spark_dsg::NodeId source, spark_dsg::NodeId target);
 
-  void mergeGraphNodes(NodeId from, NodeId to);
+  void mergeGraphNodes(spark_dsg::NodeId from, spark_dsg::NodeId to);
 
   void updateOverlapEdges();
 
@@ -182,7 +184,7 @@ class GraphExtractor {
 
   uint64_t getNextId();
 
-  NodeId getPlaceId(uint64_t gvd_id) const;
+  spark_dsg::NodeId getPlaceId(uint64_t gvd_id) const;
 
   void compressNode(uint64_t node_id, const GvdMemberInfo& node);
 
@@ -210,19 +212,19 @@ class GraphExtractor {
                             uint64_t neighbor_node_id);
 
  protected:
-  NodeSymbol next_node_id_;
+  spark_dsg::NodeSymbol next_node_id_;
   GvdGraph::Ptr gvd_;
 
-  std::map<NodeId, std::unique_ptr<PlaceNodeAttributes>> nodes_;
-  EdgeContainer edges_;
+  std::map<spark_dsg::NodeId, std::unique_ptr<spark_dsg::PlaceNodeAttributes>> nodes_;
+  spark_dsg::EdgeContainer edges_;
 
   NodeIndexMap node_index_map_;
   std::queue<GlobalIndex> modified_voxel_queue_;
 
-  std::set<EdgeKey> overlap_edges_;
-  std::set<EdgeKey> freespace_edges_;
-  std::unordered_set<NodeId> deleted_nodes_;
-  std::vector<EdgeKey> deleted_edges_;
+  std::set<spark_dsg::EdgeKey> overlap_edges_;
+  std::set<spark_dsg::EdgeKey> freespace_edges_;
+  std::unordered_set<spark_dsg::NodeId> deleted_nodes_;
+  std::vector<spark_dsg::EdgeKey> deleted_edges_;
 
   const double compression_factor_;
   GlobalIndexMap<uint64_t> index_id_map_;
@@ -237,7 +239,7 @@ class GraphExtractor {
   std::unordered_map<uint64_t, GlobalIndex> compressed_id_map_;
   std::unordered_map<uint64_t, uint64_t> compressed_remapping_;
 
-  std::unordered_set<NodeId> archived_node_ids_;
+  std::unordered_set<spark_dsg::NodeId> archived_node_ids_;
 };
 
 void declare_config(GraphExtractor::Config& config);
