@@ -32,7 +32,7 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/places/graph_extractor_utilities.h"
+#include "hydra/places/gvd_places/graph_extractor_utilities.h"
 
 #include <config_utilities/config.h>
 #include <spark_dsg/graph_utilities.h>
@@ -47,6 +47,7 @@ using spark_dsg::EdgeContainer;
 using spark_dsg::EdgeKey;
 using spark_dsg::NodeId;
 using spark_dsg::PlaceNodeAttributes;
+using spark_dsg::graph_utilities::getConnectedComponents;
 
 using Components = std::vector<std::vector<NodeId>>;
 
@@ -65,13 +66,6 @@ void sortComponents(const NodeAttrMap& attrs, Components& to_sort) {
 }
 
 }  // namespace
-
-void declare_config(OverlapEdgeConfig& conf) {
-  using namespace config;
-  name("OverlapEdgeConfig");
-  field(conf.num_neighbors_to_check, "num_neighbors_to_check");
-  field(conf.min_clearance_m, "min_clearance_m");
-}
 
 void declare_config(FreespaceEdgeConfig& conf) {
   using namespace config;
@@ -205,31 +199,6 @@ EdgeAttributes::Ptr getFreespaceEdgeInfo(const NodeAttrMap& attrs,
   return std::make_unique<EdgeAttributes>(min_weight);
 }
 
-void findOverlapEdges(const OverlapEdgeConfig& config,
-                      const NodeAttrMap& attrs,
-                      const EdgeContainer& edges,
-                      const std::unordered_set<NodeId> active_nodes,
-                      EdgeInfoMap& proposed_edges) {
-  NearestNodeFinder node_finder(graph, active_nodes);
-  for (const auto node : active_nodes) {
-    // TODO(nathan) consider deleting edges
-    node_finder.find(getNodePosition(graph, node),
-                     config.num_neighbors_to_check,
-                     true,
-                     [&](NodeId other, size_t, double) {
-                       if (edges.contains(node, other)) {
-                         return;
-                       }
-
-                       const auto thresh = config.min_clearance_m;
-                       auto info = getOverlapEdgeInfo(attrs, node, other, thresh);
-                       if (info) {
-                         proposed_edges.emplace(EdgeKey(node, other), std::move(info));
-                       }
-                     });
-  }
-}
-
 void findFreespaceEdges(const FreespaceEdgeConfig& config,
                         const AttrMap& nodes,
                         const EdgeContainer& edges,
@@ -237,7 +206,7 @@ void findFreespaceEdges(const FreespaceEdgeConfig& config,
                         const std::unordered_set<NodeId>& nodes,
                         const NodeIndexMap& indices,
                         EdgeInfoMap& proposed_edges) {
-  auto components = graph_utilities::getConnectedComponents(graph, nodes, true);
+  auto components = getConnectedComponents(graph, nodes, true);
   if (components.size() <= 1) {
     return;  // nothing to do
   }

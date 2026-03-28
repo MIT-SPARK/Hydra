@@ -39,7 +39,7 @@
 
 #include <cstddef>
 
-#include "hydra/places/gvd_voxel.h"
+#include "hydra/places/gvd_places/gvd_voxel.h"
 #include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::places {

@@ -32,47 +32,37 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include "hydra/places/gvd_integrator_config.h"
-#include "hydra/places/gvd_voxel.h"
-#include "hydra/reconstruction/voxel_types.h"
+#include "hydra/places/gvd_places/gvd_merge_policies.h"
+
+#include <config_utilities/factory.h>
+
+#include "hydra/places/gvd_places/gvd_graph.h"
 
 namespace hydra::places {
+namespace {
 
-struct DistancePotential {
-  bool is_lower;
-  double distance;
-};
+static const auto basis_registration =
+    config::Registration<MergePolicy, BasisPointMergePolicy>("basis_points");
 
-struct VoronoiCondition {
-  bool neighbor_is_voronoi{false};
-  bool current_is_voronoi{false};
-};
+static const auto distance_registration =
+    config::Registration<MergePolicy, DistanceMergePolicy>("distance");
 
-DistancePotential getLowerDistance(float v_dist,
-                                   float n_dist,
-                                   float distance,
-                                   float min_diff_m = 0.0f);
+}  // namespace
 
-VoronoiCondition checkVoronoi(const VoronoiCheckConfig& config,
-                              const GvdVoxel& current,
-                              const GlobalIndex& current_idx,
-                              const GvdVoxel& neighbor,
-                              const GlobalIndex& neighbor_idx);
+template <typename T>
+int compareValues(T lhs, T rhs) {
+  // lhs > rhs is 0 if lhs == rhs and 1 if lhs > rhs
+  return (lhs < rhs) ? -1 : (lhs > rhs);
+}
 
-bool isParentUniqueL1(const VoronoiCheckConfig& config,
-                      const GlobalIndex& /* current_index */,
-                      const GlobalIndex& current_parent,
-                      const GlobalIndex& neighbor_parent);
+int BasisPointMergePolicy::compare(const GvdMemberInfo& lhs,
+                                   const GvdMemberInfo& rhs) const {
+  return compareValues(lhs.num_basis_points, rhs.num_basis_points);
+}
 
-bool isParentUniqueAngle(const VoronoiCheckConfig& config,
-                         const GlobalIndex& current_index,
-                         const GlobalIndex& current_parent,
-                         const GlobalIndex& neighbor_parent);
-
-bool isParentUnique(const VoronoiCheckConfig& config,
-                    const GlobalIndex& current_idx,
-                    const GlobalIndex& current_parent,
-                    const GlobalIndex& neighbor_parent);
+int DistanceMergePolicy::compare(const GvdMemberInfo& lhs,
+                                 const GvdMemberInfo& rhs) const {
+  return compareValues(lhs.distance, rhs.distance);
+}
 
 }  // namespace hydra::places

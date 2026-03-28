@@ -41,13 +41,13 @@
 // implied, of the United States Air Force or the U.S. Government. The U.S.
 // Government is authorized to reproduce and distribute reprints for Government
 // purposes notwithstanding any copyright notation herein.
-#include "hydra/places/gvd_integrator.h"
+#include "hydra/places/gvd_places/gvd_integrator.h"
 
 #include <config_utilities/config.h>
 #include <config_utilities/validation.h>
 #include <spatial_hash/neighbor_utils.h>
 
-#include "hydra/places/gvd_utilities.h"
+#include "hydra/places/gvd_places/gvd_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra::places {
@@ -130,6 +130,34 @@ void declare_config(GvdIntegrator::Config& config) {
   check(config.min_distance_m, GE, 0.0, "min_distance_m");
   check(config.min_weight, GE, 0.0, "min_weight");
   check(config.surface_threshold_inflation, GT, 0.0, "surface_threshold_inflation");
+}
+
+void GvdIntegrator::Stats::clear() {
+  number_lowered_voxels = 0;
+  number_raised_voxels = 0;
+  number_new_voxels = 0;
+  number_sign_flipped = 0;
+  number_raise_updates = 0;
+  number_voronoi_found = 0;
+  number_lower_skipped = 0;
+  number_lower_updated = 0;
+  number_fixed_no_parent = 0;
+  number_force_lowered = 0;
+}
+
+std::string GvdIntegrator::Stats::print() const {
+  std::stringstream ss;
+  ss << "  - Voxel changes: ";
+  ss << number_lowered_voxels << " lowered, ";
+  ss << number_raised_voxels << " raised, ";
+  ss << number_new_voxels << " new, ";
+  ss << number_sign_flipped << " sign flipped";
+  ss << "\n  - New Voronoi Cells: " << number_voronoi_found;
+  ss << "\n  - Fixed without parents (lower): " << number_fixed_no_parent;
+  ss << "\n  - Skipped (lower): " << number_lower_skipped;
+  ss << "\n  - Updated (lower): " << number_lower_updated;
+  ss << "\n  - Forced (lower): " << number_force_lowered;
+  return ss.str();
 }
 
 GvdIntegrator::GvdIntegrator(const GvdIntegrator::Config& config,

@@ -32,9 +32,9 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/places/gvd_parent_tracker.h"
+#include "hydra/places/gvd_places/gvd_parent_tracker.h"
 
-#include "hydra/places/gvd_utilities.h"
+#include "hydra/places/gvd_places/gvd_utilities.h"
 
 namespace hydra::places {
 

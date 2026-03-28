@@ -34,9 +34,10 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
+#include <spark_dsg/scene_graph_layer.h>
+
 #include <vector>
 
-#include "hydra/common/dsg_types.h"
 #include "hydra/places/gvd_voxel.h"
 
 namespace hydra::eval {
@@ -48,10 +49,10 @@ struct PlaceMetrics {
   size_t num_valid = 0;
   std::vector<double> gvd_distance_errors;
   std::vector<double> node_gvd_distances;
-  std::vector<NodeId> node_order;
+  std::vector<spark_dsg::NodeId> node_order;
 };
 
-PlaceMetrics scorePlaces(const SceneGraphLayer& places,
+PlaceMetrics scorePlaces(const spark_dsg::SceneGraphLayer& places,
                          const places::GvdLayer& gvd,
                          size_t min_gvd_basis);
 

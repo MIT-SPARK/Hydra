@@ -32,32 +32,63 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/places/gvd_voxel.h"
+#include "hydra/places/gvd_places/gvd_graph.h"
 
 namespace hydra::places {
 
-std::ostream& operator<<(std::ostream& out, const GvdVoxel& voxel) {
-  out << "GvdVoxel<flags=";
-  out << (voxel.observed ? "o" : "-");
-  out << (voxel.on_surface ? "s" : "-");
-  out << (voxel.fixed ? "f" : "-");
-  out << (voxel.in_queue ? "q" : "-");
-  out << (voxel.to_raise ? "r" : "-");
-  out << (voxel.is_negative ? "n" : "-");
-  out << ", distance=" << voxel.distance << " -> ";
-  if (voxel.has_parent) {
-    out << voxel.parent.transpose();
-  } else {
-    out << "unknown";
-  }
-  out << ", voronoi=";
-  if (voxel.num_extra_basis) {
-    out << "y (" << static_cast<int>(voxel.num_extra_basis) << ")";
-  } else {
-    out << "n";
-  }
-  out << ">";
-  return out;
+GvdGraph::GvdGraph() : next_id_(0) {}
+
+bool GvdGraph::empty() const { return nodes_.empty(); }
+
+uint64_t GvdGraph::addNode(const Eigen::Vector3d& position, const GlobalIndex& index) {
+  // position can't change ever (so we only ever set it when adding)
+  GvdMemberInfo info;
+  info.position = position;
+  info.index = index;
+
+  const auto next_id = getNextId();
+  nodes_.emplace(next_id, info);
+  return next_id;
 }
+
+void GvdGraph::removeNode(uint64_t node) {
+  auto iter = nodes_.find(node);
+  if (iter == nodes_.end()) {
+    return;
+  }
+
+  for (const auto sibling_id : iter->second.siblings) {
+    nodes_.at(sibling_id).siblings.erase(node);
+  }
+
+  id_queue_.push_back(node);
+  nodes_.erase(iter);
+}
+
+const GvdMemberInfo* GvdGraph::getNode(uint64_t node) const {
+  return const_cast<GvdGraph*>(this)->getNode(node);
+}
+
+GvdMemberInfo* GvdGraph::getNode(uint64_t node) {
+  // TODO(nathan) make this not throw out-of-range
+  return &nodes_.at(node);
+}
+
+const GvdGraph::Nodes& GvdGraph::nodes() const { return nodes_; }
+
+uint64_t GvdGraph::getNextId() {
+  uint64_t new_id;
+  if (id_queue_.empty()) {
+    new_id = next_id_;
+    next_id_++;
+  } else {
+    new_id = id_queue_.front();
+    id_queue_.pop_front();
+  }
+
+  return new_id;
+}
+
+bool GvdGraph::hasNode(uint64_t node) const { return nodes_.count(node) > 0; }
 
 }  // namespace hydra::places

@@ -33,34 +33,71 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <memory>
+#include <ostream>
 
-#include "hydra/places/gvd_voxel.h"
+#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::places {
 
-// forward declare to avoid header
-struct VoronoiCheckConfig;
+struct GvdVoxel {
+  float distance;
+  // TODO(nathan) consider bitset instead
+  bool observed = false;
+  bool fixed = false;
+  bool in_queue = false;
+  bool to_raise = false;
+  bool is_negative = false;
+  bool on_surface = false;
+  bool has_parent = false;
 
-struct GvdVertexInfo {
-  Point pos;
-  size_t ref_count = 0;
+  uint8_t num_extra_basis = 0;
+
+  GlobalIndex parent;
+  // required for removing blocks (parents leave a dangling reference otherwise)
+  Point parent_pos;
 };
 
-struct GvdParentTracker {
-  uint8_t updateGvdParentMap(const GvdLayer& layer,
-                             const VoronoiCheckConfig& config,
-                             const GlobalIndex& voxel_index,
-                             const GvdVoxel& neighbor);
+using GvdBlock = spatial_hash::VoxelBlock<GvdVoxel>;
+using GvdLayer = spatial_hash::VoxelLayer<GvdBlock>;
 
-  void markNewGvdParent(const GvdLayer& layer, const GlobalIndex& parent);
+std::ostream& operator<<(std::ostream& out, const GvdVoxel& voxel);
 
-  void removeVoronoiFromGvdParentMap(const GlobalIndex& voxel_index);
+inline void resetVoronoi(GvdVoxel& voxel) { voxel.num_extra_basis = 0; }
 
-  void updateVertexMapping(const GvdLayer& layer);
+inline bool isVoronoi(const GvdVoxel& voxel) { return voxel.num_extra_basis != 0; }
 
-  GlobalIndexMap<GlobalIndexSet> parents;
-  GlobalIndexMap<GvdVertexInfo> parent_vertices;
-};
+inline void setSdfParent(GvdVoxel& voxel,
+                         const GvdVoxel& ancestor,
+                         const GlobalIndex& ancestor_index,
+                         const Point& ancestor_pos) {
+  voxel.has_parent = true;
+  if (ancestor.has_parent) {
+    voxel.parent = ancestor.parent;
+    voxel.parent_pos = ancestor.parent_pos;
+  } else {
+    voxel.parent = ancestor_index;
+    voxel.parent_pos = ancestor_pos;
+  }
+}
+
+inline void setDefaultDistance(GvdVoxel& voxel, const double default_distance) {
+  voxel.distance = std::copysign(default_distance, voxel.is_negative ? -1.0 : 1.0);
+}
+
+inline void setRaiseStatus(GvdVoxel& voxel, const double default_distance) {
+  voxel.has_parent = false;
+  voxel.to_raise = true;
+
+  if (voxel.fixed) {
+    return;
+  }
+
+  setDefaultDistance(voxel, default_distance);
+}
+
+inline void setGvdSurfaceVoxel(GvdVoxel& voxel) {
+  voxel.on_surface = true;
+  voxel.has_parent = false;
+}
 
 }  // namespace hydra::places

@@ -42,8 +42,8 @@
 
 #include "hydra/active_window/volumetric_window.h"
 #include "hydra/common/global_info.h"
-#include "hydra/places/graph_extractor.h"
-#include "hydra/places/graph_extractor_utilities.h"
+#include "hydra/places/gvd_places/graph_extractor.h"
+#include "hydra/places/gvd_places/graph_extractor_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
@@ -56,9 +56,16 @@ static const auto registration =
 
 }
 
-using hydra::timing::ScopedTimer;
 using places::GvdIntegrator;
 using places::GvdVoxel;
+using spark_dsg::DsgLayers;
+using spark_dsg::EdgeKey;
+using spark_dsg::NodeId;
+using spark_dsg::PlaceNodeAttributes;
+using spark_dsg::SceneGraph;
+using spark_dsg::SceneGraphLayer;
+using spark_dsg::graph_utilities::getConnectedComponents;
+using timing::ScopedTimer;
 
 void declare_config(GvdPlaceExtractor::Config& config) {
   using namespace config;
@@ -171,14 +178,14 @@ void filterInvalidNodes(const SceneGraphLayer& graph, NodeIdSet& active_nodes) {
 
   if (!invalid_nodes.empty()) {
     LOG(ERROR) << "Nodes found with invalid attributes: "
-               << displayNodeSymbolContainer(invalid_nodes);
+               << spark_dsg::displayNodeSymbolContainer(invalid_nodes);
     for (const auto& invalid_id : invalid_nodes) {
       active_nodes.erase(invalid_id);
     }
   }
 }
 
-void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph) {
+void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
   ScopedTimer timer("frontend/update_gvd_places", timestamp_ns, true, 2, false);
 
   active_nodes_ = graph_extractor_.getActiveNodes();
@@ -232,7 +239,7 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& gr
   graph_extractor_.clearDeleted();
 }
 
-void GvdPlaceExtractor::filterIsolated(DynamicSceneGraph& graph,
+void GvdPlaceExtractor::filterIsolated(SceneGraph& graph,
                                        NodeIdSet& active_neighborhood) {
   const auto& places = graph_extractor_.getGraph();
 
@@ -253,10 +260,9 @@ void GvdPlaceExtractor::filterIsolated(DynamicSceneGraph& graph,
   // within N hops of the subgraph, where N is the min allowable component size
   // ensures that we don't search the entire places subgraph, but still preserve
   // archived places that connect to a component of at least size N
-  const auto components =
-      graph_utilities::getConnectedComponents(graph.getLayer(DsgLayers::PLACES),
-                                              config.min_component_size,
-                                              active_neighborhood);
+  const auto components = getConnectedComponents(graph.getLayer(DsgLayers::PLACES),
+                                                 config.min_component_size,
+                                                 active_neighborhood);
 
   for (const auto& component : components) {
     if (component.size() >= config.min_component_size) {
@@ -270,7 +276,7 @@ void GvdPlaceExtractor::filterIsolated(DynamicSceneGraph& graph,
   }
 }
 
-void GvdPlaceExtractor::filterGround(DynamicSceneGraph& graph) {
+void GvdPlaceExtractor::filterGround(SceneGraph& graph) {
   const double max_z = latest_pos_.z() - config.robot_height + config.node_tolerance;
   std::list<NodeId> invalid_nodes;
   std::list<EdgeKey> invalid_edges;
@@ -314,8 +320,8 @@ void GvdPlaceExtractor::filterGround(DynamicSceneGraph& graph) {
                              graph_extractor_.getIndexMap(),
                              new_edges);
   for (auto&& [edge_key, attrs] : new_edges) {
-    const auto& source_pos = getNodePosition(graph, edge_key.k1);
-    const auto& target_pos = getNodePosition(graph, edge_key.k2);
+    const auto& source_pos = graph.getNode(edge_key.k1).attributes().position;
+    const auto& target_pos = graph.getNode(edge_key.k2).attributes().position;
     double source_min_z = source_pos.z() - attrs->weight;
     double target_min_z = target_pos.z() - attrs->weight;
     if (source_min_z > max_z || target_min_z > max_z) {

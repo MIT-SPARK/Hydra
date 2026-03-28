@@ -33,11 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
-
-#include "hydra/places/gvd_graph.h"
 
 namespace hydra::places {
+
+struct GvdMemberInfo;
 
 struct MergePolicy {
   virtual ~MergePolicy() = default;
@@ -53,18 +52,12 @@ struct BasisPointMergePolicy : MergePolicy {
   virtual ~BasisPointMergePolicy() = default;
 
   int compare(const GvdMemberInfo& lhs, const GvdMemberInfo& rhs) const override;
-
-  inline static const auto registration_ =
-      config::Registration<MergePolicy, BasisPointMergePolicy>("basis_points");
 };
 
 struct DistanceMergePolicy : MergePolicy {
   virtual ~DistanceMergePolicy() = default;
 
   int compare(const GvdMemberInfo& lhs, const GvdMemberInfo& rhs) const override;
-
-  inline static const auto registration_ =
-      config::Registration<MergePolicy, DistanceMergePolicy>("distance");
 };
 
 }  // namespace hydra::places

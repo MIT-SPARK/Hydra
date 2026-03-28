@@ -32,24 +32,34 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <cstdint>
+#include "hydra/places/gvd_places/gvd_voxel.h"
 
 namespace hydra::places {
 
-enum class ParentUniquenessMode {
-  ANGLE,
-  L1_DISTANCE,
-  L1_THEN_ANGLE,
-};
+std::ostream& operator<<(std::ostream& out, const GvdVoxel& voxel) {
+  out << "GvdVoxel<flags=";
+  out << (voxel.observed ? "o" : "-");
+  out << (voxel.on_surface ? "s" : "-");
+  out << (voxel.fixed ? "f" : "-");
+  out << (voxel.in_queue ? "q" : "-");
+  out << (voxel.to_raise ? "r" : "-");
+  out << (voxel.is_negative ? "n" : "-");
+  out << ", distance=" << voxel.distance << " -> ";
+  if (voxel.has_parent) {
+    out << voxel.parent.transpose();
+  } else {
+    out << "unknown";
+  }
 
-struct VoronoiCheckConfig {
-  ParentUniquenessMode mode = ParentUniquenessMode::L1_THEN_ANGLE;
-  double min_distance_m = 0.2;
-  double parent_l1_separation = 3.0;
-  double parent_cos_angle_separation = 0.5;
-};
+  out << ", voronoi=";
+  if (voxel.num_extra_basis) {
+    out << "y (" << static_cast<int>(voxel.num_extra_basis) << ")";
+  } else {
+    out << "n";
+  }
 
-void declare_config(VoronoiCheckConfig& config);
+  out << ">";
+  return out;
+}
 
 }  // namespace hydra::places

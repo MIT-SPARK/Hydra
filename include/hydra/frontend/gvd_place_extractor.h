@@ -40,9 +40,9 @@
 #include "hydra/active_window/active_window_output.h"
 #include "hydra/active_window/volumetric_window.h"
 #include "hydra/common/output_sink.h"
-#include "hydra/places/graph_extractor.h"
-#include "hydra/places/gvd_integrator.h"
-#include "hydra/places/gvd_voxel.h"
+#include "hydra/places/gvd_places/graph_extractor.h"
+#include "hydra/places/gvd_places/gvd_integrator.h"
+#include "hydra/places/gvd_places/gvd_voxel.h"
 #include "hydra/reconstruction/tsdf_interpolators.h"
 
 namespace hydra {
@@ -55,7 +55,7 @@ class GvdPlaceExtractor {
                           const places::GraphExtractor&>;
 
   struct Config {
-    std::string layer = DsgLayers::PLACES;
+    std::string layer = spark_dsg::DsgLayers::PLACES;
     places::GvdIntegrator::Config gvd;
     places::GraphExtractor::Config graph;
     config::VirtualConfig<TsdfInterpolator> tsdf_interpolator;
@@ -78,11 +78,11 @@ class GvdPlaceExtractor {
 
   void detect(const ActiveWindowOutput& msg);
 
-  void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph);
+  void updateGraph(uint64_t timestamp_ns, spark_dsg::SceneGraph& graph);
 
-  void filterIsolated(DynamicSceneGraph& graph, NodeIdSet& active_neighborhood);
+  void filterIsolated(spark_dsg::SceneGraph& graph, NodeIdSet& active_neighborhood);
 
-  void filterGround(DynamicSceneGraph& graph);
+  void filterGround(spark_dsg::SceneGraph& graph);
 
  protected:
   places::GvdLayer::Ptr gvd_;

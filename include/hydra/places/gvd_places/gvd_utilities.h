@@ -32,63 +32,59 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/places/gvd_graph.h"
+#pragma once
+#include "hydra/places/gvd_places/gvd_voxel.h"
+#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::places {
 
-GvdGraph::GvdGraph() : next_id_(0) {}
+struct VoronoiCheckConfig {
+  enum class Mode {
+    ANGLE,
+    L1_DISTANCE,
+    L1_THEN_ANGLE,
+  } mode = Mode::L1_THEN_ANGLE;
+  double min_distance_m = 0.2;
+  double parent_l1_separation = 3.0;
+  double parent_cos_angle_separation = 0.5;
+};
 
-bool GvdGraph::empty() const { return nodes_.empty(); }
+void declare_config(VoronoiCheckConfig& config);
 
-uint64_t GvdGraph::addNode(const Eigen::Vector3d& position, const GlobalIndex& index) {
-  // position can't change ever (so we only ever set it when adding)
-  GvdMemberInfo info;
-  info.position = position;
-  info.index = index;
+struct DistancePotential {
+  bool is_lower;
+  double distance;
+};
 
-  const auto next_id = getNextId();
-  nodes_.emplace(next_id, info);
-  return next_id;
-}
+struct VoronoiCondition {
+  bool neighbor_is_voronoi{false};
+  bool current_is_voronoi{false};
+};
 
-void GvdGraph::removeNode(uint64_t node) {
-  auto iter = nodes_.find(node);
-  if (iter == nodes_.end()) {
-    return;
-  }
+DistancePotential getLowerDistance(float v_dist,
+                                   float n_dist,
+                                   float distance,
+                                   float min_diff_m = 0.0f);
 
-  for (const auto sibling_id : iter->second.siblings) {
-    nodes_.at(sibling_id).siblings.erase(node);
-  }
+VoronoiCondition checkVoronoi(const VoronoiCheckConfig& config,
+                              const GvdVoxel& current,
+                              const GlobalIndex& current_idx,
+                              const GvdVoxel& neighbor,
+                              const GlobalIndex& neighbor_idx);
 
-  id_queue_.push_back(node);
-  nodes_.erase(iter);
-}
+bool isParentUniqueL1(const VoronoiCheckConfig& config,
+                      const GlobalIndex& /* current_index */,
+                      const GlobalIndex& current_parent,
+                      const GlobalIndex& neighbor_parent);
 
-const GvdMemberInfo* GvdGraph::getNode(uint64_t node) const {
-  return const_cast<GvdGraph*>(this)->getNode(node);
-}
+bool isParentUniqueAngle(const VoronoiCheckConfig& config,
+                         const GlobalIndex& current_index,
+                         const GlobalIndex& current_parent,
+                         const GlobalIndex& neighbor_parent);
 
-GvdMemberInfo* GvdGraph::getNode(uint64_t node) {
-  // TODO(nathan) make this not throw out-of-range
-  return &nodes_.at(node);
-}
-
-const GvdGraph::Nodes& GvdGraph::nodes() const { return nodes_; }
-
-uint64_t GvdGraph::getNextId() {
-  uint64_t new_id;
-  if (id_queue_.empty()) {
-    new_id = next_id_;
-    next_id_++;
-  } else {
-    new_id = id_queue_.front();
-    id_queue_.pop_front();
-  }
-
-  return new_id;
-}
-
-bool GvdGraph::hasNode(uint64_t node) const { return nodes_.count(node) > 0; }
+bool isParentUnique(const VoronoiCheckConfig& config,
+                    const GlobalIndex& current_idx,
+                    const GlobalIndex& current_parent,
+                    const GlobalIndex& neighbor_parent);
 
 }  // namespace hydra::places

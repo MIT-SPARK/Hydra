@@ -35,6 +35,7 @@
 #include "hydra/eval/place_metrics.h"
 
 #include <glog/logging.h>
+#include <spark_dsg/node_attributes.h>
 
 #include <nanoflann.hpp>
 
@@ -43,7 +44,9 @@ namespace hydra::eval {
 using nanoflann::KDTreeSingleIndexAdaptor;
 using nanoflann::L2_Simple_Adaptor;
 using places::GvdLayer;
-using places::GvdVoxel;
+using spark_dsg::NodeId;
+using spark_dsg::PlaceNodeAttributes;
+using spark_dsg::SceneGraphLayer;
 
 void fillGvdPositions(const GvdLayer& layer,
                       size_t min_gvd_basis,
@@ -135,21 +138,5 @@ PlaceMetrics scorePlaces(const SceneGraphLayer& places,
 
   return metrics;
 }
-
-/*
-nlohmann::json json_results = {
-    {"missing", missing},
-    {"valid", valid},
-    {"dist_errors", dist_errors},
-    {"closest_dists", dist_to_closest},
-    {"total", places.numNodes()},
-    {"mean", mean},
-    {"nodes", node_order},
-    {"min", valid ? *min : std::numeric_limits<double>::quiet_NaN()},
-    {"max", valid ? *max : std::numeric_limits<double>::quiet_NaN()},
-};
-std::cout << json_results << std::endl;
-}
-*/
 
 }  // namespace hydra::eval

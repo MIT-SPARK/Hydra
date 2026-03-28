@@ -32,24 +32,33 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/places/gvd_integrator_config.h"
-
-#include <config_utilities/config.h>
-#include <config_utilities/types/enum.h>
+#pragma once
+#include "hydra/places/gvd_places/gvd_voxel.h"
 
 namespace hydra::places {
 
-void declare_config(VoronoiCheckConfig& config) {
-  using namespace config;
-  name("VoronoiCheckConfig");
-  enum_field(config.mode,
-             "mode",
-             {{ParentUniquenessMode::ANGLE, "ANGLE"},
-              {ParentUniquenessMode::L1_DISTANCE, "L1_DISTANCE"},
-              {ParentUniquenessMode::L1_THEN_ANGLE, "L1_THEN_ANGLE"}});
-  field(config.min_distance_m, "min_distance_m");
-  field(config.parent_l1_separation, "parent_l1_separation");
-  field(config.parent_cos_angle_separation, "parent_cos_angle_separation");
-}
+// forward declare to avoid header
+struct VoronoiCheckConfig;
+
+struct GvdVertexInfo {
+  Point pos;
+  size_t ref_count = 0;
+};
+
+struct GvdParentTracker {
+  uint8_t updateGvdParentMap(const GvdLayer& layer,
+                             const VoronoiCheckConfig& config,
+                             const GlobalIndex& voxel_index,
+                             const GvdVoxel& neighbor);
+
+  void markNewGvdParent(const GvdLayer& layer, const GlobalIndex& parent);
+
+  void removeVoronoiFromGvdParentMap(const GlobalIndex& voxel_index);
+
+  void updateVertexMapping(const GvdLayer& layer);
+
+  GlobalIndexMap<GlobalIndexSet> parents;
+  GlobalIndexMap<GvdVertexInfo> parent_vertices;
+};
 
 }  // namespace hydra::places

@@ -36,15 +36,9 @@
 
 #include <spatial_hash/neighbor_utils.h>
 
-#include <utility>
-
-#include "hydra/places/graph_extractor.h"
-#include "hydra/places/gvd_integrator_config.h"
-#include "hydra/places/gvd_parent_tracker.h"
-#include "hydra/places/gvd_utilities.h"
-#include "hydra/places/gvd_voxel.h"
-#include "hydra/places/update_statistics.h"
-#include "hydra/reconstruction/voxel_types.h"
+#include "hydra/places/gvd_places/graph_extractor.h"
+#include "hydra/places/gvd_places/gvd_parent_tracker.h"
+#include "hydra/places/gvd_places/gvd_utilities.h"
 #include "hydra/utils/bucket_queue.h"
 #include "hydra/utils/logging.h"
 
@@ -156,7 +150,22 @@ class GvdIntegrator {
                                        const GlobalIndex& index) const;
 
  protected:
-  UpdateStatistics update_stats_;
+  struct Stats {
+    size_t number_queue_inserts;
+    size_t number_lowered_voxels;
+    size_t number_raised_voxels;
+    size_t number_new_voxels;
+    size_t number_sign_flipped;
+    size_t number_raise_updates;
+    size_t number_voronoi_found;
+    size_t number_lower_skipped;
+    size_t number_lower_updated;
+    size_t number_fixed_no_parent;
+    size_t number_force_lowered;
+
+    void clear();
+    std::string print() const;
+  } update_stats_;
 
   GvdLayer::Ptr gvd_layer_;
 

@@ -32,35 +32,40 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/places/update_statistics.h"
+#pragma once
+
+#include <cstdint>
+#include <list>
+#include <map>
+#include <set>
+#include <unordered_map>
 
 namespace hydra::places {
 
-void UpdateStatistics::clear() {
-  number_lowered_voxels = 0;
-  number_raised_voxels = 0;
-  number_new_voxels = 0;
-  number_sign_flipped = 0;
-  number_raise_updates = 0;
-  number_voronoi_found = 0;
-  number_lower_skipped = 0;
-  number_lower_updated = 0;
-  number_fixed_no_parent = 0;
-  number_force_lowered = 0;
-}
+struct CompressedNode {
+  using CompressedNodeMap = std::unordered_map<uint64_t, CompressedNode>;
+  uint64_t node_id;
+  std::set<uint64_t> siblings;
+  std::set<uint64_t> active_refs;
+  std::set<uint64_t> archived_refs;
+  std::unordered_map<uint64_t, std::map<uint64_t, uint64_t>> sibling_support;
+  std::map<uint64_t, uint64_t> sibling_ref_counts;
+  uint64_t best_gvd_id;
+  bool in_graph = false;
 
-std::ostream& operator<<(std::ostream& out, const UpdateStatistics& stats) {
-  out << "  - Voxel changes: ";
-  out << stats.number_lowered_voxels << " lowered, ";
-  out << stats.number_raised_voxels << " raised, ";
-  out << stats.number_new_voxels << " new, ";
-  out << stats.number_sign_flipped << " sign flipped";
-  out << "\n  - New Voronoi Cells: " << stats.number_voronoi_found;
-  out << "\n  - Fixed without parents (lower): " << stats.number_fixed_no_parent;
-  out << "\n  - Skipped (lower): " << stats.number_lower_skipped;
-  out << "\n  - Updated (lower): " << stats.number_lower_updated;
-  out << "\n  - Forced (lower): " << stats.number_force_lowered;
-  return out;
-}
+  explicit CompressedNode(uint64_t node_id);
+
+  void addEdgeObservation(uint64_t gvd_id,
+                          uint64_t neighbor_gvd_id,
+                          uint64_t sibling_id);
+
+  bool removeEdgeObservation(uint64_t gvd_id, uint64_t neighbor_gvd_id);
+
+  std::list<uint64_t> removeEdgeObservations(uint64_t gvd_id, CompressedNodeMap& nodes);
+
+  void mergeObservations(uint64_t original_id, uint64_t new_id);
+
+  void merge(CompressedNode& other, CompressedNodeMap& nodes);
+};
 
 }  // namespace hydra::places
