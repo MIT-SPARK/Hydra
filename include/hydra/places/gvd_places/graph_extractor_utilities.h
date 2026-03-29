@@ -76,12 +76,4 @@ spark_dsg::EdgeAttributes::Ptr getFreespaceEdgeInfo(const NodeAttrMap& graph,
                                                     spark_dsg::NodeId other,
                                                     double min_edge_clearance_m);
 
-void findFreespaceEdges(const FreespaceEdgeConfig& config,
-                        const NodeAttrMap& nodes,
-                        const spark_dsg::EdgeContainer& edges,
-                        const GvdLayer& gvd,
-                        const std::unordered_set<spark_dsg::NodeId>& active,
-                        const NodeIndexMap& node_index_map,
-                        EdgeInfoMap& proposed_edges);
-
 }  // namespace hydra::places

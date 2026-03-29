@@ -238,7 +238,7 @@ void GvdIntegrator::updateGvd(uint64_t timestamp_ns, GraphExtractor* graph_extra
     graph_extractor->fillParentInfo(*gvd_layer_, parent_tracker_);
   }
 
-  MLOG(Verbosity::STATUS) << "\n" << update_stats_;
+  MLOG(Verbosity::STATUS) << "\n" << update_stats_.print();
 }
 
 void GvdIntegrator::archiveBlocks(const BlockIndices& blocks,

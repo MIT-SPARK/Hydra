@@ -35,6 +35,7 @@
 #include "hydra/places/gvd_places/graph_extractor.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
 #include <spark_dsg/edge_attributes.h>

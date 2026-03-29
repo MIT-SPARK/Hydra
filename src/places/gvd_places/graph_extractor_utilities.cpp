@@ -51,22 +51,6 @@ using spark_dsg::graph_utilities::getConnectedComponents;
 
 using Components = std::vector<std::vector<NodeId>>;
 
-namespace {
-
-void sortComponents(const NodeAttrMap& attrs, Components& to_sort) {
-  for (auto& c : to_sort) {
-    std::sort(c.begin(), c.end(), [&](const NodeId& lhs, const NodeId& rhs) {
-      return attrs.at(lhs)->distance > attrs.at(rhs)->distance;
-    });
-  }
-
-  std::sort(to_sort.begin(), to_sort.end(), [](const auto& lhs, const auto& rhs) {
-    return lhs.size() > rhs.size();
-  });
-}
-
-}  // namespace
-
 void declare_config(FreespaceEdgeConfig& conf) {
   using namespace config;
   name("FreespaceEdgeConfig");
@@ -199,24 +183,74 @@ EdgeAttributes::Ptr getFreespaceEdgeInfo(const NodeAttrMap& attrs,
   return std::make_unique<EdgeAttributes>(min_weight);
 }
 
+std::vector<NodeId> getComponent(const NodeAttrMap& nodes,
+                                 const EdgeContainer& edges,
+                                 NodeId root,
+                                 std::unordered_set<NodeId>& seen) {
+  std::vector<NodeId> component;
+  std::deque<NodeId> frontier{root};
+  while (!frontier.empty()) {
+    const auto curr_node = frontier.front();
+    frontier.pop_front();
+    component.push_back(curr_node);
+
+    for (const auto& [neighbor, _] : nodes) {
+      if (seen.count(neighbor)) {
+        continue;
+      }
+
+      if (!edges.contains(curr_node, neighbor)) {
+        continue;
+      }
+
+      frontier.push_back(neighbor);
+      seen.insert(neighbor);
+    }
+  }
+
+  return component;
+}
+
+Components findComponents(const NodeAttrMap& nodes, const EdgeContainer& edges) {
+  Components components;
+  std::unordered_set<NodeId> visited;
+  for (const auto& [node, _] : nodes) {
+    if (visited.count(node)) {
+      continue;
+    }
+
+    std::vector<NodeId> component;
+    visited.insert(node);
+    components.push_back(getComponent(nodes, edges, node, visited));
+  }
+
+  for (auto& c : components) {
+    std::sort(c.begin(), c.end(), [&](const NodeId& lhs, const NodeId& rhs) {
+      return nodes.at(lhs)->distance > nodes.at(rhs)->distance;
+    });
+  }
+
+  std::sort(components.begin(), components.end(), [](const auto& lhs, const auto& rhs) {
+    return lhs.size() > rhs.size();
+  });
+
+  return components;
+}
+
 void findFreespaceEdges(const FreespaceEdgeConfig& config,
-                        const AttrMap& nodes,
+                        const NodeAttrMap& nodes,
                         const EdgeContainer& edges,
                         const GvdLayer& gvd,
-                        const std::unordered_set<NodeId>& nodes,
                         const NodeIndexMap& indices,
                         EdgeInfoMap& proposed_edges) {
-  auto components = getConnectedComponents(graph, nodes, true);
+  auto components = findComponents(nodes, edges);
   if (components.size() <= 1) {
     return;  // nothing to do
   }
 
-  sortComponents(graph, components);
-  std::vector<NodeId> first_component = components.front();
-
+  auto first_component = components.front();
   for (size_t i = 1; i < components.size(); ++i) {
     const auto& component = components[i];
-    NearestNodeFinder node_finder(graph, first_component);
 
     bool inserted_edge = false;
     for (size_t j = 0; j < config.num_nodes_to_check; ++j) {
