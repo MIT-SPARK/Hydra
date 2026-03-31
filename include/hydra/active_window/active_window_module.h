@@ -37,6 +37,8 @@
 #include <memory>
 #include <thread>
 
+#include <spark_dsg/node_attributes.h>
+
 #include "hydra/active_window/active_window_output.h"
 #include "hydra/active_window/volumetric_window.h"
 #include "hydra/common/message_queue.h"
@@ -81,6 +83,13 @@ class ActiveWindowModule : public Module {
   bool step(const InputPacket::Ptr& input);
 
   void addSink(const Sink::Ptr& sink);
+
+  // Extract objects remaining in the active window at shutdown.
+  // Default returns empty; downstream modules (e.g., Khronos) override.
+  virtual std::vector<std::unique_ptr<spark_dsg::NodeAttributes>>
+  extractRemainingObjects() {
+    return {};
+  }
 
   InputQueue::Ptr queue() const { return input_queue_; }
 

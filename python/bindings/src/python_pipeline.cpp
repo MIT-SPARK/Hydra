@@ -373,6 +373,7 @@ void addBindings(pybind11::module_& m) {
             input->sensor_input = std::make_unique<PythonSensorInput>(
                 timestamp_ns, depth, labels, rgb, pipeline.sensor_name);
             input->sensor_input->input_feature = feature;
+            py::gil_scoped_release release;
             return pipeline.step(input);
           },
           "timestamp_ns"_a,
@@ -400,6 +401,7 @@ void addBindings(pybind11::module_& m) {
             input->sensor_input = std::make_unique<PythonSensorInput>(
                 timestamp_ns, points, labels, colors, pipeline.sensor_name);
             input->sensor_input->input_feature = feature;
+            py::gil_scoped_release release;
             return pipeline.step(input);
           },
           "timestamp_ns"_a,

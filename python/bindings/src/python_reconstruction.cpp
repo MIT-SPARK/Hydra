@@ -243,6 +243,7 @@ void addBindings(pybind11::module_& m) {
                  world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
              input->sensor_input = std::make_unique<PythonSensorInput>(
                  timestamp_ns, depth, labels, rgb, pipeline.sensor_name);
+             py::gil_scoped_release release;
              return pipeline.step(input);
            })
       .def("step",
@@ -260,6 +261,7 @@ void addBindings(pybind11::module_& m) {
                  world_R_body[0], world_R_body[1], world_R_body[2], world_R_body[3]);
              input->sensor_input = std::make_unique<PythonSensorInput>(
                  timestamp_ns, points, labels, colors, pipeline.sensor_name);
+             py::gil_scoped_release release;
              return pipeline.step(input);
            });
 }
