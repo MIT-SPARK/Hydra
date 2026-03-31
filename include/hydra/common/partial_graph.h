@@ -56,6 +56,10 @@ class PartialGraph {
 
   void add(NodeId source, NodeId target, EdgeAttr&& attrs = nullptr);
 
+  void update(NodeId node_id, NodeAttr&& attrs = nullptr);
+
+  void update(NodeId source, NodeId target, EdgeAttr&& attrs = nullptr);
+
   void remove(NodeId node_id);
 
   void remove(NodeId source, NodeId target);
@@ -65,6 +69,12 @@ class PartialGraph {
   bool has(NodeId source, NodeId target) const;
 
   std::set<spark_dsg::NodeId> neighbors(NodeId node) const;
+
+  AttrT* at(NodeId node) const;
+
+  void contract(NodeId from, NodeId to);
+
+  const std::map<NodeId, Node>& nodes() const { return nodes_; }
 
  private:
   Node* find(NodeId node);
@@ -89,6 +99,26 @@ void PartialGraph<AttrT>::add(NodeId source, NodeId target, EdgeAttr&& attrs) {
 
   auto& target_node = allocate(target);
   target_node.neighbors.insert(source);
+}
+
+template <typename AttrT>
+void PartialGraph<AttrT>::update(NodeId node_id, NodeAttr&& attrs) {
+  auto iter = nodes_.find(node_id);
+  if (iter == nodes_.end()) {
+    add(node_id, std::move(attrs));
+  }
+
+  iter->second.attrs = std::move(attrs);
+}
+
+template <typename AttrT>
+void PartialGraph<AttrT>::update(NodeId source, NodeId target, EdgeAttr&& attrs) {
+  auto edge = edges_.find(source, target);
+  if (!edge) {
+    add(source, target, std::move(attrs));
+  }
+
+  edge->info = std::move(attrs);
 }
 
 template <typename AttrT>
@@ -124,6 +154,28 @@ template <typename AttrT>
 std::set<spark_dsg::NodeId> PartialGraph<AttrT>::neighbors(NodeId node) const {
   auto iter = nodes_.find(node);
   return iter == nodes_.end() ? std::set<NodeId>{} : iter->second.neighbors;
+}
+
+template <typename AttrT>
+AttrT* PartialGraph<AttrT>::at(NodeId node) const {
+  auto iter = nodes_.find(node);
+  return iter == nodes_.end() ? nullptr : iter->second.attrs.get();
+}
+
+template <typename AttrT>
+void PartialGraph<AttrT>::contract(NodeId from, NodeId to) {
+  auto iter = nodes_.find(from);
+  if (iter == nodes_.end()) {
+    return;
+  }
+
+  for (const auto& sibling : iter->second.neighbors) {
+    if (!edges_.contains(to, sibling)) {
+      add(to, sibling, std::move(edges_.find(from, sibling)->info));
+    }
+  }
+
+  nodes_.erase(iter);
 }
 
 template <typename AttrT>

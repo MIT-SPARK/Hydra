@@ -34,13 +34,19 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
+#include <spatial_hash/grid.h>
+#include <spatial_hash/hash.h>
+
 #include <cstdint>
 #include <list>
 #include <map>
+#include <optional>
 #include <set>
 #include <unordered_map>
 
 namespace hydra::places {
+
+struct GvdMemberInfo;
 
 struct CompressedNode {
   using CompressedNodeMap = std::unordered_map<uint64_t, CompressedNode>;
@@ -66,6 +72,33 @@ struct CompressedNode {
   void mergeObservations(uint64_t original_id, uint64_t new_id);
 
   void merge(CompressedNode& other, CompressedNodeMap& nodes);
+};
+
+struct CompressedGraph {
+  struct DeleteResult {
+    std::optional<uint64_t> id = std::nullopt;
+    bool was_best_id = false;
+    bool has_active = false;
+    bool has_archived = false;
+    std::list<uint64_t> cleared_neighbors;
+  };
+
+  CompressedGraph(float resolution_m);
+
+  void add(uint64_t gvd_id, const GvdMemberInfo& info);
+  DeleteResult remove(uint64_t gvd_id, bool is_archive);
+  void merge(uint64_t curr_node_id,
+             CompressedNode& curr_node,
+             uint64_t neighbor_node_id);
+
+  size_t next_id;
+  const spatial_hash::IndexGrid grid;
+  std::unordered_map<uint64_t, CompressedNode> nodes;
+  spatial_hash::IndexHashMap<std::set<uint64_t>> index_map;
+  std::unordered_map<uint64_t, spatial_hash::Index> id_map;
+  std::unordered_map<uint64_t, uint64_t> remapping;
+
+  std::unordered_set<uint64_t> updated;
 };
 
 }  // namespace hydra::places

@@ -43,66 +43,33 @@
 
 #include "hydra/places/gvd_places/graph_extractor_utilities.h"
 #include "hydra/places/gvd_places/gvd_parent_tracker.h"
+#include "hydra/utils/printing.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra::places {
-
-using timing::ScopedTimer;
 
 using spark_dsg::EdgeAttributes;
 using spark_dsg::EdgeKey;
 using spark_dsg::NearestVertexInfo;
 using spark_dsg::NodeId;
+using spark_dsg::NodeSymbol;
 using spark_dsg::PlaceNodeAttributes;
+using timing::ScopedTimer;
 
-using CompressedNodeMap = std::unordered_map<uint64_t, CompressedNode>;
-using CompressedRemapping = std::unordered_map<uint64_t, uint64_t>;
+namespace {
+
+struct BestMemberResult {
+  uint64_t id = 0;
+  bool is_archived = false;
+  const GvdMemberInfo* info = nullptr;
+
+  operator bool() const { return info != nullptr; }
+};
 
 struct DeleteInfo {
   GlobalIndex index;
   uint64_t id;
 };
-
-void declare_config(GraphExtractor::Config& config) {
-  using namespace config;
-  name("GraphExtractor::Config");
-  field(config.compression_distance_m, "compression_distance_m");
-  field(config.min_node_distance_m, "min_node_distance_m");
-  field(config.min_edge_distance_m, "min_edge_distance_m");
-  field(config.merge_nearby_nodes, "merge_new_nodes");
-  field(config.add_heuristic_edges, "add_heuristic_edges");
-  field(config.merge_policy, "merge_policy");
-  field(config.node_merge_distance_m, "node_merge_distance_m");
-  field(config.add_overlap_edges, "add_overlap_edges");
-  if (config.add_overlap_edges) {
-    field(config.overlap_edges, "overlap_edges");
-  }
-
-  field(config.add_freespace_edges, "add_freespace_edges");
-  if (config.add_freespace_edges) {
-    field(config.freespace_edges, "freespace_edges");
-  }
-}
-
-void declare_config(GraphExtractor::Config::OverlapEdgeConfig& conf) {
-  using namespace config;
-  name("OverlapEdgeConfig");
-  field(conf.min_clearance_m, "min_clearance_m");
-}
-
-GraphExtractor::GraphExtractor(const Config& config)
-    : config(config),
-      next_node_id_('p', 0),
-      gvd_(new GvdGraph()),
-      compression_factor_(1.0 / config.compression_distance_m),
-      merge_policy_(config::create<MergePolicy>(config.merge_policy)),
-      next_id_(0) {}
-
-GraphExtractor::~GraphExtractor() = default;
-
-void GraphExtractor::pushGvdIndex(const GlobalIndex& index) {
-  modified_voxel_queue_.push(index);
-}
 
 NearestVertexInfo convertInfo(const GvdVertexInfo& parent_info) {
   NearestVertexInfo info;
@@ -112,10 +79,181 @@ NearestVertexInfo convertInfo(const GvdVertexInfo& parent_info) {
   return info;
 }
 
+BestMemberResult getBestMember(const CompressedNode& node,
+                               const GvdGraph& gvd,
+                               const MergePolicy& policy) {
+  BestMemberResult best_member;
+  for (const auto node_id : node.active_refs) {
+    auto curr_member = gvd.getNode(node_id);
+    if (!best_member.info || policy.compare(*curr_member, *best_member.info) > 0) {
+      best_member.info = curr_member;
+      best_member.id = node_id;
+    }
+  }
+
+  for (const auto node_id : node.archived_refs) {
+    auto curr_member = gvd.getNode(node_id);
+    if (!best_member.info || policy.compare(*curr_member, *best_member.info) > 0) {
+      best_member.is_archived = true;
+      best_member.info = curr_member;
+      best_member.id = node_id;
+    }
+  }
+
+  return best_member;
+}
+
+}  // namespace
+
+void declare_config(GraphExtractor::Config::OverlapEdges& config) {
+  using namespace config;
+  name("OverlapEdgeConfig");
+  field(config.enable, "enable");
+  field(config.min_clearance_m, "min_clearance_m");
+}
+
+void declare_config(GraphExtractor::Config::FreespaceEdges& config) {
+  using namespace config;
+  name("FreespaceEdgeConfig");
+  field(config.enable, "enable");
+  field(config.max_length_m, "max_length_m");
+  field(config.num_nodes_to_check, "num_nodes_to_check");
+  field(config.num_neighbors_to_find, "num_neighbors_to_find");
+  field(config.min_clearance_m, "min_clearance_m");
+}
+
+void declare_config(GraphExtractor::Config& config) {
+  using namespace config;
+  name("GraphExtractor::Config");
+  field(config.prefix, "prefix");
+  field(config.compression_distance_m, "compression_distance_m");
+  field(config.min_node_distance_m, "min_node_distance_m");
+  field(config.min_edge_distance_m, "min_edge_distance_m");
+  field(config.merge_nearby_nodes, "merge_new_nodes");
+  field(config.merge_policy, "merge_policy");
+  field(config.node_merge_distance_m, "node_merge_distance_m");
+  field(config.overlap_edges, "overlap_edges");
+  field(config.freespace_edges, "freespace_edges");
+}
+
+GraphExtractor::GraphExtractor(const Config& config)
+    : config(config),
+      next_id_(0),
+      compressed_(config.compression_distance_m),
+      merge_policy_(config::create<MergePolicy>(config.merge_policy)) {}
+
+GraphExtractor::~GraphExtractor() = default;
+
+void GraphExtractor::pushIndex(const GlobalIndex& index) {
+  modified_voxel_queue_.push(index);
+}
+
+void GraphExtractor::clearIndex(const GlobalIndex& index) {
+  // gvd integrator update removes any invalidated voxels, so we update the support for
+  // all of hte nodes, deleting nodes that no longer have any support.
+  uint64_t gvd_id;
+  std::set<uint64_t> gvd_siblings;
+  {  // scope limiting iter lifetime to be valid
+    auto iter = index_id_map_.find(index);
+    if (iter == index_id_map_.end()) {
+      return;
+    }
+
+    gvd_id = iter->second;
+    gvd_.removeNode(iter->second);
+    index_id_map_.erase(iter);
+  }  // end iter scope
+
+  const auto info = compressed_.remove(gvd_id, false);
+  if (!info.id) {
+    return;
+  }
+
+  const auto compressed_id = info.id.value();
+  const NodeSymbol node_id(config.prefix, compressed_id);
+  if (info.was_best_id) {
+    // clear node id from active window until we assign a new member
+    node_index_map_.erase(node_id);
+  }
+
+  for (const auto sibling : info.cleared_neighbors) {
+    graph_.remove(node_id, NodeSymbol(config.prefix, sibling));
+    // TODO(nathan) track deleted
+  }
+
+  if (info.has_active) {
+    return;  // compressed node is still active; nothing else to do
+  }
+
+  if (!info.has_archived) {
+    graph_.remove(node_id);
+    // TODO(nathan) track deleted
+  } else {
+    to_archive_.insert(compressed_id);
+  }
+}
+
+void GraphExtractor::archiveIndex(const GlobalIndex& index) {
+  // 4. we archive all voxels, updating each compressed node
+  //   a. we move entries from an active set to an archived set
+  //   b. once there are no more entires in the active set, we flag as archived
+  //   c. once all siblings are also archived, we delete?
+  auto iter = index_id_map_.find(index);
+  if (iter == index_id_map_.end()) {
+    return;
+  }
+
+  // archived gvd nodes still can be accessed by their ID
+  const auto gvd_id = iter->second;
+  index_id_map_.erase(iter);
+  const auto info = compressed_.remove(gvd_id, true);
+  if (!info.id) {
+    gvd_.removeNode(gvd_id);  // nothing in the compressed graph depends on the node
+    return;
+  }
+
+  const auto compressed_id = info.id.value();
+  const NodeSymbol node_id(config.prefix, compressed_id);
+  if (info.was_best_id == gvd_id) {
+    // clear node id from active window: current best point is archived
+    node_index_map_.erase(node_id);
+  }
+
+  if (!info.has_active) {
+    to_archive_.insert(compressed_id);
+  }
+}
+
+void GraphExtractor::extract(const GvdLayer& layer, uint64_t timestamp_ns) {
+  // 0. remove all archived nodes that no longer have active siblings
+  clearArchived();
+
+  // 1. get unique and valid voxels, and then update the gvd graph and compression
+  IndexVoxelQueue seen_voxels;
+  fillSeenVoxels(layer, timestamp_ns, seen_voxels);
+  updateGvdGraph(layer, seen_voxels, timestamp_ns);
+
+  // 2. we go through a list of updated compressed nodes and decide on a representative
+  // set of attributes and edges
+  //   a. we can't average attributes, so instead we pick a single candidate
+  //   b. we could do centroid, but max(num_basis_points) might make more sense
+  assignCompressedNodeAttributes();
+  updateCompressedEdges(layer);
+
+  // 3. we optionally merge nearby nodes
+  if (config.merge_nearby_nodes) {
+    mergeNearbyNodes();
+  }
+
+  compressed_.updated.clear();
+  updateOverlapEdges();
+  updateFreespaceEdges(layer);
+}
+
 void GraphExtractor::fillParentInfo(const GvdLayer& gvd,
                                     const GvdParentTracker& tracker) {
-  for (auto&& [node_id, node_index] : node_index_map_) {
-    auto& attrs = nodes_.at(node_id);
+  for (const auto& [node_id, node_index] : node_index_map_) {
+    auto attrs = graph_.at(node_id);
     attrs->voxblox_mesh_connections.clear();
     const auto* voxel = gvd.getVoxelPtr(node_index);
     if (!voxel) {
@@ -147,351 +285,6 @@ void GraphExtractor::fillParentInfo(const GvdLayer& gvd,
   }
 }
 
-const GvdGraph& GraphExtractor::getGvdGraph() const { return *gvd_; }
-
-std::unordered_set<NodeId> GraphExtractor::getActiveNodes() const {
-  std::unordered_set<NodeId> nodes;
-  for (const auto& id_index_pair : node_index_map_) {
-    nodes.insert(id_index_pair.first);
-  }
-  return nodes;
-}
-
-const std::unordered_set<NodeId>& GraphExtractor::getDeletedNodes() const {
-  return deleted_nodes_;
-}
-
-const std::vector<EdgeKey>& GraphExtractor::getDeletedEdges() const {
-  return deleted_edges_;
-}
-
-void GraphExtractor::clearDeleted() {
-  deleted_nodes_.clear();
-  deleted_edges_.clear();
-}
-
-const NodeIndexMap& GraphExtractor::getIndexMap() const { return node_index_map_; }
-
-const CompressedNodeMap& GraphExtractor::getCompressedNodeInfo() const {
-  return compressed_info_map_;
-}
-
-const CompressedRemapping& GraphExtractor::getCompressedRemapping() const {
-  return compressed_remapping_;
-}
-
-EdgeAttributes::Ptr GraphExtractor::makeEdgeInfo(const GvdLayer& layer,
-                                                 NodeId source_id,
-                                                 NodeId target_id) const {
-  const auto source_dist = nodes_.at(source_id)->distance;
-  const auto target_dist = nodes_.at(target_id)->distance;
-  auto min_weight = std::min(source_dist, target_dist);
-  const auto source = node_index_map_.at(source_id);
-  const auto target = node_index_map_.at(target_id);
-  const auto path = makeBresenhamLine(source, target);
-  if (path.empty()) {
-    // edge is smaller than voxel size, so we just take the min distance between the two
-    return std::make_unique<EdgeAttributes>(min_weight);
-  }
-
-  for (const auto& index : path) {
-    const auto voxel = layer.getVoxelPtr(index);
-    if (!voxel) {
-      continue;
-    }
-
-    if (voxel->distance < min_weight) {
-      min_weight = voxel->distance;
-    }
-  }
-
-  return std::make_unique<EdgeAttributes>(min_weight);
-}
-
-GlobalIndex GraphExtractor::popFromModifiedQueue() {
-  GlobalIndex index = modified_voxel_queue_.front();
-  modified_voxel_queue_.pop();
-  return index;
-}
-
-void GraphExtractor::removeGraphNode(NodeId node) {
-  nodes_.erase(node);
-  deleted_nodes_.insert(node);
-}
-
-void GraphExtractor::updateGraphEdge(NodeId source,
-                                     NodeId target,
-                                     EdgeAttributes::Ptr&& attrs,
-                                     bool is_heursitic) {
-  auto prev_edge = edges_.find(source, target);
-  if (!prev_edge) {
-    edges_.insert(source, target, std::move(attrs));
-    return;
-  }
-
-  *prev_edge->info = *attrs;
-  if (!is_heursitic) {
-    // make sure any non-heurstic source of an edge takes precedence
-    overlap_edges_.erase({source, target});
-    freespace_edges_.erase({source, target});
-  }
-}
-
-void GraphExtractor::addGraphNode(NodeId node, PlaceNodeAttributes::Ptr&& attrs) {
-  nodes_.emplace(node,
-                 attrs ? std::move(attrs) : std::make_unique<PlaceNodeAttributes>());
-}
-
-void GraphExtractor::removeGraphEdge(NodeId source, NodeId target) {
-  edges_.remove(source, target);
-  deleted_edges_.push_back({source, target});
-}
-
-void GraphExtractor::mergeGraphNodes(NodeId from, NodeId to) {
-  graph_->mergeNodes(from, to);
-  deleted_nodes_.insert(from);
-}
-
-void GraphExtractor::updateOverlapEdges() {
-  if (config.add_overlap_edges) {
-    return;
-  }
-
-  const auto active_nodes = getActiveNodes();
-  for (auto iter = overlap_edges_.begin(); iter != overlap_edges_.end();) {
-    const auto [source, target] = *iter;
-    if (!active_nodes.count(source) || !active_nodes.count(target)) {
-      iter = overlap_edges_.erase(iter);
-    } else {
-      ++iter;
-    }
-  }
-
-  const auto threshold = config.overlap_edges.min_clearance_m;
-  for (auto source = active_nodes.begin(); source != active_nodes.end(); ++source) {
-    for (auto target = source; target != active_nodes.end(); ++target) {
-      if (source == target) {
-        continue;
-      }
-
-      EdgeKey key{*source, *target};
-      auto info = getOverlapEdgeInfo(nodes_, *source, *target, threshold);
-      if (info) {
-        updateGraphEdge(key.k1, key.k2, std::move(info), true);
-        overlap_edges_.insert(key);
-      } else {
-        overlap_edges_.erase(key);
-        removeGraphEdge(key.k1, key.k2);
-      }
-    }
-  }
-}
-
-void GraphExtractor::updateFreespaceEdges(const GvdLayer& gvd) {
-  if (!config.add_freespace_edges) {
-    return;
-  }
-
-  const auto active_nodes = getActiveNodes();
-  for (auto iter = freespace_edges_.begin(); iter != freespace_edges_.end();) {
-    const auto [source, target] = *iter;
-    if (!active_nodes.count(source) || !active_nodes.count(target)) {
-      iter = freespace_edges_.erase(iter);
-      continue;
-    }
-
-    auto info = getFreespaceEdgeInfo(nodes_,
-                                     gvd,
-                                     node_index_map_,
-                                     source,
-                                     target,
-                                     config.freespace_edges.min_clearance_m);
-    if (!info) {
-      removeGraphEdge(source, target);
-      iter = freespace_edges_.erase(iter);
-      continue;
-    }
-
-    updateGraphEdge(source, target, std::move(info), true);
-    ++iter;
-  }
-
-  EdgeInfoMap proposed_edges;
-  findFreespaceEdges(config.freespace_edges,
-                     *graph_,
-                     gvd,
-                     active_nodes,
-                     node_index_map_,
-                     proposed_edges);
-
-  for (auto& [key, info] : proposed_edges) {
-    updateGraphEdge(key.k1, key.k2, std::move(info), true);
-    freespace_edges_.insert(key);
-  }
-}
-
-void GraphExtractor::clearGvdIndex(const GlobalIndex& index) {
-  // gvd integrator update removes any invalidated voxels, deleting nodes that no
-  // longer have any support. We remove any deleted entries from the active set, and
-  // once the active set is empty, we delete the compressed node if the archived set is
-  // empty, otherwise we archive.
-  uint64_t gvd_id;
-  std::set<uint64_t> gvd_siblings;
-  {  // scope limiting iter lifetime to be valid
-    auto iter = index_id_map_.find(index);
-    if (iter == index_id_map_.end()) {
-      return;
-    }
-
-    gvd_id = iter->second;
-    gvd_->removeNode(iter->second);
-    index_id_map_.erase(iter);
-  }  // end iter scope
-
-  // find compressed node
-  uint64_t compressed_id;
-  {  // scope limiting iter lifetime
-    auto iter = compressed_remapping_.find(gvd_id);
-    if (iter == compressed_remapping_.end()) {
-      return;  // nothing to do if voxel wasn't compressed
-    }
-
-    compressed_id = iter->second;
-    compressed_remapping_.erase(iter);
-  }
-
-  // remove current voxel from active refs
-  auto& info = compressed_info_map_.at(compressed_id);
-  const auto deleted_siblings =
-      info.removeEdgeObservations(gvd_id, compressed_info_map_);
-  for (const auto sibling : deleted_siblings) {
-    removeGraphEdge(getPlaceId(compressed_id), getPlaceId(sibling));
-  }
-
-  if (info.best_gvd_id == gvd_id) {
-    // clear node id from active window until we assign a new member as the
-    // representative point
-    node_index_map_.erase(getPlaceId(compressed_id));
-  }
-
-  info.active_refs.erase(gvd_id);
-  updated_nodes_.insert(compressed_id);
-
-  if (!info.active_refs.empty()) {
-    // compressed node is still active; nothing else to do
-    return;
-  }
-
-  if (info.archived_refs.empty()) {
-    removeGraphNode(getPlaceId(compressed_id));
-    clearCompressionId(compressed_id, true);
-  } else {
-    to_archive_.insert(compressed_id);
-  }
-}
-
-void GraphExtractor::clearCompressionId(uint64_t node_id, bool is_delete) {
-  // clear mapping between compression index and node id
-  {  // erase node entry from compression cell and erase compression cell
-    const auto& index = compressed_id_map_.at(node_id);
-    auto iter = compressed_index_map_.find(index);
-    CHECK(iter != compressed_index_map_.end());
-    iter->second.erase(node_id);
-    if (iter->second.empty()) {
-      compressed_index_map_.erase(iter);
-    }
-  }
-
-  // remove book-keeping around archive / update
-  compressed_id_map_.erase(node_id);
-  updated_nodes_.erase(node_id);
-  to_archive_.erase(node_id);
-
-  // erase sibilings before info gets erased
-  const auto& info = compressed_info_map_.at(node_id);
-  for (const auto sibling : info.siblings) {
-    compressed_info_map_.at(sibling).siblings.erase(node_id);
-  }
-
-  compressed_info_map_.erase(node_id);
-  VLOG(10) << (is_delete ? "deleting " : "archiving ") << node_id
-           << " from compressed graph";
-}
-
-void GraphExtractor::deleteChildren(const CompressedNode& info) {
-  for (const auto gvd_id : info.archived_refs) {
-    compressed_remapping_.erase(gvd_id);
-    gvd_->removeNode(gvd_id);
-  }
-}
-
-void GraphExtractor::removeDistantIndex(const GlobalIndex& index) {
-  // 4. we archive all voxels, updating each compressed node
-  //   a. we move entries from an active set to an archived set
-  //   b. once there are no more entires in the active set, we flag as archived
-  //   c. once all siblings are also archived, we delete?
-  auto iter = index_id_map_.find(index);
-  if (iter == index_id_map_.end()) {
-    return;
-  }
-
-  // we don't need the mapping between global index and id any more: archived gvd nodes
-  // still can be accessed by their ID
-  const auto gvd_id = iter->second;
-  index_id_map_.erase(iter);
-
-  auto citer = compressed_remapping_.find(gvd_id);
-  if (citer == compressed_remapping_.end()) {
-    // nothing in the compressed graph depends on this node, so delete it
-    gvd_->removeNode(gvd_id);
-    return;
-  }
-
-  auto& info = compressed_info_map_.at(citer->second);
-  info.active_refs.erase(gvd_id);
-  info.archived_refs.insert(gvd_id);
-
-  if (info.best_gvd_id == gvd_id) {
-    // clear node id from active window: current best point is archived
-    node_index_map_.erase(getPlaceId(citer->second));
-  }
-
-  if (info.active_refs.empty()) {
-    to_archive_.insert(citer->second);
-  }
-}
-
-void GraphExtractor::fillSeenVoxels(const GvdLayer& layer,
-                                    uint64_t timestamp_ns,
-                                    IndexVoxelQueue& seen_voxels) {
-  ScopedTimer timer("places/prune_gvd_queue", timestamp_ns);
-
-  GlobalIndexSet seen_indices;
-  while (!modified_voxel_queue_.empty()) {
-    const GlobalIndex index = popFromModifiedQueue();
-    if (seen_indices.count(index)) {
-      continue;
-    }
-
-    const auto voxel = layer.getVoxelPtr(index);
-    if (voxel == nullptr) {
-      // this should only happen when we encounter voxels from archived blocks
-      VLOG(10) << "[Graph Extraction] Invalid index: " << index.transpose()
-               << " found in extraction input queue";
-      continue;
-    }
-
-    if (!voxel->num_extra_basis) {
-      // it's possible for a voxel to labeled voronoi, then get visited (clearing the
-      // voronoi flag)
-      continue;
-    }
-
-    seen_indices.insert(index);
-    seen_voxels.push_back({index, voxel});
-  }
-}
-
 void GraphExtractor::clearArchived() {
   std::list<uint64_t> to_remove;
   for (const auto id : to_archive_) {
@@ -510,91 +303,71 @@ void GraphExtractor::clearArchived() {
   }
 
   for (const auto id : to_remove) {
-    deleteChildren(compressed_info_map_.at(id));
+    for (const auto gvd_id : compressed_info_map_.at(id).archived_refs) {
+      compressed_remapping_.erase(gvd_id);
+      gvd_.removeNode(gvd_id);
+    }
+
     clearCompressionId(id, false);
     archived_node_ids_.insert(id);
   }
 }
 
-void GraphExtractor::extract(const GvdLayer& layer, uint64_t timestamp_ns) {
-  // 0(a). remove all archived nodes that no longer have active siblings
-  clearArchived();
+void GraphExtractor::fillSeenVoxels(const GvdLayer& layer,
+                                    uint64_t timestamp_ns,
+                                    IndexVoxelQueue& seen_voxels) {
+  ScopedTimer timer("places/prune_gvd_queue", timestamp_ns);
 
-  // 0(b). get unique and valid voxels
-  IndexVoxelQueue seen_voxels;
-  fillSeenVoxels(layer, timestamp_ns, seen_voxels);
+  GlobalIndexSet seen_indices;
+  while (!modified_voxel_queue_.empty()) {
+    const auto index = modified_voxel_queue_.front();
+    modified_voxel_queue_.pop();
+    if (seen_indices.count(index)) {
+      continue;
+    }
 
-  // 1. we update the full gvd graph with any new voxels from the queue from the
-  // integrator (maybe eventually optionally applying thinning)
-  updateNodeInfoMap(layer, seen_voxels, timestamp_ns);
-  // 2. we update the connectivity of the gvd graph and update the compression for any
-  // non-isolated voxels
-  updateGvdGraph(seen_voxels, timestamp_ns);
+    const auto voxel = layer.getVoxelPtr(index);
+    if (voxel == nullptr) {
+      // this should only happen when we encounter voxels from archived blocks
+      MLOG(1) << "Invalid index: " << showIndex(index) << " found in extraction queue";
+      continue;
+    }
 
-  // 3. we go through a list of updated compressed nodes and decide on a representative
-  // set of attributes
-  //   a. we can't average attributes, so instead we pick a single candidate
-  //   b. we could do centroid, but max(num_basis_points) might make more sense
-  assignCompressedNodeAttributes();
+    if (!voxel->num_extra_basis) {
+      continue;
+    }
 
-  // 4. we assign edge attributes
-  updateCompressedEdges(layer);
-
-  // 5. we optionally merge nearby nodes
-  if (config.merge_nearby_nodes) {
-    mergeNearbyNodes();
-  }
-  updated_nodes_.clear();
-
-  if (config.add_heuristic_edges) {
-    updateOverlapEdges();
-    updateFreespaceEdges(layer);
+    seen_indices.insert(index);
+    seen_voxels.push_back({index, voxel});
   }
 }
 
-void GraphExtractor::updateNode(const GlobalIndex& index,
-                                const Eigen::Vector3d& position,
-                                double distance,
-                                uint8_t num_basis_points) {
-  auto iter = index_id_map_.find(index);
-  if (iter == index_id_map_.end()) {
-    const auto next_id = gvd_->addNode(position, index);
-    iter = index_id_map_.emplace(index, next_id).first;
-  }
-
-  auto& info = *gvd_->getNode(iter->second);
-  info.distance = distance;
-  info.num_basis_points = num_basis_points;
-}
-
-void GraphExtractor::updateNodeInfoMap(const GvdLayer& layer,
-                                       const IndexVoxelQueue& update_info,
-                                       uint64_t timestamp_ns) {
-  ScopedTimer timer("places/handle_gvd_queue", timestamp_ns);
-
-  for (const auto& index_voxel_pair : update_info) {
-    updateNode(index_voxel_pair.index,
-               layer.getVoxelPosition(index_voxel_pair.index).cast<double>(),
-               index_voxel_pair.voxel->distance,
-               index_voxel_pair.voxel->num_extra_basis + 1);
-  }
-}
-
-void GraphExtractor::updateGvdGraph(const IndexVoxelQueue& update_info,
+void GraphExtractor::updateGvdGraph(const GvdLayer& layer,
+                                    const IndexVoxelQueue& update_info,
                                     uint64_t timestamp_ns) {
   ScopedTimer timer("places/update_gvd_graph", timestamp_ns);
-  std::list<DeleteInfo> to_delete;
+  for (const auto& [index, voxel] : update_info) {
+    auto iter = index_id_map_.find(index);
+    if (iter == index_id_map_.end()) {
+      const auto next_id = gvd_.addNode(layer.getVoxelPosition(index), index);
+      iter = index_id_map_.emplace(index, next_id).first;
+    }
 
-  for (const auto& index_voxel_pair : update_info) {
-    const auto& index = index_voxel_pair.index;
+    auto& info = *gvd_.getNode(iter->second);
+    info.distance = voxel->distance;
+    info.num_basis_points = voxel->num_extra_basis + 1;
+  }
+
+  std::list<DeleteInfo> to_delete;
+  const spatial_hash::NeighborSearch search(26);
+  for (const auto& [index, voxel] : update_info) {
     auto iter = index_id_map_.find(index);
     if (iter == index_id_map_.end()) {
       // if we prune the GVD, there might not be a one-to-one correspondence
       continue;
     }
 
-    auto& info = *gvd_->getNode(iter->second);
-    spatial_hash::NeighborSearch search(26);
+    auto& info = *gvd_.getNode(iter->second);
     for (const auto& neighbor_index : search.neighborIndices(index)) {
       auto niter = index_id_map_.find(neighbor_index);
       if (niter == index_id_map_.end()) {
@@ -602,7 +375,7 @@ void GraphExtractor::updateGvdGraph(const IndexVoxelQueue& update_info,
       }
 
       info.siblings.insert(niter->second);
-      gvd_->getNode(niter->second)->siblings.insert(iter->second);
+      gvd_.getNode(niter->second)->siblings.insert(iter->second);
     }
 
     if (info.siblings.empty()) {
@@ -611,213 +384,98 @@ void GraphExtractor::updateGvdGraph(const IndexVoxelQueue& update_info,
     }
 
     if (info.distance >= config.min_node_distance_m) {
-      compressNode(iter->second, info);
+      compressed_.add(iter->second, info);
     }
   }
 
   for (const auto& delete_info : to_delete) {
-    clearGvdIndex(delete_info.index);
-  }
-}
-
-GlobalIndex GraphExtractor::getCompressedIndex(const Eigen::Vector3d& point) const {
-  const Eigen::Vector3d scaled_point = point * compression_factor_;
-  return GlobalIndex(std::round(scaled_point(0)),
-                     std::round(scaled_point(1)),
-                     std::round(scaled_point(2)));
-}
-
-NodeId GraphExtractor::getPlaceId(uint64_t gvd_id) const {
-  return spark_dsg::NodeSymbol(next_node_id_.category(), gvd_id);
-}
-
-uint64_t GraphExtractor::getNextId() {
-  uint64_t new_id;
-  new_id = next_id_;
-  next_id_++;
-  return new_id;
-}
-
-std::optional<uint64_t> GraphExtractor::findCluster(
-    uint64_t node_id, const GvdMemberInfo& node, const std::set<uint64_t>& clusters) {
-  for (const auto cluster : clusters) {
-    CHECK(compressed_info_map_.count(cluster))
-        << "missing cluster: " << cluster << " from clusters: " << clusters;
-    const auto& info = compressed_info_map_.at(cluster);
-    if (info.active_refs.count(node_id)) {
-      // the current node can never be archived (has to be active to be visited by
-      // compressNode)
-      return cluster;
-    }
-
-    // we check if any siblings of this gvd voxel have been added to the compressed node
-    // already
-    // siblings can be archived (as they aren't necessarily visited by compressNode
-    for (const auto sibling : node.siblings) {
-      if (info.active_refs.count(sibling) || info.archived_refs.count(sibling)) {
-        return cluster;
-      }
-    }
-  }
-
-  return std::nullopt;
-}
-
-void GraphExtractor::mergeCompressedNodes(uint64_t curr_node_id,
-                                          CompressedNode& curr_node,
-                                          uint64_t neighbor_node_id) {
-  auto iter = compressed_info_map_.find(neighbor_node_id);
-  for (const auto child : iter->second.active_refs) {
-    compressed_remapping_[child] = curr_node_id;
-  }
-
-  for (const auto child : iter->second.archived_refs) {
-    compressed_remapping_[child] = curr_node_id;
-  }
-
-  if (iter->second.in_graph) {
-    const auto graph_id = getPlaceId(neighbor_node_id);
-    removeGraphNode(graph_id);
-    node_index_map_.erase(graph_id);
-  }
-
-  curr_node.merge(iter->second, compressed_info_map_);
-  compressed_info_map_.erase(iter);
-  compressed_id_map_.erase(neighbor_node_id);
-  updated_nodes_.erase(neighbor_node_id);
-  // neighbor probably shouldn't be a member of these, but...
-  to_archive_.erase(neighbor_node_id);
-  archived_node_ids_.erase(neighbor_node_id);
-}
-
-void GraphExtractor::compressNode(uint64_t node_id, const GvdMemberInfo& node) {
-  // get index via spatial hashing at (1 / desired_resolution)
-  const auto index = getCompressedIndex(node.position);
-
-  // add new hash to lookup if we don't have any nodes under the index
-  auto iter = compressed_index_map_.find(index);
-  if (iter == compressed_index_map_.end()) {
-    iter = compressed_index_map_.emplace(index, std::set<uint64_t>()).first;
-  }
-
-  auto cluster = findCluster(node_id, node, iter->second);
-  if (!cluster) {
-    const auto next_id = getNextId();
-    iter->second.insert(next_id);
-    compressed_id_map_.emplace(next_id, index);
-    cluster = next_id;
-
-    compressed_info_map_.emplace(next_id, CompressedNode(next_id));
-  }
-
-  // always insert an active ref and add to updated (attributes might update regardless
-  // if ref is new)
-  auto& info = compressed_info_map_.at(*cluster);
-  info.active_refs.insert(node_id);
-  compressed_remapping_[node_id] = *cluster;
-  updated_nodes_.insert(*cluster);
-
-  // construct edges by checking to see if any uncompressed neighbors map to a different
-  // compressed node
-  for (const auto neighbor : node.siblings) {
-    auto niter = compressed_remapping_.find(neighbor);
-    if (niter == compressed_remapping_.end()) {
-      continue;
-    }
-
-    if (niter->second == *cluster) {
-      continue;
-    }
-
-    if (iter->second.count(niter->second)) {
-      // voxel connected two neighboring clusters for the same index
-      iter->second.erase(niter->second);
-      mergeCompressedNodes(*cluster, info, niter->second);
-      continue;
-    }
-
-    info.addEdgeObservation(node_id, neighbor, niter->second);
-    compressed_info_map_.at(niter->second)
-        .addEdgeObservation(neighbor, node_id, *cluster);
+    clearIndex(delete_info.index);
   }
 }
 
 void GraphExtractor::assignCompressedNodeAttributes() {
-  for (const auto& compressed_id : updated_nodes_) {
-    auto& info = compressed_info_map_.at(compressed_id);
-
-    GvdMemberInfo* best_member = nullptr;
-    uint64_t best_id = 0;
-    for (const auto node_id : info.active_refs) {
-      CHECK(gvd_->hasNode(node_id)) << "Failed to get active node " << node_id
-                                    << " from compressed node " << compressed_id;
-      auto curr_member = gvd_->getNode(node_id);
-      CHECK(index_id_map_.count(curr_member->index))
-          << "active node doesn't point to index";
-      if (!best_member ||
-          curr_member->num_basis_points > best_member->num_basis_points) {
-        best_member = curr_member;
-        best_id = node_id;
-      }
+  for (const auto& compressed_id : compressed_.updated) {
+    auto& info = compressed_.nodes.at(compressed_id);
+    auto result = getBestMember(info, gvd_, *merge_policy_);
+    if (!result) {
+      LOG(WARNING) << "Empty compressed node encountered: " << compressed_id;
+      continue;
     }
 
-    bool best_is_archived = false;
-    for (const auto node_id : info.archived_refs) {
-      CHECK(gvd_->hasNode(node_id)) << "Failed to get archived node " << node_id
-                                    << " from compressed node " << compressed_id;
-      auto curr_member = gvd_->getNode(node_id);
-      if (!best_member ||
-          curr_member->num_basis_points > best_member->num_basis_points) {
-        best_is_archived = true;
-        best_member = curr_member;
-        best_id = node_id;
-      }
-    }
-
-    CHECK(best_member != nullptr);
-    info.best_gvd_id = best_id;
+    info.best_gvd_id = result.id;
     info.in_graph = true;
-
-    const auto graph_id = getPlaceId(compressed_id);
-    if (!best_is_archived) {
-      CHECK(index_id_map_.count(best_member->index))
-          << "best node doesn't point to index";
+    const auto graph_id = NodeSymbol(config.prefix, compressed_id);
+    if (!result.is_archived) {
       // avoid handing a bad index to graph compression
-      node_index_map_[graph_id] = best_member->index;
+      node_index_map_[graph_id] = result.info->index;
     }
 
-    if (nodes_.count(graph_id)) {
-      addGraphNode(graph_id);
+    auto attrs = std::make_unique<PlaceNodeAttributes>();
+    attrs->distance = result.info->distance;
+    attrs->num_basis_points = result.info->num_basis_points;
+    attrs->position = result.info->position;
+    graph_.update(graph_id, std::move(attrs));
+  }
+}
+
+void GraphExtractor::updateCompressedEdges(const GvdLayer& layer) {
+  for (const auto compressed_id : compressed_.updated) {
+    auto& info = compressed_.nodes.at(compressed_id);
+    const auto graph_id = NodeSymbol(config.prefix, compressed_id);
+    if (!node_index_map_.count(graph_id)) {
+      // this can happen when a node starts pointing to an archived gvd voxel
+      continue;
     }
 
-    auto& attrs = *nodes_.at(graph_id);
-    attrs.distance = best_member->distance;
-    attrs.num_basis_points = best_member->num_basis_points;
-    attrs.position = best_member->position;
+    for (const auto sibling : info.siblings) {
+      const NodeSymbol sibling_id(config.prefix, sibling);
+      if (!node_index_map_.count(sibling_id)) {
+        continue;  // sibling edge can't be updated
+      }
+
+      auto attrs = getFreespaceEdgeInfo(graph_,
+                                        layer,
+                                        node_index_map_,
+                                        graph_id,
+                                        sibling_id,
+                                        config.min_edge_distance_m,
+                                        false);
+      if (!attrs) {
+        graph_.remove(graph_id, sibling_id);
+        // TODO(nathan) track deleted
+        continue;
+      }
+
+      const EdgeKey key{graph_id, sibling_id};
+      graph_.update(graph_id, sibling_id, std::move(attrs));
+      // override heuristic edges with actual graph edges
+      overlap_edges_.erase(key);
+      freespace_edges_.erase(key);
+    }
   }
 }
 
 void GraphExtractor::mergeNearbyNodes() {
   std::unordered_map<uint64_t, uint64_t> merges;
   std::unordered_map<uint64_t, std::unordered_set<uint64_t>> reversed_merges;
-  for (const auto& compressed_id : updated_nodes_) {
+  for (const auto& compressed_id : compressed_.updated) {
     if (merges.count(compressed_id)) {
       continue;
     }
 
-    const auto& info = compressed_info_map_.at(compressed_id);
+    const auto& info = compressed_.nodes.at(compressed_id);
     if (!info.in_graph) {
       continue;
     }
 
     for (const auto sibling_id : info.siblings) {
-      const auto& sibling_info = compressed_info_map_.at(sibling_id);
+      const auto& sibling_info = compressed_.nodes.at(sibling_id);
       if (!sibling_info.in_graph) {
         continue;
       }
 
-      const auto gvd1 = gvd_->getNode(info.best_gvd_id);
-      const auto gvd2 = gvd_->getNode(sibling_info.best_gvd_id);
+      const auto gvd1 = gvd_.getNode(info.best_gvd_id);
+      const auto gvd2 = gvd_.getNode(sibling_info.best_gvd_id);
       if ((gvd1->position - gvd2->position).norm() > config.node_merge_distance_m) {
         continue;
       }
@@ -852,39 +510,98 @@ void GraphExtractor::mergeNearbyNodes() {
     }
   }
 
-  for (const auto& from_to_pair : merges) {
-    compressed_info_map_.at(from_to_pair.first).in_graph = false;
-    const auto to_merge = getPlaceId(from_to_pair.first);
+  for (const auto& [from, to] : merges) {
+    compressed_.nodes.at(from).in_graph = false;
+    const NodeSymbol to_merge(config.prefix, from);
     node_index_map_.erase(to_merge);
-    mergeGraphNodes(to_merge, getPlaceId(from_to_pair.second));
+    graph_.contract(to_merge, NodeSymbol(config.prefix, to));
   }
 }
 
-void GraphExtractor::updateCompressedEdges(const GvdLayer& layer) {
-  for (const auto& compressed_id : updated_nodes_) {
-    auto& info = compressed_info_map_.at(compressed_id);
-    const auto graph_id = getPlaceId(compressed_id);
-    if (!node_index_map_.count(graph_id)) {
-      // this can happen when a node starts pointing to an archived gvd voxel after a
-      // call to assignCompressedNodeAttributes
-      continue;
+void GraphExtractor::updateOverlapEdges() {
+  if (!config.overlap_edges.enable) {
+    return;
+  }
+
+  for (auto iter = overlap_edges_.begin(); iter != overlap_edges_.end();) {
+    const auto [source, target] = *iter;
+    if (!node_index_map_.count(source) && !node_index_map_.count(target)) {
+      // edge between archived nodes can be fixed
+      iter = overlap_edges_.erase(iter);
+    } else {
+      ++iter;
     }
+  }
 
-    for (const auto sibling_id : info.siblings) {
-      const auto sibling_graph_id = getPlaceId(sibling_id);
-      if (!node_index_map_.count(sibling_graph_id)) {
-        continue;  // sibling edge can't be updated
-      }
-
-      auto attrs = makeEdgeInfo(layer, graph_id, sibling_graph_id);
-      if (attrs->weight < config.min_edge_distance_m) {
-        removeGraphEdge(graph_id, sibling_id);
+  const auto threshold = config.overlap_edges.min_clearance_m;
+  for (auto source = graph_.nodes().begin(); source != graph_.nodes().end(); ++source) {
+    for (auto target = source; target != graph_.nodes().end(); ++target) {
+      if (source == target) {
         continue;
       }
 
-      updateGraphEdge(graph_id, sibling_graph_id, std::move(attrs));
+      EdgeKey key{source->first, target->first};
+      if (graph_.has(key.k1, key.k2) && !overlap_edges_.count(key)) {
+        continue;
+      }
+
+      auto info = getOverlapEdgeInfo(graph_, key.k1, key.k2, threshold);
+      if (info) {
+        graph_.update(key.k1, key.k2, std::move(info));
+        overlap_edges_.insert(key);
+      } else {
+        overlap_edges_.erase(key);
+        graph_.remove(key.k1, key.k2);
+      }
     }
   }
+}
+
+void GraphExtractor::updateFreespaceEdges(const GvdLayer& gvd) {
+  if (!config.freespace_edges.enable) {
+    return;
+  }
+
+  for (auto iter = freespace_edges_.begin(); iter != freespace_edges_.end();) {
+    const auto [source, target] = *iter;
+    if (!node_index_map_.count(source) && !node_index_map_.count(target)) {
+      iter = freespace_edges_.erase(iter);
+      continue;
+    }
+
+    auto info = getFreespaceEdgeInfo(graph_,
+                                     gvd,
+                                     node_index_map_,
+                                     source,
+                                     target,
+                                     config.freespace_edges.min_clearance_m,
+                                     true);
+    if (!info) {
+      graph_.remove(source, target);
+      iter = freespace_edges_.erase(iter);
+    } else {
+      graph_.update(source, target, std::move(info));
+      ++iter;
+    }
+  }
+
+  EdgeInfoMap proposed_edges;
+  findFreespaceEdges(config.freespace_edges,
+                     *graph_,
+                     gvd,
+                     active_nodes,
+                     node_index_map_,
+                     proposed_edges);
+
+  for (auto& [key, info] : proposed_edges) {
+    graph_.update(key.k1, key.k2, std::move(info));
+    freespace_edges_.insert(key);
+  }
+}
+
+void GraphExtractor::clearCompressionId(uint64_t node_id, bool is_delete) {
+  to_archive_.erase(node_id);
+  MLOG(2) << (is_delete ? "deleting " : "archiving ") << node_id;
 }
 
 }  // namespace hydra::places

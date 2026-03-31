@@ -35,30 +35,91 @@
 #include "hydra/places/gvd_places/graph_extractor_utilities.h"
 
 #include <config_utilities/config.h>
-#include <spark_dsg/graph_utilities.h>
 #include <spatial_hash/neighbor_utils.h>
 
-#include "hydra/utils/nearest_neighbor_utilities.h"
+#include <deque>
 
 namespace hydra::places {
 
 using spark_dsg::EdgeAttributes;
-using spark_dsg::EdgeContainer;
 using spark_dsg::EdgeKey;
 using spark_dsg::NodeId;
-using spark_dsg::PlaceNodeAttributes;
-using spark_dsg::graph_utilities::getConnectedComponents;
 
 using Components = std::vector<std::vector<NodeId>>;
 
-void declare_config(FreespaceEdgeConfig& conf) {
-  using namespace config;
-  name("FreespaceEdgeConfig");
-  field(conf.max_length_m, "max_length_m");
-  field(conf.num_nodes_to_check, "num_nodes_to_check");
-  field(conf.num_neighbors_to_find, "num_neighbors_to_find");
-  field(conf.min_clearance_m, "min_clearance_m");
+namespace {
+
+std::vector<NodeId> getComponent(const PlaceGraph& graph,
+                                 NodeId root,
+                                 std::unordered_set<NodeId>& seen) {
+  std::vector<NodeId> component;
+  std::deque<NodeId> frontier{root};
+  while (!frontier.empty()) {
+    const auto curr_id = frontier.front();
+    frontier.pop_front();
+    component.push_back(curr_id);
+    for (const auto neighbor : graph.neighbors(curr_id)) {
+      if (seen.count(neighbor)) {
+        continue;
+      }
+
+      frontier.push_back(neighbor);
+      seen.insert(neighbor);
+    }
+  }
+
+  return component;
 }
+
+Components findComponents(const PlaceGraph& graph) {
+  Components components;
+  std::unordered_set<NodeId> visited;
+  for (const auto& [node, _] : graph.nodes()) {
+    if (visited.count(node)) {
+      continue;
+    }
+
+    std::vector<NodeId> component;
+    visited.insert(node);
+    components.push_back(getComponent(graph, node, visited));
+  }
+
+  for (auto& c : components) {
+    std::sort(c.begin(), c.end(), [&](const NodeId& lhs, const NodeId& rhs) {
+      return graph.at(lhs)->distance > graph.at(rhs)->distance;
+    });
+  }
+
+  std::sort(components.begin(), components.end(), [](const auto& lhs, const auto& rhs) {
+    return lhs.size() > rhs.size();
+  });
+
+  return components;
+}
+
+std::optional<NodeId> getBestNode(const PlaceGraph& graph,
+                                  NodeId source,
+                                  const std::vector<NodeId>& candidates,
+                                  double max_distance_m) {
+  double best_dist = 0.0;
+  std::optional<NodeId> best_node;
+  const auto pos = graph.at(source)->position;
+  for (const auto& target : candidates) {
+    const auto dist = (pos - graph.at(target)->position).norm();
+    if (!best_node || dist < best_dist) {
+      best_node = target;
+      best_dist = dist;
+    }
+  }
+
+  if (best_node && best_dist > max_distance_m) {
+    best_node = std::nullopt;
+  }
+
+  return best_node;
+}
+
+}  // namespace
 
 // implementation loosely based on: https://gist.github.com/yamamushi/5823518
 GlobalIndices makeBresenhamLine(const GlobalIndex& start, const GlobalIndex& end) {
@@ -115,7 +176,7 @@ GlobalIndices makeBresenhamLine(const GlobalIndex& start, const GlobalIndex& end
   return line_points;
 }
 
-EdgeAttributes::Ptr getOverlapEdgeInfo(const NodeAttrMap& attrs,
+EdgeAttributes::Ptr getOverlapEdgeInfo(const PlaceGraph& graph,
                                        NodeId node,
                                        NodeId neighbor,
                                        double min_clearance) {
@@ -123,9 +184,9 @@ EdgeAttributes::Ptr getOverlapEdgeInfo(const NodeAttrMap& attrs,
     return nullptr;
   }
 
-  const auto r1 = attrs.at(node)->distance;
-  const auto r2 = attrs.at(neighbor)->distance;
-  const auto d = (attrs.at(node)->position - attrs.at(neighbor)->position).norm();
+  const auto r1 = graph.at(node)->distance;
+  const auto r2 = graph.at(neighbor)->distance;
+  const auto d = (graph.at(node)->position - graph.at(neighbor)->position).norm();
   if (d >= r1 + r2) {
     return nullptr;
   }
@@ -153,12 +214,13 @@ EdgeAttributes::Ptr getOverlapEdgeInfo(const NodeAttrMap& attrs,
   return std::make_unique<EdgeAttributes>(clearance);
 }
 
-EdgeAttributes::Ptr getFreespaceEdgeInfo(const NodeAttrMap& attrs,
+EdgeAttributes::Ptr getFreespaceEdgeInfo(const PlaceGraph& graph,
                                          const GvdLayer& gvd,
                                          const NodeIndexMap& node_index_map,
                                          NodeId node,
                                          NodeId other,
-                                         double min_clearance_m) {
+                                         double min_clearance_m,
+                                         bool optimistic) {
   const auto source = node_index_map.at(node);
   const auto target = node_index_map.at(other);
   const auto path = makeBresenhamLine(source, target);
@@ -166,12 +228,20 @@ EdgeAttributes::Ptr getFreespaceEdgeInfo(const NodeAttrMap& attrs,
     return nullptr;
   }
 
-  const auto source_dist = attrs.at(node)->distance;
-  const auto target_dist = attrs.at(other)->distance;
+  const auto source_dist = graph.at(node)->distance;
+  const auto target_dist = graph.at(other)->distance;
   auto min_weight = std::min(source_dist, target_dist);
   for (const auto& index : path) {
     const auto* voxel = gvd.getVoxelPtr(index);
-    if (!voxel || !voxel->observed || voxel->distance <= min_clearance_m) {
+    if (!voxel) {
+      if (optimistic) {
+        continue;  // assume that archived voxels remain free
+      } else {
+        return nullptr;
+      }
+    }
+
+    if (!voxel->observed || voxel->distance <= min_clearance_m) {
       return nullptr;
     }
 
@@ -183,67 +253,13 @@ EdgeAttributes::Ptr getFreespaceEdgeInfo(const NodeAttrMap& attrs,
   return std::make_unique<EdgeAttributes>(min_weight);
 }
 
-std::vector<NodeId> getComponent(const NodeAttrMap& nodes,
-                                 const EdgeContainer& edges,
-                                 NodeId root,
-                                 std::unordered_set<NodeId>& seen) {
-  std::vector<NodeId> component;
-  std::deque<NodeId> frontier{root};
-  while (!frontier.empty()) {
-    const auto curr_node = frontier.front();
-    frontier.pop_front();
-    component.push_back(curr_node);
-
-    for (const auto& [neighbor, _] : nodes) {
-      if (seen.count(neighbor)) {
-        continue;
-      }
-
-      if (!edges.contains(curr_node, neighbor)) {
-        continue;
-      }
-
-      frontier.push_back(neighbor);
-      seen.insert(neighbor);
-    }
-  }
-
-  return component;
-}
-
-Components findComponents(const NodeAttrMap& nodes, const EdgeContainer& edges) {
-  Components components;
-  std::unordered_set<NodeId> visited;
-  for (const auto& [node, _] : nodes) {
-    if (visited.count(node)) {
-      continue;
-    }
-
-    std::vector<NodeId> component;
-    visited.insert(node);
-    components.push_back(getComponent(nodes, edges, node, visited));
-  }
-
-  for (auto& c : components) {
-    std::sort(c.begin(), c.end(), [&](const NodeId& lhs, const NodeId& rhs) {
-      return nodes.at(lhs)->distance > nodes.at(rhs)->distance;
-    });
-  }
-
-  std::sort(components.begin(), components.end(), [](const auto& lhs, const auto& rhs) {
-    return lhs.size() > rhs.size();
-  });
-
-  return components;
-}
-
-void findFreespaceEdges(const FreespaceEdgeConfig& config,
-                        const NodeAttrMap& nodes,
-                        const EdgeContainer& edges,
+void findFreespaceEdges(const PlaceGraph& graph,
                         const GvdLayer& gvd,
                         const NodeIndexMap& indices,
+                        double max_length_m,
+                        double min_clearance_m,
                         EdgeInfoMap& proposed_edges) {
-  auto components = findComponents(nodes, edges);
+  auto components = findComponents(graph);
   if (components.size() <= 1) {
     return;  // nothing to do
   }
@@ -253,33 +269,19 @@ void findFreespaceEdges(const FreespaceEdgeConfig& config,
     const auto& component = components[i];
 
     bool inserted_edge = false;
-    for (size_t j = 0; j < config.num_nodes_to_check; ++j) {
-      if (j >= component.size()) {
-        break;
+    for (const auto& source : component) {
+      const auto target = getBestNode(graph, source, first_component, max_length_m);
+      if (!target || graph.has(source, *target)) {
+        continue;  // graph should never has edges connecting components, but...
       }
 
-      const NodeId node = component[j];
-      node_finder.find(getNodePosition(graph, node),
-                       config.num_neighbors_to_find,
-                       false,
-                       [&](NodeId other, size_t, double distance) {
-                         if (distance > config.max_length_m) {
-                           return;
-                         }
-
-                         if (graph.hasEdge(node, other)) {
-                           return;
-                         }
-
-                         auto info = getFreespaceEdgeInfo(
-                             graph, gvd, indices, node, other, config.min_clearance_m);
-                         inserted_edge |= info != nullptr;
-
-                         if (info) {
-                           proposed_edges.emplace(EdgeKey(node, other),
-                                                  std::move(info));
-                         }
-                       });
+      const EdgeKey key(source, *target);
+      auto info = getFreespaceEdgeInfo(
+          graph, gvd, indices, key.k1, key.k2, min_clearance_m, false);
+      inserted_edge |= info != nullptr;
+      if (info) {
+        proposed_edges.emplace(key, std::move(info));
+      }
     }
 
     if (inserted_edge) {

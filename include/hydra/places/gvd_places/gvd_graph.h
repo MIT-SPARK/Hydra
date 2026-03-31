@@ -47,7 +47,7 @@ namespace hydra::places {
 struct GvdMemberInfo {
   double distance = 0.0;
   uint8_t num_basis_points = 0;
-  Eigen::Vector3d position;
+  Eigen::Vector3f position;
   GlobalIndex index;
   std::set<uint64_t> siblings;
 };
@@ -61,7 +61,7 @@ class GvdGraph {
 
   bool empty() const;
 
-  uint64_t addNode(const Eigen::Vector3d& position, const GlobalIndex& index);
+  uint64_t addNode(const Eigen::Vector3f& position, const GlobalIndex& index);
 
   void removeNode(uint64_t node);
 

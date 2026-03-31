@@ -37,12 +37,13 @@
 
 #include <queue>
 
+#include "hydra/common/partial_graph.h"
 #include "hydra/places/gvd_places/compressed_node.h"
-#include "hydra/places/gvd_places/graph_extractor_utilities.h"
 #include "hydra/places/gvd_places/gvd_graph.h"
 #include "hydra/places/gvd_places/gvd_merge_policies.h"
 #include "hydra/places/gvd_places/gvd_voxel.h"
 #include "hydra/reconstruction/voxel_types.h"
+#include "hydra/utils/logging.h"
 
 namespace hydra::places {
 
@@ -60,7 +61,9 @@ class GraphExtractor {
   using Ptr = std::shared_ptr<GraphExtractor>;
   using NodeIndexMap = std::unordered_map<spark_dsg::NodeId, GlobalIndex>;
 
-  struct Config {
+  struct Config : VerbosityConfig {
+    //! Node prefix to use
+    char prefix = 'p';
     //! Average resolution of sparse graph
     double compression_distance_m = 0.5;
     //! Minimum distance for a GVD node to be considered for compression
@@ -73,125 +76,74 @@ class GraphExtractor {
     double node_merge_distance_m = 0.3;
     //! Merge policy
     std::string merge_policy = "basis_points";
-    //! Whether or not to add heuristic edges
-    bool add_heuristic_edges = false;
-    //! Add edges between nodes that have overlapping free-space regions
-    bool add_overlap_edges = true;
     //! Configuration for overlap-based edges
-    struct OverlapEdgeConfig {
+    struct OverlapEdges {
+      //! Turn on overlap-based edges
+      bool enable = true;
       //! Minimum radius to nearest obstacle for the free-space intersection
       double min_clearance_m = 0.4;
     } overlap_edges;
-    //! Add edges between disconnected components
-    bool add_freespace_edges = true;
     //! Configuration for freespace edges
-    FreespaceEdgeConfig freespace_edges;
+    struct FreespaceEdges {
+      //! Turn on freespace-based edges
+      bool enable = true;
+      //! Maximum edge length to project
+      double max_length_m = 2.0;
+      //! Number of nodes to check in a disconnected component for edge candidates
+      size_t num_nodes_to_check = 5;
+      //! Number of nearest neighbors to find in another disconnected component
+      size_t num_neighbors_to_find = 1;
+      //! Minimum distance to the nearest obstacle along an edge
+      double min_clearance_m = 0.5;
+    } freespace_edges;
+    Config() : VerbosityConfig("[graph_extraction] ") {}
   } const config;
 
   explicit GraphExtractor(const Config& config);
 
   virtual ~GraphExtractor();
 
-  void pushGvdIndex(const GlobalIndex& index);
+  void pushIndex(const GlobalIndex& index);
 
-  void clearGvdIndex(const GlobalIndex& index);
+  void clearIndex(const GlobalIndex& index);
 
-  void removeDistantIndex(const GlobalIndex& index);
+  void archiveIndex(const GlobalIndex& index);
 
   void extract(const GvdLayer& layer, uint64_t timestamp_ns);
 
   void fillParentInfo(const GvdLayer& gvd, const GvdParentTracker& parents);
 
-  const GvdGraph& getGvdGraph() const;
+  const GvdGraph& getGvdGraph() const { return gvd_; };
 
-  std::unordered_set<spark_dsg::NodeId> getActiveNodes() const;
-
-  const std::unordered_set<spark_dsg::NodeId>& getDeletedNodes() const;
-
-  const std::vector<spark_dsg::EdgeKey>& getDeletedEdges() const;
-
-  void clearDeleted();
-
-  const NodeIndexMap& getIndexMap() const;
-
-  const std::unordered_map<uint64_t, CompressedNode>& getCompressedNodeInfo() const;
-
-  const std::unordered_map<uint64_t, uint64_t>& getCompressedRemapping() const;
-
- protected:
-  spark_dsg::EdgeAttributes::Ptr makeEdgeInfo(const GvdLayer& layer,
-                                              spark_dsg::NodeId source_id,
-                                              spark_dsg::NodeId target_id) const;
-
-  GlobalIndex popFromModifiedQueue();
-
-  void removeGraphNode(spark_dsg::NodeId node);
-
-  void updateGraphEdge(spark_dsg::NodeId source,
-                       spark_dsg::NodeId target,
-                       spark_dsg::EdgeAttributes::Ptr&& attrs,
-                       bool is_heursitic = false);
-
-  void addGraphNode(spark_dsg::NodeId node,
-                    spark_dsg::PlaceNodeAttributes::Ptr&& attrs = nullptr);
-
-  void removeGraphEdge(spark_dsg::NodeId source, spark_dsg::NodeId target);
-
-  void mergeGraphNodes(spark_dsg::NodeId from, spark_dsg::NodeId to);
-
-  void updateOverlapEdges();
-
-  void updateFreespaceEdges(const GvdLayer& layer);
+ private:
+  void clearArchived();
 
   void fillSeenVoxels(const GvdLayer& layer,
                       uint64_t timestamp_ns,
                       IndexVoxelQueue& seen_voxels);
 
-  void updateNodeInfoMap(const GvdLayer& layer,
-                         const IndexVoxelQueue& update_info,
-                         uint64_t timestamp_ns);
-
-  void updateGvdGraph(const IndexVoxelQueue& update_info, uint64_t timestamp_ns);
-
-  void clearCompressionId(uint64_t node_id, bool is_delete);
-
-  GlobalIndex getCompressedIndex(const Eigen::Vector3d& point) const;
-
-  uint64_t getNextId();
-
-  spark_dsg::NodeId getPlaceId(uint64_t gvd_id) const;
-
-  void compressNode(uint64_t node_id, const GvdMemberInfo& node);
+  void updateGvdGraph(const GvdLayer& layer,
+                      const IndexVoxelQueue& update_info,
+                      uint64_t timestamp_ns);
 
   void assignCompressedNodeAttributes();
 
-  void mergeNearbyNodes();
-
   void updateCompressedEdges(const GvdLayer& layer);
 
-  void deleteChildren(const CompressedNode& info);
+  void mergeNearbyNodes();
 
-  void clearArchived();
+  void updateOverlapEdges();
 
-  void updateNode(const GlobalIndex& index,
-                  const Eigen::Vector3d& position,
-                  double distance,
-                  uint8_t num_basis_points);
+  void updateFreespaceEdges(const GvdLayer& layer);
 
-  std::optional<uint64_t> findCluster(uint64_t node_id,
-                                      const GvdMemberInfo& node,
-                                      const std::set<uint64_t>& clusters);
-
-  void mergeCompressedNodes(uint64_t curr_node_id,
-                            CompressedNode& curr_node,
-                            uint64_t neighbor_node_id);
+ private:
+  void clearCompressionId(uint64_t node_id, bool is_delete);
 
  protected:
-  spark_dsg::NodeSymbol next_node_id_;
-  GvdGraph::Ptr gvd_;
-
-  std::map<spark_dsg::NodeId, std::unique_ptr<spark_dsg::PlaceNodeAttributes>> nodes_;
-  spark_dsg::EdgeContainer edges_;
+  uint64_t next_id_;
+  GvdGraph gvd_;
+  CompressedGraph compressed_;
+  PartialGraph<spark_dsg::PlaceNodeAttributes> graph_;
 
   NodeIndexMap node_index_map_;
   std::queue<GlobalIndex> modified_voxel_queue_;
@@ -201,19 +153,10 @@ class GraphExtractor {
   std::unordered_set<spark_dsg::NodeId> deleted_nodes_;
   std::vector<spark_dsg::EdgeKey> deleted_edges_;
 
-  const double compression_factor_;
   GlobalIndexMap<uint64_t> index_id_map_;
   std::unique_ptr<MergePolicy> merge_policy_;
 
-  uint64_t next_id_;
-  std::unordered_set<uint64_t> updated_nodes_;
   std::unordered_set<uint64_t> to_archive_;
-
-  std::unordered_map<uint64_t, CompressedNode> compressed_info_map_;
-  GlobalIndexMap<std::set<uint64_t>> compressed_index_map_;
-  std::unordered_map<uint64_t, GlobalIndex> compressed_id_map_;
-  std::unordered_map<uint64_t, uint64_t> compressed_remapping_;
-
   std::unordered_set<spark_dsg::NodeId> archived_node_ids_;
 };
 

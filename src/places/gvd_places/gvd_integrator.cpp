@@ -258,7 +258,7 @@ void GvdIntegrator::archiveBlocks(const BlockIndices& blocks,
 
       const GlobalIndex global_index = block->getGlobalVoxelIndex(v);
       if (graph_extractor) {
-        graph_extractor->removeDistantIndex(global_index);
+        graph_extractor->archiveIndex(global_index);
       }
 
       parent_tracker_.removeVoronoiFromGvdParentMap(global_index);
@@ -293,7 +293,7 @@ void GvdIntegrator::updateGvdVoxel(const GlobalIndex& voxel_index,
   // pushes the new gvd member to the graph extractor on the first instance that the
   // voxel is observed
   if (graph_extractor && voxel.num_extra_basis == 1) {
-    graph_extractor->pushGvdIndex(voxel_index);
+    graph_extractor->pushIndex(voxel_index);
   }
 }
 
@@ -303,7 +303,7 @@ void GvdIntegrator::clearGvdVoxel(const GlobalIndex& index,
   if (voxel.num_extra_basis) {
     // TODO(nathan) rethink how clearing voxels from graph extractor works
     if (graph_extractor) {
-      graph_extractor->clearGvdIndex(index);
+      graph_extractor->clearIndex(index);
     }
 
     parent_tracker_.removeVoronoiFromGvdParentMap(index);

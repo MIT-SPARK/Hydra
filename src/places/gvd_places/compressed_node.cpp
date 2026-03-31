@@ -34,6 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/gvd_places/compressed_node.h"
 
+#include "hydra/places/gvd_places/gvd_graph.h"
+
 namespace hydra::places {
 
 CompressedNode::CompressedNode(uint64_t id) : node_id(id) {}
@@ -58,13 +60,11 @@ void CompressedNode::addEdgeObservation(uint64_t gvd_id,
 }
 
 bool CompressedNode::removeEdgeObservation(uint64_t gvd_id, uint64_t neighbor_gvd_id) {
-  // these both should be gauranteed to work, but we use find to make erase more
-  // efficient
+  // these both should work, but we use find to make erase more efficient
   auto& connections = sibling_support.at(gvd_id);
   auto iter = connections.find(neighbor_gvd_id);
 
-  // first decrement the ref count for the sibling and drop the sibling if no longer
-  // connected
+  // decrement the ref count for the sibling and drop the sibling if no longer connected
   auto& ref_count = sibling_ref_counts.at(iter->second);
   ref_count--;
   bool deleted_sibling = ref_count == 0;
@@ -149,6 +149,149 @@ void CompressedNode::merge(CompressedNode& other, CompressedNodeMap& nodes) {
   for (auto sibling : other.siblings) {
     nodes.at(sibling).mergeObservations(other.node_id, node_id);
   }
+}
+
+CompressedGraph::CompressedGraph(float resolution_m) : next_id(0), grid(resolution_m) {}
+
+void CompressedGraph::add(uint64_t gvd_id, const GvdMemberInfo& node) {
+  const auto index = grid.toIndex(node.position);
+  auto iter = index_map.find(index);
+  if (iter == index_map.end()) {
+    // add new hash to lookup if we don't have any nodes under the index
+    iter = index_map.emplace(index, std::set<uint64_t>()).first;
+  }
+
+  std::optional<uint64_t> cluster;
+  for (const auto curr_id : iter->second) {
+    const auto& info = nodes.at(curr_id);
+    if (info.active_refs.count(gvd_id)) {
+      cluster = curr_id;
+      break;
+    }
+
+    for (const auto sibling : node.siblings) {
+      if (info.active_refs.count(sibling) || info.archived_refs.count(sibling)) {
+        cluster = curr_id;
+        break;
+      }
+    }
+  }
+
+  if (!cluster) {
+    iter->second.insert(next_id);
+    id_map.emplace(next_id, index);
+    nodes.emplace(next_id, CompressedNode(next_id));
+    cluster = next_id;
+    ++next_id;
+  }
+
+  // always insert an active ref and add to updated (attributes might update regardless
+  // if ref is new)
+  auto& info = nodes.at(*cluster);
+  info.active_refs.insert(gvd_id);
+  remapping[gvd_id] = *cluster;
+  updated.insert(*cluster);
+
+  // construct edges by checking to see if any uncompressed neighbors map to a different
+  // compressed node
+  for (const auto neighbor : node.siblings) {
+    auto niter = remapping.find(neighbor);
+    if (niter == remapping.end()) {
+      continue;
+    }
+
+    if (niter->second == *cluster) {
+      continue;
+    }
+
+    if (iter->second.count(niter->second)) {
+      // voxel connected two neighboring clusters for the same index
+      iter->second.erase(niter->second);
+      merge(*cluster, info, niter->second);
+      continue;
+    }
+
+    info.addEdgeObservation(gvd_id, neighbor, niter->second);
+    nodes.at(niter->second).addEdgeObservation(neighbor, gvd_id, *cluster);
+  }
+}
+
+CompressedGraph::DeleteResult CompressedGraph::remove(uint64_t gvd_id,
+                                                      bool is_archive) {
+  uint64_t node_id;
+  {  // scope limiting iter lifetime
+    auto iter = remapping.find(gvd_id);
+    if (iter == remapping.end()) {
+      return {};  // nothing to do if voxel wasn't compressed
+    }
+
+    node_id = iter->second;
+    remapping.erase(iter);
+  }
+
+  auto iter = nodes.find(node_id);
+  auto& node = iter->second;
+
+  DeleteResult result;
+  result.id = node_id;
+  result.was_best_id = gvd_id == node.best_gvd_id;
+  result.cleared_neighbors = node.removeEdgeObservations(gvd_id, nodes);
+
+  node.active_refs.erase(gvd_id);
+  if (is_archive) {
+    node.archived_refs.insert(gvd_id);
+  }
+
+  result.has_active = node.active_refs.empty();
+  result.has_archived = !node.archived_refs.empty();
+  if (result.has_active) {
+    return result;
+  }
+
+  // clear mapping between compression index and node id
+  {  // erase node entry from compression cell and erase compression cell
+    const auto& index = id_map.at(node_id);
+    auto iter = index_map.find(index);
+    iter->second.erase(node_id);
+    if (iter->second.empty()) {
+      index_map.erase(iter);
+    }
+  }
+
+  id_map.erase(node_id);
+  for (const auto sibling : node.siblings) {
+    nodes.at(sibling).siblings.erase(node_id);
+  }
+
+  nodes.erase(iter);
+  return result;
+}
+
+void CompressedGraph::merge(uint64_t curr_node_id,
+                            CompressedNode& curr_node,
+                            uint64_t neighbor_node_id) {
+  auto iter = nodes.find(neighbor_node_id);
+  for (const auto child : iter->second.active_refs) {
+    remapping[child] = curr_node_id;
+  }
+
+  for (const auto child : iter->second.archived_refs) {
+    remapping[child] = curr_node_id;
+  }
+
+  if (iter->second.in_graph) {
+    const NodeSymbol graph_id(config.prefix, neighbor_node_id);
+    removeGraphNode(graph_id);
+    node_index_map_.erase(graph_id);
+  }
+
+  curr_node.merge(iter->second, nodes);
+  nodes.erase(iter);
+  id_map.erase(neighbor_node_id);
+
+  updated.erase(neighbor_node_id);
+  to_archive_.erase(neighbor_node_id);
+  archived_node_ids_.erase(neighbor_node_id);
 }
 
 }  // namespace hydra::places

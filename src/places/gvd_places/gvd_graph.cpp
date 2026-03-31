@@ -40,7 +40,7 @@ GvdGraph::GvdGraph() : next_id_(0) {}
 
 bool GvdGraph::empty() const { return nodes_.empty(); }
 
-uint64_t GvdGraph::addNode(const Eigen::Vector3d& position, const GlobalIndex& index) {
+uint64_t GvdGraph::addNode(const Eigen::Vector3f& position, const GlobalIndex& index) {
   // position can't change ever (so we only ever set it when adding)
   GvdMemberInfo info;
   info.position = position;
