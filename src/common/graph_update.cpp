@@ -123,9 +123,14 @@ void GraphUpdater::addNode(DynamicSceneGraph& graph,
                            bool mark_active,
                            std::map<NodeId, const NodeAttributes*>& active_targets) {
   std::optional<NodeId> to_merge;
-  for (const auto& [target_id, target_attrs] : active_targets) {
-    if (tracker.matcher && tracker.matcher->match(*entry.attributes, *target_attrs)) {
-      to_merge = target_id;
+  const auto target_layer = graph.findLayer(target_layer_id);
+  for (const auto& [node_id, node] : target_layer->nodes()) {
+    auto& attrs = node->attributes();
+    if (!attrs.is_active) {
+      continue;
+    }
+    if (tracker.matcher && tracker.matcher->match(*entry.attributes, attrs)) {
+      to_merge = node_id;
       break;
     }
   }
@@ -144,7 +149,6 @@ void GraphUpdater::addNode(DynamicSceneGraph& graph,
   if (mark_active) {
     attrs->is_active = true;
   }
-
   const NodeId new_id = tracker.next_id;
   VLOG(5) << "Emplacing " << tracker.next_id.str() << " @ " << target_layer_id
           << " for layer " << source_layer_id;
@@ -165,7 +169,7 @@ void GraphUpdater::deleteNode(const NodeUpdate& entry,
   }
   const auto map_iter = tracker.track_to_node.find(*entry.track_id);
   if (map_iter == tracker.track_to_node.end()) {
-    LOG(WARNING) << "Delete for unknown track_id " << *entry.track_id;
+    VLOG(5) << "Delete for unknown track_id " << *entry.track_id;
     return;
   }
   graph.removeNode(map_iter->second);
@@ -185,8 +189,6 @@ bool GraphUpdater::updateNode(const NodeUpdate& entry,
     graph.setNodeAttributes(map_iter->second, std::move(updated));
     return true;
   }
-  VLOG(5) << "Update for track_id " << *entry.track_id
-          << " with no prior node; adding new node";
   return false;
 }
 
@@ -218,27 +220,17 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
     const auto target_layer_id = tracker.config.target_layer.value_or(layer_id);
 
     std::map<NodeId, const NodeAttributes*> active_targets;
-    const auto target_layer = graph.findLayer(target_layer_id);
-    if (tracker.matcher && target_layer) {
-      for (const auto& [node_id, node] : target_layer->nodes()) {
-        auto& attrs = node->attributes();
-        if (attrs.is_active) {
-          active_targets[node_id] = &attrs;
-        }
-      }
-    }
-
     for (auto&& entry : layer_update->updates) {
-      if (!entry.attributes) {
-        LOG(WARNING) << "Update graph update missing attributes";
-        continue;
-      }
       switch (entry.update_type) {
         case NodeUpdate::UpdateType::Delete: {
           deleteNode(entry, tracker, graph);
           break;
         }
-        case NodeUpdate::UpdateType::Update: {
+        case NodeUpdate::UpdateType::UpdateOrAdd: {
+          if (!entry.attributes) {
+            LOG(WARNING) << "Update graph update missing attributes";
+            break;
+          }
           if (!updateNode(entry, tracker, graph)) {
             addNode(graph,
                     tracker,
@@ -248,16 +240,6 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
                     config.mark_active,
                     active_targets);
           }
-          break;
-        }
-        case NodeUpdate::UpdateType::Add: {
-          addNode(graph,
-                  tracker,
-                  target_layer_id,
-                  layer_id,
-                  entry,
-                  config.mark_active,
-                  active_targets);
           break;
         }
       }
