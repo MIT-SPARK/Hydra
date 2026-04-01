@@ -144,7 +144,6 @@ void GraphUpdater::addNode(DynamicSceneGraph& graph,
   if (mark_active) {
     attrs->is_active = true;
   }
-
   const NodeId new_id = tracker.next_id;
   VLOG(5) << "Emplacing " << tracker.next_id.str() << " @ " << target_layer_id
           << " for layer " << source_layer_id;
@@ -227,16 +226,16 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
     }
 
     for (auto&& entry : layer_update->updates) {
-      if (!entry.attributes) {
-        LOG(WARNING) << "Update graph update missing attributes";
-        continue;
-      }
       switch (entry.update_type) {
         case NodeUpdate::UpdateType::Delete: {
           deleteNode(entry, tracker, graph);
           break;
         }
         case NodeUpdate::UpdateType::UpdateOrAdd: {
+          if (!entry.attributes) {
+            LOG(WARNING) << "Update graph update missing attributes";
+            break;
+          }
           if (!updateNode(entry, tracker, graph)) {
             addNode(graph,
                     tracker,
