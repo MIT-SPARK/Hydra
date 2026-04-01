@@ -55,7 +55,10 @@ struct NodeUpdate {
 
   std::optional<size_t> track_id;
 
-  enum class UpdateType { UpdateOrAdd, Delete } const update_type = UpdateType::UpdateOrAdd;
+  enum class UpdateType {
+    UpdateOrAdd,
+    Delete
+  } const update_type = UpdateType::UpdateOrAdd;
 };
 
 struct LayerUpdate {
