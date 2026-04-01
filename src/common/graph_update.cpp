@@ -169,7 +169,7 @@ void GraphUpdater::deleteNode(const NodeUpdate& entry,
   }
   const auto map_iter = tracker.track_to_node.find(*entry.track_id);
   if (map_iter == tracker.track_to_node.end()) {
-    LOG(5) << "Delete for unknown track_id " << *entry.track_id;
+    VLOG(5) << "Delete for unknown track_id " << *entry.track_id;
     return;
   }
   graph.removeNode(map_iter->second);
