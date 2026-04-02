@@ -42,8 +42,6 @@
 
 #include <algorithm>
 
-#include "hydra/common/config_utilities.h"
-
 namespace YAML {
 
 template <typename T>
@@ -119,9 +117,7 @@ void GraphUpdater::addNode(DynamicSceneGraph& graph,
                            LayerTracker& tracker,
                            LayerId target_layer_id,
                            LayerId source_layer_id,
-                           const NodeUpdate& entry,
-                           bool mark_active,
-                           std::map<NodeId, const NodeAttributes*>& active_targets) {
+                           const NodeUpdate& entry) {
   std::optional<NodeId> to_merge;
   const auto target_layer = graph.findLayer(target_layer_id);
   for (const auto& [node_id, node] : target_layer->nodes()) {
@@ -129,6 +125,7 @@ void GraphUpdater::addNode(DynamicSceneGraph& graph,
     if (!attrs.is_active) {
       continue;
     }
+
     if (tracker.matcher && tracker.matcher->match(*entry.attributes, attrs)) {
       to_merge = node_id;
       break;
@@ -141,14 +138,17 @@ void GraphUpdater::addNode(DynamicSceneGraph& graph,
     if (entry.track_id) {
       tracker.track_to_node[*entry.track_id] = *to_merge;
     }
+
     // TODO(nathan) actual merge attributes
+
     return;
   }
 
   auto attrs = entry.attributes->clone();
-  if (mark_active) {
+  if (config.mark_active) {
     attrs->is_active = true;
   }
+
   const NodeId new_id = tracker.next_id;
   VLOG(5) << "Emplacing " << tracker.next_id.str() << " @ " << target_layer_id
           << " for layer " << source_layer_id;
@@ -156,6 +156,7 @@ void GraphUpdater::addNode(DynamicSceneGraph& graph,
   if (entry.track_id) {
     tracker.track_to_node[*entry.track_id] = new_id;
   }
+
   ++tracker.next_id;
   return;
 }
@@ -167,11 +168,13 @@ void GraphUpdater::deleteNode(const NodeUpdate& entry,
     LOG(WARNING) << "Delete graph update missing track_id";
     return;
   }
+
   const auto map_iter = tracker.track_to_node.find(*entry.track_id);
   if (map_iter == tracker.track_to_node.end()) {
     VLOG(5) << "Delete for unknown track_id " << *entry.track_id;
     return;
   }
+
   graph.removeNode(map_iter->second);
   tracker.track_to_node.erase(map_iter);
   return;
@@ -186,9 +189,11 @@ bool GraphUpdater::updateNode(const NodeUpdate& entry,
     if (config.mark_active) {
       updated->is_active = true;
     }
+
     graph.setNodeAttributes(map_iter->second, std::move(updated));
     return true;
   }
+
   return false;
 }
 
@@ -232,13 +237,7 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
             break;
           }
           if (!updateNode(entry, tracker, graph)) {
-            addNode(graph,
-                    tracker,
-                    target_layer_id,
-                    layer_id,
-                    entry,
-                    config.mark_active,
-                    active_targets);
+            addNode(graph, tracker, target_layer_id, layer_id, entry);
           }
           break;
         }

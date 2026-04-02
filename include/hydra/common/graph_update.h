@@ -38,7 +38,6 @@
 #include <spark_dsg/node_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
-#include <limits>
 #include <list>
 #include <map>
 #include <memory>
@@ -102,14 +101,11 @@ struct GraphUpdater {
  private:
   std::map<std::string, LayerTracker> trackers_;
 
-  void addNode(
-      spark_dsg::DynamicSceneGraph& graph,
-      LayerTracker& tracker,
-      spark_dsg::LayerId target_layer_id,
-      spark_dsg::LayerId source_layer_id,
-      const NodeUpdate& entry,
-      bool mark_active,
-      std::map<spark_dsg::NodeId, const spark_dsg::NodeAttributes*>& active_targets);
+  void addNode(spark_dsg::DynamicSceneGraph& graph,
+               LayerTracker& tracker,
+               spark_dsg::LayerId target_layer_id,
+               spark_dsg::LayerId source_layer_id,
+               const NodeUpdate& entry);
 
   bool updateNode(const NodeUpdate& entry,
                   LayerTracker& tracker,
