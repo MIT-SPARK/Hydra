@@ -78,6 +78,8 @@ class PartialGraph {
 
   const std::map<NodeId, Node>& nodes() const { return nodes_; }
 
+  size_t num_nodes() const { return nodes_.size(); }
+
  private:
   Node* find(NodeId node);
 

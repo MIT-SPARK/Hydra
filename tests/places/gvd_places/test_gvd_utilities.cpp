@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/places/gvd_utilities.h>
+#include <hydra/places/gvd_places/gvd_utilities.h>
 
 namespace hydra::places {
 
@@ -76,7 +76,7 @@ GvdVoxelWithIndex makeGvdVoxel(uint64_t x,
 VoronoiCheckConfig makeL1Config(double min_distance_m = 0.1,
                                 double min_l1_separation = 3.0) {
   VoronoiCheckConfig config;
-  config.mode = ParentUniquenessMode::L1_DISTANCE;
+  config.mode = VoronoiCheckConfig::Mode::L1_DISTANCE;
   config.min_distance_m = min_distance_m;
   config.parent_l1_separation = min_l1_separation;
   return config;
@@ -85,7 +85,7 @@ VoronoiCheckConfig makeL1Config(double min_distance_m = 0.1,
 VoronoiCheckConfig makeAngleConfig(double min_distance_m = 0.1,
                                    double max_cos_separation = 0.5) {
   VoronoiCheckConfig config;
-  config.mode = ParentUniquenessMode::ANGLE;
+  config.mode = VoronoiCheckConfig::Mode::ANGLE;
   config.min_distance_m = min_distance_m;
   config.parent_cos_angle_separation = max_cos_separation;
   return config;
@@ -95,7 +95,7 @@ VoronoiCheckConfig makeL1AndAngleConfig(double min_distance_m = 0.1,
                                         double min_l1_separation = 3.0,
                                         double max_cos_separation = 0.5) {
   VoronoiCheckConfig config;
-  config.mode = ParentUniquenessMode::L1_THEN_ANGLE;
+  config.mode = VoronoiCheckConfig::Mode::L1_THEN_ANGLE;
   config.min_distance_m = min_distance_m;
   config.parent_l1_separation = min_l1_separation;
   config.parent_cos_angle_separation = max_cos_separation;

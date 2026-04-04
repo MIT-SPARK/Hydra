@@ -33,9 +33,13 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/places/graph_extractor.h>
+#include <hydra/places/gvd_places/graph_extractor.h>
 
 namespace hydra::places {
+
+using spark_dsg::operator"" _id;
+using spark_dsg::NodeId;
+using spark_dsg::PlaceNodeAttributes;
 
 namespace {
 
@@ -47,42 +51,57 @@ class TestGraphExtractor : public GraphExtractor {
   void assignCompressedNodeAttributes(bool clear_active = true) {
     GraphExtractor::assignCompressedNodeAttributes();
     if (clear_active) {
-      updated_nodes_.clear();
+      compressed_.updated.clear();
     }
   }
 
+  const CompressedGraph& compressed() const { return compressed_; }
+
   using GraphExtractor::clearArchived;
-  using GraphExtractor::updateGvdGraph;
-  using GraphExtractor::updateNode;
-
-  using GraphExtractor::compressed_id_map_;
-  using GraphExtractor::compressed_index_map_;
-  using GraphExtractor::compressed_info_map_;
-  using GraphExtractor::compressed_remapping_;
   using GraphExtractor::to_archive_;
-  using GraphExtractor::updated_nodes_;
+  using GraphExtractor::updateGvdGraph;
 
-  void setGvdNode(
-      uint64_t x, uint64_t y, uint64_t z, double distance, uint8_t num_basis) {
+  void setGvdNode(uint64_t x, uint64_t y, uint64_t z, double distance, uint8_t basis) {
     const GlobalIndex index(x, y, z);
-    const Eigen::Vector3d position(x, y, z);
-    updateNode(index, position, distance, num_basis);
+    const Eigen::Vector3f position(x, y, z);
+
+    auto iter = index_id_map_.find(index);
+    if (iter == index_id_map_.end()) {
+      const auto next_id = gvd_.addNode(position, index);
+      iter = index_id_map_.emplace(index, next_id).first;
+    }
+
+    auto& info = *gvd_.getNode(iter->second);
+    info.distance = distance;
+    info.num_basis_points = basis;
   }
 };
 
 using Remapping = std::unordered_map<uint64_t, uint64_t>;
+using PlacesGraph = PartialGraph<PlaceNodeAttributes>;
+
+void checkNode(const PlacesGraph& graph,
+               NodeId node_id,
+               const Eigen::Vector3d& p_expected,
+               double d_expected,
+               uint8_t expected_basis) {
+  const auto attrs = graph.at(node_id);
+  ASSERT_TRUE(attrs);
+  EXPECT_NEAR((attrs->position - p_expected).norm(), 0.0, 1.0e-9);
+  EXPECT_EQ(attrs->distance, d_expected);
+  EXPECT_EQ(attrs->num_basis_points, expected_basis);
+}
 
 }  // namespace
 
-class CompressionGraphExtractorTestFixture : public ::testing::Test {
+class GraphExtractorFixture : public ::testing::Test {
  public:
-  CompressionGraphExtractorTestFixture() = default;
-  virtual ~CompressionGraphExtractorTestFixture() = default;
+  GraphExtractorFixture() : ::testing::Test(), gvd_layer(1.0, 16) {}
+  virtual ~GraphExtractorFixture() = default;
 
   virtual void SetUp() override {
-    gvd_layer.reset(new GvdLayer(1.0, 16));
     const auto block_index = BlockIndex::Zero();
-    auto gvd_block = gvd_layer->allocateBlockPtr(block_index);
+    auto gvd_block = gvd_layer.allocateBlockPtr(block_index);
     for (size_t i = 0; i < gvd_block->numVoxels(); ++i) {
       auto& voxel = gvd_block->getVoxel(i);
       voxel.distance = 0.3;
@@ -90,13 +109,13 @@ class CompressionGraphExtractorTestFixture : public ::testing::Test {
     }
   }
 
-  GvdLayer::Ptr gvd_layer;
+  GvdLayer gvd_layer;
 };
 
-TEST_F(CompressionGraphExtractorTestFixture, TestUpdateNode) {
+TEST_F(GraphExtractorFixture, TestUpdateNode) {
   GraphExtractor::Config config;
   TestGraphExtractor extractor(config);
-  const auto& gvd = extractor.getGvdGraph();
+  const auto& gvd = extractor.gvd_graph();
 
   EXPECT_TRUE(gvd.empty());
 
@@ -112,7 +131,7 @@ TEST_F(CompressionGraphExtractorTestFixture, TestUpdateNode) {
   {
     const auto info = gvd.getNode(0);
     ASSERT_TRUE(info != nullptr);
-    EXPECT_NEAR((info->position - Eigen::Vector3d(0, 0, 1)).norm(), 0.0, 1.0e-9);
+    EXPECT_NEAR((info->position - Eigen::Vector3f(0, 0, 1)).norm(), 0.0, 1.0e-9);
     EXPECT_EQ(info->distance, 0.1);
     EXPECT_EQ(info->num_basis_points, 1u);
   }
@@ -120,7 +139,7 @@ TEST_F(CompressionGraphExtractorTestFixture, TestUpdateNode) {
   {
     const auto info = gvd.getNode(1);
     ASSERT_TRUE(info != nullptr);
-    EXPECT_NEAR((info->position - Eigen::Vector3d(0, 0, 2)).norm(), 0.0, 1.0e-9);
+    EXPECT_NEAR((info->position - Eigen::Vector3f(0, 0, 2)).norm(), 0.0, 1.0e-9);
     EXPECT_EQ(info->distance, 0.2);
     EXPECT_EQ(info->num_basis_points, 2u);
   }
@@ -130,17 +149,17 @@ TEST_F(CompressionGraphExtractorTestFixture, TestUpdateNode) {
   {
     const auto info = gvd.getNode(1);
     ASSERT_TRUE(info != nullptr);
-    EXPECT_NEAR((info->position - Eigen::Vector3d(0, 0, 2)).norm(), 0.0, 1.0e-9);
+    EXPECT_NEAR((info->position - Eigen::Vector3f(0, 0, 2)).norm(), 0.0, 1.0e-9);
     EXPECT_EQ(info->distance, 0.3);
     EXPECT_EQ(info->num_basis_points, 2u);
   }
 }
 
-TEST_F(CompressionGraphExtractorTestFixture, testUpdateGraph) {
+TEST_F(GraphExtractorFixture, testUpdateGraph) {
   GraphExtractor::Config config;
   config.min_node_distance_m = 0.0;
   TestGraphExtractor extractor(config);
-  const auto& gvd = extractor.getGvdGraph();
+  const auto& gvd = extractor.gvd_graph();
 
   EXPECT_TRUE(gvd.empty());
 
@@ -150,7 +169,6 @@ TEST_F(CompressionGraphExtractorTestFixture, testUpdateGraph) {
   extractor.setGvdNode(0, 1, 0, 0.1, 1);
   EXPECT_EQ(gvd.nodes().size(), 4u);
 
-  // updateGvdGraph doesn't use voxel pointers, so nullptr is safe here
   // we also add 0, 0, 5 for test coverage (to simulate pruning)
   IndexVoxelQueue updated{{GlobalIndex(0, 0, 1), nullptr},
                           {GlobalIndex(0, 0, 2), nullptr},
@@ -158,7 +176,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testUpdateGraph) {
                           {GlobalIndex(0, 0, 4), nullptr},
                           {GlobalIndex(0, 0, 5), nullptr}};
 
-  extractor.updateGvdGraph(updated, 0);
+  extractor.updateGvdGraph(gvd_layer, updated, 0);
 
   EXPECT_EQ(gvd.nodes().size(), 3u);
   EXPECT_TRUE(gvd.hasNode(0));
@@ -185,16 +203,16 @@ TEST_F(CompressionGraphExtractorTestFixture, testUpdateGraph) {
   }
 
   Remapping expected_remapping{{0, 0}, {1, 1}, {3, 2}};
-  EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
+  EXPECT_EQ(extractor.compressed().remapping, expected_remapping);
 
-  ASSERT_TRUE(extractor.compressed_info_map_.count(0));
-  ASSERT_TRUE(extractor.compressed_info_map_.count(1));
-  ASSERT_TRUE(extractor.compressed_info_map_.count(2));
+  ASSERT_TRUE(extractor.compressed().nodes.count(0));
+  ASSERT_TRUE(extractor.compressed().nodes.count(1));
+  ASSERT_TRUE(extractor.compressed().nodes.count(2));
 
   {
     const std::set<uint64_t> expected_siblings{1, 2};
     const std::set<uint64_t> expected_active_refs{0};
-    const auto& info = extractor.compressed_info_map_.at(0);
+    const auto& info = extractor.compressed().nodes.at(0);
     EXPECT_EQ(info.siblings, expected_siblings);
     EXPECT_EQ(info.active_refs, expected_active_refs);
     EXPECT_TRUE(info.archived_refs.empty());
@@ -203,7 +221,7 @@ TEST_F(CompressionGraphExtractorTestFixture, testUpdateGraph) {
   {
     const std::set<uint64_t> expected_siblings{0};
     const std::set<uint64_t> expected_active_refs{1};
-    const auto& info = extractor.compressed_info_map_.at(1);
+    const auto& info = extractor.compressed().nodes.at(1);
     EXPECT_EQ(info.siblings, expected_siblings);
     EXPECT_EQ(info.active_refs, expected_active_refs);
     EXPECT_TRUE(info.archived_refs.empty());
@@ -212,19 +230,19 @@ TEST_F(CompressionGraphExtractorTestFixture, testUpdateGraph) {
   {
     const std::set<uint64_t> expected_siblings{0};
     const std::set<uint64_t> expected_active_refs{3};
-    const auto& info = extractor.compressed_info_map_.at(2);
+    const auto& info = extractor.compressed().nodes.at(2);
     EXPECT_EQ(info.siblings, expected_siblings);
     EXPECT_EQ(info.active_refs, expected_active_refs);
     EXPECT_TRUE(info.archived_refs.empty());
   }
 }
 
-TEST_F(CompressionGraphExtractorTestFixture, testAttributeAssignmentOneToOne) {
+TEST_F(GraphExtractorFixture, testAttributeAssignmentOneToOne) {
   GraphExtractor::Config config;
   config.min_node_distance_m = 0.0;
 
   TestGraphExtractor extractor(config);
-  const auto& gvd = extractor.getGvdGraph();
+  const auto& gvd = extractor.gvd_graph();
 
   EXPECT_TRUE(gvd.empty());
 
@@ -234,57 +252,31 @@ TEST_F(CompressionGraphExtractorTestFixture, testAttributeAssignmentOneToOne) {
   extractor.setGvdNode(0, 1, 0, 0.4, 4);
   EXPECT_EQ(gvd.nodes().size(), 4u);
 
-  // updateGvdGraph doesn't use voxel pointers, so nullptr is safe here
   IndexVoxelQueue updated{{GlobalIndex(0, 0, 1), nullptr},
                           {GlobalIndex(0, 0, 2), nullptr},
                           {GlobalIndex(0, 1, 0), nullptr},
                           {GlobalIndex(0, 0, 4), nullptr}};
 
-  extractor.updateGvdGraph(updated, 0);
+  extractor.updateGvdGraph(gvd_layer, updated, 0);
   extractor.assignCompressedNodeAttributes();
 
-  const auto& places = extractor.getGraph();
-  EXPECT_EQ(places.numNodes(), 3u);
+  const auto& places = extractor.graph();
+  EXPECT_EQ(places.num_nodes(), 3u);
 
-  ASSERT_TRUE(places.hasNode("p0"_id));
-  ASSERT_TRUE(places.hasNode("p1"_id));
-  ASSERT_TRUE(places.hasNode("p2"_id));
-
-  {
-    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
-    EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 0, 1)).norm(), 0.0, 1.0e-9);
-    EXPECT_EQ(attrs.distance, 0.1);
-    EXPECT_EQ(attrs.num_basis_points, 1u);
-  }
-
-  {
-    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
-    EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 0, 1)).norm(), 0.0, 1.0e-9);
-    EXPECT_EQ(attrs.distance, 0.1);
-    EXPECT_EQ(attrs.num_basis_points, 1u);
-  }
-
-  {
-    const auto& attrs = places.getNode("p1"_id).attributes<PlaceNodeAttributes>();
-    EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 0, 2)).norm(), 0.0, 1.0e-9);
-    EXPECT_EQ(attrs.distance, 0.2);
-    EXPECT_EQ(attrs.num_basis_points, 2u);
-  }
-
-  {
-    const auto& attrs = places.getNode("p2"_id).attributes<PlaceNodeAttributes>();
-    EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 1, 0)).norm(), 0.0, 1.0e-9);
-    EXPECT_EQ(attrs.distance, 0.4);
-    EXPECT_EQ(attrs.num_basis_points, 4u);
-  }
+  ASSERT_TRUE(places.has("p0"_id));
+  ASSERT_TRUE(places.has("p1"_id));
+  ASSERT_TRUE(places.has("p2"_id));
+  checkNode(places, "p0"_id, Eigen::Vector3d(0, 0, 1), 0.1, 1u);
+  checkNode(places, "p1"_id, Eigen::Vector3d(0, 0, 2), 0.2, 2u);
+  checkNode(places, "p2"_id, Eigen::Vector3d(0, 1, 0), 0.4, 4u);
 }
 
-TEST_F(CompressionGraphExtractorTestFixture, testAttributeAssignmentManyToOne) {
+TEST_F(GraphExtractorFixture, testAttributeAssignmentManyToOne) {
   GraphExtractor::Config config;
   config.min_node_distance_m = 0.1;
   config.compression_distance_m = 3.0;
   TestGraphExtractor extractor(config);
-  const auto& gvd = extractor.getGvdGraph();
+  const auto& gvd = extractor.gvd_graph();
 
   EXPECT_TRUE(gvd.empty());
 
@@ -295,51 +287,35 @@ TEST_F(CompressionGraphExtractorTestFixture, testAttributeAssignmentManyToOne) {
   extractor.setGvdNode(0, 0, 4, 0.5, 5);
   EXPECT_EQ(gvd.nodes().size(), 5u);
 
-  // updateGvdGraph doesn't use voxel pointers, so nullptr is safe here
   IndexVoxelQueue updated{{GlobalIndex(0, 0, 1), nullptr},
                           {GlobalIndex(0, 0, 2), nullptr},
                           {GlobalIndex(0, 0, 3), nullptr},
                           {GlobalIndex(0, 1, 0), nullptr},
                           {GlobalIndex(0, 0, 4), nullptr}};
 
-  extractor.updateGvdGraph(updated, 0);
+  extractor.updateGvdGraph(gvd_layer, updated, 0);
   extractor.assignCompressedNodeAttributes();
 
-  const auto& places = extractor.getGraph();
-  EXPECT_EQ(places.numNodes(), 2u);
-
-  ASSERT_TRUE(places.hasNode("p0"_id));
-  ASSERT_TRUE(places.hasNode("p1"_id));
+  const auto& places = extractor.graph();
+  EXPECT_EQ(places.num_nodes(), 2u);
+  ASSERT_TRUE(places.has("p0"_id));
+  ASSERT_TRUE(places.has("p1"_id));
+  checkNode(places, "p0"_id, Eigen::Vector3d(0, 1, 0), 0.4, 5u);
+  checkNode(places, "p1"_id, Eigen::Vector3d(0, 0, 4), 0.5, 5u);
 
   Remapping expected_remapping{{0, 0}, {1, 1}, {2, 1}, {3, 0}, {4, 1}};
-  EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
-
-  {
-    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
-    EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 1, 0)).norm(), 0.0, 1.0e-9)
-        << attrs.position.transpose();
-    EXPECT_EQ(attrs.distance, 0.4);
-    EXPECT_EQ(attrs.num_basis_points, 5u);
-  }
-
-  {
-    const auto& attrs = places.getNode("p1"_id).attributes<PlaceNodeAttributes>();
-    EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 0, 4)).norm(), 0.0, 1.0e-9)
-        << attrs.position.transpose();
-    EXPECT_EQ(attrs.distance, 0.5);
-    EXPECT_EQ(attrs.num_basis_points, 5u);
-  }
+  EXPECT_EQ(extractor.compressed().remapping, expected_remapping);
 }
 
 // show that isolated voxels deletion gets propagated to compressed graph
-TEST_F(CompressionGraphExtractorTestFixture, testSingleVoxelDeletion) {
+TEST_F(GraphExtractorFixture, testSingleVoxelDeletion) {
   GraphExtractor::Config config;
   config.compression_distance_m = 3.0;
   config.min_node_distance_m = 0.1;
-  TestGraphExtractor extractor(config);
-  const auto& gvd = extractor.getGvdGraph();
-  const auto& places = extractor.getGraph();
 
+  TestGraphExtractor extractor(config);
+  const auto& gvd = extractor.gvd_graph();
+  const auto& places = extractor.graph();
   EXPECT_TRUE(gvd.empty());
 
   extractor.setGvdNode(0, 0, 2, 0.2, 2);
@@ -348,29 +324,23 @@ TEST_F(CompressionGraphExtractorTestFixture, testSingleVoxelDeletion) {
   extractor.setGvdNode(1, 0, 2, 0.5, 3);
   EXPECT_EQ(gvd.nodes().size(), 4u);
 
-  // updateGvdGraph doesn't use voxel pointers, so nullptr is safe here
   IndexVoxelQueue updated{{GlobalIndex(0, 0, 2), nullptr},
                           {GlobalIndex(0, 0, 3), nullptr},
                           {GlobalIndex(0, 0, 4), nullptr},
                           {GlobalIndex(1, 0, 2), nullptr}};
 
-  extractor.updateGvdGraph(updated, 0);
+  extractor.updateGvdGraph(gvd_layer, updated, 0);
   extractor.assignCompressedNodeAttributes();
 
   {  // scope after a normal update: remapping should exist as expected
     const Remapping expected_remapping{{0, 0}, {1, 0}, {2, 0}, {3, 0}};
-    EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
-
-    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
-    EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 0, 4)).norm(), 0.0, 1.0e-9)
-        << attrs.position.transpose();
-    EXPECT_EQ(attrs.distance, 0.4);
-    EXPECT_EQ(attrs.num_basis_points, 4u);
+    EXPECT_EQ(extractor.compressed().remapping, expected_remapping);
+    checkNode(places, "p0"_id, Eigen::Vector3d(0, 0, 4), 0.4, 4u);
   }
 
-  extractor.clearGvdIndex(GlobalIndex(0, 0, 3));
+  extractor.clearIndex(GlobalIndex(0, 0, 3));
   // technically we only need to update (0, 0, 4)
-  extractor.updateGvdGraph(updated, 0);
+  extractor.updateGvdGraph(gvd_layer, updated, 0);
   extractor.assignCompressedNodeAttributes();
 
   EXPECT_EQ(gvd.nodes().size(), 2u);
@@ -378,23 +348,18 @@ TEST_F(CompressionGraphExtractorTestFixture, testSingleVoxelDeletion) {
 
   {  // scope after two gvd nodes are cleared: p0 attributes should update
     const Remapping expected_remapping{{0, 0}, {3, 0}};
-    EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
-
-    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
-    EXPECT_NEAR((attrs.position - Eigen::Vector3d(1, 0, 2)).norm(), 0.0, 1.0e-9)
-        << attrs.position.transpose();
-    EXPECT_EQ(attrs.distance, 0.5);
-    EXPECT_EQ(attrs.num_basis_points, 3u);
+    EXPECT_EQ(extractor.compressed().remapping, expected_remapping);
+    checkNode(places, "p0"_id, Eigen::Vector3d(1, 0, 2), 0.5, 3u);
   }
 }
 
-TEST_F(CompressionGraphExtractorTestFixture, testVoxelDeletion) {
+TEST_F(GraphExtractorFixture, testVoxelDeletion) {
   GraphExtractor::Config config;
   config.compression_distance_m = 3.0;
   config.min_node_distance_m = 0.0;
   TestGraphExtractor extractor(config);
-  const auto& gvd = extractor.getGvdGraph();
-  const auto& places = extractor.getGraph();
+  const auto& gvd = extractor.gvd_graph();
+  const auto& places = extractor.graph();
 
   EXPECT_TRUE(gvd.empty());
 
@@ -405,29 +370,22 @@ TEST_F(CompressionGraphExtractorTestFixture, testVoxelDeletion) {
   extractor.setGvdNode(0, 0, 4, 0.5, 5);
   EXPECT_EQ(gvd.nodes().size(), 5u);
 
-  // updateGvdGraph doesn't use voxel pointers, so nullptr is safe here
   IndexVoxelQueue updated{{GlobalIndex(0, 0, 1), nullptr},
                           {GlobalIndex(0, 0, 2), nullptr},
                           {GlobalIndex(0, 0, 3), nullptr},
                           {GlobalIndex(0, 1, 0), nullptr},
                           {GlobalIndex(0, 0, 4), nullptr}};
 
-  extractor.updateGvdGraph(updated, 0);
+  extractor.updateGvdGraph(gvd_layer, updated, 0);
   extractor.assignCompressedNodeAttributes();
 
   {  // scope after a normal update: remapping should exist as expected
     const Remapping expected_remapping{{0, 0}, {1, 1}, {2, 1}, {3, 0}, {4, 1}};
-    EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
-
-    ASSERT_TRUE(places.hasNode("p0"_id));
-    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
-    EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 1, 0)).norm(), 0.0, 1.0e-9)
-        << attrs.position.transpose();
-    EXPECT_EQ(attrs.distance, 0.4);
-    EXPECT_EQ(attrs.num_basis_points, 5u);
+    EXPECT_EQ(extractor.compressed().remapping, expected_remapping);
+    checkNode(places, "p0"_id, Eigen::Vector3d(0, 1, 0), 0.4, 5u);
   }
 
-  extractor.clearGvdIndex(GlobalIndex(0, 1, 0));
+  extractor.clearIndex(GlobalIndex(0, 1, 0));
   extractor.assignCompressedNodeAttributes();
 
   EXPECT_EQ(gvd.nodes().size(), 4u);
@@ -435,56 +393,44 @@ TEST_F(CompressionGraphExtractorTestFixture, testVoxelDeletion) {
 
   {  // scope after deleting one gvd member of p0: p0 attributes should update
     const Remapping expected_remapping{{0, 0}, {1, 1}, {2, 1}, {4, 1}};
-    EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
-
-    ASSERT_TRUE(places.hasNode("p0"_id));
-    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
-    EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 0, 1)).norm(), 0.0, 1.0e-9)
-        << attrs.position.transpose();
-    EXPECT_EQ(attrs.distance, 0.1);
-    EXPECT_EQ(attrs.num_basis_points, 1u);
+    EXPECT_EQ(extractor.compressed().remapping, expected_remapping);
+    checkNode(places, "p0"_id, Eigen::Vector3d(0, 0, 1), 0.1, 1u);
   }
 
-  extractor.clearGvdIndex(GlobalIndex(0, 0, 1));
+  extractor.clearIndex(GlobalIndex(0, 0, 1));
   EXPECT_EQ(gvd.nodes().size(), 3u);
   EXPECT_TRUE(extractor.to_archive_.empty());
-  EXPECT_TRUE(extractor.updated_nodes_.empty());
-  EXPECT_EQ(places.numNodes(), 1u);
-  EXPECT_FALSE(places.hasNode("p0"_id));
+  EXPECT_TRUE(extractor.compressed().updated.empty());
+  EXPECT_EQ(places.num_nodes(), 1u);
+  EXPECT_FALSE(places.has("p0"_id));
 
-  EXPECT_TRUE(extractor.compressed_info_map_.at(1).siblings.empty());
-  EXPECT_EQ(extractor.compressed_info_map_.size(), 1u);
-  EXPECT_EQ(extractor.compressed_index_map_.size(), 1u);
-  EXPECT_EQ(extractor.compressed_id_map_.size(), 1u);
+  EXPECT_TRUE(extractor.compressed().nodes.at(1).siblings.empty());
+  EXPECT_EQ(extractor.compressed().nodes.size(), 1u);
+  EXPECT_EQ(extractor.compressed().index_map.size(), 1u);
+  EXPECT_EQ(extractor.compressed().id_map.size(), 1u);
   {
     const Remapping expected_remapping{{1, 1}, {2, 1}, {4, 1}};
-    EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
+    EXPECT_EQ(extractor.compressed().remapping, expected_remapping);
   }
 
   extractor.setGvdNode(0, 0, 1, 0.1, 1);
   updated = {{GlobalIndex(0, 0, 1), nullptr}};
-  extractor.updateGvdGraph(updated, 0);
+  extractor.updateGvdGraph(gvd_layer, updated, 0);
   extractor.assignCompressedNodeAttributes();
   {  // scope after re-adding one gvd member of p0
     const Remapping expected_remapping{{3, 2}, {1, 1}, {2, 1}, {4, 1}};
-    EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
-
-    ASSERT_TRUE(places.hasNode("p2"_id));
-    const auto& attrs = places.getNode("p2"_id).attributes<PlaceNodeAttributes>();
-    EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 0, 1)).norm(), 0.0, 1.0e-9)
-        << attrs.position.transpose();
-    EXPECT_EQ(attrs.distance, 0.1);
-    EXPECT_EQ(attrs.num_basis_points, 1u);
+    EXPECT_EQ(extractor.compressed().remapping, expected_remapping);
+    checkNode(places, "p2"_id, Eigen::Vector3d(0, 0, 1), 0.1, 1u);
   }
 }
 
-TEST_F(CompressionGraphExtractorTestFixture, testVoxelArchival) {
+TEST_F(GraphExtractorFixture, testVoxelArchival) {
   GraphExtractor::Config config;
   config.compression_distance_m = 3.0;
   config.min_node_distance_m = 0.0;
   TestGraphExtractor extractor(config);
-  const auto& gvd = extractor.getGvdGraph();
-  const auto& places = extractor.getGraph();
+  const auto& gvd = extractor.gvd_graph();
+  const auto& places = extractor.graph();
 
   EXPECT_TRUE(gvd.empty());
 
@@ -495,32 +441,26 @@ TEST_F(CompressionGraphExtractorTestFixture, testVoxelArchival) {
   extractor.setGvdNode(0, 0, 4, 0.5, 5);
   EXPECT_EQ(gvd.nodes().size(), 5u);
 
-  // updateGvdGraph doesn't use voxel pointers, so nullptr is safe here
   IndexVoxelQueue updated{{GlobalIndex(0, 0, 1), nullptr},
                           {GlobalIndex(0, 0, 2), nullptr},
                           {GlobalIndex(0, 0, 3), nullptr},
                           {GlobalIndex(0, 1, 0), nullptr},
                           {GlobalIndex(0, 0, 4), nullptr}};
 
-  extractor.updateGvdGraph(updated, 0);
+  extractor.updateGvdGraph(gvd_layer, updated, 0);
   extractor.assignCompressedNodeAttributes();
 
   {  // scope after a normal update: remapping should exist as expected
     const Remapping expected_remapping{{0, 0}, {1, 1}, {2, 1}, {3, 0}, {4, 1}};
-    EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
-
-    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
-    EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 1, 0)).norm(), 0.0, 1.0e-9)
-        << attrs.position.transpose();
-    EXPECT_EQ(attrs.distance, 0.4);
-    EXPECT_EQ(attrs.num_basis_points, 5u);
+    EXPECT_EQ(extractor.compressed().remapping, expected_remapping);
+    checkNode(places, "p0"_id, Eigen::Vector3d(0, 1, 0), 0.4, 5u);
   }
 
   // this should force the voxel attributes to flip to 0, 0, 1 for p0
   extractor.setGvdNode(0, 0, 1, 0.1, 6);
-  extractor.removeDistantIndex(GlobalIndex(0, 0, 1));
+  extractor.archiveIndex(GlobalIndex(0, 0, 1));
   updated = {{GlobalIndex(0, 1, 0), nullptr}};
-  extractor.updateGvdGraph(updated, 0);
+  extractor.updateGvdGraph(gvd_layer, updated, 0);
   extractor.assignCompressedNodeAttributes();
 
   EXPECT_EQ(gvd.nodes().size(), 5u);
@@ -528,34 +468,30 @@ TEST_F(CompressionGraphExtractorTestFixture, testVoxelArchival) {
 
   {  // scope after deleting one gvd member of p0: p0 attributes should update
     const Remapping expected_remapping{{0, 0}, {1, 1}, {2, 1}, {3, 0}, {4, 1}};
-    EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
-
-    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
-    EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 0, 1)).norm(), 0.0, 1.0e-9)
-        << attrs.position.transpose();
-    EXPECT_EQ(attrs.distance, 0.1);
-    EXPECT_EQ(attrs.num_basis_points, 6u);
+    EXPECT_EQ(extractor.compressed().remapping, expected_remapping);
+    checkNode(places, "p0"_id, Eigen::Vector3d(0, 0, 1), 0.1, 6u);
   }
 
-  extractor.removeDistantIndex(GlobalIndex(0, 1, 0));
+  extractor.archiveIndex(GlobalIndex(0, 1, 0));
   extractor.clearArchived();
   EXPECT_FALSE(extractor.to_archive_.empty());
 
   // this should disconnect the two sibilings
-  extractor.clearGvdIndex(GlobalIndex(0, 0, 2));
+  extractor.clearIndex(GlobalIndex(0, 0, 2));
   extractor.clearArchived();
   EXPECT_TRUE(extractor.to_archive_.empty());
-  EXPECT_EQ(extractor.compressed_info_map_.size(), 1u);
+  EXPECT_EQ(extractor.compressed().nodes.size(), 1u);
   EXPECT_EQ(gvd.nodes().size(), 2u);
 }
 
-TEST_F(CompressionGraphExtractorTestFixture, testArchiveAndDelete) {
+TEST_F(GraphExtractorFixture, testArchiveAndDelete) {
   GraphExtractor::Config config;
   config.compression_distance_m = 3.0;
   config.min_node_distance_m = 0.0;
+
   TestGraphExtractor extractor(config);
-  const auto& gvd = extractor.getGvdGraph();
-  const auto& places = extractor.getGraph();
+  const auto& gvd = extractor.gvd_graph();
+  const auto& places = extractor.graph();
 
   EXPECT_TRUE(gvd.empty());
 
@@ -566,29 +502,23 @@ TEST_F(CompressionGraphExtractorTestFixture, testArchiveAndDelete) {
   extractor.setGvdNode(0, 0, 4, 0.5, 5);
   EXPECT_EQ(gvd.nodes().size(), 5u);
 
-  // updateGvdGraph doesn't use voxel pointers, so nullptr is safe here
   IndexVoxelQueue updated{{GlobalIndex(0, 0, 1), nullptr},
                           {GlobalIndex(0, 0, 2), nullptr},
                           {GlobalIndex(0, 0, 3), nullptr},
                           {GlobalIndex(0, 1, 0), nullptr},
                           {GlobalIndex(0, 0, 4), nullptr}};
 
-  extractor.updateGvdGraph(updated, 0);
+  extractor.updateGvdGraph(gvd_layer, updated, 0);
   extractor.assignCompressedNodeAttributes();
 
   {  // scope after a normal update: remapping should exist as expected
     const Remapping expected_remapping{{0, 0}, {1, 1}, {2, 1}, {3, 0}, {4, 1}};
-    EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
-
-    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
-    EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 1, 0)).norm(), 0.0, 1.0e-9)
-        << attrs.position.transpose();
-    EXPECT_EQ(attrs.distance, 0.4);
-    EXPECT_EQ(attrs.num_basis_points, 5u);
+    EXPECT_EQ(extractor.compressed().remapping, expected_remapping);
+    checkNode(places, "p0"_id, Eigen::Vector3d(0, 1, 0), 0.4, 5u);
   }
 
-  extractor.removeDistantIndex(GlobalIndex(0, 0, 1));
-  extractor.clearGvdIndex(GlobalIndex(0, 1, 0));
+  extractor.archiveIndex(GlobalIndex(0, 0, 1));
+  extractor.clearIndex(GlobalIndex(0, 1, 0));
   extractor.clearArchived();
   extractor.assignCompressedNodeAttributes();
 
@@ -598,102 +528,34 @@ TEST_F(CompressionGraphExtractorTestFixture, testArchiveAndDelete) {
 
   {  // scope after deleting one gvd member of p0: p0 attributes should update
     const Remapping expected_remapping{{0, 0}, {1, 1}, {2, 1}, {4, 1}};
-    EXPECT_EQ(extractor.compressed_remapping_, expected_remapping);
-
-    const auto& attrs = places.getNode("p0"_id).attributes<PlaceNodeAttributes>();
-    EXPECT_NEAR((attrs.position - Eigen::Vector3d(0, 0, 1)).norm(), 0.0, 1.0e-9)
-        << attrs.position.transpose();
-    EXPECT_EQ(attrs.distance, 0.1);
-    EXPECT_EQ(attrs.num_basis_points, 1u);
+    EXPECT_EQ(extractor.compressed().remapping, expected_remapping);
+    checkNode(places, "p0"_id, Eigen::Vector3d(0, 0, 1), 0.1, 1u);
   }
 }
 
-TEST_F(CompressionGraphExtractorTestFixture, testUniformGvd) {
+TEST_F(GraphExtractorFixture, testUniformGvd) {
   GraphExtractor::Config config;
   config.compression_distance_m = 0.5;
   GraphExtractor extractor(config);
 
-  const auto& gvd = extractor.getGvdGraph();
+  const auto& gvd = extractor.gvd_graph();
   EXPECT_TRUE(gvd.empty());
 
-  extractor.pushGvdIndex(GlobalIndex(0, 0, 0));
-  extractor.pushGvdIndex(GlobalIndex(1, 0, 0));
-  extractor.pushGvdIndex(GlobalIndex(0, 1, 0));
-  extractor.pushGvdIndex(GlobalIndex(0, 0, 1));
-  extractor.pushGvdIndex(GlobalIndex(2, 0, 0));
-  extractor.pushGvdIndex(GlobalIndex(0, 2, 0));
-  extractor.pushGvdIndex(GlobalIndex(0, 0, 2));
-  extractor.pushGvdIndex(GlobalIndex(3, 0, 0));
-  extractor.pushGvdIndex(GlobalIndex(0, 3, 0));
-  extractor.pushGvdIndex(GlobalIndex(0, 0, 3));
+  extractor.pushIndex(GlobalIndex(0, 0, 0));
+  extractor.pushIndex(GlobalIndex(1, 0, 0));
+  extractor.pushIndex(GlobalIndex(0, 1, 0));
+  extractor.pushIndex(GlobalIndex(0, 0, 1));
+  extractor.pushIndex(GlobalIndex(2, 0, 0));
+  extractor.pushIndex(GlobalIndex(0, 2, 0));
+  extractor.pushIndex(GlobalIndex(0, 0, 2));
+  extractor.pushIndex(GlobalIndex(3, 0, 0));
+  extractor.pushIndex(GlobalIndex(0, 3, 0));
+  extractor.pushIndex(GlobalIndex(0, 0, 3));
   // make sure we get coverage for invalid voxels
-  extractor.pushGvdIndex(GlobalIndex(0, 0, 23));
-  extractor.extract(*gvd_layer, 0);
+  extractor.pushIndex(GlobalIndex(0, 0, 23));
+  extractor.extract(gvd_layer, 0);
 
   EXPECT_EQ(gvd.nodes().size(), 10u);
-}
-
-TEST(CompressionNode, testAddEdges) {
-  std::unordered_map<uint64_t, CompressedNode> nodes{
-      {0, CompressedNode(0)}, {1, CompressedNode(1)}, {2, CompressedNode(2)}};
-  nodes.at(0).addEdgeObservation(0, 1, 1);
-  nodes.at(1).addEdgeObservation(1, 0, 0);
-  nodes.at(1).addEdgeObservation(1, 2, 2);
-  nodes.at(2).addEdgeObservation(2, 1, 1);
-
-  std::unordered_map<uint64_t, std::set<uint64_t>> expected_siblings{
-      {0, {1}},
-      {1, {0, 2}},
-      {2, {1}},
-  };
-  EXPECT_EQ(nodes.at(0).siblings, expected_siblings.at(0));
-  EXPECT_EQ(nodes.at(1).siblings, expected_siblings.at(1));
-  EXPECT_EQ(nodes.at(2).siblings, expected_siblings.at(2));
-}
-
-TEST(CompressionNode, testRemoveEdges) {
-  std::unordered_map<uint64_t, CompressedNode> nodes{
-      {0, CompressedNode(0)}, {1, CompressedNode(1)}, {2, CompressedNode(2)}};
-  nodes.at(0).addEdgeObservation(0, 1, 1);
-  nodes.at(1).addEdgeObservation(1, 0, 0);
-  nodes.at(1).addEdgeObservation(1, 2, 2);
-  nodes.at(2).addEdgeObservation(2, 1, 1);
-
-  const auto removed_siblings = nodes.at(1).removeEdgeObservations(1, nodes);
-  EXPECT_TRUE(nodes.at(0).siblings.empty());
-  EXPECT_TRUE(nodes.at(1).siblings.empty());
-  EXPECT_TRUE(nodes.at(2).siblings.empty());
-
-  std::list<uint64_t> expected_removed{0, 2};
-  EXPECT_EQ(removed_siblings, expected_removed);
-}
-
-TEST(CompressionNode, testMergePolicies) {
-  GvdMemberInfo info1;
-  info1.num_basis_points = 1;
-  info1.distance = 0.3;
-  GvdMemberInfo info2;
-  info2.num_basis_points = 3;
-  info2.distance = 0.1;
-  GvdMemberInfo info3;
-  info3.num_basis_points = 3;
-  info3.distance = 0.3;
-
-  BasisPointMergePolicy basis_policy;
-  EXPECT_EQ(basis_policy.compare(info1, info2), -1);
-  EXPECT_EQ(basis_policy.compare(info1, info3), -1);
-  EXPECT_EQ(basis_policy.compare(info2, info3), 0);
-  EXPECT_EQ(basis_policy.compare(info2, info1), 1);
-  EXPECT_EQ(basis_policy.compare(info3, info1), 1);
-  EXPECT_EQ(basis_policy.compare(info3, info2), 0);
-
-  DistanceMergePolicy distance_policy;
-  EXPECT_EQ(distance_policy.compare(info1, info2), 1);
-  EXPECT_EQ(distance_policy.compare(info1, info3), 0);
-  EXPECT_EQ(distance_policy.compare(info2, info3), -1);
-  EXPECT_EQ(distance_policy.compare(info2, info1), -1);
-  EXPECT_EQ(distance_policy.compare(info3, info1), 0);
-  EXPECT_EQ(distance_policy.compare(info3, info2), 1);
 }
 
 }  // namespace hydra::places

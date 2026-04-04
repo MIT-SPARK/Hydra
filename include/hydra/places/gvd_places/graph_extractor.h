@@ -113,7 +113,7 @@ class GraphExtractor {
 
   const GvdGraph& gvd_graph() const { return gvd_; };
 
- private:
+ protected:
   void clearArchived();
 
   void fillSeenVoxels(const GvdLayer& layer,
