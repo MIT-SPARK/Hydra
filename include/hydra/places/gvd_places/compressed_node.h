@@ -85,7 +85,7 @@ struct CompressedGraph {
 
   CompressedGraph(float resolution_m);
 
-  void add(uint64_t gvd_id, const GvdMemberInfo& info);
+  std::list<uint64_t> add(uint64_t gvd_id, const GvdMemberInfo& info);
   DeleteResult remove(uint64_t gvd_id, bool is_archive);
   void merge(uint64_t curr_node_id,
              CompressedNode& curr_node,

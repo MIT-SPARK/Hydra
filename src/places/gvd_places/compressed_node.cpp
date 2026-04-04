@@ -153,7 +153,7 @@ void CompressedNode::merge(CompressedNode& other, CompressedNodeMap& nodes) {
 
 CompressedGraph::CompressedGraph(float resolution_m) : next_id(0), grid(resolution_m) {}
 
-void CompressedGraph::add(uint64_t gvd_id, const GvdMemberInfo& node) {
+std::list<uint64_t> CompressedGraph::add(uint64_t gvd_id, const GvdMemberInfo& node) {
   const auto index = grid.toIndex(node.position);
   auto iter = index_map.find(index);
   if (iter == index_map.end()) {
@@ -194,6 +194,7 @@ void CompressedGraph::add(uint64_t gvd_id, const GvdMemberInfo& node) {
 
   // construct edges by checking to see if any uncompressed neighbors map to a different
   // compressed node
+  std::list<uint64_t> removed_graph_ids;
   for (const auto neighbor : node.siblings) {
     auto niter = remapping.find(neighbor);
     if (niter == remapping.end()) {
@@ -208,12 +209,15 @@ void CompressedGraph::add(uint64_t gvd_id, const GvdMemberInfo& node) {
       // voxel connected two neighboring clusters for the same index
       iter->second.erase(niter->second);
       merge(*cluster, info, niter->second);
+      removed_graph_ids.push_back(niter->second);
       continue;
     }
 
     info.addEdgeObservation(gvd_id, neighbor, niter->second);
     nodes.at(niter->second).addEdgeObservation(neighbor, gvd_id, *cluster);
   }
+
+  return removed_graph_ids;
 }
 
 CompressedGraph::DeleteResult CompressedGraph::remove(uint64_t gvd_id,
@@ -279,19 +283,10 @@ void CompressedGraph::merge(uint64_t curr_node_id,
     remapping[child] = curr_node_id;
   }
 
-  if (iter->second.in_graph) {
-    const NodeSymbol graph_id(config.prefix, neighbor_node_id);
-    removeGraphNode(graph_id);
-    node_index_map_.erase(graph_id);
-  }
-
   curr_node.merge(iter->second, nodes);
-  nodes.erase(iter);
   id_map.erase(neighbor_node_id);
-
   updated.erase(neighbor_node_id);
-  to_archive_.erase(neighbor_node_id);
-  archived_node_ids_.erase(neighbor_node_id);
+  nodes.erase(iter);
 }
 
 }  // namespace hydra::places

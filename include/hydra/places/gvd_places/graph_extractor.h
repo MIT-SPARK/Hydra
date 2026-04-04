@@ -89,10 +89,6 @@ class GraphExtractor {
       bool enable = true;
       //! Maximum edge length to project
       double max_length_m = 2.0;
-      //! Number of nodes to check in a disconnected component for edge candidates
-      size_t num_nodes_to_check = 5;
-      //! Number of nearest neighbors to find in another disconnected component
-      size_t num_neighbors_to_find = 1;
       //! Minimum distance to the nearest obstacle along an edge
       double min_clearance_m = 0.5;
     } freespace_edges;
@@ -135,9 +131,6 @@ class GraphExtractor {
   void updateOverlapEdges();
 
   void updateFreespaceEdges(const GvdLayer& layer);
-
- private:
-  void clearCompressionId(uint64_t node_id, bool is_delete);
 
  protected:
   uint64_t next_id_;

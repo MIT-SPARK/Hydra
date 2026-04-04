@@ -48,7 +48,6 @@
 
 namespace hydra::places {
 
-using spark_dsg::EdgeAttributes;
 using spark_dsg::EdgeKey;
 using spark_dsg::NearestVertexInfo;
 using spark_dsg::NodeId;
@@ -117,8 +116,6 @@ void declare_config(GraphExtractor::Config::FreespaceEdges& config) {
   name("FreespaceEdgeConfig");
   field(config.enable, "enable");
   field(config.max_length_m, "max_length_m");
-  field(config.num_nodes_to_check, "num_nodes_to_check");
-  field(config.num_neighbors_to_find, "num_neighbors_to_find");
   field(config.min_clearance_m, "min_clearance_m");
 }
 
@@ -288,7 +285,7 @@ void GraphExtractor::fillParentInfo(const GvdLayer& gvd,
 void GraphExtractor::clearArchived() {
   std::list<uint64_t> to_remove;
   for (const auto id : to_archive_) {
-    auto& info = compressed_info_map_.at(id);
+    auto& info = compressed_.nodes.at(id);
     bool can_be_archived = true;
     for (const auto sibling_id : info.siblings) {
       if (!to_archive_.count(sibling_id)) {
@@ -303,12 +300,13 @@ void GraphExtractor::clearArchived() {
   }
 
   for (const auto id : to_remove) {
-    for (const auto gvd_id : compressed_info_map_.at(id).archived_refs) {
-      compressed_remapping_.erase(gvd_id);
+    for (const auto gvd_id : compressed_.nodes.at(id).archived_refs) {
+      compressed_.remapping.erase(gvd_id);
       gvd_.removeNode(gvd_id);
     }
 
-    clearCompressionId(id, false);
+    MLOG(2) << "archiving " << id;
+    to_archive_.erase(id);
     archived_node_ids_.insert(id);
   }
 }
@@ -383,8 +381,17 @@ void GraphExtractor::updateGvdGraph(const GvdLayer& layer,
       continue;  // isolated voxel
     }
 
-    if (info.distance >= config.min_node_distance_m) {
-      compressed_.add(iter->second, info);
+    if (info.distance < config.min_node_distance_m) {
+      continue;
+    }
+
+    const auto removed = compressed_.add(iter->second, info);
+    for (const auto id : removed) {
+      NodeSymbol graph_id(config.prefix, id);
+      graph_.remove(id);
+      node_index_map_.erase(id);
+      to_archive_.erase(id);
+      archived_node_ids_.erase(id);
     }
   }
 
@@ -586,22 +593,17 @@ void GraphExtractor::updateFreespaceEdges(const GvdLayer& gvd) {
   }
 
   EdgeInfoMap proposed_edges;
-  findFreespaceEdges(config.freespace_edges,
-                     *graph_,
+  findFreespaceEdges(graph_,
                      gvd,
-                     active_nodes,
                      node_index_map_,
+                     config.freespace_edges.max_length_m,
+                     config.freespace_edges.min_clearance_m,
                      proposed_edges);
 
   for (auto& [key, info] : proposed_edges) {
     graph_.update(key.k1, key.k2, std::move(info));
     freespace_edges_.insert(key);
   }
-}
-
-void GraphExtractor::clearCompressionId(uint64_t node_id, bool is_delete) {
-  to_archive_.erase(node_id);
-  MLOG(2) << (is_delete ? "deleting " : "archiving ") << node_id;
 }
 
 }  // namespace hydra::places
