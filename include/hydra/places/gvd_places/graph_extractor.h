@@ -109,7 +109,9 @@ class GraphExtractor {
 
   void fillParentInfo(const GvdLayer& gvd, const GvdParentTracker& parents);
 
-  const GvdGraph& getGvdGraph() const { return gvd_; };
+  const PartialGraph<spark_dsg::PlaceNodeAttributes>& graph() const { return graph_; }
+
+  const GvdGraph& gvd_graph() const { return gvd_; };
 
  private:
   void clearArchived();

@@ -40,26 +40,13 @@
 #include <spark_dsg/graph_utilities.h>
 #include <spark_dsg/printing.h>
 
-#include "hydra/active_window/volumetric_window.h"
 #include "hydra/common/global_info.h"
-#include "hydra/places/gvd_places/graph_extractor.h"
-#include "hydra/places/gvd_places/graph_extractor_utilities.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace hydra {
-namespace {
-
-static const auto registration =
-    config::RegistrationWithConfig<GvdPlaceExtractor,
-                                   GvdPlaceExtractor,
-                                   GvdPlaceExtractor::Config>("gvd");
-
-}
 
 using places::GvdIntegrator;
-using places::GvdVoxel;
 using spark_dsg::DsgLayers;
-using spark_dsg::EdgeKey;
 using spark_dsg::NodeId;
 using spark_dsg::PlaceNodeAttributes;
 using spark_dsg::SceneGraph;
@@ -67,24 +54,61 @@ using spark_dsg::SceneGraphLayer;
 using spark_dsg::graph_utilities::getConnectedComponents;
 using timing::ScopedTimer;
 
+using PlacesGraph = PartialGraph<PlaceNodeAttributes>;
+
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<GvdPlaceExtractor,
+                                   GvdPlaceExtractor,
+                                   GvdPlaceExtractor::Config>("gvd");
+
+std::set<NodeId> getInvalidNodes(const PlacesGraph& graph) {
+  std::set<NodeId> invalid_nodes;
+  for (const auto& [node_id, node] : graph.nodes()) {
+    if (!node.attrs) {
+      continue;
+    }
+
+    if (std::isnan(node.attrs->distance)) {
+      invalid_nodes.insert(node_id);
+      continue;
+    }
+
+    if (node.attrs->position.hasNaN()) {
+      invalid_nodes.insert(node_id);
+      continue;
+    }
+
+    for (const auto& info : node.attrs->voxblox_mesh_connections) {
+      if (std::isnan(info.voxel_pos[0]) || std::isnan(info.voxel_pos[1]) ||
+          std::isnan(info.voxel_pos[2])) {
+        invalid_nodes.insert(node_id);
+        continue;
+      }
+    }
+  }
+
+  if (!invalid_nodes.empty()) {
+    LOG(ERROR) << "Nodes found with invalid attributes: "
+               << spark_dsg::displayNodeSymbolContainer(invalid_nodes);
+  }
+
+  return invalid_nodes;
+}
+
+}  // namespace
+
 void declare_config(GvdPlaceExtractor::Config& config) {
   using namespace config;
   name("GvdPlaceExtractor::Config");
+  base<VerbosityConfig>(config);
   field(config.layer, "layer");
   field(config.gvd, "gvd");
   field(config.graph, "graph");
   config.tsdf_interpolator.setOptional();
   field(config.tsdf_interpolator, "tsdf_interpolator");
   field(config.min_component_size, "min_component_size");
-  field(config.filter_places, "filter_places");
-  field(config.filter_ground, "filter_ground");
-  field(config.robot_height, "robot_height");
-  field(config.edge_tolerance, "edge_tolerance");
-  field(config.node_tolerance, "node_tolerance");
-  field(config.add_freespace_edges, "add_freespace_edges");
-  if (config.add_freespace_edges) {
-    field(config.freespace_config, "freespace_config", false);
-  }
   field(config.sinks, "sinks");
 }
 
@@ -95,10 +119,10 @@ GvdPlaceExtractor::GvdPlaceExtractor(const Config& c)
       sinks_(Sink::instantiate(config.sinks)) {
   tsdf_interpolator_ = config.tsdf_interpolator.create();
   if (tsdf_interpolator_) {
-    LOG(INFO) << "Downsampling TSDF when creating places!";
+    MLOG(0) << "Downsampling TSDF when creating places!";
   }
 
-  VLOG(1) << "\n" << Sink::printSinks(sinks_);
+  MLOG(1) << "\n" << Sink::printSinks(sinks_);
 }
 
 GvdPlaceExtractor::~GvdPlaceExtractor() {}
@@ -125,7 +149,6 @@ void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg) {
 
   const auto& tsdf = downsampled_tsdf ? *downsampled_tsdf : map.getTsdfLayer();
   const Eigen::Isometry3d world_T_body = msg.world_T_body();
-  latest_pos_ = world_T_body.translation();
 
   if (!gvd_) {
     gvd_.reset(new places::GvdLayer(tsdf.voxel_size, tsdf.voxels_per_side));
@@ -152,105 +175,57 @@ void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg) {
   Sink::callAll(sinks_, msg.timestamp_ns, world_T_body, *gvd_, graph_extractor_);
 }
 
-void filterInvalidNodes(const SceneGraphLayer& graph, NodeIdSet& active_nodes) {
-  std::list<NodeId> invalid_nodes;
-  for (const NodeId active_id : active_nodes) {
-    const auto& node = graph.getNode(active_id);
-    const auto& attrs = node.attributes<PlaceNodeAttributes>();
-    if (std::isnan(attrs.distance)) {
-      invalid_nodes.push_back(active_id);
-      continue;
-    }
-
-    if (attrs.position.hasNaN()) {
-      invalid_nodes.push_back(active_id);
-      continue;
-    }
-
-    for (const auto& info : attrs.voxblox_mesh_connections) {
-      if (std::isnan(info.voxel_pos[0]) || std::isnan(info.voxel_pos[1]) ||
-          std::isnan(info.voxel_pos[2])) {
-        invalid_nodes.push_back(active_id);
-        continue;
-      }
-    }
-  }
-
-  if (!invalid_nodes.empty()) {
-    LOG(ERROR) << "Nodes found with invalid attributes: "
-               << spark_dsg::displayNodeSymbolContainer(invalid_nodes);
-    for (const auto& invalid_id : invalid_nodes) {
-      active_nodes.erase(invalid_id);
-    }
-  }
-}
-
 void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
   ScopedTimer timer("frontend/update_gvd_places", timestamp_ns, true, 2, false);
 
-  active_nodes_ = graph_extractor_.getActiveNodes();
-  const auto& places = graph_extractor_.getGraph();
-  filterInvalidNodes(places, active_nodes_);
-  VLOG(2) << "[Hydra Frontend] Considering " << active_nodes_.size()
-          << " input place nodes ";
+  const auto& places = graph_extractor_.graph();
+  MLOG(1) << "Considering " << places.nodes().size() << " input place nodes ";
 
-  NodeIdSet active_neighborhood = active_nodes_;
-  for (const auto& node_id : graph_extractor_.getDeletedNodes()) {
+  std::vector<NodeId> deleted_nodes;
+  // const auto deleted_nodes = graph_extractor_.getDeletedNodes()
+  for (const auto& node_id : deleted_nodes) {
     const auto node = graph.findNode(node_id);
     if (!node) {
       continue;
     }
 
-    const auto& siblings = node->siblings();
-    active_neighborhood.insert(siblings.begin(), siblings.end());
+    // TODO(nathan) think about expanding siblings
     graph.removeNode(node_id);
   }
 
-  const auto& deleted_edges = graph_extractor_.getDeletedEdges();
+  // TODO(nathan) fix this
+  // const auto& deleted_edges = graph_extractor_.getDeletedEdges();
+  std::vector<NodeId> deleted_edges;
   for (size_t i = 0; i < deleted_edges.size(); i += 2) {
     const auto n1 = deleted_edges.at(i);
     const auto n2 = deleted_edges.at(i + 1);
-    active_neighborhood.insert(n1);
-    active_neighborhood.insert(n2);
     graph.removeEdge(n1, n2);
   }
 
-  for (const auto node_id : active_nodes_) {
-    const auto& node = places.getNode(node_id);
-    auto attrs = node.attributes().clone();
+  NodeIdSet active_neighborhood;
+  const auto invalid = getInvalidNodes(places);
+  for (const auto& [node_id, node] : places.nodes()) {
+    if (invalid.count(node_id)) {
+      continue;
+    }
+
+    active_neighborhood.insert(node_id);
+    auto attrs = node.attrs->clone();
     attrs->is_active = true;
     attrs->last_update_time_ns = timestamp_ns;
     graph.addOrUpdateNode(config.layer, node_id, std::move(attrs));
-
-    for (const auto sibling : node.siblings()) {
-      const auto& edge = places.getEdge(node_id, sibling);
-      graph.addOrUpdateEdge(edge.source, edge.target, edge.info->clone());
+    for (const auto sibling : places.neighbors(node_id)) {
+      graph.addOrUpdateEdge(node_id, sibling, places.at(node_id, sibling)->clone());
     }
   }
 
-  if (config.filter_ground) {
-    filterGround(graph);
-  }
-
-  if (config.filter_places) {
-    filterIsolated(graph, active_neighborhood);
-  }
-
-  graph_extractor_.clearDeleted();
+  filterIsolated(graph, active_neighborhood);
 }
 
 void GvdPlaceExtractor::filterIsolated(SceneGraph& graph,
                                        NodeIdSet& active_neighborhood) {
-  const auto& places = graph_extractor_.getGraph();
-
-  auto iter = active_neighborhood.begin();
-  while (iter != active_neighborhood.end()) {
-    if (places.hasNode(*iter)) {
-      ++iter;
-      continue;
-    }
-
-    iter = active_neighborhood.erase(iter);
+  if (config.min_component_size < 2) {
+    return;  // no need to do any work
   }
 
   // we grab connected components using the subgraph of all active places and all
@@ -271,64 +246,7 @@ void GvdPlaceExtractor::filterIsolated(SceneGraph& graph,
 
     for (const auto to_delete : component) {
       graph.removeNode(to_delete);
-      active_nodes_.erase(to_delete);
     }
-  }
-}
-
-void GvdPlaceExtractor::filterGround(SceneGraph& graph) {
-  const double max_z = latest_pos_.z() - config.robot_height + config.node_tolerance;
-  std::list<NodeId> invalid_nodes;
-  std::list<EdgeKey> invalid_edges;
-  for (const auto& node_id : active_nodes_) {
-    const auto& node = graph.getNode(node_id);
-    const auto& attrs = node.attributes<PlaceNodeAttributes>();
-    double curr_min_z = attrs.position.z() - attrs.distance;
-    if (curr_min_z > max_z) {
-      // invalid nodes will be removed (and remove all edges), so no need to check edges
-      invalid_nodes.push_back(node_id);
-      continue;
-    }
-
-    for (const auto& sibling : node.siblings()) {
-      // this check should work: each side of the edge will be one of the extreme values
-      // (and each side should be visited once
-      const auto& edge = graph.getEdge(node_id, sibling);
-      double edge_min_z = attrs.position.z() - edge.attributes().weight;
-      if (edge_min_z > max_z) {
-        invalid_edges.push_back(EdgeKey(edge.source, edge.target));
-      }
-    }
-  }
-
-  VLOG(5) << "Erasing " << invalid_nodes.size() << " nodes and " << invalid_edges.size()
-          << " edges that do not reach ground-plane";
-  for (const auto node_id : invalid_nodes) {
-    graph.removeNode(node_id);
-    active_nodes_.erase(node_id);
-  }
-
-  for (const auto edge_key : invalid_edges) {
-    graph.removeEdge(edge_key.k1, edge_key.k2);
-  }
-
-  places::EdgeInfoMap new_edges;
-  places::findFreespaceEdges(config.freespace_config,
-                             graph.getLayer(DsgLayers::PLACES),
-                             *gvd_,
-                             active_nodes_,
-                             graph_extractor_.getIndexMap(),
-                             new_edges);
-  for (auto&& [edge_key, attrs] : new_edges) {
-    const auto& source_pos = graph.getNode(edge_key.k1).attributes().position;
-    const auto& target_pos = graph.getNode(edge_key.k2).attributes().position;
-    double source_min_z = source_pos.z() - attrs->weight;
-    double target_min_z = target_pos.z() - attrs->weight;
-    if (source_min_z > max_z || target_min_z > max_z) {
-      continue;
-    }
-
-    graph.insertEdge(edge_key.k1, edge_key.k2, std::move(attrs));
   }
 }
 

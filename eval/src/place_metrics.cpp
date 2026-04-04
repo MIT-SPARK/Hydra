@@ -46,7 +46,7 @@ using nanoflann::L2_Simple_Adaptor;
 using places::GvdLayer;
 using spark_dsg::NodeId;
 using spark_dsg::PlaceNodeAttributes;
-using spark_dsg::SceneGraphLayer;
+using spark_dsg::SceneGraph;
 
 void fillGvdPositions(const GvdLayer& layer,
                       size_t min_gvd_basis,
@@ -103,17 +103,22 @@ struct DistanceFinder {
   std::unique_ptr<KDTree> kdtree;
 };
 
-PlaceMetrics scorePlaces(const SceneGraphLayer& places,
+PlaceMetrics scorePlaces(const SceneGraph& graph,
                          const GvdLayer& gvd,
-                         size_t min_gvd_basis) {
+                         size_t min_gvd_basis,
+                         const std::string& layer_id) {
   PlaceMetrics metrics;
-  metrics.is_valid = true;
+  const auto places = graph.findLayer(layer_id);
+  if (!places) {
+    return metrics;
+  }
 
+  metrics.is_valid = true;
   std::vector<Eigen::Vector3d> gvd_positions;
   fillGvdPositions(gvd, min_gvd_basis, gvd_positions);
   const DistanceFinder finder(gvd_positions);
 
-  for (auto&& [node_id, node] : places.nodes()) {
+  for (auto&& [node_id, node] : places->nodes()) {
     const auto& attrs = node->attributes<PlaceNodeAttributes>();
     metrics.node_order.push_back(node_id);
 

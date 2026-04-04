@@ -42,7 +42,6 @@
 #include "hydra/common/output_sink.h"
 #include "hydra/places/gvd_places/graph_extractor.h"
 #include "hydra/places/gvd_places/gvd_integrator.h"
-#include "hydra/places/gvd_places/gvd_voxel.h"
 #include "hydra/reconstruction/tsdf_interpolators.h"
 
 namespace hydra {
@@ -54,20 +53,21 @@ class GvdPlaceExtractor {
                           const places::GvdLayer&,
                           const places::GraphExtractor&>;
 
-  struct Config {
+  struct Config : VerbosityConfig {
+    //! Target layer to add places
     std::string layer = spark_dsg::DsgLayers::PLACES;
+    //! GVD integrator from TSDF
     places::GvdIntegrator::Config gvd;
+    //! Graph extractor for processing GVD
     places::GraphExtractor::Config graph;
+    //! Optional TSDF interpolator for downsampling TSDF
     config::VirtualConfig<TsdfInterpolator> tsdf_interpolator;
+    //! Minimum number of places to keep a connected component
     size_t min_component_size = 3;
-    bool filter_places = true;
-    bool filter_ground = false;
-    double robot_height = 0.0;
-    double node_tolerance = 1.0;
-    double edge_tolerance = 1.0;
-    bool add_freespace_edges = false;
-    places::FreespaceEdgeConfig freespace_config;
+    //! Sinks for current pose and graph status
     std::vector<Sink::Factory> sinks;
+
+    Config() : VerbosityConfig("[gvd_places] ") {}
   } const config;
 
   explicit GvdPlaceExtractor(const Config& config);
@@ -80,9 +80,8 @@ class GvdPlaceExtractor {
 
   void updateGraph(uint64_t timestamp_ns, spark_dsg::SceneGraph& graph);
 
+ protected:
   void filterIsolated(spark_dsg::SceneGraph& graph, NodeIdSet& active_neighborhood);
-
-  void filterGround(spark_dsg::SceneGraph& graph);
 
  protected:
   places::GvdLayer::Ptr gvd_;
@@ -91,7 +90,6 @@ class GvdPlaceExtractor {
   std::unique_ptr<TsdfInterpolator> tsdf_interpolator_;
   std::unique_ptr<VolumetricWindow> map_window_;
   NodeIdSet active_nodes_;
-  Eigen::Vector3d latest_pos_;
   Sink::List sinks_;
 };
 

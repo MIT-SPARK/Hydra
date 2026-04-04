@@ -420,7 +420,7 @@ void GraphExtractor::assignCompressedNodeAttributes() {
     auto attrs = std::make_unique<PlaceNodeAttributes>();
     attrs->distance = result.info->distance;
     attrs->num_basis_points = result.info->num_basis_points;
-    attrs->position = result.info->position;
+    attrs->position = result.info->position.cast<double>();
     graph_.update(graph_id, std::move(attrs));
   }
 }

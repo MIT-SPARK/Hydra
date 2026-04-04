@@ -33,12 +33,11 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-
-#include <spark_dsg/scene_graph_layer.h>
+#include <spark_dsg/scene_graph.h>
 
 #include <vector>
 
-#include "hydra/places/gvd_voxel.h"
+#include "hydra/places/gvd_places/gvd_voxel.h"
 
 namespace hydra::eval {
 
@@ -52,8 +51,9 @@ struct PlaceMetrics {
   std::vector<spark_dsg::NodeId> node_order;
 };
 
-PlaceMetrics scorePlaces(const spark_dsg::SceneGraphLayer& places,
+PlaceMetrics scorePlaces(const spark_dsg::SceneGraph& graph,
                          const places::GvdLayer& gvd,
-                         size_t min_gvd_basis);
+                         size_t min_gvd_basis,
+                         const std::string& layer_id = spark_dsg::DsgLayers::PLACES);
 
 }  // namespace hydra::eval

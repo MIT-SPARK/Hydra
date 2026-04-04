@@ -72,6 +72,8 @@ class PartialGraph {
 
   AttrT* at(NodeId node) const;
 
+  spark_dsg::EdgeAttributes* at(NodeId source, NodeId target) const;
+
   void contract(NodeId from, NodeId to);
 
   const std::map<NodeId, Node>& nodes() const { return nodes_; }
@@ -123,7 +125,7 @@ void PartialGraph<AttrT>::update(NodeId source, NodeId target, EdgeAttr&& attrs)
 
 template <typename AttrT>
 void PartialGraph<AttrT>::remove(NodeId node_id) {
-  nodes_.remove(node_id);
+  nodes_.erase(node_id);
 }
 
 template <typename AttrT>
@@ -131,12 +133,12 @@ void PartialGraph<AttrT>::remove(NodeId source, NodeId target) {
   edges_.remove(source, target);
   auto source_node = find(source);
   if (source_node) {
-    source_node->neighbors.remove(source);
+    source_node->neighbors.erase(target);
   }
 
   auto target_node = find(target);
   if (target_node) {
-    target_node->neighbors.remove(target_node);
+    target_node->neighbors.erase(source);
   }
 }
 
@@ -160,6 +162,12 @@ template <typename AttrT>
 AttrT* PartialGraph<AttrT>::at(NodeId node) const {
   auto iter = nodes_.find(node);
   return iter == nodes_.end() ? nullptr : iter->second.attrs.get();
+}
+
+template <typename AttrT>
+spark_dsg::EdgeAttributes* PartialGraph<AttrT>::at(NodeId source, NodeId target) const {
+  auto edge = edges_.find(source, target);
+  return edge ? nullptr : edge->info.get();
 }
 
 template <typename AttrT>
