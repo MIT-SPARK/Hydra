@@ -1,7 +1,6 @@
 target_sources(
   ${PROJECT_NAME}
-  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/gvd_places/compressed_node.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/gvd_places/graph_extractor.cpp
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/gvd_places/graph_extractor.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/gvd_places/graph_extractor_utilities.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/gvd_places/gvd_graph.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/gvd_places/gvd_integrator.cpp

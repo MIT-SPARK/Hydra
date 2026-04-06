@@ -38,7 +38,6 @@
 #include <queue>
 
 #include "hydra/common/partial_graph.h"
-#include "hydra/places/gvd_places/compressed_node.h"
 #include "hydra/places/gvd_places/gvd_graph.h"
 #include "hydra/places/gvd_places/gvd_merge_policies.h"
 #include "hydra/places/gvd_places/gvd_voxel.h"
@@ -48,13 +47,6 @@
 namespace hydra::places {
 
 struct GvdParentTracker;
-
-struct IndexVoxelPair {
-  GlobalIndex index;
-  const GvdVoxel* voxel;
-};
-
-using IndexVoxelQueue = std::list<IndexVoxelPair>;
 
 class GraphExtractor {
  public:
@@ -95,7 +87,7 @@ class GraphExtractor {
     Config() : VerbosityConfig("[graph_extraction] ") {}
   } const config;
 
-  explicit GraphExtractor(const Config& config);
+  GraphExtractor(const Config& config, float voxel_size);
 
   virtual ~GraphExtractor();
 
@@ -105,26 +97,19 @@ class GraphExtractor {
 
   void archiveIndex(const GlobalIndex& index);
 
-  void extract(const GvdLayer& layer, uint64_t timestamp_ns);
-
-  void fillParentInfo(const GvdLayer& gvd, const GvdParentTracker& parents);
+  void extract(uint64_t timestamp_ns,
+               const GvdLayer& layer,
+               const GvdParentTracker& parents);
 
   const PartialGraph<spark_dsg::PlaceNodeAttributes>& graph() const { return graph_; }
-
-  const GvdGraph& gvd_graph() const { return gvd_; };
 
  protected:
   void clearArchived();
 
-  void fillSeenVoxels(const GvdLayer& layer,
-                      uint64_t timestamp_ns,
-                      IndexVoxelQueue& seen_voxels);
+  void updateGvdGraph(uint64_t timestamp_ns, const GvdLayer& layer);
 
-  void updateGvdGraph(const GvdLayer& layer,
-                      const IndexVoxelQueue& update_info,
-                      uint64_t timestamp_ns);
-
-  void assignCompressedNodeAttributes();
+  void assignCompressedNodeAttributes(const GvdLayer& layer,
+                                      const GvdParentTracker& parents);
 
   void updateCompressedEdges(const GvdLayer& layer);
 
@@ -135,23 +120,16 @@ class GraphExtractor {
   void updateFreespaceEdges(const GvdLayer& layer);
 
  protected:
-  uint64_t next_id_;
   CompressedGvdGraph gvd_;
-  CompressedGraph compressed_;
   PartialGraph<spark_dsg::PlaceNodeAttributes> graph_;
+  std::unique_ptr<MergePolicy> merge_policy_;
 
-  NodeIndexMap node_index_map_;
   std::queue<GlobalIndex> modified_voxel_queue_;
-
   std::set<spark_dsg::EdgeKey> overlap_edges_;
   std::set<spark_dsg::EdgeKey> freespace_edges_;
   std::unordered_set<spark_dsg::NodeId> deleted_nodes_;
   std::vector<spark_dsg::EdgeKey> deleted_edges_;
 
-  GlobalIndexMap<uint64_t> index_id_map_;
-  std::unique_ptr<MergePolicy> merge_policy_;
-
-  std::unordered_set<uint64_t> to_archive_;
   std::unordered_set<spark_dsg::NodeId> archived_node_ids_;
 };
 

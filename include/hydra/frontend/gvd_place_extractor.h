@@ -85,11 +85,12 @@ class GvdPlaceExtractor {
 
  protected:
   places::GvdLayer::Ptr gvd_;
-  places::GraphExtractor graph_extractor_;
-  std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
-  std::unique_ptr<TsdfInterpolator> tsdf_interpolator_;
-  std::unique_ptr<VolumetricWindow> map_window_;
   NodeIdSet active_nodes_;
+
+  std::unique_ptr<VolumetricWindow> map_window_;
+  std::unique_ptr<TsdfInterpolator> tsdf_interpolator_;
+  std::unique_ptr<places::GraphExtractor> graph_extractor_;
+  std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
   Sink::List sinks_;
 };
 

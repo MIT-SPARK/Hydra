@@ -36,117 +36,22 @@
 
 namespace hydra::places {
 
+using spark_dsg::EdgeKey;
+using Node = CompressedGvdGraph::Node;
+using Nodes = CompressedGvdGraph::Nodes;
+using CompressedNode = CompressedGvdGraph::CompressedNode;
+using CompressedNodes = CompressedGvdGraph::CompressedNodes;
+
 CompressedNode::CompressedNode(uint64_t id) : node_id(id) {}
 
-void CompressedNode::addEdgeObservation(uint64_t gvd_id,
-                                        uint64_t neighbor_gvd_id,
-                                        uint64_t sibling_id) {
-  auto iter = sibling_support.find(gvd_id);
-  if (iter == sibling_support.end()) {
-    iter = sibling_support.emplace(gvd_id, std::map<uint64_t, uint64_t>()).first;
-  }
-
-  auto riter = sibling_ref_counts.find(sibling_id);
-  if (riter == sibling_ref_counts.end()) {
-    siblings.insert(sibling_id);
-    riter = sibling_ref_counts.emplace(sibling_id, 0).first;
-  }
-
-  if (iter->second.emplace(neighbor_gvd_id, sibling_id).second) {
-    riter->second++;  // increment ref count for a new observation
-  }
+std::vector<uint64_t> CompressedNode::refs() const {
+  std::vector<uint64_t> all_refs(active_refs.begin(), active_refs.end());
+  all_refs.insert(all_refs.end(), archived_refs.begin(), archived_refs.end());
+  return all_refs;
 }
 
-bool CompressedNode::removeEdgeObservation(uint64_t gvd_id, uint64_t neighbor_gvd_id) {
-  // these both should work, but we use find to make erase more efficient
-  auto& connections = sibling_support.at(gvd_id);
-  auto iter = connections.find(neighbor_gvd_id);
-
-  // decrement the ref count for the sibling and drop the sibling if no longer connected
-  auto& ref_count = sibling_ref_counts.at(iter->second);
-  ref_count--;
-  bool deleted_sibling = ref_count == 0;
-  if (deleted_sibling) {
-    siblings.erase(iter->second);
-    sibling_ref_counts.erase(iter->second);
-  }
-
-  // clean up connection tracking
-  connections.erase(iter);
-  if (connections.empty()) {
-    sibling_support.erase(gvd_id);
-  }
-
-  return deleted_sibling;
-}
-
-std::list<uint64_t> CompressedNode::removeEdgeObservations(uint64_t gvd_id,
-                                                           CompressedNodeMap& nodes) {
-  auto iter = sibling_support.find(gvd_id);
-  if (iter == sibling_support.end()) {
-    return {};
-  }
-
-  std::list<uint64_t> to_remove;
-  for (const auto& edge_pairs : iter->second) {
-    auto& neighbor = nodes.at(edge_pairs.second);
-    // when removing an observation from another node, we flip the order of the
-    // underlying gvd voxels
-    neighbor.removeEdgeObservation(edge_pairs.first, gvd_id);
-    to_remove.push_back(edge_pairs.first);
-  }
-
-  // removeEdgeObservation changes the underlying sibling_support data structure, so we
-  // need to erase internal observations separately. Note that this also clear gvd_id
-  // from sibling_support
-  std::list<uint64_t> removed_siblings;
-  for (const auto neighbor_id : to_remove) {
-    const auto sibling_id = iter->second.at(neighbor_id);
-    if (removeEdgeObservation(gvd_id, neighbor_id)) {
-      removed_siblings.push_back(sibling_id);
-    }
-  }
-
-  return removed_siblings;
-}
-
-void CompressedNode::mergeObservations(uint64_t original_id, uint64_t new_id) {
-  for (auto& id_observation_pair : sibling_support) {
-    for (auto& id_pair : id_observation_pair.second) {
-      if (id_pair.second == original_id) {
-        id_pair.second = new_id;
-      }
-    }
-  }
-
-  auto iter = sibling_ref_counts.find(new_id);
-  if (iter == sibling_ref_counts.end()) {
-    iter = sibling_ref_counts.emplace(new_id, 0).first;
-  }
-
-  iter->second += sibling_ref_counts.at(original_id);
-  sibling_ref_counts.erase(original_id);
-  siblings.erase(original_id);
-  siblings.insert(new_id);
-}
-
-void CompressedNode::merge(CompressedNode& other, CompressedNodeMap& nodes) {
-  siblings.insert(other.siblings.begin(), other.siblings.end());
-  active_refs.insert(other.active_refs.begin(), other.active_refs.end());
-  archived_refs.insert(other.archived_refs.begin(), other.archived_refs.end());
-  sibling_support.insert(other.sibling_support.begin(), other.sibling_support.end());
-  for (const auto& id_count_pair : other.sibling_ref_counts) {
-    auto iter = sibling_ref_counts.find(id_count_pair.first);
-    if (iter == sibling_ref_counts.end()) {
-      sibling_ref_counts.emplace(id_count_pair.first, id_count_pair.second);
-    } else {
-      iter->second += id_count_pair.second;
-    }
-  }
-
-  for (auto sibling : other.siblings) {
-    nodes.at(sibling).mergeObservations(other.node_id, node_id);
-  }
+bool CompressedNode::archived() const {
+  return active_refs.empty() && !archived_refs.empty();
 }
 
 CompressedGvdGraph::CompressedGvdGraph(float voxel_resolution_m,
@@ -154,73 +59,19 @@ CompressedGvdGraph::CompressedGvdGraph(float voxel_resolution_m,
     : voxel_grid(voxel_resolution_m),
       compression_grid(compression_resolution_m),
       neighbor_search(26),
-      next_gvd_id_(0),
+      next_uncompressed_id_(0),
       next_compressed_id_(0) {}
-
-bool CompressedGvdGraph::empty() const { return gvd_.empty(); }
-
-Node* CompressedGvdGraph::add_gvd(const GlobalIndex& index,
-                                  double dist,
-                                  uint8_t basis) {
-  auto iter = index_map_.find(index);
-  if (iter != index_map_.end()) {
-    auto& node = gvd_.at(iter->second);
-    node.info.distance = dist;
-    node.info.num_basis_points = basis;
-    return nullptr;
-  }
-
-  const auto pos = voxel_grid.toPoint(index);
-  const auto id = next_gvd_id();
-  index_map_.emplace(index, id);
-
-  auto niter = gvd_.emplace(id, Node{id, {dist, basis, pos, index}, {}}).first;
-  return &niter->second;
-}
-
-Node* CompressedGvdGraph::gvd_by_index(const GlobalIndex& index) {
-  auto iter = index_map_.find(index);
-  return iter == index_map_.end() ? nullptr : &gvd_.at(iter->second);
-}
-
-uint64_t CompressedGvdGraph::assign_to_cluster(const Node& node) {
-  const auto index = compression_grid.toIndex(node.info.position);
-  auto iter = compressed_index_map_.find(index);
-  if (iter == compressed_index_map_.end()) {
-    // add new hash to lookup if we don't have any nodes under the index
-    iter = compressed_index_map_.emplace(index, std::set<uint64_t>{}).first;
-  }
-
-  for (const auto& sibling : node.siblings) {
-    const auto candidate = remapping_.at(sibling);
-    if (iter->second.count(candidate)) {
-      return candidate;
-    }
-  }
-
-  const auto compressed_id = next_compressed_id();
-  iter->second.insert(compressed_id);
-  id_map.emplace(compressed_id, index);
-  compressed_.emplace(compressed_id, CompressedNode(compressed_id));
-  return compressed_id;
-}
-
-std::optional<uint64_t> CompressedGvdGraph::cluster_for_gvd(uint64_t gvd_id) const {
-  auto iter = remapping_.find(gvd_id);
-  return iter == remapping_.end() ? std::optional<uint64_t>(iter->second)
-                                  : std::nullopt;
-}
 
 void CompressedGvdGraph::add(const GlobalIndex& vindex,
                              double distance,
                              uint8_t basis) {
-  auto node = add_gvd(vindex, distance, basis);
+  auto node = add_uncompressed(vindex, distance, basis);
   if (!node) {
     return;
   }
 
   for (const auto& n_idx : neighbor_search.neighborIndices(vindex)) {
-    auto neighbor = gvd_by_index(n_idx);
+    auto neighbor = uncompressed_by_index(n_idx);
     if (!neighbor) {
       continue;
     }
@@ -231,73 +82,156 @@ void CompressedGvdGraph::add(const GlobalIndex& vindex,
 
   // always insert an active ref and add to updated
   const auto cluster = assign_to_cluster(*node);
-  auto& info = compressed_.at(cluster);
-  info.active_refs.insert(node->id);
-  remapping_[node->id] = cluster;
   updated_.insert(cluster);
 
   // construct edges by checking to see if any neighbors map to a different cluster
-  std::list<uint64_t> removed_ids;
+  auto& cell_clusters = compressed_index_map_.at(compressed_id_map_.at(cluster));
   for (const auto neighbor : node->siblings) {
     const auto neighbor_cluster = cluster_for_gvd(neighbor);
-
-    auto niter = remapping_.find(neighbor);
-    if (niter == remapping_.end()) {
+    if (!neighbor_cluster || neighbor_cluster == cluster) {
       continue;
     }
 
-    if (niter->second == cluster) {
-      continue;
-    }
-
-    if (iter->second.count(niter->second)) {
+    EdgeKey key(cluster, *neighbor_cluster);
+    if (cell_clusters.count(*neighbor_cluster)) {
       // voxel connected two neighboring clusters for the same index
-      iter->second.erase(niter->second);
-      merge(*cluster, info, niter->second);
-      removed_ids.push_back(niter->second);
+      merge_clusters(cluster, *neighbor_cluster);
+      cell_clusters.erase(*neighbor_cluster);
       continue;
     }
 
-    info.addEdgeObservation(node->id, neighbor, niter->second);
-    nodes.at(niter->second).addEdgeObservation(neighbor, gvd_id, *cluster);
-  }
+    auto iter = compressed_edge_support_.find(key);
+    if (iter == compressed_edge_support_.end()) {
+      iter = compressed_edge_support_.emplace(key, std::set<EdgeKey>{}).first;
+      compressed_.at(key.k1).siblings.insert(key.k2);
+      compressed_.at(key.k2).siblings.insert(key.k1);
+    }
 
-  return removed_ids;
+    iter->second.insert({node->id, neighbor});
+  }
 }
 
-void CompressedGvdGraph::removeNode(uint64_t node) {
-  auto iter = nodes_.find(node);
-  if (iter == nodes_.end()) {
+void CompressedGvdGraph::remove(const GlobalIndex& index) {
+  const auto maybe_gvd_id = drop_uncompressed(index);
+  if (!maybe_gvd_id) {
     return;
   }
 
-  for (const auto sibling_id : iter->second.siblings) {
-    nodes_.at(sibling_id).siblings.erase(node);
+  const auto gvd_id = *maybe_gvd_id;
+  const auto compressed_id = compression_map_.at(gvd_id);
+  compression_map_.erase(gvd_id);
+
+  std::set<uint64_t> gvd_siblings;
+  {  // scope limiting iter
+    auto iter = uncompressed_.find(gvd_id);
+    gvd_siblings = iter->second.siblings;
+    uncompressed_id_queue_.push_back(gvd_id);
+    uncompressed_.erase(iter);
   }
 
-  id_queue_.push_back(node);
-  nodes_.erase(iter);
+  auto iter = compressed_.find(compressed_id);
+  auto& node = iter->second;
+  node.active_refs.erase(gvd_id);
+  for (const auto sibling : gvd_siblings) {
+    uncompressed_.at(sibling).siblings.erase(gvd_id);
+    const auto compressed_sibling = compression_map_.at(sibling);
+    if (compressed_sibling == compressed_id) {
+      continue;  // no need to update compressed edges if sibling in same cluster
+    }
+
+    const EdgeKey key{compressed_id, compressed_sibling};
+    auto edge_iter = compressed_edge_support_.find(key);
+    if (edge_iter == compressed_edge_support_.end()) {
+      continue;
+    }
+
+    edge_iter->second.erase({gvd_id, sibling});
+    if (edge_iter->second.empty()) {
+      compressed_edge_support_.erase(edge_iter);
+      compressed_.at(compressed_id).siblings.erase(compressed_sibling);
+      compressed_.at(compressed_sibling).siblings.erase(compressed_id);
+    }
+  }
+
+  if (!node.active_refs.empty() || !node.archived_refs.empty()) {
+    return;
+  }
+
+  // clear mapping between compression index and node id
+  {  // erase node entry from compression cell and erase compression cell
+    const auto& index = compressed_id_map_.at(compressed_id);
+    auto iter = compressed_index_map_.find(index);
+    iter->second.erase(compressed_id);
+    if (iter->second.empty()) {
+      compressed_index_map_.erase(iter);
+    }
+  }
+
+  drop_compressed_id(compressed_id);
+  for (const auto sibling : node.siblings) {
+    compressed_.at(sibling).siblings.erase(compressed_id);
+  }
+
+  compressed_.erase(iter);
 }
 
-const GvdMemberInfo* CompressedGvdGraph::getNode(uint64_t node) const {
-  return const_cast<CompressedGvdGraph*>(this)->getNode(node);
+void CompressedGvdGraph::archive(const GlobalIndex& index) {
+  const auto gvd_id = drop_uncompressed(index);
+  if (!gvd_id) {
+    return;
+  }
+
+  // we move entries from an active set to an archived set
+  auto compressed_id = compression_map_.at(*gvd_id);
+  auto& node = compressed_.at(compressed_id);
+  node.active_refs.erase(*gvd_id);
+  node.archived_refs.insert(*gvd_id);
 }
 
-GvdMemberInfo* CompressedGvdGraph::getNode(uint64_t node) {
-  auto iter = nodes_.find(node);
-  return iter == nodes_.end() ? nullptr : &iter->second.info;
+void CompressedGvdGraph::dropCompressed(uint64_t compressed_id) {
+  auto iter = compressed_.find(compressed_id);
+  if (iter == compressed_.end()) {
+    return;
+  }
+
+  const auto refs = iter->second.refs();
+  for (const auto gvd_id : refs) {
+    auto niter = uncompressed_.find(gvd_id);
+    uncompressed_index_map_.erase(niter->second.info.index);
+    for (const auto sibling : niter->second.siblings) {
+      uncompressed_.at(sibling).siblings.erase(gvd_id);
+    }
+
+    uncompressed_.erase(niter);
+    uncompressed_id_queue_.push_back(gvd_id);
+  }
+
+  for (const auto sibling : iter->second.siblings) {
+    compressed_edge_support_.erase({compressed_id, sibling});
+    compressed_.at(sibling).siblings.erase(compressed_id);
+  }
+
+  drop_compressed_id(compressed_id);
+  compressed_.erase(iter);
 }
 
-const CompressedGvdGraph::Nodes& CompressedGvdGraph::nodes() const { return nodes_; }
+const GvdMemberInfo* CompressedGvdGraph::get(uint64_t node) const {
+  auto iter = uncompressed_.find(node);
+  return iter == uncompressed_.end() ? nullptr : &iter->second.info;
+}
 
-uint64_t CompressedGvdGraph::next_gvd_id() {
+const Nodes& CompressedGvdGraph::uncompressed() const { return uncompressed_; }
+
+const CompressedNodes& CompressedGvdGraph::compressed() const { return compressed_; }
+
+uint64_t CompressedGvdGraph::next_uncompressed_id() {
   uint64_t new_id;
-  if (gvd_id_queue_.empty()) {
-    new_id = next_gvd_id_;
-    next_gvd_id_++;
+  if (uncompressed_id_queue_.empty()) {
+    new_id = next_uncompressed_id_;
+    next_uncompressed_id_++;
   } else {
-    new_id = gvd_id_queue_.front();
-    gvd_id_queue_.pop_front();
+    new_id = uncompressed_id_queue_.front();
+    uncompressed_id_queue_.pop_front();
   }
 
   return new_id;
@@ -310,146 +244,123 @@ uint64_t CompressedGvdGraph::next_compressed_id() {
   return new_id;
 }
 
-bool CompressedGvdGraph::hasNode(uint64_t node) const { return nodes_.count(node) > 0; }
-
-/*
-std::list<uint64_t> CompressedGraph::add(uint64_t gvd_id, const GvdMemberInfo& node) {
-  const auto index = grid.toIndex(node.position);
-  auto iter = index_map.find(index);
-  if (iter == index_map.end()) {
-    // add new hash to lookup if we don't have any nodes under the index
-    iter = index_map.emplace(index, std::set<uint64_t>()).first;
+Node* CompressedGvdGraph::add_uncompressed(const GlobalIndex& index,
+                                           double dist,
+                                           uint8_t basis) {
+  auto iter = uncompressed_index_map_.find(index);
+  if (iter != uncompressed_index_map_.end()) {
+    auto& node = uncompressed_.at(iter->second);
+    node.info.distance = dist;
+    node.info.num_basis_points = basis;
+    return nullptr;
   }
 
-  std::optional<uint64_t> cluster;
-  for (const auto curr_id : iter->second) {
-    const auto& info = nodes.at(curr_id);
-    if (info.active_refs.count(gvd_id)) {
-      cluster = curr_id;
+  const auto pos = voxel_grid.toPoint(index);
+  const auto id = next_uncompressed_id();
+  uncompressed_index_map_.emplace(index, id);
+
+  auto niter = uncompressed_.emplace(id, Node{id, {dist, basis, pos, index}, {}}).first;
+  return &niter->second;
+}
+
+Node* CompressedGvdGraph::uncompressed_by_index(const GlobalIndex& index) {
+  auto iter = uncompressed_index_map_.find(index);
+  return iter == uncompressed_index_map_.end() ? nullptr
+                                               : &uncompressed_.at(iter->second);
+}
+
+uint64_t CompressedGvdGraph::assign_to_cluster(const Node& node) {
+  const auto index = compression_grid.toIndex(node.info.position);
+  auto iter = compressed_index_map_.find(index);
+  if (iter == compressed_index_map_.end()) {
+    // add new hash to lookup if we don't have any nodes under the index
+    iter = compressed_index_map_.emplace(index, std::set<uint64_t>{}).first;
+  }
+
+  std::optional<uint64_t> compressed_id;
+  for (const auto& sibling : node.siblings) {
+    const auto candidate = compression_map_.at(sibling);
+    if (iter->second.count(candidate)) {
+      compressed_id = candidate;
       break;
     }
-
-    for (const auto sibling : node.siblings) {
-      if (info.active_refs.count(sibling) || info.archived_refs.count(sibling)) {
-        cluster = curr_id;
-        break;
-      }
-    }
   }
 
-  if (!cluster) {
-    iter->second.insert(next_id);
-    id_map.emplace(next_id, index);
-    nodes.emplace(next_id, CompressedNode(next_id));
-    cluster = next_id;
-    ++next_id;
+  if (!compressed_id) {
+    const auto compressed_id = next_compressed_id();
+    iter->second.insert(compressed_id);
+    compressed_id_map_.emplace(compressed_id, index);
+    compressed_.emplace(compressed_id, CompressedNode(compressed_id));
   }
 
-  // always insert an active ref and add to updated (attributes might update
-regardless
-  // if ref is new)
-  auto& info = nodes.at(*cluster);
-  info.active_refs.insert(gvd_id);
-  remapping[gvd_id] = *cluster;
-  updated.insert(*cluster);
-
-  // construct edges by checking to see if any uncompressed neighbors map to a
-different
-  // compressed node
-  std::list<uint64_t> removed_graph_ids;
-  for (const auto neighbor : node.siblings) {
-    auto niter = remapping.find(neighbor);
-    if (niter == remapping.end()) {
-      continue;
-    }
-
-    if (niter->second == *cluster) {
-      continue;
-    }
-
-    if (iter->second.count(niter->second)) {
-      // voxel connected two neighboring clusters for the same index
-      iter->second.erase(niter->second);
-      merge(*cluster, info, niter->second);
-      removed_graph_ids.push_back(niter->second);
-      continue;
-    }
-
-    info.addEdgeObservation(gvd_id, neighbor, niter->second);
-    nodes.at(niter->second).addEdgeObservation(neighbor, gvd_id, *cluster);
-  }
-
-  return removed_graph_ids;
+  auto& info = compressed_.at(*compressed_id);
+  info.active_refs.insert(node.id);
+  compression_map_[node.id] = *compressed_id;
+  return *compressed_id;
 }
 
-CompressedGraph::DeleteResult CompressedGraph::remove(uint64_t gvd_id,
-                                                      bool is_archive) {
-  uint64_t node_id;
-  {  // scope limiting iter lifetime
-    auto iter = remapping.find(gvd_id);
-    if (iter == remapping.end()) {
-      return {};  // nothing to do if voxel wasn't compressed
-    }
-
-    node_id = iter->second;
-    remapping.erase(iter);
-  }
-
-  auto iter = nodes.find(node_id);
-  auto& node = iter->second;
-
-  DeleteResult result;
-  result.id = node_id;
-  result.was_best_id = gvd_id == node.best_gvd_id;
-  result.cleared_neighbors = node.removeEdgeObservations(gvd_id, nodes);
-
-  node.active_refs.erase(gvd_id);
-  if (is_archive) {
-    node.archived_refs.insert(gvd_id);
-  }
-
-  result.has_active = node.active_refs.empty();
-  result.has_archived = !node.archived_refs.empty();
-  if (result.has_active) {
-    return result;
-  }
-
-  // clear mapping between compression index and node id
-  {  // erase node entry from compression cell and erase compression cell
-    const auto& index = id_map.at(node_id);
-    auto iter = index_map.find(index);
-    iter->second.erase(node_id);
-    if (iter->second.empty()) {
-      index_map.erase(iter);
-    }
-  }
-
-  id_map.erase(node_id);
-  for (const auto sibling : node.siblings) {
-    nodes.at(sibling).siblings.erase(node_id);
-  }
-
-  nodes.erase(iter);
-  return result;
+std::optional<uint64_t> CompressedGvdGraph::cluster_for_gvd(uint64_t gvd_id) const {
+  auto iter = compression_map_.find(gvd_id);
+  return iter == compression_map_.end() ? std::optional<uint64_t>(iter->second)
+                                        : std::nullopt;
 }
 
-void CompressedGraph::merge(uint64_t curr_node_id,
-                            CompressedNode& curr_node,
-                            uint64_t neighbor_node_id) {
-  auto iter = nodes.find(neighbor_node_id);
-  for (const auto child : iter->second.active_refs) {
-    remapping[child] = curr_node_id;
+void CompressedGvdGraph::merge_clusters(uint64_t target, uint64_t candidate) {
+  auto iter = compressed_.find(candidate);
+  auto& candidate_node = iter->second;
+  auto& target_node = compressed_.at(target);
+  for (const auto child : candidate_node.active_refs) {
+    target_node.active_refs.insert(child);
+    compression_map_[child] = target;
   }
 
-  for (const auto child : iter->second.archived_refs) {
-    remapping[child] = curr_node_id;
+  for (const auto child : candidate_node.archived_refs) {
+    target_node.archived_refs.insert(child);
+    compression_map_[child] = target;
   }
 
-  curr_node.merge(iter->second, nodes);
-  id_map.erase(neighbor_node_id);
-  updated.erase(neighbor_node_id);
-  nodes.erase(iter);
+  for (auto sibling : candidate_node.siblings) {
+    target_node.siblings.insert(sibling);
+    compressed_.at(sibling).siblings.insert(target);
+
+    const EdgeKey old_key{sibling, candidate};
+    const auto old_iter = compressed_edge_support_.find(old_key);
+
+    const EdgeKey new_key{sibling, target};
+    auto new_iter = compressed_edge_support_.find(new_key);
+    if (new_iter == compressed_edge_support_.end()) {
+      new_iter = compressed_edge_support_.emplace(new_key, std::set<EdgeKey>{}).first;
+    }
+
+    new_iter->second.insert(old_iter->second.begin(), old_iter->second.end());
+    compressed_edge_support_.erase(old_iter);
+  }
+
+  compressed_id_map_.erase(candidate);
+  updated_.erase(candidate);
+  compressed_.erase(iter);
 }
-*/
+
+std::optional<uint64_t> CompressedGvdGraph::drop_uncompressed(const GlobalIndex& idx) {
+  auto iter = uncompressed_index_map_.find(idx);
+  if (iter == uncompressed_index_map_.end()) {
+    return std::nullopt;
+  }
+
+  const auto gvd_id = iter->second;
+  uncompressed_index_map_.erase(iter);
+  return gvd_id;
+}
+
+void CompressedGvdGraph::drop_compressed_id(uint64_t compressed_id) {
+  const auto id_iter = compressed_id_map_.find(compressed_id);
+  auto iter = compressed_index_map_.find(id_iter->second);
+  iter->second.erase(compressed_id);
+  if (iter->second.empty()) {
+    compressed_index_map_.erase(iter);
+  }
+
+  compressed_id_map_.erase(id_iter);
+}
 
 }  // namespace hydra::places

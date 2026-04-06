@@ -57,19 +57,6 @@ using timing::ScopedTimer;
 
 namespace {
 
-struct BestMemberResult {
-  uint64_t id = 0;
-  bool is_archived = false;
-  const GvdMemberInfo* info = nullptr;
-
-  operator bool() const { return info != nullptr; }
-};
-
-struct DeleteInfo {
-  GlobalIndex index;
-  uint64_t id;
-};
-
 NearestVertexInfo convertInfo(const GvdVertexInfo& parent_info) {
   NearestVertexInfo info;
   info.voxel_pos[0] = parent_info.pos[0];
@@ -78,28 +65,54 @@ NearestVertexInfo convertInfo(const GvdVertexInfo& parent_info) {
   return info;
 }
 
-BestMemberResult getBestMember(const CompressedNode& node,
-                               const GvdGraph& gvd,
-                               const MergePolicy& policy) {
-  BestMemberResult best_member;
-  for (const auto node_id : node.active_refs) {
-    auto curr_member = gvd.getNode(node_id);
-    if (!best_member.info || policy.compare(*curr_member, *best_member.info) > 0) {
-      best_member.info = curr_member;
-      best_member.id = node_id;
-    }
-  }
-
-  for (const auto node_id : node.archived_refs) {
-    auto curr_member = gvd.getNode(node_id);
-    if (!best_member.info || policy.compare(*curr_member, *best_member.info) > 0) {
-      best_member.is_archived = true;
-      best_member.info = curr_member;
-      best_member.id = node_id;
+// TODO(nathan) push to compressed graph impl
+const GvdMemberInfo* getBestMember(const CompressedGvdGraph::CompressedNode& node,
+                                   const CompressedGvdGraph& gvd,
+                                   const MergePolicy& policy) {
+  const GvdMemberInfo* best_member = nullptr;
+  const auto refs = node.refs();
+  for (const auto node_id : refs) {
+    auto curr_member = gvd.get(node_id);
+    if (!best_member || policy.compare(*curr_member, *best_member) > 0) {
+      best_member = curr_member;
     }
   }
 
   return best_member;
+}
+
+void fillParentInfo(const GvdLayer& layer,
+                    const GvdParentTracker& tracker,
+                    const GlobalIndex& index,
+                    PlaceNodeAttributes& attrs) {
+  const auto* voxel = layer.getVoxelPtr(index);
+  if (!voxel) {
+    // the compression-based extractor can have nodes pointing to archived voxels
+    return;
+  }
+
+  if (!tracker.parents.count(index)) {
+    LOG(ERROR) << "bad gvd voxel: " << *voxel << " @ " << index.transpose();
+    return;
+  }
+
+  // save primary parent first
+  attrs.voxblox_mesh_connections.clear();
+  const GlobalIndex curr_parent = voxel->parent;
+  auto iter = tracker.parent_vertices.find(curr_parent);
+  if (iter != tracker.parent_vertices.end()) {
+    attrs.voxblox_mesh_connections.push_back(convertInfo(iter->second));
+  }
+
+  // save all other basis points
+  for (const auto& parent : tracker.parents.at(index)) {
+    if (!tracker.parent_vertices.count(parent)) {
+      continue;
+    }
+
+    const auto& parent_info = tracker.parent_vertices.at(parent);
+    attrs.voxblox_mesh_connections.push_back(convertInfo(parent_info));
+  }
 }
 
 }  // namespace
@@ -133,10 +146,9 @@ void declare_config(GraphExtractor::Config& config) {
   field(config.freespace_edges, "freespace_edges");
 }
 
-GraphExtractor::GraphExtractor(const Config& config)
+GraphExtractor::GraphExtractor(const Config& config, float voxel_size)
     : config(config),
-      next_id_(0),
-      compressed_(config.compression_distance_m),
+      gvd_(voxel_size, config.compression_distance_m),
       merge_policy_(config::create<MergePolicy>(config.merge_policy)) {}
 
 GraphExtractor::~GraphExtractor() = default;
@@ -146,95 +158,31 @@ void GraphExtractor::pushIndex(const GlobalIndex& index) {
 }
 
 void GraphExtractor::clearIndex(const GlobalIndex& index) {
-  // gvd integrator update removes any invalidated voxels, so we update the support for
-  // all of hte nodes, deleting nodes that no longer have any support.
-  uint64_t gvd_id;
-  std::set<uint64_t> gvd_siblings;
-  {  // scope limiting iter lifetime to be valid
-    auto iter = index_id_map_.find(index);
-    if (iter == index_id_map_.end()) {
-      return;
-    }
-
-    gvd_id = iter->second;
-    gvd_.removeNode(iter->second);
-    index_id_map_.erase(iter);
-  }  // end iter scope
-
-  const auto info = compressed_.remove(gvd_id, false);
-  if (!info.id) {
-    return;
-  }
-
-  const auto compressed_id = info.id.value();
-  const NodeSymbol node_id(config.prefix, compressed_id);
-  if (info.was_best_id) {
-    // clear node id from active window until we assign a new member
-    node_index_map_.erase(node_id);
-  }
-
-  for (const auto sibling : info.cleared_neighbors) {
-    graph_.remove(node_id, NodeSymbol(config.prefix, sibling));
-    // TODO(nathan) track deleted
-  }
-
-  if (info.has_active) {
-    return;  // compressed node is still active; nothing else to do
-  }
-
-  if (!info.has_archived) {
-    graph_.remove(node_id);
-    // TODO(nathan) track deleted
-  } else {
-    to_archive_.insert(compressed_id);
-  }
+  // pass voxel index to compressed graph to handle (node state can be inferred when
+  // running extraction)
+  gvd_.remove(index);
 }
 
 void GraphExtractor::archiveIndex(const GlobalIndex& index) {
-  // 4. we archive all voxels, updating each compressed node
-  //   a. we move entries from an active set to an archived set
-  //   b. once there are no more entires in the active set, we flag as archived
-  //   c. once all siblings are also archived, we delete?
-  auto iter = index_id_map_.find(index);
-  if (iter == index_id_map_.end()) {
-    return;
-  }
-
-  // archived gvd nodes still can be accessed by their ID
-  const auto gvd_id = iter->second;
-  index_id_map_.erase(iter);
-  const auto info = compressed_.remove(gvd_id, true);
-  if (!info.id) {
-    gvd_.removeNode(gvd_id);  // nothing in the compressed graph depends on the node
-    return;
-  }
-
-  const auto compressed_id = info.id.value();
-  const NodeSymbol node_id(config.prefix, compressed_id);
-  if (info.was_best_id == gvd_id) {
-    // clear node id from active window: current best point is archived
-    node_index_map_.erase(node_id);
-  }
-
-  if (!info.has_active) {
-    to_archive_.insert(compressed_id);
-  }
+  // pass voxel index to compressed graph to handle (node state can be inferred when
+  // running extraction)
+  gvd_.archive(index);
 }
 
-void GraphExtractor::extract(const GvdLayer& layer, uint64_t timestamp_ns) {
-  // 0. remove all archived nodes that no longer have active siblings
+void GraphExtractor::extract(uint64_t timestamp_ns,
+                             const GvdLayer& layer,
+                             const GvdParentTracker& tracker) {
+  // Remove all archived nodes that no longer have active siblings
   clearArchived();
 
-  // 1. get unique and valid voxels, and then update the gvd graph and compression
-  IndexVoxelQueue seen_voxels;
-  fillSeenVoxels(layer, timestamp_ns, seen_voxels);
-  updateGvdGraph(layer, seen_voxels, timestamp_ns);
+  // Update the gvd graph and compression with unique voxels
+  updateGvdGraph(timestamp_ns, layer);
 
   // 2. we go through a list of updated compressed nodes and decide on a representative
   // set of attributes and edges
   //   a. we can't average attributes, so instead we pick a single candidate
   //   b. we could do centroid, but max(num_basis_points) might make more sense
-  assignCompressedNodeAttributes();
+  assignCompressedNodeAttributes(layer, tracker);
   updateCompressedEdges(layer);
 
   // 3. we optionally merge nearby nodes
@@ -242,79 +190,45 @@ void GraphExtractor::extract(const GvdLayer& layer, uint64_t timestamp_ns) {
     mergeNearbyNodes();
   }
 
-  compressed_.updated.clear();
   updateOverlapEdges();
   updateFreespaceEdges(layer);
 }
 
 void GraphExtractor::fillParentInfo(const GvdLayer& gvd,
-                                    const GvdParentTracker& tracker) {
-  for (const auto& [node_id, node_index] : node_index_map_) {
-    auto attrs = graph_.at(node_id);
-    attrs->voxblox_mesh_connections.clear();
-    const auto* voxel = gvd.getVoxelPtr(node_index);
-    if (!voxel) {
-      // the compression-based extractor can have nodes pointing to archived voxels
-      continue;
-    }
-
-    if (!tracker.parents.count(node_index)) {
-      LOG(ERROR) << "bad gvd voxel: " << *voxel << " @ " << node_index.transpose();
-      continue;
-    }
-
-    // save primary parent first
-    const GlobalIndex curr_parent = voxel->parent;
-    auto iter = tracker.parent_vertices.find(curr_parent);
-    if (iter != tracker.parent_vertices.end()) {
-      attrs->voxblox_mesh_connections.push_back(convertInfo(iter->second));
-    }
-
-    // save all other basis points
-    for (const auto& parent : tracker.parents.at(node_index)) {
-      if (!tracker.parent_vertices.count(parent)) {
-        continue;
-      }
-
-      const auto& parent_info = tracker.parent_vertices.at(parent);
-      attrs->voxblox_mesh_connections.push_back(convertInfo(parent_info));
-    }
-  }
-}
+                                    const GvdParentTracker& tracker) {}
 
 void GraphExtractor::clearArchived() {
-  std::list<uint64_t> to_remove;
-  for (const auto id : to_archive_) {
-    auto& info = compressed_.nodes.at(id);
+  const auto& compressed = gvd_.compressed();
+
+  std::list<uint64_t> to_archive;
+  for (const auto& [id, node] : compressed) {
+    if (!node.archived()) {
+      continue;
+    }
+
     bool can_be_archived = true;
-    for (const auto sibling_id : info.siblings) {
-      if (!to_archive_.count(sibling_id)) {
+    for (const auto sibling_id : node.siblings) {
+      const auto& sibling = compressed.at(sibling_id);
+      if (!sibling.archived()) {
         can_be_archived = false;
         break;
       }
     }
 
     if (can_be_archived) {
-      to_remove.push_back(id);
+      to_archive.push_back(id);
     }
   }
 
-  for (const auto id : to_remove) {
-    for (const auto gvd_id : compressed_.nodes.at(id).archived_refs) {
-      compressed_.remapping.erase(gvd_id);
-      gvd_.removeNode(gvd_id);
-    }
-
+  for (const auto id : to_archive) {
     MLOG(2) << "archiving " << id;
-    to_archive_.erase(id);
-    archived_node_ids_.insert(id);
+    gvd_.dropCompressed(id);
+    archived_node_ids_.insert(NodeSymbol(config.prefix, id));
   }
 }
 
-void GraphExtractor::fillSeenVoxels(const GvdLayer& layer,
-                                    uint64_t timestamp_ns,
-                                    IndexVoxelQueue& seen_voxels) {
-  ScopedTimer timer("places/prune_gvd_queue", timestamp_ns);
+void GraphExtractor::updateGvdGraph(uint64_t timestamp_ns, const GvdLayer& layer) {
+  ScopedTimer timer("places/update_gvd_graph", timestamp_ns);
 
   GlobalIndexSet seen_indices;
   while (!modified_voxel_queue_.empty()) {
@@ -335,84 +249,78 @@ void GraphExtractor::fillSeenVoxels(const GvdLayer& layer,
       continue;
     }
 
+    // TODO(nathan) check min distance criteria
     seen_indices.insert(index);
-    seen_voxels.push_back({index, voxel});
+    gvd_.add(index, voxel->distance, voxel->num_extra_basis + 1);
   }
 }
 
-void GraphExtractor::updateGvdGraph(const IndexVoxelQueue& update_info,
-                                    uint64_t timestamp_ns) {
-  ScopedTimer timer("places/update_gvd_graph", timestamp_ns);
-  for (const auto& [index, voxel] : update_info) {
-    gvd_.add(index, voxel->distance, voxel->num_extra_basis + 1);
+void GraphExtractor::assignCompressedNodeAttributes(const GvdLayer& layer,
+                                                    const GvdParentTracker& tracker) {
+  const auto& compressed = gvd_.compressed();
+  auto iter = graph_.begin();
+  while (iter != graph_.end()) {
+    NodeSymbol graph_id(iter->first);
+    if (compressed.count(graph_id.categoryId())) {
+      ++iter;
+      continue;
+    } else {
+      // TODO(nathan) track deleted
+      iter = graph_.erase(iter);
+    }
   }
 
-  std::list<DeleteInfo> to_delete;
-  const spatial_hash::NeighborSearch search(26);
-  for (const auto& [index, voxel] : update_info) {
-    auto iter = index_id_map_.find(index);
-    if (iter == index_id_map_.end()) {
-      // if we prune the GVD, there might not be a one-to-one correspondence
+  std::map<spark_dsg::NodeId, GlobalIndex> index_map;
+  for (const auto& [node_id, node] : compressed) {
+    auto result = getBestMember(node, gvd_, *merge_policy_);
+    if (!result) {
+      LOG(WARNING) << "Empty compressed node encountered: " << node_id;
       continue;
     }
 
-    auto& info = *gvd_.getNode(iter->second);
-    for (const auto& neighbor_index : search.neighborIndices(index)) {
-      auto niter = index_id_map_.find(neighbor_index);
-      if (niter == index_id_map_.end()) {
+    const auto graph_id = NodeSymbol(config.prefix, node_id);
+    auto attrs = std::make_unique<PlaceNodeAttributes>();
+    attrs->distance = result->distance;
+    attrs->num_basis_points = result->num_basis_points;
+    attrs->position = result->position.cast<double>();
+    fillParentInfo(layer, tracker, result->index, *attrs);
+    graph_.update(graph_id, std::move(attrs));
+    index_map.emplace(graph_id, result->index);
+  }
+
+  std::set<EdgeKey> curr_edges;
+  for (const auto& [node_id, node] : compressed) {
+    const NodeSymbol graph_id(config.prefix, node_id);
+    for (const auto sibling : node.siblings) {
+      const NodeSymbol sibling_id(config.prefix, sibling);
+      const EdgeKey key(graph_id, sibling_id);
+      if (curr_edges.count(key)) {
         continue;
       }
 
-      info.siblings.insert(niter->second);
-      gvd_.getNode(niter->second)->siblings.insert(iter->second);
+      if (!node_index_map_.count(sibling_id)) {
+        continue;  // sibling edge can't be updated
+      }
+
+      auto attrs = getFreespaceEdgeInfo(graph_,
+                                        layer,
+                                        node_index_map_,
+                                        graph_id,
+                                        sibling_id,
+                                        config.min_edge_distance_m,
+                                        false);
+      if (!attrs) {
+        graph_.remove(graph_id, sibling_id);
+        // TODO(nathan) track deleted
+        continue;
+      }
+
+      const EdgeKey key{graph_id, sibling_id};
+      graph_.update(graph_id, sibling_id, std::move(attrs));
+      // override heuristic edges with actual graph edges
+      overlap_edges_.erase(key);
+      freespace_edges_.erase(key);
     }
-
-    if (info.siblings.empty()) {
-      to_delete.push_back({index, iter->second});
-      continue;  // isolated voxel
-    }
-
-    if (info.distance < config.min_node_distance_m) {
-      continue;
-    }
-
-    const auto removed = compressed_.add(iter->second, info);
-    for (const auto id : removed) {
-      NodeSymbol graph_id(config.prefix, id);
-      graph_.remove(id);
-      node_index_map_.erase(id);
-      to_archive_.erase(id);
-      archived_node_ids_.erase(id);
-    }
-  }
-
-  for (const auto& delete_info : to_delete) {
-    clearIndex(delete_info.index);
-  }
-}
-
-void GraphExtractor::assignCompressedNodeAttributes() {
-  for (const auto& compressed_id : compressed_.updated) {
-    auto& info = compressed_.nodes.at(compressed_id);
-    auto result = getBestMember(info, gvd_, *merge_policy_);
-    if (!result) {
-      LOG(WARNING) << "Empty compressed node encountered: " << compressed_id;
-      continue;
-    }
-
-    info.best_gvd_id = result.id;
-    info.in_graph = true;
-    const auto graph_id = NodeSymbol(config.prefix, compressed_id);
-    if (!result.is_archived) {
-      // avoid handing a bad index to graph compression
-      node_index_map_[graph_id] = result.info->index;
-    }
-
-    auto attrs = std::make_unique<PlaceNodeAttributes>();
-    attrs->distance = result.info->distance;
-    attrs->num_basis_points = result.info->num_basis_points;
-    attrs->position = result.info->position.cast<double>();
-    graph_.update(graph_id, std::move(attrs));
   }
 }
 

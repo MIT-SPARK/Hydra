@@ -45,6 +45,7 @@
 
 namespace hydra {
 
+using places::GraphExtractor;
 using places::GvdIntegrator;
 using spark_dsg::DsgLayers;
 using spark_dsg::NodeId;
@@ -114,10 +115,9 @@ void declare_config(GvdPlaceExtractor::Config& config) {
 
 GvdPlaceExtractor::GvdPlaceExtractor(const Config& c)
     : config(config::checkValid(c)),
-      graph_extractor_(config.graph),
       map_window_(GlobalInfo::instance().createVolumetricWindow()),
+      tsdf_interpolator_(config.tsdf_interpolator.create()),
       sinks_(Sink::instantiate(config.sinks)) {
-  tsdf_interpolator_ = config.tsdf_interpolator.create();
   if (tsdf_interpolator_) {
     MLOG(0) << "Downsampling TSDF when creating places!";
   }
@@ -152,14 +152,15 @@ void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg) {
 
   if (!gvd_) {
     gvd_.reset(new places::GvdLayer(tsdf.voxel_size, tsdf.voxels_per_side));
-    gvd_integrator_.reset(new GvdIntegrator(config.gvd, gvd_));
+    gvd_integrator_ = std::make_unique<GvdIntegrator>(config.gvd, gvd_);
+    graph_extractor_ = std::make_unique<GraphExtractor>(config.graph, tsdf.voxel_size);
   }
 
   ScopedTimer graph_timer("places/gvd", msg.timestamp_ns);
   // reconstruction now only sends updated blocks so we integrate everything
   gvd_integrator_->updateFromTsdf(
       msg.timestamp_ns, tsdf, false, &map.getMeshLayer(), true);
-  gvd_integrator_->updateGvd(msg.timestamp_ns, &graph_extractor_);
+  gvd_integrator_->updateGvd(msg.timestamp_ns, graph_extractor_.get());
 
   if (map_window_) {
     BlockIndices to_archive;
@@ -169,16 +170,16 @@ void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg) {
       }
     }
 
-    gvd_integrator_->archiveBlocks(to_archive, &graph_extractor_);
+    gvd_integrator_->archiveBlocks(to_archive, graph_extractor_.get());
   }
 
-  Sink::callAll(sinks_, msg.timestamp_ns, world_T_body, *gvd_, graph_extractor_);
+  Sink::callAll(sinks_, msg.timestamp_ns, world_T_body, *gvd_, *graph_extractor_);
 }
 
 void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
   ScopedTimer timer("frontend/update_gvd_places", timestamp_ns, true, 2, false);
 
-  const auto& places = graph_extractor_.graph();
+  const auto& places = graph_extractor_->graph();
   MLOG(1) << "Considering " << places.nodes().size() << " input place nodes ";
 
   std::vector<NodeId> deleted_nodes;

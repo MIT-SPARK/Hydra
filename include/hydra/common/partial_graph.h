@@ -51,6 +51,7 @@ class PartialGraph {
     NodeAttr attrs;
     std::set<NodeId> neighbors;
   };
+  using Nodes = std::map<NodeId, Node>;
 
   void add(NodeId node_id, NodeAttr&& attrs = nullptr);
 
@@ -79,6 +80,12 @@ class PartialGraph {
   const std::map<NodeId, Node>& nodes() const { return nodes_; }
 
   size_t num_nodes() const { return nodes_.size(); }
+
+  typename Nodes::iterator begin() { return nodes_.begin(); }
+
+  typename Nodes::iterator end() { return nodes_.end(); }
+
+  typename Nodes::iterator erase(const typename Nodes::iterator& iter);
 
  private:
   Node* find(NodeId node);
@@ -202,6 +209,20 @@ template <typename AttrT>
 auto PartialGraph<AttrT>::find(NodeId node) -> typename PartialGraph::Node* {
   auto iter = nodes_.find(node);
   return iter == nodes_.end() ? nullptr : &iter->second;
+}
+
+template <typename AttrT>
+auto PartialGraph<AttrT>::erase(const typename Nodes::iterator& iter) ->
+    typename Nodes::iterator {
+  if (iter == nodes_.end()) {
+    return iter;
+  }
+
+  for (const auto& sibling : iter->second.siblings) {
+    edges_.remove(iter->first, sibling);
+  }
+
+  return nodes_.erase(iter);
 }
 
 }  // namespace hydra
