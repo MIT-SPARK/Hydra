@@ -144,30 +144,6 @@ TEST(GvdUtilities, GvdParentCorrect) {
   EXPECT_TRUE(current.voxel.has_parent);
 }
 
-TEST(GvdUtilities, setGvdSurfaceVoxel) {
-  {  // assign parent from neighbor parent
-    GvdVoxel current;
-    EXPECT_FALSE(current.has_parent);
-    EXPECT_FALSE(current.on_surface);
-
-    setGvdSurfaceVoxel(current);
-
-    EXPECT_FALSE(current.has_parent);
-    EXPECT_TRUE(current.on_surface);
-  }
-
-  {  // assign parent from neighbor parent
-    GvdVoxel current = makeGvdVoxel(1, 2, 3, 4.0, 5, 6, 7).voxel;
-    EXPECT_TRUE(current.has_parent);
-    EXPECT_FALSE(current.on_surface);
-
-    setGvdSurfaceVoxel(current);
-
-    EXPECT_FALSE(current.has_parent);
-    EXPECT_TRUE(current.on_surface);
-  }
-}
-
 // test that estimate distance handles all the different
 // sign cases correctly
 TEST(GvdUtilities, estimateDistanceCorrect) {

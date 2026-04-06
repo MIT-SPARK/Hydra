@@ -340,20 +340,11 @@ void GraphExtractor::fillSeenVoxels(const GvdLayer& layer,
   }
 }
 
-void GraphExtractor::updateGvdGraph(const GvdLayer& layer,
-                                    const IndexVoxelQueue& update_info,
+void GraphExtractor::updateGvdGraph(const IndexVoxelQueue& update_info,
                                     uint64_t timestamp_ns) {
   ScopedTimer timer("places/update_gvd_graph", timestamp_ns);
   for (const auto& [index, voxel] : update_info) {
-    auto iter = index_id_map_.find(index);
-    if (iter == index_id_map_.end()) {
-      const auto next_id = gvd_.addNode(layer.getVoxelPosition(index), index);
-      iter = index_id_map_.emplace(index, next_id).first;
-    }
-
-    auto& info = *gvd_.getNode(iter->second);
-    info.distance = voxel->distance;
-    info.num_basis_points = voxel->num_extra_basis + 1;
+    gvd_.add(index, voxel->distance, voxel->num_extra_basis + 1);
   }
 
   std::list<DeleteInfo> to_delete;

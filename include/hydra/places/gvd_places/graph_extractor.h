@@ -136,7 +136,7 @@ class GraphExtractor {
 
  protected:
   uint64_t next_id_;
-  GvdGraph gvd_;
+  CompressedGvdGraph gvd_;
   CompressedGraph compressed_;
   PartialGraph<spark_dsg::PlaceNodeAttributes> graph_;
 

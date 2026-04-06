@@ -84,7 +84,7 @@ class GvdIntegrator {
     //! Criteria for GVD membership
     VoronoiCheckConfig voronoi_config;
 
-    Config() : VerbosityConfig("[gvd] ") {}
+    Config();
   } const config;
 
   GvdIntegrator(const Config& config, const GvdLayer::Ptr& gvd_layer);

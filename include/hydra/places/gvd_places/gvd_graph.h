@@ -33,10 +33,13 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <spatial_hash/neighbor_utils.h>
+
 #include <Eigen/Dense>
 #include <cstdint>
 #include <list>
-#include <memory>
+#include <map>
+#include <optional>
 #include <set>
 #include <unordered_map>
 
@@ -49,23 +52,51 @@ struct GvdMemberInfo {
   uint8_t num_basis_points = 0;
   Eigen::Vector3f position;
   GlobalIndex index;
+};
+
+struct Node {
+  uint64_t id;
+  GvdMemberInfo info;
   std::set<uint64_t> siblings;
 };
 
-class GvdGraph {
- public:
-  using Ptr = std::shared_ptr<GvdGraph>;
-  using Nodes = std::unordered_map<uint64_t, GvdMemberInfo>;
+struct CompressedNode {
+  using CompressedNodeMap = std::unordered_map<uint64_t, CompressedNode>;
+  uint64_t node_id;
+  std::set<uint64_t> siblings;
+  std::set<uint64_t> active_refs;
+  std::set<uint64_t> archived_refs;
+  std::unordered_map<uint64_t, std::map<uint64_t, uint64_t>> sibling_support;
+  std::map<uint64_t, uint64_t> sibling_ref_counts;
+  uint64_t best_gvd_id;
 
-  GvdGraph();
+  explicit CompressedNode(uint64_t node_id);
+
+  void addEdgeObservation(uint64_t gvd_id,
+                          uint64_t neighbor_gvd_id,
+                          uint64_t sibling_id);
+
+  bool removeEdgeObservation(uint64_t gvd_id, uint64_t neighbor_gvd_id);
+
+  std::list<uint64_t> removeEdgeObservations(uint64_t gvd_id, CompressedNodeMap& nodes);
+
+  void mergeObservations(uint64_t original_id, uint64_t new_id);
+
+  void merge(CompressedNode& other, CompressedNodeMap& nodes);
+};
+
+class CompressedGvdGraph {
+ public:
+  using Nodes = std::unordered_map<uint64_t, Node>;
+  using CompressedNodes = std::unordered_map<uint64_t, CompressedNode>;
+
+  CompressedGvdGraph(float voxel_resolution_m, float compression_resolution_m);
 
   bool empty() const;
 
-  uint64_t addNode(const Eigen::Vector3f& position, const GlobalIndex& index);
+  void add(const GlobalIndex& index, double distance, uint8_t num_basis_points);
 
   void removeNode(uint64_t node);
-
-  GvdMemberInfo* getNode(uint64_t node);
 
   const GvdMemberInfo* getNode(uint64_t node) const;
 
@@ -73,14 +104,37 @@ class GvdGraph {
 
   bool hasNode(uint64_t) const;
 
- protected:
-  uint64_t getNextId();
+  const spatial_hash::LongIndexGrid voxel_grid;
+  const spatial_hash::IndexGrid compression_grid;
+  const spatial_hash::NeighborSearch neighbor_search;
 
  protected:
-  uint64_t next_id_;
-  std::list<uint64_t> id_queue_;
+  uint64_t next_gvd_id();
 
-  Nodes nodes_;
+  uint64_t next_compressed_id();
+
+  Node* add_gvd(const GlobalIndex& index, double distance, uint8_t basis);
+
+  Node* gvd_by_index(const GlobalIndex& index);
+
+  uint64_t assign_to_cluster(const Node& node);
+
+  std::optional<uint64_t> cluster_for_gvd(uint64_t gvd_id) const;
+
+ protected:
+  uint64_t next_gvd_id_;
+  uint64_t next_compressed_id_;
+  std::list<uint64_t> gvd_id_queue_;
+
+  spatial_hash::IndexHashMap<uint64_t> index_map_;
+  spatial_hash::IndexHashMap<std::set<uint64_t>> compressed_index_map_;
+
+  std::unordered_map<uint64_t, spatial_hash::Index> id_map;
+  std::unordered_map<uint64_t, uint64_t> remapping_;
+  std::unordered_set<uint64_t> updated_;
+
+  Nodes gvd_;
+  CompressedNodes compressed_;
 };
 
 }  // namespace hydra::places

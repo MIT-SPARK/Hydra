@@ -87,17 +87,11 @@ inline void setDefaultDistance(GvdVoxel& voxel, const double default_distance) {
 inline void setRaiseStatus(GvdVoxel& voxel, const double default_distance) {
   voxel.has_parent = false;
   voxel.to_raise = true;
-
   if (voxel.fixed) {
     return;
   }
 
   setDefaultDistance(voxel, default_distance);
-}
-
-inline void setGvdSurfaceVoxel(GvdVoxel& voxel) {
-  voxel.on_surface = true;
-  voxel.has_parent = false;
 }
 
 }  // namespace hydra::places

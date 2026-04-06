@@ -48,32 +48,6 @@ namespace hydra::places {
 
 struct GvdMemberInfo;
 
-struct CompressedNode {
-  using CompressedNodeMap = std::unordered_map<uint64_t, CompressedNode>;
-  uint64_t node_id;
-  std::set<uint64_t> siblings;
-  std::set<uint64_t> active_refs;
-  std::set<uint64_t> archived_refs;
-  std::unordered_map<uint64_t, std::map<uint64_t, uint64_t>> sibling_support;
-  std::map<uint64_t, uint64_t> sibling_ref_counts;
-  uint64_t best_gvd_id;
-  bool in_graph = false;
-
-  explicit CompressedNode(uint64_t node_id);
-
-  void addEdgeObservation(uint64_t gvd_id,
-                          uint64_t neighbor_gvd_id,
-                          uint64_t sibling_id);
-
-  bool removeEdgeObservation(uint64_t gvd_id, uint64_t neighbor_gvd_id);
-
-  std::list<uint64_t> removeEdgeObservations(uint64_t gvd_id, CompressedNodeMap& nodes);
-
-  void mergeObservations(uint64_t original_id, uint64_t new_id);
-
-  void merge(CompressedNode& other, CompressedNodeMap& nodes);
-};
-
 struct CompressedGraph {
   struct DeleteResult {
     std::optional<uint64_t> id = std::nullopt;

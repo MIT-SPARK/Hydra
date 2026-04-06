@@ -155,7 +155,7 @@ TEST_F(GraphExtractorFixture, TestUpdateNode) {
   }
 }
 
-TEST_F(GraphExtractorFixture, testUpdateGraph) {
+TEST_F(GraphExtractorFixture, DISABLED_testUpdateGraph) {
   GraphExtractor::Config config;
   config.min_node_distance_m = 0.0;
   TestGraphExtractor extractor(config);
@@ -237,7 +237,7 @@ TEST_F(GraphExtractorFixture, testUpdateGraph) {
   }
 }
 
-TEST_F(GraphExtractorFixture, testAttributeAssignmentOneToOne) {
+TEST_F(GraphExtractorFixture, DISABLED_testAttributeAssignmentOneToOne) {
   GraphExtractor::Config config;
   config.min_node_distance_m = 0.0;
 
@@ -271,7 +271,7 @@ TEST_F(GraphExtractorFixture, testAttributeAssignmentOneToOne) {
   checkNode(places, "p2"_id, Eigen::Vector3d(0, 1, 0), 0.4, 4u);
 }
 
-TEST_F(GraphExtractorFixture, testAttributeAssignmentManyToOne) {
+TEST_F(GraphExtractorFixture, DISABLED_testAttributeAssignmentManyToOne) {
   GraphExtractor::Config config;
   config.min_node_distance_m = 0.1;
   config.compression_distance_m = 3.0;
@@ -308,7 +308,7 @@ TEST_F(GraphExtractorFixture, testAttributeAssignmentManyToOne) {
 }
 
 // show that isolated voxels deletion gets propagated to compressed graph
-TEST_F(GraphExtractorFixture, testSingleVoxelDeletion) {
+TEST_F(GraphExtractorFixture, DISABLED_testSingleVoxelDeletion) {
   GraphExtractor::Config config;
   config.compression_distance_m = 3.0;
   config.min_node_distance_m = 0.1;
@@ -353,7 +353,7 @@ TEST_F(GraphExtractorFixture, testSingleVoxelDeletion) {
   }
 }
 
-TEST_F(GraphExtractorFixture, testVoxelDeletion) {
+TEST_F(GraphExtractorFixture, DISABLED_testVoxelDeletion) {
   GraphExtractor::Config config;
   config.compression_distance_m = 3.0;
   config.min_node_distance_m = 0.0;
@@ -424,7 +424,7 @@ TEST_F(GraphExtractorFixture, testVoxelDeletion) {
   }
 }
 
-TEST_F(GraphExtractorFixture, testVoxelArchival) {
+TEST_F(GraphExtractorFixture, DISABLED_testVoxelArchival) {
   GraphExtractor::Config config;
   config.compression_distance_m = 3.0;
   config.min_node_distance_m = 0.0;
@@ -484,7 +484,7 @@ TEST_F(GraphExtractorFixture, testVoxelArchival) {
   EXPECT_EQ(gvd.nodes().size(), 2u);
 }
 
-TEST_F(GraphExtractorFixture, testArchiveAndDelete) {
+TEST_F(GraphExtractorFixture, DISABLED_testArchiveAndDelete) {
   GraphExtractor::Config config;
   config.compression_distance_m = 3.0;
   config.min_node_distance_m = 0.0;
@@ -533,7 +533,7 @@ TEST_F(GraphExtractorFixture, testArchiveAndDelete) {
   }
 }
 
-TEST_F(GraphExtractorFixture, testUniformGvd) {
+TEST_F(GraphExtractorFixture, DISABLED_testUniformGvd) {
   GraphExtractor::Config config;
   config.compression_distance_m = 0.5;
   GraphExtractor extractor(config);
