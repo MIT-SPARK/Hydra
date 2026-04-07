@@ -55,7 +55,7 @@ struct GvdMemberInfo {
   GlobalIndex index;
 };
 
-class CompressedGvdGraph {
+class GvdGraph {
  public:
   struct Node {
     uint64_t id;
@@ -79,7 +79,7 @@ class CompressedGvdGraph {
   using CompressedNodes = std::map<uint64_t, CompressedNode>;
   using CompressionEdgeMap = std::map<spark_dsg::EdgeKey, std::set<spark_dsg::EdgeKey>>;
 
-  CompressedGvdGraph(float voxel_resolution_m, float compression_resolution_m);
+  GvdGraph(float voxel_resolution_m, float compression_resolution_m);
 
   void add(const GlobalIndex& index, double distance, uint8_t num_basis_points);
 
@@ -95,7 +95,7 @@ class CompressedGvdGraph {
 
   const CompressedNodes& compressed() const;
 
-  const spatial_hash::LongIndexGrid voxel_grid;
+  const spatial_hash::IndexGrid voxel_grid;
   const spatial_hash::IndexGrid compression_grid;
   const spatial_hash::NeighborSearch neighbor_search;
 

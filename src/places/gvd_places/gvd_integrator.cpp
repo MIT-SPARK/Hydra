@@ -236,8 +236,7 @@ void GvdIntegrator::updateGvd(uint64_t timestamp_ns, GraphExtractor* graph_extra
   if (graph_extractor) {
     MLOG(Verbosity::STATUS) << "Starting graph extraction";
     ScopedTimer timer("places/graph_extractor", timestamp_ns);
-    graph_extractor->extract(*gvd_layer_, timestamp_ns);
-    graph_extractor->fillParentInfo(*gvd_layer_, parent_tracker_);
+    graph_extractor->extract(timestamp_ns, *gvd_layer_, parent_tracker_);
   }
 
   MLOG(Verbosity::STATUS) << "\n" << update_stats_.print();

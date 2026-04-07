@@ -66,8 +66,8 @@ NearestVertexInfo convertInfo(const GvdVertexInfo& parent_info) {
 }
 
 // TODO(nathan) push to compressed graph impl
-const GvdMemberInfo* getBestMember(const CompressedGvdGraph::CompressedNode& node,
-                                   const CompressedGvdGraph& gvd,
+const GvdMemberInfo* getBestMember(const GvdGraph::CompressedNode& node,
+                                   const GvdGraph& gvd,
                                    const MergePolicy& policy) {
   const GvdMemberInfo* best_member = nullptr;
   const auto refs = node.refs();
@@ -178,24 +178,18 @@ void GraphExtractor::extract(uint64_t timestamp_ns,
   // Update the gvd graph and compression with unique voxels
   updateGvdGraph(timestamp_ns, layer);
 
-  // 2. we go through a list of updated compressed nodes and decide on a representative
-  // set of attributes and edges
-  //   a. we can't average attributes, so instead we pick a single candidate
-  //   b. we could do centroid, but max(num_basis_points) might make more sense
-  assignCompressedNodeAttributes(layer, tracker);
-  updateCompressedEdges(layer);
+  // Copy all the updates from the compressed GVD graph to the partial update
+  updatePartialGraph(layer, tracker);
 
-  // 3. we optionally merge nearby nodes
+  // Optionally merge nearby nodes
   if (config.merge_nearby_nodes) {
     mergeNearbyNodes();
   }
 
+  // Add heuristic edges to the compressed graph
   updateOverlapEdges();
   updateFreespaceEdges(layer);
 }
-
-void GraphExtractor::fillParentInfo(const GvdLayer& gvd,
-                                    const GvdParentTracker& tracker) {}
 
 void GraphExtractor::clearArchived() {
   const auto& compressed = gvd_.compressed();
@@ -223,7 +217,7 @@ void GraphExtractor::clearArchived() {
   for (const auto id : to_archive) {
     MLOG(2) << "archiving " << id;
     gvd_.dropCompressed(id);
-    archived_node_ids_.insert(NodeSymbol(config.prefix, id));
+    archived_nodes_.insert(NodeSymbol(config.prefix, id));
   }
 }
 
@@ -255,8 +249,8 @@ void GraphExtractor::updateGvdGraph(uint64_t timestamp_ns, const GvdLayer& layer
   }
 }
 
-void GraphExtractor::assignCompressedNodeAttributes(const GvdLayer& layer,
-                                                    const GvdParentTracker& tracker) {
+void GraphExtractor::updatePartialGraph(const GvdLayer& layer,
+                                        const GvdParentTracker& tracker) {
   const auto& compressed = gvd_.compressed();
   auto iter = graph_.begin();
   while (iter != graph_.end()) {
@@ -270,7 +264,6 @@ void GraphExtractor::assignCompressedNodeAttributes(const GvdLayer& layer,
     }
   }
 
-  std::map<spark_dsg::NodeId, GlobalIndex> index_map;
   for (const auto& [node_id, node] : compressed) {
     auto result = getBestMember(node, gvd_, *merge_policy_);
     if (!result) {
@@ -285,7 +278,7 @@ void GraphExtractor::assignCompressedNodeAttributes(const GvdLayer& layer,
     attrs->position = result->position.cast<double>();
     fillParentInfo(layer, tracker, result->index, *attrs);
     graph_.update(graph_id, std::move(attrs));
-    index_map.emplace(graph_id, result->index);
+    node_index_map_.emplace(graph_id, result->index);
   }
 
   std::set<EdgeKey> curr_edges;
@@ -298,6 +291,7 @@ void GraphExtractor::assignCompressedNodeAttributes(const GvdLayer& layer,
         continue;
       }
 
+      curr_edges.insert(key);
       if (!node_index_map_.count(sibling_id)) {
         continue;  // sibling edge can't be updated
       }
@@ -315,44 +309,6 @@ void GraphExtractor::assignCompressedNodeAttributes(const GvdLayer& layer,
         continue;
       }
 
-      const EdgeKey key{graph_id, sibling_id};
-      graph_.update(graph_id, sibling_id, std::move(attrs));
-      // override heuristic edges with actual graph edges
-      overlap_edges_.erase(key);
-      freespace_edges_.erase(key);
-    }
-  }
-}
-
-void GraphExtractor::updateCompressedEdges(const GvdLayer& layer) {
-  for (const auto compressed_id : compressed_.updated) {
-    auto& info = compressed_.nodes.at(compressed_id);
-    const auto graph_id = NodeSymbol(config.prefix, compressed_id);
-    if (!node_index_map_.count(graph_id)) {
-      // this can happen when a node starts pointing to an archived gvd voxel
-      continue;
-    }
-
-    for (const auto sibling : info.siblings) {
-      const NodeSymbol sibling_id(config.prefix, sibling);
-      if (!node_index_map_.count(sibling_id)) {
-        continue;  // sibling edge can't be updated
-      }
-
-      auto attrs = getFreespaceEdgeInfo(graph_,
-                                        layer,
-                                        node_index_map_,
-                                        graph_id,
-                                        sibling_id,
-                                        config.min_edge_distance_m,
-                                        false);
-      if (!attrs) {
-        graph_.remove(graph_id, sibling_id);
-        // TODO(nathan) track deleted
-        continue;
-      }
-
-      const EdgeKey key{graph_id, sibling_id};
       graph_.update(graph_id, sibling_id, std::move(attrs));
       // override heuristic edges with actual graph edges
       overlap_edges_.erase(key);
@@ -362,6 +318,7 @@ void GraphExtractor::updateCompressedEdges(const GvdLayer& layer) {
 }
 
 void GraphExtractor::mergeNearbyNodes() {
+  /*
   std::unordered_map<uint64_t, uint64_t> merges;
   std::unordered_map<uint64_t, std::unordered_set<uint64_t>> reversed_merges;
   for (const auto& compressed_id : compressed_.updated) {
@@ -422,6 +379,7 @@ void GraphExtractor::mergeNearbyNodes() {
     node_index_map_.erase(to_merge);
     graph_.contract(to_merge, NodeSymbol(config.prefix, to));
   }
+  */
 }
 
 void GraphExtractor::updateOverlapEdges() {

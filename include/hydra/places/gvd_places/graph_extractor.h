@@ -108,10 +108,7 @@ class GraphExtractor {
 
   void updateGvdGraph(uint64_t timestamp_ns, const GvdLayer& layer);
 
-  void assignCompressedNodeAttributes(const GvdLayer& layer,
-                                      const GvdParentTracker& parents);
-
-  void updateCompressedEdges(const GvdLayer& layer);
+  void updatePartialGraph(const GvdLayer& layer, const GvdParentTracker& parents);
 
   void mergeNearbyNodes();
 
@@ -120,17 +117,18 @@ class GraphExtractor {
   void updateFreespaceEdges(const GvdLayer& layer);
 
  protected:
-  CompressedGvdGraph gvd_;
+  GvdGraph gvd_;
   PartialGraph<spark_dsg::PlaceNodeAttributes> graph_;
+  std::queue<GlobalIndex> modified_voxel_queue_;
   std::unique_ptr<MergePolicy> merge_policy_;
 
-  std::queue<GlobalIndex> modified_voxel_queue_;
+  std::unordered_map<spark_dsg::NodeId, GlobalIndex> node_index_map_;
+  std::set<spark_dsg::NodeId> updated_nodes_;
   std::set<spark_dsg::EdgeKey> overlap_edges_;
   std::set<spark_dsg::EdgeKey> freespace_edges_;
-  std::unordered_set<spark_dsg::NodeId> deleted_nodes_;
+  std::set<spark_dsg::NodeId> deleted_nodes_;
   std::vector<spark_dsg::EdgeKey> deleted_edges_;
-
-  std::unordered_set<spark_dsg::NodeId> archived_node_ids_;
+  std::set<spark_dsg::NodeId> archived_nodes_;
 };
 
 void declare_config(GraphExtractor::Config& config);

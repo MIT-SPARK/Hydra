@@ -218,7 +218,7 @@ auto PartialGraph<AttrT>::erase(const typename Nodes::iterator& iter) ->
     return iter;
   }
 
-  for (const auto& sibling : iter->second.siblings) {
+  for (const auto& sibling : iter->second.neighbors) {
     edges_.remove(iter->first, sibling);
   }
 

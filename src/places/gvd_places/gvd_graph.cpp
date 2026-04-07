@@ -34,13 +34,16 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/gvd_places/gvd_graph.h"
 
+#include <glog/logging.h>
+#include <glog/stl_logging.h>
+
 namespace hydra::places {
 
 using spark_dsg::EdgeKey;
-using Node = CompressedGvdGraph::Node;
-using Nodes = CompressedGvdGraph::Nodes;
-using CompressedNode = CompressedGvdGraph::CompressedNode;
-using CompressedNodes = CompressedGvdGraph::CompressedNodes;
+using Node = GvdGraph::Node;
+using Nodes = GvdGraph::Nodes;
+using CompressedNode = GvdGraph::CompressedNode;
+using CompressedNodes = GvdGraph::CompressedNodes;
 
 CompressedNode::CompressedNode(uint64_t id) : node_id(id) {}
 
@@ -54,17 +57,14 @@ bool CompressedNode::archived() const {
   return active_refs.empty() && !archived_refs.empty();
 }
 
-CompressedGvdGraph::CompressedGvdGraph(float voxel_resolution_m,
-                                       float compression_resolution_m)
+GvdGraph::GvdGraph(float voxel_resolution_m, float compression_resolution_m)
     : voxel_grid(voxel_resolution_m),
       compression_grid(compression_resolution_m),
       neighbor_search(26),
       next_uncompressed_id_(0),
       next_compressed_id_(0) {}
 
-void CompressedGvdGraph::add(const GlobalIndex& vindex,
-                             double distance,
-                             uint8_t basis) {
+void GvdGraph::add(const GlobalIndex& vindex, double distance, uint8_t basis) {
   auto node = add_uncompressed(vindex, distance, basis);
   if (!node) {
     return;
@@ -111,7 +111,8 @@ void CompressedGvdGraph::add(const GlobalIndex& vindex,
   }
 }
 
-void CompressedGvdGraph::remove(const GlobalIndex& index) {
+void GvdGraph::remove(const GlobalIndex& index) {
+  // TODO(nathan) this needs to be able to split nodes technically
   const auto maybe_gvd_id = drop_uncompressed(index);
   if (!maybe_gvd_id) {
     return;
@@ -157,16 +158,6 @@ void CompressedGvdGraph::remove(const GlobalIndex& index) {
     return;
   }
 
-  // clear mapping between compression index and node id
-  {  // erase node entry from compression cell and erase compression cell
-    const auto& index = compressed_id_map_.at(compressed_id);
-    auto iter = compressed_index_map_.find(index);
-    iter->second.erase(compressed_id);
-    if (iter->second.empty()) {
-      compressed_index_map_.erase(iter);
-    }
-  }
-
   drop_compressed_id(compressed_id);
   for (const auto sibling : node.siblings) {
     compressed_.at(sibling).siblings.erase(compressed_id);
@@ -175,7 +166,7 @@ void CompressedGvdGraph::remove(const GlobalIndex& index) {
   compressed_.erase(iter);
 }
 
-void CompressedGvdGraph::archive(const GlobalIndex& index) {
+void GvdGraph::archive(const GlobalIndex& index) {
   const auto gvd_id = drop_uncompressed(index);
   if (!gvd_id) {
     return;
@@ -188,7 +179,7 @@ void CompressedGvdGraph::archive(const GlobalIndex& index) {
   node.archived_refs.insert(*gvd_id);
 }
 
-void CompressedGvdGraph::dropCompressed(uint64_t compressed_id) {
+void GvdGraph::dropCompressed(uint64_t compressed_id) {
   auto iter = compressed_.find(compressed_id);
   if (iter == compressed_.end()) {
     return;
@@ -215,16 +206,16 @@ void CompressedGvdGraph::dropCompressed(uint64_t compressed_id) {
   compressed_.erase(iter);
 }
 
-const GvdMemberInfo* CompressedGvdGraph::get(uint64_t node) const {
+const GvdMemberInfo* GvdGraph::get(uint64_t node) const {
   auto iter = uncompressed_.find(node);
   return iter == uncompressed_.end() ? nullptr : &iter->second.info;
 }
 
-const Nodes& CompressedGvdGraph::uncompressed() const { return uncompressed_; }
+const Nodes& GvdGraph::uncompressed() const { return uncompressed_; }
 
-const CompressedNodes& CompressedGvdGraph::compressed() const { return compressed_; }
+const CompressedNodes& GvdGraph::compressed() const { return compressed_; }
 
-uint64_t CompressedGvdGraph::next_uncompressed_id() {
+uint64_t GvdGraph::next_uncompressed_id() {
   uint64_t new_id;
   if (uncompressed_id_queue_.empty()) {
     new_id = next_uncompressed_id_;
@@ -237,16 +228,14 @@ uint64_t CompressedGvdGraph::next_uncompressed_id() {
   return new_id;
 }
 
-uint64_t CompressedGvdGraph::next_compressed_id() {
+uint64_t GvdGraph::next_compressed_id() {
   // TODO(nathan) make circular queue once backend works better
   uint64_t new_id = next_compressed_id_;
   ++next_compressed_id_;
   return new_id;
 }
 
-Node* CompressedGvdGraph::add_uncompressed(const GlobalIndex& index,
-                                           double dist,
-                                           uint8_t basis) {
+Node* GvdGraph::add_uncompressed(const GlobalIndex& index, double dist, uint8_t basis) {
   auto iter = uncompressed_index_map_.find(index);
   if (iter != uncompressed_index_map_.end()) {
     auto& node = uncompressed_.at(iter->second);
@@ -263,13 +252,13 @@ Node* CompressedGvdGraph::add_uncompressed(const GlobalIndex& index,
   return &niter->second;
 }
 
-Node* CompressedGvdGraph::uncompressed_by_index(const GlobalIndex& index) {
+Node* GvdGraph::uncompressed_by_index(const GlobalIndex& index) {
   auto iter = uncompressed_index_map_.find(index);
   return iter == uncompressed_index_map_.end() ? nullptr
                                                : &uncompressed_.at(iter->second);
 }
 
-uint64_t CompressedGvdGraph::assign_to_cluster(const Node& node) {
+uint64_t GvdGraph::assign_to_cluster(const Node& node) {
   const auto index = compression_grid.toIndex(node.info.position);
   auto iter = compressed_index_map_.find(index);
   if (iter == compressed_index_map_.end()) {
@@ -287,10 +276,10 @@ uint64_t CompressedGvdGraph::assign_to_cluster(const Node& node) {
   }
 
   if (!compressed_id) {
-    const auto compressed_id = next_compressed_id();
-    iter->second.insert(compressed_id);
-    compressed_id_map_.emplace(compressed_id, index);
-    compressed_.emplace(compressed_id, CompressedNode(compressed_id));
+    compressed_id = next_compressed_id();
+    iter->second.insert(*compressed_id);
+    compressed_id_map_.emplace(*compressed_id, index);
+    compressed_.emplace(*compressed_id, CompressedNode(*compressed_id));
   }
 
   auto& info = compressed_.at(*compressed_id);
@@ -299,13 +288,13 @@ uint64_t CompressedGvdGraph::assign_to_cluster(const Node& node) {
   return *compressed_id;
 }
 
-std::optional<uint64_t> CompressedGvdGraph::cluster_for_gvd(uint64_t gvd_id) const {
+std::optional<uint64_t> GvdGraph::cluster_for_gvd(uint64_t gvd_id) const {
   auto iter = compression_map_.find(gvd_id);
   return iter == compression_map_.end() ? std::optional<uint64_t>(iter->second)
                                         : std::nullopt;
 }
 
-void CompressedGvdGraph::merge_clusters(uint64_t target, uint64_t candidate) {
+void GvdGraph::merge_clusters(uint64_t target, uint64_t candidate) {
   auto iter = compressed_.find(candidate);
   auto& candidate_node = iter->second;
   auto& target_node = compressed_.at(target);
@@ -341,7 +330,7 @@ void CompressedGvdGraph::merge_clusters(uint64_t target, uint64_t candidate) {
   compressed_.erase(iter);
 }
 
-std::optional<uint64_t> CompressedGvdGraph::drop_uncompressed(const GlobalIndex& idx) {
+std::optional<uint64_t> GvdGraph::drop_uncompressed(const GlobalIndex& idx) {
   auto iter = uncompressed_index_map_.find(idx);
   if (iter == uncompressed_index_map_.end()) {
     return std::nullopt;
@@ -352,7 +341,7 @@ std::optional<uint64_t> CompressedGvdGraph::drop_uncompressed(const GlobalIndex&
   return gvd_id;
 }
 
-void CompressedGvdGraph::drop_compressed_id(uint64_t compressed_id) {
+void GvdGraph::drop_compressed_id(uint64_t compressed_id) {
   const auto id_iter = compressed_id_map_.find(compressed_id);
   auto iter = compressed_index_map_.find(id_iter->second);
   iter->second.erase(compressed_id);
