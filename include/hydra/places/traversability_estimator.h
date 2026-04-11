@@ -173,7 +173,8 @@ class GradientTraversabilityEstimator : public TraversabilityEstimator {
   // Helper functions.
   BlockIndexSet get2DBlockIndices(const BlockIndices& blocks) const;
 
-  std::optional<float> extractSurfaceHeight(const BlockIndex& global_2d_index,
+  std::optional<float> extractSurfaceHeight(const BlockIndex& block_2d_index,
+                                            const VoxelIndex& local_2d,
                                             float robot_z) const;
 
   float computeHorizontalDistance(const Index2D& offset) const;
