@@ -396,6 +396,7 @@ BlockIndexSet GradientTraversabilityEstimator::get2DBlockIndices(
 
 std::optional<float> GradientTraversabilityEstimator::extractSurfaceHeight(
     const BlockIndex& global_2d_index, float robot_z) const {
+  // Find the first occupied voxel in the vertical column from top to bottom. 
   const float voxel_size = tsdf_layer_->voxel_size;
   const float surface_threshold = config.surface_distance_threshold * voxel_size;
 
@@ -415,10 +416,14 @@ std::optional<float> GradientTraversabilityEstimator::extractSurfaceHeight(
     if (voxel->weight < config.min_weight) continue;
 
     // Check if on surface.
-    if (std::abs(voxel->distance) < surface_threshold) {
-      const Point voxel_pos = tsdf_layer_->getVoxelPosition(global_idx);
-      return voxel_pos.z();  // Return just the height.
-    }
+    // if (std::abs(voxel->distance) < surface_threshold) {
+    //   const Point voxel_pos = tsdf_layer_->getVoxelPosition(global_idx);
+    //   return voxel_pos.z();  // Return just the height.
+    // }
+
+    // treat any occupancy as suface if voxel is observed and occupied. 
+    const Point voxel_pos = tsdf_layer_->getVoxelPosition(global_idx);
+    return voxel_pos.z();
   }
 
   return std::nullopt;
