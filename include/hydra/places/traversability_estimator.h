@@ -149,6 +149,10 @@ class GradientTraversabilityEstimator : public TraversabilityEstimator {
     //! min_traversability threshold, even if the confidence is below min_confidence. If
     //! false, mark these voxels as unknown instead.
     bool pessimistic = true;
+
+    //! @brief If true, smooth the height map with a box filter before computing
+    //! gradients, reducing the ripple artifact caused by projective TSDF radial bias.
+    bool smoothing = true;
   };
 
   GradientTraversabilityEstimator(const Config& config);

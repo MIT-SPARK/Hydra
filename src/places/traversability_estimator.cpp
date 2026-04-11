@@ -225,6 +225,7 @@ void declare_config(GradientTraversabilityEstimator::Config& config) {
   field(config.min_confidence, "min_confidence");
   field(config.min_traversability, "min_traversability");
   field(config.pessimistic, "pessimistic");
+  field(config.smoothing, "smoothing");
 
   checkCondition(config.gradient_threshold > 0.0f,
                  "gradient_threshold must be positive");
@@ -289,7 +290,8 @@ void GradientTraversabilityEstimator::computeTraversability(
   // previously-processed traversability blocks), so newly-seen areas are included.
   Index2DMap<float> height_map;
 
-  const BlockIndexSet all_blocks_2d = get2DBlockIndices(tsdf_layer_->allocatedBlockIndices());
+  const BlockIndexSet all_blocks_2d =
+      get2DBlockIndices(tsdf_layer_->allocatedBlockIndices());
   for (const auto& block_idx_2d : all_blocks_2d) {
     for (int x = 0; x < voxels_per_side; ++x) {
       for (int y = 0; y < voxels_per_side; ++y) {
@@ -307,6 +309,29 @@ void GradientTraversabilityEstimator::computeTraversability(
     }
   }
 
+  // Optionally smooth height map to remove projective TSDF radial bias (ripple
+  // artifact). For each voxel, replace its height with the average of itself and
+  // observed neighbors.
+  Index2DMap<float> smoothed_height_map;
+  if (config.smoothing) {
+    smoothed_height_map.reserve(height_map.size());
+    for (const auto& [center_idx, center_height] : height_map) {
+      float height_sum = center_height;
+      int count = 1;
+      for (const auto& offset : kNeighborOffsets) {
+        auto it = height_map.find(
+            Index2D(center_idx.x() + offset.x(), center_idx.y() + offset.y()));
+        if (it != height_map.end()) {
+          height_sum += it->second;
+          count++;
+        }
+      }
+      smoothed_height_map[center_idx] = height_sum / count;
+    }
+  }
+  const Index2DMap<float>& grad_height_map =
+      config.smoothing ? smoothed_height_map : height_map;
+
   // PASS 2: Update ONLY the blocks that were updated in TSDF.
   for (auto& block_idx_2d : updated_blocks_2d) {
     auto& trav_block =
@@ -321,8 +346,8 @@ void GradientTraversabilityEstimator::computeTraversability(
         const Index2D center_idx(global_2d.x(), global_2d.y());
 
         // Check if center has surface.
-        auto center_it = height_map.find(center_idx);
-        if (center_it == height_map.end()) {
+        auto center_it = grad_height_map.find(center_idx);
+        if (center_it == grad_height_map.end()) {
           trav_voxel.confidence = 0.0f;
           trav_voxel.traversability = 0.0f;
           classifyTraversabilityVoxel(trav_voxel);
@@ -331,19 +356,19 @@ void GradientTraversabilityEstimator::computeTraversability(
 
         const float center_height = center_it->second;
 
-        // Compute max gradient over 8 neighbors.
-        float max_gradient = 0.0f;
+        // Compute mean gradient over observed neighbors. Skip missing neighbors —
+        // the confidence field already captures partial coverage; treating missing
+        // neighbors as infinite gradient makes boundary voxels intraversable even
+        // on flat terrain, and prevents intermediate (yellow) traversability values.
+        float gradient_sum = 0.0f;
         int num_neighbors_observed = 0;
 
         for (const auto& offset : kNeighborOffsets) {
           const Index2D neighbor_idx(center_idx.x() + offset.x(),
                                      center_idx.y() + offset.y());
 
-          auto neighbor_it = height_map.find(neighbor_idx);
-
-          if (neighbor_it == height_map.end()) {
-            // Missing neighbor = infinite gradient (obstacle).
-            max_gradient = std::numeric_limits<float>::max();
+          auto neighbor_it = grad_height_map.find(neighbor_idx);
+          if (neighbor_it == grad_height_map.end()) {
             continue;
           }
 
@@ -351,12 +376,12 @@ void GradientTraversabilityEstimator::computeTraversability(
 
           const float height_diff = std::abs(neighbor_it->second - center_height);
           const float horiz_dist = computeHorizontalDistance(offset);
-          const float gradient = height_diff / horiz_dist;
-
-          max_gradient = std::max(max_gradient, gradient);
+          gradient_sum += height_diff / horiz_dist;
         }
 
-        trav_voxel.traversability = computeTraversabilityFromGradient(max_gradient);
+        const float mean_gradient =
+            num_neighbors_observed > 0 ? gradient_sum / num_neighbors_observed : 0.0f;
+        trav_voxel.traversability = computeTraversabilityFromGradient(mean_gradient);
         trav_voxel.confidence = num_neighbors_observed / 8.0f;
 
         classifyTraversabilityVoxel(trav_voxel);
@@ -396,9 +421,10 @@ BlockIndexSet GradientTraversabilityEstimator::get2DBlockIndices(
 std::optional<float> GradientTraversabilityEstimator::extractSurfaceHeight(
     const BlockIndex& block_2d_index, const VoxelIndex& local_2d, float robot_z) const {
   // Find the highest surface voxel in the vertical column by scanning top to bottom.
-  // Uses block/local index access directly (same pattern as HeightTraversabilityEstimator)
-  // to avoid the signed/unsigned division bug in spatial_hash::blockIndexFromGlobalIndex,
-  // which corrupts getVoxelPtr lookups for any negative world coordinate.
+  // Uses block/local index access directly (same pattern as
+  // HeightTraversabilityEstimator) to avoid the signed/unsigned division bug in
+  // spatial_hash::blockIndexFromGlobalIndex, which corrupts getVoxelPtr lookups for any
+  // negative world coordinate.
   const float voxel_size = tsdf_layer_->voxel_size;
   const int vps = static_cast<int>(tsdf_layer_->voxels_per_side);
 
