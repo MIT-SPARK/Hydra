@@ -116,4 +116,75 @@ class HeightTraversabilityEstimator : public TraversabilityEstimator {
 
 void declare_config(HeightTraversabilityEstimator::Config& config);
 
+/**
+ * @brief Traversability estimator based on local terrain gradient.
+ * @note Computes traversability from maximum absolute height gradient in 8-way
+ * connected neighborhood. Captures both positive obstacles (steps, rocks) and negative
+ * obstacles (holes, cliffs).
+ */
+class GradientTraversabilityEstimator : public TraversabilityEstimator {
+ public:
+  struct Config {
+    //! @brief Maximum traversable gradient (m/m). Gradient >= threshold →
+    //! traversability = 0. Gradient = 0 → traversability = 1. Linear interpolation
+    //! between.
+    float gradient_threshold = 0.5f;
+
+    //! @brief The height above the robot body to scan for surfaces in meters.
+    float height_above = 0.3f;
+
+    //! @brief The height below the robot body to scan for surfaces in meters.
+    float height_below = 1.0f;
+
+    //! @brief Minimum TSDF weight to consider voxel observed.
+    float min_weight = 1e-6f;
+
+    //! @brief TSDF distance threshold for surface detection (multiples of voxel_size).
+    //! A voxel is on surface if abs(distance) < voxel_size * threshold.
+    float surface_distance_threshold = 1.0f;
+
+    //! @brief Minimum confidence for a voxel to be considered observed.
+    float min_confidence = 0.5f;
+
+    //! @brief Minimum traversability for a voxel to be considered traversable.
+    float min_traversability = 0.5f;
+
+    //! @brief If true, mark voxels as intraversable if they do not meet the
+    //! min_traversability threshold, even if the confidence is below min_confidence. If
+    //! false, mark these voxels as unknown instead.
+    bool pessimistic = true;
+  };
+
+  GradientTraversabilityEstimator(const Config& config);
+  ~GradientTraversabilityEstimator() override = default;
+
+  void updateTraversability(const ActiveWindowOutput& msg) override;
+
+  const Config config;
+
+ protected:
+  TsdfLayer::Ptr tsdf_layer_;
+
+  // Processing steps (reuse updateTsdf from HeightTraversabilityEstimator).
+  void updateTsdf(const ActiveWindowOutput& msg);
+  void computeTraversability(const ActiveWindowOutput& msg);
+  void classifyTraversabilityVoxel(TraversabilityVoxel& voxel) const;
+
+  // Helper functions.
+  BlockIndexSet get2DBlockIndices(const BlockIndices& blocks) const;
+
+  std::optional<float> extractSurfaceHeight(const BlockIndex& global_2d_index,
+                                            float robot_z) const;
+
+  float computeHorizontalDistance(const Index2D& offset) const;
+
+  float computeTraversabilityFromGradient(float gradient) const;
+
+ private:
+  // 8-way neighbor offsets.
+  static const std::array<Index2D, 8> kNeighborOffsets;
+};
+
+void declare_config(GradientTraversabilityEstimator::Config& config);
+
 }  // namespace hydra::places

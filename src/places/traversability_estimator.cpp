@@ -45,9 +45,26 @@ static const auto registration_ =
                                    HeightTraversabilityEstimator,
                                    HeightTraversabilityEstimator::Config>(
         "HeightTraversabilityEstimator");
-}
+
+static const auto gradient_registration_ =
+    config::RegistrationWithConfig<TraversabilityEstimator,
+                                   GradientTraversabilityEstimator,
+                                   GradientTraversabilityEstimator::Config>(
+        "GradientTraversabilityEstimator");
+}  // namespace
 
 using spark_dsg::TraversabilityState;
+
+const std::array<Index2D, 8> GradientTraversabilityEstimator::kNeighborOffsets = {{
+    {0, -1},   // bottom
+    {-1, 0},   // left
+    {0, 1},    // top
+    {1, 0},    // right
+    {-1, -1},  // bottom-left
+    {-1, 1},   // top-left
+    {1, 1},    // top-right
+    {1, -1}    // bottom-right
+}};
 
 void declare_config(HeightTraversabilityEstimator::Config& config) {
   using namespace config;
@@ -196,6 +213,238 @@ BlockIndexSet HeightTraversabilityEstimator::get2DBlockIndices(
     block_indices.emplace(BlockIndex(block.x(), block.y(), 0));
   }
   return block_indices;
+}
+
+void declare_config(GradientTraversabilityEstimator::Config& config) {
+  using namespace config;
+  name("GradientTraversabilityEstimator::Config");
+  field(config.gradient_threshold, "gradient_threshold");
+  field(config.height_above, "height_above", "m");
+  field(config.height_below, "height_below", "m");
+  field(config.min_weight, "min_weight");
+  field(config.surface_distance_threshold, "surface_distance_threshold");
+  field(config.min_confidence, "min_confidence");
+  field(config.min_traversability, "min_traversability");
+  field(config.pessimistic, "pessimistic");
+
+  checkCondition(config.gradient_threshold > 0.0f,
+                 "gradient_threshold must be positive");
+  checkCondition(config.height_above >= -config.height_below,
+                 "'height_above' and 'height_below' don't span any volume");
+  checkInRange(config.min_confidence, 0.0f, 1.0f, "min_confidence");
+  checkInRange(config.min_traversability, 0.0f, 1.0f, "min_traversability");
+}
+
+GradientTraversabilityEstimator::GradientTraversabilityEstimator(const Config& config)
+    : config(config::checkValid(config)) {}
+
+void GradientTraversabilityEstimator::updateTraversability(
+    const ActiveWindowOutput& msg) {
+  updateTsdf(msg);
+  computeTraversability(msg);
+}
+
+void GradientTraversabilityEstimator::updateTsdf(const ActiveWindowOutput& msg) {
+  // Initialize the TSDF if this is the first call.
+  if (!tsdf_layer_) {
+    const auto& map_config = msg.map().config;
+    tsdf_layer_ =
+        std::make_shared<TsdfLayer>(map_config.voxel_size, map_config.voxels_per_side);
+    traversability_layer_ = std::make_unique<TraversabilityLayer>(
+        map_config.voxel_size, map_config.voxels_per_side);
+  }
+
+  // Erase archived blocks.
+  tsdf_layer_->removeBlocks(msg.archived_mesh_indices);
+  const BlockIndexSet blocks_2d =
+      get2DBlockIndices(tsdf_layer_->allocatedBlockIndices());
+  for (const auto& block_index : traversability_layer_->allocatedBlockIndices()) {
+    if (!blocks_2d.count(block_index)) {
+      traversability_layer_->removeBlock(block_index);
+    }
+  }
+
+  // Copy in all updated blocks. These are mutually exclusive with the updated blocks.
+  for (const auto& block : msg.map().getTsdfLayer()) {
+    tsdf_layer_->allocateBlock(block.index) = block;
+    if (!block.updated) {
+      LOG(WARNING) << "TSDF block " << block.index.transpose()
+                   << " is not marked as updated, but it was copied from the map.";
+    }
+  }
+
+  // Reset the updated flag.
+  for (auto& block : *traversability_layer_) {
+    block.updated = false;
+  }
+}
+
+void GradientTraversabilityEstimator::computeTraversability(
+    const ActiveWindowOutput& msg) {
+  const BlockIndexSet updated_blocks_2d =
+      get2DBlockIndices(msg.map().getTsdfLayer().allocatedBlockIndices());
+  const float robot_z = msg.world_t_body.z();
+  const int voxels_per_side = tsdf_layer_->voxels_per_side;
+
+  // PASS 1: Extract all surface heights into a 2D map.
+  Index2DMap<float> height_map;
+
+  for (auto& block_idx_2d : updated_blocks_2d) {
+    auto& trav_block =
+        traversability_layer_->allocateBlock(block_idx_2d, voxels_per_side);
+    trav_block.reset();
+    trav_block.updated = true;
+
+    for (int x = 0; x < voxels_per_side; ++x) {
+      for (int y = 0; y < voxels_per_side; ++y) {
+        const BlockIndex global_2d = trav_block.globalFromLocalIndex(Index2D(x, y));
+
+        // Extract surface height.
+        std::optional<float> surface_height = extractSurfaceHeight(global_2d, robot_z);
+
+        if (surface_height) {
+          // Store as 2D index (x, y) → height.
+          height_map[Index2D(global_2d.x(), global_2d.y())] = *surface_height;
+        }
+      }
+    }
+  }
+
+  // PASS 2: Compute gradients and traversability using precomputed heights.
+  for (auto& block_idx_2d : updated_blocks_2d) {
+    auto& trav_block =
+        traversability_layer_->allocateBlock(block_idx_2d, voxels_per_side);
+
+    for (int x = 0; x < voxels_per_side; ++x) {
+      for (int y = 0; y < voxels_per_side; ++y) {
+        auto& trav_voxel = trav_block.voxel(x, y);
+        const BlockIndex global_2d = trav_block.globalFromLocalIndex(Index2D(x, y));
+        const Index2D center_idx(global_2d.x(), global_2d.y());
+
+        // Check if center has surface.
+        auto center_it = height_map.find(center_idx);
+        if (center_it == height_map.end()) {
+          trav_voxel.confidence = 0.0f;
+          trav_voxel.traversability = 0.0f;
+          classifyTraversabilityVoxel(trav_voxel);
+          continue;
+        }
+
+        const float center_height = center_it->second;
+
+        // Compute max gradient over 8 neighbors.
+        float max_gradient = 0.0f;
+        int num_neighbors_observed = 0;
+
+        for (const auto& offset : kNeighborOffsets) {
+          const Index2D neighbor_idx(center_idx.x() + offset.x(),
+                                     center_idx.y() + offset.y());
+
+          auto neighbor_it = height_map.find(neighbor_idx);
+
+          if (neighbor_it == height_map.end()) {
+            // Missing neighbor = infinite gradient (obstacle).
+            max_gradient = std::numeric_limits<float>::max();
+            continue;
+          }
+
+          num_neighbors_observed++;
+
+          const float height_diff = std::abs(neighbor_it->second - center_height);
+          const float horiz_dist = computeHorizontalDistance(offset);
+          const float gradient = height_diff / horiz_dist;
+
+          max_gradient = std::max(max_gradient, gradient);
+        }
+
+        trav_voxel.traversability = computeTraversabilityFromGradient(max_gradient);
+        trav_voxel.confidence = num_neighbors_observed / 8.0f;
+
+        classifyTraversabilityVoxel(trav_voxel);
+      }
+    }
+  }
+}
+
+void GradientTraversabilityEstimator::classifyTraversabilityVoxel(
+    TraversabilityVoxel& voxel) const {
+  if (voxel.confidence <= 0.0f) {
+    voxel.state = TraversabilityState::UNKNOWN;
+    return;
+  }
+  if (voxel.confidence >= config.min_confidence) {
+    if (voxel.traversability >= config.min_traversability) {
+      voxel.state = TraversabilityState::TRAVERSABLE;
+    } else {
+      voxel.state = TraversabilityState::INTRAVERSABLE;
+    }
+  } else if (config.pessimistic && voxel.traversability < config.min_traversability) {
+    voxel.state = TraversabilityState::INTRAVERSABLE;
+  } else {
+    voxel.state = TraversabilityState::UNKNOWN;
+  }
+}
+
+BlockIndexSet GradientTraversabilityEstimator::get2DBlockIndices(
+    const BlockIndices& blocks) const {
+  BlockIndexSet block_indices;
+  for (const auto& block : blocks) {
+    block_indices.emplace(BlockIndex(block.x(), block.y(), 0));
+  }
+  return block_indices;
+}
+
+std::optional<float> GradientTraversabilityEstimator::extractSurfaceHeight(
+    const BlockIndex& global_2d_index, float robot_z) const {
+  const float voxel_size = tsdf_layer_->voxel_size;
+  const float surface_threshold = config.surface_distance_threshold * voxel_size;
+
+  // Compute Z search range (same as HeightTraversabilityEstimator).
+  const Point min_point(0, 0, robot_z - config.height_below);
+  const Point max_point(0, 0, robot_z + config.height_above);
+
+  const BlockIndex min_global = tsdf_layer_->getGlobalVoxelIndex(min_point);
+  const BlockIndex max_global = tsdf_layer_->getGlobalVoxelIndex(max_point);
+
+  // Scan the vertical range for surface.
+  for (int z = max_global.z(); z >= min_global.z(); --z) {
+    const BlockIndex global_idx(global_2d_index.x(), global_2d_index.y(), z);
+    const TsdfVoxel* voxel = tsdf_layer_->getVoxelPtr(global_idx);
+
+    if (!voxel) continue;
+    if (voxel->weight < config.min_weight) continue;
+
+    // Check if on surface.
+    if (std::abs(voxel->distance) < surface_threshold) {
+      const Point voxel_pos = tsdf_layer_->getVoxelPosition(global_idx);
+      return voxel_pos.z();  // Return just the height.
+    }
+  }
+
+  return std::nullopt;
+}
+
+float GradientTraversabilityEstimator::computeHorizontalDistance(
+    const Index2D& offset) const {
+  const float voxel_size = tsdf_layer_->voxel_size;
+
+  // Diagonal: sqrt(2) * voxel_size.
+  if (offset.x() != 0 && offset.y() != 0) {
+    return voxel_size * std::sqrt(2.0f);
+  }
+
+  // Cardinal: voxel_size.
+  return voxel_size;
+}
+
+float GradientTraversabilityEstimator::computeTraversabilityFromGradient(
+    float gradient) const {
+  if (gradient >= config.gradient_threshold) {
+    return 0.0f;  // Intraversable.
+  }
+
+  // Linear interpolation: 1.0 at gradient=0, 0.0 at gradient=threshold.
+  return 1.0f - (gradient / config.gradient_threshold);
 }
 
 }  // namespace hydra::places
