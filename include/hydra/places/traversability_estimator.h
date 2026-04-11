@@ -139,10 +139,6 @@ class GradientTraversabilityEstimator : public TraversabilityEstimator {
     //! @brief Minimum TSDF weight to consider voxel observed.
     float min_weight = 1e-6f;
 
-    //! @brief TSDF distance threshold for surface detection (multiples of voxel_size).
-    //! A voxel is on surface if abs(distance) < voxel_size * threshold.
-    float surface_distance_threshold = 1.0f;
-
     //! @brief Minimum confidence for a voxel to be considered observed.
     float min_confidence = 0.5f;
 

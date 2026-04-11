@@ -222,7 +222,6 @@ void declare_config(GradientTraversabilityEstimator::Config& config) {
   field(config.height_above, "height_above", "m");
   field(config.height_below, "height_below", "m");
   field(config.min_weight, "min_weight");
-  field(config.surface_distance_threshold, "surface_distance_threshold");
   field(config.min_confidence, "min_confidence");
   field(config.min_traversability, "min_traversability");
   field(config.pessimistic, "pessimistic");
@@ -401,7 +400,6 @@ std::optional<float> GradientTraversabilityEstimator::extractSurfaceHeight(
   // to avoid the signed/unsigned division bug in spatial_hash::blockIndexFromGlobalIndex,
   // which corrupts getVoxelPtr lookups for any negative world coordinate.
   const float voxel_size = tsdf_layer_->voxel_size;
-  const float surface_threshold = config.surface_distance_threshold * voxel_size;
   const int vps = static_cast<int>(tsdf_layer_->voxels_per_side);
 
   const VoxelKey min_key =
@@ -425,7 +423,8 @@ std::optional<float> GradientTraversabilityEstimator::extractSurfaceHeight(
       if (voxel.weight < config.min_weight) {
         continue;
       }
-      if (std::abs(voxel.distance) < surface_threshold) {
+
+      if (voxel.distance < voxel_size) {
         const VoxelKey key(BlockIndex(block_2d_index.x(), block_2d_index.y(), block_z),
                            VoxelIndex(local_2d.x(), local_2d.y(), z));
         return tsdf_layer_->getVoxelPosition(key).z();
