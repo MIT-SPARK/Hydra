@@ -39,6 +39,7 @@
 #include <config_utilities/logging/log_to_glog.h>
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/validation.h>
+#include <glog/logging.h>
 #include <hydra/active_window/reconstruction_module.h>
 #include <hydra/common/global_info.h>
 #include <kimera_pgmo/compression/delta_compression.h>

@@ -37,11 +37,11 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
+#include <glog/logging.h>
 
 #include <chrono>
 #include <iomanip>
 
-#include "hydra/common/global_info.h"
 #include "hydra/input/input_conversion.h"
 #include "hydra/places/robot_footprint_integrator.h"
 #include "hydra/reconstruction/mesh_integrator.h"

@@ -38,6 +38,7 @@
 #include <config_utilities/parsing/yaml.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/settings.h>
+#include <glog/logging.h>
 
 #include "hydra/utils/timing_utilities.h"
 

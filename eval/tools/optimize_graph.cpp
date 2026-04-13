@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #include <config_utilities/parsing/yaml.h>
 #include <gflags/gflags.h>
+#include <glog/logging.h>
 #include <hydra/backend/backend_module.h>
 #include <hydra/common/global_info.h>
 #include <kimera_pgmo/deformation_graph.h>

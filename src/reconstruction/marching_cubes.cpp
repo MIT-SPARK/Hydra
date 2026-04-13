@@ -37,6 +37,8 @@
 // purposes notwithstanding any copyright notation herein.
 #include "hydra/reconstruction/marching_cubes.h"
 
+#include <glog/logging.h>
+
 #include "hydra/reconstruction/mesh_integrator.h"
 #include "hydra/utils/printing.h"
 
@@ -107,8 +109,8 @@ void MarchingCubes::interpolateEdges(const SdfPoints& points,
       edge_point.color = interpColor(point0, point1, 0.5);
       edge_point.label = interpLabel(point0, point1, 0.5);
 
-      VLOG(15) << "- t=n/a"
-               << ", v0=" << point0.pos.transpose() << ", v1=" << point1.pos.transpose()
+      VLOG(15) << "- t=n/a" << ", v0=" << point0.pos.transpose()
+               << ", v1=" << point1.pos.transpose()
                << ", coord: " << edge_point.pos.transpose();
       continue;
     }

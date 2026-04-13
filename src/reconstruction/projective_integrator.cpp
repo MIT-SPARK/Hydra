@@ -50,6 +50,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
+#include <glog/logging.h>
 
 #include <algorithm>
 #include <future>

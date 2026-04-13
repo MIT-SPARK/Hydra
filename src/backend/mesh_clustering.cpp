@@ -38,6 +38,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/validation.h>
+#include <glog/logging.h>
 #include <kimera_pgmo/mesh_delta.h>
 
 #include "hydra/common/global_info.h"

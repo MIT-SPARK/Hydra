@@ -50,9 +50,7 @@
 #include <config_utilities/config_utilities.h>
 #include <config_utilities/factory.h>
 #include <config_utilities/parsing/yaml.h>
-
-#include <unordered_map>
-#include <vector>
+#include <glog/logging.h>
 
 #include "hydra/input/sensor_utilities.h"
 

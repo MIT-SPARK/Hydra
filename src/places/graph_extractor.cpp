@@ -35,6 +35,7 @@
 #include "hydra/places/graph_extractor.h"
 
 #include <config_utilities/config.h>
+#include <glog/logging.h>
 #include <glog/stl_logging.h>
 #include <spatial_hash/neighbor_utils.h>
 
