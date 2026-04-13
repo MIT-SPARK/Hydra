@@ -186,4 +186,30 @@ TEST(GvdGraph, DropCorrect) {
   EXPECT_EQ(graph.compressed().size(), 0u);
 }
 
+TEST(GvdGraph, DropWithBlocksCorrect) {
+  GvdGraph graph(0.1, 1.0);
+  fillGraph(graph,
+            {
+                {0, 0, 0},
+                {0, 0, 1},
+                {0, 1, 0},
+                {1, 0, 0},
+                {0, 0, -1},
+                {0, -1, 0},
+                {-1, 0, 0},
+            });
+
+  EXPECT_EQ(graph.uncompressed().size(), 7u);
+  EXPECT_EQ(graph.compressed().size(), 2u);
+  EXPECT_TRUE(hasCompressedEdge(graph, 0, 1));
+
+  graph.dropCompressed(0);
+  EXPECT_EQ(graph.uncompressed().size(), 3u);
+  EXPECT_EQ(graph.compressed().size(), 1u);
+
+  graph.dropCompressed(1);
+  EXPECT_EQ(graph.uncompressed().size(), 0u);
+  EXPECT_EQ(graph.compressed().size(), 0u);
+}
+
 }  // namespace hydra::places
