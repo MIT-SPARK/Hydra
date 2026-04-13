@@ -281,7 +281,7 @@ void GradientTraversabilityEstimator::updateTsdf(const ActiveWindowOutput& msg) 
 
 void GradientTraversabilityEstimator::computeTraversability(
     const ActiveWindowOutput& msg) {
-  const BlockIndexSet updated_blocks_2d =
+  const auto updated_blocks_2d =
       get2DBlockIndices(msg.map().getTsdfLayer().allocatedBlockIndices());
   const float robot_z = msg.world_t_body.z();
   const int voxels_per_side = tsdf_layer_->voxels_per_side;
@@ -290,13 +290,10 @@ void GradientTraversabilityEstimator::computeTraversability(
   // previously-processed traversability blocks), so newly-seen areas are included.
   Index2DMap<float> height_map;
 
-  const BlockIndexSet all_blocks_2d =
-      get2DBlockIndices(tsdf_layer_->allocatedBlockIndices());
+  const auto all_blocks_2d = get2DBlockIndices(tsdf_layer_->allocatedBlockIndices());
   for (const auto& block_idx_2d : all_blocks_2d) {
     for (int x = 0; x < voxels_per_side; ++x) {
       for (int y = 0; y < voxels_per_side; ++y) {
-        // Extract surface height using block/local indices directly to avoid the
-        // signed/unsigned division bug in spatial_hash::blockIndexFromGlobalIndex.
         std::optional<float> surface_height =
             extractSurfaceHeight(block_idx_2d, VoxelIndex(x, y, 0), robot_z);
 

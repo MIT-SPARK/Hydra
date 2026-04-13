@@ -137,7 +137,7 @@ class GradientTraversabilityEstimator : public TraversabilityEstimator {
     float height_below = 1.0f;
 
     //! @brief Minimum TSDF weight to consider voxel observed.
-    float min_weight = 1e-6f;
+    float min_weight = 1.0e-6f;
 
     //! @brief Minimum confidence for a voxel to be considered observed.
     float min_confidence = 0.5f;
