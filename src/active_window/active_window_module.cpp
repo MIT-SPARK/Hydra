@@ -37,6 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
+#include <glog/logging.h>
 
 #include "hydra/common/global_info.h"
 #include "hydra/reconstruction/integration_masking.h"
