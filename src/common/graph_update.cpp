@@ -84,6 +84,8 @@ void declare_config(LayerTracker::Config& config) {
   field(config.target_layer, "target_layer");
   config.matcher.setOptional();
   field(config.matcher, "matcher");
+  config.merger.setOptional();
+  field(config.merger, "merger");
 }
 
 void declare_config(GraphUpdater::Config& config) {
@@ -107,7 +109,10 @@ void LayerUpdate::append(LayerUpdate&& rhs) {
 }
 
 LayerTracker::LayerTracker(const Config& config)
-    : config(config), next_id(config.prefix, 0), matcher(config.matcher.create()) {}
+    : config(config),
+      next_id(config.prefix, 0),
+      matcher(config.matcher.create()),
+      merger(config.merger.create()) {}
 
 GraphUpdater::GraphUpdater(const Config& config) : config(config::checkValid(config)) {
   for (const auto& [layer_name, tracker_config] : config.layer_updates) {
@@ -136,7 +141,16 @@ void GraphUpdater::addNode(DynamicSceneGraph& graph,
     if (entry.track_id) {
       tracker.track_to_node[*entry.track_id] = *to_merge;
     }
-    // TODO(nathan) actual merge attributes
+    if (tracker.merger) {
+      const auto* existing_attrs = active_targets.at(*to_merge);
+      auto merged = tracker.merger->merge({existing_attrs, entry.attributes.get()});
+      if (merged) {
+        if (mark_active) {
+          merged->is_active = true;
+        }
+        graph.setNodeAttributes(*to_merge, std::move(merged));
+      }
+    }
     return;
   }
 
@@ -178,7 +192,16 @@ bool GraphUpdater::updateNode(const NodeUpdate& entry,
                               DynamicSceneGraph& graph) {
   const auto map_iter = tracker.track_to_node.find(*entry.track_id);
   if (map_iter != tracker.track_to_node.end()) {
-    auto updated = entry.attributes->clone();
+    std::unique_ptr<NodeAttributes> updated;
+    if (tracker.merger) {
+      const auto* existing = graph.findNode(map_iter->second);
+      if (existing) {
+        updated = tracker.merger->merge({&existing->attributes(), entry.attributes.get()});
+      }
+    }
+    if (!updated) {
+      updated = entry.attributes->clone();
+    }
     if (config.mark_active) {
       updated->is_active = true;
     }

@@ -35,6 +35,16 @@
 #include "hydra/common/attribute_merger.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
+
+namespace {
+
+const auto latest_registration =
+    config::RegistrationWithConfig<AttributeMerger,
+                                   LatestAttributeMerger,
+                                   LatestAttributeMerger::Config>("LatestAttributeMerger");
+
+}  // namespace
 
 std::unique_ptr<spark_dsg::NodeAttributes> LatestAttributeMerger::merge(
     const std::vector<const spark_dsg::NodeAttributes*>& attrs) const {

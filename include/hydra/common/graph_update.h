@@ -44,6 +44,7 @@
 #include <memory>
 #include <unordered_map>
 
+#include "hydra/common/attribute_merger.h"
 #include "hydra/common/node_matchers.h"
 
 namespace hydra {
@@ -74,12 +75,14 @@ struct LayerTracker {
     char prefix = 0;
     std::optional<spark_dsg::LayerId> target_layer;
     config::VirtualConfig<NodeMatcher> matcher;
+    config::VirtualConfig<AttributeMerger> merger;
   } const config;
 
   explicit LayerTracker(const Config& config);
 
   spark_dsg::NodeSymbol next_id;
   std::unique_ptr<NodeMatcher> matcher;
+  std::unique_ptr<AttributeMerger> merger;
   //! Committed DSG node id for each object track on this logical layer.
   std::unordered_map<size_t, spark_dsg::NodeId> track_to_node;
 };
