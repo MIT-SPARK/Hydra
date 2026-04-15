@@ -34,18 +34,18 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <spark_dsg/node_attributes.h>
- 
 
 struct AttributeMerger {
-
   virtual ~AttributeMerger() = default;
-  virtual std::unique_ptr<spark_dsg::NodeAttributes> merge(const std::vector<const spark_dsg::NodeAttributes*>& attrs) const = 0;
+  virtual std::unique_ptr<spark_dsg::NodeAttributes> merge(
+      const std::vector<const spark_dsg::NodeAttributes*>& attrs) const = 0;
 };
 
 struct LatestAttributeMerger : public AttributeMerger {
   struct Config {};
   explicit LatestAttributeMerger(const Config&) {}
-  std::unique_ptr<spark_dsg::NodeAttributes> merge(const std::vector<const spark_dsg::NodeAttributes*>& attrs) const override;
+  std::unique_ptr<spark_dsg::NodeAttributes> merge(
+      const std::vector<const spark_dsg::NodeAttributes*>& attrs) const override;
 };
 
 void declare_config(LatestAttributeMerger::Config& config);
