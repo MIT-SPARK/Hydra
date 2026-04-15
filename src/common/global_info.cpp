@@ -37,6 +37,7 @@
 #include <config_utilities/config.h>
 #include <config_utilities/printing.h>
 #include <config_utilities/validation.h>
+#include <glog/logging.h>
 #include <spark_dsg/labelspace.h>
 
 #include "hydra/common/config_utilities.h"

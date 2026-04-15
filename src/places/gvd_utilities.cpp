@@ -34,6 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/gvd_utilities.h"
 
+#include <glog/logging.h>
+
 namespace hydra::places {
 
 DistancePotential getLowerDistance(float v_dist,

@@ -56,6 +56,7 @@ using timing::ScopedTimer;
 void declare_config(GenericUpdateFunctor::Config& config) {
   using namespace config;
   name("GenericUpdateFunctor::Config");
+  base<VerbosityConfig>(config);
   field(config.layer, "layer");
   field(config.deformation_interpolator, "deformation_interpolator");
   field(config.enable_merging, "enable_merging");

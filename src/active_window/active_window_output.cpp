@@ -34,11 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/active_window/active_window_output.h"
 
-#include <algorithm>
+#include <glog/logging.h>
 
 namespace hydra {
-
-using spark_dsg::NodeAttributes;
 
 const VolumetricMap& ActiveWindowOutput::map() const {
   CHECK(map_) << "Invalid map!";

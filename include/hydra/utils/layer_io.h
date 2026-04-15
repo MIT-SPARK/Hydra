@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
+#include <glog/logging.h>
 #include <spark_dsg/serialization/binary_conversions.h>
 #include <spark_dsg/serialization/binary_serialization.h>
 
