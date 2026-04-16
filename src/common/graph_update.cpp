@@ -184,8 +184,8 @@ void GraphUpdater::deleteNode(const NodeUpdate& entry,
   tracker.attribute_cache.erase(*entry.track_id);
 
   tracker.node_to_tracks[map_iter->second].erase(*entry.track_id);
-  if(tracker.node_to_tracks size == 0){
-      graph.removeNode(map_iter->second);
+  if (tracker.node_to_tracks size == 0) {
+    graph.removeNode(map_iter->second);
   } else {
     computeMergeGroup(map_iter->second, tracker, graph);
   }
@@ -198,8 +198,8 @@ bool GraphUpdater::updateNode(const NodeUpdate& entry,
                               DynamicSceneGraph& graph) {
   const auto map_iter = tracker.track_to_node.find(*entry.track_id);
   if (map_iter != tracker.track_to_node.end()) {
-    tracker.attribute_cache[*entry.track_id] = entry.attributes->clone()
-    computeMergeGroup(map_iter->second, tracker, graph);
+    tracker.attribute_cache[*entry.track_id] =
+        entry.attributes->clone() computeMergeGroup(map_iter->second, tracker, graph);
     return true;
   }
 
@@ -207,16 +207,15 @@ bool GraphUpdater::updateNode(const NodeUpdate& entry,
 }
 
 void GraphUpdater::computeMergeGroup(spark_dsg::NodeId node_id,
-                          LayerTracker& tracker,
-                          spark_dsg::DynamicSceneGraph& graph){
+                                     LayerTracker& tracker,
+                                     spark_dsg::DynamicSceneGraph& graph) {
   auto& track_ids = tracker.node_to_tracks[node_id];
-  
+
   std::vector<spark_dsg::NodeAttributes::Ptr> attrs;
 
   for (size_t id : track_ids) {
-    auto it = attribute_cache.find(id)
-    if (it != attribute_cache.end()) {
-        attrs.push_back(it->second);
+    auto it = attribute_cache.find(id) if (it != attribute_cache.end()) {
+      attrs.push_back(it->second);
     }
   }
 
@@ -226,10 +225,8 @@ void GraphUpdater::computeMergeGroup(spark_dsg::NodeId node_id,
     merged->is_active = true;
   }
 
-
   // TODO: aryannav --> add logic to handle checking for invalid tracks given new merge.
   graph.setNodeAttributes(node_id, std::move(merged));
-
 }
 
 void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {

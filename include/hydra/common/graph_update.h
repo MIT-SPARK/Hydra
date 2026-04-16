@@ -120,9 +120,9 @@ struct GraphUpdater {
                   spark_dsg::DynamicSceneGraph& graph);
 
   void computeMergeGroup(spark_dsg::NodeId node_id,
-                           spark_dsg::LayerId target_layer_id,
-                           LayerTracker& tracker,
-                           spark_dsg::DynamicSceneGraph& graph);
+                         spark_dsg::LayerId target_layer_id,
+                         LayerTracker& tracker,
+                         spark_dsg::DynamicSceneGraph& graph);
 };
 
 void declare_config(GraphUpdater::Config& config);
