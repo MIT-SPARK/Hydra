@@ -39,26 +39,24 @@
 
 namespace {
 
+using NodeAttrPtr = spark_dsg::NodeAttributes::Ptr;
+
 const auto latest_registration =
     config::RegistrationWithConfig<AttributeMerger,
-                                   LatestAttributeMerger,
-<<<<<<< HEAD
-                                   LatestAttributeMerger::Config>(
-        "LatestAttributeMerger");
-=======
-                                   LatestAttributeMerger::Config>("LatestAttributeMerger");
->>>>>>> a68d310c (rebase)
+                                   EarliestAttributeMerger,
+                                   EarliestAttributeMerger::Config>(
+        "EarliestAttributeMerger");
 
 }  // namespace
 
-std::unique_ptr<spark_dsg::NodeAttributes> LatestAttributeMerger::merge(
+NodeAttrPtr EarliestAttributeMerger::merge(
     const std::vector<const spark_dsg::NodeAttributes*>& attrs) const {
   if (attrs.empty()) {
     return nullptr;
   }
-  return attrs.back()->clone();
+  return attrs.front()->clone();
 }
 
-void declare_config(LatestAttributeMerger::Config&) {
-  config::name("LatestAttributeMerger::Config");
+void declare_config(EarliestAttributeMerger::Config&) {
+  config::name("EarliestAttributeMerger::Config");
 }

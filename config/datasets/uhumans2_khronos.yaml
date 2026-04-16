@@ -58,7 +58,7 @@ frontend:
       OBJECTS:
         prefix: O
         matcher: {type: IoUNodeMatcher, min_same_iou: 0.2, min_cross_iou: 0.5}
-        merger: {type: LatestAttributeMerger}
+        merger: {type: EarliestAttributeMerger}
   surface_places:
     type: place_2d
     prefix: P

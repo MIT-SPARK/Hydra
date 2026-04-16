@@ -42,6 +42,8 @@
 
 #include <algorithm>
 
+#include "hydra/common/attribute_merger.h"
+
 namespace YAML {
 
 template <typename T>
@@ -82,8 +84,7 @@ void declare_config(LayerTracker::Config& config) {
   field(config.target_layer, "target_layer");
   config.matcher.setOptional();
   field(config.matcher, "matcher");
-  config.merger.setOptional();
-  field(config.merger, "merger");
+  field<EarliestAttributeMerger::Config>(config.merger, "merger");
 }
 
 void declare_config(GraphUpdater::Config& config) {
@@ -143,11 +144,12 @@ void GraphUpdater::addNode(DynamicSceneGraph& graph,
     if (entry.track_id) {
       tracker.track_to_node[*entry.track_id] = *to_merge;
     }
-    if (tracker.merger) {
-      const auto* existing_attrs = active_targets.at(*to_merge);
-      auto merged = tracker.merger->merge({existing_attrs, entry.attributes.get()});
+    const auto* existing_node = graph.findNode(*to_merge);
+    if (existing_node) {
+      auto merged =
+          tracker.merger->merge({&existing_node->attributes(), entry.attributes.get()});
       if (merged) {
-        if (mark_active) {
+        if (config.mark_active) {
           merged->is_active = true;
         }
         graph.setNodeAttributes(*to_merge, std::move(merged));
@@ -198,16 +200,10 @@ bool GraphUpdater::updateNode(const NodeUpdate& entry,
   const auto map_iter = tracker.track_to_node.find(*entry.track_id);
   if (map_iter != tracker.track_to_node.end()) {
     std::unique_ptr<NodeAttributes> updated;
-    if (tracker.merger) {
-      const auto* existing = graph.findNode(map_iter->second);
-      if (existing) {
-<<<<<<< HEAD
-        updated =
-            tracker.merger->merge({&existing->attributes(), entry.attributes.get()});
-=======
-        updated = tracker.merger->merge({&existing->attributes(), entry.attributes.get()});
->>>>>>> a68d310c (rebase)
-      }
+    const auto* existing = graph.findNode(map_iter->second);
+    if (existing) {
+      updated =
+          tracker.merger->merge({&existing->attributes(), entry.attributes.get()});
     }
     if (!updated) {
       updated = entry.attributes->clone();
