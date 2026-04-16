@@ -84,7 +84,7 @@ void declare_config(LayerTracker::Config& config) {
   field(config.target_layer, "target_layer");
   config.matcher.setOptional();
   field(config.matcher, "matcher");
-  field<EarliestAttributeMerger::Config>(config.merger, "merger");
+  field(config.merger, "merger");
 }
 
 void declare_config(GraphUpdater::Config& config) {
@@ -150,8 +150,8 @@ void GraphUpdater::addNode(DynamicSceneGraph& graph,
     return;
   }
 
+  tracker.attribute_cache[*entry.track_id] = entry.attributes->clone();
   auto attrs = entry.attributes->clone();
-  tracker.attribute_cache[*entry.track_id] = attrs;
   if (config.mark_active) {
     attrs->is_active = true;
   }
@@ -184,7 +184,7 @@ void GraphUpdater::deleteNode(const NodeUpdate& entry,
   tracker.attribute_cache.erase(*entry.track_id);
 
   tracker.node_to_tracks[map_iter->second].erase(*entry.track_id);
-  if (tracker.node_to_tracks size == 0) {
+  if (tracker.node_to_tracks[map_iter->second].empty()) {
     graph.removeNode(map_iter->second);
   } else {
     computeMergeGroup(map_iter->second, tracker, graph);
@@ -198,8 +198,8 @@ bool GraphUpdater::updateNode(const NodeUpdate& entry,
                               DynamicSceneGraph& graph) {
   const auto map_iter = tracker.track_to_node.find(*entry.track_id);
   if (map_iter != tracker.track_to_node.end()) {
-    tracker.attribute_cache[*entry.track_id] =
-        entry.attributes->clone() computeMergeGroup(map_iter->second, tracker, graph);
+    tracker.attribute_cache[*entry.track_id] = entry.attributes->clone();
+    computeMergeGroup(map_iter->second, tracker, graph);
     return true;
   }
 
@@ -211,11 +211,12 @@ void GraphUpdater::computeMergeGroup(spark_dsg::NodeId node_id,
                                      spark_dsg::DynamicSceneGraph& graph) {
   auto& track_ids = tracker.node_to_tracks[node_id];
 
-  std::vector<spark_dsg::NodeAttributes::Ptr> attrs;
+  std::vector<const spark_dsg::NodeAttributes*> attrs;
 
   for (size_t id : track_ids) {
-    auto it = attribute_cache.find(id) if (it != attribute_cache.end()) {
-      attrs.push_back(it->second);
+    auto it = tracker.attribute_cache.find(id);
+    if (it != tracker.attribute_cache.end()) {
+      attrs.push_back(it->second.get());
     }
   }
 
