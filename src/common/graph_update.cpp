@@ -201,8 +201,12 @@ bool GraphUpdater::updateNode(const NodeUpdate& entry,
     if (tracker.merger) {
       const auto* existing = graph.findNode(map_iter->second);
       if (existing) {
+<<<<<<< HEAD
         updated =
             tracker.merger->merge({&existing->attributes(), entry.attributes.get()});
+=======
+        updated = tracker.merger->merge({&existing->attributes(), entry.attributes.get()});
+>>>>>>> a68d310c (rebase)
       }
     }
     if (!updated) {

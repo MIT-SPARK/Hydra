@@ -42,8 +42,12 @@ namespace {
 const auto latest_registration =
     config::RegistrationWithConfig<AttributeMerger,
                                    LatestAttributeMerger,
+<<<<<<< HEAD
                                    LatestAttributeMerger::Config>(
         "LatestAttributeMerger");
+=======
+                                   LatestAttributeMerger::Config>("LatestAttributeMerger");
+>>>>>>> a68d310c (rebase)
 
 }  // namespace
 
