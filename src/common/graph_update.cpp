@@ -144,21 +144,14 @@ void GraphUpdater::addNode(DynamicSceneGraph& graph,
     if (entry.track_id) {
       tracker.track_to_node[*entry.track_id] = *to_merge;
     }
-    const auto* existing_node = graph.findNode(*to_merge);
-    if (existing_node) {
-      auto merged =
-          tracker.merger->merge({&existing_node->attributes(), entry.attributes.get()});
-      if (merged) {
-        if (config.mark_active) {
-          merged->is_active = true;
-        }
-        graph.setNodeAttributes(*to_merge, std::move(merged));
-      }
-    }
+    tracker.attribute_cache[*entry.track_id] = entry.attributes->clone();
+    tracker.node_to_tracks[*to_merge].insert(*entry.track_id);
+    computeMergeGroup(*to_merge, tracker, graph);
     return;
   }
 
   auto attrs = entry.attributes->clone();
+  tracker.attribute_cache[*entry.track_id] = attrs;
   if (config.mark_active) {
     attrs->is_active = true;
   }
@@ -170,7 +163,7 @@ void GraphUpdater::addNode(DynamicSceneGraph& graph,
   if (entry.track_id) {
     tracker.track_to_node[*entry.track_id] = new_id;
   }
-
+  tracker.node_to_tracks[new_id] = {*entry.track_id};
   ++tracker.next_id;
   return;
 }
@@ -188,8 +181,14 @@ void GraphUpdater::deleteNode(const NodeUpdate& entry,
     VLOG(5) << "Delete for unknown track_id " << *entry.track_id;
     return;
   }
+  tracker.attribute_cache.erase(*entry.track_id);
 
-  graph.removeNode(map_iter->second);
+  tracker.node_to_tracks[map_iter->second].erase(*entry.track_id);
+  if(tracker.node_to_tracks size == 0){
+      graph.removeNode(map_iter->second);
+  } else {
+    computeMergeGroup(map_iter->second, tracker, graph);
+  }
   tracker.track_to_node.erase(map_iter);
   return;
 }
@@ -199,24 +198,38 @@ bool GraphUpdater::updateNode(const NodeUpdate& entry,
                               DynamicSceneGraph& graph) {
   const auto map_iter = tracker.track_to_node.find(*entry.track_id);
   if (map_iter != tracker.track_to_node.end()) {
-    std::unique_ptr<NodeAttributes> updated;
-    const auto* existing = graph.findNode(map_iter->second);
-    if (existing) {
-      updated =
-          tracker.merger->merge({&existing->attributes(), entry.attributes.get()});
-    }
-    if (!updated) {
-      updated = entry.attributes->clone();
-    }
-    if (config.mark_active) {
-      updated->is_active = true;
-    }
-
-    graph.setNodeAttributes(map_iter->second, std::move(updated));
+    tracker.attribute_cache[*entry.track_id] = entry.attributes->clone()
+    computeMergeGroup(map_iter->second, tracker, graph);
     return true;
   }
 
   return false;
+}
+
+void GraphUpdater::computeMergeGroup(spark_dsg::NodeId node_id,
+                          LayerTracker& tracker,
+                          spark_dsg::DynamicSceneGraph& graph){
+  auto& track_ids = tracker.node_to_tracks[node_id];
+  
+  std::vector<spark_dsg::NodeAttributes::Ptr> attrs;
+
+  for (size_t id : track_ids) {
+    auto it = attribute_cache.find(id)
+    if (it != attribute_cache.end()) {
+        attrs.push_back(it->second);
+    }
+  }
+
+  auto merged = tracker.merger->merge(attrs);
+
+  if (config.mark_active) {
+    merged->is_active = true;
+  }
+
+
+  // TODO: aryannav --> add logic to handle checking for invalid tracks given new merge.
+  graph.setNodeAttributes(node_id, std::move(merged));
+
 }
 
 void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
