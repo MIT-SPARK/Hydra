@@ -101,6 +101,8 @@ class GraphExtractor {
                const GvdLayer& layer,
                const GvdParentTracker& parents);
 
+  const GvdGraph& gvd() const { return gvd_; }
+
   const PartialGraph<spark_dsg::PlaceNodeAttributes>& graph() const { return graph_; }
 
  protected:

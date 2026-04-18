@@ -78,6 +78,7 @@ class GvdGraph {
   using Nodes = std::unordered_map<uint64_t, Node>;
   using CompressedNodes = std::map<uint64_t, CompressedNode>;
   using CompressionEdgeMap = std::map<spark_dsg::EdgeKey, std::set<spark_dsg::EdgeKey>>;
+  using NodeRemapping = std::unordered_map<uint64_t, uint64_t>;
 
   GvdGraph(float voxel_resolution_m, float compression_resolution_m);
 
@@ -94,6 +95,8 @@ class GvdGraph {
   const Nodes& uncompressed() const;
 
   const CompressedNodes& compressed() const;
+
+  const NodeRemapping& remapping() const;
 
   const spatial_hash::IndexGrid voxel_grid;
   const spatial_hash::IndexGrid compression_grid;
@@ -130,7 +133,7 @@ class GvdGraph {
   std::unordered_map<uint64_t, spatial_hash::Index> compressed_id_map_;
   CompressionEdgeMap compressed_edge_support_;
 
-  std::unordered_map<uint64_t, uint64_t> compression_map_;
+  NodeRemapping compression_map_;
   std::unordered_set<uint64_t> updated_;
 };
 

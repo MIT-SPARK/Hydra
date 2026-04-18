@@ -215,6 +215,8 @@ const Nodes& GvdGraph::uncompressed() const { return uncompressed_; }
 
 const CompressedNodes& GvdGraph::compressed() const { return compressed_; }
 
+const GvdGraph::NodeRemapping& GvdGraph::remapping() const { return compression_map_; }
+
 uint64_t GvdGraph::next_uncompressed_id() {
   uint64_t new_id;
   if (uncompressed_id_queue_.empty()) {
