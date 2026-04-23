@@ -52,6 +52,10 @@ struct TraversabilityVoxel {
   //! @brief Confidence in the traversability value in [0, 1].
   float confidence = 0.0f;
 
+  //! @brief The height of the surface in meters in global coordinate, used for
+  //! debugging and visualization.
+  std::optional<float> height = 0.0f;
+
   //! @brief Discrete traversability state for of the voxel, computed as a function of
   // traversability and confidence.
   spark_dsg::TraversabilityState state = spark_dsg::TraversabilityState::UNKNOWN;

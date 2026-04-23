@@ -381,6 +381,7 @@ void GradientTraversabilityEstimator::computeTraversability(
             num_neighbors_observed > 0 ? gradient_sum / num_neighbors_observed : 0.0f;
         trav_voxel.traversability = computeTraversabilityFromGradient(mean_gradient);
         trav_voxel.confidence = num_neighbors_observed / 8.0f;
+        trav_voxel.height = center_height;
 
         classifyTraversabilityVoxel(trav_voxel);
       }
