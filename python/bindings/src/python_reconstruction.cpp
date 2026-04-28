@@ -126,6 +126,8 @@ class PythonReconstruction {
 
   void stop();
 
+  const VolumetricMap& map() const { return module_->map(); }
+
   const std::string sensor_name;
 
  protected:
@@ -262,7 +264,12 @@ void addBindings(pybind11::module_& m) {
              input->sensor_input = std::make_unique<PythonSensorInput>(
                  timestamp_ns, points, labels, colors, pipeline.sensor_name);
              return pipeline.step(input);
-           });
+           })
+      .def_property_readonly("map",
+                             [](PythonReconstruction& r) -> const VolumetricMap& {
+                               return r.map();
+                             },
+                             py::return_value_policy::reference_internal);
 }
 
 }  // namespace python_reconstruction

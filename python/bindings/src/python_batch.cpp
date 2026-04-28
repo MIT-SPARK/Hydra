@@ -41,8 +41,11 @@
 #include <config_utilities/validation.h>
 #include <hydra/common/batch_pipeline.h>
 #include <hydra/common/global_info.h>
+#include <pybind11/eigen.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
+
+#include <limits>
 
 #include "hydra/bindings/glog_utilities.h"
 
@@ -89,8 +92,66 @@ void addBindings(pybind11::module_& m) {
       .def_static(
           "load",
           [](const std::string& filepath) { return VolumetricMap::load(filepath); })
-      .def_static("load", [](const std::filesystem::path& filepath) {
-        return VolumetricMap::load(filepath.string());
+      .def_static("load",
+                  [](const std::filesystem::path& filepath) {
+                    return VolumetricMap::load(filepath.string());
+                  })
+      .def_property_readonly("voxel_size",
+                             [](const VolumetricMap& m) { return m.config.voxel_size; })
+      .def_property_readonly("block_size",
+                             [](const VolumetricMap& m) { return m.blockSize(); })
+      .def("get_active_window_bounds",
+           [](const VolumetricMap& m) -> py::object {
+             const auto indices = m.getTsdfLayer().allocatedBlockIndices();
+             if (indices.empty()) {
+               return py::none();
+             }
+             const float bs = m.blockSize();
+             Eigen::Vector3f mn =
+                 Eigen::Vector3f::Constant(std::numeric_limits<float>::max());
+             Eigen::Vector3f mx =
+                 Eigen::Vector3f::Constant(std::numeric_limits<float>::lowest());
+             for (const auto& idx : indices) {
+               Eigen::Vector3f origin(idx.x() * bs, idx.y() * bs, idx.z() * bs);
+               mn = mn.cwiseMin(origin);
+               mx = mx.cwiseMax(origin + Eigen::Vector3f::Constant(bs));
+             }
+             return py::make_tuple(mn, mx);
+           })
+      .def("get_active_block_indices",
+           [](const VolumetricMap& m) {
+             const auto indices = m.getTsdfLayer().allocatedBlockIndices();
+             std::vector<std::tuple<int, int, int>> result;
+             result.reserve(indices.size());
+             for (const auto& idx : indices) {
+               result.emplace_back(idx.x(), idx.y(), idx.z());
+             }
+             return result;
+           })
+      .def("get_voxel_semantics_at",
+           [](const VolumetricMap& m, Eigen::Vector3f pos) -> py::object {
+             if (!m.hasSemantics()) {
+               return py::none();
+             }
+             const auto* layer = m.getSemanticLayer();
+             const SemanticVoxel* vox = layer->getVoxelPtr(pos);
+             if (!vox || vox->empty) {
+               return py::none();
+             }
+             py::dict out;
+             out["mle_label"] = vox->semantic_label;
+             out["weights"] =
+                 std::vector<float>(vox->semantic_likelihoods.data(),
+                                    vox->semantic_likelihoods.data() +
+                                        vox->semantic_likelihoods.size());
+             out["label_ids"] =
+                 std::vector<uint32_t>(vox->semantic_labels.data(),
+                                       vox->semantic_labels.data() +
+                                           vox->semantic_labels.size());
+             return out;
+           })
+      .def_static("get_label_names", []() {
+        return GlobalInfo::instance().getLabelToNameMap();
       });
 
   py::class_<PythonBatchPipeline>(m, "BatchPipeline")
