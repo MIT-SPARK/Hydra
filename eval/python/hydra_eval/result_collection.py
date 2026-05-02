@@ -5,14 +5,11 @@ import sqlite3
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-import spark_config as sc
-from ruamel.yaml import YAML
+import yaml
 
 from hydra_eval.utils import get_logger
-
-yaml = YAML(typ="safe")
 
 
 @dataclass
@@ -122,24 +119,20 @@ class ResultManager:
 
 
 @dataclass
-class TrialConfig(sc.Config):
+class TrialConfig:
     """Configuration for a single trial."""
 
     name: str = ""
-    executable: Any = sc.config_field("exec")
+    executable: Any | None = None
     args: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
-class ExperimentConfig(sc.Config):
+class ExperimentConfig:
     """Configuration for experiments."""
 
     name: str = ""
     trials: List[TrialConfig] = field(default_factory=list)
-
-    @classmethod
-    def load(cls, path: str):
-        return sc.Config.load(ExperimentConfig, path)
 
 
 class ExperimentManager:
@@ -231,12 +224,3 @@ class LaunchExec:
         serv = launch.LaunchService()
         serv.include_launch_description(self._desc)
         return serv.run()
-
-
-@sc.register_config("exec", "launch", constructor=LaunchExec)
-@dataclass
-class LaunchExec(sc.Config):
-    """Config for a tmuxp executable."""
-
-    path: Optional[str] = None
-    contents: Optional[Any] = None

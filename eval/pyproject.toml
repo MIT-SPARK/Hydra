@@ -9,9 +9,9 @@ dependencies = [
   "click",
   "matplotlib",
   "pandas",
+  "pyyaml",
   "rich",
   "seaborn",
-  "spark_config@git+https://github.com/MIT-SPARK/Spark-Config.git",
   "tqdm",
 ]
 
