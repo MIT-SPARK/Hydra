@@ -88,7 +88,7 @@ def timeline(result_path, keys):
     "--key",
     "keys",
     multiple=True,
-    default=("frontend/spin", "backend/spin"),
+    default=("frontend_spin", "backend_spin"),
     help="timer names to use for comparison",
 )
 @click.option(

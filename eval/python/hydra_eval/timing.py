@@ -198,14 +198,17 @@ def plot_comparison(results, keys, use_bars=False):
     labels = []
     result_set = []
 
-    keys = [x.replace("/", "_") for x in keys]
+    matcher = None
+    if keys:
+        matcher = re.compile("|".join(keys))
+
     for stem, result in results.items():
-        for key in keys:
-            if key not in result:
+        for key, values in result.items():
+            if matcher and not matcher.match(key):
                 continue
 
-            num_values = len(result[key])
-            data = np.hstack((data, np.squeeze(result[key][:, 1])))
+            num_values = len(values)
+            data = np.hstack((data, np.squeeze(values[:, 1])))
             labels += num_values * [key]
             result_set += num_values * [stem.upper()]
 
