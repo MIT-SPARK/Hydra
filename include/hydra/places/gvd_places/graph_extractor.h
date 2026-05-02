@@ -122,6 +122,8 @@ class GraphExtractor {
   GvdGraph gvd_;
   PartialGraph<spark_dsg::PlaceNodeAttributes> graph_;
   std::queue<GlobalIndex> modified_voxel_queue_;
+  std::queue<GlobalIndex> removed_voxel_queue_;
+  std::queue<GlobalIndex> archived_voxel_queue_;
   std::unique_ptr<MergePolicy> merge_policy_;
 
   std::unordered_map<spark_dsg::NodeId, GlobalIndex> node_index_map_;

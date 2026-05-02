@@ -158,15 +158,11 @@ void GraphExtractor::pushIndex(const GlobalIndex& index) {
 }
 
 void GraphExtractor::clearIndex(const GlobalIndex& index) {
-  // pass voxel index to compressed graph to handle (node state can be inferred when
-  // running extraction)
-  gvd_.remove(index);
+  removed_voxel_queue_.push(index);
 }
 
 void GraphExtractor::archiveIndex(const GlobalIndex& index) {
-  // pass voxel index to compressed graph to handle (node state can be inferred when
-  // running extraction)
-  gvd_.archive(index);
+  archived_voxel_queue_.push(index);
 }
 
 void GraphExtractor::extract(uint64_t timestamp_ns,
