@@ -100,6 +100,10 @@ void addBindings(pybind11::module_& m) {
                              [](const VolumetricMap& m) { return m.config.voxel_size; })
       .def_property_readonly("block_size",
                              [](const VolumetricMap& m) { return m.blockSize(); })
+      .def_property_readonly("truncation_distance",
+                             [](const VolumetricMap& m) {
+                               return m.config.truncation_distance;
+                             })
       .def("get_active_window_bounds",
            [](const VolumetricMap& m) -> py::object {
              const auto indices = m.getTsdfLayer().allocatedBlockIndices();
@@ -148,6 +152,17 @@ void addBindings(pybind11::module_& m) {
                  std::vector<uint32_t>(vox->semantic_labels.data(),
                                        vox->semantic_labels.data() +
                                            vox->semantic_labels.size());
+             return out;
+           })
+      .def("get_voxel_tsdf_at",
+           [](const VolumetricMap& m, Eigen::Vector3f pos) -> py::object {
+             const TsdfVoxel* vox = m.getTsdfLayer().getVoxelPtr(pos);
+             if (!vox || vox->weight <= 0.0f) {
+               return py::none();
+             }
+             py::dict out;
+             out["distance"] = vox->distance;
+             out["weight"] = vox->weight;
              return out;
            })
       .def_static("get_label_names", []() {
