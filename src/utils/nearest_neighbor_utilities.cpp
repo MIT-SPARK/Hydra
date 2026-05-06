@@ -199,8 +199,8 @@ size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
 
 struct PointNeighborSearch::Detail {
   // Nanoflann interface.
-  explicit Detail(const std::vector<Eigen::Vector3f>& points)
-      : points_(points),
+  explicit Detail(std::vector<Eigen::Vector3f> points)
+      : points_(std::move(points)),
         tree_(3, *this, nanoflann::KDTreeSingleIndexAdaptorParams(10)) {
     tree_.buildIndex();
   }
@@ -221,7 +221,7 @@ struct PointNeighborSearch::Detail {
     return false;
   }
 
-  const std::vector<Eigen::Vector3f>& points_;
+  std::vector<Eigen::Vector3f> points_;
   KDTreeSingleIndexAdaptor<L2_Simple_Adaptor<float, Detail>, Detail, 3> tree_;
 };
 
