@@ -94,6 +94,7 @@ bool hasCompressedEdge(const GvdGraph& graph, uint64_t source_id, uint64_t targe
 
 }  // namespace
 
+// test that compressed nodes have correct archival flag logic
 TEST(GvdGraph, ArchivedCorrect) {
   GvdGraph::CompressedNode node(0);
   node.active_refs.insert(1);
@@ -107,6 +108,7 @@ TEST(GvdGraph, ArchivedCorrect) {
   EXPECT_FALSE(node.archived());
 }
 
+// test that add handles compression and edges correctly
 TEST(GvdGraph, AddCorrect) {
   GvdGraph graph(0.1, 1.0);
   graph.add(GlobalIndex(1, 2, 3), 0.1, 2);
@@ -136,6 +138,7 @@ TEST(GvdGraph, AddCorrect) {
   ASSERT_TRUE(graph.get(2));
 }
 
+// test that removal drops uncompressed and compressed nodes correctly
 TEST(GvdGraph, RemoveCorrect) {
   GvdGraph graph(0.1, 1.0);
   fillGraph(graph, {{1, 2, 3}, {1, 2, 4}, {4, 4, 4}});
@@ -159,6 +162,7 @@ TEST(GvdGraph, RemoveCorrect) {
   EXPECT_EQ(graph.compressed().size(), 0u);
 }
 
+// test that archival doesn't change graph
 TEST(GvdGraph, ArchiveCorrect) {
   GvdGraph graph(0.1, 1.0);
   fillGraph(graph, {{1, 2, 3}, {1, 2, 4}, {4, 4, 4}});
@@ -186,6 +190,7 @@ TEST(GvdGraph, ArchiveCorrect) {
   EXPECT_TRUE(hasEdge(graph, 0, 1));
 }
 
+// check that deleting compressed nodes deleted relevant uncompressed nodes
 TEST(GvdGraph, DropCorrect) {
   GvdGraph graph(0.1, 1.0);
   fillGraph(graph, {{1, 2, 3}, {1, 2, 4}, {4, 4, 4}});
@@ -204,6 +209,7 @@ TEST(GvdGraph, DropCorrect) {
   EXPECT_EQ(graph.compressed().size(), 0u);
 }
 
+// test that voxels across blocks result in connections in the compressed graph
 TEST(GvdGraph, AddWithEdgeAcrossBlocks) {
   GvdGraph graph(0.1, 1.0);
   fillGraph(graph,
@@ -222,6 +228,7 @@ TEST(GvdGraph, AddWithEdgeAcrossBlocks) {
   EXPECT_TRUE(hasCompressedEdge(graph, 0, 1));
 }
 
+// test that adding a connecting voxel merges clusters
 TEST(GvdGraph, AddWithClusteringCorrect) {
   GvdGraph graph(0.1, 1.0);
   graph.add(GlobalIndex(0, 0, 0), 0.1, 2);
@@ -232,6 +239,63 @@ TEST(GvdGraph, AddWithClusteringCorrect) {
   graph.add(GlobalIndex(1, 0, 0), 0.1, 2);
   EXPECT_EQ(graph.uncompressed().size(), 3u);
   EXPECT_EQ(graph.compressed().size(), 1u);
+}
+
+// test that siblings and compression remapping is correct when adding nodes between
+// blocks (this is somewhat redundant with other tests as a result of being ported from
+// the graph extractor test suite)
+TEST(GvdGraph, CompressionInformationCorrect) {
+  GvdGraph gvd(0.1, 1.0);
+  EXPECT_TRUE(gvd.uncompressed().empty());
+
+  gvd.add(GlobalIndex(0, 0, 1), 0.1, 1);
+  gvd.add(GlobalIndex(0, 0, 2), 0.1, 1);
+  gvd.add(GlobalIndex(0, 0, 4), 0.1, 1);
+  gvd.add(GlobalIndex(0, 1, 0), 0.1, 1);
+  EXPECT_EQ(gvd.uncompressed().size(), 4u);
+  EXPECT_TRUE(gvd.get(0));
+  EXPECT_TRUE(gvd.get(1));
+  EXPECT_TRUE(gvd.get(2));
+  EXPECT_TRUE(gvd.get(3));
+
+  {
+    const auto& node = gvd.uncompressed().at(0);
+    std::set<uint64_t> expected_siblings{1, 3};
+    EXPECT_EQ(node.siblings, expected_siblings);
+  }
+
+  {
+    const auto& node = gvd.uncompressed().at(1);
+    std::set<uint64_t> expected_siblings{0};
+    EXPECT_EQ(node.siblings, expected_siblings);
+  }
+
+  {
+    const auto& node = gvd.uncompressed().at(3);
+    std::set<uint64_t> expected_siblings{0};
+    EXPECT_EQ(node.siblings, expected_siblings);
+  }
+
+  GvdGraph::NodeRemapping expected_remapping{{0, 0}, {1, 0}, {2, 1}, {3, 0}};
+  EXPECT_EQ(gvd.remapping(), expected_remapping);
+  ASSERT_TRUE(gvd.compressed().count(0));
+  ASSERT_TRUE(gvd.compressed().count(1));
+
+  {
+    const std::set<uint64_t> expected_active_refs{0, 1, 3};
+    const auto& info = gvd.compressed().at(0);
+    EXPECT_TRUE(info.siblings.empty());
+    EXPECT_EQ(info.active_refs, expected_active_refs);
+    EXPECT_TRUE(info.archived_refs.empty());
+  }
+
+  {
+    const std::set<uint64_t> expected_active_refs{2};
+    const auto& info = gvd.compressed().at(1);
+    EXPECT_TRUE(info.siblings.empty());
+    EXPECT_EQ(info.active_refs, expected_active_refs);
+    EXPECT_TRUE(info.archived_refs.empty());
+  }
 }
 
 TEST(GvdGraph, DropWithClusteringCorrect) {
@@ -245,6 +309,97 @@ TEST(GvdGraph, DropWithClusteringCorrect) {
   callRemove(graph, {{1, 0, 0}});
   EXPECT_EQ(graph.uncompressed().size(), 2u);
   EXPECT_EQ(graph.compressed().size(), 2u);
+}
+
+// test that readding a node updates the underlying gvd information
+// somewhat redundant with add due to port from graph extractor
+TEST(GvdGraph, NodeUpdatesCorrect) {
+  GvdGraph gvd(0.1, 1.0);
+  EXPECT_TRUE(gvd.uncompressed().empty());
+
+  gvd.add(GlobalIndex(0, 0, 1), 0.1, 1);
+  gvd.add(GlobalIndex(0, 0, 2), 0.2, 2);
+  EXPECT_EQ(gvd.uncompressed().size(), 2u);
+  EXPECT_TRUE(gvd.get(0));
+  EXPECT_TRUE(gvd.get(1));
+  EXPECT_FALSE(gvd.get(2));
+
+  {
+    const auto info = gvd.get(0);
+    ASSERT_TRUE(info != nullptr);
+    EXPECT_LT((info->position - Eigen::Vector3f(0.05, 0.05, 0.15)).norm(), 1.0e-9);
+    EXPECT_EQ(info->distance, 0.1);
+    EXPECT_EQ(info->num_basis_points, 1u);
+  }
+
+  {
+    const auto info = gvd.get(1);
+    ASSERT_TRUE(info != nullptr);
+    EXPECT_LT((info->position - Eigen::Vector3f(0.05, 0.05, 0.25)).norm(), 1.0e-9);
+    EXPECT_EQ(info->distance, 0.2);
+    EXPECT_EQ(info->num_basis_points, 2u);
+  }
+
+  gvd.add(GlobalIndex(0, 0, 2), 0.3, 2);
+  EXPECT_EQ(gvd.uncompressed().size(), 2u);
+  {
+    const auto info = gvd.get(1);
+    ASSERT_TRUE(info != nullptr);
+    EXPECT_LT((info->position - Eigen::Vector3f(0.05, 0.05, 0.25)).norm(), 1.0e-9);
+    EXPECT_EQ(info->distance, 0.3);
+    EXPECT_EQ(info->num_basis_points, 2u);
+  }
+}
+
+// not sure what this was doing in the graph extractor test suite,
+// should consider dropping at some point
+TEST(GvdGraph, UniformGvd) {
+  GvdGraph gvd(0.1, 0.5);
+  EXPECT_TRUE(gvd.uncompressed().empty());
+
+  gvd.add(GlobalIndex(0, 0, 0), 0.1, 1);
+  gvd.add(GlobalIndex(1, 0, 0), 0.1, 1);
+  gvd.add(GlobalIndex(0, 1, 0), 0.1, 1);
+  gvd.add(GlobalIndex(0, 0, 1), 0.1, 1);
+  gvd.add(GlobalIndex(2, 0, 0), 0.1, 1);
+  gvd.add(GlobalIndex(0, 2, 0), 0.1, 1);
+  gvd.add(GlobalIndex(0, 0, 2), 0.1, 1);
+  gvd.add(GlobalIndex(3, 0, 0), 0.1, 1);
+  gvd.add(GlobalIndex(0, 3, 0), 0.1, 1);
+  gvd.add(GlobalIndex(0, 0, 3), 0.1, 1);
+  EXPECT_EQ(gvd.uncompressed().size(), 10u);
+  EXPECT_EQ(gvd.compressed().size(), 1u);
+}
+
+// adapted from graph extractor tests, checks if archived flag updates after voxel
+// deletion
+TEST(GvdGraph, ArchiveAndDeleteCorrect) {
+  GvdGraph gvd(0.1, 3.0);
+  EXPECT_TRUE(gvd.uncompressed().empty());
+
+  gvd.add(GlobalIndex(0, 0, 1), 0.1, 1);
+  gvd.add(GlobalIndex(0, 0, 3), 0.2, 4);
+  gvd.add(GlobalIndex(0, 0, 4), 0.3, 3);
+  gvd.add(GlobalIndex(0, 1, 0), 0.4, 5);
+  gvd.add(GlobalIndex(0, 0, 5), 0.5, 5);
+  EXPECT_EQ(gvd.uncompressed().size(), 5u);
+
+  {
+    const GvdGraph::NodeRemapping expected{{0, 0}, {1, 1}, {2, 1}, {3, 0}, {4, 1}};
+    EXPECT_EQ(gvd.remapping(), expected);
+  }
+
+  callArchive(gvd, {{0, 0, 1}});
+  callRemove(gvd, {{0, 1, 0}});
+
+  EXPECT_EQ(gvd.uncompressed().size(), 4u);
+  ASSERT_TRUE(gvd.compressed().count(0));
+  EXPECT_TRUE(gvd.compressed().at(0).archived());
+
+  {
+    const GvdGraph::NodeRemapping expected{{0, 0}, {1, 1}, {2, 1}, {4, 1}};
+    EXPECT_EQ(gvd.remapping(), expected);
+  }
 }
 
 }  // namespace hydra::places
