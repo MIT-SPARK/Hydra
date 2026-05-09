@@ -38,6 +38,24 @@
 namespace hydra::places {
 namespace {
 
+void callArchive(GvdGraph& graph, const std::vector<GlobalIndex>& indices) {
+  std::queue<GlobalIndex> temp_queue;
+  for (const auto& index : indices) {
+    temp_queue.push(index);
+  }
+
+  graph.archive(temp_queue);
+}
+
+void callRemove(GvdGraph& graph, const std::vector<GlobalIndex>& indices) {
+  std::queue<GlobalIndex> temp_queue;
+  for (const auto& index : indices) {
+    temp_queue.push(index);
+  }
+
+  graph.remove(temp_queue);
+}
+
 void fillGraph(GvdGraph& graph, const std::vector<GlobalIndex>& indices) {
   for (const auto& idx : indices) {
     graph.add(idx, 0.1, 2);
@@ -123,20 +141,20 @@ TEST(GvdGraph, RemoveCorrect) {
   fillGraph(graph, {{1, 2, 3}, {1, 2, 4}, {4, 4, 4}});
 
   // non-existent index does not change counts
-  graph.remove(GlobalIndex(10, 10, 5));
+  callRemove(graph, {GlobalIndex(10, 10, 5)});
   EXPECT_EQ(graph.uncompressed().size(), 3u);
   EXPECT_EQ(graph.compressed().size(), 2u);
 
   // support doesn't change for compressed nodes
-  graph.remove(GlobalIndex(1, 2, 4));
+  callRemove(graph, {GlobalIndex(1, 2, 4)});
   EXPECT_EQ(graph.uncompressed().size(), 2u);
   EXPECT_EQ(graph.compressed().size(), 2u);
 
-  graph.remove(GlobalIndex(1, 2, 3));
+  callRemove(graph, {GlobalIndex(1, 2, 3)});
   EXPECT_EQ(graph.uncompressed().size(), 1u);
   EXPECT_EQ(graph.compressed().size(), 1u);
 
-  graph.remove(GlobalIndex(4, 4, 4));
+  callRemove(graph, {GlobalIndex(4, 4, 4)});
   EXPECT_EQ(graph.uncompressed().size(), 0u);
   EXPECT_EQ(graph.compressed().size(), 0u);
 }
@@ -146,23 +164,23 @@ TEST(GvdGraph, ArchiveCorrect) {
   fillGraph(graph, {{1, 2, 3}, {1, 2, 4}, {4, 4, 4}});
 
   // non-existent index does not change counts
-  graph.archive(GlobalIndex(10, 10, 5));
+  callArchive(graph, {GlobalIndex(10, 10, 5)});
   EXPECT_EQ(graph.uncompressed().size(), 3u);
   EXPECT_EQ(graph.compressed().size(), 2u);
 
   // archive doesn't change edges
-  graph.archive(GlobalIndex(1, 2, 4));
+  callArchive(graph, {GlobalIndex(1, 2, 4)});
   EXPECT_EQ(graph.uncompressed().size(), 3u);
   EXPECT_EQ(graph.compressed().size(), 2u);
   EXPECT_TRUE(hasEdge(graph, 0, 1));
 
   // support doesn't change for compressed nodes
-  graph.archive(GlobalIndex(1, 2, 3));
+  callArchive(graph, {GlobalIndex(1, 2, 3)});
   EXPECT_EQ(graph.uncompressed().size(), 3u);
   EXPECT_EQ(graph.compressed().size(), 2u);
   EXPECT_TRUE(hasEdge(graph, 0, 1));
 
-  graph.archive(GlobalIndex(4, 4, 4));
+  callArchive(graph, {GlobalIndex(4, 4, 4)});
   EXPECT_EQ(graph.uncompressed().size(), 3u);
   EXPECT_EQ(graph.compressed().size(), 2u);
   EXPECT_TRUE(hasEdge(graph, 0, 1));
@@ -186,7 +204,7 @@ TEST(GvdGraph, DropCorrect) {
   EXPECT_EQ(graph.compressed().size(), 0u);
 }
 
-TEST(GvdGraph, DropWithBlocksCorrect) {
+TEST(GvdGraph, AddWithEdgeAcrossBlocks) {
   GvdGraph graph(0.1, 1.0);
   fillGraph(graph,
             {
@@ -195,21 +213,38 @@ TEST(GvdGraph, DropWithBlocksCorrect) {
                 {0, 1, 0},
                 {1, 0, 0},
                 {0, 0, -1},
-                {0, -1, 0},
-                {-1, 0, 0},
+                {0, 1, -1},
+                {1, 0, -1},
             });
 
   EXPECT_EQ(graph.uncompressed().size(), 7u);
   EXPECT_EQ(graph.compressed().size(), 2u);
   EXPECT_TRUE(hasCompressedEdge(graph, 0, 1));
+}
 
-  graph.dropCompressed(0);
+TEST(GvdGraph, AddWithClusteringCorrect) {
+  GvdGraph graph(0.1, 1.0);
+  graph.add(GlobalIndex(0, 0, 0), 0.1, 2);
+  graph.add(GlobalIndex(2, 0, 0), 0.1, 2);
+  EXPECT_EQ(graph.uncompressed().size(), 2u);
+  EXPECT_EQ(graph.compressed().size(), 2u);
+  EXPECT_FALSE(hasCompressedEdge(graph, 0, 1));
+  graph.add(GlobalIndex(1, 0, 0), 0.1, 2);
+  EXPECT_EQ(graph.uncompressed().size(), 3u);
+  EXPECT_EQ(graph.compressed().size(), 1u);
+}
+
+TEST(GvdGraph, DropWithClusteringCorrect) {
+  GvdGraph graph(0.1, 1.0);
+  graph.add(GlobalIndex(0, 0, 0), 0.1, 2);
+  graph.add(GlobalIndex(1, 0, 0), 0.1, 2);
+  graph.add(GlobalIndex(2, 0, 0), 0.1, 2);
   EXPECT_EQ(graph.uncompressed().size(), 3u);
   EXPECT_EQ(graph.compressed().size(), 1u);
 
-  graph.dropCompressed(1);
-  EXPECT_EQ(graph.uncompressed().size(), 0u);
-  EXPECT_EQ(graph.compressed().size(), 0u);
+  callRemove(graph, {{1, 0, 0}});
+  EXPECT_EQ(graph.uncompressed().size(), 2u);
+  EXPECT_EQ(graph.compressed().size(), 2u);
 }
 
 }  // namespace hydra::places

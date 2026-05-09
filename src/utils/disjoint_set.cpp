@@ -34,20 +34,11 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/utils/disjoint_set.h"
 
-#include <glog/logging.h>
-
 namespace hydra {
 
 DisjointSet::DisjointSet() {}
 
-// implementation mainly from: https://en.wikipedia.org/wiki/Disjoint-set_data_structure
-DisjointSet::DisjointSet(const SceneGraphLayer& layer) {
-  for (const auto& id_node_pair : layer.nodes()) {
-    addSet(id_node_pair.first);
-  }
-}
-
-bool DisjointSet::addSet(NodeId node) {
+bool DisjointSet::addSet(uint64_t node) {
   if (parents.count(node)) {
     return false;
   }
@@ -58,10 +49,10 @@ bool DisjointSet::addSet(NodeId node) {
   return true;
 }
 
-NodeId DisjointSet::findSet(NodeId node) const {
-  NodeId parent = node;
+uint64_t DisjointSet::findSet(uint64_t node) const {
+  auto parent = node;
 
-  NodeId curr_node;
+  uint64_t curr_node;
   do {
     curr_node = parent;
     parent = parents.at(curr_node);
@@ -70,12 +61,13 @@ NodeId DisjointSet::findSet(NodeId node) const {
   return parent;
 }
 
-bool DisjointSet::hasSet(NodeId node) const { return parents.count(node); }
+bool DisjointSet::hasSet(uint64_t node) const { return parents.count(node); }
 
-std::optional<NodeId> DisjointSet::doUnion(NodeId lhs, NodeId rhs, bool rhs_better) {
-  NodeId lhs_set = findSet(lhs);
-  NodeId rhs_set = findSet(rhs);
-
+std::optional<uint64_t> DisjointSet::doUnion(uint64_t lhs,
+                                             uint64_t rhs,
+                                             bool rhs_better) {
+  auto lhs_set = findSet(lhs);
+  auto rhs_set = findSet(rhs);
   if (lhs_set == rhs_set) {
     return std::nullopt;
   }

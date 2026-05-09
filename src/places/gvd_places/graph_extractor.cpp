@@ -168,6 +168,10 @@ void GraphExtractor::archiveIndex(const GlobalIndex& index) {
 void GraphExtractor::extract(uint64_t timestamp_ns,
                              const GvdLayer& layer,
                              const GvdParentTracker& tracker) {
+  // process index updates from the gvd integration
+  gvd_.remove(removed_voxel_queue_);
+  gvd_.archive(archived_voxel_queue_);
+
   // Remove all archived nodes that no longer have active siblings
   clearArchived();
 
@@ -235,11 +239,10 @@ void GraphExtractor::updateGvdGraph(uint64_t timestamp_ns, const GvdLayer& layer
       continue;
     }
 
-    if (!voxel->num_extra_basis) {
+    if (!voxel->num_extra_basis || voxel->distance < config.min_node_distance_m) {
       continue;
     }
 
-    // TODO(nathan) check min distance criteria
     seen_indices.insert(index);
     gvd_.add(index, voxel->distance, voxel->num_extra_basis + 1);
   }

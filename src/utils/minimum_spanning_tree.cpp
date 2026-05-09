@@ -70,7 +70,11 @@ MinimumSpanningTreeInfo getMinimumSpanningEdges(const SceneGraphLayer& layer,
     info.counts[id_node_pair.first] = 0;
   }
 
-  DisjointSet subtrees(layer);
+  DisjointSet subtrees;
+  for (const auto& [node_id, node] : layer.nodes()) {
+    subtrees.addSet(node_id);
+  }
+
   while (!sorted_edges.empty()) {
     std::pop_heap(sorted_edges.begin(), sorted_edges.end(), std::greater<>{});
     auto min_edge = sorted_edges.back();

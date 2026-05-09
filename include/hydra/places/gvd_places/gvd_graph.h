@@ -41,6 +41,7 @@
 #include <list>
 #include <map>
 #include <optional>
+#include <queue>
 #include <set>
 #include <unordered_map>
 
@@ -77,16 +78,15 @@ class GvdGraph {
 
   using Nodes = std::unordered_map<uint64_t, Node>;
   using CompressedNodes = std::map<uint64_t, CompressedNode>;
-  using CompressionEdgeMap = std::map<spark_dsg::EdgeKey, std::set<spark_dsg::EdgeKey>>;
   using NodeRemapping = std::unordered_map<uint64_t, uint64_t>;
 
   GvdGraph(float voxel_resolution_m, float compression_resolution_m);
 
   void add(const GlobalIndex& index, double distance, uint8_t num_basis_points);
 
-  void remove(const GlobalIndex& index);
+  void remove(std::queue<GlobalIndex>& indices);
 
-  void archive(const GlobalIndex& index);
+  void archive(std::queue<GlobalIndex>& indices);
 
   void dropCompressed(uint64_t compressed_id);
 
@@ -103,6 +103,10 @@ class GvdGraph {
   const spatial_hash::NeighborSearch neighbor_search;
 
  protected:
+  void remove(const GlobalIndex& index, std::set<uint64_t>& updated);
+
+  void archive(const GlobalIndex& index);
+
   uint64_t next_uncompressed_id();
 
   uint64_t next_compressed_id();
@@ -131,7 +135,6 @@ class GvdGraph {
   CompressedNodes compressed_;
   spatial_hash::IndexHashMap<std::set<uint64_t>> compressed_index_map_;
   std::unordered_map<uint64_t, spatial_hash::Index> compressed_id_map_;
-  CompressionEdgeMap compressed_edge_support_;
 
   NodeRemapping compression_map_;
   std::unordered_set<uint64_t> updated_;

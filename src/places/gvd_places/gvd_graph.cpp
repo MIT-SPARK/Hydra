@@ -39,11 +39,48 @@
 
 namespace hydra::places {
 
-using spark_dsg::EdgeKey;
 using Node = GvdGraph::Node;
 using Nodes = GvdGraph::Nodes;
 using CompressedNode = GvdGraph::CompressedNode;
 using CompressedNodes = GvdGraph::CompressedNodes;
+
+namespace {
+
+std::vector<std::vector<uint64_t>> getComponentsForNode(const CompressedNode& node,
+                                                        const Nodes& uncompressed) {
+  std::set<uint64_t> visited;
+  const auto children = node.refs();
+  std::vector<std::vector<uint64_t>> components;
+  for (const auto& seed : children) {
+    if (visited.count(seed)) {
+      continue;
+    }
+
+    auto& component = components.emplace_back();
+    std::deque<uint64_t> frontier{seed};
+    visited.insert(seed);
+    while (!frontier.empty()) {
+      const auto gvd_id = frontier.front();
+      component.push_back(gvd_id);
+      frontier.pop_front();
+
+      const auto& gvd_node = uncompressed.at(gvd_id);
+      for (const auto sibling : gvd_node.siblings) {
+        if (!visited.count(sibling)) {
+          frontier.push_back(sibling);
+          visited.insert(sibling);
+        }
+      }
+    }
+  }
+
+  std::sort(components.begin(), components.end(), [](const auto& lhs, const auto& rhs) {
+    return lhs.size() < rhs.size();
+  });
+  return components;
+}
+
+}  // namespace
 
 CompressedNode::CompressedNode(uint64_t id) : node_id(id) {}
 
@@ -92,7 +129,6 @@ void GvdGraph::add(const GlobalIndex& vindex, double distance, uint8_t basis) {
       continue;
     }
 
-    EdgeKey key(cluster, *neighbor_cluster);
     if (cell_clusters.count(*neighbor_cluster)) {
       // voxel connected two neighboring clusters for the same index
       merge_clusters(cluster, *neighbor_cluster);
@@ -100,70 +136,115 @@ void GvdGraph::add(const GlobalIndex& vindex, double distance, uint8_t basis) {
       continue;
     }
 
-    auto iter = compressed_edge_support_.find(key);
-    if (iter == compressed_edge_support_.end()) {
-      iter = compressed_edge_support_.emplace(key, std::set<EdgeKey>{}).first;
-      compressed_.at(key.k1).siblings.insert(key.k2);
-      compressed_.at(key.k2).siblings.insert(key.k1);
-    }
-
-    iter->second.insert({node->id, neighbor});
+    compressed_.at(cluster).siblings.insert(*neighbor_cluster);
+    compressed_.at(*neighbor_cluster).siblings.insert(cluster);
   }
 }
 
-void GvdGraph::remove(const GlobalIndex& index) {
-  // TODO(nathan) this needs to be able to split nodes technically
+void GvdGraph::archive(std::queue<GlobalIndex>& indices) {
+  while (!indices.empty()) {
+    archive(indices.front());
+    indices.pop();
+  }
+}
+
+void GvdGraph::remove(std::queue<GlobalIndex>& indices) {
+  std::set<uint64_t> updated;
+  while (!indices.empty()) {
+    remove(indices.front(), updated);
+    indices.pop();
+  }
+
+  std::vector<uint64_t> nodes_to_check;
+  for (const auto compressed_id : updated) {
+    auto& node = compressed_.at(compressed_id);
+    nodes_to_check.push_back(compressed_id);
+
+    // clear old connections to invalidated nodes
+    for (const auto sibling : node.siblings) {
+      compressed_.at(sibling).siblings.erase(compressed_id);
+    }
+    node.siblings.clear();
+
+    // iterate through and construct any new components that have split off from the
+    // main component
+    const auto index = compressed_id_map_.at(compressed_id);
+    auto& curr_cell_clusters = compressed_index_map_.at(index);
+    const auto components = getComponentsForNode(node, uncompressed_);
+    for (size_t i = 1; i < components.size(); ++i) {
+      const auto new_split_id = next_compressed_id();
+      nodes_to_check.push_back(new_split_id);
+      curr_cell_clusters.insert(new_split_id);
+      compressed_id_map_.emplace(new_split_id, index);
+      auto iter = compressed_.emplace(new_split_id, CompressedNode(new_split_id)).first;
+      for (const auto new_child : components[i]) {
+        const auto active = node.active_refs.count(new_child);
+        compression_map_[new_child] = new_split_id;
+        if (active) {
+          node.active_refs.erase(new_child);
+          iter->second.active_refs.insert(new_child);
+        } else {
+          node.archived_refs.erase(new_child);
+          iter->second.archived_refs.insert(new_child);
+        }
+      }
+    }
+  }
+
+  // for every updated node or newly generated split, recompute siblings from the gvd
+  for (const auto& compressed_id : nodes_to_check) {
+    auto& node = compressed_.at(compressed_id);
+    const auto children = node.refs();
+    for (const auto& child : children) {
+      for (const auto& sibling : uncompressed_.at(child).siblings) {
+        const auto sibling_cluster = compression_map_.at(sibling);
+        if (sibling_cluster != compressed_id) {
+          node.siblings.insert(sibling_cluster);
+          compressed_.at(sibling_cluster).siblings.insert(compressed_id);
+        }
+      }
+    }
+  }
+}
+
+void GvdGraph::remove(const GlobalIndex& index, std::set<uint64_t>& updated) {
   const auto maybe_gvd_id = drop_uncompressed(index);
   if (!maybe_gvd_id) {
     return;
   }
 
+  // clean up uncompressed node information
   const auto gvd_id = *maybe_gvd_id;
-  const auto compressed_id = compression_map_.at(gvd_id);
-  compression_map_.erase(gvd_id);
-
-  std::set<uint64_t> gvd_siblings;
   {  // scope limiting iter
     auto iter = uncompressed_.find(gvd_id);
-    gvd_siblings = iter->second.siblings;
+    for (const auto sibling : iter->second.siblings) {
+      uncompressed_.at(sibling).siblings.erase(gvd_id);
+    }
+
     uncompressed_id_queue_.push_back(gvd_id);
     uncompressed_.erase(iter);
   }
 
+  const auto compressed_id = compression_map_.at(gvd_id);
+  compression_map_.erase(gvd_id);
+
   auto iter = compressed_.find(compressed_id);
   auto& node = iter->second;
   node.active_refs.erase(gvd_id);
-  for (const auto sibling : gvd_siblings) {
-    uncompressed_.at(sibling).siblings.erase(gvd_id);
-    const auto compressed_sibling = compression_map_.at(sibling);
-    if (compressed_sibling == compressed_id) {
-      continue;  // no need to update compressed edges if sibling in same cluster
-    }
-
-    const EdgeKey key{compressed_id, compressed_sibling};
-    auto edge_iter = compressed_edge_support_.find(key);
-    if (edge_iter == compressed_edge_support_.end()) {
-      continue;
-    }
-
-    edge_iter->second.erase({gvd_id, sibling});
-    if (edge_iter->second.empty()) {
-      compressed_edge_support_.erase(edge_iter);
-      compressed_.at(compressed_id).siblings.erase(compressed_sibling);
-      compressed_.at(compressed_sibling).siblings.erase(compressed_id);
-    }
-  }
-
   if (!node.active_refs.empty() || !node.archived_refs.empty()) {
+    // mark node for cleanup as long as it still points to valid gvd nodes
+    updated.insert(compressed_id);
     return;
   }
 
+  // delete compressed node and clear from nodes to process
   drop_compressed_id(compressed_id);
   for (const auto sibling : node.siblings) {
     compressed_.at(sibling).siblings.erase(compressed_id);
   }
 
   compressed_.erase(iter);
+  updated.erase(compressed_id);
 }
 
 void GvdGraph::archive(const GlobalIndex& index) {
@@ -198,7 +279,6 @@ void GvdGraph::dropCompressed(uint64_t compressed_id) {
   }
 
   for (const auto sibling : iter->second.siblings) {
-    compressed_edge_support_.erase({compressed_id, sibling});
     compressed_.at(sibling).siblings.erase(compressed_id);
   }
 
@@ -292,7 +372,7 @@ uint64_t GvdGraph::assign_to_cluster(const Node& node) {
 
 std::optional<uint64_t> GvdGraph::cluster_for_gvd(uint64_t gvd_id) const {
   auto iter = compression_map_.find(gvd_id);
-  return iter == compression_map_.end() ? std::optional<uint64_t>(iter->second)
+  return iter != compression_map_.end() ? std::optional<uint64_t>(iter->second)
                                         : std::nullopt;
 }
 
@@ -313,18 +393,6 @@ void GvdGraph::merge_clusters(uint64_t target, uint64_t candidate) {
   for (auto sibling : candidate_node.siblings) {
     target_node.siblings.insert(sibling);
     compressed_.at(sibling).siblings.insert(target);
-
-    const EdgeKey old_key{sibling, candidate};
-    const auto old_iter = compressed_edge_support_.find(old_key);
-
-    const EdgeKey new_key{sibling, target};
-    auto new_iter = compressed_edge_support_.find(new_key);
-    if (new_iter == compressed_edge_support_.end()) {
-      new_iter = compressed_edge_support_.emplace(new_key, std::set<EdgeKey>{}).first;
-    }
-
-    new_iter->second.insert(old_iter->second.begin(), old_iter->second.end());
-    compressed_edge_support_.erase(old_iter);
   }
 
   compressed_id_map_.erase(candidate);
