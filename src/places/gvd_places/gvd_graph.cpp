@@ -75,7 +75,7 @@ std::vector<std::vector<uint64_t>> getComponentsForNode(const CompressedNode& no
   }
 
   std::sort(components.begin(), components.end(), [](const auto& lhs, const auto& rhs) {
-    return lhs.size() < rhs.size();
+    return lhs.size() > rhs.size();
   });
   return components;
 }

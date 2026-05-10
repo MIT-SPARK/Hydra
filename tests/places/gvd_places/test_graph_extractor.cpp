@@ -164,52 +164,6 @@ TEST_F(GraphExtractorFixture, DISABLED_testAttributeAssignmentManyToOne) {
   EXPECT_EQ(extractor.compressed().remapping, expected_remapping);
 }
 
-// show that isolated voxels deletion gets propagated to compressed graph
-TEST_F(GraphExtractorFixture, DISABLED_testSingleVoxelDeletion) {
-  GraphExtractor::Config config;
-  config.compression_distance_m = 3.0;
-  config.min_node_distance_m = 0.1;
-
-  TestGraphExtractor extractor(config);
-  const auto& gvd = extractor.gvd_graph();
-  const auto& places = extractor.graph();
-  EXPECT_TRUE(gvd.empty());
-
-  extractor.setGvdNode(0, 0, 2, 0.2, 2);
-  extractor.setGvdNode(0, 0, 3, 0.3, 3);
-  extractor.setGvdNode(0, 0, 4, 0.4, 4);
-  extractor.setGvdNode(1, 0, 2, 0.5, 3);
-  EXPECT_EQ(gvd.nodes().size(), 4u);
-
-  IndexVoxelQueue updated{{GlobalIndex(0, 0, 2), nullptr},
-                          {GlobalIndex(0, 0, 3), nullptr},
-                          {GlobalIndex(0, 0, 4), nullptr},
-                          {GlobalIndex(1, 0, 2), nullptr}};
-
-  extractor.updateGvdGraph(gvd_layer, updated, 0);
-  extractor.assignCompressedNodeAttributes();
-
-  {  // scope after a normal update: remapping should exist as expected
-    const Remapping expected_remapping{{0, 0}, {1, 0}, {2, 0}, {3, 0}};
-    EXPECT_EQ(extractor.compressed().remapping, expected_remapping);
-    checkNode(places, "p0"_id, Eigen::Vector3d(0, 0, 4), 0.4, 4u);
-  }
-
-  extractor.clearIndex(GlobalIndex(0, 0, 3));
-  // technically we only need to update (0, 0, 4)
-  extractor.updateGvdGraph(gvd_layer, updated, 0);
-  extractor.assignCompressedNodeAttributes();
-
-  EXPECT_EQ(gvd.nodes().size(), 2u);
-  EXPECT_TRUE(extractor.to_archive_.empty());
-
-  {  // scope after two gvd nodes are cleared: p0 attributes should update
-    const Remapping expected_remapping{{0, 0}, {3, 0}};
-    EXPECT_EQ(extractor.compressed().remapping, expected_remapping);
-    checkNode(places, "p0"_id, Eigen::Vector3d(1, 0, 2), 0.5, 3u);
-  }
-}
-
 TEST_F(GraphExtractorFixture, DISABLED_testVoxelDeletion) {
   GraphExtractor::Config config;
   config.compression_distance_m = 3.0;

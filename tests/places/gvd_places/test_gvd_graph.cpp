@@ -402,4 +402,30 @@ TEST(GvdGraph, ArchiveAndDeleteCorrect) {
   }
 }
 
+// mostly duplicate with previous test due to port from graph extractor,
+// but does check that sorting order of components is correct
+TEST(GvdGraph, SingleVoxelDeletion) {
+  GvdGraph gvd(0.1, 3.0);
+  EXPECT_TRUE(gvd.uncompressed().empty());
+
+  gvd.add(GlobalIndex(0, 0, 2), 0.2, 2);
+  gvd.add(GlobalIndex(0, 0, 3), 0.3, 3);
+  gvd.add(GlobalIndex(0, 0, 4), 0.4, 4);
+  gvd.add(GlobalIndex(1, 0, 2), 0.5, 3);
+  EXPECT_EQ(gvd.uncompressed().size(), 4u);
+
+  {
+    const GvdGraph::NodeRemapping expected_remapping{{0, 0}, {1, 0}, {2, 0}, {3, 0}};
+    EXPECT_EQ(gvd.remapping(), expected_remapping);
+  }
+
+  callRemove(gvd, {{0, 0, 3}});
+  EXPECT_EQ(gvd.uncompressed().size(), 3u);
+
+  {
+    const GvdGraph::NodeRemapping expected_remapping{{0, 0}, {2, 1}, {3, 0}};
+    EXPECT_EQ(gvd.remapping(), expected_remapping);
+  }
+}
+
 }  // namespace hydra::places
