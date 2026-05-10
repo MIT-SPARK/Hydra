@@ -291,6 +291,31 @@ const GvdMemberInfo* GvdGraph::get(uint64_t node) const {
   return iter == uncompressed_.end() ? nullptr : &iter->second.info;
 }
 
+const GvdMemberInfo* GvdGraph::getCompressed(uint64_t compressed_id,
+                                             const MergePolicy& policy) const {
+  auto iter = compressed_.find(compressed_id);
+  if (iter == compressed_.end()) {
+    return nullptr;
+  }
+
+  const GvdMemberInfo* best_member = nullptr;
+  for (const auto node_id : iter->second.active_refs) {
+    const auto& gvd_node = uncompressed_.at(node_id);
+    if (!best_member || policy.compare(gvd_node.info, *best_member) > 0) {
+      best_member = &gvd_node.info;
+    }
+  }
+
+  for (const auto node_id : iter->second.archived_refs) {
+    const auto& gvd_node = uncompressed_.at(node_id);
+    if (!best_member || policy.compare(gvd_node.info, *best_member) > 0) {
+      best_member = &gvd_node.info;
+    }
+  }
+
+  return best_member;
+}
+
 const Nodes& GvdGraph::uncompressed() const { return uncompressed_; }
 
 const CompressedNodes& GvdGraph::compressed() const { return compressed_; }

@@ -65,22 +65,6 @@ NearestVertexInfo convertInfo(const GvdVertexInfo& parent_info) {
   return info;
 }
 
-// TODO(nathan) push to compressed graph impl
-const GvdMemberInfo* getBestMember(const GvdGraph::CompressedNode& node,
-                                   const GvdGraph& gvd,
-                                   const MergePolicy& policy) {
-  const GvdMemberInfo* best_member = nullptr;
-  const auto refs = node.refs();
-  for (const auto node_id : refs) {
-    auto curr_member = gvd.get(node_id);
-    if (!best_member || policy.compare(*curr_member, *best_member) > 0) {
-      best_member = curr_member;
-    }
-  }
-
-  return best_member;
-}
-
 void fillParentInfo(const GvdLayer& layer,
                     const GvdParentTracker& tracker,
                     const GlobalIndex& index,
@@ -264,7 +248,7 @@ void GraphExtractor::updatePartialGraph(const GvdLayer& layer,
   }
 
   for (const auto& [node_id, node] : compressed) {
-    auto result = getBestMember(node, gvd_, *merge_policy_);
+    auto result = gvd_.getCompressed(node_id, *merge_policy_);
     if (!result) {
       LOG(WARNING) << "Empty compressed node encountered: " << node_id;
       continue;

@@ -428,4 +428,52 @@ TEST(GvdGraph, SingleVoxelDeletion) {
   }
 }
 
+// check that merge policy and compressed node works together
+TEST(GvdGraph, AttributeAssignmentOneToOne) {
+  GvdGraph gvd(0.1, 1.0);
+  EXPECT_TRUE(gvd.uncompressed().empty());
+
+  gvd.add(GlobalIndex(0, 0, 1), 0.1, 1);
+  gvd.add(GlobalIndex(0, 0, 2), 0.2, 5);
+  gvd.add(GlobalIndex(0, 0, 4), 0.3, 3);
+  gvd.add(GlobalIndex(0, 1, 0), 0.4, 4);
+  EXPECT_EQ(gvd.uncompressed().size(), 4u);
+  EXPECT_EQ(gvd.compressed().size(), 2u);
+
+  const BasisPointMergePolicy policy;
+  const auto info_0 = gvd.getCompressed(0, policy);
+  ASSERT_TRUE(info_0);
+  const auto info_1 = gvd.getCompressed(1, policy);
+  ASSERT_TRUE(info_1);
+
+  EXPECT_EQ(info_0->distance, 0.2);
+  EXPECT_EQ(info_0->num_basis_points, 5u);
+  EXPECT_EQ(info_1->distance, 0.3);
+  EXPECT_EQ(info_1->num_basis_points, 3u);
+}
+
+// check that merge policy and compressed node works together
+TEST(GvdGraph, AttributeAssignmentManyToOne) {
+  GvdGraph gvd(0.1, 3.0);
+  gvd.add(GlobalIndex(0, 0, 1), 0.1, 1);
+  gvd.add(GlobalIndex(0, 0, 2), 0.2, 4);
+  gvd.add(GlobalIndex(0, 0, 3), 0.3, 3);
+  gvd.add(GlobalIndex(0, 1, 0), 0.4, 5);
+  gvd.add(GlobalIndex(0, 0, 4), 0.5, 5);
+  callArchive(gvd, {{0, 0, 4}, {0, 0, 3}});
+  EXPECT_EQ(gvd.uncompressed().size(), 5u);
+  EXPECT_EQ(gvd.compressed().size(), 1u);
+
+  GvdGraph::NodeRemapping expected_remapping{{0, 0}, {1, 0}, {2, 0}, {3, 0}, {4, 0}};
+  EXPECT_EQ(gvd.remapping(), expected_remapping);
+
+  const BasisPointMergePolicy policy;
+  const auto info_0 = gvd.getCompressed(0, policy);
+
+  // note that this relies on active being checked before archived
+  ASSERT_TRUE(info_0);
+  EXPECT_EQ(info_0->distance, 0.4);
+  EXPECT_EQ(info_0->num_basis_points, 5u);
+}
+
 }  // namespace hydra::places

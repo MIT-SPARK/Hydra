@@ -45,6 +45,7 @@
 #include <set>
 #include <unordered_map>
 
+#include "hydra/places/gvd_places/gvd_merge_policies.h"
 #include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::places {
@@ -91,6 +92,9 @@ class GvdGraph {
   void dropCompressed(uint64_t compressed_id);
 
   const GvdMemberInfo* get(uint64_t uncompressed_id) const;
+
+  const GvdMemberInfo* getCompressed(uint64_t compressed_id,
+                                     const MergePolicy& policy) const;
 
   const Nodes& uncompressed() const;
 
