@@ -36,6 +36,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
+#include <config_utilities/types/conversions.h>
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
 #include <spark_dsg/edge_attributes.h>
@@ -125,7 +126,7 @@ void declare_config(GraphExtractor::Config::FreespaceEdges& config) {
 void declare_config(GraphExtractor::Config& config) {
   using namespace config;
   name("GraphExtractor::Config");
-  field(config.prefix, "prefix");
+  field<CharConversion>(config.prefix, "prefix");
   field(config.compression_distance_m, "compression_distance_m");
   field(config.min_node_distance_m, "min_node_distance_m");
   field(config.min_edge_distance_m, "min_edge_distance_m");
