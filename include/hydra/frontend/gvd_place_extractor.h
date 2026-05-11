@@ -74,19 +74,16 @@ class GvdPlaceExtractor {
 
   virtual ~GvdPlaceExtractor();
 
-  NodeIdSet getActiveNodes() const;
-
   void detect(const ActiveWindowOutput& msg);
 
   void updateGraph(uint64_t timestamp_ns, spark_dsg::SceneGraph& graph);
 
  protected:
-  void filterIsolated(spark_dsg::SceneGraph& graph, NodeIdSet& active_neighborhood);
+  void filterIsolated(spark_dsg::SceneGraph& graph,
+                      std::set<spark_dsg::NodeId>& active_neighborhood);
 
  protected:
   places::GvdLayer::Ptr gvd_;
-  NodeIdSet active_nodes_;
-
   std::unique_ptr<VolumetricWindow> map_window_;
   std::unique_ptr<TsdfInterpolator> tsdf_interpolator_;
   std::unique_ptr<places::GraphExtractor> graph_extractor_;

@@ -91,6 +91,8 @@ class GvdGraph {
 
   void dropCompressed(uint64_t compressed_id);
 
+  std::vector<uint64_t> clearArchived();
+
   const GvdMemberInfo* get(uint64_t uncompressed_id) const;
 
   const GvdMemberInfo* getCompressed(uint64_t compressed_id,

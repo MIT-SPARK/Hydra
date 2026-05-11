@@ -37,9 +37,7 @@
 
 namespace hydra::places {
 
-using spark_dsg::operator"" _id;
 using spark_dsg::NodeId;
-using spark_dsg::PlaceNodeAttributes;
 
 namespace {
 
@@ -49,7 +47,6 @@ class TestGraphExtractor : public GraphExtractor {
       : GraphExtractor(config, voxel_size) {}
   ~TestGraphExtractor() = default;
 
-  using GraphExtractor::clearArchived;
   using GraphExtractor::updateGvdGraph;
 
   void setGvdNode(uint64_t x, uint64_t y, uint64_t z, double distance, uint8_t basis) {
@@ -58,10 +55,7 @@ class TestGraphExtractor : public GraphExtractor {
   }
 };
 
-using Remapping = std::unordered_map<uint64_t, uint64_t>;
-using PlacesGraph = PartialGraph<PlaceNodeAttributes>;
-
-void checkNode(const PlacesGraph& graph,
+void checkNode(const GraphExtractor::LocalGraph& graph,
                NodeId node_id,
                const Eigen::Vector3d& p_expected,
                double d_expected,

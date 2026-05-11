@@ -34,9 +34,6 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/gvd_places/gvd_graph.h"
 
-#include <glog/logging.h>
-#include <glog/stl_logging.h>
-
 namespace hydra::places {
 
 using Node = GvdGraph::Node;
@@ -284,6 +281,34 @@ void GvdGraph::dropCompressed(uint64_t compressed_id) {
 
   drop_compressed_id(compressed_id);
   compressed_.erase(iter);
+}
+
+std::vector<uint64_t> GvdGraph::clearArchived() {
+  std::vector<uint64_t> to_archive;
+  for (const auto& [id, node] : compressed_) {
+    if (!node.archived()) {
+      continue;
+    }
+
+    bool can_be_archived = true;
+    for (const auto sibling_id : node.siblings) {
+      const auto& sibling = compressed_.at(sibling_id);
+      if (!sibling.archived()) {
+        can_be_archived = false;
+        break;
+      }
+    }
+
+    if (can_be_archived) {
+      to_archive.push_back(id);
+    }
+  }
+
+  for (const auto id : to_archive) {
+    dropCompressed(id);
+  }
+
+  return to_archive;
 }
 
 const GvdMemberInfo* GvdGraph::get(uint64_t node) const {

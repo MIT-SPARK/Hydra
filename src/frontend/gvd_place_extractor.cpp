@@ -48,6 +48,7 @@ namespace hydra {
 using places::GraphExtractor;
 using places::GvdIntegrator;
 using spark_dsg::DsgLayers;
+using spark_dsg::EdgeKey;
 using spark_dsg::NodeId;
 using spark_dsg::PlaceNodeAttributes;
 using spark_dsg::SceneGraph;
@@ -127,8 +128,6 @@ GvdPlaceExtractor::GvdPlaceExtractor(const Config& c)
 
 GvdPlaceExtractor::~GvdPlaceExtractor() {}
 
-NodeIdSet GvdPlaceExtractor::getActiveNodes() const { return active_nodes_; }
-
 void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg) {
   ScopedTimer timer("frontend/detect_gvd", msg.timestamp_ns, true, 2, false);
 
@@ -183,48 +182,41 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
   MLOG(1) << "Considering " << places.nodes().size() << " input place nodes ";
 
   std::vector<NodeId> deleted_nodes;
-  // const auto deleted_nodes = graph_extractor_.getDeletedNodes()
-  for (const auto& node_id : deleted_nodes) {
-    const auto node = graph.findNode(node_id);
-    if (!node) {
-      continue;
-    }
-
-    // TODO(nathan) think about expanding siblings
+  for (const auto node_id : deleted_nodes) {
     graph.removeNode(node_id);
   }
 
-  // TODO(nathan) fix this
-  // const auto& deleted_edges = graph_extractor_.getDeletedEdges();
-  std::vector<NodeId> deleted_edges;
-  for (size_t i = 0; i < deleted_edges.size(); i += 2) {
-    const auto n1 = deleted_edges.at(i);
-    const auto n2 = deleted_edges.at(i + 1);
-    graph.removeEdge(n1, n2);
+  std::vector<EdgeKey> deleted_edges;
+  for (const auto& key : deleted_edges) {
+    graph.removeEdge(key.k1, key.k2);
   }
 
-  NodeIdSet active_neighborhood;
+  std::set<NodeId> active_neighborhood;
   const auto invalid = getInvalidNodes(places);
-  for (const auto& [node_id, node] : places.nodes()) {
+  for (const auto& [node_id, node] : places) {
     if (invalid.count(node_id)) {
       continue;
     }
 
-    active_neighborhood.insert(node_id);
-    auto attrs = node.attrs->clone();
-    attrs->is_active = true;
-    attrs->last_update_time_ns = timestamp_ns;
-    graph.addOrUpdateNode(config.layer, node_id, std::move(attrs));
-    for (const auto sibling : places.neighbors(node_id)) {
-      graph.addOrUpdateEdge(node_id, sibling, places.at(node_id, sibling)->clone());
+    if (!node.attrs) {  // fully archived node
+      graph.getNode(node_id).attributes().is_active = false;
+    } else {
+      active_neighborhood.insert(node_id);
+      auto attrs = node.attrs->clone();
+      attrs->is_active = true;
+      attrs->last_update_time_ns = timestamp_ns;
+      graph.addOrUpdateNode(config.layer, node_id, std::move(attrs));
     }
+  }
+
+  for (const auto& [key, info] : places.edges()) {
+    graph.addOrUpdateEdge(key.k1, key.k2, info->clone());
   }
 
   filterIsolated(graph, active_neighborhood);
 }
 
-void GvdPlaceExtractor::filterIsolated(SceneGraph& graph,
-                                       NodeIdSet& active_neighborhood) {
+void GvdPlaceExtractor::filterIsolated(SceneGraph& graph, std::set<NodeId>& active) {
   if (config.min_component_size < 2) {
     return;  // no need to do any work
   }
@@ -236,10 +228,9 @@ void GvdPlaceExtractor::filterIsolated(SceneGraph& graph,
   // within N hops of the subgraph, where N is the min allowable component size
   // ensures that we don't search the entire places subgraph, but still preserve
   // archived places that connect to a component of at least size N
-  const auto components = getConnectedComponents(graph.getLayer(DsgLayers::PLACES),
-                                                 config.min_component_size,
-                                                 active_neighborhood);
-
+  const auto& places = graph.getLayer(DsgLayers::PLACES);
+  const auto components =
+      getConnectedComponents(places, config.min_component_size, active);
   for (const auto& component : components) {
     if (component.size() >= config.min_component_size) {
       continue;

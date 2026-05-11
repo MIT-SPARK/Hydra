@@ -33,15 +33,11 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <spark_dsg/node_symbol.h>
-
 #include <queue>
 
 #include "hydra/common/partial_graph.h"
 #include "hydra/places/gvd_places/gvd_graph.h"
-#include "hydra/places/gvd_places/gvd_merge_policies.h"
 #include "hydra/places/gvd_places/gvd_voxel.h"
-#include "hydra/reconstruction/voxel_types.h"
 #include "hydra/utils/logging.h"
 
 namespace hydra::places {
@@ -52,6 +48,7 @@ class GraphExtractor {
  public:
   using Ptr = std::shared_ptr<GraphExtractor>;
   using NodeIndexMap = std::unordered_map<spark_dsg::NodeId, GlobalIndex>;
+  using LocalGraph = PartialGraph<spark_dsg::PlaceNodeAttributes>;
 
   struct Config : VerbosityConfig {
     //! Node prefix to use
@@ -103,11 +100,9 @@ class GraphExtractor {
 
   const GvdGraph& gvd() const { return gvd_; }
 
-  const PartialGraph<spark_dsg::PlaceNodeAttributes>& graph() const { return graph_; }
+  const LocalGraph& graph() const { return graph_; }
 
  protected:
-  void clearArchived();
-
   void updateGvdGraph(uint64_t timestamp_ns, const GvdLayer& layer);
 
   void updatePartialGraph(const GvdLayer& layer, const GvdParentTracker& parents);
@@ -118,21 +113,22 @@ class GraphExtractor {
 
   void updateFreespaceEdges(const GvdLayer& layer);
 
+  spark_dsg::NodeId toGraphId(uint64_t compressed_id) const;
+
+  uint64_t toCompressedId(spark_dsg::NodeId node_id) const;
+
  protected:
-  GvdGraph gvd_;
-  PartialGraph<spark_dsg::PlaceNodeAttributes> graph_;
   std::queue<GlobalIndex> modified_voxel_queue_;
   std::queue<GlobalIndex> removed_voxel_queue_;
   std::queue<GlobalIndex> archived_voxel_queue_;
+
+  GvdGraph gvd_;
+  LocalGraph graph_;
   std::unique_ptr<MergePolicy> merge_policy_;
 
   std::unordered_map<spark_dsg::NodeId, GlobalIndex> node_index_map_;
-  std::set<spark_dsg::NodeId> updated_nodes_;
   std::set<spark_dsg::EdgeKey> overlap_edges_;
   std::set<spark_dsg::EdgeKey> freespace_edges_;
-  std::set<spark_dsg::NodeId> deleted_nodes_;
-  std::vector<spark_dsg::EdgeKey> deleted_edges_;
-  std::set<spark_dsg::NodeId> archived_nodes_;
 };
 
 void declare_config(GraphExtractor::Config& config);
