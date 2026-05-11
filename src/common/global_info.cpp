@@ -207,11 +207,12 @@ SharedDsgInfo::Ptr GlobalInfo::createSharedDsg() const {
 
   const spark_dsg::Labelspace labelspace(getLabelToNameMap());
   if (labelspace) {
-    labelspace.save(graph, "mesh");
+    labelspace.save(graph, "mesh", false);
     for (const auto& layer_name : config_.semantic_layers) {
-      const auto key = graph.getLayerKey(layer_name);
-      if (key) {
-        labelspace.save(graph, key->layer, key->partition);
+      if (graph.layer_names().count(layer_name)) {
+        labelspace.save(graph, layer_name);
+      } else {
+        LOG(WARNING) << "Skipping saving labelspace for unknown '" << layer_name << "'";
       }
     }
   }
