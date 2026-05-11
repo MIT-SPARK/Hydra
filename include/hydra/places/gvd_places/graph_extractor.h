@@ -33,7 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <queue>
 
 #include "hydra/common/partial_graph.h"
 #include "hydra/places/gvd_places/gvd_graph.h"
@@ -88,14 +87,11 @@ class GraphExtractor {
 
   virtual ~GraphExtractor();
 
-  void pushIndex(const GlobalIndex& index);
-
-  void clearIndex(const GlobalIndex& index);
-
   void archiveIndex(const GlobalIndex& index);
 
   void extract(uint64_t timestamp_ns,
                const GvdLayer& layer,
+               const VoxelIndexChanges& changes,
                const GvdParentTracker& parents);
 
   void prune();
@@ -104,8 +100,12 @@ class GraphExtractor {
 
   const LocalGraph& graph() const { return graph_; }
 
+  void validate(const GvdLayer& layer, const BlockIndices& archived_blocks) const;
+
  protected:
-  void updateGvdGraph(uint64_t timestamp_ns, const GvdLayer& layer);
+  void updateGvdGraph(uint64_t timestamp_ns,
+                      const GvdLayer& layer,
+                      const VoxelIndexChanges& changes);
 
   void updatePartialGraph(const GvdLayer& layer, const GvdParentTracker& parents);
 
@@ -120,9 +120,6 @@ class GraphExtractor {
   uint64_t toCompressedId(spark_dsg::NodeId node_id) const;
 
  protected:
-  std::queue<GlobalIndex> modified_voxel_queue_;
-  std::queue<GlobalIndex> removed_voxel_queue_;
-
   GvdGraph gvd_;
   LocalGraph graph_;
   std::unique_ptr<MergePolicy> merge_policy_;

@@ -85,17 +85,19 @@ void GvdParentTracker::markNewGvdParent(const GvdLayer& layer,
 
 void GvdParentTracker::removeVoronoiFromGvdParentMap(const GlobalIndex& voxel_index) {
   auto voxel_parents = parents.find(voxel_index);
-  if (voxel_parents != parents.end()) {
-    for (const auto& parent : voxel_parents->second) {
-      if (parent_vertices.count(parent)) {
-        // decrement the ref count (we garbage collect later to avoid losing parents
-        // due to thrashing)
-        parent_vertices[parent].ref_count--;
-      }
-    }
-
-    parents.erase(voxel_parents);
+  if (voxel_parents == parents.end()) {
+    return;
   }
+
+  for (const auto& parent : voxel_parents->second) {
+    if (parent_vertices.count(parent)) {
+      // decrement the ref count (we garbage collect later to avoid losing parents
+      // due to thrashing)
+      parent_vertices[parent].ref_count--;
+    }
+  }
+
+  parents.erase(voxel_parents);
 }
 
 void GvdParentTracker::updateVertexMapping(const GvdLayer& layer) {

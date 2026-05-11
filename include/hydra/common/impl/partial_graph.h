@@ -33,6 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <deque>
+
 #include "hydra/common/partial_graph.h"
 
 namespace hydra {
@@ -139,7 +141,8 @@ void PartialGraph<AttrT>::contract(NodeId from, NodeId to) {
 }
 
 template <typename AttrT>
-void PartialGraph<AttrT>::prune() {
+std::vector<uint64_t> PartialGraph<AttrT>::prune() {
+  std::vector<uint64_t> pruned;
   auto iter = nodes_.begin();
   while (iter != nodes_.end()) {
     if (iter->second.attrs) {
@@ -156,6 +159,7 @@ void PartialGraph<AttrT>::prune() {
     }
 
     if (can_prune) {
+      pruned.push_back(iter->first);
       iter = erase(iter);
     } else {
       ++iter;
@@ -164,6 +168,7 @@ void PartialGraph<AttrT>::prune() {
 
   deleted_nodes_.clear();
   deleted_edges_.clear();
+  return pruned;
 }
 
 template <typename AttrT>
@@ -192,6 +197,43 @@ template <typename AttrT>
 spark_dsg::EdgeAttributes* PartialGraph<AttrT>::at(NodeId source, NodeId target) const {
   auto iter = edges_.find(spark_dsg::EdgeKey{source, target});
   return iter == edges_.end() ? nullptr : iter->second.get();
+}
+
+template <typename AttrT>
+auto PartialGraph<AttrT>::connected_components(bool sort_components) const
+    -> Components {
+  Components components;
+  std::unordered_set<NodeId> visited;
+  for (const auto& [seed, _] : nodes_) {
+    if (visited.count(seed)) {
+      continue;
+    }
+
+    visited.insert(seed);
+    std::deque<NodeId> frontier{seed};
+    auto& component = components.emplace_back();
+    while (!frontier.empty()) {
+      const auto curr_id = frontier.front();
+      frontier.pop_front();
+      component.push_back(curr_id);
+      for (const auto neighbor : nodes_.at(curr_id).neighbors) {
+        if (visited.count(neighbor)) {
+          continue;
+        }
+
+        frontier.push_back(neighbor);
+        visited.insert(neighbor);
+      }
+    }
+  }
+
+  if (sort_components) {
+    std::sort(components.begin(),
+              components.end(),
+              [](const auto& lhs, const auto& rhs) { return lhs.size() > rhs.size(); });
+  }
+
+  return components;
 }
 
 template <typename AttrT>

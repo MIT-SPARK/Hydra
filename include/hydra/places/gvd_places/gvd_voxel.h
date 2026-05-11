@@ -94,4 +94,12 @@ inline void setRaiseStatus(GvdVoxel& voxel, const double default_distance) {
   setDefaultDistance(voxel, default_distance);
 }
 
+struct VoxelIndexChanges {
+  GlobalIndexSet added;
+  GlobalIndexSet removed;
+
+  void clearIndex(const GlobalIndex& index);
+  void addIndex(const GlobalIndex& index);
+};
+
 }  // namespace hydra::places

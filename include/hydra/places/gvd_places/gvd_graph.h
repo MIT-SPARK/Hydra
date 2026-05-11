@@ -86,7 +86,7 @@ class GvdGraph {
 
   void add(const GlobalIndex& index, double distance, uint8_t num_basis_points);
 
-  void remove(std::queue<GlobalIndex>& indices);
+  void remove(const GlobalIndexSet& indices);
 
   void archive(const GlobalIndex& index);
 
@@ -96,8 +96,11 @@ class GvdGraph {
 
   const GvdMemberInfo* get(uint64_t uncompressed_id) const;
 
-  const GvdMemberInfo* getCompressed(uint64_t compressed_id,
-                                     const MergePolicy& policy) const;
+  struct CompressedAttr {
+    const GvdMemberInfo* info = nullptr;
+    bool is_archived = false;
+  };
+  CompressedAttr getCompressed(uint64_t compressed_id, const MergePolicy& policy) const;
 
   const Nodes& uncompressed() const;
 

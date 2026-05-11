@@ -97,10 +97,12 @@ class GvdIntegrator {
                       const MeshLayer* mesh = nullptr,
                       bool use_all_blocks = false);
 
-  void updateGvd(uint64_t timestamp_ns, GraphExtractor* graph_extractor = nullptr);
+  void updateGvd(uint64_t timestamp_ns, VoxelIndexChanges* changes = nullptr);
 
   void archiveBlocks(const BlockIndices& blocks,
                      GraphExtractor* graph_extractor = nullptr);
+
+  const GvdParentTracker& parent_tracker() const { return parent_tracker_; }
 
   const double default_distance;
 
@@ -109,17 +111,17 @@ class GvdIntegrator {
   void updateGvdVoxel(const GlobalIndex& voxel_index,
                       GvdVoxel& voxel,
                       GvdVoxel& other,
-                      GraphExtractor* graph_extractor);
+                      VoxelIndexChanges* changes);
 
   void clearGvdVoxel(const GlobalIndex& index,
                      GvdVoxel& voxel,
-                     GraphExtractor* graph_extractor);
+                     VoxelIndexChanges* changes);
 
   void updateVoronoiQueue(GvdVoxel& curr_voxel,
                           const GlobalIndex& curr_pos,
                           GvdVoxel& neighbor_voxel,
                           const GlobalIndex& neighbor_pos,
-                          GraphExtractor* extractor);
+                          VoxelIndexChanges* changes);
 
   // TSDF propagation
   void propagateSurface(const TsdfLayer& tsdf, const BlockIndices& blocks);
@@ -137,9 +139,11 @@ class GvdIntegrator {
 
   void raiseVoxel(const GlobalIndex& index, GvdVoxel& voxel);
 
-  void lowerVoxel(const GlobalIndex& index, GvdVoxel& voxel, GraphExtractor* extractor);
+  void lowerVoxel(const GlobalIndex& index,
+                  GvdVoxel& voxel,
+                  VoxelIndexChanges* changes);
 
-  void processOpenQueue(GraphExtractor* extractor);
+  void processOpenQueue(VoxelIndexChanges* changes);
 
   // Helpers
   bool isTsdfFixed(const TsdfVoxel& voxel);

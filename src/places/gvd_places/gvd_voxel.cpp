@@ -62,4 +62,14 @@ std::ostream& operator<<(std::ostream& out, const GvdVoxel& voxel) {
   return out;
 }
 
+void VoxelIndexChanges::clearIndex(const GlobalIndex& index) {
+  added.erase(index);
+  removed.insert(index);
+}
+
+void VoxelIndexChanges::addIndex(const GlobalIndex& index) {
+  removed.erase(index);
+  added.insert(index);
+}
+
 }  // namespace hydra::places

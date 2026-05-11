@@ -99,7 +99,7 @@ class PartialGraph {
   void contract(NodeId from, NodeId to);
 
   //! Clear archived nodes and deleted tracking information
-  void prune();
+  std::vector<uint64_t> prune();
 
   bool has(NodeId node) const;
 
@@ -110,6 +110,9 @@ class PartialGraph {
   AttrT* at(NodeId node) const;
 
   spark_dsg::EdgeAttributes* at(NodeId source, NodeId target) const;
+
+  using Components = std::vector<std::vector<uint64_t>>;
+  Components connected_components(bool sort_components = true) const;
 
   const std::map<NodeId, Node>& nodes() const { return nodes_; }
 

@@ -63,8 +63,9 @@ class TestGraphExtractor : public GraphExtractor {
 
   using GraphExtractor::updatePartialGraph;
 
-  void update() {
-    updateGvdGraph(0, gvd_layer);            // this propagates archives and deletions
+  void update(const GlobalIndexSet& removed = {}) {
+    VoxelIndexChanges changes{{}, removed};
+    updateGvdGraph(0, gvd_layer, changes);   // this propagates archives and deletions
     updatePartialGraph(gvd_layer, tracker);  // this builds the graph
   }
 
@@ -129,8 +130,7 @@ TEST(GraphExtractor, VoxelDeletion) {
     checkNode(places, "p0"_id, Eigen::Vector3d(0.5, 1.5, 0.5), 0.4, 5u);
   }
 
-  extractor.clearIndex(GlobalIndex(0, 1, 0));
-  extractor.update();
+  extractor.update({{0, 1, 0}});
 
   EXPECT_EQ(gvd.uncompressed().size(), 4u);
   EXPECT_EQ(numArchived(places), 0u);
@@ -141,8 +141,7 @@ TEST(GraphExtractor, VoxelDeletion) {
     checkNode(places, "p0"_id, Eigen::Vector3d(0.5, 0.5, 1.5), 0.1, 1u);
   }
 
-  extractor.clearIndex(GlobalIndex(0, 0, 1));
-  extractor.update();
+  extractor.update({{0, 0, 1}});
 
   EXPECT_EQ(gvd.uncompressed().size(), 3u);
   EXPECT_EQ(numArchived(places), 0u);
@@ -207,8 +206,7 @@ TEST(GraphExtractor, VoxelArchival) {
   extractor.update();
   EXPECT_EQ(numArchived(places), 1u);
 
-  extractor.clearIndex(GlobalIndex(0, 0, 2));
-  extractor.update();
+  extractor.update({{0, 0, 2}});
   EXPECT_EQ(numArchived(places), 1u);
   EXPECT_EQ(gvd.compressed().size(), 2u);
   EXPECT_EQ(gvd.uncompressed().size(), 4u);

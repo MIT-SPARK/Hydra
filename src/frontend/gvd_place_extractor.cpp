@@ -139,11 +139,15 @@ void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg) {
     graph_extractor_ = std::make_unique<GraphExtractor>(config.graph, tsdf.voxel_size);
   }
 
-  ScopedTimer graph_timer("places/gvd", msg.timestamp_ns);
+  ScopedTimer gvd_timer("places/gvd", msg.timestamp_ns);
   // reconstruction now only sends updated blocks so we integrate everything
   gvd_integrator_->updateFromTsdf(
       msg.timestamp_ns, tsdf, false, &map.getMeshLayer(), true);
-  gvd_integrator_->updateGvd(msg.timestamp_ns, graph_extractor_.get());
+
+  places::VoxelIndexChanges changes;
+  gvd_integrator_->updateGvd(msg.timestamp_ns, &changes);
+  graph_extractor_->extract(
+      msg.timestamp_ns, *gvd_, changes, gvd_integrator_->parent_tracker());
 
   if (map_window_) {
     BlockIndices to_archive;
@@ -154,6 +158,7 @@ void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg) {
     }
 
     gvd_integrator_->archiveBlocks(to_archive, graph_extractor_.get());
+    graph_extractor_->validate(*gvd_, to_archive);
   }
 
   Sink::callAll(sinks_, msg.timestamp_ns, world_T_body, *gvd_, *graph_extractor_);

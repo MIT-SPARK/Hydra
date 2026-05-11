@@ -34,6 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/gvd_places/gvd_graph.h"
 
+#include <glog/logging.h>
+
 namespace hydra::places {
 
 using Node = GvdGraph::Node;
@@ -144,11 +146,10 @@ void GvdGraph::add(const GlobalIndex& vindex, double distance, uint8_t basis) {
   }
 }
 
-void GvdGraph::remove(std::queue<GlobalIndex>& indices) {
+void GvdGraph::remove(const GlobalIndexSet& indices) {
   std::set<uint64_t> updated;
-  while (!indices.empty()) {
-    remove(indices.front(), updated);
-    indices.pop();
+  for (const auto& index : indices) {
+    remove(index, updated);
   }
 
   std::vector<uint64_t> nodes_to_check;
@@ -234,6 +235,8 @@ void GvdGraph::remove(const GlobalIndex& index, std::set<uint64_t>& updated) {
   compression_map_.erase(gvd_id);
 
   auto iter = compressed_.find(compressed_id);
+  CHECK(iter != compressed_.end()) << "Invalid compressed ID " << compressed_id;
+
   auto& node = iter->second;
   node.active_refs.erase(gvd_id);
   if (!node.active_refs.empty() || !node.archived_refs.empty()) {
@@ -261,6 +264,7 @@ void GvdGraph::dropCompressed(uint64_t compressed_id) {
   const auto refs = iter->second.refs();
   for (const auto gvd_id : refs) {
     auto niter = uncompressed_.find(gvd_id);
+    CHECK(niter != uncompressed_.end()) << "Invalid uncompressed ID " << gvd_id;
     drop_uncompressed(niter->second.info.index);
     drop_uncompressed_node(gvd_id);
   }
@@ -306,29 +310,30 @@ const GvdMemberInfo* GvdGraph::get(uint64_t node) const {
   return iter == uncompressed_.end() ? nullptr : &iter->second.info;
 }
 
-const GvdMemberInfo* GvdGraph::getCompressed(uint64_t compressed_id,
-                                             const MergePolicy& policy) const {
+GvdGraph::CompressedAttr GvdGraph::getCompressed(uint64_t compressed_id,
+                                                 const MergePolicy& policy) const {
   auto iter = compressed_.find(compressed_id);
   if (iter == compressed_.end()) {
-    return nullptr;
+    return {};
   }
 
-  const GvdMemberInfo* best_member = nullptr;
+  GvdGraph::CompressedAttr result;
   for (const auto node_id : iter->second.active_refs) {
     const auto& gvd_node = uncompressed_.at(node_id);
-    if (!best_member || policy.compare(gvd_node.info, *best_member) > 0) {
-      best_member = &gvd_node.info;
+    if (!result.info || policy.compare(gvd_node.info, *result.info) > 0) {
+      result.info = &gvd_node.info;
     }
   }
 
   for (const auto node_id : iter->second.archived_refs) {
     const auto& gvd_node = uncompressed_.at(node_id);
-    if (!best_member || policy.compare(gvd_node.info, *best_member) > 0) {
-      best_member = &gvd_node.info;
+    if (!result.info || policy.compare(gvd_node.info, *result.info) > 0) {
+      result.info = &gvd_node.info;
+      result.is_archived = true;
     }
   }
 
-  return best_member;
+  return result;
 }
 
 const Nodes& GvdGraph::uncompressed() const { return uncompressed_; }
@@ -368,6 +373,7 @@ Node* GvdGraph::add_uncompressed(const GlobalIndex& index, double dist, uint8_t 
 
   const auto pos = voxel_grid.toPoint(index);
   const auto id = next_uncompressed_id();
+  CHECK(!uncompressed_.count(id)) << "Re-using uncompressed ID";
   uncompressed_index_map_.emplace(index, id);
 
   auto niter = uncompressed_.emplace(id, Node{id, {dist, basis, pos, index}, {}}).first;
@@ -454,6 +460,11 @@ std::optional<uint64_t> GvdGraph::drop_uncompressed(const GlobalIndex& idx) {
 
 void GvdGraph::drop_uncompressed_node(uint64_t gvd_id) {
   auto iter = uncompressed_.find(gvd_id);
+  if (iter == uncompressed_.end()) {
+    LOG(WARNING) << "Dropping node " << gvd_id << " but doesn't exist";
+    return;
+  }
+
   for (const auto sibling : iter->second.siblings) {
     uncompressed_.at(sibling).siblings.erase(gvd_id);
   }

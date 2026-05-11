@@ -222,22 +222,13 @@ void GvdIntegrator::updateFromTsdf(uint64_t timestamp_ns,
   }
 }
 
-void GvdIntegrator::updateGvd(uint64_t timestamp_ns, GraphExtractor* graph_extractor) {
+void GvdIntegrator::updateGvd(uint64_t timestamp_ns, VoxelIndexChanges* changes) {
   ScopedTimer timer("places/overall_update", timestamp_ns);
 
   MLOG(Verbosity::STATUS) << "Processing open queue";
-  {  // timing scope
-    ScopedTimer timer("places/open_queue", timestamp_ns);
-    processOpenQueue(graph_extractor);
-  }  // timing scope
 
+  processOpenQueue(changes);
   parent_tracker_.updateVertexMapping(*gvd_layer_);
-
-  if (graph_extractor) {
-    MLOG(Verbosity::STATUS) << "Starting graph extraction";
-    ScopedTimer timer("places/graph_extractor", timestamp_ns);
-    graph_extractor->extract(timestamp_ns, *gvd_layer_, parent_tracker_);
-  }
 
   MLOG(Verbosity::STATUS) << "\n" << update_stats_.print();
 }
@@ -247,24 +238,16 @@ void GvdIntegrator::archiveBlocks(const BlockIndices& blocks,
   for (const auto& idx : blocks) {
     auto block = gvd_layer_->getBlockPtr(idx);
     if (!block) {
-      MLOG(1) << "Archiving unknown block " << idx.transpose();
+      LOG(ERROR) << "Archiving unknown block " << idx.transpose();
       continue;
     }
 
     for (size_t v = 0; v < block->numVoxels(); ++v) {
-      const auto& voxel = block->getVoxel(v);
       const auto global_index = block->getGlobalVoxelIndex(v);
+      parent_tracker_.removeVoronoiFromGvdParentMap(global_index);
       if (graph_extractor) {
-        // TODO(nathan) we should be able to archive only observed voxels, but appears
-        // possible to add a new block and archive in the same pass at the moment
         graph_extractor->archiveIndex(global_index);
       }
-
-      if (!voxel.observed) {
-        continue;
-      }
-
-      parent_tracker_.removeVoronoiFromGvdParentMap(global_index);
     }
 
     MLOG(Verbosity::DETAILED) << "Removing block: " << idx.transpose();
@@ -279,7 +262,7 @@ void GvdIntegrator::archiveBlocks(const BlockIndices& blocks,
 void GvdIntegrator::updateGvdVoxel(const GlobalIndex& voxel_index,
                                    GvdVoxel& voxel,
                                    GvdVoxel& other,
-                                   GraphExtractor* graph_extractor) {
+                                   VoxelIndexChanges* changes) {
   if (!isVoronoi(voxel)) {
     update_stats_.number_voronoi_found++;
     parent_tracker_.markNewGvdParent(*gvd_layer_, voxel.parent);
@@ -295,20 +278,20 @@ void GvdIntegrator::updateGvdVoxel(const GlobalIndex& voxel_index,
 
   // pushes the new gvd member to the graph extractor on the first instance that the
   // voxel is observed
-  if (graph_extractor && voxel.num_extra_basis == 1) {
-    graph_extractor->pushIndex(voxel_index);
+  if (changes) {
+    changes->addIndex(voxel_index);
   }
 }
 
 void GvdIntegrator::clearGvdVoxel(const GlobalIndex& index,
                                   GvdVoxel& voxel,
-                                  GraphExtractor* graph_extractor) {
+                                  VoxelIndexChanges* changes) {
+  if (changes) {
+    changes->clearIndex(index);
+  }
+
   if (voxel.num_extra_basis) {
     // TODO(nathan) rethink how clearing voxels from graph extractor works
-    if (graph_extractor) {
-      graph_extractor->clearIndex(index);
-    }
-
     parent_tracker_.removeVoronoiFromGvdParentMap(index);
   }
 
@@ -319,7 +302,7 @@ void GvdIntegrator::updateVoronoiQueue(GvdVoxel& voxel,
                                        const GlobalIndex& voxel_idx,
                                        GvdVoxel& neighbor,
                                        const GlobalIndex& neighbor_idx,
-                                       GraphExtractor* extractor) {
+                                       VoxelIndexChanges* changes) {
   VoronoiCondition result =
       checkVoronoi(config.voronoi_config, voxel, voxel_idx, neighbor, neighbor_idx);
 
@@ -328,11 +311,11 @@ void GvdIntegrator::updateVoronoiQueue(GvdVoxel& voxel,
   }
 
   if (result.current_is_voronoi) {
-    updateGvdVoxel(voxel_idx, voxel, neighbor, extractor);
+    updateGvdVoxel(voxel_idx, voxel, neighbor, changes);
   }
 
   if (result.neighbor_is_voronoi) {
-    updateGvdVoxel(neighbor_idx, neighbor, voxel, extractor);
+    updateGvdVoxel(neighbor_idx, neighbor, voxel, changes);
   }
 }
 
@@ -634,7 +617,7 @@ void GvdIntegrator::raiseVoxel(const GlobalIndex& index, GvdVoxel& voxel) {
 
 void GvdIntegrator::lowerVoxel(const GlobalIndex& index,
                                GvdVoxel& voxel,
-                               GraphExtractor* extractor) {
+                               VoxelIndexChanges* changes) {
   update_stats_.number_lower_updated++;
   const auto neighbor_indices = neighbor_search_.neighborIndices(index);
   if (voxel.fixed && !voxel.has_parent && !voxel.on_surface) {
@@ -690,7 +673,7 @@ void GvdIntegrator::lowerVoxel(const GlobalIndex& index,
     }
 
     if (!candidate.is_lower) {
-      updateVoronoiQueue(voxel, index, *neighbor, neighbor_index, extractor);
+      updateVoronoiQueue(voxel, index, *neighbor, neighbor_index, changes);
       continue;
     }
 
@@ -707,7 +690,7 @@ void GvdIntegrator::lowerVoxel(const GlobalIndex& index,
 }
 
 // updateDistanceMap in "B. Lau et al., Efficient grid-based .. (2013)"
-void GvdIntegrator::processOpenQueue(GraphExtractor* extractor) {
+void GvdIntegrator::processOpenQueue(VoxelIndexChanges* changes) {
   MLOG(Verbosity::DEBUG) << "*************************";
   MLOG(Verbosity::DEBUG) << "* Processing Open Queue *";
   MLOG(Verbosity::DEBUG) << "*************************";
@@ -743,8 +726,8 @@ void GvdIntegrator::processOpenQueue(GraphExtractor* extractor) {
       continue;
     }
 
-    clearGvdVoxel(index, voxel, extractor);
-    lowerVoxel(index, voxel, extractor);
+    clearGvdVoxel(index, voxel, changes);
+    lowerVoxel(index, voxel, changes);
   }
 }
 

@@ -37,8 +37,6 @@
 #include <config_utilities/config.h>
 #include <spatial_hash/neighbor_utils.h>
 
-#include <deque>
-
 namespace hydra::places {
 
 using spark_dsg::EdgeAttributes;
@@ -49,63 +47,25 @@ using Components = std::vector<std::vector<NodeId>>;
 
 namespace {
 
-std::vector<NodeId> getComponent(const PlaceGraph& graph,
-                                 NodeId root,
-                                 std::unordered_set<NodeId>& seen) {
-  std::vector<NodeId> component;
-  std::deque<NodeId> frontier{root};
-  while (!frontier.empty()) {
-    const auto curr_id = frontier.front();
-    frontier.pop_front();
-    component.push_back(curr_id);
-    for (const auto neighbor : graph.neighbors(curr_id)) {
-      if (seen.count(neighbor)) {
-        continue;
-      }
-
-      frontier.push_back(neighbor);
-      seen.insert(neighbor);
-    }
-  }
-
-  return component;
-}
-
-Components findComponents(const PlaceGraph& graph) {
-  Components components;
-  std::unordered_set<NodeId> visited;
-  for (const auto& [node, _] : graph.nodes()) {
-    if (visited.count(node)) {
-      continue;
-    }
-
-    std::vector<NodeId> component;
-    visited.insert(node);
-    components.push_back(getComponent(graph, node, visited));
-  }
-
-  for (auto& c : components) {
-    std::sort(c.begin(), c.end(), [&](const NodeId& lhs, const NodeId& rhs) {
-      return graph.at(lhs)->distance > graph.at(rhs)->distance;
-    });
-  }
-
-  std::sort(components.begin(), components.end(), [](const auto& lhs, const auto& rhs) {
-    return lhs.size() > rhs.size();
-  });
-
-  return components;
-}
-
 std::optional<NodeId> getBestNode(const PlaceGraph& graph,
                                   NodeId source,
                                   const std::vector<NodeId>& candidates,
                                   double max_distance_m) {
+  const auto source_attrs = graph.at(source);
+  if (!source_attrs) {
+    return std::nullopt;  // no best node for archived node
+  }
+
   double best_dist = 0.0;
   std::optional<NodeId> best_node;
-  const auto pos = graph.at(source)->position;
+  const auto pos = source_attrs->position;
   for (const auto& target : candidates) {
-    const auto dist = (pos - graph.at(target)->position).norm();
+    const auto target_attrs = graph.at(target);
+    if (!target_attrs) {
+      continue;  // archived node
+    }
+
+    const auto dist = (pos - target_attrs->position).norm();
     if (!best_node || dist < best_dist) {
       best_node = target;
       best_dist = dist;
@@ -259,7 +219,7 @@ void findFreespaceEdges(const PlaceGraph& graph,
                         double max_length_m,
                         double min_clearance_m,
                         EdgeInfoMap& proposed_edges) {
-  auto components = findComponents(graph);
+  auto components = graph.connected_components();
   if (components.size() <= 1) {
     return;  // nothing to do
   }

@@ -38,13 +38,8 @@
 namespace hydra::places {
 namespace {
 
-void callRemove(GvdGraph& graph, const std::vector<GlobalIndex>& indices) {
-  std::queue<GlobalIndex> temp_queue;
-  for (const auto& index : indices) {
-    temp_queue.push(index);
-  }
-
-  graph.remove(temp_queue);
+void callRemove(GvdGraph& graph, const GlobalIndexSet& indices) {
+  graph.remove(indices);
 }
 
 void fillGraph(GvdGraph& graph, const std::vector<GlobalIndex>& indices) {
@@ -433,14 +428,14 @@ TEST(GvdGraph, AttributeAssignmentOneToOne) {
 
   const BasisPointMergePolicy policy;
   const auto info_0 = gvd.getCompressed(0, policy);
-  ASSERT_TRUE(info_0);
+  ASSERT_TRUE(info_0.info);
   const auto info_1 = gvd.getCompressed(1, policy);
-  ASSERT_TRUE(info_1);
+  ASSERT_TRUE(info_1.info);
 
-  EXPECT_EQ(info_0->distance, 0.2);
-  EXPECT_EQ(info_0->num_basis_points, 5u);
-  EXPECT_EQ(info_1->distance, 0.3);
-  EXPECT_EQ(info_1->num_basis_points, 3u);
+  EXPECT_EQ(info_0.info->distance, 0.2);
+  EXPECT_EQ(info_0.info->num_basis_points, 5u);
+  EXPECT_EQ(info_1.info->distance, 0.3);
+  EXPECT_EQ(info_1.info->num_basis_points, 3u);
 }
 
 // check that merge policy and compressed node works together
@@ -463,9 +458,9 @@ TEST(GvdGraph, AttributeAssignmentManyToOne) {
   const auto info_0 = gvd.getCompressed(0, policy);
 
   // note that this relies on active being checked before archived
-  ASSERT_TRUE(info_0);
-  EXPECT_EQ(info_0->distance, 0.4);
-  EXPECT_EQ(info_0->num_basis_points, 5u);
+  ASSERT_TRUE(info_0.info);
+  EXPECT_EQ(info_0.info->distance, 0.4);
+  EXPECT_EQ(info_0.info->num_basis_points, 5u);
 }
 
 // test that merge clusters doesn't throw an error
@@ -524,6 +519,58 @@ TEST(GvdGraph, SplittingCorrect) {
   refs = {8};
   EXPECT_EQ(graph.compressed().at(3).active_refs, refs);
   EXPECT_TRUE(graph.compressed().at(3).archived_refs.empty());
+}
+
+// try to replicate weird archival behavior
+TEST(GvdGraph, ArchiveBug) {
+  GvdGraph graph(0.1, 1.0);
+  graph.add(GlobalIndex(0, -1, 0), 0.1, 2);
+  EXPECT_EQ(graph.uncompressed().size(), 1u);
+
+  graph.archive(GlobalIndex(0, -1, 0));
+  graph.add(GlobalIndex(0, -1, 0), 0.3, 3);
+  EXPECT_EQ(graph.uncompressed().size(), 2u);
+  {
+    const auto n0 = graph.get(0);
+    const auto n1 = graph.get(1);
+    ASSERT_TRUE(n0);
+    ASSERT_TRUE(n1);
+    EXPECT_EQ(n0->index, n1->index);
+    EXPECT_NE(n0->num_basis_points, n1->num_basis_points);
+    EXPECT_TRUE(graph.uncompressed().at(0).archived);
+    EXPECT_FALSE(graph.uncompressed().at(1).archived);
+  }
+
+  graph.remove({{0, -1, 0}});
+  graph.add(GlobalIndex(0, -1, 0), 0.3, 3);
+  EXPECT_EQ(graph.uncompressed().size(), 2u);
+  {
+    const auto n0 = graph.get(0);
+    const auto n1 = graph.get(1);
+    ASSERT_TRUE(n0);
+    ASSERT_TRUE(n1);
+    EXPECT_EQ(n0->index, n1->index);
+    EXPECT_NE(n0->num_basis_points, n1->num_basis_points);
+    EXPECT_TRUE(graph.uncompressed().at(0).archived);
+    EXPECT_FALSE(graph.uncompressed().at(1).archived);
+  }
+
+  graph.dropCompressed(2);
+  EXPECT_EQ(graph.uncompressed().size(), 1u);
+  EXPECT_TRUE(graph.uncompressed().count(0));
+
+  graph.add(GlobalIndex(0, -1, 0), 0.3, 3);
+  EXPECT_EQ(graph.uncompressed().size(), 2u);
+  {
+    const auto n0 = graph.get(0);
+    const auto n1 = graph.get(1);
+    ASSERT_TRUE(n0);
+    ASSERT_TRUE(n1);
+    EXPECT_EQ(n0->index, n1->index);
+    EXPECT_NE(n0->num_basis_points, n1->num_basis_points);
+    EXPECT_TRUE(graph.uncompressed().at(0).archived);
+    EXPECT_FALSE(graph.uncompressed().at(1).archived);
+  }
 }
 
 }  // namespace hydra::places
