@@ -158,10 +158,6 @@ void GraphExtractor::archiveIndex(const GlobalIndex& index) {
 void GraphExtractor::extract(uint64_t timestamp_ns,
                              const GvdLayer& layer,
                              const GvdParentTracker& tracker) {
-  // process index updates from the gvd integration
-  gvd_.remove(removed_voxel_queue_);
-  gvd_.archive(archived_voxel_queue_);
-
   // Update the gvd graph and compression with unique voxels
   updateGvdGraph(timestamp_ns, layer);
 
@@ -180,6 +176,10 @@ void GraphExtractor::extract(uint64_t timestamp_ns,
 
 void GraphExtractor::updateGvdGraph(uint64_t timestamp_ns, const GvdLayer& layer) {
   ScopedTimer timer("places/update_gvd_graph", timestamp_ns);
+
+  // process index updates from the gvd integration
+  gvd_.remove(removed_voxel_queue_);
+  gvd_.archive(archived_voxel_queue_);
 
   GlobalIndexSet seen_indices;
   while (!modified_voxel_queue_.empty()) {
@@ -257,6 +257,10 @@ void GraphExtractor::updatePartialGraph(const GvdLayer& layer,
     }
 
     for (const auto sibling : node.siblings) {
+      if (gvd_.compressed().at(sibling).archived()) {
+        continue;
+      }
+
       const EdgeKey key(toGraphId(compressed_id), toGraphId(sibling));
       if (curr_edges.count(key)) {
         continue;
@@ -283,9 +287,7 @@ void GraphExtractor::updatePartialGraph(const GvdLayer& layer,
   }
 
   const auto archived = gvd_.clearArchived();
-  for (const auto id : archived) {
-    MLOG(2) << "archiving " << id;
-  }
+  MLOG(2) << "Clearing archived nodes [" << archived << "]";
 }
 
 void GraphExtractor::mergeNearbyNodes() {

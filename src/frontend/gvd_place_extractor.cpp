@@ -48,7 +48,6 @@ namespace hydra {
 using places::GraphExtractor;
 using places::GvdIntegrator;
 using spark_dsg::DsgLayers;
-using spark_dsg::EdgeKey;
 using spark_dsg::NodeId;
 using spark_dsg::PlaceNodeAttributes;
 using spark_dsg::SceneGraph;
@@ -65,38 +64,23 @@ static const auto registration =
                                    GvdPlaceExtractor,
                                    GvdPlaceExtractor::Config>("gvd");
 
-std::set<NodeId> getInvalidNodes(const PlacesGraph& graph) {
-  std::set<NodeId> invalid_nodes;
-  for (const auto& [node_id, node] : graph.nodes()) {
-    if (!node.attrs) {
-      continue;
-    }
+bool attributesInvalid(const PlaceNodeAttributes& attrs) {
+  if (std::isnan(attrs.distance)) {
+    return true;
+  }
 
-    if (std::isnan(node.attrs->distance)) {
-      invalid_nodes.insert(node_id);
-      continue;
-    }
+  if (attrs.position.hasNaN()) {
+    return true;
+  }
 
-    if (node.attrs->position.hasNaN()) {
-      invalid_nodes.insert(node_id);
-      continue;
-    }
-
-    for (const auto& info : node.attrs->voxblox_mesh_connections) {
-      if (std::isnan(info.voxel_pos[0]) || std::isnan(info.voxel_pos[1]) ||
-          std::isnan(info.voxel_pos[2])) {
-        invalid_nodes.insert(node_id);
-        continue;
-      }
+  for (const auto& info : attrs.voxblox_mesh_connections) {
+    if (std::isnan(info.voxel_pos[0]) || std::isnan(info.voxel_pos[1]) ||
+        std::isnan(info.voxel_pos[2])) {
+      return true;
     }
   }
 
-  if (!invalid_nodes.empty()) {
-    LOG(ERROR) << "Nodes found with invalid attributes: "
-               << spark_dsg::displayNodeSymbolContainer(invalid_nodes);
-  }
-
-  return invalid_nodes;
+  return false;
 }
 
 }  // namespace
@@ -181,38 +165,39 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
   const auto& places = graph_extractor_->graph();
   MLOG(1) << "Considering " << places.nodes().size() << " input place nodes ";
 
-  std::vector<NodeId> deleted_nodes;
-  for (const auto node_id : deleted_nodes) {
+  for (const auto node_id : places.deleted_nodes()) {
     graph.removeNode(node_id);
   }
 
-  std::vector<EdgeKey> deleted_edges;
-  for (const auto& key : deleted_edges) {
+  for (const auto& key : places.deleted_edges()) {
     graph.removeEdge(key.k1, key.k2);
   }
 
   std::set<NodeId> active_neighborhood;
-  const auto invalid = getInvalidNodes(places);
   for (const auto& [node_id, node] : places) {
-    if (invalid.count(node_id)) {
+    if (!node.attrs) {  // fully archived node
+      graph.getNode(node_id).attributes().is_active = false;
       continue;
     }
 
-    if (!node.attrs) {  // fully archived node
-      graph.getNode(node_id).attributes().is_active = false;
-    } else {
-      active_neighborhood.insert(node_id);
-      auto attrs = node.attrs->clone();
-      attrs->is_active = true;
-      attrs->last_update_time_ns = timestamp_ns;
-      graph.addOrUpdateNode(config.layer, node_id, std::move(attrs));
+    if (attributesInvalid(*node.attrs)) {
+      LOG(ERROR) << "Invalid place node " << spark_dsg::NodeSymbol(node_id).str();
+      graph.removeNode(node_id);
+      continue;
     }
+
+    active_neighborhood.insert(node_id);
+    auto attrs = node.attrs->clone();
+    attrs->is_active = true;
+    attrs->last_update_time_ns = timestamp_ns;
+    graph.addOrUpdateNode(config.layer, node_id, std::move(attrs));
   }
 
   for (const auto& [key, info] : places.edges()) {
     graph.addOrUpdateEdge(key.k1, key.k2, info->clone());
   }
 
+  // TODO(nathan) prune partial graph
   filterIsolated(graph, active_neighborhood);
 }
 

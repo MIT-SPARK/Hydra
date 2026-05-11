@@ -58,6 +58,7 @@ void PartialGraph<AttrT>::update(NodeId node_id, NodeAttr&& attrs) {
   auto iter = nodes_.find(node_id);
   if (iter == nodes_.end()) {
     add(node_id, std::move(attrs));
+    return;
   }
 
   iter->second.attrs = std::move(attrs);
