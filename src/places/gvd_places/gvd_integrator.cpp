@@ -252,14 +252,16 @@ void GvdIntegrator::archiveBlocks(const BlockIndices& blocks,
     }
 
     for (size_t v = 0; v < block->numVoxels(); ++v) {
-      const GvdVoxel& voxel = block->getVoxel(v);
-      if (!voxel.observed) {
-        continue;
+      const auto& voxel = block->getVoxel(v);
+      const auto global_index = block->getGlobalVoxelIndex(v);
+      if (graph_extractor) {
+        // TODO(nathan) we should be able to archive only observed voxels, but appears
+        // possible to add a new block and archive in the same pass at the moment
+        graph_extractor->archiveIndex(global_index);
       }
 
-      const GlobalIndex global_index = block->getGlobalVoxelIndex(v);
-      if (graph_extractor) {
-        graph_extractor->archiveIndex(global_index);
+      if (!voxel.observed) {
+        continue;
       }
 
       parent_tracker_.removeVoronoiFromGvdParentMap(global_index);

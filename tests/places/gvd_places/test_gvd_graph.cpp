@@ -38,15 +38,6 @@
 namespace hydra::places {
 namespace {
 
-void callArchive(GvdGraph& graph, const std::vector<GlobalIndex>& indices) {
-  std::queue<GlobalIndex> temp_queue;
-  for (const auto& index : indices) {
-    temp_queue.push(index);
-  }
-
-  graph.archive(temp_queue);
-}
-
 void callRemove(GvdGraph& graph, const std::vector<GlobalIndex>& indices) {
   std::queue<GlobalIndex> temp_queue;
   for (const auto& index : indices) {
@@ -168,23 +159,23 @@ TEST(GvdGraph, ArchiveCorrect) {
   fillGraph(graph, {{1, 2, 3}, {1, 2, 4}, {4, 4, 4}});
 
   // non-existent index does not change counts
-  callArchive(graph, {GlobalIndex(10, 10, 5)});
+  graph.archive(GlobalIndex(10, 10, 5));
   EXPECT_EQ(graph.uncompressed().size(), 3u);
   EXPECT_EQ(graph.compressed().size(), 2u);
 
   // archive doesn't change edges
-  callArchive(graph, {GlobalIndex(1, 2, 4)});
+  graph.archive(GlobalIndex(1, 2, 4));
   EXPECT_EQ(graph.uncompressed().size(), 3u);
   EXPECT_EQ(graph.compressed().size(), 2u);
   EXPECT_TRUE(hasEdge(graph, 0, 1));
 
   // support doesn't change for compressed nodes
-  callArchive(graph, {GlobalIndex(1, 2, 3)});
+  graph.archive(GlobalIndex(1, 2, 3));
   EXPECT_EQ(graph.uncompressed().size(), 3u);
   EXPECT_EQ(graph.compressed().size(), 2u);
   EXPECT_TRUE(hasEdge(graph, 0, 1));
 
-  callArchive(graph, {GlobalIndex(4, 4, 4)});
+  graph.archive(GlobalIndex(4, 4, 4));
   EXPECT_EQ(graph.uncompressed().size(), 3u);
   EXPECT_EQ(graph.compressed().size(), 2u);
   EXPECT_TRUE(hasEdge(graph, 0, 1));
@@ -389,7 +380,7 @@ TEST(GvdGraph, ArchiveAndDeleteCorrect) {
     EXPECT_EQ(gvd.remapping(), expected);
   }
 
-  callArchive(gvd, {{0, 0, 1}});
+  gvd.archive(GlobalIndex(0, 0, 1));
   callRemove(gvd, {{0, 1, 0}});
 
   EXPECT_EQ(gvd.uncompressed().size(), 4u);
@@ -460,7 +451,8 @@ TEST(GvdGraph, AttributeAssignmentManyToOne) {
   gvd.add(GlobalIndex(0, 0, 3), 0.3, 3);
   gvd.add(GlobalIndex(0, 1, 0), 0.4, 5);
   gvd.add(GlobalIndex(0, 0, 4), 0.5, 5);
-  callArchive(gvd, {{0, 0, 4}, {0, 0, 3}});
+  gvd.archive(GlobalIndex(0, 0, 4));
+  gvd.archive(GlobalIndex(0, 0, 3));
   EXPECT_EQ(gvd.uncompressed().size(), 5u);
   EXPECT_EQ(gvd.compressed().size(), 1u);
 
@@ -474,6 +466,64 @@ TEST(GvdGraph, AttributeAssignmentManyToOne) {
   ASSERT_TRUE(info_0);
   EXPECT_EQ(info_0->distance, 0.4);
   EXPECT_EQ(info_0->num_basis_points, 5u);
+}
+
+// test that merge clusters doesn't throw an error
+TEST(GvdGraph, MergeCleanupCorrect) {
+  GvdGraph graph(0.1, 1.0);
+  graph.add(GlobalIndex(0, 0, 0), 0.1, 2);
+  graph.add(GlobalIndex(2, 0, 0), 0.1, 2);
+  graph.add(GlobalIndex(0, -1, 0), 0.1, 2);
+  graph.add(GlobalIndex(2, -1, 0), 0.1, 2);
+  EXPECT_EQ(graph.compressed().size(), 4u);
+
+  graph.add(GlobalIndex(1, 0, 0), 0.1, 2);
+  EXPECT_EQ(graph.compressed().size(), 3u);
+
+  graph.add(GlobalIndex(1, -1, 0), 0.1, 2);
+  EXPECT_EQ(graph.compressed().size(), 2u);
+
+  ASSERT_TRUE(graph.compressed().count(0));
+  ASSERT_TRUE(graph.compressed().count(2));
+  std::set<uint64_t> siblings{2};
+  EXPECT_EQ(graph.compressed().at(0).siblings, siblings);
+  siblings = {0};
+  EXPECT_EQ(graph.compressed().at(2).siblings, siblings);
+}
+
+// test that splitting stays contained to a single block
+TEST(GvdGraph, SplittingCorrect) {
+  GvdGraph graph(0.1, 1.0);
+  graph.add(GlobalIndex(0, 0, 0), 0.1, 2);
+  graph.add(GlobalIndex(0, 0, 1), 0.1, 2);
+  graph.add(GlobalIndex(0, 0, 2), 0.1, 2);
+  graph.add(GlobalIndex(2, 0, 0), 0.1, 2);
+  graph.add(GlobalIndex(2, 0, 1), 0.1, 2);
+  graph.add(GlobalIndex(2, 0, 2), 0.1, 2);
+  graph.add(GlobalIndex(0, -1, 0), 0.1, 2);
+  graph.add(GlobalIndex(1, -1, 0), 0.1, 2);
+  graph.add(GlobalIndex(2, -1, 0), 0.1, 2);
+  EXPECT_EQ(graph.compressed().size(), 3u);
+
+  callRemove(graph, {{1, -1, 0}});  // trigger splitting
+  EXPECT_EQ(graph.compressed().size(), 4u);
+  ASSERT_TRUE(graph.compressed().count(0));
+  ASSERT_TRUE(graph.compressed().count(1));
+  ASSERT_TRUE(graph.compressed().count(2));
+  ASSERT_TRUE(graph.compressed().count(3));
+
+  std::set<uint64_t> refs{0, 1, 2};
+  EXPECT_EQ(graph.compressed().at(0).active_refs, refs);
+  EXPECT_TRUE(graph.compressed().at(0).archived_refs.empty());
+  refs = {3, 4, 5};
+  EXPECT_EQ(graph.compressed().at(1).active_refs, refs);
+  EXPECT_TRUE(graph.compressed().at(1).archived_refs.empty());
+  refs = {6};
+  EXPECT_EQ(graph.compressed().at(2).active_refs, refs);
+  EXPECT_TRUE(graph.compressed().at(2).archived_refs.empty());
+  refs = {8};
+  EXPECT_EQ(graph.compressed().at(3).active_refs, refs);
+  EXPECT_TRUE(graph.compressed().at(3).archived_refs.empty());
 }
 
 }  // namespace hydra::places

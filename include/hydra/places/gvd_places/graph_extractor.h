@@ -98,6 +98,8 @@ class GraphExtractor {
                const GvdLayer& layer,
                const GvdParentTracker& parents);
 
+  void prune();
+
   const GvdGraph& gvd() const { return gvd_; }
 
   const LocalGraph& graph() const { return graph_; }
@@ -120,7 +122,6 @@ class GraphExtractor {
  protected:
   std::queue<GlobalIndex> modified_voxel_queue_;
   std::queue<GlobalIndex> removed_voxel_queue_;
-  std::queue<GlobalIndex> archived_voxel_queue_;
 
   GvdGraph gvd_;
   LocalGraph graph_;

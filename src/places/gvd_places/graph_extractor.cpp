@@ -152,9 +152,7 @@ void GraphExtractor::clearIndex(const GlobalIndex& index) {
   removed_voxel_queue_.push(index);
 }
 
-void GraphExtractor::archiveIndex(const GlobalIndex& index) {
-  archived_voxel_queue_.push(index);
-}
+void GraphExtractor::archiveIndex(const GlobalIndex& index) { gvd_.archive(index); }
 
 void GraphExtractor::extract(uint64_t timestamp_ns,
                              const GvdLayer& layer,
@@ -162,6 +160,7 @@ void GraphExtractor::extract(uint64_t timestamp_ns,
   // Update the gvd graph and compression with unique voxels
   updateGvdGraph(timestamp_ns, layer);
 
+  /*
   // Copy all the updates from the compressed GVD graph to the partial update
   updatePartialGraph(layer, tracker);
 
@@ -173,6 +172,14 @@ void GraphExtractor::extract(uint64_t timestamp_ns,
   // Add heuristic edges to the compressed graph
   updateOverlapEdges();
   updateFreespaceEdges(layer);
+  */
+}
+
+void GraphExtractor::prune() {
+  const auto archived = gvd_.clearArchived();
+  MLOG(2) << "Cleared archived nodes [" << archived << "]";
+
+  graph_.prune();
 }
 
 void GraphExtractor::updateGvdGraph(uint64_t timestamp_ns, const GvdLayer& layer) {
@@ -180,7 +187,6 @@ void GraphExtractor::updateGvdGraph(uint64_t timestamp_ns, const GvdLayer& layer
 
   // process index updates from the gvd integration
   gvd_.remove(removed_voxel_queue_);
-  gvd_.archive(archived_voxel_queue_);
 
   GlobalIndexSet seen_indices;
   while (!modified_voxel_queue_.empty()) {
@@ -286,9 +292,6 @@ void GraphExtractor::updatePartialGraph(const GvdLayer& layer,
       freespace_edges_.erase(key);
     }
   }
-
-  const auto archived = gvd_.clearArchived();
-  MLOG(2) << "Clearing archived nodes [" << archived << "]";
 }
 
 void GraphExtractor::mergeNearbyNodes() {

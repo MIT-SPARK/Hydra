@@ -197,8 +197,8 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
     graph.addOrUpdateEdge(key.k1, key.k2, info->clone());
   }
 
-  // TODO(nathan) prune partial graph
   filterIsolated(graph, active_neighborhood);
+  graph_extractor_->prune();  // clear all fully archived nodes
 }
 
 void GvdPlaceExtractor::filterIsolated(SceneGraph& graph, std::set<NodeId>& active) {

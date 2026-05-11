@@ -63,6 +63,7 @@ class GvdGraph {
     uint64_t id;
     GvdMemberInfo info;
     std::set<uint64_t> siblings;
+    bool archived = false;
   };
 
   struct CompressedNode {
@@ -87,7 +88,7 @@ class GvdGraph {
 
   void remove(std::queue<GlobalIndex>& indices);
 
-  void archive(std::queue<GlobalIndex>& indices);
+  void archive(const GlobalIndex& index);
 
   void dropCompressed(uint64_t compressed_id);
 
@@ -111,8 +112,6 @@ class GvdGraph {
  protected:
   void remove(const GlobalIndex& index, std::set<uint64_t>& updated);
 
-  void archive(const GlobalIndex& index);
-
   uint64_t next_uncompressed_id();
 
   uint64_t next_compressed_id();
@@ -129,6 +128,8 @@ class GvdGraph {
 
   std::optional<uint64_t> drop_uncompressed(const GlobalIndex& index);
 
+  void drop_uncompressed_node(uint64_t gvd_id);
+
   void drop_compressed_id(uint64_t compressed_id);
 
  protected:
@@ -143,7 +144,6 @@ class GvdGraph {
   std::unordered_map<uint64_t, spatial_hash::Index> compressed_id_map_;
 
   NodeRemapping compression_map_;
-  std::unordered_set<uint64_t> updated_;
 };
 
 }  // namespace hydra::places
