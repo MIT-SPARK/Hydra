@@ -34,9 +34,17 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/gvd_places/gvd_parent_tracker.h"
 
+#include <glog/logging.h>
+
 #include "hydra/places/gvd_places/gvd_utilities.h"
 
 namespace hydra::places {
+namespace {
+
+const static Eigen::IOFormat fmt(
+    Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "; ", "", "", "[", "]");
+
+}
 
 uint8_t GvdParentTracker::updateGvdParentMap(const GvdLayer& layer,
                                              const VoronoiCheckConfig& config,
@@ -122,6 +130,39 @@ void GvdParentTracker::updateVertexMapping(const GvdLayer& layer) {
     iter->second.pos = voxel->parent_pos;
     ++iter;
   }
+}
+
+std::vector<Point> GvdParentTracker::parentPositions(const GvdVoxel& voxel,
+                                                     const GlobalIndex& index) const {
+  auto iter = parents.find(index);
+  if (iter == parents.end()) {
+    return {};
+  }
+
+  std::vector<Point> to_return;
+  auto parent_iter = parent_vertices.find(voxel.parent);
+  if (parent_iter == parent_vertices.end()) {
+    LOG(ERROR) << "voxel " << voxel << " @ " << index.format(fmt)
+               << " has untracked parent @ " << voxel.parent.format(fmt);
+    throw std::runtime_error("Invalid parent tracker state!");
+  }
+
+  to_return.push_back(parent_iter->second.pos);
+
+  // save all other basis points
+  for (const auto& parent : iter->second) {
+    parent_iter = parent_vertices.find(parent);
+    if (parent_iter == parent_vertices.end()) {
+      LOG(ERROR) << "voxel " << voxel << " @ " << index.format(fmt)
+                 << " has basis point " << parent.format(fmt)
+                 << " missing from tracker!";
+      throw std::runtime_error("Invalid parent tracker state!");
+    }
+
+    to_return.push_back(parent_iter->second.pos);
+  }
+
+  return to_return;
 }
 
 }  // namespace hydra::places

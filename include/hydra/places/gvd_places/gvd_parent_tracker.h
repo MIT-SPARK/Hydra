@@ -57,6 +57,9 @@ struct GvdParentTracker {
 
   void updateVertexMapping(const GvdLayer& layer);
 
+  std::vector<Point> parentPositions(const GvdVoxel& voxel,
+                                     const GlobalIndex& index) const;
+
   GlobalIndexMap<GlobalIndexSet> parents;
   GlobalIndexMap<GvdVertexInfo> parent_vertices;
 };

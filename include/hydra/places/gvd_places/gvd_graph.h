@@ -33,6 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <spark_dsg/node_attributes.h>
 #include <spark_dsg/scene_graph_types.h>
 #include <spatial_hash/neighbor_utils.h>
 
@@ -41,7 +42,6 @@
 #include <list>
 #include <map>
 #include <optional>
-#include <queue>
 #include <set>
 #include <unordered_map>
 
@@ -55,6 +55,7 @@ struct GvdMemberInfo {
   uint8_t num_basis_points = 0;
   Eigen::Vector3f position;
   GlobalIndex index;
+  std::vector<Point> parents;
 };
 
 class GvdGraph {
@@ -84,7 +85,10 @@ class GvdGraph {
 
   GvdGraph(float voxel_resolution_m, float compression_resolution_m);
 
-  void add(const GlobalIndex& index, double distance, uint8_t num_basis_points);
+  void add(const GlobalIndex& index,
+           double distance,
+           uint8_t num_basis_points,
+           const std::vector<Point>& parents = {});
 
   void remove(const GlobalIndexSet& indices);
 
@@ -96,11 +100,8 @@ class GvdGraph {
 
   const GvdMemberInfo* get(uint64_t uncompressed_id) const;
 
-  struct CompressedAttr {
-    const GvdMemberInfo* info = nullptr;
-    bool is_archived = false;
-  };
-  CompressedAttr getCompressed(uint64_t compressed_id, const MergePolicy& policy) const;
+  const GvdMemberInfo* getCompressed(uint64_t compressed_id,
+                                     const MergePolicy& policy) const;
 
   const Nodes& uncompressed() const;
 
@@ -119,7 +120,10 @@ class GvdGraph {
 
   uint64_t next_compressed_id();
 
-  Node* add_uncompressed(const GlobalIndex& index, double distance, uint8_t basis);
+  Node* add_uncompressed(const GlobalIndex& index,
+                         double distance,
+                         uint8_t basis,
+                         const std::vector<Point>& parents);
 
   Node* uncompressed_by_index(const GlobalIndex& index);
 

@@ -107,8 +107,11 @@ GvdGraph::GvdGraph(float voxel_resolution_m, float compression_resolution_m)
       next_uncompressed_id_(0),
       next_compressed_id_(0) {}
 
-void GvdGraph::add(const GlobalIndex& vindex, double distance, uint8_t basis) {
-  auto node = add_uncompressed(vindex, distance, basis);
+void GvdGraph::add(const GlobalIndex& vindex,
+                   double distance,
+                   uint8_t basis,
+                   const std::vector<Point>& parents) {
+  auto node = add_uncompressed(vindex, distance, basis, parents);
   if (!node) {
     return;
   }
@@ -310,30 +313,29 @@ const GvdMemberInfo* GvdGraph::get(uint64_t node) const {
   return iter == uncompressed_.end() ? nullptr : &iter->second.info;
 }
 
-GvdGraph::CompressedAttr GvdGraph::getCompressed(uint64_t compressed_id,
-                                                 const MergePolicy& policy) const {
+const GvdMemberInfo* GvdGraph::getCompressed(uint64_t compressed_id,
+                                             const MergePolicy& policy) const {
   auto iter = compressed_.find(compressed_id);
   if (iter == compressed_.end()) {
-    return {};
+    return nullptr;
   }
 
-  GvdGraph::CompressedAttr result;
+  const GvdMemberInfo* best_member = nullptr;
   for (const auto node_id : iter->second.active_refs) {
     const auto& gvd_node = uncompressed_.at(node_id);
-    if (!result.info || policy.compare(gvd_node.info, *result.info) > 0) {
-      result.info = &gvd_node.info;
+    if (!best_member || policy.compare(gvd_node.info, *best_member) > 0) {
+      best_member = &gvd_node.info;
     }
   }
 
   for (const auto node_id : iter->second.archived_refs) {
     const auto& gvd_node = uncompressed_.at(node_id);
-    if (!result.info || policy.compare(gvd_node.info, *result.info) > 0) {
-      result.info = &gvd_node.info;
-      result.is_archived = true;
+    if (!best_member || policy.compare(gvd_node.info, *best_member) > 0) {
+      best_member = &gvd_node.info;
     }
   }
 
-  return result;
+  return best_member;
 }
 
 const Nodes& GvdGraph::uncompressed() const { return uncompressed_; }
@@ -362,12 +364,16 @@ uint64_t GvdGraph::next_compressed_id() {
   return new_id;
 }
 
-Node* GvdGraph::add_uncompressed(const GlobalIndex& index, double dist, uint8_t basis) {
+Node* GvdGraph::add_uncompressed(const GlobalIndex& index,
+                                 double dist,
+                                 uint8_t basis,
+                                 const std::vector<Point>& parents) {
   auto iter = uncompressed_index_map_.find(index);
   if (iter != uncompressed_index_map_.end()) {
     auto& node = uncompressed_.at(iter->second);
     node.info.distance = dist;
     node.info.num_basis_points = basis;
+    node.info.parents = parents;
     return nullptr;
   }
 
@@ -376,7 +382,8 @@ Node* GvdGraph::add_uncompressed(const GlobalIndex& index, double dist, uint8_t 
   CHECK(!uncompressed_.count(id)) << "Re-using uncompressed ID";
   uncompressed_index_map_.emplace(index, id);
 
-  auto niter = uncompressed_.emplace(id, Node{id, {dist, basis, pos, index}, {}}).first;
+  auto niter =
+      uncompressed_.emplace(id, Node{id, {dist, basis, pos, index, parents}, {}}).first;
   return &niter->second;
 }
 

@@ -58,14 +58,6 @@ using timing::ScopedTimer;
 
 namespace {
 
-NearestVertexInfo convertInfo(const GvdVertexInfo& parent_info) {
-  NearestVertexInfo info;
-  info.voxel_pos[0] = parent_info.pos[0];
-  info.voxel_pos[1] = parent_info.pos[1];
-  info.voxel_pos[2] = parent_info.pos[2];
-  return info;
-}
-
 std::optional<NodeId> getBestNode(const GraphExtractor::LocalGraph& graph,
                                   NodeId source,
                                   const std::vector<NodeId>& candidates,
@@ -99,7 +91,6 @@ std::optional<NodeId> getBestNode(const GraphExtractor::LocalGraph& graph,
 }
 
 void fillAttributes(const GvdLayer& layer,
-                    const GvdParentTracker& tracker,
                     const GvdMemberInfo& info,
                     PlaceNodeAttributes& attrs) {
   attrs.distance = info.distance;
@@ -110,26 +101,11 @@ void fillAttributes(const GvdLayer& layer,
   const GlobalIndex curr_parent = voxel.parent;
 
   attrs.voxblox_mesh_connections.clear();
-  auto parent_iter = tracker.parent_vertices.find(curr_parent);
-  if (parent_iter != tracker.parent_vertices.end()) {
-    attrs.voxblox_mesh_connections.push_back(convertInfo(parent_iter->second));
-  }
-
-  auto iter = tracker.parents.find(info.index);
-  if (iter == tracker.parents.end()) {
-    LOG(ERROR) << "voxel " << voxel << " @ " << info.index.transpose()
-               << " missing parents";
-    return;
-  }
-
-  // save all other basis points
-  for (const auto& parent : iter->second) {
-    if (!tracker.parent_vertices.count(parent)) {
-      continue;
-    }
-
-    const auto& parent_info = tracker.parent_vertices.at(parent);
-    attrs.voxblox_mesh_connections.push_back(convertInfo(parent_info));
+  for (const auto& parent_pos : info.parents) {
+    auto& connection = attrs.voxblox_mesh_connections.emplace_back();
+    connection.voxel_pos[0] = parent_pos[0];
+    connection.voxel_pos[1] = parent_pos[1];
+    connection.voxel_pos[2] = parent_pos[2];
   }
 }
 
@@ -200,6 +176,7 @@ void GraphExtractor::prune() {
   MLOG(2) << "Cleared archived nodes [" << archived << "]";
 
   const auto archived_node_ids = graph_.prune();
+  MLOG(2) << "Cleared graph nodes [" << archived_node_ids << "]";
   for (const auto& node_id : archived_node_ids) {
     node_index_map_.erase(node_id);
   }
@@ -233,6 +210,7 @@ void GraphExtractor::validate(const GvdLayer& layer,
 
 void GraphExtractor::updateGvdGraph(uint64_t timestamp_ns,
                                     const GvdLayer& layer,
+                                    const GvdParentTracker& tracker,
                                     const VoxelIndexChanges& changes) {
   ScopedTimer timer("places/update_gvd_graph", timestamp_ns);
 
@@ -258,8 +236,7 @@ uint64_t GraphExtractor::toCompressedId(NodeId node_id) const {
   return spark_dsg::NodeSymbol(node_id).categoryId();
 }
 
-void GraphExtractor::updatePartialGraph(const GvdLayer& layer,
-                                        const GvdParentTracker& tracker) {
+void GraphExtractor::updatePartialGraph(const GvdLayer& layer) {
   std::set<NodeId> stale_nodes;
   for (const auto& [node_id, node] : graph_.nodes()) {
     if (node.attributes().is_active) {
@@ -269,29 +246,29 @@ void GraphExtractor::updatePartialGraph(const GvdLayer& layer,
 
   std::set<EdgeKey> stale_edges;
   for (const auto& [key, _] : graph_.edges()) {
-    if (graph_.at(key.k1).is_active || graph_.at(key.k2).is_active) {
-      stale_edges.insert(key);
+    if (!graph_.at(key.k1).is_active && !graph_.at(key.k2).is_active) {
+      continue;
     }
+
+    if (overlap_edges_.count(key) || freespace_edges_.count(key)) {
+      continue;
+    }
+
+    stale_edges.insert(key);
   }
 
   const auto& compressed = gvd_.compressed();
   for (const auto& [node_id, node] : compressed) {
     const auto graph_id = toGraphId(node_id);
     stale_nodes.erase(graph_id);
-    if (node.archived()) {
-      graph_.archive(graph_id);
-      continue;
-    }
 
-    const auto [result, is_archived] = gvd_.getCompressed(node_id, *merge_policy_);
+    const auto result = gvd_.getCompressed(node_id, *merge_policy_);
     CHECK(result);
-    if (is_archived) {
-      continue;  // archive nodes should not have any changes
-    }
 
     auto attrs = std::make_unique<PlaceNodeAttributes>();
-    attrs->is_active = true;
-    fillAttributes(layer, tracker, *result, *attrs);
+    attrs->is_active = node.archived();
+    fillAttributes(layer, *result, *attrs);
+
     for (const auto sibling : node.siblings) {
       const auto sibling_id = toGraphId(sibling);
       const auto sibling_attrs = graph_.find(sibling_id);
@@ -299,22 +276,23 @@ void GraphExtractor::updatePartialGraph(const GvdLayer& layer,
         continue;  // skip any unadded nodes
       }
 
-      const EdgeKey key(graph_id, sibling_id);
       auto edge_attrs = getFreespaceEdgeInfo(layer,
                                              *attrs,
                                              result->index,
                                              *sibling_attrs,
                                              node_index_map_.at(sibling_id),
                                              config.min_edge_distance_m,
-                                             false);
-      if (!attrs) {
+                                             !sibling_attrs->is_active);
+      if (!edge_attrs) {
         graph_.remove(graph_id, sibling_id);
         continue;
       }
 
       stale_edges.erase({graph_id, sibling_id});
       graph_.add(graph_id, sibling_id, std::move(edge_attrs));
+
       // override heuristic edges with actual graph edges
+      const EdgeKey key(graph_id, sibling_id);
       overlap_edges_.erase(key);
       freespace_edges_.erase(key);
     }
@@ -325,6 +303,7 @@ void GraphExtractor::updatePartialGraph(const GvdLayer& layer,
 
   for (const auto& node_id : stale_nodes) {
     graph_.remove(node_id);
+    node_index_map_.erase(node_id);
   }
 
   for (const auto& key : stale_edges) {
@@ -404,7 +383,9 @@ void GraphExtractor::updateOverlapEdges() {
 
   for (auto iter = overlap_edges_.begin(); iter != overlap_edges_.end();) {
     const auto [source, target] = *iter;
-    if (!graph_.at(source).is_active && !graph_.at(target).is_active) {
+    if (!graph_.has(source) || !graph_.has(target)) {
+      iter = overlap_edges_.erase(iter);  // drop edges from removed nodes
+    } else if (!graph_.at(source).is_active && !graph_.at(target).is_active) {
       iter = overlap_edges_.erase(iter);  // edge between archived nodes can be fixed
     } else {
       ++iter;
@@ -444,6 +425,11 @@ void GraphExtractor::updateFreespaceEdges(const GvdLayer& gvd) {
 
   for (auto iter = freespace_edges_.begin(); iter != freespace_edges_.end();) {
     const auto [source, target] = *iter;
+    if (!graph_.has(source) || !graph_.has(target)) {
+      iter = freespace_edges_.erase(iter);  // drop edges from removed nodes
+      continue;
+    }
+
     if (!graph_.at(source).is_active && !graph_.at(target).is_active) {
       iter = freespace_edges_.erase(iter);  // edge between archived nodes can be fixed
       continue;

@@ -105,9 +105,10 @@ class GraphExtractor {
  protected:
   void updateGvdGraph(uint64_t timestamp_ns,
                       const GvdLayer& layer,
+                      const GvdParentTracker& parents,
                       const VoxelIndexChanges& changes);
 
-  void updatePartialGraph(const GvdLayer& layer, const GvdParentTracker& parents);
+  void updatePartialGraph(const GvdLayer& layer);
 
   void mergeNearbyNodes();
 
