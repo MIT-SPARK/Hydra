@@ -86,7 +86,7 @@ void checkNode(const GraphExtractor::LocalGraph& graph,
                uint8_t expected_basis) {
   Eigen::IOFormat fmt(
       Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "; ", "", "", "[", "]");
-  const auto attrs = graph.at(node_id);
+  const auto attrs = graph.find(node_id);
   ASSERT_TRUE(attrs);
   EXPECT_NEAR((attrs->position - p_expected).norm(), 0.0, 1.0e-9)
       << attrs->position.format(fmt) << " vs. expected " << p_expected.format(fmt);
@@ -97,7 +97,7 @@ void checkNode(const GraphExtractor::LocalGraph& graph,
 size_t numArchived(const GraphExtractor::LocalGraph& graph) {
   size_t num_archived = 0;
   for (const auto& [node_id, node] : graph) {
-    if (!node.attrs) {
+    if (!node.attributes().is_active) {
       ++num_archived;
     }
   }
@@ -190,19 +190,19 @@ TEST(GraphExtractor, VoxelArchival) {
 
   // this should force the voxel attributes to flip to 0, 0, 1 for p0
   extractor.addNode(0, 0, 1, 0.1, 6);
-  extractor.archiveIndex(GlobalIndex(0, 0, 1));
+  extractor.archiveIndex(GlobalIndex(0, 1, 0));
   extractor.update();
 
   EXPECT_EQ(gvd.uncompressed().size(), 5u);
   EXPECT_EQ(numArchived(places), 0u);
 
-  {  // scope after deleting one gvd member of p0: p0 attributes should update
+  {  // scope after archiving one gvd member of p0: p0 attributes should update
     const GvdGraph::NodeRemapping expected{{0, 0}, {1, 1}, {2, 1}, {3, 0}, {4, 1}};
     EXPECT_EQ(gvd.remapping(), expected);
     checkNode(places, "p0"_id, Eigen::Vector3d(0.5, 0.5, 1.5), 0.1, 6u);
   }
 
-  extractor.archiveIndex(GlobalIndex(0, 1, 0));
+  extractor.archiveIndex(GlobalIndex(0, 0, 1));
   extractor.update();
   EXPECT_EQ(numArchived(places), 1u);
 

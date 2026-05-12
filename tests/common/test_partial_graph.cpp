@@ -38,7 +38,6 @@
 
 namespace hydra {
 
-using spark_dsg::EdgeAttributes;
 using spark_dsg::NodeAttributes;
 using spark_dsg::NodeId;
 
@@ -46,30 +45,22 @@ using TestGraph = PartialGraph<NodeAttributes>;
 
 TEST(PartialGraph, AddUpdateCorrect) {
   TestGraph graph;
-  EXPECT_TRUE(graph.add(5));
+  graph.add(5);
   graph.add(5, 6);
   graph.add(6, 7);
 
   EXPECT_TRUE(graph.has(5));
   EXPECT_TRUE(graph.has(6));
   EXPECT_TRUE(graph.has(7));
+  EXPECT_TRUE(graph.find(7));  // 7 added by edge
   EXPECT_FALSE(graph.has(8));
-
-  // 7 was added by edge, so cannot readd
-  EXPECT_FALSE(graph.add(7, std::make_unique<NodeAttributes>()));
-  EXPECT_FALSE(graph.at(7));  // 7 added without attributes
-  graph.update(7, std::make_unique<NodeAttributes>());
-  EXPECT_TRUE(graph.at(7));  // update sets attributes
 
   EXPECT_TRUE(graph.has(5, 6));
   EXPECT_TRUE(graph.has(6, 7));
   EXPECT_FALSE(graph.has(7, 8));
 
-  // edges added without attributes
-  EXPECT_FALSE(graph.at(5, 6));
-  EXPECT_FALSE(graph.at(6, 7));
-  graph.update(5, 6, std::make_unique<EdgeAttributes>());
-  EXPECT_TRUE(graph.at(5, 6));
+  EXPECT_TRUE(graph.find(5, 6));
+  EXPECT_TRUE(graph.find(6, 7));
 
   std::set<NodeId> expected;
   expected = {6};
@@ -154,11 +145,15 @@ TEST(PartialGraph, PruneGraphTrivial) {
 
 TEST(PartialGraph, PruneGraph) {
   TestGraph graph;
-  graph.add(5, std::make_unique<NodeAttributes>());
+  graph.add(5).is_active = true;
   graph.add(5, 6);
   graph.add(6, 7);
+  graph.archive(6);
+  graph.archive(7);
 
-  graph.prune();
+  const auto pruned = graph.prune();
+  std::vector<uint64_t> expected{7};
+  EXPECT_EQ(pruned, expected);
   EXPECT_EQ(graph.num_nodes(), 2u);
   EXPECT_EQ(graph.num_edges(), 1u);
   EXPECT_TRUE(graph.deleted_nodes().empty());

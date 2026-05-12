@@ -179,22 +179,23 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
 
   std::set<NodeId> active_neighborhood;
   for (const auto& [node_id, node] : places) {
-    if (!node.attrs) {  // fully archived node
+    const auto& attrs = node.attributes();
+    if (!attrs.is_active) {  // fully archived node
       graph.getNode(node_id).attributes().is_active = false;
       continue;
     }
 
-    if (attributesInvalid(*node.attrs)) {
+    if (attributesInvalid(attrs)) {
       LOG(ERROR) << "Invalid place node " << spark_dsg::NodeSymbol(node_id).str();
       graph.removeNode(node_id);
       continue;
     }
 
     active_neighborhood.insert(node_id);
-    auto attrs = node.attrs->clone();
-    attrs->is_active = true;
-    attrs->last_update_time_ns = timestamp_ns;
-    graph.addOrUpdateNode(config.layer, node_id, std::move(attrs));
+    auto new_attrs = attrs.clone();
+    new_attrs->is_active = true;
+    new_attrs->last_update_time_ns = timestamp_ns;
+    graph.addOrUpdateNode(config.layer, node_id, std::move(new_attrs));
   }
 
   for (const auto& [key, info] : places.edges()) {

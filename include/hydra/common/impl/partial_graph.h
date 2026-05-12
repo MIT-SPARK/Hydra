@@ -33,6 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <spark_dsg/node_symbol.h>
+
 #include <deque>
 
 #include "hydra/common/partial_graph.h"
@@ -40,40 +42,34 @@
 namespace hydra {
 
 template <typename AttrT>
-bool PartialGraph<AttrT>::add(NodeId node_id, NodeAttr&& attrs) {
+auto PartialGraph<AttrT>::add(NodeId node_id, NodeAttrPtr&& attrs) -> NodeAttr& {
   deleted_nodes_.erase(node_id);
-  return nodes_.emplace(node_id, Node{std::move(attrs), {}}).second;
+  auto& node = allocate(node_id);
+  if (attrs) {
+    node.attrs_ = std::move(attrs);
+  }
+
+  return *node.attrs_;
 }
 
 template <typename AttrT>
-bool PartialGraph<AttrT>::add(NodeId source, NodeId target, EdgeAttr&& attrs) {
+auto PartialGraph<AttrT>::add(NodeId source, NodeId target, EdgeAttrPtr&& attrs)
+    -> EdgeAttr& {
   allocate(source).neighbors.insert(target);
   allocate(target).neighbors.insert(source);
 
   const spark_dsg::EdgeKey key{source, target};
   deleted_edges_.erase(key);
-  return edges_.emplace(key, std::move(attrs)).second;
-}
-
-template <typename AttrT>
-void PartialGraph<AttrT>::update(NodeId node_id, NodeAttr&& attrs) {
-  auto iter = nodes_.find(node_id);
-  if (iter == nodes_.end()) {
-    add(node_id, std::move(attrs));
-    return;
-  }
-
-  iter->second.attrs = std::move(attrs);
-}
-
-template <typename AttrT>
-void PartialGraph<AttrT>::update(NodeId source, NodeId target, EdgeAttr&& attrs) {
-  auto iter = edges_.find(spark_dsg::EdgeKey{source, target});
+  auto iter = edges_.find(key);
   if (iter == edges_.end()) {
-    add(source, target, std::move(attrs));
+    iter = edges_.emplace(key, std::make_unique<EdgeAttr>()).first;
   }
 
-  iter->second = std::move(attrs);
+  if (attrs) {
+    iter->second = std::move(attrs);
+  }
+
+  return *iter->second;
 }
 
 template <typename AttrT>
@@ -83,19 +79,7 @@ void PartialGraph<AttrT>::remove(NodeId node_id) {
 
 template <typename AttrT>
 void PartialGraph<AttrT>::remove(NodeId source, NodeId target) {
-  const spark_dsg::EdgeKey key{source, target};
-  edges_.erase(key);
-  deleted_edges_.insert(key);
-
-  auto source_node = find(source);
-  if (source_node) {
-    source_node->neighbors.erase(target);
-  }
-
-  auto target_node = find(target);
-  if (target_node) {
-    target_node->neighbors.erase(source);
-  }
+  erase(edges_.find({source, target}));
 }
 
 template <typename AttrT>
@@ -114,6 +98,103 @@ auto PartialGraph<AttrT>::erase(const typename Nodes::iterator& iter) ->
 
   deleted_nodes_.insert(iter->first);
   return nodes_.erase(iter);
+}
+
+template <typename AttrT>
+auto PartialGraph<AttrT>::erase(const typename Edges::iterator& iter) ->
+    typename Edges::iterator {
+  if (iter == edges_.end()) {
+    return iter;
+  }
+
+  const auto [source, target] = iter->first;
+  deleted_edges_.insert(iter->first);
+
+  auto source_node = nodes_.find(source);
+  if (source_node != nodes_.end()) {
+    source_node->second.neighbors.erase(target);
+  }
+
+  auto target_node = nodes_.find(target);
+  if (target_node != nodes_.end()) {
+    target_node->second.neighbors.erase(source);
+  }
+
+  return edges_.erase(iter);
+}
+
+template <typename AttrT>
+bool PartialGraph<AttrT>::has(NodeId node_id) const {
+  return nodes_.count(node_id);
+}
+
+template <typename AttrT>
+bool PartialGraph<AttrT>::has(NodeId source, NodeId target) const {
+  return edges_.count(spark_dsg::EdgeKey{source, target});
+}
+
+template <typename AttrT>
+auto PartialGraph<AttrT>::find(NodeId node) -> NodeAttr* {
+  auto iter = nodes_.find(node);
+  return iter == nodes_.end() ? nullptr : iter->second.attrs_.get();
+}
+
+template <typename AttrT>
+auto PartialGraph<AttrT>::find(NodeId node) const -> const NodeAttr* {
+  return const_cast<PartialGraph<AttrT>*>(this)->find(node);
+}
+
+template <typename AttrT>
+auto PartialGraph<AttrT>::find(NodeId source, NodeId target) -> EdgeAttr* {
+  auto iter = edges_.find(spark_dsg::EdgeKey{source, target});
+  return iter == edges_.end() ? nullptr : iter->second.get();
+}
+
+template <typename AttrT>
+auto PartialGraph<AttrT>::find(NodeId source, NodeId target) const -> const EdgeAttr* {
+  return const_cast<PartialGraph<AttrT>*>(this)->find(source, target);
+}
+
+template <typename AttrT>
+auto PartialGraph<AttrT>::at(NodeId node) -> NodeAttr& {
+  auto attrs = find(node);
+  if (!attrs) {
+    throw std::out_of_range("Missing node '" + spark_dsg::NodeSymbol(node).str() + "'");
+  }
+
+  return *attrs;
+}
+
+template <typename AttrT>
+auto PartialGraph<AttrT>::at(NodeId node) const -> const NodeAttr& {
+  return const_cast<PartialGraph<AttrT>*>(this)->at(node);
+}
+
+template <typename AttrT>
+auto PartialGraph<AttrT>::at(NodeId source, NodeId target) -> EdgeAttr& {
+  auto attrs = find(source, target);
+  if (!attrs) {
+    throw std::out_of_range("Missing edge '" + spark_dsg::NodeSymbol(source).str() +
+                            "' -> '" + spark_dsg::NodeSymbol(target).str() + "'");
+  }
+
+  return *attrs;
+}
+
+template <typename AttrT>
+auto PartialGraph<AttrT>::at(NodeId source, NodeId target) const -> const EdgeAttr& {
+  return const_cast<PartialGraph<AttrT>*>(this)->at(source, target);
+}
+
+template <typename AttrT>
+void PartialGraph<AttrT>::archive(NodeId node) {
+  at(node).is_active = false;
+}
+
+template <typename AttrT>
+std::set<spark_dsg::NodeId> PartialGraph<AttrT>::neighbors(NodeId node) const {
+  auto iter = nodes_.find(node);
+  return iter == nodes_.end() ? std::set<NodeId>{} : iter->second.neighbors;
 }
 
 template <typename AttrT>
@@ -164,34 +245,6 @@ std::vector<uint64_t> PartialGraph<AttrT>::prune() {
 }
 
 template <typename AttrT>
-bool PartialGraph<AttrT>::has(NodeId node_id) const {
-  return nodes_.count(node_id);
-}
-
-template <typename AttrT>
-bool PartialGraph<AttrT>::has(NodeId source, NodeId target) const {
-  return edges_.count(spark_dsg::EdgeKey{source, target});
-}
-
-template <typename AttrT>
-std::set<spark_dsg::NodeId> PartialGraph<AttrT>::neighbors(NodeId node) const {
-  auto iter = nodes_.find(node);
-  return iter == nodes_.end() ? std::set<NodeId>{} : iter->second.neighbors;
-}
-
-template <typename AttrT>
-AttrT* PartialGraph<AttrT>::at(NodeId node) const {
-  auto iter = nodes_.find(node);
-  return iter == nodes_.end() ? nullptr : iter->second.attrs.get();
-}
-
-template <typename AttrT>
-spark_dsg::EdgeAttributes* PartialGraph<AttrT>::at(NodeId source, NodeId target) const {
-  auto iter = edges_.find(spark_dsg::EdgeKey{source, target});
-  return iter == edges_.end() ? nullptr : iter->second.get();
-}
-
-template <typename AttrT>
 auto PartialGraph<AttrT>::connected_components(bool sort_components) const
     -> Components {
   Components components;
@@ -229,16 +282,10 @@ auto PartialGraph<AttrT>::connected_components(bool sort_components) const
 }
 
 template <typename AttrT>
-auto PartialGraph<AttrT>::find(NodeId node) -> typename PartialGraph::Node* {
-  auto iter = nodes_.find(node);
-  return iter == nodes_.end() ? nullptr : &iter->second;
-}
-
-template <typename AttrT>
 auto PartialGraph<AttrT>::allocate(NodeId node) -> typename PartialGraph::Node& {
   auto iter = nodes_.find(node);
   if (iter == nodes_.end()) {
-    iter = nodes_.emplace(node, Node{nullptr, {}}).first;
+    iter = nodes_.emplace(node, Node()).first;
     deleted_nodes_.erase(node);
   }
 

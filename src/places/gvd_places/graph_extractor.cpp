@@ -66,6 +66,38 @@ NearestVertexInfo convertInfo(const GvdVertexInfo& parent_info) {
   return info;
 }
 
+std::optional<NodeId> getBestNode(const GraphExtractor::LocalGraph& graph,
+                                  NodeId source,
+                                  const std::vector<NodeId>& candidates,
+                                  double max_distance_m) {
+  const auto& source_attrs = graph.at(source);
+  if (!source_attrs.is_active) {
+    return std::nullopt;  // no best node for archived node
+  }
+
+  double best_dist = 0.0;
+  std::optional<NodeId> best_node;
+  const auto pos = source_attrs.position;
+  for (const auto& target : candidates) {
+    const auto target_attrs = graph.at(target);
+    if (!target_attrs.is_active) {
+      continue;  // archived node
+    }
+
+    const auto dist = (pos - target_attrs.position).norm();
+    if (!best_node || dist < best_dist) {
+      best_node = target;
+      best_dist = dist;
+    }
+  }
+
+  if (best_node && best_dist > max_distance_m) {
+    best_node = std::nullopt;
+  }
+
+  return best_node;
+}
+
 void fillAttributes(const GvdLayer& layer,
                     const GvdParentTracker& tracker,
                     const GvdMemberInfo& info,
@@ -230,19 +262,18 @@ void GraphExtractor::updatePartialGraph(const GvdLayer& layer,
                                         const GvdParentTracker& tracker) {
   std::set<NodeId> stale_nodes;
   for (const auto& [node_id, node] : graph_.nodes()) {
-    if (node.attrs) {
+    if (node.attributes().is_active) {
       stale_nodes.insert(node_id);
     }
   }
 
   std::set<EdgeKey> stale_edges;
   for (const auto& [key, _] : graph_.edges()) {
-    if (graph_.at(key.k1) != nullptr && graph_.at(key.k2) != nullptr) {
+    if (graph_.at(key.k1).is_active || graph_.at(key.k2).is_active) {
       stale_edges.insert(key);
     }
   }
 
-  std::set<EdgeKey> seen_edges;
   const auto& compressed = gvd_.compressed();
   for (const auto& [node_id, node] : compressed) {
     const auto graph_id = toGraphId(node_id);
@@ -259,39 +290,45 @@ void GraphExtractor::updatePartialGraph(const GvdLayer& layer,
     }
 
     auto attrs = std::make_unique<PlaceNodeAttributes>();
+    attrs->is_active = true;
     fillAttributes(layer, tracker, *result, *attrs);
-    graph_.update(graph_id, std::move(attrs));
-    node_index_map_[graph_id] = result->index;
-
     for (const auto sibling : node.siblings) {
-      if (gvd_.compressed().at(sibling).archived()) {
-        continue;
+      const auto sibling_id = toGraphId(sibling);
+      const auto sibling_attrs = graph_.find(sibling_id);
+      if (!sibling_attrs) {
+        continue;  // skip any unadded nodes
       }
 
-      const EdgeKey key(toGraphId(node_id), toGraphId(sibling));
-      if (seen_edges.count(key)) {
-        continue;
-      }
-
-      seen_edges.insert(key);
-      auto attrs = getFreespaceEdgeInfo(graph_,
-                                        layer,
-                                        node_index_map_,
-                                        key.k1,
-                                        key.k2,
-                                        config.min_edge_distance_m,
-                                        false);
+      const EdgeKey key(graph_id, sibling_id);
+      auto edge_attrs = getFreespaceEdgeInfo(layer,
+                                             *attrs,
+                                             result->index,
+                                             *sibling_attrs,
+                                             node_index_map_.at(sibling_id),
+                                             config.min_edge_distance_m,
+                                             false);
       if (!attrs) {
-        graph_.remove(key.k1, key.k2);
+        graph_.remove(graph_id, sibling_id);
         continue;
       }
 
-      stale_edges.erase(key);
-      graph_.update(key.k1, key.k2, std::move(attrs));
+      stale_edges.erase({graph_id, sibling_id});
+      graph_.add(graph_id, sibling_id, std::move(edge_attrs));
       // override heuristic edges with actual graph edges
       overlap_edges_.erase(key);
       freespace_edges_.erase(key);
     }
+
+    graph_.add(graph_id, std::move(attrs));
+    node_index_map_[graph_id] = result->index;
+  }
+
+  for (const auto& node_id : stale_nodes) {
+    graph_.remove(node_id);
+  }
+
+  for (const auto& key : stale_edges) {
+    graph_.remove(key.k1, key.k2);
   }
 }
 
@@ -367,24 +404,19 @@ void GraphExtractor::updateOverlapEdges() {
 
   for (auto iter = overlap_edges_.begin(); iter != overlap_edges_.end();) {
     const auto [source, target] = *iter;
-    if (!node_index_map_.count(source) && !node_index_map_.count(target)) {
-      // edge between archived nodes can be fixed
-      iter = overlap_edges_.erase(iter);
+    if (!graph_.at(source).is_active && !graph_.at(target).is_active) {
+      iter = overlap_edges_.erase(iter);  // edge between archived nodes can be fixed
     } else {
       ++iter;
     }
   }
 
-  const auto threshold = config.overlap_edges.min_clearance_m;
+  const auto thresh = config.overlap_edges.min_clearance_m;
   for (auto s_iter = graph_.nodes().begin(); s_iter != graph_.nodes().end(); ++s_iter) {
     for (auto t_iter = std::next(s_iter); t_iter != graph_.nodes().end(); ++t_iter) {
       const auto& [source_id, source] = *s_iter;
       const auto& [target_id, target] = *t_iter;
-      if (!source.attrs || !target.attrs) {
-        continue;
-      }
-
-      if (!source.attrs->is_active && !target.attrs->is_active) {
+      if (!source.attributes().is_active && !target.attributes().is_active) {
         continue;
       }
 
@@ -393,9 +425,9 @@ void GraphExtractor::updateOverlapEdges() {
         continue;
       }
 
-      auto info = getOverlapEdgeInfo(*source.attrs, *target.attrs, threshold);
+      auto info = getOverlapEdgeInfo(source.attributes(), target.attributes(), thresh);
       if (info) {
-        graph_.update(key.k1, key.k2, std::move(info));
+        graph_.add(key.k1, key.k2, std::move(info));
         overlap_edges_.insert(key);
       } else {
         overlap_edges_.erase(key);
@@ -412,15 +444,15 @@ void GraphExtractor::updateFreespaceEdges(const GvdLayer& gvd) {
 
   for (auto iter = freespace_edges_.begin(); iter != freespace_edges_.end();) {
     const auto [source, target] = *iter;
-    if (!node_index_map_.count(source) && !node_index_map_.count(target)) {
-      iter = freespace_edges_.erase(iter);
+    if (!graph_.at(source).is_active && !graph_.at(target).is_active) {
+      iter = freespace_edges_.erase(iter);  // edge between archived nodes can be fixed
       continue;
     }
 
     auto info = getFreespaceEdgeInfo(gvd,
-                                     *graph_.at(source),
+                                     graph_.at(source),
                                      node_index_map_.at(source),
-                                     *graph_.at(target),
+                                     graph_.at(target),
                                      node_index_map_.at(target),
                                      config.freespace_edges.min_clearance_m,
                                      true);
@@ -428,7 +460,7 @@ void GraphExtractor::updateFreespaceEdges(const GvdLayer& gvd) {
       graph_.remove(source, target);
       iter = freespace_edges_.erase(iter);
     } else {
-      graph_.update(source, target, std::move(info));
+      graph_.add(source, target, std::move(info));
       ++iter;
     }
   }
@@ -444,17 +476,24 @@ void GraphExtractor::updateFreespaceEdges(const GvdLayer& gvd) {
 
     bool inserted_edge = false;
     for (const auto& source : component) {
-      const auto target = getBestNode(graph, source, first_component, config.freespace_edges.max_length_m);
-      if (!target || graph.has(source, *target)) {
+      const auto target = getBestNode(
+          graph_, source, first_component, config.freespace_edges.max_length_m);
+      if (!target || graph_.has(source, *target)) {
         continue;  // graph should never has edges connecting components, but...
       }
 
       const EdgeKey key(source, *target);
-      auto info = getFreespaceEdgeInfo(
-          graph, gvd, indices, key.k1, key.k2, min_clearance_m, false);
-      inserted_edge |= info != nullptr;
+      auto info = getFreespaceEdgeInfo(gvd,
+                                       graph_.at(source),
+                                       node_index_map_.at(source),
+                                       graph_.at(*target),
+                                       node_index_map_.at(*target),
+                                       config.freespace_edges.min_clearance_m,
+                                       false);
       if (info) {
-        proposed_edges.emplace(key, std::move(info));
+        inserted_edge = true;
+        graph_.add(key.k1, key.k2, std::move(info));
+        freespace_edges_.insert(key);
       }
     }
 
@@ -462,18 +501,6 @@ void GraphExtractor::updateFreespaceEdges(const GvdLayer& gvd) {
       // merge components if an edge was inserted
       first_component.insert(first_component.end(), component.begin(), component.end());
     }
-  }
-
-  findFreespaceEdges(graph_,
-                     gvd,
-                     node_index_map_,
-                     config.freespace_edges.max_length_m,
-                     config.freespace_edges.min_clearance_m,
-                     proposed_edges);
-
-  for (auto& [key, info] : proposed_edges) {
-    graph_.update(key.k1, key.k2, std::move(info));
-    freespace_edges_.insert(key);
   }
 }
 

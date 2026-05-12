@@ -44,85 +44,69 @@ template <typename AttrT>
 class PartialGraph {
  public:
   using NodeId = spark_dsg::NodeId;
-  using NodeAttr = std::unique_ptr<AttrT>;
-  using EdgeAttr = spark_dsg::EdgeAttributes::Ptr;
+  using NodeAttr = AttrT;
+  using NodeAttrPtr = std::unique_ptr<AttrT>;
+  using EdgeAttr = spark_dsg::EdgeAttributes;
+  using EdgeAttrPtr = std::unique_ptr<spark_dsg::EdgeAttributes>;
+
   struct Node {
-    NodeAttr attrs;
+    explicit Node(NodeAttrPtr&& attributes = nullptr)
+        : attrs_(attributes ? std::move(attributes) : std::make_unique<AttrT>()) {}
+
     std::set<NodeId> neighbors;
-    bool archived() const { return attrs ? attrs->is_active : true; }
+    bool archived() const { return !attributes().is_active; }
+
+    const NodeAttr& attributes() const { return *attrs_; }
+    NodeAttr& attributes() { return *attrs_; }
+
+   private:
+    std::unique_ptr<NodeAttr> attrs_;
+    friend class PartialGraph<AttrT>;
   };
+
   using Nodes = std::map<NodeId, Node>;
+  using Edges = std::map<spark_dsg::EdgeKey, EdgeAttrPtr>;
+  using Components = std::vector<std::vector<uint64_t>>;
 
-  /**
-   * @brief Add a node to the graph
-   * @param node_id Node to add
-   * @param attrs Attributes to add with node
-   * @return Whether or not the add was successful
-   */
-  bool add(NodeId node_id, NodeAttr&& attrs = nullptr);
-
-  /**
-   * @brief Add a undirected edge to the graph
-   * @param source One endpoint of edge to add
-   * @param target Other endpoint of edge to add
-   * @param attrs Attributes to add with edge
-   * @return Whether or not the add was successful
-   */
-  bool add(NodeId source, NodeId target, EdgeAttr&& attrs = nullptr);
-
-  /**
-   * @brief Update the attributes of a node
-   * @param node_id Node to update
-   * @param attrs New attributes to use for node
-   *
-   * Allocates the node if it doesn't exist already
-   */
-  void update(NodeId node_id, NodeAttr&& attrs);
-
-  /**
-   * @brief Update the attributes of an edge
-   * @param source One endpoint of edge to add
-   * @param target Other endpoint of edge to add
-   * @param attrs New attributes to use for edge
-   *
-   * Allocates the edge if it doesn't exist already
-   */
-  void update(NodeId source, NodeId target, EdgeAttr&& attrs);
+  NodeAttr& add(NodeId node_id, NodeAttrPtr&& attributes = nullptr);
+  EdgeAttr& add(NodeId source, NodeId target, EdgeAttrPtr&& attributes = nullptr);
 
   void remove(NodeId node_id);
-
   void remove(NodeId source, NodeId target);
 
   typename Nodes::iterator erase(const typename Nodes::iterator& iter);
-
-  void contract(NodeId from, NodeId to);
-
-  //! Clear archived nodes and deleted tracking information
-  std::vector<uint64_t> prune();
+  typename Edges::iterator erase(const typename Edges::iterator& iter);
 
   bool has(NodeId node) const;
-
   bool has(NodeId source, NodeId target) const;
+
+  NodeAttr* find(NodeId node);
+  const NodeAttr* find(NodeId node) const;
+  EdgeAttr* find(NodeId source, NodeId target);
+  const EdgeAttr* find(NodeId source, NodeId target) const;
+
+  NodeAttr& at(NodeId node);
+  const NodeAttr& at(NodeId node) const;
+  EdgeAttr& at(NodeId source, NodeId target);
+  const EdgeAttr& at(NodeId source, NodeId target) const;
+
+  void archive(NodeId node_id);
 
   std::set<spark_dsg::NodeId> neighbors(NodeId node) const;
 
-  AttrT* at(NodeId node) const;
+  std::vector<uint64_t> prune();
 
-  spark_dsg::EdgeAttributes* at(NodeId source, NodeId target) const;
+  void contract(NodeId from, NodeId to);
 
-  using Components = std::vector<std::vector<uint64_t>>;
   Components connected_components(bool sort_components = true) const;
 
-  const std::map<NodeId, Node>& nodes() const { return nodes_; }
-
-  const std::map<spark_dsg::EdgeKey, EdgeAttr>& edges() const { return edges_; }
+  const Nodes& nodes() const { return nodes_; }
+  const Edges& edges() const { return edges_; }
 
   const std::set<NodeId>& deleted_nodes() const { return deleted_nodes_; }
-
   const std::set<spark_dsg::EdgeKey>& deleted_edges() const { return deleted_edges_; }
 
   size_t num_nodes() const { return nodes_.size(); }
-
   size_t num_edges() const { return edges_.size(); }
 
   typename Nodes::iterator begin() { return nodes_.begin(); }
@@ -132,12 +116,10 @@ class PartialGraph {
   typename Nodes::const_iterator end() const { return nodes_.end(); }
 
  private:
-  Node* find(NodeId node);
-
   Node& allocate(NodeId node);
 
-  std::map<NodeId, Node> nodes_;
-  std::map<spark_dsg::EdgeKey, EdgeAttr> edges_;
+  Nodes nodes_;
+  Edges edges_;
 
   std::set<NodeId> deleted_nodes_;
   std::set<spark_dsg::EdgeKey> deleted_edges_;

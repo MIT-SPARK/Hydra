@@ -34,52 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/gvd_places/graph_extractor_utilities.h"
 
-#include <config_utilities/config.h>
-#include <spatial_hash/neighbor_utils.h>
-
 namespace hydra::places {
 
 using spark_dsg::EdgeAttributes;
-using spark_dsg::EdgeKey;
-using spark_dsg::NodeId;
-
-using Components = std::vector<std::vector<NodeId>>;
-
-namespace {
-
-std::optional<NodeId> getBestNode(const PlaceGraph& graph,
-                                  NodeId source,
-                                  const std::vector<NodeId>& candidates,
-                                  double max_distance_m) {
-  const auto source_attrs = graph.at(source);
-  if (!source_attrs) {
-    return std::nullopt;  // no best node for archived node
-  }
-
-  double best_dist = 0.0;
-  std::optional<NodeId> best_node;
-  const auto pos = source_attrs->position;
-  for (const auto& target : candidates) {
-    const auto target_attrs = graph.at(target);
-    if (!target_attrs) {
-      continue;  // archived node
-    }
-
-    const auto dist = (pos - target_attrs->position).norm();
-    if (!best_node || dist < best_dist) {
-      best_node = target;
-      best_dist = dist;
-    }
-  }
-
-  if (best_node && best_dist > max_distance_m) {
-    best_node = std::nullopt;
-  }
-
-  return best_node;
-}
-
-}  // namespace
 
 // implementation loosely based on: https://gist.github.com/yamamushi/5823518
 GlobalIndices makeBresenhamLine(const GlobalIndex& start, const GlobalIndex& end) {
