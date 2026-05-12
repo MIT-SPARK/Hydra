@@ -136,24 +136,19 @@ GlobalIndices makeBresenhamLine(const GlobalIndex& start, const GlobalIndex& end
   return line_points;
 }
 
-EdgeAttributes::Ptr getOverlapEdgeInfo(const PlaceGraph& graph,
-                                       NodeId node,
-                                       NodeId neighbor,
-                                       double min_clearance) {
-  if (node == neighbor) {
-    return nullptr;
-  }
-
-  const auto r1 = graph.at(node)->distance;
-  const auto r2 = graph.at(neighbor)->distance;
-  const auto d = (graph.at(node)->position - graph.at(neighbor)->position).norm();
+EdgeAttributes::Ptr getOverlapEdgeInfo(const PlaceAttributes& node,
+                                       const PlaceAttributes& neighbor,
+                                       double min_edge_clearance_m) {
+  const auto r1 = node.distance;
+  const auto r2 = neighbor.distance;
+  const auto d = (node.position - neighbor.position).norm();
   if (d >= r1 + r2) {
     return nullptr;
   }
 
   if (d <= r1 || d <= r2) {
     const double clearance = std::min(r1, r2);
-    if (clearance < min_clearance) {
+    if (clearance < min_edge_clearance_m) {
       // mostly for debugging
       return nullptr;
     }
@@ -167,29 +162,27 @@ EdgeAttributes::Ptr getOverlapEdgeInfo(const PlaceGraph& graph,
       std::sqrt(4 * std::pow(d, 2) * std::pow(r1, 2) -
                 std::pow(std::pow(d, 2) - std::pow(r2, 2) + std::pow(r1, 2), 2)) /
       (2 * d);
-  if (clearance < min_clearance) {
+  if (clearance < min_edge_clearance_m) {
     return nullptr;
   }
 
   return std::make_unique<EdgeAttributes>(clearance);
 }
 
-EdgeAttributes::Ptr getFreespaceEdgeInfo(const PlaceGraph& graph,
-                                         const GvdLayer& gvd,
-                                         const NodeIndexMap& node_index_map,
-                                         NodeId node,
-                                         NodeId other,
-                                         double min_clearance_m,
-                                         bool optimistic) {
-  const auto source = node_index_map.at(node);
-  const auto target = node_index_map.at(other);
-  const auto path = makeBresenhamLine(source, target);
+spark_dsg::EdgeAttributes::Ptr getFreespaceEdgeInfo(const GvdLayer& gvd,
+                                                    const PlaceAttributes& node,
+                                                    const GlobalIndex& node_index,
+                                                    const PlaceAttributes& other,
+                                                    const GlobalIndex& other_index,
+                                                    double min_edge_clearance_m,
+                                                    bool optimistic) {
+  const auto path = makeBresenhamLine(node_index, other_index);
   if (path.empty()) {
-    return nullptr;
+    return nullptr;  // indices are the same
   }
 
-  const auto source_dist = graph.at(node)->distance;
-  const auto target_dist = graph.at(other)->distance;
+  const auto source_dist = node.distance;
+  const auto target_dist = other.distance;
   auto min_weight = std::min(source_dist, target_dist);
   for (const auto& index : path) {
     const auto* voxel = gvd.getVoxelPtr(index);
@@ -201,7 +194,7 @@ EdgeAttributes::Ptr getFreespaceEdgeInfo(const PlaceGraph& graph,
       }
     }
 
-    if (!voxel->observed || voxel->distance <= min_clearance_m) {
+    if (!voxel->observed || voxel->distance <= min_edge_clearance_m) {
       return nullptr;
     }
 
@@ -211,44 +204,6 @@ EdgeAttributes::Ptr getFreespaceEdgeInfo(const PlaceGraph& graph,
   }
 
   return std::make_unique<EdgeAttributes>(min_weight);
-}
-
-void findFreespaceEdges(const PlaceGraph& graph,
-                        const GvdLayer& gvd,
-                        const NodeIndexMap& indices,
-                        double max_length_m,
-                        double min_clearance_m,
-                        EdgeInfoMap& proposed_edges) {
-  auto components = graph.connected_components();
-  if (components.size() <= 1) {
-    return;  // nothing to do
-  }
-
-  auto first_component = components.front();
-  for (size_t i = 1; i < components.size(); ++i) {
-    const auto& component = components[i];
-
-    bool inserted_edge = false;
-    for (const auto& source : component) {
-      const auto target = getBestNode(graph, source, first_component, max_length_m);
-      if (!target || graph.has(source, *target)) {
-        continue;  // graph should never has edges connecting components, but...
-      }
-
-      const EdgeKey key(source, *target);
-      auto info = getFreespaceEdgeInfo(
-          graph, gvd, indices, key.k1, key.k2, min_clearance_m, false);
-      inserted_edge |= info != nullptr;
-      if (info) {
-        proposed_edges.emplace(key, std::move(info));
-      }
-    }
-
-    if (inserted_edge) {
-      // merge components if an edge was inserted
-      first_component.insert(first_component.end(), component.begin(), component.end());
-    }
-  }
 }
 
 }  // namespace hydra::places

@@ -49,6 +49,7 @@ class PartialGraph {
   struct Node {
     NodeAttr attrs;
     std::set<NodeId> neighbors;
+    bool archived() const { return attrs ? attrs->is_active : true; }
   };
   using Nodes = std::map<NodeId, Node>;
 
@@ -87,8 +88,6 @@ class PartialGraph {
    * Allocates the edge if it doesn't exist already
    */
   void update(NodeId source, NodeId target, EdgeAttr&& attrs);
-
-  void archive(NodeId node_id);
 
   void remove(NodeId node_id);
 

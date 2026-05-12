@@ -166,7 +166,6 @@ void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg) {
 
 void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
   ScopedTimer timer("frontend/update_gvd_places", timestamp_ns, true, 2, false);
-
   const auto& places = graph_extractor_->graph();
   MLOG(1) << "Considering " << places.nodes().size() << " input place nodes ";
 

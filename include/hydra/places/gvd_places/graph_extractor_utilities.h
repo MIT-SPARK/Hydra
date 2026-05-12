@@ -34,36 +34,28 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include "hydra/common/partial_graph.h"
+#include <spark_dsg/edge_attributes.h>
+#include <spark_dsg/node_attributes.h>
+
 #include "hydra/places/gvd_places/gvd_voxel.h"
 #include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::places {
 
-using PlaceGraph = PartialGraph<spark_dsg::PlaceNodeAttributes>;
-using NodeIndexMap = std::unordered_map<spark_dsg::NodeId, GlobalIndex>;
-using EdgeInfoMap = std::map<spark_dsg::EdgeKey, spark_dsg::EdgeAttributes::Ptr>;
+using PlaceAttributes = spark_dsg::PlaceNodeAttributes;
 
 GlobalIndices makeBresenhamLine(const GlobalIndex& start, const GlobalIndex& end);
 
-spark_dsg::EdgeAttributes::Ptr getOverlapEdgeInfo(const PlaceGraph& graph,
-                                                  spark_dsg::NodeId node,
-                                                  spark_dsg::NodeId neighbor,
+spark_dsg::EdgeAttributes::Ptr getOverlapEdgeInfo(const PlaceAttributes& node,
+                                                  const PlaceAttributes& neighbor,
                                                   double min_edge_clearance_m);
 
-spark_dsg::EdgeAttributes::Ptr getFreespaceEdgeInfo(const PlaceGraph& graph,
-                                                    const GvdLayer& gvd,
-                                                    const NodeIndexMap& node_index_map,
-                                                    spark_dsg::NodeId node,
-                                                    spark_dsg::NodeId other,
+spark_dsg::EdgeAttributes::Ptr getFreespaceEdgeInfo(const GvdLayer& gvd,
+                                                    const PlaceAttributes& node,
+                                                    const GlobalIndex& node_index,
+                                                    const PlaceAttributes& other,
+                                                    const GlobalIndex& other_index,
                                                     double min_edge_clearance_m,
                                                     bool optimistic);
-
-void findFreespaceEdges(const PlaceGraph& graph,
-                        const GvdLayer& gvd,
-                        const NodeIndexMap& indices,
-                        double max_length_m,
-                        double min_clearance_m,
-                        EdgeInfoMap& proposed_edges);
 
 }  // namespace hydra::places

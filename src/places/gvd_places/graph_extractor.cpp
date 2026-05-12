@@ -66,44 +66,39 @@ NearestVertexInfo convertInfo(const GvdVertexInfo& parent_info) {
   return info;
 }
 
-std::unique_ptr<PlaceNodeAttributes> makeAttributes(const GvdLayer& layer,
-                                                    const GvdParentTracker& tracker,
-                                                    const GvdMemberInfo& info) {
-  auto attrs = std::make_unique<PlaceNodeAttributes>();
-  attrs->distance = info.distance;
-  attrs->num_basis_points = info.num_basis_points;
-  attrs->position = info.position.cast<double>();
+void fillAttributes(const GvdLayer& layer,
+                    const GvdParentTracker& tracker,
+                    const GvdMemberInfo& info,
+                    PlaceNodeAttributes& attrs) {
+  attrs.distance = info.distance;
+  attrs.num_basis_points = info.num_basis_points;
+  attrs.position = info.position.cast<double>();
 
-  const auto* voxel = layer.getVoxelPtr(info.index);
-  if (!voxel) {
-    // the compression-based extractor can have nodes pointing to archived voxels
-    return nullptr;
+  const auto& voxel = layer.getVoxel(info.index);
+  const GlobalIndex curr_parent = voxel.parent;
+
+  attrs.voxblox_mesh_connections.clear();
+  auto parent_iter = tracker.parent_vertices.find(curr_parent);
+  if (parent_iter != tracker.parent_vertices.end()) {
+    attrs.voxblox_mesh_connections.push_back(convertInfo(parent_iter->second));
   }
 
-  if (!tracker.parents.count(info.index)) {
-    LOG(ERROR) << "bad gvd voxel: " << *voxel << " @ " << info.index.transpose();
-    return nullptr;
-  }
-
-  // save primary parent first
-  attrs->voxblox_mesh_connections.clear();
-  const GlobalIndex curr_parent = voxel->parent;
-  auto iter = tracker.parent_vertices.find(curr_parent);
-  if (iter != tracker.parent_vertices.end()) {
-    attrs->voxblox_mesh_connections.push_back(convertInfo(iter->second));
+  auto iter = tracker.parents.find(info.index);
+  if (iter == tracker.parents.end()) {
+    LOG(ERROR) << "voxel " << voxel << " @ " << info.index.transpose()
+               << " missing parents";
+    return;
   }
 
   // save all other basis points
-  for (const auto& parent : tracker.parents.at(info.index)) {
+  for (const auto& parent : iter->second) {
     if (!tracker.parent_vertices.count(parent)) {
       continue;
     }
 
     const auto& parent_info = tracker.parent_vertices.at(parent);
-    attrs->voxblox_mesh_connections.push_back(convertInfo(parent_info));
+    attrs.voxblox_mesh_connections.push_back(convertInfo(parent_info));
   }
-
-  return attrs;
 }
 
 }  // namespace
@@ -233,58 +228,52 @@ uint64_t GraphExtractor::toCompressedId(NodeId node_id) const {
 
 void GraphExtractor::updatePartialGraph(const GvdLayer& layer,
                                         const GvdParentTracker& tracker) {
-  const auto& compressed = gvd_.compressed();
-
-  // clear deleted nodes
-  auto iter = graph_.begin();
-  while (iter != graph_.end()) {
-    if (compressed.count(toCompressedId(iter->first))) {
-      ++iter;
-    } else {
-      iter = graph_.erase(iter);
+  std::set<NodeId> stale_nodes;
+  for (const auto& [node_id, node] : graph_.nodes()) {
+    if (node.attrs) {
+      stale_nodes.insert(node_id);
     }
   }
 
-  for (const auto& [compressed_id, node] : compressed) {
-    const auto graph_id = toGraphId(compressed_id);
+  std::set<EdgeKey> stale_edges;
+  for (const auto& [key, _] : graph_.edges()) {
+    if (graph_.at(key.k1) != nullptr && graph_.at(key.k2) != nullptr) {
+      stale_edges.insert(key);
+    }
+  }
+
+  std::set<EdgeKey> seen_edges;
+  const auto& compressed = gvd_.compressed();
+  for (const auto& [node_id, node] : compressed) {
+    const auto graph_id = toGraphId(node_id);
+    stale_nodes.erase(graph_id);
     if (node.archived()) {
       graph_.archive(graph_id);
-      node_index_map_.erase(graph_id);
       continue;
     }
 
-    const auto result = gvd_.getCompressed(compressed_id, *merge_policy_);
-    if (!result.info || result.is_archived) {
-      continue;
+    const auto [result, is_archived] = gvd_.getCompressed(node_id, *merge_policy_);
+    CHECK(result);
+    if (is_archived) {
+      continue;  // archive nodes should not have any changes
     }
 
-    auto attrs = makeAttributes(layer, tracker, *result.info);
-    if (!attrs) {
-      LOG(ERROR) << "Attribute construction failed for " << compressed_id;
-      continue;
-    }
-
+    auto attrs = std::make_unique<PlaceNodeAttributes>();
+    fillAttributes(layer, tracker, *result, *attrs);
     graph_.update(graph_id, std::move(attrs));
-    node_index_map_[graph_id] = result.info->index;
-  }
-
-  std::set<EdgeKey> curr_edges;
-  for (const auto& [compressed_id, node] : compressed) {
-    if (node.archived()) {
-      continue;
-    }
+    node_index_map_[graph_id] = result->index;
 
     for (const auto sibling : node.siblings) {
       if (gvd_.compressed().at(sibling).archived()) {
         continue;
       }
 
-      const EdgeKey key(toGraphId(compressed_id), toGraphId(sibling));
-      if (curr_edges.count(key)) {
+      const EdgeKey key(toGraphId(node_id), toGraphId(sibling));
+      if (seen_edges.count(key)) {
         continue;
       }
 
-      curr_edges.insert(key);
+      seen_edges.insert(key);
       auto attrs = getFreespaceEdgeInfo(graph_,
                                         layer,
                                         node_index_map_,
@@ -297,6 +286,7 @@ void GraphExtractor::updatePartialGraph(const GvdLayer& layer,
         continue;
       }
 
+      stale_edges.erase(key);
       graph_.update(key.k1, key.k2, std::move(attrs));
       // override heuristic edges with actual graph edges
       overlap_edges_.erase(key);
@@ -386,18 +376,24 @@ void GraphExtractor::updateOverlapEdges() {
   }
 
   const auto threshold = config.overlap_edges.min_clearance_m;
-  for (auto source = graph_.nodes().begin(); source != graph_.nodes().end(); ++source) {
-    for (auto target = source; target != graph_.nodes().end(); ++target) {
-      if (source == target || !source->second.attrs || !target->second.attrs) {
+  for (auto s_iter = graph_.nodes().begin(); s_iter != graph_.nodes().end(); ++s_iter) {
+    for (auto t_iter = std::next(s_iter); t_iter != graph_.nodes().end(); ++t_iter) {
+      const auto& [source_id, source] = *s_iter;
+      const auto& [target_id, target] = *t_iter;
+      if (!source.attrs || !target.attrs) {
         continue;
       }
 
-      EdgeKey key{source->first, target->first};
+      if (!source.attrs->is_active && !target.attrs->is_active) {
+        continue;
+      }
+
+      EdgeKey key{source_id, target_id};
       if (graph_.has(key.k1, key.k2) && !overlap_edges_.count(key)) {
         continue;
       }
 
-      auto info = getOverlapEdgeInfo(graph_, key.k1, key.k2, threshold);
+      auto info = getOverlapEdgeInfo(*source.attrs, *target.attrs, threshold);
       if (info) {
         graph_.update(key.k1, key.k2, std::move(info));
         overlap_edges_.insert(key);
@@ -421,11 +417,11 @@ void GraphExtractor::updateFreespaceEdges(const GvdLayer& gvd) {
       continue;
     }
 
-    auto info = getFreespaceEdgeInfo(graph_,
-                                     gvd,
-                                     node_index_map_,
-                                     source,
-                                     target,
+    auto info = getFreespaceEdgeInfo(gvd,
+                                     *graph_.at(source),
+                                     node_index_map_.at(source),
+                                     *graph_.at(target),
+                                     node_index_map_.at(target),
                                      config.freespace_edges.min_clearance_m,
                                      true);
     if (!info) {
@@ -437,7 +433,37 @@ void GraphExtractor::updateFreespaceEdges(const GvdLayer& gvd) {
     }
   }
 
-  EdgeInfoMap proposed_edges;
+  auto components = graph_.connected_components();
+  if (components.size() <= 1) {
+    return;  // nothing to do
+  }
+
+  auto first_component = components.front();
+  for (size_t i = 1; i < components.size(); ++i) {
+    const auto& component = components[i];
+
+    bool inserted_edge = false;
+    for (const auto& source : component) {
+      const auto target = getBestNode(graph, source, first_component, config.freespace_edges.max_length_m);
+      if (!target || graph.has(source, *target)) {
+        continue;  // graph should never has edges connecting components, but...
+      }
+
+      const EdgeKey key(source, *target);
+      auto info = getFreespaceEdgeInfo(
+          graph, gvd, indices, key.k1, key.k2, min_clearance_m, false);
+      inserted_edge |= info != nullptr;
+      if (info) {
+        proposed_edges.emplace(key, std::move(info));
+      }
+    }
+
+    if (inserted_edge) {
+      // merge components if an edge was inserted
+      first_component.insert(first_component.end(), component.begin(), component.end());
+    }
+  }
+
   findFreespaceEdges(graph_,
                      gvd,
                      node_index_map_,

@@ -77,14 +77,6 @@ void PartialGraph<AttrT>::update(NodeId source, NodeId target, EdgeAttr&& attrs)
 }
 
 template <typename AttrT>
-void PartialGraph<AttrT>::archive(NodeId node_id) {
-  auto node = find(node_id);
-  if (node) {
-    node->attrs.reset();  // archived nodes point to nothing
-  }
-}
-
-template <typename AttrT>
 void PartialGraph<AttrT>::remove(NodeId node_id) {
   erase(nodes_.find(node_id));
 }
@@ -145,14 +137,14 @@ std::vector<uint64_t> PartialGraph<AttrT>::prune() {
   std::vector<uint64_t> pruned;
   auto iter = nodes_.begin();
   while (iter != nodes_.end()) {
-    if (iter->second.attrs) {
+    if (!iter->second.archived()) {
       ++iter;
       continue;  // skip active nodes
     }
 
     bool can_prune = true;
     for (const auto& neighbor : iter->second.neighbors) {
-      if (nodes_.at(neighbor).attrs) {
+      if (!nodes_.at(neighbor).archived()) {
         can_prune = false;
         break;
       }
