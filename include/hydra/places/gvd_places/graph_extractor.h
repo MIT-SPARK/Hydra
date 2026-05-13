@@ -50,8 +50,6 @@ class GraphExtractor {
   using LocalGraph = PartialGraph<spark_dsg::PlaceNodeAttributes>;
 
   struct Config : VerbosityConfig {
-    //! Node prefix to use
-    char prefix = 'p';
     //! Average resolution of sparse graph
     double compression_distance_m = 0.5;
     //! Minimum distance for a GVD node to be considered for compression
@@ -115,10 +113,6 @@ class GraphExtractor {
   void updateOverlapEdges();
 
   void updateFreespaceEdges(const GvdLayer& layer);
-
-  spark_dsg::NodeId toGraphId(uint64_t compressed_id) const;
-
-  uint64_t toCompressedId(spark_dsg::NodeId node_id) const;
 
  protected:
   GvdGraph gvd_;

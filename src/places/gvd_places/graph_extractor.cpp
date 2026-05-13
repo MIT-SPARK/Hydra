@@ -36,7 +36,6 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
-#include <config_utilities/types/conversions.h>
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
 #include <spark_dsg/edge_attributes.h>
@@ -51,7 +50,6 @@
 namespace hydra::places {
 
 using spark_dsg::EdgeKey;
-using spark_dsg::NearestVertexInfo;
 using spark_dsg::NodeId;
 using spark_dsg::PlaceNodeAttributes;
 using timing::ScopedTimer;
@@ -90,15 +88,10 @@ std::optional<NodeId> getBestNode(const GraphExtractor::LocalGraph& graph,
   return best_node;
 }
 
-void fillAttributes(const GvdLayer& layer,
-                    const GvdMemberInfo& info,
-                    PlaceNodeAttributes& attrs) {
+void fillAttributes(const GvdMemberInfo& info, PlaceNodeAttributes& attrs) {
   attrs.distance = info.distance;
   attrs.num_basis_points = info.num_basis_points;
   attrs.position = info.position.cast<double>();
-
-  const auto& voxel = layer.getVoxel(info.index);
-  const GlobalIndex curr_parent = voxel.parent;
 
   attrs.voxblox_mesh_connections.clear();
   for (const auto& parent_pos : info.parents) {
@@ -129,7 +122,6 @@ void declare_config(GraphExtractor::Config::FreespaceEdges& config) {
 void declare_config(GraphExtractor::Config& config) {
   using namespace config;
   name("GraphExtractor::Config");
-  field<CharConversion>(config.prefix, "prefix");
   field(config.compression_distance_m, "compression_distance_m");
   field(config.min_node_distance_m, "min_node_distance_m");
   field(config.min_edge_distance_m, "min_edge_distance_m");
@@ -156,10 +148,10 @@ void GraphExtractor::extract(uint64_t timestamp_ns,
   ScopedTimer graph_timer("places/graph_extractor", timestamp_ns);
 
   // Update the gvd graph and compression with unique voxels
-  updateGvdGraph(timestamp_ns, layer, changes);
+  updateGvdGraph(timestamp_ns, layer, tracker, changes);
 
   // Copy all the updates from the compressed GVD graph to the partial update
-  updatePartialGraph(layer, tracker);
+  updatePartialGraph(layer);
 
   // Optionally merge nearby nodes
   if (config.merge_nearby_nodes) {
@@ -224,16 +216,9 @@ void GraphExtractor::updateGvdGraph(uint64_t timestamp_ns,
       continue;
     }
 
-    gvd_.add(index, voxel->distance, voxel->num_extra_basis + 1);
+    const auto parents = tracker.parentPositions(*voxel, index);
+    gvd_.add(index, voxel->distance, voxel->num_extra_basis + 1, parents);
   }
-}
-
-NodeId GraphExtractor::toGraphId(uint64_t compressed_id) const {
-  return spark_dsg::NodeSymbol(config.prefix, compressed_id);
-}
-
-uint64_t GraphExtractor::toCompressedId(NodeId node_id) const {
-  return spark_dsg::NodeSymbol(node_id).categoryId();
 }
 
 void GraphExtractor::updatePartialGraph(const GvdLayer& layer) {
@@ -259,46 +244,52 @@ void GraphExtractor::updatePartialGraph(const GvdLayer& layer) {
 
   const auto& compressed = gvd_.compressed();
   for (const auto& [node_id, node] : compressed) {
-    const auto graph_id = toGraphId(node_id);
-    stale_nodes.erase(graph_id);
+    stale_nodes.erase(node_id);
 
     const auto result = gvd_.getCompressed(node_id, *merge_policy_);
     CHECK(result);
 
     auto attrs = std::make_unique<PlaceNodeAttributes>();
-    attrs->is_active = node.archived();
-    fillAttributes(layer, *result, *attrs);
+    attrs->is_active = !node.archived();
+    fillAttributes(*result, *attrs);
+    graph_.add(node_id, std::move(attrs));
+    node_index_map_[node_id] = result->index;
+  }
 
-    for (const auto sibling : node.siblings) {
-      const auto sibling_id = toGraphId(sibling);
+  for (const auto& [node_id, node] : compressed) {
+    const auto node_attrs = graph_.find(node_id);
+    if (!node_attrs) {
+      LOG(ERROR) << "Node " << node_id << " not in graph!";
+      continue;
+    }
+
+    for (const auto sibling_id : node.siblings) {
       const auto sibling_attrs = graph_.find(sibling_id);
       if (!sibling_attrs) {
+        LOG(ERROR) << "Sibling " << sibling_id << " not in graph!";
         continue;  // skip any unadded nodes
       }
 
       auto edge_attrs = getFreespaceEdgeInfo(layer,
-                                             *attrs,
-                                             result->index,
+                                             *node_attrs,
+                                             node_index_map_.at(node_id),
                                              *sibling_attrs,
                                              node_index_map_.at(sibling_id),
                                              config.min_edge_distance_m,
                                              !sibling_attrs->is_active);
       if (!edge_attrs) {
-        graph_.remove(graph_id, sibling_id);
+        graph_.remove(node_id, sibling_id);
         continue;
       }
 
-      stale_edges.erase({graph_id, sibling_id});
-      graph_.add(graph_id, sibling_id, std::move(edge_attrs));
+      graph_.add(node_id, sibling_id, std::move(edge_attrs));
 
       // override heuristic edges with actual graph edges
-      const EdgeKey key(graph_id, sibling_id);
+      const EdgeKey key(node_id, sibling_id);
+      stale_edges.erase(key);
       overlap_edges_.erase(key);
       freespace_edges_.erase(key);
     }
-
-    graph_.add(graph_id, std::move(attrs));
-    node_index_map_[graph_id] = result->index;
   }
 
   for (const auto& node_id : stale_nodes) {

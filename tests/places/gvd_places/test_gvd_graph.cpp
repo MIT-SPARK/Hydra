@@ -428,14 +428,14 @@ TEST(GvdGraph, AttributeAssignmentOneToOne) {
 
   const BasisPointMergePolicy policy;
   const auto info_0 = gvd.getCompressed(0, policy);
-  ASSERT_TRUE(info_0.info);
+  ASSERT_TRUE(info_0);
   const auto info_1 = gvd.getCompressed(1, policy);
-  ASSERT_TRUE(info_1.info);
+  ASSERT_TRUE(info_1);
 
-  EXPECT_EQ(info_0.info->distance, 0.2);
-  EXPECT_EQ(info_0.info->num_basis_points, 5u);
-  EXPECT_EQ(info_1.info->distance, 0.3);
-  EXPECT_EQ(info_1.info->num_basis_points, 3u);
+  EXPECT_EQ(info_0->distance, 0.2);
+  EXPECT_EQ(info_0->num_basis_points, 5u);
+  EXPECT_EQ(info_1->distance, 0.3);
+  EXPECT_EQ(info_1->num_basis_points, 3u);
 }
 
 // check that merge policy and compressed node works together
@@ -458,9 +458,9 @@ TEST(GvdGraph, AttributeAssignmentManyToOne) {
   const auto info_0 = gvd.getCompressed(0, policy);
 
   // note that this relies on active being checked before archived
-  ASSERT_TRUE(info_0.info);
-  EXPECT_EQ(info_0.info->distance, 0.4);
-  EXPECT_EQ(info_0.info->num_basis_points, 5u);
+  ASSERT_TRUE(info_0);
+  EXPECT_EQ(info_0->distance, 0.4);
+  EXPECT_EQ(info_0->num_basis_points, 5u);
 }
 
 // test that merge clusters doesn't throw an error

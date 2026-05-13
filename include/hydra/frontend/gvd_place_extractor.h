@@ -54,6 +54,8 @@ class GvdPlaceExtractor {
                           const places::GraphExtractor&>;
 
   struct Config : VerbosityConfig {
+    //! Node prefix to use
+    char prefix = 'p';
     //! Target layer to add places
     std::string layer = spark_dsg::DsgLayers::PLACES;
     //! GVD integrator from TSDF

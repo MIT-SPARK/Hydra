@@ -36,6 +36,7 @@
 
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
+#include <config_utilities/types/conversions.h>
 #include <config_utilities/validation.h>
 #include <spark_dsg/graph_utilities.h>
 #include <spark_dsg/printing.h>
@@ -49,6 +50,7 @@ using places::GraphExtractor;
 using places::GvdIntegrator;
 using spark_dsg::DsgLayers;
 using spark_dsg::NodeId;
+using spark_dsg::NodeSymbol;
 using spark_dsg::PlaceNodeAttributes;
 using spark_dsg::SceneGraph;
 using spark_dsg::SceneGraphLayer;
@@ -89,6 +91,7 @@ void declare_config(GvdPlaceExtractor::Config& config) {
   using namespace config;
   name("GvdPlaceExtractor::Config");
   base<VerbosityConfig>(config);
+  field<CharConversion>(config.prefix, "prefix");
   field(config.layer, "layer");
   field(config.gvd, "gvd");
   field(config.graph, "graph");
@@ -170,36 +173,36 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
   MLOG(1) << "Considering " << places.nodes().size() << " input place nodes ";
 
   for (const auto node_id : places.deleted_nodes()) {
-    graph.removeNode(node_id);
+    graph.removeNode(NodeSymbol(config.prefix, node_id));
   }
 
   for (const auto& key : places.deleted_edges()) {
-    graph.removeEdge(key.k1, key.k2);
+    graph.removeEdge(NodeSymbol(config.prefix, key.k1),
+                     NodeSymbol(config.prefix, key.k2));
   }
 
   std::set<NodeId> active_neighborhood;
   for (const auto& [node_id, node] : places) {
+    const NodeSymbol graph_id(config.prefix, node_id);
     const auto& attrs = node.attributes();
-    if (!attrs.is_active) {  // fully archived node
-      graph.getNode(node_id).attributes().is_active = false;
-      continue;
-    }
-
     if (attributesInvalid(attrs)) {
-      LOG(ERROR) << "Invalid place node " << spark_dsg::NodeSymbol(node_id).str();
-      graph.removeNode(node_id);
+      LOG(ERROR) << "Invalid place node " << graph_id.str();
+      graph.removeNode(graph_id);
       continue;
     }
 
-    active_neighborhood.insert(node_id);
     auto new_attrs = attrs.clone();
-    new_attrs->is_active = true;
     new_attrs->last_update_time_ns = timestamp_ns;
-    graph.addOrUpdateNode(config.layer, node_id, std::move(new_attrs));
+    graph.addOrUpdateNode(config.layer, graph_id, std::move(new_attrs));
+    if (attrs.is_active) {
+      active_neighborhood.insert(graph_id);
+    }
   }
 
   for (const auto& [key, info] : places.edges()) {
-    graph.addOrUpdateEdge(key.k1, key.k2, info->clone());
+    graph.addOrUpdateEdge(NodeSymbol(config.prefix, key.k1),
+                          NodeSymbol(config.prefix, key.k2),
+                          info->clone());
   }
 
   filterIsolated(graph, active_neighborhood);

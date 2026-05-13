@@ -36,6 +36,8 @@
 
 #include <glog/logging.h>
 
+#include <deque>
+
 namespace hydra::places {
 
 using Node = GvdGraph::Node;

@@ -67,6 +67,8 @@ frontend:
       min_edge_distance_m: 0.25
       node_merge_distance_m: 0.7
       merge_policy: distance
+      overlap_edges: {enable: false}
+      freespace_edges: {enable: false}
     tsdf_interpolator:
       type: downsample
       ratio: 2

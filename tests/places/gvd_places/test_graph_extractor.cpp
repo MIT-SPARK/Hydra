@@ -40,7 +40,6 @@
 namespace hydra::places {
 
 using spark_dsg::NodeId;
-using spark_dsg::operator""_id;
 
 namespace {
 
@@ -65,8 +64,8 @@ class TestGraphExtractor : public GraphExtractor {
 
   void update(const GlobalIndexSet& removed = {}) {
     VoxelIndexChanges changes{{}, removed};
-    updateGvdGraph(0, gvd_layer, changes);   // this propagates archives and deletions
-    updatePartialGraph(gvd_layer, tracker);  // this builds the graph
+    updateGvdGraph(0, gvd_layer, tracker, changes);  // this propagates gvd changes
+    updatePartialGraph(gvd_layer);                   // this builds the graph
   }
 
   void addNode(uint64_t x, uint64_t y, uint64_t z, double distance, uint8_t basis) {
@@ -127,7 +126,7 @@ TEST(GraphExtractor, VoxelDeletion) {
   {  // scope after a normal update: remapping should exist as expected
     const GvdGraph::NodeRemapping expected{{0, 0}, {1, 1}, {2, 1}, {3, 0}, {4, 1}};
     EXPECT_EQ(gvd.remapping(), expected);
-    checkNode(places, "p0"_id, Eigen::Vector3d(0.5, 1.5, 0.5), 0.4, 5u);
+    checkNode(places, 0, Eigen::Vector3d(0.5, 1.5, 0.5), 0.4, 5u);
   }
 
   extractor.update({{0, 1, 0}});
@@ -138,7 +137,7 @@ TEST(GraphExtractor, VoxelDeletion) {
   {  // scope after deleting one gvd member of p0: p0 attributes should update
     const GvdGraph::NodeRemapping expected{{0, 0}, {1, 1}, {2, 1}, {4, 1}};
     EXPECT_EQ(gvd.remapping(), expected);
-    checkNode(places, "p0"_id, Eigen::Vector3d(0.5, 0.5, 1.5), 0.1, 1u);
+    checkNode(places, 0, Eigen::Vector3d(0.5, 0.5, 1.5), 0.1, 1u);
   }
 
   extractor.update({{0, 0, 1}});
@@ -146,7 +145,7 @@ TEST(GraphExtractor, VoxelDeletion) {
   EXPECT_EQ(gvd.uncompressed().size(), 3u);
   EXPECT_EQ(numArchived(places), 0u);
   EXPECT_EQ(places.num_nodes(), 1u);
-  EXPECT_FALSE(places.has("p0"_id));
+  EXPECT_FALSE(places.has(0));
 
   ASSERT_TRUE(gvd.compressed().count(1));
   EXPECT_TRUE(gvd.compressed().at(1).siblings.empty());
@@ -160,7 +159,7 @@ TEST(GraphExtractor, VoxelDeletion) {
   {  // scope after re-adding one gvd member of p0
     const GvdGraph::NodeRemapping expected{{3, 2}, {1, 1}, {2, 1}, {4, 1}};
     EXPECT_EQ(gvd.remapping(), expected);
-    checkNode(places, "p2"_id, Eigen::Vector3d(0.5, 0.5, 1.5), 0.1, 1u);
+    checkNode(places, 2, Eigen::Vector3d(0.5, 0.5, 1.5), 0.1, 1u);
   }
 }
 
@@ -185,7 +184,7 @@ TEST(GraphExtractor, VoxelArchival) {
   {  // scope after a normal update: remapping should exist as expected
     const GvdGraph::NodeRemapping expected{{0, 0}, {1, 1}, {2, 1}, {3, 0}, {4, 1}};
     EXPECT_EQ(gvd.remapping(), expected);
-    checkNode(places, "p0"_id, Eigen::Vector3d(0.5, 1.5, 0.5), 0.4, 5u);
+    checkNode(places, 0, Eigen::Vector3d(0.5, 1.5, 0.5), 0.4, 5u);
   }
 
   // this should force the voxel attributes to flip to 0, 0, 1 for p0
@@ -199,7 +198,7 @@ TEST(GraphExtractor, VoxelArchival) {
   {  // scope after archiving one gvd member of p0: p0 attributes should update
     const GvdGraph::NodeRemapping expected{{0, 0}, {1, 1}, {2, 1}, {3, 0}, {4, 1}};
     EXPECT_EQ(gvd.remapping(), expected);
-    checkNode(places, "p0"_id, Eigen::Vector3d(0.5, 0.5, 1.5), 0.1, 6u);
+    checkNode(places, 0, Eigen::Vector3d(0.5, 0.5, 1.5), 0.1, 6u);
   }
 
   extractor.archiveIndex(GlobalIndex(0, 0, 1));
