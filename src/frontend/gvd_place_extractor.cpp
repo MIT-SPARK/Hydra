@@ -91,7 +91,7 @@ void declare_config(GvdPlaceExtractor::Config& config) {
   using namespace config;
   name("GvdPlaceExtractor::Config");
   base<VerbosityConfig>(config);
-  field<CharConversion>(config.prefix, "prefix");
+  field<CharConversion>(config.node_prefix, "node_prefix");
   field(config.layer, "layer");
   field(config.gvd, "gvd");
   field(config.graph, "graph");
@@ -173,17 +173,17 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
   MLOG(1) << "Considering " << places.nodes().size() << " input place nodes ";
 
   for (const auto node_id : places.deleted_nodes()) {
-    graph.removeNode(NodeSymbol(config.prefix, node_id));
+    graph.removeNode(NodeSymbol(config.node_prefix, node_id));
   }
 
   for (const auto& key : places.deleted_edges()) {
-    graph.removeEdge(NodeSymbol(config.prefix, key.k1),
-                     NodeSymbol(config.prefix, key.k2));
+    graph.removeEdge(NodeSymbol(config.node_prefix, key.k1),
+                     NodeSymbol(config.node_prefix, key.k2));
   }
 
   std::set<NodeId> active_neighborhood;
   for (const auto& [node_id, node] : places) {
-    const NodeSymbol graph_id(config.prefix, node_id);
+    const NodeSymbol graph_id(config.node_prefix, node_id);
     const auto& attrs = node.attributes();
     if (attributesInvalid(attrs)) {
       LOG(ERROR) << "Invalid place node " << graph_id.str();
@@ -200,8 +200,8 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
   }
 
   for (const auto& [key, info] : places.edges()) {
-    graph.addOrUpdateEdge(NodeSymbol(config.prefix, key.k1),
-                          NodeSymbol(config.prefix, key.k2),
+    graph.addOrUpdateEdge(NodeSymbol(config.node_prefix, key.k1),
+                          NodeSymbol(config.node_prefix, key.k2),
                           info->clone());
   }
 

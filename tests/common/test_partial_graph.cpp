@@ -160,4 +160,27 @@ TEST(PartialGraph, PruneGraph) {
   EXPECT_TRUE(graph.deleted_edges().empty());
 }
 
+TEST(PartialGraph, ContractCorrect) {
+  TestGraph graph;
+  graph.add(5, 6);
+  graph.add(6, 7);
+  graph.add(7, 8);
+
+  graph.contract(6, 7);
+
+  EXPECT_EQ(graph.num_nodes(), 3u);
+  EXPECT_EQ(graph.num_edges(), 2u);
+  EXPECT_TRUE(graph.has(5));
+  EXPECT_TRUE(graph.has(7));
+  EXPECT_TRUE(graph.has(8));
+
+  std::set<NodeId> expected;
+  expected = {7};
+  EXPECT_EQ(graph.neighbors(5), expected);
+  expected = {5, 8};
+  EXPECT_EQ(graph.neighbors(7), expected);
+  expected = {7};
+  EXPECT_EQ(graph.neighbors(8), expected);
+}
+
 }  // namespace hydra

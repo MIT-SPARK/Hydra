@@ -251,7 +251,6 @@ void GraphExtractor::updatePartialGraph(const GvdLayer& layer) {
   const auto& compressed = gvd_.compressed();
   for (const auto& [node_id, node] : compressed) {
     stale_nodes.erase(node_id);
-
     const auto result = gvd_.getCompressed(node_id, *merge_policy_);
     CHECK(result);
 
@@ -260,6 +259,7 @@ void GraphExtractor::updatePartialGraph(const GvdLayer& layer) {
     fillAttributes(*result, *attrs);
     graph_.add(node_id, std::move(attrs));
     node_index_map_[node_id] = result->index;
+    node_attribute_map_[node_id] = result;
   }
 
   for (const auto& [node_id, node] : compressed) {
@@ -301,6 +301,7 @@ void GraphExtractor::updatePartialGraph(const GvdLayer& layer) {
   for (const auto& node_id : stale_nodes) {
     graph_.remove(node_id);
     node_index_map_.erase(node_id);
+    node_attribute_map_.erase(node_id);
   }
 
   for (const auto& key : stale_edges) {
@@ -309,35 +310,30 @@ void GraphExtractor::updatePartialGraph(const GvdLayer& layer) {
 }
 
 void GraphExtractor::mergeNearbyNodes() {
-  /*
   std::unordered_map<uint64_t, uint64_t> merges;
   std::unordered_map<uint64_t, std::unordered_set<uint64_t>> reversed_merges;
-  for (const auto& compressed_id : compressed_.updated) {
-    if (merges.count(compressed_id)) {
-      continue;
+  for (const auto& [node_id, node] : gvd_.compressed()) {
+    if (merges.count(node_id) || node.archived()) {
+      continue;  // skip already merged or archived nodes
     }
 
-    const auto& info = compressed_.nodes.at(compressed_id);
-    if (!info.in_graph) {
-      continue;
-    }
-
-    for (const auto sibling_id : info.siblings) {
-      const auto& sibling_info = compressed_.nodes.at(sibling_id);
-      if (!sibling_info.in_graph) {
+    const auto node_info = node_attribute_map_.at(node_id);
+    for (const auto sibling_id : node.siblings) {
+      const auto& sibling = gvd_.compressed().at(sibling_id);
+      if (sibling.archived()) {
         continue;
       }
 
-      const auto gvd1 = gvd_.getNode(info.best_gvd_id);
-      const auto gvd2 = gvd_.getNode(sibling_info.best_gvd_id);
-      if ((gvd1->position - gvd2->position).norm() > config.node_merge_distance_m) {
+      const auto sibling_info = node_attribute_map_.at(sibling_id);
+      const auto dist = (node_info->position - sibling_info->position).norm();
+      if (dist > config.node_merge_distance_m) {
         continue;
       }
 
       // assign merge to the node with the most basis points
-      const auto lhs_is_better = merge_policy_->compare(*gvd1, *gvd2);
-      const auto from_node = lhs_is_better >= 0 ? sibling_id : compressed_id;
-      auto to_node = lhs_is_better >= 0 ? compressed_id : sibling_id;
+      const auto lhs_is_better = merge_policy_->compare(*node_info, *sibling_info);
+      const auto from_node = lhs_is_better >= 0 ? sibling_id : node_id;
+      auto to_node = lhs_is_better >= 0 ? node_id : sibling_id;
 
       auto iter = merges.find(to_node);
       to_node = (iter == merges.end()) ? to_node : iter->second;
@@ -365,12 +361,9 @@ void GraphExtractor::mergeNearbyNodes() {
   }
 
   for (const auto& [from, to] : merges) {
-    compressed_.nodes.at(from).in_graph = false;
-    const NodeSymbol to_merge(config.prefix, from);
-    node_index_map_.erase(to_merge);
-    graph_.contract(to_merge, NodeSymbol(config.prefix, to));
+    node_index_map_.erase(from);
+    graph_.contract(from, to);
   }
-  */
 }
 
 void GraphExtractor::updateOverlapEdges() {

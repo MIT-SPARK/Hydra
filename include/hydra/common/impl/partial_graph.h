@@ -205,8 +205,12 @@ void PartialGraph<AttrT>::contract(NodeId from, NodeId to) {
   }
 
   for (const auto& neighbor : iter->second.neighbors) {
+    if (neighbor == to) {
+      continue;
+    }
+
     if (!edges_.count(spark_dsg::EdgeKey{to, neighbor})) {
-      add(to, neighbor, std::move(edges_.find(from, neighbor)->info));
+      add(to, neighbor, std::move(edges_.at({from, neighbor})));
     }
   }
 

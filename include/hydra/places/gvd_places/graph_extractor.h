@@ -119,6 +119,7 @@ class GraphExtractor {
   LocalGraph graph_;
   std::unique_ptr<MergePolicy> merge_policy_;
 
+  std::unordered_map<uint64_t, const GvdMemberInfo*> node_attribute_map_;
   std::unordered_map<spark_dsg::NodeId, GlobalIndex> node_index_map_;
   std::set<spark_dsg::EdgeKey> overlap_edges_;
   std::set<spark_dsg::EdgeKey> freespace_edges_;
