@@ -54,8 +54,6 @@ class TestGraphExtractor : public GraphExtractor {
       voxel.distance = 0.3;
       voxel.num_extra_basis = 4;
     }
-
-    tracker.markNewGvdParent(gvd_layer, GlobalIndex(0, 0, 0));
   }
 
   ~TestGraphExtractor() = default;
@@ -71,7 +69,11 @@ class TestGraphExtractor : public GraphExtractor {
   void addNode(uint64_t x, uint64_t y, uint64_t z, double distance, uint8_t basis) {
     const GlobalIndex index(x, y, z);
     gvd_.add(index, distance, basis);
-    tracker.parents[index] = {GlobalIndex(0, 0, 0)};
+    GvdVoxel voxel;
+    voxel.has_parent = true;
+    voxel.parent = GlobalIndex(0, 0, 0);
+    voxel.parent_pos = Point::Zero();
+    tracker.add(voxel, index);
   }
 
   GvdLayer gvd_layer;

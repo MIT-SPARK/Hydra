@@ -40,28 +40,36 @@ namespace hydra::places {
 // forward declare to avoid header
 struct VoronoiCheckConfig;
 
-struct GvdVertexInfo {
+struct BasisPointInfo {
+  GlobalIndex index;
   Point pos;
-  size_t ref_count = 0;
+
+  struct Hash {
+    int operator()(const BasisPointInfo& info) const {
+      return spatial_hash::IndexHash()(info.index);
+    }
+  };
 };
 
+inline bool operator==(const BasisPointInfo& lhs, const BasisPointInfo& rhs) {
+  return lhs.index == rhs.index;
+}
+
+using BasisPointSet = std::unordered_set<BasisPointInfo, BasisPointInfo::Hash>;
+
 struct GvdParentTracker {
-  uint8_t updateGvdParentMap(const GvdLayer& layer,
-                             const VoronoiCheckConfig& config,
-                             const GlobalIndex& voxel_index,
-                             const GvdVoxel& neighbor);
+  bool add(const GvdVoxel& voxel, const GlobalIndex& parent);
 
-  void markNewGvdParent(const GvdLayer& layer, const GlobalIndex& parent);
+  uint8_t add_unique(const VoronoiCheckConfig& config,
+                     const GlobalIndex& voxel_index,
+                     const GvdVoxel& neighbor);
 
-  void removeVoronoiFromGvdParentMap(const GlobalIndex& voxel_index);
+  void erase(const GlobalIndex& voxel_index);
 
-  void updateVertexMapping(const GvdLayer& layer);
+  std::vector<Point> parents(const GlobalIndex& index) const;
 
-  std::vector<Point> parentPositions(const GvdVoxel& voxel,
-                                     const GlobalIndex& index) const;
-
-  GlobalIndexMap<GlobalIndexSet> parents;
-  GlobalIndexMap<GvdVertexInfo> parent_vertices;
+ private:
+  GlobalIndexMap<BasisPointSet> parents_;
 };
 
 }  // namespace hydra::places

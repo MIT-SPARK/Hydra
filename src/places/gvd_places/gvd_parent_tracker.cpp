@@ -46,120 +46,53 @@ const static Eigen::IOFormat fmt(
 
 }
 
-uint8_t GvdParentTracker::updateGvdParentMap(const GvdLayer& layer,
-                                             const VoronoiCheckConfig& config,
-                                             const GlobalIndex& voxel_index,
-                                             const GvdVoxel& neighbor) {
-  if (!parents.count(voxel_index)) {
-    parents[voxel_index] = GlobalIndexSet();
+bool GvdParentTracker::add(const GvdVoxel& voxel, const GlobalIndex& index) {
+  if (!voxel.has_parent) {
+    return false;
   }
 
-  uint8_t curr_extra_basis = parents[voxel_index].size();
-  for (const auto& other_parent : parents[voxel_index]) {
-    const bool is_unique =
-        isParentUnique(config, voxel_index, other_parent, neighbor.parent);
+  bool is_new = false;
+  auto iter = parents_.find(index);
+  if (iter == parents_.end()) {
+    iter = parents_.emplace(index, BasisPointSet{}).first;
+    is_new = true;
+  }
+
+  iter->second.insert({voxel.parent, voxel.parent_pos});
+  return is_new;
+}
+
+uint8_t GvdParentTracker::add_unique(const VoronoiCheckConfig& config,
+                                     const GlobalIndex& voxel,
+                                     const GvdVoxel& neighbor) {
+  auto& curr_parents = parents_.at(voxel);
+
+  uint8_t curr_extra_basis = curr_parents.size();
+  for (const auto& other : curr_parents) {
+    const bool is_unique = isParentUnique(config, voxel, other.index, neighbor.parent);
     if (!is_unique) {
       return curr_extra_basis;
     }
   }
 
   // parent is unique enough
-  parents[voxel_index].insert(neighbor.parent);
-  markNewGvdParent(layer, neighbor.parent);
+  curr_parents.insert({neighbor.parent, neighbor.parent_pos});
   return curr_extra_basis + 1;
 }
 
-void GvdParentTracker::markNewGvdParent(const GvdLayer& layer,
-                                        const GlobalIndex& parent) {
-  if (parent_vertices.count(parent)) {
-    // make sure the parent vertex map stays alive for this gvd member
-    parent_vertices[parent].ref_count++;
-    return;
-  }
-
-  const auto* parent_voxel = layer.getVoxelPtr(parent);
-  if (!parent_voxel || !parent_voxel->on_surface) {
-    // we can't do anything for parents that have left the active mesh before being used
-    // as a GVD parent, or parents that aren't registered to the mesh
-    return;
-  }
-
-  GvdVertexInfo info;
-  info.ref_count = 1;
-  info.pos = parent_voxel->parent_pos;
-
-  parent_vertices[parent] = info;
+void GvdParentTracker::erase(const GlobalIndex& voxel_index) {
+  parents_.erase(voxel_index);
 }
 
-void GvdParentTracker::removeVoronoiFromGvdParentMap(const GlobalIndex& voxel_index) {
-  auto voxel_parents = parents.find(voxel_index);
-  if (voxel_parents == parents.end()) {
-    return;
-  }
-
-  for (const auto& parent : voxel_parents->second) {
-    if (parent_vertices.count(parent)) {
-      // decrement the ref count (we garbage collect later to avoid losing parents
-      // due to thrashing)
-      parent_vertices[parent].ref_count--;
-    }
-  }
-
-  parents.erase(voxel_parents);
-}
-
-void GvdParentTracker::updateVertexMapping(const GvdLayer& layer) {
-  auto iter = parent_vertices.begin();
-  while (iter != parent_vertices.end()) {
-    if (!iter->second.ref_count) {
-      iter = parent_vertices.erase(iter);
-      continue;
-    }
-
-    const auto* voxel = layer.getVoxelPtr(static_cast<GlobalIndex>(iter->first));
-    if (!voxel) {
-      ++iter;
-      continue;
-    }
-
-    if (!voxel->on_surface) {
-      iter = parent_vertices.erase(iter);
-      continue;
-    }
-
-    iter->second.pos = voxel->parent_pos;
-    ++iter;
-  }
-}
-
-std::vector<Point> GvdParentTracker::parentPositions(const GvdVoxel& voxel,
-                                                     const GlobalIndex& index) const {
-  auto iter = parents.find(index);
-  if (iter == parents.end()) {
+std::vector<Point> GvdParentTracker::parents(const GlobalIndex& index) const {
+  auto iter = parents_.find(index);
+  if (iter == parents_.end()) {
     return {};
   }
 
   std::vector<Point> to_return;
-  auto parent_iter = parent_vertices.find(voxel.parent);
-  if (parent_iter == parent_vertices.end()) {
-    LOG(ERROR) << "voxel " << voxel << " @ " << index.format(fmt)
-               << " has untracked parent @ " << voxel.parent.format(fmt);
-    throw std::runtime_error("Invalid parent tracker state!");
-  }
-
-  to_return.push_back(parent_iter->second.pos);
-
-  // save all other basis points
-  for (const auto& parent : iter->second) {
-    parent_iter = parent_vertices.find(parent);
-    if (parent_iter == parent_vertices.end()) {
-      LOG(ERROR) << "voxel " << voxel << " @ " << index.format(fmt)
-                 << " has basis point " << parent.format(fmt)
-                 << " missing from tracker!";
-      throw std::runtime_error("Invalid parent tracker state!");
-    }
-
-    to_return.push_back(parent_iter->second.pos);
+  for (const auto& basis_point : iter->second) {
+    to_return.push_back(basis_point.pos);
   }
 
   return to_return;

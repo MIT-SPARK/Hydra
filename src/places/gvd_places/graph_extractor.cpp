@@ -216,7 +216,13 @@ void GraphExtractor::updateGvdGraph(uint64_t timestamp_ns,
       continue;
     }
 
-    const auto parents = tracker.parentPositions(*voxel, index);
+    const auto parents = tracker.parents(index);
+    if (parents.empty()) {
+      LOG(ERROR) << "Invalid GVD voxel with no parents: " << *voxel << " @ "
+                 << showIndex(index);
+      continue;
+    }
+
     gvd_.add(index, voxel->distance, voxel->num_extra_basis + 1, parents);
   }
 }
