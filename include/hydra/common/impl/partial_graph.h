@@ -204,6 +204,10 @@ void PartialGraph<AttrT>::contract(NodeId from, NodeId to) {
     return;
   }
 
+  if (!nodes_.count(to)) {
+    return;
+  }
+
   for (const auto& neighbor : iter->second.neighbors) {
     if (neighbor == to) {
       continue;

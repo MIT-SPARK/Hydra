@@ -171,6 +171,7 @@ void GraphExtractor::prune() {
   MLOG(2) << "Cleared graph nodes [" << archived_node_ids << "]";
   for (const auto& node_id : archived_node_ids) {
     node_index_map_.erase(node_id);
+    node_attribute_map_.erase(node_id);
   }
 }
 
@@ -361,7 +362,6 @@ void GraphExtractor::mergeNearbyNodes() {
   }
 
   for (const auto& [from, to] : merges) {
-    node_index_map_.erase(from);
     graph_.contract(from, to);
   }
 }
