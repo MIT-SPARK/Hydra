@@ -4,8 +4,6 @@
 #include <spark_dsg/scene_graph_types.h>
 #include <spatial_hash/neighbor_utils.h>
 
-#include <algorithm>
-
 #define PCL_NO_PRECOMPILE
 #include <pcl/ModelCoefficients.h>
 #include <pcl/common/centroid.h>
@@ -24,7 +22,6 @@
 
 #include <queue>
 
-#include "hydra/common/config_utilities.h"
 #include "hydra/common/global_info.h"
 #include "hydra/frontend/frontier_extractor.h"
 #include "hydra/reconstruction/voxel_types.h"
@@ -185,20 +182,12 @@ std::vector<std::pair<Eigen::Vector3d, double>> getPlacesForBlock(
   return center_dists;
 }
 
-void processBlock(NearestNodeFinder& finder,
-                  const TsdfLayer& tsdf,
+void processBlock(const TsdfLayer& tsdf,
                   const BlockIndex& block_index,
-                  const bool block_is_archived,
-                  const DynamicSceneGraph& graph,
-                  const std::vector<NodeId>& archived_places,
-                  const double max_place_radius,
                   const double min_frontier_z,
                   const double max_frontier_z,
                   const bool skip_adding_frontiers,
-                  IndexSet& skip_add_blocks,
-                  std::queue<BlockIndex>& extra_blocks,
-                  SpatialCloud::Ptr cloud,
-                  SpatialCloud::Ptr archived_cloud) {
+                  SpatialCloud::Ptr cloud) {
   const size_t voxels_per_block = std::pow(tsdf.voxels_per_side, 3);
 
   const auto tsdf_block = tsdf.getBlockPtr(block_index);
@@ -222,7 +211,7 @@ void processBlock(NearestNodeFinder& finder,
     const spatial_hash::NeighborSearch search(26);
     for (const auto& neighbor : search.neighborIndices(voxel_index)) {
       if (neighbor.array().minCoeff() < 0 ||
-          neighbor.array().maxCoeff() >= tsdf.voxels_per_side) {
+          neighbor.array().maxCoeff() >= static_cast<int>(tsdf.voxels_per_side)) {
         continue;
       }
       const size_t vn =
@@ -349,41 +338,14 @@ void FrontierExtractor::detectFrontiers(const ActiveWindowOutput& input,
     std::queue<BlockIndex> extra_blocks;
     IndexSet processed_extra_blocks;
     for (const auto& idx : tsdf_->allocatedBlockIndices()) {
-      processBlock(*place_finder_,
-                   *tsdf_,
-                   idx,
-                   just_archived_blocks_.count(idx),
-                   graph,
-                   archived_places_,
-                   config.max_place_radius,
-                   min_frontier_z,
-                   max_frontier_z,
-                   false,
-                   processed_extra_blocks,
-                   extra_blocks,
-                   cloud,
-                   archived_cloud);
+      processBlock(*tsdf_, idx, min_frontier_z, max_frontier_z, false, cloud);
     }
 
     while (!extra_blocks.empty()) {
       BlockIndex bix = extra_blocks.front();
       extra_blocks.pop();
-      bool skip_adding_frontiers = recently_archived_blocks_.count(bix);
-
-      processBlock(*place_finder_,
-                   *tsdf_,
-                   bix,
-                   just_archived_blocks_.count(bix),
-                   graph,
-                   archived_places_,
-                   config.max_place_radius,
-                   min_frontier_z,
-                   max_frontier_z,
-                   skip_adding_frontiers,
-                   processed_extra_blocks,
-                   extra_blocks,
-                   cloud,
-                   archived_cloud);
+      const bool skip_add = recently_archived_blocks_.count(bix);
+      processBlock(*tsdf_, bix, min_frontier_z, max_frontier_z, skip_add, cloud);
     }
   }
 
@@ -394,7 +356,6 @@ void FrontierExtractor::detectFrontiers(const ActiveWindowOutput& input,
     computeSparseFrontiers(archived_cloud, *tsdf_, archived_frontiers_);
   }
 
-  archived_places_.clear();
   just_archived_blocks_.clear();
 }
 
@@ -465,10 +426,6 @@ void FrontierExtractor::updateRecentBlocks(const Eigen::Vector3d& current_pos,
       ++iter;
     }
   }
-}
-
-void FrontierExtractor::setArchivedPlaces(const std::vector<NodeId>& archived_places) {
-  archived_places_ = archived_places;
 }
 
 void declare_config(FrontierExtractor::Config& config) {

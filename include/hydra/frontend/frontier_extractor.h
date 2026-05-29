@@ -68,14 +68,11 @@ class FrontierExtractor {
 
   void addFrontiers(const uint64_t timestamp_ns, DynamicSceneGraph& graph);
 
-  void setArchivedPlaces(const std::vector<NodeId>& archived_places);
-
  private:
   NodeSymbol next_node_id_;
   std::vector<std::pair<NodeId, BlockIndex>> nodes_to_remove_;
 
   TsdfLayer::Ptr tsdf_;
-  std::vector<NodeId> archived_places_;
   spatial_hash::IndexSet just_archived_blocks_;
   spatial_hash::IndexSet recently_archived_blocks_;
   std::unique_ptr<VolumetricWindow> map_window_;

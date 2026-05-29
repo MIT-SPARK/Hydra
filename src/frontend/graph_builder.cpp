@@ -549,10 +549,6 @@ void GraphBuilder::updatePlaces(const ActiveWindowOutput& input) {
       lcd_input_->archived_places.insert(archived_places.begin(),
                                          archived_places.end());
     }
-
-    if (frontier_places_) {
-      frontier_places_->setArchivedPlaces(archived_places);
-    }
   }  // end graph update critical section
 }
 
