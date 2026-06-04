@@ -112,8 +112,9 @@ GvdGraph::GvdGraph(float voxel_resolution_m, float compression_resolution_m)
 void GvdGraph::add(const GlobalIndex& vindex,
                    double distance,
                    uint8_t basis,
-                   const std::vector<Point>& parents) {
-  auto node = add_uncompressed(vindex, distance, basis, parents);
+                   const std::vector<Point>& parents,
+                   uint64_t timestamp) {
+  auto node = add_uncompressed(vindex, distance, basis, parents, timestamp);
   if (!node) {
     return;
   }
@@ -369,13 +370,15 @@ uint64_t GvdGraph::next_compressed_id() {
 Node* GvdGraph::add_uncompressed(const GlobalIndex& index,
                                  double dist,
                                  uint8_t basis,
-                                 const std::vector<Point>& parents) {
+                                 const std::vector<Point>& parents,
+                                 uint64_t timestamp) {
   auto iter = uncompressed_index_map_.find(index);
   if (iter != uncompressed_index_map_.end()) {
     auto& node = uncompressed_.at(iter->second);
     node.info.distance = dist;
     node.info.num_basis_points = basis;
     node.info.parents = parents;
+    node.info.last_updated = timestamp;
     return nullptr;
   }
 
@@ -385,7 +388,9 @@ Node* GvdGraph::add_uncompressed(const GlobalIndex& index,
   uncompressed_index_map_.emplace(index, id);
 
   auto niter =
-      uncompressed_.emplace(id, Node{id, {dist, basis, pos, index, parents}, {}}).first;
+      uncompressed_
+          .emplace(id, Node{id, {dist, basis, pos, index, parents, timestamp}, {}})
+          .first;
   return &niter->second;
 }
 

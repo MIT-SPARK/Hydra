@@ -175,10 +175,9 @@ void GraphExtractor::prune() {
   }
 }
 
-void GraphExtractor::validate(const GvdLayer& layer,
-                              const BlockIndices& archived_blocks) const {
-  spatial_hash::IndexSet to_check(archived_blocks.begin(), archived_blocks.end());
-
+void GraphExtractor::validate(uint64_t timestamp_ns,
+                              const GvdLayer& layer,
+                              const BlockIndices& /* archived_blocks */) const {
   std::vector<uint64_t> invalid_nodes;
   for (const auto& [node_id, node] : gvd_.uncompressed()) {
     if (node.archived) {
@@ -190,9 +189,15 @@ void GraphExtractor::validate(const GvdLayer& layer,
       const auto block_idx =
           spatial_hash::blockIndexFromGlobalIndex(node.info.index, 16);
       LOG(ERROR) << "Invalid node " << node_id << " is in block "
-                 << showIndex(block_idx) << " that "
-                 << (to_check.count(block_idx) ? "was" : "was not")
-                 << " in archived blocks";
+                 << showIndex(block_idx) << " (last updated at "
+                 << node.info.last_updated << " vs. " << timestamp_ns << ")";
+      invalid_nodes.push_back(node_id);
+      continue;
+    }
+
+    if (!voxel->num_extra_basis) {
+      LOG(ERROR) << "Invalid node " << node_id << " does not point to gvd voxel "
+                 << *voxel;
       invalid_nodes.push_back(node_id);
     }
   }
@@ -224,7 +229,7 @@ void GraphExtractor::updateGvdGraph(uint64_t timestamp_ns,
       continue;
     }
 
-    gvd_.add(index, voxel->distance, voxel->num_extra_basis + 1, parents);
+    gvd_.add(index, voxel->distance, voxel->num_extra_basis + 1, parents, timestamp_ns);
   }
 }
 

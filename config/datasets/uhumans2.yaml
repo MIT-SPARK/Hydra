@@ -20,7 +20,7 @@ frontend:
     min_cluster_size: 40
     cluster_tolerance: 0.25
   surface_places:
-    type: place_2d
+    # type: place_2d
     prefix: P
     pure_final_place_size: 1
     cluster_tolerance: .3
@@ -30,7 +30,7 @@ frontend:
     place_max_neighbor_z_diff: .5
     place_overlap_threshold: 0.0
   traversability_places:
-    type: traversability
+    # type: traversability
     estimator:
       type: HeightTraversabilityEstimator
       height_below: 0

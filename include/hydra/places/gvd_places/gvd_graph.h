@@ -56,6 +56,7 @@ struct GvdMemberInfo {
   Eigen::Vector3f position;
   GlobalIndex index;
   std::vector<Point> parents;
+  uint64_t last_updated = 0;
 };
 
 class GvdGraph {
@@ -88,7 +89,8 @@ class GvdGraph {
   void add(const GlobalIndex& index,
            double distance,
            uint8_t num_basis_points,
-           const std::vector<Point>& parents = {});
+           const std::vector<Point>& parents = {},
+           uint64_t timestamp = 0);
 
   void remove(const GlobalIndexSet& indices);
 
@@ -123,7 +125,8 @@ class GvdGraph {
   Node* add_uncompressed(const GlobalIndex& index,
                          double distance,
                          uint8_t basis,
-                         const std::vector<Point>& parents);
+                         const std::vector<Point>& parents,
+                         uint64_t timestamp);
 
   Node* uncompressed_by_index(const GlobalIndex& index);
 
