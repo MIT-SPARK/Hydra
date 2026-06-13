@@ -34,8 +34,14 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/loop_closure/registration.h>
+#include <spark_dsg/edge_attributes.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/node_symbol.h>
+#include <spark_dsg/scene_graph.h>
 
 namespace hydra::lcd {
+
+using namespace spark_dsg;
 
 double getPoseDistance(const gtsam::Pose3& expected,
                        const RegistrationSolution& solution) {
@@ -98,7 +104,7 @@ struct GraphRegistrationTests : public ::testing::Test {
     std::map<std::string, char> layer_map = {
         {DsgLayers::PLACES, 'p'}, {DsgLayers::OBJECTS, 'O'}, {DsgLayers::ROOMS, 'R'}};
 
-    dsg.reset(new DynamicSceneGraph());
+    dsg.reset(new SceneGraph());
 
     using namespace std::chrono_literals;
 
@@ -170,7 +176,7 @@ struct GraphRegistrationTests : public ::testing::Test {
 
   gtsam::Pose3 to_T_from;
 
-  DynamicSceneGraph::Ptr dsg;
+  SceneGraph::Ptr dsg;
   LayerRegistrationConfig reg_config;
 };
 

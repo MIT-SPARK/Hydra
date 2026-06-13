@@ -34,11 +34,26 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/loop_closure/descriptor_matching.h"
 
+#include <config_utilities/config.h>
+#include <config_utilities/types/enum.h>
 #include <glog/logging.h>
 
 namespace hydra::lcd {
 
-using Dsg = DynamicSceneGraph;
+void declare_config(DescriptorMatchConfig& conf) {
+  using namespace config;
+  name("DescriptorMatchConfig");
+  field(conf.min_score, "min_score");
+  field(conf.min_registration_score, "min_registration_score");
+  field(conf.min_time_separation_s, "min_time_separation_s");
+  field(conf.max_registration_matches, "max_registration_matches");
+  field(conf.min_score_ratio, "min_score_ratio");
+  field(conf.min_match_separation_m, "min_match_separation_m");
+  enum_field(
+      conf.type,
+      "type",
+      {{DescriptorScoreType::COSINE, "COSINE"}, {DescriptorScoreType::L1, "L1"}});
+}
 
 float computeDistanceHist(const Descriptor& lhs,
                           const Descriptor& rhs,
@@ -93,6 +108,43 @@ float computeDistance(const Descriptor& lhs,
   } else {
     return computeDistanceBow(lhs, rhs, distance_func);
   }
+}
+
+float computeCosineDistance(const Descriptor& lhs, const Descriptor& rhs) {
+  float lhs_scale = lhs.normalized ? 1.0f : lhs.values.norm();
+  float rhs_scale = rhs.normalized ? 1.0f : rhs.values.norm();
+
+  if (lhs_scale == 0.0f && rhs_scale == 0.0f) {
+    return 1.0f;
+  }
+
+  float scale = lhs_scale * rhs_scale;
+  // TODO(nathan) we might want a looser check than this
+  if (scale == 0.0f) {
+    scale = 1.0f;  // force all zero descriptors to have 0 norm (instead of nan)
+  }
+
+  return computeDistance(
+      lhs, rhs, [&scale](float lhs, float rhs) { return (lhs * rhs) / scale; });
+}
+
+float computeL1Distance(const Descriptor& lhs, const Descriptor& rhs) {
+  float lhs_scale = lhs.normalized ? 1.0f : lhs.values.lpNorm<1>();
+  float rhs_scale = rhs.normalized ? 1.0f : rhs.values.lpNorm<1>();
+
+  if (rhs_scale == 0.0f and lhs_scale == 0.0f) {
+    return 0.0f;
+  }
+
+  lhs_scale = lhs_scale == 0.0f ? 1.0f : lhs_scale;
+  rhs_scale = rhs_scale == 0.0f ? 1.0f : rhs_scale;
+
+  const float l1_diff = computeDistance(lhs, rhs, [&](float lhs, float rhs) {
+    const float lhs_val = lhs / lhs_scale;
+    const float rhs_val = rhs / rhs_scale;
+    return std::abs(lhs_val - rhs_val) - std::abs(lhs_val) - std::abs(rhs_val);
+  });
+  return 2.0f + l1_diff;
 }
 
 float computeDescriptorScore(const Descriptor& lhs,
@@ -193,8 +245,7 @@ LayerSearchResults searchDescriptors(
   }
 
   // TODO(nathan) add layer id in again or handle stats better
-  VLOG(1) << "matching "
-          << " -> shared: " << num_same_parent << ", null: " << num_null
+  VLOG(1) << "matching " << " -> shared: " << num_same_parent << ", null: " << num_null
           << ", horizon: " << num_inside_horizon << ", low: " << num_low_score
           << ", default: " << num_default_match << ", shared: " << num_shared_nodes
           << ", valid: " << new_valid_match_scores.size();

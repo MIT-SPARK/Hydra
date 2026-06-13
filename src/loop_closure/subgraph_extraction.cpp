@@ -34,24 +34,46 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/loop_closure/subgraph_extraction.h"
 
+#include <config_utilities/config.h>
 #include <glog/logging.h>
 #include <spark_dsg/graph_utilities.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/node_symbol.h>
+#include <spark_dsg/scene_graph.h>
 
 namespace hydra {
+
+void declare_config(SubgraphConfig& conf) {
+  using namespace config;
+  name("SubgraphConfig");
+  field(conf.fixed_radius, "fixed_radius");
+  field(conf.max_radius_m, "max_radius_m");
+  if (!conf.fixed_radius) {
+    field(conf.min_radius_m, "min_radius_m");
+    field(conf.min_nodes, "min_nodes");
+  }
+}
+
+using spark_dsg::DsgLayers;
+using spark_dsg::NodeId;
+using spark_dsg::NodeSymbol;
+using spark_dsg::SceneGraph;
+using spark_dsg::SceneGraphLayer;
+using spark_dsg::graph_utilities::breadthFirstSearch;
 
 SubgraphConfig::SubgraphConfig(double radius_m)
     : fixed_radius(true), max_radius_m(radius_m) {}
 
 SubgraphConfig::SubgraphConfig() = default;
 
-void getObjectsWithinRadius(const DynamicSceneGraph& graph,
+void getObjectsWithinRadius(const SceneGraph& graph,
                             const Eigen::Vector3d& origin,
                             NodeId parent,
                             double radius_m,
                             std::set<NodeId>& found) {
   std::deque<NodeId> frontier{parent};
   std::unordered_set<NodeId> visited{parent};
-  graph_utilities::breadthFirstSearch(
+  breadthFirstSearch(
       graph.getLayer(DsgLayers::PLACES),
       frontier,
       visited,
@@ -86,14 +108,14 @@ void getObjectsWithinRadius(const DynamicSceneGraph& graph,
       });
 }
 
-void getPlacesWithinRadius(const DynamicSceneGraph& graph,
+void getPlacesWithinRadius(const SceneGraph& graph,
                            const Eigen::Vector3d& origin,
                            NodeId parent,
                            double radius_m,
                            std::set<NodeId>& found) {
   std::deque<NodeId> frontier{parent};
   std::unordered_set<NodeId> visited{parent};
-  graph_utilities::breadthFirstSearch(
+  breadthFirstSearch(
       graph.getLayer(DsgLayers::PLACES),
       frontier,
       visited,
@@ -105,7 +127,7 @@ void getPlacesWithinRadius(const DynamicSceneGraph& graph,
 }
 
 std::set<NodeId> getFilteredNodeSet(const SubgraphConfig& config,
-                                    const DynamicSceneGraph& graph,
+                                    const SceneGraph& graph,
                                     const Eigen::Vector3d& origin,
                                     const std::set<NodeId>& found) {
   std::vector<std::pair<double, NodeId>> candidates;
@@ -148,7 +170,7 @@ std::set<NodeId> getFilteredNodeSet(const SubgraphConfig& config,
 }
 
 std::set<NodeId> getSubgraphNodes(const SubgraphConfig& config,
-                                  const DynamicSceneGraph& graph,
+                                  const SceneGraph& graph,
                                   NodeId root_node,
                                   bool is_places) {
   Eigen::Vector3d origin;

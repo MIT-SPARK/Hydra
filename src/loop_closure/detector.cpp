@@ -45,7 +45,6 @@
 
 #include <fstream>
 
-#include "hydra/loop_closure/loop_closure_config.h"
 #include "hydra/utils/timing_utilities.h"
 
 namespace teaser {

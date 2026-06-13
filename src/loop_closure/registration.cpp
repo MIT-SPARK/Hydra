@@ -34,6 +34,10 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/loop_closure/registration.h"
 
+#include <config_utilities/config.h>
+#include <spark_dsg/node_symbol.h>
+#include <spark_dsg/scene_graph.h>
+
 #include <fstream>
 #include <iomanip>
 
@@ -41,13 +45,27 @@
 
 namespace hydra::lcd {
 
-inline std::ostream& operator<<(std::ostream& out, const gtsam::Quaternion& q) {
-  out << "{w: " << q.w() << ", x: " << q.x() << ", y: " << q.y() << ", z: " << q.z()
-      << "}";
-  return out;
+void declare_config(LayerRegistrationConfig& conf) {
+  using namespace config;
+  name("LayerRegistrationConfig");
+  field(conf.min_correspondences, "min_correspondences");
+  field(conf.min_inliers, "min_inliers");
+  field(conf.max_same_nodes, "max_same_nodes");
+  field(conf.log_registration_problem, "log_registration_problem");
+  field(conf.registration_output_path, "registration_output_path");
+  field(conf.recreate_subgraph, "recreate_subgraph");
+  if (conf.recreate_subgraph) {
+    field(conf.subgraph_extraction, "subgraph_extraction");
+  }
 }
 
 using hydra::timing::ScopedTimer;
+using spark_dsg::AgentNodeAttributes;
+using spark_dsg::displayNodeSymbolContainer;
+using spark_dsg::DsgLayers;
+using spark_dsg::NodeId;
+using spark_dsg::NodeSymbol;
+using spark_dsg::SceneGraph;
 
 struct AgentNodePose {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -56,7 +74,7 @@ struct AgentNodePose {
   NodeId id;
 };
 
-AgentNodePose getAgentPose(const DynamicSceneGraph& graph, NodeId root_id) {
+AgentNodePose getAgentPose(const SceneGraph& graph, NodeId root_id) {
   if (!graph.hasNode(root_id)) {
     return {};
   }
@@ -77,7 +95,7 @@ AgentNodePose getAgentPose(const DynamicSceneGraph& graph, NodeId root_id) {
   return {};
 }
 
-AgentNodePose getQueryPose(const DynamicSceneGraph& graph, NodeId query_agent_id) {
+AgentNodePose getQueryPose(const SceneGraph& graph, NodeId query_agent_id) {
   const auto& attrs = graph.getNode(query_agent_id).attributes<AgentNodeAttributes>();
   return {true,
           gtsam::Pose3(gtsam::Rot3(attrs.world_R_body), attrs.position),
@@ -96,7 +114,7 @@ std::string getPoseRepr(const gtsam::Pose3& pose,
   return ss.str();
 }
 
-RegistrationSolution getFullSolutionFromLayer(const DynamicSceneGraph& graph,
+RegistrationSolution getFullSolutionFromLayer(const SceneGraph& graph,
                                               const LayerRegistrationSolution& solution,
                                               NodeId query_agent_id,
                                               NodeId match_root) {
@@ -130,7 +148,7 @@ RegistrationSolution getFullSolutionFromLayer(const DynamicSceneGraph& graph,
 }
 
 void logRegistrationProblem(const std::string& path_prefix,
-                            const DynamicSceneGraph& dsg,
+                            const SceneGraph& dsg,
                             const LayerRegistrationSolution& solution,
                             const DsgRegistrationInput& match,
                             NodeId query_agent_id) {
@@ -170,7 +188,7 @@ DsgTeaserSolver::DsgTeaserSolver(const std::string& layer,
   log_prefix = config.registration_output_path + "/" + layer_id + "_registration_";
 }
 
-RegistrationSolution DsgTeaserSolver::solve(const DynamicSceneGraph& dsg,
+RegistrationSolution DsgTeaserSolver::solve(const SceneGraph& dsg,
                                             const DsgRegistrationInput& match,
                                             NodeId query_agent_id) const {
   // TODO(nathan) helper function in dsg
