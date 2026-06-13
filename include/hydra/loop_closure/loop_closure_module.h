@@ -99,4 +99,6 @@ class LoopClosureModule : public Module {
 
 void declare_config(LoopClosureModule::Config& config);
 
+using LoopClosureConfig = LoopClosureModule::Config;
+
 }  // namespace hydra
