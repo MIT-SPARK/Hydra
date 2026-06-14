@@ -13,4 +13,3 @@ label_names:
   - {label: 1, name: car}
   - {label: 2, name: trash bin}
   - {label: 3, name: fire hydrant}
-

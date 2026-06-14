@@ -43,7 +43,7 @@ label_names:
   - {label: 35, name: storage}
   - {label: 36, name: barrel}
   - {label: 37, name: bag}
-  - {label: 38, name: basket} 
+  - {label: 38, name: basket}
   - {label: 39, name: ignore}
   - {label: 40, name: flag}
   - {label: 41, name: decor}
