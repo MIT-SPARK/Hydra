@@ -121,6 +121,7 @@ void declare_config(SurfacePlaceExtractor::Config& config) {
   field(config.place_overlap_threshold, "place_overlap_threshold");
   field(config.place_max_neighbor_z_diff, "place_max_neighbor_z_diff");
   field(config.connection_ellipse_scale_factor, "connection_ellipse_scale_factor");
+  field(config.instance_id, "instance_id");
   field(config.sinks, "sinks");
 }
 
@@ -142,7 +143,8 @@ void SurfacePlaceExtractor::detect(const ActiveWindowOutput& msg,
   MLOG(2) << "n original active indices: " << delta.getNumActiveVertices();
   const auto frozen =
       getFrozenSet(config, msg.timestamp_ns, offsets, active_places_, to_remove_);
-  const auto label_indices = clustering::getLabelIndices(labels_, delta, &frozen);
+  const auto label_indices =
+      clustering::getLabelIndices(labels_, delta, &frozen, config.instance_id);
   if (label_indices.empty()) {
     MLOG(2) << "no vertices found matching desired labels";
     return;
