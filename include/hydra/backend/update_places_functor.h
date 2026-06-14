@@ -37,7 +37,6 @@
 
 #include "hydra/backend/association_strategies.h"
 #include "hydra/backend/deformation_interpolator.h"
-#include "hydra/backend/merge_tracker.h"
 #include "hydra/backend/update_functions.h"
 #include "hydra/utils/active_window_tracker.h"
 

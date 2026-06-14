@@ -82,6 +82,10 @@ void MergeProposer::findMerges(const SceneGraphLayer& layer,
     }
 
     for (const auto& other : candidates) {
+      if (node.id == other.id) {
+        continue;  // no self-merges
+      }
+
       if (layer.hasEdge(node.id, other.id)) {
         continue;  // avoid merging siblings
       }

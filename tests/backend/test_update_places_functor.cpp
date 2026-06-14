@@ -82,7 +82,10 @@ TEST(UpdatePlacesFunctor, PlaceUpdate) {
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
   UpdateInfo::ConstPtr info(new UpdateInfo{0, &values, nullptr, true, {}});
-  UpdatePlacesFunctor functor({0.4, 0.3, DeformationInterpolator::Config{}});
+  UpdatePlacesFunctor::Config config{0.4, 0.3, DeformationInterpolator::Config{}};
+  config.use_temp_values = true;
+
+  const UpdatePlacesFunctor functor(config);
   callWithUnmerged(functor, *dsg, info, false);
 
   {  // first key exists: new value
@@ -168,7 +171,10 @@ TEST(UpdatePlacesFunctor, PlaceUpdateMerge) {
                 gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(7.0, 8.0, 9.0)));
 
   UpdateInfo::ConstPtr info(new UpdateInfo{0, &values, nullptr, true, {}});
-  UpdatePlacesFunctor functor({0.4, 0.3, DeformationInterpolator::Config{}});
+  UpdatePlacesFunctor::Config config{0.4, 0.3, DeformationInterpolator::Config{}};
+  config.use_temp_values = true;
+
+  UpdatePlacesFunctor functor(config);
   const auto result_merges = callWithUnmerged(functor, *dsg, info, true);
 
   {  // first key exists: new value
