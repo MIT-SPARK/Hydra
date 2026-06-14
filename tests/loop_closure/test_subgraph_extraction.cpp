@@ -34,12 +34,18 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <hydra/loop_closure/subgraph_extraction.h>
+#include <spark_dsg/edge_attributes.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/node_symbol.h>
+#include <spark_dsg/scene_graph.h>
 
 namespace hydra {
 
+using namespace spark_dsg;
+
 namespace {
 
-inline void emplacePlaceNode(DynamicSceneGraph& graph,
+inline void emplacePlaceNode(SceneGraph& graph,
                              const Eigen::Vector3d& pos,
                              double distance,
                              int num_basis_points,
@@ -50,7 +56,7 @@ inline void emplacePlaceNode(DynamicSceneGraph& graph,
   ++next_index;
 }
 
-inline void emplaceObjectNode(DynamicSceneGraph& graph,
+inline void emplaceObjectNode(SceneGraph& graph,
                               const Eigen::Vector3d& pos,
                               const Eigen::Vector3f& dims,
                               size_t& next_index) {
@@ -65,7 +71,7 @@ inline void emplaceObjectNode(DynamicSceneGraph& graph,
 }  // namespace
 
 TEST(GnnLcdTests, testGetSubgraphPlaces) {
-  DynamicSceneGraph graph;
+  SceneGraph graph;
 
   size_t node_idx = 0;
   emplacePlaceNode(graph, Eigen::Vector3d(0.1, 0.0, 0.0), 0.1, 1, node_idx);
@@ -125,7 +131,7 @@ TEST(GnnLcdTests, testGetSubgraphPlaces) {
 }
 
 TEST(GnnLcdTests, testGetSubgraphObjects) {
-  DynamicSceneGraph graph;
+  SceneGraph graph;
 
   size_t p_idx = 0;
   emplacePlaceNode(graph, Eigen::Vector3d(0.1, 0.0, 0.0), 0.1, 1, p_idx);

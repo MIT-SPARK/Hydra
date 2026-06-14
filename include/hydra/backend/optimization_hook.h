@@ -33,31 +33,22 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/loop_closure/detector.h"
+#include <kimera_pgmo/deformation_graph.h>
+#include <spark_dsg/scene_graph.h>
 
 namespace hydra {
 
-struct LoopClosureConfig {
-  lcd::LcdDetectorConfig detector;
-  bool visualize_dsg_lcd = false;
-  std::string lcd_visualizer_ns = "/dsg/lcd_visualizer";
-  double lcd_agent_horizon_s = 1.5;
-  double descriptor_creation_horizon_m = 10.0;
+class OptimizationHook {
+ public:
+  using Ptr = std::unique_ptr<OptimizationHook>;
+  using NodeRobotMap = std::map<spark_dsg::NodeId, int>;
+
+  virtual ~OptimizationHook() = default;
+
+  virtual void updateProblem(size_t timestamp_ns,
+                             const spark_dsg::SceneGraph& graph,
+                             kimera_pgmo::DeformationGraph& deformation_graph,
+                             const NodeRobotMap* robot_lookup = nullptr) const = 0;
 };
 
-namespace lcd {
-void declare_config(LayerLcdConfig& conf);
-void declare_config(LayerRegistrationConfig& conf);
-void declare_config(DescriptorMatchConfig& conf);
-void declare_config(GnnLcdConfig& conf);
-void declare_config(LcdDetectorConfig& conf);
-}  // namespace lcd
-
-void declare_config(SubgraphConfig& conf);
-void declare_config(LoopClosureConfig& conf);
-
 }  // namespace hydra
-
-namespace teaser {
-void declare_config(RobustRegistrationSolver::Params& conf);
-}  // namespace teaser

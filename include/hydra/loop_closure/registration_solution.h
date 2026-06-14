@@ -33,10 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <spark_dsg/scene_graph_types.h>
+
 #include <Eigen/Geometry>
 #include <cstdint>
-
-#include "hydra/common/dsg_types.h"
 
 namespace hydra::lcd {
 
@@ -45,9 +45,9 @@ struct RegistrationSolution {
   //! Whether or not the solution is valid
   bool valid = false;
   //! Agent node correponding to the "from" frame
-  NodeId from_node;
+  spark_dsg::NodeId from_node;
   //! Agent node correponding to the "to" frame
-  NodeId to_node;
+  spark_dsg::NodeId to_node;
   //! position component of to_T_from
   Eigen::Vector3d to_p_from;
   //! rotation component of to_T_from

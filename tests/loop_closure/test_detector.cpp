@@ -54,7 +54,7 @@ struct LcdDetectorTests : public ::testing::Test {
     config.places.matching = {0.8, 0.8, 0.0, 1, 0.0, 0.0};
   }
 
-  LcdDetectorConfig config;
+  LcdDetector::Config config;
   DynamicSceneGraph::Ptr dsg;
 };
 

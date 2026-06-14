@@ -35,12 +35,13 @@
 #pragma once
 #include <glog/logging.h>
 #include <gtsam/geometry/Pose3.h>
+#include <spark_dsg/node_attributes.h>
 #include <spark_dsg/printing.h>
+#include <spark_dsg/scene_graph_layer.h>
 #include <teaser/registration.h>
 
 #include <mutex>
 
-#include "hydra/loop_closure/descriptor_matching.h"
 #include "hydra/loop_closure/registration_solution.h"
 #include "hydra/loop_closure/subgraph_extraction.h"
 
@@ -57,11 +58,13 @@ struct LayerRegistrationConfig {
   SubgraphConfig subgraph_extraction;
 };
 
+void declare_config(LayerRegistrationConfig& config);
+
 struct DsgRegistrationInput {
-  std::set<NodeId> query_nodes;
-  std::set<NodeId> match_nodes;
-  NodeId query_root;
-  NodeId match_root;
+  std::set<spark_dsg::NodeId> query_nodes;
+  std::set<spark_dsg::NodeId> match_nodes;
+  spark_dsg::NodeId query_root;
+  spark_dsg::NodeId match_root;
 };
 
 struct DsgRegistrationSolver {
@@ -69,9 +72,9 @@ struct DsgRegistrationSolver {
 
   virtual ~DsgRegistrationSolver() = default;
 
-  virtual RegistrationSolution solve(const DynamicSceneGraph& dsg,
+  virtual RegistrationSolution solve(const spark_dsg::SceneGraph& dsg,
                                      const DsgRegistrationInput& match,
-                                     NodeId query_agent_id) const = 0;
+                                     spark_dsg::NodeId query_agent_id) const = 0;
 };
 
 using TeaserParams = teaser::RobustRegistrationSolver::Params;
@@ -83,9 +86,9 @@ struct DsgTeaserSolver : DsgRegistrationSolver {
 
   virtual ~DsgTeaserSolver() = default;
 
-  RegistrationSolution solve(const DynamicSceneGraph& dsg,
+  RegistrationSolution solve(const spark_dsg::SceneGraph& dsg,
                              const DsgRegistrationInput& match,
-                             NodeId query_agent_id) const override;
+                             spark_dsg::NodeId query_agent_id) const override;
 
   const std::string layer_id;
   LayerRegistrationConfig config;
@@ -95,14 +98,14 @@ struct DsgTeaserSolver : DsgRegistrationSolver {
   mutable teaser::RobustRegistrationSolver solver;
 };
 
-using CorrespondenceFunc =
-    std::function<bool(const SceneGraphNode&, const SceneGraphNode&)>;
+using CorrespondenceFunc = std::function<bool(const spark_dsg::SceneGraphNode&,
+                                              const spark_dsg::SceneGraphNode&)>;
 
-template <typename NodeSet = std::list<NodeId>>
+template <typename NodeSet = std::list<spark_dsg::NodeId>>
 struct LayerRegistrationProblem {
   mutable NodeSet src_nodes;
   mutable NodeSet dest_nodes;
-  SceneGraphLayer* dest_layer = nullptr;
+  spark_dsg::SceneGraphLayer* dest_layer = nullptr;
   std::mutex* src_mutex = nullptr;
   std::mutex* dest_mutex = nullptr;
   size_t min_correspondences;
@@ -113,12 +116,13 @@ struct LayerRegistrationSolution {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   bool valid = false;
   gtsam::Pose3 dest_T_src;
-  std::vector<std::pair<NodeId, NodeId>> inliers;
+  std::vector<std::pair<spark_dsg::NodeId, spark_dsg::NodeId>> inliers;
 };
 
 template <typename NodeSet>
-std::list<NodeId> pruneSet(const SceneGraphLayer& layer, NodeSet& nodes) {
-  std::list<NodeId> pruned;
+std::list<spark_dsg::NodeId> pruneSet(const spark_dsg::SceneGraphLayer& layer,
+                                      NodeSet& nodes) {
+  std::list<spark_dsg::NodeId> pruned;
   auto iter = nodes.begin();
   while (iter != nodes.end()) {
     if (layer.hasNode(*iter)) {
@@ -136,9 +140,9 @@ LayerRegistrationSolution registerDsgLayer(
     const LayerRegistrationConfig& config,
     teaser::RobustRegistrationSolver& solver,
     const LayerRegistrationProblem<NodeSet>& problem,
-    const SceneGraphLayer& src,
+    const spark_dsg::SceneGraphLayer& src,
     const CorrespondenceFunc& correspondence_func) {
-  std::vector<std::pair<NodeId, NodeId>> correspondences;
+  std::vector<std::pair<spark_dsg::NodeId, spark_dsg::NodeId>> correspondences;
   correspondences.reserve(problem.src_nodes.size() * problem.dest_nodes.size());
 
   if (problem.src_mutex) {
@@ -149,18 +153,18 @@ LayerRegistrationSolution registerDsgLayer(
     problem.dest_mutex->lock();
   }
 
-  const SceneGraphLayer& dest = problem.dest_layer ? *problem.dest_layer : src;
+  const auto& dest = problem.dest_layer ? *problem.dest_layer : src;
 
   const auto src_pruned = pruneSet(src, problem.src_nodes);
   if (!src_pruned.empty()) {
     VLOG(3) << "[DSG LCD] Found invalid source nodes in registration: "
-            << displayNodeSymbolContainer(src_pruned);
+            << spark_dsg::displayNodeSymbolContainer(src_pruned);
   }
 
   const auto dest_pruned = pruneSet(dest, problem.dest_nodes);
   if (!dest_pruned.empty()) {
     VLOG(3) << "[DSG LCD] Found invalid destination nodes in registration: "
-            << displayNodeSymbolContainer(dest_pruned);
+            << spark_dsg::displayNodeSymbolContainer(dest_pruned);
   }
 
   for (const auto& src_id : problem.src_nodes) {
@@ -191,8 +195,8 @@ LayerRegistrationSolution registerDsgLayer(
   Eigen::Matrix<double, 3, Eigen::Dynamic> dest_points(3, correspondences.size());
   for (size_t i = 0; i < correspondences.size(); ++i) {
     const auto correspondence = correspondences[i];
-    src_points.col(i) = getNodePosition(src, correspondence.first);
-    dest_points.col(i) = getNodePosition(dest, correspondence.second);
+    src_points.col(i) = src.getNode(correspondence.first).attributes().position;
+    dest_points.col(i) = dest.getNode(correspondence.second).attributes().position;
   }
 
   if (correspondences.size() < config.min_correspondences) {
@@ -218,7 +222,7 @@ LayerRegistrationSolution registerDsgLayer(
     return {};
   }
 
-  std::vector<std::pair<NodeId, NodeId>> valid_correspondences;
+  std::vector<std::pair<spark_dsg::NodeId, spark_dsg::NodeId>> valid_correspondences;
   valid_correspondences.reserve(
       std::min(problem.src_nodes.size(), problem.dest_nodes.size()));
 
@@ -244,7 +248,7 @@ LayerRegistrationSolution registerDsgLayerPairwise(
     const LayerRegistrationConfig& config,
     teaser::RobustRegistrationSolver& solver,
     const LayerRegistrationProblem<NodeSet>& problem,
-    const SceneGraphLayer& src) {
+    const spark_dsg::SceneGraphLayer& src) {
   return registerDsgLayer(
       config, solver, problem, src, [](const auto&, const auto&) { return true; });
 }
@@ -254,15 +258,17 @@ LayerRegistrationSolution registerDsgLayerSemantic(
     const LayerRegistrationConfig& config,
     teaser::RobustRegistrationSolver& solver,
     const LayerRegistrationProblem<NodeSet>& problem,
-    const SceneGraphLayer& src) {
+    const spark_dsg::SceneGraphLayer& src) {
   return registerDsgLayer(
       config,
       solver,
       problem,
       src,
-      [](const SceneGraphNode& src_node, const SceneGraphNode& dest_node) {
-        return src_node.attributes<SemanticNodeAttributes>().semantic_label ==
-               dest_node.attributes<SemanticNodeAttributes>().semantic_label;
+      [](const spark_dsg::SceneGraphNode& src_node,
+         const spark_dsg::SceneGraphNode& dest_node) {
+        return src_node.attributes<spark_dsg::SemanticNodeAttributes>()
+                   .semantic_label ==
+               dest_node.attributes<spark_dsg::SemanticNodeAttributes>().semantic_label;
       });
 }
 

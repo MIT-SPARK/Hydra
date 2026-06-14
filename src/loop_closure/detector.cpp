@@ -39,12 +39,36 @@
 #include "hydra/loop_closure/gnn_descriptors.h"
 #endif
 
+#include <config_utilities/config.h>
+#include <config_utilities/types/enum.h>
 #include <glog/logging.h>
 
 #include <fstream>
 
 #include "hydra/utils/timing_utilities.h"
 
+namespace teaser {
+
+using InlierSelectionMode = RobustRegistrationSolver::INLIER_SELECTION_MODE;
+
+void declare_config(RobustRegistrationSolver::Params& conf) {
+  using namespace config;
+  name("RobustRegistrationSolver::Params");
+  field(conf.estimate_scaling, "estimate_scaling");
+  field(conf.cbar2, "cbar2");
+  field(conf.rotation_gnc_factor, "rotation_gnc_factor");
+  field(conf.rotation_max_iterations, "rotation_max_iterations");
+  field(conf.kcore_heuristic_threshold, "kcore_heuristic_threshold");
+  enum_field(conf.inlier_selection_mode,
+             "inlier_selection_mode",
+             {{InlierSelectionMode::PMC_EXACT, "PMC_EXACT"},
+              {InlierSelectionMode::PMC_HEU, "PMC_HEU"},
+              {InlierSelectionMode::KCORE_HEU, "KCORE_HEU"},
+              {InlierSelectionMode::NONE, "NONE"}});
+  field(conf.max_clique_time_limit, "max_clique_time_limit");
+}
+
+}  // namespace teaser
 namespace hydra::lcd {
 
 template <typename Scalar>
@@ -70,7 +94,7 @@ std::string showVector(const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& vector,
 
 #if defined(HYDRA_USE_GNN) && HYDRA_USE_GNN
 void configureDescriptorFactories(lcd::LcdDetector& detector,
-                                  const LcdDetectorConfig& config) {
+                                  const LcdDetector::Config& config) {
   ObjectGnnDescriptor::LabelEmbeddings embeddings;
   if (config.gnn_lcd.use_onehot_encoding) {
     for (size_t i = 0; i < config.gnn_lcd.onehot_encoding_dim; ++i) {
@@ -98,7 +122,7 @@ void configureDescriptorFactories(lcd::LcdDetector& detector,
   detector.setDescriptorFactories(std::move(factories));
 }
 #else
-void configureDescriptorFactories(lcd::LcdDetector&, const LcdDetectorConfig&) {
+void configureDescriptorFactories(lcd::LcdDetector&, const LcdDetector::Config&) {
   LOG(ERROR) << "Unable to initialize GNN descriptors: not built with -DHYDRA_GNN=ON";
 }
 #endif
@@ -107,29 +131,90 @@ using hydra::timing::ScopedTimer;
 using SearchConfigMap = std::map<std::string, DescriptorMatchConfig>;
 using RegConfigMap = std::map<std::string, LayerRegistrationConfig>;
 
-LcdDetector::LcdDetector(const LcdDetectorConfig& config) : config_(config) {
+template <typename T>
+void declare_config(HistogramConfig<T>& conf) {
+  using namespace config;
+  name("HistogramConfig");
+  field(conf.min, "min");
+  field(conf.max, "max");
+  field(conf.bins, "bins");
+}
+
+void declare_config(GnnLcdConfig& conf) {
+  using namespace config;
+  name("GnnLcdConfig");
+  field(conf.use_onehot_encoding, "use_onehot_encoding");
+  field(conf.onehot_encoding_dim, "onehot_encoding_dim");
+  if (!conf.use_onehot_encoding) {
+    field(conf.label_embeddings_file, "label_embeddings_file");
+  }
+  field(conf.object_connection_radius_m, "object_connection_radius_m");
+  field(conf.object_model_path, "object_model_path");
+  field(conf.places_model_path, "places_model_path");
+  field(conf.objects_pos_in_feature, "objects_pos_in_feature");
+  field(conf.places_pos_in_feature, "places_pos_in_feature");
+}
+
+void declare_config(LayerLcdConfig& conf) {
+  using namespace config;
+  name("LayerLcdConfig");
+  field(conf.matching, "search");
+  field(conf.registration, "registration");
+}
+
+void declare_config(LcdDetector::Config::Variances& config) {
+  using namespace config;
+  name("LcdDetector::Config::Variances");
+  field(config.scene_graph, "scene_graph");
+  field(config.visual, "visual");
+
+  check(config.scene_graph, GT, 0.0, "scene_graph");
+  check(config.visual, GT, 0.0, "visual");
+}
+
+void declare_config(LcdDetector::Config& config) {
+  using namespace config;
+  name("LcdDetectorConfig");
+  field(config.objects, "objects");
+  field(config.places, "places");
+  field(config.teaser_config, "teaser");
+  field(config.enable_agent_registration, "enable_agent_registration");
+  field(config.object_extraction, "object_extraction");
+  field(config.places_extraction, "places_extraction");
+  field(config.place_histogram_config, "place_histogram_config");
+  field(config.agent_search_config, "agent");
+  field(config.variances, "variances");
+  // TODO(nathan) pin agent registration to agent min
+
+  field(config.use_gnn_descriptors, "use_gnn_descriptors");
+  if (config.use_gnn_descriptors) {
+    field(config.gnn_lcd, "gnn_lcd");
+  }
+}
+
+LcdDetector::LcdDetector(const LcdDetector::Config& config) : config(config) {
   makeDefaultDescriptorFactories();
-  if (config_.use_gnn_descriptors) {
-    configureDescriptorFactories(*this, config_);
+  if (config.use_gnn_descriptors) {
+    configureDescriptorFactories(*this, config);
   }
 
-  const SearchConfigMap search_configs{{DsgLayers::OBJECTS, config_.objects.matching},
-                                       {DsgLayers::PLACES, config_.places.matching}};
-  const RegConfigMap reg_configs{{DsgLayers::OBJECTS, config_.objects.registration}};
+  const SearchConfigMap search_configs{{DsgLayers::OBJECTS, config.objects.matching},
+                                       {DsgLayers::PLACES, config.places.matching}};
+  const RegConfigMap reg_configs{{DsgLayers::OBJECTS, config.objects.registration}};
   resetLayerAssignments(search_configs, reg_configs);
 }
 
 void LcdDetector::setDescriptorFactories(FactoryMap&& factories) {
   layer_factories_ = std::move(factories);
-  const SearchConfigMap search_configs{{DsgLayers::OBJECTS, config_.objects.matching},
-                                       {DsgLayers::PLACES, config_.places.matching}};
-  const RegConfigMap reg_configs{{DsgLayers::OBJECTS, config_.objects.registration}};
+  const SearchConfigMap search_configs{{DsgLayers::OBJECTS, config.objects.matching},
+                                       {DsgLayers::PLACES, config.places.matching}};
+  const RegConfigMap reg_configs{{DsgLayers::OBJECTS, config.objects.registration}};
   resetLayerAssignments(search_configs, reg_configs);
 }
 
 void LcdDetector::setRegistrationSolver(size_t level,
                                         DsgRegistrationSolver::Ptr&& solver) {
-  if (level == 0 && !config_.enable_agent_registration) {
+  if (level == 0 && !config.enable_agent_registration) {
     return;
   }
 
@@ -209,14 +294,13 @@ void LcdDetector::dumpDescriptors(const std::string& log_path) const {
 }
 
 void LcdDetector::makeDefaultDescriptorFactories() {
-  layer_factories_.emplace(
-      DsgLayers::OBJECTS,
-      std::make_unique<ObjectDescriptorFactory>(config_.object_extraction,
-                                                config_.num_semantic_classes));
+  layer_factories_.emplace(DsgLayers::OBJECTS,
+                           std::make_unique<ObjectDescriptorFactory>(
+                               config.object_extraction, config.num_semantic_classes));
   layer_factories_.emplace(
       DsgLayers::PLACES,
-      std::make_unique<PlaceDescriptorFactory>(config_.places_extraction,
-                                               config_.place_histogram_config));
+      std::make_unique<PlaceDescriptorFactory>(config.places_extraction,
+                                               config.place_histogram_config));
   agent_factory_ = std::make_unique<AgentDescriptorFactory>();
 }
 
@@ -237,9 +321,9 @@ void LcdDetector::resetLayerAssignments(const SearchConfigMap& search_configs,
 
     auto iter = registration_configs.find(layer);
     if (iter != registration_configs.end()) {
-      registration_solvers_.emplace(internal_idx,
-                                    std::make_unique<DsgTeaserSolver>(
-                                        layer, iter->second, config_.teaser_config));
+      registration_solvers_.emplace(
+          internal_idx,
+          std::make_unique<DsgTeaserSolver>(layer, iter->second, config.teaser_config));
     }
 
     internal_idx++;
@@ -253,7 +337,7 @@ void LcdDetector::resetLayerAssignments(const SearchConfigMap& search_configs,
     root_layer_ = internal_index_to_layer_.at(internal_idx - 1);
   }
 
-  match_config_map_[0] = config_.agent_search_config;
+  match_config_map_[0] = config.agent_search_config;
 
   cache_map_.clear();
   for (const auto& id_func_pair : layer_factories_) {
@@ -362,6 +446,8 @@ std::vector<RegistrationSolution> LcdDetector::registerAndVerify(
       registration_result =
           registration_solvers_.at(idx)->solve(dsg, registration_input, agent_id);
       registration_result.level = static_cast<int64_t>(idx);
+      registration_result.variance =
+          idx ? config.variances.scene_graph : config.variances.visual;
       if (registration_result.valid) {
         break;
       }
@@ -434,7 +520,7 @@ std::vector<RegistrationSolution> LcdDetector::detect(const DynamicSceneGraph& d
   auto descriptor = agent_factory_->construct(dsg, latest_node);
   if (descriptor) {
     matches_[0] = searchLeafDescriptors(*descriptor,
-                                        config_.agent_search_config,
+                                        config.agent_search_config,
                                         prev_valid_roots,
                                         leaf_cache_,
                                         agent_id);

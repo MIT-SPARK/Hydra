@@ -33,7 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/common/dsg_types.h"
+#include <spark_dsg/scene_graph_types.h>
+#include <spark_dsg/spark_dsg_fwd.h>
+
+#include <set>
 
 namespace hydra {
 
@@ -48,9 +51,11 @@ struct SubgraphConfig {
   SubgraphConfig();
 };
 
-std::set<NodeId> getSubgraphNodes(const SubgraphConfig& config,
-                                  const DynamicSceneGraph& graph,
-                                  NodeId root_node,
-                                  bool is_places);
+void declare_config(SubgraphConfig& config);
+
+std::set<spark_dsg::NodeId> getSubgraphNodes(const SubgraphConfig& config,
+                                             const spark_dsg::SceneGraph& graph,
+                                             spark_dsg::NodeId root_node,
+                                             bool is_places);
 
 }  // namespace hydra
