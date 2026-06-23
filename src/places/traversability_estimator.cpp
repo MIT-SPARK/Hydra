@@ -142,9 +142,29 @@ Index2DMap<float> extractHeightMap(const TsdfLayer& tsdf_layer,
   }
   return height_map;
 }
+// Where to put these helper functions?
 }  // namespace
 
 using spark_dsg::TraversabilityState;
+
+void TraversabilityEstimator::classifyTraversabilityVoxel(
+    TraversabilityVoxel& voxel) const {
+  if (voxel.confidence <= 0.0f) {
+    voxel.state = TraversabilityState::UNKNOWN;
+    return;
+  }
+  if (voxel.confidence >= min_confidence_) {
+    if (voxel.traversability >= min_traversability_) {
+      voxel.state = TraversabilityState::TRAVERSABLE;
+    } else {
+      voxel.state = TraversabilityState::INTRAVERSABLE;
+    }
+  } else if (pessimistic_ && voxel.traversability < min_traversability_) {
+    voxel.state = TraversabilityState::INTRAVERSABLE;
+  } else {
+    voxel.state = TraversabilityState::UNKNOWN;
+  }
+}
 
 const std::array<Index2D, 8> GradientTraversabilityEstimator::kNeighborOffsets = {{
     {0, -1},   // bottom
@@ -172,7 +192,11 @@ void declare_config(HeightTraversabilityEstimator::Config& config) {
 }
 
 HeightTraversabilityEstimator::HeightTraversabilityEstimator(const Config& config)
-    : config(config::checkValid(config)) {}
+    : config(config::checkValid(config)) {
+  min_confidence_ = config.min_confidence;
+  min_traversability_ = config.min_traversability;
+  pessimistic_ = config.pessimistic;
+}
 
 void HeightTraversabilityEstimator::updateTraversability(
     const ActiveWindowOutput& msg) {
@@ -278,25 +302,6 @@ void HeightTraversabilityEstimator::computeTraversability(
   }
 }
 
-void HeightTraversabilityEstimator::classifyTraversabilityVoxel(
-    TraversabilityVoxel& voxel) const {
-  if (voxel.confidence <= 0.0f) {
-    voxel.state = TraversabilityState::UNKNOWN;
-    return;
-  }
-  if (voxel.confidence >= config.min_confidence) {
-    if (voxel.traversability >= config.min_traversability) {
-      voxel.state = TraversabilityState::TRAVERSABLE;
-    } else {
-      voxel.state = TraversabilityState::INTRAVERSABLE;
-    }
-  } else if (config.pessimistic && voxel.traversability < config.min_traversability) {
-    voxel.state = TraversabilityState::INTRAVERSABLE;
-  } else {
-    voxel.state = TraversabilityState::UNKNOWN;
-  }
-}
-
 BlockIndexSet HeightTraversabilityEstimator::get2DBlockIndices(
     const BlockIndices& blocks) const {
   BlockIndexSet block_indices;
@@ -327,7 +332,11 @@ void declare_config(GradientTraversabilityEstimator::Config& config) {
 }
 
 GradientTraversabilityEstimator::GradientTraversabilityEstimator(const Config& config)
-    : config(config::checkValid(config)) {}
+    : config(config::checkValid(config)) {
+  min_confidence_ = config.min_confidence;
+  min_traversability_ = config.min_traversability;
+  pessimistic_ = config.pessimistic;
+}
 
 void GradientTraversabilityEstimator::updateTraversability(
     const ActiveWindowOutput& msg) {
@@ -425,10 +434,7 @@ void GradientTraversabilityEstimator::computeTraversability(
         int num_neighbors_observed = 0;
 
         for (const auto& offset : kNeighborOffsets) {
-          const Index2D neighbor_idx(center_idx.x() + offset.x(),
-                                     center_idx.y() + offset.y());
-
-          auto neighbor_it = grad_height_map.find(neighbor_idx);
+          auto neighbor_it = grad_height_map.find(center_idx + offset);
           if (neighbor_it == grad_height_map.end()) {
             continue;
           }
@@ -450,25 +456,6 @@ void GradientTraversabilityEstimator::computeTraversability(
         classifyTraversabilityVoxel(trav_voxel);
       }
     }
-  }
-}
-
-void GradientTraversabilityEstimator::classifyTraversabilityVoxel(
-    TraversabilityVoxel& voxel) const {
-  if (voxel.confidence <= 0.0f) {
-    voxel.state = TraversabilityState::UNKNOWN;
-    return;
-  }
-  if (voxel.confidence >= config.min_confidence) {
-    if (voxel.traversability >= config.min_traversability) {
-      voxel.state = TraversabilityState::TRAVERSABLE;
-    } else {
-      voxel.state = TraversabilityState::INTRAVERSABLE;
-    }
-  } else if (config.pessimistic && voxel.traversability < config.min_traversability) {
-    voxel.state = TraversabilityState::INTRAVERSABLE;
-  } else {
-    voxel.state = TraversabilityState::UNKNOWN;
   }
 }
 

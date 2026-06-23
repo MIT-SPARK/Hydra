@@ -64,8 +64,21 @@ class TraversabilityEstimator {
     return *traversability_layer_;
   }
 
+  /**
+   * @brief Classify a traversability voxel based on its confidence and traversability.
+   * @note Default implementation uses min_confidence_, min_traversability_, and
+   * pessimistic_ set by derived class constructors. Subclasses may override for custom
+   * logic.
+   */
+  virtual void classifyTraversabilityVoxel(TraversabilityVoxel& voxel) const;
+
  protected:
   std::unique_ptr<TraversabilityLayer> traversability_layer_;
+
+  //! Thresholds for classifyTraversabilityVoxel(), set by derived class constructors.
+  float min_confidence_ = 1.0f;
+  float min_traversability_ = 1.0f;
+  bool pessimistic_ = true;
 };
 
 /**
@@ -108,7 +121,6 @@ class HeightTraversabilityEstimator : public TraversabilityEstimator {
   // Processing steps.
   void updateTsdf(const ActiveWindowOutput& msg);
   void computeTraversability(const ActiveWindowOutput& msg);
-  void classifyTraversabilityVoxel(TraversabilityVoxel& voxel) const;
 
   // Helper functions.
   BlockIndexSet get2DBlockIndices(const BlockIndices& blocks) const;
@@ -168,7 +180,6 @@ class GradientTraversabilityEstimator : public TraversabilityEstimator {
   // Processing steps (reuse updateTsdf from HeightTraversabilityEstimator).
   void updateTsdf(const ActiveWindowOutput& msg);
   void computeTraversability(const ActiveWindowOutput& msg);
-  void classifyTraversabilityVoxel(TraversabilityVoxel& voxel) const;
 
   float computeTraversabilityFromGradient(float gradient) const;
 
