@@ -52,6 +52,96 @@ static const auto gradient_registration_ =
                                    GradientTraversabilityEstimator,
                                    GradientTraversabilityEstimator::Config>(
         "GradientTraversabilityEstimator");
+
+// Box-filter smoothing of a 2D height map: each cell becomes the average of
+// itself and its observed neighbors. Removes projective TSDF radial bias
+// (ripple artifact).
+Index2DMap<float> smoothHeightMap(const Index2DMap<float>& height_map,
+                                  const std::array<Index2D, 8>& neighbor_offsets) {
+  Index2DMap<float> smoothed;
+  smoothed.reserve(height_map.size());
+  for (const auto& [center_idx, center_height] : height_map) {
+    float height_sum = center_height;
+    int count = 1;
+    for (const auto& offset : neighbor_offsets) {
+      auto it = height_map.find(center_idx + offset);
+      if (it != height_map.end()) {
+        height_sum += it->second;
+        count++;
+      }
+    }
+    smoothed[center_idx] = height_sum / count;
+  }
+  return smoothed;
+}
+
+BlockIndexSet get2DBlockIndices(const BlockIndices& blocks) {
+  BlockIndexSet block_indices;
+  for (const auto& block : blocks) {
+    block_indices.emplace(BlockIndex(block.x(), block.y(), 0));
+  }
+  return block_indices;
+}
+
+// Build a 2D height map from a TSDF layer by scanning each vertical column of
+// voxels for the highest surface voxel within the robot's vertical scan window.
+// Uses block/local index access directly to avoid the signed/unsigned division
+// bug in spatial_hash::blockIndexFromGlobalIndex that corrupts getVoxelPtr
+// lookups for negative world coordinates.
+Index2DMap<float> extractHeightMap(const TsdfLayer& tsdf_layer,
+                                   const BlockIndexSet& blocks_2d,
+                                   float robot_z,
+                                   float height_below,
+                                   float height_above,
+                                   float min_weight) {
+  const float voxel_size = tsdf_layer.voxel_size;
+  const int vps = static_cast<int>(tsdf_layer.voxels_per_side);
+
+  const VoxelKey min_key = tsdf_layer.getVoxelKey(Point(0, 0, robot_z - height_below));
+  const VoxelKey max_key = tsdf_layer.getVoxelKey(Point(0, 0, robot_z + height_above));
+
+  Index2DMap<float> height_map;
+  for (const auto& block_idx_2d : blocks_2d) {
+    for (int x = 0; x < vps; ++x) {
+      for (int y = 0; y < vps; ++y) {
+        // Scan the vertical column top-to-bottom and record the highest surface.
+        for (int block_z = max_key.first.z(); block_z >= min_key.first.z(); --block_z) {
+          const auto tsdf_block = tsdf_layer.getBlockPtr(
+              BlockIndex(block_idx_2d.x(), block_idx_2d.y(), block_z));
+          if (!tsdf_block) {
+            continue;
+          }
+
+          const int min_voxel_z = block_z == min_key.first.z() ? min_key.second.z() : 0;
+          const int max_voxel_z =
+              block_z == max_key.first.z() ? max_key.second.z() : vps - 1;
+
+          bool found = false;
+          for (int z = max_voxel_z; z >= min_voxel_z; --z) {
+            const auto& voxel = tsdf_block->getVoxel(VoxelIndex(x, y, z));
+            if (voxel.weight < min_weight) {
+              continue;
+            }
+            if (voxel.distance < voxel_size) {
+              const VoxelKey key(
+                  BlockIndex(block_idx_2d.x(), block_idx_2d.y(), block_z),
+                  VoxelIndex(x, y, z));
+              const Index2D map_key(block_idx_2d.x() * vps + x,
+                                    block_idx_2d.y() * vps + y);
+              height_map[map_key] = tsdf_layer.getVoxelPosition(key).z();
+              found = true;
+              break;
+            }
+          }
+          if (found) {
+            break;
+          }
+        }
+      }
+    }
+  }
+  return height_map;
+}
 }  // namespace
 
 using spark_dsg::TraversabilityState;
@@ -289,46 +379,19 @@ void GradientTraversabilityEstimator::computeTraversability(
 
   // PASS 1: Extract heights from ALL currently allocated TSDF blocks (not just
   // previously-processed traversability blocks), so newly-seen areas are included.
-  Index2DMap<float> height_map;
-
   const auto all_blocks_2d = get2DBlockIndices(tsdf_layer_->allocatedBlockIndices());
-  for (const auto& block_idx_2d : all_blocks_2d) {
-    for (int x = 0; x < voxels_per_side; ++x) {
-      for (int y = 0; y < voxels_per_side; ++y) {
-        std::optional<float> surface_height =
-            extractSurfaceHeight(block_idx_2d, VoxelIndex(x, y, 0), robot_z);
-
-        if (surface_height) {
-          const Index2D key(block_idx_2d.x() * voxels_per_side + x,
-                            block_idx_2d.y() * voxels_per_side + y);
-          height_map[key] = *surface_height;
-        }
-      }
-    }
-  }
+  const Index2DMap<float> height_map = extractHeightMap(*tsdf_layer_,
+                                                        all_blocks_2d,
+                                                        robot_z,
+                                                        config.height_below,
+                                                        config.height_above,
+                                                        config.min_weight);
 
   // Optionally smooth height map to remove projective TSDF radial bias (ripple
   // artifact). For each voxel, replace its height with the average of itself and
   // observed neighbors.
-  Index2DMap<float> smoothed_height_map;
-  if (config.smoothing) {
-    smoothed_height_map.reserve(height_map.size());
-    for (const auto& [center_idx, center_height] : height_map) {
-      float height_sum = center_height;
-      int count = 1;
-      for (const auto& offset : kNeighborOffsets) {
-        auto it = height_map.find(
-            Index2D(center_idx.x() + offset.x(), center_idx.y() + offset.y()));
-        if (it != height_map.end()) {
-          height_sum += it->second;
-          count++;
-        }
-      }
-      smoothed_height_map[center_idx] = height_sum / count;
-    }
-  }
   const Index2DMap<float>& grad_height_map =
-      config.smoothing ? smoothed_height_map : height_map;
+      config.smoothing ? smoothHeightMap(height_map, kNeighborOffsets) : height_map;
 
   // PASS 2: Update ONLY the blocks that were updated in TSDF.
   for (auto& block_idx_2d : updated_blocks_2d) {
@@ -373,7 +436,8 @@ void GradientTraversabilityEstimator::computeTraversability(
           num_neighbors_observed++;
 
           const float height_diff = std::abs(neighbor_it->second - center_height);
-          const float horiz_dist = computeHorizontalDistance(offset);
+          const float horiz_dist =
+              tsdf_layer_->voxel_size * offset.cast<float>().norm();
           gradient_sum += height_diff / horiz_dist;
         }
 
@@ -406,71 +470,6 @@ void GradientTraversabilityEstimator::classifyTraversabilityVoxel(
   } else {
     voxel.state = TraversabilityState::UNKNOWN;
   }
-}
-
-BlockIndexSet GradientTraversabilityEstimator::get2DBlockIndices(
-    const BlockIndices& blocks) const {
-  BlockIndexSet block_indices;
-  for (const auto& block : blocks) {
-    block_indices.emplace(BlockIndex(block.x(), block.y(), 0));
-  }
-  return block_indices;
-}
-
-std::optional<float> GradientTraversabilityEstimator::extractSurfaceHeight(
-    const BlockIndex& block_2d_index, const VoxelIndex& local_2d, float robot_z) const {
-  // Find the highest surface voxel in the vertical column by scanning top to bottom.
-  // Uses block/local index access directly (same pattern as
-  // HeightTraversabilityEstimator) to avoid the signed/unsigned division bug in
-  // spatial_hash::blockIndexFromGlobalIndex, which corrupts getVoxelPtr lookups for any
-  // negative world coordinate.
-  const float voxel_size = tsdf_layer_->voxel_size;
-  const int vps = static_cast<int>(tsdf_layer_->voxels_per_side);
-
-  const VoxelKey min_key =
-      tsdf_layer_->getVoxelKey(Point(0, 0, robot_z - config.height_below));
-  const VoxelKey max_key =
-      tsdf_layer_->getVoxelKey(Point(0, 0, robot_z + config.height_above));
-
-  for (int block_z = max_key.first.z(); block_z >= min_key.first.z(); --block_z) {
-    const auto tsdf_block = tsdf_layer_->getBlockPtr(
-        BlockIndex(block_2d_index.x(), block_2d_index.y(), block_z));
-    if (!tsdf_block) {
-      continue;
-    }
-
-    const int min_voxel_z = block_z == min_key.first.z() ? min_key.second.z() : 0;
-    const int max_voxel_z = block_z == max_key.first.z() ? max_key.second.z() : vps - 1;
-
-    for (int z = max_voxel_z; z >= min_voxel_z; --z) {
-      const auto& voxel =
-          tsdf_block->getVoxel(VoxelIndex(local_2d.x(), local_2d.y(), z));
-      if (voxel.weight < config.min_weight) {
-        continue;
-      }
-
-      if (voxel.distance < voxel_size) {
-        const VoxelKey key(BlockIndex(block_2d_index.x(), block_2d_index.y(), block_z),
-                           VoxelIndex(local_2d.x(), local_2d.y(), z));
-        return tsdf_layer_->getVoxelPosition(key).z();
-      }
-    }
-  }
-
-  return std::nullopt;
-}
-
-float GradientTraversabilityEstimator::computeHorizontalDistance(
-    const Index2D& offset) const {
-  const float voxel_size = tsdf_layer_->voxel_size;
-
-  // Diagonal: sqrt(2) * voxel_size.
-  if (offset.x() != 0 && offset.y() != 0) {
-    return voxel_size * std::sqrt(2.0f);
-  }
-
-  // Cardinal: voxel_size.
-  return voxel_size;
 }
 
 float GradientTraversabilityEstimator::computeTraversabilityFromGradient(
