@@ -100,6 +100,7 @@ class TraversabilityEstimator {
     bool pessimistic = true;
   } const config;
 
+  explicit TraversabilityEstimator(const Config& config) : config(config) {}
   virtual ~TraversabilityEstimator() = default;
 
   /**
@@ -122,8 +123,6 @@ class TraversabilityEstimator {
   virtual void classifyTraversabilityVoxel(TraversabilityVoxel& voxel) const;
 
  protected:
-  explicit TraversabilityEstimator(const Config& config) : config(config) {}
-
   std::unique_ptr<TraversabilityLayer> traversability_layer_;
 };
 

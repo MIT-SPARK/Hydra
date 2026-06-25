@@ -111,6 +111,11 @@ std::optional<float> extractSurfaceHeight(const TsdfLayer& layer,
   return std::nullopt;
 }
 
+// Build a 2D height map from a TSDF layer by scanning each vertical column of
+// voxels for the highest surface voxel within the robot's vertical scan window.
+// Uses block/local index access directly to avoid the signed/unsigned division
+// bug in spatial_hash::blockIndexFromGlobalIndex that corrupts getVoxelPtr
+// lookups for negative world coordinates.
 HeightMap extractHeightMap(const TsdfLayer& layer,
                            const BlockIndexSet& blocks_2d,
                            float robot_z,
