@@ -153,13 +153,13 @@ void TraversabilityEstimator::classifyTraversabilityVoxel(
     voxel.state = TraversabilityState::UNKNOWN;
     return;
   }
-  if (voxel.confidence >= min_confidence_) {
-    if (voxel.traversability >= min_traversability_) {
+  if (voxel.confidence >= config.min_confidence) {
+    if (voxel.traversability >= config.min_traversability) {
       voxel.state = TraversabilityState::TRAVERSABLE;
     } else {
       voxel.state = TraversabilityState::INTRAVERSABLE;
     }
-  } else if (pessimistic_ && voxel.traversability < min_traversability_) {
+  } else if (config.pessimistic && voxel.traversability < config.min_traversability) {
     voxel.state = TraversabilityState::INTRAVERSABLE;
   } else {
     voxel.state = TraversabilityState::UNKNOWN;
@@ -177,26 +177,27 @@ const std::array<Index2D, 8> GradientTraversabilityEstimator::kNeighborOffsets =
     {1, -1}    // bottom-right
 }};
 
-void declare_config(HeightTraversabilityEstimator::Config& config) {
+void declare_config(TraversabilityEstimator::Config& config) {
   using namespace config;
-  name("HeightTraversabilityEstimator::Config");
-  field(config.height_above, "height_above", "m");
-  field(config.height_below, "height_below", "m");
   field(config.min_confidence, "min_confidence");
   field(config.min_traversability, "min_traversability");
   field(config.pessimistic, "pessimistic");
-  checkCondition(config.height_above >= -config.height_below,
-                 "'height_above' and 'height_below' don't span any volume");
   checkInRange(config.min_confidence, 0.0f, 1.0f, "min_confidence");
   checkInRange(config.min_traversability, 0.0f, 1.0f, "min_traversability");
 }
 
-HeightTraversabilityEstimator::HeightTraversabilityEstimator(const Config& config)
-    : config(config::checkValid(config)) {
-  min_confidence_ = config.min_confidence;
-  min_traversability_ = config.min_traversability;
-  pessimistic_ = config.pessimistic;
+void declare_config(HeightTraversabilityEstimator::Config& config) {
+  using namespace config;
+  name("HeightTraversabilityEstimator::Config");
+  base<TraversabilityEstimator::Config>(config);
+  field(config.height_above, "height_above", "m");
+  field(config.height_below, "height_below", "m");
+  checkCondition(config.height_above >= -config.height_below,
+                 "'height_above' and 'height_below' don't span any volume");
 }
+
+HeightTraversabilityEstimator::HeightTraversabilityEstimator(const Config& config)
+    : TraversabilityEstimator(config), config(config::checkValid(config)) {}
 
 void HeightTraversabilityEstimator::updateTraversability(
     const ActiveWindowOutput& msg) {
@@ -314,28 +315,23 @@ BlockIndexSet HeightTraversabilityEstimator::get2DBlockIndices(
 void declare_config(GradientTraversabilityEstimator::Config& config) {
   using namespace config;
   name("GradientTraversabilityEstimator::Config");
+  base<TraversabilityEstimator::Config>(config);
   field(config.gradient_threshold, "gradient_threshold");
   field(config.height_above, "height_above", "m");
   field(config.height_below, "height_below", "m");
   field(config.min_weight, "min_weight");
-  field(config.min_confidence, "min_confidence");
-  field(config.min_traversability, "min_traversability");
-  field(config.pessimistic, "pessimistic");
   field(config.smoothing, "smoothing");
 
   checkCondition(config.gradient_threshold > 0.0f,
                  "gradient_threshold must be positive");
   checkCondition(config.height_above >= -config.height_below,
                  "'height_above' and 'height_below' don't span any volume");
-  checkInRange(config.min_confidence, 0.0f, 1.0f, "min_confidence");
-  checkInRange(config.min_traversability, 0.0f, 1.0f, "min_traversability");
 }
 
 GradientTraversabilityEstimator::GradientTraversabilityEstimator(const Config& config)
-    : config(config::checkValid(config)) {
-  min_confidence_ = config.min_confidence;
-  min_traversability_ = config.min_traversability;
-  pessimistic_ = config.pessimistic;
+    : TraversabilityEstimator(config), config(config::checkValid(config)) {
+  LOG(INFO) << "Created GradientTraversabilityEstimator with min traversability: "
+            << config.min_traversability;
 }
 
 void GradientTraversabilityEstimator::updateTraversability(

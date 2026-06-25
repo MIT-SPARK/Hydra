@@ -49,8 +49,19 @@ class TraversabilityEstimator {
  public:
   using Ptr = std::shared_ptr<TraversabilityEstimator>;
   using ConstPtr = std::shared_ptr<const TraversabilityEstimator>;
+  struct Config {
+    //! @brief Minimum confidence for a voxel to be considered observed.
+    float min_confidence = 1.0f;
 
-  TraversabilityEstimator() = default;
+    //! @brief Minimum traversability for a voxel to be considered traversable.
+    float min_traversability = 1.0f;
+
+    //! @brief If true, mark voxels as intraversable if they do not meet the
+    //! min_traversability threshold, even if the confidence is below min_confidence. If
+    //! false, mark these voxels as unknown instead.
+    bool pessimistic = true;
+  } const config;
+
   virtual ~TraversabilityEstimator() = default;
 
   /**
@@ -73,13 +84,12 @@ class TraversabilityEstimator {
   virtual void classifyTraversabilityVoxel(TraversabilityVoxel& voxel) const;
 
  protected:
-  std::unique_ptr<TraversabilityLayer> traversability_layer_;
+  explicit TraversabilityEstimator(const Config& config) : config(config) {}
 
-  //! Thresholds for classifyTraversabilityVoxel(), set by derived class constructors.
-  float min_confidence_ = 1.0f;
-  float min_traversability_ = 1.0f;
-  bool pessimistic_ = true;
+  std::unique_ptr<TraversabilityLayer> traversability_layer_;
 };
+
+void declare_config(TraversabilityEstimator::Config& config);
 
 /**
  * @brief Simple traversability estimator which checks a specified volume in the TSDF
@@ -89,23 +99,12 @@ class TraversabilityEstimator {
  */
 class HeightTraversabilityEstimator : public TraversabilityEstimator {
  public:
-  struct Config {
+  struct Config : public TraversabilityEstimator::Config {
     //! @brief The height above the robot body to consider for traversability in meters.
     float height_above = 0.5f;
 
     //! @brief The height below the robot body to consider for traversability in meters.
     float height_below = 0.5f;
-
-    //! @brief Minimum confidence for a voxel to be considered observed.
-    float min_confidence = 1.0f;
-
-    //! @brief Minimum traversability for a voxel to be considered traversable.
-    float min_traversability = 1.0f;
-
-    //! @brief If true, mark voxels as intraversable if they do not meet the
-    //! min_traversability threshold, even if the confidence is below min_confidence. If
-    //! false, mark these voxels as unknown instead.
-    bool pessimistic = true;
   };
 
   HeightTraversabilityEstimator(const Config& config);
@@ -136,7 +135,7 @@ void declare_config(HeightTraversabilityEstimator::Config& config);
  */
 class GradientTraversabilityEstimator : public TraversabilityEstimator {
  public:
-  struct Config {
+  struct Config : public TraversabilityEstimator::Config {
     //! @brief Maximum traversable gradient (m/m). Gradient >= threshold →
     //! traversability = 0. Gradient = 0 → traversability = 1. Linear interpolation
     //! between.
@@ -150,17 +149,6 @@ class GradientTraversabilityEstimator : public TraversabilityEstimator {
 
     //! @brief Minimum TSDF weight to consider voxel observed.
     float min_weight = 1.0e-6f;
-
-    //! @brief Minimum confidence for a voxel to be considered observed.
-    float min_confidence = 0.5f;
-
-    //! @brief Minimum traversability for a voxel to be considered traversable.
-    float min_traversability = 0.5f;
-
-    //! @brief If true, mark voxels as intraversable if they do not meet the
-    //! min_traversability threshold, even if the confidence is below min_confidence. If
-    //! false, mark these voxels as unknown instead.
-    bool pessimistic = true;
 
     //! @brief If true, smooth the height map with a box filter before computing
     //! gradients, reducing the ripple artifact caused by projective TSDF radial bias.
