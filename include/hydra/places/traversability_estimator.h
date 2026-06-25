@@ -34,16 +34,54 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
+#include <hydra/common/output_sink.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <spark_dsg/dynamic_scene_graph.h>
 
 #include <memory>
+#include <optional>
 
 #include "hydra/active_window/active_window_output.h"
 #include "hydra/places/traversability_layer.h"
 #include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::places {
+
+struct GradientInfo {
+  float gradient = 0.0f;    // mean gradient magnitude
+  float confidence = 0.0f;  // num_neighbors / 8.0
+};
+
+using HeightMap = Index2DMap<float>;
+using GradientMap = Index2DMap<GradientInfo>;
+
+// Scan one vertical column for the highest surface voxel within [min_z, max_z].
+// Uses block/local index access to avoid the signed/unsigned division bug in
+// spatial_hash::blockIndexFromGlobalIndex for negative world coordinates.
+// Returns the voxel height if found (weight >= min_weight && distance < voxel_size).
+std::optional<float> extractSurfaceHeight(const TsdfLayer& layer,
+                                          const BlockIndex& block_2d_index,
+                                          const VoxelIndex& local_2d,
+                                          float min_z,
+                                          float max_z,
+                                          float min_weight);
+
+// Extract terrain surface heights from TSDF within a vertical window around robot_z.
+HeightMap extractHeightMap(const TsdfLayer& layer,
+                           const BlockIndexSet& blocks_2d,
+                           float robot_z,
+                           float height_below,
+                           float height_above,
+                           float min_weight);
+
+// Box-filter smoothing to reduce projective TSDF radial bias (ripple artifact).
+HeightMap smoothHeightMap(const HeightMap& height_map);
+
+// Compute mean 8-way gradient magnitude and neighbor confidence for each cell.
+GradientMap computeGradientMap(const HeightMap& height_map, float voxel_size);
+
+// Linear interpolation: 1.0 at gradient=0, 0.0 at gradient=threshold.
+float computeTraversabilityFromGradient(float gradient, float gradient_threshold);
 
 class TraversabilityEstimator {
  public:
@@ -135,6 +173,9 @@ void declare_config(HeightTraversabilityEstimator::Config& config);
  */
 class GradientTraversabilityEstimator : public TraversabilityEstimator {
  public:
+  using Sink = hydra::
+      OutputSink<const HeightMap&, const GradientMap&, const ActiveWindowOutput&>;
+
   struct Config : public TraversabilityEstimator::Config {
     //! @brief Maximum traversable gradient (m/m). Gradient >= threshold →
     //! traversability = 0. Gradient = 0 → traversability = 1. Linear interpolation
@@ -153,6 +194,9 @@ class GradientTraversabilityEstimator : public TraversabilityEstimator {
     //! @brief If true, smooth the height map with a box filter before computing
     //! gradients, reducing the ripple artifact caused by projective TSDF radial bias.
     bool smoothing = true;
+
+    //! @brief Downstream consumers of the height map and gradient map.
+    std::vector<Sink::Factory> sinks;
   };
 
   GradientTraversabilityEstimator(const Config& config);
@@ -161,6 +205,7 @@ class GradientTraversabilityEstimator : public TraversabilityEstimator {
   void updateTraversability(const ActiveWindowOutput& msg) override;
 
   const Config config;
+  Sink::List sinks_;
 
  protected:
   TsdfLayer::Ptr tsdf_layer_;
@@ -168,12 +213,6 @@ class GradientTraversabilityEstimator : public TraversabilityEstimator {
   // Processing steps (reuse updateTsdf from HeightTraversabilityEstimator).
   void updateTsdf(const ActiveWindowOutput& msg);
   void computeTraversability(const ActiveWindowOutput& msg);
-
-  float computeTraversabilityFromGradient(float gradient) const;
-
- private:
-  // 8-way neighbor offsets.
-  static const std::array<Index2D, 8> kNeighborOffsets;
 };
 
 void declare_config(GradientTraversabilityEstimator::Config& config);
