@@ -466,8 +466,8 @@ void GradientTraversabilityEstimator::computeTraversability(
     }
   }
 
-  // PASS 4: Dispatch to sinks.
-  Sink::callAll(sinks_, height_map, gradient_map, msg);
+  // PASS 4: Dispatch to sinks with the accumulated TSDF layer for bounds computation.
+  Sink::callAll(sinks_, height_map, gradient_map, msg, *tsdf_layer_);
 }
 
 }  // namespace hydra::places

@@ -173,8 +173,10 @@ void declare_config(HeightTraversabilityEstimator::Config& config);
  */
 class GradientTraversabilityEstimator : public TraversabilityEstimator {
  public:
-  using Sink = hydra::
-      OutputSink<const HeightMap&, const GradientMap&, const ActiveWindowOutput&>;
+  using Sink = hydra::OutputSink<const HeightMap&,
+                                 const GradientMap&,
+                                 const ActiveWindowOutput&,
+                                 const TsdfLayer&>;
 
   struct Config : public TraversabilityEstimator::Config {
     //! @brief Maximum traversable gradient (m/m). Gradient >= threshold →
