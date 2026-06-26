@@ -34,10 +34,12 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
+#include <hydra/common/output_sink.h>
 #include <kimera_pgmo/mesh_delta.h>
 #include <spark_dsg/dynamic_scene_graph.h>
 
 #include <memory>
+#include <optional>
 
 #include "hydra/active_window/active_window_output.h"
 #include "hydra/places/traversability_layer.h"
@@ -45,12 +47,60 @@
 
 namespace hydra::places {
 
+struct GradientInfo {
+  float gradient = 0.0f;    // mean gradient magnitude
+  float confidence = 0.0f;  // num_neighbors / 8.0
+};
+
+using HeightMap = Index2DMap<float>;
+using GradientMap = Index2DMap<GradientInfo>;
+
+// Scan one vertical column for the highest surface voxel within [min_z, max_z].
+// Uses block/local index access to avoid the signed/unsigned division bug in
+// spatial_hash::blockIndexFromGlobalIndex for negative world coordinates.
+// Returns the voxel height if found (weight >= min_weight && distance < voxel_size).
+std::optional<float> extractSurfaceHeight(const TsdfLayer& layer,
+                                          const BlockIndex& block_2d_index,
+                                          const VoxelIndex& local_2d,
+                                          float min_z,
+                                          float max_z,
+                                          float min_weight);
+
+// Extract terrain surface heights from TSDF within a vertical window around robot_z.
+HeightMap extractHeightMap(const TsdfLayer& layer,
+                           const BlockIndexSet& blocks_2d,
+                           float robot_z,
+                           float height_below,
+                           float height_above,
+                           float min_weight);
+
+// Box-filter smoothing to reduce projective TSDF radial bias (ripple artifact).
+HeightMap smoothHeightMap(const HeightMap& height_map);
+
+// Compute mean 8-way gradient magnitude and neighbor confidence for each cell.
+GradientMap computeGradientMap(const HeightMap& height_map, float voxel_size);
+
+// Linear interpolation: 1.0 at gradient=0, 0.0 at gradient=threshold.
+float computeTraversabilityFromGradient(float gradient, float gradient_threshold);
+
 class TraversabilityEstimator {
  public:
   using Ptr = std::shared_ptr<TraversabilityEstimator>;
   using ConstPtr = std::shared_ptr<const TraversabilityEstimator>;
+  struct Config {
+    //! @brief Minimum confidence for a voxel to be considered observed.
+    float min_confidence = 1.0f;
 
-  TraversabilityEstimator() = default;
+    //! @brief Minimum traversability for a voxel to be considered traversable.
+    float min_traversability = 1.0f;
+
+    //! @brief If true, mark voxels as intraversable if they do not meet the
+    //! min_traversability threshold, even if the confidence is below min_confidence. If
+    //! false, mark these voxels as unknown instead.
+    bool pessimistic = true;
+  } const config;
+
+  explicit TraversabilityEstimator(const Config& config) : config(config) {}
   virtual ~TraversabilityEstimator() = default;
 
   /**
@@ -64,9 +114,19 @@ class TraversabilityEstimator {
     return *traversability_layer_;
   }
 
+  /**
+   * @brief Classify a traversability voxel based on its confidence and traversability.
+   * @note Default implementation uses min_confidence_, min_traversability_, and
+   * pessimistic_ set by derived class constructors. Subclasses may override for custom
+   * logic.
+   */
+  virtual void classifyTraversabilityVoxel(TraversabilityVoxel& voxel) const;
+
  protected:
   std::unique_ptr<TraversabilityLayer> traversability_layer_;
 };
+
+void declare_config(TraversabilityEstimator::Config& config);
 
 /**
  * @brief Simple traversability estimator which checks a specified volume in the TSDF
@@ -76,23 +136,12 @@ class TraversabilityEstimator {
  */
 class HeightTraversabilityEstimator : public TraversabilityEstimator {
  public:
-  struct Config {
+  struct Config : public TraversabilityEstimator::Config {
     //! @brief The height above the robot body to consider for traversability in meters.
     float height_above = 0.5f;
 
     //! @brief The height below the robot body to consider for traversability in meters.
     float height_below = 0.5f;
-
-    //! @brief Minimum confidence for a voxel to be considered observed.
-    float min_confidence = 1.0f;
-
-    //! @brief Minimum traversability for a voxel to be considered traversable.
-    float min_traversability = 1.0f;
-
-    //! @brief If true, mark voxels as intraversable if they do not meet the
-    //! min_traversability threshold, even if the confidence is below min_confidence. If
-    //! false, mark these voxels as unknown instead.
-    bool pessimistic = true;
   };
 
   HeightTraversabilityEstimator(const Config& config);
@@ -108,7 +157,6 @@ class HeightTraversabilityEstimator : public TraversabilityEstimator {
   // Processing steps.
   void updateTsdf(const ActiveWindowOutput& msg);
   void computeTraversability(const ActiveWindowOutput& msg);
-  void classifyTraversabilityVoxel(TraversabilityVoxel& voxel) const;
 
   // Helper functions.
   BlockIndexSet get2DBlockIndices(const BlockIndices& blocks) const;
@@ -124,7 +172,12 @@ void declare_config(HeightTraversabilityEstimator::Config& config);
  */
 class GradientTraversabilityEstimator : public TraversabilityEstimator {
  public:
-  struct Config {
+  using Sink = hydra::OutputSink<const HeightMap&,
+                                 const GradientMap&,
+                                 const ActiveWindowOutput&,
+                                 const TsdfLayer&>;
+
+  struct Config : public TraversabilityEstimator::Config {
     //! @brief Maximum traversable gradient (m/m). Gradient >= threshold →
     //! traversability = 0. Gradient = 0 → traversability = 1. Linear interpolation
     //! between.
@@ -139,20 +192,12 @@ class GradientTraversabilityEstimator : public TraversabilityEstimator {
     //! @brief Minimum TSDF weight to consider voxel observed.
     float min_weight = 1.0e-6f;
 
-    //! @brief Minimum confidence for a voxel to be considered observed.
-    float min_confidence = 0.5f;
-
-    //! @brief Minimum traversability for a voxel to be considered traversable.
-    float min_traversability = 0.5f;
-
-    //! @brief If true, mark voxels as intraversable if they do not meet the
-    //! min_traversability threshold, even if the confidence is below min_confidence. If
-    //! false, mark these voxels as unknown instead.
-    bool pessimistic = true;
-
     //! @brief If true, smooth the height map with a box filter before computing
     //! gradients, reducing the ripple artifact caused by projective TSDF radial bias.
     bool smoothing = true;
+
+    //! @brief Downstream consumers of the height map and gradient map.
+    std::vector<Sink::Factory> sinks;
   };
 
   GradientTraversabilityEstimator(const Config& config);
@@ -161,6 +206,7 @@ class GradientTraversabilityEstimator : public TraversabilityEstimator {
   void updateTraversability(const ActiveWindowOutput& msg) override;
 
   const Config config;
+  Sink::List sinks_;
 
  protected:
   TsdfLayer::Ptr tsdf_layer_;
@@ -168,22 +214,6 @@ class GradientTraversabilityEstimator : public TraversabilityEstimator {
   // Processing steps (reuse updateTsdf from HeightTraversabilityEstimator).
   void updateTsdf(const ActiveWindowOutput& msg);
   void computeTraversability(const ActiveWindowOutput& msg);
-  void classifyTraversabilityVoxel(TraversabilityVoxel& voxel) const;
-
-  // Helper functions.
-  BlockIndexSet get2DBlockIndices(const BlockIndices& blocks) const;
-
-  std::optional<float> extractSurfaceHeight(const BlockIndex& block_2d_index,
-                                            const VoxelIndex& local_2d,
-                                            float robot_z) const;
-
-  float computeHorizontalDistance(const Index2D& offset) const;
-
-  float computeTraversabilityFromGradient(float gradient) const;
-
- private:
-  // 8-way neighbor offsets.
-  static const std::array<Index2D, 8> kNeighborOffsets;
 };
 
 void declare_config(GradientTraversabilityEstimator::Config& config);
