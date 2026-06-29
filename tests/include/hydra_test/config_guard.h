@@ -44,9 +44,13 @@ struct ConfigGuard {
     }
   }
 
-  static ConfigGuard FixedLabels(size_t num_labels) {
+  [[nodiscard]] static ConfigGuard FixedLabels(size_t num_labels) {
+    Labelspace labelspace;
+    labelspace.total_labels = num_labels;
+
     PipelineConfig config;
-    config.label_space.total_labels = num_labels;
+    config.labelspace = labelspace;
+
     GlobalInfo::init(config);
     return ConfigGuard(false);
   }

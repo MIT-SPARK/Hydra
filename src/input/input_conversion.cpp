@@ -82,7 +82,9 @@ bool normalizeData(InputData& data, bool normalize_labels) {
   return true;
 }
 
-bool colorToLabels(cv::Mat& label_image, const cv::Mat& colors) {
+bool colorToLabels(const SemanticColorMap& colormap,
+                   cv::Mat& label_image,
+                   const cv::Mat& colors) {
   if (colors.empty() || colors.channels() != 3) {
     LOG(ERROR) << "color image required to decode semantic labels";
     return false;
@@ -90,35 +92,22 @@ bool colorToLabels(cv::Mat& label_image, const cv::Mat& colors) {
 
   CHECK_EQ(colors.type(), CV_8UC3);
 
-  const auto colormap_ptr = GlobalInfo::instance().getSemanticColorMap();
-  if (!colormap_ptr || !colormap_ptr->isValid()) {
-    LOG(ERROR)
-        << "label colormap not valid, but required for converting colors to labels!";
-    return false;
-  }
-
-  cv::Mat new_label_image(colors.size(), CV_32SC1);
+  label_image = cv::Mat(colors.size(), CV_32SC1);
   for (int r = 0; r < colors.rows; ++r) {
     for (int c = 0; c < colors.cols; ++c) {
       const auto& pixel = colors.at<cv::Vec3b>(r, c);
-      spark_dsg::Color color(pixel[0], pixel[1], pixel[2]);
+      const spark_dsg::Color color(pixel[0], pixel[1], pixel[2]);
       // this is lazy, but works out to the same invalid label we normally use
-      new_label_image.at<int32_t>(r, c) =
-          colormap_ptr->getLabelFromColor(color).value_or(-1);
+      label_image.at<int32_t>(r, c) = colormap.getLabelFromColor(color).value_or(-1);
     }
   }
 
-  label_image = new_label_image;
   return true;
 }
 
 bool convertLabels(InputData& data) {
   if (data.label_image.empty()) {
-    return colorToLabels(data.label_image, data.color_image);
-  }
-
-  if (data.label_image.channels() != 1) {
-    return colorToLabels(data.label_image, data.label_image);
+    return false;
   }
 
   // Enforcing requirement for int32_t at this point
@@ -128,14 +117,12 @@ bool convertLabels(InputData& data) {
     data.label_image = new_label_image;
   }
 
-  LabelRemapper label_remapper = GlobalInfo::instance().getLabelRemapper();
-  if (!label_remapper.empty()) {
+  const auto remap = GlobalInfo::instance().getLabelRemapper();
+  if (!remap.empty()) {
     for (int r = 0; r < data.label_image.rows; ++r) {
       for (int c = 0; c < data.label_image.cols; ++c) {
-        // TODO(marcus): any reason to cache image and reassign with a new one?
-        const auto& pixel = data.label_image.at<int32_t>(r, c);
-        data.label_image.at<int32_t>(r, c) =
-            label_remapper.remapLabel(pixel).value_or(-1);
+        const auto pixel = data.label_image.at<int32_t>(r, c);
+        data.label_image.at<int32_t>(r, c) = remap.remapLabel(pixel).value_or(-1);
       }
     }
   }

@@ -73,7 +73,7 @@ static const auto registration_single =
 }  // namespace
 
 MLESemanticIntegrator::MLESemanticIntegrator(const Config& config) : config(config) {
-  total_labels_ = GlobalInfo::instance().getTotalLabels();
+  total_labels_ = GlobalInfo::instance().labelspace().total_labels;
   init_likelihood_ = std::log(1.0f / static_cast<float>(total_labels_));
 
   const auto match_likelihood = std::log(config.label_confidence);

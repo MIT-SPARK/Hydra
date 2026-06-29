@@ -5,8 +5,7 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/global_info.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/graph_update.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/hydra_pipeline.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/label_remapper.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/label_space_config.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/labelspace.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/node_matchers.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/pipeline_queues.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/robot_prefix_config.cpp

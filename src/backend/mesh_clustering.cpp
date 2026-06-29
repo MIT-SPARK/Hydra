@@ -85,10 +85,10 @@ using spatial_hash::LongIndex;
 using BlockInfo = MeshLabelClustering::BlockInfo;
 
 BlockInfo::BlockInfo()
-    : counts(Eigen::VectorXi::Zero(GlobalInfo::instance().getTotalLabels())) {}
+    : counts(Eigen::VectorXi::Zero(GlobalInfo::instance().labelspace().total_labels)) {}
 
 BlockInfo::BlockInfo(const Eigen::Vector3f& pos, float resolution)
-    : counts(Eigen::VectorXi::Zero(GlobalInfo::instance().getTotalLabels())),
+    : counts(Eigen::VectorXi::Zero(GlobalInfo::instance().labelspace().total_labels)),
       bbox(Eigen::Vector3f::Constant(resolution), pos) {}
 
 MeshLabelClustering::MeshLabelClustering(float resolution)
