@@ -36,14 +36,12 @@
 #include <config_utilities/virtual_config.h>
 #include <spark_dsg/mesh.h>
 
-#include <array>
 #include <atomic>
 #include <map>
 #include <memory>
 #include <vector>
 
-#include "hydra/common/label_remapper.h"
-#include "hydra/common/label_space_config.h"
+#include "hydra/common/labelspace.h"
 #include "hydra/common/robot_prefix_config.h"
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/input/sensor.h"
@@ -103,9 +101,9 @@ struct PipelineConfig {
   //! Default windowing function that determines the active window
   config::VirtualConfig<VolumetricWindow> map_window{SpatialWindowChecker::Config()};
   //! Closed-set labelspace information
-  LabelSpaceConfig label_space;
-  //! Human readable category names for the labelspace
-  std::map<uint32_t, std::string> label_names;
+  config::VirtualConfig<Labelspace> labelspace{Labelspace{}};
+  //! Optional remapping for input labels
+  std::filesystem::path label_remap_filepath;
   //! Configuration for scene graph mesh fields
   MeshFieldConfig mesh;
   //! @brief Layers in the scene graph that use the labelspace
@@ -124,9 +122,11 @@ class GlobalInfo {
   // this invalidates any instances (mostly intended for testing)
   static void reset();
 
-  void setForceShutdown(bool force_shutdown);
-
   bool force_shutdown() const;
+
+  const Labelspace& labelspace() const;
+
+  void setForceShutdown(bool force_shutdown);
 
   const PipelineConfig& getConfig() const;
 
@@ -134,15 +134,7 @@ class GlobalInfo {
 
   const RobotPrefixConfig& getRobotPrefix() const;
 
-  const std::map<uint32_t, std::string>& getLabelToNameMap() const;
-
-  const LabelSpaceConfig& getLabelSpaceConfig() const;
-
-  size_t getTotalLabels() const;
-
   const LabelRemapper& getLabelRemapper() const;
-
-  const SemanticColorMap* getSemanticColorMap() const;
 
   SharedDsgInfo::Ptr createSharedDsg() const;
 
@@ -159,8 +151,6 @@ class GlobalInfo {
  private:
   GlobalInfo();
 
-  void configureTimers();
-
   void initFromConfig(const PipelineConfig& config, int robot_id);
 
  private:
@@ -170,8 +160,8 @@ class GlobalInfo {
   PipelineConfig config_;
   RobotPrefixConfig robot_prefix_;
   LabelRemapper label_remapper_;
-  std::shared_ptr<SemanticColorMap> label_colormap_;
 
+  std::unique_ptr<Labelspace> labelspace_;
   std::map<std::string, std::shared_ptr<const Sensor>> sensors_;
 };
 

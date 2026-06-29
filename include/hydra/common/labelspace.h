@@ -35,20 +35,44 @@
 #pragma once
 #include <cstdint>
 #include <filesystem>
+#include <map>
+#include <optional>
 #include <set>
+#include <string>
 
 namespace hydra {
 
-struct LabelSpaceConfig {
+struct Labelspace {
+  //! Number of total labels in the labelspace
   size_t total_labels = 0;
+  //! Labels that should be treated as dynamic
   std::set<uint32_t> dynamic_labels;
+  //! Labels that should be treated as invalid (e.g., sky, unknown)
   std::set<uint32_t> invalid_labels;
+  //! Labels to use for object extraction
   std::set<uint32_t> object_labels;
+  //! Labels to use for mesh place extraction
   std::set<uint32_t> surface_places_labels;
-  std::filesystem::path colormap_filepath;
-  std::filesystem::path label_remap_filepath;
+  //! Human readable category names for the labelspace
+  std::map<uint32_t, std::string> label_names;
 };
 
-void declare_config(LabelSpaceConfig& conf);
+void declare_config(Labelspace& config);
+
+class LabelRemapper {
+ public:
+  // Construction
+  LabelRemapper();
+  explicit LabelRemapper(const std::filesystem::path& filepath);
+  virtual ~LabelRemapper() = default;
+
+  std::optional<uint32_t> remapLabel(const uint32_t from) const;
+
+  bool empty() const;
+  operator bool() const;
+
+ private:
+  std::map<uint32_t, uint32_t> label_remapping_;
+};
 
 }  // namespace hydra

@@ -165,12 +165,12 @@ void ActiveWindowModule::addSink(const Sink::Ptr& sink) {
 cv::Mat ActiveWindowModule::getDefaultIntegrationMask(const InputData& data) const {
   // TODO(nathan) cache somewhere
   const auto& sensor = data.getSensor();
-  const auto label_config = GlobalInfo::instance().getLabelSpaceConfig();
+  const auto& labelspace = GlobalInfo::instance().labelspace();
   std::set<int32_t> invalid_labels;
-  invalid_labels.insert(label_config.invalid_labels.begin(),
-                        label_config.invalid_labels.end());
-  invalid_labels.insert(label_config.dynamic_labels.begin(),
-                        label_config.dynamic_labels.end());
+  invalid_labels.insert(labelspace.invalid_labels.begin(),
+                        labelspace.invalid_labels.end());
+  invalid_labels.insert(labelspace.dynamic_labels.begin(),
+                        labelspace.dynamic_labels.end());
   invalid_labels.insert(sensor.config.invalid_labels.begin(),
                         sensor.config.invalid_labels.end());
 

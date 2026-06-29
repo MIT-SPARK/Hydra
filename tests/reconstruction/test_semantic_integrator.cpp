@@ -41,12 +41,7 @@
 namespace hydra {
 
 TEST(SemanticIntegrator, MLEIntegrationCorrect) {
-  test::ConfigGuard guard(false);
-
-  // MLE integrator reads total labels from global info
-  PipelineConfig pipeline_config;
-  pipeline_config.label_space.total_labels = 5;
-  GlobalInfo::init(pipeline_config);
+  const auto guard = test::ConfigGuard::FixedLabels(5);
 
   MLESemanticIntegrator::Config config;
   config.label_confidence = 0.8;
