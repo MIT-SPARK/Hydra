@@ -33,13 +33,16 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph_layer.h>
+
 #include <memory>
 #include <unordered_set>
 #include <vector>
 
-#include "hydra/common/dsg_types.h"
-
 namespace hydra {
+
+using namespace spark_dsg;
 
 class NearestNodeFinder {
  public:
@@ -95,7 +98,9 @@ size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
  */
 class PointNeighborSearch {
  public:
+  using Adapter = spark_dsg::BoundingBox::PointAdaptor;
   explicit PointNeighborSearch(const std::vector<Eigen::Vector3f>& points);
+  explicit PointNeighborSearch(std::unique_ptr<Adapter>&& points);
   virtual ~PointNeighborSearch();
 
   // Lookup.
@@ -109,6 +114,8 @@ class PointNeighborSearch {
   bool search(const Eigen::Vector3f& query_point,
               float& distance_squared,
               size_t& index) const;
+
+  std::vector<size_t> pointsInRadius(const Eigen::Vector3f& query, float radius) const;
 
  private:
   struct Detail;
