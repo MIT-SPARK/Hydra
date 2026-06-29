@@ -159,8 +159,6 @@ class GlobalInfo {
  private:
   GlobalInfo();
 
-  void configureTimers();
-
   void initFromConfig(const PipelineConfig& config, int robot_id);
 
  private:

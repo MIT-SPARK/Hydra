@@ -40,7 +40,6 @@
 #include <glog/logging.h>
 #include <spark_dsg/labelspace.h>
 
-#include "hydra/common/config_utilities.h"
 #include "hydra/common/semantic_color_map.h"
 #include "hydra/utils/pgmo_glog_sink.h"
 #include "hydra/utils/timing_utilities.h"
@@ -128,17 +127,13 @@ void declare_config(PipelineConfig& config) {
 
 GlobalInfo::GlobalInfo() : force_shutdown_(false) {}
 
-void GlobalInfo::configureTimers() {
-  ElapsedTimeRecorder& timer = ElapsedTimeRecorder::instance();
-  timer.timing_disabled = config_.timing_disabled;
-  timer.disable_output = config_.disable_timer_output;
-}
-
 void GlobalInfo::initFromConfig(const PipelineConfig& config, int robot_id) {
   config_ = config::checkValid(config);
   robot_prefix_ = RobotPrefixConfig(robot_id);
 
-  configureTimers();
+  auto& timer = ElapsedTimeRecorder::instance();
+  timer.timing_disabled = config_.timing_disabled;
+  timer.disable_output = config_.disable_timer_output;
 
   if (!config_.label_space.label_remap_filepath.empty()) {
     label_remapper_ = LabelRemapper(config_.label_space.label_remap_filepath);
@@ -267,11 +262,11 @@ std::unique_ptr<VolumetricWindow> GlobalInfo::createVolumetricWindow() const {
 }
 
 spark_dsg::Mesh::Ptr GlobalInfo::createMesh() const {
-  return std::make_shared<spark_dsg::Mesh>(
-      config_.mesh.with_colors,
-      true,  // we force the mesh to have last seen stamps
-      config_.mesh.with_labels,
-      config_.mesh.with_first_seen_stamps);
+  // we force the mesh to have last seen stamps
+  return std::make_shared<spark_dsg::Mesh>(config_.mesh.with_colors,
+                                           true,
+                                           config_.mesh.with_labels,
+                                           config_.mesh.with_first_seen_stamps);
 }
 
 std::ostream& operator<<(std::ostream& out, const GlobalInfo& config) {
