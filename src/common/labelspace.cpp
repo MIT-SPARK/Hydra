@@ -108,6 +108,8 @@ struct LabelNameConversion {
   }
 };
 
+// NOTE(nathan) this looks weird, but the Labelspace struct is a config and has a
+// default copy constructor that we're using to do Labelspace(const Labelspace& config)
 static const auto reg =
     config::RegistrationWithConfig<Labelspace, Labelspace, Labelspace>("from_config");
 

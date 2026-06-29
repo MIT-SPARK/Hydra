@@ -101,7 +101,7 @@ struct PipelineConfig {
   //! Default windowing function that determines the active window
   config::VirtualConfig<VolumetricWindow> map_window{SpatialWindowChecker::Config()};
   //! Closed-set labelspace information
-  config::VirtualConfig<Labelspace> labelspace;
+  config::VirtualConfig<Labelspace> labelspace{Labelspace{}};
   //! Optional remapping for input labels
   std::filesystem::path label_remap_filepath;
   //! Configuration for scene graph mesh fields

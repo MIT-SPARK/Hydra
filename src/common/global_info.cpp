@@ -87,6 +87,7 @@ void declare_config(PipelineConfig& config) {
   // the following subconfigs should not be namespaced
   field(config.frames, "frames", false);
   field(config.graph, "graph", false);
+  config.labelspace.setOptional();
   field(config.labelspace, "labelspace", false);
 }
 
