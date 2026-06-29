@@ -137,8 +137,9 @@ BoundingBox fitBoxToFilteredMesh(const Mesh& mesh,
   return BoundingBox(adaptor, type);
 }
 
-std::vector<std::vector<size_t>> getConnectedComponents(const ComponentAdaptor& points,
-                                                        float radius_m) {
+// TODO(nathan) make this work with adapter pointers
+ComponentIndices getConnectedComponents(const std::vector<Eigen::Vector3f>& points,
+                                        float radius_m) {
   std::vector<std::vector<size_t>> clusters;
   PointNeighborSearch search(points);
   std::vector<bool> seen(points.size(), false);

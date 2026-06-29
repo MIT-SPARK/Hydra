@@ -50,7 +50,7 @@ struct GraphKdTreeAdaptor {
   inline size_t kdtree_get_point_count() const { return nodes.size(); }
 
   inline double kdtree_get_pt(const size_t idx, const size_t dim) const {
-    return getNodePosition(layer, nodes[idx])(dim);
+    return layer.getNode(nodes[idx]).attributes().position(dim);
   }
 
   template <class T>
@@ -197,22 +197,21 @@ size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
 }
 
 struct PointNeighborSearch::Detail {
-  // Nanoflann interface.
-  explicit Detail(const Adapter& points)
-      : points_(points),
+  explicit Detail(std::unique_ptr<Adapter>&& points)
+      : points_(std::move(points)),
         tree_(3, *this, nanoflann::KDTreeSingleIndexAdaptorParams(10)) {
     tree_.buildIndex();
   }
 
-  std::size_t kdtree_get_point_count() const { return points_.size(); }
+  std::size_t kdtree_get_point_count() const { return points_->size(); }
 
   float kdtree_get_pt(const size_t idx, const size_t dim) const {
     if (dim == 0) {
-      return points_[idx].x();
+      return points_->get(idx).x();
     } else if (dim == 1) {
-      return points_[idx].y();
+      return points_->get(idx).y();
     } else {
-      return points_[idx].z();
+      return points_->get(idx).z();
     }
   }
 
@@ -221,12 +220,17 @@ struct PointNeighborSearch::Detail {
     return false;
   }
 
-  const Adapter& points_;
+  std::unique_ptr<Adapter> points_;
   KDTreeSingleIndexAdaptor<L2_Simple_Adaptor<float, Detail>, Detail, 3> tree_;
 };
 
-PointNeighborSearch::PointNeighborSearch(const Adapter& points) {
-  internals_ = std::make_unique<Detail>(points);
+PointNeighborSearch::PointNeighborSearch(std::unique_ptr<Adapter>&& points) {
+  internals_ = std::make_unique<Detail>(std::move(points));
+}
+
+PointNeighborSearch::PointNeighborSearch(const std::vector<Eigen::Vector3f>& points) {
+  auto adapter = std::make_unique<BoundingBox::PointVectorAdaptor>(points);
+  internals_ = std::make_unique<Detail>(std::move(adapter));
 }
 
 PointNeighborSearch::~PointNeighborSearch() {}
