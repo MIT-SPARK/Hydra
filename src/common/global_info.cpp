@@ -80,6 +80,8 @@ void declare_config(PipelineConfig& config) {
   field(config.store_visualization_details, "store_visualization_details");
   config.map_window.setOptional();
   field(config.map_window, "map_window");
+  config.labelspace.setOptional();
+  field(config.labelspace, "labelspace");
   field<Path::Absolute>(config.label_remap_filepath, "semantic_label_remap_filepath");
   field(config.mesh, "mesh");
   field(config.semantic_layers, "semantic_layers");
@@ -87,8 +89,6 @@ void declare_config(PipelineConfig& config) {
   // the following subconfigs should not be namespaced
   field(config.frames, "frames", false);
   field(config.graph, "graph", false);
-  config.labelspace.setOptional();
-  field(config.labelspace, "labelspace", false);
 }
 
 GlobalInfo::GlobalInfo() : force_shutdown_(false) {}
