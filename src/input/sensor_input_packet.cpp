@@ -38,8 +38,6 @@
 
 #include <opencv2/imgproc.hpp>
 
-#include "hydra/common/global_info.h"
-
 namespace hydra {
 namespace {
 
@@ -82,12 +80,19 @@ bool ImageInputPacket::fillInputDataImpl(InputData& msg) const {
 
   msg.depth_image = depth;
   msg.label_image = labels;
+  msg.instance_image = instances;
   // TODO(nathan) think about better copy
   msg.label_features = label_features;
 
   if (!msg.label_image.empty() && !sizesMatch(msg.depth_image, msg.label_image)) {
     LOG(ERROR) << "Label dimensions " << showImageDim(msg.label_image)
                << " do not match depth dimensions " << showImageDim(msg.depth_image);
+    return false;
+  }
+
+  if (!msg.instance_image.empty() && !sizesMatch(msg.depth_image, msg.instance_image)) {
+    LOG(ERROR) << "Instance dimensions " << showImageDim(msg.label_image)
+               << " do not match depth dimensions " << showImageDim(msg.instance_image);
     return false;
   }
 
@@ -113,9 +118,17 @@ bool CloudInputPacket::fillInputDataImpl(InputData& msg) const {
   msg.points_in_world_frame = in_world_frame;
   msg.color_image = colors;
   msg.label_image = labels;
+  msg.instance_image = instances;
 
   if (!msg.label_image.empty() && !sizesMatch(msg.vertex_map, msg.label_image)) {
     LOG(ERROR) << "Label dimensions " << showImageDim(msg.label_image)
+               << " do not match pointcloud dimensions "
+               << showImageDim(msg.vertex_map);
+    return false;
+  }
+
+  if (!msg.instance_image.empty() && !sizesMatch(msg.vertex_map, msg.instance_image)) {
+    LOG(ERROR) << "Instance dimensions " << showImageDim(msg.instance_image)
                << " do not match pointcloud dimensions "
                << showImageDim(msg.vertex_map);
     return false;

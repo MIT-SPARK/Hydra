@@ -19,7 +19,7 @@ struct InputData {
   using RangeType = float;
   using VertexType = cv::Vec3f;
   using LabelType = int;
-  using InstanceType = int;
+  using InstanceType = int16_t;
 
   explicit InputData(Sensor::ConstPtr sensor) : sensor_(std::move(sensor)) {}
   virtual ~InputData() = default;

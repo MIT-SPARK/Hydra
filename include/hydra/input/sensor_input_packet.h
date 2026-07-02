@@ -47,8 +47,11 @@ struct SensorInputPacket {
 
   bool fillInputData(InputData& msg) const;
 
+  //! Timestamp sensor input is acquired
   const uint64_t timestamp_ns;
+  //! Sensor that acquired the input
   const std::string sensor_name;
+  //! Frame ID for sensor
   std::string sensor_frame;
   //! Learned feature for the input data (e.g., CLIP for camera)
   FeatureVector input_feature;
@@ -66,6 +69,8 @@ struct ImageInputPacket : public SensorInputPacket {
   cv::Mat depth;
   //! Labels for each pixel
   cv::Mat labels;
+  //! Instance IDs for each pixel
+  cv::Mat instances;
   //! Features associated with each label
   FeatureMap<int> label_features;
   //! Whether or not the input color image is bgr order
@@ -78,10 +83,16 @@ struct ImageInputPacket : public SensorInputPacket {
 struct CloudInputPacket : public SensorInputPacket {
   explicit CloudInputPacket(uint64_t stamp, const std::string& sensor_name);
 
+  //! Whether or not the pointcloud is in the world frame
   bool in_world_frame = false;
+  //! Points for pointcloud
   cv::Mat points;
+  //! Colors for each point
   cv::Mat colors;
+  //! Labels for each point
   cv::Mat labels;
+  //! Instance IDs for each point
+  cv::Mat instances;
 
  protected:
   bool fillInputDataImpl(InputData& msg) const override;

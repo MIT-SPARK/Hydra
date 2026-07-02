@@ -34,7 +34,6 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <Eigen/Geometry>
-#include <list>
 
 #include "hydra/input/sensor_input_packet.h"
 
