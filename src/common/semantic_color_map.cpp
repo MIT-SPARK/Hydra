@@ -147,6 +147,27 @@ SemanticColorMap::Ptr SemanticColorMap::fromCsv(const std::string& filename,
   return std::make_unique<SemanticColorMap>(cmap, unknown);
 }
 
+cv::Mat SemanticColorMap::colorsToLabels(const cv::Mat& colors,
+                                         int32_t default_label) const {
+  if (colors.empty() || colors.channels() != 3) {
+    LOG(ERROR) << "3-channel color image required for conversion to labels!";
+    return cv::Mat();
+  }
+
+  CHECK_EQ(colors.type(), CV_8UC3);
+
+  cv::Mat label_image(colors.size(), CV_32SC1);
+  for (int r = 0; r < colors.rows; ++r) {
+    for (int c = 0; c < colors.cols; ++c) {
+      const auto& pixel = colors.at<cv::Vec3b>(r, c);
+      const spark_dsg::Color color(pixel[0], pixel[1], pixel[2]);
+      label_image.at<int32_t>(r, c) = getLabelFromColor(color).value_or(default_label);
+    }
+  }
+
+  return label_image;
+}
+
 SemanticColorMap::Ptr SemanticColorMap::randomColors(size_t num_labels,
                                                      const Color& unknown) {
   const std::vector<Color> defaults{Color::gray(),

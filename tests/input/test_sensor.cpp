@@ -35,9 +35,6 @@
 #include <gtest/gtest.h>
 #include <hydra/input/camera.h>
 
-#include <optional>
-#include <set>
-
 #include "hydra_test/resources.h"
 
 namespace hydra {
