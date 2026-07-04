@@ -230,15 +230,21 @@ void RegionGrowingTraversabilityClustering::mergeRegions(
       if (!region.is_active) {
         continue;
       }
-      std::list<NodeId> neighbors_to_remove;
-      for (const auto& [neighbor_id, num_connecting_voxels] : region.neighbors) {
+      // Use an explicit iterator so we can erase entries in place. Region::merge
+      // only inserts into region.neighbors (std::map insertion never invalidates
+      // iterators), so n_it stays valid across the merge; we remove the stale and
+      // merged-away neighbors here rather than inside merge().
+      for (auto n_it = region.neighbors.begin(); n_it != region.neighbors.end();) {
+        const NodeId neighbor_id = n_it->first;
         auto neighbor_it = regions_.find(neighbor_id);
         if (neighbor_it == regions_.end()) {
-          neighbors_to_remove.push_back(neighbor_id);
+          // Stale neighbor: its region was already merged away. Drop it in place.
+          n_it = region.neighbors.erase(n_it);
           continue;
         }
         Region& neighbor_region = neighbor_it->second;
         if (!neighbor_region.is_active) {
+          ++n_it;
           continue;
         }
 
@@ -248,16 +254,17 @@ void RegionGrowingTraversabilityClustering::mergeRegions(
         const Eigen::Vector2i combined_max =
             region.max_coordinates.cwiseMax(neighbor_region.max_coordinates);
         if ((combined_max - combined_min).maxCoeff() <= max_region_size_) {
-          // Merge neighbor into this region.
+          // Merge neighbor into this region, then remove it from regions_, the
+          // graph, and this region's neighbor map (in place, so no iterator is
+          // left dangling).
           region.merge(neighbor_region);
           regions_.erase(neighbor_it);
           graph.removeNode(neighbor_id);
+          n_it = region.neighbors.erase(n_it);
           merged = true;
           break;
         }
-      }
-      for (const auto neighbor_id : neighbors_to_remove) {
-        region.neighbors.erase(neighbor_id);
+        ++n_it;
       }
       if (merged) {
         break;
@@ -457,7 +464,10 @@ void RegionGrowingTraversabilityClustering::Region::merge(const Region& other) {
     neighbors[n_id] += n_count;
   }
 
-  neighbors.erase(other.id);
+  // NOTE: other.id is intentionally NOT erased from `neighbors` here. Erasing it
+  // would invalidate the caller's iterator into this map; mergeRegions() removes
+  // the merged-away neighbor in place instead. (The insertions above are safe:
+  // std::map insertion never invalidates existing iterators.)
   computeBoundary();
 }
 
@@ -500,7 +510,11 @@ void RegionGrowingTraversabilityClustering::Region::computeBoundary() {
     centroid += voxel.cast<float>();
   }
 
-  centroid /= exterior_boundary.size();
+  // Guard against an empty exterior boundary (e.g. a region with no boundary
+  // voxels): dividing a zero vector by 0 yields a NaN centroid/place position.
+  if (!exterior_boundary.empty()) {
+    centroid /= exterior_boundary.size();
+  }
 }
 
 void RegionGrowingTraversabilityClustering::Region::computeNeighbors(
