@@ -36,6 +36,7 @@
 
 #include <spark_dsg/traversability_boundary.h>
 
+#include <limits>
 #include <map>
 
 #include "hydra/places/traversability_clustering.h"
@@ -79,8 +80,10 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
     // the current layer.
     bool is_active = true;
 
-    // Centroid of the region.
-    Eigen::Vector3f centroid;
+    // Centroid of the region. Defaults to NaN so a region with no exterior
+    // boundary voxels stays distinguishable from a valid place at the origin.
+    Eigen::Vector3f centroid =
+        Eigen::Vector3f::Constant(std::numeric_limits<float>::quiet_NaN());
 
     // Axis-aligned bounding box of the region in voxel coordinates.
     Eigen::Vector2i min_coordinates;
