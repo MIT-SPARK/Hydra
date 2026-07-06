@@ -87,9 +87,7 @@ NodeCache::Entry* NodeCache::add(NodeId node_id, const NodeAttributes& attrs) {
   if (iter == nodes.end()) {
     return &nodes
                 .emplace(node_id,
-                         Entry{node_id,
-                               timestamp_ns,
-                               attrs.position.cast<float>()})
+                         Entry{node_id, timestamp_ns, attrs.position.cast<float>()})
                 .first->second;
   }
 
@@ -195,9 +193,7 @@ void DeformationInterpolator::interpolate(const DynamicSceneGraph& unmerged,
 
       auto node_ptr = dsg.findNode(entry->id);
       if (node_ptr) {
-        // move the full pose (position + bounding box + orientation), not just
-        // position; dsg holds the frontend-original this cycle so this matches
-        // new_pos for the position component
+        // move position + bounding box + orientation)
         node_ptr->attributes().transform(transform);
       }
     };
