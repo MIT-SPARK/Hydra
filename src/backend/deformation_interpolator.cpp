@@ -193,8 +193,13 @@ void DeformationInterpolator::interpolate(const DynamicSceneGraph& unmerged,
 
       auto node_ptr = dsg.findNode(entry->id);
       if (node_ptr) {
-        // move position + bounding box + orientation)
-        node_ptr->attributes().transform(transform);
+        // Reset to the cached original position before applying the transform so
+        // repeated deformation of an archived node stays idempotent (otherwise the
+        // transform compounds across loop-closure spins). transform() also moves
+        // the bounding box + orientation.
+        auto& dst = node_ptr->attributes();
+        dst.position = entry->init_pos.cast<double>();
+        dst.transform(transform);
       }
     };
 
