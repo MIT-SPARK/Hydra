@@ -230,15 +230,17 @@ void RegionGrowingTraversabilityClustering::mergeRegions(
       if (!region.is_active) {
         continue;
       }
-      std::list<NodeId> neighbors_to_remove;
-      for (const auto& [neighbor_id, num_connecting_voxels] : region.neighbors) {
+      for (auto n_it = region.neighbors.begin(); n_it != region.neighbors.end();) {
+        const auto [neighbor_id, num_connecting_voxels] = *n_it;
         auto neighbor_it = regions_.find(neighbor_id);
         if (neighbor_it == regions_.end()) {
-          neighbors_to_remove.push_back(neighbor_id);
+          // Stale neighbor: its region was already merged away. Drop it in place.
+          n_it = region.neighbors.erase(n_it);
           continue;
         }
         Region& neighbor_region = neighbor_it->second;
         if (!neighbor_region.is_active) {
+          ++n_it;
           continue;
         }
 
@@ -248,16 +250,15 @@ void RegionGrowingTraversabilityClustering::mergeRegions(
         const Eigen::Vector2i combined_max =
             region.max_coordinates.cwiseMax(neighbor_region.max_coordinates);
         if ((combined_max - combined_min).maxCoeff() <= max_region_size_) {
-          // Merge neighbor into this region.
+          // Merge neighbor into this region and then cleanup.
           region.merge(neighbor_region);
           regions_.erase(neighbor_it);
           graph.removeNode(neighbor_id);
+          n_it = region.neighbors.erase(n_it);
           merged = true;
           break;
         }
-      }
-      for (const auto neighbor_id : neighbors_to_remove) {
-        region.neighbors.erase(neighbor_id);
+        ++n_it;
       }
       if (merged) {
         break;
@@ -457,7 +458,8 @@ void RegionGrowingTraversabilityClustering::Region::merge(const Region& other) {
     neighbors[n_id] += n_count;
   }
 
-  neighbors.erase(other.id);
+  // Leave other.id in `neighbors`; mergeRegions() erases it in place so the
+  // caller's iterator stays valid.
   computeBoundary();
 }
 
@@ -486,6 +488,9 @@ void RegionGrowingTraversabilityClustering::Region::computeBoundary() {
 
   // Find exterior and interior boundary voxels.
   exterior_boundary = growRegion(boundary, furthest);
+  if (exterior_boundary.empty()) {
+    LOG(WARNING) << "Empty region encountered!";
+  }
   interior_boundary.clear();
   interior_boundary.reserve(boundary.size() - exterior_boundary.size());
   for (const auto& voxel : boundary) {
@@ -494,13 +499,15 @@ void RegionGrowingTraversabilityClustering::Region::computeBoundary() {
     }
   }
 
-  // Compute the centroid.
-  centroid = Eigen::Vector3f::Zero();
-  for (const auto& voxel : exterior_boundary) {
-    centroid += voxel.cast<float>();
+  // Compute the centroid. A boundary-less region initializes to NaN default (see
+  // Region::centroid)
+  if (!exterior_boundary.empty()) {
+    centroid = Eigen::Vector3f::Zero();
+    for (const auto& voxel : exterior_boundary) {
+      centroid += voxel.cast<float>();
+    }
+    centroid /= exterior_boundary.size();
   }
-
-  centroid /= exterior_boundary.size();
 }
 
 void RegionGrowingTraversabilityClustering::Region::computeNeighbors(
