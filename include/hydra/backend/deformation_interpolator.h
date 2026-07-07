@@ -45,6 +45,10 @@ struct NodeCache {
     NodeId id;
     uint64_t timestamp;
     Eigen::Vector3f init_pos;
+    //! Original (odometric) bounding box, INVALID if the node has none. Cached so
+    //! the deform callback can transform a fresh copy each spin rather than
+    //! mutating the box in place (which would compound on archived nodes).
+    spark_dsg::BoundingBox init_bbox;
   };
 
   Entry* add(NodeId node, const NodeAttributes& attrs);

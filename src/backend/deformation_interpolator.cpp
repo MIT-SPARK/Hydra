@@ -59,7 +59,9 @@ std::string printTransform(const Eigen::Isometry3d& tf) {
 
 }  // namespace
 
+using spark_dsg::BoundingBox;
 using spark_dsg::NodeSymbol;
+using spark_dsg::SemanticNodeAttributes;
 
 void declare_config(DeformationInterpolator::Config& config) {
   using namespace config;
@@ -83,17 +85,26 @@ NodeCache::Entry* NodeCache::add(NodeId node_id, const NodeAttributes& attrs) {
     timestamp_ns = derived->last_observed_ns.back();
   }
 
+  // Cache the original bounding box (if any) so the deform callback can transform a
+  // fresh copy each spin instead of mutating the live box in place.
+  BoundingBox bbox;  // default INVALID
+  if (const auto semantic = dynamic_cast<const SemanticNodeAttributes*>(&attrs)) {
+    bbox = semantic->bounding_box;
+  }
+
   auto iter = nodes.find(node_id);
   if (iter == nodes.end()) {
     return &nodes
-                .emplace(node_id,
-                         Entry{node_id, timestamp_ns, attrs.position.cast<float>()})
+                .emplace(
+                    node_id,
+                    Entry{node_id, timestamp_ns, attrs.position.cast<float>(), bbox})
                 .first->second;
   }
 
   if (attrs.is_active) {
     iter->second.init_pos = attrs.position.cast<float>();
     iter->second.timestamp = timestamp_ns;
+    iter->second.init_bbox = bbox;
   }
 
   return &iter->second;
@@ -188,18 +199,23 @@ void DeformationInterpolator::interpolate(const DynamicSceneGraph& unmerged,
               << " -> transform: " << printTransform(transform);
 
       const auto new_pos = transform * entry->init_pos.cast<double>();
-      auto& attrs = unmerged.getNode(entry->id).attributes();
-      attrs.position = new_pos;
+      unmerged.getNode(entry->id).attributes().position = new_pos;
 
       auto node_ptr = dsg.findNode(entry->id);
-      if (node_ptr) {
-        // Reset to the cached original position before applying the transform so
-        // repeated deformation of an archived node stays idempotent (otherwise the
-        // transform compounds across loop-closure spins). transform() also moves
-        // the bounding box + orientation.
-        auto& dst = node_ptr->attributes();
-        dst.position = entry->init_pos.cast<double>();
-        dst.transform(transform);
+      if (!node_ptr) {
+        return;
+      }
+
+      auto& dst = node_ptr->attributes();
+      dst.position = new_pos;
+
+      // Transform a fresh copy of the cached original box (never the live box) so
+      // repeated deformation of a node -- active or archived -- never compounds.
+      if (entry->init_bbox.type != BoundingBox::Type::INVALID) {
+        if (auto semantic = dynamic_cast<SemanticNodeAttributes*>(&dst)) {
+          semantic->bounding_box = entry->init_bbox;
+          semantic->bounding_box.transform(transform);
+        }
       }
     };
 
