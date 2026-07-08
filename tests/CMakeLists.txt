@@ -12,6 +12,7 @@ add_executable(
   src/resources.cpp
   backend/test_external_loop_closure.cpp
   backend/test_generic_update_functor.cpp
+  backend/test_merge_tracker.cpp
   backend/test_update_agents_functor.cpp
   backend/test_update_buildings_functor.cpp
   backend/test_update_objects_functor.cpp
