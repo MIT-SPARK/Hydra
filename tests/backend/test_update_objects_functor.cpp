@@ -49,7 +49,9 @@ MergeList callWithUnmerged(const UpdateFunctor& functor,
   functor.call(*unmerged, dsg, info);
   const auto hooks = functor.hooks();
   if (enable_merging && hooks.find_merges) {
-    return hooks.find_merges(*unmerged, info);
+    // mirror DsgUpdater: merges are found on the merged graph, which carries the
+    // updated (optimized) geometry; the unmerged graph stays odometric
+    return hooks.find_merges(*dsg.graph, info);
   } else {
     return {};
   }

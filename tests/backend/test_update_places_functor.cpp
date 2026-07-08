@@ -50,7 +50,9 @@ MergeList callWithUnmerged(const UpdateFunctor& functor,
   functor.call(*unmerged, dsg, info);
   const auto hooks = functor.hooks();
   if (enable_merging && hooks.find_merges) {
-    return hooks.find_merges(*unmerged, info);
+    // mirror DsgUpdater: merges are found on the merged graph, which carries the
+    // updated (optimized) geometry; the unmerged graph stays odometric
+    return hooks.find_merges(*dsg.graph, info);
   } else {
     return {};
   }
@@ -103,6 +105,41 @@ TEST(UpdatePlacesFunctor, PlaceUpdate) {
   {  // key doesn't exist: original value
     Eigen::Vector3d expected(1.0, 2.0, 3.0);
     Eigen::Vector3d result = graph.getPosition(NodeSymbol('p', 6));
+    EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
+  }
+}
+
+TEST(UpdatePlacesFunctor, UpdateFromValuesLeavesUnmergedUntouched) {
+  auto dsg = test::makeSharedDsg();
+  auto& graph = *dsg->graph;
+
+  auto attrs = std::make_unique<PlaceNodeAttributes>(0.0, 0.0);
+  attrs->position = Eigen::Vector3d(1.0, 2.0, 3.0);
+  attrs->is_active = true;
+  graph.emplaceNode(DsgLayers::PLACES, NodeSymbol('p', 0), std::move(attrs));
+
+  const auto unmerged = graph.clone();
+
+  gtsam::Values values;
+  values.insert(NodeSymbol('p', 0),
+                gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(4.0, 5.0, 6.0)));
+
+  UpdateInfo::ConstPtr info(new UpdateInfo{0, &values, nullptr, true, {}});
+  UpdatePlacesFunctor::Config config{0.4, 0.3, DeformationInterpolator::Config{}};
+  config.use_temp_values = true;
+
+  const UpdatePlacesFunctor functor(config);
+  functor.call(*unmerged, *dsg, info);
+
+  {  // the optimized value lands in the merged graph
+    Eigen::Vector3d expected(4.0, 5.0, 6.0);
+    Eigen::Vector3d result = graph.getPosition(NodeSymbol('p', 0));
+    EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
+  }
+
+  {  // the unmerged (odometric) graph keeps its original position
+    Eigen::Vector3d expected(1.0, 2.0, 3.0);
+    Eigen::Vector3d result = unmerged->getPosition(NodeSymbol('p', 0));
     EXPECT_NEAR(0.0, (result - expected).norm(), 1.0e-7);
   }
 }

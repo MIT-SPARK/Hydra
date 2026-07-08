@@ -116,9 +116,11 @@ size_t UpdatePlacesFunctor::updateFromValues(const LayerView& view,
 
     // TODO(nathan) consider updating distance via parents + deformation graph
     ++num_changed;
-    auto& attrs = node.attributes();
-    attrs.position = places_values.at<gtsam::Pose3>(node.id).translation();
-    dsg.graph->setNodeAttributes(node.id, attrs.clone());
+    // write the optimized position into the merged graph only; the unmerged view
+    // stays odometric
+    auto new_attrs = node.attributes().clone();
+    new_attrs->position = places_values.at<gtsam::Pose3>(node.id).translation();
+    dsg.graph->setNodeAttributes(node.id, std::move(new_attrs));
   }
 
   // TODO(nathan) fix this

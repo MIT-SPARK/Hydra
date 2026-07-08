@@ -95,6 +95,8 @@ class DsgUpdater {
   GroupedMergeTracker merge_tracker;
   std::map<std::string, UpdateFunctor::Ptr> update_functors_;
 
+  //! Source (unmerged) graph holding odometric poses; update functors read it and
+  //! write optimized results into target_dsg_ only (see BackendModule::unmerged_graph_)
   DynamicSceneGraph::Ptr source_graph_;
   SharedDsgInfo::Ptr target_dsg_;
 };

@@ -260,11 +260,25 @@ bool BackendModule::spinOnce(bool force_update) {
   }
 
   timer.reset("backend/spin");
-  if ((config.optimize_on_lc && have_loopclosures_) || force_optimize_) {
+  if ((config.optimize_on_lc && have_new_loopclosures_) || force_optimize_) {
     optimize(timestamp_ns);
   } else {
     updateDsgMesh(timestamp_ns);
-    UpdateInfo::ConstPtr info(new UpdateInfo{timestamp_ns});
+    UpdateInfo::ConstPtr info;
+    if (have_loopclosures_) {
+      // no new factors to solve: deform new/active nodes and mesh with the cached
+      // optimized values; the full solve only runs when new loop closures arrive
+      info.reset(new UpdateInfo{timestamp_ns,
+                                deformation_graph_->getTempValues(),
+                                deformation_graph_->getValues(),
+                                false,
+                                {},
+                                deformation_graph_.get(),
+                                nullptr,
+                                mesh_offsets_});
+    } else {
+      info.reset(new UpdateInfo{timestamp_ns});
+    }
     dsg_updater_->callUpdateFunctions(timestamp_ns, info);
   }
 
@@ -555,8 +569,8 @@ void BackendModule::logStatus() {
   auto& status = status_log_.back();
   const auto& timer = hydra::timing::ElapsedTimeRecorder::instance();
   status.last_spin_s = timer.getLastElapsed("backend/spin");
-  status.last_opt_s = timer.getLastElapsed("backend/optimization");
-  status.last_mesh_update_s = timer.getLastElapsed("backend/mesh_update");
+  status.last_opt_s = timer.getLastElapsed("dsg_updater/optimization");
+  status.last_mesh_update_s = timer.getLastElapsed("backend/mesh_deformation");
 }
 
 }  // namespace hydra

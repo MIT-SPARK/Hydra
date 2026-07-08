@@ -56,7 +56,9 @@ void findAndApplyMerges(const VerbosityConfig& config,
                         MergeTracker& tracker,
                         bool exhaustive) {
   // TODO(nathan) handle given merges
-  auto merges = hooks.find_merges(source, info);
+  // merges are found on the target (merged) graph: the source graph is odometric,
+  // and duplicates revealed by a loop closure only overlap in the optimized frame
+  auto merges = hooks.find_merges(*target.graph, info);
   auto applied = tracker.applyMerges(source, merges, target, hooks.merge);
   MLOG(1) << "pass 0: " << merges.size() << " merges (applied " << applied << ")";
   if (!exhaustive) {
@@ -164,14 +166,10 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
     resetBackendDsg(timestamp_ns);
   }
 
-  GraphMergeConfig merge_config;
-  merge_config.previous_merges = &target_dsg_->merges;
-  merge_config.update_dynamic_attributes = false;
-  target_dsg_->graph->mergeGraph(*source_graph_, merge_config);
-
   // Nodes occasionally get added to the backend after they've left the active window,
   // which means they never get deformed or updated correctly. This forces them to be
-  // active for at least one update
+  // active for at least one update. Runs before the graph merge so the nodes are
+  // also active in the target (merged) graph's views (e.g. for merge finding).
   std::vector<NodeId> active_nodes_to_restore;
   for (auto& [layer_id, layer] : source_graph_->layers()) {
     for (auto& [node_id, node] : layer->nodes()) {
@@ -182,6 +180,11 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
       }
     }
   }
+
+  GraphMergeConfig merge_config;
+  merge_config.previous_merges = &target_dsg_->merges;
+  merge_config.update_dynamic_attributes = false;
+  target_dsg_->graph->mergeGraph(*source_graph_, merge_config);
 
   const std::set<std::string> exhaustive_names(config.exhaustive_functors.begin(),
                                                config.exhaustive_functors.end());
@@ -213,25 +216,33 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
             *source_graph_, *target_dsg_->graph, hooks.merge);
       }
     }
-
-    // TODO(nathan) fix args for multithreading
-    MLOG(2) << "all merges: " << merge_tracker.print();
-    for (const auto& func : cleanup_hooks) {
-      func(info, *source_graph_, target_dsg_.get());
-    }
-
-    // We reset active flags for all new nodes that were inactive after one update
-    for (auto node_id : active_nodes_to_restore) {
-      auto node = source_graph_->findNode(node_id);
-      if (node) {
-        node->attributes().is_active = false;
-      }
-    }
-
-    // clear new node status
-    // TODO(nathan) add API for marking new nodes
-    source_graph_->getNewNodes(true);
   }
+
+  // TODO(nathan) fix args for multithreading
+  MLOG(2) << "all merges: " << merge_tracker.print();
+  for (const auto& func : cleanup_hooks) {
+    func(info, *source_graph_, target_dsg_.get());
+  }
+
+  // We reset active flags for all new nodes that were inactive after one update.
+  // The graph merge cloned the forced-active flag into the target graph, and the
+  // target copy is never re-cloned once the source node is archived again, so the
+  // flag has to be restored on both graphs.
+  for (auto node_id : active_nodes_to_restore) {
+    auto node = source_graph_->findNode(node_id);
+    if (node) {
+      node->attributes().is_active = false;
+    }
+
+    auto target_node = target_dsg_->graph->findNode(node_id);
+    if (target_node) {
+      target_node->attributes().is_active = false;
+    }
+  }
+
+  // clear new node status
+  // TODO(nathan) add API for marking new nodes
+  source_graph_->getNewNodes(true);
 }
 
 }  // namespace hydra

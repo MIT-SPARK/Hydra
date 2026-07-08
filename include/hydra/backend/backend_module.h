@@ -162,6 +162,12 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   uint64_t last_sequence_number_ = 0;
 
   SharedDsgInfo::Ptr private_dsg_;
+  //! Unmerged copy of the scene graph holding ODOMETRIC (never optimized) poses.
+  //! The merged private_dsg_ is derived from it via per-node odometric->optimized
+  //! transforms every optimize spin (have_loopclosures_ latches, so post-LC every
+  //! spin re-optimizes and re-deforms the active merged nodes that mergeGraph reset
+  //! to odometric clones). Nodes the interpolator skips (control-point matching
+  //! failure) or layers without a deform functor stay odometric while active.
   DynamicSceneGraph::Ptr unmerged_graph_;
   SharedModuleState::Ptr state_;
 

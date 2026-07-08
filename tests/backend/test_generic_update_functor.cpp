@@ -109,15 +109,25 @@ TEST(GenericUpdateFunctor, shouldUpdate) {
   VLOG(1) << "Using config:\n" << config::toString(config);
 
   GenericUpdateFunctor functor(config);
-  callWithUnmerged(functor, *dsg, info, false);
+  // the unmerged graph persists across spins and stays odometric; the functor only
+  // ever writes the merged graph
+  const auto unmerged = graph.clone();
+  functor.call(*unmerged, *dsg, info);
 
   const auto& result = graph.getNode(0).attributes();
   const Eigen::Vector3d expected(1.0, 2.0, 3.0);
   EXPECT_NEAR(0.0, (expected - result.position).norm(), 1.0e-7);
 
-  // second call shouldn't change position
+  {  // the odometric source is never touched
+    const Eigen::Vector3d odometric(0.0, 3.0, 1.0);
+    const auto& src = unmerged->getNode(0).attributes();
+    EXPECT_NEAR(0.0, (odometric - src.position).norm(), 1.0e-7);
+  }
+
+  // re-deforming an archived node must not compound
   graph.getNode(0).attributes().is_active = false;
-  callWithUnmerged(functor, *dsg, info, false);
+  unmerged->getNode(0).attributes().is_active = false;
+  functor.call(*unmerged, *dsg, info);
   EXPECT_NEAR(0.0, (expected - result.position).norm(), 1.0e-7);
 }
 
