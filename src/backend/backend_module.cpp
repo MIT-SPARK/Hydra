@@ -442,7 +442,12 @@ bool BackendModule::updatePrivateDsg(size_t timestamp_ns, bool force_update) {
       return false;
     }
 
-    unmerged_graph_->mergeGraph(*shared_dsg.graph);
+    // keep the odometric mirror faithful even for archived nodes: late attribute
+    // updates (e.g. an extractor finalizing a node after it archives) must still
+    // reach the backend
+    GraphMergeConfig merge_config;
+    merge_config.update_archived_attributes = true;
+    unmerged_graph_->mergeGraph(*shared_dsg.graph, merge_config);
   }  // end joint critical section
 
   backend_graph_logger_.logGraph(*private_dsg_->graph);
