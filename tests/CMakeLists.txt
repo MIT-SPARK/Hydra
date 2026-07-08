@@ -17,6 +17,7 @@ add_executable(
   backend/test_update_objects_functor.cpp
   backend/test_update_places_functor.cpp
   common/test_config_utilities.cpp
+  common/test_graph_update.cpp
   common/test_shared_dsg_info.cpp
   frontend/test_graph_connector.cpp
   frontend/test_mesh_segmenter.cpp

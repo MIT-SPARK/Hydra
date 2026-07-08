@@ -41,6 +41,7 @@
 #include <spark_dsg/dynamic_scene_graph.h>
 
 #include <algorithm>
+#include <unordered_set>
 
 namespace YAML {
 
@@ -82,6 +83,7 @@ void declare_config(LayerTracker::Config& config) {
   field(config.target_layer, "target_layer");
   config.matcher.setOptional();
   field(config.matcher, "matcher");
+  field(config.archive_missing, "archive_missing");
 }
 
 void declare_config(GraphUpdater::Config& config) {
@@ -225,7 +227,11 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
     const auto target_layer_id = tracker.config.target_layer.value_or(layer_id);
 
     std::map<NodeId, const NodeAttributes*> active_targets;
+    std::unordered_set<size_t> seen_tracks;
     for (auto&& entry : layer_update->updates) {
+      if (entry.track_id) {
+        seen_tracks.insert(*entry.track_id);
+      }
       switch (entry.update_type) {
         case NodeUpdate::UpdateType::Delete: {
           deleteNode(entry, tracker, graph);
@@ -240,6 +246,20 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
             addNode(graph, tracker, target_layer_id, layer_id, entry);
           }
           break;
+        }
+      }
+    }
+
+    if (tracker.config.archive_missing) {
+      // tracks the active window stopped emitting have left the window; archiving
+      // them makes the node visible to archived-only merge candidates (Pairwise)
+      for (const auto& [track, node_id] : tracker.track_to_node) {
+        if (seen_tracks.count(track)) {
+          continue;
+        }
+        const auto node = graph.findNode(node_id);
+        if (node && node->attributes().is_active) {
+          node->attributes().is_active = false;
         }
       }
     }
