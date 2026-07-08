@@ -36,6 +36,7 @@
 #include <config_utilities/factory.h>
 #include <gtest/gtest.h>
 #include <hydra/backend/dsg_updater.h>
+#include <hydra/backend/generic_update_functor.h>
 
 #include "hydra_test/shared_dsg_fixture.h"
 
@@ -138,6 +139,55 @@ TEST(DsgUpdater, PerSpinBookkeepingSharedAcrossFunctors) {
 
   // after the spin the forced-active flag is restored
   EXPECT_FALSE(source->getNode(trackedNode()).attributes().is_active);
+}
+
+// Duplicates revealed by a loop closure only overlap in the OPTIMIZED frame; the
+// unmerged (source) graph stays odometric, so pass-0 merge finding has to run on
+// the merged graph like the exhaustive passes already do.
+TEST(DsgUpdater, FindsPassZeroMergesOnMergedGraph) {
+  auto target = test::makeSharedDsg();
+  DynamicSceneGraph::Ptr source = target->graph->clone();
+
+  // two archived objects far apart in the odometric (source) frame
+  const auto node_a = spark_dsg::NodeSymbol('o', 0);
+  const auto node_b = spark_dsg::NodeSymbol('o', 1);
+  for (const auto node_id : {node_a, node_b}) {
+    auto attrs = std::make_unique<spark_dsg::ObjectNodeAttributes>();
+    attrs->position =
+        Eigen::Vector3d(10.0 * spark_dsg::NodeSymbol(node_id).categoryId(), 0.0, 0.0);
+    attrs->is_active = false;
+    attrs->last_update_time_ns = 10u;
+    source->emplaceNode(DsgLayers::OBJECTS, node_id, std::move(attrs));
+  }
+
+  GenericUpdateFunctor::Config functor_config;
+  functor_config.layer = DsgLayers::OBJECTS;
+  functor_config.enable_merging = true;
+
+  DsgUpdater::Config config;
+  config.update_functors.emplace_back(
+      "objects", DsgUpdater::Config::FunctorConfig(functor_config));
+
+  DsgUpdater updater(config, source, target);
+
+  // first spin clones both nodes into the merged graph
+  UpdateInfo::ConstPtr info(new UpdateInfo{0});
+  updater.callUpdateFunctions(0, info);
+  ASSERT_TRUE(target->graph->hasNode(node_a));
+  ASSERT_TRUE(target->graph->hasNode(node_b));
+
+  // simulate optimization: the merged copies land on top of each other (archived
+  // nodes are not reset by the graph merge, so this persists across spins)
+  target->graph->getNode(node_a).attributes().position = Eigen::Vector3d::Zero();
+  target->graph->getNode(node_b).attributes().position =
+      Eigen::Vector3d(0.05, 0.0, 0.0);
+
+  // loop-closure spin: the duplicates only overlap in the merged graph
+  UpdateInfo::ConstPtr lc_info(new UpdateInfo{1, nullptr, nullptr, true, {}});
+  updater.callUpdateFunctions(1, lc_info);
+
+  EXPECT_EQ(target->merges.size(), 1u);
+  EXPECT_EQ(target->graph->getLayer(DsgLayers::OBJECTS).numNodes(), 1u);
 }
 
 }  // namespace hydra
