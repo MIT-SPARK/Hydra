@@ -213,25 +213,25 @@ void DsgUpdater::callUpdateFunctions(size_t timestamp_ns, UpdateInfo::ConstPtr i
             *source_graph_, *target_dsg_->graph, hooks.merge);
       }
     }
-
-    // TODO(nathan) fix args for multithreading
-    MLOG(2) << "all merges: " << merge_tracker.print();
-    for (const auto& func : cleanup_hooks) {
-      func(info, *source_graph_, target_dsg_.get());
-    }
-
-    // We reset active flags for all new nodes that were inactive after one update
-    for (auto node_id : active_nodes_to_restore) {
-      auto node = source_graph_->findNode(node_id);
-      if (node) {
-        node->attributes().is_active = false;
-      }
-    }
-
-    // clear new node status
-    // TODO(nathan) add API for marking new nodes
-    source_graph_->getNewNodes(true);
   }
+
+  // TODO(nathan) fix args for multithreading
+  MLOG(2) << "all merges: " << merge_tracker.print();
+  for (const auto& func : cleanup_hooks) {
+    func(info, *source_graph_, target_dsg_.get());
+  }
+
+  // We reset active flags for all new nodes that were inactive after one update
+  for (auto node_id : active_nodes_to_restore) {
+    auto node = source_graph_->findNode(node_id);
+    if (node) {
+      node->attributes().is_active = false;
+    }
+  }
+
+  // clear new node status
+  // TODO(nathan) add API for marking new nodes
+  source_graph_->getNewNodes(true);
 }
 
 }  // namespace hydra
