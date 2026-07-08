@@ -569,8 +569,8 @@ void BackendModule::logStatus() {
   auto& status = status_log_.back();
   const auto& timer = hydra::timing::ElapsedTimeRecorder::instance();
   status.last_spin_s = timer.getLastElapsed("backend/spin");
-  status.last_opt_s = timer.getLastElapsed("backend/optimization");
-  status.last_mesh_update_s = timer.getLastElapsed("backend/mesh_update");
+  status.last_opt_s = timer.getLastElapsed("dsg_updater/optimization");
+  status.last_mesh_update_s = timer.getLastElapsed("backend/mesh_deformation");
 }
 
 }  // namespace hydra
