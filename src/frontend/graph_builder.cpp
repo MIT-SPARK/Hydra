@@ -346,7 +346,11 @@ void GraphBuilder::spinOnce(const ActiveWindowOutput::Ptr& msg) {
     std::unique_lock<std::mutex> lock(state_->backend_graph->mutex);
     ScopedTimer merge_timer("frontend/merge_graph", msg->timestamp_ns);
     state_->backend_graph->sequence_number = sequence_number_;
-    state_->backend_graph->graph->mergeGraph(*dsg_->graph);
+    // archived nodes still receive attribute updates (e.g. the object extractor's
+    // image_folder lands after the track archives) that the backend must see
+    GraphMergeConfig merge_config;
+    merge_config.update_archived_attributes = true;
+    state_->backend_graph->graph->mergeGraph(*dsg_->graph, merge_config);
   }  // end critical section
 
   if (queues.lcd_queue) {
