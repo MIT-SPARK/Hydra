@@ -60,6 +60,31 @@ std::string printTransform(const Eigen::Isometry3d& tf) {
 }  // namespace
 
 using spark_dsg::NodeSymbol;
+using spark_dsg::ObjectNodeAttributes;
+using spark_dsg::SemanticNodeAttributes;
+
+void applyNodeDeformation(const Eigen::Isometry3d& transform,
+                          const NodeAttributes& src,
+                          NodeAttributes& dst) {
+  dst.position = transform * src.position;
+
+  // transform a fresh copy of the odometric box (never the live optimized box) so
+  // repeated deformation of a node -- active or archived -- never compounds
+  const auto src_semantic = dynamic_cast<const SemanticNodeAttributes*>(&src);
+  auto dst_semantic = dynamic_cast<SemanticNodeAttributes*>(&dst);
+  if (src_semantic && dst_semantic &&
+      src_semantic->bounding_box.type != BoundingBox::Type::INVALID) {
+    dst_semantic->bounding_box = src_semantic->bounding_box;
+    dst_semantic->bounding_box.transform(transform);
+  }
+
+  const auto src_object = dynamic_cast<const ObjectNodeAttributes*>(&src);
+  auto dst_object = dynamic_cast<ObjectNodeAttributes*>(&dst);
+  if (src_object && dst_object) {
+    dst_object->world_R_object = Eigen::Quaterniond(
+        transform.linear() * src_object->world_R_object.toRotationMatrix());
+  }
+}
 
 void declare_config(DeformationInterpolator::Config& config) {
   using namespace config;
@@ -85,20 +110,31 @@ NodeCache::Entry* NodeCache::add(NodeId node_id, const NodeAttributes& attrs) {
 
   auto iter = nodes.find(node_id);
   if (iter == nodes.end()) {
-    return &nodes
-                .emplace(node_id,
-                         Entry{node_id,
-                               attrs.last_update_time_ns,
-                               attrs.position.cast<float>()})
-                .first->second;
+    iter =
+        nodes
+            .emplace(
+                node_id,
+                Entry{
+                    node_id, timestamp_ns, attrs.position.cast<float>(), std::nullopt})
+            .first;
+    return &iter->second;
   }
 
-  if (attrs.is_active) {
-    iter->second.init_pos = attrs.position.cast<float>();
-    iter->second.timestamp = attrs.last_update_time_ns;
-  }
-
+  // the attributes come from the unmerged graph, which is odometric by invariant,
+  // so the cached values can always refresh (archived nodes never change anyway)
+  iter->second.pos = attrs.position.cast<float>();
+  iter->second.timestamp = timestamp_ns;
   return &iter->second;
+}
+
+bool NodeCache::applyLastTransform(NodeId node_id, NodeAttributes& attrs) const {
+  const auto iter = nodes.find(node_id);
+  if (iter == nodes.end() || !iter->second.last_transform) {
+    return false;
+  }
+
+  attrs.transform(*iter->second.last_transform);
+  return true;
 }
 
 struct EntryList {
@@ -126,7 +162,7 @@ kimera_pgmo::traits::Pos pgmoGetVertex(const EntryList& entries,
     traits->stamp = entry->timestamp;
   }
 
-  return entry->init_pos;
+  return entry->pos;
 }
 
 uint64_t pgmoGetVertexStamp(const EntryList& entries, size_t i) {
@@ -189,14 +225,19 @@ void DeformationInterpolator::interpolate(const DynamicSceneGraph& unmerged,
       VLOG(5) << "node " << spark_dsg::NodeSymbol(entry->id).str()
               << " -> transform: " << printTransform(transform);
 
-      const auto new_pos = transform * entry->init_pos.cast<double>();
-      auto& attrs = unmerged.getNode(entry->id).attributes();
-      attrs.position = new_pos;
+      // recorded so merge hooks can bring attributes rebuilt from odometric
+      // constituents into the optimized frame
+      entry->last_transform = transform;
 
       auto node_ptr = dsg.findNode(entry->id);
-      if (node_ptr) {
-        node_ptr->attributes().position = new_pos;
+      if (!node_ptr) {
+        return;
       }
+
+      // the unmerged graph stays odometric: read the odometric source values and
+      // write the deformed results into the merged graph only
+      const auto& src = unmerged.getNode(entry->id).attributes();
+      applyNodeDeformation(transform, src, node_ptr->attributes());
     };
 
     dgraph.customDeformation(deform_func,

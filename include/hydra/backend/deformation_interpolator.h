@@ -35,19 +35,46 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "hydra/backend/update_functions.h"
 
 namespace hydra {
 
+/**
+ * @brief Write the deformed (optimized) version of the odometric source attributes
+ * into the destination attributes.
+ *
+ * Only spatial fields are written (position, bounding box, object orientation), so
+ * merged-only state on the destination survives. Everything is derived from the
+ * odometric source, never from the destination, so repeated application with the
+ * same transform is idempotent.
+ */
+void applyNodeDeformation(const Eigen::Isometry3d& transform,
+                          const NodeAttributes& src,
+                          NodeAttributes& dst);
+
 struct NodeCache {
   struct Entry {
     NodeId id;
     uint64_t timestamp;
-    Eigen::Vector3f init_pos;
+    //! Odometric position (the unmerged graph is odometric by invariant); doubles
+    //! as the pgmo vertex for control-point matching.
+    Eigen::Vector3f pos;
+    //! Most recent odometric->optimized transform applied to this node, if any.
+    //! Lets merge hooks bring attributes rebuilt from odometric constituents into
+    //! the optimized frame.
+    std::optional<Eigen::Isometry3d> last_transform;
   };
 
   Entry* add(NodeId node, const NodeAttributes& attrs);
+
+  /**
+   * @brief Apply the node's most recent deformation transform to the given
+   * attributes (via NodeAttributes::transform).
+   * @returns true if a transform was recorded and applied.
+   */
+  bool applyLastTransform(NodeId node, NodeAttributes& attrs) const;
 
   std::map<NodeId, Entry> nodes;
 };
@@ -68,10 +95,14 @@ class DeformationInterpolator {
   explicit DeformationInterpolator(const Config& config);
 
   /**
-   * @brief Interpolate the node positions based on the deformation graph, using the
+   * @brief Interpolate the node poses based on the deformation graph, using the
    * temporally closest control points as reference.
    *
-   * @param unmerged Unmerged scene graph to keep up to date.
+   * Reads odometric values from the unmerged scene graph and writes the deformed
+   * (optimized) values into the private DSG only; the unmerged graph is never
+   * modified.
+   *
+   * @param unmerged Unmerged (odometric) scene graph to read from.
    * @param dsg Private DSG to update.
    * @param info Update information containing deformation graph.
    * @param view View on the unmerged scene graph selecting all nodes to update.
@@ -81,20 +112,22 @@ class DeformationInterpolator {
                    const UpdateInfo::ConstPtr& info,
                    const LayerView& view) const;
 
-  /**
-   * @brief Interpolate the node positions based on the deformation graph, using the
-   * temporally closest control points as reference.
-   *
-   * @param unmerged Unmerged scene graph to keep up to date.
-   * @param dsg Private DSG to update.
-   * @param info Update information containing deformation graph.
-   * @param view View on the unmerged scene graph selecting all nodes to update.
-   */
+  //! @copydoc DeformationInterpolator::interpolate
   void interpolateNodePositions(const DynamicSceneGraph& unmerged,
                                 DynamicSceneGraph& dsg,
                                 const UpdateInfo::ConstPtr& info,
                                 const LayerView& view) const {
     interpolate(unmerged, dsg, info, view);
+  }
+
+  /**
+   * @brief Apply the node's most recent deformation transform to the given
+   * attributes (e.g. to bring merge-hook output rebuilt from odometric
+   * constituents into the optimized frame).
+   * @returns true if a transform was recorded and applied.
+   */
+  bool applyLastTransform(NodeId node, NodeAttributes& attrs) const {
+    return cache_.applyLastTransform(node, attrs);
   }
 
  private:

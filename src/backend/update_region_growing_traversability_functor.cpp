@@ -77,7 +77,14 @@ UpdateFunctor::Hooks UpdateRegionGrowingTraversabilityFunctor::hooks() const {
   };
   my_hooks.merge = [this](const DynamicSceneGraph& dsg,
                           const std::vector<NodeId>& merge_ids) {
-    return mergeNodes(dsg, merge_ids);
+    auto attrs = mergeNodes(dsg, merge_ids);
+    if (attrs) {
+      // the merged attributes are cloned from the odometric unmerged graph;
+      // re-apply the surviving node's last deformation so the merge result stays
+      // in the optimized frame
+      deformation_interpolator_.applyLastTransform(merge_ids.front(), *attrs);
+    }
+    return attrs;
   };
   my_hooks.cleanup = [this](const UpdateInfo::ConstPtr& info,
                             DynamicSceneGraph&,
