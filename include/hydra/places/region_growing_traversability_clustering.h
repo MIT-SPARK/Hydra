@@ -57,6 +57,11 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
     //! only) when false. 4-connectivity stops region growth leaking through 1-voxel
     //! diagonal gaps in walls.
     bool use_diagonal_connectivity = true;
+    //! Minimum passage width (in voxels) that connectivity may traverse. 1 disables
+    //! the check. With value W, connectivity is grown only through voxels whose
+    //! (W-1)-radius orthogonal neighborhood is fully traversable, severing phantom
+    //! gaps narrower than W voxels between rooms. Voxel size 0.1 m.
+    int min_connection_width_voxels = 1;
   } const config;
 
   using Voxels = VoxelIndices;
@@ -182,6 +187,24 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
       std::function<bool(const VoxelIndex&)> condition = [](const VoxelIndex&) {
         return true;
       });
+
+  /**
+   * @brief Erode a candidate set with a 4-connected (plus) structuring element of the
+   * given radius: keep a voxel only if every voxel within Manhattan distance `radius`
+   * is also a candidate. radius <= 0 returns the input unchanged.
+   */
+  static VoxelSet erodeCandidates(const VoxelSet& candidates, int radius);
+
+  /**
+   * @brief BFS from `seed` over `candidates`, propagating ONLY through `core` voxels
+   * (wide-enough voxels). Non-core voxels adjacent to the growing region are included
+   * as leaves but do not expand further, so connectivity cannot cross a gap thinner
+   * than the erosion that produced `core`.
+   */
+  static VoxelSet growConnectedWithMinWidth(const VoxelSet& candidates,
+                                            const VoxelSet& core,
+                                            const VoxelIndex& seed,
+                                            size_t num_neighbors);
 
   void updatePlaceNodeAttributes(spark_dsg::TravNodeAttributes& attrs,
                                  Region& region,

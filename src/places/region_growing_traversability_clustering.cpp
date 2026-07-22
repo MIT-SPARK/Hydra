@@ -42,6 +42,7 @@
 #include <spark_dsg/edge_attributes.h>
 #include <spark_dsg/node_symbol.h>
 
+#include <cstdlib>
 #include <queue>
 
 #include "hydra/utils/timing_utilities.h"
@@ -72,8 +73,10 @@ void declare_config(RegionGrowingTraversabilityClustering::Config& config) {
   field(config.max_radius, "max_radius", "m");
   field(config.num_orientation_bins, "num_orientation_bins");
   field(config.use_diagonal_connectivity, "use_diagonal_connectivity");
+  field(config.min_connection_width_voxels, "min_connection_width_voxels");
   check(config.max_radius, GT, 0.0f, "max_radius");
   check(config.num_orientation_bins, GE, 3, "num_orientation_bins");
+  check(config.min_connection_width_voxels, GE, 1, "min_connection_width_voxels");
 }
 
 RegionGrowingTraversabilityClustering::RegionGrowingTraversabilityClustering(
@@ -131,8 +134,20 @@ VoxelSet RegionGrowingTraversabilityClustering::initializeVoxels(
   Eigen::Vector3f start_2d = start_position.cast<float>();
   start_2d.z() = 0.0f;
   const auto start_index = layer.globalIndexFromPoint(start_2d);
+
   const size_t num_neighbors = config.use_diagonal_connectivity ? 8u : 4u;
-  return growRegion(candidates, start_index, num_neighbors);
+  const int erosion_radius = config.min_connection_width_voxels - 1;
+  if (erosion_radius <= 0) {
+    return growRegion(candidates, start_index, num_neighbors);
+  }
+
+  const VoxelSet core = erodeCandidates(candidates, erosion_radius);
+  if (core.find(start_index) == core.end()) {
+    // Robot cell is not "wide" (e.g. hugging a wall); fall back to plain
+    // connectivity so we never drop all places for a frame.
+    return growRegion(candidates, start_index, num_neighbors);
+  }
+  return growConnectedWithMinWidth(candidates, core, start_index, num_neighbors);
 }
 
 VoxelMap RegionGrowingTraversabilityClustering::initializeRegions(
@@ -453,6 +468,62 @@ VoxelSet RegionGrowingTraversabilityClustering::growRegion(
     }
   }
 
+  return result;
+}
+
+VoxelSet RegionGrowingTraversabilityClustering::erodeCandidates(
+    const VoxelSet& candidates, int radius) {
+  if (radius <= 0) {
+    return candidates;
+  }
+  VoxelSet eroded;
+  for (const auto& v : candidates) {
+    bool keep = true;
+    for (int dx = -radius; dx <= radius && keep; ++dx) {
+      for (int dy = -radius; dy <= radius; ++dy) {
+        if (std::abs(dx) + std::abs(dy) > radius || (dx == 0 && dy == 0)) {
+          continue;  // 4-connected (plus) ball, excluding the center
+        }
+        if (candidates.find(v + VoxelIndex(dx, dy, 0)) == candidates.end()) {
+          keep = false;
+          break;
+        }
+      }
+    }
+    if (keep) {
+      eroded.insert(v);
+    }
+  }
+  return eroded;
+}
+
+VoxelSet RegionGrowingTraversabilityClustering::growConnectedWithMinWidth(
+    const VoxelSet& candidates,
+    const VoxelSet& core,
+    const VoxelIndex& seed,
+    size_t num_neighbors) {
+  VoxelSet result;
+  if (candidates.find(seed) == candidates.end()) {
+    return result;
+  }
+  VoxelSet visited;
+  std::queue<VoxelIndex> queue;
+  queue.push(seed);
+  visited.insert(seed);
+  while (!queue.empty()) {
+    const auto current = queue.front();
+    queue.pop();
+    result.insert(current);
+    if (core.find(current) == core.end()) {
+      continue;  // narrow voxel: include but do not propagate through it
+    }
+    for (size_t k = 0; k < num_neighbors && k < neighbors_.size(); ++k) {
+      const VoxelIndex n = current + neighbors_[k];
+      if (candidates.find(n) != candidates.end() && visited.insert(n).second) {
+        queue.push(n);
+      }
+    }
+  }
   return result;
 }
 
