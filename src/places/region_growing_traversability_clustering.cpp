@@ -71,6 +71,7 @@ void declare_config(RegionGrowingTraversabilityClustering::Config& config) {
   name("RegionGrowingTraversabilityClustering::Config");
   field(config.max_radius, "max_radius", "m");
   field(config.num_orientation_bins, "num_orientation_bins");
+  field(config.use_diagonal_connectivity, "use_diagonal_connectivity");
   check(config.max_radius, GT, 0.0f, "max_radius");
   check(config.num_orientation_bins, GE, 3, "num_orientation_bins");
 }
@@ -130,7 +131,8 @@ VoxelSet RegionGrowingTraversabilityClustering::initializeVoxels(
   Eigen::Vector3f start_2d = start_position.cast<float>();
   start_2d.z() = 0.0f;
   const auto start_index = layer.globalIndexFromPoint(start_2d);
-  return growRegion(candidates, start_index);
+  const size_t num_neighbors = config.use_diagonal_connectivity ? 8u : 4u;
+  return growRegion(candidates, start_index, num_neighbors);
 }
 
 VoxelMap RegionGrowingTraversabilityClustering::initializeRegions(
@@ -160,6 +162,8 @@ VoxelMap RegionGrowingTraversabilityClustering::initializeRegions(
 
 void RegionGrowingTraversabilityClustering::growRegions(VoxelSet& all_voxels,
                                                         VoxelMap& assigned_voxels) {
+  const size_t num_neighbors = config.use_diagonal_connectivity ? 8u : 4u;
+
   // Try to grow existing regions into the closest voxels to each region.
   const auto max_dist_sq = static_cast<float>(max_region_size_ * max_region_size_);
   std::vector<Eigen::Vector3f> centroids;
@@ -185,7 +189,7 @@ void RegionGrowingTraversabilityClustering::growRegions(VoxelSet& all_voxels,
   for (auto& [region_id, candidates] : region_candidates) {
     Region& region = regions_.at(region_id);
     region.is_active = true;
-    VoxelSet grown_voxels = growRegion(candidates, *candidates.begin());
+    VoxelSet grown_voxels = growRegion(candidates, *candidates.begin(), num_neighbors);
     region.voxels.insert(grown_voxels.begin(), grown_voxels.end());
     for (const auto& voxel_index : grown_voxels) {
       assigned_voxels[voxel_index] = region_id;
@@ -200,10 +204,11 @@ void RegionGrowingTraversabilityClustering::growRegions(VoxelSet& all_voxels,
     const auto seed_index = *all_voxels.begin();
     new_region.centroid = seed_index.cast<float>();
     VoxelSet grown_voxels =
-        growRegion(all_voxels, seed_index, [&](const VoxelIndex& index) {
-          return (index.cast<float>() - new_region.centroid).squaredNorm() <=
-                 max_dist_sq;
-        });
+        growRegion(all_voxels, seed_index, num_neighbors,
+                   [&](const VoxelIndex& index) {
+                     return (index.cast<float>() - new_region.centroid)
+                                .squaredNorm() <= max_dist_sq;
+                   });
     new_region.voxels = std::move(grown_voxels);
     for (const auto& voxel_index : new_region.voxels) {
       assigned_voxels[voxel_index] = new_region.id;
@@ -421,6 +426,7 @@ RegionGrowingTraversabilityClustering::allocateNewRegion() {
 VoxelSet RegionGrowingTraversabilityClustering::growRegion(
     const VoxelSet& candidates,
     const VoxelIndex& seed_index,
+    size_t num_neighbors,
     std::function<bool(const VoxelIndex&)> condition) {
   VoxelSet result;
   if (candidates.find(seed_index) == candidates.end()) {
@@ -435,7 +441,8 @@ VoxelSet RegionGrowingTraversabilityClustering::growRegion(
   while (!queue.empty()) {
     const auto current_index = queue.front();
     queue.pop();
-    for (const auto& offset : neighbors_) {
+    for (size_t k = 0; k < num_neighbors && k < neighbors_.size(); ++k) {
+      const auto& offset = neighbors_[k];
       const VoxelIndex n_index = current_index + offset;
       if (candidates.find(n_index) == candidates.end() || !condition(n_index)) {
         continue;

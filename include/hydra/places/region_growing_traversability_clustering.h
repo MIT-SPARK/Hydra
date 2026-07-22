@@ -53,6 +53,10 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
     float max_radius = 3.0f;
     //! Number of rays to consider for boundary computation.
     int num_orientation_bins = 16;
+    //! Use 8-connectivity (incl. diagonals) when true; 4-connectivity (orthogonal
+    //! only) when false. 4-connectivity stops region growth leaking through 1-voxel
+    //! diagonal gaps in walls.
+    bool use_diagonal_connectivity = true;
   } const config;
 
   using Voxels = VoxelIndices;
@@ -168,10 +172,13 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
 
   /**
    * @brief Breadth-first search to grow a region from a seed index.
+   * @param num_neighbors 4 (orthogonal only) or 8 (incl. diagonals) entries of
+   * neighbors_ to use.
    */
   static VoxelSet growRegion(
       const VoxelSet& candidates,
       const VoxelIndex& seed_index,
+      size_t num_neighbors = 8,
       std::function<bool(const VoxelIndex&)> condition = [](const VoxelIndex&) {
         return true;
       });
