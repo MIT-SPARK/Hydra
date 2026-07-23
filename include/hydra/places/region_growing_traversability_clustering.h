@@ -189,11 +189,15 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
       });
 
   /**
-   * @brief Erode a candidate set with a 4-connected (plus) structuring element of the
-   * given radius: keep a voxel only if every voxel within Manhattan distance `radius`
-   * is also a candidate. radius <= 0 returns the input unchanged.
+   * @brief Erode a candidate set: keep a voxel only if every voxel within `radius` of
+   * it (by the structuring element) is also a candidate. The structuring element
+   * follows the connectivity so the width gate stays consistent with the BFS:
+   * `use_diagonal=false` -> 4-connected (plus / Manhattan ball); `use_diagonal=true`
+   * -> 8-connected (square / Chebyshev ball). radius <= 0 returns the input unchanged.
    */
-  static VoxelSet erodeCandidates(const VoxelSet& candidates, int radius);
+  static VoxelSet erodeCandidates(const VoxelSet& candidates,
+                                  int radius,
+                                  bool use_diagonal);
 
   /**
    * @brief BFS from `seed` over `candidates`, propagating ONLY through `core` voxels
