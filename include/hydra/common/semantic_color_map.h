@@ -37,6 +37,7 @@
 #include <spark_dsg/color.h>
 
 #include <memory>
+#include <opencv2/core/mat.hpp>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -69,6 +70,8 @@ class SemanticColorMap {
   inline operator bool() const { return isValid(); }
 
   std::string toString() const;
+
+  cv::Mat colorsToLabels(const cv::Mat& colors, int32_t default_label = -1) const;
 
  public:
   static SemanticColorMap::Ptr randomColors(size_t num_labels,

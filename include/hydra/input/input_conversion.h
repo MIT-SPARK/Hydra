@@ -23,20 +23,12 @@ std::unique_ptr<InputData> parseInputPacket(const InputPacket& input_packet,
                                             bool normalize_labels = true);
 
 /**
- * @brief make sure that all the images are of the right type
+ * @brief Ensure that all the images are of the right type
+ * @param data Input data to normalize
+ * @param normalize_labels Whether or not to ensure labels are the correct type
+ * @return Whether or not the input normalization was successful
  */
 bool normalizeData(InputData& data, bool normalize_labels = true);
-
-bool normalizeDepth(InputData& data);
-
-bool colorToLabels(cv::Mat& label_image, const cv::Mat& colors);
-
-// TODO(nathan) check if the conversions are directly used...
-bool convertLabels(InputData& data);
-
-bool convertDepth(InputData& data);
-
-bool convertColor(InputData& data);
 
 /**
  * @brief Ensure that the vertex map is in the correct frame.
