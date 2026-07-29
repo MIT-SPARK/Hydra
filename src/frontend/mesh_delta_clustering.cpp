@@ -39,8 +39,7 @@ std::string printLabels(const std::set<uint32_t>& labels) {
 
 LabelIndices getLabelIndices(const std::set<uint32_t>& desired_labels,
                              const kimera_pgmo::MeshDelta& delta,
-                             const std::unordered_set<size_t>* invalid,
-                             bool instance_id) {
+                             const std::unordered_set<size_t>* invalid) {
   LabelIndices label_indices;
   if (!kimera_pgmo::traits::get_vertex_properties(delta).has_label) {
     LOG(WARNING) << "[Delta Clustering] Mesh missing labels!";
@@ -54,11 +53,7 @@ LabelIndices getLabelIndices(const std::set<uint32_t>& desired_labels,
     }
 
     const auto& v = delta.getVertex(i);
-    const auto raw_label = v.traits.label;
-    const auto label = (instance_id && raw_label > 0xFFFF)
-                           ? static_cast<uint32_t>(raw_label >> 16)
-                           : raw_label;
-
+    const auto label = v.traits.label;
     seen_labels.insert(label);
     if (!desired_labels.count(label)) {
       continue;

@@ -67,7 +67,6 @@ class SurfacePlaceExtractor {
     double place_overlap_threshold = 0.1;
     double place_max_neighbor_z_diff = 0.5;
     double connection_ellipse_scale_factor = 1;
-    bool instance_id = false;
     std::vector<Sink::Factory> sinks;
   } const config;
 
