@@ -102,6 +102,7 @@ void declare_config(BackendModule::Config& config) {
   name("BackendConfig");
   field(config.pgmo, "pgmo");
   field(config.optimize_on_lc, "optimize_on_lc");
+  field(config.optimize_every_update, "optimize_every_update");
   field(config.external_loop_closures, "external_loop_closures");
   field(config.optimization_hooks, "optimization_hooks");
   field(config.sinks, "sinks");
@@ -260,14 +261,21 @@ bool BackendModule::spinOnce(bool force_update) {
   }
 
   timer.reset("backend/spin");
-  if ((config.optimize_on_lc && have_new_loopclosures_) || force_optimize_) {
+  // optimize if enabled and a new loop closure occurs
+  auto should_optimize = config.optimize_on_lc && have_new_loopclosures_;
+  // optimize if first loop closure is received (and optimization is enabled)
+  should_optimize |=
+      config.optimize_on_lc && config.optimize_every_update && have_loopclosures_;
+  // optimize if force_optimize_ is set
+  should_optimize |= force_optimize_;
+  if (should_optimize) {
     optimize(timestamp_ns);
   } else {
     updateDsgMesh(timestamp_ns);
+
     UpdateInfo::ConstPtr info;
     if (have_loopclosures_) {
-      // no new factors to solve: deform new/active nodes and mesh with the cached
-      // optimized values; the full solve only runs when new loop closures arrive
+      // update graph with cached optimization solution
       info.reset(new UpdateInfo{timestamp_ns,
                                 deformation_graph_->getTempValues(),
                                 deformation_graph_->getValues(),
@@ -279,6 +287,7 @@ bool BackendModule::spinOnce(bool force_update) {
     } else {
       info.reset(new UpdateInfo{timestamp_ns});
     }
+
     dsg_updater_->callUpdateFunctions(timestamp_ns, info);
   }
 
@@ -527,7 +536,7 @@ void BackendModule::optimize(size_t timestamp_ns, bool force_find_merge) {
     hook->updateProblem(timestamp_ns, *unmerged_graph_, *deformation_graph_);
   }
 
-  ScopedTimer timer("dsg_updater/optimization", timestamp_ns, true, 0, false);
+  ScopedTimer timer("backend/optimization", timestamp_ns, true, 0, false);
   KimeraPgmoInterface::optimize();
   timer.stop();
 
@@ -569,7 +578,7 @@ void BackendModule::logStatus() {
   auto& status = status_log_.back();
   const auto& timer = hydra::timing::ElapsedTimeRecorder::instance();
   status.last_spin_s = timer.getLastElapsed("backend/spin");
-  status.last_opt_s = timer.getLastElapsed("dsg_updater/optimization");
+  status.last_opt_s = timer.getLastElapsed("backend/optimization");
   status.last_mesh_update_s = timer.getLastElapsed("backend/mesh_deformation");
 }
 
