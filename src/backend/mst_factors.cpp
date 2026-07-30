@@ -120,7 +120,7 @@ void MstPlaceFactors::updateProblem(uint64_t timestamp_ns,
   }  // end timing scope
 
   {  // start timing scope
-    ScopedTimer between_timer("dsg_updater/add_places_between", timestamp_ns);
+    ScopedTimer between_timer("backend/add_places_between", timestamp_ns);
     const auto robot_id = GlobalInfo::instance().getRobotPrefix().id;
     pose_graph_tools::PoseGraph mst_edges;
     for (const auto& edge : mst_info.edges) {

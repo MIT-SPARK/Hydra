@@ -86,6 +86,8 @@ class BackendModule : public kimera_pgmo::KimeraPgmoInterface, public Module {
   struct Config : DsgUpdater::Config {
     //! Optimize the graph on every detected loop closure
     bool optimize_on_lc = true;
+    //! Optimize after every update after first loop closure
+    bool optimize_every_update = true;
     //! PGMO backend configuration
     kimera_pgmo::KimeraPgmoConfig pgmo;
     //! Configuration for associating loop closures to pose graph
