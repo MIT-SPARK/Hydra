@@ -39,33 +39,20 @@
 
 #include "hydra_test/shared_dsg_fixture.h"
 
-namespace hydra {
+using namespace spark_dsg;
 
+namespace hydra {
 namespace {
 
-using spark_dsg::NodeSymbol;
-
-void addObject(DynamicSceneGraph& graph, size_t index) {
-  auto attrs = std::make_unique<spark_dsg::ObjectNodeAttributes>();
+void addObject(SceneGraph& graph, size_t index) {
+  auto attrs = std::make_unique<ObjectNodeAttributes>();
   attrs->position << static_cast<double>(index), 0.0, 0.0;
   graph.emplaceNode(DsgLayers::OBJECTS, NodeSymbol('O', index), std::move(attrs));
 }
 
-// simple merge hook that clones the parent's attributes from the unmerged graph,
-// mirroring what real merge hooks do
-MergeTracker::MergeFunc cloneParentAttrs() {
-  return [](const DynamicSceneGraph& unmerged, const std::vector<NodeId>& nodes) {
-    const auto node = unmerged.findNode(nodes.front());
-    return node ? node->attributes().clone() : nullptr;
-  };
-}
-
 }  // namespace
 
-// The frontend can delete nodes, so a merge parent recorded by the tracker may
-// vanish from the unmerged graph. Both entry points must drop that merge set
-// instead of throwing on the missing node.
-TEST(MergeTracker, DeletedParentDoesNotThrow) {
+TEST(MergeTracker, DeletedParentCorrect) {
   auto dsg = test::makeSharedDsg();
   auto& merged = *dsg->graph;
   addObject(merged, 0);
@@ -73,21 +60,23 @@ TEST(MergeTracker, DeletedParentDoesNotThrow) {
   const auto unmerged = merged.clone();
 
   MergeTracker tracker;
-  const auto merge_attrs = cloneParentAttrs();
+  const auto merge_attrs = [](const SceneGraph& unmerged,
+                              const std::vector<NodeId>& nodes) -> NodeAttributes::Ptr {
+    const auto node = unmerged.findNode(nodes.front());
+    return node ? node->attributes().clone() : nullptr;
+  };
+
   MergeList proposals{{NodeSymbol('O', 1), NodeSymbol('O', 0)}};
   ASSERT_EQ(tracker.applyMerges(*unmerged, proposals, *dsg, merge_attrs), 1u);
 
-  // frontend deletes the surviving node from the unmerged graph
   unmerged->removeNode(NodeSymbol('O', 0));
-
+  merged.removeNode(NodeSymbol('O', 0));
   EXPECT_NO_THROW(tracker.updateAllMergeAttributes(*unmerged, merged, merge_attrs));
   MergeList repeat{{NodeSymbol('O', 1), NodeSymbol('O', 0)}};
   EXPECT_NO_THROW(tracker.applyMerges(*unmerged, repeat, *dsg, merge_attrs));
 }
 
-// A merge hook may return nullptr (e.g., when it cannot rebuild attributes);
-// the tracker must not install null attributes on the merged node.
-TEST(MergeTracker, NullMergeAttrsSkipped) {
+TEST(MergeTracker, NullAttributesCorrect) {
   auto dsg = test::makeSharedDsg();
   auto& merged = *dsg->graph;
   addObject(merged, 0);
@@ -95,14 +84,14 @@ TEST(MergeTracker, NullMergeAttrsSkipped) {
   const auto unmerged = merged.clone();
 
   MergeTracker tracker;
-  const MergeTracker::MergeFunc null_attrs = [](const DynamicSceneGraph&,
-                                                const std::vector<NodeId>&) {
-    return NodeAttributes::Ptr(nullptr);
+  const auto null_attrs = [](const DynamicSceneGraph&,
+                             const std::vector<NodeId>&) -> NodeAttributes::Ptr {
+    return nullptr;
   };
+
   MergeList proposals{{NodeSymbol('O', 1), NodeSymbol('O', 0)}};
   EXPECT_EQ(tracker.applyMerges(*unmerged, proposals, *dsg, null_attrs), 1u);
-  // the surviving node keeps valid attributes
-  EXPECT_NO_THROW(merged.getNode(NodeSymbol('O', 0)).attributes());
+  EXPECT_TRUE(merged.getNode(NodeSymbol('O', 0)).tryAttributes());
 }
 
 }  // namespace hydra

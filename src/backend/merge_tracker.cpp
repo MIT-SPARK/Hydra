@@ -80,9 +80,9 @@ size_t MergeTracker::applyMerges(const DynamicSceneGraph& unmerged,
       continue;
     }
 
-    // the frontend can delete nodes, so the recorded parent may be gone from either
-    // graph; the merged attributes can never be rebuilt again in that case
-    if (!unmerged.hasNode(node) || !graph.hasNode(node)) {
+    if (!unmerged.hasNode(node)) {
+      CHECK(!graph.hasNode(node)) << NodeSymbol(node).str()
+                                  << " deleted from unmerged graph but in merged graph";
       VLOG(1) << "Dropping merge set for missing parent " << NodeSymbol(node).str();
       merge_sets_.erase(iter);
       continue;
@@ -114,9 +114,10 @@ void MergeTracker::updateAllMergeAttributes(const DynamicSceneGraph& unmerged,
   auto iter = merge_sets_.begin();
   while (iter != merge_sets_.end()) {
     const auto parent = iter->first;
-    // the frontend can delete nodes, so the recorded parent may be gone from either
-    // graph; the merged attributes can never be rebuilt again in that case
-    if (!unmerged.hasNode(parent) || !merged.hasNode(parent)) {
+    if (!unmerged.hasNode(parent)) {
+      CHECK(!merged.hasNode(parent))
+          << NodeSymbol(parent).str()
+          << " deleted from unmerged graph but in merged graph";
       VLOG(1) << "Dropping merge set for missing parent " << NodeSymbol(parent).str();
       iter = merge_sets_.erase(iter);
       continue;
