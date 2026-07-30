@@ -34,21 +34,22 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
-#include <memory>
-
 #include "hydra/backend/update_functions.h"
 
 namespace hydra {
 
 struct NodeCache {
   struct Entry {
+    //! Node entry ID
     NodeId id;
+    //! Associated update timestamp
     uint64_t timestamp;
+    //! Odometric node position
     Eigen::Vector3f init_pos;
-    //! Original (odometric) bounding box, INVALID if the node has none. Cached so
-    //! the deform callback can transform a fresh copy each spin rather than
-    //! mutating the box in place (which would compound on archived nodes).
+    //! Odometric bounding box for node
     spark_dsg::BoundingBox init_bbox;
+
+    void update(NodeAttributes& attrs, const Eigen::Isometry3d& transform) const;
   };
 
   Entry* add(NodeId node, const NodeAttributes& attrs);

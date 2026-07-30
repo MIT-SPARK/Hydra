@@ -72,6 +72,21 @@ void declare_config(DeformationInterpolator::Config& config) {
   check(config.control_point_tolerance_s, GE, 0.0, "control_point_tolerance_s");
 }
 
+void NodeCache::Entry::update(NodeAttributes& attrs,
+                              const Eigen::Isometry3d& transform) const {
+  const auto new_pos = transform * init_pos.cast<double>();
+  attrs.position = new_pos;
+  if (init_bbox.type == BoundingBox::Type::INVALID) {
+    return;
+  }
+
+  auto derived = dynamic_cast<SemanticNodeAttributes*>(&attrs);
+  if (derived) {
+    derived->bounding_box = init_bbox;
+    derived->bounding_box.transform(transform);
+  }
+}
+
 NodeCache::Entry* NodeCache::add(NodeId node_id, const NodeAttributes& attrs) {
   uint64_t timestamp_ns = attrs.last_update_time_ns;
   if (timestamp_ns == 0u) {
@@ -85,11 +100,10 @@ NodeCache::Entry* NodeCache::add(NodeId node_id, const NodeAttributes& attrs) {
     timestamp_ns = derived->last_observed_ns.back();
   }
 
-  // Cache the original bounding box (if any) so the deform callback can transform a
-  // fresh copy each spin instead of mutating the live box in place.
-  BoundingBox bbox;  // default INVALID
-  if (const auto semantic = dynamic_cast<const SemanticNodeAttributes*>(&attrs)) {
-    bbox = semantic->bounding_box;
+  BoundingBox bbox;
+  const auto derived = dynamic_cast<const SemanticNodeAttributes*>(&attrs);
+  if (derived) {
+    bbox = derived->bounding_box;  // Cache the original bounding box of the node
   }
 
   auto iter = nodes.find(node_id);
@@ -114,7 +128,7 @@ struct EntryList {
   std::vector<NodeCache::Entry*> entries;
 
   void sort() {
-    std::sort(entries.begin(), entries.end(), [this](const auto& lhs, const auto& rhs) {
+    std::sort(entries.begin(), entries.end(), [](const auto& lhs, const auto& rhs) {
       return lhs->timestamp < rhs->timestamp;
     });
   }
@@ -198,25 +212,13 @@ void DeformationInterpolator::interpolate(const DynamicSceneGraph& unmerged,
       VLOG(5) << "node " << spark_dsg::NodeSymbol(entry->id).str()
               << " -> transform: " << printTransform(transform);
 
-      const auto new_pos = transform * entry->init_pos.cast<double>();
-      unmerged.getNode(entry->id).attributes().position = new_pos;
-
+      entry->update(unmerged.getNode(entry->id).attributes(), transform);
       auto node_ptr = dsg.findNode(entry->id);
       if (!node_ptr) {
         return;
       }
 
-      auto& dst = node_ptr->attributes();
-      dst.position = new_pos;
-
-      // Transform a fresh copy of the cached original box (never the live box) so
-      // repeated deformation of a node -- active or archived -- never compounds.
-      if (entry->init_bbox.type != BoundingBox::Type::INVALID) {
-        if (auto semantic = dynamic_cast<SemanticNodeAttributes*>(&dst)) {
-          semantic->bounding_box = entry->init_bbox;
-          semantic->bounding_box.transform(transform);
-        }
-      }
+      entry->update(node_ptr->attributes(), transform);
     };
 
     dgraph.customDeformation(deform_func,
