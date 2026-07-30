@@ -42,6 +42,8 @@
 
 #include <algorithm>
 
+#include "hydra/common/attribute_merger.h"
+
 namespace YAML {
 
 template <typename T>
@@ -82,6 +84,7 @@ void declare_config(LayerTracker::Config& config) {
   field(config.target_layer, "target_layer");
   config.matcher.setOptional();
   field(config.matcher, "matcher");
+  field(config.merger, "merger");
 }
 
 void declare_config(GraphUpdater::Config& config) {
@@ -105,7 +108,10 @@ void LayerUpdate::append(LayerUpdate&& rhs) {
 }
 
 LayerTracker::LayerTracker(const Config& config)
-    : config(config), next_id(config.prefix, 0), matcher(config.matcher.create()) {}
+    : config(config),
+      next_id(config.prefix, 0),
+      matcher(config.matcher.create()),
+      merger(config.merger.create()) {}
 
 GraphUpdater::GraphUpdater(const Config& config) : config(config::checkValid(config)) {
   for (const auto& [layer_name, tracker_config] : config.layer_updates) {
@@ -138,12 +144,13 @@ void GraphUpdater::addNode(DynamicSceneGraph& graph,
     if (entry.track_id) {
       tracker.track_to_node[*entry.track_id] = *to_merge;
     }
-
-    // TODO(nathan) actual merge attributes
-
+    tracker.attribute_cache[*entry.track_id] = entry.attributes->clone();
+    tracker.node_to_tracks[*to_merge].insert(*entry.track_id);
+    computeMergeGroup(*to_merge, tracker, graph);
     return;
   }
 
+  tracker.attribute_cache[*entry.track_id] = entry.attributes->clone();
   auto attrs = entry.attributes->clone();
   if (config.mark_active) {
     attrs->is_active = true;
@@ -156,7 +163,7 @@ void GraphUpdater::addNode(DynamicSceneGraph& graph,
   if (entry.track_id) {
     tracker.track_to_node[*entry.track_id] = new_id;
   }
-
+  tracker.node_to_tracks[new_id] = {*entry.track_id};
   ++tracker.next_id;
   return;
 }
@@ -174,8 +181,14 @@ void GraphUpdater::deleteNode(const NodeUpdate& entry,
     VLOG(5) << "Delete for unknown track_id " << *entry.track_id;
     return;
   }
+  tracker.attribute_cache.erase(*entry.track_id);
 
-  graph.removeNode(map_iter->second);
+  tracker.node_to_tracks[map_iter->second].erase(*entry.track_id);
+  if (tracker.node_to_tracks[map_iter->second].empty()) {
+    graph.removeNode(map_iter->second);
+  } else {
+    computeMergeGroup(map_iter->second, tracker, graph);
+  }
   tracker.track_to_node.erase(map_iter);
   return;
 }
@@ -185,16 +198,36 @@ bool GraphUpdater::updateNode(const NodeUpdate& entry,
                               DynamicSceneGraph& graph) {
   const auto map_iter = tracker.track_to_node.find(*entry.track_id);
   if (map_iter != tracker.track_to_node.end()) {
-    auto updated = entry.attributes->clone();
-    if (config.mark_active) {
-      updated->is_active = true;
-    }
-
-    graph.setNodeAttributes(map_iter->second, std::move(updated));
+    tracker.attribute_cache[*entry.track_id] = entry.attributes->clone();
+    computeMergeGroup(map_iter->second, tracker, graph);
     return true;
   }
 
   return false;
+}
+
+void GraphUpdater::computeMergeGroup(spark_dsg::NodeId node_id,
+                                     LayerTracker& tracker,
+                                     spark_dsg::DynamicSceneGraph& graph) {
+  auto& track_ids = tracker.node_to_tracks[node_id];
+
+  std::vector<const spark_dsg::NodeAttributes*> attrs;
+
+  for (size_t id : track_ids) {
+    auto it = tracker.attribute_cache.find(id);
+    if (it != tracker.attribute_cache.end()) {
+      attrs.push_back(it->second.get());
+    }
+  }
+
+  auto merged = tracker.merger->merge(attrs);
+
+  if (config.mark_active) {
+    merged->is_active = true;
+  }
+
+  // TODO: aryannav --> add logic to handle checking for invalid tracks given new merge.
+  graph.setNodeAttributes(node_id, std::move(merged));
 }
 
 void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {

@@ -43,6 +43,7 @@
 #include <memory>
 #include <unordered_map>
 
+#include "hydra/common/attribute_merger.h"
 #include "hydra/common/node_matchers.h"
 
 namespace hydra {
@@ -76,14 +77,18 @@ struct LayerTracker {
     char prefix = 0;
     std::optional<spark_dsg::LayerId> target_layer;
     config::VirtualConfig<NodeMatcher> matcher;
+    config::VirtualConfig<AttributeMerger> merger{EarliestAttributeMerger::Config()};
   } const config;
 
   explicit LayerTracker(const Config& config);
 
   spark_dsg::NodeSymbol next_id;
   std::unique_ptr<NodeMatcher> matcher;
+  std::unique_ptr<AttributeMerger> merger;
   //! Committed DSG node id for each object track on this logical layer.
   std::unordered_map<size_t, spark_dsg::NodeId> track_to_node;
+  std::unordered_map<spark_dsg::NodeId, std::unordered_set<size_t>> node_to_tracks;
+  std::unordered_map<size_t, spark_dsg::NodeAttributes::Ptr> attribute_cache;
 };
 
 void declare_config(LayerTracker::Config& config);
@@ -113,6 +118,10 @@ struct GraphUpdater {
   void deleteNode(const NodeUpdate& entry,
                   LayerTracker& tracker,
                   spark_dsg::DynamicSceneGraph& graph);
+
+  void computeMergeGroup(spark_dsg::NodeId node_id,
+                         LayerTracker& tracker,
+                         spark_dsg::DynamicSceneGraph& graph);
 };
 
 void declare_config(GraphUpdater::Config& config);
