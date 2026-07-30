@@ -84,6 +84,7 @@ void declare_config(LayerTracker::Config& config) {
   field(config.target_layer, "target_layer");
   config.matcher.setOptional();
   field(config.matcher, "matcher");
+  config.merger.setOptional();
   field(config.merger, "merger");
 }
 
@@ -212,7 +213,6 @@ void GraphUpdater::computeMergeGroup(spark_dsg::NodeId node_id,
   auto& track_ids = tracker.node_to_tracks[node_id];
 
   std::vector<const spark_dsg::NodeAttributes*> attrs;
-
   for (size_t id : track_ids) {
     auto it = tracker.attribute_cache.find(id);
     if (it != tracker.attribute_cache.end()) {
@@ -220,7 +220,22 @@ void GraphUpdater::computeMergeGroup(spark_dsg::NodeId node_id,
     }
   }
 
-  auto merged = tracker.merger->merge(attrs);
+  if (attrs.empty()) {
+    LOG(ERROR) << "Empty attribute merge group";
+    return;
+  }
+
+  NodeAttributes::Ptr merged;
+  if (tracker.merger) {
+    merged = tracker.merger->merge(attrs);
+  } else {
+    merged = attrs.front()->clone();
+  }
+
+  if (!merged) {
+    LOG(ERROR) << "Failed to create merged attributes";
+    return;
+  }
 
   if (config.mark_active) {
     merged->is_active = true;
