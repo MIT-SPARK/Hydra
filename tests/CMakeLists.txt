@@ -37,7 +37,7 @@ add_executable(
   places/test_gvd_integrator.cpp
   places/test_gvd_utilities.cpp
   places/test_traversability.cpp
-  places/test_region_growing_connectivity.cpp
+  places/test_region_growing_traversability_clustering.cpp
   reconstruction/test_integration_masking.cpp
   reconstruction/test_marching_cubes.cpp
   reconstruction/test_projection_interpolators.cpp

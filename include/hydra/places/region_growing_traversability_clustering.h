@@ -53,15 +53,8 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
     float max_radius = 3.0f;
     //! Number of rays to consider for boundary computation.
     int num_orientation_bins = 16;
-    //! Use 8-connectivity (incl. diagonals) when true; 4-connectivity (orthogonal
-    //! only) when false. 4-connectivity stops region growth leaking through 1-voxel
-    //! diagonal gaps in walls.
+    //! Toggle between 8-connectivity and 4-connectivity for region growing.
     bool use_diagonal_connectivity = true;
-    //! Minimum passage width (in voxels) that connectivity may traverse. 1 disables
-    //! the check. With value W, connectivity is grown only through voxels whose
-    //! (W-1)-radius orthogonal neighborhood is fully traversable, severing phantom
-    //! gaps narrower than W voxels between rooms. Voxel size 0.1 m.
-    int min_connection_width_voxels = 1;
   } const config;
 
   using Voxels = VoxelIndices;
@@ -124,6 +117,18 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
                    spark_dsg::SceneGraph& graph,
                    const std::string& layer_name) override;
 
+  /**
+   * @brief Breadth-first search to grow a region from a seed index.
+   * @param num_neighbors How many neighbors to consider during region growing.
+   */
+  static VoxelSet growRegion(
+      const VoxelSet& candidates,
+      const VoxelIndex& seed_index,
+      size_t num_neighbors = 8,
+      std::function<bool(const VoxelIndex&)> condition = [](const VoxelIndex&) {
+        return true;
+      });
+
  protected:
   size_t current_id_ = 0;
   uint64_t current_time_ns_ = 0;
@@ -174,41 +179,6 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
    * @brief Allocate a new region, keeping track of the IDs. ID 0 is reserved.
    */
   Region& allocateNewRegion();
-
-  /**
-   * @brief Breadth-first search to grow a region from a seed index.
-   * @param num_neighbors 4 (orthogonal only) or 8 (incl. diagonals) entries of
-   * neighbors_ to use.
-   */
-  static VoxelSet growRegion(
-      const VoxelSet& candidates,
-      const VoxelIndex& seed_index,
-      size_t num_neighbors = 8,
-      std::function<bool(const VoxelIndex&)> condition = [](const VoxelIndex&) {
-        return true;
-      });
-
-  /**
-   * @brief Erode a candidate set: keep a voxel only if every voxel within `radius` of
-   * it (by the structuring element) is also a candidate. The structuring element
-   * follows the connectivity so the width gate stays consistent with the BFS:
-   * `use_diagonal=false` -> 4-connected (plus / Manhattan ball); `use_diagonal=true`
-   * -> 8-connected (square / Chebyshev ball). radius <= 0 returns the input unchanged.
-   */
-  static VoxelSet erodeCandidates(const VoxelSet& candidates,
-                                  int radius,
-                                  bool use_diagonal);
-
-  /**
-   * @brief BFS from `seed` over `candidates`, propagating ONLY through `core` voxels
-   * (wide-enough voxels). Non-core voxels adjacent to the growing region are included
-   * as leaves but do not expand further, so connectivity cannot cross a gap thinner
-   * than the erosion that produced `core`.
-   */
-  static VoxelSet growConnectedWithMinWidth(const VoxelSet& candidates,
-                                            const VoxelSet& core,
-                                            const VoxelIndex& seed,
-                                            size_t num_neighbors);
 
   void updatePlaceNodeAttributes(spark_dsg::TravNodeAttributes& attrs,
                                  Region& region,
