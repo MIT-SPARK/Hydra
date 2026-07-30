@@ -53,6 +53,8 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
     float max_radius = 3.0f;
     //! Number of rays to consider for boundary computation.
     int num_orientation_bins = 16;
+    //! Toggle between 8-connectivity and 4-connectivity for region growing.
+    bool use_diagonal_connectivity = true;
   } const config;
 
   using Voxels = VoxelIndices;
@@ -115,6 +117,18 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
                    spark_dsg::SceneGraph& graph,
                    const std::string& layer_name) override;
 
+  /**
+   * @brief Breadth-first search to grow a region from a seed index.
+   * @param num_neighbors How many neighbors to consider during region growing.
+   */
+  static VoxelSet growRegion(
+      const VoxelSet& candidates,
+      const VoxelIndex& seed_index,
+      size_t num_neighbors = 8,
+      std::function<bool(const VoxelIndex&)> condition = [](const VoxelIndex&) {
+        return true;
+      });
+
  protected:
   size_t current_id_ = 0;
   uint64_t current_time_ns_ = 0;
@@ -165,16 +179,6 @@ class RegionGrowingTraversabilityClustering : public TraversabilityClustering {
    * @brief Allocate a new region, keeping track of the IDs. ID 0 is reserved.
    */
   Region& allocateNewRegion();
-
-  /**
-   * @brief Breadth-first search to grow a region from a seed index.
-   */
-  static VoxelSet growRegion(
-      const VoxelSet& candidates,
-      const VoxelIndex& seed_index,
-      std::function<bool(const VoxelIndex&)> condition = [](const VoxelIndex&) {
-        return true;
-      });
 
   void updatePlaceNodeAttributes(spark_dsg::TravNodeAttributes& attrs,
                                  Region& region,
