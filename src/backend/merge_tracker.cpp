@@ -80,6 +80,14 @@ size_t MergeTracker::applyMerges(const DynamicSceneGraph& unmerged,
       continue;
     }
 
+    if (!unmerged.hasNode(node)) {
+      CHECK(!graph.hasNode(node)) << NodeSymbol(node).str()
+                                  << " deleted from unmerged graph but in merged graph";
+      VLOG(1) << "Dropping merge set for missing parent " << NodeSymbol(node).str();
+      merge_sets_.erase(iter);
+      continue;
+    }
+
     auto child_iter = iter->second.begin();
     while (child_iter != iter->second.end()) {
       if (!unmerged.hasNode(*child_iter)) {
@@ -91,7 +99,10 @@ size_t MergeTracker::applyMerges(const DynamicSceneGraph& unmerged,
 
     std::vector<NodeId> nodes{node};
     nodes.insert(nodes.end(), iter->second.begin(), iter->second.end());
-    graph.setNodeAttributes(node, merge_attrs(unmerged, nodes));
+    auto attrs = merge_attrs(unmerged, nodes);
+    if (attrs) {
+      graph.setNodeAttributes(node, std::move(attrs));
+    }
   }
 
   return num_applied;
@@ -100,7 +111,19 @@ size_t MergeTracker::applyMerges(const DynamicSceneGraph& unmerged,
 void MergeTracker::updateAllMergeAttributes(const DynamicSceneGraph& unmerged,
                                             DynamicSceneGraph& merged,
                                             const MergeFunc& merge_attrs) {
-  for (auto& [parent, children] : merge_sets_) {
+  auto iter = merge_sets_.begin();
+  while (iter != merge_sets_.end()) {
+    const auto parent = iter->first;
+    if (!unmerged.hasNode(parent)) {
+      CHECK(!merged.hasNode(parent))
+          << NodeSymbol(parent).str()
+          << " deleted from unmerged graph but in merged graph";
+      VLOG(1) << "Dropping merge set for missing parent " << NodeSymbol(parent).str();
+      iter = merge_sets_.erase(iter);
+      continue;
+    }
+
+    auto& children = iter->second;
     auto child_iter = children.begin();
     while (child_iter != children.end()) {
       if (!unmerged.hasNode(*child_iter)) {
@@ -112,7 +135,11 @@ void MergeTracker::updateAllMergeAttributes(const DynamicSceneGraph& unmerged,
 
     std::vector<NodeId> nodes{parent};
     nodes.insert(nodes.end(), children.begin(), children.end());
-    merged.setNodeAttributes(parent, merge_attrs(unmerged, nodes));
+    auto attrs = merge_attrs(unmerged, nodes);
+    if (attrs) {
+      merged.setNodeAttributes(parent, std::move(attrs));
+    }
+    ++iter;
   }
 }
 
