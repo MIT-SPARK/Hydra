@@ -35,17 +35,21 @@
 #pragma once
 #include <spark_dsg/node_attributes.h>
 
+namespace hydra {
+
 struct AttributeMerger {
+  using AttrList = std::vector<const spark_dsg::NodeAttributes*>;
+
   virtual ~AttributeMerger() = default;
-  virtual spark_dsg::NodeAttributes::Ptr merge(
-      const std::vector<const spark_dsg::NodeAttributes*>& attrs) const = 0;
+  virtual spark_dsg::NodeAttributes::Ptr merge(const AttrList& attrs) const = 0;
 };
 
 struct EarliestAttributeMerger : public AttributeMerger {
   struct Config {};
   explicit EarliestAttributeMerger(const Config&) {}
-  std::unique_ptr<spark_dsg::NodeAttributes> merge(
-      const std::vector<const spark_dsg::NodeAttributes*>& attrs) const override;
+  spark_dsg::NodeAttributes::Ptr merge(const AttrList& attrs) const override;
 };
 
 void declare_config(EarliestAttributeMerger::Config& config);
+
+}  // namespace hydra

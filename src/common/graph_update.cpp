@@ -97,8 +97,6 @@ void declare_config(GraphUpdater::Config& config) {
 
 LayerUpdate::LayerUpdate(spark_dsg::LayerId layer) : layer(layer) {}
 
-// TODO: Potentially implement merge resolution if multiple updates for same node are
-// added in the same update.
 void LayerUpdate::append(LayerUpdate&& rhs) {
   if (layer != rhs.layer) {
     return;
@@ -122,11 +120,11 @@ GraphUpdater::GraphUpdater(const Config& config) : config(config::checkValid(con
 
 void GraphUpdater::addNode(DynamicSceneGraph& graph,
                            LayerTracker& tracker,
-                           LayerId target_layer_id,
-                           LayerId source_layer_id,
+                           LayerId target,
+                           LayerId source,
                            const NodeUpdate& entry) {
   std::optional<NodeId> to_merge;
-  const auto target_layer = graph.findLayer(target_layer_id);
+  const auto target_layer = graph.findLayer(target);
   for (const auto& [node_id, node] : target_layer->nodes()) {
     auto& attrs = node->attributes();
     if (!attrs.is_active) {
@@ -140,11 +138,12 @@ void GraphUpdater::addNode(DynamicSceneGraph& graph,
   }
 
   if (to_merge) {
-    VLOG(5) << "Merging attributes to " << NodeSymbol(*to_merge).str() << " @ "
-            << target_layer_id << " for layer " << source_layer_id;
+    VLOG(5) << "Merging to " << NodeSymbol(*to_merge).str() << " @ " << target
+            << " for " << source;
     if (entry.track_id) {
       tracker.track_to_node[*entry.track_id] = *to_merge;
     }
+
     tracker.attribute_cache[*entry.track_id] = entry.attributes->clone();
     tracker.node_to_tracks[*to_merge].insert(*entry.track_id);
     computeMergeGroup(*to_merge, tracker, graph);
@@ -157,13 +156,13 @@ void GraphUpdater::addNode(DynamicSceneGraph& graph,
     attrs->is_active = true;
   }
 
-  const NodeId new_id = tracker.next_id;
-  VLOG(5) << "Emplacing " << tracker.next_id.str() << " @ " << target_layer_id
-          << " for layer " << source_layer_id;
-  graph.emplaceNode(target_layer_id, new_id, std::move(attrs));
+  const auto new_id = tracker.next_id;
+  VLOG(5) << "Adding " << new_id.str() << " @ " << target << " for " << source;
+  graph.emplaceNode(target, new_id, std::move(attrs));
   if (entry.track_id) {
     tracker.track_to_node[*entry.track_id] = new_id;
   }
+
   tracker.node_to_tracks[new_id] = {*entry.track_id};
   ++tracker.next_id;
   return;
@@ -182,14 +181,15 @@ void GraphUpdater::deleteNode(const NodeUpdate& entry,
     VLOG(5) << "Delete for unknown track_id " << *entry.track_id;
     return;
   }
-  tracker.attribute_cache.erase(*entry.track_id);
 
+  tracker.attribute_cache.erase(*entry.track_id);
   tracker.node_to_tracks[map_iter->second].erase(*entry.track_id);
   if (tracker.node_to_tracks[map_iter->second].empty()) {
     graph.removeNode(map_iter->second);
   } else {
     computeMergeGroup(map_iter->second, tracker, graph);
   }
+
   tracker.track_to_node.erase(map_iter);
   return;
 }
@@ -211,7 +211,6 @@ void GraphUpdater::computeMergeGroup(spark_dsg::NodeId node_id,
                                      LayerTracker& tracker,
                                      spark_dsg::DynamicSceneGraph& graph) {
   auto& track_ids = tracker.node_to_tracks[node_id];
-
   std::vector<const spark_dsg::NodeAttributes*> attrs;
   for (size_t id : track_ids) {
     auto it = tracker.attribute_cache.find(id);
@@ -284,9 +283,11 @@ void GraphUpdater::update(const GraphUpdate& update, DynamicSceneGraph& graph) {
             LOG(WARNING) << "Update graph update missing attributes";
             break;
           }
+
           if (!updateNode(entry, tracker, graph)) {
             addNode(graph, tracker, target_layer_id, layer_id, entry);
           }
+
           break;
         }
       }

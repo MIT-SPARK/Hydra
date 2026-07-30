@@ -37,11 +37,10 @@
 #include <config_utilities/config.h>
 #include <config_utilities/factory.h>
 
+namespace hydra {
 namespace {
 
-using NodeAttrPtr = spark_dsg::NodeAttributes::Ptr;
-
-const auto latest_registration =
+const auto registration =
     config::RegistrationWithConfig<AttributeMerger,
                                    EarliestAttributeMerger,
                                    EarliestAttributeMerger::Config>(
@@ -49,14 +48,18 @@ const auto latest_registration =
 
 }  // namespace
 
-NodeAttrPtr EarliestAttributeMerger::merge(
-    const std::vector<const spark_dsg::NodeAttributes*>& attrs) const {
+using spark_dsg::NodeAttributes;
+
+NodeAttributes::Ptr EarliestAttributeMerger::merge(const AttrList& attrs) const {
   if (attrs.empty()) {
     return nullptr;
   }
+
   return attrs.front()->clone();
 }
 
 void declare_config(EarliestAttributeMerger::Config&) {
   config::name("EarliestAttributeMerger::Config");
 }
+
+}  // namespace hydra
