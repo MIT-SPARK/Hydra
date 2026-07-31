@@ -30,6 +30,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 find_package(config_utilities REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(GTSAM REQUIRED)
+find_package(glog REQUIRED)
 find_package(kimera_pgmo REQUIRED)
 find_package(spatial_hash REQUIRED)
 find_package(spark_dsg REQUIRED)
@@ -53,6 +54,7 @@ target_link_libraries(
   ${PROJECT_NAME}
   PUBLIC config_utilities::config_utilities
          Eigen3::Eigen
+         glog::glog
          gtsam
          kimera_pgmo::kimera_pgmo
          spark_dsg::spark_dsg

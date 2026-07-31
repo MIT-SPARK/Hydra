@@ -5,6 +5,7 @@ get_filename_component(hydra_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
 
 find_dependency(config_utilities REQUIRED)
 find_dependency(Eigen3 REQUIRED)
+find_dependency(glog REQUIRED)
 find_dependency(GTSAM REQUIRED)
 find_dependency(kimera_pgmo REQUIRED)
 find_dependency(spatial_hash REQUIRED)
