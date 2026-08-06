@@ -31,35 +31,10 @@ bool convertLabels(InputData& data) {
   }
 
   const auto remap = GlobalInfo::instance().getLabelRemapper();
-  if (!remap.empty()) {
-    for (int r = 0; r < data.label_image.rows; ++r) {
-      for (int c = 0; c < data.label_image.cols; ++c) {
-        const auto pixel = data.label_image.at<int32_t>(r, c);
-        data.label_image.at<int32_t>(r, c) = remap.remapLabel(pixel).value_or(-1);
-      }
-    }
+  if (remap) {
+    remap.remapImage(data.label_image);
   }
 
-  const auto label_type = data.label_image.type();
-  if (label_type == CV_32SC1) {
-    return true;
-  }
-
-  if (label_type != CV_8UC1 && label_type != CV_16UC1 && label_type != CV_8SC1 &&
-      label_type != CV_16SC1) {
-    LOG(ERROR) << "label image must be integer type, not "
-               << showTypeInfo(data.label_image);
-    return false;
-  }
-
-  if (label_type == CV_16SC1 || label_type == CV_8SC1) {
-    LOG_FIRST_N(WARNING, 5)
-        << "signed to unsigned conversion of labels may not do what you want!";
-  }
-
-  cv::Mat label_converted;
-  data.label_image.convertTo(label_converted, CV_32SC1);
-  data.label_image = label_converted;
   return true;
 }
 
@@ -98,6 +73,7 @@ bool convertColor(InputData& data) {
     LOG(ERROR) << "only 3-channel rgb images supported";
     return false;
   }
+
   return true;
 }
 
@@ -150,6 +126,12 @@ bool normalizeData(InputData& data, bool normalize_labels) {
 
   if (normalize_labels && !convertLabels(data)) {
     return false;
+  }
+
+  if (!data.instance_image.empty() && data.instance_image.type() != CV_16SC1) {
+    cv::Mat instances(data.instance_image.size(), CV_16SC1);
+    data.instance_image.convertTo(instances, CV_16SC1);
+    data.instance_image = instances;
   }
 
   if (!data.vertex_map.empty() && data.vertex_map.type() != CV_32FC3) {
