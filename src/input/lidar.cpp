@@ -51,7 +51,47 @@ namespace {
 static const auto registration =
     config::RegistrationWithConfig<Sensor, Lidar, Lidar::Config, std::string>("lidar");
 
+bool inputValid(const InputData& input) {
+  if (input.vertex_map.empty()) {
+    LOG(ERROR) << "pointcloud required to finalize data!";
+    return false;
+  }
+
+  if (!input.label_image.empty() &&
+      input.vertex_map.size() != input.label_image.size()) {
+    LOG(ERROR) << "label input size does not match pointcloud!";
+    return false;
+  }
+
+  if (!input.instance_image.empty() &&
+      input.vertex_map.size() != input.instance_image.size()) {
+    LOG(ERROR) << "label input size does not match pointcloud!";
+    return false;
+  }
+
+  if (!input.color_image.empty() &&
+      input.vertex_map.size() != input.color_image.size()) {
+    LOG(ERROR) << "color input size does not match pointcloud!";
+    return false;
+  }
+
+  return true;
 }
+
+void transformVertices(InputData& input) {
+  const auto world_T_sensor = input.getSensorPose().cast<float>();
+  auto point_iter = input.vertex_map.begin<cv::Vec3f>();
+  while (point_iter != input.vertex_map.end<cv::Vec3f>()) {
+    auto& p = *point_iter;
+    Eigen::Vector3f p_S(p[0], p[1], p[2]);
+    const auto p_W = world_T_sensor * p_S;
+    p[0] = p_W.x();
+    p[1] = p_W.y();
+    p[2] = p_W.z();
+  }
+}
+
+}  // namespace
 
 void declare_config(Lidar::Config& config) {
   using namespace config;
@@ -128,68 +168,50 @@ float Lidar::computeRayDensity(float voxel_size, float depth) const {
 }
 
 bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) const {
-  if (input.vertex_map.empty()) {
-    LOG(ERROR) << "pointcloud required to finalize data!";
+  if (!inputValid(input)) {
     return false;
   }
 
-  // TODO(nathan) check that input is normalized
-
-  if (input.vertex_map.size() != input.label_image.size()) {
-    LOG(ERROR) << "label input size does not match pointcloud!";
-    return false;
-  }
-
-  if (!input.color_image.empty() &&
-      input.vertex_map.size() != input.color_image.size()) {
-    LOG(ERROR) << "color input size does not match pointcloud!";
-    return false;
-  }
-
-  // TODO(nathan) think about structured points
-
-  // TODO(nathan) test
   if (force_world_frame && !input.points_in_world_frame) {
-    const auto world_T_sensor = input.getSensorPose().cast<float>();
-    auto point_iter = input.vertex_map.begin<cv::Vec3f>();
-    while (point_iter != input.vertex_map.end<cv::Vec3f>()) {
-      auto& p = *point_iter;
-      Eigen::Vector3f p_S(p[0], p[1], p[2]);
-      const auto p_W = world_T_sensor * p_S;
-      p[0] = p_W.x();
-      p[1] = p_W.y();
-      p[2] = p_W.z();
-    }
-
+    transformVertices(input);
     input.points_in_world_frame = true;
   }
 
   const auto sensor_T_world = input.getSensorPose().cast<float>().inverse();
+  const auto has_color = !input.color_image.empty();
+  const auto has_labels = !input.label_image.empty();
+  const auto has_instances = !input.instance_image.empty();
+  const auto structured =
+      (input.vertex_map.rows == width_) && (input.vertex_map.cols == height_);
+
   input.min_range = std::numeric_limits<float>::max();
   input.max_range = std::numeric_limits<float>::lowest();
-
-  bool has_color = !input.color_image.empty();
   input.range_image = cv::Mat(height_, width_, CV_32FC1, 0.0f);
-  cv::Mat labels(height_, width_, CV_32SC1, -1);
+
   cv::Mat color;
   if (has_color) {
     color = cv::Mat(height_, width_, CV_8UC3);
     color = 0;
   }
 
+  cv::Mat labels;
+  if (has_labels) {
+    labels = cv::Mat(height_, width_, CV_32SC1, -1);
+  }
+
+  cv::Mat instances;
+  if (has_instances) {
+    instances = cv::Mat::zeros(height_, width_, CV_16SC1);
+  }
+
   cv::Mat vertex_image;
-  bool not_structured =
-      (input.vertex_map.rows != width_) || (input.vertex_map.cols != height_);
-  // NOTE(hyungtae) In case the points are not structured, it automatically generates a
-  // vertex image
-  if (not_structured) {
+  if (!structured) {
     vertex_image = cv::Mat(height_, width_, CV_32FC3, cv::Scalar(0.0, 0.0, 0.0));
   }
 
-  auto point_iter = input.vertex_map.begin<cv::Vec3f>();
-  auto label_iter = input.label_image.begin<int32_t>();
+  size_t point_idx = 0;
   size_t num_invalid = 0;
-  size_t color_index = 0;
+  auto point_iter = input.vertex_map.begin<cv::Vec3f>();
   while (point_iter != input.vertex_map.end<cv::Vec3f>()) {
     const auto& p = *point_iter;
     Eigen::Vector3f p_C(p[0], p[1], p[2]);
@@ -212,49 +234,54 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
     if (u < 0 || u >= width_ || v < 0 || v >= height_) {
       ++num_invalid;
       ++point_iter;
-      ++label_iter;
-      ++color_index;
+      ++point_idx;
       continue;
     }
 
     const auto range_m = p_C.norm();
     input.min_range = std::min(input.min_range, range_m);
     input.max_range = std::max(input.max_range, range_m);
-
-    // If the pixel has already been updated with a closer point, skip the procedure
-    // below
     if (!(input.range_image.at<float>(v, u) == 0.0f ||
           range_m < input.range_image.at<float>(v, u))) {
       ++point_iter;
-      ++label_iter;
-      ++color_index;
-      continue;
+      ++point_idx;
+      continue;  // Skip the pixel if it has already been updated with a closer point
     }
 
     input.range_image.at<float>(v, u) = range_m;
-    labels.at<int32_t>(v, u) = *label_iter;
-    if (has_color) {
-      color.at<cv::Vec3b>(v, u) = input.color_image.at<cv::Vec3b>(color_index);
-    }
-
-    if (not_structured) {
+    if (!structured) {
       vertex_image.at<cv::Vec3f>(v, u) = *point_iter;
     }
 
+    if (has_color) {
+      color.at<cv::Vec3b>(v, u) = input.color_image.at<cv::Vec3b>(point_idx);
+    }
+
+    if (has_labels) {
+      labels.at<InputData::LabelType>(v, u) =
+          input.label_image.at<InputData::LabelType>(point_idx);
+    }
+
+    if (has_instances) {
+      instances.at<InputData::InstanceType>(v, u) =
+          input.instance_image.at<InputData::InstanceType>(point_idx);
+    }
+
     ++point_iter;
-    ++label_iter;
-    ++color_index;
+    ++point_idx;
   }
 
-  size_t total_lidar = input.vertex_map.rows * input.vertex_map.cols;
-  double percent_invalid = static_cast<double>(num_invalid) / total_lidar;
+  const auto total_lidar = input.vertex_map.rows * input.vertex_map.cols;
+  const auto percent_invalid = static_cast<double>(num_invalid) / total_lidar;
   VLOG(5) << "Converted lidar points! invalid: " << num_invalid << " / " << total_lidar
           << " (percent: " << percent_invalid << ")";
   input.label_image = labels;
+  input.instance_image = instances;
   input.color_image = color;
-  if (not_structured) {
+  if (!structured) {
     input.vertex_map = vertex_image;
   }
+
   return true;
 }
 
