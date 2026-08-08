@@ -86,11 +86,13 @@ TEST(Lidar, FinalizeRepresentationsCorrect) {
   v2[1] = 0.0;
   v2[2] = 1.0;
 
-  // no labels: no ability to make intermediate images
-  EXPECT_FALSE(lidar->finalizeRepresentations(msg));
-
   // invalid label size: no ability to make intermediate images
   msg.label_image = cv::Mat(2, 1, CV_32SC1);
+  EXPECT_FALSE(lidar->finalizeRepresentations(msg));
+
+  // invalid instance size: no ability to make intermediate images
+  msg.label_image = cv::Mat();
+  msg.instance_image = cv::Mat(2, 1, CV_32SC1);
   EXPECT_FALSE(lidar->finalizeRepresentations(msg));
 
   msg.label_image = cv::Mat(1, 2, CV_32SC1);
