@@ -37,7 +37,6 @@
 #include <hydra/input/lidar.h>
 
 #include <optional>
-#include <set>
 
 namespace hydra {
 
@@ -92,18 +91,24 @@ TEST(Lidar, FinalizeRepresentationsCorrect) {
 
   // invalid instance size: no ability to make intermediate images
   msg.label_image = cv::Mat();
-  msg.instance_image = cv::Mat(2, 1, CV_32SC1);
+  msg.instance_image = cv::Mat(2, 1, CV_16SC1);
   EXPECT_FALSE(lidar->finalizeRepresentations(msg));
 
   msg.label_image = cv::Mat(1, 2, CV_32SC1);
-  msg.label_image.at<int32_t>(0, 0) = 1;
-  msg.label_image.at<int32_t>(0, 1) = 2;
+  msg.label_image.at<InputData::LabelType>(0, 0) = 1;
+  msg.label_image.at<InputData::LabelType>(0, 1) = 2;
+
+  msg.instance_image = cv::Mat(1, 2, CV_16SC1);
+  msg.instance_image.at<InputData::InstanceType>(0, 0) = 3;
+  msg.instance_image.at<InputData::InstanceType>(0, 1) = 4;
 
   EXPECT_TRUE(lidar->finalizeRepresentations(msg));
   ASSERT_EQ(msg.range_image.rows, 480);
   ASSERT_EQ(msg.range_image.cols, 640);
   ASSERT_EQ(msg.label_image.rows, 480);
   ASSERT_EQ(msg.label_image.cols, 640);
+  ASSERT_EQ(msg.instance_image.rows, 480);
+  ASSERT_EQ(msg.instance_image.cols, 640);
   EXPECT_TRUE(msg.color_image.empty());
   EXPECT_NEAR(msg.min_range, std::sqrt(2.0), 1.0e-6);
   EXPECT_NEAR(msg.max_range, 5.0, 1.0e-6);
@@ -125,14 +130,17 @@ TEST(Lidar, FinalizeRepresentationsCorrect) {
 
       SCOPED_TRACE("checking [" + std::to_string(r) + ", " + std::to_string(c) + "]");
       EXPECT_NEAR(msg.range_image.at<float>(r, c), 0.0, 1.0e-3);
-      EXPECT_EQ(msg.label_image.at<int32_t>(r, c), -1);
+      EXPECT_EQ(msg.label_image.at<InputData::LabelType>(r, c), -1);
+      EXPECT_EQ(msg.instance_image.at<InputData::InstanceType>(r, c), 0);
     }
   }
 
   EXPECT_NEAR(msg.range_image.at<float>(0, 320), std::sqrt(2.0f), 1.0e-5f);
-  EXPECT_EQ(msg.label_image.at<int32_t>(0, 320), 2);
   EXPECT_NEAR(msg.range_image.at<float>(240, 131), 5.0f, 1.0e-5f);
-  EXPECT_EQ(msg.label_image.at<int32_t>(240, 131), 1);
+  EXPECT_EQ(msg.label_image.at<InputData::LabelType>(0, 320), 2);
+  EXPECT_EQ(msg.label_image.at<InputData::LabelType>(240, 131), 1);
+  EXPECT_EQ(msg.instance_image.at<InputData::InstanceType>(0, 320), 4);
+  EXPECT_EQ(msg.instance_image.at<InputData::InstanceType>(240, 131), 3);
 }
 
 TEST(Lidar, FinalizeRepresentationColor) {
@@ -149,8 +157,8 @@ TEST(Lidar, FinalizeRepresentationColor) {
   v2[2] = 1.0;
 
   msg.label_image = cv::Mat(1, 2, CV_32SC1);
-  msg.label_image.at<int32_t>(0, 0) = 1;
-  msg.label_image.at<int32_t>(0, 1) = 2;
+  msg.label_image.at<InputData::LabelType>(0, 0) = 1;
+  msg.label_image.at<InputData::LabelType>(0, 1) = 2;
 
   msg.color_image = cv::Mat(1, 2, CV_8UC3);
   msg.color_image.at<cv::Vec3b>(0, 0) = {1, 2, 3};
@@ -168,12 +176,12 @@ TEST(Lidar, FinalizeRepresentationColor) {
 
   const cv::Vec3b color1{3, 4, 5};
   EXPECT_NEAR(msg.range_image.at<float>(0, 320), std::sqrt(2.0f), 1.0e-5f);
-  EXPECT_EQ(msg.label_image.at<int32_t>(0, 320), 2);
+  EXPECT_EQ(msg.label_image.at<InputData::LabelType>(0, 320), 2);
   EXPECT_EQ(msg.color_image.at<cv::Vec3b>(0, 320), color1);
 
   const cv::Vec3b color2{1, 2, 3};
   EXPECT_NEAR(msg.range_image.at<float>(240, 131), 5.0f, 1.0e-5f);
-  EXPECT_EQ(msg.label_image.at<int32_t>(240, 131), 1);
+  EXPECT_EQ(msg.label_image.at<InputData::LabelType>(240, 131), 1);
   EXPECT_EQ(msg.color_image.at<cv::Vec3b>(240, 131), color2);
 }
 

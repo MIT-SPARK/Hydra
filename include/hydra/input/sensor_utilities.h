@@ -47,8 +47,6 @@
 // purposes notwithstanding any copyright notation herein.
 #pragma once
 
-#include <opencv2/core/mat.hpp>
-
 #include "hydra/input/sensor.h"
 #include "hydra/reconstruction/voxel_types.h"
 
@@ -97,15 +95,5 @@ BlockIndices findBlocksInViewFrustum(
     float min_range = 0.f,
     float max_range = std::numeric_limits<float>::max(),
     bool use_sensor_range = true);
-
-/**
- * @brief Compute range image from pointcloud
- * @param points Pointcloud to compute range image from
- * @param min_range Optional min range to track
- * @param max_range Optional max range to track
- */
-cv::Mat computeRangeImageFromPoints(const cv::Mat& points,
-                                    float* min_range,
-                                    float* max_range);
 
 }  // namespace hydra

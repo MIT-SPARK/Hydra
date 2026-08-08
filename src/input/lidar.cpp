@@ -40,10 +40,6 @@
 #include <glog/logging.h>
 
 #include <opencv2/core.hpp>
-#include <unordered_map>
-#include <vector>
-
-#include "hydra/input/sensor_utilities.h"
 
 namespace hydra {
 namespace {
@@ -65,7 +61,7 @@ bool inputValid(const InputData& input) {
 
   if (!input.instance_image.empty() &&
       input.vertex_map.size() != input.instance_image.size()) {
-    LOG(ERROR) << "label input size does not match pointcloud!";
+    LOG(ERROR) << "instance input size does not match pointcloud!";
     return false;
   }
 

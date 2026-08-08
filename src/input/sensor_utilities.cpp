@@ -109,38 +109,4 @@ BlockIndices findBlocksInViewFrustum(const Sensor& sensor,
   return result;
 }
 
-cv::Mat computeRangeImageFromPoints(const cv::Mat& points,
-                                    float* min_range,
-                                    float* max_range) {
-  // Compute the range (=radial distance) from the pointcloud.
-  cv::Mat range_image(points.size(), CV_32FC1);
-  if (min_range) {
-    *min_range = std::numeric_limits<float>::max();
-  }
-
-  if (max_range) {
-    *max_range = std::numeric_limits<float>::lowest();
-  }
-
-  for (int v = 0; v < points.rows; v++) {
-    for (int u = 0; u < points.cols; u++) {
-      const auto& point = points.at<cv::Vec3f>(v, u);
-      const float x = point[0];
-      const float y = point[1];
-      const float z = point[2];
-      const auto range = std::sqrt(x * x + y * y + z * z);
-      range_image.at<float>(v, u) = range;
-      if (min_range) {
-        *min_range = std::min(*min_range, range);
-      }
-
-      if (max_range) {
-        *max_range = std::max(*max_range, range);
-      }
-    }
-  }
-
-  return range_image;
-}
-
 }  // namespace hydra

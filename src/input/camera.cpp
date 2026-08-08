@@ -52,8 +52,6 @@
 #include <config_utilities/parsing/yaml.h>
 #include <glog/logging.h>
 
-#include "hydra/input/sensor_utilities.h"
-
 namespace hydra {
 namespace {
 
@@ -61,7 +59,7 @@ static const auto registration =
     config::RegistrationWithConfig<Sensor, Camera, Camera::Config, std::string>(
         "camera");
 
-}
+}  // namespace
 
 void declare_config(Camera::Config& config) {
   using namespace config;
@@ -116,7 +114,6 @@ bool Camera::finalizeRepresentations(InputData& input, bool force_world_frame) c
   if (!input.vertex_map.empty()) {
     input.range_image = computeRangeImageFromPoints(
         input.vertex_map, &input.min_range, &input.max_range);
-    // TODO(nathan) depth image?
     return true;
   }
 
@@ -243,6 +240,40 @@ cv::Mat Camera::computeRangeImage(const cv::Mat& depth_image,
                                 depth * (static_cast<float>(v) - config_.cy) * fy_inv,
                                 depth);
       const float range = p_C.norm();
+      range_image.at<float>(v, u) = range;
+      if (min_range) {
+        *min_range = std::min(*min_range, range);
+      }
+
+      if (max_range) {
+        *max_range = std::max(*max_range, range);
+      }
+    }
+  }
+
+  return range_image;
+}
+
+cv::Mat Camera::computeRangeImageFromPoints(const cv::Mat& points,
+                                            float* min_range,
+                                            float* max_range) {
+  // Compute the range (=radial distance) from the pointcloud.
+  cv::Mat range_image(points.size(), CV_32FC1);
+  if (min_range) {
+    *min_range = std::numeric_limits<float>::max();
+  }
+
+  if (max_range) {
+    *max_range = std::numeric_limits<float>::lowest();
+  }
+
+  for (int v = 0; v < points.rows; v++) {
+    for (int u = 0; u < points.cols; u++) {
+      const auto& point = points.at<cv::Vec3f>(v, u);
+      const float x = point[0];
+      const float y = point[1];
+      const float z = point[2];
+      const auto range = std::sqrt(x * x + y * y + z * z);
       range_image.at<float>(v, u) = range;
       if (min_range) {
         *min_range = std::min(*min_range, range);
