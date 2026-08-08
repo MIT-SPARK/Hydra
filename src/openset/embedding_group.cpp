@@ -1,6 +1,6 @@
 #include "hydra/openset/embedding_group.h"
 
-#include <config_utilities/types/eigen_matrix.h>
+#include <config_utilities/config.h>
 #include <glog/logging.h>
 
 #include "hydra/openset/embedding_distances.h"
