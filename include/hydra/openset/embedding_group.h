@@ -36,4 +36,6 @@ struct EmbeddingGroup {
   std::vector<std::string> names;
 };
 
+void declare_config(EmbeddingGroup& group);
+
 }  // namespace hydra
