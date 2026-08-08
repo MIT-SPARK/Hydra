@@ -40,6 +40,10 @@
 #include <set>
 #include <string>
 
+namespace cv {
+class Mat;
+}
+
 namespace hydra {
 
 struct Labelspace {
@@ -67,6 +71,7 @@ class LabelRemapper {
   virtual ~LabelRemapper() = default;
 
   std::optional<uint32_t> remapLabel(const uint32_t from) const;
+  void remapImage(cv::Mat& img) const;
 
   bool empty() const;
   operator bool() const;

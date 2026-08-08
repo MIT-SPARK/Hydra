@@ -25,7 +25,6 @@ add_executable(
   input/test_camera.cpp
   input/test_input_packet.cpp
   input/test_lidar.cpp
-  input/test_sensor_utilities.cpp
   input/test_sensor.cpp
   loop_closure/test_descriptor_matching.cpp
   loop_closure/test_detector.cpp

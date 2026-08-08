@@ -47,8 +47,6 @@
 // purposes notwithstanding any copyright notation herein.
 #pragma once
 
-#include <vector>
-
 #include "hydra/input/input_data.h"
 #include "hydra/input/sensor.h"
 
@@ -102,9 +100,13 @@ class Camera : public Sensor {
   cv::Mat computeVertexMap(const cv::Mat& depth_image,
                            const Eigen::Isometry3f* T_W_C = nullptr) const;
 
-  cv::Mat computeRangeImage(const cv::Mat& vertex_map,
+  cv::Mat computeRangeImage(const cv::Mat& depth_image,
                             float* min_range,
                             float* max_range) const;
+
+  static cv::Mat computeRangeImageFromPoints(const cv::Mat& points,
+                                             float* min_range,
+                                             float* max_range);
 
   YAML::Node dump() const override;
 

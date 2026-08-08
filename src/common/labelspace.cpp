@@ -39,6 +39,7 @@
 #include <glog/logging.h>
 #include <yaml-cpp/yaml.h>
 
+#include <opencv2/core/mat.hpp>
 #include <string>
 
 namespace {
@@ -150,5 +151,18 @@ std::optional<uint32_t> LabelRemapper::remapLabel(const uint32_t from) const {
 bool LabelRemapper::empty() const { return label_remapping_.empty(); }
 
 LabelRemapper::operator bool() const { return empty(); }
+
+void LabelRemapper::remapImage(cv::Mat& img) const {
+  if (label_remapping_.empty()) {
+    return;
+  }
+
+  for (int r = 0; r < img.rows; ++r) {
+    for (int c = 0; c < img.cols; ++c) {
+      const auto pixel = img.at<int32_t>(r, c);
+      img.at<int32_t>(r, c) = remapLabel(pixel).value_or(-1);
+    }
+  }
+}
 
 }  // namespace hydra

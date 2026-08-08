@@ -37,21 +37,17 @@
 #include <gtest/gtest.h>
 #include <hydra/input/camera.h>
 
-#include <optional>
-#include <set>
-
 namespace hydra {
 
 std::shared_ptr<Camera> createCamera(double vfov,
                                      double hfov,
                                      std::pair<double, double> range,
-                                     std::pair<int, int> width_height_pair = {640,
-                                                                              480}) {
+                                     std::pair<int, int> dims = {640, 480}) {
   Camera::Config config;
   config.min_range = range.first;
   config.max_range = range.second;
-  config.width = width_height_pair.first;
-  config.height = width_height_pair.second;
+  config.width = dims.first;
+  config.height = dims.second;
   config.cx = config.width / 2.0f;
   config.cy = config.height / 2.0f;
   config.fx = config.width / (2.0 * std::tan(hfov * M_PI / 360.0));
@@ -205,6 +201,36 @@ TEST(Camera, FinalizeRepresentationsCorrect) {
   EXPECT_NEAR(msg.min_range, 2.0f * std::sqrt(3.0f), 1.0e-5f);
   EXPECT_NEAR(msg.max_range, 4.0f * std::sqrt(2.0f), 1.0e-5f);
   // TODO(nathan) test pointcloud is in world frame
+}
+
+TEST(Camera, RangeImageFromPointsCorrect) {
+  cv::Mat points(4, 3, CV_32FC3);
+  for (int r = 0; r < points.rows; ++r) {
+    for (int c = 0; c < points.cols; ++c) {
+      auto& vec = points.at<cv::Vec3f>(r, c);
+      vec[0] = r * points.cols + c + 1;
+      vec[1] = r * points.cols + c + 1;
+      vec[2] = r * points.cols + c + 1;
+    }
+  }
+
+  float min_range = -1.0f;
+  float max_range = -1.0f;
+  const auto range_image =
+      Camera::computeRangeImageFromPoints(points, &min_range, &max_range);
+
+  ASSERT_EQ(range_image.rows, 4);
+  ASSERT_EQ(range_image.cols, 3);
+  for (int r = 0; r < points.rows; ++r) {
+    for (int c = 0; c < points.cols; ++c) {
+      EXPECT_NEAR(range_image.at<float>(r, c),
+                  std::sqrt(3.0) * (r * points.cols + c + 1),
+                  1.0e-6);
+    }
+  }
+
+  EXPECT_NEAR(min_range, std::sqrt(3.0), 1.0e-6);
+  EXPECT_NEAR(max_range, std::sqrt(3.0) * points.rows * points.cols, 1.0e-6);
 }
 
 }  // namespace hydra
