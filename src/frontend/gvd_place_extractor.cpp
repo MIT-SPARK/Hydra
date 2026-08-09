@@ -53,7 +53,6 @@ using spark_dsg::NodeId;
 using spark_dsg::NodeSymbol;
 using spark_dsg::PlaceNodeAttributes;
 using spark_dsg::SceneGraph;
-using spark_dsg::SceneGraphLayer;
 using spark_dsg::graph_utilities::getConnectedComponents;
 using timing::ScopedTimer;
 
@@ -62,7 +61,7 @@ using PlacesGraph = PartialGraph<PlaceNodeAttributes>;
 namespace {
 
 static const auto registration =
-    config::RegistrationWithConfig<GvdPlaceExtractor,
+    config::RegistrationWithConfig<GraphBuilderFunctor,
                                    GvdPlaceExtractor,
                                    GvdPlaceExtractor::Config>("gvd");
 

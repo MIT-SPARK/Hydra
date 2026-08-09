@@ -41,7 +41,6 @@
 namespace hydra::lcd {
 
 struct RegistrationSolution {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   //! Whether or not the solution is valid
   bool valid = false;
   //! Agent node correponding to the "from" frame

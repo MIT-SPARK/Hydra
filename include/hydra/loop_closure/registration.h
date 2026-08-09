@@ -113,7 +113,6 @@ struct LayerRegistrationProblem {
 };
 
 struct LayerRegistrationSolution {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   bool valid = false;
   gtsam::Pose3 dest_T_src;
   std::vector<std::pair<spark_dsg::NodeId, spark_dsg::NodeId>> inliers;

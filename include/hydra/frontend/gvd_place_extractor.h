@@ -37,16 +37,16 @@
 
 #include <memory>
 
-#include "hydra/active_window/active_window_output.h"
 #include "hydra/active_window/volumetric_window.h"
 #include "hydra/common/output_sink.h"
+#include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/places/gvd_places/graph_extractor.h"
 #include "hydra/places/gvd_places/gvd_integrator.h"
 #include "hydra/reconstruction/tsdf_interpolators.h"
 
 namespace hydra {
 
-class GvdPlaceExtractor {
+class GvdPlaceExtractor : public GraphBuilderFunctor {
  public:
   using Sink = OutputSink<uint64_t,
                           const Eigen::Isometry3d&,
@@ -76,9 +76,9 @@ class GvdPlaceExtractor {
 
   virtual ~GvdPlaceExtractor();
 
-  void detect(const ActiveWindowOutput& msg);
+  void detect(const ActiveWindowOutput& msg) override;
 
-  void updateGraph(uint64_t timestamp_ns, spark_dsg::SceneGraph& graph);
+  void updateGraph(uint64_t timestamp_ns, spark_dsg::SceneGraph& graph) override;
 
  protected:
   void filterIsolated(spark_dsg::SceneGraph& graph,

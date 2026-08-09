@@ -533,17 +533,9 @@ void GraphBuilder::updatePlaces(const ActiveWindowOutput& input) {
   }
 
   freespace_places_->detect(input);
-  {  // start graph critical section
-    std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-    std::vector<NodeId> archived_places;  // TODO(nathan) get from extractor
-    freespace_places_->updateGraph(input.timestamp_ns, *dsg_->graph);
 
-    // TODO(nathan) fix this
-    if (lcd_input_) {
-      lcd_input_->archived_places.insert(archived_places.begin(),
-                                         archived_places.end());
-    }
-  }  // end graph update critical section
+  std::lock_guard<std::mutex> graph_lock(dsg_->mutex);
+  freespace_places_->updateGraph(input.timestamp_ns, *dsg_->graph);
 }
 
 void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {
