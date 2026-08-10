@@ -75,30 +75,30 @@ TEST(Lidar, FinalizeRepresentationsCorrect) {
   // no points: no ability to make intermediate images
   EXPECT_FALSE(lidar->finalizeRepresentations(msg));
 
-  msg.vertex_map = cv::Mat(1, 2, CV_32FC3);
-  auto& v1 = msg.vertex_map.at<cv::Vec3f>(0, 0);
+  msg.vertex_map = cv::Mat(1, 2, InputData::VertexMatType);
+  auto& v1 = msg.vertex_map.at<InputData::VertexType>(0, 0);
   v1[0] = 3.0;
   v1[1] = 4.0;
   v1[2] = 0.0;
-  auto& v2 = msg.vertex_map.at<cv::Vec3f>(0, 1);
+  auto& v2 = msg.vertex_map.at<InputData::VertexType>(0, 1);
   v2[0] = 1.0;
   v2[1] = 0.0;
   v2[2] = 1.0;
 
   // invalid label size: no ability to make intermediate images
-  msg.label_image = cv::Mat(2, 1, CV_32SC1);
+  msg.label_image = cv::Mat(2, 1, InputData::LabelMatType);
   EXPECT_FALSE(lidar->finalizeRepresentations(msg));
 
   // invalid instance size: no ability to make intermediate images
   msg.label_image = cv::Mat();
-  msg.instance_image = cv::Mat(2, 1, CV_16SC1);
+  msg.instance_image = cv::Mat(2, 1, InputData::InstanceMatType);
   EXPECT_FALSE(lidar->finalizeRepresentations(msg));
 
-  msg.label_image = cv::Mat(1, 2, CV_32SC1);
+  msg.label_image = cv::Mat(1, 2, InputData::LabelMatType);
   msg.label_image.at<InputData::LabelType>(0, 0) = 1;
   msg.label_image.at<InputData::LabelType>(0, 1) = 2;
 
-  msg.instance_image = cv::Mat(1, 2, CV_16SC1);
+  msg.instance_image = cv::Mat(1, 2, InputData::InstanceMatType);
   msg.instance_image.at<InputData::InstanceType>(0, 0) = 3;
   msg.instance_image.at<InputData::InstanceType>(0, 1) = 4;
 
@@ -129,14 +129,14 @@ TEST(Lidar, FinalizeRepresentationsCorrect) {
       }
 
       SCOPED_TRACE("checking [" + std::to_string(r) + ", " + std::to_string(c) + "]");
-      EXPECT_NEAR(msg.range_image.at<float>(r, c), 0.0, 1.0e-3);
+      EXPECT_NEAR(msg.range_image.at<InputData::RangeType>(r, c), 0.0, 1.0e-3);
       EXPECT_EQ(msg.label_image.at<InputData::LabelType>(r, c), -1);
       EXPECT_EQ(msg.instance_image.at<InputData::InstanceType>(r, c), 0);
     }
   }
 
-  EXPECT_NEAR(msg.range_image.at<float>(0, 320), std::sqrt(2.0f), 1.0e-5f);
-  EXPECT_NEAR(msg.range_image.at<float>(240, 131), 5.0f, 1.0e-5f);
+  EXPECT_NEAR(msg.range_image.at<InputData::RangeType>(0, 320), std::sqrt(2.0f), 1.0e-5f);
+  EXPECT_NEAR(msg.range_image.at<InputData::RangeType>(240, 131), 5.0f, 1.0e-5f);
   EXPECT_EQ(msg.label_image.at<InputData::LabelType>(0, 320), 2);
   EXPECT_EQ(msg.label_image.at<InputData::LabelType>(240, 131), 1);
   EXPECT_EQ(msg.instance_image.at<InputData::InstanceType>(0, 320), 4);
@@ -146,23 +146,23 @@ TEST(Lidar, FinalizeRepresentationsCorrect) {
 TEST(Lidar, FinalizeRepresentationColor) {
   const auto lidar = createLidar(90.0, 180.0, {1.0, 5.0});
   InputData msg(lidar);
-  msg.vertex_map = cv::Mat(1, 2, CV_32FC3);
-  auto& v1 = msg.vertex_map.at<cv::Vec3f>(0, 0);
+  msg.vertex_map = cv::Mat(1, 2, InputData::VertexMatType);
+  auto& v1 = msg.vertex_map.at<InputData::VertexType>(0, 0);
   v1[0] = 3.0;
   v1[1] = 4.0;
   v1[2] = 0.0;
-  auto& v2 = msg.vertex_map.at<cv::Vec3f>(0, 1);
+  auto& v2 = msg.vertex_map.at<InputData::VertexType>(0, 1);
   v2[0] = 1.0;
   v2[1] = 0.0;
   v2[2] = 1.0;
 
-  msg.label_image = cv::Mat(1, 2, CV_32SC1);
+  msg.label_image = cv::Mat(1, 2, InputData::LabelMatType);
   msg.label_image.at<InputData::LabelType>(0, 0) = 1;
   msg.label_image.at<InputData::LabelType>(0, 1) = 2;
 
-  msg.color_image = cv::Mat(1, 2, CV_8UC3);
-  msg.color_image.at<cv::Vec3b>(0, 0) = {1, 2, 3};
-  msg.color_image.at<cv::Vec3b>(0, 1) = {3, 4, 5};
+  msg.color_image = cv::Mat(1, 2, InputData::ColorMatType);
+  msg.color_image.at<InputData::ColorType>(0, 0) = {1, 2, 3};
+  msg.color_image.at<InputData::ColorType>(0, 1) = {3, 4, 5};
 
   EXPECT_TRUE(lidar->finalizeRepresentations(msg));
   ASSERT_EQ(msg.range_image.rows, 480);
@@ -175,14 +175,14 @@ TEST(Lidar, FinalizeRepresentationColor) {
   EXPECT_NEAR(msg.max_range, 5.0, 1.0e-6);
 
   const cv::Vec3b color1{3, 4, 5};
-  EXPECT_NEAR(msg.range_image.at<float>(0, 320), std::sqrt(2.0f), 1.0e-5f);
+  EXPECT_NEAR(msg.range_image.at<InputData::RangeType>(0, 320), std::sqrt(2.0f), 1.0e-5f);
   EXPECT_EQ(msg.label_image.at<InputData::LabelType>(0, 320), 2);
-  EXPECT_EQ(msg.color_image.at<cv::Vec3b>(0, 320), color1);
+  EXPECT_EQ(msg.color_image.at<InputData::ColorType>(0, 320), color1);
 
   const cv::Vec3b color2{1, 2, 3};
-  EXPECT_NEAR(msg.range_image.at<float>(240, 131), 5.0f, 1.0e-5f);
+  EXPECT_NEAR(msg.range_image.at<InputData::RangeType>(240, 131), 5.0f, 1.0e-5f);
   EXPECT_EQ(msg.label_image.at<InputData::LabelType>(240, 131), 1);
-  EXPECT_EQ(msg.color_image.at<cv::Vec3b>(240, 131), color2);
+  EXPECT_EQ(msg.color_image.at<InputData::ColorType>(240, 131), color2);
 }
 
 TEST(Lidar, ImagePlaneProjectionCorrect) {

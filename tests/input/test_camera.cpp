@@ -145,20 +145,20 @@ TEST(Camera, VertexMapAndRangeCorrect) {
 
   // x: 0 -> -1.5 / 1.5 = -1.0, x: 1 -> -0.5 / 1.5 = -1/3, x: 2 -> 0.5 / 1.5 = 1/3
   // y: 0 -> -1 / 1.0 = -1.0, y: 1 -> 0 / 1.0 = 0
-  cv::Mat expected_points(depth.size(), CV_32FC3);
-  cv::Mat expected_range(depth.size(), CV_32FC1);
-  expected_points.at<cv::Vec3f>(0, 0) = {-1.0f, -1.0f, 1.0f};
-  expected_range.at<float>(0, 0) = std::sqrt(3);
-  expected_points.at<cv::Vec3f>(0, 1) = {-2.0 / 3.0f, -2.0f, 2.0f};
-  expected_range.at<float>(0, 1) = 2.9059f;
-  expected_points.at<cv::Vec3f>(0, 2) = {1.0f, -3.0f, 3.0f};
-  expected_range.at<float>(0, 2) = 4.3589f;
-  expected_points.at<cv::Vec3f>(1, 0) = {-4.0f, 0.0f, 4.0f};
-  expected_range.at<float>(1, 0) = 5.6569f;
-  expected_points.at<cv::Vec3f>(1, 1) = {-5.0 / 3.0f, 0.0f, 5.0f};
-  expected_range.at<float>(1, 1) = 5.2605f;
-  expected_points.at<cv::Vec3f>(1, 2) = {2.0f, 0.0f, 6.0f};
-  expected_range.at<float>(1, 2) = 6.3245f;
+  cv::Mat expected_points(depth.size(), InputData::VertexMatType);
+  cv::Mat expected_range(depth.size(), InputData::RangeMatType);
+  expected_points.at<InputData::VertexType>(0, 0) = {-1.0f, -1.0f, 1.0f};
+  expected_range.at<InputData::RangeType>(0, 0) = std::sqrt(3);
+  expected_points.at<InputData::VertexType>(0, 1) = {-2.0 / 3.0f, -2.0f, 2.0f};
+  expected_range.at<InputData::RangeType>(0, 1) = 2.9059f;
+  expected_points.at<InputData::VertexType>(0, 2) = {1.0f, -3.0f, 3.0f};
+  expected_range.at<InputData::RangeType>(0, 2) = 4.3589f;
+  expected_points.at<InputData::VertexType>(1, 0) = {-4.0f, 0.0f, 4.0f};
+  expected_range.at<InputData::RangeType>(1, 0) = 5.6569f;
+  expected_points.at<InputData::VertexType>(1, 1) = {-5.0 / 3.0f, 0.0f, 5.0f};
+  expected_range.at<InputData::RangeType>(1, 1) = 5.2605f;
+  expected_points.at<InputData::VertexType>(1, 2) = {2.0f, 0.0f, 6.0f};
+  expected_range.at<InputData::RangeType>(1, 2) = 6.3245f;
 
   const auto result_points = camera->computeVertexMap(depth);
   float min_range = 0.0f;
@@ -176,9 +176,11 @@ TEST(Camera, VertexMapAndRangeCorrect) {
     for (int j = 0; j < result_points.cols; ++j) {
       SCOPED_TRACE("checking result @ [" + std::to_string(i) + ", " +
                    std::to_string(j) + "]");
-      EXPECT_NEAR(result_range.at<float>(i, j), expected_range.at<float>(i, j), 1.0e-2);
-      const auto expected_point = expected_points.at<cv::Vec3f>(i, j);
-      const auto result_point = result_points.at<cv::Vec3f>(i, j);
+      EXPECT_NEAR(result_range.at<InputData::RangeType>(i, j),
+                  expected_range.at<InputData::RangeType>(i, j),
+                  1.0e-2);
+      const auto expected_point = expected_points.at<InputData::VertexType>(i, j);
+      const auto result_point = result_points.at<InputData::VertexType>(i, j);
       EXPECT_NEAR(expected_point[0], result_point[0], 1.0e-5f);
       EXPECT_NEAR(expected_point[1], result_point[1], 1.0e-5f);
       EXPECT_NEAR(expected_point[2], result_point[2], 1.0e-5f);
@@ -204,10 +206,10 @@ TEST(Camera, FinalizeRepresentationsCorrect) {
 }
 
 TEST(Camera, RangeImageFromPointsCorrect) {
-  cv::Mat points(4, 3, CV_32FC3);
+  cv::Mat points(4, 3, InputData::VertexMatType);
   for (int r = 0; r < points.rows; ++r) {
     for (int c = 0; c < points.cols; ++c) {
-      auto& vec = points.at<cv::Vec3f>(r, c);
+      auto& vec = points.at<InputData::VertexType>(r, c);
       vec[0] = r * points.cols + c + 1;
       vec[1] = r * points.cols + c + 1;
       vec[2] = r * points.cols + c + 1;
@@ -223,7 +225,7 @@ TEST(Camera, RangeImageFromPointsCorrect) {
   ASSERT_EQ(range_image.cols, 3);
   for (int r = 0; r < points.rows; ++r) {
     for (int c = 0; c < points.cols; ++c) {
-      EXPECT_NEAR(range_image.at<float>(r, c),
+      EXPECT_NEAR(range_image.at<InputData::RangeType>(r, c),
                   std::sqrt(3.0) * (r * points.cols + c + 1),
                   1.0e-6);
     }

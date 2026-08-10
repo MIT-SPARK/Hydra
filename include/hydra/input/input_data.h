@@ -16,10 +16,15 @@ struct InputData {
 
   // Types of the stored image data.
   using ColorType = cv::Vec3b;
+  inline static constexpr auto ColorMatType = CV_8UC3;
   using RangeType = float;
+  inline static constexpr auto RangeMatType = CV_32FC1;
   using VertexType = cv::Vec3f;
+  inline static constexpr auto VertexMatType = CV_32FC3;
   using LabelType = int;
+  inline static constexpr auto LabelMatType = CV_32SC1;
   using InstanceType = int16_t;
+  inline static constexpr auto InstanceMatType = CV_16SC1;
 
   explicit InputData(Sensor::ConstPtr sensor) : sensor_(std::move(sensor)) {}
   virtual ~InputData() = default;

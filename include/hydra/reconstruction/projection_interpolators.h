@@ -49,9 +49,7 @@
 
 #include <spark_dsg/color.h>
 
-#include <memory>
 #include <opencv2/core/mat.hpp>
-#include <string>
 
 namespace hydra {
 
@@ -111,6 +109,14 @@ class ProjectionInterpolator {
    */
   virtual int interpolateID(const cv::Mat& id_image,
                             const InterpolationWeights& weights) const = 0;
+
+  /**
+   * @brief Compute a binary mask value based on the provided weights.
+   * @param mask_image ID image as 8UC1 to interpolate in.
+   * @return bool The interpolated binary mask value.
+   */
+  virtual bool interpolateMask(const cv::Mat& mask_image,
+                               const InterpolationWeights& weights) const = 0;
 };
 
 /**
@@ -134,6 +140,9 @@ class InterpolatorNearest : public ProjectionInterpolator {
 
   int interpolateID(const cv::Mat& id_image,
                     const InterpolationWeights& weights) const override;
+
+  bool interpolateMask(const cv::Mat& mask_image,
+                       const InterpolationWeights& weights) const override;
 };
 
 void declare_config(InterpolatorNearest::Config& config);
@@ -159,6 +168,9 @@ class InterpolatorBilinear : public ProjectionInterpolator {
 
   int interpolateID(const cv::Mat& id_image,
                     const InterpolationWeights& weights) const override;
+
+  bool interpolateMask(const cv::Mat& mask_image,
+                       const InterpolationWeights& weights) const override;
 };
 
 void declare_config(InterpolatorBilinear::Config& config);
@@ -189,6 +201,9 @@ class InterpolatorAdaptive : public InterpolatorBilinear {
 
   int interpolateID(const cv::Mat& id_image,
                     const InterpolationWeights& weights) const override;
+
+  bool interpolateMask(const cv::Mat& mask_image,
+                       const InterpolationWeights& weights) const override;
 
  private:
   const int u_offset_[4] = {0, 0, 1, 1};

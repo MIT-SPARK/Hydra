@@ -382,7 +382,7 @@ float ProjectiveIntegrator::computeWeight(const MapConfig& map_config,
 
 bool ProjectiveIntegrator::computeLabel(const MapConfig& map_config,
                                         const InputData& data,
-                                        const cv::Mat& integration_mask,
+                                        const cv::Mat& mask,
                                         Measurement& measurement) const {
   if (measurementOutsideTruncation(map_config, config, measurement)) {
     return true;
@@ -390,9 +390,8 @@ bool ProjectiveIntegrator::computeLabel(const MapConfig& map_config,
 
   // the formatting here is a little ugly, but if an integration mask is supplied and it
   // is non-zero for the best pixel, we skip integrating the current voxel
-  if (!integration_mask.empty() &&
-      interpolator_->interpolateID(integration_mask,
-                                   measurement.interpolation_weights)) {
+  if (!mask.empty() &&
+      interpolator_->interpolateMask(mask, measurement.interpolation_weights)) {
     return false;
   }
 

@@ -195,7 +195,7 @@ bool Camera::pointIsInViewFrustum(const Eigen::Vector3f& point_C,
 cv::Mat Camera::computeVertexMap(const cv::Mat& depth_image,
                                  const Eigen::Isometry3f* T_W_C) const {
   // Compute the 3D pointcloud from a depth image.
-  cv::Mat vertices(depth_image.size(), CV_32FC3);
+  cv::Mat vertices(depth_image.size(), InputData::VertexMatType);
   const float fx_inv = 1.f / config_.fx;
   const float fy_inv = 1.f / config_.fy;
   for (int v = 0; v < depth_image.rows; v++) {
@@ -208,7 +208,7 @@ cv::Mat Camera::computeVertexMap(const cv::Mat& depth_image,
       VLOG(15) << "(" << u << ", " << v << "), d=" << depth << ", fx=" << fx_inv
                << ", fy=" << fy_inv << ", cx=" << config_.cx << ", cy=" << config_.cy
                << " -> " << p_W.transpose();
-      auto& vertex = vertices.at<cv::Vec3f>(v, u);
+      auto& vertex = vertices.at<InputData::VertexType>(v, u);
       vertex[0] = p_W.x();
       vertex[1] = p_W.y();
       vertex[2] = p_W.z();
@@ -222,7 +222,7 @@ cv::Mat Camera::computeRangeImage(const cv::Mat& depth_image,
                                   float* min_range,
                                   float* max_range) const {
   // Compute the range (=radial distance) from the pointcloud.
-  cv::Mat range_image(depth_image.size(), CV_32FC1);
+  cv::Mat range_image(depth_image.size(), InputData::RangeMatType);
   const float fx_inv = 1.0f / config_.fx;
   const float fy_inv = 1.0f / config_.fy;
   if (min_range) {
@@ -240,7 +240,7 @@ cv::Mat Camera::computeRangeImage(const cv::Mat& depth_image,
                                 depth * (static_cast<float>(v) - config_.cy) * fy_inv,
                                 depth);
       const float range = p_C.norm();
-      range_image.at<float>(v, u) = range;
+      range_image.at<InputData::RangeType>(v, u) = range;
       if (min_range) {
         *min_range = std::min(*min_range, range);
       }
@@ -258,7 +258,7 @@ cv::Mat Camera::computeRangeImageFromPoints(const cv::Mat& points,
                                             float* min_range,
                                             float* max_range) {
   // Compute the range (=radial distance) from the pointcloud.
-  cv::Mat range_image(points.size(), CV_32FC1);
+  cv::Mat range_image(points.size(), InputData::RangeMatType);
   if (min_range) {
     *min_range = std::numeric_limits<float>::max();
   }
@@ -269,12 +269,12 @@ cv::Mat Camera::computeRangeImageFromPoints(const cv::Mat& points,
 
   for (int v = 0; v < points.rows; v++) {
     for (int u = 0; u < points.cols; u++) {
-      const auto& point = points.at<cv::Vec3f>(v, u);
+      const auto& point = points.at<InputData::VertexType>(v, u);
       const float x = point[0];
       const float y = point[1];
       const float z = point[2];
       const auto range = std::sqrt(x * x + y * y + z * z);
-      range_image.at<float>(v, u) = range;
+      range_image.at<InputData::RangeType>(v, u) = range;
       if (min_range) {
         *min_range = std::min(*min_range, range);
       }

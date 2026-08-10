@@ -37,6 +37,7 @@
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
 
+#include "hydra/input/input_data.h"
 #include "hydra/utils/csv_reader.h"
 
 namespace hydra {
@@ -156,12 +157,13 @@ cv::Mat SemanticColorMap::colorsToLabels(const cv::Mat& colors,
 
   CHECK_EQ(colors.type(), CV_8UC3);
 
-  cv::Mat label_image(colors.size(), CV_32SC1);
+  cv::Mat label_image(colors.size(), InputData::LabelMatType);
   for (int r = 0; r < colors.rows; ++r) {
     for (int c = 0; c < colors.cols; ++c) {
       const auto& pixel = colors.at<cv::Vec3b>(r, c);
       const spark_dsg::Color color(pixel[0], pixel[1], pixel[2]);
-      label_image.at<int32_t>(r, c) = getLabelFromColor(color).value_or(default_label);
+      label_image.at<InputData::LabelType>(r, c) =
+          getLabelFromColor(color).value_or(default_label);
     }
   }
 

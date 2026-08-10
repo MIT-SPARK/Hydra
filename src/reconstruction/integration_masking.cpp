@@ -38,6 +38,8 @@
 
 #include <opencv2/core.hpp>
 
+#include "hydra/input/input_data.h"
+
 namespace hydra {
 namespace {
 
@@ -49,7 +51,7 @@ inline std::string showImageDim(const cv::Mat& mat) {
 
 inline bool initMask(const cv::Mat& input, cv::Mat& mask) {
   if (mask.empty()) {
-    mask = cv::Mat::zeros(input.rows, input.cols, CV_32SC1);
+    mask = cv::Mat::zeros(input.rows, input.cols, CV_8UC1);
     return true;
   }
 
@@ -59,11 +61,11 @@ inline bool initMask(const cv::Mat& input, cv::Mat& mask) {
     return false;
   }
 
-  if (mask.type() != CV_32SC1) {
-    LOG(WARNING) << "Invalid mask type! Must be CV_32SC!";
+  if (mask.type() != CV_8UC1) {
+    LOG(WARNING) << "Invalid mask type! Must be CV_8UC1!";
 
     cv::Mat converted;
-    mask.convertTo(converted, CV_32SC1);
+    mask.convertTo(converted, CV_8UC1);
     mask = converted;
   }
 
@@ -79,8 +81,8 @@ bool maskInvalidSemantics(const cv::Mat& labels,
     return true;  // more efficient to not init mask if it is going to be empty
   }
 
-  if (labels.type() != CV_32SC1) {
-    LOG(ERROR) << "Invalid label image! Type must be CV_32SC1";
+  if (labels.type() != InputData::LabelMatType) {
+    LOG(ERROR) << "Invalid label image type!";
     return false;
   }
 
@@ -90,8 +92,8 @@ bool maskInvalidSemantics(const cv::Mat& labels,
 
   for (int r = 0; r < labels.rows; ++r) {
     for (int c = 0; c < labels.cols; ++c) {
-      const auto label = labels.at<int32_t>(r, c);
-      mask.at<int32_t>(r, c) |= to_mask.count(label);
+      const auto label = labels.at<InputData::LabelType>(r, c);
+      mask.at<uint8_t>(r, c) |= to_mask.count(label);
     }
   }
 
@@ -105,7 +107,6 @@ bool maskNonZero(const cv::Mat input, cv::Mat& mask) {
 
   // if opencv implemented bitwise_or across integer types, we could just use that, but
   // this is likely more efficient than converting the entire input
-  // TODO(nathan) port to label remapper as well
   std::function<bool(const cv::Mat&, int, int)> input_getter;
   switch (input.depth()) {
     case CV_8U:
@@ -144,7 +145,7 @@ bool maskNonZero(const cv::Mat input, cv::Mat& mask) {
 
   for (int r = 0; r < input.rows; ++r) {
     for (int c = 0; c < input.cols; ++c) {
-      mask.at<int32_t>(r, c) |= input_getter(input, r, c);
+      mask.at<uint8_t>(r, c) |= input_getter(input, r, c);
     }
   }
 
