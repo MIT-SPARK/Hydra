@@ -129,27 +129,7 @@ void GvdGraph::add(const GlobalIndex& vindex,
     node->siblings.insert(neighbor->id);
   }
 
-  // always insert an active ref and add to updated
-  const auto cluster = assign_to_cluster(*node);
-
-  // construct edges by checking to see if any neighbors map to a different cluster
-  auto& cell_clusters = compressed_index_map_.at(compressed_id_map_.at(cluster));
-  for (const auto neighbor : node->siblings) {
-    const auto neighbor_cluster = cluster_for_gvd(neighbor);
-    if (!neighbor_cluster || neighbor_cluster == cluster) {
-      continue;
-    }
-
-    if (cell_clusters.count(*neighbor_cluster)) {
-      // voxel connected two neighboring clusters for the same index
-      merge_clusters(cluster, *neighbor_cluster);
-      cell_clusters.erase(*neighbor_cluster);
-      continue;
-    }
-
-    compressed_.at(cluster).siblings.insert(*neighbor_cluster);
-    compressed_.at(*neighbor_cluster).siblings.insert(cluster);
-  }
+  add_compressed(*node);
 }
 
 void GvdGraph::remove(const GlobalIndexSet& indices) {
@@ -162,13 +142,11 @@ void GvdGraph::remove(const GlobalIndexSet& indices) {
   for (const auto compressed_id : updated) {
     auto& node = compressed_.at(compressed_id);
     nodes_to_check.push_back(compressed_id);
-
-    // clear old connections to invalidated nodes
     for (const auto sibling : node.siblings) {
       compressed_.at(sibling).siblings.erase(compressed_id);
     }
-    node.siblings.clear();
 
+    node.siblings.clear();
     const auto components = getComponentsForNode(node, uncompressed_);
 
     // iterate through and construct any new components that have split off from the
@@ -392,6 +370,30 @@ Node* GvdGraph::add_uncompressed(const GlobalIndex& index,
           .emplace(id, Node{id, {dist, basis, pos, index, parents, timestamp}, {}})
           .first;
   return &niter->second;
+}
+
+void GvdGraph::add_compressed(const Node& node) {
+  // always insert an active ref and add to updated
+  const auto cluster = assign_to_cluster(node);
+
+  // construct edges by checking to see if any neighbors map to a different cluster
+  auto& cell_clusters = compressed_index_map_.at(compressed_id_map_.at(cluster));
+  for (const auto neighbor : node.siblings) {
+    const auto neighbor_cluster = cluster_for_gvd(neighbor);
+    if (!neighbor_cluster || neighbor_cluster == cluster) {
+      continue;
+    }
+
+    if (cell_clusters.count(*neighbor_cluster)) {
+      // voxel connected two neighboring clusters for the same index
+      merge_clusters(cluster, *neighbor_cluster);
+      cell_clusters.erase(*neighbor_cluster);
+      continue;
+    }
+
+    compressed_.at(cluster).siblings.insert(*neighbor_cluster);
+    compressed_.at(*neighbor_cluster).siblings.insert(cluster);
+  }
 }
 
 Node* GvdGraph::uncompressed_by_index(const GlobalIndex& index) {

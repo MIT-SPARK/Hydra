@@ -128,6 +128,8 @@ class GvdGraph {
                          const std::vector<Point>& parents,
                          uint64_t timestamp);
 
+  void add_compressed(const Node& node);
+
   Node* uncompressed_by_index(const GlobalIndex& index);
 
   uint64_t assign_to_cluster(const Node& node);
