@@ -25,6 +25,8 @@ struct InputData {
   inline static constexpr auto LabelMatType = CV_32SC1;
   using InstanceType = int16_t;
   inline static constexpr auto InstanceMatType = CV_16SC1;
+  using MaskType = uint8_t;
+  inline static constexpr auto MaskMatType = CV_8UC1;
 
   explicit InputData(Sensor::ConstPtr sensor) : sensor_(std::move(sensor)) {}
   virtual ~InputData() = default;
@@ -35,6 +37,8 @@ struct InputData {
   Eigen::Isometry3d world_T_body;
   //! Color image as RGB.
   cv::Mat color_image;
+  //! Color mask (primarily for backprojected LiDAR)
+  cv::Mat color_mask;
   //! Depth image as planar depth in meters.
   cv::Mat depth_image;
   //! Ray lengths in meters.

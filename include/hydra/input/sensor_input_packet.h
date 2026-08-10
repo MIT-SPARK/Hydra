@@ -89,6 +89,8 @@ struct CloudInputPacket : public SensorInputPacket {
   cv::Mat points;
   //! Colors for each point
   cv::Mat colors;
+  //! Color mask for each point
+  cv::Mat color_mask;
   //! Labels for each point
   cv::Mat labels;
   //! Instance IDs for each point

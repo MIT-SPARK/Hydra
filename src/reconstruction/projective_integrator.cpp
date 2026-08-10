@@ -258,23 +258,21 @@ Measurement ProjectiveIntegrator::getVoxelMeasurement(const MapConfig& map_confi
 
 void ProjectiveIntegrator::updateVoxel(const MapConfig& map_config,
                                        const InputData& data,
-                                       const Measurement& measurement,
+                                       const Measurement& meas,
                                        VoxelTuple& voxels) const {
-  if (!std::isfinite(measurement.sdf)) {
+  if (!std::isfinite(meas.sdf)) {
     LOG(ERROR) << "found invalid measurement!";
     return;
   }
 
   // Cache old weight and add measurement to the current weight
-  auto& tsdf_voxel = *voxels.tsdf;
-  const auto prev_weight = tsdf_voxel.weight;
-  tsdf_voxel.weight =
-      std::min(tsdf_voxel.weight + measurement.weight, config.max_weight);
+  auto& tsdf = *voxels.tsdf;
+  const auto prev_weight = tsdf.weight;
+  tsdf.weight = std::min(tsdf.weight + meas.weight, config.max_weight);
 
   // Update TSDF distance using weighted averaging fusion
-  tsdf_voxel.distance =
-      (tsdf_voxel.distance * prev_weight + measurement.sdf * measurement.weight) /
-      (prev_weight + measurement.weight);
+  tsdf.distance = (tsdf.distance * prev_weight + meas.sdf * meas.weight) /
+                  (prev_weight + meas.weight);
 
   if (voxels.tracking) {
     // this condition should always trigger when the voxel has no integrated
@@ -286,21 +284,26 @@ void ProjectiveIntegrator::updateVoxel(const MapConfig& map_config,
   }
 
   // Don't bother updating colors or labels outside the truncation distance
-  if (measurementOutsideTruncation(map_config, config, measurement)) {
+  if (measurementOutsideTruncation(map_config, config, meas)) {
     return;
   }
 
-  // TODO(nathan) refactor into update functions
-  if (!data.color_image.empty()) {
-    const auto color = interpolator_->interpolateColor(
-        data.color_image, measurement.interpolation_weights);
-    const float ratio = measurement.weight / (tsdf_voxel.weight + measurement.weight);
-    tsdf_voxel.color.merge(color, ratio);
+  const auto& weights = meas.interpolation_weights;
+
+  bool valid_color = true;
+  if (!data.color_mask.empty() &&
+      !interpolator_->interpolateMask(data.color_mask, weights)) {
+    valid_color = false;  // disable color update when no color present
+  }
+
+  if (!data.color_image.empty() && valid_color) {
+    const auto color = interpolator_->interpolateColor(data.color_image, weights);
+    const float ratio = meas.weight / (tsdf.weight + meas.weight);
+    tsdf.color.merge(color, ratio);
   }
 
   if (semantic_integrator_ && voxels.semantic) {
-    semantic_integrator_->updateLikelihoods(
-        measurement.label, measurement.weight, *voxels.semantic);
+    semantic_integrator_->updateLikelihoods(meas.label, meas.weight, *voxels.semantic);
   }
 }
 

@@ -175,6 +175,7 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
 
   const auto sensor_T_world = input.getSensorPose().cast<float>().inverse();
   const auto has_color = !input.color_image.empty();
+  const auto has_color_mask = !input.color_mask.empty();
   const auto has_labels = !input.label_image.empty();
   const auto has_instances = !input.instance_image.empty();
   const auto structured =
@@ -188,6 +189,12 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
   if (has_color) {
     color = cv::Mat(height_, width_, InputData::ColorMatType);
     color = 0;
+  }
+
+  cv::Mat color_mask;
+  if (has_color_mask) {
+    color_mask = cv::Mat(height_, width_, InputData::MaskMatType);
+    color_mask = 0;
   }
 
   cv::Mat labels;
@@ -257,6 +264,11 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
           input.color_image.at<InputData::ColorType>(point_idx);
     }
 
+    if (has_color_mask) {
+      color_mask.at<InputData::MaskType>(v, u) =
+          input.color_mask.at<InputData::MaskType>(point_idx);
+    }
+
     if (has_labels) {
       labels.at<InputData::LabelType>(v, u) =
           input.label_image.at<InputData::LabelType>(point_idx);
@@ -278,6 +290,7 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
   input.label_image = labels;
   input.instance_image = instances;
   input.color_image = color;
+  input.color_mask = color_mask;
   if (!structured) {
     input.vertex_map = vertex_image;
   }
