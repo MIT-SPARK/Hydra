@@ -42,6 +42,8 @@
 #include <opencv2/core/mat.hpp>
 #include <string>
 
+#include "hydra/input/input_data.h"
+
 namespace {
 
 struct LabelRemapRow {
@@ -159,8 +161,8 @@ void LabelRemapper::remapImage(cv::Mat& img) const {
 
   for (int r = 0; r < img.rows; ++r) {
     for (int c = 0; c < img.cols; ++c) {
-      const auto pixel = img.at<int32_t>(r, c);
-      img.at<int32_t>(r, c) = remapLabel(pixel).value_or(-1);
+      const auto pixel = img.at<InputData::LabelType>(r, c);
+      img.at<InputData::LabelType>(r, c) = remapLabel(pixel).value_or(-1);
     }
   }
 }
