@@ -24,9 +24,9 @@ bool convertLabels(InputData& data) {
   }
 
   // Enforcing requirement for int32_t at this point
-  if (data.label_image.type() != CV_32SC1) {
-    cv::Mat new_label_image(data.label_image.size(), CV_32SC1);
-    data.label_image.convertTo(new_label_image, CV_32SC1);
+  if (data.label_image.type() != InputData::LabelMatType) {
+    cv::Mat new_label_image(data.label_image.size(), InputData::LabelMatType);
+    data.label_image.convertTo(new_label_image, InputData::LabelMatType);
     data.label_image = new_label_image;
   }
 
@@ -69,7 +69,7 @@ bool convertColor(InputData& data) {
     return true;
   }
 
-  if (data.color_image.type() != CV_8UC3) {
+  if (data.color_image.type() != InputData::ColorMatType) {
     LOG(ERROR) << "only 3-channel rgb images supported";
     return false;
   }
@@ -128,13 +128,14 @@ bool normalizeData(InputData& data, bool normalize_labels) {
     return false;
   }
 
-  if (!data.instance_image.empty() && data.instance_image.type() != CV_16SC1) {
-    cv::Mat instances(data.instance_image.size(), CV_16SC1);
-    data.instance_image.convertTo(instances, CV_16SC1);
+  if (!data.instance_image.empty() &&
+      data.instance_image.type() != InputData::InstanceMatType) {
+    cv::Mat instances(data.instance_image.size(), InputData::InstanceMatType);
+    data.instance_image.convertTo(instances, InputData::InstanceMatType);
     data.instance_image = instances;
   }
 
-  if (!data.vertex_map.empty() && data.vertex_map.type() != CV_32FC3) {
+  if (!data.vertex_map.empty() && data.vertex_map.type() != InputData::VertexMatType) {
     LOG(ERROR) << "pointcloud must be CV_32FC3, not " << showTypeInfo(data.vertex_map);
     return false;
   }
@@ -154,7 +155,7 @@ void convertVertexMap(InputData& data, bool in_world_frame) {
 
   for (int r = 0; r < data.vertex_map.rows; ++r) {
     for (int c = 0; c < data.vertex_map.cols; ++c) {
-      auto& point = data.vertex_map.at<cv::Vec3f>(r, c);
+      auto& point = data.vertex_map.at<InputData::VertexType>(r, c);
       Eigen::Vector3f point_eigen(point[0], point[1], point[2]);
       point_eigen = transform * point_eigen;
       point[0] = point_eigen.x();

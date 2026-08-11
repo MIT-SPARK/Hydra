@@ -175,6 +175,7 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
 
   const auto sensor_T_world = input.getSensorPose().cast<float>().inverse();
   const auto has_color = !input.color_image.empty();
+  const auto has_color_mask = !input.color_mask.empty();
   const auto has_labels = !input.label_image.empty();
   const auto has_instances = !input.instance_image.empty();
   const auto structured =
@@ -182,27 +183,36 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
 
   input.min_range = std::numeric_limits<float>::max();
   input.max_range = std::numeric_limits<float>::lowest();
-  input.range_image = cv::Mat(height_, width_, CV_32FC1, 0.0f);
+  input.range_image = cv::Mat(height_, width_, InputData::RangeMatType, 0.0f);
 
   cv::Mat color;
   if (has_color) {
-    color = cv::Mat(height_, width_, CV_8UC3);
+    color = cv::Mat(height_, width_, InputData::ColorMatType);
     color = 0;
+  }
+
+  cv::Mat color_mask;
+  if (has_color_mask) {
+    color_mask = cv::Mat(height_, width_, InputData::MaskMatType);
+    color_mask = 0;
   }
 
   cv::Mat labels;
   if (has_labels) {
-    labels = cv::Mat(height_, width_, CV_32SC1, -1);
+    labels = cv::Mat(height_, width_, InputData::LabelMatType);
+    labels = -1;
   }
 
   cv::Mat instances;
   if (has_instances) {
-    instances = cv::Mat::zeros(height_, width_, CV_16SC1);
+    instances = cv::Mat(height_, width_, InputData::InstanceMatType);
+    instances = 0;
   }
 
   cv::Mat vertex_image;
   if (!structured) {
-    vertex_image = cv::Mat(height_, width_, CV_32FC3, cv::Scalar(0.0, 0.0, 0.0));
+    const cv::Scalar init(0.0, 0.0, 0.0);
+    vertex_image = cv::Mat(height_, width_, InputData::VertexMatType, init);
   }
 
   size_t point_idx = 0;
@@ -237,20 +247,26 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
     const auto range_m = p_C.norm();
     input.min_range = std::min(input.min_range, range_m);
     input.max_range = std::max(input.max_range, range_m);
-    if (!(input.range_image.at<float>(v, u) == 0.0f ||
-          range_m < input.range_image.at<float>(v, u))) {
+    if (!(input.range_image.at<InputData::RangeType>(v, u) == 0.0f ||
+          range_m < input.range_image.at<InputData::RangeType>(v, u))) {
       ++point_iter;
       ++point_idx;
       continue;  // Skip the pixel if it has already been updated with a closer point
     }
 
-    input.range_image.at<float>(v, u) = range_m;
+    input.range_image.at<InputData::RangeType>(v, u) = range_m;
     if (!structured) {
-      vertex_image.at<cv::Vec3f>(v, u) = *point_iter;
+      vertex_image.at<InputData::VertexType>(v, u) = *point_iter;
     }
 
     if (has_color) {
-      color.at<cv::Vec3b>(v, u) = input.color_image.at<cv::Vec3b>(point_idx);
+      color.at<InputData::ColorType>(v, u) =
+          input.color_image.at<InputData::ColorType>(point_idx);
+    }
+
+    if (has_color_mask) {
+      color_mask.at<InputData::MaskType>(v, u) =
+          input.color_mask.at<InputData::MaskType>(point_idx);
     }
 
     if (has_labels) {
@@ -274,6 +290,7 @@ bool Lidar::finalizeRepresentations(InputData& input, bool force_world_frame) co
   input.label_image = labels;
   input.instance_image = instances;
   input.color_image = color;
+  input.color_mask = color_mask;
   if (!structured) {
     input.vertex_map = vertex_image;
   }

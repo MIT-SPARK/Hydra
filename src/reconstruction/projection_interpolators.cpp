@@ -56,6 +56,8 @@
 #include <limits>
 #include <unordered_map>
 
+#include "hydra/input/input_data.h"
+
 namespace hydra {
 namespace {
 
@@ -98,18 +100,23 @@ Weights InterpolatorNearest::computeWeights(float u,
 
 float InterpolatorNearest::interpolateRange(const cv::Mat& range_image,
                                             const Weights& weights) const {
-  return range_image.at<float>(weights.v, weights.u);
+  return range_image.at<InputData::RangeType>(weights.v, weights.u);
 }
 
 Color InterpolatorNearest::interpolateColor(const cv::Mat& color_image,
                                             const Weights& weights) const {
-  const cv::Vec3b color = color_image.at<cv::Vec3b>(weights.v, weights.u);
+  const auto color = color_image.at<InputData::ColorType>(weights.v, weights.u);
   return Color(color[0], color[1], color[2]);
 }
 
 int InterpolatorNearest::interpolateID(const cv::Mat& id_image,
                                        const Weights& weights) const {
-  return id_image.at<int32_t>(weights.v, weights.u);
+  return id_image.at<InputData::LabelType>(weights.v, weights.u);
+}
+
+bool InterpolatorNearest::interpolateMask(const cv::Mat& mask_image,
+                                          const Weights& weights) const {
+  return mask_image.at<uint8_t>(weights.v, weights.u) > 0;
 }
 
 void declare_config(InterpolatorBilinear::Config&) {
@@ -138,19 +145,20 @@ Weights InterpolatorBilinear::computeWeights(float u,
 
 float InterpolatorBilinear::interpolateRange(const cv::Mat& range_image,
                                              const Weights& weights) const {
-  return range_image.at<float>(weights.v, weights.u) * weights.w0 +
-         range_image.at<float>(weights.v + 1, weights.u) * weights.w1 +
-         range_image.at<float>(weights.v, weights.u + 1) * weights.w2 +
-         range_image.at<float>(weights.v + 1, weights.u + 1) * weights.w3;
+  return range_image.at<InputData::RangeType>(weights.v, weights.u) * weights.w0 +
+         range_image.at<InputData::RangeType>(weights.v + 1, weights.u) * weights.w1 +
+         range_image.at<InputData::RangeType>(weights.v, weights.u + 1) * weights.w2 +
+         range_image.at<InputData::RangeType>(weights.v + 1, weights.u + 1) *
+             weights.w3;
 }
 
 Color InterpolatorBilinear::interpolateColor(const cv::Mat& color_image,
                                              const Weights& weights) const {
   Eigen::Vector3f color(0, 0, 0);
-  auto c1 = color_image.at<cv::Vec3b>(weights.v, weights.u);
-  auto c2 = color_image.at<cv::Vec3b>(weights.v + 1, weights.u);
-  auto c3 = color_image.at<cv::Vec3b>(weights.v, weights.u + 1);
-  auto c4 = color_image.at<cv::Vec3b>(weights.v + 1, weights.u + 1);
+  const auto c1 = color_image.at<InputData::ColorType>(weights.v, weights.u);
+  const auto c2 = color_image.at<InputData::ColorType>(weights.v + 1, weights.u);
+  const auto c3 = color_image.at<InputData::ColorType>(weights.v, weights.u + 1);
+  const auto c4 = color_image.at<InputData::ColorType>(weights.v + 1, weights.u + 1);
   for (size_t i = 0; i < 3; ++i) {
     color[i] = c1[i] * weights.w0 + c2[i] * weights.w1 + c3[i] * weights.w2 +
                c4[i] * weights.w3;
@@ -168,15 +176,25 @@ int InterpolatorBilinear::interpolateID(const cv::Mat& id_image,
   // TODO(nathan) consider manually implementing to avoid std::unordered_map memory
   // usage
   std::unordered_map<int, float> ids;  // These are zero initialized by default.
-  ids[id_image.at<int32_t>(weights.v, weights.u)] += weights.w0;
-  ids[id_image.at<int32_t>(weights.v + 1, weights.u)] += weights.w1;
-  ids[id_image.at<int32_t>(weights.v, weights.u + 1)] += weights.w2;
-  ids[id_image.at<int32_t>(weights.v + 1, weights.u + 1)] += weights.w3;
+  ids[id_image.at<InputData::LabelType>(weights.v, weights.u)] += weights.w0;
+  ids[id_image.at<InputData::LabelType>(weights.v + 1, weights.u)] += weights.w1;
+  ids[id_image.at<InputData::LabelType>(weights.v, weights.u + 1)] += weights.w2;
+  ids[id_image.at<InputData::LabelType>(weights.v + 1, weights.u + 1)] += weights.w3;
   return std::max_element(
              std::begin(ids),
              std::end(ids),
              [](const auto& p1, const auto& p2) { return p1.second < p2.second; })
       ->first;
+}
+
+bool InterpolatorBilinear::interpolateMask(const cv::Mat& img,
+                                           const Weights& weights) const {
+  float total = 0.0f;
+  total += img.at<uint8_t>(weights.v, weights.u) > 0 ? weights.w0 : -weights.w0;
+  total += img.at<uint8_t>(weights.v + 1, weights.u) > 0 ? weights.w1 : -weights.w1;
+  total += img.at<uint8_t>(weights.v, weights.u + 1) > 0 ? weights.w2 : -weights.w2;
+  total += img.at<uint8_t>(weights.v + 1, weights.u + 1) > 0 ? weights.w3 : -weights.w3;
+  return total >= 0.0f;  // will be negative if more weight on false
 }
 
 void declare_config(InterpolatorAdaptive::Config& config) {
@@ -205,7 +223,7 @@ Weights InterpolatorAdaptive::computeWeights(float u,
       continue;
     }
 
-    const float range = ranges.at<float>(curr_v, curr_u);
+    const float range = ranges.at<InputData::RangeType>(curr_v, curr_u);
     max = std::max(range, max);
     min = std::min(range, min);
     if (max - min > config.max_depth_difference_m) {
@@ -230,7 +248,7 @@ float InterpolatorAdaptive::interpolateRange(const cv::Mat& range_image,
     return InterpolatorBilinear::interpolateRange(range_image, weights);
   }
 
-  return range_image.at<float>(weights.v, weights.u);
+  return range_image.at<InputData::RangeType>(weights.v, weights.u);
 }
 
 Color InterpolatorAdaptive::interpolateColor(const cv::Mat& color_image,
@@ -239,7 +257,7 @@ Color InterpolatorAdaptive::interpolateColor(const cv::Mat& color_image,
     return InterpolatorBilinear::interpolateColor(color_image, weights);
   }
 
-  auto color = color_image.at<cv::Vec3b>(weights.v, weights.u);
+  auto color = color_image.at<InputData::ColorType>(weights.v, weights.u);
   return Color(color[0], color[1], color[2]);
 }
 
@@ -249,7 +267,16 @@ int InterpolatorAdaptive::interpolateID(const cv::Mat& id_image,
     return InterpolatorBilinear::interpolateID(id_image, weights);
   }
 
-  return id_image.at<int32_t>(weights.v, weights.u);
+  return id_image.at<InputData::LabelType>(weights.v, weights.u);
+}
+
+bool InterpolatorAdaptive::interpolateMask(const cv::Mat& img,
+                                           const Weights& weights) const {
+  if (weights.use_bilinear) {
+    return InterpolatorBilinear::interpolateMask(img, weights);
+  }
+
+  return img.at<uint8_t>(weights.v, weights.u) > 0;
 }
 
 }  // namespace hydra

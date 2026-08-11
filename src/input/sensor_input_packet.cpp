@@ -117,6 +117,7 @@ bool CloudInputPacket::fillInputDataImpl(InputData& msg) const {
   msg.vertex_map = points;
   msg.points_in_world_frame = in_world_frame;
   msg.color_image = colors;
+  msg.color_mask = color_mask;
   msg.label_image = labels;
   msg.instance_image = instances;
 
@@ -136,6 +137,13 @@ bool CloudInputPacket::fillInputDataImpl(InputData& msg) const {
 
   if (!msg.color_image.empty() && !sizesMatch(msg.vertex_map, msg.color_image)) {
     LOG(ERROR) << "Color dimensions " << showImageDim(msg.color_image)
+               << " do not match pointcloud dimensions "
+               << showImageDim(msg.vertex_map);
+    return false;
+  }
+
+  if (!msg.color_mask.empty() && !sizesMatch(msg.vertex_map, msg.color_mask)) {
+    LOG(ERROR) << "Color mask dimensions " << showImageDim(msg.color_mask)
                << " do not match pointcloud dimensions "
                << showImageDim(msg.vertex_map);
     return false;

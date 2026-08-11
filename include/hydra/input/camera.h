@@ -97,6 +97,8 @@ class Camera : public Sensor {
   bool pointIsInViewFrustum(const Eigen::Vector3f& point_C,
                             float inflation_distance = 0.0f) const override;
 
+  Eigen::Vector3f unprojectPixel(float u, float v, float z) const;
+
   cv::Mat computeVertexMap(const cv::Mat& depth_image,
                            const Eigen::Isometry3f* T_W_C = nullptr) const;
 
