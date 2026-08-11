@@ -192,6 +192,11 @@ bool Camera::pointIsInViewFrustum(const Eigen::Vector3f& point_C,
   return true;
 }
 
+Eigen::Vector3f Camera::unprojectPixel(float u, float v, float z) const {
+  return Eigen::Vector3f(
+      z * (u - config_.cx) / config_.fx, z * (v - config_.cy) / config_.fy, z);
+}
+
 cv::Mat Camera::computeVertexMap(const cv::Mat& depth_image,
                                  const Eigen::Isometry3f* T_W_C) const {
   // Compute the 3D pointcloud from a depth image.
