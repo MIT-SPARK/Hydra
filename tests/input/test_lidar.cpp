@@ -135,7 +135,8 @@ TEST(Lidar, FinalizeRepresentationsCorrect) {
     }
   }
 
-  EXPECT_NEAR(msg.range_image.at<InputData::RangeType>(0, 320), std::sqrt(2.0f), 1.0e-5f);
+  EXPECT_NEAR(
+      msg.range_image.at<InputData::RangeType>(0, 320), std::sqrt(2.0f), 1.0e-5f);
   EXPECT_NEAR(msg.range_image.at<InputData::RangeType>(240, 131), 5.0f, 1.0e-5f);
   EXPECT_EQ(msg.label_image.at<InputData::LabelType>(0, 320), 2);
   EXPECT_EQ(msg.label_image.at<InputData::LabelType>(240, 131), 1);
@@ -175,7 +176,8 @@ TEST(Lidar, FinalizeRepresentationColor) {
   EXPECT_NEAR(msg.max_range, 5.0, 1.0e-6);
 
   const cv::Vec3b color1{3, 4, 5};
-  EXPECT_NEAR(msg.range_image.at<InputData::RangeType>(0, 320), std::sqrt(2.0f), 1.0e-5f);
+  EXPECT_NEAR(
+      msg.range_image.at<InputData::RangeType>(0, 320), std::sqrt(2.0f), 1.0e-5f);
   EXPECT_EQ(msg.label_image.at<InputData::LabelType>(0, 320), 2);
   EXPECT_EQ(msg.color_image.at<InputData::ColorType>(0, 320), color1);
 
