@@ -144,6 +144,8 @@ class GvdGraph {
 
   void drop_compressed_id(uint64_t compressed_id);
 
+  void add_compressed_edges(const std::vector<uint64_t>& to_check);
+
  protected:
   uint64_t next_uncompressed_id_;
   Nodes uncompressed_;

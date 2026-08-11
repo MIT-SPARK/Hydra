@@ -174,20 +174,7 @@ void GvdGraph::remove(const GlobalIndexSet& indices) {
     }
   }
 
-  // for every updated node or newly generated split, recompute siblings from the gvd
-  for (const auto& compressed_id : nodes_to_check) {
-    auto& node = compressed_.at(compressed_id);
-    const auto children = node.refs();
-    for (const auto& child : children) {
-      for (const auto& sibling : uncompressed_.at(child).siblings) {
-        const auto sibling_cluster = compression_map_.at(sibling);
-        if (sibling_cluster != compressed_id) {
-          node.siblings.insert(sibling_cluster);
-          compressed_.at(sibling_cluster).siblings.insert(compressed_id);
-        }
-      }
-    }
-  }
+  add_compressed_edges(nodes_to_check);
 }
 
 void GvdGraph::archive(const GlobalIndex& index) {
@@ -498,6 +485,23 @@ void GvdGraph::drop_compressed_id(uint64_t compressed_id) {
   }
 
   compressed_id_map_.erase(id_iter);
+}
+
+void GvdGraph::add_compressed_edges(const std::vector<uint64_t>& nodes_to_check) {
+  // for every updated node or newly generated split, recompute siblings from the gvd
+  for (const auto& compressed_id : nodes_to_check) {
+    auto& node = compressed_.at(compressed_id);
+    const auto children = node.refs();
+    for (const auto& child : children) {
+      for (const auto& sibling : uncompressed_.at(child).siblings) {
+        const auto sibling_cluster = compression_map_.at(sibling);
+        if (sibling_cluster != compressed_id) {
+          node.siblings.insert(sibling_cluster);
+          compressed_.at(sibling_cluster).siblings.insert(compressed_id);
+        }
+      }
+    }
+  }
 }
 
 }  // namespace hydra::places
