@@ -179,6 +179,7 @@ void GraphExtractor::validate(uint64_t timestamp_ns,
                               const GvdLayer& layer,
                               const BlockIndices& /* archived_blocks */) const {
   std::vector<uint64_t> invalid_nodes;
+
   for (const auto& [node_id, node] : gvd_.uncompressed()) {
     if (node.archived) {
       continue;

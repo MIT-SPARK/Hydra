@@ -236,7 +236,10 @@ void GvdGraph::dropCompressed(uint64_t compressed_id) {
   for (const auto gvd_id : refs) {
     auto niter = uncompressed_.find(gvd_id);
     CHECK(niter != uncompressed_.end()) << "Invalid uncompressed ID " << gvd_id;
-    drop_uncompressed(niter->second.info.index);
+    if (!niter->second.archived) {
+      drop_uncompressed(niter->second.info.index);
+    }
+
     drop_uncompressed_node(gvd_id);
   }
 
