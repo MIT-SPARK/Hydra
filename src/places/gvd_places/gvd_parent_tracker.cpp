@@ -34,17 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include "hydra/places/gvd_places/gvd_parent_tracker.h"
 
-#include <glog/logging.h>
-
 #include "hydra/places/gvd_places/gvd_utilities.h"
 
 namespace hydra::places {
-namespace {
-
-const static Eigen::IOFormat fmt(
-    Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "; ", "", "", "[", "]");
-
-}
 
 bool GvdParentTracker::add(const GvdVoxel& voxel, const GlobalIndex& index) {
   if (!voxel.has_parent) {
