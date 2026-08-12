@@ -160,7 +160,6 @@ void GvdPlaceExtractor::detect(const ActiveWindowOutput& msg) {
     }
 
     gvd_integrator_->archiveBlocks(to_archive, graph_extractor_.get());
-    graph_extractor_->validate(msg.timestamp_ns, *gvd_, to_archive);
   }
 
   Sink::callAll(sinks_, msg.timestamp_ns, world_T_body, *gvd_, *graph_extractor_);

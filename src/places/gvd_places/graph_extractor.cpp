@@ -175,38 +175,6 @@ void GraphExtractor::prune() {
   }
 }
 
-void GraphExtractor::validate(uint64_t timestamp_ns,
-                              const GvdLayer& layer,
-                              const BlockIndices& /* archived_blocks */) const {
-  std::vector<uint64_t> invalid_nodes;
-
-  for (const auto& [node_id, node] : gvd_.uncompressed()) {
-    if (node.archived) {
-      continue;
-    }
-
-    const auto* voxel = layer.getVoxelPtr(node.info.index);
-    if (!voxel) {
-      const auto block_idx =
-          spatial_hash::blockIndexFromGlobalIndex(node.info.index, 16);
-      LOG(ERROR) << "Invalid node " << node_id << " is in block "
-                 << showIndex(block_idx) << " (last updated at "
-                 << node.info.last_updated << " vs. " << timestamp_ns << ")";
-      invalid_nodes.push_back(node_id);
-      continue;
-    }
-
-    if (!voxel->num_extra_basis) {
-      LOG(ERROR) << "Invalid node " << node_id << " does not point to gvd voxel "
-                 << *voxel;
-      invalid_nodes.push_back(node_id);
-    }
-  }
-
-  CHECK(invalid_nodes.empty()) << "Found active uncompressed nodes " << invalid_nodes
-                               << " pointing to unallocated voxels";
-}
-
 void GraphExtractor::updateGvdGraph(uint64_t timestamp_ns,
                                     const GvdLayer& layer,
                                     const GvdParentTracker& tracker,

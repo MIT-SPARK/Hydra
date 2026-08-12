@@ -98,10 +98,6 @@ class GraphExtractor {
 
   const LocalGraph& graph() const { return graph_; }
 
-  void validate(uint64_t timestamp_ns,
-                const GvdLayer& layer,
-                const BlockIndices& archived_blocks) const;
-
  protected:
   void updateGvdGraph(uint64_t timestamp_ns,
                       const GvdLayer& layer,
