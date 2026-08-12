@@ -81,10 +81,6 @@ class GvdPlaceExtractor : public GraphBuilderFunctor {
   void updateGraph(uint64_t timestamp_ns, spark_dsg::SceneGraph& graph) override;
 
  protected:
-  void filterIsolated(spark_dsg::SceneGraph& graph,
-                      std::set<spark_dsg::NodeId>& active_neighborhood);
-
- protected:
   places::GvdLayer::Ptr gvd_;
   std::unique_ptr<VolumetricWindow> map_window_;
   std::unique_ptr<TsdfInterpolator> tsdf_interpolator_;

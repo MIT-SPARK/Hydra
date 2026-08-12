@@ -48,9 +48,7 @@ frontend:
       - type: TraversabilityVisualizer
   freespace_places:
     type: gvd
-    filter_places: true
-    min_places_component_size: 3
-    filter_ground: false
+    min_component_size: 5
     gvd:
       max_distance_m: 4.5
       min_distance_m: 0.2
@@ -61,17 +59,14 @@ frontend:
         parent_l1_separation: 20
         parent_cos_angle_separation: 0.2
     graph:
-      type: CompressionGraphExtractor
       compression_distance_m: 1.5
       min_node_distance_m: 0.4
       min_edge_distance_m: 0.25
-      node_merge_distance_m: 0.7
       merge_policy: distance
+      node_merge_distance_m: 0.7
       overlap_edges: {enable: false}
       freespace_edges: {enable: false}
-    tsdf_interpolator:
-      type: downsample
-      ratio: 2
+    tsdf_interpolator: {type: downsample, ratio: 2}
   frontier_places:
     # type: voxel_clustering
     cluster_tolerance: 0.3

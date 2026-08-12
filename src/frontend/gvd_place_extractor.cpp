@@ -179,7 +179,18 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
                      NodeSymbol(config.node_prefix, key.k2));
   }
 
-  std::set<NodeId> active_neighborhood;
+  std::unordered_set<uint64_t> to_filter;
+  if (config.min_component_size >= 2) {
+    // This may delete place nodes that are part of a valid component (ideally we'd keep
+    // around the config.min_component_size hops in addition to the latest graph)
+    const auto components = places.connected_components(false);
+    for (const auto& component : components) {
+      if (component.size() < config.min_component_size) {
+        to_filter.insert(component.begin(), component.end());
+      }
+    }
+  }
+
   for (const auto& [node_id, node] : places) {
     const NodeSymbol graph_id(config.node_prefix, node_id);
     const auto& attrs = node.attributes();
@@ -189,12 +200,20 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
       continue;
     }
 
+    if (to_filter.count(node_id)) {
+      if (attrs.is_active) {
+        // bad things happen if we delete an archived node, so we only remove active
+        // nodes if they were previously added
+        MLOG(1) << "Removed isolated node " << graph_id.str();
+        graph.removeNode(graph_id);
+      }
+
+      continue;
+    }
+
     auto new_attrs = attrs.clone();
     new_attrs->last_update_time_ns = timestamp_ns;
     graph.addOrUpdateNode(config.layer, graph_id, std::move(new_attrs));
-    if (attrs.is_active) {
-      active_neighborhood.insert(graph_id);
-    }
   }
 
   for (const auto& [key, info] : places.edges()) {
@@ -203,34 +222,7 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
                           info->clone());
   }
 
-  filterIsolated(graph, active_neighborhood);
   graph_extractor_->prune();  // clear all fully archived nodes
-}
-
-void GvdPlaceExtractor::filterIsolated(SceneGraph& graph, std::set<NodeId>& active) {
-  if (config.min_component_size < 2) {
-    return;  // no need to do any work
-  }
-
-  // we grab connected components using the subgraph of all active places and all
-  // archived places that used to be a neighbor with an active place so that we don't
-  // miss disconnected components that comprised of archived nodes and formed when an
-  // active node or edge is removed. Limiting the connected component search to be
-  // within N hops of the subgraph, where N is the min allowable component size
-  // ensures that we don't search the entire places subgraph, but still preserve
-  // archived places that connect to a component of at least size N
-  const auto& places = graph.getLayer(DsgLayers::PLACES);
-  const auto components =
-      getConnectedComponents(places, config.min_component_size, active);
-  for (const auto& component : components) {
-    if (component.size() >= config.min_component_size) {
-      continue;
-    }
-
-    for (const auto to_delete : component) {
-      graph.removeNode(to_delete);
-    }
-  }
 }
 
 }  // namespace hydra
