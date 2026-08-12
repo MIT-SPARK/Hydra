@@ -152,7 +152,7 @@ std::optional<uint32_t> LabelRemapper::remapLabel(const uint32_t from) const {
 
 bool LabelRemapper::empty() const { return label_remapping_.empty(); }
 
-LabelRemapper::operator bool() const { return empty(); }
+LabelRemapper::operator bool() const { return !empty(); }
 
 void LabelRemapper::remapImage(cv::Mat& img) const {
   if (label_remapping_.empty()) {
