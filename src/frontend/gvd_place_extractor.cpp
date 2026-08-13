@@ -48,12 +48,10 @@ namespace hydra {
 
 using places::GraphExtractor;
 using places::GvdIntegrator;
-using spark_dsg::DsgLayers;
 using spark_dsg::NodeId;
 using spark_dsg::NodeSymbol;
 using spark_dsg::PlaceNodeAttributes;
 using spark_dsg::SceneGraph;
-using spark_dsg::graph_utilities::getConnectedComponents;
 using timing::ScopedTimer;
 
 using PlacesGraph = PartialGraph<PlaceNodeAttributes>;
@@ -201,7 +199,9 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
     }
 
     if (to_filter.count(node_id)) {
-      if (attrs.is_active) {
+      const auto node = graph.findNode(graph_id);
+      const auto is_active = node ? node->attributes().is_active : false;
+      if (is_active) {
         // bad things happen if we delete an archived node, so we only remove active
         // nodes if they were previously added
         MLOG(1) << "Removed isolated node " << graph_id.str();
@@ -211,7 +211,9 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
       continue;
     }
 
+    // all nodes are consider considered active until fully archived
     auto new_attrs = attrs.clone();
+    new_attrs->is_active = true;
     new_attrs->last_update_time_ns = timestamp_ns;
     graph.addOrUpdateNode(config.layer, graph_id, std::move(new_attrs));
   }
@@ -222,7 +224,14 @@ void GvdPlaceExtractor::updateGraph(uint64_t timestamp_ns, SceneGraph& graph) {
                           info->clone());
   }
 
-  graph_extractor_->prune();  // clear all fully archived nodes
+  // flip all fully archived nodes to false
+  const auto archived_ids = graph_extractor_->prune();
+  for (const auto& node_id : archived_ids) {
+    auto node = graph.findNode(NodeSymbol(config.node_prefix, node_id));
+    if (node) {
+      node->attributes().is_active = false;
+    }
+  }
 }
 
 }  // namespace hydra

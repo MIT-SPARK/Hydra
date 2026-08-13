@@ -92,7 +92,7 @@ class GraphExtractor {
                const VoxelIndexChanges& changes,
                const GvdParentTracker& parents);
 
-  void prune();
+  std::vector<uint64_t> prune();
 
   const GvdGraph& gvd() const { return gvd_; }
 

@@ -163,7 +163,7 @@ void GraphExtractor::extract(uint64_t timestamp_ns,
   updateFreespaceEdges(layer);
 }
 
-void GraphExtractor::prune() {
+std::vector<uint64_t> GraphExtractor::prune() {
   const auto archived = gvd_.clearArchived();
   MLOG(2) << "Cleared archived nodes [" << archived << "]";
 
@@ -173,6 +173,8 @@ void GraphExtractor::prune() {
     node_index_map_.erase(node_id);
     node_attribute_map_.erase(node_id);
   }
+
+  return archived_node_ids;
 }
 
 void GraphExtractor::updateGvdGraph(uint64_t timestamp_ns,
