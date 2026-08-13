@@ -124,8 +124,7 @@ void declare_config(GraphExtractor::Config& config) {
   name("GraphExtractor::Config");
   field(config.compression_distance_m, "compression_distance_m");
   field(config.min_node_distance_m, "min_node_distance_m");
-  field(config.min_edge_distance_m, "min_edge_distance_m");
-  field(config.merge_nearby_nodes, "merge_new_nodes");
+  field(config.merge_nearby_nodes, "merge_nearby_nodes");
   field(config.merge_policy, "merge_policy");
   field(config.node_merge_distance_m, "node_merge_distance_m");
   field(config.overlap_edges, "overlap_edges");
@@ -207,17 +206,11 @@ void GraphExtractor::updateGvdGraph(uint64_t timestamp_ns,
 void GraphExtractor::updatePartialGraph(const GvdLayer& layer) {
   std::set<NodeId> stale_nodes;
   for (const auto& [node_id, node] : graph_.nodes()) {
-    if (node.attributes().is_active) {
-      stale_nodes.insert(node_id);
-    }
+    stale_nodes.insert(node_id);
   }
 
   std::set<EdgeKey> stale_edges;
   for (const auto& [key, _] : graph_.edges()) {
-    if (!graph_.at(key.k1).is_active && !graph_.at(key.k2).is_active) {
-      continue;
-    }
-
     if (overlap_edges_.count(key) || freespace_edges_.count(key)) {
       continue;
     }
@@ -253,13 +246,14 @@ void GraphExtractor::updatePartialGraph(const GvdLayer& layer) {
         continue;  // skip any unadded nodes
       }
 
+      const auto permissive = !node_attrs->is_active || !sibling_attrs->is_active;
       auto edge_attrs = getFreespaceEdgeInfo(layer,
                                              *node_attrs,
                                              node_index_map_.at(node_id),
                                              *sibling_attrs,
                                              node_index_map_.at(sibling_id),
-                                             config.min_edge_distance_m,
-                                             !sibling_attrs->is_active);
+                                             config.min_node_distance_m,
+                                             permissive);
       if (!edge_attrs) {
         graph_.remove(node_id, sibling_id);
         continue;

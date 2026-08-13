@@ -54,8 +54,6 @@ class GraphExtractor {
     double compression_distance_m = 0.5;
     //! Minimum distance for a GVD node to be considered for compression
     double min_node_distance_m = 0.3;
-    //! Minimum distance for a edge to be valid
-    double min_edge_distance_m = 0.4;
     //! Whether to merge nearby neighbors
     bool merge_nearby_nodes = true;
     //! Distance to consider a merge at

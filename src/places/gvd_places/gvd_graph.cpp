@@ -309,6 +309,10 @@ const GvdMemberInfo* GvdGraph::getCompressed(uint64_t compressed_id,
   return best_member;
 }
 
+double GvdGraph::maxClearance(uint64_t source_id, uint64_t target_id) const {
+  return 0.0;
+}
+
 const Nodes& GvdGraph::uncompressed() const { return uncompressed_; }
 
 const CompressedNodes& GvdGraph::compressed() const { return compressed_; }
