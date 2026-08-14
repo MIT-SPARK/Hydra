@@ -53,7 +53,7 @@ If you find this code relevant for your work, please consider citing one or both
   - Instructions for using a real semantic segmentation model via [semantic_inference](https://github.com/MIT-SPARK/semantic_inference.git)
   - Internal refactoring and cleanup
 
-> **Node**<br>
+> **Note**<br>
 > We've updated our rosinstall file to point to the `main` branch of Kimera-PGMO. Please make sure you have the right branch checked out!
 
 **Update (06/26/24):** We've released the latest version of Hydra.
@@ -82,11 +82,11 @@ Please refer to our guide [here](https://github.com/MIT-SPARK/Hydra-ROS/tree/mai
 
 ### Hydra Python Bindings
 
-See [here](python/README.md) for information
+See [here](hydra/python/README.md) for information
 
 ### Hydra Evaluation
 
-See [here](eval/README.md) for information
+See [here](hydra/eval/README.md) for information
 
 ## Filing Issues
 

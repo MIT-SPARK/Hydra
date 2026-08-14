@@ -1,3 +1,0 @@
-include CMakeLists.txt
-graft python/bindings
-graft config
