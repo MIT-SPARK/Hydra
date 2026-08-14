@@ -50,6 +50,10 @@ std::set<size_t> getIndexResults(const PointNeighborSearch& finder,
 
 }  // namespace
 
+using spark_dsg::NodeAttributes;
+using spark_dsg::NodeId;
+using spark_dsg::SceneGraphLayer;
+
 TEST(NearestNeighborUtilities, SkipFirst) {
   SceneGraphLayer layer(1);
   layer.emplaceNode(0, std::make_unique<NodeAttributes>(Eigen::Vector3d(0, 0, 3)));

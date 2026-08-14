@@ -44,15 +44,14 @@
 #include <mutex>
 #include <thread>
 
-#include "hydra/active_window/active_window_output.h"
 #include "hydra/backend/backend_input.h"
 #include "hydra/common/message_queue.h"
 #include "hydra/common/module.h"
 #include "hydra/common/output_sink.h"
 #include "hydra/common/shared_dsg_info.h"
 #include "hydra/common/shared_module_state.h"
+#include "hydra/frontend/graph_builder_functor.h"
 #include "hydra/frontend/graph_connector.h"
-#include "hydra/frontend/gvd_place_extractor.h"
 #include "hydra/frontend/mesh_segmenter.h"
 #include "hydra/frontend/surface_place_extractor.h"
 #include "hydra/frontend/traversability_place_extractor.h"
@@ -94,7 +93,7 @@ class GraphBuilder : public Module {
     config::VirtualConfig<PoseGraphTracker> pose_graph_tracker{
         PoseGraphFromOdom::Config()};
     config::VirtualConfig<SurfacePlaceExtractor> surface_places;
-    config::VirtualConfig<GvdPlaceExtractor> freespace_places;
+    config::VirtualConfig<GraphBuilderFunctor> freespace_places;
     config::VirtualConfig<places::TraversabilityPlaceExtractor> traversability_places;
     config::VirtualConfig<FrontierExtractor> frontier_places;
     ViewDatabase::Config view_database;
@@ -189,7 +188,7 @@ class GraphBuilder : public Module {
   std::unique_ptr<PoseGraphTracker> tracker_;
   std::unique_ptr<SurfacePlaceExtractor> surface_places_;
   std::unique_ptr<places::TraversabilityPlaceExtractor> traversability_places_;
-  std::unique_ptr<GvdPlaceExtractor> freespace_places_;
+  std::unique_ptr<GraphBuilderFunctor> freespace_places_;
   std::unique_ptr<FrontierExtractor> frontier_places_;
   ViewDatabase view_database_;
 

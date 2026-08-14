@@ -33,8 +33,8 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/places/gvd_integrator.h>
-#include <hydra/places/gvd_utilities.h>
+#include <hydra/places/gvd_places/gvd_integrator.h>
+#include <hydra/places/gvd_places/gvd_utilities.h>
 #include <hydra/reconstruction/volumetric_map.h>
 
 namespace hydra::places {

@@ -33,30 +33,30 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <optional>
 
-#include "hydra/common/dsg_types.h"
+#include <cstdint>
+#include <optional>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace hydra {
 
 struct DisjointSet {
   DisjointSet();
 
-  explicit DisjointSet(const SceneGraphLayer& layer);
-
   virtual ~DisjointSet() = default;
 
-  bool hasSet(NodeId node) const;
+  bool hasSet(uint64_t node) const;
 
-  NodeId findSet(NodeId node) const;
+  uint64_t findSet(uint64_t node) const;
 
-  bool addSet(NodeId node);
+  bool addSet(uint64_t node);
 
-  std::optional<NodeId> doUnion(NodeId lhs, NodeId rhs, bool rhs_better = false);
+  std::optional<uint64_t> doUnion(uint64_t lhs, uint64_t rhs, bool rhs_better = false);
 
-  std::unordered_set<NodeId> roots;
-  std::unordered_map<NodeId, NodeId> parents;
-  std::unordered_map<NodeId, size_t> sizes;
+  std::unordered_set<uint64_t> roots;
+  std::unordered_map<uint64_t, uint64_t> parents;
+  std::unordered_map<uint64_t, size_t> sizes;
 };
 
 }  // namespace hydra

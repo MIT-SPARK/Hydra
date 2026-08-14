@@ -33,12 +33,10 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
+#include <spark_dsg/bounding_box.h>
 
 #include <Eigen/Geometry>
 #include <memory>
-
-#include "hydra/common/dsg_types.h"
 
 namespace hydra {
 
@@ -62,13 +60,7 @@ class RobotFootprintIntegrator {
 
  public:
   const Config config;
-  const BoundingBox bbox;
-
- private:
-  inline static const auto registration_ =
-      config::RegistrationWithConfig<RobotFootprintIntegrator,
-                                     RobotFootprintIntegrator,
-                                     Config>("RobotFootprintIntegrator");
+  const spark_dsg::BoundingBox bbox;
 };
 
 void declare_config(RobotFootprintIntegrator::Config& config);

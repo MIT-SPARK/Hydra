@@ -46,14 +46,18 @@
 namespace hydra {
 namespace {
 
-inline bool isChild(LayerKey layer,
-                    const std::set<LayerId>& layer_ids,
-                    const std::set<LayerId>& partition_layer_ids) {
+inline bool isChild(spark_dsg::LayerKey layer,
+                    const std::set<spark_dsg::LayerId>& layer_ids,
+                    const std::set<spark_dsg::LayerId>& partition_layer_ids) {
   return !layer.partition ? layer_ids.count(layer.layer)
                           : partition_layer_ids.count(layer.layer);
 }
 
 }  // namespace
+
+using spark_dsg::LayerId;
+using spark_dsg::NodeId;
+using spark_dsg::SceneGraph;
 
 void declare_config(LayerConnector::Config::ChildLayerConfig& config) {
   using namespace config;
@@ -74,7 +78,7 @@ void declare_config(LayerConnector::Config& config) {
 
 LayerConnector::LayerConnector(const Config& config) : config(config) {}
 
-void LayerConnector::updateParents(const DynamicSceneGraph& graph,
+void LayerConnector::updateParents(const SceneGraph& graph,
                                    const std::vector<NodeId>& new_nodes) {
   const auto parent_key = graph.getLayerKey(config.parent_layer);
   if (!parent_key) {
@@ -117,7 +121,7 @@ void LayerConnector::updateParents(const DynamicSceneGraph& graph,
   }
 }
 
-void LayerConnector::connectChildren(DynamicSceneGraph& graph,
+void LayerConnector::connectChildren(SceneGraph& graph,
                                      const std::vector<NodeId>& new_nodes) {
   std::set<LayerId> child_layer_ids;
   std::set<LayerId> partition_child_layer_ids;
@@ -201,7 +205,7 @@ GraphConnector::GraphConnector(const Config& config)
 
 GraphConnector::~GraphConnector() = default;
 
-void GraphConnector::connect(DynamicSceneGraph& graph) {
+void GraphConnector::connect(SceneGraph& graph) {
   const auto new_nodes = graph.getNewNodes(true);
   for (auto& layer : layers_) {
     // 1. Update parent set

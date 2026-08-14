@@ -46,8 +46,6 @@ struct StampedPose {
 
 class PoseGraphFromOdom : public PoseGraphTracker {
  public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
   struct Config {
     //! @brief Minimum between pose norm to add new pose graph node
     double min_pose_separation = 0.5;

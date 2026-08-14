@@ -32,35 +32,19 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/places/update_statistics.h"
+#pragma once
 
-namespace hydra::places {
+#include <spark_dsg/spark_dsg_fwd.h>
 
-void UpdateStatistics::clear() {
-  number_lowered_voxels = 0;
-  number_raised_voxels = 0;
-  number_new_voxels = 0;
-  number_sign_flipped = 0;
-  number_raise_updates = 0;
-  number_voronoi_found = 0;
-  number_lower_skipped = 0;
-  number_lower_updated = 0;
-  number_fixed_no_parent = 0;
-  number_force_lowered = 0;
-}
+#include "hydra/active_window/active_window_output.h"
 
-std::ostream& operator<<(std::ostream& out, const UpdateStatistics& stats) {
-  out << "  - Voxel changes: ";
-  out << stats.number_lowered_voxels << " lowered, ";
-  out << stats.number_raised_voxels << " raised, ";
-  out << stats.number_new_voxels << " new, ";
-  out << stats.number_sign_flipped << " sign flipped";
-  out << "\n  - New Voronoi Cells: " << stats.number_voronoi_found;
-  out << "\n  - Fixed without parents (lower): " << stats.number_fixed_no_parent;
-  out << "\n  - Skipped (lower): " << stats.number_lower_skipped;
-  out << "\n  - Updated (lower): " << stats.number_lower_updated;
-  out << "\n  - Forced (lower): " << stats.number_force_lowered;
-  return out;
-}
+namespace hydra {
 
-}  // namespace hydra::places
+class GraphBuilderFunctor {
+ public:
+  virtual ~GraphBuilderFunctor() = default;
+  virtual void detect(const ActiveWindowOutput& msg) = 0;
+  virtual void updateGraph(uint64_t timestamp_ns, spark_dsg::SceneGraph& graph) = 0;
+};
+
+}  // namespace hydra

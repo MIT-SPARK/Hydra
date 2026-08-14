@@ -50,8 +50,6 @@ double getPoseDistance(const gtsam::Pose3& expected,
 }
 
 struct LayerRegistrationTests : public ::testing::Test {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
   LayerRegistrationTests() : testing::Test() {}
 
   virtual ~LayerRegistrationTests() = default;
@@ -94,8 +92,6 @@ struct LayerRegistrationTests : public ::testing::Test {
 };
 
 struct GraphRegistrationTests : public ::testing::Test {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
   GraphRegistrationTests() : testing::Test() {}
 
   ~GraphRegistrationTests() = default;

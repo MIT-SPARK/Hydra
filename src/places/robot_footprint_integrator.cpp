@@ -35,11 +35,23 @@
 #include "hydra/places/robot_footprint_integrator.h"
 
 #include <config_utilities/config.h>
+#include <config_utilities/factory.h>
 #include <config_utilities/types/eigen_matrix.h>
 
 #include "hydra/reconstruction/volumetric_map.h"
 
 namespace hydra {
+namespace {
+
+static const auto registration =
+    config::RegistrationWithConfig<RobotFootprintIntegrator,
+                                   RobotFootprintIntegrator,
+                                   RobotFootprintIntegrator::Config>(
+        "RobotFootprintIntegrator");
+
+}
+
+using spark_dsg::BoundingBox;
 
 void declare_config(RobotFootprintIntegrator::Config& config) {
   using namespace config;

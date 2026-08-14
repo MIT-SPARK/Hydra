@@ -32,30 +32,62 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <ostream>
+#include "hydra/places/gvd_places/gvd_parent_tracker.h"
+
+#include "hydra/places/gvd_places/gvd_utilities.h"
 
 namespace hydra::places {
 
-/**
- * @brief Tracking statistics for what the integrator did
- */
-struct UpdateStatistics {
-  size_t number_queue_inserts;
-  size_t number_lowered_voxels;
-  size_t number_raised_voxels;
-  size_t number_new_voxels;
-  size_t number_sign_flipped;
-  size_t number_raise_updates;
-  size_t number_voronoi_found;
-  size_t number_lower_skipped;
-  size_t number_lower_updated;
-  size_t number_fixed_no_parent;
-  size_t number_force_lowered;
+bool GvdParentTracker::add(const GvdVoxel& voxel, const GlobalIndex& index) {
+  if (!voxel.has_parent) {
+    return false;
+  }
 
-  void clear();
-};
+  bool is_new = false;
+  auto iter = parents_.find(index);
+  if (iter == parents_.end()) {
+    iter = parents_.emplace(index, BasisPointSet{}).first;
+    is_new = true;
+  }
 
-std::ostream& operator<<(std::ostream& out, const UpdateStatistics& stats);
+  iter->second.insert({voxel.parent, voxel.parent_pos});
+  return is_new;
+}
+
+uint8_t GvdParentTracker::add_unique(const VoronoiCheckConfig& config,
+                                     const GlobalIndex& voxel,
+                                     const GvdVoxel& neighbor) {
+  auto& curr_parents = parents_.at(voxel);
+
+  uint8_t curr_extra_basis = curr_parents.size();
+  for (const auto& other : curr_parents) {
+    const bool is_unique = isParentUnique(config, voxel, other.index, neighbor.parent);
+    if (!is_unique) {
+      return curr_extra_basis;
+    }
+  }
+
+  // parent is unique enough
+  curr_parents.insert({neighbor.parent, neighbor.parent_pos});
+  return curr_extra_basis + 1;
+}
+
+void GvdParentTracker::erase(const GlobalIndex& voxel_index) {
+  parents_.erase(voxel_index);
+}
+
+std::vector<Point> GvdParentTracker::parents(const GlobalIndex& index) const {
+  auto iter = parents_.find(index);
+  if (iter == parents_.end()) {
+    return {};
+  }
+
+  std::vector<Point> to_return;
+  for (const auto& basis_point : iter->second) {
+    to_return.push_back(basis_point.pos);
+  }
+
+  return to_return;
+}
 
 }  // namespace hydra::places

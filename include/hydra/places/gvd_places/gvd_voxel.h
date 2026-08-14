@@ -32,32 +32,74 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/places/gvd_voxel.h"
+#pragma once
+#include <ostream>
+
+#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::places {
 
-std::ostream& operator<<(std::ostream& out, const GvdVoxel& voxel) {
-  out << "GvdVoxel<flags=";
-  out << (voxel.observed ? "o" : "-");
-  out << (voxel.on_surface ? "s" : "-");
-  out << (voxel.fixed ? "f" : "-");
-  out << (voxel.in_queue ? "q" : "-");
-  out << (voxel.to_raise ? "r" : "-");
-  out << (voxel.is_negative ? "n" : "-");
-  out << ", distance=" << voxel.distance << " -> ";
-  if (voxel.has_parent) {
-    out << voxel.parent.transpose();
+struct GvdVoxel {
+  float distance;
+  // TODO(nathan) consider bitset instead
+  bool observed = false;
+  bool fixed = false;
+  bool in_queue = false;
+  bool to_raise = false;
+  bool is_negative = false;
+  bool on_surface = false;
+  bool has_parent = false;
+
+  uint8_t num_extra_basis = 0;
+
+  GlobalIndex parent;
+  // required for removing blocks (parents leave a dangling reference otherwise)
+  Point parent_pos;
+};
+
+using GvdBlock = spatial_hash::VoxelBlock<GvdVoxel>;
+using GvdLayer = spatial_hash::VoxelLayer<GvdBlock>;
+
+std::ostream& operator<<(std::ostream& out, const GvdVoxel& voxel);
+
+inline void resetVoronoi(GvdVoxel& voxel) { voxel.num_extra_basis = 0; }
+
+inline bool isVoronoi(const GvdVoxel& voxel) { return voxel.num_extra_basis != 0; }
+
+inline void setSdfParent(GvdVoxel& voxel,
+                         const GvdVoxel& ancestor,
+                         const GlobalIndex& ancestor_index,
+                         const Point& ancestor_pos) {
+  voxel.has_parent = true;
+  if (ancestor.has_parent) {
+    voxel.parent = ancestor.parent;
+    voxel.parent_pos = ancestor.parent_pos;
   } else {
-    out << "unknown";
+    voxel.parent = ancestor_index;
+    voxel.parent_pos = ancestor_pos;
   }
-  out << ", voronoi=";
-  if (voxel.num_extra_basis) {
-    out << "y (" << static_cast<int>(voxel.num_extra_basis) << ")";
-  } else {
-    out << "n";
-  }
-  out << ">";
-  return out;
 }
+
+inline void setDefaultDistance(GvdVoxel& voxel, const double default_distance) {
+  voxel.distance = std::copysign(default_distance, voxel.is_negative ? -1.0 : 1.0);
+}
+
+inline void setRaiseStatus(GvdVoxel& voxel, const double default_distance) {
+  voxel.has_parent = false;
+  voxel.to_raise = true;
+  if (voxel.fixed) {
+    return;
+  }
+
+  setDefaultDistance(voxel, default_distance);
+}
+
+struct VoxelIndexChanges {
+  GlobalIndexSet added;
+  GlobalIndexSet removed;
+
+  void clearIndex(const GlobalIndex& index);
+  void addIndex(const GlobalIndex& index);
+};
 
 }  // namespace hydra::places

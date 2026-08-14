@@ -46,18 +46,19 @@ using namespace spark_dsg;
 
 class NearestNodeFinder {
  public:
-  using Callback = std::function<void(NodeId, size_t, double)>;
-  using Filter = std::function<bool(const SceneGraphNode&)>;
+  using Callback = std::function<void(spark_dsg::NodeId, size_t, double)>;
+  using Filter = std::function<bool(const spark_dsg::SceneGraphNode&)>;
   using Ptr = std::unique_ptr<NearestNodeFinder>;
 
-  NearestNodeFinder(const SceneGraphLayer& layer, const std::vector<NodeId>& nodes);
+  NearestNodeFinder(const spark_dsg::SceneGraphLayer& layer,
+                    const std::vector<spark_dsg::NodeId>& nodes);
 
-  NearestNodeFinder(const SceneGraphLayer& layer,
-                    const std::unordered_set<NodeId>& nodes);
+  NearestNodeFinder(const spark_dsg::SceneGraphLayer& layer,
+                    const std::unordered_set<spark_dsg::NodeId>& nodes);
 
   virtual ~NearestNodeFinder();
 
-  static Ptr fromLayer(const SceneGraphLayer& layer, const Filter& filter);
+  static Ptr fromLayer(const spark_dsg::SceneGraphLayer& layer, const Filter& filter);
 
   void find(const Eigen::Vector3d& position,
             size_t num_to_find,
@@ -70,13 +71,13 @@ class NearestNodeFinder {
                     const Callback& callback) const;
 
   // Simplified interface to just get the IDs.
-  std::vector<NodeId> find(const Eigen::Vector3d& position,
-                           size_t num_to_find,
-                           bool skip_first) const;
+  std::vector<spark_dsg::NodeId> find(const Eigen::Vector3d& position,
+                                      size_t num_to_find,
+                                      bool skip_first) const;
 
-  std::vector<NodeId> findRadius(const Eigen::Vector3d& position,
-                                 double radius_m,
-                                 bool skip_first) const;
+  std::vector<spark_dsg::NodeId> findRadius(const Eigen::Vector3d& position,
+                                            double radius_m,
+                                            bool skip_first) const;
 
   const size_t num_nodes;
 
@@ -85,10 +86,10 @@ class NearestNodeFinder {
   std::unique_ptr<Detail> internals_;
 };
 
-using SemanticNodeFinders =
-    std::map<SemanticNodeAttributes::Label, std::unique_ptr<NearestNodeFinder>>;
+using SemanticNodeFinders = std::map<spark_dsg::SemanticNodeAttributes::Label,
+                                     std::unique_ptr<NearestNodeFinder>>;
 
-size_t makeSemanticNodeFinders(const SceneGraphLayer& layer,
+size_t makeSemanticNodeFinders(const spark_dsg::SceneGraphLayer& layer,
                                SemanticNodeFinders& finders,
                                bool use_active = false);
 

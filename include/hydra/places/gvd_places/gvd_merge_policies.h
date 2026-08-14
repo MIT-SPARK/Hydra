@@ -32,24 +32,32 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/places/gvd_integrator_config.h"
-
-#include <config_utilities/config.h>
-#include <config_utilities/types/enum.h>
+#pragma once
 
 namespace hydra::places {
 
-void declare_config(VoronoiCheckConfig& config) {
-  using namespace config;
-  name("VoronoiCheckConfig");
-  enum_field(config.mode,
-             "mode",
-             {{ParentUniquenessMode::ANGLE, "ANGLE"},
-              {ParentUniquenessMode::L1_DISTANCE, "L1_DISTANCE"},
-              {ParentUniquenessMode::L1_THEN_ANGLE, "L1_THEN_ANGLE"}});
-  field(config.min_distance_m, "min_distance_m");
-  field(config.parent_l1_separation, "parent_l1_separation");
-  field(config.parent_cos_angle_separation, "parent_cos_angle_separation");
-}
+struct GvdMemberInfo;
+
+struct MergePolicy {
+  virtual ~MergePolicy() = default;
+
+  /**
+   * \brief compare two gvd nodes to see which is more representativie
+   * \return Returns -1 if right is better, 0 if tie, 1 if left is better
+   */
+  virtual int compare(const GvdMemberInfo& lhs, const GvdMemberInfo& rhs) const = 0;
+};
+
+struct BasisPointMergePolicy : MergePolicy {
+  virtual ~BasisPointMergePolicy() = default;
+
+  int compare(const GvdMemberInfo& lhs, const GvdMemberInfo& rhs) const override;
+};
+
+struct DistanceMergePolicy : MergePolicy {
+  virtual ~DistanceMergePolicy() = default;
+
+  int compare(const GvdMemberInfo& lhs, const GvdMemberInfo& rhs) const override;
+};
 
 }  // namespace hydra::places

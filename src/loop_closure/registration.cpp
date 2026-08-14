@@ -68,7 +68,6 @@ using spark_dsg::NodeSymbol;
 using spark_dsg::SceneGraph;
 
 struct AgentNodePose {
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   bool valid = false;
   gtsam::Pose3 world_T_body;
   NodeId id;

@@ -1,0 +1,195 @@
+/* -----------------------------------------------------------------------------
+ * Copyright 2022 Massachusetts Institute of Technology.
+ * All Rights Reserved
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *  1. Redistributions of source code must retain the above copyright notice,
+ *     this list of conditions and the following disclaimer.
+ *
+ *  2. Redistributions in binary form must reproduce the above copyright notice,
+ *     this list of conditions and the following disclaimer in the documentation
+ *     and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Research was sponsored by the United States Air Force Research Laboratory and
+ * the United States Air Force Artificial Intelligence Accelerator and was
+ * accomplished under Cooperative Agreement Number FA8750-19-2-1000. The views
+ * and conclusions contained in this document are those of the authors and should
+ * not be interpreted as representing the official policies, either expressed or
+ * implied, of the United States Air Force or the U.S. Government. The U.S.
+ * Government is authorized to reproduce and distribute reprints for Government
+ * purposes notwithstanding any copyright notation herein.
+ * -------------------------------------------------------------------------- */
+#include "hydra/places/gvd_places/graph_extractor_utilities.h"
+
+namespace hydra::places {
+
+using spark_dsg::EdgeAttributes;
+
+// implementation loosely based on: https://gist.github.com/yamamushi/5823518
+GlobalIndices makeBresenhamLine(const GlobalIndex& start, const GlobalIndex& end) {
+  GlobalIndex diff = end - start;
+  GlobalIndex inc(diff(0) < 0 ? -1 : 1, diff(1) < 0 ? -1 : 1, diff(2) < 0 ? -1 : 1);
+
+  diff = diff.array().abs();
+  const GlobalIndex diff_twice = 2 * diff;
+
+  int max_idx;
+  int min_idx_1;
+  int min_idx_2;
+  if (diff(0) >= diff(1) && diff(0) >= diff(2)) {
+    max_idx = 0;
+    min_idx_1 = 1;
+    min_idx_2 = 2;
+  } else if (diff(1) >= diff(0) && diff(1) >= diff(2)) {
+    max_idx = 1;
+    min_idx_1 = 0;
+    min_idx_2 = 2;
+  } else {
+    max_idx = 2;
+    min_idx_1 = 0;
+    min_idx_2 = 1;
+  }
+
+  if (diff(max_idx) <= 1) {
+    return GlobalIndices();
+  }
+
+  GlobalIndices line_points(diff(max_idx) - 1);
+  GlobalIndex point = start;
+
+  int64_t err_1 = diff_twice(min_idx_1) - diff(max_idx);
+  int64_t err_2 = diff_twice(min_idx_2) - diff(max_idx);
+  for (int64_t i = 0; i < diff(max_idx); ++i) {
+    if (i > 0) {
+      line_points[i - 1] = point;
+    }
+
+    if (err_1 > 0) {
+      point(min_idx_1) += inc(min_idx_1);
+      err_1 -= diff_twice(max_idx);
+    }
+    if (err_2 > 0) {
+      point(min_idx_2) += inc(min_idx_2);
+      err_2 -= diff_twice(max_idx);
+    }
+    err_1 += diff_twice(min_idx_1);
+    err_2 += diff_twice(min_idx_2);
+    point[max_idx] += inc(max_idx);
+  }
+
+  return line_points;
+}
+
+EdgeAttributes::Ptr getOverlapEdgeInfo(const PlaceAttributes& node,
+                                       const PlaceAttributes& neighbor,
+                                       double min_edge_clearance_m) {
+  const auto r1 = node.distance;
+  const auto r2 = neighbor.distance;
+  const auto d = (node.position - neighbor.position).norm();
+  if (d >= r1 + r2) {
+    return nullptr;
+  }
+
+  if (d <= r1 || d <= r2) {
+    const double clearance = std::min(r1, r2);
+    if (clearance < min_edge_clearance_m) {
+      // mostly for debugging
+      return nullptr;
+    }
+
+    // intersection is inside one node's sphere
+    return std::make_unique<EdgeAttributes>(clearance);
+  }
+
+  // see https://mathworld.wolfram.com/Sphere-SphereIntersection.html
+  const double clearance =
+      std::sqrt(4 * std::pow(d, 2) * std::pow(r1, 2) -
+                std::pow(std::pow(d, 2) - std::pow(r2, 2) + std::pow(r1, 2), 2)) /
+      (2 * d);
+  if (clearance < min_edge_clearance_m) {
+    return nullptr;
+  }
+
+  return std::make_unique<EdgeAttributes>(clearance);
+}
+
+std::optional<double> getMinFreespaceClearance(const GvdLayer& gvd,
+                                               const GlobalIndex& node_index,
+                                               const GlobalIndex& other_index) {
+  const auto path = makeBresenhamLine(node_index, other_index);
+  if (path.empty()) {
+    return std::nullopt;  // indices are the same
+  }
+
+  std::optional<double> min_dist;
+  for (const auto& index : path) {
+    const auto* voxel = gvd.getVoxelPtr(index);
+    if (!voxel) {
+      continue;  // assume that archived voxels remain free
+    }
+
+    if (!voxel->observed) {
+      // shouldn't happen, but possible that straightline path goes through unobserved
+      // space
+      return std::nullopt;
+    }
+
+    if (!min_dist || voxel->distance < *min_dist) {
+      min_dist = voxel->distance;
+    }
+  }
+
+  return min_dist;
+}
+
+spark_dsg::EdgeAttributes::Ptr getFreespaceEdgeInfo(const GvdLayer& gvd,
+                                                    const PlaceAttributes& node,
+                                                    const GlobalIndex& node_index,
+                                                    const PlaceAttributes& other,
+                                                    const GlobalIndex& other_index,
+                                                    double min_edge_clearance_m,
+                                                    bool optimistic) {
+  const auto path = makeBresenhamLine(node_index, other_index);
+  if (path.empty()) {
+    return nullptr;  // indices are the same
+  }
+
+  const auto source_dist = node.distance;
+  const auto target_dist = other.distance;
+  auto min_dist = std::min(source_dist, target_dist);
+  for (const auto& index : path) {
+    const auto* voxel = gvd.getVoxelPtr(index);
+    if (!voxel) {
+      if (optimistic) {
+        continue;  // assume that archived voxels remain free
+      } else {
+        return nullptr;
+      }
+    }
+
+    if (!voxel->observed || voxel->distance <= min_edge_clearance_m) {
+      return nullptr;
+    }
+
+    if (voxel->distance < min_dist) {
+      min_dist = voxel->distance;
+    }
+  }
+
+  return std::make_unique<EdgeAttributes>(min_dist);
+}
+
+}  // namespace hydra::places

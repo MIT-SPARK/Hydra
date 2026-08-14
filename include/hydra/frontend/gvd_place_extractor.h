@@ -37,61 +37,55 @@
 
 #include <memory>
 
-#include "hydra/active_window/active_window_output.h"
 #include "hydra/active_window/volumetric_window.h"
 #include "hydra/common/output_sink.h"
-#include "hydra/places/graph_extractor.h"
-#include "hydra/places/gvd_integrator.h"
-#include "hydra/places/gvd_voxel.h"
+#include "hydra/frontend/graph_builder_functor.h"
+#include "hydra/places/gvd_places/graph_extractor.h"
+#include "hydra/places/gvd_places/gvd_integrator.h"
 #include "hydra/reconstruction/tsdf_interpolators.h"
 
 namespace hydra {
 
-class GvdPlaceExtractor {
+class GvdPlaceExtractor : public GraphBuilderFunctor {
  public:
   using Sink = OutputSink<uint64_t,
                           const Eigen::Isometry3d&,
                           const places::GvdLayer&,
                           const places::GraphExtractor&>;
 
-  struct Config {
-    std::string layer = DsgLayers::PLACES;
+  struct Config : VerbosityConfig {
+    //! Node prefix to use
+    char node_prefix = 'p';
+    //! Target layer to add places
+    std::string layer = spark_dsg::DsgLayers::PLACES;
+    //! GVD integrator from TSDF
     places::GvdIntegrator::Config gvd;
+    //! Graph extractor for processing GVD
     places::GraphExtractor::Config graph;
+    //! Optional TSDF interpolator for downsampling TSDF
     config::VirtualConfig<TsdfInterpolator> tsdf_interpolator;
+    //! Minimum number of places to keep a connected component
     size_t min_component_size = 3;
-    bool filter_places = true;
-    bool filter_ground = false;
-    double robot_height = 0.0;
-    double node_tolerance = 1.0;
-    double edge_tolerance = 1.0;
-    bool add_freespace_edges = false;
-    places::FreespaceEdgeConfig freespace_config;
+    //! Sinks for current pose and graph status
     std::vector<Sink::Factory> sinks;
+
+    Config() : VerbosityConfig("[gvd_places] ") {}
   } const config;
 
   explicit GvdPlaceExtractor(const Config& config);
 
   virtual ~GvdPlaceExtractor();
 
-  NodeIdSet getActiveNodes() const;
+  void detect(const ActiveWindowOutput& msg) override;
 
-  void detect(const ActiveWindowOutput& msg);
-
-  void updateGraph(uint64_t timestamp_ns, DynamicSceneGraph& graph);
-
-  void filterIsolated(DynamicSceneGraph& graph, NodeIdSet& active_neighborhood);
-
-  void filterGround(DynamicSceneGraph& graph);
+  void updateGraph(uint64_t timestamp_ns, spark_dsg::SceneGraph& graph) override;
 
  protected:
   places::GvdLayer::Ptr gvd_;
-  places::GraphExtractor graph_extractor_;
-  std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
-  std::unique_ptr<TsdfInterpolator> tsdf_interpolator_;
   std::unique_ptr<VolumetricWindow> map_window_;
-  NodeIdSet active_nodes_;
-  Eigen::Vector3d latest_pos_;
+  std::unique_ptr<TsdfInterpolator> tsdf_interpolator_;
+  std::unique_ptr<places::GraphExtractor> graph_extractor_;
+  std::unique_ptr<places::GvdIntegrator> gvd_integrator_;
   Sink::List sinks_;
 };
 

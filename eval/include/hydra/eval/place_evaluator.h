@@ -35,9 +35,8 @@
 #pragma once
 #include <optional>
 
-#include "hydra/common/dsg_types.h"
 #include "hydra/eval/place_metrics.h"
-#include "hydra/places/gvd_integrator.h"
+#include "hydra/places/gvd_places/gvd_integrator.h"
 #include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::eval {
@@ -51,7 +50,9 @@ class PlaceEvaluator {
 
   void computeGroundTruth(const places::GvdIntegrator::Config& config);
 
-  PlaceMetrics eval(const std::string& graph_filepath, uint8_t min_basis) const;
+  PlaceMetrics eval(const std::string& graph_filepath,
+                    uint8_t min_basis,
+                    const std::string& layer_id = spark_dsg::DsgLayers::PLACES) const;
 
  public:
   static PlaceEvaluator::Ptr fromFile(const std::string& config_filepath,

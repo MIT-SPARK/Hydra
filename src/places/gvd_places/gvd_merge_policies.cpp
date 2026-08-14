@@ -32,55 +32,37 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <Eigen/Dense>
-#include <cstdint>
-#include <list>
-#include <memory>
-#include <set>
-#include <unordered_map>
+#include "hydra/places/gvd_places/gvd_merge_policies.h"
 
-#include "hydra/reconstruction/voxel_types.h"
+#include <config_utilities/factory.h>
+
+#include "hydra/places/gvd_places/gvd_graph.h"
 
 namespace hydra::places {
+namespace {
 
-struct GvdMemberInfo {
-  double distance = 0.0;
-  uint8_t num_basis_points = 0;
-  Eigen::Vector3d position;
-  GlobalIndex index;
-  std::set<uint64_t> siblings;
-};
+static const auto basis_registration =
+    config::Registration<MergePolicy, BasisPointMergePolicy>("basis_points");
 
-class GvdGraph {
- public:
-  using Ptr = std::shared_ptr<GvdGraph>;
-  using Nodes = std::unordered_map<uint64_t, GvdMemberInfo>;
+static const auto distance_registration =
+    config::Registration<MergePolicy, DistanceMergePolicy>("distance");
 
-  GvdGraph();
+}  // namespace
 
-  bool empty() const;
+template <typename T>
+int compareValues(T lhs, T rhs) {
+  // lhs > rhs is 0 if lhs == rhs and 1 if lhs > rhs
+  return (lhs < rhs) ? -1 : (lhs > rhs);
+}
 
-  uint64_t addNode(const Eigen::Vector3d& position, const GlobalIndex& index);
+int BasisPointMergePolicy::compare(const GvdMemberInfo& lhs,
+                                   const GvdMemberInfo& rhs) const {
+  return compareValues(lhs.num_basis_points, rhs.num_basis_points);
+}
 
-  void removeNode(uint64_t node);
-
-  GvdMemberInfo* getNode(uint64_t node);
-
-  const GvdMemberInfo* getNode(uint64_t node) const;
-
-  const Nodes& nodes() const;
-
-  bool hasNode(uint64_t) const;
-
- protected:
-  uint64_t getNextId();
-
- protected:
-  uint64_t next_id_;
-  std::list<uint64_t> id_queue_;
-
-  Nodes nodes_;
-};
+int DistanceMergePolicy::compare(const GvdMemberInfo& lhs,
+                                 const GvdMemberInfo& rhs) const {
+  return compareValues(lhs.distance, rhs.distance);
+}
 
 }  // namespace hydra::places

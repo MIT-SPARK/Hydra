@@ -513,7 +513,15 @@ void GraphBuilder::updateFrontiers(const ActiveWindowOutput& input) {
     std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
 
     ScopedTimer timer("frontend/frontiers", timestamp, true, 1, false);
-    NodeIdSet active_nodes = freespace_places_->getActiveNodes();
+    // TODO(nathan) this should get wiped out when we updated the frontiers
+    NodeIdSet active_nodes;
+    for (const auto& [node_id, node] :
+         dsg_->graph->getLayer(DsgLayers::PLACES).nodes()) {
+      if (node->attributes().is_active) {
+        active_nodes.insert(node_id);
+      }
+    }
+
     frontier_places_->detectFrontiers(input, *dsg_->graph, active_nodes);
     frontier_places_->addFrontiers(timestamp, *dsg_->graph);
   }  // end graph update critical section
@@ -524,32 +532,10 @@ void GraphBuilder::updatePlaces(const ActiveWindowOutput& input) {
     return;
   }
 
-  NodeIdSet active_nodes;
   freespace_places_->detect(input);
-  {  // start graph critical section
-    std::unique_lock<std::mutex> graph_lock(dsg_->mutex);
-    freespace_places_->updateGraph(input.timestamp_ns, *dsg_->graph);
 
-    // force active flag on places
-    active_nodes = freespace_places_->getActiveNodes();
-    std::vector<NodeId> archived_places;
-    for (const auto& [node_id, node] :
-         dsg_->graph->getLayer(DsgLayers::PLACES).nodes()) {
-      auto& attrs = node->attributes<PlaceNodeAttributes>();
-      const auto prev_active = attrs.is_active;
-      if (attrs.real_place) {
-        attrs.is_active = active_nodes.count(node_id);
-      }
-      if (prev_active && !attrs.is_active) {
-        archived_places.push_back(node_id);
-      }
-    }
-
-    if (lcd_input_) {
-      lcd_input_->archived_places.insert(archived_places.begin(),
-                                         archived_places.end());
-    }
-  }  // end graph update critical section
+  std::lock_guard<std::mutex> graph_lock(dsg_->mutex);
+  freespace_places_->updateGraph(input.timestamp_ns, *dsg_->graph);
 }
 
 void GraphBuilder::updatePlaces2d(const ActiveWindowOutput& input) {

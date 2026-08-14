@@ -33,38 +33,43 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <config_utilities/factory.h>
-
-#include "hydra/places/gvd_graph.h"
+#include "hydra/places/gvd_places/gvd_voxel.h"
 
 namespace hydra::places {
 
-struct MergePolicy {
-  virtual ~MergePolicy() = default;
+// forward declare to avoid header
+struct VoronoiCheckConfig;
 
-  /**
-   * \brief compare two gvd nodes to see which is more representativie
-   * \return Returns -1 if right is better, 0 if tie, 1 if left is better
-   */
-  virtual int compare(const GvdMemberInfo& lhs, const GvdMemberInfo& rhs) const = 0;
+struct BasisPointInfo {
+  GlobalIndex index;
+  Point pos;
+
+  struct Hash {
+    int operator()(const BasisPointInfo& info) const {
+      return spatial_hash::IndexHash()(info.index);
+    }
+  };
 };
 
-struct BasisPointMergePolicy : MergePolicy {
-  virtual ~BasisPointMergePolicy() = default;
+inline bool operator==(const BasisPointInfo& lhs, const BasisPointInfo& rhs) {
+  return lhs.index == rhs.index;
+}
 
-  int compare(const GvdMemberInfo& lhs, const GvdMemberInfo& rhs) const override;
+using BasisPointSet = std::unordered_set<BasisPointInfo, BasisPointInfo::Hash>;
 
-  inline static const auto registration_ =
-      config::Registration<MergePolicy, BasisPointMergePolicy>("basis_points");
-};
+struct GvdParentTracker {
+  bool add(const GvdVoxel& voxel, const GlobalIndex& parent);
 
-struct DistanceMergePolicy : MergePolicy {
-  virtual ~DistanceMergePolicy() = default;
+  uint8_t add_unique(const VoronoiCheckConfig& config,
+                     const GlobalIndex& voxel_index,
+                     const GvdVoxel& neighbor);
 
-  int compare(const GvdMemberInfo& lhs, const GvdMemberInfo& rhs) const override;
+  void erase(const GlobalIndex& voxel_index);
 
-  inline static const auto registration_ =
-      config::Registration<MergePolicy, DistanceMergePolicy>("distance");
+  std::vector<Point> parents(const GlobalIndex& index) const;
+
+ private:
+  GlobalIndexMap<BasisPointSet> parents_;
 };
 
 }  // namespace hydra::places

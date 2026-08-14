@@ -38,7 +38,6 @@
 #include <config_utilities/printing.h>
 #include <glog/logging.h>
 
-#include "hydra/places/gvd_integrator.h"
 #include "hydra/reconstruction/volumetric_map.h"
 #include "hydra/utils/layer_io.h"
 
@@ -46,7 +45,7 @@ namespace hydra::eval {
 
 using places::GvdIntegrator;
 using places::GvdLayer;
-using places::GvdVoxel;
+using spark_dsg::SceneGraph;
 
 PlaceEvaluator::PlaceEvaluator(const GvdIntegrator::Config& config,
                                const TsdfLayer::Ptr& tsdf)
@@ -84,16 +83,16 @@ PlaceEvaluator::Ptr PlaceEvaluator::fromFile(const std::string& config_filepath,
 }
 
 PlaceMetrics PlaceEvaluator::eval(const std::string& graph_filepath,
-                                  uint8_t min_basis) const {
-  const auto graph = DynamicSceneGraph::load(graph_filepath);
-  if (!graph->hasLayer(DsgLayers::PLACES)) {
-    LOG(ERROR) << "Graph file: " << graph_filepath << " does not have places";
-    return {};
+                                  uint8_t min_basis,
+                                  const std::string& layer_id) const {
+  const auto graph = SceneGraph::load(graph_filepath);
+  const auto metrics = scorePlaces(*graph, *gvd_, min_basis, layer_id);
+  if (!metrics.is_valid) {
+    LOG(ERROR) << "Graph file: " << graph_filepath << " does not have layer '"
+               << layer_id << "'";
   }
 
-  const auto& places = graph->getLayer(DsgLayers::PLACES);
-  LOG(INFO) << "Place Nodes: " << places.nodes().size();
-  return scorePlaces(places, *gvd_, min_basis);
+  return metrics;
 }
 
 }  // namespace hydra::eval

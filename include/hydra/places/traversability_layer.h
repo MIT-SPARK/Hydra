@@ -77,18 +77,11 @@ struct Index2DHash {
   inline static const auto s = Index2D(1, 1290);
   int operator()(const Index2D& index) const { return index.dot(s); }
 };
-using Index2DSet = std::unordered_set<Index2D,
-                                      Index2DHash,
-                                      std::equal_to<Index2D>,
-                                      Eigen::aligned_allocator<Index2D>>;
+using Index2DSet = std::unordered_set<Index2D, Index2DHash, std::equal_to<Index2D>>;
 
 template <typename ValueT>
 using Index2DMap =
-    std::unordered_map<Index2D,
-                       ValueT,
-                       Index2DHash,
-                       std::equal_to<Index2D>,
-                       Eigen::aligned_allocator<std::pair<const Index2D, ValueT>>>;
+    std::unordered_map<Index2D, ValueT, Index2DHash, std::equal_to<Index2D>>;
 
 // TODO(lschmid): Update SpatialHash to support 2D blocks.
 template <typename VoxelT>

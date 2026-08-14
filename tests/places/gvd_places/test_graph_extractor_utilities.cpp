@@ -33,7 +33,7 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
-#include <hydra/places/graph_extractor_utilities.h>
+#include <hydra/places/gvd_places/graph_extractor_utilities.h>
 
 namespace hydra::places {
 

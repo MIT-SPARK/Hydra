@@ -32,63 +32,34 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/places/gvd_graph.h"
+#pragma once
+
+#include <spark_dsg/edge_attributes.h>
+#include <spark_dsg/node_attributes.h>
+
+#include "hydra/places/gvd_places/gvd_voxel.h"
+#include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::places {
 
-GvdGraph::GvdGraph() : next_id_(0) {}
+using PlaceAttributes = spark_dsg::PlaceNodeAttributes;
 
-bool GvdGraph::empty() const { return nodes_.empty(); }
+GlobalIndices makeBresenhamLine(const GlobalIndex& start, const GlobalIndex& end);
 
-uint64_t GvdGraph::addNode(const Eigen::Vector3d& position, const GlobalIndex& index) {
-  // position can't change ever (so we only ever set it when adding)
-  GvdMemberInfo info;
-  info.position = position;
-  info.index = index;
+spark_dsg::EdgeAttributes::Ptr getOverlapEdgeInfo(const PlaceAttributes& node,
+                                                  const PlaceAttributes& neighbor,
+                                                  double min_edge_clearance_m);
 
-  const auto next_id = getNextId();
-  nodes_.emplace(next_id, info);
-  return next_id;
-}
+std::optional<double> getMinFreespaceClearance(const GvdLayer& gvd,
+                                               const GlobalIndex& node_index,
+                                               const GlobalIndex& other_index);
 
-void GvdGraph::removeNode(uint64_t node) {
-  auto iter = nodes_.find(node);
-  if (iter == nodes_.end()) {
-    return;
-  }
-
-  for (const auto sibling_id : iter->second.siblings) {
-    nodes_.at(sibling_id).siblings.erase(node);
-  }
-
-  id_queue_.push_back(node);
-  nodes_.erase(iter);
-}
-
-const GvdMemberInfo* GvdGraph::getNode(uint64_t node) const {
-  return const_cast<GvdGraph*>(this)->getNode(node);
-}
-
-GvdMemberInfo* GvdGraph::getNode(uint64_t node) {
-  // TODO(nathan) make this not throw out-of-range
-  return &nodes_.at(node);
-}
-
-const GvdGraph::Nodes& GvdGraph::nodes() const { return nodes_; }
-
-uint64_t GvdGraph::getNextId() {
-  uint64_t new_id;
-  if (id_queue_.empty()) {
-    new_id = next_id_;
-    next_id_++;
-  } else {
-    new_id = id_queue_.front();
-    id_queue_.pop_front();
-  }
-
-  return new_id;
-}
-
-bool GvdGraph::hasNode(uint64_t node) const { return nodes_.count(node) > 0; }
+spark_dsg::EdgeAttributes::Ptr getFreespaceEdgeInfo(const GvdLayer& gvd,
+                                                    const PlaceAttributes& node,
+                                                    const GlobalIndex& node_index,
+                                                    const PlaceAttributes& other,
+                                                    const GlobalIndex& other_index,
+                                                    double min_edge_clearance_m,
+                                                    bool optimistic);
 
 }  // namespace hydra::places

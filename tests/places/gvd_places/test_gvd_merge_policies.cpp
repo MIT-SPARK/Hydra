@@ -32,35 +32,50 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#pragma once
-#include <memory>
-
-#include "hydra/places/gvd_voxel.h"
+#include <gtest/gtest.h>
+#include <hydra/places/gvd_places/gvd_graph.h>
+#include <hydra/places/gvd_places/gvd_merge_policies.h>
 
 namespace hydra::places {
 
-// forward declare to avoid header
-struct VoronoiCheckConfig;
+TEST(GvdMergePolicies, BasisPolicyCorrect) {
+  GvdMemberInfo info1;
+  info1.num_basis_points = 1;
+  info1.distance = 0.3;
+  GvdMemberInfo info2;
+  info2.num_basis_points = 3;
+  info2.distance = 0.1;
+  GvdMemberInfo info3;
+  info3.num_basis_points = 3;
+  info3.distance = 0.3;
 
-struct GvdVertexInfo {
-  Point pos;
-  size_t ref_count = 0;
-};
+  BasisPointMergePolicy basis_policy;
+  EXPECT_EQ(basis_policy.compare(info1, info2), -1);
+  EXPECT_EQ(basis_policy.compare(info1, info3), -1);
+  EXPECT_EQ(basis_policy.compare(info2, info3), 0);
+  EXPECT_EQ(basis_policy.compare(info2, info1), 1);
+  EXPECT_EQ(basis_policy.compare(info3, info1), 1);
+  EXPECT_EQ(basis_policy.compare(info3, info2), 0);
+}
 
-struct GvdParentTracker {
-  uint8_t updateGvdParentMap(const GvdLayer& layer,
-                             const VoronoiCheckConfig& config,
-                             const GlobalIndex& voxel_index,
-                             const GvdVoxel& neighbor);
+TEST(GvdMergePolicies, DistancePolicyCorrect) {
+  GvdMemberInfo info1;
+  info1.num_basis_points = 1;
+  info1.distance = 0.3;
+  GvdMemberInfo info2;
+  info2.num_basis_points = 3;
+  info2.distance = 0.1;
+  GvdMemberInfo info3;
+  info3.num_basis_points = 3;
+  info3.distance = 0.3;
 
-  void markNewGvdParent(const GvdLayer& layer, const GlobalIndex& parent);
-
-  void removeVoronoiFromGvdParentMap(const GlobalIndex& voxel_index);
-
-  void updateVertexMapping(const GvdLayer& layer);
-
-  GlobalIndexMap<GlobalIndexSet> parents;
-  GlobalIndexMap<GvdVertexInfo> parent_vertices;
-};
+  DistanceMergePolicy distance_policy;
+  EXPECT_EQ(distance_policy.compare(info1, info2), 1);
+  EXPECT_EQ(distance_policy.compare(info1, info3), 0);
+  EXPECT_EQ(distance_policy.compare(info2, info3), -1);
+  EXPECT_EQ(distance_policy.compare(info2, info1), -1);
+  EXPECT_EQ(distance_policy.compare(info3, info1), 0);
+  EXPECT_EQ(distance_policy.compare(info3, info2), 1);
+}
 
 }  // namespace hydra::places

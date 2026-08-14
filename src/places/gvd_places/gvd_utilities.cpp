@@ -32,11 +32,26 @@
  * Government is authorized to reproduce and distribute reprints for Government
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
-#include "hydra/places/gvd_utilities.h"
+#include "hydra/places/gvd_places/gvd_utilities.h"
 
+#include <config_utilities/config.h>
+#include <config_utilities/types/enum.h>
 #include <glog/logging.h>
 
 namespace hydra::places {
+
+void declare_config(VoronoiCheckConfig& config) {
+  using namespace config;
+  name("VoronoiCheckConfig");
+  enum_field(config.mode,
+             "mode",
+             {{VoronoiCheckConfig::Mode::ANGLE, "ANGLE"},
+              {VoronoiCheckConfig::Mode::L1_DISTANCE, "L1_DISTANCE"},
+              {VoronoiCheckConfig::Mode::L1_THEN_ANGLE, "L1_THEN_ANGLE"}});
+  field(config.min_distance_m, "min_distance_m");
+  field(config.parent_l1_separation, "parent_l1_separation");
+  field(config.parent_cos_angle_separation, "parent_cos_angle_separation");
+}
 
 DistancePotential getLowerDistance(float v_dist,
                                    float n_dist,
@@ -120,11 +135,11 @@ bool isParentUnique(const VoronoiCheckConfig& config,
                     const GlobalIndex& current_parent,
                     const GlobalIndex& neighbor_parent) {
   switch (config.mode) {
-    case ParentUniquenessMode::ANGLE:
+    case VoronoiCheckConfig::Mode::ANGLE:
       return isParentUniqueAngle(config, current_idx, current_parent, neighbor_parent);
-    case ParentUniquenessMode::L1_DISTANCE:
+    case VoronoiCheckConfig::Mode::L1_DISTANCE:
       return isParentUniqueL1(config, current_idx, current_parent, neighbor_parent);
-    case ParentUniquenessMode::L1_THEN_ANGLE:
+    case VoronoiCheckConfig::Mode::L1_THEN_ANGLE:
     default:
       return isParentUniqueL1(config, current_idx, current_parent, neighbor_parent) ||
              isParentUniqueAngle(config, current_idx, current_parent, neighbor_parent);

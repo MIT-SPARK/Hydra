@@ -33,11 +33,23 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "hydra/places/gvd_integrator_config.h"
-#include "hydra/places/gvd_voxel.h"
+#include "hydra/places/gvd_places/gvd_voxel.h"
 #include "hydra/reconstruction/voxel_types.h"
 
 namespace hydra::places {
+
+struct VoronoiCheckConfig {
+  enum class Mode {
+    ANGLE,
+    L1_DISTANCE,
+    L1_THEN_ANGLE,
+  } mode = Mode::L1_THEN_ANGLE;
+  double min_distance_m = 0.2;
+  double parent_l1_separation = 3.0;
+  double parent_cos_angle_separation = 0.5;
+};
+
+void declare_config(VoronoiCheckConfig& config);
 
 struct DistancePotential {
   bool is_lower;
