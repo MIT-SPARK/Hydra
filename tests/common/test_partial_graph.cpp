@@ -78,7 +78,7 @@ TEST(PartialGraph, RemoveNodeCorrect) {
   EXPECT_TRUE(graph.deleted_nodes().empty());
   EXPECT_TRUE(graph.deleted_edges().empty());
 
-  graph.remove(6);
+  graph.remove(6, true);
   std::set<spark_dsg::NodeId> deleted_nodes{6};
   std::set<spark_dsg::EdgeKey> deleted_edges{{5, 6}, {6, 7}};
   EXPECT_EQ(graph.deleted_nodes(), deleted_nodes);
@@ -107,7 +107,7 @@ TEST(PartialGraph, RemoveEdgeCorrect) {
   EXPECT_TRUE(graph.deleted_nodes().empty());
   EXPECT_TRUE(graph.deleted_edges().empty());
 
-  graph.remove(6, 7);
+  graph.remove(6, 7, true);
   std::set<spark_dsg::EdgeKey> deleted_edges{{6, 7}};
   EXPECT_TRUE(graph.deleted_nodes().empty());
   EXPECT_EQ(graph.deleted_edges(), deleted_edges);
@@ -131,7 +131,7 @@ TEST(PartialGraph, PruneGraphTrivial) {
   graph.add(5, 6);
   graph.add(6, 7);
   graph.add(7, 8);
-  graph.remove(7, 8);
+  graph.remove(7, 8, true);
 
   std::set<spark_dsg::EdgeKey> deleted_edges{{7, 8}};
   EXPECT_EQ(graph.deleted_edges(), deleted_edges);

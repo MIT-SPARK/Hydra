@@ -60,9 +60,8 @@ frontend:
         parent_cos_angle_separation: 0.2
     graph:
       compression_distance_m: 1.5
-      min_node_distance_m: 0.4
-      min_edge_distance_m: 0.25
-      merge_nearby_nodes: false
+      min_node_distance_m: 0.3
+      merge_nearby_nodes: true
       merge_policy: distance
       node_merge_distance_m: 0.7
       overlap_edges: {enable: false}

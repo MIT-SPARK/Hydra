@@ -175,6 +175,20 @@ void GraphExtractor::extract(uint64_t timestamp_ns,
 }
 
 std::vector<uint64_t> GraphExtractor::prune() {
+  // update archived flags for all nodes after archive pass
+  for (const auto& [node_id, node] : gvd_.compressed()) {
+    if (!node.archived()) {
+      continue;
+    }
+
+    auto attrs = graph_.find(node_id);
+    if (!attrs) {
+      continue;
+    }
+
+    attrs->is_active = false;
+  }
+
   const auto archived = gvd_.clearArchived();
   MLOG(2) << "Cleared archived nodes [" << archived << "]";
 
@@ -304,17 +318,12 @@ void GraphExtractor::mergeNearbyNodes() {
   std::unordered_map<uint64_t, uint64_t> merges;
   std::unordered_map<uint64_t, std::unordered_set<uint64_t>> reversed_merges;
   for (const auto& [node_id, node] : gvd_.compressed()) {
-    if (merges.count(node_id) || node.archived()) {
-      continue;  // skip already merged or archived nodes
+    if (merges.count(node_id)) {
+      continue;  // skip already merged nodes
     }
 
     const auto node_info = node_attribute_map_.at(node_id);
     for (const auto sibling_id : node.siblings) {
-      const auto& sibling = gvd_.compressed().at(sibling_id);
-      if (sibling.archived()) {
-        continue;
-      }
-
       const auto sibling_info = node_attribute_map_.at(sibling_id);
       const auto dist = (node_info->position - sibling_info->position).norm();
       if (dist > config.node_merge_distance_m) {

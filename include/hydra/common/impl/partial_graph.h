@@ -73,51 +73,63 @@ auto PartialGraph<AttrT>::add(NodeId source, NodeId target, EdgeAttrPtr&& attrs)
 }
 
 template <typename AttrT>
-void PartialGraph<AttrT>::remove(NodeId node_id) {
-  erase(nodes_.find(node_id));
+void PartialGraph<AttrT>::remove(NodeId node_id, bool ignore_archive) {
+  erase(nodes_.find(node_id), ignore_archive);
 }
 
 template <typename AttrT>
-void PartialGraph<AttrT>::remove(NodeId source, NodeId target) {
-  erase(edges_.find({source, target}));
+void PartialGraph<AttrT>::remove(NodeId source, NodeId target, bool ignore_archive) {
+  erase(edges_.find({source, target}), ignore_archive);
 }
 
 template <typename AttrT>
-auto PartialGraph<AttrT>::erase(const typename Nodes::iterator& iter) ->
-    typename Nodes::iterator {
+auto PartialGraph<AttrT>::erase(const typename Nodes::iterator& iter,
+                                bool ignore_archive) -> typename Nodes::iterator {
   if (iter == nodes_.end()) {
     return iter;
   }
 
+  const auto active = iter->second.attributes().is_active;
   for (const auto& neighbor : iter->second.neighbors) {
     const spark_dsg::EdgeKey key{iter->first, neighbor};
     edges_.erase(key);
     nodes_.at(neighbor).neighbors.erase(iter->first);
-    deleted_edges_.insert(key);
+    if (active || ignore_archive) {
+      deleted_edges_.insert(key);
+    }
   }
 
-  deleted_nodes_.insert(iter->first);
+  if (active || ignore_archive) {
+    deleted_nodes_.insert(iter->first);
+  }
+
   return nodes_.erase(iter);
 }
 
 template <typename AttrT>
-auto PartialGraph<AttrT>::erase(const typename Edges::iterator& iter) ->
-    typename Edges::iterator {
+auto PartialGraph<AttrT>::erase(const typename Edges::iterator& iter,
+                                bool ignore_archive) -> typename Edges::iterator {
   if (iter == edges_.end()) {
     return iter;
   }
 
   const auto [source, target] = iter->first;
-  deleted_edges_.insert(iter->first);
 
+  bool active = false;
   auto source_node = nodes_.find(source);
   if (source_node != nodes_.end()) {
     source_node->second.neighbors.erase(target);
+    active |= source_node->second.attributes().is_active;
   }
 
   auto target_node = nodes_.find(target);
   if (target_node != nodes_.end()) {
     target_node->second.neighbors.erase(source);
+    active |= target_node->second.attributes().is_active;
+  }
+
+  if (active || ignore_archive) {
+    deleted_edges_.insert(iter->first);
   }
 
   return edges_.erase(iter);

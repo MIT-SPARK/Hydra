@@ -71,11 +71,13 @@ class PartialGraph {
   NodeAttr& add(NodeId node_id, NodeAttrPtr&& attributes = nullptr);
   EdgeAttr& add(NodeId source, NodeId target, EdgeAttrPtr&& attributes = nullptr);
 
-  void remove(NodeId node_id);
-  void remove(NodeId source, NodeId target);
+  void remove(NodeId node_id, bool ignore_archive = false);
+  void remove(NodeId source, NodeId target, bool ignore_archive = false);
 
-  typename Nodes::iterator erase(const typename Nodes::iterator& iter);
-  typename Edges::iterator erase(const typename Edges::iterator& iter);
+  typename Nodes::iterator erase(const typename Nodes::iterator& iter,
+                                 bool ignore_archive = false);
+  typename Edges::iterator erase(const typename Edges::iterator& iter,
+                                 bool ignore_archive = false);
 
   bool has(NodeId node) const;
   bool has(NodeId source, NodeId target) const;
