@@ -102,7 +102,9 @@ class GraphExtractor {
                       const GvdParentTracker& parents,
                       const VoxelIndexChanges& changes);
 
-  void updatePartialGraph(const GvdLayer& layer);
+  void updateCompressedNodes();
+
+  void updateCompressedEdges(const GvdLayer& layer);
 
   void mergeNearbyNodes();
 

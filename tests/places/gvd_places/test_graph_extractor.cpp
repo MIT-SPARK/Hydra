@@ -58,12 +58,11 @@ class TestGraphExtractor : public GraphExtractor {
 
   ~TestGraphExtractor() = default;
 
-  using GraphExtractor::updatePartialGraph;
-
   void update(const GlobalIndexSet& removed = {}) {
     VoxelIndexChanges changes{{}, removed};
     updateGvdGraph(0, gvd_layer, tracker, changes);  // this propagates gvd changes
-    updatePartialGraph(gvd_layer);                   // this builds the graph
+    updateCompressedNodes();
+    updateCompressedEdges(gvd_layer);
   }
 
   void addNode(uint64_t x, uint64_t y, uint64_t z, double distance, uint8_t basis) {

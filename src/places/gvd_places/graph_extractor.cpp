@@ -49,12 +49,23 @@
 
 namespace hydra::places {
 
+using spark_dsg::EdgeAttributes;
 using spark_dsg::EdgeKey;
 using spark_dsg::NodeId;
 using spark_dsg::PlaceNodeAttributes;
 using timing::ScopedTimer;
 
 namespace {
+
+template <typename T>
+T optional_min(const std::optional<T>& opt, T value) {
+  return opt ? std::min(*opt, value) : value;
+}
+
+template <typename T>
+T optional_max(const std::optional<T>& opt, T value) {
+  return opt ? std::max(*opt, value) : value;
+}
 
 std::optional<NodeId> getBestNode(const GraphExtractor::LocalGraph& graph,
                                   NodeId source,
@@ -150,7 +161,8 @@ void GraphExtractor::extract(uint64_t timestamp_ns,
   updateGvdGraph(timestamp_ns, layer, tracker, changes);
 
   // Copy all the updates from the compressed GVD graph to the partial update
-  updatePartialGraph(layer);
+  updateCompressedNodes();
+  updateCompressedEdges(layer);
 
   // Optionally merge nearby nodes
   if (config.merge_nearby_nodes) {
@@ -203,19 +215,10 @@ void GraphExtractor::updateGvdGraph(uint64_t timestamp_ns,
   }
 }
 
-void GraphExtractor::updatePartialGraph(const GvdLayer& layer) {
+void GraphExtractor::updateCompressedNodes() {
   std::set<NodeId> stale_nodes;
   for (const auto& [node_id, node] : graph_.nodes()) {
     stale_nodes.insert(node_id);
-  }
-
-  std::set<EdgeKey> stale_edges;
-  for (const auto& [key, _] : graph_.edges()) {
-    if (overlap_edges_.count(key) || freespace_edges_.count(key)) {
-      continue;
-    }
-
-    stale_edges.insert(key);
   }
 
   const auto& compressed = gvd_.compressed();
@@ -232,13 +235,33 @@ void GraphExtractor::updatePartialGraph(const GvdLayer& layer) {
     node_attribute_map_[node_id] = result;
   }
 
+  for (const auto& node_id : stale_nodes) {
+    graph_.remove(node_id);
+    node_index_map_.erase(node_id);
+    node_attribute_map_.erase(node_id);
+  }
+}
+
+void GraphExtractor::updateCompressedEdges(const GvdLayer& layer) {
+  std::set<EdgeKey> stale_edges;
+  for (const auto& [key, _] : graph_.edges()) {
+    if (overlap_edges_.count(key) || freespace_edges_.count(key)) {
+      continue;
+    }
+
+    stale_edges.insert(key);
+  }
+
+  const auto& compressed = gvd_.compressed();
   for (const auto& [node_id, node] : compressed) {
     const auto node_attrs = graph_.find(node_id);
     if (!node_attrs) {
+      // TODO(nathan) technically we should be able to use at
       LOG(ERROR) << "Node " << node_id << " not in graph!";
       continue;
     }
 
+    const auto& node_voxel = node_index_map_.at(node_id);
     for (const auto sibling_id : node.siblings) {
       const auto sibling_attrs = graph_.find(sibling_id);
       if (!sibling_attrs) {
@@ -246,20 +269,23 @@ void GraphExtractor::updatePartialGraph(const GvdLayer& layer) {
         continue;  // skip any unadded nodes
       }
 
-      const auto permissive = !node_attrs->is_active || !sibling_attrs->is_active;
-      auto edge_attrs = getFreespaceEdgeInfo(layer,
-                                             *node_attrs,
-                                             node_index_map_.at(node_id),
-                                             *sibling_attrs,
-                                             node_index_map_.at(sibling_id),
-                                             config.min_node_distance_m,
-                                             permissive);
-      if (!edge_attrs) {
-        graph_.remove(node_id, sibling_id);
-        continue;
+      // look up min voxel distance in straight line between centroids (if valid)
+      const auto& sibling_voxel = node_index_map_.at(sibling_id);
+      auto min_dist = getMinFreespaceClearance(layer, node_voxel, sibling_voxel);
+
+      // if one or both of the nodes are archived, we try and respect the previous
+      // minimum clearance in the archived block
+      const auto archived = !node_attrs->is_active || !sibling_attrs->is_active;
+      const auto prev = graph_.find(node_id, sibling_id);
+      if (archived && prev) {
+        min_dist = optional_min(min_dist, prev->weight);
       }
 
-      graph_.add(node_id, sibling_id, std::move(edge_attrs));
+      // by definition, two nodes that share an edge are connected by a path of
+      // voxels at least `min_node_distance_m` away from an obstacle even if the
+      // straightline path has less clearance
+      const auto dist = optional_max(min_dist, config.min_node_distance_m);
+      graph_.add(node_id, sibling_id, std::make_unique<EdgeAttributes>(dist));
 
       // override heuristic edges with actual graph edges
       const EdgeKey key(node_id, sibling_id);
@@ -267,12 +293,6 @@ void GraphExtractor::updatePartialGraph(const GvdLayer& layer) {
       overlap_edges_.erase(key);
       freespace_edges_.erase(key);
     }
-  }
-
-  for (const auto& node_id : stale_nodes) {
-    graph_.remove(node_id);
-    node_index_map_.erase(node_id);
-    node_attribute_map_.erase(node_id);
   }
 
   for (const auto& key : stale_edges) {

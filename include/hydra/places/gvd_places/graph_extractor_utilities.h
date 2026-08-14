@@ -50,6 +50,10 @@ spark_dsg::EdgeAttributes::Ptr getOverlapEdgeInfo(const PlaceAttributes& node,
                                                   const PlaceAttributes& neighbor,
                                                   double min_edge_clearance_m);
 
+std::optional<double> getMinFreespaceClearance(const GvdLayer& gvd,
+                                               const GlobalIndex& node_index,
+                                               const GlobalIndex& other_index);
+
 spark_dsg::EdgeAttributes::Ptr getFreespaceEdgeInfo(const GvdLayer& gvd,
                                                     const PlaceAttributes& node,
                                                     const GlobalIndex& node_index,

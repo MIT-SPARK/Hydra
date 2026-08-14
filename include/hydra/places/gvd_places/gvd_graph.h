@@ -105,8 +105,6 @@ class GvdGraph {
   const GvdMemberInfo* getCompressed(uint64_t compressed_id,
                                      const MergePolicy& policy) const;
 
-  double maxClearance(uint64_t source, uint64_t target) const;
-
   const Nodes& uncompressed() const;
 
   const CompressedNodes& compressed() const;

@@ -126,6 +126,35 @@ EdgeAttributes::Ptr getOverlapEdgeInfo(const PlaceAttributes& node,
   return std::make_unique<EdgeAttributes>(clearance);
 }
 
+std::optional<double> getMinFreespaceClearance(const GvdLayer& gvd,
+                                               const GlobalIndex& node_index,
+                                               const GlobalIndex& other_index) {
+  const auto path = makeBresenhamLine(node_index, other_index);
+  if (path.empty()) {
+    return std::nullopt;  // indices are the same
+  }
+
+  std::optional<double> min_dist;
+  for (const auto& index : path) {
+    const auto* voxel = gvd.getVoxelPtr(index);
+    if (!voxel) {
+      continue;  // assume that archived voxels remain free
+    }
+
+    if (!voxel->observed) {
+      // shouldn't happen, but possible that straightline path goes through unobserved
+      // space
+      return std::nullopt;
+    }
+
+    if (!min_dist || voxel->distance < *min_dist) {
+      min_dist = voxel->distance;
+    }
+  }
+
+  return min_dist;
+}
+
 spark_dsg::EdgeAttributes::Ptr getFreespaceEdgeInfo(const GvdLayer& gvd,
                                                     const PlaceAttributes& node,
                                                     const GlobalIndex& node_index,
@@ -140,7 +169,7 @@ spark_dsg::EdgeAttributes::Ptr getFreespaceEdgeInfo(const GvdLayer& gvd,
 
   const auto source_dist = node.distance;
   const auto target_dist = other.distance;
-  auto min_weight = std::min(source_dist, target_dist);
+  auto min_dist = std::min(source_dist, target_dist);
   for (const auto& index : path) {
     const auto* voxel = gvd.getVoxelPtr(index);
     if (!voxel) {
@@ -155,12 +184,12 @@ spark_dsg::EdgeAttributes::Ptr getFreespaceEdgeInfo(const GvdLayer& gvd,
       return nullptr;
     }
 
-    if (voxel->distance < min_weight) {
-      min_weight = voxel->distance;
+    if (voxel->distance < min_dist) {
+      min_dist = voxel->distance;
     }
   }
 
-  return std::make_unique<EdgeAttributes>(min_weight);
+  return std::make_unique<EdgeAttributes>(min_dist);
 }
 
 }  // namespace hydra::places
