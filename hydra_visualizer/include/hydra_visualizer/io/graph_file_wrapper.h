@@ -37,7 +37,6 @@
 #include <ianvs/node_handle.h>
 
 #include <filesystem>
-
 #include <rclcpp/service.hpp>
 #include <rclcpp/subscription.hpp>
 #include <std_msgs/msg/string.hpp>

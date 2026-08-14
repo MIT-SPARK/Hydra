@@ -38,11 +38,10 @@
 #include <spark_dsg/bounding_box.h>
 #include <spatial_hash/voxel_layer.h>
 
+#include <Eigen/Geometry>
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <rclcpp/publisher.hpp>
 #include <rclcpp/time.hpp>
-
-#include <Eigen/Geometry>
 
 namespace hydra {
 namespace voxel_traits {

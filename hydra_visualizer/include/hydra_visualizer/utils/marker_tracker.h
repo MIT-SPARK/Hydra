@@ -35,7 +35,6 @@
 #pragma once
 #include <map>
 #include <set>
-
 #include <visualization_msgs/msg/marker_array.hpp>
 
 namespace hydra {

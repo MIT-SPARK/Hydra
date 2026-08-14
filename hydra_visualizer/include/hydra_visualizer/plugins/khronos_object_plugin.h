@@ -79,14 +79,13 @@
 #include <spark_dsg/node_attributes.h>
 #include <tf2_ros/transform_broadcaster.h>
 
+#include <kimera_pgmo_msgs/msg/mesh.hpp>
 #include <memory>
+#include <rclcpp/publisher.hpp>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
-
-#include <kimera_pgmo_msgs/msg/mesh.hpp>
-#include <rclcpp/publisher.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 
 #include "hydra_visualizer/plugins/visualizer_plugin.h"

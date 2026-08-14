@@ -41,11 +41,10 @@
 #include <ianvs/node_handle.h>
 #include <tf2_ros/static_transform_broadcaster.h>
 
+#include <Eigen/Geometry>
 #include <rclcpp/node.hpp>
 #include <rclcpp/publisher.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
-
-#include <Eigen/Geometry>
 
 namespace hydra {
 

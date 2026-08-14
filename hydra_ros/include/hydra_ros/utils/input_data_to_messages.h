@@ -38,7 +38,6 @@
 
 #include <functional>
 #include <limits>
-
 #include <opencv2/core/mat.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>

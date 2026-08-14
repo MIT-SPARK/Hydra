@@ -5,7 +5,6 @@
 #include <ianvs/node_handle.h>
 
 #include <memory>
-
 #include <rclcpp/publisher.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 

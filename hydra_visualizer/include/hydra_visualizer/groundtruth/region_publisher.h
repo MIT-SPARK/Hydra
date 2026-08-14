@@ -33,13 +33,12 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
+#include <Eigen/Dense>
 #include <filesystem>
-
 #include <rclcpp/node.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 
 #include "hydra_visualizer/utils/marker_tracker.h"
-#include <Eigen/Dense>
 
 namespace hydra {
 

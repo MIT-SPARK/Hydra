@@ -35,11 +35,10 @@
 #include <hydra/common/semantic_color_map.h>
 #include <ianvs/spin_functions.h>
 
-#include <filesystem>
-
 #include <CLI/CLI.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 #include <cv_bridge/cv_mat_sensor_msgs_image_type_adapter.hpp>
+#include <filesystem>
 #include <sensor_msgs/msg/image.hpp>
 
 namespace hydra {

@@ -37,10 +37,9 @@
 #include <ianvs/node_handle.h>
 #include <spark_dsg/bounding_box.h>
 
+#include <Eigen/Geometry>
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <rclcpp/publisher.hpp>
-
-#include <Eigen/Geometry>
 
 namespace hydra {
 

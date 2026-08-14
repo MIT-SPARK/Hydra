@@ -37,12 +37,10 @@
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 
-#include <optional>
-#include <string>
-
-#include <rclcpp/time.hpp>
-
 #include <Eigen/Geometry>
+#include <optional>
+#include <rclcpp/time.hpp>
+#include <string>
 
 namespace hydra {
 

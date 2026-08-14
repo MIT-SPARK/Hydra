@@ -36,10 +36,9 @@
 #include <hydra/common/dsg_types.h>
 #include <ianvs/node_handle.h>
 
-#include <optional>
-
 #include <hydra_msgs/msg/dsg_update.hpp>
 #include <kimera_pgmo_msgs/msg/mesh.hpp>
+#include <optional>
 #include <rclcpp/publisher.hpp>
 #include <rclcpp/subscription.hpp>
 #include <rclcpp/time.hpp>

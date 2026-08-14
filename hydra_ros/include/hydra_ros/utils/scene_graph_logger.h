@@ -33,7 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #include <filesystem>
-
 #include <rclcpp/node.hpp>
 
 #include "hydra_ros/utils/dsg_streaming_interface.h"

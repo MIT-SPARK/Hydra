@@ -40,7 +40,6 @@
 #include <ianvs/node_handle.h>
 
 #include <mutex>
-
 #include <visualization_msgs/msg/marker.hpp>
 
 namespace hydra {

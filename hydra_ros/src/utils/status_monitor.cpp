@@ -38,7 +38,6 @@
 #include <config_utilities/validation.h>
 
 #include <chrono>
-
 #include <nlohmann/json.hpp>
 
 namespace hydra {

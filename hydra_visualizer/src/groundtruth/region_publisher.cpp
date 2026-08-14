@@ -43,7 +43,6 @@
 #include <yaml-cpp/yaml.h>
 
 #include <filesystem>
-
 #include <tf2_eigen/tf2_eigen.hpp>
 
 #include "hydra_visualizer/color/colormap_utilities.h"

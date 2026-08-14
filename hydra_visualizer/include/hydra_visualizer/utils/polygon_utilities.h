@@ -37,11 +37,9 @@
 
 #include <spark_dsg/dynamic_scene_graph.h>
 
-#include <optional>
-
-#include <visualization_msgs/msg/marker.hpp>
-
 #include <Eigen/Dense>
+#include <optional>
+#include <visualization_msgs/msg/marker.hpp>
 
 namespace hydra {
 

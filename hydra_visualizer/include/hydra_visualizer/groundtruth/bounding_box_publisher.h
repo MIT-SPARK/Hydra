@@ -36,7 +36,6 @@
 #include <spark_dsg/bounding_box.h>
 
 #include <filesystem>
-
 #include <rclcpp/node.hpp>
 #include <std_msgs/msg/string.hpp>
 

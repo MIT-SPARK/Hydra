@@ -36,10 +36,9 @@
 #include <hydra/frontend/graph_builder.h>
 #include <pose_graph_tools_ros/conversions.h>
 
-#include <map>
-
 #include <kimera_pgmo_msgs/msg/mesh_delta.hpp>
 #include <kimera_pgmo_msgs/srv/mesh_delta_query.hpp>
+#include <map>
 
 #include "hydra_ros/utils/dsg_streaming_interface.h"
 

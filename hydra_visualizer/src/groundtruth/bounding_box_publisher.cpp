@@ -43,7 +43,6 @@
 #include <glog/logging.h>
 
 #include <algorithm>
-
 #include <tf2_eigen/tf2_eigen.hpp>
 
 #include "hydra_visualizer/color/colormap_utilities.h"

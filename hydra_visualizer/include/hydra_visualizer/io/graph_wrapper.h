@@ -36,7 +36,6 @@
 #include <spark_dsg/dynamic_scene_graph.h>
 
 #include <mutex>
-
 #include <rclcpp/time.hpp>
 
 namespace hydra {
